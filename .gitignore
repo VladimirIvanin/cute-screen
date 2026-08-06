@@ -1,0 +1,10 @@
+# Local planning and agent context
+.agents/
+.codex/
+PLAN.md
+docs/STATE.md
+docs/RESEARCH.md
+docs/milestones/
+tools.md
+prototype-html/
+screenshots/
