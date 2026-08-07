@@ -2,7 +2,7 @@
 
 Cute Screen is a local-first screenshot capture and annotation application being built with Tauri 2, Vue 3, and Rust. The repository is currently at **M00 / foundation**: workspace boundaries, deterministic test seams, and CI are available, while capture, editor, renderer, and library product features are intentionally not implemented.
 
-The product contract lives in [`docs/PRODUCT.md`](docs/PRODUCT.md), accepted architecture decisions in [`docs/DECISIONS.md`](docs/DECISIONS.md), and current milestone evidence in [`docs/milestones/M00-foundation.md`](docs/milestones/M00-foundation.md).
+The product contract lives in [`docs/PRODUCT.md`](docs/PRODUCT.md), accepted architecture decisions in [`docs/DECISIONS.md`](docs/DECISIONS.md), and the foundation verification strategy in [`docs/TESTING.md`](docs/TESTING.md) and [CI workflow](.github/workflows/ci.yml).
 
 ## Toolchain
 

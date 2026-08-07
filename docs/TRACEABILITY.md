@@ -4,7 +4,7 @@
 
 Evidence заполняется фактической ссылкой на test ID, CI run, screenshot/log или system smoke record. Placeholder не позволяет получить `verified`.
 
-Foundation harness не создаёт отдельного продуктового требования. Его локальные и CI-доказательства фиксируются в [`M00 evidence`](milestones/M00-foundation.md#evidence); статусы `REQ-*` ниже M00 не меняет.
+Foundation harness не создаёт отдельного продуктового требования. Его локальные и CI-доказательства определены в [стратегии тестирования](TESTING.md) и [CI workflow](../.github/workflows/ci.yml); статусы `REQ-*` ниже M00 не меняет.
 
 | Requirement | Основное автоматическое доказательство | Runtime/platform доказательство     | Статус  |
 | ----------- | -------------------------------------- | ----------------------------------- | ------- |
