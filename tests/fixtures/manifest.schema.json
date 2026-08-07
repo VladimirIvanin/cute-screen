@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cute-screen.local/schemas/fixture-manifest.json",
+  "title": "Cute Screen fixture manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "fixtures"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "fixtures": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/fixture" }
+    }
+  },
+  "$defs": {
+    "fixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "file",
+        "sha256",
+        "dimensions",
+        "format",
+        "expectedDecode",
+        "source",
+        "license",
+        "acquisition"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "file": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "dimensions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["width", "height"],
+          "properties": {
+            "width": { "type": "integer", "minimum": 1 },
+            "height": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "format": { "type": "string", "minLength": 1 },
+        "expectedDecode": { "enum": ["success", "failure"] },
+        "source": { "type": "string", "minLength": 1 },
+        "license": { "type": "string", "minLength": 1 },
+        "acquisition": { "type": "string", "minLength": 1 },
+        "harnessOnly": { "type": "boolean" }
+      }
+    }
+  }
+}

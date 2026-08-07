@@ -1,0 +1,34 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Cute Screen",
+  "version": "0.0.0",
+  "identifier": "io.github.vladimirivanin.cute-screen",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build",
+    "devUrl": "http://127.0.0.1:5173",
+    "frontendDist": "../apps/desktop/dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "security": {
+      "capabilities": ["default"],
+      "csp": "default-src 'self'; img-src 'self' asset: data:; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost"
+    },
+    "windows": [
+      {
+        "label": "main",
+        "title": "Cute Screen",
+        "width": 960,
+        "height": 640,
+        "minWidth": 640,
+        "minHeight": 480,
+        "decorations": true,
+        "resizable": true
+      }
+    ]
+  },
+  "bundle": {
+    "active": false
+  }
+}

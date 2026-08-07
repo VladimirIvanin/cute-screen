@@ -6,16 +6,16 @@
 
 ## Пирамида тестов
 
-| Слой | Инструмент | Что проверяет | Не проверяет |
-|---|---|---|---|
-| Rust unit | `cargo test` | capability mapping, validation, paths, storage transitions | OS permission dialogs и реальный capture |
-| Rust property | `proptest` | geometry, migrations, command invariants | Webview/UI |
-| TS core | Vitest + fast-check | scene, transforms, hit testing, undo/redo, serialization | CanvasKit/WebGL runtime |
-| Vue component | Vitest + Vue Testing Library | semantics, keyboard, states, adapter calls | Tauri window, portals, native clipboard |
-| Renderer golden | headless CanvasKit/Canvas2D | raster output и parity | Реальный системный webview |
-| Browser E2E | WebdriverIO browser mode | полные editor flows с mocked native adapters | OS integration |
-| Tauri E2E | WebdriverIO + `@wdio/tauri-service` | production mount-flow и IPC в WebKitGTK/WebView2/WKWebView | Реальные permission/portal UI в generic CI |
-| System smoke | platform runners/manual harness | capture, hotkeys, portals, permissions, window lifecycle | Детерминированный pixel output |
+| Слой            | Инструмент                          | Что проверяет                                              | Не проверяет                               |
+| --------------- | ----------------------------------- | ---------------------------------------------------------- | ------------------------------------------ |
+| Rust unit       | `cargo test`                        | capability mapping, validation, paths, storage transitions | OS permission dialogs и реальный capture   |
+| Rust property   | `proptest`                          | geometry, migrations, command invariants                   | Webview/UI                                 |
+| TS core         | Vitest + fast-check                 | scene, transforms, hit testing, undo/redo, serialization   | CanvasKit/WebGL runtime                    |
+| Vue component   | Vitest + Vue Testing Library        | semantics, keyboard, states, adapter calls                 | Tauri window, portals, native clipboard    |
+| Renderer golden | headless CanvasKit/Canvas2D         | raster output и parity                                     | Реальный системный webview                 |
+| Browser E2E     | WebdriverIO browser mode            | полные editor flows с mocked native adapters               | OS integration                             |
+| Tauri E2E       | WebdriverIO + `@wdio/tauri-service` | production mount-flow и IPC в WebKitGTK/WebView2/WKWebView | Реальные permission/portal UI в generic CI |
+| System smoke    | platform runners/manual harness     | capture, hotkeys, portals, permissions, window lifecycle   | Детерминированный pixel output             |
 
 Тестовый WebDriver plugin включается только в test/debug bundle и отсутствует в релизной конфигурации.
 

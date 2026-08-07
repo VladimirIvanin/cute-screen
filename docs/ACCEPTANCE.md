@@ -153,17 +153,17 @@
 
 ## Keyboard matrix
 
-| Действие | Default | В text editing | Ожидаемое поведение |
-|---|---|---|---|
-| Select | `V` | вводит символ | Включает Select вне поля ввода |
-| Hand | `H`, hold `Space` | обычный пробел | Временный pan при удержании вне text edit |
-| Crop | `C` | вводит символ | Открывает crop session |
-| Arrow/Shape/Pencil/Marker/Text | `A/S/P/M/T` | ввод | Выбирает tool вне text edit |
-| Delete | `Delete`, `Backspace` | редактирует текст | Удаляет selection вне text edit |
-| Cancel | `Escape` | завершает/отменяет text edit | Закрывает transient UI или очищает selection |
-| Undo/Redo | platform convention | работает в text editor как единая command model | Отменяет последнее обратимое действие |
-| Copy/Paste | platform convention | text semantics | Layer/bitmap/text dispatch |
-| Duplicate | platform convention | не перехватывает ввод | Создаёт offset copy |
-| Guides | configurable hold key | не активирует в text edit | Показывает только пока клавиша удерживается |
+| Действие                       | Default               | В text editing                                  | Ожидаемое поведение                          |
+| ------------------------------ | --------------------- | ----------------------------------------------- | -------------------------------------------- |
+| Select                         | `V`                   | вводит символ                                   | Включает Select вне поля ввода               |
+| Hand                           | `H`, hold `Space`     | обычный пробел                                  | Временный pan при удержании вне text edit    |
+| Crop                           | `C`                   | вводит символ                                   | Открывает crop session                       |
+| Arrow/Shape/Pencil/Marker/Text | `A/S/P/M/T`           | ввод                                            | Выбирает tool вне text edit                  |
+| Delete                         | `Delete`, `Backspace` | редактирует текст                               | Удаляет selection вне text edit              |
+| Cancel                         | `Escape`              | завершает/отменяет text edit                    | Закрывает transient UI или очищает selection |
+| Undo/Redo                      | platform convention   | работает в text editor как единая command model | Отменяет последнее обратимое действие        |
+| Copy/Paste                     | platform convention   | text semantics                                  | Layer/bitmap/text dispatch                   |
+| Duplicate                      | platform convention   | не перехватывает ввод                           | Создаёт offset copy                          |
+| Guides                         | configurable hold key | не активирует в text edit                       | Показывает только пока клавиша удерживается  |
 
 Точные platform key combinations фиксируются перед реализацией shortcuts и отображаются в tooltips/settings.

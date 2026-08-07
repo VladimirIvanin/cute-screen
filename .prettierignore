@@ -1,0 +1,11 @@
+.git
+node_modules
+dist
+target
+src-tauri/gen
+coverage
+artifacts
+pnpm-lock.yaml
+Cargo.lock
+screenshots
+prototype-html

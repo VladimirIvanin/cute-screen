@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Production permissions for the main Cute Screen window.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

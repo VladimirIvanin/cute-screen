@@ -8,3 +8,27 @@ docs/milestones/
 tools.md
 prototype-html/
 screenshots/
+
+# JavaScript
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Rust / Tauri
+target/
+src-tauri/target/
+src-tauri/gen/
+
+# Tests and local state
+artifacts/
+.wdio/
+test-results/
+*.log
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json

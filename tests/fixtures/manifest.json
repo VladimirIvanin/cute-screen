@@ -1,0 +1,18 @@
+{
+  "$schema": "./manifest.schema.json",
+  "schemaVersion": 1,
+  "fixtures": [
+    {
+      "id": "harness-red-1x1",
+      "file": "harness/red-1x1.ppm",
+      "sha256": "c940efc28573af63c6ebbfeb23e69ded35c645b0dca6c4553d62aa1977912614",
+      "dimensions": { "width": 1, "height": 1 },
+      "format": "ppm",
+      "expectedDecode": "success",
+      "source": "Created in-repository for M00 harness validation",
+      "license": "CC0-1.0",
+      "acquisition": "Included in the repository at tests/fixtures/harness/red-1x1.ppm",
+      "harnessOnly": true
+    }
+  ]
+}

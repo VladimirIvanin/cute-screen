@@ -1,0 +1,1 @@
+import '@wdio/tauri-plugin'

@@ -13,13 +13,13 @@ Artifacts считаются тестовыми/неофициальными с�
 
 ## Матрица artifacts
 
-| ОС | Target | Runner | CI artifact |
-|---|---|---|---|
-| Linux | `x86_64-unknown-linux-gnu` | conservative Ubuntu x64 | `.deb`, `.AppImage` |
-| Linux | `aarch64-unknown-linux-gnu` | native Ubuntu ARM64 | `.deb`, `.AppImage` |
-| macOS | `x86_64-apple-darwin` + `aarch64-apple-darwin` | native Apple Silicon | unsigned universal `.dmg` |
-| Windows | `x86_64-pc-windows-msvc` | Windows x64 | unsigned NSIS `.exe` |
-| Windows | `aarch64-pc-windows-msvc` | Windows ARM64 | unsigned NSIS `.exe` |
+| ОС      | Target                                         | Runner                  | CI artifact               |
+| ------- | ---------------------------------------------- | ----------------------- | ------------------------- |
+| Linux   | `x86_64-unknown-linux-gnu`                     | conservative Ubuntu x64 | `.deb`, `.AppImage`       |
+| Linux   | `aarch64-unknown-linux-gnu`                    | native Ubuntu ARM64     | `.deb`, `.AppImage`       |
+| macOS   | `x86_64-apple-darwin` + `aarch64-apple-darwin` | native Apple Silicon    | unsigned universal `.dmg` |
+| Windows | `x86_64-pc-windows-msvc`                       | Windows x64             | unsigned NSIS `.exe`      |
+| Windows | `aarch64-pc-windows-msvc`                      | Windows ARM64           | unsigned NSIS `.exe`      |
 
 Если hosted ARM runner недоступен, workflow использует узко помеченный self-hosted native runner. Cross-compilation может проверить compile, но не заменяет native install/launch smoke.
 

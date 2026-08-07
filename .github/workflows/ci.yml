@@ -1,0 +1,198 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: 22.23.1
+  PNPM_VERSION: 10.33.2
+  RUST_VERSION: 1.97.0
+  CARGO_DENY_VERSION: 0.20.2
+
+jobs:
+  quality-linux:
+    name: Linux quality and runtime smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Install Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Activate pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@${PNPM_VERSION} --activate
+
+      - name: Install Rust
+        run: |
+          rustup toolchain install "${RUST_VERSION}" --profile minimal --component clippy,rustfmt
+          rustup default "${RUST_VERSION}"
+
+      - name: Install Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends build-essential curl file libayatana-appindicator3-dev librsvg2-dev libssl-dev libwebkit2gtk-4.1-dev libxdo-dev webkit2gtk-driver wget xvfb
+
+      - name: Resolve pnpm store
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm and Cargo
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            ${{ steps.pnpm-store.outputs.path }}
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: m00-${{ runner.os }}-${{ runner.arch }}-node-${{ env.NODE_VERSION }}-rust-${{ env.RUST_VERSION }}-${{ hashFiles('pnpm-lock.yaml', 'Cargo.lock') }}
+
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check frontend and documentation
+        run: pnpm check
+
+      - name: Run unit and harness suites
+        run: |
+          pnpm test
+          pnpm test:coverage
+          pnpm test:render
+          pnpm test:perf
+
+      - name: Check Rust
+        run: |
+          cargo fmt --all --check
+          cargo clippy --workspace --all-targets -- -D warnings
+          cargo clippy --workspace --all-targets --features fake-platform,test-harness -- -D warnings
+          cargo test --workspace
+          cargo test --workspace --features fake-platform
+
+      - name: Audit JavaScript dependencies
+        run: |
+          pnpm audit:licenses
+          pnpm audit:security
+
+      - name: Audit Rust dependencies
+        run: |
+          cargo install cargo-deny --version "=${CARGO_DENY_VERSION}" --locked
+          cargo deny check
+
+      - name: Run browser E2E
+        run: pnpm test:e2e:browser
+
+      - name: Run real Tauri E2E
+        run: xvfb-run --auto-servernum pnpm test:e2e:tauri
+
+      - name: Verify production excludes test drivers
+        run: pnpm verify:release-boundary
+
+      - name: Upload failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: m00-linux-failure-${{ github.run_id }}
+          path: |
+            artifacts
+            coverage
+          if-no-files-found: ignore
+          retention-days: 14
+
+  compile:
+    name: Compile ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x64
+            os: ubuntu-24.04
+            tauri_deps: true
+          - name: Linux ARM64
+            os: ubuntu-24.04-arm
+            tauri_deps: true
+          - name: Windows x64
+            os: windows-2025
+            tauri_deps: false
+          - name: Windows ARM64
+            os: windows-11-arm
+            tauri_deps: false
+          - name: macOS ARM64
+            os: macos-15
+            tauri_deps: false
+          - name: macOS Intel
+            os: macos-15-intel
+            tauri_deps: false
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Install Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Activate pnpm
+        shell: bash
+        run: |
+          corepack enable
+          corepack prepare pnpm@${PNPM_VERSION} --activate
+
+      - name: Install Rust
+        shell: bash
+        run: |
+          rustup toolchain install "${RUST_VERSION}" --profile minimal --component clippy,rustfmt
+          rustup default "${RUST_VERSION}"
+
+      - name: Install Linux Tauri dependencies
+        if: matrix.tauri_deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends build-essential curl file libayatana-appindicator3-dev librsvg2-dev libssl-dev libwebkit2gtk-4.1-dev libxdo-dev wget
+
+      - name: Resolve pnpm store
+        id: pnpm-store
+        shell: bash
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm and Cargo
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            ${{ steps.pnpm-store.outputs.path }}
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: m00-compile-${{ matrix.os }}-${{ runner.arch }}-node-${{ env.NODE_VERSION }}-rust-${{ env.RUST_VERSION }}-${{ hashFiles('pnpm-lock.yaml', 'Cargo.lock') }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Compile frontend and Rust workspace
+        run: |
+          pnpm build
+          cargo check --workspace --all-targets
+
+      - name: Upload compile logs on failure
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: m00-compile-${{ matrix.os }}-${{ github.run_id }}
+          path: artifacts
+          if-no-files-found: ignore
+          retention-days: 14

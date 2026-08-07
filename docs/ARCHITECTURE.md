@@ -34,15 +34,15 @@ editor-core ← editor-renderer ← editor-vue ← desktop shell
 
 ```ts
 interface EditorDocument {
-  schemaVersion: number;
-  id: string;
-  source: SourceImageRef;
-  canvas: { width: number; height: number };
-  crop: CropRect | null;
-  layers: LayerNode[];
-  presentation: PresentationSettings;
-  createdAt: string;
-  updatedAt: string;
+  schemaVersion: number
+  id: string
+  source: SourceImageRef
+  canvas: { width: number; height: number }
+  crop: CropRect | null
+  layers: LayerNode[]
+  presentation: PresentationSettings
+  createdAt: string
+  updatedAt: string
 }
 ```
 

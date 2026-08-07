@@ -1,0 +1,35 @@
+[package]
+name = "cute-screen-desktop"
+version.workspace = true
+description = "Cute Screen desktop host"
+authors = ["Cute Screen contributors"]
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "cute_screen_desktop"
+path = "src/lib.rs"
+
+[[bin]]
+name = "cute-screen"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "=2.6.3", features = [] }
+
+[dependencies]
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"
+tauri = { version = "=2.11.5", features = [] }
+tauri-plugin-wdio = { version = "=1.3.0", optional = true }
+tauri-plugin-wdio-webdriver = { version = "=1.3.0", optional = true }
+thiserror = "=2.0.19"
+
+[features]
+default = []
+fake-platform = []
+test-harness = [
+  "dep:tauri-plugin-wdio",
+  "dep:tauri-plugin-wdio-webdriver",
+]

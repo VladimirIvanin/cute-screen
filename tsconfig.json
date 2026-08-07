@@ -1,0 +1,8 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/editor-core" },
+    { "path": "packages/editor-renderer" },
+    { "path": "packages/editor-vue" }
+  ]
+}

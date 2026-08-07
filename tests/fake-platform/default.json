@@ -1,0 +1,22 @@
+{
+  "clock": "2026-01-02T03:04:05Z",
+  "ids": [
+    "00000000-0000-4000-8000-000000000001",
+    "00000000-0000-4000-8000-000000000002"
+  ],
+  "monitors": [
+    {
+      "id": "monitor-primary",
+      "logicalBounds": { "x": 0, "y": 0, "width": 1920, "height": 1080 },
+      "physicalBounds": { "x": 0, "y": 0, "width": 1920, "height": 1080 },
+      "scaleFactor": 1
+    }
+  ],
+  "permissions": {
+    "capture": "granted",
+    "clipboard": "granted",
+    "hotkeys": "granted"
+  },
+  "dialogs": [],
+  "conflicts": []
+}

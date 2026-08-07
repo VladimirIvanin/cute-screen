@@ -1,0 +1,15 @@
+{
+  "app": {
+    "withGlobalTauri": true,
+    "security": {
+      "capabilities": [
+        {
+          "identifier": "test-harness",
+          "description": "Test-only permissions for the embedded WDIO driver.",
+          "windows": ["main"],
+          "permissions": ["core:default", "core:window:default", "wdio:default"]
+        }
+      ]
+    }
+  }
+}

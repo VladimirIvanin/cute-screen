@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cute-screen.local/schemas/fake-platform-scenario.json",
+  "title": "FakePlatformScenario",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "clock",
+    "ids",
+    "monitors",
+    "permissions",
+    "dialogs",
+    "conflicts"
+  ],
+  "properties": {
+    "clock": { "type": "string", "minLength": 1 },
+    "ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "monitors": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/monitor" }
+    },
+    "permissions": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "dialogs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/dialog" }
+    },
+    "conflicts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "bounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "width", "height"],
+      "properties": {
+        "x": { "type": "integer" },
+        "y": { "type": "integer" },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "monitor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "logicalBounds", "physicalBounds", "scaleFactor"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "logicalBounds": { "$ref": "#/$defs/bounds" },
+        "physicalBounds": { "$ref": "#/$defs/bounds" },
+        "scaleFactor": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "dialog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": { "type": "string", "minLength": 1 },
+        "response": { "type": ["string", "null"] }
+      }
+    }
+  }
+}
