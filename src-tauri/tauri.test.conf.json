@@ -9,7 +9,11 @@
           "windows": ["main"],
           "permissions": ["core:default", "core:window:default", "wdio:default"]
         }
-      ]
+      ],
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$APPLOCALDATA/blobs/**", "$APPCACHE/m01-fixtures/**"]
+      }
     }
   }
 }

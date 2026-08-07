@@ -5,21 +5,46 @@ import path from 'node:path'
 
 import Ajv2020 from 'ajv/dist/2020.js'
 
-export interface FixtureEntry {
+interface FixtureBase {
   readonly id: string
+  readonly kind: 'image' | 'monitor-layout'
   readonly file: string
   readonly sha256: string
-  readonly dimensions: Readonly<{ width: number; height: number }>
-  readonly format: string
-  readonly expectedDecode: 'success' | 'failure'
   readonly source: string
   readonly license: string
   readonly acquisition: string
+  readonly generator?: Readonly<{ command: string; version: number }>
   readonly harnessOnly?: boolean
 }
 
+export interface ImageFixtureEntry extends FixtureBase {
+  readonly kind: 'image'
+  readonly dimensions: Readonly<{ width: number; height: number }>
+  readonly format: string
+  readonly expectedDecode: 'success' | 'failure'
+  readonly pixelProbes: readonly Readonly<{
+    x: number
+    y: number
+    rgba: readonly [number, number, number, number]
+    tolerance: number
+  }>[]
+  readonly nodeCount?: number
+  readonly metadata: Readonly<{
+    alpha: boolean
+    icc: boolean
+    exifOrientation: number
+  }>
+}
+
+export interface MonitorFixtureEntry extends FixtureBase {
+  readonly kind: 'monitor-layout'
+  readonly expectedValidation: 'success'
+}
+
+export type FixtureEntry = ImageFixtureEntry | MonitorFixtureEntry
+
 export interface FixtureManifest {
-  readonly schemaVersion: 1
+  readonly schemaVersion: 2
   readonly fixtures: readonly FixtureEntry[]
 }
 

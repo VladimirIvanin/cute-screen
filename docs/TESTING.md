@@ -34,6 +34,11 @@ pnpm test:perf
 cargo test --workspace
 cargo test --workspace --features fake-platform
 cargo clippy --workspace --all-targets -- -D warnings
+pnpm smoke:m01:x11
+pnpm smoke:m01:portal:probe
+pnpm smoke:m01:portal:screenshot
+pnpm smoke:m01:portal:shortcuts
+pnpm smoke:m01:portal:invalid-uri
 ```
 
 Каждая команда возвращает ненулевой exit code при провале и не изменяет tracked files.
@@ -146,6 +151,8 @@ Goldens создаются для каждого LayerNode:
 
 Обновление goldens выполняется отдельной явной командой и требует visual review. Обычный test command не перезаписывает snapshots.
 
+Для M01 явная команда обновления — `pnpm test:render:update`; `pnpm test:render` только читает committed PNG.
+
 ## Vue и визуальные состояния
 
 Компонентные тесты проверяют:
@@ -210,6 +217,10 @@ Tauri tests выполняются последовательно там, где
 - Memory после 20 циклов open/close возвращается в установленный budget без монотонного роста.
 
 Trend benchmark запускается в PR, hard gate — на стабильном выделенном runner.
+
+M01 `pnpm test:perf` выполняет 30 warmups и 120 измеряемых полных software-CanvasKit redraws для 4K/500 и 8K/1000 и пишет `artifacts/perf/m01-renderer.json` с runner identity и fixture SHA. Бюджеты становятся blocking только при `CUTE_SCREEN_REFERENCE_RUNNER=1`; любое ненулевое число idle frames остаётся hard failure везде.
+
+Linux system smoke пишет JSON в `artifacts/m01/`: commit SHA, OS/arch/session, portal и WebKitGTK versions, monitor layout, correlation ID и observable result. `portal-screenshot` и `portal-shortcuts` интерактивны; cancel записывается как ожидаемый outcome без error-log. Эти локальные файлы становятся milestone evidence только после загрузки в CI/system-run artifact с устойчивой ссылкой.
 
 ## Диагностика и incidents
 

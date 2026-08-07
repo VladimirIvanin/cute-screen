@@ -2,17 +2,17 @@
 
 ## Поддерживаемые цели
 
-| Платформа       | Архитектура    | Захват                               | Горячие клавиши                        | Неофициальный CI artifact |
-| --------------- | -------------- | ------------------------------------ | -------------------------------------- | ------------------------- |
-| Linux X11       | x86_64         | Native backend + собственный overlay | Tauri/global-hotkey                    | deb, AppImage             |
-| Linux X11       | aarch64        | Native backend + собственный overlay | Tauri/global-hotkey                    | deb, AppImage             |
-| GNOME Wayland   | x86_64/aarch64 | XDG Screenshot portal                | XDG GlobalShortcuts или CLI fallback   | deb, AppImage             |
-| KDE Wayland     | x86_64/aarch64 | XDG Screenshot portal                | XDG GlobalShortcuts или CLI fallback   | deb, AppImage             |
-| wlroots Wayland | x86_64/aarch64 | Portal при наличии                   | Portal при наличии, иначе CLI fallback | deb, AppImage             |
-| Windows         | x86_64         | Native/xcap adapter + overlay        | Tauri/global-hotkey                    | NSIS exe                  |
-| Windows 11      | ARM64          | Native/xcap adapter + overlay        | Tauri/global-hotkey                    | NSIS exe                  |
-| macOS           | Intel          | Screen capture adapter + overlay     | Tauri/global-hotkey                    | universal DMG             |
-| macOS           | Apple Silicon  | Screen capture adapter + overlay     | Tauri/global-hotkey                    | universal DMG             |
+| Платформа       | Архитектура    | Захват                                | Горячие клавиши                        | Неофициальный CI artifact |
+| --------------- | -------------- | ------------------------------------- | -------------------------------------- | ------------------------- |
+| Linux X11       | x86_64         | `x11rb` adapter + собственный overlay | Tauri/global-hotkey                    | deb, AppImage             |
+| Linux X11       | aarch64        | `x11rb` adapter + собственный overlay | Tauri/global-hotkey                    | deb, AppImage             |
+| GNOME Wayland   | x86_64/aarch64 | XDG Screenshot portal                 | XDG GlobalShortcuts или CLI fallback   | deb, AppImage             |
+| KDE Wayland     | x86_64/aarch64 | XDG Screenshot portal                 | XDG GlobalShortcuts или CLI fallback   | deb, AppImage             |
+| wlroots Wayland | x86_64/aarch64 | Portal при наличии                    | Portal при наличии, иначе CLI fallback | deb, AppImage             |
+| Windows         | x86_64         | Native adapter (M04) + overlay        | Tauri/global-hotkey                    | NSIS exe                  |
+| Windows 11      | ARM64          | Native adapter (M04) + overlay        | Tauri/global-hotkey                    | NSIS exe                  |
+| macOS           | Intel          | Screen capture adapter + overlay      | Tauri/global-hotkey                    | universal DMG             |
+| macOS           | Apple Silicon  | Screen capture adapter + overlay      | Tauri/global-hotkey                    | universal DMG             |
 
 Точные минимальные версии ОС фиксируются после runtime-проверки capture API и webview. Release baseline не повышается без ADR и CI-доказательства.
 
@@ -90,3 +90,16 @@ UI получает `CaptureCapabilities` и не показывает непо�
 - ссылку на log/screenshot/test run.
 
 Статус `supported` разрешён только после реального smoke, а не после успешной компиляции.
+
+## M01 capability baseline
+
+- `xcap` 0.9.7 отклонён из-за security advisories в dependency graph; решение и отдельный `x11rb` 0.14.0 boundary зафиксированы в ADR-019.
+- Локальный Ubuntu/GNOME X11 controlled-window smoke подтвердил monitor enumeration, physical millimetres, coordinates, 96×64 RGBA capture и SHA-256. До появления устойчивой CI artifact URL это локальная диагностика, не статус `supported`.
+- Локальный X11 portal probe увидел Screenshot v2 без `AvailableTargets` и без GlobalShortcuts. Это не evidence для GNOME/KDE Wayland; обе строки остаются `pending`.
+- WebKitGTK 2.52.3 подтвердил scoped asset decode и binary IPC fallback, но CanvasKit/WebGL startup в этом runtime перешёл на Canvas2D. WebView2 и WKWebView runtime evidence отсутствует.
+
+## CLI fallback contract (M04 dispatch pending)
+
+- Установленный deb: `cute-screen capture --mode area`.
+- AppImage: shell-quoted абсолютный путь из `current_exe`, затем те же аргументы `capture --mode area`; перемещение AppImage требует заново сформировать строку.
+- M01 только фиксирует строку и capability state. Single-instance dispatch и выполнение capture реализуются в M04; отсутствие portal нельзя объявлять success.

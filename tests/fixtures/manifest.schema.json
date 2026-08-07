@@ -7,29 +7,78 @@
   "required": ["schemaVersion", "fixtures"],
   "properties": {
     "$schema": { "type": "string" },
-    "schemaVersion": { "const": 1 },
+    "schemaVersion": { "const": 2 },
     "fixtures": {
       "type": "array",
       "items": { "$ref": "#/$defs/fixture" }
     }
   },
   "$defs": {
+    "generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "version"],
+      "properties": {
+        "command": { "type": "string", "minLength": 1 },
+        "version": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "pixelProbe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "rgba", "tolerance"],
+      "properties": {
+        "x": { "type": "integer", "minimum": 0 },
+        "y": { "type": "integer", "minimum": 0 },
+        "rgba": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": { "type": "integer", "minimum": 0, "maximum": 255 }
+        },
+        "tolerance": { "type": "integer", "minimum": 0, "maximum": 255 }
+      }
+    },
     "fixture": {
+      "oneOf": [
+        { "$ref": "#/$defs/imageFixture" },
+        { "$ref": "#/$defs/monitorFixture" }
+      ]
+    },
+    "baseProperties": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["image", "monitor-layout"] },
+        "file": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "source": { "type": "string", "minLength": 1 },
+        "license": { "type": "string", "minLength": 1 },
+        "acquisition": { "type": "string", "minLength": 1 },
+        "generator": { "$ref": "#/$defs/generator" },
+        "harnessOnly": { "type": "boolean" }
+      }
+    },
+    "imageFixture": {
       "type": "object",
       "additionalProperties": false,
       "required": [
         "id",
+        "kind",
         "file",
         "sha256",
         "dimensions",
         "format",
         "expectedDecode",
+        "pixelProbes",
+        "metadata",
         "source",
         "license",
         "acquisition"
       ],
       "properties": {
         "id": { "type": "string", "minLength": 1 },
+        "kind": { "const": "image" },
         "file": { "type": "string", "minLength": 1 },
         "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
         "dimensions": {
@@ -43,10 +92,52 @@
         },
         "format": { "type": "string", "minLength": 1 },
         "expectedDecode": { "enum": ["success", "failure"] },
+        "pixelProbes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/pixelProbe" }
+        },
+        "nodeCount": { "type": "integer", "minimum": 1 },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["alpha", "icc", "exifOrientation"],
+          "properties": {
+            "alpha": { "type": "boolean" },
+            "icc": { "type": "boolean" },
+            "exifOrientation": { "type": "integer", "minimum": 1, "maximum": 8 }
+          }
+        },
         "source": { "type": "string", "minLength": 1 },
         "license": { "type": "string", "minLength": 1 },
         "acquisition": { "type": "string", "minLength": 1 },
+        "generator": { "$ref": "#/$defs/generator" },
         "harnessOnly": { "type": "boolean" }
+      }
+    },
+    "monitorFixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "file",
+        "sha256",
+        "expectedValidation",
+        "source",
+        "license",
+        "acquisition",
+        "generator"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "const": "monitor-layout" },
+        "file": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "expectedValidation": { "const": "success" },
+        "source": { "type": "string", "minLength": 1 },
+        "license": { "type": "string", "minLength": 1 },
+        "acquisition": { "type": "string", "minLength": 1 },
+        "generator": { "$ref": "#/$defs/generator" }
       }
     }
   }

@@ -5,7 +5,12 @@ import App from '../../../apps/desktop/src/App.vue'
 import type { DesktopBridge } from '../../../apps/desktop/src/desktop-bridge'
 
 function bridgeWithPing(ping: DesktopBridge['ping']): DesktopBridge {
-  return { ping }
+  return {
+    ping,
+    stageImage: vi.fn(),
+    readImageBytes: vi.fn(),
+    platformCapabilities: vi.fn(),
+  }
 }
 
 describe('foundation screen', () => {

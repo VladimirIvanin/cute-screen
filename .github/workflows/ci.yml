@@ -79,8 +79,12 @@ jobs:
           cargo fmt --all --check
           cargo clippy --workspace --all-targets -- -D warnings
           cargo clippy --workspace --all-targets --features fake-platform,test-harness -- -D warnings
+          cargo clippy --workspace --all-targets --features x11-capture -- -D warnings
           cargo test --workspace
           cargo test --workspace --features fake-platform
+
+      - name: Run controlled X11 renderer boundary smoke
+        run: xvfb-run --auto-servernum env XDG_SESSION_TYPE=x11 pnpm smoke:m01:x11
 
       - name: Audit JavaScript dependencies
         run: |
@@ -100,6 +104,17 @@ jobs:
 
       - name: Verify production excludes test drivers
         run: pnpm verify:release-boundary
+
+      - name: Upload M01 trend and smoke evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: m01-linux-evidence-${{ github.run_id }}
+          path: |
+            artifacts/perf/m01-renderer.json
+            artifacts/m01/x11-controlled.json
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Upload failure artifacts
         if: failure()

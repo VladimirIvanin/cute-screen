@@ -3,6 +3,13 @@ export interface PixelDifference {
   readonly maximumDelta: number
 }
 
+export const semanticParityTolerance = {
+  // Skia and Cairo use different edge antialiasing kernels. Interior pixels
+  // must agree; up to six percent of channels may differ at vector edges.
+  maximumChangedChannelRatio: 0.06,
+  maximumDelta: 255,
+} as const
+
 export function compareRgba(
   actual: Uint8Array,
   expected: Uint8Array,

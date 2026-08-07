@@ -25,6 +25,7 @@ artifacts/
 .wdio/
 test-results/
 *.log
+tests/fixtures/generated/
 
 # Editors and OS
 .DS_Store

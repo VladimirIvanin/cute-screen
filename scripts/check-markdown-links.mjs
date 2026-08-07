@@ -7,7 +7,7 @@ import fg from 'fast-glob'
 const root = process.cwd()
 const markdownFiles = await fg(['**/*.md'], {
   cwd: root,
-  ignore: ['node_modules/**', 'target/**'],
+  ignore: ['**/node_modules/**', '**/target/**'],
   absolute: true,
 })
 const failures = []

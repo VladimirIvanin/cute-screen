@@ -1,18 +1,136 @@
 {
   "$schema": "./manifest.schema.json",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "fixtures": [
     {
       "id": "harness-red-1x1",
+      "kind": "image",
       "file": "harness/red-1x1.ppm",
       "sha256": "c940efc28573af63c6ebbfeb23e69ded35c645b0dca6c4553d62aa1977912614",
       "dimensions": { "width": 1, "height": 1 },
       "format": "ppm",
       "expectedDecode": "success",
+      "pixelProbes": [
+        { "x": 0, "y": 0, "rgba": [255, 0, 0, 255], "tolerance": 0 }
+      ],
+      "metadata": { "alpha": false, "icc": false, "exifOrientation": 1 },
       "source": "Created in-repository for M00 harness validation",
       "license": "CC0-1.0",
       "acquisition": "Included in the repository at tests/fixtures/harness/red-1x1.ppm",
       "harnessOnly": true
+    },
+    {
+      "id": "m01-ui-4k",
+      "kind": "image",
+      "file": "generated/ui-4k.png",
+      "sha256": "b4c84b61cc04d893e1523f81bc56fff1d127ca702c0c8220bf0224cd9915fa98",
+      "dimensions": { "width": 3840, "height": 2160 },
+      "format": "png",
+      "expectedDecode": "success",
+      "pixelProbes": [
+        { "x": 0, "y": 0, "rgba": [24, 38, 52, 255], "tolerance": 2 }
+      ],
+      "nodeCount": 500,
+      "metadata": { "alpha": false, "icc": false, "exifOrientation": 1 },
+      "source": "Deterministically generated in-repository for M01",
+      "license": "CC0-1.0",
+      "acquisition": "pnpm fixtures:generate:m01",
+      "generator": { "command": "pnpm fixtures:generate:m01", "version": 2 }
+    },
+    {
+      "id": "m01-ui-8k",
+      "kind": "image",
+      "file": "generated/ui-8k.png",
+      "sha256": "06f0154e5d73a6ea5072624152dcb1544a5e51fdf3c5334a5f2d50759d6e67d6",
+      "dimensions": { "width": 7680, "height": 4320 },
+      "format": "png",
+      "expectedDecode": "success",
+      "pixelProbes": [
+        { "x": 0, "y": 0, "rgba": [24, 38, 52, 255], "tolerance": 2 }
+      ],
+      "nodeCount": 1000,
+      "metadata": { "alpha": false, "icc": false, "exifOrientation": 1 },
+      "source": "Deterministically generated in-repository for M01",
+      "license": "CC0-1.0",
+      "acquisition": "pnpm fixtures:generate:m01",
+      "generator": { "command": "pnpm fixtures:generate:m01", "version": 2 }
+    },
+    {
+      "id": "m01-alpha-png",
+      "kind": "image",
+      "file": "generated/alpha.png",
+      "sha256": "89896be081a2398e2cea888df4035873283c3ddf687d26ee38623752041d5538",
+      "dimensions": { "width": 64, "height": 64 },
+      "format": "png",
+      "expectedDecode": "success",
+      "pixelProbes": [
+        { "x": 0, "y": 0, "rgba": [24, 38, 52, 0], "tolerance": 2 }
+      ],
+      "metadata": { "alpha": true, "icc": false, "exifOrientation": 1 },
+      "source": "Deterministically generated in-repository for M01",
+      "license": "CC0-1.0",
+      "acquisition": "pnpm fixtures:generate:m01",
+      "generator": { "command": "pnpm fixtures:generate:m01", "version": 2 }
+    },
+    {
+      "id": "m01-icc-png",
+      "kind": "image",
+      "file": "generated/icc.png",
+      "sha256": "e6257b9fe539efa6b5b9f35e7641b434c8644fe8aa473c9c66f1d379c2d9d9f0",
+      "dimensions": { "width": 64, "height": 64 },
+      "format": "png",
+      "expectedDecode": "success",
+      "pixelProbes": [
+        { "x": 0, "y": 0, "rgba": [24, 38, 52, 255], "tolerance": 2 }
+      ],
+      "metadata": { "alpha": false, "icc": true, "exifOrientation": 1 },
+      "source": "Deterministically generated in-repository for M01",
+      "license": "CC0-1.0",
+      "acquisition": "pnpm fixtures:generate:m01",
+      "generator": { "command": "pnpm fixtures:generate:m01", "version": 2 }
+    },
+    {
+      "id": "m01-exif-png",
+      "kind": "image",
+      "file": "generated/exif.png",
+      "sha256": "eb970cd7118c167e70a22cb3efa9a89c75067fab5cf921bff76d09ae16ade242",
+      "dimensions": { "width": 64, "height": 32 },
+      "format": "png",
+      "expectedDecode": "success",
+      "pixelProbes": [
+        { "x": 0, "y": 0, "rgba": [24, 38, 52, 255], "tolerance": 2 }
+      ],
+      "metadata": { "alpha": false, "icc": false, "exifOrientation": 6 },
+      "source": "Deterministically generated in-repository for M01",
+      "license": "CC0-1.0",
+      "acquisition": "pnpm fixtures:generate:m01",
+      "generator": { "command": "pnpm fixtures:generate:m01", "version": 2 }
+    },
+    {
+      "id": "m01-corrupted-png",
+      "kind": "image",
+      "file": "generated/corrupted.png",
+      "sha256": "d74322353f4e4af90297231e768fbba508103cc46c7ea37abe72c620ae098872",
+      "dimensions": { "width": 64, "height": 64 },
+      "format": "png",
+      "expectedDecode": "failure",
+      "pixelProbes": [],
+      "metadata": { "alpha": false, "icc": false, "exifOrientation": 1 },
+      "source": "Deterministically generated in-repository for M01",
+      "license": "CC0-1.0",
+      "acquisition": "pnpm fixtures:generate:m01",
+      "generator": { "command": "pnpm fixtures:generate:m01", "version": 2 }
+    },
+    {
+      "id": "m01-mixed-dpi-horizontal",
+      "kind": "monitor-layout",
+      "file": "generated/mixed-dpi-horizontal.json",
+      "sha256": "bab4e87c642c19051e3357da579c25c0233defff12847e0d4c4bf64d2423341f",
+      "expectedValidation": "success",
+      "source": "Deterministically generated in-repository for M01",
+      "license": "CC0-1.0",
+      "acquisition": "pnpm fixtures:generate:m01",
+      "generator": { "command": "pnpm fixtures:generate:m01", "version": 2 }
     }
   ]
 }

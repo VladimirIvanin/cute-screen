@@ -23,6 +23,34 @@ describe('fixture manifest harness', () => {
     )
   })
 
+  it('contains production-shaped M01 image and monitor fixtures', async () => {
+    const manifest = await loadFixtureManifest(manifestPath, schemaPath)
+    const byId = new Map(
+      manifest.fixtures.map((fixture) => [fixture.id, fixture]),
+    )
+
+    expect(byId.get('m01-ui-4k')).toMatchObject({
+      kind: 'image',
+      dimensions: { width: 3840, height: 2160 },
+      nodeCount: 500,
+      expectedDecode: 'success',
+    })
+    expect(byId.get('m01-ui-8k')).toMatchObject({
+      kind: 'image',
+      dimensions: { width: 7680, height: 4320 },
+      nodeCount: 1000,
+      expectedDecode: 'success',
+    })
+    expect(byId.get('m01-corrupted-png')).toMatchObject({
+      kind: 'image',
+      expectedDecode: 'failure',
+    })
+    expect(byId.get('m01-mixed-dpi-horizontal')).toMatchObject({
+      kind: 'monitor-layout',
+      expectedValidation: 'success',
+    })
+  })
+
   it('reports ID, expected hash, and acquisition instructions when missing', async () => {
     const manifest = await loadFixtureManifest(manifestPath, schemaPath)
     const fixture = manifest.fixtures[0]!

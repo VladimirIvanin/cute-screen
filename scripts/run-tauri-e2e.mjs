@@ -51,6 +51,7 @@ const executable = path.join(
 )
 
 try {
+  run('pnpm', ['fixtures:generate:m01'])
   run(
     'pnpm',
     [
@@ -65,6 +66,7 @@ try {
     ],
     {
       VITE_TEST_HARNESS: 'true',
+      VITE_M01_HARNESS: 'true',
     },
   )
   run('pnpm', ['exec', 'wdio', 'run', 'tests/e2e/wdio.tauri.conf.ts'], {

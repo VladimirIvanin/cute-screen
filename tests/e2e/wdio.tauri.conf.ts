@@ -15,7 +15,7 @@ if (!appBinaryPath) {
 
 export const config: WebdriverIO.Config = {
   runner: 'local',
-  specs: ['./specs/tauri-foundation.e2e.ts'],
+  specs: ['./specs/tauri-*.e2e.ts'],
   maxInstances: 1,
   logLevel: 'info',
   outputDir,

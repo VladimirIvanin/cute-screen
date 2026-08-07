@@ -9,6 +9,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./m01-harness": {
+      "types": "./dist/m01-harness.d.ts",
+      "import": "./dist/m01-harness.js",
+      "default": "./dist/m01-harness.js"
     }
   },
   "dependencies": {

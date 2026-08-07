@@ -137,3 +137,13 @@
 **Не делаем:** GitHub Releases API как обязательный источник, автоматическое скачивание, установку, rollback, update manifests и фоновые запросы без opt-in.
 
 **Последствия:** unsigned Windows/macOS builds могут показывать SmartScreen/Gatekeeper warnings; это честно описывается рядом с artifact. Если позднее потребуется официальный канал, он вводится отдельным ADR.
+
+## ADR-019 — Отклонение xcap 0.9.7 и отдельный X11 adapter
+
+**Статус:** accepted
+
+**Контекст:** M01 рассматривал `xcap` 0.9.7 как candidate для X11/Windows/macOS. Лицензия crate совместима с permissive-only policy, но обязательный `cargo deny check` для all-features graph обнаружил в его Linux build-chain `xcb` → `quick-xml` 0.30.0 с `RUSTSEC-2026-0194` и `RUSTSEC-2026-0195`. Кроме того, Linux build `xcap` безусловно требует PipeWire development libraries, хотя Wayland path проекта обязан использовать только XDG portals.
+
+**Решение:** `xcap` 0.9.7 отклонён и не входит в production dependency graph. X11 risk spike использует отдельный permissive `x11rb` adapter за feature `x11-capture`; Wayland adapter остаётся на `ashpd` и никогда не вызывает X11 adapter. Общие `CaptureBackend`, DTO и stable error codes не меняются.
+
+**Проверка:** `cargo deny check` должен быть зелёным с all-features graph. Controlled X11 gate отдельно проверяет RandR monitor coordinates/physical dimensions и RGBA hash реального окна; до появления такого evidence X11 capability не объявляется доступной.

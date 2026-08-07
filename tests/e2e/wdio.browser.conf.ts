@@ -6,7 +6,7 @@ const outputDir = path.resolve('artifacts/browser-e2e')
 
 export const config: WebdriverIO.Config = {
   runner: 'local',
-  specs: ['./specs/browser-foundation.e2e.ts'],
+  specs: ['./specs/browser-*.e2e.ts'],
   maxInstances: 1,
   logLevel: 'warn',
   baseUrl: 'http://127.0.0.1:5173',
@@ -20,7 +20,10 @@ export const config: WebdriverIO.Config = {
         devServer: {
           command: 'pnpm dev',
           cwd: process.cwd(),
-          env: { VITE_TEST_HARNESS: 'true' },
+          env: {
+            VITE_TEST_HARNESS: 'true',
+            VITE_M01_HARNESS: 'true',
+          },
           reuseExistingServer: false,
           timeoutMs: 60_000,
         },

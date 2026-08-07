@@ -3,6 +3,22 @@ import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
   plugins: [vue()],
+  resolve: {
+    alias: {
+      '@cute-screen/editor-core': new URL(
+        './packages/editor-core/src/index.ts',
+        import.meta.url,
+      ).pathname,
+      '@cute-screen/editor-renderer': new URL(
+        './packages/editor-renderer/src/index.ts',
+        import.meta.url,
+      ).pathname,
+      '@cute-screen/editor-vue': new URL(
+        './packages/editor-vue/src/index.ts',
+        import.meta.url,
+      ).pathname,
+    },
+  },
   test: {
     coverage: {
       provider: 'v8',
@@ -16,6 +32,14 @@ export default defineConfig({
           name: 'core',
           environment: 'node',
           include: ['packages/editor-core/src/**/*.test.ts'],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'renderer',
+          environment: 'node',
+          include: ['packages/editor-renderer/src/**/*.test.ts'],
         },
       },
       {
