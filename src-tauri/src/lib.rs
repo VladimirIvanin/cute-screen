@@ -1,4 +1,5 @@
 use std::env;
+use std::sync::Mutex;
 
 #[cfg(feature = "test-harness")]
 use std::fs;
@@ -10,9 +11,16 @@ use image_transport::{ImageTransportService, StagedImageMetadata};
 use platform::{CaptureRequest, CaptureResult, CaptureTarget, PortalCapabilityProbe};
 use platform::{PlatformCapabilities, PlatformError, SessionKind};
 use serde::Serialize;
-use tauri::{Manager, State};
+use tauri::{
+    Manager, State,
+    menu::{Menu, MenuItem, PredefinedMenuItem},
+    tray::TrayIconBuilder,
+};
+
+use lifecycle::{LaunchIntentV1, LifecycleState, parse_launch};
 
 pub mod image_transport;
+pub mod lifecycle;
 #[cfg(target_os = "linux")]
 pub mod linux_platform;
 pub mod platform;
@@ -156,6 +164,66 @@ fn initialize_image_transport<R: tauri::Runtime>(
     Ok(transport)
 }
 
+fn show_editor<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+}
+
+fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()> {
+    let capture_area = MenuItem::with_id(app, "capture-area", "Capture Area", false, None::<&str>)?;
+    let capture_window =
+        MenuItem::with_id(app, "capture-window", "Capture Window", false, None::<&str>)?;
+    let show = MenuItem::with_id(app, "show-editor", "Show Editor", true, None::<&str>)?;
+    let settings = MenuItem::with_id(app, "settings", "Settings", false, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+    let separator = PredefinedMenuItem::separator(app)?;
+    let menu = Menu::with_items(
+        app,
+        &[
+            &capture_area,
+            &capture_window,
+            &separator,
+            &show,
+            &settings,
+            &quit,
+        ],
+    )?;
+
+    TrayIconBuilder::with_id("main-tray")
+        .menu(&menu)
+        .show_menu_on_left_click(true)
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "show-editor" => show_editor(app),
+            "quit" => {
+                let state = app.state::<Mutex<LifecycleState>>();
+                if let Ok(mut state) = state.lock() {
+                    state.begin_quit();
+                }
+                app.exit(0);
+            }
+            _ => {}
+        })
+        .build(app)?;
+    Ok(())
+}
+
+fn handle_launch<R: tauri::Runtime>(app: &tauri::AppHandle<R>, intent: LaunchIntentV1) {
+    match intent {
+        LaunchIntentV1::ShowEditor => show_editor(app),
+        LaunchIntentV1::Background => {
+            let tray_available = app
+                .try_state::<Mutex<LifecycleState>>()
+                .is_some_and(|state| state.lock().is_ok_and(|value| value.tray_available()));
+            if !tray_available {
+                show_editor(app);
+            }
+        }
+    }
+}
+
 #[cfg(feature = "test-harness")]
 fn register_test_fixtures(
     transport: &ImageTransportService,
@@ -186,18 +254,66 @@ fn register_test_fixtures(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let builder = tauri::Builder::default().setup(|app| {
-        let transport = initialize_image_transport(app)?;
-        app.manage(transport);
-
-        #[cfg(feature = "fake-platform")]
-        {
-            let scenario = fake_platform::load_scenario_from_env()?;
-            eprintln!("{}", fake_platform::FAKE_PLATFORM_SENTINEL);
-            app.manage(scenario);
+    let launch_intent = match parse_launch(env::args_os()) {
+        Ok(intent) => intent,
+        Err(error) => {
+            let exit_code = if error.use_stderr() { 2 } else { 0 };
+            let _ = error.print();
+            std::process::exit(exit_code);
         }
-        Ok(())
-    });
+    };
+
+    let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(
+            |app, args, _cwd| match parse_launch(args) {
+                Ok(intent) => handle_launch(app, intent),
+                Err(error) => {
+                    eprintln!("cute-screen lifecycle warning: invalid forwarded payload: {error}")
+                }
+            },
+        ))
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec!["--background"]),
+        ))
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == "main"
+                    && window
+                        .app_handle()
+                        .try_state::<Mutex<LifecycleState>>()
+                        .is_some_and(|state| {
+                            state.lock().is_ok_and(|value| value.should_hide_on_close())
+                        })
+                {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
+        })
+        .setup(move |app| {
+            app.manage(Mutex::new(LifecycleState::default()));
+            let transport = initialize_image_transport(app)?;
+            app.manage(transport);
+
+            let tray_result = create_tray(app.handle());
+            if let Ok(mut state) = app.state::<Mutex<LifecycleState>>().lock() {
+                state.set_tray_available(tray_result.is_ok());
+            }
+            if let Err(error) = tray_result {
+                eprintln!("cute-screen lifecycle warning: tray unavailable: {error}");
+            }
+
+            handle_launch(app.handle(), launch_intent);
+
+            #[cfg(feature = "fake-platform")]
+            {
+                let scenario = fake_platform::load_scenario_from_env()?;
+                eprintln!("{}", fake_platform::FAKE_PLATFORM_SENTINEL);
+                app.manage(scenario);
+            }
+            Ok(())
+        });
 
     #[cfg(feature = "test-harness")]
     let builder = {

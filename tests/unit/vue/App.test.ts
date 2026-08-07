@@ -1,77 +1,64 @@
 import { fireEvent, render, screen } from '@testing-library/vue'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import App from '../../../apps/desktop/src/App.vue'
-import type { DesktopBridge } from '../../../apps/desktop/src/desktop-bridge'
+import {
+  assertLocaleCompleteness,
+  createEditorShellPinia,
+  parsePreferences,
+  resolveSystemLocale,
+} from '@cute-screen/editor-vue'
 
-function bridgeWithPing(ping: DesktopBridge['ping']): DesktopBridge {
-  return {
-    ping,
-    stageImage: vi.fn(),
-    readImageBytes: vi.fn(),
-    platformCapabilities: vi.fn(),
-  }
+function renderApp() {
+  return render(App, { global: { plugins: [createEditorShellPinia()] } })
 }
 
-describe('foundation screen', () => {
-  it('mounts from clean state without making a product claim', () => {
-    render(App, {
-      props: {
-        bridge: bridgeWithPing(vi.fn()),
-      },
-    })
+describe('M02 editor shell', () => {
+  it('mounts from a clean state with a useful empty canvas', () => {
+    renderApp()
 
     expect(
-      screen.getByRole('heading', { name: 'Cute Screen workspace is ready' }),
+      screen.getByRole('heading', { name: 'Capture your first screen' }),
     ).toBeInTheDocument()
-    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Copy' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Export' })).toBeDisabled()
+    expect(
+      screen.queryByRole('navigation', { name: 'Series frames' }),
+    ).not.toBeInTheDocument()
   })
 
-  it('performs the typed ping flow and exposes a disabled loading state', async () => {
-    let resolvePing:
-      ((value: { message: 'pong'; protocolVersion: 1 }) => void) | undefined
-    const ping = vi.fn(
-      () =>
-        new Promise<{ message: 'pong'; protocolVersion: 1 }>((resolve) => {
-          resolvePing = resolve
-        }),
-    )
+  it('keeps familiar compact actions accessible and labels every icon control', async () => {
+    renderApp()
+    expect(screen.getByRole('button', { name: 'Capture' })).toBeEnabled()
+    expect(
+      screen.getByRole('button', { name: 'More actions' }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Zoom out' })).toBeInTheDocument()
 
-    render(App, { props: { bridge: bridgeWithPing(ping) } })
-    const button = screen.getByRole('button', { name: 'Check desktop bridge' })
-    await fireEvent.click(button)
-
-    expect(button).toBeDisabled()
-    expect(button).toHaveTextContent('Checking…')
-
-    resolvePing?.({ message: 'pong', protocolVersion: 1 })
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      'Desktop bridge ready · protocol 1',
-    )
-    expect(ping).toHaveBeenCalledTimes(1)
+    await fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
+    expect(
+      screen.getByRole('menuitemradio', { name: 'Dark' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('menuitemradio', { name: 'RU' }),
+    ).toBeInTheDocument()
   })
 
-  it('shows a recoverable error and retries', async () => {
-    const ping = vi
-      .fn<DesktopBridge['ping']>()
-      .mockRejectedValueOnce(new Error('IPC unavailable'))
-      .mockResolvedValueOnce({ message: 'pong', protocolVersion: 1 })
+  it('uses the product locale fallback for corrupt preferences', () => {
+    expect(resolveSystemLocale(['ru-RU', 'en-US'])).toBe('ru')
+    expect(resolveSystemLocale(['de-DE'])).toBe('en')
+    expect(parsePreferences('{broken', ['ru-RU'])).toMatchObject({
+      locale: 'ru',
+      theme: 'system',
+    })
+    expect(
+      parsePreferences('{"schemaVersion":1,"locale":"fr","theme":"night"}', [
+        'en-US',
+      ]),
+    ).toMatchObject({ locale: 'en', theme: 'system' })
+  })
 
-    render(App, { props: { bridge: bridgeWithPing(ping) } })
-    await fireEvent.click(
-      screen.getByRole('button', { name: 'Check desktop bridge' }),
-    )
-
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'IPC unavailable',
-    )
-    await fireEvent.click(
-      screen.getByRole('button', { name: 'Retry desktop bridge' }),
-    )
-
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      'Desktop bridge ready',
-    )
-    expect(ping).toHaveBeenCalledTimes(2)
+  it('keeps the RU and EN dictionaries complete', () => {
+    expect(assertLocaleCompleteness()).toBe(true)
   })
 })

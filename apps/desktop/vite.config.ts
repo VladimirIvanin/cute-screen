@@ -3,6 +3,18 @@ import { defineConfig } from 'vite'
 
 export default defineConfig({
   plugins: [vue()],
+  resolve: {
+    alias: {
+      '@cute-screen/editor-vue': new URL(
+        '../../packages/editor-vue/src/index.ts',
+        import.meta.url,
+      ).pathname,
+      '@cute-screen/editor-vue/shell.css': new URL(
+        '../../packages/editor-vue/src/shell/shell.css',
+        import.meta.url,
+      ).pathname,
+    },
+  },
   root: new URL('.', import.meta.url).pathname,
   build: {
     emptyOutDir: true,

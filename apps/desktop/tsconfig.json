@@ -1,5 +1,13 @@
 {
   "compilerOptions": {
+    "baseUrl": "../..",
+    "ignoreDeprecations": "6.0",
+    "paths": {
+      "@cute-screen/editor-vue": ["packages/editor-vue/src/index.ts"],
+      "@cute-screen/editor-vue/shell.css": [
+        "packages/editor-vue/src/shell/shell.css"
+      ]
+    },
     "target": "ES2023",
     "useDefineForClassFields": true,
     "module": "ESNext",

@@ -1,4 +1,5 @@
 import { createApp } from 'vue'
+import { createEditorShellPinia } from '@cute-screen/editor-vue'
 
 import App from './App.vue'
 import './styles.css'
@@ -13,4 +14,4 @@ const Root =
     ? (await import('./M01Harness.vue')).default
     : App
 
-createApp(Root).mount('#app')
+createApp(Root).use(createEditorShellPinia()).mount('#app')
