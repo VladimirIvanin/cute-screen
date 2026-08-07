@@ -30,7 +30,17 @@ export const config: WebdriverIO.Config = {
       },
     ],
   ],
-  capabilities: [{ browserName: 'tauri' }],
+  capabilities: [
+    {
+      browserName: 'tauri',
+      'goog:chromeOptions': {
+        // Chrome 131+ disables the software WebGL fallback unless this is
+        // explicit. Browser mode intentionally exercises CanvasKit/WebGL,
+        // while the application runtime retains its Canvas2D fallback.
+        args: ['--enable-unsafe-swiftshader'],
+      },
+    },
+  ],
   framework: 'mocha',
   reporters: [
     'spec',
