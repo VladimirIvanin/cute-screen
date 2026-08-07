@@ -277,18 +277,17 @@ pub fn run() {
             Some(vec!["--background"]),
         ))
         .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                if window.label() == "main"
-                    && window
-                        .app_handle()
-                        .try_state::<Mutex<LifecycleState>>()
-                        .is_some_and(|state| {
-                            state.lock().is_ok_and(|value| value.should_hide_on_close())
-                        })
-                {
-                    api.prevent_close();
-                    let _ = window.hide();
-                }
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event
+                && window.label() == "main"
+                && window
+                    .app_handle()
+                    .try_state::<Mutex<LifecycleState>>()
+                    .is_some_and(|state| {
+                        state.lock().is_ok_and(|value| value.should_hide_on_close())
+                    })
+            {
+                api.prevent_close();
+                let _ = window.hide();
             }
         })
         .setup(move |app| {

@@ -41,6 +41,8 @@ pnpm smoke:m01:portal:shortcuts
 pnpm smoke:m01:portal:invalid-uri
 ```
 
+`pnpm check` включает Rust format и все три CI-конфигурации Clippy с `-D warnings`; изменения Rust не передаются в CI без этого локального gate.
+
 Каждая команда возвращает ненулевой exit code при провале и не изменяет tracked files.
 
 ## Правило user-action
