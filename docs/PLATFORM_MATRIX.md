@@ -100,7 +100,8 @@ UI получает `CaptureCapabilities` и не показывает непо�
 
 - `xcap` 0.9.7 отклонён из-за security advisories в dependency graph; решение и отдельный `x11rb` 0.14.0 boundary зафиксированы в ADR-019.
 - Локальный Ubuntu/GNOME X11 controlled-window smoke подтвердил monitor enumeration, physical millimetres, coordinates, 96×64 RGBA capture и SHA-256. До появления устойчивой CI artifact URL это локальная диагностика, не статус `supported`.
-- Локальный X11 portal probe увидел Screenshot v2 без `AvailableTargets` и без GlobalShortcuts. Это не evidence для GNOME/KDE Wayland; обе строки остаются `pending`.
+- Локальный X11 portal probe увидел Screenshot v2 без `AvailableTargets` и без GlobalShortcuts. Это диагностика dbus на X11-сессии, не substitute для Wayland runtime.
+- Локальный Ubuntu 24.04 / GNOME Wayland smoke (2026-08-09, SHA `7ff7d283`, xdg-desktop-portal 1.18.4, gnome portal 46.2): Screenshot portal v2 подтвердил interactive area capture (640×360 RGBA, decoded PNG SHA-256 `361b7fa2…`); `availableTargets: 0` (monitor/window target через portal v3 недоступен); GlobalShortcuts portal backend отсутствует → hotkey capability `unavailable`, CLI fallback. Evidence: `artifacts/m01/portal-probe.json`, `portal-screenshot.json`, `portal-shortcuts.json`, `portal-invalid-uri.json`. Статус GNOME Wayland capture — локальная диагностика, не `supported` без CI artifact URL. KDE Wayland и полный shortcut bind/activate cycle остаются pending.
 - WebKitGTK 2.52.3, локальный Windows x64 / WebView2 smoke (2026-08-08) и
   локальный macOS 12.7.6 x64 / WKWebView 605.1.15 smoke (2026-08-09)
   подтвердили scoped asset decode, binary IPC fallback и typed error для
@@ -115,6 +116,11 @@ UI получает `CaptureCapabilities` и не показывает непо�
   per-scenario прогона; Canvas2D startup fallback, asset alpha decode, binary
   ICC fallback и corrupt error подтверждены; артефакты в
   `artifacts/tauri-e2e/junit-*`.
+- Linux M01 Tauri E2E на GNOME Wayland: `pnpm test:e2e:tauri` (2026-08-09,
+  Ubuntu 24.04 x64 / WebKitGTK 2.52.3, SHA `7ff7d283`) прошёл четыре
+  per-scenario прогона на Wayland-сессии; Canvas2D startup fallback, asset
+  alpha decode, binary ICC fallback и corrupt error подтверждены; артефакты в
+  `artifacts/tauri-e2e/`.
 
 ## CLI fallback contract (M04 dispatch pending)
 

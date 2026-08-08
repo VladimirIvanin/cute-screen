@@ -226,6 +226,8 @@ M01 `pnpm test:perf` выполняет 30 warmups и 120 измеряемых �
 
 Linux system smoke пишет JSON в `artifacts/m01/`: commit SHA, OS/arch/session, portal и WebKitGTK versions, monitor layout, correlation ID и observable result. `portal-screenshot` и `portal-shortcuts` интерактивны; cancel записывается как ожидаемый outcome без error-log. Эти локальные файлы становятся milestone evidence только после загрузки в CI/system-run artifact с устойчивой ссылкой.
 
+Локальный GNOME Wayland прогон 2026-08-09 (SHA `7ff7d283`): `portal-probe`, `portal-invalid-uri` и `portal-screenshot` — success; `portal-shortcuts` — `shortcutUnavailable` на GNOME backend без GlobalShortcuts interface. JSON записаны в `artifacts/m01/`; cancel semantics и KDE Wayland остаются pending.
+
 ## Диагностика и incidents
 
 - Frontend invoke, Rust command и long operation используют correlation ID.
