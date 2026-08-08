@@ -3,13 +3,17 @@ import type { FrameSummary } from '../types'
 defineProps<{
   frames: readonly FrameSummary[]
   activeFrameId?: string | undefined
-  t: (key: 'selectedFrame') => string
+  t: (key: 'selectedFrame' | 'seriesFrames') => string
 }>()
 const emit = defineEmits<{ select: [id: string] }>()
 </script>
 
 <template>
-  <nav v-if="frames.length" class="cs-filmstrip" aria-label="Series frames">
+  <nav
+    v-if="frames.length"
+    class="cs-filmstrip"
+    :aria-label="t('seriesFrames')"
+  >
     <button
       v-for="frame in frames"
       :key="frame.id"

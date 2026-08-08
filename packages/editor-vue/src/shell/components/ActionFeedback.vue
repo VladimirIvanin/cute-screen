@@ -1,10 +1,20 @@
 <script setup lang="ts">
-import type { AsyncActionState } from '../types'
+import type { AsyncActionName, AsyncActionState } from '../types'
 defineProps<{
   state: AsyncActionState
-  t: (key: 'cancel' | 'retry') => string
+  t: (
+    key: 'cancel' | 'retry' | 'captureAction' | 'copyAction' | 'exportAction',
+  ) => string
 }>()
 const emit = defineEmits<{ cancel: []; retry: [] }>()
+const actionKey: Record<
+  AsyncActionName,
+  'captureAction' | 'copyAction' | 'exportAction'
+> = {
+  capture: 'captureAction',
+  copy: 'copyAction',
+  export: 'exportAction',
+}
 </script>
 
 <template>
@@ -14,7 +24,9 @@ const emit = defineEmits<{ cancel: []; retry: [] }>()
     :class="`is-${state.status}`"
     :role="state.status === 'error' ? 'alert' : 'status'"
   >
-    <span v-if="state.status === 'pending'">{{ state.action }}…</span>
+    <span v-if="state.status === 'pending'"
+      >{{ t(actionKey[state.action]) }}…</span
+    >
     <span v-else>{{ state.message }}</span>
     <button
       v-if="state.status === 'pending'"

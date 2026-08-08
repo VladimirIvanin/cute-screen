@@ -73,7 +73,7 @@ button:focus-visible {
   padding: 0 12px;
   border-bottom: 1px solid var(--border);
   background: var(--surface-raised);
-  z-index: 5;
+  z-index: 10;
 }
 .cs-brand {
   display: flex;
@@ -470,7 +470,7 @@ button:focus-visible {
 .cs-zoom-controls {
   position: absolute;
   z-index: 6;
-  right: 14px;
+  left: 66px;
   bottom: 14px;
   display: flex;
   align-items: center;

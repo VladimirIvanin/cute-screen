@@ -5,13 +5,13 @@ import type { ToolDescriptor } from '../types'
 defineProps<{
   tools: readonly ToolDescriptor[]
   activeToolId?: string | undefined
-  t: (key: ToolDescriptor['labelKey']) => string
+  t: (key: ToolDescriptor['labelKey'] | 'tools') => string
 }>()
 const emit = defineEmits<{ select: [id: string] }>()
 </script>
 
 <template>
-  <aside class="cs-toolrail" aria-label="Tools">
+  <aside class="cs-toolrail" :aria-label="t('tools')">
     <template
       v-for="group in ['canvas', 'annotate', 'more'] as const"
       :key="group"

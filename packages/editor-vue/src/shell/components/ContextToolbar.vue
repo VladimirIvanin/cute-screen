@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { UiIcon } from '../icon'
 import type { ContextToolbarSchema } from '../types'
-defineProps<{ schema?: ContextToolbarSchema | undefined }>()
+defineProps<{
+  schema?: ContextToolbarSchema | undefined
+  label: string
+}>()
 </script>
 
 <template>
-  <section v-if="schema" class="cs-context-toolbar" aria-label="Tool settings">
+  <section v-if="schema" class="cs-context-toolbar" :aria-label="label">
     <span class="cs-context-icon"><UiIcon :name="schema.icon" /></span>
     <div>
       <strong>{{ schema.title }}</strong

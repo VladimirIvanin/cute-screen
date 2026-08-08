@@ -84,6 +84,7 @@ export type IconName =
   | 'arrow'
   | 'camera'
   | 'check'
+  | 'close'
   | 'chevronDown'
   | 'copy'
   | 'crop'
@@ -109,7 +110,9 @@ export type IconName =
 
 export const translationKeys = [
   'appName',
+  'canvasViewport',
   'capture',
+  'captureAction',
   'copy',
   'export',
   'moreActions',
@@ -118,8 +121,15 @@ export const translationKeys = [
   'systemTheme',
   'lightTheme',
   'darkTheme',
+  'tools',
+  'toolSettings',
+  'seriesFrames',
+  'zoom',
+  'sceneCanvas',
+  'interactionOverlay',
   'emptyTitle',
   'emptyDescription',
+  'readyLoadError',
   'captureUnavailable',
   'copyUnavailable',
   'exportUnavailable',
@@ -138,6 +148,9 @@ export const translationKeys = [
   'toolPrivacy',
   'toolSpotlight',
   'toolUnavailable',
+  'arrowHint',
+  'color',
+  'width',
   'zoomOut',
   'zoomIn',
   'zoomValue',
@@ -145,6 +158,8 @@ export const translationKeys = [
   'cancel',
   'retry',
   'loadingEditor',
+  'copyAction',
+  'exportAction',
   'undo',
   'redo',
 ] as const

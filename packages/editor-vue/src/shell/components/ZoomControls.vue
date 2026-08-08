@@ -2,13 +2,13 @@
 import { UiIcon } from '../icon'
 defineProps<{
   zoom: number
-  t: (key: 'zoomOut' | 'zoomIn' | 'zoomValue') => string
+  t: (key: 'zoom' | 'zoomOut' | 'zoomIn' | 'zoomValue') => string
 }>()
 const emit = defineEmits<{ zoom: [value: number] }>()
 </script>
 
 <template>
-  <div class="cs-zoom-controls" role="group" aria-label="Zoom">
+  <div class="cs-zoom-controls" role="group" :aria-label="t('zoom')">
     <button
       type="button"
       class="cs-icon-button"

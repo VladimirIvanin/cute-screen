@@ -31,7 +31,7 @@ const emit = defineEmits<{ select: [id: string]; toggle: [] }>()
         :title="t('hideLayers')"
         @click="emit('toggle')"
       >
-        ×
+        <UiIcon name="close" />
       </button>
     </header>
     <p v-if="layers.length === 0" class="cs-layers-empty">

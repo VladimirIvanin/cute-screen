@@ -6,7 +6,14 @@ import type { CanvasViewportHosts, ShellDocumentState } from '../types'
 defineProps<{
   documentState: ShellDocumentState
   t: (
-    key: 'emptyTitle' | 'emptyDescription' | 'loadingEditor' | 'retry',
+    key:
+      | 'canvasViewport'
+      | 'sceneCanvas'
+      | 'interactionOverlay'
+      | 'emptyTitle'
+      | 'emptyDescription'
+      | 'loadingEditor'
+      | 'retry',
   ) => string
 }>()
 const emit = defineEmits<{
@@ -27,18 +34,18 @@ onMounted(() => {
 </script>
 
 <template>
-  <main class="cs-viewport" aria-label="Canvas viewport">
+  <main class="cs-viewport" :aria-label="t('canvasViewport')">
     <div ref="scrollContainer" class="cs-canvas-scroll">
       <div class="cs-canvas-surface">
         <canvas
           ref="scene"
           class="cs-canvas"
-          aria-label="Scene canvas"
+          :aria-label="t('sceneCanvas')"
         ></canvas>
         <canvas
           ref="overlay"
           class="cs-canvas cs-canvas-overlay"
-          aria-label="Interaction overlay"
+          :aria-label="t('interactionOverlay')"
         ></canvas>
         <section
           v-if="documentState.kind === 'empty'"

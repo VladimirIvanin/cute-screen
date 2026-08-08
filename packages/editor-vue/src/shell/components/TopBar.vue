@@ -17,6 +17,14 @@ const emit = defineEmits<{
 }>()
 const menuOpen = ref(false)
 const disabled = computed(() => props.pending)
+function selectTheme(value: ThemePreference): void {
+  menuOpen.value = false
+  emit('theme', value)
+}
+function selectLocale(value: SupportedLocale): void {
+  menuOpen.value = false
+  emit('locale', value)
+}
 </script>
 
 <template>
@@ -52,6 +60,8 @@ const disabled = computed(() => props.pending)
         type="button"
         class="cs-button cs-button-quiet"
         :disabled="disabled"
+        :aria-label="t('capture')"
+        :title="t('capture')"
         @click="emit('action', 'capture')"
       >
         <UiIcon name="camera" /><span>{{ t('capture') }}</span>
@@ -60,6 +70,7 @@ const disabled = computed(() => props.pending)
         type="button"
         class="cs-button cs-button-quiet"
         :disabled="disabled || !canCopyOrExport"
+        :aria-label="t('copy')"
         :title="canCopyOrExport ? t('copy') : t('copyUnavailable')"
         @click="emit('action', 'copy')"
       >
@@ -84,7 +95,7 @@ const disabled = computed(() => props.pending)
             type="button"
             role="menuitemradio"
             :aria-checked="theme === value"
-            @click="emit('theme', value)"
+            @click="selectTheme(value)"
           >
             {{
               t(
@@ -103,7 +114,7 @@ const disabled = computed(() => props.pending)
             type="button"
             role="menuitemradio"
             :aria-checked="locale === value"
-            @click="emit('locale', value)"
+            @click="selectLocale(value)"
           >
             {{ value.toUpperCase() }}
           </button>
@@ -113,6 +124,7 @@ const disabled = computed(() => props.pending)
         type="button"
         class="cs-button cs-button-primary"
         :disabled="disabled || !canCopyOrExport"
+        :aria-label="t('export')"
         :title="canCopyOrExport ? t('export') : t('exportUnavailable')"
         @click="emit('action', 'export')"
       >

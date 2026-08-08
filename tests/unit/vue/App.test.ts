@@ -61,4 +61,24 @@ describe('M02 editor shell', () => {
   it('keeps the RU and EN dictionaries complete', () => {
     expect(assertLocaleCompleteness()).toBe(true)
   })
+
+  it('localizes visible shell labels and action feedback without a restart', async () => {
+    renderApp()
+
+    await fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
+    await fireEvent.click(screen.getByRole('menuitemradio', { name: 'RU' }))
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('complementary', { name: 'Инструменты' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('main', { name: 'Область холста' }),
+    ).toBeInTheDocument()
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Снимок' }))
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Захват станет доступен после подключения native backend.',
+    )
+  })
 })

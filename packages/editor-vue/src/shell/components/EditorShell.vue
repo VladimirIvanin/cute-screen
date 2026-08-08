@@ -115,10 +115,10 @@ const contextSchema = computed(() =>
     ? {
         icon: 'arrow' as const,
         title: translate('toolArrow'),
-        hint: 'Drag to create an arrow',
+        hint: translate('arrowHint'),
         controls: [
-          { kind: 'color' as const, id: 'color', label: 'Color' },
-          { kind: 'range' as const, id: 'width', label: 'Width' },
+          { kind: 'color' as const, id: 'color', label: translate('color') },
+          { kind: 'range' as const, id: 'width', label: translate('width') },
         ],
       }
     : undefined,
@@ -162,7 +162,7 @@ function loadFixture(): void {
   if (props.fixture === 'error') {
     store.setDocumentState({
       kind: 'error',
-      message: 'The fake document could not be loaded.',
+      message: translate('readyLoadError'),
     })
     return
   }
@@ -270,7 +270,10 @@ watch(
         @toggle="store.toggleLayers"
       />
       <ZoomControls :zoom="store.zoom" :t="translate" @zoom="store.setZoom" />
-      <ContextToolbar :schema="contextSchema" />
+      <ContextToolbar
+        :schema="contextSchema"
+        :label="translate('toolSettings')"
+      />
     </div>
     <SeriesFilmstrip
       :frames="store.frames"

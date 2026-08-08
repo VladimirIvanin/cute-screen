@@ -8,6 +8,7 @@ const paths: Record<IconName, string[]> = {
     'M12 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z',
   ],
   check: ['m5 12 4 4L19 6'],
+  close: ['m6 6 12 12M18 6 6 18'],
   chevronDown: ['m7 10 5 5 5-5'],
   copy: ['M8 8h11v11H8Z', 'M16 8V5H5v11h3'],
   crop: ['M6 3v13a2 2 0 0 0 2 2h13', 'M3 6h13a2 2 0 0 1 2 2v13'],
