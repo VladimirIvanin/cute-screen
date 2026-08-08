@@ -5,6 +5,10 @@ export default defineConfig({
   plugins: [vue()],
   resolve: {
     alias: {
+      '@cute-screen/editor-vue/m01-harness': new URL(
+        '../../packages/editor-vue/src/m01-harness.ts',
+        import.meta.url,
+      ).pathname,
       '@cute-screen/editor-vue': new URL(
         '../../packages/editor-vue/src/index.ts',
         import.meta.url,

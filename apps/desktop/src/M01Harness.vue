@@ -322,3 +322,172 @@ async function verifyTransport(): Promise<void> {
     </footer>
   </main>
 </template>
+
+<style scoped>
+.diagnostic-shell {
+  display: grid;
+  height: 100vh;
+  min-height: 100vh;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.diagnostic-header,
+.diagnostic-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  background: var(--surface-raised);
+}
+
+.diagnostic-header {
+  min-height: 72px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.diagnostic-header h1 {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.3;
+}
+
+.backend-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+
+.state-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.diagnostic-workspace {
+  display: grid;
+  min-height: 0;
+  place-items: center;
+  overflow: auto;
+  padding: 32px;
+  background: var(--canvas);
+}
+
+.diagnostic-canvas-stack {
+  position: relative;
+  width: min(100%, 960px, calc((100vh - 208px) * 16 / 9));
+  max-height: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background:
+    linear-gradient(45deg, var(--surface-sunken) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--surface-sunken) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--surface-sunken) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--surface-sunken) 75%),
+    var(--surface-raised);
+  background-position:
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0;
+  background-size: 16px 16px;
+  box-shadow: var(--shadow-overlay);
+}
+
+.diagnostic-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.diagnostic-overlay {
+  pointer-events: none;
+}
+
+.diagnostic-footer {
+  min-height: 72px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+}
+
+.diagnostic-actions,
+.diagnostic-metrics {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.diagnostic-actions button {
+  min-height: 36px;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  background: var(--surface-raised);
+  cursor: pointer;
+}
+
+.diagnostic-actions button:hover:not(:disabled) {
+  border-color: var(--text-muted);
+  background: var(--surface-hover);
+}
+
+.diagnostic-actions button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.diagnostic-metrics {
+  margin: 0;
+  gap: 24px;
+}
+
+.diagnostic-metrics div {
+  display: grid;
+  min-width: 64px;
+  gap: 2px;
+}
+
+.diagnostic-metrics dt {
+  color: var(--text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.diagnostic-metrics dd {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 760px) {
+  .diagnostic-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .diagnostic-actions {
+    flex-wrap: wrap;
+  }
+}
+</style>
