@@ -146,10 +146,15 @@ function browserStorage(): Storage | undefined {
 }
 const preferencesOptions: ShellStoreOptions = {
   ...(props.actions ? { actions: props.actions } : {}),
-  languages: navigator.languages,
+  languages:
+    import.meta.env.VITE_TEST_HARNESS === 'true'
+      ? (['en'] as const)
+      : navigator.languages,
   preferences: createBrowserPreferencesStorage(
     browserStorage(),
-    navigator.languages,
+    import.meta.env.VITE_TEST_HARNESS === 'true'
+      ? (['en'] as const)
+      : navigator.languages,
   ),
   systemDark: () => media.matches,
 }
