@@ -29,9 +29,7 @@ export const config: WebdriverIO.Config = {
         captureBackendLogs: true,
         captureFrontendLogs: true,
         driverProvider: 'embedded',
-        appArgs: harnessQuery
-          ? [`--e2e-harness-query=${harnessQuery}`]
-          : [],
+        appArgs: harnessQuery ? [`--e2e-harness-query=${harnessQuery}`] : [],
         env: harnessQuery
           ? { CUTE_SCREEN_E2E_HARNESS_QUERY: harnessQuery }
           : {},

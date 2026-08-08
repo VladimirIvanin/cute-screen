@@ -10,13 +10,19 @@ export default defineConfig({
   resolve: {
     alias: {
       '@cute-screen/editor-vue/m01-harness': fileURLToPath(
-        new URL('../../packages/editor-vue/src/m01-harness.ts', import.meta.url),
+        new URL(
+          '../../packages/editor-vue/src/m01-harness.ts',
+          import.meta.url,
+        ),
       ),
       '@cute-screen/editor-vue': fileURLToPath(
         new URL('../../packages/editor-vue/src/index.ts', import.meta.url),
       ),
       '@cute-screen/editor-vue/shell.css': fileURLToPath(
-        new URL('../../packages/editor-vue/src/shell/shell.css', import.meta.url),
+        new URL(
+          '../../packages/editor-vue/src/shell/shell.css',
+          import.meta.url,
+        ),
       ),
     },
   },
