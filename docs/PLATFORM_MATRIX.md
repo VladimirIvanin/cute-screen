@@ -101,15 +101,20 @@ UI получает `CaptureCapabilities` и не показывает непо�
 - `xcap` 0.9.7 отклонён из-за security advisories в dependency graph; решение и отдельный `x11rb` 0.14.0 boundary зафиксированы в ADR-019.
 - Локальный Ubuntu/GNOME X11 controlled-window smoke подтвердил monitor enumeration, physical millimetres, coordinates, 96×64 RGBA capture и SHA-256. До появления устойчивой CI artifact URL это локальная диагностика, не статус `supported`.
 - Локальный X11 portal probe увидел Screenshot v2 без `AvailableTargets` и без GlobalShortcuts. Это не evidence для GNOME/KDE Wayland; обе строки остаются `pending`.
-- WebKitGTK 2.52.3 и локальный Windows x64 / WebView2 smoke (2026-08-08)
+- WebKitGTK 2.52.3, локальный Windows x64 / WebView2 smoke (2026-08-08) и
+  локальный macOS 12.7.6 x64 / WKWebView 605.1.15 smoke (2026-08-09)
   подтвердили scoped asset decode, binary IPC fallback и typed error для
-  corrupted PNG. В обоих runtime CanvasKit/WebGL startup перешёл на Canvas2D.
-  WKWebView runtime evidence отсутствует; macOS Tauri E2E использует тот же
-  embedded WebDriver provider, но не имеет runtime proof.
+  corrupted PNG. Во всех трёх runtime CanvasKit/WebGL startup перешёл на
+  Canvas2D fallback.
 - Windows M01 Tauri E2E: `pnpm test:e2e:tauri` (2026-08-09, Windows x64 /
   WebView2) прошёл четыре per-scenario прогона — `tauri-foundation.e2e.ts`,
   `tauri-renderer-alpha.e2e.ts`, `tauri-renderer-binary.e2e.ts`,
   `tauri-renderer-corrupted.e2e.ts`; артефакты в `artifacts/tauri-e2e/junit-*`.
+- macOS M01 Tauri E2E: `pnpm test:e2e:tauri` (2026-08-09, macOS 12.7.6 x64 /
+  Intel i7-4770HQ / WKWebView 605.1.15, SHA `22119a9`) прошёл те же четыре
+  per-scenario прогона; Canvas2D startup fallback, asset alpha decode, binary
+  ICC fallback и corrupt error подтверждены; артефакты в
+  `artifacts/tauri-e2e/junit-*`.
 
 ## CLI fallback contract (M04 dispatch pending)
 
