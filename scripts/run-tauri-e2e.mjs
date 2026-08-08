@@ -30,6 +30,11 @@ const scenarios = [
     harnessQuery: '?m01=1&assetFailure=1&token=m01-icc-png',
   },
   {
+    id: 'renderer-exif',
+    spec: 'tests/e2e/specs/tauri-renderer-exif.e2e.ts',
+    harnessQuery: '?m01=1&token=m01-exif-png',
+  },
+  {
     id: 'renderer-corrupted',
     spec: 'tests/e2e/specs/tauri-renderer-corrupted.e2e.ts',
     harnessQuery: '?m01=1&token=m01-corrupted-png',

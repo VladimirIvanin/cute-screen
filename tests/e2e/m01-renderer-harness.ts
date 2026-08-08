@@ -23,3 +23,7 @@ export async function expectStartupBackend(): Promise<void> {
   const label = (await $('.backend-state').getText()).trim()
   expect(label).toMatch(startupBackendPattern)
 }
+
+export async function expectCanvasKitStartup(): Promise<void> {
+  await expect($('.backend-state')).toHaveText('canvaskit ready')
+}
