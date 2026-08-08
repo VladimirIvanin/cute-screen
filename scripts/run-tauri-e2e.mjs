@@ -20,6 +20,11 @@ const scenarios = [
     spec: 'tests/e2e/specs/tauri-foundation.e2e.ts',
   },
   {
+    id: 'shell',
+    spec: 'tests/e2e/specs/tauri-shell.e2e.ts',
+    harnessQuery: '?m02=ready',
+  },
+  {
     id: 'renderer-alpha',
     spec: 'tests/e2e/specs/tauri-renderer-alpha.e2e.ts',
     harnessQuery: '?m01=1&token=m01-alpha-png',

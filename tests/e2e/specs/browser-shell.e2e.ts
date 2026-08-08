@@ -74,6 +74,20 @@ describe('M02 editor shell in browser mode', () => {
     )
   })
 
+  it('renders the light theme at desktop scale', async () => {
+    await browser.setWindowSize(1600, 1000)
+    await openShell('ready')
+
+    await $('button[aria-label="More actions"]').click()
+    await $('button=Light').click()
+    expect(
+      await browser.execute(() => document.documentElement.dataset.theme),
+    ).toBe('light')
+    await browser.saveScreenshot(
+      path.resolve('artifacts/browser-e2e/m02-ready-light-1600x1000.png'),
+    )
+  })
+
   it('renders loading and recoverable error states, and reaches capture first by keyboard', async () => {
     await browser.setWindowSize(1024, 700)
     await openShell('loading')
