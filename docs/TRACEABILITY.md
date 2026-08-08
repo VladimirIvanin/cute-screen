@@ -1,8 +1,14 @@
 # Трассируемость требований
 
-Статусы: `planned`, `implemented`, `verified`, `blocked`. `implemented` означает наличие реализации, `verified` — подтверждённое пользовательское поведение на требуемых уровнях.
+Статусы: `planned`, `implemented`, `verified`, `blocked`. `implemented` означает
+наличие реализации и применимые automated/local-runtime evidence текущей системы;
+`verified` — подтверждённое пользовательское поведение в полной финальной
+platform/release matrix.
 
-Evidence заполняется фактической ссылкой на test ID, CI run, screenshot/log или system smoke record. Placeholder не позволяет получить `verified`.
+Evidence заполняется фактической ссылкой на test ID, CI run, screenshot/log или
+system smoke record. Во время разработки отсутствующее evidence других ОС
+помечается как отложенное; оно не блокирует следующий milestone, но placeholder
+не позволяет получить `verified` или статус platform `supported`.
 
 Foundation harness не создаёт отдельного продуктового требования. Его локальные и CI-доказательства определены в [стратегии тестирования](TESTING.md) и [CI workflow](../.github/workflows/ci.yml); статусы `REQ-*` ниже M00 не меняет.
 

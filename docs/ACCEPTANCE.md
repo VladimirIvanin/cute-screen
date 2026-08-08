@@ -7,6 +7,18 @@
 - `Pass` нельзя выставить по mocked backend, если сценарий требует реальную ОС.
 - Отмена и отказ разрешений проверяются так же, как happy path.
 
+## Режимы приёмки
+
+**Local development acceptance:** во время разработки выполняются сценарии и
+runtime checks, доступные на текущей системе владельца проекта. Реальный результат
+этой системы достаточен для продолжения следующего milestone, но не означает
+support на других platform rows.
+
+**Final platform/release acceptance:** после функционального завершения приложения
+все применимые сценарии повторяются на полной platform matrix, включая реальные
+webview, capture/hotkey, permissions и install/launch. Только этот этап может
+дать requirement статус `verified` и platform статус `supported`.
+
 ## A01 — Первый запуск
 
 **Начало:** чистая установка и пустой app data.
@@ -28,7 +40,8 @@
 4. Выбрать область.
 5. Проверить, что новый снимок декодирован, добавлен в серию и открыт в editor.
 
-Повторить для X11, GNOME Wayland, KDE Wayland, Windows и macOS. На Wayland selector системный.
+В финальной platform/release acceptance повторить для X11, GNOME Wayland, KDE
+Wayland, Windows и macOS. На Wayland selector системный.
 
 ## A03 — Конфликт shortcut и fallback
 

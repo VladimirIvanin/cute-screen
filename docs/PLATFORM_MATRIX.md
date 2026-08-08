@@ -14,7 +14,8 @@
 | macOS           | Intel          | Screen capture adapter + overlay      | Tauri/global-hotkey                    | universal DMG             |
 | macOS           | Apple Silicon  | Screen capture adapter + overlay      | Tauri/global-hotkey                    | universal DMG             |
 
-Точные минимальные версии ОС фиксируются после runtime-проверки capture API и webview. Release baseline не повышается без ADR и CI-доказательства.
+Точные минимальные версии ОС фиксируются во время финальной runtime-проверки
+capture API и webview. Release baseline не повышается без ADR и CI-доказательства.
 
 ## Capture capabilities
 
@@ -82,6 +83,12 @@ UI получает `CaptureCapabilities` и не показывает непо�
 - Повторная установка более новой CI-сборки не должна удалять shortcut configuration или library.
 
 ## Runtime evidence
+
+Во время разработки runtime evidence собирается только на текущей системе
+владельца проекта. Другие строки matrix получают code/compile/fake-platform
+coverage, но остаются без runtime support claim. Полный список ниже обязателен
+для финальной platform/release acceptance после функционального завершения
+приложения.
 
 Каждая platform-row получает:
 

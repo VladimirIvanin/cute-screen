@@ -19,6 +19,19 @@
 
 Тестовый WebDriver plugin включается только в test/debug bundle и отсутствует в релизной конфигурации.
 
+## Режим проверки в разработке
+
+Во время разработки реальная runtime-приёмка выполняется только на текущей
+системе владельца проекта. Изменение, затрагивающее webview/Tauri/OS, проверяется
+там, где этот путь доступен; результат фиксирует фактическую OS/architecture/
+session. Для остальных платформ сохраняются production code paths, общие traits,
+compile checks и fake-platform tests, но не создаётся заявление о runtime support.
+
+После функционального завершения приложения выполняется финальная
+platform/release acceptance: реальные webview, capture, hotkey, permissions и
+install/launch повторяются по полной матрице. До неё незапущенные platform rows
+являются отложенным evidence, а не блокером следующего milestone.
+
 ## Стабильные команды
 
 Проект предоставляет следующие команды:
@@ -168,7 +181,9 @@ Goldens создаются для каждого LayerNode:
 - `Escape`, text-editing exceptions и shortcuts;
 - computed visual state для toggles, а не только имя класса.
 
-Platform visual snapshots создаются отдельно для Linux, Windows и macOS shell layouts. Системные window controls остаются native и не имитируются snapshot CSS.
+Для финальной platform/release acceptance platform visual snapshots создаются
+отдельно для Linux, Windows и macOS shell layouts. Системные window controls
+остаются native и не имитируются snapshot CSS.
 
 ## E2E suites
 
@@ -195,11 +210,18 @@ Platform visual snapshots создаются отдельно для Linux, Wind
 - export и повторное декодирование;
 - diagnostics correlation ID.
 
-Tauri tests выполняются последовательно там, где single-instance, fixed ports или shortcuts могут конфликтовать.
+Во время разработки эти тесты запускаются на текущей системе владельца; прогоны
+на остальных webviews отложены до финальной platform/release acceptance. Tauri
+tests выполняются последовательно там, где single-instance, fixed ports или
+shortcuts могут конфликтовать.
 
 `pnpm test:e2e:tauri` (`scripts/run-tauri-e2e.mjs`) собирает test-harness binary один раз, затем запускает отдельный wdio-прогон на каждый сценарий (`foundation`, `renderer-alpha`, `renderer-binary`, `renderer-corrupted`) с изолированным app data. Harness query передаётся приложению при старте через service-level `appArgs`/`env` embedded provider — in-session navigation и `beforeSession` не используются, потому что embedded `@wdio/tauri-service` спаунит процесс в `onPrepare`, а `tauri_plugin_single_instance` не допускает второй экземпляр в том же прогоне. macOS использует тот же embedded provider; WKWebView runtime evidence подтверждено локальным прогоном 2026-08-09 и описано в M01 evidence.
 
 ### System smoke
+
+На текущей системе выполняются только применимые smoke-сценарии. Полное
+повторение этого списка на всех platform rows — финальная acceptance, а не
+условие закрытия промежуточной разработки.
 
 - X11: real hotkey и frozen overlay;
 - GNOME/KDE Wayland: real Screenshot и GlobalShortcuts portals;
@@ -224,7 +246,7 @@ Trend benchmark запускается в PR, hard gate — на стабиль�
 
 M01 `pnpm test:perf` выполняет 30 warmups и 120 измеряемых полных software-CanvasKit redraws для 4K/500 и 8K/1000 и пишет `artifacts/perf/m01-renderer.json` с runner identity и fixture SHA. Бюджеты становятся blocking только при `CUTE_SCREEN_REFERENCE_RUNNER=1`; любое ненулевое число idle frames остаётся hard failure везде.
 
-Linux system smoke пишет JSON в `artifacts/m01/`: commit SHA, OS/arch/session, portal и WebKitGTK versions, monitor layout, correlation ID и observable result. `portal-screenshot` и `portal-shortcuts` интерактивны; cancel записывается как ожидаемый outcome без error-log. Эти локальные файлы становятся milestone evidence только после загрузки в CI/system-run artifact с устойчивой ссылкой.
+Linux system smoke пишет JSON в `artifacts/m01/`: commit SHA, OS/arch/session, portal и WebKitGTK versions, monitor layout, correlation ID и observable result. `portal-screenshot` и `portal-shortcuts` интерактивны; cancel записывается как ожидаемый outcome без error-log. Во время разработки эти локальные файлы являются evidence текущей системы и достаточны для local development acceptance. Для финального `verified`/`supported` они должны попасть в устойчивый CI/system-run artifact вместе с остальной платформенной матрицей.
 
 Локальный GNOME Wayland прогон 2026-08-09 (SHA `7ff7d283`): `portal-probe`, `portal-invalid-uri` и `portal-screenshot` — success; `portal-shortcuts` — `shortcutUnavailable` на GNOME backend без GlobalShortcuts interface. JSON записаны в `artifacts/m01/`; cancel semantics и KDE Wayland остаются pending.
 
@@ -252,11 +274,10 @@ Linux system smoke пишет JSON в `artifacts/m01/`: commit SHA, OS/arch/sess
 
 ### Nightly
 
-- real-Tauri suite на Linux, Windows и macOS;
-- performance trends;
-- large fixtures;
-- memory/soak;
-- scheduled system platform smokes на доступных runners.
+- На текущей системе: доступные real-Tauri, performance trends, large fixtures,
+  memory/soak и system smokes.
+- После функционального завершения: real-Tauri и system platform smokes на
+  Linux, Windows и macOS.
 
 ### Versioned build
 

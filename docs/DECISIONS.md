@@ -98,7 +98,7 @@
 
 ## ADR-013 — Runtime evidence обязательно
 
-**Статус:** accepted
+**Статус:** superseded by ADR-020
 
 **Решение:** requirement нельзя закрыть unit-тестом механизма, если пользовательский путь зависит от webview/Tauri/OS. `TRACEABILITY.md` хранит автоматическое и runtime-доказательство.
 
@@ -147,3 +147,25 @@
 **Решение:** `xcap` 0.9.7 отклонён и не входит в production dependency graph. X11 risk spike использует отдельный permissive `x11rb` adapter за feature `x11-capture`; Wayland adapter остаётся на `ashpd` и никогда не вызывает X11 adapter. Общие `CaptureBackend`, DTO и stable error codes не меняются.
 
 **Проверка:** `cargo deny check` должен быть зелёным с all-features graph. Controlled X11 gate отдельно проверяет RandR monitor coordinates/physical dimensions и RGBA hash реального окна; до появления такого evidence X11 capability не объявляется доступной.
+
+## ADR-020 — Локальная runtime-приёмка до финальной платформенной матрицы
+
+**Статус:** accepted; supersedes ADR-013
+
+**Контекст:** приложение разрабатывается и проверяется на текущей системе владельца
+проекта. Выполнять runtime, portal, native-window и installation прогоны на
+каждой целевой ОС после каждого вертикального среза нецелесообразно; это
+замедляет завершение продукта без добавления нового пользовательского сценария.
+
+**Решение:** во время разработки runtime-приёмка выполняется только на текущей
+системе владельца. Для остальных platform rows продолжаются реализация,
+type/compile checks и deterministic tests через общие traits/fake-platform, но
+runtime-статус не заявляется. Полная матрица реальных webview, capture, hotkey,
+permissions и install/launch выполняется один раз после функционального
+завершения приложения как финальная platform/release acceptance.
+
+**Границы:** это не отменяет unit/property/render/browser tests, requirements к
+undo/redo, безопасной обработке ошибок и platform capability contracts. Локальный
+runtime pass не означает `supported` или `verified` для другой ОС; до финальной
+матрицы такие строки остаются `planned` либо `implemented` с явно указанным
+отложенным evidence.

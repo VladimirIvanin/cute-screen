@@ -49,9 +49,10 @@ Artifacts считаются тестовыми/неофициальными с�
 
 ### `nightly.yml`
 
-- Real Tauri E2E на Linux, Windows и macOS.
-- Large fixtures, memory/soak и performance trends.
-- Доступные system capture/hotkey/portal smokes.
+- Во время разработки: доступные на текущей системе real Tauri E2E, large
+  fixtures, memory/soak, performance trends и system smoke.
+- После функционального завершения: Real Tauri E2E и system
+  capture/hotkey/portal smokes на Linux, Windows и macOS.
 - Artifacts могут иметь короткий retention и не считаются versioned builds.
 
 ### `build-artifacts.yml`
