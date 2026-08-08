@@ -9,9 +9,17 @@ const onePixelPng = Uint8Array.from([
 ])
 
 describe('M01 renderer harness in browser mode', () => {
+  async function openHarness(query: string): Promise<void> {
+    await browser.url('/')
+    await browser.execute((search) => {
+      window.location.search = search
+    }, query)
+    await expect($('.backend-state')).toExist()
+  }
+
   it('loads bundled CanvasKit and keeps scene and overlay separate', async () => {
     await browser.setWindowSize(960, 640)
-    await browser.url('/?m01=1')
+    await openHarness('?m01=1')
     await expect($('.backend-state')).toHaveText('canvaskit ready')
     await expect($$('.diagnostic-canvas')).toBeElementsArrayOfSize(2)
     await expect($('.diagnostic-metrics')).toHaveText(
@@ -41,24 +49,24 @@ describe('M01 renderer harness in browser mode', () => {
   })
 
   it('falls back for missing WASM and for context loss, then restores once', async () => {
-    await browser.url('/?m01=1&renderer=canvas2d')
+    await openHarness('?m01=1&renderer=canvas2d')
     await expect($('.backend-state')).toHaveText(
       'Canvas2D fallback · startupFailure',
     )
 
-    await browser.url('/?m01=1&renderer=broken-wasm')
+    await openHarness('?m01=1&renderer=broken-wasm')
     await expect($('.backend-state')).toHaveText(
       'Canvas2D fallback · startupFailure',
     )
 
-    await browser.url('/?m01=1&syntheticContext=1')
+    await openHarness('?m01=1&syntheticContext=1')
     await expect($('.backend-state')).toHaveText('canvaskit ready')
     await $('button=Lose context').click()
     await expect($('.backend-state')).toHaveText('Canvas2D recovery active')
     await $('button=Restore context').click()
     await expect($('.backend-state')).toHaveText('canvaskit ready')
 
-    await browser.url('/?m01=1')
+    await openHarness('?m01=1')
     await expect($('.backend-state')).toHaveText('canvaskit ready')
     await $('button=Lose context').click()
     await expect($('.backend-state')).toHaveText('Canvas2D recovery active')
@@ -69,8 +77,8 @@ describe('M01 renderer harness in browser mode', () => {
   })
 
   it('uses raw binary IPC after a forced asset failure', async () => {
-    await browser.url(
-      '/?m01=1&assetFailure=1&browserBinary=1&token=browser-pixel',
+    await openHarness(
+      '?m01=1&assetFailure=1&browserBinary=1&token=browser-pixel',
     )
     const stage = await browser.tauri.mock('stage_image')
     await stage.mockResolvedValue({
