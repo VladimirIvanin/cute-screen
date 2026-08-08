@@ -38,6 +38,9 @@ pub enum LaunchIntentV1 {
 struct Cli {
     #[arg(long)]
     background: bool,
+    #[cfg(feature = "test-harness")]
+    #[arg(long = "e2e-harness-query", hide = true)]
+    e2e_harness_query: Option<String>,
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -57,6 +60,20 @@ where
         LaunchIntentV1::Background
     } else {
         LaunchIntentV1::ShowEditor
+    })
+}
+
+#[cfg(feature = "test-harness")]
+pub fn parse_e2e_harness_query<I, T>(args: I) -> Option<String>
+where
+    I: IntoIterator<Item = T>,
+    T: Into<std::ffi::OsString> + Clone,
+{
+    let cli = Cli::try_parse_from(args).ok()?;
+    cli.e2e_harness_query.or_else(|| {
+        std::env::var("CUTE_SCREEN_E2E_HARNESS_QUERY")
+            .ok()
+            .filter(|value| !value.is_empty())
     })
 }
 

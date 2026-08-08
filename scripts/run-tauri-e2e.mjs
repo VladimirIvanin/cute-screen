@@ -1,13 +1,40 @@
 import { spawnSync } from 'node:child_process'
+import net from 'node:net'
 import { mkdtemp, mkdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
 
 const root = process.cwd()
-const appData = await mkdtemp(path.join(tmpdir(), 'cute-screen-e2e-'))
 const artifacts = path.join(root, 'artifacts', 'tauri-e2e')
 await mkdir(artifacts, { recursive: true })
+
+const embeddedWebDriverPort = Number.parseInt(
+  process.env.TAURI_WEBDRIVER_PORT ?? '4445',
+  10,
+)
+
+const scenarios = [
+  {
+    id: 'foundation',
+    spec: 'tests/e2e/specs/tauri-foundation.e2e.ts',
+  },
+  {
+    id: 'renderer-alpha',
+    spec: 'tests/e2e/specs/tauri-renderer-alpha.e2e.ts',
+    harnessQuery: '?m01=1&token=m01-alpha-png',
+  },
+  {
+    id: 'renderer-binary',
+    spec: 'tests/e2e/specs/tauri-renderer-binary.e2e.ts',
+    harnessQuery: '?m01=1&assetFailure=1&token=m01-icc-png',
+  },
+  {
+    id: 'renderer-corrupted',
+    spec: 'tests/e2e/specs/tauri-renderer-corrupted.e2e.ts',
+    harnessQuery: '?m01=1&token=m01-corrupted-png',
+  },
+]
 
 function isolatedAppDataEnvironment(directory) {
   const environment = { CUTE_SCREEN_E2E_APP_DATA: directory }
@@ -41,7 +68,38 @@ function run(command, args, extraEnv = {}) {
     shell: process.platform === 'win32',
   })
   if (result.error) throw result.error
-  if (result.status !== 0) process.exit(result.status ?? 1)
+  return result.status ?? 1
+}
+
+function isPortInUse(port) {
+  return new Promise((resolve, reject) => {
+    const socket = net.createConnection({ port, host: '127.0.0.1' })
+    socket.once('connect', () => {
+      socket.destroy()
+      resolve(true)
+    })
+    socket.once('error', (error) => {
+      if (error.code === 'ECONNREFUSED') {
+        resolve(false)
+        return
+      }
+      reject(error)
+    })
+  })
+}
+
+async function waitForPortFree(port, timeoutMs = 30_000) {
+  const startedAt = Date.now()
+  while (Date.now() - startedAt < timeoutMs) {
+    const inUse = await isPortInUse(port)
+    if (!inUse) {
+      return
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500))
+  }
+  throw new Error(
+    `Embedded WebDriver port ${port} is still in use after ${timeoutMs}ms; previous app instance did not exit`,
+  )
 }
 
 const executable = path.join(
@@ -50,6 +108,9 @@ const executable = path.join(
   'debug',
   process.platform === 'win32' ? 'cute-screen.exe' : 'cute-screen',
 )
+
+const failedScenarios = []
+const retainedAppDataDirs = []
 
 try {
   run('pnpm', ['fixtures:generate:m01'])
@@ -70,11 +131,53 @@ try {
       VITE_M01_HARNESS: 'true',
     },
   )
-  run('pnpm', ['exec', 'wdio', 'run', 'tests/e2e/wdio.tauri.conf.ts'], {
-    ...isolatedAppDataEnvironment(appData),
-    CUTE_SCREEN_WDIO_APP_BINARY: executable,
-    CUTE_SCREEN_WDIO_ARTIFACTS: artifacts,
-  })
-} finally {
-  await rm(appData, { recursive: true, force: true })
+
+  for (const scenario of scenarios) {
+    const appData = await mkdtemp(
+      path.join(tmpdir(), `cute-screen-e2e-${scenario.id}-`),
+    )
+
+    await waitForPortFree(embeddedWebDriverPort)
+
+    const scenarioEnv = {
+      ...isolatedAppDataEnvironment(appData),
+      CUTE_SCREEN_WDIO_APP_BINARY: executable,
+      CUTE_SCREEN_WDIO_ARTIFACTS: artifacts,
+      CUTE_SCREEN_E2E_SCENARIO: scenario.id,
+    }
+    if (scenario.harnessQuery) {
+      scenarioEnv.CUTE_SCREEN_E2E_HARNESS_QUERY = scenario.harnessQuery
+    }
+
+    const status = run(
+      'pnpm',
+      [
+        'exec',
+        'wdio',
+        'run',
+        'tests/e2e/wdio.tauri.conf.ts',
+        '--spec',
+        scenario.spec,
+      ],
+      scenarioEnv,
+    )
+
+    if (status === 0) {
+      await rm(appData, { recursive: true, force: true })
+      continue
+    }
+
+    failedScenarios.push(scenario.id)
+    retainedAppDataDirs.push(appData)
+  }
+} catch (error) {
+  process.exitCode = 1
+  throw error
+}
+
+if (failedScenarios.length > 0) {
+  process.exitCode = 1
+  throw new Error(
+    `Tauri E2E failed for: ${failedScenarios.join(', ')}; retained appData=${retainedAppDataDirs.join(', ')}`,
+  )
 }

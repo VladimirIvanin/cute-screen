@@ -14,6 +14,7 @@ import {
 import { loadImageWithBinaryFallback } from '@cute-screen/editor-vue'
 
 import { tauriDesktopBridge } from './desktop-bridge'
+import { resolveHarnessSearch } from './e2e-harness-query'
 
 const sceneCanvas = ref<HTMLCanvasElement>()
 const overlayCanvas = ref<HTMLCanvasElement>()
@@ -37,10 +38,7 @@ const transportState = ref<
 >({ status: 'idle' })
 let runtime: RendererRuntime | undefined
 let replacementCanvas: HTMLCanvasElement | undefined
-
-const parameters = new URLSearchParams(window.location.search)
-const requestedBackend = parameters.get('renderer')
-const forceAssetFailure = parameters.get('assetFailure') === '1'
+let harnessParameters = new URLSearchParams(window.location.search)
 const statusLabel = computed(() => {
   const state = runtimeState.value
   if (state.status === 'initializing') return 'Initializing renderer'
@@ -118,6 +116,8 @@ function activateSceneCanvas(canvas: HTMLCanvasElement): void {
 
 onMounted(async () => {
   if (!sceneCanvas.value || !overlayCanvas.value) return
+  harnessParameters = new URLSearchParams(await resolveHarnessSearch())
+  const requestedBackend = harnessParameters.get('renderer')
   runtime = new RendererRuntime({
     stack: {
       scene: sceneCanvas.value,
@@ -158,7 +158,7 @@ onBeforeUnmount(() => runtime?.dispose())
 function loseContext(): void {
   const canvas = sceneCanvas.value
   if (!canvas) return
-  if (parameters.get('syntheticContext') === '1') {
+  if (harnessParameters.get('syntheticContext') === '1') {
     canvas.dispatchEvent(new Event('webglcontextlost', { cancelable: true }))
     return
   }
@@ -171,7 +171,7 @@ function loseContext(): void {
 function restoreContext(): void {
   const canvas = sceneCanvas.value
   if (!canvas) return
-  if (parameters.get('syntheticContext') === '1') {
+  if (harnessParameters.get('syntheticContext') === '1') {
     canvas.dispatchEvent(new Event('webglcontextrestored'))
     return
   }
@@ -187,7 +187,7 @@ async function verifyTransport(): Promise<void> {
   try {
     let pixel = 'unavailable'
     const bridge =
-      parameters.get('browserBinary') === '1'
+      harnessParameters.get('browserBinary') === '1'
         ? {
             ...tauriDesktopBridge,
             readImageBytes: async (token: string, correlationId: string) => {
@@ -200,12 +200,13 @@ async function verifyTransport(): Promise<void> {
           }
         : tauriDesktopBridge
     const result = await loadImageWithBinaryFallback({
-      token: parameters.get('token') ?? 'm01-alpha-png',
+      token: harnessParameters.get('token') ?? 'm01-alpha-png',
       correlationId: 'm01-transport-harness',
       bridge,
-      convertFileSrc: forceAssetFailure
-        ? () => 'asset://forced-denial'
-        : convertFileSrc,
+      convertFileSrc:
+        harnessParameters.get('assetFailure') === '1'
+          ? () => 'asset://forced-denial'
+          : convertFileSrc,
       onPrimaryFailure: (error, assetUrl) => {
         primaryDiagnostic.value = `${assetUrl} :: ${error instanceof Error ? `${error.name}: ${error.message}` : String(error)}`
       },

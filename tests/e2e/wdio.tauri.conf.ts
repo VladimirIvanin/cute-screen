@@ -6,6 +6,8 @@ const appBinaryPath = process.env.CUTE_SCREEN_WDIO_APP_BINARY
 const outputDir = path.resolve(
   process.env.CUTE_SCREEN_WDIO_ARTIFACTS ?? 'artifacts/tauri-e2e',
 )
+const scenarioId = process.env.CUTE_SCREEN_E2E_SCENARIO ?? 'default'
+const harnessQuery = process.env.CUTE_SCREEN_E2E_HARNESS_QUERY
 
 if (!appBinaryPath) {
   throw new Error(
@@ -27,6 +29,12 @@ export const config: WebdriverIO.Config = {
         captureBackendLogs: true,
         captureFrontendLogs: true,
         driverProvider: 'embedded',
+        appArgs: harnessQuery
+          ? [`--e2e-harness-query=${harnessQuery}`]
+          : [],
+        env: harnessQuery
+          ? { CUTE_SCREEN_E2E_HARNESS_QUERY: harnessQuery }
+          : {},
       },
     ],
   ],
@@ -38,7 +46,7 @@ export const config: WebdriverIO.Config = {
       'junit',
       {
         outputDir,
-        outputFileFormat: ({ cid }) => `junit-${cid}.xml`,
+        outputFileFormat: ({ cid }) => `junit-${scenarioId}-${cid}.xml`,
       },
     ],
   ],

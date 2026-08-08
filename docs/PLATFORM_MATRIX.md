@@ -73,7 +73,12 @@ UI получает `CaptureCapabilities` и не показывает непо�
 
 ### Windows
 
-- Проверяются WebView2 runtime, mixed DPI и политика запуска в фоне.
+- Локальный M01 smoke на Windows x64 подтвердил WebView2 runtime: asset decode,
+  binary IPC/Blob fallback и typed error для corrupted PNG.
+- CanvasKit/WebGL startup в проверенном WebView2 перешёл на Canvas2D fallback;
+  это не подтверждает primary CanvasKit path для Windows.
+- Mixed DPI, политика запуска в фоне, capture и hotkey остаются pending до M04
+  system smoke.
 - Повторная установка более новой CI-сборки не должна удалять shortcut configuration или library.
 
 ## Runtime evidence
@@ -96,7 +101,15 @@ UI получает `CaptureCapabilities` и не показывает непо�
 - `xcap` 0.9.7 отклонён из-за security advisories в dependency graph; решение и отдельный `x11rb` 0.14.0 boundary зафиксированы в ADR-019.
 - Локальный Ubuntu/GNOME X11 controlled-window smoke подтвердил monitor enumeration, physical millimetres, coordinates, 96×64 RGBA capture и SHA-256. До появления устойчивой CI artifact URL это локальная диагностика, не статус `supported`.
 - Локальный X11 portal probe увидел Screenshot v2 без `AvailableTargets` и без GlobalShortcuts. Это не evidence для GNOME/KDE Wayland; обе строки остаются `pending`.
-- WebKitGTK 2.52.3 подтвердил scoped asset decode и binary IPC fallback, но CanvasKit/WebGL startup в этом runtime перешёл на Canvas2D. WebView2 и WKWebView runtime evidence отсутствует.
+- WebKitGTK 2.52.3 и локальный Windows x64 / WebView2 smoke (2026-08-08)
+  подтвердили scoped asset decode, binary IPC fallback и typed error для
+  corrupted PNG. В обоих runtime CanvasKit/WebGL startup перешёл на Canvas2D.
+  WKWebView runtime evidence отсутствует; macOS Tauri E2E использует тот же
+  embedded WebDriver provider, но не имеет runtime proof.
+- Windows M01 Tauri E2E: `pnpm test:e2e:tauri` (2026-08-09, Windows x64 /
+  WebView2) прошёл четыре per-scenario прогона — `tauri-foundation.e2e.ts`,
+  `tauri-renderer-alpha.e2e.ts`, `tauri-renderer-binary.e2e.ts`,
+  `tauri-renderer-corrupted.e2e.ts`; артефакты в `artifacts/tauri-e2e/junit-*`.
 
 ## CLI fallback contract (M04 dispatch pending)
 

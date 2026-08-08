@@ -7,8 +7,12 @@ use std::fs;
 #[cfg(feature = "test-harness")]
 use image_transport::RegisteredImage;
 use image_transport::{ImageTransportService, StagedImageMetadata};
+#[cfg(all(feature = "test-harness", target_os = "linux"))]
+use platform::{CaptureRequest, CaptureTarget};
 #[cfg(feature = "test-harness")]
-use platform::{CaptureRequest, CaptureResult, CaptureTarget, PortalCapabilityProbe};
+use platform::PortalCapabilityProbe;
+#[cfg(all(feature = "test-harness", target_os = "linux"))]
+use platform::CaptureResult;
 use platform::{PlatformCapabilities, PlatformError, SessionKind};
 use serde::Serialize;
 use tauri::{
@@ -87,6 +91,12 @@ async fn platform_capabilities(correlation_id: String) -> PlatformCapabilities {
 
 #[cfg(feature = "test-harness")]
 #[tauri::command]
+fn get_e2e_harness_query() -> Option<String> {
+    lifecycle::parse_e2e_harness_query(env::args_os())
+}
+
+#[cfg(feature = "test-harness")]
+#[tauri::command]
 async fn test_portal_probe(correlation_id: String) -> Result<PortalCapabilityProbe, PlatformError> {
     #[cfg(target_os = "linux")]
     {
@@ -101,25 +111,29 @@ async fn test_portal_probe(correlation_id: String) -> Result<PortalCapabilityPro
     ))
 }
 
-#[cfg(feature = "test-harness")]
+#[cfg(all(feature = "test-harness", target_os = "linux"))]
 #[tauri::command]
 async fn test_portal_capture(
     correlation_id: String,
     transport: State<'_, ImageTransportService>,
 ) -> Result<CaptureResult, PlatformError> {
-    #[cfg(target_os = "linux")]
-    {
-        return linux_platform::AshpdPortalClient::default()
-            .capture_to_transport(
-                CaptureRequest {
-                    correlation_id,
-                    target: CaptureTarget::Area,
-                },
-                transport.inner(),
-            )
-            .await;
-    }
-    #[cfg(not(target_os = "linux"))]
+    linux_platform::AshpdPortalClient::default()
+        .capture_to_transport(
+            CaptureRequest {
+                correlation_id,
+                target: CaptureTarget::Area,
+            },
+            transport.inner(),
+        )
+        .await
+}
+
+#[cfg(all(feature = "test-harness", not(target_os = "linux")))]
+#[tauri::command]
+async fn test_portal_capture(
+    correlation_id: String,
+    _transport: State<'_, ImageTransportService>,
+) -> Result<platform::CaptureResult, PlatformError> {
     Err(PlatformError::new(
         platform::PlatformErrorCode::PortalUnavailable,
         correlation_id,
@@ -315,21 +329,19 @@ pub fn run() {
         });
 
     #[cfg(feature = "test-harness")]
-    let builder = {
-        eprintln!("cute-screen:test-harness");
-        builder
-            .plugin(tauri_plugin_wdio::init())
-            .plugin(tauri_plugin_wdio_webdriver::init())
-    };
+    let builder = builder
+        .plugin(tauri_plugin_wdio::init())
+        .plugin(tauri_plugin_wdio_webdriver::init());
 
     #[cfg(feature = "test-harness")]
     let builder = builder.invoke_handler(tauri::generate_handler![
         ping,
         platform_capabilities,
+        get_e2e_harness_query,
         read_image_bytes,
         stage_image,
         test_portal_capture,
-        test_portal_probe
+        test_portal_probe,
     ]);
 
     #[cfg(not(feature = "test-harness"))]
