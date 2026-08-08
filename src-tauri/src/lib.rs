@@ -8,11 +8,11 @@ use std::fs;
 use image_transport::RegisteredImage;
 use image_transport::{ImageTransportService, StagedImageMetadata};
 #[cfg(all(feature = "test-harness", target_os = "linux"))]
-use platform::{CaptureRequest, CaptureTarget};
+use platform::CaptureResult;
 #[cfg(feature = "test-harness")]
 use platform::PortalCapabilityProbe;
 #[cfg(all(feature = "test-harness", target_os = "linux"))]
-use platform::CaptureResult;
+use platform::{CaptureRequest, CaptureTarget};
 use platform::{PlatformCapabilities, PlatformError, SessionKind};
 use serde::Serialize;
 use tauri::{
