@@ -1,11 +1,11 @@
 import { $, expect } from '@wdio/globals'
 
 describe('foundation shell in a real Tauri webview', () => {
-  it('boots, completes typed Rust IPC, and lets the runner close cleanly', async () => {
-    await expect($('h1')).toHaveText('Cute Screen workspace is ready')
-    await $('button=Check desktop bridge').click()
-    await expect($('[role="status"]')).toHaveText(
-      'Desktop bridge ready · protocol 1',
-    )
+  it('boots the empty editor and completes the test capture action', async () => {
+    await expect($('h1')).toHaveText('Capture your first screen')
+    await expect($('button=Copy')).toBeDisabled()
+    await expect($('button=Export')).toBeDisabled()
+    await $('button=Capture').click()
+    await expect($('[role="status"]')).toHaveText('capture completed')
   })
 })

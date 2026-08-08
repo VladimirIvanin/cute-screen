@@ -18,12 +18,8 @@ export const config: WebdriverIO.Config = {
         mode: 'browser',
         devServerUrl: 'http://127.0.0.1:5173',
         devServer: {
-          command: 'pnpm dev',
+          command: 'pnpm dev:e2e:browser',
           cwd: process.cwd(),
-          env: {
-            VITE_TEST_HARNESS: 'true',
-            VITE_M01_HARNESS: 'true',
-          },
           reuseExistingServer: false,
           timeoutMs: 60_000,
         },

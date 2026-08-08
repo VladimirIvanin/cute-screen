@@ -70,8 +70,8 @@ Foundation harness не создаёт отдельного продуктово
 | REQ-UI-002  | `m02-shell` theme reaction test                        | system/light/dark snapshots                      | planned |
 | REQ-UI-003  | `m02-shell` locale completeness/fallback test          | live RU/EN switch E2E                            | planned |
 | REQ-UI-004  | `m02-shell` responsive component tests                 | 1024 px runtime review                           | planned |
-| REQ-UI-005  | `m02-shell` semantic state tests                       | visual/contrast review                           | planned |
-| REQ-UI-006  | `m02-shell` accessibility queries                      | keyboard/screen-reader audit                     | planned |
+| REQ-UI-005  | `m02-shell` semantic-state tests; `browser-foundation` | visual/contrast review                           | planned |
+| REQ-UI-006  | `m02-shell` accessibility queries; `browser-foundation` | keyboard/screen-reader audit                     | planned |
 | REQ-UI-007  | `m02-shell` focus/reduced-motion tests                 | keyboard-only E2E                                | planned |
 | REQ-UI-008  | `m02-lifecycle` window config unit test                | native decoration smoke                          | planned |
 | REQ-UI-009  | diagnostics redaction tests                            | exported bundle review                           | planned |
