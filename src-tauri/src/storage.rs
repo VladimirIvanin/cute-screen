@@ -2,7 +2,7 @@ use std::{
     collections::BTreeSet,
     fs::{self, File, OpenOptions},
     io::{Read, Write},
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
     sync::mpsc::{self, Sender},
     thread,
     time::{SystemTime, UNIX_EPOCH},
@@ -275,6 +275,7 @@ impl StorageState {
         let resources_root = resources_root.join("resources");
         fs::create_dir_all(&blobs_root)?;
         fs::create_dir_all(&resources_root)?;
+        let resources_root = resources_root.canonicalize()?;
         let mut connection = Connection::open(root.join("library.sqlite3"))?;
         connection.pragma_update(None, "foreign_keys", "ON")?;
         connection.pragma_update(None, "journal_mode", "WAL")?;
@@ -304,35 +305,38 @@ impl StorageState {
         .to_string();
         self.connection.execute(
             "INSERT INTO recovery_journal (operation_id, kind, state, payload_json, created_at, updated_at) VALUES (?1, 'createCapture', 'prepared', ?2, ?3, ?3)",
-            params![operation_id, journal_payload, now_millis()],
+            params![operation_id, journal_payload, now_millis()?],
         )?;
         let blob = self.store_blob(&request.source_bytes, &request.source_metadata)?;
         self.connection.execute(
             "UPDATE recovery_journal SET state = 'blobReady', updated_at = ?2 WHERE operation_id = ?1",
-            params![operation_id, now_millis()],
+            params![operation_id, now_millis()?],
         )?;
 
         let transaction = self.connection.transaction()?;
-        let series_id = request.series_id.unwrap_or_else(|| {
-            transaction
+        let series_id = match request.series_id {
+            Some(series_id) => series_id,
+            None => transaction
                 .query_row(
                     "SELECT value_json FROM settings WHERE key = 'session.activeSeriesId'",
                     [],
                     |row| row.get::<_, String>(0),
                 )
-                .optional()
-                .ok()
-                .flatten()
-                .and_then(|value| serde_json::from_str::<String>(&value).ok())
-                .unwrap_or_else(|| Uuid::now_v7().to_string())
-        });
+                .optional()?
+                .map(|value| {
+                    serde_json::from_str::<String>(&value)
+                        .map_err(|error| RepositoryError::InvalidDocument(error.to_string()))
+                })
+                .transpose()?
+                .unwrap_or_else(|| Uuid::now_v7().to_string()),
+        };
         transaction.execute(
             "INSERT OR IGNORE INTO series (id, title, created_at, updated_at, deleted_at) VALUES (?1, NULL, ?2, ?2, NULL)",
             params![series_id, request.captured_at],
         )?;
         transaction.execute(
             "INSERT INTO blobs (hash, format, mime_type, byte_size, width, height, color_metadata_json, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8) ON CONFLICT(hash) DO NOTHING",
-            params![blob.hash, blob.metadata.format, blob.metadata.mime_type, blob.byte_size as i64, blob.metadata.width, blob.metadata.height, serde_json::to_string(&blob.metadata.color_metadata).map_err(|error| RepositoryError::InvalidDocument(error.to_string()))?, request.captured_at],
+            params![blob.hash, blob.metadata.format, blob.metadata.mime_type, sqlite_byte_size(blob.byte_size)?, blob.metadata.width, blob.metadata.height, serde_json::to_string(&blob.metadata.color_metadata).map_err(|error| RepositoryError::InvalidDocument(error.to_string()))?, request.captured_at],
         )?;
         transaction.execute(
             "INSERT INTO captures (id, series_id, original_blob_hash, captured_at, created_at, updated_at, deleted_at) VALUES (?1, ?2, ?3, ?4, ?4, ?4, NULL)",
@@ -379,7 +383,7 @@ impl StorageState {
         let blob = self.store_blob(bytes, metadata)?;
         self.connection.execute(
             "INSERT INTO blobs (hash, format, mime_type, byte_size, width, height, color_metadata_json, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8) ON CONFLICT(hash) DO NOTHING",
-            params![blob.hash, blob.metadata.format, blob.metadata.mime_type, blob.byte_size as i64, blob.metadata.width, blob.metadata.height, serde_json::to_string(&blob.metadata.color_metadata).map_err(|error| RepositoryError::InvalidDocument(error.to_string()))?, now_millis()],
+            params![blob.hash, blob.metadata.format, blob.metadata.mime_type, sqlite_byte_size(blob.byte_size)?, blob.metadata.width, blob.metadata.height, serde_json::to_string(&blob.metadata.color_metadata).map_err(|error| RepositoryError::InvalidDocument(error.to_string()))?, now_millis()?],
         )?;
         Ok(blob)
     }
@@ -407,7 +411,7 @@ impl StorageState {
         ).optional()?.ok_or_else(|| RepositoryError::InvalidDocument("document does not exist".to_owned()))?;
         let updated = transaction.execute(
             "UPDATE documents SET revision = revision + 1, content_json = ?1, content_sha256 = ?2, updated_at = ?3 WHERE id = ?4 AND revision = ?5",
-            params![document_json, sha256_hex(document_json.as_bytes()), now_millis(), document_id, expected_revision],
+            params![document_json, sha256_hex(document_json.as_bytes()), now_millis()?, document_id, expected_revision],
         )?;
         if updated != 1 {
             return Err(RepositoryError::RevisionConflict);
@@ -443,25 +447,25 @@ impl StorageState {
             .map_err(|error| RepositoryError::InvalidDocument(error.to_string()))?;
         self.connection.execute(
             "INSERT INTO settings (key, schema_version, value_json, updated_at) VALUES (?1, ?2, ?3, ?4) ON CONFLICT(key) DO UPDATE SET schema_version = excluded.schema_version, value_json = excluded.value_json, updated_at = excluded.updated_at",
-            params![key, schema_version, value_json, now_millis()],
+            params![key, schema_version, value_json, now_millis()?],
         )?;
         Ok(())
     }
 
     fn register_derivative(&mut self, metadata: DerivativeMetadata) -> Result<(), RepositoryError> {
-        if metadata.variant != "thumbnail" && metadata.variant != "interactive-2048" {
-            return Err(RepositoryError::InvalidImage);
-        }
-        let cache_path = self
-            .resources_root
-            .join(&metadata.source_hash)
-            .join(&metadata.cache_path);
-        if !cache_path.starts_with(&self.resources_root) {
+        validate_derivative_metadata(&metadata)?;
+        let cache_path = self.derivative_cache_path(&metadata.source_hash, &metadata.cache_path)?;
+        let canonical_cache_path = cache_path
+            .canonicalize()
+            .map_err(|_| RepositoryError::InvalidImage)?;
+        if !canonical_cache_path.is_file()
+            || !canonical_cache_path.starts_with(&self.resources_root)
+        {
             return Err(RepositoryError::PermissionDenied);
         }
         self.connection.execute(
             "INSERT INTO blob_derivatives (source_hash, variant, generator_version, cache_path, content_hash, byte_size, width, height, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9) ON CONFLICT(source_hash, variant, generator_version) DO UPDATE SET cache_path = excluded.cache_path, content_hash = excluded.content_hash, byte_size = excluded.byte_size, width = excluded.width, height = excluded.height, created_at = excluded.created_at",
-            params![metadata.source_hash, metadata.variant, metadata.generator_version, metadata.cache_path, metadata.content_hash, metadata.byte_size as i64, metadata.width, metadata.height, now_millis()],
+            params![metadata.source_hash, metadata.variant, metadata.generator_version, metadata.cache_path, metadata.content_hash, sqlite_byte_size(metadata.byte_size)?, metadata.width, metadata.height, now_millis()?],
         )?;
         Ok(())
     }
@@ -471,6 +475,14 @@ impl StorageState {
         source_hash: &str,
         variant: &str,
     ) -> Result<Option<PathBuf>, RepositoryError> {
+        if !is_sha256(source_hash) {
+            return Err(RepositoryError::MissingBlob {
+                hash: source_hash.to_owned(),
+            });
+        }
+        if !is_derivative_variant(variant) {
+            return Err(RepositoryError::InvalidImage);
+        }
         let relative: Option<String> = self.connection.query_row(
             "SELECT cache_path FROM blob_derivatives WHERE source_hash = ?1 AND variant = ?2 ORDER BY generator_version DESC LIMIT 1",
             params![source_hash, variant],
@@ -479,19 +491,19 @@ impl StorageState {
         let Some(relative) = relative else {
             return Ok(None);
         };
-        let path = self.resources_root.join(source_hash).join(relative);
-        if !path.starts_with(&self.resources_root) {
-            return Err(RepositoryError::PermissionDenied);
-        }
-        if path.is_file() {
-            Ok(Some(path))
-        } else {
+        let path = self.derivative_cache_path(source_hash, &relative)?;
+        if !path.is_file() {
             self.connection.execute(
                 "DELETE FROM blob_derivatives WHERE source_hash = ?1 AND variant = ?2",
                 params![source_hash, variant],
             )?;
-            Ok(None)
+            return Ok(None);
         }
+        let canonical_path = path.canonicalize()?;
+        if !canonical_path.starts_with(&self.resources_root) {
+            return Err(RepositoryError::PermissionDenied);
+        }
+        Ok(Some(canonical_path))
     }
 
     fn blob_path_checked(&mut self, hash: &str) -> Result<PathBuf, RepositoryError> {
@@ -511,7 +523,7 @@ impl StorageState {
             .ok_or_else(|| RepositoryError::MissingBlob {
                 hash: hash.to_owned(),
             })?;
-        let path = blob_path(&self.blobs_root, hash, &extension);
+        let path = blob_path(&self.blobs_root, hash, &extension)?;
         if path.is_file() {
             Ok(path)
         } else {
@@ -527,11 +539,12 @@ impl StorageState {
         metadata: &BlobMetadata,
     ) -> Result<StoredBlob, RepositoryError> {
         let hash = sha256_hex(bytes);
-        let path = blob_path(&self.blobs_root, &hash, &metadata.format);
+        let byte_size = encoded_byte_size(bytes.len())?;
+        let path = blob_path(&self.blobs_root, &hash, &metadata.format)?;
         if path.is_file() {
             return Ok(StoredBlob {
                 hash,
-                byte_size: bytes.len() as u64,
+                byte_size,
                 metadata: metadata.clone(),
             });
         }
@@ -558,9 +571,20 @@ impl StorageState {
         }
         Ok(StoredBlob {
             hash,
-            byte_size: bytes.len() as u64,
+            byte_size,
             metadata: metadata.clone(),
         })
+    }
+
+    fn derivative_cache_path(
+        &self,
+        source_hash: &str,
+        cache_path: &str,
+    ) -> Result<PathBuf, RepositoryError> {
+        if !is_sha256(source_hash) || !is_safe_relative_path(cache_path) {
+            return Err(RepositoryError::PermissionDenied);
+        }
+        Ok(self.resources_root.join(source_hash).join(cache_path))
     }
 
     fn recover(&mut self) -> Result<(), RepositoryError> {
@@ -594,15 +618,21 @@ impl StorageState {
         let mut blobs = Vec::new();
         let mut rows = self.connection.prepare("SELECT b.hash, b.format, b.byte_size, b.mime_type FROM blobs b JOIN blob_references r ON r.blob_hash = b.hash WHERE r.owner_kind = 'document' AND r.owner_id = ?1 ORDER BY b.hash")?;
         let iterator = rows.query_map(params![document_id], |row| {
-            Ok(RecoveryBundleBlob {
-                hash: row.get(0)?,
-                extension: row.get(1)?,
-                byte_size: row.get::<_, i64>(2)? as u64,
-                mime_type: row.get(3)?,
-            })
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, i64>(2)?,
+                row.get::<_, String>(3)?,
+            ))
         })?;
         for row in iterator {
-            blobs.push(row?);
+            let (hash, extension, byte_size, mime_type) = row?;
+            blobs.push(RecoveryBundleBlob {
+                hash,
+                extension,
+                byte_size: byte_size_from_database(byte_size)?,
+                mime_type,
+            });
         }
         let manifest = RecoveryBundleManifest {
             bundle_version: RECOVERY_BUNDLE_VERSION,
@@ -638,7 +668,7 @@ impl StorageState {
                 archive
                     .start_file(format!("blobs/{}.{}", blob.hash, blob.extension), options)
                     .map_err(|error| RepositoryError::Io(error.to_string()))?;
-                let path = blob_path(&self.blobs_root, &blob.hash, &blob.extension);
+                let path = blob_path(&self.blobs_root, &blob.hash, &blob.extension)?;
                 let mut input = File::open(path).map_err(|_| RepositoryError::MissingBlob {
                     hash: blob.hash.clone(),
                 })?;
@@ -691,15 +721,11 @@ impl StorageState {
                     RepositoryError::InvalidDocument("source mimeType is missing".to_owned())
                 })?
                 .to_owned(),
-            width: source.get("width").and_then(Value::as_u64).ok_or_else(|| {
-                RepositoryError::InvalidDocument("source width is missing".to_owned())
-            })? as u32,
-            height: source
-                .get("height")
-                .and_then(Value::as_u64)
-                .ok_or_else(|| {
-                    RepositoryError::InvalidDocument("source height is missing".to_owned())
-                })? as u32,
+            width: json_u32(source.get("width").and_then(Value::as_u64), "source width")?,
+            height: json_u32(
+                source.get("height").and_then(Value::as_u64),
+                "source height",
+            )?,
             color_metadata: source.get("color").cloned().unwrap_or(Value::Null),
         };
         let source_entry = manifest
@@ -769,7 +795,7 @@ fn migrate(connection: &mut Connection) -> Result<(), RepositoryError> {
     )?;
     connection.execute(
         "INSERT OR IGNORE INTO schema_migrations (version, name, checksum, applied_at) VALUES (1, 'm03-initial', 'm03-initial-v1', ?1)",
-        params![now_millis()],
+        params![now_millis()?],
     )?;
     Ok(())
 }
@@ -826,10 +852,13 @@ fn validate_document(document_json: &str) -> Result<(), RepositoryError> {
         .get("schemaVersion")
         .and_then(Value::as_u64)
         .ok_or_else(|| RepositoryError::InvalidDocument("schemaVersion is missing".to_owned()))?;
+    let schema_version = u32::try_from(schema_version).map_err(|_| {
+        RepositoryError::InvalidDocument(
+            "schemaVersion exceeds the supported integer range".to_owned(),
+        )
+    })?;
     if schema_version > 1 {
-        return Err(RepositoryError::NewerSchema {
-            schema_version: schema_version as u32,
-        });
+        return Err(RepositoryError::NewerSchema { schema_version });
     }
     if value.get("id").and_then(Value::as_str).is_none() {
         return Err(RepositoryError::InvalidDocument("id is missing".to_owned()));
@@ -838,45 +867,114 @@ fn validate_document(document_json: &str) -> Result<(), RepositoryError> {
 }
 
 fn validate_image(bytes: &[u8], metadata: &BlobMetadata) -> Result<(), RepositoryError> {
-    if bytes.len() as u64 > MAX_ENCODED_BYTES {
+    if encoded_byte_size(bytes.len())? > MAX_ENCODED_BYTES {
         return Err(RepositoryError::ImageTooLarge);
     }
-    if metadata.width == 0
-        || metadata.height == 0
-        || metadata.width > MAX_IMAGE_EDGE
-        || metadata.height > MAX_IMAGE_EDGE
-    {
-        return Err(RepositoryError::ImageTooLarge);
-    }
-    if u64::from(metadata.width) * u64::from(metadata.height) > MAX_IMAGE_PIXELS {
-        return Err(RepositoryError::ImageTooLarge);
-    }
-    match metadata.format.as_str() {
-        "png" | "jpeg" | "webp" | "svg" => Ok(()),
-        _ => Err(RepositoryError::InvalidImage),
+    validate_dimensions(metadata.width, metadata.height)?;
+    if is_supported_format(&metadata.format) {
+        Ok(())
+    } else {
+        Err(RepositoryError::InvalidImage)
     }
 }
 
-fn blob_path(blobs_root: &Path, hash: &str, extension: &str) -> PathBuf {
-    blobs_root
-        .join(&hash[0..2])
-        .join(&hash[2..4])
-        .join(format!("{hash}.{extension}"))
+fn validate_derivative_metadata(metadata: &DerivativeMetadata) -> Result<(), RepositoryError> {
+    if !is_sha256(&metadata.source_hash)
+        || !is_sha256(&metadata.content_hash)
+        || !is_derivative_variant(&metadata.variant)
+        || !is_safe_relative_path(&metadata.cache_path)
+    {
+        return Err(RepositoryError::InvalidImage);
+    }
+    if metadata.byte_size > MAX_ENCODED_BYTES {
+        return Err(RepositoryError::ImageTooLarge);
+    }
+    validate_dimensions(metadata.width, metadata.height)
 }
 
 fn is_sha256(value: &str) -> bool {
-    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+    value.len() == 64
+        && value.bytes().all(|byte| {
+            byte.is_ascii_digit() || (byte.is_ascii_lowercase() && byte.is_ascii_hexdigit())
+        })
+}
+
+fn is_supported_format(format: &str) -> bool {
+    matches!(format, "png" | "jpeg" | "webp" | "svg")
+}
+
+fn is_derivative_variant(variant: &str) -> bool {
+    matches!(variant, "thumbnail" | "interactive-2048")
+}
+
+fn is_safe_relative_path(value: &str) -> bool {
+    !value.is_empty()
+        && Path::new(value)
+            .components()
+            .all(|component| matches!(component, Component::Normal(_)))
+}
+
+fn validate_dimensions(width: u32, height: u32) -> Result<(), RepositoryError> {
+    if width == 0
+        || height == 0
+        || width > MAX_IMAGE_EDGE
+        || height > MAX_IMAGE_EDGE
+        || u64::from(width) * u64::from(height) > MAX_IMAGE_PIXELS
+    {
+        Err(RepositoryError::ImageTooLarge)
+    } else {
+        Ok(())
+    }
+}
+
+fn blob_path(blobs_root: &Path, hash: &str, extension: &str) -> Result<PathBuf, RepositoryError> {
+    if !is_sha256(hash) {
+        return Err(RepositoryError::MissingBlob {
+            hash: hash.to_owned(),
+        });
+    }
+    if !is_supported_format(extension) {
+        return Err(RepositoryError::InvalidImage);
+    }
+    Ok(blobs_root
+        .join(&hash[..2])
+        .join(&hash[2..4])
+        .join(format!("{hash}.{extension}")))
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
-fn now_millis() -> i64 {
-    SystemTime::now()
+fn encoded_byte_size(value: usize) -> Result<u64, RepositoryError> {
+    u64::try_from(value).map_err(|_| RepositoryError::ImageTooLarge)
+}
+
+fn sqlite_byte_size(value: u64) -> Result<i64, RepositoryError> {
+    i64::try_from(value).map_err(|_| RepositoryError::InvalidImage)
+}
+
+fn byte_size_from_database(value: i64) -> Result<u64, RepositoryError> {
+    u64::try_from(value)
+        .map_err(|_| RepositoryError::Database("blob byte_size cannot be negative".to_owned()))
+}
+
+fn json_u32(value: Option<u64>, field: &str) -> Result<u32, RepositoryError> {
+    let value =
+        value.ok_or_else(|| RepositoryError::InvalidDocument(format!("{field} is missing")))?;
+    u32::try_from(value).map_err(|_| {
+        RepositoryError::InvalidDocument(format!("{field} exceeds the supported range"))
+    })
+}
+
+fn now_millis() -> Result<i64, RepositoryError> {
+    let milliseconds = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis() as i64
+        .map_err(|error| RepositoryError::Io(error.to_string()))?
+        .as_millis();
+    i64::try_from(milliseconds).map_err(|_| {
+        RepositoryError::Io("system clock exceeds the supported timestamp range".to_owned())
+    })
 }
 
 fn sync_directory(path: &Path) -> Result<(), RepositoryError> {
@@ -917,7 +1015,7 @@ fn read_bundle_blob(
     archive: &mut ZipArchive<File>,
     entry: &RecoveryBundleBlob,
 ) -> Result<Vec<u8>, RepositoryError> {
-    if !is_sha256(&entry.hash) || entry.extension.contains(['/', '\\']) {
+    if !is_sha256(&entry.hash) || !is_supported_format(&entry.extension) {
         return Err(RepositoryError::InvalidRecoveryBundle(
             "invalid blob entry".to_owned(),
         ));
@@ -931,16 +1029,26 @@ fn read_bundle_blob(
             "blob size mismatch".to_owned(),
         ));
     }
-    let mut bytes = Vec::with_capacity(file.size() as usize);
+    let capacity = usize::try_from(file.size()).map_err(|_| {
+        RepositoryError::InvalidRecoveryBundle("blob entry exceeds addressable memory".to_owned())
+    })?;
+    let mut bytes = Vec::with_capacity(capacity);
     file.read_to_end(&mut bytes)?;
     Ok(bytes)
 }
 
 #[cfg(test)]
 mod tests {
+    use std::{fs, path::Path};
+
+    #[cfg(unix)]
+    use std::os::unix::fs::symlink;
+
     use tempfile::tempdir;
 
-    use super::{BlobMetadata, CreateCaptureRequest, LibraryRepository, RepositoryError};
+    use super::{
+        BlobMetadata, CreateCaptureRequest, DerivativeMetadata, LibraryRepository, RepositoryError,
+    };
 
     fn metadata() -> BlobMetadata {
         BlobMetadata {
@@ -961,6 +1069,19 @@ mod tests {
             "presentation": { "beautify": { "enabled": false }, "watermark": { "enabled": false } },
             "createdAt": "2026-08-09T00:00:00.000Z", "updatedAt": "2026-08-09T00:00:00.000Z"
         }).to_string()
+    }
+
+    fn derivative_metadata(source_hash: String, cache_path: &str) -> DerivativeMetadata {
+        DerivativeMetadata {
+            source_hash,
+            variant: "thumbnail".to_owned(),
+            generator_version: 1,
+            cache_path: cache_path.to_owned(),
+            content_hash: super::sha256_hex(b"derivative"),
+            byte_size: 10,
+            width: 1,
+            height: 1,
+        }
     }
 
     #[test]
@@ -1087,5 +1208,101 @@ mod tests {
                 .expect("restored blob")
                 .is_file()
         );
+    }
+
+    #[test]
+    fn rejects_schema_versions_that_do_not_fit_u32() {
+        let document = serde_json::json!({
+            "schemaVersion": u64::MAX,
+            "id": "doc-1",
+        })
+        .to_string();
+
+        assert!(matches!(
+            super::validate_document(&document),
+            Err(RepositoryError::InvalidDocument(_))
+        ));
+    }
+
+    #[test]
+    fn rejects_derivative_cache_paths_with_non_normal_components() {
+        let hash = super::sha256_hex(b"source");
+        for path in [
+            "../outside.png",
+            "./thumbnail.png",
+            "/tmp/thumbnail.png",
+            "",
+        ] {
+            assert!(matches!(
+                super::validate_derivative_metadata(&derivative_metadata(hash.clone(), path)),
+                Err(RepositoryError::InvalidImage)
+            ));
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_derivative_symlinks_outside_the_resources_root() {
+        let directory = tempdir().expect("temp directory");
+        let repository =
+            LibraryRepository::initialize(directory.path(), directory.path()).expect("repository");
+        let stored = repository
+            .import_blob(b"source".to_vec(), metadata())
+            .expect("source blob should import");
+        let outside = directory.path().join("outside.png");
+        fs::write(&outside, b"derivative").expect("outside fixture should be written");
+        let source_root = directory.path().join("resources").join(&stored.hash);
+        fs::create_dir_all(&source_root).expect("resource directory should exist");
+        symlink(&outside, source_root.join("thumbnail.png")).expect("symlink should be created");
+
+        let error = repository
+            .register_derivative(derivative_metadata(stored.hash, "thumbnail.png"))
+            .expect_err("symlink outside the owned root must be rejected");
+        assert!(matches!(error, RepositoryError::PermissionDenied));
+    }
+
+    #[test]
+    fn reports_malformed_active_series_settings_instead_of_creating_a_new_series() {
+        let directory = tempdir().expect("temp directory");
+        let repository =
+            LibraryRepository::initialize(directory.path(), directory.path()).expect("repository");
+        let bytes = b"fake-png-image".to_vec();
+        let hash = super::sha256_hex(&bytes);
+        repository
+            .put_setting("session.activeSeriesId".to_owned(), 1, "{}".to_owned())
+            .expect("setting should save");
+
+        let error = repository
+            .create_capture(CreateCaptureRequest {
+                document_id: "doc-1".to_owned(),
+                capture_id: "capture-1".to_owned(),
+                series_id: None,
+                document_json: document("doc-1", &hash),
+                source_bytes: bytes,
+                source_metadata: metadata(),
+                captured_at: 1,
+            })
+            .expect_err("malformed active series setting must be reported");
+        assert!(matches!(error, RepositoryError::InvalidDocument(_)));
+    }
+
+    #[test]
+    fn rejects_invalid_hashes_and_persisted_numeric_values_without_panicking() {
+        assert!(matches!(
+            super::blob_path(Path::new("/blobs"), "short", "png"),
+            Err(RepositoryError::MissingBlob { .. })
+        ));
+        assert!(matches!(
+            super::sqlite_byte_size(u64::MAX),
+            Err(RepositoryError::InvalidImage)
+        ));
+        assert!(matches!(
+            super::byte_size_from_database(-1),
+            Err(RepositoryError::Database(_))
+        ));
+        assert!(matches!(
+            super::json_u32(Some(u64::MAX), "source width"),
+            Err(RepositoryError::InvalidDocument(_))
+        ));
     }
 }

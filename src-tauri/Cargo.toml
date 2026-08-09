@@ -8,6 +8,9 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 
+[lints]
+workspace = true
+
 [lib]
 name = "cute_screen_desktop"
 path = "src/lib.rs"
@@ -36,6 +39,7 @@ url = "=2.5.8"
 rusqlite = { version = "=0.40.2", features = ["bundled"] }
 uuid = { version = "=1.24.0", features = ["v7", "serde"] }
 zip = { version = "=6.0.0", default-features = false, features = ["deflate"] }
+tempfile = "=3.27.0"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 ashpd = { version = "=0.13.13", default-features = false, features = ["tokio", "screenshot", "global_shortcuts"] }
@@ -50,6 +54,3 @@ test-harness = [
   "dep:tauri-plugin-wdio",
   "dep:tauri-plugin-wdio-webdriver",
 ]
-
-[dev-dependencies]
-tempfile = "=3.27.0"

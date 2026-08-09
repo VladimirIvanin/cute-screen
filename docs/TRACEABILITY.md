@@ -23,7 +23,7 @@ Foundation harness не создаёт отдельного продуктово
 | REQ-CAP-007 | capability mapping                                                    | platform cursor on/off result                          | planned                            |
 | REQ-CAP-008 | M01 monitor-layout fixtures; M03 coordinate properties                | mixed-DPI multi-monitor smoke                          | planned                            |
 | REQ-CAP-009 | M01 backend capability tests; M04 capture integration                 | X11 overlay + Wayland portal                           | planned                            |
-| REQ-CAP-010 | M03 `storage::creates_deduplicated_capture_and_persists_the_document` | M04 capture opens decoded document                     | implemented; runtime planned       |
+| REQ-CAP-010 | M03 immutable-blob/token-collision and capture persistence tests | M04 capture opens decoded document                     | implemented; runtime planned       |
 | REQ-ACT-001 | binding validation                                                    | hidden-app hotkey per platform                         | planned                            |
 | REQ-ACT-002 | conflict rollback test                                                | occupied shortcut UI flow                              | planned                            |
 | REQ-ACT-003 | M01 portal lifecycle adapter; M04 binding integration                 | GNOME/KDE binding flow                                 | planned                            |
@@ -85,7 +85,7 @@ Foundation harness не создаёт отдельного продуктово
 | REQ-QLT-002 | M01 8K/1000 baseline; M13 hard gate                                   | reference runner report                                | planned                            |
 | REQ-QLT-003 | M01 scheduler idle test; M13 editor trace                             | runtime no-continuous-frame trace                      | planned                            |
 | REQ-QLT-004 | 1000-item benchmark                                                   | runtime first-page trace                               | planned                            |
-| REQ-QLT-005 | M03 journal/atomic-file unit coverage                                 | crash/restart recovery                                 | implemented; fault/runtime planned |
+| REQ-QLT-005 | M03 journal, atomic-file and constrained-path unit coverage                                 | crash/restart recovery                                 | implemented; fault/runtime planned |
 | REQ-REL-001 | Linux artifact/architecture checks                                    | x64/ARM64 install smoke                                | planned                            |
 | REQ-REL-002 | universal binary check                                                | unsigned Intel/Apple launch smoke                      | planned                            |
 | REQ-REL-003 | installer/architecture checks                                         | unsigned Win x64/ARM64 launch smoke                    | planned                            |

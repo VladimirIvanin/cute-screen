@@ -411,9 +411,10 @@ pub fn run() {
         stage_image
     ]);
 
-    builder
-        .run(tauri::generate_context!())
-        .expect("failed to run Cute Screen desktop host");
+    if let Err(error) = builder.run(tauri::generate_context!()) {
+        eprintln!("cute-screen startup failed: {error}");
+        std::process::exit(1);
+    }
 }
 
 #[cfg(test)]

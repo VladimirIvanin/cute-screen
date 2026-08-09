@@ -80,6 +80,7 @@ jobs:
           cargo clippy --workspace --all-targets -- -D warnings
           cargo clippy --workspace --all-targets --features fake-platform,test-harness -- -D warnings
           cargo clippy --workspace --all-targets --features x11-capture -- -D warnings
+          cargo clippy --workspace --lib --bins --all-features -- -D clippy::unwrap_used -D clippy::expect_used
           cargo test --workspace
           cargo test --workspace --features fake-platform
 

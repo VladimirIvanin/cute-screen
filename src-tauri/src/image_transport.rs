@@ -1,12 +1,14 @@
 use std::{
     collections::BTreeMap,
-    fs,
+    fs::{self, File},
+    io::{Read, Write},
     path::{Path, PathBuf},
     sync::RwLock,
 };
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
+use tempfile::NamedTempFile;
 
 use crate::platform::{PlatformError, PlatformErrorCode};
 
@@ -133,7 +135,16 @@ impl ImageTransportService {
             "image"
         };
         let owned_source = self.source_root.join(format!("{token}.{extension}"));
-        fs::copy(canonical_source, &owned_source)
+        let mut temporary = NamedTempFile::new_in(&self.source_root)
+            .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?;
+        copy_and_hash(&canonical_source, temporary.as_file_mut())
+            .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?;
+        temporary
+            .as_file()
+            .sync_all()
+            .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?;
+        temporary
+            .persist_noclobber(&owned_source)
             .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?;
         self.register(
             token,
@@ -171,7 +182,16 @@ impl ImageTransportService {
             _ => "image",
         };
         let destination = self.stage_root.join(format!("{token}.{extension}"));
-        fs::copy(&canonical_source, &destination)
+        let mut temporary = NamedTempFile::new_in(&self.stage_root)
+            .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?;
+        let sha256 = copy_and_hash(&canonical_source, temporary.as_file_mut())
+            .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?;
+        temporary
+            .as_file()
+            .sync_all()
+            .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?;
+        temporary
+            .persist(&destination)
             .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?;
         let canonical_destination = destination
             .canonicalize()
@@ -182,9 +202,6 @@ impl ImageTransportService {
                 correlation_id,
             ));
         }
-        let bytes = fs::read(&canonical_destination)
-            .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?;
-        let sha256 = format!("{:x}", Sha256::digest(&bytes));
 
         Ok(StagedImageMetadata {
             token: token.to_owned(),
@@ -228,42 +245,50 @@ fn transport_error(code: PlatformErrorCode, correlation_id: &str) -> PlatformErr
     PlatformError::new(code, correlation_id)
 }
 
+fn copy_and_hash(source: &Path, destination: &mut File) -> std::io::Result<String> {
+    let mut source = File::open(source)?;
+    let mut buffer = [0_u8; 64 * 1024];
+    let mut hasher = Sha256::new();
+    loop {
+        let read = source.read(&mut buffer)?;
+        if read == 0 {
+            break;
+        }
+        let chunk = &buffer[..read];
+        destination.write_all(chunk)?;
+        hasher.update(chunk);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
 #[cfg(test)]
 mod tests {
     use std::{
         fs,
-        path::PathBuf,
-        sync::atomic::{AtomicU64, Ordering},
+        path::{Path, PathBuf},
     };
 
     use super::{ImageTransportService, RegisteredImage};
     use crate::platform::PlatformErrorCode;
+    use tempfile::{TempDir, tempdir};
 
-    static TEMP_ID: AtomicU64 = AtomicU64::new(0);
-
-    struct TempTree(PathBuf);
+    struct TempTree(TempDir);
 
     impl TempTree {
         fn new() -> Self {
-            let id = TEMP_ID.fetch_add(1, Ordering::Relaxed);
-            let path =
-                std::env::temp_dir().join(format!("cute-screen-m01-{}-{id}", std::process::id()));
-            fs::create_dir_all(&path).expect("temporary tree should be created");
-            Self(path)
+            Self(tempdir().expect("temporary tree should be created"))
         }
-    }
 
-    impl Drop for TempTree {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.0);
+        fn path(&self) -> &Path {
+            self.0.path()
         }
     }
 
     #[test]
     fn stages_only_registered_tokens_inside_the_owned_root() {
         let tree = TempTree::new();
-        let source_root = tree.0.join("library");
-        let stage_root = tree.0.join("cache");
+        let source_root = tree.path().join("library");
+        let stage_root = tree.path().join("cache");
         fs::create_dir_all(&source_root).expect("source root should exist");
         let source = source_root.join("alpha.png");
         fs::write(&source, b"png-bytes").expect("fixture should be written");
@@ -296,10 +321,10 @@ mod tests {
     #[test]
     fn rejects_unregistered_tokens_and_sources_outside_the_owned_root() {
         let tree = TempTree::new();
-        let source_root = tree.0.join("library");
-        let stage_root = tree.0.join("cache");
+        let source_root = tree.path().join("library");
+        let stage_root = tree.path().join("cache");
         fs::create_dir_all(&source_root).unwrap();
-        let outside = tree.0.join("outside.png");
+        let outside = tree.path().join("outside.png");
         fs::write(&outside, b"outside").unwrap();
 
         let service = ImageTransportService::new(&source_root, &stage_root).unwrap();
@@ -315,5 +340,37 @@ mod tests {
             .stage_image("../frontend-path", "transport-test")
             .expect_err("frontend paths are not tokens");
         assert_eq!(error.code, PlatformErrorCode::InvalidUri);
+    }
+
+    #[test]
+    fn import_owned_image_does_not_replace_an_existing_token() {
+        let tree = TempTree::new();
+        let source_root = tree.path().join("library");
+        let stage_root = tree.path().join("cache");
+        let first = tree.path().join("first.png");
+        let second = tree.path().join("second.png");
+        fs::write(&first, b"first-image").expect("first fixture should be written");
+        fs::write(&second, b"second-image").expect("second fixture should be written");
+
+        let service = ImageTransportService::new(&source_root, &stage_root)
+            .expect("service should initialize");
+        service
+            .import_owned_image("owned-token", &first, "image/png", 1, 1, "transport-test")
+            .expect("first image should import");
+
+        let error = service
+            .import_owned_image("owned-token", &second, "image/png", 1, 1, "transport-test")
+            .expect_err("existing token must not overwrite its immutable original");
+        assert_eq!(error.code, PlatformErrorCode::CaptureFailed);
+    }
+
+    #[test]
+    fn temporary_tree_is_removed_when_the_fixture_drops() {
+        let path: PathBuf = {
+            let tree = TempTree::new();
+            tree.path().to_path_buf()
+        };
+
+        assert!(!path.exists());
     }
 }

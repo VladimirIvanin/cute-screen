@@ -47,6 +47,7 @@ pnpm test:perf
 cargo test --workspace
 cargo test --workspace --features fake-platform
 cargo clippy --workspace --all-targets -- -D warnings
+cargo clippy --workspace --lib --bins --all-features -- -D clippy::unwrap_used -D clippy::expect_used
 pnpm smoke:m01:x11
 pnpm smoke:m01:portal:probe
 pnpm smoke:m01:portal:screenshot
@@ -54,7 +55,7 @@ pnpm smoke:m01:portal:shortcuts
 pnpm smoke:m01:portal:invalid-uri
 ```
 
-`pnpm check` включает Rust format и все три CI-конфигурации Clippy с `-D warnings`; изменения Rust не передаются в CI без этого локального gate.
+`pnpm check` включает Rust format, три CI-конфигурации Clippy с `-D warnings` и production-only gate против `unwrap()`/`expect()`; изменения Rust не передаются в CI без этого локального gate.
 
 Каждая команда возвращает ненулевой exit code при провале и не изменяет tracked files.
 

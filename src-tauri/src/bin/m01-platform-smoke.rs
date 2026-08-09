@@ -15,6 +15,7 @@ mod linux {
     };
     use serde::Serialize;
     use serde_json::{Value, json};
+    use tempfile::tempdir;
 
     #[cfg(feature = "x11-capture")]
     use cute_screen_desktop::platform::SessionKind;
@@ -144,13 +145,19 @@ mod linux {
     async fn portal_screenshot(correlation_id: &str) -> Observation {
         let probe = AshpdPortalClient::default().probe(correlation_id).await;
         let versions = portal_version_map(probe.as_ref().ok());
-        let temp_root = env::temp_dir().join(format!("cute-screen-{correlation_id}"));
-        let transport =
-            ImageTransportService::new(temp_root.join("library"), temp_root.join("blobs"));
-        let result = match (probe, transport) {
-            (Err(error), _) => Err(error),
-            (_, Err(error)) => Err(error),
-            (Ok(_), Ok(transport)) => AshpdPortalClient::default()
+        let result = async {
+            probe?;
+            let temp_root = tempdir().map_err(|_| {
+                PlatformError::new(
+                    cute_screen_desktop::platform::PlatformErrorCode::CaptureFailed,
+                    correlation_id,
+                )
+            })?;
+            let transport = ImageTransportService::new(
+                temp_root.path().join("library"),
+                temp_root.path().join("blobs"),
+            )?;
+            AshpdPortalClient::default()
                 .capture_to_transport(
                     CaptureRequest {
                         correlation_id: correlation_id.to_owned(),
@@ -159,8 +166,9 @@ mod linux {
                     &transport,
                 )
                 .await
-                .map(|capture| json!(capture)),
-        };
+                .map(|capture| json!(capture))
+        }
+        .await;
         (result, versions, json!([]))
     }
 
