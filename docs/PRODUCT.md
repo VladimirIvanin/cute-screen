@@ -2,15 +2,28 @@
 
 ## Назначение и аудитория
 
-Cute Screen помогает быстро пройти путь `capture → clarify → export`: вызвать захват глобальной комбинацией, снять нужную область/экран/окно, пояснить изображение аннотациями и скопировать либо экспортировать результат.
+Cute Screen — полноценный local-first редактор снимков и изображений для пути
+`capture/open → edit/compose → export`: вызвать захват глобальной комбинацией или
+открыть картинку, выполнить аннотацию и частые графические правки, собрать
+выразительную композицию и скопировать либо экспортировать результат.
+
+Продукт не пытается повторить весь профессиональный raster/DTP workflow, но
+должен заменять тяжёлый графический редактор в типичных быстрых задачах:
+скомпоновать несколько изображений, изменить canvas и слои, скрыть данные,
+оформить фигуры и текст, подготовить публикационный результат.
 
 Основная аудитория — пользователи Linux, разработчики, дизайнеры, технические авторы и команды поддержки, которым нужен локальный инструмент без аккаунта и облачной обработки. Windows и macOS получают тот же документ, редактор и набор функций.
 
 ## Принципы продукта
 
 - Local-first: снимки и документы не покидают устройство.
+- Полноценный продукт, а не урезанный MVP: широкий набор инструментов образует
+  согласованный редактируемый документ, имеет persistence, undo/redo,
+  preview/export parity и необходимые failure states.
 - Linux-first по порядку снижения рисков; GitHub Actions собирает все платформы, но официальный подписанный канал дистрибуции не создаётся.
 - Canvas является рабочей поверхностью, интерфейс не конкурирует со снимком.
+- Базовые действия остаются быстрыми, а профессионально полезные параметры
+  раскрываются контекстно и не перегружают постоянный chrome.
 - Инструмент остаётся активным до явной смены или `Escape`.
 - Все обратимые правки покрываются undo/redo.
 - Платформенные ограничения объясняются честно; Wayland selector может отличаться визуально.
@@ -52,14 +65,26 @@ Cute Screen помогает быстро пройти путь `capture → cla
 - `REQ-EDT-009` — layers panel ограничена выбором, порядком, visibility, lock, rotation и opacity.
 - `REQ-EDT-010` — clipboard различает внутренние слои, bitmap и plain text.
 - `REQ-EDT-011` — keyboard duplicate создаёт копию с предсказуемым offset.
+- `REQ-EDT-012` — canvas имеет собственные dimensions и продолжает существовать,
+  если базовое изображение удалено, уменьшено или перемещено.
+- `REQ-EDT-013` — исходное изображение представлено locked-by-default raster
+  layer; после unlock его можно move/resize/rotate/delete, не изменяя immutable
+  original blob.
+- `REQ-EDT-014` — horizontal/vertical flip преобразует все canvas layers и crop
+  одной undoable document command и совпадает в preview/export.
 
 ## Инструменты аннотации
 
 - `REQ-TOL-001` — arrow/line: прямая или кривая, anchor points, стили линии и варианты наконечников, включая отсутствие наконечника.
-- `REQ-TOL-002` — shapes: rectangle, circle, oval, diamond, star; stroke, fill, fill opacity и визуальный corner radius.
+- `REQ-TOL-002` — shapes: rectangle, circle, oval, diamond, star; stroke,
+  solid/gradient/pattern/texture fills, fill/layer opacity, blend modes и
+  визуальный corner radius.
 - `REQ-TOL-003` — pencil: базовые кисти, толщина, opacity, smoothing и цвет.
 - `REQ-TOL-004` — marker: толщина, opacity и blend modes highlight/darken.
-- `REQ-TOL-005` — text: минимальный WYSIWYG, multiline, шрифт, размер, начертание, alignment, цвет и фон.
+- `REQ-TOL-005` — text: FigJam-like direct WYSIWYG editing, multiline,
+  typography, alignment, spacing, solid/gradient/pattern/texture fill, outline,
+  shadows, background, opacity/blend, common layer transforms и curated style
+  presets.
 - `REQ-TOL-006` — numbered marker: несколько форм, автоматическая последовательность и редактируемый multiline label.
 - `REQ-TOL-007` — callout: выразительный визуальный стиль, pointer/tail и полноценное редактирование текста.
 - `REQ-TOL-008` — manual censor: pixelate, blur и solid fill; без автоматического поиска данных.
@@ -70,6 +95,9 @@ Cute Screen помогает быстро пройти путь `capture → cla
 - `REQ-TOL-013` — crop: свободный режим, aspect presets, handles, rule-of-thirds, reset, `Enter` и `Escape`.
 - `REQ-TOL-014` — вставка emoji как редактируемого слоя.
 - `REQ-TOL-015` — вставка PNG/JPEG/WebP/SVG как image layer.
+- `REQ-TOL-016` — Open image и bitmap paste из empty state создают новый
+  editable document с locked base layer; bitmap paste в активный document
+  создаёт image layer тем же flow, что Image tool.
 
 ## Серии и библиотека
 

@@ -189,3 +189,48 @@ manager; texture-limit выбирает preview до появления tiled re
 должен опираться на reference rows и отдельный maintenance flow. Малые
 thumbnails могут быть перенесены в отдельный cache database только после
 platform benchmark. Recovery bundle включает authoritative blobs, но не cache.
+
+## ADR-022 — Независимый canvas и исходное изображение как raster layer
+
+**Статус:** accepted
+
+**Контекст:** специальный неуправляемый screenshot background ограничивает
+быстрые графические задачи: пользователь не может освободить canvas, изменить
+размер/позицию исходного изображения или собрать композицию из нескольких
+bitmap. При этом immutable original из ADR-006/ADR-021 должен сохраниться.
+
+**Решение:** `EditorDocument.source` хранит immutable provenance и blob reference,
+а видимое исходное изображение является обычным ordered raster `LayerNode` с
+ролью `base`. Initial-document factory создаёт canvas по decoded dimensions,
+помещает base layer внизу и включает lock. После явного unlock слой использует
+общие transform/delete commands; его удаление не удаляет original и не меняет
+canvas dimensions. Horizontal/vertical canvas flip является сериализуемой
+command над слоями и crop, а не viewport transform.
+
+**Последствия:** renderer больше не имеет отдельного screenshot-background path;
+capture, Open image и empty-state bitmap paste используют один document factory.
+Legacy documents мигрируются идемпотентно. Preview, restart и export tests
+обязаны покрывать resized/deleted base layer и canvas flip.
+
+## ADR-023 — Общая paint/effect model для полноценного редактора
+
+**Статус:** accepted
+
+**Контекст:** отдельные ad-hoc реализации gradient, pattern, texture, outline,
+shadow и blend для shapes, text и presentation быстро расходятся между
+CanvasKit, Canvas2D, DOM text overlay и export. Одновременно продукт должен
+закрывать частые простые задачи графического редактора, а не останавливаться на
+минимальных аннотациях.
+
+**Решение:** scene layers используют versioned reusable primitives: solid и
+multi-stop linear/radial gradients, bundled pattern или immutable image texture,
+opacity, curated blend modes, outline/stroke и bounded shadow stack. Text style
+presets являются комбинациями тех же полей; texture/pattern transform хранит
+scale, rotation и offset. Advanced controls раскрываются контекстно. Arbitrary
+user shader code, shader graph и plugin effects не входят в текущий продукт.
+
+**Последствия:** M06 сначала вводит общие paint/compositing primitives, M07
+доводит их до text/texture/style-presets вертикального среза. Каждый primitive
+обязан иметь schema migration, CanvasKit/Canvas2D/export parity, memory limits и
+failure behavior для missing texture. Богатый scope реализуется этапами, но не
+объявляется необязательным MVP-spike.

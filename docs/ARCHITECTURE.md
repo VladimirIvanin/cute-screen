@@ -48,7 +48,23 @@ interface EditorDocument {
 
 `LayerNode` — discriminated union: arrow, shape, pencil, marker, text, numbered marker, callout, censor, spotlight, ruler, loupe, emoji и image. Общие поля: immutable ID, transform, opacity, visibility, lock, z-order и tool-specific payload.
 
-Координаты хранятся в image space. Viewport имеет отдельные `zoom`, `panX`, `panY`, DPR и матрицы преобразования. Crop не меняет исходные координаты и применяется как viewport/export clipping rectangle.
+`EditorDocument.source` хранит immutable original provenance и blob reference, но
+не является специальным renderer background. Видимый исходный screenshot или
+открытая картинка представлены нижним image `LayerNode` с `role: base`, locked
+по умолчанию. После unlock этот узел использует общие transform/delete commands;
+его удаление не удаляет source blob и не меняет canvas dimensions.
+
+Координаты хранятся в canvas space, независимом от bounds или наличия base image.
+Viewport имеет отдельные `zoom`, `panX`, `panY`, DPR и матрицы преобразования.
+Crop не меняет исходные координаты и применяется как viewport/export clipping
+rectangle. Horizontal/vertical canvas flip преобразует layers и crop одной
+document command, но не presentation или viewport.
+
+Shape и text используют общую versioned paint/effect model: solid,
+multi-stop linear/radial gradient, bundled pattern или immutable image texture,
+paint transform, opacity, curated blend mode, outline/stroke и bounded shadow
+stack. Presets сериализуют те же primitive fields и не создают отдельный тип
+renderer node. Arbitrary shader code в документ не сохраняется.
 
 ## Команды и состояние
 
@@ -64,12 +80,14 @@ interface EditorDocument {
 
 ### Основной путь
 
-- CanvasKit/WebGL2 рисует screenshot texture и scene layer.
+- CanvasKit/WebGL2 рисует единый ordered scene graph, включая base raster layer;
+  отдельного неуправляемого screenshot-background pass нет.
 - Второй canvas рисует hover, selection handles, crop overlay, guides и in-progress gesture.
 - Dirty flags разделены на scene, overlay, viewport, resource и export.
 - Scheduler объединяет несколько invalidations в один `requestAnimationFrame`.
 - Для статичных узлов используются cached pictures; spatial index отбрасывает невидимые узлы.
-- Background screenshot декодируется один раз и повторно используется как GPU resource.
+- Каждый immutable raster/texture blob декодируется один раз, дедуплицируется
+  resource manager и повторно используется как GPU resource.
 
 ### Compatibility path
 
