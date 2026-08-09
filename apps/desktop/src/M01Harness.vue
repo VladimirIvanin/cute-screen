@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { convertFileSrc } from '@tauri-apps/api/core'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 import {
@@ -203,10 +202,9 @@ async function verifyTransport(): Promise<void> {
       token: harnessParameters.get('token') ?? 'm01-alpha-png',
       correlationId: 'm01-transport-harness',
       bridge,
-      convertFileSrc:
-        harnessParameters.get('assetFailure') === '1'
-          ? () => 'asset://forced-denial'
-          : convertFileSrc,
+      ...(harnessParameters.get('assetFailure') === '1'
+        ? { decodeImage: async () => Promise.reject(new Error('asset denied')) }
+        : {}),
       onPrimaryFailure: (error, assetUrl) => {
         primaryDiagnostic.value = `${assetUrl} :: ${error instanceof Error ? `${error.name}: ${error.message}` : String(error)}`
       },

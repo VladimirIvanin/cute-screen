@@ -1,5 +1,6 @@
 use std::env;
 use std::sync::Mutex;
+use uuid::Uuid;
 
 #[cfg(feature = "test-harness")]
 use std::fs;
@@ -75,8 +76,19 @@ fn read_image_bytes(
 fn repository_open_last(
     _correlation_id: String,
     repository: State<'_, LibraryRepository>,
+    transport: State<'_, ImageTransportService>,
 ) -> Result<Option<OpenDocument>, RepositoryError> {
-    repository.open_last()
+    let Some(mut document) = repository.open_last()? else {
+        return Ok(None);
+    };
+    let source = repository
+        .resolve_capture_source(document.capture_id.clone(), document.source_hash.clone())?;
+    let token = Uuid::now_v7().simple().to_string();
+    transport
+        .register_authoritative(token.clone(), source)
+        .map_err(|error| RepositoryError::Io(error.to_string()))?;
+    document.image_token = Some(token);
+    Ok(Some(document))
 }
 
 #[tauri::command]

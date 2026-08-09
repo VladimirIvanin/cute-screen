@@ -18,6 +18,7 @@ pub struct RegisteredImage {
     mime_type: String,
     width: u32,
     height: u32,
+    authoritative: bool,
 }
 
 impl RegisteredImage {
@@ -32,6 +33,7 @@ impl RegisteredImage {
             mime_type: mime_type.into(),
             width,
             height,
+            authoritative: false,
         }
     }
 }
@@ -40,7 +42,7 @@ impl RegisteredImage {
 #[serde(rename_all = "camelCase")]
 pub struct StagedImageMetadata {
     pub token: String,
-    pub path: String,
+    pub asset_url: String,
     pub mime_type: String,
     pub width: u32,
     pub height: u32,
@@ -51,7 +53,6 @@ pub struct StagedImageMetadata {
 #[derive(Debug)]
 pub struct ImageTransportService {
     source_root: PathBuf,
-    stage_root: PathBuf,
     images: RwLock<BTreeMap<String, RegisteredImage>>,
 }
 
@@ -68,14 +69,13 @@ impl ImageTransportService {
             .as_ref()
             .canonicalize()
             .map_err(|_| transport_error(PlatformErrorCode::InvalidUri, "initialization"))?;
-        let stage_root = stage_root
+        stage_root
             .as_ref()
             .canonicalize()
             .map_err(|_| transport_error(PlatformErrorCode::InvalidUri, "initialization"))?;
 
         Ok(Self {
             source_root,
-            stage_root,
             images: RwLock::new(BTreeMap::new()),
         })
     }
@@ -99,6 +99,33 @@ impl ImageTransportService {
                 "registration",
             ));
         }
+        self.images
+            .write()
+            .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, "registration"))?
+            .insert(token, image);
+        Ok(())
+    }
+
+    /// Registers a blob only after `LibraryRepository` has checked its capture
+    /// reference and canonical content-addressed location.
+    pub fn register_authoritative(
+        &self,
+        token: impl Into<String>,
+        source: crate::storage::AuthorizedCaptureSource,
+    ) -> Result<(), PlatformError> {
+        let token = token.into();
+        validate_token(&token, "registration")?;
+        let canonical = source
+            .path
+            .canonicalize()
+            .map_err(|_| transport_error(PlatformErrorCode::InvalidUri, "registration"))?;
+        let image = RegisteredImage {
+            source: canonical,
+            mime_type: source.metadata.mime_type,
+            width: source.metadata.width,
+            height: source.metadata.height,
+            authoritative: true,
+        };
         self.images
             .write()
             .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, "registration"))?
@@ -169,43 +196,20 @@ impl ImageTransportService {
             .source
             .canonicalize()
             .map_err(|_| transport_error(PlatformErrorCode::InvalidUri, correlation_id))?;
-        if !canonical_source.starts_with(&self.source_root) {
+        if !image.authoritative && !canonical_source.starts_with(&self.source_root) {
             return Err(transport_error(
                 PlatformErrorCode::PermissionDenied,
                 correlation_id,
             ));
         }
 
-        let extension = match image.mime_type.as_str() {
-            "image/png" => "png",
-            "image/jpeg" => "jpg",
-            _ => "image",
-        };
-        let destination = self.stage_root.join(format!("{token}.{extension}"));
-        let mut temporary = NamedTempFile::new_in(&self.stage_root)
+        let sha256 = hash_file(&canonical_source)
             .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?;
-        let sha256 = copy_and_hash(&canonical_source, temporary.as_file_mut())
-            .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?;
-        temporary
-            .as_file()
-            .sync_all()
-            .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?;
-        temporary
-            .persist(&destination)
-            .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?;
-        let canonical_destination = destination
-            .canonicalize()
-            .map_err(|_| transport_error(PlatformErrorCode::InvalidUri, correlation_id))?;
-        if !canonical_destination.starts_with(&self.stage_root) {
-            return Err(transport_error(
-                PlatformErrorCode::PermissionDenied,
-                correlation_id,
-            ));
-        }
 
         Ok(StagedImageMetadata {
             token: token.to_owned(),
-            path: canonical_destination.to_string_lossy().into_owned(),
+            asset_url: asset_url(&canonical_source)
+                .map_err(|_| transport_error(PlatformErrorCode::InvalidUri, correlation_id))?,
             mime_type: image.mime_type,
             width: image.width,
             height: image.height,
@@ -219,8 +223,15 @@ impl ImageTransportService {
         token: &str,
         correlation_id: &str,
     ) -> Result<Vec<u8>, PlatformError> {
-        let metadata = self.stage_image(token, correlation_id)?;
-        fs::read(metadata.path)
+        validate_token(token, correlation_id)?;
+        let image = self
+            .images
+            .read()
+            .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?
+            .get(token)
+            .cloned()
+            .ok_or_else(|| transport_error(PlatformErrorCode::InvalidUri, correlation_id))?;
+        fs::read(image.source)
             .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))
     }
 }
@@ -259,6 +270,26 @@ fn copy_and_hash(source: &Path, destination: &mut File) -> std::io::Result<Strin
         hasher.update(chunk);
     }
     Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn hash_file(source: &Path) -> std::io::Result<String> {
+    let mut source = File::open(source)?;
+    let mut buffer = [0_u8; 64 * 1024];
+    let mut hasher = Sha256::new();
+    loop {
+        let read = source.read(&mut buffer)?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn asset_url(path: &Path) -> Result<String, ()> {
+    let mut url = url::Url::parse("asset://localhost/").map_err(|_| ())?;
+    url.set_path(&path.to_string_lossy());
+    Ok(url.into())
 }
 
 #[cfg(test)]
@@ -305,10 +336,7 @@ mod tests {
         let metadata = service
             .stage_image("alpha-token", "transport-test")
             .expect("registered image should stage");
-        let staged = PathBuf::from(&metadata.path)
-            .canonicalize()
-            .expect("staged path should be canonical");
-        assert!(staged.starts_with(stage_root.canonicalize().unwrap()));
+        assert!(metadata.asset_url.starts_with("asset://localhost/"));
         assert_eq!(metadata.correlation_id, "transport-test");
         assert_eq!(
             service

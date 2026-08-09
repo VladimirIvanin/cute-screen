@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { DocumentSessionController } from '@cute-screen/editor-vue'
+import {
+  DocumentSessionController,
+  DocumentSessionCoordinator,
+} from '@cute-screen/editor-vue'
 import {
   parseEditorDocument,
   serializeEditorDocument,
@@ -109,16 +112,19 @@ describe('M03 document persistence session', () => {
   })
 
   it('does not treat a save from an abandoned undo branch as current', async () => {
-    let resolveSave: ((revision: number) => void) | undefined
+    let resolveFirst: ((revision: number) => void) | undefined
+    let calls = 0
     const session = new DocumentSessionController({
       document,
       revision: 1,
       debounceMs: 60_000,
       bridge: {
         saveDocument: async () =>
-          new Promise<number>((resolve) => {
-            resolveSave = resolve
-          }),
+          ++calls === 1
+            ? new Promise<number>((resolve) => {
+                resolveFirst = resolve
+              })
+            : 3,
       },
       correlationId: () => 'test',
     })
@@ -142,7 +148,7 @@ describe('M03 document persistence session', () => {
     })
     const firstSave = session.flush()
     await Promise.resolve()
-    if (!resolveSave) throw new Error('save did not start')
+    if (!resolveFirst) throw new Error('save did not start')
 
     session.undo()
     session.execute({
@@ -150,11 +156,57 @@ describe('M03 document persistence session', () => {
       before: null,
       after: { x: 0, y: 0, width: 80, height: 80 },
     })
-    resolveSave(2)
+    resolveFirst(2)
     await firstSave
 
-    expect(session.snapshot.core.dirty).toBe(true)
-    expect(session.snapshot.saveState).toBe('dirty')
+    expect(session.snapshot.core.dirty).toBe(false)
+    expect(session.snapshot.saveState).toBe('saved')
+    expect(calls).toBe(2)
     session.dispose()
+  })
+
+  it('retains the old session when a handoff flush fails and switches on retry', async () => {
+    let shouldFail = true
+    let active: DocumentSessionController | undefined
+    const coordinator = new DocumentSessionCoordinator({
+      bridge: {
+        saveDocument: async () => {
+          if (shouldFail) throw new Error('disk full')
+          return 2
+        },
+      },
+      correlationId: () => 'handoff',
+      onActiveSession: (session) => {
+        active = session
+      },
+    })
+    coordinator.openInitial({ documentId: document.id, document, revision: 1 })
+    const old = active
+    if (!old) throw new Error('initial session missing')
+    old.execute({
+      type: 'setCrop',
+      before: null,
+      after: { x: 0, y: 0, width: 80, height: 80 },
+    })
+    const incoming = {
+      ...document,
+      id: '019c1f62-058e-7000-8000-000000000099',
+    }
+
+    await expect(
+      coordinator.handoff({
+        documentId: incoming.id,
+        document: incoming,
+        revision: 1,
+      }),
+    ).resolves.toMatchObject({ kind: 'failed' })
+    expect(active).toBe(old)
+    expect(coordinator.pending?.documentId).toBe(incoming.id)
+
+    shouldFail = false
+    await expect(coordinator.retryPendingHandoff()).resolves.toEqual({
+      kind: 'switched',
+    })
+    expect(active?.snapshot.core.document.id).toBe(incoming.id)
   })
 })

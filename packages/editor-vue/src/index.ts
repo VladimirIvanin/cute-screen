@@ -37,10 +37,16 @@ export {
   DocumentSessionController,
   parsePersistedDocument,
   type DocumentPersistenceBridge,
+  type DocumentFlushOutcome,
   type DocumentSaveState,
   type DocumentSessionSnapshot,
   type PersistedDocumentRecord,
 } from './document-session'
+export {
+  DocumentSessionCoordinator,
+  type CoordinatedDocumentRecord,
+  type DocumentHandoffOutcome,
+} from './document-session-coordinator'
 export { createEditorShellPinia, useEditorShellStore } from './shell/store'
 export { assertLocaleCompleteness, resolveSystemLocale, t } from './shell/i18n'
 export {

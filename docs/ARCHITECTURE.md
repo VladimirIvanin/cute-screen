@@ -155,6 +155,10 @@ SQLite содержит как минимум:
 - `settings`
 - `recovery_journal`
 
+`captures.capture_metadata_json` хранит versioned provenance v1: backend,
+target, geometry, monitor snapshot, cursor и invocation source. Все ключи
+присутствуют; недоступные значения записываются как `null`.
+
 Файл оригинала сначала записывается во временное имя в той же файловой системе, синхронизируется и атомарно переименовывается. После этого транзакция базы связывает blob с capture. Незавершённые записи находятся по recovery journal при следующем запуске. Unreferenced blobs очищаются только отдельным безопасным maintenance flow.
 
 ## Безопасность

@@ -1,6 +1,6 @@
 export interface StagedImageMetadata {
   readonly token: string
-  readonly path: string
+  readonly assetUrl: string
   readonly mimeType: string
   readonly width: number
   readonly height: number
@@ -44,7 +44,6 @@ export interface LoadImageOptions<Resource> {
   readonly token: string
   readonly correlationId: string
   readonly bridge: ImageTransportBridge
-  readonly convertFileSrc: (path: string) => string
   readonly createResource: (
     image: HTMLImageElement,
     metadata: StagedImageMetadata,
@@ -116,7 +115,7 @@ export async function loadImageWithBinaryFallback<Resource>(
   }
 
   const decodeImage = options.decodeImage ?? decodeBrowserImage
-  const assetUrl = options.convertFileSrc(metadata.path)
+  const assetUrl = metadata.assetUrl
   try {
     const image = await decodeImage(assetUrl)
     assertDimensions(image, metadata)

@@ -3,12 +3,15 @@ use std::{
     fs::{self, File, OpenOptions},
     io::{Read, Write},
     path::{Component, Path, PathBuf},
-    sync::mpsc::{self, Sender},
+    sync::{
+        Arc,
+        mpsc::{self, Sender},
+    },
     thread,
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use rusqlite::{Connection, OptionalExtension, Transaction, params};
+use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior, params};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -32,6 +35,12 @@ pub enum RepositoryError {
     InvalidDocument(String),
     #[error("document schema {schema_version} is newer than supported")]
     NewerSchema { schema_version: u32 },
+    #[error("database schema version {found} is newer than supported version {supported}")]
+    UnsupportedDatabaseSchema { found: i64, supported: i64 },
+    #[error("database migration history is invalid: {0}")]
+    MigrationIntegrity(String),
+    #[error("storage fault injected at {point:?}")]
+    InjectedFault { point: StorageFaultPoint },
     #[error("blob is missing: {hash}")]
     MissingBlob { hash: String },
     #[error("stored document revision changed before save")]
@@ -76,6 +85,68 @@ pub struct BlobMetadata {
     pub color_metadata: Value,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CaptureMetadataV1 {
+    pub schema_version: u8,
+    pub backend: String,
+    pub target: String,
+    pub geometry: Option<Value>,
+    pub monitor_snapshot: Option<Value>,
+    pub cursor: Option<Value>,
+    pub invocation_source: String,
+}
+
+impl CaptureMetadataV1 {
+    pub fn unknown() -> Self {
+        Self {
+            schema_version: 1,
+            backend: "unknown".to_owned(),
+            target: "unknown".to_owned(),
+            geometry: None,
+            monitor_snapshot: None,
+            cursor: None,
+            invocation_source: "unknown".to_owned(),
+        }
+    }
+
+    fn validate(&self) -> Result<(), RepositoryError> {
+        if self.schema_version != 1
+            || self.backend.is_empty()
+            || self.target.is_empty()
+            || self.invocation_source.is_empty()
+        {
+            return Err(RepositoryError::InvalidDocument(
+                "capture metadata v1 is invalid".to_owned(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum StorageFaultPoint {
+    JournalPrepared,
+    BlobWrittenAndSynced,
+    MetadataTransactionStarted,
+    BeforeMetadataCommit,
+    AfterMetadataCommit,
+}
+
+pub trait StorageFaultInjector: Send + Sync {
+    fn checkpoint(&self, point: StorageFaultPoint) -> Result<(), RepositoryError>;
+}
+
+#[derive(Debug, Default)]
+struct NoopStorageFaultInjector;
+
+impl StorageFaultInjector for NoopStorageFaultInjector {
+    fn checkpoint(&self, _point: StorageFaultPoint) -> Result<(), RepositoryError> {
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StoredBlob {
@@ -93,6 +164,7 @@ pub struct CreateCaptureRequest {
     pub document_json: String,
     pub source_bytes: Vec<u8>,
     pub source_metadata: BlobMetadata,
+    pub capture_metadata: CaptureMetadataV1,
     pub captured_at: i64,
 }
 
@@ -104,6 +176,18 @@ pub struct OpenDocument {
     pub revision: i64,
     pub document_json: String,
     pub source_hash: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image_token: Option<String>,
+}
+
+/// Native-only description of an original that has been authorised by the
+/// repository. It is deliberately never serialized across the Tauri boundary.
+#[derive(Debug, Clone)]
+pub struct AuthorizedCaptureSource {
+    pub capture_id: String,
+    pub hash: String,
+    pub path: PathBuf,
+    pub metadata: BlobMetadata,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -141,6 +225,7 @@ struct StorageState {
     blobs_root: PathBuf,
     resources_root: PathBuf,
     connection: Connection,
+    fault_injector: Arc<dyn StorageFaultInjector>,
 }
 
 type Job = Box<dyn FnOnce(&mut StorageState) + Send + 'static>;
@@ -158,6 +243,18 @@ impl LibraryRepository {
         root: impl AsRef<Path>,
         resources_root: impl AsRef<Path>,
     ) -> Result<Self, RepositoryError> {
+        Self::initialize_with_fault_injector(
+            root,
+            resources_root,
+            Arc::new(NoopStorageFaultInjector),
+        )
+    }
+
+    pub fn initialize_with_fault_injector(
+        root: impl AsRef<Path>,
+        resources_root: impl AsRef<Path>,
+        fault_injector: Arc<dyn StorageFaultInjector>,
+    ) -> Result<Self, RepositoryError> {
         let root = root.as_ref().to_path_buf();
         let resources_root = resources_root.as_ref().to_path_buf();
         let (sender, receiver) = mpsc::channel::<Job>();
@@ -165,7 +262,7 @@ impl LibraryRepository {
         thread::Builder::new()
             .name("cute-screen-storage".to_owned())
             .spawn(move || {
-                let initialized = StorageState::open(&root, &resources_root);
+                let initialized = StorageState::open(&root, &resources_root, fault_injector);
                 let _ = ready_sender.send(initialized.as_ref().map(|_| ()).map_err(Clone::clone));
                 let Ok(mut state) = initialized else { return };
                 while let Ok(job) = receiver.recv() {
@@ -236,6 +333,14 @@ impl LibraryRepository {
         self.call(move |state| state.blob_path_checked(&hash))
     }
 
+    pub fn resolve_capture_source(
+        &self,
+        capture_id: String,
+        source_hash: String,
+    ) -> Result<AuthorizedCaptureSource, RepositoryError> {
+        self.call(move |state| state.resolve_capture_source(&capture_id, &source_hash))
+    }
+
     pub fn export_recovery_bundle(
         &self,
         document_id: String,
@@ -269,7 +374,11 @@ impl LibraryRepository {
 }
 
 impl StorageState {
-    fn open(root: &Path, resources_root: &Path) -> Result<Self, RepositoryError> {
+    fn open(
+        root: &Path,
+        resources_root: &Path,
+        fault_injector: Arc<dyn StorageFaultInjector>,
+    ) -> Result<Self, RepositoryError> {
         fs::create_dir_all(root)?;
         let blobs_root = root.join("blobs");
         let resources_root = resources_root.join("resources");
@@ -286,6 +395,7 @@ impl StorageState {
             blobs_root,
             resources_root,
             connection,
+            fault_injector,
         };
         state.recover()?;
         Ok(state)
@@ -295,8 +405,8 @@ impl StorageState {
         &mut self,
         request: CreateCaptureRequest,
     ) -> Result<OpenDocument, RepositoryError> {
-        validate_image(&request.source_bytes, &request.source_metadata)?;
-        validate_document(&request.document_json)?;
+        let source = inspect_source_bytes(&request.source_bytes)?;
+        validate_capture_request(&request, &source)?;
         let operation_id = Uuid::now_v7().to_string();
         let journal_payload = serde_json::json!({
             "documentId": request.document_id,
@@ -307,13 +417,21 @@ impl StorageState {
             "INSERT INTO recovery_journal (operation_id, kind, state, payload_json, created_at, updated_at) VALUES (?1, 'createCapture', 'prepared', ?2, ?3, ?3)",
             params![operation_id, journal_payload, now_millis()?],
         )?;
+        self.fault_injector
+            .checkpoint(StorageFaultPoint::JournalPrepared)?;
         let blob = self.store_blob(&request.source_bytes, &request.source_metadata)?;
+        self.fault_injector
+            .checkpoint(StorageFaultPoint::BlobWrittenAndSynced)?;
         self.connection.execute(
             "UPDATE recovery_journal SET state = 'blobReady', updated_at = ?2 WHERE operation_id = ?1",
             params![operation_id, now_millis()?],
         )?;
 
-        let transaction = self.connection.transaction()?;
+        let transaction = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        self.fault_injector
+            .checkpoint(StorageFaultPoint::MetadataTransactionStarted)?;
         let series_id = match request.series_id {
             Some(series_id) => series_id,
             None => transaction
@@ -339,8 +457,8 @@ impl StorageState {
             params![blob.hash, blob.metadata.format, blob.metadata.mime_type, sqlite_byte_size(blob.byte_size)?, blob.metadata.width, blob.metadata.height, serde_json::to_string(&blob.metadata.color_metadata).map_err(|error| RepositoryError::InvalidDocument(error.to_string()))?, request.captured_at],
         )?;
         transaction.execute(
-            "INSERT INTO captures (id, series_id, original_blob_hash, captured_at, created_at, updated_at, deleted_at) VALUES (?1, ?2, ?3, ?4, ?4, ?4, NULL)",
-            params![request.capture_id, series_id, blob.hash, request.captured_at],
+            "INSERT INTO captures (id, series_id, original_blob_hash, capture_metadata_json, captured_at, created_at, updated_at, deleted_at) VALUES (?1, ?2, ?3, ?4, ?5, ?5, ?5, NULL)",
+            params![request.capture_id, series_id, blob.hash, serde_json::to_string(&request.capture_metadata).map_err(|error| RepositoryError::InvalidDocument(error.to_string()))?, request.captured_at],
         )?;
         transaction.execute(
             "INSERT INTO documents (id, capture_id, schema_version, revision, content_json, content_sha256, created_at, updated_at) VALUES (?1, ?2, 1, 1, ?3, ?4, ?5, ?5)",
@@ -364,13 +482,18 @@ impl StorageState {
             "DELETE FROM recovery_journal WHERE operation_id = ?1",
             params![operation_id],
         )?;
+        self.fault_injector
+            .checkpoint(StorageFaultPoint::BeforeMetadataCommit)?;
         transaction.commit()?;
+        self.fault_injector
+            .checkpoint(StorageFaultPoint::AfterMetadataCommit)?;
         Ok(OpenDocument {
             document_id: request.document_id,
             capture_id: request.capture_id,
             revision: 1,
             document_json: request.document_json,
             source_hash: blob.hash,
+            image_token: None,
         })
     }
 
@@ -392,7 +515,7 @@ impl StorageState {
         self.connection.query_row(
             "SELECT d.id, d.capture_id, d.revision, d.content_json, c.original_blob_hash FROM documents d JOIN captures c ON c.id = d.capture_id WHERE c.deleted_at IS NULL ORDER BY c.captured_at DESC LIMIT 1",
             [],
-            |row| Ok(OpenDocument { document_id: row.get(0)?, capture_id: row.get(1)?, revision: row.get(2)?, document_json: row.get(3)?, source_hash: row.get(4)? }),
+            |row| Ok(OpenDocument { document_id: row.get(0)?, capture_id: row.get(1)?, revision: row.get(2)?, document_json: row.get(3)?, source_hash: row.get(4)?, image_token: None }),
         ).optional().map_err(RepositoryError::from)
     }
 
@@ -531,6 +654,53 @@ impl StorageState {
                 hash: hash.to_owned(),
             })
         }
+    }
+
+    fn resolve_capture_source(
+        &mut self,
+        capture_id: &str,
+        source_hash: &str,
+    ) -> Result<AuthorizedCaptureSource, RepositoryError> {
+        if !is_sha256(source_hash) {
+            return Err(RepositoryError::MissingBlob {
+                hash: source_hash.to_owned(),
+            });
+        }
+        let metadata = self
+            .connection
+            .query_row(
+                "SELECT b.hash, b.format, b.mime_type, b.width, b.height, b.color_metadata_json FROM captures c JOIN blobs b ON b.hash = c.original_blob_hash WHERE c.id = ?1 AND c.original_blob_hash = ?2 AND c.deleted_at IS NULL",
+                params![capture_id, source_hash],
+                |row| {
+                    let color: String = row.get(5)?;
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        BlobMetadata {
+                            format: row.get(1)?,
+                            mime_type: row.get(2)?,
+                            width: row.get(3)?,
+                            height: row.get(4)?,
+                            color_metadata: serde_json::from_str(&color).map_err(|error| rusqlite::Error::FromSqlConversionFailure(5, rusqlite::types::Type::Text, Box::new(error)))?,
+                        },
+                    ))
+                },
+            )
+            .optional()?
+            .ok_or_else(|| RepositoryError::MissingBlob {
+                hash: source_hash.to_owned(),
+            })?;
+        let path = self.blob_path_checked(&metadata.0)?;
+        let canonical_root = self.blobs_root.canonicalize()?;
+        let canonical_path = path.canonicalize()?;
+        if !canonical_path.starts_with(&canonical_root) {
+            return Err(RepositoryError::PermissionDenied);
+        }
+        Ok(AuthorizedCaptureSource {
+            capture_id: capture_id.to_owned(),
+            hash: metadata.0,
+            path: canonical_path,
+            metadata: metadata.1,
+        })
     }
 
     fn store_blob(
@@ -768,15 +938,26 @@ impl StorageState {
                 .map_err(|error| RepositoryError::InvalidDocument(error.to_string()))?,
             source_bytes,
             source_metadata,
+            capture_metadata: CaptureMetadataV1::unknown(),
             captured_at,
         };
         self.create_capture(request)
     }
 }
 
-fn migrate(connection: &mut Connection) -> Result<(), RepositoryError> {
-    connection.execute_batch(
-        "
+struct Migration {
+    version: i64,
+    name: &'static str,
+    checksum: &'static str,
+    sql: &'static str,
+}
+
+const MIGRATIONS: [Migration; 2] = [
+    Migration {
+        version: 1,
+        name: "m03-initial",
+        checksum: "m03-initial-v1",
+        sql: "
         CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, checksum TEXT NOT NULL, applied_at INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS series (id TEXT PRIMARY KEY, title TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, deleted_at INTEGER);
         CREATE TABLE IF NOT EXISTS blobs (hash TEXT PRIMARY KEY, format TEXT NOT NULL, mime_type TEXT NOT NULL, byte_size INTEGER NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, color_metadata_json TEXT NOT NULL, created_at INTEGER NOT NULL);
@@ -791,12 +972,62 @@ fn migrate(connection: &mut Connection) -> Result<(), RepositoryError> {
         CREATE INDEX IF NOT EXISTS documents_updated ON documents(updated_at DESC);
         CREATE INDEX IF NOT EXISTS blob_references_hash ON blob_references(blob_hash);
         CREATE INDEX IF NOT EXISTS recovery_journal_state ON recovery_journal(state, updated_at);
-        "
+        ",
+    },
+    Migration {
+        version: 2,
+        name: "m03-capture-metadata-v1",
+        checksum: "m03-capture-metadata-v1",
+        sql: "ALTER TABLE captures ADD COLUMN capture_metadata_json TEXT NOT NULL DEFAULT '{\"schemaVersion\":1,\"backend\":\"unknown\",\"target\":\"unknown\",\"geometry\":null,\"monitorSnapshot\":null,\"cursor\":null,\"invocationSource\":\"unknown\"}';",
+    },
+];
+
+fn migrate(connection: &mut Connection) -> Result<(), RepositoryError> {
+    connection.execute_batch(
+        "CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, checksum TEXT NOT NULL, applied_at INTEGER NOT NULL);",
     )?;
-    connection.execute(
-        "INSERT OR IGNORE INTO schema_migrations (version, name, checksum, applied_at) VALUES (1, 'm03-initial', 'm03-initial-v1', ?1)",
-        params![now_millis()?],
-    )?;
+    let mut statement = connection
+        .prepare("SELECT version, name, checksum FROM schema_migrations ORDER BY version ASC")?;
+    let rows = statement
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+            ))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    drop(statement);
+
+    let supported = MIGRATIONS.last().map_or(0, |migration| migration.version);
+    if let Some((found, _, _)) = rows.last()
+        && *found > supported
+    {
+        return Err(RepositoryError::UnsupportedDatabaseSchema {
+            found: *found,
+            supported,
+        });
+    }
+    for (index, (version, name, checksum)) in rows.iter().enumerate() {
+        let expected = MIGRATIONS.get(index).ok_or_else(|| {
+            RepositoryError::MigrationIntegrity(format!("unknown migration version {version}"))
+        })?;
+        if *version != expected.version || name != expected.name || checksum != expected.checksum {
+            return Err(RepositoryError::MigrationIntegrity(format!(
+                "migration {version} does not match the registered version/name/checksum"
+            )));
+        }
+    }
+
+    for migration in MIGRATIONS.iter().skip(rows.len()) {
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        transaction.execute_batch(migration.sql)?;
+        transaction.execute(
+            "INSERT INTO schema_migrations (version, name, checksum, applied_at) VALUES (?1, ?2, ?3, ?4)",
+            params![migration.version, migration.name, migration.checksum, now_millis()?],
+        )?;
+        transaction.commit()?;
+    }
     Ok(())
 }
 
@@ -845,7 +1076,7 @@ fn collect_blob_hashes(value: &Value, hashes: &mut BTreeSet<String>) {
     }
 }
 
-fn validate_document(document_json: &str) -> Result<(), RepositoryError> {
+fn document_value(document_json: &str) -> Result<Value, RepositoryError> {
     let value: Value = serde_json::from_str(document_json)
         .map_err(|error| RepositoryError::InvalidDocument(error.to_string()))?;
     let schema_version = value
@@ -863,19 +1094,216 @@ fn validate_document(document_json: &str) -> Result<(), RepositoryError> {
     if value.get("id").and_then(Value::as_str).is_none() {
         return Err(RepositoryError::InvalidDocument("id is missing".to_owned()));
     }
+    Ok(value)
+}
+
+fn validate_document(document_json: &str) -> Result<(), RepositoryError> {
+    let _ = document_value(document_json)?;
+    Ok(())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SourceFacts {
+    hash: String,
+    format: String,
+    mime_type: String,
+    width: u32,
+    height: u32,
+}
+
+fn inspect_source_bytes(bytes: &[u8]) -> Result<SourceFacts, RepositoryError> {
+    if encoded_byte_size(bytes.len())? > MAX_ENCODED_BYTES {
+        return Err(RepositoryError::ImageTooLarge);
+    }
+    let (format, mime_type, width, height) = if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+        let decoder = png::Decoder::new(std::io::Cursor::new(bytes));
+        let reader = decoder
+            .read_info()
+            .map_err(|_| RepositoryError::InvalidImage)?;
+        let (width, height) = reader.info().size();
+        ("png", "image/png", width, height)
+    } else if bytes.starts_with(&[0xff, 0xd8, 0xff]) {
+        let (width, height) = jpeg_dimensions(bytes)?;
+        ("jpeg", "image/jpeg", width, height)
+    } else if bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WEBP") {
+        let (width, height) = webp_dimensions(bytes)?;
+        ("webp", "image/webp", width, height)
+    } else {
+        let (width, height) = svg_dimensions(bytes)?;
+        ("svg", "image/svg+xml", width, height)
+    };
+    validate_dimensions(width, height)?;
+    Ok(SourceFacts {
+        hash: sha256_hex(bytes),
+        format: format.to_owned(),
+        mime_type: mime_type.to_owned(),
+        width,
+        height,
+    })
+}
+
+fn validate_capture_request(
+    request: &CreateCaptureRequest,
+    source: &SourceFacts,
+) -> Result<(), RepositoryError> {
+    request.capture_metadata.validate()?;
+    if request.source_metadata.format != source.format
+        || request.source_metadata.mime_type != source.mime_type
+        || request.source_metadata.width != source.width
+        || request.source_metadata.height != source.height
+    {
+        return Err(RepositoryError::InvalidDocument(
+            "source metadata does not match the encoded image".to_owned(),
+        ));
+    }
+    let document = document_value(&request.document_json)?;
+    if document.get("id").and_then(Value::as_str) != Some(request.document_id.as_str()) {
+        return Err(RepositoryError::InvalidDocument(
+            "document id does not match the capture request".to_owned(),
+        ));
+    }
+    let source_value = document
+        .get("source")
+        .and_then(Value::as_object)
+        .ok_or_else(|| RepositoryError::InvalidDocument("source is missing".to_owned()))?;
+    let matches = source_value.get("blobHash").and_then(Value::as_str)
+        == Some(source.hash.as_str())
+        && source_value.get("format").and_then(Value::as_str) == Some(source.format.as_str())
+        && source_value.get("mimeType").and_then(Value::as_str) == Some(source.mime_type.as_str())
+        && source_value.get("width").and_then(Value::as_u64) == Some(u64::from(source.width))
+        && source_value.get("height").and_then(Value::as_u64) == Some(u64::from(source.height));
+    if !matches {
+        return Err(RepositoryError::InvalidDocument(
+            "document source does not match the encoded image".to_owned(),
+        ));
+    }
     Ok(())
 }
 
 fn validate_image(bytes: &[u8], metadata: &BlobMetadata) -> Result<(), RepositoryError> {
-    if encoded_byte_size(bytes.len())? > MAX_ENCODED_BYTES {
-        return Err(RepositoryError::ImageTooLarge);
-    }
-    validate_dimensions(metadata.width, metadata.height)?;
-    if is_supported_format(&metadata.format) {
+    let source = inspect_source_bytes(bytes)?;
+    if metadata.format == source.format
+        && metadata.mime_type == source.mime_type
+        && metadata.width == source.width
+        && metadata.height == source.height
+    {
         Ok(())
     } else {
         Err(RepositoryError::InvalidImage)
     }
+}
+
+fn jpeg_dimensions(bytes: &[u8]) -> Result<(u32, u32), RepositoryError> {
+    let mut index = 2;
+    while index + 9 < bytes.len() {
+        if bytes[index] != 0xff {
+            return Err(RepositoryError::InvalidImage);
+        }
+        while bytes.get(index) == Some(&0xff) {
+            index += 1;
+        }
+        let marker = *bytes.get(index).ok_or(RepositoryError::InvalidImage)?;
+        index += 1;
+        if matches!(marker, 0xd8 | 0xd9) || (0xd0..=0xd7).contains(&marker) {
+            continue;
+        }
+        let length = u16::from_be_bytes([
+            *bytes.get(index).ok_or(RepositoryError::InvalidImage)?,
+            *bytes.get(index + 1).ok_or(RepositoryError::InvalidImage)?,
+        ]) as usize;
+        if length < 2 || index + length > bytes.len() {
+            return Err(RepositoryError::InvalidImage);
+        }
+        if matches!(marker, 0xc0..=0xc3 | 0xc5..=0xc7 | 0xc9..=0xcb | 0xcd..=0xcf) {
+            let height = u16::from_be_bytes([bytes[index + 3], bytes[index + 4]]);
+            let width = u16::from_be_bytes([bytes[index + 5], bytes[index + 6]]);
+            return Ok((u32::from(width), u32::from(height)));
+        }
+        index += length;
+    }
+    Err(RepositoryError::InvalidImage)
+}
+
+fn webp_dimensions(bytes: &[u8]) -> Result<(u32, u32), RepositoryError> {
+    let chunk = bytes.get(12..16).ok_or(RepositoryError::InvalidImage)?;
+    match chunk {
+        b"VP8X" if bytes.len() >= 30 => {
+            let width = 1 + u32::from_le_bytes([bytes[24], bytes[25], bytes[26], 0]);
+            let height = 1 + u32::from_le_bytes([bytes[27], bytes[28], bytes[29], 0]);
+            Ok((width, height))
+        }
+        b"VP8 " if bytes.len() >= 30 && bytes.get(23..26) == Some(&[0x9d, 0x01, 0x2a]) => {
+            let width = u16::from_le_bytes([bytes[26], bytes[27]]) & 0x3fff;
+            let height = u16::from_le_bytes([bytes[28], bytes[29]]) & 0x3fff;
+            Ok((u32::from(width), u32::from(height)))
+        }
+        b"VP8L" if bytes.len() >= 25 && bytes[20] == 0x2f => {
+            let bits = u32::from_le_bytes([bytes[21], bytes[22], bytes[23], bytes[24]]);
+            Ok(((bits & 0x3fff) + 1, ((bits >> 14) & 0x3fff) + 1))
+        }
+        _ => Err(RepositoryError::InvalidImage),
+    }
+}
+
+fn svg_dimensions(bytes: &[u8]) -> Result<(u32, u32), RepositoryError> {
+    let svg = std::str::from_utf8(bytes).map_err(|_| RepositoryError::InvalidImage)?;
+    let lowered = svg.to_ascii_lowercase();
+    if !lowered.contains("<svg")
+        || lowered.contains("<!doctype")
+        || lowered.contains("<!entity")
+        || lowered.contains("<script")
+    {
+        return Err(RepositoryError::InvalidImage);
+    }
+    let tag_end = svg.find('>').ok_or(RepositoryError::InvalidImage)?;
+    let tag = &svg[..tag_end];
+    let width = xml_numeric_attribute(tag, "width");
+    let height = xml_numeric_attribute(tag, "height");
+    match (width, height) {
+        (Some(width), Some(height)) => Ok((width, height)),
+        _ => {
+            let view_box = xml_attribute(tag, "viewBox").ok_or(RepositoryError::InvalidImage)?;
+            let values = view_box.split_ascii_whitespace().collect::<Vec<_>>();
+            if values.len() != 4 {
+                return Err(RepositoryError::InvalidImage);
+            }
+            let width = values[2]
+                .parse::<f64>()
+                .map_err(|_| RepositoryError::InvalidImage)?;
+            let height = values[3]
+                .parse::<f64>()
+                .map_err(|_| RepositoryError::InvalidImage)?;
+            if !width.is_finite() || !height.is_finite() || width <= 0.0 || height <= 0.0 {
+                return Err(RepositoryError::InvalidImage);
+            }
+            Ok((positive_ceiled_u32(width)?, positive_ceiled_u32(height)?))
+        }
+    }
+}
+
+fn xml_numeric_attribute(tag: &str, name: &str) -> Option<u32> {
+    let value = xml_attribute(tag, name)?;
+    let number = value.trim_end_matches("px").parse::<f64>().ok()?;
+    (number.is_finite() && number > 0.0 && number <= f64::from(u32::MAX))
+        .then(|| positive_ceiled_u32(number).ok())
+        .flatten()
+}
+
+fn xml_attribute<'a>(tag: &'a str, name: &str) -> Option<&'a str> {
+    ['\"', '\''].into_iter().find_map(|quote| {
+        let marker = format!("{name}={quote}");
+        let start = tag.find(&marker).map(|index| index + marker.len())?;
+        let end = tag[start..].find(quote).map(|index| index + start)?;
+        Some(&tag[start..end])
+    })
+}
+
+fn positive_ceiled_u32(value: f64) -> Result<u32, RepositoryError> {
+    value
+        .ceil()
+        .to_string()
+        .parse::<u32>()
+        .map_err(|_| RepositoryError::InvalidImage)
 }
 
 fn validate_derivative_metadata(metadata: &DerivativeMetadata) -> Result<(), RepositoryError> {
@@ -1039,7 +1467,9 @@ fn read_bundle_blob(
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, path::Path};
+    use std::{fs, path::Path, sync::Arc};
+
+    use rusqlite::Connection;
 
     #[cfg(unix)]
     use std::os::unix::fs::symlink;
@@ -1047,25 +1477,34 @@ mod tests {
     use tempfile::tempdir;
 
     use super::{
-        BlobMetadata, CreateCaptureRequest, DerivativeMetadata, LibraryRepository, RepositoryError,
+        BlobMetadata, CaptureMetadataV1, CreateCaptureRequest, DerivativeMetadata,
+        LibraryRepository, RepositoryError,
     };
 
     fn metadata() -> BlobMetadata {
         BlobMetadata {
             format: "png".to_owned(),
             mime_type: "image/png".to_owned(),
-            width: 2,
-            height: 2,
+            width: 3840,
+            height: 2160,
             color_metadata: serde_json::json!({ "colorSpace": "srgb" }),
         }
+    }
+
+    fn fixture_bytes() -> Vec<u8> {
+        fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../tests/fixtures/generated/ui-4k.png"
+        ))
+        .expect("production-shaped PNG fixture")
     }
 
     fn document(id: &str, hash: &str) -> String {
         serde_json::json!({
             "schemaVersion": 1,
             "id": id,
-            "source": { "blobHash": hash, "format": "png", "mimeType": "image/png", "width": 2, "height": 2, "orientationApplied": true, "color": { "colorSpace": "srgb", "hasIccProfile": false } },
-            "canvas": { "width": 2, "height": 2 }, "crop": null, "layers": [],
+            "source": { "blobHash": hash, "format": "png", "mimeType": "image/png", "width": 3840, "height": 2160, "orientationApplied": true, "color": { "colorSpace": "srgb", "hasIccProfile": false } },
+            "canvas": { "width": 3840, "height": 2160 }, "crop": null, "layers": [],
             "presentation": { "beautify": { "enabled": false }, "watermark": { "enabled": false } },
             "createdAt": "2026-08-09T00:00:00.000Z", "updatedAt": "2026-08-09T00:00:00.000Z"
         }).to_string()
@@ -1084,12 +1523,107 @@ mod tests {
         }
     }
 
+    fn request(document_id: &str, capture_id: &str) -> CreateCaptureRequest {
+        let source_bytes = fixture_bytes();
+        let hash = super::sha256_hex(&source_bytes);
+        CreateCaptureRequest {
+            document_id: document_id.to_owned(),
+            capture_id: capture_id.to_owned(),
+            series_id: None,
+            document_json: document(document_id, &hash),
+            source_bytes,
+            source_metadata: metadata(),
+            capture_metadata: CaptureMetadataV1::unknown(),
+            captured_at: 1,
+        }
+    }
+
+    struct FailAt(super::StorageFaultPoint);
+
+    impl super::StorageFaultInjector for FailAt {
+        fn checkpoint(
+            &self,
+            point: super::StorageFaultPoint,
+        ) -> Result<(), super::RepositoryError> {
+            if point == self.0 {
+                Err(super::RepositoryError::InjectedFault { point })
+            } else {
+                Ok(())
+            }
+        }
+    }
+
+    #[test]
+    fn migration_registry_rejects_damaged_history_and_newer_versions() {
+        let directory = tempdir().expect("temp directory");
+        let database = directory.path().join("library.sqlite3");
+        let mut connection = Connection::open(&database).expect("database");
+        super::migrate(&mut connection).expect("migrate empty database");
+        assert_eq!(
+            connection
+                .query_row("SELECT COUNT(*) FROM schema_migrations", [], |row| row
+                    .get::<_, i64>(0))
+                .expect("migration count"),
+            2
+        );
+        connection
+            .execute(
+                "UPDATE schema_migrations SET checksum = 'damaged' WHERE version = 1",
+                [],
+            )
+            .expect("damage checksum");
+        assert!(matches!(
+            super::migrate(&mut connection),
+            Err(RepositoryError::MigrationIntegrity(_))
+        ));
+        connection
+            .execute(
+                "UPDATE schema_migrations SET checksum = 'm03-initial-v1' WHERE version = 1",
+                [],
+            )
+            .expect("restore checksum");
+        connection
+            .execute("INSERT INTO schema_migrations (version, name, checksum, applied_at) VALUES (3, 'future', 'future', 0)", [])
+            .expect("insert future migration");
+        assert!(matches!(
+            super::migrate(&mut connection),
+            Err(RepositoryError::UnsupportedDatabaseSchema { .. })
+        ));
+    }
+
+    #[test]
+    fn recovery_after_pre_commit_fault_keeps_only_the_reusable_orphan_blob() {
+        let directory = tempdir().expect("temp directory");
+        let repository = LibraryRepository::initialize_with_fault_injector(
+            directory.path(),
+            directory.path(),
+            Arc::new(FailAt(super::StorageFaultPoint::BeforeMetadataCommit)),
+        )
+        .expect("repository");
+        let failed = request("doc-failed", "capture-failed");
+        let hash = super::sha256_hex(&failed.source_bytes);
+        assert!(matches!(
+            repository.create_capture(failed),
+            Err(RepositoryError::InjectedFault { .. })
+        ));
+        drop(repository);
+
+        let reopened = LibraryRepository::initialize(directory.path(), directory.path())
+            .expect("restart repository");
+        assert!(reopened.open_last().expect("open last").is_none());
+        assert!(reopened.blob_path(hash.clone()).is_err());
+        let completed = reopened
+            .create_capture(request("doc-retry", "capture-retry"))
+            .expect("retry reuses blob");
+        assert_eq!(completed.source_hash, hash);
+    }
+
     #[test]
     fn creates_deduplicated_capture_and_persists_the_document() {
         let directory = tempdir().expect("temp directory");
         let repository =
             LibraryRepository::initialize(directory.path(), directory.path()).expect("repository");
-        let bytes = b"fake-png-image".to_vec();
+        let bytes = fixture_bytes();
         let hash = super::sha256_hex(&bytes);
         let first = repository
             .create_capture(CreateCaptureRequest {
@@ -1099,6 +1633,7 @@ mod tests {
                 document_json: document("doc-1", &hash),
                 source_bytes: bytes.clone(),
                 source_metadata: metadata(),
+                capture_metadata: CaptureMetadataV1::unknown(),
                 captured_at: 1,
             })
             .expect("first capture");
@@ -1110,6 +1645,7 @@ mod tests {
                 document_json: document("doc-2", &hash),
                 source_bytes: bytes,
                 source_metadata: metadata(),
+                capture_metadata: CaptureMetadataV1::unknown(),
                 captured_at: 2,
             })
             .expect("second capture");
@@ -1130,7 +1666,7 @@ mod tests {
         let directory = tempdir().expect("temp directory");
         let repository =
             LibraryRepository::initialize(directory.path(), directory.path()).expect("repository");
-        let bytes = b"fake-png-image".to_vec();
+        let bytes = fixture_bytes();
         let hash = super::sha256_hex(&bytes);
         repository
             .create_capture(CreateCaptureRequest {
@@ -1140,6 +1676,7 @@ mod tests {
                 document_json: document("doc-1", &hash),
                 source_bytes: bytes,
                 source_metadata: metadata(),
+                capture_metadata: CaptureMetadataV1::unknown(),
                 captured_at: 1,
             })
             .expect("capture");
@@ -1161,11 +1698,12 @@ mod tests {
                 capture_id: "capture-2".to_owned(),
                 series_id: None,
                 document_json: document("doc-2", &hash),
-                source_bytes: vec![1],
+                source_bytes: fixture_bytes(),
                 source_metadata: too_large,
+                capture_metadata: CaptureMetadataV1::unknown(),
                 captured_at: 2
             }),
-            Err(RepositoryError::ImageTooLarge)
+            Err(RepositoryError::InvalidDocument(_))
         ));
     }
 
@@ -1175,7 +1713,7 @@ mod tests {
         let source_repository =
             LibraryRepository::initialize(source_directory.path(), source_directory.path())
                 .expect("source repository");
-        let bytes = b"fake-png-image".to_vec();
+        let bytes = fixture_bytes();
         let hash = super::sha256_hex(&bytes);
         source_repository
             .create_capture(CreateCaptureRequest {
@@ -1185,6 +1723,7 @@ mod tests {
                 document_json: document("doc-1", &hash),
                 source_bytes: bytes,
                 source_metadata: metadata(),
+                capture_metadata: CaptureMetadataV1::unknown(),
                 captured_at: 1,
             })
             .expect("capture");
@@ -1247,7 +1786,7 @@ mod tests {
         let repository =
             LibraryRepository::initialize(directory.path(), directory.path()).expect("repository");
         let stored = repository
-            .import_blob(b"source".to_vec(), metadata())
+            .import_blob(fixture_bytes(), metadata())
             .expect("source blob should import");
         let outside = directory.path().join("outside.png");
         fs::write(&outside, b"derivative").expect("outside fixture should be written");
@@ -1266,7 +1805,7 @@ mod tests {
         let directory = tempdir().expect("temp directory");
         let repository =
             LibraryRepository::initialize(directory.path(), directory.path()).expect("repository");
-        let bytes = b"fake-png-image".to_vec();
+        let bytes = fixture_bytes();
         let hash = super::sha256_hex(&bytes);
         repository
             .put_setting("session.activeSeriesId".to_owned(), 1, "{}".to_owned())
@@ -1280,6 +1819,7 @@ mod tests {
                 document_json: document("doc-1", &hash),
                 source_bytes: bytes,
                 source_metadata: metadata(),
+                capture_metadata: CaptureMetadataV1::unknown(),
                 captured_at: 1,
             })
             .expect_err("malformed active series setting must be reported");

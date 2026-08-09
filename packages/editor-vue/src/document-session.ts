@@ -29,6 +29,11 @@ export interface DocumentSessionSnapshot {
   readonly error?: string
 }
 
+export type DocumentFlushOutcome =
+  | { readonly kind: 'saved' }
+  | { readonly kind: 'noChanges' }
+  | { readonly kind: 'failed'; readonly error: string }
+
 export interface DocumentSessionOptions {
   readonly document: EditorDocumentV1
   readonly revision: number
@@ -43,13 +48,13 @@ export class DocumentSessionController {
   readonly #manager: CommandManager
   readonly #bridge: DocumentPersistenceBridge
   readonly #correlationId: () => string
-  #onChange: (snapshot: DocumentSessionSnapshot) => void
+  #listeners = new Set<(snapshot: DocumentSessionSnapshot) => void>()
   readonly #debounceMs: number
   #revision: number
   #state: DocumentSaveState = 'saved'
   #error: string | undefined
   #timer: number | undefined
-  #inFlight: Promise<void> | undefined
+  #inFlight: Promise<DocumentFlushOutcome> | undefined
 
   constructor(options: DocumentSessionOptions) {
     this.#manager = new CommandManager(options.document)
@@ -57,7 +62,7 @@ export class DocumentSessionController {
     this.#revision = options.revision
     this.#bridge = options.bridge
     this.#correlationId = options.correlationId
-    this.#onChange = options.onChange ?? (() => undefined)
+    if (options.onChange) this.#listeners.add(options.onChange)
     this.#debounceMs = options.debounceMs ?? 500
   }
 
@@ -91,23 +96,29 @@ export class DocumentSessionController {
     return this.#publish()
   }
 
-  retry(): Promise<void> {
+  retry(): Promise<DocumentFlushOutcome> {
     return this.flush()
   }
 
-  setOnChange(listener: (snapshot: DocumentSessionSnapshot) => void): void {
-    this.#onChange = listener
+  subscribe(listener: (snapshot: DocumentSessionSnapshot) => void): () => void {
+    this.#listeners.add(listener)
     listener(this.snapshot)
+    return () => this.#listeners.delete(listener)
   }
 
-  async flush(): Promise<void> {
+  async flush(): Promise<DocumentFlushOutcome> {
     if (this.#timer !== undefined) {
       window.clearTimeout(this.#timer)
       this.#timer = undefined
     }
-    if (!this.#manager.snapshot.dirty) return
-    if (!this.#inFlight) this.#inFlight = this.#save()
-    await this.#inFlight
+    let saved = false
+    while (this.#manager.snapshot.dirty) {
+      if (!this.#inFlight) this.#inFlight = this.#save()
+      const outcome = await this.#inFlight
+      if (outcome.kind === 'failed') return outcome
+      saved ||= outcome.kind === 'saved'
+    }
+    return saved ? { kind: 'saved' } : { kind: 'noChanges' }
   }
 
   dispose(): void {
@@ -123,7 +134,7 @@ export class DocumentSessionController {
     }, this.#debounceMs)
   }
 
-  async #save(): Promise<void> {
+  async #save(): Promise<DocumentFlushOutcome> {
     const versionToken = this.#manager.snapshot.versionToken
     let saved = false
     this.#state = 'saving'
@@ -144,9 +155,11 @@ export class DocumentSessionController {
       this.#state = this.#manager.snapshot.dirty ? 'dirty' : 'saved'
       this.#error = undefined
       saved = true
+      return { kind: 'saved' }
     } catch (error) {
       this.#state = 'error'
       this.#error = error instanceof Error ? error.message : String(error)
+      return { kind: 'failed', error: this.#error }
     } finally {
       this.#inFlight = undefined
       this.#publish()
@@ -156,7 +169,7 @@ export class DocumentSessionController {
 
   #publish(): DocumentSessionSnapshot {
     const snapshot = this.snapshot
-    this.#onChange(snapshot)
+    for (const listener of this.#listeners) listener(snapshot)
     return snapshot
   }
 }

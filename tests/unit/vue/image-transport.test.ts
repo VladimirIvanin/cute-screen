@@ -8,7 +8,7 @@ import {
 
 const metadata = {
   token: 'm01-alpha-png',
-  path: '/scoped/m01-alpha-png.png',
+  assetUrl: 'asset://localhost/m01-alpha-png.png',
   mimeType: 'image/png',
   width: 64,
   height: 64,
@@ -37,7 +37,6 @@ describe('image transport', () => {
       token: metadata.token,
       correlationId: metadata.correlationId,
       bridge: adapter,
-      convertFileSrc: (path) => `asset://${path}`,
       decodeImage: vi.fn().mockResolvedValue(decodedImage()),
       createResource: vi.fn().mockResolvedValue(resource),
       objectUrls: {
@@ -61,7 +60,6 @@ describe('image transport', () => {
       token: metadata.token,
       correlationId: metadata.correlationId,
       bridge: adapter,
-      convertFileSrc: () => 'asset://denied',
       decodeImage,
       createResource: vi
         .fn()
@@ -84,7 +82,6 @@ describe('image transport', () => {
         token: metadata.token,
         correlationId: metadata.correlationId,
         bridge: bridge(),
-        convertFileSrc: () => 'asset://denied',
         decodeImage: vi.fn().mockRejectedValue(new Error('decode failed')),
         createResource: vi.fn(),
         objectUrls: {

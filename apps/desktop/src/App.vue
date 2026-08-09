@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, shallowRef } from 'vue'
 import {
   DocumentSessionController,
+  DocumentSessionCoordinator,
   EditorShell,
+  loadImageWithBinaryFallback,
   parsePersistedDocument,
   type ShellActionAdapter,
 } from '@cute-screen/editor-vue'
@@ -34,7 +36,7 @@ const testActions: ShellActionAdapter | undefined =
       }
     : undefined
 
-const documentSession = ref<DocumentSessionController>()
+const documentSession = shallowRef<DocumentSessionController>()
 
 function correlationId(): string {
   return `m03-${Date.now()}-${Math.random().toString(16).slice(2)}`
@@ -50,9 +52,7 @@ onMounted(async () => {
     if (!record) return
     const document = parsePersistedDocument(record)
     if (!document) return
-    documentSession.value = new DocumentSessionController({
-      document,
-      revision: record.revision,
+    const coordinator = new DocumentSessionCoordinator({
       bridge: {
         saveDocument: (save, correlation) =>
           tauriDesktopBridge.repositorySaveDocument(
@@ -63,7 +63,23 @@ onMounted(async () => {
           ),
       },
       correlationId,
+      onActiveSession: (session) => {
+        documentSession.value = session
+      },
     })
+    coordinator.openInitial({
+      documentId: record.documentId,
+      document,
+      revision: record.revision,
+    })
+    if (record.imageToken) {
+      await loadImageWithBinaryFallback({
+        token: record.imageToken,
+        correlationId: correlationId(),
+        bridge: tauriDesktopBridge,
+        createResource: async () => undefined,
+      })
+    }
   } catch (error) {
     console.warn('Cute Screen storage unavailable during startup', error)
   }

@@ -250,17 +250,18 @@ function retryDocumentSave(): void {
 }
 onMounted(() => {
   store.initialize(preferencesOptions)
-  if (props.documentSession)
-    props.documentSession.setOnChange(applyDocumentSnapshot)
-  else loadFixture()
+  if (!props.documentSession) loadFixture()
   media.addEventListener('change', onMediaChange)
   window.addEventListener('keydown', onKeydown)
 })
 watch(
   () => props.documentSession,
-  (session) => {
-    if (session) session.setOnChange(applyDocumentSnapshot)
+  (session, _previous, onCleanup) => {
+    if (!session) return
+    const unsubscribe = session.subscribe(applyDocumentSnapshot)
+    onCleanup(unsubscribe)
   },
+  { immediate: true },
 )
 onBeforeUnmount(() => {
   // Navigation/remount must not leave the coalesced save behind.

@@ -44,6 +44,7 @@ export interface RepositoryOpenDocument {
   readonly revision: number
   readonly documentJson: string
   readonly sourceHash: string
+  readonly imageToken?: string
 }
 
 export const tauriDesktopBridge: DesktopBridge = {
