@@ -4,17 +4,28 @@ import { UiIcon } from '../icon'
 import type { SupportedLocale, ThemePreference } from '../types'
 import type { DocumentSaveState } from '../types'
 
-const props = defineProps<{
-  locale: SupportedLocale
-  theme: ThemePreference
-  canCopyOrExport: boolean
-  canUndo?: boolean
-  canRedo?: boolean
-  saveState?: DocumentSaveState
-  saveError?: string | undefined
-  pending?: boolean
-  t: (key: Parameters<typeof import('../i18n').t>[1]) => string
-}>()
+const props = withDefaults(
+  defineProps<{
+    locale: SupportedLocale
+    theme: ThemePreference
+    canCopyOrExport: boolean
+    canUndo?: boolean
+    canRedo?: boolean
+    saveState?: DocumentSaveState | undefined
+    saveError?: string | undefined
+    pending?: boolean
+    captureAvailable?: boolean
+    captureUnavailableReason?: string | undefined
+    t: (key: Parameters<typeof import('../i18n').t>[1]) => string
+  }>(),
+  {
+    saveState: undefined,
+    saveError: undefined,
+    pending: false,
+    captureAvailable: true,
+    captureUnavailableReason: undefined,
+  },
+)
 const emit = defineEmits<{
   action: [name: 'capture' | 'copy' | 'export']
   undo: []
@@ -26,6 +37,14 @@ const emit = defineEmits<{
 }>()
 const menuOpen = ref(false)
 const disabled = computed(() => props.pending)
+const captureDisabled = computed(
+  () => disabled.value || !props.captureAvailable,
+)
+const captureTitle = computed(() =>
+  props.captureAvailable
+    ? props.t('capture')
+    : (props.captureUnavailableReason ?? props.t('captureUnavailable')),
+)
 function selectTheme(value: ThemePreference): void {
   menuOpen.value = false
   emit('theme', value)
@@ -103,9 +122,9 @@ function selectLocale(value: SupportedLocale): void {
       <button
         type="button"
         class="cs-button cs-button-quiet"
-        :disabled="disabled"
+        :disabled="captureDisabled"
         :aria-label="t('capture')"
-        :title="t('capture')"
+        :title="captureTitle"
         @click="emit('action', 'capture')"
       >
         <UiIcon name="camera" /><span>{{ t('capture') }}</span>

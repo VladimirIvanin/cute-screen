@@ -64,7 +64,16 @@ export type AsyncActionName = 'capture' | 'copy' | 'export'
 
 export type AsyncActionState =
   | { readonly status: 'idle' }
-  | { readonly status: 'pending'; readonly action: AsyncActionName }
+  | {
+      readonly status: 'pending'
+      readonly action: AsyncActionName
+      readonly captureProgress?: CaptureProgressState
+    }
+  | {
+      readonly status: 'cancelled'
+      readonly action: AsyncActionName
+      readonly message: string
+    }
   | {
       readonly status: 'success'
       readonly action: AsyncActionName
@@ -87,7 +96,11 @@ export interface DocumentHistoryState {
 }
 
 export interface ShellActionAdapter {
-  run(action: AsyncActionName, signal: AbortSignal): Promise<string>
+  run(
+    action: AsyncActionName,
+    signal: AbortSignal,
+    reportCaptureProgress?: (state: CaptureProgressState) => void,
+  ): Promise<string>
 }
 
 export type IconName =
@@ -123,6 +136,13 @@ export const translationKeys = [
   'canvasViewport',
   'capture',
   'captureAction',
+  'captureProbing',
+  'captureReady',
+  'captureDelay',
+  'captureSelecting',
+  'captureCapturing',
+  'capturePersisting',
+  'captureCancelled',
   'copy',
   'export',
   'moreActions',
@@ -141,6 +161,9 @@ export const translationKeys = [
   'emptyDescription',
   'readyLoadError',
   'captureUnavailable',
+  'captureFallback',
+  'copyCaptureFallback',
+  'captureFallbackCopied',
   'copyUnavailable',
   'exportUnavailable',
   'layers',
@@ -180,3 +203,4 @@ export const translationKeys = [
 ] as const
 
 export type TranslationKey = (typeof translationKeys)[number]
+import type { CaptureProgressState } from '../platform'

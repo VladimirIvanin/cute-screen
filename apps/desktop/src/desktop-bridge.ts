@@ -2,9 +2,13 @@ import { invoke } from '@tauri-apps/api/core'
 
 import type {
   ImageTransportBridge,
+  CaptureOutcomeV1,
+  CaptureRequestV1,
   CaptureResult,
   PlatformCapabilities,
   PortalCapabilityProbe,
+  ShortcutBindingResult,
+  ShortcutSpec,
   StagedImageMetadata,
 } from '@cute-screen/editor-vue'
 
@@ -16,6 +20,17 @@ export interface PingResponse {
 export interface DesktopBridge extends ImageTransportBridge {
   ping(): Promise<PingResponse>
   platformCapabilities(correlationId: string): Promise<PlatformCapabilities>
+  captureRequest(request: CaptureRequestV1): Promise<CaptureOutcomeV1>
+  captureCancel(): Promise<boolean>
+  capturePreflightSetReady(ready: boolean): Promise<void>
+  capturePreflightComplete(
+    correlationId: string,
+    allowed: boolean,
+  ): Promise<boolean>
+  hotkeysBind(
+    shortcuts: readonly ShortcutSpec[],
+    correlationId: string,
+  ): Promise<readonly ShortcutBindingResult[]>
   /** Available only in builds compiled with the Rust `test-harness` feature. */
   testPortalProbe?(correlationId: string): Promise<PortalCapabilityProbe>
   /** Opens the real system selector; available only in test-harness builds. */
@@ -23,6 +38,9 @@ export interface DesktopBridge extends ImageTransportBridge {
   repositoryOpenLast(
     correlationId: string,
   ): Promise<RepositoryOpenDocument | null>
+  repositoryListActiveSeriesFrames(
+    correlationId: string,
+  ): Promise<readonly RepositorySeriesFrame[]>
   repositorySaveDocument(
     documentId: string,
     expectedRevision: number,
@@ -53,6 +71,10 @@ export interface RepositoryOpenDocument {
   readonly imageToken?: string
 }
 
+export interface RepositorySeriesFrame {
+  readonly captureId: string
+}
+
 export type RecoveryExportOutcome =
   { readonly kind: 'saved' } | { readonly kind: 'cancelled' }
 
@@ -64,6 +86,18 @@ export const tauriDesktopBridge: DesktopBridge = {
     invoke<ArrayBuffer>('read_image_bytes', { token, correlationId }),
   platformCapabilities: (correlationId) =>
     invoke<PlatformCapabilities>('platform_capabilities', { correlationId }),
+  captureRequest: (request) =>
+    invoke<CaptureOutcomeV1>('capture_request', { request }),
+  captureCancel: () => invoke<boolean>('capture_cancel'),
+  capturePreflightSetReady: (ready) =>
+    invoke<void>('capture_preflight_set_ready', { ready }),
+  capturePreflightComplete: (correlationId, allowed) =>
+    invoke<boolean>('capture_preflight_complete', { correlationId, allowed }),
+  hotkeysBind: (shortcuts, correlationId) =>
+    invoke<readonly ShortcutBindingResult[]>('hotkeys_bind', {
+      shortcuts,
+      correlationId,
+    }),
   testPortalProbe: (correlationId) =>
     invoke<PortalCapabilityProbe>('test_portal_probe', { correlationId }),
   testPortalCapture: (correlationId) =>
@@ -72,6 +106,13 @@ export const tauriDesktopBridge: DesktopBridge = {
     invoke<RepositoryOpenDocument | null>('repository_open_last', {
       correlationId,
     }),
+  repositoryListActiveSeriesFrames: (correlationId) =>
+    invoke<readonly RepositorySeriesFrame[]>(
+      'repository_list_active_series_frames',
+      {
+        correlationId,
+      },
+    ),
   repositorySaveDocument: (
     documentId,
     expectedRevision,

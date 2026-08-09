@@ -1,4 +1,16 @@
-use std::{collections::BTreeSet, fs::File, io::BufReader, path::PathBuf, sync::Arc};
+use std::{
+    collections::BTreeSet,
+    fs::File,
+    future::Future,
+    io::BufReader,
+    path::PathBuf,
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
+    thread::JoinHandle,
+    time::Duration,
+};
 
 use ashpd::{
     Error as AshpdError,
@@ -23,6 +35,10 @@ use crate::{
     },
 };
 
+const PORTAL_HOTKEY_RECOVERY_DELAY: Duration = Duration::from_millis(250);
+const PORTAL_PROBE_TIMEOUT: Duration = Duration::from_secs(2);
+const PORTAL_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(2);
+
 #[derive(Debug, Default)]
 pub struct AshpdPortalClient {
     transport: Option<Arc<ImageTransportService>>,
@@ -39,22 +55,24 @@ impl AshpdPortalClient {
         &self,
         correlation_id: &str,
     ) -> Result<PortalCapabilityProbe, PlatformError> {
-        let screenshot = ScreenshotProxy::new()
-            .await
-            .map_err(|error| map_ashpd_error(error, correlation_id))?;
+        let screenshot =
+            portal_handshake(ScreenshotProxy::new(), PORTAL_PROBE_TIMEOUT, correlation_id).await?;
         let version = screenshot.version();
         let available_targets = if version >= 3 {
-            screenshot
-                .available_targets()
-                .await
-                .map_err(|error| map_ashpd_error(error, correlation_id))?
-                .bits()
+            portal_handshake(
+                screenshot.available_targets(),
+                PORTAL_PROBE_TIMEOUT,
+                correlation_id,
+            )
+            .await?
+            .bits()
         } else {
             0
         };
-        let global_shortcuts_available = GlobalShortcuts::new()
-            .await
-            .is_ok_and(|proxy| proxy.version() > 0);
+        let global_shortcuts_available =
+            portal_handshake(GlobalShortcuts::new(), PORTAL_PROBE_TIMEOUT, correlation_id)
+                .await
+                .is_ok_and(|proxy| proxy.version() > 0);
 
         Ok(PortalCapabilityProbe {
             screenshot_version: version,
@@ -68,9 +86,12 @@ impl AshpdPortalClient {
         request: CaptureRequest,
         transport: &ImageTransportService,
     ) -> Result<CaptureResult, PlatformError> {
-        let proxy = ScreenshotProxy::new()
-            .await
-            .map_err(|error| map_ashpd_error(error, &request.correlation_id))?;
+        let proxy = portal_handshake(
+            ScreenshotProxy::new(),
+            PORTAL_HANDSHAKE_TIMEOUT,
+            &request.correlation_id,
+        )
+        .await?;
         let version = proxy.version();
         if version < 2 {
             return Err(PlatformError::new(
@@ -79,25 +100,34 @@ impl AshpdPortalClient {
             ));
         }
 
+        let advertised_targets = if version >= 3 {
+            portal_handshake(
+                proxy.available_targets(),
+                PORTAL_HANDSHAKE_TIMEOUT,
+                &request.correlation_id,
+            )
+            .await?
+            .bits()
+        } else {
+            0
+        };
+        let target = portal_target_for_request(version, advertised_targets, request.target)
+            .map_err(|code| PlatformError::new(code, &request.correlation_id))?;
         let mut screenshot = Screenshot::request().interactive(true).modal(true);
-        if version >= 3 {
-            let target = match request.target {
-                CaptureTarget::Area => AvailableTargets::Area,
-                CaptureTarget::Monitor => AvailableTargets::Screen,
-                CaptureTarget::Window => AvailableTargets::Window,
-            };
+        if let Some(target) = target {
             screenshot = screenshot.target(target);
-        } else if request.target != CaptureTarget::Area {
-            return Err(PlatformError::new(
-                PlatformErrorCode::PortalTooOld,
-                request.correlation_id,
-            ));
         }
 
-        let response = screenshot
-            .send()
-            .await
-            .and_then(|request| request.response())
+        let portal_request = portal_handshake(
+            screenshot.send(),
+            PORTAL_HANDSHAKE_TIMEOUT,
+            &request.correlation_id,
+        )
+        .await?;
+        // The user-facing selector deliberately has no technical timeout. Its
+        // request object stays alive until the portal answers or the app exits.
+        let response = portal_request
+            .response()
             .map_err(|error| map_ashpd_error(error, &request.correlation_id))?;
         let source = validated_file_uri(response.uri().as_str(), &request.correlation_id)?;
         let file = File::open(&source).map_err(|_| {
@@ -125,8 +155,45 @@ impl AshpdPortalClient {
             correlation_id: request.correlation_id,
             width,
             height,
+            geometry: None,
+            cursor_included: None,
         })
     }
+}
+
+async fn portal_handshake<T>(
+    operation: impl Future<Output = Result<T, AshpdError>>,
+    timeout: Duration,
+    correlation_id: &str,
+) -> Result<T, PlatformError> {
+    tokio::time::timeout(timeout, operation)
+        .await
+        .map_err(|_| PlatformError::new(PlatformErrorCode::PortalUnavailable, correlation_id))?
+        .map_err(|error| map_ashpd_error(error, correlation_id))
+}
+
+fn portal_target_for_request(
+    version: u32,
+    advertised_targets: u32,
+    request: CaptureTarget,
+) -> Result<Option<AvailableTargets>, PlatformErrorCode> {
+    if version < 2 {
+        return Err(PlatformErrorCode::PortalTooOld);
+    }
+    if version < 3 {
+        return (request == CaptureTarget::Area)
+            .then_some(None)
+            .ok_or(PlatformErrorCode::InvalidTarget);
+    }
+    let (target, target_bit) = match request {
+        CaptureTarget::Area => (AvailableTargets::Area, 4),
+        CaptureTarget::Monitor => (AvailableTargets::Screen, 1),
+        CaptureTarget::Window => (AvailableTargets::Window, 2),
+        CaptureTarget::ActiveWindow => (AvailableTargets::ActiveWindow, 8),
+    };
+    (advertised_targets & target_bit != 0)
+        .then_some(Some(target))
+        .ok_or(PlatformErrorCode::InvalidTarget)
 }
 
 impl PortalClient for AshpdPortalClient {
@@ -163,6 +230,158 @@ pub struct PortalShortcutSession {
     proxy: GlobalShortcuts,
     session: Session<GlobalShortcuts>,
     bound_ids: BTreeSet<String>,
+}
+
+struct HotkeyWorker {
+    stop: Arc<AtomicBool>,
+    join: JoinHandle<()>,
+}
+
+/// Owns one GlobalShortcuts portal session for the running desktop process.
+/// Rebinding synchronously closes the old listener before opening a replacement
+/// session, so a failed new bind never mutates the persisted caller setting.
+pub struct PortalHotkeyService {
+    worker: Mutex<Option<HotkeyWorker>>,
+}
+
+impl Default for PortalHotkeyService {
+    fn default() -> Self {
+        Self {
+            worker: Mutex::new(None),
+        }
+    }
+}
+
+impl PortalHotkeyService {
+    pub async fn bind(
+        &self,
+        shortcuts: Vec<ShortcutSpec>,
+        correlation_id: &str,
+        on_activated: Arc<dyn Fn(String) + Send + Sync>,
+    ) -> Result<Vec<ShortcutBindingResult>, PlatformError> {
+        let mut session = PortalShortcutSession::create(correlation_id).await?;
+        let bindings = session.bind_once(&shortcuts, correlation_id).await?;
+        // Leave a working listener intact if portal binding is cancelled or
+        // denied. Only a successfully prepared replacement can displace it.
+        self.stop_current();
+        let (proxy, portal_session) = session.into_parts();
+        let stop = Arc::new(AtomicBool::new(false));
+        let worker_stop = Arc::clone(&stop);
+        let recovery_correlation_id = correlation_id.to_owned();
+        let join = std::thread::Builder::new()
+            .name("cute-screen-global-shortcuts".to_owned())
+            .spawn(move || {
+                tauri::async_runtime::block_on(run_portal_hotkey_worker(
+                    proxy,
+                    portal_session,
+                    shortcuts,
+                    recovery_correlation_id,
+                    worker_stop,
+                    on_activated,
+                ));
+            })
+            .map_err(|_| {
+                PlatformError::new(PlatformErrorCode::ShortcutUnavailable, correlation_id)
+            })?;
+        self.worker
+            .lock()
+            .map_err(|_| {
+                PlatformError::new(PlatformErrorCode::ShortcutUnavailable, correlation_id)
+            })?
+            .replace(HotkeyWorker { stop, join });
+        Ok(bindings)
+    }
+
+    pub fn close(&self) {
+        self.stop_current();
+    }
+
+    fn stop_current(&self) {
+        let worker = self.worker.lock().ok().and_then(|mut value| value.take());
+        if let Some(worker) = worker {
+            worker.stop.store(true, Ordering::Release);
+            let _ = worker.join.join();
+        }
+    }
+}
+
+async fn run_portal_hotkey_worker(
+    mut proxy: GlobalShortcuts,
+    mut portal_session: Session<GlobalShortcuts>,
+    shortcuts: Vec<ShortcutSpec>,
+    correlation_id: String,
+    stop: Arc<AtomicBool>,
+    on_activated: Arc<dyn Fn(String) + Send + Sync>,
+) {
+    loop {
+        listen_for_activations(
+            &proxy,
+            &portal_session,
+            Arc::clone(&stop),
+            Arc::clone(&on_activated),
+        )
+        .await;
+        if stop.load(Ordering::Acquire) {
+            break;
+        }
+
+        // A portal daemon restart invalidates both signal streams and the
+        // session. Recreate/list/bind from the worker rather than leaving a
+        // stale service that claims hotkeys are still active.
+        loop {
+            if stop.load(Ordering::Acquire) {
+                return;
+            }
+            tokio::time::sleep(PORTAL_HOTKEY_RECOVERY_DELAY).await;
+            let Ok(mut replacement) = PortalShortcutSession::create(&correlation_id).await else {
+                continue;
+            };
+            if replacement
+                .bind_once(&shortcuts, &correlation_id)
+                .await
+                .is_err()
+            {
+                let _ = replacement.close(&correlation_id).await;
+                continue;
+            }
+            (proxy, portal_session) = replacement.into_parts();
+            break;
+        }
+    }
+}
+
+async fn listen_for_activations(
+    proxy: &GlobalShortcuts,
+    portal_session: &Session<GlobalShortcuts>,
+    stop: Arc<AtomicBool>,
+    on_activated: Arc<dyn Fn(String) + Send + Sync>,
+) {
+    let mut activated = match proxy.receive_activated().await {
+        Ok(stream) => stream,
+        Err(_) => {
+            let _ = portal_session.close().await;
+            return;
+        }
+    };
+    let mut deactivated = match proxy.receive_deactivated().await {
+        Ok(stream) => stream,
+        Err(_) => {
+            let _ = portal_session.close().await;
+            return;
+        }
+    };
+    while !stop.load(Ordering::Acquire) {
+        if let Ok(Some(event)) =
+            tokio::time::timeout(Duration::from_millis(100), activated.next()).await
+        {
+            on_activated(event.shortcut_id().to_owned());
+        }
+        // Poll deactivation too, so portal signal queues are not allowed to
+        // grow while the application is idle. The action is intentionally only
+        // dispatched for `Activated`.
+        let _ = tokio::time::timeout(Duration::from_millis(100), deactivated.next()).await;
+    }
+    let _ = portal_session.close().await;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
@@ -299,6 +518,10 @@ impl PortalShortcutSession {
             .map_err(|error| map_shortcut_error(error, correlation_id))
     }
 
+    fn into_parts(self) -> (GlobalShortcuts, Session<GlobalShortcuts>) {
+        (self.proxy, self.session)
+    }
+
     /// Portal sessions do not have a restore token. Recovery is an explicit
     /// close/create/list/bind cycle with the same application IDs.
     pub async fn recreate(
@@ -369,11 +592,13 @@ fn map_shortcut_error(error: AshpdError, correlation_id: &str) -> PlatformError 
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
+    use std::{collections::BTreeSet, time::Duration};
 
-    use crate::platform::{PlatformErrorCode, PortalClient, ShortcutSpec};
+    use crate::platform::{CaptureTarget, PlatformErrorCode, PortalClient, ShortcutSpec};
 
-    use super::{AshpdPortalClient, missing_shortcuts, validated_file_uri};
+    use super::{
+        AshpdPortalClient, missing_shortcuts, portal_target_for_request, validated_file_uri,
+    };
 
     #[test]
     fn ashpd_client_implements_the_portal_boundary() {
@@ -413,5 +638,46 @@ mod tests {
         let missing = missing_shortcuts(&existing, &requested);
         assert_eq!(missing.len(), 1);
         assert_eq!(missing[0].id, "capture-window");
+    }
+
+    #[test]
+    fn portal_v2_accepts_only_the_interactive_area_selector() {
+        assert_eq!(
+            portal_target_for_request(2, 0, CaptureTarget::Area).expect("area"),
+            None
+        );
+        assert_eq!(
+            portal_target_for_request(2, 0, CaptureTarget::Window).unwrap_err(),
+            PlatformErrorCode::InvalidTarget
+        );
+    }
+
+    #[test]
+    fn portal_v3_never_sends_an_unadvertised_target() {
+        assert_eq!(
+            portal_target_for_request(3, 4, CaptureTarget::Area).expect("area target"),
+            Some(ashpd::desktop::screenshot::AvailableTargets::Area)
+        );
+        assert_eq!(
+            portal_target_for_request(3, 4, CaptureTarget::ActiveWindow).unwrap_err(),
+            PlatformErrorCode::InvalidTarget
+        );
+    }
+
+    #[test]
+    fn portal_handshake_timeout_is_reported_without_timing_out_the_selector() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .expect("runtime");
+        let error = runtime
+            .block_on(super::portal_handshake(
+                std::future::pending::<Result<(), ashpd::Error>>(),
+                Duration::ZERO,
+                "portal-timeout",
+            ))
+            .expect_err("technical handshake must be bounded");
+
+        assert_eq!(error.code, PlatformErrorCode::PortalUnavailable);
     }
 }

@@ -1,5 +1,6 @@
 [package]
 name = "cute-screen-desktop"
+autobins = false
 default-run = "cute-screen"
 version.workspace = true
 description = "Cute Screen desktop host"
@@ -19,6 +20,16 @@ path = "src/lib.rs"
 name = "cute-screen"
 path = "src/main.rs"
 
+[[bin]]
+name = "m01-platform-smoke"
+path = "src/bin/m01-platform-smoke.rs"
+required-features = ["platform-smoke"]
+
+[[bin]]
+name = "m04-platform-smoke"
+path = "src/bin/m04-platform-smoke.rs"
+required-features = ["platform-smoke"]
+
 [build-dependencies]
 tauri-build = { version = "=2.6.3", features = [] }
 
@@ -33,23 +44,26 @@ clap = { version = "=4.6.4", features = ["derive"] }
 tauri-plugin-single-instance = "=2.4.3"
 tauri-plugin-autostart = "=2.5.1"
 tauri-plugin-dialog = "=2.7.2"
+tauri-plugin-notification = "=2.3.3"
 tauri-plugin-wdio = { version = "=1.3.0", optional = true }
 tauri-plugin-wdio-webdriver = { version = "=1.3.0", optional = true }
 thiserror = "=2.0.19"
 url = "=2.5.8"
 rusqlite = { version = "=0.40.2", features = ["bundled"] }
 uuid = { version = "=1.24.0", features = ["v7", "serde"] }
+chrono = "=0.4.45"
 zip = { version = "=6.0.0", default-features = false, features = ["deflate"] }
 tempfile = "=3.27.0"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 ashpd = { version = "=0.13.13", default-features = false, features = ["tokio", "screenshot", "global_shortcuts"] }
-tokio = { version = "=1.53.1", features = ["rt", "time"] }
-x11rb = { version = "=0.14.0", default-features = false, features = ["image", "randr"], optional = true }
+tokio = { version = "=1.53.1", features = ["rt", "sync", "time"] }
+x11rb = { version = "=0.14.0", default-features = false, features = ["image", "randr", "xfixes"], optional = true }
 
 [features]
-default = []
+default = ["x11-capture"]
 fake-platform = []
+platform-smoke = []
 x11-capture = ["dep:x11rb"]
 test-harness = [
   "dep:tauri-plugin-wdio",

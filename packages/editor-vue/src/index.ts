@@ -14,7 +14,15 @@ export {
 
 export type {
   CaptureResult,
+  CaptureAction,
   CaptureCapabilities,
+  CaptureOutcomeV1,
+  CaptureProgressState,
+  CaptureProgressV1,
+  CaptureRequestV1,
+  CaptureTerminalOutcome,
+  ShortcutBindingResult,
+  ShortcutSpec,
   ClipboardCapabilities,
   DialogCapabilities,
   HotkeyCapabilities,
@@ -48,7 +56,11 @@ export {
   type CoordinatedDocumentRecord,
   type DocumentHandoffOutcome,
 } from './document-session-coordinator'
-export { createEditorShellPinia, useEditorShellStore } from './shell/store'
+export {
+  ActionCancelledError,
+  createEditorShellPinia,
+  useEditorShellStore,
+} from './shell/store'
 export { assertLocaleCompleteness, resolveSystemLocale, t } from './shell/i18n'
 export {
   createBrowserPreferencesStorage,

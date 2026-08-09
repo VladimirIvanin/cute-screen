@@ -50,6 +50,15 @@ pub struct StagedImageMetadata {
     pub correlation_id: String,
 }
 
+/// Native-only owned image material. It never crosses the Tauri IPC boundary.
+#[derive(Debug, Clone)]
+pub struct OwnedImage {
+    pub bytes: Vec<u8>,
+    pub mime_type: String,
+    pub width: u32,
+    pub height: u32,
+}
+
 #[derive(Debug)]
 pub struct ImageTransportService {
     source_root: PathBuf,
@@ -177,6 +186,74 @@ impl ImageTransportService {
             token,
             RegisteredImage::new(owned_source, mime_type, width, height),
         )
+    }
+
+    /// Stores native capture bytes directly in the operation-owned transport.
+    /// It is intentionally native-only: callers never choose a destination
+    /// path, and the frontend still receives only the opaque token.
+    pub fn import_owned_bytes(
+        &self,
+        token: &str,
+        bytes: &[u8],
+        mime_type: impl Into<String>,
+        width: u32,
+        height: u32,
+        correlation_id: &str,
+    ) -> Result<(), PlatformError> {
+        validate_token(token, correlation_id)?;
+        let mime_type = mime_type.into();
+        let extension = if mime_type == "image/png" {
+            "png"
+        } else {
+            "image"
+        };
+        let owned_source = self.source_root.join(format!("{token}.{extension}"));
+        let mut temporary = NamedTempFile::new_in(&self.source_root)
+            .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?;
+        temporary
+            .write_all(bytes)
+            .and_then(|()| temporary.as_file().sync_all())
+            .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?;
+        temporary
+            .persist_noclobber(&owned_source)
+            .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?;
+        self.register(
+            token,
+            RegisteredImage::new(owned_source, mime_type, width, height),
+        )
+    }
+
+    /// Consumes a capture-owned staging file after native persistence has either
+    /// committed it to the repository or failed. Authoritative library blobs
+    /// deliberately cannot be consumed by this method.
+    pub fn take_owned_image(
+        &self,
+        token: &str,
+        correlation_id: &str,
+    ) -> Result<OwnedImage, PlatformError> {
+        validate_token(token, correlation_id)?;
+        let image = self
+            .images
+            .write()
+            .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?
+            .remove(token)
+            .ok_or_else(|| transport_error(PlatformErrorCode::InvalidUri, correlation_id))?;
+        if image.authoritative || !image.source.starts_with(&self.source_root) {
+            return Err(transport_error(
+                PlatformErrorCode::PermissionDenied,
+                correlation_id,
+            ));
+        }
+        let bytes = fs::read(&image.source)
+            .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?;
+        fs::remove_file(&image.source)
+            .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?;
+        Ok(OwnedImage {
+            bytes,
+            mime_type: image.mime_type,
+            width: image.width,
+            height: image.height,
+        })
     }
 
     pub fn stage_image(

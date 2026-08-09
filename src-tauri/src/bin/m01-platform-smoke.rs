@@ -358,11 +358,11 @@ mod linux {
     fn print_help() {
         println!(
             "M01 Linux platform smoke\n\n\
-             cargo run --bin m01-platform-smoke -- portal-probe --output <json>\n\
-             cargo run --bin m01-platform-smoke -- portal-screenshot --output <json>\n\
-             cargo run --bin m01-platform-smoke -- portal-shortcuts --output <json>\n\
-             cargo run --bin m01-platform-smoke -- portal-invalid-uri --output <json>\n\
-             cargo run --features x11-capture --bin m01-platform-smoke -- x11-controlled --output <json>"
+             cargo run --features platform-smoke --bin m01-platform-smoke -- portal-probe --output <json>\n\
+             cargo run --features platform-smoke --bin m01-platform-smoke -- portal-screenshot --output <json>\n\
+             cargo run --features platform-smoke --bin m01-platform-smoke -- portal-shortcuts --output <json>\n\
+             cargo run --features platform-smoke --bin m01-platform-smoke -- portal-invalid-uri --output <json>\n\
+             cargo run --features platform-smoke,x11-capture --bin m01-platform-smoke -- x11-controlled --output <json>"
         );
     }
 }

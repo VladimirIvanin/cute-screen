@@ -7,11 +7,14 @@ use thiserror::Error;
 #[serde(rename_all = "camelCase")]
 pub enum PlatformErrorCode {
     Cancelled,
+    Busy,
     PortalUnavailable,
     PortalTooOld,
     InvalidUri,
+    InvalidTarget,
     PermissionDenied,
     CaptureFailed,
+    StorageFailed,
     ShortcutUnavailable,
     ShortcutBindCancelled,
 }
@@ -62,6 +65,8 @@ pub struct CaptureCapabilities {
     pub interactive_selector: bool,
     pub monitor_target: bool,
     pub window_target: bool,
+    pub active_window_target: bool,
+    pub cursor: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -88,6 +93,8 @@ pub struct PlatformCapabilities {
     pub capture: CaptureCapabilities,
     pub hotkeys: HotkeyCapabilities,
     pub cli_fallback: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cli_fallback_command: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -117,8 +124,15 @@ impl PlatformCapabilities {
             backend == CaptureBackendKind::WaylandPortal && probe.screenshot_version >= 2;
         let portal_v3 =
             backend == CaptureBackendKind::WaylandPortal && probe.screenshot_version >= 3;
+        let x11 = backend == CaptureBackendKind::X11;
         let capture_available = backend != CaptureBackendKind::Unavailable;
-        let hotkeys = if session == SessionKind::Wayland && probe.global_shortcuts_available {
+        let hotkeys = if session == SessionKind::X11 && x11_available {
+            HotkeyCapabilities {
+                available: true,
+                backend: HotkeyBackendKind::Native,
+                can_list_shortcuts: false,
+            }
+        } else if session == SessionKind::Wayland && probe.global_shortcuts_available {
             HotkeyCapabilities {
                 available: true,
                 backend: HotkeyBackendKind::GlobalShortcutsPortal,
@@ -131,6 +145,10 @@ impl PlatformCapabilities {
                 can_list_shortcuts: false,
             }
         };
+        // The fallback is an activation alternative, not a substitute for
+        // screenshot capability. A Wayland portal may capture while the
+        // desktop has no GlobalShortcuts implementation.
+        let cli_fallback = !hotkeys.available;
 
         Self {
             correlation_id,
@@ -138,12 +156,17 @@ impl PlatformCapabilities {
             capture: CaptureCapabilities {
                 available: capture_available,
                 backend,
-                interactive_selector: portal_v2 || backend == CaptureBackendKind::X11,
-                monitor_target: portal_v3 && probe.available_targets & 1 != 0,
-                window_target: portal_v3 && probe.available_targets & 2 != 0,
+                // X11 now owns a frozen-frame native overlay; Wayland's
+                // selector remains exclusively portal-driven.
+                interactive_selector: portal_v2 || x11,
+                monitor_target: x11 || (portal_v3 && probe.available_targets & 1 != 0),
+                window_target: x11 || (portal_v3 && probe.available_targets & 2 != 0),
+                active_window_target: x11 || (portal_v3 && probe.available_targets & 8 != 0),
+                cursor: false,
             },
             hotkeys,
-            cli_fallback: !capture_available,
+            cli_fallback,
+            cli_fallback_command: None,
         }
     }
 }
@@ -175,6 +198,24 @@ pub enum CaptureTarget {
     Area,
     Monitor,
     Window,
+    ActiveWindow,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CaptureGeometry {
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
+    pub source_width: u32,
+    pub source_height: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub layout_fingerprint: Option<String>,
+    /// Stable RandR monitor names intersecting the captured physical bounds.
+    /// A repeated area validates these together with the full layout hash.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub monitor_ids: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -184,6 +225,10 @@ pub struct CaptureResult {
     pub correlation_id: String,
     pub width: u32,
     pub height: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub geometry: Option<CaptureGeometry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cursor_included: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -248,11 +293,14 @@ mod tests {
     fn platform_error_codes_are_stable_camel_case_values() {
         let cases = [
             (PlatformErrorCode::Cancelled, "cancelled"),
+            (PlatformErrorCode::Busy, "busy"),
             (PlatformErrorCode::PortalUnavailable, "portalUnavailable"),
             (PlatformErrorCode::PortalTooOld, "portalTooOld"),
             (PlatformErrorCode::InvalidUri, "invalidUri"),
+            (PlatformErrorCode::InvalidTarget, "invalidTarget"),
             (PlatformErrorCode::PermissionDenied, "permissionDenied"),
             (PlatformErrorCode::CaptureFailed, "captureFailed"),
+            (PlatformErrorCode::StorageFailed, "storageFailed"),
             (
                 PlatformErrorCode::ShortcutUnavailable,
                 "shortcutUnavailable",
@@ -298,5 +346,38 @@ mod tests {
 
         assert!(!capabilities.capture.available);
         assert!(capabilities.cli_fallback);
+    }
+
+    #[test]
+    fn portal_capture_without_global_shortcuts_advertises_cli_fallback() {
+        let capabilities = PlatformCapabilities::for_session(
+            "m04-correlation".to_owned(),
+            SessionKind::Wayland,
+            Some(super::PortalCapabilityProbe {
+                screenshot_version: 2,
+                available_targets: 0,
+                global_shortcuts_available: false,
+            }),
+            None,
+        );
+
+        assert!(capabilities.capture.available);
+        assert!(capabilities.cli_fallback);
+    }
+
+    #[test]
+    fn x11_advertises_its_frozen_overlay_and_direct_targets() {
+        let capabilities = PlatformCapabilities::for_session(
+            "m04-x11".to_owned(),
+            SessionKind::X11,
+            None,
+            Some(true),
+        );
+
+        assert!(capabilities.capture.available);
+        assert!(capabilities.capture.monitor_target);
+        assert!(capabilities.capture.interactive_selector);
+        assert!(capabilities.capture.window_target);
+        assert!(capabilities.capture.active_window_target);
     }
 }

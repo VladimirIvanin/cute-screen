@@ -1,5 +1,9 @@
+use std::collections::{HashMap, VecDeque};
 use std::env;
-use std::sync::Mutex;
+use std::sync::{
+    Arc, Mutex,
+    atomic::{AtomicBool, Ordering},
+};
 use uuid::Uuid;
 
 #[cfg(feature = "test-harness")]
@@ -16,7 +20,10 @@ use platform::CaptureResult;
 use platform::PortalCapabilityProbe;
 #[cfg(all(feature = "test-harness", target_os = "linux"))]
 use platform::{CaptureRequest, CaptureTarget};
-use platform::{PlatformCapabilities, PlatformError, SessionKind};
+use platform::{
+    PlatformCapabilities, PlatformError, PlatformErrorCode, SessionKind, ShortcutBindingResult,
+    ShortcutSpec,
+};
 use serde::Serialize;
 use tauri::{
     Emitter, Manager, State,
@@ -24,12 +31,136 @@ use tauri::{
     tray::TrayIconBuilder,
 };
 use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_notification::NotificationExt;
 
+use activation::{
+    ACTIVATION_PROTOCOL_VERSION, ActivationDispatch, ActivationReplyV1, ActivationRequestV1,
+    ActivationServer,
+};
+use capture::{
+    CaptureController, CaptureInvocationSource, CaptureOutcomeV1, CaptureProgressState,
+    CaptureRequestV1, CaptureTerminalOutcome,
+};
 use lifecycle::{LaunchIntentV1, LifecycleState, parse_launch};
 #[cfg(feature = "test-harness")]
 use storage::{BlobMetadata, CaptureMetadataV1, CreateCaptureRequest};
 use storage::{LibraryRepository, OpenDocument, RepositoryError};
 
+const CAPTURE_PREFLIGHT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+const CAPTURE_DIAGNOSTIC_CAPACITY: usize = 64;
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CaptureDiagnosticV1 {
+    correlation_id: String,
+    invocation_source: String,
+    terminal_outcome: CaptureTerminalOutcome,
+}
+
+#[derive(Default)]
+struct CaptureDiagnosticsService {
+    active_sources: Mutex<HashMap<String, String>>,
+    entries: Mutex<VecDeque<CaptureDiagnosticV1>>,
+}
+
+impl CaptureDiagnosticsService {
+    fn begin(&self, request: &CaptureRequestV1) {
+        let source = match request.invocation_source {
+            CaptureInvocationSource::Cli => "cli",
+            CaptureInvocationSource::Tray => "tray",
+            CaptureInvocationSource::Ui => "ui",
+            CaptureInvocationSource::Hotkey => "hotkey",
+        };
+        if let Ok(mut active) = self.active_sources.lock() {
+            active.insert(request.correlation_id.clone(), source.to_owned());
+        }
+    }
+
+    fn finish(&self, outcome: &CaptureOutcomeV1) {
+        let source = self
+            .active_sources
+            .lock()
+            .ok()
+            .and_then(|mut active| active.remove(&outcome.correlation_id))
+            .unwrap_or_else(|| "unknown".to_owned());
+        if let Ok(mut entries) = self.entries.lock() {
+            if entries.len() == CAPTURE_DIAGNOSTIC_CAPACITY {
+                let _ = entries.pop_front();
+            }
+            entries.push_back(CaptureDiagnosticV1 {
+                correlation_id: outcome.correlation_id.clone(),
+                invocation_source: source,
+                terminal_outcome: outcome.outcome,
+            });
+        }
+    }
+
+    fn snapshot(&self) -> Vec<CaptureDiagnosticV1> {
+        self.entries
+            .lock()
+            .map(|entries| entries.iter().cloned().collect())
+            .unwrap_or_default()
+    }
+}
+
+/// A frontend acknowledgement gate used before a capture hides the editor.
+///
+/// Tray, global shortcut, and warm CLI activation all execute in the native
+/// process, so they cannot rely on a Vue click handler to persist an active
+/// document. The renderer explicitly registers readiness after installing its
+/// listener; a missing or failed acknowledgement fails closed before capture.
+#[derive(Default)]
+struct CapturePreflightService {
+    frontend_ready: AtomicBool,
+    pending: Mutex<HashMap<String, tokio::sync::oneshot::Sender<bool>>>,
+}
+
+impl CapturePreflightService {
+    fn set_frontend_ready(&self, ready: bool) {
+        self.frontend_ready.store(ready, Ordering::Release);
+        if !ready && let Ok(mut pending) = self.pending.lock() {
+            for (_, sender) in pending.drain() {
+                let _ = sender.send(false);
+            }
+        }
+    }
+
+    fn begin(&self, correlation_id: &str) -> Option<tokio::sync::oneshot::Receiver<bool>> {
+        if !self.frontend_ready.load(Ordering::Acquire) {
+            return None;
+        }
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        let Ok(mut pending) = self.pending.lock() else {
+            // A poisoned acknowledgement registry must not let a dirty
+            // document be captured without its persistence preflight.
+            let (_sender, receiver) = tokio::sync::oneshot::channel();
+            return Some(receiver);
+        };
+        if !self.frontend_ready.load(Ordering::Acquire) {
+            return None;
+        }
+        pending.insert(correlation_id.to_owned(), sender);
+        Some(receiver)
+    }
+
+    fn complete(&self, correlation_id: &str, allowed: bool) -> bool {
+        let Ok(mut pending) = self.pending.lock() else {
+            return false;
+        };
+        pending
+            .remove(correlation_id)
+            .is_some_and(|sender| sender.send(allowed).is_ok())
+    }
+
+    fn remove(&self, correlation_id: &str) {
+        if let Ok(mut pending) = self.pending.lock() {
+            pending.remove(correlation_id);
+        }
+    }
+}
+
+pub mod activation;
+pub mod capture;
 pub mod image_transport;
 pub mod lifecycle;
 #[cfg(target_os = "linux")]
@@ -47,6 +178,14 @@ pub mod fake_platform;
 pub struct PingResponse {
     pub message: &'static str,
     pub protocol_version: u8,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CaptureProgressV1 {
+    version: u8,
+    correlation_id: String,
+    state: CaptureProgressState,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -68,7 +207,7 @@ fn ping() -> PingResponse {
 fn stage_image(
     token: String,
     correlation_id: String,
-    transport: State<'_, ImageTransportService>,
+    transport: State<'_, Arc<ImageTransportService>>,
 ) -> Result<StagedImageMetadata, PlatformError> {
     transport.stage_image(&token, &correlation_id)
 }
@@ -77,7 +216,7 @@ fn stage_image(
 fn read_image_bytes(
     token: String,
     correlation_id: String,
-    transport: State<'_, ImageTransportService>,
+    transport: State<'_, Arc<ImageTransportService>>,
 ) -> Result<tauri::ipc::Response, PlatformError> {
     transport
         .read_image_bytes(&token, &correlation_id)
@@ -88,7 +227,7 @@ fn read_image_bytes(
 fn repository_open_last(
     _correlation_id: String,
     repository: State<'_, LibraryRepository>,
-    transport: State<'_, ImageTransportService>,
+    transport: State<'_, Arc<ImageTransportService>>,
 ) -> Result<Option<OpenDocument>, RepositoryError> {
     let Some(mut document) = repository.open_last()? else {
         return Ok(None);
@@ -101,6 +240,14 @@ fn repository_open_last(
         .map_err(|error| RepositoryError::Io(error.to_string()))?;
     document.image_token = Some(token);
     Ok(Some(document))
+}
+
+#[tauri::command]
+fn repository_list_active_series_frames(
+    _correlation_id: String,
+    repository: State<'_, LibraryRepository>,
+) -> Result<Vec<storage::SeriesFrame>, RepositoryError> {
+    repository.list_active_series_frames()
 }
 
 #[tauri::command]
@@ -155,6 +302,14 @@ fn lifecycle_complete_main_window_close(app: tauri::AppHandle) {
 
 #[tauri::command]
 fn lifecycle_finish_quit(app: tauri::AppHandle) {
+    #[cfg(target_os = "linux")]
+    if let Some(service) = app.try_state::<linux_platform::PortalHotkeyService>() {
+        service.close();
+    }
+    #[cfg(all(target_os = "linux", feature = "x11-capture"))]
+    if let Some(service) = app.try_state::<x11_platform::X11HotkeyService>() {
+        service.close();
+    }
     if let Some(state) = app.try_state::<Mutex<LifecycleState>>()
         && let Ok(mut state) = state.lock()
     {
@@ -185,6 +340,15 @@ fn settings_put(
 
 #[tauri::command]
 async fn platform_capabilities(correlation_id: String) -> PlatformCapabilities {
+    #[cfg(feature = "fake-platform")]
+    if env::var_os("CUTE_SCREEN_E2E_FAKE_CAPTURE").is_some() {
+        return PlatformCapabilities::for_session(
+            correlation_id,
+            SessionKind::X11,
+            None,
+            Some(true),
+        );
+    }
     let session = current_session();
     #[cfg(target_os = "linux")]
     let portal = if session == SessionKind::Wayland {
@@ -198,9 +362,128 @@ async fn platform_capabilities(correlation_id: String) -> PlatformCapabilities {
     #[cfg(not(target_os = "linux"))]
     let portal = None;
 
-    // The x11rb adapter stays unavailable until the controlled gate emits an
-    // accepted runtime artifact; compilation alone is not sufficient.
-    PlatformCapabilities::for_session(correlation_id, session, portal, None)
+    // The X11 adapter is compiled into the Linux artifact. XFixes cursor
+    // compositing is exposed only after a live extension handshake.
+    #[cfg(all(target_os = "linux", feature = "x11-capture"))]
+    let x11_adapter_available = x11_platform::X11CaptureAdapter.available();
+    #[cfg(not(all(target_os = "linux", feature = "x11-capture")))]
+    let x11_adapter_available = false;
+    let mut capabilities = PlatformCapabilities::for_session(
+        correlation_id,
+        session,
+        portal,
+        Some(x11_adapter_available),
+    );
+    #[cfg(all(target_os = "linux", feature = "x11-capture"))]
+    if session == SessionKind::X11 {
+        let adapter = x11_platform::X11CaptureAdapter;
+        capabilities.capture.cursor = adapter.cursor_available();
+        apply_x11_target_capabilities(&mut capabilities, adapter.target_capabilities());
+    }
+    if capabilities.cli_fallback {
+        capabilities.cli_fallback_command = lifecycle::current_cli_fallback_command();
+    }
+    capabilities
+}
+
+#[cfg(all(target_os = "linux", feature = "x11-capture"))]
+fn apply_x11_target_capabilities(
+    capabilities: &mut PlatformCapabilities,
+    targets: x11_platform::X11TargetCapabilities,
+) {
+    capabilities.capture.window_target &= targets.window_selector;
+    capabilities.capture.active_window_target &= targets.active_window;
+}
+
+#[tauri::command]
+async fn capture_request(
+    request: CaptureRequestV1,
+    app: tauri::AppHandle,
+    controller: State<'_, CaptureController>,
+) -> Result<CaptureOutcomeV1, PlatformError> {
+    Ok(capture_with_preflight(&app, controller.inner(), request).await)
+}
+
+#[tauri::command]
+fn capture_cancel(controller: State<'_, CaptureController>) -> bool {
+    controller.cancel()
+}
+
+#[tauri::command]
+fn capture_diagnostics(
+    diagnostics: State<'_, CaptureDiagnosticsService>,
+) -> Vec<CaptureDiagnosticV1> {
+    diagnostics.snapshot()
+}
+
+#[tauri::command]
+fn capture_preflight_set_ready(ready: bool, service: State<'_, CapturePreflightService>) {
+    service.set_frontend_ready(ready);
+}
+
+#[tauri::command]
+fn capture_preflight_complete(
+    correlation_id: String,
+    allowed: bool,
+    service: State<'_, CapturePreflightService>,
+) -> bool {
+    service.complete(&correlation_id, allowed)
+}
+
+#[tauri::command]
+async fn hotkeys_bind(
+    shortcuts: Vec<ShortcutSpec>,
+    correlation_id: String,
+    app: tauri::AppHandle,
+) -> Result<Vec<ShortcutBindingResult>, PlatformError> {
+    #[cfg(target_os = "linux")]
+    {
+        let callback = hotkey_capture_callback(app.clone());
+        match current_session() {
+            SessionKind::Wayland => {
+                let service = app
+                    .try_state::<linux_platform::PortalHotkeyService>()
+                    .ok_or_else(|| {
+                        PlatformError::new(PlatformErrorCode::ShortcutUnavailable, &correlation_id)
+                    })?;
+                service.bind(shortcuts, &correlation_id, callback).await
+            }
+            SessionKind::X11 => {
+                #[cfg(feature = "x11-capture")]
+                {
+                    let service = app
+                        .try_state::<x11_platform::X11HotkeyService>()
+                        .ok_or_else(|| {
+                            PlatformError::new(
+                                PlatformErrorCode::ShortcutUnavailable,
+                                &correlation_id,
+                            )
+                        })?;
+                    service.bind(shortcuts, &correlation_id, callback)
+                }
+                #[cfg(not(feature = "x11-capture"))]
+                {
+                    let _ = (shortcuts, callback);
+                    Err(PlatformError::new(
+                        PlatformErrorCode::ShortcutUnavailable,
+                        correlation_id,
+                    ))
+                }
+            }
+            _ => Err(PlatformError::new(
+                PlatformErrorCode::ShortcutUnavailable,
+                correlation_id,
+            )),
+        }
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = (shortcuts, app);
+        Err(PlatformError::new(
+            PlatformErrorCode::ShortcutUnavailable,
+            correlation_id,
+        ))
+    }
 }
 
 #[cfg(feature = "test-harness")]
@@ -229,7 +512,7 @@ async fn test_portal_probe(correlation_id: String) -> Result<PortalCapabilityPro
 #[tauri::command]
 async fn test_portal_capture(
     correlation_id: String,
-    transport: State<'_, ImageTransportService>,
+    transport: State<'_, Arc<ImageTransportService>>,
 ) -> Result<CaptureResult, PlatformError> {
     linux_platform::AshpdPortalClient::default()
         .capture_to_transport(
@@ -246,7 +529,7 @@ async fn test_portal_capture(
 #[tauri::command]
 async fn test_portal_capture(
     correlation_id: String,
-    _transport: State<'_, ImageTransportService>,
+    _transport: State<'_, Arc<ImageTransportService>>,
 ) -> Result<platform::CaptureResult, PlatformError> {
     Err(PlatformError::new(
         platform::PlatformErrorCode::PortalUnavailable,
@@ -275,7 +558,7 @@ fn current_session() -> SessionKind {
 
 fn initialize_image_transport<R: tauri::Runtime>(
     app: &tauri::App<R>,
-) -> Result<ImageTransportService, Box<dyn std::error::Error>> {
+) -> Result<Arc<ImageTransportService>, Box<dyn std::error::Error>> {
     let local_data = app.path().app_local_data_dir()?;
     let stage_root = local_data.join("blobs");
 
@@ -284,7 +567,7 @@ fn initialize_image_transport<R: tauri::Runtime>(
     #[cfg(not(feature = "test-harness"))]
     let source_root = local_data.join("library");
 
-    let transport = ImageTransportService::new(&source_root, stage_root)?;
+    let transport = Arc::new(ImageTransportService::new(&source_root, stage_root)?);
 
     #[cfg(feature = "test-harness")]
     register_test_fixtures(&transport, &source_root)?;
@@ -306,6 +589,31 @@ fn show_editor<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
         let _ = window.unminimize();
         let _ = window.set_focus();
     }
+}
+
+/// Hides the X11 editor before the scoped capture connection reads the root.
+/// On cancellation the caller restores it, keeping the pre-capture visible
+/// state without letting the editor leak into the frozen source frame.
+fn hide_editor_for_x11_capture<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    correlation_id: &str,
+) -> Result<bool, PlatformError> {
+    if current_session() != SessionKind::X11 {
+        return Ok(false);
+    }
+    let Some(window) = app.get_webview_window("main") else {
+        return Ok(false);
+    };
+    let was_visible = window.is_visible().unwrap_or(false);
+    if !was_visible {
+        return Ok(false);
+    }
+    window
+        .hide()
+        .map_err(|_| PlatformError::new(PlatformErrorCode::CaptureFailed, correlation_id))?;
+    #[cfg(all(target_os = "linux", feature = "x11-capture"))]
+    x11_platform::X11CaptureAdapter.round_trip_barrier(correlation_id)?;
+    Ok(true)
 }
 
 fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()> {
@@ -332,12 +640,225 @@ fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()
         .menu(&menu)
         .show_menu_on_left_click(true)
         .on_menu_event(|app, event| match event.id.as_ref() {
+            "capture-area" => start_capture(
+                app,
+                capture_request_for_tray(capture::CaptureAction::Area),
+                false,
+            ),
+            "capture-window" => start_capture(
+                app,
+                capture_request_for_tray(capture::CaptureAction::Window),
+                false,
+            ),
             "show-editor" => show_editor(app),
             "quit" if app.emit("cute-screen:request-quit", ()).is_err() => app.exit(0),
             _ => {}
         })
         .build(app)?;
+    refresh_tray_capture_items(capture_area, capture_window);
     Ok(())
+}
+
+/// Tray items begin disabled: the portal version/advertised targets are not
+/// known until the asynchronous capability probe returns. This avoids a menu
+/// action that looks available but immediately fails in an unsupported session.
+fn refresh_tray_capture_items<R: tauri::Runtime>(
+    capture_area: MenuItem<R>,
+    capture_window: MenuItem<R>,
+) {
+    tauri::async_runtime::spawn(async move {
+        let capabilities = platform_capabilities("tray-capabilities".to_owned()).await;
+        let _ = capture_area.set_enabled(capabilities.capture.available);
+        let _ = capture_window.set_enabled(capabilities.capture.window_target);
+    });
+}
+
+fn capture_request_for_tray(action: capture::CaptureAction) -> CaptureRequestV1 {
+    CaptureRequestV1 {
+        correlation_id: Uuid::now_v7().to_string(),
+        action,
+        delay_ms: 0,
+        cursor: false,
+        series_id: None,
+        invocation_source: CaptureInvocationSource::Tray,
+    }
+}
+
+fn action_for_shortcut_id(shortcut_id: &str) -> Option<capture::CaptureAction> {
+    match shortcut_id {
+        "capture-area" => Some(capture::CaptureAction::Area),
+        "capture-screen" => Some(capture::CaptureAction::Screen),
+        "capture-window" => Some(capture::CaptureAction::Window),
+        "capture-active-window" => Some(capture::CaptureAction::ActiveWindow),
+        "capture-repeat" => Some(capture::CaptureAction::Repeat),
+        _ => None,
+    }
+}
+
+fn hotkey_capture_callback<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+) -> Arc<dyn Fn(String) + Send + Sync> {
+    Arc::new(move |shortcut_id| {
+        let Some(action) = action_for_shortcut_id(&shortcut_id) else {
+            return;
+        };
+        start_capture(
+            &app,
+            CaptureRequestV1 {
+                correlation_id: Uuid::now_v7().to_string(),
+                action,
+                delay_ms: 0,
+                cursor: false,
+                series_id: None,
+                invocation_source: CaptureInvocationSource::Hotkey,
+            },
+            false,
+        );
+    })
+}
+
+fn publish_capture_outcome<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    outcome: &CaptureOutcomeV1,
+) {
+    if let Some(diagnostics) = app.try_state::<CaptureDiagnosticsService>() {
+        diagnostics.finish(outcome);
+    }
+    if outcome.outcome == CaptureTerminalOutcome::Captured {
+        show_editor(app);
+    } else if outcome.outcome != CaptureTerminalOutcome::Cancelled {
+        let _ = app
+            .notification()
+            .builder()
+            .title("Cute Screen capture failed")
+            .body("Open Cute Screen to retry or inspect diagnostics.")
+            .show();
+    }
+    let _ = app.emit("cute-screen:capture-outcome", outcome);
+}
+
+fn publish_capture_progress<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    correlation_id: &str,
+    state: CaptureProgressState,
+) {
+    let _ = app.emit(
+        "cute-screen:capture-progress",
+        CaptureProgressV1 {
+            version: 1,
+            correlation_id: correlation_id.to_owned(),
+            state,
+        },
+    );
+}
+
+fn failed_capture(correlation_id: String) -> CaptureOutcomeV1 {
+    CaptureOutcomeV1 {
+        version: 1,
+        correlation_id,
+        outcome: CaptureTerminalOutcome::Failed,
+        document: None,
+    }
+}
+
+async fn capture_with_preflight<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    controller: &CaptureController,
+    request: CaptureRequestV1,
+) -> CaptureOutcomeV1 {
+    if let Some(diagnostics) = app.try_state::<CaptureDiagnosticsService>() {
+        diagnostics.begin(&request);
+    }
+    publish_capture_progress(app, &request.correlation_id, CaptureProgressState::Probing);
+    let preflight = app.state::<CapturePreflightService>();
+    let Some(approval) = preflight.begin(&request.correlation_id) else {
+        let restore_editor = match hide_editor_for_x11_capture(app, &request.correlation_id) {
+            Ok(restore_editor) => restore_editor,
+            Err(_) => {
+                let outcome = failed_capture(request.correlation_id);
+                publish_capture_outcome(app, &outcome);
+                return outcome;
+            }
+        };
+        publish_capture_progress(app, &request.correlation_id, CaptureProgressState::Ready);
+        let progress_app = app.clone();
+        let progress_correlation_id = request.correlation_id.clone();
+        let outcome = controller
+            .capture_with_progress(request, move |state| {
+                publish_capture_progress(&progress_app, &progress_correlation_id, state);
+            })
+            .await;
+        publish_capture_outcome(app, &outcome);
+        if outcome.outcome != CaptureTerminalOutcome::Captured && restore_editor {
+            show_editor(app);
+        }
+        return outcome;
+    };
+
+    if app
+        .emit(
+            "cute-screen:capture-preflight",
+            request.correlation_id.clone(),
+        )
+        .is_err()
+    {
+        preflight.remove(&request.correlation_id);
+        let outcome = failed_capture(request.correlation_id);
+        publish_capture_outcome(app, &outcome);
+        return outcome;
+    }
+
+    let allowed = matches!(
+        tokio::time::timeout(CAPTURE_PREFLIGHT_TIMEOUT, approval).await,
+        Ok(Ok(true))
+    );
+    preflight.remove(&request.correlation_id);
+    if !allowed {
+        let outcome = failed_capture(request.correlation_id);
+        publish_capture_outcome(app, &outcome);
+        return outcome;
+    }
+
+    publish_capture_progress(app, &request.correlation_id, CaptureProgressState::Ready);
+    let restore_editor = match hide_editor_for_x11_capture(app, &request.correlation_id) {
+        Ok(restore_editor) => restore_editor,
+        Err(_) => {
+            let outcome = failed_capture(request.correlation_id);
+            publish_capture_outcome(app, &outcome);
+            return outcome;
+        }
+    };
+    let progress_app = app.clone();
+    let progress_correlation_id = request.correlation_id.clone();
+    let outcome = controller
+        .capture_with_progress(request, move |state| {
+            publish_capture_progress(&progress_app, &progress_correlation_id, state);
+        })
+        .await;
+    publish_capture_outcome(app, &outcome);
+    if outcome.outcome != CaptureTerminalOutcome::Captured && restore_editor {
+        show_editor(app);
+    }
+    outcome
+}
+
+fn start_capture<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    request: CaptureRequestV1,
+    cli_json: bool,
+) {
+    let controller = app.state::<CaptureController>().inner().clone();
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let outcome = capture_with_preflight(&app, &controller, request).await;
+        if cli_json {
+            let reply = activation_reply(&outcome.correlation_id, outcome.outcome);
+            if let Ok(json) = serde_json::to_string(&reply) {
+                println!("{json}");
+            }
+            app.exit(capture_exit_code(outcome.outcome));
+        }
+    });
 }
 
 fn handle_launch<R: tauri::Runtime>(app: &tauri::AppHandle<R>, intent: LaunchIntentV1) {
@@ -351,6 +872,26 @@ fn handle_launch<R: tauri::Runtime>(app: &tauri::AppHandle<R>, intent: LaunchInt
                 show_editor(app);
             }
         }
+        LaunchIntentV1::Capture(capture) => start_capture(app, capture.request, capture.json),
+    }
+}
+
+fn activation_reply(request_id: &str, outcome: CaptureTerminalOutcome) -> ActivationReplyV1 {
+    ActivationReplyV1 {
+        version: ACTIVATION_PROTOCOL_VERSION,
+        request_id: request_id.to_owned(),
+        outcome,
+    }
+}
+
+fn capture_exit_code(outcome: CaptureTerminalOutcome) -> i32 {
+    match outcome {
+        CaptureTerminalOutcome::Captured => 0,
+        CaptureTerminalOutcome::Cancelled => 130,
+        CaptureTerminalOutcome::Busy => 75,
+        CaptureTerminalOutcome::PermissionDenied => 77,
+        CaptureTerminalOutcome::Unavailable | CaptureTerminalOutcome::InvalidTarget => 69,
+        CaptureTerminalOutcome::Failed => 1,
     }
 }
 
@@ -434,6 +975,29 @@ pub fn run() {
         }
     };
 
+    if let LaunchIntentV1::Capture(capture) = &launch_intent {
+        let request = ActivationRequestV1 {
+            version: ACTIVATION_PROTOCOL_VERSION,
+            request_id: capture.request.correlation_id.clone(),
+            capture: capture.request.clone(),
+        };
+        match activation::dispatch_to_primary(request, capture.json) {
+            Ok((ActivationDispatch::Terminal, Some(reply))) => {
+                if capture.json
+                    && let Ok(json) = serde_json::to_string(&reply)
+                {
+                    println!("{json}");
+                }
+                std::process::exit(capture_exit_code(reply.outcome));
+            }
+            Ok((ActivationDispatch::Accepted, _)) => std::process::exit(0),
+            Ok((ActivationDispatch::NoPrimary, _)) => {}
+            Ok((ActivationDispatch::Terminal, None)) | Err(_) => {
+                std::process::exit(1);
+            }
+        }
+    }
+
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(
             |app, args, _cwd| match parse_launch(args) {
@@ -448,14 +1012,42 @@ pub fn run() {
             Some(vec!["--background"]),
         ))
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .setup(move |app| {
             app.manage(Mutex::new(LifecycleState::default()));
             let repository = initialize_repository(app)?;
             #[cfg(feature = "test-harness")]
             seed_m03_document(&repository)?;
-            app.manage(repository);
             let transport = initialize_image_transport(app)?;
+            let controller = CaptureController::new(repository.clone(), Arc::clone(&transport));
+            app.manage(repository);
             app.manage(transport);
+            app.manage(controller.clone());
+            app.manage(CapturePreflightService::default());
+            app.manage(CaptureDiagnosticsService::default());
+
+            #[cfg(target_os = "linux")]
+            app.manage(linux_platform::PortalHotkeyService::default());
+
+            #[cfg(all(target_os = "linux", feature = "x11-capture"))]
+            app.manage(x11_platform::X11HotkeyService::default());
+
+            #[cfg(unix)]
+            {
+                let activation_app = app.handle().clone();
+                let activation_controller = controller;
+                let activation_server = ActivationServer::start(
+                    activation::endpoint_for_current_session()?,
+                    Arc::new(move |request| {
+                        tauri::async_runtime::block_on(capture_with_preflight(
+                            &activation_app,
+                            &activation_controller,
+                            request,
+                        ))
+                    }),
+                )?;
+                app.manage(activation_server);
+            }
 
             let tray_result = create_tray(app.handle());
             if let Ok(mut state) = app.state::<Mutex<LifecycleState>>().lock() {
@@ -484,10 +1076,17 @@ pub fn run() {
     #[cfg(feature = "test-harness")]
     let builder = builder.invoke_handler(tauri::generate_handler![
         ping,
+        capture_request,
+        capture_cancel,
+        capture_diagnostics,
+        capture_preflight_set_ready,
+        capture_preflight_complete,
+        hotkeys_bind,
         platform_capabilities,
         get_e2e_harness_query,
         read_image_bytes,
         repository_open_last,
+        repository_list_active_series_frames,
         repository_save_document,
         repository_export_recovery_bundle,
         lifecycle_complete_main_window_close,
@@ -502,9 +1101,16 @@ pub fn run() {
     #[cfg(not(feature = "test-harness"))]
     let builder = builder.invoke_handler(tauri::generate_handler![
         ping,
+        capture_request,
+        capture_cancel,
+        capture_diagnostics,
+        capture_preflight_set_ready,
+        capture_preflight_complete,
+        hotkeys_bind,
         platform_capabilities,
         read_image_bytes,
         repository_open_last,
+        repository_list_active_series_frames,
         repository_save_document,
         repository_export_recovery_bundle,
         lifecycle_complete_main_window_close,
@@ -522,7 +1128,7 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::PingResponse;
+    use super::{CapturePreflightService, PingResponse, action_for_shortcut_id};
 
     #[test]
     fn ping_contract_is_stable() {
@@ -533,5 +1139,102 @@ mod tests {
                 protocol_version: 1,
             }
         );
+    }
+
+    #[test]
+    fn only_declared_portal_shortcut_ids_dispatch_capture_actions() {
+        assert_eq!(
+            action_for_shortcut_id("capture-active-window"),
+            Some(crate::capture::CaptureAction::ActiveWindow)
+        );
+        assert_eq!(action_for_shortcut_id("untrusted-action"), None);
+    }
+
+    #[test]
+    fn preflight_delivers_frontend_acknowledgement_once() {
+        let service = CapturePreflightService::default();
+        service.set_frontend_ready(true);
+        let receiver = service.begin("capture-1").expect("frontend is ready");
+
+        assert!(service.complete("capture-1", true));
+        assert!(!service.complete("capture-1", true));
+
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .expect("runtime");
+        assert!(runtime.block_on(receiver).expect("acknowledgement"));
+    }
+
+    #[test]
+    fn preflight_shutdown_rejects_pending_capture() {
+        let service = CapturePreflightService::default();
+        service.set_frontend_ready(true);
+        let receiver = service.begin("capture-1").expect("frontend is ready");
+        service.set_frontend_ready(false);
+
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .expect("runtime");
+        assert!(
+            !runtime
+                .block_on(receiver)
+                .expect("shutdown acknowledgement")
+        );
+    }
+
+    #[test]
+    fn capture_diagnostics_are_bounded_and_do_not_serialize_capture_content() {
+        let diagnostics = super::CaptureDiagnosticsService::default();
+        let request = crate::capture::CaptureRequestV1 {
+            correlation_id: "diagnostic-correlation".to_owned(),
+            action: crate::capture::CaptureAction::Area,
+            delay_ms: 0,
+            cursor: false,
+            series_id: Some("series-private-data".to_owned()),
+            invocation_source: crate::capture::CaptureInvocationSource::Hotkey,
+        };
+        diagnostics.begin(&request);
+        diagnostics.finish(&crate::capture::CaptureOutcomeV1 {
+            version: 1,
+            correlation_id: request.correlation_id,
+            outcome: crate::capture::CaptureTerminalOutcome::Failed,
+            document: None,
+        });
+
+        let records = diagnostics.snapshot();
+        let value = serde_json::to_value(&records[0]).expect("diagnostic JSON");
+        assert_eq!(
+            value,
+            serde_json::json!({
+                "correlationId": "diagnostic-correlation",
+                "invocationSource": "hotkey",
+                "terminalOutcome": "failed",
+            })
+        );
+    }
+
+    #[cfg(all(target_os = "linux", feature = "x11-capture"))]
+    #[test]
+    fn x11_window_targets_are_disabled_without_required_ewmh_atoms() {
+        let mut capabilities = crate::platform::PlatformCapabilities::for_session(
+            "x11-capabilities".to_owned(),
+            crate::platform::SessionKind::X11,
+            None,
+            Some(true),
+        );
+
+        super::apply_x11_target_capabilities(
+            &mut capabilities,
+            crate::x11_platform::X11TargetCapabilities {
+                window_selector: false,
+                active_window: false,
+            },
+        );
+
+        assert!(capabilities.capture.available);
+        assert!(!capabilities.capture.window_target);
+        assert!(!capabilities.capture.active_window_target);
     }
 }

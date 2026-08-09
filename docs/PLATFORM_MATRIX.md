@@ -103,7 +103,7 @@ coverage, но остаются без runtime support claim. Полный сп�
 
 Статус `supported` разрешён только после реального smoke, а не после успешной компиляции.
 
-## M01 capability baseline
+## M01/M04 capability baseline
 
 - `xcap` 0.9.7 отклонён из-за security advisories в dependency graph; решение и отдельный `x11rb` 0.14.0 boundary зафиксированы в ADR-019.
 - Локальный Ubuntu/GNOME X11 controlled-window smoke подтвердил monitor enumeration, physical millimetres, coordinates, 96×64 RGBA capture и SHA-256. До появления устойчивой CI artifact URL это локальная диагностика, не статус `supported`.
@@ -128,9 +128,102 @@ coverage, но остаются без runtime support claim. Полный сп�
   per-scenario прогона на Wayland-сессии; Canvas2D startup fallback, asset
   alpha decode, binary ICC fallback и corrupt error подтверждены; артефакты в
   `artifacts/tauri-e2e/`.
+- M04 clean-profile Tauri E2E на локальном WebKitGTK (2026-08-10):
+  `m04-clean-profile-capture.e2e.ts` начал с пустого app data, вызвал
+  production `capture_request`, сохранил и заново смонтировал первый документ
+  через repository и decoded asset. Пиксели поставляет только feature-gated
+  fake native adapter; frontend state и image bytes не seed-ятся. Evidence:
+  `artifacts/tauri-e2e/junit-m04-clean-profile-capture-0-0.xml`. Это доказывает
+  orchestration/mount-flow, но не native capture или platform support.
+- M04 local Ubuntu/GNOME X11 x86_64 smoke (2026-08-09):
+  `pnpm smoke:m04:x11:screen` захватил root 2560×1440, декодировал PNG,
+  передал bytes через owned transport, сохранил immutable original и создал
+  editable document. Evidence: `artifacts/m04/x11-screen.json`. Это только
+  прямой X11 screen flow; area overlay, window/active-window, cursor,
+  multi-monitor/repeat и X11 hotkeys остаются pending, поэтому это не статус
+  `supported`.
+- M04 local Ubuntu/GNOME X11 x86_64 frozen-area smoke (2026-08-09):
+  `pnpm smoke:m04:x11:area` captured the root before mapping a native X11
+  overlay, used an automated 100,100→400,300 drag, and persisted the resulting
+  300×200 document. Evidence: `artifacts/m04/x11-area.json`. `xdotool` is only
+  the local smoke driver, never a product dependency. The overlay keeps the
+  resulting selection until Enter/double-click, supports arrow-key physical-pixel
+  nudge, move-by-drag and Shift+arrow resize; keyboard behavior has X11 unit
+  coverage, while a physical keyboard smoke remains pending.
+- M04 local Ubuntu/GNOME X11 x86_64 selector-cancel smoke (2026-08-09):
+  `pnpm smoke:m04:x11:area-cancel` cancelled an active Area operation through
+  the shared controller, returned terminal `cancelled` without a document, and
+  exercised native overlay cleanup (pointer/keyboard ungrab and destroy).
+  Evidence: `artifacts/m04/x11-area-cancel.json`.
+- M04 local Ubuntu/GNOME X11 x86_64 cursor smoke (2026-08-09):
+  `pnpm smoke:m04:x11:screen-cursor` completed through the XFixes version
+  handshake; persisted capture metadata records `cursor.requested: true` and
+  `result: included`. Evidence: `artifacts/m04/x11-screen-cursor.json`.
+- M04 local Ubuntu/GNOME X11 x86_64 window-selector smoke (2026-08-09):
+  `pnpm smoke:m04:x11:window` read the EWMH stacking list, excluded desktop,
+  dock and transient/tool window types, highlighted the clicked topmost client
+  over a frozen root frame,
+  and persisted a 2560×1331 document. Evidence:
+  `artifacts/m04/x11-window.json`. Frame-extents/multi-monitor validation and
+  keyboard move/resize/nudge semantics remain pending.
+- The selector policy also rejects root, unmapped/minimized and `_NET_WM_PID`
+  windows owned by the current Tauri process, without title matching; its
+  deterministic unit test covers those exclusions plus desktop/dock. Invalid
+  or zero geometry is rejected before an overlay rectangle is created.
+- Window/ActiveWindow capability is independently gated by the needed EWMH
+  atoms. A usable X root only enables Screen/Area; it cannot make an unavailable
+  window selector look supported.
+- M04 local Ubuntu/GNOME X11 x86_64 active-window smoke (2026-08-09):
+  `pnpm smoke:m04:x11:active-window` resolved `_NET_ACTIVE_WINDOW` and cropped
+  its 2560×1331 bounds from one frozen root frame before persisting the decoded
+  original. Evidence: `artifacts/m04/x11-active-window.json`. It reuses the
+  selector inventory, so minimized, self and non-user targets return
+  `invalidTarget`; occluded pixels retain the visible frozen-compositor result.
+  Multi-monitor runtime validation remains pending.
+- M04 local Ubuntu/GNOME X11 x86_64 repeat smoke (2026-08-09):
+  `pnpm smoke:m04:x11:repeat` persisted the 300×200 selected physical area,
+  then repeated it from the same frozen-root coordinate snapshot. The repeat
+  rejects a changed virtual-root size or RandR monitor-layout fingerprint and
+  stores geometry in capture metadata.
+  Evidence: `artifacts/m04/x11-repeat.json`. The geometry stores the
+  largest-intersection RandR monitor first, followed by every other intersected
+  name; repeat rejects an identity mismatch as well as a layout mismatch.
+  Horizontal/vertical property tests include negative, vertical, cross-monitor
+  and seam-tie bounds. DPI/rotation runtime validation remains pending.
+- M04 local Ubuntu/GNOME X11 x86_64 cold CLI smoke (2026-08-09):
+  `pnpm smoke:m04:x11:cli-cold` launched the real Tauri lifecycle with
+  `capture --mode screen --json` and received a terminal `captured` reply.
+  Evidence: `artifacts/m04/x11-cli-cold.json`.
+- M04 local Ubuntu/GNOME X11 x86_64 warm CLI smoke (2026-08-09):
+  `pnpm smoke:m04:x11:cli-warm` started an isolated hidden primary,
+  forwarded `capture --mode screen --json` via its session socket and received
+  a terminal `captured` reply. Evidence: `artifacts/m04/x11-cli-warm.json`.
+  The direct X11 `active-window` backend is an EWMH lookup and crop from one
+  frozen root frame.
+  The X11 native hotkey backend now parses normalized triggers and uses
+  passive grabs behind `hotkeys_bind`; physical-key activation/conflict
+  evidence remains pending because XTEST/`xdotool` does not exercise passive
+  grabs on this session.
+- M04 local Ubuntu x86_64 deb bundle smoke (2026-08-10):
+  `pnpm smoke:m04:deb` produced
+  `target/release/bundle/deb/Cute Screen_0.0.0_amd64.deb`; `dpkg-deb` verified
+  the native architecture, `usr/bin/cute-screen` and a desktop entry, and
+  rejected test-only `m01/m04-platform-smoke` binaries. The extracted deb
+  executable and `Cute Screen_0.0.0_amd64.AppImage` both ran `--help` with the
+  capture grammar; AppImage was built after declaring existing square icons in
+  Tauri bundle config. This is still not an installed/portable capture proof:
+  desktop activation and moved-AppImage fallback capture remain pending.
 
-## CLI fallback contract (M04 dispatch pending)
+## CLI fallback and activation contract (M04 partial)
 
 - Установленный deb: `cute-screen capture --mode area`.
 - AppImage: shell-quoted абсолютный путь из `current_exe`, затем те же аргументы `capture --mode area`; перемещение AppImage требует заново сформировать строку.
-- M01 только фиксирует строку и capability state. Single-instance dispatch и выполнение capture реализуются в M04; отсутствие portal нельзя объявлять success.
+- `capture --json` передаёт request в primary process через per-user/session
+  Unix socket и ждёт terminal outcome (`captured`, `cancelled`, `busy`,
+  permission/unavailable/failed), не путь к blob и не image bytes. Cold start
+  использует тот же controller. Socket ограничен правами `0600` и scoped к
+  `XDG_RUNTIME_DIR`/session display. Unit coverage есть; реальный warm/cold
+  desktop smoke остаётся pending.
+- Отсутствие portal или неподдерживаемый capture target нельзя объявлять
+  success. CLI fallback пока является конкретной альтернативой binding flow,
+  а не доказательством поддержки Wayland hotkey.

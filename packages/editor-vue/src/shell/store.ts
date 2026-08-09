@@ -15,12 +15,21 @@ import type {
   ThemePreference,
   DocumentHistoryState,
 } from './types'
+import type { CaptureProgressState } from '../platform'
 
 export interface ShellStoreOptions {
   readonly preferences: UiPreferencesStorage
   readonly languages: readonly string[]
   readonly systemDark: () => boolean
   readonly actions?: ShellActionAdapter | undefined
+}
+
+/** Expected terminal outcome from a native selector or portal. */
+export class ActionCancelledError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'ActionCancelledError'
+  }
 }
 
 export const useEditorShellStore = defineStore(
@@ -98,6 +107,10 @@ export const useEditorShellStore = defineStore(
       selectedLayerId.value = value.selectedLayerId
       activeFrameId.value = value.frames?.find((frame) => frame.selected)?.id
     }
+    function setFrames(value: readonly FrameSummary[]): void {
+      frames.value = value
+      activeFrameId.value = value.find((frame) => frame.selected)?.id
+    }
     function selectTool(id: string): void {
       activeToolId.value = id
     }
@@ -122,6 +135,18 @@ export const useEditorShellStore = defineStore(
     function cancelAction(): void {
       controller?.abort()
     }
+    function setCaptureProgress(progress: CaptureProgressState): void {
+      if (
+        actionState.value.status === 'pending' &&
+        actionState.value.action === 'capture'
+      ) {
+        actionState.value = {
+          status: 'pending',
+          action: 'capture',
+          captureProgress: progress,
+        }
+      }
+    }
 
     async function runAction(action: AsyncActionName): Promise<void> {
       if (!options?.actions) {
@@ -139,14 +164,32 @@ export const useEditorShellStore = defineStore(
         return
       }
       controller?.abort()
-      controller = new AbortController()
-      actionState.value = { status: 'pending', action }
+      const actionController = new AbortController()
+      controller = actionController
+      actionState.value =
+        action === 'capture'
+          ? { status: 'pending', action, captureProgress: 'probing' }
+          : { status: 'pending', action }
       try {
-        const message = await options.actions.run(action, controller.signal)
+        const message = await options.actions.run(
+          action,
+          actionController.signal,
+          action === 'capture' ? setCaptureProgress : undefined,
+        )
         actionState.value = { status: 'success', action, message }
       } catch (error) {
-        if (controller.signal.aborted) {
-          actionState.value = { status: 'idle' }
+        if (
+          actionController.signal.aborted ||
+          error instanceof ActionCancelledError
+        ) {
+          actionState.value = {
+            status: 'cancelled',
+            action,
+            message:
+              error instanceof ActionCancelledError
+                ? error.message
+                : t(locale.value, 'captureCancelled'),
+          }
           return
         }
         actionState.value = {
@@ -155,7 +198,7 @@ export const useEditorShellStore = defineStore(
           message: error instanceof Error ? error.message : String(error),
         }
       } finally {
-        controller = undefined
+        if (controller === actionController) controller = undefined
       }
     }
 
@@ -183,7 +226,9 @@ export const useEditorShellStore = defineStore(
       selectedLayerId,
       setDocumentState,
       setDocumentHistory,
+      setCaptureProgress,
       setFixture,
+      setFrames,
       setLayersOpen,
       setLocale,
       setSystemDark,

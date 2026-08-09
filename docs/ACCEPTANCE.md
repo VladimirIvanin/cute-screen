@@ -32,7 +32,20 @@ webview, capture/hotkey, permissions и install/launch. Только этот э
 
 **Результат:** нет необработанных ошибок, пустых панелей и лишней серии; настройки сохраняются.
 
+M04 partial evidence: `pnpm test:e2e:tauri` scenario
+`m04-clean-profile-capture.e2e.ts` starts with empty app data and reaches an
+enabled Copy/Export state only after the production capture request has
+persisted and mounted the first document. Its native pixels are feature-gated
+fake-adapter data; it is orchestration evidence, not a real-OS capture claim.
+
 ## A02 — Hotkey capture из скрытого приложения
+
+M04 partial evidence: local Ubuntu/GNOME X11 `screen` and frozen `area` capture
+successfully passed controller → owned transport → immutable library → editable
+document (`pnpm smoke:m04:x11:screen`, `pnpm smoke:m04:x11:area` and
+`pnpm smoke:m04:x11:window`, evidence
+`artifacts/m04/x11-*.json`). It does not yet satisfy this scenario: hidden-app
+native hotkey runtime and complete area interaction semantics remain pending.
 
 1. Назначить свободную комбинацию для area capture.
 2. Скрыть editor.

@@ -6,6 +6,8 @@ export interface CaptureCapabilities {
   readonly interactiveSelector: boolean
   readonly monitorTarget: boolean
   readonly windowTarget: boolean
+  readonly activeWindowTarget: boolean
+  readonly cursor: boolean
 }
 
 export interface HotkeyCapabilities {
@@ -37,6 +39,7 @@ export interface PlatformCapabilities {
   readonly capture: CaptureCapabilities
   readonly hotkeys: HotkeyCapabilities
   readonly cliFallback: boolean
+  readonly cliFallbackCommand?: string
 }
 
 export interface PortalCapabilityProbe {
@@ -50,4 +53,69 @@ export interface CaptureResult {
   readonly correlationId: string
   readonly width: number
   readonly height: number
+  readonly geometry?: {
+    readonly x: number
+    readonly y: number
+    readonly width: number
+    readonly height: number
+    readonly sourceWidth: number
+    readonly sourceHeight: number
+    readonly layoutFingerprint?: string
+    readonly monitorIds?: readonly string[]
+  }
+}
+
+export type CaptureAction =
+  'area' | 'screen' | 'window' | 'activeWindow' | 'repeat'
+export type CaptureInvocationSource = 'cli' | 'tray' | 'ui' | 'hotkey'
+export type CaptureTerminalOutcome =
+  | 'captured'
+  | 'cancelled'
+  | 'busy'
+  | 'permissionDenied'
+  | 'unavailable'
+  | 'invalidTarget'
+  | 'failed'
+
+export type CaptureProgressState =
+  'probing' | 'ready' | 'delay' | 'selecting' | 'capturing' | 'persisting'
+
+export interface CaptureProgressV1 {
+  readonly version: 1
+  readonly correlationId: string
+  readonly state: CaptureProgressState
+}
+
+export interface CaptureRequestV1 {
+  readonly correlationId: string
+  readonly action: CaptureAction
+  readonly delayMs: number
+  readonly cursor: boolean
+  readonly seriesId?: string
+  readonly invocationSource: CaptureInvocationSource
+}
+
+export interface CaptureOutcomeV1 {
+  readonly version: 1
+  readonly correlationId: string
+  readonly outcome: CaptureTerminalOutcome
+  readonly document?: {
+    readonly documentId: string
+    readonly captureId: string
+    readonly revision: number
+    readonly documentJson: string
+    readonly sourceHash: string
+    readonly imageToken?: string
+  }
+}
+
+export interface ShortcutSpec {
+  readonly id: string
+  readonly preferredTrigger?: string
+}
+
+export interface ShortcutBindingResult {
+  readonly id: string
+  readonly active: boolean
+  readonly correlationId: string
 }

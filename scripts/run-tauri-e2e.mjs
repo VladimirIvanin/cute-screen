@@ -37,6 +37,12 @@ const scenarios = [
     persistenceGroup: 'm03',
   },
   {
+    id: 'm04-clean-profile-capture',
+    spec: 'tests/e2e/specs/m04-clean-profile-capture.e2e.ts',
+    harnessQuery: '?m04=1',
+    fakeCapture: true,
+  },
+  {
     id: 'renderer-alpha',
     spec: 'tests/e2e/specs/tauri-renderer-alpha.e2e.ts',
     harnessQuery: '?m01=1&token=m01-alpha-png',
@@ -173,6 +179,9 @@ try {
     }
     if (scenario.harnessQuery) {
       scenarioEnv.CUTE_SCREEN_E2E_HARNESS_QUERY = scenario.harnessQuery
+    }
+    if (scenario.fakeCapture) {
+      scenarioEnv.CUTE_SCREEN_E2E_FAKE_CAPTURE = '1'
     }
 
     const status = run(

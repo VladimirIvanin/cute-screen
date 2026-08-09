@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import { t } from '../i18n'
 import { createBrowserPreferencesStorage } from '../preferences'
 import { useEditorShellStore, type ShellStoreOptions } from '../store'
+import type { CaptureProgressState } from '../../platform'
 import type {
   CanvasViewportHosts,
+  FrameSummary,
   ShellDocumentState,
   ShellActionAdapter,
   ToolDescriptor,
@@ -31,6 +33,11 @@ const props = withDefaults(
     fixture?: 'empty' | 'error' | 'loading' | 'ready'
     initialDocumentState?: ShellDocumentState | undefined
     readOnlyDocument?: boolean
+    captureAvailable?: boolean
+    captureUnavailableReason?: string | undefined
+    captureFallbackCommand?: string | undefined
+    captureProgress?: CaptureProgressState | undefined
+    frames?: readonly FrameSummary[] | undefined
   }>(),
   {
     actions: undefined,
@@ -38,6 +45,11 @@ const props = withDefaults(
     fixture: 'empty',
     initialDocumentState: undefined,
     readOnlyDocument: false,
+    captureAvailable: true,
+    captureUnavailableReason: undefined,
+    captureFallbackCommand: undefined,
+    captureProgress: undefined,
+    frames: undefined,
   },
 )
 const emit = defineEmits<{
@@ -46,6 +58,7 @@ const emit = defineEmits<{
 }>()
 const store = useEditorShellStore()
 const state = storeToRefs(store)
+const fallbackCopied = ref(false)
 const translate = (key: Parameters<typeof t>[1]) => t(state.locale.value, key)
 const hasInteractiveDocument = computed(
   () => props.documentSession !== undefined || props.fixture === 'ready',
@@ -260,6 +273,16 @@ function undoDocument(): void {
 function redoDocument(): void {
   props.documentSession?.redo()
 }
+async function copyCaptureFallback(): Promise<void> {
+  const command = props.captureFallbackCommand
+  if (!command || !navigator.clipboard) return
+  try {
+    await navigator.clipboard.writeText(command)
+    fallbackCopied.value = true
+  } catch (error) {
+    console.warn('cute-screen fallback command copy failed', error)
+  }
+}
 function retryDocumentSave(): void {
   void props.documentSession?.retry()
 }
@@ -290,6 +313,13 @@ onMounted(() => {
   window.addEventListener('keydown', onKeydown)
 })
 watch(
+  () => props.frames,
+  (frames) => {
+    if (frames) store.setFrames(frames)
+  },
+  { immediate: true },
+)
+watch(
   () => props.documentSession,
   (session, _previous, onCleanup) => {
     if (!session) return
@@ -297,6 +327,12 @@ watch(
     onCleanup(unsubscribe)
   },
   { immediate: true },
+)
+watch(
+  () => props.captureProgress,
+  (progress) => {
+    if (progress) store.setCaptureProgress(progress)
+  },
 )
 watch(
   () => props.initialDocumentState,
@@ -344,6 +380,10 @@ watch(
       :save-state="store.documentHistory.saveState"
       :save-error="store.documentHistory.error"
       :pending="store.actionState.status === 'pending'"
+      :capture-available="props.captureAvailable"
+      :capture-unavailable-reason="
+        props.captureUnavailableReason ?? translate('captureUnavailable')
+      "
       :t="translate"
       @action="store.runAction"
       @undo="undoDocument"
@@ -353,6 +393,25 @@ watch(
       @locale="store.setLocale"
       @theme="store.setTheme"
     />
+    <div
+      v-if="props.captureFallbackCommand"
+      class="cs-capture-fallback"
+      role="status"
+    >
+      <span>{{ translate('captureFallback') }}</span>
+      <code>{{ props.captureFallbackCommand }}</code>
+      <button
+        type="button"
+        :aria-label="translate('copyCaptureFallback')"
+        @click="copyCaptureFallback"
+      >
+        {{
+          fallbackCopied
+            ? translate('captureFallbackCopied')
+            : translate('copyCaptureFallback')
+        }}
+      </button>
+    </div>
     <div class="cs-workbench">
       <ToolRail
         :tools="tools"

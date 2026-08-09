@@ -180,6 +180,12 @@ pub struct OpenDocument {
     pub image_token: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SeriesFrame {
+    pub capture_id: String,
+}
+
 /// Native-only description of an original that has been authorised by the
 /// repository. It is deliberately never serialized across the Tauri boundary.
 #[derive(Debug, Clone)]
@@ -293,6 +299,10 @@ impl LibraryRepository {
 
     pub fn open_last(&self) -> Result<Option<OpenDocument>, RepositoryError> {
         self.call(StorageState::open_last)
+    }
+
+    pub fn list_active_series_frames(&self) -> Result<Vec<SeriesFrame>, RepositoryError> {
+        self.call(StorageState::list_active_series_frames)
     }
 
     pub fn save_document(
@@ -517,6 +527,36 @@ impl StorageState {
             [],
             |row| Ok(OpenDocument { document_id: row.get(0)?, capture_id: row.get(1)?, revision: row.get(2)?, document_json: row.get(3)?, source_hash: row.get(4)?, image_token: None }),
         ).optional().map_err(RepositoryError::from)
+    }
+
+    fn list_active_series_frames(&mut self) -> Result<Vec<SeriesFrame>, RepositoryError> {
+        let series_id = self
+            .connection
+            .query_row(
+                "SELECT value_json FROM settings WHERE key = 'session.activeSeriesId'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?
+            .map(|value| {
+                serde_json::from_str::<String>(&value)
+                    .map_err(|error| RepositoryError::InvalidDocument(error.to_string()))
+            })
+            .transpose()?;
+        let Some(series_id) = series_id else {
+            return Ok(Vec::new());
+        };
+        let mut statement = self.connection.prepare(
+            "SELECT id FROM captures WHERE series_id = ?1 AND deleted_at IS NULL ORDER BY captured_at ASC, id ASC",
+        )?;
+        statement
+            .query_map(params![series_id], |row| {
+                Ok(SeriesFrame {
+                    capture_id: row.get(0)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(RepositoryError::from)
     }
 
     fn save_document(
@@ -1719,6 +1759,42 @@ mod tests {
                 .expect("document")
                 .document_id,
             "doc-2"
+        );
+    }
+
+    #[test]
+    fn lists_active_series_frames_in_capture_order() {
+        let directory = tempdir().expect("temp directory");
+        let repository =
+            LibraryRepository::initialize(directory.path(), directory.path()).expect("repository");
+        let hash = super::sha256_hex(&fixture_bytes());
+        for (document_id, capture_id, captured_at) in [
+            ("doc-first", "capture-first", 10),
+            ("doc-second", "capture-second", 20),
+        ] {
+            repository
+                .create_capture(CreateCaptureRequest {
+                    document_id: document_id.to_owned(),
+                    capture_id: capture_id.to_owned(),
+                    series_id: None,
+                    document_json: document(document_id, &hash),
+                    source_bytes: fixture_bytes(),
+                    source_metadata: metadata(),
+                    capture_metadata: CaptureMetadataV1::unknown(),
+                    captured_at,
+                })
+                .expect("capture");
+        }
+
+        let frames = repository
+            .list_active_series_frames()
+            .expect("active series frames");
+        assert_eq!(
+            frames
+                .iter()
+                .map(|frame| frame.capture_id.as_str())
+                .collect::<Vec<_>>(),
+            ["capture-first", "capture-second"]
         );
     }
 

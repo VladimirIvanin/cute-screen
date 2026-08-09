@@ -1,9 +1,21 @@
 <script setup lang="ts">
+import type { CaptureProgressState } from '../../platform'
 import type { AsyncActionName, AsyncActionState } from '../types'
 defineProps<{
   state: AsyncActionState
   t: (
-    key: 'cancel' | 'retry' | 'captureAction' | 'copyAction' | 'exportAction',
+    key:
+      | 'cancel'
+      | 'retry'
+      | 'captureAction'
+      | 'copyAction'
+      | 'exportAction'
+      | 'captureProbing'
+      | 'captureReady'
+      | 'captureDelay'
+      | 'captureSelecting'
+      | 'captureCapturing'
+      | 'capturePersisting',
   ) => string
 }>()
 const emit = defineEmits<{ cancel: []; retry: [] }>()
@@ -15,6 +27,22 @@ const actionKey: Record<
   copy: 'copyAction',
   export: 'exportAction',
 }
+const progressKey: Record<
+  CaptureProgressState,
+  | 'captureProbing'
+  | 'captureReady'
+  | 'captureDelay'
+  | 'captureSelecting'
+  | 'captureCapturing'
+  | 'capturePersisting'
+> = {
+  probing: 'captureProbing',
+  ready: 'captureReady',
+  delay: 'captureDelay',
+  selecting: 'captureSelecting',
+  capturing: 'captureCapturing',
+  persisting: 'capturePersisting',
+}
 </script>
 
 <template>
@@ -24,9 +52,13 @@ const actionKey: Record<
     :class="`is-${state.status}`"
     :role="state.status === 'error' ? 'alert' : 'status'"
   >
-    <span v-if="state.status === 'pending'"
-      >{{ t(actionKey[state.action]) }}…</span
-    >
+    <span v-if="state.status === 'pending'">
+      {{
+        state.action === 'capture' && state.captureProgress
+          ? t(progressKey[state.captureProgress])
+          : `${t(actionKey[state.action])}…`
+      }}
+    </span>
     <span v-else>{{ state.message }}</span>
     <button
       v-if="state.status === 'pending'"
