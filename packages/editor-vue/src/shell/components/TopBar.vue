@@ -2,16 +2,24 @@
 import { computed, ref } from 'vue'
 import { UiIcon } from '../icon'
 import type { SupportedLocale, ThemePreference } from '../types'
+import type { DocumentSaveState } from '../types'
 
 const props = defineProps<{
   locale: SupportedLocale
   theme: ThemePreference
   canCopyOrExport: boolean
+  canUndo?: boolean
+  canRedo?: boolean
+  saveState?: DocumentSaveState
+  saveError?: string | undefined
   pending?: boolean
   t: (key: Parameters<typeof import('../i18n').t>[1]) => string
 }>()
 const emit = defineEmits<{
   action: [name: 'capture' | 'copy' | 'export']
+  undo: []
+  redo: []
+  retrySave: []
   locale: [value: SupportedLocale]
   theme: [value: ThemePreference]
 }>()
@@ -41,7 +49,8 @@ function selectLocale(value: SupportedLocale): void {
         class="cs-icon-button"
         :aria-label="t('undo')"
         :title="t('undo')"
-        disabled
+        :disabled="!canUndo"
+        @click="emit('undo')"
       >
         <UiIcon name="undo" />
       </button>
@@ -50,11 +59,37 @@ function selectLocale(value: SupportedLocale): void {
         class="cs-icon-button"
         :aria-label="t('redo')"
         :title="t('redo')"
-        disabled
+        :disabled="!canRedo"
+        @click="emit('redo')"
       >
         <UiIcon name="redo" />
       </button>
     </div>
+    <p
+      v-if="saveState && saveState !== 'saved'"
+      class="cs-save-status"
+      role="status"
+      aria-live="polite"
+      :data-state="saveState"
+    >
+      {{
+        saveState === 'dirty'
+          ? t('unsavedChanges')
+          : saveState === 'saving'
+            ? t('savingDocument')
+            : saveState === 'readOnly'
+              ? t('readOnlyDocument')
+              : (saveError ?? t('saveFailed'))
+      }}
+      <button
+        v-if="saveState === 'error'"
+        type="button"
+        class="cs-save-retry"
+        @click="emit('retrySave')"
+      >
+        {{ t('retry') }}
+      </button>
+    </p>
     <div class="cs-top-actions">
       <button
         type="button"

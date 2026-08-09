@@ -1,6 +1,16 @@
 import type { EditorCoreBoundary } from '@cute-screen/editor-core'
 
-export { createRenderSceneSnapshot } from '@cute-screen/editor-core'
+export {
+  applyEditorCommand,
+  CommandManager,
+  createRenderSceneSnapshot,
+  parseEditorDocument,
+  serializeEditorDocument,
+  type EditorCommand,
+  type EditorDocumentV1,
+  type EditorSnapshot,
+  type ParsedEditorDocument,
+} from '@cute-screen/editor-core'
 
 export {
   Canvas2DRenderer,
@@ -15,6 +25,16 @@ export {
   type CanvasKitApi,
 } from './canvaskit'
 export { loadBundledCanvasKit } from './bundled-canvaskit'
+export {
+  ImageResourceManager,
+  selectImageVariant,
+  type ImageResourceKey,
+  type ImageResourceLease,
+  type ImageResourceManagerOptions,
+  type ImageVariant,
+  type ImageVariantSelection,
+  type ManagedImageResource,
+} from './image-resource-manager'
 export { RendererRuntime, type RendererRuntimeOptions } from './runtime'
 export {
   FrameScheduler,

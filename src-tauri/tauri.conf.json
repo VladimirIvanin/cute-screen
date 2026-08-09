@@ -16,7 +16,7 @@
       "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; img-src 'self' asset: http://asset.localhost blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost",
       "assetProtocol": {
         "enable": true,
-        "scope": ["$APPLOCALDATA/blobs/**"]
+        "scope": ["$APPLOCALDATA/blobs/**", "$APPCACHE/resources/**"]
       }
     },
     "windows": [

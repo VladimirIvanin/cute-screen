@@ -17,7 +17,11 @@
       ],
       "assetProtocol": {
         "enable": true,
-        "scope": ["$APPLOCALDATA/blobs/**", "$APPCACHE/m01-fixtures/**"]
+        "scope": [
+          "$APPLOCALDATA/blobs/**",
+          "$APPCACHE/resources/**",
+          "$APPCACHE/m01-fixtures/**"
+        ]
       }
     }
   }

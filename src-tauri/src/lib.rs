@@ -22,12 +22,14 @@ use tauri::{
 };
 
 use lifecycle::{LaunchIntentV1, LifecycleState, parse_launch};
+use storage::{LibraryRepository, OpenDocument, RepositoryError};
 
 pub mod image_transport;
 pub mod lifecycle;
 #[cfg(target_os = "linux")]
 pub mod linux_platform;
 pub mod platform;
+pub mod storage;
 #[cfg(all(target_os = "linux", feature = "x11-capture"))]
 pub mod x11_platform;
 
@@ -67,6 +69,45 @@ fn read_image_bytes(
     transport
         .read_image_bytes(&token, &correlation_id)
         .map(tauri::ipc::Response::new)
+}
+
+#[tauri::command]
+fn repository_open_last(
+    _correlation_id: String,
+    repository: State<'_, LibraryRepository>,
+) -> Result<Option<OpenDocument>, RepositoryError> {
+    repository.open_last()
+}
+
+#[tauri::command]
+fn repository_save_document(
+    _correlation_id: String,
+    document_id: String,
+    expected_revision: i64,
+    document_json: String,
+    repository: State<'_, LibraryRepository>,
+) -> Result<i64, RepositoryError> {
+    repository.save_document(document_id, expected_revision, document_json)
+}
+
+#[tauri::command]
+fn settings_get(
+    _correlation_id: String,
+    key: String,
+    repository: State<'_, LibraryRepository>,
+) -> Result<Option<String>, RepositoryError> {
+    repository.get_setting(key)
+}
+
+#[tauri::command]
+fn settings_put(
+    _correlation_id: String,
+    key: String,
+    schema_version: u32,
+    value_json: String,
+    repository: State<'_, LibraryRepository>,
+) -> Result<(), RepositoryError> {
+    repository.put_setting(key, schema_version, value_json)
 }
 
 #[tauri::command]
@@ -176,6 +217,14 @@ fn initialize_image_transport<R: tauri::Runtime>(
     register_test_fixtures(&transport, &source_root)?;
 
     Ok(transport)
+}
+
+fn initialize_repository<R: tauri::Runtime>(
+    app: &tauri::App<R>,
+) -> Result<LibraryRepository, Box<dyn std::error::Error>> {
+    let local_data = app.path().app_local_data_dir()?;
+    let cache = app.path().app_cache_dir()?;
+    Ok(LibraryRepository::initialize(local_data, cache)?)
 }
 
 fn show_editor<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
@@ -306,6 +355,8 @@ pub fn run() {
         })
         .setup(move |app| {
             app.manage(Mutex::new(LifecycleState::default()));
+            let repository = initialize_repository(app)?;
+            app.manage(repository);
             let transport = initialize_image_transport(app)?;
             app.manage(transport);
 
@@ -339,6 +390,10 @@ pub fn run() {
         platform_capabilities,
         get_e2e_harness_query,
         read_image_bytes,
+        repository_open_last,
+        repository_save_document,
+        settings_get,
+        settings_put,
         stage_image,
         test_portal_capture,
         test_portal_probe,
@@ -349,6 +404,10 @@ pub fn run() {
         ping,
         platform_capabilities,
         read_image_bytes,
+        repository_open_last,
+        repository_save_document,
+        settings_get,
+        settings_put,
         stage_image
     ]);
 

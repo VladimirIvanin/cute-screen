@@ -76,6 +76,16 @@ export type AsyncActionState =
       readonly message: string
     }
 
+export type DocumentSaveState =
+  'saved' | 'dirty' | 'saving' | 'error' | 'readOnly'
+
+export interface DocumentHistoryState {
+  readonly canUndo: boolean
+  readonly canRedo: boolean
+  readonly saveState: DocumentSaveState
+  readonly error?: string
+}
+
 export interface ShellActionAdapter {
   run(action: AsyncActionName, signal: AbortSignal): Promise<string>
 }
@@ -162,6 +172,10 @@ export const translationKeys = [
   'exportAction',
   'undo',
   'redo',
+  'unsavedChanges',
+  'savingDocument',
+  'readOnlyDocument',
+  'saveFailed',
 ] as const
 
 export type TranslationKey = (typeof translationKeys)[number]

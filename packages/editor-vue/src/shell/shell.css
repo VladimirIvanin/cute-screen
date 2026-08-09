@@ -112,6 +112,32 @@ button:focus-visible {
   padding-left: 8px;
   border-left: 1px solid var(--border);
 }
+
+.cs-save-status {
+  margin: 0;
+  max-width: 14rem;
+  overflow: hidden;
+  color: var(--cs-text-muted);
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cs-save-retry {
+  margin-inline-start: 0.4rem;
+  border: 0;
+  border-radius: 0.3rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 0.1rem 0.25rem;
+  text-decoration: underline;
+}
+
+.cs-save-status[data-state='error'] {
+  color: var(--cs-danger);
+}
 .cs-top-actions {
   display: flex;
   align-items: center;

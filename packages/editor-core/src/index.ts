@@ -5,6 +5,46 @@ export interface RgbaColor {
   readonly alpha: number
 }
 
+export {
+  DEFAULT_PRESENTATION_SETTINGS,
+  EDITOR_DOCUMENT_SCHEMA_VERSION,
+  invertMatrix,
+  multiplyMatrices,
+  parseEditorDocument,
+  serializeEditorDocument,
+  transformPoint,
+  transformToMatrix,
+  type ArrowLayer,
+  type CalloutLayer,
+  type CensorLayer,
+  type ColorMetadata,
+  type EditorDocumentV1,
+  type EmojiLayer,
+  type ImageLayer,
+  type ImageLayerPayload,
+  type JsonObject,
+  type JsonValue,
+  type LayerKind,
+  type LayerNode,
+  type LoupeLayer,
+  type Matrix2D,
+  type ParsedEditorDocument,
+  type Point,
+  type PresentationSettingsV1,
+  type Rect,
+  type SourceImageRef,
+  type Transform2D,
+} from './document'
+export {
+  applyEditorCommand,
+  revertEditorCommand,
+  CommandManager,
+  type CommandManagerOptions,
+  type EditorCommand,
+  type EditorSnapshot,
+  type IdGenerator,
+} from './commands'
+
 interface RenderNodeBase {
   readonly id: string
   readonly rotation: number

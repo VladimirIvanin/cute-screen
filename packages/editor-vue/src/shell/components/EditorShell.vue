@@ -10,6 +10,10 @@ import type {
   ShellActionAdapter,
   ToolDescriptor,
 } from '../types'
+import type {
+  DocumentSessionController,
+  DocumentSessionSnapshot,
+} from '../../document-session'
 import ActionFeedback from './ActionFeedback.vue'
 import CanvasViewport from './CanvasViewport.vue'
 import ContextToolbar from './ContextToolbar.vue'
@@ -22,9 +26,10 @@ import ZoomControls from './ZoomControls.vue'
 const props = withDefaults(
   defineProps<{
     actions?: ShellActionAdapter | undefined
+    documentSession?: DocumentSessionController | undefined
     fixture?: 'empty' | 'error' | 'loading' | 'ready'
   }>(),
-  { actions: undefined, fixture: 'empty' },
+  { actions: undefined, documentSession: undefined, fixture: 'empty' },
 )
 const emit = defineEmits<{ hostsReady: [hosts: CanvasViewportHosts] }>()
 const store = useEditorShellStore()
@@ -221,13 +226,46 @@ function onKeydown(event: KeyboardEvent): void {
     store.setLayersOpen(false)
   }
 }
+function applyDocumentSnapshot(snapshot: DocumentSessionSnapshot): void {
+  store.setDocumentState({
+    kind: 'ready',
+    title: `Document ${snapshot.core.document.id.slice(0, 8)}`,
+    dimensions: `${snapshot.core.document.canvas.width} × ${snapshot.core.document.canvas.height}`,
+  })
+  store.setDocumentHistory({
+    canUndo: snapshot.core.canUndo,
+    canRedo: snapshot.core.canRedo,
+    saveState: snapshot.saveState,
+    ...(snapshot.error ? { error: snapshot.error } : {}),
+  })
+}
+function undoDocument(): void {
+  props.documentSession?.undo()
+}
+function redoDocument(): void {
+  props.documentSession?.redo()
+}
+function retryDocumentSave(): void {
+  void props.documentSession?.retry()
+}
 onMounted(() => {
   store.initialize(preferencesOptions)
-  loadFixture()
+  if (props.documentSession)
+    props.documentSession.setOnChange(applyDocumentSnapshot)
+  else loadFixture()
   media.addEventListener('change', onMediaChange)
   window.addEventListener('keydown', onKeydown)
 })
+watch(
+  () => props.documentSession,
+  (session) => {
+    if (session) session.setOnChange(applyDocumentSnapshot)
+  },
+)
 onBeforeUnmount(() => {
+  // Navigation/remount must not leave the coalesced save behind.
+  void props.documentSession?.flush()
+  props.documentSession?.dispose()
   media.removeEventListener('change', onMediaChange)
   window.removeEventListener('keydown', onKeydown)
 })
@@ -247,9 +285,16 @@ watch(
       :locale="store.locale"
       :theme="store.preferences.theme"
       :can-copy-or-export="store.canCopyOrExport"
+      :can-undo="store.documentHistory.canUndo"
+      :can-redo="store.documentHistory.canRedo"
+      :save-state="store.documentHistory.saveState"
+      :save-error="store.documentHistory.error"
       :pending="store.actionState.status === 'pending'"
       :t="translate"
       @action="store.runAction"
+      @undo="undoDocument"
+      @redo="redoDocument"
+      @retry-save="retryDocumentSave"
       @locale="store.setLocale"
       @theme="store.setTheme"
     />

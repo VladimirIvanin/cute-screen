@@ -20,6 +20,30 @@ export interface DesktopBridge extends ImageTransportBridge {
   testPortalProbe?(correlationId: string): Promise<PortalCapabilityProbe>
   /** Opens the real system selector; available only in test-harness builds. */
   testPortalCapture?(correlationId: string): Promise<CaptureResult>
+  repositoryOpenLast(
+    correlationId: string,
+  ): Promise<RepositoryOpenDocument | null>
+  repositorySaveDocument(
+    documentId: string,
+    expectedRevision: number,
+    documentJson: string,
+    correlationId: string,
+  ): Promise<number>
+  settingsGet(key: string, correlationId: string): Promise<string | null>
+  settingsPut(
+    key: string,
+    schemaVersion: number,
+    valueJson: string,
+    correlationId: string,
+  ): Promise<void>
+}
+
+export interface RepositoryOpenDocument {
+  readonly documentId: string
+  readonly captureId: string
+  readonly revision: number
+  readonly documentJson: string
+  readonly sourceHash: string
 }
 
 export const tauriDesktopBridge: DesktopBridge = {
@@ -34,4 +58,29 @@ export const tauriDesktopBridge: DesktopBridge = {
     invoke<PortalCapabilityProbe>('test_portal_probe', { correlationId }),
   testPortalCapture: (correlationId) =>
     invoke<CaptureResult>('test_portal_capture', { correlationId }),
+  repositoryOpenLast: (correlationId) =>
+    invoke<RepositoryOpenDocument | null>('repository_open_last', {
+      correlationId,
+    }),
+  repositorySaveDocument: (
+    documentId,
+    expectedRevision,
+    documentJson,
+    correlationId,
+  ) =>
+    invoke<number>('repository_save_document', {
+      documentId,
+      expectedRevision,
+      documentJson,
+      correlationId,
+    }),
+  settingsGet: (key, correlationId) =>
+    invoke<string | null>('settings_get', { key, correlationId }),
+  settingsPut: (key, schemaVersion, valueJson, correlationId) =>
+    invoke<void>('settings_put', {
+      key,
+      schemaVersion,
+      valueJson,
+      correlationId,
+    }),
 }

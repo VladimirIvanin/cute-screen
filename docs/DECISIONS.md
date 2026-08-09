@@ -169,3 +169,23 @@ undo/redo, безопасной обработке ошибок и platform capa
 runtime pass не означает `supported` или `verified` для другой ОС; до финальной
 матрицы такие строки остаются `planned` либо `implemented` с явно указанным
 отложенным evidence.
+
+## ADR-021 — Content-addressed blobs и bounded image resources
+
+**Статус:** accepted
+
+**Контекст:** M03 должен хранить originals и будущие image layers локально,
+не помещая bytes в document JSON или SQLite metadata. Полноразмерные bitmap
+потребляют значительно больше памяти, чем их сжатые файлы, поэтому один hash
+store без resource lifecycle привёл бы к повторному decode и GPU upload.
+
+**Решение:** originals и imported images хранятся неизменяемыми файлами под
+SHA-256, разложенными по двум hash-prefix каталогам; SQLite хранит metadata и
+явные references. Derivatives — `thumbnail` и `interactive-2048` — являются
+rebuildable cache. Renderer получает byte-bounded, deduplicating resource
+manager; texture-limit выбирает preview до появления tiled rendering в M07.
+
+**Последствия:** blob cleanup не выполняется автоматически при старте; он
+должен опираться на reference rows и отдельный maintenance flow. Малые
+thumbnails могут быть перенесены в отдельный cache database только после
+platform benchmark. Recovery bundle включает authoritative blobs, но не cache.

@@ -33,6 +33,14 @@ export { default as ContextToolbar } from './shell/components/ContextToolbar.vue
 export { default as LayersPanel } from './shell/components/LayersPanel.vue'
 export { default as SeriesFilmstrip } from './shell/components/SeriesFilmstrip.vue'
 export { default as ZoomControls } from './shell/components/ZoomControls.vue'
+export {
+  DocumentSessionController,
+  parsePersistedDocument,
+  type DocumentPersistenceBridge,
+  type DocumentSaveState,
+  type DocumentSessionSnapshot,
+  type PersistedDocumentRecord,
+} from './document-session'
 export { createEditorShellPinia, useEditorShellStore } from './shell/store'
 export { assertLocaleCompleteness, resolveSystemLocale, t } from './shell/i18n'
 export {

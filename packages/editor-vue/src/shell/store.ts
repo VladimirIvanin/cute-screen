@@ -13,6 +13,7 @@ import type {
   ShellDocumentState,
   SupportedLocale,
   ThemePreference,
+  DocumentHistoryState,
 } from './types'
 
 export interface ShellStoreOptions {
@@ -36,6 +37,11 @@ export const useEditorShellStore = defineStore(
     const actionState = ref<AsyncActionState>({ status: 'idle' })
     const layers = ref<readonly LayerSummary[]>([])
     const frames = ref<readonly FrameSummary[]>([])
+    const documentHistory = ref<DocumentHistoryState>({
+      canUndo: false,
+      canRedo: false,
+      saveState: 'saved',
+    })
     let options: ShellStoreOptions | undefined
     let controller: AbortController | undefined
 
@@ -74,6 +80,9 @@ export const useEditorShellStore = defineStore(
     }
     function setDocumentState(value: ShellDocumentState): void {
       documentState.value = value
+    }
+    function setDocumentHistory(value: DocumentHistoryState): void {
+      documentHistory.value = value
     }
     function setFixture(value: {
       document: ShellDocumentState
@@ -158,6 +167,7 @@ export const useEditorShellStore = defineStore(
       clearFeedback,
       cancelAction,
       documentState,
+      documentHistory,
       frames,
       hasFrames,
       initialize,
@@ -172,6 +182,7 @@ export const useEditorShellStore = defineStore(
       selectTool,
       selectedLayerId,
       setDocumentState,
+      setDocumentHistory,
       setFixture,
       setLayersOpen,
       setLocale,
