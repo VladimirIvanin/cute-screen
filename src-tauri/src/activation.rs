@@ -1,5 +1,5 @@
 use std::{
-    io::{self, Read, Write},
+    io::{self, Read},
     path::{Path, PathBuf},
     sync::{
         Arc,
@@ -8,6 +8,9 @@ use std::{
     thread::{self, JoinHandle},
     time::Duration,
 };
+
+#[cfg(unix)]
+use std::io::Write;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;

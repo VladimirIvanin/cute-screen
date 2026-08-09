@@ -54,10 +54,12 @@ uuid = { version = "=1.24.0", features = ["v7", "serde"] }
 chrono = "=0.4.45"
 zip = { version = "=6.0.0", default-features = false, features = ["deflate"] }
 tempfile = "=3.27.0"
+# CapturePreflightService is shared by every desktop host, not only the Linux
+# portal implementation.
+tokio = { version = "=1.53.1", features = ["rt", "sync", "time"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 ashpd = { version = "=0.13.13", default-features = false, features = ["tokio", "screenshot", "global_shortcuts"] }
-tokio = { version = "=1.53.1", features = ["rt", "sync", "time"] }
 x11rb = { version = "=0.14.0", default-features = false, features = ["image", "randr", "xfixes"], optional = true }
 
 [features]
