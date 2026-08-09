@@ -288,7 +288,9 @@ fn hash_file(source: &Path) -> std::io::Result<String> {
 
 fn asset_url(path: &Path) -> Result<String, ()> {
     let mut url = url::Url::parse("asset://localhost/").map_err(|_| ())?;
-    url.set_path(&path.to_string_lossy());
+    url.path_segments_mut()
+        .map_err(|_| ())?
+        .push(&path.to_string_lossy());
     Ok(url.into())
 }
 
@@ -299,7 +301,7 @@ mod tests {
         path::{Path, PathBuf},
     };
 
-    use super::{ImageTransportService, RegisteredImage};
+    use super::{ImageTransportService, RegisteredImage, asset_url};
     use crate::platform::PlatformErrorCode;
     use tempfile::{TempDir, tempdir};
 
@@ -400,5 +402,13 @@ mod tests {
         };
 
         assert!(!path.exists());
+    }
+
+    #[test]
+    fn asset_url_keeps_an_absolute_path_as_a_single_encoded_segment() {
+        let url = asset_url(Path::new("/tmp/m01 fixture.png"))
+            .expect("asset URL should be formed for an absolute path");
+
+        assert_eq!(url, "asset://localhost/%2Ftmp%2Fm01%20fixture.png");
     }
 }
