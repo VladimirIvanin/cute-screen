@@ -33,9 +33,10 @@ use tauri::{
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_notification::NotificationExt;
 
+#[cfg(unix)]
+use activation::ActivationServer;
 use activation::{
     ACTIVATION_PROTOCOL_VERSION, ActivationDispatch, ActivationReplyV1, ActivationRequestV1,
-    ActivationServer,
 };
 use capture::{
     CaptureController, CaptureInvocationSource, CaptureOutcomeV1, CaptureProgressState,

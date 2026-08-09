@@ -1,3 +1,4 @@
+#[cfg(unix)]
 use std::{
     io,
     path::{Path, PathBuf},
@@ -15,7 +16,9 @@ use std::io::{Read, Write};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::capture::{CaptureOutcomeV1, CaptureRequestV1, CaptureTerminalOutcome};
+#[cfg(unix)]
+use crate::capture::CaptureOutcomeV1;
+use crate::capture::{CaptureRequestV1, CaptureTerminalOutcome};
 
 pub const ACTIVATION_PROTOCOL_VERSION: u8 = 1;
 const MAX_PAYLOAD_BYTES: usize = 64 * 1024;

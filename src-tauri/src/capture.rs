@@ -10,15 +10,15 @@ use uuid::Uuid;
 
 use crate::{
     image_transport::{ImageTransportService, OwnedImage},
-    platform::{
-        CaptureGeometry, CaptureRequest, CaptureResult, CaptureTarget, PlatformErrorCode,
-        PortalClient,
-    },
+    platform::{CaptureGeometry, CaptureResult, CaptureTarget, PlatformErrorCode},
     storage::{
         BlobMetadata, CaptureMetadataV1, CreateCaptureRequest, LibraryRepository, OpenDocument,
         RepositoryError,
     },
 };
+
+#[cfg(target_os = "linux")]
+use crate::platform::{CaptureRequest, PortalClient};
 
 const CAPTURE_OUTCOME_VERSION: u8 = 1;
 
@@ -245,10 +245,11 @@ impl CaptureController {
             )),
         };
         #[cfg(not(target_os = "linux"))]
-        let result: Result<CaptureResult, PlatformError> = Err(PlatformError::new(
-            PlatformErrorCode::PortalUnavailable,
-            &request.correlation_id,
-        ));
+        let result: Result<CaptureResult, crate::platform::PlatformError> =
+            Err(crate::platform::PlatformError::new(
+                PlatformErrorCode::PortalUnavailable,
+                &request.correlation_id,
+            ));
 
         match result {
             Ok(frame) => {
