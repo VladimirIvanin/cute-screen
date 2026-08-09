@@ -180,6 +180,17 @@ function restoreContext(): void {
   else canvas.dispatchEvent(new Event('webglcontextrestored'))
 }
 
+async function decodeHarnessImage(url: string): Promise<HTMLImageElement> {
+  if (url.startsWith('asset:')) {
+    throw new Error('asset denied')
+  }
+
+  const image = new Image()
+  image.src = url
+  await image.decode()
+  return image
+}
+
 async function verifyTransport(): Promise<void> {
   if (!runtime) return
   transportState.value = { status: 'loading' }
@@ -203,7 +214,7 @@ async function verifyTransport(): Promise<void> {
       correlationId: 'm01-transport-harness',
       bridge,
       ...(harnessParameters.get('assetFailure') === '1'
-        ? { decodeImage: async () => Promise.reject(new Error('asset denied')) }
+        ? { decodeImage: decodeHarnessImage }
         : {}),
       onPrimaryFailure: (error, assetUrl) => {
         primaryDiagnostic.value = `${assetUrl} :: ${error instanceof Error ? `${error.name}: ${error.message}` : String(error)}`
