@@ -63,18 +63,25 @@ Wayland, Windows и macOS. На Wayland selector системный.
 ## A05 — Базовое редактирование
 
 1. Открыть новый снимок.
-2. Pan/zoom.
-3. Нарисовать два пересекающихся объекта одним активным инструментом.
-4. Убедиться, что новые объекты не выбраны автоматически.
-5. Перейти в Select и double-click циклически выбрать слои.
-6. Move/resize/rotate/opacity/lock/z-order.
-7. Undo/redo весь путь.
+2. Убедиться, что снимок показан нижним locked base layer, а canvas имеет
+   собственные dimensions.
+3. Unlock, resize/move и удалить base layer; проверить, что canvas и immutable
+   original сохранились, затем выполнить Undo.
+4. Pan/zoom.
+5. Нарисовать два пересекающихся объекта одним активным инструментом.
+6. Убедиться, что новые объекты не выбраны автоматически.
+7. Перейти в Select и double-click циклически выбрать слои.
+8. Move/resize/rotate/opacity/lock/z-order.
+9. Выполнить horizontal и vertical canvas flip, затем undo/redo весь путь.
 
-**Результат:** viewport не прыгает, selection и history согласованы.
+**Результат:** viewport не прыгает, selection/history согласованы, base image
+редактируется как слой без изменения оригинала, flip совпадает в preview/export.
 
 ## A06 — Drawing tools
 
-Проверить arrow/line, curved anchors, shapes, radius, fill opacity, pencil brushes и marker blend modes. Для каждого инструмента:
+Проверить arrow/line, curved anchors, shapes, radius, solid/linear/radial
+gradient, pattern/texture fill, fill/layer opacity, shape blend modes, pencil
+brushes и marker blend modes. Для каждого инструмента:
 
 - pointer preview следует за курсором;
 - настройки находятся только в contextual toolbar;
@@ -84,18 +91,31 @@ Wayland, Windows и macOS. На Wayland selector системный.
 
 ## A07 — Text/content/clipboard
 
-1. Создать multiline RU/EN text и отредактировать его.
-2. Создать numbered marker и callout.
-3. Вставить emoji и локальное изображение.
-4. Скопировать editor layer и вставить его.
-5. Вставить plain text и bitmap из внешнего приложения.
-6. Выполнить keyboard duplicate.
+1. Из empty state открыть локальную картинку и проверить новый document с locked
+   base layer.
+2. Вернуться в empty state, вставить bitmap из внешнего приложения и проверить
+   тот же document creation flow.
+3. В активный document вставить bitmap и убедиться, что он добавлен как обычный
+   Image tool layer без auto-selection и смены active tool.
+4. Создать multiline RU/EN text и отредактировать его в auto-size/fixed-width.
+5. Настроить typography, gradient/pattern/texture fill, outline, shadows,
+   background, opacity/blend и применить несколько style presets.
+6. Создать numbered marker и callout.
+7. Вставить emoji и локальное изображение через Image tool.
+8. Скопировать editor layer и вставить его.
+9. Вставить plain text из внешнего приложения и выполнить keyboard duplicate.
 
-**Результат:** тип clipboard распознан, text editing не запускает tool/global shortcuts.
+**Результат:** Open/Paste routing зависит от наличия активного документа, тип
+clipboard распознан, text editing не запускает tool/global shortcuts, text
+preview и export визуально согласованы.
 
 ## A08 — Crop и precision tools
 
-На чистом документе открыть Crop без предварительного программного задания frame size. Проверить presets, handles, rule-of-thirds, reset, `Enter`, `Escape` и undo. Затем проверить manual censor, spotlight, ruler, temporary guides, loupe auto-selection и eyedropper clipboard/toast/recent color.
+На чистом документе открыть Crop без предварительного программного задания frame
+size. Проверить presets, handles, rule-of-thirds, reset, `Enter`, `Escape` и undo.
+Повторить после resize/delete base layer и до/после canvas flip: crop использует
+canvas bounds. Затем проверить manual censor, spotlight, ruler, temporary guides,
+loupe auto-selection и eyedropper clipboard/toast/recent color.
 
 ## A09 — Серии и библиотека
 

@@ -143,6 +143,10 @@ Property-based тесты покрывают:
 - `screenToImage(imageToScreen(point)) ≈ point`;
 - resize/rotate не создаёт NaN/Infinity;
 - locked layer не меняется command-операциями;
+- canvas dimensions не зависят от удаления/resize base image layer;
+- base-layer transform/delete/flip не изменяет immutable original blob;
+- horizontal либо vertical flip, применённый дважды, возвращает semantic
+  equivalent document, включая crop;
 - undo(apply(command)) возвращает эквивалентный документ;
 - serialization round-trip сохраняет semantic document;
 - migrations идемпотентны относительно текущей версии;
@@ -159,9 +163,13 @@ Goldens создаются для каждого LayerNode:
 - rotate/scale;
 - 1× и 2× DPR;
 - crop clipping;
+- base image resized/deleted и horizontal/vertical canvas flip;
+- shape solid/linear/radial gradient, pattern/texture fills, opacity и curated
+  blend modes;
 - marker blend modes;
 - censor modes;
-- text RU/EN и multiline;
+- text RU/EN, multiline, gradient/pattern/texture fill, outline, shadow,
+  background и style presets;
 - beautify/watermark;
 - CanvasKit/Canvas2D parity с documented tolerance.
 
@@ -193,7 +201,8 @@ Goldens создаются для каждого LayerNode:
 - capture result поступает из mocked adapter;
 - все editor tools и contextual toolbar;
 - undo/redo и overlap cycling;
-- clipboard type dispatch;
+- base-layer unlock/resize/delete и canvas flip;
+- clipboard type dispatch, empty-state Open/Paste и active-document image paste;
 - library/filmstrip lazy loading;
 - export configuration;
 - RU/EN и themes;
