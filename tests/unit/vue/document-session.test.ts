@@ -107,4 +107,54 @@ describe('M03 document persistence session', () => {
     expect(attempts).toBe(2)
     expect(session.snapshot.saveState).toBe('saved')
   })
+
+  it('does not treat a save from an abandoned undo branch as current', async () => {
+    let resolveSave: ((revision: number) => void) | undefined
+    const session = new DocumentSessionController({
+      document,
+      revision: 1,
+      debounceMs: 60_000,
+      bridge: {
+        saveDocument: async () =>
+          new Promise<number>((resolve) => {
+            resolveSave = resolve
+          }),
+      },
+      correlationId: () => 'test',
+    })
+    session.execute({
+      type: 'addLayer',
+      layer: {
+        id: '019c1f62-058e-7000-8000-000000000010',
+        kind: 'shape',
+        transform: {
+          translateX: 0,
+          translateY: 0,
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+        },
+        opacity: 1,
+        visible: true,
+        locked: false,
+        payload: { shape: 'rectangle' },
+      },
+    })
+    const firstSave = session.flush()
+    await Promise.resolve()
+    if (!resolveSave) throw new Error('save did not start')
+
+    session.undo()
+    session.execute({
+      type: 'setCrop',
+      before: null,
+      after: { x: 0, y: 0, width: 80, height: 80 },
+    })
+    resolveSave(2)
+    await firstSave
+
+    expect(session.snapshot.core.dirty).toBe(true)
+    expect(session.snapshot.saveState).toBe('dirty')
+    session.dispose()
+  })
 })

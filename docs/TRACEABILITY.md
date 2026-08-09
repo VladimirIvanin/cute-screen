@@ -35,8 +35,8 @@ Foundation harness не создаёт отдельного продуктово
 | REQ-EDT-002 | command/selection tests                                               | draw two objects pointer E2E                           | planned                            |
 | REQ-EDT-003 | loupe selection test                                                  | loupe create/configure E2E                             | planned                            |
 | REQ-EDT-004 | overlap hit-test property test                                        | double-click cycle E2E                                 | planned                            |
-| REQ-EDT-005 | command suite                                                         | pointer + keyboard E2E                                 | planned                            |
-| REQ-EDT-006 | M03 `document.test.ts`, `document-session.test.ts`                    | cross-tool undo/redo E2E                               | implemented; runtime planned       |
+| REQ-EDT-005 | M03 `commands/operations.test.ts`                                     | pointer + keyboard E2E                                 | planned                            |
+| REQ-EDT-006 | M03 `commands/manager.test.ts`, `document-session.test.ts`            | cross-tool undo/redo E2E                               | implemented; runtime planned       |
 | REQ-EDT-007 | guide state tests                                                     | hold/release shortcut E2E                              | planned                            |
 | REQ-EDT-008 | `M02 editor shell` component test                                     | `M02 shell` browser screenshots                        | implemented                        |
 | REQ-EDT-009 | `M02 editor shell` layer-panel component test                         | `M02 shell` browser selected-layer interaction         | implemented                        |
@@ -54,7 +54,7 @@ Foundation harness не создаёт отдельного продуктово
 | REQ-TOL-010 | distance/unit tests                                                   | ruler + guides E2E                                     | planned                            |
 | REQ-TOL-011 | loupe renderer tests                                                  | auto-selection/config E2E                              | planned                            |
 | REQ-TOL-012 | color conversion tests                                                | real clipboard + toast                                 | planned                            |
-| REQ-TOL-013 | M03 crop command/bounds tests                                         | clean-state mount-flow                                 | implemented; runtime planned       |
+| REQ-TOL-013 | M03 `document/codec.test.ts`, `commands/operations.test.ts`           | clean-state mount-flow                                 | implemented; runtime planned       |
 | REQ-TOL-014 | emoji layer round-trip                                                | emoji insert/edit E2E                                  | planned                            |
 | REQ-TOL-015 | safe image decode tests                                               | file dialog/paste E2E                                  | planned                            |
 | REQ-LIB-001 | M03 repository first-capture transaction                              | clean profile capture                                  | implemented; runtime planned       |

@@ -117,6 +117,7 @@ describe('M03 document core', () => {
       applyEditorCommand(lockedDocument, {
         type: 'removeLayer',
         layer: locked,
+        index: 0,
       }),
     ).toThrow(/locked/u)
     expect(() =>
