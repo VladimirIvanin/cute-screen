@@ -2,8 +2,14 @@ import { describe, expect, it } from 'vitest'
 
 import { CommandManager, type EditorDocumentV1, type LayerNode } from '../index'
 
+const DOCUMENT_ID = '019c1f62-058e-7000-8000-000000000000'
+const BASE_ID = '019c1f62-058e-7000-8000-000000000001'
+const FIRST_ID = '019c1f62-058e-7000-8000-000000000002'
+const SECOND_ID = '019c1f62-058e-7000-8000-000000000003'
+const BRANCH_ID = '019c1f62-058e-7000-8000-000000000004'
+
 const baseLayer: LayerNode = {
-  id: 'base',
+  id: BASE_ID,
   kind: 'shape',
   transform: {
     translateX: 0,
@@ -20,7 +26,7 @@ const baseLayer: LayerNode = {
 
 const document: EditorDocumentV1 = {
   schemaVersion: 1,
-  id: 'document',
+  id: DOCUMENT_ID,
   source: {
     blobHash: 'a'.repeat(64),
     format: 'png',
@@ -43,13 +49,13 @@ describe('CommandManager history identity', () => {
     const manager = new CommandManager(document)
     const first = manager.execute({
       type: 'addLayer',
-      layer: { ...baseLayer, id: 'first' },
+      layer: { ...baseLayer, id: FIRST_ID },
     }).versionToken
 
     manager.undo()
     const branch = manager.execute({
       type: 'addLayer',
-      layer: { ...baseLayer, id: 'branch' },
+      layer: { ...baseLayer, id: BRANCH_ID },
     }).versionToken
 
     expect(branch).not.toBe(first)
@@ -59,21 +65,27 @@ describe('CommandManager history identity', () => {
 
   it('trims old history entries and clears redo after a new branch', () => {
     const manager = new CommandManager(document, { maxEntries: 1 })
-    manager.execute({ type: 'addLayer', layer: { ...baseLayer, id: 'first' } })
-    manager.execute({ type: 'addLayer', layer: { ...baseLayer, id: 'second' } })
+    manager.execute({ type: 'addLayer', layer: { ...baseLayer, id: FIRST_ID } })
+    manager.execute({
+      type: 'addLayer',
+      layer: { ...baseLayer, id: SECOND_ID },
+    })
 
     expect(manager.undo().document.layers.map(({ id }) => id)).toEqual([
-      'base',
-      'first',
+      BASE_ID,
+      FIRST_ID,
     ])
     expect(manager.snapshot.canUndo).toBe(false)
     expect(manager.redo().document.layers.map(({ id }) => id)).toEqual([
-      'base',
-      'first',
-      'second',
+      BASE_ID,
+      FIRST_ID,
+      SECOND_ID,
     ])
     manager.undo()
-    manager.execute({ type: 'addLayer', layer: { ...baseLayer, id: 'branch' } })
+    manager.execute({
+      type: 'addLayer',
+      layer: { ...baseLayer, id: BRANCH_ID },
+    })
     expect(manager.snapshot.canRedo).toBe(false)
   })
 
@@ -83,5 +95,22 @@ describe('CommandManager history identity', () => {
     )
     const manager = new CommandManager(document)
     expect(() => manager.markSaved(1)).toThrow(/versionToken/u)
+  })
+
+  it('does not create history or dirty state for a no-op crop command', () => {
+    const manager = new CommandManager(document)
+
+    const snapshot = manager.execute({
+      type: 'setCrop',
+      before: null,
+      after: null,
+    })
+
+    expect(snapshot).toMatchObject({
+      canUndo: false,
+      canRedo: false,
+      dirty: false,
+      versionToken: 0,
+    })
   })
 })

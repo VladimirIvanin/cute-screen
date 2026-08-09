@@ -8,9 +8,17 @@ import {
   type LayerNode,
 } from '../index'
 
-function layer(id: string, locked = false): LayerNode {
+const DOCUMENT_ID = '019c1f62-058e-7000-8000-000000000000'
+const IDS = {
+  first: '019c1f62-058e-7000-8000-000000000001',
+  middle: '019c1f62-058e-7000-8000-000000000002',
+  last: '019c1f62-058e-7000-8000-000000000003',
+  locked: '019c1f62-058e-7000-8000-000000000004',
+} as const
+
+function layer(id: keyof typeof IDS, locked = false): LayerNode {
   return {
-    id,
+    id: IDS[id],
     kind: 'shape',
     transform: {
       translateX: 0,
@@ -29,7 +37,7 @@ function layer(id: string, locked = false): LayerNode {
 function document(layers: readonly LayerNode[]): EditorDocumentV1 {
   return {
     schemaVersion: 1,
-    id: 'document',
+    id: DOCUMENT_ID,
     source: {
       blobHash: 'a'.repeat(64),
       format: 'png',
@@ -60,10 +68,10 @@ describe('editor command operations', () => {
     const command = { type: 'removeLayer' as const, layer: middle, index: 1 }
 
     const after = applyEditorCommand(before, command)
-    expect(after.layers.map(({ id }) => id)).toEqual(['first', 'last'])
+    expect(after.layers.map(({ id }) => id)).toEqual([IDS.first, IDS.last])
     expect(
       revertEditorCommand(after, command).layers.map(({ id }) => id),
-    ).toEqual(['first', 'middle', 'last'])
+    ).toEqual([IDS.first, IDS.middle, IDS.last])
   })
 
   it('allows an explicit unlock but blocks other locked-layer mutations', () => {

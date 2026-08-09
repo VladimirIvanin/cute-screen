@@ -1,4 +1,5 @@
 import { serializeEditorDocument } from '../document/codec'
+import { jsonEquals } from '../document/json'
 import type { EditorDocumentV1 } from '../document/types'
 import { applyEditorCommand } from './operations'
 import type {
@@ -86,6 +87,7 @@ export class CommandManager {
   execute(command: EditorCommand): EditorSnapshot {
     const before = this.#document
     const after = applyEditorCommand(before, command)
+    if (jsonEquals(before, after)) return this.snapshot
     if (this.#nextToken > Number.MAX_SAFE_INTEGER) {
       throw new Error('version token space exhausted')
     }

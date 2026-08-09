@@ -176,6 +176,7 @@ export const translationKeys = [
   'savingDocument',
   'readOnlyDocument',
   'saveFailed',
+  'exportRecovery',
 ] as const
 
 export type TranslationKey = (typeof translationKeys)[number]

@@ -7,6 +7,7 @@ import { createBrowserPreferencesStorage } from '../preferences'
 import { useEditorShellStore, type ShellStoreOptions } from '../store'
 import type {
   CanvasViewportHosts,
+  ShellDocumentState,
   ShellActionAdapter,
   ToolDescriptor,
 } from '../types'
@@ -28,13 +29,27 @@ const props = withDefaults(
     actions?: ShellActionAdapter | undefined
     documentSession?: DocumentSessionController | undefined
     fixture?: 'empty' | 'error' | 'loading' | 'ready'
+    initialDocumentState?: ShellDocumentState | undefined
+    readOnlyDocument?: boolean
   }>(),
-  { actions: undefined, documentSession: undefined, fixture: 'empty' },
+  {
+    actions: undefined,
+    documentSession: undefined,
+    fixture: 'empty',
+    initialDocumentState: undefined,
+    readOnlyDocument: false,
+  },
 )
-const emit = defineEmits<{ hostsReady: [hosts: CanvasViewportHosts] }>()
+const emit = defineEmits<{
+  hostsReady: [hosts: CanvasViewportHosts]
+  retryLoad: []
+}>()
 const store = useEditorShellStore()
 const state = storeToRefs(store)
 const translate = (key: Parameters<typeof t>[1]) => t(state.locale.value, key)
+const hasInteractiveDocument = computed(
+  () => props.documentSession !== undefined || props.fixture === 'ready',
+)
 const tools: readonly ToolDescriptor[] = [
   {
     id: 'select',
@@ -42,7 +57,7 @@ const tools: readonly ToolDescriptor[] = [
     icon: 'select',
     labelKey: 'toolSelect',
     shortcut: 'V',
-    disabled: props.fixture !== 'ready',
+    disabled: !hasInteractiveDocument.value,
   },
   {
     id: 'hand',
@@ -50,7 +65,7 @@ const tools: readonly ToolDescriptor[] = [
     icon: 'hand',
     labelKey: 'toolHand',
     shortcut: 'H',
-    disabled: props.fixture !== 'ready',
+    disabled: !hasInteractiveDocument.value,
   },
   {
     id: 'crop',
@@ -66,7 +81,7 @@ const tools: readonly ToolDescriptor[] = [
     icon: 'arrow',
     labelKey: 'toolArrow',
     shortcut: 'A',
-    disabled: props.fixture !== 'ready',
+    disabled: !hasInteractiveDocument.value,
   },
   {
     id: 'shape',
@@ -248,9 +263,29 @@ function redoDocument(): void {
 function retryDocumentSave(): void {
   void props.documentSession?.retry()
 }
+async function exportDocumentRecovery(): Promise<void> {
+  const outcome = await props.documentSession?.exportRecoveryBundle()
+  if (outcome?.kind === 'failed') {
+    store.setDocumentHistory({
+      ...store.documentHistory,
+      saveState: 'error',
+      error: outcome.error,
+    })
+  }
+}
 onMounted(() => {
   store.initialize(preferencesOptions)
-  if (!props.documentSession) loadFixture()
+  if (!props.documentSession) {
+    store.setDocumentState(props.initialDocumentState ?? { kind: 'empty' })
+    if (!props.initialDocumentState) loadFixture()
+    if (props.readOnlyDocument) {
+      store.setDocumentHistory({
+        canUndo: false,
+        canRedo: false,
+        saveState: 'readOnly',
+      })
+    }
+  }
   media.addEventListener('change', onMediaChange)
   window.addEventListener('keydown', onKeydown)
 })
@@ -262,6 +297,24 @@ watch(
     onCleanup(unsubscribe)
   },
   { immediate: true },
+)
+watch(
+  () => props.initialDocumentState,
+  (state) => {
+    if (!props.documentSession && state) store.setDocumentState(state)
+  },
+)
+watch(
+  () => props.readOnlyDocument,
+  (readOnly) => {
+    if (!props.documentSession && readOnly) {
+      store.setDocumentHistory({
+        canUndo: false,
+        canRedo: false,
+        saveState: 'readOnly',
+      })
+    }
+  },
 )
 onBeforeUnmount(() => {
   // Navigation/remount must not leave the coalesced save behind.
@@ -296,6 +349,7 @@ watch(
       @undo="undoDocument"
       @redo="redoDocument"
       @retry-save="retryDocumentSave"
+      @export-recovery="exportDocumentRecovery"
       @locale="store.setLocale"
       @theme="store.setTheme"
     />
@@ -310,7 +364,7 @@ watch(
         :document-state="store.documentState"
         :t="translate"
         @hosts-ready="emit('hostsReady', $event)"
-        @retry="store.setDocumentState({ kind: 'empty' })"
+        @retry="emit('retryLoad')"
       />
       <LayersPanel
         :layers="store.layers"

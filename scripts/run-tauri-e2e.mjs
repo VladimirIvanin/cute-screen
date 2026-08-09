@@ -25,6 +25,18 @@ const scenarios = [
     harnessQuery: '?m02=ready',
   },
   {
+    id: 'document-write',
+    spec: 'tests/e2e/specs/document-persistence-write.e2e.ts',
+    harnessQuery: '?m03=1',
+    persistenceGroup: 'm03',
+  },
+  {
+    id: 'document-reopen',
+    spec: 'tests/e2e/specs/document-persistence-reopen.e2e.ts',
+    harnessQuery: '?m03=1',
+    persistenceGroup: 'm03',
+  },
+  {
     id: 'renderer-alpha',
     spec: 'tests/e2e/specs/tauri-renderer-alpha.e2e.ts',
     harnessQuery: '?m01=1&token=m01-alpha-png',
@@ -121,6 +133,7 @@ const executable = path.join(
 
 const failedScenarios = []
 const retainedAppDataDirs = []
+let m03AppData
 
 try {
   run('pnpm', ['fixtures:generate:m01'])
@@ -143,9 +156,12 @@ try {
   )
 
   for (const scenario of scenarios) {
-    const appData = await mkdtemp(
-      path.join(tmpdir(), `cute-screen-e2e-${scenario.id}-`),
-    )
+    const appData =
+      scenario.persistenceGroup === 'm03'
+        ? (m03AppData ??= await mkdtemp(
+            path.join(tmpdir(), 'cute-screen-e2e-m03-'),
+          ))
+        : await mkdtemp(path.join(tmpdir(), `cute-screen-e2e-${scenario.id}-`))
 
     await waitForPortFree(embeddedWebDriverPort)
 
@@ -172,10 +188,12 @@ try {
       scenarioEnv,
     )
 
-    if (status === 0) {
+    if (status === 0 && scenario.persistenceGroup !== 'm03') {
       await rm(appData, { recursive: true, force: true })
       continue
     }
+
+    if (status === 0) continue
 
     failedScenarios.push(scenario.id)
     retainedAppDataDirs.push(appData)
@@ -183,6 +201,14 @@ try {
 } catch (error) {
   process.exitCode = 1
   throw error
+}
+
+if (m03AppData) {
+  if (failedScenarios.some((id) => id.startsWith('document-'))) {
+    retainedAppDataDirs.push(m03AppData)
+  } else {
+    await rm(m03AppData, { recursive: true, force: true })
+  }
 }
 
 if (failedScenarios.length > 0) {

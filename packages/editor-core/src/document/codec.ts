@@ -17,6 +17,10 @@ import {
 } from './types'
 
 const imageFormats = ['png', 'jpeg', 'webp', 'svg'] as const
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu
+const ULID_PATTERN = /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/u
+const SHA256_PATTERN = /^[a-f0-9]{64}$/u
 
 type ImageFormat = (typeof imageFormats)[number]
 
@@ -25,6 +29,22 @@ function readNonEmptyString(value: unknown, field: string): string {
     throw new Error(`${field} must be a non-empty string`)
   }
   return value
+}
+
+function readStableId(value: unknown, field: string): string {
+  const id = readNonEmptyString(value, field)
+  if (!UUID_PATTERN.test(id) && !ULID_PATTERN.test(id)) {
+    throw new Error(`${field} must be a UUID or ULID`)
+  }
+  return id
+}
+
+function readSha256(value: unknown, field: string): string {
+  const hash = readNonEmptyString(value, field)
+  if (!SHA256_PATTERN.test(hash)) {
+    throw new Error(`${field} must be a lowercase SHA-256 hash`)
+  }
+  return hash
 }
 
 function readFiniteNumber(value: unknown, field: string): number {
@@ -112,7 +132,7 @@ function parseSource(value: unknown): SourceImageRef {
     throw new Error('source.orientationApplied must be true')
   }
   return Object.freeze({
-    blobHash: readNonEmptyString(input.blobHash, 'source.blobHash'),
+    blobHash: readSha256(input.blobHash, 'source.blobHash'),
     format: input.format,
     mimeType: readNonEmptyString(input.mimeType, 'source.mimeType'),
     width: readPositiveNumber(input.width, 'source.width'),
@@ -176,7 +196,7 @@ function parseImagePayload(value: unknown, field: string): ImageLayerPayload {
   ])
   return Object.freeze({
     ...(extras ?? {}),
-    blobHash: readNonEmptyString(input.blobHash, `${field}.blobHash`),
+    blobHash: readSha256(input.blobHash, `${field}.blobHash`),
     intrinsicWidth: readPositiveNumber(
       input.intrinsicWidth,
       `${field}.intrinsicWidth`,
@@ -213,7 +233,7 @@ function parseLayer(value: unknown, index: number): LayerNode {
       ? parseImagePayload(input.payload, `${field}.payload`)
       : freezeJsonObject(input.payload, `${field}.payload`)
   return Object.freeze({
-    id: readNonEmptyString(input.id, `${field}.id`),
+    id: readStableId(input.id, `${field}.id`),
     kind: input.kind,
     transform: parseTransform(input.transform, `${field}.transform`),
     opacity,
@@ -332,7 +352,7 @@ export function parseEditorDocument(
   ])
   const document: EditorDocumentV1 = {
     schemaVersion: EDITOR_DOCUMENT_SCHEMA_VERSION,
-    id: readNonEmptyString(migrated.id, 'id'),
+    id: readStableId(migrated.id, 'id'),
     source: parseSource(migrated.source),
     canvas: canvasSize,
     crop,

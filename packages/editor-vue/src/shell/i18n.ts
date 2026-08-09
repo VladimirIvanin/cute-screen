@@ -65,6 +65,7 @@ const dictionaries: Record<SupportedLocale, Record<TranslationKey, string>> = {
     savingDocument: 'Saving…',
     readOnlyDocument: 'Read-only document',
     saveFailed: 'Saving failed',
+    exportRecovery: 'Export recovery',
   },
   ru: {
     appName: 'Cute Screen',
@@ -126,6 +127,7 @@ const dictionaries: Record<SupportedLocale, Record<TranslationKey, string>> = {
     savingDocument: 'Сохраняем…',
     readOnlyDocument: 'Документ только для чтения',
     saveFailed: 'Не удалось сохранить',
+    exportRecovery: 'Экспортировать восстановление',
   },
 }
 

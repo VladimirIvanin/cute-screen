@@ -56,6 +56,7 @@ interface EditorDocument {
 - Pointer gesture хранит transient draft вне документа; commit происходит один раз в конце жеста.
 - Property drag может показывать live preview, но создаёт одну undo-команду на завершение.
 - Новая команда после undo очищает redo branch.
+- No-op и отклонённая команда не создают history step, не меняют dirty checkpoint и не запускают autosave. Undo/revert восстанавливает предыдущее committed состояние; после history limit самая старая сохранённая запись становится границей undo.
 - Selection, hover, guides, active tool и viewport не сериализуются как слои.
 - Pinia хранит UI/session state и компактный `EditorSnapshot`: tool, selection IDs, zoom, dirty, undo/redo availability и active frame.
 

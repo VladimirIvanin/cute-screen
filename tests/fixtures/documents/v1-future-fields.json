@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "019c1f62-058e-7000-8000-000000000000",
+  "source": {
+    "blobHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "format": "png",
+    "mimeType": "image/png",
+    "width": 100,
+    "height": 100,
+    "orientationApplied": true,
+    "color": { "colorSpace": "srgb", "hasIccProfile": false }
+  },
+  "canvas": { "width": 100, "height": 100 },
+  "crop": null,
+  "layers": [],
+  "presentation": {
+    "beautify": { "enabled": false },
+    "watermark": { "enabled": false }
+  },
+  "futureDocumentField": { "preserved": true },
+  "createdAt": "2026-08-09T00:00:00.000Z",
+  "updatedAt": "2026-08-09T00:00:00.000Z"
+}

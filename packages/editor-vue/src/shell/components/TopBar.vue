@@ -20,6 +20,7 @@ const emit = defineEmits<{
   undo: []
   redo: []
   retrySave: []
+  exportRecovery: []
   locale: [value: SupportedLocale]
   theme: [value: ThemePreference]
 }>()
@@ -88,6 +89,14 @@ function selectLocale(value: SupportedLocale): void {
         @click="emit('retrySave')"
       >
         {{ t('retry') }}
+      </button>
+      <button
+        v-if="saveState === 'error'"
+        type="button"
+        class="cs-save-retry"
+        @click="emit('exportRecovery')"
+      >
+        {{ t('exportRecovery') }}
       </button>
     </p>
     <div class="cs-top-actions">

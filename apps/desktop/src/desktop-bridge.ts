@@ -29,6 +29,12 @@ export interface DesktopBridge extends ImageTransportBridge {
     documentJson: string,
     correlationId: string,
   ): Promise<number>
+  repositoryExportRecoveryBundle(
+    documentId: string,
+    correlationId: string,
+  ): Promise<RecoveryExportOutcome>
+  lifecycleCompleteMainWindowClose(): Promise<void>
+  lifecycleFinishQuit(): Promise<void>
   settingsGet(key: string, correlationId: string): Promise<string | null>
   settingsPut(
     key: string,
@@ -46,6 +52,9 @@ export interface RepositoryOpenDocument {
   readonly sourceHash: string
   readonly imageToken?: string
 }
+
+export type RecoveryExportOutcome =
+  { readonly kind: 'saved' } | { readonly kind: 'cancelled' }
 
 export const tauriDesktopBridge: DesktopBridge = {
   ping: () => invoke<PingResponse>('ping'),
@@ -75,6 +84,14 @@ export const tauriDesktopBridge: DesktopBridge = {
       documentJson,
       correlationId,
     }),
+  repositoryExportRecoveryBundle: (documentId, correlationId) =>
+    invoke<RecoveryExportOutcome>('repository_export_recovery_bundle', {
+      documentId,
+      correlationId,
+    }),
+  lifecycleCompleteMainWindowClose: () =>
+    invoke<void>('lifecycle_complete_main_window_close'),
+  lifecycleFinishQuit: () => invoke<void>('lifecycle_finish_quit'),
   settingsGet: (key, correlationId) =>
     invoke<string | null>('settings_get', { key, correlationId }),
   settingsPut: (key, schemaVersion, valueJson, correlationId) =>

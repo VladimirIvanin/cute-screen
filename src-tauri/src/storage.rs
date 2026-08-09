@@ -1592,6 +1592,37 @@ mod tests {
     }
 
     #[test]
+    fn migration_fixture_upgrades_a_v1_database_to_capture_metadata_v2() {
+        let directory = tempdir().expect("temp directory");
+        let database = directory.path().join("library.sqlite3");
+        let mut connection = Connection::open(&database).expect("database");
+        connection
+            .execute_batch(super::MIGRATIONS[0].sql)
+            .expect("v1 fixture schema");
+        connection
+            .execute(
+                "INSERT INTO schema_migrations (version, name, checksum, applied_at) VALUES (1, 'm03-initial', 'm03-initial-v1', 0)",
+                [],
+            )
+            .expect("v1 fixture migration record");
+
+        super::migrate(&mut connection).expect("upgrade fixture");
+
+        let columns = connection
+            .prepare("PRAGMA table_info(captures)")
+            .expect("capture table metadata")
+            .query_map([], |row| row.get::<_, String>(1))
+            .expect("capture columns")
+            .collect::<Result<Vec<_>, _>>()
+            .expect("column names");
+        assert!(
+            columns
+                .iter()
+                .any(|column| column == "capture_metadata_json")
+        );
+    }
+
+    #[test]
     fn recovery_after_pre_commit_fault_keeps_only_the_reusable_orphan_blob() {
         let directory = tempdir().expect("temp directory");
         let repository = LibraryRepository::initialize_with_fault_injector(
@@ -1616,6 +1647,36 @@ mod tests {
             .create_capture(request("doc-retry", "capture-retry"))
             .expect("retry reuses blob");
         assert_eq!(completed.source_hash, hash);
+    }
+
+    #[test]
+    fn recovery_distinguishes_pre_commit_orphans_from_post_commit_documents() {
+        for point in [
+            super::StorageFaultPoint::JournalPrepared,
+            super::StorageFaultPoint::BlobWrittenAndSynced,
+            super::StorageFaultPoint::MetadataTransactionStarted,
+            super::StorageFaultPoint::BeforeMetadataCommit,
+            super::StorageFaultPoint::AfterMetadataCommit,
+        ] {
+            let directory = tempdir().expect("temp directory");
+            let repository = LibraryRepository::initialize_with_fault_injector(
+                directory.path(),
+                directory.path(),
+                Arc::new(FailAt(point)),
+            )
+            .expect("repository");
+            let result = repository.create_capture(request("doc-fault", "capture-fault"));
+            assert!(matches!(result, Err(RepositoryError::InjectedFault { .. })));
+            drop(repository);
+
+            let reopened = LibraryRepository::initialize(directory.path(), directory.path())
+                .expect("restart repository");
+            let opened = reopened.open_last().expect("open after recovery");
+            assert_eq!(
+                opened.is_some(),
+                point == super::StorageFaultPoint::AfterMetadataCommit
+            );
+        }
     }
 
     #[test]
@@ -1659,6 +1720,42 @@ mod tests {
                 .document_id,
             "doc-2"
         );
+    }
+
+    #[test]
+    fn saving_a_document_never_changes_the_original_blob_bytes() {
+        let directory = tempdir().expect("temp directory");
+        let repository =
+            LibraryRepository::initialize(directory.path(), directory.path()).expect("repository");
+        let created = repository
+            .create_capture(request("doc-immutable", "capture-immutable"))
+            .expect("capture");
+        let before = fs::read(
+            repository
+                .blob_path(created.source_hash.clone())
+                .expect("original path"),
+        )
+        .expect("original bytes");
+        let changed_document = serde_json::json!({
+            "schemaVersion": 1,
+            "id": "doc-immutable",
+            "source": { "blobHash": created.source_hash, "format": "png", "mimeType": "image/png", "width": 3840, "height": 2160, "orientationApplied": true, "color": { "colorSpace": "srgb", "hasIccProfile": false } },
+            "canvas": { "width": 3840, "height": 2160 }, "crop": { "x": 0, "y": 0, "width": 100, "height": 100 }, "layers": [],
+            "presentation": { "beautify": { "enabled": false }, "watermark": { "enabled": false } },
+            "createdAt": "2026-08-09T00:00:00.000Z", "updatedAt": "2026-08-09T00:00:00.000Z"
+        })
+        .to_string();
+        repository
+            .save_document(created.document_id, created.revision, changed_document)
+            .expect("save changed document");
+
+        let after = fs::read(
+            repository
+                .blob_path(created.source_hash)
+                .expect("original path after save"),
+        )
+        .expect("original bytes after save");
+        assert_eq!(after, before);
     }
 
     #[test]

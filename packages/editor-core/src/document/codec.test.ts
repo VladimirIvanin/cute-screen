@@ -1,4 +1,6 @@
 import fc from 'fast-check'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -9,7 +11,7 @@ import {
 } from '../index'
 
 const layer: LayerNode = {
-  id: 'layer',
+  id: '019c1f62-058e-7000-8000-000000000001',
   kind: 'shape',
   transform: {
     translateX: 0,
@@ -26,7 +28,7 @@ const layer: LayerNode = {
 
 const document: EditorDocumentV1 = {
   schemaVersion: 1,
-  id: 'document',
+  id: '019c1f62-058e-7000-8000-000000000000',
   source: {
     blobHash: 'a'.repeat(64),
     format: 'png',
@@ -42,6 +44,15 @@ const document: EditorDocumentV1 = {
   presentation: { beautify: { enabled: false }, watermark: { enabled: false } },
   createdAt: '2026-08-09T00:00:00.000Z',
   updatedAt: '2026-08-09T00:00:00.000Z',
+}
+
+function fixture(name: string): string {
+  return readFileSync(
+    fileURLToPath(
+      new URL(`../../../../tests/fixtures/documents/${name}`, import.meta.url),
+    ),
+    'utf8',
+  )
 }
 
 describe('editor document codec', () => {
@@ -66,6 +77,24 @@ describe('editor document codec', () => {
 
     expect(() => parseEditorDocument(JSON.stringify(raw))).toThrow(
       /presentation/u,
+    )
+  })
+
+  it('rejects non-stable IDs and non-SHA-256 blob hashes', () => {
+    const invalidId = JSON.parse(serializeEditorDocument(document)) as Record<
+      string,
+      unknown
+    >
+    invalidId.id = 'array-index-0'
+    expect(() => parseEditorDocument(JSON.stringify(invalidId))).toThrow(/id/u)
+
+    const invalidHash = JSON.parse(serializeEditorDocument(document)) as Record<
+      string,
+      unknown
+    >
+    ;(invalidHash.source as Record<string, unknown>).blobHash = 'not-a-hash'
+    expect(() => parseEditorDocument(JSON.stringify(invalidHash))).toThrow(
+      /blobHash/u,
     )
   })
 
@@ -105,5 +134,26 @@ describe('editor document codec', () => {
         },
       ),
     )
+  })
+
+  it('matches committed golden fixtures for supported and newer schemas', () => {
+    const migrated = parseEditorDocument(fixture('v0-minimal.json'))
+    if (migrated.kind !== 'editable')
+      throw new Error('expected migrated fixture')
+    expect(JSON.parse(serializeEditorDocument(migrated.document))).toEqual(
+      JSON.parse(fixture('v0-minimal.expected-v1.json')),
+    )
+
+    const futureFields = parseEditorDocument(fixture('v1-future-fields.json'))
+    if (futureFields.kind !== 'editable')
+      throw new Error('expected editable current fixture')
+    expect(JSON.parse(serializeEditorDocument(futureFields.document))).toEqual(
+      JSON.parse(fixture('v1-future-fields.json')),
+    )
+
+    expect(parseEditorDocument(fixture('newer-v2.json'))).toMatchObject({
+      kind: 'readOnly',
+      schemaVersion: 2,
+    })
   })
 })

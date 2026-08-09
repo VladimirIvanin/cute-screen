@@ -3,6 +3,8 @@ use std::sync::Mutex;
 use uuid::Uuid;
 
 #[cfg(feature = "test-harness")]
+use sha2::{Digest, Sha256};
+#[cfg(feature = "test-harness")]
 use std::fs;
 
 #[cfg(feature = "test-harness")]
@@ -17,12 +19,15 @@ use platform::{CaptureRequest, CaptureTarget};
 use platform::{PlatformCapabilities, PlatformError, SessionKind};
 use serde::Serialize;
 use tauri::{
-    Manager, State,
+    Emitter, Manager, State,
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
 };
+use tauri_plugin_dialog::DialogExt;
 
 use lifecycle::{LaunchIntentV1, LifecycleState, parse_launch};
+#[cfg(feature = "test-harness")]
+use storage::{BlobMetadata, CaptureMetadataV1, CreateCaptureRequest};
 use storage::{LibraryRepository, OpenDocument, RepositoryError};
 
 pub mod image_transport;
@@ -42,6 +47,13 @@ pub mod fake_platform;
 pub struct PingResponse {
     pub message: &'static str,
     pub protocol_version: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+enum RecoveryExportOutcome {
+    Saved,
+    Cancelled,
 }
 
 #[tauri::command]
@@ -100,6 +112,55 @@ fn repository_save_document(
     repository: State<'_, LibraryRepository>,
 ) -> Result<i64, RepositoryError> {
     repository.save_document(document_id, expected_revision, document_json)
+}
+
+#[tauri::command]
+async fn repository_export_recovery_bundle(
+    _correlation_id: String,
+    document_id: String,
+    app: tauri::AppHandle,
+    repository: State<'_, LibraryRepository>,
+) -> Result<RecoveryExportOutcome, RepositoryError> {
+    let suggested_name = format!("{document_id}.cutescreen-recovery");
+    let Some(destination) = app
+        .dialog()
+        .file()
+        .set_title("Export document recovery")
+        .set_file_name(suggested_name)
+        .add_filter("Cute Screen recovery", &["cutescreen-recovery"])
+        .blocking_save_file()
+    else {
+        return Ok(RecoveryExportOutcome::Cancelled);
+    };
+    let destination = destination
+        .into_path()
+        .map_err(|error| RepositoryError::Io(error.to_string()))?;
+    repository.export_recovery_bundle(document_id, destination)?;
+    Ok(RecoveryExportOutcome::Saved)
+}
+
+#[tauri::command]
+fn lifecycle_complete_main_window_close(app: tauri::AppHandle) {
+    let should_hide = app
+        .try_state::<Mutex<LifecycleState>>()
+        .is_some_and(|state| state.lock().is_ok_and(|value| value.should_hide_on_close()));
+    if should_hide {
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.hide();
+        }
+    } else {
+        app.exit(0);
+    }
+}
+
+#[tauri::command]
+fn lifecycle_finish_quit(app: tauri::AppHandle) {
+    if let Some(state) = app.try_state::<Mutex<LifecycleState>>()
+        && let Ok(mut state) = state.lock()
+    {
+        state.begin_quit();
+    }
+    app.exit(0);
 }
 
 #[tauri::command]
@@ -272,13 +333,7 @@ fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()
         .show_menu_on_left_click(true)
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show-editor" => show_editor(app),
-            "quit" => {
-                let state = app.state::<Mutex<LifecycleState>>();
-                if let Ok(mut state) = state.lock() {
-                    state.begin_quit();
-                }
-                app.exit(0);
-            }
+            "quit" if app.emit("cute-screen:request-quit", ()).is_err() => app.exit(0),
             _ => {}
         })
         .build(app)?;
@@ -327,6 +382,47 @@ fn register_test_fixtures(
     Ok(())
 }
 
+#[cfg(feature = "test-harness")]
+fn seed_m03_document(repository: &LibraryRepository) -> Result<(), RepositoryError> {
+    if env::var("CUTE_SCREEN_E2E_SCENARIO").ok().as_deref() != Some("document-write")
+        || repository.open_last()?.is_some()
+    {
+        return Ok(());
+    }
+    let bytes = fs::read(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../tests/fixtures/generated/ui-4k.png"),
+    )?;
+    let hash = format!("{:x}", Sha256::digest(&bytes));
+    let document_id = "019c1f62-058e-7000-8000-000000000000";
+    let document = serde_json::json!({
+        "schemaVersion": 1,
+        "id": document_id,
+        "source": { "blobHash": hash, "format": "png", "mimeType": "image/png", "width": 3840, "height": 2160, "orientationApplied": true, "color": { "colorSpace": "srgb", "hasIccProfile": false } },
+        "canvas": { "width": 3840, "height": 2160 }, "crop": null, "layers": [],
+        "presentation": { "beautify": { "enabled": false }, "watermark": { "enabled": false } },
+        "createdAt": "2026-08-09T00:00:00.000Z", "updatedAt": "2026-08-09T00:00:00.000Z"
+    })
+    .to_string();
+    repository.create_capture(CreateCaptureRequest {
+        document_id: document_id.to_owned(),
+        capture_id: "019c1f62-058e-7000-8000-000000000001".to_owned(),
+        series_id: None,
+        document_json: document,
+        source_bytes: bytes,
+        source_metadata: BlobMetadata {
+            format: "png".to_owned(),
+            mime_type: "image/png".to_owned(),
+            width: 3840,
+            height: 2160,
+            color_metadata: serde_json::json!({ "colorSpace": "srgb" }),
+        },
+        capture_metadata: CaptureMetadataV1::unknown(),
+        captured_at: 1,
+    })?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let launch_intent = match parse_launch(env::args_os()) {
@@ -351,23 +447,12 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec!["--background"]),
         ))
-        .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event
-                && window.label() == "main"
-                && window
-                    .app_handle()
-                    .try_state::<Mutex<LifecycleState>>()
-                    .is_some_and(|state| {
-                        state.lock().is_ok_and(|value| value.should_hide_on_close())
-                    })
-            {
-                api.prevent_close();
-                let _ = window.hide();
-            }
-        })
+        .plugin(tauri_plugin_dialog::init())
         .setup(move |app| {
             app.manage(Mutex::new(LifecycleState::default()));
             let repository = initialize_repository(app)?;
+            #[cfg(feature = "test-harness")]
+            seed_m03_document(&repository)?;
             app.manage(repository);
             let transport = initialize_image_transport(app)?;
             app.manage(transport);
@@ -404,6 +489,9 @@ pub fn run() {
         read_image_bytes,
         repository_open_last,
         repository_save_document,
+        repository_export_recovery_bundle,
+        lifecycle_complete_main_window_close,
+        lifecycle_finish_quit,
         settings_get,
         settings_put,
         stage_image,
@@ -418,6 +506,9 @@ pub fn run() {
         read_image_bytes,
         repository_open_last,
         repository_save_document,
+        repository_export_recovery_bundle,
+        lifecycle_complete_main_window_close,
+        lifecycle_finish_quit,
         settings_get,
         settings_put,
         stage_image

@@ -9,7 +9,9 @@ export {
   type EditorCommand,
   type EditorDocumentV1,
   type EditorSnapshot,
+  TransientEditorStateController,
   type ParsedEditorDocument,
+  type EditorTransientState,
 } from '@cute-screen/editor-core'
 
 export {

@@ -6,6 +6,7 @@ import { $, browser, expect } from '@wdio/globals'
 declare global {
   interface Window {
     __cuteScreenE2eWindow?: {
+      close(): Promise<void>
       hide(): Promise<void>
       isDecorated(): Promise<boolean>
       isVisible(): Promise<boolean>

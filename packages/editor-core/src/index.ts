@@ -49,6 +49,10 @@ export {
   type IdGenerator,
 } from './commands'
 export {
+  TransientEditorStateController,
+  type EditorTransientState,
+} from './transient'
+export {
   createRenderSceneSnapshot,
   type EditorCoreBoundary,
   type RenderBackgroundRef,

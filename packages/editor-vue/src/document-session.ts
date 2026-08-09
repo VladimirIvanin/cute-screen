@@ -2,9 +2,12 @@ import {
   CommandManager,
   parseEditorDocument,
   serializeEditorDocument,
+  TransientEditorStateController,
   type EditorCommand,
   type EditorDocumentV1,
   type EditorSnapshot,
+  type EditorTransientState,
+  type ParsedEditorDocument,
 } from '@cute-screen/editor-renderer'
 
 export type DocumentSaveState =
@@ -21,10 +24,20 @@ export interface DocumentPersistenceBridge {
     record: PersistedDocumentRecord,
     correlationId: string,
   ): Promise<number>
+  exportRecoveryBundle(
+    documentId: string,
+    correlationId: string,
+  ): Promise<DocumentRecoveryExportOutcome>
 }
+
+export type DocumentRecoveryExportOutcome =
+  | { readonly kind: 'saved' }
+  | { readonly kind: 'cancelled' }
+  | { readonly kind: 'failed'; readonly error: string }
 
 export interface DocumentSessionSnapshot {
   readonly core: EditorSnapshot
+  readonly transient: EditorTransientState<unknown>
   readonly saveState: DocumentSaveState
   readonly error?: string
 }
@@ -46,6 +59,7 @@ export interface DocumentSessionOptions {
 /** Keeps the DOM-free core object out of Pinia/Vue reactivity. */
 export class DocumentSessionController {
   readonly #manager: CommandManager
+  readonly #transient = new TransientEditorStateController<unknown>()
   readonly #bridge: DocumentPersistenceBridge
   readonly #correlationId: () => string
   #listeners = new Set<(snapshot: DocumentSessionSnapshot) => void>()
@@ -69,13 +83,17 @@ export class DocumentSessionController {
   get snapshot(): DocumentSessionSnapshot {
     return {
       core: this.#manager.snapshot,
+      transient: this.#transient.snapshot,
       saveState: this.#state,
       ...(this.#error ? { error: this.#error } : {}),
     }
   }
 
   execute(command: EditorCommand): DocumentSessionSnapshot {
-    this.#manager.execute(command)
+    const before = this.#manager.snapshot
+    const committed = this.#manager.execute(command)
+    this.#transient.reconcile(committed.document)
+    if (committed.versionToken === before.versionToken) return this.#publish()
     this.#state = 'dirty'
     this.#error = undefined
     this.#scheduleSave()
@@ -83,14 +101,20 @@ export class DocumentSessionController {
   }
 
   undo(): DocumentSessionSnapshot {
-    this.#manager.undo()
-    this.#state = this.#manager.snapshot.dirty ? 'dirty' : 'saved'
+    const before = this.#manager.snapshot
+    const reverted = this.#manager.undo()
+    this.#transient.reconcile(reverted.document)
+    if (reverted.versionToken === before.versionToken) return this.#publish()
+    this.#state = reverted.dirty ? 'dirty' : 'saved'
     this.#scheduleSave()
     return this.#publish()
   }
 
   redo(): DocumentSessionSnapshot {
-    this.#manager.redo()
+    const before = this.#manager.snapshot
+    const replayed = this.#manager.redo()
+    this.#transient.reconcile(replayed.document)
+    if (replayed.versionToken === before.versionToken) return this.#publish()
     this.#state = 'dirty'
     this.#scheduleSave()
     return this.#publish()
@@ -98,6 +122,13 @@ export class DocumentSessionController {
 
   retry(): Promise<DocumentFlushOutcome> {
     return this.flush()
+  }
+
+  exportRecoveryBundle(): Promise<DocumentRecoveryExportOutcome> {
+    return this.#bridge.exportRecoveryBundle(
+      this.#manager.snapshot.document.id,
+      this.#correlationId(),
+    )
   }
 
   subscribe(listener: (snapshot: DocumentSessionSnapshot) => void): () => void {
@@ -176,7 +207,6 @@ export class DocumentSessionController {
 
 export function parsePersistedDocument(
   record: PersistedDocumentRecord,
-): EditorDocumentV1 | undefined {
-  const parsed = parseEditorDocument(record.documentJson)
-  return parsed.kind === 'editable' ? parsed.document : undefined
+): ParsedEditorDocument {
+  return parseEditorDocument(record.documentJson)
 }

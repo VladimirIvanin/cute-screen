@@ -38,6 +38,7 @@ export {
   parsePersistedDocument,
   type DocumentPersistenceBridge,
   type DocumentFlushOutcome,
+  type DocumentRecoveryExportOutcome,
   type DocumentSaveState,
   type DocumentSessionSnapshot,
   type PersistedDocumentRecord,

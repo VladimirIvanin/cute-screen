@@ -31,6 +31,27 @@ const document: EditorDocumentV1 = {
 }
 
 describe('M03 document persistence session', () => {
+  it('does not autosave a command that leaves the committed document unchanged', async () => {
+    vi.useFakeTimers()
+    const saveDocument = vi.fn(async () => 2)
+    const session = new DocumentSessionController({
+      document,
+      revision: 1,
+      bridge: {
+        saveDocument,
+        exportRecoveryBundle: async () => ({ kind: 'saved' }),
+      },
+      correlationId: () => 'no-op',
+    })
+
+    session.execute({ type: 'setCrop', before: null, after: null })
+    await vi.advanceTimersByTimeAsync(500)
+
+    expect(saveDocument).not.toHaveBeenCalled()
+    expect(session.snapshot.saveState).toBe('saved')
+    vi.useRealTimers()
+  })
+
   it('coalesces committed commands and retains dirty state until the matching save succeeds', async () => {
     vi.useFakeTimers()
     const saves: Array<{ readonly documentJson: string }> = []
@@ -41,7 +62,10 @@ describe('M03 document persistence session', () => {
     const session = new DocumentSessionController({
       document,
       revision: 1,
-      bridge: { saveDocument },
+      bridge: {
+        saveDocument,
+        exportRecoveryBundle: async () => ({ kind: 'saved' }),
+      },
       correlationId: () => 'test',
     })
     session.execute({
@@ -88,6 +112,7 @@ describe('M03 document persistence session', () => {
           if (attempts === 1) throw new Error('disk full')
           return 2
         },
+        exportRecoveryBundle: async () => ({ kind: 'saved' }),
       },
       correlationId: () => 'test',
     })
@@ -125,6 +150,7 @@ describe('M03 document persistence session', () => {
                 resolveFirst = resolve
               })
             : 3,
+        exportRecoveryBundle: async () => ({ kind: 'saved' }),
       },
       correlationId: () => 'test',
     })
@@ -174,6 +200,7 @@ describe('M03 document persistence session', () => {
           if (shouldFail) throw new Error('disk full')
           return 2
         },
+        exportRecoveryBundle: async () => ({ kind: 'saved' }),
       },
       correlationId: () => 'handoff',
       onActiveSession: (session) => {
@@ -208,5 +235,32 @@ describe('M03 document persistence session', () => {
       kind: 'switched',
     })
     expect(active?.snapshot.core.document.id).toBe(incoming.id)
+  })
+
+  it('returns a typed recovery export outcome without discarding the document', async () => {
+    const session = new DocumentSessionController({
+      document,
+      revision: 1,
+      bridge: {
+        saveDocument: async () => 2,
+        exportRecoveryBundle: async () => ({ kind: 'cancelled' }),
+      },
+      correlationId: () => 'recovery',
+    })
+    session.execute({
+      type: 'setCrop',
+      before: null,
+      after: { x: 0, y: 0, width: 80, height: 80 },
+    })
+
+    await expect(session.exportRecoveryBundle()).resolves.toEqual({
+      kind: 'cancelled',
+    })
+    expect(session.snapshot.core.document.crop).toEqual({
+      x: 0,
+      y: 0,
+      width: 80,
+      height: 80,
+    })
   })
 })
