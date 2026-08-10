@@ -1,0 +1,115 @@
+import { describe, expect, it } from 'vitest'
+
+import {
+  DocumentSpatialIndex,
+  hitTestDocument,
+  hitTestDocumentAll,
+  type EditorDocumentV1,
+} from './index'
+
+const source = {
+  blobHash: 'a'.repeat(64),
+  format: 'png' as const,
+  mimeType: 'image/png',
+  width: 100,
+  height: 100,
+  orientationApplied: true as const,
+  color: { colorSpace: 'srgb' as const, hasIccProfile: false },
+}
+const transform = {
+  translateX: 0,
+  translateY: 0,
+  rotation: 0,
+  scaleX: 1,
+  scaleY: 1,
+}
+function layer(id: string, overrides: Record<string, unknown> = {}) {
+  return {
+    id,
+    kind: 'shape' as const,
+    localBounds: { x: 0, y: 0, width: 20, height: 20 },
+    transform,
+    opacity: 1,
+    visible: true,
+    locked: false,
+    payload: {},
+    ...overrides,
+  }
+}
+function document(
+  layers: readonly ReturnType<typeof layer>[],
+): EditorDocumentV1 {
+  return {
+    schemaVersion: 2,
+    id: '019c1f62-058e-7000-8000-000000000000',
+    source,
+    canvas: { width: 100, height: 100 },
+    crop: null,
+    layers,
+    presentation: {
+      beautify: { enabled: false },
+      watermark: { enabled: false },
+    },
+    createdAt: '2026-08-10T00:00:00.000Z',
+    updatedAt: '2026-08-10T00:00:00.000Z',
+  }
+}
+
+describe('M05 hit testing', () => {
+  it('returns the topmost unlocked visible layer', () => {
+    expect(
+      hitTestDocument(document([layer('bottom'), layer('top')]), {
+        x: 10,
+        y: 10,
+      }),
+    ).toMatchObject({
+      nodeId: 'top',
+      zOrder: 1,
+    })
+  })
+
+  it('skips locked and hidden layers for canvas transforms', () => {
+    expect(
+      hitTestDocument(
+        document([
+          layer('bottom'),
+          layer('locked', { locked: true }),
+          layer('hidden', { visible: false }),
+        ]),
+        { x: 10, y: 10 },
+      ),
+    ).toMatchObject({ nodeId: 'bottom' })
+  })
+
+  it('returns overlap candidates from top to bottom for cycling', () => {
+    expect(
+      hitTestDocumentAll(
+        document([layer('bottom'), layer('middle'), layer('top')]),
+        {
+          x: 10,
+          y: 10,
+        },
+      ).map((hit) => hit.nodeId),
+    ).toEqual(['top', 'middle', 'bottom'])
+  })
+
+  it('updates only affected bounds while preserving z-ordered point results', () => {
+    const initial = document([layer('bottom'), layer('top')])
+    const index = new DocumentSpatialIndex(initial)
+    expect(index.hitAll({ x: 10, y: 10 }).map((hit) => hit.nodeId)).toEqual([
+      'top',
+      'bottom',
+    ])
+    const moved = document([
+      layer('bottom'),
+      layer('top', { transform: { ...transform, translateX: 40 } }),
+    ])
+    index.update(moved, ['top'])
+    expect(index.hitAll({ x: 10, y: 10 }).map((hit) => hit.nodeId)).toEqual([
+      'bottom',
+    ])
+    expect(index.hitAll({ x: 45, y: 10 }).map((hit) => hit.nodeId)).toEqual([
+      'top',
+    ])
+  })
+})

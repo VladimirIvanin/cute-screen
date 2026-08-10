@@ -10,5 +10,11 @@
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     }
+  },
+  "dependencies": {
+    "rbush": "4.0.1"
+  },
+  "devDependencies": {
+    "@types/rbush": "3.0.4"
   }
 }

@@ -7,8 +7,21 @@ describe('M01 render scene snapshot', () => {
     const scene = createRenderSceneSnapshot({
       width: 3840,
       height: 2160,
-      background: { resourceId: 'fixture-4k', width: 3840, height: 2160 },
       nodes: [
+        {
+          kind: 'image',
+          id: 'base-image',
+          resourceId: 'fixture-4k',
+          x: 0,
+          y: 0,
+          width: 3840,
+          height: 2160,
+          scaleX: 1,
+          scaleY: 1,
+          rotation: 0,
+          opacity: 1,
+          visible: true,
+        },
         {
           kind: 'rect',
           id: 'rect-1',

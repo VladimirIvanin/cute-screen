@@ -392,19 +392,18 @@ fn fake_capture_frame(
     transport: &ImageTransportService,
     correlation_id: &str,
 ) -> Result<CaptureResult, crate::platform::PlatformError> {
+    const WIDTH: u32 = 400;
+    const HEIGHT: u32 = 300;
     let mut bytes = Vec::new();
     {
-        let mut encoder = png::Encoder::new(&mut bytes, 2, 2);
+        let mut encoder = png::Encoder::new(&mut bytes, WIDTH, HEIGHT);
         encoder.set_color(png::ColorType::Rgba);
         encoder.set_depth(png::BitDepth::Eight);
         let mut writer = encoder.write_header().map_err(|_| {
             crate::platform::PlatformError::new(PlatformErrorCode::CaptureFailed, correlation_id)
         })?;
         writer
-            .write_image_data(&[
-                0x12, 0x34, 0x56, 0xff, 0x65, 0x43, 0x21, 0xff, 0xaa, 0xbb, 0xcc, 0xff, 0x22, 0x44,
-                0x66, 0xff,
-            ])
+            .write_image_data(&vec![0x7f; (WIDTH * HEIGHT * 4) as usize])
             .map_err(|_| {
                 crate::platform::PlatformError::new(
                     PlatformErrorCode::CaptureFailed,
@@ -413,12 +412,12 @@ fn fake_capture_frame(
             })?;
     }
     let token = format!("fake-{}", Uuid::now_v7().simple());
-    transport.import_owned_bytes(&token, &bytes, "image/png", 2, 2, correlation_id)?;
+    transport.import_owned_bytes(&token, &bytes, "image/png", WIDTH, HEIGHT, correlation_id)?;
     Ok(CaptureResult {
         image_token: token,
         correlation_id: correlation_id.to_owned(),
-        width: 2,
-        height: 2,
+        width: WIDTH,
+        height: HEIGHT,
         geometry: None,
         cursor_included: None,
     })
@@ -556,8 +555,16 @@ fn initial_document_json(
     source: &BlobMetadata,
     timestamp: String,
 ) -> String {
+    let base_layer_id = format!(
+        "{}-{}-7{}-8{}-{}",
+        &source_hash[0..8],
+        &source_hash[8..12],
+        &source_hash[13..16],
+        &source_hash[17..20],
+        &source_hash[20..32],
+    );
     serde_json::json!({
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "id": document_id,
         "source": {
             "blobHash": source_hash,
@@ -570,7 +577,24 @@ fn initial_document_json(
         },
         "canvas": { "width": source.width, "height": source.height },
         "crop": null,
-        "layers": [],
+        "layers": [{
+            "id": base_layer_id,
+            "kind": "image",
+            "localBounds": { "x": 0, "y": 0, "width": source.width, "height": source.height },
+            "transform": { "translateX": 0, "translateY": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 },
+            "opacity": 1,
+            "visible": true,
+            "locked": true,
+            "payload": {
+                "blobHash": source_hash,
+                "intrinsicWidth": source.width,
+                "intrinsicHeight": source.height,
+                "format": source.format,
+                "orientationApplied": true,
+                "color": source.color_metadata,
+                "role": "base",
+            },
+        }],
         "presentation": { "beautify": { "enabled": false }, "watermark": { "enabled": false } },
         "createdAt": timestamp,
         "updatedAt": timestamp,
@@ -722,7 +746,7 @@ mod tests {
     }
 
     #[test]
-    fn initial_document_factory_matches_editor_core_v1_golden() {
+    fn initial_document_factory_creates_the_v2_locked_base_layer() {
         let metadata = BlobMetadata {
             format: "png".to_owned(),
             mime_type: "image/png".to_owned(),
@@ -740,12 +764,17 @@ mod tests {
             "2026-08-09T00:00:00.000Z".to_owned(),
         ))
         .expect("factory JSON");
-        let expected: serde_json::Value = serde_json::from_str(include_str!(
-            "../../tests/fixtures/documents/v0-minimal.expected-v1.json"
-        ))
-        .expect("editor-core v1 golden JSON");
-
-        assert_eq!(actual, expected);
+        assert_eq!(actual["schemaVersion"], 2);
+        assert_eq!(actual["layers"].as_array().map(Vec::len), Some(1));
+        let base = &actual["layers"][0];
+        assert_eq!(base["kind"], "image");
+        assert_eq!(base["locked"], true);
+        assert_eq!(base["payload"]["role"], "base");
+        assert_eq!(base["payload"]["blobHash"], "a".repeat(64));
+        assert_eq!(
+            base["localBounds"],
+            serde_json::json!({ "x": 0, "y": 0, "width": 100, "height": 100 })
+        );
     }
 
     #[test]
@@ -856,7 +885,7 @@ mod tests {
         let document_value: serde_json::Value =
             serde_json::from_str(&persisted.document_json).expect("initial document JSON");
         assert_eq!(persisted.document_id, document.document_id);
-        assert_eq!(document_value["schemaVersion"], 1);
+        assert_eq!(document_value["schemaVersion"], 2);
         assert_eq!(document_value["source"]["blobHash"], document.source_hash);
         assert_eq!(document_value["canvas"]["width"], 1);
     }

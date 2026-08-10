@@ -1,5 +1,8 @@
 import { createCanvas, loadImage } from '@napi-rs/canvas'
-import { createRenderSceneSnapshot } from '@cute-screen/editor-core'
+import {
+  createRenderSceneSnapshot,
+  type RenderSceneSnapshot,
+} from '@cute-screen/editor-core'
 import {
   Canvas2DRenderer,
   renderHeadlessCanvasKitPng,
@@ -79,8 +82,10 @@ function scene(dpr: 1 | 2) {
   })
 }
 
-async function canvas2dPng(dpr: 1 | 2): Promise<Uint8Array> {
-  const snapshot = scene(dpr)
+async function canvas2dPng(
+  snapshot: RenderSceneSnapshot,
+  dpr: 1 | 2,
+): Promise<Uint8Array> {
   const renderer = new Canvas2DRenderer({
     exportCanvas: (width, height) =>
       createCanvas(width, height) as unknown as Canvas2DLike,
@@ -113,6 +118,28 @@ async function rgba(png: Uint8Array): Promise<Uint8Array> {
   )
 }
 
+function alphaBounds(
+  pixels: Uint8Array,
+  width: number,
+  height: number,
+): Readonly<{ left: number; top: number; right: number; bottom: number }> {
+  let left = width
+  let top = height
+  let right = -1
+  let bottom = -1
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if ((pixels[(y * width + x) * 4 + 3] ?? 0) === 0) continue
+      left = Math.min(left, x)
+      top = Math.min(top, y)
+      right = Math.max(right, x)
+      bottom = Math.max(bottom, y)
+    }
+  }
+  if (right < 0) throw new Error('expected non-transparent renderer output')
+  return { left, top, right, bottom }
+}
+
 async function assertGolden(name: string, actual: Uint8Array): Promise<void> {
   const file = path.join(goldenRoot, `${name}.png`)
   if (process.env.CUTE_SCREEN_UPDATE_GOLDENS === '1') {
@@ -140,7 +167,7 @@ describe('renderer golden harness self-test', () => {
   for (const dpr of [1, 2] as const) {
     it(`matches CanvasKit and Canvas2D goldens at DPR ${dpr}`, async () => {
       const canvasKitPng = renderHeadlessCanvasKitPng(canvasKit, scene(dpr))
-      const fallbackPng = await canvas2dPng(dpr)
+      const fallbackPng = await canvas2dPng(scene(dpr), dpr)
       await assertGolden(`canvaskit-dpr-${dpr}`, canvasKitPng)
       await assertGolden(`canvas2d-dpr-${dpr}`, fallbackPng)
 
@@ -154,6 +181,56 @@ describe('renderer golden harness self-test', () => {
       expect(difference.maximumDelta).toBeLessThanOrEqual(
         semanticParityTolerance.maximumDelta,
       )
+    })
+  }
+
+  for (const dpr of [1, 2] as const) {
+    it(`keeps transformed missing-image bounds aligned at DPR ${dpr}`, async () => {
+      const scale = (value: number) => value * dpr
+      const snapshot = createRenderSceneSnapshot({
+        width: scale(128),
+        height: scale(96),
+        nodes: [
+          {
+            kind: 'image',
+            id: 'flipped-base',
+            resourceId: 'missing-base',
+            x: scale(112),
+            y: scale(12),
+            width: scale(64),
+            height: scale(48),
+            scaleX: 1,
+            scaleY: -1,
+            rotation: 180,
+            opacity: 0.8,
+            visible: true,
+          },
+        ],
+      })
+      const canvasKitPng = renderHeadlessCanvasKitPng(canvasKit, snapshot)
+      const fallbackPng = await canvas2dPng(snapshot, dpr)
+      const canvasKitBounds = alphaBounds(
+        await rgba(canvasKitPng),
+        snapshot.width,
+        snapshot.height,
+      )
+      const canvas2dBounds = alphaBounds(
+        await rgba(fallbackPng),
+        snapshot.width,
+        snapshot.height,
+      )
+      expect(
+        Math.abs(canvasKitBounds.left - canvas2dBounds.left),
+      ).toBeLessThanOrEqual(1)
+      expect(
+        Math.abs(canvasKitBounds.top - canvas2dBounds.top),
+      ).toBeLessThanOrEqual(1)
+      expect(
+        Math.abs(canvasKitBounds.right - canvas2dBounds.right),
+      ).toBeLessThanOrEqual(1)
+      expect(
+        Math.abs(canvasKitBounds.bottom - canvas2dBounds.bottom),
+      ).toBeLessThanOrEqual(1)
     })
   }
 

@@ -84,7 +84,7 @@ describe('M03 document core', () => {
       kind: 'editable',
     })
 
-    const future = { ...v0, schemaVersion: 2 }
+    const future = { ...v0, schemaVersion: 3 }
     expect(parseEditorDocument(JSON.stringify(future))).toMatchObject({
       kind: 'readOnly',
       reason: 'newerSchema',
@@ -133,7 +133,7 @@ describe('M03 document core', () => {
     const matrix = transformToMatrix({
       translateX: 5,
       translateY: -7,
-      rotation: Math.PI / 3,
+      rotation: 60,
       scaleX: 2,
       scaleY: 3,
     })

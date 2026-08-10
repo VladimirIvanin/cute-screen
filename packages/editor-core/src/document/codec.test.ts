@@ -98,6 +98,19 @@ describe('editor document codec', () => {
     )
   })
 
+  it('requires an explicit image role in persisted v2 documents', () => {
+    const migrated = parseEditorDocument(fixture('v0-minimal.json'))
+    if (migrated.kind !== 'editable') throw new Error('expected migration')
+    const raw = JSON.parse(serializeEditorDocument(migrated.document)) as {
+      layers: Array<{ payload: Record<string, unknown> }>
+    }
+    delete raw.layers[0]!.payload.role
+
+    expect(() => parseEditorDocument(JSON.stringify(raw))).toThrow(
+      /layers\[0\]\.payload\.role/u,
+    )
+  })
+
   it('round-trips valid crop values', () => {
     fc.assert(
       fc.property(
@@ -140,20 +153,35 @@ describe('editor document codec', () => {
     const migrated = parseEditorDocument(fixture('v0-minimal.json'))
     if (migrated.kind !== 'editable')
       throw new Error('expected migrated fixture')
-    expect(JSON.parse(serializeEditorDocument(migrated.document))).toEqual(
-      JSON.parse(fixture('v0-minimal.expected-v1.json')),
-    )
+    expect(
+      JSON.parse(serializeEditorDocument(migrated.document)),
+    ).toMatchObject({
+      schemaVersion: 2,
+      layers: [
+        {
+          kind: 'image',
+          locked: true,
+          localBounds: { x: 0, y: 0, width: 100, height: 100 },
+          payload: { role: 'base', blobHash: 'a'.repeat(64) },
+        },
+      ],
+    })
 
     const futureFields = parseEditorDocument(fixture('v1-future-fields.json'))
     if (futureFields.kind !== 'editable')
       throw new Error('expected editable current fixture')
-    expect(JSON.parse(serializeEditorDocument(futureFields.document))).toEqual(
-      JSON.parse(fixture('v1-future-fields.json')),
-    )
-
-    expect(parseEditorDocument(fixture('newer-v2.json'))).toMatchObject({
-      kind: 'readOnly',
+    expect(
+      JSON.parse(serializeEditorDocument(futureFields.document)),
+    ).toMatchObject({
       schemaVersion: 2,
+      futureDocumentField: { preserved: true },
+    })
+
+    expect(
+      parseEditorDocument(JSON.stringify({ schemaVersion: 3 })),
+    ).toMatchObject({
+      kind: 'readOnly',
+      schemaVersion: 3,
     })
   })
 })

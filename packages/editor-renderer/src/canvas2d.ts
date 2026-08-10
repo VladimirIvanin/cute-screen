@@ -28,6 +28,7 @@ type Context2D = Pick<
   | 'save'
   | 'restore'
   | 'translate'
+  | 'scale'
   | 'rotate'
   | 'setTransform'
   | 'globalAlpha'
@@ -132,6 +133,10 @@ export function drawNodes2D(
         })
         break
       }
+      case 'image':
+        // Image resources are resolved by the renderer; no placeholder is drawn
+        // here so overlays stay independent from committed scene rendering.
+        break
     }
   }
 }
@@ -234,13 +239,33 @@ export class Canvas2DRenderer implements Renderer {
     const context = canvas.getContext('2d')!
     context.setTransform(1, 0, 0, 1, 0, 0)
     context.clearRect(0, 0, canvas.width, canvas.height)
-    if (scene.background) {
-      const resource = this.#resources.get(scene.background.resourceId)
-      if (resource) {
-        context.drawImage(resource.source, 0, 0, scene.width, scene.height)
+    for (const node of scene.nodes) {
+      if (node.kind !== 'image') {
+        drawNodes2D(context, [node])
+        continue
       }
+      if (!node.visible || node.opacity === 0) continue
+      const resource = this.#resources.get(node.resourceId)
+      context.save()
+      context.globalAlpha = node.opacity
+      context.translate(node.x, node.y)
+      context.rotate((node.rotation * Math.PI) / 180)
+      context.scale(node.scaleX, node.scaleY)
+      if (resource) {
+        context.drawImage(resource.source, 0, 0, node.width, node.height)
+      } else {
+        // A missing blob is a recoverable per-resource failure: preserve the
+        // canvas and history while making the affected bounds visible.
+        // Match CanvasKit's 0.72/0.28/0.28 placeholder color exactly after
+        // its 8-bit conversion, so fallback and headless output stay stable.
+        context.fillStyle = 'rgba(184, 71, 71, 0.16)'
+        context.strokeStyle = 'rgba(184, 71, 71, 0.9)'
+        context.lineWidth = 1
+        context.fillRect(0, 0, node.width, node.height)
+        context.strokeRect(0, 0, node.width, node.height)
+      }
+      context.restore()
     }
-    drawNodes2D(context, scene.nodes)
   }
 
   async #blobBytes(canvas: Canvas2DLike): Promise<Uint8Array> {

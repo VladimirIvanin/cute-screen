@@ -11,6 +11,7 @@ import {
   type CaptureProgressState,
   type CaptureProgressV1,
   type FrameSummary,
+  type EditorDocumentV1,
   type PlatformCapabilities,
   type ShellActionAdapter,
   type ShellDocumentState,
@@ -21,6 +22,9 @@ declare global {
     __cuteScreenE2eDocument?: {
       setCrop(): void
       snapshot(): { crop: unknown; saveState: string } | undefined
+    }
+    __cuteScreenE2eM05?: {
+      snapshot(): EditorDocumentV1 | undefined
     }
   }
 }
@@ -36,6 +40,9 @@ const m03Harness =
 const m04CaptureHarness =
   import.meta.env.VITE_TEST_HARNESS === 'true' &&
   new URLSearchParams(window.location.search).get('m04') === '1'
+const m05Harness =
+  import.meta.env.VITE_TEST_HARNESS === 'true' &&
+  new URLSearchParams(window.location.search).get('m05') === '1'
 
 const testActions: ShellActionAdapter | undefined =
   import.meta.env.VITE_TEST_HARNESS === 'true' && !m04CaptureHarness
@@ -131,6 +138,7 @@ const documentCoordinator = shallowRef<DocumentSessionCoordinator>()
 const platformCapabilities = shallowRef<PlatformCapabilities>()
 const captureProgress = shallowRef<CaptureProgressState>()
 const seriesFrames = shallowRef<readonly FrameSummary[]>([])
+const sourceImage = shallowRef<HTMLImageElement>()
 let capturedDocumentMount: Promise<boolean> | undefined
 const documentState = shallowRef<ShellDocumentState>({ kind: 'loading' })
 const readOnlyDocument = shallowRef(false)
@@ -201,8 +209,13 @@ async function loadPersistedDocument(): Promise<boolean> {
         token: record.imageToken,
         correlationId: correlationId(),
         bridge: tauriDesktopBridge,
-        createResource: async () => undefined,
+        createResource: async (image) => {
+          sourceImage.value = image
+          return image
+        },
       })
+    } else {
+      sourceImage.value = undefined
     }
     if (parsed.kind === 'readOnly') {
       await closeDocumentSession()
@@ -258,6 +271,106 @@ async function loadPersistedDocument(): Promise<boolean> {
     }
     return false
   }
+}
+
+function loadM05HarnessImage(): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image()
+    image.addEventListener('load', () => resolve(image), { once: true })
+    image.addEventListener(
+      'error',
+      () => reject(new Error('M05 fixture failed')),
+      { once: true },
+    )
+    image.src =
+      'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="160" height="120"%3E%3Crect width="160" height="120" fill="%23273d5a"/%3E%3C/svg%3E'
+  })
+}
+
+async function mountM05HarnessDocument(): Promise<void> {
+  const hash = 'f'.repeat(64)
+  const document: EditorDocumentV1 = {
+    schemaVersion: 2,
+    id: '019c1f62-058e-7000-8000-000000000005',
+    source: {
+      blobHash: hash,
+      format: 'svg',
+      mimeType: 'image/svg+xml',
+      width: 160,
+      height: 120,
+      orientationApplied: true,
+      color: { colorSpace: 'srgb', hasIccProfile: false },
+    },
+    canvas: { width: 160, height: 120 },
+    crop: { x: 20, y: 15, width: 100, height: 80 },
+    layers: [
+      {
+        id: '019c1f62-058e-7000-8000-000000000101',
+        kind: 'image',
+        localBounds: { x: 0, y: 0, width: 160, height: 120 },
+        transform: {
+          translateX: 0,
+          translateY: 0,
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+        },
+        opacity: 1,
+        visible: true,
+        locked: true,
+        payload: {
+          blobHash: hash,
+          intrinsicWidth: 160,
+          intrinsicHeight: 120,
+          format: 'svg',
+          orientationApplied: true,
+          color: { colorSpace: 'srgb', hasIccProfile: false },
+          role: 'base',
+        },
+      },
+      ...[
+        '019c1f62-058e-7000-8000-000000000102',
+        '019c1f62-058e-7000-8000-000000000103',
+        '019c1f62-058e-7000-8000-000000000104',
+      ].map((id, index) => ({
+        id,
+        kind: 'shape' as const,
+        localBounds: { x: 0, y: 0, width: 60, height: 40 },
+        transform: {
+          translateX: 40,
+          translateY: 30,
+          rotation: index * 5,
+          scaleX: 1,
+          scaleY: 1,
+        },
+        opacity: 1,
+        visible: true,
+        locked: false,
+        payload: {},
+      })),
+    ],
+    presentation: {
+      beautify: { enabled: false },
+      watermark: { enabled: false },
+    },
+    createdAt: '2026-08-10T00:00:00.000Z',
+    updatedAt: '2026-08-10T00:00:00.000Z',
+  }
+  const session = new DocumentSessionController({
+    document,
+    revision: 0,
+    debounceMs: 0,
+    bridge: {
+      saveDocument: async (record) => record.revision + 1,
+      exportRecoveryBundle: async () => ({ kind: 'saved' }),
+    },
+    correlationId,
+  })
+  documentSession.value = session
+  window.__cuteScreenE2eM05 = {
+    snapshot: () => documentSession.value?.snapshot.core.document,
+  }
+  sourceImage.value = await loadM05HarnessImage()
 }
 
 /** Shares the native outcome event and the command response for one capture. */
@@ -406,6 +519,17 @@ async function installLifecycleGuards(): Promise<void> {
 
 onMounted(() => {
   void (async () => {
+    if (m05Harness) {
+      try {
+        await mountM05HarnessDocument()
+      } catch (error) {
+        documentState.value = {
+          kind: 'error',
+          message: error instanceof Error ? error.message : String(error),
+        }
+      }
+      return
+    }
     // Do not acknowledge native tray/hotkey preflight until the persisted
     // session, if any, is mounted and can actually be flushed.
     await loadPersistedDocument()
@@ -438,6 +562,7 @@ onBeforeUnmount(() => {
     :capture-fallback-command="captureFallbackCommand"
     :capture-progress="captureProgress"
     :frames="seriesFrames"
+    :source-image="sourceImage"
     @retry-load="loadPersistedDocument"
   />
 </template>

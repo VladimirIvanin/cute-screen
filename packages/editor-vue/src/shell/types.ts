@@ -34,6 +34,8 @@ export interface LayerSummary {
   readonly name: string
   readonly visible: boolean
   readonly locked: boolean
+  readonly opacity: number
+  readonly rotation: number
 }
 
 export interface FrameSummary {
@@ -43,6 +45,7 @@ export interface FrameSummary {
 }
 
 export type ContextControl =
+  | { readonly kind: 'action'; readonly id: string; readonly label: string }
   | { readonly kind: 'color'; readonly id: string; readonly label: string }
   | { readonly kind: 'range'; readonly id: string; readonly label: string }
   | { readonly kind: 'select'; readonly id: string; readonly label: string }
@@ -112,6 +115,8 @@ export type IconName =
   | 'copy'
   | 'crop'
   | 'export'
+  | 'eye'
+  | 'eyeOff'
   | 'hand'
   | 'image'
   | 'layers'
@@ -153,8 +158,13 @@ export const translationKeys = [
   'darkTheme',
   'tools',
   'toolSettings',
+  'canvasActions',
+  'flipHorizontal',
+  'flipVertical',
   'seriesFrames',
   'zoom',
+  'fitZoom',
+  'zoomPercentage',
   'sceneCanvas',
   'interactionOverlay',
   'emptyTitle',
@@ -168,6 +178,13 @@ export const translationKeys = [
   'exportUnavailable',
   'layers',
   'layersEmpty',
+  'baseImage',
+  'opacity',
+  'rotation',
+  'moveLayerUp',
+  'moveLayerDown',
+  'lockLayer',
+  'unlockLayer',
   'hideLayers',
   'showLayers',
   'toolSelect',

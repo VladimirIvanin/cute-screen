@@ -5,6 +5,7 @@ defineProps<{
   schema?: ContextToolbarSchema | undefined
   label: string
 }>()
+const emit = defineEmits<{ action: [id: string] }>()
 </script>
 
 <template>
@@ -15,12 +16,17 @@ defineProps<{
       ><small>{{ schema.hint }}</small>
     </div>
     <div class="cs-context-controls">
-      <span
-        v-for="control in schema.controls"
-        :key="control.id"
-        class="cs-context-control"
-        >{{ control.label }}</span
-      >
+      <template v-for="control in schema.controls" :key="control.id">
+        <button
+          v-if="control.kind === 'action'"
+          type="button"
+          class="cs-context-control"
+          @click="emit('action', control.id)"
+        >
+          {{ control.label }}
+        </button>
+        <span v-else class="cs-context-control">{{ control.label }}</span>
+      </template>
     </div>
   </section>
 </template>

@@ -7,6 +7,67 @@ function assertNever(value: never): never {
   throw new Error(`unsupported editor command: ${String(value)}`)
 }
 
+/** Creates one atomic document-level reflection; locked and hidden layers are intentional participants. */
+export function createFlipCanvasCommand(
+  document: EditorDocumentV1,
+  axis: 'horizontal' | 'vertical',
+): Extract<EditorCommand, { type: 'flipCanvas' }> {
+  const afterLayers = document.layers.map((layer) => {
+    const { transform } = layer
+    const radians = (transform.rotation * Math.PI) / 180
+    const scaleX = Math.hypot(
+      transform.scaleX * Math.cos(radians),
+      transform.scaleX * Math.sin(radians),
+    )
+    const nextRotation =
+      axis === 'horizontal'
+        ? (Math.atan2(
+            transform.scaleX * Math.sin(radians),
+            -transform.scaleX * Math.cos(radians),
+          ) *
+            180) /
+          Math.PI
+        : Math.atan2(
+            -transform.scaleX * Math.sin(radians),
+            transform.scaleX * Math.cos(radians),
+          ) *
+          (180 / Math.PI)
+    return {
+      ...layer,
+      transform: {
+        translateX:
+          axis === 'horizontal'
+            ? document.canvas.width - transform.translateX
+            : transform.translateX,
+        translateY:
+          axis === 'vertical'
+            ? document.canvas.height - transform.translateY
+            : transform.translateY,
+        rotation: nextRotation,
+        scaleX,
+        scaleY:
+          -Math.sign(transform.scaleX * transform.scaleY) *
+          Math.abs(transform.scaleY),
+      },
+    } as LayerNode
+  })
+  const crop = document.crop
+  const afterCrop =
+    crop === null
+      ? null
+      : axis === 'horizontal'
+        ? { ...crop, x: document.canvas.width - crop.x - crop.width }
+        : { ...crop, y: document.canvas.height - crop.y - crop.height }
+  return Object.freeze({
+    type: 'flipCanvas',
+    axis,
+    beforeLayers: document.layers,
+    afterLayers: Object.freeze(afterLayers),
+    beforeCrop: document.crop,
+    afterCrop: afterCrop === null ? null : Object.freeze(afterCrop),
+  })
+}
+
 function replaceDocument(
   document: EditorDocumentV1,
   next: Pick<EditorDocumentV1, 'layers'> | Pick<EditorDocumentV1, 'crop'>,
@@ -164,6 +225,30 @@ function applySetCrop(
   return replaceDocument(document, { crop: command.after })
 }
 
+function applyBatch(
+  document: EditorDocumentV1,
+  command: Extract<EditorCommand, { type: 'batch' }>,
+): EditorDocumentV1 {
+  if (command.commands.length === 0) throw new Error('batch must not be empty')
+  return command.commands.reduce(applyEditorCommand, document)
+}
+
+function applyFlipCanvas(
+  document: EditorDocumentV1,
+  command: Extract<EditorCommand, { type: 'flipCanvas' }>,
+): EditorDocumentV1 {
+  if (
+    !jsonEquals(document.layers, command.beforeLayers) ||
+    !jsonEquals(document.crop, command.beforeCrop)
+  ) {
+    throw new Error('flip source no longer matches')
+  }
+  return replaceDocument(document, {
+    layers: command.afterLayers,
+    crop: command.afterCrop,
+  })
+}
+
 export function applyEditorCommand(
   document: EditorDocumentV1,
   command: EditorCommand,
@@ -181,6 +266,10 @@ export function applyEditorCommand(
       return applyDuplicateLayer(document, command)
     case 'setCrop':
       return applySetCrop(document, command)
+    case 'batch':
+      return applyBatch(document, command)
+    case 'flipCanvas':
+      return applyFlipCanvas(document, command)
     default:
       return assertNever(command)
   }
@@ -272,6 +361,29 @@ function revertSetCrop(
   return replaceDocument(document, { crop: command.before })
 }
 
+function revertBatch(
+  document: EditorDocumentV1,
+  command: Extract<EditorCommand, { type: 'batch' }>,
+): EditorDocumentV1 {
+  return [...command.commands].reverse().reduce(revertEditorCommand, document)
+}
+
+function revertFlipCanvas(
+  document: EditorDocumentV1,
+  command: Extract<EditorCommand, { type: 'flipCanvas' }>,
+): EditorDocumentV1 {
+  if (
+    !jsonEquals(document.layers, command.afterLayers) ||
+    !jsonEquals(document.crop, command.afterCrop)
+  ) {
+    throw new Error('flip result no longer matches')
+  }
+  return replaceDocument(document, {
+    layers: command.beforeLayers,
+    crop: command.beforeCrop,
+  })
+}
+
 export function revertEditorCommand(
   document: EditorDocumentV1,
   command: EditorCommand,
@@ -289,6 +401,10 @@ export function revertEditorCommand(
       return revertDuplicateLayer(document, command)
     case 'setCrop':
       return revertSetCrop(document, command)
+    case 'batch':
+      return revertBatch(document, command)
+    case 'flipCanvas':
+      return revertFlipCanvas(document, command)
     default:
       return assertNever(command)
   }

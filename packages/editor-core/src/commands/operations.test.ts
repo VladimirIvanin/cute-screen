@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   applyEditorCommand,
+  createFlipCanvasCommand,
   revertEditorCommand,
   type EditorDocumentV1,
   type LayerNode,
@@ -27,6 +28,7 @@ function layer(id: keyof typeof IDS, locked = false): LayerNode {
       scaleX: 1,
       scaleY: 1,
     },
+    localBounds: { x: 0, y: 0, width: 10, height: 10 },
     opacity: 1,
     visible: true,
     locked,
@@ -36,7 +38,7 @@ function layer(id: keyof typeof IDS, locked = false): LayerNode {
 
 function document(layers: readonly LayerNode[]): EditorDocumentV1 {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: DOCUMENT_ID,
     source: {
       blobHash: 'a'.repeat(64),
@@ -108,5 +110,31 @@ describe('editor command operations', () => {
         expect(revertEditorCommand(after, command)).toEqual(before)
       }),
     )
+  })
+
+  it('reflects locked layers and crop as one undoable canvas command', () => {
+    const base = {
+      ...layer('first', true),
+      kind: 'image' as const,
+      payload: {
+        blobHash: 'a'.repeat(64),
+        intrinsicWidth: 100,
+        intrinsicHeight: 100,
+        format: 'png' as const,
+        orientationApplied: true as const,
+        color: { colorSpace: 'srgb' as const, hasIccProfile: false },
+        role: 'base' as const,
+      },
+    }
+    const before = {
+      ...document([base]),
+      crop: { x: 10, y: 20, width: 30, height: 40 },
+    }
+    const command = createFlipCanvasCommand(before, 'horizontal')
+    const after = applyEditorCommand(before, command)
+
+    expect(after.layers[0]?.locked).toBe(true)
+    expect(after.crop).toEqual({ x: 60, y: 20, width: 30, height: 40 })
+    expect(revertEditorCommand(after, command)).toEqual(before)
   })
 })

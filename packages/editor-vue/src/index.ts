@@ -1,4 +1,5 @@
 import type { EditorRendererBoundary } from '@cute-screen/editor-renderer'
+import type { EditorDocumentV1 } from '@cute-screen/editor-renderer'
 import './shell/shell.css'
 
 export {
@@ -86,3 +87,5 @@ export type EditorVueBoundary = Readonly<{
   package: 'editor-vue'
   renderer: EditorRendererBoundary
 }>
+
+export type { EditorDocumentV1 }

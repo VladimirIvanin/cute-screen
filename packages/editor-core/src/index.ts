@@ -4,11 +4,13 @@ export {
   LAYER_KINDS,
   parseEditorDocument,
   serializeEditorDocument,
+  createDocumentRenderScene,
   type ArrowLayer,
   type CalloutLayer,
   type CensorLayer,
   type ColorMetadata,
   type EditorDocumentV1,
+  type EditorDocumentV2,
   type EmojiLayer,
   type ImageLayer,
   type ImageLayerPayload,
@@ -40,8 +42,30 @@ export {
   transformToMatrix,
 } from './geometry'
 export {
+  createViewportState,
+  fitViewport,
+  panViewport,
+  zoomAt,
+  type ViewportFitMode,
+  type ViewportState,
+} from './viewport'
+export {
+  hitTestDocument,
+  hitTestDocumentAll,
+  DocumentSpatialIndex,
+  type HitPart,
+  type HitTestResult,
+} from './hit-test'
+export {
+  InteractionController,
+  type EditorToolId,
+  type InteractionState,
+} from './interaction'
+export { snapPoint, type SnapCandidate, type SnapResult } from './snap'
+export {
   applyEditorCommand,
   CommandManager,
+  createFlipCanvasCommand,
   revertEditorCommand,
   type CommandManagerOptions,
   type EditorCommand,
@@ -55,9 +79,9 @@ export {
 export {
   createRenderSceneSnapshot,
   type EditorCoreBoundary,
-  type RenderBackgroundRef,
   type RenderEllipseNode,
   type RenderLineNode,
+  type RenderImageNode,
   type RenderNode,
   type RenderRectNode,
   type RenderSceneInput,

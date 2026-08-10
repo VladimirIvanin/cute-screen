@@ -471,7 +471,7 @@ impl StorageState {
             params![request.capture_id, series_id, blob.hash, serde_json::to_string(&request.capture_metadata).map_err(|error| RepositoryError::InvalidDocument(error.to_string()))?, request.captured_at],
         )?;
         transaction.execute(
-            "INSERT INTO documents (id, capture_id, schema_version, revision, content_json, content_sha256, created_at, updated_at) VALUES (?1, ?2, 1, 1, ?3, ?4, ?5, ?5)",
+            "INSERT INTO documents (id, capture_id, schema_version, revision, content_json, content_sha256, created_at, updated_at) VALUES (?1, ?2, 2, 1, ?3, ?4, ?5, ?5)",
             params![request.document_id, request.capture_id, request.document_json, sha256_hex(request.document_json.as_bytes()), request.captured_at],
         )?;
         replace_document_references(
@@ -1128,7 +1128,7 @@ fn document_value(document_json: &str) -> Result<Value, RepositoryError> {
             "schemaVersion exceeds the supported integer range".to_owned(),
         )
     })?;
-    if schema_version > 1 {
+    if schema_version > 2 {
         return Err(RepositoryError::NewerSchema { schema_version });
     }
     if value.get("id").and_then(Value::as_str).is_none() {

@@ -62,3 +62,48 @@ describe('editor-core dependency boundary', () => {
     }
   })
 })
+
+describe('M05 icon-system boundary', () => {
+  it('keeps Lucide imports and SVG markup behind the typed UiIcon adapter', async () => {
+    const root = process.cwd()
+    const sources = await fg('packages/editor-vue/src/**/*.ts', { cwd: root })
+    const violations: string[] = []
+    for (const source of sources) {
+      const code = await readFile(path.join(root, source), 'utf8')
+      if (
+        source !== 'packages/editor-vue/src/shell/icon.ts' &&
+        code.includes("from 'lucide-vue-next'")
+      ) {
+        violations.push(`${source}: direct Lucide import`)
+      }
+      if (source.includes('/shell/components/') && /<svg(?:\s|>)/u.test(code)) {
+        violations.push(`${source}: inline SVG`)
+      }
+    }
+    expect(violations).toEqual([])
+  })
+
+  it('maps every declared semantic IconName in the central adapter', async () => {
+    const root = process.cwd()
+    const [types, icon] = await Promise.all([
+      readFile(
+        path.join(root, 'packages/editor-vue/src/shell/types.ts'),
+        'utf8',
+      ),
+      readFile(
+        path.join(root, 'packages/editor-vue/src/shell/icon.ts'),
+        'utf8',
+      ),
+    ])
+    const iconType = types.match(
+      /export type IconName =([\s\S]*?)\n\nexport const/u,
+    )?.[1]
+    if (!iconType) throw new Error('IconName declaration is missing')
+    const names = [...iconType.matchAll(/\| '([A-Za-z]+)'/gu)]
+      .map((match) => match[1])
+      .filter((name): name is string => name !== undefined)
+    for (const name of names) {
+      expect(icon).toContain(`${name}:`)
+    }
+  })
+})

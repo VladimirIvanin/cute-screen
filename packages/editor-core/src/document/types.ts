@@ -1,4 +1,4 @@
-export const EDITOR_DOCUMENT_SCHEMA_VERSION = 1 as const
+export const EDITOR_DOCUMENT_SCHEMA_VERSION = 2 as const
 
 export type JsonPrimitive = string | number | boolean | null
 export type JsonValue = JsonPrimitive | readonly JsonValue[] | JsonObject
@@ -85,6 +85,8 @@ export interface LayerBase<K extends LayerKind, P extends JsonObject> {
   readonly id: string
   readonly kind: K
   readonly transform: Transform2D
+  /** Bounds in the node's untransformed local coordinate system. */
+  readonly localBounds?: Rect
   readonly opacity: number
   readonly visible: boolean
   readonly locked: boolean
@@ -100,6 +102,8 @@ export interface ImageLayerPayload extends JsonObject {
   readonly format: 'png' | 'jpeg' | 'webp' | 'svg'
   readonly orientationApplied: true
   readonly color: ColorMetadata & JsonObject
+  /** v2 makes the original screenshot an ordinary, locked-by-default image. */
+  readonly role: 'base' | 'content'
 }
 
 export type ArrowLayer = LayerBase<'arrow', JsonObject>
@@ -132,7 +136,8 @@ export type LayerNode =
   | ImageLayer
 
 export interface EditorDocumentV1 {
-  readonly schemaVersion: typeof EDITOR_DOCUMENT_SCHEMA_VERSION
+  /** Kept as an exported compatibility name while persisted documents are v2. */
+  readonly schemaVersion: 1 | typeof EDITOR_DOCUMENT_SCHEMA_VERSION
   readonly id: string
   readonly source: SourceImageRef
   readonly canvas: Readonly<{ width: number; height: number }>
@@ -143,6 +148,14 @@ export interface EditorDocumentV1 {
   readonly createdAt: string
   readonly updatedAt: string
   readonly extras?: JsonObject
+}
+
+export interface EditorDocumentV2 extends Omit<
+  EditorDocumentV1,
+  'schemaVersion' | 'layers'
+> {
+  readonly schemaVersion: typeof EDITOR_DOCUMENT_SCHEMA_VERSION
+  readonly layers: readonly LayerNode[]
 }
 
 export type ParsedEditorDocument =

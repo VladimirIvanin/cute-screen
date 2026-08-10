@@ -44,18 +44,24 @@ export interface RenderLineNode extends RenderNodeBase {
   readonly strokeWidth: number
 }
 
-export type RenderNode = RenderRectNode | RenderEllipseNode | RenderLineNode
-
-export interface RenderBackgroundRef {
+/** Raster layers share the ordered scene graph with annotation nodes. */
+export interface RenderImageNode extends RenderNodeBase {
+  readonly kind: 'image'
   readonly resourceId: string
+  readonly x: number
+  readonly y: number
   readonly width: number
   readonly height: number
+  readonly scaleX: number
+  readonly scaleY: number
 }
+
+export type RenderNode =
+  RenderRectNode | RenderEllipseNode | RenderLineNode | RenderImageNode
 
 export interface RenderSceneSnapshot {
   readonly width: number
   readonly height: number
-  readonly background?: RenderBackgroundRef
   readonly nodes: readonly RenderNode[]
 }
 
@@ -141,6 +147,22 @@ function freezeLineNode(node: RenderLineNode): RenderLineNode {
   return Object.freeze({ ...node, stroke: freezeColor(node.stroke) })
 }
 
+function freezeImageNode(node: RenderImageNode): RenderImageNode {
+  if (!node.resourceId)
+    throw new Error(`${node.id}.resourceId must not be empty`)
+  assertFinite(node.x, `${node.id}.x`)
+  assertFinite(node.y, `${node.id}.y`)
+  assertPositive(node.width, `${node.id}.width`)
+  assertPositive(node.height, `${node.id}.height`)
+  if (!Number.isFinite(node.scaleX) || node.scaleX === 0) {
+    throw new RangeError(`${node.id}.scaleX must be finite and non-zero`)
+  }
+  if (!Number.isFinite(node.scaleY) || node.scaleY === 0) {
+    throw new RangeError(`${node.id}.scaleY must be finite and non-zero`)
+  }
+  return Object.freeze({ ...node })
+}
+
 function assertNever(value: never): never {
   throw new Error(`unsupported render node: ${String(value)}`)
 }
@@ -154,19 +176,11 @@ function freezeNode(node: RenderNode): RenderNode {
       return freezeEllipseNode(node)
     case 'line':
       return freezeLineNode(node)
+    case 'image':
+      return freezeImageNode(node)
     default:
       return assertNever(node)
   }
-}
-
-function freezeBackground(
-  background: RenderBackgroundRef,
-): RenderBackgroundRef {
-  if (!background.resourceId)
-    throw new Error('background.resourceId must not be empty')
-  assertPositive(background.width, 'background.width')
-  assertPositive(background.height, 'background.height')
-  return Object.freeze({ ...background })
 }
 
 export function createRenderSceneSnapshot(
@@ -181,14 +195,9 @@ export function createRenderSceneSnapshot(
     ids.add(node.id)
     return freezeNode(node)
   })
-  const background =
-    input.background === undefined
-      ? undefined
-      : freezeBackground(input.background)
   return Object.freeze({
     width: input.width,
     height: input.height,
-    ...(background === undefined ? {} : { background }),
     nodes: Object.freeze(nodes),
   })
 }

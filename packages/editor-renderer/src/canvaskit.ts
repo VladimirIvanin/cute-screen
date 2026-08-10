@@ -43,6 +43,8 @@ interface CanvasKitCanvas {
   save(): number
   restore(): void
   rotate(rotation: number, centerX: number, centerY: number): void
+  translate(x: number, y: number): void
+  scale(x: number, y: number): void
   drawRect(rect: Float32Array, paint: CanvasKitPaint): void
   drawOval(rect: Float32Array, paint: CanvasKitPaint): void
   drawLine(
@@ -223,24 +225,55 @@ function drawScene(
 ): void {
   const canvas = surface.getCanvas()
   canvas.clear(canvasKit.TRANSPARENT)
-  if (scene.background) {
-    const resource = resources.get(scene.background.resourceId)
-    if (resource) {
-      const paint = new canvasKit.Paint()
-      try {
+  for (const node of scene.nodes) {
+    if (node.kind !== 'image') {
+      drawNodesCanvasKit(canvasKit, canvas, [node])
+      continue
+    }
+    if (!node.visible || node.opacity === 0) continue
+    const resource = resources.get(node.resourceId)
+    const fill = new canvasKit.Paint()
+    const stroke = new canvasKit.Paint()
+    try {
+      canvas.save()
+      canvas.translate(node.x, node.y)
+      canvas.rotate(node.rotation, 0, 0)
+      canvas.scale(node.scaleX, node.scaleY)
+      if (resource) {
+        fill.setAntiAlias(true)
+        fill.setColorComponents(1, 1, 1, node.opacity)
         canvas.drawImageRect(
           resource.image,
           canvasKit.XYWHRect(0, 0, resource.width, resource.height),
-          canvasKit.XYWHRect(0, 0, scene.width, scene.height),
-          paint,
+          canvasKit.XYWHRect(0, 0, node.width, node.height),
+          fill,
           false,
         )
-      } finally {
-        paint.delete()
+      } else {
+        configurePaint(
+          canvasKit,
+          fill,
+          { red: 0.72, green: 0.28, blue: 0.28, alpha: 0.16 },
+          node.opacity,
+          'fill',
+        )
+        configurePaint(
+          canvasKit,
+          stroke,
+          { red: 0.72, green: 0.28, blue: 0.28, alpha: 0.9 },
+          node.opacity,
+          'stroke',
+        )
+        const bounds = canvasKit.XYWHRect(0, 0, node.width, node.height)
+        canvas.drawRect(bounds, fill)
+        canvas.drawRect(bounds, stroke)
       }
+    } finally {
+      canvas.restore()
+      fill.delete()
+      stroke.delete()
     }
   }
-  drawNodesCanvasKit(canvasKit, canvas, scene.nodes)
   surface.flush()
 }
 

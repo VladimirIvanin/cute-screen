@@ -1,5 +1,9 @@
 export { CommandManager } from './commands/manager'
-export { applyEditorCommand, revertEditorCommand } from './commands/operations'
+export {
+  applyEditorCommand,
+  createFlipCanvasCommand,
+  revertEditorCommand,
+} from './commands/operations'
 export type {
   CommandManagerOptions,
   EditorCommand,

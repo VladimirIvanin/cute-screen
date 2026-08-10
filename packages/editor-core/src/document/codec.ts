@@ -185,6 +185,9 @@ function parseImagePayload(value: unknown, field: string): ImageLayerPayload {
   if (input.orientationApplied !== true) {
     throw new Error(`${field}.orientationApplied must be true`)
   }
+  if (input.role !== 'base' && input.role !== 'content') {
+    throw new Error(`${field}.role is invalid`)
+  }
   const color = colorToJson(parseColor(input.color, `${field}.color`))
   const extras = collectExtras(input, [
     'blobHash',
@@ -193,6 +196,7 @@ function parseImagePayload(value: unknown, field: string): ImageLayerPayload {
     'format',
     'orientationApplied',
     'color',
+    'role',
   ])
   return Object.freeze({
     ...(extras ?? {}),
@@ -208,6 +212,7 @@ function parseImagePayload(value: unknown, field: string): ImageLayerPayload {
     format: input.format,
     orientationApplied: true,
     color,
+    role: input.role,
   })
 }
 
@@ -219,6 +224,7 @@ function parseLayer(value: unknown, index: number): LayerNode {
     'id',
     'kind',
     'transform',
+    'localBounds',
     'opacity',
     'visible',
     'locked',
@@ -236,12 +242,84 @@ function parseLayer(value: unknown, index: number): LayerNode {
     id: readStableId(input.id, `${field}.id`),
     kind: input.kind,
     transform: parseTransform(input.transform, `${field}.transform`),
+    ...(input.localBounds === undefined
+      ? {}
+      : { localBounds: parseRect(input.localBounds, `${field}.localBounds`) }),
     opacity,
     visible: readBoolean(input.visible, `${field}.visible`),
     locked: readBoolean(input.locked, `${field}.locked`),
     payload,
     ...(extras === undefined ? {} : { extras }),
   }) as LayerNode
+}
+
+function stableBaseLayerId(documentId: string, sourceHash: string): string {
+  const seed = `${sourceHash.slice(0, 8)}-${sourceHash.slice(8, 12)}-7${sourceHash.slice(13, 16)}-8${sourceHash.slice(17, 20)}-${sourceHash.slice(20, 32)}`
+  return seed === documentId ? documentId : seed
+}
+
+function migrateV1ToV2(raw: Record<string, unknown>): Record<string, unknown> {
+  const source = readJsonObject(raw.source, 'source')
+  const layers = Array.isArray(raw.layers) ? raw.layers : []
+  const baseId = stableBaseLayerId(
+    readStableId(raw.id, 'id'),
+    readSha256(source.blobHash, 'source.blobHash'),
+  )
+  const withBounds: Record<string, unknown>[] = layers.map((layer) => {
+    const input = readJsonObject(layer, 'layer')
+    return {
+      ...input,
+      localBounds: input.localBounds ?? { x: 0, y: 0, width: 1, height: 1 },
+      ...(input.kind === 'image'
+        ? {
+            payload: {
+              ...readJsonObject(input.payload, 'layer.payload'),
+              role:
+                readJsonObject(input.payload, 'layer.payload').role ??
+                'content',
+            },
+          }
+        : {}),
+    }
+  })
+  const hasBase = withBounds.some((layer) => {
+    const payload = layer.payload
+    return (
+      layer.kind === 'image' &&
+      payload &&
+      typeof payload === 'object' &&
+      (payload as Record<string, unknown>).role === 'base'
+    )
+  })
+  const base = {
+    id: baseId,
+    kind: 'image',
+    localBounds: { x: 0, y: 0, width: source.width, height: source.height },
+    transform: {
+      translateX: 0,
+      translateY: 0,
+      rotation: 0,
+      scaleX: 1,
+      scaleY: 1,
+    },
+    opacity: 1,
+    visible: true,
+    locked: true,
+    payload: {
+      blobHash: source.blobHash,
+      intrinsicWidth: source.width,
+      intrinsicHeight: source.height,
+      format: source.format,
+      orientationApplied: true,
+      color: source.color,
+      role: 'base',
+    },
+  }
+  return {
+    ...raw,
+    schemaVersion: 2,
+    layers: hasBase ? withBounds : [base, ...withBounds],
+  }
 }
 
 function migrateV0ToV1(raw: Record<string, unknown>): Record<string, unknown> {
@@ -257,7 +335,8 @@ function migrateToCurrent(
   raw: Record<string, unknown>,
   schemaVersion: number,
 ): Record<string, unknown> {
-  return schemaVersion === 0 ? migrateV0ToV1(raw) : raw
+  const v1 = schemaVersion === 0 ? migrateV0ToV1(raw) : raw
+  return schemaVersion < 2 ? migrateV1ToV2(v1) : v1
 }
 
 function documentToJson(document: EditorDocumentV1): JsonObject {
@@ -272,6 +351,10 @@ function documentToJson(document: EditorDocumentV1): JsonObject {
       scaleX: layer.transform.scaleX,
       scaleY: layer.transform.scaleY,
     },
+    localBounds:
+      layer.localBounds === undefined
+        ? { x: 0, y: 0, width: 1, height: 1 }
+        : rectToJson(layer.localBounds),
     opacity: layer.opacity,
     visible: layer.visible,
     locked: layer.locked,
@@ -320,12 +403,22 @@ export function parseEditorDocument(
   })
   if (!Array.isArray(migrated.layers))
     throw new Error('layers must be an array')
+  const source = parseSource(migrated.source)
   const layers = migrated.layers.map((layer, index) => parseLayer(layer, index))
   const ids = new Set<string>()
+  let baseCount = 0
   for (const layer of layers) {
     if (ids.has(layer.id)) throw new Error(`duplicate layer id: ${layer.id}`)
     ids.add(layer.id)
+    if (layer.kind === 'image' && layer.payload.role === 'base') {
+      baseCount += 1
+      if (layer.payload.blobHash !== source.blobHash) {
+        throw new Error('base layer must reference source.blobHash')
+      }
+    }
   }
+  if (baseCount > 1)
+    throw new Error('document must not contain more than one base layer')
   const crop =
     migrated.crop === null || migrated.crop === undefined
       ? null
@@ -353,7 +446,7 @@ export function parseEditorDocument(
   const document: EditorDocumentV1 = {
     schemaVersion: EDITOR_DOCUMENT_SCHEMA_VERSION,
     id: readStableId(migrated.id, 'id'),
-    source: parseSource(migrated.source),
+    source,
     canvas: canvasSize,
     crop,
     layers: Object.freeze(layers),

@@ -1,4 +1,7 @@
-import { serializeEditorDocument } from '../document/codec'
+import {
+  normalizeEditorDocument,
+  serializeEditorDocument,
+} from '../document/codec'
 import { jsonEquals } from '../document/json'
 import type { EditorDocumentV1 } from '../document/types'
 import { applyEditorCommand } from './operations'
@@ -67,7 +70,7 @@ export class CommandManager {
   #bytes = 0
 
   constructor(document: EditorDocumentV1, options: CommandManagerOptions = {}) {
-    this.#document = document
+    this.#document = normalizeEditorDocument(document)
     this.#maxEntries = options.maxEntries ?? DEFAULT_MAX_ENTRIES
     this.#maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES
     assertLimit(this.#maxEntries, 'maxEntries')

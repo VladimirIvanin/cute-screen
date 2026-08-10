@@ -16,6 +16,15 @@ export type EditorCommand =
     }>
   | Readonly<{ type: 'duplicateLayer'; sourceId: string; layer: LayerNode }>
   | Readonly<{ type: 'setCrop'; before: Rect | null; after: Rect | null }>
+  | Readonly<{ type: 'batch'; commands: readonly EditorCommand[] }>
+  | Readonly<{
+      type: 'flipCanvas'
+      axis: 'horizontal' | 'vertical'
+      beforeLayers: readonly LayerNode[]
+      afterLayers: readonly LayerNode[]
+      beforeCrop: Rect | null
+      afterCrop: Rect | null
+    }>
 
 export interface EditorSnapshot {
   readonly document: EditorDocumentV1

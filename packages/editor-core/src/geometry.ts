@@ -10,8 +10,9 @@ export function transformToMatrix(transform: Transform2D): Matrix2D {
   assertFinite(transform.rotation, 'transform.rotation')
   assertFinite(transform.scaleX, 'transform.scaleX')
   assertFinite(transform.scaleY, 'transform.scaleY')
-  const cosine = Math.cos(transform.rotation)
-  const sine = Math.sin(transform.rotation)
+  const radians = (transform.rotation * Math.PI) / 180
+  const cosine = Math.cos(radians)
+  const sine = Math.sin(radians)
   return Object.freeze({
     a: cosine * transform.scaleX,
     b: sine * transform.scaleX,

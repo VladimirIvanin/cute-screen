@@ -46,6 +46,8 @@ describe('render scene validation', () => {
       ],
     })
 
-    expect(Object.isFrozen(scene.nodes[0]?.stroke)).toBe(true)
+    const first = scene.nodes[0]
+    if (!first || first.kind !== 'ellipse') throw new Error('ellipse missing')
+    expect(Object.isFrozen(first.stroke)).toBe(true)
   })
 })

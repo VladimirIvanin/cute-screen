@@ -7,6 +7,69 @@ import {
 } from '@cute-screen/editor-vue'
 
 describe('M04 capture action feedback', () => {
+  it('keeps ordered multi-selection transient and clears it without document state', () => {
+    const store = useEditorShellStore(createEditorShellPinia())
+    store.selectLayer('bottom')
+    store.selectLayer('top', true)
+    expect(store.selectedLayerIds).toEqual(['bottom', 'top'])
+    expect(store.selectedLayerId).toBe('bottom')
+    store.selectLayer('bottom', true)
+    expect(store.selectedLayerIds).toEqual(['top'])
+    expect(store.selectedLayerId).toBe('top')
+    store.clearLayerSelection()
+    expect(store.selectedLayerIds).toEqual([])
+  })
+
+  it('selects an inclusive Layers-panel range from the primary selection', () => {
+    const store = useEditorShellStore(createEditorShellPinia())
+    store.setLayers(
+      ['top', 'middle', 'bottom'].map((id) => ({
+        id,
+        icon: 'shape' as const,
+        name: id,
+        visible: true,
+        locked: false,
+        opacity: 1,
+        rotation: 0,
+      })),
+    )
+    store.selectLayer('top')
+    store.selectLayer('bottom', false, true)
+
+    expect(store.selectedLayerIds).toEqual(['top', 'middle', 'bottom'])
+    expect(store.selectedLayerId).toBe('top')
+  })
+
+  it('switches between fit and custom viewport zoom explicitly', () => {
+    const store = useEditorShellStore(createEditorShellPinia())
+    expect(store.zoomMode).toBe('fit')
+    store.setFitZoom(625)
+    expect(store.zoom).toBe(625)
+    expect(store.zoomMode).toBe('fit')
+    store.setZoom(125)
+    expect(store.zoomMode).toBe('custom')
+    store.enableFit()
+    expect(store.zoomMode).toBe('fit')
+  })
+
+  it('preserves viewport zoom and mode independently for each frame', () => {
+    const store = useEditorShellStore(createEditorShellPinia())
+    store.setFrames([
+      { id: 'one', label: '1', selected: true },
+      { id: 'two', label: '2', selected: false },
+    ])
+    store.setZoom(175)
+    store.selectFrame('two')
+    store.setFitZoom(80)
+    store.selectFrame('one')
+
+    expect(store.zoom).toBe(175)
+    expect(store.zoomMode).toBe('custom')
+    store.selectFrame('two')
+    expect(store.zoom).toBe(80)
+    expect(store.zoomMode).toBe('fit')
+  })
+
   it('shows native capture progress without turning it into a terminal result', async () => {
     const store = useEditorShellStore(createEditorShellPinia())
     let reportProgress: ((state: 'selecting') => void) | undefined

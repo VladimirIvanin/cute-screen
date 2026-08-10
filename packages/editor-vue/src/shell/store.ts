@@ -38,8 +38,14 @@ export const useEditorShellStore = defineStore(
     const documentState = ref<ShellDocumentState>({ kind: 'empty' })
     const activeToolId = ref<string | undefined>()
     const selectedLayerId = ref<string | undefined>()
+    const selectedLayerIds = ref<readonly string[]>([])
     const activeFrameId = ref<string | undefined>()
     const zoom = ref(100)
+    const zoomMode = ref<'fit' | 'custom'>('fit')
+    const frameViewports = new Map<
+      string,
+      { readonly zoom: number; readonly mode: 'fit' | 'custom' }
+    >()
     const layersOpen = ref(false)
     const preferences = ref(defaultPreferences(navigator.languages))
     const systemDark = ref(false)
@@ -105,20 +111,60 @@ export const useEditorShellStore = defineStore(
       frames.value = value.frames ?? []
       activeToolId.value = value.activeToolId
       selectedLayerId.value = value.selectedLayerId
+      selectedLayerIds.value = value.selectedLayerId
+        ? [value.selectedLayerId]
+        : []
       activeFrameId.value = value.frames?.find((frame) => frame.selected)?.id
     }
     function setFrames(value: readonly FrameSummary[]): void {
       frames.value = value
       activeFrameId.value = value.find((frame) => frame.selected)?.id
     }
+    function setLayers(value: readonly LayerSummary[]): void {
+      layers.value = value
+    }
     function selectTool(id: string): void {
       activeToolId.value = id
     }
-    function selectLayer(id: string): void {
-      selectedLayerId.value = id
+    function selectLayer(id: string, toggle = false, range = false): void {
+      const anchor = selectedLayerId.value
+      const anchorIndex = anchor
+        ? layers.value.findIndex((layer) => layer.id === anchor)
+        : -1
+      const targetIndex = layers.value.findIndex((layer) => layer.id === id)
+      const selected =
+        range && anchorIndex >= 0 && targetIndex >= 0
+          ? layers.value
+              .slice(
+                Math.min(anchorIndex, targetIndex),
+                Math.max(anchorIndex, targetIndex) + 1,
+              )
+              .map((layer) => layer.id)
+          : toggle
+            ? selectedLayerIds.value.includes(id)
+              ? selectedLayerIds.value.filter((value) => value !== id)
+              : [...selectedLayerIds.value, id]
+            : [id]
+      selectedLayerIds.value = selected
+      selectedLayerId.value = range && anchor ? anchor : selected[0]
+    }
+    function clearLayerSelection(): void {
+      selectedLayerId.value = undefined
+      selectedLayerIds.value = []
     }
     function selectFrame(id: string): void {
+      if (activeFrameId.value) {
+        frameViewports.set(activeFrameId.value, {
+          zoom: zoom.value,
+          mode: zoomMode.value,
+        })
+      }
       activeFrameId.value = id
+      const preserved = frameViewports.get(id)
+      if (preserved) {
+        zoom.value = preserved.zoom
+        zoomMode.value = preserved.mode
+      }
     }
     function setLayersOpen(value: boolean): void {
       layersOpen.value = value
@@ -127,7 +173,33 @@ export const useEditorShellStore = defineStore(
       layersOpen.value = !layersOpen.value
     }
     function setZoom(value: number): void {
-      zoom.value = Math.max(25, Math.min(400, value))
+      zoom.value = Math.max(10, Math.min(1600, value))
+      zoomMode.value = 'custom'
+      if (activeFrameId.value) {
+        frameViewports.set(activeFrameId.value, {
+          zoom: zoom.value,
+          mode: zoomMode.value,
+        })
+      }
+    }
+    function setFitZoom(value: number): void {
+      zoom.value = Math.max(10, Math.min(1600, value))
+      zoomMode.value = 'fit'
+      if (activeFrameId.value) {
+        frameViewports.set(activeFrameId.value, {
+          zoom: zoom.value,
+          mode: zoomMode.value,
+        })
+      }
+    }
+    function enableFit(): void {
+      zoomMode.value = 'fit'
+      if (activeFrameId.value) {
+        frameViewports.set(activeFrameId.value, {
+          zoom: zoom.value,
+          mode: zoomMode.value,
+        })
+      }
     }
     function clearFeedback(): void {
       actionState.value = { status: 'idle' }
@@ -208,6 +280,7 @@ export const useEditorShellStore = defineStore(
       actionState,
       canCopyOrExport,
       clearFeedback,
+      clearLayerSelection,
       cancelAction,
       documentState,
       documentHistory,
@@ -224,11 +297,15 @@ export const useEditorShellStore = defineStore(
       selectLayer,
       selectTool,
       selectedLayerId,
+      selectedLayerIds,
       setDocumentState,
       setDocumentHistory,
       setCaptureProgress,
+      enableFit,
+      setFitZoom,
       setFixture,
       setFrames,
+      setLayers,
       setLayersOpen,
       setLocale,
       setSystemDark,
@@ -236,6 +313,7 @@ export const useEditorShellStore = defineStore(
       setZoom,
       toggleLayers,
       zoom,
+      zoomMode,
     }
   },
 )

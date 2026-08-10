@@ -2,9 +2,17 @@
 import { UiIcon } from '../icon'
 defineProps<{
   zoom: number
-  t: (key: 'zoom' | 'zoomOut' | 'zoomIn' | 'zoomValue') => string
+  t: (
+    key:
+      | 'zoom'
+      | 'zoomOut'
+      | 'zoomIn'
+      | 'zoomValue'
+      | 'zoomPercentage'
+      | 'fitZoom',
+  ) => string
 }>()
-const emit = defineEmits<{ zoom: [value: number] }>()
+const emit = defineEmits<{ zoom: [value: number]; fit: [] }>()
 </script>
 
 <template>
@@ -20,12 +28,45 @@ const emit = defineEmits<{ zoom: [value: number] }>()
     </button>
     <button
       type="button"
+      class="cs-zoom-fit"
+      :aria-label="t('fitZoom')"
+      :title="t('fitZoom')"
+      @click="emit('fit')"
+    >
+      Fit
+    </button>
+    <button
+      type="button"
       class="cs-zoom-value"
       :title="t('zoomValue')"
       @click="emit('zoom', 100)"
     >
       {{ zoom }}%
     </button>
+    <input
+      class="cs-zoom-input"
+      type="number"
+      min="10"
+      max="1600"
+      step="1"
+      :value="zoom"
+      :aria-label="t('zoomPercentage')"
+      @change="emit('zoom', Number(($event.target as HTMLInputElement).value))"
+    />
+    <select
+      class="cs-zoom-presets"
+      :value="zoom"
+      :aria-label="t('zoom')"
+      @change="emit('zoom', Number(($event.target as HTMLSelectElement).value))"
+    >
+      <option
+        v-for="value in [25, 50, 75, 100, 125, 150, 200, 400]"
+        :key="value"
+        :value="value"
+      >
+        {{ value }}%
+      </option>
+    </select>
     <button
       type="button"
       class="cs-icon-button"
