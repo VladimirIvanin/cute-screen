@@ -1,5 +1,6 @@
 import type { EditorRendererBoundary } from '@cute-screen/editor-renderer'
 import type { EditorDocumentV1 } from '@cute-screen/editor-renderer'
+import './fonts'
 import './shell/shell.css'
 
 export {
@@ -16,14 +17,19 @@ export {
   ImageTransportError,
   loadImageWithBinaryFallback,
   type ImageTransportBridge,
+  type ClipboardBridge,
+  type NativeClipboardSnapshot,
+  type ClipboardBitmapSnapshot,
   type ImageTransportErrorCode,
   type LoadedImageResource,
   type LoadImageOptions,
   type ObjectUrlLifecycle,
   type StagedImageMetadata,
 } from './image-transport'
+export type { SystemFontCatalogBridge, SystemFontFace } from './font-catalog'
 export {
   TextureResourceResolver,
+  type ContentImageBridge,
   type TextureFillBridge,
   type TextureImportOutcome,
   type TextureResourceState,

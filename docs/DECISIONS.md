@@ -288,3 +288,8 @@ bytes передаются только raw binary IPC.
 layers одной command только после успешной записи clipboard. Пакеты шрифтов,
 SVG и assets добавляются лишь после license/security audit; platform evidence
 обязано отдельно покрыть Linux X11/Wayland, Windows и macOS.
+
+Bundled baseline M07 — `@fontsource/roboto` 5.3.0 (OFL-1.1): только
+Regular/Bold и соответствующие italic faces. Это audited dependency, включаемая
+в webview bundle; установленный system font не подменяет document reference
+молча.

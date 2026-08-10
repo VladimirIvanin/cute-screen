@@ -25,6 +25,7 @@ type Context2D = Pick<
   | 'moveTo'
   | 'lineTo'
   | 'closePath'
+  | 'clip'
   | 'quadraticCurveTo'
   | 'fill'
   | 'stroke'
@@ -45,6 +46,16 @@ type Context2D = Pick<
   | 'createRadialGradient'
   | 'createPattern'
   | 'setLineDash'
+  | 'fillText'
+  | 'strokeText'
+  | 'measureText'
+  | 'font'
+  | 'textAlign'
+  | 'textBaseline'
+  | 'shadowColor'
+  | 'shadowOffsetX'
+  | 'shadowOffsetY'
+  | 'shadowBlur'
 >
 
 export interface Canvas2DLike {
@@ -194,6 +205,11 @@ export function drawNodes2D(
         const centerY = node.y + node.height / 2
         withRotation(context, node, centerX, centerY, () => {
           context.fillStyle = paintStyle(context, node.fill, resources)
+          if (node.stroke && (node.strokeWidth ?? 0) > 0) {
+            context.strokeStyle = cssColor(node.stroke)
+            context.lineWidth = node.strokeWidth ?? 1
+            context.lineJoin = node.lineJoin ?? 'miter'
+          }
           if ((node.cornerRadius ?? 0) > 0) {
             roundedRectPath(
               context,
@@ -307,6 +323,117 @@ export function drawNodes2D(
         // Image resources are resolved by the renderer; no placeholder is drawn
         // here so overlays stay independent from committed scene rendering.
         break
+      case 'text': {
+        const centerX = node.x + node.width / 2
+        const centerY = node.y + node.height / 2
+        withRotation(context, node, centerX, centerY, () => {
+          context.font = `${node.fontStyle} ${node.fontWeight} ${node.fontSize}px "${node.fontFamily.replaceAll('"', '')}", sans-serif`
+          context.textBaseline = 'top'
+          context.textAlign =
+            node.align === 'center'
+              ? 'center'
+              : node.align === 'end'
+                ? 'right'
+                : 'left'
+          context.fillStyle = paintStyle(context, node.fill, resources)
+          const x =
+            node.align === 'center'
+              ? node.x + node.width / 2
+              : node.align === 'end'
+                ? node.x + node.width
+                : node.x
+          const drawLine = (
+            line: string,
+            y: number,
+            draw: (text: string, x: number, y: number) => void,
+          ): void => {
+            const spacing = node.letterSpacing ?? 0
+            if (spacing === 0) {
+              draw(line, x, y)
+              return
+            }
+            const characters = Array.from(line)
+            const width = characters.reduce(
+              (total, character, index) =>
+                total +
+                context.measureText(character).width +
+                (index === characters.length - 1 ? 0 : spacing),
+              0,
+            )
+            let cursor =
+              node.align === 'center'
+                ? x - width / 2
+                : node.align === 'end'
+                  ? x - width
+                  : x
+            for (const character of characters) {
+              draw(character, cursor, y)
+              cursor += context.measureText(character).width + spacing
+            }
+          }
+          for (const shadow of node.shadows ?? []) {
+            context.shadowColor = cssColor(shadow.color)
+            context.shadowOffsetX = shadow.offsetX
+            context.shadowOffsetY = shadow.offsetY
+            context.shadowBlur = shadow.blur
+            // Draw a colored source as well as its shadow; the final text pass
+            // below covers the source while retaining the blurred perimeter.
+            context.fillStyle = cssColor(shadow.color)
+            for (const [index, line] of node.text.split('\n').entries()) {
+              drawLine(line, node.y + index * node.lineHeight, (text, x, y) =>
+                context.fillText(text, x, y),
+              )
+            }
+          }
+          context.shadowColor = 'rgba(0, 0, 0, 0)'
+          context.shadowOffsetX = 0
+          context.shadowOffsetY = 0
+          context.shadowBlur = 0
+          for (const [index, line] of node.text.split('\n').entries()) {
+            if (node.stroke && (node.strokeWidth ?? 0) > 0) {
+              drawLine(line, node.y + index * node.lineHeight, (text, x, y) =>
+                context.strokeText(text, x, y),
+              )
+            }
+            drawLine(line, node.y + index * node.lineHeight, (text, x, y) =>
+              context.fillText(text, x, y),
+            )
+          }
+          if (node.underline) {
+            context.strokeStyle = paintStyle(context, node.fill, resources)
+            context.lineWidth = Math.max(1, node.fontSize * 0.06)
+            for (const [index, line] of node.text.split('\n').entries()) {
+              const spacing = node.letterSpacing ?? 0
+              const characters = Array.from(line)
+              const width =
+                spacing === 0
+                  ? context.measureText(line).width
+                  : characters.reduce(
+                      (total, character, characterIndex) =>
+                        total +
+                        context.measureText(character).width +
+                        (characterIndex === characters.length - 1
+                          ? 0
+                          : spacing),
+                      0,
+                    )
+              const startX =
+                node.align === 'center'
+                  ? x - width / 2
+                  : node.align === 'end'
+                    ? x - width
+                    : x
+              const underlineY =
+                node.y + index * node.lineHeight + node.fontSize * 1.06
+              context.beginPath()
+              context.moveTo(startX, underlineY)
+              context.lineTo(startX + width, underlineY)
+              context.stroke()
+            }
+          }
+        })
+        break
+      }
     }
   }
 }
@@ -423,6 +550,17 @@ export class Canvas2DRenderer implements Renderer {
       context.rotate((node.rotation * Math.PI) / 180)
       context.scale(node.scaleX, node.scaleY)
       if (resource) {
+        if ((node.cornerRadius ?? 0) > 0) {
+          roundedRectPath(
+            context,
+            0,
+            0,
+            node.width,
+            node.height,
+            node.cornerRadius ?? 0,
+          )
+          context.clip()
+        }
         context.drawImage(resource.source, 0, 0, node.width, node.height)
       } else {
         // A missing blob is a recoverable per-resource failure: preserve the
@@ -432,8 +570,39 @@ export class Canvas2DRenderer implements Renderer {
         context.fillStyle = 'rgba(184, 71, 71, 0.16)'
         context.strokeStyle = 'rgba(184, 71, 71, 0.9)'
         context.lineWidth = 1
-        context.fillRect(0, 0, node.width, node.height)
-        context.strokeRect(0, 0, node.width, node.height)
+        if ((node.cornerRadius ?? 0) > 0) {
+          roundedRectPath(
+            context,
+            0,
+            0,
+            node.width,
+            node.height,
+            node.cornerRadius ?? 0,
+          )
+          context.fill()
+          context.stroke()
+        } else {
+          context.fillRect(0, 0, node.width, node.height)
+          context.strokeRect(0, 0, node.width, node.height)
+        }
+      }
+      if (node.stroke && (node.strokeWidth ?? 0) > 0) {
+        context.strokeStyle = cssColor(node.stroke)
+        context.lineWidth = node.strokeWidth ?? 1
+        context.lineJoin = node.lineJoin ?? 'miter'
+        if ((node.cornerRadius ?? 0) > 0) {
+          roundedRectPath(
+            context,
+            0,
+            0,
+            node.width,
+            node.height,
+            node.cornerRadius ?? 0,
+          )
+          context.stroke()
+        } else {
+          context.strokeRect(0, 0, node.width, node.height)
+        }
       }
       context.restore()
     }

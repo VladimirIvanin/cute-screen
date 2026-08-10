@@ -139,6 +139,49 @@ describe('Canvas2DRenderer', () => {
     ).toBeGreaterThan(0)
   })
 
+  it('clips a rounded content-image placeholder and draws its border', async () => {
+    const renderer = new Canvas2DRenderer()
+    const sceneCanvas = createCanvas(64, 64)
+    const overlayCanvas = createCanvas(64, 64)
+    await renderer.initialize({
+      scene: asHtmlCanvas(sceneCanvas),
+      overlay: asHtmlCanvas(overlayCanvas),
+      dpr: 1,
+      correlationId: 'rounded-image',
+    })
+    renderer.setScene(
+      createRenderSceneSnapshot({
+        width: 64,
+        height: 64,
+        nodes: [
+          {
+            kind: 'image',
+            id: 'missing-rounded',
+            resourceId: 'not-loaded',
+            x: 8,
+            y: 8,
+            width: 32,
+            height: 32,
+            scaleX: 1,
+            scaleY: 1,
+            cornerRadius: 12,
+            stroke: { red: 0.2, green: 0.6, blue: 1, alpha: 1 },
+            strokeWidth: 3,
+            lineJoin: 'round',
+            rotation: 0,
+            opacity: 1,
+            visible: true,
+          },
+        ],
+      }),
+    )
+
+    renderer.render(['scene'])
+    const context = sceneCanvas.getContext('2d')
+    expect(context?.getImageData(8, 8, 1, 1).data[3]).toBe(0)
+    expect(context?.getImageData(24, 8, 1, 1).data[2]).toBeGreaterThan(0)
+  })
+
   it('preserves scene-node z-order across image and vector nodes', async () => {
     const renderer = new Canvas2DRenderer()
     const sceneCanvas = createCanvas(64, 64)
@@ -187,6 +230,103 @@ describe('Canvas2DRenderer', () => {
     renderer.render(['scene'])
     const pixel = sceneCanvas.getContext('2d')?.getImageData(28, 28, 1, 1).data
     expect(pixel?.[0]).toBeGreaterThan(0)
+  })
+
+  it('renders committed multiline text through the same Canvas2D scene path', async () => {
+    const renderer = new Canvas2DRenderer()
+    const sceneCanvas = createCanvas(160, 80)
+    await renderer.initialize({
+      scene: asHtmlCanvas(sceneCanvas),
+      overlay: asHtmlCanvas(createCanvas(160, 80)),
+      dpr: 1,
+      correlationId: 'text-render',
+    })
+    renderer.setScene(
+      createRenderSceneSnapshot({
+        width: 160,
+        height: 80,
+        nodes: [
+          {
+            id: 'text',
+            kind: 'text',
+            text: 'A\nB',
+            x: 12,
+            y: 12,
+            width: 60,
+            height: 48,
+            fontFamily: 'sans-serif',
+            fontSize: 24,
+            fontWeight: 400,
+            fontStyle: 'normal',
+            align: 'start',
+            lineHeight: 28,
+            rotation: 0,
+            opacity: 1,
+            visible: true,
+            fill: { red: 1, green: 0, blue: 0, alpha: 1 },
+          },
+        ],
+      }),
+    )
+
+    renderer.render(['scene'])
+    const alpha = sceneCanvas
+      .getContext('2d')
+      ?.getImageData(12, 20, 24, 30).data
+    expect(alpha?.some((value, index) => index % 4 === 3 && value > 0)).toBe(
+      true,
+    )
+  })
+
+  it('renders a bounded text shadow stack behind the final glyph pass', async () => {
+    const renderer = new Canvas2DRenderer()
+    const sceneCanvas = createCanvas(80, 64)
+    await renderer.initialize({
+      scene: asHtmlCanvas(sceneCanvas),
+      overlay: asHtmlCanvas(createCanvas(80, 64)),
+      dpr: 1,
+      correlationId: 'text-shadow',
+    })
+    renderer.setScene(
+      createRenderSceneSnapshot({
+        width: 80,
+        height: 64,
+        nodes: [
+          {
+            kind: 'text',
+            id: 'shadowed-i',
+            text: 'I',
+            x: 10,
+            y: 10,
+            width: 20,
+            height: 36,
+            fontFamily: 'sans-serif',
+            fontSize: 32,
+            fontWeight: 400,
+            fontStyle: 'normal',
+            align: 'start',
+            lineHeight: 36,
+            fill: { red: 1, green: 1, blue: 1, alpha: 1 },
+            shadows: [
+              {
+                color: { red: 1, green: 0, blue: 0, alpha: 1 },
+                offsetX: 20,
+                offsetY: 0,
+                blur: 0,
+              },
+            ],
+            rotation: 0,
+            opacity: 1,
+            visible: true,
+          },
+        ],
+      }),
+    )
+
+    renderer.render(['scene'])
+    const pixel = sceneCanvas.getContext('2d')?.getImageData(34, 25, 1, 1).data
+    expect(pixel?.[0]).toBeGreaterThan(0)
+    expect(pixel?.[3]).toBeGreaterThan(0)
   })
 
   it('renders renderer-neutral linear gradients in exported output', async () => {

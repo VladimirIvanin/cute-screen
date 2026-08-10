@@ -8,8 +8,9 @@ export type TextureImportOutcome =
   | Readonly<{
       readonly kind: 'imported'
       readonly blobHash: string
-      readonly format: 'png' | 'jpeg' | 'webp'
-      readonly mimeType: 'image/png' | 'image/jpeg' | 'image/webp'
+      readonly format: 'png' | 'jpeg' | 'webp' | 'svg'
+      readonly mimeType:
+        'image/png' | 'image/jpeg' | 'image/webp' | 'image/svg+xml'
       readonly width: number
       readonly height: number
       readonly resourceToken: string
@@ -22,6 +23,11 @@ export interface TextureFillBridge extends ImageTransportBridge {
     blobHash: string,
     correlationId: string,
   ): Promise<TextureImportOutcome>
+}
+
+/** Separate from texture selection: the result becomes a document image layer. */
+export interface ContentImageBridge extends ImageTransportBridge {
+  importContentImage(correlationId: string): Promise<TextureImportOutcome>
 }
 
 export type TextureResourceState =

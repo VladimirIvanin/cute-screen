@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { UiIcon } from '../icon'
 import type { CanvasViewportHosts, ShellDocumentState } from '../types'
 import {
@@ -15,10 +15,42 @@ import {
   type SnapCandidate,
   type Transform2D,
   type ImageResource,
+  type SrgbColor,
+  type ShadowStyle,
   createDrawingLayer,
+  createTextLayer,
+  createTextCommitCommand,
+  createNumberedMarkerLayer,
+  createCalloutLayer,
   type DrawingDefaults,
   type DrawingTool,
+  type FontReference,
+  type CalloutLayer,
+  type BlendMode,
+  type NumberedMarkerLayer,
+  type TextLayer,
+  type TextBackground,
 } from '@cute-screen/editor-renderer'
+
+export interface TextToolDefaults {
+  readonly font: FontReference
+  readonly fontSize: number
+  readonly weight: FontReference['weight']
+  readonly italic: boolean
+  readonly underline: boolean
+  readonly letterSpacing: number
+  readonly alignment: 'start' | 'center' | 'end' | 'justify'
+  readonly lineHeight: number
+  readonly color: SrgbColor
+  readonly fill: TextLayer['payload']['fill']
+  readonly outline: TextLayer['payload']['outline']
+  readonly background: TextBackground | null
+  readonly opacity: number
+  readonly blendMode: BlendMode
+  readonly shadows: readonly ShadowStyle[]
+}
+
+type EditableTextLayer = TextLayer | CalloutLayer | NumberedMarkerLayer
 
 const props = defineProps<{
   documentState: ShellDocumentState
@@ -31,6 +63,10 @@ const props = defineProps<{
   selectedLayerIds?: readonly string[] | undefined
   activeTool?: string | undefined
   drawingDefaults?: DrawingDefaults | undefined
+  textDefaults?: TextToolDefaults | undefined
+  nextMarkerSequence?: number | undefined
+  markerShape?: 'circle' | 'square' | 'diamond' | 'star' | undefined
+  openImageAvailable?: boolean | undefined
   zoom?: number | undefined
   fitMode?: boolean | undefined
   t: (
@@ -40,6 +76,7 @@ const props = defineProps<{
       | 'interactionOverlay'
       | 'emptyTitle'
       | 'emptyDescription'
+      | 'openImage'
       | 'loadingEditor'
       | 'retry',
   ) => string
@@ -54,6 +91,9 @@ const emit = defineEmits<{
     payload: import('@cute-screen/editor-renderer').JsonObject,
   ]
   addLayer: [layer: LayerNode]
+  documentCommand: [command: unknown]
+  requestImageImport: [origin: { readonly x: number; readonly y: number }]
+  openImage: []
   selectTool: [id: 'select']
   zoom: [value: number]
   fitZoom: [value: number]
@@ -61,8 +101,21 @@ const emit = defineEmits<{
 }>()
 const scene = ref<HTMLCanvasElement>()
 const overlay = ref<HTMLCanvasElement>()
+const textEditor = ref<HTMLTextAreaElement>()
 const scrollContainer = ref<HTMLDivElement>()
 const rendererError = ref<string>()
+const editingText = ref<
+  | {
+      readonly origin: CanvasPoint
+      readonly width: number
+      readonly fixedWidth: boolean
+      value: string
+      composing: boolean
+      readonly kind: 'text' | 'callout'
+      readonly existing?: EditableTextLayer
+    }
+  | undefined
+>()
 let renderer: Canvas2DRenderer | undefined
 let imageResources = new Map<
   string,
@@ -130,6 +183,11 @@ let gesture:
       readonly drawFromCenter: boolean
       readonly points: readonly CanvasPoint[]
     }
+  | {
+      readonly kind: 'text'
+      readonly start: CanvasPoint
+      readonly current: CanvasPoint
+    }
   | undefined
 
 type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w'
@@ -138,6 +196,85 @@ type CanvasPoint = {
   readonly y: number
   readonly pressure?: number
 }
+const DEFAULT_TEXT_FONT: FontReference = Object.freeze({
+  source: 'bundled',
+  family: 'Roboto',
+  weight: 400,
+  style: 'normal',
+})
+const DEFAULT_TEXT_TOOL: TextToolDefaults = Object.freeze({
+  font: DEFAULT_TEXT_FONT,
+  fontSize: 16,
+  weight: 400,
+  italic: false,
+  underline: false,
+  letterSpacing: 0,
+  alignment: 'start',
+  lineHeight: 1.25,
+  color: { red: 0, green: 0, blue: 0, alpha: 1 },
+  fill: {
+    kind: 'solid' as const,
+    color: { red: 0, green: 0, blue: 0, alpha: 1 },
+    opacity: 1,
+  },
+  outline: null,
+  background: null,
+  opacity: 1,
+  blendMode: 'normal',
+  shadows: [],
+})
+function cssTextColor(color: SrgbColor): string {
+  return `rgba(${Math.round(color.red * 255)}, ${Math.round(color.green * 255)}, ${Math.round(color.blue * 255)}, ${color.alpha})`
+}
+function cssTextBackground(
+  background: TextBackground | null,
+): string | undefined {
+  const fill = background?.fill as
+    | {
+        readonly kind?: unknown
+        readonly color?: unknown
+      }
+    | undefined
+  if (fill?.kind !== 'solid' || !fill.color || typeof fill.color !== 'object')
+    return undefined
+  const color = fill.color as Partial<SrgbColor>
+  if (
+    ![color.red, color.green, color.blue, color.alpha].every(
+      (channel) => typeof channel === 'number' && Number.isFinite(channel),
+    )
+  ) {
+    return undefined
+  }
+  return cssTextColor(color as SrgbColor)
+}
+const editorTextStyle = computed(() => {
+  const defaults = props.textDefaults ?? DEFAULT_TEXT_TOOL
+  const existing = editingText.value?.existing
+  const content =
+    existing?.kind === 'numberedMarker'
+      ? existing.payload.label
+      : existing?.payload.content
+  const font =
+    existing === undefined || existing.kind === 'numberedMarker'
+      ? defaults.font
+      : existing.payload.font
+  return {
+    font,
+    fontSize: content?.spans[0]?.fontSize ?? defaults.fontSize,
+    weight: content?.spans[0]?.weight ?? defaults.weight,
+    italic: content?.spans[0]?.italic ?? defaults.italic,
+    underline: content?.spans[0]?.underline ?? defaults.underline,
+    letterSpacing: content?.spans[0]?.letterSpacing ?? defaults.letterSpacing,
+    lineHeight: content?.paragraphs[0]?.lineHeight ?? defaults.lineHeight,
+    color: defaults.color,
+    background:
+      existing === undefined
+        ? defaults.background
+        : existing.kind === 'text'
+          ? existing.payload.background
+          : null,
+  }
+})
 async function ensureRenderer(): Promise<Canvas2DRenderer | undefined> {
   if (!scene.value || !overlay.value || !props.canvas) return undefined
   if (renderer) return renderer
@@ -399,6 +536,7 @@ function previewTransform(layer: LayerNode): Transform2D {
     !gesture ||
     gesture.kind === 'pan' ||
     gesture.kind === 'draw' ||
+    gesture.kind === 'text' ||
     gesture.id !== layer.id
   ) {
     return layer.transform
@@ -642,6 +780,15 @@ function canvasPoint(event: {
         : 0.5,
   }
 }
+function visibleCanvasCenter(): CanvasPoint | undefined {
+  const container = scrollContainer.value
+  if (!container) return undefined
+  const viewport = container.getBoundingClientRect()
+  return canvasPoint({
+    clientX: viewport.left + viewport.width / 2,
+    clientY: viewport.top + viewport.height / 2,
+  })
+}
 function payloadPoint(value: unknown, fallback: CanvasPoint): CanvasPoint {
   if (!value || typeof value !== 'object') return fallback
   const point = value as Record<string, unknown>
@@ -776,6 +923,59 @@ function onPointerDown(event: PointerEvent): void {
     return
   }
   if (event.button !== 0) return
+  if (props.activeTool === 'image') {
+    event.preventDefault()
+    const center = visibleCanvasCenter() ?? point
+    emit('requestImageImport', { x: center.x, y: center.y })
+    return
+  }
+  if (props.activeTool === 'numberedMarker') {
+    event.preventDefault()
+    const sequence = props.nextMarkerSequence ?? 1
+    emit(
+      'addLayer',
+      createNumberedMarkerLayer({
+        id: crypto.randomUUID(),
+        sequence,
+        origin: point,
+        shape: props.markerShape ?? 'circle',
+      }),
+    )
+    return
+  }
+  if (props.activeTool === 'callout') {
+    event.preventDefault()
+    startTextEditor({ origin: point, kind: 'callout' })
+    return
+  }
+  if (props.activeTool === 'text') {
+    event.preventDefault()
+    const text = props.document.layers.find(
+      (layer) =>
+        layer.id === hitTestDocument(props.document!, point)?.nodeId &&
+        (layer.kind === 'text' ||
+          layer.kind === 'callout' ||
+          layer.kind === 'numberedMarker'),
+    )
+    if (
+      text?.kind === 'text' ||
+      text?.kind === 'callout' ||
+      text?.kind === 'numberedMarker'
+    ) {
+      const bounds = layerBounds(text)
+      startTextEditor({
+        origin: {
+          x: text.transform.translateX + bounds.x,
+          y: text.transform.translateY + bounds.y,
+        },
+        existing: text,
+      })
+    } else {
+      scene.value.setPointerCapture(event.pointerId)
+      gesture = { kind: 'text', start: point, current: point }
+    }
+    return
+  }
   if (
     props.activeTool === 'arrow' ||
     props.activeTool === 'shape' ||
@@ -873,10 +1073,216 @@ function onPointerDown(event: PointerEvent): void {
     guidesVisible: false,
   }
 }
+function startTextEditor(input: {
+  readonly origin: CanvasPoint
+  readonly existing?: EditableTextLayer
+  readonly kind?: 'text' | 'callout'
+  readonly width?: number
+  readonly fixedWidth?: boolean
+}): void {
+  const bounds = input.existing ? layerBounds(input.existing) : undefined
+  editingText.value = {
+    origin: input.origin,
+    width:
+      input.width ??
+      bounds?.width ??
+      Math.max(160, props.canvas?.width ? props.canvas.width / 3 : 160),
+    fixedWidth:
+      input.fixedWidth ??
+      (input.existing?.kind === 'text'
+        ? input.existing.payload.content.wrap === 'fixedWidth'
+        : false),
+    value:
+      input.existing?.kind === 'numberedMarker'
+        ? input.existing.payload.label.text
+        : (input.existing?.payload.content.text ?? ''),
+    composing: false,
+    kind: input.kind ?? 'text',
+    ...(input.existing === undefined ? {} : { existing: input.existing }),
+  }
+  void nextTick(() => textEditor.value?.focus())
+}
+function commitTextEditor(): void {
+  const editing = editingText.value
+  if (!editing || editing.composing) return
+  editingText.value = undefined
+  const defaults = props.textDefaults ?? DEFAULT_TEXT_TOOL
+  const existing = editing.existing
+  if (existing?.kind === 'callout' || existing?.kind === 'numberedMarker') {
+    const draft = createTextLayer({
+      id: existing.id,
+      text: editing.value,
+      origin: {
+        x: existing.transform.translateX,
+        y: existing.transform.translateY,
+      },
+      font: existing.kind === 'callout' ? existing.payload.font : defaults.font,
+      fontSize:
+        existing.kind === 'callout'
+          ? (existing.payload.content.spans[0]?.fontSize ?? defaults.fontSize)
+          : defaults.fontSize,
+      underline:
+        existing.kind === 'callout'
+          ? (existing.payload.content.spans[0]?.underline ?? defaults.underline)
+          : (existing.payload.label.spans[0]?.underline ?? defaults.underline),
+      letterSpacing:
+        existing.kind === 'callout'
+          ? (existing.payload.content.spans[0]?.letterSpacing ??
+            defaults.letterSpacing)
+          : (existing.payload.label.spans[0]?.letterSpacing ??
+            defaults.letterSpacing),
+      fixedWidth: layerBounds(existing).width,
+      color: defaults.color,
+    })
+    if (!draft) return
+    const next: EditableTextLayer =
+      existing.kind === 'callout'
+        ? {
+            ...existing,
+            payload: { ...existing.payload, content: draft.payload.content },
+          }
+        : {
+            ...existing,
+            payload: { ...existing.payload, label: draft.payload.content },
+          }
+    emit('documentCommand', {
+      type: 'updateLayer',
+      before: existing,
+      after: next,
+    })
+    return
+  }
+  if (editing.kind === 'callout') {
+    const layer = createCalloutLayer({
+      id: crypto.randomUUID(),
+      text: editing.value,
+      origin: editing.origin,
+      tailAnchor: {
+        x: editing.width / 2,
+        y: defaults.fontSize * defaults.lineHeight + 40,
+      },
+      font: defaults.font,
+    })
+    if (layer) emit('addLayer', layer)
+    return
+  }
+  const draft = createTextLayer({
+    id: crypto.randomUUID(),
+    text: editing.value,
+    origin: editing.existing
+      ? {
+          x: editing.existing.transform.translateX,
+          y: editing.existing.transform.translateY,
+        }
+      : editing.origin,
+    font: existing?.payload.font ?? defaults.font,
+    fontSize: existing?.payload.content.spans[0]?.fontSize ?? defaults.fontSize,
+    weight: existing?.payload.content.spans[0]?.weight ?? defaults.weight,
+    italic: existing?.payload.content.spans[0]?.italic ?? defaults.italic,
+    underline:
+      existing?.payload.content.spans[0]?.underline ?? defaults.underline,
+    letterSpacing:
+      existing?.payload.content.spans[0]?.letterSpacing ??
+      defaults.letterSpacing,
+    alignment:
+      existing?.payload.content.paragraphs[0]?.alignment ?? defaults.alignment,
+    lineHeight:
+      existing?.payload.content.paragraphs[0]?.lineHeight ??
+      defaults.lineHeight,
+    ...(editing.fixedWidth ? { fixedWidth: editing.width } : {}),
+    color: defaults.color,
+    fill: existing === undefined ? defaults.fill : existing.payload.fill,
+    outline:
+      existing === undefined ? defaults.outline : existing.payload.outline,
+    background:
+      existing === undefined
+        ? defaults.background
+        : existing.payload.background,
+    opacity: existing === undefined ? defaults.opacity : existing.opacity,
+    blendMode:
+      existing === undefined
+        ? defaults.blendMode
+        : (existing.blendMode ?? 'normal'),
+    shadows:
+      existing === undefined ? defaults.shadows : (existing.shadows ?? []),
+  })
+  if (!draft) {
+    if (!existing) return
+    const index = props.document?.layers.findIndex(
+      (layer) => layer.id === existing.id,
+    )
+    if (index === undefined || index < 0) return
+    emit(
+      'documentCommand',
+      createTextCommitCommand({
+        existing,
+        next: null,
+        index,
+      }),
+    )
+    return
+  }
+  if (!existing) {
+    emit('documentCommand', createTextCommitCommand({ next: draft }))
+    return
+  }
+  const next: TextLayer = {
+    ...draft,
+    id: existing.id,
+    transform: existing.transform,
+    opacity: existing.opacity,
+    blendMode: existing.blendMode ?? 'normal',
+    payload: {
+      ...existing.payload,
+      content: draft.payload.content,
+    },
+  }
+  emit('documentCommand', createTextCommitCommand({ existing, next }))
+}
+function cancelTextEditor(): void {
+  editingText.value = undefined
+}
+function onTextEditorKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    event.stopPropagation()
+    cancelTextEditor()
+    return
+  }
+  if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+    event.preventDefault()
+    event.stopPropagation()
+    commitTextEditor()
+  }
+}
 function onDoubleClick(event: MouseEvent): void {
   const point = canvasPoint(event)
   if (!point || !props.document) return
   const hits = hitTestDocumentAll(props.document, point)
+  const text = props.document.layers.find(
+    (layer) =>
+      layer.id === hits[0]?.nodeId &&
+      (layer.kind === 'text' ||
+        layer.kind === 'callout' ||
+        layer.kind === 'numberedMarker'),
+  )
+  if (
+    text?.kind === 'text' ||
+    text?.kind === 'callout' ||
+    text?.kind === 'numberedMarker'
+  ) {
+    event.preventDefault()
+    const bounds = layerBounds(text)
+    startTextEditor({
+      origin: {
+        x: text.transform.translateX + bounds.x,
+        y: text.transform.translateY + bounds.y,
+      },
+      existing: text,
+      kind: 'text',
+    })
+    return
+  }
   if (hits.length < 2) return
   const key = hits.map((hit) => hit.nodeId).join(':')
   const currentIndex = hits.findIndex(
@@ -966,6 +1372,10 @@ function onPointerMove(event: PointerEvent): void {
         samples.length > 0 ? [...gesture.points, ...samples] : gesture.points,
     }
     invalidateOverlay()
+    return
+  }
+  if (gesture.kind === 'text') {
+    gesture = { ...gesture, current: point }
   }
 }
 function finishGesture(event: PointerEvent): void {
@@ -1035,6 +1445,19 @@ function finishGesture(event: PointerEvent): void {
     })
     if (layer) emit('addLayer', layer)
   }
+  if (completed?.kind === 'text') {
+    const width = Math.abs(completed.current.x - completed.start.x)
+    const fixedWidth = width >= 4
+    startTextEditor({
+      origin: fixedWidth
+        ? {
+            x: Math.min(completed.start.x, completed.current.x),
+            y: Math.min(completed.start.y, completed.current.y),
+          }
+        : completed.start,
+      ...(fixedWidth ? { width, fixedWidth: true } : {}),
+    })
+  }
   invalidateOverlay()
 }
 function cancelGesture(event?: PointerEvent): void {
@@ -1067,6 +1490,10 @@ function onWindowKeydown(event: KeyboardEvent): void {
     spacePressed = true
   }
   if (event.key === 'Escape') {
+    if (editingText.value) {
+      cancelTextEditor()
+      return
+    }
     if (gesture?.kind === 'draw') {
       cancelGesture()
     } else if (
@@ -1135,6 +1562,36 @@ onBeforeUnmount(() => {
             @dblclick="onDoubleClick"
             @wheel="onWheel"
           ></canvas>
+          <textarea
+            v-if="editingText"
+            ref="textEditor"
+            v-model="editingText.value"
+            class="cs-text-editor"
+            :style="{
+              left: `${editingText.origin.x * ((zoom ?? 100) / 100)}px`,
+              top: `${editingText.origin.y * ((zoom ?? 100) / 100)}px`,
+              width: `${editingText.width * ((zoom ?? 100) / 100)}px`,
+              fontSize: `${editorTextStyle.fontSize * ((zoom ?? 100) / 100)}px`,
+              lineHeight: String(editorTextStyle.lineHeight),
+              fontFamily: editorTextStyle.font.family,
+              fontWeight: String(editorTextStyle.weight),
+              fontStyle: editorTextStyle.italic ? 'italic' : 'normal',
+              textDecoration: editorTextStyle.underline ? 'underline' : 'none',
+              letterSpacing: `${editorTextStyle.letterSpacing * ((zoom ?? 100) / 100)}px`,
+              color: cssTextColor(editorTextStyle.color),
+              backgroundColor: cssTextBackground(editorTextStyle.background),
+              borderRadius: editorTextStyle.background
+                ? `${editorTextStyle.background.radius * ((zoom ?? 100) / 100)}px`
+                : undefined,
+            }"
+            :aria-label="
+              editingText.kind === 'callout' ? 'Callout editor' : 'Text editor'
+            "
+            @compositionstart="editingText.composing = true"
+            @compositionend="editingText.composing = false"
+            @keydown="onTextEditorKeydown"
+            @blur="commitTextEditor"
+          ></textarea>
           <canvas
             ref="overlay"
             class="cs-canvas cs-canvas-overlay"
@@ -1154,6 +1611,14 @@ onBeforeUnmount(() => {
             <UiIcon name="camera" />
             <h1 id="cs-empty-title">{{ t('emptyTitle') }}</h1>
             <p>{{ t('emptyDescription') }}</p>
+            <button
+              v-if="openImageAvailable"
+              type="button"
+              class="cs-button"
+              @click="emit('openImage')"
+            >
+              <UiIcon name="image" />{{ t('openImage') }}
+            </button>
           </section>
           <p
             v-else-if="documentState.kind === 'loading'"

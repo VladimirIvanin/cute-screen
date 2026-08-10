@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import {
+  computed,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  shallowRef,
+  watch,
+} from 'vue'
 import { storeToRefs } from 'pinia'
 
 import { t } from '../i18n'
@@ -7,6 +14,10 @@ import {
   createBrowserDrawingToolPreferencesStorage,
   createBrowserPreferencesStorage,
 } from '../preferences'
+import {
+  createBrowserTextStylePresetsStorage,
+  type UserTextStylePreset,
+} from '../../text-style-presets'
 import { useEditorShellStore, type ShellStoreOptions } from '../store'
 import type { CaptureProgressState } from '../../platform'
 import type {
@@ -20,24 +31,37 @@ import type {
   DocumentSessionController,
   DocumentSessionSnapshot,
 } from '../../document-session'
+import { loadImageWithBinaryFallback } from '../../image-transport'
+import type { ClipboardBridge } from '../../image-transport'
+import type { SystemFontFace } from '../../font-catalog'
 import {
   TextureResourceResolver,
+  type ContentImageBridge,
   type TextureFillBridge,
 } from '../../texture-fill'
 import {
   createFlipCanvasCommand,
+  createContentImageLayer,
+  createDuplicateLayerCommand,
+  createTextLayer,
+  nextNumberedMarkerSequence,
   defaultDrawingToolPreferences,
   DEFAULT_DRAWING_DEFAULTS,
   rememberDrawingColor,
   type DrawingDefaults,
+  type BlendMode,
   type EditorDocumentV1,
+  type EditorCommand,
   type ImageLayer,
   type JsonObject,
   type LayerNode,
+  type SrgbColor,
+  type ShadowStyle,
+  type TextBackground,
   type Transform2D,
 } from '@cute-screen/editor-renderer'
 import ActionFeedback from './ActionFeedback.vue'
-import CanvasViewport from './CanvasViewport.vue'
+import CanvasViewport, { type TextToolDefaults } from './CanvasViewport.vue'
 import ContextToolbar from './ContextToolbar.vue'
 import LayersPanel from './LayersPanel.vue'
 import SeriesFilmstrip from './SeriesFilmstrip.vue'
@@ -59,11 +83,15 @@ const props = withDefaults(
     readOnlyDocument?: boolean
     captureAvailable?: boolean
     captureUnavailableReason?: string | undefined
+    openImageAvailable?: boolean
     captureFallbackCommand?: string | undefined
     captureProgress?: CaptureProgressState | undefined
     frames?: readonly FrameSummary[] | undefined
     sourceImage?: HTMLImageElement | undefined
     textureBridge?: TextureFillBridge | undefined
+    contentImageBridge?: ContentImageBridge | undefined
+    clipboardBridge?: ClipboardBridge | undefined
+    systemFonts?: readonly SystemFontFace[] | undefined
   }>(),
   {
     actions: undefined,
@@ -73,11 +101,15 @@ const props = withDefaults(
     readOnlyDocument: false,
     captureAvailable: true,
     captureUnavailableReason: undefined,
+    openImageAvailable: false,
     captureFallbackCommand: undefined,
     captureProgress: undefined,
     frames: undefined,
     sourceImage: undefined,
     textureBridge: undefined,
+    contentImageBridge: undefined,
+    clipboardBridge: undefined,
+    systemFonts: undefined,
   },
 )
 const emit = defineEmits<{
@@ -90,6 +122,384 @@ const fallbackCopied = ref(false)
 const drawingDefaults = ref<DrawingDefaults>(
   structuredClone(DEFAULT_DRAWING_DEFAULTS),
 )
+const textDefaults = shallowRef<TextToolDefaults>({
+  font: {
+    source: 'bundled',
+    family: 'Roboto',
+    weight: 400,
+    style: 'normal',
+  },
+  fontSize: 16,
+  weight: 400,
+  italic: false,
+  underline: false,
+  letterSpacing: 0,
+  alignment: 'start',
+  lineHeight: 1.25,
+  color: { red: 0, green: 0, blue: 0, alpha: 1 },
+  fill: {
+    kind: 'solid',
+    color: { red: 0, green: 0, blue: 0, alpha: 1 },
+    opacity: 1,
+  },
+  outline: null,
+  background: null,
+  opacity: 1,
+  blendMode: 'normal',
+  shadows: [],
+})
+const activeTextPreset = ref('plain')
+const personalTextPreset = shallowRef<UserTextStylePreset>()
+const TEXT_BLEND_OPTIONS: readonly {
+  readonly value: BlendMode
+  readonly label: string
+}[] = [
+  { value: 'normal', label: 'Normal' },
+  { value: 'multiply', label: 'Multiply' },
+  { value: 'screen', label: 'Screen' },
+  { value: 'overlay', label: 'Overlay' },
+  { value: 'darken', label: 'Darken' },
+  { value: 'lighten', label: 'Lighten' },
+  { value: 'softLight', label: 'Soft light' },
+  { value: 'hardLight', label: 'Hard light' },
+]
+const textFontOptions = computed(() => {
+  const families = new Set<string>()
+  const options: Array<{ readonly value: string; readonly label: string }> = [
+    { value: 'bundled:Roboto', label: 'Roboto · bundled' },
+  ]
+  for (const face of props.systemFonts ?? []) {
+    if (families.has(face.family)) continue
+    families.add(face.family)
+    options.push({
+      value: `system:${face.family}`,
+      label: `${face.family} · system`,
+    })
+  }
+  return options
+})
+function textFontOptionValue(font: TextToolDefaults['font']): string {
+  return font.source === 'bundled' ? 'bundled:Roboto' : `system:${font.family}`
+}
+function closestSystemFontFace(
+  faces: readonly SystemFontFace[],
+  family: string,
+  weight: TextToolDefaults['weight'],
+  italic: boolean,
+): SystemFontFace | undefined {
+  const candidates = faces.filter((face) => face.family === family)
+  if (candidates.length === 0) return undefined
+  const desiredStyle = italic ? 'italic' : 'normal'
+  return [...candidates].sort((left, right) => {
+    const leftStyle = left.style === desiredStyle ? 0 : 1
+    const rightStyle = right.style === desiredStyle ? 0 : 1
+    if (leftStyle !== rightStyle) return leftStyle - rightStyle
+    return Math.abs(left.weight - weight) - Math.abs(right.weight - weight)
+  })[0]
+}
+function textFillPreset(
+  kind: 'solid' | 'linearGradient' | 'radialGradient' | 'pattern',
+  color: SrgbColor,
+): TextToolDefaults['fill'] {
+  if (kind === 'solid') {
+    return { kind: 'solid', color, opacity: 1 }
+  }
+  if (kind === 'linearGradient') {
+    return {
+      kind,
+      stops: [
+        { position: 0, color },
+        { position: 1, color: { red: 0.3, green: 0.6, blue: 1, alpha: 1 } },
+      ],
+      start: { x: 0, y: 0 },
+      end: { x: 1, y: 1 },
+      opacity: 1,
+    }
+  }
+  if (kind === 'radialGradient') {
+    return {
+      kind,
+      stops: [
+        { position: 0, color },
+        { position: 1, color: { red: 0.84, green: 0.35, blue: 0.8, alpha: 1 } },
+      ],
+      center: { x: 0.5, y: 0.5 },
+      radius: 0.5,
+      opacity: 1,
+    }
+  }
+  return {
+    kind: 'pattern',
+    pattern: 'diagonal',
+    color,
+    background: { red: 1, green: 1, blue: 1, alpha: 1 },
+    transform: { scale: 1, rotation: 0, offsetX: 0, offsetY: 0 },
+    opacity: 1,
+  }
+}
+function textOutlinePreset(
+  value: 'none' | 'white' | 'black',
+): TextToolDefaults['outline'] {
+  if (value === 'none') return null
+  const channel = value === 'white' ? 1 : 0
+  return {
+    stroke: {
+      color: { red: channel, green: channel, blue: channel, alpha: 1 },
+      width: 2,
+      style: 'solid',
+      cap: 'round',
+      join: 'round',
+    },
+    position: 'center',
+  }
+}
+function textOutlineOption(outline: TextToolDefaults['outline']): string {
+  if (!outline) return 'none'
+  if (JSON.stringify(outline) === JSON.stringify(textOutlinePreset('white')))
+    return 'white'
+  if (JSON.stringify(outline) === JSON.stringify(textOutlinePreset('black')))
+    return 'black'
+  return 'none'
+}
+const TEXT_BACKGROUND_PRESETS: Readonly<Record<string, TextBackground | null>> =
+  Object.freeze({
+    none: null,
+    yellow: {
+      fill: {
+        kind: 'solid',
+        color: { red: 1, green: 0.87, blue: 0.3, alpha: 1 },
+        opacity: 1,
+      },
+      padding: 6,
+      radius: 4,
+    },
+    blue: {
+      fill: {
+        kind: 'solid',
+        color: { red: 0.55, green: 0.78, blue: 1, alpha: 1 },
+        opacity: 1,
+      },
+      padding: 6,
+      radius: 4,
+    },
+    pink: {
+      fill: {
+        kind: 'solid',
+        color: { red: 1, green: 0.68, blue: 0.78, alpha: 1 },
+        opacity: 1,
+      },
+      padding: 6,
+      radius: 4,
+    },
+  })
+function textBackgroundPreset(background: TextBackground | null): string {
+  if (!background) return 'none'
+  return (
+    Object.entries(TEXT_BACKGROUND_PRESETS).find(([, candidate]) => {
+      if (!candidate) return false
+      return JSON.stringify(background) === JSON.stringify(candidate)
+    })?.[0] ?? 'none'
+  )
+}
+const TEXT_SHADOW_PRESETS: Readonly<Record<string, readonly ShadowStyle[]>> =
+  Object.freeze({
+    none: [],
+    drop: [
+      {
+        color: { red: 0, green: 0, blue: 0, alpha: 0.35 },
+        offsetX: 2,
+        offsetY: 3,
+        blur: 3,
+      },
+    ],
+    soft: [
+      {
+        color: { red: 0.08, green: 0.12, blue: 0.2, alpha: 0.28 },
+        offsetX: 0,
+        offsetY: 4,
+        blur: 10,
+      },
+    ],
+    neon: [
+      {
+        color: { red: 0.1, green: 0.95, blue: 1, alpha: 0.9 },
+        offsetX: 0,
+        offsetY: 0,
+        blur: 12,
+      },
+    ],
+  })
+function textShadowPreset(shadows: readonly ShadowStyle[]): string {
+  return (
+    Object.entries(TEXT_SHADOW_PRESETS).find(
+      ([, candidate]) =>
+        candidate.length === shadows.length &&
+        candidate.every(
+          (shadow, index) =>
+            JSON.stringify(shadow) === JSON.stringify(shadows[index]),
+        ),
+    )?.[0] ?? 'none'
+  )
+}
+const TEXT_PRESET_OPTIONS: readonly {
+  readonly value: string
+  readonly label: string
+}[] = [
+  { value: 'plain', label: 'Plain' },
+  { value: 'label', label: 'Label' },
+  { value: 'sticker', label: 'Sticker' },
+  { value: 'outline', label: 'Outline' },
+  { value: 'shadow', label: 'Shadow' },
+  { value: 'neon', label: 'Neon' },
+  { value: 'gradient', label: 'Gradient' },
+  { value: 'texture', label: 'Texture' },
+  { value: 'custom', label: 'Custom' },
+]
+const textPresetOptions = computed(() => {
+  const options = [...TEXT_PRESET_OPTIONS]
+  if (personalTextPreset.value) {
+    options.splice(options.length - 1, 0, {
+      value: personalTextPreset.value.id,
+      label: personalTextPreset.value.label,
+    })
+  }
+  return options
+})
+function applyTextPreset(value: string): boolean {
+  const current = textDefaults.value
+  const black: SrgbColor = { red: 0, green: 0, blue: 0, alpha: 1 }
+  const white: SrgbColor = { red: 1, green: 1, blue: 1, alpha: 1 }
+  let next: TextToolDefaults
+  switch (value) {
+    case 'plain':
+      next = {
+        ...current,
+        fontSize: 16,
+        weight: 400,
+        italic: false,
+        color: black,
+        fill: textFillPreset('solid', black),
+        outline: null,
+        background: null,
+        opacity: 1,
+        blendMode: 'normal',
+        shadows: [],
+      }
+      break
+    case 'label':
+      next = {
+        ...current,
+        fontSize: 16,
+        weight: 700,
+        color: black,
+        fill: textFillPreset('solid', black),
+        outline: null,
+        background: structuredClone(TEXT_BACKGROUND_PRESETS.yellow!),
+        opacity: 1,
+        blendMode: 'normal',
+        shadows: [],
+      }
+      break
+    case 'sticker':
+      next = {
+        ...current,
+        fontSize: 24,
+        weight: 700,
+        color: white,
+        fill: textFillPreset('solid', white),
+        outline: textOutlinePreset('black'),
+        background: structuredClone(TEXT_BACKGROUND_PRESETS.pink!),
+        opacity: 1,
+        blendMode: 'normal',
+        shadows: [],
+      }
+      break
+    case 'outline':
+      next = {
+        ...current,
+        fontSize: 24,
+        weight: 700,
+        color: white,
+        fill: textFillPreset('solid', white),
+        outline: textOutlinePreset('black'),
+        background: null,
+        opacity: 1,
+        blendMode: 'normal',
+        shadows: [],
+      }
+      break
+    case 'shadow':
+      next = {
+        ...current,
+        fontSize: 24,
+        weight: 700,
+        color: black,
+        fill: textFillPreset('solid', black),
+        outline: null,
+        background: null,
+        opacity: 1,
+        blendMode: 'normal',
+        shadows: structuredClone(TEXT_SHADOW_PRESETS.drop ?? []),
+      }
+      break
+    case 'neon': {
+      const cyan: SrgbColor = { red: 0.1, green: 0.95, blue: 1, alpha: 1 }
+      next = {
+        ...current,
+        fontSize: 24,
+        weight: 700,
+        color: cyan,
+        fill: textFillPreset('solid', cyan),
+        outline: null,
+        background: {
+          fill: {
+            kind: 'solid',
+            color: { red: 0.04, green: 0.07, blue: 0.12, alpha: 1 },
+            opacity: 1,
+          },
+          padding: 6,
+          radius: 4,
+        },
+        opacity: 1,
+        blendMode: 'screen',
+        shadows: structuredClone(TEXT_SHADOW_PRESETS.neon ?? []),
+      }
+      break
+    }
+    case 'gradient': {
+      const blue: SrgbColor = { red: 0.2, green: 0.5, blue: 1, alpha: 1 }
+      next = {
+        ...current,
+        fontSize: 24,
+        weight: 700,
+        color: blue,
+        fill: textFillPreset('linearGradient', blue),
+        outline: null,
+        background: null,
+        opacity: 1,
+        blendMode: 'normal',
+        shadows: [],
+      }
+      break
+    }
+    default:
+      return false
+  }
+  textDefaults.value = {
+    ...next,
+    underline: false,
+    letterSpacing: 0,
+    font: {
+      ...current.font,
+      weight: next.weight,
+      style: next.italic ? 'italic' : 'normal',
+    },
+  }
+  activeTextPreset.value = value
+  return true
+}
+const markerShape = ref<'circle' | 'square' | 'diamond' | 'star'>('circle')
+const contentImageImporting = ref(false)
 let drawingPreferences = defaultDrawingToolPreferences()
 let textureResolver: TextureResourceResolver | undefined
 const textureImages = ref<ReadonlyMap<string, HTMLImageElement>>(new Map())
@@ -101,6 +511,19 @@ const baseImageLayer = computed(() =>
   ),
 )
 const translate = (key: Parameters<typeof t>[1]) => t(state.locale.value, key)
+const textFontHint = computed(() => {
+  const font = textDefaults.value.font
+  if (font.source !== 'system') return undefined
+  const exactFace = props.systemFonts?.some(
+    (face) =>
+      face.family === font.family &&
+      face.weight === textDefaults.value.weight &&
+      face.style === (textDefaults.value.italic ? 'italic' : 'normal'),
+  )
+  return exactFace
+    ? undefined
+    : `Missing ${font.family} face; preview may use a substitute.`
+})
 const hasInteractiveDocument = computed(
   () => props.documentSession !== undefined || props.fixture === 'ready',
 )
@@ -167,7 +590,34 @@ const tools = computed<readonly ToolDescriptor[]>(() => [
     icon: 'text',
     labelKey: 'toolText',
     shortcut: 'T',
-    disabled: true,
+    disabled: !hasInteractiveDocument.value || props.readOnlyDocument,
+  },
+  {
+    id: 'numberedMarker',
+    group: 'annotate',
+    icon: 'plus',
+    labelKey: 'toolNumberedMarker',
+    shortcut: 'N',
+    disabled: !hasInteractiveDocument.value || props.readOnlyDocument,
+  },
+  {
+    id: 'callout',
+    group: 'annotate',
+    icon: 'text',
+    labelKey: 'toolCallout',
+    shortcut: 'O',
+    disabled: !hasInteractiveDocument.value || props.readOnlyDocument,
+  },
+  {
+    id: 'image',
+    group: 'annotate',
+    icon: 'image',
+    labelKey: 'toolImage',
+    disabled:
+      !hasInteractiveDocument.value ||
+      props.readOnlyDocument ||
+      !props.contentImageBridge ||
+      contentImageImporting.value,
   },
   {
     id: 'privacy',
@@ -459,8 +909,266 @@ function drawingControl(
 }
 const contextSchema = computed(() => {
   const tool = state.activeToolId.value
+  if (tool === 'text') {
+    return {
+      icon: 'text' as const,
+      title: translate('toolText'),
+      hint: textFontHint.value ?? translate('canvasViewport'),
+      controls: [
+        {
+          kind: 'select' as const,
+          id: 'textPreset',
+          label: 'Preset',
+          value: activeTextPreset.value,
+          options: props.textureBridge
+            ? textPresetOptions.value
+            : textPresetOptions.value.filter(
+                ({ value }) => value !== 'texture',
+              ),
+        },
+        {
+          kind: 'action' as const,
+          id: 'saveTextPreset',
+          label: 'Save personal preset',
+        },
+        {
+          kind: 'select' as const,
+          id: 'textFont',
+          label: 'Font',
+          value: textFontOptionValue(textDefaults.value.font),
+          options: textFontOptions.value,
+        },
+        {
+          kind: 'select' as const,
+          id: 'textFontSize',
+          label: 'Size',
+          value: String(textDefaults.value.fontSize),
+          options: [12, 16, 20, 24, 32, 48, 64].map((size) => ({
+            value: String(size),
+            label: `${size}px`,
+          })),
+        },
+        {
+          kind: 'select' as const,
+          id: 'textItalic',
+          label: 'Style',
+          value: textDefaults.value.italic ? 'italic' : 'normal',
+          options: [
+            { value: 'normal', label: 'Normal' },
+            { value: 'italic', label: 'Italic' },
+          ],
+        },
+        {
+          kind: 'select' as const,
+          id: 'textUnderline',
+          label: 'Underline',
+          value: textDefaults.value.underline ? 'on' : 'off',
+          options: [
+            { value: 'off', label: 'Off' },
+            { value: 'on', label: 'On' },
+          ],
+        },
+        {
+          kind: 'select' as const,
+          id: 'textLetterSpacing',
+          label: 'Spacing',
+          value: String(textDefaults.value.letterSpacing),
+          options: [-2, 0, 1, 2, 4].map((spacing) => ({
+            value: String(spacing),
+            label: `${spacing}px`,
+          })),
+        },
+        {
+          kind: 'color' as const,
+          id: 'textColor',
+          label: 'Color',
+          value: hexColor(textDefaults.value.color),
+        },
+        {
+          kind: 'select' as const,
+          id: 'textFill',
+          label: 'Fill',
+          value: textDefaults.value.fill.kind,
+          options: [
+            { value: 'solid', label: 'Solid' },
+            { value: 'linearGradient', label: 'Gradient' },
+            { value: 'radialGradient', label: 'Radial' },
+            { value: 'pattern', label: 'Pattern' },
+          ],
+        },
+        ...(props.textureBridge
+          ? [
+              {
+                kind: 'action' as const,
+                id: 'textImportTexture',
+                label: 'Import texture',
+              },
+            ]
+          : []),
+        {
+          kind: 'select' as const,
+          id: 'textOutline',
+          label: 'Outline',
+          value: textOutlineOption(textDefaults.value.outline),
+          options: [
+            { value: 'none', label: 'None' },
+            { value: 'white', label: 'White' },
+            { value: 'black', label: 'Black' },
+          ],
+        },
+        {
+          kind: 'select' as const,
+          id: 'textBackground',
+          label: 'Background',
+          value: textBackgroundPreset(textDefaults.value.background),
+          options: [
+            { value: 'none', label: 'None' },
+            { value: 'yellow', label: 'Yellow' },
+            { value: 'blue', label: 'Blue' },
+            { value: 'pink', label: 'Pink' },
+          ],
+        },
+        {
+          kind: 'select' as const,
+          id: 'textShadow',
+          label: 'Shadow',
+          value: textShadowPreset(textDefaults.value.shadows),
+          options: [
+            { value: 'none', label: 'None' },
+            { value: 'drop', label: 'Drop' },
+            { value: 'soft', label: 'Soft' },
+            { value: 'neon', label: 'Neon' },
+          ],
+        },
+        {
+          kind: 'select' as const,
+          id: 'textWeight',
+          label: 'Weight',
+          value: String(textDefaults.value.weight),
+          options: [400, 500, 600, 700].map((weight) => ({
+            value: String(weight),
+            label: String(weight),
+          })),
+        },
+        {
+          kind: 'select' as const,
+          id: 'textAlign',
+          label: 'Align',
+          value: textDefaults.value.alignment,
+          options: [
+            { value: 'start', label: 'Start' },
+            { value: 'center', label: 'Center' },
+            { value: 'end', label: 'End' },
+          ],
+        },
+        {
+          kind: 'select' as const,
+          id: 'textLineHeight',
+          label: 'Line height',
+          value: String(textDefaults.value.lineHeight),
+          options: [1, 1.15, 1.25, 1.5, 1.75, 2].map((lineHeight) => ({
+            value: String(lineHeight),
+            label: `${lineHeight}×`,
+          })),
+        },
+        {
+          kind: 'range' as const,
+          id: 'textOpacity',
+          label: 'Opacity',
+          value: textDefaults.value.opacity,
+          min: 0,
+          max: 1,
+          step: 0.05,
+        },
+        {
+          kind: 'select' as const,
+          id: 'textBlendMode',
+          label: 'Blend',
+          value: textDefaults.value.blendMode,
+          options: TEXT_BLEND_OPTIONS,
+        },
+      ],
+    }
+  }
+  if (tool === 'numberedMarker') {
+    return {
+      icon: 'plus' as const,
+      title: translate('toolNumberedMarker'),
+      hint: translate('canvasViewport'),
+      controls: [
+        {
+          kind: 'select' as const,
+          id: 'markerShape',
+          label: 'Shape',
+          value: markerShape.value,
+          options: ['circle', 'square', 'diamond', 'star'].map((shape) => ({
+            value: shape,
+            label: shape,
+          })),
+        },
+      ],
+    }
+  }
   if (isDrawingTool(tool)) {
     return drawingControl(tool)
+  }
+  const selectedImage =
+    tool === 'select'
+      ? activeDocument.value?.layers.find(
+          (layer) => layer.id === store.selectedLayerId,
+        )
+      : undefined
+  if (
+    selectedImage?.kind === 'image' &&
+    selectedImage.payload.role === 'content'
+  ) {
+    const border = selectedImage.payload.border
+    return {
+      icon: 'image' as const,
+      title: 'Image',
+      hint: translate('canvasViewport'),
+      controls: [
+        {
+          kind: 'range' as const,
+          id: 'imageRadius',
+          label: 'Radius',
+          value: selectedImage.payload.radius ?? 0,
+          min: 0,
+          max: Math.min(
+            128,
+            (selectedImage.localBounds?.width ?? 0) / 2,
+            (selectedImage.localBounds?.height ?? 0) / 2,
+          ),
+          step: 1,
+        },
+        {
+          kind: 'color' as const,
+          id: 'imageBorderColor',
+          label: 'Border',
+          value: hexColor(
+            border?.color ?? { red: 0, green: 0, blue: 0, alpha: 1 },
+          ),
+        },
+        {
+          kind: 'range' as const,
+          id: 'imageBorderWidth',
+          label: 'Border width',
+          value: border?.width ?? 0,
+          min: 0,
+          max: 16,
+          step: 1,
+        },
+        {
+          kind: 'range' as const,
+          id: 'imageOpacity',
+          label: 'Opacity',
+          value: selectedImage.opacity,
+          min: 0,
+          max: 1,
+          step: 0.05,
+        },
+      ],
+    }
   }
   const selected = tool === 'select' ? selectedDrawingLayer() : undefined
   if (selected && isDrawingTool(selected.kind)) {
@@ -487,6 +1195,44 @@ const contextSchema = computed(() => {
     : undefined
 })
 async function onContextAction(id: string): Promise<void> {
+  if (id === 'saveTextPreset') {
+    const storage = createBrowserTextStylePresetsStorage(browserStorage())
+    storage.save(textDefaults.value)
+    personalTextPreset.value = storage.load()
+    if (personalTextPreset.value) activeTextPreset.value = 'personal'
+    return
+  }
+  if (id === 'textImportTexture') {
+    if (!props.textureBridge) return
+    textureResolver ??= new TextureResourceResolver({
+      bridge: props.textureBridge,
+      correlationId: () => crypto.randomUUID(),
+    })
+    const imported = await textureResolver.import()
+    if (imported.kind !== 'imported' || imported.format === 'svg') return
+    const resource = textureResolver.get(imported.blobHash)
+    if (resource?.kind === 'ready') {
+      textureImages.value = new Map(textureImages.value).set(
+        imported.blobHash,
+        resource.image,
+      )
+    }
+    textDefaults.value = {
+      ...textDefaults.value,
+      fill: {
+        kind: 'imageTexture',
+        blobHash: imported.blobHash,
+        format: imported.format,
+        intrinsicWidth: imported.width,
+        intrinsicHeight: imported.height,
+        fit: 'fit',
+        transform: { scale: 1, rotation: 0, offsetX: 0, offsetY: 0 },
+        opacity: 1,
+      },
+    }
+    activeTextPreset.value = 'texture'
+    return
+  }
   if (id === 'importTexture') {
     if (!props.textureBridge) return
     textureResolver ??= new TextureResourceResolver({
@@ -569,6 +1315,246 @@ async function onContextAction(id: string): Promise<void> {
 }
 function onContextChange(id: string, value: string): void {
   const activeTool = state.activeToolId.value
+  if (activeTool === 'text') {
+    if (id === 'textPreset') {
+      if (value === 'personal') {
+        const preset = personalTextPreset.value
+        if (!preset) return
+        textDefaults.value = structuredClone(preset.values)
+        activeTextPreset.value = preset.id
+        return
+      }
+      if (value === 'texture') {
+        void onContextAction('textImportTexture')
+        return
+      }
+      applyTextPreset(value)
+      return
+    }
+    if (id === 'textFont') {
+      if (value === 'bundled:Roboto') {
+        textDefaults.value = {
+          ...textDefaults.value,
+          font: {
+            source: 'bundled',
+            family: 'Roboto',
+            weight: textDefaults.value.weight,
+            style: textDefaults.value.italic ? 'italic' : 'normal',
+          },
+        }
+        return
+      }
+      const family = value.startsWith('system:') ? value.slice(7) : ''
+      if (!props.systemFonts?.some((font) => font.family === family)) return
+      const face = closestSystemFontFace(
+        props.systemFonts,
+        family,
+        textDefaults.value.weight,
+        textDefaults.value.italic,
+      )
+      if (!face) return
+      textDefaults.value = {
+        ...textDefaults.value,
+        font: {
+          source: 'system',
+          family,
+          weight: face.weight,
+          style: face.style,
+        },
+        weight: face.weight,
+        italic: face.style === 'italic',
+      }
+    } else if (id === 'textFontSize') {
+      const fontSize = Number(value)
+      if (!Number.isFinite(fontSize) || fontSize < 8 || fontSize > 256) return
+      textDefaults.value = { ...textDefaults.value, fontSize }
+    } else if (id === 'textWeight') {
+      const weight = Number(value)
+      if (!Number.isInteger(weight) || weight < 100 || weight > 900) return
+      textDefaults.value = {
+        ...textDefaults.value,
+        weight: weight as TextToolDefaults['weight'],
+        font: {
+          ...textDefaults.value.font,
+          weight: weight as TextToolDefaults['weight'],
+        },
+      }
+    } else if (id === 'textAlign') {
+      if (!['start', 'center', 'end'].includes(value)) return
+      textDefaults.value = {
+        ...textDefaults.value,
+        alignment: value as TextToolDefaults['alignment'],
+      }
+    } else if (id === 'textLineHeight') {
+      const lineHeight = Number(value)
+      if (!Number.isFinite(lineHeight) || lineHeight < 0.8 || lineHeight > 4)
+        return
+      textDefaults.value = { ...textDefaults.value, lineHeight }
+    } else if (id === 'textOpacity') {
+      const opacity = Number(value)
+      if (!Number.isFinite(opacity) || opacity < 0 || opacity > 1) return
+      textDefaults.value = { ...textDefaults.value, opacity }
+    } else if (id === 'textBlendMode') {
+      if (!TEXT_BLEND_OPTIONS.some((option) => option.value === value)) return
+      textDefaults.value = {
+        ...textDefaults.value,
+        blendMode: value as BlendMode,
+      }
+    } else if (id === 'textItalic') {
+      if (value !== 'normal' && value !== 'italic') return
+      textDefaults.value = {
+        ...textDefaults.value,
+        italic: value === 'italic',
+        font: { ...textDefaults.value.font, style: value },
+      }
+    } else if (id === 'textUnderline') {
+      if (value !== 'off' && value !== 'on') return
+      textDefaults.value = {
+        ...textDefaults.value,
+        underline: value === 'on',
+      }
+    } else if (id === 'textLetterSpacing') {
+      const letterSpacing = Number(value)
+      if (
+        !Number.isFinite(letterSpacing) ||
+        letterSpacing < -256 ||
+        letterSpacing > 256
+      ) {
+        return
+      }
+      textDefaults.value = { ...textDefaults.value, letterSpacing }
+    } else if (id === 'textColor') {
+      const match = /^#([0-9a-f]{6})$/iu.exec(value)
+      if (!match) return
+      const hex = match[1]!
+      const color: SrgbColor = {
+        red: Number.parseInt(hex.slice(0, 2), 16) / 255,
+        green: Number.parseInt(hex.slice(2, 4), 16) / 255,
+        blue: Number.parseInt(hex.slice(4, 6), 16) / 255,
+        alpha: 1,
+      }
+      textDefaults.value = {
+        ...textDefaults.value,
+        color,
+        fill: textFillPreset('solid', color),
+      }
+    } else if (id === 'textFill') {
+      if (
+        value !== 'solid' &&
+        value !== 'linearGradient' &&
+        value !== 'radialGradient' &&
+        value !== 'pattern'
+      ) {
+        return
+      }
+      textDefaults.value = {
+        ...textDefaults.value,
+        fill: textFillPreset(value, textDefaults.value.color),
+      }
+    } else if (id === 'textOutline') {
+      if (value !== 'none' && value !== 'white' && value !== 'black') return
+      textDefaults.value = {
+        ...textDefaults.value,
+        outline: textOutlinePreset(value),
+      }
+    } else if (id === 'textBackground') {
+      const background = TEXT_BACKGROUND_PRESETS[value]
+      if (background === undefined) return
+      textDefaults.value = {
+        ...textDefaults.value,
+        background: background === null ? null : structuredClone(background),
+      }
+    } else if (id === 'textShadow') {
+      const shadows = TEXT_SHADOW_PRESETS[value]
+      if (!shadows) return
+      textDefaults.value = {
+        ...textDefaults.value,
+        shadows: structuredClone(shadows),
+      }
+    }
+    activeTextPreset.value = 'custom'
+    return
+  }
+  if (
+    id === 'imageRadius' ||
+    id === 'imageBorderColor' ||
+    id === 'imageBorderWidth' ||
+    id === 'imageOpacity'
+  ) {
+    const image = activeDocument.value?.layers.find(
+      (layer) => layer.id === store.selectedLayerId,
+    )
+    if (
+      !image ||
+      image.kind !== 'image' ||
+      image.payload.role !== 'content' ||
+      !props.documentSession ||
+      image.locked
+    ) {
+      return
+    }
+    const currentBorder = image.payload.border
+    const defaultBorder = {
+      color: { red: 0, green: 0, blue: 0, alpha: 1 },
+      width: 2,
+      style: 'solid' as const,
+      cap: 'round' as const,
+      join: 'round' as const,
+    }
+    let payload = image.payload
+    let opacity = image.opacity
+    if (id === 'imageRadius') {
+      const radius = Number(value)
+      const maxRadius =
+        Math.min(
+          image.localBounds?.width ?? 0,
+          image.localBounds?.height ?? 0,
+        ) / 2
+      if (!Number.isFinite(radius) || radius < 0 || radius > maxRadius) return
+      payload = { ...payload, radius }
+    } else if (id === 'imageOpacity') {
+      const nextOpacity = Number(value)
+      if (!Number.isFinite(nextOpacity) || nextOpacity < 0 || nextOpacity > 1)
+        return
+      opacity = nextOpacity
+    } else if (id === 'imageBorderWidth') {
+      const width = Number(value)
+      if (!Number.isFinite(width) || width < 0 || width > 16) return
+      payload = {
+        ...payload,
+        border:
+          width === 0 ? null : { ...(currentBorder ?? defaultBorder), width },
+      }
+    } else {
+      const match = /^#([0-9a-f]{6})$/iu.exec(value)
+      if (!match) return
+      const hex = match[1]!
+      payload = {
+        ...payload,
+        border: {
+          ...(currentBorder ?? defaultBorder),
+          color: {
+            red: Number.parseInt(hex.slice(0, 2), 16) / 255,
+            green: Number.parseInt(hex.slice(2, 4), 16) / 255,
+            blue: Number.parseInt(hex.slice(4, 6), 16) / 255,
+            alpha: 1,
+          },
+        },
+      }
+    }
+    props.documentSession.execute({
+      type: 'updateLayer',
+      before: image,
+      after: { ...image, payload, opacity },
+    })
+    return
+  }
+  if (activeTool === 'numberedMarker') {
+    if (['circle', 'square', 'diamond', 'star'].includes(value)) {
+      markerShape.value = value as typeof markerShape.value
+    }
+    return
+  }
   const selected = activeTool === 'select' ? selectedDrawingLayer() : undefined
   const tool = isDrawingTool(activeTool)
     ? activeTool
@@ -971,6 +1957,148 @@ function addLayer(
   if (!props.documentSession || props.readOnlyDocument) return
   props.documentSession.execute({ type: 'addLayer', layer })
 }
+async function importContentImage(origin: {
+  readonly x: number
+  readonly y: number
+}): Promise<void> {
+  if (
+    contentImageImporting.value ||
+    !props.contentImageBridge ||
+    !props.documentSession ||
+    props.readOnlyDocument
+  ) {
+    return
+  }
+  contentImageImporting.value = true
+  try {
+    const imported = await props.contentImageBridge.importContentImage(
+      crypto.randomUUID(),
+    )
+    if (imported.kind !== 'imported') return
+    const resource = await loadImageWithBinaryFallback({
+      token: imported.resourceToken,
+      correlationId: crypto.randomUUID(),
+      bridge: props.contentImageBridge,
+      createResource: async (image) => image,
+    })
+    textureImages.value = new Map(textureImages.value).set(
+      imported.blobHash,
+      resource.resource,
+    )
+    const layer = createContentImageLayer({
+      id: crypto.randomUUID(),
+      blobHash: imported.blobHash,
+      format: imported.format,
+      intrinsicWidth: imported.width,
+      intrinsicHeight: imported.height,
+      origin: {
+        x: origin.x - imported.width / 2,
+        y: origin.y - imported.height / 2,
+      },
+    })
+    // New content deliberately remains unselected; the active Image tool stays
+    // active so repeated imports retain the same interaction contract.
+    props.documentSession.execute({ type: 'addLayer', layer })
+  } finally {
+    contentImageImporting.value = false
+  }
+}
+async function pasteNativeClipboard(): Promise<void> {
+  const bridge = props.clipboardBridge
+  const document = activeDocument.value
+  if (!bridge || !document || !props.documentSession || props.readOnlyDocument)
+    return
+  try {
+    const snapshot = await bridge.readClipboardSnapshot(crypto.randomUUID())
+    const center = {
+      x: document.canvas.width / 2,
+      y: document.canvas.height / 2,
+    }
+    if (snapshot.bitmap) {
+      const bitmap = snapshot.bitmap
+      const loaded = await loadImageWithBinaryFallback({
+        token: bitmap.resourceToken,
+        correlationId: crypto.randomUUID(),
+        bridge,
+        createResource: async (image) => image,
+      })
+      textureImages.value = new Map(textureImages.value).set(
+        bitmap.blobHash,
+        loaded.resource,
+      )
+      props.documentSession.execute({
+        type: 'addLayer',
+        layer: createContentImageLayer({
+          id: crypto.randomUUID(),
+          blobHash: bitmap.blobHash,
+          format: bitmap.format,
+          intrinsicWidth: bitmap.width,
+          intrinsicHeight: bitmap.height,
+          origin: {
+            x: center.x - bitmap.width / 2,
+            y: center.y - bitmap.height / 2,
+          },
+        }),
+      })
+      return
+    }
+    if (!snapshot.text) return
+    const layer = createTextLayer({
+      id: crypto.randomUUID(),
+      text: snapshot.text,
+      origin: center,
+      font: textDefaults.value.font,
+      fontSize: textDefaults.value.fontSize,
+      weight: textDefaults.value.weight,
+      italic: textDefaults.value.italic,
+      underline: textDefaults.value.underline,
+      letterSpacing: textDefaults.value.letterSpacing,
+      alignment: textDefaults.value.alignment,
+      lineHeight: textDefaults.value.lineHeight,
+      color: textDefaults.value.color,
+      fill: textDefaults.value.fill,
+      outline: textDefaults.value.outline,
+      background: textDefaults.value.background,
+      opacity: textDefaults.value.opacity,
+      blendMode: textDefaults.value.blendMode,
+      shadows: textDefaults.value.shadows,
+    })
+    if (layer) props.documentSession.execute({ type: 'addLayer', layer })
+  } catch (error) {
+    console.warn('cute-screen native clipboard paste failed', error)
+  }
+}
+async function copySelectedTextLayer(cut: boolean): Promise<void> {
+  const bridge = props.clipboardBridge
+  const document = activeDocument.value
+  const layerId = store.selectedLayerId
+  if (
+    !bridge?.writeClipboardText ||
+    !document ||
+    !layerId ||
+    !props.documentSession ||
+    props.readOnlyDocument
+  )
+    return
+  const index = document.layers.findIndex((layer) => layer.id === layerId)
+  const layer = document.layers[index]
+  if (!layer || layer.kind !== 'text' || layer.locked) return
+  try {
+    await bridge.writeClipboardText(
+      layer.payload.content.text,
+      crypto.randomUUID(),
+    )
+    if (cut) {
+      props.documentSession.execute({ type: 'removeLayer', layer, index })
+    }
+  } catch (error) {
+    console.warn('cute-screen native text clipboard write failed', error)
+  }
+}
+function executeDocumentCommand(command: unknown): void {
+  if (!props.documentSession || props.readOnlyDocument) return
+  props.documentSession.execute(command as EditorCommand)
+}
 const media: Pick<
   MediaQueryList,
   'matches' | 'addEventListener' | 'removeEventListener'
@@ -1079,6 +2207,13 @@ function onKeydown(event: KeyboardEvent): void {
     return
   }
   const modifier = event.metaKey || event.ctrlKey
+  if (modifier && event.key.toLowerCase() === 'o') {
+    if (props.openImageAvailable) {
+      event.preventDefault()
+      void store.runAction('openImage')
+    }
+    return
+  }
   if (modifier && event.key.toLowerCase() === 'z') {
     event.preventDefault()
     if (event.shiftKey) redoDocument()
@@ -1091,19 +2226,35 @@ function onKeydown(event: KeyboardEvent): void {
     )
     if (source && !source.locked) {
       event.preventDefault()
-      props.documentSession?.execute({
-        type: 'duplicateLayer',
-        sourceId: source.id,
-        layer: {
-          ...source,
+      props.documentSession?.execute(
+        createDuplicateLayerCommand(source, {
           id: crypto.randomUUID(),
-          transform: {
-            ...source.transform,
-            translateX: source.transform.translateX + 10,
-            translateY: source.transform.translateY + 10,
-          },
-        },
-      })
+          zoom: Math.max(0.01, store.zoom / 100),
+          cascadeIndex: 1,
+        }),
+      )
+    }
+    return
+  }
+  if (
+    modifier &&
+    (event.key.toLowerCase() === 'c' || event.key.toLowerCase() === 'x') &&
+    store.selectedLayerId
+  ) {
+    if (props.clipboardBridge?.writeClipboardText) {
+      event.preventDefault()
+      void copySelectedTextLayer(event.key.toLowerCase() === 'x')
+    }
+    return
+  }
+  if (modifier && event.key.toLowerCase() === 'v') {
+    if (
+      props.clipboardBridge &&
+      activeDocument.value &&
+      props.documentSession
+    ) {
+      event.preventDefault()
+      void pasteNativeClipboard()
     }
     return
   }
@@ -1250,14 +2401,32 @@ async function resolveDocumentTextures(
     correlationId: () => crypto.randomUUID(),
   })
   const nextImages = new Map(textureImages.value)
+  const textureBlobHash = (fill: unknown): string | undefined => {
+    if (!fill || typeof fill !== 'object') return undefined
+    const candidate = fill as Record<string, unknown>
+    return candidate.kind === 'imageTexture' &&
+      typeof candidate.blobHash === 'string'
+      ? candidate.blobHash
+      : undefined
+  }
   for (const layer of document.layers) {
-    if (layer.kind !== 'shape') continue
-    const fill = layer.payload.fill as Record<string, unknown> | undefined
-    if (fill?.kind !== 'imageTexture' || typeof fill.blobHash !== 'string')
-      continue
-    const resource = await textureResolver.resolve(fill.blobHash)
-    if (resource.kind === 'ready') nextImages.set(fill.blobHash, resource.image)
-    else nextImages.delete(fill.blobHash)
+    const blobHashes =
+      layer.kind === 'image' && layer.payload.role === 'content'
+        ? [layer.payload.blobHash]
+        : layer.kind === 'shape'
+          ? [textureBlobHash(layer.payload.fill)]
+          : layer.kind === 'text'
+            ? [
+                textureBlobHash(layer.payload.fill),
+                textureBlobHash(layer.payload.background?.fill),
+              ]
+            : []
+    for (const blobHash of blobHashes) {
+      if (!blobHash) continue
+      const resource = await textureResolver.resolve(blobHash)
+      if (resource.kind === 'ready') nextImages.set(blobHash, resource.image)
+      else nextImages.delete(blobHash)
+    }
   }
   textureImages.value = nextImages
 }
@@ -1269,6 +2438,8 @@ watch(
   },
 )
 onMounted(() => {
+  personalTextPreset.value =
+    createBrowserTextStylePresetsStorage(browserStorage()).load()
   drawingPreferences = createBrowserDrawingToolPreferencesStorage(
     browserStorage(),
   ).load() as typeof drawingPreferences
@@ -1360,6 +2531,7 @@ watch(
       :capture-unavailable-reason="
         props.captureUnavailableReason ?? translate('captureUnavailable')
       "
+      :open-image-available="props.openImageAvailable"
       :t="translate"
       @action="store.runAction"
       @undo="undoDocument"
@@ -1406,6 +2578,14 @@ watch(
         :selected-layer-ids="store.selectedLayerIds"
         :active-tool="store.activeToolId"
         :drawing-defaults="drawingDefaults"
+        :text-defaults="textDefaults"
+        :next-marker-sequence="
+          activeDocument
+            ? nextNumberedMarkerSequence(activeDocument.layers)
+            : undefined
+        "
+        :marker-shape="markerShape"
+        :open-image-available="props.openImageAvailable"
         :zoom="store.zoom"
         :fit-mode="store.zoomMode === 'fit'"
         :t="translate"
@@ -1415,6 +2595,9 @@ watch(
         @transform-layer="transformLayer"
         @update-layer-payload="updateLayerPayload"
         @add-layer="addLayer"
+        @document-command="executeDocumentCommand"
+        @request-image-import="importContentImage"
+        @open-image="store.runAction('openImage')"
         @select-tool="store.selectTool"
         @zoom="store.setZoom"
         @fit-zoom="store.setFitZoom"

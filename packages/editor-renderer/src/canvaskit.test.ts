@@ -103,6 +103,10 @@ describe('CanvasKit headless renderer', () => {
             height: 20,
             scaleX: 1,
             scaleY: 1,
+            cornerRadius: 8,
+            stroke: { red: 0.2, green: 0.6, blue: 1, alpha: 1 },
+            strokeWidth: 2,
+            lineJoin: 'round',
             rotation: 0,
             opacity: 1,
             visible: true,
@@ -112,6 +116,11 @@ describe('CanvasKit headless renderer', () => {
     )
     const decoded = await loadImage(png)
     expect(decoded.width).toBe(32)
+    const canvas = createCanvas(decoded.width, decoded.height)
+    const context = canvas.getContext('2d')
+    context.drawImage(decoded, 0, 0)
+    expect(context.getImageData(4, 4, 1, 1).data[3]).toBe(0)
+    expect(context.getImageData(14, 4, 1, 1).data[2]).toBeGreaterThan(0)
   })
 
   it('renders a renderer-neutral radial gradient headlessly', async () => {

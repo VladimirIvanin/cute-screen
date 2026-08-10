@@ -169,6 +169,9 @@ importers:
       '@cute-screen/editor-renderer':
         specifier: workspace:*
         version: link:../editor-renderer
+      '@fontsource/roboto':
+        specifier: 5.3.0
+        version: 5.3.0
       '@lucide/vue':
         specifier: 1.31.0
         version: 1.31.0(vue@3.5.41(typescript@7.0.2))
@@ -464,6 +467,9 @@ packages:
     peerDependenciesMeta:
       '@noble/hashes':
         optional: true
+
+  '@fontsource/roboto@5.3.0':
+    resolution: {integrity: sha512-BapRJOWYP+LZ21zp+wBQjfpPYKRoxc4LspJ/RLuI+HSMBD5u/X4O+ESDrSvEqDSy0rAl7GwBJ+09mdc16cVQ1Q==}
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -4107,6 +4113,8 @@ snapshots:
       levn: 0.4.1
 
   '@exodus/bytes@1.15.1': {}
+
+  '@fontsource/roboto@5.3.0': {}
 
   '@humanfs/core@0.19.2':
     dependencies:

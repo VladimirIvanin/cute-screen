@@ -74,7 +74,10 @@ export {
 } from './drawing-preferences'
 export {
   CLIPBOARD_LAYERS_MIME,
+  createCalloutLayer,
+  createContentImageLayer,
   createDuplicateLayerCommand,
+  createEmojiLayer,
   createNumberedMarkerLayer,
   createPasteLayersCommand,
   createTextCommitCommand,
@@ -83,6 +86,8 @@ export {
   encodeClipboardLayersV1,
   nextNumberedMarkerSequence,
   pasteClipboardLayers,
+  routeClipboardSnapshot,
+  type ClipboardDispatch,
   type ClipboardLayersV1,
 } from './content-tools'
 export {
@@ -134,6 +139,8 @@ export {
   type RenderPathNode,
   type RenderPolygonNode,
   type RenderImageNode,
+  type RenderTextNode,
+  type RenderShadow,
   type RenderPaint,
   type RenderGradientStop,
   type RenderBlendMode,

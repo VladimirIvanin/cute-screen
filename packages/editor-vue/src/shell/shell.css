@@ -340,6 +340,20 @@ button:focus-visible {
   z-index: 1;
   pointer-events: none;
 }
+.cs-text-editor {
+  position: absolute;
+  z-index: 2;
+  min-height: 2.5em;
+  padding: 2px 4px;
+  resize: both;
+  overflow: hidden;
+  color: var(--text);
+  border: 1px solid var(--focus-ring);
+  border-radius: var(--radius-sm);
+  outline: none;
+  background: color-mix(in srgb, var(--surface-raised) 92%, transparent);
+  font-family: Roboto, ui-sans-serif, system-ui, sans-serif;
+}
 .cs-empty-state,
 .cs-loading {
   z-index: 2;

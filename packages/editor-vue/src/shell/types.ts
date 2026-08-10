@@ -85,7 +85,7 @@ export interface CanvasViewportHosts {
   readonly scrollContainer: HTMLDivElement
 }
 
-export type AsyncActionName = 'capture' | 'copy' | 'export'
+export type AsyncActionName = 'capture' | 'openImage' | 'copy' | 'export'
 
 export type AsyncActionState =
   | { readonly status: 'idle' }
@@ -170,6 +170,9 @@ export const translationKeys = [
   'captureCapturing',
   'capturePersisting',
   'captureCancelled',
+  'openImage',
+  'openImageAction',
+  'openImageUnavailable',
   'copy',
   'export',
   'moreActions',
@@ -217,6 +220,9 @@ export const translationKeys = [
   'toolPencil',
   'toolMarker',
   'toolText',
+  'toolNumberedMarker',
+  'toolCallout',
+  'toolImage',
   'toolPrivacy',
   'toolSpotlight',
   'toolUnavailable',

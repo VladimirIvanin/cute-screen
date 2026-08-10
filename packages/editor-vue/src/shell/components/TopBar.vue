@@ -16,6 +16,7 @@ const props = withDefaults(
     pending?: boolean
     captureAvailable?: boolean
     captureUnavailableReason?: string | undefined
+    openImageAvailable?: boolean
     t: (key: Parameters<typeof import('../i18n').t>[1]) => string
   }>(),
   {
@@ -24,10 +25,11 @@ const props = withDefaults(
     pending: false,
     captureAvailable: true,
     captureUnavailableReason: undefined,
+    openImageAvailable: false,
   },
 )
 const emit = defineEmits<{
-  action: [name: 'capture' | 'copy' | 'export']
+  action: [name: 'capture' | 'openImage' | 'copy' | 'export']
   undo: []
   redo: []
   retrySave: []
@@ -44,6 +46,11 @@ const captureTitle = computed(() =>
   props.captureAvailable
     ? props.t('capture')
     : (props.captureUnavailableReason ?? props.t('captureUnavailable')),
+)
+const openImageTitle = computed(() =>
+  props.openImageAvailable
+    ? props.t('openImage')
+    : props.t('openImageUnavailable'),
 )
 function selectTheme(value: ThemePreference): void {
   menuOpen.value = false
@@ -128,6 +135,16 @@ function selectLocale(value: SupportedLocale): void {
         @click="emit('action', 'capture')"
       >
         <UiIcon name="camera" /><span>{{ t('capture') }}</span>
+      </button>
+      <button
+        type="button"
+        class="cs-button cs-button-quiet"
+        :disabled="disabled || !openImageAvailable"
+        :aria-label="t('openImage')"
+        :title="openImageTitle"
+        @click="emit('action', 'openImage')"
+      >
+        <UiIcon name="image" /><span>{{ t('openImage') }}</span>
       </button>
       <button
         type="button"

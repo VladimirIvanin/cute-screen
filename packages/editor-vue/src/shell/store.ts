@@ -225,9 +225,11 @@ export const useEditorShellStore = defineStore(
         const key =
           action === 'capture'
             ? 'captureUnavailable'
-            : action === 'copy'
-              ? 'copyUnavailable'
-              : 'exportUnavailable'
+            : action === 'openImage'
+              ? 'openImageUnavailable'
+              : action === 'copy'
+                ? 'copyUnavailable'
+                : 'exportUnavailable'
         actionState.value = {
           status: 'error',
           action,

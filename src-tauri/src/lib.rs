@@ -39,12 +39,13 @@ use activation::{
 };
 use capture::{
     CaptureController, CaptureInvocationSource, CaptureOutcomeV1, CaptureProgressState,
-    CaptureRequestV1, CaptureTerminalOutcome,
+    CaptureRequestV1, CaptureTerminalOutcome, CreateDocumentFromImageRequest, ImageProvenance,
+    create_document_from_image,
 };
 use lifecycle::{LaunchIntentV1, LifecycleState, parse_launch};
 #[cfg(feature = "test-harness")]
-use storage::{BlobMetadata, CaptureMetadataV1, CreateCaptureRequest};
-use storage::{LibraryRepository, OpenDocument, RepositoryError};
+use storage::{BlobMetadata, CreateCaptureRequest};
+use storage::{CaptureMetadataV1, LibraryRepository, OpenDocument, RepositoryError};
 
 const CAPTURE_PREFLIGHT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 const CAPTURE_DIAGNOSTIC_CAPACITY: usize = 64;
@@ -69,6 +70,38 @@ enum TextureImportOutcome {
         height: u32,
         resource_token: String,
     },
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase", tag = "kind")]
+enum OpenImageOutcome {
+    Cancelled,
+    Opened { document: OpenDocument },
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase", tag = "kind")]
+enum ClipboardOpenImageOutcome {
+    NoBitmap,
+    Opened { document: OpenDocument },
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ClipboardBitmapSnapshot {
+    blob_hash: String,
+    resource_token: String,
+    format: String,
+    mime_type: String,
+    width: u32,
+    height: u32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ClipboardReadSnapshot {
+    bitmap: Option<ClipboardBitmapSnapshot>,
+    text: Option<String>,
 }
 
 #[derive(Default)]
@@ -175,6 +208,8 @@ impl CapturePreflightService {
 
 pub mod activation;
 pub mod capture;
+mod clipboard;
+mod fonts;
 pub mod image_transport;
 pub mod lifecycle;
 #[cfg(target_os = "linux")]
@@ -314,6 +349,168 @@ fn repository_import_texture(
 }
 
 #[tauri::command]
+fn repository_import_content_image(
+    correlation_id: String,
+    app: tauri::AppHandle,
+    repository: State<'_, LibraryRepository>,
+    transport: State<'_, Arc<ImageTransportService>>,
+) -> Result<TextureImportOutcome, RepositoryError> {
+    let Some(source) = app
+        .dialog()
+        .file()
+        .set_title("Import image")
+        .add_filter("Images", &["png", "jpg", "jpeg", "webp", "svg"])
+        .blocking_pick_file()
+    else {
+        return Ok(TextureImportOutcome::Cancelled);
+    };
+    let path = source
+        .into_path()
+        .map_err(|error| RepositoryError::Io(error.to_string()))?;
+    let bytes = fs::read(path)?;
+    let metadata = storage::inspect_content_image_bytes(&bytes)?;
+    let stored = repository.import_blob(bytes, metadata)?;
+    let resource = repository.resolve_blob_source(stored.hash.clone())?;
+    let resource_token = Uuid::now_v7().simple().to_string();
+    transport
+        .register_authoritative_blob(resource_token.clone(), resource)
+        .map_err(|error| RepositoryError::Io(error.to_string()))?;
+    let _ = correlation_id;
+    Ok(TextureImportOutcome::Imported {
+        blob_hash: stored.hash,
+        format: stored.metadata.format,
+        mime_type: stored.metadata.mime_type,
+        width: stored.metadata.width,
+        height: stored.metadata.height,
+        resource_token,
+    })
+}
+
+#[tauri::command]
+fn clipboard_read_snapshot(
+    correlation_id: String,
+    repository: State<'_, LibraryRepository>,
+    transport: State<'_, Arc<ImageTransportService>>,
+) -> Result<ClipboardReadSnapshot, RepositoryError> {
+    let snapshot = clipboard::read_native_snapshot().map_err(RepositoryError::Io)?;
+    let bitmap = snapshot
+        .bitmap
+        .map(
+            |bitmap| -> Result<ClipboardBitmapSnapshot, RepositoryError> {
+                let metadata = storage::inspect_content_image_bytes(&bitmap.png_bytes)?;
+                let stored = repository.import_blob(bitmap.png_bytes, metadata)?;
+                let source = repository.resolve_blob_source(stored.hash.clone())?;
+                let resource_token = Uuid::now_v7().simple().to_string();
+                transport
+                    .register_authoritative_blob(resource_token.clone(), source)
+                    .map_err(|error| RepositoryError::Io(error.to_string()))?;
+                Ok(ClipboardBitmapSnapshot {
+                    blob_hash: stored.hash,
+                    resource_token,
+                    format: stored.metadata.format,
+                    mime_type: stored.metadata.mime_type,
+                    width: stored.metadata.width,
+                    height: stored.metadata.height,
+                })
+            },
+        )
+        .transpose()?;
+    let _ = correlation_id;
+    Ok(ClipboardReadSnapshot {
+        bitmap,
+        text: snapshot.text,
+    })
+}
+
+#[tauri::command]
+fn clipboard_write_text(text: String, correlation_id: String) -> Result<(), RepositoryError> {
+    clipboard::write_native_text(&text).map_err(RepositoryError::Io)?;
+    let _ = correlation_id;
+    Ok(())
+}
+
+#[tauri::command]
+fn font_catalog_list(
+    correlation_id: String,
+) -> Result<Vec<fonts::SystemFontFace>, RepositoryError> {
+    let fonts = fonts::list_system_font_faces().map_err(RepositoryError::Io)?;
+    let _ = correlation_id;
+    Ok(fonts)
+}
+
+#[tauri::command]
+fn clipboard_open_image(
+    correlation_id: String,
+    repository: State<'_, LibraryRepository>,
+    transport: State<'_, Arc<ImageTransportService>>,
+) -> Result<ClipboardOpenImageOutcome, RepositoryError> {
+    let snapshot = clipboard::read_native_snapshot().map_err(RepositoryError::Io)?;
+    let Some(bitmap) = snapshot.bitmap else {
+        return Ok(ClipboardOpenImageOutcome::NoBitmap);
+    };
+    let mut document = create_document_from_image(
+        &repository,
+        CreateDocumentFromImageRequest {
+            source_bytes: bitmap.png_bytes,
+            provenance: ImageProvenance::Clipboard,
+            series_id: None,
+            frame_metadata: CaptureMetadataV1::unknown(),
+            captured_at: chrono::Utc::now(),
+        },
+    )?;
+    let source = repository
+        .resolve_capture_source(document.capture_id.clone(), document.source_hash.clone())?;
+    let token = Uuid::now_v7().simple().to_string();
+    transport
+        .register_authoritative(token.clone(), source)
+        .map_err(|error| RepositoryError::Io(error.to_string()))?;
+    document.image_token = Some(token);
+    let _ = correlation_id;
+    Ok(ClipboardOpenImageOutcome::Opened { document })
+}
+
+#[tauri::command]
+fn repository_open_image(
+    correlation_id: String,
+    app: tauri::AppHandle,
+    repository: State<'_, LibraryRepository>,
+    transport: State<'_, Arc<ImageTransportService>>,
+) -> Result<OpenImageOutcome, RepositoryError> {
+    let Some(source) = app
+        .dialog()
+        .file()
+        .set_title("Open image")
+        .add_filter("Images", &["png", "jpg", "jpeg", "webp", "svg"])
+        .blocking_pick_file()
+    else {
+        return Ok(OpenImageOutcome::Cancelled);
+    };
+    let path = source
+        .into_path()
+        .map_err(|error| RepositoryError::Io(error.to_string()))?;
+    let source_bytes = fs::read(path)?;
+    let mut document = create_document_from_image(
+        &repository,
+        CreateDocumentFromImageRequest {
+            source_bytes,
+            provenance: ImageProvenance::FileOpen,
+            series_id: None,
+            frame_metadata: CaptureMetadataV1::unknown(),
+            captured_at: chrono::Utc::now(),
+        },
+    )?;
+    let source = repository
+        .resolve_capture_source(document.capture_id.clone(), document.source_hash.clone())?;
+    let token = Uuid::now_v7().simple().to_string();
+    transport
+        .register_authoritative(token.clone(), source)
+        .map_err(|error| RepositoryError::Io(error.to_string()))?;
+    document.image_token = Some(token);
+    let _ = correlation_id;
+    Ok(OpenImageOutcome::Opened { document })
+}
+
+#[tauri::command]
 fn repository_resolve_texture(
     _correlation_id: String,
     blob_hash: String,
@@ -321,7 +518,10 @@ fn repository_resolve_texture(
     transport: State<'_, Arc<ImageTransportService>>,
 ) -> Result<TextureImportOutcome, RepositoryError> {
     let resource = repository.resolve_blob_source(blob_hash)?;
-    if !matches!(resource.metadata.format.as_str(), "png" | "jpeg" | "webp") {
+    if !matches!(
+        resource.metadata.format.as_str(),
+        "png" | "jpeg" | "webp" | "svg"
+    ) {
         return Err(RepositoryError::InvalidImage);
     }
     let resource_token = Uuid::now_v7().simple().to_string();
@@ -1171,6 +1371,12 @@ pub fn run() {
         repository_list_active_series_frames,
         repository_save_document,
         repository_import_texture,
+        repository_import_content_image,
+        clipboard_read_snapshot,
+        clipboard_write_text,
+        font_catalog_list,
+        clipboard_open_image,
+        repository_open_image,
         repository_resolve_texture,
         repository_export_recovery_bundle,
         lifecycle_complete_main_window_close,
@@ -1197,6 +1403,12 @@ pub fn run() {
         repository_list_active_series_frames,
         repository_save_document,
         repository_import_texture,
+        repository_import_content_image,
+        clipboard_read_snapshot,
+        clipboard_write_text,
+        font_catalog_list,
+        clipboard_open_image,
+        repository_open_image,
         repository_resolve_texture,
         repository_export_recovery_bundle,
         lifecycle_complete_main_window_close,

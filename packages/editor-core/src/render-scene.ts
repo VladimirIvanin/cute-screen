@@ -10,6 +10,14 @@ export interface RenderGradientStop {
   readonly color: RgbaColor
 }
 
+/** Renderer-safe shadow primitive shared by text preview and export. */
+export interface RenderShadow {
+  readonly color: RgbaColor
+  readonly offsetX: number
+  readonly offsetY: number
+  readonly blur: number
+}
+
 /** Renderer-neutral paints deliberately carry resolved canvas-space geometry. */
 export type RenderPaint =
   | RgbaColor
@@ -134,6 +142,33 @@ export interface RenderImageNode extends RenderNodeBase {
   readonly height: number
   readonly scaleX: number
   readonly scaleY: number
+  readonly cornerRadius?: number
+  readonly stroke?: RgbaColor
+  readonly strokeWidth?: number
+  readonly lineJoin?: RenderLineJoin
+}
+
+/** Text stays a first-class scene node so preview and export share layout input. */
+export interface RenderTextNode extends RenderNodeBase {
+  readonly kind: 'text'
+  readonly text: string
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+  readonly fontFamily: string
+  readonly fontSize: number
+  readonly fontWeight: number
+  readonly fontStyle: 'normal' | 'italic'
+  readonly underline?: boolean
+  readonly letterSpacing?: number
+  readonly align: 'start' | 'center' | 'end' | 'justify'
+  readonly lineHeight: number
+  readonly fill: RenderPaint
+  readonly shadows?: readonly RenderShadow[]
+  readonly stroke?: RgbaColor
+  readonly strokeWidth?: number
+  readonly lineJoin?: RenderLineJoin
 }
 
 export type RenderNode =
@@ -143,6 +178,7 @@ export type RenderNode =
   | RenderPathNode
   | RenderPolygonNode
   | RenderImageNode
+  | RenderTextNode
 
 export interface RenderSceneSnapshot {
   readonly width: number
@@ -360,7 +396,92 @@ function freezeImageNode(node: RenderImageNode): RenderImageNode {
   if (!Number.isFinite(node.scaleY) || node.scaleY === 0) {
     throw new RangeError(`${node.id}.scaleY must be finite and non-zero`)
   }
-  return Object.freeze({ ...node })
+  if (node.cornerRadius !== undefined) {
+    assertNonNegative(node.cornerRadius, `${node.id}.cornerRadius`)
+    if (node.cornerRadius > Math.min(node.width, node.height) / 2) {
+      throw new RangeError(`${node.id}.cornerRadius exceeds its bounds`)
+    }
+  }
+  if (node.strokeWidth !== undefined) {
+    assertNonNegative(node.strokeWidth, `${node.id}.strokeWidth`)
+  }
+  if (
+    node.lineJoin !== undefined &&
+    !['miter', 'round', 'bevel'].includes(node.lineJoin)
+  ) {
+    throw new RangeError(`${node.id}.lineJoin is invalid`)
+  }
+  return Object.freeze({
+    ...node,
+    ...(node.stroke === undefined ? {} : { stroke: freezeColor(node.stroke) }),
+  })
+}
+
+function freezeTextNode(node: RenderTextNode): RenderTextNode {
+  if (node.text.length === 0) throw new Error(`${node.id}.text is empty`)
+  if (!node.fontFamily) throw new Error(`${node.id}.fontFamily is empty`)
+  assertFinite(node.x, `${node.id}.x`)
+  assertFinite(node.y, `${node.id}.y`)
+  for (const [field, value] of Object.entries({
+    width: node.width,
+    height: node.height,
+    fontSize: node.fontSize,
+    lineHeight: node.lineHeight,
+  }))
+    assertPositive(value, `${node.id}.${field}`)
+  if (
+    !Number.isInteger(node.fontWeight) ||
+    node.fontWeight < 100 ||
+    node.fontWeight > 900
+  ) {
+    throw new RangeError(`${node.id}.fontWeight is invalid`)
+  }
+  if (!['normal', 'italic'].includes(node.fontStyle)) {
+    throw new RangeError(`${node.id}.fontStyle is invalid`)
+  }
+  if (
+    node.letterSpacing !== undefined &&
+    (!Number.isFinite(node.letterSpacing) || Math.abs(node.letterSpacing) > 256)
+  ) {
+    throw new RangeError(`${node.id}.letterSpacing is invalid`)
+  }
+  if (!['start', 'center', 'end', 'justify'].includes(node.align)) {
+    throw new RangeError(`${node.id}.align is invalid`)
+  }
+  if (node.strokeWidth !== undefined) {
+    assertPositive(node.strokeWidth, `${node.id}.strokeWidth`)
+  }
+  if (
+    node.lineJoin !== undefined &&
+    !['miter', 'round', 'bevel'].includes(node.lineJoin)
+  ) {
+    throw new RangeError(`${node.id}.lineJoin is invalid`)
+  }
+  if (node.shadows !== undefined && node.shadows.length > 4) {
+    throw new RangeError(`${node.id}.shadows exceeds renderer limit`)
+  }
+  const shadows = node.shadows?.map((shadow, index) => {
+    assertFinite(shadow.offsetX, `${node.id}.shadows[${index}].offsetX`)
+    assertFinite(shadow.offsetY, `${node.id}.shadows[${index}].offsetY`)
+    if (!Number.isFinite(shadow.blur) || shadow.blur < 0 || shadow.blur > 128) {
+      throw new RangeError(`${node.id}.shadows[${index}].blur is invalid`)
+    }
+    return Object.freeze({
+      color: freezeColor(shadow.color),
+      offsetX: shadow.offsetX,
+      offsetY: shadow.offsetY,
+      blur: shadow.blur,
+    })
+  })
+  return Object.freeze({
+    ...node,
+    ...(node.letterSpacing === undefined
+      ? {}
+      : { letterSpacing: node.letterSpacing }),
+    fill: freezePaint(node.fill, `${node.id}.fill`),
+    ...(shadows === undefined ? {} : { shadows: Object.freeze(shadows) }),
+    ...(node.stroke === undefined ? {} : { stroke: freezeColor(node.stroke) }),
+  })
 }
 
 function assertNever(value: never): never {
@@ -382,6 +503,8 @@ function freezeNode(node: RenderNode): RenderNode {
       return freezePolygonNode(node)
     case 'image':
       return freezeImageNode(node)
+    case 'text':
+      return freezeTextNode(node)
     default:
       return assertNever(node)
   }

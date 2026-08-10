@@ -1,17 +1,26 @@
 import { fireEvent, render, screen } from '@testing-library/vue'
 import { describe, expect, it, vi } from 'vitest'
+import { markRaw } from 'vue'
 
 import App from '../../../apps/desktop/src/App.vue'
 import ActionFeedback from '../../../packages/editor-vue/src/shell/components/ActionFeedback.vue'
+import CanvasViewport from '../../../packages/editor-vue/src/shell/components/CanvasViewport.vue'
 import EditorShell from '../../../packages/editor-vue/src/shell/components/EditorShell.vue'
 import TopBar from '../../../packages/editor-vue/src/shell/components/TopBar.vue'
 import ZoomControls from '../../../packages/editor-vue/src/shell/components/ZoomControls.vue'
 import {
   assertLocaleCompleteness,
   createEditorShellPinia,
+  DocumentSessionController,
   parsePreferences,
   resolveSystemLocale,
+  type TextureFillBridge,
 } from '@cute-screen/editor-vue'
+import {
+  createContentImageLayer,
+  createTextLayer,
+  type EditorDocumentV1,
+} from '@cute-screen/editor-renderer'
 
 function renderApp() {
   return render(App, { global: { plugins: [createEditorShellPinia()] } })
@@ -47,6 +56,309 @@ describe('M02 editor shell', () => {
       'title',
       'Portal backend is unavailable',
     )
+  })
+
+  it('routes Open image to the native action only when the desktop bridge is available', async () => {
+    const view = render(TopBar, {
+      props: {
+        locale: 'en',
+        theme: 'system',
+        canCopyOrExport: false,
+        openImageAvailable: true,
+        t: (key) => key,
+      },
+    })
+
+    const openImage = screen.getByRole('button', { name: 'openImage' })
+    expect(openImage).toBeEnabled()
+    await fireEvent.click(openImage)
+    expect(view.emitted('action')).toEqual([['openImage']])
+  })
+
+  it('offers Open image from the empty canvas when the native bridge is available', async () => {
+    const view = render(CanvasViewport, {
+      props: {
+        documentState: { kind: 'empty' },
+        openImageAvailable: true,
+        t: (key) => key,
+      },
+    })
+
+    await fireEvent.click(screen.getByRole('button', { name: 'openImage' }))
+    expect(view.emitted('openImage')).toEqual([[]])
+  })
+
+  it('exposes compact text background presets only in the contextual toolbar', async () => {
+    render(EditorShell, {
+      props: {
+        fixture: 'ready',
+        initialDocumentState: {
+          kind: 'ready',
+          title: 'Test',
+          dimensions: '100 × 100',
+        },
+      },
+      global: { plugins: [createEditorShellPinia()] },
+    })
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Text' }))
+    const preset = screen.getByRole('combobox', { name: 'Preset' })
+    expect(preset).toHaveValue('plain')
+    await fireEvent.update(preset, 'neon')
+    expect(preset).toHaveValue('neon')
+
+    const background = screen.getByRole('combobox', { name: 'Background' })
+    expect(background).toHaveValue('none')
+    await fireEvent.update(background, 'blue')
+    expect(background).toHaveValue('blue')
+
+    expect(preset).toHaveValue('custom')
+
+    const lineHeight = screen.getByRole('combobox', { name: 'Line height' })
+    expect(lineHeight).toHaveValue('1.25')
+    await fireEvent.update(lineHeight, '1.5')
+    expect(lineHeight).toHaveValue('1.5')
+
+    const shadow = screen.getByRole('combobox', { name: 'Shadow' })
+    expect(shadow).toHaveValue('neon')
+    await fireEvent.update(shadow, 'soft')
+    expect(shadow).toHaveValue('soft')
+
+    await fireEvent.click(
+      screen.getByRole('button', { name: 'Save personal preset' }),
+    )
+    expect(
+      screen.getByRole('option', { name: 'My preset' }),
+    ).toBeInTheDocument()
+    await fireEvent.update(preset, 'plain')
+    expect(background).toHaveValue('none')
+    await fireEvent.update(preset, 'personal')
+    expect(background).toHaveValue('blue')
+    expect(shadow).toHaveValue('soft')
+  })
+
+  it('offers discovered system font families without sending font bytes through the shell', async () => {
+    render(EditorShell, {
+      props: {
+        fixture: 'ready',
+        initialDocumentState: {
+          kind: 'ready',
+          title: 'Test',
+          dimensions: '100 × 100',
+        },
+        systemFonts: [{ family: 'Noto Sans', weight: 400, style: 'normal' }],
+      },
+      global: { plugins: [createEditorShellPinia()] },
+    })
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Text' }))
+    const font = screen.getByRole('combobox', { name: 'Font' })
+    expect(font).toHaveValue('bundled:Roboto')
+    expect(
+      screen.getByRole('option', { name: 'Noto Sans · system' }),
+    ).toBeInTheDocument()
+    await fireEvent.update(font, 'system:Noto Sans')
+    expect(font).toHaveValue('system:Noto Sans')
+    await fireEvent.update(
+      screen.getByRole('combobox', { name: 'Style' }),
+      'italic',
+    )
+    expect(
+      screen.getByText('Missing Noto Sans face; preview may use a substitute.'),
+    ).toBeInTheDocument()
+  })
+
+  it('cuts a selected Text layer only after the native plain-text write succeeds', async () => {
+    const text = createTextLayer({
+      id: '019c1f62-058e-7000-8000-000000000001',
+      text: 'Copy me',
+      origin: { x: 10, y: 10 },
+      font: {
+        source: 'bundled',
+        family: 'Roboto',
+        weight: 400,
+        style: 'normal',
+      },
+    })
+    if (!text) throw new Error('test Text layer should exist')
+    const document: EditorDocumentV1 = {
+      schemaVersion: 4,
+      id: '019c1f62-058e-7000-8000-000000000000',
+      source: {
+        blobHash: 'a'.repeat(64),
+        format: 'png',
+        mimeType: 'image/png',
+        width: 100,
+        height: 100,
+        orientationApplied: true,
+        color: { colorSpace: 'srgb', hasIccProfile: false },
+      },
+      canvas: { width: 100, height: 100 },
+      crop: null,
+      layers: [text],
+      presentation: {
+        beautify: { enabled: false },
+        watermark: { enabled: false },
+      },
+      createdAt: '2026-08-11T00:00:00.000Z',
+      updatedAt: '2026-08-11T00:00:00.000Z',
+    }
+    const session = new DocumentSessionController({
+      document,
+      revision: 1,
+      bridge: {
+        saveDocument: async () => 2,
+        exportRecoveryBundle: async () => ({ kind: 'saved' }),
+      },
+      correlationId: () => 'clipboard-test',
+      debounceMs: 60_000,
+    })
+    const writeClipboardText = vi.fn().mockResolvedValue(undefined)
+    const view = render(EditorShell, {
+      props: {
+        documentSession: markRaw(session),
+        clipboardBridge: {
+          readClipboardSnapshot: async () => ({}),
+          writeClipboardText,
+          stageImage: async () => {
+            throw new Error('not used')
+          },
+          readImageBytes: async () => new ArrayBuffer(0),
+        },
+      },
+      global: { plugins: [createEditorShellPinia()] },
+    })
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Show layers' }))
+    const selectText = view.container.querySelector(
+      '.cs-layer-select',
+    ) as HTMLButtonElement
+    await fireEvent.click(selectText)
+    await fireEvent.keyDown(window, { key: 'x', ctrlKey: true })
+    await vi.waitFor(() =>
+      expect(writeClipboardText).toHaveBeenCalledWith(
+        'Copy me',
+        expect.any(String),
+      ),
+    )
+    expect(session.snapshot.core.document.layers).toEqual([])
+
+    session.dispose()
+    view.unmount()
+  })
+
+  it('keeps content-image radius, border and opacity in the contextual toolbar', async () => {
+    const image = createContentImageLayer({
+      id: '019c1f62-058e-7000-8000-0000000000ac',
+      blobHash: 'b'.repeat(64),
+      format: 'png',
+      intrinsicWidth: 80,
+      intrinsicHeight: 60,
+      origin: { x: 10, y: 12 },
+    })
+    const document: EditorDocumentV1 = {
+      schemaVersion: 4,
+      id: '019c1f62-058e-7000-8000-000000000000',
+      source: {
+        blobHash: 'a'.repeat(64),
+        format: 'png',
+        mimeType: 'image/png',
+        width: 100,
+        height: 100,
+        orientationApplied: true,
+        color: { colorSpace: 'srgb', hasIccProfile: false },
+      },
+      canvas: { width: 100, height: 100 },
+      crop: null,
+      layers: [image],
+      presentation: {
+        beautify: { enabled: false },
+        watermark: { enabled: false },
+      },
+      createdAt: '2026-08-11T00:00:00.000Z',
+      updatedAt: '2026-08-11T00:00:00.000Z',
+    }
+    const session = new DocumentSessionController({
+      document,
+      revision: 1,
+      bridge: {
+        saveDocument: async () => 2,
+        exportRecoveryBundle: async () => ({ kind: 'saved' }),
+      },
+      correlationId: () => 'content-image-style',
+      debounceMs: 60_000,
+    })
+    const view = render(EditorShell, {
+      props: { documentSession: markRaw(session) },
+      global: { plugins: [createEditorShellPinia()] },
+    })
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Show layers' }))
+    await fireEvent.click(
+      view.container.querySelector('.cs-layer-select') as HTMLButtonElement,
+    )
+    await fireEvent.click(screen.getByRole('button', { name: 'Select' }))
+    await fireEvent.change(screen.getByRole('slider', { name: 'Radius' }), {
+      target: { value: '12' },
+    })
+    await fireEvent.update(screen.getByLabelText('Border'), '#3399ff')
+    await fireEvent.change(
+      screen.getByRole('slider', { name: 'Border width' }),
+      { target: { value: '3' } },
+    )
+    await fireEvent.change(
+      view.container.querySelector(
+        'input[aria-label="Opacity"]',
+      ) as HTMLInputElement,
+      { target: { value: '0.6' } },
+    )
+
+    expect(session.snapshot.core.document.layers[0]).toMatchObject({
+      kind: 'image',
+      opacity: 0.6,
+      payload: {
+        radius: 12,
+        border: {
+          width: 3,
+          color: { red: 0.2, green: 0.6, blue: 1, alpha: 1 },
+        },
+      },
+    })
+
+    session.dispose()
+    view.unmount()
+  })
+
+  it('offers text texture import only when the native raw-binary bridge is available', async () => {
+    const importTexture = vi.fn().mockResolvedValue({ kind: 'cancelled' })
+    const textureBridge: TextureFillBridge = {
+      importTexture,
+      resolveTexture: async () => ({ kind: 'cancelled' }),
+      stageImage: async () => {
+        throw new Error('not called for a cancelled import')
+      },
+      readImageBytes: async () => {
+        throw new Error('not called for a cancelled import')
+      },
+    }
+    render(EditorShell, {
+      props: {
+        fixture: 'ready',
+        initialDocumentState: {
+          kind: 'ready',
+          title: 'Test',
+          dimensions: '100 × 100',
+        },
+        textureBridge,
+      },
+      global: { plugins: [createEditorShellPinia()] },
+    })
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Text' }))
+    await fireEvent.click(
+      screen.getByRole('button', { name: 'Import texture' }),
+    )
+    expect(importTexture).toHaveBeenCalledOnce()
   })
 
   it('renders a native selector cancellation as terminal feedback, not an error', () => {

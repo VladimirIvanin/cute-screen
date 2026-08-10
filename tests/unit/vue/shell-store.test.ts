@@ -124,6 +124,28 @@ describe('M04 capture action feedback', () => {
     })
   })
 
+  it('keeps Open image cancellation distinct from an error', async () => {
+    const store = useEditorShellStore(createEditorShellPinia())
+    store.initialize({
+      preferences: { load: () => undefined, save: () => undefined },
+      languages: ['en'],
+      systemDark: () => false,
+      actions: {
+        run: async () => {
+          throw new ActionCancelledError('Open image cancelled')
+        },
+      },
+    })
+
+    await store.runAction('openImage')
+
+    expect(store.actionState).toEqual({
+      status: 'cancelled',
+      action: 'openImage',
+      message: 'Open image cancelled',
+    })
+  })
+
   it('keeps the editor interaction state intact when capture storage fails and retries', async () => {
     const store = useEditorShellStore(createEditorShellPinia())
     let attempts = 0

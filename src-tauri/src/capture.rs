@@ -13,7 +13,7 @@ use crate::{
     platform::{CaptureGeometry, CaptureResult, CaptureTarget, PlatformErrorCode},
     storage::{
         BlobMetadata, CaptureMetadataV1, CreateCaptureRequest, LibraryRepository, OpenDocument,
-        RepositoryError,
+        RepositoryError, inspect_content_image_bytes,
     },
 };
 
@@ -118,6 +118,74 @@ pub enum CaptureProgressState {
     Selecting,
     Capturing,
     Persisting,
+}
+
+/// Identifies the ingress that created a document without changing its editor
+/// semantics. All variants use the same immutable base-layer transaction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImageProvenance {
+    Capture,
+    FileOpen,
+    Clipboard,
+}
+
+impl ImageProvenance {
+    fn schema_value(self) -> &'static str {
+        match self {
+            Self::Capture => "capture",
+            Self::FileOpen => "fileOpen",
+            Self::Clipboard => "clipboard",
+        }
+    }
+}
+
+/// Input for the shared immutable-image document factory.
+///
+/// The native ingress is responsible for staging and validating bytes before
+/// this factory consumes them. The repository then commits the blob, frame and
+/// document as one recoverable transaction.
+pub struct CreateDocumentFromImageRequest {
+    pub source_bytes: Vec<u8>,
+    pub provenance: ImageProvenance,
+    pub series_id: Option<String>,
+    pub frame_metadata: CaptureMetadataV1,
+    pub captured_at: chrono::DateTime<Utc>,
+}
+
+/// Creates a new editable document from an already validated local image.
+///
+/// # Errors
+///
+/// Returns [`RepositoryError`] when the bytes/metadata are invalid or the
+/// repository transaction cannot be committed. In either case, no new active
+/// frame is opened.
+pub fn create_document_from_image(
+    repository: &LibraryRepository,
+    request: CreateDocumentFromImageRequest,
+) -> Result<OpenDocument, RepositoryError> {
+    let document_id = Uuid::now_v7().to_string();
+    let source_metadata = inspect_content_image_bytes(&request.source_bytes)?;
+    let source_hash = format!("{:x}", Sha256::digest(&request.source_bytes));
+    let document_json = initial_document_json(
+        &document_id,
+        &source_hash,
+        &source_metadata,
+        request.provenance,
+        request
+            .captured_at
+            .to_rfc3339_opts(SecondsFormat::Millis, true),
+    );
+    let captured_at = request.captured_at.timestamp_millis();
+    repository.create_capture(CreateCaptureRequest {
+        document_id,
+        capture_id: Uuid::now_v7().to_string(),
+        series_id: request.series_id,
+        document_json,
+        source_bytes: request.source_bytes,
+        source_metadata,
+        capture_metadata: request.frame_metadata,
+        captured_at,
+    })
 }
 
 #[derive(Clone)]
@@ -349,32 +417,17 @@ impl CaptureController {
         geometry: Option<CaptureGeometry>,
         cursor_included: Option<bool>,
     ) -> Result<OpenDocument, RepositoryError> {
-        let document_id = Uuid::now_v7().to_string();
         let captured_at = Utc::now();
-        let source_hash = format!("{:x}", Sha256::digest(&owned.bytes));
-        let source_metadata = BlobMetadata {
-            format: "png".to_owned(),
-            mime_type: owned.mime_type,
-            width: owned.width,
-            height: owned.height,
-            color_metadata: serde_json::json!({ "colorSpace": "srgb", "hasIccProfile": false }),
-        };
-        let document_json = initial_document_json(
-            &document_id,
-            &source_hash,
-            &source_metadata,
-            captured_at.to_rfc3339_opts(SecondsFormat::Millis, true),
-        );
-        self.repository.create_capture(CreateCaptureRequest {
-            document_id,
-            capture_id: Uuid::now_v7().to_string(),
-            series_id: request.series_id.clone(),
-            document_json,
-            source_bytes: owned.bytes,
-            source_metadata,
-            capture_metadata: capture_metadata(request, geometry, cursor_included),
-            captured_at: captured_at.timestamp_millis(),
-        })
+        create_document_from_image(
+            &self.repository,
+            CreateDocumentFromImageRequest {
+                source_bytes: owned.bytes,
+                provenance: ImageProvenance::Capture,
+                series_id: request.series_id.clone(),
+                frame_metadata: capture_metadata(request, geometry, cursor_included),
+                captured_at,
+            },
+        )
     }
 }
 
@@ -553,6 +606,7 @@ fn initial_document_json(
     document_id: &str,
     source_hash: &str,
     source: &BlobMetadata,
+    provenance: ImageProvenance,
     timestamp: String,
 ) -> String {
     let base_layer_id = format!(
@@ -573,7 +627,7 @@ fn initial_document_json(
             "width": source.width,
             "height": source.height,
             "orientationApplied": true,
-            "provenance": "capture",
+            "provenance": provenance.schema_value(),
             "color": source.color_metadata,
         },
         "canvas": { "width": source.width, "height": source.height },
@@ -676,15 +730,16 @@ impl Drop for ActiveOperation {
 mod tests {
     use super::{
         ActiveOperation, CaptureAction, CaptureController, CaptureInvocationSource,
-        CaptureProgressState, CaptureRequestV1, CaptureTerminalOutcome, progress_before_backend,
-        terminal, terminal_from_error,
+        CaptureProgressState, CaptureRequestV1, CaptureTerminalOutcome,
+        CreateDocumentFromImageRequest, ImageProvenance, create_document_from_image,
+        progress_before_backend, terminal, terminal_from_error,
     };
     use crate::{
         image_transport::{ImageTransportService, OwnedImage},
         platform::{CaptureResult, PlatformErrorCode},
         storage::{
-            BlobMetadata, LibraryRepository, RepositoryError, StorageFaultInjector,
-            StorageFaultPoint,
+            BlobMetadata, CaptureMetadataV1, LibraryRepository, RepositoryError,
+            StorageFaultInjector, StorageFaultPoint,
         },
     };
     use std::{
@@ -768,6 +823,7 @@ mod tests {
             "019c1f62-058e-7000-8000-000000000000",
             &"a".repeat(64),
             &metadata,
+            ImageProvenance::Capture,
             "2026-08-09T00:00:00.000Z".to_owned(),
         ))
         .expect("factory JSON");
@@ -782,6 +838,31 @@ mod tests {
             base["localBounds"],
             serde_json::json!({ "x": 0, "y": 0, "width": 100, "height": 100 })
         );
+    }
+
+    #[test]
+    fn create_document_from_image_uses_file_open_provenance_and_a_locked_base_layer() {
+        let directory = tempfile::tempdir().expect("temporary library");
+        let repository =
+            LibraryRepository::initialize(directory.path(), directory.path()).expect("repository");
+        let document = create_document_from_image(
+            &repository,
+            CreateDocumentFromImageRequest {
+                source_bytes: png_1x1(),
+                provenance: ImageProvenance::FileOpen,
+                series_id: None,
+                frame_metadata: CaptureMetadataV1::unknown(),
+                captured_at: chrono::Utc::now(),
+            },
+        )
+        .expect("file-open document");
+        let value: serde_json::Value =
+            serde_json::from_str(&document.document_json).expect("document JSON");
+
+        assert_eq!(value["source"]["provenance"], "fileOpen");
+        assert_eq!(value["layers"][0]["locked"], true);
+        assert_eq!(value["layers"][0]["payload"]["role"], "base");
+        assert!(repository.open_last().expect("open last").is_some());
     }
 
     #[test]

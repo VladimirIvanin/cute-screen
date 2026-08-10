@@ -8,6 +8,7 @@ defineProps<{
       | 'cancel'
       | 'retry'
       | 'captureAction'
+      | 'openImageAction'
       | 'copyAction'
       | 'exportAction'
       | 'captureProbing'
@@ -21,9 +22,10 @@ defineProps<{
 const emit = defineEmits<{ cancel: []; retry: [] }>()
 const actionKey: Record<
   AsyncActionName,
-  'captureAction' | 'copyAction' | 'exportAction'
+  'captureAction' | 'openImageAction' | 'copyAction' | 'exportAction'
 > = {
   capture: 'captureAction',
+  openImage: 'openImageAction',
   copy: 'copyAction',
   export: 'exportAction',
 }

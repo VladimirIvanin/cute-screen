@@ -13,6 +13,27 @@ export interface ImageTransportBridge {
   readImageBytes(token: string, correlationId: string): Promise<ArrayBuffer>
 }
 
+export interface ClipboardBitmapSnapshot {
+  readonly blobHash: string
+  readonly resourceToken: string
+  readonly format: 'png' | 'jpeg' | 'webp' | 'svg'
+  readonly mimeType: string
+  readonly width: number
+  readonly height: number
+}
+
+export interface NativeClipboardSnapshot {
+  readonly bitmap?: ClipboardBitmapSnapshot
+  readonly text?: string
+}
+
+/** Native clipboard snapshot; image bytes remain behind an opaque transport token. */
+export interface ClipboardBridge extends ImageTransportBridge {
+  readClipboardSnapshot(correlationId: string): Promise<NativeClipboardSnapshot>
+  /** Writes the interoperable plain-text fallback for a selected Text layer. */
+  writeClipboardText?(text: string, correlationId: string): Promise<void>
+}
+
 export type ImageTransportErrorCode =
   'dimensionMismatch' | 'imageCorrupt' | 'transportDenied'
 

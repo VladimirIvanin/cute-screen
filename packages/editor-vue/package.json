@@ -21,6 +21,7 @@
     "./shell.css": "./dist/shell.css"
   },
   "dependencies": {
+    "@fontsource/roboto": "5.3.0",
     "@cute-screen/editor-renderer": "workspace:*",
     "@lucide/vue": "1.31.0",
     "pinia": "3.0.4",

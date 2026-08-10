@@ -1,11 +1,18 @@
 import { parseEditorDocument } from './document/codec'
 import type { EditorCommand } from './commands/types'
 import type {
+  CalloutLayer,
+  BlendMode,
+  EmojiAssetReference,
+  EmojiLayer,
   FontReference,
+  ImageLayer,
   JsonObject,
   LayerNode,
   NumberedMarkerLayer,
   Point,
+  SrgbColor,
+  ShadowStyle,
   TextLayer,
 } from './document/types'
 
@@ -30,6 +37,23 @@ const BLACK_FILL = Object.freeze({
   color: Object.freeze({ red: 0, green: 0, blue: 0, alpha: 1 }),
   opacity: 1,
 })
+
+const DEFAULT_COLOR = Object.freeze({
+  colorSpace: 'srgb' as const,
+  hasIccProfile: false,
+})
+
+const SHA256_PATTERN = /^[a-f0-9]{64}$/u
+const TEXT_BLEND_MODES: readonly BlendMode[] = [
+  'normal',
+  'multiply',
+  'screen',
+  'overlay',
+  'darken',
+  'lighten',
+  'softLight',
+  'hardLight',
+]
 
 function cloneLayer(layer: LayerNode): LayerNode {
   return JSON.parse(JSON.stringify(layer)) as LayerNode
@@ -74,6 +98,60 @@ function assertFinitePoint(origin: Point): void {
   }
 }
 
+function assertPositiveFinite(value: number, field: string): void {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`${field} must be positive and finite`)
+  }
+}
+
+function assertNonEmptyString(value: string, field: string): void {
+  if (value.length === 0) throw new Error(`${field} must not be empty`)
+}
+
+function solidTextFill(color: SrgbColor | undefined) {
+  const value = color ?? BLACK_FILL.color
+  if (
+    ![value.red, value.green, value.blue, value.alpha].every(
+      (channel) =>
+        typeof channel === 'number' &&
+        Number.isFinite(channel) &&
+        channel >= 0 &&
+        channel <= 1,
+    )
+  ) {
+    throw new Error('text color must use finite sRGB channels from 0 to 1')
+  }
+  return Object.freeze({
+    kind: 'solid' as const,
+    color: Object.freeze({
+      red: value.red,
+      green: value.green,
+      blue: value.blue,
+      alpha: value.alpha,
+    }),
+    opacity: 1,
+  })
+}
+
+function assertTextBackground(
+  background: NonNullable<TextLayer['payload']['background']>,
+): void {
+  if (
+    !Number.isFinite(background.padding) ||
+    background.padding < 0 ||
+    background.padding > 256
+  ) {
+    throw new Error('text background padding must be between 0 and 256')
+  }
+  if (
+    !Number.isFinite(background.radius) ||
+    background.radius < 0 ||
+    background.radius > 16_384
+  ) {
+    throw new Error('text background radius must be between 0 and 16384')
+  }
+}
+
 /**
  * Builds an uncommitted layer. The session controller decides whether it becomes
  * one addLayer or updateLayer command; a blank new session intentionally yields
@@ -84,7 +162,21 @@ export function createTextLayer(input: {
   readonly text: string
   readonly origin: Point
   readonly font: FontReference
+  readonly fontSize?: number
+  readonly weight?: FontReference['weight']
+  readonly italic?: boolean
+  readonly underline?: boolean
+  readonly letterSpacing?: number
+  readonly alignment?: 'start' | 'center' | 'end' | 'justify'
+  readonly lineHeight?: number
   readonly fixedWidth?: number
+  readonly color?: SrgbColor
+  readonly fill?: TextLayer['payload']['fill']
+  readonly outline?: TextLayer['payload']['outline']
+  readonly background?: TextLayer['payload']['background']
+  readonly opacity?: number
+  readonly blendMode?: BlendMode
+  readonly shadows?: readonly ShadowStyle[]
 }): TextLayer | null {
   if (input.text.length === 0) return null
   assertFinitePoint(input.origin)
@@ -94,7 +186,45 @@ export function createTextLayer(input: {
   ) {
     throw new Error('fixed-width text requires a positive finite width')
   }
-  const fontSize = 16
+  const fontSize = input.fontSize ?? 16
+  if (!Number.isFinite(fontSize) || fontSize < 8 || fontSize > 256) {
+    throw new Error('text font size must be between 8 and 256')
+  }
+  const lineHeight = input.lineHeight ?? 1.25
+  if (!Number.isFinite(lineHeight) || lineHeight < 0.8 || lineHeight > 4) {
+    throw new Error('text line height must be between 0.8 and 4')
+  }
+  const letterSpacing = input.letterSpacing ?? 0
+  if (
+    !Number.isFinite(letterSpacing) ||
+    letterSpacing < -256 ||
+    letterSpacing > 256
+  ) {
+    throw new Error('text letter spacing must be between -256 and 256')
+  }
+  if (input.background) assertTextBackground(input.background)
+  const opacity = input.opacity ?? 1
+  if (!Number.isFinite(opacity) || opacity < 0 || opacity > 1) {
+    throw new Error('text opacity must be between 0 and 1')
+  }
+  const blendMode = input.blendMode ?? 'normal'
+  if (!TEXT_BLEND_MODES.includes(blendMode)) {
+    throw new Error('text blend mode is invalid')
+  }
+  const shadows = input.shadows ?? []
+  if (
+    shadows.length > 4 ||
+    shadows.some(
+      (shadow) =>
+        !Number.isFinite(shadow.offsetX) ||
+        !Number.isFinite(shadow.offsetY) ||
+        !Number.isFinite(shadow.blur) ||
+        shadow.blur < 0 ||
+        shadow.blur > 128,
+    )
+  ) {
+    throw new Error('text shadows are invalid')
+  }
   const width =
     input.fixedWidth ?? Math.max(fontSize, input.text.length * fontSize * 0.6)
   return Object.freeze({
@@ -111,14 +241,23 @@ export function createTextLayer(input: {
       width,
       height: Math.max(
         fontSize * 1.25,
-        input.text.split('\n').length * fontSize * 1.25,
+        input.text.split('\n').length * fontSize * lineHeight,
       ),
     },
-    opacity: 1,
+    opacity,
     visible: true,
     locked: false,
-    blendMode: 'normal',
-    shadows: [],
+    blendMode,
+    shadows: Object.freeze(
+      shadows.map((shadow) =>
+        Object.freeze({
+          color: { ...shadow.color },
+          offsetX: shadow.offsetX,
+          offsetY: shadow.offsetY,
+          blur: shadow.blur,
+        }),
+      ),
+    ),
     payload: {
       content: {
         text: input.text,
@@ -127,13 +266,32 @@ export function createTextLayer(input: {
         ...(input.fixedWidth === undefined
           ? {}
           : { fixedWidth: input.fixedWidth }),
-        spans: [],
-        paragraphs: [],
+        spans: [
+          {
+            start: 0,
+            end: input.text.length,
+            fontSize,
+            ...(input.weight === undefined ? {} : { weight: input.weight }),
+            ...(input.italic === undefined ? {} : { italic: input.italic }),
+            ...(input.underline === undefined
+              ? {}
+              : { underline: input.underline }),
+            ...(input.letterSpacing === undefined ? {} : { letterSpacing }),
+          },
+        ],
+        paragraphs: [
+          {
+            start: 0,
+            end: input.text.length,
+            alignment: input.alignment ?? 'start',
+            lineHeight,
+          },
+        ],
       },
       font: input.font,
-      fill: BLACK_FILL,
-      outline: null,
-      background: null,
+      fill: input.fill ?? solidTextFill(input.color),
+      outline: input.outline ?? null,
+      background: input.background ?? null,
     },
   })
 }
@@ -173,6 +331,158 @@ export function createNumberedMarkerLayer(input: {
       },
       fill: BLACK_FILL,
       outline: null,
+    },
+  })
+}
+
+/** Creates one portable callout node; the direct editor owns later text edits. */
+export function createCalloutLayer(input: {
+  readonly id: string
+  readonly text: string
+  readonly origin: Point
+  readonly tailAnchor: Point
+  readonly font: FontReference
+  readonly padding?: number
+  readonly radius?: number
+}): CalloutLayer | null {
+  if (input.text.length === 0) return null
+  assertFinitePoint(input.origin)
+  assertFinitePoint(input.tailAnchor)
+  const padding = input.padding ?? 8
+  const radius = input.radius ?? 8
+  if (!Number.isFinite(padding) || padding < 0) {
+    throw new Error('callout padding must be finite and non-negative')
+  }
+  if (!Number.isFinite(radius) || radius < 0) {
+    throw new Error('callout radius must be finite and non-negative')
+  }
+  const fontSize = 16
+  const lines = input.text.split('\n')
+  const width = Math.max(
+    fontSize * 4,
+    Math.max(...lines.map((line) => line.length)) * fontSize * 0.6,
+  )
+  const lineHeight = fontSize * 1.25
+  return Object.freeze({
+    id: input.id,
+    kind: 'callout',
+    transform: {
+      ...IDENTITY,
+      translateX: input.origin.x,
+      translateY: input.origin.y,
+    },
+    localBounds: {
+      x: 0,
+      y: 0,
+      width: width + padding * 2,
+      height: lines.length * lineHeight + padding * 2,
+    },
+    opacity: 1,
+    visible: true,
+    locked: false,
+    blendMode: 'normal',
+    shadows: [],
+    payload: {
+      content: {
+        text: input.text,
+        wrap: 'autoSize' as const,
+        spans: [],
+        paragraphs: [],
+      },
+      font: input.font,
+      fill: BLACK_FILL,
+      outline: null,
+      padding,
+      radius,
+      tailAnchor: { x: input.tailAnchor.x, y: input.tailAnchor.y },
+    },
+  })
+}
+
+/** Emoji stays portable by storing its grapheme and an approved static asset ID. */
+export function createEmojiLayer(input: {
+  readonly id: string
+  readonly grapheme: string
+  readonly origin: Point
+  readonly asset: EmojiAssetReference
+  readonly size?: number
+}): EmojiLayer {
+  assertFinitePoint(input.origin)
+  assertNonEmptyString(input.grapheme, 'emoji grapheme')
+  if ([...input.grapheme].length > 16) {
+    throw new Error('emoji grapheme must contain at most 16 code points')
+  }
+  assertNonEmptyString(input.asset.version, 'emoji asset version')
+  assertNonEmptyString(input.asset.assetId, 'emoji asset id')
+  const size = input.size ?? 32
+  assertPositiveFinite(size, 'emoji size')
+  return Object.freeze({
+    id: input.id,
+    kind: 'emoji',
+    transform: {
+      ...IDENTITY,
+      translateX: input.origin.x,
+      translateY: input.origin.y,
+    },
+    localBounds: { x: 0, y: 0, width: size, height: size },
+    opacity: 1,
+    visible: true,
+    locked: false,
+    blendMode: 'normal',
+    shadows: [],
+    payload: { grapheme: input.grapheme, asset: input.asset },
+  })
+}
+
+/**
+ * Creates an ordinary content image. The caller supplies an immutable blob
+ * produced by the native staged-import path; this helper never receives bytes.
+ */
+export function createContentImageLayer(input: {
+  readonly id: string
+  readonly blobHash: string
+  readonly format: ImageLayer['payload']['format']
+  readonly intrinsicWidth: number
+  readonly intrinsicHeight: number
+  readonly origin: Point
+}): ImageLayer {
+  assertFinitePoint(input.origin)
+  if (!SHA256_PATTERN.test(input.blobHash)) {
+    throw new Error('content image blob hash must be a lowercase SHA-256 hash')
+  }
+  assertPositiveFinite(input.intrinsicWidth, 'content image width')
+  assertPositiveFinite(input.intrinsicHeight, 'content image height')
+  return Object.freeze({
+    id: input.id,
+    kind: 'image',
+    transform: {
+      ...IDENTITY,
+      translateX: input.origin.x,
+      translateY: input.origin.y,
+    },
+    localBounds: {
+      x: 0,
+      y: 0,
+      width: input.intrinsicWidth,
+      height: input.intrinsicHeight,
+    },
+    opacity: 1,
+    visible: true,
+    locked: false,
+    blendMode: 'normal',
+    shadows: [],
+    payload: {
+      blobHash: input.blobHash,
+      intrinsicWidth: input.intrinsicWidth,
+      intrinsicHeight: input.intrinsicHeight,
+      format: input.format,
+      orientationApplied: true as const,
+      color: DEFAULT_COLOR,
+      role: 'content' as const,
+      border: null,
+      radius: 0,
+      crop: null,
+      mask: null,
     },
   })
 }
@@ -254,6 +564,52 @@ export function decodeClipboardLayersV1(serialized: string): ClipboardLayersV1 {
     return contentImage(layer)
   })
   return Object.freeze({ version: 1, layers: Object.freeze(parsedLayers) })
+}
+
+export type ClipboardDispatch =
+  | Readonly<{
+      kind: 'internal'
+      payload: ClipboardLayersV1
+      warning?: 'internalPayloadInvalid'
+    }>
+  | Readonly<{ kind: 'bitmap'; warning?: 'internalPayloadInvalid' }>
+  | Readonly<{ kind: 'text'; text: string }>
+  | Readonly<{ kind: 'emptyHint' }>
+  | Readonly<{ kind: 'empty' }>
+
+/**
+ * Routes one atomic native clipboard snapshot without exposing its bytes.
+ * Empty state intentionally accepts only a bitmap, avoiding a phantom document.
+ */
+export function routeClipboardSnapshot(input: {
+  readonly activeDocument: boolean
+  readonly internal?: string
+  readonly bitmapAvailable?: boolean
+  readonly text?: string
+}): ClipboardDispatch {
+  let warning: 'internalPayloadInvalid' | undefined
+  if (input.activeDocument && input.internal !== undefined) {
+    try {
+      return Object.freeze({
+        kind: 'internal' as const,
+        payload: decodeClipboardLayersV1(input.internal),
+      })
+    } catch {
+      warning = 'internalPayloadInvalid'
+    }
+  }
+  if (input.bitmapAvailable) {
+    return Object.freeze({
+      kind: 'bitmap' as const,
+      ...(warning === undefined ? {} : { warning }),
+    })
+  }
+  if (input.activeDocument && input.text !== undefined) {
+    return Object.freeze({ kind: 'text' as const, text: input.text })
+  }
+  return Object.freeze({
+    kind: input.activeDocument ? ('empty' as const) : ('emptyHint' as const),
+  })
 }
 
 export function pasteClipboardLayers(

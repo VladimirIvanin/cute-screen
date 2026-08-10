@@ -38,10 +38,12 @@ interface CanvasKitPaint extends CanvasKitDeletable {
   setBlendMode(value: unknown): void
   setShader(shader: CanvasKitShader | null): void
   setPathEffect(effect: CanvasKitPathEffect | null): void
+  setMaskFilter?(filter: CanvasKitMaskFilter | null): void
 }
 
 type CanvasKitShader = CanvasKitDeletable
 type CanvasKitPathEffect = CanvasKitDeletable
+type CanvasKitMaskFilter = CanvasKitDeletable
 type CanvasKitPath = CanvasKitDeletable
 
 interface CanvasKitPathBuilder extends CanvasKitDeletable {
@@ -94,10 +96,22 @@ interface CanvasKitCanvas {
     paint: CanvasKitPaint,
     fastSample?: boolean,
   ): void
+  clipRRect?(rrect: Float32Array, op?: unknown, antiAlias?: boolean): void
+  drawRRect?(rrect: Float32Array, paint: CanvasKitPaint): void
   drawPicture?(picture: CanvasKitPicture): void
+  drawText?(
+    text: string,
+    x: number,
+    y: number,
+    paint: CanvasKitPaint,
+    font: CanvasKitFont,
+  ): void
 }
 
 type CanvasKitPicture = CanvasKitDeletable
+interface CanvasKitFont extends CanvasKitDeletable {
+  getTextWidth?(text: string): number
+}
 
 interface CanvasKitPictureRecorder extends CanvasKitDeletable {
   beginRecording(bounds: Float32Array): CanvasKitCanvas
@@ -161,10 +175,28 @@ export interface CanvasKitApi {
   readonly PathEffect: Readonly<{
     MakeDash(intervals: number[], phase?: number): CanvasKitPathEffect
   }>
+  readonly MaskFilter?: Readonly<{
+    MakeBlur(
+      style: unknown,
+      sigma: number,
+      respectCTM: boolean,
+    ): CanvasKitMaskFilter
+  }>
+  readonly BlurStyle?: Readonly<{ Normal: unknown }>
+  readonly ClipOp?: Readonly<{ Intersect?: unknown }>
   readonly ImageFormat: Readonly<{ PNG: unknown }>
   readonly TRANSPARENT: unknown
   readonly PictureRecorder?: new () => CanvasKitPictureRecorder
+  readonly Font?: new (
+    typeface: CanvasKitDeletable,
+    size: number,
+  ) => CanvasKitFont
+  readonly Typeface?: Readonly<{
+    MakeDefault?: () => CanvasKitDeletable
+    GetDefault?: () => CanvasKitDeletable
+  }>
   XYWHRect(x: number, y: number, width: number, height: number): Float32Array
+  RRectXY(rect: Float32Array, radiusX: number, radiusY: number): Float32Array
   LTRBRect(
     left: number,
     top: number,
@@ -616,6 +648,178 @@ export function drawNodesCanvasKit(
           }
           break
         }
+        case 'text': {
+          if (!canvasKit.Font || !canvasKit.Typeface || !canvas.drawText) break
+          const typeface =
+            canvasKit.Typeface.MakeDefault?.() ??
+            canvasKit.Typeface.GetDefault?.()
+          if (!typeface) break
+          const font = new canvasKit.Font(typeface, node.fontSize)
+          try {
+            withRotation(
+              canvas,
+              node,
+              node.x + node.width / 2,
+              node.y + node.height / 2,
+              () => {
+                const drawLine = (
+                  line: string,
+                  y: number,
+                  paint: CanvasKitPaint,
+                  offsetX = 0,
+                ): void => {
+                  const spacing = node.letterSpacing ?? 0
+                  const characters = Array.from(line)
+                  const characterWidth = (character: string): number =>
+                    font.getTextWidth?.(character) ?? node.fontSize * 0.6
+                  const width =
+                    spacing === 0
+                      ? (font.getTextWidth?.(line) ??
+                        characters.length * node.fontSize * 0.6)
+                      : characters.reduce(
+                          (total, character, index) =>
+                            total +
+                            characterWidth(character) +
+                            (index === characters.length - 1 ? 0 : spacing),
+                          0,
+                        )
+                  let x =
+                    node.align === 'center'
+                      ? node.x + node.width / 2 - width / 2
+                      : node.align === 'end'
+                        ? node.x + node.width - width
+                        : node.x
+                  x += offsetX
+                  if (spacing === 0) {
+                    canvas.drawText!(line, x, y, paint, font)
+                    return
+                  }
+                  for (const character of characters) {
+                    canvas.drawText!(character, x, y, paint, font)
+                    x += characterWidth(character) + spacing
+                  }
+                }
+                for (const shadow of node.shadows ?? []) {
+                  const maskFilter =
+                    shadow.blur > 0 &&
+                    canvasKit.MaskFilter &&
+                    canvasKit.BlurStyle &&
+                    stroke.setMaskFilter
+                      ? canvasKit.MaskFilter.MakeBlur(
+                          canvasKit.BlurStyle.Normal,
+                          shadow.blur / 2,
+                          false,
+                        )
+                      : undefined
+                  try {
+                    configurePaint(
+                      canvasKit,
+                      stroke,
+                      shadow.color,
+                      node.opacity,
+                      'fill',
+                    )
+                    stroke.setBlendMode(blendMode(canvasKit, node.blendMode))
+                    stroke.setMaskFilter?.(maskFilter ?? null)
+                    for (const [index, line] of node.text
+                      .split('\n')
+                      .entries()) {
+                      drawLine(
+                        line,
+                        node.y +
+                          node.fontSize +
+                          shadow.offsetY +
+                          index * node.lineHeight,
+                        stroke,
+                        shadow.offsetX,
+                      )
+                    }
+                  } finally {
+                    stroke.setMaskFilter?.(null)
+                    maskFilter?.delete()
+                  }
+                }
+                if (node.stroke && (node.strokeWidth ?? 0) > 0) {
+                  configurePaint(
+                    canvasKit,
+                    stroke,
+                    node.stroke,
+                    node.opacity,
+                    'stroke',
+                    node.strokeWidth ?? 1,
+                  )
+                  stroke.setBlendMode(blendMode(canvasKit, node.blendMode))
+                  stroke.setStrokeJoin(
+                    node.lineJoin === 'round'
+                      ? canvasKit.StrokeJoin.Round
+                      : node.lineJoin === 'bevel'
+                        ? canvasKit.StrokeJoin.Bevel
+                        : canvasKit.StrokeJoin.Miter,
+                  )
+                  for (const [index, line] of node.text.split('\n').entries()) {
+                    drawLine(
+                      line,
+                      node.y + node.fontSize + index * node.lineHeight,
+                      stroke,
+                    )
+                  }
+                }
+                shader = configureFillPaint(
+                  canvasKit,
+                  fill,
+                  node.fill,
+                  node.opacity,
+                  node.blendMode,
+                  resources,
+                )
+                for (const [index, line] of node.text.split('\n').entries()) {
+                  drawLine(
+                    line,
+                    node.y + node.fontSize + index * node.lineHeight,
+                    fill,
+                  )
+                }
+                if (node.underline) {
+                  fill.setStyle(canvasKit.PaintStyle.Stroke)
+                  fill.setStrokeWidth(Math.max(1, node.fontSize * 0.06))
+                  for (const [index, line] of node.text.split('\n').entries()) {
+                    const characters = Array.from(line)
+                    const spacing = node.letterSpacing ?? 0
+                    const width = characters.reduce(
+                      (total, character, characterIndex) =>
+                        total +
+                        (font.getTextWidth?.(character) ??
+                          node.fontSize * 0.6) +
+                        (characterIndex === characters.length - 1
+                          ? 0
+                          : spacing),
+                      0,
+                    )
+                    const startX =
+                      node.align === 'center'
+                        ? node.x + node.width / 2 - width / 2
+                        : node.align === 'end'
+                          ? node.x + node.width - width
+                          : node.x
+                    const underlineY =
+                      node.y + node.fontSize * 1.06 + index * node.lineHeight
+                    canvas.drawLine(
+                      startX,
+                      underlineY,
+                      startX + width,
+                      underlineY,
+                      fill,
+                    )
+                  }
+                }
+              },
+            )
+          } finally {
+            font.delete()
+            typeface.delete()
+          }
+          break
+        }
       }
     } finally {
       fill.delete()
@@ -648,6 +852,18 @@ function drawScene(
       canvas.translate(node.x, node.y)
       canvas.rotate(node.rotation, 0, 0)
       canvas.scale(node.scaleX, node.scaleY)
+      const bounds = canvasKit.XYWHRect(0, 0, node.width, node.height)
+      const rounded =
+        (node.cornerRadius ?? 0) > 0
+          ? canvasKit.RRectXY(
+              bounds,
+              node.cornerRadius ?? 0,
+              node.cornerRadius ?? 0,
+            )
+          : undefined
+      if (rounded) {
+        canvas.clipRRect?.(rounded, canvasKit.ClipOp?.Intersect, true)
+      }
       if (resource) {
         fill.setAntiAlias(true)
         fill.setColorComponents(1, 1, 1, node.opacity)
@@ -655,7 +871,7 @@ function drawScene(
         canvas.drawImageRect(
           resource.image,
           canvasKit.XYWHRect(0, 0, resource.width, resource.height),
-          canvasKit.XYWHRect(0, 0, node.width, node.height),
+          bounds,
           fill,
           false,
         )
@@ -674,9 +890,32 @@ function drawScene(
           node.opacity,
           'stroke',
         )
-        const bounds = canvasKit.XYWHRect(0, 0, node.width, node.height)
-        canvas.drawRect(bounds, fill)
-        canvas.drawRect(bounds, stroke)
+        if (rounded && canvas.drawRRect) {
+          canvas.drawRRect(rounded, fill)
+          canvas.drawRRect(rounded, stroke)
+        } else {
+          canvas.drawRect(bounds, fill)
+          canvas.drawRect(bounds, stroke)
+        }
+      }
+      if (node.stroke && (node.strokeWidth ?? 0) > 0) {
+        configurePaint(
+          canvasKit,
+          stroke,
+          node.stroke,
+          node.opacity,
+          'stroke',
+          node.strokeWidth ?? 1,
+        )
+        stroke.setStrokeJoin(
+          node.lineJoin === 'round'
+            ? canvasKit.StrokeJoin.Round
+            : node.lineJoin === 'bevel'
+              ? canvasKit.StrokeJoin.Bevel
+              : canvasKit.StrokeJoin.Miter,
+        )
+        if (rounded && canvas.drawRRect) canvas.drawRRect(rounded, stroke)
+        else canvas.drawRect(bounds, stroke)
       }
     } finally {
       canvas.restore()
@@ -894,13 +1133,25 @@ export class CanvasKitRenderer implements Renderer {
       canvas.translate(node.x, node.y)
       canvas.rotate(node.rotation, 0, 0)
       canvas.scale(node.scaleX, node.scaleY)
+      const bounds = this.#canvasKit.XYWHRect(0, 0, node.width, node.height)
+      const rounded =
+        (node.cornerRadius ?? 0) > 0
+          ? this.#canvasKit.RRectXY(
+              bounds,
+              node.cornerRadius ?? 0,
+              node.cornerRadius ?? 0,
+            )
+          : undefined
+      if (rounded) {
+        canvas.clipRRect?.(rounded, this.#canvasKit.ClipOp?.Intersect, true)
+      }
       if (resource) {
         fill.setAntiAlias(true)
         fill.setColorComponents(1, 1, 1, node.opacity)
         canvas.drawImageRect(
           resource.image,
           this.#canvasKit.XYWHRect(0, 0, resource.width, resource.height),
-          this.#canvasKit.XYWHRect(0, 0, node.width, node.height),
+          bounds,
           fill,
           false,
         )
@@ -919,9 +1170,32 @@ export class CanvasKitRenderer implements Renderer {
           node.opacity,
           'stroke',
         )
-        const bounds = this.#canvasKit.XYWHRect(0, 0, node.width, node.height)
-        canvas.drawRect(bounds, fill)
-        canvas.drawRect(bounds, stroke)
+        if (rounded && canvas.drawRRect) {
+          canvas.drawRRect(rounded, fill)
+          canvas.drawRRect(rounded, stroke)
+        } else {
+          canvas.drawRect(bounds, fill)
+          canvas.drawRect(bounds, stroke)
+        }
+      }
+      if (node.stroke && (node.strokeWidth ?? 0) > 0) {
+        configurePaint(
+          this.#canvasKit,
+          stroke,
+          node.stroke,
+          node.opacity,
+          'stroke',
+          node.strokeWidth ?? 1,
+        )
+        stroke.setStrokeJoin(
+          node.lineJoin === 'round'
+            ? this.#canvasKit.StrokeJoin.Round
+            : node.lineJoin === 'bevel'
+              ? this.#canvasKit.StrokeJoin.Bevel
+              : this.#canvasKit.StrokeJoin.Miter,
+        )
+        if (rounded && canvas.drawRRect) canvas.drawRRect(rounded, stroke)
+        else canvas.drawRect(bounds, stroke)
       }
     } finally {
       canvas.restore()

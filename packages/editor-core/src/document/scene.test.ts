@@ -67,6 +67,40 @@ describe('document render scene', () => {
     expect('background' in scene).toBe(false)
   })
 
+  it('compiles content-image radius and border through the shared render node', () => {
+    const base = document.layers[0]
+    if (!base || base.kind !== 'image') throw new Error('expected image layer')
+    const scene = createDocumentRenderScene({
+      ...document,
+      schemaVersion: 4,
+      layers: [
+        {
+          ...base,
+          payload: {
+            ...base.payload,
+            role: 'content',
+            radius: 18,
+            border: {
+              color: { red: 0.2, green: 0.6, blue: 1, alpha: 1 },
+              width: 3,
+              style: 'solid',
+              cap: 'round',
+              join: 'round',
+            },
+          },
+        },
+      ],
+    })
+
+    expect(scene.nodes[0]).toMatchObject({
+      kind: 'image',
+      cornerRadius: 18,
+      stroke: { red: 0.2, green: 0.6, blue: 1, alpha: 1 },
+      strokeWidth: 3,
+      lineJoin: 'round',
+    })
+  })
+
   it('compiles normalized gradient geometry into renderer-neutral canvas coordinates', () => {
     const scene = createDocumentRenderScene({
       ...document,
@@ -386,5 +420,322 @@ describe('document render scene', () => {
       ],
     })
     expect(scene.nodes[0]).toMatchObject({ kind: 'rect', cornerRadius: 6 })
+  })
+
+  it('compiles committed multiline text into a renderer-neutral node', () => {
+    const scene = createDocumentRenderScene({
+      ...document,
+      schemaVersion: 4,
+      layers: [
+        {
+          id: '019c1f62-058e-7000-8000-000000000009',
+          kind: 'text',
+          localBounds: { x: 0, y: 0, width: 120, height: 48 },
+          transform: {
+            ...document.layers[0]!.transform,
+            translateX: 12,
+            translateY: 18,
+          },
+          opacity: 0.8,
+          visible: true,
+          locked: false,
+          blendMode: 'screen',
+          shadows: [
+            {
+              color: { red: 0, green: 0, blue: 0, alpha: 0.4 },
+              offsetX: 2,
+              offsetY: 3,
+              blur: 4,
+            },
+          ],
+          payload: {
+            content: {
+              text: 'Привет\nworld',
+              wrap: 'fixedWidth',
+              fixedWidth: 120,
+              spans: [
+                {
+                  start: 0,
+                  end: 12,
+                  fontSize: 20,
+                  underline: true,
+                  letterSpacing: 2,
+                },
+              ],
+              paragraphs: [{ start: 0, end: 12, alignment: 'center' }],
+            },
+            font: {
+              source: 'bundled',
+              family: 'Cute Sans',
+              weight: 600,
+              style: 'italic',
+            },
+            fill: {
+              kind: 'solid',
+              color: { red: 0.2, green: 0.3, blue: 0.4, alpha: 1 },
+              opacity: 1,
+            },
+            outline: null,
+            background: null,
+          },
+        },
+      ],
+    })
+
+    expect(scene.nodes).toEqual([
+      expect.objectContaining({
+        kind: 'text',
+        text: 'Привет\nworld',
+        x: 12,
+        y: 18,
+        width: 120,
+        fontSize: 20,
+        fontFamily: 'Cute Sans',
+        fontWeight: 600,
+        fontStyle: 'italic',
+        underline: true,
+        letterSpacing: 2,
+        align: 'center',
+        opacity: 0.8,
+        blendMode: 'screen',
+        shadows: [
+          {
+            color: { red: 0, green: 0, blue: 0, alpha: 0.4 },
+            offsetX: 2,
+            offsetY: 3,
+            blur: 4,
+          },
+        ],
+      }),
+    ])
+  })
+
+  it('renders a text background through the shared rectangle paint primitive', () => {
+    const scene = createDocumentRenderScene({
+      ...document,
+      schemaVersion: 4,
+      layers: [
+        {
+          id: '019c1f62-058e-7000-8000-000000000019',
+          kind: 'text',
+          localBounds: { x: 0, y: 0, width: 120, height: 24 },
+          transform: {
+            ...document.layers[0]!.transform,
+            translateX: 20,
+            translateY: 30,
+          },
+          opacity: 1,
+          visible: true,
+          locked: false,
+          blendMode: 'normal',
+          shadows: [],
+          payload: {
+            content: {
+              text: 'Label',
+              wrap: 'autoSize',
+              spans: [],
+              paragraphs: [],
+            },
+            font: {
+              source: 'bundled',
+              family: 'Roboto',
+              weight: 400,
+              style: 'normal',
+            },
+            fill: {
+              kind: 'solid',
+              color: { red: 0, green: 0, blue: 0, alpha: 1 },
+              opacity: 1,
+            },
+            outline: null,
+            background: {
+              fill: {
+                kind: 'solid',
+                color: { red: 1, green: 0.8, blue: 0.2, alpha: 1 },
+                opacity: 1,
+              },
+              padding: 6,
+              radius: 4,
+            },
+          },
+        },
+      ],
+    })
+
+    expect(scene.nodes).toEqual([
+      expect.objectContaining({
+        kind: 'rect',
+        id: '019c1f62-058e-7000-8000-000000000019:background',
+        x: 14,
+        y: 24,
+        width: 132,
+        height: 36,
+        cornerRadius: 4,
+      }),
+      expect.objectContaining({
+        kind: 'text',
+        id: '019c1f62-058e-7000-8000-000000000019',
+      }),
+    ])
+  })
+
+  it('compiles a text outline into shared renderer stroke fields', () => {
+    const scene = createDocumentRenderScene({
+      ...document,
+      schemaVersion: 4,
+      layers: [
+        {
+          id: '019c1f62-058e-7000-8000-000000000020',
+          kind: 'text',
+          localBounds: { x: 0, y: 0, width: 120, height: 24 },
+          transform: { ...document.layers[0]!.transform },
+          opacity: 1,
+          visible: true,
+          locked: false,
+          blendMode: 'normal',
+          shadows: [],
+          payload: {
+            content: {
+              text: 'Outlined',
+              wrap: 'autoSize',
+              spans: [],
+              paragraphs: [],
+            },
+            font: {
+              source: 'bundled',
+              family: 'Roboto',
+              weight: 400,
+              style: 'normal',
+            },
+            fill: {
+              kind: 'solid',
+              color: { red: 1, green: 1, blue: 1, alpha: 1 },
+              opacity: 1,
+            },
+            outline: {
+              stroke: {
+                color: { red: 0, green: 0, blue: 0, alpha: 1 },
+                width: 2,
+                style: 'solid',
+                cap: 'round',
+                join: 'round',
+              },
+              position: 'center',
+            },
+            background: null,
+          },
+        },
+      ],
+    })
+
+    expect(scene.nodes).toEqual([
+      expect.objectContaining({
+        kind: 'text',
+        stroke: { red: 0, green: 0, blue: 0, alpha: 1 },
+        strokeWidth: 2,
+        lineJoin: 'round',
+      }),
+    ])
+  })
+
+  it('compiles a numbered marker body and readable label from its stable sequence', () => {
+    const scene = createDocumentRenderScene({
+      ...document,
+      schemaVersion: 4,
+      layers: [
+        {
+          id: '019c1f62-058e-7000-8000-000000000010',
+          kind: 'numberedMarker',
+          localBounds: { x: 0, y: 0, width: 32, height: 32 },
+          transform: { ...document.layers[0]!.transform },
+          opacity: 1,
+          visible: true,
+          locked: false,
+          shadows: [],
+          payload: {
+            sequence: 7,
+            shape: 'diamond',
+            label: { text: '7', wrap: 'autoSize', spans: [], paragraphs: [] },
+            fill: {
+              kind: 'solid',
+              color: { red: 0.1, green: 0.2, blue: 0.3, alpha: 1 },
+              opacity: 1,
+            },
+            outline: null,
+          },
+        },
+      ],
+    })
+
+    expect(scene.nodes).toEqual([
+      expect.objectContaining({
+        kind: 'polygon',
+        id: expect.stringMatching(/:body$/u),
+      }),
+      expect.objectContaining({
+        kind: 'text',
+        id: expect.stringMatching(/:label$/u),
+        text: '7',
+        align: 'center',
+      }),
+    ])
+  })
+
+  it('keeps callout bubble, separate tail and multiline text in one ordered scene object', () => {
+    const scene = createDocumentRenderScene({
+      ...document,
+      schemaVersion: 4,
+      layers: [
+        {
+          id: '019c1f62-058e-7000-8000-000000000011',
+          kind: 'callout',
+          localBounds: { x: 0, y: 0, width: 120, height: 48 },
+          transform: { ...document.layers[0]!.transform },
+          opacity: 1,
+          visible: true,
+          locked: false,
+          shadows: [],
+          payload: {
+            content: {
+              text: 'Line one\nLine two',
+              wrap: 'autoSize',
+              spans: [],
+              paragraphs: [],
+            },
+            font: {
+              source: 'bundled',
+              family: 'Inter',
+              weight: 400,
+              style: 'normal',
+            },
+            fill: {
+              kind: 'solid',
+              color: { red: 0.1, green: 0.2, blue: 0.3, alpha: 1 },
+              opacity: 1,
+            },
+            outline: null,
+            padding: 8,
+            radius: 10,
+            tailAnchor: { x: 20, y: 70 },
+          },
+        },
+      ],
+    })
+
+    expect(scene.nodes.map((node) => node.kind)).toEqual([
+      'rect',
+      'polygon',
+      'text',
+    ])
+    expect(scene.nodes[1]).toMatchObject({
+      id: expect.stringMatching(/:tail$/u),
+    })
+    const tail = scene.nodes[1]
+    if (!tail || tail.kind !== 'polygon') throw new Error('expected tail')
+    const baseCenterX = (tail.points[0]!.x + tail.points[1]!.x) / 2
+    // The separate anchor is left of the bubble centre, so the attachment
+    // follows it instead of using a fixed bottom-centre tail.
+    expect(baseCenterX).toBeLessThan(72)
+    expect(scene.nodes[2]).toMatchObject({ text: 'Line one\nLine two' })
   })
 })

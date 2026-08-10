@@ -22,6 +22,9 @@ import {
   type ShellActionAdapter,
   type ShellDocumentState,
   type TextureFillBridge,
+  type SystemFontFace,
+  type ContentImageBridge,
+  type ClipboardBridge,
 } from '@cute-screen/editor-vue'
 
 declare global {
@@ -88,14 +91,28 @@ const desktopActions: ShellActionAdapter | undefined =
     : '__TAURI_INTERNALS__' in window
       ? {
           run: async (action, signal, reportCaptureProgress) => {
-            if (action !== 'capture') {
-              throw new Error(`${action} is not available yet`)
-            }
             const flush = await documentSession.value?.flush()
             if (flush?.kind === 'failed') {
               throw new Error(flush.error)
             }
             const { tauriDesktopBridge } = await import('./desktop-bridge')
+            if (action === 'openImage') {
+              const outcome =
+                await tauriDesktopBridge.repositoryOpenImage(correlationId())
+              if (signal.aborted || outcome.kind === 'cancelled') {
+                throw new ActionCancelledError('Open image cancelled')
+              }
+              const mounted = await mountCapturedDocument()
+              if (!mounted) {
+                throw new Error(
+                  'Image was saved, but the editor could not open it',
+                )
+              }
+              return 'Image opened'
+            }
+            if (action !== 'capture') {
+              throw new Error(`${action} is not available yet`)
+            }
             const onAbort = () => {
               void tauriDesktopBridge.captureCancel().catch((error) => {
                 console.warn('cute-screen capture cancellation failed', error)
@@ -157,6 +174,9 @@ const captureProgress = shallowRef<CaptureProgressState>()
 const seriesFrames = shallowRef<readonly FrameSummary[]>([])
 const sourceImage = shallowRef<HTMLImageElement>()
 const textureBridge = shallowRef<TextureFillBridge>()
+const contentImageBridge = shallowRef<ContentImageBridge>()
+const clipboardBridge = shallowRef<ClipboardBridge>()
+const systemFonts = shallowRef<readonly SystemFontFace[]>([])
 let capturedDocumentMount: Promise<boolean> | undefined
 const documentState = shallowRef<ShellDocumentState>({ kind: 'loading' })
 const readOnlyDocument = shallowRef(false)
@@ -173,6 +193,7 @@ const captureAvailable = computed(() =>
     ? true
     : (platformCapabilities.value?.capture.available ?? false),
 )
+const openImageAvailable = computed(() => '__TAURI_INTERNALS__' in window)
 const captureFallbackCommand = computed(() =>
   platformCapabilities.value?.cliFallback
     ? platformCapabilities.value.cliFallbackCommand
@@ -289,6 +310,37 @@ async function loadPersistedDocument(): Promise<boolean> {
     }
     return false
   }
+}
+
+async function pasteClipboardIntoEmptyDocument(): Promise<void> {
+  if (!('__TAURI_INTERNALS__' in window) || documentSession.value) return
+  try {
+    const { tauriDesktopBridge } = await import('./desktop-bridge')
+    const outcome = await tauriDesktopBridge.clipboardOpenImage(correlationId())
+    if (outcome.kind !== 'opened') return
+    await mountCapturedDocument()
+  } catch (error) {
+    console.warn('cute-screen empty clipboard image paste failed', error)
+  }
+}
+
+function onWindowClipboardKeydown(event: KeyboardEvent): void {
+  if (
+    !(event.metaKey || event.ctrlKey) ||
+    event.key.toLowerCase() !== 'v' ||
+    documentSession.value
+  ) {
+    return
+  }
+  if (
+    event.target instanceof HTMLInputElement ||
+    event.target instanceof HTMLTextAreaElement ||
+    (event.target instanceof HTMLElement && event.target.isContentEditable)
+  ) {
+    return
+  }
+  event.preventDefault()
+  void pasteClipboardIntoEmptyDocument()
 }
 
 function loadM05HarnessImage(
@@ -554,10 +606,21 @@ async function installLifecycleGuards(): Promise<void> {
 }
 
 onMounted(() => {
+  window.addEventListener('keydown', onWindowClipboardKeydown)
   void (async () => {
     if ('__TAURI_INTERNALS__' in window) {
       const { tauriDesktopBridge } = await import('./desktop-bridge')
       textureBridge.value = tauriDesktopBridge
+      contentImageBridge.value = tauriDesktopBridge
+      clipboardBridge.value = tauriDesktopBridge
+      if (import.meta.env.VITE_TEST_HARNESS !== 'true') {
+        try {
+          systemFonts.value =
+            await tauriDesktopBridge.listSystemFonts(correlationId())
+        } catch (error) {
+          console.warn('cute-screen system font catalog failed', error)
+        }
+      }
     }
     if (m05ReferencePerfHarness) return
     if (m05Harness) {
@@ -580,6 +643,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onWindowClipboardKeydown)
   if ('__TAURI_INTERNALS__' in window) {
     void import('./desktop-bridge').then(({ tauriDesktopBridge }) =>
       tauriDesktopBridge.capturePreflightSetReady(false).catch((error) => {
@@ -605,11 +669,15 @@ onBeforeUnmount(() => {
     :document-session="documentSession"
     :actions="desktopActions"
     :capture-available="captureAvailable"
+    :open-image-available="openImageAvailable"
     :capture-fallback-command="captureFallbackCommand"
     :capture-progress="captureProgress"
     :frames="seriesFrames"
     :source-image="sourceImage"
     :texture-bridge="textureBridge"
+    :content-image-bridge="contentImageBridge"
+    :clipboard-bridge="clipboardBridge"
+    :system-fonts="systemFonts"
     @retry-load="loadPersistedDocument"
   />
 </template>

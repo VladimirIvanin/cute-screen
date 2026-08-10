@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import CanvasViewport from '../../../packages/editor-vue/src/shell/components/CanvasViewport.vue'
 import type { EditorDocumentV1 } from '@cute-screen/editor-renderer'
+import type { TextToolDefaults } from '../../../packages/editor-vue/src/shell/components/CanvasViewport.vue'
 
 const document: EditorDocumentV1 = {
   schemaVersion: 2,
@@ -71,6 +72,7 @@ function mountViewport(
   activeTool?: string,
   viewportDocument: EditorDocumentV1 = document,
   selectedLayerId = 'shape',
+  textDefaults?: TextToolDefaults,
 ) {
   const rendered = render(CanvasViewport, {
     props: {
@@ -79,6 +81,7 @@ function mountViewport(
       document: viewportDocument,
       selectedLayerId,
       activeTool,
+      ...(textDefaults === undefined ? {} : { textDefaults }),
       zoom: 100,
       fitMode: true,
       t: (key) => key,
@@ -249,6 +252,155 @@ describe('M05 CanvasViewport transforms', () => {
     await fireEvent.pointerCancel(scene, { pointerId: 1 })
 
     expect(emitted().addLayer).toBeUndefined()
+  })
+
+  it('routes an Image-tool click to one native import request at the visible canvas centre', async () => {
+    const { container, scene, emitted } = mountViewport('image')
+    const scroll = container.querySelector(
+      '.cs-canvas-scroll',
+    ) as HTMLDivElement
+    vi.spyOn(scroll, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      top: 0,
+      right: 100,
+      bottom: 100,
+      left: 0,
+      toJSON: () => ({}),
+    })
+
+    await fireEvent.pointerDown(scene, {
+      pointerId: 1,
+      clientX: 15,
+      clientY: 20,
+    })
+
+    expect(emitted().requestImageImport).toEqual([[{ x: 50, y: 50 }]])
+    expect(emitted().addLayer).toBeUndefined()
+  })
+
+  it('commits click-created text as auto-sized content in one command', async () => {
+    vi.stubGlobal('crypto', {
+      randomUUID: vi.fn(() => '019c1f62-058e-7000-8000-000000000099'),
+    })
+    const { getByLabelText, scene, emitted } = mountViewport('text')
+
+    await fireEvent.pointerDown(scene, {
+      pointerId: 1,
+      clientX: 30,
+      clientY: 40,
+    })
+    await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 30, clientY: 40 })
+    const editor = getByLabelText('Text editor') as HTMLTextAreaElement
+    await fireEvent.update(editor, 'Click text')
+    await fireEvent.keyDown(editor, { key: 'Enter', ctrlKey: true })
+
+    expect(emitted().documentCommand).toEqual([
+      [
+        expect.objectContaining({
+          type: 'addLayer',
+          layer: expect.objectContaining({
+            kind: 'text',
+            payload: expect.objectContaining({
+              content: expect.objectContaining({ wrap: 'autoSize' }),
+            }),
+          }),
+        }),
+      ],
+    ])
+    vi.unstubAllGlobals()
+  })
+
+  it('shows the selected portable text background in the DOM editor overlay', async () => {
+    const background = {
+      fill: {
+        kind: 'solid' as const,
+        color: { red: 1, green: 0.8, blue: 0.2, alpha: 1 },
+        opacity: 1,
+      },
+      padding: 6,
+      radius: 4,
+    }
+    const { getByLabelText, scene } = mountViewport('text', document, 'shape', {
+      font: {
+        source: 'bundled',
+        family: 'Roboto',
+        weight: 400,
+        style: 'normal',
+      },
+      fontSize: 16,
+      weight: 400,
+      italic: false,
+      underline: false,
+      letterSpacing: 0,
+      alignment: 'start',
+      lineHeight: 1.25,
+      color: { red: 0, green: 0, blue: 0, alpha: 1 },
+      fill: {
+        kind: 'solid',
+        color: { red: 0, green: 0, blue: 0, alpha: 1 },
+        opacity: 1,
+      },
+      outline: null,
+      background,
+      opacity: 1,
+      blendMode: 'normal',
+      shadows: [],
+    })
+
+    await fireEvent.pointerDown(scene, {
+      pointerId: 1,
+      clientX: 30,
+      clientY: 40,
+    })
+    await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 30, clientY: 40 })
+
+    const editor = getByLabelText('Text editor') as HTMLTextAreaElement
+    expect(editor.style.backgroundColor).toBe('rgb(255, 204, 51)')
+    expect(editor.style.borderRadius).toBe('4px')
+  })
+
+  it('uses the horizontal drag span as a fixed text width before opening the editor', async () => {
+    vi.stubGlobal('crypto', {
+      randomUUID: vi.fn(() => '019c1f62-058e-7000-8000-000000000099'),
+    })
+    const { getByLabelText, scene, emitted } = mountViewport('text')
+
+    await fireEvent.pointerDown(scene, {
+      pointerId: 1,
+      clientX: 20,
+      clientY: 30,
+    })
+    expect(() => getByLabelText('Text editor')).toThrow()
+    await fireEvent.pointerMove(scene, {
+      pointerId: 1,
+      clientX: 80,
+      clientY: 45,
+    })
+    await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 80, clientY: 45 })
+    const editor = getByLabelText('Text editor') as HTMLTextAreaElement
+    await fireEvent.update(editor, 'Fixed width')
+    await fireEvent.keyDown(editor, { key: 'Enter', ctrlKey: true })
+
+    expect(emitted().documentCommand).toEqual([
+      [
+        expect.objectContaining({
+          type: 'addLayer',
+          layer: expect.objectContaining({
+            localBounds: expect.objectContaining({ width: 60 }),
+            payload: expect.objectContaining({
+              content: expect.objectContaining({
+                wrap: 'fixedWidth',
+                fixedWidth: 60,
+              }),
+            }),
+          }),
+        }),
+      ],
+    ])
+    vi.unstubAllGlobals()
   })
 
   it('returns to Select on Escape after an already-cancelled drawing draft', async () => {

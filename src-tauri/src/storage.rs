@@ -19,7 +19,10 @@ use thiserror::Error;
 use uuid::Uuid;
 use zip::{ZipArchive, ZipWriter, write::SimpleFileOptions};
 
+use image::{ImageDecoder, codecs::jpeg::JpegDecoder, metadata::Orientation};
+
 const MAX_ENCODED_BYTES: u64 = 512 * 1024 * 1024;
+const MAX_SVG_ENCODED_BYTES: usize = 10 * 1024 * 1024;
 const MAX_IMAGE_EDGE: u32 = 32_768;
 const MAX_IMAGE_PIXELS: u64 = 134_217_728;
 const RECOVERY_BUNDLE_VERSION: u32 = 1;
@@ -1272,6 +1275,74 @@ pub fn inspect_texture_bytes(bytes: &[u8]) -> Result<BlobMetadata, RepositoryErr
     })
 }
 
+/// Validates bytes accepted by the M07 image import pipeline.
+///
+/// PNG, JPEG and WebP keep their immutable original bytes. SVG is accepted only
+/// as a bounded static image: executable content, external resources, embedded
+/// images and non-local paint URLs are rejected before a document can reference
+/// the blob.
+pub fn inspect_content_image_bytes(bytes: &[u8]) -> Result<BlobMetadata, RepositoryError> {
+    let source = inspect_source_bytes(bytes)?;
+    if source.format == "svg" {
+        validate_static_svg(bytes)?;
+    }
+    Ok(BlobMetadata {
+        format: source.format,
+        mime_type: source.mime_type,
+        width: source.width,
+        height: source.height,
+        color_metadata: serde_json::json!({
+            "colorSpace": "srgb",
+            "hasIccProfile": false,
+        }),
+    })
+}
+
+fn validate_static_svg(bytes: &[u8]) -> Result<(), RepositoryError> {
+    if bytes.len() > MAX_SVG_ENCODED_BYTES {
+        return Err(RepositoryError::ImageTooLarge);
+    }
+    let svg = std::str::from_utf8(bytes).map_err(|_| RepositoryError::InvalidImage)?;
+    let lowered = svg.to_ascii_lowercase();
+    if [
+        "<script",
+        "<foreignobject",
+        "<iframe",
+        "<object",
+        "<embed",
+        "<image",
+        "javascript:",
+        "data:",
+    ]
+    .iter()
+    .any(|forbidden| lowered.contains(forbidden))
+    {
+        return Err(RepositoryError::InvalidImage);
+    }
+    if lowered
+        .split(|character: char| character.is_ascii_whitespace() || character == '<')
+        .any(|attribute| attribute.starts_with("on"))
+    {
+        return Err(RepositoryError::InvalidImage);
+    }
+    if lowered.contains("href") {
+        return Err(RepositoryError::InvalidImage);
+    }
+    if svg_url_values(&lowered).any(|value| !value.trim_start().starts_with('#')) {
+        return Err(RepositoryError::InvalidImage);
+    }
+    Ok(())
+}
+
+fn svg_url_values(svg: &str) -> impl Iterator<Item = &str> {
+    svg.match_indices("url").filter_map(|(index, _)| {
+        let value = svg.get(index + "url".len()..)?.trim_start();
+        let value = value.strip_prefix('(')?;
+        let end = value.find(')')?;
+        value.get(..end)
+    })
+}
+
 fn validate_capture_request(
     request: &CreateCaptureRequest,
     source: &SourceFacts,
@@ -1324,8 +1395,29 @@ fn validate_image(bytes: &[u8], metadata: &BlobMetadata) -> Result<(), Repositor
 }
 
 fn jpeg_dimensions(bytes: &[u8]) -> Result<(u32, u32), RepositoryError> {
+    let decoder =
+        JpegDecoder::new(std::io::Cursor::new(bytes)).map_err(|_| RepositoryError::InvalidImage)?;
+    let (width, height) = decoder.dimensions();
+    let orientation = jpeg_exif_orientation(bytes)?;
+    if matches!(
+        orientation,
+        Orientation::Rotate90
+            | Orientation::Rotate270
+            | Orientation::Rotate90FlipH
+            | Orientation::Rotate270FlipH
+    ) {
+        Ok((height, width))
+    } else {
+        Ok((width, height))
+    }
+}
+
+/// Reads the optional EXIF orientation before the JPEG scan begins. The raw
+/// bytes stay immutable; this only makes the native dimensions agree with the
+/// single orientation pass performed by the browser decoder.
+fn jpeg_exif_orientation(bytes: &[u8]) -> Result<Orientation, RepositoryError> {
     let mut index = 2;
-    while index + 9 < bytes.len() {
+    while index + 1 < bytes.len() {
         if bytes[index] != 0xff {
             return Err(RepositoryError::InvalidImage);
         }
@@ -1334,6 +1426,9 @@ fn jpeg_dimensions(bytes: &[u8]) -> Result<(u32, u32), RepositoryError> {
         }
         let marker = *bytes.get(index).ok_or(RepositoryError::InvalidImage)?;
         index += 1;
+        if marker == 0xda || matches!(marker, 0xc0..=0xcf) {
+            return Ok(Orientation::NoTransforms);
+        }
         if matches!(marker, 0xd8 | 0xd9) || (0xd0..=0xd7).contains(&marker) {
             continue;
         }
@@ -1344,10 +1439,10 @@ fn jpeg_dimensions(bytes: &[u8]) -> Result<(u32, u32), RepositoryError> {
         if length < 2 || index + length > bytes.len() {
             return Err(RepositoryError::InvalidImage);
         }
-        if matches!(marker, 0xc0..=0xc3 | 0xc5..=0xc7 | 0xc9..=0xcb | 0xcd..=0xcf) {
-            let height = u16::from_be_bytes([bytes[index + 3], bytes[index + 4]]);
-            let width = u16::from_be_bytes([bytes[index + 5], bytes[index + 6]]);
-            return Ok((u32::from(width), u32::from(height)));
+        let payload = &bytes[index + 2..index + length];
+        if marker == 0xe1 && payload.starts_with(b"Exif\0\0") {
+            return Orientation::from_exif_chunk(&payload[6..])
+                .ok_or(RepositoryError::InvalidImage);
         }
         index += length;
     }
@@ -1599,6 +1694,7 @@ fn read_bundle_blob(
 mod tests {
     use std::{fs, path::Path, sync::Arc};
 
+    use image::{ImageBuffer, Rgb, codecs::jpeg::JpegEncoder};
     use rusqlite::Connection;
 
     #[cfg(unix)]
@@ -1627,6 +1723,56 @@ mod tests {
             "/../tests/fixtures/generated/ui-4k.png"
         ))
         .expect("production-shaped PNG fixture")
+    }
+
+    fn jpeg_with_exif_orientation(width: u32, height: u32, orientation: u8) -> Vec<u8> {
+        let image = ImageBuffer::from_pixel(width, height, Rgb([23_u8, 45, 67]));
+        let mut jpeg = Vec::new();
+        JpegEncoder::new_with_quality(&mut jpeg, 90)
+            .encode_image(&image)
+            .expect("JPEG fixture");
+        let exif = [
+            b'E',
+            b'x',
+            b'i',
+            b'f',
+            0,
+            0, // EXIF marker
+            b'M',
+            b'M',
+            0,
+            42,
+            0,
+            0,
+            0,
+            8, // TIFF header and IFD offset
+            0,
+            1, // one IFD entry
+            1,
+            0x12,
+            0,
+            3,
+            0,
+            0,
+            0,
+            1,
+            0,
+            orientation,
+            0,
+            0, // orientation tag
+            0,
+            0,
+            0,
+            0, // no next IFD
+        ];
+        let length = u16::try_from(exif.len() + 2).expect("small EXIF fixture");
+        let mut oriented = Vec::with_capacity(jpeg.len() + exif.len() + 4);
+        oriented.extend_from_slice(&jpeg[..2]);
+        oriented.extend_from_slice(&[0xff, 0xe1]);
+        oriented.extend_from_slice(&length.to_be_bytes());
+        oriented.extend_from_slice(&exif);
+        oriented.extend_from_slice(&jpeg[2..]);
+        oriented
     }
 
     fn document(id: &str, hash: &str) -> String {
@@ -2056,6 +2202,70 @@ mod tests {
         assert_eq!(resolved.metadata.mime_type, "image/png");
         assert!(matches!(
             super::inspect_texture_bytes(br#"<svg width=\"1\" height=\"1\"/>"#),
+            Err(RepositoryError::InvalidImage)
+        ));
+    }
+
+    #[test]
+    fn content_image_import_rejects_svg_with_external_or_executable_content() {
+        let external =
+            br#"<svg width="1" height="1"><image href="https://example.test/image.png" /></svg>"#;
+        let spaced_external =
+            br#"<svg width="1" height="1"><image href = "https://example.test/image.png" /></svg>"#;
+        let scripted = br#"<svg width="1" height="1" onload="alert(1)"></svg>"#;
+        let spaced_scripted = br#"<svg width="1" height="1" onload = "alert(1)"></svg>"#;
+
+        assert!(matches!(
+            super::inspect_content_image_bytes(external),
+            Err(RepositoryError::InvalidImage)
+        ));
+        assert!(matches!(
+            super::inspect_content_image_bytes(scripted),
+            Err(RepositoryError::InvalidImage)
+        ));
+        assert!(matches!(
+            super::inspect_content_image_bytes(spaced_external),
+            Err(RepositoryError::InvalidImage)
+        ));
+        assert!(matches!(
+            super::inspect_content_image_bytes(spaced_scripted),
+            Err(RepositoryError::InvalidImage)
+        ));
+    }
+
+    #[test]
+    fn content_image_import_accepts_a_static_svg_with_bounded_dimensions() {
+        let source = br##"<svg width="20" height="10" xmlns="http://www.w3.org/2000/svg"><rect width="20" height="10" fill="#123456" /></svg>"##;
+
+        let metadata = super::inspect_content_image_bytes(source).expect("safe SVG metadata");
+
+        assert_eq!(metadata.format, "svg");
+        assert_eq!(metadata.mime_type, "image/svg+xml");
+        assert_eq!(metadata.width, 20);
+        assert_eq!(metadata.height, 10);
+    }
+
+    #[test]
+    fn content_image_import_reports_dimensions_after_exif_orientation_once() {
+        let source = jpeg_with_exif_orientation(3, 2, 6);
+        assert_eq!(
+            super::jpeg_exif_orientation(&source).expect("EXIF orientation"),
+            image::metadata::Orientation::Rotate90
+        );
+
+        let metadata = super::inspect_content_image_bytes(&source).expect("oriented JPEG metadata");
+
+        assert_eq!(metadata.format, "jpeg");
+        assert_eq!(metadata.mime_type, "image/jpeg");
+        assert_eq!((metadata.width, metadata.height), (2, 3));
+    }
+
+    #[test]
+    fn content_image_import_rejects_an_invalid_exif_orientation() {
+        let source = jpeg_with_exif_orientation(3, 2, 9);
+
+        assert!(matches!(
+            super::inspect_content_image_bytes(&source),
             Err(RepositoryError::InvalidImage)
         ));
     }

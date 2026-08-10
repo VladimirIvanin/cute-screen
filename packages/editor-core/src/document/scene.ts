@@ -171,6 +171,22 @@ function bounds(layer: LayerNode) {
   return layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
 }
 
+function shadows(layer: LayerNode) {
+  return Object.freeze(
+    (layer.shadows ?? []).slice(0, 4).map((shadow) =>
+      Object.freeze({
+        color: color(shadow.color, TRANSPARENT),
+        offsetX: Number.isFinite(shadow.offsetX) ? shadow.offsetX : 0,
+        offsetY: Number.isFinite(shadow.offsetY) ? shadow.offsetY : 0,
+        blur:
+          Number.isFinite(shadow.blur) && shadow.blur >= 0
+            ? Math.min(128, shadow.blur)
+            : 0,
+      }),
+    ),
+  )
+}
+
 function localPoint(
   value: unknown,
   fallback: { readonly x: number; readonly y: number },
@@ -604,11 +620,317 @@ function drawingNodes(layer: LayerNode): readonly RenderNode[] {
   return []
 }
 
+function textNodes(
+  layer: Extract<LayerNode, { readonly kind: 'text' }>,
+): readonly RenderNode[] {
+  const bounds = layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
+  const { content, font } = layer.payload
+  const firstSpan = content.spans[0]
+  const firstParagraph = content.paragraphs[0]
+  const fontSize = firstSpan?.fontSize ?? 16
+  const outline = layer.payload.outline?.stroke
+  const text: RenderNode = {
+    id: layer.id,
+    kind: 'text',
+    text: content.text,
+    x: layer.transform.translateX + bounds.x,
+    y: layer.transform.translateY + bounds.y,
+    width: bounds.width,
+    height: bounds.height,
+    fontFamily: font.family,
+    fontSize,
+    fontWeight: firstSpan?.weight ?? font.weight,
+    fontStyle: firstSpan?.italic ? 'italic' : font.style,
+    ...(firstSpan?.underline ? { underline: true } : {}),
+    ...(firstSpan?.letterSpacing === undefined
+      ? {}
+      : { letterSpacing: firstSpan.letterSpacing }),
+    align: firstParagraph?.alignment ?? 'start',
+    lineHeight: (firstParagraph?.lineHeight ?? 1.25) * fontSize,
+    rotation: layer.transform.rotation,
+    opacity: layer.opacity,
+    visible: layer.visible,
+    blendMode: layer.blendMode ?? 'normal',
+    ...(layer.shadows?.length ? { shadows: shadows(layer) } : {}),
+    fill: fill(layer.payload.fill, {
+      x: layer.transform.translateX + bounds.x,
+      y: layer.transform.translateY + bounds.y,
+      width: bounds.width,
+      height: bounds.height,
+    }),
+    ...(outline === undefined
+      ? {}
+      : {
+          stroke: color(outline.color),
+          strokeWidth: outline.width,
+          lineJoin: outline.join,
+        }),
+  }
+  const background = layer.payload.background
+  if (!background) return [text]
+  const padding = background.padding
+  const backgroundBounds = {
+    x: layer.transform.translateX + bounds.x - padding,
+    y: layer.transform.translateY + bounds.y - padding,
+    width: bounds.width + padding * 2,
+    height: bounds.height + padding * 2,
+  }
+  return [
+    {
+      id: `${layer.id}:background`,
+      kind: 'rect',
+      ...backgroundBounds,
+      cornerRadius: Math.min(
+        background.radius,
+        backgroundBounds.width / 2,
+        backgroundBounds.height / 2,
+      ),
+      rotation: layer.transform.rotation,
+      opacity: layer.opacity,
+      visible: layer.visible,
+      blendMode: layer.blendMode ?? 'normal',
+      fill: fill(background.fill, backgroundBounds),
+    },
+    text,
+  ]
+}
+
+function numberedMarkerNodes(
+  layer: Extract<LayerNode, { readonly kind: 'numberedMarker' }>,
+): readonly RenderNode[] {
+  const bounds = layer.localBounds ?? { x: 0, y: 0, width: 32, height: 32 }
+  const x = layer.transform.translateX + bounds.x
+  const y = layer.transform.translateY + bounds.y
+  const centerX = x + bounds.width / 2
+  const centerY = y + bounds.height / 2
+  const payload = layer.payload
+  const outline = payload.outline?.stroke
+  const body = {
+    id: `${layer.id}:body`,
+    rotation: layer.transform.rotation,
+    opacity: layer.opacity,
+    visible: layer.visible,
+    blendMode: layer.blendMode ?? 'normal',
+    fill: fill(payload.fill, {
+      x,
+      y,
+      width: bounds.width,
+      height: bounds.height,
+    }),
+    ...(outline === undefined
+      ? {}
+      : {
+          stroke: color(outline.color),
+          strokeWidth: outline.width,
+          lineJoin: outline.join,
+        }),
+  }
+  const node: RenderNode =
+    payload.shape === 'circle'
+      ? {
+          ...body,
+          kind: 'ellipse',
+          centerX,
+          centerY,
+          radiusX: bounds.width / 2,
+          radiusY: bounds.height / 2,
+        }
+      : payload.shape === 'square'
+        ? {
+            ...body,
+            kind: 'rect',
+            x,
+            y,
+            width: bounds.width,
+            height: bounds.height,
+          }
+        : {
+            ...body,
+            kind: 'polygon',
+            points:
+              payload.shape === 'diamond'
+                ? [
+                    { x: centerX, y },
+                    { x: x + bounds.width, y: centerY },
+                    { x: centerX, y: y + bounds.height },
+                    { x, y: centerY },
+                  ]
+                : Array.from({ length: 10 }, (_, index) => {
+                    const outer = index % 2 === 0
+                    const angle = -Math.PI / 2 + (Math.PI * index) / 5
+                    return {
+                      x:
+                        centerX +
+                        Math.cos(angle) *
+                          (bounds.width / 2) *
+                          (outer ? 1 : 0.45),
+                      y:
+                        centerY +
+                        Math.sin(angle) *
+                          (bounds.height / 2) *
+                          (outer ? 1 : 0.45),
+                    }
+                  }),
+          }
+  const fontSize = Math.max(
+    12,
+    Math.min(18, Math.min(bounds.width, bounds.height) * 0.55),
+  )
+  return [
+    node,
+    {
+      id: `${layer.id}:label`,
+      kind: 'text',
+      text: payload.label.text,
+      x,
+      y: y + (bounds.height - fontSize * 1.25) / 2,
+      width: bounds.width,
+      height: fontSize * 1.25,
+      fontFamily: 'Inter',
+      fontSize,
+      fontWeight: 700,
+      fontStyle: 'normal',
+      align: 'center',
+      lineHeight: fontSize * 1.25,
+      rotation: layer.transform.rotation,
+      opacity: layer.opacity,
+      visible: layer.visible,
+      blendMode: layer.blendMode ?? 'normal',
+      fill: { red: 1, green: 1, blue: 1, alpha: 1 },
+    },
+  ]
+}
+
+function calloutNodes(
+  layer: Extract<LayerNode, { readonly kind: 'callout' }>,
+): readonly RenderNode[] {
+  const bounds = layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
+  const x = layer.transform.translateX + bounds.x
+  const y = layer.transform.translateY + bounds.y
+  const payload = layer.payload
+  const outline = payload.outline?.stroke
+  const common = {
+    rotation: layer.transform.rotation,
+    opacity: layer.opacity,
+    visible: layer.visible,
+    blendMode: layer.blendMode ?? 'normal',
+  }
+  const bubble: RenderNode = {
+    ...common,
+    id: `${layer.id}:bubble`,
+    kind: 'rect',
+    x,
+    y,
+    width: bounds.width,
+    height: bounds.height,
+    cornerRadius: Math.min(payload.radius, bounds.width / 2, bounds.height / 2),
+    fill: fill(payload.fill, {
+      x,
+      y,
+      width: bounds.width,
+      height: bounds.height,
+    }),
+    ...(outline === undefined
+      ? {}
+      : {
+          stroke: color(outline.color),
+          strokeWidth: outline.width,
+          lineJoin: outline.join,
+        }),
+  }
+  const tailAnchor = {
+    x: layer.transform.translateX + payload.tailAnchor.x,
+    y: layer.transform.translateY + payload.tailAnchor.y,
+  }
+  const bubbleCenter = { x: x + bounds.width / 2, y: y + bounds.height / 2 }
+  const vector = {
+    x: tailAnchor.x - bubbleCenter.x,
+    y: tailAnchor.y - bubbleCenter.y,
+  }
+  const vectorLength = Math.hypot(vector.x, vector.y)
+  const direction =
+    vectorLength > 0
+      ? { x: vector.x / vectorLength, y: vector.y / vectorLength }
+      : { x: 0, y: 1 }
+  const boundaryScale =
+    1 /
+    Math.max(
+      Math.abs(direction.x) / Math.max(bounds.width / 2, 0.001),
+      Math.abs(direction.y) / Math.max(bounds.height / 2, 0.001),
+    )
+  const tailBase = {
+    x: bubbleCenter.x + direction.x * boundaryScale,
+    y: bubbleCenter.y + direction.y * boundaryScale,
+  }
+  const tailHalfWidth = 9
+  const perpendicular = { x: -direction.y, y: direction.x }
+  const tail: RenderNode = {
+    ...common,
+    id: `${layer.id}:tail`,
+    kind: 'polygon',
+    points: [
+      {
+        x: tailBase.x + perpendicular.x * tailHalfWidth,
+        y: tailBase.y + perpendicular.y * tailHalfWidth,
+      },
+      {
+        x: tailBase.x - perpendicular.x * tailHalfWidth,
+        y: tailBase.y - perpendicular.y * tailHalfWidth,
+      },
+      tailAnchor,
+    ],
+    fill: fill(payload.fill, {
+      x,
+      y,
+      width: bounds.width,
+      height: bounds.height,
+    }),
+    ...(outline === undefined
+      ? {}
+      : {
+          stroke: color(outline.color),
+          strokeWidth: outline.width,
+          lineJoin: outline.join,
+        }),
+  }
+  const fontSize = payload.content.spans[0]?.fontSize ?? 16
+  const lineHeight =
+    (payload.content.paragraphs[0]?.lineHeight ?? 1.25) * fontSize
+  const text: RenderNode = {
+    ...common,
+    id: `${layer.id}:text`,
+    kind: 'text',
+    text: payload.content.text,
+    x: x + payload.padding,
+    y: y + payload.padding,
+    width: Math.max(1, bounds.width - payload.padding * 2),
+    height: Math.max(1, bounds.height - payload.padding * 2),
+    fontFamily: payload.font.family,
+    fontSize,
+    fontWeight: payload.content.spans[0]?.weight ?? payload.font.weight,
+    fontStyle: payload.content.spans[0]?.italic ? 'italic' : payload.font.style,
+    align: payload.content.paragraphs[0]?.alignment ?? 'start',
+    lineHeight,
+    fill: { red: 1, green: 1, blue: 1, alpha: 1 },
+  }
+  return [bubble, tail, text]
+}
+
 /** Converts persisted nodes to renderer-neutral, ordered scene nodes. */
 export function createDocumentRenderScene(document: EditorDocumentV1) {
   const nodes: RenderNode[] = document.layers.flatMap((layer) => {
+    if (layer.kind === 'text') return textNodes(layer)
+    if (layer.kind === 'numberedMarker') return numberedMarkerNodes(layer)
+    if (layer.kind === 'callout') return calloutNodes(layer)
     if (layer.kind !== 'image') return drawingNodes(layer)
     const bounds = layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
+    const imageBorder = layer.payload.border
+      ? stroke(layer.payload.border)
+      : undefined
+    const imageRadius = Math.max(
+      0,
+      Math.min(layer.payload.radius ?? 0, bounds.width / 2, bounds.height / 2),
+    )
     return [
       {
         id: layer.id,
@@ -624,6 +946,14 @@ export function createDocumentRenderScene(document: EditorDocumentV1) {
         opacity: layer.opacity,
         visible: layer.visible,
         blendMode: layer.blendMode ?? 'normal',
+        ...(imageRadius > 0 ? { cornerRadius: imageRadius } : {}),
+        ...(imageBorder
+          ? {
+              stroke: imageBorder.color,
+              strokeWidth: imageBorder.width,
+              lineJoin: imageBorder.join,
+            }
+          : {}),
       },
     ]
   })

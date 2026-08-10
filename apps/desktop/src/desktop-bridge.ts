@@ -2,6 +2,11 @@ import { invoke } from '@tauri-apps/api/core'
 
 import type {
   ImageTransportBridge,
+  SystemFontCatalogBridge,
+  SystemFontFace,
+  ContentImageBridge,
+  ClipboardBridge,
+  NativeClipboardSnapshot,
   CaptureOutcomeV1,
   CaptureRequestV1,
   CaptureResult,
@@ -19,7 +24,13 @@ export interface PingResponse {
   readonly protocolVersion: 1
 }
 
-export interface DesktopBridge extends ImageTransportBridge, TextureFillBridge {
+export interface DesktopBridge
+  extends
+    ImageTransportBridge,
+    TextureFillBridge,
+    ContentImageBridge,
+    ClipboardBridge,
+    SystemFontCatalogBridge {
   ping(): Promise<PingResponse>
   platformCapabilities(correlationId: string): Promise<PlatformCapabilities>
   captureRequest(request: CaptureRequestV1): Promise<CaptureOutcomeV1>
@@ -40,6 +51,12 @@ export interface DesktopBridge extends ImageTransportBridge, TextureFillBridge {
   repositoryOpenLast(
     correlationId: string,
   ): Promise<RepositoryOpenDocument | null>
+  repositoryOpenImage(correlationId: string): Promise<OpenImageOutcome>
+  importContentImage(correlationId: string): Promise<TextureImportOutcome>
+  readClipboardSnapshot(correlationId: string): Promise<NativeClipboardSnapshot>
+  writeClipboardText(text: string, correlationId: string): Promise<void>
+  listSystemFonts(correlationId: string): Promise<readonly SystemFontFace[]>
+  clipboardOpenImage(correlationId: string): Promise<ClipboardOpenImageOutcome>
   repositoryListActiveSeriesFrames(
     correlationId: string,
   ): Promise<readonly RepositorySeriesFrame[]>
@@ -82,6 +99,14 @@ export interface RepositorySeriesFrame {
   readonly captureId: string
 }
 
+export type OpenImageOutcome =
+  | { readonly kind: 'cancelled' }
+  | { readonly kind: 'opened'; readonly document: RepositoryOpenDocument }
+
+export type ClipboardOpenImageOutcome =
+  | { readonly kind: 'noBitmap' }
+  | { readonly kind: 'opened'; readonly document: RepositoryOpenDocument }
+
 export type RecoveryExportOutcome =
   { readonly kind: 'saved' } | { readonly kind: 'cancelled' }
 
@@ -111,6 +136,24 @@ export const tauriDesktopBridge: DesktopBridge = {
     invoke<CaptureResult>('test_portal_capture', { correlationId }),
   repositoryOpenLast: (correlationId) =>
     invoke<RepositoryOpenDocument | null>('repository_open_last', {
+      correlationId,
+    }),
+  repositoryOpenImage: (correlationId) =>
+    invoke<OpenImageOutcome>('repository_open_image', { correlationId }),
+  importContentImage: (correlationId) =>
+    invoke<TextureImportOutcome>('repository_import_content_image', {
+      correlationId,
+    }),
+  readClipboardSnapshot: (correlationId) =>
+    invoke<NativeClipboardSnapshot>('clipboard_read_snapshot', {
+      correlationId,
+    }),
+  writeClipboardText: (text, correlationId) =>
+    invoke<void>('clipboard_write_text', { text, correlationId }),
+  listSystemFonts: (correlationId) =>
+    invoke<readonly SystemFontFace[]>('font_catalog_list', { correlationId }),
+  clipboardOpenImage: (correlationId) =>
+    invoke<ClipboardOpenImageOutcome>('clipboard_open_image', {
       correlationId,
     }),
   repositoryListActiveSeriesFrames: (correlationId) =>
