@@ -53,7 +53,7 @@ function layer(id: keyof typeof IDS, locked = false): LayerNode {
 
 function document(layers: readonly LayerNode[]): EditorDocumentV1 {
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     id: DOCUMENT_ID,
     source: {
       blobHash: 'a'.repeat(64),
@@ -62,6 +62,7 @@ function document(layers: readonly LayerNode[]): EditorDocumentV1 {
       width: 100,
       height: 100,
       orientationApplied: true,
+      provenance: 'capture',
       color: { colorSpace: 'srgb', hasIccProfile: false },
     },
     canvas: { width: 100, height: 100 },
@@ -139,6 +140,10 @@ describe('editor command operations', () => {
         orientationApplied: true as const,
         color: { colorSpace: 'srgb' as const, hasIccProfile: false },
         role: 'base' as const,
+        border: null,
+        radius: 0,
+        crop: null,
+        mask: null,
       },
     }
     const before = {

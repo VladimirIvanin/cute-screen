@@ -7,9 +7,17 @@ import {
   type ColorMetadata,
   type BlendMode,
   type ArrowLayerPayload,
+  type CalloutPayload,
+  type EmojiPayload,
+  type FontReference,
   type ShapeLayerPayload,
   type PencilLayerPayload,
   type MarkerLayerPayload,
+  type NumberedMarkerPayload,
+  type RichTextContent,
+  type RichTextParagraph,
+  type RichTextSpan,
+  type TextLayerPayload,
   type EditorDocumentV1,
   type ImageLayerPayload,
   type JsonObject,
@@ -27,6 +35,11 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu
 const ULID_PATTERN = /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/u
 const SHA256_PATTERN = /^[a-f0-9]{64}$/u
+const MAX_TEXT_UTF16_LENGTH = 100_000
+const MAX_RICH_TEXT_RANGES = 2_048
+const MAX_TEXT_FONT_SIZE = 512
+const MAX_TEXT_SPACING = 256
+const MAX_IMAGE_RADIUS = 16_384
 
 type ImageFormat = (typeof imageFormats)[number]
 
@@ -116,6 +129,80 @@ function completeDrawingPayload(
     ...defaultDrawingPayload(kind, bounds),
     ...payload,
   } as unknown as JsonObject
+}
+
+function defaultContentPayload(kind: LayerKind): JsonObject {
+  const text = {
+    content: { text: '', wrap: 'autoSize', spans: [], paragraphs: [] },
+    font: { source: 'bundled', family: 'Roboto', weight: 400, style: 'normal' },
+    fill: {
+      kind: 'solid',
+      color: { red: 0, green: 0, blue: 0, alpha: 1 },
+      opacity: 1,
+    },
+    outline: null,
+    background: null,
+  }
+  switch (kind) {
+    case 'text':
+      return text
+    case 'numberedMarker':
+      return {
+        sequence: 1,
+        shape: 'circle',
+        label: text.content,
+        fill: text.fill,
+        outline: null,
+      }
+    case 'callout':
+      return { ...text, padding: 8, radius: 8, tailAnchor: { x: 0, y: 0 } }
+    case 'emoji':
+      return {
+        grapheme: '❓',
+        asset: {
+          collection: 'notoEmoji',
+          version: '15.1',
+          assetId: 'question',
+        },
+      }
+    default:
+      return {}
+  }
+}
+
+function completeLayerPayload(
+  kind: LayerKind,
+  payload: Record<string, unknown>,
+  bounds: { readonly width?: unknown; readonly height?: unknown },
+): JsonObject {
+  const drawing = completeDrawingPayload(kind, payload, bounds)
+  if (kind === 'image') {
+    return {
+      ...drawing,
+      border: payload.border ?? null,
+      radius: payload.radius ?? 0,
+      crop: payload.crop ?? null,
+      mask: payload.mask ?? null,
+    } as unknown as JsonObject
+  }
+  const defaults = defaultContentPayload(kind)
+  if (kind === 'text') {
+    const legacyText =
+      typeof payload.text === 'string' ? payload.text : undefined
+    return {
+      ...defaults,
+      ...payload,
+      content:
+        payload.content ??
+        (legacyText === undefined
+          ? (defaults as { content: JsonObject }).content
+          : {
+              ...(defaults as { content: JsonObject }).content,
+              text: legacyText,
+            }),
+    } as unknown as JsonObject
+  }
+  return { ...defaults, ...drawing }
 }
 
 function readNonEmptyString(value: unknown, field: string): string {
@@ -229,6 +316,13 @@ function parseSource(value: unknown): SourceImageRef {
   if (input.orientationApplied !== true) {
     throw new Error('source.orientationApplied must be true')
   }
+  if (
+    input.provenance !== 'capture' &&
+    input.provenance !== 'fileOpen' &&
+    input.provenance !== 'clipboard'
+  ) {
+    throw new Error('source.provenance is invalid')
+  }
   return Object.freeze({
     blobHash: readSha256(input.blobHash, 'source.blobHash'),
     format: input.format,
@@ -236,6 +330,7 @@ function parseSource(value: unknown): SourceImageRef {
     width: readPositiveNumber(input.width, 'source.width'),
     height: readPositiveNumber(input.height, 'source.height'),
     orientationApplied: true,
+    provenance: input.provenance,
     color: parseColor(input.color, 'source.color'),
   })
 }
@@ -248,6 +343,7 @@ function sourceToJson(source: SourceImageRef): JsonObject {
     width: source.width,
     height: source.height,
     orientationApplied: true,
+    provenance: source.provenance ?? 'capture',
     color: colorToJson(source.color),
   }
 }
@@ -276,6 +372,325 @@ function parsePresentation(value: unknown): PresentationSettingsV1 {
   return DEFAULT_PRESENTATION_SETTINGS
 }
 
+function parseBoundedNonNegative(
+  value: unknown,
+  field: string,
+  maximum: number,
+): number {
+  const number = readFiniteNumber(value, field)
+  if (number < 0 || number > maximum) {
+    throw new Error(`${field} is outside supported bounds`)
+  }
+  return number
+}
+
+function parseFontReference(value: unknown, field: string): FontReference {
+  const input = readJsonObject(value, field)
+  if (input.source !== 'bundled' && input.source !== 'system') {
+    throw new Error(`${field}.source is invalid`)
+  }
+  const weight = readFiniteNumber(input.weight, `${field}.weight`)
+  if (
+    !Number.isInteger(weight) ||
+    weight < 100 ||
+    weight > 900 ||
+    weight % 100 !== 0
+  ) {
+    throw new Error(`${field}.weight is invalid`)
+  }
+  if (input.style !== 'normal' && input.style !== 'italic') {
+    throw new Error(`${field}.style is invalid`)
+  }
+  const postscriptName =
+    input.postscriptName === undefined
+      ? undefined
+      : readNonEmptyString(input.postscriptName, `${field}.postscriptName`)
+  return Object.freeze({
+    source: input.source,
+    family: readNonEmptyString(input.family, `${field}.family`),
+    ...(postscriptName === undefined ? {} : { postscriptName }),
+    weight: weight as FontReference['weight'],
+    style: input.style,
+  })
+}
+
+function isUtf16Boundary(text: string, offset: number): boolean {
+  if (offset <= 0 || offset >= text.length) return true
+  const before = text.charCodeAt(offset - 1)
+  const after = text.charCodeAt(offset)
+  return !(
+    before >= 0xd800 &&
+    before <= 0xdbff &&
+    after >= 0xdc00 &&
+    after <= 0xdfff
+  )
+}
+
+function parseTextRange(
+  value: unknown,
+  field: string,
+  text: string,
+): Readonly<{ start: number; end: number }> {
+  const input = readJsonObject(value, field)
+  const start = readFiniteNumber(input.start, `${field}.start`)
+  const end = readFiniteNumber(input.end, `${field}.end`)
+  if (
+    !Number.isInteger(start) ||
+    !Number.isInteger(end) ||
+    start < 0 ||
+    end < start ||
+    end > text.length ||
+    !isUtf16Boundary(text, start) ||
+    !isUtf16Boundary(text, end)
+  ) {
+    throw new Error(`${field} must use UTF-16 boundaries between graphemes`)
+  }
+  return Object.freeze({ start, end })
+}
+
+function parseRichTextContent(value: unknown, field: string): RichTextContent {
+  const input = readJsonObject(value, field)
+  const text = typeof input.text === 'string' ? input.text : undefined
+  if (text === undefined || text.length > MAX_TEXT_UTF16_LENGTH) {
+    throw new Error(`${field}.text is invalid`)
+  }
+  if (input.wrap !== 'autoSize' && input.wrap !== 'fixedWidth') {
+    throw new Error(`${field}.wrap is invalid`)
+  }
+  const fixedWidth =
+    input.wrap === 'fixedWidth'
+      ? readPositiveNumber(input.fixedWidth, `${field}.fixedWidth`)
+      : undefined
+  if (input.wrap === 'autoSize' && input.fixedWidth !== undefined) {
+    throw new Error(`${field}.fixedWidth is only valid for fixedWidth text`)
+  }
+  if (
+    !Array.isArray(input.spans) ||
+    !Array.isArray(input.paragraphs) ||
+    input.spans.length > MAX_RICH_TEXT_RANGES ||
+    input.paragraphs.length > MAX_RICH_TEXT_RANGES
+  ) {
+    throw new Error(`${field} ranges are invalid`)
+  }
+  const spans = input.spans.map((span, index) => {
+    const range = parseTextRange(span, `${field}.spans[${index}]`, text)
+    const item = readJsonObject(span, `${field}.spans[${index}]`)
+    const fontSize =
+      item.fontSize === undefined
+        ? undefined
+        : readPositiveNumber(item.fontSize, `${field}.spans[${index}].fontSize`)
+    if (fontSize !== undefined && fontSize > MAX_TEXT_FONT_SIZE) {
+      throw new Error(
+        `${field}.spans[${index}].fontSize is outside supported bounds`,
+      )
+    }
+    const weight =
+      item.weight === undefined
+        ? undefined
+        : readFiniteNumber(item.weight, `${field}.spans[${index}].weight`)
+    if (
+      weight !== undefined &&
+      (!Number.isInteger(weight) ||
+        weight < 100 ||
+        weight > 900 ||
+        weight % 100 !== 0)
+    ) {
+      throw new Error(`${field}.spans[${index}].weight is invalid`)
+    }
+    const letterSpacing =
+      item.letterSpacing === undefined
+        ? undefined
+        : readFiniteNumber(
+            item.letterSpacing,
+            `${field}.spans[${index}].letterSpacing`,
+          )
+    if (
+      letterSpacing !== undefined &&
+      Math.abs(letterSpacing) > MAX_TEXT_SPACING
+    ) {
+      throw new Error(
+        `${field}.spans[${index}].letterSpacing is outside supported bounds`,
+      )
+    }
+    return Object.freeze({
+      ...range,
+      ...(fontSize === undefined ? {} : { fontSize }),
+      ...(weight === undefined
+        ? {}
+        : { weight: weight as RichTextSpan['weight'] }),
+      ...(item.italic === undefined
+        ? {}
+        : {
+            italic: readBoolean(item.italic, `${field}.spans[${index}].italic`),
+          }),
+      ...(item.underline === undefined
+        ? {}
+        : {
+            underline: readBoolean(
+              item.underline,
+              `${field}.spans[${index}].underline`,
+            ),
+          }),
+      ...(letterSpacing === undefined ? {} : { letterSpacing }),
+    }) as RichTextSpan
+  })
+  const paragraphs = input.paragraphs.map((paragraph, index) => {
+    const range = parseTextRange(
+      paragraph,
+      `${field}.paragraphs[${index}]`,
+      text,
+    )
+    const item = readJsonObject(paragraph, `${field}.paragraphs[${index}]`)
+    if (
+      !['start', 'center', 'end', 'justify'].includes(String(item.alignment))
+    ) {
+      throw new Error(`${field}.paragraphs[${index}].alignment is invalid`)
+    }
+    const lineHeight =
+      item.lineHeight === undefined
+        ? undefined
+        : readPositiveNumber(
+            item.lineHeight,
+            `${field}.paragraphs[${index}].lineHeight`,
+          )
+    if (lineHeight !== undefined && lineHeight > MAX_TEXT_SPACING) {
+      throw new Error(
+        `${field}.paragraphs[${index}].lineHeight is outside supported bounds`,
+      )
+    }
+    return Object.freeze({
+      ...range,
+      alignment: item.alignment as RichTextParagraph['alignment'],
+      ...(lineHeight === undefined ? {} : { lineHeight }),
+    }) as RichTextParagraph
+  })
+  return Object.freeze({
+    text,
+    wrap: input.wrap,
+    ...(fixedWidth === undefined ? {} : { fixedWidth }),
+    spans: Object.freeze(spans),
+    paragraphs: Object.freeze(paragraphs),
+  })
+}
+
+function parseTextOutline(
+  value: unknown,
+  field: string,
+): TextLayerPayload['outline'] {
+  if (value === null) return null
+  const input = readJsonObject(value, field)
+  if (input.position !== 'center' && input.position !== 'outside') {
+    throw new Error(`${field}.position is invalid`)
+  }
+  return Object.freeze({
+    stroke: parseStroke(
+      input.stroke,
+      `${field}.stroke`,
+    ) as TextLayerPayload['outline'] extends infer T
+      ? T extends { stroke: infer S }
+        ? S
+        : never
+      : never,
+    position: input.position,
+  }) as TextLayerPayload['outline']
+}
+
+function parseTextBackground(
+  value: unknown,
+  field: string,
+): TextLayerPayload['background'] {
+  if (value === null) return null
+  const input = readJsonObject(value, field)
+  return Object.freeze({
+    fill: parseFill(input.fill, `${field}.fill`) as TextLayerPayload['fill'],
+    padding: parseBoundedNonNegative(
+      input.padding,
+      `${field}.padding`,
+      MAX_TEXT_SPACING,
+    ),
+    radius: parseBoundedNonNegative(
+      input.radius,
+      `${field}.radius`,
+      MAX_IMAGE_RADIUS,
+    ),
+  }) as TextLayerPayload['background']
+}
+
+function parseTextPayload(value: unknown, field: string): TextLayerPayload {
+  const input = readJsonObject(value, field)
+  return Object.freeze({
+    content: parseRichTextContent(input.content, `${field}.content`),
+    font: parseFontReference(input.font, `${field}.font`),
+    fill: parseFill(input.fill, `${field}.fill`) as TextLayerPayload['fill'],
+    outline: parseTextOutline(input.outline, `${field}.outline`),
+    background: parseTextBackground(input.background, `${field}.background`),
+  })
+}
+
+function parseNumberedMarkerPayload(
+  value: unknown,
+  field: string,
+): NumberedMarkerPayload {
+  const input = readJsonObject(value, field)
+  const sequence = readPositiveNumber(input.sequence, `${field}.sequence`)
+  if (!Number.isInteger(sequence))
+    throw new Error(`${field}.sequence is invalid`)
+  if (!['circle', 'square', 'diamond', 'star'].includes(String(input.shape))) {
+    throw new Error(`${field}.shape is invalid`)
+  }
+  return Object.freeze({
+    sequence,
+    shape: input.shape as NumberedMarkerPayload['shape'],
+    label: parseRichTextContent(input.label, `${field}.label`),
+    fill: parseFill(
+      input.fill,
+      `${field}.fill`,
+    ) as NumberedMarkerPayload['fill'],
+    outline: parseTextOutline(input.outline, `${field}.outline`),
+  })
+}
+
+function parseCalloutPayload(value: unknown, field: string): CalloutPayload {
+  const input = readJsonObject(value, field)
+  return Object.freeze({
+    content: parseRichTextContent(input.content, `${field}.content`),
+    font: parseFontReference(input.font, `${field}.font`),
+    fill: parseFill(input.fill, `${field}.fill`) as CalloutPayload['fill'],
+    outline: parseTextOutline(input.outline, `${field}.outline`),
+    padding: parseBoundedNonNegative(
+      input.padding,
+      `${field}.padding`,
+      MAX_TEXT_SPACING,
+    ),
+    radius: parseBoundedNonNegative(
+      input.radius,
+      `${field}.radius`,
+      MAX_IMAGE_RADIUS,
+    ),
+    tailAnchor: parsePointPayload(
+      input.tailAnchor,
+      `${field}.tailAnchor`,
+    ) as CalloutPayload['tailAnchor'],
+  })
+}
+
+function parseEmojiPayload(value: unknown, field: string): EmojiPayload {
+  const input = readJsonObject(value, field)
+  const grapheme = readNonEmptyString(input.grapheme, `${field}.grapheme`)
+  if ([...grapheme].length > 16) throw new Error(`${field}.grapheme is invalid`)
+  const asset = readJsonObject(input.asset, `${field}.asset`)
+  if (asset.collection !== 'notoEmoji')
+    throw new Error(`${field}.asset.collection is invalid`)
+  return Object.freeze({
+    grapheme,
+    asset: Object.freeze({
+      collection: 'notoEmoji',
+      version: readNonEmptyString(asset.version, `${field}.asset.version`),
+      assetId: readNonEmptyString(asset.assetId, `${field}.asset.assetId`),
+    }),
+  })
+}
+
 function parseImagePayload(value: unknown, field: string): ImageLayerPayload {
   const input = readJsonObject(value, field)
   if (!isImageFormat(input.format))
@@ -295,7 +710,14 @@ function parseImagePayload(value: unknown, field: string): ImageLayerPayload {
     'orientationApplied',
     'color',
     'role',
+    'border',
+    'radius',
+    'crop',
+    'mask',
   ])
+  if (input.crop !== null || input.mask !== null) {
+    throw new Error(`${field}.crop and ${field}.mask must be null`)
+  }
   return Object.freeze({
     ...(extras ?? {}),
     blobHash: readSha256(input.blobHash, `${field}.blobHash`),
@@ -311,6 +733,20 @@ function parseImagePayload(value: unknown, field: string): ImageLayerPayload {
     orientationApplied: true,
     color,
     role: input.role,
+    border:
+      input.border === null
+        ? null
+        : (parseStroke(input.border, `${field}.border`) as Exclude<
+            ImageLayerPayload['border'],
+            undefined
+          >),
+    radius: parseBoundedNonNegative(
+      input.radius,
+      `${field}.radius`,
+      MAX_IMAGE_RADIUS,
+    ),
+    crop: null,
+    mask: null,
   })
 }
 
@@ -630,6 +1066,27 @@ function parseDrawingPayload(
   }
 }
 
+function parseLayerPayload(
+  kind: LayerKind,
+  value: unknown,
+  field: string,
+): JsonObject {
+  switch (kind) {
+    case 'image':
+      return parseImagePayload(value, field)
+    case 'text':
+      return parseTextPayload(value, field)
+    case 'numberedMarker':
+      return parseNumberedMarkerPayload(value, field)
+    case 'callout':
+      return parseCalloutPayload(value, field)
+    case 'emoji':
+      return parseEmojiPayload(value, field)
+    default:
+      return parseDrawingPayload(kind, value, field)
+  }
+}
+
 function parseLayer(value: unknown, index: number): LayerNode {
   const field = `layers[${index}]`
   const input = readJsonObject(value, field)
@@ -650,10 +1107,11 @@ function parseLayer(value: unknown, index: number): LayerNode {
   if (opacity < 0 || opacity > 1) {
     throw new Error(`${field}.opacity must be between 0 and 1`)
   }
-  const payload =
-    input.kind === 'image'
-      ? parseImagePayload(input.payload, `${field}.payload`)
-      : parseDrawingPayload(input.kind, input.payload, `${field}.payload`)
+  const payload = parseLayerPayload(
+    input.kind,
+    input.payload,
+    `${field}.payload`,
+  )
   const blendMode = input.blendMode
   if (!isBlendMode(blendMode)) throw new Error(`${field}.blendMode is invalid`)
   if (!Array.isArray(input.shadows) || input.shadows.length > 4) {
@@ -794,6 +1252,30 @@ function migrateV2ToV3(raw: Record<string, unknown>): Record<string, unknown> {
   }
 }
 
+function migrateV3ToV4(raw: Record<string, unknown>): Record<string, unknown> {
+  const source = readJsonObject(raw.source, 'source')
+  const layers = Array.isArray(raw.layers) ? raw.layers : []
+  return {
+    ...raw,
+    schemaVersion: 4,
+    source: { ...source, provenance: source.provenance ?? 'capture' },
+    layers: layers.map((layer) => {
+      const input = readJsonObject(layer, 'layer')
+      const bounds =
+        input.localBounds && typeof input.localBounds === 'object'
+          ? readJsonObject(input.localBounds, 'layer.localBounds')
+          : { x: 0, y: 0, width: 1, height: 1 }
+      const payload = readJsonObject(input.payload, 'layer.payload')
+      return {
+        ...input,
+        payload: isLayerKind(input.kind)
+          ? completeLayerPayload(input.kind, payload, bounds)
+          : payload,
+      }
+    }),
+  }
+}
+
 function migrateV0ToV1(raw: Record<string, unknown>): Record<string, unknown> {
   return {
     ...raw,
@@ -809,7 +1291,8 @@ function migrateToCurrent(
 ): Record<string, unknown> {
   const v1 = schemaVersion === 0 ? migrateV0ToV1(raw) : raw
   const v2 = schemaVersion < 2 ? migrateV1ToV2(v1) : v1
-  return schemaVersion < 3 ? migrateV2ToV3(v2) : v2
+  const v3 = schemaVersion < 3 ? migrateV2ToV3(v2) : v2
+  return schemaVersion < 4 ? migrateV3ToV4(v3) : v3
 }
 
 function documentToJson(document: EditorDocumentV1): JsonObject {
@@ -833,7 +1316,7 @@ function documentToJson(document: EditorDocumentV1): JsonObject {
     locked: layer.locked,
     blendMode: layer.blendMode ?? 'normal',
     shadows: layer.shadows ?? [],
-    payload: completeDrawingPayload(
+    payload: completeLayerPayload(
       layer.kind,
       layer.payload,
       layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 },

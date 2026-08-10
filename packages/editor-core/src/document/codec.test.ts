@@ -72,6 +72,59 @@ function fixture(name: string): string {
 }
 
 describe('editor document codec', () => {
+  it('migrates v3 source provenance and validates typed v4 rich text', () => {
+    const raw = JSON.parse(serializeEditorDocument(document)) as Record<
+      string,
+      unknown
+    >
+    raw.schemaVersion = 3
+    const migrated = parseEditorDocument(JSON.stringify(raw))
+    if (migrated.kind !== 'editable') throw new Error('expected editable')
+
+    expect(migrated.document.schemaVersion).toBe(4)
+    expect(migrated.document.source.provenance).toBe('capture')
+
+    const text = {
+      ...raw,
+      schemaVersion: 4,
+      source: { ...(raw.source as object), provenance: 'fileOpen' },
+      layers: [
+        {
+          ...layer,
+          kind: 'text',
+          localBounds: { x: 0, y: 0, width: 10, height: 10 },
+          payload: {
+            content: {
+              text: 'A😀B',
+              wrap: 'autoSize',
+              spans: [{ start: 0, end: 4, fontSize: 16 }],
+              paragraphs: [],
+            },
+            font: {
+              source: 'bundled',
+              family: 'Roboto',
+              weight: 400,
+              style: 'normal',
+            },
+            fill: {
+              kind: 'solid',
+              color: { red: 0, green: 0, blue: 0, alpha: 1 },
+              opacity: 1,
+            },
+            outline: null,
+            background: null,
+          },
+        },
+      ],
+    }
+    expect(parseEditorDocument(JSON.stringify(text))).toMatchObject({
+      kind: 'editable',
+    })
+
+    text.layers[0]!.payload.content.spans[0]!.end = 2
+    expect(() => parseEditorDocument(JSON.stringify(text))).toThrow(/UTF-16/u)
+  })
+
   it('deeply freezes nested payload values', () => {
     const parsed = parseEditorDocument(serializeEditorDocument(document))
     if (parsed.kind !== 'editable')
@@ -187,7 +240,7 @@ describe('editor document codec', () => {
     expect(
       JSON.parse(serializeEditorDocument(migrated.document)),
     ).toMatchObject({
-      schemaVersion: 3,
+      schemaVersion: 4,
       layers: [
         {
           kind: 'image',
@@ -204,15 +257,15 @@ describe('editor document codec', () => {
     expect(
       JSON.parse(serializeEditorDocument(futureFields.document)),
     ).toMatchObject({
-      schemaVersion: 3,
+      schemaVersion: 4,
       futureDocumentField: { preserved: true },
     })
 
     expect(
-      parseEditorDocument(JSON.stringify({ schemaVersion: 4 })),
+      parseEditorDocument(JSON.stringify({ schemaVersion: 5 })),
     ).toMatchObject({
       kind: 'readOnly',
-      schemaVersion: 4,
+      schemaVersion: 5,
     })
   })
 })

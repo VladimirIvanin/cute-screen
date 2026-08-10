@@ -253,3 +253,38 @@ infrastructure failure. M13 повторяет тот же gate для build can
 **Последствия:** `pnpm test:perf` остаётся software trend и не может закрыть
 REQ-QLT-001. Reference workflow ручной, доверенный и не выполняет fork PR;
 artifact хранит fingerprint, commit, fixture, CPU/GPU metrics и runtime logs.
+
+## ADR-025 — Portable content resources, staged import и native clipboard
+
+**Статус:** accepted
+
+**Контекст:** M07 добавляет переносимый rich text, локальные изображения и
+clipboard. Передача bytes через JSON/base64 расходится с существующим binary
+transport, а опора на шрифты, emoji или X11-only clipboard хоста делает документ
+и Wayland-поведение непредсказуемыми.
+
+**Решение:** документ v4 хранит plain Unicode и portable references, а не DOM
+или HTML. Базовый текстовый fallback — проверенные bundled Roboto
+Regular/Bold/Italic/Bold Italic; system face описывается family/PostScript/style
+reference и при отсутствии даёт явное предупреждение. Emoji хранит grapheme и
+versioned reference на approved static asset, а не зависит от системного emoji
+font. Image import выполняется staged: native reader помещает raw bytes во
+временное operation staging, Rust валидирует signature/limits/EXIF и статически
+sanitizes SVG без scripts, events, external URLs и fonts; document transaction
+выполняется только после webview decode opaque token. Отмена и ошибки удаляют
+только staging.
+
+Internal clipboard использует versioned
+`application/x-cute-screen-layers+json;version=1` вместе с PNG и plain-text
+fallback. Backend выбирается нативно для каждой платформы (GTK targets для
+Linux X11/Wayland, registered Windows format и NSPasteboard UTI); X11-only
+abstraction не является Linux implementation. Renderer PNG и импортированные
+bytes передаются только raw binary IPC.
+
+**Последствия:** content-layer codec обязан отвергать malformed/non-finite
+данные и не переносит transient state. Paste сначала читает атомарный snapshot:
+в active document valid internal payload имеет приоритет над bitmap и text;
+повреждённый/newer payload допускает bitmap fallback с warning. Cut удаляет
+layers одной command только после успешной записи clipboard. Пакеты шрифтов,
+SVG и assets добавляются лишь после license/security audit; platform evidence
+обязано отдельно покрыть Linux X11/Wayland, Windows и macOS.

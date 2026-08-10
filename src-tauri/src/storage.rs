@@ -434,6 +434,15 @@ impl StorageState {
     ) -> Result<OpenDocument, RepositoryError> {
         let source = inspect_source_bytes(&request.source_bytes)?;
         validate_capture_request(&request, &source)?;
+        let document_schema_version = document_value(&request.document_json)?
+            .get("schemaVersion")
+            .and_then(Value::as_u64)
+            .and_then(|version| u32::try_from(version).ok())
+            .ok_or_else(|| {
+                RepositoryError::InvalidDocument(
+                    "schemaVersion is missing or exceeds the supported integer range".to_owned(),
+                )
+            })?;
         let operation_id = Uuid::now_v7().to_string();
         let journal_payload = serde_json::json!({
             "documentId": request.document_id,
@@ -488,8 +497,8 @@ impl StorageState {
             params![request.capture_id, series_id, blob.hash, serde_json::to_string(&request.capture_metadata).map_err(|error| RepositoryError::InvalidDocument(error.to_string()))?, request.captured_at],
         )?;
         transaction.execute(
-            "INSERT INTO documents (id, capture_id, schema_version, revision, content_json, content_sha256, created_at, updated_at) VALUES (?1, ?2, 3, 1, ?3, ?4, ?5, ?5)",
-            params![request.document_id, request.capture_id, request.document_json, sha256_hex(request.document_json.as_bytes()), request.captured_at],
+            "INSERT INTO documents (id, capture_id, schema_version, revision, content_json, content_sha256, created_at, updated_at) VALUES (?1, ?2, ?3, 1, ?4, ?5, ?6, ?6)",
+            params![request.document_id, request.capture_id, document_schema_version, request.document_json, sha256_hex(request.document_json.as_bytes()), request.captured_at],
         )?;
         replace_document_references(
             &transaction,
@@ -1190,7 +1199,7 @@ fn document_value(document_json: &str) -> Result<Value, RepositoryError> {
             "schemaVersion exceeds the supported integer range".to_owned(),
         )
     })?;
-    if schema_version > 3 {
+    if schema_version > 4 {
         return Err(RepositoryError::NewerSchema { schema_version });
     }
     if value.get("id").and_then(Value::as_str).is_none() {
@@ -2015,6 +2024,17 @@ mod tests {
             super::validate_document(&document),
             Err(RepositoryError::InvalidDocument(_))
         ));
+    }
+
+    #[test]
+    fn accepts_the_current_m07_document_schema() {
+        let document = serde_json::json!({
+            "schemaVersion": 4,
+            "id": "doc-1",
+        })
+        .to_string();
+
+        assert!(super::validate_document(&document).is_ok());
     }
 
     #[test]

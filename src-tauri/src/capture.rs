@@ -564,7 +564,7 @@ fn initial_document_json(
         &source_hash[20..32],
     );
     serde_json::json!({
-        "schemaVersion": 3,
+        "schemaVersion": 4,
         "id": document_id,
         "source": {
             "blobHash": source_hash,
@@ -573,6 +573,7 @@ fn initial_document_json(
             "width": source.width,
             "height": source.height,
             "orientationApplied": true,
+            "provenance": "capture",
             "color": source.color_metadata,
         },
         "canvas": { "width": source.width, "height": source.height },
@@ -595,6 +596,10 @@ fn initial_document_json(
                 "orientationApplied": true,
                 "color": source.color_metadata,
                 "role": "base",
+                "border": null,
+                "radius": 0,
+                "crop": null,
+                "mask": null,
             },
         }],
         "presentation": { "beautify": { "enabled": false }, "watermark": { "enabled": false } },
@@ -748,7 +753,7 @@ mod tests {
     }
 
     #[test]
-    fn initial_document_factory_creates_the_v3_locked_base_layer() {
+    fn initial_document_factory_creates_the_v4_locked_base_layer() {
         let metadata = BlobMetadata {
             format: "png".to_owned(),
             mime_type: "image/png".to_owned(),
@@ -766,7 +771,7 @@ mod tests {
             "2026-08-09T00:00:00.000Z".to_owned(),
         ))
         .expect("factory JSON");
-        assert_eq!(actual["schemaVersion"], 3);
+        assert_eq!(actual["schemaVersion"], 4);
         assert_eq!(actual["layers"].as_array().map(Vec::len), Some(1));
         let base = &actual["layers"][0];
         assert_eq!(base["kind"], "image");
@@ -887,7 +892,7 @@ mod tests {
         let document_value: serde_json::Value =
             serde_json::from_str(&persisted.document_json).expect("initial document JSON");
         assert_eq!(persisted.document_id, document.document_id);
-        assert_eq!(document_value["schemaVersion"], 3);
+        assert_eq!(document_value["schemaVersion"], 4);
         assert_eq!(document_value["source"]["blobHash"], document.source_hash);
         assert_eq!(document_value["canvas"]["width"], 1);
     }
