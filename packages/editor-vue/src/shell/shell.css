@@ -61,7 +61,8 @@ button:focus-visible {
 .cs-editor-shell {
   display: grid;
   grid-template-rows: 52px minmax(0, 1fr) auto;
-  min-height: 100dvh;
+  height: 100dvh;
+  min-height: 0;
   overflow: hidden;
   background: var(--surface);
 }
@@ -235,6 +236,7 @@ button:focus-visible {
   display: grid;
   grid-template-columns: 52px minmax(0, 1fr);
   min-height: 0;
+  overflow: hidden;
 }
 
 .cs-capture-fallback {
@@ -313,12 +315,17 @@ button:focus-visible {
   overflow: auto;
   padding: 48px 72px 92px;
 }
-.cs-canvas-surface {
-  position: relative;
+.cs-canvas-stage {
   display: grid;
+  width: max-content;
+  height: max-content;
   min-width: 100%;
   min-height: 100%;
   place-items: center;
+}
+.cs-canvas-surface {
+  position: relative;
+  flex: none;
 }
 .cs-canvas {
   position: absolute;

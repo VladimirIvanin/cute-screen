@@ -1,4 +1,5 @@
 import { $, browser, expect } from '@wdio/globals'
+import path from 'node:path'
 import { Key } from 'webdriverio'
 
 type HarnessDocument = {
@@ -29,12 +30,50 @@ async function snapshot(): Promise<HarnessDocument> {
   })
 }
 
-async function openM05(): Promise<void> {
+async function openM05(viewportFixture = false): Promise<void> {
   await browser.url('/')
   await browser.execute(() => window.localStorage.clear())
-  await browser.url('/?m05=1')
+  await browser.url(`/?m05=1${viewportFixture ? '&m05viewport=1' : ''}`)
   await expect($('.cs-canvas-ready')).toExist()
   await browser.waitUntil(async () => (await snapshot()).layers.length === 4)
+  if (viewportFixture) {
+    await browser.waitUntil(
+      async () => (await $('.cs-zoom-value').getText()) !== '100%',
+    )
+  }
+}
+
+async function viewportLayout() {
+  return browser.execute(() => {
+    const rect = (selector: string) => {
+      const element = document.querySelector(selector)
+      if (!(element instanceof HTMLElement)) {
+        throw new Error(`Missing viewport element: ${selector}`)
+      }
+      const bounds = element.getBoundingClientRect()
+      return {
+        width: bounds.width,
+        height: bounds.height,
+        top: bounds.top,
+        bottom: bounds.bottom,
+      }
+    }
+    const zoomText = document.querySelector('.cs-zoom-value')?.textContent ?? ''
+    const scene = document.querySelector('.cs-canvas:not(.cs-canvas-overlay)')
+    if (!(scene instanceof HTMLCanvasElement)) {
+      throw new Error('Missing scene canvas')
+    }
+    return {
+      windowHeight: window.innerHeight,
+      zoom: Number.parseInt(zoomText, 10),
+      canvasWidth: scene.width,
+      canvasHeight: scene.height,
+      shell: rect('.cs-editor-shell'),
+      viewport: rect('.cs-viewport'),
+      surface: rect('.cs-canvas-surface'),
+      zoomControls: rect('.cs-zoom-controls'),
+    }
+  })
 }
 
 /**
@@ -51,6 +90,51 @@ async function clickEnabledHistoryAction(
 }
 
 describe('M05 editor foundation in browser mode', () => {
+  it('keeps the zoomed surface exact without resizing or clipping the editor shell', async () => {
+    await browser.setWindowSize(1024, 700)
+    await openM05(true)
+
+    const fit = await viewportLayout()
+    expect(fit.surface.width).toBeCloseTo((fit.canvasWidth * fit.zoom) / 100, 0)
+    expect(fit.surface.height).toBeCloseTo(
+      (fit.canvasHeight * fit.zoom) / 100,
+      0,
+    )
+    expect(fit.shell.bottom).toBeLessThanOrEqual(fit.windowHeight)
+    expect(fit.zoomControls.bottom).toBeLessThanOrEqual(fit.viewport.bottom)
+    await browser.saveScreenshot(
+      path.resolve('artifacts/browser-e2e/m05-viewport-fit-1024x700.png'),
+    )
+
+    await $('.cs-zoom-value').click()
+    await expect($('.cs-zoom-value')).toHaveText('100%')
+    const actualSize = await viewportLayout()
+    expect(actualSize.surface.width).toBeCloseTo(actualSize.canvasWidth, 0)
+    expect(actualSize.surface.height).toBeCloseTo(actualSize.canvasHeight, 0)
+    expect(actualSize.viewport.height).toBeCloseTo(fit.viewport.height, 0)
+    expect(actualSize.zoomControls.bottom).toBeLessThanOrEqual(
+      actualSize.viewport.bottom,
+    )
+    await browser.saveScreenshot(
+      path.resolve('artifacts/browser-e2e/m05-viewport-100-1024x700.png'),
+    )
+
+    await $('button[aria-label="Fit canvas"]').click()
+    await expect($('.cs-zoom-value')).toHaveText(`${fit.zoom}%`)
+    const refit = await viewportLayout()
+    expect(refit.surface.width).toBeCloseTo(
+      (refit.canvasWidth * refit.zoom) / 100,
+      0,
+    )
+    expect(refit.surface.height).toBeCloseTo(
+      (refit.canvasHeight * refit.zoom) / 100,
+      0,
+    )
+    expect(refit.viewport.height).toBeCloseTo(fit.viewport.height, 0)
+    expect(refit.zoomControls.bottom).toBeLessThanOrEqual(refit.viewport.bottom)
+    await browser.setWindowSize(1600, 1000)
+  })
+
   it('uses the persisted document session for base lifecycle and undo', async () => {
     await openM05()
     const initial = await snapshot()

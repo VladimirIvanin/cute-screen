@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { UiIcon } from '../icon'
-defineProps<{
+const props = defineProps<{
   zoom: number
   t: (
     key:
@@ -13,6 +14,11 @@ defineProps<{
   ) => string
 }>()
 const emit = defineEmits<{ zoom: [value: number]; fit: [] }>()
+const zoomOptions = computed(() =>
+  [...new Set([25, 50, 75, 100, 125, 150, 200, 400, props.zoom])].sort(
+    (left, right) => left - right,
+  ),
+)
 </script>
 
 <template>
@@ -59,11 +65,7 @@ const emit = defineEmits<{ zoom: [value: number]; fit: [] }>()
       :aria-label="t('zoom')"
       @change="emit('zoom', Number(($event.target as HTMLSelectElement).value))"
     >
-      <option
-        v-for="value in [25, 50, 75, 100, 125, 150, 200, 400]"
-        :key="value"
-        :value="value"
-      >
+      <option v-for="value in zoomOptions" :key="value" :value="value">
         {{ value }}%
       </option>
     </select>

@@ -5,6 +5,7 @@ import App from '../../../apps/desktop/src/App.vue'
 import ActionFeedback from '../../../packages/editor-vue/src/shell/components/ActionFeedback.vue'
 import EditorShell from '../../../packages/editor-vue/src/shell/components/EditorShell.vue'
 import TopBar from '../../../packages/editor-vue/src/shell/components/TopBar.vue'
+import ZoomControls from '../../../packages/editor-vue/src/shell/components/ZoomControls.vue'
 import {
   assertLocaleCompleteness,
   createEditorShellPinia,
@@ -17,6 +18,18 @@ function renderApp() {
 }
 
 describe('M02 editor shell', () => {
+  it('shows a non-preset Fit percentage in the zoom preset control', () => {
+    render(ZoomControls, {
+      props: {
+        zoom: 22,
+        t: (key) => key,
+      },
+    })
+
+    expect(screen.getByRole('combobox', { name: 'zoom' })).toHaveValue('22')
+    expect(screen.getByRole('option', { name: '22%' })).toBeInTheDocument()
+  })
+
   it('disables capture when the native capability probe says it is unavailable', () => {
     render(TopBar, {
       props: {

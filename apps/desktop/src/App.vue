@@ -49,6 +49,9 @@ const m04CaptureHarness =
 const m05Harness =
   import.meta.env.VITE_TEST_HARNESS === 'true' &&
   new URLSearchParams(window.location.search).get('m05') === '1'
+const m05ViewportHarness =
+  m05Harness &&
+  new URLSearchParams(window.location.search).get('m05viewport') === '1'
 const m05ReferencePerfHarness =
   import.meta.env.VITE_TEST_HARNESS === 'true' &&
   new URLSearchParams(window.location.search).get('m05perf') === '1'
@@ -286,7 +289,9 @@ async function loadPersistedDocument(): Promise<boolean> {
   }
 }
 
-function loadM05HarnessImage(): Promise<HTMLImageElement> {
+function loadM05HarnessImage(
+  dimensions: Readonly<{ width: number; height: number }>,
+): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image()
     image.addEventListener('load', () => resolve(image), { once: true })
@@ -295,13 +300,17 @@ function loadM05HarnessImage(): Promise<HTMLImageElement> {
       () => reject(new Error('M05 fixture failed')),
       { once: true },
     )
-    image.src =
-      'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="160" height="120"%3E%3Crect width="160" height="120" fill="%23273d5a"/%3E%3C/svg%3E'
+    image.src = `data:image/svg+xml,${encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${dimensions.width}" height="${dimensions.height}"><rect width="100%" height="100%" fill="#273d5a"/></svg>`,
+    )}`
   })
 }
 
 async function mountM05HarnessDocument(): Promise<void> {
   const hash = 'f'.repeat(64)
+  const dimensions = m05ViewportHarness
+    ? { width: 2560, height: 1440 }
+    : { width: 160, height: 120 }
   const document: EditorDocumentV1 = {
     schemaVersion: 2,
     id: '019c1f62-058e-7000-8000-000000000005',
@@ -309,18 +318,23 @@ async function mountM05HarnessDocument(): Promise<void> {
       blobHash: hash,
       format: 'svg',
       mimeType: 'image/svg+xml',
-      width: 160,
-      height: 120,
+      width: dimensions.width,
+      height: dimensions.height,
       orientationApplied: true,
       color: { colorSpace: 'srgb', hasIccProfile: false },
     },
-    canvas: { width: 160, height: 120 },
+    canvas: dimensions,
     crop: { x: 20, y: 15, width: 100, height: 80 },
     layers: [
       {
         id: '019c1f62-058e-7000-8000-000000000101',
         kind: 'image',
-        localBounds: { x: 0, y: 0, width: 160, height: 120 },
+        localBounds: {
+          x: 0,
+          y: 0,
+          width: dimensions.width,
+          height: dimensions.height,
+        },
         transform: {
           translateX: 0,
           translateY: 0,
@@ -333,8 +347,8 @@ async function mountM05HarnessDocument(): Promise<void> {
         locked: true,
         payload: {
           blobHash: hash,
-          intrinsicWidth: 160,
-          intrinsicHeight: 120,
+          intrinsicWidth: dimensions.width,
+          intrinsicHeight: dimensions.height,
           format: 'svg',
           orientationApplied: true,
           color: { colorSpace: 'srgb', hasIccProfile: false },
@@ -383,7 +397,7 @@ async function mountM05HarnessDocument(): Promise<void> {
   window.__cuteScreenE2eM05 = {
     snapshot: () => documentSession.value?.snapshot.core.document,
   }
-  sourceImage.value = await loadM05HarnessImage()
+  sourceImage.value = await loadM05HarnessImage(dimensions)
 }
 
 /** Shares the native outcome event and the command response for one capture. */

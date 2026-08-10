@@ -80,15 +80,18 @@ Wayland, Windows и macOS. На Wayland selector системный.
    собственные dimensions.
 3. Unlock, resize/move и удалить base layer; проверить, что canvas и immutable
    original сохранились, затем выполнить Undo.
-4. Pan/zoom.
+4. Выполнить Fit → 100% → Fit на production-like снимке и проверить pan/zoom:
+   zoom HUD остаётся видимым, canvas surface соответствует проценту, а высота
+   viewport и окна не меняется.
 5. Нарисовать два пересекающихся объекта одним активным инструментом.
 6. Убедиться, что новые объекты не выбраны автоматически.
 7. Перейти в Select и double-click циклически выбрать слои.
 8. Move/resize/rotate/opacity/lock/z-order.
 9. Выполнить horizontal и vertical canvas flip, затем undo/redo весь путь.
 
-**Результат:** viewport не прыгает, selection/history согласованы, base image
-редактируется как слой без изменения оригинала, flip совпадает в preview/export.
+**Результат:** viewport и постоянные controls не прыгают и не обрезаются,
+selection/history согласованы, base image редактируется как слой без изменения
+оригинала, flip совпадает в preview/export.
 
 ## A06 — Drawing tools
 

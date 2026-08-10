@@ -97,7 +97,7 @@ function mountViewport() {
 }
 
 describe('M05 CanvasViewport transforms', () => {
-  it('keeps fit mode tied to the viewport size with 24px padding', async () => {
+  it('fits to the usable viewport after subtracting canvas chrome insets', async () => {
     let notify: (() => void) | undefined
     vi.stubGlobal(
       'ResizeObserver',
@@ -117,12 +117,31 @@ describe('M05 CanvasViewport transforms', () => {
       clientWidth: { configurable: true, value: 848 },
       clientHeight: { configurable: true, value: 648 },
     })
+    vi.spyOn(window, 'getComputedStyle').mockReturnValue({
+      paddingTop: '48px',
+      paddingRight: '72px',
+      paddingBottom: '92px',
+      paddingLeft: '72px',
+    } as CSSStyleDeclaration)
 
     notify?.()
     await Promise.resolve()
-    expect(emitted().fitZoom).toEqual([[600]])
+    expect(emitted().fitZoom).toEqual([[508]])
     unmount()
     vi.unstubAllGlobals()
+  })
+
+  it('keeps the exact zoomed canvas surface separate from its centering stage', () => {
+    const { container } = mountViewport()
+    const stage = container.querySelector('.cs-canvas-stage')
+    const surface = container.querySelector(
+      '.cs-canvas-surface',
+    ) as HTMLDivElement
+
+    expect(stage).not.toBeNull()
+    expect(stage).toContainElement(surface)
+    expect(surface.style.width).toBe('100px')
+    expect(surface.style.height).toBe('100px')
   })
 
   it('commits one constrained corner resize only on pointer release', async () => {

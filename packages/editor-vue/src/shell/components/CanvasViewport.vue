@@ -55,6 +55,7 @@ let renderer: Canvas2DRenderer | undefined
 let imageResource: ImageResource | undefined
 let activeImageKey: string | undefined
 let resizeObserver: ResizeObserver | undefined
+let lastFitZoom: number | undefined
 let pendingZoomAnchor:
   | {
       readonly canvas: CanvasPoint
@@ -161,15 +162,31 @@ async function drawDocument(): Promise<void> {
 function fitCanvas(): void {
   const container = scrollContainer.value
   const canvas = props.canvas
-  if (!props.fitMode || !container || !canvas) return
-  const availableWidth = container.clientWidth - 48
-  const availableHeight = container.clientHeight - 48
+  if (!props.fitMode) {
+    lastFitZoom = undefined
+    return
+  }
+  if (!container || !canvas) return
+  const style = window.getComputedStyle(container)
+  const inset = (value: string): number => {
+    const parsed = Number.parseFloat(value)
+    return Number.isFinite(parsed) ? parsed : 0
+  }
+  const availableWidth =
+    container.clientWidth - inset(style.paddingLeft) - inset(style.paddingRight)
+  const availableHeight =
+    container.clientHeight -
+    inset(style.paddingTop) -
+    inset(style.paddingBottom)
   if (availableWidth <= 0 || availableHeight <= 0) return
   const scale = Math.min(
     availableWidth / canvas.width,
     availableHeight / canvas.height,
   )
-  emit('fitZoom', Math.round(scale * 100))
+  const nextZoom = Math.round(scale * 100)
+  if (nextZoom === props.zoom || nextZoom === lastFitZoom) return
+  lastFitZoom = nextZoom
+  emit('fitZoom', nextZoom)
 }
 function retryRender(): void {
   void drawDocument()
@@ -833,69 +850,71 @@ onBeforeUnmount(() => {
 <template>
   <main class="cs-viewport" :aria-label="t('canvasViewport')">
     <div ref="scrollContainer" class="cs-canvas-scroll">
-      <div
-        class="cs-canvas-surface"
-        :style="
-          canvas
-            ? {
-                width: `${canvas.width * ((zoom ?? 100) / 100)}px`,
-                height: `${canvas.height * ((zoom ?? 100) / 100)}px`,
-              }
-            : undefined
-        "
-      >
-        <canvas
-          ref="scene"
-          class="cs-canvas"
-          :aria-label="t('sceneCanvas')"
-          @pointerdown="onPointerDown"
-          @pointermove="onPointerMove"
-          @pointerup="finishGesture"
-          @pointercancel="finishGesture"
-          @lostpointercapture="finishGesture"
-          @dblclick="onDoubleClick"
-          @wheel="onWheel"
-        ></canvas>
-        <canvas
-          ref="overlay"
-          class="cs-canvas cs-canvas-overlay"
-          :aria-label="t('interactionOverlay')"
-        ></canvas>
-        <section v-if="rendererError" class="cs-empty-state" role="alert">
-          <h1>{{ rendererError }}</h1>
-          <button type="button" class="cs-button" @click="retryRender">
-            {{ t('retry') }}
-          </button>
-        </section>
-        <section
-          v-else-if="documentState.kind === 'empty'"
-          class="cs-empty-state"
-          aria-labelledby="cs-empty-title"
+      <div class="cs-canvas-stage">
+        <div
+          class="cs-canvas-surface"
+          :style="
+            canvas
+              ? {
+                  width: `${canvas.width * ((zoom ?? 100) / 100)}px`,
+                  height: `${canvas.height * ((zoom ?? 100) / 100)}px`,
+                }
+              : undefined
+          "
         >
-          <UiIcon name="camera" />
-          <h1 id="cs-empty-title">{{ t('emptyTitle') }}</h1>
-          <p>{{ t('emptyDescription') }}</p>
-        </section>
-        <p
-          v-else-if="documentState.kind === 'loading'"
-          class="cs-loading"
-          role="status"
-        >
-          {{ t('loadingEditor') }}
-        </p>
-        <section
-          v-else-if="documentState.kind === 'error'"
-          class="cs-empty-state"
-          role="alert"
-        >
-          <h1>{{ documentState.message }}</h1>
-          <button type="button" class="cs-button" @click="emit('retry')">
-            {{ t('retry') }}
-          </button>
-        </section>
-        <p v-else class="cs-canvas-ready" aria-live="polite">
-          {{ documentState.title }} · {{ documentState.dimensions }}
-        </p>
+          <canvas
+            ref="scene"
+            class="cs-canvas"
+            :aria-label="t('sceneCanvas')"
+            @pointerdown="onPointerDown"
+            @pointermove="onPointerMove"
+            @pointerup="finishGesture"
+            @pointercancel="finishGesture"
+            @lostpointercapture="finishGesture"
+            @dblclick="onDoubleClick"
+            @wheel="onWheel"
+          ></canvas>
+          <canvas
+            ref="overlay"
+            class="cs-canvas cs-canvas-overlay"
+            :aria-label="t('interactionOverlay')"
+          ></canvas>
+          <section v-if="rendererError" class="cs-empty-state" role="alert">
+            <h1>{{ rendererError }}</h1>
+            <button type="button" class="cs-button" @click="retryRender">
+              {{ t('retry') }}
+            </button>
+          </section>
+          <section
+            v-else-if="documentState.kind === 'empty'"
+            class="cs-empty-state"
+            aria-labelledby="cs-empty-title"
+          >
+            <UiIcon name="camera" />
+            <h1 id="cs-empty-title">{{ t('emptyTitle') }}</h1>
+            <p>{{ t('emptyDescription') }}</p>
+          </section>
+          <p
+            v-else-if="documentState.kind === 'loading'"
+            class="cs-loading"
+            role="status"
+          >
+            {{ t('loadingEditor') }}
+          </p>
+          <section
+            v-else-if="documentState.kind === 'error'"
+            class="cs-empty-state"
+            role="alert"
+          >
+            <h1>{{ documentState.message }}</h1>
+            <button type="button" class="cs-button" @click="emit('retry')">
+              {{ t('retry') }}
+            </button>
+          </section>
+          <p v-else class="cs-canvas-ready" aria-live="polite">
+            {{ documentState.title }} · {{ documentState.dimensions }}
+          </p>
+        </div>
       </div>
     </div>
   </main>
