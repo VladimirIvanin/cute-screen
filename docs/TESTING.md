@@ -59,6 +59,29 @@ pnpm smoke:m01:portal:invalid-uri
 
 Каждая команда возвращает ненулевой exit code при провале и не изменяет tracked files.
 
+## Локальные execution records
+
+### Windows x64, 2026-08-10
+
+На commit `3dcfcc5`, Windows 10 Home 22H2 (build 19045), x86_64, Intel
+i7-11700K успешно завершились `cargo test --workspace` (46/46) и
+`pnpm test:render` (6/6). Это portable Rust и headless renderer evidence; эти
+команды не создают отдельный artifact, evidence — terminal log прогона.
+
+Первоначальный прогон не является release gate: на машине был Node `24.11.1`
+при требуемом `22.23.1`, а Vite не собирался с deprecated
+`lucide-vue-next@1.0.0`. После запуска с Node `22.23.1` и migration на
+`@lucide/vue@1.31.0` завершились `pnpm typecheck`, `pnpm test` (123/123),
+`pnpm test:render` (6/6) и `pnpm test:boundaries` (4/4). Browser harness
+перенесён с POSIX env assignment на `.env.e2e` и запускает Vite как прямой
+Node-process, поэтому один server переживает все WDIO workers на Windows,
+Linux и macOS. Повторный `pnpm test:e2e:browser` прошёл M01 foundation/renderer,
+M02 shell и M06 drawing specs; M05 spec остаётся failed из-за 0.2 px rounding
+и недоступного Undo, а не из-за dev-server lifecycle. Полный `pnpm check`
+пока блокируется только тремя существующими неотформатированными файлами:
+`.github/workflows/ci.yml`, `.github/workflows/reference-perf.yml` и
+`.prettierrc.json`.
+
 ## Правило user-action
 
 Acceptance criterion формулируется наблюдаемым результатом:

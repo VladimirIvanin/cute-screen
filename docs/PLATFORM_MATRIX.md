@@ -76,6 +76,15 @@ UI получает `CaptureCapabilities` и не показывает непо�
 
 - Локальный M01 smoke на Windows x64 подтвердил WebView2 runtime: asset decode,
   binary IPC/Blob fallback и typed error для corrupted PNG.
+- Повторная локальная regression-проверка 2026-08-10 на Windows 10 Home 22H2
+  (build 19045), x86_64, commit `3dcfcc5`: `cargo test --workspace` прошёл
+  46/46, `pnpm test` прошёл 123/123 и `pnpm test:render` прошёл 6/6 при Node
+  `22.23.1`. Migration на `@lucide/vue@1.31.0` сняла production-build blocker;
+  browser harness больше не зависит от POSIX shell syntax и сохраняет Vite
+  server между spec workers. M01/M02/M06 browser specs прошли, M05 остаётся
+  failed на UI rounding/interactability assertions. Это portable
+  Rust/headless/browser coverage без WebView2 или native-capture claim и не
+  меняет статус platform support.
 - CanvasKit/WebGL startup в проверенном WebView2 перешёл на Canvas2D fallback;
   это не подтверждает primary CanvasKit path для Windows.
 - Mixed DPI, политика запуска в фоне, capture и hotkey остаются pending до M04

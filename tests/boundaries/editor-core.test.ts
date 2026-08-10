@@ -72,7 +72,7 @@ describe('M05 icon-system boundary', () => {
       const code = await readFile(path.join(root, source), 'utf8')
       if (
         source !== 'packages/editor-vue/src/shell/icon.ts' &&
-        code.includes("from 'lucide-vue-next'")
+        code.includes("from '@lucide/vue'")
       ) {
         violations.push(`${source}: direct Lucide import`)
       }

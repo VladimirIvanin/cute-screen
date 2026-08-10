@@ -1,28 +1,60 @@
+import { spawn } from 'node:child_process'
+import { once } from 'node:events'
 import path from 'node:path'
 
 import { saveFailureScreenshot } from './failure-artifacts'
 
 const outputDir = path.resolve('artifacts/browser-e2e')
+const devServerUrl = 'http://127.0.0.1:5173'
+
+async function startBrowserDevServer(): Promise<{
+  url: string
+  close: () => Promise<void>
+}> {
+  const devServerProcess = spawn(
+    process.execPath,
+    [
+      path.resolve('node_modules/vite/bin/vite.js'),
+      '--mode',
+      'e2e',
+      '--config',
+      path.resolve('apps/desktop/vite.config.ts'),
+    ],
+    {
+      cwd: process.cwd(),
+      stdio: 'inherit',
+    },
+  )
+
+  return {
+    url: devServerUrl,
+    close: async () => {
+      if (
+        devServerProcess.exitCode !== null ||
+        devServerProcess.signalCode !== null
+      ) {
+        return
+      }
+      devServerProcess.kill()
+      await once(devServerProcess, 'exit')
+    },
+  }
+}
 
 export const config: WebdriverIO.Config = {
   runner: 'local',
   specs: ['./specs/browser-*.e2e.ts'],
   maxInstances: 1,
   logLevel: 'warn',
-  baseUrl: 'http://127.0.0.1:5173',
+  baseUrl: devServerUrl,
   outputDir,
   services: [
     [
       '@wdio/tauri-service',
       {
         mode: 'browser',
-        devServerUrl: 'http://127.0.0.1:5173',
-        devServer: {
-          command: 'pnpm dev:e2e:browser',
-          cwd: process.cwd(),
-          reuseExistingServer: false,
-          timeoutMs: 60_000,
-        },
+        devServerUrl,
+        devServer: startBrowserDevServer,
       },
     ],
   ],

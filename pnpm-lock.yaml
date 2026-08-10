@@ -169,9 +169,9 @@ importers:
       '@cute-screen/editor-renderer':
         specifier: workspace:*
         version: link:../editor-renderer
-      lucide-vue-next:
-        specifier: 1.0.0
-        version: 1.0.0(vue@3.5.41(typescript@7.0.2))
+      '@lucide/vue':
+        specifier: 1.31.0
+        version: 1.31.0(vue@3.5.41(typescript@7.0.2))
       pinia:
         specifier: 3.0.4
         version: 3.0.4(typescript@7.0.2)(vue@3.5.41(typescript@7.0.2))
@@ -656,6 +656,11 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
+
+  '@lucide/vue@1.31.0':
+    resolution: {integrity: sha512-NtjEHhcAa7umPh40wrRmlESJqNGdnpc7LziBKFnW3fmlrW0g2xMCDpdWU7WeEHRSl3xOpxbqiFTLKxoK3CoVCg==}
+    peerDependencies:
+      vue: '>=3.0.1'
 
   '@napi-rs/canvas-android-arm64@1.0.2':
     resolution: {integrity: sha512-IMXKVQod0ol4vt3gmClUfXz4JAgHYESGPCUqmH3lQxBoL0K/2greJaQE1HVBVxWWFKfLc4OLZVdxg7kXVyXv+g==}
@@ -2835,12 +2840,6 @@ packages:
     resolution: {integrity: sha512-jumlc0BIUrS3qJGgIkWZsyfAM7NCWiBcCDhnd+3NNM5KbBmLTgHVfWBcg6W+rLUsIpzpERPsvwUP7CckAQSOoA==}
     engines: {node: '>=12'}
 
-  lucide-vue-next@1.0.0:
-    resolution: {integrity: sha512-V6SPvx1IHTj/UY+FrIYWV5faISsPSb8BnWSFDxAtezWKvWc9ZZ40PDrdu1/Qb5vg4lHWr1hs1BAMGVGm6V1Xdg==}
-    deprecated: Package deprecated. Please use @lucide/vue instead.
-    peerDependencies:
-      vue: '>=3.0.1'
-
   lz-string@1.5.0:
     resolution: {integrity: sha512-h5bgJWpxJNswbU7qCrV0tIKQCaS3blPDrqKWx+QxzuzL1zGUzij9XCWLrSLsJPu5t+eWA/ycetzYAO5IOMcWAQ==}
     hasBin: true
@@ -4294,6 +4293,10 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
+
+  '@lucide/vue@1.31.0(vue@3.5.41(typescript@7.0.2))':
+    dependencies:
+      vue: 3.5.41(typescript@7.0.2)
 
   '@napi-rs/canvas-android-arm64@1.0.2':
     optional: true
@@ -6654,10 +6657,6 @@ snapshots:
   lru-cache@11.5.2: {}
 
   lru-cache@7.18.3: {}
-
-  lucide-vue-next@1.0.0(vue@3.5.41(typescript@7.0.2)):
-    dependencies:
-      vue: 3.5.41(typescript@7.0.2)
 
   lz-string@1.5.0: {}
 

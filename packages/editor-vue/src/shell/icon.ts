@@ -27,7 +27,7 @@ import {
   X,
   ZoomIn,
   ZoomOut,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 import { h, type Component, type FunctionalComponent } from 'vue'
 
 import type { IconName } from './types'
