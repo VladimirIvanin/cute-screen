@@ -5,6 +5,7 @@
   "license": "MIT",
   "type": "module",
   "dependencies": {
+    "@cute-screen/editor-renderer": "workspace:*",
     "@cute-screen/editor-vue": "workspace:*",
     "@tauri-apps/api": "2.11.1",
     "vue": "3.5.41"
