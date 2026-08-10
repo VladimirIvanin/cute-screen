@@ -232,6 +232,8 @@ button:focus-visible {
   background: var(--surface-hover);
 }
 .cs-workbench {
+  --bottom-zoom-lane: 396px;
+  --bottom-inspector-lane: 316px;
   position: relative;
   display: grid;
   grid-template-columns: 52px minmax(0, 1fr);
@@ -507,10 +509,16 @@ button:focus-visible {
   position: absolute;
   z-index: 6;
   bottom: 14px;
-  left: 50%;
+  left: calc(
+    var(--bottom-zoom-lane) +
+      (100% - var(--bottom-zoom-lane) - var(--bottom-inspector-lane)) / 2
+  );
   display: flex;
+  min-width: 0;
   min-height: 46px;
-  max-width: calc(100% - 180px);
+  max-width: calc(
+    100% - var(--bottom-zoom-lane) - var(--bottom-inspector-lane)
+  );
   align-items: center;
   gap: 9px;
   padding: 5px 8px;
@@ -532,7 +540,12 @@ button:focus-visible {
 .cs-context-toolbar strong,
 .cs-context-toolbar small {
   display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+}
+.cs-context-copy {
+  min-width: 0;
 }
 .cs-context-toolbar strong {
   font-size: 12px;
@@ -543,10 +556,15 @@ button:focus-visible {
 }
 .cs-context-controls {
   display: flex;
+  min-width: 0;
+  max-width: 100%;
   gap: 6px;
   margin-left: 8px;
+  overflow-x: auto;
+  scrollbar-width: thin;
 }
 .cs-context-control {
+  flex: none;
   padding: 5px 7px;
   border-radius: 5px;
   color: var(--text-muted);
@@ -649,11 +667,7 @@ button:focus-visible {
     width: 36px;
     padding: 0;
   }
-  .cs-context-toolbar {
-    max-width: calc(100% - 160px);
-  }
-  .cs-context-toolbar small,
-  .cs-context-controls {
+  .cs-context-toolbar small {
     display: none;
   }
 }

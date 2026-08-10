@@ -375,7 +375,14 @@ async function mountM05HarnessDocument(): Promise<void> {
         opacity: 1,
         visible: true,
         locked: false,
-        payload: {},
+        payload: {
+          shape: 'rectangle',
+          fill: {
+            kind: 'solid',
+            color: { red: 0.898, green: 0.282, blue: 0.302, alpha: 1 },
+            opacity: 1,
+          },
+        },
       })),
     ],
     presentation: {

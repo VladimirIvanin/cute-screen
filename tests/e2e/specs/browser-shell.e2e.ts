@@ -25,6 +25,22 @@ describe('M02 editor shell in browser mode', () => {
     await expect($('nav[aria-label="Series frames"]')).toExist()
     await expect($('.cs-layer-row.is-selected')).toExist()
     await expect($('button=Export')).toBeEnabled()
+    expect(
+      await browser.execute(() => {
+        const context = document.querySelector('.cs-context-toolbar')
+        const zoom = document.querySelector('.cs-zoom-controls')
+        if (!(context instanceof HTMLElement) || !(zoom instanceof HTMLElement))
+          throw new Error('Missing bottom workbench controls')
+        const contextBounds = context.getBoundingClientRect()
+        const zoomBounds = zoom.getBoundingClientRect()
+        return (
+          contextBounds.right <= zoomBounds.left ||
+          zoomBounds.right <= contextBounds.left ||
+          contextBounds.bottom <= zoomBounds.top ||
+          zoomBounds.bottom <= contextBounds.top
+        )
+      }),
+    ).toBe(true)
     await $('button[aria-label="Zoom in"]').click()
     await expect($('.cs-zoom-value')).toHaveText('110%')
     await browser.saveScreenshot(

@@ -14,7 +14,7 @@ const emit = defineEmits<{
 <template>
   <section v-if="schema" class="cs-context-toolbar" :aria-label="label">
     <span class="cs-context-icon"><UiIcon :name="schema.icon" /></span>
-    <div>
+    <div class="cs-context-copy">
       <strong>{{ schema.title }}</strong
       ><small>{{ schema.hint }}</small>
     </div>
