@@ -3,6 +3,16 @@ import type { EditorDocumentV1 } from '@cute-screen/editor-renderer'
 import './shell/shell.css'
 
 export {
+  Canvas2DRenderer,
+  CanvasKitRenderer,
+  createRenderSceneSnapshot,
+  loadBundledCanvasKit,
+  RendererRuntime,
+  type FrameMetric,
+  type FrameProbe,
+} from '@cute-screen/editor-renderer'
+
+export {
   ImageTransportError,
   loadImageWithBinaryFallback,
   type ImageTransportBridge,

@@ -9,7 +9,7 @@ import {
   loadBundledCanvasKit,
   type FrameMetric,
   type FrameProbe,
-} from '@cute-screen/editor-renderer'
+} from '@cute-screen/editor-vue'
 import referenceImageUrl from '../../../tests/fixtures/generated/ui-4k.png'
 
 type GpuTimerExtension = {

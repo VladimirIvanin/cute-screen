@@ -135,9 +135,6 @@ importers:
 
   apps/desktop:
     dependencies:
-      '@cute-screen/editor-renderer':
-        specifier: workspace:*
-        version: link:../../packages/editor-renderer
       '@cute-screen/editor-vue':
         specifier: workspace:*
         version: link:../../packages/editor-vue
