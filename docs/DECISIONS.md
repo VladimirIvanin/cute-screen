@@ -234,3 +234,22 @@ user shader code, shader graph и plugin effects не входят в текущ
 обязан иметь schema migration, CanvasKit/Canvas2D/export parity, memory limits и
 failure behavior для missing texture. Богатый scope реализуется этапами, но не
 объявляется необязательным MVP-spike.
+
+## ADR-024 — Fixed reference runner и GPU-complete performance gate
+
+**Статус:** accepted
+
+**Контекст:** software CanvasKit surfaces измеряют CPU raster path и не могут
+служить доказательством display budget CanvasKit/WebGL. Нестабильный hosted
+runner и CPU-submit duration также не показывают фактическую GPU работу.
+
+**Решение:** M05 использует выделенный Ubuntu 24.04/X11 self-hosted runner:
+i7-11700K, RTX 2070 SUPER, NVIDIA 595.84 и WebKitGTK 2.52.3. Real Tauri
+renderer измеряется WebGL2 `EXT_disjoint_timer_query_webgl2` тремя независимыми
+прогонами (30 warmups + 120 samples); каждый должен дать 4K/500 GPU p95 ≤16,7
+ms. Fallback/software renderer, absent extension и GPU disjoint —
+infrastructure failure. M13 повторяет тот же gate для build candidate.
+
+**Последствия:** `pnpm test:perf` остаётся software trend и не может закрыть
+REQ-QLT-001. Reference workflow ручной, доверенный и не выполняет fork PR;
+artifact хранит fingerprint, commit, fixture, CPU/GPU metrics и runtime logs.

@@ -254,7 +254,18 @@ shortcuts могут конфликтовать.
 
 Trend benchmark запускается в PR, hard gate — на стабильном выделенном runner.
 
-M01 `pnpm test:perf` выполняет 30 warmups и 120 измеряемых полных software-CanvasKit redraws для 4K/500 и 8K/1000 и пишет `artifacts/perf/m01-renderer.json` с runner identity и fixture SHA. Бюджеты становятся blocking только при `CUTE_SCREEN_REFERENCE_RUNNER=1`; любое ненулевое число idle frames остаётся hard failure везде.
+M01 `pnpm test:perf` выполняет 30 warmups и 120 измеряемых полных software-CanvasKit redraws для 4K/500 и 8K/1000 и пишет `artifacts/perf/m01-renderer.json` с runner identity и fixture SHA. Это только trend: software/headless CanvasKit никогда не сравнивается с product budget. Любое ненулевое число idle frames остаётся hard failure везде.
+
+M05 `pnpm test:perf:reference` запускается только на designated self-hosted
+Ubuntu 24.04/X11 reference host (i7-11700K, RTX 2070 SUPER, NVIDIA 595.84,
+WebKitGTK 2.52.3, окно 1600×1000, DPR 1). Он выполняет три независимых
+real-Tauri прогона; каждый содержит 30 warmups и 120 valid WebGL2
+`EXT_disjoint_timer_query_webgl2` samples для 4K/500 committed scene. CanvasKit
+fallback, SwiftShader/llvmpipe/software renderer, missing timer extension или
+`GPU_DISJOINT` делают прогон infrastructure failure. Gate пройден только если
+все три GPU p95 ≤16,7 ms, idle frames равны нулю и pointer-to-overlay p95 ≤50
+ms. JSON/JUnit/logs/screenshot сохраняются как workflow artifact; M13 повторяет
+этот gate на build candidate.
 
 Linux system smoke пишет JSON в `artifacts/m01/`: commit SHA, OS/arch/session, portal и WebKitGTK versions, monitor layout, correlation ID и observable result. `portal-screenshot` и `portal-shortcuts` интерактивны; cancel записывается как ожидаемый outcome без error-log. Во время разработки эти локальные файлы являются evidence текущей системы и достаточны для local development acceptance. Для финального `verified`/`supported` они должны попасть в устойчивый CI/system-run artifact вместе с остальной платформенной матрицей.
 

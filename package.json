@@ -30,6 +30,7 @@
     "test:render": "pnpm fixtures:generate:m01 && vitest run --project render-harness",
     "test:render:update": "pnpm fixtures:generate:m01 && CUTE_SCREEN_UPDATE_GOLDENS=1 vitest run --project render-harness",
     "test:perf": "pnpm fixtures:generate:m01 && vitest run --project perf-harness",
+    "test:perf:reference": "pnpm fixtures:generate:m01 && node scripts/run-reference-perf.mjs",
     "fixtures:generate:m01": "node scripts/generate-m01-fixtures.mjs",
     "test:e2e:browser": "wdio run tests/e2e/wdio.browser.conf.ts",
     "test:e2e:tauri": "node scripts/run-tauri-e2e.mjs",

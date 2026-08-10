@@ -56,7 +56,7 @@ export const config: WebdriverIO.Config = {
   connectionRetryCount: 1,
   mochaOpts: {
     ui: 'bdd',
-    timeout: 60_000,
+    timeout: process.env.CUTE_SCREEN_REFERENCE_PASS ? 180_000 : 60_000,
   },
   afterTest: async (test, _context, { passed }) => {
     await saveFailureScreenshot(outputDir, test.title, passed)

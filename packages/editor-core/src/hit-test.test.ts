@@ -112,4 +112,16 @@ describe('M05 hit testing', () => {
       'top',
     ])
   })
+
+  it('does not return candidates outside the spatial query bounds', () => {
+    const index = new DocumentSpatialIndex(
+      document([
+        layer('near'),
+        layer('far', { transform: { ...transform, translateX: 70 } }),
+      ]),
+    )
+    expect(index.hitAll({ x: 10, y: 10 }).map((hit) => hit.nodeId)).toEqual([
+      'near',
+    ])
+  })
 })

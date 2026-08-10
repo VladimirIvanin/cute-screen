@@ -34,6 +34,12 @@ export interface FrameMetric {
   readonly duration: number
 }
 
+/** Optional, non-production instrumentation around one renderer frame. */
+export interface FrameProbe {
+  beforeFrame(reasons: readonly InvalidationReason[]): void
+  afterFrame(metric: FrameMetric): void
+}
+
 export interface Renderer {
   readonly backend: RendererBackend
   initialize(stack: CanvasStack): Promise<void>

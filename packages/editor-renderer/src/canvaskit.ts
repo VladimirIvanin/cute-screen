@@ -61,6 +61,14 @@ interface CanvasKitCanvas {
     paint: CanvasKitPaint,
     fastSample?: boolean,
   ): void
+  drawPicture?(picture: CanvasKitPicture): void
+}
+
+type CanvasKitPicture = CanvasKitDeletable
+
+interface CanvasKitPictureRecorder extends CanvasKitDeletable {
+  beginRecording(bounds: Float32Array): CanvasKitCanvas
+  finishRecordingAsPicture(): CanvasKitPicture
 }
 
 interface CanvasKitSurface {
@@ -79,6 +87,7 @@ export interface CanvasKitApi {
   readonly PaintStyle: Readonly<{ Fill: unknown; Stroke: unknown }>
   readonly ImageFormat: Readonly<{ PNG: unknown }>
   readonly TRANSPARENT: unknown
+  readonly PictureRecorder?: new () => CanvasKitPictureRecorder
   XYWHRect(x: number, y: number, width: number, height: number): Float32Array
   LTRBRect(
     left: number,
@@ -307,6 +316,8 @@ export class CanvasKitRenderer implements Renderer {
   #surface: CanvasKitSurface | undefined
   #scene: RenderSceneSnapshot | undefined
   #overlay: readonly RenderNode[] = []
+  #picture: CanvasKitPicture | undefined
+  #pictureScene: RenderSceneSnapshot | undefined
   #disposed = false
 
   constructor(
@@ -321,6 +332,15 @@ export class CanvasKitRenderer implements Renderer {
     this.#assertActive()
     const surface = this.#canvasKit.MakeWebGLCanvasSurface(stack.scene)
     if (!surface) throw new Error('CanvasKit WebGL surface creation failed')
+    // CanvasKit silently swaps the DOM canvas for a software surface when the
+    // GPU surface cannot be made. Runtime owns fallback explicitly so pointer
+    // listeners, telemetry and backend state stay coherent.
+    if (!stack.scene.isConnected) {
+      surface.dispose()
+      throw new Error(
+        'CanvasKit replaced the scene canvas with a software surface',
+      )
+    }
     this.#stack = stack
     this.#surface = surface
     if (!stack.overlay.getContext('2d')) {
@@ -340,16 +360,21 @@ export class CanvasKitRenderer implements Renderer {
       height: input.height,
       image,
       dispose: () => {
-        if (this.#resources.delete(input.id)) image.delete()
+        if (this.#resources.delete(input.id)) {
+          this.#disposePicture()
+          image.delete()
+        }
       },
     }
     this.#resources.set(resource.id, resource)
+    this.#disposePicture()
     return resource
   }
 
   setScene(scene: RenderSceneSnapshot): void {
     this.#assertActive()
     this.#scene = scene
+    if (this.#pictureScene !== scene) this.#disposePicture()
   }
 
   setOverlay(nodes: readonly RenderNode[]): void {
@@ -365,7 +390,7 @@ export class CanvasKitRenderer implements Renderer {
         ['scene', 'viewport', 'resource', 'export'].includes(reason),
       )
     ) {
-      drawScene(this.#canvasKit, this.#surface!, this.#scene!, this.#resources)
+      this.#drawCommittedScene()
     }
     if (reasons.includes('overlay') || reasons.includes('viewport')) {
       const overlay = this.#stack!.overlay
@@ -410,6 +435,99 @@ export class CanvasKitRenderer implements Renderer {
     this.#surface = undefined
     this.#stack = undefined
     this.#scene = undefined
+    this.#disposePicture()
+  }
+
+  #drawCommittedScene(): void {
+    const canvas = this.#surface!.getCanvas()
+    const picture = this.#pictureForScene()
+    canvas.clear(this.#canvasKit.TRANSPARENT)
+    if (picture && canvas.drawPicture) {
+      canvas.drawPicture(picture)
+      this.#surface!.flush()
+      return
+    }
+    drawScene(this.#canvasKit, this.#surface!, this.#scene!, this.#resources)
+  }
+
+  #pictureForScene(): CanvasKitPicture | undefined {
+    if (this.#picture && this.#pictureScene === this.#scene)
+      return this.#picture
+    const PictureRecorder = this.#canvasKit.PictureRecorder
+    if (!PictureRecorder || !this.#scene) return undefined
+    const recorder = new PictureRecorder()
+    try {
+      const recording = recorder.beginRecording(
+        this.#canvasKit.XYWHRect(0, 0, this.#scene.width, this.#scene.height),
+      )
+      for (const node of this.#scene.nodes) {
+        if (node.kind === 'image') {
+          this.#drawImageNode(recording, node)
+        } else {
+          drawNodesCanvasKit(this.#canvasKit, recording, [node])
+        }
+      }
+      this.#picture = recorder.finishRecordingAsPicture()
+      this.#pictureScene = this.#scene
+      return this.#picture
+    } finally {
+      recorder.delete()
+    }
+  }
+
+  #drawImageNode(
+    canvas: CanvasKitCanvas,
+    node: Extract<RenderNode, { kind: 'image' }>,
+  ): void {
+    if (!node.visible || node.opacity === 0) return
+    const resource = this.#resources.get(node.resourceId)
+    const fill = new this.#canvasKit.Paint()
+    const stroke = new this.#canvasKit.Paint()
+    try {
+      canvas.save()
+      canvas.translate(node.x, node.y)
+      canvas.rotate(node.rotation, 0, 0)
+      canvas.scale(node.scaleX, node.scaleY)
+      if (resource) {
+        fill.setAntiAlias(true)
+        fill.setColorComponents(1, 1, 1, node.opacity)
+        canvas.drawImageRect(
+          resource.image,
+          this.#canvasKit.XYWHRect(0, 0, resource.width, resource.height),
+          this.#canvasKit.XYWHRect(0, 0, node.width, node.height),
+          fill,
+          false,
+        )
+      } else {
+        configurePaint(
+          this.#canvasKit,
+          fill,
+          { red: 0.72, green: 0.28, blue: 0.28, alpha: 0.16 },
+          node.opacity,
+          'fill',
+        )
+        configurePaint(
+          this.#canvasKit,
+          stroke,
+          { red: 0.72, green: 0.28, blue: 0.28, alpha: 0.9 },
+          node.opacity,
+          'stroke',
+        )
+        const bounds = this.#canvasKit.XYWHRect(0, 0, node.width, node.height)
+        canvas.drawRect(bounds, fill)
+        canvas.drawRect(bounds, stroke)
+      }
+    } finally {
+      canvas.restore()
+      fill.delete()
+      stroke.delete()
+    }
+  }
+
+  #disposePicture(): void {
+    this.#picture?.delete()
+    this.#picture = undefined
+    this.#pictureScene = undefined
   }
 
   #assertActive(): void {

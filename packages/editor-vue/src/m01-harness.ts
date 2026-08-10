@@ -9,5 +9,6 @@ export {
   createRenderSceneSnapshot,
   loadBundledCanvasKit,
   type FrameMetric,
+  type FrameProbe,
   type RendererRuntimeState,
 } from '@cute-screen/editor-renderer'

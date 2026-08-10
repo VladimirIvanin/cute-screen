@@ -53,6 +53,15 @@ Artifacts считаются тестовыми/неофициальными с�
   fixtures, memory/soak, performance trends и system smoke.
 - После функционального завершения: Real Tauri E2E и system
   capture/hotkey/portal smokes на Linux, Windows и macOS.
+
+### `reference-perf.yml`
+
+Manual-only workflow для trusted commits на self-hosted `cutescreen-reference`
+runner. Он не запускается для fork PR и не получает repository secrets. Перед
+M05 evidence проверяет pinned Linux/X11/GPU/WebKitGTK fingerprint и запускает
+`pnpm test:perf:reference`; его artifacts удерживаются 90 дней.
+Provisioning и runbook: [REFERENCE_PERF_RUNNER.md](REFERENCE_PERF_RUNNER.md).
+
 - Artifacts могут иметь короткий retention и не считаются versioned builds.
 
 ### `build-artifacts.yml`

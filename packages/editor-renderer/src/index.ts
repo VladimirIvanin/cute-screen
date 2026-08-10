@@ -60,6 +60,7 @@ export {
 export type {
   CanvasStack,
   FrameMetric,
+  FrameProbe,
   ImageResource,
   ImageResourceInput,
   Renderer,

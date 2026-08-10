@@ -162,4 +162,40 @@ describe('RendererRuntime', () => {
       expect(restoredPrimary.createImageResource).toHaveBeenCalledTimes(1),
     )
   })
+
+  it('brackets scheduled renderer frames with the optional probe', async () => {
+    const primary = renderer('canvaskit')
+    let callback: FrameRequestCallback | undefined
+    const beforeFrame = vi.fn()
+    const afterFrame = vi.fn()
+    const runtime = new RendererRuntime({
+      stack: {
+        scene: canvas(),
+        overlay: canvas(),
+        dpr: 1,
+        correlationId: 'probe-test',
+      },
+      createPrimary: () => primary,
+      createFallback: () => renderer('canvas2d'),
+      createReplacementSceneCanvas: canvas,
+      activateSceneCanvas: vi.fn(),
+      requestFrame: vi.fn((next) => {
+        callback = next
+        return 1
+      }),
+      cancelFrame: vi.fn(),
+      frameProbe: { beforeFrame, afterFrame },
+    })
+    await runtime.initialize()
+    runtime.setScene(
+      createRenderSceneSnapshot({ width: 1, height: 1, nodes: [] }),
+    )
+    runtime.invalidate('scene')
+    callback?.(1)
+
+    expect(beforeFrame).toHaveBeenCalledWith(['scene'])
+    expect(afterFrame).toHaveBeenCalledWith(
+      expect.objectContaining({ backend: 'canvaskit' }),
+    )
+  })
 })

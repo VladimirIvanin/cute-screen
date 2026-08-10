@@ -3,6 +3,7 @@ import type { RenderNode, RenderSceneSnapshot } from '@cute-screen/editor-core'
 import { FrameScheduler, type InvalidationReason } from './scheduler'
 import type {
   CanvasStack,
+  FrameProbe,
   FrameMetric,
   ImageResource,
   ImageResourceInput,
@@ -22,6 +23,7 @@ export interface RendererRuntimeOptions {
   readonly cancelFrame?: (handle: number) => void
   readonly onStateChange?: (state: RendererRuntimeState) => void
   readonly onFrame?: (metric: FrameMetric) => void
+  readonly frameProbe?: FrameProbe | undefined
 }
 
 export class RendererRuntime {
@@ -59,7 +61,10 @@ export class RendererRuntime {
         options.cancelFrame ?? ((handle) => cancelAnimationFrame(handle)),
       render: ({ reasons }) => {
         if (!this.#active || !this.#scene) return
-        options.onFrame?.(this.#active.render(reasons))
+        options.frameProbe?.beforeFrame(reasons)
+        const metric = this.#active.render(reasons)
+        options.frameProbe?.afterFrame(metric)
+        options.onFrame?.(metric)
       },
     })
   }

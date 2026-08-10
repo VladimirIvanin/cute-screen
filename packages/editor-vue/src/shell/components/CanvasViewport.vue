@@ -13,6 +13,7 @@ import {
   type LayerNode,
   type SnapCandidate,
   type Transform2D,
+  type ImageResource,
 } from '@cute-screen/editor-renderer'
 
 const props = defineProps<{
@@ -51,7 +52,8 @@ const overlay = ref<HTMLCanvasElement>()
 const scrollContainer = ref<HTMLDivElement>()
 const rendererError = ref<string>()
 let renderer: Canvas2DRenderer | undefined
-let rendererGeneration = 0
+let imageResource: ImageResource | undefined
+let activeImageKey: string | undefined
 let resizeObserver: ResizeObserver | undefined
 let pendingZoomAnchor:
   | {
@@ -102,6 +104,19 @@ let gesture:
 
 type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w'
 type CanvasPoint = { readonly x: number; readonly y: number }
+async function ensureRenderer(): Promise<Canvas2DRenderer | undefined> {
+  if (!scene.value || !overlay.value || !props.canvas) return undefined
+  if (renderer) return renderer
+  const next = new Canvas2DRenderer()
+  await next.initialize({
+    scene: scene.value,
+    overlay: overlay.value,
+    dpr: window.devicePixelRatio || 1,
+    correlationId: 'editor-viewport',
+  })
+  renderer = next
+  return next
+}
 async function drawDocument(): Promise<void> {
   if (!scene.value || !props.canvas) return
   rendererError.value = undefined
@@ -115,35 +130,33 @@ async function drawDocument(): Promise<void> {
   if (!props.document || !props.image || !layer) {
     const context = scene.value.getContext('2d')
     context?.clearRect(0, 0, scene.value.width, scene.value.height)
-    drawOverlay()
+    invalidateOverlay()
     return
   }
   try {
-    const generation = ++rendererGeneration
-    renderer?.dispose()
-    const nextRenderer = new Canvas2DRenderer()
-    renderer = nextRenderer
-    await nextRenderer.initialize({
-      scene: scene.value,
-      overlay: overlay.value!,
-      dpr: window.devicePixelRatio || 1,
-      correlationId: 'editor-viewport',
-    })
-    if (generation !== rendererGeneration || renderer !== nextRenderer) return
-    await nextRenderer.createImageResource({
-      id: layer.payload.blobHash,
-      width: props.image.naturalWidth,
-      height: props.image.naturalHeight,
-      source: props.image,
-    })
-    nextRenderer.setScene(createDocumentRenderScene(props.document))
-    nextRenderer.render(['scene'])
+    const runtime = await ensureRenderer()
+    if (!runtime) return
+    const imageKey = `${layer.payload.blobHash}:${props.image.currentSrc || props.image.src}`
+    if (activeImageKey !== imageKey) {
+      imageResource?.dispose()
+      imageResource = await runtime.createImageResource({
+        id: layer.payload.blobHash,
+        width: props.image.naturalWidth,
+        height: props.image.naturalHeight,
+        source: props.image,
+      })
+      activeImageKey = imageKey
+    }
+    runtime.setScene(createDocumentRenderScene(props.document))
+    runtime.render(['scene'])
   } catch (error) {
     renderer?.dispose()
     renderer = undefined
+    imageResource = undefined
+    activeImageKey = undefined
     rendererError.value = error instanceof Error ? error.message : String(error)
   }
-  drawOverlay()
+  invalidateOverlay()
 }
 function fitCanvas(): void {
   const container = scrollContainer.value
@@ -438,6 +451,11 @@ function drawOverlay(): void {
     context.restore()
   }
 }
+function invalidateOverlay(): void {
+  // Interaction state is non-reactive; only the lightweight overlay updates
+  // during pointer movement, never the committed scene or Vue tree.
+  drawOverlay()
+}
 onMounted(() => {
   if (scene.value && overlay.value && scrollContainer.value)
     emit('hostsReady', {
@@ -453,14 +471,12 @@ onMounted(() => {
   void nextTick(fitCanvas)
 })
 watch(
-  () => [
-    props.canvas,
-    props.image,
-    props.imageLayer,
-    props.selectedLayerId,
-    props.document,
-  ],
+  () => [props.canvas, props.image, props.imageLayer, props.document],
   () => void drawDocument(),
+)
+watch(
+  () => [props.selectedLayerId, props.selectedLayerIds],
+  () => invalidateOverlay(),
 )
 watch(
   () => [props.canvas, props.fitMode],
@@ -693,7 +709,7 @@ function onPointerMove(event: PointerEvent): void {
       guides: result.guides,
       guidesVisible: event.altKey,
     }
-    drawOverlay()
+    invalidateOverlay()
     return
   }
   if (gesture.kind === 'resize') {
@@ -703,7 +719,7 @@ function onPointerMove(event: PointerEvent): void {
       freeResize: event.shiftKey,
       centerResize: event.altKey,
     }
-    drawOverlay()
+    invalidateOverlay()
     return
   }
   if (gesture.kind === 'rotate') {
@@ -715,7 +731,7 @@ function onPointerMove(event: PointerEvent): void {
       gesture.initial.rotation + ((angle - gesture.startAngle) * 180) / Math.PI
     if (event.shiftKey) rotation = Math.round(rotation / 15) * 15
     gesture = { ...gesture, currentAngle: rotation }
-    drawOverlay()
+    invalidateOverlay()
   }
 }
 function finishGesture(event: PointerEvent): void {
@@ -759,7 +775,7 @@ function finishGesture(event: PointerEvent): void {
       rotation: completed.currentAngle,
     })
   }
-  drawOverlay()
+  invalidateOverlay()
 }
 function onWheel(event: WheelEvent): void {
   if (!event.ctrlKey && !event.metaKey) return
@@ -788,13 +804,13 @@ function onWindowKeyup(event: KeyboardEvent): void {
   if (event.code === 'Space') spacePressed = false
   if (event.key === 'Alt' && gesture?.kind === 'move') {
     gesture = { ...gesture, guidesVisible: false }
-    drawOverlay()
+    invalidateOverlay()
   }
 }
 function onWindowBlur(): void {
   spacePressed = false
   gesture = undefined
-  drawOverlay()
+  invalidateOverlay()
 }
 onMounted(() => {
   window.addEventListener('keydown', onWindowKeydown)
@@ -804,6 +820,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
   resizeObserver?.disconnect()
   resizeObserver = undefined
+  imageResource?.dispose()
+  imageResource = undefined
   renderer?.dispose()
   renderer = undefined
   window.removeEventListener('keydown', onWindowKeydown)

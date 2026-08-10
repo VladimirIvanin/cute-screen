@@ -61,9 +61,14 @@ export class DocumentSpatialIndex {
         })
         .map((item) => item.layerId),
     )
-    return hitTestDocumentAll(this.#document, canvasPoint).filter((hit) =>
-      candidateIds.has(hit.nodeId),
-    )
+    const hits: HitTestResult[] = []
+    for (let index = this.#document.layers.length - 1; index >= 0; index -= 1) {
+      const layer = this.#document.layers[index]
+      if (!layer || !candidateIds.has(layer.id)) continue
+      const hit = hitLayer(layer, canvasPoint, index)
+      if (hit) hits.push(hit)
+    }
+    return Object.freeze(hits)
   }
 
   #insertAll(document: EditorDocumentV1): void {
@@ -107,24 +112,8 @@ export function hitTestDocument(
   for (let index = document.layers.length - 1; index >= 0; index -= 1) {
     const layer = document.layers[index]
     if (!layer || !layer.visible || layer.locked) continue
-    const bounds = layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
-    const local = transformPoint(
-      invertMatrix(transformToMatrix(layer.transform)),
-      canvasPoint,
-    )
-    if (
-      local.x >= bounds.x &&
-      local.x <= bounds.x + bounds.width &&
-      local.y >= bounds.y &&
-      local.y <= bounds.y + bounds.height
-    ) {
-      return Object.freeze({
-        nodeId: layer.id,
-        part: 'fill',
-        distance: 0,
-        zOrder: index,
-      })
-    }
+    const hit = hitLayer(layer, canvasPoint, index)
+    if (hit) return hit
   }
   return undefined
 }
@@ -138,26 +127,34 @@ export function hitTestDocumentAll(
   for (let index = document.layers.length - 1; index >= 0; index -= 1) {
     const layer = document.layers[index]
     if (!layer || !layer.visible || layer.locked) continue
-    const bounds = layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
-    const local = transformPoint(
-      invertMatrix(transformToMatrix(layer.transform)),
-      canvasPoint,
-    )
-    if (
-      local.x >= bounds.x &&
-      local.x <= bounds.x + bounds.width &&
-      local.y >= bounds.y &&
-      local.y <= bounds.y + bounds.height
-    ) {
-      hits.push(
-        Object.freeze({
-          nodeId: layer.id,
-          part: 'fill',
-          distance: 0,
-          zOrder: index,
-        }),
-      )
-    }
+    const hit = hitLayer(layer, canvasPoint, index)
+    if (hit) hits.push(hit)
   }
   return Object.freeze(hits)
+}
+
+function hitLayer(
+  layer: EditorDocumentV1['layers'][number],
+  canvasPoint: Point,
+  zOrder: number,
+): HitTestResult | undefined {
+  const bounds = layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
+  const local = transformPoint(
+    invertMatrix(transformToMatrix(layer.transform)),
+    canvasPoint,
+  )
+  if (
+    local.x < bounds.x ||
+    local.x > bounds.x + bounds.width ||
+    local.y < bounds.y ||
+    local.y > bounds.y + bounds.height
+  ) {
+    return undefined
+  }
+  return Object.freeze({
+    nodeId: layer.id,
+    part: 'fill',
+    distance: 0,
+    zOrder,
+  })
 }

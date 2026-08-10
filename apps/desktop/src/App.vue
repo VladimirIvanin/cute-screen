@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, shallowRef } from 'vue'
+import {
+  computed,
+  defineAsyncComponent,
+  onBeforeUnmount,
+  onMounted,
+  shallowRef,
+} from 'vue'
 import {
   DocumentSessionController,
   DocumentSessionCoordinator,
@@ -43,6 +49,13 @@ const m04CaptureHarness =
 const m05Harness =
   import.meta.env.VITE_TEST_HARNESS === 'true' &&
   new URLSearchParams(window.location.search).get('m05') === '1'
+const m05ReferencePerfHarness =
+  import.meta.env.VITE_TEST_HARNESS === 'true' &&
+  new URLSearchParams(window.location.search).get('m05perf') === '1'
+const M05ReferencePerformance =
+  import.meta.env.VITE_TEST_HARNESS === 'true'
+    ? defineAsyncComponent(() => import('./M05ReferencePerformance.vue'))
+    : undefined
 
 const testActions: ShellActionAdapter | undefined =
   import.meta.env.VITE_TEST_HARNESS === 'true' && !m04CaptureHarness
@@ -519,6 +532,7 @@ async function installLifecycleGuards(): Promise<void> {
 
 onMounted(() => {
   void (async () => {
+    if (m05ReferencePerfHarness) return
     if (m05Harness) {
       try {
         await mountM05HarnessDocument()
@@ -552,7 +566,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+  <component
+    :is="M05ReferencePerformance"
+    v-if="m05ReferencePerfHarness && M05ReferencePerformance"
+  />
   <EditorShell
+    v-else
     :fixture="fixture"
     :initial-document-state="initialDocumentState"
     :read-only-document="readOnlyDocument"
