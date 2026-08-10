@@ -5,7 +5,10 @@ defineProps<{
   schema?: ContextToolbarSchema | undefined
   label: string
 }>()
-const emit = defineEmits<{ action: [id: string] }>()
+const emit = defineEmits<{
+  action: [id: string]
+  change: [id: string, value: string]
+}>()
 </script>
 
 <template>
@@ -25,7 +28,61 @@ const emit = defineEmits<{ action: [id: string] }>()
         >
           {{ control.label }}
         </button>
-        <span v-else class="cs-context-control">{{ control.label }}</span>
+        <label v-else-if="control.kind === 'color'" class="cs-context-control">
+          <span>{{ control.label }}</span>
+          <input
+            type="color"
+            :value="control.value"
+            :aria-label="control.label"
+            @input="
+              emit(
+                'change',
+                control.id,
+                ($event.target as HTMLInputElement).value,
+              )
+            "
+          />
+        </label>
+        <label v-else-if="control.kind === 'range'" class="cs-context-control">
+          <span>{{ control.label }}</span>
+          <input
+            type="range"
+            :value="control.value"
+            :min="control.min"
+            :max="control.max"
+            :step="control.step"
+            :aria-label="control.label"
+            @change="
+              emit(
+                'change',
+                control.id,
+                ($event.target as HTMLInputElement).value,
+              )
+            "
+          />
+        </label>
+        <label v-else-if="control.kind === 'select'" class="cs-context-control">
+          <span>{{ control.label }}</span>
+          <select
+            :value="control.value"
+            :aria-label="control.label"
+            @change="
+              emit(
+                'change',
+                control.id,
+                ($event.target as HTMLSelectElement).value,
+              )
+            "
+          >
+            <option
+              v-for="option in control.options"
+              :key="option.value"
+              :value="option.value"
+            >
+              {{ option.label }}
+            </option>
+          </select>
+        </label>
       </template>
     </div>
   </section>

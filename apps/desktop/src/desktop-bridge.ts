@@ -10,6 +10,8 @@ import type {
   ShortcutBindingResult,
   ShortcutSpec,
   StagedImageMetadata,
+  TextureFillBridge,
+  TextureImportOutcome,
 } from '@cute-screen/editor-vue'
 
 export interface PingResponse {
@@ -17,7 +19,7 @@ export interface PingResponse {
   readonly protocolVersion: 1
 }
 
-export interface DesktopBridge extends ImageTransportBridge {
+export interface DesktopBridge extends ImageTransportBridge, TextureFillBridge {
   ping(): Promise<PingResponse>
   platformCapabilities(correlationId: string): Promise<PlatformCapabilities>
   captureRequest(request: CaptureRequestV1): Promise<CaptureOutcomeV1>
@@ -51,6 +53,11 @@ export interface DesktopBridge extends ImageTransportBridge {
     documentId: string,
     correlationId: string,
   ): Promise<RecoveryExportOutcome>
+  repositoryImportTexture(correlationId: string): Promise<TextureImportOutcome>
+  repositoryResolveTexture(
+    blobHash: string,
+    correlationId: string,
+  ): Promise<TextureImportOutcome>
   lifecycleCompleteMainWindowClose(): Promise<void>
   lifecycleFinishQuit(): Promise<void>
   settingsGet(key: string, correlationId: string): Promise<string | null>
@@ -128,6 +135,24 @@ export const tauriDesktopBridge: DesktopBridge = {
   repositoryExportRecoveryBundle: (documentId, correlationId) =>
     invoke<RecoveryExportOutcome>('repository_export_recovery_bundle', {
       documentId,
+      correlationId,
+    }),
+  importTexture: (correlationId) =>
+    invoke<TextureImportOutcome>('repository_import_texture', {
+      correlationId,
+    }),
+  resolveTexture: (blobHash, correlationId) =>
+    invoke<TextureImportOutcome>('repository_resolve_texture', {
+      blobHash,
+      correlationId,
+    }),
+  repositoryImportTexture: (correlationId) =>
+    invoke<TextureImportOutcome>('repository_import_texture', {
+      correlationId,
+    }),
+  repositoryResolveTexture: (blobHash, correlationId) =>
+    invoke<TextureImportOutcome>('repository_resolve_texture', {
+      blobHash,
       correlationId,
     }),
   lifecycleCompleteMainWindowClose: () =>

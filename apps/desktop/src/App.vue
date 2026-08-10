@@ -21,6 +21,7 @@ import {
   type PlatformCapabilities,
   type ShellActionAdapter,
   type ShellDocumentState,
+  type TextureFillBridge,
 } from '@cute-screen/editor-vue'
 
 declare global {
@@ -155,6 +156,7 @@ const platformCapabilities = shallowRef<PlatformCapabilities>()
 const captureProgress = shallowRef<CaptureProgressState>()
 const seriesFrames = shallowRef<readonly FrameSummary[]>([])
 const sourceImage = shallowRef<HTMLImageElement>()
+const textureBridge = shallowRef<TextureFillBridge>()
 let capturedDocumentMount: Promise<boolean> | undefined
 const documentState = shallowRef<ShellDocumentState>({ kind: 'loading' })
 const readOnlyDocument = shallowRef(false)
@@ -546,6 +548,10 @@ async function installLifecycleGuards(): Promise<void> {
 
 onMounted(() => {
   void (async () => {
+    if ('__TAURI_INTERNALS__' in window) {
+      const { tauriDesktopBridge } = await import('./desktop-bridge')
+      textureBridge.value = tauriDesktopBridge
+    }
     if (m05ReferencePerfHarness) return
     if (m05Harness) {
       try {
@@ -596,6 +602,7 @@ onBeforeUnmount(() => {
     :capture-progress="captureProgress"
     :frames="seriesFrames"
     :source-image="sourceImage"
+    :texture-bridge="textureBridge"
     @retry-load="loadPersistedDocument"
   />
 </template>

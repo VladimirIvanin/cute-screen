@@ -46,9 +46,31 @@ export interface FrameSummary {
 
 export type ContextControl =
   | { readonly kind: 'action'; readonly id: string; readonly label: string }
-  | { readonly kind: 'color'; readonly id: string; readonly label: string }
-  | { readonly kind: 'range'; readonly id: string; readonly label: string }
-  | { readonly kind: 'select'; readonly id: string; readonly label: string }
+  | {
+      readonly kind: 'color'
+      readonly id: string
+      readonly label: string
+      readonly value: string
+    }
+  | {
+      readonly kind: 'range'
+      readonly id: string
+      readonly label: string
+      readonly value: number
+      readonly min: number
+      readonly max: number
+      readonly step: number
+    }
+  | {
+      readonly kind: 'select'
+      readonly id: string
+      readonly label: string
+      readonly value: string
+      readonly options: readonly Readonly<{
+        readonly value: string
+        readonly label: string
+      }>[]
+    }
 
 export interface ContextToolbarSchema {
   readonly icon: IconName

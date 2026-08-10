@@ -23,11 +23,27 @@ const layer: LayerNode = {
   opacity: 1,
   visible: true,
   locked: false,
-  payload: { shape: 'rectangle', nested: { value: 'immutable' } },
+  blendMode: 'normal',
+  shadows: [],
+  payload: {
+    shape: 'rectangle',
+    fill: { kind: 'none' },
+    stroke: {
+      color: { red: 0.898, green: 0.282, blue: 0.302, alpha: 1 },
+      width: 3,
+      style: 'solid',
+      cap: 'round',
+      join: 'round',
+    },
+    cornerRadius: 0,
+    starPoints: 5,
+    starInnerRatio: 0.45,
+    nested: { value: 'immutable' },
+  },
 }
 
 const document: EditorDocumentV1 = {
-  schemaVersion: 1,
+  schemaVersion: 3,
   id: '019c1f62-058e-7000-8000-000000000000',
   source: {
     blobHash: 'a'.repeat(64),
@@ -111,6 +127,21 @@ describe('editor document codec', () => {
     )
   })
 
+  it('rejects malformed M06 paint payloads before persistence', () => {
+    const raw = JSON.parse(serializeEditorDocument(document)) as {
+      layers: Array<{ payload: Record<string, unknown> }>
+    }
+    raw.layers[0]!.payload.fill = {
+      kind: 'linearGradient',
+      stops: [{ position: 0, color: { red: 0, green: 0, blue: 0, alpha: 1 } }],
+      start: { x: 0, y: 0 },
+      end: { x: 1, y: 1 },
+      opacity: 1,
+    }
+
+    expect(() => parseEditorDocument(JSON.stringify(raw))).toThrow(/stops/u)
+  })
+
   it('round-trips valid crop values', () => {
     fc.assert(
       fc.property(
@@ -156,7 +187,7 @@ describe('editor document codec', () => {
     expect(
       JSON.parse(serializeEditorDocument(migrated.document)),
     ).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       layers: [
         {
           kind: 'image',
@@ -173,15 +204,15 @@ describe('editor document codec', () => {
     expect(
       JSON.parse(serializeEditorDocument(futureFields.document)),
     ).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       futureDocumentField: { preserved: true },
     })
 
     expect(
-      parseEditorDocument(JSON.stringify({ schemaVersion: 3 })),
+      parseEditorDocument(JSON.stringify({ schemaVersion: 4 })),
     ).toMatchObject({
       kind: 'readOnly',
-      schemaVersion: 3,
+      schemaVersion: 4,
     })
   })
 })

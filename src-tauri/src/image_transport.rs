@@ -142,6 +142,34 @@ impl ImageTransportService {
         Ok(())
     }
 
+    /// Registers a repository-authorized immutable resource such as a texture
+    /// fill. The caller has already resolved the content-addressed blob; the
+    /// webview still receives only the opaque token.
+    pub fn register_authoritative_blob(
+        &self,
+        token: impl Into<String>,
+        source: crate::storage::AuthorizedBlobSource,
+    ) -> Result<(), PlatformError> {
+        let token = token.into();
+        validate_token(&token, "registration")?;
+        let canonical = source
+            .path
+            .canonicalize()
+            .map_err(|_| transport_error(PlatformErrorCode::InvalidUri, "registration"))?;
+        let image = RegisteredImage {
+            source: canonical,
+            mime_type: source.metadata.mime_type,
+            width: source.metadata.width,
+            height: source.metadata.height,
+            authoritative: true,
+        };
+        self.images
+            .write()
+            .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, "registration"))?
+            .insert(token, image);
+        Ok(())
+    }
+
     /// Copies a path returned by trusted native code into the service-owned
     /// library before exposing an opaque token to the frontend.
     pub fn import_owned_image(

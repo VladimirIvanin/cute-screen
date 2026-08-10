@@ -22,6 +22,12 @@ export {
   type ObjectUrlLifecycle,
   type StagedImageMetadata,
 } from './image-transport'
+export {
+  TextureResourceResolver,
+  type TextureFillBridge,
+  type TextureImportOutcome,
+  type TextureResourceState,
+} from './texture-fill'
 
 export type {
   CaptureResult,

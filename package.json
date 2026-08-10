@@ -12,7 +12,7 @@
   "scripts": {
     "preinstall": "node scripts/verify-toolchain.mjs",
     "dev": "vite --config apps/desktop/vite.config.ts",
-    "dev:e2e:browser": "vite --mode e2e --config apps/desktop/vite.config.ts",
+    "dev:e2e:browser": "VITE_TEST_HARNESS=true vite --mode e2e --config apps/desktop/vite.config.ts",
     "build": "pnpm build:packages && vite build --config apps/desktop/vite.config.ts",
     "build:packages": "vue-tsc -b packages/editor-core packages/editor-renderer && pnpm --filter @cute-screen/editor-vue build",
     "tauri": "tauri",

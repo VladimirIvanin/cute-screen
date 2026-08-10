@@ -9,6 +9,48 @@ function asHtmlCanvas(canvas: unknown): HTMLCanvasElement {
 }
 
 describe('Canvas2DRenderer', () => {
+  it('strokes a marker contour as one continuous path', async () => {
+    const renderer = new Canvas2DRenderer()
+    const sceneCanvas = createCanvas(64, 64)
+    const overlayCanvas = createCanvas(64, 64)
+    await renderer.initialize({
+      scene: asHtmlCanvas(sceneCanvas),
+      overlay: asHtmlCanvas(overlayCanvas),
+      dpr: 1,
+      correlationId: 'marker-path',
+    })
+    renderer.setScene(
+      createRenderSceneSnapshot({
+        width: 64,
+        height: 64,
+        nodes: [
+          {
+            kind: 'path',
+            id: 'marker',
+            points: [
+              { x: 8, y: 8 },
+              { x: 32, y: 40 },
+              { x: 56, y: 8 },
+            ],
+            rotation: 0,
+            opacity: 1,
+            visible: true,
+            blendMode: 'multiply',
+            stroke: { red: 1, green: 0.8, blue: 0, alpha: 1 },
+            strokeWidth: 12,
+            lineCap: 'round',
+            lineJoin: 'round',
+          },
+        ],
+      }),
+    )
+
+    renderer.render(['scene'])
+    expect(
+      sceneCanvas.getContext('2d')?.getImageData(32, 40, 1, 1).data[3],
+    ).toBeGreaterThan(0)
+  })
+
   it('renders and exports binary PNG without a continuous loop', async () => {
     let time = 10
     const renderer = new Canvas2DRenderer({
@@ -145,5 +187,111 @@ describe('Canvas2DRenderer', () => {
     renderer.render(['scene'])
     const pixel = sceneCanvas.getContext('2d')?.getImageData(28, 28, 1, 1).data
     expect(pixel?.[0]).toBeGreaterThan(0)
+  })
+
+  it('renders renderer-neutral linear gradients in exported output', async () => {
+    const renderer = new Canvas2DRenderer({
+      exportCanvas: (width, height) =>
+        createCanvas(width, height) as unknown as Canvas2DLike,
+    })
+    const sceneCanvas = createCanvas(32, 8)
+    const overlayCanvas = createCanvas(32, 8)
+    await renderer.initialize({
+      scene: asHtmlCanvas(sceneCanvas),
+      overlay: asHtmlCanvas(overlayCanvas),
+      dpr: 1,
+      correlationId: 'gradient',
+    })
+    renderer.setScene(
+      createRenderSceneSnapshot({
+        width: 32,
+        height: 8,
+        nodes: [
+          {
+            kind: 'rect',
+            id: 'gradient',
+            x: 0,
+            y: 0,
+            width: 32,
+            height: 8,
+            rotation: 0,
+            opacity: 1,
+            visible: true,
+            blendMode: 'normal',
+            fill: {
+              kind: 'linearGradient',
+              startX: 0,
+              startY: 0,
+              endX: 32,
+              endY: 0,
+              stops: [
+                { position: 0, color: { red: 1, green: 0, blue: 0, alpha: 1 } },
+                { position: 1, color: { red: 0, green: 0, blue: 1, alpha: 1 } },
+              ],
+            },
+          },
+        ],
+      }),
+    )
+    renderer.render(['scene'])
+    const context = sceneCanvas.getContext('2d')!
+    expect(context.getImageData(2, 4, 1, 1).data[0] ?? 0).toBeGreaterThan(
+      context.getImageData(2, 4, 1, 1).data[2] ?? 0,
+    )
+    expect(context.getImageData(29, 4, 1, 1).data[2] ?? 0).toBeGreaterThan(
+      context.getImageData(29, 4, 1, 1).data[0] ?? 0,
+    )
+  })
+
+  it('uses a registered immutable resource for an image texture fill', async () => {
+    const renderer = new Canvas2DRenderer()
+    const sceneCanvas = createCanvas(16, 16)
+    const overlayCanvas = createCanvas(16, 16)
+    const texture = createCanvas(2, 2)
+    texture.getContext('2d').fillStyle = '#00ff00'
+    texture.getContext('2d').fillRect(0, 0, 2, 2)
+    await renderer.initialize({
+      scene: asHtmlCanvas(sceneCanvas),
+      overlay: asHtmlCanvas(overlayCanvas),
+      dpr: 1,
+      correlationId: 'image-texture',
+    })
+    await renderer.createImageResource({
+      id: 'texture',
+      width: 2,
+      height: 2,
+      source: texture as unknown as HTMLImageElement,
+    })
+    renderer.setScene(
+      createRenderSceneSnapshot({
+        width: 16,
+        height: 16,
+        nodes: [
+          {
+            kind: 'rect',
+            id: 'texture-shape',
+            x: 0,
+            y: 0,
+            width: 16,
+            height: 16,
+            rotation: 0,
+            opacity: 1,
+            visible: true,
+            fill: {
+              kind: 'imageTexture',
+              resourceId: 'texture',
+              opacity: 1,
+              scale: 1,
+              rotation: 0,
+              offsetX: 0,
+              offsetY: 0,
+            },
+          },
+        ],
+      }),
+    )
+    renderer.render(['scene'])
+    const pixel = sceneCanvas.getContext('2d')?.getImageData(8, 8, 1, 1).data
+    expect(pixel?.[1]).toBeGreaterThan(200)
   })
 })

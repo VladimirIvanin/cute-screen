@@ -49,7 +49,9 @@ beforeEach(() => {
     arc: vi.fn(),
     beginPath: vi.fn(),
     clearRect: vi.fn(),
+    closePath: vi.fn(),
     drawImage: vi.fn(),
+    ellipse: vi.fn(),
     fill: vi.fn(),
     fillRect: vi.fn(),
     lineTo: vi.fn(),
@@ -65,13 +67,18 @@ beforeEach(() => {
   } as unknown as CanvasRenderingContext2D)
 })
 
-function mountViewport() {
+function mountViewport(
+  activeTool?: string,
+  viewportDocument: EditorDocumentV1 = document,
+  selectedLayerId = 'shape',
+) {
   const rendered = render(CanvasViewport, {
     props: {
       documentState: { kind: 'ready', title: 'Test', dimensions: '100 × 100' },
-      canvas: document.canvas,
-      document,
-      selectedLayerId: 'shape',
+      canvas: viewportDocument.canvas,
+      document: viewportDocument,
+      selectedLayerId,
+      activeTool,
       zoom: 100,
       fitMode: true,
       t: (key) => key,
@@ -192,6 +199,122 @@ describe('M05 CanvasViewport transforms', () => {
 
     expect(emitted().transformLayer).toEqual([
       ['shape', expect.objectContaining({ rotation: 90 })],
+    ])
+  })
+
+  it('keeps drawing drafts transient and commits each pointer create once', async () => {
+    vi.stubGlobal('crypto', {
+      randomUUID: vi.fn(() => '019c1f62-058e-7000-8000-000000000099'),
+    })
+    const { scene, emitted } = mountViewport('arrow')
+
+    await fireEvent.pointerDown(scene, { pointerId: 1, clientX: 5, clientY: 5 })
+    await fireEvent.pointerMove(scene, {
+      pointerId: 1,
+      clientX: 25,
+      clientY: 5,
+    })
+    expect(emitted().addLayer).toBeUndefined()
+    await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 25, clientY: 5 })
+    await fireEvent.pointerDown(scene, {
+      pointerId: 2,
+      clientX: 5,
+      clientY: 10,
+    })
+    await fireEvent.pointerMove(scene, {
+      pointerId: 2,
+      clientX: 25,
+      clientY: 10,
+    })
+    await fireEvent.pointerUp(scene, { pointerId: 2, clientX: 25, clientY: 10 })
+
+    const addLayer = emitted().addLayer as unknown as
+      readonly [unknown][] | undefined
+    expect(addLayer).toHaveLength(2)
+    expect(addLayer?.[0]?.[0]).toMatchObject({
+      kind: 'arrow',
+      blendMode: 'normal',
+    })
+    vi.unstubAllGlobals()
+  })
+
+  it('does not commit a cancelled drawing draft', async () => {
+    const { scene, emitted } = mountViewport('marker')
+    await fireEvent.pointerDown(scene, { pointerId: 1, clientX: 5, clientY: 5 })
+    await fireEvent.pointerMove(scene, {
+      pointerId: 1,
+      clientX: 25,
+      clientY: 5,
+    })
+    await fireEvent.pointerCancel(scene, { pointerId: 1 })
+
+    expect(emitted().addLayer).toBeUndefined()
+  })
+
+  it('returns to Select on Escape after an already-cancelled drawing draft', async () => {
+    const { emitted } = mountViewport('shape')
+    await fireEvent.keyDown(window, { key: 'Escape' })
+
+    expect(emitted().selectTool).toEqual([['select']])
+  })
+
+  it('commits one arrow anchor payload update on handle release', async () => {
+    const arrowDocument: EditorDocumentV1 = {
+      ...document,
+      layers: [
+        {
+          id: 'arrow',
+          kind: 'arrow',
+          localBounds: { x: 0, y: 0, width: 20, height: 10 },
+          transform: {
+            translateX: 10,
+            translateY: 10,
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+          },
+          opacity: 1,
+          visible: true,
+          locked: false,
+          payload: {
+            path: 'straight',
+            start: { x: 0, y: 0 },
+            end: { x: 20, y: 10 },
+            startCap: 'none',
+            endCap: 'triangle',
+            stroke: {
+              color: { red: 1, green: 0, blue: 0, alpha: 1 },
+              width: 2,
+              style: 'solid',
+              cap: 'round',
+              join: 'round',
+            },
+          },
+        },
+      ],
+    }
+    const { scene, emitted } = mountViewport(undefined, arrowDocument, 'arrow')
+    await fireEvent.pointerDown(scene, {
+      pointerId: 1,
+      clientX: 10,
+      clientY: 10,
+    })
+    await fireEvent.pointerMove(scene, {
+      pointerId: 1,
+      clientX: 15,
+      clientY: 15,
+    })
+    expect(emitted().updateLayerPayload).toBeUndefined()
+    await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 15, clientY: 15 })
+
+    const update = emitted().updateLayerPayload as unknown as
+      | readonly [
+          string,
+          { readonly start: { readonly x: number; readonly y: number } },
+        ][]
+      | undefined
+    expect(update).toEqual([
+      ['arrow', expect.objectContaining({ start: { x: 5, y: 5 } })],
     ])
   })
 })

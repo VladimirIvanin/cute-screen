@@ -564,7 +564,7 @@ fn initial_document_json(
         &source_hash[20..32],
     );
     serde_json::json!({
-        "schemaVersion": 2,
+        "schemaVersion": 3,
         "id": document_id,
         "source": {
             "blobHash": source_hash,
@@ -585,6 +585,8 @@ fn initial_document_json(
             "opacity": 1,
             "visible": true,
             "locked": true,
+            "blendMode": "normal",
+            "shadows": [],
             "payload": {
                 "blobHash": source_hash,
                 "intrinsicWidth": source.width,
@@ -746,7 +748,7 @@ mod tests {
     }
 
     #[test]
-    fn initial_document_factory_creates_the_v2_locked_base_layer() {
+    fn initial_document_factory_creates_the_v3_locked_base_layer() {
         let metadata = BlobMetadata {
             format: "png".to_owned(),
             mime_type: "image/png".to_owned(),
@@ -764,7 +766,7 @@ mod tests {
             "2026-08-09T00:00:00.000Z".to_owned(),
         ))
         .expect("factory JSON");
-        assert_eq!(actual["schemaVersion"], 2);
+        assert_eq!(actual["schemaVersion"], 3);
         assert_eq!(actual["layers"].as_array().map(Vec::len), Some(1));
         let base = &actual["layers"][0];
         assert_eq!(base["kind"], "image");
@@ -885,7 +887,7 @@ mod tests {
         let document_value: serde_json::Value =
             serde_json::from_str(&persisted.document_json).expect("initial document JSON");
         assert_eq!(persisted.document_id, document.document_id);
-        assert_eq!(document_value["schemaVersion"], 2);
+        assert_eq!(document_value["schemaVersion"], 3);
         assert_eq!(document_value["source"]["blobHash"], document.source_hash);
         assert_eq!(document_value["canvas"]["width"], 1);
     }

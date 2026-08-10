@@ -5,6 +5,7 @@ import type { CanvasViewportHosts, ShellDocumentState } from '../types'
 import {
   Canvas2DRenderer,
   createDocumentRenderScene,
+  drawNodes2D,
   hitTestDocument,
   hitTestDocumentAll,
   snapPoint,
@@ -14,17 +15,22 @@ import {
   type SnapCandidate,
   type Transform2D,
   type ImageResource,
+  createDrawingLayer,
+  type DrawingDefaults,
+  type DrawingTool,
 } from '@cute-screen/editor-renderer'
 
 const props = defineProps<{
   documentState: ShellDocumentState
   canvas?: { readonly width: number; readonly height: number } | undefined
   image?: HTMLImageElement | undefined
+  textureImages?: ReadonlyMap<string, HTMLImageElement> | undefined
   imageLayer?: ImageLayer | undefined
   document?: EditorDocumentV1 | undefined
   selectedLayerId?: string | undefined
   selectedLayerIds?: readonly string[] | undefined
   activeTool?: string | undefined
+  drawingDefaults?: DrawingDefaults | undefined
   zoom?: number | undefined
   fitMode?: boolean | undefined
   t: (
@@ -43,6 +49,12 @@ const emit = defineEmits<{
   selectLayer: [id: string, toggle: boolean]
   moveLayer: [id: string, deltaX: number, deltaY: number]
   transformLayer: [id: string, transform: Transform2D]
+  updateLayerPayload: [
+    id: string,
+    payload: import('@cute-screen/editor-renderer').JsonObject,
+  ]
+  addLayer: [layer: LayerNode]
+  selectTool: [id: 'select']
   zoom: [value: number]
   fitZoom: [value: number]
   retry: []
@@ -52,8 +64,10 @@ const overlay = ref<HTMLCanvasElement>()
 const scrollContainer = ref<HTMLDivElement>()
 const rendererError = ref<string>()
 let renderer: Canvas2DRenderer | undefined
-let imageResource: ImageResource | undefined
-let activeImageKey: string | undefined
+let imageResources = new Map<
+  string,
+  { readonly key: string; readonly resource: ImageResource }
+>()
 let resizeObserver: ResizeObserver | undefined
 let lastFitZoom: number | undefined
 let pendingZoomAnchor:
@@ -101,10 +115,29 @@ let gesture:
       readonly initial: Transform2D
       readonly currentAngle: number
     }
+  | {
+      readonly kind: 'arrowHandle'
+      readonly id: string
+      readonly handle: 'start' | 'end' | 'bend'
+      readonly current: { x: number; y: number }
+    }
+  | {
+      readonly kind: 'draw'
+      readonly tool: DrawingTool
+      readonly start: CanvasPoint
+      readonly current: CanvasPoint
+      readonly constrainAngle: boolean
+      readonly drawFromCenter: boolean
+      readonly points: readonly CanvasPoint[]
+    }
   | undefined
 
 type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w'
-type CanvasPoint = { readonly x: number; readonly y: number }
+type CanvasPoint = {
+  readonly x: number
+  readonly y: number
+  readonly pressure?: number
+}
 async function ensureRenderer(): Promise<Canvas2DRenderer | undefined> {
   if (!scene.value || !overlay.value || !props.canvas) return undefined
   if (renderer) return renderer
@@ -137,24 +170,33 @@ async function drawDocument(): Promise<void> {
   try {
     const runtime = await ensureRenderer()
     if (!runtime) return
-    const imageKey = `${layer.payload.blobHash}:${props.image.currentSrc || props.image.src}`
-    if (activeImageKey !== imageKey) {
-      imageResource?.dispose()
-      imageResource = await runtime.createImageResource({
-        id: layer.payload.blobHash,
-        width: props.image.naturalWidth,
-        height: props.image.naturalHeight,
-        source: props.image,
+    const imageInputs = new Map<string, HTMLImageElement>([
+      [layer.payload.blobHash, props.image],
+      ...(props.textureImages ?? new Map()),
+    ])
+    for (const [id, image] of imageInputs) {
+      const key = `${id}:${image.currentSrc || image.src}`
+      if (imageResources.get(id)?.key === key) continue
+      imageResources.get(id)?.resource.dispose()
+      const resource = await runtime.createImageResource({
+        id,
+        width: image.naturalWidth,
+        height: image.naturalHeight,
+        source: image,
       })
-      activeImageKey = imageKey
+      imageResources.set(id, { key, resource })
+    }
+    for (const [id, resource] of imageResources) {
+      if (imageInputs.has(id)) continue
+      resource.resource.dispose()
+      imageResources.delete(id)
     }
     runtime.setScene(createDocumentRenderScene(props.document))
     runtime.render(['scene'])
   } catch (error) {
     renderer?.dispose()
     renderer = undefined
-    imageResource = undefined
-    activeImageKey = undefined
+    imageResources = new Map()
     rendererError.value = error instanceof Error ? error.message : String(error)
   }
   invalidateOverlay()
@@ -353,7 +395,12 @@ function resizeTransform(
   }
 }
 function previewTransform(layer: LayerNode): Transform2D {
-  if (!gesture || gesture.kind === 'pan' || gesture.id !== layer.id) {
+  if (
+    !gesture ||
+    gesture.kind === 'pan' ||
+    gesture.kind === 'draw' ||
+    gesture.id !== layer.id
+  ) {
     return layer.transform
   }
   if (gesture.kind === 'move') {
@@ -379,11 +426,32 @@ function previewTransform(layer: LayerNode): Transform2D {
   }
   return layer.transform
 }
+function drawDraft(context: CanvasRenderingContext2D): void {
+  if (!gesture || gesture.kind !== 'draw') return
+  const layer = createDrawingLayer({
+    id: '__drawing-draft__',
+    tool: gesture.tool,
+    start: gesture.start,
+    end: gesture.current,
+    ...(props.drawingDefaults === undefined
+      ? {}
+      : { defaults: props.drawingDefaults }),
+    constrainAngle: gesture.constrainAngle,
+    drawFromCenter: gesture.drawFromCenter,
+    points: gesture.points,
+  })
+  if (!layer || !props.document) return
+  drawNodes2D(
+    context,
+    createDocumentRenderScene({ ...props.document, layers: [layer] }).nodes,
+  )
+}
 function drawOverlay(): void {
   if (!overlay.value || !props.canvas) return
   const context = overlay.value.getContext('2d')
   if (!context) return
   context.clearRect(0, 0, overlay.value.width, overlay.value.height)
+  drawDraft(context)
   const layer = selectedLayer()
   if (!layer || !layer.visible) return
   const transform = previewTransform(layer)
@@ -426,6 +494,37 @@ function drawOverlay(): void {
       handleHalfSize * 2,
       handleHalfSize * 2,
     )
+  }
+  if (layer.kind === 'arrow') {
+    const payload = layer.payload as Record<string, unknown>
+    const anchors: readonly (readonly [
+      'start' | 'end' | 'bend',
+      CanvasPoint,
+    ])[] = [
+      ['start', payloadPoint(payload.start, { x: 0, y: 0 })],
+      ['end', payloadPoint(payload.end, { x: bounds.width, y: bounds.height })],
+      ...(payload.path === 'quadratic'
+        ? [
+            [
+              'bend',
+              payloadPoint(payload.bend, { x: bounds.width / 2, y: 0 }),
+            ] as const,
+          ]
+        : []),
+    ]
+    for (const [name, saved] of anchors) {
+      const local =
+        gesture?.kind === 'arrowHandle' &&
+        gesture.id === layer.id &&
+        gesture.handle === name
+          ? toLocal(layer, gesture.current)
+          : saved
+      const position = transformPoint(transform, local)
+      context.beginPath()
+      context.arc(position.x, position.y, handleHalfSize + 2, 0, Math.PI * 2)
+      context.fill()
+      context.stroke()
+    }
   }
   const topCenter = transformPoint(transform, {
     x: bounds.x + bounds.width / 2,
@@ -488,7 +587,13 @@ onMounted(() => {
   void nextTick(fitCanvas)
 })
 watch(
-  () => [props.canvas, props.image, props.imageLayer, props.document],
+  () => [
+    props.canvas,
+    props.image,
+    props.imageLayer,
+    props.document,
+    props.textureImages,
+  ],
   () => void drawDocument(),
 )
 watch(
@@ -521,13 +626,31 @@ watch(
 function canvasPoint(event: {
   readonly clientX: number
   readonly clientY: number
-}): { x: number; y: number } | undefined {
+  readonly pressure?: number
+  readonly pointerType?: string
+}): CanvasPoint | undefined {
   if (!scene.value || !props.document) return undefined
   const rect = scene.value.getBoundingClientRect()
   return {
     x: ((event.clientX - rect.left) * scene.value.width) / rect.width,
     y: ((event.clientY - rect.top) * scene.value.height) / rect.height,
+    pressure:
+      event.pointerType === 'pen' &&
+      typeof event.pressure === 'number' &&
+      Number.isFinite(event.pressure)
+        ? Math.max(0, Math.min(1, event.pressure))
+        : 0.5,
   }
+}
+function payloadPoint(value: unknown, fallback: CanvasPoint): CanvasPoint {
+  if (!value || typeof value !== 'object') return fallback
+  const point = value as Record<string, unknown>
+  return typeof point.x === 'number' &&
+    Number.isFinite(point.x) &&
+    typeof point.y === 'number' &&
+    Number.isFinite(point.y)
+    ? { x: point.x, y: point.y }
+    : fallback
 }
 function handleAtPoint(
   layer: LayerNode,
@@ -610,6 +733,32 @@ function handleAtPoint(
     ? 'rotate'
     : undefined
 }
+function arrowHandleAtPoint(
+  layer: LayerNode,
+  point: CanvasPoint,
+): 'start' | 'end' | 'bend' | undefined {
+  if (layer.kind !== 'arrow') return undefined
+  const payload = layer.payload as Record<string, unknown>
+  const bounds = layerBounds(layer)
+  const anchors: readonly (readonly ['start' | 'end' | 'bend', CanvasPoint])[] =
+    [
+      ['start', payloadPoint(payload.start, { x: 0, y: 0 })],
+      ['end', payloadPoint(payload.end, { x: bounds.width, y: bounds.height })],
+      ...(payload.path === 'quadratic'
+        ? [
+            [
+              'bend',
+              payloadPoint(payload.bend, { x: bounds.width / 2, y: 0 }),
+            ] as const,
+          ]
+        : []),
+    ]
+  const tolerance = 9 / ((props.zoom ?? 100) / 100)
+  return anchors.find(([, local]) => {
+    const candidate = transformPoint(layer.transform, local)
+    return Math.hypot(candidate.x - point.x, candidate.y - point.y) <= tolerance
+  })?.[0]
+}
 function onPointerDown(event: PointerEvent): void {
   const point = canvasPoint(event)
   if (!point || !scene.value || !props.document) return
@@ -627,7 +776,41 @@ function onPointerDown(event: PointerEvent): void {
     return
   }
   if (event.button !== 0) return
+  if (
+    props.activeTool === 'arrow' ||
+    props.activeTool === 'shape' ||
+    props.activeTool === 'pencil' ||
+    props.activeTool === 'marker'
+  ) {
+    event.preventDefault()
+    scene.value.setPointerCapture(event.pointerId)
+    gesture = {
+      kind: 'draw',
+      tool: props.activeTool,
+      start: point,
+      current: point,
+      constrainAngle: event.shiftKey,
+      drawFromCenter: event.altKey,
+      points: [point],
+    }
+    invalidateOverlay()
+    return
+  }
   const selected = selectedLayer()
+  const arrowHandle =
+    selected && !selected.locked
+      ? arrowHandleAtPoint(selected, point)
+      : undefined
+  if (selected && arrowHandle) {
+    scene.value.setPointerCapture(event.pointerId)
+    gesture = {
+      kind: 'arrowHandle',
+      id: selected.id,
+      handle: arrowHandle,
+      current: point,
+    }
+    return
+  }
   const handle =
     selected && !selected.locked ? handleAtPoint(selected, point) : undefined
   if (selected && handle) {
@@ -749,6 +932,40 @@ function onPointerMove(event: PointerEvent): void {
     if (event.shiftKey) rotation = Math.round(rotation / 15) * 15
     gesture = { ...gesture, currentAngle: rotation }
     invalidateOverlay()
+    return
+  }
+  if (gesture.kind === 'arrowHandle') {
+    gesture = { ...gesture, current: point }
+    invalidateOverlay()
+    return
+  }
+  if (gesture.kind === 'draw') {
+    const coalesced = event.getCoalescedEvents?.() ?? [event]
+    const samples: CanvasPoint[] = []
+    if (gesture.tool === 'pencil' || gesture.tool === 'marker') {
+      let previous = gesture.points[gesture.points.length - 1]
+      for (const sample of coalesced) {
+        const candidate = canvasPoint(sample)
+        if (
+          candidate &&
+          (!previous ||
+            Math.hypot(candidate.x - previous.x, candidate.y - previous.y) >=
+              0.5)
+        ) {
+          samples.push(candidate)
+          previous = candidate
+        }
+      }
+    }
+    gesture = {
+      ...gesture,
+      current: point,
+      constrainAngle: event.shiftKey,
+      drawFromCenter: event.altKey,
+      points:
+        samples.length > 0 ? [...gesture.points, ...samples] : gesture.points,
+    }
+    invalidateOverlay()
   }
 }
 function finishGesture(event: PointerEvent): void {
@@ -792,6 +1009,39 @@ function finishGesture(event: PointerEvent): void {
       rotation: completed.currentAngle,
     })
   }
+  if (completed?.kind === 'arrowHandle') {
+    const layer = props.document?.layers.find(
+      (candidate) => candidate.id === completed.id,
+    )
+    if (layer?.kind === 'arrow') {
+      emit('updateLayerPayload', completed.id, {
+        ...layer.payload,
+        [completed.handle]: toLocal(layer, completed.current),
+      })
+    }
+  }
+  if (completed?.kind === 'draw') {
+    const layer = createDrawingLayer({
+      id: crypto.randomUUID(),
+      tool: completed.tool,
+      start: completed.start,
+      end: completed.current,
+      ...(props.drawingDefaults === undefined
+        ? {}
+        : { defaults: props.drawingDefaults }),
+      constrainAngle: completed.constrainAngle,
+      drawFromCenter: completed.drawFromCenter,
+      points: completed.points,
+    })
+    if (layer) emit('addLayer', layer)
+  }
+  invalidateOverlay()
+}
+function cancelGesture(event?: PointerEvent): void {
+  gesture = undefined
+  if (event && scene.value?.hasPointerCapture(event.pointerId)) {
+    scene.value.releasePointerCapture(event.pointerId)
+  }
   invalidateOverlay()
 }
 function onWheel(event: WheelEvent): void {
@@ -816,6 +1066,18 @@ function onWindowKeydown(event: KeyboardEvent): void {
   ) {
     spacePressed = true
   }
+  if (event.key === 'Escape') {
+    if (gesture?.kind === 'draw') {
+      cancelGesture()
+    } else if (
+      props.activeTool === 'arrow' ||
+      props.activeTool === 'shape' ||
+      props.activeTool === 'pencil' ||
+      props.activeTool === 'marker'
+    ) {
+      emit('selectTool', 'select')
+    }
+  }
 }
 function onWindowKeyup(event: KeyboardEvent): void {
   if (event.code === 'Space') spacePressed = false
@@ -826,8 +1088,7 @@ function onWindowKeyup(event: KeyboardEvent): void {
 }
 function onWindowBlur(): void {
   spacePressed = false
-  gesture = undefined
-  invalidateOverlay()
+  cancelGesture()
 }
 onMounted(() => {
   window.addEventListener('keydown', onWindowKeydown)
@@ -837,8 +1098,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
   resizeObserver?.disconnect()
   resizeObserver = undefined
-  imageResource?.dispose()
-  imageResource = undefined
+  for (const { resource } of imageResources.values()) resource.dispose()
+  imageResources.clear()
   renderer?.dispose()
   renderer = undefined
   window.removeEventListener('keydown', onWindowKeydown)
@@ -869,8 +1130,8 @@ onBeforeUnmount(() => {
             @pointerdown="onPointerDown"
             @pointermove="onPointerMove"
             @pointerup="finishGesture"
-            @pointercancel="finishGesture"
-            @lostpointercapture="finishGesture"
+            @pointercancel="cancelGesture"
+            @lostpointercapture="cancelGesture"
             @dblclick="onDoubleClick"
             @wheel="onWheel"
           ></canvas>

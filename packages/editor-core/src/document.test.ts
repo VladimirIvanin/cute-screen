@@ -25,11 +25,26 @@ const layer: LayerNode = {
   opacity: 1,
   visible: true,
   locked: false,
-  payload: { shape: 'rectangle', width: 20, height: 10 },
+  blendMode: 'normal',
+  shadows: [],
+  payload: {
+    shape: 'rectangle',
+    fill: { kind: 'none' },
+    stroke: {
+      color: { red: 0.898, green: 0.282, blue: 0.302, alpha: 1 },
+      width: 3,
+      style: 'solid',
+      cap: 'round',
+      join: 'round',
+    },
+    cornerRadius: 0,
+    starPoints: 5,
+    starInnerRatio: 0.45,
+  },
 }
 
 const document: EditorDocumentV1 = {
-  schemaVersion: 1,
+  schemaVersion: 3,
   id: '019c1f62-058e-7000-8000-000000000000',
   source: {
     blobHash: 'a'.repeat(64),
@@ -84,7 +99,7 @@ describe('M03 document core', () => {
       kind: 'editable',
     })
 
-    const future = { ...v0, schemaVersion: 3 }
+    const future = { ...v0, schemaVersion: 4 }
     expect(parseEditorDocument(JSON.stringify(future))).toMatchObject({
       kind: 'readOnly',
       reason: 'newerSchema',

@@ -124,4 +124,44 @@ describe('M05 hit testing', () => {
       'near',
     ])
   })
+
+  it('does not treat a transparent shape interior as a fill hit', () => {
+    const transparent = layer('outline', {
+      payload: {
+        shape: 'rectangle',
+        fill: { kind: 'none' },
+        stroke: { width: 2 },
+      },
+    })
+    expect(
+      hitTestDocument(document([transparent]), { x: 10, y: 10 }),
+    ).toBeUndefined()
+    expect(
+      hitTestDocument(document([transparent]), { x: 0, y: 10 }),
+    ).toMatchObject({
+      nodeId: 'outline',
+      part: 'stroke',
+    })
+  })
+
+  it('uses the actual star polygon instead of its rectangular bounds', () => {
+    const star = layer('star', {
+      localBounds: { x: 0, y: 0, width: 100, height: 100 },
+      payload: {
+        shape: 'star',
+        fill: {
+          kind: 'solid',
+          color: { red: 1, green: 0, blue: 0, alpha: 1 },
+          opacity: 1,
+        },
+        stroke: { width: 2 },
+        starPoints: 5,
+        starInnerRatio: 0.3,
+      },
+    })
+    expect(hitTestDocument(document([star]), { x: 50, y: 45 })).toMatchObject({
+      part: 'fill',
+    })
+    expect(hitTestDocument(document([star]), { x: 4, y: 4 })).toBeUndefined()
+  })
 })

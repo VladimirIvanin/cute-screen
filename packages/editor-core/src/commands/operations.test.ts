@@ -32,13 +32,28 @@ function layer(id: keyof typeof IDS, locked = false): LayerNode {
     opacity: 1,
     visible: true,
     locked,
-    payload: { shape: 'rectangle' },
+    blendMode: 'normal',
+    shadows: [],
+    payload: {
+      shape: 'rectangle',
+      fill: { kind: 'none' },
+      stroke: {
+        color: { red: 0.898, green: 0.282, blue: 0.302, alpha: 1 },
+        width: 3,
+        style: 'solid',
+        cap: 'round',
+        join: 'round',
+      },
+      cornerRadius: 0,
+      starPoints: 5,
+      starInnerRatio: 0.45,
+    },
   }
 }
 
 function document(layers: readonly LayerNode[]): EditorDocumentV1 {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     id: DOCUMENT_ID,
     source: {
       blobHash: 'a'.repeat(64),

@@ -1,6 +1,9 @@
 import type { Point } from './document/types'
 
-export type EditorToolId = 'select' | 'hand'
+/** Tools with a document-changing gesture are intentionally explicit here so
+ * the DOM adapter cannot invent a persisted tool id. */
+export type EditorToolId =
+  'select' | 'hand' | 'arrow' | 'shape' | 'pencil' | 'marker'
 
 export interface InteractionState {
   readonly activeTool: EditorToolId

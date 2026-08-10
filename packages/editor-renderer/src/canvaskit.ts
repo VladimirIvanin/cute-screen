@@ -1,5 +1,6 @@
 import type {
   RenderNode,
+  RenderPaint,
   RenderSceneSnapshot,
   RgbaColor,
 } from '@cute-screen/editor-core'
@@ -32,10 +33,41 @@ interface CanvasKitPaint extends CanvasKitDeletable {
   ): void
   setStyle(style: unknown): void
   setStrokeWidth(width: number): void
+  setStrokeCap(value: unknown): void
+  setStrokeJoin(value: unknown): void
+  setBlendMode(value: unknown): void
+  setShader(shader: CanvasKitShader | null): void
+  setPathEffect(effect: CanvasKitPathEffect | null): void
+}
+
+type CanvasKitShader = CanvasKitDeletable
+type CanvasKitPathEffect = CanvasKitDeletable
+type CanvasKitPath = CanvasKitDeletable
+
+interface CanvasKitPathBuilder extends CanvasKitDeletable {
+  moveTo(x: number, y: number): void
+  lineTo(x: number, y: number): void
+  cubicTo(
+    control1X: number,
+    control1Y: number,
+    control2X: number,
+    control2Y: number,
+    endX: number,
+    endY: number,
+  ): void
+  close(): void
+  detach(): CanvasKitPath
 }
 
 interface CanvasKitImage extends CanvasKitDeletable {
   encodeToBytes(format: unknown): Uint8Array | null
+  makeShaderOptions?(
+    tileX: unknown,
+    tileY: unknown,
+    filter: unknown,
+    mipmap: unknown,
+    matrix?: Float32Array,
+  ): CanvasKitShader | null
 }
 
 interface CanvasKitCanvas {
@@ -54,6 +86,7 @@ interface CanvasKitCanvas {
     y2: number,
     paint: CanvasKitPaint,
   ): void
+  drawPath(path: CanvasKitPath, paint: CanvasKitPaint): void
   drawImageRect(
     image: CanvasKitImage,
     source: Float32Array,
@@ -84,7 +117,50 @@ interface CanvasKitSurface {
 
 export interface CanvasKitApi {
   readonly Paint: new () => CanvasKitPaint
+  readonly PathBuilder: new () => CanvasKitPathBuilder
   readonly PaintStyle: Readonly<{ Fill: unknown; Stroke: unknown }>
+  readonly BlendMode: Readonly<{
+    SrcOver: unknown
+    Multiply: unknown
+    Screen: unknown
+    Overlay: unknown
+    Darken: unknown
+    Lighten: unknown
+    SoftLight: unknown
+    HardLight: unknown
+  }>
+  readonly StrokeCap: Readonly<{
+    Butt: unknown
+    Round: unknown
+    Square: unknown
+  }>
+  readonly StrokeJoin: Readonly<{
+    Miter: unknown
+    Round: unknown
+    Bevel: unknown
+  }>
+  readonly TileMode: Readonly<{ Clamp: unknown; Repeat?: unknown }>
+  readonly FilterMode?: Readonly<{ Linear?: unknown }>
+  readonly MipmapMode?: Readonly<{ None?: unknown }>
+  readonly Shader: Readonly<{
+    MakeLinearGradient(
+      start: readonly number[],
+      end: readonly number[],
+      colors: Float32Array,
+      positions: number[] | null,
+      tileMode: unknown,
+    ): CanvasKitShader
+    MakeRadialGradient(
+      center: readonly number[],
+      radius: number,
+      colors: Float32Array,
+      positions: number[] | null,
+      tileMode: unknown,
+    ): CanvasKitShader
+  }>
+  readonly PathEffect: Readonly<{
+    MakeDash(intervals: number[], phase?: number): CanvasKitPathEffect
+  }>
   readonly ImageFormat: Readonly<{ PNG: unknown }>
   readonly TRANSPARENT: unknown
   readonly PictureRecorder?: new () => CanvasKitPictureRecorder
@@ -121,6 +197,160 @@ function configurePaint(
   if (style === 'stroke') paint.setStrokeWidth(strokeWidth)
 }
 
+function blendMode(
+  canvasKit: CanvasKitApi,
+  mode: RenderNode['blendMode'],
+): unknown {
+  switch (mode) {
+    case 'multiply':
+      return canvasKit.BlendMode.Multiply
+    case 'screen':
+      return canvasKit.BlendMode.Screen
+    case 'overlay':
+      return canvasKit.BlendMode.Overlay
+    case 'darken':
+      return canvasKit.BlendMode.Darken
+    case 'lighten':
+      return canvasKit.BlendMode.Lighten
+    case 'softLight':
+      return canvasKit.BlendMode.SoftLight
+    case 'hardLight':
+      return canvasKit.BlendMode.HardLight
+    default:
+      return canvasKit.BlendMode.SrcOver
+  }
+}
+
+function configureFillPaint(
+  canvasKit: CanvasKitApi,
+  paint: CanvasKitPaint,
+  fill: RenderPaint,
+  opacity: number,
+  blend: RenderNode['blendMode'],
+  resources: ReadonlyMap<string, CanvasKitImageResource> = new Map(),
+): CanvasKitShader | undefined {
+  if (!('kind' in fill)) {
+    configurePaint(canvasKit, paint, fill, opacity, 'fill')
+    paint.setBlendMode(blendMode(canvasKit, blend))
+    return undefined
+  }
+  if (fill.kind === 'imageTexture') {
+    const shader = resources
+      .get(fill.resourceId)
+      ?.image.makeShaderOptions?.(
+        canvasKit.TileMode.Repeat ?? canvasKit.TileMode.Clamp,
+        canvasKit.TileMode.Repeat ?? canvasKit.TileMode.Clamp,
+        canvasKit.FilterMode?.Linear,
+        canvasKit.MipmapMode?.None,
+        new Float32Array([
+          fill.scale,
+          0,
+          fill.offsetX,
+          0,
+          fill.scale,
+          fill.offsetY,
+          0,
+          0,
+          1,
+        ]),
+      )
+    if (shader) {
+      configurePaint(
+        canvasKit,
+        paint,
+        { red: 1, green: 1, blue: 1, alpha: fill.opacity },
+        opacity,
+        'fill',
+      )
+      paint.setShader(shader)
+      paint.setBlendMode(blendMode(canvasKit, blend))
+      return shader
+    }
+    // Image shaders are supplied by the next CanvasKit texture compiler. Keep
+    // the missing-resource placeholder explicit until then, rather than
+    // rendering a different silent solid fill than Canvas2D.
+    configurePaint(
+      canvasKit,
+      paint,
+      { red: 0.898, green: 0.282, blue: 0.302, alpha: 0.16 },
+      opacity,
+      'fill',
+    )
+    paint.setBlendMode(blendMode(canvasKit, blend))
+    return undefined
+  }
+  const colors = new Float32Array(
+    fill.stops.flatMap((stop) => [
+      stop.color.red,
+      stop.color.green,
+      stop.color.blue,
+      stop.color.alpha,
+    ]),
+  )
+  const positions = fill.stops.map((stop) => stop.position)
+  const shader =
+    fill.kind === 'linearGradient'
+      ? canvasKit.Shader.MakeLinearGradient(
+          [fill.startX, fill.startY],
+          [fill.endX, fill.endY],
+          colors,
+          positions,
+          canvasKit.TileMode.Clamp,
+        )
+      : canvasKit.Shader.MakeRadialGradient(
+          [fill.centerX, fill.centerY],
+          fill.radius,
+          colors,
+          positions,
+          canvasKit.TileMode.Clamp,
+        )
+  configurePaint(
+    canvasKit,
+    paint,
+    { red: 1, green: 1, blue: 1, alpha: 1 },
+    opacity,
+    'fill',
+  )
+  paint.setShader(shader)
+  paint.setBlendMode(blendMode(canvasKit, blend))
+  return shader
+}
+
+function configureStrokePaint(
+  canvasKit: CanvasKitApi,
+  paint: CanvasKitPaint,
+  node:
+    | Extract<RenderNode, { readonly kind: 'line' | 'path' }>
+    | Extract<RenderNode, { readonly kind: 'rect' | 'ellipse' | 'polygon' }>,
+  color: RgbaColor,
+  width: number,
+): CanvasKitPathEffect | undefined {
+  configurePaint(canvasKit, paint, color, node.opacity, 'stroke', width)
+  paint.setBlendMode(blendMode(canvasKit, node.blendMode))
+  paint.setStrokeCap(
+    (node.kind === 'line' || node.kind === 'path') && node.lineCap === 'round'
+      ? canvasKit.StrokeCap.Round
+      : (node.kind === 'line' || node.kind === 'path') &&
+          node.lineCap === 'square'
+        ? canvasKit.StrokeCap.Square
+        : canvasKit.StrokeCap.Butt,
+  )
+  paint.setStrokeJoin(
+    node.lineJoin === 'round'
+      ? canvasKit.StrokeJoin.Round
+      : node.lineJoin === 'bevel'
+        ? canvasKit.StrokeJoin.Bevel
+        : canvasKit.StrokeJoin.Miter,
+  )
+  if ((node.kind === 'line' || node.kind === 'path') && node.dash) {
+    const effect = canvasKit.PathEffect.MakeDash([...node.dash])
+    paint.setPathEffect(effect)
+    return effect
+  }
+  paint.setPathEffect(null)
+  return undefined
+}
+
 function withRotation(
   canvas: CanvasKitCanvas,
   node: RenderNode,
@@ -134,15 +364,84 @@ function withRotation(
   canvas.restore()
 }
 
+function roundedRectPath(
+  canvasKit: CanvasKitApi,
+  node: Extract<RenderNode, { readonly kind: 'rect' }>,
+): CanvasKitPath {
+  const builder = new canvasKit.PathBuilder()
+  try {
+    const radius = Math.min(
+      node.cornerRadius ?? 0,
+      node.width / 2,
+      node.height / 2,
+    )
+    if (radius <= 0) {
+      builder.moveTo(node.x, node.y)
+      builder.lineTo(node.x + node.width, node.y)
+      builder.lineTo(node.x + node.width, node.y + node.height)
+      builder.lineTo(node.x, node.y + node.height)
+      builder.close()
+      return builder.detach()
+    }
+    // Cubic approximation of a circular quarter; Canvas2D uses a quadratic
+    // corner, while this keeps CanvasKit's path renderer deterministic.
+    const kappa = radius * 0.552_284_75
+    builder.moveTo(node.x + radius, node.y)
+    builder.lineTo(node.x + node.width - radius, node.y)
+    builder.cubicTo(
+      node.x + node.width - radius + kappa,
+      node.y,
+      node.x + node.width,
+      node.y + radius - kappa,
+      node.x + node.width,
+      node.y + radius,
+    )
+    builder.lineTo(node.x + node.width, node.y + node.height - radius)
+    builder.cubicTo(
+      node.x + node.width,
+      node.y + node.height - radius + kappa,
+      node.x + node.width - radius + kappa,
+      node.y + node.height,
+      node.x + node.width - radius,
+      node.y + node.height,
+    )
+    builder.lineTo(node.x + radius, node.y + node.height)
+    builder.cubicTo(
+      node.x + radius - kappa,
+      node.y + node.height,
+      node.x,
+      node.y + node.height - radius + kappa,
+      node.x,
+      node.y + node.height - radius,
+    )
+    builder.lineTo(node.x, node.y + radius)
+    builder.cubicTo(
+      node.x,
+      node.y + radius - kappa,
+      node.x + radius - kappa,
+      node.y,
+      node.x + radius,
+      node.y,
+    )
+    builder.close()
+    return builder.detach()
+  } finally {
+    builder.delete()
+  }
+}
+
 export function drawNodesCanvasKit(
   canvasKit: CanvasKitApi,
   canvas: CanvasKitCanvas,
   nodes: readonly RenderNode[],
+  resources: ReadonlyMap<string, CanvasKitImageResource> = new Map(),
 ): void {
   for (const node of nodes) {
     if (!node.visible || node.opacity === 0) continue
     const fill = new canvasKit.Paint()
     const stroke = new canvasKit.Paint()
+    let shader: CanvasKitShader | undefined
+    let pathEffect: CanvasKitPathEffect | undefined
     try {
       switch (node.kind) {
         case 'rect': {
@@ -152,27 +451,43 @@ export function drawNodesCanvasKit(
             node.width,
             node.height,
           )
-          withRotation(
-            canvas,
-            node,
-            node.x + node.width / 2,
-            node.y + node.height / 2,
-            () => {
-              configurePaint(canvasKit, fill, node.fill, node.opacity, 'fill')
-              canvas.drawRect(rect, fill)
-              if (node.stroke && (node.strokeWidth ?? 0) > 0) {
-                configurePaint(
+          const roundedPath =
+            (node.cornerRadius ?? 0) > 0
+              ? roundedRectPath(canvasKit, node)
+              : undefined
+          try {
+            withRotation(
+              canvas,
+              node,
+              node.x + node.width / 2,
+              node.y + node.height / 2,
+              () => {
+                shader = configureFillPaint(
                   canvasKit,
-                  stroke,
-                  node.stroke,
+                  fill,
+                  node.fill,
                   node.opacity,
-                  'stroke',
-                  node.strokeWidth,
+                  node.blendMode,
+                  resources,
                 )
-                canvas.drawRect(rect, stroke)
-              }
-            },
-          )
+                if (roundedPath) canvas.drawPath(roundedPath, fill)
+                else canvas.drawRect(rect, fill)
+                if (node.stroke && (node.strokeWidth ?? 0) > 0) {
+                  pathEffect = configureStrokePaint(
+                    canvasKit,
+                    stroke,
+                    node,
+                    node.stroke,
+                    node.strokeWidth ?? 1,
+                  )
+                  if (roundedPath) canvas.drawPath(roundedPath, stroke)
+                  else canvas.drawRect(rect, stroke)
+                }
+              },
+            )
+          } finally {
+            roundedPath?.delete()
+          }
           break
         }
         case 'ellipse': {
@@ -183,16 +498,22 @@ export function drawNodesCanvasKit(
             node.centerY + node.radiusY,
           )
           withRotation(canvas, node, node.centerX, node.centerY, () => {
-            configurePaint(canvasKit, fill, node.fill, node.opacity, 'fill')
+            shader = configureFillPaint(
+              canvasKit,
+              fill,
+              node.fill,
+              node.opacity,
+              node.blendMode,
+              resources,
+            )
             canvas.drawOval(oval, fill)
             if (node.stroke && (node.strokeWidth ?? 0) > 0) {
-              configurePaint(
+              pathEffect = configureStrokePaint(
                 canvasKit,
                 stroke,
+                node,
                 node.stroke,
-                node.opacity,
-                'stroke',
-                node.strokeWidth,
+                node.strokeWidth ?? 1,
               )
               canvas.drawOval(oval, stroke)
             }
@@ -206,22 +527,101 @@ export function drawNodesCanvasKit(
             (node.x1 + node.x2) / 2,
             (node.y1 + node.y2) / 2,
             () => {
-              configurePaint(
+              pathEffect = configureStrokePaint(
                 canvasKit,
                 stroke,
+                node,
                 node.stroke,
-                node.opacity,
-                'stroke',
                 node.strokeWidth,
               )
               canvas.drawLine(node.x1, node.y1, node.x2, node.y2, stroke)
             },
           )
           break
+        case 'path': {
+          const pathBuilder = new canvasKit.PathBuilder()
+          const first = node.points[0]!
+          pathBuilder.moveTo(first.x, first.y)
+          for (const point of node.points.slice(1))
+            pathBuilder.lineTo(point.x, point.y)
+          const centerX =
+            (Math.min(...node.points.map((point) => point.x)) +
+              Math.max(...node.points.map((point) => point.x))) /
+            2
+          const centerY =
+            (Math.min(...node.points.map((point) => point.y)) +
+              Math.max(...node.points.map((point) => point.y))) /
+            2
+          let path: CanvasKitPath | undefined
+          try {
+            const builtPath = pathBuilder.detach()
+            path = builtPath
+            withRotation(canvas, node, centerX, centerY, () => {
+              pathEffect = configureStrokePaint(
+                canvasKit,
+                stroke,
+                node,
+                node.stroke,
+                node.strokeWidth,
+              )
+              canvas.drawPath(builtPath, stroke)
+            })
+          } finally {
+            path?.delete()
+            pathBuilder.delete()
+          }
+          break
+        }
+        case 'polygon': {
+          const pathBuilder = new canvasKit.PathBuilder()
+          const first = node.points[0]!
+          pathBuilder.moveTo(first.x, first.y)
+          for (const point of node.points.slice(1))
+            pathBuilder.lineTo(point.x, point.y)
+          pathBuilder.close()
+          const centerX =
+            node.points.reduce((total, point) => total + point.x, 0) /
+            node.points.length
+          const centerY =
+            node.points.reduce((total, point) => total + point.y, 0) /
+            node.points.length
+          let path: CanvasKitPath | undefined
+          try {
+            const builtPath = pathBuilder.detach()
+            path = builtPath
+            withRotation(canvas, node, centerX, centerY, () => {
+              shader = configureFillPaint(
+                canvasKit,
+                fill,
+                node.fill,
+                node.opacity,
+                node.blendMode,
+                resources,
+              )
+              canvas.drawPath(builtPath, fill)
+              if (node.stroke && (node.strokeWidth ?? 0) > 0) {
+                pathEffect = configureStrokePaint(
+                  canvasKit,
+                  stroke,
+                  node,
+                  node.stroke,
+                  node.strokeWidth ?? 1,
+                )
+                canvas.drawPath(builtPath, stroke)
+              }
+            })
+          } finally {
+            path?.delete()
+            pathBuilder.delete()
+          }
+          break
+        }
       }
     } finally {
       fill.delete()
       stroke.delete()
+      shader?.delete()
+      pathEffect?.delete()
     }
   }
 }
@@ -236,7 +636,7 @@ function drawScene(
   canvas.clear(canvasKit.TRANSPARENT)
   for (const node of scene.nodes) {
     if (node.kind !== 'image') {
-      drawNodesCanvasKit(canvasKit, canvas, [node])
+      drawNodesCanvasKit(canvasKit, canvas, [node], resources)
       continue
     }
     if (!node.visible || node.opacity === 0) continue
@@ -251,6 +651,7 @@ function drawScene(
       if (resource) {
         fill.setAntiAlias(true)
         fill.setColorComponents(1, 1, 1, node.opacity)
+        fill.setBlendMode(blendMode(canvasKit, node.blendMode))
         canvas.drawImageRect(
           resource.image,
           canvasKit.XYWHRect(0, 0, resource.width, resource.height),
@@ -464,7 +865,12 @@ export class CanvasKitRenderer implements Renderer {
         if (node.kind === 'image') {
           this.#drawImageNode(recording, node)
         } else {
-          drawNodesCanvasKit(this.#canvasKit, recording, [node])
+          drawNodesCanvasKit(
+            this.#canvasKit,
+            recording,
+            [node],
+            this.#resources,
+          )
         }
       }
       this.#picture = recorder.finishRecordingAsPicture()

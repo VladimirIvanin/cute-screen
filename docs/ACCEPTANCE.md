@@ -95,6 +95,11 @@ selection/history согласованы, base image редактируется 
 
 ## A06 — Drawing tools
 
+Current status: partial implementation. Chrome 150/Linux browser evidence covers
+the M06 pointer and gradient-default flows (2026-08-10); the scenario remains
+pending until the M05 performance gate, Tauri renderer evidence and paint/parity
+matrix are recorded.
+
 Проверить arrow/line, curved anchors, shapes, radius, solid/linear/radial
 gradient, pattern/texture fill, fill/layer opacity, shape blend modes, pencil
 brushes и marker blend modes. Для каждого инструмента:

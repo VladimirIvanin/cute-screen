@@ -7,6 +7,45 @@ import { describe, expect, it } from 'vitest'
 import { renderHeadlessCanvasKitPng } from './canvaskit'
 
 describe('CanvasKit headless renderer', () => {
+  it('renders a contiguous marker path headlessly', async () => {
+    const canvasKit = (await CanvasKitInit({
+      locateFile: () =>
+        path.resolve(
+          process.cwd(),
+          'packages/editor-renderer/node_modules/canvaskit-wasm/bin/canvaskit.wasm',
+        ),
+    })) as import('./canvaskit').CanvasKitApi
+    const png = renderHeadlessCanvasKitPng(
+      canvasKit,
+      createRenderSceneSnapshot({
+        width: 64,
+        height: 64,
+        nodes: [
+          {
+            kind: 'path',
+            id: 'marker',
+            points: [
+              { x: 8, y: 8 },
+              { x: 32, y: 40 },
+              { x: 56, y: 8 },
+            ],
+            rotation: 0,
+            opacity: 0.35,
+            visible: true,
+            blendMode: 'multiply',
+            stroke: { red: 1, green: 0.8, blue: 0, alpha: 1 },
+            strokeWidth: 18,
+            lineCap: 'round',
+            lineJoin: 'round',
+          },
+        ],
+      }),
+    )
+
+    const decoded = await loadImage(png)
+    expect([decoded.width, decoded.height]).toEqual([64, 64])
+  })
+
   it('creates a software surface and returns decoded PNG bytes', async () => {
     const canvasKit = (await CanvasKitInit({
       locateFile: () =>
@@ -73,6 +112,48 @@ describe('CanvasKit headless renderer', () => {
     )
     const decoded = await loadImage(png)
     expect(decoded.width).toBe(32)
+  })
+
+  it('renders a renderer-neutral radial gradient headlessly', async () => {
+    const canvasKit = (await CanvasKitInit({
+      locateFile: () =>
+        path.resolve(
+          process.cwd(),
+          'packages/editor-renderer/node_modules/canvaskit-wasm/bin/canvaskit.wasm',
+        ),
+    })) as import('./canvaskit').CanvasKitApi
+    const png = renderHeadlessCanvasKitPng(
+      canvasKit,
+      createRenderSceneSnapshot({
+        width: 32,
+        height: 32,
+        nodes: [
+          {
+            kind: 'ellipse',
+            id: 'gradient',
+            centerX: 16,
+            centerY: 16,
+            radiusX: 16,
+            radiusY: 16,
+            rotation: 0,
+            opacity: 1,
+            visible: true,
+            fill: {
+              kind: 'radialGradient',
+              centerX: 16,
+              centerY: 16,
+              radius: 16,
+              stops: [
+                { position: 0, color: { red: 1, green: 1, blue: 1, alpha: 1 } },
+                { position: 1, color: { red: 0, green: 0, blue: 0, alpha: 1 } },
+              ],
+            },
+          },
+        ],
+      }),
+    )
+    const decoded = await loadImage(png)
+    expect([decoded.width, decoded.height]).toEqual([32, 32])
   })
 
   it('preserves scene-node z-order across image and vector nodes', async () => {

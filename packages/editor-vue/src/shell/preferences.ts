@@ -1,7 +1,14 @@
 import type { SupportedLocale, ThemePreference, UiPreferencesV1 } from './types'
 import { resolveSystemLocale } from './i18n'
+import {
+  defaultDrawingToolPreferences,
+  parseDrawingToolPreferences,
+  type DrawingToolPreferencesStorage,
+} from '@cute-screen/editor-renderer'
 
 export const UI_PREFERENCES_STORAGE_KEY = 'cute-screen.ui-preferences.v1'
+export const DRAWING_TOOL_PREFERENCES_STORAGE_KEY =
+  'cute-screen.drawing-tool-preferences.v1'
 
 export interface UiPreferencesStorage {
   load(): UiPreferencesV1 | undefined
@@ -71,6 +78,35 @@ export function createBrowserPreferencesStorage(
       if (!storage) return
       try {
         storage.setItem(UI_PREFERENCES_STORAGE_KEY, JSON.stringify(preferences))
+      } catch (error) {
+        void error
+      }
+    },
+  }
+}
+
+/** Browser adapter only; the drawing-preferences codec itself lives in editor-core. */
+export function createBrowserDrawingToolPreferencesStorage(
+  storage: Storage | undefined,
+): DrawingToolPreferencesStorage {
+  return {
+    load: () => {
+      if (!storage) return defaultDrawingToolPreferences()
+      try {
+        const raw = storage.getItem(DRAWING_TOOL_PREFERENCES_STORAGE_KEY)
+        return parseDrawingToolPreferences(raw ? JSON.parse(raw) : undefined)
+      } catch (error) {
+        void error
+        return defaultDrawingToolPreferences()
+      }
+    },
+    save: (preferences) => {
+      if (!storage) return
+      try {
+        storage.setItem(
+          DRAWING_TOOL_PREFERENCES_STORAGE_KEY,
+          JSON.stringify(preferences),
+        )
       } catch (error) {
         void error
       }

@@ -1,4 +1,5 @@
-export const EDITOR_DOCUMENT_SCHEMA_VERSION = 2 as const
+/** M06 stores complete drawing-tool payloads and shared compositing fields. */
+export const EDITOR_DOCUMENT_SCHEMA_VERSION = 3 as const
 
 export type JsonPrimitive = string | number | boolean | null
 export type JsonValue = JsonPrimitive | readonly JsonValue[] | JsonObject
@@ -16,6 +17,99 @@ export interface Rect {
   readonly y: number
   readonly width: number
   readonly height: number
+}
+
+export interface SrgbColor extends JsonObject {
+  readonly red: number
+  readonly green: number
+  readonly blue: number
+  readonly alpha: number
+}
+
+export const BLEND_MODES = [
+  'normal',
+  'multiply',
+  'screen',
+  'overlay',
+  'darken',
+  'lighten',
+  'softLight',
+  'hardLight',
+] as const
+
+export type BlendMode = (typeof BLEND_MODES)[number]
+
+export interface ShadowStyle extends JsonObject {
+  readonly color: SrgbColor
+  readonly offsetX: number
+  readonly offsetY: number
+  readonly blur: number
+}
+
+export interface GradientStop extends JsonObject {
+  readonly position: number
+  readonly color: SrgbColor
+}
+
+export interface PaintTransform extends JsonObject {
+  readonly scale: number
+  readonly rotation: number
+  readonly offsetX: number
+  readonly offsetY: number
+}
+
+export type FillPaint =
+  | Readonly<{ readonly kind: 'none' }>
+  | Readonly<{
+      readonly kind: 'solid'
+      readonly color: SrgbColor
+      readonly opacity: number
+    }>
+  | Readonly<{
+      readonly kind: 'linearGradient'
+      readonly stops: readonly GradientStop[]
+      readonly start: Point
+      readonly end: Point
+      readonly opacity: number
+    }>
+  | Readonly<{
+      readonly kind: 'radialGradient'
+      readonly stops: readonly GradientStop[]
+      readonly center: Point
+      readonly radius: number
+      readonly opacity: number
+    }>
+  | Readonly<{
+      readonly kind: 'pattern'
+      readonly pattern: 'dots' | 'grid' | 'diagonal' | 'crosshatch' | 'checker'
+      readonly color: SrgbColor
+      readonly background: SrgbColor
+      readonly transform: PaintTransform
+      readonly opacity: number
+    }>
+  | Readonly<{
+      readonly kind: 'imageTexture'
+      readonly blobHash: string
+      readonly format: 'png' | 'jpeg' | 'webp'
+      readonly intrinsicWidth: number
+      readonly intrinsicHeight: number
+      readonly fit: 'repeat' | 'fit' | 'fill'
+      readonly transform: PaintTransform
+      readonly opacity: number
+    }>
+
+export interface StrokeStyle extends JsonObject {
+  readonly color: SrgbColor
+  readonly width: number
+  readonly style: 'solid' | 'dashed' | 'dotted'
+  readonly cap: 'butt' | 'round' | 'square'
+  readonly join: 'miter' | 'round' | 'bevel'
+}
+
+export interface SampledPoint extends JsonObject {
+  readonly x: number
+  readonly y: number
+  readonly pressure: number
 }
 
 export interface Transform2D {
@@ -90,6 +184,10 @@ export interface LayerBase<K extends LayerKind, P extends JsonObject> {
   readonly opacity: number
   readonly visible: boolean
   readonly locked: boolean
+  /** Applied after the layer's fill, stroke and shadows are grouped. */
+  readonly blendMode?: BlendMode
+  /** Bounded by the document codec to keep preview/export deterministic. */
+  readonly shadows?: readonly ShadowStyle[]
   readonly payload: P
   /** Future fields are retained verbatim during parse/serialize round-trips. */
   readonly extras?: JsonObject
@@ -106,6 +204,41 @@ export interface ImageLayerPayload extends JsonObject {
   readonly role: 'base' | 'content'
 }
 
+export interface ArrowLayerPayload extends JsonObject {
+  readonly path: 'straight' | 'quadratic'
+  readonly start: Point & JsonObject
+  readonly end: Point & JsonObject
+  readonly bend?: Point & JsonObject
+  readonly stroke: StrokeStyle
+  readonly startCap: 'none' | 'chevron' | 'triangle' | 'circle'
+  readonly endCap: 'none' | 'chevron' | 'triangle' | 'circle'
+}
+
+export interface ShapeLayerPayload extends JsonObject {
+  readonly shape: 'rectangle' | 'circle' | 'oval' | 'diamond' | 'star'
+  readonly fill: FillPaint & JsonObject
+  readonly stroke: StrokeStyle
+  readonly cornerRadius: number
+  readonly starPoints: number
+  readonly starInnerRatio: number
+}
+
+export interface PencilLayerPayload extends JsonObject {
+  readonly points: readonly SampledPoint[]
+  readonly brush: 'pen' | 'pencil' | 'brush'
+  readonly width: number
+  readonly color: SrgbColor
+  readonly smoothing: number
+}
+
+export interface MarkerLayerPayload extends JsonObject {
+  readonly points: readonly SampledPoint[]
+  readonly width: number
+  readonly color: SrgbColor
+  readonly smoothing: number
+}
+
+/** Payload-specific contracts are validated by the v3 codec; legacy aliases stay broad for migration input. */
 export type ArrowLayer = LayerBase<'arrow', JsonObject>
 export type ShapeLayer = LayerBase<'shape', JsonObject>
 export type PencilLayer = LayerBase<'pencil', JsonObject>
@@ -136,8 +269,8 @@ export type LayerNode =
   | ImageLayer
 
 export interface EditorDocumentV1 {
-  /** Kept as an exported compatibility name while persisted documents are v2. */
-  readonly schemaVersion: 1 | typeof EDITOR_DOCUMENT_SCHEMA_VERSION
+  /** Compatibility input type; parsed documents always use the current schema. */
+  readonly schemaVersion: 1 | 2 | typeof EDITOR_DOCUMENT_SCHEMA_VERSION
   readonly id: string
   readonly source: SourceImageRef
   readonly canvas: Readonly<{ width: number; height: number }>
@@ -157,6 +290,23 @@ export interface EditorDocumentV2 extends Omit<
   readonly schemaVersion: typeof EDITOR_DOCUMENT_SCHEMA_VERSION
   readonly layers: readonly LayerNode[]
 }
+
+export interface EditorDocumentV3 extends Omit<
+  EditorDocumentV1,
+  'schemaVersion' | 'layers'
+> {
+  readonly schemaVersion: typeof EDITOR_DOCUMENT_SCHEMA_VERSION
+  /** v3 persistence never permits implicit geometry/effect defaults. */
+  readonly layers: readonly (LayerNode &
+    Readonly<{
+      readonly localBounds: Rect
+      readonly blendMode: BlendMode
+      readonly shadows: readonly ShadowStyle[]
+    }>)[]
+}
+
+/** Current editable document contract. */
+export type EditorDocument = EditorDocumentV3
 
 export type ParsedEditorDocument =
   | Readonly<{ kind: 'editable'; document: EditorDocumentV1 }>

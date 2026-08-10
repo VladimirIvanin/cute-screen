@@ -1,5 +1,6 @@
 use std::collections::{HashMap, VecDeque};
 use std::env;
+use std::fs;
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, Ordering},
@@ -8,8 +9,6 @@ use uuid::Uuid;
 
 #[cfg(feature = "test-harness")]
 use sha2::{Digest, Sha256};
-#[cfg(feature = "test-harness")]
-use std::fs;
 
 #[cfg(feature = "test-harness")]
 use image_transport::RegisteredImage;
@@ -56,6 +55,20 @@ struct CaptureDiagnosticV1 {
     correlation_id: String,
     invocation_source: String,
     terminal_outcome: CaptureTerminalOutcome,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase", tag = "kind")]
+enum TextureImportOutcome {
+    Cancelled,
+    Imported {
+        blob_hash: String,
+        format: String,
+        mime_type: String,
+        width: u32,
+        height: u32,
+        resource_token: String,
+    },
 }
 
 #[derive(Default)]
@@ -260,6 +273,74 @@ fn repository_save_document(
     repository: State<'_, LibraryRepository>,
 ) -> Result<i64, RepositoryError> {
     repository.save_document(document_id, expected_revision, document_json)
+}
+
+#[tauri::command]
+fn repository_import_texture(
+    correlation_id: String,
+    app: tauri::AppHandle,
+    repository: State<'_, LibraryRepository>,
+    transport: State<'_, Arc<ImageTransportService>>,
+) -> Result<TextureImportOutcome, RepositoryError> {
+    let Some(source) = app
+        .dialog()
+        .file()
+        .set_title("Import texture")
+        .add_filter("Raster textures", &["png", "jpg", "jpeg", "webp"])
+        .blocking_pick_file()
+    else {
+        return Ok(TextureImportOutcome::Cancelled);
+    };
+    let path = source
+        .into_path()
+        .map_err(|error| RepositoryError::Io(error.to_string()))?;
+    let bytes = fs::read(path)?;
+    let metadata = storage::inspect_texture_bytes(&bytes)?;
+    let stored = repository.import_blob(bytes, metadata)?;
+    let resource = repository.resolve_blob_source(stored.hash.clone())?;
+    let resource_token = Uuid::now_v7().simple().to_string();
+    transport
+        .register_authoritative_blob(resource_token.clone(), resource)
+        .map_err(|error| RepositoryError::Io(error.to_string()))?;
+    let _ = correlation_id;
+    Ok(TextureImportOutcome::Imported {
+        blob_hash: stored.hash,
+        format: stored.metadata.format,
+        mime_type: stored.metadata.mime_type,
+        width: stored.metadata.width,
+        height: stored.metadata.height,
+        resource_token,
+    })
+}
+
+#[tauri::command]
+fn repository_resolve_texture(
+    _correlation_id: String,
+    blob_hash: String,
+    repository: State<'_, LibraryRepository>,
+    transport: State<'_, Arc<ImageTransportService>>,
+) -> Result<TextureImportOutcome, RepositoryError> {
+    let resource = repository.resolve_blob_source(blob_hash)?;
+    if !matches!(resource.metadata.format.as_str(), "png" | "jpeg" | "webp") {
+        return Err(RepositoryError::InvalidImage);
+    }
+    let resource_token = Uuid::now_v7().simple().to_string();
+    let hash = resource.hash.clone();
+    let format = resource.metadata.format.clone();
+    let mime_type = resource.metadata.mime_type.clone();
+    let width = resource.metadata.width;
+    let height = resource.metadata.height;
+    transport
+        .register_authoritative_blob(resource_token.clone(), resource)
+        .map_err(|error| RepositoryError::Io(error.to_string()))?;
+    Ok(TextureImportOutcome::Imported {
+        blob_hash: hash,
+        format,
+        mime_type,
+        width,
+        height,
+        resource_token,
+    })
 }
 
 #[tauri::command]
@@ -1089,6 +1170,8 @@ pub fn run() {
         repository_open_last,
         repository_list_active_series_frames,
         repository_save_document,
+        repository_import_texture,
+        repository_resolve_texture,
         repository_export_recovery_bundle,
         lifecycle_complete_main_window_close,
         lifecycle_finish_quit,
@@ -1113,6 +1196,8 @@ pub fn run() {
         repository_open_last,
         repository_list_active_series_frames,
         repository_save_document,
+        repository_import_texture,
+        repository_resolve_texture,
         repository_export_recovery_bundle,
         lifecycle_complete_main_window_close,
         lifecycle_finish_quit,

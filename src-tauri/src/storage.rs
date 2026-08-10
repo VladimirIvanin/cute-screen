@@ -196,6 +196,16 @@ pub struct AuthorizedCaptureSource {
     pub metadata: BlobMetadata,
 }
 
+/// Native-only description of any immutable raster blob authorised by the
+/// repository. Texture fills use this rather than accepting arbitrary paths
+/// from the webview.
+#[derive(Debug, Clone)]
+pub struct AuthorizedBlobSource {
+    pub hash: String,
+    pub path: PathBuf,
+    pub metadata: BlobMetadata,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DerivativeMetadata {
@@ -351,6 +361,13 @@ impl LibraryRepository {
         self.call(move |state| state.resolve_capture_source(&capture_id, &source_hash))
     }
 
+    pub fn resolve_blob_source(
+        &self,
+        hash: String,
+    ) -> Result<AuthorizedBlobSource, RepositoryError> {
+        self.call(move |state| state.resolve_blob_source(&hash))
+    }
+
     pub fn export_recovery_bundle(
         &self,
         document_id: String,
@@ -471,7 +488,7 @@ impl StorageState {
             params![request.capture_id, series_id, blob.hash, serde_json::to_string(&request.capture_metadata).map_err(|error| RepositoryError::InvalidDocument(error.to_string()))?, request.captured_at],
         )?;
         transaction.execute(
-            "INSERT INTO documents (id, capture_id, schema_version, revision, content_json, content_sha256, created_at, updated_at) VALUES (?1, ?2, 2, 1, ?3, ?4, ?5, ?5)",
+            "INSERT INTO documents (id, capture_id, schema_version, revision, content_json, content_sha256, created_at, updated_at) VALUES (?1, ?2, 3, 1, ?3, ?4, ?5, ?5)",
             params![request.document_id, request.capture_id, request.document_json, sha256_hex(request.document_json.as_bytes()), request.captured_at],
         )?;
         replace_document_references(
@@ -565,7 +582,13 @@ impl StorageState {
         expected_revision: i64,
         document_json: &str,
     ) -> Result<i64, RepositoryError> {
-        validate_document(document_json)?;
+        let document = document_value(document_json)?;
+        let schema_version = document
+            .get("schemaVersion")
+            .and_then(Value::as_i64)
+            .ok_or_else(|| {
+                RepositoryError::InvalidDocument("schemaVersion is missing".to_owned())
+            })?;
         let transaction = self.connection.transaction()?;
         let source_hash: String = transaction.query_row(
             "SELECT c.original_blob_hash FROM documents d JOIN captures c ON c.id = d.capture_id WHERE d.id = ?1",
@@ -573,8 +596,8 @@ impl StorageState {
             |row| row.get(0),
         ).optional()?.ok_or_else(|| RepositoryError::InvalidDocument("document does not exist".to_owned()))?;
         let updated = transaction.execute(
-            "UPDATE documents SET revision = revision + 1, content_json = ?1, content_sha256 = ?2, updated_at = ?3 WHERE id = ?4 AND revision = ?5",
-            params![document_json, sha256_hex(document_json.as_bytes()), now_millis()?, document_id, expected_revision],
+            "UPDATE documents SET revision = revision + 1, schema_version = ?1, content_json = ?2, content_sha256 = ?3, updated_at = ?4 WHERE id = ?5 AND revision = ?6",
+            params![schema_version, document_json, sha256_hex(document_json.as_bytes()), now_millis()?, document_id, expected_revision],
         )?;
         if updated != 1 {
             return Err(RepositoryError::RevisionConflict);
@@ -740,6 +763,45 @@ impl StorageState {
             hash: metadata.0,
             path: canonical_path,
             metadata: metadata.1,
+        })
+    }
+
+    fn resolve_blob_source(&mut self, hash: &str) -> Result<AuthorizedBlobSource, RepositoryError> {
+        if !is_sha256(hash) {
+            return Err(RepositoryError::MissingBlob {
+                hash: hash.to_owned(),
+            });
+        }
+        let metadata = self
+            .connection
+            .query_row(
+                "SELECT format, mime_type, width, height, color_metadata_json FROM blobs WHERE hash = ?1",
+                params![hash],
+                |row| {
+                    let color: String = row.get(4)?;
+                    Ok(BlobMetadata {
+                        format: row.get(0)?,
+                        mime_type: row.get(1)?,
+                        width: row.get(2)?,
+                        height: row.get(3)?,
+                        color_metadata: serde_json::from_str(&color).map_err(|error| rusqlite::Error::FromSqlConversionFailure(4, rusqlite::types::Type::Text, Box::new(error)))?,
+                    })
+                },
+            )
+            .optional()?
+            .ok_or_else(|| RepositoryError::MissingBlob {
+                hash: hash.to_owned(),
+            })?;
+        let path = self.blob_path_checked(hash)?;
+        let canonical_root = self.blobs_root.canonicalize()?;
+        let canonical_path = path.canonicalize()?;
+        if !canonical_path.starts_with(&canonical_root) {
+            return Err(RepositoryError::PermissionDenied);
+        }
+        Ok(AuthorizedBlobSource {
+            hash: hash.to_owned(),
+            path: canonical_path,
+            metadata,
         })
     }
 
@@ -1128,7 +1190,7 @@ fn document_value(document_json: &str) -> Result<Value, RepositoryError> {
             "schemaVersion exceeds the supported integer range".to_owned(),
         )
     })?;
-    if schema_version > 2 {
+    if schema_version > 3 {
         return Err(RepositoryError::NewerSchema { schema_version });
     }
     if value.get("id").and_then(Value::as_str).is_none() {
@@ -1179,6 +1241,25 @@ fn inspect_source_bytes(bytes: &[u8]) -> Result<SourceFacts, RepositoryError> {
         mime_type: mime_type.to_owned(),
         width,
         height,
+    })
+}
+
+/// Inspects only the M06 raster texture formats. SVG is intentionally excluded
+/// until the dedicated M07 sanitization flow exists.
+pub fn inspect_texture_bytes(bytes: &[u8]) -> Result<BlobMetadata, RepositoryError> {
+    let source = inspect_source_bytes(bytes)?;
+    if !matches!(source.format.as_str(), "png" | "jpeg" | "webp") {
+        return Err(RepositoryError::InvalidImage);
+    }
+    Ok(BlobMetadata {
+        format: source.format,
+        mime_type: source.mime_type,
+        width: source.width,
+        height: source.height,
+        color_metadata: serde_json::json!({
+            "colorSpace": "srgb",
+            "hasIccProfile": false,
+        }),
     })
 }
 
@@ -1933,6 +2014,29 @@ mod tests {
         assert!(matches!(
             super::validate_document(&document),
             Err(RepositoryError::InvalidDocument(_))
+        ));
+    }
+
+    #[test]
+    fn texture_import_accepts_only_raster_bytes_and_resolves_an_immutable_blob() {
+        let directory = tempdir().expect("temp directory");
+        let repository =
+            LibraryRepository::initialize(directory.path(), directory.path()).expect("repository");
+        let bytes = fixture_bytes();
+        let texture_metadata = super::inspect_texture_bytes(&bytes).expect("png texture");
+        let stored = repository
+            .import_blob(bytes, texture_metadata)
+            .expect("stored texture");
+        let resolved = repository
+            .resolve_blob_source(stored.hash.clone())
+            .expect("authorized texture");
+
+        assert_eq!(resolved.hash, stored.hash);
+        assert!(resolved.path.is_file());
+        assert_eq!(resolved.metadata.mime_type, "image/png");
+        assert!(matches!(
+            super::inspect_texture_bytes(br#"<svg width=\"1\" height=\"1\"/>"#),
+            Err(RepositoryError::InvalidImage)
         ));
     }
 

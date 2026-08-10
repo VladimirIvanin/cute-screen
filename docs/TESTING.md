@@ -138,6 +138,17 @@ Manifest `tests/fixtures/manifest.json` хранит ID, SHA-256, dimensions, fo
 
 ## Core invariants
 
+## M06 drawing-tool evidence
+
+The current M06 slice is required to keep draft input transient: component code
+may invalidate only the overlay for pointer movement, and a completed gesture
+must call exactly one `addLayer` command. Core tests cover schema v3 migration,
+paint validation, no-op vector gestures, freehand simplification and transparent
+shape stroke hit-testing. Chrome browser mode covers two persistent arrow
+gestures, cancellation, all four creation tools and gradient defaults; its Vite
+server must set `VITE_TEST_HARNESS=true`. This does not replace pending Tauri
+flows, texture import/relink, or CanvasKit/Canvas2D/export parity goldens.
+
 Property-based тесты покрывают:
 
 - `screenToImage(imageToScreen(point)) ≈ point`;

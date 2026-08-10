@@ -1,5 +1,6 @@
 import type {
   RenderNode,
+  RenderPaint,
   RenderSceneSnapshot,
   RgbaColor,
 } from '@cute-screen/editor-core'
@@ -23,6 +24,8 @@ type Context2D = Pick<
   | 'ellipse'
   | 'moveTo'
   | 'lineTo'
+  | 'closePath'
+  | 'quadraticCurveTo'
   | 'fill'
   | 'stroke'
   | 'save'
@@ -35,6 +38,13 @@ type Context2D = Pick<
   | 'fillStyle'
   | 'strokeStyle'
   | 'lineWidth'
+  | 'lineCap'
+  | 'lineJoin'
+  | 'globalCompositeOperation'
+  | 'createLinearGradient'
+  | 'createRadialGradient'
+  | 'createPattern'
+  | 'setLineDash'
 >
 
 export interface Canvas2DLike {
@@ -60,6 +70,71 @@ function cssColor(color: RgbaColor): string {
   )}, ${Math.round(color.blue * 255)}, ${color.alpha})`
 }
 
+function cssBlendMode(mode: RenderNode['blendMode']): GlobalCompositeOperation {
+  switch (mode) {
+    case 'multiply':
+      return 'multiply'
+    case 'screen':
+      return 'screen'
+    case 'overlay':
+      return 'overlay'
+    case 'darken':
+      return 'darken'
+    case 'lighten':
+      return 'lighten'
+    case 'softLight':
+      return 'soft-light'
+    case 'hardLight':
+      return 'hard-light'
+    default:
+      return 'source-over'
+  }
+}
+
+function paintStyle(
+  context: Context2D,
+  paint: RenderPaint,
+  resources: ReadonlyMap<string, ImageResourceInput['source']> = new Map(),
+): string | CanvasGradient | CanvasPattern {
+  if (!('kind' in paint)) return cssColor(paint)
+  if (paint.kind === 'imageTexture') {
+    const resource = resources.get(paint.resourceId)
+    if (!resource) return 'rgba(229, 72, 77, 0.16)'
+    const pattern = context.createPattern(resource, 'repeat')
+    if (!pattern) return 'rgba(229, 72, 77, 0.16)'
+    if (
+      typeof pattern.setTransform === 'function' &&
+      typeof DOMMatrix !== 'undefined'
+    ) {
+      const transform = new DOMMatrix()
+        .translate(paint.offsetX, paint.offsetY)
+        .rotate(paint.rotation)
+        .scale(paint.scale)
+      pattern.setTransform(transform)
+    }
+    return pattern
+  }
+  const gradient =
+    paint.kind === 'linearGradient'
+      ? context.createLinearGradient(
+          paint.startX,
+          paint.startY,
+          paint.endX,
+          paint.endY,
+        )
+      : context.createRadialGradient(
+          paint.centerX,
+          paint.centerY,
+          0,
+          paint.centerX,
+          paint.centerY,
+          paint.radius,
+        )
+  for (const stop of paint.stops)
+    gradient.addColorStop(stop.position, cssColor(stop.color))
+  return gradient
+}
+
 function withRotation(
   context: Context2D,
   node: RenderNode,
@@ -69,6 +144,7 @@ function withRotation(
 ): void {
   context.save()
   context.globalAlpha = node.opacity
+  context.globalCompositeOperation = cssBlendMode(node.blendMode)
   if (node.rotation !== 0) {
     context.translate(centerX, centerY)
     context.rotate((node.rotation * Math.PI) / 180)
@@ -78,9 +154,37 @@ function withRotation(
   context.restore()
 }
 
+function roundedRectPath(
+  context: Context2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+): void {
+  const corner = Math.min(radius, width / 2, height / 2)
+  context.beginPath()
+  context.moveTo(x + corner, y)
+  context.lineTo(x + width - corner, y)
+  context.quadraticCurveTo(x + width, y, x + width, y + corner)
+  context.lineTo(x + width, y + height - corner)
+  context.quadraticCurveTo(
+    x + width,
+    y + height,
+    x + width - corner,
+    y + height,
+  )
+  context.lineTo(x + corner, y + height)
+  context.quadraticCurveTo(x, y + height, x, y + height - corner)
+  context.lineTo(x, y + corner)
+  context.quadraticCurveTo(x, y, x + corner, y)
+  context.closePath()
+}
+
 export function drawNodes2D(
   context: Context2D,
   nodes: readonly RenderNode[],
+  resources: ReadonlyMap<string, ImageResourceInput['source']> = new Map(),
 ): void {
   for (const node of nodes) {
     if (!node.visible || node.opacity === 0) continue
@@ -89,12 +193,26 @@ export function drawNodes2D(
         const centerX = node.x + node.width / 2
         const centerY = node.y + node.height / 2
         withRotation(context, node, centerX, centerY, () => {
-          context.fillStyle = cssColor(node.fill)
-          context.fillRect(node.x, node.y, node.width, node.height)
+          context.fillStyle = paintStyle(context, node.fill, resources)
+          if ((node.cornerRadius ?? 0) > 0) {
+            roundedRectPath(
+              context,
+              node.x,
+              node.y,
+              node.width,
+              node.height,
+              node.cornerRadius ?? 0,
+            )
+            context.fill()
+          } else {
+            context.fillRect(node.x, node.y, node.width, node.height)
+          }
           if (node.stroke && (node.strokeWidth ?? 0) > 0) {
             context.strokeStyle = cssColor(node.stroke)
             context.lineWidth = node.strokeWidth ?? 1
-            context.strokeRect(node.x, node.y, node.width, node.height)
+            context.lineJoin = node.lineJoin ?? 'miter'
+            if ((node.cornerRadius ?? 0) > 0) context.stroke()
+            else context.strokeRect(node.x, node.y, node.width, node.height)
           }
         })
         break
@@ -111,11 +229,12 @@ export function drawNodes2D(
             0,
             Math.PI * 2,
           )
-          context.fillStyle = cssColor(node.fill)
+          context.fillStyle = paintStyle(context, node.fill, resources)
           context.fill()
           if (node.stroke && (node.strokeWidth ?? 0) > 0) {
             context.strokeStyle = cssColor(node.stroke)
             context.lineWidth = node.strokeWidth ?? 1
+            context.lineJoin = node.lineJoin ?? 'miter'
             context.stroke()
           }
         })
@@ -129,7 +248,58 @@ export function drawNodes2D(
           context.lineTo(node.x2, node.y2)
           context.strokeStyle = cssColor(node.stroke)
           context.lineWidth = node.strokeWidth
+          context.lineCap = node.lineCap ?? 'butt'
+          context.lineJoin = node.lineJoin ?? 'miter'
+          context.setLineDash(node.dash ? [...node.dash] : [])
           context.stroke()
+        })
+        break
+      }
+      case 'path': {
+        const centerX =
+          (Math.min(...node.points.map((point) => point.x)) +
+            Math.max(...node.points.map((point) => point.x))) /
+          2
+        const centerY =
+          (Math.min(...node.points.map((point) => point.y)) +
+            Math.max(...node.points.map((point) => point.y))) /
+          2
+        withRotation(context, node, centerX, centerY, () => {
+          context.beginPath()
+          context.moveTo(node.points[0]!.x, node.points[0]!.y)
+          for (const point of node.points.slice(1))
+            context.lineTo(point.x, point.y)
+          context.strokeStyle = cssColor(node.stroke)
+          context.lineWidth = node.strokeWidth
+          context.lineCap = node.lineCap ?? 'butt'
+          context.lineJoin = node.lineJoin ?? 'miter'
+          context.setLineDash(node.dash ? [...node.dash] : [])
+          context.stroke()
+        })
+        break
+      }
+      case 'polygon': {
+        const first = node.points[0]!
+        const centerX =
+          node.points.reduce((total, point) => total + point.x, 0) /
+          node.points.length
+        const centerY =
+          node.points.reduce((total, point) => total + point.y, 0) /
+          node.points.length
+        withRotation(context, node, centerX, centerY, () => {
+          context.beginPath()
+          context.moveTo(first.x, first.y)
+          for (const point of node.points.slice(1))
+            context.lineTo(point.x, point.y)
+          context.closePath()
+          context.fillStyle = paintStyle(context, node.fill, resources)
+          context.fill()
+          if (node.stroke && (node.strokeWidth ?? 0) > 0) {
+            context.strokeStyle = cssColor(node.stroke)
+            context.lineWidth = node.strokeWidth ?? 1
+            context.lineJoin = node.lineJoin ?? 'miter'
+            context.stroke()
+          }
         })
         break
       }
@@ -200,7 +370,7 @@ export class Canvas2DRenderer implements Renderer {
       const context = stack.overlay.getContext('2d')!
       context.setTransform(1, 0, 0, 1, 0, 0)
       context.clearRect(0, 0, stack.overlay.width, stack.overlay.height)
-      drawNodes2D(context, this.#overlay)
+      drawNodes2D(context, this.#overlay, this.#resourceSources())
     }
     return {
       backend: this.backend,
@@ -241,13 +411,14 @@ export class Canvas2DRenderer implements Renderer {
     context.clearRect(0, 0, canvas.width, canvas.height)
     for (const node of scene.nodes) {
       if (node.kind !== 'image') {
-        drawNodes2D(context, [node])
+        drawNodes2D(context, [node], this.#resourceSources())
         continue
       }
       if (!node.visible || node.opacity === 0) continue
       const resource = this.#resources.get(node.resourceId)
       context.save()
       context.globalAlpha = node.opacity
+      context.globalCompositeOperation = cssBlendMode(node.blendMode)
       context.translate(node.x, node.y)
       context.rotate((node.rotation * Math.PI) / 180)
       context.scale(node.scaleX, node.scaleY)
@@ -277,6 +448,15 @@ export class Canvas2DRenderer implements Renderer {
       }, 'image/png')
     })
     return new Uint8Array(await blob.arrayBuffer())
+  }
+
+  #resourceSources(): ReadonlyMap<string, ImageResourceInput['source']> {
+    return new Map(
+      [...this.#resources.entries()].map(([id, resource]) => [
+        id,
+        resource.source,
+      ]),
+    )
   }
 
   #assertActive(): void {
