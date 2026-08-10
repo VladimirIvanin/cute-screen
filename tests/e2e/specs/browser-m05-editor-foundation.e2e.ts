@@ -37,6 +37,19 @@ async function openM05(): Promise<void> {
   await browser.waitUntil(async () => (await snapshot()).layers.length === 4)
 }
 
+/**
+ * The document-session snapshot is published synchronously, while the toolbar
+ * state is rendered by Vue on its next update.  Waiting for the control keeps
+ * the test coupled to the user-visible contract instead of racing that update.
+ */
+async function clickEnabledHistoryAction(
+  label: 'Undo' | 'Redo',
+): Promise<void> {
+  const action = $(`button[aria-label="${label}"]`)
+  await expect(action).toBeEnabled()
+  await action.click()
+}
+
 describe('M05 editor foundation in browser mode', () => {
   it('uses the persisted document session for base lifecycle and undo', async () => {
     await openM05()
@@ -53,7 +66,7 @@ describe('M05 editor foundation in browser mode', () => {
       (await snapshot()).layers.every((layer) => layer.id !== baseId),
     )
 
-    await $('button[aria-label="Undo"]').click()
+    await clickEnabledHistoryAction('Undo')
     await browser.waitUntil(async () =>
       (await snapshot()).layers.some((layer) => layer.id === baseId),
     )
@@ -72,7 +85,7 @@ describe('M05 editor foundation in browser mode', () => {
         .translateX,
     ).toBe(120)
 
-    await $('button[aria-label="Undo"]').click()
+    await clickEnabledHistoryAction('Undo')
     await browser.waitUntil(async () => (await snapshot()).crop?.x === 20)
     expect(
       (await snapshot()).layers.find((layer) => layer.id === frontId)?.transform
@@ -121,14 +134,14 @@ describe('M05 editor foundation in browser mode', () => {
     )
     expect(moved?.transform.translateY).not.toBe(before?.transform.translateY)
 
-    await $('button[aria-label="Undo"]').click()
+    await clickEnabledHistoryAction('Undo')
     await browser.waitUntil(async () => {
       const layer = (await snapshot()).layers.find(
         (item) => item.id === frontId,
       )
       return layer?.transform.translateX === before?.transform.translateX
     })
-    await $('button[aria-label="Redo"]').click()
+    await clickEnabledHistoryAction('Redo')
     await browser.waitUntil(async () => {
       const layer = (await snapshot()).layers.find(
         (item) => item.id === frontId,
