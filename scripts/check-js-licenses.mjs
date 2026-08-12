@@ -2,6 +2,8 @@ import process from 'node:process'
 
 import { init } from 'license-checker-rseidelsohn'
 
+import { isAllowedProductionLicense } from './js-license-policy.mjs'
+
 const packages = await new Promise((resolve, reject) => {
   init(
     { start: process.cwd(), production: true, excludePrivatePackages: true },
@@ -11,18 +13,6 @@ const packages = await new Promise((resolve, reject) => {
     },
   )
 })
-const allowed = new Set([
-  '0BSD',
-  'Apache-2.0',
-  'BSD-2-Clause',
-  'BSD-3-Clause',
-  'CC0-1.0',
-  'ISC',
-  'MIT',
-  'MIT-0',
-  'Unicode-3.0',
-  'Zlib',
-])
 const violations = []
 
 for (const [name, metadata] of Object.entries(packages)) {
@@ -35,7 +25,7 @@ for (const [name, metadata] of Object.entries(packages)) {
 
   if (
     identifiers.length === 0 ||
-    identifiers.some((license) => !allowed.has(license))
+    identifiers.some((license) => !isAllowedProductionLicense(name, license))
   ) {
     violations.push(`${name}: ${expression || 'UNKNOWN'}`)
   }

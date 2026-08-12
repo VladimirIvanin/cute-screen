@@ -119,6 +119,8 @@ const emit = defineEmits<{
 const store = useEditorShellStore()
 const state = storeToRefs(store)
 const fallbackCopied = ref(false)
+const fallbackVisible = ref(true)
+let fallbackCopiedTimer: number | undefined
 const drawingDefaults = ref<DrawingDefaults>(
   structuredClone(DEFAULT_DRAWING_DEFAULTS),
 )
@@ -2374,9 +2376,20 @@ async function copyCaptureFallback(): Promise<void> {
   try {
     await navigator.clipboard.writeText(command)
     fallbackCopied.value = true
+    if (fallbackCopiedTimer) window.clearTimeout(fallbackCopiedTimer)
+    fallbackCopiedTimer = window.setTimeout(() => {
+      fallbackCopied.value = false
+      fallbackCopiedTimer = undefined
+    }, 3_000)
   } catch (error) {
     console.warn('cute-screen fallback command copy failed', error)
   }
+}
+function dismissCaptureFallback(): void {
+  fallbackVisible.value = false
+  fallbackCopied.value = false
+  if (fallbackCopiedTimer) window.clearTimeout(fallbackCopiedTimer)
+  fallbackCopiedTimer = undefined
 }
 function retryDocumentSave(): void {
   void props.documentSession?.retry()
@@ -2503,6 +2516,7 @@ onBeforeUnmount(() => {
   // Navigation/remount must not leave the coalesced save behind.
   void props.documentSession?.flush()
   props.documentSession?.dispose()
+  if (fallbackCopiedTimer) window.clearTimeout(fallbackCopiedTimer)
   media.removeEventListener('change', onMediaChange)
   window.removeEventListener('keydown', onKeydown)
 })
@@ -2542,7 +2556,7 @@ watch(
       @theme="store.setTheme"
     />
     <div
-      v-if="props.captureFallbackCommand"
+      v-if="props.captureFallbackCommand && fallbackVisible"
       class="cs-capture-fallback"
       role="status"
     >
@@ -2558,6 +2572,15 @@ watch(
             ? translate('captureFallbackCopied')
             : translate('copyCaptureFallback')
         }}
+      </button>
+      <button
+        class="cs-capture-fallback-dismiss"
+        type="button"
+        :aria-label="translate('dismissCaptureFallback')"
+        :title="translate('dismissCaptureFallback')"
+        @click="dismissCaptureFallback"
+      >
+        <span aria-hidden="true">×</span>
       </button>
     </div>
     <div class="cs-workbench">

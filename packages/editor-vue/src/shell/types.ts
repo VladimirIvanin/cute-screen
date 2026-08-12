@@ -199,6 +199,7 @@ export const translationKeys = [
   'captureFallback',
   'copyCaptureFallback',
   'captureFallbackCopied',
+  'dismissCaptureFallback',
   'copyUnavailable',
   'exportUnavailable',
   'layers',

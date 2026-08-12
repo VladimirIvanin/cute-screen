@@ -379,7 +379,7 @@ describe('M02 editor shell', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('shows and confirms copying the exact CLI fallback when global shortcuts are unavailable', async () => {
+  it('shows, copies, and lets the user dismiss the CLI fallback notice', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     const descriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
     Object.defineProperty(navigator, 'clipboard', {
@@ -407,6 +407,12 @@ describe('M02 editor shell', () => {
       "'/opt/Cute Screen/cute-screen' capture --mode area",
     )
     expect(screen.getByText('Capture command copied')).toBeInTheDocument()
+    await fireEvent.click(
+      screen.getByRole('button', { name: 'Dismiss capture fallback notice' }),
+    )
+    expect(
+      screen.queryByText("'/opt/Cute Screen/cute-screen' capture --mode area"),
+    ).not.toBeInTheDocument()
     if (descriptor) Object.defineProperty(navigator, 'clipboard', descriptor)
     else Reflect.deleteProperty(navigator, 'clipboard')
   })

@@ -157,9 +157,13 @@ Network error не перезаписывает последний успешн�
 - Lockfiles обязательны.
 - GitHub Actions pinned по full commit SHA.
 - Rust audit через `cargo audit`/`cargo deny`.
-- JS audit с документированным allowlist.
+- JS audit с fail-closed allowlist из `scripts/js-license-policy.mjs`.
+  Шрифтовая `OFL-1.1` разрешается только для явно проверенной версии пакета;
+  `@fontsource/roboto@5.3.0` одобрен как bundled Roboto из ADR-025. Обновление
+  версии или другой OFL-пакет требует отдельного license audit и новой точной
+  записи в allowlist.
 - SBOM CycloneDX или SPDX создаётся для каждого versioned build.
-- License report проверяет permissive policy.
+- License report проверяет permissive policy и перечисленные asset exceptions.
 - Signing certificates, notarization credentials и updater private keys не создаются и не требуются.
 
 ## Build blockers
