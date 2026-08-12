@@ -331,6 +331,68 @@ function arrowCapNodes(
   return []
 }
 
+function triangleCapInset(
+  cap: unknown,
+  style: ReturnType<typeof stroke>,
+): number {
+  return cap === 'triangle' ? Math.max(style.width * 3, 8) : 0
+}
+
+function trimArrowBodyPoints(
+  points: readonly { readonly x: number; readonly y: number }[],
+  startCap: unknown,
+  endCap: unknown,
+  style: ReturnType<typeof stroke>,
+): readonly { readonly x: number; readonly y: number }[] {
+  const startInset = triangleCapInset(startCap, style)
+  const endInset = triangleCapInset(endCap, style)
+  if ((startInset === 0 && endInset === 0) || points.length < 2)
+    return points
+
+  const segmentLengths = points.slice(1).map((point, index) =>
+    Math.hypot(point.x - points[index]!.x, point.y - points[index]!.y),
+  )
+  const totalLength = segmentLengths.reduce((total, length) => total + length, 0)
+  if (totalLength === 0) return []
+
+  const insetScale = Math.min(
+    1,
+    totalLength / Math.max(startInset + endInset, 1),
+  )
+  const bodyStart = startInset * insetScale
+  const bodyEnd = totalLength - endInset * insetScale
+  if (bodyEnd - bodyStart <= Number.EPSILON) return []
+
+  const pointAtDistance = (distance: number) => {
+    let travelled = 0
+    for (let index = 0; index < segmentLengths.length; index += 1) {
+      const segmentLength = segmentLengths[index]!
+      if (segmentLength === 0) continue
+      if (distance <= travelled + segmentLength) {
+        const start = points[index]!
+        const end = points[index + 1]!
+        const ratio = (distance - travelled) / segmentLength
+        return {
+          x: start.x + (end.x - start.x) * ratio,
+          y: start.y + (end.y - start.y) * ratio,
+        }
+      }
+      travelled += segmentLength
+    }
+    return points.at(-1)!
+  }
+
+  const body = [pointAtDistance(bodyStart)]
+  let travelled = 0
+  for (let index = 0; index < segmentLengths.length - 1; index += 1) {
+    travelled += segmentLengths[index]!
+    if (travelled > bodyStart && travelled < bodyEnd)
+      body.push(points[index + 1]!)
+  }
+  body.push(pointAtDistance(bodyEnd))
+  return body
+}
+
 function drawingNodes(layer: LayerNode): readonly RenderNode[] {
   const payload = layer.payload as JsonObject
   const localBounds = bounds(layer)
@@ -343,8 +405,24 @@ function drawingNodes(layer: LayerNode): readonly RenderNode[] {
     })
     if (payload.path !== 'quadratic') {
       const angle = Math.atan2(end.y - start.y, end.x - start.x)
+      const bodyPoints = trimArrowBodyPoints(
+        [start, end],
+        payload.startCap,
+        payload.endCap,
+        style,
+      )
       return [
-        lineNode(layer, `${layer.id}:body`, start, end, style),
+        ...(bodyPoints.length >= 2
+          ? [
+              lineNode(
+                layer,
+                `${layer.id}:body`,
+                bodyPoints[0]!,
+                bodyPoints.at(-1)!,
+                style,
+              ),
+            ]
+          : []),
         ...arrowCapNodes(
           layer,
           `${layer.id}:start-cap`,
@@ -378,13 +456,19 @@ function drawingNodes(layer: LayerNode): readonly RenderNode[] {
           t * t * end.y,
       }
     })
-    const body = points
+    const bodyPoints = trimArrowBodyPoints(
+      points,
+      payload.startCap,
+      payload.endCap,
+      style,
+    )
+    const body = bodyPoints
       .slice(1)
       .map((point, index) =>
         lineNode(
           layer,
           `${layer.id}:curve:${index}`,
-          points[index]!,
+          bodyPoints[index]!,
           point,
           style,
         ),

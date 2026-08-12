@@ -199,6 +199,61 @@ describe('document render scene', () => {
     expect(scene.nodes[0]).toMatchObject({ dash: [6, 4], lineCap: 'round' })
   })
 
+  it('ends a thick arrow body at the base of its triangle cap', () => {
+    const scene = createDocumentRenderScene({
+      ...document,
+      schemaVersion: 3,
+      layers: [
+        {
+          id: '019c1f62-058e-7000-8000-000000000012',
+          kind: 'arrow',
+          localBounds: { x: 0, y: 0, width: 100, height: 20 },
+          transform: {
+            ...document.layers[0]!.transform,
+            translateX: 0,
+            translateY: 0,
+          },
+          opacity: 1,
+          visible: true,
+          locked: false,
+          blendMode: 'normal',
+          shadows: [],
+          payload: {
+            path: 'straight',
+            start: { x: 0, y: 10 },
+            end: { x: 100, y: 10 },
+            startCap: 'none',
+            endCap: 'triangle',
+            stroke: {
+              color: { red: 1, green: 0, blue: 0, alpha: 1 },
+              width: 20,
+              style: 'solid',
+              cap: 'round',
+              join: 'round',
+            },
+          },
+        },
+      ],
+    })
+
+    expect(scene.nodes[0]).toMatchObject({
+      kind: 'line',
+      x1: 0,
+      y1: 10,
+      x2: 40,
+      y2: 10,
+      strokeWidth: 20,
+    })
+    const triangle = scene.nodes[1]
+    if (!triangle || triangle.kind !== 'polygon')
+      throw new Error('expected triangle cap')
+    expect(triangle.points).toEqual([
+      { x: 100, y: 10 },
+      { x: 40, y: 43 },
+      { x: 40, y: -23 },
+    ])
+  })
+
   it('compiles alternating inner and outer star points', () => {
     const scene = createDocumentRenderScene({
       ...document,

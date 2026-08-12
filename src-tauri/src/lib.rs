@@ -908,6 +908,13 @@ fn hide_editor_for_x11_capture<R: tauri::Runtime>(
 }
 
 fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()> {
+    // TrayIconBuilder does not inherit the window icon. In particular, Windows
+    // registers a notification-area entry without a visible glyph when no tray
+    // image is supplied explicitly.
+    let icon = app
+        .default_window_icon()
+        .cloned()
+        .ok_or_else(|| tauri::Error::AssetNotFound("default tray icon".to_owned()))?;
     let capture_area = MenuItem::with_id(app, "capture-area", "Capture Area", false, None::<&str>)?;
     let capture_window =
         MenuItem::with_id(app, "capture-window", "Capture Window", false, None::<&str>)?;
@@ -928,6 +935,8 @@ fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()
     )?;
 
     TrayIconBuilder::with_id("main-tray")
+        .icon(icon)
+        .tooltip("Cute Screen")
         .menu(&menu)
         .show_menu_on_left_click(true)
         .on_menu_event(|app, event| match event.id.as_ref() {
