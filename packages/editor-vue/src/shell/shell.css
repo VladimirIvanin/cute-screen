@@ -242,18 +242,31 @@ button:focus-visible {
 }
 
 .cs-capture-fallback {
-  display: flex;
+  position: fixed;
+  z-index: 30;
+  top: 64px;
+  right: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 8px;
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--border);
+  width: min(560px, calc(100vw - 24px));
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-overlay);
   color: var(--text-muted);
   font-size: 13px;
 }
 
+.cs-capture-fallback > span {
+  grid-column: 1 / -1;
+}
+
 .cs-capture-fallback code {
+  min-width: 0;
   overflow: hidden;
-  max-width: min(56vw, 680px);
   padding: 2px 6px;
   border-radius: 4px;
   background: var(--surface-hover);
@@ -273,7 +286,6 @@ button:focus-visible {
   display: grid;
   width: 28px;
   height: 28px;
-  margin-left: auto;
   place-items: center;
   border-radius: var(--radius-sm) !important;
   color: var(--text-muted) !important;

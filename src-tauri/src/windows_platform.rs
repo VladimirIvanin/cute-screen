@@ -8,9 +8,10 @@ use uuid::Uuid;
 use windows_sys::Win32::{
     Foundation::{GetLastError, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM},
     Graphics::Gdi::{
-        BI_RGB, BITMAPINFO, BITMAPINFOHEADER, BitBlt, CAPTUREBLT, CreateCompatibleDC,
-        CreateDIBSection, DIB_RGB_COLORS, DeleteDC, DeleteObject, GetDC, HDC, ReleaseDC, SRCCOPY,
-        SelectObject,
+        BI_RGB, BITMAPINFO, BITMAPINFOHEADER, BLACK_BRUSH, BeginPaint, BitBlt, CAPTUREBLT,
+        CreateCompatibleDC, CreateDIBSection, DIB_RGB_COLORS, DeleteDC, DeleteObject, EndPaint,
+        FrameRect, GetDC, GetStockObject, HDC, InvalidateRect, PAINTSTRUCT, ReleaseDC, SRCCOPY,
+        SelectObject, WHITE_BRUSH,
     },
     System::LibraryLoader::GetModuleHandleW,
     UI::WindowsAndMessaging::{
@@ -18,9 +19,9 @@ use windows_sys::Win32::{
         GA_ROOT, GetAncestor, GetForegroundWindow, GetMessageW, GetSystemMetrics, GetWindowRect,
         IDC_CROSS, LWA_ALPHA, LoadCursorW, MSG, PostQuitMessage, RegisterClassW,
         SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SW_SHOW,
-        SetLayeredWindowAttributes, ShowWindow, WM_DESTROY, WM_KEYDOWN, WM_LBUTTONDOWN,
-        WM_LBUTTONUP, WNDCLASSW, WS_EX_LAYERED, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
-        WindowFromPoint,
+        SetLayeredWindowAttributes, ShowWindow, WM_CLOSE, WM_DESTROY, WM_KEYDOWN, WM_LBUTTONDOWN,
+        WM_LBUTTONUP, WM_MOUSEMOVE, WM_PAINT, WNDCLASSW, WS_EX_LAYERED, WS_EX_TOOLWINDOW,
+        WS_EX_TOPMOST, WS_POPUP, WindowFromPoint,
     },
 };
 
@@ -295,23 +296,18 @@ fn select_on_virtual_desktop(
         return Err(error);
     }
 
-    let mut message = MSG::default();
-    let message_result = unsafe { GetMessageW(&mut message, std::ptr::null_mut(), 0, 0) };
-    if message_result == -1 {
-        let error = last_error(correlation_id, "selectorMessageLoop");
-        unsafe { DestroyWindow(window) };
-        return Err(error);
-    }
-    while message_result > 0 {
-        unsafe { DispatchMessageW(&message) };
-        let next = unsafe { GetMessageW(&mut message, std::ptr::null_mut(), 0, 0) };
-        if next == -1 {
-            let error = last_error(correlation_id, "selectorMessageLoop");
-            unsafe { DestroyWindow(window) };
-            return Err(error);
-        }
-        if next == 0 {
-            break;
+    loop {
+        let mut message = MSG::default();
+        match unsafe { GetMessageW(&mut message, std::ptr::null_mut(), 0, 0) } {
+            -1 => {
+                let error = last_error(correlation_id, "selectorMessageLoop");
+                unsafe { DestroyWindow(window) };
+                return Err(error);
+            }
+            0 => break,
+            _ => {
+                unsafe { DispatchMessageW(&message) };
+            }
         }
     }
     unsafe { DestroyWindow(window) };
@@ -335,6 +331,7 @@ fn register_selector_class() -> bool {
         lpfnWndProc: Some(selector_window_proc),
         hInstance: unsafe { GetModuleHandleW(null()) },
         hCursor: cursor,
+        hbrBackground: unsafe { GetStockObject(BLACK_BRUSH).cast() },
         lpszClassName: class_name.as_ptr(),
         ..WNDCLASSW::default()
     };
@@ -360,34 +357,92 @@ unsafe extern "system" fn selector_window_proc(
                 state.start = Some(selector_point(lparam, state.origin));
                 state.end = state.start;
             }
+            unsafe { InvalidateRect(window, null(), 1) };
+            0
+        }
+        WM_MOUSEMOVE => {
+            if let Ok(mut state) = SELECTOR_STATE.lock()
+                && state.start.is_some()
+            {
+                state.end = Some(selector_point(lparam, state.origin));
+            }
+            unsafe { InvalidateRect(window, null(), 1) };
             0
         }
         WM_LBUTTONUP => {
             if let Ok(mut state) = SELECTOR_STATE.lock() {
                 state.end = Some(selector_point(lparam, state.origin));
             }
-            unsafe { PostQuitMessage(0) };
+            post_selector_quit(message, wparam);
             0
         }
         WM_KEYDOWN if wparam == 0x1b => {
             if let Ok(mut state) = SELECTOR_STATE.lock() {
                 state.cancelled = true;
             }
-            unsafe { PostQuitMessage(0) };
+            post_selector_quit(message, wparam);
             0
         }
-        WM_DESTROY => {
-            unsafe { PostQuitMessage(0) };
+        WM_CLOSE => {
+            if let Ok(mut state) = SELECTOR_STATE.lock() {
+                state.cancelled = true;
+            }
+            post_selector_quit(message, wparam);
+            0
+        }
+        WM_DESTROY => 0,
+        WM_PAINT => {
+            paint_selector(window);
             0
         }
         _ => unsafe { DefWindowProcW(window, message, wparam, lparam) },
     }
 }
 
+fn post_selector_quit(message: u32, wparam: WPARAM) {
+    if selector_posts_quit(message, wparam) {
+        unsafe { PostQuitMessage(0) };
+    }
+}
+
+fn selector_posts_quit(message: u32, wparam: WPARAM) -> bool {
+    message == WM_LBUTTONUP || message == WM_CLOSE || (message == WM_KEYDOWN && wparam == 0x1b)
+}
+
+fn paint_selector(window: HWND) {
+    let mut paint = PAINTSTRUCT::default();
+    let dc = unsafe { BeginPaint(window, &mut paint) };
+    if dc.is_null() {
+        return;
+    }
+    let selection = SELECTOR_STATE.lock().ok().and_then(|state| {
+        state
+            .start
+            .zip(state.end)
+            .map(|(start, end)| (start, end, state.origin))
+    });
+    if let Some((start, end, origin)) = selection {
+        let mut rect = RECT {
+            left: start.x.min(end.x) - origin.x,
+            top: start.y.min(end.y) - origin.y,
+            right: start.x.max(end.x) - origin.x,
+            bottom: start.y.max(end.y) - origin.y,
+        };
+        if rect.right == rect.left {
+            rect.right += 1;
+        }
+        if rect.bottom == rect.top {
+            rect.bottom += 1;
+        }
+        unsafe { FrameRect(dc, &rect, GetStockObject(WHITE_BRUSH).cast()) };
+    }
+    unsafe { EndPaint(window, &paint) };
+}
+
 fn selector_point(lparam: LPARAM, origin: POINT) -> POINT {
-    let packed = lparam as u32;
-    let x = i32::from((packed & 0xffff) as u16 as i16);
-    let y = i32::from((packed >> 16) as u16 as i16);
+    let bytes = lparam.to_le_bytes();
+    let x = i32::from(i16::from_le_bytes([bytes[0], bytes[1]]));
+    let y = i32::from(i16::from_le_bytes([bytes[2], bytes[3]]));
     POINT {
         x: origin.x + x,
         y: origin.y + y,
@@ -622,5 +677,11 @@ mod tests {
             (target.x, target.y, target.width, target.height),
             (-100, 80, 30, 40)
         );
+    }
+
+    #[test]
+    fn selector_cleanup_does_not_enqueue_another_quit_for_the_next_capture() {
+        assert!(!super::selector_posts_quit(super::WM_DESTROY, 0));
+        assert!(super::selector_posts_quit(super::WM_LBUTTONUP, 0));
     }
 }

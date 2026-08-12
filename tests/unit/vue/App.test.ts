@@ -400,7 +400,7 @@ describe('M02 editor shell', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('shows, copies, and lets the user dismiss the CLI fallback notice', async () => {
+  it('shows, copies, and lets the user dismiss the CLI fallback snackbar', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     const descriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
     Object.defineProperty(navigator, 'clipboard', {
@@ -418,6 +418,10 @@ describe('M02 editor shell', () => {
     expect(
       screen.getByText("'/opt/Cute Screen/cute-screen' capture --mode area"),
     ).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveAttribute(
+      'data-placement',
+      'overlay',
+    )
     expect(
       screen.getByRole('button', { name: 'Copy capture command' }),
     ).toBeInTheDocument()

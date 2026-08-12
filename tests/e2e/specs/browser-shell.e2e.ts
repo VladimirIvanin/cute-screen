@@ -65,6 +65,46 @@ describe('M02 editor shell in browser mode', () => {
     )
   })
 
+  it('keeps the CLI fallback snackbar out of the zoomed workbench layout', async () => {
+    await browser.setWindowSize(1024, 700)
+    await browser.url('/?m04fallback=1')
+    await expect($('.cs-capture-fallback')).toExist()
+
+    const before = await browser.execute(() => {
+      const fallback = document.querySelector('.cs-capture-fallback')
+      const workbench = document.querySelector('.cs-workbench')
+      if (
+        !(fallback instanceof HTMLElement) ||
+        !(workbench instanceof HTMLElement)
+      ) {
+        throw new Error('Missing fallback snackbar or workbench')
+      }
+      const bounds = workbench.getBoundingClientRect()
+      return {
+        fallbackPosition: getComputedStyle(fallback).position,
+        workbench: { top: bounds.top, height: bounds.height },
+      }
+    })
+
+    expect(before.fallbackPosition).toBe('fixed')
+    expect(before.workbench.top).toBeCloseTo(52, 0)
+    await $('button[aria-label="Zoom in"]').click()
+    await expect($('.cs-zoom-value')).toHaveText('110%')
+
+    const after = await browser.execute(() => {
+      const workbench = document.querySelector('.cs-workbench')
+      if (!(workbench instanceof HTMLElement))
+        throw new Error('Missing workbench')
+      const bounds = workbench.getBoundingClientRect()
+      return { top: bounds.top, height: bounds.height }
+    })
+
+    expect(after).toEqual(before.workbench)
+    await browser.saveScreenshot(
+      path.resolve('artifacts/browser-e2e/m04-fallback-snackbar-1024x700.png'),
+    )
+  })
+
   it('switches locale and theme live with localized accessible names', async () => {
     await browser.setWindowSize(1600, 1000)
     await openShell('ready')

@@ -16,6 +16,7 @@ import {
   type CaptureOutcomeV1,
   type CaptureProgressState,
   type CaptureProgressV1,
+  type CanvasViewportHosts,
   type FrameSummary,
   type EditorDocumentV1,
   type PlatformCapabilities,
@@ -26,6 +27,7 @@ import {
   type ContentImageBridge,
   type ClipboardBridge,
 } from '@cute-screen/editor-vue'
+import { writeResultCanvasToClipboard } from './result-clipboard'
 
 declare global {
   interface Window {
@@ -50,6 +52,9 @@ const m03Harness =
 const m04CaptureHarness =
   import.meta.env.VITE_TEST_HARNESS === 'true' &&
   new URLSearchParams(window.location.search).get('m04') === '1'
+const m04FallbackHarness =
+  import.meta.env.VITE_TEST_HARNESS === 'true' &&
+  new URLSearchParams(window.location.search).get('m04fallback') === '1'
 const m05Harness =
   import.meta.env.VITE_TEST_HARNESS === 'true' &&
   new URLSearchParams(window.location.search).get('m05') === '1'
@@ -91,6 +96,18 @@ const desktopActions: ShellActionAdapter | undefined =
     : '__TAURI_INTERNALS__' in window
       ? {
           run: async (action, signal, reportCaptureProgress) => {
+            if (action === 'copy') {
+              const scene = canvasViewportHosts.value?.scene
+              if (!scene) throw new Error('The rendered result is not ready')
+              if (signal.aborted) {
+                throw new ActionCancelledError('Copy cancelled')
+              }
+              await writeResultCanvasToClipboard(scene)
+              if (signal.aborted) {
+                throw new ActionCancelledError('Copy cancelled')
+              }
+              return 'Result copied'
+            }
             const flush = await documentSession.value?.flush()
             if (flush?.kind === 'failed') {
               throw new Error(flush.error)
@@ -174,6 +191,7 @@ const textureBridge = shallowRef<TextureFillBridge>()
 const contentImageBridge = shallowRef<ContentImageBridge>()
 const clipboardBridge = shallowRef<ClipboardBridge>()
 const systemFonts = shallowRef<readonly SystemFontFace[]>([])
+const canvasViewportHosts = shallowRef<CanvasViewportHosts>()
 let capturedDocumentMount: Promise<boolean> | undefined
 const documentState = shallowRef<ShellDocumentState>({ kind: 'loading' })
 const readOnlyDocument = shallowRef(false)
@@ -192,13 +210,19 @@ const captureAvailable = computed(() =>
 )
 const openImageAvailable = computed(() => '__TAURI_INTERNALS__' in window)
 const captureFallbackCommand = computed(() =>
-  platformCapabilities.value?.cliFallback
-    ? platformCapabilities.value.cliFallbackCommand
-    : undefined,
+  m04FallbackHarness
+    ? "'/opt/Cute Screen/cute-screen' capture --mode area"
+    : platformCapabilities.value?.cliFallback
+      ? platformCapabilities.value.cliFallbackCommand
+      : undefined,
 )
 
 function correlationId(): string {
   return `m03-${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+function onCanvasViewportHostsReady(hosts: CanvasViewportHosts): void {
+  canvasViewportHosts.value = hosts
 }
 
 async function refreshPlatformCapabilities(): Promise<void> {
@@ -675,6 +699,7 @@ onBeforeUnmount(() => {
     :content-image-bridge="contentImageBridge"
     :clipboard-bridge="clipboardBridge"
     :system-fonts="systemFonts"
+    @hosts-ready="onCanvasViewportHostsReady"
     @retry-load="loadPersistedDocument"
   />
 </template>

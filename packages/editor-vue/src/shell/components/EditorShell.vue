@@ -2572,6 +2572,8 @@ watch(
       v-if="props.captureFallbackCommand && fallbackVisible"
       class="cs-capture-fallback"
       role="status"
+      aria-live="polite"
+      data-placement="overlay"
     >
       <span>{{ translate('captureFallback') }}</span>
       <code>{{ props.captureFallbackCommand }}</code>
