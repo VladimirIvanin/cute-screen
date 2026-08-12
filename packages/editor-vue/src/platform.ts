@@ -1,4 +1,8 @@
-export type CaptureBackendKind = 'unavailable' | 'waylandPortal' | 'x11'
+export type CaptureBackendKind =
+  | 'unavailable'
+  | 'waylandPortal'
+  | 'windowsGdi'
+  | 'x11'
 
 export interface CaptureCapabilities {
   readonly available: boolean

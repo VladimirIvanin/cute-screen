@@ -134,12 +134,9 @@ const desktopActions: ShellActionAdapter | undefined =
                 )
               }
               reportCaptureProgress?.('ready')
-              const captureAction =
-                capabilities.session === 'x11' &&
-                capabilities.capture.monitorTarget &&
-                !capabilities.capture.interactiveSelector
-                  ? 'screen'
-                  : 'area'
+              const captureAction = capabilities.capture.interactiveSelector
+                ? 'area'
+                : 'screen'
               const outcome = await tauriDesktopBridge.captureRequest({
                 correlationId: correlationId(),
                 action: captureAction,

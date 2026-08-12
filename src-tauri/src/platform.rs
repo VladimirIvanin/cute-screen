@@ -54,6 +54,7 @@ pub enum SessionKind {
 pub enum CaptureBackendKind {
     Unavailable,
     WaylandPortal,
+    WindowsGdi,
     X11,
 }
 
@@ -113,8 +114,8 @@ impl PlatformCapabilities {
         x11_gate_passed: Option<bool>,
     ) -> Self {
         let portal_available = portal.is_some_and(|probe| probe.screenshot_version > 0);
-        let x11_available = x11_gate_passed.unwrap_or(false);
-        let backend = select_capture_backend(session, portal_available, x11_available);
+        let native_adapter_available = x11_gate_passed.unwrap_or(false);
+        let backend = select_capture_backend(session, portal_available, native_adapter_available);
         let probe = portal.unwrap_or(PortalCapabilityProbe {
             screenshot_version: 0,
             available_targets: 0,
@@ -125,8 +126,9 @@ impl PlatformCapabilities {
         let portal_v3 =
             backend == CaptureBackendKind::WaylandPortal && probe.screenshot_version >= 3;
         let x11 = backend == CaptureBackendKind::X11;
+        let windows_gdi = backend == CaptureBackendKind::WindowsGdi;
         let capture_available = backend != CaptureBackendKind::Unavailable;
-        let hotkeys = if session == SessionKind::X11 && x11_available {
+        let hotkeys = if session == SessionKind::X11 && native_adapter_available {
             HotkeyCapabilities {
                 available: true,
                 backend: HotkeyBackendKind::Native,
@@ -159,7 +161,7 @@ impl PlatformCapabilities {
                 // X11 now owns a frozen-frame native overlay; Wayland's
                 // selector remains exclusively portal-driven.
                 interactive_selector: portal_v2 || x11,
-                monitor_target: x11 || (portal_v3 && probe.available_targets & 1 != 0),
+                monitor_target: x11 || windows_gdi || (portal_v3 && probe.available_targets & 1 != 0),
                 window_target: x11 || (portal_v3 && probe.available_targets & 2 != 0),
                 active_window_target: x11 || (portal_v3 && probe.available_targets & 8 != 0),
                 cursor: false,
@@ -181,6 +183,8 @@ pub fn select_capture_backend(
         SessionKind::Wayland => CaptureBackendKind::Unavailable,
         SessionKind::X11 if x11_gate_passed => CaptureBackendKind::X11,
         SessionKind::X11 => CaptureBackendKind::Unavailable,
+        SessionKind::Windows if x11_gate_passed => CaptureBackendKind::WindowsGdi,
+        SessionKind::Windows => CaptureBackendKind::Unavailable,
         _ => CaptureBackendKind::Unavailable,
     }
 }
@@ -379,5 +383,23 @@ mod tests {
         assert!(capabilities.capture.interactive_selector);
         assert!(capabilities.capture.window_target);
         assert!(capabilities.capture.active_window_target);
+    }
+
+    #[test]
+    fn windows_gdi_advertises_only_the_direct_screen_slice() {
+        let capabilities = PlatformCapabilities::for_session(
+            "windows-gdi".to_owned(),
+            SessionKind::Windows,
+            None,
+            Some(true),
+        );
+
+        assert!(capabilities.capture.available);
+        assert_eq!(capabilities.capture.backend, CaptureBackendKind::WindowsGdi);
+        assert!(capabilities.capture.monitor_target);
+        assert!(!capabilities.capture.interactive_selector);
+        assert!(!capabilities.capture.window_target);
+        assert!(!capabilities.capture.active_window_target);
+        assert!(!capabilities.capture.cursor);
     }
 }

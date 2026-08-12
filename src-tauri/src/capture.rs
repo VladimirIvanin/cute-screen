@@ -312,7 +312,13 @@ impl CaptureController {
                 &request.correlation_id,
             )),
         };
-        #[cfg(not(target_os = "linux"))]
+        #[cfg(target_os = "windows")]
+        let result = crate::windows_platform::WindowsGdiCaptureAdapter.capture_to_transport(
+            request.action.target(),
+            &request.correlation_id,
+            Arc::clone(&self.transport),
+        );
+        #[cfg(not(any(target_os = "linux", target_os = "windows")))]
         let result: Result<CaptureResult, crate::platform::PlatformError> =
             Err(crate::platform::PlatformError::new(
                 PlatformErrorCode::PortalUnavailable,

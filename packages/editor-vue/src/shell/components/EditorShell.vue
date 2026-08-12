@@ -10,6 +10,7 @@ import {
 import { storeToRefs } from 'pinia'
 
 import { t } from '../i18n'
+import { UiIcon } from '../icon'
 import {
   createBrowserDrawingToolPreferencesStorage,
   createBrowserPreferencesStorage,
@@ -2580,7 +2581,7 @@ watch(
         :title="translate('dismissCaptureFallback')"
         @click="dismissCaptureFallback"
       >
-        <span aria-hidden="true">×</span>
+        <UiIcon name="close" />
       </button>
     </div>
     <div class="cs-workbench">

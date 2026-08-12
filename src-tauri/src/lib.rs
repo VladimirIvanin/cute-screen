@@ -47,6 +47,9 @@ use lifecycle::{LaunchIntentV1, LifecycleState, parse_launch};
 use storage::{BlobMetadata, CreateCaptureRequest};
 use storage::{CaptureMetadataV1, LibraryRepository, OpenDocument, RepositoryError};
 
+#[cfg(target_os = "windows")]
+mod windows_platform;
+
 const CAPTURE_PREFLIGHT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 const CAPTURE_DIAGNOSTIC_CAPACITY: usize = 64;
 
@@ -644,17 +647,23 @@ async fn platform_capabilities(correlation_id: String) -> PlatformCapabilities {
     #[cfg(not(target_os = "linux"))]
     let portal = None;
 
-    // The X11 adapter is compiled into the Linux artifact. XFixes cursor
-    // compositing is exposed only after a live extension handshake.
+    // A platform adapter is reported available only after its lightweight
+    // native probe succeeds. XFixes cursor compositing remains gated by its
+    // own live extension handshake below.
     #[cfg(all(target_os = "linux", feature = "x11-capture"))]
-    let x11_adapter_available = x11_platform::X11CaptureAdapter.available();
-    #[cfg(not(all(target_os = "linux", feature = "x11-capture")))]
-    let x11_adapter_available = false;
+    let native_adapter_available = x11_platform::X11CaptureAdapter.available();
+    #[cfg(target_os = "windows")]
+    let native_adapter_available = windows_platform::WindowsGdiCaptureAdapter.available();
+    #[cfg(not(any(
+        all(target_os = "linux", feature = "x11-capture"),
+        target_os = "windows"
+    )))]
+    let native_adapter_available = false;
     let mut capabilities = PlatformCapabilities::for_session(
         correlation_id,
         session,
         portal,
-        Some(x11_adapter_available),
+        Some(native_adapter_available),
     );
     #[cfg(all(target_os = "linux", feature = "x11-capture"))]
     if session == SessionKind::X11 {

@@ -277,8 +277,6 @@ button:focus-visible {
   place-items: center;
   border-radius: var(--radius-sm) !important;
   color: var(--text-muted) !important;
-  font-size: 20px !important;
-  line-height: 1;
 }
 .cs-capture-fallback-dismiss:hover {
   background: var(--surface-hover) !important;
