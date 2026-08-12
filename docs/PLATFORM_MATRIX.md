@@ -2,32 +2,32 @@
 
 ## Поддерживаемые цели
 
-| Платформа       | Архитектура    | Захват                                                                          | Горячие клавиши                        | Неофициальный CI artifact |
-| --------------- | -------------- | ------------------------------------------------------------------------------- | -------------------------------------- | ------------------------- |
-| Linux X11       | x86_64         | `x11rb` visible drawable + собственный frozen overlay; compositor runtime re-smoke pending | Tauri/global-hotkey                    | deb, AppImage             |
-| Linux X11       | aarch64        | `x11rb` visible drawable + собственный frozen overlay; compositor runtime re-smoke pending | Tauri/global-hotkey                    | deb, AppImage             |
-| GNOME Wayland   | x86_64/aarch64 | XDG Screenshot portal                                                           | XDG GlobalShortcuts или CLI fallback   | deb, AppImage             |
-| KDE Wayland     | x86_64/aarch64 | XDG Screenshot portal                                                           | XDG GlobalShortcuts или CLI fallback   | deb, AppImage             |
-| wlroots Wayland | x86_64/aarch64 | Portal при наличии                                                              | Portal при наличии, иначе CLI fallback | deb, AppImage             |
+| Платформа       | Архитектура    | Захват                                                                                             | Горячие клавиши                        | Неофициальный CI artifact |
+| --------------- | -------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------- |
+| Linux X11       | x86_64         | `x11rb` visible drawable + собственный frozen overlay; compositor runtime re-smoke pending         | Tauri/global-hotkey                    | deb, AppImage             |
+| Linux X11       | aarch64        | `x11rb` visible drawable + собственный frozen overlay; compositor runtime re-smoke pending         | Tauri/global-hotkey                    | deb, AppImage             |
+| GNOME Wayland   | x86_64/aarch64 | XDG Screenshot portal                                                                              | XDG GlobalShortcuts или CLI fallback   | deb, AppImage             |
+| KDE Wayland     | x86_64/aarch64 | XDG Screenshot portal                                                                              | XDG GlobalShortcuts или CLI fallback   | deb, AppImage             |
+| wlroots Wayland | x86_64/aarch64 | Portal при наличии                                                                                 | Portal при наличии, иначе CLI fallback | deb, AppImage             |
 | Windows         | x86_64         | DXGI/D3D11 compositor frozen-frame adapter with area/window selector; topmost-window smoke pending | Tauri/global-hotkey                    | NSIS exe                  |
-| Windows 11      | ARM64          | DXGI/D3D11 compositor frozen-frame adapter with area/window selector; runtime smoke pending | Tauri/global-hotkey                    | NSIS exe                  |
-| macOS           | Intel          | Screen capture adapter + overlay                                                | Tauri/global-hotkey                    | universal DMG             |
-| macOS           | Apple Silicon  | Screen capture adapter + overlay                                                | Tauri/global-hotkey                    | universal DMG             |
+| Windows 11      | ARM64          | DXGI/D3D11 compositor frozen-frame adapter with area/window selector; runtime smoke pending        | Tauri/global-hotkey                    | NSIS exe                  |
+| macOS           | Intel          | Screen capture adapter + overlay                                                                   | Tauri/global-hotkey                    | universal DMG             |
+| macOS           | Apple Silicon  | Screen capture adapter + overlay                                                                   | Tauri/global-hotkey                    | universal DMG             |
 
 Точные минимальные версии ОС фиксируются во время финальной runtime-проверки
 capture API и webview. Release baseline не повышается без ADR и CI-доказательства.
 
 ## Capture capabilities
 
-| Возможность      | X11                                            | Wayland portal                                         | Windows               | macOS                   |
-| ---------------- | ---------------------------------------------- | ------------------------------------------------------ | --------------------- | ----------------------- |
-| Area             | Custom frozen overlay                          | System selector                                        | Custom frozen overlay | Custom frozen overlay   |
-| Screen           | Root or Composite Overlay Window               | Portal target/capability                               | DXGI virtual screen   | Direct after permission |
-| Window           | Direct/window list                             | Portal target/capability                               | Direct/window list    | Direct/window list      |
-| Active window    | Window manager adapter                         | Portal when exposed, otherwise clear unavailable state | Native                | Native                  |
-| Repeat last area | Stored physical/image geometry with validation | New portal interaction if silent reuse is unavailable  | Stored geometry       | Stored geometry         |
-| Delay            | App countdown before backend invocation        | App countdown before portal                            | App countdown         | App countdown           |
-| Cursor           | Capability-dependent                           | Portal-dependent                                       | Backend option        | Backend option          |
+| Возможность      | X11                                            | Wayland portal                                         | Windows                               | macOS                   |
+| ---------------- | ---------------------------------------------- | ------------------------------------------------------ | ------------------------------------- | ----------------------- |
+| Area             | Custom frozen overlay                          | System selector                                        | Live selector; DXGI freeze on confirm | Custom frozen overlay   |
+| Screen           | Root or Composite Overlay Window               | Portal target/capability                               | DXGI virtual screen                   | Direct after permission |
+| Window           | Direct/window list                             | Portal target/capability                               | Direct/window list                    | Direct/window list      |
+| Active window    | Window manager adapter                         | Portal when exposed, otherwise clear unavailable state | Native                                | Native                  |
+| Repeat last area | Stored physical/image geometry with validation | New portal interaction if silent reuse is unavailable  | Stored geometry                       | Stored geometry         |
+| Delay            | App countdown before backend invocation        | App countdown before portal                            | App countdown                         | App countdown           |
+| Cursor           | Capability-dependent                           | Portal-dependent                                       | Backend option                        | Backend option          |
 
 UI получает `CaptureCapabilities` и не показывает неподдерживаемый режим как рабочий. Если функция временно недоступна, control disabled с объяснением и доступной альтернативой.
 
@@ -80,8 +80,9 @@ UI получает `CaptureCapabilities` и не показывает непо�
 
 - Windows backend uses DXGI Desktop Duplication plus a D3D11 CPU-readable
   staging texture for every attached output. It assembles one physical
-  virtual-desktop frame under a per-monitor-v2 DPI context before showing the
-  native selector; Area and Window crop that immutable compositor frame.
+  virtual-desktop frame under a per-monitor-v2 DPI context. Screen and Active
+  Window are direct snapshots; Area and Window destroy the selector, restore
+  the foreground window, flush DWM and only then acquire/crop the immutable frame.
   Pointer-only DXGI updates are skipped, protected-content masking and rotated
   outputs fail explicitly, and there is no GDI fallback. Unit assembly/crop and
   a local interactive-desktop compositor probe pass on Windows x64 (2026-08-12);

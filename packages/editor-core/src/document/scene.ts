@@ -346,13 +346,17 @@ function trimArrowBodyPoints(
 ): readonly { readonly x: number; readonly y: number }[] {
   const startInset = triangleCapInset(startCap, style)
   const endInset = triangleCapInset(endCap, style)
-  if ((startInset === 0 && endInset === 0) || points.length < 2)
-    return points
+  if ((startInset === 0 && endInset === 0) || points.length < 2) return points
 
-  const segmentLengths = points.slice(1).map((point, index) =>
-    Math.hypot(point.x - points[index]!.x, point.y - points[index]!.y),
+  const segmentLengths = points
+    .slice(1)
+    .map((point, index) =>
+      Math.hypot(point.x - points[index]!.x, point.y - points[index]!.y),
+    )
+  const totalLength = segmentLengths.reduce(
+    (total, length) => total + length,
+    0,
   )
-  const totalLength = segmentLengths.reduce((total, length) => total + length, 0)
   if (totalLength === 0) return []
 
   const insetScale = Math.min(

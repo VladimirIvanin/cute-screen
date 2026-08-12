@@ -314,7 +314,7 @@ lists и embedded content не являются document data.
 
 ## ADR-027 — Windows capture использует compositor frame
 
-**Статус:** accepted
+**Статус:** superseded by ADR-029
 
 **Контекст:** GDI `BitBlt` даже с `CAPTUREBLT` не гарантирует совпадение с
 видимым результатом DWM. Layered, аппаратно отрисованное или системное окно
@@ -359,3 +359,28 @@ composited/layered окно и проверить его pixels в frozen frame.
 **Последствия:** X11 с активным compositor без Composite Overlay Window получает
 typed capture failure. Существующие non-composited X11 smoke остаются валидны,
 но не доказывают compositor parity.
+
+## ADR-029 — Windows interactive capture freezes on confirmation
+
+**Статус:** accepted
+
+**Контекст:** ADR-027 исправил источник pixels, но сохранил неверный момент
+заморозки: DXGI frame создавался до selector. Если пользователь открывал Area,
+переключался через Alt+Tab на другое окно и затем выбирал область, selector
+показывал новое окно поверх старого frozen frame, а результат содержал старый.
+
+**Решение:** Windows Area и Window сначала выполняют selection. После terminal
+pointer action selector уничтожается, восстанавливается последнее foreground
+окно, с которого selector получил activation, выполняется `DwmFlush`, и только
+затем через DXGI приобретается один immutable compositor frame и применяется
+crop. Screen и Active Window остаются direct snapshots без selector.
+
+**Проверка:** unit contract фиксирует `SelectThenFrame` для Area/Window и
+`FrameThenResolve` для direct targets. Runtime smoke обязан открыть Area,
+переключиться на контрольное foreground окно при открытом selector, подтвердить
+область и проверить pixels нового окна при отсутствии selector pixels.
+
+**Последствия:** визуальная область до подтверждения является live desktop, а
+immutable original определяется в момент подтверждения. X11 frozen overlay не
+получает это поведение автоматически: его task-switch flow требует отдельного
+решения и runtime evidence.

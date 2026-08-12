@@ -26,6 +26,7 @@ use windows::{
 };
 use windows_sys::Win32::{
     Foundation::{GetLastError, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM},
+    Graphics::Dwm::DwmFlush,
     Graphics::Gdi::{
         BLACK_BRUSH, BeginPaint, EndPaint, FrameRect, GetStockObject, InvalidateRect, PAINTSTRUCT,
         WHITE_BRUSH,
@@ -38,11 +39,12 @@ use windows_sys::Win32::{
     UI::WindowsAndMessaging::{
         CS_HREDRAW, CS_VREDRAW, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
         GA_ROOT, GetAncestor, GetForegroundWindow, GetMessageW, GetSystemMetrics, GetWindowRect,
-        IDC_CROSS, LWA_ALPHA, LoadCursorW, MSG, PostQuitMessage, RegisterClassW,
+        IDC_CROSS, IsWindow, LWA_ALPHA, LoadCursorW, MSG, PostQuitMessage, RegisterClassW,
         SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SW_SHOW,
-        SetLayeredWindowAttributes, ShowWindow, WM_CLOSE, WM_DESTROY, WM_KEYDOWN, WM_LBUTTONDOWN,
-        WM_LBUTTONUP, WM_MOUSEMOVE, WM_PAINT, WNDCLASSW, WS_EX_LAYERED, WS_EX_TOOLWINDOW,
-        WS_EX_TOPMOST, WS_POPUP, WindowFromPoint,
+        SetForegroundWindow, SetLayeredWindowAttributes, ShowWindow, WA_INACTIVE, WM_ACTIVATE,
+        WM_CLOSE, WM_DESTROY, WM_KEYDOWN, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEACTIVATE,
+        WM_MOUSEMOVE, WM_PAINT, WNDCLASSW, WS_EX_LAYERED, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
+        WS_POPUP, WindowFromPoint,
     },
 };
 
@@ -53,9 +55,10 @@ use crate::{
 
 /// Direct Windows desktop capture using DWM's composited DXGI outputs.
 ///
-/// Captures a frozen virtual desktop into an application-owned BGRA buffer before a
-/// native selector is shown. Area and window requests crop that same immutable
-/// frame, so the selector itself never appears in the result.
+/// Captures a composited virtual desktop into an application-owned BGRA buffer.
+/// Interactive targets resolve and destroy their selector first, then acquire
+/// one immutable frame, so a task switch made during selection is included and
+/// the selector itself never appears in the result.
 pub struct WindowsCompositorCaptureAdapter;
 
 impl WindowsCompositorCaptureAdapter {
@@ -75,14 +78,16 @@ impl WindowsCompositorCaptureAdapter {
             ThreadDpiAwarenessGuard::enter().map_err(|stage| failure(correlation_id, stage))?;
         let source_geometry =
             virtual_screen_geometry().map_err(|stage| failure(correlation_id, stage))?;
-        let outputs = capture_compositor_outputs(&source_geometry, correlation_id)?;
-        let source_bgra = compose_compositor_outputs(&source_geometry, &outputs, correlation_id)?;
-        let geometry = match target {
-            CaptureTarget::Monitor => source_geometry.clone(),
-            CaptureTarget::Area => area_geometry(&source_geometry, correlation_id)?,
-            CaptureTarget::Window => selected_window_geometry(&source_geometry, correlation_id)?,
-            CaptureTarget::ActiveWindow => {
-                active_window_geometry(&source_geometry, correlation_id)?
+        let (geometry, source_bgra) = match capture_execution_order(target) {
+            CaptureExecutionOrder::SelectThenFrame => {
+                let geometry = resolve_target_geometry(target, &source_geometry, correlation_id)?;
+                let frame = capture_compositor_frame(&source_geometry, correlation_id)?;
+                (geometry, frame)
+            }
+            CaptureExecutionOrder::FrameThenResolve => {
+                let frame = capture_compositor_frame(&source_geometry, correlation_id)?;
+                let geometry = resolve_target_geometry(target, &source_geometry, correlation_id)?;
+                (geometry, frame)
             }
         };
         let bgra = crop_bgra(&source_bgra, &source_geometry, &geometry, correlation_id)?;
@@ -106,6 +111,42 @@ impl WindowsCompositorCaptureAdapter {
             cursor_included: Some(false),
         })
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CaptureExecutionOrder {
+    SelectThenFrame,
+    FrameThenResolve,
+}
+
+fn capture_execution_order(target: CaptureTarget) -> CaptureExecutionOrder {
+    match target {
+        CaptureTarget::Area | CaptureTarget::Window => CaptureExecutionOrder::SelectThenFrame,
+        CaptureTarget::Monitor | CaptureTarget::ActiveWindow => {
+            CaptureExecutionOrder::FrameThenResolve
+        }
+    }
+}
+
+fn resolve_target_geometry(
+    target: CaptureTarget,
+    source: &CaptureGeometry,
+    correlation_id: &str,
+) -> Result<CaptureGeometry, PlatformError> {
+    match target {
+        CaptureTarget::Monitor => Ok(source.clone()),
+        CaptureTarget::Area => area_geometry(source, correlation_id),
+        CaptureTarget::Window => selected_window_geometry(source, correlation_id),
+        CaptureTarget::ActiveWindow => active_window_geometry(source, correlation_id),
+    }
+}
+
+fn capture_compositor_frame(
+    source: &CaptureGeometry,
+    correlation_id: &str,
+) -> Result<Vec<u8>, PlatformError> {
+    let outputs = capture_compositor_outputs(source, correlation_id)?;
+    compose_compositor_outputs(source, &outputs, correlation_id)
 }
 
 struct ThreadDpiAwarenessGuard(DPI_AWARENESS_CONTEXT);
@@ -137,6 +178,7 @@ struct SelectionState {
     start: Option<POINT>,
     end: Option<POINT>,
     cancelled: bool,
+    restore_foreground: isize,
 }
 
 static SELECTOR_STATE: Mutex<SelectionState> = Mutex::new(SelectionState {
@@ -144,6 +186,7 @@ static SELECTOR_STATE: Mutex<SelectionState> = Mutex::new(SelectionState {
     start: None,
     end: None,
     cancelled: false,
+    restore_foreground: 0,
 });
 static SELECTOR_CLASS_REGISTERED: OnceLock<bool> = OnceLock::new();
 
@@ -308,6 +351,7 @@ fn select_on_virtual_desktop(
                 x: source.x,
                 y: source.y,
             },
+            restore_foreground: unsafe { GetForegroundWindow() } as isize,
             ..SelectionState::default()
         };
     }
@@ -352,17 +396,45 @@ fn select_on_virtual_desktop(
             }
         }
     }
-    unsafe { DestroyWindow(window) };
-    let selection = SELECTOR_STATE
+    let selection = *SELECTOR_STATE
         .lock()
         .map_err(|_| failure(correlation_id, "selectorState"))?;
+    unsafe { DestroyWindow(window) };
     if selection.cancelled || selection.start.is_none() || selection.end.is_none() {
         return Err(PlatformError::new(
             PlatformErrorCode::Cancelled,
             correlation_id,
         ));
     }
-    Ok(*selection)
+    restore_foreground_after_selector(selection.restore_foreground, correlation_id)?;
+    Ok(selection)
+}
+
+fn restore_foreground_after_selector(
+    restore_foreground: isize,
+    correlation_id: &str,
+) -> Result<(), PlatformError> {
+    let restore = restore_foreground as HWND;
+    if !restore.is_null()
+        && unsafe { IsWindow(restore) } != 0
+        && unsafe { GetForegroundWindow() } != restore
+        && unsafe { SetForegroundWindow(restore) } == 0
+    {
+        return Err(failure(correlation_id, "restoreForegroundWindow"));
+    }
+    if unsafe { DwmFlush() } < 0 {
+        return Err(failure(correlation_id, "flushDesktopComposition"));
+    }
+    Ok(())
+}
+
+fn foreground_restore_candidate(
+    activation: usize,
+    previous: isize,
+    selector: isize,
+) -> Option<isize> {
+    (activation != WA_INACTIVE as usize && previous != 0 && previous != selector)
+        .then_some(previous)
 }
 
 fn register_selector_class() -> bool {
@@ -394,6 +466,25 @@ unsafe extern "system" fn selector_window_proc(
     lparam: LPARAM,
 ) -> LRESULT {
     match message {
+        WM_MOUSEACTIVATE => {
+            let foreground = unsafe { GetForegroundWindow() };
+            if !foreground.is_null()
+                && foreground != window
+                && let Ok(mut state) = SELECTOR_STATE.lock()
+            {
+                state.restore_foreground = foreground as isize;
+            }
+            unsafe { DefWindowProcW(window, message, wparam, lparam) }
+        }
+        WM_ACTIVATE => {
+            if let Some(previous) =
+                foreground_restore_candidate(wparam & 0xffff, lparam, window as isize)
+                && let Ok(mut state) = SELECTOR_STATE.lock()
+            {
+                state.restore_foreground = previous;
+            }
+            unsafe { DefWindowProcW(window, message, wparam, lparam) }
+        }
         WM_LBUTTONDOWN => {
             if let Ok(mut state) = SELECTOR_STATE.lock() {
                 state.start = Some(selector_point(lparam, state.origin));
@@ -833,7 +924,8 @@ fn last_error(correlation_id: &str, stage: &'static str) -> PlatformError {
 #[cfg(test)]
 mod tests {
     use super::{
-        CompositorOutputFrame, compose_compositor_outputs, crop_bgra, encode_bgra_png,
+        CaptureExecutionOrder, CompositorOutputFrame, capture_execution_order,
+        compose_compositor_outputs, crop_bgra, encode_bgra_png, foreground_restore_candidate,
         intersect_rect,
     };
     use crate::platform::CaptureGeometry;
@@ -895,6 +987,29 @@ mod tests {
     }
 
     #[test]
+    fn interactive_targets_select_before_acquiring_the_compositor_frame() {
+        assert_eq!(
+            capture_execution_order(crate::platform::CaptureTarget::Area),
+            CaptureExecutionOrder::SelectThenFrame
+        );
+        assert_eq!(
+            capture_execution_order(crate::platform::CaptureTarget::Window),
+            CaptureExecutionOrder::SelectThenFrame
+        );
+        assert_eq!(
+            capture_execution_order(crate::platform::CaptureTarget::Monitor),
+            CaptureExecutionOrder::FrameThenResolve
+        );
+    }
+
+    #[test]
+    fn selector_restores_the_window_that_was_active_before_its_latest_activation() {
+        assert_eq!(foreground_restore_candidate(1, 42, 7), Some(42));
+        assert_eq!(foreground_restore_candidate(0, 42, 7), None);
+        assert_eq!(foreground_restore_candidate(1, 7, 7), None);
+    }
+
+    #[test]
     fn assembles_compositor_outputs_with_row_pitch_and_negative_coordinates() {
         let desktop = geometry(-2, 0, 4, 1);
         let outputs = [
@@ -922,6 +1037,7 @@ mod tests {
     #[test]
     #[ignore = "requires an interactive Windows desktop"]
     fn compositor_runtime_probe_reads_the_visible_desktop() {
+        let _dpi_awareness = super::ThreadDpiAwarenessGuard::enter().expect("DPI awareness");
         let desktop = super::virtual_screen_geometry().expect("virtual desktop");
         let outputs = super::capture_compositor_outputs(&desktop, "dxgi-runtime-probe")
             .expect("DXGI compositor outputs");

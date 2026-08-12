@@ -40,11 +40,13 @@ fake-adapter data; it is orchestration evidence, not a real-OS capture claim.
 
 Windows screen, area and window capture has DXGI compositor-frame assembly,
 PNG-encoding, DPI and frozen-frame crop coverage plus a local interactive
-desktop probe. Platform evidence still requires a real screenshot with Task
-Manager (or another independently rendered system/layered window) visibly above
-a control window: select an area crossing both, decode the produced PNG, verify
-control pixels from both windows, then confirm controller → immutable library →
-mounted document. A PNG that contains only the windows underneath is a failure.
+desktop probe. Platform evidence still requires opening Area while one control
+window is visible, switching through Alt+Tab to Task Manager (or another
+independently rendered system/layered window) while the selector remains open,
+then selecting an area crossing it. Decode the produced PNG, verify pixels from
+the newly foregrounded window, then confirm controller → immutable library →
+mounted document. A PNG containing the pre-selector desktop or only the windows
+underneath is a failure.
 
 The corresponding X11 compositor smoke must run with `_NET_WM_CM_Sn` owned,
 place a separate composited/layered control window above the base fixture and

@@ -68,12 +68,12 @@ ashpd = { version = "=0.13.13", default-features = false, features = ["tokio", "
 x11rb = { version = "=0.14.0", default-features = false, features = ["composite", "image", "randr", "xfixes"], optional = true }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_System_LibraryLoader", "Win32_UI_HiDpi", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Graphics_Gdi", "Win32_System_LibraryLoader", "Win32_UI_HiDpi", "Win32_UI_WindowsAndMessaging"] }
 windows = { version = "=0.61.3", features = ["Win32_Foundation", "Win32_Graphics_Direct3D", "Win32_Graphics_Direct3D11", "Win32_Graphics_Dxgi", "Win32_Graphics_Dxgi_Common", "Win32_Graphics_Gdi"] }
 
-[target.'cfg(target_os = "windows")'.dev-dependencies]
-# Compile the pure x11rb adapter and its policy tests on Windows CI too. This
-# catches protocol/API drift even when a Linux sysroot is unavailable locally.
+[dev-dependencies]
+# `cargo check --all-targets` compiles the cfg(test) X11 adapter on every CI
+# host. Keep its pure-Rust protocol dependency available outside Linux too.
 x11rb = { version = "=0.14.0", default-features = false, features = ["composite", "image", "randr", "xfixes"] }
 
 [features]
