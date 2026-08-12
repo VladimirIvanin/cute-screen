@@ -1,16 +1,26 @@
-use std::{ffi::c_void, sync::Arc};
+use std::{
+    ffi::c_void,
+    ptr::null,
+    sync::{Arc, Mutex, OnceLock},
+};
 
 use uuid::Uuid;
 use windows_sys::Win32::{
-    Foundation::{GetLastError, HWND},
+    Foundation::{GetLastError, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM},
     Graphics::Gdi::{
         BI_RGB, BITMAPINFO, BITMAPINFOHEADER, BitBlt, CAPTUREBLT, CreateCompatibleDC,
         CreateDIBSection, DIB_RGB_COLORS, DeleteDC, DeleteObject, GetDC, HDC, ReleaseDC, SRCCOPY,
         SelectObject,
     },
+    System::LibraryLoader::GetModuleHandleW,
     UI::WindowsAndMessaging::{
-        GetSystemMetrics, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN,
-        SM_YVIRTUALSCREEN,
+        CS_HREDRAW, CS_VREDRAW, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
+        GA_ROOT, GetAncestor, GetForegroundWindow, GetMessageW, GetSystemMetrics, GetWindowRect,
+        IDC_CROSS, LWA_ALPHA, LoadCursorW, MSG, PostQuitMessage, RegisterClassW,
+        SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SW_SHOW,
+        SetLayeredWindowAttributes, ShowWindow, WM_DESTROY, WM_KEYDOWN, WM_LBUTTONDOWN,
+        WM_LBUTTONUP, WNDCLASSW, WS_EX_LAYERED, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+        WindowFromPoint,
     },
 };
 
@@ -21,9 +31,9 @@ use crate::{
 
 /// Direct Windows desktop capture using the GDI virtual-screen surface.
 ///
-/// This deliberately advertises only a non-interactive screen target. Area
-/// selection, per-window capture and cursor composition each need their own
-/// native contract and must not be inferred from a successful screen read.
+/// Captures a frozen virtual desktop into an application-owned DIB before a
+/// native selector is shown. Area and window requests crop that same immutable
+/// frame, so the selector itself never appears in the result.
 pub struct WindowsGdiCaptureAdapter;
 
 impl WindowsGdiCaptureAdapter {
@@ -44,15 +54,18 @@ impl WindowsGdiCaptureAdapter {
         correlation_id: &str,
         transport: Arc<ImageTransportService>,
     ) -> Result<CaptureResult, PlatformError> {
-        if target != CaptureTarget::Monitor {
-            return Err(PlatformError::new(
-                PlatformErrorCode::InvalidTarget,
-                correlation_id,
-            ));
-        }
-
-        let geometry = virtual_screen_geometry().map_err(|stage| failure(correlation_id, stage))?;
-        let bgra = capture_virtual_screen(&geometry, correlation_id)?;
+        let source_geometry =
+            virtual_screen_geometry().map_err(|stage| failure(correlation_id, stage))?;
+        let source_bgra = capture_virtual_screen(&source_geometry, correlation_id)?;
+        let geometry = match target {
+            CaptureTarget::Monitor => source_geometry.clone(),
+            CaptureTarget::Area => area_geometry(&source_geometry, correlation_id)?,
+            CaptureTarget::Window => selected_window_geometry(&source_geometry, correlation_id)?,
+            CaptureTarget::ActiveWindow => {
+                active_window_geometry(&source_geometry, correlation_id)?
+            }
+        };
+        let bgra = crop_bgra(&source_bgra, &source_geometry, &geometry, correlation_id)?;
         let png = encode_bgra_png(&bgra, geometry.width, geometry.height, correlation_id)?;
         let image_token = Uuid::now_v7().simple().to_string();
         transport.import_owned_bytes(
@@ -72,6 +85,312 @@ impl WindowsGdiCaptureAdapter {
             geometry: Some(geometry),
             cursor_included: Some(false),
         })
+    }
+}
+
+#[derive(Clone, Copy, Default)]
+struct SelectionState {
+    origin: POINT,
+    start: Option<POINT>,
+    end: Option<POINT>,
+    cancelled: bool,
+}
+
+static SELECTOR_STATE: Mutex<SelectionState> = Mutex::new(SelectionState {
+    origin: POINT { x: 0, y: 0 },
+    start: None,
+    end: None,
+    cancelled: false,
+});
+static SELECTOR_CLASS_REGISTERED: OnceLock<bool> = OnceLock::new();
+
+fn area_geometry(
+    source: &CaptureGeometry,
+    correlation_id: &str,
+) -> Result<CaptureGeometry, PlatformError> {
+    let selection = select_on_virtual_desktop(source, correlation_id)?;
+    let (Some(start), Some(end)) = (selection.start, selection.end) else {
+        return Err(PlatformError::new(
+            PlatformErrorCode::Cancelled,
+            correlation_id,
+        ));
+    };
+    let left = start.x.min(end.x);
+    let top = start.y.min(end.y);
+    let right = start.x.max(end.x);
+    let bottom = start.y.max(end.y);
+    let geometry = intersect_rect(source, left, top, right - left, bottom - top)
+        .ok_or_else(|| PlatformError::new(PlatformErrorCode::Cancelled, correlation_id))?;
+    Ok(geometry)
+}
+
+fn selected_window_geometry(
+    source: &CaptureGeometry,
+    correlation_id: &str,
+) -> Result<CaptureGeometry, PlatformError> {
+    let selection = select_on_virtual_desktop(source, correlation_id)?;
+    let point = selection
+        .end
+        .ok_or_else(|| PlatformError::new(PlatformErrorCode::Cancelled, correlation_id))?;
+    let window = unsafe { WindowFromPoint(point) };
+    window_geometry(source, window, correlation_id)
+}
+
+fn active_window_geometry(
+    source: &CaptureGeometry,
+    correlation_id: &str,
+) -> Result<CaptureGeometry, PlatformError> {
+    let window = unsafe { GetForegroundWindow() };
+    window_geometry(source, window, correlation_id)
+}
+
+fn window_geometry(
+    source: &CaptureGeometry,
+    window: HWND,
+    correlation_id: &str,
+) -> Result<CaptureGeometry, PlatformError> {
+    if window.is_null() {
+        return Err(PlatformError::new(
+            PlatformErrorCode::InvalidTarget,
+            correlation_id,
+        ));
+    }
+    let root = unsafe { GetAncestor(window, GA_ROOT) };
+    if root.is_null() {
+        return Err(PlatformError::new(
+            PlatformErrorCode::InvalidTarget,
+            correlation_id,
+        ));
+    }
+    let mut rect = RECT::default();
+    if unsafe { GetWindowRect(root, &mut rect) } == 0 {
+        return Err(last_error(correlation_id, "getWindowRect"));
+    }
+    intersect_rect(
+        source,
+        rect.left,
+        rect.top,
+        rect.right - rect.left,
+        rect.bottom - rect.top,
+    )
+    .ok_or_else(|| PlatformError::new(PlatformErrorCode::InvalidTarget, correlation_id))
+}
+
+fn intersect_rect(
+    source: &CaptureGeometry,
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+) -> Option<CaptureGeometry> {
+    if width <= 0 || height <= 0 {
+        return None;
+    }
+    let source_right = i64::from(source.x) + i64::from(source.width);
+    let source_bottom = i64::from(source.y) + i64::from(source.height);
+    let right = i64::from(x) + i64::from(width);
+    let bottom = i64::from(y) + i64::from(height);
+    let left = i64::from(source.x).max(i64::from(x));
+    let top = i64::from(source.y).max(i64::from(y));
+    let right = source_right.min(right);
+    let bottom = source_bottom.min(bottom);
+    if right <= left || bottom <= top {
+        return None;
+    }
+    let width = u32::try_from(right - left).ok()?;
+    let height = u32::try_from(bottom - top).ok()?;
+    Some(CaptureGeometry {
+        x: i32::try_from(left).ok()?,
+        y: i32::try_from(top).ok()?,
+        width,
+        height,
+        source_width: width,
+        source_height: height,
+        layout_fingerprint: None,
+        monitor_ids: None,
+    })
+}
+
+fn crop_bgra(
+    source: &[u8],
+    source_geometry: &CaptureGeometry,
+    target: &CaptureGeometry,
+    correlation_id: &str,
+) -> Result<Vec<u8>, PlatformError> {
+    let expected_source = checked_pixel_len(source_geometry.width, source_geometry.height)
+        .ok_or_else(|| failure(correlation_id, "sourcePixelBufferSize"))?;
+    if source.len() != expected_source {
+        return Err(failure(correlation_id, "sourcePixelBufferLength"));
+    }
+    let output_len = checked_pixel_len(target.width, target.height)
+        .ok_or_else(|| failure(correlation_id, "cropPixelBufferSize"))?;
+    let x = usize::try_from(target.x - source_geometry.x)
+        .map_err(|_| failure(correlation_id, "cropX"))?;
+    let y = usize::try_from(target.y - source_geometry.y)
+        .map_err(|_| failure(correlation_id, "cropY"))?;
+    let source_width = usize::try_from(source_geometry.width)
+        .map_err(|_| failure(correlation_id, "sourceWidth"))?;
+    let target_width =
+        usize::try_from(target.width).map_err(|_| failure(correlation_id, "cropWidth"))?;
+    let target_height =
+        usize::try_from(target.height).map_err(|_| failure(correlation_id, "cropHeight"))?;
+    let mut output = vec![0; output_len];
+    for row in 0..target_height {
+        let source_offset = ((y + row) * source_width + x) * 4;
+        let target_offset = row * target_width * 4;
+        output[target_offset..target_offset + target_width * 4]
+            .copy_from_slice(&source[source_offset..source_offset + target_width * 4]);
+    }
+    Ok(output)
+}
+
+fn select_on_virtual_desktop(
+    source: &CaptureGeometry,
+    correlation_id: &str,
+) -> Result<SelectionState, PlatformError> {
+    if !*SELECTOR_CLASS_REGISTERED.get_or_init(register_selector_class) {
+        return Err(last_error(correlation_id, "registerSelectorClass"));
+    }
+    let width =
+        i32::try_from(source.width).map_err(|_| failure(correlation_id, "selectorWidth"))?;
+    let height =
+        i32::try_from(source.height).map_err(|_| failure(correlation_id, "selectorHeight"))?;
+    let class_name = selector_class_name();
+    {
+        let mut state = SELECTOR_STATE
+            .lock()
+            .map_err(|_| failure(correlation_id, "selectorState"))?;
+        *state = SelectionState {
+            origin: POINT {
+                x: source.x,
+                y: source.y,
+            },
+            ..SelectionState::default()
+        };
+    }
+    let window = unsafe {
+        CreateWindowExW(
+            WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED,
+            class_name.as_ptr(),
+            null(),
+            WS_POPUP,
+            source.x,
+            source.y,
+            width,
+            height,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            GetModuleHandleW(null()),
+            null(),
+        )
+    };
+    if window.is_null() {
+        return Err(last_error(correlation_id, "createSelectorWindow"));
+    }
+    unsafe { ShowWindow(window, SW_SHOW) };
+    let layered = unsafe { SetLayeredWindowAttributes(window, 0, 48, LWA_ALPHA) };
+    if layered == 0 {
+        let error = last_error(correlation_id, "showSelectorWindow");
+        unsafe { DestroyWindow(window) };
+        return Err(error);
+    }
+
+    let mut message = MSG::default();
+    let message_result = unsafe { GetMessageW(&mut message, std::ptr::null_mut(), 0, 0) };
+    if message_result == -1 {
+        let error = last_error(correlation_id, "selectorMessageLoop");
+        unsafe { DestroyWindow(window) };
+        return Err(error);
+    }
+    while message_result > 0 {
+        unsafe { DispatchMessageW(&message) };
+        let next = unsafe { GetMessageW(&mut message, std::ptr::null_mut(), 0, 0) };
+        if next == -1 {
+            let error = last_error(correlation_id, "selectorMessageLoop");
+            unsafe { DestroyWindow(window) };
+            return Err(error);
+        }
+        if next == 0 {
+            break;
+        }
+    }
+    unsafe { DestroyWindow(window) };
+    let selection = SELECTOR_STATE
+        .lock()
+        .map_err(|_| failure(correlation_id, "selectorState"))?;
+    if selection.cancelled || selection.start.is_none() || selection.end.is_none() {
+        return Err(PlatformError::new(
+            PlatformErrorCode::Cancelled,
+            correlation_id,
+        ));
+    }
+    Ok(*selection)
+}
+
+fn register_selector_class() -> bool {
+    let class_name = selector_class_name();
+    let cursor = unsafe { LoadCursorW(std::ptr::null_mut(), IDC_CROSS) };
+    let class = WNDCLASSW {
+        style: CS_HREDRAW | CS_VREDRAW,
+        lpfnWndProc: Some(selector_window_proc),
+        hInstance: unsafe { GetModuleHandleW(null()) },
+        hCursor: cursor,
+        lpszClassName: class_name.as_ptr(),
+        ..WNDCLASSW::default()
+    };
+    unsafe { RegisterClassW(&class) != 0 }
+}
+
+fn selector_class_name() -> Vec<u16> {
+    "CuteScreenCaptureSelector"
+        .encode_utf16()
+        .chain(std::iter::once(0))
+        .collect()
+}
+
+unsafe extern "system" fn selector_window_proc(
+    window: HWND,
+    message: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    match message {
+        WM_LBUTTONDOWN => {
+            if let Ok(mut state) = SELECTOR_STATE.lock() {
+                state.start = Some(selector_point(lparam, state.origin));
+                state.end = state.start;
+            }
+            0
+        }
+        WM_LBUTTONUP => {
+            if let Ok(mut state) = SELECTOR_STATE.lock() {
+                state.end = Some(selector_point(lparam, state.origin));
+            }
+            unsafe { PostQuitMessage(0) };
+            0
+        }
+        WM_KEYDOWN if wparam == 0x1b => {
+            if let Ok(mut state) = SELECTOR_STATE.lock() {
+                state.cancelled = true;
+            }
+            unsafe { PostQuitMessage(0) };
+            0
+        }
+        WM_DESTROY => {
+            unsafe { PostQuitMessage(0) };
+            0
+        }
+        _ => unsafe { DefWindowProcW(window, message, wparam, lparam) },
+    }
+}
+
+fn selector_point(lparam: LPARAM, origin: POINT) -> POINT {
+    let packed = lparam as u32;
+    let x = i32::from((packed & 0xffff) as u16 as i16);
+    let y = i32::from((packed >> 16) as u16 as i16);
+    POINT {
+        x: origin.x + x,
+        y: origin.y + y,
     }
 }
 
@@ -252,7 +571,21 @@ fn last_error(correlation_id: &str, stage: &'static str) -> PlatformError {
 
 #[cfg(test)]
 mod tests {
-    use super::encode_bgra_png;
+    use super::{crop_bgra, encode_bgra_png, intersect_rect};
+    use crate::platform::CaptureGeometry;
+
+    fn geometry(x: i32, y: i32, width: u32, height: u32) -> CaptureGeometry {
+        CaptureGeometry {
+            x,
+            y,
+            width,
+            height,
+            source_width: width,
+            source_height: height,
+            layout_fingerprint: None,
+            monitor_ids: None,
+        }
+    }
 
     #[test]
     fn encodes_top_down_bgra_as_opaque_rgba_png() {
@@ -264,5 +597,30 @@ mod tests {
 
         assert_eq!((info.width, info.height), (1, 1));
         assert_eq!(&output[..info.buffer_size()], &[250, 10, 5, 255]);
+    }
+
+    #[test]
+    fn crops_selected_physical_bounds_from_the_frozen_virtual_frame() {
+        let source = geometry(-100, 20, 3, 2);
+        let target = geometry(-99, 21, 2, 1);
+        let pixels = [
+            1, 0, 0, 255, 2, 0, 0, 255, 3, 0, 0, 255, 4, 0, 0, 255, 5, 0, 0, 255, 6, 0, 0, 255,
+        ];
+
+        let cropped = crop_bgra(&pixels, &source, &target, "crop-test").expect("crop");
+
+        assert_eq!(cropped, vec![5, 0, 0, 255, 6, 0, 0, 255]);
+    }
+
+    #[test]
+    fn intersects_window_bounds_with_the_virtual_desktop() {
+        let source = geometry(-100, 20, 100, 100);
+
+        let target = intersect_rect(&source, -120, 80, 50, 70).expect("intersection");
+
+        assert_eq!(
+            (target.x, target.y, target.width, target.height),
+            (-100, 80, 30, 40)
+        );
     }
 }

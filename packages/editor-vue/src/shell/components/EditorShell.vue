@@ -2210,6 +2210,18 @@ function onKeydown(event: KeyboardEvent): void {
     return
   }
   const modifier = event.metaKey || event.ctrlKey
+  if (!modifier && !event.altKey) {
+    const shortcut = event.key.toLowerCase()
+    const tool = tools.value.find(
+      (candidate) =>
+        !candidate.disabled && candidate.shortcut?.toLowerCase() === shortcut,
+    )
+    if (tool) {
+      event.preventDefault()
+      store.selectTool(tool.id)
+      return
+    }
+  }
   if (modifier && event.key.toLowerCase() === 'o') {
     if (props.openImageAvailable) {
       event.preventDefault()

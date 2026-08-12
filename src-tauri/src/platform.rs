@@ -158,14 +158,18 @@ impl PlatformCapabilities {
             capture: CaptureCapabilities {
                 available: capture_available,
                 backend,
-                // X11 now owns a frozen-frame native overlay; Wayland's
-                // selector remains exclusively portal-driven.
-                interactive_selector: portal_v2 || x11,
+                // Native X11 and Windows adapters own a frozen-frame
+                // selector; Wayland's remains exclusively portal-driven.
+                interactive_selector: portal_v2 || x11 || windows_gdi,
                 monitor_target: x11
                     || windows_gdi
                     || (portal_v3 && probe.available_targets & 1 != 0),
-                window_target: x11 || (portal_v3 && probe.available_targets & 2 != 0),
-                active_window_target: x11 || (portal_v3 && probe.available_targets & 8 != 0),
+                window_target: x11
+                    || windows_gdi
+                    || (portal_v3 && probe.available_targets & 2 != 0),
+                active_window_target: x11
+                    || windows_gdi
+                    || (portal_v3 && probe.available_targets & 8 != 0),
                 cursor: false,
             },
             hotkeys,
@@ -388,7 +392,7 @@ mod tests {
     }
 
     #[test]
-    fn windows_gdi_advertises_only_the_direct_screen_slice() {
+    fn windows_gdi_advertises_area_screen_and_window_targets() {
         let capabilities = PlatformCapabilities::for_session(
             "windows-gdi".to_owned(),
             SessionKind::Windows,
@@ -399,9 +403,9 @@ mod tests {
         assert!(capabilities.capture.available);
         assert_eq!(capabilities.capture.backend, CaptureBackendKind::WindowsGdi);
         assert!(capabilities.capture.monitor_target);
-        assert!(!capabilities.capture.interactive_selector);
-        assert!(!capabilities.capture.window_target);
-        assert!(!capabilities.capture.active_window_target);
+        assert!(capabilities.capture.interactive_selector);
+        assert!(capabilities.capture.window_target);
+        assert!(capabilities.capture.active_window_target);
         assert!(!capabilities.capture.cursor);
     }
 }

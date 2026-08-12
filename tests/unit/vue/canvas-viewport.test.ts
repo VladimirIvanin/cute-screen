@@ -154,6 +154,29 @@ describe('M05 CanvasViewport transforms', () => {
     expect(surface.style.height).toBe('100px')
   })
 
+  it('pans the scroll surface when Hand is active', async () => {
+    const { container, scene } = mountViewport('hand')
+    const scroll = container.querySelector(
+      '.cs-canvas-scroll',
+    ) as HTMLDivElement
+    scroll.scrollLeft = 50
+    scroll.scrollTop = 60
+
+    await fireEvent.pointerDown(scene, {
+      pointerId: 1,
+      clientX: 50,
+      clientY: 50,
+    })
+    await fireEvent.pointerMove(scene, {
+      pointerId: 1,
+      clientX: 30,
+      clientY: 40,
+    })
+
+    expect(scroll.scrollLeft).toBe(70)
+    expect(scroll.scrollTop).toBe(70)
+  })
+
   it('commits one constrained corner resize only on pointer release', async () => {
     const { scene, emitted } = mountViewport()
 

@@ -88,6 +88,27 @@ describe('M02 editor shell', () => {
     expect(view.emitted('openImage')).toEqual([[]])
   })
 
+  it('activates Hand with H outside text editing without intercepting text input', async () => {
+    render(EditorShell, {
+      props: { fixture: 'ready' },
+      global: { plugins: [createEditorShellPinia()] },
+    })
+
+    const hand = screen.getByRole('button', { name: 'Hand' })
+    expect(hand).toHaveAttribute('aria-pressed', 'false')
+
+    await fireEvent.keyDown(window, { key: 'h' })
+    expect(hand).toHaveAttribute('aria-pressed', 'true')
+
+    const textInput = document.createElement('textarea')
+    document.body.append(textInput)
+    textInput.focus()
+    await fireEvent.keyDown(textInput, { key: 'v' })
+
+    expect(hand).toHaveAttribute('aria-pressed', 'true')
+    textInput.remove()
+  })
+
   it('exposes compact text background presets only in the contextual toolbar', async () => {
     render(EditorShell, {
       props: {

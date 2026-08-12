@@ -313,11 +313,26 @@ impl CaptureController {
             )),
         };
         #[cfg(target_os = "windows")]
-        let result = crate::windows_platform::WindowsGdiCaptureAdapter.capture_to_transport(
-            request.action.target(),
-            &request.correlation_id,
-            Arc::clone(&self.transport),
-        );
+        let result = {
+            let target = request.action.target();
+            let correlation_id = request.correlation_id.clone();
+            let transport = Arc::clone(&self.transport);
+            match tokio::task::spawn_blocking(move || {
+                crate::windows_platform::WindowsGdiCaptureAdapter.capture_to_transport(
+                    target,
+                    &correlation_id,
+                    transport,
+                )
+            })
+            .await
+            {
+                Ok(result) => result,
+                Err(_) => Err(crate::platform::PlatformError::new(
+                    PlatformErrorCode::CaptureFailed,
+                    &request.correlation_id,
+                )),
+            }
+        };
         #[cfg(not(any(target_os = "linux", target_os = "windows")))]
         let result: Result<CaptureResult, crate::platform::PlatformError> =
             Err(crate::platform::PlatformError::new(
@@ -483,7 +498,9 @@ fn fake_capture_frame(
 }
 
 fn capture_backend_metadata_name() -> &'static str {
-    if cfg!(target_os = "linux")
+    if cfg!(target_os = "windows") {
+        "windowsGdi"
+    } else if cfg!(target_os = "linux")
         && std::env::var("XDG_SESSION_TYPE")
             .is_ok_and(|session| session.eq_ignore_ascii_case("x11"))
     {

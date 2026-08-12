@@ -9,8 +9,8 @@
 | GNOME Wayland   | x86_64/aarch64 | XDG Screenshot portal                              | XDG GlobalShortcuts или CLI fallback   | deb, AppImage             |
 | KDE Wayland     | x86_64/aarch64 | XDG Screenshot portal                              | XDG GlobalShortcuts или CLI fallback   | deb, AppImage             |
 | wlroots Wayland | x86_64/aarch64 | Portal при наличии                                 | Portal при наличии, иначе CLI fallback | deb, AppImage             |
-| Windows         | x86_64         | GDI virtual-screen adapter (M04); selector pending | Tauri/global-hotkey                    | NSIS exe                  |
-| Windows 11      | ARM64          | GDI virtual-screen adapter (M04); selector pending | Tauri/global-hotkey                    | NSIS exe                  |
+| Windows         | x86_64         | GDI frozen-frame adapter with area/window selector (M04); runtime smoke pending | Tauri/global-hotkey                    | NSIS exe                  |
+| Windows 11      | ARM64          | GDI frozen-frame adapter with area/window selector (M04); runtime smoke pending | Tauri/global-hotkey                    | NSIS exe                  |
 | macOS           | Intel          | Screen capture adapter + overlay                   | Tauri/global-hotkey                    | universal DMG             |
 | macOS           | Apple Silicon  | Screen capture adapter + overlay                   | Tauri/global-hotkey                    | universal DMG             |
 
@@ -21,7 +21,7 @@ capture API и webview. Release baseline не повышается без ADR и
 
 | Возможность      | X11                                            | Wayland portal                                         | Windows                 | macOS                   |
 | ---------------- | ---------------------------------------------- | ------------------------------------------------------ | ----------------------- | ----------------------- |
-| Area             | Custom frozen overlay                          | System selector                                        | Pending native selector | Custom frozen overlay   |
+| Area             | Custom frozen overlay                          | System selector                                        | Custom frozen overlay   | Custom frozen overlay   |
 | Screen           | Direct                                         | Portal target/capability                               | GDI virtual screen      | Direct after permission |
 | Window           | Direct/window list                             | Portal target/capability                               | Direct/window list      | Direct/window list      |
 | Active window    | Window manager adapter                         | Portal when exposed, otherwise clear unavailable state | Native                  | Native                  |
@@ -75,13 +75,13 @@ UI получает `CaptureCapabilities` и не показывает непо�
 ### Windows
 
 - M04 Windows backend uses `GetSystemMetrics` plus GDI `BitBlt` from the
-  virtual desktop into an application-owned top-down DIB, converts BGRA to a
-  PNG and writes it to the owned image transport. It advertises only the
-  direct Screen target (`windowsGdi`); area selection, window/active-window,
-  repeat-area, cursor composition and hotkeys stay disabled. The UI therefore
-  requests `screen`, not an unavailable area selector. The pure PNG conversion
-  and capability contracts pass in Rust; real desktop capture/runtime evidence
-  remains pending and this is not a `supported` claim.
+  virtual desktop into an application-owned top-down DIB. It freezes that frame
+  before showing a native overlay: Area crops drag bounds and Window resolves
+  the clicked top-level window; Screen and Active Window are direct targets.
+  All outputs convert BGRA to PNG in the owned image transport. Cursor
+  composition, repeat-area and hotkeys remain unavailable. Rust capability and
+  frozen-frame crop contracts pass; a real Windows desktop smoke is still
+  required before this becomes a `supported` claim.
 - Локальный M01 smoke на Windows x64 подтвердил WebView2 runtime: asset decode,
   binary IPC/Blob fallback и typed error для corrupted PNG.
 - Повторная локальная regression-проверка 2026-08-10 на Windows 10 Home 22H2

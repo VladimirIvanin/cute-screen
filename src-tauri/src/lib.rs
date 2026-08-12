@@ -916,6 +916,8 @@ fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()
         .cloned()
         .ok_or_else(|| tauri::Error::AssetNotFound("default tray icon".to_owned()))?;
     let capture_area = MenuItem::with_id(app, "capture-area", "Capture Area", false, None::<&str>)?;
+    let capture_screen =
+        MenuItem::with_id(app, "capture-screen", "Capture Screen", false, None::<&str>)?;
     let capture_window =
         MenuItem::with_id(app, "capture-window", "Capture Window", false, None::<&str>)?;
     let show = MenuItem::with_id(app, "show-editor", "Show Editor", true, None::<&str>)?;
@@ -926,6 +928,7 @@ fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()
         app,
         &[
             &capture_area,
+            &capture_screen,
             &capture_window,
             &separator,
             &show,
@@ -945,6 +948,11 @@ fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()
                 capture_request_for_tray(capture::CaptureAction::Area),
                 false,
             ),
+            "capture-screen" => start_capture(
+                app,
+                capture_request_for_tray(capture::CaptureAction::Screen),
+                false,
+            ),
             "capture-window" => start_capture(
                 app,
                 capture_request_for_tray(capture::CaptureAction::Window),
@@ -955,7 +963,7 @@ fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()
             _ => {}
         })
         .build(app)?;
-    refresh_tray_capture_items(capture_area, capture_window);
+    refresh_tray_capture_items(capture_area, capture_screen, capture_window);
     Ok(())
 }
 
@@ -964,11 +972,13 @@ fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()
 /// action that looks available but immediately fails in an unsupported session.
 fn refresh_tray_capture_items<R: tauri::Runtime>(
     capture_area: MenuItem<R>,
+    capture_screen: MenuItem<R>,
     capture_window: MenuItem<R>,
 ) {
     tauri::async_runtime::spawn(async move {
         let capabilities = platform_capabilities("tray-capabilities".to_owned()).await;
-        let _ = capture_area.set_enabled(capabilities.capture.available);
+        let _ = capture_area.set_enabled(capabilities.capture.interactive_selector);
+        let _ = capture_screen.set_enabled(capabilities.capture.monitor_target);
         let _ = capture_window.set_enabled(capabilities.capture.window_target);
     });
 }
@@ -1462,6 +1472,10 @@ mod tests {
         assert_eq!(
             action_for_shortcut_id("capture-active-window"),
             Some(crate::capture::CaptureAction::ActiveWindow)
+        );
+        assert_eq!(
+            action_for_shortcut_id("capture-screen"),
+            Some(crate::capture::CaptureAction::Screen)
         );
         assert_eq!(action_for_shortcut_id("untrusted-action"), None);
     }
