@@ -62,6 +62,11 @@ export type RenderLineJoin = 'miter' | 'round' | 'bevel'
 interface RenderNodeBase {
   readonly id: string
   readonly rotation: number
+  /** Optional layer-space scale. When present, rotation and scale share this origin. */
+  readonly scaleX?: number
+  readonly scaleY?: number
+  readonly transformOriginX?: number
+  readonly transformOriginY?: number
   readonly opacity: number
   readonly visible: boolean
   readonly blendMode?: RenderBlendMode
@@ -295,6 +300,23 @@ function validateStrokeStyle(node: RenderLineNode | RenderPathNode): void {
 function assertNodeBase(node: RenderNode): void {
   if (!node.id) throw new Error('Render node id must not be empty')
   assertFinite(node.rotation, `${node.id}.rotation`)
+  if (node.scaleX !== undefined) assertFinite(node.scaleX, `${node.id}.scaleX`)
+  if (node.scaleY !== undefined) assertFinite(node.scaleY, `${node.id}.scaleY`)
+  if (node.scaleX === 0 || node.scaleY === 0) {
+    throw new RangeError(`Render node ${node.id} scale must not be zero`)
+  }
+  if (
+    (node.transformOriginX === undefined) !==
+    (node.transformOriginY === undefined)
+  ) {
+    throw new RangeError(
+      `Render node ${node.id} transform origin must contain both coordinates`,
+    )
+  }
+  if (node.transformOriginX !== undefined) {
+    assertFinite(node.transformOriginX, `${node.id}.transformOriginX`)
+    assertFinite(node.transformOriginY!, `${node.id}.transformOriginY`)
+  }
   if (!Number.isFinite(node.opacity) || node.opacity < 0 || node.opacity > 1) {
     throw new RangeError(
       `Render node ${node.id} opacity must be between 0 and 1`,

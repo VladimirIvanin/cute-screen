@@ -9,6 +9,46 @@ function asHtmlCanvas(canvas: unknown): HTMLCanvasElement {
 }
 
 describe('Canvas2DRenderer', () => {
+  it('applies a shared negative layer scale to vector annotations', async () => {
+    const renderer = new Canvas2DRenderer()
+    const sceneCanvas = createCanvas(64, 64)
+    await renderer.initialize({
+      scene: asHtmlCanvas(sceneCanvas),
+      overlay: asHtmlCanvas(createCanvas(64, 64)),
+      dpr: 1,
+      correlationId: 'flipped-vector',
+    })
+    renderer.setScene(
+      createRenderSceneSnapshot({
+        width: 64,
+        height: 64,
+        nodes: [
+          {
+            kind: 'rect',
+            id: 'annotation',
+            x: 8,
+            y: 8,
+            width: 8,
+            height: 8,
+            rotation: 0,
+            scaleX: 1,
+            scaleY: -1,
+            transformOriginX: 0,
+            transformOriginY: 32,
+            opacity: 1,
+            visible: true,
+            fill: { red: 1, green: 0, blue: 0, alpha: 1 },
+          },
+        ],
+      }),
+    )
+
+    renderer.render(['scene'])
+    const context = sceneCanvas.getContext('2d')!
+    expect(context.getImageData(12, 52, 1, 1).data[3]).toBeGreaterThan(0)
+    expect(context.getImageData(12, 12, 1, 1).data[3]).toBe(0)
+  })
+
   it('strokes a marker contour as one continuous path', async () => {
     const renderer = new Canvas2DRenderer()
     const sceneCanvas = createCanvas(64, 64)

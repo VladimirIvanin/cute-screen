@@ -7,6 +7,48 @@ import { describe, expect, it } from 'vitest'
 import { renderHeadlessCanvasKitPng } from './canvaskit'
 
 describe('CanvasKit headless renderer', () => {
+  it('applies a shared negative layer scale to vector annotations', async () => {
+    const canvasKit = (await CanvasKitInit({
+      locateFile: () =>
+        path.resolve(
+          process.cwd(),
+          'packages/editor-renderer/node_modules/canvaskit-wasm/bin/canvaskit.wasm',
+        ),
+    })) as import('./canvaskit').CanvasKitApi
+    const png = renderHeadlessCanvasKitPng(
+      canvasKit,
+      createRenderSceneSnapshot({
+        width: 64,
+        height: 64,
+        nodes: [
+          {
+            kind: 'rect',
+            id: 'annotation',
+            x: 8,
+            y: 8,
+            width: 8,
+            height: 8,
+            rotation: 0,
+            scaleX: 1,
+            scaleY: -1,
+            transformOriginX: 0,
+            transformOriginY: 32,
+            opacity: 1,
+            visible: true,
+            fill: { red: 1, green: 0, blue: 0, alpha: 1 },
+          },
+        ],
+      }),
+    )
+    const image = await loadImage(png)
+    const canvas = createCanvas(image.width, image.height)
+    const context = canvas.getContext('2d')
+    context.drawImage(image, 0, 0)
+
+    expect(context.getImageData(12, 52, 1, 1).data[3]).toBeGreaterThan(0)
+    expect(context.getImageData(12, 12, 1, 1).data[3]).toBe(0)
+  })
+
   it('renders a contiguous marker path headlessly', async () => {
     const canvasKit = (await CanvasKitInit({
       locateFile: () =>

@@ -1006,11 +1006,28 @@ function calloutNodes(
 
 /** Converts persisted nodes to renderer-neutral, ordered scene nodes. */
 export function createDocumentRenderScene(document: EditorDocumentV1) {
-  const nodes: RenderNode[] = document.layers.flatMap((layer) => {
-    if (layer.kind === 'text') return textNodes(layer)
-    if (layer.kind === 'numberedMarker') return numberedMarkerNodes(layer)
-    if (layer.kind === 'callout') return calloutNodes(layer)
-    if (layer.kind !== 'image') return drawingNodes(layer)
+  const nodes: RenderNode[] = []
+  for (const layer of document.layers) {
+    if (layer.kind !== 'image') {
+      const annotationNodes =
+        layer.kind === 'text'
+          ? textNodes(layer)
+          : layer.kind === 'numberedMarker'
+            ? numberedMarkerNodes(layer)
+            : layer.kind === 'callout'
+              ? calloutNodes(layer)
+              : drawingNodes(layer)
+      nodes.push(
+        ...annotationNodes.map((node) => ({
+          ...node,
+          scaleX: layer.transform.scaleX,
+          scaleY: layer.transform.scaleY,
+          transformOriginX: layer.transform.translateX,
+          transformOriginY: layer.transform.translateY,
+        })),
+      )
+      continue
+    }
     const bounds = layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
     const imageBorder = layer.payload.border
       ? stroke(layer.payload.border)
@@ -1019,32 +1036,30 @@ export function createDocumentRenderScene(document: EditorDocumentV1) {
       0,
       Math.min(layer.payload.radius ?? 0, bounds.width / 2, bounds.height / 2),
     )
-    return [
-      {
-        id: layer.id,
-        kind: 'image' as const,
-        resourceId: layer.payload.blobHash,
-        x: layer.transform.translateX + bounds.x,
-        y: layer.transform.translateY + bounds.y,
-        width: bounds.width,
-        height: bounds.height,
-        scaleX: layer.transform.scaleX,
-        scaleY: layer.transform.scaleY,
-        rotation: layer.transform.rotation,
-        opacity: layer.opacity,
-        visible: layer.visible,
-        blendMode: layer.blendMode ?? 'normal',
-        ...(imageRadius > 0 ? { cornerRadius: imageRadius } : {}),
-        ...(imageBorder
-          ? {
-              stroke: imageBorder.color,
-              strokeWidth: imageBorder.width,
-              lineJoin: imageBorder.join,
-            }
-          : {}),
-      },
-    ]
-  })
+    nodes.push({
+      id: layer.id,
+      kind: 'image' as const,
+      resourceId: layer.payload.blobHash,
+      x: layer.transform.translateX + bounds.x,
+      y: layer.transform.translateY + bounds.y,
+      width: bounds.width,
+      height: bounds.height,
+      scaleX: layer.transform.scaleX,
+      scaleY: layer.transform.scaleY,
+      rotation: layer.transform.rotation,
+      opacity: layer.opacity,
+      visible: layer.visible,
+      blendMode: layer.blendMode ?? 'normal',
+      ...(imageRadius > 0 ? { cornerRadius: imageRadius } : {}),
+      ...(imageBorder
+        ? {
+            stroke: imageBorder.color,
+            strokeWidth: imageBorder.width,
+            lineJoin: imageBorder.join,
+          }
+        : {}),
+    })
+  }
   return createRenderSceneSnapshot({
     width: document.canvas.width,
     height: document.canvas.height,

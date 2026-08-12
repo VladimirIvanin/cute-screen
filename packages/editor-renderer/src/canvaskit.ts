@@ -383,7 +383,7 @@ function configureStrokePaint(
   return undefined
 }
 
-function withRotation(
+function withTransform(
   canvas: CanvasKitCanvas,
   node: RenderNode,
   centerX: number,
@@ -391,7 +391,16 @@ function withRotation(
   draw: () => void,
 ): void {
   canvas.save()
-  if (node.rotation !== 0) canvas.rotate(node.rotation, centerX, centerY)
+  const originX = node.transformOriginX ?? centerX
+  const originY = node.transformOriginY ?? centerY
+  const scaleX = node.scaleX ?? 1
+  const scaleY = node.scaleY ?? 1
+  if (node.rotation !== 0 || scaleX !== 1 || scaleY !== 1) {
+    canvas.translate(originX, originY)
+    canvas.rotate(node.rotation, 0, 0)
+    canvas.scale(scaleX, scaleY)
+    canvas.translate(-originX, -originY)
+  }
   draw()
   canvas.restore()
 }
@@ -488,7 +497,7 @@ export function drawNodesCanvasKit(
               ? roundedRectPath(canvasKit, node)
               : undefined
           try {
-            withRotation(
+            withTransform(
               canvas,
               node,
               node.x + node.width / 2,
@@ -529,7 +538,7 @@ export function drawNodesCanvasKit(
             node.centerX + node.radiusX,
             node.centerY + node.radiusY,
           )
-          withRotation(canvas, node, node.centerX, node.centerY, () => {
+          withTransform(canvas, node, node.centerX, node.centerY, () => {
             shader = configureFillPaint(
               canvasKit,
               fill,
@@ -553,7 +562,7 @@ export function drawNodesCanvasKit(
           break
         }
         case 'line':
-          withRotation(
+          withTransform(
             canvas,
             node,
             (node.x1 + node.x2) / 2,
@@ -588,7 +597,7 @@ export function drawNodesCanvasKit(
           try {
             const builtPath = pathBuilder.detach()
             path = builtPath
-            withRotation(canvas, node, centerX, centerY, () => {
+            withTransform(canvas, node, centerX, centerY, () => {
               pathEffect = configureStrokePaint(
                 canvasKit,
                 stroke,
@@ -621,7 +630,7 @@ export function drawNodesCanvasKit(
           try {
             const builtPath = pathBuilder.detach()
             path = builtPath
-            withRotation(canvas, node, centerX, centerY, () => {
+            withTransform(canvas, node, centerX, centerY, () => {
               shader = configureFillPaint(
                 canvasKit,
                 fill,
@@ -656,7 +665,7 @@ export function drawNodesCanvasKit(
           if (!typeface) break
           const font = new canvasKit.Font(typeface, node.fontSize)
           try {
-            withRotation(
+            withTransform(
               canvas,
               node,
               node.x + node.width / 2,

@@ -4,9 +4,12 @@ import { describe, expect, it } from 'vitest'
 import {
   applyEditorCommand,
   createFlipCanvasCommand,
+  multiplyMatrices,
   revertEditorCommand,
+  transformToMatrix,
   type EditorDocumentV1,
   type LayerNode,
+  type Matrix2D,
 } from '../index'
 
 const DOCUMENT_ID = '019c1f62-058e-7000-8000-000000000000'
@@ -157,4 +160,35 @@ describe('editor command operations', () => {
     expect(after.crop).toEqual({ x: 60, y: 20, width: 30, height: 40 })
     expect(revertEditorCommand(after, command)).toEqual(before)
   })
+
+  it.each(['horizontal', 'vertical'] as const)(
+    'composes a %s canvas reflection with the complete layer transform',
+    (axis) => {
+      const transformed = {
+        ...layer('middle'),
+        transform: {
+          translateX: 23,
+          translateY: 31,
+          rotation: 37,
+          scaleX: 1.4,
+          scaleY: 0.65,
+        },
+      }
+      const before = document([transformed])
+      const command = createFlipCanvasCommand(before, axis)
+      const actual = transformToMatrix(command.afterLayers[0]!.transform)
+      const reflection: Matrix2D =
+        axis === 'horizontal'
+          ? { a: -1, b: 0, c: 0, d: 1, e: before.canvas.width, f: 0 }
+          : { a: 1, b: 0, c: 0, d: -1, e: 0, f: before.canvas.height }
+      const expected = multiplyMatrices(
+        reflection,
+        transformToMatrix(transformed.transform),
+      )
+
+      for (const field of ['a', 'b', 'c', 'd', 'e', 'f'] as const) {
+        expect(actual[field]).toBeCloseTo(expected[field], 12)
+      }
+    },
+  )
 })

@@ -199,6 +199,52 @@ describe('document render scene', () => {
     expect(scene.nodes[0]).toMatchObject({ dash: [6, 4], lineCap: 'round' })
   })
 
+  it('preserves the complete transform for non-image render nodes', () => {
+    const scene = createDocumentRenderScene({
+      ...document,
+      schemaVersion: 3,
+      layers: [
+        {
+          id: '019c1f62-058e-7000-8000-000000000002',
+          kind: 'shape',
+          localBounds: { x: 0, y: 0, width: 20, height: 10 },
+          transform: {
+            translateX: 17,
+            translateY: 23,
+            rotation: 31,
+            scaleX: 1.25,
+            scaleY: -0.75,
+          },
+          opacity: 1,
+          visible: true,
+          locked: false,
+          payload: {
+            shape: 'rectangle',
+            fill: { kind: 'none' },
+            stroke: {
+              color: { red: 1, green: 0, blue: 0, alpha: 1 },
+              width: 2,
+              style: 'solid',
+              cap: 'round',
+              join: 'round',
+            },
+            cornerRadius: 0,
+            starPoints: 5,
+            starInnerRatio: 0.45,
+          },
+        },
+      ],
+    })
+
+    expect(scene.nodes[0]).toMatchObject({
+      rotation: 31,
+      scaleX: 1.25,
+      scaleY: -0.75,
+      transformOriginX: 17,
+      transformOriginY: 23,
+    })
+  })
+
   it('ends a thick arrow body at the base of its triangle cap', () => {
     const scene = createDocumentRenderScene({
       ...document,

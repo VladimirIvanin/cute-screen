@@ -146,7 +146,7 @@ function paintStyle(
   return gradient
 }
 
-function withRotation(
+function withTransform(
   context: Context2D,
   node: RenderNode,
   centerX: number,
@@ -156,10 +156,15 @@ function withRotation(
   context.save()
   context.globalAlpha = node.opacity
   context.globalCompositeOperation = cssBlendMode(node.blendMode)
-  if (node.rotation !== 0) {
-    context.translate(centerX, centerY)
+  const originX = node.transformOriginX ?? centerX
+  const originY = node.transformOriginY ?? centerY
+  const scaleX = node.scaleX ?? 1
+  const scaleY = node.scaleY ?? 1
+  if (node.rotation !== 0 || scaleX !== 1 || scaleY !== 1) {
+    context.translate(originX, originY)
     context.rotate((node.rotation * Math.PI) / 180)
-    context.translate(-centerX, -centerY)
+    context.scale(scaleX, scaleY)
+    context.translate(-originX, -originY)
   }
   draw()
   context.restore()
@@ -203,7 +208,7 @@ export function drawNodes2D(
       case 'rect': {
         const centerX = node.x + node.width / 2
         const centerY = node.y + node.height / 2
-        withRotation(context, node, centerX, centerY, () => {
+        withTransform(context, node, centerX, centerY, () => {
           context.fillStyle = paintStyle(context, node.fill, resources)
           if (node.stroke && (node.strokeWidth ?? 0) > 0) {
             context.strokeStyle = cssColor(node.stroke)
@@ -234,7 +239,7 @@ export function drawNodes2D(
         break
       }
       case 'ellipse':
-        withRotation(context, node, node.centerX, node.centerY, () => {
+        withTransform(context, node, node.centerX, node.centerY, () => {
           context.beginPath()
           context.ellipse(
             node.centerX,
@@ -258,7 +263,7 @@ export function drawNodes2D(
       case 'line': {
         const centerX = (node.x1 + node.x2) / 2
         const centerY = (node.y1 + node.y2) / 2
-        withRotation(context, node, centerX, centerY, () => {
+        withTransform(context, node, centerX, centerY, () => {
           context.beginPath()
           context.moveTo(node.x1, node.y1)
           context.lineTo(node.x2, node.y2)
@@ -280,7 +285,7 @@ export function drawNodes2D(
           (Math.min(...node.points.map((point) => point.y)) +
             Math.max(...node.points.map((point) => point.y))) /
           2
-        withRotation(context, node, centerX, centerY, () => {
+        withTransform(context, node, centerX, centerY, () => {
           context.beginPath()
           context.moveTo(node.points[0]!.x, node.points[0]!.y)
           for (const point of node.points.slice(1))
@@ -302,7 +307,7 @@ export function drawNodes2D(
         const centerY =
           node.points.reduce((total, point) => total + point.y, 0) /
           node.points.length
-        withRotation(context, node, centerX, centerY, () => {
+        withTransform(context, node, centerX, centerY, () => {
           context.beginPath()
           context.moveTo(first.x, first.y)
           for (const point of node.points.slice(1))
@@ -326,7 +331,7 @@ export function drawNodes2D(
       case 'text': {
         const centerX = node.x + node.width / 2
         const centerY = node.y + node.height / 2
-        withRotation(context, node, centerX, centerY, () => {
+        withTransform(context, node, centerX, centerY, () => {
           context.font = `${node.fontStyle} ${node.fontWeight} ${node.fontSize}px "${node.fontFamily.replaceAll('"', '')}", sans-serif`
           context.textBaseline = 'top'
           context.textAlign =
