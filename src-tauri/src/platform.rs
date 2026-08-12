@@ -161,7 +161,9 @@ impl PlatformCapabilities {
                 // X11 now owns a frozen-frame native overlay; Wayland's
                 // selector remains exclusively portal-driven.
                 interactive_selector: portal_v2 || x11,
-                monitor_target: x11 || windows_gdi || (portal_v3 && probe.available_targets & 1 != 0),
+                monitor_target: x11
+                    || windows_gdi
+                    || (portal_v3 && probe.available_targets & 1 != 0),
                 window_target: x11 || (portal_v3 && probe.available_targets & 2 != 0),
                 active_window_target: x11 || (portal_v3 && probe.available_targets & 8 != 0),
                 cursor: false,

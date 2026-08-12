@@ -2,32 +2,32 @@
 
 ## Поддерживаемые цели
 
-| Платформа       | Архитектура    | Захват                                | Горячие клавиши                        | Неофициальный CI artifact |
-| --------------- | -------------- | ------------------------------------- | -------------------------------------- | ------------------------- |
-| Linux X11       | x86_64         | `x11rb` adapter + собственный overlay | Tauri/global-hotkey                    | deb, AppImage             |
-| Linux X11       | aarch64        | `x11rb` adapter + собственный overlay | Tauri/global-hotkey                    | deb, AppImage             |
-| GNOME Wayland   | x86_64/aarch64 | XDG Screenshot portal                 | XDG GlobalShortcuts или CLI fallback   | deb, AppImage             |
-| KDE Wayland     | x86_64/aarch64 | XDG Screenshot portal                 | XDG GlobalShortcuts или CLI fallback   | deb, AppImage             |
-| wlroots Wayland | x86_64/aarch64 | Portal при наличии                    | Portal при наличии, иначе CLI fallback | deb, AppImage             |
-| Windows         | x86_64         | Native adapter (M04) + overlay        | Tauri/global-hotkey                    | NSIS exe                  |
-| Windows 11      | ARM64          | Native adapter (M04) + overlay        | Tauri/global-hotkey                    | NSIS exe                  |
-| macOS           | Intel          | Screen capture adapter + overlay      | Tauri/global-hotkey                    | universal DMG             |
-| macOS           | Apple Silicon  | Screen capture adapter + overlay      | Tauri/global-hotkey                    | universal DMG             |
+| Платформа       | Архитектура    | Захват                                             | Горячие клавиши                        | Неофициальный CI artifact |
+| --------------- | -------------- | -------------------------------------------------- | -------------------------------------- | ------------------------- |
+| Linux X11       | x86_64         | `x11rb` adapter + собственный overlay              | Tauri/global-hotkey                    | deb, AppImage             |
+| Linux X11       | aarch64        | `x11rb` adapter + собственный overlay              | Tauri/global-hotkey                    | deb, AppImage             |
+| GNOME Wayland   | x86_64/aarch64 | XDG Screenshot portal                              | XDG GlobalShortcuts или CLI fallback   | deb, AppImage             |
+| KDE Wayland     | x86_64/aarch64 | XDG Screenshot portal                              | XDG GlobalShortcuts или CLI fallback   | deb, AppImage             |
+| wlroots Wayland | x86_64/aarch64 | Portal при наличии                                 | Portal при наличии, иначе CLI fallback | deb, AppImage             |
+| Windows         | x86_64         | GDI virtual-screen adapter (M04); selector pending | Tauri/global-hotkey                    | NSIS exe                  |
+| Windows 11      | ARM64          | GDI virtual-screen adapter (M04); selector pending | Tauri/global-hotkey                    | NSIS exe                  |
+| macOS           | Intel          | Screen capture adapter + overlay                   | Tauri/global-hotkey                    | universal DMG             |
+| macOS           | Apple Silicon  | Screen capture adapter + overlay                   | Tauri/global-hotkey                    | universal DMG             |
 
 Точные минимальные версии ОС фиксируются во время финальной runtime-проверки
 capture API и webview. Release baseline не повышается без ADR и CI-доказательства.
 
 ## Capture capabilities
 
-| Возможность      | X11                                            | Wayland portal                                         | Windows               | macOS                   |
-| ---------------- | ---------------------------------------------- | ------------------------------------------------------ | --------------------- | ----------------------- |
-| Area             | Custom frozen overlay                          | System selector                                        | Custom frozen overlay | Custom frozen overlay   |
-| Screen           | Direct                                         | Portal target/capability                               | Direct                | Direct after permission |
-| Window           | Direct/window list                             | Portal target/capability                               | Direct/window list    | Direct/window list      |
-| Active window    | Window manager adapter                         | Portal when exposed, otherwise clear unavailable state | Native                | Native                  |
-| Repeat last area | Stored physical/image geometry with validation | New portal interaction if silent reuse is unavailable  | Stored geometry       | Stored geometry         |
-| Delay            | App countdown before backend invocation        | App countdown before portal                            | App countdown         | App countdown           |
-| Cursor           | Capability-dependent                           | Portal-dependent                                       | Backend option        | Backend option          |
+| Возможность      | X11                                            | Wayland portal                                         | Windows                 | macOS                   |
+| ---------------- | ---------------------------------------------- | ------------------------------------------------------ | ----------------------- | ----------------------- |
+| Area             | Custom frozen overlay                          | System selector                                        | Pending native selector | Custom frozen overlay   |
+| Screen           | Direct                                         | Portal target/capability                               | GDI virtual screen      | Direct after permission |
+| Window           | Direct/window list                             | Portal target/capability                               | Direct/window list      | Direct/window list      |
+| Active window    | Window manager adapter                         | Portal when exposed, otherwise clear unavailable state | Native                  | Native                  |
+| Repeat last area | Stored physical/image geometry with validation | New portal interaction if silent reuse is unavailable  | Stored geometry         | Stored geometry         |
+| Delay            | App countdown before backend invocation        | App countdown before portal                            | App countdown           | App countdown           |
+| Cursor           | Capability-dependent                           | Portal-dependent                                       | Backend option          | Backend option          |
 
 UI получает `CaptureCapabilities` и не показывает неподдерживаемый режим как рабочий. Если функция временно недоступна, control disabled с объяснением и доступной альтернативой.
 
@@ -74,6 +74,14 @@ UI получает `CaptureCapabilities` и не показывает непо�
 
 ### Windows
 
+- M04 Windows backend uses `GetSystemMetrics` plus GDI `BitBlt` from the
+  virtual desktop into an application-owned top-down DIB, converts BGRA to a
+  PNG and writes it to the owned image transport. It advertises only the
+  direct Screen target (`windowsGdi`); area selection, window/active-window,
+  repeat-area, cursor composition and hotkeys stay disabled. The UI therefore
+  requests `screen`, not an unavailable area selector. The pure PNG conversion
+  and capability contracts pass in Rust; real desktop capture/runtime evidence
+  remains pending and this is not a `supported` claim.
 - Локальный M01 smoke на Windows x64 подтвердил WebView2 runtime: asset decode,
   binary IPC/Blob fallback и typed error для corrupted PNG.
 - Повторная локальная regression-проверка 2026-08-10 на Windows 10 Home 22H2

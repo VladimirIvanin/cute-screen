@@ -16,9 +16,7 @@ use windows_sys::Win32::{
 
 use crate::{
     image_transport::ImageTransportService,
-    platform::{
-        CaptureGeometry, CaptureResult, CaptureTarget, PlatformError, PlatformErrorCode,
-    },
+    platform::{CaptureGeometry, CaptureResult, CaptureTarget, PlatformError, PlatformErrorCode},
 };
 
 /// Direct Windows desktop capture using the GDI virtual-screen surface.
@@ -30,7 +28,14 @@ pub struct WindowsGdiCaptureAdapter;
 
 impl WindowsGdiCaptureAdapter {
     pub fn available(&self) -> bool {
-        virtual_screen_geometry().is_ok() && unsafe { desktop_dc().is_ok() }
+        if virtual_screen_geometry().is_err() {
+            return false;
+        }
+        let Ok(dc) = (unsafe { desktop_dc() }) else {
+            return false;
+        };
+        unsafe { ReleaseDC(std::ptr::null_mut(), dc) };
+        true
     }
 
     pub fn capture_to_transport(
@@ -98,12 +103,17 @@ fn capture_virtual_screen(
 ) -> Result<Vec<u8>, PlatformError> {
     let pixel_len = checked_pixel_len(geometry.width, geometry.height)
         .ok_or_else(|| failure(correlation_id, "pixelBufferSize"))?;
+    let width =
+        i32::try_from(geometry.width).map_err(|_| failure(correlation_id, "captureWidth"))?;
+    let height =
+        i32::try_from(geometry.height).map_err(|_| failure(correlation_id, "captureHeight"))?;
     unsafe {
         let screen_dc = desktop_dc().map_err(|stage| failure(correlation_id, stage))?;
         let memory_dc = CreateCompatibleDC(screen_dc);
         if memory_dc.is_null() {
+            let error = last_error(correlation_id, "createCompatibleDc");
             ReleaseDC(std::ptr::null_mut(), screen_dc);
-            return Err(last_error(correlation_id, "createCompatibleDc"));
+            return Err(error);
         }
 
         let mut pixels = std::ptr::null_mut();
@@ -116,31 +126,37 @@ fn capture_virtual_screen(
             0,
         );
         if bitmap.is_null() || pixels.is_null() {
+            let error = last_error(correlation_id, "createDibSection");
             DeleteDC(memory_dc);
             ReleaseDC(std::ptr::null_mut(), screen_dc);
-            return Err(last_error(correlation_id, "createDibSection"));
+            return Err(error);
         }
 
         let previous = SelectObject(memory_dc, bitmap.cast::<c_void>());
         if previous.is_null() {
+            let error = last_error(correlation_id, "selectBitmap");
             DeleteObject(bitmap.cast::<c_void>());
             DeleteDC(memory_dc);
             ReleaseDC(std::ptr::null_mut(), screen_dc);
-            return Err(last_error(correlation_id, "selectBitmap"));
+            return Err(error);
         }
 
         let copied = BitBlt(
             memory_dc,
             0,
             0,
-            i32::try_from(geometry.width).map_err(|_| failure(correlation_id, "captureWidth"))?,
-            i32::try_from(geometry.height)
-                .map_err(|_| failure(correlation_id, "captureHeight"))?,
+            width,
+            height,
             screen_dc,
             geometry.x,
             geometry.y,
             SRCCOPY | CAPTUREBLT,
         ) != 0;
+        let bitblt_error = if copied {
+            None
+        } else {
+            Some(last_error(correlation_id, "bitBlt"))
+        };
         let bytes = if copied {
             std::slice::from_raw_parts(pixels.cast::<u8>(), pixel_len).to_vec()
         } else {
@@ -152,8 +168,8 @@ fn capture_virtual_screen(
         DeleteDC(memory_dc);
         ReleaseDC(std::ptr::null_mut(), screen_dc);
 
-        if !copied {
-            return Err(last_error(correlation_id, "bitBlt"));
+        if let Some(error) = bitblt_error {
+            return Err(error);
         }
         Ok(bytes)
     }
@@ -228,7 +244,9 @@ fn failure(correlation_id: &str, stage: &'static str) -> PlatformError {
 fn last_error(correlation_id: &str, stage: &'static str) -> PlatformError {
     let mut error = failure(correlation_id, stage);
     let code = unsafe { GetLastError() };
-    error.context.insert("win32Error".to_owned(), code.to_string());
+    error
+        .context
+        .insert("win32Error".to_owned(), code.to_string());
     error
 }
 

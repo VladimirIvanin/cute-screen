@@ -38,6 +38,11 @@ enabled Copy/Export state only after the production capture request has
 persisted and mounted the first document. Its native pixels are feature-gated
 fake-adapter data; it is orchestration evidence, not a real-OS capture claim.
 
+Windows M04 direct-screen capture has Rust capability/PNG-encoding coverage,
+but still needs a real Windows desktop smoke that decodes the produced PNG and
+confirms controller → immutable library → mounted document before it may count
+as platform evidence.
+
 ## A02 — Hotkey capture из скрытого приложения
 
 M04 partial evidence: local Ubuntu/GNOME X11 `screen` and frozen `area` capture
