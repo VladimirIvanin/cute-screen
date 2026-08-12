@@ -316,8 +316,12 @@ describe('M05 CanvasViewport transforms', () => {
       clientY: 40,
     })
     await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 30, clientY: 40 })
-    const editor = getByLabelText('Text editor') as HTMLTextAreaElement
-    await fireEvent.update(editor, 'Click text')
+    const editor = getByLabelText('Text editor') as HTMLDivElement
+    expect(emitted().textEditing).toEqual([
+      [expect.objectContaining({ kind: 'text' })],
+    ])
+    editor.textContent = 'Click text'
+    await fireEvent.input(editor)
     await fireEvent.keyDown(editor, { key: 'Enter', ctrlKey: true })
 
     expect(emitted().documentCommand).toEqual([
@@ -333,7 +337,65 @@ describe('M05 CanvasViewport transforms', () => {
         }),
       ],
     ])
+    expect(emitted().textEditing?.at(-1)).toEqual([undefined])
     vi.unstubAllGlobals()
+  })
+
+  it('commits entered text when the canvas is clicked', async () => {
+    vi.stubGlobal('crypto', {
+      randomUUID: vi.fn(() => '019c1f62-058e-7000-8000-000000000100'),
+    })
+    const { getByLabelText, scene, emitted } = mountViewport('text')
+
+    await fireEvent.pointerDown(scene, {
+      pointerId: 1,
+      clientX: 30,
+      clientY: 40,
+    })
+    await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 30, clientY: 40 })
+    const editor = getByLabelText('Text editor') as HTMLDivElement
+    editor.textContent = 'Click to commit'
+    await fireEvent.input(editor)
+
+    await fireEvent.pointerDown(scene, {
+      pointerId: 2,
+      clientX: 70,
+      clientY: 80,
+    })
+
+    expect(emitted().documentCommand).toEqual([
+      [
+        expect.objectContaining({
+          type: 'addLayer',
+          layer: expect.objectContaining({
+            kind: 'text',
+            payload: expect.objectContaining({
+              content: expect.objectContaining({ text: 'Click to commit' }),
+            }),
+          }),
+        }),
+      ],
+    ])
+    expect(() => getByLabelText('Text editor')).toThrow()
+    vi.unstubAllGlobals()
+  })
+
+  it('uses a contenteditable editor, accepts plain-text paste and commits on blur', async () => {
+    const { getByLabelText, scene, emitted } = mountViewport('text')
+    await fireEvent.pointerDown(scene, {
+      pointerId: 1,
+      clientX: 30,
+      clientY: 40,
+    })
+    await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 30, clientY: 40 })
+    const editor = getByLabelText('Text editor') as HTMLDivElement
+    expect(editor).toHaveAttribute('contenteditable', 'true')
+    expect(editor.tagName).toBe('DIV')
+    await fireEvent.paste(editor, {
+      clipboardData: { getData: () => 'Plain\ntext' },
+    })
+    await fireEvent.blur(editor)
+    await vi.waitFor(() => expect(emitted().documentCommand).toHaveLength(1))
   })
 
   it('shows the selected portable text background in the DOM editor overlay', async () => {
@@ -380,7 +442,7 @@ describe('M05 CanvasViewport transforms', () => {
     })
     await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 30, clientY: 40 })
 
-    const editor = getByLabelText('Text editor') as HTMLTextAreaElement
+    const editor = getByLabelText('Text editor') as HTMLDivElement
     expect(editor.style.backgroundColor).toBe('rgb(255, 204, 51)')
     expect(editor.style.borderRadius).toBe('4px')
   })
@@ -403,8 +465,9 @@ describe('M05 CanvasViewport transforms', () => {
       clientY: 45,
     })
     await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 80, clientY: 45 })
-    const editor = getByLabelText('Text editor') as HTMLTextAreaElement
-    await fireEvent.update(editor, 'Fixed width')
+    const editor = getByLabelText('Text editor') as HTMLDivElement
+    editor.textContent = 'Fixed width'
+    await fireEvent.input(editor)
     await fireEvent.keyDown(editor, { key: 'Enter', ctrlKey: true })
 
     expect(emitted().documentCommand).toEqual([

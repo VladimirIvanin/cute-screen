@@ -152,6 +152,10 @@ const textDefaults = shallowRef<TextToolDefaults>({
   shadows: [],
 })
 const activeTextPreset = ref('plain')
+const textStyleRevision = ref(0)
+const textDraft = ref<
+  { readonly id: string; readonly kind: 'text' | 'callout' } | undefined
+>()
 const personalTextPreset = shallowRef<UserTextStylePreset>()
 const TEXT_BLEND_OPTIONS: readonly {
   readonly value: BlendMode
@@ -166,6 +170,9 @@ const TEXT_BLEND_OPTIONS: readonly {
   { value: 'softLight', label: 'Soft light' },
   { value: 'hardLight', label: 'Hard light' },
 ]
+watch(textDefaults, () => {
+  textStyleRevision.value += 1
+})
 const textFontOptions = computed(() => {
   const families = new Set<string>()
   const options: Array<{ readonly value: string; readonly label: string }> = [
@@ -2361,10 +2368,28 @@ function applyDocumentSnapshot(snapshot: DocumentSessionSnapshot): void {
     saveState: snapshot.saveState,
     ...(snapshot.error ? { error: snapshot.error } : {}),
   })
-  store.setLayers(
-    [...snapshot.core.document.layers].reverse().map((layer) => ({
+  syncLayerSummaries(snapshot.core.document)
+  void resolveDocumentTextures(snapshot.core.document)
+}
+function syncLayerSummaries(document: EditorDocumentV1): void {
+  store.setLayers([
+    ...(textDraft.value
+      ? [
+          {
+            id: textDraft.value.id,
+            icon: 'text' as const,
+            name: 'Text · Editing…',
+            visible: true,
+            locked: true,
+            opacity: 1,
+            rotation: 0,
+            transient: true,
+          },
+        ]
+      : []),
+    ...[...document.layers].reverse().map((layer) => ({
       id: layer.id,
-      icon: layer.kind === 'image' ? 'image' : 'shape',
+      icon: (layer.kind === 'image' ? 'image' : 'shape') as 'image' | 'shape',
       name:
         layer.kind === 'image' && layer.payload.role === 'base'
           ? translate('baseImage')
@@ -2374,8 +2399,13 @@ function applyDocumentSnapshot(snapshot: DocumentSessionSnapshot): void {
       opacity: layer.opacity,
       rotation: layer.transform.rotation,
     })),
-  )
-  void resolveDocumentTextures(snapshot.core.document)
+  ])
+}
+function setTextDraft(
+  draft: { readonly id: string; readonly kind: 'text' | 'callout' } | undefined,
+): void {
+  textDraft.value = draft
+  if (activeDocument.value) syncLayerSummaries(activeDocument.value)
 }
 function undoDocument(): void {
   props.documentSession?.undo()
@@ -2617,6 +2647,7 @@ watch(
         :active-tool="store.activeToolId"
         :drawing-defaults="drawingDefaults"
         :text-defaults="textDefaults"
+        :text-style-revision="textStyleRevision"
         :next-marker-sequence="
           activeDocument
             ? nextNumberedMarkerSequence(activeDocument.layers)
@@ -2634,6 +2665,7 @@ watch(
         @update-layer-payload="updateLayerPayload"
         @add-layer="addLayer"
         @document-command="executeDocumentCommand"
+        @text-editing="setTextDraft"
         @request-image-import="importContentImage"
         @open-image="store.runAction('openImage')"
         @select-tool="store.selectTool"

@@ -81,12 +81,12 @@ describe('editor document codec', () => {
     const migrated = parseEditorDocument(JSON.stringify(raw))
     if (migrated.kind !== 'editable') throw new Error('expected editable')
 
-    expect(migrated.document.schemaVersion).toBe(4)
+    expect(migrated.document.schemaVersion).toBe(5)
     expect(migrated.document.source.provenance).toBe('capture')
 
     const text = {
       ...raw,
-      schemaVersion: 4,
+      schemaVersion: 5,
       source: { ...(raw.source as object), provenance: 'fileOpen' },
       layers: [
         {
@@ -123,6 +123,66 @@ describe('editor document codec', () => {
 
     text.layers[0]!.payload.content.spans[0]!.end = 2
     expect(() => parseEditorDocument(JSON.stringify(text))).toThrow(/UTF-16/u)
+  })
+
+  it('migrates v4 rich text and canonicalizes portable span overrides', () => {
+    const raw = JSON.parse(serializeEditorDocument(document)) as Record<
+      string,
+      unknown
+    >
+    raw.schemaVersion = 4
+    raw.layers = [
+      {
+        ...layer,
+        kind: 'text',
+        localBounds: { x: 0, y: 0, width: 40, height: 20 },
+        payload: {
+          content: {
+            text: 'AB',
+            wrap: 'autoSize',
+            spans: [
+              {
+                start: 0,
+                end: 1,
+                color: { red: 1, green: 0, blue: 0, alpha: 1 },
+              },
+              {
+                start: 1,
+                end: 2,
+                color: { red: 1, green: 0, blue: 0, alpha: 1 },
+              },
+            ],
+            paragraphs: [],
+          },
+          font: {
+            source: 'bundled',
+            family: 'Roboto',
+            weight: 400,
+            style: 'normal',
+          },
+          fill: {
+            kind: 'solid',
+            color: { red: 0, green: 0, blue: 0, alpha: 1 },
+            opacity: 1,
+          },
+          outline: null,
+          background: null,
+        },
+      },
+    ]
+    const parsed = parseEditorDocument(JSON.stringify(raw))
+    if (parsed.kind !== 'editable') throw new Error('expected editable')
+    expect(parsed.document.schemaVersion).toBe(5)
+    const content = (
+      parsed.document.layers[0] as Extract<LayerNode, { kind: 'text' }>
+    ).payload.content
+    expect(content.spans).toEqual([
+      {
+        start: 0,
+        end: 2,
+        color: { red: 1, green: 0, blue: 0, alpha: 1 },
+      },
+    ])
   })
 
   it('deeply freezes nested payload values', () => {
@@ -240,7 +300,7 @@ describe('editor document codec', () => {
     expect(
       JSON.parse(serializeEditorDocument(migrated.document)),
     ).toMatchObject({
-      schemaVersion: 4,
+      schemaVersion: 5,
       layers: [
         {
           kind: 'image',
@@ -257,15 +317,15 @@ describe('editor document codec', () => {
     expect(
       JSON.parse(serializeEditorDocument(futureFields.document)),
     ).toMatchObject({
-      schemaVersion: 4,
+      schemaVersion: 5,
       futureDocumentField: { preserved: true },
     })
 
     expect(
-      parseEditorDocument(JSON.stringify({ schemaVersion: 5 })),
+      parseEditorDocument(JSON.stringify({ schemaVersion: 6 })),
     ).toMatchObject({
       kind: 'readOnly',
-      schemaVersion: 5,
+      schemaVersion: 6,
     })
   })
 })

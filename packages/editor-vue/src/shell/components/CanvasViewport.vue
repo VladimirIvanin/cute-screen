@@ -64,6 +64,7 @@ const props = defineProps<{
   activeTool?: string | undefined
   drawingDefaults?: DrawingDefaults | undefined
   textDefaults?: TextToolDefaults | undefined
+  textStyleRevision?: number | undefined
   nextMarkerSequence?: number | undefined
   markerShape?: 'circle' | 'square' | 'diamond' | 'star' | undefined
   openImageAvailable?: boolean | undefined
@@ -92,6 +93,10 @@ const emit = defineEmits<{
   ]
   addLayer: [layer: LayerNode]
   documentCommand: [command: unknown]
+  textEditing: [
+    draft:
+      { readonly id: string; readonly kind: 'text' | 'callout' } | undefined,
+  ]
   requestImageImport: [origin: { readonly x: number; readonly y: number }]
   openImage: []
   selectTool: [id: 'select']
@@ -101,7 +106,7 @@ const emit = defineEmits<{
 }>()
 const scene = ref<HTMLCanvasElement>()
 const overlay = ref<HTMLCanvasElement>()
-const textEditor = ref<HTMLTextAreaElement>()
+const textEditor = ref<HTMLDivElement>()
 const scrollContainer = ref<HTMLDivElement>()
 const rendererError = ref<string>()
 const editingText = ref<
@@ -109,8 +114,10 @@ const editingText = ref<
       readonly origin: CanvasPoint
       readonly width: number
       readonly fixedWidth: boolean
+      readonly id: string
       value: string
       composing: boolean
+      style: TextToolDefaults
       readonly kind: 'text' | 'callout'
       readonly existing?: EditableTextLayer
     }
@@ -248,33 +255,57 @@ function cssTextBackground(
   return cssTextColor(color as SrgbColor)
 }
 const editorTextStyle = computed(() => {
-  const defaults = props.textDefaults ?? DEFAULT_TEXT_TOOL
-  const existing = editingText.value?.existing
-  const content =
-    existing?.kind === 'numberedMarker'
-      ? existing.payload.label
-      : existing?.payload.content
-  const font =
-    existing === undefined || existing.kind === 'numberedMarker'
-      ? defaults.font
-      : existing.payload.font
-  return {
-    font,
-    fontSize: content?.spans[0]?.fontSize ?? defaults.fontSize,
-    weight: content?.spans[0]?.weight ?? defaults.weight,
-    italic: content?.spans[0]?.italic ?? defaults.italic,
-    underline: content?.spans[0]?.underline ?? defaults.underline,
-    letterSpacing: content?.spans[0]?.letterSpacing ?? defaults.letterSpacing,
-    lineHeight: content?.paragraphs[0]?.lineHeight ?? defaults.lineHeight,
-    color: defaults.color,
-    background:
-      existing === undefined
-        ? defaults.background
-        : existing.kind === 'text'
-          ? existing.payload.background
-          : null,
-  }
+  return editingText.value?.style ?? props.textDefaults ?? DEFAULT_TEXT_TOOL
 })
+function copyTextStyle(value: TextToolDefaults): TextToolDefaults {
+  // Props may be Vue proxies; structuredClone deliberately rejects them.
+  return JSON.parse(JSON.stringify(value)) as TextToolDefaults
+}
+function styleForSession(
+  existing: EditableTextLayer | undefined,
+): TextToolDefaults {
+  const defaults = props.textDefaults ?? DEFAULT_TEXT_TOOL
+  if (!existing) return copyTextStyle(defaults)
+  const content =
+    existing.kind === 'numberedMarker'
+      ? existing.payload.label
+      : existing.payload.content
+  const span = content.spans[0]
+  const paragraph = content.paragraphs[0]
+  return {
+    ...copyTextStyle(defaults),
+    font:
+      existing.kind === 'numberedMarker'
+        ? defaults.font
+        : existing.payload.font,
+    fontSize: span?.fontSize ?? defaults.fontSize,
+    weight: span?.weight ?? defaults.weight,
+    italic: span?.italic ?? defaults.italic,
+    underline: span?.underline ?? defaults.underline,
+    letterSpacing: span?.letterSpacing ?? defaults.letterSpacing,
+    alignment: paragraph?.alignment ?? defaults.alignment,
+    lineHeight: paragraph?.lineHeight ?? defaults.lineHeight,
+    ...(existing.kind === 'text'
+      ? {
+          fill: existing.payload.fill,
+          outline: existing.payload.outline,
+          background: existing.payload.background,
+          opacity: existing.opacity,
+          blendMode: existing.blendMode ?? 'normal',
+          shadows: existing.shadows ?? [],
+        }
+      : {}),
+  }
+}
+watch(
+  () => props.textStyleRevision,
+  () => {
+    if (!editingText.value) return
+    editingText.value.style = copyTextStyle(
+      props.textDefaults ?? DEFAULT_TEXT_TOOL,
+    )
+  },
+)
 async function ensureRenderer(): Promise<Canvas2DRenderer | undefined> {
   if (!scene.value || !overlay.value || !props.canvas) return undefined
   if (renderer) return renderer
@@ -907,6 +938,16 @@ function arrowHandleAtPoint(
   })?.[0]
 }
 function onPointerDown(event: PointerEvent): void {
+  // A canvas click is the direct confirmation gesture for the transient text
+  // editor. Commit it before starting another canvas gesture so the next text
+  // session cannot replace this one while its blur handler is still pending.
+  if (editingText.value) {
+    if (event.button === 0 && !editingText.value.composing) {
+      event.preventDefault()
+      commitTextEditor()
+    }
+    return
+  }
   const point = canvasPoint(event)
   if (!point || !scene.value || !props.document) return
   const pan = event.button === 1 || props.activeTool === 'hand' || spacePressed
@@ -1082,6 +1123,7 @@ function startTextEditor(input: {
 }): void {
   const bounds = input.existing ? layerBounds(input.existing) : undefined
   editingText.value = {
+    id: input.existing?.id ?? crypto.randomUUID(),
     origin: input.origin,
     width:
       input.width ??
@@ -1097,16 +1139,82 @@ function startTextEditor(input: {
         ? input.existing.payload.label.text
         : (input.existing?.payload.content.text ?? ''),
     composing: false,
+    style: styleForSession(input.existing),
     kind: input.kind ?? 'text',
     ...(input.existing === undefined ? {} : { existing: input.existing }),
   }
-  void nextTick(() => textEditor.value?.focus())
+  emit('textEditing', {
+    id: editingText.value.id,
+    kind: editingText.value.kind,
+  })
+  void nextTick(() => {
+    const editor = textEditor.value
+    if (!editor || !editingText.value) return
+    // The DOM is a short-lived editing projection. The document continues to
+    // store only plain Unicode and typed ranges, never HTML.
+    editor.textContent = editingText.value.value
+    editor.focus()
+    const selection = window.getSelection()
+    const range = document.createRange()
+    range.selectNodeContents(editor)
+    range.collapse(false)
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+  })
+}
+function readEditorText(): string {
+  const editor = textEditor.value
+  if (!editor) return editingText.value?.value ?? ''
+  // innerText preserves the visual paragraph boundaries produced by Enter.
+  return (editor.innerText || editor.textContent || '').replace(/\r\n?/gu, '\n')
+}
+function onTextEditorInput(): void {
+  const editing = editingText.value
+  if (!editing) return
+  editing.value = readEditorText()
+}
+function onTextEditorCompositionEnd(): void {
+  if (editingText.value) editingText.value.composing = false
+  onTextEditorInput()
+}
+function onTextEditorPaste(event: ClipboardEvent): void {
+  const text = event.clipboardData?.getData('text/plain')
+  if (text === undefined) return
+  event.preventDefault()
+  const selection = window.getSelection()
+  const range = selection?.rangeCount ? selection.getRangeAt(0) : undefined
+  if (!range) return
+  range.deleteContents()
+  const node = document.createTextNode(text.replace(/\r\n?/gu, '\n'))
+  range.insertNode(node)
+  range.setStartAfter(node)
+  range.collapse(true)
+  selection?.removeAllRanges()
+  selection?.addRange(range)
+  onTextEditorInput()
+}
+function onTextEditorBlur(): void {
+  // A toolbar click belongs to the active editing session, not to the canvas.
+  window.setTimeout(() => {
+    if (!editingText.value) return
+    const active = document.activeElement
+    if (
+      active instanceof HTMLElement &&
+      active.closest('.cs-context-toolbar')
+    ) {
+      textEditor.value?.focus()
+      return
+    }
+    commitTextEditor()
+  }, 0)
 }
 function commitTextEditor(): void {
   const editing = editingText.value
   if (!editing || editing.composing) return
   editingText.value = undefined
+  emit('textEditing', undefined)
   const defaults = props.textDefaults ?? DEFAULT_TEXT_TOOL
+  const style = editing.style
   const existing = editing.existing
   if (existing?.kind === 'callout' || existing?.kind === 'numberedMarker') {
     const draft = createTextLayer({
@@ -1116,23 +1224,12 @@ function commitTextEditor(): void {
         x: existing.transform.translateX,
         y: existing.transform.translateY,
       },
-      font: existing.kind === 'callout' ? existing.payload.font : defaults.font,
-      fontSize:
-        existing.kind === 'callout'
-          ? (existing.payload.content.spans[0]?.fontSize ?? defaults.fontSize)
-          : defaults.fontSize,
-      underline:
-        existing.kind === 'callout'
-          ? (existing.payload.content.spans[0]?.underline ?? defaults.underline)
-          : (existing.payload.label.spans[0]?.underline ?? defaults.underline),
-      letterSpacing:
-        existing.kind === 'callout'
-          ? (existing.payload.content.spans[0]?.letterSpacing ??
-            defaults.letterSpacing)
-          : (existing.payload.label.spans[0]?.letterSpacing ??
-            defaults.letterSpacing),
+      font: existing.kind === 'callout' ? style.font : defaults.font,
+      fontSize: style.fontSize,
+      underline: style.underline,
+      letterSpacing: style.letterSpacing,
       fixedWidth: layerBounds(existing).width,
-      color: defaults.color,
+      color: style.color,
     })
     if (!draft) return
     const next: EditableTextLayer =
@@ -1154,20 +1251,20 @@ function commitTextEditor(): void {
   }
   if (editing.kind === 'callout') {
     const layer = createCalloutLayer({
-      id: crypto.randomUUID(),
+      id: editing.id,
       text: editing.value,
       origin: editing.origin,
       tailAnchor: {
         x: editing.width / 2,
-        y: defaults.fontSize * defaults.lineHeight + 40,
+        y: style.fontSize * style.lineHeight + 40,
       },
-      font: defaults.font,
+      font: style.font,
     })
     if (layer) emit('addLayer', layer)
     return
   }
   const draft = createTextLayer({
-    id: crypto.randomUUID(),
+    id: editing.id,
     text: editing.value,
     origin: editing.existing
       ? {
@@ -1175,36 +1272,22 @@ function commitTextEditor(): void {
           y: editing.existing.transform.translateY,
         }
       : editing.origin,
-    font: existing?.payload.font ?? defaults.font,
-    fontSize: existing?.payload.content.spans[0]?.fontSize ?? defaults.fontSize,
-    weight: existing?.payload.content.spans[0]?.weight ?? defaults.weight,
-    italic: existing?.payload.content.spans[0]?.italic ?? defaults.italic,
-    underline:
-      existing?.payload.content.spans[0]?.underline ?? defaults.underline,
-    letterSpacing:
-      existing?.payload.content.spans[0]?.letterSpacing ??
-      defaults.letterSpacing,
-    alignment:
-      existing?.payload.content.paragraphs[0]?.alignment ?? defaults.alignment,
-    lineHeight:
-      existing?.payload.content.paragraphs[0]?.lineHeight ??
-      defaults.lineHeight,
+    font: style.font,
+    fontSize: style.fontSize,
+    weight: style.weight,
+    italic: style.italic,
+    underline: style.underline,
+    letterSpacing: style.letterSpacing,
+    alignment: style.alignment,
+    lineHeight: style.lineHeight,
     ...(editing.fixedWidth ? { fixedWidth: editing.width } : {}),
-    color: defaults.color,
-    fill: existing === undefined ? defaults.fill : existing.payload.fill,
-    outline:
-      existing === undefined ? defaults.outline : existing.payload.outline,
-    background:
-      existing === undefined
-        ? defaults.background
-        : existing.payload.background,
-    opacity: existing === undefined ? defaults.opacity : existing.opacity,
-    blendMode:
-      existing === undefined
-        ? defaults.blendMode
-        : (existing.blendMode ?? 'normal'),
-    shadows:
-      existing === undefined ? defaults.shadows : (existing.shadows ?? []),
+    color: style.color,
+    fill: style.fill,
+    outline: style.outline,
+    background: style.background,
+    opacity: style.opacity,
+    blendMode: style.blendMode,
+    shadows: style.shadows,
   })
   if (!draft) {
     if (!existing) return
@@ -1230,10 +1313,11 @@ function commitTextEditor(): void {
     ...draft,
     id: existing.id,
     transform: existing.transform,
-    opacity: existing.opacity,
-    blendMode: existing.blendMode ?? 'normal',
+    opacity: draft.opacity,
+    blendMode: draft.blendMode ?? 'normal',
+    shadows: draft.shadows ?? [],
     payload: {
-      ...existing.payload,
+      ...draft.payload,
       content: draft.payload.content,
     },
   }
@@ -1241,6 +1325,7 @@ function commitTextEditor(): void {
 }
 function cancelTextEditor(): void {
   editingText.value = undefined
+  emit('textEditing', undefined)
 }
 function onTextEditorKeydown(event: KeyboardEvent): void {
   if (event.key === 'Escape') {
@@ -1485,7 +1570,8 @@ function onWindowKeydown(event: KeyboardEvent): void {
   if (
     event.code === 'Space' &&
     !(event.target instanceof HTMLInputElement) &&
-    !(event.target instanceof HTMLTextAreaElement)
+    !(event.target instanceof HTMLTextAreaElement) &&
+    !(event.target instanceof HTMLElement && event.target.isContentEditable)
   ) {
     spacePressed = true
   }
@@ -1562,11 +1648,14 @@ onBeforeUnmount(() => {
             @dblclick="onDoubleClick"
             @wheel="onWheel"
           ></canvas>
-          <textarea
+          <div
             v-if="editingText"
             ref="textEditor"
-            v-model="editingText.value"
             class="cs-text-editor"
+            contenteditable="true"
+            spellcheck="true"
+            role="textbox"
+            aria-multiline="true"
             :style="{
               left: `${editingText.origin.x * ((zoom ?? 100) / 100)}px`,
               top: `${editingText.origin.y * ((zoom ?? 100) / 100)}px`,
@@ -1588,10 +1677,12 @@ onBeforeUnmount(() => {
               editingText.kind === 'callout' ? 'Callout editor' : 'Text editor'
             "
             @compositionstart="editingText.composing = true"
-            @compositionend="editingText.composing = false"
+            @compositionend="onTextEditorCompositionEnd"
+            @input="onTextEditorInput"
+            @paste="onTextEditorPaste"
             @keydown="onTextEditorKeydown"
-            @blur="commitTextEditor"
-          ></textarea>
+            @blur="onTextEditorBlur"
+          ></div>
           <canvas
             ref="overlay"
             class="cs-canvas cs-canvas-overlay"

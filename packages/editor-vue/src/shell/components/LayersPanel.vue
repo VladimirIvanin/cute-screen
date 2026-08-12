@@ -79,7 +79,7 @@ const emit = defineEmits<{
         :key="layer.id"
         class="cs-layer-row"
         :data-layer-id="layer.id"
-        draggable="true"
+        :draggable="!layer.transient"
         :class="{
           'is-selected':
             selectedLayerIds?.includes(layer.id) ??
@@ -97,6 +97,7 @@ const emit = defineEmits<{
         <button
           type="button"
           class="cs-layer-select"
+          :disabled="layer.transient"
           @click="
             emit(
               'select',
@@ -111,6 +112,7 @@ const emit = defineEmits<{
         <button
           type="button"
           class="cs-layer-action"
+          :disabled="layer.transient"
           :aria-label="layer.visible ? t('hideLayers') : t('showLayers')"
           @click.stop="emit('visibility', layer.id)"
         >
@@ -119,6 +121,7 @@ const emit = defineEmits<{
         <button
           type="button"
           class="cs-layer-action"
+          :disabled="layer.transient"
           :aria-label="layer.locked ? t('unlockLayer') : t('lockLayer')"
           @click.stop="emit('lock', layer.id)"
         >
@@ -132,7 +135,7 @@ const emit = defineEmits<{
               min="0"
               max="100"
               :value="Math.round(layer.opacity * 100)"
-              :disabled="layer.locked"
+              :disabled="layer.locked || layer.transient"
               @input="
                 emit(
                   'opacity',
@@ -150,7 +153,7 @@ const emit = defineEmits<{
               max="360"
               step="1"
               :value="Math.round(layer.rotation)"
-              :disabled="layer.locked"
+              :disabled="layer.locked || layer.transient"
               @change="
                 emit(
                   'rotation',
@@ -165,7 +168,7 @@ const emit = defineEmits<{
             class="cs-layer-order"
             :aria-label="t('moveLayerUp')"
             :title="t('moveLayerUp')"
-            :disabled="layer.locked"
+            :disabled="layer.locked || layer.transient"
             @click="emit('reorder', layer.id, 'up')"
           >
             ↑
@@ -175,7 +178,7 @@ const emit = defineEmits<{
             class="cs-layer-order"
             :aria-label="t('moveLayerDown')"
             :title="t('moveLayerDown')"
-            :disabled="layer.locked"
+            :disabled="layer.locked || layer.transient"
             @click="emit('reorder', layer.id, 'down')"
           >
             ↓

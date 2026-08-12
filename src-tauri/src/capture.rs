@@ -194,6 +194,7 @@ pub struct CaptureController {
     transport: Arc<ImageTransportService>,
     state: Arc<Mutex<CaptureState>>,
     cancel_signal: Arc<AtomicBool>,
+    #[cfg(all(target_os = "linux", feature = "x11-capture"))]
     last_x11_area: Arc<Mutex<Option<CaptureGeometry>>>,
 }
 
@@ -210,6 +211,7 @@ impl CaptureController {
             transport,
             state: Arc::new(Mutex::new(CaptureState::default())),
             cancel_signal: Arc::new(AtomicBool::new(false)),
+            #[cfg(all(target_os = "linux", feature = "x11-capture"))]
             last_x11_area: Arc::new(Mutex::new(None)),
         }
     }
@@ -299,13 +301,23 @@ impl CaptureController {
                 .await
             }
             "x11" => {
-                capture_x11_target(
-                    request.clone(),
-                    Arc::clone(&self.transport),
-                    Arc::clone(&self.last_x11_area),
-                    Arc::clone(&self.cancel_signal),
-                )
-                .await
+                #[cfg(feature = "x11-capture")]
+                {
+                    capture_x11_target(
+                        request.clone(),
+                        Arc::clone(&self.transport),
+                        Arc::clone(&self.last_x11_area),
+                        Arc::clone(&self.cancel_signal),
+                    )
+                    .await
+                }
+                #[cfg(not(feature = "x11-capture"))]
+                {
+                    Err(crate::platform::PlatformError::new(
+                        PlatformErrorCode::PortalUnavailable,
+                        &request.correlation_id,
+                    ))
+                }
             }
             _ => Err(crate::platform::PlatformError::new(
                 PlatformErrorCode::PortalUnavailable,
@@ -610,19 +622,6 @@ fn capture_x11_target_blocking(
                 request.cursor,
             ),
     }
-}
-
-#[cfg(not(all(target_os = "linux", feature = "x11-capture")))]
-async fn capture_x11_target(
-    request: CaptureRequestV1,
-    _transport: Arc<ImageTransportService>,
-    _last_x11_area: Arc<Mutex<Option<CaptureGeometry>>>,
-    _cancel_signal: Arc<AtomicBool>,
-) -> Result<CaptureResult, crate::platform::PlatformError> {
-    Err(crate::platform::PlatformError::new(
-        PlatformErrorCode::PortalUnavailable,
-        &request.correlation_id,
-    ))
 }
 
 fn initial_document_json(

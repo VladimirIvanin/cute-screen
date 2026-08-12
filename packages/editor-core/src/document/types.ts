@@ -1,5 +1,5 @@
-/** M07 adds portable content-layer payloads and source provenance. */
-export const EDITOR_DOCUMENT_SCHEMA_VERSION = 4 as const
+/** M08 adds portable per-range typography without serialising editor DOM. */
+export const EDITOR_DOCUMENT_SCHEMA_VERSION = 5 as const
 
 export type JsonPrimitive = string | number | boolean | null
 export type JsonValue = JsonPrimitive | readonly JsonValue[] | JsonObject
@@ -219,11 +219,20 @@ export interface FontReference extends JsonObject {
   readonly style: 'normal' | 'italic'
 }
 
+/** A portable family reference that may override the layer face for one span. */
+export interface FontFamilyReference extends JsonObject {
+  readonly source: 'bundled' | 'system'
+  readonly family: string
+  readonly postscriptName?: string
+}
+
 export interface RichTextSpan extends JsonObject {
   /** UTF-16 offsets; codec rejects offsets that split a surrogate pair. */
   readonly start: number
   readonly end: number
   readonly fontSize?: number
+  readonly font?: FontFamilyReference
+  readonly color?: SrgbColor
   readonly weight?: FontReference['weight']
   readonly italic?: boolean
   readonly underline?: boolean
@@ -362,7 +371,7 @@ export type LayerNode =
 
 export interface EditorDocumentV1 {
   /** Compatibility input type; parsed documents always use the current schema. */
-  readonly schemaVersion: 1 | 2 | 3 | typeof EDITOR_DOCUMENT_SCHEMA_VERSION
+  readonly schemaVersion: 1 | 2 | 3 | 4 | typeof EDITOR_DOCUMENT_SCHEMA_VERSION
   readonly id: string
   readonly source: SourceImageRef
   readonly canvas: Readonly<{ width: number; height: number }>
@@ -401,6 +410,19 @@ export interface EditorDocumentV4 extends Omit<
   EditorDocumentV1,
   'schemaVersion' | 'layers'
 > {
+  readonly schemaVersion: 4
+  readonly layers: readonly (LayerNode &
+    Readonly<{
+      readonly localBounds: Rect
+      readonly blendMode: BlendMode
+      readonly shadows: readonly ShadowStyle[]
+    }>)[]
+}
+
+export interface EditorDocumentV5 extends Omit<
+  EditorDocumentV1,
+  'schemaVersion' | 'layers'
+> {
   readonly schemaVersion: typeof EDITOR_DOCUMENT_SCHEMA_VERSION
   readonly layers: readonly (LayerNode &
     Readonly<{
@@ -411,7 +433,7 @@ export interface EditorDocumentV4 extends Omit<
 }
 
 /** Current editable document contract. */
-export type EditorDocument = EditorDocumentV4
+export type EditorDocument = EditorDocumentV5
 
 export type ParsedEditorDocument =
   | Readonly<{ kind: 'editable'; document: EditorDocumentV1 }>

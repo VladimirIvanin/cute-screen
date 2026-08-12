@@ -99,7 +99,7 @@ describe('M03 document core', () => {
       kind: 'editable',
     })
 
-    const future = { ...v0, schemaVersion: 5 }
+    const future = { ...v0, schemaVersion: 6 }
     expect(parseEditorDocument(JSON.stringify(future))).toMatchObject({
       kind: 'readOnly',
       reason: 'newerSchema',

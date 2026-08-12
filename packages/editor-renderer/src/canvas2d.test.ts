@@ -324,9 +324,17 @@ describe('Canvas2DRenderer', () => {
     )
 
     renderer.render(['scene'])
-    const pixel = sceneCanvas.getContext('2d')?.getImageData(34, 25, 1, 1).data
-    expect(pixel?.[0]).toBeGreaterThan(0)
-    expect(pixel?.[3]).toBeGreaterThan(0)
+    const pixels = sceneCanvas
+      .getContext('2d')
+      ?.getImageData(28, 10, 24, 36).data
+    expect(
+      pixels?.some(
+        (value, index) =>
+          index % 4 === 0 &&
+          value > (pixels[index + 1] ?? 0) &&
+          (pixels[index + 3] ?? 0) > 0,
+      ),
+    ).toBe(true)
   })
 
   it('renders renderer-neutral linear gradients in exported output', async () => {

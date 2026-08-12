@@ -81,7 +81,8 @@ Cute Screen — полноценный local-first редактор снимко
   визуальный corner radius.
 - `REQ-TOL-003` — pencil: базовые кисти, толщина, opacity, smoothing и цвет.
 - `REQ-TOL-004` — marker: толщина, opacity и blend modes highlight/darken.
-- `REQ-TOL-005` — text: FigJam-like direct WYSIWYG editing, multiline,
+- `REQ-TOL-005` — text: FigJam-like direct WYSIWYG editing through a transient
+  `contenteditable` projection (never persisted as HTML), multiline,
   typography, alignment, spacing, solid/gradient/pattern/texture fill, outline,
   shadows, background, opacity/blend, common layer transforms и curated style
   presets.

@@ -19,7 +19,7 @@ import {
 } from './index'
 
 const document: EditorDocumentV1 = {
-  schemaVersion: 4,
+  schemaVersion: 5,
   id: '019c1f62-058e-7000-8000-000000000000',
   source: {
     blobHash: 'a'.repeat(64),
@@ -370,7 +370,7 @@ describe('M07 content-layer core contracts', () => {
         },
       }),
     ).toBeNull()
-    expect(document.schemaVersion).toBe(4)
+    expect(document.schemaVersion).toBe(5)
   })
 
   it('commits text as exactly one add, update or removal command', () => {

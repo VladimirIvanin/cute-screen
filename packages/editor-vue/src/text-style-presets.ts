@@ -46,7 +46,7 @@ function normalize(values: unknown): TextStylePresetValues | undefined {
   const source = values as Record<string, unknown>
   try {
     const parsed = parseEditorDocument({
-      schemaVersion: 4,
+      schemaVersion: 5,
       id: '019c1f62-058e-7000-8000-0000000000aa',
       source: {
         blobHash: 'a'.repeat(64),

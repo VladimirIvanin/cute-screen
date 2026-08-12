@@ -994,6 +994,7 @@ fn capture_request_for_tray(action: capture::CaptureAction) -> CaptureRequestV1 
     }
 }
 
+#[cfg(any(target_os = "linux", test))]
 fn action_for_shortcut_id(shortcut_id: &str) -> Option<capture::CaptureAction> {
     match shortcut_id {
         "capture-area" => Some(capture::CaptureAction::Area),
@@ -1005,6 +1006,7 @@ fn action_for_shortcut_id(shortcut_id: &str) -> Option<capture::CaptureAction> {
     }
 }
 
+#[cfg(target_os = "linux")]
 fn hotkey_capture_callback<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
 ) -> Arc<dyn Fn(String) + Send + Sync> {

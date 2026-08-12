@@ -293,3 +293,21 @@ Bundled baseline M07 — `@fontsource/roboto` 5.3.0 (OFL-1.1): только
 Regular/Bold и соответствующие italic faces. Это audited dependency, включаемая
 в webview bundle; установленный system font не подменяет document reference
 молча.
+
+## ADR-026 — Transient contenteditable и renderer-neutral rich-text ranges
+
+**Статус:** accepted
+
+**Контекст:** native textarea не даёт FigJam-like direct editing, selection и
+range typography, а сохранение DOM/HTML нарушает portable document contract.
+
+**Решение:** документ v5 хранит plain Unicode, paragraph ranges и
+канонические UTF-16-safe span overrides для portable font family и solid color.
+`contenteditable` существует только как transient projection: browser владеет
+caret/IME/selection, адаптер принимает plain-text paste и строит typed content,
+а commit создаёт ровно одну `EditorCommand`. Canvas2D и CanvasKit получают один
+renderer-neutral layout contract.
+
+**Последствия:** draft не сериализуется и Escape его откатывает; v4 documents
+мигрируют без изменения визуального результата. HTML, arbitrary browser marks,
+lists и embedded content не являются document data.

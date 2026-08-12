@@ -1,8 +1,11 @@
+#[cfg(any(target_os = "linux", test))]
 use std::collections::BTreeSet;
+#[cfg(target_os = "linux")]
 use std::process::Command;
 
 use serde::Serialize;
 
+#[cfg(any(target_os = "linux", test))]
 const MAX_SYSTEM_FONT_FACES: usize = 512;
 
 /// A compact, platform-neutral font face reference. Font bytes never cross the
@@ -17,6 +20,7 @@ pub struct SystemFontFace {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(rename_all = "lowercase")]
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 pub enum SystemFontStyle {
     Normal,
     Italic,
@@ -48,6 +52,7 @@ pub fn list_system_font_faces() -> Result<Vec<SystemFontFace>, String> {
     }
 }
 
+#[cfg(any(target_os = "linux", test))]
 fn parse_fontconfig_catalog(output: &str) -> Vec<SystemFontFace> {
     let mut faces = BTreeSet::new();
     for line in output.lines() {
@@ -82,6 +87,7 @@ fn parse_fontconfig_catalog(output: &str) -> Vec<SystemFontFace> {
     faces.into_iter().collect()
 }
 
+#[cfg(any(target_os = "linux", test))]
 fn fontconfig_weight(value: &str) -> u16 {
     let Ok(weight) = value.trim().parse::<i16>() else {
         return 400;

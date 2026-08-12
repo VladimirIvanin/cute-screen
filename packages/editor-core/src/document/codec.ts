@@ -10,6 +10,7 @@ import {
   type CalloutPayload,
   type EmojiPayload,
   type FontReference,
+  type FontFamilyReference,
   type ShapeLayerPayload,
   type PencilLayerPayload,
   type MarkerLayerPayload,
@@ -17,6 +18,7 @@ import {
   type RichTextContent,
   type RichTextParagraph,
   type RichTextSpan,
+  type SrgbColor,
   type TextLayerPayload,
   type EditorDocumentV1,
   type ImageLayerPayload,
@@ -448,6 +450,25 @@ function parseTextRange(
   return Object.freeze({ start, end })
 }
 
+function canonicalizeRichTextSpans(
+  spans: readonly RichTextSpan[],
+): readonly RichTextSpan[] {
+  const result: RichTextSpan[] = []
+  for (const span of spans) {
+    const previous = result.at(-1)
+    const previousStyle = previous
+      ? JSON.stringify({ ...previous, start: 0, end: 0 })
+      : undefined
+    const style = JSON.stringify({ ...span, start: 0, end: 0 })
+    if (previous && previous.end === span.start && previousStyle === style) {
+      result[result.length - 1] = Object.freeze({ ...previous, end: span.end })
+    } else {
+      result.push(span)
+    }
+  }
+  return Object.freeze(result)
+}
+
 function parseRichTextContent(value: unknown, field: string): RichTextContent {
   const input = readJsonObject(value, field)
   const text = typeof input.text === 'string' ? input.text : undefined
@@ -472,9 +493,15 @@ function parseRichTextContent(value: unknown, field: string): RichTextContent {
   ) {
     throw new Error(`${field} ranges are invalid`)
   }
-  const spans = input.spans.map((span, index) => {
+  let previousEnd = 0
+  const hasSpans = Array.isArray(input.spans) && input.spans.length > 0
+  const parsedSpans = (input.spans as readonly unknown[]).map((span, index) => {
     const range = parseTextRange(span, `${field}.spans[${index}]`, text)
     const item = readJsonObject(span, `${field}.spans[${index}]`)
+    if (hasSpans && (range.start !== previousEnd || range.end <= range.start)) {
+      throw new Error(`${field}.spans must be contiguous non-empty ranges`)
+    }
+    previousEnd = range.end
     const fontSize =
       item.fontSize === undefined
         ? undefined
@@ -512,9 +539,22 @@ function parseRichTextContent(value: unknown, field: string): RichTextContent {
         `${field}.spans[${index}].letterSpacing is outside supported bounds`,
       )
     }
+    const font =
+      item.font === undefined
+        ? undefined
+        : parseFontFamilyReference(item.font, `${field}.spans[${index}].font`)
+    const color =
+      item.color === undefined
+        ? undefined
+        : (parseSrgbColor(
+            item.color,
+            `${field}.spans[${index}].color`,
+          ) as unknown as SrgbColor)
     return Object.freeze({
       ...range,
       ...(fontSize === undefined ? {} : { fontSize }),
+      ...(font === undefined ? {} : { font }),
+      ...(color === undefined ? {} : { color }),
       ...(weight === undefined
         ? {}
         : { weight: weight as RichTextSpan['weight'] }),
@@ -534,6 +574,13 @@ function parseRichTextContent(value: unknown, field: string): RichTextContent {
       ...(letterSpacing === undefined ? {} : { letterSpacing }),
     }) as RichTextSpan
   })
+  const spans = canonicalizeRichTextSpans(parsedSpans)
+  if (
+    (text.length === 0 && spans.length !== 0) ||
+    (spans.length > 0 && previousEnd !== text.length)
+  ) {
+    throw new Error(`${field}.spans must cover text exactly`)
+  }
   const paragraphs = input.paragraphs.map((paragraph, index) => {
     const range = parseTextRange(
       paragraph,
@@ -568,8 +615,29 @@ function parseRichTextContent(value: unknown, field: string): RichTextContent {
     text,
     wrap: input.wrap,
     ...(fixedWidth === undefined ? {} : { fixedWidth }),
-    spans: Object.freeze(spans),
+    spans,
     paragraphs: Object.freeze(paragraphs),
+  })
+}
+
+function parseFontFamilyReference(
+  value: unknown,
+  field: string,
+): FontFamilyReference {
+  const input = readJsonObject(value, field)
+  const source = input.source
+  if (source !== 'bundled' && source !== 'system') {
+    throw new Error(`${field}.source is invalid`)
+  }
+  const family = readNonEmptyString(input.family, `${field}.family`)
+  const postscriptName =
+    input.postscriptName === undefined
+      ? undefined
+      : readNonEmptyString(input.postscriptName, `${field}.postscriptName`)
+  return Object.freeze({
+    source,
+    family,
+    ...(postscriptName === undefined ? {} : { postscriptName }),
   })
 }
 
@@ -1276,6 +1344,10 @@ function migrateV3ToV4(raw: Record<string, unknown>): Record<string, unknown> {
   }
 }
 
+function migrateV4ToV5(raw: Record<string, unknown>): Record<string, unknown> {
+  return { ...raw, schemaVersion: 5 }
+}
+
 function migrateV0ToV1(raw: Record<string, unknown>): Record<string, unknown> {
   return {
     ...raw,
@@ -1292,7 +1364,8 @@ function migrateToCurrent(
   const v1 = schemaVersion === 0 ? migrateV0ToV1(raw) : raw
   const v2 = schemaVersion < 2 ? migrateV1ToV2(v1) : v1
   const v3 = schemaVersion < 3 ? migrateV2ToV3(v2) : v2
-  return schemaVersion < 4 ? migrateV3ToV4(v3) : v3
+  const v4 = schemaVersion < 4 ? migrateV3ToV4(v3) : v3
+  return schemaVersion < 5 ? migrateV4ToV5(v4) : v4
 }
 
 function documentToJson(document: EditorDocumentV1): JsonObject {

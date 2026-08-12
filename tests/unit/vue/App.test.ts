@@ -203,7 +203,7 @@ describe('M02 editor shell', () => {
     })
     if (!text) throw new Error('test Text layer should exist')
     const document: EditorDocumentV1 = {
-      schemaVersion: 4,
+      schemaVersion: 5,
       id: '019c1f62-058e-7000-8000-000000000000',
       source: {
         blobHash: 'a'.repeat(64),
@@ -278,7 +278,7 @@ describe('M02 editor shell', () => {
       origin: { x: 10, y: 12 },
     })
     const document: EditorDocumentV1 = {
-      schemaVersion: 4,
+      schemaVersion: 5,
       id: '019c1f62-058e-7000-8000-000000000000',
       source: {
         blobHash: 'a'.repeat(64),

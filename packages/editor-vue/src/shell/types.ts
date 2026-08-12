@@ -36,6 +36,8 @@ export interface LayerSummary {
   readonly locked: boolean
   readonly opacity: number
   readonly rotation: number
+  /** A non-serializable editor projection, e.g. the current text draft. */
+  readonly transient?: boolean
 }
 
 export interface FrameSummary {
