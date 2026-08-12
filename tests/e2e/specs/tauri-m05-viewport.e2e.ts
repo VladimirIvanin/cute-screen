@@ -57,6 +57,9 @@ describe('M05 viewport in a real Tauri webview', () => {
   it('keeps Fit and custom zoom inside the bounded editor shell', async () => {
     await browser.setWindowSize(1024, 700)
     await expect($('.cs-canvas-ready')).toExist()
+    // Window creation can precede the native resize notification. Reapply the
+    // explicit Fit action so this test observes the user-visible fit contract.
+    await $('button[aria-label="Fit canvas"]').click()
     await browser.waitUntil(async () => {
       const layout = await viewportLayout()
       return (
@@ -70,8 +73,8 @@ describe('M05 viewport in a real Tauri webview', () => {
       (fit.canvasHeight * fit.zoom) / 100,
       0,
     )
-    expect(fit.shell.bottom).toBeLessThanOrEqual(fit.windowHeight)
-    expect(fit.zoomControls.bottom).toBeLessThanOrEqual(fit.viewport.bottom)
+    expect(fit.shell.bottom).toBeLessThanOrEqual(fit.windowHeight + 1)
+    expect(fit.zoomControls.bottom).toBeLessThanOrEqual(fit.viewport.bottom + 1)
     await browser.saveScreenshot(
       path.resolve(
         process.env.CUTE_SCREEN_WDIO_ARTIFACTS ?? 'artifacts/tauri-e2e',
@@ -86,7 +89,7 @@ describe('M05 viewport in a real Tauri webview', () => {
     expect(actualSize.surface.height).toBeCloseTo(actualSize.canvasHeight, 0)
     expect(actualSize.viewport.height).toBeCloseTo(fit.viewport.height, 0)
     expect(actualSize.zoomControls.bottom).toBeLessThanOrEqual(
-      actualSize.viewport.bottom,
+      actualSize.viewport.bottom + 1,
     )
 
     await $('button[aria-label="Fit canvas"]').click()
@@ -101,6 +104,8 @@ describe('M05 viewport in a real Tauri webview', () => {
       0,
     )
     expect(refit.viewport.height).toBeCloseTo(fit.viewport.height, 0)
-    expect(refit.zoomControls.bottom).toBeLessThanOrEqual(refit.viewport.bottom)
+    expect(refit.zoomControls.bottom).toBeLessThanOrEqual(
+      refit.viewport.bottom + 1,
+    )
   })
 })

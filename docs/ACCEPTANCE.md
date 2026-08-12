@@ -108,6 +108,15 @@ Wayland, Windows и macOS. На Wayland selector системный.
 selection/history согласованы, base image редактируется как слой без изменения
 оригинала, flip совпадает в preview/export.
 
+### UI shell evidence
+
+На 1600×1000, 1280×720 и 1024×700 открыть populated shell, переключить RU/EN и
+light/dark, открыть меню и contextual colour/select controls, затем закрыть их
+Escape и outside click. Проверить возврат focus к trigger, отсутствие document
+horizontal overflow и доступность Capture/Copy/Export. В LayersPanel завершить
+drag opacity и изменить rotation: каждый завершённый control interaction создаёт
+не более одной undoable document command.
+
 ## A06 — Drawing tools
 
 Current status: partial implementation. Chrome 150/Linux browser evidence covers

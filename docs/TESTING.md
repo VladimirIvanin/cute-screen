@@ -230,6 +230,26 @@ Goldens создаются для каждого LayerNode:
 
 ## E2E suites
 
+### UI-system evidence (2026-08-12, Windows, Chrome 151)
+
+- `pnpm typecheck` — passed; production editor bundle uses named Naive UI
+  imports (`dist/index.js` 681.38 kB, gzip 161.13 kB).
+- `pnpm test` — 172 passed.
+- `pnpm test:e2e:browser` — all five specifications passed, including M02
+  responsive shell, M05 zoom/undo and M06 contextual controls.
+- `pnpm test:perf` — 4 passed; no idle animation loop was introduced.
+- `pnpm licenses list --prod --json` reports MIT for `naive-ui@2.44.1` and
+  `katex@0.16.22`.
+
+`pnpm test:e2e:tauri` was also run on Windows on 2026-08-12. Its foundation and
+native-shell scenarios passed, but the suite remains red on pre-existing M03
+persistence, M04 clean-profile mount and M01 scoped image-decode scenarios.
+After that run the embedded WebDriver did not reliably reopen port 4445 for the
+isolated M05 retry, so this is not claimed as completed UI runtime evidence.
+The manual comparison of final screenshots with `prototype-html` likewise
+remains a separate acceptance step; browser-mode screenshots do not substitute
+for either proof.
+
 ### Browser mode
 
 - capture result поступает из mocked adapter;

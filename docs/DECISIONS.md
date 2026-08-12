@@ -384,3 +384,29 @@ crop. Screen и Active Window остаются direct snapshots без selector.
 immutable original определяется в момент подтверждения. X11 frozen overlay не
 получает это поведение автоматически: его task-switch flow требует отдельного
 решения и runtime evidence.
+
+## ADR-030 — Naive UI как слой интерактивных Vue-примитивов
+
+**Статус:** accepted
+
+**Контекст:** editor shell имеет собственные canvas/layout contracts, но
+дублирует controls, menus, popovers, focus handling и browser-native form
+appearance. Это делает visual language несогласованным и увеличивает стоимость
+доступности и keyboard regressions.
+
+**Решение:** `naive-ui@2.44.1` используется только как MIT-licensed,
+tree-shakeable слой Vue controls и overlays: buttons, tooltips, dropdowns,
+popovers, selects, sliders, number inputs и colour control. `EditorShell`,
+CanvasViewport, document commands, scene graph и interaction pointer loop
+остаются собственными. Единые Cute Screen semantic tokens задают theme overrides
+для light/dark; popup containers монтируются в shell overlay root. Прототип
+`prototype-html` служит visual reference, но не production implementation.
+
+**Проверка:** component/browser/Tauri evidence проверяет locale/theme,
+accessible names, focus return, Escape/outside close, 1024 px geometry и один
+undoable commit для завершённого slider/color/number interaction. License audit
+проверяет всю production dependency chain.
+
+**Последствия:** UI cannot import Naive controls into renderer, scene graph or
+pointermove path. Existing public shell props/emits and `ContextToolbarSchema`
+остаются совместимыми; internal CSS classes не являются public API.

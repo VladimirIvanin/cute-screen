@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { NButton, NInputNumber } from 'naive-ui'
 import { UiIcon } from '../icon'
+import UiSelect from '../ui/UiSelect.vue'
 const props = defineProps<{
   zoom: number
   t: (
@@ -23,60 +25,60 @@ const zoomOptions = computed(() =>
 
 <template>
   <div class="cs-zoom-controls" role="group" :aria-label="t('zoom')">
-    <button
-      type="button"
+    <NButton
+      quaternary
+      circle
       class="cs-icon-button"
       :aria-label="t('zoomOut')"
       :title="t('zoomOut')"
       @click="emit('zoom', zoom - 10)"
     >
       <UiIcon name="zoomOut" />
-    </button>
-    <button
-      type="button"
+    </NButton>
+    <NButton
+      quaternary
       class="cs-zoom-fit"
       :aria-label="t('fitZoom')"
       :title="t('fitZoom')"
       @click="emit('fit')"
     >
       Fit
-    </button>
-    <button
-      type="button"
+    </NButton>
+    <NButton
+      quaternary
       class="cs-zoom-value"
       :title="t('zoomValue')"
       @click="emit('zoom', 100)"
     >
       {{ zoom }}%
-    </button>
-    <input
+    </NButton>
+    <NInputNumber
       class="cs-zoom-input"
-      type="number"
-      min="10"
-      max="1600"
-      step="1"
+      size="small"
+      :min="10"
+      :max="1600"
+      :step="1"
       :value="zoom"
       :aria-label="t('zoomPercentage')"
-      @change="emit('zoom', Number(($event.target as HTMLInputElement).value))"
+      :show-button="false"
+      @update:value="typeof $event === 'number' && emit('zoom', $event)"
     />
-    <select
+    <UiSelect
       class="cs-zoom-presets"
-      :value="zoom"
-      :aria-label="t('zoom')"
-      @change="emit('zoom', Number(($event.target as HTMLSelectElement).value))"
-    >
-      <option v-for="value in zoomOptions" :key="value" :value="value">
-        {{ value }}%
-      </option>
-    </select>
-    <button
-      type="button"
+      :model-value="zoom"
+      v-bind="{ ariaLabel: t('zoom') }"
+      :options="zoomOptions.map((value) => ({ value, label: `${value}%` }))"
+      @update:model-value="typeof $event === 'number' && emit('zoom', $event)"
+    />
+    <NButton
+      quaternary
+      circle
       class="cs-icon-button"
       :aria-label="t('zoomIn')"
       :title="t('zoomIn')"
       @click="emit('zoom', zoom + 10)"
     >
       <UiIcon name="zoomIn" />
-    </button>
+    </NButton>
   </div>
 </template>

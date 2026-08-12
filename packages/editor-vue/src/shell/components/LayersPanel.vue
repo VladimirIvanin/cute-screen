@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { NButton } from 'naive-ui'
 
 import { UiIcon } from '../icon'
 import type { LayerSummary } from '../types'
+import DeferredNumberInput from '../ui/DeferredNumberInput.vue'
+import DeferredSlider from '../ui/DeferredSlider.vue'
 defineProps<{
   layers: readonly LayerSummary[]
   open: boolean
@@ -47,28 +50,30 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <button
+  <NButton
     v-if="!open"
-    type="button"
+    quaternary
+    circle
     class="cs-layers-peek cs-icon-button"
     :aria-label="t('showLayers')"
     :title="t('showLayers')"
     @click="emit('toggle')"
   >
     <UiIcon name="layers" />
-  </button>
+  </NButton>
   <aside v-else class="cs-layers-panel" aria-label="Layers">
     <header>
       <strong>{{ t('layers') }}</strong
-      ><button
-        type="button"
+      ><NButton
+        quaternary
+        circle
         class="cs-icon-button"
         :aria-label="t('hideLayers')"
         :title="t('hideLayers')"
         @click="emit('toggle')"
       >
         <UiIcon name="close" />
-      </button>
+      </NButton>
     </header>
     <p v-if="layers.length === 0" class="cs-layers-empty">
       {{ t('layersEmpty') }}
@@ -94,10 +99,10 @@ const emit = defineEmits<{
         @drop="dropReorder(layer.id)"
         @dragend="clearReorder"
       >
-        <button
-          type="button"
+        <NButton
+          quaternary
           class="cs-layer-select"
-          :disabled="layer.transient"
+          :disabled="Boolean(layer.transient)"
           @click="
             emit(
               'select',
@@ -108,81 +113,74 @@ const emit = defineEmits<{
           "
         >
           <UiIcon :name="layer.icon" /><span>{{ layer.name }}</span>
-        </button>
-        <button
-          type="button"
+        </NButton>
+        <NButton
+          quaternary
+          circle
           class="cs-layer-action"
-          :disabled="layer.transient"
+          :disabled="Boolean(layer.transient)"
           :aria-label="layer.visible ? t('hideLayers') : t('showLayers')"
           @click.stop="emit('visibility', layer.id)"
         >
           <UiIcon :name="layer.visible ? 'eye' : 'eyeOff'" />
-        </button>
-        <button
-          type="button"
+        </NButton>
+        <NButton
+          quaternary
+          circle
           class="cs-layer-action"
-          :disabled="layer.transient"
+          :disabled="Boolean(layer.transient)"
           :aria-label="layer.locked ? t('unlockLayer') : t('lockLayer')"
           @click.stop="emit('lock', layer.id)"
         >
           <UiIcon :name="layer.locked ? 'lock' : 'unlock'" />
-        </button>
+        </NButton>
         <div class="cs-layer-properties">
           <label>
             <span>{{ t('opacity') }}</span>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              :value="Math.round(layer.opacity * 100)"
-              :disabled="layer.locked || layer.transient"
-              @input="
-                emit(
-                  'opacity',
-                  layer.id,
-                  Number(($event.target as HTMLInputElement).value) / 100,
-                )
-              "
+            <DeferredSlider
+              :min="0"
+              :max="100"
+              :model-value="Math.round(layer.opacity * 100)"
+              :step="1"
+              v-bind="{ ariaLabel: t('opacity') }"
+              :disabled="Boolean(layer.locked || layer.transient)"
+              @commit="emit('opacity', layer.id, Number($event) / 100)"
             />
           </label>
           <label>
             <span>{{ t('rotation') }}</span>
-            <input
-              type="number"
-              min="-360"
-              max="360"
-              step="1"
-              :value="Math.round(layer.rotation)"
-              :disabled="layer.locked || layer.transient"
-              @change="
-                emit(
-                  'rotation',
-                  layer.id,
-                  Number(($event.target as HTMLInputElement).value),
-                )
-              "
+            <DeferredNumberInput
+              :min="-360"
+              :max="360"
+              :step="1"
+              :model-value="Math.round(layer.rotation)"
+              v-bind="{ ariaLabel: t('rotation') }"
+              :disabled="Boolean(layer.locked || layer.transient)"
+              @commit="emit('rotation', layer.id, Number($event))"
             />
           </label>
-          <button
-            type="button"
+          <NButton
+            quaternary
+            circle
             class="cs-layer-order"
             :aria-label="t('moveLayerUp')"
             :title="t('moveLayerUp')"
-            :disabled="layer.locked || layer.transient"
+            :disabled="Boolean(layer.locked || layer.transient)"
             @click="emit('reorder', layer.id, 'up')"
           >
             ↑
-          </button>
-          <button
-            type="button"
+          </NButton>
+          <NButton
+            quaternary
+            circle
             class="cs-layer-order"
             :aria-label="t('moveLayerDown')"
             :title="t('moveLayerDown')"
-            :disabled="layer.locked || layer.transient"
+            :disabled="Boolean(layer.locked || layer.transient)"
             @click="emit('reorder', layer.id, 'down')"
           >
             ↓
-          </button>
+          </NButton>
         </div>
       </div>
     </div>

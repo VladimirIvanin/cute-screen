@@ -398,6 +398,7 @@ function fitCanvas(): void {
   lastFitZoom = nextZoom
   emit('fitZoom', nextZoom)
 }
+defineExpose({ refitCanvas: fitCanvas })
 function retryRender(): void {
   void drawDocument()
 }

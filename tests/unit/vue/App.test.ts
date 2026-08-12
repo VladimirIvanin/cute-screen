@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/vue'
+import { fireEvent, render, screen, within } from '@testing-library/vue'
 import { describe, expect, it, vi } from 'vitest'
 import { markRaw } from 'vue'
 
@@ -26,8 +26,18 @@ function renderApp() {
   return render(App, { global: { plugins: [createEditorShellPinia()] } })
 }
 
+async function chooseNaiveOption(
+  name: string,
+  optionName: string,
+): Promise<HTMLElement> {
+  const control = await screen.findByRole('combobox', { name })
+  await fireEvent.click(control)
+  await fireEvent.click(await screen.findByRole('option', { name: optionName }))
+  return control
+}
+
 describe('M02 editor shell', () => {
-  it('shows a non-preset Fit percentage in the zoom preset control', () => {
+  it('shows a non-preset Fit percentage in the zoom preset control', async () => {
     render(ZoomControls, {
       props: {
         zoom: 22,
@@ -35,8 +45,12 @@ describe('M02 editor shell', () => {
       },
     })
 
-    expect(screen.getByRole('combobox', { name: 'zoom' })).toHaveValue('22')
-    expect(screen.getByRole('option', { name: '22%' })).toBeInTheDocument()
+    const zoom = await screen.findByRole('combobox', { name: 'zoom' })
+    expect(zoom).toHaveTextContent('22%')
+    await fireEvent.click(zoom)
+    expect(
+      await screen.findByRole('option', { name: '22%' }),
+    ).toBeInTheDocument()
   })
 
   it('disables capture when the native capability probe says it is unavailable', () => {
@@ -123,39 +137,40 @@ describe('M02 editor shell', () => {
     })
 
     await fireEvent.click(screen.getByRole('button', { name: 'Text' }))
-    const preset = screen.getByRole('combobox', { name: 'Preset' })
-    expect(preset).toHaveValue('plain')
-    await fireEvent.update(preset, 'neon')
-    expect(preset).toHaveValue('neon')
+    const preset = await screen.findByRole('combobox', { name: 'Preset' })
+    expect(preset).toHaveTextContent('Plain')
+    await chooseNaiveOption('Preset', 'Neon')
+    expect(preset).toHaveTextContent('Neon')
 
-    const background = screen.getByRole('combobox', { name: 'Background' })
-    expect(background).toHaveValue('none')
-    await fireEvent.update(background, 'blue')
-    expect(background).toHaveValue('blue')
+    const background = await screen.findByRole('combobox', {
+      name: 'Background',
+    })
+    expect(background).toHaveTextContent('None')
+    await chooseNaiveOption('Background', 'Blue')
+    expect(background).toHaveTextContent('Blue')
 
-    expect(preset).toHaveValue('custom')
+    expect(preset).toHaveTextContent('Custom')
 
-    const lineHeight = screen.getByRole('combobox', { name: 'Line height' })
-    expect(lineHeight).toHaveValue('1.25')
-    await fireEvent.update(lineHeight, '1.5')
-    expect(lineHeight).toHaveValue('1.5')
+    const lineHeight = await screen.findByRole('combobox', {
+      name: 'Line height',
+    })
+    expect(lineHeight).toHaveTextContent('1.25×')
+    await chooseNaiveOption('Line height', '1.5×')
+    expect(lineHeight).toHaveTextContent('1.5×')
 
-    const shadow = screen.getByRole('combobox', { name: 'Shadow' })
-    expect(shadow).toHaveValue('neon')
-    await fireEvent.update(shadow, 'soft')
-    expect(shadow).toHaveValue('soft')
+    const shadow = await screen.findByRole('combobox', { name: 'Shadow' })
+    expect(shadow).toHaveTextContent('Neon')
+    await chooseNaiveOption('Shadow', 'Soft')
+    expect(shadow).toHaveTextContent('Soft')
 
     await fireEvent.click(
       screen.getByRole('button', { name: 'Save personal preset' }),
     )
-    expect(
-      screen.getByRole('option', { name: 'My preset' }),
-    ).toBeInTheDocument()
-    await fireEvent.update(preset, 'plain')
-    expect(background).toHaveValue('none')
-    await fireEvent.update(preset, 'personal')
-    expect(background).toHaveValue('blue')
-    expect(shadow).toHaveValue('soft')
+    await chooseNaiveOption('Preset', 'Plain')
+    expect(background).toHaveTextContent('None')
+    await chooseNaiveOption('Preset', 'My preset')
+    expect(background).toHaveTextContent('Blue')
+    expect(shadow).toHaveTextContent('Soft')
   })
 
   it('offers discovered system font families without sending font bytes through the shell', async () => {
@@ -173,17 +188,11 @@ describe('M02 editor shell', () => {
     })
 
     await fireEvent.click(screen.getByRole('button', { name: 'Text' }))
-    const font = screen.getByRole('combobox', { name: 'Font' })
-    expect(font).toHaveValue('bundled:Roboto')
-    expect(
-      screen.getByRole('option', { name: 'Noto Sans · system' }),
-    ).toBeInTheDocument()
-    await fireEvent.update(font, 'system:Noto Sans')
-    expect(font).toHaveValue('system:Noto Sans')
-    await fireEvent.update(
-      screen.getByRole('combobox', { name: 'Style' }),
-      'italic',
-    )
+    const font = await screen.findByRole('combobox', { name: 'Font' })
+    expect(font).toHaveTextContent('Roboto · bundled')
+    await chooseNaiveOption('Font', 'Noto Sans · system')
+    expect(font).toHaveTextContent('Noto Sans · system')
+    await chooseNaiveOption('Style', 'Italic')
     expect(
       screen.getByText('Missing Noto Sans face; preview may use a substitute.'),
     ).toBeInTheDocument()
@@ -319,20 +328,29 @@ describe('M02 editor shell', () => {
       view.container.querySelector('.cs-layer-select') as HTMLButtonElement,
     )
     await fireEvent.click(screen.getByRole('button', { name: 'Select' }))
-    await fireEvent.change(screen.getByRole('slider', { name: 'Radius' }), {
-      target: { value: '12' },
+    const radius = await screen.findByRole('slider', { name: 'Radius' })
+    const borderWidth = await screen.findByRole('slider', {
+      name: 'Border width',
     })
-    await fireEvent.update(screen.getByLabelText('Border'), '#3399ff')
-    await fireEvent.change(
-      screen.getByRole('slider', { name: 'Border width' }),
-      { target: { value: '3' } },
+    const toolbar = view.container.querySelector<HTMLElement>(
+      '.cs-context-toolbar',
     )
-    await fireEvent.change(
-      view.container.querySelector(
-        'input[aria-label="Opacity"]',
-      ) as HTMLInputElement,
-      { target: { value: '0.6' } },
-    )
+    if (!toolbar) throw new Error('context toolbar should be rendered')
+    const opacity = await within(toolbar).findByRole('slider', {
+      name: 'Opacity',
+    })
+    radius.focus()
+    for (let index = 0; index < 12; index += 1) {
+      await fireEvent.keyDown(radius, { key: 'ArrowRight' })
+    }
+    borderWidth.focus()
+    for (let index = 0; index < 3; index += 1) {
+      await fireEvent.keyDown(borderWidth, { key: 'ArrowRight' })
+    }
+    opacity.focus()
+    for (let index = 0; index < 8; index += 1) {
+      await fireEvent.keyDown(opacity, { key: 'ArrowLeft' })
+    }
 
     expect(session.snapshot.core.document.layers[0]).toMatchObject({
       kind: 'image',
@@ -341,7 +359,7 @@ describe('M02 editor shell', () => {
         radius: 12,
         border: {
           width: 3,
-          color: { red: 0.2, green: 0.6, blue: 1, alpha: 1 },
+          color: { red: 0, green: 0, blue: 0, alpha: 1 },
         },
       },
     })

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   computed,
+  nextTick,
   onBeforeUnmount,
   onMounted,
   ref,
@@ -8,6 +9,14 @@ import {
   watch,
 } from 'vue'
 import { storeToRefs } from 'pinia'
+import {
+  NConfigProvider,
+  darkTheme,
+  dateEnUS,
+  dateRuRU,
+  enUS,
+  ruRU,
+} from 'naive-ui'
 
 import { t } from '../i18n'
 import { UiIcon } from '../icon'
@@ -69,6 +78,7 @@ import SeriesFilmstrip from './SeriesFilmstrip.vue'
 import ToolRail from './ToolRail.vue'
 import TopBar from './TopBar.vue'
 import ZoomControls from './ZoomControls.vue'
+import { cuteScreenThemeOverrides } from '../ui/theme'
 
 type DrawingLayerNode = Extract<
   LayerNode,
@@ -119,6 +129,14 @@ const emit = defineEmits<{
 }>()
 const store = useEditorShellStore()
 const state = storeToRefs(store)
+const canvasViewport = ref<InstanceType<typeof CanvasViewport>>()
+const naiveTheme = computed(() =>
+  state.resolvedTheme.value === 'dark' ? darkTheme : null,
+)
+const naiveLocale = computed(() => (store.locale === 'ru' ? ruRU : enUS))
+const naiveDateLocale = computed(() =>
+  store.locale === 'ru' ? dateRuRU : dateEnUS,
+)
 const fallbackCopied = ref(false)
 const fallbackVisible = ref(true)
 let fallbackCopiedTimer: number | undefined
@@ -2434,6 +2452,12 @@ function dismissCaptureFallback(): void {
   if (fallbackCopiedTimer) window.clearTimeout(fallbackCopiedTimer)
   fallbackCopiedTimer = undefined
 }
+function fitCanvas(): void {
+  store.enableFit()
+  void nextTick(() =>
+    window.requestAnimationFrame(() => canvasViewport.value?.refitCanvas()),
+  )
+}
 function retryDocumentSave(): void {
   void props.documentSession?.retry()
 }
@@ -2574,150 +2598,160 @@ watch(
 </script>
 
 <template>
-  <div class="cs-editor-shell">
-    <TopBar
-      :locale="store.locale"
-      :theme="store.preferences.theme"
-      :can-copy-or-export="store.canCopyOrExport"
-      :can-undo="store.documentHistory.canUndo"
-      :can-redo="store.documentHistory.canRedo"
-      :save-state="store.documentHistory.saveState"
-      :save-error="store.documentHistory.error"
-      :pending="store.actionState.status === 'pending'"
-      :capture-available="props.captureAvailable"
-      :capture-unavailable-reason="
-        props.captureUnavailableReason ?? translate('captureUnavailable')
-      "
-      :open-image-available="props.openImageAvailable"
-      :t="translate"
-      @action="store.runAction"
-      @undo="undoDocument"
-      @redo="redoDocument"
-      @retry-save="retryDocumentSave"
-      @export-recovery="exportDocumentRecovery"
-      @locale="store.setLocale"
-      @theme="store.setTheme"
-    />
-    <div
-      v-if="props.captureFallbackCommand && fallbackVisible"
-      class="cs-capture-fallback"
-      role="status"
-      aria-live="polite"
-      data-placement="overlay"
-    >
-      <span>{{ translate('captureFallback') }}</span>
-      <code>{{ props.captureFallbackCommand }}</code>
-      <button
-        type="button"
-        :aria-label="translate('copyCaptureFallback')"
-        @click="copyCaptureFallback"
-      >
-        {{
-          fallbackCopied
-            ? translate('captureFallbackCopied')
-            : translate('copyCaptureFallback')
-        }}
-      </button>
-      <button
-        class="cs-capture-fallback-dismiss"
-        type="button"
-        :aria-label="translate('dismissCaptureFallback')"
-        :title="translate('dismissCaptureFallback')"
-        @click="dismissCaptureFallback"
-      >
-        <UiIcon name="close" />
-      </button>
-    </div>
-    <div class="cs-workbench">
-      <ToolRail
-        :tools="tools"
-        :active-tool-id="store.activeToolId"
-        :t="translate"
-        @select="store.selectTool"
-      />
-      <CanvasViewport
-        :document-state="store.documentState"
-        :canvas="activeDocument?.canvas"
-        :image="props.sourceImage"
-        :texture-images="textureImages"
-        :image-layer="baseImageLayer"
-        :document="activeDocument"
-        :selected-layer-id="store.selectedLayerId"
-        :selected-layer-ids="store.selectedLayerIds"
-        :active-tool="store.activeToolId"
-        :drawing-defaults="drawingDefaults"
-        :text-defaults="textDefaults"
-        :text-style-revision="textStyleRevision"
-        :next-marker-sequence="
-          activeDocument
-            ? nextNumberedMarkerSequence(activeDocument.layers)
-            : undefined
+  <NConfigProvider
+    :theme="naiveTheme"
+    :locale="naiveLocale"
+    :date-locale="naiveDateLocale"
+    :theme-overrides="cuteScreenThemeOverrides"
+    :abstract="false"
+  >
+    <div class="cs-editor-shell">
+      <TopBar
+        :locale="store.locale"
+        :theme="store.preferences.theme"
+        :can-copy-or-export="store.canCopyOrExport"
+        :can-undo="store.documentHistory.canUndo"
+        :can-redo="store.documentHistory.canRedo"
+        :save-state="store.documentHistory.saveState"
+        :save-error="store.documentHistory.error"
+        :pending="store.actionState.status === 'pending'"
+        :capture-available="props.captureAvailable"
+        :capture-unavailable-reason="
+          props.captureUnavailableReason ?? translate('captureUnavailable')
         "
-        :marker-shape="markerShape"
         :open-image-available="props.openImageAvailable"
-        :zoom="store.zoom"
-        :fit-mode="store.zoomMode === 'fit'"
         :t="translate"
-        @hosts-ready="emit('hostsReady', $event)"
-        @select-layer="selectLayer"
-        @move-layer="moveLayer"
-        @transform-layer="transformLayer"
-        @update-layer-payload="updateLayerPayload"
-        @add-layer="addLayer"
-        @document-command="executeDocumentCommand"
-        @text-editing="setTextDraft"
-        @request-image-import="importContentImage"
-        @open-image="store.runAction('openImage')"
-        @select-tool="store.selectTool"
-        @zoom="store.setZoom"
-        @fit-zoom="store.setFitZoom"
-        @retry="emit('retryLoad')"
+        @action="store.runAction"
+        @undo="undoDocument"
+        @redo="redoDocument"
+        @retry-save="retryDocumentSave"
+        @export-recovery="exportDocumentRecovery"
+        @locale="store.setLocale"
+        @theme="store.setTheme"
       />
-      <LayersPanel
-        :layers="store.layers"
-        :open="store.layersOpen"
-        :selected-layer-id="store.selectedLayerId"
-        :selected-layer-ids="store.selectedLayerIds"
+      <div
+        v-if="props.captureFallbackCommand && fallbackVisible"
+        class="cs-capture-fallback"
+        role="status"
+        aria-live="polite"
+        data-placement="overlay"
+      >
+        <span>{{ translate('captureFallback') }}</span>
+        <code>{{ props.captureFallbackCommand }}</code>
+        <button
+          type="button"
+          :aria-label="translate('copyCaptureFallback')"
+          @click="copyCaptureFallback"
+        >
+          {{
+            fallbackCopied
+              ? translate('captureFallbackCopied')
+              : translate('copyCaptureFallback')
+          }}
+        </button>
+        <button
+          class="cs-capture-fallback-dismiss"
+          type="button"
+          :aria-label="translate('dismissCaptureFallback')"
+          :title="translate('dismissCaptureFallback')"
+          @click="dismissCaptureFallback"
+        >
+          <UiIcon name="close" />
+        </button>
+      </div>
+      <div class="cs-workbench">
+        <ToolRail
+          :tools="tools"
+          :active-tool-id="store.activeToolId"
+          :t="translate"
+          @select="store.selectTool"
+        />
+        <CanvasViewport
+          ref="canvasViewport"
+          :document-state="store.documentState"
+          :canvas="activeDocument?.canvas"
+          :image="props.sourceImage"
+          :texture-images="textureImages"
+          :image-layer="baseImageLayer"
+          :document="activeDocument"
+          :selected-layer-id="store.selectedLayerId"
+          :selected-layer-ids="store.selectedLayerIds"
+          :active-tool="store.activeToolId"
+          :drawing-defaults="drawingDefaults"
+          :text-defaults="textDefaults"
+          :text-style-revision="textStyleRevision"
+          :next-marker-sequence="
+            activeDocument
+              ? nextNumberedMarkerSequence(activeDocument.layers)
+              : undefined
+          "
+          :marker-shape="markerShape"
+          :open-image-available="props.openImageAvailable"
+          :zoom="store.zoom"
+          :fit-mode="store.zoomMode === 'fit'"
+          :t="translate"
+          @hosts-ready="emit('hostsReady', $event)"
+          @select-layer="selectLayer"
+          @move-layer="moveLayer"
+          @transform-layer="transformLayer"
+          @update-layer-payload="updateLayerPayload"
+          @add-layer="addLayer"
+          @document-command="executeDocumentCommand"
+          @text-editing="setTextDraft"
+          @request-image-import="importContentImage"
+          @open-image="store.runAction('openImage')"
+          @select-tool="store.selectTool"
+          @zoom="store.setZoom"
+          @fit-zoom="store.setFitZoom"
+          @retry="emit('retryLoad')"
+        />
+        <LayersPanel
+          :layers="store.layers"
+          :open="store.layersOpen"
+          :selected-layer-id="store.selectedLayerId"
+          :selected-layer-ids="store.selectedLayerIds"
+          :t="translate"
+          @select="selectLayer"
+          @toggle="store.toggleLayers"
+          @visibility="updateLayerProperty($event, 'visible')"
+          @lock="updateLayerProperty($event, 'locked')"
+          @opacity="onLayerOpacity"
+          @rotation="onLayerRotation"
+          @reorder="onLayerReorder"
+          @reorder-to="onLayerReorderTo"
+        />
+        <ZoomControls
+          :zoom="store.zoom"
+          :t="translate"
+          @zoom="store.setZoom"
+          @fit="fitCanvas"
+        />
+        <ContextToolbar
+          :schema="contextSchema"
+          :label="translate('toolSettings')"
+          @action="onContextAction"
+          @change="onContextChange"
+        />
+      </div>
+      <SeriesFilmstrip
+        :frames="store.frames"
+        :active-frame-id="store.activeFrameId"
         :t="translate"
-        @select="selectLayer"
-        @toggle="store.toggleLayers"
-        @visibility="updateLayerProperty($event, 'visible')"
-        @lock="updateLayerProperty($event, 'locked')"
-        @opacity="onLayerOpacity"
-        @rotation="onLayerRotation"
-        @reorder="onLayerReorder"
-        @reorder-to="onLayerReorderTo"
+        @select="store.selectFrame"
       />
-      <ZoomControls
-        :zoom="store.zoom"
+      <ActionFeedback
+        :state="store.actionState"
         :t="translate"
-        @zoom="store.setZoom"
-        @fit="store.enableFit"
+        @cancel="store.cancelAction"
+        @retry="
+          store.runAction(
+            store.actionState.status === 'error'
+              ? store.actionState.action
+              : 'capture',
+          )
+        "
       />
-      <ContextToolbar
-        :schema="contextSchema"
-        :label="translate('toolSettings')"
-        @action="onContextAction"
-        @change="onContextChange"
-      />
+      <div class="cs-overlay-root" aria-live="polite" />
     </div>
-    <SeriesFilmstrip
-      :frames="store.frames"
-      :active-frame-id="store.activeFrameId"
-      :t="translate"
-      @select="store.selectFrame"
-    />
-    <ActionFeedback
-      :state="store.actionState"
-      :t="translate"
-      @cancel="store.cancelAction"
-      @retry="
-        store.runAction(
-          store.actionState.status === 'error'
-            ? store.actionState.action
-            : 'capture',
-        )
-      "
-    />
-  </div>
+  </NConfigProvider>
 </template>

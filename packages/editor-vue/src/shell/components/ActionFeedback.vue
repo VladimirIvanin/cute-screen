@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { NButton } from 'naive-ui'
 import type { CaptureProgressState } from '../../platform'
 import type { AsyncActionName, AsyncActionState } from '../types'
 defineProps<{
@@ -62,19 +63,11 @@ const progressKey: Record<
       }}
     </span>
     <span v-else>{{ state.message }}</span>
-    <button
-      v-if="state.status === 'pending'"
-      type="button"
-      @click="emit('cancel')"
-    >
+    <NButton v-if="state.status === 'pending'" text @click="emit('cancel')">
       {{ t('cancel') }}
-    </button>
-    <button
-      v-else-if="state.status === 'error'"
-      type="button"
-      @click="emit('retry')"
-    >
+    </NButton>
+    <NButton v-else-if="state.status === 'error'" text @click="emit('retry')">
       {{ t('retry') }}
-    </button>
+    </NButton>
   </div>
 </template>

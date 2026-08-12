@@ -720,3 +720,324 @@ button:focus-visible {
     animation-duration: 0.01ms !important;
   }
 }
+
+/* Naive UI shell composition -------------------------------------------------
+   The editor owns placement; Naive UI owns only control and overlay behaviour.
+   These rules intentionally come last so legacy component-local geometry cannot
+   compete with the prototype-derived floating workspace. */
+.cs-editor-shell {
+  position: relative;
+  display: block;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--canvas);
+}
+
+.cs-workbench {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+}
+
+.cs-viewport {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.cs-canvas-scroll {
+  padding: 82px 96px 94px;
+}
+
+.cs-topbar {
+  position: absolute;
+  z-index: 40;
+  top: 12px;
+  right: 14px;
+  left: 14px;
+  height: 42px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  pointer-events: none;
+}
+
+.cs-brand,
+.cs-history,
+.cs-top-actions,
+.cs-save-status {
+  pointer-events: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-raised) 94%, transparent);
+  box-shadow: var(--shadow-overlay);
+  backdrop-filter: blur(16px) saturate(1.12);
+}
+
+.cs-brand {
+  height: 42px;
+  padding: 0 11px 0 7px;
+}
+
+.cs-brand-mark {
+  width: 30px;
+  height: 30px;
+}
+
+.cs-history {
+  height: 42px;
+  margin-left: 4px;
+  padding: 2px;
+}
+
+.cs-save-status {
+  padding: 7px 10px;
+}
+
+.cs-top-actions {
+  height: 42px;
+  gap: 3px;
+  padding: 3px;
+}
+
+.cs-top-actions .n-button {
+  --n-height: 34px;
+}
+
+.cs-top-actions .cs-button-primary {
+  --n-color: var(--accent);
+  --n-color-hover: var(--accent-hover);
+  --n-color-pressed: var(--accent-hover);
+  --n-border: 1px solid var(--accent);
+  --n-border-hover: 1px solid var(--accent-hover);
+  --n-text-color: var(--accent-contrast);
+  --n-text-color-hover: var(--accent-contrast);
+}
+
+.cs-toolrail {
+  position: absolute;
+  z-index: 20;
+  top: 76px;
+  left: 14px;
+  width: 46px;
+  max-height: calc(100% - 158px);
+  padding: 5px;
+  gap: 2px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--surface-raised) 94%, transparent);
+  box-shadow: var(--shadow-overlay);
+  backdrop-filter: blur(16px) saturate(1.12);
+}
+
+.cs-tool-group {
+  gap: 1px;
+}
+.cs-tool-button {
+  width: 34px;
+  height: 34px;
+}
+.cs-tool-button.is-active {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.cs-tool-button.is-active::before {
+  display: none;
+}
+
+.cs-layers-panel {
+  position: absolute;
+  z-index: 20;
+  top: 76px;
+  right: 14px;
+  bottom: 76px;
+  width: min(292px, calc(100vw - 96px));
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--surface-raised) 96%, transparent);
+  backdrop-filter: blur(16px) saturate(1.12);
+}
+
+.cs-layers-peek {
+  position: absolute;
+  z-index: 20;
+  top: 76px;
+  right: 14px;
+  border-radius: 12px;
+}
+
+.cs-layer-row {
+  position: relative;
+}
+.cs-layer-properties {
+  grid-template-columns: minmax(0, 1fr) 82px 30px 30px;
+}
+.cs-layer-properties .cs-ui-slider {
+  min-width: 0;
+}
+.cs-layer-properties .cs-ui-number-input {
+  width: 78px;
+}
+
+.cs-context-toolbar {
+  position: absolute;
+  z-index: 20;
+  right: 450px;
+  bottom: 14px;
+  left: 418px;
+  width: auto;
+  max-width: none;
+  min-height: 48px;
+  padding: 5px 8px;
+  border-radius: 13px;
+  transform: none;
+  background: color-mix(in srgb, var(--surface-raised) 96%, transparent);
+  backdrop-filter: blur(16px) saturate(1.12);
+}
+
+.cs-context-controls {
+  gap: 7px;
+  padding-bottom: 1px;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.cs-context-control {
+  display: flex;
+  min-width: max-content;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  background: transparent;
+}
+
+.cs-context-control > span {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.cs-context-control .cs-ui-slider {
+  width: 92px;
+}
+.cs-context-control .cs-ui-select {
+  width: 108px;
+}
+.cs-context-control .cs-ui-color-picker {
+  width: 28px;
+}
+
+.cs-zoom-controls {
+  z-index: 21;
+  right: 14px;
+  bottom: 14px;
+  left: auto;
+  padding: 3px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-raised) 96%, transparent);
+  backdrop-filter: blur(16px) saturate(1.12);
+}
+
+.cs-zoom-controls .n-button {
+  --n-height: 30px;
+}
+.cs-zoom-input {
+  width: 66px;
+}
+.cs-zoom-presets {
+  width: 76px;
+}
+
+.cs-filmstrip {
+  position: absolute;
+  z-index: 21;
+  bottom: 14px;
+  left: 14px;
+  width: min(286px, calc(100vw - 28px));
+  min-height: 54px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--surface-raised) 96%, transparent);
+  box-shadow: var(--shadow-overlay);
+  backdrop-filter: blur(16px) saturate(1.12);
+}
+
+.cs-frame {
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+}
+
+.cs-action-feedback {
+  z-index: 50;
+  right: 14px;
+  bottom: 72px;
+  border-radius: 12px;
+}
+
+.cs-capture-fallback {
+  z-index: 50;
+  top: 66px;
+  right: 14px;
+  border-radius: 12px;
+}
+
+.cs-overlay-root {
+  position: fixed;
+  z-index: 60;
+  inset: 0;
+  pointer-events: none;
+}
+.cs-overlay-root > * {
+  pointer-events: auto;
+}
+.cs-menu {
+  width: 188px;
+}
+.cs-menu .n-button {
+  display: flex;
+  width: 100%;
+  justify-content: flex-start;
+}
+
+@media (max-width: 1100px) {
+  .cs-history {
+    display: flex;
+  }
+
+  .cs-top-actions .cs-button-quiet span {
+    display: none;
+  }
+  .cs-top-actions .cs-button-quiet {
+    width: 34px;
+    padding: 0;
+  }
+  .cs-context-toolbar {
+    right: 302px;
+    bottom: 72px;
+    left: 306px;
+    width: auto;
+  }
+  .cs-context-copy {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .cs-brand strong,
+  .cs-history,
+  .cs-save-status,
+  .cs-zoom-input,
+  .cs-zoom-presets {
+    display: none;
+  }
+  .cs-context-toolbar {
+    right: 258px;
+    bottom: 72px;
+    left: 14px;
+    width: auto;
+  }
+  .cs-context-control .cs-ui-slider {
+    width: 66px;
+  }
+}

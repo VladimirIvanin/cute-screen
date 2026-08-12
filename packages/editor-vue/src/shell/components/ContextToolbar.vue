@@ -1,6 +1,10 @@
 <script setup lang="ts">
+import { NButton } from 'naive-ui'
 import { UiIcon } from '../icon'
 import type { ContextToolbarSchema } from '../types'
+import DeferredColorPicker from '../ui/DeferredColorPicker.vue'
+import DeferredSlider from '../ui/DeferredSlider.vue'
+import UiSelect from '../ui/UiSelect.vue'
 defineProps<{
   schema?: ContextToolbarSchema | undefined
   label: string
@@ -20,68 +24,43 @@ const emit = defineEmits<{
     </div>
     <div class="cs-context-controls">
       <template v-for="control in schema.controls" :key="control.id">
-        <button
+        <NButton
           v-if="control.kind === 'action'"
-          type="button"
+          size="small"
+          tertiary
           class="cs-context-control"
           @click="emit('action', control.id)"
         >
           {{ control.label }}
-        </button>
+        </NButton>
         <label v-else-if="control.kind === 'color'" class="cs-context-control">
           <span>{{ control.label }}</span>
-          <input
-            type="color"
-            :value="control.value"
-            :aria-label="control.label"
-            @input="
-              emit(
-                'change',
-                control.id,
-                ($event.target as HTMLInputElement).value,
-              )
-            "
+          <DeferredColorPicker
+            :model-value="control.value"
+            v-bind="{ ariaLabel: control.label }"
+            @commit="emit('change', control.id, $event)"
           />
         </label>
         <label v-else-if="control.kind === 'range'" class="cs-context-control">
           <span>{{ control.label }}</span>
-          <input
-            type="range"
-            :value="control.value"
+          <DeferredSlider
+            :model-value="control.value"
             :min="control.min"
             :max="control.max"
             :step="control.step"
-            :aria-label="control.label"
-            @change="
-              emit(
-                'change',
-                control.id,
-                ($event.target as HTMLInputElement).value,
-              )
-            "
+            v-bind="{ ariaLabel: control.label }"
+            @commit="emit('change', control.id, String($event))"
           />
         </label>
         <label v-else-if="control.kind === 'select'" class="cs-context-control">
           <span>{{ control.label }}</span>
-          <select
-            :value="control.value"
-            :aria-label="control.label"
-            @change="
-              emit(
-                'change',
-                control.id,
-                ($event.target as HTMLSelectElement).value,
-              )
-            "
-          >
-            <option
-              v-for="option in control.options"
-              :key="option.value"
-              :value="option.value"
-            >
-              {{ option.label }}
-            </option>
-          </select>
+          <UiSelect
+            class="cs-ui-select"
+            :model-value="control.value"
+            v-bind="{ ariaLabel: control.label }"
+            :options="control.options"
+            @update:model-value="emit('change', control.id, String($event))"
+          />
         </label>
       </template>
     </div>

@@ -87,7 +87,7 @@ describe('M02 editor shell in browser mode', () => {
     })
 
     expect(before.fallbackPosition).toBe('fixed')
-    expect(before.workbench.top).toBeCloseTo(52, 0)
+    expect(before.workbench.top).toBeCloseTo(0, 0)
     await $('button[aria-label="Zoom in"]').click()
     await expect($('.cs-zoom-value')).toHaveText('110%')
 

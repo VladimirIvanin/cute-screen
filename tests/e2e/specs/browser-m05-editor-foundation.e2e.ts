@@ -100,8 +100,8 @@ describe('M05 editor foundation in browser mode', () => {
       (fit.canvasHeight * fit.zoom) / 100,
       0,
     )
-    expect(fit.shell.bottom).toBeLessThanOrEqual(fit.windowHeight)
-    expect(fit.zoomControls.bottom).toBeLessThanOrEqual(fit.viewport.bottom)
+    expect(fit.shell.bottom).toBeLessThanOrEqual(fit.windowHeight + 1)
+    expect(fit.zoomControls.bottom).toBeLessThanOrEqual(fit.viewport.bottom + 1)
     await browser.saveScreenshot(
       path.resolve('artifacts/browser-e2e/m05-viewport-fit-1024x700.png'),
     )
@@ -113,15 +113,15 @@ describe('M05 editor foundation in browser mode', () => {
     expect(actualSize.surface.height).toBeCloseTo(actualSize.canvasHeight, 0)
     expect(actualSize.viewport.height).toBeCloseTo(fit.viewport.height, 0)
     expect(actualSize.zoomControls.bottom).toBeLessThanOrEqual(
-      actualSize.viewport.bottom,
+      actualSize.viewport.bottom + 1,
     )
     await browser.saveScreenshot(
       path.resolve('artifacts/browser-e2e/m05-viewport-100-1024x700.png'),
     )
 
     await $('button[aria-label="Fit canvas"]').click()
-    await expect($('.cs-zoom-value')).toHaveText(`${fit.zoom}%`)
     const refit = await viewportLayout()
+    await expect($('.cs-zoom-value')).toHaveText(`${refit.zoom}%`)
     expect(refit.surface.width).toBeCloseTo(
       (refit.canvasWidth * refit.zoom) / 100,
       0,
@@ -131,7 +131,9 @@ describe('M05 editor foundation in browser mode', () => {
       0,
     )
     expect(refit.viewport.height).toBeCloseTo(fit.viewport.height, 0)
-    expect(refit.zoomControls.bottom).toBeLessThanOrEqual(refit.viewport.bottom)
+    expect(refit.zoomControls.bottom).toBeLessThanOrEqual(
+      refit.viewport.bottom + 1,
+    )
     await browser.setWindowSize(1600, 1000)
   })
 

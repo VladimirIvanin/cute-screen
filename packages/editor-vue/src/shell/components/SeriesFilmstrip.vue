@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { NButton } from 'naive-ui'
 import type { FrameSummary } from '../types'
 defineProps<{
   frames: readonly FrameSummary[]
@@ -14,10 +15,10 @@ const emit = defineEmits<{ select: [id: string] }>()
     class="cs-filmstrip"
     :aria-label="t('seriesFrames')"
   >
-    <button
+    <NButton
       v-for="frame in frames"
       :key="frame.id"
-      type="button"
+      quaternary
       class="cs-frame"
       :class="{ 'is-selected': frame.id === activeFrameId }"
       :aria-selected="frame.id === activeFrameId"
@@ -29,6 +30,6 @@ const emit = defineEmits<{ select: [id: string] }>()
       @click="emit('select', frame.id)"
     >
       <span>{{ frame.label }}</span>
-    </button>
+    </NButton>
   </nav>
 </template>

@@ -122,6 +122,21 @@ renderer node. Arbitrary shader code в документ не сохраняет
 
 Tool settings принадлежат `ContextToolbar`. `LayersPanel` не становится вторым inspector: она управляет выбором, порядком, visibility, lock, rotation и opacity. При пустом selection она показывает компактную подсказку, а не пустую широкую панель.
 
+### Naive UI boundary
+
+`EditorShell` hosts `NConfigProvider` and maps the existing locale/theme
+preferences to Naive UI’s locale, date locale and light/dark overrides. Naive
+UI is limited to interactive controls and transient overlays: buttons,
+tooltips, popovers, selects, sliders, number inputs and colour pickers.
+Popups are teleported into the shell-owned `.cs-overlay-root`, which provides a
+shared stacking context and viewport collision handling.
+
+`CanvasViewport`, the scene graph, renderer and pointer-move path do not mount
+Naive UI controls and remain outside Vue’s deep-reactive state. Adapter
+components keep local drafts for pointer sliders, colour pickers and number
+inputs, committing to the existing contextual-toolbar events only at their
+document-command boundary.
+
 ## Rust host
 
 ### Сервисы

@@ -31,6 +31,54 @@ async function openDrawingHarness(): Promise<void> {
   await browser.waitUntil(async () => (await snapshot()).layers.length === 4)
 }
 
+async function chooseOption(
+  controlName: string,
+  optionName: string,
+): Promise<void> {
+  const control = $(`[role="combobox"][aria-label="${controlName}"]`)
+  await browser.execute((name) => {
+    const target = [
+      ...document.querySelectorAll<HTMLElement>('[role="combobox"]'),
+    ].find((element) => element.getAttribute('aria-label') === name)
+    if (!target) throw new Error(`Missing combobox: ${name}`)
+    target.click()
+  }, controlName)
+  await browser.waitUntil(() =>
+    browser.execute(
+      (name) =>
+        [
+          ...document.querySelectorAll<HTMLElement>(
+            '.cs-overlay-root [role="option"]',
+          ),
+        ].some((element) => {
+          const text = element.textContent?.trim() ?? ''
+          const numericName = name.replace(/[^0-9.]/g, '')
+          return (
+            text === name ||
+            (numericName !== '' && text.startsWith(numericName))
+          )
+        }),
+      optionName,
+    ),
+  )
+  await browser.execute((name) => {
+    const target = [
+      ...document.querySelectorAll<HTMLElement>(
+        '.cs-overlay-root [role="option"]',
+      ),
+    ].find((element) => {
+      const text = element.textContent?.trim() ?? ''
+      const numericName = name.replace(/[^0-9.]/g, '')
+      return (
+        text === name || (numericName !== '' && text.startsWith(numericName))
+      )
+    })
+    if (!target) throw new Error(`Missing select option: ${name}`)
+    target.click()
+  }, optionName)
+  await control.waitForExist()
+}
+
 describe('M06 drawing tools in browser mode', () => {
   it('decodes an EXIF-rotated JPEG with the display dimensions published by native import', async () => {
     await browser.url('/')
@@ -173,10 +221,7 @@ describe('M06 drawing tools in browser mode', () => {
     await openDrawingHarness()
     const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
     await $('button[aria-label="Shape"]').click()
-    await $('select[aria-label="Fill"]').selectByAttribute(
-      'value',
-      'linearGradient',
-    )
+    await chooseOption('Fill', 'Linear gradient')
     await browser
       .action('pointer')
       .move({ origin: scene, x: 20, y: 20, duration: 0 })
@@ -195,47 +240,35 @@ describe('M06 drawing tools in browser mode', () => {
     const textTool = $('button[aria-label="Text"]')
     const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
     await textTool.click()
-    const preset = $('select[aria-label="Preset"]')
-    await preset.selectByAttribute('value', 'neon')
-    await expect(preset).toHaveValue('neon')
-    await expect($('select[aria-label="Shadow"]')).toHaveValue('neon')
-    await $('select[aria-label="Fill"]').selectByAttribute(
-      'value',
-      'radialGradient',
+    await chooseOption('Preset', 'Neon')
+    const preset = $('[role="combobox"][aria-label="Preset"]')
+    await expect(preset).toHaveText('Neon')
+    await expect($('[role="combobox"][aria-label="Shadow"]')).toHaveText('Neon')
+    await chooseOption('Fill', 'Radial')
+    await expect(preset).toHaveText('Custom')
+    await chooseOption('Outline', 'White')
+    await chooseOption('Underline', 'On')
+    await chooseOption('Spacing', '2px')
+    await chooseOption('Background', 'Blue')
+    await chooseOption('Shadow', 'Drop')
+    await chooseOption('Line height', '1.5Г—')
+    const opacity = $(
+      '.cs-context-toolbar [role="slider"][aria-label="Opacity"]',
     )
-    await expect(preset).toHaveValue('custom')
-    await $('select[aria-label="Outline"]').selectByAttribute('value', 'white')
-    await $('select[aria-label="Underline"]').selectByAttribute('value', 'on')
-    await $('select[aria-label="Spacing"]').selectByAttribute('value', '2')
-    await $('select[aria-label="Background"]').selectByAttribute(
-      'value',
-      'blue',
-    )
-    await $('select[aria-label="Shadow"]').selectByAttribute('value', 'drop')
-    await $('select[aria-label="Line height"]').selectByAttribute(
-      'value',
-      '1.5',
-    )
-    await browser.execute(() => {
-      const opacity = document.querySelector<HTMLInputElement>(
-        'input[aria-label="Opacity"]',
-      )
-      if (!opacity) throw new Error('text opacity control is missing')
-      opacity.value = '0.6'
-      opacity.dispatchEvent(new Event('change', { bubbles: true }))
-    })
-    await $('select[aria-label="Blend"]').selectByAttribute('value', 'screen')
+    await opacity.click()
+    for (let index = 0; index < 8; index += 1) await browser.keys('ArrowLeft')
+    await chooseOption('Blend', 'Screen')
     await $('button=Save personal preset').click()
-    await preset.selectByAttribute('value', 'plain')
-    await expect($('select[aria-label="Fill"]')).toHaveValue('solid')
-    await preset.selectByAttribute('value', 'personal')
-    await expect($('select[aria-label="Fill"]')).toHaveValue('radialGradient')
-    await expect($('select[aria-label="Shadow"]')).toHaveValue('drop')
+    await chooseOption('Preset', 'Plain')
+    await expect($('[role="combobox"][aria-label="Fill"]')).toHaveText('Solid')
+    await chooseOption('Preset', 'My preset')
+    await expect($('[role="combobox"][aria-label="Fill"]')).toHaveText('Radial')
+    await expect($('[role="combobox"][aria-label="Shadow"]')).toHaveText('Drop')
     await scene.click({ x: 24, y: 24 })
     const editor = $('[contenteditable="true"][aria-label="Text editor"]')
     await expect(editor).toExist()
     await editor.addValue('Привет\nworld')
-    await scene.click({ x: 72, y: 48 })
+    await browser.keys(['Control', 'Enter'])
     await browser.waitUntil(async () => (await snapshot()).layers.length === 5)
     const created = (await snapshot()).layers.at(-1)
     expect(created).toMatchObject({
@@ -295,7 +328,7 @@ describe('M06 drawing tools in browser mode', () => {
     const markerTool = $('button[aria-label="Numbered marker"]')
     const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
     await markerTool.click()
-    await $('select[aria-label="Shape"]').selectByAttribute('value', 'diamond')
+    await chooseOption('Shape', 'diamond')
     await scene.click({ x: 24, y: 24 })
     await scene.click({ x: 72, y: 48 })
     await browser.waitUntil(async () => (await snapshot()).layers.length === 6)

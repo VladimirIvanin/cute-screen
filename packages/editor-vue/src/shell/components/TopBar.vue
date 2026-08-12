@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { NButton, NPopover, NTooltip } from 'naive-ui'
 import { UiIcon } from '../icon'
 import type { SupportedLocale, ThemePreference } from '../types'
 import type { DocumentSaveState } from '../types'
@@ -71,26 +72,38 @@ function selectLocale(value: SupportedLocale): void {
       <strong>Cute Screen</strong>
     </div>
     <div class="cs-history" role="group" :aria-label="t('undo')">
-      <button
-        type="button"
-        class="cs-icon-button"
-        :aria-label="t('undo')"
-        :title="t('undo')"
-        :disabled="!canUndo"
-        @click="emit('undo')"
-      >
-        <UiIcon name="undo" />
-      </button>
-      <button
-        type="button"
-        class="cs-icon-button"
-        :aria-label="t('redo')"
-        :title="t('redo')"
-        :disabled="!canRedo"
-        @click="emit('redo')"
-      >
-        <UiIcon name="redo" />
-      </button>
+      <NTooltip>
+        <template #trigger>
+          <NButton
+            quaternary
+            circle
+            class="cs-icon-button"
+            :aria-label="t('undo')"
+            :title="t('undo')"
+            :disabled="!canUndo"
+            @click="emit('undo')"
+          >
+            <UiIcon name="undo" />
+          </NButton>
+        </template>
+        {{ t('undo') }}
+      </NTooltip>
+      <NTooltip>
+        <template #trigger>
+          <NButton
+            quaternary
+            circle
+            class="cs-icon-button"
+            :aria-label="t('redo')"
+            :title="t('redo')"
+            :disabled="!canRedo"
+            @click="emit('redo')"
+          >
+            <UiIcon name="redo" />
+          </NButton>
+        </template>
+        {{ t('redo') }}
+      </NTooltip>
     </div>
     <p
       v-if="saveState && saveState !== 'saved'"
@@ -108,72 +121,93 @@ function selectLocale(value: SupportedLocale): void {
               ? t('readOnlyDocument')
               : (saveError ?? t('saveFailed'))
       }}
-      <button
+      <NButton
         v-if="saveState === 'error'"
-        type="button"
         class="cs-save-retry"
         @click="emit('retrySave')"
       >
         {{ t('retry') }}
-      </button>
-      <button
+      </NButton>
+      <NButton
         v-if="saveState === 'error'"
-        type="button"
         class="cs-save-retry"
         @click="emit('exportRecovery')"
       >
         {{ t('exportRecovery') }}
-      </button>
+      </NButton>
     </p>
     <div class="cs-top-actions">
-      <button
-        type="button"
-        class="cs-button cs-button-quiet"
-        :disabled="captureDisabled"
-        :aria-label="t('capture')"
-        :title="captureTitle"
-        @click="emit('action', 'capture')"
+      <NTooltip>
+        <template #trigger>
+          <NButton
+            secondary
+            class="cs-button cs-button-quiet"
+            :disabled="captureDisabled"
+            :aria-label="t('capture')"
+            :title="captureTitle"
+            @click="emit('action', 'capture')"
+          >
+            <UiIcon name="camera" /><span>{{ t('capture') }}</span>
+          </NButton>
+        </template>
+        {{ captureTitle }}
+      </NTooltip>
+      <NTooltip>
+        <template #trigger>
+          <NButton
+            secondary
+            class="cs-button cs-button-quiet"
+            :disabled="disabled || !openImageAvailable"
+            :aria-label="t('openImage')"
+            :title="openImageTitle"
+            @click="emit('action', 'openImage')"
+          >
+            <UiIcon name="image" /><span>{{ t('openImage') }}</span>
+          </NButton>
+        </template>
+        {{ openImageTitle }}
+      </NTooltip>
+      <NTooltip>
+        <template #trigger>
+          <NButton
+            secondary
+            class="cs-button cs-button-quiet"
+            :disabled="disabled || !canCopyOrExport"
+            :aria-label="t('copy')"
+            :title="canCopyOrExport ? t('copy') : t('copyUnavailable')"
+            @click="emit('action', 'copy')"
+          >
+            <UiIcon name="copy" /><span>{{ t('copy') }}</span>
+          </NButton>
+        </template>
+        {{ canCopyOrExport ? t('copy') : t('copyUnavailable') }}
+      </NTooltip>
+      <NPopover
+        v-model:show="menuOpen"
+        trigger="click"
+        placement="bottom-end"
+        :show-arrow="false"
+        to=".cs-overlay-root"
       >
-        <UiIcon name="camera" /><span>{{ t('capture') }}</span>
-      </button>
-      <button
-        type="button"
-        class="cs-button cs-button-quiet"
-        :disabled="disabled || !openImageAvailable"
-        :aria-label="t('openImage')"
-        :title="openImageTitle"
-        @click="emit('action', 'openImage')"
-      >
-        <UiIcon name="image" /><span>{{ t('openImage') }}</span>
-      </button>
-      <button
-        type="button"
-        class="cs-button cs-button-quiet"
-        :disabled="disabled || !canCopyOrExport"
-        :aria-label="t('copy')"
-        :title="canCopyOrExport ? t('copy') : t('copyUnavailable')"
-        @click="emit('action', 'copy')"
-      >
-        <UiIcon name="copy" /><span>{{ t('copy') }}</span>
-      </button>
-      <div class="cs-overflow">
-        <button
-          type="button"
-          class="cs-icon-button"
-          :aria-expanded="menuOpen"
-          :aria-label="t('moreActions')"
-          :title="t('moreActions')"
-          @click="menuOpen = !menuOpen"
-        >
-          <UiIcon name="more" />
-        </button>
-        <div v-if="menuOpen" class="cs-menu" role="menu">
+        <template #trigger>
+          <NButton
+            quaternary
+            circle
+            class="cs-icon-button"
+            :aria-expanded="menuOpen"
+            :aria-label="t('moreActions')"
+            :title="t('moreActions')"
+          >
+            <UiIcon name="more" />
+          </NButton>
+        </template>
+        <div class="cs-menu" role="menu">
           <p>{{ t('theme') }}</p>
-          <button
+          <NButton
             v-for="value in ['system', 'light', 'dark'] as const"
             :key="value"
-            type="button"
             role="menuitemradio"
+            text
             :aria-checked="theme === value"
             @click="selectTheme(value)"
           >
@@ -186,30 +220,35 @@ function selectLocale(value: SupportedLocale): void {
                     : 'darkTheme',
               )
             }}
-          </button>
+          </NButton>
           <p>{{ t('language') }}</p>
-          <button
+          <NButton
             v-for="value in ['ru', 'en'] as const"
             :key="value"
-            type="button"
             role="menuitemradio"
+            text
             :aria-checked="locale === value"
             @click="selectLocale(value)"
           >
             {{ value.toUpperCase() }}
-          </button>
+          </NButton>
         </div>
-      </div>
-      <button
-        type="button"
-        class="cs-button cs-button-primary"
-        :disabled="disabled || !canCopyOrExport"
-        :aria-label="t('export')"
-        :title="canCopyOrExport ? t('export') : t('exportUnavailable')"
-        @click="emit('action', 'export')"
-      >
-        <UiIcon name="export" /><span>{{ t('export') }}</span>
-      </button>
+      </NPopover>
+      <NTooltip>
+        <template #trigger>
+          <NButton
+            type="primary"
+            class="cs-button cs-button-primary"
+            :disabled="disabled || !canCopyOrExport"
+            :aria-label="t('export')"
+            :title="canCopyOrExport ? t('export') : t('exportUnavailable')"
+            @click="emit('action', 'export')"
+          >
+            <UiIcon name="export" /><span>{{ t('export') }}</span>
+          </NButton>
+        </template>
+        {{ canCopyOrExport ? t('export') : t('exportUnavailable') }}
+      </NTooltip>
     </div>
   </header>
 </template>
