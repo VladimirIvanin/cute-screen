@@ -38,10 +38,18 @@ enabled Copy/Export state only after the production capture request has
 persisted and mounted the first document. Its native pixels are feature-gated
 fake-adapter data; it is orchestration evidence, not a real-OS capture claim.
 
-Windows M04 screen, area and window capture has Rust capability/PNG-encoding
-and frozen-frame crop coverage, but still needs a real Windows desktop smoke
-that decodes the produced PNG and confirms controller → immutable library →
-mounted document before it may count as platform evidence.
+Windows screen, area and window capture has DXGI compositor-frame assembly,
+PNG-encoding, DPI and frozen-frame crop coverage plus a local interactive
+desktop probe. Platform evidence still requires a real screenshot with Task
+Manager (or another independently rendered system/layered window) visibly above
+a control window: select an area crossing both, decode the produced PNG, verify
+control pixels from both windows, then confirm controller → immutable library →
+mounted document. A PNG that contains only the windows underneath is a failure.
+
+The corresponding X11 compositor smoke must run with `_NET_WM_CM_Sn` owned,
+place a separate composited/layered control window above the base fixture and
+verify its pixels in the frozen result. Existing non-composited root smokes do
+not satisfy this regression.
 
 ## A02 — Hotkey capture из скрытого приложения
 

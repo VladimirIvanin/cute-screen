@@ -19,6 +19,7 @@ use x11rb::{
     image::{Image, PixelLayout},
     protocol::{
         Event,
+        composite::ConnectionExt as _,
         randr::ConnectionExt as _,
         xfixes::ConnectionExt as _,
         xproto::{
@@ -660,7 +661,13 @@ impl X11CaptureAdapter {
             .get(screen_number)
             .ok_or_else(|| gate_error(correlation_id, "screen"))?;
         let monitors = randr_monitor_layout(&connection, screen.root, correlation_id)?;
-        let frame = capture_root_frame(&connection, screen.root, correlation_id, cursor)?;
+        let frame = capture_root_frame(
+            &connection,
+            screen_number,
+            screen.root,
+            correlation_id,
+            cursor,
+        )?;
         let bounds = (0, 0, frame.width, frame.height);
         let geometry = capture_geometry_with_layout(
             bounds,
@@ -705,7 +712,13 @@ impl X11CaptureAdapter {
             .map(|candidate| candidate.bounds)
             .ok_or_else(|| PlatformError::new(PlatformErrorCode::InvalidTarget, correlation_id))?;
         let monitors = randr_monitor_layout(&connection, screen.root, correlation_id)?;
-        let root_frame = capture_root_frame(&connection, screen.root, correlation_id, cursor)?;
+        let root_frame = capture_root_frame(
+            &connection,
+            screen_number,
+            screen.root,
+            correlation_id,
+            cursor,
+        )?;
         let capture_geometry = capture_geometry_with_layout(
             geometry,
             root_frame.width,
@@ -747,7 +760,8 @@ impl X11CaptureAdapter {
         let root_depth = screen.root_depth;
         let root_visual = screen.root_visual;
         let monitors = randr_monitor_layout(&connection, root, correlation_id)?;
-        let root_frame = capture_root_frame(&connection, root, correlation_id, cursor)?;
+        let root_frame =
+            capture_root_frame(&connection, screen_number, root, correlation_id, cursor)?;
         let bounds = select_frozen_target(
             &connection,
             root,
@@ -803,7 +817,13 @@ impl X11CaptureAdapter {
                 correlation_id,
             ));
         }
-        let root_frame = capture_root_frame(&connection, screen.root, correlation_id, cursor)?;
+        let root_frame = capture_root_frame(
+            &connection,
+            screen_number,
+            screen.root,
+            correlation_id,
+            cursor,
+        )?;
         let bounds = select_frozen_target(
             &connection,
             screen.root,
@@ -852,7 +872,8 @@ impl X11CaptureAdapter {
             .get(screen_number)
             .ok_or_else(|| gate_error(correlation_id, "screen"))?
             .root;
-        let root_frame = capture_root_frame(&connection, root, correlation_id, cursor)?;
+        let root_frame =
+            capture_root_frame(&connection, screen_number, root, correlation_id, cursor)?;
         let monitors = randr_monitor_layout(&connection, root, correlation_id)?;
         if u32::from(root_frame.width) != geometry.source_width
             || u32::from(root_frame.height) != geometry.source_height
@@ -1088,6 +1109,7 @@ struct RgbaFrame {
 
 fn capture_root_frame<C: Connection>(
     connection: &C,
+    screen_number: usize,
     root: u32,
     correlation_id: &str,
     cursor: bool,
@@ -1100,8 +1122,18 @@ fn capture_root_frame<C: Connection>(
     if geometry.width == 0 || geometry.height == 0 {
         return Err(gate_error(correlation_id, "rootGeometryEmpty"));
     }
-    let (image, visual_id) = Image::get(connection, root, 0, 0, geometry.width, geometry.height)
-        .map_err(|_| gate_error(correlation_id, "rootImage"))?;
+    let drawable = visible_desktop_drawable(connection, screen_number, root, correlation_id)?;
+    let captured = Image::get(
+        connection,
+        drawable.id(),
+        0,
+        0,
+        geometry.width,
+        geometry.height,
+    )
+    .map_err(|_| gate_error(correlation_id, drawable.image_stage()));
+    let released = drawable.release(connection, correlation_id);
+    let (image, visual_id) = captured.and_then(|frame| released.map(|()| frame))?;
     let image = image.into_owned();
     let mut frame = RgbaFrame {
         width: geometry.width,
@@ -1120,6 +1152,92 @@ fn capture_root_frame<C: Connection>(
         }
     }
     Ok(frame)
+}
+
+#[derive(Clone, Copy)]
+enum VisibleDesktopDrawable {
+    Root(u32),
+    CompositeOverlay { root: u32, overlay: u32 },
+}
+
+impl VisibleDesktopDrawable {
+    fn id(self) -> u32 {
+        match self {
+            Self::Root(root) => root,
+            Self::CompositeOverlay { overlay, .. } => overlay,
+        }
+    }
+
+    fn image_stage(self) -> &'static str {
+        match self {
+            Self::Root(_) => "rootImage",
+            Self::CompositeOverlay { .. } => "compositeOverlayImage",
+        }
+    }
+
+    fn release<C: Connection>(
+        self,
+        connection: &C,
+        correlation_id: &str,
+    ) -> Result<(), PlatformError> {
+        let Self::CompositeOverlay { root, .. } = self else {
+            return Ok(());
+        };
+        connection
+            .composite_release_overlay_window(root)
+            .map_err(|_| gate_error(correlation_id, "compositeOverlayReleaseRequest"))?
+            .check()
+            .map_err(|_| gate_error(correlation_id, "compositeOverlayRelease"))
+    }
+}
+
+fn visible_desktop_drawable<C: Connection>(
+    connection: &C,
+    screen_number: usize,
+    root: u32,
+    correlation_id: &str,
+) -> Result<VisibleDesktopDrawable, PlatformError> {
+    let selection_name = format!("_NET_WM_CM_S{screen_number}");
+    let selection = connection
+        .intern_atom(true, selection_name.as_bytes())
+        .map_err(|_| gate_error(correlation_id, "compositorSelectionRequest"))?
+        .reply()
+        .map_err(|_| gate_error(correlation_id, "compositorSelectionReply"))?
+        .atom;
+    if selection == NONE {
+        return Ok(VisibleDesktopDrawable::Root(root));
+    }
+    let owner = connection
+        .get_selection_owner(selection)
+        .map_err(|_| gate_error(correlation_id, "compositorOwnerRequest"))?
+        .reply()
+        .map_err(|_| gate_error(correlation_id, "compositorOwnerReply"))?
+        .owner;
+    if !compositor_owner_requires_overlay(owner) {
+        return Ok(VisibleDesktopDrawable::Root(root));
+    }
+    let version = connection
+        .composite_query_version(0, 4)
+        .map_err(|_| gate_error(correlation_id, "compositeVersionRequest"))?
+        .reply()
+        .map_err(|_| gate_error(correlation_id, "compositeVersionReply"))?;
+    if version.major_version == 0 && version.minor_version < 3 {
+        return Err(gate_error(correlation_id, "compositeOverlayTooOld"));
+    }
+    let overlay = connection
+        .composite_get_overlay_window(root)
+        .map_err(|_| gate_error(correlation_id, "compositeOverlayRequest"))?
+        .reply()
+        .map_err(|_| gate_error(correlation_id, "compositeOverlayReply"))?
+        .overlay_win;
+    if overlay == NONE {
+        return Err(gate_error(correlation_id, "compositeOverlayMissing"));
+    }
+    Ok(VisibleDesktopDrawable::CompositeOverlay { root, overlay })
+}
+
+fn compositor_owner_requires_overlay(owner: u32) -> bool {
+    owner != NONE
 }
 
 fn composite_xfixes_cursor<C: Connection>(
@@ -2147,9 +2265,9 @@ mod tests {
     use super::{
         RgbaFrame, WindowCandidate, WindowSelectionContext, WindowSelectionMetadata,
         X11CaptureAdapter, X11HotkeyBinding, X11MonitorLayout, apply_frame_extents,
-        crop_root_frame, current_monitor_id_for_bounds, monitor_ids_for_bounds, move_rectangle,
-        parse_hotkey_trigger, rectangle_contains, replacement_plan, resize_rectangle, window_at,
-        window_selection_policy_allows,
+        compositor_owner_requires_overlay, crop_root_frame, current_monitor_id_for_bounds,
+        monitor_ids_for_bounds, move_rectangle, parse_hotkey_trigger, rectangle_contains,
+        replacement_plan, resize_rectangle, window_at, window_selection_policy_allows,
     };
     use x11rb::protocol::xproto::{MapState, Rectangle};
 
@@ -2194,6 +2312,12 @@ mod tests {
 
         assert_eq!((screen.width, screen.height), (2, 1));
         assert_eq!(screen.rgba, vec![1, 2, 3, 255, 4, 5, 6, 255]);
+    }
+
+    #[test]
+    fn composited_session_requires_the_overlay_instead_of_the_legacy_root() {
+        assert!(!compositor_owner_requires_overlay(x11rb::NONE));
+        assert!(compositor_owner_requires_overlay(42));
     }
 
     #[test]

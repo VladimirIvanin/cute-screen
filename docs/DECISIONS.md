@@ -311,3 +311,51 @@ renderer-neutral layout contract.
 **Последствия:** draft не сериализуется и Escape его откатывает; v4 documents
 мигрируют без изменения визуального результата. HTML, arbitrary browser marks,
 lists и embedded content не являются document data.
+
+## ADR-027 — Windows capture использует compositor frame
+
+**Статус:** accepted
+
+**Контекст:** GDI `BitBlt` даже с `CAPTUREBLT` не гарантирует совпадение с
+видимым результатом DWM. Layered, аппаратно отрисованное или системное окно
+может оставаться видимым через selector, но отсутствовать в замороженном кадре;
+успешный PNG в таком случае является ложным успехом.
+
+**Решение:** Windows backend получает каждый активный output через DXGI Desktop
+Duplication, копирует D3D11 texture в CPU-readable staging и собирает единый
+physical virtual-desktop frame до показа selector. GDI desktop capture не
+является fallback: недоступность compositor frame возвращает typed capture
+failure. Area и Window по-прежнему являются crop одного immutable frame.
+
+**Проверка:** unit tests покрывают row pitch, отрицательные virtual coordinates,
+несколько outputs и crop; Windows runtime smoke обязан держать поверх обычного
+окна видимое system/layered окно и сравнить контрольные pixels внутри выбранной
+области. Успех маленькой синтетической fixture не заменяет этот smoke.
+
+**Последствия:** Desktop Duplication требует D3D11/DXGI и может быть недоступен
+в secure desktop, disconnected session или при смене display mode; эти случаи
+являются восстанавливаемой ошибкой. Поворот output и mixed-adapter layout входят
+в compositor-frame contract и не могут молча деградировать к GDI.
+
+## ADR-028 — X11 capture выбирает фактически видимый drawable
+
+**Статус:** accepted
+
+**Контекст:** при активном X11 compositing manager дочерние окна root могут быть
+redirected в off-screen storage, а итоговый desktop рисуется в Composite Overlay
+Window. `GetImage(root)` в такой сессии не гарантирует кадр, видимый пользователю,
+и способен пропустить верхнее аппаратно отрисованное окно.
+
+**Решение:** backend проверяет owner selection `_NET_WM_CM_Sn`. Без compositor
+он замораживает root drawable. При compositor owner он требует Composite 0.3,
+получает Composite Overlay Window, читает его и освобождает reference после
+получения pixels. Ошибка overlay не деградирует к заведомо неполному root frame.
+Wayland продолжает использовать системный XDG Screenshot selector.
+
+**Проверка:** unit contract различает composited и non-composited drawable
+policy. Runtime smoke на X11 должен держать поверх контрольного окна отдельное
+composited/layered окно и проверить его pixels в frozen frame.
+
+**Последствия:** X11 с активным compositor без Composite Overlay Window получает
+typed capture failure. Существующие non-composited X11 smoke остаются валидны,
+но не доказывают compositor parity.

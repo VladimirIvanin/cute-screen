@@ -219,7 +219,7 @@ pub mod lifecycle;
 pub mod linux_platform;
 pub mod platform;
 pub mod storage;
-#[cfg(all(target_os = "linux", feature = "x11-capture"))]
+#[cfg(all(feature = "x11-capture", any(target_os = "linux", test)))]
 pub mod x11_platform;
 
 #[cfg(feature = "fake-platform")]
@@ -653,7 +653,7 @@ async fn platform_capabilities(correlation_id: String) -> PlatformCapabilities {
     #[cfg(all(target_os = "linux", feature = "x11-capture"))]
     let native_adapter_available = x11_platform::X11CaptureAdapter.available();
     #[cfg(target_os = "windows")]
-    let native_adapter_available = windows_platform::WindowsGdiCaptureAdapter.available();
+    let native_adapter_available = windows_platform::WindowsCompositorCaptureAdapter.available();
     #[cfg(not(any(
         all(target_os = "linux", feature = "x11-capture"),
         target_os = "windows"

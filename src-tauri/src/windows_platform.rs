@@ -1,19 +1,40 @@
 use std::{
-    ffi::c_void,
     ptr::null,
     sync::{Arc, Mutex, OnceLock},
+    time::{Duration, Instant},
 };
 
 use uuid::Uuid;
+use windows::{
+    Win32::{
+        Foundation::HMODULE,
+        Graphics::{
+            Direct3D::D3D_DRIVER_TYPE_UNKNOWN,
+            Direct3D11::{
+                D3D11_CPU_ACCESS_READ, D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_MAP_READ,
+                D3D11_MAPPED_SUBRESOURCE, D3D11_SDK_VERSION, D3D11_TEXTURE2D_DESC,
+                D3D11_USAGE_STAGING, D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext,
+                ID3D11Texture2D,
+            },
+            Dxgi::{
+                CreateDXGIFactory1, DXGI_ERROR_NOT_FOUND, DXGI_OUTDUPL_FRAME_INFO, IDXGIAdapter1,
+                IDXGIFactory1, IDXGIOutput1, IDXGIResource,
+            },
+        },
+    },
+    core::Interface,
+};
 use windows_sys::Win32::{
     Foundation::{GetLastError, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM},
     Graphics::Gdi::{
-        BI_RGB, BITMAPINFO, BITMAPINFOHEADER, BLACK_BRUSH, BeginPaint, BitBlt, CAPTUREBLT,
-        CreateCompatibleDC, CreateDIBSection, DIB_RGB_COLORS, DeleteDC, DeleteObject, EndPaint,
-        FrameRect, GetDC, GetStockObject, HDC, InvalidateRect, PAINTSTRUCT, ReleaseDC, SRCCOPY,
-        SelectObject, WHITE_BRUSH,
+        BLACK_BRUSH, BeginPaint, EndPaint, FrameRect, GetStockObject, InvalidateRect, PAINTSTRUCT,
+        WHITE_BRUSH,
     },
     System::LibraryLoader::GetModuleHandleW,
+    UI::HiDpi::{
+        DPI_AWARENESS_CONTEXT, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
+        SetThreadDpiAwarenessContext,
+    },
     UI::WindowsAndMessaging::{
         CS_HREDRAW, CS_VREDRAW, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
         GA_ROOT, GetAncestor, GetForegroundWindow, GetMessageW, GetSystemMetrics, GetWindowRect,
@@ -30,23 +51,18 @@ use crate::{
     platform::{CaptureGeometry, CaptureResult, CaptureTarget, PlatformError, PlatformErrorCode},
 };
 
-/// Direct Windows desktop capture using the GDI virtual-screen surface.
+/// Direct Windows desktop capture using DWM's composited DXGI outputs.
 ///
-/// Captures a frozen virtual desktop into an application-owned DIB before a
+/// Captures a frozen virtual desktop into an application-owned BGRA buffer before a
 /// native selector is shown. Area and window requests crop that same immutable
 /// frame, so the selector itself never appears in the result.
-pub struct WindowsGdiCaptureAdapter;
+pub struct WindowsCompositorCaptureAdapter;
 
-impl WindowsGdiCaptureAdapter {
+impl WindowsCompositorCaptureAdapter {
     pub fn available(&self) -> bool {
-        if virtual_screen_geometry().is_err() {
-            return false;
-        }
-        let Ok(dc) = (unsafe { desktop_dc() }) else {
-            return false;
-        };
-        unsafe { ReleaseDC(std::ptr::null_mut(), dc) };
-        true
+        virtual_screen_geometry().is_ok_and(|geometry| {
+            capture_compositor_outputs(&geometry, "windows-capability-probe").is_ok()
+        })
     }
 
     pub fn capture_to_transport(
@@ -55,9 +71,12 @@ impl WindowsGdiCaptureAdapter {
         correlation_id: &str,
         transport: Arc<ImageTransportService>,
     ) -> Result<CaptureResult, PlatformError> {
+        let _dpi_awareness =
+            ThreadDpiAwarenessGuard::enter().map_err(|stage| failure(correlation_id, stage))?;
         let source_geometry =
             virtual_screen_geometry().map_err(|stage| failure(correlation_id, stage))?;
-        let source_bgra = capture_virtual_screen(&source_geometry, correlation_id)?;
+        let outputs = capture_compositor_outputs(&source_geometry, correlation_id)?;
+        let source_bgra = compose_compositor_outputs(&source_geometry, &outputs, correlation_id)?;
         let geometry = match target {
             CaptureTarget::Monitor => source_geometry.clone(),
             CaptureTarget::Area => area_geometry(&source_geometry, correlation_id)?,
@@ -86,6 +105,29 @@ impl WindowsGdiCaptureAdapter {
             geometry: Some(geometry),
             cursor_included: Some(false),
         })
+    }
+}
+
+struct ThreadDpiAwarenessGuard(DPI_AWARENESS_CONTEXT);
+
+impl ThreadDpiAwarenessGuard {
+    fn enter() -> Result<Self, &'static str> {
+        let previous =
+            unsafe { SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) };
+        if previous.is_null() {
+            Err("setThreadDpiAwareness")
+        } else {
+            Ok(Self(previous))
+        }
+    }
+}
+
+impl Drop for ThreadDpiAwarenessGuard {
+    fn drop(&mut self) {
+        let restored = unsafe { SetThreadDpiAwarenessContext(self.0) };
+        if restored.is_null() && std::env::var_os("CUTE_SCREEN_CAPTURE_DEBUG").is_some() {
+            eprintln!("cute-screen could not restore the previous thread DPI awareness context");
+        }
     }
 }
 
@@ -450,6 +492,7 @@ fn selector_point(lparam: LPARAM, origin: POINT) -> POINT {
 }
 
 fn virtual_screen_geometry() -> Result<CaptureGeometry, &'static str> {
+    let _dpi_awareness = ThreadDpiAwarenessGuard::enter()?;
     let x = unsafe { GetSystemMetrics(SM_XVIRTUALSCREEN) };
     let y = unsafe { GetSystemMetrics(SM_YVIRTUALSCREEN) };
     let width = unsafe { GetSystemMetrics(SM_CXVIRTUALSCREEN) };
@@ -471,108 +514,271 @@ fn virtual_screen_geometry() -> Result<CaptureGeometry, &'static str> {
     })
 }
 
-fn capture_virtual_screen(
+struct CompositorOutputFrame {
+    geometry: CaptureGeometry,
+    row_pitch: usize,
+    bgra: Vec<u8>,
+}
+
+fn capture_compositor_outputs(
+    desktop: &CaptureGeometry,
+    correlation_id: &str,
+) -> Result<Vec<CompositorOutputFrame>, PlatformError> {
+    let factory: IDXGIFactory1 = unsafe { CreateDXGIFactory1() }
+        .map_err(|error| compositor_failure(correlation_id, "createDxgiFactory", &error))?;
+    let mut frames = Vec::new();
+    let mut adapter_index = 0;
+    loop {
+        let adapter = match unsafe { factory.EnumAdapters1(adapter_index) } {
+            Ok(adapter) => adapter,
+            Err(error) if error.code() == DXGI_ERROR_NOT_FOUND => break,
+            Err(error) => {
+                return Err(compositor_failure(
+                    correlation_id,
+                    "enumerateDxgiAdapter",
+                    &error,
+                ));
+            }
+        };
+        capture_adapter_outputs(&adapter, desktop, correlation_id, &mut frames)?;
+        adapter_index += 1;
+    }
+    if frames.is_empty() {
+        return Err(failure(correlation_id, "noAttachedDxgiOutput"));
+    }
+    Ok(frames)
+}
+
+fn capture_adapter_outputs(
+    adapter: &IDXGIAdapter1,
+    desktop: &CaptureGeometry,
+    correlation_id: &str,
+    frames: &mut Vec<CompositorOutputFrame>,
+) -> Result<(), PlatformError> {
+    let (device, context) = create_d3d_device(adapter, correlation_id)?;
+    let mut output_index = 0;
+    loop {
+        let output = match unsafe { adapter.EnumOutputs(output_index) } {
+            Ok(output) => output,
+            Err(error) if error.code() == DXGI_ERROR_NOT_FOUND => break,
+            Err(error) => {
+                return Err(compositor_failure(
+                    correlation_id,
+                    "enumerateDxgiOutput",
+                    &error,
+                ));
+            }
+        };
+        output_index += 1;
+        let description = unsafe { output.GetDesc() }
+            .map_err(|error| compositor_failure(correlation_id, "getDxgiOutputDesc", &error))?;
+        if !description.AttachedToDesktop.as_bool() {
+            continue;
+        }
+        let rect = description.DesktopCoordinates;
+        let geometry = intersect_rect(
+            desktop,
+            rect.left,
+            rect.top,
+            rect.right - rect.left,
+            rect.bottom - rect.top,
+        )
+        .ok_or_else(|| failure(correlation_id, "dxgiOutputGeometry"))?;
+        let output: IDXGIOutput1 = output
+            .cast()
+            .map_err(|error| compositor_failure(correlation_id, "castDxgiOutput", &error))?;
+        frames.push(capture_dxgi_output(
+            &output,
+            &device,
+            &context,
+            geometry,
+            correlation_id,
+        )?);
+    }
+    Ok(())
+}
+
+fn create_d3d_device(
+    adapter: &IDXGIAdapter1,
+    correlation_id: &str,
+) -> Result<(ID3D11Device, ID3D11DeviceContext), PlatformError> {
+    let mut device = None;
+    let mut context = None;
+    unsafe {
+        D3D11CreateDevice(
+            adapter,
+            D3D_DRIVER_TYPE_UNKNOWN,
+            HMODULE::default(),
+            D3D11_CREATE_DEVICE_BGRA_SUPPORT,
+            None,
+            D3D11_SDK_VERSION,
+            Some(&mut device),
+            None,
+            Some(&mut context),
+        )
+    }
+    .map_err(|error| compositor_failure(correlation_id, "createD3dDevice", &error))?;
+    Ok((
+        device.ok_or_else(|| failure(correlation_id, "missingD3dDevice"))?,
+        context.ok_or_else(|| failure(correlation_id, "missingD3dContext"))?,
+    ))
+}
+
+fn capture_dxgi_output(
+    output: &IDXGIOutput1,
+    device: &ID3D11Device,
+    context: &ID3D11DeviceContext,
+    geometry: CaptureGeometry,
+    correlation_id: &str,
+) -> Result<CompositorOutputFrame, PlatformError> {
+    let duplication = unsafe { output.DuplicateOutput(device) }
+        .map_err(|error| compositor_failure(correlation_id, "duplicateDxgiOutput", &error))?;
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return Err(failure(correlation_id, "dxgiDesktopFrameTimeout"));
+        }
+        let timeout = u32::try_from(remaining.as_millis().min(250)).unwrap_or(250);
+        let mut frame_info = DXGI_OUTDUPL_FRAME_INFO::default();
+        let mut resource: Option<IDXGIResource> = None;
+        unsafe { duplication.AcquireNextFrame(timeout, &mut frame_info, &mut resource) }
+            .map_err(|error| compositor_failure(correlation_id, "acquireDxgiFrame", &error))?;
+        if frame_info.LastPresentTime == 0 {
+            unsafe { duplication.ReleaseFrame() }.map_err(|error| {
+                compositor_failure(correlation_id, "releasePointerOnlyDxgiFrame", &error)
+            })?;
+            continue;
+        }
+        let captured = if frame_info.ProtectedContentMaskedOut.as_bool() {
+            Err(failure(correlation_id, "dxgiProtectedContentMasked"))
+        } else {
+            capture_acquired_frame(resource, device, context, geometry.clone(), correlation_id)
+        };
+        let released = unsafe { duplication.ReleaseFrame() }
+            .map_err(|error| compositor_failure(correlation_id, "releaseDxgiFrame", &error));
+        return captured.and_then(|frame| released.map(|()| frame));
+    }
+}
+
+fn capture_acquired_frame(
+    resource: Option<IDXGIResource>,
+    device: &ID3D11Device,
+    context: &ID3D11DeviceContext,
+    geometry: CaptureGeometry,
+    correlation_id: &str,
+) -> Result<CompositorOutputFrame, PlatformError> {
+    let texture: ID3D11Texture2D = resource
+        .ok_or_else(|| failure(correlation_id, "missingDxgiFrameResource"))?
+        .cast()
+        .map_err(|error| compositor_failure(correlation_id, "castDxgiTexture", &error))?;
+    let mut description = D3D11_TEXTURE2D_DESC::default();
+    unsafe { texture.GetDesc(&mut description) };
+    if description.Width != geometry.width || description.Height != geometry.height {
+        return Err(failure(correlation_id, "rotatedDxgiOutputUnsupported"));
+    }
+    description.Usage = D3D11_USAGE_STAGING;
+    description.BindFlags = 0;
+    description.CPUAccessFlags = D3D11_CPU_ACCESS_READ.0 as u32;
+    description.MiscFlags = 0;
+    let mut staging = None;
+    unsafe { device.CreateTexture2D(&description, None, Some(&mut staging)) }
+        .map_err(|error| compositor_failure(correlation_id, "createDxgiStaging", &error))?;
+    let staging = staging.ok_or_else(|| failure(correlation_id, "missingDxgiStaging"))?;
+    unsafe { context.CopyResource(&staging, &texture) };
+    let mut mapped = D3D11_MAPPED_SUBRESOURCE::default();
+    unsafe { context.Map(&staging, 0, D3D11_MAP_READ, 0, Some(&mut mapped)) }
+        .map_err(|error| compositor_failure(correlation_id, "mapDxgiStaging", &error))?;
+    let copied = copy_mapped_output(&mapped, &geometry, correlation_id);
+    unsafe { context.Unmap(&staging, 0) };
+    copied
+}
+
+fn copy_mapped_output(
+    mapped: &D3D11_MAPPED_SUBRESOURCE,
     geometry: &CaptureGeometry,
     correlation_id: &str,
+) -> Result<CompositorOutputFrame, PlatformError> {
+    if mapped.pData.is_null() {
+        return Err(failure(correlation_id, "emptyDxgiMappedData"));
+    }
+    let row_pitch =
+        usize::try_from(mapped.RowPitch).map_err(|_| failure(correlation_id, "dxgiRowPitch"))?;
+    let height = usize::try_from(geometry.height)
+        .map_err(|_| failure(correlation_id, "dxgiOutputHeight"))?;
+    let byte_len = row_pitch
+        .checked_mul(height)
+        .ok_or_else(|| failure(correlation_id, "dxgiMappedLength"))?;
+    let bgra = unsafe { std::slice::from_raw_parts(mapped.pData.cast::<u8>(), byte_len) }.to_vec();
+    Ok(CompositorOutputFrame {
+        geometry: geometry.clone(),
+        row_pitch,
+        bgra,
+    })
+}
+
+fn compose_compositor_outputs(
+    desktop: &CaptureGeometry,
+    outputs: &[CompositorOutputFrame],
+    correlation_id: &str,
 ) -> Result<Vec<u8>, PlatformError> {
-    let pixel_len = checked_pixel_len(geometry.width, geometry.height)
-        .ok_or_else(|| failure(correlation_id, "pixelBufferSize"))?;
-    let width =
-        i32::try_from(geometry.width).map_err(|_| failure(correlation_id, "captureWidth"))?;
-    let height =
-        i32::try_from(geometry.height).map_err(|_| failure(correlation_id, "captureHeight"))?;
-    unsafe {
-        let screen_dc = desktop_dc().map_err(|stage| failure(correlation_id, stage))?;
-        let memory_dc = CreateCompatibleDC(screen_dc);
-        if memory_dc.is_null() {
-            let error = last_error(correlation_id, "createCompatibleDc");
-            ReleaseDC(std::ptr::null_mut(), screen_dc);
-            return Err(error);
+    let mut composed = vec![
+        0;
+        checked_pixel_len(desktop.width, desktop.height)
+            .ok_or_else(|| failure(correlation_id, "compositorFrameSize"))?
+    ];
+    let desktop_width = usize::try_from(desktop.width)
+        .map_err(|_| failure(correlation_id, "compositorDesktopWidth"))?;
+    let desktop_height = usize::try_from(desktop.height)
+        .map_err(|_| failure(correlation_id, "compositorDesktopHeight"))?;
+    for output in outputs {
+        let output_width = usize::try_from(output.geometry.width)
+            .map_err(|_| failure(correlation_id, "compositorOutputWidth"))?;
+        let row_bytes = output_width
+            .checked_mul(4)
+            .ok_or_else(|| failure(correlation_id, "compositorOutputRow"))?;
+        let height = usize::try_from(output.geometry.height)
+            .map_err(|_| failure(correlation_id, "compositorOutputHeight"))?;
+        let required = output
+            .row_pitch
+            .checked_mul(height)
+            .ok_or_else(|| failure(correlation_id, "compositorOutputLength"))?;
+        if output.row_pitch < row_bytes || output.bgra.len() < required {
+            return Err(failure(correlation_id, "compositorOutputBuffer"));
         }
-
-        let mut pixels = std::ptr::null_mut();
-        let bitmap = CreateDIBSection(
-            screen_dc,
-            &bitmap_info(geometry.width, geometry.height),
-            DIB_RGB_COLORS,
-            &mut pixels,
-            std::ptr::null_mut(),
-            0,
-        );
-        if bitmap.is_null() || pixels.is_null() {
-            let error = last_error(correlation_id, "createDibSection");
-            DeleteDC(memory_dc);
-            ReleaseDC(std::ptr::null_mut(), screen_dc);
-            return Err(error);
+        let x = usize::try_from(output.geometry.x - desktop.x)
+            .map_err(|_| failure(correlation_id, "compositorOutputX"))?;
+        let y = usize::try_from(output.geometry.y - desktop.y)
+            .map_err(|_| failure(correlation_id, "compositorOutputY"))?;
+        let right = x
+            .checked_add(output_width)
+            .ok_or_else(|| failure(correlation_id, "compositorOutputRight"))?;
+        let bottom = y
+            .checked_add(height)
+            .ok_or_else(|| failure(correlation_id, "compositorOutputBottom"))?;
+        if right > desktop_width || bottom > desktop_height {
+            return Err(failure(correlation_id, "compositorOutputBounds"));
         }
-
-        let previous = SelectObject(memory_dc, bitmap.cast::<c_void>());
-        if previous.is_null() {
-            let error = last_error(correlation_id, "selectBitmap");
-            DeleteObject(bitmap.cast::<c_void>());
-            DeleteDC(memory_dc);
-            ReleaseDC(std::ptr::null_mut(), screen_dc);
-            return Err(error);
+        for row in 0..height {
+            let source_offset = row * output.row_pitch;
+            let target_offset = ((y + row) * desktop_width + x) * 4;
+            composed[target_offset..target_offset + row_bytes]
+                .copy_from_slice(&output.bgra[source_offset..source_offset + row_bytes]);
         }
-
-        let copied = BitBlt(
-            memory_dc,
-            0,
-            0,
-            width,
-            height,
-            screen_dc,
-            geometry.x,
-            geometry.y,
-            SRCCOPY | CAPTUREBLT,
-        ) != 0;
-        let bitblt_error = if copied {
-            None
-        } else {
-            Some(last_error(correlation_id, "bitBlt"))
-        };
-        let bytes = if copied {
-            std::slice::from_raw_parts(pixels.cast::<u8>(), pixel_len).to_vec()
-        } else {
-            Vec::new()
-        };
-
-        SelectObject(memory_dc, previous);
-        DeleteObject(bitmap.cast::<c_void>());
-        DeleteDC(memory_dc);
-        ReleaseDC(std::ptr::null_mut(), screen_dc);
-
-        if let Some(error) = bitblt_error {
-            return Err(error);
-        }
-        Ok(bytes)
     }
+    Ok(composed)
 }
 
-unsafe fn desktop_dc() -> Result<HDC, &'static str> {
-    let dc = unsafe { GetDC(std::ptr::null_mut::<c_void>() as HWND) };
-    if dc.is_null() {
-        Err("getDesktopDc")
-    } else {
-        Ok(dc)
-    }
-}
-
-fn bitmap_info(width: u32, height: u32) -> BITMAPINFO {
-    BITMAPINFO {
-        bmiHeader: BITMAPINFOHEADER {
-            biSize: 40,
-            biWidth: i32::try_from(width).unwrap_or(i32::MAX),
-            // A negative height keeps the DIB top-down, so the PNG encoder
-            // consumes pixels in the order returned by BitBlt.
-            biHeight: -i32::try_from(height).unwrap_or(i32::MAX),
-            biPlanes: 1,
-            biBitCount: 32,
-            biCompression: BI_RGB,
-            ..BITMAPINFOHEADER::default()
-        },
-        ..BITMAPINFO::default()
-    }
+fn compositor_failure(
+    correlation_id: &str,
+    stage: &'static str,
+    source: &windows::core::Error,
+) -> PlatformError {
+    let mut error = failure(correlation_id, stage);
+    error
+        .context
+        .insert("hresult".to_owned(), format!("{:#010x}", source.code().0));
+    error
 }
 
 fn encode_bgra_png(
@@ -626,7 +832,10 @@ fn last_error(correlation_id: &str, stage: &'static str) -> PlatformError {
 
 #[cfg(test)]
 mod tests {
-    use super::{crop_bgra, encode_bgra_png, intersect_rect};
+    use super::{
+        CompositorOutputFrame, compose_compositor_outputs, crop_bgra, encode_bgra_png,
+        intersect_rect,
+    };
     use crate::platform::CaptureGeometry;
 
     fn geometry(x: i32, y: i32, width: u32, height: u32) -> CaptureGeometry {
@@ -683,5 +892,52 @@ mod tests {
     fn selector_cleanup_does_not_enqueue_another_quit_for_the_next_capture() {
         assert!(!super::selector_posts_quit(super::WM_DESTROY, 0));
         assert!(super::selector_posts_quit(super::WM_LBUTTONUP, 0));
+    }
+
+    #[test]
+    fn assembles_compositor_outputs_with_row_pitch_and_negative_coordinates() {
+        let desktop = geometry(-2, 0, 4, 1);
+        let outputs = [
+            CompositorOutputFrame {
+                geometry: geometry(-2, 0, 2, 1),
+                row_pitch: 12,
+                bgra: vec![1, 0, 0, 255, 2, 0, 0, 255, 99, 99, 99, 99],
+            },
+            CompositorOutputFrame {
+                geometry: geometry(0, 0, 2, 1),
+                row_pitch: 8,
+                bgra: vec![3, 0, 0, 255, 4, 0, 0, 255],
+            },
+        ];
+
+        let frame = compose_compositor_outputs(&desktop, &outputs, "compose-test")
+            .expect("compositor outputs");
+
+        assert_eq!(
+            frame,
+            vec![1, 0, 0, 255, 2, 0, 0, 255, 3, 0, 0, 255, 4, 0, 0, 255,]
+        );
+    }
+
+    #[test]
+    #[ignore = "requires an interactive Windows desktop"]
+    fn compositor_runtime_probe_reads_the_visible_desktop() {
+        let desktop = super::virtual_screen_geometry().expect("virtual desktop");
+        let outputs = super::capture_compositor_outputs(&desktop, "dxgi-runtime-probe")
+            .expect("DXGI compositor outputs");
+        let frame = super::compose_compositor_outputs(&desktop, &outputs, "dxgi-runtime-probe")
+            .expect("composited virtual desktop");
+
+        assert_eq!(
+            frame.len(),
+            usize::try_from(desktop.width).unwrap_or_default()
+                * usize::try_from(desktop.height).unwrap_or_default()
+                * 4
+        );
+        assert!(
+            frame
+                .chunks_exact(4)
+                .any(|pixel| pixel[..3].iter().any(|channel| *channel != 0))
+        );
     }
 }

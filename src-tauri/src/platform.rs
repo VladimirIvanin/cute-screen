@@ -54,7 +54,7 @@ pub enum SessionKind {
 pub enum CaptureBackendKind {
     Unavailable,
     WaylandPortal,
-    WindowsGdi,
+    WindowsDxgi,
     X11,
 }
 
@@ -126,7 +126,7 @@ impl PlatformCapabilities {
         let portal_v3 =
             backend == CaptureBackendKind::WaylandPortal && probe.screenshot_version >= 3;
         let x11 = backend == CaptureBackendKind::X11;
-        let windows_gdi = backend == CaptureBackendKind::WindowsGdi;
+        let windows_dxgi = backend == CaptureBackendKind::WindowsDxgi;
         let capture_available = backend != CaptureBackendKind::Unavailable;
         let hotkeys = if session == SessionKind::X11 && native_adapter_available {
             HotkeyCapabilities {
@@ -160,15 +160,15 @@ impl PlatformCapabilities {
                 backend,
                 // Native X11 and Windows adapters own a frozen-frame
                 // selector; Wayland's remains exclusively portal-driven.
-                interactive_selector: portal_v2 || x11 || windows_gdi,
+                interactive_selector: portal_v2 || x11 || windows_dxgi,
                 monitor_target: x11
-                    || windows_gdi
+                    || windows_dxgi
                     || (portal_v3 && probe.available_targets & 1 != 0),
                 window_target: x11
-                    || windows_gdi
+                    || windows_dxgi
                     || (portal_v3 && probe.available_targets & 2 != 0),
                 active_window_target: x11
-                    || windows_gdi
+                    || windows_dxgi
                     || (portal_v3 && probe.available_targets & 8 != 0),
                 cursor: false,
             },
@@ -189,7 +189,7 @@ pub fn select_capture_backend(
         SessionKind::Wayland => CaptureBackendKind::Unavailable,
         SessionKind::X11 if x11_gate_passed => CaptureBackendKind::X11,
         SessionKind::X11 => CaptureBackendKind::Unavailable,
-        SessionKind::Windows if x11_gate_passed => CaptureBackendKind::WindowsGdi,
+        SessionKind::Windows if x11_gate_passed => CaptureBackendKind::WindowsDxgi,
         SessionKind::Windows => CaptureBackendKind::Unavailable,
         _ => CaptureBackendKind::Unavailable,
     }
@@ -392,16 +392,19 @@ mod tests {
     }
 
     #[test]
-    fn windows_gdi_advertises_area_screen_and_window_targets() {
+    fn windows_dxgi_advertises_area_screen_and_window_targets() {
         let capabilities = PlatformCapabilities::for_session(
-            "windows-gdi".to_owned(),
+            "windows-dxgi".to_owned(),
             SessionKind::Windows,
             None,
             Some(true),
         );
 
         assert!(capabilities.capture.available);
-        assert_eq!(capabilities.capture.backend, CaptureBackendKind::WindowsGdi);
+        assert_eq!(
+            capabilities.capture.backend,
+            CaptureBackendKind::WindowsDxgi
+        );
         assert!(capabilities.capture.monitor_target);
         assert!(capabilities.capture.interactive_selector);
         assert!(capabilities.capture.window_target);

@@ -330,7 +330,7 @@ impl CaptureController {
             let correlation_id = request.correlation_id.clone();
             let transport = Arc::clone(&self.transport);
             match tokio::task::spawn_blocking(move || {
-                crate::windows_platform::WindowsGdiCaptureAdapter.capture_to_transport(
+                crate::windows_platform::WindowsCompositorCaptureAdapter.capture_to_transport(
                     target,
                     &correlation_id,
                     transport,
@@ -511,7 +511,7 @@ fn fake_capture_frame(
 
 fn capture_backend_metadata_name() -> &'static str {
     if cfg!(target_os = "windows") {
-        "windowsGdi"
+        "windowsDxgi"
     } else if cfg!(target_os = "linux")
         && std::env::var("XDG_SESSION_TYPE")
             .is_ok_and(|session| session.eq_ignore_ascii_case("x11"))
