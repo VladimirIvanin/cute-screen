@@ -144,6 +144,35 @@ describe('M02 editor shell in browser mode', () => {
     )
   })
 
+  it('places the overflow menu through the overlay without a second absolute offset', async () => {
+    await browser.setWindowSize(1600, 1000)
+    await openShell('ready')
+
+    const trigger = $('button[aria-label="More actions"]')
+    await trigger.click()
+    await expect($('.cs-menu')).toExist()
+
+    const placement = await browser.execute(() => {
+      const menu = document.querySelector('.cs-menu')
+      const trigger = document.querySelector(
+        'button[aria-label="More actions"]',
+      )
+      if (!(menu instanceof HTMLElement) || !(trigger instanceof HTMLElement)) {
+        throw new Error('Missing overflow menu or trigger')
+      }
+      const menuBounds = menu.getBoundingClientRect()
+      const triggerBounds = trigger.getBoundingClientRect()
+      return {
+        position: getComputedStyle(menu).position,
+        menuTop: menuBounds.top,
+        triggerBottom: triggerBounds.bottom,
+      }
+    })
+
+    expect(placement.position).toBe('static')
+    expect(placement.menuTop).toBeGreaterThanOrEqual(placement.triggerBottom)
+  })
+
   it('renders loading and recoverable error states, and reaches capture first by keyboard', async () => {
     await browser.setWindowSize(1024, 700)
     await openShell('loading')

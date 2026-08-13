@@ -66,6 +66,7 @@ export { default as SeriesFilmstrip } from './shell/components/SeriesFilmstrip.v
 export { default as ZoomControls } from './shell/components/ZoomControls.vue'
 export {
   DocumentSessionController,
+  describeError,
   parsePersistedDocument,
   type DocumentPersistenceBridge,
   type DocumentFlushOutcome,

@@ -56,6 +56,25 @@ export interface DocumentSessionOptions {
   readonly debounceMs?: number
 }
 
+/** Extracts a useful message from native/Tauri rejections, which are plain objects. */
+export function describeError(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message.trim()) return error.message
+  if (typeof error === 'string' && error.trim()) return error
+  if (typeof error === 'object' && error !== null) {
+    const nativeError = error as {
+      readonly message?: unknown
+      readonly error?: unknown
+    }
+    if (typeof nativeError.message === 'string' && nativeError.message.trim()) {
+      return nativeError.message
+    }
+    if (typeof nativeError.error === 'string' && nativeError.error.trim()) {
+      return nativeError.error
+    }
+  }
+  return fallback
+}
+
 /** Keeps the DOM-free core object out of Pinia/Vue reactivity. */
 export class DocumentSessionController {
   readonly #manager: CommandManager
@@ -189,7 +208,7 @@ export class DocumentSessionController {
       return { kind: 'saved' }
     } catch (error) {
       this.#state = 'error'
-      this.#error = error instanceof Error ? error.message : String(error)
+      this.#error = describeError(error, 'Unable to save the document.')
       return { kind: 'failed', error: this.#error }
     } finally {
       this.#inFlight = undefined

@@ -136,6 +136,31 @@ describe('M03 document persistence session', () => {
     expect(session.snapshot.saveState).toBe('saved')
   })
 
+  it('uses a native structured error message instead of stringifying the object', async () => {
+    const session = new DocumentSessionController({
+      document,
+      revision: 1,
+      bridge: {
+        saveDocument: async () => {
+          throw { message: 'The document revision is stale.' }
+        },
+        exportRecoveryBundle: async () => ({ kind: 'saved' }),
+      },
+      correlationId: () => 'structured-native-error',
+    })
+    session.execute({
+      type: 'setCrop',
+      before: null,
+      after: { x: 0, y: 0, width: 80, height: 80 },
+    })
+
+    await expect(session.flush()).resolves.toEqual({
+      kind: 'failed',
+      error: 'The document revision is stale.',
+    })
+    expect(session.snapshot.error).toBe('The document revision is stale.')
+  })
+
   it('does not treat a save from an abandoned undo branch as current', async () => {
     let resolveFirst: ((revision: number) => void) | undefined
     let calls = 0

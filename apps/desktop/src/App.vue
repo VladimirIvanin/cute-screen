@@ -11,6 +11,7 @@ import {
   DocumentSessionCoordinator,
   EditorShell,
   ActionCancelledError,
+  describeError,
   loadImageWithBinaryFallback,
   parsePersistedDocument,
   type CaptureOutcomeV1,
@@ -515,7 +516,10 @@ function createDocumentCoordinator(
         } catch (error) {
           return {
             kind: 'failed' as const,
-            error: error instanceof Error ? error.message : String(error),
+            error: describeError(
+              error,
+              'Unable to export the recovery bundle.',
+            ),
           }
         }
       },
