@@ -570,6 +570,25 @@ button:focus-visible {
   color: var(--accent);
   background: var(--accent-soft);
 }
+.cs-context-icon svg {
+  width: var(--cs-context-glyph-size, 20px);
+  height: var(--cs-context-glyph-size, 20px);
+}
+.cs-context-icon--arrow {
+  --cs-context-glyph-size: 36px;
+}
+.cs-context-icon--pencil {
+  --cs-context-glyph-size: 18px;
+}
+.cs-context-icon--text {
+  --cs-context-glyph-size: 27px;
+}
+.cs-context-icon--select {
+  --cs-context-glyph-size: 22px;
+}
+.cs-context-icon--hand {
+  --cs-context-glyph-size: 19px;
+}
 .cs-context-controls {
   display: flex;
   min-width: 0;

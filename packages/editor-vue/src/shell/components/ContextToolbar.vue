@@ -17,7 +17,9 @@ const emit = defineEmits<{
 
 <template>
   <section v-if="schema" class="cs-context-toolbar" :aria-label="label">
-    <span class="cs-context-icon"><UiIcon :name="schema.icon" /></span>
+    <span class="cs-context-icon" :class="`cs-context-icon--${schema.icon}`"
+      ><UiIcon :name="schema.icon"
+    /></span>
     <div class="cs-context-controls">
       <template v-for="control in schema.controls" :key="control.id">
         <NButton
