@@ -18,12 +18,15 @@ import {
   type SrgbColor,
   type ShadowStyle,
   createDrawingLayer,
+  arrowSelectionHandles,
+  updateArrowHandle,
   createTextLayer,
   createTextCommitCommand,
   createNumberedMarkerLayer,
   createCalloutLayer,
   type DrawingDefaults,
   type DrawingTool,
+  type ArrowHandleKind,
   type FontReference,
   type CalloutLayer,
   type BlendMode,
@@ -183,7 +186,8 @@ let gesture:
   | {
       readonly kind: 'arrowHandle'
       readonly id: string
-      readonly handle: 'start' | 'end' | 'bend'
+      readonly handle: ArrowHandleKind
+      readonly start: { x: number; y: number }
       readonly current: { x: number; y: number }
     }
   | {
@@ -687,23 +691,7 @@ function drawOverlay(): void {
     )
   }
   if (layer.kind === 'arrow') {
-    const payload = layer.payload as Record<string, unknown>
-    const anchors: readonly (readonly [
-      'start' | 'end' | 'bend',
-      CanvasPoint,
-    ])[] = [
-      ['start', payloadPoint(payload.start, { x: 0, y: 0 })],
-      ['end', payloadPoint(payload.end, { x: bounds.width, y: bounds.height })],
-      ...(payload.path === 'quadratic'
-        ? [
-            [
-              'bend',
-              payloadPoint(payload.bend, { x: bounds.width / 2, y: 0 }),
-            ] as const,
-          ]
-        : []),
-    ]
-    for (const [name, saved] of anchors) {
+    for (const { kind: name, point: saved } of arrowSelectionHandles(layer)) {
       const local =
         gesture?.kind === 'arrowHandle' &&
         gesture.id === layer.id &&
@@ -895,16 +883,6 @@ function initialSamplingCursor(): CanvasPoint | undefined {
     }
   )
 }
-function payloadPoint(value: unknown, fallback: CanvasPoint): CanvasPoint {
-  if (!value || typeof value !== 'object') return fallback
-  const point = value as Record<string, unknown>
-  return typeof point.x === 'number' &&
-    Number.isFinite(point.x) &&
-    typeof point.y === 'number' &&
-    Number.isFinite(point.y)
-    ? { x: point.x, y: point.y }
-    : fallback
-}
 function handleAtPoint(
   layer: LayerNode,
   point: CanvasPoint,
@@ -989,28 +967,13 @@ function handleAtPoint(
 function arrowHandleAtPoint(
   layer: LayerNode,
   point: CanvasPoint,
-): 'start' | 'end' | 'bend' | undefined {
+): ArrowHandleKind | undefined {
   if (layer.kind !== 'arrow') return undefined
-  const payload = layer.payload as Record<string, unknown>
-  const bounds = layerBounds(layer)
-  const anchors: readonly (readonly ['start' | 'end' | 'bend', CanvasPoint])[] =
-    [
-      ['start', payloadPoint(payload.start, { x: 0, y: 0 })],
-      ['end', payloadPoint(payload.end, { x: bounds.width, y: bounds.height })],
-      ...(payload.path === 'quadratic'
-        ? [
-            [
-              'bend',
-              payloadPoint(payload.bend, { x: bounds.width / 2, y: 0 }),
-            ] as const,
-          ]
-        : []),
-    ]
   const tolerance = 9 / ((props.zoom ?? 100) / 100)
-  return anchors.find(([, local]) => {
+  return arrowSelectionHandles(layer).find(({ point: local }) => {
     const candidate = transformPoint(layer.transform, local)
     return Math.hypot(candidate.x - point.x, candidate.y - point.y) <= tolerance
-  })?.[0]
+  })?.kind
 }
 function onPointerDown(event: PointerEvent): void {
   // A canvas click is the direct confirmation gesture for the transient text
@@ -1129,6 +1092,7 @@ function onPointerDown(event: PointerEvent): void {
       kind: 'arrowHandle',
       id: selected.id,
       handle: arrowHandle,
+      start: point,
       current: point,
     }
     return
@@ -1589,10 +1553,20 @@ function finishGesture(event: PointerEvent): void {
     const layer = props.document?.layers.find(
       (candidate) => candidate.id === completed.id,
     )
-    if (layer?.kind === 'arrow') {
-      emit('updateLayerPayload', completed.id, {
-        ...layer.payload,
-        [completed.handle]: toLocal(layer, completed.current),
+    if (
+      layer?.kind === 'arrow' &&
+      (completed.current.x !== completed.start.x ||
+        completed.current.y !== completed.start.y)
+    ) {
+      const after = updateArrowHandle(
+        layer,
+        completed.handle,
+        toLocal(layer, completed.current),
+      )
+      emit('documentCommand', {
+        type: 'updateLayer',
+        before: layer,
+        after,
       })
     }
   }

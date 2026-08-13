@@ -1,11 +1,13 @@
 export {
   DEFAULT_PRESENTATION_SETTINGS,
+  ARROW_CAPS,
   EDITOR_DOCUMENT_SCHEMA_VERSION,
   LAYER_KINDS,
   parseEditorDocument,
   serializeEditorDocument,
   createDocumentRenderScene,
   type ArrowLayer,
+  type ArrowCap,
   type CalloutLayer,
   type CensorLayer,
   type ColorMetadata,
@@ -14,6 +16,7 @@ export {
   type EditorDocumentV3,
   type EditorDocumentV4,
   type EditorDocumentV5,
+  type EditorDocumentV6,
   type EditorDocument,
   type BlendMode,
   type SrgbColor,
@@ -69,10 +72,22 @@ export {
   type ShapeKind,
 } from './drawing'
 export {
+  arrowCapSize,
+  arrowEndpointAngles,
+  arrowPathPoints,
+  arrowSelectionHandles,
+  rebaseArrowLayer,
+  trimArrowBodyPoints,
+  updateArrowHandle,
+  type ArrowHandleKind,
+  type ArrowSelectionHandle,
+} from './arrow-geometry'
+export {
   defaultDrawingToolPreferences,
   parseDrawingToolPreferences,
   rememberDrawingColor,
-  type DrawingToolPreferencesV1,
+  type DrawingToolPreferences,
+  type DrawingToolPreferencesV2,
   type DrawingToolPreferencesStorage,
 } from './drawing-preferences'
 export {

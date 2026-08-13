@@ -34,7 +34,13 @@ declare global {
   interface Window {
     __cuteScreenE2eDocument?: {
       setCrop(): void
-      snapshot(): { crop: unknown; saveState: string } | undefined
+      snapshot():
+        | {
+            crop: unknown
+            layers: EditorDocumentV1['layers']
+            saveState: string
+          }
+        | undefined
     }
     __cuteScreenE2eM05?: {
       snapshot(): EditorDocumentV1 | undefined
@@ -318,6 +324,7 @@ async function loadPersistedDocument(): Promise<boolean> {
           return active
             ? {
                 crop: active.snapshot.core.document.crop,
+                layers: active.snapshot.core.document.layers,
                 saveState: active.snapshot.saveState,
               }
             : undefined

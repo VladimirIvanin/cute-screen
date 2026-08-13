@@ -14,16 +14,117 @@ import {
   DocumentSessionController,
   parsePreferences,
   resolveSystemLocale,
+  t,
   type TextureFillBridge,
 } from '@cute-screen/editor-vue'
 import {
   createContentImageLayer,
   createTextLayer,
+  hitTestDocument,
+  parseEditorDocument,
+  serializeEditorDocument,
   type EditorDocumentV1,
 } from '@cute-screen/editor-renderer'
 
 function renderApp() {
   return render(App, { global: { plugins: [createEditorShellPinia()] } })
+}
+
+function arrowDocument(locked = false): EditorDocumentV1 {
+  return {
+    schemaVersion: 6,
+    id: '019c1f62-058e-7000-8000-0000000000aa',
+    source: {
+      blobHash: 'a'.repeat(64),
+      format: 'png',
+      mimeType: 'image/png',
+      width: 100,
+      height: 100,
+      orientationApplied: true,
+      color: { colorSpace: 'srgb', hasIccProfile: false },
+    },
+    canvas: { width: 100, height: 100 },
+    crop: null,
+    layers: [
+      {
+        id: '019c1f62-058e-7000-8000-0000000000ab',
+        kind: 'arrow',
+        localBounds: { x: 0, y: 0, width: 60, height: 20 },
+        transform: {
+          translateX: 10,
+          translateY: 10,
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+        },
+        opacity: 0.4,
+        blendMode: 'screen',
+        shadows: [],
+        visible: true,
+        locked,
+        payload: {
+          path: 'straight',
+          start: { x: 0, y: 0 },
+          end: { x: 60, y: 20 },
+          startCap: 'none',
+          endCap: 'solidArrow',
+          stroke: {
+            color: { red: 0.9, green: 0.2, blue: 0.3, alpha: 1 },
+            width: 3,
+            style: 'dotted',
+            cap: 'round',
+            join: 'round',
+          },
+        },
+      },
+    ],
+    presentation: {
+      beautify: { enabled: false },
+      watermark: { enabled: false },
+    },
+    createdAt: '2026-08-13T00:00:00.000Z',
+    updatedAt: '2026-08-13T00:00:00.000Z',
+  }
+}
+
+function arrowSession(document = arrowDocument()): DocumentSessionController {
+  return new DocumentSessionController({
+    document,
+    revision: 1,
+    bridge: {
+      saveDocument: async () => 2,
+      exportRecoveryBundle: async () => ({ kind: 'saved' }),
+    },
+    correlationId: () => 'arrow-toolbar-test',
+    debounceMs: 60_000,
+  })
+}
+
+function divergentArrowDocument(): EditorDocumentV1 {
+  const document = arrowDocument()
+  const arrow = document.layers[0]
+  if (!arrow || arrow.kind !== 'arrow') throw new Error('expected arrow')
+  return {
+    ...document,
+    layers: [
+      {
+        ...arrow,
+        payload: {
+          ...arrow.payload,
+          path: 'quadratic',
+          bend: { x: 30, y: -15 },
+          startCap: 'lineArrow',
+          endCap: 'diamond',
+          stroke: {
+            ...arrow.payload.stroke,
+            color: { red: 0.1, green: 0.2, blue: 0.3, alpha: 1 },
+            width: 3,
+            style: 'dotted',
+          },
+        },
+      },
+    ],
+  }
 }
 
 async function chooseNaiveOption(
@@ -37,6 +138,227 @@ async function chooseNaiveOption(
 }
 
 describe('M02 editor shell', () => {
+  it('keeps an unselected Arrow change in persistent defaults without a document command', async () => {
+    window.localStorage.clear()
+    const session = arrowSession()
+    const first = render(EditorShell, {
+      props: { documentSession: markRaw(session) },
+      global: { plugins: [createEditorShellPinia()] },
+    })
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Arrow' }))
+    await fireEvent.click(
+      await screen.findByRole('button', { name: 'Stroke: 3 px' }),
+    )
+    await fireEvent.click(await screen.findByRole('button', { name: '2 px' }))
+
+    expect(screen.getByRole('button', { name: 'Arrow' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(session.snapshot.core.canUndo).toBe(false)
+    expect(session.snapshot.core.document.layers[0]).toMatchObject({
+      payload: { stroke: { width: 3, style: 'dotted' } },
+    })
+    first.unmount()
+    session.dispose()
+
+    render(EditorShell, {
+      props: { fixture: 'ready' },
+      global: { plugins: [createEditorShellPinia()] },
+    })
+    expect(
+      await screen.findByRole('button', { name: 'Stroke: 2 px' }),
+    ).toBeInTheDocument()
+  })
+
+  it('shows a selected unlocked Arrow payload instead of active-tool defaults and commits one change', async () => {
+    window.localStorage.clear()
+    const session = arrowSession(divergentArrowDocument())
+    const view = render(EditorShell, {
+      props: { documentSession: markRaw(session) },
+      global: { plugins: [createEditorShellPinia()] },
+    })
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Arrow' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Show layers' }))
+    await fireEvent.click(
+      view.container.querySelector('.cs-layer-select') as HTMLButtonElement,
+    )
+
+    expect(
+      screen.getByRole('button', { name: 'Color: #1A334D' }),
+    ).toBeInTheDocument()
+    await fireEvent.click(screen.getByRole('button', { name: 'Stroke: 3 px' }))
+    expect(
+      await screen.findByRole('button', { name: 'Dotted' }),
+    ).toHaveAttribute('aria-pressed', 'true')
+    expect(
+      screen.getByRole('button', { name: 'Tail: Line arrow' }),
+    ).toBeVisible()
+    expect(
+      screen.getByRole('button', { name: 'Geometry: Curved' }),
+    ).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Head: Diamond' })).toBeVisible()
+
+    const execute = vi.spyOn(session, 'execute')
+    await fireEvent.click(screen.getByRole('button', { name: 'Head: Diamond' }))
+    await fireEvent.click(await screen.findByRole('button', { name: 'Circle' }))
+
+    expect(execute).toHaveBeenCalledTimes(1)
+    expect(session.snapshot.core.document.layers[0]).toMatchObject({
+      payload: {
+        path: 'quadratic',
+        startCap: 'lineArrow',
+        endCap: 'circle',
+        stroke: {
+          color: { red: 0.1, green: 0.2, blue: 0.3, alpha: 1 },
+          width: 3,
+          style: 'dotted',
+        },
+      },
+    })
+    expect(screen.getByRole('button', { name: 'Arrow' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+
+    session.dispose()
+    view.unmount()
+  })
+
+  it('rebases a selected Arrow 10 px toolbar update for hit testing, undo and reopen', async () => {
+    window.localStorage.clear()
+    const session = arrowSession()
+    const before = structuredClone(session.snapshot.core.document.layers[0])
+    const view = render(EditorShell, {
+      props: { documentSession: markRaw(session) },
+      global: { plugins: [createEditorShellPinia()] },
+    })
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Arrow' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Show layers' }))
+    await fireEvent.click(
+      view.container.querySelector('.cs-layer-select') as HTMLButtonElement,
+    )
+    const execute = vi.spyOn(session, 'execute')
+    await fireEvent.click(screen.getByRole('button', { name: 'Stroke: 3 px' }))
+    await fireEvent.click(await screen.findByRole('button', { name: '10 px' }))
+
+    expect(execute).toHaveBeenCalledTimes(1)
+    const updated = session.snapshot.core.document
+    expect(updated.layers[0]?.localBounds?.width).toBeGreaterThan(
+      before?.localBounds?.width ?? 0,
+    )
+    expect(updated.layers[0]?.localBounds?.height).toBeGreaterThan(
+      before?.localBounds?.height ?? 0,
+    )
+    expect(hitTestDocument(updated, { x: 95, y: 30 })).toMatchObject({
+      nodeId: '019c1f62-058e-7000-8000-0000000000ab',
+      part: 'stroke',
+    })
+    expect(parseEditorDocument(serializeEditorDocument(updated))).toMatchObject(
+      { kind: 'editable' },
+    )
+
+    session.undo()
+    expect(session.snapshot.core.document.layers[0]).toEqual(before)
+    expect(screen.getByRole('button', { name: 'Arrow' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+
+    session.dispose()
+    view.unmount()
+  })
+
+  it('updates a selected Arrow with one undoable command while preserving opacity, blend and legacy style', async () => {
+    window.localStorage.clear()
+    const session = arrowSession()
+    const view = render(EditorShell, {
+      props: { documentSession: markRaw(session) },
+      global: { plugins: [createEditorShellPinia()] },
+    })
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Arrow' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Show layers' }))
+    await fireEvent.click(
+      view.container.querySelector('.cs-layer-select') as HTMLButtonElement,
+    )
+    await fireEvent.click(screen.getByRole('button', { name: 'Stroke: 3 px' }))
+    await fireEvent.click(await screen.findByRole('button', { name: '4 px' }))
+
+    expect(session.snapshot.core.document.layers[0]).toMatchObject({
+      opacity: 0.4,
+      blendMode: 'screen',
+      payload: { stroke: { width: 4, style: 'dotted' } },
+    })
+    session.undo()
+    expect(session.snapshot.core.document.layers[0]).toMatchObject({
+      payload: { stroke: { width: 3, style: 'dotted' } },
+    })
+
+    await fireEvent.click(
+      screen.getByRole('button', { name: 'Geometry: Straight' }),
+    )
+    await fireEvent.click(await screen.findByRole('button', { name: 'Elbow' }))
+    expect(session.snapshot.core.document.layers[0]).toMatchObject({
+      opacity: 0.4,
+      blendMode: 'screen',
+      payload: {
+        path: 'elbow',
+        stroke: { width: 3, style: 'dotted' },
+      },
+    })
+    session.undo()
+    expect(session.snapshot.core.document.layers[0]).toMatchObject({
+      payload: { path: 'straight', stroke: { width: 3, style: 'dotted' } },
+    })
+
+    session.dispose()
+    view.unmount()
+  })
+
+  it('disables all Arrow controls for a selected locked layer and for a read-only document', async () => {
+    window.localStorage.clear()
+    const session = arrowSession(arrowDocument(true))
+    const view = render(EditorShell, {
+      props: { documentSession: markRaw(session) },
+      global: { plugins: [createEditorShellPinia()] },
+    })
+    await fireEvent.click(screen.getByRole('button', { name: 'Arrow' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Show layers' }))
+    await fireEvent.click(
+      view.container.querySelector('.cs-layer-select') as HTMLButtonElement,
+    )
+
+    expect(screen.getByRole('button', { name: 'Stroke: 3 px' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Tail: None' })).toBeDisabled()
+    expect(
+      screen.getByRole('button', { name: 'Geometry: Straight' }),
+    ).toBeDisabled()
+    expect(
+      screen.getByRole('button', { name: 'Head: Solid arrow' }),
+    ).toBeDisabled()
+
+    session.dispose()
+    view.unmount()
+    render(EditorShell, {
+      props: { fixture: 'ready', readOnlyDocument: true },
+      global: { plugins: [createEditorShellPinia()] },
+    })
+    await fireEvent.click(screen.getByRole('button', { name: 'Arrow' }))
+    expect(
+      await screen.findByRole('button', { name: 'Stroke: 3 px' }),
+    ).toBeDisabled()
+  })
+
+  it('localizes Arrow toolbar labels in Russian', async () => {
+    expect(t('ru', 'arrowStroke')).toBe('Линия')
+    expect(t('ru', 'arrowTail')).toBe('Хвост')
+    expect(t('ru', 'arrowGeometry')).toBe('Геометрия')
+    expect(t('ru', 'arrowHead')).toBe('Наконечник')
+  })
   it('shows a non-preset Fit percentage in the zoom preset control', async () => {
     render(ZoomControls, {
       props: {

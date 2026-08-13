@@ -1,4 +1,5 @@
 import { parseEditorDocument } from './document/codec'
+import { EDITOR_DOCUMENT_SCHEMA_VERSION } from './document/types'
 import type { EditorCommand } from './commands/types'
 import type {
   CalloutLayer,
@@ -533,7 +534,7 @@ export function decodeClipboardLayersV1(serialized: string): ClipboardLayersV1 {
       cloneLayer(stripTransientLayerFields(rawLayer) as LayerNode),
     )
     const parsed = parseEditorDocument({
-      schemaVersion: 5,
+      schemaVersion: EDITOR_DOCUMENT_SCHEMA_VERSION,
       id: '019c1f62-058e-7000-8000-000000000000',
       source: {
         blobHash: 'a'.repeat(64),

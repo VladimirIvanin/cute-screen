@@ -597,12 +597,120 @@ button:focus-visible {
   overflow-x: auto;
   scrollbar-width: thin;
 }
+.cs-context-toolbar--arrow .cs-context-controls {
+  min-width: 208px;
+}
 .cs-context-control {
   flex: none;
   padding: 5px 7px;
   border-radius: 5px;
   color: var(--text-muted);
   background: var(--surface-sunken);
+  font-size: 11px;
+}
+.cs-arrow-toolbar-control {
+  display: flex;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+}
+.cs-arrow-toolbar-trigger,
+.cs-color-more--compact {
+  display: inline-grid;
+  width: 36px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text);
+  background: var(--surface-sunken);
+  cursor: pointer;
+}
+.cs-arrow-toolbar-trigger:hover:not(:disabled),
+.cs-arrow-toolbar-trigger:focus-visible,
+.cs-color-more--compact:hover:not(:disabled),
+.cs-color-more--compact:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  outline: none;
+  background: var(--surface-hover);
+}
+.cs-arrow-toolbar-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.cs-arrow-toolbar-trigger svg {
+  width: 30px;
+  height: 20px;
+}
+.cs-arrow-toolbar-trigger > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.cs-color-more--compact {
+  width: 36px;
+  min-width: 36px;
+  height: 32px;
+  padding: 3px !important;
+}
+.cs-color-compact-swatch {
+  width: 21px;
+  height: 21px;
+  border: 1px solid color-mix(in srgb, var(--text) 35%, transparent);
+  border-radius: 5px;
+}
+.cs-arrow-toolbar-popover {
+  display: grid;
+  gap: 8px;
+  min-width: 176px;
+  padding: 8px;
+}
+.cs-arrow-toolbar-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.cs-arrow-toolbar-options button {
+  display: inline-flex;
+  min-width: 30px;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text);
+  background: var(--surface-sunken);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+}
+.cs-arrow-toolbar-options button:hover,
+.cs-arrow-toolbar-options button:focus-visible,
+.cs-arrow-toolbar-options button[aria-pressed='true'] {
+  border-color: var(--accent);
+  outline: none;
+  background: var(--accent-soft);
+}
+.cs-arrow-toolbar-options svg {
+  width: 34px;
+  height: 18px;
+}
+.cs-arrow-toolbar-options--caps button {
+  min-width: 72px;
+  padding: 4px 6px;
+}
+.cs-arrow-legacy-width {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 7px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-muted);
   font-size: 11px;
 }
 .cs-zoom-controls {

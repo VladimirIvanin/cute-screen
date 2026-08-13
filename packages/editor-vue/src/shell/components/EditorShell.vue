@@ -32,6 +32,7 @@ import { useEditorShellStore, type ShellStoreOptions } from '../store'
 import type { CaptureProgressState } from '../../platform'
 import type {
   CanvasViewportHosts,
+  ContextToolbarSchema,
   FrameSummary,
   ShellDocumentState,
   ShellActionAdapter,
@@ -58,8 +59,9 @@ import {
   defaultDrawingToolPreferences,
   DEFAULT_DRAWING_DEFAULTS,
   rememberDrawingColor,
+  rebaseArrowLayer,
   type DrawingDefaults,
-  type DrawingToolPreferencesV1,
+  type DrawingToolPreferencesV2,
   type BlendMode,
   type EditorDocumentV1,
   type EditorCommand,
@@ -529,7 +531,7 @@ function applyTextPreset(value: string): boolean {
 }
 const markerShape = ref<'circle' | 'square' | 'diamond' | 'star'>('circle')
 const contentImageImporting = ref(false)
-const drawingPreferences = shallowRef<DrawingToolPreferencesV1>(
+const drawingPreferences = shallowRef<DrawingToolPreferencesV2>(
   defaultDrawingToolPreferences(),
 )
 const samplingControl = ref<string>()
@@ -708,9 +710,10 @@ function selectedDrawingLayer(): DrawingLayerNode | undefined {
 function drawingControl(
   tool: 'arrow' | 'shape' | 'pencil' | 'marker',
   values: JsonObject = drawingDefaults.value[tool],
-) {
+): ContextToolbarSchema {
   const selected = selectedDrawingLayer()
-  const colorDisabled = selected?.kind === tool && selected.locked
+  const colorDisabled =
+    props.readOnlyDocument || (selected?.kind === tool && selected.locked)
   const stroke = values.stroke as Record<string, unknown> | undefined
   const color =
     tool === 'arrow' || tool === 'shape' ? stroke?.color : values.color
@@ -722,22 +725,107 @@ function drawingControl(
       : undefined
   const shapeFillKind =
     typeof shapeFill?.kind === 'string' ? shapeFill.kind : 'none'
+  if (tool === 'arrow') {
+    const capOptions = [
+      ['none', 'arrowNone'],
+      ['lineArrow', 'arrowLine'],
+      ['solidArrow', 'arrowSolidArrow'],
+      ['triangle', 'arrowTriangle'],
+      ['circle', 'arrowCircle'],
+      ['diamond', 'arrowDiamond'],
+    ].map(([value, key]) => ({
+      value: value as
+        'none' | 'lineArrow' | 'solidArrow' | 'triangle' | 'circle' | 'diamond',
+      label: translate(key as Parameters<typeof translate>[0]),
+    }))
+    return {
+      icon: 'arrow' as const,
+      title: translate('toolArrow'),
+      hint: translate('arrowHint'),
+      controls: [
+        {
+          kind: 'color' as const,
+          id: 'color',
+          label: translate('color'),
+          value: hexColor(color),
+          compact: true,
+          disabled: colorDisabled,
+          eyedropper: Boolean(activeDocument.value) && !colorDisabled,
+        },
+        {
+          kind: 'arrowStroke' as const,
+          id: 'stroke' as const,
+          label: translate('arrowStroke'),
+          width: typeof width === 'number' ? width : 3,
+          style:
+            stroke?.style === 'solid' || stroke?.style === 'dotted'
+              ? stroke.style
+              : 'dashed',
+          disabled: colorDisabled,
+          solidLabel: translate('arrowSolid'),
+          dashedLabel: translate('arrowDashed'),
+          dottedLabel: translate('arrowDotted'),
+        },
+        {
+          kind: 'arrowCap' as const,
+          id: 'startCap' as const,
+          label: translate('arrowTail'),
+          value: (typeof values.startCap === 'string'
+            ? values.startCap
+            : 'none') as
+            | 'none'
+            | 'lineArrow'
+            | 'solidArrow'
+            | 'triangle'
+            | 'circle'
+            | 'diamond',
+          disabled: colorDisabled,
+          options: capOptions,
+        },
+        {
+          kind: 'arrowPath' as const,
+          id: 'arrowPath' as const,
+          label: translate('arrowGeometry'),
+          value:
+            values.path === 'quadratic' || values.path === 'elbow'
+              ? values.path
+              : 'straight',
+          disabled: colorDisabled,
+          options: [
+            { value: 'straight' as const, label: translate('arrowStraight') },
+            { value: 'elbow' as const, label: translate('arrowElbow') },
+            { value: 'quadratic' as const, label: translate('arrowQuadratic') },
+          ],
+        },
+        {
+          kind: 'arrowCap' as const,
+          id: 'endCap' as const,
+          label: translate('arrowHead'),
+          value: (typeof values.endCap === 'string'
+            ? values.endCap
+            : 'solidArrow') as
+            | 'none'
+            | 'lineArrow'
+            | 'solidArrow'
+            | 'triangle'
+            | 'circle'
+            | 'diamond',
+          disabled: colorDisabled,
+          options: capOptions,
+        },
+      ],
+    }
+  }
   return {
-    icon:
-      tool === 'shape'
-        ? ('shape' as const)
-        : (tool as 'arrow' | 'pencil' | 'marker'),
+    icon: tool === 'shape' ? ('shape' as const) : (tool as 'pencil' | 'marker'),
     title: translate(
-      tool === 'arrow'
-        ? 'toolArrow'
-        : tool === 'shape'
-          ? 'toolShape'
-          : tool === 'pencil'
-            ? 'toolPencil'
-            : 'toolMarker',
+      tool === 'shape'
+        ? 'toolShape'
+        : tool === 'pencil'
+          ? 'toolPencil'
+          : 'toolMarker',
     ),
-    hint:
-      tool === 'arrow' ? translate('arrowHint') : translate('canvasViewport'),
+    hint: translate('canvasViewport'),
     controls: [
       {
         kind: 'color' as const,
@@ -795,40 +883,6 @@ function drawingControl(
           'hardLight',
         ].map((value) => ({ value, label: value })),
       },
-      ...(tool === 'arrow'
-        ? [
-            {
-              kind: 'select' as const,
-              id: 'arrowPath',
-              label: 'Path',
-              value: values.path === 'quadratic' ? 'quadratic' : 'straight',
-              options: [
-                { value: 'straight', label: 'Straight' },
-                { value: 'quadratic', label: 'Curved' },
-              ],
-            },
-            {
-              kind: 'select' as const,
-              id: 'startCap',
-              label: 'Start cap',
-              value:
-                typeof values.startCap === 'string' ? values.startCap : 'none',
-              options: ['none', 'chevron', 'triangle', 'circle'].map(
-                (value) => ({ value, label: value }),
-              ),
-            },
-            {
-              kind: 'select' as const,
-              id: 'endCap',
-              label: 'End cap',
-              value:
-                typeof values.endCap === 'string' ? values.endCap : 'triangle',
-              options: ['none', 'chevron', 'triangle', 'circle'].map(
-                (value) => ({ value, label: value }),
-              ),
-            },
-          ]
-        : []),
       ...(tool === 'shape'
         ? [
             {
@@ -1156,7 +1210,11 @@ const contextSchema = computed(() => {
     }
   }
   if (isDrawingTool(tool)) {
-    return drawingControl(tool)
+    const selected = selectedDrawingLayer()
+    return drawingControl(
+      tool,
+      selected?.kind === tool ? selected.payload : drawingDefaults.value[tool],
+    )
   }
   const selectedImage =
     tool === 'select'
@@ -1603,7 +1661,14 @@ function onContextChange(id: string, value: string): void {
     }
     return
   }
-  const selected = activeTool === 'select' ? selectedDrawingLayer() : undefined
+  const selectedCandidate = selectedDrawingLayer()
+  const selected = isDrawingTool(activeTool)
+    ? selectedCandidate?.kind === activeTool
+      ? selectedCandidate
+      : undefined
+    : activeTool === 'select'
+      ? selectedCandidate
+      : undefined
   const tool = isDrawingTool(activeTool)
     ? activeTool
     : selected && isDrawingTool(selected.kind)
@@ -1620,6 +1685,7 @@ function onContextChange(id: string, value: string): void {
       'arrowPath',
       'startCap',
       'endCap',
+      'strokeStyle',
       'brush',
       'markerMode',
       'layerOpacity',
@@ -1659,32 +1725,73 @@ function onContextChange(id: string, value: string): void {
       return
     payload = { ...current, shape: value }
   } else if (id === 'arrowPath') {
-    if (tool !== 'arrow' || (value !== 'straight' && value !== 'quadratic'))
+    if (
+      tool !== 'arrow' ||
+      (value !== 'straight' && value !== 'quadratic' && value !== 'elbow')
+    )
       return
+    const start = current.start as {
+      readonly x?: unknown
+      readonly y?: unknown
+    }
+    const end = current.end as { readonly x?: unknown; readonly y?: unknown }
+    const midpoint = {
+      x:
+        typeof start?.x === 'number' && typeof end?.x === 'number'
+          ? (start.x + end.x) / 2
+          : 0,
+      y:
+        typeof start?.y === 'number' && typeof end?.y === 'number'
+          ? (start.y + end.y) / 2
+          : 0,
+    }
+    const { bend: _bend, elbow: _elbow, ...pathIndependent } = current
+    void _bend
+    void _elbow
     payload =
       value === 'quadratic'
         ? {
-            ...current,
+            ...pathIndependent,
             path: value,
-            ...(selected && current.bend === undefined
-              ? {
-                  bend: {
-                    x: selected.localBounds
-                      ? selected.localBounds.width / 2
-                      : 0.5,
-                    y: selected.localBounds ? 0 : 0,
-                  },
-                }
-              : {}),
+            bend:
+              current.bend && typeof current.bend === 'object'
+                ? current.bend
+                : midpoint,
           }
-        : { ...current, path: value }
+        : value === 'elbow'
+          ? {
+              ...pathIndependent,
+              path: value,
+              elbow:
+                current.elbow && typeof current.elbow === 'object'
+                  ? current.elbow
+                  : { axis: 'y', offset: 0 },
+            }
+          : { ...pathIndependent, path: value }
   } else if (id === 'startCap' || id === 'endCap') {
     if (
       tool !== 'arrow' ||
-      !['none', 'chevron', 'triangle', 'circle'].includes(value)
+      ![
+        'none',
+        'lineArrow',
+        'solidArrow',
+        'triangle',
+        'circle',
+        'diamond',
+      ].includes(value)
     )
       return
     payload = { ...current, [id]: value }
+  } else if (id === 'strokeStyle') {
+    if (
+      tool !== 'arrow' ||
+      (value !== 'solid' && value !== 'dashed' && value !== 'dotted')
+    )
+      return
+    payload = {
+      ...current,
+      stroke: { ...(current.stroke as Record<string, unknown>), style: value },
+    }
   } else if (id === 'brush') {
     if (tool !== 'pencil' || !['pen', 'pencil', 'brush'].includes(value)) return
     payload = { ...current, brush: value }
@@ -1808,30 +1915,36 @@ function onContextChange(id: string, value: string): void {
   }
   if (selected) {
     if (!props.documentSession || selected.locked) return
+    let after: LayerNode = {
+      ...selected,
+      ...(id === 'layerOpacity'
+        ? { opacity: payload.layerOpacity as number }
+        : {}),
+      ...(id === 'blendMode'
+        ? {
+            blendMode:
+              payload.blendMode as import('@cute-screen/editor-renderer').BlendMode,
+          }
+        : {}),
+      ...(id === 'layerOpacity' || id === 'blendMode' ? {} : { payload }),
+      ...(id === 'markerMode'
+        ? {
+            blendMode:
+              value === 'darken' ? ('darken' as const) : ('multiply' as const),
+          }
+        : {}),
+    } as LayerNode
+    if (
+      selected.kind === 'arrow' &&
+      id !== 'layerOpacity' &&
+      id !== 'blendMode'
+    ) {
+      after = rebaseArrowLayer(selected, payload as typeof selected.payload)
+    }
     props.documentSession.execute({
       type: 'updateLayer',
       before: selected,
-      after: {
-        ...selected,
-        ...(id === 'layerOpacity'
-          ? { opacity: payload.layerOpacity as number }
-          : {}),
-        ...(id === 'blendMode'
-          ? {
-              blendMode:
-                payload.blendMode as import('@cute-screen/editor-renderer').BlendMode,
-            }
-          : {}),
-        ...(id === 'layerOpacity' || id === 'blendMode' ? {} : { payload }),
-        ...(id === 'markerMode'
-          ? {
-              blendMode:
-                value === 'darken'
-                  ? ('darken' as const)
-                  : ('multiply' as const),
-            }
-          : {}),
-      },
+      after,
     })
     return
   }
@@ -2606,7 +2719,7 @@ onMounted(() => {
     createBrowserTextStylePresetsStorage(browserStorage()).load()
   drawingPreferences.value = createBrowserDrawingToolPreferencesStorage(
     browserStorage(),
-  ).load() as DrawingToolPreferencesV1
+  ).load() as DrawingToolPreferencesV2
   drawingDefaults.value = drawingPreferences.value.defaults
   store.initialize(preferencesOptions)
   if (!props.documentSession) {

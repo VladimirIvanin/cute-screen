@@ -1,6 +1,8 @@
 import RBush from 'rbush'
 
 import type { EditorDocumentV1, JsonObject, Point } from './document/types'
+import type { ArrowLayerPayload } from './document/types'
+import { arrowCapSize, arrowPathPoints } from './arrow-geometry'
 import { invertMatrix, transformPoint, transformToMatrix } from './geometry'
 
 export type HitPart = 'fill' | 'handle' | 'stroke'
@@ -252,38 +254,22 @@ function drawingHitPart(
   const bounds = layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
   const strokeWidth = payloadStrokeWidth(payload)
   if (layer.kind === 'arrow') {
-    const start = payloadPoint(payload.start, { x: bounds.x, y: bounds.y })
-    const end = payloadPoint(payload.end, {
-      x: bounds.x + bounds.width,
-      y: bounds.y + bounds.height,
-    })
-    const bend =
-      payload.path === 'quadratic'
-        ? payloadPoint(payload.bend, { x: (start.x + end.x) / 2, y: start.y })
-        : undefined
-    const samples = bend
-      ? Array.from({ length: 17 }, (_, index) => {
-          const t = index / 16
-          const inverse = 1 - t
-          return {
-            x:
-              inverse * inverse * start.x +
-              2 * inverse * t * bend.x +
-              t * t * end.x,
-            y:
-              inverse * inverse * start.y +
-              2 * inverse * t * bend.y +
-              t * t * end.y,
-          }
-        })
-      : [start, end]
-    return samples
+    const arrow = payload as unknown as ArrowLayerPayload
+    const samples = arrowPathPoints(arrow)
+    const bodyHit = samples
       .slice(1)
       .some(
         (sample, index) =>
           pointToSegmentDistance(point, samples[index]!, sample) <=
           strokeWidth / 2,
       )
+    if (bodyHit) return 'stroke'
+    const capHit = (cap: ArrowLayerPayload['startCap'], anchor: Point) =>
+      cap !== 'none' &&
+      Math.hypot(point.x - anchor.x, point.y - anchor.y) <=
+        arrowCapSize(cap, strokeWidth)
+    return capHit(arrow.startCap, arrow.start) ||
+      capHit(arrow.endCap, arrow.end)
       ? 'stroke'
       : undefined
   }

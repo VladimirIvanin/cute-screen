@@ -5,6 +5,8 @@ import {
   DEFAULT_DRAWING_DEFAULTS,
   simplifySampledPoints,
 } from './drawing'
+import { arrowPathPoints } from './arrow-geometry'
+import type { ArrowLayer } from './document/types'
 
 const id = '019c1f62-058e-7000-8000-000000000010'
 
@@ -78,8 +80,8 @@ describe('M06 drawing factories', () => {
         arrow: {
           ...DEFAULT_DRAWING_DEFAULTS.arrow,
           path: 'quadratic',
-          startCap: 'triangle',
-          endCap: 'triangle',
+          startCap: 'solidArrow',
+          endCap: 'solidArrow',
         },
       },
     })
@@ -90,6 +92,37 @@ describe('M06 drawing factories', () => {
     expect(payload.bend.y).toBeGreaterThanOrEqual(0)
     expect(payload.bend.x).toBeGreaterThanOrEqual(0)
     expect(layer?.localBounds?.width).toBeGreaterThan(60)
+  })
+
+  it('creates a rebased three-segment elbow with unchanged world endpoints', () => {
+    const layer = createDrawingLayer({
+      id,
+      tool: 'arrow',
+      start: { x: 20, y: 30 },
+      end: { x: 100, y: 90 },
+      defaults: {
+        ...DEFAULT_DRAWING_DEFAULTS,
+        arrow: {
+          ...DEFAULT_DRAWING_DEFAULTS.arrow,
+          path: 'elbow',
+          elbow: { axis: 'y', offset: 0 },
+          startCap: 'circle',
+          endCap: 'diamond',
+        },
+      },
+    }) as ArrowLayer
+
+    const points = arrowPathPoints(layer.payload)
+    expect(points).toHaveLength(4)
+    expect({
+      x: layer.transform.translateX + layer.payload.start.x,
+      y: layer.transform.translateY + layer.payload.start.y,
+    }).toEqual({ x: 20, y: 30 })
+    expect({
+      x: layer.transform.translateX + layer.payload.end.x,
+      y: layer.transform.translateY + layer.payload.end.y,
+    }).toEqual({ x: 100, y: 90 })
+    expect(points[1]!.x).toBe(points[2]!.x)
   })
 
   it('uses a square local geometry for Shift-constrained shapes', () => {

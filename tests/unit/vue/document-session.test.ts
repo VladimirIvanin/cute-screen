@@ -5,7 +5,10 @@ import {
   DocumentSessionCoordinator,
 } from '@cute-screen/editor-vue'
 import {
+  createDrawingLayer,
+  defaultDrawingToolPreferences,
   parseEditorDocument,
+  parseDrawingToolPreferences,
   serializeEditorDocument,
   type EditorDocumentV1,
 } from '@cute-screen/editor-renderer'
@@ -98,6 +101,62 @@ describe('M03 document persistence session', () => {
     expect(serializeEditorDocument(session.snapshot.core.document)).toBe(
       saved.documentJson,
     )
+    vi.useRealTimers()
+  })
+
+  it('autosaves a serializable Arrow created from recovered corrupt preferences', async () => {
+    vi.useFakeTimers()
+    const fallback = defaultDrawingToolPreferences().defaults.arrow
+    const fallbackStroke = fallback.stroke as Record<string, unknown>
+    const preferences = parseDrawingToolPreferences({
+      schemaVersion: 2,
+      defaults: {
+        arrow: {
+          ...fallback,
+          path: 'elbow',
+          elbow: { axis: 'z', offset: Number.NaN },
+          stroke: {
+            ...fallbackStroke,
+            width: 0,
+            style: 'zigzag',
+            color: { red: 2, green: 0, blue: 0, alpha: 1 },
+          },
+        },
+      },
+      recentColors: [],
+    })
+    const arrow = createDrawingLayer({
+      id: '019c1f62-058e-7000-8000-0000000000f2',
+      tool: 'arrow',
+      start: { x: 10, y: 10 },
+      end: { x: 80, y: 40 },
+      defaults: preferences.defaults,
+    })
+    if (!arrow) throw new Error('expected recovered Arrow')
+    const saveDocument = vi.fn(
+      async (record: { readonly documentJson: string }) => {
+        expect(parseEditorDocument(record.documentJson)).toMatchObject({
+          kind: 'editable',
+        })
+        return 2
+      },
+    )
+    const session = new DocumentSessionController({
+      document,
+      revision: 1,
+      bridge: {
+        saveDocument,
+        exportRecoveryBundle: async () => ({ kind: 'saved' }),
+      },
+      correlationId: () => 'recovered-arrow-autosave',
+    })
+
+    session.execute({ type: 'addLayer', layer: arrow })
+    await vi.advanceTimersByTimeAsync(500)
+
+    expect(saveDocument).toHaveBeenCalledTimes(1)
+    expect(session.snapshot.saveState).toBe('saved')
+    session.dispose()
     vi.useRealTimers()
   })
 

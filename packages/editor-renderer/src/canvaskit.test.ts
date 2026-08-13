@@ -88,6 +88,49 @@ describe('CanvasKit headless renderer', () => {
     expect([decoded.width, decoded.height]).toEqual([64, 64])
   })
 
+  it('continues an arrow dash phase through an elbow corner', async () => {
+    const canvasKit = (await CanvasKitInit({
+      locateFile: () =>
+        path.resolve(
+          process.cwd(),
+          'packages/editor-renderer/node_modules/canvaskit-wasm/bin/canvaskit.wasm',
+        ),
+    })) as import('./canvaskit').CanvasKitApi
+    const png = renderHeadlessCanvasKitPng(
+      canvasKit,
+      createRenderSceneSnapshot({
+        width: 40,
+        height: 40,
+        nodes: [
+          {
+            kind: 'path',
+            id: 'arrow:body',
+            points: [
+              { x: 8, y: 8 },
+              { x: 16, y: 8 },
+              { x: 16, y: 32 },
+            ],
+            rotation: 0,
+            opacity: 1,
+            visible: true,
+            stroke: { red: 1, green: 0, blue: 0, alpha: 1 },
+            strokeWidth: 2,
+            lineCap: 'butt',
+            lineJoin: 'round',
+            dash: [8, 4],
+          },
+        ],
+      }),
+    )
+    const decoded = await loadImage(png)
+    const canvas = createCanvas(decoded.width, decoded.height)
+    const context = canvas.getContext('2d')
+    context.drawImage(decoded, 0, 0)
+
+    expect(context.getImageData(16, 10, 1, 1).data[3]).toBe(0)
+    expect(context.getImageData(16, 14, 1, 1).data[3]).toBeGreaterThan(0)
+  })
+
   it('creates a software surface and returns decoded PNG bytes', async () => {
     const canvasKit = (await CanvasKitInit({
       locateFile: () =>

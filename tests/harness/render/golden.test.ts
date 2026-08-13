@@ -1,6 +1,12 @@
 import { createCanvas, loadImage } from '@napi-rs/canvas'
 import {
+  createDocumentRenderScene,
   createRenderSceneSnapshot,
+  parseEditorDocument,
+  serializeEditorDocument,
+  type ArrowCap,
+  type ArrowLayer,
+  type EditorDocumentV1,
   type RenderSceneSnapshot,
 } from '@cute-screen/editor-core'
 import {
@@ -82,19 +88,17 @@ function scene(dpr: 1 | 2) {
   })
 }
 
-async function canvas2dPng(
+async function canvas2dPngs(
   snapshot: RenderSceneSnapshot,
   dpr: 1 | 2,
-): Promise<Uint8Array> {
+): Promise<Readonly<{ preview: Uint8Array; exported: Uint8Array }>> {
+  const sceneCanvas = createCanvas(snapshot.width, snapshot.height)
   const renderer = new Canvas2DRenderer({
     exportCanvas: (width, height) =>
       createCanvas(width, height) as unknown as Canvas2DLike,
   })
   await renderer.initialize({
-    scene: createCanvas(
-      snapshot.width,
-      snapshot.height,
-    ) as unknown as HTMLCanvasElement,
+    scene: sceneCanvas as unknown as HTMLCanvasElement,
     overlay: createCanvas(
       snapshot.width,
       snapshot.height,
@@ -103,9 +107,177 @@ async function canvas2dPng(
     correlationId: `golden-canvas2d-dpr-${dpr}`,
   })
   renderer.setScene(snapshot)
-  const png = await renderer.exportPng()
+  renderer.render(['scene'])
+  const preview = await sceneCanvas.encode('png')
+  const exported = await renderer.exportPng()
   renderer.dispose()
-  return png
+  return { preview, exported }
+}
+
+const arrowCaps = [
+  'none',
+  'lineArrow',
+  'solidArrow',
+  'triangle',
+  'circle',
+  'diamond',
+] as const satisfies readonly ArrowCap[]
+
+function persistedArrowScene(
+  route: 'straight' | 'quadratic' | 'elbow',
+): RenderSceneSnapshot {
+  const layers: ArrowLayer[] = []
+  for (const [styleIndex, style] of ['solid', 'dashed'].entries()) {
+    for (const [capIndex, cap] of arrowCaps.entries()) {
+      const row = styleIndex * arrowCaps.length + capIndex
+      const y = 24 + row * 30
+      const start = { x: 24, y }
+      const end = { x: 312, y: route === 'elbow' ? y + 12 : y }
+      layers.push({
+        id: `019c1f62-058e-7000-8000-${(row + 1).toString().padStart(12, '0')}`,
+        kind: 'arrow',
+        localBounds: { x: 0, y: 0, width: 336, height: 390 },
+        transform: {
+          translateX: 0,
+          translateY: 0,
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+        },
+        opacity: 1,
+        visible: true,
+        locked: false,
+        blendMode: 'normal',
+        shadows: [],
+        payload: {
+          path: route,
+          start,
+          end,
+          ...(route === 'quadratic' ? { bend: { x: 168, y: y - 12 } } : {}),
+          ...(route === 'elbow'
+            ? {
+                elbow: { axis: 'y' as const, offset: row % 2 === 0 ? -18 : 18 },
+              }
+            : {}),
+          stroke: {
+            color: { red: 0.12, green: 0.45, blue: 0.88, alpha: 1 },
+            width: 3,
+            style: style as 'solid' | 'dashed',
+            cap: 'round',
+            join: 'round',
+          },
+          startCap: cap,
+          endCap: cap,
+        },
+      })
+    }
+  }
+  const document: EditorDocumentV1 = {
+    schemaVersion: 6,
+    id: '019c1f62-058e-7000-8000-000000000600',
+    source: {
+      blobHash: 'a'.repeat(64),
+      format: 'png',
+      mimeType: 'image/png',
+      width: 360,
+      height: 390,
+      orientationApplied: true,
+      color: { colorSpace: 'srgb', hasIccProfile: false },
+    },
+    canvas: { width: 360, height: 390 },
+    crop: null,
+    layers,
+    presentation: {
+      beautify: { enabled: false },
+      watermark: { enabled: false },
+    },
+    createdAt: '2026-08-13T00:00:00.000Z',
+    updatedAt: '2026-08-13T00:00:00.000Z',
+  }
+  const parsed = parseEditorDocument(serializeEditorDocument(document))
+  if (parsed.kind !== 'editable')
+    throw new Error('arrow golden must be editable')
+  return createDocumentRenderScene(parsed.document)
+}
+
+function curvedStartCapRepairScene(): RenderSceneSnapshot {
+  const arrow: ArrowLayer = {
+    id: '019c1f62-058e-7000-8000-000000000613',
+    kind: 'arrow',
+    localBounds: { x: 0, y: 0, width: 360, height: 140 },
+    transform: {
+      translateX: 0,
+      translateY: 0,
+      rotation: 0,
+      scaleX: 1,
+      scaleY: 1,
+    },
+    opacity: 1,
+    visible: true,
+    locked: false,
+    blendMode: 'normal',
+    shadows: [],
+    payload: {
+      path: 'quadratic',
+      start: { x: 32, y: 28 },
+      end: { x: 328, y: 110 },
+      bend: { x: 76, y: 102 },
+      stroke: {
+        color: { red: 1, green: 0.78, blue: 0.23, alpha: 1 },
+        width: 6,
+        style: 'solid',
+        cap: 'round',
+        join: 'round',
+      },
+      startCap: 'solidArrow',
+      endCap: 'solidArrow',
+    },
+  }
+  const document: EditorDocumentV1 = {
+    schemaVersion: 6,
+    id: '019c1f62-058e-7000-8000-000000000614',
+    source: {
+      blobHash: 'b'.repeat(64),
+      format: 'png',
+      mimeType: 'image/png',
+      width: 360,
+      height: 140,
+      orientationApplied: true,
+      color: { colorSpace: 'srgb', hasIccProfile: false },
+    },
+    canvas: { width: 360, height: 140 },
+    crop: null,
+    layers: [arrow],
+    presentation: {
+      beautify: { enabled: false },
+      watermark: { enabled: false },
+    },
+    createdAt: '2026-08-14T00:00:00.000Z',
+    updatedAt: '2026-08-14T00:00:00.000Z',
+  }
+  const parsed = parseEditorDocument(serializeEditorDocument(document))
+  if (parsed.kind !== 'editable')
+    throw new Error('curved start-cap repair golden must be editable')
+  const arrowScene = createDocumentRenderScene(parsed.document)
+  return createRenderSceneSnapshot({
+    width: arrowScene.width,
+    height: arrowScene.height,
+    nodes: [
+      {
+        kind: 'rect',
+        id: 'repair-background',
+        x: 0,
+        y: 0,
+        width: arrowScene.width,
+        height: arrowScene.height,
+        rotation: 0,
+        opacity: 1,
+        visible: true,
+        fill: { red: 0.055, green: 0.063, blue: 0.075, alpha: 1 },
+      },
+      ...arrowScene.nodes,
+    ],
+  })
 }
 
 async function rgba(png: Uint8Array): Promise<Uint8Array> {
@@ -167,13 +339,20 @@ describe('renderer golden harness self-test', () => {
   for (const dpr of [1, 2] as const) {
     it(`matches CanvasKit and Canvas2D goldens at DPR ${dpr}`, async () => {
       const canvasKitPng = renderHeadlessCanvasKitPng(canvasKit, scene(dpr))
-      const fallbackPng = await canvas2dPng(scene(dpr), dpr)
+      const fallback = await canvas2dPngs(scene(dpr), dpr)
       await assertGolden(`canvaskit-dpr-${dpr}`, canvasKitPng)
-      await assertGolden(`canvas2d-dpr-${dpr}`, fallbackPng)
+      await assertGolden(`canvas2d-dpr-${dpr}`, fallback.exported)
+
+      expect(
+        compareRgba(
+          await rgba(fallback.preview),
+          await rgba(fallback.exported),
+        ),
+      ).toEqual({ changedChannels: 0, maximumDelta: 0 })
 
       const difference = compareRgba(
         await rgba(canvasKitPng),
-        await rgba(fallbackPng),
+        await rgba(fallback.exported),
       )
       expect(
         difference.changedChannels / (scene(dpr).width * scene(dpr).height * 4),
@@ -208,14 +387,14 @@ describe('renderer golden harness self-test', () => {
         ],
       })
       const canvasKitPng = renderHeadlessCanvasKitPng(canvasKit, snapshot)
-      const fallbackPng = await canvas2dPng(snapshot, dpr)
+      const fallback = await canvas2dPngs(snapshot, dpr)
       const canvasKitBounds = alphaBounds(
         await rgba(canvasKitPng),
         snapshot.width,
         snapshot.height,
       )
       const canvas2dBounds = alphaBounds(
-        await rgba(fallbackPng),
+        await rgba(fallback.exported),
         snapshot.width,
         snapshot.height,
       )
@@ -233,6 +412,63 @@ describe('renderer golden harness self-test', () => {
       ).toBeLessThanOrEqual(1)
     })
   }
+
+  for (const route of ['straight', 'quadratic', 'elbow'] as const) {
+    it(`matches persisted ${route} arrow goldens for solid/dashed bodies and every endpoint`, async () => {
+      const snapshot = persistedArrowScene(route)
+      const canvasKitPng = renderHeadlessCanvasKitPng(canvasKit, snapshot)
+      const fallback = await canvas2dPngs(snapshot, 1)
+
+      await assertGolden(`arrow-${route}-canvaskit`, canvasKitPng)
+      await assertGolden(`arrow-${route}-canvas2d`, fallback.exported)
+      expect(
+        compareRgba(
+          await rgba(fallback.preview),
+          await rgba(fallback.exported),
+        ),
+      ).toEqual({ changedChannels: 0, maximumDelta: 0 })
+
+      const difference = compareRgba(
+        await rgba(canvasKitPng),
+        await rgba(fallback.exported),
+      )
+      expect(
+        difference.changedChannels / (snapshot.width * snapshot.height * 4),
+      ).toBeLessThanOrEqual(semanticParityTolerance.maximumChangedChannelRatio)
+      expect(difference.maximumDelta).toBeLessThanOrEqual(
+        semanticParityTolerance.maximumDelta,
+      )
+    })
+  }
+
+  it('matches the repaired curved left solid-cap golden', async () => {
+    const snapshot = curvedStartCapRepairScene()
+    const canvasKitPng = renderHeadlessCanvasKitPng(canvasKit, snapshot)
+    const fallback = await canvas2dPngs(snapshot, 1)
+
+    await assertGolden(
+      'arrow-quadratic-start-cap-repair-canvaskit',
+      canvasKitPng,
+    )
+    await assertGolden(
+      'arrow-quadratic-start-cap-repair-canvas2d',
+      fallback.exported,
+    )
+    expect(
+      compareRgba(await rgba(fallback.preview), await rgba(fallback.exported)),
+    ).toEqual({ changedChannels: 0, maximumDelta: 0 })
+
+    const difference = compareRgba(
+      await rgba(canvasKitPng),
+      await rgba(fallback.exported),
+    )
+    expect(
+      difference.changedChannels / (snapshot.width * snapshot.height * 4),
+    ).toBeLessThanOrEqual(semanticParityTolerance.maximumChangedChannelRatio)
+    expect(difference.maximumDelta).toBeLessThanOrEqual(
+      semanticParityTolerance.maximumDelta,
+    )
+  })
 
   it('rejects the deterministic corrupted PNG fixture', async () => {
     await expect(

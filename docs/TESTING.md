@@ -82,6 +82,92 @@ M02 shell и M06 drawing specs; M05 spec остаётся failed из-за 0.2 p
 `.github/workflows/ci.yml`, `.github/workflows/reference-perf.yml` и
 `.prettierrc.json`.
 
+### Arrow v6, Windows x64, 2026-08-13
+
+На Windows 10 Home 22H2 build 19045, x86_64, Node `22.23.1`, pnpm `10.33.2`
+и Rust `1.97.0` выполнен persisted arrow/rendering slice. Focused Vitest
+(`arrow-geometry`, drawing preferences/factory, codec, scene, hit-test,
+CanvasViewport, Canvas2D и CanvasKit) прошёл 92/92; `pnpm test` прошёл 197/197,
+`pnpm test:render` — 6/6, `cargo test --workspace` — 77 passed и один
+interactive Windows test ignored, `pnpm test:boundaries` — 7/7, `pnpm
+docs:check` и `pnpm check:rust` прошли.
+
+`pnpm check` успешно завершил lint, package/Vue/e2e typecheck и production Vue
+build, затем остановился на repository-wide `prettier . --check`: 18
+существующих tracked files не соответствуют текущему formatter, включая
+workflow/config, unrelated Vue/platform/license files и long-table
+`docs/TRACEABILITY.md`. Все изменённые TS/Vue-файлы этого slice отдельно прошли
+scoped Prettier check; форматирование unrelated files не выполнялось.
+
+### Arrow integration evidence, Windows x64, 2026-08-13
+
+На Windows 10 Home 22H2 build 19045, x86_64, Node `22.23.1`, pnpm
+`10.33.2`, Chrome `151.0.7922.109` и Rust `1.97.0` выполнена integration/
+evidence-проверка arrow scope. Прямой render-harness прогон сначала дал
+ожидаемые 3 failures из 9 из-за отсутствующих arrow PNG. После явного update
+через PowerShell environment `CUTE_SCREEN_UPDATE_GOLDENS=1` focused suite и
+стабильный `pnpm test:render` прошли 9/9. Шесть новых PNG покрывают persisted
+straight/quadratic/elbow, solid/dashed и одинаковый complete endpoint set на
+обоих концах: `none`, `lineArrow`, `solidArrow`, `triangle`, `circle`,
+`diamond`. Harness декодирует PNG в RGBA, требует точного совпадения Canvas2D
+preview/export и проверяет CanvasKit/Canvas2D по зафиксированному semantic
+tolerance.
+
+Все шесть PNG просмотрены в native resolution 360×390: в каждом видны 12
+необрезанных строк (шесть solid и шесть dashed), все endpoint glyphs на обоих
+концах, непрерывные quadratic/elbow body и согласованный CanvasKit/Canvas2D
+результат. Проверка не ограничивалась существованием файлов.
+
+Focused `browser-m06-drawing-tools.e2e.ts` прошёл 9/9, полный
+`pnpm test:e2e:browser` — 5/5 specs и 27 scenarios. Chrome проверил пять
+наблюдаемых controls без toolbar/document overflow на 1600×1000, 1280×720 и
+1024×700 во всех сочетаниях RU/EN и light/dark; screenshots записаны в
+`artifacts/browser-e2e/arrow-toolbar-*.png`. Тем же pointer flow подтверждены
+active-tool persistence, отсутствие auto-selection, elbow middle-segment drag
+одной command и undo/redo. `pnpm test` прошёл 206/206; `cargo test --workspace`
+— 77 passed и один interactive Windows desktop test ignored.
+
+`pnpm test:e2e:tauri` собрал debug/test-harness binary и обнаружил WebView2
+runtime `151.0.4129.78`, но остался red: embedded WebDriver server не открыл
+port 4445 за 60 секунд во всех 11 scenarios, включая прежние foundation и
+renderer. Ни `tauri-arrow.e2e.ts`, ни M03 arrow write/reopen не начали test
+body, поэтому WebView2 arrow и native persisted-reopen не считаются runtime
+evidence. Логи: `artifacts/tauri-e2e/wdio*.log`; app-data failed scenarios
+runner намеренно сохранил во временных каталогах.
+
+Финальный `pnpm check` прошёл lint, полный TypeScript/Vue/E2E typecheck и
+production Vue build, затем ожидаемо остановился на `prettier . --check`:
+17 pre-existing unrelated files (workflow/config, `docs/BUILD_RELEASE.md`,
+platform/font/license/store files и их tests) остаются неформатированными.
+Scoped Prettier check всех файлов этого integration slice прошёл. Поскольку
+aggregate не дошёл до последующих стадий, отдельно успешно выполнены
+`pnpm docs:check`, `pnpm test:boundaries` (7/7) и `pnpm check:rust` (все четыре
+Clippy/fmt конфигурации).
+
+### Arrow repair, Windows x64, 2026-08-14
+
+На Windows 10 Home 22H2 build 19045, AMD64, Node `22.23.1` и pnpm `10.33.2`
+после repair selected-toolbar, rebased toolbar mutations и corrupt drawing
+preferences focused core/Vue suite прошёл 77/77, а первый полный `pnpm test` —
+220/220.
+
+Отдельная user-reported repair для левого filled cap на заметно изогнутой
+quadratic Arrow воспроизведена semantic scene-тестом: до исправления центр
+основания cap расходился с trimmed body на 2,39 px, а две стороны closed cap —
+примерно на 3 px. После использования общей trim-point и направления
+anchor→trim join в scene объединённый focused core/renderer/Vue suite прошёл
+114/114, `pnpm test:render` — 10/10, а повторный полный `pnpm test` — 221/221.
+Новые Canvas2D и CanvasKit PNG визуально проверены; стык тела с жёлтым start cap
+чистый и симметричный, endpoint styles и единый dashed path сохранены.
+
+`pnpm typecheck` с production Vue build и полный `pnpm lint` прошли; scoped
+Prettier для изменённых repair TS/Vue-файлов, `TESTING.md` и `ACCEPTANCE.md`, а
+также `git diff --check` прошли. Полный Prettier-check `TRACEABILITY.md` по-прежнему
+показывает существующее форматирование большой таблицы; файл не переформатирован
+целиком вне scope.
+Browser и Tauri suites не перезапускались, поэтому новых runtime-утверждений
+этот repair не добавляет.
+
 ## Правило user-action
 
 Acceptance criterion формулируется наблюдаемым результатом:

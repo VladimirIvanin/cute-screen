@@ -4,6 +4,7 @@ import {
   DocumentSpatialIndex,
   hitTestDocument,
   hitTestDocumentAll,
+  rebaseArrowLayer,
   type EditorDocumentV1,
 } from './index'
 
@@ -36,9 +37,7 @@ function layer(id: string, overrides: Record<string, unknown> = {}) {
     ...overrides,
   }
 }
-function document(
-  layers: readonly ReturnType<typeof layer>[],
-): EditorDocumentV1 {
+function document(layers: EditorDocumentV1['layers']): EditorDocumentV1 {
   return {
     schemaVersion: 2,
     id: '019c1f62-058e-7000-8000-000000000000',
@@ -163,5 +162,85 @@ describe('M05 hit testing', () => {
       part: 'fill',
     })
     expect(hitTestDocument(document([star]), { x: 4, y: 4 })).toBeUndefined()
+  })
+
+  it('hit-tests all three segments of an elbow through shared path points', () => {
+    const elbow: EditorDocumentV1['layers'][number] = {
+      id: 'elbow',
+      kind: 'arrow' as const,
+      localBounds: { x: 0, y: 0, width: 100, height: 100 },
+      transform,
+      opacity: 1,
+      visible: true,
+      locked: false,
+      payload: {
+        path: 'elbow',
+        start: { x: 10, y: 10 },
+        end: { x: 90, y: 90 },
+        elbow: { axis: 'y', offset: -10 },
+        startCap: 'none',
+        endCap: 'solidArrow',
+        stroke: {
+          color: { red: 1, green: 0, blue: 0, alpha: 1 },
+          width: 4,
+          style: 'dashed',
+          cap: 'round',
+          join: 'round',
+        },
+      },
+    }
+
+    for (const point of [
+      { x: 25, y: 10 },
+      { x: 40, y: 50 },
+      { x: 70, y: 90 },
+    ]) {
+      expect(hitTestDocument(document([elbow]), point)).toMatchObject({
+        nodeId: 'elbow',
+        part: 'stroke',
+      })
+    }
+    expect(hitTestDocument(document([elbow]), { x: 70, y: 50 })).toBeUndefined()
+  })
+
+  it('hits a 10 px Arrow cap outside its previous local bounds after rebasing', () => {
+    const before: Extract<
+      EditorDocumentV1['layers'][number],
+      { kind: 'arrow' }
+    > = {
+      id: 'wide-cap',
+      kind: 'arrow',
+      localBounds: { x: 0, y: 0, width: 60, height: 20 },
+      transform: { ...transform, translateX: 10, translateY: 10 },
+      opacity: 1,
+      visible: true,
+      locked: false,
+      payload: {
+        path: 'straight',
+        start: { x: 0, y: 0 },
+        end: { x: 60, y: 20 },
+        startCap: 'none',
+        endCap: 'solidArrow',
+        stroke: {
+          color: { red: 1, green: 0, blue: 0, alpha: 1 },
+          width: 3,
+          style: 'solid',
+          cap: 'round',
+          join: 'round',
+        },
+      },
+    }
+    const after = rebaseArrowLayer(before, {
+      ...before.payload,
+      stroke: { ...before.payload.stroke, width: 10 },
+    })
+
+    expect(
+      hitTestDocument(document([before]), { x: 95, y: 30 }),
+    ).toBeUndefined()
+    expect(hitTestDocument(document([after]), { x: 95, y: 30 })).toMatchObject({
+      nodeId: 'wide-cap',
+      part: 'stroke',
+    })
   })
 })

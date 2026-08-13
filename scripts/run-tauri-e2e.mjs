@@ -25,6 +25,11 @@ const scenarios = [
     harnessQuery: '?m02=ready',
   },
   {
+    id: 'arrow',
+    spec: 'tests/e2e/specs/tauri-arrow.e2e.ts',
+    harnessQuery: '?m05=1',
+  },
+  {
     id: 'm05-viewport',
     spec: 'tests/e2e/specs/tauri-m05-viewport.e2e.ts',
     harnessQuery: '?m05=1&m05viewport=1',

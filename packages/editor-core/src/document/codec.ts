@@ -1,6 +1,7 @@
 import { collectExtras, freezeJsonObject, readJsonObject } from './json'
 import {
   DEFAULT_PRESENTATION_SETTINGS,
+  ARROW_CAPS,
   BLEND_MODES,
   EDITOR_DOCUMENT_SCHEMA_VERSION,
   LAYER_KINDS,
@@ -83,7 +84,7 @@ function defaultDrawingPayload(
         end: { x: width, y: height },
         stroke: defaultStroke(),
         startCap: 'none',
-        endCap: 'triangle',
+        endCap: 'solidArrow',
       }
     case 'shape':
       return {
@@ -993,20 +994,17 @@ function parseFill(value: unknown, field: string): JsonObject {
 
 function parseArrowPayload(value: unknown, field: string): ArrowLayerPayload {
   const input = readJsonObject(value, field)
-  if (input.path !== 'straight' && input.path !== 'quadratic') {
+  if (
+    input.path !== 'straight' &&
+    input.path !== 'quadratic' &&
+    input.path !== 'elbow'
+  ) {
     throw new Error(`${field}.path is invalid`)
   }
-  const parseCap = (
-    value: unknown,
-    cap: string,
-  ): 'none' | 'chevron' | 'triangle' | 'circle' => {
-    if (
-      value === 'none' ||
-      value === 'chevron' ||
-      value === 'triangle' ||
-      value === 'circle'
-    )
-      return value
+  const parseCap = (value: unknown, cap: string) => {
+    if (ARROW_CAPS.includes(value as (typeof ARROW_CAPS)[number])) {
+      return value as (typeof ARROW_CAPS)[number]
+    }
     throw new Error(`${field}.${cap} is invalid`)
   }
   const startCap = parseCap(input.startCap, 'startCap')
@@ -1014,6 +1012,25 @@ function parseArrowPayload(value: unknown, field: string): ArrowLayerPayload {
   if (input.path === 'quadratic' && input.bend === undefined) {
     throw new Error(`${field}.bend is required for a quadratic path`)
   }
+  if (input.path === 'elbow' && input.elbow === undefined) {
+    throw new Error(`${field}.elbow is required for an elbow path`)
+  }
+  if (input.text !== undefined || input.label !== undefined) {
+    throw new Error(`${field} connector text is not supported`)
+  }
+  const elbow =
+    input.path === 'elbow'
+      ? (() => {
+          const route = readJsonObject(input.elbow, `${field}.elbow`)
+          if (route.axis !== 'x' && route.axis !== 'y') {
+            throw new Error(`${field}.elbow.axis is invalid`)
+          }
+          return Object.freeze({
+            axis: route.axis,
+            offset: readFiniteNumber(route.offset, `${field}.elbow.offset`),
+          })
+        })()
+      : undefined
   return Object.freeze({
     path: input.path,
     start: parsePointPayload(
@@ -1024,7 +1041,7 @@ function parseArrowPayload(value: unknown, field: string): ArrowLayerPayload {
       input.end,
       `${field}.end`,
     ) as ArrowLayerPayload['end'],
-    ...(input.bend === undefined
+    ...(input.path !== 'quadratic'
       ? {}
       : {
           bend: parsePointPayload(
@@ -1032,6 +1049,7 @@ function parseArrowPayload(value: unknown, field: string): ArrowLayerPayload {
             `${field}.bend`,
           ) as ArrowLayerPayload['start'],
         }),
+    ...(elbow === undefined ? {} : { elbow }),
     stroke: parseStroke(
       input.stroke,
       `${field}.stroke`,
@@ -1348,6 +1366,33 @@ function migrateV4ToV5(raw: Record<string, unknown>): Record<string, unknown> {
   return { ...raw, schemaVersion: 5 }
 }
 
+function migrateV5ToV6(raw: Record<string, unknown>): Record<string, unknown> {
+  const layers = Array.isArray(raw.layers) ? raw.layers : []
+  const migrateCap = (value: unknown): unknown =>
+    value === 'chevron'
+      ? 'lineArrow'
+      : value === 'triangle'
+        ? 'solidArrow'
+        : value
+  return {
+    ...raw,
+    schemaVersion: 6,
+    layers: layers.map((layer) => {
+      const input = readJsonObject(layer, 'layer')
+      if (input.kind !== 'arrow') return input
+      const payload = readJsonObject(input.payload, 'layer.payload')
+      return {
+        ...input,
+        payload: {
+          ...payload,
+          startCap: migrateCap(payload.startCap),
+          endCap: migrateCap(payload.endCap),
+        },
+      }
+    }),
+  }
+}
+
 function migrateV0ToV1(raw: Record<string, unknown>): Record<string, unknown> {
   return {
     ...raw,
@@ -1365,7 +1410,8 @@ function migrateToCurrent(
   const v2 = schemaVersion < 2 ? migrateV1ToV2(v1) : v1
   const v3 = schemaVersion < 3 ? migrateV2ToV3(v2) : v2
   const v4 = schemaVersion < 4 ? migrateV3ToV4(v3) : v3
-  return schemaVersion < 5 ? migrateV4ToV5(v4) : v4
+  const v5 = schemaVersion < 5 ? migrateV4ToV5(v4) : v4
+  return schemaVersion < 6 ? migrateV5ToV6(v5) : v5
 }
 
 function documentToJson(document: EditorDocumentV1): JsonObject {

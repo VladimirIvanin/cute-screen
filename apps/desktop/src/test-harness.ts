@@ -1,5 +1,6 @@
 import '@wdio/tauri-plugin'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import type { EditorDocumentV1 } from '@cute-screen/editor-vue'
 
 declare global {
   interface Window {
@@ -11,7 +12,13 @@ declare global {
     }
     __cuteScreenE2eDocument?: {
       setCrop(): void
-      snapshot(): { crop: unknown; saveState: string } | undefined
+      snapshot():
+        | {
+            crop: unknown
+            layers: EditorDocumentV1['layers']
+            saveState: string
+          }
+        | undefined
     }
   }
 }

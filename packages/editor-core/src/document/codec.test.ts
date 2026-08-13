@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 import {
+  createDocumentRenderScene,
   parseEditorDocument,
   serializeEditorDocument,
   type EditorDocumentV1,
@@ -81,7 +82,7 @@ describe('editor document codec', () => {
     const migrated = parseEditorDocument(JSON.stringify(raw))
     if (migrated.kind !== 'editable') throw new Error('expected editable')
 
-    expect(migrated.document.schemaVersion).toBe(5)
+    expect(migrated.document.schemaVersion).toBe(6)
     expect(migrated.document.source.provenance).toBe('capture')
 
     const text = {
@@ -172,7 +173,7 @@ describe('editor document codec', () => {
     ]
     const parsed = parseEditorDocument(JSON.stringify(raw))
     if (parsed.kind !== 'editable') throw new Error('expected editable')
-    expect(parsed.document.schemaVersion).toBe(5)
+    expect(parsed.document.schemaVersion).toBe(6)
     const content = (
       parsed.document.layers[0] as Extract<LayerNode, { kind: 'text' }>
     ).payload.content
@@ -183,6 +184,178 @@ describe('editor document codec', () => {
         color: { red: 1, green: 0, blue: 0, alpha: 1 },
       },
     ])
+  })
+
+  it('migrates v5 arrow caps without changing legacy visual fields', () => {
+    const raw = JSON.parse(serializeEditorDocument(document)) as Record<
+      string,
+      unknown
+    >
+    raw.schemaVersion = 5
+    raw.layers = [
+      {
+        ...layer,
+        kind: 'arrow',
+        localBounds: { x: 0, y: 0, width: 96, height: 48 },
+        opacity: 0.42,
+        blendMode: 'overlay',
+        payload: {
+          path: 'quadratic',
+          start: { x: 8, y: 32 },
+          end: { x: 88, y: 32 },
+          bend: { x: 48, y: 8 },
+          stroke: {
+            color: { red: 0.1, green: 0.2, blue: 0.3, alpha: 0.8 },
+            width: 3,
+            style: 'dotted',
+            cap: 'round',
+            join: 'round',
+          },
+          startCap: 'chevron',
+          endCap: 'triangle',
+        },
+      },
+    ]
+
+    const migrated = parseEditorDocument(JSON.stringify(raw))
+    if (migrated.kind !== 'editable') throw new Error('expected editable')
+    expect(migrated.document.schemaVersion).toBe(6)
+    expect(migrated.document.layers[0]).toMatchObject({
+      kind: 'arrow',
+      localBounds: { x: 0, y: 0, width: 96, height: 48 },
+      opacity: 0.42,
+      blendMode: 'overlay',
+      payload: {
+        path: 'quadratic',
+        start: { x: 8, y: 32 },
+        end: { x: 88, y: 32 },
+        bend: { x: 48, y: 8 },
+        stroke: { width: 3, style: 'dotted' },
+        startCap: 'lineArrow',
+        endCap: 'solidArrow',
+      },
+    })
+    const scene = createDocumentRenderScene(migrated.document)
+    expect(scene.nodes.map((node) => node.kind)).toEqual([
+      'path',
+      'path',
+      'polygon',
+    ])
+    expect(scene.nodes[0]).toMatchObject({
+      id: `${layer.id}:body`,
+      strokeWidth: 3,
+      dash: [3, 6],
+      opacity: 0.42,
+      blendMode: 'overlay',
+    })
+    expect(scene.nodes[1]).toMatchObject({
+      id: `${layer.id}:start-cap`,
+      kind: 'path',
+    })
+    expect(scene.nodes[2]).toMatchObject({
+      id: `${layer.id}:end-cap`,
+      kind: 'polygon',
+    })
+    expect(
+      parseEditorDocument(serializeEditorDocument(migrated.document)),
+    ).toEqual(migrated)
+  })
+
+  it('round-trips every arrow path and endpoint type', () => {
+    const caps = [
+      'none',
+      'lineArrow',
+      'solidArrow',
+      'triangle',
+      'circle',
+      'diamond',
+    ] as const
+    const raw = JSON.parse(serializeEditorDocument(document)) as Record<
+      string,
+      unknown
+    >
+    raw.layers = caps.map((cap, index) => ({
+      ...layer,
+      id: `019c1f62-058e-7000-8000-0000000001${String(index).padStart(2, '0')}`,
+      kind: 'arrow',
+      localBounds: { x: 0, y: 0, width: 80, height: 40 },
+      payload: {
+        path:
+          index % 3 === 0
+            ? 'straight'
+            : index % 3 === 1
+              ? 'quadratic'
+              : 'elbow',
+        start: { x: 4, y: 20 },
+        end: { x: 76, y: 20 },
+        ...(index % 3 === 1 ? { bend: { x: 40, y: 4 } } : {}),
+        ...(index % 3 === 2
+          ? { elbow: { axis: index % 2 === 0 ? 'x' : 'y', offset: 20 } }
+          : {}),
+        stroke: {
+          color: { red: 1, green: 0, blue: 0, alpha: 1 },
+          width: 3,
+          style: index % 2 === 0 ? 'solid' : 'dashed',
+          cap: 'round',
+          join: 'round',
+        },
+        startCap: cap,
+        endCap: caps.at(-(index + 1)),
+      },
+    }))
+
+    const parsed = parseEditorDocument(JSON.stringify(raw))
+    expect(parsed).toMatchObject({ kind: 'editable' })
+    if (parsed.kind !== 'editable') throw new Error('expected editable')
+    expect(
+      parseEditorDocument(serializeEditorDocument(parsed.document)),
+    ).toEqual(parsed)
+  })
+
+  it('rejects malformed path-specific arrow data', () => {
+    const candidate = JSON.parse(serializeEditorDocument(document)) as {
+      layers: Array<Record<string, unknown>>
+    }
+    const arrow = {
+      ...layer,
+      kind: 'arrow',
+      localBounds: { x: 0, y: 0, width: 80, height: 40 },
+      payload: {
+        path: 'quadratic',
+        start: { x: 4, y: 20 },
+        end: { x: 76, y: 20 },
+        stroke: {
+          color: { red: 1, green: 0, blue: 0, alpha: 1 },
+          width: 3,
+          style: 'solid',
+          cap: 'round',
+          join: 'round',
+        },
+        startCap: 'none',
+        endCap: 'solidArrow',
+      },
+    }
+    candidate.layers = [arrow]
+    expect(() => parseEditorDocument(JSON.stringify(candidate))).toThrow(
+      /bend is required/u,
+    )
+
+    ;(arrow.payload as Record<string, unknown>).path = 'elbow'
+    expect(() => parseEditorDocument(JSON.stringify(candidate))).toThrow(
+      /elbow is required/u,
+    )
+    ;(arrow.payload as Record<string, unknown>).elbow = {
+      axis: 'z',
+      offset: Number.NaN,
+    }
+    expect(() => parseEditorDocument(JSON.stringify(candidate))).toThrow(
+      /elbow/u,
+    )
+    ;(arrow.payload as Record<string, unknown>).path = 'straight'
+    ;(arrow.payload as Record<string, unknown>).startCap = 'chevron'
+    expect(() => parseEditorDocument(JSON.stringify(candidate))).toThrow(
+      /startCap/u,
+    )
   })
 
   it('deeply freezes nested payload values', () => {
@@ -300,7 +473,7 @@ describe('editor document codec', () => {
     expect(
       JSON.parse(serializeEditorDocument(migrated.document)),
     ).toMatchObject({
-      schemaVersion: 5,
+      schemaVersion: 6,
       layers: [
         {
           kind: 'image',
@@ -317,15 +490,15 @@ describe('editor document codec', () => {
     expect(
       JSON.parse(serializeEditorDocument(futureFields.document)),
     ).toMatchObject({
-      schemaVersion: 5,
+      schemaVersion: 6,
       futureDocumentField: { preserved: true },
     })
 
     expect(
-      parseEditorDocument(JSON.stringify({ schemaVersion: 6 })),
+      parseEditorDocument(JSON.stringify({ schemaVersion: 7 })),
     ).toMatchObject({
       kind: 'readOnly',
-      schemaVersion: 6,
+      schemaVersion: 7,
     })
   })
 })

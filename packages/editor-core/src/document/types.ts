@@ -1,5 +1,5 @@
-/** M08 adds portable per-range typography without serialising editor DOM. */
-export const EDITOR_DOCUMENT_SCHEMA_VERSION = 5 as const
+/** v6 persists compact straight/quadratic/elbow arrows and independent endpoints. */
+export const EDITOR_DOCUMENT_SCHEMA_VERSION = 6 as const
 
 export type JsonPrimitive = string | number | boolean | null
 export type JsonValue = JsonPrimitive | readonly JsonValue[] | JsonObject
@@ -303,14 +303,31 @@ export interface EmojiPayload extends JsonObject {
 }
 
 export interface ArrowLayerPayload extends JsonObject {
-  readonly path: 'straight' | 'quadratic'
+  readonly path: 'straight' | 'quadratic' | 'elbow'
   readonly start: Point & JsonObject
   readonly end: Point & JsonObject
   readonly bend?: Point & JsonObject
+  readonly elbow?: Readonly<{
+    readonly axis: 'x' | 'y'
+    /** Signed displacement of the middle segment from the endpoint midpoint. */
+    readonly offset: number
+  }> &
+    JsonObject
   readonly stroke: StrokeStyle
-  readonly startCap: 'none' | 'chevron' | 'triangle' | 'circle'
-  readonly endCap: 'none' | 'chevron' | 'triangle' | 'circle'
+  readonly startCap: ArrowCap
+  readonly endCap: ArrowCap
 }
+
+export const ARROW_CAPS = [
+  'none',
+  'lineArrow',
+  'solidArrow',
+  'triangle',
+  'circle',
+  'diamond',
+] as const
+
+export type ArrowCap = (typeof ARROW_CAPS)[number]
 
 export interface ShapeLayerPayload extends JsonObject {
   readonly shape: 'rectangle' | 'circle' | 'oval' | 'diamond' | 'star'
@@ -336,8 +353,8 @@ export interface MarkerLayerPayload extends JsonObject {
   readonly smoothing: number
 }
 
-/** Payload-specific contracts are validated by the v4 codec; legacy aliases stay broad for migration input. */
-export type ArrowLayer = LayerBase<'arrow', JsonObject>
+/** Payload-specific contracts are validated by the current codec. */
+export type ArrowLayer = LayerBase<'arrow', ArrowLayerPayload>
 export type ShapeLayer = LayerBase<'shape', JsonObject>
 export type PencilLayer = LayerBase<'pencil', JsonObject>
 export type MarkerLayer = LayerBase<'marker', JsonObject>
@@ -371,7 +388,8 @@ export type LayerNode =
 
 export interface EditorDocumentV1 {
   /** Compatibility input type; parsed documents always use the current schema. */
-  readonly schemaVersion: 1 | 2 | 3 | 4 | typeof EDITOR_DOCUMENT_SCHEMA_VERSION
+  readonly schemaVersion:
+    1 | 2 | 3 | 4 | 5 | typeof EDITOR_DOCUMENT_SCHEMA_VERSION
   readonly id: string
   readonly source: SourceImageRef
   readonly canvas: Readonly<{ width: number; height: number }>
@@ -423,6 +441,19 @@ export interface EditorDocumentV5 extends Omit<
   EditorDocumentV1,
   'schemaVersion' | 'layers'
 > {
+  readonly schemaVersion: 5
+  readonly layers: readonly (LayerNode &
+    Readonly<{
+      readonly localBounds: Rect
+      readonly blendMode: BlendMode
+      readonly shadows: readonly ShadowStyle[]
+    }>)[]
+}
+
+export interface EditorDocumentV6 extends Omit<
+  EditorDocumentV1,
+  'schemaVersion' | 'layers'
+> {
   readonly schemaVersion: typeof EDITOR_DOCUMENT_SCHEMA_VERSION
   readonly layers: readonly (LayerNode &
     Readonly<{
@@ -433,7 +464,7 @@ export interface EditorDocumentV5 extends Omit<
 }
 
 /** Current editable document contract. */
-export type EditorDocument = EditorDocumentV5
+export type EditorDocument = EditorDocumentV6
 
 export type ParsedEditorDocument =
   | Readonly<{ kind: 'editable'; document: EditorDocumentV1 }>

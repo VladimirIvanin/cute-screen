@@ -21,8 +21,15 @@ const props = withDefaults(
     disabled?: boolean
     eyedropper?: boolean
     locale?: 'en' | 'ru'
+    compact?: boolean
   }>(),
-  { recentColors: () => [], disabled: false, eyedropper: true, locale: 'en' },
+  {
+    recentColors: () => [],
+    disabled: false,
+    eyedropper: true,
+    locale: 'en',
+    compact: false,
+  },
 )
 const emit = defineEmits<{
   commit: [value: string]
@@ -177,17 +184,19 @@ function requestEyedropper(): void {
 <template>
   <div class="cs-ui-color-picker">
     <div class="cs-color-quick" :aria-label="ariaLabel">
-      <button
-        v-for="color in quickColors"
-        :key="color"
-        class="cs-color-swatch"
-        :class="{ 'is-active': color === draft }"
-        type="button"
-        :style="{ backgroundColor: color }"
-        :aria-label="`${ariaLabel}: ${color}`"
-        :disabled="disabled"
-        @click="choose(color)"
-      />
+      <template v-if="!compact">
+        <button
+          v-for="color in quickColors"
+          :key="color"
+          class="cs-color-swatch"
+          :class="{ 'is-active': color === draft }"
+          type="button"
+          :style="{ backgroundColor: color }"
+          :aria-label="`${ariaLabel}: ${color}`"
+          :disabled="disabled"
+          @click="choose(color)"
+        />
+      </template>
       <NPopover
         v-model:show="shown"
         trigger="click"
@@ -200,14 +209,22 @@ function requestEyedropper(): void {
           <NButton
             ref="trigger"
             class="cs-color-more"
+            :class="{ 'cs-color-more--compact': compact }"
             quaternary
             circle
             :disabled="disabled"
-            :aria-label="ariaLabel"
+            :aria-label="compact ? `${ariaLabel}: ${draft}` : ariaLabel"
+            :title="compact ? `${ariaLabel}: ${draft}` : ariaLabel"
             :aria-expanded="shown"
             aria-haspopup="dialog"
           >
-            <span aria-hidden="true">+</span>
+            <span
+              v-if="compact"
+              class="cs-color-compact-swatch"
+              :style="{ backgroundColor: draft }"
+              aria-hidden="true"
+            />
+            <span v-else aria-hidden="true">+</span>
           </NButton>
         </template>
         <section

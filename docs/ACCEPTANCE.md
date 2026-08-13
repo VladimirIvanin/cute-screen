@@ -120,9 +120,34 @@ drag opacity и изменить rotation: каждый завершённый c
 ## A06 — Drawing tools
 
 Current status: partial implementation. Chrome 150/Linux browser evidence covers
-the M06 pointer and gradient-default flows (2026-08-10); the scenario remains
-pending until the M05 performance gate, Tauri renderer evidence and paint/parity
-matrix are recorded.
+the M06 pointer and gradient-default flows (2026-08-10). Windows 10 x64 focused
+evidence (2026-08-13) covers the v6/v2 persisted arrow engine: v5/v1 migration,
+straight/quadratic/three-segment elbow routes, independent endpoint styles,
+continuous solid/dashed/dotted-legacy bodies, rebased bounds, hit testing and
+one-command endpoint/bend/middle-segment edits. Chrome 151/Windows browser
+evidence additionally covers the five-control compact toolbar without overflow
+at 1600×1000, 1280×720 and 1024×700 for RU/EN and light/dark, active-tool
+persistence, no auto-selection, elbow middle-segment drag and undo/redo. Six
+visually reviewed renderer goldens cover all three paths, both body styles and
+the complete endpoint set; decoded Canvas2D preview/export is exact and
+CanvasKit/Canvas2D stays within the documented semantic tolerance. Real Tauri
+WebView2 and native persisted-reopen evidence remain pending because the
+2026-08-13 embedded driver did not open port 4445; M05 performance gate and the
+remaining non-arrow paint/parity matrix are also pending.
+
+Windows 10 x64 repair evidence (2026-08-14) additionally covers selected Arrow
+values diverging from active-tool defaults, 10 px/cap bounds and hit testing
+outside the old bounds, one-command undo/reopen, and recoverable corrupt v1/v2
+preferences through autosave. This evidence is core/Vue only: browser and Tauri
+were not rerun.
+
+The separate user-reported curved Arrow repair covers a yellow quadratic Arrow
+with filled caps: the trimmed body starts at the center of the left cap base,
+and the cap direction is symmetric around the actual anchor-to-trim join instead
+of the mismatched first sample. The semantic scene regression and visually
+inspected Canvas2D/CanvasKit goldens pass; endpoint styles and continuous dashed
+body rendering are unchanged. This is renderer-harness evidence, not a new
+browser or Tauri claim.
 
 Проверить arrow/line, curved anchors, shapes, radius, solid/linear/radial
 gradient, pattern/texture fill, fill/layer opacity, shape blend modes, pencil
@@ -133,6 +158,13 @@ brushes и marker blend modes. Для каждого инструмента:
 - active tool сохраняется;
 - итог соответствует renderer golden;
 - изменение настройки undoable.
+
+Для arrow отдельно открыть migrated v5 document и v1 drawing preferences,
+проверить `chevron → lineArrow`, `triangle → solidArrow`, неизменные width 3,
+dotted, opacity/blend и world endpoints. Создать straight, quadratic и elbow,
+перетащить start/end, bend и elbow middle-segment handle; до pointer-up document
+не меняется, pointer-up создаёт ровно одну update command. Connector text не
+должен приниматься document codec.
 
 ## A07 — Text/content/clipboard
 

@@ -91,6 +91,47 @@ describe('Canvas2DRenderer', () => {
     ).toBeGreaterThan(0)
   })
 
+  it('continues an arrow dash phase through an elbow corner', async () => {
+    const renderer = new Canvas2DRenderer()
+    const sceneCanvas = createCanvas(40, 40)
+    await renderer.initialize({
+      scene: asHtmlCanvas(sceneCanvas),
+      overlay: asHtmlCanvas(createCanvas(40, 40)),
+      dpr: 1,
+      correlationId: 'dashed-elbow',
+    })
+    renderer.setScene(
+      createRenderSceneSnapshot({
+        width: 40,
+        height: 40,
+        nodes: [
+          {
+            kind: 'path',
+            id: 'arrow:body',
+            points: [
+              { x: 8, y: 8 },
+              { x: 16, y: 8 },
+              { x: 16, y: 32 },
+            ],
+            rotation: 0,
+            opacity: 1,
+            visible: true,
+            stroke: { red: 1, green: 0, blue: 0, alpha: 1 },
+            strokeWidth: 2,
+            lineCap: 'butt',
+            lineJoin: 'round',
+            dash: [8, 4],
+          },
+        ],
+      }),
+    )
+
+    renderer.render(['scene'])
+    const context = sceneCanvas.getContext('2d')!
+    expect(context.getImageData(16, 10, 1, 1).data[3]).toBe(0)
+    expect(context.getImageData(16, 14, 1, 1).data[3]).toBeGreaterThan(0)
+  })
+
   it('renders and exports binary PNG without a continuous loop', async () => {
     let time = 10
     const renderer = new Canvas2DRenderer({

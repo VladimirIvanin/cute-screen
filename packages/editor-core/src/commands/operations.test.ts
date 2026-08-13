@@ -56,7 +56,7 @@ function layer(id: keyof typeof IDS, locked = false): LayerNode {
 
 function document(layers: readonly LayerNode[]): EditorDocumentV1 {
   return {
-    schemaVersion: 5,
+    schemaVersion: 6,
     id: DOCUMENT_ID,
     source: {
       blobHash: 'a'.repeat(64),

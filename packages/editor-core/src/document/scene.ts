@@ -4,7 +4,19 @@ import {
   type RenderPaint,
   type RgbaColor,
 } from '../render-scene'
-import type { EditorDocumentV1, JsonObject, LayerNode } from './types'
+import {
+  arrowCapSize,
+  arrowEndpointAngles,
+  arrowPathPoints,
+  trimArrowBodyPoints,
+} from '../arrow-geometry'
+import type {
+  ArrowCap,
+  ArrowLayerPayload,
+  EditorDocumentV1,
+  JsonObject,
+  LayerNode,
+} from './types'
 
 const TRANSPARENT: RgbaColor = Object.freeze({
   red: 0,
@@ -231,27 +243,63 @@ function lineNode(
   }
 }
 
+function pathNode(
+  layer: LayerNode,
+  id: string,
+  points: readonly { readonly x: number; readonly y: number }[],
+  style: ReturnType<typeof stroke>,
+): RenderNode {
+  return {
+    kind: 'path',
+    id,
+    points: points.map((point) => ({
+      x: layer.transform.translateX + point.x,
+      y: layer.transform.translateY + point.y,
+    })),
+    rotation: layer.transform.rotation,
+    opacity: layer.opacity,
+    visible: layer.visible,
+    blendMode: layer.blendMode ?? 'normal',
+    stroke: style.color,
+    strokeWidth: style.width,
+    lineCap: style.cap,
+    lineJoin: style.join,
+    ...(style.dash === undefined ? {} : { dash: style.dash }),
+  }
+}
+
 function arrowCapNodes(
   layer: LayerNode,
   id: string,
   point: { readonly x: number; readonly y: number },
   angle: number,
-  cap: unknown,
+  cap: ArrowCap,
   style: ReturnType<typeof stroke>,
+  bodyJoin?: { readonly x: number; readonly y: number },
 ): readonly RenderNode[] {
   if (cap === 'none') return []
   const anchor = {
     x: layer.transform.translateX + point.x,
     y: layer.transform.translateY + point.y,
   }
-  const size = Math.max(style.width * 3, 8)
+  const size = arrowCapSize(cap, style.width)
+  const behind =
+    bodyJoin && (cap === 'solidArrow' || cap === 'triangle')
+      ? {
+          x: layer.transform.translateX + bodyJoin.x,
+          y: layer.transform.translateY + bodyJoin.y,
+        }
+      : {
+          x: anchor.x - Math.cos(angle) * size,
+          y: anchor.y - Math.sin(angle) * size,
+        }
+  const capAngle =
+    bodyJoin && (cap === 'solidArrow' || cap === 'triangle')
+      ? Math.atan2(anchor.y - behind.y, anchor.x - behind.x)
+      : angle
   const perpendicular = {
-    x: Math.cos(angle + Math.PI / 2),
-    y: Math.sin(angle + Math.PI / 2),
-  }
-  const behind = {
-    x: anchor.x - Math.cos(angle) * size,
-    y: anchor.y - Math.sin(angle) * size,
+    x: Math.cos(capAngle + Math.PI / 2),
+    y: Math.sin(capAngle + Math.PI / 2),
   }
   const left = {
     x: behind.x + perpendicular.x * size * 0.55,
@@ -284,13 +332,58 @@ function arrowCapNodes(
       },
     ]
   }
-  if (cap === 'triangle') {
+  if (cap === 'solidArrow' || cap === 'triangle') {
     return [
       {
         ...common,
         kind: 'polygon' as const,
         id,
         points: [anchor, left, right],
+        fill: cap === 'solidArrow' ? style.color : TRANSPARENT,
+        stroke: style.color,
+        strokeWidth:
+          cap === 'solidArrow' ? Math.max(1, style.width / 2) : style.width,
+        lineJoin: style.join,
+      },
+    ]
+  }
+  if (cap === 'lineArrow') {
+    return [
+      {
+        ...common,
+        kind: 'path' as const,
+        id,
+        points: [left, anchor, right],
+        stroke: style.color,
+        strokeWidth: style.width,
+        lineCap: style.cap,
+        lineJoin: style.join,
+      },
+    ]
+  }
+  if (cap === 'diamond') {
+    const forward = {
+      x: anchor.x + Math.cos(angle) * size * 0.65,
+      y: anchor.y + Math.sin(angle) * size * 0.65,
+    }
+    const back = {
+      x: anchor.x - Math.cos(angle) * size * 0.65,
+      y: anchor.y - Math.sin(angle) * size * 0.65,
+    }
+    const diamondLeft = {
+      x: anchor.x + perpendicular.x * size * 0.55,
+      y: anchor.y + perpendicular.y * size * 0.55,
+    }
+    const diamondRight = {
+      x: anchor.x - perpendicular.x * size * 0.55,
+      y: anchor.y - perpendicular.y * size * 0.55,
+    }
+    return [
+      {
+        ...common,
+        kind: 'polygon' as const,
+        id,
+        points: [forward, diamondLeft, back, diamondRight],
         fill: style.color,
         stroke: style.color,
         strokeWidth: Math.max(1, style.width / 2),
@@ -298,204 +391,44 @@ function arrowCapNodes(
       },
     ]
   }
-  if (cap === 'chevron') {
-    return [
-      {
-        ...common,
-        kind: 'line' as const,
-        id: `${id}:left`,
-        x1: left.x,
-        y1: left.y,
-        x2: anchor.x,
-        y2: anchor.y,
-        stroke: style.color,
-        strokeWidth: style.width,
-        lineCap: style.cap,
-        lineJoin: style.join,
-      },
-      {
-        ...common,
-        kind: 'line' as const,
-        id: `${id}:right`,
-        x1: right.x,
-        y1: right.y,
-        x2: anchor.x,
-        y2: anchor.y,
-        stroke: style.color,
-        strokeWidth: style.width,
-        lineCap: style.cap,
-        lineJoin: style.join,
-      },
-    ]
-  }
   return []
-}
-
-function triangleCapInset(
-  cap: unknown,
-  style: ReturnType<typeof stroke>,
-): number {
-  return cap === 'triangle' ? Math.max(style.width * 3, 8) : 0
-}
-
-function trimArrowBodyPoints(
-  points: readonly { readonly x: number; readonly y: number }[],
-  startCap: unknown,
-  endCap: unknown,
-  style: ReturnType<typeof stroke>,
-): readonly { readonly x: number; readonly y: number }[] {
-  const startInset = triangleCapInset(startCap, style)
-  const endInset = triangleCapInset(endCap, style)
-  if ((startInset === 0 && endInset === 0) || points.length < 2) return points
-
-  const segmentLengths = points
-    .slice(1)
-    .map((point, index) =>
-      Math.hypot(point.x - points[index]!.x, point.y - points[index]!.y),
-    )
-  const totalLength = segmentLengths.reduce(
-    (total, length) => total + length,
-    0,
-  )
-  if (totalLength === 0) return []
-
-  const insetScale = Math.min(
-    1,
-    totalLength / Math.max(startInset + endInset, 1),
-  )
-  const bodyStart = startInset * insetScale
-  const bodyEnd = totalLength - endInset * insetScale
-  if (bodyEnd - bodyStart <= Number.EPSILON) return []
-
-  const pointAtDistance = (distance: number) => {
-    let travelled = 0
-    for (let index = 0; index < segmentLengths.length; index += 1) {
-      const segmentLength = segmentLengths[index]!
-      if (segmentLength === 0) continue
-      if (distance <= travelled + segmentLength) {
-        const start = points[index]!
-        const end = points[index + 1]!
-        const ratio = (distance - travelled) / segmentLength
-        return {
-          x: start.x + (end.x - start.x) * ratio,
-          y: start.y + (end.y - start.y) * ratio,
-        }
-      }
-      travelled += segmentLength
-    }
-    return points.at(-1)!
-  }
-
-  const body = [pointAtDistance(bodyStart)]
-  let travelled = 0
-  for (let index = 0; index < segmentLengths.length - 1; index += 1) {
-    travelled += segmentLengths[index]!
-    if (travelled > bodyStart && travelled < bodyEnd)
-      body.push(points[index + 1]!)
-  }
-  body.push(pointAtDistance(bodyEnd))
-  return body
 }
 
 function drawingNodes(layer: LayerNode): readonly RenderNode[] {
   const payload = layer.payload as JsonObject
   const localBounds = bounds(layer)
   if (layer.kind === 'arrow') {
-    const style = stroke(payload.stroke)
-    const start = localPoint(payload.start, { x: 0, y: 0 })
-    const end = localPoint(payload.end, {
-      x: localBounds.width,
-      y: localBounds.height,
-    })
-    if (payload.path !== 'quadratic') {
-      const angle = Math.atan2(end.y - start.y, end.x - start.x)
-      const bodyPoints = trimArrowBodyPoints(
-        [start, end],
-        payload.startCap,
-        payload.endCap,
-        style,
-      )
-      return [
-        ...(bodyPoints.length >= 2
-          ? [
-              lineNode(
-                layer,
-                `${layer.id}:body`,
-                bodyPoints[0]!,
-                bodyPoints.at(-1)!,
-                style,
-              ),
-            ]
-          : []),
-        ...arrowCapNodes(
-          layer,
-          `${layer.id}:start-cap`,
-          start,
-          angle + Math.PI,
-          payload.startCap,
-          style,
-        ),
-        ...arrowCapNodes(
-          layer,
-          `${layer.id}:end-cap`,
-          end,
-          angle,
-          payload.endCap,
-          style,
-        ),
-      ]
-    }
-    const bend = localPoint(payload.bend, { x: localBounds.width / 2, y: 0 })
-    const points = Array.from({ length: 17 }, (_, index) => {
-      const t = index / 16
-      const inverse = 1 - t
-      return {
-        x:
-          inverse * inverse * start.x +
-          2 * inverse * t * bend.x +
-          t * t * end.x,
-        y:
-          inverse * inverse * start.y +
-          2 * inverse * t * bend.y +
-          t * t * end.y,
-      }
-    })
+    const arrow = payload as unknown as ArrowLayerPayload
+    const style = stroke(arrow.stroke)
+    const points = arrowPathPoints(arrow)
     const bodyPoints = trimArrowBodyPoints(
       points,
-      payload.startCap,
-      payload.endCap,
-      style,
+      arrow.startCap,
+      arrow.endCap,
+      style.width,
     )
-    const body = bodyPoints
-      .slice(1)
-      .map((point, index) =>
-        lineNode(
-          layer,
-          `${layer.id}:curve:${index}`,
-          bodyPoints[index]!,
-          point,
-          style,
-        ),
-      )
-    const startAngle = Math.atan2(bend.y - start.y, bend.x - start.x)
-    const endAngle = Math.atan2(end.y - bend.y, end.x - bend.x)
+    const angles = arrowEndpointAngles(points)
     return [
-      ...body,
+      ...(bodyPoints.length >= 2
+        ? [pathNode(layer, `${layer.id}:body`, bodyPoints, style)]
+        : []),
       ...arrowCapNodes(
         layer,
         `${layer.id}:start-cap`,
-        start,
-        startAngle + Math.PI,
-        payload.startCap,
+        arrow.start,
+        angles.start,
+        arrow.startCap,
         style,
+        bodyPoints[0],
       ),
       ...arrowCapNodes(
         layer,
         `${layer.id}:end-cap`,
-        end,
-        endAngle,
-        payload.endCap,
+        arrow.end,
+        angles.end,
+        arrow.endCap,
         style,
+        bodyPoints.at(-1),
       ),
     ]
   }

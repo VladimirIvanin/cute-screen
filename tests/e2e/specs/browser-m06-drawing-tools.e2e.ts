@@ -1,4 +1,5 @@
-import { $, browser, expect } from '@wdio/globals'
+import { $, $$, browser, expect } from '@wdio/globals'
+import path from 'node:path'
 
 type HarnessSnapshot = {
   readonly layers: readonly {
@@ -6,6 +7,10 @@ type HarnessSnapshot = {
     readonly kind: string
     readonly opacity: number
     readonly blendMode?: string
+    readonly transform?: {
+      readonly translateX: number
+      readonly translateY: number
+    }
     readonly payload?: Record<string, unknown>
   }[]
 }
@@ -79,7 +84,187 @@ async function chooseOption(
   await control.waitForExist()
 }
 
+async function setShellPreferences(
+  locale: 'en' | 'ru',
+  theme: 'light' | 'dark',
+): Promise<void> {
+  const currentLocale = await browser.execute(
+    () => document.documentElement.lang,
+  )
+  if (currentLocale !== locale) {
+    await $(
+      `button[aria-label="${currentLocale === 'ru' ? 'Другие действия' : 'More actions'}"]`,
+    ).click()
+    await $(`button=${locale === 'ru' ? 'RU' : 'EN'}`).click()
+  }
+  const currentTheme = await browser.execute(
+    () => document.documentElement.dataset.theme,
+  )
+  if (currentTheme !== theme) {
+    await $(
+      `button[aria-label="${locale === 'ru' ? 'Другие действия' : 'More actions'}"]`,
+    ).click()
+    await $(
+      `button=${
+        locale === 'ru'
+          ? theme === 'light'
+            ? 'Светлая'
+            : 'Тёмная'
+          : theme === 'light'
+            ? 'Light'
+            : 'Dark'
+      }`,
+    ).click()
+  }
+  await browser.waitUntil(
+    async () =>
+      (await browser.execute(() => document.documentElement.lang)) === locale &&
+      (await browser.execute(() => document.documentElement.dataset.theme)) ===
+        theme,
+  )
+}
+
+async function chooseArrowPopover(
+  control: 'arrowPath',
+  option: 'Elbow',
+): Promise<void> {
+  await $(`[data-control="${control}"] .cs-arrow-toolbar-trigger`).click()
+  await $(`button=${option}`).click()
+}
+
+async function arrowHandleViewportPoint(
+  arrow: HarnessSnapshot['layers'][number],
+): Promise<Readonly<{ x: number; y: number }>> {
+  const payload = arrow.payload
+  const start = payload?.start as { x: number; y: number }
+  const end = payload?.end as { x: number; y: number }
+  const transform = arrow.transform as
+    { translateX: number; translateY: number } | undefined
+  const elbow = payload?.elbow as { axis: 'x' | 'y'; offset: number }
+  const midpoint = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 }
+  const local =
+    elbow.axis === 'x'
+      ? { x: midpoint.x, y: midpoint.y + elbow.offset }
+      : { x: midpoint.x + elbow.offset, y: midpoint.y }
+  return browser.execute(
+    ({ x, y, translateX, translateY }) => {
+      const scene = document.querySelector<HTMLCanvasElement>(
+        '.cs-canvas:not(.cs-canvas-overlay)',
+      )
+      if (!scene) throw new Error('Scene canvas is missing')
+      const bounds = scene.getBoundingClientRect()
+      return {
+        x: Math.round(
+          bounds.left + ((translateX + x) / scene.width) * bounds.width,
+        ),
+        y: Math.round(
+          bounds.top + ((translateY + y) / scene.height) * bounds.height,
+        ),
+      }
+    },
+    {
+      x: local.x,
+      y: local.y,
+      translateX: transform?.translateX ?? 0,
+      translateY: transform?.translateY ?? 0,
+    },
+  )
+}
+
 describe('M06 drawing tools in browser mode', () => {
+  it('shows all five arrow controls without toolbar overflow across the supported UI matrix', async () => {
+    const sizes = [
+      { width: 1600, height: 1000 },
+      { width: 1280, height: 720 },
+      { width: 1024, height: 700 },
+    ] as const
+    const preferences = [
+      { locale: 'en', theme: 'light' },
+      { locale: 'en', theme: 'dark' },
+      { locale: 'ru', theme: 'light' },
+      { locale: 'ru', theme: 'dark' },
+    ] as const
+
+    for (const size of sizes) {
+      await browser.setWindowSize(size.width, size.height)
+      await openDrawingHarness()
+      await $('button[aria-label="Arrow"]').click()
+      for (const preference of preferences) {
+        await setShellPreferences(preference.locale, preference.theme)
+        const layout = await browser.execute(() => {
+          const toolbar = document.querySelector<HTMLElement>(
+            '.cs-context-toolbar',
+          )
+          const controls = document.querySelector<HTMLElement>(
+            '.cs-context-controls',
+          )
+          if (!toolbar || !controls) throw new Error('Arrow toolbar is missing')
+          const bounds = toolbar.getBoundingClientRect()
+          const controlIds = [
+            ...controls.querySelectorAll<HTMLElement>('[data-control]'),
+          ].map((control) => control.dataset.control)
+          const observable = [
+            ...controls.querySelectorAll<HTMLElement>(
+              '.cs-arrow-toolbar-trigger, .cs-color-more--compact',
+            ),
+          ].filter((control) => {
+            const rect = control.getBoundingClientRect()
+            return rect.width > 0 && rect.height > 0
+          })
+          return {
+            controlIds,
+            observableCount: observable.length,
+            observableLabels: observable.map((control) =>
+              control.getAttribute('aria-label'),
+            ),
+            controlsClientWidth: controls.clientWidth,
+            controlsScrollWidth: controls.scrollWidth,
+            controlsFit: controls.scrollWidth <= controls.clientWidth,
+            toolbarFits:
+              bounds.left >= 0 &&
+              bounds.right <= window.innerWidth &&
+              bounds.top >= 0 &&
+              bounds.bottom <= window.innerHeight,
+            documentFits:
+              document.documentElement.scrollWidth <= window.innerWidth,
+          }
+        })
+        expect({ size, preference, ...layout }).toEqual({
+          size,
+          preference,
+          controlIds: ['color', 'stroke', 'startCap', 'arrowPath', 'endCap'],
+          observableCount: 5,
+          observableLabels:
+            preference.locale === 'ru'
+              ? [
+                  'Цвет: #E5484D',
+                  'Линия: 3 px',
+                  'Хвост: Нет',
+                  'Геометрия: Прямая',
+                  'Наконечник: Заполненная стрелка',
+                ]
+              : [
+                  'Color: #E5484D',
+                  'Stroke: 3 px',
+                  'Tail: None',
+                  'Geometry: Straight',
+                  'Head: Solid arrow',
+                ],
+          controlsClientWidth: layout.controlsClientWidth,
+          controlsScrollWidth: layout.controlsClientWidth,
+          controlsFit: true,
+          toolbarFits: true,
+          documentFits: true,
+        })
+        await browser.saveScreenshot(
+          path.resolve(
+            `artifacts/browser-e2e/arrow-toolbar-${size.width}x${size.height}-${preference.locale}-${preference.theme}.png`,
+          ),
+        )
+      }
+    }
+  })
+
   it('decodes an EXIF-rotated JPEG with the display dimensions published by native import', async () => {
     await browser.url('/')
     const dimensions = await browser.execute(async () => {
@@ -187,6 +372,74 @@ describe('M06 drawing tools in browser mode', () => {
       .cancel()
       .perform()
     expect((await snapshot()).layers).toHaveLength(6)
+  })
+
+  it('keeps a new elbow unselected, drags its middle segment once, and restores it through undo/redo', async () => {
+    await browser.setWindowSize(1280, 720)
+    await openDrawingHarness()
+    await $('button[aria-label="Show layers"]').click()
+    const arrowTool = $('button[aria-label="Arrow"]')
+    await arrowTool.click()
+    await chooseArrowPopover('arrowPath', 'Elbow')
+    const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
+    const beforeCount = (await snapshot()).layers.length
+    await browser
+      .action('pointer')
+      .move({ origin: scene, x: -52, y: -18, duration: 0 })
+      .down({ button: 'left' })
+      .move({ origin: 'pointer', x: 104, y: 36, duration: 80 })
+      .up({ button: 'left' })
+      .perform()
+    await browser.waitUntil(
+      async () => (await snapshot()).layers.length === beforeCount + 1,
+    )
+    await expect(arrowTool).toHaveAttribute('aria-pressed', 'true')
+    expect(await $$('.cs-layer-row.is-selected').length).toBe(0)
+
+    const created = (await snapshot()).layers.at(-1)!
+    expect(created.payload?.path).toBe('elbow')
+    const originalOffset = (created.payload?.elbow as { offset: number }).offset
+    await $('button[aria-label="Select"]').click()
+    const handle = await arrowHandleViewportPoint(created)
+    await browser
+      .action('pointer')
+      .move({ origin: 'viewport', x: handle.x, y: handle.y, duration: 0 })
+      .down({ button: 'left' })
+      .up({ button: 'left' })
+      .perform()
+    await browser.waitUntil(
+      async () => (await $$('.cs-layer-row.is-selected').length) === 1,
+    )
+    await browser
+      .action('pointer')
+      .move({ origin: 'viewport', x: handle.x, y: handle.y, duration: 0 })
+      .down({ button: 'left' })
+      .move({ origin: 'pointer', x: 22, y: 0, duration: 80 })
+      .up({ button: 'left' })
+      .perform()
+    await browser.waitUntil(async () => {
+      const arrow = (await snapshot()).layers.at(-1)
+      return (
+        (arrow?.payload?.elbow as { offset?: number } | undefined)?.offset !==
+        originalOffset
+      )
+    })
+    const draggedOffset = (
+      (await snapshot()).layers.at(-1)?.payload?.elbow as { offset: number }
+    ).offset
+
+    await $('button[aria-label="Undo"]').click()
+    await browser.waitUntil(
+      async () =>
+        ((await snapshot()).layers.at(-1)?.payload?.elbow as { offset: number })
+          .offset === originalOffset,
+    )
+    await $('button[aria-label="Redo"]').click()
+    await browser.waitUntil(
+      async () =>
+        ((await snapshot()).layers.at(-1)?.payload?.elbow as { offset: number })
+          .offset === draggedOffset,
+    )
   })
 
   it('creates shape, pencil and marker layers through real pointer gestures', async () => {

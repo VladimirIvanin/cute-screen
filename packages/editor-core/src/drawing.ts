@@ -1,10 +1,14 @@
 import type {
+  ArrowCap,
+  ArrowLayer,
+  ArrowLayerPayload,
   JsonObject,
   LayerNode,
   Point,
   Rect,
   Transform2D,
 } from './document/types'
+import { rebaseArrowLayer } from './arrow-geometry'
 
 export type DrawingTool = 'arrow' | 'shape' | 'pencil' | 'marker'
 export type ShapeKind = 'rectangle' | 'circle' | 'oval' | 'diamond' | 'star'
@@ -27,7 +31,7 @@ export const DEFAULT_DRAWING_DEFAULTS: DrawingDefaults = Object.freeze({
       join: 'round',
     }),
     startCap: 'none',
-    endCap: 'triangle',
+    endCap: 'solidArrow',
   }),
   shape: Object.freeze({
     shape: 'rectangle',
@@ -147,7 +151,7 @@ function layerBlendMode(
     : 'normal'
 }
 
-/** Builds one v3 drawing layer; callers only commit the returned value on pointer-up. */
+/** Builds one current drawing layer; callers only commit it on pointer-up. */
 export function createDrawingLayer(input: {
   readonly id: string
   readonly tool: DrawingTool
@@ -209,22 +213,43 @@ export function createDrawingLayer(input: {
             ),
         }
       : undefined
-  const arrowCapExtent =
-    input.tool === 'arrow' &&
-    (defaults.arrow.startCap !== 'none' || defaults.arrow.endCap !== 'none')
-      ? Math.max(strokeWidth * 3, 8)
-      : 0
-  const inset = Math.max(strokeWidth / 2, arrowCapExtent)
+  const requestedArrowPath = defaults.arrow.path
+  const arrowPath =
+    requestedArrowPath === 'quadratic' || requestedArrowPath === 'elbow'
+      ? requestedArrowPath
+      : 'straight'
+  const requestedElbow =
+    defaults.arrow.elbow &&
+    typeof defaults.arrow.elbow === 'object' &&
+    !Array.isArray(defaults.arrow.elbow)
+      ? (defaults.arrow.elbow as JsonObject)
+      : undefined
+  const arrowElbow =
+    arrowPath === 'elbow'
+      ? {
+          axis: requestedElbow?.axis === 'x' ? ('x' as const) : ('y' as const),
+          offset:
+            typeof requestedElbow?.offset === 'number' &&
+            Number.isFinite(requestedElbow.offset)
+              ? requestedElbow.offset
+              : 0,
+        }
+      : undefined
+  const arrowCap = (value: unknown, fallback: ArrowCap): ArrowCap =>
+    value === 'none' ||
+    value === 'lineArrow' ||
+    value === 'solidArrow' ||
+    value === 'triangle' ||
+    value === 'circle' ||
+    value === 'diamond'
+      ? value
+      : fallback
+  const inset = strokeWidth / 2
   const geometry =
     input.tool === 'pencil' || input.tool === 'marker'
       ? pointsBounds(samples, strokeWidth / 2)
       : input.tool === 'arrow'
-        ? pointsBounds(
-            arrowCurveBend
-              ? [input.start, end, arrowCurveBend]
-              : [input.start, end],
-            inset,
-          )
+        ? bounds({ x: 0, y: 0 }, { x: 0, y: 0 })
         : input.drawFromCenter
           ? bounds(
               { x: input.start.x * 2 - end.x, y: input.start.y * 2 - end.y },
@@ -233,11 +258,6 @@ export function createDrawingLayer(input: {
               inset,
             )
           : bounds(input.start, end, 1, inset)
-  const localStart = {
-    x: input.start.x - geometry.x,
-    y: input.start.y - geometry.y,
-  }
-  const localEnd = { x: end.x - geometry.x, y: end.y - geometry.y }
   const common = {
     id: input.id,
     transform: {
@@ -261,25 +281,38 @@ export function createDrawingLayer(input: {
     shadows: [],
   }
   if (input.tool === 'arrow') {
-    return Object.freeze({
+    const arrowStroke = defaults.arrow.stroke as ArrowLayerPayload['stroke']
+    const arrowStyle = { ...defaults.arrow }
+    delete arrowStyle.bend
+    delete arrowStyle.elbow
+    delete arrowStyle.end
+    delete arrowStyle.start
+    const payload: ArrowLayerPayload = {
+      ...arrowStyle,
+      path: arrowPath,
+      start: { x: input.start.x, y: input.start.y },
+      end: { x: end.x, y: end.y },
+      stroke: arrowStroke,
+      startCap: arrowCap(defaults.arrow.startCap, 'none'),
+      endCap: arrowCap(defaults.arrow.endCap, 'solidArrow'),
+      ...(arrowPath === 'quadratic'
+        ? {
+            bend: arrowCurveBend ?? {
+              x: (input.start.x + end.x) / 2,
+              y: input.start.y,
+            },
+          }
+        : {}),
+      ...(arrowElbow === undefined ? {} : { elbow: arrowElbow }),
+    }
+    const seed: ArrowLayer = {
       ...common,
       kind: 'arrow' as const,
-      payload: {
-        ...defaults.arrow,
-        start: localStart,
-        end: localEnd,
-        ...(defaults.arrow.path === 'quadratic'
-          ? {
-              bend: arrowCurveBend
-                ? {
-                    x: arrowCurveBend.x - geometry.x,
-                    y: arrowCurveBend.y - geometry.y,
-                  }
-                : { x: (localStart.x + localEnd.x) / 2, y: localStart.y },
-            }
-          : {}),
-      },
-    })
+      transform: IDENTITY_TRANSFORM,
+      localBounds: { x: 0, y: 0, width: 1, height: 1 },
+      payload,
+    }
+    return rebaseArrowLayer(seed, payload)
   }
   if (input.tool === 'shape') {
     const square = shape === 'circle'

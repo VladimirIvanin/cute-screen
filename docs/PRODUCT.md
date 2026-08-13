@@ -75,7 +75,11 @@ Cute Screen — полноценный local-first редактор снимко
 
 ## Инструменты аннотации
 
-- `REQ-TOL-001` — arrow/line: прямая или кривая, anchor points, стили линии и варианты наконечников, включая отсутствие наконечника.
+- `REQ-TOL-001` — arrow/line: компактные FigJam-style straight, quadratic
+  curved и three-segment elbow paths с редактируемыми endpoint/bend либо
+  middle-segment anchors; tail и head независимо выбирают `none`, `lineArrow`,
+  `solidArrow`, `triangle`, `circle` или `diamond`; body поддерживает solid и
+  dashed style. Connector text не входит в arrow document contract.
 - `REQ-TOL-002` — shapes: rectangle, circle, oval, diamond, star; stroke,
   solid/gradient/pattern/texture fills, fill/layer opacity, blend modes и
   визуальный corner radius.

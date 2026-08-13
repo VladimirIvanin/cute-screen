@@ -25,6 +25,7 @@ const MAX_ENCODED_BYTES: u64 = 512 * 1024 * 1024;
 const MAX_SVG_ENCODED_BYTES: usize = 10 * 1024 * 1024;
 const MAX_IMAGE_EDGE: u32 = 32_768;
 const MAX_IMAGE_PIXELS: u64 = 134_217_728;
+const MAX_DOCUMENT_SCHEMA_VERSION: u32 = 6;
 const RECOVERY_BUNDLE_VERSION: u32 = 1;
 
 #[derive(Debug, Error, Clone, Serialize)]
@@ -1202,7 +1203,7 @@ fn document_value(document_json: &str) -> Result<Value, RepositoryError> {
             "schemaVersion exceeds the supported integer range".to_owned(),
         )
     })?;
-    if schema_version > 4 {
+    if schema_version > MAX_DOCUMENT_SCHEMA_VERSION {
         return Err(RepositoryError::NewerSchema { schema_version });
     }
     if value.get("id").and_then(Value::as_str).is_none() {
@@ -2173,14 +2174,24 @@ mod tests {
     }
 
     #[test]
-    fn accepts_the_current_m07_document_schema() {
+    fn accepts_the_current_arrow_document_schema_and_rejects_newer() {
         let document = serde_json::json!({
-            "schemaVersion": 4,
+            "schemaVersion": 6,
             "id": "doc-1",
         })
         .to_string();
 
         assert!(super::validate_document(&document).is_ok());
+
+        let newer = serde_json::json!({
+            "schemaVersion": 7,
+            "id": "doc-1",
+        })
+        .to_string();
+        assert!(matches!(
+            super::validate_document(&newer),
+            Err(RepositoryError::NewerSchema { schema_version: 7 })
+        ));
     }
 
     #[test]

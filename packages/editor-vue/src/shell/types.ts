@@ -55,6 +55,8 @@ export type ContextControl =
       readonly value: string
       readonly disabled?: boolean
       readonly eyedropper?: boolean
+      /** Arrow uses one swatch trigger instead of the general quick-colour row. */
+      readonly compact?: boolean
     }
   | {
       readonly kind: 'range'
@@ -72,6 +74,46 @@ export type ContextControl =
       readonly value: string
       readonly options: readonly Readonly<{
         readonly value: string
+        readonly label: string
+      }>[]
+    }
+  | {
+      readonly kind: 'arrowStroke'
+      readonly id: 'stroke'
+      readonly label: string
+      readonly width: number
+      readonly style: 'solid' | 'dashed' | 'dotted'
+      readonly disabled?: boolean
+      readonly solidLabel: string
+      readonly dashedLabel: string
+      readonly dottedLabel: string
+    }
+  | {
+      readonly kind: 'arrowCap'
+      readonly id: 'startCap' | 'endCap'
+      readonly label: string
+      readonly value:
+        'none' | 'lineArrow' | 'solidArrow' | 'triangle' | 'circle' | 'diamond'
+      readonly disabled?: boolean
+      readonly options: readonly Readonly<{
+        readonly value:
+          | 'none'
+          | 'lineArrow'
+          | 'solidArrow'
+          | 'triangle'
+          | 'circle'
+          | 'diamond'
+        readonly label: string
+      }>[]
+    }
+  | {
+      readonly kind: 'arrowPath'
+      readonly id: 'arrowPath'
+      readonly label: string
+      readonly value: 'straight' | 'elbow' | 'quadratic'
+      readonly disabled?: boolean
+      readonly options: readonly Readonly<{
+        readonly value: 'straight' | 'elbow' | 'quadratic'
         readonly label: string
       }>[]
     }
@@ -235,6 +277,22 @@ export const translationKeys = [
   'toolSpotlight',
   'toolUnavailable',
   'arrowHint',
+  'arrowStroke',
+  'arrowTail',
+  'arrowGeometry',
+  'arrowHead',
+  'arrowSolid',
+  'arrowDashed',
+  'arrowDotted',
+  'arrowStraight',
+  'arrowElbow',
+  'arrowQuadratic',
+  'arrowNone',
+  'arrowLine',
+  'arrowSolidArrow',
+  'arrowTriangle',
+  'arrowCircle',
+  'arrowDiamond',
   'color',
   'width',
   'zoomOut',
