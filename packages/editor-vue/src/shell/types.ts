@@ -53,6 +53,8 @@ export type ContextControl =
       readonly id: string
       readonly label: string
       readonly value: string
+      readonly disabled?: boolean
+      readonly eyedropper?: boolean
     }
   | {
       readonly kind: 'range'
@@ -141,6 +143,7 @@ export type IconName =
   | 'export'
   | 'eye'
   | 'eyeOff'
+  | 'eyedropper'
   | 'hand'
   | 'image'
   | 'layers'
@@ -154,6 +157,7 @@ export type IconName =
   | 'select'
   | 'shape'
   | 'spotlight'
+  | 'sparkles'
   | 'text'
   | 'undo'
   | 'unlock'
@@ -226,6 +230,7 @@ export const translationKeys = [
   'toolNumberedMarker',
   'toolCallout',
   'toolImage',
+  'toolEyedropper',
   'toolPrivacy',
   'toolSpotlight',
   'toolUnavailable',

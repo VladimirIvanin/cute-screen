@@ -159,7 +159,9 @@ preview и export визуально согласованы.
 На чистом документе открыть Crop без предварительного программного задания frame
 size. Проверить presets, handles, rule-of-thirds, reset, `Enter`, `Escape` и undo.
 Повторить после resize/delete base layer и до/после canvas flip: crop использует
-canvas bounds. Затем проверить manual censor, spotlight, ruler, temporary guides,
+canvas bounds. Затем проверить color picker: открыть contextual control на desktop и 1024×700, выбрать белый, чёрный и серый, ввести HEX, проверить recent и compact suggestions. Запустить пипетку из picker и tool rail, выбрать известный непрозрачный scene-пиксель при zoom, убедиться, что HEX скопирован, toast и recent обновлены, а transient overlay в sample не попал. Проверить стрелки/Shift+стрелки, Enter и Escape, прозрачный пиксель и clipboard failure; единственное изменение выбранного слоя должно undo/redo ровно одной command.
+
+Затем проверить manual censor, spotlight, ruler, temporary guides,
 loupe auto-selection и eyedropper clipboard/toast/recent color.
 
 ## A09 — Серии и библиотека

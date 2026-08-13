@@ -1,4 +1,4 @@
-import { render } from '@testing-library/vue'
+import { fireEvent, render, screen } from '@testing-library/vue'
 import { describe, expect, it } from 'vitest'
 
 import DeferredColorPicker from '../../../packages/editor-vue/src/shell/ui/DeferredColorPicker.vue'
@@ -44,5 +44,37 @@ describe('Naive UI editor control adapters', () => {
     })
     expect(color.getByRole('button', { name: 'Colour' })).toBeInTheDocument()
     expect(color.emitted('commit')).toBeUndefined()
+  })
+
+  it('provides a 32-colour keyboard grid and commits only completed picker edits', async () => {
+    const root = document.createElement('div')
+    root.className = 'cs-overlay-root'
+    document.body.append(root)
+    const color = render(DeferredColorPicker, {
+      props: { modelValue: '#d14b7c', ariaLabel: 'Colour', locale: 'en' },
+    })
+
+    await fireEvent.click(color.getByRole('button', { name: 'Colour' }))
+    const grid = await screen.findByRole('listbox')
+    const options = await screen.findAllByRole('option')
+    expect(options).toHaveLength(32)
+    expect(options[0]).toHaveAttribute('style', expect.stringContaining('255'))
+    expect(options[7]).toHaveAttribute('style', expect.stringContaining('0'))
+
+    await fireEvent.keyDown(options[0]!, { key: 'End' })
+    expect(document.activeElement).toBe(options[31])
+    await fireEvent.click(options[0]!)
+    expect(color.emitted('commit')).toEqual([['#FFFFFF']])
+
+    const hex = screen.getByRole('textbox')
+    await fireEvent.change(hex, { target: { value: '#bad' } })
+    expect(color.emitted('commit')).toEqual([['#FFFFFF'], ['#BBAADD']])
+    await fireEvent.change(hex, { target: { value: 'nope' } })
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+    expect(color.emitted('commit')).toEqual([['#FFFFFF'], ['#BBAADD']])
+    expect(grid).toBeInTheDocument()
+
+    color.unmount()
+    root.remove()
   })
 })

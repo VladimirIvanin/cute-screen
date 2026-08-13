@@ -62,6 +62,7 @@ const props = defineProps<{
   selectedLayerId?: string | undefined
   selectedLayerIds?: readonly string[] | undefined
   activeTool?: string | undefined
+  sampling?: boolean | undefined
   drawingDefaults?: DrawingDefaults | undefined
   textDefaults?: TextToolDefaults | undefined
   textStyleRevision?: number | undefined
@@ -103,12 +104,16 @@ const emit = defineEmits<{
   zoom: [value: number]
   fitZoom: [value: number]
   retry: []
+  colorSample: [value: string]
+  colorSampleError: [message: string]
+  colorSampleCancel: []
 }>()
 const scene = ref<HTMLCanvasElement>()
 const overlay = ref<HTMLCanvasElement>()
 const textEditor = ref<HTMLDivElement>()
 const scrollContainer = ref<HTMLDivElement>()
 const rendererError = ref<string>()
+const samplingCursor = ref<CanvasPoint>()
 const editingText = ref<
   | {
       readonly origin: CanvasPoint
@@ -622,6 +627,22 @@ function drawOverlay(): void {
   if (!context) return
   context.clearRect(0, 0, overlay.value.width, overlay.value.height)
   drawDraft(context)
+  if (props.sampling && samplingCursor.value) {
+    const point = samplingCursor.value
+    context.save()
+    context.strokeStyle = '#fff'
+    context.lineWidth = 1 / ((props.zoom ?? 100) / 100)
+    context.beginPath()
+    context.arc(
+      point.x,
+      point.y,
+      7 / ((props.zoom ?? 100) / 100),
+      0,
+      Math.PI * 2,
+    )
+    context.stroke()
+    context.restore()
+  }
   const layer = selectedLayer()
   if (!layer || !layer.visible) return
   const transform = previewTransform(layer)
@@ -801,6 +822,7 @@ function canvasPoint(event: {
 }): CanvasPoint | undefined {
   if (!scene.value || !props.document) return undefined
   const rect = scene.value.getBoundingClientRect()
+  if (rect.width <= 0 || rect.height <= 0) return undefined
   return {
     x: ((event.clientX - rect.left) * scene.value.width) / rect.width,
     y: ((event.clientY - rect.top) * scene.value.height) / rect.height,
@@ -812,6 +834,49 @@ function canvasPoint(event: {
         : 0.5,
   }
 }
+function sampleScene(point: CanvasPoint): void {
+  const canvas = scene.value
+  if (!canvas)
+    return emit(
+      'colorSampleError',
+      samplingError(
+        'Canvas is unavailable for colour sampling',
+        'Холст недоступен для выбора цвета',
+      ),
+    )
+  const x = Math.max(0, Math.min(canvas.width - 1, Math.round(point.x)))
+  const y = Math.max(0, Math.min(canvas.height - 1, Math.round(point.y)))
+  try {
+    const data = canvas.getContext('2d')?.getImageData(x, y, 1, 1).data
+    if (!data || data[3] === 0) {
+      emit(
+        'colorSampleError',
+        samplingError(
+          'There is no opaque colour at this point',
+          'В этой точке нет непрозрачного цвета',
+        ),
+      )
+      return
+    }
+    const hex = `#${[data[0], data[1], data[2]]
+      .map((channel) => (channel ?? 0).toString(16).padStart(2, '0'))
+      .join('')
+      .toUpperCase()}`
+    emit('colorSample', hex)
+  } catch (error) {
+    console.warn('cute-screen scene colour sampling failed', error)
+    emit(
+      'colorSampleError',
+      samplingError(
+        'The canvas colour could not be read',
+        'Не удалось прочитать цвет с холста',
+      ),
+    )
+  }
+}
+function samplingError(english: string, russian: string): string {
+  return document.documentElement.lang === 'ru' ? russian : english
+}
 function visibleCanvasCenter(): CanvasPoint | undefined {
   const container = scrollContainer.value
   if (!container) return undefined
@@ -820,6 +885,15 @@ function visibleCanvasCenter(): CanvasPoint | undefined {
     clientX: viewport.left + viewport.width / 2,
     clientY: viewport.top + viewport.height / 2,
   })
+}
+function initialSamplingCursor(): CanvasPoint | undefined {
+  if (!props.canvas) return undefined
+  return (
+    visibleCanvasCenter() ?? {
+      x: Math.max(0, (props.canvas.width - 1) / 2),
+      y: Math.max(0, (props.canvas.height - 1) / 2),
+    }
+  )
 }
 function payloadPoint(value: unknown, fallback: CanvasPoint): CanvasPoint {
   if (!value || typeof value !== 'object') return fallback
@@ -951,6 +1025,12 @@ function onPointerDown(event: PointerEvent): void {
   }
   const point = canvasPoint(event)
   if (!point || !scene.value || !props.document) return
+  if (props.sampling) {
+    event.preventDefault()
+    samplingCursor.value = point
+    sampleScene(point)
+    return
+  }
   const pan = event.button === 1 || props.activeTool === 'hand' || spacePressed
   if (pan && scrollContainer.value) {
     event.preventDefault()
@@ -1568,6 +1648,38 @@ function onWheel(event: WheelEvent): void {
   emit('zoom', Math.round(current * (event.deltaY < 0 ? 1.1 : 1 / 1.1)))
 }
 function onWindowKeydown(event: KeyboardEvent): void {
+  if (props.sampling && scene.value && props.canvas) {
+    const initial = samplingCursor.value ??
+      initialSamplingCursor() ?? { x: 0, y: 0 }
+    const step = event.shiftKey ? 10 : 1
+    const moves: Record<string, readonly [number, number]> = {
+      ArrowLeft: [-step, 0],
+      ArrowRight: [step, 0],
+      ArrowUp: [0, -step],
+      ArrowDown: [0, step],
+    }
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      sampleScene(initial)
+      return
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      samplingCursor.value = undefined
+      emit('colorSampleCancel')
+      return
+    }
+    const move = moves[event.key]
+    if (move) {
+      event.preventDefault()
+      samplingCursor.value = {
+        x: Math.max(0, Math.min(props.canvas.width - 1, initial.x + move[0])),
+        y: Math.max(0, Math.min(props.canvas.height - 1, initial.y + move[1])),
+      }
+      invalidateOverlay()
+      return
+    }
+  }
   if (
     event.code === 'Space' &&
     !(event.target instanceof HTMLInputElement) &&
@@ -1593,6 +1705,19 @@ function onWindowKeydown(event: KeyboardEvent): void {
     }
   }
 }
+watch(
+  () => props.sampling,
+  (sampling) => {
+    if (!sampling) {
+      samplingCursor.value = undefined
+      invalidateOverlay()
+      return
+    }
+    samplingCursor.value = initialSamplingCursor()
+    invalidateOverlay()
+    void nextTick(() => scene.value?.focus({ preventScroll: true }))
+  },
+)
 function onWindowKeyup(event: KeyboardEvent): void {
   if (event.code === 'Space') spacePressed = false
   if (event.key === 'Alt' && gesture?.kind === 'move') {
@@ -1641,6 +1766,7 @@ onBeforeUnmount(() => {
             ref="scene"
             class="cs-canvas"
             :aria-label="t('sceneCanvas')"
+            :tabindex="sampling ? 0 : -1"
             @pointerdown="onPointerDown"
             @pointermove="onPointerMove"
             @pointerup="finishGesture"

@@ -73,6 +73,7 @@ function mountViewport(
   viewportDocument: EditorDocumentV1 = document,
   selectedLayerId = 'shape',
   textDefaults?: TextToolDefaults,
+  sampling = false,
 ) {
   const rendered = render(CanvasViewport, {
     props: {
@@ -81,6 +82,7 @@ function mountViewport(
       document: viewportDocument,
       selectedLayerId,
       activeTool,
+      sampling,
       ...(textDefaults === undefined ? {} : { textDefaults }),
       zoom: 100,
       fitMode: true,
@@ -107,6 +109,63 @@ function mountViewport(
 }
 
 describe('M05 CanvasViewport transforms', () => {
+  it('samples one opaque scene pixel without reading the interaction overlay', async () => {
+    const { scene, emitted } = mountViewport(
+      undefined,
+      document,
+      'shape',
+      undefined,
+      true,
+    )
+    const getImageData = vi.fn(() => ({
+      data: new Uint8ClampedArray([18, 52, 86, 255]),
+    }))
+    vi.spyOn(scene, 'getContext').mockReturnValue({
+      getImageData,
+    } as unknown as CanvasRenderingContext2D)
+
+    await fireEvent.pointerDown(scene, {
+      pointerId: 1,
+      clientX: 25,
+      clientY: 30,
+    })
+
+    expect(getImageData).toHaveBeenCalledWith(25, 30, 1, 1)
+    expect(emitted().colorSample).toEqual([['#123456']])
+    expect(emitted().addLayer).toBeUndefined()
+  })
+
+  it('keeps sampling available after a transparent scene pixel', async () => {
+    const { scene, emitted } = mountViewport(
+      undefined,
+      document,
+      'shape',
+      undefined,
+      true,
+    )
+    const getImageData = vi.fn(() => ({
+      data: new Uint8ClampedArray([18, 52, 86, 0]),
+    }))
+    vi.spyOn(scene, 'getContext').mockReturnValue({
+      getImageData,
+    } as unknown as CanvasRenderingContext2D)
+
+    await fireEvent.pointerDown(scene, {
+      pointerId: 1,
+      clientX: 25,
+      clientY: 30,
+    })
+    await fireEvent.pointerDown(scene, {
+      pointerId: 2,
+      clientX: 26,
+      clientY: 30,
+    })
+
+    expect(getImageData).toHaveBeenCalledTimes(2)
+    expect(emitted().colorSample).toBeUndefined()
+    expect(emitted().colorSampleError).toHaveLength(2)
+  })
+
   it('fits to the usable viewport after subtracting canvas chrome insets', async () => {
     let notify: (() => void) | undefined
     vi.stubGlobal(

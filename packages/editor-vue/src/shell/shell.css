@@ -917,7 +917,312 @@ button:focus-visible {
   width: 108px;
 }
 .cs-context-control .cs-ui-color-picker {
+  width: auto;
+}
+
+.cs-color-quick {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.cs-color-swatch,
+.cs-color-more {
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.cs-color-swatch.is-active {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+.cs-color-more {
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+}
+.cs-color-popover {
+  width: 332px;
+  max-width: calc(100vw - 24px);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-raised);
+  box-shadow: 0 14px 40px rgb(0 0 0 / 28%);
+}
+.cs-color-head {
+  display: grid;
+  grid-template-columns: 30px 1fr 28px;
+  gap: 8px;
+  align-items: center;
+  min-height: 48px;
+  padding: 7px 8px 7px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.cs-color-current {
+  display: block;
   width: 28px;
+  height: 28px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 16%);
+}
+.cs-color-current-small {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+}
+.cs-color-head strong {
+  font-size: 12px;
+}
+.cs-color-editor {
+  padding: 10px 12px;
+}
+.cs-color-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 5px;
+  padding: 2px;
+}
+.cs-color-tile {
+  position: relative;
+  aspect-ratio: 1;
+  min-width: 0;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 8%);
+}
+.cs-color-tile:hover {
+  transform: translateY(-1px);
+}
+.cs-color-tile.is-active {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+  z-index: 1;
+}
+.cs-color-tile.is-active::after {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 9px;
+  height: 9px;
+  content: '';
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 62%);
+  transform: translate(-50%, -50%);
+}
+.cs-color-hue {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 8px;
+  align-items: center;
+  margin-top: 9px;
+}
+.cs-color-hue input {
+  width: 100%;
+  height: 15px;
+  appearance: none;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #f44, #ff4, #4f4, #4ff, #44f, #f4f, #f44);
+}
+.cs-color-hue input::-webkit-slider-thumb {
+  width: 15px;
+  height: 15px;
+  appearance: none;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 48%);
+}
+.cs-color-value-row {
+  display: grid;
+  grid-template-columns: 1fr 34px;
+  gap: 7px;
+  margin-top: 8px;
+}
+.cs-color-hex {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  align-items: center;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-sunken);
+}
+.cs-color-hex:focus-within {
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 1px var(--focus-ring);
+}
+.cs-color-hex span {
+  padding-left: 9px;
+  color: var(--text-muted);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+}
+.cs-color-hex input {
+  width: 100%;
+  height: 30px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font:
+    11px ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  text-transform: uppercase;
+}
+.cs-color-hex.is-invalid {
+  border-color: var(--danger);
+}
+.cs-color-eyedropper {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+}
+.cs-color-error {
+  margin: 6px 0 0;
+  color: var(--danger);
+  font-size: 10px;
+}
+.cs-color-section {
+  padding: 8px 12px 10px;
+  border-top: 1px solid var(--border);
+}
+.cs-color-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 17px;
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+.cs-color-section-title span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.cs-color-section-title svg {
+  width: 12px;
+  height: 12px;
+  color: var(--accent);
+}
+.cs-color-section-title small {
+  font-size: 8px;
+  font-weight: 400;
+  text-transform: none;
+}
+.cs-color-recent {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 5px;
+}
+.cs-color-recent-item {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  height: 32px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.cs-color-recent-item.is-active {
+  border-color: var(--accent);
+}
+.cs-color-recent-item > span {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+}
+.cs-color-recent-item strong {
+  overflow: hidden;
+  font:
+    9px ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cs-color-empty {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+.cs-color-suggestions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  margin-top: 5px;
+}
+.cs-color-suggestion {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 5px;
+  align-items: center;
+  min-width: 0;
+  height: 28px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.cs-color-suggestion > span {
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+}
+.cs-color-suggestion strong {
+  overflow: hidden;
+  font-size: 8px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cs-color-tile:focus-visible,
+.cs-color-swatch:focus-visible,
+.cs-color-more:focus-visible,
+.cs-color-recent-item:focus-visible,
+.cs-color-suggestion:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.cs-eyedropper-feedback {
+  position: fixed;
+  z-index: 70;
+  right: 14px;
+  bottom: 58px;
+  max-width: 320px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+  color: var(--text);
+  font-size: 11px;
 }
 
 .cs-zoom-controls {

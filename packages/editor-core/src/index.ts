@@ -76,6 +76,18 @@ export {
   type DrawingToolPreferencesStorage,
 } from './drawing-preferences'
 export {
+  colorPalette,
+  colorSuggestions,
+  contrastRatio,
+  hexToSrgb,
+  hsvToSrgb,
+  normalizeHex,
+  srgbToHex,
+  srgbToHsv,
+  type ColorSuggestion,
+  type HsvColor,
+} from './color-picker'
+export {
   CLIPBOARD_LAYERS_MIME,
   createCalloutLayer,
   createContentImageLayer,

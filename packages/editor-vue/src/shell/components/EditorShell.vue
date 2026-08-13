@@ -59,6 +59,7 @@ import {
   DEFAULT_DRAWING_DEFAULTS,
   rememberDrawingColor,
   type DrawingDefaults,
+  type DrawingToolPreferencesV1,
   type BlendMode,
   type EditorDocumentV1,
   type EditorCommand,
@@ -528,7 +529,11 @@ function applyTextPreset(value: string): boolean {
 }
 const markerShape = ref<'circle' | 'square' | 'diamond' | 'star'>('circle')
 const contentImageImporting = ref(false)
-let drawingPreferences = defaultDrawingToolPreferences()
+const drawingPreferences = shallowRef<DrawingToolPreferencesV1>(
+  defaultDrawingToolPreferences(),
+)
+const samplingControl = ref<string>()
+const eyedropperFeedback = ref<string>()
 let textureResolver: TextureResourceResolver | undefined
 const textureImages = ref<ReadonlyMap<string, HTMLImageElement>>(new Map())
 const activeDocument = ref<EditorDocumentV1>()
@@ -648,6 +653,14 @@ const tools = computed<readonly ToolDescriptor[]>(() => [
       contentImageImporting.value,
   },
   {
+    id: 'eyedropper',
+    group: 'more',
+    icon: 'eyedropper',
+    labelKey: 'toolEyedropper',
+    shortcut: 'I',
+    disabled: !hasInteractiveDocument.value,
+  },
+  {
     id: 'privacy',
     group: 'more',
     icon: 'privacy',
@@ -696,6 +709,8 @@ function drawingControl(
   tool: 'arrow' | 'shape' | 'pencil' | 'marker',
   values: JsonObject = drawingDefaults.value[tool],
 ) {
+  const selected = selectedDrawingLayer()
+  const colorDisabled = selected?.kind === tool && selected.locked
   const stroke = values.stroke as Record<string, unknown> | undefined
   const color =
     tool === 'arrow' || tool === 'shape' ? stroke?.color : values.color
@@ -729,6 +744,8 @@ function drawingControl(
         id: 'color',
         label: translate('color'),
         value: hexColor(color),
+        disabled: colorDisabled,
+        eyedropper: Boolean(activeDocument.value) && !colorDisabled,
       },
       {
         kind: 'range' as const,
@@ -1011,6 +1028,7 @@ const contextSchema = computed(() => {
           id: 'textColor',
           label: 'Color',
           value: hexColor(textDefaults.value.color),
+          eyedropper: Boolean(activeDocument.value),
         },
         {
           kind: 'select' as const,
@@ -1176,6 +1194,8 @@ const contextSchema = computed(() => {
           value: hexColor(
             border?.color ?? { red: 0, green: 0, blue: 0, alpha: 1 },
           ),
+          disabled: selectedImage.locked,
+          eyedropper: Boolean(activeDocument.value) && !selectedImage.locked,
         },
         {
           kind: 'range' as const,
@@ -1301,12 +1321,12 @@ async function onContextAction(id: string): Promise<void> {
       })
     } else {
       drawingDefaults.value = { ...drawingDefaults.value, shape: payload }
-      drawingPreferences = {
-        ...drawingPreferences,
+      drawingPreferences.value = {
+        ...drawingPreferences.value,
         defaults: drawingDefaults.value,
       }
       createBrowserDrawingToolPreferencesStorage(browserStorage()).save(
-        drawingPreferences,
+        drawingPreferences.value,
       )
     }
     return
@@ -1816,8 +1836,8 @@ function onContextChange(id: string, value: string): void {
     return
   }
   drawingDefaults.value = { ...drawingDefaults.value, [tool]: payload }
-  drawingPreferences = {
-    ...drawingPreferences,
+  drawingPreferences.value = {
+    ...drawingPreferences.value,
     defaults: drawingDefaults.value,
   }
   if (id === 'color') {
@@ -1826,15 +1846,79 @@ function onContextChange(id: string, value: string): void {
         ? (payload.stroke as Record<string, unknown> | undefined)?.color
         : payload.color
     if (candidate && typeof candidate === 'object') {
-      drawingPreferences = rememberDrawingColor(
-        drawingPreferences,
+      drawingPreferences.value = rememberDrawingColor(
+        drawingPreferences.value,
         candidate as import('@cute-screen/editor-renderer').SrgbColor,
       )
     }
   }
   createBrowserDrawingToolPreferencesStorage(browserStorage()).save(
-    drawingPreferences,
+    drawingPreferences.value,
   )
+}
+function rememberColor(value: string): void {
+  const match = /^#([\da-f]{6})$/iu.exec(value)
+  if (!match) return
+  const hex = match[1]!
+  drawingPreferences.value = rememberDrawingColor(drawingPreferences.value, {
+    red: Number.parseInt(hex.slice(0, 2), 16) / 255,
+    green: Number.parseInt(hex.slice(2, 4), 16) / 255,
+    blue: Number.parseInt(hex.slice(4, 6), 16) / 255,
+    alpha: 1,
+  })
+  createBrowserDrawingToolPreferencesStorage(browserStorage()).save(
+    drawingPreferences.value,
+  )
+}
+function onColorChange(id: string, value: string): void {
+  onContextChange(id, value)
+  rememberColor(value)
+}
+function eyedropperPrompt(): string {
+  return state.locale.value === 'ru'
+    ? 'Выберите цвет на снимке'
+    : 'Choose a colour on the canvas'
+}
+function startEyedropper(id: string): void {
+  samplingControl.value = id
+  eyedropperFeedback.value = eyedropperPrompt()
+}
+async function onColorSample(value: string): Promise<void> {
+  const target = samplingControl.value
+  if (target) onColorChange(target, value)
+  else rememberColor(value)
+  samplingControl.value = undefined
+  eyedropperFeedback.value =
+    state.locale.value === 'ru'
+      ? `Цвет выбран: ${value}`
+      : `Colour selected: ${value}`
+  try {
+    if (props.clipboardBridge?.writeClipboardText) {
+      await props.clipboardBridge.writeClipboardText(value, crypto.randomUUID())
+    } else if (navigator.clipboard) {
+      await navigator.clipboard.writeText(value)
+    }
+  } catch (error) {
+    console.warn('cute-screen eyedropper clipboard write failed', error)
+    eyedropperFeedback.value =
+      state.locale.value === 'ru'
+        ? `Цвет выбран: ${value}. Не удалось скопировать HEX.`
+        : `Colour selected: ${value}. HEX could not be copied.`
+  }
+}
+function onColorSampleError(message: string): void {
+  eyedropperFeedback.value = message
+}
+function onColorSampleCancel(): void {
+  samplingControl.value = undefined
+  eyedropperFeedback.value =
+    state.locale.value === 'ru'
+      ? 'Выбор цвета отменён'
+      : 'Colour sampling cancelled'
+}
+function selectTool(id: string): void {
+  store.selectTool(id)
+  if (id === 'eyedropper') eyedropperFeedback.value = eyedropperPrompt()
 }
 function updateLayerProperty(
   id: string,
@@ -2520,10 +2604,10 @@ watch(
 onMounted(() => {
   personalTextPreset.value =
     createBrowserTextStylePresetsStorage(browserStorage()).load()
-  drawingPreferences = createBrowserDrawingToolPreferencesStorage(
+  drawingPreferences.value = createBrowserDrawingToolPreferencesStorage(
     browserStorage(),
-  ).load() as typeof drawingPreferences
-  drawingDefaults.value = drawingPreferences.defaults
+  ).load() as DrawingToolPreferencesV1
+  drawingDefaults.value = drawingPreferences.value.defaults
   store.initialize(preferencesOptions)
   if (!props.documentSession) {
     store.setDocumentState(props.initialDocumentState ?? { kind: 'empty' })
@@ -2664,7 +2748,7 @@ watch(
           :tools="tools"
           :active-tool-id="store.activeToolId"
           :t="translate"
-          @select="store.selectTool"
+          @select="selectTool"
         />
         <CanvasViewport
           ref="canvasViewport"
@@ -2677,6 +2761,9 @@ watch(
           :selected-layer-id="store.selectedLayerId"
           :selected-layer-ids="store.selectedLayerIds"
           :active-tool="store.activeToolId"
+          :sampling="
+            Boolean(samplingControl || store.activeToolId === 'eyedropper')
+          "
           :drawing-defaults="drawingDefaults"
           :text-defaults="textDefaults"
           :text-style-revision="textStyleRevision"
@@ -2701,6 +2788,9 @@ watch(
           @request-image-import="importContentImage"
           @open-image="store.runAction('openImage')"
           @select-tool="store.selectTool"
+          @color-sample="onColorSample"
+          @color-sample-error="onColorSampleError"
+          @color-sample-cancel="onColorSampleCancel"
           @zoom="store.setZoom"
           @fit-zoom="store.setFitZoom"
           @retry="emit('retryLoad')"
@@ -2729,8 +2819,11 @@ watch(
         <ContextToolbar
           :schema="contextSchema"
           :label="translate('toolSettings')"
+          :recent-colors="drawingPreferences.recentColors"
+          :picker-locale="state.locale.value"
           @action="onContextAction"
-          @change="onContextChange"
+          @change="onColorChange"
+          @eyedropper="startEyedropper"
         />
       </div>
       <SeriesFilmstrip
@@ -2752,6 +2845,9 @@ watch(
         "
       />
       <div class="cs-overlay-root" aria-live="polite" />
+      <p v-if="eyedropperFeedback" class="cs-eyedropper-feedback" role="status">
+        {{ eyedropperFeedback }}
+      </p>
     </div>
   </NConfigProvider>
 </template>

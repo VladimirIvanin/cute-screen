@@ -61,7 +61,7 @@ Cute Screen — полноценный local-first редактор снимко
 - `REQ-EDT-005` — selection, move, resize, rotate, duplicate, delete, lock, visibility, z-order и opacity.
 - `REQ-EDT-006` — все изменения документа undoable; redo очищается после новой ветки изменений.
 - `REQ-EDT-007` — guides появляются только при удержании назначенной клавиши.
-- `REQ-EDT-008` — tool settings находятся только в contextual toolbar.
+- `REQ-EDT-008` — tool settings находятся только в contextual toolbar. Цветовые controls используют product-owned picker с палитрой, HEX, recent/suggestions и canvas-only пипеткой; draft не создаёт document history entry до завершения взаимодействия.
 - `REQ-EDT-009` — layers panel ограничена выбором, порядком, visibility, lock, rotation и opacity.
 - `REQ-EDT-010` — clipboard различает внутренние слои, bitmap и plain text.
 - `REQ-EDT-011` — keyboard duplicate создаёт копию с предсказуемым offset.
@@ -92,7 +92,7 @@ Cute Screen — полноценный local-first редактор снимко
 - `REQ-TOL-009` — spotlight: rectangle/ellipse/diamond и настраиваемое затемнение.
 - `REQ-TOL-010` — ruler измеряет расстояние в pixels/percent и взаимодействует с временными guides.
 - `REQ-TOL-011` — loupe: zoom, размер, circle/rectangle, border color/width и shadow.
-- `REQ-TOL-012` — eyedropper копирует HEX, показывает результат и добавляет цвет в recent colors.
+- `REQ-TOL-012` — eyedropper читает один непрозрачный пиксель скомпонованного scene canvas (без transient overlay), нормализует и копирует uppercase HEX, показывает доступный результат и добавляет цвет в recent colors. Pointer и клавиатурный sampling отменяемы; ошибка чтения или clipboard не откатывает уже выбранный цвет и не создаёт document command.
 - `REQ-TOL-013` — crop: свободный режим, aspect presets, handles, rule-of-thirds, reset, `Enter` и `Escape`.
 - `REQ-TOL-014` — вставка emoji как редактируемого слоя.
 - `REQ-TOL-015` — вставка PNG/JPEG/WebP/SVG как image layer.

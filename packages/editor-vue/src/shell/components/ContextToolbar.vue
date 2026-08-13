@@ -2,21 +2,31 @@
 import { NButton } from 'naive-ui'
 import { UiIcon } from '../icon'
 import type { ContextToolbarSchema } from '../types'
+import type { SrgbColor } from '@cute-screen/editor-renderer'
 import DeferredColorPicker from '../ui/DeferredColorPicker.vue'
 import DeferredSlider from '../ui/DeferredSlider.vue'
 import UiSelect from '../ui/UiSelect.vue'
 defineProps<{
   schema?: ContextToolbarSchema | undefined
   label: string
+  recentColors?: readonly SrgbColor[]
+  pickerLocale?: 'en' | 'ru'
 }>()
 const emit = defineEmits<{
   action: [id: string]
   change: [id: string, value: string]
+  eyedropper: [id: string]
 }>()
 </script>
 
 <template>
-  <section v-if="schema" class="cs-context-toolbar" :aria-label="label">
+  <section
+    v-if="schema"
+    class="cs-context-toolbar"
+    :aria-label="label"
+    :aria-description="schema.hint"
+  >
+    <span hidden>{{ schema.hint }}</span>
     <span class="cs-context-icon" :class="`cs-context-icon--${schema.icon}`"
       ><UiIcon :name="schema.icon"
     /></span>
@@ -35,8 +45,13 @@ const emit = defineEmits<{
           <span>{{ control.label }}</span>
           <DeferredColorPicker
             :model-value="control.value"
+            :recent-colors="recentColors ?? []"
+            :disabled="control.disabled ?? false"
+            :eyedropper="control.eyedropper ?? true"
+            :locale="pickerLocale ?? 'en'"
             v-bind="{ ariaLabel: control.label }"
             @commit="emit('change', control.id, $event)"
+            @eyedropper="emit('eyedropper', control.id)"
           />
         </label>
         <label v-else-if="control.kind === 'range'" class="cs-context-control">
