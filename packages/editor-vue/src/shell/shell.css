@@ -570,29 +570,11 @@ button:focus-visible {
   color: var(--accent);
   background: var(--accent-soft);
 }
-.cs-context-toolbar strong,
-.cs-context-toolbar small {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.cs-context-copy {
-  min-width: 0;
-}
-.cs-context-toolbar strong {
-  font-size: 12px;
-}
-.cs-context-toolbar small {
-  color: var(--text-muted);
-  font-size: 10px;
-}
 .cs-context-controls {
   display: flex;
   min-width: 0;
   max-width: 100%;
   gap: 6px;
-  margin-left: 8px;
   overflow-x: auto;
   scrollbar-width: thin;
 }
@@ -1010,9 +992,6 @@ button:focus-visible {
     bottom: 72px;
     left: 306px;
     width: auto;
-  }
-  .cs-context-copy {
-    display: none;
   }
 }
 

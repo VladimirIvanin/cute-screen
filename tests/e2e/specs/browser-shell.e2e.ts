@@ -19,7 +19,9 @@ describe('M02 editor shell in browser mode', () => {
       'aria-pressed',
       'true',
     )
-    await expect($('.cs-context-toolbar')).toHaveText(
+    await expect($('.cs-context-toolbar .cs-context-icon')).toExist()
+    await expect($('.cs-context-toolbar .cs-context-copy')).not.toExist()
+    await expect($('.cs-context-toolbar')).not.toHaveText(
       expect.stringContaining('Drag to create an arrow'),
     )
     await expect($('nav[aria-label="Series frames"]')).toExist()
@@ -116,9 +118,9 @@ describe('M02 editor shell in browser mode', () => {
     )
     await expect($('aside[aria-label="Инструменты"]')).toExist()
     await $('button[aria-label="Стрелка"]').click()
-    await expect($('section[aria-label="Настройки инструмента"]')).toHaveText(
-      expect.stringContaining('Потяните, чтобы нарисовать стрелку'),
-    )
+    await expect(
+      $('section[aria-label="Настройки инструмента"] .cs-context-copy'),
+    ).not.toExist()
 
     await $('button[aria-label="Другие действия"]').click()
     await $('button=Тёмная').click()
