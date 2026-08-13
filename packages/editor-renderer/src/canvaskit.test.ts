@@ -4,7 +4,10 @@ import CanvasKitInit from 'canvaskit-wasm'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-import { renderHeadlessCanvasKitPng } from './canvaskit'
+import {
+  renderHeadlessCanvasKitPng,
+  resolveCanvasKitVisualCenterBaseline,
+} from './canvaskit'
 
 describe('CanvasKit headless renderer', () => {
   it('applies a shared negative layer scale to vector annotations', async () => {
@@ -248,6 +251,22 @@ describe('CanvasKit headless renderer', () => {
     )
     const decoded = await loadImage(png)
     expect([decoded.width, decoded.height]).toEqual([32, 32])
+  })
+
+  it('computes a visual-center baseline from CanvasKit glyph bounds', () => {
+    const baseline = resolveCanvasKitVisualCenterBaseline(
+      {
+        getGlyphIDs: () => new Uint16Array([1]),
+        getGlyphBounds: () => new Float32Array([0, -20, 9, 1]),
+      },
+      '1',
+      8,
+      48,
+      40,
+      32,
+    )
+
+    expect(baseline).toBe(41.5)
   })
 
   it('preserves scene-node z-order across image and vector nodes', async () => {

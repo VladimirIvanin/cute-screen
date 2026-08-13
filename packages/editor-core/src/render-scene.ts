@@ -168,6 +168,8 @@ export interface RenderTextNode extends RenderNodeBase {
   readonly underline?: boolean
   readonly letterSpacing?: number
   readonly align: 'start' | 'center' | 'end' | 'justify'
+  /** Optional optical alignment for compact labels such as numbered markers. */
+  readonly verticalAlign?: 'visualCenter'
   readonly lineHeight: number
   readonly fill: RenderPaint
   readonly shadows?: readonly RenderShadow[]

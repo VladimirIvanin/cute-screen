@@ -975,7 +975,13 @@ describe('document render scene', () => {
         kind: 'text',
         id: expect.stringMatching(/:label$/u),
         text: '7',
+        x: 12,
+        y: 16,
+        width: 32,
+        height: 32,
+        fontFamily: 'Roboto',
         align: 'center',
+        verticalAlign: 'visualCenter',
       }),
     ])
   })

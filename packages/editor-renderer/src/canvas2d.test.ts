@@ -1,4 +1,4 @@
-import { createCanvas, loadImage } from '@napi-rs/canvas'
+import { createCanvas, loadImage, type Canvas } from '@napi-rs/canvas'
 import { createRenderSceneSnapshot } from '@cute-screen/editor-core'
 import { describe, expect, it } from 'vitest'
 
@@ -6,6 +6,23 @@ import { Canvas2DRenderer, type Canvas2DLike } from './canvas2d'
 
 function asHtmlCanvas(canvas: unknown): HTMLCanvasElement {
   return canvas as unknown as HTMLCanvasElement
+}
+
+function verticalInkCenter(canvas: Canvas): number {
+  const { data, width, height } = canvas
+    .getContext('2d')
+    .getImageData(0, 0, canvas.width, canvas.height)
+  let top = height
+  let bottom = -1
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if ((data[(y * width + x) * 4 + 3] ?? 0) === 0) continue
+      top = Math.min(top, y)
+      bottom = Math.max(bottom, y)
+    }
+  }
+  if (bottom < top) throw new Error('expected rendered text ink')
+  return (top + bottom + 1) / 2
 }
 
 describe('Canvas2DRenderer', () => {
@@ -356,6 +373,51 @@ describe('Canvas2DRenderer', () => {
       ?.getImageData(12, 20, 24, 30).data
     expect(alpha?.some((value, index) => index % 4 === 3 && value > 0)).toBe(
       true,
+    )
+  })
+
+  it('visually centers numbered-marker digits from measured glyph ink', async () => {
+    const renderer = new Canvas2DRenderer()
+    const sceneCanvas = createCanvas(64, 64)
+    await renderer.initialize({
+      scene: asHtmlCanvas(sceneCanvas),
+      overlay: asHtmlCanvas(createCanvas(64, 64)),
+      dpr: 1,
+      correlationId: 'numbered-marker-center',
+    })
+    renderer.setScene(
+      createRenderSceneSnapshot({
+        width: 64,
+        height: 64,
+        nodes: [
+          {
+            id: 'numbered-marker:label',
+            kind: 'text',
+            text: '1',
+            x: 8,
+            y: 8,
+            width: 48,
+            height: 48,
+            fontFamily: 'Roboto',
+            fontSize: 32,
+            fontWeight: 700,
+            fontStyle: 'normal',
+            align: 'center',
+            verticalAlign: 'visualCenter',
+            lineHeight: 40,
+            rotation: 0,
+            opacity: 1,
+            visible: true,
+            fill: { red: 1, green: 1, blue: 1, alpha: 1 },
+          },
+        ],
+      }),
+    )
+
+    renderer.render(['scene'])
+
+    expect(Math.abs(verticalInkCenter(sceneCanvas) - 32)).toBeLessThanOrEqual(
+      0.5,
     )
   })
 

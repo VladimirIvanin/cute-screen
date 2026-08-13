@@ -168,6 +168,29 @@ Prettier для изменённых repair TS/Vue-файлов, `TESTING.md` и
 Browser и Tauri suites не перезапускались, поэтому новых runtime-утверждений
 этот repair не добавляет.
 
+### Numbered marker alignment repair, Windows x64, 2026-08-14
+
+На Windows 10 Home 22H2 build 19045, AMD64, Node `22.23.1` и pnpm `10.33.2`
+номерная метка переведена с top/em-box offset на измеряемый visual baseline.
+Red-first focused core/renderer suite воспроизвёл смещение Canvas2D: центр ink
+цифры был `10.5` при центре bounds `32`. После исправления focused suite прошёл
+39/39, `pnpm test` — 223/223, `pnpm test:render` — 10/10; `pnpm typecheck`,
+`pnpm lint`, `pnpm docs:check`, `pnpm test:boundaries` (7/7), scoped Prettier
+и `git diff --check` прошли. Полный `pnpm check` повторно прошёл lint,
+typecheck и production Vue build, затем остановился на repository-wide
+Prettier-check: 18 существующих unrelated workflow/config/docs/Vue/script/test
+files остаются неформатированными; изменённые TS и относящиеся к repair docs
+прошли scoped check.
+
+Локальный Chromium-прогон Vite E2E harness при zoom 453% сохранён в
+`artifacts/browser-e2e/numbered-marker-visual-center.png`. Pixel inspection
+дал центр чёрного круга 426,5 screen px и центр белой цифры 424 px: -2,5
+screen px, то есть -0,55 canvas px. Scene contract использует audited bundled
+Roboto вместо отсутствующего Inter. Установленный Evergreen WebView2 имеет
+версию `151.0.4129.78`, но реальный Tauri/WebView2 flow
+не перезапускался. Aggregate `pnpm test:e2e:browser` до этого завис без spec-log
+и был остановлен timeout через 184 секунды; он не считается passed evidence.
+
 ## Правило user-action
 
 Acceptance criterion формулируется наблюдаемым результатом:

@@ -109,9 +109,21 @@ interface CanvasKitCanvas {
 }
 
 type CanvasKitPicture = CanvasKitDeletable
-interface CanvasKitFont extends CanvasKitDeletable {
+export interface CanvasKitFontMetricsSource {
   getTextWidth?(text: string): number
+  getMetrics?(): Readonly<{
+    ascent: number
+    descent: number
+    leading: number
+    bounds?: Float32Array
+  }>
+  getGlyphIDs?(text: string): Uint16Array | null
+  getGlyphBounds?(glyphs: Uint16Array): Float32Array
+  getGlyphWidths?(glyphs: Uint16Array): Float32Array
 }
+
+interface CanvasKitFont
+  extends CanvasKitDeletable, CanvasKitFontMetricsSource {}
 
 interface CanvasKitPictureRecorder extends CanvasKitDeletable {
   beginRecording(bounds: Float32Array): CanvasKitCanvas
@@ -471,6 +483,92 @@ function roundedRectPath(
   }
 }
 
+function canvasKitInkBounds(
+  font: CanvasKitFontMetricsSource,
+  text: string,
+  fontSize: number,
+): Readonly<{ top: number; bottom: number }> {
+  const glyphs = font.getGlyphIDs?.(text)
+  if (glyphs && glyphs.length > 0 && font.getGlyphBounds) {
+    const bounds = font.getGlyphBounds(glyphs)
+    let top = Number.POSITIVE_INFINITY
+    let bottom = Number.NEGATIVE_INFINITY
+    for (let index = 0; index + 3 < bounds.length; index += 4) {
+      const glyphTop = bounds[index + 1] ?? Number.NaN
+      const glyphBottom = bounds[index + 3] ?? Number.NaN
+      if (!Number.isFinite(glyphTop) || !Number.isFinite(glyphBottom)) continue
+      top = Math.min(top, glyphTop)
+      bottom = Math.max(bottom, glyphBottom)
+    }
+    if (Number.isFinite(top) && Number.isFinite(bottom) && bottom > top) {
+      return { top, bottom }
+    }
+  }
+  const metrics = font.getMetrics?.()
+  if (metrics) {
+    if (
+      Number.isFinite(metrics.ascent) &&
+      Number.isFinite(metrics.descent) &&
+      metrics.descent > metrics.ascent
+    ) {
+      return { top: metrics.ascent, bottom: metrics.descent }
+    }
+    const bounds = metrics.bounds
+    const boundsTop = bounds?.[1] ?? Number.NaN
+    const boundsBottom = bounds?.[3] ?? Number.NaN
+    if (
+      bounds &&
+      Number.isFinite(boundsTop) &&
+      Number.isFinite(boundsBottom) &&
+      boundsBottom > boundsTop
+    ) {
+      return { top: boundsTop, bottom: boundsBottom }
+    }
+  }
+  return { top: -fontSize * 0.8, bottom: fontSize * 0.2 }
+}
+
+export function resolveCanvasKitVisualCenterBaseline(
+  font: CanvasKitFontMetricsSource,
+  text: string,
+  y: number,
+  height: number,
+  lineHeight: number,
+  fontSize: number,
+): number {
+  const lines = text.split('\n')
+  let top = Number.POSITIVE_INFINITY
+  let bottom = Number.NEGATIVE_INFINITY
+  for (const [index, line] of lines.entries()) {
+    if (line.length === 0) continue
+    const ink = canvasKitInkBounds(font, line, fontSize)
+    top = Math.min(top, index * lineHeight + ink.top)
+    bottom = Math.max(bottom, index * lineHeight + ink.bottom)
+  }
+  if (!Number.isFinite(top) || !Number.isFinite(bottom)) {
+    const fallback = canvasKitInkBounds(font, '0', fontSize)
+    top = fallback.top
+    bottom = (lines.length - 1) * lineHeight + fallback.bottom
+  }
+  return y + height / 2 - (top + bottom) / 2
+}
+
+function canvasKitTextWidth(
+  font: CanvasKitFontMetricsSource,
+  text: string,
+  fontSize: number,
+): number {
+  const measured = font.getTextWidth?.(text)
+  if (typeof measured === 'number' && Number.isFinite(measured)) return measured
+  const glyphs = font.getGlyphIDs?.(text)
+  if (glyphs && font.getGlyphWidths) {
+    return font
+      .getGlyphWidths(glyphs)
+      .reduce((total, width) => total + width, 0)
+  }
+  return Array.from(text).length * fontSize * 0.6
+}
+
 export function drawNodesCanvasKit(
   canvasKit: CanvasKitApi,
   canvas: CanvasKitCanvas,
@@ -671,6 +769,18 @@ export function drawNodesCanvasKit(
               node.x + node.width / 2,
               node.y + node.height / 2,
               () => {
+                const lines = node.text.split('\n')
+                const firstLineBaseline =
+                  node.verticalAlign === 'visualCenter'
+                    ? resolveCanvasKitVisualCenterBaseline(
+                        font,
+                        node.text,
+                        node.y,
+                        node.height,
+                        node.lineHeight,
+                        node.fontSize,
+                      )
+                    : node.y + node.fontSize
                 const drawLine = (
                   line: string,
                   y: number,
@@ -680,11 +790,10 @@ export function drawNodesCanvasKit(
                   const spacing = node.letterSpacing ?? 0
                   const characters = Array.from(line)
                   const characterWidth = (character: string): number =>
-                    font.getTextWidth?.(character) ?? node.fontSize * 0.6
+                    canvasKitTextWidth(font, character, node.fontSize)
                   const width =
                     spacing === 0
-                      ? (font.getTextWidth?.(line) ??
-                        characters.length * node.fontSize * 0.6)
+                      ? canvasKitTextWidth(font, line, node.fontSize)
                       : characters.reduce(
                           (total, character, index) =>
                             total +
@@ -730,15 +839,12 @@ export function drawNodesCanvasKit(
                     )
                     stroke.setBlendMode(blendMode(canvasKit, node.blendMode))
                     stroke.setMaskFilter?.(maskFilter ?? null)
-                    for (const [index, line] of node.text
-                      .split('\n')
-                      .entries()) {
+                    for (const [index, line] of lines.entries()) {
                       drawLine(
                         line,
-                        node.y +
-                          node.fontSize +
-                          shadow.offsetY +
-                          index * node.lineHeight,
+                        firstLineBaseline +
+                          index * node.lineHeight +
+                          shadow.offsetY,
                         stroke,
                         shadow.offsetX,
                       )
@@ -765,10 +871,10 @@ export function drawNodesCanvasKit(
                         ? canvasKit.StrokeJoin.Bevel
                         : canvasKit.StrokeJoin.Miter,
                   )
-                  for (const [index, line] of node.text.split('\n').entries()) {
+                  for (const [index, line] of lines.entries()) {
                     drawLine(
                       line,
-                      node.y + node.fontSize + index * node.lineHeight,
+                      firstLineBaseline + index * node.lineHeight,
                       stroke,
                     )
                   }
@@ -781,24 +887,23 @@ export function drawNodesCanvasKit(
                   node.blendMode,
                   resources,
                 )
-                for (const [index, line] of node.text.split('\n').entries()) {
+                for (const [index, line] of lines.entries()) {
                   drawLine(
                     line,
-                    node.y + node.fontSize + index * node.lineHeight,
+                    firstLineBaseline + index * node.lineHeight,
                     fill,
                   )
                 }
                 if (node.underline) {
                   fill.setStyle(canvasKit.PaintStyle.Stroke)
                   fill.setStrokeWidth(Math.max(1, node.fontSize * 0.06))
-                  for (const [index, line] of node.text.split('\n').entries()) {
+                  for (const [index, line] of lines.entries()) {
                     const characters = Array.from(line)
                     const spacing = node.letterSpacing ?? 0
                     const width = characters.reduce(
                       (total, character, characterIndex) =>
                         total +
-                        (font.getTextWidth?.(character) ??
-                          node.fontSize * 0.6) +
+                        canvasKitTextWidth(font, character, node.fontSize) +
                         (characterIndex === characters.length - 1
                           ? 0
                           : spacing),
@@ -811,7 +916,13 @@ export function drawNodesCanvasKit(
                           ? node.x + node.width - width
                           : node.x
                     const underlineY =
-                      node.y + node.fontSize * 1.06 + index * node.lineHeight
+                      node.verticalAlign === 'visualCenter'
+                        ? firstLineBaseline +
+                          index * node.lineHeight +
+                          node.fontSize * 0.08
+                        : node.y +
+                          node.fontSize * 1.06 +
+                          index * node.lineHeight
                     canvas.drawLine(
                       startX,
                       underlineY,

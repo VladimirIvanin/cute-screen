@@ -2,6 +2,7 @@ import type {
   RenderNode,
   RenderPaint,
   RenderSceneSnapshot,
+  RenderTextNode,
   RgbaColor,
 } from '@cute-screen/editor-core'
 
@@ -144,6 +145,50 @@ function paintStyle(
   for (const stop of paint.stops)
     gradient.addColorStop(stop.position, cssColor(stop.color))
   return gradient
+}
+
+function measuredInkBounds(
+  metrics: TextMetrics,
+  fontSize: number,
+): Readonly<{ top: number; bottom: number }> {
+  const candidates = [
+    [metrics.actualBoundingBoxAscent, metrics.actualBoundingBoxDescent],
+    [metrics.fontBoundingBoxAscent, metrics.fontBoundingBoxDescent],
+    [metrics.emHeightAscent, metrics.emHeightDescent],
+  ] as const
+  for (const [ascent, descent] of candidates) {
+    if (
+      Number.isFinite(ascent) &&
+      Number.isFinite(descent) &&
+      ascent >= 0 &&
+      descent >= 0 &&
+      ascent + descent > 0
+    ) {
+      return { top: -ascent, bottom: descent }
+    }
+  }
+  return { top: -fontSize * 0.8, bottom: fontSize * 0.2 }
+}
+
+function visualCenterBaseline(
+  context: Context2D,
+  node: RenderTextNode,
+  lines: readonly string[],
+): number {
+  let top = Number.POSITIVE_INFINITY
+  let bottom = Number.NEGATIVE_INFINITY
+  for (const [index, line] of lines.entries()) {
+    if (line.length === 0) continue
+    const ink = measuredInkBounds(context.measureText(line), node.fontSize)
+    top = Math.min(top, index * node.lineHeight + ink.top)
+    bottom = Math.max(bottom, index * node.lineHeight + ink.bottom)
+  }
+  if (!Number.isFinite(top) || !Number.isFinite(bottom)) {
+    const fallback = measuredInkBounds(context.measureText('0'), node.fontSize)
+    top = fallback.top
+    bottom = (lines.length - 1) * node.lineHeight + fallback.bottom
+  }
+  return node.y + node.height / 2 - (top + bottom) / 2
 }
 
 function withTransform(
@@ -333,7 +378,13 @@ export function drawNodes2D(
         const centerY = node.y + node.height / 2
         withTransform(context, node, centerX, centerY, () => {
           context.font = `${node.fontStyle} ${node.fontWeight} ${node.fontSize}px "${node.fontFamily.replaceAll('"', '')}", sans-serif`
-          context.textBaseline = 'top'
+          const lines = node.text.split('\n')
+          context.textBaseline =
+            node.verticalAlign === 'visualCenter' ? 'alphabetic' : 'top'
+          const firstLineY =
+            node.verticalAlign === 'visualCenter'
+              ? visualCenterBaseline(context, node, lines)
+              : node.y
           context.textAlign =
             node.align === 'center'
               ? 'center'
@@ -384,9 +435,11 @@ export function drawNodes2D(
             // Draw a colored source as well as its shadow; the final text pass
             // below covers the source while retaining the blurred perimeter.
             context.fillStyle = cssColor(shadow.color)
-            for (const [index, line] of node.text.split('\n').entries()) {
-              drawLine(line, node.y + index * node.lineHeight, (text, x, y) =>
-                context.fillText(text, x, y),
+            for (const [index, line] of lines.entries()) {
+              drawLine(
+                line,
+                firstLineY + index * node.lineHeight,
+                (text, x, y) => context.fillText(text, x, y),
               )
             }
           }
@@ -394,20 +447,22 @@ export function drawNodes2D(
           context.shadowOffsetX = 0
           context.shadowOffsetY = 0
           context.shadowBlur = 0
-          for (const [index, line] of node.text.split('\n').entries()) {
+          for (const [index, line] of lines.entries()) {
             if (node.stroke && (node.strokeWidth ?? 0) > 0) {
-              drawLine(line, node.y + index * node.lineHeight, (text, x, y) =>
-                context.strokeText(text, x, y),
+              drawLine(
+                line,
+                firstLineY + index * node.lineHeight,
+                (text, x, y) => context.strokeText(text, x, y),
               )
             }
-            drawLine(line, node.y + index * node.lineHeight, (text, x, y) =>
+            drawLine(line, firstLineY + index * node.lineHeight, (text, x, y) =>
               context.fillText(text, x, y),
             )
           }
           if (node.underline) {
             context.strokeStyle = paintStyle(context, node.fill, resources)
             context.lineWidth = Math.max(1, node.fontSize * 0.06)
-            for (const [index, line] of node.text.split('\n').entries()) {
+            for (const [index, line] of lines.entries()) {
               const spacing = node.letterSpacing ?? 0
               const characters = Array.from(line)
               const width =
@@ -429,7 +484,9 @@ export function drawNodes2D(
                     ? x - width
                     : x
               const underlineY =
-                node.y + index * node.lineHeight + node.fontSize * 1.06
+                node.verticalAlign === 'visualCenter'
+                  ? firstLineY + index * node.lineHeight + node.fontSize * 0.08
+                  : node.y + index * node.lineHeight + node.fontSize * 1.06
               context.beginPath()
               context.moveTo(startX, underlineY)
               context.lineTo(startX + width, underlineY)

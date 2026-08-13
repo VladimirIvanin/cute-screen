@@ -168,6 +168,13 @@ dotted, opacity/blend и world endpoints. Создать straight, quadratic и 
 
 ## A07 — Text/content/clipboard
 
+Windows x64 repair evidence (2026-08-14) покрывает оптическое центрирование
+цифры numbered marker: renderer использует actual glyph ink ascent/descent, а
+не верх em-box. Focused core/Canvas2D/CanvasKit regressions прошли 39/39;
+локальный Chromium screenshot при zoom 453% дал -0,55 canvas px между центром
+круга и центром ink цифры. Реальный Tauri/WebView2 rerun и multiline label
+editing остаются pending.
+
 1. Из empty state открыть локальную картинку и проверить новый document с locked
    base layer.
 2. Вернуться в empty state, вставить bitmap из внешнего приложения и проверить
