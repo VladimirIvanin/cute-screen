@@ -44,6 +44,7 @@ declare global {
     }
     __cuteScreenE2eM05?: {
       snapshot(): EditorDocumentV1 | undefined
+      versionToken(): number | undefined
     }
   }
 }
@@ -284,7 +285,7 @@ async function loadPersistedDocument(): Promise<boolean> {
     } else {
       sourceImage.value = undefined
     }
-    if (parsed.kind === 'readOnly') {
+    if (parsed.kind !== 'editable') {
       await closeDocumentSession()
       readOnlyDocument.value = true
       documentState.value = {
@@ -395,7 +396,7 @@ async function mountM05HarnessDocument(): Promise<void> {
     ? { width: 2560, height: 1440 }
     : { width: 160, height: 120 }
   const document: EditorDocumentV1 = {
-    schemaVersion: 2,
+    schemaVersion: 7,
     id: '019c1f62-058e-7000-8000-000000000005',
     source: {
       blobHash: hash,
@@ -426,6 +427,8 @@ async function mountM05HarnessDocument(): Promise<void> {
           scaleY: 1,
         },
         opacity: 1,
+        blendMode: 'normal',
+        shadows: [],
         visible: true,
         locked: true,
         payload: {
@@ -436,6 +439,10 @@ async function mountM05HarnessDocument(): Promise<void> {
           orientationApplied: true,
           color: { colorSpace: 'srgb', hasIccProfile: false },
           role: 'base',
+          border: null,
+          radius: 0,
+          crop: null,
+          mask: null,
         },
       },
       ...[
@@ -454,6 +461,8 @@ async function mountM05HarnessDocument(): Promise<void> {
           scaleY: 1,
         },
         opacity: 1,
+        blendMode: 'normal' as const,
+        shadows: [],
         visible: true,
         locked: false,
         payload: {
@@ -463,6 +472,16 @@ async function mountM05HarnessDocument(): Promise<void> {
             color: { red: 0.898, green: 0.282, blue: 0.302, alpha: 1 },
             opacity: 1,
           },
+          stroke: {
+            color: { red: 0.898, green: 0.282, blue: 0.302, alpha: 1 },
+            width: 3,
+            style: 'solid',
+            cap: 'round',
+            join: 'round',
+          },
+          cornerRadius: 0,
+          starPoints: 5,
+          starInnerRatio: 0.45,
         },
       })),
     ],
@@ -486,6 +505,7 @@ async function mountM05HarnessDocument(): Promise<void> {
   documentSession.value = session
   window.__cuteScreenE2eM05 = {
     snapshot: () => documentSession.value?.snapshot.core.document,
+    versionToken: () => documentSession.value?.snapshot.core.versionToken,
   }
   sourceImage.value = await loadM05HarnessImage(dimensions)
 }

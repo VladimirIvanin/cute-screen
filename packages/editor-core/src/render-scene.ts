@@ -10,14 +10,6 @@ export interface RenderGradientStop {
   readonly color: RgbaColor
 }
 
-/** Renderer-safe shadow primitive shared by text preview and export. */
-export interface RenderShadow {
-  readonly color: RgbaColor
-  readonly offsetX: number
-  readonly offsetY: number
-  readonly blur: number
-}
-
 /** Renderer-neutral paints deliberately carry resolved canvas-space geometry. */
 export type RenderPaint =
   | RgbaColor
@@ -153,7 +145,30 @@ export interface RenderImageNode extends RenderNodeBase {
   readonly lineJoin?: RenderLineJoin
 }
 
-/** Text stays a first-class scene node so preview and export share layout input. */
+export interface RenderTextStyle {
+  readonly fontFamily: string
+  readonly fontSize: number
+  readonly color: RgbaColor
+  readonly fontWeight: number
+  readonly fontStyle: 'normal' | 'italic'
+  readonly strikethrough: boolean
+}
+
+export interface RenderTextRun extends RenderTextStyle {
+  /** UTF-16 offsets into RenderTextNode.text. */
+  readonly start: number
+  readonly end: number
+}
+
+export interface RenderTextParagraph {
+  /** UTF-16 offsets into RenderTextNode.text. */
+  readonly start: number
+  readonly end: number
+  readonly alignment: 'start' | 'center' | 'end'
+  readonly listKind: 'none' | 'bullet'
+}
+
+/** Text stays a first-class scene node so preview and export share rich layout input. */
 export interface RenderTextNode extends RenderNodeBase {
   readonly kind: 'text'
   readonly text: string
@@ -161,21 +176,12 @@ export interface RenderTextNode extends RenderNodeBase {
   readonly y: number
   readonly width: number
   readonly height: number
-  readonly fontFamily: string
-  readonly fontSize: number
-  readonly fontWeight: number
-  readonly fontStyle: 'normal' | 'italic'
-  readonly underline?: boolean
-  readonly letterSpacing?: number
-  readonly align: 'start' | 'center' | 'end' | 'justify'
+  readonly wrap: 'autoSize' | 'fixedWidth'
+  readonly fixedWidth?: number
+  readonly runs: readonly RenderTextRun[]
+  readonly paragraphs: readonly RenderTextParagraph[]
   /** Optional optical alignment for compact labels such as numbered markers. */
   readonly verticalAlign?: 'visualCenter'
-  readonly lineHeight: number
-  readonly fill: RenderPaint
-  readonly shadows?: readonly RenderShadow[]
-  readonly stroke?: RgbaColor
-  readonly strokeWidth?: number
-  readonly lineJoin?: RenderLineJoin
 }
 
 export type RenderNode =
@@ -442,69 +448,113 @@ function freezeImageNode(node: RenderImageNode): RenderImageNode {
 }
 
 function freezeTextNode(node: RenderTextNode): RenderTextNode {
-  if (node.text.length === 0) throw new Error(`${node.id}.text is empty`)
-  if (!node.fontFamily) throw new Error(`${node.id}.fontFamily is empty`)
   assertFinite(node.x, `${node.id}.x`)
   assertFinite(node.y, `${node.id}.y`)
   for (const [field, value] of Object.entries({
     width: node.width,
     height: node.height,
-    fontSize: node.fontSize,
-    lineHeight: node.lineHeight,
   }))
     assertPositive(value, `${node.id}.${field}`)
-  if (
-    !Number.isInteger(node.fontWeight) ||
-    node.fontWeight < 100 ||
-    node.fontWeight > 900
-  ) {
-    throw new RangeError(`${node.id}.fontWeight is invalid`)
+  if (node.wrap !== 'autoSize' && node.wrap !== 'fixedWidth') {
+    throw new RangeError(`${node.id}.wrap is invalid`)
   }
-  if (!['normal', 'italic'].includes(node.fontStyle)) {
-    throw new RangeError(`${node.id}.fontStyle is invalid`)
-  }
-  if (
-    node.letterSpacing !== undefined &&
-    (!Number.isFinite(node.letterSpacing) || Math.abs(node.letterSpacing) > 256)
-  ) {
-    throw new RangeError(`${node.id}.letterSpacing is invalid`)
-  }
-  if (!['start', 'center', 'end', 'justify'].includes(node.align)) {
-    throw new RangeError(`${node.id}.align is invalid`)
-  }
-  if (node.strokeWidth !== undefined) {
-    assertPositive(node.strokeWidth, `${node.id}.strokeWidth`)
-  }
-  if (
-    node.lineJoin !== undefined &&
-    !['miter', 'round', 'bevel'].includes(node.lineJoin)
-  ) {
-    throw new RangeError(`${node.id}.lineJoin is invalid`)
-  }
-  if (node.shadows !== undefined && node.shadows.length > 4) {
-    throw new RangeError(`${node.id}.shadows exceeds renderer limit`)
-  }
-  const shadows = node.shadows?.map((shadow, index) => {
-    assertFinite(shadow.offsetX, `${node.id}.shadows[${index}].offsetX`)
-    assertFinite(shadow.offsetY, `${node.id}.shadows[${index}].offsetY`)
-    if (!Number.isFinite(shadow.blur) || shadow.blur < 0 || shadow.blur > 128) {
-      throw new RangeError(`${node.id}.shadows[${index}].blur is invalid`)
+  if (node.wrap === 'fixedWidth') {
+    if (node.fixedWidth === undefined) {
+      throw new RangeError(`${node.id}.fixedWidth is required`)
     }
-    return Object.freeze({
-      color: freezeColor(shadow.color),
-      offsetX: shadow.offsetX,
-      offsetY: shadow.offsetY,
-      blur: shadow.blur,
-    })
+    assertPositive(node.fixedWidth, `${node.id}.fixedWidth`)
+  } else if (node.fixedWidth !== undefined) {
+    throw new RangeError(
+      `${node.id}.fixedWidth is only valid for fixedWidth text`,
+    )
+  }
+  const isBoundary = (offset: number): boolean => {
+    if (!Number.isInteger(offset) || offset < 0 || offset > node.text.length)
+      return false
+    if (offset === 0 || offset === node.text.length) return true
+    const previous = node.text.charCodeAt(offset - 1)
+    const next = node.text.charCodeAt(offset)
+    return !(
+      previous >= 0xd800 &&
+      previous <= 0xdbff &&
+      next >= 0xdc00 &&
+      next <= 0xdfff
+    )
+  }
+  let runEnd = 0
+  const runs = node.runs.map((run, index) => {
+    if (
+      run.start !== runEnd ||
+      run.end <= run.start ||
+      !isBoundary(run.start) ||
+      !isBoundary(run.end)
+    ) {
+      throw new RangeError(
+        `${node.id}.runs[${index}] must be contiguous UTF-16 ranges`,
+      )
+    }
+    runEnd = run.end
+    if (!run.fontFamily)
+      throw new Error(`${node.id}.runs[${index}].fontFamily is empty`)
+    assertPositive(run.fontSize, `${node.id}.runs[${index}].fontSize`)
+    if (
+      !Number.isInteger(run.fontWeight) ||
+      run.fontWeight < 100 ||
+      run.fontWeight > 900 ||
+      run.fontWeight % 100 !== 0
+    ) {
+      throw new RangeError(`${node.id}.runs[${index}].fontWeight is invalid`)
+    }
+    if (!['normal', 'italic'].includes(run.fontStyle)) {
+      throw new RangeError(`${node.id}.runs[${index}].fontStyle is invalid`)
+    }
+    return Object.freeze({ ...run, color: freezeColor(run.color) })
   })
+  let paragraphEnd = 0
+  const paragraphs = node.paragraphs.map((paragraph, index) => {
+    const terminalEmpty =
+      index === node.paragraphs.length - 1 &&
+      paragraph.start === node.text.length &&
+      paragraph.end === node.text.length &&
+      node.text.endsWith('\n')
+    if (
+      paragraph.start !== paragraphEnd ||
+      (paragraph.end <= paragraph.start && !terminalEmpty) ||
+      !isBoundary(paragraph.start) ||
+      !isBoundary(paragraph.end)
+    ) {
+      throw new RangeError(
+        `${node.id}.paragraphs[${index}] must be contiguous UTF-16 ranges`,
+      )
+    }
+    paragraphEnd = paragraph.end
+    if (!['start', 'center', 'end'].includes(paragraph.alignment)) {
+      throw new RangeError(
+        `${node.id}.paragraphs[${index}].alignment is invalid`,
+      )
+    }
+    if (paragraph.listKind !== 'none' && paragraph.listKind !== 'bullet') {
+      throw new RangeError(
+        `${node.id}.paragraphs[${index}].listKind is invalid`,
+      )
+    }
+    return Object.freeze({ ...paragraph })
+  })
+  if (
+    (node.text.length === 0 &&
+      (runs.length !== 0 || paragraphs.length !== 0)) ||
+    (node.text.length > 0 &&
+      (runs.length === 0 ||
+        paragraphs.length === 0 ||
+        runEnd !== node.text.length ||
+        paragraphEnd !== node.text.length))
+  ) {
+    throw new RangeError(`${node.id} rich text ranges must cover text exactly`)
+  }
   return Object.freeze({
     ...node,
-    ...(node.letterSpacing === undefined
-      ? {}
-      : { letterSpacing: node.letterSpacing }),
-    fill: freezePaint(node.fill, `${node.id}.fill`),
-    ...(shadows === undefined ? {} : { shadows: Object.freeze(shadows) }),
-    ...(node.stroke === undefined ? {} : { stroke: freezeColor(node.stroke) }),
+    runs: Object.freeze(runs),
+    paragraphs: Object.freeze(paragraphs),
   })
 }
 

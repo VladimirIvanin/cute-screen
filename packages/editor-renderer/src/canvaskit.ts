@@ -2,11 +2,13 @@ import type {
   RenderNode,
   RenderPaint,
   RenderSceneSnapshot,
+  RenderTextStyle,
   RgbaColor,
 } from '@cute-screen/editor-core'
 
 import type { InvalidationReason } from './scheduler'
 import { drawNodes2D } from './canvas2d'
+import { layoutRichText } from './rich-text-layout'
 import type {
   CanvasStack,
   FrameMetric,
@@ -45,6 +47,15 @@ type CanvasKitShader = CanvasKitDeletable
 type CanvasKitPathEffect = CanvasKitDeletable
 type CanvasKitMaskFilter = CanvasKitDeletable
 type CanvasKitPath = CanvasKitDeletable
+interface CanvasKitTypeface extends CanvasKitDeletable {
+  getGlyphIDs?(text: string): Uint16Array | null
+}
+
+export interface CanvasKitFontData {
+  readonly family: string
+  readonly subset: 'latin' | 'cyrillic'
+  readonly data: ArrayBuffer
+}
 
 interface CanvasKitPathBuilder extends CanvasKitDeletable {
   moveTo(x: number, y: number): void
@@ -122,8 +133,10 @@ export interface CanvasKitFontMetricsSource {
   getGlyphWidths?(glyphs: Uint16Array): Float32Array
 }
 
-interface CanvasKitFont
-  extends CanvasKitDeletable, CanvasKitFontMetricsSource {}
+interface CanvasKitFont extends CanvasKitDeletable, CanvasKitFontMetricsSource {
+  setEmbolden?(embolden: boolean): void
+  setSkewX?(skew: number): void
+}
 
 interface CanvasKitPictureRecorder extends CanvasKitDeletable {
   beginRecording(bounds: Float32Array): CanvasKitCanvas
@@ -200,12 +213,13 @@ export interface CanvasKitApi {
   readonly TRANSPARENT: unknown
   readonly PictureRecorder?: new () => CanvasKitPictureRecorder
   readonly Font?: new (
-    typeface: CanvasKitDeletable,
+    typeface: CanvasKitTypeface,
     size: number,
   ) => CanvasKitFont
   readonly Typeface?: Readonly<{
-    MakeDefault?: () => CanvasKitDeletable
-    GetDefault?: () => CanvasKitDeletable
+    MakeDefault?: () => CanvasKitTypeface
+    GetDefault?: () => CanvasKitTypeface
+    MakeFreeTypeFaceFromData?: (data: ArrayBuffer) => CanvasKitTypeface | null
   }>
   XYWHRect(x: number, y: number, width: number, height: number): Float32Array
   RRectXY(rect: Float32Array, radiusX: number, radiusY: number): Float32Array
@@ -569,11 +583,83 @@ function canvasKitTextWidth(
   return Array.from(text).length * fontSize * 0.6
 }
 
+interface ResolvedCanvasKitTypeface {
+  readonly key: string
+  readonly typeface: CanvasKitTypeface
+}
+
+function requiresCyrillicCoverage(text: string): boolean {
+  return /[\u0400-\u052f]/u.test(text)
+}
+
+function hasGlyphCoverage(
+  source: Pick<CanvasKitFontMetricsSource, 'getGlyphIDs'>,
+  text: string,
+): boolean {
+  const glyphs = source.getGlyphIDs?.(text)
+  return (
+    glyphs !== null &&
+    glyphs !== undefined &&
+    glyphs.length === Array.from(text).length &&
+    !glyphs.some((glyph) => glyph === 0)
+  )
+}
+
+class CanvasKitTypefaceStore {
+  readonly #typefaces = new Map<string, CanvasKitTypeface>()
+
+  constructor(canvasKit: CanvasKitApi, fontData: readonly CanvasKitFontData[]) {
+    const makeTypeface = canvasKit.Typeface?.MakeFreeTypeFaceFromData
+    if (!makeTypeface) return
+    for (const font of fontData) {
+      const typeface = makeTypeface(font.data.slice(0))
+      if (typeface) {
+        this.#typefaces.set(
+          `${font.family.toLowerCase()}\u0000${font.subset}`,
+          typeface,
+        )
+      }
+    }
+  }
+
+  resolve(family: string, text: string): ResolvedCanvasKitTypeface | undefined {
+    const requireCoverage = requiresCyrillicCoverage(text)
+    const subset = requireCoverage ? 'cyrillic' : 'latin'
+    const normalizedFamily = family.toLowerCase()
+    const exactKey = `${normalizedFamily}\u0000${subset}`
+    const exact = this.#typefaces.get(exactKey)
+    if (exact && (!requireCoverage || hasGlyphCoverage(exact, text)))
+      return { key: exactKey, typeface: exact }
+    for (const [key, typeface] of this.#typefaces) {
+      if (
+        key.endsWith(`\u0000${subset}`) &&
+        (!requireCoverage || hasGlyphCoverage(typeface, text))
+      )
+        return { key, typeface }
+    }
+    if (!requireCoverage) {
+      const fallback = this.#typefaces.entries().next().value as
+        readonly [string, CanvasKitTypeface] | undefined
+      return fallback ? { key: fallback[0], typeface: fallback[1] } : undefined
+    }
+    for (const [key, typeface] of this.#typefaces) {
+      if (hasGlyphCoverage(typeface, text)) return { key, typeface }
+    }
+    return undefined
+  }
+
+  dispose(): void {
+    for (const typeface of this.#typefaces.values()) typeface.delete()
+    this.#typefaces.clear()
+  }
+}
+
 export function drawNodesCanvasKit(
   canvasKit: CanvasKitApi,
   canvas: CanvasKitCanvas,
   nodes: readonly RenderNode[],
   resources: ReadonlyMap<string, CanvasKitImageResource> = new Map(),
+  typefaces?: CanvasKitTypefaceStore,
 ): void {
   for (const node of nodes) {
     if (!node.visible || node.opacity === 0) continue
@@ -757,11 +843,60 @@ export function drawNodesCanvasKit(
         }
         case 'text': {
           if (!canvasKit.Font || !canvasKit.Typeface || !canvas.drawText) break
-          const typeface =
+          const defaultTypeface =
             canvasKit.Typeface.MakeDefault?.() ??
             canvasKit.Typeface.GetDefault?.()
-          if (!typeface) break
-          const font = new canvasKit.Font(typeface, node.fontSize)
+          if (!defaultTypeface && !typefaces) break
+          const fonts = new Map<string, CanvasKitFont>()
+          const fontForStyle = (
+            style: RenderTextStyle,
+            text: string,
+          ): CanvasKitFont => {
+            const resolved = typefaces?.resolve(style.fontFamily, text)
+            const typeface = resolved?.typeface ?? defaultTypeface
+            if (!typeface) {
+              if (requiresCyrillicCoverage(text)) {
+                throw new Error(
+                  `CanvasKit glyph coverage is unavailable for "${node.text}" in ${style.fontFamily}`,
+                )
+              }
+              throw new Error(
+                `CanvasKit typeface is unavailable for ${style.fontFamily}`,
+              )
+            }
+            const key = [
+              resolved?.key ?? 'default',
+              style.fontSize,
+              style.fontWeight,
+              style.fontStyle,
+            ].join('\u0000')
+            const existing = fonts.get(key)
+            if (existing) {
+              if (
+                requiresCyrillicCoverage(text) &&
+                !hasGlyphCoverage(existing, text)
+              ) {
+                throw new Error(
+                  `CanvasKit glyph coverage is unavailable for "${node.text}" in ${style.fontFamily}`,
+                )
+              }
+              return existing
+            }
+            const font = new canvasKit.Font!(typeface, style.fontSize)
+            font.setEmbolden?.(style.fontWeight >= 600)
+            font.setSkewX?.(style.fontStyle === 'italic' ? -0.2 : 0)
+            if (
+              requiresCyrillicCoverage(text) &&
+              !hasGlyphCoverage(font, text)
+            ) {
+              font.delete()
+              throw new Error(
+                `CanvasKit glyph coverage is unavailable for "${node.text}" in ${style.fontFamily}`,
+              )
+            }
+            fonts.set(key, font)
+            return font
+          }
           try {
             withTransform(
               canvas,
@@ -769,174 +904,76 @@ export function drawNodesCanvasKit(
               node.x + node.width / 2,
               node.y + node.height / 2,
               () => {
-                const lines = node.text.split('\n')
-                const firstLineBaseline =
-                  node.verticalAlign === 'visualCenter'
-                    ? resolveCanvasKitVisualCenterBaseline(
-                        font,
-                        node.text,
-                        node.y,
-                        node.height,
-                        node.lineHeight,
-                        node.fontSize,
-                      )
-                    : node.y + node.fontSize
-                const drawLine = (
-                  line: string,
-                  y: number,
-                  paint: CanvasKitPaint,
-                  offsetX = 0,
-                ): void => {
-                  const spacing = node.letterSpacing ?? 0
-                  const characters = Array.from(line)
-                  const characterWidth = (character: string): number =>
-                    canvasKitTextWidth(font, character, node.fontSize)
-                  const width =
-                    spacing === 0
-                      ? canvasKitTextWidth(font, line, node.fontSize)
-                      : characters.reduce(
-                          (total, character, index) =>
-                            total +
-                            characterWidth(character) +
-                            (index === characters.length - 1 ? 0 : spacing),
-                          0,
-                        )
-                  let x =
-                    node.align === 'center'
-                      ? node.x + node.width / 2 - width / 2
-                      : node.align === 'end'
-                        ? node.x + node.width - width
-                        : node.x
-                  x += offsetX
-                  if (spacing === 0) {
-                    canvas.drawText!(line, x, y, paint, font)
-                    return
+                const layout = layoutRichText(node, (text, style) => {
+                  const font = fontForStyle(style, text)
+                  const ink = canvasKitInkBounds(font, text, style.fontSize)
+                  return {
+                    width: canvasKitTextWidth(font, text, style.fontSize),
+                    ascent: Math.max(0, -ink.top),
+                    descent: Math.max(0, ink.bottom),
                   }
-                  for (const character of characters) {
-                    canvas.drawText!(character, x, y, paint, font)
-                    x += characterWidth(character) + spacing
-                  }
-                }
-                for (const shadow of node.shadows ?? []) {
-                  const maskFilter =
-                    shadow.blur > 0 &&
-                    canvasKit.MaskFilter &&
-                    canvasKit.BlurStyle &&
-                    stroke.setMaskFilter
-                      ? canvasKit.MaskFilter.MakeBlur(
-                          canvasKit.BlurStyle.Normal,
-                          shadow.blur / 2,
-                          false,
-                        )
-                      : undefined
-                  try {
+                })
+                for (const line of layout.lines) {
+                  if (line.bullet) {
                     configurePaint(
                       canvasKit,
-                      stroke,
-                      shadow.color,
+                      fill,
+                      line.bullet.color,
                       node.opacity,
                       'fill',
                     )
-                    stroke.setBlendMode(blendMode(canvasKit, node.blendMode))
-                    stroke.setMaskFilter?.(maskFilter ?? null)
-                    for (const [index, line] of lines.entries()) {
-                      drawLine(
-                        line,
-                        firstLineBaseline +
-                          index * node.lineHeight +
-                          shadow.offsetY,
-                        stroke,
-                        shadow.offsetX,
-                      )
-                    }
-                  } finally {
-                    stroke.setMaskFilter?.(null)
-                    maskFilter?.delete()
-                  }
-                }
-                if (node.stroke && (node.strokeWidth ?? 0) > 0) {
-                  configurePaint(
-                    canvasKit,
-                    stroke,
-                    node.stroke,
-                    node.opacity,
-                    'stroke',
-                    node.strokeWidth ?? 1,
-                  )
-                  stroke.setBlendMode(blendMode(canvasKit, node.blendMode))
-                  stroke.setStrokeJoin(
-                    node.lineJoin === 'round'
-                      ? canvasKit.StrokeJoin.Round
-                      : node.lineJoin === 'bevel'
-                        ? canvasKit.StrokeJoin.Bevel
-                        : canvasKit.StrokeJoin.Miter,
-                  )
-                  for (const [index, line] of lines.entries()) {
-                    drawLine(
-                      line,
-                      firstLineBaseline + index * node.lineHeight,
-                      stroke,
-                    )
-                  }
-                }
-                shader = configureFillPaint(
-                  canvasKit,
-                  fill,
-                  node.fill,
-                  node.opacity,
-                  node.blendMode,
-                  resources,
-                )
-                for (const [index, line] of lines.entries()) {
-                  drawLine(
-                    line,
-                    firstLineBaseline + index * node.lineHeight,
-                    fill,
-                  )
-                }
-                if (node.underline) {
-                  fill.setStyle(canvasKit.PaintStyle.Stroke)
-                  fill.setStrokeWidth(Math.max(1, node.fontSize * 0.06))
-                  for (const [index, line] of lines.entries()) {
-                    const characters = Array.from(line)
-                    const spacing = node.letterSpacing ?? 0
-                    const width = characters.reduce(
-                      (total, character, characterIndex) =>
-                        total +
-                        canvasKitTextWidth(font, character, node.fontSize) +
-                        (characterIndex === characters.length - 1
-                          ? 0
-                          : spacing),
-                      0,
-                    )
-                    const startX =
-                      node.align === 'center'
-                        ? node.x + node.width / 2 - width / 2
-                        : node.align === 'end'
-                          ? node.x + node.width - width
-                          : node.x
-                    const underlineY =
-                      node.verticalAlign === 'visualCenter'
-                        ? firstLineBaseline +
-                          index * node.lineHeight +
-                          node.fontSize * 0.08
-                        : node.y +
-                          node.fontSize * 1.06 +
-                          index * node.lineHeight
-                    canvas.drawLine(
-                      startX,
-                      underlineY,
-                      startX + width,
-                      underlineY,
+                    fill.setBlendMode(blendMode(canvasKit, node.blendMode))
+                    canvas.drawOval(
+                      canvasKit.LTRBRect(
+                        line.bullet.centerX - line.bullet.radius,
+                        line.bullet.centerY - line.bullet.radius,
+                        line.bullet.centerX + line.bullet.radius,
+                        line.bullet.centerY + line.bullet.radius,
+                      ),
                       fill,
+                    )
+                  }
+                  for (const fragment of line.fragments) {
+                    configurePaint(
+                      canvasKit,
+                      fill,
+                      fragment.color,
+                      node.opacity,
+                      'fill',
+                    )
+                    fill.setBlendMode(blendMode(canvasKit, node.blendMode))
+                    canvas.drawText!(
+                      fragment.text,
+                      fragment.x,
+                      fragment.baseline,
+                      fill,
+                      fontForStyle(fragment, fragment.text),
+                    )
+                  }
+                  for (const strike of line.strikes) {
+                    configurePaint(
+                      canvasKit,
+                      stroke,
+                      strike.color,
+                      node.opacity,
+                      'stroke',
+                      strike.thickness,
+                    )
+                    stroke.setBlendMode(blendMode(canvasKit, node.blendMode))
+                    canvas.drawLine(
+                      strike.x,
+                      strike.y,
+                      strike.x + strike.width,
+                      strike.y,
+                      stroke,
                     )
                   }
                 }
               },
             )
           } finally {
-            font.delete()
-            typeface.delete()
+            for (const font of fonts.values()) font.delete()
+            defaultTypeface?.delete()
           }
           break
         }
@@ -955,12 +992,13 @@ function drawScene(
   surface: CanvasKitSurface,
   scene: RenderSceneSnapshot,
   resources: ReadonlyMap<string, CanvasKitImageResource>,
+  typefaces?: CanvasKitTypefaceStore,
 ): void {
   const canvas = surface.getCanvas()
   canvas.clear(canvasKit.TRANSPARENT)
   for (const node of scene.nodes) {
     if (node.kind !== 'image') {
-      drawNodesCanvasKit(canvasKit, canvas, [node], resources)
+      drawNodesCanvasKit(canvasKit, canvas, [node], resources, typefaces)
       continue
     }
     if (!node.visible || node.opacity === 0) continue
@@ -1049,11 +1087,13 @@ function drawScene(
 export function renderHeadlessCanvasKitPng(
   canvasKit: CanvasKitApi,
   scene: RenderSceneSnapshot,
+  fontData: readonly CanvasKitFontData[] = [],
 ): Uint8Array {
   const surface = canvasKit.MakeSurface(scene.width, scene.height)
   if (!surface) throw new Error('CanvasKit headless surface creation failed')
+  const typefaces = new CanvasKitTypefaceStore(canvasKit, fontData)
   try {
-    drawScene(canvasKit, surface, scene, new Map())
+    drawScene(canvasKit, surface, scene, new Map(), typefaces)
     const image = surface.makeImageSnapshot()
     try {
       const bytes = image.encodeToBytes(canvasKit.ImageFormat.PNG)
@@ -1063,6 +1103,7 @@ export function renderHeadlessCanvasKitPng(
       image.delete()
     }
   } finally {
+    typefaces.dispose()
     surface.dispose()
   }
 }
@@ -1072,6 +1113,7 @@ export class CanvasKitRenderer implements Renderer {
   readonly #canvasKit: CanvasKitApi
   readonly #now: () => number
   readonly #resources = new Map<string, CanvasKitImageResource>()
+  readonly #typefaces: CanvasKitTypefaceStore
   #stack: CanvasStack | undefined
   #surface: CanvasKitSurface | undefined
   #scene: RenderSceneSnapshot | undefined
@@ -1083,9 +1125,11 @@ export class CanvasKitRenderer implements Renderer {
   constructor(
     canvasKit: CanvasKitApi,
     now: () => number = () => performance.now(),
+    fontData: readonly CanvasKitFontData[] = [],
   ) {
     this.#canvasKit = canvasKit
     this.#now = now
+    this.#typefaces = new CanvasKitTypefaceStore(canvasKit, fontData)
   }
 
   async initialize(stack: CanvasStack): Promise<void> {
@@ -1171,7 +1215,13 @@ export class CanvasKitRenderer implements Renderer {
 
   async exportPng(): Promise<Uint8Array> {
     this.#assertReady()
-    drawScene(this.#canvasKit, this.#surface!, this.#scene!, this.#resources)
+    drawScene(
+      this.#canvasKit,
+      this.#surface!,
+      this.#scene!,
+      this.#resources,
+      this.#typefaces,
+    )
     const image = this.#surface!.makeImageSnapshot()
     try {
       const bytes = image.encodeToBytes(this.#canvasKit.ImageFormat.PNG)
@@ -1185,7 +1235,9 @@ export class CanvasKitRenderer implements Renderer {
   dispose(): void {
     if (this.#disposed) return
     this.#disposed = true
+    this.#disposePicture()
     for (const resource of [...this.#resources.values()]) resource.dispose()
+    this.#typefaces.dispose()
     const surface = this.#surface
     const contextHandle = surface?.Gd
     surface?.dispose()
@@ -1195,7 +1247,6 @@ export class CanvasKitRenderer implements Renderer {
     this.#surface = undefined
     this.#stack = undefined
     this.#scene = undefined
-    this.#disposePicture()
   }
 
   #drawCommittedScene(): void {
@@ -1207,7 +1258,13 @@ export class CanvasKitRenderer implements Renderer {
       this.#surface!.flush()
       return
     }
-    drawScene(this.#canvasKit, this.#surface!, this.#scene!, this.#resources)
+    drawScene(
+      this.#canvasKit,
+      this.#surface!,
+      this.#scene!,
+      this.#resources,
+      this.#typefaces,
+    )
   }
 
   #pictureForScene(): CanvasKitPicture | undefined {
@@ -1229,6 +1286,7 @@ export class CanvasKitRenderer implements Renderer {
             recording,
             [node],
             this.#resources,
+            this.#typefaces,
           )
         }
       }

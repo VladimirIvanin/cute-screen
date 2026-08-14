@@ -2,10 +2,11 @@ import type {
   RenderNode,
   RenderPaint,
   RenderSceneSnapshot,
-  RenderTextNode,
+  RenderTextStyle,
   RgbaColor,
 } from '@cute-screen/editor-core'
 
+import { layoutRichText } from './rich-text-layout'
 import type { InvalidationReason } from './scheduler'
 import type {
   CanvasStack,
@@ -74,6 +75,8 @@ interface Canvas2DImageResource extends ImageResource {
 export interface Canvas2DRendererOptions {
   readonly now?: () => number
   readonly exportCanvas?: (width: number, height: number) => Canvas2DLike
+  /** Mirrors browser unicode-range font selection in deterministic headless tests. */
+  readonly resolveFontFamily?: (text: string, style: RenderTextStyle) => string
 }
 
 function cssColor(color: RgbaColor): string {
@@ -147,48 +150,8 @@ function paintStyle(
   return gradient
 }
 
-function measuredInkBounds(
-  metrics: TextMetrics,
-  fontSize: number,
-): Readonly<{ top: number; bottom: number }> {
-  const candidates = [
-    [metrics.actualBoundingBoxAscent, metrics.actualBoundingBoxDescent],
-    [metrics.fontBoundingBoxAscent, metrics.fontBoundingBoxDescent],
-    [metrics.emHeightAscent, metrics.emHeightDescent],
-  ] as const
-  for (const [ascent, descent] of candidates) {
-    if (
-      Number.isFinite(ascent) &&
-      Number.isFinite(descent) &&
-      ascent >= 0 &&
-      descent >= 0 &&
-      ascent + descent > 0
-    ) {
-      return { top: -ascent, bottom: descent }
-    }
-  }
-  return { top: -fontSize * 0.8, bottom: fontSize * 0.2 }
-}
-
-function visualCenterBaseline(
-  context: Context2D,
-  node: RenderTextNode,
-  lines: readonly string[],
-): number {
-  let top = Number.POSITIVE_INFINITY
-  let bottom = Number.NEGATIVE_INFINITY
-  for (const [index, line] of lines.entries()) {
-    if (line.length === 0) continue
-    const ink = measuredInkBounds(context.measureText(line), node.fontSize)
-    top = Math.min(top, index * node.lineHeight + ink.top)
-    bottom = Math.max(bottom, index * node.lineHeight + ink.bottom)
-  }
-  if (!Number.isFinite(top) || !Number.isFinite(bottom)) {
-    const fallback = measuredInkBounds(context.measureText('0'), node.fontSize)
-    top = fallback.top
-    bottom = (lines.length - 1) * node.lineHeight + fallback.bottom
-  }
-  return node.y + node.height / 2 - (top + bottom) / 2
+function canvasFont(style: RenderTextStyle, fontFamily: string): string {
+  return `${style.fontStyle} ${style.fontWeight} ${style.fontSize}px "${fontFamily.replaceAll('"', '')}", sans-serif`
 }
 
 function withTransform(
@@ -246,6 +209,9 @@ export function drawNodes2D(
   context: Context2D,
   nodes: readonly RenderNode[],
   resources: ReadonlyMap<string, ImageResourceInput['source']> = new Map(),
+  resolveFontFamily: NonNullable<
+    Canvas2DRendererOptions['resolveFontFamily']
+  > = (_text, style) => style.fontFamily,
 ): void {
   for (const node of nodes) {
     if (!node.visible || node.opacity === 0) continue
@@ -377,119 +343,49 @@ export function drawNodes2D(
         const centerX = node.x + node.width / 2
         const centerY = node.y + node.height / 2
         withTransform(context, node, centerX, centerY, () => {
-          context.font = `${node.fontStyle} ${node.fontWeight} ${node.fontSize}px "${node.fontFamily.replaceAll('"', '')}", sans-serif`
-          const lines = node.text.split('\n')
-          context.textBaseline =
-            node.verticalAlign === 'visualCenter' ? 'alphabetic' : 'top'
-          const firstLineY =
-            node.verticalAlign === 'visualCenter'
-              ? visualCenterBaseline(context, node, lines)
-              : node.y
-          context.textAlign =
-            node.align === 'center'
-              ? 'center'
-              : node.align === 'end'
-                ? 'right'
-                : 'left'
-          context.fillStyle = paintStyle(context, node.fill, resources)
-          const x =
-            node.align === 'center'
-              ? node.x + node.width / 2
-              : node.align === 'end'
-                ? node.x + node.width
-                : node.x
-          const drawLine = (
-            line: string,
-            y: number,
-            draw: (text: string, x: number, y: number) => void,
-          ): void => {
-            const spacing = node.letterSpacing ?? 0
-            if (spacing === 0) {
-              draw(line, x, y)
-              return
-            }
-            const characters = Array.from(line)
-            const width = characters.reduce(
-              (total, character, index) =>
-                total +
-                context.measureText(character).width +
-                (index === characters.length - 1 ? 0 : spacing),
-              0,
-            )
-            let cursor =
-              node.align === 'center'
-                ? x - width / 2
-                : node.align === 'end'
-                  ? x - width
-                  : x
-            for (const character of characters) {
-              draw(character, cursor, y)
-              cursor += context.measureText(character).width + spacing
-            }
-          }
-          for (const shadow of node.shadows ?? []) {
-            context.shadowColor = cssColor(shadow.color)
-            context.shadowOffsetX = shadow.offsetX
-            context.shadowOffsetY = shadow.offsetY
-            context.shadowBlur = shadow.blur
-            // Draw a colored source as well as its shadow; the final text pass
-            // below covers the source while retaining the blurred perimeter.
-            context.fillStyle = cssColor(shadow.color)
-            for (const [index, line] of lines.entries()) {
-              drawLine(
-                line,
-                firstLineY + index * node.lineHeight,
-                (text, x, y) => context.fillText(text, x, y),
-              )
-            }
-          }
-          context.shadowColor = 'rgba(0, 0, 0, 0)'
-          context.shadowOffsetX = 0
-          context.shadowOffsetY = 0
-          context.shadowBlur = 0
-          for (const [index, line] of lines.entries()) {
-            if (node.stroke && (node.strokeWidth ?? 0) > 0) {
-              drawLine(
-                line,
-                firstLineY + index * node.lineHeight,
-                (text, x, y) => context.strokeText(text, x, y),
-              )
-            }
-            drawLine(line, firstLineY + index * node.lineHeight, (text, x, y) =>
-              context.fillText(text, x, y),
-            )
-          }
-          if (node.underline) {
-            context.strokeStyle = paintStyle(context, node.fill, resources)
-            context.lineWidth = Math.max(1, node.fontSize * 0.06)
-            for (const [index, line] of lines.entries()) {
-              const spacing = node.letterSpacing ?? 0
-              const characters = Array.from(line)
-              const width =
-                spacing === 0
-                  ? context.measureText(line).width
-                  : characters.reduce(
-                      (total, character, characterIndex) =>
-                        total +
-                        context.measureText(character).width +
-                        (characterIndex === characters.length - 1
-                          ? 0
-                          : spacing),
-                      0,
-                    )
-              const startX =
-                node.align === 'center'
-                  ? x - width / 2
-                  : node.align === 'end'
-                    ? x - width
-                    : x
-              const underlineY =
-                node.verticalAlign === 'visualCenter'
-                  ? firstLineY + index * node.lineHeight + node.fontSize * 0.08
-                  : node.y + index * node.lineHeight + node.fontSize * 1.06
+          const layout = layoutRichText(node, (text, style) => {
+            context.font = canvasFont(style, resolveFontFamily(text, style))
+            const metrics = context.measureText(text)
+            const ascent = Number.isFinite(metrics.actualBoundingBoxAscent)
+              ? metrics.actualBoundingBoxAscent
+              : style.fontSize * 0.8
+            const descent = Number.isFinite(metrics.actualBoundingBoxDescent)
+              ? metrics.actualBoundingBoxDescent
+              : style.fontSize * 0.2
+            return { width: metrics.width, ascent, descent }
+          })
+          context.textAlign = 'left'
+          context.textBaseline = 'alphabetic'
+          for (const line of layout.lines) {
+            if (line.bullet) {
               context.beginPath()
-              context.moveTo(startX, underlineY)
-              context.lineTo(startX + width, underlineY)
+              context.ellipse(
+                line.bullet.centerX,
+                line.bullet.centerY,
+                line.bullet.radius,
+                line.bullet.radius,
+                0,
+                0,
+                Math.PI * 2,
+              )
+              context.fillStyle = cssColor(line.bullet.color)
+              context.fill()
+            }
+            for (const fragment of line.fragments) {
+              context.font = canvasFont(
+                fragment,
+                resolveFontFamily(fragment.text, fragment),
+              )
+              context.fillStyle = cssColor(fragment.color)
+              context.fillText(fragment.text, fragment.x, fragment.baseline)
+            }
+            for (const strike of line.strikes) {
+              context.beginPath()
+              context.moveTo(strike.x, strike.y)
+              context.lineTo(strike.x + strike.width, strike.y)
+              context.strokeStyle = cssColor(strike.color)
+              context.lineWidth = strike.thickness
+              context.lineCap = 'butt'
               context.stroke()
             }
           }
@@ -504,6 +400,9 @@ export class Canvas2DRenderer implements Renderer {
   readonly backend = 'canvas2d' as const
   readonly #now: () => number
   readonly #exportCanvas?: Canvas2DRendererOptions['exportCanvas']
+  readonly #resolveFontFamily: NonNullable<
+    Canvas2DRendererOptions['resolveFontFamily']
+  >
   readonly #resources = new Map<string, Canvas2DImageResource>()
   #stack: CanvasStack | undefined
   #scene: RenderSceneSnapshot | undefined
@@ -513,6 +412,8 @@ export class Canvas2DRenderer implements Renderer {
   constructor(options: Canvas2DRendererOptions = {}) {
     this.#now = options.now ?? (() => performance.now())
     this.#exportCanvas = options.exportCanvas
+    this.#resolveFontFamily =
+      options.resolveFontFamily ?? ((_text, style) => style.fontFamily)
   }
 
   async initialize(stack: CanvasStack): Promise<void> {
@@ -559,7 +460,12 @@ export class Canvas2DRenderer implements Renderer {
       const context = stack.overlay.getContext('2d')!
       context.setTransform(1, 0, 0, 1, 0, 0)
       context.clearRect(0, 0, stack.overlay.width, stack.overlay.height)
-      drawNodes2D(context, this.#overlay, this.#resourceSources())
+      drawNodes2D(
+        context,
+        this.#overlay,
+        this.#resourceSources(),
+        this.#resolveFontFamily,
+      )
     }
     return {
       backend: this.backend,
@@ -600,7 +506,12 @@ export class Canvas2DRenderer implements Renderer {
     context.clearRect(0, 0, canvas.width, canvas.height)
     for (const node of scene.nodes) {
       if (node.kind !== 'image') {
-        drawNodes2D(context, [node], this.#resourceSources())
+        drawNodes2D(
+          context,
+          [node],
+          this.#resourceSources(),
+          this.#resolveFontFamily,
+        )
         continue
       }
       if (!node.visible || node.opacity === 0) continue

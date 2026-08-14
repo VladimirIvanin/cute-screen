@@ -292,7 +292,8 @@ Property-based тесты покрывают:
   equivalent document, включая crop;
 - undo(apply(command)) возвращает эквивалентный документ;
 - serialization round-trip сохраняет semantic document;
-- migrations идемпотентны относительно текущей версии;
+- v7 round-trip семантически стабилен, а v0-v6 возвращаются typed unsupported
+  `olderSchema` без миграции или изменения raw JSON;
 - crop остаётся внутри canvas и имеет положительный размер;
 - hit-test order соответствует z-order и overlap cycling;
 - repeat-area после monitor change либо валиден, либо требует нового выбора.
@@ -311,8 +312,7 @@ Goldens создаются для каждого LayerNode:
   blend modes;
 - marker blend modes;
 - censor modes;
-- text RU/EN, multiline, gradient/pattern/texture fill, outline, shadow,
-  background и style presets;
+- text RU/EN, multiline, portable span/paragraph ranges и solid background;
 - beautify/watermark;
 - CanvasKit/Canvas2D parity с documented tolerance.
 
@@ -434,6 +434,59 @@ Linux system smoke пишет JSON в `artifacts/m01/`: commit SHA, OS/arch/sess
 
 Локальный GNOME Wayland прогон 2026-08-09 (SHA `7ff7d283`): `portal-probe`, `portal-invalid-uri` и `portal-screenshot` — success; `portal-shortcuts` — `shortcutUnavailable` на GNOME backend без GlobalShortcuts interface. JSON записаны в `artifacts/m01/`; cancel semantics и KDE Wayland остаются pending.
 
+## Schema v7 contract evidence (2026-08-14)
+
+На Windows 10 Home 22H2 build 19045, AMD64 red-first focused TypeScript suite
+первоначально завершился 14/14 failures, а Rust schema-gate test не
+скомпилировался без `OlderSchema`. После реализации:
+
+- focused v7/codec/clipboard suite — 40/40;
+- весь editor-core — 125/125;
+- `cargo test --workspace` — 77 passed, один interactive Windows desktop test
+  ignored; `pnpm check:rust` прошёл все feature/clippy gates;
+- render harness — 10/10, boundaries — 7/7, lint и docs checks прошли.
+
+Это contract evidence, не runtime evidence text editing/layout. Workspace
+`pnpm typecheck` останавливается на renderer, который ещё обращается к удалённым
+text fields. Workspace `pnpm test` имеет 228/232 passed; четыре ожидаемых
+downstream Vue failures относятся к удалённым presets и legacy layer fixtures
+без обязательных v7 bounds. Они должны быть исправлены в следующих
+renderer/editor/UI slices, а не ослаблением v7 codec.
+
+## Schema v7 renderer/layout evidence (2026-08-14)
+
+На Windows 10 Home 22H2 build 19045, AMD64 renderer slice выполнен red-first:
+focused core/layout прогон сначала упал на отсутствующем layout module и трёх
+scene assertions, а render harness — на двух отсутствующих rich-text PNG.
+После реализации:
+
+- editor-core — 125/125, renderer — 33/33;
+- `pnpm test:render` — 11/11, `pnpm test:boundaries` — 7/7;
+- package typecheck `vue-tsc -b packages/editor-core packages/editor-renderer`
+  и полный ESLint прошли;
+- workspace `pnpm test` — 232/236: четыре оставшихся failures находятся только
+  в последующих Vue consumers (`text-style-presets`, два document-session legacy
+  fixtures и App text-background preset);
+- workspace `pnpm typecheck` проходит editor-core/editor-renderer и
+  останавливается в `editor-vue` на удалённых v7 полях/presets и legacy text
+  creation contracts.
+
+Детерминированный layout покрывает UTF-16-safe emoji traversal, mixed family,
+size, color, weight, italic и strikethrough, fixed-width wrapping, paragraph
+alignment, bullet metadata без добавления символа в content и visual-center
+labels. Два новых 360×220 PNG декодированы и просмотрены: Text background,
+Callout bubble/tail и Numbered Marker badge сохраняют разные container
+semantics. Canvas2D preview/export совпадают по RGBA; CanvasKit/Canvas2D
+укладываются в существующий semantic tolerance. Это headless renderer evidence,
+не browser/Tauri/contenteditable/IME acceptance.
+
+Корректирующий прогон проверяет Cyrillic coverage через реальные CanvasKit glyph
+IDs: Latin-only font data обязана завершить render явной ошибкой вместо `.notdef`
+tofu. Harness передаёт CanvasKit и регистрирует для headless Canvas2D оба уже
+аудированных Roboto subset (`latin` и `cyrillic`); в явно перегенерированных PNG
+слово «справа» читается в обеих backend-ветках. Цветной emoji-шрифт не добавлялся,
+его одинаковый fallback не считается доказательством emoji glyph coverage.
+
 ## Диагностика и incidents
 
 - Frontend invoke, Rust command и long operation используют correlation ID.
@@ -442,6 +495,80 @@ Linux system smoke пишет JSON в `artifacts/m01/`: commit SHA, OS/arch/sess
 - Unexpected error получает toast/dialog и log context.
 - Incident не закрывается без regression test на уровне, где проявлялась ошибка.
 - Postmortem сохраняется по `docs/retrospectives/_TEMPLATE.md` и обновляет requirement/ADR/test при необходимости.
+
+## Schema v7 rich-text editing evidence (2026-08-14)
+
+На Windows 10 Home 22H2 build 19045, AMD64 slice выполнен red-first. Первый
+focused core-прогон не нашёл `rich-text-editing` module, первый controller-прогон
+не нашёл `rich-text-editor`, а terminal empty bullet paragraph сначала был
+отклонён codec как невалидный range. Первый component-прогон после появления
+реализации дал 8/8 failures из-за Vue-proxy над controller с private state; после
+перевода transient controller в `markRaw` и завершения DOM projection:
+
+- focused core/Vue slice — 63/63;
+- editor-core + renderer — 169/169;
+- `pnpm test:render` — 11/11, `pnpm test:boundaries` — 7/7;
+- package build/typecheck `vue-tsc -b packages/editor-core packages/editor-renderer`
+  и полный ESLint прошли;
+- workspace `pnpm test` — 257/261. Четыре ожидаемых downstream failures остались
+  в task-4 consumers: `text-style-presets`, два legacy `document-session` fixtures
+  без обязательных v7 bounds и App personal/background preset UI;
+- workspace typecheck проходит editor-core/editor-renderer и останавливается в
+  `editor-vue` на прежнем task-4 `EditorShell`/`text-style-presets` API удалённых
+  v0-v6 fields и presets.
+
+Core regressions покрывают границы surrogate pairs, forward/reverse selection,
+split/merge spans, collapsed typing style, insert/delete/replace и paragraph
+range normalization. Component/controller regressions покрывают selection sync,
+отложенный IME reconcile, bullet Enter/empty-Enter/Backspace, plain-text-only
+copy/cut/paste, Escape rollback и ровно одну update command на Text, Callout и
+Numbered Marker. Это headless DOM evidence; runtime evidence фиксируется отдельно
+ниже и не смешивается с real-Tauri.
+
+## Schema v7 integration evidence (2026-08-14)
+
+Windows 10 22H2 build 19045, AMD64; Node 22.23.1, pnpm 10.33.2. Стабильный
+`pnpm.cmd test:e2e:browser` прошёл 6/6 spec-файлов на Chrome
+151.0.7922.138. Из-за неполного внешнего cache WebdriverIO команда запускалась с
+process-local `CHROMEDRIVER_PATH` на уже установленный ChromeDriver
+151.0.7922.109 той же ветки 7922; это восстановление тестовой инфраструктуры, а
+не production requirement. Новый `browser-v7-rich-text.e2e.ts` прошёл 4/4 и
+доказывает:
+
+- range/caret formatting, mixed states и partial patch без clobber;
+- bullet Enter, empty Enter и Backspace, composition/IME и plain-text-only paste;
+- ровно один version-token/`EditorCommand` на commit и Escape rollback;
+- visibility для Text/Callout/Numbered Marker, active edit и единственного
+  selected text-bearing layer;
+- font family, preset/arbitrary size validation, alignment, text/background
+  solid colors, None, padding/radius, callout bubble и numbered badge с
+  disabled list/None/padding/radius;
+- EN/RU accessible names, Escape/click-outside focus и однострочный 640 px
+  overflow без horizontal scroll.
+
+Отдельная ручная browser-skill проверка выполнена на текущей E2E-сборке в
+in-app Chromium. На 1024×700 toolbar имеет высоту 32 px и утверждённый порядок
+`color → font → size → bold → italic → strikethrough → list → alignment →
+background`; на 640×700 он остаётся в одну строку, `scrollWidth == clientWidth`,
+document не скроллится по горизонтали, а Bullet/Alignment/Background доступны
+в именованном overflow dialog. Проверка выявила и закрыла утечку visually-hidden
+`Text color` label за границы toolbar; исправленный UI повторно просмотрен на
+обоих viewport. Screenshot был фактически снят и просмотрен в browser-skill
+сессии, но отдельный repository artifact не сохранялся.
+
+`pnpm.cmd test:e2e:tauri` остаётся отдельным недоступным слоем. Runner собрал и
+запустил real `target/debug/cute-screen.exe` с WebView2 runtime 151.0.4129.78,
+но до test bodies обнаружил отсутствие совместимого `msedgedriver` и начал
+`Attempting to download msedgedriver 151.0.4129.78`; загрузка/установка запрещена
+приёмочным scope. Порт 4445 не открылся, новый JUnit не создан, поэтому здесь нет
+real-WebView2 утверждения и browser result его не заменяет.
+
+Финальная stable matrix на той же Windows-системе: `pnpm.cmd check` прошёл lint,
+typecheck/package builds, Prettier, docs, boundaries и все Rust clippy-профили;
+`pnpm.cmd test` — 263/263, `pnpm.cmd test:render` — 11/11,
+`pnpm.cmd test:perf` — 4/4, `cargo test --workspace` — 77 passed и один
+интерактивный Windows desktop test ignored. `pnpm.cmd tauri build` создал
+`target/release/cute-screen.exe`; `git diff --check` завершился с exit code 0.
 
 ## CI gates
 

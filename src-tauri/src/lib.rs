@@ -1249,7 +1249,7 @@ fn seed_m03_document(repository: &LibraryRepository) -> Result<(), RepositoryErr
     let hash = format!("{:x}", Sha256::digest(&bytes));
     let document_id = "019c1f62-058e-7000-8000-000000000000";
     let document = serde_json::json!({
-        "schemaVersion": 1,
+        "schemaVersion": 7,
         "id": document_id,
         "source": { "blobHash": hash, "format": "png", "mimeType": "image/png", "width": 3840, "height": 2160, "orientationApplied": true, "color": { "colorSpace": "srgb", "hasIccProfile": false } },
         "canvas": { "width": 3840, "height": 2160 }, "crop": null, "layers": [],

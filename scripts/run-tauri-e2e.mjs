@@ -30,6 +30,11 @@ const scenarios = [
     harnessQuery: '?m05=1',
   },
   {
+    id: 'v7-rich-text',
+    spec: 'tests/e2e/specs/tauri-v7-rich-text.e2e.ts',
+    harnessQuery: '?m05=1',
+  },
+  {
     id: 'm05-viewport',
     spec: 'tests/e2e/specs/tauri-m05-viewport.e2e.ts',
     harnessQuery: '?m05=1&m05viewport=1',

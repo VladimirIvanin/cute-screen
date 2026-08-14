@@ -1,13 +1,34 @@
 import { createCanvas, loadImage } from '@napi-rs/canvas'
 import { createRenderSceneSnapshot } from '@cute-screen/editor-core'
 import CanvasKitInit from 'canvaskit-wasm'
+import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import {
   renderHeadlessCanvasKitPng,
   resolveCanvasKitVisualCenterBaseline,
+  type CanvasKitFontData,
 } from './canvaskit'
+
+async function robotoFontData(
+  subset: CanvasKitFontData['subset'],
+): Promise<CanvasKitFontData> {
+  const bytes = await readFile(
+    path.resolve(
+      process.cwd(),
+      `packages/editor-vue/node_modules/@fontsource/roboto/files/roboto-${subset}-400-normal.woff2`,
+    ),
+  )
+  return {
+    family: 'Roboto',
+    subset,
+    data: bytes.buffer.slice(
+      bytes.byteOffset,
+      bytes.byteOffset + bytes.byteLength,
+    ) as ArrayBuffer,
+  }
+}
 
 describe('CanvasKit headless renderer', () => {
   it('applies a shared negative layer scale to vector annotations', async () => {
@@ -267,6 +288,139 @@ describe('CanvasKit headless renderer', () => {
     )
 
     expect(baseline).toBe(41.5)
+  })
+
+  it('renders mixed rich-text runs, bullet metadata and strikethrough headlessly', async () => {
+    const canvasKit = (await CanvasKitInit({
+      locateFile: () =>
+        path.resolve(
+          process.cwd(),
+          'packages/editor-renderer/node_modules/canvaskit-wasm/bin/canvaskit.wasm',
+        ),
+    })) as import('./canvaskit').CanvasKitApi
+    const fontData = await Promise.all([
+      robotoFontData('latin'),
+      robotoFontData('cyrillic'),
+    ])
+    const png = renderHeadlessCanvasKitPng(
+      canvasKit,
+      createRenderSceneSnapshot({
+        width: 160,
+        height: 80,
+        nodes: [
+          {
+            kind: 'text',
+            id: 'rich-text',
+            text: 'A справа',
+            x: 10,
+            y: 10,
+            width: 120,
+            height: 48,
+            wrap: 'fixedWidth',
+            fixedWidth: 120,
+            runs: [
+              {
+                start: 0,
+                end: 1,
+                fontFamily: 'Roboto',
+                fontSize: 32,
+                color: { red: 0, green: 0, blue: 1, alpha: 1 },
+                fontWeight: 400,
+                fontStyle: 'normal',
+                strikethrough: false,
+              },
+              {
+                start: 1,
+                end: 8,
+                fontFamily: 'Roboto',
+                fontSize: 24,
+                color: { red: 1, green: 0, blue: 0, alpha: 1 },
+                fontWeight: 700,
+                fontStyle: 'italic',
+                strikethrough: true,
+              },
+            ],
+            paragraphs: [
+              { start: 0, end: 8, alignment: 'start', listKind: 'bullet' },
+            ],
+            rotation: 0,
+            opacity: 1,
+            visible: true,
+          },
+        ],
+      }),
+      fontData,
+    )
+    const image = await loadImage(png)
+    const canvas = createCanvas(image.width, image.height)
+    const context = canvas.getContext('2d')
+    context.drawImage(image, 0, 0)
+    const pixels = context.getImageData(0, 0, image.width, image.height).data
+    expect(
+      pixels.some(
+        (value, index) =>
+          index % 4 === 2 &&
+          value > (pixels[index - 2] ?? 0) &&
+          (pixels[index + 1] ?? 0) > 0,
+      ),
+    ).toBe(true)
+    expect(
+      pixels.some(
+        (value, index) =>
+          index % 4 === 0 &&
+          value > (pixels[index + 2] ?? 0) &&
+          (pixels[index + 3] ?? 0) > 0,
+      ),
+    ).toBe(true)
+  })
+
+  it('rejects Cyrillic text when no supplied typeface covers its glyphs', async () => {
+    const canvasKit = (await CanvasKitInit({
+      locateFile: () =>
+        path.resolve(
+          process.cwd(),
+          'packages/editor-renderer/node_modules/canvaskit-wasm/bin/canvaskit.wasm',
+        ),
+    })) as import('./canvaskit').CanvasKitApi
+    const latin = await robotoFontData('latin')
+    const snapshot = createRenderSceneSnapshot({
+      width: 160,
+      height: 48,
+      nodes: [
+        {
+          kind: 'text',
+          id: 'cyrillic-coverage',
+          text: 'справа',
+          x: 4,
+          y: 4,
+          width: 152,
+          height: 40,
+          wrap: 'autoSize',
+          runs: [
+            {
+              start: 0,
+              end: 6,
+              fontFamily: 'Roboto',
+              fontSize: 24,
+              color: { red: 1, green: 1, blue: 1, alpha: 1 },
+              fontWeight: 400,
+              fontStyle: 'normal',
+              strikethrough: false,
+            },
+          ],
+          paragraphs: [
+            { start: 0, end: 6, alignment: 'start', listKind: 'none' },
+          ],
+          rotation: 0,
+          opacity: 1,
+          visible: true,
+        },
+      ],
+    })
+
+    expect(() =>
+      renderHeadlessCanvasKitPng(canvasKit, snapshot, [latin]),
+    ).toThrow(/glyph coverage.*справа/u)
   })
 
   it('preserves scene-node z-order across image and vector nodes', async () => {

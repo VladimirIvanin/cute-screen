@@ -175,6 +175,15 @@ Windows x64 repair evidence (2026-08-14) покрывает оптическое
 круга и центром ink цифры. Реальный Tauri/WebView2 rerun и multiline label
 editing остаются pending.
 
+Headless renderer evidence (2026-08-14) дополнительно покрывает v7 runs и
+paragraph metadata для Text, Callout и Numbered Marker: mixed family/size/color/
+weight/italic/strikethrough, fixed-width wrapping, `start|center|end`, bullets
+без изменения persisted content и solid background padding/radius. Canvas2D и
+CanvasKit goldens декодированы и визуально проверены; preview/export Canvas2D
+совпадают точно, backend parity остаётся в documented tolerance. Это закрывает
+renderer/layout часть шага 5–6, но не direct editing, selection, IME, toolbar,
+browser или real-Tauri acceptance.
+
 1. Из empty state открыть локальную картинку и проверить новый document с locked
    base layer.
 2. Вернуться в empty state, вставить bitmap из внешнего приложения и проверить
@@ -182,9 +191,12 @@ editing остаются pending.
 3. В активный document вставить bitmap и убедиться, что он добавлен как обычный
    Image tool layer без auto-selection и смены active tool.
 4. Создать multiline RU/EN text и отредактировать его в auto-size/fixed-width.
-5. Настроить typography, gradient/pattern/texture fill, outline, shadows,
-   background, opacity/blend и применить несколько style presets.
-6. Создать numbered marker и callout.
+5. Настроить v7 typography: portable family, size, solid color, weight,
+   italic, strikethrough, paragraph alignment/list и solid background с
+   padding/radius. Проверить, что removed text effects и common
+   opacity/blend/shadows не попадают в persisted JSON.
+6. Создать numbered marker и callout с тем же rich-text contract, сохранив
+   badge и bubble semantics.
 7. Вставить emoji и локальное изображение через Image tool.
 8. Скопировать editor layer и вставить его.
 9. Вставить plain text из внешнего приложения и выполнить keyboard duplicate.
@@ -192,6 +204,22 @@ editing остаются pending.
 **Результат:** Open/Paste routing зависит от наличия активного документа, тип
 clipboard распознан, text editing не запускает tool/global shortcuts, text
 preview и export визуально согласованы.
+
+Headless editing evidence (2026-08-14) закрывает pure/controller/component
+контракты direct editing: UTF-16-safe selection, formatting по диапазону,
+collapsed typing style, paragraph/list normalization, IME без промежуточных
+document commands, plain-text clipboard и одна command на завершённую сессию.
+Escape проверен как ожидаемая отмена без commit. Общий flow покрыт для Text,
+Callout и Numbered Marker.
+
+Windows browser acceptance (2026-08-14) закрывает этот runtime flow: Chrome
+151.0.7922.138, 6/6 specs, включая 4/4 v7 rich-text scenarios. Отдельная
+browser-skill visual inspection подтверждает 32 px compact toolbar, порядок и
+сегментацию controls на 1024×700, а также одну строку без horizontal scroll с
+доступным overflow на 640×700; найденный выпавший `Text color` label исправлен и
+перепроверен. Real Tauri/WebView2 acceptance не заявляется: stable runner дошёл
+до WebView2 151.0.4129.78, но до test bodies потребовал отсутствующий
+`msedgedriver` 151.0.4129.78 и попытку download, запрещённую scope.
 
 ## A08 — Crop и precision tools
 

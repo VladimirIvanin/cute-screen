@@ -115,6 +115,8 @@ describe('arrow geometry', () => {
         scaleY: 0.5,
       },
       opacity: 1,
+      blendMode: 'normal',
+      shadows: [],
       visible: true,
       locked: false,
       payload: {
@@ -165,6 +167,8 @@ describe('arrow geometry', () => {
         scaleY: 1,
       },
       opacity: 1,
+      blendMode: 'normal',
+      shadows: [],
       visible: true,
       locked: false,
       payload: elbowPayload('y', -10),
@@ -189,6 +193,8 @@ describe('arrow geometry', () => {
         scaleY: 1,
       },
       opacity: 1,
+      blendMode: 'normal',
+      shadows: [],
       visible: true,
       locked: false,
       payload: {

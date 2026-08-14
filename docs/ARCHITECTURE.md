@@ -46,7 +46,11 @@ interface EditorDocument {
 }
 ```
 
-`LayerNode` — discriminated union: arrow, shape, pencil, marker, text, numbered marker, callout, censor, spotlight, ruler, loupe, emoji и image. Общие поля: immutable ID, transform, opacity, visibility, lock, z-order и tool-specific payload.
+`LayerNode` — discriminated union: arrow, shape, pencil, marker, text, numbered
+marker, callout, censor, spotlight, ruler, loupe, emoji и image. Общие поля:
+immutable ID, transform, visibility, lock, z-order и tool-specific payload.
+Opacity, blend и shadows относятся только к нетекстовым composited layers;
+text, callout и numbered marker не сохраняют их в schema v7.
 
 `EditorDocument.source` хранит immutable original provenance и blob reference, но
 не является специальным renderer background. Видимый исходный screenshot или
@@ -60,11 +64,29 @@ Crop не меняет исходные координаты и применяе
 rectangle. Horizontal/vertical canvas flip преобразует layers и crop одной
 document command, но не presentation или viewport.
 
-Shape и text используют общую versioned paint/effect model: solid,
-multi-stop linear/radial gradient, bundled pattern или immutable image texture,
-paint transform, opacity, curated blend mode, outline/stroke и bounded shadow
-stack. Presets сериализуют те же primitive fields и не создают отдельный тип
-renderer node. Arbitrary shader code в документ не сохраняется.
+Schema v7 — единственная editable persisted schema. v0-v6 возвращаются parser
+как typed unsupported `olderSchema` без миграции и изменения raw data; v8+
+возвращаются typed read-only `newerSchema`.
+
+Shape использует versioned paint/effect model: solid, multi-stop linear/radial
+gradient, bundled pattern или immutable image texture, paint transform,
+opacity, curated blend mode, stroke и bounded shadow stack. Arbitrary shader
+code в документ не сохраняется.
+
+Text-bearing v7 layers используют общий renderer-neutral rich-text contract:
+UTF-16-safe spans содержат только portable font family, font size, solid color,
+weight, italic и strikethrough; paragraph ranges — alignment
+`start|center|end` и list kind `none|bullet`. Text background, Callout bubble и
+Numbered Marker badge остаются разными container semantics и используют solid
+colors. Text background хранит также padding и radius. Новый text factory
+создаёт 24 px text. Presets, underline, letter spacing, line-height field,
+gradient/pattern/texture text fill, text outline, text shadows и text
+opacity/blend в v7 отсутствуют.
+
+Internal layer clipboard использует MIME version 2 и сохраняет
+`documentSchemaVersion: 7`; decode каждого слоя проходит через production v7
+parser. Изображения остаются immutable blob references и не попадают в этот
+JSON как bytes/base64.
 
 ## Команды и состояние
 

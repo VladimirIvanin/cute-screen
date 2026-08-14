@@ -352,16 +352,26 @@ describe('Canvas2DRenderer', () => {
             y: 12,
             width: 60,
             height: 48,
-            fontFamily: 'sans-serif',
-            fontSize: 24,
-            fontWeight: 400,
-            fontStyle: 'normal',
-            align: 'start',
-            lineHeight: 28,
+            wrap: 'autoSize',
+            runs: [
+              {
+                start: 0,
+                end: 3,
+                fontFamily: 'sans-serif',
+                fontSize: 24,
+                color: { red: 1, green: 0, blue: 0, alpha: 1 },
+                fontWeight: 400,
+                fontStyle: 'normal',
+                strikethrough: false,
+              },
+            ],
+            paragraphs: [
+              { start: 0, end: 2, alignment: 'start', listKind: 'none' },
+              { start: 2, end: 3, alignment: 'start', listKind: 'none' },
+            ],
             rotation: 0,
             opacity: 1,
             visible: true,
-            fill: { red: 1, green: 0, blue: 0, alpha: 1 },
           },
         ],
       }),
@@ -398,17 +408,26 @@ describe('Canvas2DRenderer', () => {
             y: 8,
             width: 48,
             height: 48,
-            fontFamily: 'Roboto',
-            fontSize: 32,
-            fontWeight: 700,
-            fontStyle: 'normal',
-            align: 'center',
+            wrap: 'autoSize',
+            runs: [
+              {
+                start: 0,
+                end: 1,
+                fontFamily: 'Roboto',
+                fontSize: 32,
+                color: { red: 1, green: 1, blue: 1, alpha: 1 },
+                fontWeight: 700,
+                fontStyle: 'normal',
+                strikethrough: false,
+              },
+            ],
+            paragraphs: [
+              { start: 0, end: 1, alignment: 'center', listKind: 'none' },
+            ],
             verticalAlign: 'visualCenter',
-            lineHeight: 40,
             rotation: 0,
             opacity: 1,
             visible: true,
-            fill: { red: 1, green: 1, blue: 1, alpha: 1 },
           },
         ],
       }),
@@ -421,42 +440,54 @@ describe('Canvas2DRenderer', () => {
     )
   })
 
-  it('renders a bounded text shadow stack behind the final glyph pass', async () => {
+  it('renders mixed run colors, a metadata bullet and strikethrough', async () => {
     const renderer = new Canvas2DRenderer()
-    const sceneCanvas = createCanvas(80, 64)
+    const sceneCanvas = createCanvas(160, 80)
     await renderer.initialize({
       scene: asHtmlCanvas(sceneCanvas),
-      overlay: asHtmlCanvas(createCanvas(80, 64)),
+      overlay: asHtmlCanvas(createCanvas(160, 80)),
       dpr: 1,
-      correlationId: 'text-shadow',
+      correlationId: 'rich-text',
     })
     renderer.setScene(
       createRenderSceneSnapshot({
-        width: 80,
-        height: 64,
+        width: 160,
+        height: 80,
         nodes: [
           {
             kind: 'text',
-            id: 'shadowed-i',
-            text: 'I',
+            id: 'rich-text',
+            text: 'A B',
             x: 10,
             y: 10,
-            width: 20,
-            height: 36,
-            fontFamily: 'sans-serif',
-            fontSize: 32,
-            fontWeight: 400,
-            fontStyle: 'normal',
-            align: 'start',
-            lineHeight: 36,
-            fill: { red: 1, green: 1, blue: 1, alpha: 1 },
-            shadows: [
+            width: 120,
+            height: 48,
+            wrap: 'fixedWidth',
+            fixedWidth: 120,
+            runs: [
               {
-                color: { red: 1, green: 0, blue: 0, alpha: 1 },
-                offsetX: 20,
-                offsetY: 0,
-                blur: 0,
+                start: 0,
+                end: 1,
+                fontFamily: 'sans-serif',
+                fontSize: 32,
+                color: { red: 0, green: 0, blue: 1, alpha: 1 },
+                fontWeight: 400,
+                fontStyle: 'normal',
+                strikethrough: false,
               },
+              {
+                start: 1,
+                end: 3,
+                fontFamily: 'serif',
+                fontSize: 24,
+                color: { red: 1, green: 0, blue: 0, alpha: 1 },
+                fontWeight: 700,
+                fontStyle: 'italic',
+                strikethrough: true,
+              },
+            ],
+            paragraphs: [
+              { start: 0, end: 3, alignment: 'start', listKind: 'bullet' },
             ],
             rotation: 0,
             opacity: 1,
@@ -469,12 +500,20 @@ describe('Canvas2DRenderer', () => {
     renderer.render(['scene'])
     const pixels = sceneCanvas
       .getContext('2d')
-      ?.getImageData(28, 10, 24, 36).data
+      ?.getImageData(10, 10, 120, 48).data
+    expect(
+      pixels?.some(
+        (value, index) =>
+          index % 4 === 2 &&
+          value > (pixels[index - 2] ?? 0) &&
+          (pixels[index + 1] ?? 0) > 0,
+      ),
+    ).toBe(true)
     expect(
       pixels?.some(
         (value, index) =>
           index % 4 === 0 &&
-          value > (pixels[index + 1] ?? 0) &&
+          value > (pixels[index + 2] ?? 0) &&
           (pixels[index + 3] ?? 0) > 0,
       ),
     ).toBe(true)

@@ -1,5 +1,5 @@
-/** v6 persists compact straight/quadratic/elbow arrows and independent endpoints. */
-export const EDITOR_DOCUMENT_SCHEMA_VERSION = 6 as const
+/** v7 is the only editable persisted document schema. */
+export const EDITOR_DOCUMENT_SCHEMA_VERSION = 7 as const
 
 export type JsonPrimitive = string | number | boolean | null
 export type JsonValue = JsonPrimitive | readonly JsonValue[] | JsonObject
@@ -143,7 +143,7 @@ export interface SourceImageRef {
   readonly width: number
   readonly height: number
   readonly orientationApplied: true
-  /** Ingress flow; legacy factories may omit it, but the v4 codec always emits it. */
+  /** Ingress flow; all v7 persistence factories emit it. */
   readonly provenance?: 'capture' | 'fileOpen' | 'clipboard'
   readonly color: ColorMetadata
 }
@@ -182,17 +182,29 @@ export interface LayerBase<K extends LayerKind, P extends JsonObject> {
   readonly kind: K
   readonly transform: Transform2D
   /** Bounds in the node's untransformed local coordinate system. */
-  readonly localBounds?: Rect
-  readonly opacity: number
+  readonly localBounds: Rect
   readonly visible: boolean
   readonly locked: boolean
-  /** Applied after the layer's fill, stroke and shadows are grouped. */
-  readonly blendMode?: BlendMode
-  /** Bounded by the document codec to keep preview/export deterministic. */
-  readonly shadows?: readonly ShadowStyle[]
   readonly payload: P
   /** Future fields are retained verbatim during parse/serialize round-trips. */
   readonly extras?: JsonObject
+}
+
+/** Text-bearing v7 layers intentionally cannot persist common visual effects. */
+export type TextBearingLayerBase<
+  K extends 'text' | 'numberedMarker' | 'callout',
+  P extends JsonObject,
+> = LayerBase<K, P>
+
+export interface CompositedLayerBase<
+  K extends Exclude<LayerKind, 'text' | 'numberedMarker' | 'callout'>,
+  P extends JsonObject,
+> extends LayerBase<K, P> {
+  readonly opacity: number
+  /** Applied after the layer's fill, stroke and shadows are grouped. */
+  readonly blendMode: BlendMode
+  /** Bounded by the document codec to keep preview/export deterministic. */
+  readonly shadows: readonly ShadowStyle[]
 }
 
 export interface ImageLayerPayload extends JsonObject {
@@ -211,85 +223,62 @@ export interface ImageLayerPayload extends JsonObject {
   readonly mask?: null
 }
 
-export interface FontReference extends JsonObject {
-  readonly source: 'bundled' | 'system'
-  readonly family: string
-  readonly postscriptName?: string
-  readonly weight: 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900
-  readonly style: 'normal' | 'italic'
-}
+export type FontWeight = 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900
 
-/** A portable family reference that may override the layer face for one span. */
-export interface FontFamilyReference extends JsonObject {
-  readonly source: 'bundled' | 'system'
-  readonly family: string
-  readonly postscriptName?: string
-}
-
-export interface RichTextSpan extends JsonObject {
+export type RichTextSpan = Readonly<{
   /** UTF-16 offsets; codec rejects offsets that split a surrogate pair. */
   readonly start: number
   readonly end: number
-  readonly fontSize?: number
-  readonly font?: FontFamilyReference
-  readonly color?: SrgbColor
-  readonly weight?: FontReference['weight']
-  readonly italic?: boolean
-  readonly underline?: boolean
-  readonly letterSpacing?: number
-}
+  readonly fontFamily: string
+  readonly fontSize: number
+  readonly color: SrgbColor
+  readonly weight: FontWeight
+  readonly italic: boolean
+  readonly strikethrough: boolean
+}>
 
-export interface RichTextParagraph extends JsonObject {
+export type RichTextParagraph = Readonly<{
   readonly start: number
   readonly end: number
-  readonly alignment: 'start' | 'center' | 'end' | 'justify'
-  readonly lineHeight?: number
-}
+  readonly alignment: 'start' | 'center' | 'end'
+  readonly listKind: 'none' | 'bullet'
+}>
 
-export interface RichTextContent extends JsonObject {
+export type RichTextContent = Readonly<{
   readonly text: string
   readonly wrap: 'autoSize' | 'fixedWidth'
   readonly fixedWidth?: number
   readonly spans: readonly RichTextSpan[]
   readonly paragraphs: readonly RichTextParagraph[]
-}
+}>
 
-export interface TextOutline extends JsonObject {
-  readonly stroke: StrokeStyle
-  readonly position: 'center' | 'outside'
-}
-
-export interface TextBackground extends JsonObject {
-  readonly fill: FillPaint & JsonObject
+export type TextBackground = Readonly<{
+  readonly color: SrgbColor
   readonly padding: number
   readonly radius: number
-}
+}>
 
-export interface TextLayerPayload extends JsonObject {
+export type TextLayerPayload = Readonly<{
   readonly content: RichTextContent
-  readonly font: FontReference
-  readonly fill: FillPaint & JsonObject
-  readonly outline: TextOutline | null
   readonly background: TextBackground | null
-}
+}>
 
-export interface NumberedMarkerPayload extends JsonObject {
-  readonly sequence: number
+export type NumberedMarkerBadge = Readonly<{
   readonly shape: 'circle' | 'square' | 'diamond' | 'star'
-  readonly label: RichTextContent
-  readonly fill: FillPaint & JsonObject
-  readonly outline: TextOutline | null
-}
+  readonly color: SrgbColor
+}>
 
-export interface CalloutPayload extends JsonObject {
+export type NumberedMarkerPayload = Readonly<{
+  readonly sequence: number
+  readonly label: RichTextContent
+  readonly badge: NumberedMarkerBadge
+}>
+
+export type CalloutPayload = Readonly<{
   readonly content: RichTextContent
-  readonly font: FontReference
-  readonly fill: FillPaint & JsonObject
-  readonly outline: TextOutline | null
-  readonly padding: number
-  readonly radius: number
+  readonly bubble: TextBackground
   readonly tailAnchor: Point & JsonObject
-}
+}>
 
 export interface EmojiAssetReference extends JsonObject {
   readonly collection: 'notoEmoji'
@@ -354,22 +343,22 @@ export interface MarkerLayerPayload extends JsonObject {
 }
 
 /** Payload-specific contracts are validated by the current codec. */
-export type ArrowLayer = LayerBase<'arrow', ArrowLayerPayload>
-export type ShapeLayer = LayerBase<'shape', JsonObject>
-export type PencilLayer = LayerBase<'pencil', JsonObject>
-export type MarkerLayer = LayerBase<'marker', JsonObject>
-export type TextLayer = LayerBase<'text', TextLayerPayload>
-export type NumberedMarkerLayer = LayerBase<
+export type ArrowLayer = CompositedLayerBase<'arrow', ArrowLayerPayload>
+export type ShapeLayer = CompositedLayerBase<'shape', JsonObject>
+export type PencilLayer = CompositedLayerBase<'pencil', JsonObject>
+export type MarkerLayer = CompositedLayerBase<'marker', JsonObject>
+export type TextLayer = TextBearingLayerBase<'text', TextLayerPayload>
+export type NumberedMarkerLayer = TextBearingLayerBase<
   'numberedMarker',
   NumberedMarkerPayload
 >
-export type CalloutLayer = LayerBase<'callout', CalloutPayload>
-export type CensorLayer = LayerBase<'censor', JsonObject>
-export type SpotlightLayer = LayerBase<'spotlight', JsonObject>
-export type RulerLayer = LayerBase<'ruler', JsonObject>
-export type LoupeLayer = LayerBase<'loupe', JsonObject>
-export type EmojiLayer = LayerBase<'emoji', EmojiPayload>
-export type ImageLayer = LayerBase<'image', ImageLayerPayload>
+export type CalloutLayer = TextBearingLayerBase<'callout', CalloutPayload>
+export type CensorLayer = CompositedLayerBase<'censor', JsonObject>
+export type SpotlightLayer = CompositedLayerBase<'spotlight', JsonObject>
+export type RulerLayer = CompositedLayerBase<'ruler', JsonObject>
+export type LoupeLayer = CompositedLayerBase<'loupe', JsonObject>
+export type EmojiLayer = CompositedLayerBase<'emoji', EmojiPayload>
+export type ImageLayer = CompositedLayerBase<'image', ImageLayerPayload>
 
 export type LayerNode =
   | ArrowLayer
@@ -386,10 +375,8 @@ export type LayerNode =
   | EmojiLayer
   | ImageLayer
 
-export interface EditorDocumentV1 {
-  /** Compatibility input type; parsed documents always use the current schema. */
-  readonly schemaVersion:
-    1 | 2 | 3 | 4 | 5 | typeof EDITOR_DOCUMENT_SCHEMA_VERSION
+export interface EditorDocumentV7 {
+  readonly schemaVersion: typeof EDITOR_DOCUMENT_SCHEMA_VERSION
   readonly id: string
   readonly source: SourceImageRef
   readonly canvas: Readonly<{ width: number; height: number }>
@@ -402,72 +389,25 @@ export interface EditorDocumentV1 {
   readonly extras?: JsonObject
 }
 
-export interface EditorDocumentV2 extends Omit<
-  EditorDocumentV1,
-  'schemaVersion' | 'layers'
-> {
-  readonly schemaVersion: 2
-  readonly layers: readonly LayerNode[]
-}
-
-export interface EditorDocumentV3 extends Omit<
-  EditorDocumentV1,
-  'schemaVersion' | 'layers'
-> {
-  readonly schemaVersion: 3
-  /** v3 persistence never permits implicit geometry/effect defaults. */
-  readonly layers: readonly (LayerNode &
-    Readonly<{
-      readonly localBounds: Rect
-      readonly blendMode: BlendMode
-      readonly shadows: readonly ShadowStyle[]
-    }>)[]
-}
-
-export interface EditorDocumentV4 extends Omit<
-  EditorDocumentV1,
-  'schemaVersion' | 'layers'
-> {
-  readonly schemaVersion: 4
-  readonly layers: readonly (LayerNode &
-    Readonly<{
-      readonly localBounds: Rect
-      readonly blendMode: BlendMode
-      readonly shadows: readonly ShadowStyle[]
-    }>)[]
-}
-
-export interface EditorDocumentV5 extends Omit<
-  EditorDocumentV1,
-  'schemaVersion' | 'layers'
-> {
-  readonly schemaVersion: 5
-  readonly layers: readonly (LayerNode &
-    Readonly<{
-      readonly localBounds: Rect
-      readonly blendMode: BlendMode
-      readonly shadows: readonly ShadowStyle[]
-    }>)[]
-}
-
-export interface EditorDocumentV6 extends Omit<
-  EditorDocumentV1,
-  'schemaVersion' | 'layers'
-> {
-  readonly schemaVersion: typeof EDITOR_DOCUMENT_SCHEMA_VERSION
-  readonly layers: readonly (LayerNode &
-    Readonly<{
-      readonly localBounds: Rect
-      readonly blendMode: BlendMode
-      readonly shadows: readonly ShadowStyle[]
-    }>)[]
-}
-
 /** Current editable document contract. */
-export type EditorDocument = EditorDocumentV6
+export type EditorDocument = EditorDocumentV7
+
+/** @deprecated Historical names now alias the sole editable v7 contract. */
+export type EditorDocumentV1 = EditorDocumentV7
+export type EditorDocumentV2 = EditorDocumentV7
+export type EditorDocumentV3 = EditorDocumentV7
+export type EditorDocumentV4 = EditorDocumentV7
+export type EditorDocumentV5 = EditorDocumentV7
+export type EditorDocumentV6 = EditorDocumentV7
 
 export type ParsedEditorDocument =
-  | Readonly<{ kind: 'editable'; document: EditorDocumentV1 }>
+  | Readonly<{ kind: 'editable'; document: EditorDocument }>
+  | Readonly<{
+      kind: 'unsupported'
+      schemaVersion: number
+      raw: JsonObject
+      reason: 'olderSchema'
+    }>
   | Readonly<{
       kind: 'readOnly'
       schemaVersion: number

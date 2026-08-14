@@ -24,7 +24,7 @@ function documentWithRecoveredArrow(
   })
   if (!arrow || arrow.kind !== 'arrow') throw new Error('expected arrow')
   return {
-    schemaVersion: 6,
+    schemaVersion: 7,
     id: documentId,
     source: {
       blobHash: 'a'.repeat(64),
@@ -33,6 +33,7 @@ function documentWithRecoveredArrow(
       width: 100,
       height: 100,
       orientationApplied: true,
+      provenance: 'capture',
       color: { colorSpace: 'srgb', hasIccProfile: false },
     },
     canvas: { width: 100, height: 100 },

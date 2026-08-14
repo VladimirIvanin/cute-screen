@@ -16,6 +16,7 @@ import type {
   EditorDocumentV1,
   JsonObject,
   LayerNode,
+  RichTextContent,
 } from './types'
 
 const TRANSPARENT: RgbaColor = Object.freeze({
@@ -28,6 +29,12 @@ const FALLBACK_STROKE: RgbaColor = Object.freeze({
   red: 0.898,
   green: 0.282,
   blue: 0.302,
+  alpha: 1,
+})
+const TEXT_BLACK: RgbaColor = Object.freeze({
+  red: 0,
+  green: 0,
+  blue: 0,
   alpha: 1,
 })
 
@@ -180,23 +187,15 @@ function stroke(value: unknown): {
 }
 
 function bounds(layer: LayerNode) {
-  return layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
+  return layer.localBounds
 }
 
-function shadows(layer: LayerNode) {
-  return Object.freeze(
-    (layer.shadows ?? []).slice(0, 4).map((shadow) =>
-      Object.freeze({
-        color: color(shadow.color, TRANSPARENT),
-        offsetX: Number.isFinite(shadow.offsetX) ? shadow.offsetX : 0,
-        offsetY: Number.isFinite(shadow.offsetY) ? shadow.offsetY : 0,
-        blur:
-          Number.isFinite(shadow.blur) && shadow.blur >= 0
-            ? Math.min(128, shadow.blur)
-            : 0,
-      }),
-    ),
-  )
+function layerOpacity(layer: LayerNode): number {
+  return 'opacity' in layer ? layer.opacity : 1
+}
+
+function layerBlendMode(layer: LayerNode) {
+  return 'blendMode' in layer ? layer.blendMode : 'normal'
 }
 
 function localPoint(
@@ -232,9 +231,9 @@ function lineNode(
     x2: layer.transform.translateX + end.x,
     y2: layer.transform.translateY + end.y,
     rotation: layer.transform.rotation,
-    opacity: layer.opacity,
+    opacity: layerOpacity(layer),
     visible: layer.visible,
-    blendMode: layer.blendMode ?? 'normal',
+    blendMode: layerBlendMode(layer),
     stroke: style.color,
     strokeWidth: style.width,
     lineCap: style.cap,
@@ -257,9 +256,9 @@ function pathNode(
       y: layer.transform.translateY + point.y,
     })),
     rotation: layer.transform.rotation,
-    opacity: layer.opacity,
+    opacity: layerOpacity(layer),
     visible: layer.visible,
-    blendMode: layer.blendMode ?? 'normal',
+    blendMode: layerBlendMode(layer),
     stroke: style.color,
     strokeWidth: style.width,
     lineCap: style.cap,
@@ -311,9 +310,9 @@ function arrowCapNodes(
   }
   const common = {
     rotation: layer.transform.rotation,
-    opacity: layer.opacity,
+    opacity: layerOpacity(layer),
     visible: layer.visible,
-    blendMode: layer.blendMode ?? 'normal',
+    blendMode: layerBlendMode(layer),
   }
   if (cap === 'circle') {
     return [
@@ -641,52 +640,65 @@ function drawingNodes(layer: LayerNode): readonly RenderNode[] {
   return []
 }
 
+function richTextNode(
+  id: string,
+  content: RichTextContent,
+  geometry: Readonly<{
+    x: number
+    y: number
+    width: number
+    height: number
+  }>,
+  layer: Extract<
+    LayerNode,
+    { readonly kind: 'text' | 'numberedMarker' | 'callout' }
+  >,
+  verticalAlign?: 'visualCenter',
+): Extract<RenderNode, { readonly kind: 'text' }> {
+  return {
+    id,
+    kind: 'text',
+    text: content.text,
+    ...geometry,
+    wrap: content.wrap,
+    ...(content.fixedWidth === undefined
+      ? {}
+      : { fixedWidth: content.fixedWidth }),
+    runs: content.spans.map((span) => ({
+      start: span.start,
+      end: span.end,
+      fontFamily: span.fontFamily,
+      fontSize: span.fontSize,
+      color: color(span.color, TEXT_BLACK),
+      fontWeight: span.weight,
+      fontStyle: span.italic ? 'italic' : 'normal',
+      strikethrough: span.strikethrough,
+    })),
+    paragraphs: content.paragraphs.map((paragraph) => ({ ...paragraph })),
+    ...(verticalAlign === undefined ? {} : { verticalAlign }),
+    rotation: layer.transform.rotation,
+    opacity: 1,
+    visible: layer.visible,
+    blendMode: 'normal',
+  }
+}
+
 function textNodes(
   layer: Extract<LayerNode, { readonly kind: 'text' }>,
 ): readonly RenderNode[] {
-  const bounds = layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
-  const { content, font } = layer.payload
-  const firstSpan = content.spans[0]
-  const firstParagraph = content.paragraphs[0]
-  const fontSize = firstSpan?.fontSize ?? 16
-  const outline = layer.payload.outline?.stroke
-  const text: RenderNode = {
-    id: layer.id,
-    kind: 'text',
-    text: content.text,
-    x: layer.transform.translateX + bounds.x,
-    y: layer.transform.translateY + bounds.y,
-    width: bounds.width,
-    height: bounds.height,
-    fontFamily: font.family,
-    fontSize,
-    fontWeight: firstSpan?.weight ?? font.weight,
-    fontStyle: firstSpan?.italic ? 'italic' : font.style,
-    ...(firstSpan?.underline ? { underline: true } : {}),
-    ...(firstSpan?.letterSpacing === undefined
-      ? {}
-      : { letterSpacing: firstSpan.letterSpacing }),
-    align: firstParagraph?.alignment ?? 'start',
-    lineHeight: (firstParagraph?.lineHeight ?? 1.25) * fontSize,
-    rotation: layer.transform.rotation,
-    opacity: layer.opacity,
-    visible: layer.visible,
-    blendMode: layer.blendMode ?? 'normal',
-    ...(layer.shadows?.length ? { shadows: shadows(layer) } : {}),
-    fill: fill(layer.payload.fill, {
+  const bounds = layer.localBounds
+  const { content } = layer.payload
+  const text = richTextNode(
+    layer.id,
+    content,
+    {
       x: layer.transform.translateX + bounds.x,
       y: layer.transform.translateY + bounds.y,
       width: bounds.width,
       height: bounds.height,
-    }),
-    ...(outline === undefined
-      ? {}
-      : {
-          stroke: color(outline.color),
-          strokeWidth: outline.width,
-          lineJoin: outline.join,
-        }),
-  }
+    },
+    layer,
+  )
   const background = layer.payload.background
   if (!background) return [text]
   const padding = background.padding
@@ -707,10 +719,10 @@ function textNodes(
         backgroundBounds.height / 2,
       ),
       rotation: layer.transform.rotation,
-      opacity: layer.opacity,
+      opacity: 1,
       visible: layer.visible,
-      blendMode: layer.blendMode ?? 'normal',
-      fill: fill(background.fill, backgroundBounds),
+      blendMode: 'normal',
+      fill: color(background.color),
     },
     text,
   ]
@@ -719,35 +731,22 @@ function textNodes(
 function numberedMarkerNodes(
   layer: Extract<LayerNode, { readonly kind: 'numberedMarker' }>,
 ): readonly RenderNode[] {
-  const bounds = layer.localBounds ?? { x: 0, y: 0, width: 32, height: 32 }
+  const bounds = layer.localBounds
   const x = layer.transform.translateX + bounds.x
   const y = layer.transform.translateY + bounds.y
   const centerX = x + bounds.width / 2
   const centerY = y + bounds.height / 2
   const payload = layer.payload
-  const outline = payload.outline?.stroke
   const body = {
     id: `${layer.id}:body`,
     rotation: layer.transform.rotation,
-    opacity: layer.opacity,
+    opacity: 1,
     visible: layer.visible,
-    blendMode: layer.blendMode ?? 'normal',
-    fill: fill(payload.fill, {
-      x,
-      y,
-      width: bounds.width,
-      height: bounds.height,
-    }),
-    ...(outline === undefined
-      ? {}
-      : {
-          stroke: color(outline.color),
-          strokeWidth: outline.width,
-          lineJoin: outline.join,
-        }),
+    blendMode: 'normal' as const,
+    fill: color(payload.badge.color),
   }
   const node: RenderNode =
-    payload.shape === 'circle'
+    payload.badge.shape === 'circle'
       ? {
           ...body,
           kind: 'ellipse',
@@ -756,7 +755,7 @@ function numberedMarkerNodes(
           radiusX: bounds.width / 2,
           radiusY: bounds.height / 2,
         }
-      : payload.shape === 'square'
+      : payload.badge.shape === 'square'
         ? {
             ...body,
             kind: 'rect',
@@ -769,7 +768,7 @@ function numberedMarkerNodes(
             ...body,
             kind: 'polygon',
             points:
-              payload.shape === 'diamond'
+              payload.badge.shape === 'diamond'
                 ? [
                     { x: centerX, y },
                     { x: x + bounds.width, y: centerY },
@@ -793,49 +792,30 @@ function numberedMarkerNodes(
                     }
                   }),
           }
-  const fontSize = Math.max(
-    12,
-    Math.min(18, Math.min(bounds.width, bounds.height) * 0.55),
-  )
   return [
     node,
-    {
-      id: `${layer.id}:label`,
-      kind: 'text',
-      text: payload.label.text,
-      x,
-      y,
-      width: bounds.width,
-      height: bounds.height,
-      fontFamily: 'Roboto',
-      fontSize,
-      fontWeight: 700,
-      fontStyle: 'normal',
-      align: 'center',
-      verticalAlign: 'visualCenter',
-      lineHeight: fontSize * 1.25,
-      rotation: layer.transform.rotation,
-      opacity: layer.opacity,
-      visible: layer.visible,
-      blendMode: layer.blendMode ?? 'normal',
-      fill: { red: 1, green: 1, blue: 1, alpha: 1 },
-    },
+    richTextNode(
+      `${layer.id}:label`,
+      payload.label,
+      { x, y, width: bounds.width, height: bounds.height },
+      layer,
+      'visualCenter',
+    ),
   ]
 }
 
 function calloutNodes(
   layer: Extract<LayerNode, { readonly kind: 'callout' }>,
 ): readonly RenderNode[] {
-  const bounds = layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
+  const bounds = layer.localBounds
   const x = layer.transform.translateX + bounds.x
   const y = layer.transform.translateY + bounds.y
   const payload = layer.payload
-  const outline = payload.outline?.stroke
   const common = {
     rotation: layer.transform.rotation,
-    opacity: layer.opacity,
+    opacity: 1,
     visible: layer.visible,
-    blendMode: layer.blendMode ?? 'normal',
+    blendMode: 'normal' as const,
   }
   const bubble: RenderNode = {
     ...common,
@@ -845,20 +825,12 @@ function calloutNodes(
     y,
     width: bounds.width,
     height: bounds.height,
-    cornerRadius: Math.min(payload.radius, bounds.width / 2, bounds.height / 2),
-    fill: fill(payload.fill, {
-      x,
-      y,
-      width: bounds.width,
-      height: bounds.height,
-    }),
-    ...(outline === undefined
-      ? {}
-      : {
-          stroke: color(outline.color),
-          strokeWidth: outline.width,
-          lineJoin: outline.join,
-        }),
+    cornerRadius: Math.min(
+      payload.bubble.radius,
+      bounds.width / 2,
+      bounds.height / 2,
+    ),
+    fill: color(payload.bubble.color),
   }
   const tailAnchor = {
     x: layer.transform.translateX + payload.tailAnchor.x,
@@ -901,40 +873,19 @@ function calloutNodes(
       },
       tailAnchor,
     ],
-    fill: fill(payload.fill, {
-      x,
-      y,
-      width: bounds.width,
-      height: bounds.height,
-    }),
-    ...(outline === undefined
-      ? {}
-      : {
-          stroke: color(outline.color),
-          strokeWidth: outline.width,
-          lineJoin: outline.join,
-        }),
+    fill: color(payload.bubble.color),
   }
-  const fontSize = payload.content.spans[0]?.fontSize ?? 16
-  const lineHeight =
-    (payload.content.paragraphs[0]?.lineHeight ?? 1.25) * fontSize
-  const text: RenderNode = {
-    ...common,
-    id: `${layer.id}:text`,
-    kind: 'text',
-    text: payload.content.text,
-    x: x + payload.padding,
-    y: y + payload.padding,
-    width: Math.max(1, bounds.width - payload.padding * 2),
-    height: Math.max(1, bounds.height - payload.padding * 2),
-    fontFamily: payload.font.family,
-    fontSize,
-    fontWeight: payload.content.spans[0]?.weight ?? payload.font.weight,
-    fontStyle: payload.content.spans[0]?.italic ? 'italic' : payload.font.style,
-    align: payload.content.paragraphs[0]?.alignment ?? 'start',
-    lineHeight,
-    fill: { red: 1, green: 1, blue: 1, alpha: 1 },
-  }
+  const text = richTextNode(
+    `${layer.id}:text`,
+    payload.content,
+    {
+      x: x + payload.bubble.padding,
+      y: y + payload.bubble.padding,
+      width: Math.max(1, bounds.width - payload.bubble.padding * 2),
+      height: Math.max(1, bounds.height - payload.bubble.padding * 2),
+    },
+    layer,
+  )
   return [bubble, tail, text]
 }
 

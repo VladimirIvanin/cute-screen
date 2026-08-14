@@ -2,42 +2,19 @@ import { describe, expect, it } from 'vitest'
 
 import {
   createCalloutLayer,
-  createNumberedMarkerLayer,
   createContentImageLayer,
   createDuplicateLayerCommand,
   createEmojiLayer,
+  createNumberedMarkerLayer,
   createTextCommitCommand,
   createTextLayer,
-  decodeClipboardLayersV1,
-  encodeClipboardLayersV1,
+  decodeClipboardLayersV2,
+  encodeClipboardLayersV2,
   nextNumberedMarkerSequence,
   pasteClipboardLayers,
   routeClipboardSnapshot,
-  type EditorDocumentV1,
   type EditorCommand,
-  type LayerNode,
 } from './index'
-
-const document: EditorDocumentV1 = {
-  schemaVersion: 5,
-  id: '019c1f62-058e-7000-8000-000000000000',
-  source: {
-    blobHash: 'a'.repeat(64),
-    format: 'png',
-    mimeType: 'image/png',
-    width: 100,
-    height: 100,
-    orientationApplied: true,
-    provenance: 'capture',
-    color: { colorSpace: 'srgb', hasIccProfile: false },
-  },
-  canvas: { width: 100, height: 100 },
-  crop: null,
-  layers: [],
-  presentation: { beautify: { enabled: false }, watermark: { enabled: false } },
-  createdAt: '2026-08-10T00:00:00.000Z',
-  updatedAt: '2026-08-10T00:00:00.000Z',
-}
 
 const ids = [
   '019c1f62-058e-7000-8000-000000000001',
@@ -45,170 +22,49 @@ const ids = [
   '019c1f62-058e-7000-8000-000000000003',
 ] as const
 
-describe('M07 content-layer core contracts', () => {
-  it('creates portable text with one typed rich-text payload', () => {
+describe('v7 content-layer core contracts', () => {
+  it('creates 24 px portable text with only the approved span fields', () => {
     const layer = createTextLayer({
       id: ids[0],
       text: 'Привет\nworld',
       origin: { x: 8, y: 12 },
-      font: {
-        source: 'bundled',
-        family: 'Roboto',
-        weight: 400,
-        style: 'normal',
-      },
+      weight: 700,
+      italic: true,
+      strikethrough: true,
+      alignment: 'center',
+      listKind: 'bullet',
+      color: { red: 0.9, green: 0.28, blue: 0.3, alpha: 1 },
     })
     if (layer === null) throw new Error('expected non-empty text layer')
 
-    expect(layer.payload.content.text).toBe('Привет\nworld')
-    expect(layer.payload.content.wrap).toBe('autoSize')
-    expect(layer.payload.fill).toMatchObject({ kind: 'solid' })
-  })
-
-  it('persists bounded underline and letter spacing in its single text span', () => {
-    const layer = createTextLayer({
-      id: ids[0],
-      text: 'Spaced',
-      origin: { x: 8, y: 12 },
-      font: {
-        source: 'bundled',
-        family: 'Roboto',
-        weight: 400,
-        style: 'normal',
-      },
-      underline: true,
-      letterSpacing: 3,
-    })
-    if (layer === null) throw new Error('expected non-empty text layer')
-
+    expect(layer).not.toHaveProperty('opacity')
+    expect(layer).not.toHaveProperty('blendMode')
+    expect(layer).not.toHaveProperty('shadows')
     expect(layer.payload.content.spans).toEqual([
-      expect.objectContaining({
+      {
         start: 0,
-        end: 6,
-        underline: true,
-        letterSpacing: 3,
-      }),
+        end: 12,
+        fontFamily: 'Roboto',
+        fontSize: 24,
+        color: { red: 0.9, green: 0.28, blue: 0.3, alpha: 1 },
+        weight: 700,
+        italic: true,
+        strikethrough: true,
+      },
     ])
-    expect(() =>
-      createTextLayer({
-        id: ids[0],
-        text: 'invalid',
-        origin: { x: 8, y: 12 },
-        font: {
-          source: 'bundled',
-          family: 'Roboto',
-          weight: 400,
-          style: 'normal',
-        },
-        letterSpacing: 257,
-      }),
-    ).toThrow('text letter spacing must be between -256 and 256')
+    expect(layer.payload.content.paragraphs).toEqual([
+      {
+        start: 0,
+        end: 12,
+        alignment: 'center',
+        listKind: 'bullet',
+      },
+    ])
   })
 
-  it('persists an explicit solid text color instead of relying on a renderer default', () => {
-    const layer = createTextLayer({
-      id: ids[0],
-      text: 'accent',
-      origin: { x: 8, y: 12 },
-      font: {
-        source: 'bundled',
-        family: 'Roboto',
-        weight: 400,
-        style: 'normal',
-      },
-      color: { red: 0.9, green: 0.28, blue: 0.3, alpha: 1 },
-    })
-    if (layer === null) throw new Error('expected non-empty text layer')
-
-    expect(layer.payload.fill).toEqual({
-      kind: 'solid',
-      color: { red: 0.9, green: 0.28, blue: 0.3, alpha: 1 },
-      opacity: 1,
-    })
-  })
-
-  it('persists a shared gradient fill instead of collapsing it to a text color', () => {
-    const fill = {
-      kind: 'linearGradient' as const,
-      stops: [
-        { position: 0, color: { red: 1, green: 0, blue: 0, alpha: 1 } },
-        { position: 1, color: { red: 0, green: 0, blue: 1, alpha: 1 } },
-      ],
-      start: { x: 0, y: 0 },
-      end: { x: 1, y: 1 },
-      opacity: 1,
-    }
-    const layer = createTextLayer({
-      id: ids[0],
-      text: 'gradient',
-      origin: { x: 8, y: 12 },
-      font: {
-        source: 'bundled',
-        family: 'Roboto',
-        weight: 400,
-        style: 'normal',
-      },
-      fill,
-    })
-    if (layer === null) throw new Error('expected non-empty text layer')
-
-    expect(layer.payload.fill).toEqual(fill)
-  })
-
-  it('persists text opacity and blend mode as common layer composition fields', () => {
-    const layer = createTextLayer({
-      id: ids[0],
-      text: 'screen label',
-      origin: { x: 8, y: 12 },
-      font: {
-        source: 'bundled',
-        family: 'Roboto',
-        weight: 400,
-        style: 'normal',
-      },
-      opacity: 0.6,
-      blendMode: 'screen',
-    })
-    if (layer === null) throw new Error('expected non-empty text layer')
-
-    expect(layer).toMatchObject({ opacity: 0.6, blendMode: 'screen' })
-  })
-
-  it('keeps a portable text outline in the authored layer payload', () => {
-    const outline = {
-      stroke: {
-        color: { red: 1, green: 1, blue: 1, alpha: 1 },
-        width: 2,
-        style: 'solid' as const,
-        cap: 'round' as const,
-        join: 'round' as const,
-      },
-      position: 'center' as const,
-    }
-    const layer = createTextLayer({
-      id: ids[0],
-      text: 'outlined',
-      origin: { x: 8, y: 12 },
-      font: {
-        source: 'bundled',
-        family: 'Roboto',
-        weight: 400,
-        style: 'normal',
-      },
-      outline,
-    })
-    if (layer === null) throw new Error('expected non-empty text layer')
-
-    expect(layer.payload.outline).toEqual(outline)
-  })
-
-  it('keeps a bounded text background in the same portable layer payload', () => {
+  it('persists only a bounded solid text background', () => {
     const background = {
-      fill: {
-        kind: 'solid' as const,
-        color: { red: 1, green: 0.8, blue: 0.2, alpha: 1 },
-        opacity: 1,
-      },
+      color: { red: 1, green: 0.8, blue: 0.2, alpha: 1 },
       padding: 6,
       radius: 4,
     }
@@ -216,85 +72,20 @@ describe('M07 content-layer core contracts', () => {
       id: ids[0],
       text: 'label',
       origin: { x: 8, y: 12 },
-      font: {
-        source: 'bundled',
-        family: 'Roboto',
-        weight: 400,
-        style: 'normal',
-      },
       background,
     })
-    if (layer === null) throw new Error('expected non-empty text layer')
-
-    expect(layer.payload.background).toEqual(background)
-  })
-
-  it('stores a bounded renderer-safe shadow stack directly on the text layer', () => {
-    const shadows = [
-      {
-        color: { red: 0, green: 0, blue: 0, alpha: 0.35 },
-        offsetX: 2,
-        offsetY: 3,
-        blur: 3,
-      },
-    ]
-    const layer = createTextLayer({
-      id: ids[0],
-      text: 'shadowed',
-      origin: { x: 8, y: 12 },
-      font: {
-        source: 'bundled',
-        family: 'Roboto',
-        weight: 400,
-        style: 'normal',
-      },
-      shadows,
-    })
-    if (layer === null) throw new Error('expected non-empty text layer')
-
-    expect(layer.shadows).toEqual(shadows)
-    expect(() =>
-      createTextLayer({
-        id: ids[1],
-        text: 'too blurry',
-        origin: { x: 8, y: 12 },
-        font: {
-          source: 'bundled',
-          family: 'Roboto',
-          weight: 400,
-          style: 'normal',
-        },
-        shadows: [{ ...shadows[0]!, blur: 129 }],
-      }),
-    ).toThrow('text shadows are invalid')
-  })
-
-  it('rejects an out-of-range text background before creating a command payload', () => {
+    expect(layer?.payload.background).toEqual(background)
     expect(() =>
       createTextLayer({
         id: ids[0],
-        text: 'label',
+        text: 'invalid',
         origin: { x: 8, y: 12 },
-        font: {
-          source: 'bundled',
-          family: 'Roboto',
-          weight: 400,
-          style: 'normal',
-        },
-        background: {
-          fill: {
-            kind: 'solid',
-            color: { red: 1, green: 1, blue: 1, alpha: 1 },
-            opacity: 1,
-          },
-          padding: 257,
-          radius: 4,
-        },
+        background: { ...background, padding: 257 },
       }),
-    ).toThrow('text background padding must be between 0 and 256')
+    ).toThrow(/padding/u)
   })
 
-  it('allocates the minimal free marker number and preserves duplicates', () => {
+  it('allocates the minimal free marker number and preserves badge semantics', () => {
     const one = createNumberedMarkerLayer({
       id: ids[0],
       sequence: 1,
@@ -304,50 +95,36 @@ describe('M07 content-layer core contracts', () => {
       id: ids[1],
       sequence: 3,
       origin: { x: 0, y: 0 },
+      shape: 'diamond',
     })
-
     expect(nextNumberedMarkerSequence([one, three])).toBe(2)
+    expect(three.payload.badge.shape).toBe('diamond')
+    expect(three).not.toHaveProperty('opacity')
   })
 
-  it('copies portable layers, remaps IDs and demotes a copied base image', () => {
-    const textLayer = createTextLayer({
+  it('copies v7 portable layers, remaps IDs and demotes a base image', () => {
+    const base = createContentImageLayer({
       id: ids[0],
-      text: 'placeholder',
+      blobHash: 'a'.repeat(64),
+      format: 'png',
+      intrinsicWidth: 100,
+      intrinsicHeight: 100,
       origin: { x: 0, y: 0 },
-      font: {
-        source: 'bundled',
-        family: 'Roboto',
-        weight: 400,
-        style: 'normal',
-      },
     })
-    if (textLayer === null) throw new Error('expected non-empty text layer')
-    const base: LayerNode = {
-      ...textLayer,
-      kind: 'image',
-      locked: true,
-      payload: {
-        blobHash: 'a'.repeat(64),
-        intrinsicWidth: 100,
-        intrinsicHeight: 100,
-        format: 'png',
-        orientationApplied: true,
-        color: { colorSpace: 'srgb', hasIccProfile: false },
-        role: 'base',
-        border: null,
-        radius: 0,
-        crop: null,
-        mask: null,
-      },
-    }
-    const encoded = encodeClipboardLayersV1([base])
-    const decoded = decodeClipboardLayersV1(encoded)
+    const encoded = encodeClipboardLayersV2([
+      { ...base, locked: true, payload: { ...base.payload, role: 'base' } },
+    ])
+    const decoded = decodeClipboardLayersV2(encoded)
     const pasted = pasteClipboardLayers(decoded, {
       id: () => ids[2],
       zoom: 2,
       cascadeIndex: 1,
     })
 
+    expect(JSON.parse(encoded)).toMatchObject({
+      version: 2,
+      documentSchemaVersion: 7,
+    })
     expect(pasted[0]).toMatchObject({
       id: ids[2],
       locked: false,
@@ -358,19 +135,8 @@ describe('M07 content-layer core contracts', () => {
 
   it('does not allocate content commands for an empty new text layer', () => {
     expect(
-      createTextLayer({
-        id: ids[0],
-        text: '',
-        origin: { x: 0, y: 0 },
-        font: {
-          source: 'bundled',
-          family: 'Roboto',
-          weight: 400,
-          style: 'normal',
-        },
-      }),
+      createTextLayer({ id: ids[0], text: '', origin: { x: 0, y: 0 } }),
     ).toBeNull()
-    expect(document.schemaVersion).toBe(5)
   })
 
   it('commits text as exactly one add, update or removal command', () => {
@@ -378,27 +144,13 @@ describe('M07 content-layer core contracts', () => {
       id: ids[0],
       text: 'initial',
       origin: { x: 0, y: 0 },
-      font: {
-        source: 'bundled',
-        family: 'Roboto',
-        weight: 400,
-        style: 'normal',
-      },
     })
-    if (created === null) throw new Error('expected text layer')
     const updated = createTextLayer({
       id: ids[0],
       text: 'changed',
       origin: { x: 0, y: 0 },
-      font: {
-        source: 'bundled',
-        family: 'Roboto',
-        weight: 400,
-        style: 'normal',
-      },
     })
-    if (updated === null) throw new Error('expected updated text layer')
-
+    if (created === null || updated === null) throw new Error('expected text')
     expect(createTextCommitCommand({ next: created })).toMatchObject({
       type: 'addLayer',
     })
@@ -415,14 +167,8 @@ describe('M07 content-layer core contracts', () => {
       id: ids[0],
       text: 'duplicate me',
       origin: { x: 0, y: 0 },
-      font: {
-        source: 'bundled',
-        family: 'Roboto',
-        weight: 400,
-        style: 'normal',
-      },
     })
-    if (source === null) throw new Error('expected text layer')
+    if (source === null) throw new Error('expected text')
     const command: EditorCommand = createDuplicateLayerCommand(source, {
       id: ids[1],
       zoom: 2,
@@ -435,25 +181,22 @@ describe('M07 content-layer core contracts', () => {
     })
   })
 
-  it('creates typed callout, emoji and immutable content-image layers', () => {
-    const font = {
-      source: 'bundled' as const,
-      family: 'Roboto',
-      weight: 400 as const,
-      style: 'normal' as const,
-    }
-    expect(
-      createCalloutLayer({
-        id: ids[0],
-        text: 'Read this',
-        origin: { x: 10, y: 12 },
-        tailAnchor: { x: 80, y: 90 },
-        font,
-      }),
-    ).toMatchObject({
-      kind: 'callout',
-      payload: { content: { text: 'Read this' }, tailAnchor: { x: 80, y: 90 } },
+  it('creates callout, emoji and immutable content-image layers', () => {
+    const callout = createCalloutLayer({
+      id: ids[0],
+      text: 'Read this',
+      origin: { x: 10, y: 12 },
+      tailAnchor: { x: 80, y: 90 },
     })
+    expect(callout).toMatchObject({
+      kind: 'callout',
+      payload: {
+        content: { text: 'Read this' },
+        bubble: { padding: 8, radius: 8 },
+        tailAnchor: { x: 80, y: 90 },
+      },
+    })
+    expect(callout).not.toHaveProperty('opacity')
     expect(
       createEmojiLayer({
         id: ids[1],
@@ -475,37 +218,24 @@ describe('M07 content-layer core contracts', () => {
         intrinsicHeight: 60,
         origin: { x: 15, y: 20 },
       }),
-    ).toMatchObject({
-      kind: 'image',
-      locked: false,
-      localBounds: { width: 80, height: 60 },
-      payload: { role: 'content', blobHash: 'b'.repeat(64) },
-    })
+    ).toMatchObject({ kind: 'image', payload: { role: 'content' } })
   })
 
-  it('sizes a multiline callout from its longest line and all line boxes', () => {
+  it('sizes a multiline 24 px callout from its longest line', () => {
     const layer = createCalloutLayer({
       id: ids[0],
       text: 'wide line\nx',
       origin: { x: 10, y: 12 },
       tailAnchor: { x: 40, y: 80 },
-      font: {
-        source: 'bundled',
-        family: 'Roboto',
-        weight: 400,
-        style: 'normal',
-      },
     })
-    if (layer === null) throw new Error('expected callout')
-
-    expect(layer.localBounds).toMatchObject({
-      width: 16 * 'wide line'.length * 0.6 + 16,
-      height: 16 * 1.25 * 2 + 16,
+    expect(layer?.localBounds).toMatchObject({
+      width: 24 * 'wide line'.length * 0.6 + 16,
+      height: 24 * 1.25 * 2 + 16,
     })
   })
 
-  it('routes clipboard content by the documented active and empty-state precedence', () => {
-    const internal = encodeClipboardLayersV1([
+  it('routes clipboard content by active and empty-state precedence', () => {
+    const internal = encodeClipboardLayersV2([
       createNumberedMarkerLayer({
         id: ids[0],
         sequence: 1,
@@ -525,27 +255,13 @@ describe('M07 content-layer core contracts', () => {
         activeDocument: true,
         internal: '{bad json',
         bitmapAvailable: true,
-        text: 'fallback',
       }),
     ).toMatchObject({ kind: 'bitmap', warning: 'internalPayloadInvalid' })
     expect(
-      routeClipboardSnapshot({
-        activeDocument: true,
-        text: 'plain text',
-      }),
+      routeClipboardSnapshot({ activeDocument: true, text: 'plain text' }),
     ).toEqual({ kind: 'text', text: 'plain text' })
-    expect(
-      routeClipboardSnapshot({
-        activeDocument: false,
-        internal,
-        text: 'plain text',
-      }),
-    ).toEqual({ kind: 'emptyHint' })
-    expect(
-      routeClipboardSnapshot({
-        activeDocument: false,
-        bitmapAvailable: true,
-      }),
-    ).toEqual({ kind: 'bitmap' })
+    expect(routeClipboardSnapshot({ activeDocument: false, internal })).toEqual(
+      { kind: 'emptyHint' },
+    )
   })
 })

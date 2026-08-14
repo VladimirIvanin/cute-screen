@@ -18,14 +18,30 @@ const baseLayer: LayerNode = {
     scaleX: 1,
     scaleY: 1,
   },
+  localBounds: { x: 0, y: 0, width: 20, height: 20 },
   opacity: 1,
   visible: true,
   locked: false,
-  payload: { shape: 'rectangle' },
+  blendMode: 'normal',
+  shadows: [],
+  payload: {
+    shape: 'rectangle',
+    fill: { kind: 'none' },
+    stroke: {
+      color: { red: 1, green: 0, blue: 0, alpha: 1 },
+      width: 2,
+      style: 'solid',
+      cap: 'round',
+      join: 'round',
+    },
+    cornerRadius: 0,
+    starPoints: 5,
+    starInnerRatio: 0.45,
+  },
 }
 
 const document: EditorDocumentV1 = {
-  schemaVersion: 1,
+  schemaVersion: 7,
   id: DOCUMENT_ID,
   source: {
     blobHash: 'a'.repeat(64),
@@ -34,6 +50,7 @@ const document: EditorDocumentV1 = {
     width: 100,
     height: 100,
     orientationApplied: true,
+    provenance: 'capture',
     color: { colorSpace: 'srgb', hasIccProfile: false },
   },
   canvas: { width: 100, height: 100 },

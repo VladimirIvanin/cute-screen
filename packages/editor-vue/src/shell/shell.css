@@ -373,6 +373,18 @@ button:focus-visible {
   overflow-wrap: break-word;
   font-family: Roboto, ui-sans-serif, system-ui, sans-serif;
 }
+.cs-text-editor [data-rich-text-paragraph] {
+  position: relative;
+  min-height: 1.25em;
+}
+.cs-text-editor [data-list-kind='bullet'] {
+  padding-inline-start: 1.1em;
+}
+.cs-text-editor [data-list-kind='bullet']::before {
+  position: absolute;
+  inset-inline-start: 0.25em;
+  content: '•';
+}
 .cs-empty-state,
 .cs-loading {
   z-index: 2;
@@ -596,6 +608,141 @@ button:focus-visible {
   gap: 6px;
   overflow-x: auto;
   scrollbar-width: thin;
+}
+.cs-context-toolbar--text {
+  min-height: 44px;
+  padding: 4px 6px;
+}
+.cs-text-toolbar {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  gap: 3px;
+  overflow: visible;
+}
+.cs-text-toolbar > button,
+.cs-text-toolbar > select,
+.cs-text-toolbar > input,
+.cs-text-toolbar-color {
+  flex: 0 1 auto;
+  width: 34px;
+  height: 32px;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text);
+  background: var(--surface-sunken);
+  text-align: center;
+}
+.cs-text-toolbar > select[data-text-control='font'] {
+  width: clamp(64px, 12vw, 128px);
+  padding-inline: 4px;
+  text-align: left;
+}
+.cs-text-toolbar > input[data-text-control='size'] {
+  width: 48px;
+}
+.cs-text-size-popover,
+.cs-text-overflow-popover {
+  position: fixed;
+  z-index: 12;
+  bottom: 64px;
+  display: grid;
+  gap: 8px;
+  min-width: 210px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-overlay);
+}
+.cs-text-size-popover {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.cs-text-size-popover label {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.cs-text-overflow-trigger {
+  display: none;
+}
+.cs-text-toolbar svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+}
+.cs-text-toolbar button:focus-visible,
+.cs-text-toolbar select:focus-visible,
+.cs-text-toolbar input:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+.cs-text-toolbar button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.cs-text-toolbar-color {
+  display: grid;
+  place-items: center;
+}
+.cs-text-toolbar-color > .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.cs-text-toolbar-color input {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.cs-text-background-popover {
+  position: fixed;
+  z-index: 12;
+  bottom: 64px;
+  display: grid;
+  gap: 8px;
+  min-width: 210px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-overlay);
+}
+.cs-text-background-popover label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+@media (max-width: 700px) {
+  .cs-text-toolbar > select[data-text-control='font'] {
+    width: 64px;
+  }
+  .cs-text-toolbar {
+    gap: 1px;
+  }
+  .cs-text-toolbar .cs-text-overflowable {
+    display: none;
+  }
+  .cs-text-toolbar .cs-text-overflow-trigger {
+    display: inline-grid;
+    place-items: center;
+  }
+  .cs-context-toolbar--text {
+    max-width: calc(100% - 16px);
+  }
 }
 .cs-context-toolbar--arrow .cs-context-controls {
   min-width: 208px;

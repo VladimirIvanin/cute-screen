@@ -250,6 +250,14 @@ function drawingHitPart(
   point: Point,
 ): HitPart | undefined {
   if (layer.kind === 'image') return 'fill'
+  if (
+    layer.kind !== 'arrow' &&
+    layer.kind !== 'pencil' &&
+    layer.kind !== 'marker' &&
+    layer.kind !== 'shape'
+  ) {
+    return 'fill'
+  }
   const payload = layer.payload
   const bounds = layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
   const strokeWidth = payloadStrokeWidth(payload)
@@ -292,7 +300,6 @@ function drawingHitPart(
       ? 'stroke'
       : undefined
   }
-  if (layer.kind !== 'shape') return 'fill'
   // Pre-v3 in-memory fixtures and third-party callers may not have a drawing
   // payload yet. Keep the historical bounds hit until they pass the codec.
   if (Object.keys(payload).length === 0) return 'fill'

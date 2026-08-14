@@ -24,10 +24,6 @@ import {
   createBrowserDrawingToolPreferencesStorage,
   createBrowserPreferencesStorage,
 } from '../preferences'
-import {
-  createBrowserTextStylePresetsStorage,
-  type UserTextStylePreset,
-} from '../../text-style-presets'
 import { useEditorShellStore, type ShellStoreOptions } from '../store'
 import type { CaptureProgressState } from '../../platform'
 import type {
@@ -62,19 +58,26 @@ import {
   rebaseArrowLayer,
   type DrawingDefaults,
   type DrawingToolPreferencesV2,
-  type BlendMode,
   type EditorDocumentV1,
   type EditorCommand,
   type ImageLayer,
   type JsonObject,
   type LayerNode,
   type SrgbColor,
-  type ShadowStyle,
   type TextBackground,
+  type RichTextContent,
+  type RichTextParagraphStyle,
+  type RichTextSpanStyle,
+  applyRichTextParagraphStyle,
+  applyRichTextSpanStyle,
   type Transform2D,
 } from '@cute-screen/editor-renderer'
 import ActionFeedback from './ActionFeedback.vue'
-import CanvasViewport, { type TextToolDefaults } from './CanvasViewport.vue'
+import CanvasViewport, {
+  type TextFormattingPatch,
+  type TextToolbarSnapshot,
+  type TextToolDefaults,
+} from './CanvasViewport.vue'
 import ContextToolbar from './ContextToolbar.vue'
 import LayersPanel from './LayersPanel.vue'
 import SeriesFilmstrip from './SeriesFilmstrip.vue'
@@ -147,68 +150,28 @@ const drawingDefaults = ref<DrawingDefaults>(
   structuredClone(DEFAULT_DRAWING_DEFAULTS),
 )
 const textDefaults = shallowRef<TextToolDefaults>({
-  font: {
-    source: 'bundled',
-    family: 'Roboto',
-    weight: 400,
-    style: 'normal',
-  },
-  fontSize: 16,
+  fontFamily: 'Roboto',
+  fontSize: 24,
   weight: 400,
   italic: false,
-  underline: false,
-  letterSpacing: 0,
+  strikethrough: false,
   alignment: 'start',
-  lineHeight: 1.25,
+  listKind: 'none',
   color: { red: 0, green: 0, blue: 0, alpha: 1 },
-  fill: {
-    kind: 'solid',
-    color: { red: 0, green: 0, blue: 0, alpha: 1 },
-    opacity: 1,
-  },
-  outline: null,
   background: null,
-  opacity: 1,
-  blendMode: 'normal',
-  shadows: [],
 })
-const activeTextPreset = ref('plain')
-const textStyleRevision = ref(0)
+const textFormatting = shallowRef<TextFormattingPatch>()
+let textFormattingRevision = 0
 const textDraft = ref<
-  { readonly id: string; readonly kind: 'text' | 'callout' } | undefined
+  | {
+      readonly id: string
+      readonly kind: 'text' | 'callout' | 'numberedMarker'
+      readonly snapshot: TextToolbarSnapshot
+    }
+  | undefined
 >()
-const personalTextPreset = shallowRef<UserTextStylePreset>()
-const TEXT_BLEND_OPTIONS: readonly {
-  readonly value: BlendMode
-  readonly label: string
-}[] = [
-  { value: 'normal', label: 'Normal' },
-  { value: 'multiply', label: 'Multiply' },
-  { value: 'screen', label: 'Screen' },
-  { value: 'overlay', label: 'Overlay' },
-  { value: 'darken', label: 'Darken' },
-  { value: 'lighten', label: 'Lighten' },
-  { value: 'softLight', label: 'Soft light' },
-  { value: 'hardLight', label: 'Hard light' },
-]
-watch(textDefaults, () => {
-  textStyleRevision.value += 1
-})
-const textFontOptions = computed(() => {
-  const families = new Set<string>()
-  const options: Array<{ readonly value: string; readonly label: string }> = [
-    { value: 'bundled:Roboto', label: 'Roboto · bundled' },
-  ]
-  for (const face of props.systemFonts ?? []) {
-    if (families.has(face.family)) continue
-    families.add(face.family)
-    options.push({
-      value: `system:${face.family}`,
-      label: `${face.family} · system`,
-    })
-  }
-  return options
-})
+/* Removed v0–v6 text presets/effects. Kept as a short-term source comment so
+ * surrounding drawing-tool code remains untouched in this concurrent checkout.
 function textFontOptionValue(font: TextToolDefaults['font']): string {
   return font.source === 'bundled' ? 'bundled:Roboto' : `system:${font.family}`
 }
@@ -529,6 +492,7 @@ function applyTextPreset(value: string): boolean {
   activeTextPreset.value = value
   return true
 }
+*/
 const markerShape = ref<'circle' | 'square' | 'diamond' | 'star'>('circle')
 const contentImageImporting = ref(false)
 const drawingPreferences = shallowRef<DrawingToolPreferencesV2>(
@@ -546,19 +510,6 @@ const baseImageLayer = computed(() =>
   ),
 )
 const translate = (key: Parameters<typeof t>[1]) => t(state.locale.value, key)
-const textFontHint = computed(() => {
-  const font = textDefaults.value.font
-  if (font.source !== 'system') return undefined
-  const exactFace = props.systemFonts?.some(
-    (face) =>
-      face.family === font.family &&
-      face.weight === textDefaults.value.weight &&
-      face.style === (textDefaults.value.italic ? 'italic' : 'normal'),
-  )
-  return exactFace
-    ? undefined
-    : `Missing ${font.family} face; preview may use a substitute.`
-})
 const hasInteractiveDocument = computed(
   () => props.documentSession !== undefined || props.fixture === 'ready',
 )
@@ -1008,7 +959,170 @@ function drawingControl(
 }
 const contextSchema = computed(() => {
   const tool = state.activeToolId.value
-  if (tool === 'text') {
+  const selectedCandidate =
+    store.selectedLayerIds.length === 1
+      ? activeDocument.value?.layers.find(
+          (layer) => layer.id === store.selectedLayerId,
+        )
+      : undefined
+  const selectedText =
+    selectedCandidate?.kind === 'text' ||
+    selectedCandidate?.kind === 'callout' ||
+    selectedCandidate?.kind === 'numberedMarker'
+      ? selectedCandidate
+      : undefined
+  const textKind =
+    textDraft.value?.kind ??
+    (selectedText?.kind === 'text' ||
+    selectedText?.kind === 'callout' ||
+    selectedText?.kind === 'numberedMarker'
+      ? selectedText.kind
+      : tool === 'text' || tool === 'callout' || tool === 'numberedMarker'
+        ? tool
+        : undefined)
+  if (textKind) {
+    const snapshot = textDraft.value?.snapshot
+    const content: RichTextContent | undefined = selectedText
+      ? selectedText.kind === 'numberedMarker'
+        ? selectedText.payload.label
+        : selectedText.payload.content
+      : undefined
+    const spans = content?.spans ?? []
+    const paragraphs = content?.paragraphs ?? []
+    const same = <T,>(values: readonly T[], fallback: T): T | null =>
+      values.length === 0 || values.every((value) => value === values[0])
+        ? (values[0] ?? fallback)
+        : null
+    const sameColor = (values: readonly SrgbColor[]): SrgbColor | null => {
+      const firstColor = values[0]
+      if (firstColor === undefined) return textDefaults.value.color
+      return values.every(
+        (color) =>
+          color.red === firstColor.red &&
+          color.green === firstColor.green &&
+          color.blue === firstColor.blue &&
+          color.alpha === firstColor.alpha,
+      )
+        ? firstColor
+        : null
+    }
+    const first = spans[0]
+    const selectedColor = sameColor(spans.map((span) => span.color))
+    const background =
+      selectedText?.kind === 'text'
+        ? selectedText.payload.background
+        : selectedText?.kind === 'callout'
+          ? selectedText.payload.bubble
+          : selectedText?.kind === 'numberedMarker'
+            ? { color: selectedText.payload.badge.color, padding: 0, radius: 0 }
+            : textDefaults.value.background
+    return {
+      icon: 'text' as const,
+      title:
+        textKind === 'callout'
+          ? translate('toolCallout')
+          : textKind === 'numberedMarker'
+            ? translate('toolNumberedMarker')
+            : translate('toolText'),
+      hint: translate('canvasViewport'),
+      controls: [],
+      text: {
+        kind: textKind,
+        color: snapshot
+          ? snapshot.color
+            ? hexColor(snapshot.color)
+            : null
+          : selectedColor
+            ? hexColor(selectedColor)
+            : null,
+        fontFamily: snapshot
+          ? snapshot.fontFamily
+          : same(
+              spans.map((span) => span.fontFamily),
+              textDefaults.value.fontFamily,
+            ),
+        fonts: [
+          ...new Set([
+            'Roboto',
+            'Arial',
+            'Georgia',
+            'monospace',
+            ...(props.systemFonts ?? []).map((face) => face.family),
+            snapshot?.fontFamily ??
+              first?.fontFamily ??
+              textDefaults.value.fontFamily,
+          ]),
+        ],
+        fontSize: snapshot
+          ? snapshot.fontSize
+          : same(
+              spans.map((span) => span.fontSize),
+              textDefaults.value.fontSize,
+            ),
+        bold: snapshot
+          ? snapshot.weight === null
+            ? null
+            : snapshot.weight >= 700
+          : same(
+              spans.map((span) => span.weight >= 700),
+              textDefaults.value.weight >= 700,
+            ),
+        italic: snapshot
+          ? snapshot.italic
+          : same(
+              spans.map((span) => span.italic),
+              textDefaults.value.italic,
+            ),
+        strikethrough: snapshot
+          ? snapshot.strikethrough
+          : same(
+              spans.map((span) => span.strikethrough),
+              textDefaults.value.strikethrough,
+            ),
+        listKind: snapshot
+          ? snapshot.listKind
+          : same(
+              paragraphs.map((paragraph) => paragraph.listKind),
+              textDefaults.value.listKind,
+            ),
+        alignment: snapshot
+          ? snapshot.alignment
+          : same(
+              paragraphs.map((paragraph) => paragraph.alignment),
+              textDefaults.value.alignment,
+            ),
+        background: (snapshot ? snapshot.background : background)
+          ? {
+              color: hexColor(
+                (snapshot ? snapshot.background : background)!.color,
+              ),
+              padding: (snapshot ? snapshot.background : background)!.padding,
+              radius: (snapshot ? snapshot.background : background)!.radius,
+            }
+          : null,
+        disabled:
+          textKind === 'numberedMarker'
+            ? (['list', 'none', 'padding', 'radius'] as const)
+            : textKind === 'callout'
+              ? (['none'] as const)
+              : [],
+        ...(textKind === 'numberedMarker' || textKind === 'callout'
+          ? {
+              disabledReason:
+                state.locale.value === 'ru'
+                  ? textKind === 'numberedMarker'
+                    ? 'Списки, отступ и скругление недоступны для номерной метки.'
+                    : 'Фон выноски нельзя удалить: можно выбрать только сплошной цвет.'
+                  : textKind === 'numberedMarker'
+                    ? 'Lists, padding and radius are unavailable for numbered markers.'
+                    : 'A callout bubble cannot be removed; choose a solid color instead.',
+            }
+          : {}),
+      },
+    }
+  }
+  /* Legacy v0–v6 text controls intentionally removed from the v7 toolbar.
+  if (tool === 'text' && false) {
     return {
       icon: 'text' as const,
       title: translate('toolText'),
@@ -1190,6 +1304,8 @@ const contextSchema = computed(() => {
       ],
     }
   }
+  }
+  */
   if (tool === 'numberedMarker') {
     return {
       icon: 'plus' as const,
@@ -1301,6 +1417,8 @@ const contextSchema = computed(() => {
     : undefined
 })
 async function onContextAction(id: string): Promise<void> {
+  /* Legacy style-preset and text-texture actions are intentionally absent. */
+  /*
   if (id === 'saveTextPreset') {
     const storage = createBrowserTextStylePresetsStorage(browserStorage())
     storage.save(textDefaults.value)
@@ -1339,6 +1457,7 @@ async function onContextAction(id: string): Promise<void> {
     activeTextPreset.value = 'texture'
     return
   }
+  */
   if (id === 'importTexture') {
     if (!props.textureBridge) return
     textureResolver ??= new TextureResourceResolver({
@@ -1419,8 +1538,194 @@ async function onContextAction(id: string): Promise<void> {
     )
   }
 }
+function parseTextColor(value: string): SrgbColor | undefined {
+  const match = /^#([0-9a-f]{6})$/iu.exec(value)
+  if (!match) return undefined
+  const hex = match[1]!
+  return {
+    red: Number.parseInt(hex.slice(0, 2), 16) / 255,
+    green: Number.parseInt(hex.slice(2, 4), 16) / 255,
+    blue: Number.parseInt(hex.slice(4, 6), 16) / 255,
+    alpha: 1,
+  }
+}
+function selectedTextBearingLayer():
+  | Extract<LayerNode, { readonly kind: 'text' | 'callout' | 'numberedMarker' }>
+  | undefined {
+  if (store.selectedLayerIds.length !== 1) return undefined
+  const layer = activeDocument.value?.layers.find(
+    (candidate) => candidate.id === store.selectedLayerId,
+  )
+  return layer?.kind === 'text' ||
+    layer?.kind === 'callout' ||
+    layer?.kind === 'numberedMarker'
+    ? layer
+    : undefined
+}
+function updateWholeTextLayer(
+  span: { -readonly [K in keyof RichTextSpanStyle]?: RichTextSpanStyle[K] },
+  paragraph: {
+    -readonly [K in keyof RichTextParagraphStyle]?: RichTextParagraphStyle[K]
+  },
+  background?: TextBackground | null,
+): void {
+  const layer = selectedTextBearingLayer()
+  if (!layer || layer.locked || !props.documentSession || textDraft.value)
+    return
+  const content =
+    layer.kind === 'numberedMarker'
+      ? layer.payload.label
+      : layer.payload.content
+  const firstSpan = content.spans[0]
+  const firstParagraph = content.paragraphs[0]
+  if (!firstSpan || !firstParagraph) return
+  const selection = { anchor: 0, focus: content.text.length }
+  const styled = applyRichTextSpanStyle(
+    {
+      content,
+      selection,
+      typingStyle: firstSpan,
+      paragraphStyle: firstParagraph,
+    },
+    span,
+  )
+  const formatted = applyRichTextParagraphStyle(styled, paragraph)
+  const after =
+    layer.kind === 'text'
+      ? {
+          ...layer,
+          payload: {
+            ...layer.payload,
+            content: formatted.content,
+            ...(background === undefined ? {} : { background }),
+          },
+        }
+      : layer.kind === 'callout'
+        ? {
+            ...layer,
+            payload: {
+              ...layer.payload,
+              content: formatted.content,
+              ...(background === undefined
+                ? {}
+                : { bubble: background ?? layer.payload.bubble }),
+            },
+          }
+        : {
+            ...layer,
+            payload: {
+              ...layer.payload,
+              label: formatted.content,
+              ...(background === undefined
+                ? {}
+                : {
+                    badge: {
+                      ...layer.payload.badge,
+                      color: background?.color ?? layer.payload.badge.color,
+                    },
+                  }),
+            },
+          }
+  props.documentSession.execute({ type: 'updateLayer', before: layer, after })
+}
+function applyV7TextChange(id: string, value: string): boolean {
+  const span: {
+    -readonly [K in keyof RichTextSpanStyle]?: RichTextSpanStyle[K]
+  } = {}
+  const paragraph: {
+    -readonly [K in keyof RichTextParagraphStyle]?: RichTextParagraphStyle[K]
+  } = {}
+  let background: TextBackground | null | undefined
+  if (id === 'textColor') {
+    const color = parseTextColor(value)
+    if (!color) return true
+    textDefaults.value = { ...textDefaults.value, color }
+    span.color = color
+  } else if (id === 'textFont') {
+    if (!value.trim()) return true
+    textDefaults.value = { ...textDefaults.value, fontFamily: value }
+    span.fontFamily = value
+  } else if (id === 'textFontSize') {
+    const fontSize = Number(value)
+    if (!Number.isInteger(fontSize) || fontSize < 8 || fontSize > 256)
+      return true
+    textDefaults.value = { ...textDefaults.value, fontSize }
+    span.fontSize = fontSize
+  } else if (id === 'textBold') {
+    const weight = value === 'true' ? 700 : 400
+    textDefaults.value = {
+      ...textDefaults.value,
+      weight: weight as TextToolDefaults['weight'],
+    }
+    span.weight = weight as TextToolDefaults['weight']
+  } else if (id === 'textItalic' || id === 'textStrikethrough') {
+    const enabled = value === 'true'
+    if (id === 'textItalic') {
+      textDefaults.value = { ...textDefaults.value, italic: enabled }
+      span.italic = enabled
+    } else {
+      textDefaults.value = { ...textDefaults.value, strikethrough: enabled }
+      span.strikethrough = enabled
+    }
+  } else if (id === 'textList') {
+    if (value !== 'none' && value !== 'bullet') return true
+    textDefaults.value = { ...textDefaults.value, listKind: value }
+    paragraph.listKind = value
+  } else if (id === 'textAlign') {
+    if (value !== 'start' && value !== 'center' && value !== 'end') return true
+    textDefaults.value = { ...textDefaults.value, alignment: value }
+    paragraph.alignment = value
+  } else if (id === 'textBackground') {
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(value)
+    } catch (error) {
+      console.warn('cute-screen text background draft is invalid', error)
+      return true
+    }
+    if (parsed === null) background = null
+    else if (typeof parsed === 'object' && parsed !== null) {
+      const draft = parsed as {
+        color?: unknown
+        padding?: unknown
+        radius?: unknown
+      }
+      const color =
+        typeof draft.color === 'string'
+          ? parseTextColor(draft.color)
+          : undefined
+      const padding = Number(draft.padding)
+      const radius = Number(draft.radius)
+      if (
+        !color ||
+        !Number.isInteger(padding) ||
+        !Number.isInteger(radius) ||
+        padding < 0 ||
+        padding > 256 ||
+        radius < 0 ||
+        radius > 256
+      )
+        return true
+      background = { color, padding, radius }
+    } else return true
+    textDefaults.value = { ...textDefaults.value, background }
+  } else return false
+  if (textDraft.value) {
+    textFormatting.value = {
+      revision: ++textFormattingRevision,
+      ...(Object.keys(span).length > 0 ? { span } : {}),
+      ...(Object.keys(paragraph).length > 0 ? { paragraph } : {}),
+      ...(background === undefined ? {} : { background }),
+    }
+    return true
+  }
+  updateWholeTextLayer(span, paragraph, background)
+  return true
+}
 function onContextChange(id: string, value: string): void {
+  if (applyV7TextChange(id, value)) return
   const activeTool = state.activeToolId.value
+  /* Legacy text controls intentionally removed from the v7 toolbar.
   if (activeTool === 'text') {
     if (id === 'textPreset') {
       if (value === 'personal') {
@@ -1581,6 +1886,8 @@ function onContextChange(id: string, value: string): void {
     activeTextPreset.value = 'custom'
     return
   }
+  }
+  */
   if (
     id === 'imageRadius' ||
     id === 'imageBorderColor' ||
@@ -2047,6 +2354,23 @@ function updateLayerProperty(
     (layer.locked && property !== 'locked')
   )
     return
+  if (property === 'opacity') {
+    if (
+      layer.kind === 'text' ||
+      layer.kind === 'callout' ||
+      layer.kind === 'numberedMarker'
+    )
+      return
+    props.documentSession.execute({
+      type: 'updateLayer',
+      before: layer,
+      after: {
+        ...layer,
+        opacity: Math.max(0, Math.min(1, value ?? layer.opacity)),
+      },
+    })
+    return
+  }
   props.documentSession.execute({
     type: 'updateLayer',
     before: layer,
@@ -2055,18 +2379,13 @@ function updateLayerProperty(
         ? { ...layer, visible: !layer.visible }
         : property === 'locked'
           ? { ...layer, locked: !layer.locked }
-          : property === 'opacity'
-            ? {
-                ...layer,
-                opacity: Math.max(0, Math.min(1, value ?? layer.opacity)),
-              }
-            : {
-                ...layer,
-                transform: {
-                  ...layer.transform,
-                  rotation: value ?? layer.transform.rotation,
-                },
+          : {
+              ...layer,
+              transform: {
+                ...layer.transform,
+                rotation: value ?? layer.transform.rotation,
               },
+            },
   })
 }
 function reorderLayer(id: string, direction: 'up' | 'down'): void {
@@ -2272,21 +2591,15 @@ async function pasteNativeClipboard(): Promise<void> {
       id: crypto.randomUUID(),
       text: snapshot.text,
       origin: center,
-      font: textDefaults.value.font,
+      fontFamily: textDefaults.value.fontFamily,
       fontSize: textDefaults.value.fontSize,
       weight: textDefaults.value.weight,
       italic: textDefaults.value.italic,
-      underline: textDefaults.value.underline,
-      letterSpacing: textDefaults.value.letterSpacing,
+      strikethrough: textDefaults.value.strikethrough,
       alignment: textDefaults.value.alignment,
-      lineHeight: textDefaults.value.lineHeight,
+      listKind: textDefaults.value.listKind,
       color: textDefaults.value.color,
-      fill: textDefaults.value.fill,
-      outline: textDefaults.value.outline,
       background: textDefaults.value.background,
-      opacity: textDefaults.value.opacity,
-      blendMode: textDefaults.value.blendMode,
-      shadows: textDefaults.value.shadows,
     })
     if (layer) props.documentSession.execute({ type: 'addLayer', layer })
   } catch (error) {
@@ -2611,13 +2924,19 @@ function syncLayerSummaries(document: EditorDocumentV1): void {
           : layer.kind,
       visible: layer.visible,
       locked: layer.locked,
-      opacity: layer.opacity,
+      opacity: 'opacity' in layer ? layer.opacity : 1,
       rotation: layer.transform.rotation,
     })),
   ])
 }
 function setTextDraft(
-  draft: { readonly id: string; readonly kind: 'text' | 'callout' } | undefined,
+  draft:
+    | {
+        readonly id: string
+        readonly kind: 'text' | 'callout' | 'numberedMarker'
+        readonly snapshot: TextToolbarSnapshot
+      }
+    | undefined,
 ): void {
   textDraft.value = draft
   if (activeDocument.value) syncLayerSummaries(activeDocument.value)
@@ -2692,12 +3011,7 @@ async function resolveDocumentTextures(
         ? [layer.payload.blobHash]
         : layer.kind === 'shape'
           ? [textureBlobHash(layer.payload.fill)]
-          : layer.kind === 'text'
-            ? [
-                textureBlobHash(layer.payload.fill),
-                textureBlobHash(layer.payload.background?.fill),
-              ]
-            : []
+          : []
     for (const blobHash of blobHashes) {
       if (!blobHash) continue
       const resource = await textureResolver.resolve(blobHash)
@@ -2715,8 +3029,6 @@ watch(
   },
 )
 onMounted(() => {
-  personalTextPreset.value =
-    createBrowserTextStylePresetsStorage(browserStorage()).load()
   drawingPreferences.value = createBrowserDrawingToolPreferencesStorage(
     browserStorage(),
   ).load() as DrawingToolPreferencesV2
@@ -2879,7 +3191,7 @@ watch(
           "
           :drawing-defaults="drawingDefaults"
           :text-defaults="textDefaults"
-          :text-style-revision="textStyleRevision"
+          :text-formatting="textFormatting"
           :next-marker-sequence="
             activeDocument
               ? nextNumberedMarkerSequence(activeDocument.layers)

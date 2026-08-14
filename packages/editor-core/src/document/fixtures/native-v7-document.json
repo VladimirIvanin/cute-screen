@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 7,
+  "id": "019c1f62-058e-7000-8000-000000000000",
+  "source": {
+    "blobHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "format": "png",
+    "mimeType": "image/png",
+    "width": 100,
+    "height": 100,
+    "orientationApplied": true,
+    "provenance": "capture",
+    "color": {
+      "colorSpace": "srgb",
+      "hasIccProfile": false
+    }
+  },
+  "canvas": {
+    "width": 100,
+    "height": 100
+  },
+  "crop": null,
+  "layers": [
+    {
+      "id": "aaaaaaaa-aaaa-7aaa-8aaa-aaaaaaaaaaaa",
+      "kind": "image",
+      "localBounds": {
+        "x": 0,
+        "y": 0,
+        "width": 100,
+        "height": 100
+      },
+      "transform": {
+        "translateX": 0,
+        "translateY": 0,
+        "rotation": 0,
+        "scaleX": 1,
+        "scaleY": 1
+      },
+      "opacity": 1,
+      "visible": true,
+      "locked": true,
+      "blendMode": "normal",
+      "shadows": [],
+      "payload": {
+        "blobHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "intrinsicWidth": 100,
+        "intrinsicHeight": 100,
+        "format": "png",
+        "orientationApplied": true,
+        "color": {
+          "colorSpace": "srgb",
+          "hasIccProfile": false
+        },
+        "role": "base",
+        "border": null,
+        "radius": 0,
+        "crop": null,
+        "mask": null
+      }
+    }
+  ],
+  "presentation": {
+    "beautify": {
+      "enabled": false
+    },
+    "watermark": {
+      "enabled": false
+    }
+  },
+  "createdAt": "2026-08-09T00:00:00.000Z",
+  "updatedAt": "2026-08-09T00:00:00.000Z"
+}

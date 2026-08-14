@@ -3,25 +3,25 @@ import { EDITOR_DOCUMENT_SCHEMA_VERSION } from './document/types'
 import type { EditorCommand } from './commands/types'
 import type {
   CalloutLayer,
-  BlendMode,
   EmojiAssetReference,
   EmojiLayer,
-  FontReference,
   ImageLayer,
   JsonObject,
   LayerNode,
   NumberedMarkerLayer,
   Point,
   SrgbColor,
-  ShadowStyle,
   TextLayer,
 } from './document/types'
 
-export const CLIPBOARD_LAYERS_MIME =
-  'application/x-cute-screen-layers+json;version=1' as const
+type EditableTextLayer = TextLayer | CalloutLayer | NumberedMarkerLayer
 
-export interface ClipboardLayersV1 {
-  readonly version: 1
+export const CLIPBOARD_LAYERS_MIME =
+  'application/x-cute-screen-layers+json;version=2' as const
+
+export interface ClipboardLayersV2 {
+  readonly version: 2
+  readonly documentSchemaVersion: typeof EDITOR_DOCUMENT_SCHEMA_VERSION
   readonly layers: readonly LayerNode[]
 }
 
@@ -33,11 +33,8 @@ const IDENTITY = Object.freeze({
   scaleY: 1,
 })
 
-const BLACK_FILL = Object.freeze({
-  kind: 'solid' as const,
-  color: Object.freeze({ red: 0, green: 0, blue: 0, alpha: 1 }),
-  opacity: 1,
-})
+const BLACK_COLOR = Object.freeze({ red: 0, green: 0, blue: 0, alpha: 1 })
+const WHITE_COLOR = Object.freeze({ red: 1, green: 1, blue: 1, alpha: 1 })
 
 const DEFAULT_COLOR = Object.freeze({
   colorSpace: 'srgb' as const,
@@ -45,16 +42,9 @@ const DEFAULT_COLOR = Object.freeze({
 })
 
 const SHA256_PATTERN = /^[a-f0-9]{64}$/u
-const TEXT_BLEND_MODES: readonly BlendMode[] = [
-  'normal',
-  'multiply',
-  'screen',
-  'overlay',
-  'darken',
-  'lighten',
-  'softLight',
-  'hardLight',
-]
+const DEFAULT_TEXT_FONT_FAMILY = 'Roboto'
+const DEFAULT_TEXT_FONT_SIZE = 24
+const DEFAULT_TEXT_LINE_HEIGHT = 1.25
 
 function cloneLayer(layer: LayerNode): LayerNode {
   return JSON.parse(JSON.stringify(layer)) as LayerNode
@@ -109,8 +99,8 @@ function assertNonEmptyString(value: string, field: string): void {
   if (value.length === 0) throw new Error(`${field} must not be empty`)
 }
 
-function solidTextFill(color: SrgbColor | undefined) {
-  const value = color ?? BLACK_FILL.color
+function solidColor(color: SrgbColor | undefined, field = 'text color') {
+  const value = color ?? BLACK_COLOR
   if (
     ![value.red, value.green, value.blue, value.alpha].every(
       (channel) =>
@@ -120,23 +110,20 @@ function solidTextFill(color: SrgbColor | undefined) {
         channel <= 1,
     )
   ) {
-    throw new Error('text color must use finite sRGB channels from 0 to 1')
+    throw new Error(`${field} must use finite sRGB channels from 0 to 1`)
   }
   return Object.freeze({
-    kind: 'solid' as const,
-    color: Object.freeze({
-      red: value.red,
-      green: value.green,
-      blue: value.blue,
-      alpha: value.alpha,
-    }),
-    opacity: 1,
+    red: value.red,
+    green: value.green,
+    blue: value.blue,
+    alpha: value.alpha,
   })
 }
 
 function assertTextBackground(
   background: NonNullable<TextLayer['payload']['background']>,
 ): void {
+  solidColor(background.color, 'text background color')
   if (
     !Number.isFinite(background.padding) ||
     background.padding < 0 ||
@@ -162,22 +149,16 @@ export function createTextLayer(input: {
   readonly id: string
   readonly text: string
   readonly origin: Point
-  readonly font: FontReference
+  readonly fontFamily?: string
   readonly fontSize?: number
-  readonly weight?: FontReference['weight']
+  readonly weight?: 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900
   readonly italic?: boolean
-  readonly underline?: boolean
-  readonly letterSpacing?: number
-  readonly alignment?: 'start' | 'center' | 'end' | 'justify'
-  readonly lineHeight?: number
+  readonly strikethrough?: boolean
+  readonly alignment?: 'start' | 'center' | 'end'
+  readonly listKind?: 'none' | 'bullet'
   readonly fixedWidth?: number
   readonly color?: SrgbColor
-  readonly fill?: TextLayer['payload']['fill']
-  readonly outline?: TextLayer['payload']['outline']
   readonly background?: TextLayer['payload']['background']
-  readonly opacity?: number
-  readonly blendMode?: BlendMode
-  readonly shadows?: readonly ShadowStyle[]
 }): TextLayer | null {
   if (input.text.length === 0) return null
   assertFinitePoint(input.origin)
@@ -187,45 +168,22 @@ export function createTextLayer(input: {
   ) {
     throw new Error('fixed-width text requires a positive finite width')
   }
-  const fontSize = input.fontSize ?? 16
+  const fontFamily = input.fontFamily ?? DEFAULT_TEXT_FONT_FAMILY
+  if (fontFamily.length === 0) throw new Error('text font family is required')
+  const fontSize = input.fontSize ?? DEFAULT_TEXT_FONT_SIZE
   if (!Number.isFinite(fontSize) || fontSize < 8 || fontSize > 256) {
     throw new Error('text font size must be between 8 and 256')
   }
-  const lineHeight = input.lineHeight ?? 1.25
-  if (!Number.isFinite(lineHeight) || lineHeight < 0.8 || lineHeight > 4) {
-    throw new Error('text line height must be between 0.8 and 4')
-  }
-  const letterSpacing = input.letterSpacing ?? 0
+  const weight = input.weight ?? 400
   if (
-    !Number.isFinite(letterSpacing) ||
-    letterSpacing < -256 ||
-    letterSpacing > 256
+    !Number.isInteger(weight) ||
+    weight < 100 ||
+    weight > 900 ||
+    weight % 100 !== 0
   ) {
-    throw new Error('text letter spacing must be between -256 and 256')
+    throw new Error('text weight must be a portable CSS weight')
   }
   if (input.background) assertTextBackground(input.background)
-  const opacity = input.opacity ?? 1
-  if (!Number.isFinite(opacity) || opacity < 0 || opacity > 1) {
-    throw new Error('text opacity must be between 0 and 1')
-  }
-  const blendMode = input.blendMode ?? 'normal'
-  if (!TEXT_BLEND_MODES.includes(blendMode)) {
-    throw new Error('text blend mode is invalid')
-  }
-  const shadows = input.shadows ?? []
-  if (
-    shadows.length > 4 ||
-    shadows.some(
-      (shadow) =>
-        !Number.isFinite(shadow.offsetX) ||
-        !Number.isFinite(shadow.offsetY) ||
-        !Number.isFinite(shadow.blur) ||
-        shadow.blur < 0 ||
-        shadow.blur > 128,
-    )
-  ) {
-    throw new Error('text shadows are invalid')
-  }
   const width =
     input.fixedWidth ?? Math.max(fontSize, input.text.length * fontSize * 0.6)
   return Object.freeze({
@@ -241,24 +199,12 @@ export function createTextLayer(input: {
       y: 0,
       width,
       height: Math.max(
-        fontSize * 1.25,
-        input.text.split('\n').length * fontSize * lineHeight,
+        fontSize * DEFAULT_TEXT_LINE_HEIGHT,
+        input.text.split('\n').length * fontSize * DEFAULT_TEXT_LINE_HEIGHT,
       ),
     },
-    opacity,
     visible: true,
     locked: false,
-    blendMode,
-    shadows: Object.freeze(
-      shadows.map((shadow) =>
-        Object.freeze({
-          color: { ...shadow.color },
-          offsetX: shadow.offsetX,
-          offsetY: shadow.offsetY,
-          blur: shadow.blur,
-        }),
-      ),
-    ),
     payload: {
       content: {
         text: input.text,
@@ -271,13 +217,12 @@ export function createTextLayer(input: {
           {
             start: 0,
             end: input.text.length,
+            fontFamily,
             fontSize,
-            ...(input.weight === undefined ? {} : { weight: input.weight }),
-            ...(input.italic === undefined ? {} : { italic: input.italic }),
-            ...(input.underline === undefined
-              ? {}
-              : { underline: input.underline }),
-            ...(input.letterSpacing === undefined ? {} : { letterSpacing }),
+            color: solidColor(input.color),
+            weight,
+            italic: input.italic ?? false,
+            strikethrough: input.strikethrough ?? false,
           },
         ],
         paragraphs: [
@@ -285,14 +230,21 @@ export function createTextLayer(input: {
             start: 0,
             end: input.text.length,
             alignment: input.alignment ?? 'start',
-            lineHeight,
+            listKind: input.listKind ?? 'none',
           },
         ],
       },
-      font: input.font,
-      fill: input.fill ?? solidTextFill(input.color),
-      outline: input.outline ?? null,
-      background: input.background ?? null,
+      background:
+        input.background == null
+          ? null
+          : {
+              color: solidColor(
+                input.background.color,
+                'text background color',
+              ),
+              padding: input.background.padding,
+              radius: input.background.radius,
+            },
     },
   })
 }
@@ -301,7 +253,8 @@ export function createNumberedMarkerLayer(input: {
   readonly id: string
   readonly sequence: number
   readonly origin: Point
-  readonly shape?: NumberedMarkerLayer['payload']['shape']
+  readonly shape?: NumberedMarkerLayer['payload']['badge']['shape']
+  readonly badgeColor?: SrgbColor
 }): NumberedMarkerLayer {
   assertFinitePoint(input.origin)
   if (!Number.isInteger(input.sequence) || input.sequence <= 0) {
@@ -316,22 +269,38 @@ export function createNumberedMarkerLayer(input: {
       translateY: input.origin.y,
     },
     localBounds: { x: 0, y: 0, width: 32, height: 32 },
-    opacity: 1,
     visible: true,
     locked: false,
-    blendMode: 'normal',
-    shadows: [],
     payload: {
       sequence: input.sequence,
-      shape: input.shape ?? 'circle',
       label: {
         text: String(input.sequence),
         wrap: 'autoSize' as const,
-        spans: [],
-        paragraphs: [],
+        spans: [
+          {
+            start: 0,
+            end: String(input.sequence).length,
+            fontFamily: DEFAULT_TEXT_FONT_FAMILY,
+            fontSize: 16,
+            color: WHITE_COLOR,
+            weight: 700 as const,
+            italic: false,
+            strikethrough: false,
+          },
+        ],
+        paragraphs: [
+          {
+            start: 0,
+            end: String(input.sequence).length,
+            alignment: 'center' as const,
+            listKind: 'none' as const,
+          },
+        ],
       },
-      fill: BLACK_FILL,
-      outline: null,
+      badge: {
+        shape: input.shape ?? 'circle',
+        color: solidColor(input.badgeColor),
+      },
     },
   })
 }
@@ -342,7 +311,9 @@ export function createCalloutLayer(input: {
   readonly text: string
   readonly origin: Point
   readonly tailAnchor: Point
-  readonly font: FontReference
+  readonly fontFamily?: string
+  readonly color?: SrgbColor
+  readonly bubbleColor?: SrgbColor
   readonly padding?: number
   readonly radius?: number
 }): CalloutLayer | null {
@@ -357,7 +328,10 @@ export function createCalloutLayer(input: {
   if (!Number.isFinite(radius) || radius < 0) {
     throw new Error('callout radius must be finite and non-negative')
   }
-  const fontSize = 16
+  const fontFamily = input.fontFamily ?? DEFAULT_TEXT_FONT_FAMILY
+  if (fontFamily.length === 0)
+    throw new Error('callout font family is required')
+  const fontSize = DEFAULT_TEXT_FONT_SIZE
   const lines = input.text.split('\n')
   const width = Math.max(
     fontSize * 4,
@@ -378,23 +352,38 @@ export function createCalloutLayer(input: {
       width: width + padding * 2,
       height: lines.length * lineHeight + padding * 2,
     },
-    opacity: 1,
     visible: true,
     locked: false,
-    blendMode: 'normal',
-    shadows: [],
     payload: {
       content: {
         text: input.text,
         wrap: 'autoSize' as const,
-        spans: [],
-        paragraphs: [],
+        spans: [
+          {
+            start: 0,
+            end: input.text.length,
+            fontFamily,
+            fontSize,
+            color: solidColor(input.color),
+            weight: 400 as const,
+            italic: false,
+            strikethrough: false,
+          },
+        ],
+        paragraphs: [
+          {
+            start: 0,
+            end: input.text.length,
+            alignment: 'start' as const,
+            listKind: 'none' as const,
+          },
+        ],
       },
-      font: input.font,
-      fill: BLACK_FILL,
-      outline: null,
-      padding,
-      radius,
+      bubble: {
+        color: solidColor(input.bubbleColor ?? WHITE_COLOR),
+        padding,
+        radius,
+      },
       tailAnchor: { x: input.tailAnchor.x, y: input.tailAnchor.y },
     },
   })
@@ -502,15 +491,16 @@ export function nextNumberedMarkerSequence(
   return candidate
 }
 
-export function encodeClipboardLayersV1(layers: readonly LayerNode[]): string {
-  const payload: ClipboardLayersV1 = {
-    version: 1,
+export function encodeClipboardLayersV2(layers: readonly LayerNode[]): string {
+  const payload: ClipboardLayersV2 = {
+    version: 2,
+    documentSchemaVersion: EDITOR_DOCUMENT_SCHEMA_VERSION,
     layers: layers.map((layer) => contentImage(cloneLayer(layer))),
   }
   return JSON.stringify(payload)
 }
 
-export function decodeClipboardLayersV1(serialized: string): ClipboardLayersV1 {
+export function decodeClipboardLayersV2(serialized: string): ClipboardLayersV2 {
   let candidate: unknown
   try {
     candidate = JSON.parse(serialized) as unknown
@@ -520,7 +510,9 @@ export function decodeClipboardLayersV1(serialized: string): ClipboardLayersV1 {
   if (
     !candidate ||
     typeof candidate !== 'object' ||
-    (candidate as { version?: unknown }).version !== 1 ||
+    (candidate as { version?: unknown }).version !== 2 ||
+    (candidate as { documentSchemaVersion?: unknown }).documentSchemaVersion !==
+      EDITOR_DOCUMENT_SCHEMA_VERSION ||
     !Array.isArray((candidate as { layers?: unknown }).layers)
   ) {
     throw new Error('clipboard layer payload has an unsupported version')
@@ -564,13 +556,17 @@ export function decodeClipboardLayersV1(serialized: string): ClipboardLayersV1 {
       throw new Error(`clipboard layer ${index} is missing after validation`)
     return contentImage(layer)
   })
-  return Object.freeze({ version: 1, layers: Object.freeze(parsedLayers) })
+  return Object.freeze({
+    version: 2,
+    documentSchemaVersion: EDITOR_DOCUMENT_SCHEMA_VERSION,
+    layers: Object.freeze(parsedLayers),
+  })
 }
 
 export type ClipboardDispatch =
   | Readonly<{
       kind: 'internal'
-      payload: ClipboardLayersV1
+      payload: ClipboardLayersV2
       warning?: 'internalPayloadInvalid'
     }>
   | Readonly<{ kind: 'bitmap'; warning?: 'internalPayloadInvalid' }>
@@ -593,7 +589,7 @@ export function routeClipboardSnapshot(input: {
     try {
       return Object.freeze({
         kind: 'internal' as const,
-        payload: decodeClipboardLayersV1(input.internal),
+        payload: decodeClipboardLayersV2(input.internal),
       })
     } catch {
       warning = 'internalPayloadInvalid'
@@ -614,7 +610,7 @@ export function routeClipboardSnapshot(input: {
 }
 
 export function pasteClipboardLayers(
-  payload: ClipboardLayersV1,
+  payload: ClipboardLayersV2,
   input: {
     readonly id: () => string
     readonly zoom: number
@@ -652,8 +648,8 @@ export function pasteClipboardLayers(
 
 /** Converts a completed DOM-free text session into the sole document mutation. */
 export function createTextCommitCommand(input: {
-  readonly existing?: TextLayer
-  readonly next: TextLayer | null
+  readonly existing?: EditableTextLayer
+  readonly next: EditableTextLayer | null
   /** Required only when removing an existing layer. */
   readonly index?: number
 }): EditorCommand | null {
@@ -678,6 +674,9 @@ export function createTextCommitCommand(input: {
   if (input.existing.id !== input.next.id) {
     throw new Error('text update must preserve the layer id')
   }
+  if (input.existing.kind !== input.next.kind) {
+    throw new Error('text update must preserve the container kind')
+  }
   return Object.freeze({
     type: 'updateLayer',
     before: input.existing,
@@ -694,7 +693,11 @@ export function createDuplicateLayerCommand(
   },
 ): Extract<EditorCommand, { type: 'duplicateLayer' }> {
   const duplicated = pasteClipboardLayers(
-    Object.freeze({ version: 1, layers: Object.freeze([source]) }),
+    Object.freeze({
+      version: 2,
+      documentSchemaVersion: EDITOR_DOCUMENT_SCHEMA_VERSION,
+      layers: Object.freeze([source]),
+    }),
     { ...input, id: () => input.id },
   )[0]
   if (!duplicated) throw new Error('duplicate source did not produce a layer')

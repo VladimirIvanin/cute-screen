@@ -7,7 +7,7 @@ import {
 } from './index'
 
 const document: EditorDocumentV1 = {
-  schemaVersion: 1,
+  schemaVersion: 7,
   id: '019c1f62-058e-7000-8000-000000000000',
   source: {
     blobHash: 'a'.repeat(64),
@@ -16,6 +16,7 @@ const document: EditorDocumentV1 = {
     width: 100,
     height: 100,
     orientationApplied: true,
+    provenance: 'capture',
     color: { colorSpace: 'srgb', hasIccProfile: false },
   },
   canvas: { width: 100, height: 100 },

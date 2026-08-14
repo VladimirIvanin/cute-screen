@@ -15,6 +15,7 @@ const source = {
   width: 100,
   height: 100,
   orientationApplied: true as const,
+  provenance: 'capture' as const,
   color: { colorSpace: 'srgb' as const, hasIccProfile: false },
 }
 const transform = {
@@ -33,13 +34,15 @@ function layer(id: string, overrides: Record<string, unknown> = {}) {
     opacity: 1,
     visible: true,
     locked: false,
+    blendMode: 'normal' as const,
+    shadows: [],
     payload: {},
     ...overrides,
   }
 }
 function document(layers: EditorDocumentV1['layers']): EditorDocumentV1 {
   return {
-    schemaVersion: 2,
+    schemaVersion: 7,
     id: '019c1f62-058e-7000-8000-000000000000',
     source,
     canvas: { width: 100, height: 100 },
@@ -171,6 +174,8 @@ describe('M05 hit testing', () => {
       localBounds: { x: 0, y: 0, width: 100, height: 100 },
       transform,
       opacity: 1,
+      blendMode: 'normal',
+      shadows: [],
       visible: true,
       locked: false,
       payload: {
@@ -213,6 +218,8 @@ describe('M05 hit testing', () => {
       localBounds: { x: 0, y: 0, width: 60, height: 20 },
       transform: { ...transform, translateX: 10, translateY: 10 },
       opacity: 1,
+      blendMode: 'normal',
+      shadows: [],
       visible: true,
       locked: false,
       payload: {

@@ -86,10 +86,15 @@ Cute Screen — полноценный local-first редактор снимко
 - `REQ-TOL-003` — pencil: базовые кисти, толщина, opacity, smoothing и цвет.
 - `REQ-TOL-004` — marker: толщина, opacity и blend modes highlight/darken.
 - `REQ-TOL-005` — text: FigJam-like direct WYSIWYG editing through a transient
-  `contenteditable` projection (never persisted as HTML), multiline,
-  typography, alignment, spacing, solid/gradient/pattern/texture fill, outline,
-  shadows, background, opacity/blend, common layer transforms и curated style
-  presets.
+  `contenteditable` projection (never persisted as HTML), multiline и portable
+  v7 rich text. UTF-16-safe spans хранят только family, size, solid color,
+  weight, italic и strikethrough; paragraphs — alignment
+  `start|center|end` и list kind `none|bullet`. Text background хранит только
+  solid color, padding и radius. Text, callout и numbered marker используют
+  этот общий text contract, сохраняя собственные container semantics. Presets,
+  underline, letter spacing, line-height contract, gradient/pattern/texture
+  text fill, text outline, text shadows и text opacity/blend не входят в v7;
+  common layer opacity/blend/shadows для text-bearing layers не сохраняются.
 - `REQ-TOL-006` — numbered marker: несколько форм, автоматическая последовательность и редактируемый multiline label.
 - `REQ-TOL-007` — callout: выразительный визуальный стиль, pointer/tail и полноценное редактирование текста.
 - `REQ-TOL-008` — manual censor: pixelate, blur и solid fill; без автоматического поиска данных.

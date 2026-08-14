@@ -14,7 +14,7 @@ import {
 } from '@cute-screen/editor-renderer'
 
 const document: EditorDocumentV1 = {
-  schemaVersion: 1,
+  schemaVersion: 7,
   id: '019c1f62-058e-7000-8000-000000000000',
   source: {
     blobHash: 'a'.repeat(64),
@@ -83,10 +83,26 @@ describe('M03 document persistence session', () => {
           scaleX: 1,
           scaleY: 1,
         },
+        localBounds: { x: 0, y: 0, width: 20, height: 20 },
         opacity: 1,
+        blendMode: 'normal',
+        shadows: [],
         visible: true,
         locked: false,
-        payload: { shape: 'rectangle' },
+        payload: {
+          shape: 'rectangle',
+          fill: { kind: 'none' },
+          stroke: {
+            color: { red: 0, green: 0, blue: 0, alpha: 1 },
+            width: 1,
+            style: 'solid',
+            cap: 'round',
+            join: 'round',
+          },
+          cornerRadius: 0,
+          starPoints: 5,
+          starInnerRatio: 0.45,
+        },
       },
     })
     expect(session.snapshot.saveState).toBe('dirty')
@@ -250,10 +266,26 @@ describe('M03 document persistence session', () => {
           scaleX: 1,
           scaleY: 1,
         },
+        localBounds: { x: 0, y: 0, width: 20, height: 20 },
         opacity: 1,
+        blendMode: 'normal',
+        shadows: [],
         visible: true,
         locked: false,
-        payload: { shape: 'rectangle' },
+        payload: {
+          shape: 'rectangle',
+          fill: { kind: 'none' },
+          stroke: {
+            color: { red: 0, green: 0, blue: 0, alpha: 1 },
+            width: 1,
+            style: 'solid',
+            cap: 'round',
+            join: 'round',
+          },
+          cornerRadius: 0,
+          starPoints: 5,
+          starInnerRatio: 0.45,
+        },
       },
     })
     const firstSave = session.flush()

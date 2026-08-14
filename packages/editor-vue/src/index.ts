@@ -91,6 +91,10 @@ export {
   defaultPreferences,
   parsePreferences,
 } from './shell/preferences'
+export {
+  RichTextEditorController,
+  type BrowserTextReconcileResult,
+} from './rich-text-editor'
 export type {
   AsyncActionState,
   CanvasViewportHosts,

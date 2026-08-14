@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { createDocumentRenderScene, type EditorDocumentV1 } from '../index'
 
 const document: EditorDocumentV1 = {
-  schemaVersion: 2,
+  schemaVersion: 7,
   id: '019c1f62-058e-7000-8000-000000000000',
   source: {
     blobHash: 'a'.repeat(64),
@@ -12,6 +12,7 @@ const document: EditorDocumentV1 = {
     width: 640,
     height: 480,
     orientationApplied: true,
+    provenance: 'capture',
     color: { colorSpace: 'srgb', hasIccProfile: false },
   },
   canvas: { width: 800, height: 600 },
@@ -31,6 +32,8 @@ const document: EditorDocumentV1 = {
       opacity: 1,
       visible: true,
       locked: true,
+      blendMode: 'normal',
+      shadows: [],
       payload: {
         blobHash: 'a'.repeat(64),
         intrinsicWidth: 640,
@@ -72,7 +75,7 @@ describe('document render scene', () => {
     if (!base || base.kind !== 'image') throw new Error('expected image layer')
     const scene = createDocumentRenderScene({
       ...document,
-      schemaVersion: 4,
+      schemaVersion: 7,
       layers: [
         {
           ...base,
@@ -104,7 +107,7 @@ describe('document render scene', () => {
   it('compiles normalized gradient geometry into renderer-neutral canvas coordinates', () => {
     const scene = createDocumentRenderScene({
       ...document,
-      schemaVersion: 3,
+      schemaVersion: 7,
       layers: [
         {
           id: '019c1f62-058e-7000-8000-000000000002',
@@ -162,7 +165,7 @@ describe('document render scene', () => {
   it('compiles independent arrow caps into the ordered render scene', () => {
     const scene = createDocumentRenderScene({
       ...document,
-      schemaVersion: 3,
+      schemaVersion: 7,
       layers: [
         {
           id: '019c1f62-058e-7000-8000-000000000003',
@@ -335,7 +338,7 @@ describe('document render scene', () => {
   it('preserves the complete transform for non-image render nodes', () => {
     const scene = createDocumentRenderScene({
       ...document,
-      schemaVersion: 3,
+      schemaVersion: 7,
       layers: [
         {
           id: '019c1f62-058e-7000-8000-000000000002',
@@ -349,6 +352,8 @@ describe('document render scene', () => {
             scaleY: -0.75,
           },
           opacity: 1,
+          blendMode: 'normal',
+          shadows: [],
           visible: true,
           locked: false,
           payload: {
@@ -381,7 +386,7 @@ describe('document render scene', () => {
   it('ends a thick arrow body at the base of its solid arrow cap', () => {
     const scene = createDocumentRenderScene({
       ...document,
-      schemaVersion: 3,
+      schemaVersion: 7,
       layers: [
         {
           id: '019c1f62-058e-7000-8000-000000000012',
@@ -501,7 +506,7 @@ describe('document render scene', () => {
   it('compiles alternating inner and outer star points', () => {
     const scene = createDocumentRenderScene({
       ...document,
-      schemaVersion: 3,
+      schemaVersion: 7,
       layers: [
         {
           id: '019c1f62-058e-7000-8000-000000000004',
@@ -540,7 +545,7 @@ describe('document render scene', () => {
   it('uses sampled pen pressure and renders a one-point marker as a dot', () => {
     const scene = createDocumentRenderScene({
       ...document,
-      schemaVersion: 3,
+      schemaVersion: 7,
       layers: [
         {
           id: '019c1f62-058e-7000-8000-000000000005',
@@ -589,7 +594,7 @@ describe('document render scene', () => {
   it('compiles a multi-point marker into one contiguous round path', () => {
     const scene = createDocumentRenderScene({
       ...document,
-      schemaVersion: 3,
+      schemaVersion: 7,
       layers: [
         {
           id: '019c1f62-058e-7000-8000-000000000008',
@@ -632,7 +637,7 @@ describe('document render scene', () => {
   it('keeps an image texture as a renderer resource reference', () => {
     const scene = createDocumentRenderScene({
       ...document,
-      schemaVersion: 3,
+      schemaVersion: 7,
       layers: [
         {
           id: '019c1f62-058e-7000-8000-000000000007',
@@ -689,7 +694,7 @@ describe('document render scene', () => {
   it('clamps and compiles rectangle corner radius into the shared scene', () => {
     const scene = createDocumentRenderScene({
       ...document,
-      schemaVersion: 3,
+      schemaVersion: 7,
       layers: [
         {
           id: '019c1f62-058e-7000-8000-000000000008',
@@ -721,10 +726,10 @@ describe('document render scene', () => {
     expect(scene.nodes[0]).toMatchObject({ kind: 'rect', cornerRadius: 6 })
   })
 
-  it('compiles committed multiline text into a renderer-neutral node', () => {
+  it('compiles v7 runs and paragraph metadata into a renderer-neutral node', () => {
     const scene = createDocumentRenderScene({
       ...document,
-      schemaVersion: 4,
+      schemaVersion: 7,
       layers: [
         {
           id: '019c1f62-058e-7000-8000-000000000009',
@@ -735,18 +740,8 @@ describe('document render scene', () => {
             translateX: 12,
             translateY: 18,
           },
-          opacity: 0.8,
           visible: true,
           locked: false,
-          blendMode: 'screen',
-          shadows: [
-            {
-              color: { red: 0, green: 0, blue: 0, alpha: 0.4 },
-              offsetX: 2,
-              offsetY: 3,
-              blur: 4,
-            },
-          ],
           payload: {
             content: {
               text: 'Привет\nworld',
@@ -756,25 +751,23 @@ describe('document render scene', () => {
                 {
                   start: 0,
                   end: 12,
+                  fontFamily: 'Cute Sans',
                   fontSize: 20,
-                  underline: true,
-                  letterSpacing: 2,
+                  color: { red: 0.2, green: 0.3, blue: 0.4, alpha: 1 },
+                  weight: 600,
+                  italic: true,
+                  strikethrough: true,
                 },
               ],
-              paragraphs: [{ start: 0, end: 12, alignment: 'center' }],
+              paragraphs: [
+                {
+                  start: 0,
+                  end: 12,
+                  alignment: 'center',
+                  listKind: 'bullet',
+                },
+              ],
             },
-            font: {
-              source: 'bundled',
-              family: 'Cute Sans',
-              weight: 600,
-              style: 'italic',
-            },
-            fill: {
-              kind: 'solid',
-              color: { red: 0.2, green: 0.3, blue: 0.4, alpha: 1 },
-              opacity: 1,
-            },
-            outline: null,
             background: null,
           },
         },
@@ -788,23 +781,29 @@ describe('document render scene', () => {
         x: 12,
         y: 18,
         width: 120,
-        fontSize: 20,
-        fontFamily: 'Cute Sans',
-        fontWeight: 600,
-        fontStyle: 'italic',
-        underline: true,
-        letterSpacing: 2,
-        align: 'center',
-        opacity: 0.8,
-        blendMode: 'screen',
-        shadows: [
+        wrap: 'fixedWidth',
+        runs: [
           {
-            color: { red: 0, green: 0, blue: 0, alpha: 0.4 },
-            offsetX: 2,
-            offsetY: 3,
-            blur: 4,
+            start: 0,
+            end: 12,
+            fontFamily: 'Cute Sans',
+            fontSize: 20,
+            color: { red: 0.2, green: 0.3, blue: 0.4, alpha: 1 },
+            fontWeight: 600,
+            fontStyle: 'italic',
+            strikethrough: true,
           },
         ],
+        paragraphs: [
+          {
+            start: 0,
+            end: 12,
+            alignment: 'center',
+            listKind: 'bullet',
+          },
+        ],
+        opacity: 1,
+        blendMode: 'normal',
       }),
     ])
   })
@@ -812,7 +811,7 @@ describe('document render scene', () => {
   it('renders a text background through the shared rectangle paint primitive', () => {
     const scene = createDocumentRenderScene({
       ...document,
-      schemaVersion: 4,
+      schemaVersion: 7,
       layers: [
         {
           id: '019c1f62-058e-7000-8000-000000000019',
@@ -823,36 +822,35 @@ describe('document render scene', () => {
             translateX: 20,
             translateY: 30,
           },
-          opacity: 1,
           visible: true,
           locked: false,
-          blendMode: 'normal',
-          shadows: [],
           payload: {
             content: {
               text: 'Label',
               wrap: 'autoSize',
-              spans: [],
-              paragraphs: [],
+              spans: [
+                {
+                  start: 0,
+                  end: 5,
+                  fontFamily: 'Roboto',
+                  fontSize: 24,
+                  color: { red: 0, green: 0, blue: 0, alpha: 1 },
+                  weight: 400,
+                  italic: false,
+                  strikethrough: false,
+                },
+              ],
+              paragraphs: [
+                {
+                  start: 0,
+                  end: 5,
+                  alignment: 'start',
+                  listKind: 'none',
+                },
+              ],
             },
-            font: {
-              source: 'bundled',
-              family: 'Roboto',
-              weight: 400,
-              style: 'normal',
-            },
-            fill: {
-              kind: 'solid',
-              color: { red: 0, green: 0, blue: 0, alpha: 1 },
-              opacity: 1,
-            },
-            outline: null,
             background: {
-              fill: {
-                kind: 'solid',
-                color: { red: 1, green: 0.8, blue: 0.2, alpha: 1 },
-                opacity: 1,
-              },
+              color: { red: 1, green: 0.8, blue: 0.2, alpha: 1 },
               padding: 6,
               radius: 4,
             },
@@ -878,89 +876,48 @@ describe('document render scene', () => {
     ])
   })
 
-  it('compiles a text outline into shared renderer stroke fields', () => {
-    const scene = createDocumentRenderScene({
-      ...document,
-      schemaVersion: 4,
-      layers: [
-        {
-          id: '019c1f62-058e-7000-8000-000000000020',
-          kind: 'text',
-          localBounds: { x: 0, y: 0, width: 120, height: 24 },
-          transform: { ...document.layers[0]!.transform },
-          opacity: 1,
-          visible: true,
-          locked: false,
-          blendMode: 'normal',
-          shadows: [],
-          payload: {
-            content: {
-              text: 'Outlined',
-              wrap: 'autoSize',
-              spans: [],
-              paragraphs: [],
-            },
-            font: {
-              source: 'bundled',
-              family: 'Roboto',
-              weight: 400,
-              style: 'normal',
-            },
-            fill: {
-              kind: 'solid',
-              color: { red: 1, green: 1, blue: 1, alpha: 1 },
-              opacity: 1,
-            },
-            outline: {
-              stroke: {
-                color: { red: 0, green: 0, blue: 0, alpha: 1 },
-                width: 2,
-                style: 'solid',
-                cap: 'round',
-                join: 'round',
-              },
-              position: 'center',
-            },
-            background: null,
-          },
-        },
-      ],
-    })
-
-    expect(scene.nodes).toEqual([
-      expect.objectContaining({
-        kind: 'text',
-        stroke: { red: 0, green: 0, blue: 0, alpha: 1 },
-        strokeWidth: 2,
-        lineJoin: 'round',
-      }),
-    ])
-  })
-
   it('compiles a numbered marker body and readable label from its stable sequence', () => {
     const scene = createDocumentRenderScene({
       ...document,
-      schemaVersion: 4,
+      schemaVersion: 7,
       layers: [
         {
           id: '019c1f62-058e-7000-8000-000000000010',
           kind: 'numberedMarker',
           localBounds: { x: 0, y: 0, width: 32, height: 32 },
           transform: { ...document.layers[0]!.transform },
-          opacity: 1,
           visible: true,
           locked: false,
-          shadows: [],
           payload: {
             sequence: 7,
-            shape: 'diamond',
-            label: { text: '7', wrap: 'autoSize', spans: [], paragraphs: [] },
-            fill: {
-              kind: 'solid',
-              color: { red: 0.1, green: 0.2, blue: 0.3, alpha: 1 },
-              opacity: 1,
+            label: {
+              text: '7',
+              wrap: 'autoSize',
+              spans: [
+                {
+                  start: 0,
+                  end: 1,
+                  fontFamily: 'Roboto',
+                  fontSize: 16,
+                  color: { red: 1, green: 1, blue: 1, alpha: 1 },
+                  weight: 700,
+                  italic: false,
+                  strikethrough: false,
+                },
+              ],
+              paragraphs: [
+                {
+                  start: 0,
+                  end: 1,
+                  alignment: 'center',
+                  listKind: 'none',
+                },
+              ],
             },
-            outline: null,
+            badge: {
+              shape: 'diamond',
+              color: { red: 0.1, green: 0.2, blue: 0.3, alpha: 1 },
+            },
           },
         },
       ],
@@ -979,8 +936,8 @@ describe('document render scene', () => {
         y: 16,
         width: 32,
         height: 32,
-        fontFamily: 'Roboto',
-        align: 'center',
+        runs: [expect.objectContaining({ fontFamily: 'Roboto' })],
+        paragraphs: [expect.objectContaining({ alignment: 'center' })],
         verticalAlign: 'visualCenter',
       }),
     ])
@@ -989,38 +946,45 @@ describe('document render scene', () => {
   it('keeps callout bubble, separate tail and multiline text in one ordered scene object', () => {
     const scene = createDocumentRenderScene({
       ...document,
-      schemaVersion: 4,
+      schemaVersion: 7,
       layers: [
         {
           id: '019c1f62-058e-7000-8000-000000000011',
           kind: 'callout',
           localBounds: { x: 0, y: 0, width: 120, height: 48 },
           transform: { ...document.layers[0]!.transform },
-          opacity: 1,
           visible: true,
           locked: false,
-          shadows: [],
           payload: {
             content: {
               text: 'Line one\nLine two',
               wrap: 'autoSize',
-              spans: [],
-              paragraphs: [],
+              spans: [
+                {
+                  start: 0,
+                  end: 17,
+                  fontFamily: 'Roboto',
+                  fontSize: 24,
+                  color: { red: 0, green: 0, blue: 0, alpha: 1 },
+                  weight: 400,
+                  italic: false,
+                  strikethrough: false,
+                },
+              ],
+              paragraphs: [
+                {
+                  start: 0,
+                  end: 17,
+                  alignment: 'start',
+                  listKind: 'none',
+                },
+              ],
             },
-            font: {
-              source: 'bundled',
-              family: 'Inter',
-              weight: 400,
-              style: 'normal',
-            },
-            fill: {
-              kind: 'solid',
+            bubble: {
               color: { red: 0.1, green: 0.2, blue: 0.3, alpha: 1 },
-              opacity: 1,
+              padding: 8,
+              radius: 10,
             },
-            outline: null,
-            padding: 8,
-            radius: 10,
             tailAnchor: { x: 20, y: 70 },
           },
         },
@@ -1041,6 +1005,12 @@ describe('document render scene', () => {
     // The separate anchor is left of the bubble centre, so the attachment
     // follows it instead of using a fixed bottom-centre tail.
     expect(baseCenterX).toBeLessThan(72)
-    expect(scene.nodes[2]).toMatchObject({ text: 'Line one\nLine two' })
+    expect(scene.nodes[2]).toMatchObject({
+      text: 'Line one\nLine two',
+      runs: [expect.objectContaining({ fontFamily: 'Roboto', fontSize: 24 })],
+      paragraphs: [
+        expect.objectContaining({ alignment: 'start', listKind: 'none' }),
+      ],
+    })
   })
 })

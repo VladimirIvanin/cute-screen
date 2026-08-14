@@ -25,7 +25,7 @@ const MAX_ENCODED_BYTES: u64 = 512 * 1024 * 1024;
 const MAX_SVG_ENCODED_BYTES: usize = 10 * 1024 * 1024;
 const MAX_IMAGE_EDGE: u32 = 32_768;
 const MAX_IMAGE_PIXELS: u64 = 134_217_728;
-const MAX_DOCUMENT_SCHEMA_VERSION: u32 = 6;
+const EDITABLE_DOCUMENT_SCHEMA_VERSION: u32 = 7;
 const RECOVERY_BUNDLE_VERSION: u32 = 1;
 
 #[derive(Debug, Error, Clone, Serialize)]
@@ -39,6 +39,8 @@ pub enum RepositoryError {
     InvalidDocument(String),
     #[error("document schema {schema_version} is newer than supported")]
     NewerSchema { schema_version: u32 },
+    #[error("document schema {schema_version} is older than editable schema v7")]
+    OlderSchema { schema_version: u32 },
     #[error("database schema version {found} is newer than supported version {supported}")]
     UnsupportedDatabaseSchema { found: i64, supported: i64 },
     #[error("database migration history is invalid: {0}")]
@@ -552,11 +554,15 @@ impl StorageState {
     }
 
     fn open_last(&mut self) -> Result<Option<OpenDocument>, RepositoryError> {
-        self.connection.query_row(
+        let document = self.connection.query_row(
             "SELECT d.id, d.capture_id, d.revision, d.content_json, c.original_blob_hash FROM documents d JOIN captures c ON c.id = d.capture_id WHERE c.deleted_at IS NULL ORDER BY c.captured_at DESC LIMIT 1",
             [],
             |row| Ok(OpenDocument { document_id: row.get(0)?, capture_id: row.get(1)?, revision: row.get(2)?, document_json: row.get(3)?, source_hash: row.get(4)?, image_token: None }),
-        ).optional().map_err(RepositoryError::from)
+        ).optional()?;
+        if let Some(open) = &document {
+            validate_document(&open.document_json)?;
+        }
+        Ok(document)
     }
 
     fn list_active_series_frames(&mut self) -> Result<Vec<SeriesFrame>, RepositoryError> {
@@ -1203,8 +1209,11 @@ fn document_value(document_json: &str) -> Result<Value, RepositoryError> {
             "schemaVersion exceeds the supported integer range".to_owned(),
         )
     })?;
-    if schema_version > MAX_DOCUMENT_SCHEMA_VERSION {
+    if schema_version > EDITABLE_DOCUMENT_SCHEMA_VERSION {
         return Err(RepositoryError::NewerSchema { schema_version });
+    }
+    if schema_version < EDITABLE_DOCUMENT_SCHEMA_VERSION {
+        return Err(RepositoryError::OlderSchema { schema_version });
     }
     if value.get("id").and_then(Value::as_str).is_none() {
         return Err(RepositoryError::InvalidDocument("id is missing".to_owned()));
@@ -1778,7 +1787,7 @@ mod tests {
 
     fn document(id: &str, hash: &str) -> String {
         serde_json::json!({
-            "schemaVersion": 1,
+            "schemaVersion": 7,
             "id": id,
             "source": { "blobHash": hash, "format": "png", "mimeType": "image/png", "width": 3840, "height": 2160, "orientationApplied": true, "color": { "colorSpace": "srgb", "hasIccProfile": false } },
             "canvas": { "width": 3840, "height": 2160 }, "crop": null, "layers": [],
@@ -2050,7 +2059,7 @@ mod tests {
         )
         .expect("original bytes");
         let changed_document = serde_json::json!({
-            "schemaVersion": 1,
+            "schemaVersion": 7,
             "id": "doc-immutable",
             "source": { "blobHash": created.source_hash, "format": "png", "mimeType": "image/png", "width": 3840, "height": 2160, "orientationApplied": true, "color": { "colorSpace": "srgb", "hasIccProfile": false } },
             "canvas": { "width": 3840, "height": 2160 }, "crop": { "x": 0, "y": 0, "width": 100, "height": 100 }, "layers": [],
@@ -2174,23 +2183,37 @@ mod tests {
     }
 
     #[test]
-    fn accepts_the_current_arrow_document_schema_and_rejects_newer() {
+    fn accepts_only_v7_for_editing_and_types_older_and_newer_schemas() {
         let document = serde_json::json!({
-            "schemaVersion": 6,
+            "schemaVersion": 7,
             "id": "doc-1",
         })
         .to_string();
 
         assert!(super::validate_document(&document).is_ok());
 
+        for schema_version in 0..=6 {
+            let older = serde_json::json!({
+                "schemaVersion": schema_version,
+                "id": "doc-1",
+            })
+            .to_string();
+            assert!(matches!(
+                super::validate_document(&older),
+                Err(RepositoryError::OlderSchema {
+                    schema_version: found
+                }) if found == schema_version
+            ));
+        }
+
         let newer = serde_json::json!({
-            "schemaVersion": 7,
+            "schemaVersion": 8,
             "id": "doc-1",
         })
         .to_string();
         assert!(matches!(
             super::validate_document(&newer),
-            Err(RepositoryError::NewerSchema { schema_version: 7 })
+            Err(RepositoryError::NewerSchema { schema_version: 8 })
         ));
     }
 

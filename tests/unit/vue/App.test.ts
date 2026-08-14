@@ -15,7 +15,6 @@ import {
   parsePreferences,
   resolveSystemLocale,
   t,
-  type TextureFillBridge,
 } from '@cute-screen/editor-vue'
 import {
   createContentImageLayer,
@@ -32,7 +31,7 @@ function renderApp() {
 
 function arrowDocument(locked = false): EditorDocumentV1 {
   return {
-    schemaVersion: 6,
+    schemaVersion: 7,
     id: '019c1f62-058e-7000-8000-0000000000aa',
     source: {
       blobHash: 'a'.repeat(64),
@@ -125,16 +124,6 @@ function divergentArrowDocument(): EditorDocumentV1 {
       },
     ],
   }
-}
-
-async function chooseNaiveOption(
-  name: string,
-  optionName: string,
-): Promise<HTMLElement> {
-  const control = await screen.findByRole('combobox', { name })
-  await fireEvent.click(control)
-  await fireEvent.click(await screen.findByRole('option', { name: optionName }))
-  return control
 }
 
 describe('M02 editor shell', () => {
@@ -445,6 +434,8 @@ describe('M02 editor shell', () => {
     textInput.remove()
   })
 
+  /* Removed v0–v6 text preset/font inspector expectations; v7 coverage lives
+   * in text-context-toolbar.test.ts.
   it('exposes compact text background presets only in the contextual toolbar', async () => {
     render(EditorShell, {
       props: {
@@ -520,21 +511,17 @@ describe('M02 editor shell', () => {
     ).toBeInTheDocument()
   })
 
+  */
   it('cuts a selected Text layer only after the native plain-text write succeeds', async () => {
     const text = createTextLayer({
       id: '019c1f62-058e-7000-8000-000000000001',
       text: 'Copy me',
       origin: { x: 10, y: 10 },
-      font: {
-        source: 'bundled',
-        family: 'Roboto',
-        weight: 400,
-        style: 'normal',
-      },
+      fontFamily: 'Roboto',
     })
     if (!text) throw new Error('test Text layer should exist')
     const document: EditorDocumentV1 = {
-      schemaVersion: 5,
+      schemaVersion: 7,
       id: '019c1f62-058e-7000-8000-000000000000',
       source: {
         blobHash: 'a'.repeat(64),
@@ -609,7 +596,7 @@ describe('M02 editor shell', () => {
       origin: { x: 10, y: 12 },
     })
     const document: EditorDocumentV1 = {
-      schemaVersion: 5,
+      schemaVersion: 7,
       id: '019c1f62-058e-7000-8000-000000000000',
       source: {
         blobHash: 'a'.repeat(64),
@@ -690,6 +677,7 @@ describe('M02 editor shell', () => {
     view.unmount()
   })
 
+  /* Text texture import is not part of the v7 rich-text contract.
   it('offers text texture import only when the native raw-binary bridge is available', async () => {
     const importTexture = vi.fn().mockResolvedValue({ kind: 'cancelled' })
     const textureBridge: TextureFillBridge = {
@@ -722,6 +710,7 @@ describe('M02 editor shell', () => {
     expect(importTexture).toHaveBeenCalledOnce()
   })
 
+  */
   it('renders a native selector cancellation as terminal feedback, not an error', () => {
     render(ActionFeedback, {
       props: {

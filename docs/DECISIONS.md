@@ -36,7 +36,7 @@
 
 ## ADR-005 — Единый versioned document и command history
 
-**Статус:** accepted
+**Статус:** accepted; older-schema migration portion superseded by ADR-031
 
 **Решение:** `EditorDocument` имеет `schemaVersion`; любое изменение проходит через `EditorCommand`. Transient gesture не попадает в документ до commit.
 
@@ -192,7 +192,7 @@ platform benchmark. Recovery bundle включает authoritative blobs, но �
 
 ## ADR-022 — Независимый canvas и исходное изображение как raster layer
 
-**Статус:** accepted
+**Статус:** accepted; older-schema migration portion superseded by ADR-031
 
 **Контекст:** специальный неуправляемый screenshot background ограничивает
 быстрые графические задачи: пользователь не может освободить canvas, изменить
@@ -214,7 +214,7 @@ Legacy documents мигрируются идемпотентно. Preview, resta
 
 ## ADR-023 — Общая paint/effect model для полноценного редактора
 
-**Статус:** accepted
+**Статус:** accepted; text-contract portions superseded by ADR-031
 
 **Контекст:** отдельные ad-hoc реализации gradient, pattern, texture, outline,
 shadow и blend для shapes, text и presentation быстро расходятся между
@@ -256,7 +256,8 @@ artifact хранит fingerprint, commit, fixture, CPU/GPU metrics и runtime l
 
 ## ADR-025 — Portable content resources, staged import и native clipboard
 
-**Статус:** accepted
+**Статус:** accepted; text-reference and internal clipboard-version portions
+superseded by ADR-031
 
 **Контекст:** M07 добавляет переносимый rich text, локальные изображения и
 clipboard. Передача bytes через JSON/base64 расходится с существующим binary
@@ -296,7 +297,7 @@ Regular/Bold и соответствующие italic faces. Это audited depe
 
 ## ADR-026 — Transient contenteditable и renderer-neutral rich-text ranges
 
-**Статус:** accepted
+**Статус:** accepted; text-schema portions superseded by ADR-031
 
 **Контекст:** native textarea не даёт FigJam-like direct editing, selection и
 range typography, а сохранение DOM/HTML нарушает portable document contract.
@@ -410,3 +411,48 @@ undoable commit для завершённого slider/color/number interaction.
 **Последствия:** UI cannot import Naive controls into renderer, scene graph or
 pointermove path. Existing public shell props/emits and `ContextToolbarSchema`
 остаются совместимыми; internal CSS classes не являются public API.
+
+## ADR-031 — Editable document v7 и переносимый минимальный text contract
+
+**Статус:** accepted; supersedes the older-schema migration portions of ADR-005
+and ADR-022 and the text-contract portions of ADR-023, ADR-025 and ADR-026
+
+**Контекст:** paint/effect scope ADR-023 и ранний rich-text scope ADR-026
+закрепили поля, которые требуют разных layout/rendering contracts в DOM,
+Canvas2D и CanvasKit и не нужны для основного annotation workflow. Их
+сохранение в common layer fields позволяло обойти ограничения text payload.
+Одновременная поддержка миграций v0-v6 скрывала этот разрыв и не давала v7
+стать однозначной editable boundary для следующих renderer/editor/UI slices.
+
+**Решение:** schema v7 является единственной editable persisted schema.
+Документы v0-v6 не мигрируются и не открываются: parser возвращает typed
+`olderSchema` unsupported state с неизменённым raw JSON. v8+ возвращается как
+typed read-only `newerSchema` state. Native capture/open/clipboard creation и
+TypeScript factories создают только v7. Internal layer clipboard переходит на
+`application/x-cute-screen-layers+json;version=2` с явным
+`documentSchemaVersion: 7`; payload v1 больше не является editable input.
+
+Text, Callout и Numbered Marker используют общий renderer-neutral rich-text
+contract, сохраняя разные container semantics: background block, bubble и
+badge. `RichTextSpan` имеет UTF-16-safe range и только portable font family,
+font size, solid sRGB color, weight, italic и strikethrough.
+`RichTextParagraph` имеет UTF-16-safe range, alignment `start|center|end` и
+list kind `none|bullet`. Text background — solid sRGB color, padding и radius.
+Новый текст имеет размер 24 px; именованные size presets относятся к UI и не
+являются persisted data.
+
+Presets, underline, letter spacing, line-height field, gradient/pattern/texture
+text fill, text outline, text shadows и text opacity/blend полностью удалены из
+v7. Text-bearing layers не сохраняют эти эффекты через common layer
+`opacity`, `blendMode` или `shadows`. Transient `contenteditable`, plain-text
+paste, one-command commit и отсутствие HTML в документе из ADR-026 сохраняются.
+Paint/effect model ADR-023 продолжает действовать для нетекстовых слоёв.
+
+**Проверяемое основание:** core codec tests обязаны доказать strict v7
+round-trip, UTF-16 boundaries, exact span/paragraph coverage, solid colors и
+background bounds, отказ removed fields, typed v0-v6/v8+ outcomes и отсутствие
+image bytes в JSON. Rust tests обязаны доказать v7 native factory/persistence и
+typed rejection older/newer schemas. Clipboard v2 tests обязаны декодировать
+v7 text-bearing layers через тот же production parser. Renderer layout,
+contenteditable selection и compact toolbar проверяются отдельными slices и не
+являются evidence этого schema change.

@@ -5,7 +5,7 @@ type HarnessSnapshot = {
   readonly layers: readonly {
     readonly id: string
     readonly kind: string
-    readonly opacity: number
+    readonly opacity?: number
     readonly blendMode?: string
     readonly transform?: {
       readonly translateX: number
@@ -493,30 +493,39 @@ describe('M06 drawing tools in browser mode', () => {
     const textTool = $('button[aria-label="Text"]')
     const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
     await textTool.click()
-    await chooseOption('Preset', 'Neon')
-    const preset = $('[role="combobox"][aria-label="Preset"]')
-    await expect(preset).toHaveText('Neon')
-    await expect($('[role="combobox"][aria-label="Shadow"]')).toHaveText('Neon')
-    await chooseOption('Fill', 'Radial')
-    await expect(preset).toHaveText('Custom')
-    await chooseOption('Outline', 'White')
-    await chooseOption('Underline', 'On')
-    await chooseOption('Spacing', '2px')
-    await chooseOption('Background', 'Blue')
-    await chooseOption('Shadow', 'Drop')
-    await chooseOption('Line height', '1.5Г—')
-    const opacity = $(
-      '.cs-context-toolbar [role="slider"][aria-label="Opacity"]',
-    )
-    await opacity.click()
-    for (let index = 0; index < 8; index += 1) await browser.keys('ArrowLeft')
-    await chooseOption('Blend', 'Screen')
-    await $('button=Save personal preset').click()
-    await chooseOption('Preset', 'Plain')
-    await expect($('[role="combobox"][aria-label="Fill"]')).toHaveText('Solid')
-    await chooseOption('Preset', 'My preset')
-    await expect($('[role="combobox"][aria-label="Fill"]')).toHaveText('Radial')
-    await expect($('[role="combobox"][aria-label="Shadow"]')).toHaveText('Drop')
+    await expect($('.cs-text-toolbar')).toHaveAttribute('aria-label', 'Text')
+    await $('select[aria-label="Font family"]').selectByVisibleText('Georgia')
+    await $('button[aria-label="Font size"]').click()
+    await $('button=32').click()
+    await $('button[aria-label="Bold"]').click()
+    await browser.execute(() => {
+      const input = document.querySelector<HTMLInputElement>(
+        'input[aria-label="Text color"]',
+      )
+      if (!input) throw new Error('Text color input is missing')
+      input.value = '#336699'
+      input.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    await $('button[aria-label="Background"]').click()
+    await browser.execute(() => {
+      const color = document.querySelector<HTMLInputElement>(
+        'input[aria-label="Background Text color"]',
+      )
+      const inputs = [
+        ...document.querySelectorAll<HTMLInputElement>(
+          '.cs-text-background-popover input[type="number"]',
+        ),
+      ]
+      if (!color || inputs.length !== 2)
+        throw new Error('Text background controls are missing')
+      color.value = '#fff2a8'
+      color.dispatchEvent(new Event('input', { bubbles: true }))
+      inputs[0]!.value = '6'
+      inputs[0]!.dispatchEvent(new Event('input', { bubbles: true }))
+      inputs[1]!.value = '4'
+      inputs[1]!.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await $('.cs-text-background-popover').$('button=Apply').click()
     await scene.click({ x: 24, y: 24 })
     const editor = $('[contenteditable="true"][aria-label="Text editor"]')
     await expect(editor).toExist()
@@ -529,50 +538,47 @@ describe('M06 drawing tools in browser mode', () => {
       payload: { content: { text: 'Привет\nworld' } },
     })
     expect(created?.payload?.background).toMatchObject({
-      fill: {
-        kind: 'solid',
-        color: { red: 0.55, green: 0.78, blue: 1, alpha: 1 },
-      },
       padding: 6,
       radius: 4,
     })
-    expect(created?.payload?.fill).toMatchObject({ kind: 'radialGradient' })
-    expect(created?.payload?.outline).toMatchObject({
-      stroke: {
-        color: { red: 1, green: 1, blue: 1, alpha: 1 },
-        width: 2,
-      },
-      position: 'center',
-    })
-    expect(created).toMatchObject({
-      opacity: 0.6,
-      blendMode: 'screen',
-      shadows: [
-        {
-          color: { red: 0, green: 0, blue: 0, alpha: 0.35 },
-          offsetX: 2,
-          offsetY: 3,
-          blur: 3,
-        },
-      ],
-    })
-    const paragraphs = (
-      created?.payload?.content as
-        | { readonly paragraphs?: readonly { readonly lineHeight?: number }[] }
-        | undefined
-    )?.paragraphs
-    expect(paragraphs?.[0]).toMatchObject({ lineHeight: 1.5 })
+    const background = created?.payload?.background as {
+      readonly color: {
+        readonly red: number
+        readonly green: number
+        readonly blue: number
+        readonly alpha: number
+      }
+    }
+    expect(background.color.red).toBeCloseTo(1)
+    expect(background.color.green).toBeCloseTo(242 / 255)
+    expect(background.color.blue).toBeCloseTo(168 / 255)
+    expect(background.color.alpha).toBeCloseTo(1)
     const spans = (
       created?.payload?.content as
         | {
             readonly spans?: readonly {
-              readonly underline?: boolean
-              readonly letterSpacing?: number
+              readonly fontFamily?: string
+              readonly fontSize?: number
+              readonly weight?: number
+              readonly color?: Record<string, number>
             }[]
           }
         | undefined
     )?.spans
-    expect(spans?.[0]).toMatchObject({ underline: true, letterSpacing: 2 })
+    expect(spans?.[0]).toMatchObject({
+      fontFamily: 'Georgia',
+      fontSize: 32,
+      weight: 700,
+      color: {
+        red: 0.2,
+        green: 0.4,
+        blue: 0.6,
+        alpha: 1,
+      },
+    })
+    expect(created).not.toHaveProperty('opacity')
+    expect(created).not.toHaveProperty('blendMode')
+    expect(created).not.toHaveProperty('shadows')
     await expect(textTool).toHaveAttribute('aria-pressed', 'true')
   })
 
@@ -581,7 +587,6 @@ describe('M06 drawing tools in browser mode', () => {
     const markerTool = $('button[aria-label="Numbered marker"]')
     const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
     await markerTool.click()
-    await chooseOption('Shape', 'diamond')
     await scene.click({ x: 24, y: 24 })
     await scene.click({ x: 72, y: 48 })
     await browser.waitUntil(async () => (await snapshot()).layers.length === 6)
@@ -589,7 +594,7 @@ describe('M06 drawing tools in browser mode', () => {
       (layer) => layer.kind === 'numberedMarker',
     )
     expect(markers.map((layer) => layer.payload?.sequence)).toEqual([1, 2])
-    expect(markers[0]?.payload?.shape).toBe('diamond')
+    expect(markers[0]?.payload?.badge).toMatchObject({ shape: 'circle' })
     await expect(markerTool).toHaveAttribute('aria-pressed', 'true')
   })
 

@@ -123,6 +123,26 @@ export interface ContextToolbarSchema {
   readonly title: string
   readonly hint: string
   readonly controls: readonly ContextControl[]
+  /** The v7 rich-text toolbar is a compact, shared control strip. */
+  readonly text?: Readonly<{
+    readonly kind: 'text' | 'callout' | 'numberedMarker'
+    readonly color: string | null
+    readonly fontFamily: string | null
+    readonly fonts: readonly string[]
+    readonly fontSize: number | null
+    readonly bold: boolean | null
+    readonly italic: boolean | null
+    readonly strikethrough: boolean | null
+    readonly listKind: 'none' | 'bullet' | null
+    readonly alignment: 'start' | 'center' | 'end' | null
+    readonly background: {
+      readonly color: string
+      readonly padding: number
+      readonly radius: number
+    } | null
+    readonly disabled: readonly ('list' | 'none' | 'padding' | 'radius')[]
+    readonly disabledReason?: string
+  }>
 }
 
 export interface CanvasViewportHosts {

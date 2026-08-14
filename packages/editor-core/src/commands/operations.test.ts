@@ -20,7 +20,10 @@ const IDS = {
   locked: '019c1f62-058e-7000-8000-000000000004',
 } as const
 
-function layer(id: keyof typeof IDS, locked = false): LayerNode {
+function layer(
+  id: keyof typeof IDS,
+  locked = false,
+): Extract<LayerNode, { readonly kind: 'shape' }> {
   return {
     id: IDS[id],
     kind: 'shape',
@@ -56,7 +59,7 @@ function layer(id: keyof typeof IDS, locked = false): LayerNode {
 
 function document(layers: readonly LayerNode[]): EditorDocumentV1 {
   return {
-    schemaVersion: 6,
+    schemaVersion: 7,
     id: DOCUMENT_ID,
     source: {
       blobHash: 'a'.repeat(64),

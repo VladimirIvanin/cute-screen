@@ -22,6 +22,7 @@ const layer: LayerNode = {
     scaleX: 1,
     scaleY: 1,
   },
+  localBounds: { x: 0, y: 0, width: 20, height: 20 },
   opacity: 1,
   visible: true,
   locked: false,
@@ -44,7 +45,7 @@ const layer: LayerNode = {
 }
 
 const document: EditorDocumentV1 = {
-  schemaVersion: 3,
+  schemaVersion: 7,
   id: '019c1f62-058e-7000-8000-000000000000',
   source: {
     blobHash: 'a'.repeat(64),
@@ -53,6 +54,7 @@ const document: EditorDocumentV1 = {
     width: 100,
     height: 100,
     orientationApplied: true,
+    provenance: 'capture',
     color: { colorSpace: 'srgb', hasIccProfile: false },
   },
   canvas: { width: 100, height: 100 },
@@ -87,7 +89,7 @@ describe('M03 document core', () => {
     ).toBe('kept')
   })
 
-  it('migrates v0 and opens newer documents read-only', () => {
+  it('types older documents as unsupported and newer documents read-only', () => {
     const v0 = JSON.parse(serializeEditorDocument(document)) as Record<
       string,
       unknown
@@ -96,10 +98,11 @@ describe('M03 document core', () => {
     delete v0.crop
     delete v0.presentation
     expect(parseEditorDocument(JSON.stringify(v0))).toMatchObject({
-      kind: 'editable',
+      kind: 'unsupported',
+      reason: 'olderSchema',
     })
 
-    const future = { ...v0, schemaVersion: 7 }
+    const future = { ...v0, schemaVersion: 8 }
     expect(parseEditorDocument(JSON.stringify(future))).toMatchObject({
       kind: 'readOnly',
       reason: 'newerSchema',

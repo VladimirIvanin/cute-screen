@@ -10,7 +10,7 @@ import {
 import type { TextToolDefaults } from '../../../packages/editor-vue/src/shell/components/CanvasViewport.vue'
 
 const document: EditorDocumentV1 = {
-  schemaVersion: 2,
+  schemaVersion: 7,
   id: '019c1f62-058e-7000-8000-000000000000',
   source: {
     blobHash: 'a'.repeat(64),
@@ -36,6 +36,8 @@ const document: EditorDocumentV1 = {
         scaleY: 1,
       },
       opacity: 1,
+      blendMode: 'normal',
+      shadows: [],
       visible: true,
       locked: false,
       payload: {},
@@ -463,39 +465,20 @@ describe('M05 CanvasViewport transforms', () => {
 
   it('shows the selected portable text background in the DOM editor overlay', async () => {
     const background = {
-      fill: {
-        kind: 'solid' as const,
-        color: { red: 1, green: 0.8, blue: 0.2, alpha: 1 },
-        opacity: 1,
-      },
+      color: { red: 1, green: 0.8, blue: 0.2, alpha: 1 },
       padding: 6,
       radius: 4,
     }
     const { getByLabelText, scene } = mountViewport('text', document, 'shape', {
-      font: {
-        source: 'bundled',
-        family: 'Roboto',
-        weight: 400,
-        style: 'normal',
-      },
-      fontSize: 16,
+      fontFamily: 'Roboto',
+      fontSize: 24,
       weight: 400,
       italic: false,
-      underline: false,
-      letterSpacing: 0,
+      strikethrough: false,
       alignment: 'start',
-      lineHeight: 1.25,
+      listKind: 'none',
       color: { red: 0, green: 0, blue: 0, alpha: 1 },
-      fill: {
-        kind: 'solid',
-        color: { red: 0, green: 0, blue: 0, alpha: 1 },
-        opacity: 1,
-      },
-      outline: null,
       background,
-      opacity: 1,
-      blendMode: 'normal',
-      shadows: [],
     })
 
     await fireEvent.pointerDown(scene, {
@@ -575,6 +558,8 @@ describe('M05 CanvasViewport transforms', () => {
             scaleY: 1,
           },
           opacity: 1,
+          blendMode: 'normal',
+          shadows: [],
           visible: true,
           locked: false,
           payload: {
@@ -651,6 +636,8 @@ describe('M05 CanvasViewport transforms', () => {
             scaleY: 1,
           },
           opacity: 1,
+          blendMode: 'normal',
+          shadows: [],
           visible: true,
           locked: false,
           payload: {
@@ -723,6 +710,8 @@ describe('M05 CanvasViewport transforms', () => {
             scaleY: 1,
           },
           opacity: 1,
+          blendMode: 'normal',
+          shadows: [],
           visible: true,
           locked: false,
           payload: {
@@ -784,6 +773,8 @@ describe('M05 CanvasViewport transforms', () => {
         scaleY: 1,
       },
       opacity: 1,
+      blendMode: 'normal',
+      shadows: [],
       visible: true,
       locked: false,
       payload: {
