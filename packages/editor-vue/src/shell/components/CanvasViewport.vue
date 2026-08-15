@@ -404,6 +404,56 @@ async function ensureRenderer(): Promise<Canvas2DRenderer | undefined> {
   renderer = next
   return next
 }
+function documentWithoutGestureLayer(): EditorDocumentV1 | undefined {
+  const document = props.document
+  const hiddenLayerId =
+    gesture &&
+    (gesture.kind === 'move' ||
+      gesture.kind === 'resize' ||
+      gesture.kind === 'rotate' ||
+      gesture.kind === 'arrowHandle')
+      ? gesture.id
+      : undefined
+  if (!document || !hiddenLayerId) return document
+  return {
+    ...document,
+    layers: document.layers.filter((layer) => layer.id !== hiddenLayerId),
+  }
+}
+function setCommittedScene(runtime: Canvas2DRenderer): void {
+  const document = documentWithoutGestureLayer()
+  if (!document) return
+  const documentScene = createDocumentRenderScene(document)
+  const editing = editingText.value
+  if (!editing?.existing) {
+    runtime.setScene(documentScene)
+    return
+  }
+  // The contenteditable owns the text projection during direct editing.
+  // Keep non-text callout/marker container nodes in the committed scene.
+  const hiddenNodeIds =
+    editing.existing.kind === 'text'
+      ? new Set([editing.id, `${editing.id}:background`])
+      : editing.existing.kind === 'callout'
+        ? new Set([`${editing.id}:text`])
+        : new Set([`${editing.id}:label`])
+  runtime.setScene(
+    createRenderSceneSnapshot({
+      width: documentScene.width,
+      height: documentScene.height,
+      nodes: documentScene.nodes.filter(
+        (candidate) => !hiddenNodeIds.has(candidate.id),
+      ),
+    }),
+  )
+}
+function renderCommittedSceneForGesture(): void {
+  if (renderer) {
+    setCommittedScene(renderer)
+    renderer.render(['scene'])
+  }
+  invalidateOverlay()
+}
 async function drawDocument(): Promise<void> {
   if (!scene.value || !props.canvas) return
   rendererError.value = undefined
@@ -444,29 +494,7 @@ async function drawDocument(): Promise<void> {
       resource.resource.dispose()
       imageResources.delete(id)
     }
-    const documentScene = createDocumentRenderScene(props.document)
-    const editing = editingText.value
-    if (!editing?.existing) {
-      runtime.setScene(documentScene)
-    } else {
-      // The contenteditable owns the text projection during direct editing.
-      // Keep non-text callout/marker container nodes in the committed scene.
-      const hiddenNodeIds =
-        editing.existing.kind === 'text'
-          ? new Set([editing.id, `${editing.id}:background`])
-          : editing.existing.kind === 'callout'
-            ? new Set([`${editing.id}:text`])
-            : new Set([`${editing.id}:label`])
-      runtime.setScene(
-        createRenderSceneSnapshot({
-          width: documentScene.width,
-          height: documentScene.height,
-          nodes: documentScene.nodes.filter(
-            (candidate) => !hiddenNodeIds.has(candidate.id),
-          ),
-        }),
-      )
-    }
+    setCommittedScene(runtime)
     runtime.render(['scene'])
   } catch (error) {
     renderer?.dispose()
@@ -703,6 +731,39 @@ function previewTransform(layer: LayerNode): Transform2D {
   }
   return layer.transform
 }
+function gesturePreviewLayer(): LayerNode | undefined {
+  if (
+    !gesture ||
+    gesture.kind === 'pan' ||
+    gesture.kind === 'draw' ||
+    gesture.kind === 'text'
+  ) {
+    return undefined
+  }
+  const activeGesture = gesture
+  const layer = props.document?.layers.find(
+    (candidate) => candidate.id === activeGesture.id,
+  )
+  if (!layer) return undefined
+  if (activeGesture.kind === 'arrowHandle') {
+    return layer.kind === 'arrow'
+      ? updateArrowHandle(
+          layer,
+          activeGesture.handle,
+          toLocal(layer, activeGesture.current),
+        )
+      : undefined
+  }
+  return { ...layer, transform: previewTransform(layer) }
+}
+function gesturePreviewNodes() {
+  const layer = gesturePreviewLayer()
+  if (!layer || !props.document) return []
+  return createDocumentRenderScene({
+    ...props.document,
+    layers: [layer],
+  }).nodes
+}
 function drawDraft(context: CanvasRenderingContext2D): void {
   if (!gesture || gesture.kind !== 'draw') return
   const layer = createDrawingLayer({
@@ -727,7 +788,14 @@ function drawOverlay(): void {
   if (!overlay.value || !props.canvas) return
   const context = overlay.value.getContext('2d')
   if (!context) return
-  context.clearRect(0, 0, overlay.value.width, overlay.value.height)
+  const previewNodes = gesturePreviewNodes()
+  if (renderer) {
+    renderer.setOverlay(previewNodes)
+    renderer.render(['overlay'])
+  } else {
+    context.clearRect(0, 0, overlay.value.width, overlay.value.height)
+    drawNodes2D(context, previewNodes)
+  }
   drawDraft(context)
   if (props.sampling && samplingCursor.value) {
     const point = samplingCursor.value
@@ -1197,6 +1265,7 @@ function onPointerDown(event: PointerEvent): void {
       start: point,
       current: point,
     }
+    renderCommittedSceneForGesture()
     return
   }
   const handle =
@@ -1230,6 +1299,7 @@ function onPointerDown(event: PointerEvent): void {
         centerResize: event.altKey,
       }
     }
+    renderCommittedSceneForGesture()
     return
   }
   const hits = hitTestDocumentAll(props.document, point)
@@ -1260,6 +1330,7 @@ function onPointerDown(event: PointerEvent): void {
     guides: [],
     guidesVisible: false,
   }
+  renderCommittedSceneForGesture()
 }
 function startTextEditor(input: {
   readonly origin: CanvasPoint
@@ -1804,13 +1875,27 @@ function finishGesture(event: PointerEvent): void {
     })
   }
   invalidateOverlay()
+  if (
+    completed?.kind === 'move' ||
+    completed?.kind === 'resize' ||
+    completed?.kind === 'rotate' ||
+    completed?.kind === 'arrowHandle'
+  ) {
+    void nextTick(renderCommittedSceneForGesture)
+  }
 }
 function cancelGesture(event?: PointerEvent): void {
+  const restoreCommittedScene =
+    gesture?.kind === 'move' ||
+    gesture?.kind === 'resize' ||
+    gesture?.kind === 'rotate' ||
+    gesture?.kind === 'arrowHandle'
   gesture = undefined
   if (event && scene.value?.hasPointerCapture(event.pointerId)) {
     scene.value.releasePointerCapture(event.pointerId)
   }
   invalidateOverlay()
+  if (restoreCommittedScene) void nextTick(renderCommittedSceneForGesture)
 }
 function onWheel(event: WheelEvent): void {
   if (!event.ctrlKey && !event.metaKey) return

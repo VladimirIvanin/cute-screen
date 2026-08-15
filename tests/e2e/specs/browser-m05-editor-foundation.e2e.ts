@@ -202,10 +202,46 @@ describe('M05 editor foundation in browser mode', () => {
     expect(before).toBeDefined()
 
     await browser
-      .action('pointer')
+      .action('pointer', { id: 'm05-move-pointer' })
       .move({ origin: canvas, x: 0, y: 0, duration: 0 })
       .down({ button: 'left' })
       .move({ origin: 'pointer', x: 24, y: 12, duration: 100 })
+      .perform(true)
+
+    const transientPreview = await browser.execute(() => {
+      const overlay = document.querySelector<HTMLCanvasElement>(
+        '.cs-canvas-overlay[aria-label="Interaction overlay"]',
+      )
+      if (!overlay) throw new Error('Interaction overlay is missing')
+      const context = overlay.getContext('2d')
+      if (!context) throw new Error('Interaction overlay context is missing')
+      const pixels = context.getImageData(
+        0,
+        0,
+        overlay.width,
+        overlay.height,
+      ).data
+      let warmOpaque = 0
+      for (let index = 0; index < pixels.length; index += 4) {
+        if (
+          pixels[index]! > 200 &&
+          pixels[index + 1]! < 100 &&
+          pixels[index + 2]! < 110 &&
+          pixels[index + 3]! > 200
+        ) {
+          warmOpaque += 1
+        }
+      }
+      return warmOpaque
+    })
+    expect(transientPreview).toBeGreaterThan(50)
+    expect(
+      (await snapshot()).layers.find((layer) => layer.id === frontId)
+        ?.transform,
+    ).toEqual(before?.transform)
+
+    await browser
+      .action('pointer', { id: 'm05-move-pointer' })
       .up({ button: 'left' })
       .perform()
 

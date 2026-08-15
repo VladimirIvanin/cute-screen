@@ -242,6 +242,68 @@ describe('M05 CanvasViewport transforms', () => {
     expect(scroll.scrollTop).toBe(70)
   })
 
+  it('renders a moved Arrow at its transient position before pointer release', async () => {
+    const arrowDocument: EditorDocumentV1 = {
+      ...document,
+      layers: [
+        {
+          id: 'arrow',
+          kind: 'arrow',
+          localBounds: { x: 10, y: 10, width: 60, height: 20 },
+          transform: {
+            translateX: 0,
+            translateY: 0,
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+          },
+          opacity: 1,
+          blendMode: 'normal',
+          shadows: [],
+          visible: true,
+          locked: false,
+          payload: {
+            path: 'straight',
+            start: { x: 10, y: 10 },
+            end: { x: 70, y: 30 },
+            startCap: 'none',
+            endCap: 'none',
+            stroke: {
+              color: { red: 0.82, green: 0.36, blue: 0.08, alpha: 1 },
+              width: 4,
+              style: 'solid',
+              cap: 'round',
+              join: 'round',
+            },
+          },
+        },
+      ],
+    }
+    const getContext = vi.mocked(HTMLCanvasElement.prototype.getContext)
+    const context = window.document
+      .createElement('canvas')
+      .getContext('2d') as CanvasRenderingContext2D
+    const { scene, emitted } = mountViewport(undefined, arrowDocument, 'arrow')
+    vi.mocked(context.moveTo).mockClear()
+    vi.mocked(context.lineTo).mockClear()
+
+    await fireEvent.pointerDown(scene, {
+      pointerId: 1,
+      clientX: 40,
+      clientY: 20,
+    })
+    await fireEvent.pointerMove(scene, {
+      pointerId: 1,
+      clientX: 50,
+      clientY: 30,
+    })
+
+    expect(context.moveTo).toHaveBeenCalledWith(20, 20)
+    expect(context.lineTo).toHaveBeenCalledWith(80, 40)
+    expect(emitted().moveLayer).toBeUndefined()
+    expect(getContext).toHaveBeenCalled()
+  })
+
   it('commits one constrained corner resize only on pointer release', async () => {
     const { scene, emitted } = mountViewport()
 
