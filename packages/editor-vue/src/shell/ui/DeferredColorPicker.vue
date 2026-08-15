@@ -79,6 +79,12 @@ watch(
     if (!shown.value) resetDraft()
   },
 )
+watch(
+  () => props.disabled,
+  (disabled) => {
+    if (disabled && shown.value) close()
+  },
+)
 
 function setDraft(
   value: string,
@@ -95,11 +101,16 @@ function setDraft(
 }
 
 function commit(value = draft.value): void {
+  if (props.disabled) return
   if (!setDraft(value)) return
   emit('commit', draft.value)
 }
 
 function onShown(next: boolean): void {
+  if (next && props.disabled) {
+    shown.value = false
+    return
+  }
   shown.value = next
   if (next) {
     resetDraft()
@@ -115,11 +126,13 @@ function close(): void {
 }
 
 function choose(value: string): void {
+  if (props.disabled) return
   if (!setDraft(value)) return
   commit()
 }
 
 function onHueInput(event: Event): void {
+  if (props.disabled) return
   const nextHue = Number((event.target as HTMLInputElement).value)
   if (!Number.isFinite(nextHue)) return
   preservedHue.value = nextHue
@@ -131,12 +144,14 @@ function onHueInput(event: Event): void {
 }
 
 function onHueChange(): void {
+  if (props.disabled) return
   if (!hueDragging.value) return
   hueDragging.value = false
   commit()
 }
 
 function applyHex(): void {
+  if (props.disabled) return
   const input = hexInput.value?.value ?? ''
   if (!setDraft(input)) {
     hexError.value = 'Invalid HEX colour'
@@ -176,6 +191,7 @@ function keydown(event: KeyboardEvent): void {
 }
 
 function requestEyedropper(): void {
+  if (props.disabled) return
   close()
   emit('eyedropper')
 }
@@ -199,6 +215,7 @@ function requestEyedropper(): void {
       </template>
       <NPopover
         v-model:show="shown"
+        :disabled="disabled"
         trigger="click"
         placement="top-start"
         :show-arrow="false"
@@ -269,6 +286,7 @@ function requestEyedropper(): void {
                 role="option"
                 :aria-selected="srgbToHex(color) === draft"
                 :tabindex="srgbToHex(color) === draft ? 0 : -1"
+                :disabled="disabled"
                 :style="{ backgroundColor: srgbToHex(color) }"
                 :aria-label="`${locale === 'ru' ? 'Выбрать' : 'Choose'} ${srgbToHex(color)}`"
                 @click="choose(srgbToHex(color))"
@@ -302,6 +320,7 @@ function requestEyedropper(): void {
                     locale === 'ru' ? 'HEX-код цвета' : 'HEX colour code'
                   "
                   :aria-invalid="Boolean(hexError)"
+                  :disabled="disabled"
                   @change="applyHex"
                   @keydown.enter.prevent="applyHex"
               /></label>
@@ -342,6 +361,7 @@ function requestEyedropper(): void {
                 class="cs-color-recent-item"
                 :class="{ 'is-active': srgbToHex(color) === draft }"
                 :aria-label="`${index === 0 ? (locale === 'ru' ? 'Последний' : 'Latest') : locale === 'ru' ? 'Предыдущий' : 'Previous'} ${locale === 'ru' ? 'цвет' : 'colour'} ${srgbToHex(color)}`"
+                :disabled="disabled"
                 @click="choose(srgbToHex(color))"
               >
                 <span
@@ -372,6 +392,7 @@ function requestEyedropper(): void {
                     class="cs-color-suggestion"
                     type="button"
                     :aria-label="`${suggestion.id}: ${srgbToHex(suggestion.color)}`"
+                    :disabled="disabled"
                     @click="choose(srgbToHex(suggestion.color))"
                   >
                     <span

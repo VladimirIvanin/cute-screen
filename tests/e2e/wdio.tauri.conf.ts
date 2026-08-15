@@ -28,6 +28,7 @@ export const config: WebdriverIO.Config = {
         appBinaryPath,
         captureBackendLogs: true,
         captureFrontendLogs: true,
+        autoDownloadEdgeDriver: false,
         driverProvider: 'embedded',
         appArgs: harnessQuery ? [`--e2e-harness-query=${harnessQuery}`] : [],
         env: {

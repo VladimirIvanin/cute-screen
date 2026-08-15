@@ -36,6 +36,7 @@ watch(
 )
 
 function update(next: number): void {
+  if (props.disabled) return
   value.value = next
   // Keyboard interaction is already discrete. Pointer drags commit only once
   // from dragend, preventing a command/history entry per input event.
@@ -43,6 +44,11 @@ function update(next: number): void {
 }
 
 function complete(): void {
+  if (props.disabled) {
+    dragging.value = false
+    value.value = props.modelValue
+    return
+  }
   if (!dragging.value) return
   dragging.value = false
   emit('commit', value.value)

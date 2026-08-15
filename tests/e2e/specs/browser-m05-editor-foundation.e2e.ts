@@ -3,6 +3,7 @@ import path from 'node:path'
 import { Key } from 'webdriverio'
 
 type HarnessDocument = {
+  readonly canvas: { readonly width: number; readonly height: number }
   readonly crop: { readonly x: number; readonly y: number } | null
   readonly layers: readonly {
     readonly id: string
@@ -76,6 +77,26 @@ async function viewportLayout() {
   })
 }
 
+async function canvasPoint(
+  x: number,
+  y: number,
+): Promise<Readonly<{ x: number; y: number }>> {
+  return browser.execute(
+    ({ canvasX, canvasY }) => {
+      const scene = document.querySelector<HTMLCanvasElement>(
+        '.cs-canvas:not(.cs-canvas-overlay)',
+      )
+      if (!scene) throw new Error('Scene canvas is missing')
+      const bounds = scene.getBoundingClientRect()
+      return {
+        x: Math.round(bounds.left + (canvasX / scene.width) * bounds.width),
+        y: Math.round(bounds.top + (canvasY / scene.height) * bounds.height),
+      }
+    },
+    { canvasX: x, canvasY: y },
+  )
+}
+
 /**
  * The document-session snapshot is published synchronously, while the toolbar
  * state is rendered by Vue on its next update.  Waiting for the control keeps
@@ -95,9 +116,13 @@ describe('M05 editor foundation in browser mode', () => {
     await openM05(true)
 
     const fit = await viewportLayout()
-    expect(fit.surface.width).toBeCloseTo((fit.canvasWidth * fit.zoom) / 100, 0)
+    const mounted = await snapshot()
+    expect(fit.surface.width).toBeCloseTo(
+      (mounted.canvas.width * fit.zoom) / 100,
+      0,
+    )
     expect(fit.surface.height).toBeCloseTo(
-      (fit.canvasHeight * fit.zoom) / 100,
+      (mounted.canvas.height * fit.zoom) / 100,
       0,
     )
     expect(fit.shell.bottom).toBeLessThanOrEqual(fit.windowHeight + 1)
@@ -109,8 +134,8 @@ describe('M05 editor foundation in browser mode', () => {
     await $('.cs-zoom-value').click()
     await expect($('.cs-zoom-value')).toHaveText('100%')
     const actualSize = await viewportLayout()
-    expect(actualSize.surface.width).toBeCloseTo(actualSize.canvasWidth, 0)
-    expect(actualSize.surface.height).toBeCloseTo(actualSize.canvasHeight, 0)
+    expect(actualSize.surface.width).toBeCloseTo(mounted.canvas.width, 0)
+    expect(actualSize.surface.height).toBeCloseTo(mounted.canvas.height, 0)
     expect(actualSize.viewport.height).toBeCloseTo(fit.viewport.height, 0)
     expect(actualSize.zoomControls.bottom).toBeLessThanOrEqual(
       actualSize.viewport.bottom + 1,
@@ -123,11 +148,11 @@ describe('M05 editor foundation in browser mode', () => {
     const refit = await viewportLayout()
     await expect($('.cs-zoom-value')).toHaveText(`${refit.zoom}%`)
     expect(refit.surface.width).toBeCloseTo(
-      (refit.canvasWidth * refit.zoom) / 100,
+      (mounted.canvas.width * refit.zoom) / 100,
       0,
     )
     expect(refit.surface.height).toBeCloseTo(
-      (refit.canvasHeight * refit.zoom) / 100,
+      (mounted.canvas.height * refit.zoom) / 100,
       0,
     )
     expect(refit.viewport.height).toBeCloseTo(fit.viewport.height, 0)
@@ -274,56 +299,49 @@ describe('M05 editor foundation in browser mode', () => {
 
   it('draws snap guides only while Alt is held during a pointer gesture', async () => {
     await openM05()
-    const canvas = $('.cs-canvas[aria-label="Scene canvas"]')
+    await $('button[aria-label="Show layers"]').click()
+    await $(`[data-layer-id="${frontId}"] .cs-layer-select`).click()
+    const start = await canvasPoint(70, 50)
+    const next = await canvasPoint(71, 51)
     await browser
       .action('pointer', { id: 'm05-guide-pointer' })
-      .move({ origin: canvas, x: 0, y: 0, duration: 0 })
+      .move({ origin: 'viewport', x: start.x, y: start.y, duration: 0 })
       .down({ button: 'left' })
+      .move({ origin: 'viewport', x: next.x, y: next.y, duration: 40 })
       .perform(true)
-    await browser
-      .action('key', { id: 'm05-guide-key' })
-      .down(Key.Alt)
-      .perform(true)
-    await browser
-      .action('pointer', { id: 'm05-guide-pointer' })
-      .move({ origin: 'pointer', x: 1, y: 1, duration: 50 })
-      .perform(true)
-
-    const guidePixels = await browser.execute(() => {
+    const withoutGuides = await browser.execute(() => {
       const overlay = document.querySelector<HTMLCanvasElement>(
         '.cs-canvas-overlay[aria-label="Interaction overlay"]',
       )
       if (!overlay) throw new Error('Interaction overlay is missing')
-      const context = overlay.getContext('2d')
-      if (!context) throw new Error('Interaction overlay context is missing')
-      const pixels = context.getImageData(78, 90, 5, 25).data
-      let warm = 0
-      for (let index = 0; index < pixels.length; index += 4) {
-        if (pixels[index]! > 150 && pixels[index + 1]! > 70) warm += 1
-      }
-      return warm
+      return overlay.toDataURL()
     })
-    expect(guidePixels).toBeGreaterThan(0)
+    await browser
+      .action('key', { id: 'm05-guide-key' })
+      .down(Key.Alt)
+      .perform(true)
+
+    const heldGuides = await browser.execute(() => {
+      const overlay = document.querySelector<HTMLCanvasElement>(
+        '.cs-canvas-overlay[aria-label="Interaction overlay"]',
+      )
+      if (!overlay) throw new Error('Interaction overlay is missing')
+      return overlay.toDataURL()
+    })
+    expect(heldGuides).not.toBe(withoutGuides)
 
     await browser
       .action('key', { id: 'm05-guide-key' })
       .up(Key.Alt)
       .perform(true)
-    const releasedPixels = await browser.execute(() => {
+    const releasedGuides = await browser.execute(() => {
       const overlay = document.querySelector<HTMLCanvasElement>(
         '.cs-canvas-overlay[aria-label="Interaction overlay"]',
       )
       if (!overlay) throw new Error('Interaction overlay is missing')
-      const context = overlay.getContext('2d')
-      if (!context) throw new Error('Interaction overlay context is missing')
-      const pixels = context.getImageData(78, 90, 5, 25).data
-      let warm = 0
-      for (let index = 0; index < pixels.length; index += 4) {
-        if (pixels[index]! > 150 && pixels[index + 1]! > 70) warm += 1
-      }
-      return warm
+      return overlay.toDataURL()
     })
-    expect(releasedPixels).toBe(0)
+    expect(releasedGuides).toBe(withoutGuides)
     await browser
       .action('pointer', { id: 'm05-guide-pointer' })
       .up({ button: 'left' })

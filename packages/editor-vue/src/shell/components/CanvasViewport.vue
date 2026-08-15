@@ -9,7 +9,11 @@ import {
   watch,
 } from 'vue'
 import { UiIcon } from '../icon'
-import type { CanvasViewportHosts, ShellDocumentState } from '../types'
+import type {
+  CanvasViewportHosts,
+  PrecisionToolDefaults,
+  ShellDocumentState,
+} from '../types'
 import {
   RichTextEditorController,
   readRichTextDomSelection,
@@ -19,6 +23,9 @@ import {
 } from '../../rich-text-editor'
 import {
   Canvas2DRenderer,
+  DEFAULT_RULER_COLOR,
+  DEFAULT_RULER_FONT_SIZE,
+  DEFAULT_RULER_THICKNESS,
   createDocumentRenderScene,
   createRenderSceneSnapshot,
   drawNodes2D,
@@ -50,6 +57,23 @@ import {
   type TextLayer,
   type TextBackground,
   richTextSelectionRange,
+  applyCropSession,
+  cancelCropSession,
+  createCropSession,
+  moveCrop,
+  nudgeCrop,
+  resetCrop,
+  resizeCrop,
+  setCropPreset,
+  createCensorLayer,
+  createLoupeLayer,
+  createRulerLayer,
+  createSpotlightLayer,
+  snapRulerEndpoint,
+  type CropPreset,
+  type CropResizeHandle,
+  type CropSession,
+  type RulerAngleGuide,
 } from '@cute-screen/editor-renderer'
 
 export interface TextToolDefaults {
@@ -96,6 +120,8 @@ const props = defineProps<{
   selectedLayerIds?: readonly string[] | undefined
   activeTool?: string | undefined
   sampling?: boolean | undefined
+  samplingBlocked?: boolean | undefined
+  precisionDefaults?: PrecisionToolDefaults | undefined
   drawingDefaults?: DrawingDefaults | undefined
   textDefaults?: TextToolDefaults | undefined
   textFormatting?: TextFormattingPatch | undefined
@@ -125,7 +151,7 @@ const emit = defineEmits<{
     id: string,
     payload: import('@cute-screen/editor-renderer').JsonObject,
   ]
-  addLayer: [layer: LayerNode]
+  addLayer: [layer: LayerNode, selectAfter?: boolean]
   documentCommand: [command: unknown]
   textEditing: [
     draft:
@@ -146,6 +172,7 @@ const emit = defineEmits<{
   colorSample: [value: string]
   colorSampleError: [message: string]
   colorSampleCancel: []
+  toolError: [message: string]
 }>()
 const scene = ref<HTMLCanvasElement>()
 const overlay = ref<HTMLCanvasElement>()
@@ -167,11 +194,15 @@ const editingText = ref<
   | undefined
 >()
 let renderer: Canvas2DRenderer | undefined
+let rendererInitialization: Promise<Canvas2DRenderer | undefined> | undefined
+let rendererSceneReady = false
+let drawRevision = 0
 let imageResources = new Map<
   string,
   { readonly key: string; readonly resource: ImageResource }
 >()
 let resizeObserver: ResizeObserver | undefined
+let componentMounted = false
 let textToolbarPointerDown = false
 let lastFitZoom: number | undefined
 let pendingZoomAnchor:
@@ -185,6 +216,8 @@ let spacePressed = false
 let cycle:
   | { readonly key: string; readonly at: number; readonly index: number }
   | undefined
+let cropSession: CropSession | undefined
+let rulerGuide: RulerAngleGuide | undefined
 let gesture:
   | {
       readonly kind: 'pan'
@@ -240,6 +273,21 @@ let gesture:
       readonly start: CanvasPoint
       readonly current: CanvasPoint
     }
+  | {
+      readonly kind: 'precision'
+      readonly tool: 'censor' | 'spotlight' | 'ruler' | 'loupe'
+      readonly start: CanvasPoint
+      readonly current: CanvasPoint
+      readonly points: readonly CanvasPoint[]
+      readonly guidesHeld: boolean
+    }
+  | {
+      readonly kind: 'crop'
+      readonly action: 'move' | 'resize'
+      readonly handle?: CropResizeHandle
+      readonly start: CanvasPoint
+      readonly initial: CropSession
+    }
   | undefined
 
 type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w'
@@ -247,6 +295,12 @@ type CanvasPoint = {
   readonly x: number
   readonly y: number
   readonly pressure?: number
+}
+type ViewportOutputBounds = {
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
 }
 const DEFAULT_TEXT_TOOL: TextToolDefaults = Object.freeze({
   fontFamily: 'Roboto',
@@ -258,6 +312,52 @@ const DEFAULT_TEXT_TOOL: TextToolDefaults = Object.freeze({
   listKind: 'none',
   color: { red: 0, green: 0, blue: 0, alpha: 1 },
   background: null,
+})
+const DEFAULT_PRECISION_TOOLS: PrecisionToolDefaults = Object.freeze({
+  censor: Object.freeze({
+    region: 'rectangle',
+    mode: 'pixelate',
+    blockSize: 12,
+    blurStrength: 12,
+    solidColor: Object.freeze({ red: 0, green: 0, blue: 0, alpha: 1 }),
+  }),
+  spotlight: Object.freeze({
+    shape: 'rectangle',
+    dimColor: Object.freeze({ red: 0, green: 0, blue: 0, alpha: 1 }),
+    dimOpacity: 0.65,
+    feather: 'soft',
+  }),
+  ruler: Object.freeze({
+    unit: 'pixels',
+    snap: true,
+    snapAngleIncrementDegrees: 15,
+    color: DEFAULT_RULER_COLOR,
+    thickness: DEFAULT_RULER_THICKNESS,
+    fontSize: DEFAULT_RULER_FONT_SIZE,
+  }),
+  loupe: Object.freeze({
+    zoom: 2,
+    size: 120,
+    shape: 'circle',
+    borderColor: Object.freeze({ red: 1, green: 1, blue: 1, alpha: 1 }),
+    borderWidth: 3,
+    shadow: true,
+  }),
+})
+const viewportOutputBounds = computed<ViewportOutputBounds | undefined>(() => {
+  const canvas = props.canvas
+  if (!canvas) return undefined
+  if (props.activeTool === 'crop') {
+    return { x: 0, y: 0, width: canvas.width, height: canvas.height }
+  }
+  return (
+    props.document?.crop ?? {
+      x: 0,
+      y: 0,
+      width: canvas.width,
+      height: canvas.height,
+    }
+  )
 })
 function cssTextColor(color: SrgbColor): string {
   return `rgba(${Math.round(color.red * 255)}, ${Math.round(color.green * 255)}, ${Math.round(color.blue * 255)}, ${color.alpha})`
@@ -394,15 +494,36 @@ watch(
 async function ensureRenderer(): Promise<Canvas2DRenderer | undefined> {
   if (!scene.value || !overlay.value || !props.canvas) return undefined
   if (renderer) return renderer
+  if (rendererInitialization) return rendererInitialization
   const next = new Canvas2DRenderer()
-  await next.initialize({
-    scene: scene.value,
-    overlay: overlay.value,
-    dpr: window.devicePixelRatio || 1,
-    correlationId: 'editor-viewport',
-  })
-  renderer = next
-  return next
+  const initialization = (async () => {
+    await next.initialize({
+      scene: scene.value!,
+      overlay: overlay.value!,
+      dpr: window.devicePixelRatio || 1,
+      correlationId: 'editor-viewport',
+    })
+    if (!componentMounted) {
+      next.dispose()
+      return undefined
+    }
+    renderer = next
+    rendererSceneReady = false
+    return next
+  })()
+  rendererInitialization = initialization
+  try {
+    return await initialization
+  } catch (error) {
+    if (renderer === next) renderer = undefined
+    rendererSceneReady = false
+    next.dispose()
+    throw error
+  } finally {
+    if (rendererInitialization === initialization) {
+      rendererInitialization = undefined
+    }
+  }
 }
 function documentWithoutGestureLayer(): EditorDocumentV1 | undefined {
   const document = props.document
@@ -423,10 +544,15 @@ function documentWithoutGestureLayer(): EditorDocumentV1 | undefined {
 function setCommittedScene(runtime: Canvas2DRenderer): void {
   const document = documentWithoutGestureLayer()
   if (!document) return
-  const documentScene = createDocumentRenderScene(document)
+  const documentScene = createDocumentRenderScene(
+    props.activeTool === 'crop' && document.crop
+      ? { ...document, crop: null }
+      : document,
+  )
   const editing = editingText.value
   if (!editing?.existing) {
     runtime.setScene(documentScene)
+    rendererSceneReady = true
     return
   }
   // The contenteditable owns the text projection during direct editing.
@@ -441,30 +567,34 @@ function setCommittedScene(runtime: Canvas2DRenderer): void {
     createRenderSceneSnapshot({
       width: documentScene.width,
       height: documentScene.height,
+      outputBounds: documentScene.outputBounds,
       nodes: documentScene.nodes.filter(
         (candidate) => !hiddenNodeIds.has(candidate.id),
       ),
     }),
   )
+  rendererSceneReady = true
 }
 function renderCommittedSceneForGesture(): void {
-  if (renderer) {
+  if (renderer && rendererSceneReady) {
     setCommittedScene(renderer)
     renderer.render(['scene'])
   }
-  invalidateOverlay()
+  if (componentMounted) invalidateOverlay()
 }
 async function drawDocument(): Promise<void> {
-  if (!scene.value || !props.canvas) return
+  const revision = ++drawRevision
+  const bounds = viewportOutputBounds.value
+  if (!scene.value || !props.canvas || !bounds) return
   rendererError.value = undefined
-  scene.value.width = props.canvas.width
-  scene.value.height = props.canvas.height
+  scene.value.width = Math.max(1, Math.round(bounds.width))
+  scene.value.height = Math.max(1, Math.round(bounds.height))
   if (overlay.value) {
-    overlay.value.width = props.canvas.width
-    overlay.value.height = props.canvas.height
+    overlay.value.width = Math.max(1, Math.round(bounds.width))
+    overlay.value.height = Math.max(1, Math.round(bounds.height))
   }
   const layer = props.imageLayer
-  if (!props.document || !props.image || !layer) {
+  if (!props.document) {
     const context = scene.value.getContext('2d')
     context?.clearRect(0, 0, scene.value.width, scene.value.height)
     invalidateOverlay()
@@ -472,9 +602,11 @@ async function drawDocument(): Promise<void> {
   }
   try {
     const runtime = await ensureRenderer()
-    if (!runtime) return
+    if (!runtime || !componentMounted || revision !== drawRevision) return
     const imageInputs = new Map<string, HTMLImageElement>([
-      [layer.payload.blobHash, props.image],
+      ...(layer && props.image
+        ? ([[layer.payload.blobHash, props.image]] as const)
+        : []),
       ...(props.textureImages ?? new Map()),
     ])
     for (const [id, image] of imageInputs) {
@@ -487,6 +619,10 @@ async function drawDocument(): Promise<void> {
         height: image.naturalHeight,
         source: image,
       })
+      if (!componentMounted || revision !== drawRevision) {
+        resource.dispose()
+        return
+      }
       imageResources.set(id, { key, resource })
     }
     for (const [id, resource] of imageResources) {
@@ -497,21 +633,23 @@ async function drawDocument(): Promise<void> {
     setCommittedScene(runtime)
     runtime.render(['scene'])
   } catch (error) {
+    if (revision !== drawRevision) return
     renderer?.dispose()
     renderer = undefined
+    rendererSceneReady = false
     imageResources = new Map()
     rendererError.value = error instanceof Error ? error.message : String(error)
   }
-  invalidateOverlay()
+  if (componentMounted && revision === drawRevision) invalidateOverlay()
 }
 function fitCanvas(): void {
   const container = scrollContainer.value
-  const canvas = props.canvas
+  const bounds = viewportOutputBounds.value
   if (!props.fitMode) {
     lastFitZoom = undefined
     return
   }
-  if (!container || !canvas) return
+  if (!container || !bounds) return
   const style = window.getComputedStyle(container)
   const inset = (value: string): number => {
     const parsed = Number.parseFloat(value)
@@ -525,15 +663,14 @@ function fitCanvas(): void {
     inset(style.paddingBottom)
   if (availableWidth <= 0 || availableHeight <= 0) return
   const scale = Math.min(
-    availableWidth / canvas.width,
-    availableHeight / canvas.height,
+    availableWidth / bounds.width,
+    availableHeight / bounds.height,
   )
   const nextZoom = Math.round(scale * 100)
   if (nextZoom === props.zoom || nextZoom === lastFitZoom) return
   lastFitZoom = nextZoom
   emit('fitZoom', nextZoom)
 }
-defineExpose({ refitCanvas: fitCanvas })
 function retryRender(): void {
   void drawDocument()
 }
@@ -704,6 +841,8 @@ function previewTransform(layer: LayerNode): Transform2D {
     gesture.kind === 'pan' ||
     gesture.kind === 'draw' ||
     gesture.kind === 'text' ||
+    gesture.kind === 'precision' ||
+    gesture.kind === 'crop' ||
     gesture.id !== layer.id
   ) {
     return layer.transform
@@ -736,7 +875,9 @@ function gesturePreviewLayer(): LayerNode | undefined {
     !gesture ||
     gesture.kind === 'pan' ||
     gesture.kind === 'draw' ||
-    gesture.kind === 'text'
+    gesture.kind === 'text' ||
+    gesture.kind === 'precision' ||
+    gesture.kind === 'crop'
   ) {
     return undefined
   }
@@ -784,19 +925,329 @@ function drawDraft(context: CanvasRenderingContext2D): void {
     createDocumentRenderScene({ ...props.document, layers: [layer] }).nodes,
   )
 }
+function rectFromPoints(start: CanvasPoint, end: CanvasPoint) {
+  return {
+    x: Math.min(start.x, end.x),
+    y: Math.min(start.y, end.y),
+    width: Math.abs(end.x - start.x),
+    height: Math.abs(end.y - start.y),
+  }
+}
+function freeformDraftPoints(
+  points: readonly CanvasPoint[],
+  start: CanvasPoint,
+  end: CanvasPoint,
+): readonly CanvasPoint[] {
+  if (points.length >= 3) {
+    const area = points.reduce((sum, point, index) => {
+      const next = points[(index + 1) % points.length]!
+      return sum + point.x * next.y - next.x * point.y
+    }, 0)
+    if (Math.abs(area) > 0.5) return points
+  }
+  const bounds = rectFromPoints(start, end)
+  return [
+    { x: bounds.x, y: bounds.y },
+    { x: bounds.x + bounds.width, y: bounds.y },
+    { x: bounds.x + bounds.width, y: bounds.y + bounds.height },
+    { x: bounds.x, y: bounds.y + bounds.height },
+  ]
+}
+function precisionDraftLayer(
+  id = '__precision-draft__',
+): LayerNode | undefined {
+  if (!gesture || gesture.kind !== 'precision') return undefined
+  const defaults = props.precisionDefaults ?? DEFAULT_PRECISION_TOOLS
+  const bounds = rectFromPoints(gesture.start, gesture.current)
+  if (gesture.tool === 'censor') {
+    if (bounds.width < 1 || bounds.height < 1) return undefined
+    const effect =
+      defaults.censor.mode === 'pixelate'
+        ? ({ mode: 'pixelate', blockSize: defaults.censor.blockSize } as const)
+        : defaults.censor.mode === 'blur'
+          ? ({ mode: 'blur', strength: defaults.censor.blurStrength } as const)
+          : ({ mode: 'solid', color: defaults.censor.solidColor } as const)
+    return createCensorLayer({
+      id,
+      region:
+        defaults.censor.region === 'freeform'
+          ? {
+              kind: 'freeform',
+              points: freeformDraftPoints(
+                gesture.points,
+                gesture.start,
+                gesture.current,
+              ),
+            }
+          : { kind: 'rectangle', bounds },
+      effect,
+    })
+  }
+  if (gesture.tool === 'spotlight') {
+    if (bounds.width < 1 || bounds.height < 1) return undefined
+    return createSpotlightLayer({
+      id,
+      bounds,
+      shape: defaults.spotlight.shape,
+      dimColor: defaults.spotlight.dimColor,
+      dimOpacity: defaults.spotlight.dimOpacity,
+      feather: defaults.spotlight.feather,
+    })
+  }
+  if (gesture.tool === 'ruler') {
+    if (!props.canvas) return undefined
+    if (
+      gesture.start.x === gesture.current.x &&
+      gesture.start.y === gesture.current.y
+    ) {
+      return undefined
+    }
+    return createRulerLayer({
+      id,
+      canvas: props.canvas,
+      start: gesture.start,
+      end: gesture.current,
+      unit: defaults.ruler.unit,
+      snapAngleIncrementDegrees: defaults.ruler.snapAngleIncrementDegrees,
+      color: defaults.ruler.color,
+      thickness: defaults.ruler.thickness,
+      fontSize: defaults.ruler.fontSize,
+    })
+  }
+  if (!props.canvas) return undefined
+  const zoom = defaults.loupe.zoom
+  const maximumSourceSize = Math.min(props.canvas.width, props.canvas.height)
+  const size = Math.min(defaults.loupe.size, maximumSourceSize * zoom)
+  const sourceSize = size / zoom
+  const sourceX = Math.max(
+    0,
+    Math.min(props.canvas.width - sourceSize, gesture.start.x - sourceSize / 2),
+  )
+  const sourceY = Math.max(
+    0,
+    Math.min(
+      props.canvas.height - sourceSize,
+      gesture.start.y - sourceSize / 2,
+    ),
+  )
+  return createLoupeLayer({
+    id,
+    canvas: props.canvas,
+    sourceRegion: {
+      x: sourceX,
+      y: sourceY,
+      width: sourceSize,
+      height: sourceSize,
+    },
+    destination: {
+      x: gesture.current.x - size / 2,
+      y: gesture.current.y - size / 2,
+    },
+    zoom,
+    size,
+    shape: defaults.loupe.shape,
+    borderColor: defaults.loupe.borderColor,
+    borderWidth: defaults.loupe.borderWidth,
+    shadow: defaults.loupe.shadow
+      ? {
+          color: { red: 0, green: 0, blue: 0, alpha: 0.35 },
+          offsetX: 0,
+          offsetY: 6,
+          blur: 14,
+        }
+      : null,
+  })
+}
+function drawPrecisionDraft(context: CanvasRenderingContext2D): void {
+  if (!gesture || gesture.kind !== 'precision') return
+  const defaults = props.precisionDefaults ?? DEFAULT_PRECISION_TOOLS
+  const bounds = rectFromPoints(gesture.start, gesture.current)
+  const scale = (props.zoom ?? 100) / 100
+  context.save()
+  context.strokeStyle = '#d9773b'
+  context.fillStyle = 'rgba(217, 119, 59, 0.14)'
+  context.lineWidth = 2 / scale
+  context.setLineDash([5 / scale, 3 / scale])
+  context.beginPath()
+  if (gesture.tool === 'censor' && defaults.censor.region === 'freeform') {
+    const points = freeformDraftPoints(
+      gesture.points,
+      gesture.start,
+      gesture.current,
+    )
+    const first = points[0]
+    if (first) {
+      context.moveTo(first.x, first.y)
+      for (const point of points.slice(1)) context.lineTo(point.x, point.y)
+      context.closePath()
+    }
+  } else if (gesture.tool === 'ruler') {
+    context.moveTo(gesture.start.x, gesture.start.y)
+    context.lineTo(gesture.current.x, gesture.current.y)
+  } else if (gesture.tool === 'loupe') {
+    const sourceSize = defaults.loupe.size / defaults.loupe.zoom
+    context.moveTo(gesture.current.x, gesture.current.y)
+    context.lineTo(gesture.start.x, gesture.start.y)
+    context.rect(
+      gesture.start.x - sourceSize / 2,
+      gesture.start.y - sourceSize / 2,
+      sourceSize,
+      sourceSize,
+    )
+    if (defaults.loupe.shape === 'circle') {
+      context.moveTo(
+        gesture.current.x + defaults.loupe.size / 2,
+        gesture.current.y,
+      )
+      context.arc(
+        gesture.current.x,
+        gesture.current.y,
+        defaults.loupe.size / 2,
+        0,
+        Math.PI * 2,
+      )
+    } else {
+      context.rect(
+        gesture.current.x - defaults.loupe.size / 2,
+        gesture.current.y - defaults.loupe.size / 2,
+        defaults.loupe.size,
+        defaults.loupe.size,
+      )
+    }
+  } else if (
+    gesture.tool === 'spotlight' &&
+    defaults.spotlight.shape === 'ellipse'
+  ) {
+    context.ellipse(
+      bounds.x + bounds.width / 2,
+      bounds.y + bounds.height / 2,
+      bounds.width / 2,
+      bounds.height / 2,
+      0,
+      0,
+      Math.PI * 2,
+    )
+  } else if (
+    gesture.tool === 'spotlight' &&
+    defaults.spotlight.shape === 'diamond'
+  ) {
+    context.moveTo(bounds.x + bounds.width / 2, bounds.y)
+    context.lineTo(bounds.x + bounds.width, bounds.y + bounds.height / 2)
+    context.lineTo(bounds.x + bounds.width / 2, bounds.y + bounds.height)
+    context.lineTo(bounds.x, bounds.y + bounds.height / 2)
+    context.closePath()
+  } else {
+    context.rect(bounds.x, bounds.y, bounds.width, bounds.height)
+  }
+  context.fill()
+  context.stroke()
+  context.restore()
+  if (!rulerGuide) return
+  context.save()
+  context.strokeStyle = '#d9773b'
+  context.lineWidth = 1 / ((props.zoom ?? 100) / 100)
+  context.setLineDash([4, 3])
+  context.beginPath()
+  context.moveTo(rulerGuide.start.x, rulerGuide.start.y)
+  context.lineTo(rulerGuide.end.x, rulerGuide.end.y)
+  context.stroke()
+  context.restore()
+}
+function ensureCropSession(): CropSession | undefined {
+  if (props.activeTool !== 'crop' || !props.document) return undefined
+  if (!cropSession) {
+    try {
+      cropSession = createCropSession(props.document)
+    } catch (error) {
+      rendererError.value =
+        error instanceof Error ? error.message : String(error)
+      return undefined
+    }
+  }
+  return cropSession
+}
+function cropHandlePositions(session: CropSession) {
+  const { x, y, width, height } = session.crop
+  return [
+    ['northWest', { x, y }],
+    ['north', { x: x + width / 2, y }],
+    ['northEast', { x: x + width, y }],
+    ['east', { x: x + width, y: y + height / 2 }],
+    ['southEast', { x: x + width, y: y + height }],
+    ['south', { x: x + width / 2, y: y + height }],
+    ['southWest', { x, y: y + height }],
+    ['west', { x, y: y + height / 2 }],
+  ] as const
+}
+function cropHandleAtPoint(
+  session: CropSession,
+  point: CanvasPoint,
+): CropResizeHandle | undefined {
+  const tolerance = 9 / ((props.zoom ?? 100) / 100)
+  return cropHandlePositions(session).find(
+    ([, position]) =>
+      Math.hypot(position.x - point.x, position.y - point.y) <= tolerance,
+  )?.[0]
+}
+function drawCropOverlay(context: CanvasRenderingContext2D): boolean {
+  const session = ensureCropSession()
+  if (!session || props.activeTool !== 'crop') return false
+  const { x, y, width, height } = session.crop
+  const right = x + width
+  const bottom = y + height
+  context.save()
+  context.fillStyle = 'rgba(8, 12, 18, 0.58)'
+  context.fillRect(0, 0, props.canvas!.width, y)
+  context.fillRect(
+    0,
+    bottom,
+    props.canvas!.width,
+    props.canvas!.height - bottom,
+  )
+  context.fillRect(0, y, x, height)
+  context.fillRect(right, y, props.canvas!.width - right, height)
+  context.strokeStyle = '#ffffff'
+  context.lineWidth = 1 / ((props.zoom ?? 100) / 100)
+  context.setLineDash([])
+  context.strokeRect(x, y, width, height)
+  context.strokeStyle = 'rgba(255,255,255,0.72)'
+  context.beginPath()
+  for (const fraction of [1 / 3, 2 / 3]) {
+    context.moveTo(x + width * fraction, y)
+    context.lineTo(x + width * fraction, bottom)
+    context.moveTo(x, y + height * fraction)
+    context.lineTo(right, y + height * fraction)
+  }
+  context.stroke()
+  const half = 4 / ((props.zoom ?? 100) / 100)
+  context.fillStyle = '#ffffff'
+  context.strokeStyle = '#d9773b'
+  for (const [, position] of cropHandlePositions(session)) {
+    context.fillRect(position.x - half, position.y - half, half * 2, half * 2)
+    context.strokeRect(position.x - half, position.y - half, half * 2, half * 2)
+  }
+  context.restore()
+  return true
+}
 function drawOverlay(): void {
-  if (!overlay.value || !props.canvas) return
+  const outputBounds = viewportOutputBounds.value
+  if (!overlay.value || !props.canvas || !outputBounds) return
   const context = overlay.value.getContext('2d')
-  if (!context) return
+  if (!context || typeof context.clearRect !== 'function') return
   const previewNodes = gesturePreviewNodes()
-  if (renderer) {
+  if (renderer && rendererSceneReady) {
     renderer.setOverlay(previewNodes)
     renderer.render(['overlay'])
   } else {
+    context.setTransform?.(1, 0, 0, 1, 0, 0)
     context.clearRect(0, 0, overlay.value.width, overlay.value.height)
-    drawNodes2D(context, previewNodes)
   }
+  // Overlay primitives are expressed in document canvas coordinates even
+  // though the visible bitmap is output-local after a committed crop.
+  context.setTransform?.(1, 0, 0, 1, -outputBounds.x, -outputBounds.y)
+  if (!renderer) drawNodes2D(context, previewNodes)
   drawDraft(context)
+  drawPrecisionDraft(context)
   if (props.sampling && samplingCursor.value) {
     const point = samplingCursor.value
     context.save()
@@ -813,6 +1264,7 @@ function drawOverlay(): void {
     context.stroke()
     context.restore()
   }
+  if (drawCropOverlay(context)) return
   const layer = selectedLayer()
   if (!layer || !layer.visible) return
   const transform = previewTransform(layer)
@@ -871,6 +1323,9 @@ function drawOverlay(): void {
       context.stroke()
     }
   }
+  if (layer.kind === 'loupe') {
+    drawSelectedLoupeOverlay(context, layer, transform)
+  }
   const topCenter = transformPoint(transform, {
     x: bounds.x + bounds.width / 2,
     y: bounds.y,
@@ -912,12 +1367,107 @@ function drawOverlay(): void {
     context.restore()
   }
 }
+
+function roundedOverlayPath(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+): void {
+  const right = x + width
+  const bottom = y + height
+  const safeRadius = Math.min(radius, width / 2, height / 2)
+  context.beginPath()
+  context.moveTo(x + safeRadius, y)
+  context.lineTo(right - safeRadius, y)
+  context.quadraticCurveTo(right, y, right, y + safeRadius)
+  context.lineTo(right, bottom - safeRadius)
+  context.quadraticCurveTo(right, bottom, right - safeRadius, bottom)
+  context.lineTo(x + safeRadius, bottom)
+  context.quadraticCurveTo(x, bottom, x, bottom - safeRadius)
+  context.lineTo(x, y + safeRadius)
+  context.quadraticCurveTo(x, y, x + safeRadius, y)
+  context.closePath()
+}
+
+function drawSelectedLoupeOverlay(
+  context: CanvasRenderingContext2D,
+  layer: Extract<LayerNode, { readonly kind: 'loupe' }>,
+  transform: Transform2D,
+): void {
+  const scale = (props.zoom ?? 100) / 100
+  const source = {
+    x: layer.payload.sourceRegion.x + layer.payload.sourceRegion.width / 2,
+    y: layer.payload.sourceRegion.y + layer.payload.sourceRegion.height / 2,
+  }
+  const markerHalf = 4 / scale
+  context.save()
+  context.fillStyle = '#ffffff'
+  context.strokeStyle = '#d9773b'
+  context.lineWidth = 1.5 / scale
+  context.fillRect(
+    source.x - markerHalf,
+    source.y - markerHalf,
+    markerHalf * 2,
+    markerHalf * 2,
+  )
+  context.strokeRect(
+    source.x - markerHalf,
+    source.y - markerHalf,
+    markerHalf * 2,
+    markerHalf * 2,
+  )
+
+  const bounds = layerBounds(layer)
+  const lensBottom = transformPoint(transform, {
+    x: bounds.x + bounds.width / 2,
+    y: bounds.y + bounds.height,
+  })
+  const lensTop = transformPoint(transform, {
+    x: bounds.x + bounds.width / 2,
+    y: bounds.y,
+  })
+  const labels = [
+    `${String(layer.payload.zoom).replace(/\.0$/, '')}×`,
+    `${Math.round(layer.payload.lens.size)}`,
+  ]
+  context.font = `600 ${11 / scale}px system-ui, sans-serif`
+  context.textAlign = 'center'
+  context.textBaseline = 'middle'
+  const height = 18 / scale
+  const gap = 6 / scale
+  const widths = labels.map(
+    (label) => context.measureText(label).width + 14 / scale,
+  )
+  const totalWidth = widths[0]! + widths[1]! + gap
+  const belowY = lensBottom.y + 8 / scale
+  const y =
+    belowY + height <= (props.canvas?.height ?? Number.POSITIVE_INFINITY)
+      ? belowY
+      : lensTop.y - 8 / scale - height
+  let x = lensBottom.x - totalWidth / 2
+  for (const [index, label] of labels.entries()) {
+    const width = widths[index]!
+    roundedOverlayPath(context, x, y, width, height, height / 2)
+    context.fillStyle = '#ffffff'
+    context.strokeStyle = '#d9773b'
+    context.fill()
+    context.stroke()
+    context.fillStyle = '#d9773b'
+    context.fillText(label, x + width / 2, y + height / 2)
+    x += width + gap
+  }
+  context.restore()
+}
 function invalidateOverlay(): void {
   // Interaction state is non-reactive; only the lightweight overlay updates
   // during pointer movement, never the committed scene or Vue tree.
   drawOverlay()
 }
 onMounted(() => {
+  componentMounted = true
   if (scene.value && overlay.value && scrollContainer.value)
     emit('hostsReady', {
       scene: scene.value,
@@ -942,6 +1492,38 @@ watch(
   () => void drawDocument(),
 )
 watch(
+  () => props.document,
+  () => {
+    cropSession = undefined
+    if (props.activeTool === 'crop') ensureCropSession()
+    invalidateOverlay()
+  },
+)
+watch(
+  () => props.activeTool,
+  (tool) => {
+    cancelGesture()
+    cropSession =
+      tool === 'crop' && props.document
+        ? createCropSession(props.document)
+        : undefined
+    invalidateOverlay()
+    if (
+      tool === 'crop' ||
+      tool === 'censor' ||
+      tool === 'spotlight' ||
+      tool === 'ruler' ||
+      tool === 'loupe'
+    ) {
+      void nextTick(() => scene.value?.focus({ preventScroll: true }))
+    }
+    void nextTick(() => {
+      void drawDocument()
+      fitCanvas()
+    })
+  },
+)
+watch(
   () => editingText.value?.existing?.id,
   () => void drawDocument(),
 )
@@ -950,7 +1532,11 @@ watch(
   () => invalidateOverlay(),
 )
 watch(
-  () => [props.canvas, props.fitMode],
+  () => [
+    viewportOutputBounds.value?.width,
+    viewportOutputBounds.value?.height,
+    props.fitMode,
+  ],
   () => void nextTick(fitCanvas),
 )
 watch(
@@ -962,13 +1548,15 @@ watch(
     await nextTick()
     const viewport = scrollContainer.value.getBoundingClientRect()
     const scale = zoom / 100
+    const bounds = viewportOutputBounds.value
+    if (!bounds) return
     scrollContainer.value.scrollLeft = Math.max(
       0,
-      anchor.canvas.x * scale - (anchor.clientX - viewport.left),
+      (anchor.canvas.x - bounds.x) * scale - (anchor.clientX - viewport.left),
     )
     scrollContainer.value.scrollTop = Math.max(
       0,
-      anchor.canvas.y * scale - (anchor.clientY - viewport.top),
+      (anchor.canvas.y - bounds.y) * scale - (anchor.clientY - viewport.top),
     )
   },
 )
@@ -978,12 +1566,16 @@ function canvasPoint(event: {
   readonly pressure?: number
   readonly pointerType?: string
 }): CanvasPoint | undefined {
-  if (!scene.value || !props.document) return undefined
+  const bounds = viewportOutputBounds.value
+  if (!scene.value || !props.document || !bounds) return undefined
   const rect = scene.value.getBoundingClientRect()
   if (rect.width <= 0 || rect.height <= 0) return undefined
   return {
-    x: ((event.clientX - rect.left) * scene.value.width) / rect.width,
-    y: ((event.clientY - rect.top) * scene.value.height) / rect.height,
+    x:
+      bounds.x + ((event.clientX - rect.left) * scene.value.width) / rect.width,
+    y:
+      bounds.y +
+      ((event.clientY - rect.top) * scene.value.height) / rect.height,
     pressure:
       event.pointerType === 'pen' &&
       typeof event.pressure === 'number' &&
@@ -994,6 +1586,7 @@ function canvasPoint(event: {
 }
 function sampleScene(point: CanvasPoint): void {
   const canvas = scene.value
+  const bounds = viewportOutputBounds.value
   if (!canvas)
     return emit(
       'colorSampleError',
@@ -1002,11 +1595,28 @@ function sampleScene(point: CanvasPoint): void {
         'Холст недоступен для выбора цвета',
       ),
     )
-  const x = Math.max(0, Math.min(canvas.width - 1, Math.round(point.x)))
-  const y = Math.max(0, Math.min(canvas.height - 1, Math.round(point.y)))
+  if (!bounds) return
+  if (props.samplingBlocked) {
+    emit(
+      'colorSampleError',
+      samplingError(
+        'Scene textures are still loading; try again when the canvas is ready',
+        'Текстуры сцены ещё загружаются; повторите, когда холст будет готов',
+      ),
+    )
+    return
+  }
+  const x = Math.max(
+    0,
+    Math.min(canvas.width - 1, Math.round(point.x - bounds.x)),
+  )
+  const y = Math.max(
+    0,
+    Math.min(canvas.height - 1, Math.round(point.y - bounds.y)),
+  )
   try {
     const data = canvas.getContext('2d')?.getImageData(x, y, 1, 1).data
-    if (!data || data[3] === 0) {
+    if (!data || data[3] !== 255) {
       emit(
         'colorSampleError',
         samplingError(
@@ -1045,11 +1655,12 @@ function visibleCanvasCenter(): CanvasPoint | undefined {
   })
 }
 function initialSamplingCursor(): CanvasPoint | undefined {
-  if (!props.canvas) return undefined
+  const bounds = viewportOutputBounds.value
+  if (!bounds) return undefined
   return (
     visibleCanvasCenter() ?? {
-      x: Math.max(0, (props.canvas.width - 1) / 2),
-      y: Math.max(0, (props.canvas.height - 1) / 2),
+      x: bounds.x + Math.max(0, (bounds.width - 1) / 2),
+      y: bounds.y + Math.max(0, (bounds.height - 1) / 2),
     }
   )
 }
@@ -1160,6 +1771,11 @@ function onPointerDown(event: PointerEvent): void {
   if (!point || !scene.value || !props.document) return
   if (props.sampling) {
     event.preventDefault()
+    if (event.button > 0) {
+      samplingCursor.value = undefined
+      emit('colorSampleCancel')
+      return
+    }
     samplingCursor.value = point
     sampleScene(point)
     return
@@ -1178,6 +1794,47 @@ function onPointerDown(event: PointerEvent): void {
     return
   }
   if (event.button !== 0) return
+  if (props.activeTool === 'crop') {
+    const session = ensureCropSession()
+    if (!session) return
+    event.preventDefault()
+    const handle = cropHandleAtPoint(session, point)
+    const inside =
+      point.x >= session.crop.x &&
+      point.x <= session.crop.x + session.crop.width &&
+      point.y >= session.crop.y &&
+      point.y <= session.crop.y + session.crop.height
+    if (!handle && !inside) return
+    scene.value.setPointerCapture(event.pointerId)
+    gesture = {
+      kind: 'crop',
+      action: handle ? 'resize' : 'move',
+      ...(handle ? { handle } : {}),
+      start: point,
+      initial: session,
+    }
+    return
+  }
+  if (
+    props.activeTool === 'censor' ||
+    props.activeTool === 'spotlight' ||
+    props.activeTool === 'ruler' ||
+    props.activeTool === 'loupe'
+  ) {
+    event.preventDefault()
+    scene.value.setPointerCapture(event.pointerId)
+    gesture = {
+      kind: 'precision',
+      tool: props.activeTool,
+      start: point,
+      current: point,
+      points: [point],
+      guidesHeld: event.altKey,
+    }
+    rulerGuide = undefined
+    invalidateOverlay()
+    return
+  }
   if (props.activeTool === 'image') {
     event.preventDefault()
     const center = visibleCanvasCenter() ?? point
@@ -1708,6 +2365,51 @@ function onPointerMove(event: PointerEvent): void {
       gesture.scrollTop - (event.clientY - gesture.clientY)
     return
   }
+  if (gesture.kind === 'crop') {
+    const delta = {
+      x: point.x - gesture.start.x,
+      y: point.y - gesture.start.y,
+    }
+    cropSession =
+      gesture.action === 'move'
+        ? moveCrop(gesture.initial, delta)
+        : resizeCrop(gesture.initial, gesture.handle!, delta)
+    invalidateOverlay()
+    return
+  }
+  if (gesture.kind === 'precision') {
+    const defaults = props.precisionDefaults ?? DEFAULT_PRECISION_TOOLS
+    let current = point
+    rulerGuide = undefined
+    if (
+      gesture.tool === 'ruler' &&
+      defaults.ruler.snap &&
+      (event.altKey || gesture.guidesHeld)
+    ) {
+      const snapped = snapRulerEndpoint(
+        gesture.start,
+        point,
+        defaults.ruler.snapAngleIncrementDegrees,
+      )
+      current = snapped.end
+      rulerGuide = snapped.guide
+    }
+    const previous = gesture.points[gesture.points.length - 1]
+    gesture = {
+      ...gesture,
+      current,
+      guidesHeld: event.altKey,
+      points:
+        gesture.tool === 'censor' &&
+        defaults.censor.region === 'freeform' &&
+        (!previous ||
+          Math.hypot(point.x - previous.x, point.y - previous.y) >= 0.5)
+          ? [...gesture.points, point]
+          : gesture.points,
+    }
+    invalidateOverlay()
+    return
+  }
   if (gesture.kind === 'move') {
     const result = snapPoint(
       point,
@@ -1786,7 +2488,24 @@ function onPointerMove(event: PointerEvent): void {
 }
 function finishGesture(event: PointerEvent): void {
   const completed = gesture
+  let completedPrecisionLayer: LayerNode | undefined
+  if (completed?.kind === 'precision') {
+    try {
+      completedPrecisionLayer = precisionDraftLayer(crypto.randomUUID())
+    } catch (error) {
+      emit(
+        'toolError',
+        error instanceof Error
+          ? error.message
+          : samplingError(
+              'The tool gesture could not be created',
+              'Не удалось создать элемент',
+            ),
+      )
+    }
+  }
   gesture = undefined
+  rulerGuide = undefined
   if (scene.value?.hasPointerCapture(event.pointerId)) {
     scene.value.releasePointerCapture(event.pointerId)
   }
@@ -1861,6 +2580,13 @@ function finishGesture(event: PointerEvent): void {
     })
     if (layer) emit('addLayer', layer)
   }
+  if (completed?.kind === 'precision' && completedPrecisionLayer) {
+    emit(
+      'addLayer',
+      completedPrecisionLayer,
+      completedPrecisionLayer.kind === 'loupe',
+    )
+  }
   if (completed?.kind === 'text') {
     const width = Math.abs(completed.current.x - completed.start.x)
     const fixedWidth = width >= 4
@@ -1885,12 +2611,15 @@ function finishGesture(event: PointerEvent): void {
   }
 }
 function cancelGesture(event?: PointerEvent): void {
+  const cancelledCrop = gesture?.kind === 'crop' ? gesture.initial : undefined
   const restoreCommittedScene =
     gesture?.kind === 'move' ||
     gesture?.kind === 'resize' ||
     gesture?.kind === 'rotate' ||
     gesture?.kind === 'arrowHandle'
   gesture = undefined
+  if (cancelledCrop) cropSession = cancelledCrop
+  rulerGuide = undefined
   if (event && scene.value?.hasPointerCapture(event.pointerId)) {
     scene.value.releasePointerCapture(event.pointerId)
   }
@@ -1911,8 +2640,45 @@ function onWheel(event: WheelEvent): void {
   const current = props.zoom ?? 100
   emit('zoom', Math.round(current * (event.deltaY < 0 ? 1.1 : 1 / 1.1)))
 }
+function setCropPresetValue(preset: CropPreset): void {
+  const session = ensureCropSession()
+  if (!session) return
+  cropSession = setCropPreset(session, preset)
+  invalidateOverlay()
+}
+function resetCropDraft(): void {
+  const session = ensureCropSession()
+  if (!session) return
+  cropSession = resetCrop(session)
+  invalidateOverlay()
+}
+function applyCropDraft(): void {
+  const session = ensureCropSession()
+  if (!session) return
+  emit('documentCommand', applyCropSession(session))
+}
+function cancelCropDraft(): void {
+  const session = cropSession
+  if (session) cancelCropSession(session)
+  cropSession = undefined
+  cancelGesture()
+  emit('selectTool', 'select')
+}
+defineExpose({
+  applyCropDraft,
+  cancelCropDraft,
+  resetCropDraft,
+  setCropPresetValue,
+  refitCanvas: fitCanvas,
+})
 function onWindowKeydown(event: KeyboardEvent): void {
   if (props.sampling && scene.value && props.canvas) {
+    const bounds = viewportOutputBounds.value ?? {
+      x: 0,
+      y: 0,
+      width: props.canvas.width,
+      height: props.canvas.height,
+    }
     const initial = samplingCursor.value ??
       initialSamplingCursor() ?? { x: 0, y: 0 }
     const step = event.shiftKey ? 10 : 1
@@ -1937,11 +2703,60 @@ function onWindowKeydown(event: KeyboardEvent): void {
     if (move) {
       event.preventDefault()
       samplingCursor.value = {
-        x: Math.max(0, Math.min(props.canvas.width - 1, initial.x + move[0])),
-        y: Math.max(0, Math.min(props.canvas.height - 1, initial.y + move[1])),
+        x: Math.max(
+          bounds.x,
+          Math.min(bounds.x + bounds.width - 1, initial.x + move[0]),
+        ),
+        y: Math.max(
+          bounds.y,
+          Math.min(bounds.y + bounds.height - 1, initial.y + move[1]),
+        ),
       }
       invalidateOverlay()
       return
+    }
+  }
+  if (props.activeTool === 'crop' && ensureCropSession()) {
+    const directions = {
+      ArrowLeft: 'left',
+      ArrowRight: 'right',
+      ArrowUp: 'up',
+      ArrowDown: 'down',
+    } as const
+    const direction = directions[event.key as keyof typeof directions]
+    if (direction) {
+      event.preventDefault()
+      cropSession = nudgeCrop(cropSession!, direction, event.shiftKey ? 10 : 1)
+      invalidateOverlay()
+      return
+    }
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      applyCropDraft()
+      return
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      cancelCropDraft()
+      return
+    }
+  }
+  if (event.key === 'Alt' && gesture?.kind === 'move') {
+    gesture = { ...gesture, guidesVisible: true }
+    invalidateOverlay()
+  }
+  if (event.key === 'Alt' && gesture?.kind === 'precision') {
+    gesture = { ...gesture, guidesHeld: true }
+    const defaults = props.precisionDefaults ?? DEFAULT_PRECISION_TOOLS
+    if (gesture.tool === 'ruler' && defaults.ruler.snap) {
+      const snapped = snapRulerEndpoint(
+        gesture.start,
+        gesture.current,
+        defaults.ruler.snapAngleIncrementDegrees,
+      )
+      gesture = { ...gesture, current: snapped.end }
+      rulerGuide = snapped.guide
+      invalidateOverlay()
     }
   }
   if (
@@ -1963,8 +2778,13 @@ function onWindowKeydown(event: KeyboardEvent): void {
       props.activeTool === 'arrow' ||
       props.activeTool === 'shape' ||
       props.activeTool === 'pencil' ||
-      props.activeTool === 'marker'
+      props.activeTool === 'marker' ||
+      props.activeTool === 'censor' ||
+      props.activeTool === 'spotlight' ||
+      props.activeTool === 'ruler' ||
+      props.activeTool === 'loupe'
     ) {
+      cancelGesture()
       emit('selectTool', 'select')
     }
   }
@@ -1988,9 +2808,15 @@ function onWindowKeyup(event: KeyboardEvent): void {
     gesture = { ...gesture, guidesVisible: false }
     invalidateOverlay()
   }
+  if (event.key === 'Alt' && gesture?.kind === 'precision') {
+    gesture = { ...gesture, guidesHeld: false }
+    rulerGuide = undefined
+    invalidateOverlay()
+  }
 }
 function onWindowBlur(): void {
   spacePressed = false
+  rulerGuide = undefined
   cancelGesture()
 }
 function onDocumentSelectionChange(): void {
@@ -2014,12 +2840,15 @@ onMounted(() => {
   document.addEventListener('selectionchange', onDocumentSelectionChange)
 })
 onBeforeUnmount(() => {
+  componentMounted = false
+  drawRevision += 1
   resizeObserver?.disconnect()
   resizeObserver = undefined
   for (const { resource } of imageResources.values()) resource.dispose()
   imageResources.clear()
   renderer?.dispose()
   renderer = undefined
+  rendererSceneReady = false
   window.removeEventListener('keydown', onWindowKeydown)
   window.removeEventListener('keyup', onWindowKeyup)
   window.removeEventListener('blur', onWindowBlur)
@@ -2035,10 +2864,10 @@ onBeforeUnmount(() => {
         <div
           class="cs-canvas-surface"
           :style="
-            canvas
+            viewportOutputBounds
               ? {
-                  width: `${canvas.width * ((zoom ?? 100) / 100)}px`,
-                  height: `${canvas.height * ((zoom ?? 100) / 100)}px`,
+                  width: `${viewportOutputBounds.width * ((zoom ?? 100) / 100)}px`,
+                  height: `${viewportOutputBounds.height * ((zoom ?? 100) / 100)}px`,
                 }
               : undefined
           "
@@ -2047,7 +2876,16 @@ onBeforeUnmount(() => {
             ref="scene"
             class="cs-canvas"
             :aria-label="t('sceneCanvas')"
-            :tabindex="sampling ? 0 : -1"
+            :tabindex="
+              sampling ||
+              activeTool === 'crop' ||
+              activeTool === 'censor' ||
+              activeTool === 'spotlight' ||
+              activeTool === 'ruler' ||
+              activeTool === 'loupe'
+                ? 0
+                : -1
+            "
             @pointerdown="onPointerDown"
             @pointermove="onPointerMove"
             @pointerup="finishGesture"
@@ -2065,8 +2903,8 @@ onBeforeUnmount(() => {
             role="textbox"
             aria-multiline="true"
             :style="{
-              left: `${editingText.origin.x * ((zoom ?? 100) / 100)}px`,
-              top: `${editingText.origin.y * ((zoom ?? 100) / 100)}px`,
+              left: `${(editingText.origin.x - (viewportOutputBounds?.x ?? 0)) * ((zoom ?? 100) / 100)}px`,
+              top: `${(editingText.origin.y - (viewportOutputBounds?.y ?? 0)) * ((zoom ?? 100) / 100)}px`,
               width: `${editingText.width * ((zoom ?? 100) / 100)}px`,
               fontSize: `${editorTextStyle.fontSize * ((zoom ?? 100) / 100)}px`,
               lineHeight: '1.25',

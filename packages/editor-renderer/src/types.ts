@@ -40,6 +40,10 @@ export interface FrameProbe {
   afterFrame(metric: FrameMetric): void
 }
 
+export interface RenderExportOptions {
+  readonly scale?: number
+}
+
 export interface Renderer {
   readonly backend: RendererBackend
   initialize(stack: CanvasStack): Promise<void>
@@ -47,7 +51,7 @@ export interface Renderer {
   setScene(scene: RenderSceneSnapshot): void
   setOverlay(nodes: readonly RenderNode[]): void
   render(reasons: readonly InvalidationReason[]): FrameMetric
-  exportPng(): Promise<Uint8Array>
+  exportPng(options?: RenderExportOptions): Promise<Uint8Array>
   dispose(): void
 }
 

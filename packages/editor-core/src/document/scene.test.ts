@@ -51,6 +51,24 @@ const document: EditorDocumentV1 = {
 }
 
 describe('document render scene', () => {
+  it('maps crop to output bounds without translating or mutating layer coordinates', () => {
+    const croppedDocument: EditorDocumentV1 = {
+      ...document,
+      crop: { x: 120, y: 80, width: 320, height: 240 },
+    }
+    const before = JSON.stringify(croppedDocument)
+    const scene = createDocumentRenderScene(croppedDocument)
+
+    expect(scene.outputBounds).toEqual({
+      x: 120,
+      y: 80,
+      width: 320,
+      height: 240,
+    })
+    expect(scene.nodes[0]).toMatchObject({ x: 12, y: 16 })
+    expect(JSON.stringify(croppedDocument)).toBe(before)
+  })
+
   it('renders the base layer in normal z-order instead of a background pass', () => {
     const scene = createDocumentRenderScene(document)
     expect(scene).toMatchObject({

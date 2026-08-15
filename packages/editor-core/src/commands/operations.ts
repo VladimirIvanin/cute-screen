@@ -1,6 +1,7 @@
 import { normalizeEditorDocument } from '../document/codec'
 import { jsonEquals } from '../document/json'
 import type { EditorDocumentV1, LayerNode } from '../document/types'
+import { rebaseRulerLayer } from '../precision-tools'
 import type { EditorCommand } from './types'
 
 function assertNever(value: never): never {
@@ -32,7 +33,7 @@ export function createFlipCanvasCommand(
             transform.scaleX * Math.cos(radians),
           ) *
           (180 / Math.PI)
-    return {
+    const reflected = {
       ...layer,
       transform: {
         translateX:
@@ -48,6 +49,23 @@ export function createFlipCanvasCommand(
         scaleY:
           -Math.sign(transform.scaleX * transform.scaleY) *
           Math.abs(transform.scaleY),
+      },
+    } as LayerNode
+    if (reflected.kind === 'ruler') {
+      return rebaseRulerLayer(reflected, reflected.payload, document.canvas)
+    }
+    if (reflected.kind !== 'loupe') return reflected
+    const source = reflected.payload.sourceRegion
+    return {
+      ...reflected,
+      payload: {
+        ...reflected.payload,
+        sourceRegion: {
+          ...source,
+          ...(axis === 'horizontal'
+            ? { x: document.canvas.width - source.x - source.width }
+            : { y: document.canvas.height - source.y - source.height }),
+        },
       },
     } as LayerNode
   })

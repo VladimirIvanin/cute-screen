@@ -157,20 +157,25 @@ describe('editor document v7 codec', () => {
     expect(() => parseEditorDocument(raw)).toThrow(/bend is required/u)
   })
 
-  it('deeply freezes nested generic payload values', () => {
+  it('deeply freezes nested precision-tool payload values', () => {
     const raw = rawDocument()
     raw.layers = [
       {
         ...shape,
         kind: 'spotlight',
-        payload: { nested: { value: 'immutable' } },
+        payload: {
+          shape: 'rectangle',
+          dimColor: { red: 0, green: 0, blue: 0, alpha: 1 },
+          dimOpacity: 0.65,
+          feather: null,
+        },
       },
     ]
     const parsed = parseEditorDocument(raw)
     if (parsed.kind !== 'editable') throw new Error('expected editable v7')
     const spotlight = parsed.document.layers[0]
     if (spotlight?.kind !== 'spotlight') throw new Error('expected spotlight')
-    expect(Object.isFrozen(spotlight.payload.nested)).toBe(true)
+    expect(Object.isFrozen(spotlight.payload.dimColor)).toBe(true)
   })
 
   it('rejects invalid presentation, IDs and source hashes', () => {

@@ -342,6 +342,93 @@ export interface MarkerLayerPayload extends JsonObject {
   readonly smoothing: number
 }
 
+export const CENSOR_MODES = ['pixelate', 'blur', 'solid'] as const
+export type CensorMode = (typeof CENSOR_MODES)[number]
+
+export type CensorRegion =
+  | Readonly<{ readonly kind: 'rectangle' }>
+  | Readonly<{
+      readonly kind: 'freeform'
+      /** An implicitly closed, simple polygon in layer-local coordinates. */
+      readonly points: readonly (Point & JsonObject)[]
+    }>
+
+export type CensorEffect =
+  | Readonly<{ readonly mode: 'pixelate'; readonly blockSize: number }>
+  | Readonly<{ readonly mode: 'blur'; readonly strength: number }>
+  | Readonly<{ readonly mode: 'solid'; readonly color: SrgbColor }>
+
+export type CensorLayerPayload = Readonly<{
+  readonly region: CensorRegion & JsonObject
+  readonly effect: CensorEffect & JsonObject
+  /** The renderer samples only nodes preceding this layer in z-order. */
+  readonly sampleSource: 'compositeBelow'
+}>
+
+export const SPOTLIGHT_SHAPES = ['rectangle', 'ellipse', 'diamond'] as const
+export type SpotlightShape = (typeof SPOTLIGHT_SHAPES)[number]
+export const SPOTLIGHT_FEATHER_PRESETS = ['soft', 'strong'] as const
+export type SpotlightFeatherPreset = (typeof SPOTLIGHT_FEATHER_PRESETS)[number]
+
+export type SpotlightLayerPayload = Readonly<{
+  readonly shape: SpotlightShape
+  readonly dimColor: SrgbColor
+  readonly dimOpacity: number
+  /** `null` means a hard aperture edge. */
+  readonly feather: SpotlightFeatherPreset | null
+}>
+
+export const RULER_UNITS = ['pixels', 'percent'] as const
+export type RulerUnit = (typeof RULER_UNITS)[number]
+
+export const DEFAULT_RULER_COLOR: SrgbColor = Object.freeze({
+  red: 227 / 255,
+  green: 72 / 255,
+  blue: 143 / 255,
+  alpha: 1,
+})
+export const DEFAULT_RULER_THICKNESS = 2
+export const DEFAULT_RULER_FONT_SIZE = 14
+export const RULER_THICKNESS_BOUNDS = Object.freeze({ min: 1, max: 12 })
+export const RULER_FONT_SIZE_BOUNDS = Object.freeze({ min: 10, max: 48 })
+
+export type RulerLayerPayload = Readonly<{
+  readonly start: Point & JsonObject
+  readonly end: Point & JsonObject
+  readonly unit: RulerUnit
+  /** Percent length is relative to hypot(canvas.width, canvas.height). */
+  readonly percentBasis: 'canvasDiagonal'
+  readonly snapAngleIncrementDegrees: number
+  readonly color: SrgbColor
+  readonly thickness: number
+  readonly fontSize: number
+}>
+
+export const LOUPE_SHAPES = ['circle', 'rectangle'] as const
+export type LoupeShape = (typeof LOUPE_SHAPES)[number]
+
+export interface LoupeLens extends JsonObject {
+  readonly shape: LoupeShape
+  readonly size: number
+}
+
+export interface LoupeBorder extends JsonObject {
+  readonly color: SrgbColor
+  readonly width: number
+}
+
+export type LoupeLayerPayload = Readonly<{
+  /** Canvas-space sampling rect, intentionally independent from lens movement. */
+  readonly sourceRegion: Rect & JsonObject
+  /** Destination geometry; layer transform/localBounds place the lens. */
+  readonly lens: LoupeLens
+  readonly zoom: number
+  readonly border: LoupeBorder
+  readonly shadow: ShadowStyle | null
+  /** Prevents the lens from recursively sampling itself or higher layers. */
+  readonly sampleSource: 'compositeBelow'
+}>
+
 /** Payload-specific contracts are validated by the current codec. */
 export type ArrowLayer = CompositedLayerBase<'arrow', ArrowLayerPayload>
 export type ShapeLayer = CompositedLayerBase<'shape', JsonObject>
@@ -353,10 +440,13 @@ export type NumberedMarkerLayer = TextBearingLayerBase<
   NumberedMarkerPayload
 >
 export type CalloutLayer = TextBearingLayerBase<'callout', CalloutPayload>
-export type CensorLayer = CompositedLayerBase<'censor', JsonObject>
-export type SpotlightLayer = CompositedLayerBase<'spotlight', JsonObject>
-export type RulerLayer = CompositedLayerBase<'ruler', JsonObject>
-export type LoupeLayer = CompositedLayerBase<'loupe', JsonObject>
+export type CensorLayer = CompositedLayerBase<'censor', CensorLayerPayload>
+export type SpotlightLayer = CompositedLayerBase<
+  'spotlight',
+  SpotlightLayerPayload
+>
+export type RulerLayer = CompositedLayerBase<'ruler', RulerLayerPayload>
+export type LoupeLayer = CompositedLayerBase<'loupe', LoupeLayerPayload>
 export type EmojiLayer = CompositedLayerBase<'emoji', EmojiPayload>
 export type ImageLayer = CompositedLayerBase<'image', ImageLayerPayload>
 

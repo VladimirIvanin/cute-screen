@@ -46,6 +46,19 @@ declare global {
       snapshot(): EditorDocumentV1 | undefined
       versionToken(): number | undefined
     }
+    __cuteScreenE2eM08?: {
+      snapshot():
+        | {
+            document: EditorDocumentV1
+            decodedSource?: {
+              width: number
+              height: number
+            }
+            clipboardText?: string
+          }
+        | undefined
+      readClipboardText(): Promise<string | undefined>
+    }
   }
 }
 
@@ -66,6 +79,23 @@ const m04FallbackHarness =
 const m05Harness =
   import.meta.env.VITE_TEST_HARNESS === 'true' &&
   new URLSearchParams(window.location.search).get('m05') === '1'
+const m08Harness =
+  import.meta.env.VITE_TEST_HARNESS === 'true' &&
+  new URLSearchParams(window.location.search).get('m08') === '1'
+const m08SourceNotReady =
+  m08Harness &&
+  new URLSearchParams(window.location.search).get('m08notready') === '1'
+const m08ClipboardError =
+  m08Harness &&
+  new URLSearchParams(window.location.search).get('m08clipboarderror') === '1'
+const m08AlphaQuery = new URLSearchParams(window.location.search).get(
+  'm08alpha',
+)
+const m08SourceAlpha =
+  m08Harness &&
+  (m08AlphaQuery === '0' || m08AlphaQuery === '128' || m08AlphaQuery === '255')
+    ? Number(m08AlphaQuery)
+    : 255
 const m05ViewportHarness =
   m05Harness &&
   new URLSearchParams(window.location.search).get('m05viewport') === '1'
@@ -200,6 +230,7 @@ const contentImageBridge = shallowRef<ContentImageBridge>()
 const clipboardBridge = shallowRef<ClipboardBridge>()
 const systemFonts = shallowRef<readonly SystemFontFace[]>([])
 const canvasViewportHosts = shallowRef<CanvasViewportHosts>()
+let m08BrowserClipboardText: string | undefined
 let capturedDocumentMount: Promise<boolean> | undefined
 const documentState = shallowRef<ShellDocumentState>({ kind: 'loading' })
 const readOnlyDocument = shallowRef(false)
@@ -231,6 +262,59 @@ function correlationId(): string {
 
 function onCanvasViewportHostsReady(hosts: CanvasViewportHosts): void {
   canvasViewportHosts.value = hosts
+}
+
+function installM08HarnessFacade(): void {
+  if (!m08Harness) return
+  window.__cuteScreenE2eM08 = {
+    snapshot: () => {
+      const document = documentSession.value?.snapshot.core.document
+      if (!document) return undefined
+      const image = sourceImage.value
+      return {
+        document,
+        ...(image
+          ? {
+              decodedSource: {
+                width: image.naturalWidth,
+                height: image.naturalHeight,
+              },
+            }
+          : {}),
+        ...(m08BrowserClipboardText
+          ? { clipboardText: m08BrowserClipboardText }
+          : {}),
+      }
+    },
+    readClipboardText: async () => {
+      const bridge = clipboardBridge.value
+      if (!bridge) return m08BrowserClipboardText
+      const snapshot = await bridge.readClipboardSnapshot(correlationId())
+      return snapshot.text
+    },
+  }
+}
+
+function installM08BrowserClipboardBridge(): void {
+  // Browser mode injects a command-interception-shaped `__TAURI_INTERNALS__`
+  // object as well, so the explicit M05 document harness is the reliable
+  // boundary between this local adapter and a real Tauri M08 scenario.
+  if (!m08Harness || !m05Harness) return
+  clipboardBridge.value = {
+    readClipboardSnapshot: async () => ({
+      ...(m08BrowserClipboardText ? { text: m08BrowserClipboardText } : {}),
+    }),
+    writeClipboardText: async (text) => {
+      if (m08ClipboardError) throw new Error('clipboard busy')
+      m08BrowserClipboardText = text
+    },
+    stageImage: async () => {
+      throw new Error('M08 browser clipboard does not provide bitmap data')
+    },
+    readImageBytes: async () => {
+      throw new Error('M08 browser clipboard does not provide image bytes')
+    },
+  }
 }
 
 async function refreshPlatformCapabilities(): Promise<void> {
@@ -309,6 +393,7 @@ async function loadPersistedDocument(): Promise<boolean> {
       created.openInitial(incoming)
       documentCoordinator.value = created
     }
+    installM08HarnessFacade()
     if (m03Harness) {
       window.__cuteScreenE2eDocument = {
         setCrop: () => {
@@ -385,7 +470,7 @@ function loadM05HarnessImage(
       { once: true },
     )
     image.src = `data:image/svg+xml,${encodeURIComponent(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="${dimensions.width}" height="${dimensions.height}"><rect width="100%" height="100%" fill="#273d5a"/></svg>`,
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${dimensions.width}" height="${dimensions.height}"><rect width="100%" height="100%" fill="#273d5a" fill-opacity="${m08SourceAlpha / 255}"/></svg>`,
     )}`
   })
 }
@@ -394,7 +479,9 @@ async function mountM05HarnessDocument(): Promise<void> {
   const hash = 'f'.repeat(64)
   const dimensions = m05ViewportHarness
     ? { width: 2560, height: 1440 }
-    : { width: 160, height: 120 }
+    : m08Harness
+      ? { width: 400, height: 300 }
+      : { width: 160, height: 120 }
   const document: EditorDocumentV1 = {
     schemaVersion: 7,
     id: '019c1f62-058e-7000-8000-000000000005',
@@ -408,7 +495,7 @@ async function mountM05HarnessDocument(): Promise<void> {
       color: { colorSpace: 'srgb', hasIccProfile: false },
     },
     canvas: dimensions,
-    crop: { x: 20, y: 15, width: 100, height: 80 },
+    crop: m08Harness ? null : { x: 20, y: 15, width: 100, height: 80 },
     layers: [
       {
         id: '019c1f62-058e-7000-8000-000000000101',
@@ -507,7 +594,11 @@ async function mountM05HarnessDocument(): Promise<void> {
     snapshot: () => documentSession.value?.snapshot.core.document,
     versionToken: () => documentSession.value?.snapshot.core.versionToken,
   }
-  sourceImage.value = await loadM05HarnessImage(dimensions)
+  sourceImage.value = m08SourceNotReady
+    ? undefined
+    : await loadM05HarnessImage(dimensions)
+  installM08BrowserClipboardBridge()
+  installM08HarnessFacade()
 }
 
 /** Shares the native outcome event and the command response for one capture. */
@@ -665,6 +756,7 @@ onMounted(() => {
       textureBridge.value = tauriDesktopBridge
       contentImageBridge.value = tauriDesktopBridge
       clipboardBridge.value = tauriDesktopBridge
+      installM08HarnessFacade()
       if (import.meta.env.VITE_TEST_HARNESS !== 'true') {
         try {
           systemFonts.value =

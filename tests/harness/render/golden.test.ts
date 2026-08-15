@@ -114,8 +114,12 @@ function scene(dpr: 1 | 2) {
 async function canvas2dPngs(
   snapshot: RenderSceneSnapshot,
   dpr: 1 | 2,
+  exportScale = 1,
 ): Promise<Readonly<{ preview: Uint8Array; exported: Uint8Array }>> {
-  const sceneCanvas = createCanvas(snapshot.width, snapshot.height)
+  const sceneCanvas = createCanvas(
+    snapshot.outputBounds.width,
+    snapshot.outputBounds.height,
+  )
   const renderer = new Canvas2DRenderer({
     exportCanvas: (width, height) =>
       createCanvas(width, height) as unknown as Canvas2DLike,
@@ -125,8 +129,8 @@ async function canvas2dPngs(
   await renderer.initialize({
     scene: sceneCanvas as unknown as HTMLCanvasElement,
     overlay: createCanvas(
-      snapshot.width,
-      snapshot.height,
+      snapshot.outputBounds.width,
+      snapshot.outputBounds.height,
     ) as unknown as HTMLCanvasElement,
     dpr,
     correlationId: `golden-canvas2d-dpr-${dpr}`,
@@ -134,9 +138,174 @@ async function canvas2dPngs(
   renderer.setScene(snapshot)
   renderer.render(['scene'])
   const preview = await sceneCanvas.encode('png')
-  const exported = await renderer.exportPng()
+  const exported = await renderer.exportPng({ scale: exportScale })
   renderer.dispose()
   return { preview, exported }
+}
+
+function precisionScene(): RenderSceneSnapshot {
+  const nodes: RenderSceneSnapshot['nodes'][number][] = [
+    {
+      kind: 'rect',
+      id: 'precision-background',
+      x: 0,
+      y: 0,
+      width: 240,
+      height: 160,
+      rotation: 0,
+      opacity: 1,
+      visible: true,
+      fill: { red: 0.94, green: 0.95, blue: 0.98, alpha: 1 },
+    },
+  ]
+  for (let index = 0; index < 24; index += 1) {
+    nodes.push({
+      kind: 'rect',
+      id: `precision-stripe-${index}`,
+      x: index * 10,
+      y: 8,
+      width: 10,
+      height: 54,
+      rotation: 0,
+      opacity: 1,
+      visible: true,
+      fill:
+        index % 2 === 0
+          ? { red: 0.94, green: 0.24, blue: 0.18, alpha: 1 }
+          : { red: 0.1, green: 0.42, blue: 0.92, alpha: 1 },
+    })
+  }
+  nodes.push(
+    {
+      kind: 'censor',
+      id: 'precision-pixelate',
+      region: { kind: 'rectangle', x: 16, y: 16, width: 56, height: 36 },
+      effect: { mode: 'pixelate', blockSize: 12 },
+      sampleSource: 'compositeBelow',
+      rotation: 0,
+      opacity: 1,
+      visible: true,
+    },
+    {
+      kind: 'censor',
+      id: 'precision-blur',
+      region: { kind: 'rectangle', x: 88, y: 16, width: 56, height: 36 },
+      effect: { mode: 'blur', strength: 7 },
+      sampleSource: 'compositeBelow',
+      rotation: 0,
+      opacity: 1,
+      visible: true,
+    },
+    {
+      kind: 'censor',
+      id: 'precision-solid',
+      region: { kind: 'rectangle', x: 160, y: 16, width: 56, height: 36 },
+      effect: {
+        mode: 'solid',
+        color: { red: 0.1, green: 0.12, blue: 0.18, alpha: 1 },
+      },
+      sampleSource: 'compositeBelow',
+      rotation: 0,
+      opacity: 1,
+      visible: true,
+    },
+    {
+      kind: 'spotlight',
+      id: 'precision-spotlight',
+      aperture: {
+        shape: 'ellipse',
+        x: 18,
+        y: 78,
+        width: 76,
+        height: 54,
+      },
+      dimColor: { red: 0.02, green: 0.04, blue: 0.08, alpha: 1 },
+      dimOpacity: 0.28,
+      feather: 'soft',
+      rotation: 0,
+      opacity: 1,
+      visible: true,
+    },
+    {
+      kind: 'loupe',
+      id: 'precision-loupe',
+      sourceRegion: { x: 16, y: 16, width: 32, height: 32 },
+      lens: { shape: 'circle', x: 124, y: 78, size: 64 },
+      zoom: 2,
+      border: {
+        color: { red: 1, green: 0.78, blue: 0.18, alpha: 1 },
+        width: 4,
+      },
+      shadow: {
+        color: { red: 0, green: 0, blue: 0, alpha: 0.45 },
+        offsetX: 3,
+        offsetY: 5,
+        blur: 8,
+      },
+      sampleSource: 'compositeBelow',
+      rotation: 0,
+      opacity: 1,
+      visible: true,
+    },
+    {
+      kind: 'ruler',
+      id: 'precision-ruler-horizontal',
+      x1: 112,
+      y1: 70,
+      x2: 214,
+      y2: 70,
+      length: 102,
+      angleDegrees: 0,
+      percent: 35.363,
+      percentBasis: 'canvasDiagonal',
+      unit: 'pixels',
+      label: '102 px',
+      color: { red: 227 / 255, green: 72 / 255, blue: 143 / 255, alpha: 1 },
+      thickness: 2,
+      fontSize: 14,
+      rotation: 0,
+      opacity: 1,
+      visible: true,
+    },
+    {
+      kind: 'ruler',
+      id: 'precision-ruler',
+      x1: 56,
+      y1: 146,
+      x2: 144,
+      y2: 106,
+      length: 96.664_367,
+      angleDegrees: -24.443_955,
+      percent: 33.515,
+      percentBasis: 'canvasDiagonal',
+      unit: 'pixels',
+      label: '97 px',
+      color: { red: 227 / 255, green: 72 / 255, blue: 143 / 255, alpha: 1 },
+      thickness: 3,
+      fontSize: 16,
+      rotation: 0,
+      opacity: 1,
+      visible: true,
+    },
+    {
+      kind: 'rect',
+      id: 'precision-higher-layer',
+      x: 42,
+      y: 26,
+      width: 10,
+      height: 10,
+      rotation: 0,
+      opacity: 1,
+      visible: true,
+      fill: { red: 0.1, green: 0.82, blue: 0.3, alpha: 1 },
+    },
+  )
+  return createRenderSceneSnapshot({
+    width: 240,
+    height: 160,
+    outputBounds: { x: 24, y: 8, width: 208, height: 144 },
+    nodes,
+  })
 }
 
 const arrowCaps = [
@@ -698,6 +867,44 @@ describe('renderer golden harness self-test', () => {
       semanticParityTolerance.maximumDelta,
     )
   })
+
+  for (const exportScale of [1, 2] as const) {
+    it(`matches cropped M08 precision goldens at export scale ${exportScale}`, async () => {
+      const snapshot = precisionScene()
+      const canvasKitPng = renderHeadlessCanvasKitPng(
+        canvasKit,
+        snapshot,
+        canvasKitFonts,
+        { scale: exportScale },
+      )
+      const fallback = await canvas2dPngs(snapshot, 1, exportScale)
+      await assertGolden(
+        `precision-m08-scale-${exportScale}-canvaskit`,
+        canvasKitPng,
+      )
+      await assertGolden(
+        `precision-m08-scale-${exportScale}-canvas2d`,
+        fallback.exported,
+      )
+
+      const outputPixels =
+        Math.round(snapshot.outputBounds.width * exportScale) *
+        Math.round(snapshot.outputBounds.height * exportScale)
+      const difference = compareRgba(
+        await rgba(canvasKitPng),
+        await rgba(fallback.exported),
+        24,
+      )
+      // Canvas2D uses a deterministic box blur while CanvasKit uses its
+      // Gaussian image filter. Solid areas and sampling order are asserted by
+      // focused pixel tests; this broader visual comparison allows their edge
+      // kernels and native ruler glyph rasterizers to differ honestly.
+      expect(difference.changedChannels / (outputPixels * 4)).toBeLessThan(0.09)
+      expect(difference.maximumDelta).toBeLessThanOrEqual(
+        semanticParityTolerance.maximumDelta,
+      )
+    })
+  }
 
   it('rejects the deterministic corrupted PNG fixture', async () => {
     await expect(

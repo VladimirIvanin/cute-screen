@@ -1,7 +1,11 @@
 import type {
+  RenderCensorNode,
+  RenderLoupeNode,
   RenderNode,
   RenderPaint,
+  RenderRulerNode,
   RenderSceneSnapshot,
+  RenderSpotlightNode,
   RenderTextStyle,
   RgbaColor,
 } from '@cute-screen/editor-core'
@@ -9,16 +13,30 @@ import type {
 import type { InvalidationReason } from './scheduler'
 import { drawNodes2D } from './canvas2d'
 import { layoutRichText } from './rich-text-layout'
+import {
+  formatRulerDisplayLabel,
+  intersectPixelRects,
+  loupeConnectorGeometry,
+  rulerBadgeBox,
+  rulerBadgePalette,
+  rulerBadgeRotationDegrees,
+  rulerEndpointTickHalfLength,
+  rulerWorldEndpoints,
+  scaledOutputSize,
+  spotlightFeatherWidth,
+} from './precision-rendering'
 import type {
   CanvasStack,
   FrameMetric,
   ImageResource,
   ImageResourceInput,
   Renderer,
+  RenderExportOptions,
 } from './types'
 
 interface CanvasKitImageResource extends ImageResource {
-  readonly image: CanvasKitImage
+  readonly source: ImageResourceInput['source']
+  image: CanvasKitImage
 }
 
 interface CanvasKitDeletable {
@@ -41,11 +59,13 @@ interface CanvasKitPaint extends CanvasKitDeletable {
   setShader(shader: CanvasKitShader | null): void
   setPathEffect(effect: CanvasKitPathEffect | null): void
   setMaskFilter?(filter: CanvasKitMaskFilter | null): void
+  setImageFilter?(filter: CanvasKitImageFilter | null): void
 }
 
 type CanvasKitShader = CanvasKitDeletable
 type CanvasKitPathEffect = CanvasKitDeletable
 type CanvasKitMaskFilter = CanvasKitDeletable
+type CanvasKitImageFilter = CanvasKitDeletable
 type CanvasKitPath = CanvasKitDeletable
 interface CanvasKitTypeface extends CanvasKitDeletable {
   getGlyphIDs?(text: string): Uint16Array | null
@@ -69,6 +89,8 @@ interface CanvasKitPathBuilder extends CanvasKitDeletable {
     endY: number,
   ): void
   close(): void
+  addOval?(oval: Float32Array, isCounterClockwise?: boolean): void
+  addRect?(rect: Float32Array, isCounterClockwise?: boolean): void
   detach(): CanvasKitPath
 }
 
@@ -107,6 +129,16 @@ interface CanvasKitCanvas {
     paint: CanvasKitPaint,
     fastSample?: boolean,
   ): void
+  drawImageRectOptions?(
+    image: CanvasKitImage,
+    source: Float32Array,
+    destination: Float32Array,
+    filter: unknown,
+    mipmap: unknown,
+    paint?: CanvasKitPaint | null,
+  ): void
+  clipPath?(path: CanvasKitPath, op: unknown, antiAlias: boolean): void
+  clipRect?(rect: Float32Array, op: unknown, antiAlias: boolean): void
   clipRRect?(rrect: Float32Array, op?: unknown, antiAlias?: boolean): void
   drawRRect?(rrect: Float32Array, paint: CanvasKitPaint): void
   drawPicture?(picture: CanvasKitPicture): void
@@ -160,6 +192,7 @@ export interface CanvasKitApi {
   readonly PaintStyle: Readonly<{ Fill: unknown; Stroke: unknown }>
   readonly BlendMode: Readonly<{
     SrcOver: unknown
+    Src?: unknown
     Multiply: unknown
     Screen: unknown
     Overlay: unknown
@@ -179,7 +212,7 @@ export interface CanvasKitApi {
     Bevel: unknown
   }>
   readonly TileMode: Readonly<{ Clamp: unknown; Repeat?: unknown }>
-  readonly FilterMode?: Readonly<{ Linear?: unknown }>
+  readonly FilterMode?: Readonly<{ Linear?: unknown; Nearest?: unknown }>
   readonly MipmapMode?: Readonly<{ None?: unknown }>
   readonly Shader: Readonly<{
     MakeLinearGradient(
@@ -207,8 +240,16 @@ export interface CanvasKitApi {
       respectCTM: boolean,
     ): CanvasKitMaskFilter
   }>
+  readonly ImageFilter?: Readonly<{
+    MakeBlur(
+      sigmaX: number,
+      sigmaY: number,
+      tileMode: unknown,
+      input: CanvasKitImageFilter | null,
+    ): CanvasKitImageFilter
+  }>
   readonly BlurStyle?: Readonly<{ Normal: unknown }>
-  readonly ClipOp?: Readonly<{ Intersect?: unknown }>
+  readonly ClipOp?: Readonly<{ Intersect?: unknown; Difference?: unknown }>
   readonly ImageFormat: Readonly<{ PNG: unknown }>
   readonly TRANSPARENT: unknown
   readonly PictureRecorder?: new () => CanvasKitPictureRecorder
@@ -429,6 +470,25 @@ function withTransform(
   }
   draw()
   canvas.restore()
+}
+
+/** Leaves the device-space clip created under a layer transform in place while
+ * returning drawing coordinates to the parent scene transform. */
+function cancelNodeTransform(
+  canvas: CanvasKitCanvas,
+  node: RenderNode,
+  centerX: number,
+  centerY: number,
+): void {
+  const originX = node.transformOriginX ?? centerX
+  const originY = node.transformOriginY ?? centerY
+  const scaleX = node.scaleX ?? 1
+  const scaleY = node.scaleY ?? 1
+  if (node.rotation === 0 && scaleX === 1 && scaleY === 1) return
+  canvas.translate(originX, originY)
+  canvas.scale(1 / scaleX, 1 / scaleY)
+  canvas.rotate(-node.rotation, 0, 0)
+  canvas.translate(-originX, -originY)
 }
 
 function roundedRectPath(
@@ -665,6 +725,623 @@ class CanvasKitTypefaceStore {
   dispose(): void {
     for (const typeface of this.#typefaces.values()) typeface.delete()
     this.#typefaces.clear()
+  }
+}
+
+function censorPath(
+  canvasKit: CanvasKitApi,
+  node: RenderCensorNode,
+): CanvasKitPath {
+  const builder = new canvasKit.PathBuilder()
+  if (node.region.kind === 'rectangle') {
+    builder.moveTo(node.region.x, node.region.y)
+    builder.lineTo(node.region.x + node.region.width, node.region.y)
+    builder.lineTo(
+      node.region.x + node.region.width,
+      node.region.y + node.region.height,
+    )
+    builder.lineTo(node.region.x, node.region.y + node.region.height)
+  } else {
+    const first = node.region.points[0]!
+    builder.moveTo(first.x, first.y)
+    for (const point of node.region.points.slice(1)) {
+      builder.lineTo(point.x, point.y)
+    }
+  }
+  builder.close()
+  const path = builder.detach()
+  builder.delete()
+  return path
+}
+
+function spotlightPath(
+  canvasKit: CanvasKitApi,
+  node: RenderSpotlightNode,
+): CanvasKitPath {
+  const aperture = node.aperture
+  const builder = new canvasKit.PathBuilder()
+  if (aperture.shape === 'ellipse') {
+    if (builder.addOval) {
+      builder.addOval(
+        canvasKit.XYWHRect(
+          aperture.x,
+          aperture.y,
+          aperture.width,
+          aperture.height,
+        ),
+      )
+    } else {
+      const centerX = aperture.x + aperture.width / 2
+      const centerY = aperture.y + aperture.height / 2
+      const radiusX = aperture.width / 2
+      const radiusY = aperture.height / 2
+      const kappa = 0.552_284_75
+      builder.moveTo(centerX + radiusX, centerY)
+      builder.cubicTo(
+        centerX + radiusX,
+        centerY + radiusY * kappa,
+        centerX + radiusX * kappa,
+        centerY + radiusY,
+        centerX,
+        centerY + radiusY,
+      )
+      builder.cubicTo(
+        centerX - radiusX * kappa,
+        centerY + radiusY,
+        centerX - radiusX,
+        centerY + radiusY * kappa,
+        centerX - radiusX,
+        centerY,
+      )
+      builder.cubicTo(
+        centerX - radiusX,
+        centerY - radiusY * kappa,
+        centerX - radiusX * kappa,
+        centerY - radiusY,
+        centerX,
+        centerY - radiusY,
+      )
+      builder.cubicTo(
+        centerX + radiusX * kappa,
+        centerY - radiusY,
+        centerX + radiusX,
+        centerY - radiusY * kappa,
+        centerX + radiusX,
+        centerY,
+      )
+      builder.close()
+    }
+  } else {
+    const points =
+      aperture.shape === 'diamond'
+        ? [
+            [aperture.x + aperture.width / 2, aperture.y],
+            [aperture.x + aperture.width, aperture.y + aperture.height / 2],
+            [aperture.x + aperture.width / 2, aperture.y + aperture.height],
+            [aperture.x, aperture.y + aperture.height / 2],
+          ]
+        : [
+            [aperture.x, aperture.y],
+            [aperture.x + aperture.width, aperture.y],
+            [aperture.x + aperture.width, aperture.y + aperture.height],
+            [aperture.x, aperture.y + aperture.height],
+          ]
+    builder.moveTo(points[0]![0]!, points[0]![1]!)
+    for (const point of points.slice(1)) builder.lineTo(point[0]!, point[1]!)
+    builder.close()
+  }
+  const path = builder.detach()
+  builder.delete()
+  return path
+}
+
+function loupePath(
+  canvasKit: CanvasKitApi,
+  node: RenderLoupeNode,
+): CanvasKitPath {
+  const builder = new canvasKit.PathBuilder()
+  if (node.lens.shape === 'circle' && builder.addOval) {
+    builder.addOval(
+      canvasKit.XYWHRect(
+        node.lens.x,
+        node.lens.y,
+        node.lens.size,
+        node.lens.size,
+      ),
+    )
+  } else {
+    const x = node.lens.x
+    const y = node.lens.y
+    const edgeX = x + node.lens.size
+    const edgeY = y + node.lens.size
+    builder.moveTo(x, y)
+    builder.lineTo(edgeX, y)
+    builder.lineTo(edgeX, edgeY)
+    builder.lineTo(x, edgeY)
+    builder.close()
+  }
+  const path = builder.detach()
+  builder.delete()
+  return path
+}
+
+function drawSnapshotCanvasKit(
+  canvasKit: CanvasKitApi,
+  canvas: CanvasKitCanvas,
+  image: CanvasKitImage,
+  source: Float32Array,
+  destination: Float32Array,
+  paint: CanvasKitPaint,
+  nearest = false,
+): void {
+  if (canvas.drawImageRectOptions && canvasKit.FilterMode) {
+    canvas.drawImageRectOptions(
+      image,
+      source,
+      destination,
+      nearest
+        ? (canvasKit.FilterMode.Nearest ?? canvasKit.FilterMode.Linear)
+        : canvasKit.FilterMode.Linear,
+      canvasKit.MipmapMode?.None,
+      paint,
+    )
+    return
+  }
+  canvas.drawImageRect(image, source, destination, paint, nearest)
+}
+
+function drawCensorCanvasKit(
+  canvasKit: CanvasKitApi,
+  surface: CanvasKitSurface,
+  canvas: CanvasKitCanvas,
+  scene: RenderSceneSnapshot,
+  node: RenderCensorNode,
+  scale: number,
+): void {
+  const path = censorPath(canvasKit, node)
+  const paint = new canvasKit.Paint()
+  const center =
+    node.region.kind === 'rectangle'
+      ? {
+          x: node.region.x + node.region.width / 2,
+          y: node.region.y + node.region.height / 2,
+        }
+      : {
+          x:
+            node.region.points.reduce((sum, point) => sum + point.x, 0) /
+            node.region.points.length,
+          y:
+            node.region.points.reduce((sum, point) => sum + point.y, 0) /
+            node.region.points.length,
+        }
+  try {
+    if (node.effect.mode === 'solid') {
+      withTransform(canvas, node, center.x, center.y, () => {
+        configurePaint(
+          canvasKit,
+          paint,
+          node.effect.mode === 'solid'
+            ? node.effect.color
+            : { red: 0, green: 0, blue: 0, alpha: 0 },
+          node.opacity,
+          'fill',
+        )
+        paint.setBlendMode(blendMode(canvasKit, node.blendMode))
+        canvas.drawPath(path, paint)
+      })
+      return
+    }
+
+    surface.flush()
+    const below = surface.makeImageSnapshot()
+    try {
+      paint.setAntiAlias(false)
+      paint.setColorComponents(1, 1, 1, node.opacity)
+      paint.setBlendMode(blendMode(canvasKit, node.blendMode))
+      if (node.effect.mode === 'blur') {
+        const filter = canvasKit.ImageFilter?.MakeBlur(
+          Math.max(0.5, (node.effect.strength * scale) / 2),
+          Math.max(0.5, (node.effect.strength * scale) / 2),
+          canvasKit.TileMode.Clamp,
+          null,
+        )
+        try {
+          paint.setImageFilter?.(filter ?? null)
+          withTransform(canvas, node, center.x, center.y, () => {
+            canvas.clipPath?.(path, canvasKit.ClipOp?.Intersect, true)
+            cancelNodeTransform(canvas, node, center.x, center.y)
+            drawSnapshotCanvasKit(
+              canvasKit,
+              canvas,
+              below,
+              canvasKit.XYWHRect(
+                0,
+                0,
+                scene.width * scale,
+                scene.height * scale,
+              ),
+              canvasKit.XYWHRect(0, 0, scene.width, scene.height),
+              paint,
+            )
+          })
+        } finally {
+          paint.setImageFilter?.(null)
+          filter?.delete()
+        }
+      } else {
+        const effect = node.effect
+        withTransform(canvas, node, center.x, center.y, () => {
+          canvas.clipPath?.(path, canvasKit.ClipOp?.Intersect, false)
+          cancelNodeTransform(canvas, node, center.x, center.y)
+          for (let y = 0; y < scene.height; y += effect.blockSize) {
+            for (let x = 0; x < scene.width; x += effect.blockSize) {
+              const width = Math.min(effect.blockSize, scene.width - x)
+              const height = Math.min(effect.blockSize, scene.height - y)
+              const sampleX =
+                Math.min(scene.width - 0.5, x + effect.blockSize / 2) * scale
+              const sampleY =
+                Math.min(scene.height - 0.5, y + effect.blockSize / 2) * scale
+              drawSnapshotCanvasKit(
+                canvasKit,
+                canvas,
+                below,
+                canvasKit.XYWHRect(sampleX, sampleY, 1, 1),
+                canvasKit.XYWHRect(x, y, width, height),
+                paint,
+                true,
+              )
+            }
+          }
+        })
+      }
+    } finally {
+      below.delete()
+    }
+  } finally {
+    paint.delete()
+    path.delete()
+  }
+}
+
+function drawSpotlightCanvasKit(
+  canvasKit: CanvasKitApi,
+  surface: CanvasKitSurface,
+  canvas: CanvasKitCanvas,
+  scene: RenderSceneSnapshot,
+  node: RenderSpotlightNode,
+  scale: number,
+): void {
+  surface.flush()
+  const below = surface.makeImageSnapshot()
+  const path = spotlightPath(canvasKit, node)
+  const paint = new canvasKit.Paint()
+  const centerX = node.aperture.x + node.aperture.width / 2
+  const centerY = node.aperture.y + node.aperture.height / 2
+  let featherFilter: CanvasKitMaskFilter | undefined
+  try {
+    configurePaint(
+      canvasKit,
+      paint,
+      node.dimColor,
+      node.opacity * node.dimOpacity,
+      'fill',
+    )
+    paint.setBlendMode(blendMode(canvasKit, node.blendMode))
+    canvas.drawRect(canvasKit.XYWHRect(0, 0, scene.width, scene.height), paint)
+
+    withTransform(canvas, node, centerX, centerY, () => {
+      canvas.clipPath?.(path, canvasKit.ClipOp?.Intersect, true)
+      cancelNodeTransform(canvas, node, centerX, centerY)
+      paint.setColorComponents(1, 1, 1, 1)
+      paint.setBlendMode(canvasKit.BlendMode.Src ?? canvasKit.BlendMode.SrcOver)
+      drawSnapshotCanvasKit(
+        canvasKit,
+        canvas,
+        below,
+        canvasKit.XYWHRect(0, 0, scene.width * scale, scene.height * scale),
+        canvasKit.XYWHRect(0, 0, scene.width, scene.height),
+        paint,
+      )
+    })
+
+    const feather = spotlightFeatherWidth(node.feather)
+    if (feather > 0) {
+      configurePaint(
+        canvasKit,
+        paint,
+        node.dimColor,
+        node.opacity * node.dimOpacity * 0.8,
+        'stroke',
+        feather * 0.9,
+      )
+      paint.setBlendMode(blendMode(canvasKit, node.blendMode))
+      if (canvasKit.MaskFilter && canvasKit.BlurStyle && paint.setMaskFilter) {
+        featherFilter = canvasKit.MaskFilter.MakeBlur(
+          canvasKit.BlurStyle.Normal,
+          Math.max(0.5, feather / 2),
+          true,
+        )
+        paint.setMaskFilter(featherFilter)
+      }
+      withTransform(canvas, node, centerX, centerY, () => {
+        canvas.drawPath(path, paint)
+      })
+    }
+  } finally {
+    paint.setMaskFilter?.(null)
+    featherFilter?.delete()
+    paint.delete()
+    path.delete()
+    below.delete()
+  }
+}
+
+function drawRulerCanvasKit(
+  canvasKit: CanvasKitApi,
+  canvas: CanvasKitCanvas,
+  node: RenderRulerNode,
+  typefaces?: CanvasKitTypefaceStore,
+): void {
+  const stroke = new canvasKit.Paint()
+  const fill = new canvasKit.Paint()
+  const centerX = (node.x1 + node.x2) / 2
+  const centerY = (node.y1 + node.y2) / 2
+  const label = formatRulerDisplayLabel(node)
+  try {
+    withTransform(canvas, node, centerX, centerY, () => {
+      const dx = node.x2 - node.x1
+      const dy = node.y2 - node.y1
+      const length = Math.hypot(dx, dy)
+      const perpendicular = { x: -dy / length, y: dx / length }
+      const tickHalf = rulerEndpointTickHalfLength(node.thickness)
+      configurePaint(
+        canvasKit,
+        stroke,
+        node.color,
+        node.opacity,
+        'stroke',
+        node.thickness,
+      )
+      stroke.setStrokeCap(canvasKit.StrokeCap.Butt)
+      stroke.setBlendMode(blendMode(canvasKit, node.blendMode))
+      canvas.drawLine(node.x1, node.y1, node.x2, node.y2, stroke)
+      for (const endpoint of [
+        { x: node.x1, y: node.y1 },
+        { x: node.x2, y: node.y2 },
+      ]) {
+        canvas.drawLine(
+          endpoint.x - perpendicular.x * tickHalf,
+          endpoint.y - perpendicular.y * tickHalf,
+          endpoint.x + perpendicular.x * tickHalf,
+          endpoint.y + perpendicular.y * tickHalf,
+          stroke,
+        )
+      }
+    })
+    if (!canvasKit.Font || !canvas.drawText) return
+    const resolved = typefaces?.resolve('Roboto', label)
+    const fallback = resolved
+      ? undefined
+      : (canvasKit.Typeface?.MakeDefault?.() ??
+        canvasKit.Typeface?.GetDefault?.())
+    const typeface = resolved?.typeface ?? fallback
+    if (!typeface) return
+    const font = new canvasKit.Font(typeface, node.fontSize)
+    font.setEmbolden?.(true)
+    try {
+      const labelWidth = canvasKitTextWidth(font, label, node.fontSize)
+      const badge = rulerBadgeBox(labelWidth, node.fontSize)
+      const palette = rulerBadgePalette(node.color)
+      const badgeRect = canvasKit.XYWHRect(
+        -badge.width / 2,
+        -badge.height / 2,
+        badge.width,
+        badge.height,
+      )
+      const rounded = canvasKit.RRectXY(badgeRect, badge.radius, badge.radius)
+      const endpoints = rulerWorldEndpoints(node)
+      const badgeCenterX = (endpoints.start.x + endpoints.end.x) / 2
+      const badgeCenterY = (endpoints.start.y + endpoints.end.y) / 2
+      canvas.save()
+      try {
+        canvas.translate(badgeCenterX, badgeCenterY)
+        canvas.rotate(rulerBadgeRotationDegrees(node), 0, 0)
+        configurePaint(
+          canvasKit,
+          fill,
+          palette.background,
+          node.opacity,
+          'fill',
+        )
+        fill.setBlendMode(blendMode(canvasKit, node.blendMode))
+        if (canvas.drawRRect) canvas.drawRRect(rounded, fill)
+        else canvas.drawRect(badgeRect, fill)
+        configurePaint(canvasKit, stroke, node.color, node.opacity, 'stroke', 1)
+        stroke.setStrokeCap(canvasKit.StrokeCap.Butt)
+        stroke.setBlendMode(blendMode(canvasKit, node.blendMode))
+        if (canvas.drawRRect) canvas.drawRRect(rounded, stroke)
+        else canvas.drawRect(badgeRect, stroke)
+        configurePaint(canvasKit, fill, palette.text, node.opacity, 'fill')
+        fill.setBlendMode(blendMode(canvasKit, node.blendMode))
+        const baseline = resolveCanvasKitVisualCenterBaseline(
+          font,
+          label,
+          -badge.height / 2,
+          badge.height,
+          node.fontSize,
+          node.fontSize,
+        )
+        canvas.drawText(label, -labelWidth / 2, baseline, fill, font)
+      } finally {
+        canvas.restore()
+      }
+    } finally {
+      font.delete()
+      fallback?.delete()
+    }
+  } finally {
+    fill.delete()
+    stroke.delete()
+  }
+}
+
+function drawLoupeCanvasKit(
+  canvasKit: CanvasKitApi,
+  surface: CanvasKitSurface,
+  canvas: CanvasKitCanvas,
+  scene: RenderSceneSnapshot,
+  node: RenderLoupeNode,
+  scale: number,
+): void {
+  surface.flush()
+  const below = surface.makeImageSnapshot()
+  const path = loupePath(canvasKit, node)
+  const paint = new canvasKit.Paint()
+  const radius = node.lens.size / 2
+  const centerX = node.lens.x + radius
+  const centerY = node.lens.y + radius
+  const connector = loupeConnectorGeometry(node)
+  let shadowFilter: CanvasKitMaskFilter | undefined
+  try {
+    if (connector) {
+      configurePaint(
+        canvasKit,
+        paint,
+        node.border.color,
+        node.opacity,
+        'stroke',
+        3,
+      )
+      paint.setBlendMode(blendMode(canvasKit, node.blendMode))
+      paint.setStrokeCap(canvasKit.StrokeCap.Round)
+      paint.setStrokeJoin(canvasKit.StrokeJoin.Round)
+      canvas.drawLine(
+        connector.lensCenter.x,
+        connector.lensCenter.y,
+        connector.lineEnd.x,
+        connector.lineEnd.y,
+        paint,
+      )
+      const arrowBuilder = new canvasKit.PathBuilder()
+      arrowBuilder.moveTo(connector.source.x, connector.source.y)
+      arrowBuilder.lineTo(connector.arrowLeft.x, connector.arrowLeft.y)
+      arrowBuilder.lineTo(connector.arrowRight.x, connector.arrowRight.y)
+      arrowBuilder.close()
+      const arrow = arrowBuilder.detach()
+      arrowBuilder.delete()
+      try {
+        configurePaint(
+          canvasKit,
+          paint,
+          node.border.color,
+          node.opacity,
+          'fill',
+        )
+        paint.setBlendMode(blendMode(canvasKit, node.blendMode))
+        canvas.drawPath(arrow, paint)
+      } finally {
+        arrow.delete()
+      }
+    }
+    withTransform(canvas, node, centerX, centerY, () => {
+      if (node.shadow) {
+        configurePaint(
+          canvasKit,
+          paint,
+          node.shadow.color,
+          node.opacity,
+          'stroke',
+          Math.max(1, node.border.width),
+        )
+        if (
+          canvasKit.MaskFilter &&
+          canvasKit.BlurStyle &&
+          paint.setMaskFilter
+        ) {
+          shadowFilter = canvasKit.MaskFilter.MakeBlur(
+            canvasKit.BlurStyle.Normal,
+            Math.max(0.5, node.shadow.blur / 2),
+            true,
+          )
+          paint.setMaskFilter(shadowFilter)
+        }
+        canvas.save()
+        canvas.translate(node.shadow.offsetX, node.shadow.offsetY)
+        canvas.drawPath(path, paint)
+        canvas.restore()
+        paint.setMaskFilter?.(null)
+      }
+
+      canvas.save()
+      canvas.clipPath?.(path, canvasKit.ClipOp?.Intersect, true)
+      paint.setAntiAlias(false)
+      paint.setColorComponents(0, 0, 0, 0)
+      paint.setBlendMode(canvasKit.BlendMode.Src)
+      canvas.drawRect(
+        canvasKit.XYWHRect(
+          node.lens.x,
+          node.lens.y,
+          node.lens.size,
+          node.lens.size,
+        ),
+        paint,
+      )
+      // The lens starts as transparent black; only its source/canvas intersection
+      // is populated from the frozen composite below.
+      const sourceIntersection = intersectPixelRects(node.sourceRegion, {
+        x: 0,
+        y: 0,
+        width: scene.width,
+        height: scene.height,
+      })
+      if (sourceIntersection) {
+        paint.setColorComponents(1, 1, 1, node.opacity)
+        paint.setBlendMode(blendMode(canvasKit, node.blendMode))
+        const destinationX =
+          node.lens.x + (sourceIntersection.x - node.sourceRegion.x) * node.zoom
+        const destinationY =
+          node.lens.y + (sourceIntersection.y - node.sourceRegion.y) * node.zoom
+        drawSnapshotCanvasKit(
+          canvasKit,
+          canvas,
+          below,
+          canvasKit.XYWHRect(
+            sourceIntersection.x * scale,
+            sourceIntersection.y * scale,
+            sourceIntersection.width * scale,
+            sourceIntersection.height * scale,
+          ),
+          canvasKit.XYWHRect(
+            destinationX,
+            destinationY,
+            sourceIntersection.width * node.zoom,
+            sourceIntersection.height * node.zoom,
+          ),
+          paint,
+          true,
+        )
+      }
+      canvas.restore()
+
+      if (node.border.width > 0) {
+        configurePaint(
+          canvasKit,
+          paint,
+          node.border.color,
+          node.opacity,
+          'stroke',
+          node.border.width,
+        )
+        paint.setBlendMode(blendMode(canvasKit, node.blendMode))
+        canvas.drawPath(path, paint)
+      }
+    })
+  } finally {
+    paint.setMaskFilter?.(null)
+    shadowFilter?.delete()
+    paint.delete()
+    path.delete()
+    below.delete()
   }
 }
 
@@ -994,6 +1671,15 @@ export function drawNodesCanvasKit(
           }
           break
         }
+        case 'ruler':
+          drawRulerCanvasKit(canvasKit, canvas, node, typefaces)
+          break
+        case 'censor':
+        case 'spotlight':
+        case 'loupe':
+          throw new Error(
+            `${node.kind} rendering requires an ordered CanvasKit surface`,
+          )
       }
     } finally {
       fill.delete()
@@ -1010,118 +1696,213 @@ function drawScene(
   scene: RenderSceneSnapshot,
   resources: ReadonlyMap<string, CanvasKitImageResource>,
   typefaces?: CanvasKitTypefaceStore,
+  scale = 1,
+  translateToOutput = false,
 ): void {
   const canvas = surface.getCanvas()
   canvas.clear(canvasKit.TRANSPARENT)
-  for (const node of scene.nodes) {
-    if (node.kind !== 'image') {
-      drawNodesCanvasKit(canvasKit, canvas, [node], resources, typefaces)
-      continue
+  canvas.save()
+  try {
+    canvas.scale(scale, scale)
+    if (translateToOutput) {
+      canvas.translate(-scene.outputBounds.x, -scene.outputBounds.y)
     }
-    if (!node.visible || node.opacity === 0) continue
-    const resource = resources.get(node.resourceId)
-    const fill = new canvasKit.Paint()
-    const stroke = new canvasKit.Paint()
-    try {
-      canvas.save()
-      canvas.translate(node.x, node.y)
-      canvas.rotate(node.rotation, 0, 0)
-      canvas.scale(node.scaleX, node.scaleY)
-      const bounds = canvasKit.XYWHRect(0, 0, node.width, node.height)
-      const rounded =
-        (node.cornerRadius ?? 0) > 0
-          ? canvasKit.RRectXY(
-              bounds,
-              node.cornerRadius ?? 0,
-              node.cornerRadius ?? 0,
-            )
-          : undefined
-      if (rounded) {
-        canvas.clipRRect?.(rounded, canvasKit.ClipOp?.Intersect, true)
+    for (const node of scene.nodes) {
+      if (!node.visible || node.opacity === 0) continue
+      if (node.kind === 'censor') {
+        drawCensorCanvasKit(canvasKit, surface, canvas, scene, node, scale)
+        continue
       }
-      if (resource) {
-        fill.setAntiAlias(true)
-        fill.setColorComponents(1, 1, 1, node.opacity)
-        fill.setBlendMode(blendMode(canvasKit, node.blendMode))
-        canvas.drawImageRect(
-          resource.image,
-          canvasKit.XYWHRect(0, 0, resource.width, resource.height),
-          bounds,
-          fill,
-          false,
-        )
-      } else {
-        configurePaint(
-          canvasKit,
-          fill,
-          { red: 0.72, green: 0.28, blue: 0.28, alpha: 0.16 },
-          node.opacity,
-          'fill',
-        )
-        configurePaint(
-          canvasKit,
-          stroke,
-          { red: 0.72, green: 0.28, blue: 0.28, alpha: 0.9 },
-          node.opacity,
-          'stroke',
-        )
-        if (rounded && canvas.drawRRect) {
-          canvas.drawRRect(rounded, fill)
-          canvas.drawRRect(rounded, stroke)
-        } else {
-          canvas.drawRect(bounds, fill)
-          canvas.drawRect(bounds, stroke)
+      if (node.kind === 'spotlight') {
+        drawSpotlightCanvasKit(canvasKit, surface, canvas, scene, node, scale)
+        continue
+      }
+      if (node.kind === 'ruler') {
+        drawRulerCanvasKit(canvasKit, canvas, node, typefaces)
+        continue
+      }
+      if (node.kind === 'loupe') {
+        drawLoupeCanvasKit(canvasKit, surface, canvas, scene, node, scale)
+        continue
+      }
+      if (node.kind !== 'image') {
+        drawNodesCanvasKit(canvasKit, canvas, [node], resources, typefaces)
+        continue
+      }
+      const resource = resources.get(node.resourceId)
+      const fill = new canvasKit.Paint()
+      const stroke = new canvasKit.Paint()
+      try {
+        canvas.save()
+        canvas.translate(node.x, node.y)
+        canvas.rotate(node.rotation, 0, 0)
+        canvas.scale(node.scaleX, node.scaleY)
+        const bounds = canvasKit.XYWHRect(0, 0, node.width, node.height)
+        const rounded =
+          (node.cornerRadius ?? 0) > 0
+            ? canvasKit.RRectXY(
+                bounds,
+                node.cornerRadius ?? 0,
+                node.cornerRadius ?? 0,
+              )
+            : undefined
+        if (rounded) {
+          canvas.clipRRect?.(rounded, canvasKit.ClipOp?.Intersect, true)
         }
+        if (resource) {
+          fill.setAntiAlias(true)
+          fill.setColorComponents(1, 1, 1, node.opacity)
+          fill.setBlendMode(blendMode(canvasKit, node.blendMode))
+          canvas.drawImageRect(
+            resource.image,
+            canvasKit.XYWHRect(0, 0, resource.width, resource.height),
+            bounds,
+            fill,
+            false,
+          )
+        } else {
+          configurePaint(
+            canvasKit,
+            fill,
+            { red: 0.72, green: 0.28, blue: 0.28, alpha: 0.16 },
+            node.opacity,
+            'fill',
+          )
+          configurePaint(
+            canvasKit,
+            stroke,
+            { red: 0.72, green: 0.28, blue: 0.28, alpha: 0.9 },
+            node.opacity,
+            'stroke',
+          )
+          if (rounded && canvas.drawRRect) {
+            canvas.drawRRect(rounded, fill)
+            canvas.drawRRect(rounded, stroke)
+          } else {
+            canvas.drawRect(bounds, fill)
+            canvas.drawRect(bounds, stroke)
+          }
+        }
+        if (node.stroke && (node.strokeWidth ?? 0) > 0) {
+          configurePaint(
+            canvasKit,
+            stroke,
+            node.stroke,
+            node.opacity,
+            'stroke',
+            node.strokeWidth ?? 1,
+          )
+          stroke.setStrokeJoin(
+            node.lineJoin === 'round'
+              ? canvasKit.StrokeJoin.Round
+              : node.lineJoin === 'bevel'
+                ? canvasKit.StrokeJoin.Bevel
+                : canvasKit.StrokeJoin.Miter,
+          )
+          if (rounded && canvas.drawRRect) canvas.drawRRect(rounded, stroke)
+          else canvas.drawRect(bounds, stroke)
+        }
+      } finally {
+        canvas.restore()
+        fill.delete()
+        stroke.delete()
       }
-      if (node.stroke && (node.strokeWidth ?? 0) > 0) {
-        configurePaint(
-          canvasKit,
-          stroke,
-          node.stroke,
-          node.opacity,
-          'stroke',
-          node.strokeWidth ?? 1,
-        )
-        stroke.setStrokeJoin(
-          node.lineJoin === 'round'
-            ? canvasKit.StrokeJoin.Round
-            : node.lineJoin === 'bevel'
-              ? canvasKit.StrokeJoin.Bevel
-              : canvasKit.StrokeJoin.Miter,
-        )
-        if (rounded && canvas.drawRRect) canvas.drawRRect(rounded, stroke)
-        else canvas.drawRect(bounds, stroke)
-      }
-    } finally {
-      canvas.restore()
-      fill.delete()
-      stroke.delete()
     }
+  } finally {
+    canvas.restore()
   }
   surface.flush()
+}
+
+function renderCanvasKitPng(
+  canvasKit: CanvasKitApi,
+  scene: RenderSceneSnapshot,
+  resources: ReadonlyMap<string, CanvasKitImageResource>,
+  typefaces: CanvasKitTypefaceStore,
+  options: RenderExportOptions = {},
+): Uint8Array {
+  const scale = options.scale ?? 1
+  const outputSize = scaledOutputSize(scene.outputBounds, scale)
+  const fullWidth = Math.max(1, Math.round(scene.width * scale))
+  const fullHeight = Math.max(1, Math.round(scene.height * scale))
+  const surface = canvasKit.MakeSurface(fullWidth, fullHeight)
+  if (!surface) throw new Error('CanvasKit headless surface creation failed')
+  try {
+    drawScene(canvasKit, surface, scene, resources, typefaces, scale)
+    const fullImage = surface.makeImageSnapshot()
+    try {
+      const fullOutput =
+        scene.outputBounds.x === 0 &&
+        scene.outputBounds.y === 0 &&
+        scene.outputBounds.width === scene.width &&
+        scene.outputBounds.height === scene.height
+      if (fullOutput) {
+        const bytes = fullImage.encodeToBytes(canvasKit.ImageFormat.PNG)
+        if (!bytes) throw new Error('CanvasKit PNG encoding failed')
+        return new Uint8Array(bytes)
+      }
+
+      const outputSurface = canvasKit.MakeSurface(
+        outputSize.width,
+        outputSize.height,
+      )
+      if (!outputSurface) {
+        throw new Error('CanvasKit cropped surface creation failed')
+      }
+      try {
+        const canvas = outputSurface.getCanvas()
+        canvas.clear(canvasKit.TRANSPARENT)
+        const paint = new canvasKit.Paint()
+        try {
+          paint.setAntiAlias(false)
+          paint.setColorComponents(1, 1, 1, 1)
+          drawSnapshotCanvasKit(
+            canvasKit,
+            canvas,
+            fullImage,
+            canvasKit.XYWHRect(
+              scene.outputBounds.x * scale,
+              scene.outputBounds.y * scale,
+              scene.outputBounds.width * scale,
+              scene.outputBounds.height * scale,
+            ),
+            canvasKit.XYWHRect(0, 0, outputSize.width, outputSize.height),
+            paint,
+          )
+        } finally {
+          paint.delete()
+        }
+        outputSurface.flush()
+        const outputImage = outputSurface.makeImageSnapshot()
+        try {
+          const bytes = outputImage.encodeToBytes(canvasKit.ImageFormat.PNG)
+          if (!bytes) throw new Error('CanvasKit PNG encoding failed')
+          return new Uint8Array(bytes)
+        } finally {
+          outputImage.delete()
+        }
+      } finally {
+        outputSurface.dispose()
+      }
+    } finally {
+      fullImage.delete()
+    }
+  } finally {
+    surface.dispose()
+  }
 }
 
 export function renderHeadlessCanvasKitPng(
   canvasKit: CanvasKitApi,
   scene: RenderSceneSnapshot,
   fontData: readonly CanvasKitFontData[] = [],
+  options: RenderExportOptions = {},
 ): Uint8Array {
-  const surface = canvasKit.MakeSurface(scene.width, scene.height)
-  if (!surface) throw new Error('CanvasKit headless surface creation failed')
   const typefaces = new CanvasKitTypefaceStore(canvasKit, fontData)
   try {
-    drawScene(canvasKit, surface, scene, new Map(), typefaces)
-    const image = surface.makeImageSnapshot()
-    try {
-      const bytes = image.encodeToBytes(canvasKit.ImageFormat.PNG)
-      if (!bytes) throw new Error('CanvasKit PNG encoding failed')
-      return new Uint8Array(bytes)
-    } finally {
-      image.delete()
-    }
+    return renderCanvasKitPng(canvasKit, scene, new Map(), typefaces, options)
   } finally {
     typefaces.dispose()
-    surface.dispose()
   }
 }
 
@@ -1151,39 +1932,38 @@ export class CanvasKitRenderer implements Renderer {
 
   async initialize(stack: CanvasStack): Promise<void> {
     this.#assertActive()
-    const surface = this.#canvasKit.MakeWebGLCanvasSurface(stack.scene)
-    if (!surface) throw new Error('CanvasKit WebGL surface creation failed')
-    // CanvasKit silently swaps the DOM canvas for a software surface when the
-    // GPU surface cannot be made. Runtime owns fallback explicitly so pointer
-    // listeners, telemetry and backend state stay coherent.
-    if (!stack.scene.isConnected) {
-      surface.dispose()
-      throw new Error(
-        'CanvasKit replaced the scene canvas with a software surface',
-      )
-    }
     this.#stack = stack
-    this.#surface = surface
     if (!stack.overlay.getContext('2d')) {
-      surface.dispose()
-      this.#surface = undefined
+      this.#stack = undefined
       throw new Error('Canvas2D overlay context is unavailable')
+    }
+    const bounds = this.#scene?.outputBounds
+    try {
+      this.#replaceSurface(
+        bounds?.width ?? Math.max(1, stack.scene.width),
+        bounds?.height ?? Math.max(1, stack.scene.height),
+      )
+    } catch (error) {
+      this.#stack = undefined
+      throw error
     }
   }
 
   async createImageResource(input: ImageResourceInput): Promise<ImageResource> {
     this.#assertReady(false)
+    this.#resources.get(input.id)?.dispose()
     const image = this.#surface!.makeImageFromTextureSource(input.source)
     if (!image) throw new Error(`CanvasKit texture load failed for ${input.id}`)
     const resource: CanvasKitImageResource = {
       id: input.id,
       width: input.width,
       height: input.height,
+      source: input.source,
       image,
       dispose: () => {
         if (this.#resources.delete(input.id)) {
           this.#disposePicture()
-          image.delete()
+          resource.image.delete()
         }
       },
     }
@@ -1196,6 +1976,9 @@ export class CanvasKitRenderer implements Renderer {
     this.#assertActive()
     this.#scene = scene
     if (this.#pictureScene !== scene) this.#disposePicture()
+    if (this.#stack) {
+      this.#replaceSurface(scene.outputBounds.width, scene.outputBounds.height)
+    }
   }
 
   setOverlay(nodes: readonly RenderNode[]): void {
@@ -1215,9 +1998,13 @@ export class CanvasKitRenderer implements Renderer {
     }
     if (reasons.includes('overlay') || reasons.includes('viewport')) {
       const overlay = this.#stack!.overlay
+      const bounds = this.#scene!.outputBounds
+      overlay.width = Math.max(1, Math.round(bounds.width))
+      overlay.height = Math.max(1, Math.round(bounds.height))
       const context = overlay.getContext('2d')!
       context.setTransform(1, 0, 0, 1, 0, 0)
       context.clearRect(0, 0, overlay.width, overlay.height)
+      context.setTransform(1, 0, 0, 1, -bounds.x, -bounds.y)
       drawNodes2D(context, this.#overlay)
     }
     return {
@@ -1230,23 +2017,15 @@ export class CanvasKitRenderer implements Renderer {
     }
   }
 
-  async exportPng(): Promise<Uint8Array> {
+  async exportPng(options: RenderExportOptions = {}): Promise<Uint8Array> {
     this.#assertReady()
-    drawScene(
+    return renderCanvasKitPng(
       this.#canvasKit,
-      this.#surface!,
       this.#scene!,
       this.#resources,
       this.#typefaces,
+      options,
     )
-    const image = this.#surface!.makeImageSnapshot()
-    try {
-      const bytes = image.encodeToBytes(this.#canvasKit.ImageFormat.PNG)
-      if (!bytes) throw new Error('CanvasKit PNG encoding failed')
-      return new Uint8Array(bytes)
-    } finally {
-      image.delete()
-    }
   }
 
   dispose(): void {
@@ -1267,6 +2046,62 @@ export class CanvasKitRenderer implements Renderer {
   }
 
   #drawCommittedScene(): void {
+    const scene = this.#scene!
+    const cropped =
+      scene.outputBounds.x !== 0 ||
+      scene.outputBounds.y !== 0 ||
+      scene.outputBounds.width !== scene.width ||
+      scene.outputBounds.height !== scene.height
+    if (cropped) {
+      const working = this.#canvasKit.MakeSurface(scene.width, scene.height)
+      if (!working) throw new Error('CanvasKit crop surface creation failed')
+      try {
+        drawScene(
+          this.#canvasKit,
+          working,
+          scene,
+          this.#resources,
+          this.#typefaces,
+        )
+        const image = working.makeImageSnapshot()
+        try {
+          const canvas = this.#surface!.getCanvas()
+          canvas.clear(this.#canvasKit.TRANSPARENT)
+          const paint = new this.#canvasKit.Paint()
+          try {
+            paint.setAntiAlias(false)
+            paint.setColorComponents(1, 1, 1, 1)
+            drawSnapshotCanvasKit(
+              this.#canvasKit,
+              canvas,
+              image,
+              this.#canvasKit.XYWHRect(
+                scene.outputBounds.x,
+                scene.outputBounds.y,
+                scene.outputBounds.width,
+                scene.outputBounds.height,
+              ),
+              this.#canvasKit.XYWHRect(
+                0,
+                0,
+                scene.outputBounds.width,
+                scene.outputBounds.height,
+              ),
+              paint,
+            )
+          } finally {
+            paint.delete()
+          }
+          this.#surface!.flush()
+        } finally {
+          image.delete()
+        }
+      } finally {
+        working.dispose()
+      }
+      return
+    }
+
     const canvas = this.#surface!.getCanvas()
     const picture = this.#pictureForScene()
     canvas.clear(this.#canvasKit.TRANSPARENT)
@@ -1289,6 +2124,20 @@ export class CanvasKitRenderer implements Renderer {
       return this.#picture
     const PictureRecorder = this.#canvasKit.PictureRecorder
     if (!PictureRecorder || !this.#scene) return undefined
+    const scene = this.#scene
+    const fullOutput =
+      scene.outputBounds.x === 0 &&
+      scene.outputBounds.y === 0 &&
+      scene.outputBounds.width === scene.width &&
+      scene.outputBounds.height === scene.height
+    if (
+      !fullOutput ||
+      scene.nodes.some((node) =>
+        ['censor', 'spotlight', 'loupe'].includes(node.kind),
+      )
+    ) {
+      return undefined
+    }
     const recorder = new PictureRecorder()
     try {
       const recording = recorder.beginRecording(
@@ -1403,6 +2252,76 @@ export class CanvasKitRenderer implements Renderer {
     this.#picture?.delete()
     this.#picture = undefined
     this.#pictureScene = undefined
+  }
+
+  #replaceSurface(width: number, height: number): void {
+    const stack = this.#stack
+    if (!stack) return
+    const targetWidth = Math.max(1, Math.round(width))
+    const targetHeight = Math.max(1, Math.round(height))
+    const sizeChanged =
+      stack.scene.width !== targetWidth ||
+      stack.scene.height !== targetHeight ||
+      !this.#surface
+    stack.scene.style.width = `${targetWidth}px`
+    stack.scene.style.height = `${targetHeight}px`
+    stack.overlay.style.width = `${targetWidth}px`
+    stack.overlay.style.height = `${targetHeight}px`
+    if (!sizeChanged) return
+
+    this.#disposePicture()
+    const previousSurface = this.#surface
+    const previousContext = previousSurface?.Gd
+    previousSurface?.dispose()
+    if (previousContext !== undefined) {
+      this.#canvasKit.deleteContext(previousContext)
+    }
+    this.#surface = undefined
+
+    stack.scene.width = targetWidth
+    stack.scene.height = targetHeight
+    stack.overlay.width = targetWidth
+    stack.overlay.height = targetHeight
+    const surface = this.#canvasKit.MakeWebGLCanvasSurface(stack.scene)
+    if (!surface) throw new Error('CanvasKit WebGL surface creation failed')
+    // CanvasKit silently swaps the DOM canvas for a software surface when the
+    // GPU surface cannot be made. Runtime owns fallback explicitly so pointer
+    // listeners, telemetry and backend state stay coherent.
+    if (!stack.scene.isConnected) {
+      const contextHandle = surface.Gd
+      surface.dispose()
+      if (contextHandle !== undefined) {
+        this.#canvasKit.deleteContext(contextHandle)
+      }
+      throw new Error(
+        'CanvasKit replaced the scene canvas with a software surface',
+      )
+    }
+
+    const replacements = new Map<string, CanvasKitImage>()
+    try {
+      for (const [id, resource] of this.#resources) {
+        const image = surface.makeImageFromTextureSource(resource.source)
+        if (!image) {
+          throw new Error(`CanvasKit texture reload failed for ${id}`)
+        }
+        replacements.set(id, image)
+      }
+    } catch (error) {
+      for (const image of replacements.values()) image.delete()
+      const contextHandle = surface.Gd
+      surface.dispose()
+      if (contextHandle !== undefined) {
+        this.#canvasKit.deleteContext(contextHandle)
+      }
+      throw error
+    }
+    for (const [id, image] of replacements) {
+      const resource = this.#resources.get(id)!
+      resource.image.delete()
+      resource.image = image
+    }
+    this.#surface = surface
   }
 
   #assertActive(): void {

@@ -206,6 +206,47 @@ describe('M05 CanvasViewport transforms', () => {
     vi.unstubAllGlobals()
   })
 
+  it('fits the committed crop output instead of the full document canvas', async () => {
+    let notify: (() => void) | undefined
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: () => void) {
+          notify = callback
+        }
+        observe(): void {}
+        disconnect(): void {}
+      },
+    )
+    const croppedDocument: EditorDocumentV1 = {
+      ...document,
+      crop: { x: 20, y: 30, width: 50, height: 25 },
+    }
+    const { container, emitted, unmount } = mountViewport(
+      'select',
+      croppedDocument,
+    )
+    const scroll = container.querySelector(
+      '.cs-canvas-scroll',
+    ) as HTMLDivElement
+    Object.defineProperties(scroll, {
+      clientWidth: { configurable: true, value: 848 },
+      clientHeight: { configurable: true, value: 648 },
+    })
+    vi.spyOn(window, 'getComputedStyle').mockReturnValue({
+      paddingTop: '48px',
+      paddingRight: '72px',
+      paddingBottom: '92px',
+      paddingLeft: '72px',
+    } as CSSStyleDeclaration)
+
+    notify?.()
+    await Promise.resolve()
+    expect(emitted().fitZoom).toEqual([[1408]])
+    unmount()
+    vi.unstubAllGlobals()
+  })
+
   it('keeps the exact zoomed canvas surface separate from its centering stage', () => {
     const { container } = mountViewport()
     const stage = container.querySelector('.cs-canvas-stage')

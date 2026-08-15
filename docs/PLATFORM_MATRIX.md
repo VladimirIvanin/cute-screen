@@ -101,6 +101,17 @@ UI получает `CaptureCapabilities` и не показывает непо�
   меняет статус platform support.
 - CanvasKit/WebGL startup в проверенном WebView2 перешёл на Canvas2D fallback;
   это не подтверждает primary CanvasKit path для Windows.
+- M08 Windows browser acceptance (2026-08-15, Chrome 151.0.7922.138) passed its
+  focused 8/8 crop/precision scenarios and visually inspected 1440×900 and
+  1024×700 EN/RU screenshots plus the ruler visual/default-settings artifact.
+  This is browser evidence only. The feature-gated
+  real-Tauri binary built, but `@wdio/tauri-service` timed out waiting 60 seconds
+  for its embedded WebDriver on port 4445 before the test body. Therefore the
+  clean decoded-source crop mount and native clipboard readback remain pending.
+  This does not claim a full browser-suite or real-Tauri pass, and the saved
+  gitignored `artifacts/tauri-e2e/wdio.log` does not contain the timeout
+  transcript; durable real-Tauri evidence remains pending. No Windows/WebView2
+  support claim is added.
 - Mixed DPI, политика запуска в фоне, capture и hotkey остаются pending до M04
   system smoke.
 - Повторная установка более новой CI-сборки не должна удалять shortcut configuration или library.

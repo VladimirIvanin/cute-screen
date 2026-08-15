@@ -13,6 +13,7 @@ export const semanticParityTolerance = {
 export function compareRgba(
   actual: Uint8Array,
   expected: Uint8Array,
+  channelTolerance = 0,
 ): PixelDifference {
   if (actual.length !== expected.length || actual.length % 4 !== 0) {
     throw new Error('RGBA buffers must have equal lengths divisible by four')
@@ -22,7 +23,7 @@ export function compareRgba(
   let maximumDelta = 0
   for (let index = 0; index < actual.length; index += 1) {
     const delta = Math.abs((actual[index] ?? 0) - (expected[index] ?? 0))
-    if (delta > 0) changedChannels += 1
+    if (delta > channelTolerance) changedChannels += 1
     maximumDelta = Math.max(maximumDelta, delta)
   }
 

@@ -68,6 +68,12 @@ Schema v7 — единственная editable persisted schema. v0-v6 возв
 как typed unsupported `olderSchema` без миграции и изменения raw data; v8+
 возвращаются typed read-only `newerSchema`.
 
+Ruler payload в strict v7 хранит endpoints, unit, percent basis, angle-step,
+`color`, целочисленную `thickness` в диапазоне 1…12 и целочисленный `fontSize`
+в диапазоне 10…48. Renderer-neutral scene переносит эти значения без UI state;
+angle/snapping остаются семантикой инструмента, а committed on-canvas label
+содержит только длину.
+
 Shape использует versioned paint/effect model: solid, multi-stop linear/radial
 gradient, bundled pattern или immutable image texture, paint transform,
 opacity, curated blend mode, stroke и bounded shadow stack. Arbitrary shader

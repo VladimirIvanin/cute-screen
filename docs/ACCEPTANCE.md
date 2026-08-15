@@ -235,7 +235,76 @@ size. Проверить presets, handles, rule-of-thirds, reset, `Enter`, `Esca
 canvas bounds. Затем проверить color picker: открыть contextual control на desktop и 1024×700, выбрать белый, чёрный и серый, ввести HEX, проверить recent и compact suggestions. Запустить пипетку из picker и tool rail, выбрать известный непрозрачный scene-пиксель при zoom, убедиться, что HEX скопирован, toast и recent обновлены, а transient overlay в sample не попал. Проверить стрелки/Shift+стрелки, Enter и Escape, прозрачный пиксель и clipboard failure; единственное изменение выбранного слоя должно undo/redo ровно одной command.
 
 Затем проверить manual censor, spotlight, ruler, temporary guides,
-loupe auto-selection и eyedropper clipboard/toast/recent color.
+loupe auto-selection и eyedropper clipboard/toast/recent color. Для ruler
+проверить persisted цвет/толщину/размер подписи в нижнем RU/EN toolbar,
+перпендикулярные endpoint ticks без точек и rotated-upright contrast badge с
+одной длиной (`NNN px` или `%`) без угла; LayersPanel не дублирует настройки.
+
+Observed Windows 10 build 19045 evidence covers seeded browser interactions for
+A08, not a clean production mount. The focused Chrome 151 M08 spec passed 8/8
+scenarios through the `?m05=1`/M08 App harness: crop remained tied to the 400×300
+canvas after user-visible base resize/delete and before/after flips;
+presets, handles, rule-of-thirds, reset, Enter/Escape and undo were exercised;
+hold/release/window-blur guides changed only the interaction overlay; loupe was
+the only precision tool auto-selected after creation; and eyedropper sampled
+`#273D5A` at zoom while excluding its transient overlay. Alpha `0` and `128`
+were rejected before clipboard/swatch/recent mutation, while alpha `255`
+produced uppercase HEX. Locked/read-only precision controls expose disabled
+semantics and remain history/default neutral; unlock followed by a completed
+update creates one command. Swatch, recent colour, pointer/keyboard cancel,
+not-ready and recoverable clipboard-error states were observable. Desktop and
+1024×700 EN/RU screenshots plus
+`artifacts/browser-e2e/m08-ruler-visual.png` were captured and visually
+inspected with all contextual controls inside the viewport. The ruler artifact
+shows the default pink-crimson angled line, perpendicular ticks, upright
+length-only badge and its bottom toolbar; no ruler settings appear in LayersPanel.
+
+Renderer/export evidence decodes Canvas2D and CanvasKit PNG output, checks all
+three censor modes against lower/higher layers, spotlight shapes and feather,
+ruler colour/thickness/ticks and length-only contrast badge, loupe
+clipping/border/shadow and crop crossing an effect.
+`pnpm test:render` passed 13/13 and four visually inspected precision goldens
+cover scales 1 and 2.
+
+The cropped-viewport repair adds focused Chrome 151 evidence for a committed
+non-origin (`x=60`) crop. After leaving Crop edit mode, the visible surface used
+the cropped 1:1 aspect ratio; new censor and ruler gestures, eyedropper sampling,
+and create/reopen text editing resolved to canvas-space coordinates without state
+injection. Vue coverage also proves that Crop edit/reset temporarily returns to
+the full canvas and that text-edit scene rebuilds preserve `outputBounds`. The
+live CanvasKit lifecycle test proves full→crop→full backing/CSS resizing while
+registered images and fonts remain usable; this is not real GPU/WebView evidence.
+
+The loupe/ruler repair additionally proves that canvas flips mirror a loupe's
+separate source rectangle in the same undoable command and that a partially
+out-of-canvas source produces transparent-black unsampled lens pixels in both
+render backends at scales 1 and 2. Ruler badges derive their upright orientation
+from world-space endpoints after rotation or either reflection, while line/ticks
+retain the layer transform. Short-ruler selection/hit bounds expand after label
+size and thickness changes without moving the measured world endpoints. The
+focused Chrome 151 M08 spec passed 8/8. Its existing ruler scenario now also
+performs a strong non-uniform generic resize, proves the fixed-world badge stays
+inside the visible selection frame and can be reselected outside the scaled line,
+and checks one-command undo/redo with stable world endpoints. The visually
+inspected artifact is
+`artifacts/browser-e2e/m08-ruler-bounds-after-style.png`; renderer goldens
+remained unchanged.
+
+The loupe callout follow-up brings the committed visual closer to the Electron
+prototype without changing schema v7. Canvas2D and CanvasKit decoded-pixel
+coverage proves a border-coloured connector and source arrowhead for circular
+and rectangular lenses at export scales 1 and 2. The connector is drawn only
+after the frozen composite-below snapshot, while the selected source marker and
+zoom/size chips live exclusively in the interaction overlay. All four updated
+M08 precision goldens were opened and visually inspected; the focused suite
+passed 68/68, render harness 13/13, full unit/component suite 396/396 and
+`pnpm check` completed successfully on Windows x64.
+
+Real-Tauri A08 remains blocked, not passed. The feature-gated Windows binary
+built successfully, but `@wdio/tauri-service` did not observe the embedded
+WebDriver server on port 4445 within 60 seconds, so neither clean-state decoded
+crop mount nor native system-clipboard readback reached its test body. Browser
+clipboard evidence is not substituted for that native result.
 
 ## A09 — Серии и библиотека
 
@@ -258,6 +327,11 @@ loupe auto-selection и eyedropper clipboard/toast/recent color.
 7. Отменить длительный export.
 
 **Результат:** оригиналы не изменены, output dimensions/pixels соответствуют настройкам.
+
+The headless PNG renderer additionally proves crop-controlled output dimensions,
+representative pixels and immutable document/source/layer data. Native Save As,
+JPEG/WebP, clipboard, cancellation and full multi-frame stitch remain pending
+and are not inferred from this evidence.
 
 ## A11 — Ошибки и восстановление
 

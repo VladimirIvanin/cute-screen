@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest'
 
 import {
   applyEditorCommand,
+  CommandManager,
   createFlipCanvasCommand,
+  createLoupeLayer,
   multiplyMatrices,
   revertEditorCommand,
   transformToMatrix,
@@ -192,6 +194,35 @@ describe('editor command operations', () => {
       for (const field of ['a', 'b', 'c', 'd', 'e', 'f'] as const) {
         expect(actual[field]).toBeCloseTo(expected[field], 12)
       }
+    },
+  )
+
+  it.each([
+    ['horizontal', { x: -10, y: 70, width: 30, height: 30 }],
+    ['vertical', { x: 80, y: 0, width: 30, height: 30 }],
+  ] as const)(
+    'mirrors a partially out-of-canvas loupe source in the same %s history entry',
+    (axis, expectedSourceRegion) => {
+      const loupe = createLoupeLayer({
+        id: IDS.middle,
+        canvas: { width: 100, height: 100 },
+        sourceRegion: { x: 80, y: 70, width: 30, height: 30 },
+        destination: { x: 20, y: 10 },
+        zoom: 2,
+        size: 60,
+      })
+      const before = document([loupe])
+      const manager = new CommandManager(before)
+
+      manager.execute(createFlipCanvasCommand(before, axis))
+      const after = manager.snapshot.document.layers[0]
+
+      expect(after).toMatchObject({
+        kind: 'loupe',
+        payload: { sourceRegion: expectedSourceRegion },
+      })
+      expect(manager.undo().document).toEqual(before)
+      expect(manager.redo().document.layers[0]).toEqual(after)
     },
   )
 })

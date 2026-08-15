@@ -4,6 +4,7 @@ import type { EditorDocumentV1, JsonObject, Point } from './document/types'
 import type { ArrowLayerPayload } from './document/types'
 import { arrowCapSize, arrowPathPoints } from './arrow-geometry'
 import { invertMatrix, transformPoint, transformToMatrix } from './geometry'
+import { precisionLayerHitPart } from './precision-tools'
 
 export type HitPart = 'fill' | 'handle' | 'stroke'
 
@@ -67,7 +68,7 @@ export class DocumentSpatialIndex {
     for (let index = this.#document.layers.length - 1; index >= 0; index -= 1) {
       const layer = this.#document.layers[index]
       if (!layer || !candidateIds.has(layer.id)) continue
-      const hit = hitLayer(layer, canvasPoint, index)
+      const hit = hitLayer(layer, canvasPoint, index, this.#document.canvas)
       if (hit) hits.push(hit)
     }
     return Object.freeze(hits)
@@ -114,7 +115,7 @@ export function hitTestDocument(
   for (let index = document.layers.length - 1; index >= 0; index -= 1) {
     const layer = document.layers[index]
     if (!layer || !layer.visible || layer.locked) continue
-    const hit = hitLayer(layer, canvasPoint, index)
+    const hit = hitLayer(layer, canvasPoint, index, document.canvas)
     if (hit) return hit
   }
   return undefined
@@ -129,7 +130,7 @@ export function hitTestDocumentAll(
   for (let index = document.layers.length - 1; index >= 0; index -= 1) {
     const layer = document.layers[index]
     if (!layer || !layer.visible || layer.locked) continue
-    const hit = hitLayer(layer, canvasPoint, index)
+    const hit = hitLayer(layer, canvasPoint, index, document.canvas)
     if (hit) hits.push(hit)
   }
   return Object.freeze(hits)
@@ -139,6 +140,7 @@ function hitLayer(
   layer: EditorDocumentV1['layers'][number],
   canvasPoint: Point,
   zOrder: number,
+  canvas: EditorDocumentV1['canvas'],
 ): HitTestResult | undefined {
   const bounds = layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
   const local = transformPoint(
@@ -152,7 +154,7 @@ function hitLayer(
     local.y > bounds.y + bounds.height
   )
     return undefined
-  const part = drawingHitPart(layer, local)
+  const part = drawingHitPart(layer, local, canvas)
   if (!part) return undefined
   return Object.freeze({
     nodeId: layer.id,
@@ -248,8 +250,17 @@ function polygonStrokeHit(
 function drawingHitPart(
   layer: EditorDocumentV1['layers'][number],
   point: Point,
+  canvas: EditorDocumentV1['canvas'],
 ): HitPart | undefined {
   if (layer.kind === 'image') return 'fill'
+  if (
+    layer.kind === 'censor' ||
+    layer.kind === 'spotlight' ||
+    layer.kind === 'ruler' ||
+    layer.kind === 'loupe'
+  ) {
+    return precisionLayerHitPart(layer, point, canvas)
+  }
   if (
     layer.kind !== 'arrow' &&
     layer.kind !== 'pencil' &&

@@ -9,6 +9,18 @@ defineProps<{
   t: (key: ToolDescriptor['labelKey'] | 'tools') => string
 }>()
 const emit = defineEmits<{ select: [id: string] }>()
+
+function toolTitle(
+  tool: ToolDescriptor,
+  translate: (key: ToolDescriptor['labelKey'] | 'tools') => string,
+): string {
+  if (tool.disabled && tool.disabledReasonKey) {
+    return translate(tool.disabledReasonKey)
+  }
+  return tool.shortcut
+    ? `${translate(tool.labelKey)} (${tool.shortcut})`
+    : translate(tool.labelKey)
+}
 </script>
 
 <template>
@@ -36,21 +48,13 @@ const emit = defineEmits<{ select: [id: string] }>()
               :disabled="Boolean(tool.disabled)"
               :aria-pressed="activeToolId === tool.id"
               :aria-label="t(tool.labelKey)"
-              :title="
-                tool.shortcut
-                  ? `${t(tool.labelKey)} (${tool.shortcut})`
-                  : t(tool.labelKey)
-              "
+              :title="toolTitle(tool, t)"
               @click="emit('select', tool.id)"
             >
               <UiIcon :name="tool.icon" />
             </NButton>
           </template>
-          {{
-            tool.shortcut
-              ? `${t(tool.labelKey)} (${tool.shortcut})`
-              : t(tool.labelKey)
-          }}
+          {{ toolTitle(tool, t) }}
         </NTooltip>
       </div>
     </template>

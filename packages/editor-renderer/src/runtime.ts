@@ -8,6 +8,7 @@ import type {
   ImageResource,
   ImageResourceInput,
   Renderer,
+  RenderExportOptions,
   RendererRuntimeState,
 } from './types'
 
@@ -143,10 +144,10 @@ export class RendererRuntime {
     this.#scheduler.invalidate(reason)
   }
 
-  async exportPng(): Promise<Uint8Array> {
+  async exportPng(options?: RenderExportOptions): Promise<Uint8Array> {
     this.#assertActive()
     if (!this.#active) throw new Error('RendererRuntime is not initialized')
-    return this.#active.exportPng()
+    return this.#active.exportPng(options)
   }
 
   dispose(): void {

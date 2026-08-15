@@ -99,8 +99,19 @@ Cute Screen — полноценный local-first редактор снимко
 - `REQ-TOL-007` — callout: выразительный визуальный стиль, pointer/tail и полноценное редактирование текста.
 - `REQ-TOL-008` — manual censor: pixelate, blur и solid fill; без автоматического поиска данных.
 - `REQ-TOL-009` — spotlight: rectangle/ellipse/diamond и настраиваемое затемнение.
-- `REQ-TOL-010` — ruler измеряет расстояние в pixels/percent и взаимодействует с временными guides.
-- `REQ-TOL-011` — loupe: zoom, размер, circle/rectangle, border color/width и shadow.
+- `REQ-TOL-010` — ruler измеряет расстояние в pixels/percent и взаимодействует
+  с временными guides. Persisted цвет (по умолчанию розово-малиновый), толщина
+  и размер подписи настраиваются только в нижнем contextual toolbar. На canvas
+  показывается цветная линия с короткими перпендикулярными засечками без круглых
+  endpoint dots и перекрывающий линию rounded contrast badge: он повёрнут вдоль
+  ruler, но текст остаётся читаемым, содержит только целое `NNN px` либо значение
+  с `%` и имеет тонкую рамку цвета линии. Угол остаётся отдельной семантикой для
+  snapping и contextual UI, но в badge не выводится.
+- `REQ-TOL-011` — loupe: zoom, размер, circle/rectangle, border color/width и
+  shadow. Линза оформлена как callout: connector цвета рамки ведёт от линзы к
+  центру source region и одинаково попадает в preview/export. Для выбранной
+  лупы точка source и компактные zoom/size chips отображаются только в
+  transient overlay и не попадают в документ или export.
 - `REQ-TOL-012` — eyedropper читает один непрозрачный пиксель скомпонованного scene canvas (без transient overlay), нормализует и копирует uppercase HEX, показывает доступный результат и добавляет цвет в recent colors. Pointer и клавиатурный sampling отменяемы; ошибка чтения или clipboard не откатывает уже выбранный цвет и не создаёт document command.
 - `REQ-TOL-013` — crop: свободный режим, aspect presets, handles, rule-of-thirds, reset, `Enter` и `Escape`.
 - `REQ-TOL-014` — вставка emoji как редактируемого слоя.

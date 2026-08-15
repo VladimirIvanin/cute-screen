@@ -99,6 +99,7 @@ export type {
   AsyncActionState,
   CanvasViewportHosts,
   ContextToolbarSchema,
+  PrecisionToolDefaults,
   FrameSummary,
   LayerSummary,
   ShellActionAdapter,

@@ -1151,6 +1151,17 @@ button:focus-visible {
   scrollbar-color: var(--border-strong) transparent;
 }
 
+.cs-context-toolbar--precision {
+  height: auto;
+  align-items: flex-start;
+}
+
+.cs-context-toolbar--precision .cs-context-controls {
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  overflow-x: visible;
+}
+
 .cs-context-control {
   display: flex;
   min-width: max-content;
@@ -1478,6 +1489,30 @@ button:focus-visible {
   box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
   color: var(--text);
   font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.cs-tool-error {
+  position: fixed;
+  z-index: 70;
+  right: 14px;
+  bottom: 92px;
+  max-width: 360px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--text);
+  font-size: 11px;
+}
+.cs-eyedropper-swatch {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
 }
 
 .cs-zoom-controls {

@@ -30,6 +30,7 @@ import type {
   CanvasViewportHosts,
   ContextToolbarSchema,
   FrameSummary,
+  PrecisionToolDefaults,
   ShellDocumentState,
   ShellActionAdapter,
   ToolDescriptor,
@@ -54,8 +55,12 @@ import {
   nextNumberedMarkerSequence,
   defaultDrawingToolPreferences,
   DEFAULT_DRAWING_DEFAULTS,
+  DEFAULT_RULER_COLOR,
+  DEFAULT_RULER_FONT_SIZE,
+  DEFAULT_RULER_THICKNESS,
   rememberDrawingColor,
   rebaseArrowLayer,
+  rebaseRulerLayer,
   type DrawingDefaults,
   type DrawingToolPreferencesV2,
   type EditorDocumentV1,
@@ -63,6 +68,11 @@ import {
   type ImageLayer,
   type JsonObject,
   type LayerNode,
+  type CensorLayer,
+  type SpotlightLayer,
+  type RulerLayer,
+  type LoupeLayer,
+  type CropPreset,
   type SrgbColor,
   type TextBackground,
   type RichTextContent,
@@ -494,12 +504,46 @@ function applyTextPreset(value: string): boolean {
 }
 */
 const markerShape = ref<'circle' | 'square' | 'diamond' | 'star'>('circle')
+const cropPreset = ref<CropPreset>('free')
+const precisionDefaults = shallowRef<PrecisionToolDefaults>({
+  censor: {
+    region: 'rectangle',
+    mode: 'pixelate',
+    blockSize: 12,
+    blurStrength: 12,
+    solidColor: { red: 0, green: 0, blue: 0, alpha: 1 },
+  },
+  spotlight: {
+    shape: 'rectangle',
+    dimColor: { red: 0, green: 0, blue: 0, alpha: 1 },
+    dimOpacity: 0.65,
+    feather: 'soft',
+  },
+  ruler: {
+    unit: 'pixels',
+    snap: true,
+    snapAngleIncrementDegrees: 15,
+    color: DEFAULT_RULER_COLOR,
+    thickness: DEFAULT_RULER_THICKNESS,
+    fontSize: DEFAULT_RULER_FONT_SIZE,
+  },
+  loupe: {
+    zoom: 2,
+    size: 120,
+    shape: 'circle',
+    borderColor: { red: 1, green: 1, blue: 1, alpha: 1 },
+    borderWidth: 3,
+    shadow: true,
+  },
+})
 const contentImageImporting = ref(false)
 const drawingPreferences = shallowRef<DrawingToolPreferencesV2>(
   defaultDrawingToolPreferences(),
 )
 const samplingControl = ref<string>()
 const eyedropperFeedback = ref<string>()
+const eyedropperColor = ref<string>()
+const toolError = ref<string>()
 let textureResolver: TextureResourceResolver | undefined
 const textureImages = ref<ReadonlyMap<string, HTMLImageElement>>(new Map())
 const activeDocument = ref<EditorDocumentV1>()
@@ -509,6 +553,17 @@ const baseImageLayer = computed(() =>
       layer.kind === 'image' && layer.payload.role === 'base',
   ),
 )
+const sceneTexturesReady = computed(() => {
+  const document = activeDocument.value
+  if (!document) return false
+  if (baseImageLayer.value && !props.sourceImage) return false
+  return document.layers.every(
+    (layer) =>
+      layer.kind !== 'image' ||
+      layer.payload.role !== 'content' ||
+      textureImages.value.has(layer.payload.blobHash),
+  )
+})
 const translate = (key: Parameters<typeof t>[1]) => t(state.locale.value, key)
 const hasInteractiveDocument = computed(
   () => props.documentSession !== undefined || props.fixture === 'ready',
@@ -536,7 +591,10 @@ const tools = computed<readonly ToolDescriptor[]>(() => [
     icon: 'crop',
     labelKey: 'toolCrop',
     shortcut: 'C',
-    disabled: true,
+    disabled: !activeDocument.value || props.readOnlyDocument,
+    disabledReasonKey: !activeDocument.value
+      ? 'toolNeedsCanvas'
+      : 'readOnlyDocument',
   },
   {
     id: 'arrow',
@@ -611,21 +669,50 @@ const tools = computed<readonly ToolDescriptor[]>(() => [
     icon: 'eyedropper',
     labelKey: 'toolEyedropper',
     shortcut: 'I',
-    disabled: !hasInteractiveDocument.value,
+    disabled: !activeDocument.value,
+    disabledReasonKey: 'toolNeedsCanvas',
   },
   {
-    id: 'privacy',
+    id: 'censor',
     group: 'more',
     icon: 'privacy',
     labelKey: 'toolPrivacy',
-    disabled: true,
+    disabled: !activeDocument.value || props.readOnlyDocument,
+    disabledReasonKey: !activeDocument.value
+      ? 'toolNeedsCanvas'
+      : 'readOnlyDocument',
   },
   {
     id: 'spotlight',
     group: 'more',
     icon: 'spotlight',
     labelKey: 'toolSpotlight',
-    disabled: true,
+    disabled: !activeDocument.value || props.readOnlyDocument,
+    disabledReasonKey: !activeDocument.value
+      ? 'toolNeedsCanvas'
+      : 'readOnlyDocument',
+  },
+  {
+    id: 'ruler',
+    group: 'more',
+    icon: 'ruler',
+    labelKey: 'toolRuler',
+    shortcut: 'R',
+    disabled: !activeDocument.value || props.readOnlyDocument,
+    disabledReasonKey: !activeDocument.value
+      ? 'toolNeedsCanvas'
+      : 'readOnlyDocument',
+  },
+  {
+    id: 'loupe',
+    group: 'more',
+    icon: 'loupe',
+    labelKey: 'toolLoupe',
+    shortcut: 'L',
+    disabled: !activeDocument.value || props.readOnlyDocument,
+    disabledReasonKey: !activeDocument.value
+      ? 'toolNeedsCanvas'
+      : 'readOnlyDocument',
   },
 ])
 function hexColor(value: unknown): string {
@@ -638,6 +725,350 @@ function hexColor(value: unknown): string {
   return `#${[channel('red'), channel('green'), channel('blue')]
     .map((item) => item.toString(16).padStart(2, '0'))
     .join('')}`
+}
+type PrecisionLayer = CensorLayer | SpotlightLayer | RulerLayer | LoupeLayer
+type PrecisionTool = PrecisionLayer['kind']
+function precisionText(english: string, russian: string): string {
+  return state.locale.value === 'ru' ? russian : english
+}
+function selectedPrecisionLayer(): PrecisionLayer | undefined {
+  if (store.selectedLayerIds.length !== 1) return undefined
+  const layer = activeDocument.value?.layers.find(
+    (candidate) => candidate.id === store.selectedLayerId,
+  )
+  return layer?.kind === 'censor' ||
+    layer?.kind === 'spotlight' ||
+    layer?.kind === 'ruler' ||
+    layer?.kind === 'loupe'
+    ? layer
+    : undefined
+}
+function precisionToolSchema(
+  tool: PrecisionTool,
+  selected?: PrecisionLayer,
+): ContextToolbarSchema {
+  const defaults = precisionDefaults.value
+  if (tool === 'censor') {
+    const layer = selected?.kind === 'censor' ? selected : undefined
+    const controlsDisabled =
+      props.readOnlyDocument || !activeDocument.value || Boolean(layer?.locked)
+    const selectedEffect = layer?.payload.effect as
+      | {
+          readonly mode: 'pixelate' | 'blur' | 'solid'
+          readonly blockSize?: number
+          readonly strength?: number
+          readonly color?: SrgbColor
+        }
+      | undefined
+    const mode = selectedEffect?.mode ?? defaults.censor.mode
+    const selectedSolidColor =
+      selectedEffect?.mode === 'solid' && selectedEffect.color
+        ? selectedEffect.color
+        : defaults.censor.solidColor
+    return {
+      icon: 'privacy',
+      title: translate('toolPrivacy'),
+      hint: precisionText(
+        'Drag to hide data manually',
+        'Потяните, чтобы скрыть данные вручную',
+      ),
+      controls: [
+        {
+          kind: 'select',
+          id: 'censorRegion',
+          label: precisionText('Region', 'Область'),
+          value: layer?.payload.region.kind ?? defaults.censor.region,
+          disabled: controlsDisabled,
+          options: [
+            {
+              value: 'rectangle',
+              label: precisionText('Rectangle', 'Прямоугольник'),
+            },
+            {
+              value: 'freeform',
+              label: precisionText('Freeform', 'Произвольная'),
+            },
+          ],
+        },
+        {
+          kind: 'select',
+          id: 'censorMode',
+          label: precisionText('Effect', 'Эффект'),
+          value: mode,
+          disabled: controlsDisabled,
+          options: [
+            {
+              value: 'pixelate',
+              label: precisionText('Pixelate', 'Пикселизация'),
+            },
+            { value: 'blur', label: precisionText('Blur', 'Размытие') },
+            { value: 'solid', label: precisionText('Solid', 'Сплошной цвет') },
+          ],
+        },
+        ...(mode === 'pixelate'
+          ? [
+              {
+                kind: 'range' as const,
+                id: 'censorBlockSize',
+                label: precisionText('Block size', 'Размер блока'),
+                value:
+                  selectedEffect?.mode === 'pixelate'
+                    ? (selectedEffect.blockSize ?? defaults.censor.blockSize)
+                    : defaults.censor.blockSize,
+                min: 2,
+                max: 128,
+                step: 1,
+                disabled: controlsDisabled,
+              },
+            ]
+          : mode === 'blur'
+            ? [
+                {
+                  kind: 'range' as const,
+                  id: 'censorBlurStrength',
+                  label: precisionText('Blur strength', 'Сила размытия'),
+                  value:
+                    selectedEffect?.mode === 'blur'
+                      ? (selectedEffect.strength ??
+                        defaults.censor.blurStrength)
+                      : defaults.censor.blurStrength,
+                  min: 0.5,
+                  max: 128,
+                  step: 0.5,
+                  disabled: controlsDisabled,
+                },
+              ]
+            : [
+                {
+                  kind: 'color' as const,
+                  id: 'censorSolidColor',
+                  label: precisionText('Solid color', 'Сплошной цвет'),
+                  value: hexColor(selectedSolidColor),
+                  disabled: controlsDisabled,
+                  eyedropper:
+                    Boolean(activeDocument.value) && !controlsDisabled,
+                },
+              ]),
+      ],
+    }
+  }
+  if (tool === 'spotlight') {
+    const layer = selected?.kind === 'spotlight' ? selected : undefined
+    const controlsDisabled =
+      props.readOnlyDocument || !activeDocument.value || Boolean(layer?.locked)
+    return {
+      icon: 'spotlight',
+      title: translate('toolSpotlight'),
+      hint: precisionText('Drag an aperture', 'Потяните область подсветки'),
+      controls: [
+        {
+          kind: 'select',
+          id: 'spotlightShape',
+          label: precisionText('Shape', 'Форма'),
+          value: layer?.payload.shape ?? defaults.spotlight.shape,
+          disabled: controlsDisabled,
+          options: [
+            {
+              value: 'rectangle',
+              label: precisionText('Rectangle', 'Прямоугольник'),
+            },
+            { value: 'ellipse', label: precisionText('Ellipse', 'Эллипс') },
+            { value: 'diamond', label: precisionText('Diamond', 'Ромб') },
+          ],
+        },
+        {
+          kind: 'color',
+          id: 'spotlightDimColor',
+          label: precisionText('Dim color', 'Цвет затемнения'),
+          value: hexColor(
+            layer?.payload.dimColor ?? defaults.spotlight.dimColor,
+          ),
+          disabled: controlsDisabled,
+          eyedropper: Boolean(activeDocument.value) && !controlsDisabled,
+        },
+        {
+          kind: 'range',
+          id: 'spotlightDimOpacity',
+          label: precisionText('Dim opacity', 'Непрозрачность затемнения'),
+          value:
+            (layer?.payload.dimOpacity ?? defaults.spotlight.dimOpacity) * 100,
+          min: 0,
+          max: 100,
+          step: 1,
+          disabled: controlsDisabled,
+        },
+        {
+          kind: 'select',
+          id: 'spotlightFeather',
+          label: precisionText('Feather', 'Растушёвка'),
+          value: layer?.payload.feather ?? defaults.spotlight.feather ?? 'none',
+          disabled: controlsDisabled,
+          options: [
+            { value: 'none', label: precisionText('None', 'Нет') },
+            { value: 'soft', label: precisionText('Soft', 'Мягкая') },
+            { value: 'strong', label: precisionText('Strong', 'Сильная') },
+          ],
+        },
+      ],
+    }
+  }
+  if (tool === 'ruler') {
+    const layer = selected?.kind === 'ruler' ? selected : undefined
+    const controlsDisabled =
+      props.readOnlyDocument || !activeDocument.value || Boolean(layer?.locked)
+    return {
+      icon: 'ruler',
+      title: translate('toolRuler'),
+      hint: precisionText(
+        'Hold Alt for angle guides',
+        'Удерживайте Alt для угловых направляющих',
+      ),
+      controls: [
+        {
+          kind: 'color',
+          id: 'rulerColor',
+          label: precisionText('Colour', 'Цвет'),
+          value: hexColor(layer?.payload.color ?? defaults.ruler.color),
+          disabled: controlsDisabled,
+          eyedropper: Boolean(activeDocument.value) && !controlsDisabled,
+        },
+        {
+          kind: 'range',
+          id: 'rulerThickness',
+          label: precisionText('Thickness', 'Толщина'),
+          value: layer?.payload.thickness ?? defaults.ruler.thickness,
+          min: 1,
+          max: 12,
+          step: 1,
+          disabled: controlsDisabled,
+        },
+        {
+          kind: 'range',
+          id: 'rulerFontSize',
+          label: precisionText('Label size', 'Размер подписи'),
+          value: layer?.payload.fontSize ?? defaults.ruler.fontSize,
+          min: 10,
+          max: 48,
+          step: 1,
+          disabled: controlsDisabled,
+        },
+        {
+          kind: 'select',
+          id: 'rulerUnit',
+          label: precisionText('Unit', 'Единицы'),
+          value: layer?.payload.unit ?? defaults.ruler.unit,
+          disabled: controlsDisabled,
+          options: [
+            { value: 'pixels', label: precisionText('Pixels', 'Пиксели') },
+            { value: 'percent', label: precisionText('Percent', 'Проценты') },
+          ],
+        },
+        {
+          kind: 'select',
+          id: 'rulerSnap',
+          label: precisionText('Snapping', 'Привязка'),
+          value: defaults.ruler.snap ? 'on' : 'off',
+          disabled: controlsDisabled || Boolean(layer),
+          options: [
+            { value: 'on', label: precisionText('On', 'Вкл.') },
+            { value: 'off', label: precisionText('Off', 'Выкл.') },
+          ],
+        },
+        {
+          kind: 'range',
+          id: 'rulerAngle',
+          label: precisionText('Angle step', 'Шаг угла'),
+          value:
+            layer?.payload.snapAngleIncrementDegrees ??
+            defaults.ruler.snapAngleIncrementDegrees,
+          min: 1,
+          max: 90,
+          step: 1,
+          disabled: controlsDisabled,
+        },
+      ],
+    }
+  }
+  const layer = selected?.kind === 'loupe' ? selected : undefined
+  const controlsDisabled =
+    props.readOnlyDocument || !activeDocument.value || Boolean(layer?.locked)
+  return {
+    icon: 'loupe',
+    title: translate('toolLoupe'),
+    hint: precisionText(
+      'Drag from source to lens',
+      'Потяните от источника к линзе',
+    ),
+    controls: [
+      {
+        kind: 'range',
+        id: 'loupeZoom',
+        label: precisionText('Zoom', 'Увеличение'),
+        value: layer?.payload.zoom ?? defaults.loupe.zoom,
+        min: 1,
+        max: 16,
+        step: 0.5,
+        disabled: controlsDisabled,
+      },
+      {
+        kind: 'range',
+        id: 'loupeSize',
+        label: precisionText('Size', 'Размер'),
+        value: layer?.payload.lens.size ?? defaults.loupe.size,
+        min: 16,
+        max: 512,
+        step: 1,
+        disabled: controlsDisabled,
+      },
+      {
+        kind: 'select',
+        id: 'loupeShape',
+        label: precisionText('Shape', 'Форма'),
+        value: layer?.payload.lens.shape ?? defaults.loupe.shape,
+        disabled: controlsDisabled,
+        options: [
+          { value: 'circle', label: precisionText('Circle', 'Круг') },
+          {
+            value: 'rectangle',
+            label: precisionText('Rectangle', 'Прямоугольник'),
+          },
+        ],
+      },
+      {
+        kind: 'color',
+        id: 'loupeBorderColor',
+        label: precisionText('Border color', 'Цвет рамки'),
+        value: hexColor(
+          layer?.payload.border.color ?? defaults.loupe.borderColor,
+        ),
+        disabled: controlsDisabled,
+        eyedropper: Boolean(activeDocument.value) && !controlsDisabled,
+      },
+      {
+        kind: 'range',
+        id: 'loupeBorderWidth',
+        label: precisionText('Border width', 'Толщина рамки'),
+        value: layer?.payload.border.width ?? defaults.loupe.borderWidth,
+        min: 0,
+        max: 64,
+        step: 1,
+        disabled: controlsDisabled,
+      },
+      {
+        kind: 'select',
+        id: 'loupeShadow',
+        label: precisionText('Shadow', 'Тень'),
+        value: (layer ? layer.payload.shadow !== null : defaults.loupe.shadow)
+          ? 'on'
+          : 'off',
+        disabled: controlsDisabled,
+        options: [
+          { value: 'on', label: precisionText('On', 'Вкл.') },
+          { value: 'off', label: precisionText('Off', 'Выкл.') },
+        ],
+      },
+    ],
+  }
 }
 function isDrawingTool(
   value: string | undefined,
@@ -965,6 +1396,58 @@ const contextSchema = computed(() => {
           (layer) => layer.id === store.selectedLayerId,
         )
       : undefined
+  if (tool === 'crop') {
+    return {
+      icon: 'crop' as const,
+      title: translate('toolCrop'),
+      hint: precisionText(
+        'Enter applies · Escape cancels',
+        'Enter применяет · Escape отменяет',
+      ),
+      controls: [
+        {
+          kind: 'select' as const,
+          id: 'cropPreset',
+          label: precisionText('Preset', 'Пропорции'),
+          value: cropPreset.value,
+          options: [
+            { value: 'free', label: precisionText('Free', 'Свободно') },
+            { value: '1:1', label: '1:1' },
+            { value: '4:3', label: '4:3' },
+            { value: '16:9', label: '16:9' },
+            { value: 'original', label: precisionText('Original', 'Оригинал') },
+          ],
+        },
+        {
+          kind: 'action' as const,
+          id: 'cropReset',
+          label: precisionText('Reset', 'Сбросить'),
+        },
+        {
+          kind: 'action' as const,
+          id: 'cropApply',
+          label: precisionText('Apply', 'Применить'),
+        },
+        {
+          kind: 'action' as const,
+          id: 'cropCancel',
+          label: translate('cancel'),
+        },
+      ],
+    }
+  }
+  const selectedPrecision = selectedPrecisionLayer()
+  const precisionTool =
+    tool === 'censor' ||
+    tool === 'spotlight' ||
+    tool === 'ruler' ||
+    tool === 'loupe'
+      ? tool
+      : tool === 'select'
+        ? selectedPrecision?.kind
+        : undefined
+  if (precisionTool)
+    return precisionToolSchema(precisionTool, selectedPrecision)
   const selectedText =
     selectedCandidate?.kind === 'text' ||
     selectedCandidate?.kind === 'callout' ||
@@ -1417,6 +1900,19 @@ const contextSchema = computed(() => {
     : undefined
 })
 async function onContextAction(id: string): Promise<void> {
+  if (id === 'cropReset') {
+    cropPreset.value = 'free'
+    canvasViewport.value?.resetCropDraft()
+    return
+  }
+  if (id === 'cropApply') {
+    canvasViewport.value?.applyCropDraft()
+    return
+  }
+  if (id === 'cropCancel') {
+    canvasViewport.value?.cancelCropDraft()
+    return
+  }
   /* Legacy style-preset and text-texture actions are intentionally absent. */
   /*
   if (id === 'saveTextPreset') {
@@ -1722,8 +2218,450 @@ function applyV7TextChange(id: string, value: string): boolean {
   updateWholeTextLayer(span, paragraph, background)
   return true
 }
+function precisionToolForControl(id: string): PrecisionTool | undefined {
+  return (['censor', 'spotlight', 'ruler', 'loupe'] as const).find((tool) =>
+    id.startsWith(tool),
+  )
+}
+function precisionChangeBlocked(id: string): boolean {
+  const tool = precisionToolForControl(id)
+  if (!tool) return false
+  const selected = selectedPrecisionLayer()
+  return (
+    !activeDocument.value ||
+    props.readOnlyDocument ||
+    (selected?.kind === tool && Boolean(selected.locked))
+  )
+}
+function applyPrecisionChange(id: string, value: string): boolean {
+  const tool = precisionToolForControl(id)
+  if (!tool) return false
+  const selectedCandidate = selectedPrecisionLayer()
+  const selected =
+    selectedCandidate?.kind === tool ? selectedCandidate : undefined
+  if (!activeDocument.value || props.readOnlyDocument || selected?.locked)
+    return true
+  let nextDefaults = precisionDefaults.value
+  let after: LayerNode | undefined
+  const number = Number(value)
+  if (
+    id === 'censorRegion' &&
+    (value === 'rectangle' || value === 'freeform')
+  ) {
+    nextDefaults = {
+      ...nextDefaults,
+      censor: { ...nextDefaults.censor, region: value },
+    }
+    if (selected?.kind === 'censor') {
+      after = {
+        ...selected,
+        payload: {
+          ...selected.payload,
+          region:
+            value === 'rectangle'
+              ? { kind: 'rectangle' }
+              : {
+                  kind: 'freeform',
+                  points: [
+                    { x: 0, y: 0 },
+                    { x: selected.localBounds.width, y: 0 },
+                    {
+                      x: selected.localBounds.width,
+                      y: selected.localBounds.height,
+                    },
+                    { x: 0, y: selected.localBounds.height },
+                  ],
+                },
+        },
+      }
+    }
+  } else if (
+    id === 'censorMode' &&
+    (value === 'pixelate' || value === 'blur' || value === 'solid')
+  ) {
+    nextDefaults = {
+      ...nextDefaults,
+      censor: { ...nextDefaults.censor, mode: value },
+    }
+    if (selected?.kind === 'censor') {
+      after = {
+        ...selected,
+        payload: {
+          ...selected.payload,
+          effect:
+            value === 'pixelate'
+              ? { mode: value, blockSize: nextDefaults.censor.blockSize }
+              : value === 'blur'
+                ? { mode: value, strength: nextDefaults.censor.blurStrength }
+                : { mode: value, color: nextDefaults.censor.solidColor },
+        },
+      }
+    }
+  } else if (
+    id === 'censorBlockSize' &&
+    Number.isInteger(number) &&
+    number >= 2 &&
+    number <= 128
+  ) {
+    nextDefaults = {
+      ...nextDefaults,
+      censor: { ...nextDefaults.censor, blockSize: number },
+    }
+    if (selected?.kind === 'censor') {
+      after = {
+        ...selected,
+        payload: {
+          ...selected.payload,
+          effect: { mode: 'pixelate', blockSize: number },
+        },
+      }
+    }
+  } else if (
+    id === 'censorBlurStrength' &&
+    Number.isFinite(number) &&
+    number >= 0.5 &&
+    number <= 128
+  ) {
+    nextDefaults = {
+      ...nextDefaults,
+      censor: { ...nextDefaults.censor, blurStrength: number },
+    }
+    if (selected?.kind === 'censor') {
+      after = {
+        ...selected,
+        payload: {
+          ...selected.payload,
+          effect: { mode: 'blur', strength: number },
+        },
+      }
+    }
+  } else if (id === 'censorSolidColor') {
+    const color = parseTextColor(value)
+    if (!color) return true
+    nextDefaults = {
+      ...nextDefaults,
+      censor: { ...nextDefaults.censor, solidColor: color },
+    }
+    if (selected?.kind === 'censor') {
+      after = {
+        ...selected,
+        payload: {
+          ...selected.payload,
+          effect: { mode: 'solid', color },
+        },
+      }
+    }
+  } else if (
+    id === 'spotlightShape' &&
+    (value === 'rectangle' || value === 'ellipse' || value === 'diamond')
+  ) {
+    nextDefaults = {
+      ...nextDefaults,
+      spotlight: { ...nextDefaults.spotlight, shape: value },
+    }
+    if (selected?.kind === 'spotlight') {
+      after = { ...selected, payload: { ...selected.payload, shape: value } }
+    }
+  } else if (id === 'spotlightDimColor') {
+    const dimColor = parseTextColor(value)
+    if (!dimColor) return true
+    nextDefaults = {
+      ...nextDefaults,
+      spotlight: { ...nextDefaults.spotlight, dimColor },
+    }
+    if (selected?.kind === 'spotlight') {
+      after = { ...selected, payload: { ...selected.payload, dimColor } }
+    }
+  } else if (
+    id === 'spotlightDimOpacity' &&
+    Number.isFinite(number) &&
+    number >= 0 &&
+    number <= 100
+  ) {
+    const dimOpacity = number / 100
+    nextDefaults = {
+      ...nextDefaults,
+      spotlight: { ...nextDefaults.spotlight, dimOpacity },
+    }
+    if (selected?.kind === 'spotlight') {
+      after = { ...selected, payload: { ...selected.payload, dimOpacity } }
+    }
+  } else if (
+    id === 'spotlightFeather' &&
+    (value === 'none' || value === 'soft' || value === 'strong')
+  ) {
+    const feather = value === 'none' ? null : value
+    nextDefaults = {
+      ...nextDefaults,
+      spotlight: { ...nextDefaults.spotlight, feather },
+    }
+    if (selected?.kind === 'spotlight') {
+      after = { ...selected, payload: { ...selected.payload, feather } }
+    }
+  } else if (id === 'rulerColor') {
+    const color = parseTextColor(value)
+    if (!color) return true
+    nextDefaults = {
+      ...nextDefaults,
+      ruler: { ...nextDefaults.ruler, color },
+    }
+    if (selected?.kind === 'ruler') {
+      after = { ...selected, payload: { ...selected.payload, color } }
+    }
+  } else if (
+    id === 'rulerThickness' &&
+    Number.isFinite(number) &&
+    number >= 1 &&
+    number <= 12
+  ) {
+    nextDefaults = {
+      ...nextDefaults,
+      ruler: { ...nextDefaults.ruler, thickness: number },
+    }
+    if (selected?.kind === 'ruler') {
+      after = {
+        ...selected,
+        payload: { ...selected.payload, thickness: number },
+      }
+    }
+  } else if (
+    id === 'rulerFontSize' &&
+    Number.isFinite(number) &&
+    number >= 10 &&
+    number <= 48
+  ) {
+    nextDefaults = {
+      ...nextDefaults,
+      ruler: { ...nextDefaults.ruler, fontSize: number },
+    }
+    if (selected?.kind === 'ruler') {
+      after = {
+        ...selected,
+        payload: { ...selected.payload, fontSize: number },
+      }
+    }
+  } else if (
+    id === 'rulerUnit' &&
+    (value === 'pixels' || value === 'percent')
+  ) {
+    nextDefaults = {
+      ...nextDefaults,
+      ruler: { ...nextDefaults.ruler, unit: value },
+    }
+    if (selected?.kind === 'ruler') {
+      after = { ...selected, payload: { ...selected.payload, unit: value } }
+    }
+  } else if (id === 'rulerSnap' && (value === 'on' || value === 'off')) {
+    nextDefaults = {
+      ...nextDefaults,
+      ruler: { ...nextDefaults.ruler, snap: value === 'on' },
+    }
+  } else if (
+    id === 'rulerAngle' &&
+    Number.isFinite(number) &&
+    number > 0 &&
+    number <= 90
+  ) {
+    nextDefaults = {
+      ...nextDefaults,
+      ruler: { ...nextDefaults.ruler, snapAngleIncrementDegrees: number },
+    }
+    if (selected?.kind === 'ruler') {
+      after = {
+        ...selected,
+        payload: { ...selected.payload, snapAngleIncrementDegrees: number },
+      }
+    }
+  } else if (
+    id === 'loupeZoom' &&
+    Number.isFinite(number) &&
+    number >= 1 &&
+    number <= 16
+  ) {
+    nextDefaults = {
+      ...nextDefaults,
+      loupe: { ...nextDefaults.loupe, zoom: number },
+    }
+    if (selected?.kind === 'loupe') {
+      const source = selected.payload.sourceRegion
+      const side = selected.payload.lens.size / number
+      const canvas = activeDocument.value?.canvas
+      if (!canvas || side > Math.min(canvas.width, canvas.height)) return true
+      after = {
+        ...selected,
+        payload: {
+          ...selected.payload,
+          zoom: number,
+          sourceRegion: {
+            x: Math.max(
+              0,
+              Math.min(
+                canvas.width - side,
+                source.x + source.width / 2 - side / 2,
+              ),
+            ),
+            y: Math.max(
+              0,
+              Math.min(
+                canvas.height - side,
+                source.y + source.height / 2 - side / 2,
+              ),
+            ),
+            width: side,
+            height: side,
+          },
+        },
+      }
+    }
+  } else if (
+    id === 'loupeSize' &&
+    Number.isFinite(number) &&
+    number >= 16 &&
+    number <= 2048
+  ) {
+    nextDefaults = {
+      ...nextDefaults,
+      loupe: { ...nextDefaults.loupe, size: number },
+    }
+    if (selected?.kind === 'loupe') {
+      const source = selected.payload.sourceRegion
+      const side = number / selected.payload.zoom
+      const canvas = activeDocument.value?.canvas
+      if (!canvas || side > Math.min(canvas.width, canvas.height)) return true
+      after = {
+        ...selected,
+        localBounds: { ...selected.localBounds, width: number, height: number },
+        payload: {
+          ...selected.payload,
+          lens: { ...selected.payload.lens, size: number },
+          sourceRegion: {
+            x: Math.max(
+              0,
+              Math.min(
+                canvas.width - side,
+                source.x + source.width / 2 - side / 2,
+              ),
+            ),
+            y: Math.max(
+              0,
+              Math.min(
+                canvas.height - side,
+                source.y + source.height / 2 - side / 2,
+              ),
+            ),
+            width: side,
+            height: side,
+          },
+        },
+      }
+    }
+  } else if (
+    id === 'loupeShape' &&
+    (value === 'circle' || value === 'rectangle')
+  ) {
+    nextDefaults = {
+      ...nextDefaults,
+      loupe: { ...nextDefaults.loupe, shape: value },
+    }
+    if (selected?.kind === 'loupe') {
+      after = {
+        ...selected,
+        payload: {
+          ...selected.payload,
+          lens: { ...selected.payload.lens, shape: value },
+        },
+      }
+    }
+  } else if (id === 'loupeBorderColor') {
+    const color = parseTextColor(value)
+    if (!color) return true
+    nextDefaults = {
+      ...nextDefaults,
+      loupe: { ...nextDefaults.loupe, borderColor: color },
+    }
+    if (selected?.kind === 'loupe') {
+      after = {
+        ...selected,
+        payload: {
+          ...selected.payload,
+          border: { ...selected.payload.border, color },
+        },
+      }
+    }
+  } else if (
+    id === 'loupeBorderWidth' &&
+    Number.isFinite(number) &&
+    number >= 0 &&
+    number <= 64
+  ) {
+    nextDefaults = {
+      ...nextDefaults,
+      loupe: { ...nextDefaults.loupe, borderWidth: number },
+    }
+    if (selected?.kind === 'loupe') {
+      after = {
+        ...selected,
+        payload: {
+          ...selected.payload,
+          border: { ...selected.payload.border, width: number },
+        },
+      }
+    }
+  } else if (id === 'loupeShadow' && (value === 'on' || value === 'off')) {
+    const enabled = value === 'on'
+    nextDefaults = {
+      ...nextDefaults,
+      loupe: { ...nextDefaults.loupe, shadow: enabled },
+    }
+    if (selected?.kind === 'loupe') {
+      after = {
+        ...selected,
+        payload: {
+          ...selected.payload,
+          shadow: enabled
+            ? (selected.payload.shadow ?? {
+                color: { red: 0, green: 0, blue: 0, alpha: 0.35 },
+                offsetX: 0,
+                offsetY: 6,
+                blur: 14,
+              })
+            : null,
+        },
+      }
+    }
+  } else {
+    return true
+  }
+  if (!selected) precisionDefaults.value = nextDefaults
+  if (
+    selected?.kind === 'ruler' &&
+    after?.kind === 'ruler' &&
+    activeDocument.value
+  ) {
+    after = rebaseRulerLayer(
+      selected,
+      after.payload,
+      activeDocument.value.canvas,
+    )
+  }
+  if (selected && after && props.documentSession && !selected.locked) {
+    props.documentSession.execute({
+      type: 'updateLayer',
+      before: selected,
+      after,
+    })
+  }
+  return true
+}
 function onContextChange(id: string, value: string): void {
   if (applyV7TextChange(id, value)) return
+  if (id === 'cropPreset') {
+    if (!['free', '1:1', '4:3', '16:9', 'original'].includes(value)) return
+    cropPreset.value = value as CropPreset
+    canvasViewport.value?.setCropPresetValue(cropPreset.value)
+    return
+  }
+  if (applyPrecisionChange(id, value)) return
   const activeTool = state.activeToolId.value
   /* Legacy text controls intentionally removed from the v7 toolbar.
   if (activeTool === 'text') {
@@ -2291,6 +3229,7 @@ function rememberColor(value: string): void {
   )
 }
 function onColorChange(id: string, value: string): void {
+  if (precisionChangeBlocked(id)) return
   onContextChange(id, value)
   rememberColor(value)
 }
@@ -2300,30 +3239,43 @@ function eyedropperPrompt(): string {
     : 'Choose a colour on the canvas'
 }
 function startEyedropper(id: string): void {
+  if (precisionChangeBlocked(id)) return
   samplingControl.value = id
+  eyedropperColor.value = undefined
   eyedropperFeedback.value = eyedropperPrompt()
 }
 async function onColorSample(value: string): Promise<void> {
+  const normalized = value.toUpperCase()
   const target = samplingControl.value
-  if (target) onColorChange(target, value)
-  else rememberColor(value)
+  if (target && precisionChangeBlocked(target)) {
+    samplingControl.value = undefined
+    eyedropperColor.value = undefined
+    eyedropperFeedback.value = translate('readOnlyDocument')
+    return
+  }
+  if (target) onColorChange(target, normalized)
+  else rememberColor(normalized)
   samplingControl.value = undefined
+  eyedropperColor.value = normalized
   eyedropperFeedback.value =
     state.locale.value === 'ru'
-      ? `Цвет выбран: ${value}`
-      : `Colour selected: ${value}`
+      ? `Цвет выбран: ${normalized}`
+      : `Colour selected: ${normalized}`
   try {
     if (props.clipboardBridge?.writeClipboardText) {
-      await props.clipboardBridge.writeClipboardText(value, crypto.randomUUID())
+      await props.clipboardBridge.writeClipboardText(
+        normalized,
+        crypto.randomUUID(),
+      )
     } else if (navigator.clipboard) {
-      await navigator.clipboard.writeText(value)
+      await navigator.clipboard.writeText(normalized)
     }
   } catch (error) {
     console.warn('cute-screen eyedropper clipboard write failed', error)
     eyedropperFeedback.value =
       state.locale.value === 'ru'
-        ? `Цвет выбран: ${value}. Не удалось скопировать HEX.`
-        : `Colour selected: ${value}. HEX could not be copied.`
+        ? `Цвет выбран: ${normalized}. Не удалось скопировать HEX.`
+        : `Colour selected: ${normalized}. HEX could not be copied.`
   }
 }
 function onColorSampleError(message: string): void {
@@ -2331,14 +3283,27 @@ function onColorSampleError(message: string): void {
 }
 function onColorSampleCancel(): void {
   samplingControl.value = undefined
+  eyedropperColor.value = undefined
   eyedropperFeedback.value =
     state.locale.value === 'ru'
       ? 'Выбор цвета отменён'
       : 'Colour sampling cancelled'
 }
 function selectTool(id: string): void {
+  toolError.value = undefined
   store.selectTool(id)
-  if (id === 'eyedropper') eyedropperFeedback.value = eyedropperPrompt()
+  if (id === 'eyedropper') {
+    eyedropperColor.value = undefined
+    eyedropperFeedback.value = eyedropperPrompt()
+  }
+}
+function canonicalizeLayerTransform(
+  layer: LayerNode,
+  transform: Transform2D,
+): LayerNode {
+  const canvas = activeDocument.value?.canvas
+  if (layer.kind !== 'ruler' || !canvas) return { ...layer, transform }
+  return rebaseRulerLayer({ ...layer, transform }, layer.payload, canvas)
 }
 function updateLayerProperty(
   id: string,
@@ -2371,21 +3336,19 @@ function updateLayerProperty(
     })
     return
   }
+  const after =
+    property === 'visible'
+      ? { ...layer, visible: !layer.visible }
+      : property === 'locked'
+        ? { ...layer, locked: !layer.locked }
+        : canonicalizeLayerTransform(layer, {
+            ...layer.transform,
+            rotation: value ?? layer.transform.rotation,
+          })
   props.documentSession.execute({
     type: 'updateLayer',
     before: layer,
-    after:
-      property === 'visible'
-        ? { ...layer, visible: !layer.visible }
-        : property === 'locked'
-          ? { ...layer, locked: !layer.locked }
-          : {
-              ...layer,
-              transform: {
-                ...layer.transform,
-                rotation: value ?? layer.transform.rotation,
-              },
-            },
+    after,
   })
 }
 function reorderLayer(id: string, direction: 'up' | 'down'): void {
@@ -2451,14 +3414,11 @@ function moveLayer(id: string, deltaX: number, deltaY: number): void {
   const commands = layers.map((layer) => ({
     type: 'updateLayer' as const,
     before: layer,
-    after: {
-      ...layer,
-      transform: {
-        ...layer.transform,
-        translateX: layer.transform.translateX + deltaX,
-        translateY: layer.transform.translateY + deltaY,
-      },
-    },
+    after: canonicalizeLayerTransform(layer, {
+      ...layer.transform,
+      translateX: layer.transform.translateX + deltaX,
+      translateY: layer.transform.translateY + deltaY,
+    }),
   }))
   props.documentSession.execute(
     commands.length === 1 ? commands[0]! : { type: 'batch', commands },
@@ -2471,17 +3431,11 @@ function transformLayer(id: string, transform: Transform2D): void {
   const layer = activeDocument.value?.layers.find(
     (candidate) => candidate.id === id,
   )
-  if (
-    !layer ||
-    layer.kind === 'image' ||
-    layer.locked ||
-    !props.documentSession
-  )
-    return
+  if (!layer || layer.locked || !props.documentSession) return
   props.documentSession.execute({
     type: 'updateLayer',
     before: layer,
-    after: { ...layer, transform },
+    after: canonicalizeLayerTransform(layer, transform),
   })
 }
 function updateLayerPayload(id: string, payload: JsonObject): void {
@@ -2497,9 +3451,11 @@ function updateLayerPayload(id: string, payload: JsonObject): void {
 }
 function addLayer(
   layer: import('@cute-screen/editor-renderer').LayerNode,
+  selectAfter = false,
 ): void {
   if (!props.documentSession || props.readOnlyDocument) return
   props.documentSession.execute({ type: 'addLayer', layer })
+  if (selectAfter && layer.kind === 'loupe') store.selectLayer(layer.id)
 }
 async function importContentImage(origin: {
   readonly x: number
@@ -2740,7 +3696,8 @@ function onKeydown(event: KeyboardEvent): void {
   if (
     target instanceof HTMLInputElement ||
     target instanceof HTMLTextAreaElement ||
-    (target instanceof HTMLElement && target.isContentEditable)
+    (target instanceof HTMLElement &&
+      (target.isContentEditable || target.closest('[role="slider"]')))
   ) {
     return
   }
@@ -2835,14 +3792,11 @@ function onKeydown(event: KeyboardEvent): void {
       const commands = layers.map((layer) => ({
         type: 'updateLayer' as const,
         before: layer,
-        after: {
-          ...layer,
-          transform: {
-            ...layer.transform,
-            translateX: layer.transform.translateX + delta[0] * multiplier,
-            translateY: layer.transform.translateY + delta[1] * multiplier,
-          },
-        },
+        after: canonicalizeLayerTransform(layer, {
+          ...layer.transform,
+          translateX: layer.transform.translateX + delta[0] * multiplier,
+          translateY: layer.transform.translateY + delta[1] * multiplier,
+        }),
       }))
       props.documentSession?.execute(
         commands.length === 1 ? commands[0]! : { type: 'batch', commands },
@@ -2880,7 +3834,7 @@ function applyDocumentSnapshot(snapshot: DocumentSessionSnapshot): void {
       const layer = snapshot.core.document.layers.find(
         (candidate) => candidate.id === id,
       )
-      return !layer || !layer.visible || layer.locked
+      return !layer || !layer.visible
     })
   ) {
     store.clearLayerSelection()
@@ -3026,6 +3980,12 @@ watch(
   () => props.textureBridge,
   () => {
     if (activeDocument.value) void resolveDocumentTextures(activeDocument.value)
+  },
+)
+watch(
+  () => state.activeToolId.value,
+  (tool, previous) => {
+    if (tool === 'crop' && previous !== 'crop') cropPreset.value = 'free'
   },
 )
 onMounted(() => {
@@ -3189,7 +4149,9 @@ watch(
           :sampling="
             Boolean(samplingControl || store.activeToolId === 'eyedropper')
           "
+          :sampling-blocked="!sceneTexturesReady"
           :drawing-defaults="drawingDefaults"
+          :precision-defaults="precisionDefaults"
           :text-defaults="textDefaults"
           :text-formatting="textFormatting"
           :next-marker-sequence="
@@ -3216,6 +4178,7 @@ watch(
           @color-sample="onColorSample"
           @color-sample-error="onColorSampleError"
           @color-sample-cancel="onColorSampleCancel"
+          @tool-error="toolError = $event"
           @zoom="store.setZoom"
           @fit-zoom="store.setFitZoom"
           @retry="emit('retryLoad')"
@@ -3271,7 +4234,20 @@ watch(
       />
       <div class="cs-overlay-root" aria-live="polite" />
       <p v-if="eyedropperFeedback" class="cs-eyedropper-feedback" role="status">
-        {{ eyedropperFeedback }}
+        <span
+          v-if="eyedropperColor"
+          class="cs-eyedropper-swatch"
+          :style="{ backgroundColor: eyedropperColor }"
+          :aria-label="
+            state.locale.value === 'ru'
+              ? `Образец цвета ${eyedropperColor}`
+              : `Colour swatch ${eyedropperColor}`
+          "
+        />
+        <span>{{ eyedropperFeedback }}</span>
+      </p>
+      <p v-if="toolError" class="cs-tool-error" role="alert">
+        {{ toolError }}
       </p>
     </div>
   </NConfigProvider>

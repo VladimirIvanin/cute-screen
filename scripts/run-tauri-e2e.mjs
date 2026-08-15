@@ -58,6 +58,18 @@ const scenarios = [
     fakeCapture: true,
   },
   {
+    id: 'm08-crop-first-open',
+    spec: 'tests/e2e/specs/tauri-m08-crop-first-open.e2e.ts',
+    harnessQuery: '?m04=1&m08=1',
+    fakeCapture: true,
+  },
+  {
+    id: 'm08-eyedropper-clipboard',
+    spec: 'tests/e2e/specs/tauri-m08-eyedropper-clipboard.e2e.ts',
+    harnessQuery: '?m04=1&m08=1',
+    fakeCapture: true,
+  },
+  {
     id: 'renderer-alpha',
     spec: 'tests/e2e/specs/tauri-renderer-alpha.e2e.ts',
     harnessQuery: '?m01=1&token=m01-alpha-png',
@@ -151,6 +163,14 @@ const executable = path.join(
   'debug',
   process.platform === 'win32' ? 'cute-screen.exe' : 'cute-screen',
 )
+const wdioCli = path.join(
+  root,
+  'node_modules',
+  '@wdio',
+  'cli',
+  'bin',
+  'wdio.js',
+)
 
 const failedScenarios = []
 const retainedAppDataDirs = []
@@ -200,15 +220,8 @@ try {
     }
 
     const status = run(
-      'pnpm',
-      [
-        'exec',
-        'wdio',
-        'run',
-        'tests/e2e/wdio.tauri.conf.ts',
-        '--spec',
-        scenario.spec,
-      ],
+      process.execPath,
+      [wdioCli, 'run', 'tests/e2e/wdio.tauri.conf.ts', '--spec', scenario.spec],
       scenarioEnv,
     )
 

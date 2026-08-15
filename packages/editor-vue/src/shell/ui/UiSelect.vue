@@ -8,6 +8,7 @@ const props = defineProps<{
   ariaLabel: string
   size?: 'small' | 'medium' | 'large'
   class?: string
+  disabled?: boolean
 }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string | number] }>()
 const host = ref<HTMLElement>()
@@ -17,6 +18,8 @@ function labelInteractivePart(): void {
   if (!target) return
   target.setAttribute('role', 'combobox')
   target.setAttribute('aria-label', props.ariaLabel)
+  target.setAttribute('aria-disabled', String(props.disabled ?? false))
+  target.setAttribute('tabindex', props.disabled ? '-1' : '0')
 }
 
 function labelOptions(): void {
@@ -39,7 +42,7 @@ function scheduleOptionLabels(): void {
 
 onMounted(() => void nextTick(labelInteractivePart))
 watch(
-  () => props.ariaLabel,
+  () => [props.ariaLabel, props.disabled] as const,
   () => void nextTick(labelInteractivePart),
 )
 </script>
@@ -51,9 +54,10 @@ watch(
       :size="size ?? 'small'"
       :options="[...options]"
       :virtual-scroll="false"
+      :disabled="disabled ?? false"
       to=".cs-overlay-root"
       @update:value="
-        typeof $event === 'string' || typeof $event === 'number'
+        !disabled && (typeof $event === 'string' || typeof $event === 'number')
           ? emit('update:modelValue', $event)
           : undefined
       "

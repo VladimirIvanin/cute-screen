@@ -289,6 +289,13 @@ onBeforeUnmount(() =>
     :class="{
       'cs-context-toolbar--arrow': schema.icon === 'arrow',
       'cs-context-toolbar--text': schema.text,
+      'cs-context-toolbar--precision': [
+        'crop',
+        'privacy',
+        'spotlight',
+        'ruler',
+        'loupe',
+      ].includes(schema.icon),
     }"
     :aria-label="label"
     :aria-description="schema.hint"
@@ -621,6 +628,7 @@ onBeforeUnmount(() =>
           size="small"
           tertiary
           class="cs-context-control"
+          :disabled="control.disabled ?? false"
           @click="emit('action', control.id)"
         >
           {{ control.label }}
@@ -979,6 +987,7 @@ onBeforeUnmount(() =>
             :min="control.min"
             :max="control.max"
             :step="control.step"
+            :disabled="control.disabled ?? false"
             v-bind="{ ariaLabel: control.label }"
             @commit="emit('change', control.id, String($event))"
           />
@@ -990,6 +999,7 @@ onBeforeUnmount(() =>
             :model-value="control.value"
             v-bind="{ ariaLabel: control.label }"
             :options="control.options"
+            :disabled="control.disabled ?? false"
             @update:model-value="emit('change', control.id, String($event))"
           />
         </label>

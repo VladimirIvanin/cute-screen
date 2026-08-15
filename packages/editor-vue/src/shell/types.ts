@@ -47,7 +47,12 @@ export interface FrameSummary {
 }
 
 export type ContextControl =
-  | { readonly kind: 'action'; readonly id: string; readonly label: string }
+  | {
+      readonly kind: 'action'
+      readonly id: string
+      readonly label: string
+      readonly disabled?: boolean
+    }
   | {
       readonly kind: 'color'
       readonly id: string
@@ -66,12 +71,14 @@ export type ContextControl =
       readonly min: number
       readonly max: number
       readonly step: number
+      readonly disabled?: boolean
     }
   | {
       readonly kind: 'select'
       readonly id: string
       readonly label: string
       readonly value: string
+      readonly disabled?: boolean
       readonly options: readonly Readonly<{
         readonly value: string
         readonly label: string
@@ -145,6 +152,38 @@ export interface ContextToolbarSchema {
   }>
 }
 
+export interface PrecisionToolDefaults {
+  readonly censor: {
+    readonly region: 'rectangle' | 'freeform'
+    readonly mode: 'pixelate' | 'blur' | 'solid'
+    readonly blockSize: number
+    readonly blurStrength: number
+    readonly solidColor: import('@cute-screen/editor-renderer').SrgbColor
+  }
+  readonly spotlight: {
+    readonly shape: 'rectangle' | 'ellipse' | 'diamond'
+    readonly dimColor: import('@cute-screen/editor-renderer').SrgbColor
+    readonly dimOpacity: number
+    readonly feather: 'soft' | 'strong' | null
+  }
+  readonly ruler: {
+    readonly unit: 'pixels' | 'percent'
+    readonly snap: boolean
+    readonly snapAngleIncrementDegrees: number
+    readonly color: import('@cute-screen/editor-renderer').SrgbColor
+    readonly thickness: number
+    readonly fontSize: number
+  }
+  readonly loupe: {
+    readonly zoom: number
+    readonly size: number
+    readonly shape: 'circle' | 'rectangle'
+    readonly borderColor: import('@cute-screen/editor-renderer').SrgbColor
+    readonly borderWidth: number
+    readonly shadow: boolean
+  }
+}
+
 export interface CanvasViewportHosts {
   readonly scene: HTMLCanvasElement
   readonly overlay: HTMLCanvasElement
@@ -210,12 +249,14 @@ export type IconName =
   | 'image'
   | 'layers'
   | 'lock'
+  | 'loupe'
   | 'marker'
   | 'more'
   | 'pencil'
   | 'plus'
   | 'privacy'
   | 'redo'
+  | 'ruler'
   | 'select'
   | 'shape'
   | 'spotlight'
@@ -295,7 +336,10 @@ export const translationKeys = [
   'toolEyedropper',
   'toolPrivacy',
   'toolSpotlight',
+  'toolRuler',
+  'toolLoupe',
   'toolUnavailable',
+  'toolNeedsCanvas',
   'arrowHint',
   'arrowStroke',
   'arrowTail',

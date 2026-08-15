@@ -487,6 +487,95 @@ tofu. Harness передаёт CanvasKit и регистрирует для head
 слово «справа» читается в обеих backend-ветках. Цветной emoji-шрифт не добавлялся,
 его одинаковый fallback не считается доказательством emoji glyph coverage.
 
+## M08 crop editor-core evidence (2026-08-15)
+
+Windows 10 build 19045, x64; Node 22.23.1, pnpm 10.33.2; base SHA `5c08f63`.
+Новый `crop-session.test.ts` был запущен до реализации и дал ожидаемые 18/18
+failures из-за отсутствующего public crop-session API. После реализации и
+добавления property regressions:
+
+- focused crop suite — 23/23;
+- весь editor-core — 160/160;
+- `pnpm test` — 41/41 test files и 291/291 tests;
+- package build/typecheck `pnpm exec vue-tsc -b packages/editor-core` прошёл;
+- scoped ESLint и Prettier для core-файлов, а затем полный `pnpm check` прошли,
+  включая repository formatting/docs, 7/7 boundary tests и все Rust
+  fmt/Clippy feature combinations.
+
+Core evidence покрывает canvas-only open/reopen при moved/resized/deleted base
+layer, free/1:1/4:3/16:9/original presets, minimum/out-of-canvas constraints,
+move, все edge/corner handles, keyboard nudge, reset, immutable cancel, один
+`setCrop` apply с no-op history, source/layer/blob immutability и crop × canvas
+flip undo/redo replay. Renderer/Vue, browser, real-Tauri и platform runtime в
+этом slice не запускались и не заявляются.
+
+## M08 precision-tool editor-core evidence (2026-08-15)
+
+Windows 10 build 19045, AMD64; Node 22.23.1, pnpm 10.33.2. Новый
+`precision-tools.test.ts` был запущен до реализации и дал ожидаемые 13/13
+failures на отсутствующих публичных типах, фабриках и geometry API. После
+реализации и расширения positive/negative matrix:
+
+- focused precision suite — 23/23;
+- весь editor-core — 22/22 test files и 183/183 tests;
+- `pnpm test` — 42/42 test files и 314/314 tests;
+- `pnpm build:packages` и отдельный
+  `pnpm exec vue-tsc -b packages/editor-core` прошли;
+- scoped ESLint/Prettier, `pnpm docs:check` и полный `pnpm check` прошли,
+  включая workspace typecheck/build, repository formatting, 7/7 boundary tests
+  и все Rust fmt/Clippy feature combinations.
+
+Core evidence покрывает строгие typed v7 payloads и malformed rejection для
+manual censor, spotlight, ruler и loupe; rectangle/freeform/ellipse/diamond/
+circle geometry и hit testing; composite-below scene descriptors; ruler
+distance/angle semantics с canvas-diagonal basis, pixel/percent length labels и
+transient snapping guide; loupe source/destination separation и bounded settings; одну add/update
+command с undo/redo и отсутствие selection data. Новые semantic scene nodes
+являются только renderer-neutral handoff. Renderer implementation/goldens, Vue
+tool lifecycle и loupe auto-selection, browser/Tauri и platform runtime в этом
+slice не запускались и не заявляются.
+
+## M08 precision renderer/export evidence (2026-08-15)
+
+Windows 10 build 19045, AMD64; Node 22.23.1, pnpm 10.33.2. The red-first
+renderer run failed because `precision-rendering` did not exist, the core crop
+run failed 2/21 assertions because `outputBounds` did not exist, and the first
+render-harness run failed on the four deliberately absent precision goldens.
+After implementation and an intentional golden update:
+
+- focused `precision-rendering.test.ts` — 9/9 tests;
+- `pnpm exec vitest run --project core` — 22/22 files and 185/185 tests;
+- `pnpm exec vitest run --project renderer` — 7/7 files and 43/43 tests;
+- `pnpm test:render` — 1/1 file and 13/13 tests;
+- `pnpm exec vue-tsc -b packages/editor-core packages/editor-renderer` — passed;
+- `pnpm build:packages` — passed, including the editor Vue Vite build;
+- scoped ESLint and Prettier over the changed core/renderer/harness files — passed;
+- `pnpm check` — passed, including full lint/typecheck/package build, repository
+  formatting, Markdown links, 7/7 boundary tests and every configured Rust
+  fmt/Clippy feature combination;
+- `git diff --check` — passed (line-ending conversion warnings only);
+- `pnpm test` retry — 43/43 files and 325/325 tests. The immediately preceding
+  run reached 42/43 files and 316/325 tests before one Vitest worker exited
+  unexpectedly without an assertion failure; the clean retry is recorded, not
+  substituted for the first observation.
+
+Decoded PNG assertions cover crop dimensions and translated pixels, an effect
+crossing the crop boundary, exact solid censor, deterministic image-space
+pixelate blocks at export scales 1 and 2, toleranced blur, spotlight shapes and
+feathering, ruler line/ticks and length-only badge, loupe clipping/border/shadow and
+transparent-black out-of-canvas source behavior. Lower/higher test colours
+prove composite-below sampling for censor and loupe, and overlay pixels are
+excluded from export. Four visually inspected PNG goldens cover Canvas2D and
+CanvasKit at scales 1 and 2.
+
+Canvas2D blur is a deterministic separable box blur; CanvasKit uses its Gaussian
+image filter. Per-backend PNG baselines remain exact, while cross-backend
+semantic parity ignores per-channel deltas up to 24 and permits fewer than 9%
+of channels beyond that threshold for blur and independent glyph edge
+antialiasing. Solid censor pixels are exact on both backends. These checks are
+headless; browser, Tauri/WebView, GPU, native Save As, JPEG/WebP and full stitch
+orchestration were not run or claimed.
+
 ## Диагностика и incidents
 
 - Frontend invoke, Rust command и long operation используют correlation ID.
@@ -597,6 +686,341 @@ config удалён, порт освобождён. Штатный `pnpm test:re
 переносим на Windows из-за POSIX-синтаксиса environment assignment; goldens
 обновлены тем же render-harness с process-local PowerShell environment variable.
 Это не заявляет real-Tauri/WebView2 acceptance.
+
+## M08 Vue interaction evidence (2026-08-15)
+
+Windows 10 22H2 build 19045, AMD64; Node 22.23.1, pnpm 10.33.2. The
+Vue/component contract was exercised without browser, Tauri or native clipboard
+claims.
+
+- The red-first focused run failed 8/8 tests before the Vue implementation: crop
+  commands/overlay, precision creation, guide lifetime, not-ready sampling and
+  contextual settings were absent.
+- `pnpm exec vitest run --project vue tests/unit/vue/m08-precision-interactions.test.ts`
+  passed 18/18. It covers eight crop handles, transient drafts, presets/reset,
+  nudge/apply/cancel/reopen, base resize/flip/removal independence, all four
+  precision creation payloads, freeform censor, add/update command boundaries,
+  selection and active-tool semantics, deterministic undo/redo, hold-only
+  guides, image-space scene sampling, uppercase HEX/recent colours, clipboard
+  failure recovery, pointer/keyboard cancel, EN/RU settings and disabled state.
+- The full Vue project passed 13/13 files and 111/111 tests. Scoped `vue-tsc` and
+  ESLint passed, and `pnpm --filter @cute-screen/editor-vue build` produced the
+  package output successfully.
+- `pnpm test` passed the combined core, renderer, Vue, fixture and fake-platform
+  matrix: 44/44 files and 343/343 tests.
+- `pnpm check` passed ESLint, package/desktop/test/E2E typechecks and builds,
+  repository-wide Prettier, 34-file documentation link validation, 7/7 boundary
+  tests, Rust formatting and all four clippy feature combinations.
+
+Browser/Tauri keyboard routing, decoded-source production mount, native
+clipboard writes, WebView/GPU readback and visual 1024 px acceptance remain for
+their dedicated gates.
+
+## M08 browser and real-Tauri acceptance evidence (2026-08-15)
+
+Environment: Windows 10 Home 22H2 build 19045, AMD64; Node 22.23.1, pnpm
+10.33.2; Chrome 151.0.7922.138; locally detected WebView2 runtime
+151.0.4129.78.
+
+- The focused
+  `pnpm exec wdio run tests/e2e/wdio.browser.conf.ts --spec tests/e2e/specs/browser-m08-crop-precision.e2e.ts`
+  run passed 5/5 scenarios after its final stabilization. It uses pointer,
+  keyboard and labelled-control interaction rather than mutation helpers. The
+  read-only harness snapshot supplies assertions only; it never calls
+  `setFrameSize` or seeds a crop.
+- Browser crop evidence covers decoded fixture/canvas dimensions of 400×300,
+  a user-resized and then deleted unlocked base image, free/original/1:1/4:3/
+  16:9 presets, a handle drag, rule-of-thirds/dim pixels, reset, Enter, Escape,
+  undo, and vertical-before/horizontal-after crop flips. The product defect that
+  rejected transform commits for an unlocked image layer was repaired.
+- Precision evidence covers pointer creation of censor, spotlight, ruler and
+  loupe; no auto-selection for the first three; loupe-only auto-selection; and
+  persistent active-tool semantics. Whole-overlay pixel snapshots prove guides
+  are absent without Alt, visible while held, cleared on keyup/window blur and
+  absent from the document/committed scene.
+- Eyedropper sampled the visible `#273D5A` scene at zoom, not its transient
+  overlay, and exposed uppercase HEX, swatch, recent colour, pointer/keyboard
+  cancel, not-ready and recoverable clipboard-error states. The successful
+  browser clipboard bridge is test-only and is not native clipboard evidence.
+- The six inspected screenshots are
+  `artifacts/browser-e2e/m08-crop-resized-deleted-base.png` and
+  `m08-toolbar-{1440x900,1024x700}-{en,ru}.png`, plus
+  `artifacts/browser-e2e/m08-ruler-visual.png`. The responsive toolbars wrap
+  without horizontal overflow; labels and focus semantics remain available in
+  both locales. The ruler screenshot visibly includes the angled default
+  pink-crimson line, perpendicular ticks, upright length-only badge and all six
+  settings in the bottom toolbar.
+- `pnpm test:render` passed 1/1 file and 13/13 tests. All four
+  `precision-m08-scale-{1,2}-{canvas2d,canvaskit}.png` goldens were opened and
+  visually inspected. `pnpm test` passed 44/44 files and 343/343 tests in the
+  original M08 acceptance slice; the later focused ruler-extension Vue run
+  passed 19/19.
+- `pnpm check` passed lint, package/desktop/E2E typechecks and builds, formatting,
+  34-file docs validation, 7/7 boundary tests and all configured Rust
+  fmt/Clippy combinations before the final evidence-text update; it was rerun
+  after documentation was finalized.
+- The full browser command was observed honestly rather than promoted from the
+  focused pass. Its latest pre-stabilization run completed 4/7 spec files and
+  failed on an M06 pointer-action timeout, two M08 timing assertions later
+  stabilized in the focused 5/5 run, and the independently reproducible M07
+  rich-text top-edge regression (`3.847` canvas px). M05 was repaired and its
+  focused browser spec passed 7/7. No M07 threshold was weakened in this slice.
+
+### M08 ruler visual/persistence extension (2026-08-15)
+
+The visual was independently implemented from the product contract and visual
+observation of the old prototype/reference; no old implementation source was
+copied or linked. `docs/TRACEABILITY.md` was updated before tests or production
+code.
+
+- The first focused core run failed 4/24 tests: visual defaults and required v7
+  fields were absent, pixel labels were fractional, and styled updates were
+  rejected. A second strictness-first run intentionally failed 1/24 until
+  fractional thickness/font-size values were rejected. Final focused core+codec
+  passed 34/34.
+- The first focused renderer run failed 3/11 because the badge still contained
+  the angle and the scale-1/2 pink-line/tick/no-dot pixels were absent. Final
+  Canvas2D/CanvasKit semantics and pixel coverage passed 12/12.
+- The first focused Vue run failed 3/19 because created rulers lacked visual
+  fields and the new colour/thickness/label-size controls were absent. During
+  the green pass, slider ArrowRight exposed an extra global nudge command; the
+  slider keyboard target is now excluded from canvas shortcuts. Final focused
+  Vue passed 19/19, including update/undo/redo and RU/EN/LayersPanel boundaries.
+- Before the intentional golden update, ordinary `pnpm test:render` failed only
+  its two M08 scale cases (the four Canvas2D/CanvasKit artifacts); the other
+  11/13 tests passed. The same render harness was then run with process-local
+  `CUTE_SCREEN_UPDATE_GOLDENS=1`, after which `pnpm test:render` passed 13/13.
+  All four `precision-m08-scale-{1,2}-{canvas2d,canvaskit}.png` artifacts were
+  opened and visually inspected for both horizontal and angled ruler cases.
+- The first focused browser attempt stopped before mount because incremental
+  workspace output was stale and lacked the new renderer export. A forced
+  scoped package rebuild refreshed `dist`; the unchanged focused M08 command
+  then passed 5/5 in Chrome 151 and produced the inspected
+  `artifacts/browser-e2e/m08-ruler-visual.png`.
+- Scoped `vue-tsc` passed, and final `pnpm test` passed 44/44 files and 348/348
+  tests. The first `pnpm check` stopped on one missing type-only import in the
+  new test; after adding it, the targeted test/E2E typechecks and the complete
+  `pnpm check` passed. That complete check included lint, package/desktop/test/E2E
+  typechecks and builds, repository-wide formatting, 34-file documentation link
+  validation, 7/7 boundary tests, Rust formatting and all configured Clippy
+  feature combinations. Final `git diff --check` is recorded in the handoff.
+
+This extension adds no real-Tauri claim. The existing embedded-WebDriver port
+4445 blocker remains the authoritative status until a test body actually runs.
+
+## M08 cropped-viewport repair evidence (2026-08-15)
+
+Windows 10 22H2 build 19045, AMD64; Node 22.23.1, pnpm 10.33.2; Chrome
+151.0.7922.138. `docs/TRACEABILITY.md` was updated before the repair tests or
+production edits. No package was installed or downloaded.
+
+- The first combined Vue/renderer command failed 5/56 tests: four exposed the
+  full-canvas Fit/CSS size, missing crop-origin pointer translation and incorrect
+  DOM-text offset; one exposed a live CanvasKit backing surface that remained at
+  its initial size. The final unchanged focused command passed 56/56.
+- Focused crop/precision core plus Canvas2D/CanvasKit renderer regression coverage
+  passed 82/82. The live renderer test drove full→crop→full recreation, verified
+  intrinsic and CSS scene/overlay sizes, disposal of replaced surfaces/contexts,
+  image re-upload and font lifetime. `pnpm test:render` passed 13/13.
+- The new browser scenario failed red-first at the visible cropped-surface aspect
+  ratio (1/6 scenarios failed). The final focused browser spec passed 6/6 in
+  Chrome 151 after applying an `x=60` crop through the visible Crop flow. It then
+  created censor and ruler layers, sampled with the eyedropper, and created and
+  reopened text through the cropped surface; only a read-only document snapshot
+  was used to verify canvas-space coordinates.
+- Scoped Vue/E2E typechecks passed. Final `pnpm test` passed 44/44 files and
+  353/353 tests. The first full `pnpm check` stopped on one strict test-only
+  emitted-event type; after that correction it reached the formatting gate and
+  identified only the five newly edited repair files for scoped formatting.
+  After scoped formatting, the complete `pnpm check` passed lint, all
+  package/desktop/test/E2E typechecks and builds, repository-wide formatting,
+  34-file documentation validation, 7/7 boundary tests, Rust formatting and all
+  configured Clippy feature combinations. Formatting, docs and diff checks were
+  then repeated after this final evidence update.
+
+This repair does not add a real GPU/WebView claim. Per the known infrastructure
+blocker, real-Tauri was not re-run; the embedded-WebDriver port 4445 status below
+remains authoritative.
+
+The clean-state Tauri specs are present as
+`tauri-m08-crop-first-open.e2e.ts` and
+`tauri-m08-eyedropper-clipboard.e2e.ts`. Production `App.vue` loads the persisted
+document, decodes the source with binary fallback, assigns `sourceImage`, and
+only then opens the `DocumentSessionController`; the crop spec starts from an
+isolated empty app-data directory and invokes the production fake-capture
+request without a frame-size helper.
+
+Real-Tauri execution is blocked before either M08 test body. The debug
+feature-gated binary built at `target/debug/cute-screen.exe`, and backend/frontend
+logs show the fake-platform app and Tauri bridge became ready, but the service
+raised `Failed to start embedded WebDriver ... port 4445 within 60000ms`.
+Consequently clean-state WebView crop mount and system clipboard readback remain
+pending. The runner was changed to invoke the already-installed local WDIO CLI
+instead of nested Corepack, and `autoDownloadEdgeDriver: false` now prevents
+future network downloads. Before that guard was added, the service silently
+downloaded `msedgedriver 151.0.4129.78` to the user temp directory during the
+attempt; no further download was authorized or performed. The saved gitignored
+`artifacts/tauri-e2e/wdio.log` does not contain the embedded-WebDriver timeout
+transcript, so it is not durable proof of that failure. The timeout was observed
+in transient command output only; clean mount and native clipboard real-Tauri
+evidence therefore remain pending. No log is created or reconstructed to replace
+the missing transcript.
+
+## M08 loupe/ruler transform and bounds repair evidence (2026-08-15)
+
+Windows 10 22H2 build 19045, AMD64; Node 22.23.1, pnpm 10.33.2; Chrome
+151.0.7922.138. `docs/TRACEABILITY.md` was updated before the repair tests and
+production changes. No package was installed or downloaded, and the approved
+default ruler colour, thickness, font size and badge layout were not changed.
+
+- Red-first command coverage failed 2/8 because strict v7 rejected the new
+  partially out-of-canvas loupe fixture before horizontal/vertical flip replay.
+  Red-first precision-core coverage failed 2/26 on that codec contract and the
+  short-ruler visual bounds. Red-first renderer coverage failed 12/26: three
+  transformed-ruler pixel comparisons and nine transparent loupe sample checks.
+- The same `flipCanvas` command now mirrors `sourceRegion` on both axes and its
+  command test proves undo/redo. Strict-v7 factory/codec coverage accepts only a
+  bounded finite positive region that intersects the canvas, while rejecting
+  non-finite, zero/negative, wholly disjoint and abusive-coordinate candidates.
+- Canvas2D and CanvasKit decoded pixels cover circle/rectangle lenses at export
+  scales 1 and 2. The complete lens sample is cleared to transparent black before
+  only the source/canvas intersection is copied from the frozen composite below;
+  Canvas2D committed-preview pixels are checked separately. The existing
+  source/destination split and no-recursion ordering remain unchanged.
+- Semantic world-endpoint tests cover a 120° ruler rotation and horizontal and
+  vertical reflection. Exact backend pixel comparisons cover the transformed
+  badge in Canvas2D and CanvasKit while line/ticks retain the layer transform.
+  Core tests cover short-ruler creation, badge/tick hit area, font/thickness
+  rebasing, stable world endpoints and command undo/redo.
+- Focused final evidence passed 136/136 across the selected core/codec/scene,
+  renderer and Vue files; full core passed 190/190, full renderer 61/61 and the
+  focused M08 Vue suite 22/22. `pnpm test:render` passed 13/13 without a golden
+  update. Final `pnpm test` passed 44/44 files and 371/371 tests.
+- The focused M08 browser spec passed 7/7. The ruler scenario creates and selects
+  the layer through visible controls, changes label size and thickness with real
+  pointer drags, observes the selection-frame growth, and checks two-step
+  undo/redo. `artifacts/browser-e2e/m08-ruler-bounds-after-style.png` was opened
+  and visually inspected.
+- `pnpm check` passed after an initial test-only readonly-fixture type error was
+  repaired with immutable reconstruction. The successful gate includes lint,
+  all configured TypeScript/E2E builds, repository formatting, 34-file docs
+  validation, 7/7 boundary tests, Rust formatting and all configured Clippy
+  feature combinations. Final docs formatting/link and `git diff --check` are
+  repeated after this evidence update.
+
+This repair adds no real GPU/WebView claim. The existing embedded-WebDriver port
+4445 blocker remains the authoritative real-Tauri status.
+
+## M08 locked precision controls and opaque eyedropper repair evidence (2026-08-15)
+
+Windows 10 22H2 build 19045, AMD64; Node 22.23.1, pnpm 10.33.2; Chrome
+151.0.7922.138. `docs/TRACEABILITY.md` was updated before the repair tests and
+production edits. `docs/milestones/` remains gitignored and was neither
+force-added nor used as tracked evidence. No package was installed or
+downloaded.
+
+- The red-first focused Vue run completed 31 tests with six expected failures:
+  four locked censor/spotlight/ruler/loupe cases exposed enabled contextual
+  controls, alpha `128` emitted `#ABCDEF`, and the parent shell advanced to the
+  clipboard/swatch/recent path for that semi-transparent sample. Final focused
+  Vue passed 32/32, including the added selected read-only ruler regression.
+- Range, select, colour and related precision controls now expose their native
+  disabled/`aria-disabled` state and leave disabled controls outside sequential
+  focus. Focus, keyboard and pointer attempts do not execute a command or mutate
+  creation defaults/recent colours. A selected unlocked layer receives exactly
+  one `updateLayer` command per completed interaction; with no selection the
+  same toolbar changes only the defaults used by the next created layer.
+- The red-first focused browser run passed six scenarios and failed the two new
+  scenarios: locked Effect lacked `aria-disabled`, and the alpha harness still
+  sampled `#273D5A`. The unchanged focused command then passed 8/8. Its locked
+  scenario checks a stable document/version token through focus, keyboard and
+  pointer attempts, verifies the unmodified creation default, unlocks the layer
+  and observes exactly one version increment for the normal update.
+- Eyedropper component and seeded browser coverage accepts only alpha `255`.
+  Alpha `0` and `128` surface the existing recoverable “no opaque colour” state
+  before clipboard, swatch or recent-colour mutation; alpha `255` still returns
+  uppercase `#273D5A`. Existing zoom/crop mapping and transient-overlay
+  exclusion scenarios remain in the same passing browser spec.
+- `pnpm test:render` passed 13/13 without a golden update or renderer change.
+  The first `pnpm test` attempt passed 43/44 files before one Vitest fork exited
+  unexpectedly without an assertion failure; the unchanged rerun passed 44/44
+  files and 381/381 tests.
+- The first `pnpm check` reached formatting after lint and all TypeScript/E2E
+  builds, then stopped only because the final `docs/TRACEABILITY.md` evidence
+  edit needed Prettier. After formatting that tracked file, the complete
+  unchanged gate passed lint, all configured TypeScript/E2E builds,
+  repository-wide formatting, 34-file documentation link validation, 7/7
+  boundary tests, Rust formatting and all configured Clippy feature
+  combinations.
+
+No Tauri run was attempted. Clean production decoded-source mount and native
+clipboard readback remain pending behind the existing embedded-WebDriver port
+4445 blocker. The `?m05=1`/M08 App harness results above are seeded interaction
+coverage only. The previously recorded full-browser M06 timeout and M07
+rich-text top-edge failure remain unresolved and are not promoted to a universal
+browser pass.
+
+## M08 generic ruler resize/transform repair evidence (2026-08-15)
+
+Windows 10 22H2 build 19045, AMD64; Node 22.23.1, pnpm 10.33.2; Chrome
+151.0.7922.138. `docs/TRACEABILITY.md` was updated and the tests were authored
+before production changes. No package was installed or downloaded. The M08 dirty
+tree was preserved; `docs/milestones/` and `artifacts/` remain gitignored and
+were not force-added.
+
+- After correcting only new-test fixture/transform helpers, strict-v7 red failed
+  because an endpoint-containing but badge/tick-incomplete `localBounds` decoded
+  as editable. A later direct-save mutation check bypassed the shell canonicalizer
+  and failed the focused Vue test on the new codec guard; restoring the production
+  canonicalizer passed the unchanged target 1/1.
+- Core coverage drives 5–9% strong scale-down, non-uniform scaling, 37° rotation,
+  127°/−73° rotation with horizontal/vertical reflection, and proves that the raw
+  scaled bounds are nonconservative while `rebaseRulerLayer` preserves factual
+  world endpoints, rotation/reflection, selection geometry, badge hit and spatial
+  broad phase. Strict v7 rejects derived-bound undercoverage without weakening the
+  required colour/thickness/font-size payload.
+- `EditorShell` applies the same canonical transform boundary to persisted ruler
+  move, generic resize/rotate, LayersPanel rotation and canvas reflection. The Vue
+  pointer test proves no command before pointer-up, exactly one `updateLayer`
+  afterward, and exact undo/redo. Focused core/codec/command/hit plus Vue coverage
+  passed 6 files and 114/114 tests.
+- The existing focused M08 browser spec remains eight scenarios and passed 8/8.
+  Its ruler scenario uses the visible Select handle for a strong non-uniform
+  resize, observes one version increment, a badge-covering selection frame,
+  canvas badge re-selection and exact undo/redo. This is seeded Chrome evidence,
+  not a full-browser or real-Tauri claim.
+- `pnpm test:render` passed 13/13 without a golden update. `pnpm test` passed
+  44 files and 387/387 tests. The approved `#E3488F`, ticks without dots and
+  length-only upright badge were not changed.
+
+Tauri was not run. The saved gitignored `artifacts/tauri-e2e/wdio.log` still
+contains no timeout transcript, no replacement log was created, and durable
+clean-mount/native-clipboard real-Tauri evidence remains pending.
+
+## M08 loupe callout visual evidence (2026-08-15)
+
+Windows 10 22H2 build 19045, AMD64; Node 22.23.1 and pnpm 10.33.2. The
+`REQ-TOL-011` and traceability rows were updated before test and production
+changes. The Electron prototype was used only as UX reference; its code was not
+copied into the Tauri/Vue implementation.
+
+- Red-first focused execution failed all eight Canvas2D/CanvasKit connector
+  pixel cases (circle/rectangle at scales 1/2) and the selected-loupe Vue
+  overlay case. The remaining 59 focused tests passed.
+- Final focused renderer/Vue execution passed 68/68. The renderer freezes the
+  composite-below snapshot before drawing the derived connector, so the line
+  and arrowhead cannot recursively enter the lens sample.
+- `pnpm test:render` passed 13/13 after updating and visually inspecting the
+  four M08 Canvas2D/CanvasKit scale-1/scale-2 PNGs. Connector colour follows the
+  persisted border colour; the source marker and zoom/size chips are drawn only
+  by the interaction overlay.
+- `pnpm test` passed 44 files and 396/396 tests. `pnpm check` passed ESLint,
+  package/app/test TypeScript builds, Prettier, Markdown links, 7/7 boundary
+  tests and all four documented Rust clippy configurations.
+- The repository's `pnpm test:render:update` command uses POSIX inline
+  environment syntax and is not directly executable by `cmd.exe`. On Windows,
+  the same render-harness command was run with
+  `$env:CUTE_SCREEN_UPDATE_GOLDENS = '1'`; no alternate script was introduced.
 
 ## CI gates
 
