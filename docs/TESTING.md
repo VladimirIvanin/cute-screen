@@ -570,6 +570,34 @@ typecheck/package builds, Prettier, docs, boundaries и все Rust clippy-пр�
 интерактивный Windows desktop test ignored. `pnpm.cmd tauri build` создал
 `target/release/cute-screen.exe`; `git diff --check` завершился с exit code 0.
 
+## Text projection handoff repair evidence (2026-08-15)
+
+Windows 10 Home 22H2 build 19045, AMD64; Node 22.23.1, pnpm 10.33.2. Две
+регрессии выполнены red-first: Vue component сначала оставлял persisted Text в
+renderer scene во время `contenteditable`, а renderer-neutral layout давал
+разные baseline `36` и `38` для одной строки при разных glyph ink bounds. После
+исправления:
+
+- focused Vue/renderer slice — 39/39;
+- `pnpm test` — 267/267;
+- `pnpm test:render` — 11/11 после обновления двух rich-text goldens; Canvas2D и
+  CanvasKit PNG декодированы и визуально просмотрены;
+- `pnpm exec tsc --noEmit -p tests/e2e/tsconfig.json` прошёл;
+- `pnpm check` прошёл полностью: ESLint, typecheck/build, formatting, docs links,
+  7/7 boundary tests, Rust fmt и четыре clippy feature combinations;
+- `browser-v7-rich-text.e2e.ts` — 5/5 на Chrome 151.0.7922.138. Новый сценарий
+  ждёт загрузки audited Roboto, сравнивает DOM projection и canvas pixel top-edge
+  с допуском 1 canvas px, затем доказывает отсутствие persisted text pixels во
+  время повторного редактирования и их восстановление после Escape.
+
+Обычный browser runner сначала не стартовал, потому что пользовательский Vite
+уже занимал `127.0.0.1:5173`. Для проверки без остановки чужого процесса тот же
+WebdriverIO browser service и spec были запущены одноразово на `5174`; временный
+config удалён, порт освобождён. Штатный `pnpm test:render:update` также не
+переносим на Windows из-за POSIX-синтаксиса environment assignment; goldens
+обновлены тем же render-harness с process-local PowerShell environment variable.
+Это не заявляет real-Tauri/WebView2 acceptance.
+
 ## CI gates
 
 ### Каждый PR

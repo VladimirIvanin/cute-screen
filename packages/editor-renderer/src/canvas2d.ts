@@ -352,7 +352,19 @@ export function drawNodes2D(
             const descent = Number.isFinite(metrics.actualBoundingBoxDescent)
               ? metrics.actualBoundingBoxDescent
               : style.fontSize * 0.2
-            return { width: metrics.width, ascent, descent }
+            const lineAscent = Number.isFinite(metrics.fontBoundingBoxAscent)
+              ? metrics.fontBoundingBoxAscent
+              : style.fontSize * 0.8
+            const lineDescent = Number.isFinite(metrics.fontBoundingBoxDescent)
+              ? metrics.fontBoundingBoxDescent
+              : style.fontSize * 0.2
+            return {
+              width: metrics.width,
+              ascent,
+              descent,
+              lineAscent,
+              lineDescent,
+            }
           })
           context.textAlign = 'left'
           context.textBaseline = 'alphabetic'

@@ -221,6 +221,12 @@ browser-skill visual inspection подтверждает 32 px compact toolbar, 
 до WebView2 151.0.4129.78, но до test bodies потребовал отсутствующий
 `msedgedriver` 151.0.4129.78 и попытку download, запрещённую scope.
 
+Windows browser repair acceptance (2026-08-15) дополнительно проверяет handoff
+`contenteditable → canvas`: верхняя граница ink до и после commit совпадает с
+допуском 1 canvas px, а при повторном редактировании persisted text pixels
+отсутствуют под transient projection и возвращаются после Escape. Chrome
+151.0.7922.138 rich-text spec прошёл 5/5; real Tauri/WebView2 не заявляется.
+
 ## A08 — Crop и precision tools
 
 На чистом документе открыть Crop без предварительного программного задания frame

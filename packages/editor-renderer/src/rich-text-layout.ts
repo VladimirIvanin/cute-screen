@@ -4,8 +4,21 @@ import type {
   RgbaColor,
 } from '@cute-screen/editor-core'
 
+const TEXT_LINE_HEIGHT = 1.25
+const FALLBACK_LINE_ASCENT = 0.8
+const FALLBACK_LINE_DESCENT = 0.2
+
 export type RichTextMeasureResult =
-  number | Readonly<{ width: number; ascent: number; descent: number }>
+  | number
+  | Readonly<{
+      width: number
+      /** Actual glyph ink bounds used for visual centering. */
+      ascent: number
+      descent: number
+      /** Font box metrics used for a CSS-compatible line baseline. */
+      lineAscent?: number
+      lineDescent?: number
+    }>
 
 export type RichTextMeasure = (
   text: string,
@@ -64,6 +77,7 @@ interface StyledCodePoint {
   readonly width: number
   readonly ascent: number
   readonly descent: number
+  readonly baselineOffset: number
   readonly whitespace: boolean
   readonly newline: boolean
 }
@@ -99,10 +113,16 @@ function styledCodePoints(
       typeof measurement === 'number'
         ? {
             width: measurement,
-            ascent: style.fontSize * 0.8,
-            descent: style.fontSize * 0.2,
+            ascent: style.fontSize * FALLBACK_LINE_ASCENT,
+            descent: style.fontSize * FALLBACK_LINE_DESCENT,
           }
         : measurement
+    const lineAscent =
+      measured.lineAscent ?? style.fontSize * FALLBACK_LINE_ASCENT
+    const lineDescent =
+      measured.lineDescent ?? style.fontSize * FALLBACK_LINE_DESCENT
+    const halfLeading =
+      (style.fontSize * TEXT_LINE_HEIGHT - lineAscent - lineDescent) / 2
     glyphs.push({
       text,
       start: offset,
@@ -111,6 +131,7 @@ function styledCodePoints(
       width: text === '\n' || text === '\r' ? 0 : measured.width,
       ascent: measured.ascent,
       descent: measured.descent,
+      baselineOffset: lineAscent + halfLeading,
       whitespace: text !== '\n' && text !== '\r' && /\s/u.test(text),
       newline: text === '\n' || text === '\r',
     })
@@ -274,20 +295,23 @@ export function layoutRichText(
   const lineHeights = pendingLines.map((line) =>
     Math.max(
       1,
-      ...line.glyphs.map((glyph) => glyph.style.fontSize * 1.25),
-      line.paragraphFontSize * 1.25,
+      ...line.glyphs.map((glyph) => glyph.style.fontSize * TEXT_LINE_HEIGHT),
+      line.paragraphFontSize * TEXT_LINE_HEIGHT,
     ),
   )
   const totalHeight = lineHeights.reduce((total, height) => total + height, 0)
   const lineTops: number[] = []
-  const lineAscents: number[] = []
+  const lineBaselineOffsets: number[] = []
   let rawTop = node.y
   for (const [lineIndex, line] of pendingLines.entries()) {
     lineTops.push(rawTop)
-    lineAscents.push(
+    lineBaselineOffsets.push(
       Math.max(
-        line.paragraphFontSize * 0.8,
-        ...line.glyphs.map((glyph) => glyph.ascent),
+        line.paragraphFontSize *
+          (FALLBACK_LINE_ASCENT +
+            (TEXT_LINE_HEIGHT - FALLBACK_LINE_ASCENT - FALLBACK_LINE_DESCENT) /
+              2),
+        ...line.glyphs.map((glyph) => glyph.baselineOffset),
       ),
     )
     rawTop += lineHeights[lineIndex]!
@@ -297,10 +321,16 @@ export function layoutRichText(
     let inkTop = Number.POSITIVE_INFINITY
     let inkBottom = Number.NEGATIVE_INFINITY
     for (const [lineIndex, line] of pendingLines.entries()) {
-      const baseline = lineTops[lineIndex]! + lineAscents[lineIndex]!
+      const baseline = lineTops[lineIndex]! + lineBaselineOffsets[lineIndex]!
       if (line.glyphs.length === 0) {
-        inkTop = Math.min(inkTop, baseline - line.paragraphFontSize * 0.8)
-        inkBottom = Math.max(inkBottom, baseline + line.paragraphFontSize * 0.2)
+        inkTop = Math.min(
+          inkTop,
+          baseline - line.paragraphFontSize * FALLBACK_LINE_ASCENT,
+        )
+        inkBottom = Math.max(
+          inkBottom,
+          baseline + line.paragraphFontSize * FALLBACK_LINE_DESCENT,
+        )
       } else {
         for (const glyph of line.glyphs) {
           inkTop = Math.min(inkTop, baseline - glyph.ascent)
@@ -322,7 +352,7 @@ export function layoutRichText(
           ? line.contentX + line.contentWidth - width
           : line.contentX
     const top = lineTops[lineIndex]! + verticalShift
-    const baseline = top + lineAscents[lineIndex]!
+    const baseline = top + lineBaselineOffsets[lineIndex]!
     const fragments: RichTextLayoutFragment[] = []
     let cursor = x
     for (const glyph of line.glyphs) {

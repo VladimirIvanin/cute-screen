@@ -101,7 +101,8 @@
   },
   "pnpm": {
     "overrides": {
-      "@webgpu/types": "0.1.71"
+      "@webgpu/types": "0.1.71",
+      "nanoid": "3.3.18"
     },
     "onlyBuiltDependencies": [
       "esbuild"

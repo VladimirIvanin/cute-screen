@@ -102,6 +102,26 @@ describe('v7 content-layer core contracts', () => {
     expect(three).not.toHaveProperty('opacity')
   })
 
+  it('centres a numbered marker on its creation origin', () => {
+    const origin = { x: 80, y: 96 }
+    const marker = createNumberedMarkerLayer({
+      id: ids[0],
+      sequence: 1,
+      origin,
+    })
+
+    expect({
+      x:
+        marker.transform.translateX +
+        marker.localBounds.x +
+        marker.localBounds.width / 2,
+      y:
+        marker.transform.translateY +
+        marker.localBounds.y +
+        marker.localBounds.height / 2,
+    }).toEqual(origin)
+  })
+
   it('copies v7 portable layers, remaps IDs and demotes a base image', () => {
     const base = createContentImageLayer({
       id: ids[0],

@@ -542,6 +542,20 @@ function canvasKitInkBounds(
   return { top: -fontSize * 0.8, bottom: fontSize * 0.2 }
 }
 
+function canvasKitLineMetrics(
+  font: CanvasKitFontMetricsSource,
+  fontSize: number,
+): Readonly<{ ascent: number; descent: number }> {
+  const metrics = font.getMetrics?.()
+  const ascent = metrics ? -metrics.ascent : Number.NaN
+  const descent = metrics?.descent ?? Number.NaN
+  return {
+    ascent: Number.isFinite(ascent) && ascent >= 0 ? ascent : fontSize * 0.8,
+    descent:
+      Number.isFinite(descent) && descent >= 0 ? descent : fontSize * 0.2,
+  }
+}
+
 export function resolveCanvasKitVisualCenterBaseline(
   font: CanvasKitFontMetricsSource,
   text: string,
@@ -907,10 +921,13 @@ export function drawNodesCanvasKit(
                 const layout = layoutRichText(node, (text, style) => {
                   const font = fontForStyle(style, text)
                   const ink = canvasKitInkBounds(font, text, style.fontSize)
+                  const line = canvasKitLineMetrics(font, style.fontSize)
                   return {
                     width: canvasKitTextWidth(font, text, style.fontSize),
                     ascent: Math.max(0, -ink.top),
                     descent: Math.max(0, ink.bottom),
+                    lineAscent: line.ascent,
+                    lineDescent: line.descent,
                   }
                 })
                 for (const line of layout.lines) {

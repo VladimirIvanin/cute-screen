@@ -365,8 +365,8 @@ button:focus-visible {
   min-height: 1.25em;
   padding: 0;
   overflow: visible;
-  border: 1px solid var(--focus-ring);
-  outline: none;
+  border: 0;
+  outline: 1px solid var(--focus-ring);
   background: transparent;
   caret-color: currentColor;
   white-space: pre-wrap;

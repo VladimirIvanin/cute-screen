@@ -260,15 +260,16 @@ export function createNumberedMarkerLayer(input: {
   if (!Number.isInteger(input.sequence) || input.sequence <= 0) {
     throw new Error('numbered marker sequence must be a positive integer')
   }
+  const localBounds = { x: 0, y: 0, width: 32, height: 32 }
   return Object.freeze({
     id: input.id,
     kind: 'numberedMarker',
     transform: {
       ...IDENTITY,
-      translateX: input.origin.x,
-      translateY: input.origin.y,
+      translateX: input.origin.x - (localBounds.x + localBounds.width / 2),
+      translateY: input.origin.y - (localBounds.y + localBounds.height / 2),
     },
-    localBounds: { x: 0, y: 0, width: 32, height: 32 },
+    localBounds,
     visible: true,
     locked: false,
     payload: {

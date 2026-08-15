@@ -5,11 +5,14 @@ import CanvasViewport, {
   type TextFormattingPatch,
   type TextToolDefaults,
 } from '../../../packages/editor-vue/src/shell/components/CanvasViewport.vue'
+import type { RenderSceneSnapshot } from '@cute-screen/editor-core'
 import {
+  Canvas2DRenderer,
   createCalloutLayer,
   createNumberedMarkerLayer,
   createTextLayer,
   type EditorDocument,
+  type ImageLayer,
   type LayerNode,
 } from '@cute-screen/editor-renderer'
 
@@ -57,13 +60,59 @@ beforeEach(() => {
   } as unknown as CanvasRenderingContext2D)
 })
 
-function mount(layer?: LayerNode, activeTool = 'select') {
+function mount(
+  layer?: LayerNode,
+  activeTool = 'select',
+  renderPersistedScene = false,
+) {
+  const imageLayer: ImageLayer = {
+    id: '019c1f62-058e-7000-8000-000000000001',
+    kind: 'image',
+    localBounds: { x: 0, y: 0, width: 240, height: 160 },
+    transform: {
+      translateX: 0,
+      translateY: 0,
+      rotation: 0,
+      scaleX: 1,
+      scaleY: 1,
+    },
+    opacity: 1,
+    blendMode: 'normal',
+    shadows: [],
+    visible: true,
+    locked: true,
+    payload: {
+      blobHash: 'a'.repeat(64),
+      intrinsicWidth: 240,
+      intrinsicHeight: 160,
+      format: 'png',
+      orientationApplied: true,
+      color: { colorSpace: 'srgb', hasIccProfile: false },
+      role: 'base',
+      border: null,
+      radius: 0,
+      crop: null,
+      mask: null,
+    },
+  }
   const document = editorDocument(layer)
+  const renderDocument = renderPersistedScene
+    ? { ...document, layers: layer ? [imageLayer, layer] : [imageLayer] }
+    : document
+  const image = new Image()
+  if (renderPersistedScene) {
+    Object.defineProperties(image, {
+      naturalWidth: { configurable: true, value: 240 },
+      naturalHeight: { configurable: true, value: 160 },
+    })
+    image.src = 'data:image/png;base64,'
+  }
   const rendered = render(CanvasViewport, {
     props: {
       documentState: { kind: 'ready', title: 'Text', dimensions: '240 × 160' },
-      canvas: document.canvas,
-      document,
+      canvas: renderDocument.canvas,
+      document: renderDocument,
+      ...(renderPersistedScene ? { image, imageLayer } : {}),
       activeTool,
       textDefaults: TEXT_DEFAULTS,
       zoom: 100,
@@ -475,4 +524,63 @@ describe('v7 rich-text component editing', () => {
       })
     },
   )
+
+  it('replaces persisted text with one transient projection and restores it on cancel', async () => {
+    const layer = createTextLayer({
+      id: '019c1f62-058e-7000-8000-000000000109',
+      text: 'single projection',
+      origin: { x: 10, y: 10 },
+    })!
+    const scenes: RenderSceneSnapshot[] = []
+    const setScene = vi
+      .spyOn(Canvas2DRenderer.prototype, 'setScene')
+      .mockImplementation((scene) => {
+        scenes.push(scene)
+      })
+    const renderScene = vi
+      .spyOn(Canvas2DRenderer.prototype, 'render')
+      .mockReturnValue({
+        backend: 'canvas2d',
+        correlationId: 'text-projection-test',
+        reasons: ['scene'],
+        nodeCount: 0,
+        startedAt: 0,
+        duration: 0,
+      })
+
+    try {
+      const rendered = mount(layer, 'select', true)
+      await vi.waitFor(() =>
+        expect(scenes.at(-1)?.nodes.some((node) => node.id === layer.id)).toBe(
+          true,
+        ),
+      )
+
+      await fireEvent.dblClick(rendered.scene, {
+        clientX: layer.transform.translateX + 2,
+        clientY: layer.transform.translateY + 2,
+      })
+      await expect(
+        rendered.findByLabelText('Text editor'),
+      ).resolves.toBeTruthy()
+      await vi.waitFor(() =>
+        expect(scenes.at(-1)?.nodes.some((node) => node.id === layer.id)).toBe(
+          false,
+        ),
+      )
+
+      await fireEvent.keyDown(rendered.getByLabelText('Text editor'), {
+        key: 'Escape',
+      })
+      await vi.waitFor(() =>
+        expect(scenes.at(-1)?.nodes.some((node) => node.id === layer.id)).toBe(
+          true,
+        ),
+      )
+      expect(rendered.emitted().documentCommand).toBeUndefined()
+    } finally {
+      setScene.mockRestore()
+      renderScene.mockRestore()
+    }
+  })
 })

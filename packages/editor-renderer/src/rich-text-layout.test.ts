@@ -149,9 +149,43 @@ describe('renderer-neutral rich text layout', () => {
 
     expect(layout.lines).toHaveLength(1)
     expect(layout.lines[0]?.height).toBe(30)
-    expect(layout.lines[0]?.top).toBe(38)
+    expect(layout.lines[0]?.top).toBe(35)
+    expect(layout.lines[0]?.baseline).toBeCloseTo(57.2)
     expect(
       layout.lines[0]?.fragments.map((fragment) => fragment.fontSize),
     ).toEqual([16, 24])
+  })
+
+  it('keeps a CSS-like line baseline stable when glyph ink bounds change', () => {
+    const node = textNode({
+      text: 'a',
+      width: 100,
+      runs: [
+        {
+          start: 0,
+          end: 1,
+          fontFamily: 'Roboto',
+          fontSize: 20,
+          color: black,
+          fontWeight: 400,
+          fontStyle: 'normal',
+          strikethrough: false,
+        },
+      ],
+      paragraphs: [{ start: 0, end: 1, alignment: 'start', listKind: 'none' }],
+    })
+    const shallowInk = layoutRichText(node, () => ({
+      width: 10,
+      ascent: 10,
+      descent: 2,
+    }))
+    const tallInk = layoutRichText(node, () => ({
+      width: 10,
+      ascent: 18,
+      descent: 3,
+    }))
+
+    expect(shallowInk.lines[0]?.baseline).toBe(tallInk.lines[0]?.baseline)
+    expect(shallowInk.lines[0]?.baseline).toBe(38.5)
   })
 })

@@ -20,6 +20,7 @@ import {
 import {
   Canvas2DRenderer,
   createDocumentRenderScene,
+  createRenderSceneSnapshot,
   drawNodes2D,
   hitTestDocument,
   hitTestDocumentAll,
@@ -443,7 +444,29 @@ async function drawDocument(): Promise<void> {
       resource.resource.dispose()
       imageResources.delete(id)
     }
-    runtime.setScene(createDocumentRenderScene(props.document))
+    const documentScene = createDocumentRenderScene(props.document)
+    const editing = editingText.value
+    if (!editing?.existing) {
+      runtime.setScene(documentScene)
+    } else {
+      // The contenteditable owns the text projection during direct editing.
+      // Keep non-text callout/marker container nodes in the committed scene.
+      const hiddenNodeIds =
+        editing.existing.kind === 'text'
+          ? new Set([editing.id, `${editing.id}:background`])
+          : editing.existing.kind === 'callout'
+            ? new Set([`${editing.id}:text`])
+            : new Set([`${editing.id}:label`])
+      runtime.setScene(
+        createRenderSceneSnapshot({
+          width: documentScene.width,
+          height: documentScene.height,
+          nodes: documentScene.nodes.filter(
+            (candidate) => !hiddenNodeIds.has(candidate.id),
+          ),
+        }),
+      )
+    }
     runtime.render(['scene'])
   } catch (error) {
     renderer?.dispose()
@@ -848,6 +871,10 @@ watch(
     props.document,
     props.textureImages,
   ],
+  () => void drawDocument(),
+)
+watch(
+  () => editingText.value?.existing?.id,
   () => void drawDocument(),
 )
 watch(

@@ -369,6 +369,46 @@ describe('M05 CanvasViewport transforms', () => {
     expect(emitted().addLayer).toBeUndefined()
   })
 
+  it('creates a numbered marker with the pointer click at its centre', async () => {
+    vi.stubGlobal('crypto', {
+      randomUUID: vi.fn(() => '019c1f62-058e-7000-8000-000000000099'),
+    })
+    const { scene, emitted } = mountViewport('numberedMarker')
+
+    await fireEvent.pointerDown(scene, {
+      pointerId: 1,
+      clientX: 30,
+      clientY: 40,
+    })
+
+    const addLayer = emitted().addLayer as unknown as
+      readonly [unknown][] | undefined
+    const layer = (addLayer?.[0]?.[0] ?? null) as {
+      readonly transform: {
+        readonly translateX: number
+        readonly translateY: number
+      }
+      readonly localBounds: {
+        readonly x: number
+        readonly y: number
+        readonly width: number
+        readonly height: number
+      }
+    } | null
+    expect(layer).not.toBeNull()
+    expect({
+      x:
+        layer!.transform.translateX +
+        layer!.localBounds.x +
+        layer!.localBounds.width / 2,
+      y:
+        layer!.transform.translateY +
+        layer!.localBounds.y +
+        layer!.localBounds.height / 2,
+    }).toEqual({ x: 30, y: 40 })
+    vi.unstubAllGlobals()
+  })
+
   it('commits click-created text as auto-sized content in one command', async () => {
     vi.stubGlobal('crypto', {
       randomUUID: vi.fn(() => '019c1f62-058e-7000-8000-000000000099'),
