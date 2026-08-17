@@ -274,10 +274,27 @@ export type NumberedMarkerPayload = Readonly<{
   readonly badge: NumberedMarkerBadge
 }>
 
+export type CalloutRoute = Readonly<{
+  readonly path: 'elbow'
+  readonly elbow: Readonly<{
+    readonly axis: 'x' | 'y'
+    /** Signed displacement of the middle segment from the endpoint midpoint. */
+    readonly offset: number
+  }> &
+    JsonObject
+}>
+
+export type CalloutMarker = 'circle'
+
 export type CalloutPayload = Readonly<{
   readonly content: RichTextContent
-  readonly bubble: TextBackground
-  readonly tailAnchor: Point & JsonObject
+  readonly background: TextBackground | null
+  readonly target: Point & JsonObject
+  readonly label: Point & JsonObject
+  readonly route: CalloutRoute
+  readonly stroke: StrokeStyle
+  readonly targetMarker: CalloutMarker
+  readonly labelMarker: CalloutMarker
 }>
 
 export interface EmojiAssetReference extends JsonObject {

@@ -616,12 +616,18 @@ describe('M06 drawing tools in browser mode', () => {
     await expect(markerTool).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('creates a multiline callout with a separate renderer tail through the same overlay flow', async () => {
+  it('creates a multiline callout through drag target→label and preserves the active tool', async () => {
     await openDrawingHarness()
     const calloutTool = $('button[aria-label="Callout"]')
     const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
     await calloutTool.click()
-    await scene.click({ x: 42, y: 36 })
+    await browser
+      .action('pointer')
+      .move({ origin: scene, x: -52, y: -18, duration: 0 })
+      .down({ button: 'left' })
+      .move({ origin: 'pointer', x: 104, y: 36, duration: 80 })
+      .up({ button: 'left' })
+      .perform()
     const editor = $('[contenteditable="true"][aria-label="Callout editor"]')
     await expect(editor).toExist()
     await editor.addValue('First\nsecond')
@@ -629,7 +635,11 @@ describe('M06 drawing tools in browser mode', () => {
     await browser.waitUntil(async () => (await snapshot()).layers.length === 5)
     expect((await snapshot()).layers.at(-1)).toMatchObject({
       kind: 'callout',
-      payload: { content: { text: 'First\nsecond' } },
+      payload: {
+        content: { text: 'First\nsecond' },
+        targetMarker: 'circle',
+        labelMarker: 'circle',
+      },
     })
     await expect(calloutTool).toHaveAttribute('aria-pressed', 'true')
   })

@@ -475,7 +475,7 @@ scene assertions, а render harness — на двух отсутствующих
 size, color, weight, italic и strikethrough, fixed-width wrapping, paragraph
 alignment, bullet metadata без добавления символа в content и visual-center
 labels. Два новых 360×220 PNG декодированы и просмотрены: Text background,
-Callout bubble/tail и Numbered Marker badge сохраняют разные container
+Callout leader-line connector/markers и Numbered Marker badge сохраняют разные container
 semantics. Canvas2D preview/export совпадают по RGBA; CanvasKit/Canvas2D
 укладываются в существующий semantic tolerance. Это headless renderer evidence,
 не browser/Tauri/contenteditable/IME acceptance.

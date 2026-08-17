@@ -82,9 +82,11 @@ code в документ не сохраняется.
 Text-bearing v7 layers используют общий renderer-neutral rich-text contract:
 UTF-16-safe spans содержат только portable font family, font size, solid color,
 weight, italic и strikethrough; paragraph ranges — alignment
-`start|center|end` и list kind `none|bullet`. Text background, Callout bubble и
-Numbered Marker badge остаются разными container semantics и используют solid
-colors. Text background хранит также padding и radius. Новый text factory
+`start|center|end` и list kind `none|bullet`. Text background, Callout optional
+background и Numbered Marker badge остаются разными container semantics и
+используют solid colors. Text background хранит также padding и radius.
+Callout payload хранит target/label points, elbow route, stroke и circle
+markers вместо bubble/tail. Новый text factory
 создаёт 24 px text. Presets, underline, letter spacing, line-height field,
 gradient/pattern/texture text fill, text outline, text shadows и text
 opacity/blend в v7 отсутствуют.

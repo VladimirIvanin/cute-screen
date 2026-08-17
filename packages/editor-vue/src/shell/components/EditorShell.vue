@@ -60,6 +60,7 @@ import {
   DEFAULT_RULER_THICKNESS,
   rememberDrawingColor,
   rebaseArrowLayer,
+  rebaseCalloutLayer,
   rebaseRulerLayer,
   type DrawingDefaults,
   type DrawingToolPreferencesV2,
@@ -1495,10 +1496,12 @@ const contextSchema = computed(() => {
       selectedText?.kind === 'text'
         ? selectedText.payload.background
         : selectedText?.kind === 'callout'
-          ? selectedText.payload.bubble
+          ? selectedText.payload.background
           : selectedText?.kind === 'numberedMarker'
             ? { color: selectedText.payload.badge.color, padding: 0, radius: 0 }
             : textDefaults.value.background
+    const calloutStroke =
+      selectedText?.kind === 'callout' ? selectedText.payload.stroke : undefined
     return {
       icon: 'text' as const,
       title:
@@ -1508,7 +1511,45 @@ const contextSchema = computed(() => {
             ? translate('toolNumberedMarker')
             : translate('toolText'),
       hint: translate('canvasViewport'),
-      controls: [],
+      controls:
+        textKind === 'callout' && calloutStroke
+          ? [
+              {
+                kind: 'color' as const,
+                id: 'color' as const,
+                label: translate('color'),
+                value: hexColor(calloutStroke.color),
+                compact: true,
+                disabled: Boolean(
+                  props.readOnlyDocument ||
+                    (selectedText?.kind === 'callout' && selectedText.locked),
+                ),
+                eyedropper:
+                  Boolean(activeDocument.value) &&
+                  !(
+                    props.readOnlyDocument ||
+                    (selectedText?.kind === 'callout' && selectedText.locked)
+                  ),
+              },
+              {
+                kind: 'arrowStroke' as const,
+                id: 'stroke' as const,
+                label: translate('arrowStroke'),
+                width: calloutStroke.width,
+                style: (calloutStroke.style === 'solid' ||
+                calloutStroke.style === 'dotted'
+                  ? calloutStroke.style
+                  : 'dashed') as 'solid' | 'dashed' | 'dotted',
+                disabled: Boolean(
+                  props.readOnlyDocument ||
+                  (selectedText?.kind === 'callout' && selectedText.locked),
+                ),
+                solidLabel: translate('arrowSolid'),
+                dashedLabel: translate('arrowDashed'),
+                dottedLabel: translate('arrowDotted'),
+              },
+            ]
+          : [],
       text: {
         kind: textKind,
         color: snapshot
@@ -1586,21 +1627,7 @@ const contextSchema = computed(() => {
         disabled:
           textKind === 'numberedMarker'
             ? (['list', 'none', 'padding', 'radius'] as const)
-            : textKind === 'callout'
-              ? (['none'] as const)
-              : [],
-        ...(textKind === 'numberedMarker' || textKind === 'callout'
-          ? {
-              disabledReason:
-                state.locale.value === 'ru'
-                  ? textKind === 'numberedMarker'
-                    ? 'Списки, отступ и скругление недоступны для номерной метки.'
-                    : 'Фон выноски нельзя удалить: можно выбрать только сплошной цвет.'
-                  : textKind === 'numberedMarker'
-                    ? 'Lists, padding and radius are unavailable for numbered markers.'
-                    : 'A callout bubble cannot be removed; choose a solid color instead.',
-            }
-          : {}),
+            : [],
       },
     }
   }
@@ -2104,7 +2131,7 @@ function updateWholeTextLayer(
               content: formatted.content,
               ...(background === undefined
                 ? {}
-                : { bubble: background ?? layer.payload.bubble }),
+                : { background: background ?? layer.payload.background }),
             },
           }
         : {
@@ -2217,6 +2244,71 @@ function applyV7TextChange(id: string, value: string): boolean {
   }
   updateWholeTextLayer(span, paragraph, background)
   return true
+}
+function applyCalloutStrokeChange(id: string, value: string): boolean {
+  if (id !== 'color' && id !== 'stroke') return false
+  const selected = activeDocument.value?.layers.find(
+    (layer) => layer.id === store.selectedLayerId,
+  )
+  if (
+    selected?.kind !== 'callout' ||
+    selected.locked ||
+    !props.documentSession
+  ) {
+    return false
+  }
+  if (id === 'color') {
+    const color = parseTextColor(value)
+    if (!color) return true
+    const after = rebaseCalloutLayer(selected, {
+      ...selected.payload,
+      stroke: { ...selected.payload.stroke, color },
+    })
+    props.documentSession.execute({
+      type: 'updateLayer',
+      before: selected,
+      after,
+    })
+    return true
+  }
+  if (id === 'stroke') {
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(value)
+    } catch (error) {
+      console.warn('cute-screen callout stroke draft is invalid', error)
+      return true
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return true
+    }
+    const draft = parsed as { width?: unknown; style?: unknown }
+    const width = Number(draft.width)
+    const style = draft.style
+    if (
+      !Number.isFinite(width) ||
+      width < 1 ||
+      width > 24 ||
+      (style !== 'solid' && style !== 'dashed' && style !== 'dotted')
+    ) {
+      return true
+    }
+    const after = rebaseCalloutLayer(selected, {
+      ...selected.payload,
+      stroke: {
+        ...selected.payload.stroke,
+        width,
+        style,
+      },
+    })
+    props.documentSession.execute({
+      type: 'updateLayer',
+      before: selected,
+      after,
+    })
+    return true
+  }
+  return false
 }
 function precisionToolForControl(id: string): PrecisionTool | undefined {
   return (['censor', 'spotlight', 'ruler', 'loupe'] as const).find((tool) =>
@@ -2655,6 +2747,7 @@ function applyPrecisionChange(id: string, value: string): boolean {
 }
 function onContextChange(id: string, value: string): void {
   if (applyV7TextChange(id, value)) return
+  if (applyCalloutStrokeChange(id, value)) return
   if (id === 'cropPreset') {
     if (!['free', '1:1', '4:3', '16:9', 'original'].includes(value)) return
     cropPreset.value = value as CropPreset

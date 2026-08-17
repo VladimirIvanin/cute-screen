@@ -1,8 +1,17 @@
 import RBush from 'rbush'
 
-import type { EditorDocumentV1, JsonObject, Point } from './document/types'
-import type { ArrowLayerPayload } from './document/types'
 import { arrowCapSize, arrowPathPoints } from './arrow-geometry'
+import {
+  calloutMarkerRadius,
+  calloutPathPoints,
+  calloutTextRect,
+} from './callout-geometry'
+import type {
+  ArrowLayerPayload,
+  EditorDocumentV1,
+  JsonObject,
+  Point,
+} from './document/types'
 import { invertMatrix, transformPoint, transformToMatrix } from './geometry'
 import { precisionLayerHitPart } from './precision-tools'
 
@@ -188,6 +197,23 @@ function payloadStrokeWidth(payload: JsonObject, fallback = 1): number {
     : fallback
 }
 
+function pointInRect(
+  point: Point,
+  rect: {
+    readonly x: number
+    readonly y: number
+    readonly width: number
+    readonly height: number
+  },
+): boolean {
+  return (
+    point.x >= rect.x &&
+    point.x <= rect.x + rect.width &&
+    point.y >= rect.y &&
+    point.y <= rect.y + rect.height
+  )
+}
+
 function pointToSegmentDistance(
   point: Point,
   start: Point,
@@ -260,6 +286,25 @@ function drawingHitPart(
     layer.kind === 'loupe'
   ) {
     return precisionLayerHitPart(layer, point, canvas)
+  }
+  if (layer.kind === 'callout') {
+    const callout = layer.payload
+    const samples = calloutPathPoints(callout)
+    const strokeWidth = callout.stroke.width
+    const bodyHit = samples
+      .slice(1)
+      .some(
+        (sample, index) =>
+          pointToSegmentDistance(point, samples[index]!, sample) <=
+          strokeWidth / 2,
+      )
+    if (bodyHit) return 'stroke'
+    const markerRadius = calloutMarkerRadius(strokeWidth)
+    const markerHit = (anchor: Point) =>
+      Math.hypot(point.x - anchor.x, point.y - anchor.y) <= markerRadius
+    if (markerHit(callout.target) || markerHit(callout.label)) return 'stroke'
+    const textRect = calloutTextRect(callout)
+    return pointInRect(point, textRect) ? 'fill' : undefined
   }
   if (
     layer.kind !== 'arrow' &&

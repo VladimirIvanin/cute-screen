@@ -96,6 +96,19 @@ export {
   type ShapeKind,
 } from './drawing'
 export {
+  calloutGeometryBounds,
+  calloutMarkerRadius,
+  calloutPathPoints,
+  calloutSelectionHandles,
+  calloutTextLayout,
+  calloutTextRect,
+  defaultCalloutRoute,
+  rebaseCalloutLayer,
+  updateCalloutHandle,
+  type CalloutHandleKind,
+  type CalloutSelectionHandle,
+} from './callout-geometry'
+export {
   arrowCapSize,
   arrowEndpointAngles,
   arrowPathPoints,

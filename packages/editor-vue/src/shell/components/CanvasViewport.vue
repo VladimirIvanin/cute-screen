@@ -46,16 +46,25 @@ import {
   createTextCommitCommand,
   createNumberedMarkerLayer,
   createCalloutLayer,
+  calloutSelectionHandles,
+  updateCalloutHandle,
+  calloutPathPoints,
+  calloutMarkerRadius,
+  calloutTextLayout,
+  defaultCalloutRoute,
+  rebaseCalloutLayer,
   type DrawingDefaults,
   type DrawingTool,
   type ArrowHandleKind,
+  type CalloutHandleKind,
   type CalloutLayer,
   type NumberedMarkerLayer,
   type RichTextContent,
   type RichTextParagraphStyle,
+  type StrokeStyle,
+  type TextBackground,
   type RichTextSpanStyle,
   type TextLayer,
-  type TextBackground,
   richTextSelectionRange,
   applyCropSession,
   cancelCropSession,
@@ -191,6 +200,11 @@ const editingText = ref<
       background: TextBackground | null
       readonly kind: 'text' | 'callout' | 'numberedMarker'
       readonly existing?: EditableTextLayer
+      readonly calloutDraft?: {
+        readonly target: CanvasPoint
+        readonly label: CanvasPoint
+      }
+      calloutStroke?: StrokeStyle
     }
   | undefined
 >()
@@ -261,6 +275,19 @@ let gesture:
       readonly current: { x: number; y: number }
     }
   | {
+      readonly kind: 'calloutHandle'
+      readonly id: string
+      readonly handle: CalloutHandleKind
+      readonly start: { x: number; y: number }
+      readonly current: { x: number; y: number }
+    }
+  | {
+      readonly kind: 'calloutDraw'
+      readonly start: CanvasPoint
+      readonly current: CanvasPoint
+      readonly constrainAngle: boolean
+    }
+  | {
       readonly kind: 'draw'
       readonly tool: DrawingTool
       readonly start: CanvasPoint
@@ -303,6 +330,13 @@ type ViewportOutputBounds = {
   readonly width: number
   readonly height: number
 }
+const DEFAULT_CALLOUT_STROKE: StrokeStyle = Object.freeze({
+  color: Object.freeze({ red: 0.55, green: 0.55, blue: 0.55, alpha: 1 }),
+  width: 2,
+  style: 'solid',
+  cap: 'round',
+  join: 'round',
+})
 const DEFAULT_TEXT_TOOL: TextToolDefaults = Object.freeze({
   fontFamily: 'Roboto',
   fontSize: 24,
@@ -533,7 +567,8 @@ function documentWithoutGestureLayer(): EditorDocumentV1 | undefined {
     (gesture.kind === 'move' ||
       gesture.kind === 'resize' ||
       gesture.kind === 'rotate' ||
-      gesture.kind === 'arrowHandle')
+      gesture.kind === 'arrowHandle' ||
+      gesture.kind === 'calloutHandle')
       ? gesture.id
       : undefined
   if (!document || !hiddenLayerId) return document
@@ -562,7 +597,7 @@ function setCommittedScene(runtime: Canvas2DRenderer): void {
     editing.existing.kind === 'text'
       ? new Set([editing.id, `${editing.id}:background`])
       : editing.existing.kind === 'callout'
-        ? new Set([`${editing.id}:text`])
+        ? new Set([`${editing.id}:text`, `${editing.id}:background`])
         : new Set([`${editing.id}:label`])
   runtime.setScene(
     createRenderSceneSnapshot({
@@ -841,6 +876,7 @@ function previewTransform(layer: LayerNode): Transform2D {
     !gesture ||
     gesture.kind === 'pan' ||
     gesture.kind === 'draw' ||
+    gesture.kind === 'calloutDraw' ||
     gesture.kind === 'text' ||
     gesture.kind === 'precision' ||
     gesture.kind === 'crop' ||
@@ -876,6 +912,7 @@ function gesturePreviewLayer(): LayerNode | undefined {
     !gesture ||
     gesture.kind === 'pan' ||
     gesture.kind === 'draw' ||
+    gesture.kind === 'calloutDraw' ||
     gesture.kind === 'text' ||
     gesture.kind === 'precision' ||
     gesture.kind === 'crop'
@@ -890,6 +927,15 @@ function gesturePreviewLayer(): LayerNode | undefined {
   if (activeGesture.kind === 'arrowHandle') {
     return layer.kind === 'arrow'
       ? updateArrowHandle(
+          layer,
+          activeGesture.handle,
+          toLocal(layer, activeGesture.current),
+        )
+      : undefined
+  }
+  if (activeGesture.kind === 'calloutHandle') {
+    return layer.kind === 'callout'
+      ? updateCalloutHandle(
           layer,
           activeGesture.handle,
           toLocal(layer, activeGesture.current),
@@ -925,6 +971,77 @@ function drawDraft(context: CanvasRenderingContext2D): void {
     context,
     createDocumentRenderScene({ ...props.document, layers: [layer] }).nodes,
   )
+}
+function resolveCalloutStroke(): StrokeStyle {
+  const arrowStroke = props.drawingDefaults?.arrow?.stroke
+  if (arrowStroke && typeof arrowStroke === 'object') {
+    return arrowStroke as StrokeStyle
+  }
+  return DEFAULT_CALLOUT_STROKE
+}
+function drawCalloutDraft(context: CanvasRenderingContext2D): void {
+  let target: CanvasPoint | undefined
+  let label: CanvasPoint | undefined
+  let stroke = resolveCalloutStroke()
+  if (gesture?.kind === 'calloutDraw') {
+    target = gesture.start
+    label = gesture.current
+  } else {
+    const editing = editingText.value
+    if (
+      editing?.kind !== 'callout' ||
+      editing.existing ||
+      !editing.calloutDraft
+    ) {
+      return
+    }
+    target = editing.calloutDraft.target
+    label = editing.calloutDraft.label
+    stroke = editing.calloutStroke ?? stroke
+  }
+  if (
+    !target ||
+    !label ||
+    (target.x === label.x && target.y === label.y)
+  ) {
+    return
+  }
+  const route = defaultCalloutRoute(target, label)
+  const points = calloutPathPoints({
+    target,
+    label,
+    route,
+    stroke,
+    content: {
+      text: '',
+      wrap: 'autoSize',
+      spans: [],
+      paragraphs: [],
+    },
+    background: null,
+    targetMarker: 'circle',
+    labelMarker: 'circle',
+  })
+  const markerRadius = calloutMarkerRadius(stroke.width)
+  const scale = 1 / ((props.zoom ?? 100) / 100)
+  context.save()
+  context.strokeStyle = `rgba(${Math.round(stroke.color.red * 255)}, ${Math.round(stroke.color.green * 255)}, ${Math.round(stroke.color.blue * 255)}, ${stroke.color.alpha})`
+  context.lineWidth = stroke.width * scale
+  context.lineCap = 'round'
+  context.lineJoin = 'round'
+  context.beginPath()
+  context.moveTo(points[0]!.x, points[0]!.y)
+  for (const point of points.slice(1)) {
+    context.lineTo(point.x, point.y)
+  }
+  context.stroke()
+  context.fillStyle = context.strokeStyle
+  for (const point of [points[0]!, points[points.length - 1]!]) {
+    context.beginPath()
+    context.arc(point.x, point.y, markerRadius, 0, Math.PI * 2)
+    context.fill()
+  }
+  context.restore()
 }
 function rectFromPoints(start: CanvasPoint, end: CanvasPoint) {
   return {
@@ -1250,6 +1367,7 @@ function drawOverlay(): void {
   context.setTransform?.(1, 0, 0, 1, -outputBounds.x, -outputBounds.y)
   if (!renderer) drawNodes2D(context, previewNodes)
   drawDraft(context)
+  drawCalloutDraft(context)
   drawPrecisionDraft(context)
   if (props.sampling && samplingCursor.value) {
     const point = samplingCursor.value
@@ -1304,6 +1422,21 @@ function drawOverlay(): void {
       handleHalfSize,
       outputBounds,
     )
+  }
+  if (layer.kind === 'callout') {
+    for (const { kind: name, point: saved } of calloutSelectionHandles(layer)) {
+      const local =
+        gesture?.kind === 'calloutHandle' &&
+        gesture.id === layer.id &&
+        gesture.handle === name
+          ? toLocal(layer, gesture.current)
+          : saved
+      const position = transformPoint(transform, local)
+      context.beginPath()
+      context.arc(position.x, position.y, handleHalfSize + 2, 0, Math.PI * 2)
+      context.fill()
+      context.stroke()
+    }
   }
   if (layer.kind === 'arrow') {
     for (const { kind: name, point: saved } of arrowSelectionHandles(layer)) {
@@ -1742,6 +1875,28 @@ function handleAtPoint(
     ? 'rotate'
     : undefined
 }
+function calloutHandleAtPoint(
+  layer: LayerNode,
+  point: CanvasPoint,
+): CalloutHandleKind | undefined {
+  if (layer.kind !== 'callout') return undefined
+  const tolerance = 9 / ((props.zoom ?? 100) / 100)
+  return calloutSelectionHandles(layer).find(({ point: local }) => {
+    const candidate = transformPoint(layer.transform, local)
+    return Math.hypot(candidate.x - point.x, candidate.y - point.y) <= tolerance
+  })?.kind
+}
+function calloutEditorOrigin(
+  label: CanvasPoint,
+  stroke: StrokeStyle,
+  fontSize: number,
+): CanvasPoint {
+  const markerRadius = calloutMarkerRadius(stroke.width)
+  return {
+    x: label.x + markerRadius + 6,
+    y: label.y - (fontSize * 1.25) / 2,
+  }
+}
 function arrowHandleAtPoint(
   layer: LayerNode,
   point: CanvasPoint,
@@ -1854,7 +2009,14 @@ function onPointerDown(event: PointerEvent): void {
   }
   if (props.activeTool === 'callout') {
     event.preventDefault()
-    startTextEditor({ origin: point, kind: 'callout' })
+    scene.value.setPointerCapture(event.pointerId)
+    gesture = {
+      kind: 'calloutDraw',
+      start: point,
+      current: point,
+      constrainAngle: event.shiftKey,
+    }
+    invalidateOverlay()
     return
   }
   if (props.activeTool === 'text') {
@@ -1871,12 +2033,19 @@ function onPointerDown(event: PointerEvent): void {
       text?.kind === 'callout' ||
       text?.kind === 'numberedMarker'
     ) {
+      const layout =
+        text.kind === 'callout' ? calloutTextLayout(text.payload) : undefined
       const bounds = layerBounds(text)
       startTextEditor({
-        origin: {
-          x: text.transform.translateX + bounds.x,
-          y: text.transform.translateY + bounds.y,
-        },
+        origin: layout
+          ? {
+              x: text.transform.translateX + layout.text.x,
+              y: text.transform.translateY + layout.text.y,
+            }
+          : {
+              x: text.transform.translateX + bounds.x,
+              y: text.transform.translateY + bounds.y,
+            },
         existing: text,
       })
     } else {
@@ -1906,6 +2075,22 @@ function onPointerDown(event: PointerEvent): void {
     return
   }
   const selected = selectedLayer()
+  const calloutHandle =
+    selected?.kind === 'callout' && !selected.locked
+      ? calloutHandleAtPoint(selected, point)
+      : undefined
+  if (selected && calloutHandle) {
+    scene.value.setPointerCapture(event.pointerId)
+    gesture = {
+      kind: 'calloutHandle',
+      id: selected.id,
+      handle: calloutHandle,
+      start: point,
+      current: point,
+    }
+    renderCommittedSceneForGesture()
+    return
+  }
   const arrowHandle =
     selected && !selected.locked
       ? arrowHandleAtPoint(selected, point)
@@ -1992,6 +2177,11 @@ function startTextEditor(input: {
   readonly kind?: 'text' | 'callout'
   readonly width?: number
   readonly fixedWidth?: boolean
+  readonly calloutDraft?: {
+    readonly target: CanvasPoint
+    readonly label: CanvasPoint
+  }
+  readonly calloutStroke?: StrokeStyle
 }): void {
   const bounds = input.existing ? layerBounds(input.existing) : undefined
   const defaults = copyTextStyle(props.textDefaults ?? DEFAULT_TEXT_TOOL)
@@ -2044,7 +2234,7 @@ function startTextEditor(input: {
       input.existing?.kind === 'text'
         ? input.existing.payload.background
         : input.existing?.kind === 'callout'
-          ? input.existing.payload.bubble
+          ? input.existing.payload.background
           : input.existing?.kind === 'numberedMarker'
             ? {
                 color: input.existing.payload.badge.color,
@@ -2054,6 +2244,12 @@ function startTextEditor(input: {
             : defaults.background,
     kind: input.existing?.kind ?? input.kind ?? 'text',
     ...(input.existing === undefined ? {} : { existing: input.existing }),
+    ...(input.calloutDraft === undefined
+      ? {}
+      : { calloutDraft: input.calloutDraft }),
+    ...(input.calloutStroke === undefined
+      ? {}
+      : { calloutStroke: input.calloutStroke }),
   }
   emitTextEditing()
   void nextTick(() => {
@@ -2207,32 +2403,23 @@ function commitTextEditor(): void {
       },
     }
   } else if (existing?.kind === 'callout') {
-    next = {
-      ...existing,
-      payload: {
-        ...existing.payload,
-        content,
-        bubble: editing.background ?? existing.payload.bubble,
-      },
-    }
+    next = rebaseCalloutLayer(existing, {
+      ...existing.payload,
+      content,
+      background: editing.background ?? existing.payload.background,
+    })
   } else if (editing.kind === 'callout') {
+    const draft = editing.calloutDraft
+    if (!draft) return
     const layer = createCalloutLayer({
       id: editing.id,
       text: content.text,
-      origin: editing.origin,
-      tailAnchor: {
-        x: editing.width / 2,
-        y: style.fontSize * 1.25 + 40,
-      },
+      target: draft.target,
+      label: draft.label,
       fontFamily: style.fontFamily,
       color: style.color,
-      ...(editing.background
-        ? {
-            bubbleColor: editing.background.color,
-            padding: editing.background.padding,
-            radius: editing.background.radius,
-          }
-        : {}),
+      background: editing.background,
+      stroke: editing.calloutStroke ?? resolveCalloutStroke(),
     })
     next = layer ? { ...layer, payload: { ...layer.payload, content } } : null
   } else {
@@ -2450,6 +2637,16 @@ function onPointerMove(event: PointerEvent): void {
     invalidateOverlay()
     return
   }
+  if (gesture.kind === 'calloutHandle') {
+    gesture = { ...gesture, current: point }
+    invalidateOverlay()
+    return
+  }
+  if (gesture.kind === 'calloutDraw') {
+    gesture = { ...gesture, current: point, constrainAngle: event.shiftKey }
+    invalidateOverlay()
+    return
+  }
   if (gesture.kind === 'draw') {
     const coalesced = event.getCoalescedEvents?.() ?? [event]
     const samples: CanvasPoint[] = []
@@ -2562,6 +2759,48 @@ function finishGesture(event: PointerEvent): void {
       })
     }
   }
+  if (completed?.kind === 'calloutHandle') {
+    const layer = props.document?.layers.find(
+      (candidate) => candidate.id === completed.id,
+    )
+    if (
+      layer?.kind === 'callout' &&
+      (completed.current.x !== completed.start.x ||
+        completed.current.y !== completed.start.y)
+    ) {
+      const after = updateCalloutHandle(
+        layer,
+        completed.handle,
+        toLocal(layer, completed.current),
+      )
+      emit('documentCommand', {
+        type: 'updateLayer',
+        before: layer,
+        after,
+      })
+    }
+  }
+  if (completed?.kind === 'calloutDraw') {
+    if (
+      completed.start.x !== completed.current.x ||
+      completed.start.y !== completed.current.y
+    ) {
+      const stroke = resolveCalloutStroke()
+      startTextEditor({
+        origin: calloutEditorOrigin(
+          completed.current,
+          stroke,
+          props.textDefaults?.fontSize ?? DEFAULT_TEXT_TOOL.fontSize,
+        ),
+        kind: 'callout',
+        calloutDraft: {
+          target: completed.start,
+          label: completed.current,
+        },
+        calloutStroke: stroke,
+      })
+    }
+  }
   if (completed?.kind === 'draw') {
     const layer = createDrawingLayer({
       id: crypto.randomUUID(),
@@ -2602,7 +2841,8 @@ function finishGesture(event: PointerEvent): void {
     completed?.kind === 'move' ||
     completed?.kind === 'resize' ||
     completed?.kind === 'rotate' ||
-    completed?.kind === 'arrowHandle'
+    completed?.kind === 'arrowHandle' ||
+    completed?.kind === 'calloutHandle'
   ) {
     void nextTick(renderCommittedSceneForGesture)
   }
@@ -2613,7 +2853,8 @@ function cancelGesture(event?: PointerEvent): void {
     gesture?.kind === 'move' ||
     gesture?.kind === 'resize' ||
     gesture?.kind === 'rotate' ||
-    gesture?.kind === 'arrowHandle'
+    gesture?.kind === 'arrowHandle' ||
+    gesture?.kind === 'calloutHandle'
   gesture = undefined
   if (cancelledCrop) cropSession = cancelledCrop
   rulerGuide = undefined
@@ -2770,6 +3011,8 @@ function onWindowKeydown(event: KeyboardEvent): void {
       return
     }
     if (gesture?.kind === 'draw') {
+      cancelGesture()
+    } else if (gesture?.kind === 'calloutDraw') {
       cancelGesture()
     } else if (
       props.activeTool === 'arrow' ||

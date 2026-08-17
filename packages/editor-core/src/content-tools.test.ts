@@ -205,15 +205,16 @@ describe('v7 content-layer core contracts', () => {
     const callout = createCalloutLayer({
       id: ids[0],
       text: 'Read this',
-      origin: { x: 10, y: 12 },
-      tailAnchor: { x: 80, y: 90 },
+      target: { x: 10, y: 12 },
+      label: { x: 140, y: 90 },
     })
     expect(callout).toMatchObject({
       kind: 'callout',
       payload: {
         content: { text: 'Read this' },
-        bubble: { padding: 8, radius: 8 },
-        tailAnchor: { x: 80, y: 90 },
+        background: null,
+        targetMarker: 'circle',
+        labelMarker: 'circle',
       },
     })
     expect(callout).not.toHaveProperty('opacity')
@@ -245,13 +246,11 @@ describe('v7 content-layer core contracts', () => {
     const layer = createCalloutLayer({
       id: ids[0],
       text: 'wide line\nx',
-      origin: { x: 10, y: 12 },
-      tailAnchor: { x: 40, y: 80 },
+      target: { x: 10, y: 12 },
+      label: { x: 40, y: 80 },
     })
-    expect(layer?.localBounds).toMatchObject({
-      width: 24 * 'wide line'.length * 0.6 + 16,
-      height: 24 * 1.25 * 2 + 16,
-    })
+    expect(layer?.localBounds.width).toBeGreaterThan(24 * 'wide line'.length * 0.6)
+    expect(layer?.localBounds.height).toBeGreaterThan(24 * 1.25 * 2)
   })
 
   it('routes clipboard content by active and empty-state precedence', () => {

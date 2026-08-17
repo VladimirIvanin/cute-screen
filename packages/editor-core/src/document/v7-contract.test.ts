@@ -120,12 +120,22 @@ describe('document schema v7 contract', () => {
       kind: 'callout',
       payload: {
         content,
-        bubble: {
-          color: { red: 1, green: 1, blue: 1, alpha: 1 },
-          padding: 8,
-          radius: 8,
+        background: null,
+        target: { x: 20, y: 40 },
+        label: { x: 120, y: 80 },
+        route: {
+          path: 'elbow',
+          elbow: { axis: 'y', offset: 0 },
         },
-        tailAnchor: { x: 90, y: 70 },
+        stroke: {
+          color: { red: 0.5, green: 0.5, blue: 0.5, alpha: 1 },
+          width: 2,
+          style: 'solid',
+          cap: 'round',
+          join: 'round',
+        },
+        targetMarker: 'circle',
+        labelMarker: 'circle',
       },
     }
     const marker = {
@@ -228,10 +238,11 @@ describe('document schema v7 contract', () => {
     )
   })
 
-  it.each([
-    [
-      'callout',
-      {
+  it('rejects legacy callout bubble/tail payload fields', () => {
+    const legacy = {
+      ...textLayer(),
+      kind: 'callout',
+      payload: {
         content,
         bubble: {
           color: { red: 1, green: 1, blue: 1, alpha: 1 },
@@ -239,6 +250,34 @@ describe('document schema v7 contract', () => {
           radius: 8,
         },
         tailAnchor: { x: 90, y: 70 },
+      },
+    }
+    expect(() => parseEditorDocument(documentWith([legacy]))).toThrow(
+      /legacy callout bubble\/tail fields are removed/u,
+    )
+  })
+
+  it.each([
+    [
+      'callout',
+      {
+        content,
+        background: null,
+        target: { x: 20, y: 40 },
+        label: { x: 120, y: 80 },
+        route: {
+          path: 'elbow',
+          elbow: { axis: 'y', offset: 0 },
+        },
+        stroke: {
+          color: { red: 0.5, green: 0.5, blue: 0.5, alpha: 1 },
+          width: 2,
+          style: 'solid',
+          cap: 'round',
+          join: 'round',
+        },
+        targetMarker: 'circle',
+        labelMarker: 'circle',
       },
     ],
     [

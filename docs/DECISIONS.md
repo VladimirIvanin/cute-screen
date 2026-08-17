@@ -456,3 +456,23 @@ typed rejection older/newer schemas. Clipboard v2 tests обязаны деко�
 v7 text-bearing layers через тот же production parser. Renderer layout,
 contenteditable selection и compact toolbar проверяются отдельными slices и не
 являются evidence этого schema change.
+
+## ADR-032 — Callout leader line вместо speech bubble
+
+**Статус:** accepted; supersedes the callout container semantics portion of
+ADR-031
+
+**Контекст:** bubble/tail callout не соответствует technical annotation
+workflow: хвост задаётся эвристикой, текст отрывается от target и toolbar
+дублирует bubble-only semantics. Arrow connector text по-прежнему запрещён
+(`REQ-TOL-001`).
+
+**Решение:** schema v7 сохраняется; `CalloutPayload` заменяется на leader line:
+`target`, `label`, elbow `route`, `stroke`, circle `targetMarker`/`labelMarker`,
+optional `background` и общий `RichTextContent`. Старые `bubble`/`tailAnchor`
+отклоняются codec без migration. Создание — drag target→label, затем transient
+contenteditable. Text/Callout/Numbered Marker делят rich-text contract.
+
+**Проверяемое основание:** codec reject legacy bubble/tail; factory/scene/hit-test
+tests для elbow+markers+text; Vue drag/commit и contextual stroke+text toolbar;
+browser e2e multiline callout с сохранением active tool.

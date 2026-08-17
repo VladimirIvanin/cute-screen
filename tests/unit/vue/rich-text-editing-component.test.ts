@@ -15,6 +15,7 @@ import {
   type ImageLayer,
   type LayerNode,
 } from '@cute-screen/editor-renderer'
+import { calloutTextLayout } from '@cute-screen/editor-core'
 
 const TEXT_DEFAULTS: TextToolDefaults = Object.freeze({
   fontFamily: 'Roboto',
@@ -141,10 +142,14 @@ async function openExistingEditor(
   layer: LayerNode,
 ): Promise<ReturnType<typeof mount>> {
   const rendered = mount(layer)
-  await fireEvent.dblClick(rendered.scene, {
-    clientX: layer.transform.translateX + 2,
-    clientY: layer.transform.translateY + 2,
-  })
+  let clientX = layer.transform.translateX + 2
+  let clientY = layer.transform.translateY + 2
+  if (layer.kind === 'callout') {
+    const layout = calloutTextLayout(layer.payload)
+    clientX = layer.transform.translateX + layout.text.x + 2
+    clientY = layer.transform.translateY + layout.text.y + 2
+  }
+  await fireEvent.dblClick(rendered.scene, { clientX, clientY })
   return rendered
 }
 
@@ -332,8 +337,8 @@ describe('v7 rich-text component editing', () => {
           ? createCalloutLayer({
               id,
               text: 'old',
-              origin: { x: 10, y: 10 },
-              tailAnchor: { x: 20, y: 60 },
+              target: { x: 10, y: 60 },
+              label: { x: 120, y: 20 },
             })!
           : createNumberedMarkerLayer({
               id,
@@ -360,7 +365,7 @@ describe('v7 rich-text component editing', () => {
       if (kind === 'callout') {
         expect(command?.after).toMatchObject({
           kind,
-          payload: { bubble: { padding: 12, radius: 18 } },
+          payload: { background: { padding: 12, radius: 18 } },
         })
       } else {
         expect(command?.after).toMatchObject({
@@ -498,8 +503,8 @@ describe('v7 rich-text component editing', () => {
             ? createCalloutLayer({
                 id,
                 text: 'old',
-                origin: { x: 10, y: 10 },
-                tailAnchor: { x: 20, y: 60 },
+                target: { x: 10, y: 60 },
+                label: { x: 120, y: 20 },
               })!
             : createNumberedMarkerLayer({
                 id,

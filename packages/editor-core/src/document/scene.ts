@@ -5,6 +5,11 @@ import {
   type RgbaColor,
 } from '../render-scene'
 import {
+  calloutMarkerRadius,
+  calloutPathPoints,
+  calloutTextLayout,
+} from '../callout-geometry'
+import {
   arrowCapSize,
   arrowEndpointAngles,
   arrowPathPoints,
@@ -812,86 +817,101 @@ function numberedMarkerNodes(
 function calloutNodes(
   layer: Extract<LayerNode, { readonly kind: 'callout' }>,
 ): readonly RenderNode[] {
-  const bounds = layer.localBounds
-  const x = layer.transform.translateX + bounds.x
-  const y = layer.transform.translateY + bounds.y
   const payload = layer.payload
+  if (
+    payload.target === undefined ||
+    payload.label === undefined ||
+    payload.route?.path !== 'elbow' ||
+    payload.stroke === undefined
+  ) {
+    return []
+  }
   const common = {
     rotation: layer.transform.rotation,
     opacity: 1,
     visible: layer.visible,
     blendMode: 'normal' as const,
   }
-  const bubble: RenderNode = {
+  const strokeStyle = stroke(payload.stroke)
+  const markerRadius = calloutMarkerRadius(payload.stroke.width)
+  const markerFill = color(payload.stroke.color)
+  const pathPoints = calloutPathPoints(payload)
+  const connector = pathNode(
+    layer,
+    `${layer.id}:connector`,
+    pathPoints,
+    strokeStyle,
+  )
+  const targetMarker: RenderNode = {
     ...common,
-    id: `${layer.id}:bubble`,
-    kind: 'rect',
-    x,
-    y,
-    width: bounds.width,
-    height: bounds.height,
-    cornerRadius: Math.min(
-      payload.bubble.radius,
-      bounds.width / 2,
-      bounds.height / 2,
-    ),
-    fill: color(payload.bubble.color),
+    id: `${layer.id}:target-marker`,
+    kind: 'ellipse',
+    centerX: layer.transform.translateX + payload.target.x,
+    centerY: layer.transform.translateY + payload.target.y,
+    radiusX: markerRadius,
+    radiusY: markerRadius,
+    fill: markerFill,
   }
-  const tailAnchor = {
-    x: layer.transform.translateX + payload.tailAnchor.x,
-    y: layer.transform.translateY + payload.tailAnchor.y,
-  }
-  const bubbleCenter = { x: x + bounds.width / 2, y: y + bounds.height / 2 }
-  const vector = {
-    x: tailAnchor.x - bubbleCenter.x,
-    y: tailAnchor.y - bubbleCenter.y,
-  }
-  const vectorLength = Math.hypot(vector.x, vector.y)
-  const direction =
-    vectorLength > 0
-      ? { x: vector.x / vectorLength, y: vector.y / vectorLength }
-      : { x: 0, y: 1 }
-  const boundaryScale =
-    1 /
-    Math.max(
-      Math.abs(direction.x) / Math.max(bounds.width / 2, 0.001),
-      Math.abs(direction.y) / Math.max(bounds.height / 2, 0.001),
-    )
-  const tailBase = {
-    x: bubbleCenter.x + direction.x * boundaryScale,
-    y: bubbleCenter.y + direction.y * boundaryScale,
-  }
-  const tailHalfWidth = 9
-  const perpendicular = { x: -direction.y, y: direction.x }
-  const tail: RenderNode = {
+  const labelMarker: RenderNode = {
     ...common,
-    id: `${layer.id}:tail`,
-    kind: 'polygon',
-    points: [
-      {
-        x: tailBase.x + perpendicular.x * tailHalfWidth,
-        y: tailBase.y + perpendicular.y * tailHalfWidth,
-      },
-      {
-        x: tailBase.x - perpendicular.x * tailHalfWidth,
-        y: tailBase.y - perpendicular.y * tailHalfWidth,
-      },
-      tailAnchor,
-    ],
-    fill: color(payload.bubble.color),
+    id: `${layer.id}:label-marker`,
+    kind: 'ellipse',
+    centerX: layer.transform.translateX + payload.label.x,
+    centerY: layer.transform.translateY + payload.label.y,
+    radiusX: markerRadius,
+    radiusY: markerRadius,
+    fill: markerFill,
   }
+  const layout = calloutTextLayout(payload)
   const text = richTextNode(
     `${layer.id}:text`,
     payload.content,
     {
-      x: x + payload.bubble.padding,
-      y: y + payload.bubble.padding,
-      width: Math.max(1, bounds.width - payload.bubble.padding * 2),
-      height: Math.max(1, bounds.height - payload.bubble.padding * 2),
+      x: layer.transform.translateX + layout.text.x,
+      y: layer.transform.translateY + layout.text.y,
+      width: layout.text.width,
+      height: layout.text.height,
     },
     layer,
   )
-  return [bubble, tail, text]
+  if (!layout.background) {
+    return [connector, targetMarker, labelMarker, text]
+  }
+  const background = layout.background
+  const bounds = calloutTextRectFromLayout(layout)
+  const backgroundNode: RenderNode = {
+    ...common,
+    id: `${layer.id}:background`,
+    kind: 'rect',
+    x: layer.transform.translateX + bounds.x,
+    y: layer.transform.translateY + bounds.y,
+    width: bounds.width,
+    height: bounds.height,
+    cornerRadius: Math.min(
+      background.radius,
+      bounds.width / 2,
+      bounds.height / 2,
+    ),
+    fill: color(background.color),
+  }
+  return [connector, targetMarker, labelMarker, backgroundNode, text]
+}
+
+function calloutTextRectFromLayout(
+  layout: ReturnType<typeof calloutTextLayout>,
+): {
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+} {
+  const padding = layout.background?.padding ?? 0
+  return {
+    x: layout.text.x - padding,
+    y: layout.text.y - padding,
+    width: layout.text.width + padding * 2,
+    height: layout.text.height + padding * 2,
+  }
 }
 
 function precisionNodes(

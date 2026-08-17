@@ -96,7 +96,10 @@ Cute Screen — полноценный local-first редактор снимко
   text fill, text outline, text shadows и text opacity/blend не входят в v7;
   common layer opacity/blend/shadows для text-bearing layers не сохраняются.
 - `REQ-TOL-006` — numbered marker: несколько форм, автоматическая последовательность и редактируемый multiline label.
-- `REQ-TOL-007` — callout: выразительный визуальный стиль, pointer/tail и полноценное редактирование текста.
+- `REQ-TOL-007` — callout: leader line от target marker через orthogonal elbow connector
+  к label marker и portable rich-text подпись с optional solid background.
+  Создание drag target→label, затем transient contenteditable и one-command commit.
+  Handles target, label и elbow middle-segment. Speech-bubble tail не входит.
 - `REQ-TOL-008` — manual censor: pixelate, blur и solid fill; без автоматического поиска данных.
 - `REQ-TOL-009` — spotlight: rectangle/ellipse/diamond и настраиваемое затемнение.
 - `REQ-TOL-010` — ruler измеряет расстояние в pixels/percent и взаимодействует

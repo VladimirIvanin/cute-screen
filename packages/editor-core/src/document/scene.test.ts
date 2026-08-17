@@ -961,7 +961,7 @@ describe('document render scene', () => {
     ])
   })
 
-  it('keeps callout bubble, separate tail and multiline text in one ordered scene object', () => {
+  it('keeps callout connector, markers and multiline text in one ordered scene object', () => {
     const scene = createDocumentRenderScene({
       ...document,
       schemaVersion: 7,
@@ -969,7 +969,7 @@ describe('document render scene', () => {
         {
           id: '019c1f62-058e-7000-8000-000000000011',
           kind: 'callout',
-          localBounds: { x: 0, y: 0, width: 120, height: 48 },
+          localBounds: { x: 0, y: 0, width: 180, height: 120 },
           transform: { ...document.layers[0]!.transform },
           visible: true,
           locked: false,
@@ -998,32 +998,37 @@ describe('document render scene', () => {
                 },
               ],
             },
-            bubble: {
-              color: { red: 0.1, green: 0.2, blue: 0.3, alpha: 1 },
-              padding: 8,
-              radius: 10,
+            background: null,
+            target: { x: 20, y: 90 },
+            label: { x: 120, y: 40 },
+            route: {
+              path: 'elbow',
+              elbow: { axis: 'y', offset: 0 },
             },
-            tailAnchor: { x: 20, y: 70 },
+            stroke: {
+              color: { red: 0.5, green: 0.5, blue: 0.5, alpha: 1 },
+              width: 2,
+              style: 'solid',
+              cap: 'round',
+              join: 'round',
+            },
+            targetMarker: 'circle',
+            labelMarker: 'circle',
           },
         },
       ],
     })
 
     expect(scene.nodes.map((node) => node.kind)).toEqual([
-      'rect',
-      'polygon',
+      'path',
+      'ellipse',
+      'ellipse',
       'text',
     ])
-    expect(scene.nodes[1]).toMatchObject({
-      id: expect.stringMatching(/:tail$/u),
+    expect(scene.nodes[0]).toMatchObject({
+      id: expect.stringMatching(/:connector$/u),
     })
-    const tail = scene.nodes[1]
-    if (!tail || tail.kind !== 'polygon') throw new Error('expected tail')
-    const baseCenterX = (tail.points[0]!.x + tail.points[1]!.x) / 2
-    // The separate anchor is left of the bubble centre, so the attachment
-    // follows it instead of using a fixed bottom-centre tail.
-    expect(baseCenterX).toBeLessThan(72)
-    expect(scene.nodes[2]).toMatchObject({
+    expect(scene.nodes[3]).toMatchObject({
       text: 'Line one\nLine two',
       runs: [expect.objectContaining({ fontFamily: 'Roboto', fontSize: 24 })],
       paragraphs: [

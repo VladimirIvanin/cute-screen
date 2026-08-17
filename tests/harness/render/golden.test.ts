@@ -589,12 +589,22 @@ function persistedRichTextScene(): RenderSceneSnapshot {
               { start: 8, end: 14, alignment: 'end', listKind: 'bullet' },
             ],
           },
-          bubble: {
-            color: { red: 0.08, green: 0.34, blue: 0.66, alpha: 1 },
-            padding: 8,
-            radius: 12,
+          background: null,
+          target: { x: 40, y: 100 },
+          label: { x: 160, y: 40 },
+          route: {
+            path: 'elbow',
+            elbow: { axis: 'y', offset: 0 },
           },
-          tailAnchor: { x: 125, y: 112 },
+          stroke: {
+            color: { red: 0.5, green: 0.5, blue: 0.5, alpha: 1 },
+            width: 2,
+            style: 'solid',
+            cap: 'round',
+            join: 'round',
+          },
+          targetMarker: 'circle',
+          labelMarker: 'circle',
         },
       },
       {

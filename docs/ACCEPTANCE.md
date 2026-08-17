@@ -196,7 +196,7 @@ browser или real-Tauri acceptance.
    padding/radius. Проверить, что removed text effects и common
    opacity/blend/shadows не попадают в persisted JSON.
 6. Создать numbered marker и callout с тем же rich-text contract, сохранив
-   badge и bubble semantics.
+   badge и leader-line callout semantics.
 7. Вставить emoji и локальное изображение через Image tool.
 8. Скопировать editor layer и вставить его.
 9. Вставить plain text из внешнего приложения и выполнить keyboard duplicate.

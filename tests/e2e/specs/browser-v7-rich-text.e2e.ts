@@ -612,7 +612,13 @@ describe('Document v7 rich text in browser mode', () => {
 
     await $('button[aria-label="Callout"]').click()
     await applyBackground({ color: '#ffcc66', padding: 10, radius: 14 })
-    await scene.click({ x: -24, y: -12 })
+    await browser
+      .action('pointer')
+      .move({ origin: scene, x: -24, y: -12, duration: 0 })
+      .down({ button: 'left' })
+      .move({ origin: 'pointer', x: 96, y: 48, duration: 80 })
+      .up({ button: 'left' })
+      .perform()
     const calloutEditor = $(
       '[contenteditable="true"][aria-label="Callout editor"]',
     )
@@ -621,9 +627,10 @@ describe('Document v7 rich text in browser mode', () => {
     let layer = (await snapshot()).layers.at(-1)
     expect(layer).toMatchObject({
       kind: 'callout',
-      payload: { bubble: { padding: 10, radius: 14 } },
+      payload: { background: { padding: 10, radius: 14 } },
     })
-    expect(layer?.payload).toHaveProperty('tailAnchor')
+    expect(layer?.payload).toHaveProperty('target')
+    expect(layer?.payload).toHaveProperty('label')
 
     await $('button[aria-label="Numbered marker"]').click()
     await expect($('button[aria-label="Bullet list"]')).toBeDisabled()
