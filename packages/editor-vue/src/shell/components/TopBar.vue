@@ -187,6 +187,7 @@ function selectLocale(value: SupportedLocale): void {
         trigger="click"
         placement="bottom-end"
         :show-arrow="false"
+        raw
         to=".cs-overlay-root"
       >
         <template #trigger>

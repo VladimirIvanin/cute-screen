@@ -36,5 +36,6 @@ export const cuteScreenThemeOverrides: GlobalThemeOverrides = {
   },
   Popover: {
     borderRadius: '12px',
+    padding: '0',
   },
 }

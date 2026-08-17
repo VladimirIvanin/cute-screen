@@ -814,6 +814,10 @@ button:focus-visible {
   gap: 8px;
   min-width: 176px;
   padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-overlay);
 }
 .cs-arrow-toolbar-options {
   display: flex;

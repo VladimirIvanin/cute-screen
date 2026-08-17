@@ -219,6 +219,7 @@ function requestEyedropper(): void {
         trigger="click"
         placement="top-start"
         :show-arrow="false"
+        raw
         to=".cs-overlay-root"
         @update:show="onShown"
       >

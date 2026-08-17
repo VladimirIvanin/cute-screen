@@ -75,6 +75,7 @@ import {
   type CropSession,
   type RulerAngleGuide,
 } from '@cute-screen/editor-renderer'
+import { drawClampedHandleSquare } from '../overlay-handle-bounds'
 
 export interface TextToolDefaults {
   readonly fontFamily: string
@@ -1189,7 +1190,10 @@ function cropHandleAtPoint(
       Math.hypot(position.x - point.x, position.y - point.y) <= tolerance,
   )?.[0]
 }
-function drawCropOverlay(context: CanvasRenderingContext2D): boolean {
+function drawCropOverlay(
+  context: CanvasRenderingContext2D,
+  outputBounds: ViewportOutputBounds,
+): boolean {
   const session = ensureCropSession()
   if (!session || props.activeTool !== 'crop') return false
   const { x, y, width, height } = session.crop
@@ -1223,8 +1227,7 @@ function drawCropOverlay(context: CanvasRenderingContext2D): boolean {
   context.fillStyle = '#ffffff'
   context.strokeStyle = '#d9773b'
   for (const [, position] of cropHandlePositions(session)) {
-    context.fillRect(position.x - half, position.y - half, half * 2, half * 2)
-    context.strokeRect(position.x - half, position.y - half, half * 2, half * 2)
+    drawClampedHandleSquare(context, position, half, outputBounds)
   }
   context.restore()
   return true
@@ -1264,7 +1267,7 @@ function drawOverlay(): void {
     context.stroke()
     context.restore()
   }
-  if (drawCropOverlay(context)) return
+  if (drawCropOverlay(context, outputBounds)) return
   const layer = selectedLayer()
   if (!layer || !layer.visible) return
   const transform = previewTransform(layer)
@@ -1295,17 +1298,11 @@ function drawOverlay(): void {
   context.strokeStyle = '#d9773b'
   for (const position of handlePositions) {
     const canvasPosition = transformPoint(transform, position)
-    context.fillRect(
-      canvasPosition.x - handleHalfSize,
-      canvasPosition.y - handleHalfSize,
-      handleHalfSize * 2,
-      handleHalfSize * 2,
-    )
-    context.strokeRect(
-      canvasPosition.x - handleHalfSize,
-      canvasPosition.y - handleHalfSize,
-      handleHalfSize * 2,
-      handleHalfSize * 2,
+    drawClampedHandleSquare(
+      context,
+      canvasPosition,
+      handleHalfSize,
+      outputBounds,
     )
   }
   if (layer.kind === 'arrow') {

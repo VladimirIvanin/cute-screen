@@ -662,6 +662,7 @@ onBeforeUnmount(() =>
             trigger="click"
             placement="top"
             :show-arrow="false"
+            raw
             to=".cs-overlay-root"
             @update:show="onPopoverShown(control.id, $event)"
           >
@@ -797,6 +798,7 @@ onBeforeUnmount(() =>
             trigger="click"
             placement="top"
             :show-arrow="false"
+            raw
             to=".cs-overlay-root"
             @update:show="onPopoverShown(control.id, $event)"
           >
@@ -904,6 +906,7 @@ onBeforeUnmount(() =>
             trigger="click"
             placement="top"
             :show-arrow="false"
+            raw
             to=".cs-overlay-root"
             @update:show="onPopoverShown(control.id, $event)"
           >
