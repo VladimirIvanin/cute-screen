@@ -191,9 +191,10 @@ browser или real-Tauri acceptance.
 3. В активный document вставить bitmap и убедиться, что он добавлен как обычный
    Image tool layer без auto-selection и смены active tool.
 4. Создать multiline RU/EN text и отредактировать его в auto-size/fixed-width.
-5. Настроить v7 typography: portable family, size, solid color, weight,
-   italic, strikethrough, paragraph alignment/list и solid background с
-   padding/radius. Проверить, что removed text effects и common
+5. Настроить v7 typography через нижний toolbar для выбранного слоя или через
+   transient floating toolbar при inline edit: portable family, size, solid
+   color, weight, italic, strikethrough, paragraph alignment/list и solid
+   background с padding/radius. Проверить, что removed text effects и common
    opacity/blend/shadows не попадают в persisted JSON.
 6. Создать numbered marker и callout с тем же rich-text contract, сохранив
    badge и leader-line callout semantics.

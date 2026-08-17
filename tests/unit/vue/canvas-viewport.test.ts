@@ -9,6 +9,24 @@ import {
 } from '@cute-screen/editor-renderer'
 import type { TextToolDefaults } from '../../../packages/editor-vue/src/shell/components/CanvasViewport.vue'
 
+const TEXT_TOOLBAR_SCHEMA = {
+  text: {
+    kind: 'text' as const,
+    color: '#101010',
+    fontFamily: 'Roboto',
+    fonts: ['Roboto', 'Arial'],
+    fontSize: 24,
+    bold: false,
+    italic: false,
+    strikethrough: false,
+    listKind: 'none' as const,
+    alignment: 'start' as const,
+    background: null,
+    disabled: [] as const,
+  },
+  title: 'Text',
+}
+
 const document: EditorDocumentV1 = {
   schemaVersion: 7,
   id: '019c1f62-058e-7000-8000-000000000000',
@@ -80,6 +98,7 @@ function mountViewport(
   selectedLayerId = 'shape',
   textDefaults?: TextToolDefaults,
   sampling = false,
+  textToolbarSchema?: typeof TEXT_TOOLBAR_SCHEMA,
 ) {
   const rendered = render(CanvasViewport, {
     props: {
@@ -90,6 +109,7 @@ function mountViewport(
       activeTool,
       sampling,
       ...(textDefaults === undefined ? {} : { textDefaults }),
+      ...(textToolbarSchema === undefined ? {} : { textToolbarSchema }),
       zoom: 100,
       fitMode: true,
       t: (key) => key,
@@ -676,6 +696,43 @@ describe('M05 CanvasViewport transforms', () => {
       ],
     ])
     vi.unstubAllGlobals()
+  })
+
+  it('shows the floating text toolbar only while editing with schema wiring', async () => {
+    const { getByLabelText, scene, container, emitted } = mountViewport(
+      'text',
+      document,
+      'shape',
+      undefined,
+      false,
+      TEXT_TOOLBAR_SCHEMA,
+    )
+
+    await fireEvent.pointerDown(scene, {
+      pointerId: 1,
+      clientX: 30,
+      clientY: 40,
+    })
+    await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 30, clientY: 40 })
+    const editor = getByLabelText('Text editor') as HTMLDivElement
+    expect(
+      container.querySelector('.cs-text-floating-toolbar-host'),
+    ).toBeTruthy()
+    expect(container.querySelector('.cs-text-floating-toolbar')).toBeTruthy()
+
+    editor.textContent = 'Toolbar focus'
+    await fireEvent.input(editor)
+    const bold = getByLabelText('Bold') as HTMLButtonElement
+    await fireEvent.click(bold)
+    expect(emitted().textToolbarChange).toContainEqual(['textBold', 'true'])
+
+    await fireEvent.blur(editor, { relatedTarget: bold })
+    await vi.waitFor(() =>
+      expect(emitted().documentCommand ?? []).toHaveLength(0),
+    )
+    await fireEvent.keyDown(editor, { key: 'Enter', ctrlKey: true })
+    expect(emitted().documentCommand).toHaveLength(1)
+    expect(container.querySelector('.cs-text-floating-toolbar-host')).toBeNull()
   })
 
   it('returns to Select on Escape after an already-cancelled drawing draft', async () => {

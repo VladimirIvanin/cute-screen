@@ -590,7 +590,8 @@ button:focus-visible {
   opacity: 0;
 }
 .cs-layer-lock:not(.is-locked):hover:not(:disabled) .cs-layer-lock-idle,
-.cs-layer-lock:not(.is-locked):focus-visible:not(:disabled) .cs-layer-lock-idle {
+.cs-layer-lock:not(.is-locked):focus-visible:not(:disabled)
+  .cs-layer-lock-idle {
   opacity: 0.55;
 }
 .cs-layer-row.is-selected .cs-layer-lock.is-locked {
@@ -754,6 +755,59 @@ button:focus-visible {
   fill: none;
   stroke: currentColor;
   stroke-width: 1.8;
+}
+.cs-text-floating-toolbar-host {
+  position: absolute;
+  z-index: 4;
+  pointer-events: auto;
+  max-width: calc(100% - 8px);
+}
+.cs-text-floating-toolbar {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-overlay);
+}
+.cs-text-floating-toolbar .cs-text-size-popover,
+.cs-text-floating-toolbar .cs-text-overflow-popover,
+.cs-text-floating-toolbar .cs-text-background-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  bottom: auto;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 12;
+}
+.cs-text-floating-toolbar-host[data-placement='below']
+  .cs-text-floating-toolbar
+  .cs-text-size-popover,
+.cs-text-floating-toolbar-host[data-placement='below']
+  .cs-text-floating-toolbar
+  .cs-text-overflow-popover,
+.cs-text-floating-toolbar-host[data-placement='below']
+  .cs-text-floating-toolbar
+  .cs-text-background-popover {
+  top: auto;
+  bottom: calc(100% + 8px);
+}
+@media (max-width: 700px) {
+  .cs-text-floating-toolbar-host {
+    max-width: calc(100% - 16px);
+  }
+  .cs-text-floating-toolbar > select[data-text-control='font'] {
+    width: 64px;
+  }
+  .cs-text-floating-toolbar {
+    gap: 1px;
+  }
+  .cs-text-floating-toolbar .cs-text-overflowable {
+    display: none;
+  }
+  .cs-text-floating-toolbar .cs-text-overflow-trigger {
+    display: inline-grid;
+    place-items: center;
+  }
 }
 .cs-text-toolbar button:focus-visible,
 .cs-text-toolbar select:focus-visible,

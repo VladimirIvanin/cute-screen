@@ -1389,6 +1389,206 @@ function drawingControl(
     ],
   }
 }
+function buildTextContextSchema(
+  selectedCandidate: LayerNode | undefined,
+  tool: string,
+): ContextToolbarSchema | undefined {
+  const selectedText =
+    selectedCandidate?.kind === 'text' ||
+    selectedCandidate?.kind === 'callout' ||
+    selectedCandidate?.kind === 'numberedMarker'
+      ? selectedCandidate
+      : undefined
+  const textKind =
+    textDraft.value?.kind ??
+    (selectedText?.kind === 'text' ||
+    selectedText?.kind === 'callout' ||
+    selectedText?.kind === 'numberedMarker'
+      ? selectedText.kind
+      : tool === 'text' || tool === 'callout' || tool === 'numberedMarker'
+        ? tool
+        : undefined)
+  if (!textKind) return undefined
+  const snapshot = textDraft.value?.snapshot
+  const content: RichTextContent | undefined = selectedText
+    ? selectedText.kind === 'numberedMarker'
+      ? selectedText.payload.label
+      : selectedText.payload.content
+    : undefined
+  const spans = content?.spans ?? []
+  const paragraphs = content?.paragraphs ?? []
+  const same = <T,>(values: readonly T[], fallback: T): T | null =>
+    values.length === 0 || values.every((value) => value === values[0])
+      ? (values[0] ?? fallback)
+      : null
+  const sameColor = (values: readonly SrgbColor[]): SrgbColor | null => {
+    const firstColor = values[0]
+    if (firstColor === undefined) return textDefaults.value.color
+    return values.every(
+      (color) =>
+        color.red === firstColor.red &&
+        color.green === firstColor.green &&
+        color.blue === firstColor.blue &&
+        color.alpha === firstColor.alpha,
+    )
+      ? firstColor
+      : null
+  }
+  const first = spans[0]
+  const selectedColor = sameColor(spans.map((span) => span.color))
+  const background =
+    selectedText?.kind === 'text'
+      ? selectedText.payload.background
+      : selectedText?.kind === 'callout'
+        ? selectedText.payload.background
+        : selectedText?.kind === 'numberedMarker'
+          ? { color: selectedText.payload.badge.color, padding: 0, radius: 0 }
+          : textDefaults.value.background
+  const calloutStroke =
+    selectedText?.kind === 'callout' ? selectedText.payload.stroke : undefined
+  const textToolbar = {
+    kind: textKind,
+    color: snapshot
+      ? snapshot.color
+        ? hexColor(snapshot.color)
+        : null
+      : selectedColor
+        ? hexColor(selectedColor)
+        : null,
+    fontFamily: snapshot
+      ? snapshot.fontFamily
+      : same(
+          spans.map((span) => span.fontFamily),
+          textDefaults.value.fontFamily,
+        ),
+    fonts: [
+      ...new Set([
+        'Roboto',
+        'Arial',
+        'Georgia',
+        'monospace',
+        ...(props.systemFonts ?? []).map((face) => face.family),
+        snapshot?.fontFamily ??
+          first?.fontFamily ??
+          textDefaults.value.fontFamily,
+      ]),
+    ],
+    fontSize: snapshot
+      ? snapshot.fontSize
+      : same(
+          spans.map((span) => span.fontSize),
+          textDefaults.value.fontSize,
+        ),
+    bold: snapshot
+      ? snapshot.weight === null
+        ? null
+        : snapshot.weight >= 700
+      : same(
+          spans.map((span) => span.weight >= 700),
+          textDefaults.value.weight >= 700,
+        ),
+    italic: snapshot
+      ? snapshot.italic
+      : same(
+          spans.map((span) => span.italic),
+          textDefaults.value.italic,
+        ),
+    strikethrough: snapshot
+      ? snapshot.strikethrough
+      : same(
+          spans.map((span) => span.strikethrough),
+          textDefaults.value.strikethrough,
+        ),
+    listKind: snapshot
+      ? snapshot.listKind
+      : same(
+          paragraphs.map((paragraph) => paragraph.listKind),
+          textDefaults.value.listKind,
+        ),
+    alignment: snapshot
+      ? snapshot.alignment
+      : same(
+          paragraphs.map((paragraph) => paragraph.alignment),
+          textDefaults.value.alignment,
+        ),
+    background: (snapshot ? snapshot.background : background)
+      ? {
+          color: hexColor((snapshot ? snapshot.background : background)!.color),
+          padding: (snapshot ? snapshot.background : background)!.padding,
+          radius: (snapshot ? snapshot.background : background)!.radius,
+        }
+      : null,
+    disabled:
+      textKind === 'numberedMarker'
+        ? (['list', 'none', 'padding', 'radius'] as const)
+        : [],
+  }
+  return {
+    icon: 'text' as const,
+    title:
+      textKind === 'callout'
+        ? translate('toolCallout')
+        : textKind === 'numberedMarker'
+          ? translate('toolNumberedMarker')
+          : translate('toolText'),
+    hint: translate('canvasViewport'),
+    controls:
+      textKind === 'callout' && calloutStroke
+        ? [
+            {
+              kind: 'color' as const,
+              id: 'color' as const,
+              label: translate('color'),
+              value: hexColor(calloutStroke.color),
+              compact: true,
+              disabled: Boolean(
+                props.readOnlyDocument ||
+                (selectedText?.kind === 'callout' && selectedText.locked),
+              ),
+              eyedropper:
+                Boolean(activeDocument.value) &&
+                !(
+                  props.readOnlyDocument ||
+                  (selectedText?.kind === 'callout' && selectedText.locked)
+                ),
+            },
+            {
+              kind: 'arrowStroke' as const,
+              id: 'stroke' as const,
+              label: translate('arrowStroke'),
+              width: calloutStroke.width,
+              style: (calloutStroke.style === 'solid' ||
+              calloutStroke.style === 'dotted'
+                ? calloutStroke.style
+                : 'dashed') as 'solid' | 'dashed' | 'dotted',
+              disabled: Boolean(
+                props.readOnlyDocument ||
+                (selectedText?.kind === 'callout' && selectedText.locked),
+              ),
+              solidLabel: translate('arrowSolid'),
+              dashedLabel: translate('arrowDashed'),
+              dottedLabel: translate('arrowDotted'),
+            },
+          ]
+        : [],
+    text: textToolbar,
+  }
+}
+const floatingTextToolbarSchema = computed(() => {
+  if (!textDraft.value) return undefined
+  const selectedCandidate =
+    store.selectedLayerIds.length === 1
+      ? activeDocument.value?.layers.find(
+          (layer) => layer.id === store.selectedLayerId,
+        )
+      : undefined
+  const schema = buildTextContextSchema(
+    selectedCandidate,
+    state.activeToolId.value ?? 'select',
+  )
+  if (!schema?.text) return undefined
+  return { text: schema.text, title: schema.title }
+})
 const contextSchema = computed(() => {
   const tool = state.activeToolId.value
   const selectedCandidate =
@@ -1449,187 +1649,17 @@ const contextSchema = computed(() => {
         : undefined
   if (precisionTool)
     return precisionToolSchema(precisionTool, selectedPrecision)
-  const selectedText =
-    selectedCandidate?.kind === 'text' ||
-    selectedCandidate?.kind === 'callout' ||
-    selectedCandidate?.kind === 'numberedMarker'
-      ? selectedCandidate
-      : undefined
-  const textKind =
-    textDraft.value?.kind ??
-    (selectedText?.kind === 'text' ||
-    selectedText?.kind === 'callout' ||
-    selectedText?.kind === 'numberedMarker'
-      ? selectedText.kind
-      : tool === 'text' || tool === 'callout' || tool === 'numberedMarker'
-        ? tool
-        : undefined)
-  if (textKind) {
-    const snapshot = textDraft.value?.snapshot
-    const content: RichTextContent | undefined = selectedText
-      ? selectedText.kind === 'numberedMarker'
-        ? selectedText.payload.label
-        : selectedText.payload.content
-      : undefined
-    const spans = content?.spans ?? []
-    const paragraphs = content?.paragraphs ?? []
-    const same = <T,>(values: readonly T[], fallback: T): T | null =>
-      values.length === 0 || values.every((value) => value === values[0])
-        ? (values[0] ?? fallback)
-        : null
-    const sameColor = (values: readonly SrgbColor[]): SrgbColor | null => {
-      const firstColor = values[0]
-      if (firstColor === undefined) return textDefaults.value.color
-      return values.every(
-        (color) =>
-          color.red === firstColor.red &&
-          color.green === firstColor.green &&
-          color.blue === firstColor.blue &&
-          color.alpha === firstColor.alpha,
-      )
-        ? firstColor
-        : null
+  const textSchema = buildTextContextSchema(selectedCandidate, tool ?? 'select')
+  if (textSchema) {
+    if (textDraft.value) {
+      return {
+        icon: textSchema.icon,
+        title: textSchema.title,
+        hint: textSchema.hint,
+        controls: textSchema.controls,
+      }
     }
-    const first = spans[0]
-    const selectedColor = sameColor(spans.map((span) => span.color))
-    const background =
-      selectedText?.kind === 'text'
-        ? selectedText.payload.background
-        : selectedText?.kind === 'callout'
-          ? selectedText.payload.background
-          : selectedText?.kind === 'numberedMarker'
-            ? { color: selectedText.payload.badge.color, padding: 0, radius: 0 }
-            : textDefaults.value.background
-    const calloutStroke =
-      selectedText?.kind === 'callout' ? selectedText.payload.stroke : undefined
-    return {
-      icon: 'text' as const,
-      title:
-        textKind === 'callout'
-          ? translate('toolCallout')
-          : textKind === 'numberedMarker'
-            ? translate('toolNumberedMarker')
-            : translate('toolText'),
-      hint: translate('canvasViewport'),
-      controls:
-        textKind === 'callout' && calloutStroke
-          ? [
-              {
-                kind: 'color' as const,
-                id: 'color' as const,
-                label: translate('color'),
-                value: hexColor(calloutStroke.color),
-                compact: true,
-                disabled: Boolean(
-                  props.readOnlyDocument ||
-                    (selectedText?.kind === 'callout' && selectedText.locked),
-                ),
-                eyedropper:
-                  Boolean(activeDocument.value) &&
-                  !(
-                    props.readOnlyDocument ||
-                    (selectedText?.kind === 'callout' && selectedText.locked)
-                  ),
-              },
-              {
-                kind: 'arrowStroke' as const,
-                id: 'stroke' as const,
-                label: translate('arrowStroke'),
-                width: calloutStroke.width,
-                style: (calloutStroke.style === 'solid' ||
-                calloutStroke.style === 'dotted'
-                  ? calloutStroke.style
-                  : 'dashed') as 'solid' | 'dashed' | 'dotted',
-                disabled: Boolean(
-                  props.readOnlyDocument ||
-                  (selectedText?.kind === 'callout' && selectedText.locked),
-                ),
-                solidLabel: translate('arrowSolid'),
-                dashedLabel: translate('arrowDashed'),
-                dottedLabel: translate('arrowDotted'),
-              },
-            ]
-          : [],
-      text: {
-        kind: textKind,
-        color: snapshot
-          ? snapshot.color
-            ? hexColor(snapshot.color)
-            : null
-          : selectedColor
-            ? hexColor(selectedColor)
-            : null,
-        fontFamily: snapshot
-          ? snapshot.fontFamily
-          : same(
-              spans.map((span) => span.fontFamily),
-              textDefaults.value.fontFamily,
-            ),
-        fonts: [
-          ...new Set([
-            'Roboto',
-            'Arial',
-            'Georgia',
-            'monospace',
-            ...(props.systemFonts ?? []).map((face) => face.family),
-            snapshot?.fontFamily ??
-              first?.fontFamily ??
-              textDefaults.value.fontFamily,
-          ]),
-        ],
-        fontSize: snapshot
-          ? snapshot.fontSize
-          : same(
-              spans.map((span) => span.fontSize),
-              textDefaults.value.fontSize,
-            ),
-        bold: snapshot
-          ? snapshot.weight === null
-            ? null
-            : snapshot.weight >= 700
-          : same(
-              spans.map((span) => span.weight >= 700),
-              textDefaults.value.weight >= 700,
-            ),
-        italic: snapshot
-          ? snapshot.italic
-          : same(
-              spans.map((span) => span.italic),
-              textDefaults.value.italic,
-            ),
-        strikethrough: snapshot
-          ? snapshot.strikethrough
-          : same(
-              spans.map((span) => span.strikethrough),
-              textDefaults.value.strikethrough,
-            ),
-        listKind: snapshot
-          ? snapshot.listKind
-          : same(
-              paragraphs.map((paragraph) => paragraph.listKind),
-              textDefaults.value.listKind,
-            ),
-        alignment: snapshot
-          ? snapshot.alignment
-          : same(
-              paragraphs.map((paragraph) => paragraph.alignment),
-              textDefaults.value.alignment,
-            ),
-        background: (snapshot ? snapshot.background : background)
-          ? {
-              color: hexColor(
-                (snapshot ? snapshot.background : background)!.color,
-              ),
-              padding: (snapshot ? snapshot.background : background)!.padding,
-              radius: (snapshot ? snapshot.background : background)!.radius,
-            }
-          : null,
-        disabled:
-          textKind === 'numberedMarker'
-            ? (['list', 'none', 'padding', 'radius'] as const)
-            : [],
-      },
-    }
+    return textSchema
   }
   /* Legacy v0–v6 text controls intentionally removed from the v7 toolbar.
   if (tool === 'text' && false) {
@@ -3469,9 +3499,6 @@ function onLayerOpacity(id: string, opacity: number): void {
 function onLayerRotation(id: string, rotation: number): void {
   updateLayerProperty(id, 'rotation', rotation)
 }
-function onLayerReorder(id: string, direction: 'up' | 'down'): void {
-  reorderLayer(id, direction)
-}
 function resolveLayerReorderToIndex(
   layerCount: number,
   fromIndex: number,
@@ -4280,6 +4307,8 @@ watch(
           :precision-defaults="precisionDefaults"
           :text-defaults="textDefaults"
           :text-formatting="textFormatting"
+          :text-toolbar-schema="floatingTextToolbarSchema"
+          :text-toolbar-locale="state.locale.value"
           :next-marker-sequence="
             activeDocument
               ? nextNumberedMarkerSequence(activeDocument.layers)
@@ -4298,6 +4327,7 @@ watch(
           @add-layer="addLayer"
           @document-command="executeDocumentCommand"
           @text-editing="setTextDraft"
+          @text-toolbar-change="onContextChange"
           @request-image-import="importContentImage"
           @open-image="store.runAction('openImage')"
           @select-tool="store.selectTool"

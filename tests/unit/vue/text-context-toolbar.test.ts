@@ -2,6 +2,7 @@ import { fireEvent, render, waitFor, within } from '@testing-library/vue'
 import { describe, expect, it } from 'vitest'
 
 import ContextToolbar from '../../../packages/editor-vue/src/shell/components/ContextToolbar.vue'
+import TextFormattingToolbar from '../../../packages/editor-vue/src/shell/components/TextFormattingToolbar.vue'
 
 const schema = {
   icon: 'text' as const,
@@ -169,5 +170,34 @@ describe('v7 text contextual toolbar', () => {
       { key: 'Escape' },
     )
     expect(overflow).toHaveFocus()
+  })
+
+  it('renders the same control strip in the floating variant', async () => {
+    const rendered = render(TextFormattingToolbar, {
+      props: {
+        text: schema.text,
+        title: 'Text',
+        pickerLocale: 'en',
+        variant: 'floating',
+      },
+    })
+    expect(
+      rendered.container.querySelector('.cs-text-floating-toolbar'),
+    ).toBeTruthy()
+    expect(
+      [...rendered.container.querySelectorAll('[data-text-control]')].map(
+        (node) => node.getAttribute('data-text-control'),
+      ),
+    ).toEqual([
+      'color',
+      'font',
+      'size',
+      'bold',
+      'italic',
+      'strikethrough',
+      'list',
+      'alignment',
+      'background',
+    ])
   })
 })

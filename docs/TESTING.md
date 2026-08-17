@@ -628,7 +628,9 @@ process-local `CHROMEDRIVER_PATH` на уже установленный ChromeD
 - bullet Enter, empty Enter и Backspace, composition/IME и plain-text-only paste;
 - ровно один version-token/`EditorCommand` на commit и Escape rollback;
 - visibility для Text/Callout/Numbered Marker, active edit и единственного
-  selected text-bearing layer;
+  selected text-bearing layer; при inline edit formatting controls живут в
+  transient floating toolbar над editor, а нижний contextual toolbar не
+  дублирует text strip;
 - font family, preset/arbitrary size validation, alignment, text/background
   solid colors, None, padding/radius, callout bubble и numbered badge с
   disabled list/None/padding/radius;

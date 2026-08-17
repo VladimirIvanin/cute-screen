@@ -539,8 +539,13 @@ describe('Document v7 rich text in browser mode', () => {
     await $('button[aria-label="Text"]').click()
     const editor = await startTextAt(12, 12)
     await editor.addValue('Selected text')
-    await expect($('.cs-text-toolbar')).toHaveAttribute('aria-label', 'Text')
+    await expect($('.cs-text-floating-toolbar')).toHaveAttribute(
+      'aria-label',
+      'Text',
+    )
+    await expect($('.cs-context-toolbar .cs-text-toolbar')).not.toExist()
     await browser.keys(['Control', 'Enter'])
+    await expect($('.cs-text-floating-toolbar-host')).not.toExist()
     await $('button[aria-label="Show layers"]').click()
     await $('button[aria-label="Select"]').click()
     await $('.cs-layer-row .cs-layer-select').click()

@@ -150,7 +150,15 @@ JSON как bytes/base64.
 
 Компоненты используют semantic CSS variables: surface, raised, sunken, text, muted, border, accent, danger, focus ring, radii и elevations. Raw brand colors не повторяются в SFC.
 
-Tool settings принадлежат `ContextToolbar`. `LayersPanel` не становится вторым inspector: она управляет выбором, порядком, visibility, lock, rotation и opacity. Список слоёв — однострочные ряды; opacity и rotation редактируются в шапке панели для выбранного слоя, а не на каждой строке. При пустом selection она показывает компактную подсказку, а не пустую широкую панель.
+Tool settings принадлежат contextual toolbar. При inline-редактировании
+Text/Callout/Numbered Marker shared `TextFormattingToolbar` монтируется в
+transient host `CanvasViewport` над `.cs-text-editor`; нижний `ContextToolbar`
+в это время не дублирует text controls. Defaults и форматирование выбранного,
+но не редактируемого слоя остаются внизу. `LayersPanel` не становится вторым
+inspector: она управляет выбором, порядком, visibility, lock, rotation и
+opacity. Список слоёв — однострочные ряды; opacity и rotation редактируются в
+шапке панели для выбранного слоя, а не на каждой строке. При пустом selection
+она показывает компактную подсказку, а не пустую широкую панель.
 
 ### Naive UI boundary
 

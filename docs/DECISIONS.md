@@ -90,11 +90,30 @@
 
 ## ADR-012 — Tool settings находятся только в toolbar
 
-**Статус:** accepted
+**Статус:** superseded by ADR-033
 
 **Решение:** top bar, tool rail, canvas, bottom contextual toolbar, series filmstrip, layers panel и zoom control сохраняются. Layers panel не дублирует tool options.
 
 **Уточнение:** main editor использует системные window decorations; CSS-клоны системных кнопок не создаются.
+
+## ADR-033 — Transient text formatting bar над inline editor
+
+**Статус:** accepted; supersedes the bottom-only text-settings portion of ADR-012
+
+**Контекст:** FigJam-like text editing держит formatting controls рядом с
+редактируемым текстом. Нижний contextual toolbar остаётся единственным местом
+для defaults, выбранного-but-not-editing слоя и non-text tools.
+
+**Решение:** при активной inline edit-сессии Text/Callout/Numbered Marker
+EditorShell передаёт shared `TextFormattingToolbar` в transient host
+`CanvasViewport` над `.cs-text-editor`. Тот же `applyV7TextChange` и
+`textFormatting` patch применяются без нового document command до commit.
+Во время edit нижний toolbar не показывает text controls. Popover/focus guard
+включает floating bar; blur не коммитит edit-сессию.
+
+**Проверяемое основание:** component/e2e regression на порядок controls,
+mixed/disabled, focus/blur без commit, responsive overflow 1024/640, позицию
+над editor и отсутствие дублирования в bottom toolbar.
 
 ## ADR-013 — Runtime evidence обязательно
 

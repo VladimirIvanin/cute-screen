@@ -61,7 +61,13 @@ Cute Screen — полноценный local-first редактор снимко
 - `REQ-EDT-005` — selection, move, resize, rotate, duplicate, delete, lock, visibility, z-order и opacity.
 - `REQ-EDT-006` — все изменения документа undoable; redo очищается после новой ветки изменений.
 - `REQ-EDT-007` — guides появляются только при удержании назначенной клавиши.
-- `REQ-EDT-008` — tool settings находятся только в contextual toolbar. Цветовые controls используют product-owned picker с палитрой, HEX, recent/suggestions и canvas-only пипеткой; draft не создаёт document history entry до завершения взаимодействия.
+- `REQ-EDT-008` — tool settings находятся только в contextual toolbar. При
+  inline-редактировании Text, Callout и Numbered Marker transient-панель
+  форматирования появляется над редактируемым текстом; вне такой сессии
+  настройки выбранного слоя и defaults остаются в нижнем contextual toolbar.
+  Цветовые controls используют product-owned picker с палитрой, HEX,
+  recent/suggestions и canvas-only пипеткой; draft не создаёт document history
+  entry до завершения взаимодействия.
 - `REQ-EDT-009` — layers panel ограничена выбором, порядком, visibility, lock, rotation и opacity.
 - `REQ-EDT-010` — clipboard различает внутренние слои, bitmap и plain text.
 - `REQ-EDT-011` — keyboard duplicate создаёт копию с предсказуемым offset.
@@ -86,7 +92,8 @@ Cute Screen — полноценный local-first редактор снимко
 - `REQ-TOL-003` — pencil: базовые кисти, толщина, opacity, smoothing и цвет.
 - `REQ-TOL-004` — marker: толщина, opacity и blend modes highlight/darken.
 - `REQ-TOL-005` — text: FigJam-like direct WYSIWYG editing through a transient
-  `contenteditable` projection (never persisted as HTML), multiline и portable
+  `contenteditable` projection (never persisted as HTML) с transient-панелью
+  форматирования над редактируемым текстом, multiline и portable
   v7 rich text. UTF-16-safe spans хранят только family, size, solid color,
   weight, italic и strikethrough; paragraphs — alignment
   `start|center|end` и list kind `none|bullet`. Text background хранит только

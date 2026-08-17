@@ -9,8 +9,10 @@ import {
   watch,
 } from 'vue'
 import { UiIcon } from '../icon'
+import TextFormattingToolbar from './TextFormattingToolbar.vue'
 import type {
   CanvasViewportHosts,
+  ContextToolbarSchema,
   PrecisionToolDefaults,
   ShellDocumentState,
 } from '../types'
@@ -135,6 +137,13 @@ const props = defineProps<{
   drawingDefaults?: DrawingDefaults | undefined
   textDefaults?: TextToolDefaults | undefined
   textFormatting?: TextFormattingPatch | undefined
+  textToolbarSchema?:
+    | Readonly<{
+        readonly text: NonNullable<ContextToolbarSchema['text']>
+        readonly title: string
+      }>
+    | undefined
+  textToolbarLocale?: 'en' | 'ru'
   nextMarkerSequence?: number | undefined
   markerShape?: 'circle' | 'square' | 'diamond' | 'star' | undefined
   openImageAvailable?: boolean | undefined
@@ -173,6 +182,7 @@ const emit = defineEmits<{
       | undefined,
   ]
   textEditingCancelled: [reason: 'escape']
+  textToolbarChange: [id: string, value: string]
   requestImageImport: [origin: { readonly x: number; readonly y: number }]
   openImage: []
   selectTool: [id: 'select']
@@ -187,7 +197,16 @@ const emit = defineEmits<{
 const scene = ref<HTMLCanvasElement>()
 const overlay = ref<HTMLCanvasElement>()
 const textEditor = ref<HTMLDivElement>()
+const textFloatingToolbar = ref<HTMLDivElement>()
 const scrollContainer = ref<HTMLDivElement>()
+const floatingToolbarLayout = ref<
+  | {
+      readonly left: number
+      readonly top: number
+      readonly placement: 'above' | 'below'
+    }
+  | undefined
+>()
 const rendererError = ref<string>()
 const samplingCursor = ref<CanvasPoint>()
 const editingText = ref<
@@ -219,6 +238,45 @@ let imageResources = new Map<
 let resizeObserver: ResizeObserver | undefined
 let componentMounted = false
 let textToolbarPointerDown = false
+const TEXT_TOOLBAR_SELECTOR =
+  '.cs-context-toolbar, .cs-text-floating-toolbar, .cs-text-size-popover, .cs-text-background-popover, .cs-text-overflow-popover'
+
+function isTextToolbarTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLElement &&
+    target.closest(TEXT_TOOLBAR_SELECTOR) !== null
+  )
+}
+
+function updateFloatingToolbarLayout(): void {
+  const editor = textEditor.value
+  const toolbarHost = textFloatingToolbar.value
+  const surface =
+    editor?.offsetParent instanceof HTMLElement
+      ? editor.offsetParent
+      : undefined
+  if (!editor || !surface || !editingText.value || !props.textToolbarSchema) {
+    floatingToolbarLayout.value = undefined
+    return
+  }
+  const editorRect = editor.getBoundingClientRect()
+  const surfaceRect = surface.getBoundingClientRect()
+  const toolbarHeight = toolbarHost?.offsetHeight ?? 44
+  const toolbarWidth = toolbarHost?.offsetWidth ?? 320
+  const gap = 10
+  const centerX = editorRect.left - surfaceRect.left + editorRect.width / 2
+  const minLeft = toolbarWidth / 2 + 4
+  const maxLeft = Math.max(minLeft, surface.clientWidth - toolbarWidth / 2 - 4)
+  const left = Math.max(minLeft, Math.min(maxLeft, centerX))
+  const aboveTop = editorRect.top - surfaceRect.top - toolbarHeight - gap
+  let top = aboveTop
+  let placement: 'above' | 'below' = 'above'
+  if (aboveTop < 4) {
+    top = editorRect.bottom - surfaceRect.top + gap
+    placement = 'below'
+  }
+  floatingToolbarLayout.value = Object.freeze({ left, top, placement })
+}
 let lastFitZoom: number | undefined
 let pendingZoomAnchor:
   | {
@@ -523,7 +581,18 @@ watch(
 watch(
   () => props.zoom,
   () => {
-    if (editingText.value) void nextTick(renderTextEditorProjection)
+    if (editingText.value) {
+      void nextTick(() => {
+        renderTextEditorProjection()
+        updateFloatingToolbarLayout()
+      })
+    }
+  },
+)
+watch(
+  () => props.textToolbarSchema,
+  () => {
+    if (editingText.value) void nextTick(updateFloatingToolbarLayout)
   },
 )
 async function ensureRenderer(): Promise<Canvas2DRenderer | undefined> {
@@ -999,11 +1068,7 @@ function drawCalloutDraft(context: CanvasRenderingContext2D): void {
     label = editing.calloutDraft.label
     stroke = editing.calloutStroke ?? stroke
   }
-  if (
-    !target ||
-    !label ||
-    (target.x === label.x && target.y === label.y)
-  ) {
+  if (!target || !label || (target.x === label.x && target.y === label.y)) {
     return
   }
   const route = defaultCalloutRoute(target, label)
@@ -2259,6 +2324,7 @@ function startTextEditor(input: {
     // store only plain Unicode and typed ranges, never HTML.
     editor.focus()
     renderTextEditorProjection()
+    void nextTick(updateFloatingToolbarLayout)
   })
 }
 function syncTextEditorSelection(): void {
@@ -2267,6 +2333,7 @@ function syncTextEditorSelection(): void {
   if (!editor || !editing) return
   editing.controller.setSelection(readRichTextDomSelection(editor))
   emitTextEditing()
+  void nextTick(updateFloatingToolbarLayout)
 }
 function renderTextEditorProjection(): void {
   const editor = textEditor.value
@@ -2278,6 +2345,7 @@ function renderTextEditorProjection(): void {
     (props.zoom ?? 100) / 100,
   )
   restoreRichTextDomSelection(editor, editing.controller.state.selection)
+  void nextTick(updateFloatingToolbarLayout)
 }
 function readEditorText(): string {
   const editor = textEditor.value
@@ -2343,26 +2411,18 @@ function onTextEditorBlur(event: FocusEvent): void {
   // Capture relatedTarget before Vue updates the toolbar: a formatting change
   // can replace the focused control before this deferred check runs.
   const movedIntoToolbar =
-    textToolbarPointerDown ||
-    (event.relatedTarget instanceof HTMLElement &&
-      event.relatedTarget.closest('.cs-context-toolbar') !== null)
+    textToolbarPointerDown || isTextToolbarTarget(event.relatedTarget)
   window.setTimeout(() => {
     if (!editingText.value) return
     const active = document.activeElement
-    if (
-      movedIntoToolbar ||
-      (active instanceof HTMLElement && active.closest('.cs-context-toolbar'))
-    ) {
+    if (movedIntoToolbar || isTextToolbarTarget(active)) {
       return
     }
     commitTextEditor()
   }, 0)
 }
 function onDocumentPointerDown(event: PointerEvent): void {
-  const target = event.target
-  textToolbarPointerDown =
-    target instanceof HTMLElement &&
-    target.closest('.cs-context-toolbar') !== null
+  textToolbarPointerDown = isTextToolbarTarget(event.target)
   window.setTimeout(() => {
     textToolbarPointerDown = false
   }, 0)
@@ -2371,6 +2431,7 @@ function commitTextEditor(): void {
   const editing = editingText.value
   if (!editing || editing.controller.composing) return
   editingText.value = undefined
+  floatingToolbarLayout.value = undefined
   emitTextEditing()
   const content = editing.controller.state.content
   const style = content.spans[0] ?? editing.controller.state.typingStyle
@@ -2459,6 +2520,7 @@ function commitTextEditor(): void {
 }
 function cancelTextEditor(): void {
   editingText.value = undefined
+  floatingToolbarLayout.value = undefined
   emitTextEditing()
   emit('textEditingCancelled', 'escape')
 }
@@ -3134,6 +3196,30 @@ onBeforeUnmount(() => {
             @dblclick="onDoubleClick"
             @wheel="onWheel"
           ></canvas>
+          <div
+            v-if="editingText && textToolbarSchema"
+            ref="textFloatingToolbar"
+            class="cs-text-floating-toolbar-host"
+            :style="
+              floatingToolbarLayout
+                ? {
+                    left: `${floatingToolbarLayout.left}px`,
+                    top: `${floatingToolbarLayout.top}px`,
+                    transform: 'translateX(-50%)',
+                  }
+                : { visibility: 'hidden' }
+            "
+            :data-placement="floatingToolbarLayout?.placement"
+            @pointerdown.stop
+          >
+            <TextFormattingToolbar
+              :text="textToolbarSchema.text"
+              :title="textToolbarSchema.title"
+              :picker-locale="textToolbarLocale ?? 'en'"
+              variant="floating"
+              @change="(id, value) => emit('textToolbarChange', id, value)"
+            />
+          </div>
           <div
             v-if="editingText"
             ref="textEditor"
