@@ -418,7 +418,7 @@ button:focus-visible {
   bottom: 14px;
   display: grid;
   width: 288px;
-  grid-template-rows: 44px minmax(0, 1fr);
+  grid-template-rows: 44px auto minmax(0, 1fr);
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -434,6 +434,45 @@ button:focus-visible {
 .cs-layers-panel header button {
   margin-left: auto;
 }
+.cs-layers-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.cs-layers-control {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.cs-layers-control-label {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cs-layers-control .cs-ui-slider {
+  min-width: 0;
+}
+.cs-layers-control .cs-ui-number-input {
+  width: 100%;
+  max-width: 100%;
+}
+.cs-layers-control .cs-ui-number-input .n-input {
+  min-width: 0;
+}
+.cs-layers-controls-hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
 .cs-layers-empty {
   padding: 14px;
   color: var(--text-muted);
@@ -444,102 +483,142 @@ button:focus-visible {
   padding: 6px;
 }
 .cs-layer-row {
+  position: relative;
   display: grid;
   width: 100%;
-  grid-template-columns: minmax(0, 1fr) 28px 28px;
+  grid-template-columns: 26px minmax(0, 1fr) 26px;
   align-items: center;
-  gap: 7px;
-  min-height: 42px;
-  padding: 0 7px;
+  gap: 4px;
+  min-height: 34px;
+  padding: 0 4px;
   border: 1px solid transparent;
   border-radius: 7px;
   color: var(--text);
   background: transparent;
   text-align: left;
-  cursor: pointer;
 }
-.cs-layer-properties {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 74px 28px 28px;
-  align-items: center;
-  gap: 6px;
-  padding: 0 0 7px 33px;
+.cs-layer-select.is-reorderable {
+  cursor: grab;
+  touch-action: none;
 }
-.cs-layer-properties label {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 5px;
-  color: var(--text-muted);
-  font-size: 10px;
+.cs-layer-select.is-reorderable:active,
+.cs-layer-row.is-dragging .cs-layer-select.is-reorderable {
+  cursor: grabbing;
 }
-.cs-layer-properties input {
-  min-width: 0;
+.cs-layer-row.is-dragging .cs-layer-select {
+  user-select: none;
 }
-.cs-layer-properties input[type='number'] {
-  width: 48px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  color: var(--text);
-  background: var(--surface-sunken);
+.cs-layer-row.is-locked {
+  border-color: color-mix(in srgb, var(--text-muted) 28%, var(--border));
+  background: color-mix(in srgb, var(--surface-sunken) 72%, transparent);
 }
-.cs-layer-order {
-  width: 28px;
-  height: 28px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  color: var(--text-muted);
-  background: transparent;
-  cursor: pointer;
+.cs-layer-row.is-locked .cs-layer-name {
+  opacity: 0.78;
 }
-.cs-layer-order:hover:not(:disabled) {
-  color: var(--text);
-  background: var(--surface-hover);
+.cs-layer-row.is-dragging {
+  opacity: 0.45;
+}
+.cs-layer-row.is-drop-before {
+  box-shadow: inset 0 2px 0 0 var(--accent);
+}
+.cs-layer-row.is-drop-after {
+  box-shadow: inset 0 -2px 0 0 var(--accent);
 }
 .cs-layer-select {
-  display: grid;
+  display: block;
+  width: 100%;
   min-width: 0;
-  grid-template-columns: 26px minmax(0, 1fr);
-  align-items: center;
-  gap: 7px;
+  padding: 4px 6px;
   border: 0;
+  border-radius: var(--radius-sm);
   color: inherit;
   background: transparent;
   cursor: pointer;
   text-align: left;
 }
+.cs-layer-select:hover:not([aria-disabled='true']) {
+  background: color-mix(in srgb, var(--surface-hover) 70%, transparent);
+}
+.cs-layer-select[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.cs-layer-name {
+  display: block;
+  overflow: hidden;
+  min-width: 0;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cs-layer-row > .cs-layer-action.n-button {
+  width: 26px !important;
+  min-width: 26px !important;
+  height: 26px !important;
+  padding: 0 !important;
+}
 .cs-layer-action {
   display: inline-grid;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   place-items: center;
+  padding: 0;
   border: 0;
   border-radius: var(--radius-sm);
   color: var(--text-muted);
   background: transparent;
   cursor: pointer;
 }
-.cs-layer-action:hover {
+.cs-layer-action:hover:not(:disabled) {
   color: var(--text);
   background: var(--surface-hover);
 }
-.cs-layer-row span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.cs-layer-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.cs-layer-lock.is-locked {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.cs-layer-lock.is-locked svg {
+  stroke-width: 2.2;
+}
+.cs-layer-lock-idle {
+  opacity: 0;
+}
+.cs-layer-lock:not(.is-locked):hover:not(:disabled) .cs-layer-lock-idle,
+.cs-layer-lock:not(.is-locked):focus-visible:not(:disabled) .cs-layer-lock-idle {
+  opacity: 0.55;
+}
+.cs-layer-row.is-selected .cs-layer-lock.is-locked {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
 }
 .cs-layer-row.is-selected {
   border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
   background: var(--accent-soft);
 }
+.cs-layer-row.is-selected.is-locked {
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--text-muted));
+  background: color-mix(
+    in srgb,
+    var(--accent-soft) 72%,
+    var(--surface-sunken) 28%
+  );
+}
 .cs-layer-row.is-selected::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
   width: 3px;
-  height: 22px;
+  height: 18px;
   border-radius: 2px;
   background: var(--accent);
   content: '';
-  position: absolute;
+  transform: translateY(-50%);
 }
 .cs-layers-peek {
   position: absolute;
@@ -1106,7 +1185,7 @@ button:focus-visible {
   top: 76px;
   right: 14px;
   bottom: 76px;
-  width: min(292px, calc(100vw - 96px));
+  width: min(320px, calc(100vw - 96px));
   border-radius: 13px;
   background: color-mix(in srgb, var(--surface-raised) 96%, transparent);
   backdrop-filter: blur(16px) saturate(1.12);
@@ -1122,15 +1201,6 @@ button:focus-visible {
 
 .cs-layer-row {
   position: relative;
-}
-.cs-layer-properties {
-  grid-template-columns: minmax(0, 1fr) 82px 30px 30px;
-}
-.cs-layer-properties .cs-ui-slider {
-  min-width: 0;
-}
-.cs-layer-properties .cs-ui-number-input {
-  width: 78px;
 }
 
 .cs-context-toolbar {

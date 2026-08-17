@@ -148,7 +148,7 @@ JSON как bytes/base64.
 
 Компоненты используют semantic CSS variables: surface, raised, sunken, text, muted, border, accent, danger, focus ring, radii и elevations. Raw brand colors не повторяются в SFC.
 
-Tool settings принадлежат `ContextToolbar`. `LayersPanel` не становится вторым inspector: она управляет выбором, порядком, visibility, lock, rotation и opacity. При пустом selection она показывает компактную подсказку, а не пустую широкую панель.
+Tool settings принадлежат `ContextToolbar`. `LayersPanel` не становится вторым inspector: она управляет выбором, порядком, visibility, lock, rotation и opacity. Список слоёв — однострочные ряды; opacity и rotation редактируются в шапке панели для выбранного слоя, а не на каждой строке. При пустом selection она показывает компактную подсказку, а не пустую широкую панель.
 
 ### Naive UI boundary
 

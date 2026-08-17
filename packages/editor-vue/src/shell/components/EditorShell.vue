@@ -3379,7 +3379,25 @@ function onLayerRotation(id: string, rotation: number): void {
 function onLayerReorder(id: string, direction: 'up' | 'down'): void {
   reorderLayer(id, direction)
 }
-function onLayerReorderTo(id: string, targetId: string): void {
+function resolveLayerReorderToIndex(
+  layerCount: number,
+  fromIndex: number,
+  targetIndex: number,
+  place: 'before' | 'after',
+): number {
+  const sourceDisplay = layerCount - 1 - fromIndex
+  const targetDisplay = layerCount - 1 - targetIndex
+  let insertDisplay = place === 'before' ? targetDisplay : targetDisplay + 1
+  if (sourceDisplay < insertDisplay) {
+    insertDisplay -= 1
+  }
+  return layerCount - 1 - insertDisplay
+}
+function onLayerReorderTo(
+  id: string,
+  targetId: string,
+  place: 'before' | 'after',
+): void {
   const layers = activeDocument.value?.layers
   if (!layers || !props.documentSession) return
   const fromIndex = layers.findIndex((layer) => layer.id === id)
@@ -3391,11 +3409,18 @@ function onLayerReorderTo(id: string, targetId: string): void {
     fromIndex === targetIndex
   )
     return
+  const toIndex = resolveLayerReorderToIndex(
+    layers.length,
+    fromIndex,
+    targetIndex,
+    place,
+  )
+  if (fromIndex === toIndex) return
   props.documentSession.execute({
     type: 'reorderLayer',
     layerId: id,
     fromIndex,
-    toIndex: targetIndex,
+    toIndex,
   })
 }
 function moveLayer(id: string, deltaX: number, deltaY: number): void {
@@ -3659,6 +3684,7 @@ function loadFixture(): void {
           locked: false,
           opacity: 1,
           rotation: 0,
+          opacityEditable: false,
         },
         {
           id: 'arrow-1',
@@ -3668,6 +3694,7 @@ function loadFixture(): void {
           locked: false,
           opacity: 1,
           rotation: 0,
+          opacityEditable: true,
         },
         {
           id: 'marker-1',
@@ -3677,6 +3704,7 @@ function loadFixture(): void {
           locked: true,
           opacity: 1,
           rotation: 0,
+          opacityEditable: true,
         },
       ],
       frames: [
@@ -3865,6 +3893,7 @@ function syncLayerSummaries(document: EditorDocumentV1): void {
             locked: true,
             opacity: 1,
             rotation: 0,
+            opacityEditable: false,
             transient: true,
           },
         ]
@@ -3880,6 +3909,10 @@ function syncLayerSummaries(document: EditorDocumentV1): void {
       locked: layer.locked,
       opacity: 'opacity' in layer ? layer.opacity : 1,
       rotation: layer.transform.rotation,
+      opacityEditable:
+        layer.kind !== 'text' &&
+        layer.kind !== 'callout' &&
+        layer.kind !== 'numberedMarker',
     })),
   ])
 }
@@ -4195,7 +4228,6 @@ watch(
           @lock="updateLayerProperty($event, 'locked')"
           @opacity="onLayerOpacity"
           @rotation="onLayerRotation"
-          @reorder="onLayerReorder"
           @reorder-to="onLayerReorderTo"
         />
         <ZoomControls

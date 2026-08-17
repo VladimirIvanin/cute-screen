@@ -36,6 +36,7 @@ export interface LayerSummary {
   readonly locked: boolean
   readonly opacity: number
   readonly rotation: number
+  readonly opacityEditable: boolean
   /** A non-serializable editor projection, e.g. the current text draft. */
   readonly transient?: boolean
 }
@@ -313,6 +314,7 @@ export const translationKeys = [
   'exportUnavailable',
   'layers',
   'layersEmpty',
+  'layersNoSelection',
   'baseImage',
   'opacity',
   'rotation',

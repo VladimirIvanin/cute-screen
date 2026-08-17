@@ -31,6 +31,7 @@ describe('M04 capture action feedback', () => {
         locked: false,
         opacity: 1,
         rotation: 0,
+        opacityEditable: true,
       })),
     )
     store.selectLayer('top')
