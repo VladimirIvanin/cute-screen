@@ -2,6 +2,13 @@ import { $, $$, browser, expect } from '@wdio/globals'
 import path from 'node:path'
 
 type HarnessSnapshot = {
+  readonly canvas: { readonly width: number; readonly height: number }
+  readonly crop: {
+    readonly x: number
+    readonly y: number
+    readonly width: number
+    readonly height: number
+  } | null
   readonly layers: readonly {
     readonly id: string
     readonly kind: string
@@ -135,6 +142,13 @@ async function chooseArrowPopover(
 async function arrowHandleViewportPoint(
   arrow: HarnessSnapshot['layers'][number],
 ): Promise<Readonly<{ x: number; y: number }>> {
+  const harnessDocument = await snapshot()
+  const outputBounds = harnessDocument.crop ?? {
+    x: 0,
+    y: 0,
+    width: harnessDocument.canvas.width,
+    height: harnessDocument.canvas.height,
+  }
   const payload = arrow.payload
   const start = payload?.start as { x: number; y: number }
   const end = payload?.end as { x: number; y: number }
@@ -147,7 +161,7 @@ async function arrowHandleViewportPoint(
       ? { x: midpoint.x, y: midpoint.y + elbow.offset }
       : { x: midpoint.x + elbow.offset, y: midpoint.y }
   return browser.execute(
-    ({ x, y, translateX, translateY }) => {
+    ({ x, y, translateX, translateY, outputX, outputY }) => {
       const scene = document.querySelector<HTMLCanvasElement>(
         '.cs-canvas:not(.cs-canvas-overlay)',
       )
@@ -155,10 +169,12 @@ async function arrowHandleViewportPoint(
       const bounds = scene.getBoundingClientRect()
       return {
         x: Math.round(
-          bounds.left + ((translateX + x) / scene.width) * bounds.width,
+          bounds.left +
+            ((translateX + x - outputX) / scene.width) * bounds.width,
         ),
         y: Math.round(
-          bounds.top + ((translateY + y) / scene.height) * bounds.height,
+          bounds.top +
+            ((translateY + y - outputY) / scene.height) * bounds.height,
         ),
       }
     },
@@ -167,6 +183,8 @@ async function arrowHandleViewportPoint(
       y: local.y,
       translateX: transform?.translateX ?? 0,
       translateY: transform?.translateY ?? 0,
+      outputX: outputBounds.x,
+      outputY: outputBounds.y,
     },
   )
 }

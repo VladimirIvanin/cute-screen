@@ -1022,6 +1022,26 @@ copied into the Tauri/Vue implementation.
   the same render-harness command was run with
   `$env:CUTE_SCREEN_UPDATE_GOLDENS = '1'`; no alternate script was introduced.
 
+## Browser E2E cropped-viewport stability evidence (2026-08-17)
+
+- The aggregate Chrome 151 run reproduced three failed spec files before the
+  repair. M05 compared a committed 100×80 crop surface with the 2560×1440
+  document canvas and targeted a snap gesture without translating the crop
+  origin. M06 targeted the elbow handle in full-canvas coordinates against the
+  cropped scene backing store. M08 compared integer WebDriver viewport input
+  with ideal fractional canvas coordinates; on Linux the reported example was
+  `30.3125` for an ideal `30`.
+- Browser coordinate helpers now map through the visible output bounds. The M08
+  contract compares persisted canvas-space geometry with the point actually
+  delivered after WebDriver's integer CSS-pixel quantization. Overlay assertions
+  wait for the observable held/released frame, and the strong ruler resize waits
+  for its single document version increment before checking the resulting scale.
+- Focused Chrome 151 / Windows x64 results: M05 7/7, M06 9/9 and M08 8/8.
+  `$env:CUTE_SCREEN_BROWSER_E2E_PORT = '5174'; pnpm test:e2e:browser` passed all
+  7/7 spec files in 92 seconds. The configurable strict Vite port isolated the
+  run from an existing local development server; CI retains port 5173 by default.
+  The reported Linux runner has not been rerun locally.
+
 ## CI gates
 
 ### Каждый PR

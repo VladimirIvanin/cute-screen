@@ -4,7 +4,12 @@ import { Key } from 'webdriverio'
 
 type HarnessDocument = {
   readonly canvas: { readonly width: number; readonly height: number }
-  readonly crop: { readonly x: number; readonly y: number } | null
+  readonly crop: {
+    readonly x: number
+    readonly y: number
+    readonly width: number
+    readonly height: number
+  } | null
   readonly layers: readonly {
     readonly id: string
     readonly locked: boolean
@@ -77,23 +82,43 @@ async function viewportLayout() {
   })
 }
 
+async function waitForSurfaceSize(
+  width: number,
+  height: number,
+): Promise<void> {
+  await browser.waitUntil(async () => {
+    const layout = await viewportLayout()
+    return (
+      Math.abs(layout.surface.width - width) < 0.5 &&
+      Math.abs(layout.surface.height - height) < 0.5
+    )
+  })
+}
+
 async function canvasPoint(
   x: number,
   y: number,
 ): Promise<Readonly<{ x: number; y: number }>> {
+  const harnessDocument = await snapshot()
+  const outputX = harnessDocument.crop?.x ?? 0
+  const outputY = harnessDocument.crop?.y ?? 0
   return browser.execute(
-    ({ canvasX, canvasY }) => {
+    ({ canvasX, canvasY, originX, originY }) => {
       const scene = document.querySelector<HTMLCanvasElement>(
         '.cs-canvas:not(.cs-canvas-overlay)',
       )
       if (!scene) throw new Error('Scene canvas is missing')
       const bounds = scene.getBoundingClientRect()
       return {
-        x: Math.round(bounds.left + (canvasX / scene.width) * bounds.width),
-        y: Math.round(bounds.top + (canvasY / scene.height) * bounds.height),
+        x: Math.round(
+          bounds.left + ((canvasX - originX) / scene.width) * bounds.width,
+        ),
+        y: Math.round(
+          bounds.top + ((canvasY - originY) / scene.height) * bounds.height,
+        ),
       }
     },
-    { canvasX: x, canvasY: y },
+    { canvasX: x, canvasY: y, originX: outputX, originY: outputY },
   )
 }
 
@@ -117,14 +142,10 @@ describe('M05 editor foundation in browser mode', () => {
 
     const fit = await viewportLayout()
     const mounted = await snapshot()
-    expect(fit.surface.width).toBeCloseTo(
-      (mounted.canvas.width * fit.zoom) / 100,
-      0,
-    )
-    expect(fit.surface.height).toBeCloseTo(
-      (mounted.canvas.height * fit.zoom) / 100,
-      0,
-    )
+    const outputWidth = mounted.crop?.width ?? mounted.canvas.width
+    const outputHeight = mounted.crop?.height ?? mounted.canvas.height
+    expect(fit.surface.width).toBeCloseTo((outputWidth * fit.zoom) / 100, 0)
+    expect(fit.surface.height).toBeCloseTo((outputHeight * fit.zoom) / 100, 0)
     expect(fit.shell.bottom).toBeLessThanOrEqual(fit.windowHeight + 1)
     expect(fit.zoomControls.bottom).toBeLessThanOrEqual(fit.viewport.bottom + 1)
     await browser.saveScreenshot(
@@ -133,9 +154,10 @@ describe('M05 editor foundation in browser mode', () => {
 
     await $('.cs-zoom-value').click()
     await expect($('.cs-zoom-value')).toHaveText('100%')
+    await waitForSurfaceSize(outputWidth, outputHeight)
     const actualSize = await viewportLayout()
-    expect(actualSize.surface.width).toBeCloseTo(mounted.canvas.width, 0)
-    expect(actualSize.surface.height).toBeCloseTo(mounted.canvas.height, 0)
+    expect(actualSize.surface.width).toBeCloseTo(outputWidth, 0)
+    expect(actualSize.surface.height).toBeCloseTo(outputHeight, 0)
     expect(actualSize.viewport.height).toBeCloseTo(fit.viewport.height, 0)
     expect(actualSize.zoomControls.bottom).toBeLessThanOrEqual(
       actualSize.viewport.bottom + 1,
@@ -145,14 +167,16 @@ describe('M05 editor foundation in browser mode', () => {
     )
 
     await $('button[aria-label="Fit canvas"]').click()
-    const refit = await viewportLayout()
-    await expect($('.cs-zoom-value')).toHaveText(`${refit.zoom}%`)
-    expect(refit.surface.width).toBeCloseTo(
-      (mounted.canvas.width * refit.zoom) / 100,
-      0,
+    await browser.waitUntil(async () => (await viewportLayout()).zoom !== 100)
+    const refitZoom = (await viewportLayout()).zoom
+    await waitForSurfaceSize(
+      (outputWidth * refitZoom) / 100,
+      (outputHeight * refitZoom) / 100,
     )
+    const refit = await viewportLayout()
+    expect(refit.surface.width).toBeCloseTo((outputWidth * refit.zoom) / 100, 0)
     expect(refit.surface.height).toBeCloseTo(
-      (mounted.canvas.height * refit.zoom) / 100,
+      (outputHeight * refit.zoom) / 100,
       0,
     )
     expect(refit.viewport.height).toBeCloseTo(fit.viewport.height, 0)
@@ -301,8 +325,8 @@ describe('M05 editor foundation in browser mode', () => {
     await openM05()
     await $('button[aria-label="Show layers"]').click()
     await $(`[data-layer-id="${frontId}"] .cs-layer-select`).click()
-    const start = await canvasPoint(70, 50)
-    const next = await canvasPoint(71, 51)
+    const start = await canvasPoint(68, 48)
+    const next = await canvasPoint(70, 50)
     await browser
       .action('pointer', { id: 'm05-guide-pointer' })
       .move({ origin: 'viewport', x: start.x, y: start.y, duration: 0 })
@@ -320,27 +344,24 @@ describe('M05 editor foundation in browser mode', () => {
       .action('key', { id: 'm05-guide-key' })
       .down(Key.Alt)
       .perform(true)
-
-    const heldGuides = await browser.execute(() => {
-      const overlay = document.querySelector<HTMLCanvasElement>(
-        '.cs-canvas-overlay[aria-label="Interaction overlay"]',
-      )
-      if (!overlay) throw new Error('Interaction overlay is missing')
-      return overlay.toDataURL()
-    })
+    const readOverlay = () =>
+      browser.execute(() => {
+        const overlay = document.querySelector<HTMLCanvasElement>(
+          '.cs-canvas-overlay[aria-label="Interaction overlay"]',
+        )
+        if (!overlay) throw new Error('Interaction overlay is missing')
+        return overlay.toDataURL()
+      })
+    await browser.waitUntil(async () => (await readOverlay()) !== withoutGuides)
+    const heldGuides = await readOverlay()
     expect(heldGuides).not.toBe(withoutGuides)
 
     await browser
       .action('key', { id: 'm05-guide-key' })
       .up(Key.Alt)
       .perform(true)
-    const releasedGuides = await browser.execute(() => {
-      const overlay = document.querySelector<HTMLCanvasElement>(
-        '.cs-canvas-overlay[aria-label="Interaction overlay"]',
-      )
-      if (!overlay) throw new Error('Interaction overlay is missing')
-      return overlay.toDataURL()
-    })
+    await browser.waitUntil(async () => (await readOverlay()) === withoutGuides)
+    const releasedGuides = await readOverlay()
     expect(releasedGuides).toBe(withoutGuides)
     await browser
       .action('pointer', { id: 'm05-guide-pointer' })

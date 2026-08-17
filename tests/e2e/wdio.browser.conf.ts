@@ -5,7 +5,11 @@ import path from 'node:path'
 import { saveFailureScreenshot } from './failure-artifacts'
 
 const outputDir = path.resolve('artifacts/browser-e2e')
-const devServerUrl = 'http://127.0.0.1:5173'
+const browserE2ePort = process.env.CUTE_SCREEN_BROWSER_E2E_PORT ?? '5173'
+if (!/^[0-9]+$/u.test(browserE2ePort)) {
+  throw new Error('CUTE_SCREEN_BROWSER_E2E_PORT must be a decimal port number')
+}
+const devServerUrl = `http://127.0.0.1:${browserE2ePort}`
 
 async function startBrowserDevServer(): Promise<{
   url: string
@@ -19,6 +23,9 @@ async function startBrowserDevServer(): Promise<{
       'e2e',
       '--config',
       path.resolve('apps/desktop/vite.config.ts'),
+      '--port',
+      browserE2ePort,
+      '--strictPort',
     ],
     {
       cwd: process.cwd(),
