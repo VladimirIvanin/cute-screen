@@ -44,8 +44,9 @@ jobs:
 
       - name: Install Tauri system dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends build-essential curl file libayatana-appindicator3-dev librsvg2-dev libssl-dev libwebkit2gtk-4.1-dev libxdo-dev webkit2gtk-driver wget xvfb
+          bash scripts/ci-install-linux-tauri-deps.sh \
+            build-essential curl file libayatana-appindicator3-dev librsvg2-dev \
+            libssl-dev libwebkit2gtk-4.1-dev libxdo-dev webkit2gtk-driver wget xvfb
 
       - name: Resolve pnpm store
         id: pnpm-store
@@ -178,8 +179,9 @@ jobs:
       - name: Install Linux Tauri dependencies
         if: matrix.tauri_deps
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends build-essential curl file libayatana-appindicator3-dev librsvg2-dev libssl-dev libwebkit2gtk-4.1-dev libxdo-dev wget
+          bash scripts/ci-install-linux-tauri-deps.sh \
+            build-essential curl file libayatana-appindicator3-dev librsvg2-dev \
+            libssl-dev libwebkit2gtk-4.1-dev libxdo-dev wget
 
       - name: Resolve pnpm store
         id: pnpm-store

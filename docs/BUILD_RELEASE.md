@@ -47,6 +47,12 @@ Artifacts считаются тестовыми/неофициальными с�
 - Linux fake-platform Tauri smoke;
 - compile checks Windows/macOS и ARM targets.
 
+Linux jobs не используют `azure.archive.ubuntu.com` как первый apt-mirror:
+hosted Ubuntu runners могут зависнуть на нём на десятки минут и сжечь
+`timeout-minutes` ещё на `apt-get update`. Установка Tauri-зависимостей идёт
+через `scripts/ci-install-linux-tauri-deps.sh` с bounded HTTP timeout и
+повторными попытками.
+
 ### `nightly.yml`
 
 - Во время разработки: доступные на текущей системе real Tauri E2E, large
