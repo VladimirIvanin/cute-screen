@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { markRaw } from 'vue'
 
 import App from '../../../apps/desktop/src/App.vue'
+import { selectLayerFromPanel } from './layer-selection'
 import ActionFeedback from '../../../packages/editor-vue/src/shell/components/ActionFeedback.vue'
 import CanvasViewport from '../../../packages/editor-vue/src/shell/components/CanvasViewport.vue'
 import EditorShell from '../../../packages/editor-vue/src/shell/components/EditorShell.vue'
@@ -126,6 +127,10 @@ function divergentArrowDocument(): EditorDocumentV1 {
   }
 }
 
+async function selectArrowLayer(view: ReturnType<typeof render>) {
+  return selectLayerFromPanel(view)
+}
+
 describe('M02 editor shell', () => {
   it('keeps an unselected Arrow change in persistent defaults without a document command', async () => {
     window.localStorage.clear()
@@ -136,6 +141,10 @@ describe('M02 editor shell', () => {
     })
 
     await fireEvent.click(screen.getByRole('button', { name: 'Arrow' }))
+    expect(
+      screen.queryByRole('button', { name: 'Stroke: 3 px' }),
+    ).not.toBeInTheDocument()
+    await fireEvent.contextMenu(screen.getByRole('button', { name: 'Arrow' }))
     await fireEvent.click(
       await screen.findByRole('button', { name: 'Stroke: 3 px' }),
     )
@@ -156,6 +165,7 @@ describe('M02 editor shell', () => {
       props: { fixture: 'ready' },
       global: { plugins: [createEditorShellPinia()] },
     })
+    await fireEvent.contextMenu(screen.getByRole('button', { name: 'Arrow' }))
     expect(
       await screen.findByRole('button', { name: 'Stroke: 2 px' }),
     ).toBeInTheDocument()
@@ -169,15 +179,13 @@ describe('M02 editor shell', () => {
       global: { plugins: [createEditorShellPinia()] },
     })
 
-    await fireEvent.click(screen.getByRole('button', { name: 'Arrow' }))
-    await fireEvent.click(screen.getByRole('button', { name: 'Show layers' }))
-    await fireEvent.click(
-      view.container.querySelector('.cs-layer-select') as HTMLButtonElement,
-    )
+    await selectArrowLayer(view)
 
-    expect(
-      screen.getByRole('button', { name: 'Color: #1A334D' }),
-    ).toBeInTheDocument()
+    await vi.waitFor(() => {
+      expect(
+        view.container.querySelector('.cs-arrow-floating-toolbar-host'),
+      ).toBeTruthy()
+    })
     await fireEvent.click(screen.getByRole('button', { name: 'Stroke: 3 px' }))
     expect(
       await screen.findByRole('button', { name: 'Dotted' }),
@@ -207,7 +215,7 @@ describe('M02 editor shell', () => {
         },
       },
     })
-    expect(screen.getByRole('button', { name: 'Arrow' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Select' })).toHaveAttribute(
       'aria-pressed',
       'true',
     )
@@ -225,11 +233,7 @@ describe('M02 editor shell', () => {
       global: { plugins: [createEditorShellPinia()] },
     })
 
-    await fireEvent.click(screen.getByRole('button', { name: 'Arrow' }))
-    await fireEvent.click(screen.getByRole('button', { name: 'Show layers' }))
-    await fireEvent.click(
-      view.container.querySelector('.cs-layer-select') as HTMLButtonElement,
-    )
+    await selectArrowLayer(view)
     const execute = vi.spyOn(session, 'execute')
     await fireEvent.click(screen.getByRole('button', { name: 'Stroke: 3 px' }))
     await fireEvent.click(await screen.findByRole('button', { name: '10 px' }))
@@ -252,7 +256,7 @@ describe('M02 editor shell', () => {
 
     session.undo()
     expect(session.snapshot.core.document.layers[0]).toEqual(before)
-    expect(screen.getByRole('button', { name: 'Arrow' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Select' })).toHaveAttribute(
       'aria-pressed',
       'true',
     )
@@ -269,11 +273,7 @@ describe('M02 editor shell', () => {
       global: { plugins: [createEditorShellPinia()] },
     })
 
-    await fireEvent.click(screen.getByRole('button', { name: 'Arrow' }))
-    await fireEvent.click(screen.getByRole('button', { name: 'Show layers' }))
-    await fireEvent.click(
-      view.container.querySelector('.cs-layer-select') as HTMLButtonElement,
-    )
+    await selectArrowLayer(view)
     await fireEvent.click(screen.getByRole('button', { name: 'Stroke: 3 px' }))
     await fireEvent.click(await screen.findByRole('button', { name: '4 px' }))
 
@@ -315,11 +315,7 @@ describe('M02 editor shell', () => {
       props: { documentSession: markRaw(session) },
       global: { plugins: [createEditorShellPinia()] },
     })
-    await fireEvent.click(screen.getByRole('button', { name: 'Arrow' }))
-    await fireEvent.click(screen.getByRole('button', { name: 'Show layers' }))
-    await fireEvent.click(
-      view.container.querySelector('.cs-layer-select') as HTMLButtonElement,
-    )
+    await selectArrowLayer(view)
 
     expect(screen.getByRole('button', { name: 'Stroke: 3 px' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Tail: None' })).toBeDisabled()
@@ -336,7 +332,7 @@ describe('M02 editor shell', () => {
       props: { fixture: 'ready', readOnlyDocument: true },
       global: { plugins: [createEditorShellPinia()] },
     })
-    await fireEvent.click(screen.getByRole('button', { name: 'Arrow' }))
+    await fireEvent.contextMenu(screen.getByRole('button', { name: 'Arrow' }))
     expect(
       await screen.findByRole('button', { name: 'Stroke: 3 px' }),
     ).toBeDisabled()
@@ -348,20 +344,31 @@ describe('M02 editor shell', () => {
     expect(t('ru', 'arrowGeometry')).toBe('Геометрия')
     expect(t('ru', 'arrowHead')).toBe('Наконечник')
   })
-  it('shows a non-preset Fit percentage in the zoom preset control', async () => {
-    render(ZoomControls, {
+  it('keeps compact zoom actions without free-form input or preset select', async () => {
+    const view = render(ZoomControls, {
       props: {
         zoom: 22,
         t: (key) => key,
       },
     })
 
-    const zoom = await screen.findByRole('combobox', { name: 'zoom' })
-    expect(zoom).toHaveTextContent('22%')
-    await fireEvent.click(zoom)
-    expect(
-      await screen.findByRole('option', { name: '22%' }),
-    ).toBeInTheDocument()
+    const hud = screen.getByRole('group', { name: 'zoom' })
+    expect(hud).toHaveAttribute('data-zoom', '22')
+    expect(screen.getByRole('button', { name: 'zoomOut' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'fitZoom' })).toHaveTextContent(
+      'Fit',
+    )
+    expect(screen.getByRole('button', { name: 'zoomValue' })).toHaveTextContent(
+      '100%',
+    )
+    expect(screen.getByRole('button', { name: 'zoomIn' })).toBeInTheDocument()
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
+
+    await fireEvent.click(screen.getByRole('button', { name: 'zoomValue' }))
+    expect(view.emitted('zoom')).toEqual([[100]])
+    await fireEvent.click(screen.getByRole('button', { name: 'fitZoom' }))
+    expect(view.emitted('fit')).toEqual([[]])
   })
 
   it('disables capture when the native capability probe says it is unavailable', () => {
@@ -568,11 +575,7 @@ describe('M02 editor shell', () => {
       global: { plugins: [createEditorShellPinia()] },
     })
 
-    await fireEvent.click(screen.getByRole('button', { name: 'Show layers' }))
-    const selectText = view.container.querySelector(
-      '.cs-layer-select',
-    ) as HTMLButtonElement
-    await fireEvent.click(selectText)
+    await selectLayerFromPanel(view, { activateSelect: false })
     await fireEvent.keyDown(window, { key: 'x', ctrlKey: true })
     await vi.waitFor(() =>
       expect(writeClipboardText).toHaveBeenCalledWith(
@@ -632,11 +635,7 @@ describe('M02 editor shell', () => {
       global: { plugins: [createEditorShellPinia()] },
     })
 
-    await fireEvent.click(screen.getByRole('button', { name: 'Show layers' }))
-    await fireEvent.click(
-      view.container.querySelector('.cs-layer-select') as HTMLButtonElement,
-    )
-    await fireEvent.click(screen.getByRole('button', { name: 'Select' }))
+    await selectLayerFromPanel(view)
     const radius = await screen.findByRole('slider', { name: 'Radius' })
     const borderWidth = await screen.findByRole('slider', {
       name: 'Border width',

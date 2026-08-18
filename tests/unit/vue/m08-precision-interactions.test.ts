@@ -27,6 +27,7 @@ import {
 } from '@cute-screen/editor-renderer'
 import CanvasViewport from '../../../packages/editor-vue/src/shell/components/CanvasViewport.vue'
 import EditorShell from '../../../packages/editor-vue/src/shell/components/EditorShell.vue'
+import { selectLayerFromPanel } from './layer-selection'
 
 function transformedPoint(
   transform: RulerLayer['transform'],
@@ -1018,11 +1019,10 @@ describe('M08 shell lifecycle and contextual settings', () => {
         global: { plugins: [pinia] },
       })
       await fireEvent.click(screen.getByRole('button', { name: toolLabel }))
-      await fireEvent.click(screen.getByRole('button', { name: 'Show layers' }))
+      await selectLayerFromPanel(view, { activateSelect: false })
       const layerButton = view.container.querySelector(
         '.cs-layer-select',
       ) as HTMLButtonElement
-      await fireEvent.click(layerButton)
       expect(layerButton.closest('.cs-layer-row')).toHaveAttribute(
         'aria-selected',
         'true',
@@ -1096,7 +1096,8 @@ describe('M08 shell lifecycle and contextual settings', () => {
         )
       }
 
-      await fireEvent.click(layerButton)
+      layerButton.focus()
+      await fireEvent.keyDown(layerButton, { key: 'Enter' })
       await fireEvent.click(
         screen.getByRole('button', { name: 'Unlock layer' }),
       )
@@ -1261,15 +1262,14 @@ describe('M08 shell lifecycle and contextual settings', () => {
       kind: 'censor',
       payload: { effect: { mode: 'pixelate' } },
     })
-    await fireEvent.click(screen.getByRole('button', { name: 'Show layers' }))
+    await selectLayerFromPanel(view, { activateSelect: false })
     const layerButton = view.container.querySelector(
       '.cs-layer-select',
     ) as HTMLButtonElement
     expect(layerButton.closest('.cs-layer-row')).toHaveAttribute(
       'aria-selected',
-      'false',
+      'true',
     )
-    await fireEvent.click(layerButton)
     await fireEvent.click(screen.getByRole('combobox', { name: 'Effect' }))
     await fireEvent.click(await screen.findByRole('option', { name: 'Blur' }))
 
@@ -1333,10 +1333,7 @@ describe('M08 shell lifecycle and contextual settings', () => {
       clientX: 80,
       clientY: 30,
     })
-    await fireEvent.click(screen.getByRole('button', { name: 'Show layers' }))
-    await fireEvent.click(
-      view.container.querySelector('.cs-layer-select') as HTMLButtonElement,
-    )
+    await selectLayerFromPanel(view, { activateSelect: false })
 
     const thickness = await screen.findByRole('slider', { name: 'Thickness' })
     thickness.focus()

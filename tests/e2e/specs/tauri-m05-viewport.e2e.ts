@@ -27,7 +27,8 @@ async function viewportLayout() {
     const scene = required<HTMLCanvasElement>(
       '.cs-canvas:not(.cs-canvas-overlay)',
     )
-    const zoomText = required<HTMLButtonElement>('.cs-zoom-value').textContent
+    const zoomText =
+      required<HTMLElement>('.cs-zoom-controls').getAttribute('data-zoom')
     return {
       windowHeight: window.innerHeight,
       zoom: Number.parseInt(zoomText ?? '', 10),
@@ -83,7 +84,7 @@ describe('M05 viewport in a real Tauri webview', () => {
     )
 
     await $('.cs-zoom-value').click()
-    await expect($('.cs-zoom-value')).toHaveText('100%')
+    await expect($('.cs-zoom-controls')).toHaveAttribute('data-zoom', '100')
     const actualSize = await viewportLayout()
     expect(actualSize.surface.width).toBeCloseTo(actualSize.canvasWidth, 0)
     expect(actualSize.surface.height).toBeCloseTo(actualSize.canvasHeight, 0)
@@ -93,7 +94,10 @@ describe('M05 viewport in a real Tauri webview', () => {
     )
 
     await $('button[aria-label="Fit canvas"]').click()
-    await expect($('.cs-zoom-value')).toHaveText(`${fit.zoom}%`)
+    await expect($('.cs-zoom-controls')).toHaveAttribute(
+      'data-zoom',
+      String(fit.zoom),
+    )
     const refit = await viewportLayout()
     expect(refit.surface.width).toBeCloseTo(
       (refit.canvasWidth * refit.zoom) / 100,

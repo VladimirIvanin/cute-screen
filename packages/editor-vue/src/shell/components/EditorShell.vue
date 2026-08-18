@@ -84,6 +84,7 @@ import {
   type Transform2D,
 } from '@cute-screen/editor-renderer'
 import ActionFeedback from './ActionFeedback.vue'
+import ArrowFormattingToolbar from './ArrowFormattingToolbar.vue'
 import CanvasViewport, {
   type TextFormattingPatch,
   type TextToolbarSnapshot,
@@ -181,6 +182,21 @@ const textDraft = ref<
     }
   | undefined
 >()
+const toolConfigure = ref<
+  | {
+      readonly toolId: string
+      readonly anchor: HTMLElement
+    }
+  | undefined
+>()
+const toolConfigureLayout = ref<
+  | {
+      readonly left: number
+      readonly top: number
+    }
+  | undefined
+>()
+const configureDefaultsTool = ref<'arrow' | undefined>()
 /* Removed v0–v6 text presets/effects. Kept as a short-term source comment so
  * surrounding drawing-tool code remains untouched in this concurrent checkout.
 function textFontOptionValue(font: TextToolDefaults['font']): string {
@@ -1589,8 +1605,23 @@ const floatingTextToolbarSchema = computed(() => {
   if (!schema?.text) return undefined
   return { text: schema.text, title: schema.title }
 })
+const floatingArrowToolbarSchema = computed(() => {
+  if ((state.activeToolId.value ?? 'select') !== 'select') return undefined
+  if (store.selectedLayerIds.length !== 1) return undefined
+  const layer = activeDocument.value?.layers.find(
+    (candidate) => candidate.id === store.selectedLayerId,
+  )
+  if (!layer || layer.kind !== 'arrow') return undefined
+  const schema = drawingControl('arrow', layer.payload)
+  return { controls: schema.controls, title: schema.title }
+})
+const toolConfigureArrowSchema = computed(() => {
+  if (toolConfigure.value?.toolId !== 'arrow') return undefined
+  const schema = drawingControl('arrow', drawingDefaults.value.arrow)
+  return { controls: schema.controls, title: schema.title }
+})
 const contextSchema = computed(() => {
-  const tool = state.activeToolId.value
+  const tool = state.activeToolId.value ?? 'select'
   const selectedCandidate =
     store.selectedLayerIds.length === 1
       ? activeDocument.value?.layers.find(
@@ -1866,6 +1897,7 @@ const contextSchema = computed(() => {
     }
   }
   if (isDrawingTool(tool)) {
+    if (tool === 'arrow') return undefined
     const selected = selectedDrawingLayer()
     return drawingControl(
       tool,
@@ -1934,6 +1966,7 @@ const contextSchema = computed(() => {
   }
   const selected = tool === 'select' ? selectedDrawingLayer() : undefined
   if (selected && isDrawingTool(selected.kind)) {
+    if (selected.kind === 'arrow') return undefined
     return drawingControl(selected.kind, selected.payload)
   }
   return activeDocument.value
@@ -3030,18 +3063,22 @@ function onContextChange(id: string, value: string): void {
     return
   }
   const selectedCandidate = selectedDrawingLayer()
-  const selected = isDrawingTool(activeTool)
-    ? selectedCandidate?.kind === activeTool
-      ? selectedCandidate
-      : undefined
-    : activeTool === 'select'
-      ? selectedCandidate
-      : undefined
-  const tool = isDrawingTool(activeTool)
-    ? activeTool
-    : selected && isDrawingTool(selected.kind)
-      ? selected.kind
-      : undefined
+  const selected = configureDefaultsTool.value
+    ? undefined
+    : isDrawingTool(activeTool)
+      ? selectedCandidate?.kind === activeTool
+        ? selectedCandidate
+        : undefined
+      : activeTool === 'select'
+        ? selectedCandidate
+        : undefined
+  const tool = configureDefaultsTool.value
+    ? configureDefaultsTool.value
+    : isDrawingTool(activeTool)
+      ? activeTool
+      : selected && isDrawingTool(selected.kind)
+        ? selected.kind
+        : undefined
   if (
     ![
       'color',
@@ -3411,6 +3448,42 @@ function onColorSampleCancel(): void {
     state.locale.value === 'ru'
       ? 'Выбор цвета отменён'
       : 'Colour sampling cancelled'
+}
+function onToolConfigureOutsidePointer(event: PointerEvent): void {
+  if (!toolConfigure.value) return
+  const target = event.target
+  if (!(target instanceof Node)) return
+  if (
+    toolConfigure.value.anchor.contains(target) ||
+    (target instanceof HTMLElement &&
+      target.closest(
+        '.cs-tool-configure-popover-host, .cs-arrow-toolbar-popover',
+      ))
+  ) {
+    return
+  }
+  closeToolConfigure()
+}
+function openToolConfigure(toolId: string, anchor: HTMLElement): void {
+  if (toolId !== 'arrow') return
+  const rect = anchor.getBoundingClientRect()
+  toolConfigure.value = { toolId, anchor }
+  toolConfigureLayout.value = {
+    left: rect.left + rect.width / 2,
+    top: rect.top,
+  }
+}
+function closeToolConfigure(): void {
+  toolConfigure.value = undefined
+  toolConfigureLayout.value = undefined
+}
+function onToolConfigureChange(id: string, value: string): void {
+  configureDefaultsTool.value = 'arrow'
+  try {
+    onContextChange(id, value)
+  } finally {
+    configureDefaultsTool.value = undefined
+  }
 }
 function selectTool(id: string): void {
   toolError.value = undefined
@@ -4160,6 +4233,7 @@ onMounted(() => {
   }
   media.addEventListener('change', onMediaChange)
   window.addEventListener('keydown', onKeydown)
+  document.addEventListener('pointerdown', onToolConfigureOutsidePointer, true)
 })
 watch(
   () => props.frames,
@@ -4208,6 +4282,11 @@ onBeforeUnmount(() => {
   if (fallbackCopiedTimer) window.clearTimeout(fallbackCopiedTimer)
   media.removeEventListener('change', onMediaChange)
   window.removeEventListener('keydown', onKeydown)
+  document.removeEventListener(
+    'pointerdown',
+    onToolConfigureOutsidePointer,
+    true,
+  )
 })
 watch(
   [state.resolvedTheme, state.locale],
@@ -4287,6 +4366,7 @@ watch(
           :active-tool-id="store.activeToolId"
           :t="translate"
           @select="selectTool"
+          @configure="openToolConfigure"
         />
         <CanvasViewport
           ref="canvasViewport"
@@ -4309,6 +4389,8 @@ watch(
           :text-formatting="textFormatting"
           :text-toolbar-schema="floatingTextToolbarSchema"
           :text-toolbar-locale="state.locale.value"
+          :arrow-toolbar-schema="floatingArrowToolbarSchema"
+          :arrow-toolbar-locale="state.locale.value"
           :next-marker-sequence="
             activeDocument
               ? nextNumberedMarkerSequence(activeDocument.layers)
@@ -4328,6 +4410,7 @@ watch(
           @document-command="executeDocumentCommand"
           @text-editing="setTextDraft"
           @text-toolbar-change="onContextChange"
+          @arrow-toolbar-change="onContextChange"
           @request-image-import="importContentImage"
           @open-image="store.runAction('openImage')"
           @select-tool="store.selectTool"
@@ -4387,7 +4470,26 @@ watch(
           )
         "
       />
-      <div class="cs-overlay-root" aria-live="polite" />
+      <div class="cs-overlay-root" aria-live="polite">
+        <div
+          v-if="toolConfigureArrowSchema && toolConfigureLayout"
+          class="cs-tool-configure-popover-host"
+          :style="{
+            left: `${toolConfigureLayout.left}px`,
+            top: `${toolConfigureLayout.top}px`,
+          }"
+          @pointerdown.stop
+        >
+          <ArrowFormattingToolbar
+            variant="popover"
+            :controls="toolConfigureArrowSchema.controls"
+            :recent-colors="drawingPreferences.recentColors"
+            :picker-locale="state.locale.value"
+            @change="onToolConfigureChange"
+            @eyedropper="startEyedropper"
+          />
+        </div>
+      </div>
       <p v-if="eyedropperFeedback" class="cs-eyedropper-feedback" role="status">
         <span
           v-if="eyedropperColor"

@@ -1,6 +1,32 @@
 import { $, $$, browser, expect } from '@wdio/globals'
 import path from 'node:path'
 
+async function openArrowConfigurePopover(): Promise<void> {
+  await browser.execute(() => {
+    const button = document.querySelector<HTMLButtonElement>(
+      'button[aria-label="Arrow"], button[aria-label="Стрелка"]',
+    )
+    if (!button) throw new Error('Arrow tool button is missing')
+    button.dispatchEvent(
+      new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+      }),
+    )
+  })
+  await expect($('.cs-tool-configure-popover-host')).toExist()
+}
+
+async function closeArrowConfigurePopover(): Promise<void> {
+  await browser.execute(() => {
+    document.body.dispatchEvent(
+      new PointerEvent('pointerdown', { bubbles: true }),
+    )
+  })
+  await expect($('.cs-tool-configure-popover-host')).not.toExist()
+}
+
 type ArrowSnapshot = {
   readonly layers: readonly {
     readonly id: string
@@ -121,12 +147,13 @@ describe('Arrow toolbar and engine in a real Tauri WebView2', () => {
         await setPreferences(preference.locale, preference.theme)
         const arrowLabel = preference.locale === 'ru' ? 'Стрелка' : 'Arrow'
         await $(`button[aria-label="${arrowLabel}"]`).click()
+        await openArrowConfigurePopover()
         const layout = await browser.execute(() => {
           const toolbar = document.querySelector<HTMLElement>(
-            '.cs-context-toolbar',
+            '.cs-tool-configure-popover-host',
           )
-          const controls = document.querySelector<HTMLElement>(
-            '.cs-context-controls',
+          const controls = toolbar?.querySelector<HTMLElement>(
+            '.cs-arrow-formatting-toolbar',
           )
           if (!toolbar || !controls) throw new Error('Arrow toolbar is missing')
           const bounds = toolbar.getBoundingClientRect()
@@ -154,6 +181,7 @@ describe('Arrow toolbar and engine in a real Tauri WebView2', () => {
           toolbarFits: true,
           documentFits: true,
         })
+        await closeArrowConfigurePopover()
         await browser.saveScreenshot(
           path.resolve(
             `artifacts/tauri-e2e/arrow-toolbar-${size.width}x${size.height}-${preference.locale}-${preference.theme}.png`,
@@ -167,8 +195,12 @@ describe('Arrow toolbar and engine in a real Tauri WebView2', () => {
     await $('button[aria-label="Show layers"]').click()
     const arrowTool = $('button[aria-label="Arrow"]')
     await arrowTool.click()
-    await $('[data-control="arrowPath"] .cs-arrow-toolbar-trigger').click()
+    await openArrowConfigurePopover()
+    await $(
+      '.cs-tool-configure-popover-host [data-control="arrowPath"] .cs-arrow-toolbar-trigger',
+    ).click()
     await $('button=Elbow').click()
+    await closeArrowConfigurePopover()
     const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
     const beforeCount = (await snapshot()).layers.length
     await browser

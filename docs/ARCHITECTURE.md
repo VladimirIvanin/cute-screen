@@ -142,6 +142,8 @@ JSON как bytes/base64.
 - `ToolRail`
 - `CanvasViewport`
 - `ContextToolbar`
+- `ArrowFormattingToolbar`
+- `TextFormattingToolbar`
 - `SeriesFilmstrip`
 - `LayersPanel`
 - `ZoomControls`
@@ -150,15 +152,22 @@ JSON как bytes/base64.
 
 Компоненты используют semantic CSS variables: surface, raised, sunken, text, muted, border, accent, danger, focus ring, radii и elevations. Raw brand colors не повторяются в SFC.
 
-Tool settings принадлежат contextual toolbar. При inline-редактировании
-Text/Callout/Numbered Marker shared `TextFormattingToolbar` монтируется в
-transient host `CanvasViewport` над `.cs-text-editor`; нижний `ContextToolbar`
-в это время не дублирует text controls. Defaults и форматирование выбранного,
-но не редактируемого слоя остаются внизу. `LayersPanel` не становится вторым
-inspector: она управляет выбором, порядком, visibility, lock, rotation и
-opacity. Список слоёв — однострочные ряды; opacity и rotation редактируются в
-шапке панели для выбранного слоя, а не на каждой строке. При пустом selection
-она показывает компактную подсказку, а не пустую широкую панель.
+Tool settings принадлежат нижнему chrome редактора. Горизонтальный `ToolRail`
+центрирован внизу; `ContextToolbar` появляется над ним для активных
+non-arrow инструментов, precision tools и выбранных слоёв, кроме arrow.
+При inline-редактировании Text/Callout/Numbered Marker shared
+`TextFormattingToolbar` монтируется в transient host `CanvasViewport` над
+`.cs-text-editor`; нижний `ContextToolbar` в это время не дублирует text
+controls. Arrow settings не показываются в нижнем toolbar: shared
+`ArrowFormattingToolbar` монтируется в transient host над выделенной стрелкой
+только при инструменте select, а defaults arrow редактируются через configure
+popover на кнопке инструмента arrow. Defaults и форматирование выбранного,
+но не редактируемого non-arrow слоя остаются в `ContextToolbar` над rail.
+`LayersPanel` не становится вторым inspector: она управляет выбором, порядком,
+visibility, lock, rotation и opacity. Список слоёв — однострочные ряды;
+opacity и rotation редактируются в шапке панели для выбранного слоя, а не на
+каждой строке. При пустом selection она показывает компактную подсказку, а не
+пустую широкую панель.
 
 ### Naive UI boundary
 

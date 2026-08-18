@@ -10,6 +10,7 @@ import {
 } from 'vue'
 import { UiIcon } from '../icon'
 import TextFormattingToolbar from './TextFormattingToolbar.vue'
+import ArrowFormattingToolbar from './ArrowFormattingToolbar.vue'
 import type {
   CanvasViewportHosts,
   ContextToolbarSchema,
@@ -144,6 +145,13 @@ const props = defineProps<{
       }>
     | undefined
   textToolbarLocale?: 'en' | 'ru'
+  arrowToolbarSchema?:
+    | Readonly<{
+        readonly controls: ContextToolbarSchema['controls']
+        readonly title: string
+      }>
+    | undefined
+  arrowToolbarLocale?: 'en' | 'ru'
   nextMarkerSequence?: number | undefined
   markerShape?: 'circle' | 'square' | 'diamond' | 'star' | undefined
   openImageAvailable?: boolean | undefined
@@ -183,6 +191,7 @@ const emit = defineEmits<{
   ]
   textEditingCancelled: [reason: 'escape']
   textToolbarChange: [id: string, value: string]
+  arrowToolbarChange: [id: string, value: string]
   requestImageImport: [origin: { readonly x: number; readonly y: number }]
   openImage: []
   selectTool: [id: 'select']
@@ -198,8 +207,17 @@ const scene = ref<HTMLCanvasElement>()
 const overlay = ref<HTMLCanvasElement>()
 const textEditor = ref<HTMLDivElement>()
 const textFloatingToolbar = ref<HTMLDivElement>()
+const arrowFloatingToolbar = ref<HTMLDivElement>()
 const scrollContainer = ref<HTMLDivElement>()
 const floatingToolbarLayout = ref<
+  | {
+      readonly left: number
+      readonly top: number
+      readonly placement: 'above' | 'below'
+    }
+  | undefined
+>()
+const floatingArrowToolbarLayout = ref<
   | {
       readonly left: number
       readonly top: number
@@ -238,23 +256,28 @@ let imageResources = new Map<
 let resizeObserver: ResizeObserver | undefined
 let componentMounted = false
 let textToolbarPointerDown = false
-const TEXT_TOOLBAR_SELECTOR =
-  '.cs-context-toolbar, .cs-text-floating-toolbar, .cs-text-size-popover, .cs-text-background-popover, .cs-text-overflow-popover'
+const FLOATING_TOOLBAR_SELECTOR =
+  '.cs-context-toolbar, .cs-text-floating-toolbar, .cs-arrow-floating-toolbar, .cs-arrow-formatting-toolbar, .cs-text-size-popover, .cs-text-background-popover, .cs-text-overflow-popover, .cs-arrow-toolbar-popover'
 
-function isTextToolbarTarget(target: EventTarget | null): boolean {
+function isFloatingToolbarTarget(target: EventTarget | null): boolean {
   return (
     target instanceof HTMLElement &&
-    target.closest(TEXT_TOOLBAR_SELECTOR) !== null
+    target.closest(FLOATING_TOOLBAR_SELECTOR) !== null
   )
+}
+
+function canvasSurfaceElement(
+  host: HTMLElement | undefined,
+): HTMLElement | undefined {
+  if (host?.offsetParent instanceof HTMLElement) return host.offsetParent
+  const surface = scrollContainer.value?.querySelector('.cs-canvas-surface')
+  return surface instanceof HTMLElement ? surface : undefined
 }
 
 function updateFloatingToolbarLayout(): void {
   const editor = textEditor.value
   const toolbarHost = textFloatingToolbar.value
-  const surface =
-    editor?.offsetParent instanceof HTMLElement
-      ? editor.offsetParent
-      : undefined
+  const surface = canvasSurfaceElement(editor ?? toolbarHost)
   if (!editor || !surface || !editingText.value || !props.textToolbarSchema) {
     floatingToolbarLayout.value = undefined
     return
@@ -276,6 +299,43 @@ function updateFloatingToolbarLayout(): void {
     placement = 'below'
   }
   floatingToolbarLayout.value = Object.freeze({ left, top, placement })
+}
+function updateFloatingArrowToolbarLayout(): void {
+  const layer = selectedLayer()
+  const toolbarHost = arrowFloatingToolbar.value
+  const surface = canvasSurfaceElement(toolbarHost)
+  if (
+    !layer ||
+    layer.kind !== 'arrow' ||
+    !surface ||
+    !props.arrowToolbarSchema
+  ) {
+    floatingArrowToolbarLayout.value = undefined
+    return
+  }
+  const bounds = layerBounds(layer)
+  const topCenter = transformPoint(layer.transform, {
+    x: bounds.x + bounds.width / 2,
+    y: bounds.y,
+  })
+  const outputBounds = viewportOutputBounds.value
+  const scale = (props.zoom ?? 100) / 100
+  const canvasX = (topCenter.x - (outputBounds?.x ?? 0)) * scale
+  const canvasY = (topCenter.y - (outputBounds?.y ?? 0)) * scale
+  const toolbarHeight = toolbarHost?.offsetHeight ?? 44
+  const toolbarWidth = toolbarHost?.offsetWidth ?? 320
+  const gap = 10
+  const minLeft = toolbarWidth / 2 + 4
+  const maxLeft = Math.max(minLeft, surface.clientWidth - toolbarWidth / 2 - 4)
+  const left = Math.max(minLeft, Math.min(maxLeft, canvasX))
+  const aboveTop = canvasY - toolbarHeight - gap
+  let top = aboveTop
+  let placement: 'above' | 'below' = 'above'
+  if (aboveTop < 4) {
+    top = canvasY + gap
+    placement = 'below'
+  }
+  floatingArrowToolbarLayout.value = Object.freeze({ left, top, placement })
 }
 let lastFitZoom: number | undefined
 let pendingZoomAnchor:
@@ -594,6 +654,18 @@ watch(
   () => {
     if (editingText.value) void nextTick(updateFloatingToolbarLayout)
   },
+)
+watch(
+  () => [
+    props.selectedLayerId,
+    props.selectedLayerIds,
+    props.arrowToolbarSchema,
+    props.zoom,
+  ],
+  () => {
+    void nextTick(updateFloatingArrowToolbarLayout)
+  },
+  { immediate: true },
 )
 async function ensureRenderer(): Promise<Canvas2DRenderer | undefined> {
   if (!scene.value || !overlay.value || !props.canvas) return undefined
@@ -2411,18 +2483,18 @@ function onTextEditorBlur(event: FocusEvent): void {
   // Capture relatedTarget before Vue updates the toolbar: a formatting change
   // can replace the focused control before this deferred check runs.
   const movedIntoToolbar =
-    textToolbarPointerDown || isTextToolbarTarget(event.relatedTarget)
+    textToolbarPointerDown || isFloatingToolbarTarget(event.relatedTarget)
   window.setTimeout(() => {
     if (!editingText.value) return
     const active = document.activeElement
-    if (movedIntoToolbar || isTextToolbarTarget(active)) {
+    if (movedIntoToolbar || isFloatingToolbarTarget(active)) {
       return
     }
     commitTextEditor()
   }, 0)
 }
 function onDocumentPointerDown(event: PointerEvent): void {
-  textToolbarPointerDown = isTextToolbarTarget(event.target)
+  textToolbarPointerDown = isFloatingToolbarTarget(event.target)
   window.setTimeout(() => {
     textToolbarPointerDown = false
   }, 0)
@@ -3218,6 +3290,30 @@ onBeforeUnmount(() => {
               :picker-locale="textToolbarLocale ?? 'en'"
               variant="floating"
               @change="(id, value) => emit('textToolbarChange', id, value)"
+            />
+          </div>
+          <div
+            v-if="arrowToolbarSchema"
+            ref="arrowFloatingToolbar"
+            class="cs-arrow-floating-toolbar-host"
+            :style="
+              floatingArrowToolbarLayout
+                ? {
+                    left: `${floatingArrowToolbarLayout.left}px`,
+                    top: `${floatingArrowToolbarLayout.top}px`,
+                    transform: 'translateX(-50%)',
+                  }
+                : { visibility: 'hidden' }
+            "
+            :data-placement="floatingArrowToolbarLayout?.placement"
+            @pointerdown.stop
+          >
+            <ArrowFormattingToolbar
+              class="cs-arrow-floating-toolbar"
+              variant="floating"
+              :controls="arrowToolbarSchema.controls"
+              :picker-locale="arrowToolbarLocale ?? 'en'"
+              @change="(id, value) => emit('arrowToolbarChange', id, value)"
             />
           </div>
           <div

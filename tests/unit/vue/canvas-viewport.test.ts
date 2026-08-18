@@ -92,6 +92,22 @@ beforeEach(() => {
   } as unknown as CanvasRenderingContext2D)
 })
 
+const ARROW_TOOLBAR_SCHEMA = {
+  controls: [
+    {
+      kind: 'arrowStroke' as const,
+      id: 'stroke' as const,
+      label: 'Stroke',
+      width: 2,
+      style: 'solid' as const,
+      solidLabel: 'Solid',
+      dashedLabel: 'Dashed',
+      dottedLabel: 'Dotted',
+    },
+  ],
+  title: 'Arrow',
+}
+
 function mountViewport(
   activeTool?: string,
   viewportDocument: EditorDocumentV1 = document,
@@ -99,6 +115,7 @@ function mountViewport(
   textDefaults?: TextToolDefaults,
   sampling = false,
   textToolbarSchema?: typeof TEXT_TOOLBAR_SCHEMA,
+  arrowToolbarSchema?: typeof ARROW_TOOLBAR_SCHEMA,
 ) {
   const rendered = render(CanvasViewport, {
     props: {
@@ -110,6 +127,7 @@ function mountViewport(
       sampling,
       ...(textDefaults === undefined ? {} : { textDefaults }),
       ...(textToolbarSchema === undefined ? {} : { textToolbarSchema }),
+      ...(arrowToolbarSchema === undefined ? {} : { arrowToolbarSchema }),
       zoom: 100,
       fitMode: true,
       t: (key) => key,
@@ -733,6 +751,72 @@ describe('M05 CanvasViewport transforms', () => {
     await fireEvent.keyDown(editor, { key: 'Enter', ctrlKey: true })
     expect(emitted().documentCommand).toHaveLength(1)
     expect(container.querySelector('.cs-text-floating-toolbar-host')).toBeNull()
+  })
+
+  it('shows the floating arrow toolbar only for a selected arrow schema', () => {
+    const arrowDocument: EditorDocumentV1 = {
+      ...document,
+      layers: [
+        {
+          id: 'arrow',
+          kind: 'arrow',
+          localBounds: { x: 0, y: 0, width: 20, height: 10 },
+          transform: {
+            translateX: 10,
+            translateY: 10,
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+          },
+          opacity: 1,
+          blendMode: 'normal',
+          shadows: [],
+          visible: true,
+          locked: false,
+          payload: {
+            path: 'straight',
+            start: { x: 0, y: 0 },
+            end: { x: 20, y: 10 },
+            startCap: 'none',
+            endCap: 'solidArrow',
+            stroke: {
+              color: { red: 1, green: 0, blue: 0, alpha: 1 },
+              width: 2,
+              style: 'solid',
+              cap: 'round',
+              join: 'round',
+            },
+          },
+        },
+      ],
+    }
+    const withoutSchema = mountViewport(
+      'select',
+      arrowDocument,
+      'arrow',
+      undefined,
+      false,
+    )
+    expect(
+      withoutSchema.container.querySelector('.cs-arrow-floating-toolbar-host'),
+    ).toBeNull()
+    withoutSchema.unmount()
+
+    const withSchema = mountViewport(
+      'select',
+      arrowDocument,
+      'arrow',
+      undefined,
+      false,
+      undefined,
+      ARROW_TOOLBAR_SCHEMA,
+    )
+    expect(
+      withSchema.container.querySelector('.cs-arrow-floating-toolbar-host'),
+    ).toBeTruthy()
+    expect(
+      withSchema.container.querySelector('.cs-arrow-floating-toolbar'),
+    ).toBeTruthy()
   })
 
   it('returns to Select on Escape after an already-cancelled drawing draft', async () => {

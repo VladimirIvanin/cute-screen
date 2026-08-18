@@ -90,7 +90,7 @@
 
 ## ADR-012 — Tool settings находятся только в toolbar
 
-**Статус:** superseded by ADR-033
+**Статус:** superseded by ADR-034
 
 **Решение:** top bar, tool rail, canvas, bottom contextual toolbar, series filmstrip, layers panel и zoom control сохраняются. Layers panel не дублирует tool options.
 
@@ -98,7 +98,7 @@
 
 ## ADR-033 — Transient text formatting bar над inline editor
 
-**Статус:** accepted; supersedes the bottom-only text-settings portion of ADR-012
+**Статус:** superseded by ADR-034
 
 **Контекст:** FigJam-like text editing держит formatting controls рядом с
 редактируемым текстом. Нижний contextual toolbar остаётся единственным местом
@@ -114,6 +114,29 @@ EditorShell передаёт shared `TextFormattingToolbar` в transient host
 **Проверяемое основание:** component/e2e regression на порядок controls,
 mixed/disabled, focus/blur без commit, responsive overflow 1024/640, позицию
 над editor и отсутствие дублирования в bottom toolbar.
+
+## ADR-034 — Нижний tool rail и transient панели у объекта
+
+**Статус:** accepted; supersedes ADR-012 and the toolbar-layout portion of
+ADR-033
+
+**Контекст:** FigJam-like chrome держит основной tool rail внизу, а controls
+над ним. Arrow и text не должны дублировать inspector в layers panel или
+показывать settings до выбора/редактирования.
+
+**Решение:** `ToolRail` становится горизонтальным и центрируется внизу.
+`ContextToolbar` монтируется над rail для активных non-arrow инструментов,
+precision tools и выбранных non-arrow слоёв. Arrow settings убираются из
+нижнего toolbar: `ArrowFormattingToolbar` появляется над выделенной стрелкой
+только при инструменте select; defaults arrow редактируются через configure
+popover по context menu / Shift+F10 на кнопке инструмента arrow.
+`TextFormattingToolbar` сохраняет transient host над inline editor; нижний
+toolbar не дублирует text controls во время edit.
+
+**Проверяемое основание:** `arrow-context-toolbar.test.ts`, `App.test.ts`,
+`canvas-viewport.test.ts`, `layer-selection.ts` helper и focused browser shell
+/regression suites на bottom rail layout, отсутствие arrow controls при active
+arrow tool, floating arrow toolbar при select и configure popover defaults.
 
 ## ADR-013 — Runtime evidence обязательно
 

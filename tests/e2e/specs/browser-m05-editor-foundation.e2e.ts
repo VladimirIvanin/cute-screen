@@ -43,9 +43,9 @@ async function openM05(viewportFixture = false): Promise<void> {
   await expect($('.cs-canvas-ready')).toExist()
   await browser.waitUntil(async () => (await snapshot()).layers.length === 4)
   if (viewportFixture) {
-    await browser.waitUntil(
-      async () => (await $('.cs-zoom-value').getText()) !== '100%',
-    )
+    await browser.waitUntil(async () => {
+      return (await $('.cs-zoom-controls').getAttribute('data-zoom')) !== '100'
+    })
   }
 }
 
@@ -64,7 +64,9 @@ async function viewportLayout() {
         bottom: bounds.bottom,
       }
     }
-    const zoomText = document.querySelector('.cs-zoom-value')?.textContent ?? ''
+    const zoomText =
+      document.querySelector('.cs-zoom-controls')?.getAttribute('data-zoom') ??
+      ''
     const scene = document.querySelector('.cs-canvas:not(.cs-canvas-overlay)')
     if (!(scene instanceof HTMLCanvasElement)) {
       throw new Error('Missing scene canvas')
@@ -153,7 +155,7 @@ describe('M05 editor foundation in browser mode', () => {
     )
 
     await $('.cs-zoom-value').click()
-    await expect($('.cs-zoom-value')).toHaveText('100%')
+    await expect($('.cs-zoom-controls')).toHaveAttribute('data-zoom', '100')
     await waitForSurfaceSize(outputWidth, outputHeight)
     const actualSize = await viewportLayout()
     expect(actualSize.surface.width).toBeCloseTo(outputWidth, 0)

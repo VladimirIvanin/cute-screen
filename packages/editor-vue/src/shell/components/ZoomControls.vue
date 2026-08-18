@@ -1,30 +1,20 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { NButton, NInputNumber } from 'naive-ui'
+import { NButton } from 'naive-ui'
 import { UiIcon } from '../icon'
-import UiSelect from '../ui/UiSelect.vue'
-const props = defineProps<{
+defineProps<{
   zoom: number
-  t: (
-    key:
-      | 'zoom'
-      | 'zoomOut'
-      | 'zoomIn'
-      | 'zoomValue'
-      | 'zoomPercentage'
-      | 'fitZoom',
-  ) => string
+  t: (key: 'zoom' | 'zoomOut' | 'zoomIn' | 'zoomValue' | 'fitZoom') => string
 }>()
 const emit = defineEmits<{ zoom: [value: number]; fit: [] }>()
-const zoomOptions = computed(() =>
-  [...new Set([25, 50, 75, 100, 125, 150, 200, 400, props.zoom])].sort(
-    (left, right) => left - right,
-  ),
-)
 </script>
 
 <template>
-  <div class="cs-zoom-controls" role="group" :aria-label="t('zoom')">
+  <div
+    class="cs-zoom-controls"
+    role="group"
+    :aria-label="t('zoom')"
+    :data-zoom="zoom"
+  >
     <NButton
       quaternary
       circle
@@ -47,29 +37,12 @@ const zoomOptions = computed(() =>
     <NButton
       quaternary
       class="cs-zoom-value"
+      :aria-label="t('zoomValue')"
       :title="t('zoomValue')"
       @click="emit('zoom', 100)"
     >
-      {{ zoom }}%
+      100%
     </NButton>
-    <NInputNumber
-      class="cs-zoom-input"
-      size="small"
-      :min="10"
-      :max="1600"
-      :step="1"
-      :value="zoom"
-      :aria-label="t('zoomPercentage')"
-      :show-button="false"
-      @update:value="typeof $event === 'number' && emit('zoom', $event)"
-    />
-    <UiSelect
-      class="cs-zoom-presets"
-      :model-value="zoom"
-      v-bind="{ ariaLabel: t('zoom') }"
-      :options="zoomOptions.map((value) => ({ value, label: `${value}%` }))"
-      @update:model-value="typeof $event === 'number' && emit('zoom', $event)"
-    />
     <NButton
       quaternary
       circle

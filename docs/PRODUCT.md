@@ -61,10 +61,15 @@ Cute Screen — полноценный local-first редактор снимко
 - `REQ-EDT-005` — selection, move, resize, rotate, duplicate, delete, lock, visibility, z-order и opacity.
 - `REQ-EDT-006` — все изменения документа undoable; redo очищается после новой ветки изменений.
 - `REQ-EDT-007` — guides появляются только при удержании назначенной клавиши.
-- `REQ-EDT-008` — tool settings находятся только в contextual toolbar. При
-  inline-редактировании Text, Callout и Numbered Marker transient-панель
-  форматирования появляется над редактируемым текстом; вне такой сессии
-  настройки выбранного слоя и defaults остаются в нижнем contextual toolbar.
+- `REQ-EDT-008` — основной `ToolRail` находится внизу по центру; панель
+  контролов (`ContextToolbar`) появляется непосредственно над ним для активных
+  non-arrow инструментов, precision tools и выбранных слоёв, кроме arrow.
+  При inline-редактировании Text, Callout и Numbered Marker transient-панель
+  форматирования появляется над редактируемым текстом; нижний toolbar не
+  дублирует text controls. Arrow settings не показываются при активации
+  инструмента arrow; transient `ArrowFormattingToolbar` появляется над
+  выделенной стрелкой только при инструменте select, а defaults arrow
+  настраиваются через context menu/tool configure popover на кнопке инструмента.
   Цветовые controls используют product-owned picker с палитрой, HEX,
   recent/suggestions и canvas-only пипеткой; draft не создаёт document history
   entry до завершения взаимодействия.
@@ -85,7 +90,10 @@ Cute Screen — полноценный local-first редактор снимко
   curved и three-segment elbow paths с редактируемыми endpoint/bend либо
   middle-segment anchors; tail и head независимо выбирают `none`, `lineArrow`,
   `solidArrow`, `triangle`, `circle` или `diamond`; body поддерживает solid и
-  dashed style. Connector text не входит в arrow document contract.
+  dashed style. Connector text не входит в arrow document contract. Arrow
+  settings не показываются при активном инструменте arrow; transient toolbar
+  над выделенной стрелкой доступен только через select, а defaults — через
+  configure popover (context menu / Shift+F10) на кнопке инструмента arrow.
 - `REQ-TOL-002` — shapes: rectangle, circle, oval, diamond, star; stroke,
   solid/gradient/pattern/texture fills, fill/layer opacity, blend modes и
   визуальный corner radius.

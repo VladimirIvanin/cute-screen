@@ -791,6 +791,45 @@ button:focus-visible {
   top: auto;
   bottom: calc(100% + 8px);
 }
+
+.cs-arrow-floating-toolbar-host {
+  position: absolute;
+  z-index: 4;
+  pointer-events: auto;
+  max-width: calc(100% - 8px);
+}
+
+.cs-arrow-floating-toolbar,
+.cs-arrow-formatting-toolbar--floating {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-overlay);
+}
+
+.cs-arrow-formatting-toolbar--popover {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-overlay);
+}
+
+.cs-tool-configure-popover-host {
+  position: fixed;
+  z-index: 50;
+  pointer-events: auto;
+  transform: translate(-50%, calc(-100% - 8px));
+}
 @media (max-width: 700px) {
   .cs-text-floating-toolbar-host {
     max-width: calc(100% - 16px);
@@ -1021,19 +1060,6 @@ button:focus-visible {
   background: transparent;
   cursor: pointer;
 }
-.cs-zoom-input,
-.cs-zoom-presets {
-  width: 58px;
-  height: 28px;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  color: var(--text);
-  background: var(--surface-sunken);
-  font-size: 11px;
-}
-.cs-zoom-presets {
-  width: 56px;
-}
 .cs-filmstrip {
   display: flex;
   min-height: 64px;
@@ -1120,6 +1146,14 @@ button:focus-visible {
 }
 
 .cs-workbench {
+  --bottom-rail-height: 46px;
+  --bottom-rail-gap: 8px;
+  --bottom-rail-offset: 14px;
+  --bottom-controls-height: 48px;
+  --bottom-chrome-reserve: calc(
+    var(--bottom-rail-offset) + var(--bottom-rail-height) +
+      var(--bottom-rail-gap) + var(--bottom-controls-height) + 12px
+  );
   position: absolute;
   inset: 0;
   display: block;
@@ -1133,7 +1167,7 @@ button:focus-visible {
 }
 
 .cs-canvas-scroll {
-  padding: 82px 96px 94px;
+  padding: 64px 48px var(--bottom-chrome-reserve);
 }
 
 .cs-topbar {
@@ -1204,22 +1238,40 @@ button:focus-visible {
 .cs-toolrail {
   position: absolute;
   z-index: 20;
-  top: 76px;
-  left: 14px;
-  width: 46px;
-  max-height: calc(100% - 158px);
+  top: auto;
+  bottom: var(--bottom-rail-offset);
+  left: 50%;
+  right: auto;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  width: auto;
+  max-width: min(920px, calc(100vw - 360px));
+  max-height: none;
   padding: 5px;
   gap: 2px;
-  overflow-y: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
   border: 1px solid var(--border);
   border-radius: 13px;
   background: color-mix(in srgb, var(--surface-raised) 94%, transparent);
   box-shadow: var(--shadow-overlay);
   backdrop-filter: blur(16px) saturate(1.12);
+  transform: translateX(-50%);
 }
 
-.cs-tool-group {
+.cs-toolrail--horizontal .cs-tool-group {
+  display: flex;
+  flex-direction: row;
   gap: 1px;
+}
+
+.cs-tool-group-separator {
+  flex: none;
+  width: 1px;
+  height: 24px;
+  margin: 0 4px;
+  background: var(--border);
 }
 .cs-tool-button {
   width: 34px;
@@ -1236,9 +1288,9 @@ button:focus-visible {
 .cs-layers-panel {
   position: absolute;
   z-index: 20;
-  top: 76px;
+  top: 64px;
   right: 14px;
-  bottom: 76px;
+  bottom: var(--bottom-chrome-reserve);
   width: min(320px, calc(100vw - 96px));
   border-radius: 13px;
   background: color-mix(in srgb, var(--surface-raised) 96%, transparent);
@@ -1248,7 +1300,7 @@ button:focus-visible {
 .cs-layers-peek {
   position: absolute;
   z-index: 20;
-  top: 76px;
+  top: 64px;
   right: 14px;
   border-radius: 12px;
 }
@@ -1260,15 +1312,18 @@ button:focus-visible {
 .cs-context-toolbar {
   position: absolute;
   z-index: 20;
-  right: 450px;
-  bottom: 14px;
-  left: 418px;
+  right: auto;
+  bottom: calc(
+    var(--bottom-rail-offset) + var(--bottom-rail-height) +
+      var(--bottom-rail-gap)
+  );
+  left: 50%;
   width: auto;
-  max-width: none;
+  max-width: min(920px, calc(100vw - 360px));
   min-height: 48px;
   padding: 5px 8px;
   border-radius: 13px;
-  transform: none;
+  transform: translateX(-50%);
   background: color-mix(in srgb, var(--surface-raised) 96%, transparent);
   backdrop-filter: blur(16px) saturate(1.12);
 }
@@ -1657,12 +1712,6 @@ button:focus-visible {
 .cs-zoom-controls .n-button {
   --n-height: 30px;
 }
-.cs-zoom-input {
-  width: 66px;
-}
-.cs-zoom-presets {
-  width: 76px;
-}
 
 .cs-filmstrip {
   position: absolute;
@@ -1730,28 +1779,22 @@ button:focus-visible {
     padding: 0;
   }
   .cs-context-toolbar {
-    right: 302px;
-    bottom: 72px;
-    left: 306px;
-    width: auto;
+    max-width: min(760px, calc(100vw - 320px));
+  }
+
+  .cs-toolrail {
+    max-width: min(760px, calc(100vw - 320px));
   }
 }
 
 @media (max-width: 760px) {
   .cs-brand strong,
   .cs-history,
-  .cs-save-status,
-  .cs-zoom-input,
-  .cs-zoom-presets {
+  .cs-save-status {
     display: none;
   }
-  .cs-context-toolbar {
-    right: 258px;
-    bottom: 72px;
-    left: 14px;
-    width: auto;
-  }
-  .cs-context-control .cs-ui-slider {
-    width: 66px;
+  .cs-context-toolbar,
+  .cs-toolrail {
+    max-width: calc(100vw - 28px);
   }
 }

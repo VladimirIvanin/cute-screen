@@ -135,8 +135,16 @@ async function chooseArrowPopover(
   control: 'arrowPath',
   option: 'Elbow',
 ): Promise<void> {
-  await $(`[data-control="${control}"] .cs-arrow-toolbar-trigger`).click()
+  await openArrowConfigurePopover()
+  await $(
+    `.cs-tool-configure-popover-host [data-control="${control}"] .cs-arrow-toolbar-trigger`,
+  ).click()
   await $(`button=${option}`).click()
+  await browser.execute(() => {
+    document.body.dispatchEvent(
+      new PointerEvent('pointerdown', { bubbles: true }),
+    )
+  })
 }
 
 async function arrowHandleViewportPoint(
@@ -189,6 +197,23 @@ async function arrowHandleViewportPoint(
   )
 }
 
+async function openArrowConfigurePopover(): Promise<void> {
+  await browser.execute(() => {
+    const button = document.querySelector<HTMLButtonElement>(
+      'button[aria-label="Arrow"], button[aria-label="Стрелка"]',
+    )
+    if (!button) throw new Error('Arrow tool button is missing')
+    button.dispatchEvent(
+      new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+      }),
+    )
+  })
+  await expect($('.cs-tool-configure-popover-host')).toExist()
+}
+
 describe('M06 drawing tools in browser mode', () => {
   it('shows all five arrow controls without toolbar overflow across the supported UI matrix', async () => {
     const sizes = [
@@ -209,12 +234,13 @@ describe('M06 drawing tools in browser mode', () => {
       await $('button[aria-label="Arrow"]').click()
       for (const preference of preferences) {
         await setShellPreferences(preference.locale, preference.theme)
+        await openArrowConfigurePopover()
         const layout = await browser.execute(() => {
           const toolbar = document.querySelector<HTMLElement>(
-            '.cs-context-toolbar',
+            '.cs-tool-configure-popover-host',
           )
-          const controls = document.querySelector<HTMLElement>(
-            '.cs-context-controls',
+          const controls = toolbar?.querySelector<HTMLElement>(
+            '.cs-arrow-formatting-toolbar',
           )
           if (!toolbar || !controls) throw new Error('Arrow toolbar is missing')
           const bounds = toolbar.getBoundingClientRect()
@@ -279,6 +305,11 @@ describe('M06 drawing tools in browser mode', () => {
             `artifacts/browser-e2e/arrow-toolbar-${size.width}x${size.height}-${preference.locale}-${preference.theme}.png`,
           ),
         )
+        await browser.execute(() => {
+          document.body.dispatchEvent(
+            new PointerEvent('pointerdown', { bubbles: true }),
+          )
+        })
       }
     }
   })

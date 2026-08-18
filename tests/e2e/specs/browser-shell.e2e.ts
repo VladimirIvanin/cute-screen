@@ -19,11 +19,11 @@ describe('M02 editor shell in browser mode', () => {
       'aria-pressed',
       'true',
     )
+    await expect($('.cs-toolrail--horizontal')).toExist()
+    await expect($('.cs-context-toolbar')).not.toExist()
+    await $('button[aria-label="Marker"]').click()
     await expect($('.cs-context-toolbar .cs-context-icon')).toExist()
     await expect($('.cs-context-toolbar .cs-context-copy')).not.toExist()
-    await expect($('.cs-context-toolbar')).not.toHaveText(
-      expect.stringContaining('Drag to create an arrow'),
-    )
     await expect($('nav[aria-label="Series frames"]')).toExist()
     await expect($('.cs-layer-row.is-selected')).toExist()
     await expect($('button=Export')).toBeEnabled()
@@ -31,20 +31,25 @@ describe('M02 editor shell in browser mode', () => {
       await browser.execute(() => {
         const context = document.querySelector('.cs-context-toolbar')
         const zoom = document.querySelector('.cs-zoom-controls')
+        const rail = document.querySelector('.cs-toolrail')
         if (!(context instanceof HTMLElement) || !(zoom instanceof HTMLElement))
           throw new Error('Missing bottom workbench controls')
+        if (!(rail instanceof HTMLElement))
+          throw new Error('Missing bottom tool rail')
         const contextBounds = context.getBoundingClientRect()
         const zoomBounds = zoom.getBoundingClientRect()
+        const railBounds = rail.getBoundingClientRect()
         return (
-          contextBounds.right <= zoomBounds.left ||
-          zoomBounds.right <= contextBounds.left ||
-          contextBounds.bottom <= zoomBounds.top ||
-          zoomBounds.bottom <= contextBounds.top
+          (contextBounds.right <= zoomBounds.left ||
+            zoomBounds.right <= contextBounds.left ||
+            contextBounds.bottom <= zoomBounds.top ||
+            zoomBounds.bottom <= contextBounds.top) &&
+          contextBounds.bottom <= railBounds.top + 1
         )
       }),
     ).toBe(true)
     await $('button[aria-label="Zoom in"]').click()
-    await expect($('.cs-zoom-value')).toHaveText('110%')
+    await expect($('.cs-zoom-controls')).toHaveAttribute('data-zoom', '110')
     await browser.saveScreenshot(
       path.resolve('artifacts/browser-e2e/m02-ready-1600x1000.png'),
     )
@@ -91,7 +96,7 @@ describe('M02 editor shell in browser mode', () => {
     expect(before.fallbackPosition).toBe('fixed')
     expect(before.workbench.top).toBeCloseTo(0, 0)
     await $('button[aria-label="Zoom in"]').click()
-    await expect($('.cs-zoom-value')).toHaveText('110%')
+    await expect($('.cs-zoom-controls')).toHaveAttribute('data-zoom', '110')
 
     const after = await browser.execute(() => {
       const workbench = document.querySelector('.cs-workbench')

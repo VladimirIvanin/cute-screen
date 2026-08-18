@@ -21,10 +21,11 @@ describe('M04 clean-profile capture', () => {
       }),
     ).toEqual([400, 300])
 
-    const zoomBefore = await $('.cs-zoom-value').getText()
+    const zoomBefore = await $('.cs-zoom-controls').getAttribute('data-zoom')
     await browser.setWindowSize(1600, 1000)
     await browser.waitUntil(
-      async () => (await $('.cs-zoom-value').getText()) !== zoomBefore,
+      async () =>
+        (await $('.cs-zoom-controls').getAttribute('data-zoom')) !== zoomBefore,
     )
   })
 })

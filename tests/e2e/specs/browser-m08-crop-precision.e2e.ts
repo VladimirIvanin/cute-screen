@@ -1222,7 +1222,7 @@ describe('M08 crop and precision acceptance in browser mode', () => {
 
     await openM08({ alpha: 255 })
     await $('button[aria-label="Zoom in"]').click()
-    await expect($('.cs-zoom-value')).not.toHaveText('100%')
+    await expect($('.cs-zoom-controls')).not.toHaveAttribute('data-zoom', '100')
     await $('button[aria-label="Eyedropper"]').click()
     const cursorAlpha = await browser.execute(() => {
       const overlay = document.querySelector<HTMLCanvasElement>(

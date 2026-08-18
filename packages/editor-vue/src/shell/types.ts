@@ -299,7 +299,6 @@ export const translationKeys = [
   'seriesFrames',
   'zoom',
   'fitZoom',
-  'zoomPercentage',
   'sceneCanvas',
   'interactionOverlay',
   'emptyTitle',
