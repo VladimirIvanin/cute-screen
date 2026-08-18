@@ -536,7 +536,10 @@ function parseNumberedMarkerPayload(
   })
 }
 
-function parseCalloutRoute(value: unknown, field: string): CalloutPayload['route'] {
+function parseCalloutRoute(
+  value: unknown,
+  field: string,
+): CalloutPayload['route'] {
   const input = readJsonObject(value, field)
   assertOnlyFields(input, ['path', 'elbow'], field)
   if (input.path !== 'elbow') throw new Error(`${field}.path is invalid`)
@@ -554,7 +557,10 @@ function parseCalloutRoute(value: unknown, field: string): CalloutPayload['route
   }) as CalloutPayload['route']
 }
 
-function parseCalloutMarker(value: unknown, field: string): CalloutPayload['targetMarker'] {
+function parseCalloutMarker(
+  value: unknown,
+  field: string,
+): CalloutPayload['targetMarker'] {
   if (value !== 'circle') throw new Error(`${field} is invalid`)
   return 'circle'
 }
@@ -562,7 +568,9 @@ function parseCalloutMarker(value: unknown, field: string): CalloutPayload['targ
 function parseCalloutPayload(value: unknown, field: string): CalloutPayload {
   const input = readJsonObject(value, field)
   if (Object.hasOwn(input, 'bubble') || Object.hasOwn(input, 'tailAnchor')) {
-    throw new Error(`${field} legacy callout bubble/tail fields are removed in v7`)
+    throw new Error(
+      `${field} legacy callout bubble/tail fields are removed in v7`,
+    )
   }
   assertOnlyFields(
     input,
@@ -593,7 +601,10 @@ function parseCalloutPayload(value: unknown, field: string): CalloutPayload {
       `${field}.label`,
     ) as CalloutPayload['label'],
     route: parseCalloutRoute(input.route, `${field}.route`),
-    stroke: parseStroke(input.stroke, `${field}.stroke`) as CalloutPayload['stroke'],
+    stroke: parseStroke(
+      input.stroke,
+      `${field}.stroke`,
+    ) as CalloutPayload['stroke'],
     targetMarker: parseCalloutMarker(
       input.targetMarker,
       `${field}.targetMarker`,

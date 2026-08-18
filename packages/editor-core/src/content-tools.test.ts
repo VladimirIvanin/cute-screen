@@ -249,7 +249,9 @@ describe('v7 content-layer core contracts', () => {
       target: { x: 10, y: 12 },
       label: { x: 40, y: 80 },
     })
-    expect(layer?.localBounds.width).toBeGreaterThan(24 * 'wide line'.length * 0.6)
+    expect(layer?.localBounds.width).toBeGreaterThan(
+      24 * 'wide line'.length * 0.6,
+    )
     expect(layer?.localBounds.height).toBeGreaterThan(24 * 1.25 * 2)
   })
 

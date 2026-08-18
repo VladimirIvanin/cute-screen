@@ -147,27 +147,15 @@ function onLayerPointerCancel(event: PointerEvent): void {
 }
 
 function isDropBefore(layerId: string): boolean {
-  return (
-    dropTarget.value?.id === layerId && dropTarget.value.place === 'before'
-  )
+  return dropTarget.value?.id === layerId && dropTarget.value.place === 'before'
 }
 
 function isDropAfter(layerId: string): boolean {
-  return (
-    dropTarget.value?.id === layerId && dropTarget.value.place === 'after'
-  )
+  return dropTarget.value?.id === layerId && dropTarget.value.place === 'after'
 }
 
-function selectLayer(
-  layerId: string,
-  event: MouseEvent | KeyboardEvent,
-): void {
-  emit(
-    'select',
-    layerId,
-    event.metaKey || event.ctrlKey,
-    event.shiftKey,
-  )
+function selectLayer(layerId: string, event: MouseEvent | KeyboardEvent): void {
+  emit('select', layerId, event.metaKey || event.ctrlKey, event.shiftKey)
 }
 
 const emit = defineEmits<{
@@ -217,9 +205,7 @@ const emit = defineEmits<{
             :model-value="Math.round(selectedLayer.opacity * 100)"
             :step="1"
             v-bind="{ ariaLabel: t('opacity') }"
-            :disabled="
-              controlsDisabled || !selectedLayer.opacityEditable
-            "
+            :disabled="controlsDisabled || !selectedLayer.opacityEditable"
             @commit="emit('opacity', selectedLayer.id, Number($event) / 100)"
           />
         </label>

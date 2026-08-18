@@ -190,7 +190,9 @@ describe('M05 LayersPanel reorder', () => {
       },
     })
 
-    expect(rendered.container.querySelector('.cs-layers-controls')).not.toBeNull()
+    expect(
+      rendered.container.querySelector('.cs-layers-controls'),
+    ).not.toBeNull()
     expect(rendered.container.querySelector('.cs-layer-properties')).toBeNull()
     expect(
       await rendered.findByRole('slider', { name: 'opacity' }),
