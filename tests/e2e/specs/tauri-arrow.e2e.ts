@@ -1,31 +1,11 @@
 import { $, $$, browser, expect } from '@wdio/globals'
 import path from 'node:path'
 
-async function openArrowConfigurePopover(): Promise<void> {
-  await browser.execute(() => {
-    const button = document.querySelector<HTMLButtonElement>(
-      'button[aria-label="Arrow"], button[aria-label="Стрелка"]',
-    )
-    if (!button) throw new Error('Arrow tool button is missing')
-    button.dispatchEvent(
-      new MouseEvent('contextmenu', {
-        bubbles: true,
-        cancelable: true,
-        view: window,
-      }),
-    )
-  })
-  await expect($('.cs-tool-configure-popover-host')).toExist()
-}
-
-async function closeArrowConfigurePopover(): Promise<void> {
-  await browser.execute(() => {
-    document.body.dispatchEvent(
-      new PointerEvent('pointerdown', { bubbles: true }),
-    )
-  })
-  await expect($('.cs-tool-configure-popover-host')).not.toExist()
-}
+import {
+  chooseArrowConfigureOption,
+  closeArrowConfigurePopover,
+  openArrowConfigurePopover,
+} from '../arrow-toolbar'
 
 type ArrowSnapshot = {
   readonly layers: readonly {
@@ -196,10 +176,7 @@ describe('Arrow toolbar and engine in a real Tauri WebView2', () => {
     const arrowTool = $('button[aria-label="Arrow"]')
     await arrowTool.click()
     await openArrowConfigurePopover()
-    await $(
-      '.cs-tool-configure-popover-host [data-control="arrowPath"] .cs-arrow-toolbar-trigger',
-    ).click()
-    await $('button=Elbow').click()
+    await chooseArrowConfigureOption('arrowPath', 'Elbow')
     await closeArrowConfigurePopover()
     const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
     const beforeCount = (await snapshot()).layers.length

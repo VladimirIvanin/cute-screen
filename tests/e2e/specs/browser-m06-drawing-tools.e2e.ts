@@ -1,6 +1,11 @@
 import { $, $$, browser, expect } from '@wdio/globals'
 import path from 'node:path'
 
+import {
+  chooseArrowConfigureOption,
+  openArrowConfigurePopover,
+} from '../arrow-toolbar'
+
 type HarnessSnapshot = {
   readonly canvas: { readonly width: number; readonly height: number }
   readonly crop: {
@@ -131,22 +136,6 @@ async function setShellPreferences(
   )
 }
 
-async function chooseArrowPopover(
-  control: 'arrowPath',
-  option: 'Elbow',
-): Promise<void> {
-  await openArrowConfigurePopover()
-  await $(
-    `.cs-tool-configure-popover-host [data-control="${control}"] .cs-arrow-toolbar-trigger`,
-  ).click()
-  await $(`button=${option}`).click()
-  await browser.execute(() => {
-    document.body.dispatchEvent(
-      new PointerEvent('pointerdown', { bubbles: true }),
-    )
-  })
-}
-
 async function arrowHandleViewportPoint(
   arrow: HarnessSnapshot['layers'][number],
 ): Promise<Readonly<{ x: number; y: number }>> {
@@ -195,23 +184,6 @@ async function arrowHandleViewportPoint(
       outputY: outputBounds.y,
     },
   )
-}
-
-async function openArrowConfigurePopover(): Promise<void> {
-  await browser.execute(() => {
-    const button = document.querySelector<HTMLButtonElement>(
-      'button[aria-label="Arrow"], button[aria-label="Стрелка"]',
-    )
-    if (!button) throw new Error('Arrow tool button is missing')
-    button.dispatchEvent(
-      new MouseEvent('contextmenu', {
-        bubbles: true,
-        cancelable: true,
-        view: window,
-      }),
-    )
-  })
-  await expect($('.cs-tool-configure-popover-host')).toExist()
 }
 
 describe('M06 drawing tools in browser mode', () => {
@@ -429,7 +401,13 @@ describe('M06 drawing tools in browser mode', () => {
     await $('button[aria-label="Show layers"]').click()
     const arrowTool = $('button[aria-label="Arrow"]')
     await arrowTool.click()
-    await chooseArrowPopover('arrowPath', 'Elbow')
+    await openArrowConfigurePopover()
+    await chooseArrowConfigureOption('arrowPath', 'Elbow')
+    await browser.execute(() => {
+      document.body.dispatchEvent(
+        new PointerEvent('pointerdown', { bubbles: true }),
+      )
+    })
     const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
     const beforeCount = (await snapshot()).layers.length
     await browser

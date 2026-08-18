@@ -1,5 +1,7 @@
 import { $, $$, browser, expect } from '@wdio/globals'
 
+import { chooseArrowConfigureOption, openArrowConfigurePopover } from '../arrow-toolbar'
+
 declare global {
   interface Window {
     __cuteScreenE2eWindow?: {
@@ -37,8 +39,8 @@ describe('M03 persisted document write', () => {
     await $('button[aria-label="Show layers"]').click()
     const arrowTool = $('button[aria-label="Arrow"]')
     await arrowTool.click()
-    await $('[data-control="arrowPath"] .cs-arrow-toolbar-trigger').click()
-    await $('button=Elbow').click()
+    await openArrowConfigurePopover()
+    await chooseArrowConfigureOption('arrowPath', 'Elbow')
     const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
     await browser
       .action('pointer')
