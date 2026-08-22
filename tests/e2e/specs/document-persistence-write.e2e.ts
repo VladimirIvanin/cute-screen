@@ -1,6 +1,9 @@
 import { $, $$, browser, expect } from '@wdio/globals'
 
-import { chooseArrowConfigureOption, openArrowConfigurePopover } from '../arrow-toolbar'
+import {
+  chooseArrowConfigureOption,
+  openArrowConfigurePopover,
+} from '../arrow-toolbar'
 
 declare global {
   interface Window {
