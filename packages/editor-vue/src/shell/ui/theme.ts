@@ -38,4 +38,11 @@ export const cuteScreenThemeOverrides: GlobalThemeOverrides = {
     borderRadius: '12px',
     padding: '0',
   },
+  Tooltip: {
+    peers: {
+      Popover: {
+        padding: '6px 10px',
+      },
+    },
+  },
 }

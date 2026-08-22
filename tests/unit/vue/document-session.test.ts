@@ -34,6 +34,40 @@ const document: EditorDocumentV1 = {
 }
 
 describe('M03 document persistence session', () => {
+  it('opens legacy non-image scale normalized without dirty state or history', () => {
+    const layer = createDrawingLayer({
+      id: '019c1f62-058e-7000-8000-000000000088',
+      tool: 'shape',
+      start: { x: 10, y: 10 },
+      end: { x: 60, y: 40 },
+    })!
+    const session = new DocumentSessionController({
+      document: {
+        ...document,
+        layers: [
+          {
+            ...layer,
+            transform: { ...layer.transform, scaleX: -2, scaleY: 0.5 },
+          },
+        ],
+      },
+      revision: 1,
+      bridge: {
+        saveDocument: async () => 2,
+        exportRecoveryBundle: async () => ({ kind: 'saved' }),
+      },
+      correlationId: () => 'legacy-normalization',
+    })
+
+    expect(session.snapshot.core.document.layers[0]!.transform).toMatchObject({
+      scaleX: 1,
+      scaleY: 1,
+    })
+    expect(session.snapshot.core.dirty).toBe(false)
+    expect(session.snapshot.core.canUndo).toBe(false)
+    expect(session.snapshot.saveState).toBe('saved')
+  })
+
   it('does not autosave a command that leaves the committed document unchanged', async () => {
     vi.useFakeTimers()
     const saveDocument = vi.fn(async () => 2)

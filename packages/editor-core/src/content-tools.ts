@@ -1,6 +1,7 @@
 import { parseEditorDocument } from './document/codec'
 import { defaultCalloutRoute, rebaseCalloutLayer } from './callout-geometry'
 import { EDITOR_DOCUMENT_SCHEMA_VERSION } from './document/types'
+import { normalizeEditableLayerScale } from './layer-resize'
 import type { EditorCommand } from './commands/types'
 import type {
   CalloutLayer,
@@ -626,7 +627,9 @@ export function pasteClipboardLayers(
       if (ids.has(id))
         throw new Error('clipboard paste id generator returned a duplicate')
       ids.add(id)
-      const layer = contentImage(cloneLayer(source))
+      const layer = normalizeEditableLayerScale(
+        contentImage(cloneLayer(source)),
+      )
       return Object.freeze({
         ...layer,
         id,

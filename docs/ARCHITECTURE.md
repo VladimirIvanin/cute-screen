@@ -52,6 +52,12 @@ immutable ID, transform, visibility, lock, z-order и tool-specific payload.
 Opacity, blend и shadows относятся только к нетекстовым composited layers;
 text, callout и numbered marker не сохраняют их в schema v7.
 
+Non-unit transform scale является editable capability только image layers.
+Non-image resize изменяет payload/local bounds через DOM-free geometry helpers,
+сохраняя style values; command boundary не принимает новый non-unit scale для
+таких слоёв. Legacy normalization выполняется до создания command history и не
+меняет schema v7.
+
 `EditorDocument.source` хранит immutable original provenance и blob reference, но
 не является специальным renderer background. Видимый исходный screenshot или
 открытая картинка представлены нижним image `LayerNode` с `role: base`, locked

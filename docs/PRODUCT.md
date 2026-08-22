@@ -58,7 +58,14 @@ Cute Screen — полноценный local-first редактор снимко
 - `REQ-EDT-002` — добавленный элемент не становится выбранным; активный инструмент сохраняется.
 - `REQ-EDT-003` — loupe после добавления выбирается автоматически для настройки; иные исключения требуют ADR.
 - `REQ-EDT-004` — double click инструментом выбора циклически проваливается по пересекающимся слоям.
-- `REQ-EDT-005` — selection, move, resize, rotate, duplicate, delete, lock, visibility, z-order и opacity.
+- `REQ-EDT-005` — selection, move, rotate, duplicate, delete, lock, visibility,
+  z-order и opacity. Generic transform-scale разрешён только image layers;
+  non-image tools изменяют размер только через собственную persisted geometry,
+  не масштабируя stroke, text или effect style. Поворот на canvas выполняется
+  через corner rotation zones без отдельного вынесенного rotate handle. Для
+  bounds/points resize противоположная сторона закреплена в world space;
+  `Shift` сохраняет aspect ratio, `Alt` изменяет geometry от центра. Locked
+  layer показывает selection frame без активных handles.
 - `REQ-EDT-006` — все изменения документа undoable; redo очищается после новой ветки изменений.
 - `REQ-EDT-007` — guides появляются только при удержании назначенной клавиши.
 - `REQ-EDT-008` — основной `ToolRail` находится внизу по центру; панель
@@ -80,7 +87,11 @@ Cute Screen — полноценный local-first редактор снимко
   если базовое изображение удалено, уменьшено или перемещено.
 - `REQ-EDT-013` — исходное изображение представлено locked-by-default raster
   layer; после unlock его можно move/resize/rotate/delete, не изменяя immutable
-  original blob.
+  original blob. Base и content image являются единственными слоями, которым
+  UI разрешает persisted non-unit transform scale. При открытии editable
+  document и internal clipboard paste legacy non-image scale с модулем, отличным
+  от `1`, нормализуется в `+1/+1` без компенсации geometry, history entry или
+  dirty state; чистые unit reflections сохраняются.
 - `REQ-EDT-014` — horizontal/vertical flip преобразует все canvas layers и crop
   одной undoable document command и совпадает в preview/export.
 
@@ -94,11 +105,16 @@ Cute Screen — полноценный local-first редактор снимко
   settings не показываются при активном инструменте arrow; transient toolbar
   над выделенной стрелкой доступен только через select, а defaults — через
   configure popover (context menu / Shift+F10) на кнопке инструмента arrow.
+  Изменение размера выполняется endpoint/bend/middle-segment anchors без
+  generic transform-scale и без масштабирования stroke/caps.
 - `REQ-TOL-002` — shapes: rectangle, circle, oval, diamond, star; stroke,
   solid/gradient/pattern/texture fills, fill/layer opacity, blend modes и
-  визуальный corner radius.
-- `REQ-TOL-003` — pencil: базовые кисти, толщина, opacity, smoothing и цвет.
-- `REQ-TOL-004` — marker: толщина, opacity и blend modes highlight/darken.
+  визуальный corner radius. Bounds handles меняют intrinsic geometry, сохраняя
+  paint/stroke values.
+- `REQ-TOL-003` — pencil: базовые кисти, толщина, opacity, smoothing и цвет;
+  bounds handles преобразуют sampled points, но не толщину кисти.
+- `REQ-TOL-004` — marker: толщина, opacity и blend modes highlight/darken;
+  bounds handles преобразуют sampled points, но не толщину marker.
 - `REQ-TOL-005` — text: FigJam-like direct WYSIWYG editing through a transient
   `contenteditable` projection (never persisted as HTML) с transient-панелью
   форматирования над редактируемым текстом, multiline и portable
@@ -110,13 +126,23 @@ Cute Screen — полноценный local-first редактор снимко
   underline, letter spacing, line-height contract, gradient/pattern/texture
   text fill, text outline, text shadows и text opacity/blend не входят в v7;
   common layer opacity/blend/shadows для text-bearing layers не сохраняются.
-- `REQ-TOL-006` — numbered marker: несколько форм, автоматическая последовательность и редактируемый multiline label.
+  Боковые width handles переводят auto-size text в fixed-width либо меняют
+  существующий wrap width без масштабирования glyph/font styles.
+- `REQ-TOL-006` — numbered marker: несколько форм, автоматическая
+  последовательность и редактируемый multiline label. Размер определяется
+  содержимым автоматически; resize handles отсутствуют.
 - `REQ-TOL-007` — callout: leader line от target marker через orthogonal elbow connector
   к label marker и portable rich-text подпись с optional solid background.
   Создание drag target→label, затем transient contenteditable и one-command commit.
-  Handles target, label и elbow middle-segment. Speech-bubble tail не входит.
-- `REQ-TOL-008` — manual censor: pixelate, blur и solid fill; без автоматического поиска данных.
-- `REQ-TOL-009` — spotlight: rectangle/ellipse/diamond и настраиваемое затемнение.
+  Handles target, label и elbow middle-segment изменяют connector geometry без
+  transform-scale; label handle сохраняет роль точки положения подписи.
+  Speech-bubble tail не входит.
+- `REQ-TOL-008` — manual censor: pixelate, blur и solid fill; без
+  автоматического поиска данных. Rectangle изменяет intrinsic bounds, freeform
+  пропорционально преобразует persisted points; effect parameters не
+  масштабируются.
+- `REQ-TOL-009` — spotlight: rectangle/ellipse/diamond и настраиваемое затемнение;
+  bounds handles меняют aperture geometry без масштабирования dim/feather style.
 - `REQ-TOL-010` — ruler измеряет расстояние в pixels/percent и взаимодействует
   с временными guides. Persisted цвет (по умолчанию розово-малиновый), толщина
   и размер подписи настраиваются только в нижнем contextual toolbar. На canvas
@@ -124,16 +150,24 @@ Cute Screen — полноценный local-first редактор снимко
   endpoint dots и перекрывающий линию rounded contrast badge: он повёрнут вдоль
   ruler, но текст остаётся читаемым, содержит только целое `NNN px` либо значение
   с `%` и имеет тонкую рамку цвета линии. Угол остаётся отдельной семантикой для
-  snapping и contextual UI, но в badge не выводится.
+  snapping и contextual UI, но в badge не выводится. Start/end handles меняют
+  factual endpoints и пересчитывают conservative bounds, сохраняя thickness,
+  ticks и badge font size.
 - `REQ-TOL-011` — loupe: zoom, размер, circle/rectangle, border color/width и
   shadow. Линза оформлена как callout: connector цвета рамки ведёт от линзы к
   центру source region и одинаково попадает в preview/export. Для выбранной
   лупы точка source и компактные zoom/size chips отображаются только в
-  transient overlay и не попадают в документ или export.
+  transient overlay и не попадают в документ или export. Corner handles
+  равномерно меняют intrinsic `lens.size` и destination bounds; квадратный
+  source region остаётся центрированным на прежнем source center, zoom и style
+  не меняются, codec limits соблюдаются.
 - `REQ-TOL-012` — eyedropper читает один непрозрачный пиксель скомпонованного scene canvas (без transient overlay), нормализует и копирует uppercase HEX, показывает доступный результат и добавляет цвет в recent colors. Pointer и клавиатурный sampling отменяемы; ошибка чтения или clipboard не откатывает уже выбранный цвет и не создаёт document command.
 - `REQ-TOL-013` — crop: свободный режим, aspect presets, handles, rule-of-thirds, reset, `Enter` и `Escape`.
-- `REQ-TOL-014` — вставка emoji как редактируемого слоя.
-- `REQ-TOL-015` — вставка PNG/JPEG/WebP/SVG как image layer.
+- `REQ-TOL-014` — вставка emoji как редактируемого слоя; corner handles
+  равномерно меняют intrinsic size без transform-scale.
+- `REQ-TOL-015` — вставка PNG/JPEG/WebP/SVG как image layer. Image selection
+  сохраняет восемь transform-resize handles: aspect ratio сохраняется по
+  умолчанию, `Shift` разрешает free resize, `Alt` изменяет размер от центра.
 - `REQ-TOL-016` — Open image и bitmap paste из empty state создают новый
   editable document с locked base layer; bitmap paste в активный document
   создаёт image layer тем же flow, что Image tool.

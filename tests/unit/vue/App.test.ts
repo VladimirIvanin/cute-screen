@@ -359,7 +359,7 @@ describe('M02 editor shell', () => {
       'Fit',
     )
     expect(screen.getByRole('button', { name: 'zoomValue' })).toHaveTextContent(
-      '100%',
+      '1:1',
     )
     expect(screen.getByRole('button', { name: 'zoomIn' })).toBeInTheDocument()
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()

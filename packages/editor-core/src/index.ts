@@ -201,6 +201,19 @@ export {
   transformToMatrix,
 } from './geometry'
 export {
+  BOUNDS_RESIZE_HANDLES,
+  assertLayerEditableScale,
+  layerIntrinsicResizeHandles,
+  layerResizeCapability,
+  normalizeEditableDocumentScales,
+  normalizeEditableLayerScale,
+  resizeLayerGeometry,
+  type BoundsResizeHandle,
+  type IntrinsicResizeHandle,
+  type LayerResizeCapability,
+  type ResizeLayerGeometryOptions,
+} from './layer-resize'
+export {
   createViewportState,
   fitViewport,
   panViewport,

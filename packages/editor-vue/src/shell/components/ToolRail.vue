@@ -61,6 +61,7 @@ function onToolKeydown(tool: ToolDescriptor, event: KeyboardEvent): void {
           :key="tool.id"
           placement="top"
           :delay="400"
+          :disabled="Boolean(tool.disabled)"
         >
           <template #trigger>
             <NButton
@@ -71,7 +72,7 @@ function onToolKeydown(tool: ToolDescriptor, event: KeyboardEvent): void {
               :disabled="Boolean(tool.disabled)"
               :aria-pressed="activeToolId === tool.id"
               :aria-label="t(tool.labelKey)"
-              :title="toolTitle(tool, t)"
+              :title="tool.disabled ? toolTitle(tool, t) : undefined"
               @click="emit('select', tool.id)"
               @contextmenu="onConfigure(tool, $event)"
               @keydown="onToolKeydown(tool, $event)"

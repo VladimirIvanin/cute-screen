@@ -4,6 +4,7 @@ import {
   createCalloutLayer,
   createContentImageLayer,
   createDuplicateLayerCommand,
+  createDrawingLayer,
   createEmojiLayer,
   createNumberedMarkerLayer,
   createTextCommitCommand,
@@ -151,6 +152,31 @@ describe('v7 content-layer core contracts', () => {
       payload: { role: 'content' },
       transform: { translateX: 8, translateY: 8 },
     })
+  })
+
+  it('normalizes legacy non-image scale while pasting internal layers', () => {
+    const shape = createDrawingLayer({
+      id: ids[0],
+      tool: 'shape',
+      start: { x: 10, y: 10 },
+      end: { x: 80, y: 50 },
+    })!
+    const encoded = encodeClipboardLayersV2([
+      {
+        ...shape,
+        transform: { ...shape.transform, scaleX: 2, scaleY: -0.5 },
+      },
+    ])
+
+    const pasted = pasteClipboardLayers(decodeClipboardLayersV2(encoded), {
+      id: () => ids[2],
+      zoom: 1,
+      cascadeIndex: 0,
+    })
+
+    expect(pasted[0]!.transform).toMatchObject({ scaleX: 1, scaleY: 1 })
+    expect(pasted[0]!.localBounds).toEqual(shape.localBounds)
+    expect(pasted[0]!.payload).toEqual(shape.payload)
   })
 
   it('does not allocate content commands for an empty new text layer', () => {

@@ -1,6 +1,7 @@
 import { normalizeEditorDocument } from '../document/codec'
 import { jsonEquals } from '../document/json'
 import type { EditorDocumentV1, LayerNode } from '../document/types'
+import { assertLayerEditableScale } from '../layer-resize'
 import { rebaseRulerLayer } from '../precision-tools'
 import type { EditorCommand } from './types'
 
@@ -123,6 +124,7 @@ function applyAddLayer(
   document: EditorDocumentV1,
   command: Extract<EditorCommand, { type: 'addLayer' }>,
 ): EditorDocumentV1 {
+  assertLayerEditableScale(command.layer)
   if (document.layers.some((layer) => layer.id === command.layer.id)) {
     throw new Error(`duplicate layer id: ${command.layer.id}`)
   }
@@ -172,6 +174,7 @@ function applyUpdateLayer(
   if (current.locked && !isUnlockOnlyChange(command.before, command.after)) {
     throw new Error(`layer ${current.id} is locked`)
   }
+  assertLayerEditableScale(command.after)
   return replaceDocument(document, {
     layers: document.layers.map((layer) =>
       layer.id === command.before.id ? command.after : layer,
@@ -228,6 +231,7 @@ function applyDuplicateLayer(
   if (document.layers.some((layer) => layer.id === command.layer.id)) {
     throw new Error(`duplicate layer id: ${command.layer.id}`)
   }
+  assertLayerEditableScale(command.layer)
   return replaceDocument(document, {
     layers: [...document.layers, command.layer],
   })

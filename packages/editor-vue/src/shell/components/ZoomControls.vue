@@ -41,7 +41,7 @@ const emit = defineEmits<{ zoom: [value: number]; fit: [] }>()
       :title="t('zoomValue')"
       @click="emit('zoom', 100)"
     >
-      100%
+      1:1
     </NButton>
     <NButton
       quaternary

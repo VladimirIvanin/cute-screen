@@ -1362,7 +1362,7 @@ describe('M08 shell lifecycle and contextual settings', () => {
     vi.unstubAllGlobals()
   })
 
-  it('canonicalizes one strong non-uniform ruler resize for its selection frame and badge hit with exact undo/redo', async () => {
+  it('moves one ruler endpoint intrinsically with conservative bounds and exact undo/redo', async () => {
     const ruler = precisionLayerFixture('ruler') as RulerLayer
     const beforeDocument = { ...documentFixture(), layers: [ruler] }
     const session = new DocumentSessionController({
@@ -1372,7 +1372,7 @@ describe('M08 shell lifecycle and contextual settings', () => {
         saveDocument: async () => 2,
         exportRecoveryBundle: async () => ({ kind: 'saved' }),
       },
-      correlationId: () => 'm08-ruler-generic-resize',
+      correlationId: () => 'm08-ruler-intrinsic-resize',
       debounceMs: 60_000,
     })
     const pinia = createEditorShellPinia()
@@ -1387,14 +1387,9 @@ describe('M08 shell lifecycle and contextual settings', () => {
     const scene = screen.getByLabelText('Scene canvas') as HTMLCanvasElement
     prepareScene(scene)
     const execute = vi.spyOn(session, 'execute')
-    const resizeStart = transformedPoint(ruler.transform, {
-      x: ruler.localBounds.x + ruler.localBounds.width,
-      y: ruler.localBounds.y + ruler.localBounds.height,
-    })
-    const resizeEnd = transformedPoint(ruler.transform, {
-      x: ruler.localBounds.x + ruler.localBounds.width * 0.08,
-      y: ruler.localBounds.y + ruler.localBounds.height * 0.3,
-    })
+    const fixedStart = transformedPoint(ruler.transform, ruler.payload.start)
+    const resizeStart = transformedPoint(ruler.transform, ruler.payload.end)
+    const resizeEnd = { x: resizeStart.x + 35, y: resizeStart.y + 24 }
 
     await fireEvent.pointerDown(scene, {
       pointerId: 26,
@@ -1423,43 +1418,25 @@ describe('M08 shell lifecycle and contextual settings', () => {
     )
     const after = session.snapshot.core.document.layers[0]
     if (after?.kind !== 'ruler') throw new Error('expected resized ruler')
-    expect(after.transform.scaleX).toBeCloseTo(0.08, 10)
-    expect(after.transform.scaleY).toBeCloseTo(0.3, 10)
+    expect(after.transform.scaleX).toBe(1)
+    expect(after.transform.scaleY).toBe(1)
+    expect(after.payload).toMatchObject({
+      thickness: ruler.payload.thickness,
+      fontSize: ruler.payload.fontSize,
+      color: ruler.payload.color,
+      unit: ruler.payload.unit,
+    })
     expect(rulerVisualBoundsAreConservative(after, beforeDocument.canvas)).toBe(
       true,
     )
-    const worldFrameWidth = Math.abs(
-      after.transform.scaleX * after.localBounds.width,
-    )
-    const worldFrameHeight = Math.abs(
-      after.transform.scaleY * after.localBounds.height,
-    )
-    expect(worldFrameWidth).toBeGreaterThan(50)
-    expect(worldFrameHeight).toBeGreaterThan(20)
-
-    const rawResizeTransform = {
-      ...ruler.transform,
-      scaleX: ruler.transform.scaleX * 0.08,
-      scaleY: ruler.transform.scaleY * 0.3,
-    }
-    const expectedEndpoints = [
-      transformedPoint(rawResizeTransform, ruler.payload.start),
-      transformedPoint(rawResizeTransform, ruler.payload.end),
-    ] as const
     const actualEndpoints = [
       transformedPoint(after.transform, after.payload.start),
       transformedPoint(after.transform, after.payload.end),
     ] as const
-    for (const index of [0, 1] as const) {
-      expect(actualEndpoints[index].x).toBeCloseTo(
-        expectedEndpoints[index].x,
-        8,
-      )
-      expect(actualEndpoints[index].y).toBeCloseTo(
-        expectedEndpoints[index].y,
-        8,
-      )
-    }
+    expect(actualEndpoints[0].x).toBeCloseTo(fixedStart.x, 8)
+    expect(actualEndpoints[0].y).toBeCloseTo(fixedStart.y, 8)
+    expect(actualEndpoints[1].x).toBeCloseTo(resizeEnd.x, 8)
+    expect(actualEndpoints[1].y).toBeCloseTo(resizeEnd.y, 8)
     const [start, end] = actualEndpoints
     const length = Math.hypot(end.x - start.x, end.y - start.y)
     const badgePoint = {

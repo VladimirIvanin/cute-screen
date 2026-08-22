@@ -6,6 +6,7 @@ import {
   rebaseArrowLayer,
   type ArrowLayer,
   type EditorDocumentV1,
+  type LayerNode,
 } from '@cute-screen/editor-renderer'
 import type { TextToolDefaults } from '../../../packages/editor-vue/src/shell/components/CanvasViewport.vue'
 
@@ -321,6 +322,37 @@ describe('M05 CanvasViewport transforms', () => {
     expect(scroll.scrollTop).toBe(70)
   })
 
+  it('shows grab feedback for Hand and grabbing only during its pan gesture', async () => {
+    const { scene } = mountViewport('hand')
+
+    expect(scene.style.cursor).toBe('grab')
+
+    await fireEvent.pointerDown(scene, {
+      pointerId: 1,
+      button: 0,
+      clientX: 50,
+      clientY: 50,
+    })
+    expect(scene.style.cursor).toBe('grabbing')
+
+    await fireEvent.pointerUp(scene, {
+      pointerId: 1,
+      button: 0,
+      clientX: 50,
+      clientY: 50,
+    })
+    expect(scene.style.cursor).toBe('grab')
+
+    await fireEvent.pointerDown(scene, {
+      pointerId: 2,
+      button: 0,
+      clientX: 50,
+      clientY: 50,
+    })
+    await fireEvent.pointerCancel(scene, { pointerId: 2 })
+    expect(scene.style.cursor).toBe('grab')
+  })
+
   it('renders a moved Arrow at its transient position before pointer release', async () => {
     const arrowDocument: EditorDocumentV1 = {
       ...document,
@@ -383,7 +415,7 @@ describe('M05 CanvasViewport transforms', () => {
     expect(getContext).toHaveBeenCalled()
   })
 
-  it('commits one constrained corner resize only on pointer release', async () => {
+  it('commits one intrinsic shape resize without transform scale on release', async () => {
     const { scene, emitted } = mountViewport()
 
     await fireEvent.pointerDown(scene, {
@@ -396,23 +428,208 @@ describe('M05 CanvasViewport transforms', () => {
       clientX: 50,
       clientY: 50,
     })
-    expect(emitted().transformLayer).toBeUndefined()
+    expect(emitted().documentCommand).toBeUndefined()
     await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 50, clientY: 50 })
 
-    expect(emitted().transformLayer).toEqual([
+    expect(emitted().transformLayer).toBeUndefined()
+    expect(emitted().toolError).toBeUndefined()
+    expect(emitted().documentCommand).toEqual([
       [
-        'shape',
         expect.objectContaining({
-          translateX: 10,
-          translateY: 10,
-          scaleX: 2,
-          scaleY: 2,
+          type: 'updateLayer',
+          after: expect.objectContaining({
+            localBounds: { x: 0, y: 0, width: 40, height: 40 },
+            transform: expect.objectContaining({ scaleX: 1, scaleY: 1 }),
+          }),
         }),
       ],
     ])
   })
 
-  it('commits Shift-constrained rotation only on pointer release', async () => {
+  it('applies Shift aspect lock and Alt centre resize to intrinsic geometry', async () => {
+    const { scene, emitted } = mountViewport()
+
+    await fireEvent.pointerDown(scene, {
+      pointerId: 1,
+      clientX: 30,
+      clientY: 30,
+      shiftKey: true,
+      altKey: true,
+    })
+    await fireEvent.pointerMove(scene, {
+      pointerId: 1,
+      clientX: 50,
+      clientY: 40,
+      shiftKey: true,
+      altKey: true,
+    })
+    await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 50, clientY: 40 })
+
+    const command = (
+      emitted().documentCommand as unknown[][] | undefined
+    )?.[0]?.[0] as { readonly after?: LayerNode } | undefined
+    expect(command?.after?.localBounds).toEqual({
+      x: -20,
+      y: -20,
+      width: 60,
+      height: 60,
+    })
+    expect(command?.after?.transform).toMatchObject({ scaleX: 1, scaleY: 1 })
+  })
+
+  it('cancels intrinsic resize without committing a command', async () => {
+    const { scene, emitted } = mountViewport()
+
+    await fireEvent.pointerDown(scene, {
+      pointerId: 1,
+      clientX: 30,
+      clientY: 30,
+    })
+    await fireEvent.pointerMove(scene, {
+      pointerId: 1,
+      clientX: 55,
+      clientY: 45,
+    })
+    await fireEvent.pointerCancel(scene, { pointerId: 1 })
+
+    expect(emitted().documentCommand).toBeUndefined()
+    expect(emitted().transformLayer).toBeUndefined()
+  })
+
+  it('keeps transform resize for image layers', async () => {
+    const imageDocument: EditorDocumentV1 = {
+      ...document,
+      layers: [
+        {
+          id: 'image',
+          kind: 'image',
+          localBounds: { x: 0, y: 0, width: 20, height: 20 },
+          transform: {
+            translateX: 10,
+            translateY: 10,
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+          },
+          opacity: 1,
+          blendMode: 'normal',
+          shadows: [],
+          visible: true,
+          locked: false,
+          payload: {
+            blobHash: 'b'.repeat(64),
+            intrinsicWidth: 20,
+            intrinsicHeight: 20,
+            format: 'png',
+            orientationApplied: true,
+            color: { colorSpace: 'srgb', hasIccProfile: false },
+            role: 'content',
+          },
+        },
+      ],
+    }
+    const { scene, emitted } = mountViewport(undefined, imageDocument, 'image')
+
+    await fireEvent.pointerDown(scene, {
+      pointerId: 1,
+      clientX: 30,
+      clientY: 30,
+    })
+    await fireEvent.pointerMove(scene, {
+      pointerId: 1,
+      clientX: 50,
+      clientY: 50,
+    })
+    await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 50, clientY: 50 })
+
+    expect(emitted().transformLayer).toEqual([
+      ['image', expect.objectContaining({ scaleX: 2, scaleY: 2 })],
+    ])
+  })
+
+  it('allows Shift free-resize for image layers', async () => {
+    const imageDocument: EditorDocumentV1 = {
+      ...document,
+      layers: [
+        {
+          id: 'image-free-resize',
+          kind: 'image',
+          localBounds: { x: 0, y: 0, width: 20, height: 20 },
+          transform: {
+            translateX: 10,
+            translateY: 10,
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+          },
+          opacity: 1,
+          blendMode: 'normal',
+          shadows: [],
+          visible: true,
+          locked: false,
+          payload: {
+            blobHash: 'c'.repeat(64),
+            intrinsicWidth: 20,
+            intrinsicHeight: 20,
+            format: 'png',
+            orientationApplied: true,
+            color: { colorSpace: 'srgb', hasIccProfile: false },
+            role: 'content',
+          },
+        },
+      ],
+    }
+    const { scene, emitted } = mountViewport(
+      undefined,
+      imageDocument,
+      'image-free-resize',
+    )
+
+    await fireEvent.pointerDown(scene, {
+      pointerId: 1,
+      clientX: 30,
+      clientY: 30,
+      shiftKey: true,
+    })
+    await fireEvent.pointerMove(scene, {
+      pointerId: 1,
+      clientX: 50,
+      clientY: 40,
+      shiftKey: true,
+    })
+    await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 50, clientY: 40 })
+
+    expect(emitted().transformLayer).toEqual([
+      [
+        'image-free-resize',
+        expect.objectContaining({ scaleX: 2, scaleY: 1.5 }),
+      ],
+    ])
+  })
+
+  it('commits Shift-constrained rotation from an outer corner zone', async () => {
+    const { scene, emitted } = mountViewport()
+
+    await fireEvent.pointerDown(scene, {
+      pointerId: 1,
+      clientX: 41,
+      clientY: 41,
+    })
+    await fireEvent.pointerMove(scene, {
+      pointerId: 1,
+      clientX: -1,
+      clientY: 41,
+      shiftKey: true,
+    })
+    expect(emitted().transformLayer).toBeUndefined()
+    await fireEvent.pointerUp(scene, { pointerId: 1, clientX: -1, clientY: 41 })
+
+    expect(emitted().transformLayer).toEqual([
+      ['shape', expect.objectContaining({ rotation: 90 })],
+    ])
+  })
+
+  it('does not rotate from the removed detached top handle position', async () => {
     const { scene, emitted } = mountViewport()
 
     await fireEvent.pointerDown(scene, {
@@ -424,14 +641,24 @@ describe('M05 CanvasViewport transforms', () => {
       pointerId: 1,
       clientX: 42,
       clientY: 20,
-      shiftKey: true,
     })
-    expect(emitted().transformLayer).toBeUndefined()
     await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 42, clientY: 20 })
 
-    expect(emitted().transformLayer).toEqual([
-      ['shape', expect.objectContaining({ rotation: 90 })],
-    ])
+    expect(emitted().transformLayer).toBeUndefined()
+  })
+
+  it('uses direct hover cursors for intrinsic resize and corner rotation zones', async () => {
+    const { scene } = mountViewport()
+
+    await fireEvent.pointerMove(scene, { clientX: 30, clientY: 30 })
+    expect(scene.style.cursor).toBe('nwse-resize')
+
+    await fireEvent.pointerMove(scene, { clientX: 41, clientY: 41 })
+    expect(scene.classList).toContain('cs-canvas-rotate-cursor')
+
+    await fireEvent.pointerMove(scene, { clientX: 20, clientY: 20 })
+    expect(scene.style.cursor).toBe('move')
+    expect(scene.classList).not.toContain('cs-canvas-rotate-cursor')
   })
 
   it('keeps drawing drafts transient and commits each pointer create once', async () => {
@@ -817,6 +1044,88 @@ describe('M05 CanvasViewport transforms', () => {
     expect(
       withSchema.container.querySelector('.cs-arrow-floating-toolbar'),
     ).toBeTruthy()
+  })
+
+  it('keeps a moving selected arrow, selection frame and floating toolbar on one transient geometry', async () => {
+    const arrowDocument: EditorDocumentV1 = {
+      ...document,
+      layers: [
+        {
+          id: 'moving-arrow',
+          kind: 'arrow',
+          localBounds: { x: 0, y: 0, width: 20, height: 10 },
+          transform: {
+            translateX: 10,
+            translateY: 10,
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+          },
+          opacity: 1,
+          blendMode: 'normal',
+          shadows: [],
+          visible: true,
+          locked: false,
+          payload: {
+            path: 'straight',
+            start: { x: 0, y: 0 },
+            end: { x: 20, y: 10 },
+            startCap: 'none',
+            endCap: 'solidArrow',
+            stroke: {
+              color: { red: 1, green: 0, blue: 0, alpha: 1 },
+              width: 2,
+              style: 'solid',
+              cap: 'round',
+              join: 'round',
+            },
+          },
+        },
+      ],
+    }
+    const { container, scene } = mountViewport(
+      'select',
+      arrowDocument,
+      'moving-arrow',
+      undefined,
+      false,
+      undefined,
+      ARROW_TOOLBAR_SCHEMA,
+    )
+    const surface = container.querySelector('.cs-canvas-surface') as HTMLElement
+    const toolbar = container.querySelector(
+      '.cs-arrow-floating-toolbar-host',
+    ) as HTMLDivElement
+    Object.defineProperty(surface, 'clientWidth', {
+      configurable: true,
+      value: 1_000,
+    })
+    Object.defineProperty(toolbar, 'offsetWidth', {
+      configurable: true,
+      value: 200,
+    })
+    Object.defineProperty(toolbar, 'offsetHeight', {
+      configurable: true,
+      value: 40,
+    })
+    await vi.waitFor(() => expect(toolbar.style.left).not.toBe(''))
+    const context = scene.getContext('2d') as CanvasRenderingContext2D
+    vi.mocked(context.translate).mockClear()
+
+    await fireEvent.pointerDown(scene, {
+      pointerId: 1,
+      clientX: 20,
+      clientY: 15,
+    })
+    await fireEvent.pointerMove(scene, {
+      pointerId: 1,
+      clientX: 400,
+      clientY: 200,
+    })
+
+    expect(toolbar.style.left).toBe('400px')
+    expect(context.translate).toHaveBeenCalledWith(390, 195)
+    expect(context.translate).not.toHaveBeenCalledWith(770, 380)
   })
 
   it('returns to Select on Escape after an already-cancelled drawing draft', async () => {

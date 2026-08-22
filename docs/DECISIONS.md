@@ -138,6 +138,34 @@ toolbar не дублирует text controls во время edit.
 /regression suites на bottom rail layout, отсутствие arrow controls при active
 arrow tool, floating arrow toolbar при select и configure popover defaults.
 
+## ADR-035 — Image-only transform scale и intrinsic geometry handles
+
+**Статус:** accepted
+
+**Контекст:** общий bounding-box scale растягивает stroke, arrow caps, text и
+effect geometry и создаёт визуально сломанные слои. При этом raster/image layer
+должен сохранять обычный proportional resize, а vector/annotation tools уже
+имеют либо могут однозначно получить собственную редактируемую геометрию.
+
+**Решение:** persisted non-unit `Transform2D.scaleX/scaleY` создаётся UI только
+для `image` layers. Остальные слои меняют endpoints, sampled points,
+`localBounds`, lens size либо text wrap width через DOM-free editor-core helpers;
+style values остаются неизменными. Отдельный верхний rotate handle удаляется:
+rotation доступен через внешние зоны четырёх углов, а у resizeable geometry
+внутренняя зона угла остаётся resize handle. Все gestures transient до одного
+`updateLayer` на release.
+
+При открытии editable v7 документа legacy non-image layer с модулем хотя бы
+одного scale, отличным от единицы, получает `scaleX = scaleY = 1` без
+компенсации translation и без history/dirty state. Чистые unit reflections
+`±1` сохраняются для canvas flip; image scale не меняется. Schema v7 и
+`EditorCommand` wire shape остаются прежними.
+
+**Проверяемое основание:** red-first core tests покрывают scale policy,
+idempotent load normalization, unit reflections, intrinsic geometry/style
+invariants и undo/redo. Vue/browser tests проверяют handle routing, corner
+rotation, transient preview/cancel и отсутствие non-image transform scale.
+
 ## ADR-013 — Runtime evidence обязательно
 
 **Статус:** superseded by ADR-020

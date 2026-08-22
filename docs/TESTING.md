@@ -61,6 +61,24 @@ pnpm smoke:m01:portal:invalid-uri
 
 ## Локальные execution records
 
+### Short arrow endpoint repair, Windows x64, 2026-08-22
+
+Для `REQ-TOL-001` сначала добавлен scene regression для прямой стрелки длиной
+4 px при номинальном закрытом наконечнике 9 px. Red-прогон focused
+`document/scene.test.ts` дал ожидаемый 1 failure из 20: основание наконечника
+оказалось в `x=5` вместо второй опорной точки `x=10`. После исправления focused
+`scene` + `arrow-geometry` прошёл 27/27, `pnpm test` — 413/413, а
+`pnpm test:render` — 13/13 без изменения существующих goldens. Регрессия
+параметризована для `solidArrow` и outline `triangle`; длина и ширина закрытого
+наконечника масштабируются одним коэффициентом до доступной длины route.
+
+`pnpm check` успешно завершил lint, полный TypeScript/Vue build и typecheck,
+затем остановился на repository-wide format gate из-за уже изменённого вне
+этого repair файла `tests/e2e/specs/document-persistence-write.e2e.ts`.
+Scoped Prettier для изменённых core/docs файлов, `pnpm docs:check` и
+`pnpm test:boundaries` (7/7) прошли. Изменение renderer-neutral и не создаёт
+новых browser, Tauri или platform-runtime claims.
+
 ### Windows x64, 2026-08-10
 
 На commit `3dcfcc5`, Windows 10 Home 22H2 (build 19045), x86_64, Intel
@@ -962,7 +980,12 @@ coverage only. The previously recorded full-browser M06 timeout and M07
 rich-text top-edge failure remain unresolved and are not promoted to a universal
 browser pass.
 
-## M08 generic ruler resize/transform repair evidence (2026-08-15)
+## M08 generic ruler resize/transform repair evidence (2026-08-15, superseded)
+
+This is historical evidence for legacy transform decoding and conservative
+bounds. ADR-035 superseded generic non-image scaling on 2026-08-22; the current
+ruler interaction changes factual endpoints with unit transform scale, as
+recorded in the later image-only scale evidence section.
 
 Windows 10 22H2 build 19045, AMD64; Node 22.23.1, pnpm 10.33.2; Chrome
 151.0.7922.138. `docs/TRACEABILITY.md` was updated and the tests were authored
@@ -981,16 +1004,14 @@ were not force-added.
   world endpoints, rotation/reflection, selection geometry, badge hit and spatial
   broad phase. Strict v7 rejects derived-bound undercoverage without weakening the
   required colour/thickness/font-size payload.
-- `EditorShell` applies the same canonical transform boundary to persisted ruler
-  move, generic resize/rotate, LayersPanel rotation and canvas reflection. The Vue
-  pointer test proves no command before pointer-up, exactly one `updateLayer`
-  afterward, and exact undo/redo. Focused core/codec/command/hit plus Vue coverage
-  passed 6 files and 114/114 tests.
-- The existing focused M08 browser spec remains eight scenarios and passed 8/8.
-  Its ruler scenario uses the visible Select handle for a strong non-uniform
-  resize, observes one version increment, a badge-covering selection frame,
-  canvas badge re-selection and exact undo/redo. This is seeded Chrome evidence,
-  not a full-browser or real-Tauri claim.
+- At the time, `EditorShell` applied the same canonical transform boundary to
+  persisted ruler move, generic resize/rotate, LayersPanel rotation and canvas
+  reflection. That generic resize UI path is no longer active; the retained
+  coverage still protects legacy decoding and conservative bounds.
+- The historical focused M08 browser spec passed 8/8 using a strong non-uniform
+  ruler resize. It has since been replaced by the intrinsic endpoint scenario
+  documented in the 2026-08-22 section; the old result is not a current UI
+  requirement or a real-Tauri claim.
 - `pnpm test:render` passed 13/13 without a golden update. `pnpm test` passed
   44 files and 387/387 tests. The approved `#E3488F`, ticks without dots and
   length-only upright badge were not changed.
@@ -1043,6 +1064,78 @@ copied into the Tauri/Vue implementation.
   7/7 spec files in 92 seconds. The configurable strict Vite port isolated the
   run from an existing local development server; CI retains port 5173 by default.
   The reported Linux runner has not been rerun locally.
+
+## Hand cursor and tooltip repair evidence (2026-08-22)
+
+Windows 10 22H2 build 19045, AMD64; Node 22.23.1 and pnpm 10.33.2.
+
+- The red-first focused Vue run failed 2/30: active Hand exposed no cursor
+  feedback, and enabled tool buttons still had a duplicate native `title` while
+  the global zero-padding popover override leaked into tooltips.
+- The final focused cursor/tooltip run passed 30/30. Hand now exposes `grab`,
+  changes to `grabbing` only between pointer-down and release/cancel, and does
+  not add document state. Enabled tools use the padded custom tooltip; disabled
+  tools retain their existing native explanatory title while the custom tooltip
+  is disabled, so only one tooltip path is active.
+- The related precision regression suite passed 64/64 and the complete Vue
+  project passed 14 files and 140/140 tests. `pnpm test` passed 46 files and
+  411/411 tests across the configured core, renderer, Vue, fixture and
+  fake-platform projects.
+- ESLint, the editor-vue production build, test typecheck, scoped Prettier,
+  Markdown links, 7/7 boundary tests and `git diff --check` passed. The aggregate
+  `pnpm check` passed lint/typecheck/build, then stopped at the repository-wide
+  formatting gate on the pre-existing
+  `tests/e2e/specs/document-persistence-write.e2e.ts`; that unrelated file was
+  not modified in this repair.
+
+This is component/build evidence. No browser screenshot or real-Tauri/WebView
+claim is added.
+
+## Image-only scale and intrinsic geometry resize evidence (2026-08-22)
+
+Windows 10 22H2 build 19045, AMD64; Node 22.23.1, pnpm 10.33.2; Chrome
+151.0.7922.170. The schema remains v7 and the `EditorCommand` union and
+`CanvasViewport` public props/emits were not changed. Existing dirty-tree work
+was preserved and combined with this slice.
+
+- The initial focused core gate failed 9/9 before `layer-resize.ts` existed.
+  Final focused core passed 10/10, covering capability mapping, legacy
+  normalization/idempotency, command rejection, internal clipboard
+  normalization, pure canvas-reflection persistence and exact undo/redo.
+- `DocumentSessionController` normalizes editable non-image scale before the
+  command manager is exposed and immediately marks that normalized baseline as
+  saved. Component coverage verifies `dirty === false`, no undo entry and no
+  autosave solely for normalization.
+- The final focused CanvasViewport suite passed 33/33. Non-image selection uses
+  tool-owned bounds/points/endpoints/width handles and emits one `updateLayer`
+  command on release; image selection retains eight transform handles. The
+  detached rotate stalk is absent, inner corners resize where supported, outer
+  corner zones rotate, locked layers expose only their frame, and the
+  product-owned rotate cursor is toggled directly on the canvas without a Vue
+  pointermove render loop. The Arrow move regression proves its committed ink
+  preview, selection frame and floating formatting toolbar all read the same
+  transient layer geometry; the toolbar host is updated directly during the
+  pointer gesture. Shift/Alt and pointer-cancel paths are covered.
+- `pnpm test` passed 47 files and 432/432 tests. `pnpm test:render` passed
+  13/13 without a golden update. `pnpm docs:check`, `pnpm test:boundaries` and
+  `pnpm check:rust` passed (34 Markdown files, 7/7 boundary tests and all
+  configured Rust fmt/Clippy feature combinations).
+- `$env:CUTE_SCREEN_BROWSER_E2E_PORT = '5174'; pnpm test:e2e:browser` passed
+  all 7/7 Chrome spec files. The M08 browser flow moves a ruler endpoint with
+  unchanged thickness/font-size and exact undo/redo, and narrows text through
+  its side handle with fixed spans, increased layout height and unit scale.
+  Existing M05/M06 flows retain image resize, move, canvas flip, arrow geometry
+  editing and z-order/layer interaction coverage.
+- `pnpm test:e2e:tauri` built `target/debug/cute-screen.exe`, then every WDIO
+  scenario failed before application interaction with `No "browserName"
+defined in capabilities nor hostname or port found`. Consequently the
+  real-WebView persistence reopen check for legacy normalization and pure flip
+  remains pending; no Tauri behavioral pass is claimed.
+- The aggregate `pnpm check` reached the repository-wide Prettier gate after
+  lint, package/app/test builds and typecheck. All files in this change were
+  formatted, but the gate still reports the pre-existing unmodified
+  `tests/e2e/specs/document-persistence-write.e2e.ts`; that unrelated file was
+  intentionally not rewritten.
 
 ## CI gates
 

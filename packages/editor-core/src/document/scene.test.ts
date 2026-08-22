@@ -456,6 +456,57 @@ describe('document render scene', () => {
     ])
   })
 
+  it.each(['solidArrow', 'triangle'] as const)(
+    'shrinks a %s cap when its endpoints are closer than the nominal cap length',
+    (endCap) => {
+      const scene = createDocumentRenderScene({
+        ...document,
+        schemaVersion: 7,
+        layers: [
+          {
+            id: '019c1f62-058e-7000-8000-000000000013',
+            kind: 'arrow',
+            localBounds: { x: 0, y: 0, width: 22, height: 22 },
+            transform: {
+              ...document.layers[0]!.transform,
+              translateX: 0,
+              translateY: 0,
+            },
+            opacity: 1,
+            visible: true,
+            locked: false,
+            blendMode: 'normal',
+            shadows: [],
+            payload: {
+              path: 'straight',
+              start: { x: 10, y: 10 },
+              end: { x: 14, y: 10 },
+              startCap: 'none',
+              endCap,
+              stroke: {
+                color: { red: 1, green: 0, blue: 0, alpha: 1 },
+                width: 3,
+                style: 'solid',
+                cap: 'round',
+                join: 'round',
+              },
+            },
+          },
+        ],
+      })
+
+      expect(scene.nodes).toHaveLength(1)
+      const triangle = scene.nodes[0]
+      if (!triangle || triangle.kind !== 'polygon')
+        throw new Error('expected triangle cap')
+      expect(triangle.points[0]).toEqual({ x: 14, y: 10 })
+      expect(triangle.points[1]!.x).toBeCloseTo(10)
+      expect(triangle.points[2]!.x).toBeCloseTo(10)
+      expect(Math.abs(triangle.points[1]!.y - 10)).toBeCloseTo(2.2)
+      expect(Math.abs(triangle.points[2]!.y - 10)).toBeCloseTo(2.2)
+    },
+  )
+
   it('joins a curved body at the base of its left solid arrow cap', () => {
     const scene = createDocumentRenderScene({
       ...document,

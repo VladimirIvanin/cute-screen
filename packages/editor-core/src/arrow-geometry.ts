@@ -231,6 +231,23 @@ function capBodyInset(cap: ArrowCap, strokeWidth: number): number {
     : 0
 }
 
+export function scaledClosedArrowCapSizes(
+  points: readonly Point[],
+  startCap: ArrowCap,
+  endCap: ArrowCap,
+  strokeWidth: number,
+): Readonly<{ readonly start: number; readonly end: number }> {
+  const start = capBodyInset(startCap, strokeWidth)
+  const end = capBodyInset(endCap, strokeWidth)
+  if (start === 0 && end === 0) return Object.freeze({ start, end })
+  const total = points.slice(1).reduce((sum, entry, index) => {
+    const previous = points[index]!
+    return sum + Math.hypot(entry.x - previous.x, entry.y - previous.y)
+  }, 0)
+  const scale = Math.min(1, total / Math.max(start + end, 1))
+  return Object.freeze({ start: start * scale, end: end * scale })
+}
+
 /** Trims closed triangular endpoints without splitting the body contour. */
 export function trimArrowBodyPoints(
   points: readonly Point[],
@@ -238,9 +255,19 @@ export function trimArrowBodyPoints(
   endCap: ArrowCap,
   strokeWidth: number,
 ): readonly Point[] {
-  const startInset = capBodyInset(startCap, strokeWidth)
-  const endInset = capBodyInset(endCap, strokeWidth)
-  if ((startInset === 0 && endInset === 0) || points.length < 2) return points
+  const requestedStartInset = capBodyInset(startCap, strokeWidth)
+  const requestedEndInset = capBodyInset(endCap, strokeWidth)
+  const { start: startInset, end: endInset } = scaledClosedArrowCapSizes(
+    points,
+    startCap,
+    endCap,
+    strokeWidth,
+  )
+  if (
+    (requestedStartInset === 0 && requestedEndInset === 0) ||
+    points.length < 2
+  )
+    return points
   const lengths = points
     .slice(1)
     .map((entry, index) =>
@@ -248,9 +275,8 @@ export function trimArrowBodyPoints(
     )
   const total = lengths.reduce((sum, length) => sum + length, 0)
   if (total === 0) return Object.freeze([])
-  const scale = Math.min(1, total / Math.max(startInset + endInset, 1))
-  const bodyStart = startInset * scale
-  const bodyEnd = total - endInset * scale
+  const bodyStart = startInset
+  const bodyEnd = total - endInset
   if (bodyEnd - bodyStart <= Number.EPSILON) return Object.freeze([])
 
   const at = (distance: number): Point => {

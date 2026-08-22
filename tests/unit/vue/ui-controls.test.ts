@@ -4,8 +4,34 @@ import { describe, expect, it } from 'vitest'
 import DeferredColorPicker from '../../../packages/editor-vue/src/shell/ui/DeferredColorPicker.vue'
 import DeferredNumberInput from '../../../packages/editor-vue/src/shell/ui/DeferredNumberInput.vue'
 import DeferredSlider from '../../../packages/editor-vue/src/shell/ui/DeferredSlider.vue'
+import ToolRail from '../../../packages/editor-vue/src/shell/components/ToolRail.vue'
+import { cuteScreenThemeOverrides } from '../../../packages/editor-vue/src/shell/ui/theme'
 
 describe('Naive UI editor control adapters', () => {
+  it('uses one padded product tooltip for tool buttons', () => {
+    const view = render(ToolRail, {
+      props: {
+        tools: [
+          {
+            id: 'hand',
+            group: 'canvas',
+            icon: 'hand',
+            labelKey: 'toolHand',
+            shortcut: 'H',
+          },
+        ],
+        activeToolId: 'hand',
+        t: (key) => (key === 'toolHand' ? 'Hand' : key),
+      },
+    })
+
+    const hand = view.getByRole('button', { name: 'Hand' })
+    expect(hand).not.toHaveAttribute('title')
+    expect(cuteScreenThemeOverrides.Tooltip).toMatchObject({
+      peers: { Popover: { padding: '6px 10px' } },
+    })
+  })
+
   it('exposes a labelled slider without committing on mount', async () => {
     const view = render(DeferredSlider, {
       props: {

@@ -1,5 +1,6 @@
 import {
   CommandManager,
+  normalizeEditableDocumentScales,
   parseEditorDocument,
   serializeEditorDocument,
   TransientEditorStateController,
@@ -90,7 +91,9 @@ export class DocumentSessionController {
   #inFlight: Promise<DocumentFlushOutcome> | undefined
 
   constructor(options: DocumentSessionOptions) {
-    this.#manager = new CommandManager(options.document)
+    this.#manager = new CommandManager(
+      normalizeEditableDocumentScales(options.document),
+    )
     this.#manager.markSaved()
     this.#revision = options.revision
     this.#bridge = options.bridge

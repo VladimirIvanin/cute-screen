@@ -34,9 +34,14 @@ import {
   drawNodes2D,
   hitTestDocument,
   hitTestDocumentAll,
+  BOUNDS_RESIZE_HANDLES,
+  layerIntrinsicResizeHandles,
+  resizeLayerGeometry,
   snapPoint,
   type EditorDocumentV1,
   type ImageLayer,
+  type BoundsResizeHandle,
+  type IntrinsicResizeHandle,
   type LayerNode,
   type SnapCandidate,
   type Transform2D,
@@ -217,16 +222,15 @@ const floatingToolbarLayout = ref<
     }
   | undefined
 >()
-const floatingArrowToolbarLayout = ref<
-  | {
-      readonly left: number
-      readonly top: number
-      readonly placement: 'above' | 'below'
-    }
-  | undefined
->()
+type FloatingToolbarLayout = {
+  readonly left: number
+  readonly top: number
+  readonly placement: 'above' | 'below'
+}
+const floatingArrowToolbarLayout = ref<FloatingToolbarLayout | undefined>()
 const rendererError = ref<string>()
 const samplingCursor = ref<CanvasPoint>()
+const isPanning = ref(false)
 const editingText = ref<
   | {
       readonly origin: CanvasPoint
@@ -300,9 +304,10 @@ function updateFloatingToolbarLayout(): void {
   }
   floatingToolbarLayout.value = Object.freeze({ left, top, placement })
 }
-function updateFloatingArrowToolbarLayout(): void {
-  const layer = selectedLayer()
-  const toolbarHost = arrowFloatingToolbar.value
+function floatingArrowToolbarLayoutFor(
+  layer: LayerNode | undefined,
+  toolbarHost: HTMLElement | undefined,
+): FloatingToolbarLayout | undefined {
   const surface = canvasSurfaceElement(toolbarHost)
   if (
     !layer ||
@@ -310,8 +315,7 @@ function updateFloatingArrowToolbarLayout(): void {
     !surface ||
     !props.arrowToolbarSchema
   ) {
-    floatingArrowToolbarLayout.value = undefined
-    return
+    return undefined
   }
   const bounds = layerBounds(layer)
   const topCenter = transformPoint(layer.transform, {
@@ -335,7 +339,34 @@ function updateFloatingArrowToolbarLayout(): void {
     top = canvasY + gap
     placement = 'below'
   }
-  floatingArrowToolbarLayout.value = Object.freeze({ left, top, placement })
+  return Object.freeze({ left, top, placement })
+}
+function updateFloatingArrowToolbarLayout(): void {
+  floatingArrowToolbarLayout.value = floatingArrowToolbarLayoutFor(
+    selectedLayer(),
+    arrowFloatingToolbar.value,
+  )
+}
+function updateTransientArrowToolbarLayout(): void {
+  const toolbarHost = arrowFloatingToolbar.value
+  const selected = selectedLayer()
+  const preview = gesturePreviewLayer()
+  if (
+    !toolbarHost ||
+    preview?.id !== selected?.id ||
+    preview?.kind !== 'arrow'
+  ) {
+    return
+  }
+  const layout = floatingArrowToolbarLayoutFor(preview, toolbarHost)
+  if (!layout) return
+  // Pointer moves must not update Vue state: the overlay and this host both
+  // consume the same transient layer geometry directly.
+  toolbarHost.style.left = `${layout.left}px`
+  toolbarHost.style.top = `${layout.top}px`
+  toolbarHost.style.transform = 'translateX(-50%)'
+  toolbarHost.style.visibility = ''
+  toolbarHost.dataset.placement = layout.placement
 }
 let lastFitZoom: number | undefined
 let pendingZoomAnchor:
@@ -375,6 +406,16 @@ let gesture:
       readonly current: { x: number; y: number }
       readonly initial: Transform2D
       readonly freeResize: boolean
+      readonly centerResize: boolean
+    }
+  | {
+      readonly kind: 'intrinsicResize'
+      readonly id: string
+      readonly handle: IntrinsicResizeHandle
+      readonly start: { x: number; y: number }
+      readonly current: { x: number; y: number }
+      readonly initial: LayerNode
+      readonly preserveAspect: boolean
       readonly centerResize: boolean
     }
   | {
@@ -436,7 +477,7 @@ let gesture:
     }
   | undefined
 
-type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w'
+type ResizeHandle = BoundsResizeHandle
 type CanvasPoint = {
   readonly x: number
   readonly y: number
@@ -707,6 +748,7 @@ function documentWithoutGestureLayer(): EditorDocumentV1 | undefined {
     gesture &&
     (gesture.kind === 'move' ||
       gesture.kind === 'resize' ||
+      gesture.kind === 'intrinsicResize' ||
       gesture.kind === 'rotate' ||
       gesture.kind === 'arrowHandle' ||
       gesture.kind === 'calloutHandle')
@@ -888,6 +930,40 @@ function toLocal(layer: LayerNode, point: CanvasPoint): CanvasPoint {
 function layerBounds(layer: LayerNode) {
   return layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
 }
+
+function localBoundsHandlePositions(
+  bounds: ReturnType<typeof layerBounds>,
+): Readonly<Record<ResizeHandle, CanvasPoint>> {
+  return {
+    nw: { x: bounds.x, y: bounds.y },
+    n: { x: bounds.x + bounds.width / 2, y: bounds.y },
+    ne: { x: bounds.x + bounds.width, y: bounds.y },
+    e: {
+      x: bounds.x + bounds.width,
+      y: bounds.y + bounds.height / 2,
+    },
+    se: { x: bounds.x + bounds.width, y: bounds.y + bounds.height },
+    s: {
+      x: bounds.x + bounds.width / 2,
+      y: bounds.y + bounds.height,
+    },
+    sw: { x: bounds.x, y: bounds.y + bounds.height },
+    w: { x: bounds.x, y: bounds.y + bounds.height / 2 },
+  }
+}
+
+function worldBoundsHandlePositions(
+  layer: LayerNode,
+  transform: Transform2D = layer.transform,
+): Readonly<Record<ResizeHandle, CanvasPoint>> {
+  const local = localBoundsHandlePositions(layerBounds(layer))
+  return Object.fromEntries(
+    BOUNDS_RESIZE_HANDLES.map((handle) => [
+      handle,
+      transformPoint(transform, local[handle]),
+    ]),
+  ) as Readonly<Record<ResizeHandle, CanvasPoint>>
+}
 function snapCandidates(excludingId: string): readonly SnapCandidate[] {
   const document = props.document
   if (!document) return []
@@ -1065,6 +1141,20 @@ function gesturePreviewLayer(): LayerNode | undefined {
     (candidate) => candidate.id === activeGesture.id,
   )
   if (!layer) return undefined
+  if (activeGesture.kind === 'intrinsicResize') {
+    return resizeLayerGeometry(
+      layer,
+      activeGesture.handle,
+      activeGesture.current,
+      {
+        preserveAspect: activeGesture.preserveAspect,
+        fromCenter: activeGesture.centerResize,
+        ...(props.document === undefined
+          ? {}
+          : { canvas: props.document.canvas }),
+      },
+    )
+  }
   if (activeGesture.kind === 'arrowHandle') {
     return layer.kind === 'arrow'
       ? updateArrowHandle(
@@ -1523,9 +1613,16 @@ function drawOverlay(): void {
     context.restore()
   }
   if (drawCropOverlay(context, outputBounds)) return
-  const layer = selectedLayer()
+  const committedLayer = selectedLayer()
+  const previewLayer = gesturePreviewLayer()
+  const layer =
+    previewLayer && previewLayer.id === committedLayer?.id
+      ? previewLayer
+      : committedLayer
   if (!layer || !layer.visible) return
-  const transform = previewTransform(layer)
+  // `gesturePreviewLayer` already includes the transient transform. Applying
+  // `previewTransform` again made the selection frame drift by a second delta.
+  const transform = layer.transform
   const bounds = layerBounds(layer)
   context.save()
   context.translate(transform.translateX, transform.translateY)
@@ -1538,24 +1635,24 @@ function drawOverlay(): void {
   context.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height)
   context.setLineDash([])
   context.restore()
-  const handlePositions: readonly CanvasPoint[] = [
-    { x: bounds.x, y: bounds.y },
-    { x: bounds.x + bounds.width / 2, y: bounds.y },
-    { x: bounds.x + bounds.width, y: bounds.y },
-    { x: bounds.x + bounds.width, y: bounds.y + bounds.height / 2 },
-    { x: bounds.x, y: bounds.y + bounds.height },
-    { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height },
-    { x: bounds.x + bounds.width, y: bounds.y + bounds.height },
-    { x: bounds.x, y: bounds.y + bounds.height / 2 },
-  ]
+  if (layer.locked) return
   const handleHalfSize = 3 / ((props.zoom ?? 100) / 100)
   context.fillStyle = '#fff'
   context.strokeStyle = '#d9773b'
-  for (const position of handlePositions) {
-    const canvasPosition = transformPoint(transform, position)
+  const intrinsicHandles = layerIntrinsicResizeHandles(layer).filter(
+    (handle): handle is ResizeHandle => handle !== 'start' && handle !== 'end',
+  )
+  const resizeHandles =
+    layer.kind === 'image' ? BOUNDS_RESIZE_HANDLES : intrinsicHandles
+  const handlesToDraw =
+    resizeHandles.length > 0
+      ? resizeHandles
+      : (['nw', 'ne', 'se', 'sw'] as const)
+  const boundsPositions = worldBoundsHandlePositions(layer, transform)
+  for (const handle of handlesToDraw) {
     drawClampedHandleSquare(
       context,
-      canvasPosition,
+      boundsPositions[handle],
       handleHalfSize,
       outputBounds,
     )
@@ -1590,31 +1687,18 @@ function drawOverlay(): void {
       context.stroke()
     }
   }
+  if (layer.kind === 'ruler') {
+    for (const saved of [layer.payload.start, layer.payload.end]) {
+      const position = transformPoint(transform, saved)
+      context.beginPath()
+      context.arc(position.x, position.y, handleHalfSize + 2, 0, Math.PI * 2)
+      context.fill()
+      context.stroke()
+    }
+  }
   if (layer.kind === 'loupe') {
     drawSelectedLoupeOverlay(context, layer, transform)
   }
-  const topCenter = transformPoint(transform, {
-    x: bounds.x + bounds.width / 2,
-    y: bounds.y,
-  })
-  const center = transformPoint(transform, {
-    x: bounds.x + bounds.width / 2,
-    y: bounds.y + bounds.height / 2,
-  })
-  const vectorLength =
-    Math.hypot(topCenter.x - center.x, topCenter.y - center.y) || 1
-  const rotateHandle = {
-    x: topCenter.x + ((topCenter.x - center.x) / vectorLength) * 22,
-    y: topCenter.y + ((topCenter.y - center.y) / vectorLength) * 22,
-  }
-  context.beginPath()
-  context.moveTo(topCenter.x, topCenter.y)
-  context.lineTo(rotateHandle.x, rotateHandle.y)
-  context.stroke()
-  context.beginPath()
-  context.arc(rotateHandle.x, rotateHandle.y, 5, 0, Math.PI * 2)
-  context.fill()
-  context.stroke()
   if (gesture?.kind === 'move' && gesture.guidesVisible) {
     context.save()
     context.strokeStyle = '#d9773b'
@@ -1732,6 +1816,7 @@ function invalidateOverlay(): void {
   // Interaction state is non-reactive; only the lightweight overlay updates
   // during pointer movement, never the committed scene or Vue tree.
   drawOverlay()
+  updateTransientArrowToolbarLayout()
 }
 onMounted(() => {
   componentMounted = true
@@ -1931,86 +2016,123 @@ function initialSamplingCursor(): CanvasPoint | undefined {
     }
   )
 }
-function handleAtPoint(
+function boundsResizeHandleAtPoint(
   layer: LayerNode,
   point: CanvasPoint,
-): ResizeHandle | 'rotate' | undefined {
-  const bounds = layerBounds(layer)
-  const handles: readonly [ResizeHandle, CanvasPoint][] = [
-    ['nw', transformPoint(layer.transform, { x: bounds.x, y: bounds.y })],
-    [
-      'n',
-      transformPoint(layer.transform, {
-        x: bounds.x + bounds.width / 2,
-        y: bounds.y,
-      }),
-    ],
-    [
-      'ne',
-      transformPoint(layer.transform, {
-        x: bounds.x + bounds.width,
-        y: bounds.y,
-      }),
-    ],
-    [
-      'e',
-      transformPoint(layer.transform, {
-        x: bounds.x + bounds.width,
-        y: bounds.y + bounds.height / 2,
-      }),
-    ],
-    [
-      'sw',
-      transformPoint(layer.transform, {
-        x: bounds.x,
-        y: bounds.y + bounds.height,
-      }),
-    ],
-    [
-      's',
-      transformPoint(layer.transform, {
-        x: bounds.x + bounds.width / 2,
-        y: bounds.y + bounds.height,
-      }),
-    ],
-    [
-      'se',
-      transformPoint(layer.transform, {
-        x: bounds.x + bounds.width,
-        y: bounds.y + bounds.height,
-      }),
-    ],
-    [
-      'w',
-      transformPoint(layer.transform, {
-        x: bounds.x,
-        y: bounds.y + bounds.height / 2,
-      }),
-    ],
-  ]
+): ResizeHandle | undefined {
+  const handles =
+    layer.kind === 'image'
+      ? BOUNDS_RESIZE_HANDLES
+      : layerIntrinsicResizeHandles(layer).filter(
+          (handle): handle is ResizeHandle =>
+            handle !== 'start' && handle !== 'end',
+        )
+  const positions = worldBoundsHandlePositions(layer)
   const tolerance = 9 / ((props.zoom ?? 100) / 100)
-  for (const [handle, position] of handles) {
+  for (const handle of handles) {
+    const position = positions[handle]
     if (Math.hypot(position.x - point.x, position.y - point.y) <= tolerance) {
       return handle
     }
   }
+  return undefined
+}
+
+function rotationCornerAtPoint(
+  layer: LayerNode,
+  point: CanvasPoint,
+): ResizeHandle | undefined {
+  const positions = worldBoundsHandlePositions(layer)
+  const bounds = layerBounds(layer)
   const center = transformPoint(layer.transform, {
     x: bounds.x + bounds.width / 2,
     y: bounds.y + bounds.height / 2,
   })
-  const topCenter = transformPoint(layer.transform, {
-    x: bounds.x + bounds.width / 2,
-    y: bounds.y,
-  })
-  const length = Math.hypot(topCenter.x - center.x, topCenter.y - center.y) || 1
-  const rotateHandle = {
-    x: topCenter.x + ((topCenter.x - center.x) / length) * 22,
-    y: topCenter.y + ((topCenter.y - center.y) / length) * 22,
+  const cornerHandles = ['nw', 'ne', 'se', 'sw'] as const
+  const resizeCorners = new Set(
+    (layer.kind === 'image'
+      ? BOUNDS_RESIZE_HANDLES
+      : layerIntrinsicResizeHandles(layer)
+    ).filter((handle) => cornerHandles.includes(handle as never)),
+  )
+  const tolerance = 9 / ((props.zoom ?? 100) / 100)
+  const offset = 14 / ((props.zoom ?? 100) / 100)
+  for (const handle of cornerHandles) {
+    const corner = positions[handle]
+    const length = Math.hypot(corner.x - center.x, corner.y - center.y) || 1
+    const target = resizeCorners.has(handle)
+      ? {
+          x: corner.x + ((corner.x - center.x) / length) * offset,
+          y: corner.y + ((corner.y - center.y) / length) * offset,
+        }
+      : corner
+    if (Math.hypot(target.x - point.x, target.y - point.y) <= tolerance) {
+      return handle
+    }
   }
-  return Math.hypot(rotateHandle.x - point.x, rotateHandle.y - point.y) <=
-    tolerance
-    ? 'rotate'
-    : undefined
+  return undefined
+}
+
+function intrinsicEndpointAtPoint(
+  layer: LayerNode,
+  point: CanvasPoint,
+): 'start' | 'end' | undefined {
+  if (layer.kind !== 'ruler') return undefined
+  const tolerance = 9 / ((props.zoom ?? 100) / 100)
+  for (const handle of ['start', 'end'] as const) {
+    const candidate = transformPoint(layer.transform, layer.payload[handle])
+    if (Math.hypot(candidate.x - point.x, candidate.y - point.y) <= tolerance) {
+      return handle
+    }
+  }
+  return undefined
+}
+
+function resizeCursor(handle: ResizeHandle): string {
+  if (handle === 'n' || handle === 's') return 'ns-resize'
+  if (handle === 'e' || handle === 'w') return 'ew-resize'
+  return handle === 'nw' || handle === 'se' ? 'nwse-resize' : 'nesw-resize'
+}
+
+function setDirectCursor(cursor: string, rotate = false): void {
+  if (!scene.value) return
+  scene.value.classList.toggle('cs-canvas-rotate-cursor', rotate)
+  scene.value.style.cursor = cursor
+}
+
+function updateHoverCursor(point: CanvasPoint): void {
+  const canvas = scene.value
+  const document = props.document
+  if (
+    !canvas ||
+    !document ||
+    props.activeTool === 'hand' ||
+    props.activeTool === 'crop'
+  )
+    return
+  const layer = selectedLayer()
+  if (!layer || layer.locked || !layer.visible) {
+    setDirectCursor('')
+    return
+  }
+  if (
+    calloutHandleAtPoint(layer, point) ||
+    arrowHandleAtPoint(layer, point) ||
+    intrinsicEndpointAtPoint(layer, point)
+  ) {
+    setDirectCursor('crosshair')
+    return
+  }
+  const resize = boundsResizeHandleAtPoint(layer, point)
+  if (resize) {
+    setDirectCursor(resizeCursor(resize))
+    return
+  }
+  if (rotationCornerAtPoint(layer, point)) {
+    setDirectCursor('', true)
+    return
+  }
+  setDirectCursor(hitTestDocument(document, point) ? 'move' : '')
 }
 function calloutHandleAtPoint(
   layer: LayerNode,
@@ -2073,6 +2195,7 @@ function onPointerDown(event: PointerEvent): void {
   if (pan && scrollContainer.value) {
     event.preventDefault()
     scene.value.setPointerCapture(event.pointerId)
+    isPanning.value = true
     gesture = {
       kind: 'pan',
       clientX: event.clientX,
@@ -2244,36 +2367,82 @@ function onPointerDown(event: PointerEvent): void {
     renderCommittedSceneForGesture()
     return
   }
-  const handle =
-    selected && !selected.locked ? handleAtPoint(selected, point) : undefined
-  if (selected && handle) {
+  const intrinsicEndpoint =
+    selected && !selected.locked
+      ? intrinsicEndpointAtPoint(selected, point)
+      : undefined
+  if (selected && intrinsicEndpoint) {
     scene.value.setPointerCapture(event.pointerId)
-    if (handle === 'rotate') {
-      const bounds = layerBounds(selected)
-      const center = transformPoint(selected.transform, {
-        x: bounds.x + bounds.width / 2,
-        y: bounds.y + bounds.height / 2,
-      })
-      const angle = Math.atan2(point.y - center.y, point.x - center.x)
-      gesture = {
-        kind: 'rotate',
-        id: selected.id,
-        center,
-        startAngle: angle,
-        initial: selected.transform,
-        currentAngle: selected.transform.rotation,
-      }
-    } else {
+    setDirectCursor('crosshair')
+    gesture = {
+      kind: 'intrinsicResize',
+      id: selected.id,
+      handle: intrinsicEndpoint,
+      start: point,
+      current: point,
+      initial: selected,
+      preserveAspect: false,
+      centerResize: false,
+    }
+    renderCommittedSceneForGesture()
+    return
+  }
+  const resizeHandle =
+    selected && !selected.locked
+      ? boundsResizeHandleAtPoint(selected, point)
+      : undefined
+  if (selected && resizeHandle) {
+    scene.value.setPointerCapture(event.pointerId)
+    setDirectCursor(resizeCursor(resizeHandle))
+    if (selected.kind === 'image') {
       gesture = {
         kind: 'resize',
         id: selected.id,
-        handle,
+        handle: resizeHandle,
         start: point,
         current: point,
         initial: selected.transform,
         freeResize: event.shiftKey,
         centerResize: event.altKey,
       }
+    } else {
+      gesture = {
+        kind: 'intrinsicResize',
+        id: selected.id,
+        handle: resizeHandle,
+        start: point,
+        current: point,
+        initial: selected,
+        preserveAspect:
+          event.shiftKey ||
+          selected.kind === 'emoji' ||
+          selected.kind === 'loupe',
+        centerResize: event.altKey,
+      }
+    }
+    renderCommittedSceneForGesture()
+    return
+  }
+  const rotationCorner =
+    selected && !selected.locked
+      ? rotationCornerAtPoint(selected, point)
+      : undefined
+  if (selected && rotationCorner) {
+    scene.value.setPointerCapture(event.pointerId)
+    setDirectCursor('', true)
+    const bounds = layerBounds(selected)
+    const center = transformPoint(selected.transform, {
+      x: bounds.x + bounds.width / 2,
+      y: bounds.y + bounds.height / 2,
+    })
+    const angle = Math.atan2(point.y - center.y, point.x - center.x)
+    gesture = {
+      kind: 'rotate',
+      id: selected.id,
+      center,
+      startAngle: angle,
+      initial: selected.transform,
+      currentAngle: selected.transform.rotation,
     }
     renderCommittedSceneForGesture()
     return
@@ -2675,7 +2844,11 @@ function onDoubleClick(event: MouseEvent): void {
 }
 function onPointerMove(event: PointerEvent): void {
   const point = canvasPoint(event)
-  if (!point || !gesture) return
+  if (!point) return
+  if (!gesture) {
+    updateHoverCursor(point)
+    return
+  }
   if (gesture.kind === 'pan' && scrollContainer.value) {
     scrollContainer.value.scrollLeft =
       gesture.scrollLeft - (event.clientX - gesture.clientX)
@@ -2750,6 +2923,22 @@ function onPointerMove(event: PointerEvent): void {
       current: point,
       freeResize: event.shiftKey,
       centerResize: event.altKey,
+    }
+    invalidateOverlay()
+    return
+  }
+  if (gesture.kind === 'intrinsicResize') {
+    gesture = {
+      ...gesture,
+      current: point,
+      preserveAspect:
+        event.shiftKey ||
+        gesture.initial.kind === 'emoji' ||
+        gesture.initial.kind === 'loupe',
+      centerResize:
+        gesture.handle === 'start' || gesture.handle === 'end'
+          ? false
+          : event.altKey,
     }
     invalidateOverlay()
     return
@@ -2833,6 +3022,7 @@ function finishGesture(event: PointerEvent): void {
     }
   }
   gesture = undefined
+  isPanning.value = false
   rulerGuide = undefined
   if (scene.value?.hasPointerCapture(event.pointerId)) {
     scene.value.releasePointerCapture(event.pointerId)
@@ -2861,6 +3051,43 @@ function finishGesture(event: PointerEvent): void {
         completed.centerResize,
       )
       emit('transformLayer', completed.id, transform)
+    }
+  }
+  if (
+    completed?.kind === 'intrinsicResize' &&
+    (completed.current.x !== completed.start.x ||
+      completed.current.y !== completed.start.y)
+  ) {
+    try {
+      const after = resizeLayerGeometry(
+        completed.initial,
+        completed.handle,
+        completed.current,
+        {
+          preserveAspect: completed.preserveAspect,
+          fromCenter: completed.centerResize,
+          ...(props.document === undefined
+            ? {}
+            : { canvas: props.document.canvas }),
+        },
+      )
+      if (JSON.stringify(after) !== JSON.stringify(completed.initial)) {
+        emit('documentCommand', {
+          type: 'updateLayer',
+          before: completed.initial,
+          after,
+        })
+      }
+    } catch (error) {
+      emit(
+        'toolError',
+        error instanceof Error
+          ? error.message
+          : samplingError(
+              'The layer geometry could not be resized',
+              'Не удалось изменить геометрию слоя',
+            ),
+      )
     }
   }
   if (
@@ -2971,14 +3198,20 @@ function finishGesture(event: PointerEvent): void {
     })
   }
   invalidateOverlay()
+  const hoverPoint = canvasPoint(event)
+  if (hoverPoint) updateHoverCursor(hoverPoint)
   if (
     completed?.kind === 'move' ||
     completed?.kind === 'resize' ||
+    completed?.kind === 'intrinsicResize' ||
     completed?.kind === 'rotate' ||
     completed?.kind === 'arrowHandle' ||
     completed?.kind === 'calloutHandle'
   ) {
-    void nextTick(renderCommittedSceneForGesture)
+    void nextTick(() => {
+      renderCommittedSceneForGesture()
+      updateFloatingArrowToolbarLayout()
+    })
   }
 }
 function cancelGesture(event?: PointerEvent): void {
@@ -2986,17 +3219,28 @@ function cancelGesture(event?: PointerEvent): void {
   const restoreCommittedScene =
     gesture?.kind === 'move' ||
     gesture?.kind === 'resize' ||
+    gesture?.kind === 'intrinsicResize' ||
     gesture?.kind === 'rotate' ||
     gesture?.kind === 'arrowHandle' ||
     gesture?.kind === 'calloutHandle'
   gesture = undefined
+  isPanning.value = false
   if (cancelledCrop) cropSession = cancelledCrop
   rulerGuide = undefined
   if (event && scene.value?.hasPointerCapture(event.pointerId)) {
     scene.value.releasePointerCapture(event.pointerId)
   }
+  if (event) {
+    const hoverPoint = canvasPoint(event)
+    if (hoverPoint) updateHoverCursor(hoverPoint)
+  }
   invalidateOverlay()
-  if (restoreCommittedScene) void nextTick(renderCommittedSceneForGesture)
+  if (restoreCommittedScene) {
+    void nextTick(() => {
+      renderCommittedSceneForGesture()
+      updateFloatingArrowToolbarLayout()
+    })
+  }
 }
 function onWheel(event: WheelEvent): void {
   if (!event.ctrlKey && !event.metaKey) return
@@ -3249,6 +3493,13 @@ onBeforeUnmount(() => {
           <canvas
             ref="scene"
             class="cs-canvas"
+            :style="{
+              cursor: isPanning
+                ? 'grabbing'
+                : activeTool === 'hand'
+                  ? 'grab'
+                  : undefined,
+            }"
             :aria-label="t('sceneCanvas')"
             :tabindex="
               sampling ||

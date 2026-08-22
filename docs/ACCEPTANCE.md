@@ -95,18 +95,35 @@ Wayland, Windows и macOS. На Wayland selector системный.
    собственные dimensions.
 3. Unlock, resize/move и удалить base layer; проверить, что canvas и immutable
    original сохранились, затем выполнить Undo.
-4. Выполнить Fit → 100% → Fit на production-like снимке и проверить pan/zoom:
+4. Выполнить Fit → 1:1 → Fit на production-like снимке и проверить pan/zoom:
    zoom HUD остаётся видимым, canvas surface соответствует проценту, а высота
    viewport и окна не меняется.
 5. Нарисовать два пересекающихся объекта одним активным инструментом.
 6. Убедиться, что новые объекты не выбраны автоматически.
 7. Перейти в Select и double-click циклически выбрать слои.
-8. Move/resize/rotate/opacity/lock/z-order.
+8. Move/rotate/opacity/lock/z-order; image layers resize through their frame,
+   while non-image layers expose only tool-owned geometry handles and never
+   commit non-unit transform scale. Rotation uses corner zones without a
+   detached top handle.
+   While moving a selected Arrow, verify that its ink, selection frame and
+   floating formatting toolbar follow the same pointer preview without a
+   visible offset.
 9. Выполнить horizontal и vertical canvas flip, затем undo/redo весь путь.
 
 **Результат:** viewport и постоянные controls не прыгают и не обрезаются,
 selection/history согласованы, base image редактируется как слой без изменения
-оригинала, flip совпадает в preview/export.
+оригинала, intrinsic resize не масштабирует stroke/text/effect styles, flip
+совпадает в preview/export.
+
+Windows x64 local-development evidence (2026-08-22): the focused CanvasViewport
+suite passed 33/33 for image resize, intrinsic non-image handles, corner rotate,
+direct cursors, synchronized Arrow preview/frame/toolbar, modifiers, cancel and
+one-command release. The complete Chrome
+151 browser matrix passed 7/7 spec files on isolated port 5174; its M08 scenarios
+resize a ruler through its factual endpoint and reflow text through a side width
+handle while preserving style and unit transform scale. `pnpm test:render`
+passed 13/13. Real-Tauri persisted-reopen acceptance is still pending because
+the locally built app could not create an embedded WebDriver session.
 
 ### UI shell evidence
 
@@ -148,6 +165,15 @@ of the mismatched first sample. The semantic scene regression and visually
 inspected Canvas2D/CanvasKit goldens pass; endpoint styles and continuous dashed
 body rendering are unchanged. This is renderer-harness evidence, not a new
 browser or Tauri claim.
+
+The user-reported short Arrow repair covers straight arrows whose endpoints are
+closer than the nominal closed-cap length. The `solidArrow` and outline
+`triangle` scene regressions require the cap base to stop at the available
+route and its width to shrink by the same factor, so moving the handles together
+cannot produce a full-size overflowing wedge. The full 413-test suite and all
+13 existing renderer goldens pass; normal-length geometry, persisted endpoints
+and selection handles are unchanged. This is deterministic core/render evidence,
+not a new browser or Tauri claim.
 
 Проверить arrow/line, curved anchors, shapes, radius, solid/linear/radial
 gradient, pattern/texture fill, fill/layer opacity, shape blend modes, pencil
@@ -283,10 +309,10 @@ render backends at scales 1 and 2. Ruler badges derive their upright orientation
 from world-space endpoints after rotation or either reflection, while line/ticks
 retain the layer transform. Short-ruler selection/hit bounds expand after label
 size and thickness changes without moving the measured world endpoints. The
-focused Chrome 151 M08 spec passed 8/8. Its existing ruler scenario now also
-performs a strong non-uniform generic resize, proves the fixed-world badge stays
-inside the visible selection frame and can be reselected outside the scaled line,
-and checks one-command undo/redo with stable world endpoints. The visually
+focused Chrome 151 M08 spec passed 8/8. Its ruler scenario now moves a factual
+endpoint through the intrinsic handle, proves thickness and badge font size stay
+unchanged, keeps the badge inside the visible conservative selection frame and
+checks one-command undo/redo with a fixed opposite endpoint. The visually
 inspected artifact is
 `artifacts/browser-e2e/m08-ruler-bounds-after-style.png`; renderer goldens
 remained unchanged.
@@ -357,6 +383,11 @@ and are not inferred from this evidence.
 - 1024 px без горизонтального overflow основных действий.
 - Reduced motion.
 - RU/EN строки не обрезают primary actions.
+
+Windows x64 component evidence (2026-08-22) additionally verifies Hand cursor
+feedback (`grab` at rest, `grabbing` only during pan) and a single tooltip path
+with explicit custom-tooltip padding. Browser visual and real-Tauri acceptance
+remain pending.
 
 ## A13 — Performance
 

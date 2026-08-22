@@ -13,6 +13,7 @@ import {
   arrowCapSize,
   arrowEndpointAngles,
   arrowPathPoints,
+  scaledClosedArrowCapSizes,
   trimArrowBodyPoints,
 } from '../arrow-geometry'
 import { measureRuler } from '../precision-tools'
@@ -285,13 +286,14 @@ function arrowCapNodes(
   cap: ArrowCap,
   style: ReturnType<typeof stroke>,
   bodyJoin?: { readonly x: number; readonly y: number },
+  renderedSize?: number,
 ): readonly RenderNode[] {
   if (cap === 'none') return []
   const anchor = {
     x: layer.transform.translateX + point.x,
     y: layer.transform.translateY + point.y,
   }
-  const size = arrowCapSize(cap, style.width)
+  const size = renderedSize ?? arrowCapSize(cap, style.width)
   const behind =
     bodyJoin && (cap === 'solidArrow' || cap === 'triangle')
       ? {
@@ -417,6 +419,12 @@ function drawingNodes(layer: LayerNode): readonly RenderNode[] {
       style.width,
     )
     const angles = arrowEndpointAngles(points)
+    const capSizes = scaledClosedArrowCapSizes(
+      points,
+      arrow.startCap,
+      arrow.endCap,
+      style.width,
+    )
     return [
       ...(bodyPoints.length >= 2
         ? [pathNode(layer, `${layer.id}:body`, bodyPoints, style)]
@@ -429,6 +437,9 @@ function drawingNodes(layer: LayerNode): readonly RenderNode[] {
         arrow.startCap,
         style,
         bodyPoints[0],
+        arrow.startCap === 'solidArrow' || arrow.startCap === 'triangle'
+          ? capSizes.start
+          : undefined,
       ),
       ...arrowCapNodes(
         layer,
@@ -438,6 +449,9 @@ function drawingNodes(layer: LayerNode): readonly RenderNode[] {
         arrow.endCap,
         style,
         bodyPoints.at(-1),
+        arrow.endCap === 'solidArrow' || arrow.endCap === 'triangle'
+          ? capSizes.end
+          : undefined,
       ),
     ]
   }

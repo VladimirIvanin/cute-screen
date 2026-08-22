@@ -354,6 +354,12 @@ button:focus-visible {
   height: 100%;
   pointer-events: auto;
 }
+.cs-canvas-rotate-cursor {
+  cursor:
+    url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20d%3D%22M7%206h5a6%206%200%201%201-5.2%203%22%20fill%3D%22none%22%20stroke%3D%22%23d9773b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%2F%3E%3Cpath%20d%3D%22M7%202v4h4%22%20fill%3D%22none%22%20stroke%3D%22%23d9773b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E')
+      12 12,
+    crosshair;
+}
 .cs-canvas-overlay {
   z-index: 1;
   pointer-events: none;
@@ -1052,10 +1058,11 @@ button:focus-visible {
 }
 .cs-zoom-value,
 .cs-zoom-fit {
-  min-width: 56px;
-  height: 32px;
+  min-width: 42px;
+  height: 30px;
+  padding: 0 8px;
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   color: var(--text-muted);
   background: transparent;
   cursor: pointer;
@@ -1699,18 +1706,34 @@ button:focus-visible {
 }
 
 .cs-zoom-controls {
+  --cs-zoom-button-radius: var(--radius-sm);
+  --cs-zoom-shell-inset: 4px;
   z-index: 21;
   right: 14px;
   bottom: 14px;
   left: auto;
   padding: 3px;
-  border-radius: 12px;
+  border-radius: calc(
+    var(--cs-zoom-button-radius) + var(--cs-zoom-shell-inset)
+  );
   background: color-mix(in srgb, var(--surface-raised) 96%, transparent);
   backdrop-filter: blur(16px) saturate(1.12);
 }
 
 .cs-zoom-controls .n-button {
   --n-height: 30px;
+}
+
+.cs-zoom-controls .cs-icon-button {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--cs-zoom-button-radius);
+}
+
+.cs-zoom-controls .cs-zoom-fit,
+.cs-zoom-controls .cs-zoom-value {
+  height: 30px;
+  border-radius: var(--cs-zoom-button-radius);
 }
 
 .cs-filmstrip {

@@ -695,7 +695,7 @@ describe('M08 crop and precision acceptance in browser mode', () => {
     await $('button[aria-label="Text"]').click()
     const textGesture = await dragCanvas(
       { x: 150, y: 120 },
-      { x: 150, y: 120 },
+      { x: 230, y: 120 },
       'm08-cropped-text',
     )
     const editor = $('[contenteditable="true"][aria-label="Text editor"]')
@@ -715,44 +715,50 @@ describe('M08 crop and precision acceptance in browser mode', () => {
       5,
     )
 
+    await $('button[aria-label="Show layers"]').click()
     await $('button[aria-label="Select"]').click()
-    const textPoint = await canvasPoint(150, 120)
-    await browser
-      .action('pointer', { id: 'm08-cropped-text-edit' })
-      .move({
-        origin: 'viewport',
-        x: textPoint.x,
-        y: textPoint.y,
-        duration: 0,
-      })
-      .down({ button: 'left' })
-      .up({ button: 'left' })
-      .pause(40)
-      .down({ button: 'left' })
-      .up({ button: 'left' })
-      .perform()
-    const reopened = $('[contenteditable="true"][aria-label="Text editor"]')
-    await expect(reopened).toExist()
-    await expect(reopened).toHaveText('Cropped')
-    await browser.waitUntil(() =>
-      browser.execute(
-        () =>
-          document.activeElement?.getAttribute('contenteditable') === 'true',
-      ),
+    await $(`[data-layer-id="${createdText.id}"] .cs-layer-select`).click()
+    const textContentBefore = createdText.payload.content as {
+      readonly spans: readonly unknown[]
+    }
+    const resizeStart = {
+      x:
+        createdText.transform.translateX +
+        createdText.localBounds.x +
+        createdText.localBounds.width -
+        60,
+      y:
+        createdText.transform.translateY +
+        createdText.localBounds.y +
+        createdText.localBounds.height / 2,
+    }
+    const versionBeforeResize = await m08VersionToken()
+    await dragCanvas(
+      resizeStart,
+      { x: resizeStart.x - 40, y: resizeStart.y },
+      'm08-cropped-text-width-resize',
     )
-    await reopened.click()
-    await browser.keys(Key.End)
-    await reopened.addValue(' edit')
-    await expect(reopened).toHaveText('Cropped edit')
-    await browser.keys(['Control', 'Enter'])
-    await browser.waitUntil(async () => {
-      const layer = (await m08Snapshot()).document.layers.find(
-        (candidate) => candidate.id === createdText.id,
-      )
-      const content = layer?.payload.content as
-        { readonly text?: string } | undefined
-      return content?.text === 'Cropped edit'
-    })
+    await browser.waitUntil(
+      async () => (await m08VersionToken()) === versionBeforeResize + 1,
+    )
+    const resizedText = (await m08Snapshot()).document.layers.find(
+      (candidate) => candidate.id === createdText.id,
+    )!
+    const resizedContent = resizedText.payload.content as {
+      readonly wrap: string
+      readonly fixedWidth: number
+      readonly spans: readonly unknown[]
+    }
+    expect(resizedContent.wrap).toBe('fixedWidth')
+    expect(resizedContent.fixedWidth).toBeLessThan(
+      createdText.localBounds.width,
+    )
+    expect(resizedContent.spans).toEqual(textContentBefore.spans)
+    expect(resizedText.localBounds.height).toBeGreaterThan(
+      createdText.localBounds.height,
+    )
+    expect(resizedText.transform.scaleX).toBe(1)
+    expect(resizedText.transform.scaleY).toBe(1)
   })
 
   it('keeps every M08 contextual setting labelled and inside desktop and 1024px RU/EN layouts', async () => {
@@ -986,7 +992,7 @@ describe('M08 crop and precision acceptance in browser mode', () => {
     expect(await m08VersionToken()).toBe(versionAfterUnlock + 1)
   })
 
-  it('keeps the ruler frame and badge hittable through style growth and strong generic resize with undo/redo', async () => {
+  it('keeps the ruler frame and badge hittable through style growth and intrinsic endpoint resize with undo/redo', async () => {
     await browser.setWindowSize(1280, 800)
     await openM08()
     await $('button[aria-label="Show layers"]').click()
@@ -1043,23 +1049,28 @@ describe('M08 crop and precision acceptance in browser mode', () => {
 
     await $('button[aria-label="Select"]').click()
     const beforeResize = (await m08Snapshot()).document.layers.at(-1)!
-    const resizeStart = transformedLayerPoint(beforeResize, {
-      x: beforeResize.localBounds.x + beforeResize.localBounds.width,
-      y: beforeResize.localBounds.y + beforeResize.localBounds.height,
-    })
-    const resizeEnd = transformedLayerPoint(beforeResize, {
-      x: beforeResize.localBounds.x + beforeResize.localBounds.width * 0.08,
-      y: beforeResize.localBounds.y + beforeResize.localBounds.height * 0.3,
-    })
+    const payloadBefore = beforeResize.payload as {
+      readonly start: { readonly x: number; readonly y: number }
+      readonly end: { readonly x: number; readonly y: number }
+      readonly thickness: number
+      readonly fontSize: number
+    }
+    const fixedStart = transformedLayerPoint(beforeResize, payloadBefore.start)
+    const resizeStart = transformedLayerPoint(beforeResize, payloadBefore.end)
+    const resizeEnd = { x: resizeStart.x + 35, y: resizeStart.y + 24 }
     const versionBeforeResize = await m08VersionToken()
-    await dragCanvas(resizeStart, resizeEnd, 'm08-ruler-strong-resize')
+    await dragCanvas(resizeStart, resizeEnd, 'm08-ruler-endpoint-resize')
     await browser.waitUntil(
       async () => (await m08VersionToken()) === versionBeforeResize + 1,
     )
     expect(await m08VersionToken()).toBe(versionBeforeResize + 1)
     const afterResize = (await m08Snapshot()).document.layers.at(-1)!
-    expect(afterResize.transform.scaleX).toBeLessThan(0.2)
-    expect(afterResize.transform.scaleY).toBeLessThan(0.5)
+    expect(afterResize.transform.scaleX).toBe(1)
+    expect(afterResize.transform.scaleY).toBe(1)
+    expect(afterResize.payload).toMatchObject({
+      thickness: payloadBefore.thickness,
+      fontSize: payloadBefore.fontSize,
+    })
     const resizedFrame = await overlayAlphaBounds()
     expect(
       Math.max(resizedFrame?.width ?? 0, resizedFrame?.height ?? 0),
@@ -1068,37 +1079,16 @@ describe('M08 crop and precision acceptance in browser mode', () => {
       Math.min(resizedFrame?.width ?? 0, resizedFrame?.height ?? 0),
     ).toBeGreaterThan(16)
 
-    const payloadBefore = beforeResize.payload as {
-      readonly start: { readonly x: number; readonly y: number }
-      readonly end: { readonly x: number; readonly y: number }
-    }
     const payloadAfter = afterResize.payload as typeof payloadBefore
-    const rawResizeLayer: M08Layer = {
-      ...beforeResize,
-      transform: {
-        ...beforeResize.transform,
-        scaleX: afterResize.transform.scaleX,
-        scaleY: afterResize.transform.scaleY,
-      },
-    }
-    const expectedEndpoints = [
-      transformedLayerPoint(rawResizeLayer, payloadBefore.start),
-      transformedLayerPoint(rawResizeLayer, payloadBefore.end),
-    ] as const
     const actualEndpoints = [
       transformedLayerPoint(afterResize, payloadAfter.start),
       transformedLayerPoint(afterResize, payloadAfter.end),
     ] as const
-    for (const index of [0, 1] as const) {
-      expect(actualEndpoints[index].x).toBeCloseTo(
-        expectedEndpoints[index].x,
-        5,
-      )
-      expect(actualEndpoints[index].y).toBeCloseTo(
-        expectedEndpoints[index].y,
-        5,
-      )
-    }
+    expect(actualEndpoints[0].x).toBeCloseTo(fixedStart.x, 5)
+    expect(actualEndpoints[0].y).toBeCloseTo(fixedStart.y, 5)
+    // WebDriver pointer coordinates are rounded through the zoomed CSS surface.
+    expect(actualEndpoints[1].x).toBeCloseTo(resizeEnd.x, 0)
+    expect(actualEndpoints[1].y).toBeCloseTo(resizeEnd.y, 0)
 
     await $(`[data-layer-id="${baseId}"] .cs-layer-select`).click()
     const [start, end] = actualEndpoints
