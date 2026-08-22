@@ -3393,16 +3393,11 @@ function onColorChange(id: string, value: string): void {
   onContextChange(id, value)
   rememberColor(value)
 }
-function eyedropperPrompt(): string {
-  return state.locale.value === 'ru'
-    ? 'Выберите цвет на снимке'
-    : 'Choose a colour on the canvas'
-}
 function startEyedropper(id: string): void {
   if (precisionChangeBlocked(id)) return
   samplingControl.value = id
   eyedropperColor.value = undefined
-  eyedropperFeedback.value = eyedropperPrompt()
+  eyedropperFeedback.value = undefined
 }
 async function onColorSample(value: string): Promise<void> {
   const normalized = value.toUpperCase()
@@ -3490,7 +3485,7 @@ function selectTool(id: string): void {
   store.selectTool(id)
   if (id === 'eyedropper') {
     eyedropperColor.value = undefined
-    eyedropperFeedback.value = eyedropperPrompt()
+    eyedropperFeedback.value = undefined
   }
 }
 function canonicalizeLayerTransform(

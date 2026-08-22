@@ -360,6 +360,12 @@ button:focus-visible {
       12 12,
     crosshair;
 }
+.cs-canvas-eyedropper-cursor {
+  cursor:
+    url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2228%22%20height%3D%2228%22%20viewBox%3D%220%200%2028%2028%22%3E%3Cg%20transform%3D%22translate(2%202)%22%20fill%3D%22none%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%224%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m12%209-8.414%208.414A2%202%200%200%200%203%2018.828v1.344a2%202%200%200%201-.586%201.414A2%202%200%200%201%203.828%2021h1.344a2%202%200%200%200%201.414-.586L15%2012%22%2F%3E%3Cpath%20d%3D%22m18%209%20.4.4a1%201%200%201%201-3%203l-3.8-3.8a1%201%200%201%201%203-3l.4.4%203.4-3.4a1%201%200%201%201%203%203z%22%2F%3E%3Cpath%20d%3D%22m2%2022%20.414-.414%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate(2%202)%22%20fill%3D%22none%22%20stroke%3D%22%23d14b7c%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m12%209-8.414%208.414A2%202%200%200%200%203%2018.828v1.344a2%202%200%200%201-.586%201.414A2%202%200%200%201%203.828%2021h1.344a2%202%200%200%200%201.414-.586L15%2012%22%2F%3E%3Cpath%20d%3D%22m18%209%20.4.4a1%201%200%201%201-3%203l-3.8-3.8a1%201%200%201%201%203-3l.4.4%203.4-3.4a1%201%200%201%201%203%203z%22%2F%3E%3Cpath%20d%3D%22m2%2022%20.414-.414%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E')
+      4 24,
+    crosshair;
+}
 .cs-canvas-overlay {
   z-index: 1;
   pointer-events: none;
@@ -1664,6 +1670,133 @@ button:focus-visible {
 .cs-color-suggestion:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
+}
+.cs-eyedropper-loupe {
+  position: absolute;
+  z-index: 32;
+  top: 0;
+  left: 0;
+  display: flex;
+  width: 286px;
+  min-height: 88px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px 8px 8px;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 14px;
+  background: #28282a;
+  box-shadow:
+    0 14px 36px rgb(0 0 0 / 34%),
+    0 2px 8px rgb(0 0 0 / 24%);
+  color: #f7f7f8;
+  pointer-events: none;
+  transform: translate3d(0, 0, 0);
+  visibility: hidden;
+  will-change: transform;
+}
+.cs-eyedropper-loupe-preview {
+  position: relative;
+  display: block;
+  width: 72px;
+  height: 72px;
+  flex: 0 0 72px;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 8px;
+  background-color: #fff;
+  background-image:
+    linear-gradient(45deg, #d9d9dc 25%, transparent 25%),
+    linear-gradient(-45deg, #d9d9dc 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #d9d9dc 75%),
+    linear-gradient(-45deg, transparent 75%, #d9d9dc 75%);
+  background-position:
+    0 0,
+    0 4px,
+    4px -4px,
+    -4px 0;
+  background-size: 8px 8px;
+}
+.cs-eyedropper-loupe-preview canvas,
+.cs-eyedropper-loupe-grid {
+  position: absolute;
+  inset: 0;
+  width: 72px;
+  height: 72px;
+}
+.cs-eyedropper-loupe-preview canvas {
+  display: block;
+  image-rendering: pixelated;
+}
+.cs-eyedropper-loupe-grid {
+  background-image:
+    repeating-linear-gradient(
+      to right,
+      transparent 0 7px,
+      rgb(35 35 37 / 22%) 7px 8px
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0 7px,
+      rgb(35 35 37 / 22%) 7px 8px
+    );
+}
+.cs-eyedropper-loupe-target {
+  position: absolute;
+  top: 32px;
+  left: 32px;
+  width: 8px;
+  height: 8px;
+  border: 2px solid #fff;
+  border-radius: 2px;
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 88%),
+    0 1px 3px rgb(0 0 0 / 72%);
+}
+.cs-eyedropper-loupe-details {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 9px;
+}
+.cs-eyedropper-loupe-value {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+}
+.cs-eyedropper-loupe-hex {
+  overflow: hidden;
+  color: #fff;
+  font:
+    700 15px/1 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
+  letter-spacing: 0.01em;
+  text-overflow: ellipsis;
+}
+.cs-eyedropper-loupe-swatch {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  border: 1px solid rgb(255 255 255 / 28%);
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 35%);
+}
+.cs-eyedropper-loupe-hint {
+  overflow: hidden;
+  color: #b9b9bf;
+  font-size: 12px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cs-eyedropper-loupe[data-state='unavailable'] .cs-eyedropper-loupe-hex,
+.cs-eyedropper-loupe[data-state='loading'] .cs-eyedropper-loupe-hex,
+.cs-eyedropper-loupe[data-state='error'] .cs-eyedropper-loupe-hex {
+  color: #b9b9bf;
 }
 .cs-eyedropper-feedback {
   position: fixed;

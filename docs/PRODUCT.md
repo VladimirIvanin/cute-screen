@@ -161,7 +161,16 @@ Cute Screen — полноценный local-first редактор снимко
   равномерно меняют intrinsic `lens.size` и destination bounds; квадратный
   source region остаётся центрированным на прежнем source center, zoom и style
   не меняются, codec limits соблюдаются.
-- `REQ-TOL-012` — eyedropper читает один непрозрачный пиксель скомпонованного scene canvas (без transient overlay), нормализует и копирует uppercase HEX, показывает доступный результат и добавляет цвет в recent colors. Pointer и клавиатурный sampling отменяемы; ошибка чтения или clipboard не откатывает уже выбранный цвет и не создаёт document command.
+- `REQ-TOL-012` — eyedropper читает один непрозрачный пиксель
+  скомпонованного scene canvas (без transient overlay), нормализует и копирует
+  uppercase HEX, показывает доступный результат и добавляет цвет в recent
+  colors. Во время sampling рядом с pointer/keyboard target отображается
+  pointer-transparent transient-карточка с pixelated 9×9 preview, выделенным
+  центральным пикселем, live swatch/HEX и подсказкой подтверждения; карточка
+  остаётся внутри viewport, не пишет clipboard/recent до click/Enter и не
+  попадает в document/export. Pointer и клавиатурный sampling отменяемы; ошибка
+  чтения или clipboard не откатывает уже выбранный цвет и не создаёт document
+  command.
 - `REQ-TOL-013` — crop: свободный режим, aspect presets, handles, rule-of-thirds, reset, `Enter` и `Escape`.
 - `REQ-TOL-014` — вставка emoji как редактируемого слоя; corner handles
   равномерно меняют intrinsic size без transform-scale.

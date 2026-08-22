@@ -1137,6 +1137,35 @@ defined in capabilities nor hostname or port found`. Consequently the
   `tests/e2e/specs/document-persistence-write.e2e.ts`; that unrelated file was
   intentionally not rewritten.
 
+## Eyedropper live-loupe evidence (2026-08-22)
+
+Windows 10 22H2 build 19045, AMD64; Node 22.23.1, pnpm 10.33.2; Chrome
+151.0.7922.170. The change is transient Vue UI only: schema v7, `EditorCommand`,
+renderer/export and the persisted loupe tool are unchanged.
+
+- The red-first focused Vue run passed the existing 34 cases and failed the two
+  new live-loupe cases because no frame-coalesced preview or accessible card
+  existed. The final focused run passed 36/36.
+- Component coverage proves a 9×9 scene-only preview, highlighted centre,
+  uppercase live HEX, alpha-unavailable state, right/left and below/above
+  placement, viewport clamping, one read per animation frame, no repeated
+  readback inside the same scene pixel and no pre-confirmation `colorSample`.
+- The editor-vue production build and E2E TypeScript check passed. `pnpm test`
+  passed 47 files and 434/434 tests; `pnpm test:render` passed 13/13 without a
+  golden update.
+- The focused Chrome M08 spec passed 8/8. The live eyedropper scenario covers
+  alpha `0`/`128`/`255`, zoom, keyboard confirmation, cancel, not-ready and
+  clipboard-error paths. EN 1280×800 and RU 1024×700 screenshots were opened
+  and visually inspected; the card, grid, centre target, `#273D5A` swatch/HEX
+  and localized hint stay legible and clear of bottom chrome.
+- A repeated aggregate browser run passed all 7/7 spec files; M08 passed 8/8.
+  An earlier aggregate attempt timed out in the unrelated ruler scenario, while
+  both the focused run and the repeated aggregate completed that scenario.
+- `pnpm test:e2e:tauri` did not reach any WebView test body: its build could not
+  replace the in-use `target/debug/cute-screen.exe`, and the subsequent WDIO
+  attempts reported no embedded-session capability. No real-Tauri/WebView or
+  native-clipboard result is claimed.
+
 ## CI gates
 
 ### Каждый PR

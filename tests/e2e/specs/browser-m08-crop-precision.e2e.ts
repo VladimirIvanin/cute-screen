@@ -1201,6 +1201,11 @@ describe('M08 crop and precision acceptance in browser mode', () => {
     for (const alpha of [0, 128] as const) {
       await openM08({ alpha })
       await $('button[aria-label="Eyedropper"]').click()
+      await expect($('.cs-eyedropper-loupe')).toBeDisplayed()
+      await expect($('.cs-eyedropper-loupe')).toHaveAttribute(
+        'data-state',
+        'unavailable',
+      )
       await browser.keys('Enter')
       await expect($('.cs-eyedropper-feedback')).toHaveText(
         'There is no opaque colour at this point',
@@ -1214,15 +1219,19 @@ describe('M08 crop and precision acceptance in browser mode', () => {
     await $('button[aria-label="Zoom in"]').click()
     await expect($('.cs-zoom-controls')).not.toHaveAttribute('data-zoom', '100')
     await $('button[aria-label="Eyedropper"]').click()
-    const cursorAlpha = await browser.execute(() => {
-      const overlay = document.querySelector<HTMLCanvasElement>(
-        '.cs-canvas-overlay[aria-label="Interaction overlay"]',
-      )
-      if (!overlay) throw new Error('Interaction overlay is missing')
-      const data = overlay.getContext('2d')?.getImageData(190, 140, 21, 21).data
-      return data ? Math.max(...data.filter((_, index) => index % 4 === 3)) : 0
-    })
-    expect(cursorAlpha).toBeGreaterThan(0)
+    await expect($('.cs-eyedropper-loupe')).toBeDisplayed()
+    await expect($('.cs-eyedropper-loupe')).toHaveText(
+      expect.stringContaining('#273D5A'),
+    )
+    await expect($('.cs-eyedropper-loupe canvas')).toHaveAttribute('width', '9')
+    await expect($('.cs-eyedropper-loupe canvas')).toHaveAttribute(
+      'height',
+      '9',
+    )
+    await browser.saveScreenshot(
+      path.resolve('artifacts/browser-e2e/m08-eyedropper-live-loupe-en.png'),
+    )
+    await expect($('.cs-eyedropper-loupe-target')).toBeDisplayed()
     await browser.keys([Key.Shift, 'ArrowRight'])
     await browser.keys('Enter')
     await expect($('.cs-eyedropper-feedback')).toHaveText(
@@ -1271,5 +1280,18 @@ describe('M08 crop and precision acceptance in browser mode', () => {
     )
     await expect($('[aria-label="Colour swatch #273D5A"]')).toExist()
     expect(await recentColourHex()).toBe('#273D5A')
+
+    await browser.setWindowSize(1024, 700)
+    await openM08({ alpha: 255 })
+    await setLocale('ru')
+    await $('button[aria-label="Пипетка"]').click()
+    await expect($('.cs-eyedropper-loupe')).toHaveText(
+      expect.stringContaining('Нажмите, чтобы выбрать'),
+    )
+    await browser.saveScreenshot(
+      path.resolve(
+        'artifacts/browser-e2e/m08-eyedropper-live-loupe-1024-ru.png',
+      ),
+    )
   })
 })

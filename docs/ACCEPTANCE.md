@@ -259,7 +259,15 @@ Windows browser repair acceptance (2026-08-15) дополнительно про
 На чистом документе открыть Crop без предварительного программного задания frame
 size. Проверить presets, handles, rule-of-thirds, reset, `Enter`, `Escape` и undo.
 Повторить после resize/delete base layer и до/после canvas flip: crop использует
-canvas bounds. Затем проверить color picker: открыть contextual control на desktop и 1024×700, выбрать белый, чёрный и серый, ввести HEX, проверить recent и compact suggestions. Запустить пипетку из picker и tool rail, выбрать известный непрозрачный scene-пиксель при zoom, убедиться, что HEX скопирован, toast и recent обновлены, а transient overlay в sample не попал. Проверить стрелки/Shift+стрелки, Enter и Escape, прозрачный пиксель и clipboard failure; единственное изменение выбранного слоя должно undo/redo ровно одной command.
+canvas bounds. Затем проверить color picker: открыть contextual control на desktop
+и 1024×700, выбрать белый, чёрный и серый, ввести HEX, проверить recent и compact
+suggestions. Запустить пипетку из picker и tool rail: до подтверждения рядом с
+pointer/keyboard target должна появиться не перехватывающая ввод 9×9 лупа с
+выделенным центром, live swatch/HEX и подсказкой. Выбрать известный непрозрачный
+scene-пиксель при zoom, убедиться, что HEX скопирован, toast и recent обновлены, а
+transient overlay в sample не попал. Проверить стрелки/Shift+стрелки, Enter и
+Escape, прозрачный пиксель и clipboard failure; единственное изменение выбранного
+слоя должно undo/redo ровно одной command.
 
 Затем проверить manual censor, spotlight, ruler, temporary guides,
 loupe auto-selection и eyedropper clipboard/toast/recent color. Для ruler
@@ -285,6 +293,22 @@ not-ready and recoverable clipboard-error states were observable. Desktop and
 inspected with all contextual controls inside the viewport. The ruler artifact
 shows the default pink-crimson angled line, perpendicular ticks, upright
 length-only badge and its bottom toolbar; no ruler settings appear in LayersPanel.
+
+The 2026-08-22 eyedropper follow-up adds a pointer-transparent 9×9 live loupe
+without changing schema v7, renderer/export or document history. Pointer moves
+are coalesced to one preview update per animation frame and repeated motion
+inside one scene pixel does not repeat readback; card placement flips and clamps
+inside the viewport. Focused Vue coverage passed 36/36 after the expected
+red-first 2/36 failures. Focused Chrome 151 M08 passed 8/8; the inspected
+`m08-eyedropper-live-loupe-en.png` and
+`m08-eyedropper-live-loupe-1024-ru.png` artifacts show `#273D5A`, the centre
+target and complete EN/RU hints without bottom-chrome overlap. Alpha `0`/`128`,
+loading, readback and clipboard failures remain recoverable, and only click or
+Enter reaches clipboard/recent colours. The repeated aggregate browser run
+passed all 7/7 spec files. Real-Tauri acceptance remains blocked before test
+bodies: the runner could not replace the in-use debug executable and WDIO could
+not create an embedded session, so no native clipboard/WebView result is
+claimed.
 
 Renderer/export evidence decodes Canvas2D and CanvasKit PNG output, checks all
 three censor modes against lower/higher layers, spotlight shapes and feather,

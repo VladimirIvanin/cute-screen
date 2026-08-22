@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/vue'
 import { markRaw, nextTick } from 'vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   hitTestDocument,
@@ -165,6 +165,7 @@ function canvasContext() {
       actualBoundingBoxDescent: 3,
     })),
     moveTo: vi.fn(),
+    putImageData: vi.fn(),
     quadraticCurveTo: vi.fn(),
     restore: vi.fn(),
     rect: vi.fn(),
@@ -242,6 +243,10 @@ beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
     currentContext,
   )
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
 })
 
 describe('M08 crop interaction', () => {
@@ -762,9 +767,10 @@ describe('M08 manual precision tools', () => {
     const getImageData = vi.fn(() => ({
       data: new Uint8ClampedArray([171, 205, 239, 255]),
     }))
-    vi.spyOn(scene, 'getContext').mockReturnValue({
-      getImageData,
-    } as unknown as CanvasRenderingContext2D)
+    Object.defineProperty(scene, 'getContext', {
+      configurable: true,
+      value: vi.fn(() => ({ getImageData })),
+    })
 
     await fireEvent.pointerDown(scene, {
       pointerId: 21,
@@ -774,6 +780,130 @@ describe('M08 manual precision tools', () => {
 
     expect(getImageData).toHaveBeenCalledWith(30, 20, 1, 1)
     expect(view.emitted().colorSample).toEqual([['#ABCDEF']])
+  })
+
+  it('renders a frame-coalesced live 9 by 9 eyedropper loupe before confirmation', async () => {
+    const frames: FrameRequestCallback[] = []
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback)
+      return frames.length
+    })
+    const view = render(CanvasViewport, {
+      props: {
+        documentState: { kind: 'ready', title: 'M08', dimensions: '120 × 80' },
+        canvas: { width: 120, height: 80 },
+        document: documentFixture(),
+        sampling: true,
+        zoom: 100,
+        fitMode: false,
+        t: (key: string) => key,
+      } as never,
+    })
+    const scene = view.getByLabelText('sceneCanvas') as HTMLCanvasElement
+    prepareScene(scene)
+    expect(scene.classList).toContain('cs-canvas-eyedropper-cursor')
+    const getImageData = vi.fn(
+      (_x: number, _y: number, width: number, height: number) => {
+        const data = new Uint8ClampedArray(width * height * 4)
+        for (let index = 0; index < data.length; index += 4) {
+          data.set([171, 205, 239, 255], index)
+        }
+        return { data, width, height }
+      },
+    )
+    Object.defineProperty(scene, 'getContext', {
+      configurable: true,
+      value: vi.fn(() => ({ getImageData })),
+    })
+
+    await nextTick()
+    frames.splice(0).forEach((callback) => callback(0))
+    getImageData.mockClear()
+    await fireEvent.pointerMove(scene, { clientX: 30, clientY: 20 })
+    await fireEvent.pointerMove(scene, { clientX: 31, clientY: 21 })
+
+    expect(getImageData).not.toHaveBeenCalled()
+    expect(frames).toHaveLength(1)
+    frames.shift()!(16)
+
+    const loupe = view.getByLabelText('eyedropperMagnifier')
+    const preview = loupe.querySelector('canvas') as HTMLCanvasElement
+    expect(preview).toHaveAttribute('width', '9')
+    expect(preview).toHaveAttribute('height', '9')
+    expect(loupe).toHaveAttribute('data-state', 'opaque')
+    expect(loupe).toHaveTextContent('#ABCDEF')
+    expect(loupe).toHaveTextContent('eyedropperClickToSample')
+    expect(getImageData).toHaveBeenCalledTimes(1)
+    expect(getImageData).toHaveBeenCalledWith(27, 17, 9, 9)
+    expect(view.emitted().colorSample).toBeUndefined()
+
+    await fireEvent.pointerMove(scene, { clientX: 31, clientY: 21 })
+    frames.shift()!(32)
+    expect(getImageData).toHaveBeenCalledTimes(1)
+  })
+
+  it('marks a transparent live sample unavailable and keeps the loupe inside the viewport', async () => {
+    const frames: FrameRequestCallback[] = []
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback)
+      return frames.length
+    })
+    const view = render(CanvasViewport, {
+      props: {
+        documentState: { kind: 'ready', title: 'M08', dimensions: '120 × 80' },
+        canvas: { width: 120, height: 80 },
+        document: documentFixture(),
+        sampling: true,
+        zoom: 100,
+        fitMode: false,
+        t: (key: string) => key,
+      } as never,
+    })
+    const scene = view.getByLabelText('sceneCanvas') as HTMLCanvasElement
+    prepareScene(scene, 300, 200)
+    Object.defineProperty(scene, 'getContext', {
+      configurable: true,
+      value: vi.fn(() => ({
+        getImageData: (
+          _x: number,
+          _y: number,
+          width: number,
+          height: number,
+        ) => ({
+          data: new Uint8ClampedArray(width * height * 4),
+          width,
+          height,
+        }),
+      })),
+    })
+    const viewport = view.container.querySelector('.cs-viewport') as HTMLElement
+    vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      width: 300,
+      height: 200,
+      top: 0,
+      right: 300,
+      bottom: 200,
+      left: 0,
+      toJSON: () => ({}),
+    })
+    const loupe = view.getByLabelText('eyedropperMagnifier') as HTMLElement
+    Object.defineProperties(loupe, {
+      offsetWidth: { configurable: true, value: 286 },
+      offsetHeight: { configurable: true, value: 88 },
+    })
+
+    await nextTick()
+    frames.splice(0).forEach((callback) => callback(0))
+    await fireEvent.pointerMove(scene, { clientX: 290, clientY: 190 })
+    frames.shift()!(16)
+
+    expect(loupe).toHaveAttribute('data-state', 'unavailable')
+    expect(loupe).toHaveAttribute('data-horizontal-placement', 'left')
+    expect(loupe).toHaveAttribute('data-vertical-placement', 'above')
+    expect(loupe).toHaveTextContent('eyedropperNoOpaqueColour')
+    expect(view.emitted().colorSample).toBeUndefined()
   })
 
   it.each([

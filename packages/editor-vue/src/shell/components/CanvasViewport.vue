@@ -167,6 +167,11 @@ const props = defineProps<{
       | 'canvasViewport'
       | 'sceneCanvas'
       | 'interactionOverlay'
+      | 'eyedropperMagnifier'
+      | 'eyedropperClickToSample'
+      | 'eyedropperNoOpaqueColour'
+      | 'eyedropperPreviewLoading'
+      | 'eyedropperPreviewUnavailable'
       | 'emptyTitle'
       | 'emptyDescription'
       | 'openImage'
@@ -210,6 +215,12 @@ const emit = defineEmits<{
 }>()
 const scene = ref<HTMLCanvasElement>()
 const overlay = ref<HTMLCanvasElement>()
+const viewportRoot = ref<HTMLElement>()
+const eyedropperLoupe = ref<HTMLElement>()
+const eyedropperPreview = ref<HTMLCanvasElement>()
+const eyedropperSwatch = ref<HTMLElement>()
+const eyedropperHex = ref<HTMLElement>()
+const eyedropperHint = ref<HTMLElement>()
 const textEditor = ref<HTMLDivElement>()
 const textFloatingToolbar = ref<HTMLDivElement>()
 const arrowFloatingToolbar = ref<HTMLDivElement>()
@@ -230,6 +241,22 @@ type FloatingToolbarLayout = {
 const floatingArrowToolbarLayout = ref<FloatingToolbarLayout | undefined>()
 const rendererError = ref<string>()
 const samplingCursor = ref<CanvasPoint>()
+const EYEDROPPER_GRID_SIZE = 9
+const EYEDROPPER_GRID_RADIUS = Math.floor(EYEDROPPER_GRID_SIZE / 2)
+const EYEDROPPER_CARD_FALLBACK_WIDTH = 286
+const EYEDROPPER_CARD_FALLBACK_HEIGHT = 88
+const EYEDROPPER_CARD_GAP = 18
+const EYEDROPPER_VIEWPORT_MARGIN = 8
+type EyedropperPreviewState = 'opaque' | 'unavailable' | 'loading' | 'error'
+interface EyedropperPreviewRequest {
+  readonly point: CanvasPoint
+  readonly clientX: number
+  readonly clientY: number
+}
+let pendingEyedropperPreview: EyedropperPreviewRequest | undefined
+let eyedropperPreviewFrame: number | undefined
+let lastEyedropperPreviewKey: string | undefined
+let warnedAboutEyedropperPreview = false
 const isPanning = ref(false)
 const editingText = ref<
   | {
@@ -1596,22 +1623,6 @@ function drawOverlay(): void {
   drawDraft(context)
   drawCalloutDraft(context)
   drawPrecisionDraft(context)
-  if (props.sampling && samplingCursor.value) {
-    const point = samplingCursor.value
-    context.save()
-    context.strokeStyle = '#fff'
-    context.lineWidth = 1 / ((props.zoom ?? 100) / 100)
-    context.beginPath()
-    context.arc(
-      point.x,
-      point.y,
-      7 / ((props.zoom ?? 100) / 100),
-      0,
-      Math.PI * 2,
-    )
-    context.stroke()
-    context.restore()
-  }
   if (drawCropOverlay(context, outputBounds)) return
   const committedLayer = selectedLayer()
   const previewLayer = gesturePreviewLayer()
@@ -1936,9 +1947,208 @@ function canvasPoint(event: {
         : 0.5,
   }
 }
-function sampleScene(point: CanvasPoint): void {
+function scenePixel(
+  point: CanvasPoint,
+): Readonly<{ x: number; y: number }> | undefined {
   const canvas = scene.value
   const bounds = viewportOutputBounds.value
+  if (!canvas || !bounds || canvas.width <= 0 || canvas.height <= 0) {
+    return undefined
+  }
+  return {
+    x: Math.max(0, Math.min(canvas.width - 1, Math.round(point.x - bounds.x))),
+    y: Math.max(0, Math.min(canvas.height - 1, Math.round(point.y - bounds.y))),
+  }
+}
+function pixelHex(data: Uint8ClampedArray, offset = 0): string {
+  return `#${[data[offset], data[offset + 1], data[offset + 2]]
+    .map((channel) => (channel ?? 0).toString(16).padStart(2, '0'))
+    .join('')
+    .toUpperCase()}`
+}
+function samplingClientPoint(
+  point: CanvasPoint,
+): Readonly<{ clientX: number; clientY: number }> | undefined {
+  const canvas = scene.value
+  const bounds = viewportOutputBounds.value
+  if (!canvas || !bounds || canvas.width <= 0 || canvas.height <= 0) {
+    return undefined
+  }
+  const rect = canvas.getBoundingClientRect()
+  if (rect.width <= 0 || rect.height <= 0) return undefined
+  return {
+    clientX:
+      rect.left + ((point.x - bounds.x + 0.5) * rect.width) / canvas.width,
+    clientY:
+      rect.top + ((point.y - bounds.y + 0.5) * rect.height) / canvas.height,
+  }
+}
+function positionEyedropperLoupe(request: EyedropperPreviewRequest): void {
+  const root = viewportRoot.value
+  const loupe = eyedropperLoupe.value
+  if (!root || !loupe) return
+  const rootRect = root.getBoundingClientRect()
+  const width = loupe.offsetWidth || EYEDROPPER_CARD_FALLBACK_WIDTH
+  const height = loupe.offsetHeight || EYEDROPPER_CARD_FALLBACK_HEIGHT
+  const localX = request.clientX - rootRect.left
+  const localY = request.clientY - rootRect.top
+  const right = localX + EYEDROPPER_CARD_GAP
+  const left = localX - EYEDROPPER_CARD_GAP - width
+  const below = localY + EYEDROPPER_CARD_GAP
+  const above = localY - EYEDROPPER_CARD_GAP - height
+  const horizontalPlacement =
+    right + width <= rootRect.width - EYEDROPPER_VIEWPORT_MARGIN
+      ? 'right'
+      : 'left'
+  const verticalPlacement =
+    below + height <= rootRect.height - EYEDROPPER_VIEWPORT_MARGIN
+      ? 'below'
+      : 'above'
+  const maxLeft = Math.max(
+    EYEDROPPER_VIEWPORT_MARGIN,
+    rootRect.width - width - EYEDROPPER_VIEWPORT_MARGIN,
+  )
+  const maxTop = Math.max(
+    EYEDROPPER_VIEWPORT_MARGIN,
+    rootRect.height - height - EYEDROPPER_VIEWPORT_MARGIN,
+  )
+  const x = Math.max(
+    EYEDROPPER_VIEWPORT_MARGIN,
+    Math.min(maxLeft, horizontalPlacement === 'right' ? right : left),
+  )
+  const y = Math.max(
+    EYEDROPPER_VIEWPORT_MARGIN,
+    Math.min(maxTop, verticalPlacement === 'below' ? below : above),
+  )
+  loupe.dataset.horizontalPlacement = horizontalPlacement
+  loupe.dataset.verticalPlacement = verticalPlacement
+  loupe.style.transform = `translate3d(${Math.round(x)}px, ${Math.round(y)}px, 0)`
+}
+function setEyedropperPreviewState(
+  state: EyedropperPreviewState,
+  hex?: string,
+): void {
+  const loupe = eyedropperLoupe.value
+  const swatch = eyedropperSwatch.value
+  const output = eyedropperHex.value
+  const hint = eyedropperHint.value
+  if (loupe) loupe.dataset.state = state
+  if (output) output.textContent = hex ?? '—'
+  if (swatch) {
+    swatch.hidden = !hex
+    swatch.style.backgroundColor = hex ?? 'transparent'
+  }
+  if (hint) {
+    hint.textContent =
+      state === 'opaque'
+        ? props.t('eyedropperClickToSample')
+        : state === 'unavailable'
+          ? props.t('eyedropperNoOpaqueColour')
+          : state === 'loading'
+            ? props.t('eyedropperPreviewLoading')
+            : props.t('eyedropperPreviewUnavailable')
+  }
+}
+function renderEyedropperPreview(request: EyedropperPreviewRequest): void {
+  const canvas = scene.value
+  const preview = eyedropperPreview.value
+  const loupe = eyedropperLoupe.value
+  const pixel = scenePixel(request.point)
+  if (!canvas || !preview || !loupe || !pixel) return
+  loupe.style.visibility = 'visible'
+  positionEyedropperLoupe(request)
+  const previewKey = `${pixel.x}:${pixel.y}:${props.samplingBlocked ? 'blocked' : 'ready'}`
+  if (previewKey === lastEyedropperPreviewKey) return
+  lastEyedropperPreviewKey = previewKey
+  const previewContext = preview.getContext('2d')
+  if (
+    !previewContext ||
+    typeof previewContext.clearRect !== 'function' ||
+    typeof previewContext.putImageData !== 'function'
+  ) {
+    setEyedropperPreviewState('error')
+    return
+  }
+  previewContext.clearRect(0, 0, EYEDROPPER_GRID_SIZE, EYEDROPPER_GRID_SIZE)
+  if (props.samplingBlocked) {
+    setEyedropperPreviewState('loading')
+    return
+  }
+  const sourceX = Math.max(0, pixel.x - EYEDROPPER_GRID_RADIUS)
+  const sourceY = Math.max(0, pixel.y - EYEDROPPER_GRID_RADIUS)
+  const sourceRight = Math.min(
+    canvas.width,
+    pixel.x + EYEDROPPER_GRID_RADIUS + 1,
+  )
+  const sourceBottom = Math.min(
+    canvas.height,
+    pixel.y + EYEDROPPER_GRID_RADIUS + 1,
+  )
+  const sourceWidth = sourceRight - sourceX
+  const sourceHeight = sourceBottom - sourceY
+  try {
+    const sourceContext = canvas.getContext('2d')
+    if (!sourceContext) {
+      setEyedropperPreviewState('error')
+      return
+    }
+    const pixels = sourceContext.getImageData(
+      sourceX,
+      sourceY,
+      sourceWidth,
+      sourceHeight,
+    )
+    previewContext.putImageData(
+      pixels,
+      sourceX - (pixel.x - EYEDROPPER_GRID_RADIUS),
+      sourceY - (pixel.y - EYEDROPPER_GRID_RADIUS),
+    )
+    const centerOffset =
+      ((pixel.y - sourceY) * sourceWidth + (pixel.x - sourceX)) * 4
+    if (pixels.data[centerOffset + 3] !== 255) {
+      setEyedropperPreviewState('unavailable')
+      return
+    }
+    setEyedropperPreviewState('opaque', pixelHex(pixels.data, centerOffset))
+  } catch (error) {
+    if (!warnedAboutEyedropperPreview) {
+      warnedAboutEyedropperPreview = true
+      console.warn('cute-screen eyedropper preview read failed', error)
+    }
+    setEyedropperPreviewState('error')
+  }
+}
+function scheduleEyedropperPreview(
+  point: CanvasPoint,
+  client = samplingClientPoint(point),
+): void {
+  if (!props.sampling || !client) return
+  pendingEyedropperPreview = {
+    point,
+    clientX: client.clientX,
+    clientY: client.clientY,
+  }
+  if (eyedropperPreviewFrame !== undefined) return
+  eyedropperPreviewFrame = -1
+  const frame = window.requestAnimationFrame(() => {
+    eyedropperPreviewFrame = undefined
+    const request = pendingEyedropperPreview
+    pendingEyedropperPreview = undefined
+    if (request && props.sampling) renderEyedropperPreview(request)
+  })
+  if (eyedropperPreviewFrame !== undefined) eyedropperPreviewFrame = frame
+}
+function hideEyedropperPreview(): void {
+  pendingEyedropperPreview = undefined
+  lastEyedropperPreviewKey = undefined
+  if (eyedropperPreviewFrame !== undefined && eyedropperPreviewFrame >= 0) {
+    window.cancelAnimationFrame(eyedropperPreviewFrame)
+  }
+  eyedropperPreviewFrame = undefined
+  if (eyedropperLoupe.value) eyedropperLoupe.value.style.visibility = 'hidden'
+}
+function sampleScene(point: CanvasPoint): void {
+  const canvas = scene.value
   if (!canvas)
     return emit(
       'colorSampleError',
@@ -1947,7 +2157,6 @@ function sampleScene(point: CanvasPoint): void {
         'Холст недоступен для выбора цвета',
       ),
     )
-  if (!bounds) return
   if (props.samplingBlocked) {
     emit(
       'colorSampleError',
@@ -1958,16 +2167,12 @@ function sampleScene(point: CanvasPoint): void {
     )
     return
   }
-  const x = Math.max(
-    0,
-    Math.min(canvas.width - 1, Math.round(point.x - bounds.x)),
-  )
-  const y = Math.max(
-    0,
-    Math.min(canvas.height - 1, Math.round(point.y - bounds.y)),
-  )
+  const pixel = scenePixel(point)
+  if (!pixel) return
   try {
-    const data = canvas.getContext('2d')?.getImageData(x, y, 1, 1).data
+    const data = canvas
+      .getContext('2d')
+      ?.getImageData(pixel.x, pixel.y, 1, 1).data
     if (!data || data[3] !== 255) {
       emit(
         'colorSampleError',
@@ -1978,11 +2183,7 @@ function sampleScene(point: CanvasPoint): void {
       )
       return
     }
-    const hex = `#${[data[0], data[1], data[2]]
-      .map((channel) => (channel ?? 0).toString(16).padStart(2, '0'))
-      .join('')
-      .toUpperCase()}`
-    emit('colorSample', hex)
+    emit('colorSample', pixelHex(data))
   } catch (error) {
     console.warn('cute-screen scene colour sampling failed', error)
     emit(
@@ -2184,10 +2385,15 @@ function onPointerDown(event: PointerEvent): void {
     event.preventDefault()
     if (event.button > 0) {
       samplingCursor.value = undefined
+      hideEyedropperPreview()
       emit('colorSampleCancel')
       return
     }
     samplingCursor.value = point
+    scheduleEyedropperPreview(point, {
+      clientX: event.clientX,
+      clientY: event.clientY,
+    })
     sampleScene(point)
     return
   }
@@ -2845,6 +3051,15 @@ function onDoubleClick(event: MouseEvent): void {
 function onPointerMove(event: PointerEvent): void {
   const point = canvasPoint(event)
   if (!point) return
+  if (props.sampling) {
+    samplingCursor.value = point
+    scheduleEyedropperPreview(point, {
+      clientX: event.clientX,
+      clientY: event.clientY,
+    })
+    invalidateOverlay()
+    return
+  }
   if (!gesture) {
     updateHoverCursor(point)
     return
@@ -3312,13 +3527,14 @@ function onWindowKeydown(event: KeyboardEvent): void {
     if (event.key === 'Escape') {
       event.preventDefault()
       samplingCursor.value = undefined
+      hideEyedropperPreview()
       emit('colorSampleCancel')
       return
     }
     const move = moves[event.key]
     if (move) {
       event.preventDefault()
-      samplingCursor.value = {
+      const next = {
         x: Math.max(
           bounds.x,
           Math.min(bounds.x + bounds.width - 1, initial.x + move[0]),
@@ -3328,6 +3544,8 @@ function onWindowKeydown(event: KeyboardEvent): void {
           Math.min(bounds.y + bounds.height - 1, initial.y + move[1]),
         ),
       }
+      samplingCursor.value = next
+      scheduleEyedropperPreview(next)
       invalidateOverlay()
       return
     }
@@ -3411,13 +3629,34 @@ watch(
   () => props.sampling,
   (sampling) => {
     if (!sampling) {
+      setDirectCursor('')
       samplingCursor.value = undefined
+      hideEyedropperPreview()
       invalidateOverlay()
       return
     }
-    samplingCursor.value = initialSamplingCursor()
+    setDirectCursor('')
+    warnedAboutEyedropperPreview = false
+    lastEyedropperPreviewKey = undefined
+    const initial = initialSamplingCursor()
+    samplingCursor.value = initial
     invalidateOverlay()
-    void nextTick(() => scene.value?.focus({ preventScroll: true }))
+    void nextTick(() => {
+      scene.value?.focus({ preventScroll: true })
+      if (initial) scheduleEyedropperPreview(initial)
+    })
+  },
+)
+watch(
+  () => [props.samplingBlocked, props.zoom, viewportOutputBounds.value],
+  () => {
+    if (!props.sampling || !samplingCursor.value) return
+    lastEyedropperPreviewKey = undefined
+    void nextTick(() => {
+      if (samplingCursor.value) {
+        scheduleEyedropperPreview(samplingCursor.value)
+      }
+    })
   },
 )
 function onWindowKeyup(event: KeyboardEvent): void {
@@ -3456,8 +3695,17 @@ onMounted(() => {
   window.addEventListener('blur', onWindowBlur)
   document.addEventListener('pointerdown', onDocumentPointerDown, true)
   document.addEventListener('selectionchange', onDocumentSelectionChange)
+  if (props.sampling) {
+    void nextTick(() => {
+      const initial = initialSamplingCursor()
+      samplingCursor.value = initial
+      if (initial) scheduleEyedropperPreview(initial)
+      invalidateOverlay()
+    })
+  }
 })
 onBeforeUnmount(() => {
+  hideEyedropperPreview()
   componentMounted = false
   drawRevision += 1
   resizeObserver?.disconnect()
@@ -3476,7 +3724,11 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="cs-viewport" :aria-label="t('canvasViewport')">
+  <main
+    ref="viewportRoot"
+    class="cs-viewport"
+    :aria-label="t('canvasViewport')"
+  >
     <div ref="scrollContainer" class="cs-canvas-scroll">
       <div class="cs-canvas-stage">
         <div
@@ -3493,6 +3745,7 @@ onBeforeUnmount(() => {
           <canvas
             ref="scene"
             class="cs-canvas"
+            :class="{ 'cs-canvas-eyedropper-cursor': sampling }"
             :style="{
               cursor: isPanning
                 ? 'grabbing'
@@ -3661,5 +3914,34 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </div>
+    <section
+      v-show="sampling"
+      ref="eyedropperLoupe"
+      class="cs-eyedropper-loupe"
+      data-state="loading"
+      :aria-label="t('eyedropperMagnifier')"
+    >
+      <span class="cs-eyedropper-loupe-preview" aria-hidden="true">
+        <canvas
+          ref="eyedropperPreview"
+          :width="EYEDROPPER_GRID_SIZE"
+          :height="EYEDROPPER_GRID_SIZE"
+        ></canvas>
+        <span class="cs-eyedropper-loupe-grid"></span>
+        <span class="cs-eyedropper-loupe-target"></span>
+      </span>
+      <span class="cs-eyedropper-loupe-details">
+        <span class="cs-eyedropper-loupe-value">
+          <span
+            ref="eyedropperSwatch"
+            class="cs-eyedropper-loupe-swatch"
+          ></span>
+          <span ref="eyedropperHex" class="cs-eyedropper-loupe-hex">—</span>
+        </span>
+        <span ref="eyedropperHint" class="cs-eyedropper-loupe-hint">
+          {{ t('eyedropperClickToSample') }}
+        </span>
+      </span>
+    </section>
   </main>
 </template>
