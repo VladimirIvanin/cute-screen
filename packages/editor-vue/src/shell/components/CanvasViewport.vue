@@ -468,6 +468,13 @@ let gesture:
       readonly current: { x: number; y: number }
     }
   | {
+      readonly kind: 'loupeSource'
+      readonly id: string
+      readonly start: { x: number; y: number }
+      readonly current: { x: number; y: number }
+      readonly initial: Extract<LayerNode, { readonly kind: 'loupe' }>
+    }
+  | {
       readonly kind: 'calloutDraw'
       readonly start: CanvasPoint
       readonly current: CanvasPoint
@@ -771,6 +778,27 @@ async function ensureRenderer(): Promise<Canvas2DRenderer | undefined> {
 }
 function documentWithoutGestureLayer(): EditorDocumentV1 | undefined {
   const document = props.document
+  if (!document) return undefined
+  const activeGesture = gesture
+  if (activeGesture?.kind === 'loupeSource') {
+    return {
+      ...document,
+      layers: document.layers.map((layer) =>
+        layer.id === activeGesture.id && layer.kind === 'loupe'
+          ? moveLoupeSourceMarker(layer, activeGesture.current)
+          : layer,
+      ),
+    }
+  }
+  const previewLayer = gesturePreviewLayer()
+  if (previewLayer?.kind === 'loupe') {
+    return {
+      ...document,
+      layers: document.layers.map((layer) =>
+        layer.id === previewLayer.id ? previewLayer : layer,
+      ),
+    }
+  }
   const hiddenLayerId =
     gesture &&
     (gesture.kind === 'move' ||
@@ -781,7 +809,7 @@ function documentWithoutGestureLayer(): EditorDocumentV1 | undefined {
       gesture.kind === 'calloutHandle')
       ? gesture.id
       : undefined
-  if (!document || !hiddenLayerId) return document
+  if (!hiddenLayerId) return document
   return {
     ...document,
     layers: document.layers.filter((layer) => layer.id !== hiddenLayerId),
@@ -827,6 +855,13 @@ function renderCommittedSceneForGesture(): void {
     renderer.render(['scene'])
   }
   if (componentMounted) invalidateOverlay()
+}
+function invalidateGesturePreview(): void {
+  if (gesturePreviewLayer()?.kind === 'loupe') {
+    renderCommittedSceneForGesture()
+    return
+  }
+  invalidateOverlay()
 }
 async function drawDocument(): Promise<void> {
   const revision = ++drawRevision
@@ -924,6 +959,39 @@ function selectedLayer(): LayerNode | undefined {
   return props.document?.layers.find(
     (layer) => layer.id === props.selectedLayerId,
   )
+}
+function loupeSourceCenter(
+  layer: Extract<LayerNode, { readonly kind: 'loupe' }>,
+): CanvasPoint {
+  const { sourceRegion } = layer.payload
+  return {
+    x: sourceRegion.x + sourceRegion.width / 2,
+    y: sourceRegion.y + sourceRegion.height / 2,
+  }
+}
+function moveLoupeSourceMarker(
+  layer: Extract<LayerNode, { readonly kind: 'loupe' }>,
+  point: CanvasPoint,
+): Extract<LayerNode, { readonly kind: 'loupe' }> {
+  const canvas = props.canvas
+  if (!canvas) return layer
+  const center = {
+    x: Math.max(0, Math.min(canvas.width, point.x)),
+    y: Math.max(0, Math.min(canvas.height, point.y)),
+  }
+  const source = layer.payload.sourceRegion
+  return Object.freeze({
+    ...layer,
+    payload: Object.freeze({
+      ...layer.payload,
+      sourceRegion: Object.freeze({
+        x: center.x - source.width / 2,
+        y: center.y - source.height / 2,
+        width: source.width,
+        height: source.height,
+      }),
+    }),
+  })
 }
 function transformPoint(
   transform: Transform2D,
@@ -1159,7 +1227,8 @@ function gesturePreviewLayer(): LayerNode | undefined {
     gesture.kind === 'calloutDraw' ||
     gesture.kind === 'text' ||
     gesture.kind === 'precision' ||
-    gesture.kind === 'crop'
+    gesture.kind === 'crop' ||
+    gesture.kind === 'loupeSource'
   ) {
     return undefined
   }
@@ -1204,7 +1273,10 @@ function gesturePreviewLayer(): LayerNode | undefined {
 }
 function gesturePreviewNodes() {
   const layer = gesturePreviewLayer()
-  if (!layer || !props.document) return []
+  // Loupe rendering needs the ordered scene surface to sample layers beneath
+  // it. Its transient geometry is therefore rendered in the scene, never the
+  // generic overlay node list.
+  if (!layer || layer.kind === 'loupe' || !props.document) return []
   return createDocumentRenderScene({
     ...props.document,
     layers: [layer],
@@ -1708,7 +1780,11 @@ function drawOverlay(): void {
     }
   }
   if (layer.kind === 'loupe') {
-    drawSelectedLoupeOverlay(context, layer, transform)
+    const source =
+      gesture?.kind === 'loupeSource' && gesture.id === layer.id
+        ? loupeSourceCenter(moveLoupeSourceMarker(layer, gesture.current))
+        : undefined
+    drawSelectedLoupeOverlay(context, layer, transform, source)
   }
   if (gesture?.kind === 'move' && gesture.guidesVisible) {
     context.save()
@@ -1758,12 +1834,10 @@ function drawSelectedLoupeOverlay(
   context: CanvasRenderingContext2D,
   layer: Extract<LayerNode, { readonly kind: 'loupe' }>,
   transform: Transform2D,
+  sourceOverride?: CanvasPoint,
 ): void {
   const scale = (props.zoom ?? 100) / 100
-  const source = {
-    x: layer.payload.sourceRegion.x + layer.payload.sourceRegion.width / 2,
-    y: layer.payload.sourceRegion.y + layer.payload.sourceRegion.height / 2,
-  }
+  const source = sourceOverride ?? loupeSourceCenter(layer)
   const markerHalf = 4 / scale
   context.save()
   context.fillStyle = '#ffffff'
@@ -2319,7 +2393,8 @@ function updateHoverCursor(point: CanvasPoint): void {
   if (
     calloutHandleAtPoint(layer, point) ||
     arrowHandleAtPoint(layer, point) ||
-    intrinsicEndpointAtPoint(layer, point)
+    intrinsicEndpointAtPoint(layer, point) ||
+    loupeSourceHandleAtPoint(layer, point)
   ) {
     setDirectCursor('crosshair')
     return
@@ -2345,6 +2420,15 @@ function calloutHandleAtPoint(
     const candidate = transformPoint(layer.transform, local)
     return Math.hypot(candidate.x - point.x, candidate.y - point.y) <= tolerance
   })?.kind
+}
+function loupeSourceHandleAtPoint(
+  layer: LayerNode,
+  point: CanvasPoint,
+): boolean {
+  if (layer.kind !== 'loupe') return false
+  const source = loupeSourceCenter(layer)
+  const tolerance = 9 / ((props.zoom ?? 100) / 100)
+  return Math.hypot(source.x - point.x, source.y - point.y) <= tolerance
 }
 function calloutEditorOrigin(
   label: CanvasPoint,
@@ -2431,6 +2515,25 @@ function onPointerDown(event: PointerEvent): void {
       start: point,
       initial: session,
     }
+    return
+  }
+  const selected = selectedLayer()
+  const loupeSource =
+    selected?.kind === 'loupe' && !selected.locked
+      ? loupeSourceHandleAtPoint(selected, point)
+      : false
+  if (selected?.kind === 'loupe' && loupeSource) {
+    event.preventDefault()
+    scene.value.setPointerCapture(event.pointerId)
+    setDirectCursor('crosshair')
+    gesture = {
+      kind: 'loupeSource',
+      id: selected.id,
+      start: point,
+      current: point,
+      initial: selected,
+    }
+    renderCommittedSceneForGesture()
     return
   }
   if (
@@ -2540,7 +2643,6 @@ function onPointerDown(event: PointerEvent): void {
     invalidateOverlay()
     return
   }
-  const selected = selectedLayer()
   const calloutHandle =
     selected?.kind === 'callout' && !selected.locked
       ? calloutHandleAtPoint(selected, point)
@@ -3129,7 +3231,7 @@ function onPointerMove(event: PointerEvent): void {
       guides: result.guides,
       guidesVisible: event.altKey,
     }
-    invalidateOverlay()
+    invalidateGesturePreview()
     return
   }
   if (gesture.kind === 'resize') {
@@ -3139,7 +3241,7 @@ function onPointerMove(event: PointerEvent): void {
       freeResize: event.shiftKey,
       centerResize: event.altKey,
     }
-    invalidateOverlay()
+    invalidateGesturePreview()
     return
   }
   if (gesture.kind === 'intrinsicResize') {
@@ -3155,7 +3257,7 @@ function onPointerMove(event: PointerEvent): void {
           ? false
           : event.altKey,
     }
-    invalidateOverlay()
+    invalidateGesturePreview()
     return
   }
   if (gesture.kind === 'rotate') {
@@ -3167,7 +3269,7 @@ function onPointerMove(event: PointerEvent): void {
       gesture.initial.rotation + ((angle - gesture.startAngle) * 180) / Math.PI
     if (event.shiftKey) rotation = Math.round(rotation / 15) * 15
     gesture = { ...gesture, currentAngle: rotation }
-    invalidateOverlay()
+    invalidateGesturePreview()
     return
   }
   if (gesture.kind === 'arrowHandle') {
@@ -3178,6 +3280,11 @@ function onPointerMove(event: PointerEvent): void {
   if (gesture.kind === 'calloutHandle') {
     gesture = { ...gesture, current: point }
     invalidateOverlay()
+    return
+  }
+  if (gesture.kind === 'loupeSource') {
+    gesture = { ...gesture, current: point }
+    renderCommittedSceneForGesture()
     return
   }
   if (gesture.kind === 'calloutDraw') {
@@ -3356,6 +3463,20 @@ function finishGesture(event: PointerEvent): void {
       })
     }
   }
+  if (
+    completed?.kind === 'loupeSource' &&
+    (completed.current.x !== completed.start.x ||
+      completed.current.y !== completed.start.y)
+  ) {
+    const after = moveLoupeSourceMarker(completed.initial, completed.current)
+    if (JSON.stringify(after) !== JSON.stringify(completed.initial)) {
+      emit('documentCommand', {
+        type: 'updateLayer',
+        before: completed.initial,
+        after,
+      })
+    }
+  }
   if (completed?.kind === 'calloutDraw') {
     if (
       completed.start.x !== completed.current.x ||
@@ -3421,7 +3542,8 @@ function finishGesture(event: PointerEvent): void {
     completed?.kind === 'intrinsicResize' ||
     completed?.kind === 'rotate' ||
     completed?.kind === 'arrowHandle' ||
-    completed?.kind === 'calloutHandle'
+    completed?.kind === 'calloutHandle' ||
+    completed?.kind === 'loupeSource'
   ) {
     void nextTick(() => {
       renderCommittedSceneForGesture()
@@ -3437,7 +3559,8 @@ function cancelGesture(event?: PointerEvent): void {
     gesture?.kind === 'intrinsicResize' ||
     gesture?.kind === 'rotate' ||
     gesture?.kind === 'arrowHandle' ||
-    gesture?.kind === 'calloutHandle'
+    gesture?.kind === 'calloutHandle' ||
+    gesture?.kind === 'loupeSource'
   gesture = undefined
   isPanning.value = false
   if (cancelledCrop) cropSession = cancelledCrop

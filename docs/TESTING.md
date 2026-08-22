@@ -1166,6 +1166,30 @@ renderer/export and the persisted loupe tool are unchanged.
   attempts reported no embedded-session capability. No real-Tauri/WebView or
   native-clipboard result is claimed.
 
+## Loupe source-marker drag evidence (2026-08-22)
+
+Windows x64 local workspace. The source-marker repair is limited to the
+selected persisted loupe; document schema v7, renderer/export and creation
+defaults are unchanged.
+
+- The red-first Vue test failed because the drawn source marker had no hit-test
+  gesture and emitted no `EditorCommand`.
+- Final `pnpm vitest run --project vue tests/unit/vue/m08-precision-interactions.test.ts`
+  passed 37/37. It drags the source marker while the Loupe tool remains active,
+  verifies no new layer is created, and observes one `updateLayer` command that
+  keeps source-region dimensions while moving its centre.
+- During the drag, the non-reactive transient source region is rendered through
+  the ordered Canvas2D scene, so its connector, lens sample and overlay marker
+  use the same source centre in each frame; only pointer-up writes the command.
+- Moving or resizing the lens uses that same ordered scene path. The generic
+  overlay deliberately receives no loupe node, because it cannot provide the
+  composite-below surface required to render the connector and lens together.
+- The complete Vue project passed 14 files and 151/151 tests. JSDOM reports its
+  known unimplemented canvas-context notices during unrelated tests, but they
+  do not fail a test or produce an unhandled exception.
+- `pnpm typecheck` and scoped Prettier verification passed. No browser or
+  real-Tauri evidence is claimed for this focused interaction repair.
+
 ## CI gates
 
 ### Каждый PR

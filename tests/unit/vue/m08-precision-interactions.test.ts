@@ -661,6 +661,50 @@ describe('M08 manual precision tools', () => {
     })
   })
 
+  it('moves a selected loupe source marker in one document command', async () => {
+    const loupe = precisionLayerFixture('loupe')
+    const { scene, emitted } = mountViewportDocument(
+      'loupe',
+      { ...documentFixture(), layers: [loupe] },
+      precisionDefaults,
+      loupe.id,
+    )
+
+    await fireEvent.pointerDown(scene, {
+      pointerId: 29,
+      clientX: 22,
+      clientY: 22,
+    })
+    await fireEvent.pointerMove(scene, {
+      pointerId: 29,
+      clientX: 42,
+      clientY: 30,
+    })
+    expect(emitted().documentCommand).toBeUndefined()
+    await fireEvent.pointerUp(scene, {
+      pointerId: 29,
+      clientX: 42,
+      clientY: 30,
+    })
+
+    expect(emitted().documentCommand).toEqual([
+      [
+        {
+          type: 'updateLayer',
+          before: loupe,
+          after: expect.objectContaining({
+            id: loupe.id,
+            kind: 'loupe',
+            payload: expect.objectContaining({
+              sourceRegion: { x: 30, y: 18, width: 24, height: 24 },
+            }),
+          }),
+        },
+      ],
+    ])
+    expect(emitted().addLayer).toBeUndefined()
+  })
+
   it('commits a freeform censor polygon from the transient pointer path', async () => {
     vi.stubGlobal('crypto', {
       randomUUID: vi.fn(() => '019c1f62-058e-7000-8000-000000000822'),
