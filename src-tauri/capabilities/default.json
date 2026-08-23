@@ -2,6 +2,6 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Production permissions for the main Cute Screen window.",
-  "windows": ["main"],
+  "windows": ["main", "quick-capture"],
   "permissions": ["core:default", "notification:default"]
 }

@@ -279,6 +279,7 @@ export const translationKeys = [
   'captureSelecting',
   'captureCapturing',
   'capturePersisting',
+  'captureQuickEditing',
   'captureCancelled',
   'openImage',
   'openImageAction',

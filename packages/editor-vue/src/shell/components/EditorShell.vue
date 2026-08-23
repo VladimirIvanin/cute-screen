@@ -10,6 +10,7 @@ import {
 } from 'vue'
 import { storeToRefs } from 'pinia'
 import {
+  NButton,
   NConfigProvider,
   darkTheme,
   dateEnUS,
@@ -121,6 +122,7 @@ const props = withDefaults(
     contentImageBridge?: ContentImageBridge | undefined
     clipboardBridge?: ClipboardBridge | undefined
     systemFonts?: readonly SystemFontFace[] | undefined
+    quickMode?: boolean
   }>(),
   {
     actions: undefined,
@@ -139,6 +141,7 @@ const props = withDefaults(
     contentImageBridge: undefined,
     clipboardBridge: undefined,
     systemFonts: undefined,
+    quickMode: false,
   },
 )
 const emit = defineEmits<{
@@ -585,7 +588,7 @@ const translate = (key: Parameters<typeof t>[1]) => t(state.locale.value, key)
 const hasInteractiveDocument = computed(
   () => props.documentSession !== undefined || props.fixture === 'ready',
 )
-const tools = computed<readonly ToolDescriptor[]>(() => [
+const allTools = computed<readonly ToolDescriptor[]>(() => [
   {
     id: 'select',
     group: 'canvas',
@@ -732,6 +735,27 @@ const tools = computed<readonly ToolDescriptor[]>(() => [
       : 'readOnlyDocument',
   },
 ])
+const quickToolIds = new Set([
+  'select',
+  'arrow',
+  'shape',
+  'pencil',
+  'marker',
+  'text',
+  'numberedMarker',
+  'callout',
+  'image',
+  'eyedropper',
+  'censor',
+  'spotlight',
+  'ruler',
+  'loupe',
+])
+const tools = computed<readonly ToolDescriptor[]>(() =>
+  props.quickMode
+    ? allTools.value.filter((tool) => quickToolIds.has(tool.id))
+    : allTools.value,
+)
 function hexColor(value: unknown): string {
   if (!value || typeof value !== 'object') return '#e5484d'
   const color = value as Record<string, unknown>
@@ -4303,6 +4327,7 @@ watch(
   >
     <div class="cs-editor-shell">
       <TopBar
+        v-if="!props.quickMode"
         :locale="store.locale"
         :theme="store.preferences.theme"
         :can-copy-or-export="store.canCopyOrExport"
@@ -4356,7 +4381,43 @@ watch(
         </button>
       </div>
       <div class="cs-workbench">
+        <div v-if="props.quickMode" class="cs-quick-toolrail-group">
+          <ToolRail
+            :tools="tools"
+            :active-tool-id="store.activeToolId"
+            :t="translate"
+            @select="selectTool"
+            @configure="openToolConfigure"
+          />
+          <div
+            class="cs-quick-history"
+            role="group"
+            :aria-label="translate('undo')"
+          >
+            <NButton
+              quaternary
+              circle
+              class="cs-tool-button"
+              :disabled="!store.documentHistory.canUndo"
+              :aria-label="translate('undo')"
+              @click="undoDocument"
+            >
+              <UiIcon name="undo" />
+            </NButton>
+            <NButton
+              quaternary
+              circle
+              class="cs-tool-button"
+              :disabled="!store.documentHistory.canRedo"
+              :aria-label="translate('redo')"
+              @click="redoDocument"
+            >
+              <UiIcon name="redo" />
+            </NButton>
+          </div>
+        </div>
         <ToolRail
+          v-else
           :tools="tools"
           :active-tool-id="store.activeToolId"
           :t="translate"
@@ -4395,6 +4456,7 @@ watch(
           :open-image-available="props.openImageAvailable"
           :zoom="store.zoom"
           :fit-mode="store.zoomMode === 'fit'"
+          :quick-frame-mode="props.quickMode"
           :t="translate"
           @hosts-ready="emit('hostsReady', $event)"
           @select-layer="selectLayer"
@@ -4418,6 +4480,7 @@ watch(
           @retry="emit('retryLoad')"
         />
         <LayersPanel
+          v-if="!props.quickMode"
           :layers="store.layers"
           :open="store.layersOpen"
           :selected-layer-id="store.selectedLayerId"
@@ -4432,6 +4495,7 @@ watch(
           @reorder-to="onLayerReorderTo"
         />
         <ZoomControls
+          v-if="!props.quickMode"
           :zoom="store.zoom"
           :t="translate"
           @zoom="store.setZoom"
@@ -4448,6 +4512,7 @@ watch(
         />
       </div>
       <SeriesFilmstrip
+        v-if="!props.quickMode"
         :frames="store.frames"
         :active-frame-id="store.activeFrameId"
         :t="translate"

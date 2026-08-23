@@ -17,7 +17,8 @@ defineProps<{
       | 'captureDelay'
       | 'captureSelecting'
       | 'captureCapturing'
-      | 'capturePersisting',
+      | 'capturePersisting'
+      | 'captureQuickEditing',
   ) => string
 }>()
 const emit = defineEmits<{ cancel: []; retry: [] }>()
@@ -38,6 +39,7 @@ const progressKey: Record<
   | 'captureSelecting'
   | 'captureCapturing'
   | 'capturePersisting'
+  | 'captureQuickEditing'
 > = {
   probing: 'captureProbing',
   ready: 'captureReady',
@@ -45,6 +47,7 @@ const progressKey: Record<
   selecting: 'captureSelecting',
   capturing: 'captureCapturing',
   persisting: 'capturePersisting',
+  quickEditing: 'captureQuickEditing',
 }
 </script>
 

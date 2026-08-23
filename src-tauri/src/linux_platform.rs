@@ -156,6 +156,7 @@ impl AshpdPortalClient {
             width,
             height,
             geometry: None,
+            quick_frame_geometry: None,
             cursor_included: None,
         })
     }

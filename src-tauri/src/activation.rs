@@ -255,9 +255,10 @@ mod unix {
             let server = ActivationServer::start(
                 endpoint.clone(),
                 Arc::new(|_capture| CaptureOutcomeV1 {
-                    version: 1,
+                    version: 2,
                     correlation_id: "capture-1".to_owned(),
                     outcome: CaptureTerminalOutcome::Cancelled,
+                    completion: None,
                     document: None,
                 }),
             )
@@ -276,9 +277,10 @@ mod unix {
             let server = ActivationServer::start(
                 endpoint.clone(),
                 Arc::new(|_capture| CaptureOutcomeV1 {
-                    version: 1,
+                    version: 2,
                     correlation_id: "capture-1".to_owned(),
                     outcome: CaptureTerminalOutcome::Cancelled,
+                    completion: None,
                     document: None,
                 }),
             )
@@ -301,9 +303,10 @@ mod unix {
             let server = ActivationServer::start(
                 endpoint.clone(),
                 Arc::new(|_capture| CaptureOutcomeV1 {
-                    version: 1,
+                    version: 2,
                     correlation_id: "capture-1".to_owned(),
                     outcome: CaptureTerminalOutcome::Cancelled,
+                    completion: None,
                     document: None,
                 }),
             )

@@ -710,7 +710,19 @@ async function installLifecycleGuards(): Promise<void> {
       'cute-screen:capture-outcome',
       async (event) => {
         captureProgress.value = undefined
-        if (event.payload.outcome === 'captured') await mountCapturedDocument()
+        if (event.payload.outcome !== 'captured') return
+        let mounted = false
+        try {
+          mounted = await mountCapturedDocument()
+        } finally {
+          const documentId = event.payload.document?.documentId
+          if (event.payload.completion === 'editor' && documentId) {
+            await tauriDesktopBridge.quickCaptureEditorMounted(
+              documentId,
+              mounted,
+            )
+          }
+        }
       },
     ),
   )

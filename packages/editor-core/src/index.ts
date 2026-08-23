@@ -222,6 +222,10 @@ export {
   type ViewportState,
 } from './viewport'
 export {
+  materializeQuickCaptureDocument,
+  type QuickCaptureMaterialization,
+} from './quick-capture'
+export {
   hitTestDocument,
   hitTestDocumentAll,
   DocumentSpatialIndex,

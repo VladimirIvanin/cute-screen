@@ -20,7 +20,7 @@ use crate::{
 #[cfg(target_os = "linux")]
 use crate::platform::{CaptureRequest, PortalClient};
 
-const CAPTURE_OUTCOME_VERSION: u8 = 1;
+const CAPTURE_OUTCOME_VERSION: u8 = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -86,12 +86,57 @@ pub struct CaptureRequestV1 {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CaptureOutcomeV1 {
+pub struct CaptureOutcomeV2 {
     pub version: u8,
     pub correlation_id: String,
     pub outcome: CaptureTerminalOutcome,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub completion: Option<CaptureCompletion>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub document: Option<OpenDocument>,
+}
+
+pub type CaptureOutcomeV1 = CaptureOutcomeV2;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CaptureCompletion {
+    Copied,
+    Saved,
+    Editor,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QuickCaptureSelectionV1 {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QuickCaptureDraftV1 {
+    pub version: u8,
+    pub draft_id: String,
+    pub correlation_id: String,
+    pub image_token: String,
+    pub width: u32,
+    pub height: u32,
+    pub selection: QuickCaptureSelectionV1,
+    pub can_expand_selection: bool,
+}
+
+#[derive(Debug)]
+struct QuickCaptureDraftRecord {
+    descriptor: QuickCaptureDraftV1,
+    request: CaptureRequestV1,
+    geometry: Option<CaptureGeometry>,
+    frame_geometry: Option<CaptureGeometry>,
+    cursor_included: Option<bool>,
+    prepared_token: Option<String>,
+    terminal: Option<tokio::sync::oneshot::Sender<CaptureOutcomeV2>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -118,6 +163,7 @@ pub enum CaptureProgressState {
     Selecting,
     Capturing,
     Persisting,
+    QuickEditing,
 }
 
 /// Identifies the ingress that created a document without changing its editor
@@ -194,6 +240,7 @@ pub struct CaptureController {
     transport: Arc<ImageTransportService>,
     state: Arc<Mutex<CaptureState>>,
     cancel_signal: Arc<AtomicBool>,
+    quick_draft: Arc<Mutex<Option<QuickCaptureDraftRecord>>>,
     #[cfg(all(target_os = "linux", feature = "x11-capture"))]
     last_x11_area: Arc<Mutex<Option<CaptureGeometry>>>,
 }
@@ -211,6 +258,7 @@ impl CaptureController {
             transport,
             state: Arc::new(Mutex::new(CaptureState::default())),
             cancel_signal: Arc::new(AtomicBool::new(false)),
+            quick_draft: Arc::new(Mutex::new(None)),
             #[cfg(all(target_os = "linux", feature = "x11-capture"))]
             last_x11_area: Arc::new(Mutex::new(None)),
         }
@@ -220,6 +268,377 @@ impl CaptureController {
     /// second activation observes `busy`; it never creates a hidden queue.
     pub async fn capture(&self, request: CaptureRequestV1) -> CaptureOutcomeV1 {
         self.capture_with_progress(request, |_| {}).await
+    }
+
+    pub fn active_quick_draft(&self) -> Option<QuickCaptureDraftV1> {
+        self.quick_draft
+            .lock()
+            .ok()
+            .and_then(|active| active.as_ref().map(|record| record.descriptor.clone()))
+    }
+
+    pub fn stage_quick_frame(
+        &self,
+        request: &CaptureRequestV1,
+        frame: CaptureResult,
+    ) -> Result<QuickCaptureDraftV1, crate::platform::PlatformError> {
+        self.stage_quick_frame_with_terminal(request, frame, None)
+    }
+
+    fn stage_quick_frame_with_terminal(
+        &self,
+        request: &CaptureRequestV1,
+        frame: CaptureResult,
+        terminal: Option<tokio::sync::oneshot::Sender<CaptureOutcomeV2>>,
+    ) -> Result<QuickCaptureDraftV1, crate::platform::PlatformError> {
+        if request.action != CaptureAction::Area || frame.width == 0 || frame.height == 0 {
+            return Err(crate::platform::PlatformError::new(
+                PlatformErrorCode::InvalidTarget,
+                &request.correlation_id,
+            ));
+        }
+        let mut active = self.quick_draft.lock().map_err(|_| {
+            crate::platform::PlatformError::new(
+                PlatformErrorCode::CaptureFailed,
+                &request.correlation_id,
+            )
+        })?;
+        if active.is_some() {
+            return Err(crate::platform::PlatformError::new(
+                PlatformErrorCode::Busy,
+                &request.correlation_id,
+            ));
+        }
+        let (selection, can_expand_selection) =
+            match (frame.quick_frame_geometry.as_ref(), frame.geometry.as_ref()) {
+                (Some(frame_geometry), Some(selection_geometry)) => {
+                    let x = selection_geometry
+                        .x
+                        .checked_sub(frame_geometry.x)
+                        .and_then(|value| u32::try_from(value).ok());
+                    let y = selection_geometry
+                        .y
+                        .checked_sub(frame_geometry.y)
+                        .and_then(|value| u32::try_from(value).ok());
+                    let Some((x, y)) = x.zip(y) else {
+                        return Err(crate::platform::PlatformError::new(
+                            PlatformErrorCode::InvalidTarget,
+                            &request.correlation_id,
+                        ));
+                    };
+                    (
+                        QuickCaptureSelectionV1 {
+                            x,
+                            y,
+                            width: selection_geometry.width,
+                            height: selection_geometry.height,
+                        },
+                        true,
+                    )
+                }
+                _ => (
+                    QuickCaptureSelectionV1 {
+                        x: 0,
+                        y: 0,
+                        width: frame.width,
+                        height: frame.height,
+                    },
+                    false,
+                ),
+            };
+        if selection
+            .x
+            .checked_add(selection.width)
+            .is_none_or(|right| right > frame.width)
+            || selection
+                .y
+                .checked_add(selection.height)
+                .is_none_or(|bottom| bottom > frame.height)
+        {
+            return Err(crate::platform::PlatformError::new(
+                PlatformErrorCode::InvalidTarget,
+                &request.correlation_id,
+            ));
+        }
+        let descriptor = QuickCaptureDraftV1 {
+            version: 1,
+            draft_id: Uuid::now_v7().to_string(),
+            correlation_id: request.correlation_id.clone(),
+            image_token: frame.image_token,
+            width: frame.width,
+            height: frame.height,
+            selection,
+            can_expand_selection,
+        };
+        *active = Some(QuickCaptureDraftRecord {
+            descriptor: descriptor.clone(),
+            request: request.clone(),
+            geometry: frame.geometry,
+            frame_geometry: frame.quick_frame_geometry,
+            cursor_included: frame.cursor_included,
+            prepared_token: None,
+            terminal,
+        });
+        Ok(descriptor)
+    }
+
+    async fn wait_for_quick_frame<F>(
+        &self,
+        request: &CaptureRequestV1,
+        frame: CaptureResult,
+        ready: F,
+    ) -> CaptureOutcomeV2
+    where
+        F: FnOnce(),
+    {
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        if let Err(error) = self.stage_quick_frame_with_terminal(request, frame, Some(sender)) {
+            return terminal(
+                &request.correlation_id,
+                terminal_from_error(error.code),
+                None,
+            );
+        }
+        ready();
+        match tokio::time::timeout(std::time::Duration::from_secs(30 * 60), receiver).await {
+            Ok(Ok(outcome)) => outcome,
+            Ok(Err(_)) => terminal(
+                &request.correlation_id,
+                CaptureTerminalOutcome::Failed,
+                None,
+            ),
+            Err(_) => {
+                if let Some(draft) = self.active_quick_draft() {
+                    let _ = self.cancel_quick_draft(&draft.draft_id);
+                }
+                terminal(
+                    &request.correlation_id,
+                    CaptureTerminalOutcome::Cancelled,
+                    None,
+                )
+            }
+        }
+    }
+
+    pub fn cancel_quick_draft(&self, draft_id: &str) -> bool {
+        let record = {
+            let Ok(mut active) = self.quick_draft.lock() else {
+                return false;
+            };
+            if active
+                .as_ref()
+                .is_none_or(|record| record.descriptor.draft_id != draft_id)
+            {
+                return false;
+            }
+            active.take()
+        };
+        let Some(record) = record else {
+            return false;
+        };
+        let _ = self.transport.take_owned_image(
+            &record.descriptor.image_token,
+            &record.descriptor.correlation_id,
+        );
+        if let Some(token) = record.prepared_token {
+            let _ = self
+                .transport
+                .take_owned_image(&token, &record.descriptor.correlation_id);
+        }
+        if let Some(sender) = record.terminal {
+            let _ = sender.send(terminal(
+                &record.descriptor.correlation_id,
+                CaptureTerminalOutcome::Cancelled,
+                None,
+            ));
+        }
+        true
+    }
+
+    pub fn prepare_quick_result(&self, bytes: &[u8]) -> Result<(), RepositoryError> {
+        let metadata = inspect_content_image_bytes(bytes)?;
+        if metadata.format != "png" {
+            return Err(RepositoryError::InvalidImage);
+        }
+        let (draft_id, correlation_id) = {
+            let active = self
+                .quick_draft
+                .lock()
+                .map_err(|_| RepositoryError::Io("quick draft lock poisoned".to_owned()))?;
+            let record = active.as_ref().ok_or_else(|| {
+                RepositoryError::InvalidDocument("quick draft is not active".to_owned())
+            })?;
+            (
+                record.descriptor.draft_id.clone(),
+                record.descriptor.correlation_id.clone(),
+            )
+        };
+        let token = format!("quick-result-{}", Uuid::now_v7().simple());
+        self.transport
+            .import_owned_bytes(
+                &token,
+                bytes,
+                "image/png",
+                metadata.width,
+                metadata.height,
+                &correlation_id,
+            )
+            .map_err(|error| RepositoryError::Io(error.to_string()))?;
+        let previous = {
+            let mut active = self
+                .quick_draft
+                .lock()
+                .map_err(|_| RepositoryError::Io("quick draft lock poisoned".to_owned()))?;
+            let Some(record) = active.as_mut() else {
+                let _ = self.transport.take_owned_image(&token, &correlation_id);
+                return Err(RepositoryError::InvalidDocument(
+                    "quick draft is not active".to_owned(),
+                ));
+            };
+            if record.descriptor.draft_id != draft_id {
+                let _ = self.transport.take_owned_image(&token, &correlation_id);
+                return Err(RepositoryError::InvalidDocument(
+                    "quick draft changed while preparing result".to_owned(),
+                ));
+            }
+            record.prepared_token.replace(token)
+        };
+        if let Some(previous) = previous {
+            let _ = self.transport.take_owned_image(&previous, &correlation_id);
+        }
+        Ok(())
+    }
+
+    pub fn commit_quick_draft(
+        &self,
+        draft_id: &str,
+        document_json: String,
+        completion: CaptureCompletion,
+        selection: QuickCaptureSelectionV1,
+    ) -> Result<CaptureOutcomeV2, RepositoryError> {
+        let (request, mut geometry, cursor_included, correlation_id, image_token, prepared_token) = {
+            let active = self
+                .quick_draft
+                .lock()
+                .map_err(|_| RepositoryError::Io("quick draft lock poisoned".to_owned()))?;
+            let record = active
+                .as_ref()
+                .filter(|record| record.descriptor.draft_id == draft_id)
+                .ok_or_else(|| {
+                    RepositoryError::InvalidDocument("quick draft is not active".to_owned())
+                })?;
+            if selection
+                .x
+                .checked_add(selection.width)
+                .is_none_or(|right| right > record.descriptor.width)
+                || selection
+                    .y
+                    .checked_add(selection.height)
+                    .is_none_or(|bottom| bottom > record.descriptor.height)
+                || selection.width == 0
+                || selection.height == 0
+            {
+                return Err(RepositoryError::InvalidDocument(
+                    "quick selection exceeds the frozen frame".to_owned(),
+                ));
+            }
+            let mut geometry = record.geometry.clone();
+            if let Some(frame) = record.frame_geometry.as_ref() {
+                geometry = Some(CaptureGeometry {
+                    x: frame
+                        .x
+                        .saturating_add(i32::try_from(selection.x).unwrap_or(i32::MAX)),
+                    y: frame
+                        .y
+                        .saturating_add(i32::try_from(selection.y).unwrap_or(i32::MAX)),
+                    width: selection.width,
+                    height: selection.height,
+                    source_width: frame.source_width,
+                    source_height: frame.source_height,
+                    layout_fingerprint: frame.layout_fingerprint.clone(),
+                    monitor_ids: None,
+                });
+            }
+            (
+                record.request.clone(),
+                geometry,
+                record.cursor_included,
+                record.descriptor.correlation_id.clone(),
+                record.descriptor.image_token.clone(),
+                record.prepared_token.clone(),
+            )
+        };
+        let result_token = prepared_token.as_deref().unwrap_or(&image_token);
+        let owned = self
+            .transport
+            .take_owned_image(result_token, &correlation_id)
+            .map_err(|error| RepositoryError::Io(error.to_string()))?;
+        if owned.width != selection.width || owned.height != selection.height {
+            let _ = self.transport.import_owned_bytes(
+                result_token,
+                &owned.bytes,
+                &owned.mime_type,
+                owned.width,
+                owned.height,
+                &correlation_id,
+            );
+            return Err(RepositoryError::InvalidImage);
+        }
+        let recovery = owned.clone();
+        let document = match self.persist_quick_owned(
+            &request,
+            geometry.take(),
+            cursor_included,
+            owned,
+            document_json,
+        ) {
+            Ok(document) => document,
+            Err(error) => {
+                let _ = self.transport.import_owned_bytes(
+                    result_token,
+                    &recovery.bytes,
+                    &recovery.mime_type,
+                    recovery.width,
+                    recovery.height,
+                    &correlation_id,
+                );
+                return Err(error);
+            }
+        };
+        let record = {
+            let mut active = self
+                .quick_draft
+                .lock()
+                .map_err(|_| RepositoryError::Io("quick draft lock poisoned".to_owned()))?;
+            active.take().ok_or_else(|| {
+                RepositoryError::InvalidDocument("quick draft is not active".to_owned())
+            })?
+        };
+        if prepared_token.is_some() {
+            let _ = self
+                .transport
+                .take_owned_image(&image_token, &correlation_id);
+        }
+        let source = self
+            .repository
+            .resolve_capture_source(document.capture_id.clone(), document.source_hash.clone())?;
+        let token = Uuid::now_v7().simple().to_string();
+        self.transport
+            .register_authoritative(token.clone(), source)
+            .map_err(|error| RepositoryError::Io(error.to_string()))?;
+        let mut document = document;
+        document.image_token = Some(token);
+        let outcome = CaptureOutcomeV2 {
+            version: CAPTURE_OUTCOME_VERSION,
+            correlation_id,
+            outcome: CaptureTerminalOutcome::Captured,
+            completion: Some(completion),
+            document: Some(document),
+        };
+        if let Some(sender) = record.terminal {
+            let _ = sender.send(outcome.clone());
+        }
+        Ok(outcome)
     }
 
     /// Runs capture while synchronously publishing state transitions to the
@@ -270,6 +689,12 @@ impl CaptureController {
             progress(CaptureProgressState::Capturing);
             let result = fake_capture_frame(&self.transport, &request.correlation_id);
             return match result {
+                Ok(frame) if request.action == CaptureAction::Area => {
+                    self.wait_for_quick_frame(&request, frame, || {
+                        progress(CaptureProgressState::QuickEditing);
+                    })
+                    .await
+                }
                 Ok(frame) => {
                     progress(CaptureProgressState::Persisting);
                     self.persist_frame(&request, frame)
@@ -353,6 +778,12 @@ impl CaptureController {
             ));
 
         match result {
+            Ok(frame) if request.action == CaptureAction::Area => {
+                self.wait_for_quick_frame(&request, frame, || {
+                    progress(CaptureProgressState::QuickEditing);
+                })
+                .await
+            }
             Ok(frame) => {
                 progress(CaptureProgressState::Persisting);
                 self.persist_frame(&request, frame)
@@ -373,6 +804,9 @@ impl CaptureController {
     /// Cancels an active pre-capture delay. Native/portal selectors retain
     /// their own cancellation mechanisms after the backend has been invoked.
     pub fn cancel(&self) -> bool {
+        if let Some(draft) = self.active_quick_draft() {
+            return self.cancel_quick_draft(&draft.draft_id);
+        }
         let Ok(mut state) = self.state.lock() else {
             return false;
         };
@@ -462,6 +896,48 @@ impl CaptureController {
             },
         )
     }
+
+    fn persist_quick_owned(
+        &self,
+        request: &CaptureRequestV1,
+        geometry: Option<CaptureGeometry>,
+        cursor_included: Option<bool>,
+        owned: OwnedImage,
+        document_json: String,
+    ) -> Result<OpenDocument, RepositoryError> {
+        let source_metadata = inspect_content_image_bytes(&owned.bytes)?;
+        if source_metadata.width != owned.width || source_metadata.height != owned.height {
+            return Err(RepositoryError::InvalidImage);
+        }
+        let source_hash = format!("{:x}", Sha256::digest(&owned.bytes));
+        let document: serde_json::Value = serde_json::from_str(&document_json)
+            .map_err(|error| RepositoryError::InvalidDocument(error.to_string()))?;
+        let document_id = document
+            .get("id")
+            .and_then(serde_json::Value::as_str)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| RepositoryError::InvalidDocument("id is missing".to_owned()))?
+            .to_owned();
+        if document
+            .pointer("/source/blobHash")
+            .and_then(serde_json::Value::as_str)
+            != Some(source_hash.as_str())
+        {
+            return Err(RepositoryError::InvalidDocument(
+                "quick document source hash does not match staged pixels".to_owned(),
+            ));
+        }
+        self.repository.create_capture(CreateCaptureRequest {
+            document_id,
+            capture_id: Uuid::now_v7().to_string(),
+            series_id: request.series_id.clone(),
+            document_json,
+            source_bytes: owned.bytes,
+            source_metadata,
+            capture_metadata: capture_metadata(request, geometry, cursor_included),
+            captured_at: Utc::now().timestamp_millis(),
+        })
+    }
 }
 
 fn progress_before_backend(action: CaptureAction) -> CaptureProgressState {
@@ -505,6 +981,7 @@ fn fake_capture_frame(
         width: WIDTH,
         height: HEIGHT,
         geometry: None,
+        quick_frame_geometry: None,
         cursor_included: None,
     })
 }
@@ -694,6 +1171,11 @@ fn terminal(
         version: CAPTURE_OUTCOME_VERSION,
         correlation_id: correlation_id.to_owned(),
         outcome,
+        completion: if outcome == CaptureTerminalOutcome::Captured && document.is_some() {
+            Some(CaptureCompletion::Editor)
+        } else {
+            None
+        },
         document,
     }
 }
@@ -758,12 +1240,13 @@ mod tests {
     };
     use crate::{
         image_transport::{ImageTransportService, OwnedImage},
-        platform::{CaptureResult, PlatformErrorCode},
+        platform::{CaptureGeometry, CaptureResult, PlatformErrorCode},
         storage::{
             BlobMetadata, CaptureMetadataV1, LibraryRepository, RepositoryError,
             StorageFaultInjector, StorageFaultPoint,
         },
     };
+    use sha2::Digest;
     use std::{
         fs,
         sync::{Arc, Mutex, atomic::AtomicBool},
@@ -814,7 +1297,7 @@ mod tests {
             None,
         );
         assert_eq!(outcome.outcome, CaptureTerminalOutcome::Cancelled);
-        assert_eq!(outcome.version, 1);
+        assert_eq!(outcome.version, 2);
     }
 
     #[test]
@@ -1092,6 +1575,7 @@ mod tests {
                 width: 1,
                 height: 1,
                 geometry: None,
+                quick_frame_geometry: None,
                 cursor_included: None,
             },
         );
@@ -1146,6 +1630,7 @@ mod tests {
                 width: 1,
                 height: 1,
                 geometry: None,
+                quick_frame_geometry: None,
                 cursor_included: None,
             },
         );
@@ -1163,14 +1648,263 @@ mod tests {
         assert!(repository.open_last().expect("open last").is_some());
     }
 
+    #[test]
+    fn area_draft_is_not_persisted_until_commit_and_cancel_consumes_staging() {
+        let directory = tempfile::tempdir().expect("temporary library");
+        let repository =
+            LibraryRepository::initialize(directory.path(), directory.path()).expect("repository");
+        let source_root = directory.path().join("transport");
+        let transport = Arc::new(
+            ImageTransportService::new(&source_root, directory.path().join("stage"))
+                .expect("transport"),
+        );
+        transport
+            .import_owned_bytes(
+                "quick-owned",
+                &png_1x1(),
+                "image/png",
+                1,
+                1,
+                "quick-capture",
+            )
+            .expect("owned capture staging");
+        let controller = CaptureController::new(repository.clone(), Arc::clone(&transport));
+        let draft = controller
+            .stage_quick_frame(
+                &CaptureRequestV1 {
+                    correlation_id: "quick-capture".to_owned(),
+                    action: CaptureAction::Area,
+                    delay_ms: 0,
+                    cursor: false,
+                    series_id: None,
+                    invocation_source: CaptureInvocationSource::Ui,
+                },
+                CaptureResult {
+                    image_token: "quick-owned".to_owned(),
+                    correlation_id: "quick-capture".to_owned(),
+                    width: 1,
+                    height: 1,
+                    geometry: None,
+                    quick_frame_geometry: None,
+                    cursor_included: None,
+                },
+            )
+            .expect("quick draft");
+
+        assert_eq!(draft.version, 1);
+        assert_eq!(draft.selection.width, 1);
+        assert!(!draft.can_expand_selection);
+        assert!(repository.open_last().expect("open last").is_none());
+        assert!(
+            transport
+                .stage_image(&draft.image_token, "quick-capture")
+                .is_ok()
+        );
+
+        assert!(controller.cancel_quick_draft(&draft.draft_id));
+        assert!(repository.open_last().expect("open last").is_none());
+        assert!(!source_root.join("quick-owned.png").exists());
+        assert!(controller.active_quick_draft().is_none());
+    }
+
+    #[test]
+    fn quick_commit_persists_the_frontend_document_and_reports_completion() {
+        let directory = tempfile::tempdir().expect("temporary library");
+        let repository =
+            LibraryRepository::initialize(directory.path(), directory.path()).expect("repository");
+        let transport = Arc::new(
+            ImageTransportService::new(
+                directory.path().join("transport"),
+                directory.path().join("stage"),
+            )
+            .expect("transport"),
+        );
+        transport
+            .import_owned_bytes(
+                "quick-commit-owned",
+                &png_1x1(),
+                "image/png",
+                1,
+                1,
+                "quick-commit",
+            )
+            .expect("owned capture staging");
+        let controller = CaptureController::new(repository.clone(), transport);
+        let request = CaptureRequestV1 {
+            correlation_id: "quick-commit".to_owned(),
+            action: CaptureAction::Area,
+            delay_ms: 0,
+            cursor: false,
+            series_id: None,
+            invocation_source: CaptureInvocationSource::Ui,
+        };
+        let draft = controller
+            .stage_quick_frame(
+                &request,
+                CaptureResult {
+                    image_token: "quick-commit-owned".to_owned(),
+                    correlation_id: "quick-commit".to_owned(),
+                    width: 1,
+                    height: 1,
+                    geometry: None,
+                    quick_frame_geometry: None,
+                    cursor_included: None,
+                },
+            )
+            .expect("quick draft");
+        let metadata = BlobMetadata {
+            format: "png".to_owned(),
+            mime_type: "image/png".to_owned(),
+            width: 1,
+            height: 1,
+            color_metadata: serde_json::json!({
+                "colorSpace": "srgb",
+                "hasIccProfile": false,
+            }),
+        };
+        let document_id = "019d0000-0000-7000-8000-000000000010";
+        let document_json = super::initial_document_json(
+            document_id,
+            &format!("{:x}", sha2::Sha256::digest(png_1x1())),
+            &metadata,
+            ImageProvenance::Capture,
+            "2026-08-22T00:00:00.000Z".to_owned(),
+        );
+
+        let outcome = controller
+            .commit_quick_draft(
+                &draft.draft_id,
+                document_json,
+                super::CaptureCompletion::Editor,
+                draft.selection,
+            )
+            .expect("quick commit");
+        assert_eq!(outcome.version, 2);
+        assert_eq!(outcome.completion, Some(super::CaptureCompletion::Editor));
+        assert_eq!(
+            outcome
+                .document
+                .as_ref()
+                .map(|value| value.document_id.as_str()),
+            Some(document_id)
+        );
+        assert!(repository.open_last().expect("open last").is_some());
+    }
+
+    #[test]
+    fn full_frame_area_prepares_and_commits_only_the_final_crop() {
+        let directory = tempfile::tempdir().expect("temporary library");
+        let repository =
+            LibraryRepository::initialize(directory.path(), directory.path()).expect("repository");
+        let transport = Arc::new(
+            ImageTransportService::new(
+                directory.path().join("transport"),
+                directory.path().join("stage"),
+            )
+            .expect("transport"),
+        );
+        let full = png_rgba(3, 2, [16, 32, 48, 255]);
+        transport
+            .import_owned_bytes("quick-full", &full, "image/png", 3, 2, "quick-full")
+            .expect("full-frame staging");
+        let controller = CaptureController::new(repository.clone(), transport);
+        let request = CaptureRequestV1 {
+            correlation_id: "quick-full".to_owned(),
+            action: CaptureAction::Area,
+            delay_ms: 0,
+            cursor: false,
+            series_id: None,
+            invocation_source: CaptureInvocationSource::Ui,
+        };
+        let selection_geometry = CaptureGeometry {
+            x: -99,
+            y: 50,
+            width: 1,
+            height: 2,
+            source_width: 3,
+            source_height: 2,
+            layout_fingerprint: Some("layout".to_owned()),
+            monitor_ids: Some(vec!["display".to_owned()]),
+        };
+        let frame_geometry = CaptureGeometry {
+            x: -100,
+            y: 50,
+            width: 3,
+            height: 2,
+            source_width: 3,
+            source_height: 2,
+            layout_fingerprint: Some("layout".to_owned()),
+            monitor_ids: Some(vec!["display".to_owned()]),
+        };
+        let draft = controller
+            .stage_quick_frame(
+                &request,
+                CaptureResult {
+                    image_token: "quick-full".to_owned(),
+                    correlation_id: "quick-full".to_owned(),
+                    width: 3,
+                    height: 2,
+                    geometry: Some(selection_geometry),
+                    quick_frame_geometry: Some(frame_geometry),
+                    cursor_included: Some(false),
+                },
+            )
+            .expect("full-frame draft");
+        assert!(draft.can_expand_selection);
+        assert_eq!(draft.selection.x, 1);
+
+        let cropped = png_rgba(1, 2, [200, 10, 20, 255]);
+        controller
+            .prepare_quick_result(&cropped)
+            .expect("prepared crop");
+        let metadata = BlobMetadata {
+            format: "png".to_owned(),
+            mime_type: "image/png".to_owned(),
+            width: 1,
+            height: 2,
+            color_metadata: serde_json::json!({
+                "colorSpace": "srgb",
+                "hasIccProfile": false,
+            }),
+        };
+        let document_json = super::initial_document_json(
+            "019d0000-0000-7000-8000-000000000011",
+            &format!("{:x}", sha2::Sha256::digest(&cropped)),
+            &metadata,
+            ImageProvenance::Capture,
+            "2026-08-23T00:00:00.000Z".to_owned(),
+        );
+        let outcome = controller
+            .commit_quick_draft(
+                &draft.draft_id,
+                document_json,
+                super::CaptureCompletion::Copied,
+                draft.selection,
+            )
+            .expect("cropped commit");
+        let opened = outcome.document.expect("materialized document");
+        let source = repository
+            .resolve_capture_source(opened.capture_id, opened.source_hash)
+            .expect("immutable cropped source");
+        assert_eq!((source.metadata.width, source.metadata.height), (1, 2));
+        assert_eq!(
+            fs::read(source.path).expect("cropped source bytes"),
+            cropped
+        );
+    }
+
     fn png_1x1() -> Vec<u8> {
+        png_rgba(1, 1, [255, 0, 0, 255])
+    }
+
+    fn png_rgba(width: u32, height: u32, pixel: [u8; 4]) -> Vec<u8> {
         let mut bytes = Vec::new();
-        let mut encoder = png::Encoder::new(&mut bytes, 1, 1);
+        let mut encoder = png::Encoder::new(&mut bytes, width, height);
         encoder.set_color(png::ColorType::Rgba);
         encoder.set_depth(png::BitDepth::Eight);
         let mut writer = encoder.write_header().expect("PNG header");
         writer
-            .write_image_data(&[255, 0, 0, 255])
+            .write_image_data(&pixel.repeat((width * height) as usize))
             .expect("PNG pixel");
         drop(writer);
         bytes

@@ -4,6 +4,8 @@ export {
   applyEditorCommand,
   CommandManager,
   createFlipCanvasCommand,
+  createEditorDocumentFromImage,
+  materializeQuickCaptureDocument,
   createRenderSceneSnapshot,
   createDocumentRenderScene,
   hitTestDocument,

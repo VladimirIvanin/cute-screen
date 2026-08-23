@@ -28,7 +28,9 @@ use windows_sys::Win32::{
     Foundation::{GetLastError, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM},
     Graphics::Dwm::DwmFlush,
     Graphics::Gdi::{
-        BLACK_BRUSH, BeginPaint, EndPaint, FrameRect, GetStockObject, InvalidateRect, PAINTSTRUCT,
+        BLACK_BRUSH, BeginPaint, CreatePen, CreateSolidBrush, DeleteObject, Ellipse, EndPaint,
+        GetStockObject, InvalidateRect, LineTo, MoveToEx, PAINTSTRUCT, PS_DASH, PS_SOLID,
+        Rectangle, RoundRect, SelectObject, SetBkMode, SetTextColor, TRANSPARENT, TextOutW,
         WHITE_BRUSH,
     },
     System::LibraryLoader::GetModuleHandleW,
@@ -36,15 +38,16 @@ use windows_sys::Win32::{
         DPI_AWARENESS_CONTEXT, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
         SetThreadDpiAwarenessContext,
     },
+    UI::Input::KeyboardAndMouse::SetFocus,
     UI::WindowsAndMessaging::{
         CS_HREDRAW, CS_VREDRAW, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
-        GA_ROOT, GetAncestor, GetForegroundWindow, GetMessageW, GetSystemMetrics, GetWindowRect,
-        IDC_CROSS, IsWindow, LWA_ALPHA, LoadCursorW, MSG, PostQuitMessage, RegisterClassW,
-        SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SW_SHOW,
-        SetForegroundWindow, SetLayeredWindowAttributes, ShowWindow, WA_INACTIVE, WM_ACTIVATE,
-        WM_CLOSE, WM_DESTROY, WM_KEYDOWN, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEACTIVATE,
-        WM_MOUSEMOVE, WM_PAINT, WNDCLASSW, WS_EX_LAYERED, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
-        WS_POPUP, WindowFromPoint,
+        GA_ROOT, GetAncestor, GetClientRect, GetForegroundWindow, GetMessageW, GetSystemMetrics,
+        GetWindowRect, IDC_CROSS, IsWindow, LWA_COLORKEY, LoadCursorW, MSG, PostQuitMessage,
+        RegisterClassW, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN,
+        SM_YVIRTUALSCREEN, SW_SHOW, SetForegroundWindow, SetLayeredWindowAttributes, ShowWindow,
+        WA_INACTIVE, WM_ACTIVATE, WM_CLOSE, WM_DESTROY, WM_KEYDOWN, WM_LBUTTONDOWN, WM_LBUTTONUP,
+        WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_PAINT, WNDCLASSW, WS_EX_LAYERED, WS_EX_TOOLWINDOW,
+        WS_EX_TOPMOST, WS_POPUP, WindowFromPoint,
     },
 };
 
@@ -90,24 +93,39 @@ impl WindowsCompositorCaptureAdapter {
                 (geometry, frame)
             }
         };
-        let bgra = crop_bgra(&source_bgra, &source_geometry, &geometry, correlation_id)?;
-        let png = encode_bgra_png(&bgra, geometry.width, geometry.height, correlation_id)?;
+        let (bgra, width, height, quick_frame_geometry) = if target == CaptureTarget::Area {
+            (
+                source_bgra,
+                source_geometry.width,
+                source_geometry.height,
+                Some(source_geometry.clone()),
+            )
+        } else {
+            (
+                crop_bgra(&source_bgra, &source_geometry, &geometry, correlation_id)?,
+                geometry.width,
+                geometry.height,
+                None,
+            )
+        };
+        let png = encode_bgra_png(&bgra, width, height, correlation_id)?;
         let image_token = Uuid::now_v7().simple().to_string();
         transport.import_owned_bytes(
             &image_token,
             &png,
             "image/png",
-            geometry.width,
-            geometry.height,
+            width,
+            height,
             correlation_id,
         )?;
 
         Ok(CaptureResult {
             image_token,
             correlation_id: correlation_id.to_owned(),
-            width: geometry.width,
-            height: geometry.height,
+            width,
+            height,
             geometry: Some(geometry),
+            quick_frame_geometry,
             cursor_included: Some(false),
         })
     }
@@ -177,6 +195,7 @@ struct SelectionState {
     origin: POINT,
     start: Option<POINT>,
     end: Option<POINT>,
+    cursor: Option<POINT>,
     cancelled: bool,
     restore_foreground: isize,
 }
@@ -185,6 +204,7 @@ static SELECTOR_STATE: Mutex<SelectionState> = Mutex::new(SelectionState {
     origin: POINT { x: 0, y: 0 },
     start: None,
     end: None,
+    cursor: None,
     cancelled: false,
     restore_foreground: 0,
 });
@@ -374,14 +394,21 @@ fn select_on_virtual_desktop(
     if window.is_null() {
         return Err(last_error(correlation_id, "createSelectorWindow"));
     }
-    unsafe { ShowWindow(window, SW_SHOW) };
-    let layered = unsafe { SetLayeredWindowAttributes(window, 0, 48, LWA_ALPHA) };
+    // The clear colour stays transparent while selector chrome remains fully
+    // opaque. Applying one alpha value to the whole window made the hint text
+    // and icon unreadable.
+    let layered = unsafe { SetLayeredWindowAttributes(window, 0, 255, LWA_COLORKEY) };
     if layered == 0 {
         let error = last_error(correlation_id, "showSelectorWindow");
         unsafe { DestroyWindow(window) };
         return Err(error);
     }
+    unsafe { ShowWindow(window, SW_SHOW) };
 
+    unsafe {
+        SetForegroundWindow(window);
+        SetFocus(window);
+    }
     loop {
         let mut message = MSG::default();
         match unsafe { GetMessageW(&mut message, std::ptr::null_mut(), 0, 0) } {
@@ -494,12 +521,22 @@ unsafe extern "system" fn selector_window_proc(
             0
         }
         WM_MOUSEMOVE => {
-            if let Ok(mut state) = SELECTOR_STATE.lock()
-                && state.start.is_some()
-            {
-                state.end = Some(selector_point(lparam, state.origin));
+            let mut changed = false;
+            if let Ok(mut state) = SELECTOR_STATE.lock() {
+                let point = selector_point(lparam, state.origin);
+                if state.start.is_some() {
+                    state.end = Some(point);
+                    changed = true;
+                } else if state.cursor.is_none() {
+                    // Anchor the pre-drag hint once. Repainting a layered
+                    // surface for every raw pointer packet caused flicker.
+                    state.cursor = Some(point);
+                    changed = true;
+                }
             }
-            unsafe { InvalidateRect(window, null(), 1) };
+            if changed {
+                unsafe { InvalidateRect(window, null(), 1) };
+            }
             0
         }
         WM_LBUTTONUP => {
@@ -548,13 +585,11 @@ fn paint_selector(window: HWND) {
     if dc.is_null() {
         return;
     }
-    let selection = SELECTOR_STATE.lock().ok().and_then(|state| {
-        state
-            .start
-            .zip(state.end)
-            .map(|(start, end)| (start, end, state.origin))
-    });
-    if let Some((start, end, origin)) = selection {
+    let state = SELECTOR_STATE.lock().ok().map(|state| *state);
+    if let Some(state) = state
+        && let Some((start, end)) = state.start.zip(state.end)
+    {
+        let origin = state.origin;
         let mut rect = RECT {
             left: start.x.min(end.x) - origin.x,
             top: start.y.min(end.y) - origin.y,
@@ -567,7 +602,94 @@ fn paint_selector(window: HWND) {
         if rect.bottom == rect.top {
             rect.bottom += 1;
         }
-        unsafe { FrameRect(dc, &rect, GetStockObject(WHITE_BRUSH).cast()) };
+        let pen = unsafe { CreatePen(PS_DASH, 1, 0x00ff_ffff) };
+        let previous = unsafe { SelectObject(dc, pen.cast()) };
+        unsafe {
+            MoveToEx(dc, rect.left, rect.top, std::ptr::null_mut());
+            LineTo(dc, rect.right, rect.top);
+            LineTo(dc, rect.right, rect.bottom);
+            LineTo(dc, rect.left, rect.bottom);
+            LineTo(dc, rect.left, rect.top);
+            SelectObject(dc, previous);
+            DeleteObject(pen.cast());
+        }
+        let width = (rect.right - rect.left).unsigned_abs();
+        let height = (rect.bottom - rect.top).unsigned_abs();
+        let label = format!("{width} × {height}");
+        let label_w = 18 + i32::try_from(label.encode_utf16().count()).unwrap_or(12) * 8;
+        let label_top = (rect.top - 34).max(8);
+        let label_rect = RECT {
+            left: rect.left.max(8),
+            top: label_top,
+            right: rect.left.max(8) + label_w,
+            bottom: label_top + 28,
+        };
+        let brush = unsafe { CreateSolidBrush(0x0020_2020) };
+        let text: Vec<u16> = label.encode_utf16().collect();
+        unsafe {
+            let previous_brush = SelectObject(dc, brush.cast());
+            RoundRect(
+                dc,
+                label_rect.left,
+                label_rect.top,
+                label_rect.right,
+                label_rect.bottom,
+                12,
+                12,
+            );
+            SetBkMode(dc, TRANSPARENT.cast_signed());
+            SetTextColor(dc, 0x00ff_ffff);
+            TextOutW(
+                dc,
+                label_rect.left + 9,
+                label_rect.top + 6,
+                text.as_ptr(),
+                i32::try_from(text.len()).unwrap_or(0),
+            );
+            SelectObject(dc, previous_brush);
+            DeleteObject(brush.cast());
+        }
+    } else if let Some(state) = state
+        && let Some(cursor) = state.cursor
+    {
+        let mut client = RECT::default();
+        unsafe { GetClientRect(window, &mut client) };
+        let cursor_x = cursor.x - state.origin.x;
+        let cursor_y = cursor.y - state.origin.y;
+        let width = 226;
+        let height = 48;
+        let left = (cursor_x + 18).clamp(8, (client.right - width - 8).max(8));
+        let top = (cursor_y + 22).clamp(8, (client.bottom - height - 8).max(8));
+        let card = RECT {
+            left,
+            top,
+            right: left + width,
+            bottom: top + height,
+        };
+        let text: Vec<u16> = "Выделите область".encode_utf16().collect();
+        unsafe {
+            let previous_brush = SelectObject(dc, GetStockObject(WHITE_BRUSH));
+            let hint_pen = CreatePen(PS_SOLID, 1, 0x0018_1818);
+            let previous_pen = SelectObject(dc, hint_pen.cast());
+            RoundRect(dc, card.left, card.top, card.right, card.bottom, 16, 16);
+            SetBkMode(dc, TRANSPARENT.cast_signed());
+            SetTextColor(dc, 0x0018_1818);
+            TextOutW(
+                dc,
+                left + 14,
+                top + 15,
+                text.as_ptr(),
+                i32::try_from(text.len()).unwrap_or(0),
+            );
+            // Small camera glyph, drawn natively so selector chrome has no
+            // font/icon asset dependency.
+            Rectangle(dc, left + 184, top + 14, left + 214, top + 37);
+            Rectangle(dc, left + 192, top + 10, left + 205, top + 15);
+            Ellipse(dc, left + 193, top + 19, left + 205, top + 31);
+            SelectObject(dc, previous_pen);
+            SelectObject(dc, previous_brush);
+            DeleteObject(hint_pen.cast());
+        }
     }
     unsafe { EndPaint(window, &paint) };
 }
@@ -984,6 +1106,8 @@ mod tests {
     fn selector_cleanup_does_not_enqueue_another_quit_for_the_next_capture() {
         assert!(!super::selector_posts_quit(super::WM_DESTROY, 0));
         assert!(super::selector_posts_quit(super::WM_LBUTTONUP, 0));
+        assert!(super::selector_posts_quit(super::WM_KEYDOWN, 0x1b));
+        assert!(!super::selector_posts_quit(super::WM_KEYDOWN, 0x0d));
     }
 
     #[test]

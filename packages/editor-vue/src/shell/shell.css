@@ -665,6 +665,36 @@ button:focus-visible {
   box-shadow: var(--shadow-overlay);
   transform: translateX(-50%);
 }
+
+.cs-quick-toolrail-group {
+  position: absolute;
+  z-index: 20;
+  bottom: var(--bottom-rail-offset);
+  left: 50%;
+  display: flex;
+  max-width: calc(100vw - 32px);
+  align-items: center;
+  gap: 6px;
+  transform: translateX(-50%);
+}
+
+.cs-quick-toolrail-group .cs-toolrail {
+  position: static;
+  max-width: calc(100vw - 126px);
+  transform: none;
+}
+
+.cs-quick-history {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--surface-raised) 94%, transparent);
+  box-shadow: var(--shadow-overlay);
+  backdrop-filter: blur(16px) saturate(1.12);
+}
 .cs-context-icon {
   display: grid;
   width: 32px;

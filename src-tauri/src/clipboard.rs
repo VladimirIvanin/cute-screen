@@ -1,4 +1,4 @@
-use std::io::Cursor;
+use std::{borrow::Cow, io::Cursor};
 
 use arboard::Clipboard;
 
@@ -47,6 +47,38 @@ pub fn write_native_text(text: &str) -> Result<(), String> {
     let mut clipboard = Clipboard::new().map_err(|error| error.to_string())?;
     clipboard
         .set_text(text.to_owned())
+        .map_err(|error| error.to_string())
+}
+
+/// Decodes a bounded PNG payload and writes native RGBA pixels to the system
+/// clipboard. The IPC body is raw binary, never JSON/base64.
+pub fn write_native_png(bytes: &[u8]) -> Result<(), String> {
+    let mut decoder = png::Decoder::new(Cursor::new(bytes));
+    decoder.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
+    let mut reader = decoder.read_info().map_err(|error| error.to_string())?;
+    let size = reader
+        .output_buffer_size()
+        .ok_or_else(|| "PNG output is too large".to_owned())?;
+    let mut decoded = vec![0; size];
+    let info = reader
+        .next_frame(&mut decoded)
+        .map_err(|error| error.to_string())?;
+    let pixels = &decoded[..info.buffer_size()];
+    let rgba = match info.color_type {
+        png::ColorType::Rgba => pixels.to_vec(),
+        png::ColorType::Rgb => pixels
+            .chunks_exact(3)
+            .flat_map(|p| [p[0], p[1], p[2], 255])
+            .collect(),
+        _ => return Err("clipboard PNG must decode to RGB or RGBA".to_owned()),
+    };
+    let mut clipboard = Clipboard::new().map_err(|error| error.to_string())?;
+    clipboard
+        .set_image(arboard::ImageData {
+            width: info.width as usize,
+            height: info.height as usize,
+            bytes: Cow::Owned(rgba),
+        })
         .map_err(|error| error.to_string())
 }
 

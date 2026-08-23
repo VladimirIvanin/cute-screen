@@ -40,7 +40,27 @@ Cute Screen — полноценный local-first редактор снимко
 - `REQ-CAP-007` — настройка включения курсора там, где это поддерживает backend.
 - `REQ-CAP-008` — multi-monitor и mixed-DPI без смещения итоговой области.
 - `REQ-CAP-009` — X11 использует frozen-screen overlay; Wayland использует системный XDG selector.
-- `REQ-CAP-010` — снимок сразу сохраняется как неизменяемый оригинал и открывается редактируемым документом.
+- `REQ-CAP-010` — Screen, Window, Active Window и Repeat сразу сохраняют
+  неизменяемый оригинал и открывают редактируемый документ. Явный Area capture
+  сначала создаёт неперсистентный quick-capture draft и материализует original,
+  capture и editable document только по Copy, Save PNG или Editor.
+- `REQ-CAP-011` — quick-capture draft существует только во временном приватном
+  staging, не попадает в series/library и полностью очищается по Close/Escape,
+  crash, app exit или failed staging до materialization.
+- `REQ-CAP-012` — рамка Area остаётся move/resize-доступной после появления
+  инструментов и изменяется одной undoable `setCrop` command на gesture;
+  аннотации остаются привязаны к physical pixels frozen frame и только
+  clip-ятся новой рамкой. До начала drag нативный selector показывает
+  непрозрачную закруглённую подсказку «Выделите область» с иконкой камеры;
+  во время drag показывает пунктирную рамку и читаемый размер. Escape отменяет
+  selector без создания draft.
+- `REQ-CAP-013` — Windows/X11/macOS Area quick-mode показывает frozen desktop
+  в исходных physical coordinates. Wayland сохраняет системный XDG selector,
+  показывает возвращённый portal fragment на нейтральном фоне и не разрешает
+  расширять рамку за его пределы.
+- `REQ-CAP-014` — один Area draft блокирует параллельный capture. Copy, Save PNG
+  и Editor дают terminal `captured` с различимым completion; Close даёт
+  ожидаемый `cancelled` без скрытой очереди.
 
 ## Запуск и горячие клавиши
 
@@ -201,6 +221,10 @@ Cute Screen — полноценный local-first редактор снимко
 - `REQ-OUT-005` — stitch объединяет выбранные кадры серии вертикально или горизонтально с gap/background.
 - `REQ-OUT-006` — экспорт атомарный и никогда не изменяет оригинал.
 - `REQ-OUT-007` — длительные export/copy показывают progress, поддерживают cancel и сообщают recoverable error.
+- `REQ-OUT-008` — quick Copy помещает crop с текущими редактируемыми
+  аннотациями в native bitmap clipboard; quick Save использует системный Save
+  As, пишет только PNG атомарно и повторно декодирует результат. Image bytes не
+  передаются через JSON/base64.
 
 ## Интерфейс и настройки
 
@@ -213,6 +237,10 @@ Cute Screen — полноценный local-first редактор снимко
 - `REQ-UI-007` — focus order следует визуальному порядку, reduced motion уважается.
 - `REQ-UI-008` — main editor использует системные window decorations; overlays/pin могут быть frameless.
 - `REQ-UI-009` — локальные rotating logs и ручной diagnostic bundle без отправки данных.
+- `REQ-UI-010` — Area quick-mode использует frameless chrome: dimension badge,
+  annotation toolbar у нижней стороны рамки и action bar Editor/Copy/Save/Close
+  справа. Панели меняют сторону при collision, остаются keyboard-accessible и
+  не содержат OCR, AI/cloud, print, Pin, layers, beautify или watermark.
 
 ## Качество и поставка
 

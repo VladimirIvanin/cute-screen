@@ -144,6 +144,7 @@ JSON как bytes/base64.
 Основные компоненты:
 
 - `EditorShell`
+- `QuickCaptureShell`
 - `TopBar`
 - `ToolRail`
 - `CanvasViewport`
@@ -189,6 +190,27 @@ Naive UI controls and remain outside Vue’s deep-reactive state. Adapter
 components keep local drafts for pointer sliders, colour pickers and number
 inputs, committing to the existing contextual-toolbar events only at their
 document-command boundary.
+
+### Area quick capture
+
+Явный Area capture после platform selector создаёт `QuickCaptureDraftV1`, а не
+library record. Windows/X11/macOS draft может ссылаться на frozen virtual
+desktop и physical selection bounds; Wayland draft содержит только portal
+fragment. Pixels доступны Vue только через scoped/binary transport token.
+
+`QuickCaptureShell` использует тот же document, renderer, `CanvasViewport`,
+tool defaults и `EditorCommand`, но не монтирует TopBar, LayersPanel,
+SeriesFilmstrip, beautify или watermark. Crop остаётся изменяемым; committed
+layers хранят full-frame coordinates и clip-ятся crop. Перед Copy/Save/Editor
+DOM-free materializer вычитает crop origin из geometry, заменяет base на hash
+cropped original, устанавливает canvas в размер crop и очищает document crop.
+
+Draft store допускает одну активную сессию и удаляет staging по cancel, crash,
+shutdown и timeout. Подготовка cropped source и финальный repository commit —
+разные versioned IPC steps, поэтому frontend получает итоговый hash/metadata до
+создания persisted document, а transaction всё равно атомарно связывает bytes,
+capture и document. Encoded output загружается в Rust binary transport; JSON и
+base64 для изображения запрещены.
 
 ## Rust host
 

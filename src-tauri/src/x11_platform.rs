@@ -24,7 +24,8 @@ use x11rb::{
         xfixes::ConnectionExt as _,
         xproto::{
             AtomEnum, ButtonIndex, ChangeWindowAttributesAux, ConnectionExt as _, CreateGCAux,
-            CreateWindowAux, EventMask, GX, GrabMode, GrabStatus, MapState, Rectangle, WindowClass,
+            CreateWindowAux, EventMask, GX, GrabMode, GrabStatus, LineStyle, MapState, Rectangle,
+            WindowClass,
         },
     },
     rust_connection::RustConnection,
@@ -779,9 +780,16 @@ impl X11CaptureAdapter {
             &monitors,
             correlation_id,
         )?;
-        let frame = crop_root_frame(root_frame, bounds, correlation_id)?;
-        let mut result = import_rgba_frame(transport, correlation_id, frame)?;
+        let frame_geometry = capture_geometry_with_layout(
+            (0, 0, root_frame.width, root_frame.height),
+            root_frame.width,
+            root_frame.height,
+            &monitors,
+            correlation_id,
+        )?;
+        let mut result = import_rgba_frame(transport, correlation_id, root_frame)?;
         result.geometry = Some(geometry);
+        result.quick_frame_geometry = Some(frame_geometry);
         Ok(result)
     }
 
@@ -1367,9 +1375,13 @@ fn select_frozen_target<C: Connection>(
             &CreateGCAux::new()
                 .function(GX::XOR)
                 .foreground(u32::MAX)
-                .line_width(2),
+                .line_width(2)
+                .line_style(LineStyle::ON_OFF_DASH),
         )
         .map_err(|_| gate_error(correlation_id, "overlaySelectionGc"))?;
+    connection
+        .set_dashes(selection_gc, 0, &[7, 5])
+        .map_err(|_| gate_error(correlation_id, "overlaySelectionDash"))?;
     let selection = (|| -> Result<(i32, i32, u16, u16), PlatformError> {
         let native = frame
             .native
@@ -1456,6 +1468,7 @@ fn interaction_loop<C: Connection>(
     let mut current = None;
     let mut window_current = None;
     let mut rendered = None;
+    let mut rendered_hint = None;
     let mut area_drag = None;
     let mut last_area_click: Option<(Instant, (i16, i16))> = None;
     while Instant::now() < deadline {
@@ -1530,6 +1543,16 @@ fn interaction_loop<C: Connection>(
         }
         match event {
             Event::ButtonPress(event) if event.detail == u8::from(ButtonIndex::M1) => {
+                redraw_area_hint(
+                    connection,
+                    overlay,
+                    selection_gc,
+                    &mut rendered_hint,
+                    None,
+                    width,
+                    height,
+                    correlation_id,
+                )?;
                 let point = clamp_point(event.event_x, event.event_y, width, height);
                 let selected = rectangle_for(anchor, current);
                 if let Some(rectangle) = selected
@@ -1581,6 +1604,18 @@ fn interaction_loop<C: Connection>(
                     &mut rendered,
                     anchor,
                     current,
+                    correlation_id,
+                )?;
+            }
+            Event::MotionNotify(event) if anchor.is_none() => {
+                redraw_area_hint(
+                    connection,
+                    overlay,
+                    selection_gc,
+                    &mut rendered_hint,
+                    Some(clamp_point(event.event_x, event.event_y, width, height)),
+                    width,
+                    height,
                     correlation_id,
                 )?;
             }
@@ -1686,6 +1721,9 @@ fn redraw_selection<C: Connection>(
     current: Option<(i16, i16)>,
     correlation_id: &str,
 ) -> Result<(), PlatformError> {
+    if let Some(previous) = *rendered {
+        xor_size_badge(connection, overlay, selection_gc, previous, correlation_id)?;
+    }
     redraw_rectangle(
         connection,
         overlay,
@@ -1693,7 +1731,118 @@ fn redraw_selection<C: Connection>(
         rendered,
         rectangle_for(anchor, current),
         correlation_id,
-    )
+    )?;
+    if let Some(next) = *rendered {
+        xor_size_badge(connection, overlay, selection_gc, next, correlation_id)?;
+    }
+    connection
+        .flush()
+        .map_err(|_| gate_error(correlation_id, "overlayDrawSelection"))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn redraw_area_hint<C: Connection>(
+    connection: &C,
+    overlay: u32,
+    gc: u32,
+    rendered: &mut Option<Rectangle>,
+    cursor: Option<(i16, i16)>,
+    width: u16,
+    height: u16,
+    correlation_id: &str,
+) -> Result<(), PlatformError> {
+    const HINT_WIDTH: u16 = 190;
+    const HINT_HEIGHT: u16 = 42;
+    let draw = |card: Rectangle| -> Result<(), PlatformError> {
+        connection
+            .poly_fill_rectangle(overlay, gc, &[card])
+            .map_err(|_| gate_error(correlation_id, "overlayHintCard"))?;
+        connection
+            .image_text8(
+                overlay,
+                gc,
+                card.x.saturating_add(12),
+                card.y.saturating_add(26),
+                b"Select area",
+            )
+            .map_err(|_| gate_error(correlation_id, "overlayHintText"))?;
+        let camera = Rectangle {
+            x: card.x.saturating_add(151),
+            y: card.y.saturating_add(11),
+            width: 26,
+            height: 20,
+        };
+        let camera_top = Rectangle {
+            x: camera.x.saturating_add(7),
+            y: camera.y.saturating_sub(4),
+            width: 12,
+            height: 5,
+        };
+        connection
+            .poly_rectangle(overlay, gc, &[camera, camera_top])
+            .map_err(|_| gate_error(correlation_id, "overlayHintIcon"))?;
+        Ok(())
+    };
+    if let Some(previous) = rendered.take() {
+        draw(previous)?;
+    }
+    if let Some((cursor_x, cursor_y)) = cursor {
+        let max_x = i32::from(width.saturating_sub(HINT_WIDTH).saturating_sub(8));
+        let max_y = i32::from(height.saturating_sub(HINT_HEIGHT).saturating_sub(8));
+        let x = (i32::from(cursor_x) + 18).clamp(8, max_x.max(8));
+        let y = (i32::from(cursor_y) + 22).clamp(8, max_y.max(8));
+        let card = Rectangle {
+            x: i16::try_from(x).unwrap_or(i16::MAX),
+            y: i16::try_from(y).unwrap_or(i16::MAX),
+            width: HINT_WIDTH,
+            height: HINT_HEIGHT,
+        };
+        draw(card)?;
+        *rendered = Some(card);
+    }
+    connection
+        .flush()
+        .map_err(|_| gate_error(correlation_id, "overlayHintFlush"))
+}
+
+fn xor_size_badge<C: Connection>(
+    connection: &C,
+    overlay: u32,
+    gc: u32,
+    rectangle: Rectangle,
+    correlation_id: &str,
+) -> Result<(), PlatformError> {
+    let label = format!("{} x {}", rectangle.width, rectangle.height);
+    let badge_width =
+        u16::try_from(label.len().saturating_mul(8).saturating_add(14)).unwrap_or(u16::MAX);
+    let badge_x = rectangle.x.max(4);
+    let badge_y = if rectangle.y >= 28 {
+        rectangle.y - 28
+    } else {
+        rectangle
+            .y
+            .saturating_add(i16::try_from(rectangle.height).unwrap_or(i16::MAX))
+            .saturating_add(4)
+    };
+    let badge = Rectangle {
+        x: badge_x,
+        y: badge_y,
+        width: badge_width,
+        height: 24,
+    };
+    connection
+        .poly_fill_rectangle(overlay, gc, &[badge])
+        .map_err(|_| gate_error(correlation_id, "overlaySizeBadge"))?;
+    connection
+        .image_text8(
+            overlay,
+            gc,
+            badge_x.saturating_add(7),
+            badge_y.saturating_add(17),
+            label.as_bytes(),
+        )
+        .map_err(|_| gate_error(correlation_id, "overlaySizeText"))?;
+    Ok(())
 }
 
 fn redraw_rectangle<C: Connection>(
@@ -2204,6 +2353,7 @@ fn import_rgba_frame(
         width: u32::from(frame.width),
         height: u32::from(frame.height),
         geometry: None,
+        quick_frame_geometry: None,
         cursor_included: Some(frame.cursor_included),
     })
 }

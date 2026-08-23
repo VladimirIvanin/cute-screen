@@ -79,7 +79,13 @@ export type CaptureTerminalOutcome =
   | 'failed'
 
 export type CaptureProgressState =
-  'probing' | 'ready' | 'delay' | 'selecting' | 'capturing' | 'persisting'
+  | 'probing'
+  | 'ready'
+  | 'delay'
+  | 'selecting'
+  | 'capturing'
+  | 'persisting'
+  | 'quickEditing'
 
 export interface CaptureProgressV1 {
   readonly version: 1
@@ -96,10 +102,13 @@ export interface CaptureRequestV1 {
   readonly invocationSource: CaptureInvocationSource
 }
 
-export interface CaptureOutcomeV1 {
-  readonly version: 1
+export type CaptureCompletion = 'copied' | 'saved' | 'editor'
+
+export interface CaptureOutcomeV2 {
+  readonly version: 2
   readonly correlationId: string
   readonly outcome: CaptureTerminalOutcome
+  readonly completion?: CaptureCompletion
   readonly document?: {
     readonly documentId: string
     readonly captureId: string
@@ -108,6 +117,25 @@ export interface CaptureOutcomeV1 {
     readonly sourceHash: string
     readonly imageToken?: string
   }
+}
+
+/** @deprecated Capture outcome v2 preserves the existing terminal fields. */
+export type CaptureOutcomeV1 = CaptureOutcomeV2
+
+export interface QuickCaptureDraftV1 {
+  readonly version: 1
+  readonly draftId: string
+  readonly correlationId: string
+  readonly imageToken: string
+  readonly width: number
+  readonly height: number
+  readonly selection: Readonly<{
+    x: number
+    y: number
+    width: number
+    height: number
+  }>
+  readonly canExpandSelection: boolean
 }
 
 export interface ShortcutSpec {

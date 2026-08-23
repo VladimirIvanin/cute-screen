@@ -837,4 +837,40 @@ describe('M02 editor shell', () => {
       'Захват станет доступен после подключения native backend.',
     )
   })
+
+  it('uses the quick-mode tool contract and hides full editor chrome', () => {
+    render(EditorShell, {
+      props: { quickMode: true, fixture: 'ready' },
+      global: { plugins: [createEditorShellPinia()] },
+    })
+
+    const rail = screen.getByRole('complementary', { name: 'Tools' })
+    const labels = within(rail)
+      .getAllByRole('button')
+      .map((button) => button.getAttribute('aria-label'))
+    expect(labels).toEqual([
+      'Select',
+      'Arrow',
+      'Shape',
+      'Pencil',
+      'Marker',
+      'Text',
+      'Numbered marker',
+      'Callout',
+      'Image',
+      'Eyedropper',
+      'Hide data',
+      'Spotlight',
+      'Ruler',
+      'Loupe',
+    ])
+    expect(
+      screen.queryByRole('button', { name: 'Crop' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Layers' }),
+    ).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Redo' })).toBeInTheDocument()
+  })
 })

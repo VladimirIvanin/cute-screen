@@ -26,6 +26,12 @@ const isM01Harness =
   import.meta.env.VITE_M01_HARNESS === 'true' &&
   harnessParams.get('m01') === '1'
 
-const Root = isM01Harness ? (await import('./M01Harness.vue')).default : App
+const isQuickCapture =
+  new URLSearchParams(window.location.search).get('quickCapture') === '1'
+const Root = isM01Harness
+  ? (await import('./M01Harness.vue')).default
+  : isQuickCapture
+    ? (await import('./QuickCaptureApp.vue')).default
+    : App
 
 createApp(Root).use(createEditorShellPinia()).mount('#app')

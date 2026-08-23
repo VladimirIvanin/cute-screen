@@ -433,7 +433,7 @@ typed capture failure. Существующие non-composited X11 smoke ост�
 
 ## ADR-029 — Windows interactive capture freezes on confirmation
 
-**Статус:** accepted
+**Статус:** accepted; момент materialization Area original superseded by ADR-036
 
 **Контекст:** ADR-027 исправил источник pixels, но сохранил неверный момент
 заморозки: DXGI frame создавался до selector. Если пользователь открывал Area,
@@ -455,6 +455,30 @@ crop. Screen и Active Window остаются direct snapshots без selector.
 immutable original определяется в момент подтверждения. X11 frozen overlay не
 получает это поведение автоматически: его task-switch flow требует отдельного
 решения и runtime evidence.
+
+## ADR-036 — Area capture использует временный quick draft
+
+**Статус:** accepted; supersedes only the Area immutable-original timing of
+ADR-029
+
+**Контекст:** обязательное открытие полного редактора после Area мешает
+сценарию «выделить → скопировать». При этом custom annotation chrome нельзя
+встраивать в Wayland XDG selector, а сохранение отменённого quick-mode засоряет
+library.
+
+**Решение:** явный Area capture после platform selector удерживает pixels в
+приватном bounded staging и открывает frameless `QuickCaptureShell`. Crop и
+аннотации используют обычный v7 document/`EditorCommand`, но документ не
+persisted. Copy, Save PNG или Editor сначала rebase-ят draft к выбранному crop
+и атомарно создают immutable original, capture и editable document; Close и
+Escape до этого уничтожают staging. Windows/X11/macOS могут показывать полный
+frozen frame, Wayland использует только fragment, возвращённый portal, и не
+пытается заменить системный selector.
+
+**Проверяемое основание:** red-first editor-core rebase/crop tests, Rust
+stage/commit/cancel and transaction-fault tests, Vue toolbar/keyboard tests и
+real-Tauri platform smokes. Screen, Window, Active Window и Repeat сохраняют
+старый direct-to-editor flow.
 
 ## ADR-030 — Naive UI как слой интерактивных Vue-примитивов
 

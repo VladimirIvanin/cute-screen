@@ -8,6 +8,8 @@ import type {
   ClipboardBridge,
   NativeClipboardSnapshot,
   CaptureOutcomeV1,
+  CaptureCompletion,
+  QuickCaptureDraftV1,
   CaptureRequestV1,
   CaptureResult,
   PlatformCapabilities,
@@ -35,6 +37,23 @@ export interface DesktopBridge
   platformCapabilities(correlationId: string): Promise<PlatformCapabilities>
   captureRequest(request: CaptureRequestV1): Promise<CaptureOutcomeV1>
   captureCancel(): Promise<boolean>
+  quickCaptureGetActive(): Promise<QuickCaptureDraftV1 | null>
+  quickCaptureCommit(
+    draftId: string,
+    documentJson: string,
+    completion: CaptureCompletion,
+    selection: QuickCaptureDraftV1['selection'],
+  ): Promise<CaptureOutcomeV1>
+  quickCaptureCancel(draftId: string): Promise<boolean>
+  quickCaptureEditorMounted(
+    documentId: string,
+    mounted: boolean,
+  ): Promise<boolean>
+  quickCaptureOpenEditor(): Promise<void>
+  quickCaptureCopyPng(bytes: Uint8Array): Promise<void>
+  quickCapturePreparePng(bytes: Uint8Array): Promise<void>
+  quickCaptureChooseSavePng(): Promise<boolean>
+  quickCaptureWriteSavePng(bytes: Uint8Array): Promise<void>
   capturePreflightSetReady(ready: boolean): Promise<void>
   capturePreflightComplete(
     correlationId: string,
@@ -121,6 +140,27 @@ export const tauriDesktopBridge: DesktopBridge = {
   captureRequest: (request) =>
     invoke<CaptureOutcomeV1>('capture_request', { request }),
   captureCancel: () => invoke<boolean>('capture_cancel'),
+  quickCaptureGetActive: () =>
+    invoke<QuickCaptureDraftV1 | null>('quick_capture_get_active'),
+  quickCaptureCommit: (draftId, documentJson, completion, selection) =>
+    invoke<CaptureOutcomeV1>('quick_capture_commit', {
+      draftId,
+      documentJson,
+      completion,
+      selection,
+    }),
+  quickCaptureCancel: (draftId) =>
+    invoke<boolean>('quick_capture_cancel', { draftId }),
+  quickCaptureEditorMounted: (documentId, mounted) =>
+    invoke<boolean>('quick_capture_editor_mounted', { documentId, mounted }),
+  quickCaptureOpenEditor: () => invoke<void>('quick_capture_open_editor'),
+  quickCaptureCopyPng: (bytes) => invoke<void>('quick_capture_copy_png', bytes),
+  quickCapturePreparePng: (bytes) =>
+    invoke<void>('quick_capture_prepare_png', bytes),
+  quickCaptureChooseSavePng: () =>
+    invoke<boolean>('quick_capture_choose_save_png'),
+  quickCaptureWriteSavePng: (bytes) =>
+    invoke<void>('quick_capture_write_save_png', bytes),
   capturePreflightSetReady: (ready) =>
     invoke<void>('capture_preflight_set_ready', { ready }),
   capturePreflightComplete: (correlationId, allowed) =>

@@ -29,6 +29,13 @@ capture API и webview. Release baseline не повышается без ADR и
 | Delay            | App countdown before backend invocation        | App countdown before portal                            | App countdown                         | App countdown           |
 | Cursor           | Capability-dependent                           | Portal-dependent                                       | Backend option                        | Backend option          |
 
+Area является единственной capture action, которая заканчивается в quick-mode.
+На X11/Windows/macOS quick surface сохраняет frozen desktop и physical selection
+coordinates. Wayland сначала завершает системный XDG selector, затем показывает
+только возвращённый fragment на нейтральном фоне; рамку можно перемещать и
+уменьшать внутри fragment, но нельзя расширять за его границы. Screen, Window,
+Active Window и Repeat продолжают direct-to-editor flow.
+
 UI получает `CaptureCapabilities` и не показывает неподдерживаемый режим как рабочий. Если функция временно недоступна, control disabled с объяснением и доступной альтернативой.
 
 ## Hotkey behavior

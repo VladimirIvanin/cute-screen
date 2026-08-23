@@ -425,6 +425,29 @@ remain pending.
 
 Для Linux x64/ARM64, Windows x64/ARM64 и macOS Intel/Apple Silicon скачать versioned artifact из GitHub Actions, проверить checksum/архитектуру, выполнить install/launch → capture → edit → export → relaunch → uninstall. На Windows/macOS ожидаемые предупреждения unsigned build документированы.
 
+## A15 — Area quick capture
+
+1. Запустить Area из editor, скрытого tray, hotkey и CLI; основной editor не
+   должен появиться до действия Editor.
+2. До drag проверить стабильную непрозрачную закруглённую подсказку
+   «Выделите область» с иконкой камеры; во время drag — пунктирную рамку и
+   читаемый dimension badge без мерцания. Escape на этом этапе отменяет capture.
+3. После selector проверить frameless surface, dimension badge, полный набор
+   quick annotation tools и action bar Editor/Copy/Save/Close.
+4. Создать аннотацию, затем move/resize рамку: annotation остаётся над теми же
+   pixels frozen desktop, crop clip изменяется, undo/redo возвращает рамку.
+5. Close/Escape до commit не оставляет capture, document, series frame или
+   staged blob. Параллельный capture возвращает busy.
+6. Copy создаёт editable library document, помещает rendered crop в native
+   clipboard и закрывает overlay только после успеха. Clipboard error оставляет
+   recoverable quick surface.
+7. Save cancel не материализует draft; успешный Save создаёт document, атомарный
+   PNG и проходит повторный decode. Editor открывает тот же editable document с
+   сохранёнными слоями и history-compatible geometry.
+8. Повторить на Windows/X11 mixed-DPI и cross-monitor layouts. На Wayland
+   подтвердить системный selector, fragment-only surface и disabled expansion.
+9. Screen, Window, Active Window и Repeat по-прежнему открывают полный editor.
+
 Отдельно проверить GitHub version check:
 
 1. При равном/старом теге приложение показывает, что текущая версия актуальна.

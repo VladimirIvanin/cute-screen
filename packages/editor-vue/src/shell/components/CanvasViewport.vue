@@ -162,6 +162,7 @@ const props = defineProps<{
   openImageAvailable?: boolean | undefined
   zoom?: number | undefined
   fitMode?: boolean | undefined
+  quickFrameMode?: boolean | undefined
   t: (
     key:
       | 'canvasViewport'
@@ -575,7 +576,7 @@ const DEFAULT_PRECISION_TOOLS: PrecisionToolDefaults = Object.freeze({
 const viewportOutputBounds = computed<ViewportOutputBounds | undefined>(() => {
   const canvas = props.canvas
   if (!canvas) return undefined
-  if (props.activeTool === 'crop') {
+  if (props.activeTool === 'crop' || props.quickFrameMode) {
     return { x: 0, y: 0, width: canvas.width, height: canvas.height }
   }
   return (
@@ -819,7 +820,7 @@ function setCommittedScene(runtime: Canvas2DRenderer): void {
   const document = documentWithoutGestureLayer()
   if (!document) return
   const documentScene = createDocumentRenderScene(
-    props.activeTool === 'crop' && document.crop
+    (props.activeTool === 'crop' || props.quickFrameMode) && document.crop
       ? { ...document, crop: null }
       : document,
   )
@@ -1598,7 +1599,8 @@ function drawPrecisionDraft(context: CanvasRenderingContext2D): void {
   context.restore()
 }
 function ensureCropSession(): CropSession | undefined {
-  if (props.activeTool !== 'crop' || !props.document) return undefined
+  if ((props.activeTool !== 'crop' && !props.quickFrameMode) || !props.document)
+    return undefined
   if (!cropSession) {
     try {
       cropSession = createCropSession(props.document)
@@ -1638,7 +1640,8 @@ function drawCropOverlay(
   outputBounds: ViewportOutputBounds,
 ): boolean {
   const session = ensureCropSession()
-  if (!session || props.activeTool !== 'crop') return false
+  if (!session || (props.activeTool !== 'crop' && !props.quickFrameMode))
+    return false
   const { x, y, width, height } = session.crop
   const right = x + width
   const bottom = y + height
@@ -1654,19 +1657,47 @@ function drawCropOverlay(
   context.fillRect(0, y, x, height)
   context.fillRect(right, y, props.canvas!.width - right, height)
   context.strokeStyle = '#ffffff'
-  context.lineWidth = 1 / ((props.zoom ?? 100) / 100)
-  context.setLineDash([])
+  const zoomScale = (props.zoom ?? 100) / 100
+  context.lineWidth = 1 / zoomScale
+  context.setLineDash(
+    props.quickFrameMode ? [7 / zoomScale, 5 / zoomScale] : [],
+  )
   context.strokeRect(x, y, width, height)
-  context.strokeStyle = 'rgba(255,255,255,0.72)'
-  context.beginPath()
-  for (const fraction of [1 / 3, 2 / 3]) {
-    context.moveTo(x + width * fraction, y)
-    context.lineTo(x + width * fraction, bottom)
-    context.moveTo(x, y + height * fraction)
-    context.lineTo(right, y + height * fraction)
+  context.setLineDash([])
+  if (!props.quickFrameMode) {
+    context.strokeStyle = 'rgba(255,255,255,0.72)'
+    context.beginPath()
+    for (const fraction of [1 / 3, 2 / 3]) {
+      context.moveTo(x + width * fraction, y)
+      context.lineTo(x + width * fraction, bottom)
+      context.moveTo(x, y + height * fraction)
+      context.lineTo(right, y + height * fraction)
+    }
+    context.stroke()
+  } else {
+    const label = `${Math.round(width)} × ${Math.round(height)}`
+    const badgeHeight = 28 / zoomScale
+    const badgeWidth = (label.length * 8 + 18) / zoomScale
+    const badgeX = Math.max(
+      6 / zoomScale,
+      Math.min(x, props.canvas!.width - badgeWidth - 6 / zoomScale),
+    )
+    const above = y - badgeHeight - 7 / zoomScale
+    const badgeY = above >= 6 / zoomScale ? above : y + 7 / zoomScale
+    context.fillStyle = 'rgba(24, 26, 30, 0.94)'
+    context.beginPath()
+    if (typeof context.roundRect === 'function') {
+      context.roundRect(badgeX, badgeY, badgeWidth, badgeHeight, 8 / zoomScale)
+      context.fill()
+    } else {
+      context.fillRect(badgeX, badgeY, badgeWidth, badgeHeight)
+    }
+    context.fillStyle = '#ffffff'
+    context.font = `${13 / zoomScale}px Roboto, sans-serif`
+    context.textBaseline = 'middle'
+    context.fillText(label, badgeX + 9 / zoomScale, badgeY + badgeHeight / 2)
   }
-  context.stroke()
-  const half = 4 / ((props.zoom ?? 100) / 100)
+  const half = 4 / zoomScale
   context.fillStyle = '#ffffff'
   context.strokeStyle = '#d9773b'
   for (const [, position] of cropHandlePositions(session)) {
@@ -1932,7 +1963,7 @@ watch(
   () => props.document,
   () => {
     cropSession = undefined
-    if (props.activeTool === 'crop') ensureCropSession()
+    if (props.activeTool === 'crop' || props.quickFrameMode) ensureCropSession()
     invalidateOverlay()
   },
 )
@@ -2496,26 +2527,37 @@ function onPointerDown(event: PointerEvent): void {
     return
   }
   if (event.button !== 0) return
-  if (props.activeTool === 'crop') {
+  if (props.activeTool === 'crop' || props.quickFrameMode) {
     const session = ensureCropSession()
     if (!session) return
-    event.preventDefault()
     const handle = cropHandleAtPoint(session, point)
     const inside =
       point.x >= session.crop.x &&
       point.x <= session.crop.x + session.crop.width &&
       point.y >= session.crop.y &&
       point.y <= session.crop.y + session.crop.height
-    if (!handle && !inside) return
-    scene.value.setPointerCapture(event.pointerId)
-    gesture = {
-      kind: 'crop',
-      action: handle ? 'resize' : 'move',
-      ...(handle ? { handle } : {}),
-      start: point,
-      initial: session,
+    const tolerance = 7 / ((props.zoom ?? 100) / 100)
+    const nearBorder =
+      inside &&
+      Math.min(
+        Math.abs(point.x - session.crop.x),
+        Math.abs(point.x - session.crop.x - session.crop.width),
+        Math.abs(point.y - session.crop.y),
+        Math.abs(point.y - session.crop.y - session.crop.height),
+      ) <= tolerance
+    if (handle || (props.quickFrameMode ? nearBorder : inside)) {
+      event.preventDefault()
+      scene.value.setPointerCapture(event.pointerId)
+      gesture = {
+        kind: 'crop',
+        action: handle ? 'resize' : 'move',
+        ...(handle ? { handle } : {}),
+        start: point,
+        initial: session,
+      }
+      return
     }
-    return
+    if (props.activeTool === 'crop') return
   }
   const selected = selectedLayer()
   const loupeSource =

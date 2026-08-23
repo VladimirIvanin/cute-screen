@@ -237,6 +237,10 @@ pub struct CaptureResult {
     pub height: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub geometry: Option<CaptureGeometry>,
+    /// Full frozen frame used only by Area quick-mode. `geometry` remains the
+    /// initially selected physical rectangle for capture metadata.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quick_frame_geometry: Option<CaptureGeometry>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cursor_included: Option<bool>,
 }

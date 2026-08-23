@@ -1,6 +1,7 @@
 use std::collections::{HashMap, VecDeque};
 use std::env;
 use std::fs;
+use std::io::Write;
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, Ordering},
@@ -25,7 +26,7 @@ use platform::{
 };
 use serde::Serialize;
 use tauri::{
-    Emitter, Manager, State,
+    Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder,
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
 };
@@ -38,14 +39,15 @@ use activation::{
     ACTIVATION_PROTOCOL_VERSION, ActivationDispatch, ActivationReplyV1, ActivationRequestV1,
 };
 use capture::{
-    CaptureController, CaptureInvocationSource, CaptureOutcomeV1, CaptureProgressState,
-    CaptureRequestV1, CaptureTerminalOutcome, CreateDocumentFromImageRequest, ImageProvenance,
+    CaptureCompletion, CaptureController, CaptureInvocationSource, CaptureOutcomeV1,
+    CaptureOutcomeV2, CaptureProgressState, CaptureRequestV1, CaptureTerminalOutcome,
+    CreateDocumentFromImageRequest, ImageProvenance, QuickCaptureDraftV1, QuickCaptureSelectionV1,
     create_document_from_image,
 };
 use lifecycle::{LaunchIntentV1, LifecycleState, parse_launch};
 #[cfg(feature = "test-harness")]
-use storage::{BlobMetadata, CreateCaptureRequest};
-use storage::{CaptureMetadataV1, LibraryRepository, OpenDocument, RepositoryError};
+use storage::CreateCaptureRequest;
+use storage::{BlobMetadata, CaptureMetadataV1, LibraryRepository, OpenDocument, RepositoryError};
 
 #[cfg(target_os = "windows")]
 mod windows_platform;
@@ -205,6 +207,44 @@ impl CapturePreflightService {
     fn remove(&self, correlation_id: &str) {
         if let Ok(mut pending) = self.pending.lock() {
             pending.remove(correlation_id);
+        }
+    }
+}
+
+#[derive(Default)]
+struct QuickEditorMountService {
+    pending: Mutex<HashMap<String, tokio::sync::oneshot::Sender<bool>>>,
+}
+
+#[derive(Default)]
+struct QuickSaveTargetService {
+    destination: Mutex<Option<std::path::PathBuf>>,
+}
+
+impl QuickEditorMountService {
+    fn begin(
+        &self,
+        document_id: &str,
+    ) -> Result<tokio::sync::oneshot::Receiver<bool>, RepositoryError> {
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        self.pending
+            .lock()
+            .map_err(|_| RepositoryError::Io("quick editor mount lock poisoned".to_owned()))?
+            .insert(document_id.to_owned(), sender);
+        Ok(receiver)
+    }
+
+    fn complete(&self, document_id: &str, mounted: bool) -> bool {
+        self.pending
+            .lock()
+            .ok()
+            .and_then(|mut pending| pending.remove(document_id))
+            .is_some_and(|sender| sender.send(mounted).is_ok())
+    }
+
+    fn remove(&self, document_id: &str) {
+        if let Ok(mut pending) = self.pending.lock() {
+            pending.remove(document_id);
         }
     }
 }
@@ -587,6 +627,9 @@ fn lifecycle_complete_main_window_close(app: tauri::AppHandle) {
 
 #[tauri::command]
 fn lifecycle_finish_quit(app: tauri::AppHandle) {
+    if let Some(controller) = app.try_state::<CaptureController>() {
+        let _ = controller.cancel();
+    }
     #[cfg(target_os = "linux")]
     if let Some(service) = app.try_state::<linux_platform::PortalHotkeyService>() {
         service.close();
@@ -693,6 +736,181 @@ async fn capture_request(
     controller: State<'_, CaptureController>,
 ) -> Result<CaptureOutcomeV1, PlatformError> {
     Ok(capture_with_preflight(&app, controller.inner(), request).await)
+}
+
+#[tauri::command]
+fn quick_capture_get_active(
+    controller: State<'_, CaptureController>,
+) -> Option<QuickCaptureDraftV1> {
+    controller.active_quick_draft()
+}
+
+#[tauri::command]
+async fn quick_capture_commit(
+    draft_id: String,
+    document_json: String,
+    completion: CaptureCompletion,
+    selection: QuickCaptureSelectionV1,
+    controller: State<'_, CaptureController>,
+    mounts: State<'_, QuickEditorMountService>,
+) -> Result<CaptureOutcomeV2, RepositoryError> {
+    let document_id = (completion == CaptureCompletion::Editor)
+        .then(|| {
+            serde_json::from_str::<serde_json::Value>(&document_json)
+                .ok()
+                .and_then(|value| {
+                    value
+                        .get("id")
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::to_owned)
+                })
+        })
+        .flatten();
+    let acknowledgement = document_id
+        .as_deref()
+        .map(|id| mounts.begin(id))
+        .transpose()?;
+    let outcome =
+        match controller.commit_quick_draft(&draft_id, document_json, completion, selection) {
+            Ok(outcome) => outcome,
+            Err(error) => {
+                if let Some(document_id) = document_id.as_deref() {
+                    mounts.remove(document_id);
+                }
+                return Err(error);
+            }
+        };
+    if let (Some(document_id), Some(acknowledgement)) = (document_id, acknowledgement) {
+        let mounted = matches!(
+            tokio::time::timeout(std::time::Duration::from_secs(10), acknowledgement).await,
+            Ok(Ok(true))
+        );
+        mounts.remove(&document_id);
+        if !mounted {
+            return Err(RepositoryError::Io(
+                "editor did not acknowledge the quick capture mount".to_owned(),
+            ));
+        }
+    }
+    Ok(outcome)
+}
+
+#[tauri::command]
+fn quick_capture_editor_mounted(
+    document_id: String,
+    mounted: bool,
+    service: State<'_, QuickEditorMountService>,
+) -> bool {
+    service.complete(&document_id, mounted)
+}
+
+#[tauri::command]
+fn quick_capture_open_editor(app: tauri::AppHandle) {
+    show_editor(&app);
+}
+
+#[tauri::command]
+fn quick_capture_cancel(draft_id: String, controller: State<'_, CaptureController>) -> bool {
+    controller.cancel_quick_draft(&draft_id)
+}
+
+#[tauri::command]
+fn quick_capture_copy_png(request: tauri::ipc::Request<'_>) -> Result<(), RepositoryError> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err(RepositoryError::InvalidImage);
+    };
+    storage::inspect_content_image_bytes(bytes)?;
+    clipboard::write_native_png(bytes).map_err(RepositoryError::Io)
+}
+
+#[tauri::command]
+fn quick_capture_prepare_png(
+    request: tauri::ipc::Request<'_>,
+    controller: State<'_, CaptureController>,
+) -> Result<(), RepositoryError> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err(RepositoryError::InvalidImage);
+    };
+    controller.prepare_quick_result(bytes)
+}
+
+#[tauri::command]
+fn quick_capture_choose_save_png(
+    app: tauri::AppHandle,
+    service: State<'_, QuickSaveTargetService>,
+) -> Result<bool, RepositoryError> {
+    let Some(destination) = app
+        .dialog()
+        .file()
+        .set_title("Save quick capture")
+        .set_file_name("cute-screen.png")
+        .add_filter("PNG image", &["png"])
+        .blocking_save_file()
+    else {
+        if let Ok(mut current) = service.destination.lock() {
+            *current = None;
+        }
+        return Ok(false);
+    };
+    let destination = destination
+        .into_path()
+        .map_err(|error| RepositoryError::Io(error.to_string()))?;
+    *service
+        .destination
+        .lock()
+        .map_err(|_| RepositoryError::Io("quick save target lock poisoned".to_owned()))? =
+        Some(destination);
+    Ok(true)
+}
+
+#[tauri::command]
+fn quick_capture_write_save_png(
+    request: tauri::ipc::Request<'_>,
+    service: State<'_, QuickSaveTargetService>,
+) -> Result<(), RepositoryError> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err(RepositoryError::InvalidImage);
+    };
+    let metadata = storage::inspect_content_image_bytes(bytes)?;
+    if metadata.format != "png" {
+        return Err(RepositoryError::InvalidImage);
+    }
+    let destination = service
+        .destination
+        .lock()
+        .map_err(|_| RepositoryError::Io("quick save target lock poisoned".to_owned()))?
+        .clone()
+        .ok_or_else(|| RepositoryError::Io("quick save target is not selected".to_owned()))?;
+    write_verified_png(&destination, bytes, &metadata)?;
+    if let Ok(mut current) = service.destination.lock() {
+        *current = None;
+    }
+    Ok(())
+}
+
+fn write_verified_png(
+    destination: &std::path::Path,
+    bytes: &[u8],
+    metadata: &BlobMetadata,
+) -> Result<(), RepositoryError> {
+    let parent = destination
+        .parent()
+        .ok_or_else(|| RepositoryError::Io("save destination has no parent".to_owned()))?;
+    let mut temporary = tempfile::NamedTempFile::new_in(parent)?;
+    temporary.write_all(bytes)?;
+    temporary.as_file_mut().sync_all()?;
+    temporary
+        .persist(destination)
+        .map_err(|error| RepositoryError::Io(error.to_string()))?;
+    let verified = fs::read(destination)?;
+    let verified_metadata = storage::inspect_content_image_bytes(&verified)?;
+    if verified_metadata.format != "png"
+        || verified_metadata.width != metadata.width
+        || verified_metadata.height != metadata.height
+    {
+        return Err(RepositoryError::InvalidImage);
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -882,6 +1100,28 @@ fn show_editor<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     }
 }
 
+fn show_quick_capture<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+    if let Some(window) = app.get_webview_window("quick-capture") {
+        let _ = window.show();
+        let _ = window.set_focus();
+        return;
+    }
+    let url = WebviewUrl::App("index.html?quickCapture=1".into());
+    if let Err(error) = WebviewWindowBuilder::new(app, "quick-capture", url)
+        .title("Cute Screen Quick Capture")
+        .decorations(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .fullscreen(true)
+        .build()
+    {
+        eprintln!("cute-screen quick capture window failed: {error}");
+        if let Some(controller) = app.try_state::<CaptureController>() {
+            let _ = controller.cancel();
+        }
+    }
+}
+
 /// Hides the X11 editor before the scoped capture connection reads the root.
 /// On cancellation the caller restores it, keeping the pre-capture visible
 /// state without letting the editor leak into the frozen source frame.
@@ -920,7 +1160,16 @@ fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()
         MenuItem::with_id(app, "capture-screen", "Capture Screen", false, None::<&str>)?;
     let capture_window =
         MenuItem::with_id(app, "capture-window", "Capture Window", false, None::<&str>)?;
-    let show = MenuItem::with_id(app, "show-editor", "Show Editor", true, None::<&str>)?;
+    let editor_label = if env::var("LANG")
+        .unwrap_or_default()
+        .to_lowercase()
+        .starts_with("ru")
+    {
+        "Открыть редактор"
+    } else {
+        "Open Editor"
+    };
+    let show = MenuItem::with_id(app, "show-editor", editor_label, true, None::<&str>)?;
     let settings = MenuItem::with_id(app, "settings", "Settings", false, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
@@ -1036,9 +1285,11 @@ fn publish_capture_outcome<R: tauri::Runtime>(
     if let Some(diagnostics) = app.try_state::<CaptureDiagnosticsService>() {
         diagnostics.finish(outcome);
     }
-    if outcome.outcome == CaptureTerminalOutcome::Captured {
+    if outcome.outcome == CaptureTerminalOutcome::Captured
+        && outcome.completion == Some(CaptureCompletion::Editor)
+    {
         show_editor(app);
-    } else if outcome.outcome != CaptureTerminalOutcome::Cancelled {
+    } else if outcome.outcome == CaptureTerminalOutcome::Failed {
         let _ = app
             .notification()
             .builder()
@@ -1054,6 +1305,9 @@ fn publish_capture_progress<R: tauri::Runtime>(
     correlation_id: &str,
     state: CaptureProgressState,
 ) {
+    if state == CaptureProgressState::QuickEditing {
+        show_quick_capture(app);
+    }
     let _ = app.emit(
         "cute-screen:capture-progress",
         CaptureProgressV1 {
@@ -1066,9 +1320,10 @@ fn publish_capture_progress<R: tauri::Runtime>(
 
 fn failed_capture(correlation_id: String) -> CaptureOutcomeV1 {
     CaptureOutcomeV1 {
-        version: 1,
+        version: 2,
         correlation_id,
         outcome: CaptureTerminalOutcome::Failed,
+        completion: None,
         document: None,
     }
 }
@@ -1336,6 +1591,8 @@ pub fn run() {
             app.manage(transport);
             app.manage(controller.clone());
             app.manage(CapturePreflightService::default());
+            app.manage(QuickEditorMountService::default());
+            app.manage(QuickSaveTargetService::default());
             app.manage(CaptureDiagnosticsService::default());
 
             #[cfg(target_os = "linux")]
@@ -1390,6 +1647,15 @@ pub fn run() {
         ping,
         capture_request,
         capture_cancel,
+        quick_capture_get_active,
+        quick_capture_commit,
+        quick_capture_editor_mounted,
+        quick_capture_open_editor,
+        quick_capture_cancel,
+        quick_capture_copy_png,
+        quick_capture_prepare_png,
+        quick_capture_choose_save_png,
+        quick_capture_write_save_png,
         capture_diagnostics,
         capture_preflight_set_ready,
         capture_preflight_complete,
@@ -1423,6 +1689,15 @@ pub fn run() {
         ping,
         capture_request,
         capture_cancel,
+        quick_capture_get_active,
+        quick_capture_commit,
+        quick_capture_editor_mounted,
+        quick_capture_open_editor,
+        quick_capture_cancel,
+        quick_capture_copy_png,
+        quick_capture_prepare_png,
+        quick_capture_choose_save_png,
+        quick_capture_write_save_png,
         capture_diagnostics,
         capture_preflight_set_ready,
         capture_preflight_complete,
@@ -1456,7 +1731,10 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::{CapturePreflightService, PingResponse, action_for_shortcut_id};
+    use super::{
+        CapturePreflightService, PingResponse, QuickEditorMountService, action_for_shortcut_id,
+        write_verified_png,
+    };
 
     #[test]
     fn ping_contract_is_stable() {
@@ -1517,6 +1795,46 @@ mod tests {
     }
 
     #[test]
+    fn quick_editor_mount_acknowledgement_is_delivered_once() {
+        let service = QuickEditorMountService::default();
+        let receiver = service.begin("document-1").expect("mount waiter");
+
+        assert!(service.complete("document-1", true));
+        assert!(!service.complete("document-1", true));
+
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .expect("runtime");
+        assert!(runtime.block_on(receiver).expect("mount acknowledgement"));
+    }
+
+    #[test]
+    fn quick_save_atomically_writes_a_png_that_decodes_again() {
+        let directory = tempfile::tempdir().expect("temporary save directory");
+        let destination = directory.path().join("capture.png");
+        let mut bytes = Vec::new();
+        {
+            let mut encoder = png::Encoder::new(&mut bytes, 1, 1);
+            encoder.set_color(png::ColorType::Rgba);
+            encoder.set_depth(png::BitDepth::Eight);
+            let mut writer = encoder.write_header().expect("PNG header");
+            writer
+                .write_image_data(&[12, 34, 56, 255])
+                .expect("PNG pixels");
+        }
+        let metadata = crate::storage::inspect_content_image_bytes(&bytes).expect("metadata");
+
+        write_verified_png(&destination, &bytes, &metadata).expect("verified save");
+
+        let saved = std::fs::read(destination).expect("saved PNG");
+        assert_eq!(
+            crate::storage::inspect_content_image_bytes(&saved).expect("decoded saved PNG"),
+            metadata
+        );
+    }
+
+    #[test]
     fn capture_diagnostics_are_bounded_and_do_not_serialize_capture_content() {
         let diagnostics = super::CaptureDiagnosticsService::default();
         let request = crate::capture::CaptureRequestV1 {
@@ -1529,9 +1847,10 @@ mod tests {
         };
         diagnostics.begin(&request);
         diagnostics.finish(&crate::capture::CaptureOutcomeV1 {
-            version: 1,
+            version: 2,
             correlation_id: request.correlation_id,
             outcome: crate::capture::CaptureTerminalOutcome::Failed,
+            completion: None,
             document: None,
         });
 
