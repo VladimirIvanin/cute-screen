@@ -754,11 +754,13 @@ impl CaptureController {
             let target = request.action.target();
             let correlation_id = request.correlation_id.clone();
             let transport = Arc::clone(&self.transport);
+            let cancel_signal = Arc::clone(&self.cancel_signal);
             match tokio::task::spawn_blocking(move || {
                 crate::windows_platform::WindowsCompositorCaptureAdapter.capture_to_transport(
                     target,
                     &correlation_id,
                     transport,
+                    cancel_signal,
                 )
             })
             .await

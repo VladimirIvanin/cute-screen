@@ -839,10 +839,14 @@ describe('M02 editor shell', () => {
   })
 
   it('uses the quick-mode tool contract and hides full editor chrome', () => {
-    render(EditorShell, {
+    const view = render(EditorShell, {
       props: { quickMode: true, fixture: 'ready' },
       global: { plugins: [createEditorShellPinia()] },
     })
+
+    expect(view.container.querySelector('.cs-editor-shell')).toHaveClass(
+      'is-quick-mode',
+    )
 
     const rail = screen.getByRole('complementary', { name: 'Tools' })
     const labels = within(rail)

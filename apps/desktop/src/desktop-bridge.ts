@@ -38,6 +38,8 @@ export interface DesktopBridge
   captureRequest(request: CaptureRequestV1): Promise<CaptureOutcomeV1>
   captureCancel(): Promise<boolean>
   quickCaptureGetActive(): Promise<QuickCaptureDraftV1 | null>
+  quickCapturePresent(draftId: string): Promise<boolean>
+  quickCaptureDismiss(): Promise<boolean>
   quickCaptureCommit(
     draftId: string,
     documentJson: string,
@@ -142,6 +144,9 @@ export const tauriDesktopBridge: DesktopBridge = {
   captureCancel: () => invoke<boolean>('capture_cancel'),
   quickCaptureGetActive: () =>
     invoke<QuickCaptureDraftV1 | null>('quick_capture_get_active'),
+  quickCapturePresent: (draftId) =>
+    invoke<boolean>('quick_capture_present', { draftId }),
+  quickCaptureDismiss: () => invoke<boolean>('quick_capture_dismiss'),
   quickCaptureCommit: (draftId, documentJson, completion, selection) =>
     invoke<CaptureOutcomeV1>('quick_capture_commit', {
       draftId,

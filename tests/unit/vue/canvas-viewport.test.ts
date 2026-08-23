@@ -80,12 +80,15 @@ beforeEach(() => {
     ellipse: vi.fn(),
     fill: vi.fn(),
     fillRect: vi.fn(),
+    fillText: vi.fn(),
     lineTo: vi.fn(),
     moveTo: vi.fn(),
     restore: vi.fn(),
     rotate: vi.fn(),
+    roundRect: vi.fn(),
     save: vi.fn(),
     scale: vi.fn(),
+    setTransform: vi.fn(),
     setLineDash: vi.fn(),
     stroke: vi.fn(),
     strokeRect: vi.fn(),
@@ -117,6 +120,7 @@ function mountViewport(
   sampling = false,
   textToolbarSchema?: typeof TEXT_TOOLBAR_SCHEMA,
   arrowToolbarSchema?: typeof ARROW_TOOLBAR_SCHEMA,
+  quickFrameMode = false,
 ) {
   const rendered = render(CanvasViewport, {
     props: {
@@ -126,6 +130,7 @@ function mountViewport(
       selectedLayerId,
       activeTool,
       sampling,
+      quickFrameMode,
       ...(textDefaults === undefined ? {} : { textDefaults }),
       ...(textToolbarSchema === undefined ? {} : { textToolbarSchema }),
       ...(arrowToolbarSchema === undefined ? {} : { arrowToolbarSchema }),
@@ -135,8 +140,16 @@ function mountViewport(
     },
   })
   const scene = rendered.getByLabelText('sceneCanvas') as HTMLCanvasElement
-  Object.defineProperty(scene, 'width', { configurable: true, value: 100 })
-  Object.defineProperty(scene, 'height', { configurable: true, value: 100 })
+  Object.defineProperty(scene, 'width', {
+    configurable: true,
+    value: 100,
+    writable: true,
+  })
+  Object.defineProperty(scene, 'height', {
+    configurable: true,
+    value: 100,
+    writable: true,
+  })
   vi.spyOn(scene, 'getBoundingClientRect').mockReturnValue({
     x: 0,
     y: 0,
@@ -154,6 +167,70 @@ function mountViewport(
 }
 
 describe('M05 CanvasViewport transforms', () => {
+  it('signals quick-mode readiness only after the document frame renders', async () => {
+    const { emitted } = mountViewport(
+      undefined,
+      document,
+      'shape',
+      undefined,
+      false,
+      undefined,
+      undefined,
+      true,
+    )
+
+    await vi.waitFor(() =>
+      expect(emitted().frameReady).toEqual([[document.id]]),
+    )
+  })
+
+  it('streams quick-frame geometry and commits one crop command on release', async () => {
+    const croppedDocument: EditorDocumentV1 = {
+      ...document,
+      crop: { x: 10, y: 10, width: 60, height: 60 },
+    }
+    const { scene, emitted } = mountViewport(
+      'select',
+      croppedDocument,
+      'shape',
+      undefined,
+      false,
+      undefined,
+      undefined,
+      true,
+    )
+
+    await fireEvent.pointerDown(scene, {
+      pointerId: 7,
+      button: 0,
+      clientX: 70,
+      clientY: 70,
+    })
+    await fireEvent.pointerMove(scene, {
+      pointerId: 7,
+      clientX: 80,
+      clientY: 75,
+    })
+    await fireEvent.pointerUp(scene, {
+      pointerId: 7,
+      clientX: 80,
+      clientY: 75,
+    })
+
+    expect(emitted().quickFrameChange).toEqual([
+      [{ x: 10, y: 10, width: 70, height: 65 }],
+    ])
+    expect(emitted().documentCommand).toEqual([
+      [
+        {
+          type: 'setCrop',
+          before: { x: 10, y: 10, width: 60, height: 60 },
+          after: { x: 10, y: 10, width: 70, height: 65 },
+        },
+      ],
+    ])
+  })
+
   it('samples one opaque scene pixel without reading the interaction overlay', async () => {
     const { scene, emitted } = mountViewport(
       undefined,

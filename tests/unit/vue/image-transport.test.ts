@@ -75,6 +75,32 @@ describe('image transport', () => {
     expect(revoke).toHaveBeenCalledExactlyOnceWith('blob:m01')
   })
 
+  it('loads a native memory preview without attempting an asset URL', async () => {
+    const adapter = bridge()
+    vi.mocked(adapter.stageImage).mockResolvedValue({
+      ...metadata,
+      assetUrl: '',
+      mimeType: 'image/bmp',
+    })
+    const decodeImage = vi.fn().mockResolvedValue(decodedImage())
+    const result = await loadImageWithBinaryFallback({
+      token: metadata.token,
+      correlationId: metadata.correlationId,
+      bridge: adapter,
+      decodeImage,
+      createResource: vi
+        .fn()
+        .mockResolvedValue({ id: 'resource', dispose: vi.fn() }),
+      objectUrls: {
+        create: vi.fn().mockReturnValue('blob:memory-preview'),
+        revoke: vi.fn(),
+      },
+    })
+
+    expect(result.transport).toBe('binary')
+    expect(decodeImage).toHaveBeenCalledExactlyOnceWith('blob:memory-preview')
+  })
+
   it('revokes the Blob URL and returns a typed corrupt-image error', async () => {
     const revoke = vi.fn()
     await expect(

@@ -88,10 +88,12 @@ UI получает `CaptureCapabilities` и не показывает непо�
 - Windows backend uses DXGI Desktop Duplication plus a D3D11 CPU-readable
   staging texture for every attached output. It assembles one physical
   virtual-desktop frame under a per-monitor-v2 DPI context. Screen and Active
-  Window are direct snapshots; Area and Window destroy the selector, restore
-  the foreground window, flush DWM and only then acquire/crop the immutable frame.
-  Pointer-only DXGI updates are skipped, protected-content masking and rotated
-  outputs fail explicitly, and there is no GDI fallback. Unit assembly/crop and
+  Window are direct snapshots. Area and Window prepare DXGI duplication before
+  selection, then destroy the selector, restore the foreground window, issue a
+  fully transparent non-activating compositor pulse, flush DWM and only then
+  acquire/crop the immutable frame. A pointer-only update is retried only when
+  it has no desktop resource; protected-content masking and rotated outputs fail
+  explicitly, and there is no GDI fallback. Unit assembly/crop and
   a local interactive-desktop compositor probe pass on Windows x64 (2026-08-12);
   the Task Manager/topmost-window pixel smoke is still required before a
   `supported` claim.

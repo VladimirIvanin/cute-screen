@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 import {
   createEditorDocumentFromImage,
   DocumentSessionController,
@@ -11,6 +11,14 @@ import {
   type ShellDocumentState,
 } from '@cute-screen/editor-vue'
 import { tauriDesktopBridge } from './desktop-bridge'
+import {
+  cancelQuickCaptureAction,
+  normalizeQuickCaptureSelection,
+} from './quick-capture-actions'
+import {
+  computeQuickCaptureLayout,
+  type QuickRect,
+} from './quick-capture-layout'
 
 const draft = shallowRef<QuickCaptureDraftV1>()
 const session = shallowRef<DocumentSessionController>()
@@ -39,79 +47,80 @@ const labels = russian
       portalLimit: 'The frame can only be reduced inside the portal fragment',
     }
 const currentCrop = ref({ x: 0, y: 0, width: 0, height: 0 })
-const actionStyle = shallowRef<Record<string, string>>()
 let unsubscribeSession: (() => void) | undefined
+let unsubscribeQuickCaptureAvailable: (() => void) | undefined
 let sceneElement: HTMLCanvasElement | undefined
+let loadRevision = 0
+let presentedDraftId: string | undefined
+let presentingDraftId: string | undefined
 
 function onHostsReady(value: CanvasViewportHosts): void {
   sceneElement?.removeEventListener('dblclick', onSceneDoubleClick)
   hosts.value = value
   sceneElement = value.scene
   sceneElement.addEventListener('dblclick', onSceneDoubleClick)
-  updateQuickLayout()
+  requestAnimationFrame(() => updateQuickLayout())
 }
 
-function updateQuickLayout(): void {
-  if (!hosts.value || currentCrop.value.width <= 0) return
+function updateQuickLayout(crop: QuickRect = currentCrop.value): void {
+  if (!hosts.value || crop.width <= 0) return
   const bounds = hosts.value.scene.getBoundingClientRect()
   const sourceWidth = session.value?.snapshot.core.document.canvas.width ?? 1
   const sourceHeight = session.value?.snapshot.core.document.canvas.height ?? 1
-  const scaleX = bounds.width / sourceWidth
-  const scaleY = bounds.height / sourceHeight
-  const crop = currentCrop.value
-  const left = bounds.left + crop.x * scaleX
-  const right = left + crop.width * scaleX
-  const centerY = bounds.top + (crop.y + crop.height / 2) * scaleY
-  const barWidth = 124
-  const gap = 12
-  let barLeft: number
-  if (window.innerWidth - right >= barWidth + gap + 8) {
-    barLeft = right + gap
-  } else if (left >= barWidth + gap + 8) {
-    barLeft = left - barWidth - gap
-  } else {
-    barLeft = Math.max(8, window.innerWidth - barWidth - 8)
-  }
-  actionStyle.value = {
-    left: `${Math.round(barLeft)}px`,
-    right: 'auto',
-    top: `${Math.round(Math.max(96, Math.min(window.innerHeight - 96, centerY)))}px`,
-  }
-
   const quickRoot = document.querySelector<HTMLElement>('.cs-quick-capture')
+  const actions = quickRoot?.querySelector<HTMLElement>('.cs-quick-actions')
   const toolRow = quickRoot?.querySelector<HTMLElement>(
     '.cs-quick-toolrail-group',
   )
   const context = quickRoot?.querySelector<HTMLElement>('.cs-context-toolbar')
-  if (!toolRow) return
+  if (!actions || !toolRow) return
   const contextHeight = context?.offsetHeight ?? 0
   const verticalGap = context ? 6 : 0
   const groupHeight = contextHeight + verticalGap + toolRow.offsetHeight
-  const cropTop = bounds.top + crop.y * scaleY
-  const cropBottom = cropTop + crop.height * scaleY
-  const below = cropBottom + gap
-  const groupTop =
-    below + groupHeight <= window.innerHeight - 8
-      ? below
-      : cropTop - gap - groupHeight >= 8
-        ? cropTop - gap - groupHeight
-        : Math.max(8, window.innerHeight - groupHeight - 8)
   const groupWidth = Math.max(toolRow.offsetWidth, context?.offsetWidth ?? 0)
-  const centeredLeft = left + (right - left - groupWidth) / 2
-  const groupLeft = Math.max(
-    8,
-    Math.min(window.innerWidth - groupWidth - 8, centeredLeft),
-  )
+  const layout = computeQuickCaptureLayout({
+    viewport: { width: window.innerWidth, height: window.innerHeight },
+    scene: {
+      left: bounds.left,
+      top: bounds.top,
+      width: bounds.width,
+      height: bounds.height,
+    },
+    source: { width: sourceWidth, height: sourceHeight },
+    crop,
+    actionSize: {
+      width: actions.offsetWidth || 124,
+      height: actions.offsetHeight || 220,
+    },
+    toolSize: {
+      width: groupWidth || 620,
+      height: groupHeight || 96,
+    },
+  })
+  actions.style.left = `${Math.round(layout.actions.left)}px`
+  actions.style.right = 'auto'
+  actions.style.top = `${Math.round(layout.actions.top)}px`
+  actions.style.transform = 'none'
+  actions.dataset.placement = layout.actions.side
   if (context) {
-    context.style.left = `${Math.round(groupLeft)}px`
-    context.style.top = `${Math.round(groupTop)}px`
+    context.style.left = `${Math.round(layout.tools.left)}px`
+    context.style.top = `${Math.round(layout.tools.top)}px`
     context.style.bottom = 'auto'
     context.style.transform = 'none'
   }
-  toolRow.style.left = `${Math.round(groupLeft)}px`
-  toolRow.style.top = `${Math.round(groupTop + contextHeight + verticalGap)}px`
+  toolRow.style.left = `${Math.round(layout.tools.left)}px`
+  toolRow.style.top = `${Math.round(layout.tools.top + contextHeight + verticalGap)}px`
   toolRow.style.bottom = 'auto'
   toolRow.style.transform = 'none'
+  toolRow.dataset.placement = layout.tools.side
+}
+
+function onQuickFrameChange(crop: QuickRect): void {
+  updateQuickLayout(crop)
+}
+
+function onWindowResize(): void {
+  updateQuickLayout()
 }
 
 function onSceneDoubleClick(event: MouseEvent): void {
@@ -135,20 +144,61 @@ function onSceneDoubleClick(event: MouseEvent): void {
   void copy()
 }
 
-async function closeWindow(): Promise<void> {
-  const { getCurrentWindow } = await import('@tauri-apps/api/window')
-  await getCurrentWindow().close()
+function resetDraftSession(): void {
+  unsubscribeSession?.()
+  unsubscribeSession = undefined
+  session.value?.dispose()
+  session.value = undefined
+  sourceImage.value = undefined
+  draft.value = undefined
+  currentCrop.value = { x: 0, y: 0, width: 0, height: 0 }
+  documentState.value = { kind: 'loading' }
+  materialized.value = false
+  error.value = undefined
+  presentedDraftId = undefined
+  presentingDraftId = undefined
+}
+
+async function dismissWindow(): Promise<void> {
+  const dismissed = await tauriDesktopBridge.quickCaptureDismiss()
+  if (!dismissed) throw new Error('Quick capture window is unavailable')
+  resetDraftSession()
+}
+
+async function presentPreparedDraft(draftId: string): Promise<void> {
+  if (presentedDraftId === draftId || presentingDraftId === draftId) return
+  presentingDraftId = draftId
+  try {
+    await nextTick()
+    if (draft.value?.draftId !== draftId) return
+    updateQuickLayout()
+    if (draft.value?.draftId !== draftId) return
+    const presented = await tauriDesktopBridge.quickCapturePresent(draftId)
+    if (!presented) throw new Error('Quick capture draft is no longer active')
+    presentedDraftId = draftId
+  } finally {
+    if (presentingDraftId === draftId) presentingDraftId = undefined
+  }
+}
+
+function onFrameReady(documentId: string): void {
+  const activeDraft = draft.value
+  if (!activeDraft || session.value?.snapshot.core.document.id !== documentId)
+    return
+  void presentPreparedDraft(activeDraft.draftId).catch((cause) => {
+    error.value = cause instanceof Error ? cause.message : String(cause)
+  })
 }
 
 async function loadDraft(): Promise<void> {
+  const revision = ++loadRevision
   const active = await tauriDesktopBridge.quickCaptureGetActive()
+  if (revision !== loadRevision) return
   if (!active) {
-    documentState.value = {
-      kind: 'error',
-      message: 'Quick capture draft is no longer available.',
-    }
+    resetDraftSession()
     return
   }
+  resetDraftSession()
   draft.value = active
   const loaded = await loadImageWithBinaryFallback({
     token: active.imageToken,
@@ -156,6 +206,7 @@ async function loadDraft(): Promise<void> {
     bridge: tauriDesktopBridge,
     createResource: async (image: HTMLImageElement) => image,
   })
+  if (revision !== loadRevision) return
   sourceImage.value = loaded.resource
   const now = new Date().toISOString()
   const created = createEditorDocumentFromImage({
@@ -197,7 +248,7 @@ async function loadDraft(): Promise<void> {
     currentCrop.value = crop
       ? { ...crop }
       : { x: 0, y: 0, width: active.width, height: active.height }
-    requestAnimationFrame(updateQuickLayout)
+    requestAnimationFrame(() => updateQuickLayout())
   })
   documentState.value = {
     kind: 'ready',
@@ -206,31 +257,69 @@ async function loadDraft(): Promise<void> {
   }
 }
 
+async function prepareActiveDraft(): Promise<void> {
+  error.value = undefined
+  try {
+    await loadDraft()
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : String(cause)
+    documentState.value = { kind: 'error', message }
+    error.value = message
+    const activeDraft = draft.value
+    if (activeDraft) await presentPreparedDraft(activeDraft.draftId)
+  }
+}
+
+function recordPreparationError(cause: unknown): void {
+  const message = cause instanceof Error ? cause.message : String(cause)
+  documentState.value = { kind: 'error', message }
+  error.value = message
+}
+
+async function initializeQuickCaptureWindow(): Promise<void> {
+  const { listen } = await import('@tauri-apps/api/event')
+  unsubscribeQuickCaptureAvailable = await listen(
+    'cute-screen:quick-capture-available',
+    () => void prepareActiveDraft().catch(recordPreparationError),
+  )
+  await prepareActiveDraft()
+}
+
 function hexDigest(bytes: ArrayBuffer): string {
   return Array.from(new Uint8Array(bytes), (value) =>
     value.toString(16).padStart(2, '0'),
   ).join('')
 }
 
+function physicalSelection(): QuickRect {
+  if (!draft.value) throw new Error('Quick capture draft is not ready')
+  return normalizeQuickCaptureSelection(currentCrop.value, {
+    width: draft.value.width,
+    height: draft.value.height,
+  })
+}
+
 async function commit(
   completion: 'copied' | 'saved' | 'editor',
   preparedPng?: Uint8Array,
+  preparedSelection?: QuickRect,
 ): Promise<void> {
   if (materialized.value) return
   if (!draft.value || !session.value) return
-  const png = preparedPng ?? (await resultPng())
+  const selection = preparedSelection ?? physicalSelection()
+  const png = preparedPng ?? (await resultPng(selection))
   const sourceHash = hexDigest(
     await crypto.subtle.digest('SHA-256', Uint8Array.from(png).buffer),
   )
   const materializedDocument = materializeQuickCaptureDocument(
-    session.value.snapshot.core.document,
+    { ...session.value.snapshot.core.document, crop: selection },
     {
       source: {
         blobHash: sourceHash,
         format: 'png',
         mimeType: 'image/png',
-        width: currentCrop.value.width,
-        height: currentCrop.value.height,
+        width: selection.width,
+        height: selection.height,
         orientationApplied: true,
         provenance: 'capture',
         color: { colorSpace: 'srgb', hasIccProfile: false },
@@ -243,7 +332,7 @@ async function commit(
     draft.value.draftId,
     JSON.stringify(materializedDocument),
     completion,
-    currentCrop.value,
+    selection,
   )
   materialized.value = true
 }
@@ -258,25 +347,26 @@ async function detectMaterializedAfterError(): Promise<void> {
   }
 }
 
-async function resultPng(): Promise<Uint8Array> {
+async function resultPng(
+  selection: QuickRect = physicalSelection(),
+): Promise<Uint8Array> {
   if (!hosts.value) throw new Error('Rendered capture is not ready')
   const source = hosts.value.scene
-  const crop = currentCrop.value
   const output = document.createElement('canvas')
-  output.width = crop.width
-  output.height = crop.height
+  output.width = selection.width
+  output.height = selection.height
   const context = output.getContext('2d')
   if (!context) throw new Error('PNG canvas is unavailable')
   context.drawImage(
     source,
-    crop.x,
-    crop.y,
-    crop.width,
-    crop.height,
+    selection.x,
+    selection.y,
+    selection.width,
+    selection.height,
     0,
     0,
-    crop.width,
-    crop.height,
+    selection.width,
+    selection.height,
   )
   const blob = await new Promise<Blob>((resolve, reject) =>
     output.toBlob(
@@ -293,10 +383,11 @@ async function copy(): Promise<void> {
   pending.value = true
   error.value = undefined
   try {
-    const png = await resultPng()
-    await commit('copied', png)
+    const selection = physicalSelection()
+    const png = await resultPng(selection)
+    await commit('copied', png, selection)
     await tauriDesktopBridge.quickCaptureCopyPng(png)
-    await closeWindow()
+    await dismissWindow()
   } catch (cause) {
     await detectMaterializedAfterError()
     error.value = cause instanceof Error ? cause.message : String(cause)
@@ -310,12 +401,13 @@ async function save(): Promise<void> {
   pending.value = true
   error.value = undefined
   try {
-    const png = await resultPng()
+    const selection = physicalSelection()
+    const png = await resultPng(selection)
     const selected = await tauriDesktopBridge.quickCaptureChooseSavePng()
     if (!selected) return
-    await commit('saved', png)
+    await commit('saved', png, selection)
     await tauriDesktopBridge.quickCaptureWriteSavePng(png)
-    await closeWindow()
+    await dismissWindow()
   } catch (cause) {
     await detectMaterializedAfterError()
     error.value = cause instanceof Error ? cause.message : String(cause)
@@ -333,7 +425,7 @@ async function openEditor(): Promise<void> {
     } else {
       await commit('editor')
     }
-    await closeWindow()
+    await dismissWindow()
   } catch (cause) {
     await detectMaterializedAfterError()
     error.value = cause instanceof Error ? cause.message : String(cause)
@@ -343,9 +435,20 @@ async function openEditor(): Promise<void> {
 }
 
 async function cancel(): Promise<void> {
-  if (draft.value)
-    await tauriDesktopBridge.quickCaptureCancel(draft.value.draftId)
-  await closeWindow()
+  if (pending.value) return
+  pending.value = true
+  error.value = undefined
+  try {
+    await cancelQuickCaptureAction({
+      draftId: draft.value?.draftId,
+      cancelDraft: tauriDesktopBridge.quickCaptureCancel,
+      closeWindow: dismissWindow,
+    })
+  } catch (cause) {
+    error.value = cause instanceof Error ? cause.message : String(cause)
+  } finally {
+    pending.value = false
+  }
 }
 
 function onKeydown(event: KeyboardEvent): void {
@@ -368,20 +471,17 @@ function onKeydown(event: KeyboardEvent): void {
 
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
-  window.addEventListener('resize', updateQuickLayout)
-  void loadDraft().catch((cause) => {
-    documentState.value = {
-      kind: 'error',
-      message: cause instanceof Error ? cause.message : String(cause),
-    }
-  })
+  window.addEventListener('resize', onWindowResize)
+  void initializeQuickCaptureWindow().catch(recordPreparationError)
 })
 onBeforeUnmount(() => {
+  loadRevision += 1
   window.removeEventListener('keydown', onKeydown)
-  window.removeEventListener('resize', updateQuickLayout)
+  window.removeEventListener('resize', onWindowResize)
   sceneElement?.removeEventListener('dblclick', onSceneDoubleClick)
-  session.value?.dispose()
+  unsubscribeQuickCaptureAvailable?.()
   unsubscribeSession?.()
+  session.value?.dispose()
 })
 </script>
 
@@ -394,15 +494,13 @@ onBeforeUnmount(() => {
       :source-image="sourceImage"
       :content-image-bridge="tauriDesktopBridge"
       @hosts-ready="onHostsReady"
+      @frame-ready="onFrameReady"
+      @quick-frame-change="onQuickFrameChange"
     />
     <div v-if="draft" class="cs-quick-size-a11y" aria-live="polite">
       {{ currentCrop.width }} × {{ currentCrop.height }}
     </div>
-    <nav
-      class="cs-quick-actions"
-      :aria-label="labels.actions"
-      :style="actionStyle"
-    >
+    <nav v-if="draft" class="cs-quick-actions" :aria-label="labels.actions">
       <button type="button" :disabled="pending" @click="openEditor">
         {{ labels.editor }}
       </button>

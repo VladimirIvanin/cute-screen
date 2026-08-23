@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "quick-capture",
+  "description": "Production permissions for the quick-capture window.",
+  "windows": ["quick-capture"],
+  "permissions": ["core:default"]
+}

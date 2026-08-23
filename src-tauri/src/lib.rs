@@ -29,6 +29,8 @@ use tauri::{
     Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder,
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
+    utils::config::BackgroundThrottlingPolicy,
+    webview::Color,
 };
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_notification::NotificationExt;
@@ -746,6 +748,36 @@ fn quick_capture_get_active(
 }
 
 #[tauri::command]
+fn quick_capture_present(
+    draft_id: String,
+    app: tauri::AppHandle,
+    controller: State<'_, CaptureController>,
+) -> Result<bool, String> {
+    let active = controller.active_quick_draft();
+    if !quick_capture_draft_matches(
+        active.as_ref().map(|draft| draft.draft_id.as_str()),
+        &draft_id,
+    ) {
+        return Ok(false);
+    }
+    let window = app
+        .get_webview_window("quick-capture")
+        .ok_or_else(|| "quick capture window is unavailable".to_owned())?;
+    window.show().map_err(|error| error.to_string())?;
+    window.set_focus().map_err(|error| error.to_string())?;
+    Ok(true)
+}
+
+#[tauri::command]
+fn quick_capture_dismiss(app: tauri::AppHandle) -> Result<bool, String> {
+    let Some(window) = app.get_webview_window("quick-capture") else {
+        return Ok(false);
+    };
+    window.hide().map_err(|error| error.to_string())?;
+    Ok(true)
+}
+
+#[tauri::command]
 async fn quick_capture_commit(
     draft_id: String,
     document_json: String,
@@ -1100,36 +1132,79 @@ fn show_editor<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     }
 }
 
-fn show_quick_capture<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
-    if let Some(window) = app.get_webview_window("quick-capture") {
-        let _ = window.show();
-        let _ = window.set_focus();
-        return;
+fn quick_capture_webview_url() -> WebviewUrl {
+    WebviewUrl::App("index.html?quickCapture=1".into())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct QuickCaptureWindowPolicy {
+    visible: bool,
+    focused: bool,
+    background_throttling_disabled: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum QuickCapturePrewarmMoment {
+    Startup,
+    AreaPreflight,
+}
+
+const fn quick_capture_window_policy() -> QuickCaptureWindowPolicy {
+    QuickCaptureWindowPolicy {
+        visible: false,
+        focused: false,
+        background_throttling_disabled: true,
     }
-    let url = WebviewUrl::App("index.html?quickCapture=1".into());
-    if let Err(error) = WebviewWindowBuilder::new(app, "quick-capture", url)
+}
+
+const fn should_ensure_quick_capture_window(
+    moment: QuickCapturePrewarmMoment,
+    has_active_draft: bool,
+) -> bool {
+    match moment {
+        QuickCapturePrewarmMoment::Startup => true,
+        QuickCapturePrewarmMoment::AreaPreflight => !has_active_draft,
+    }
+}
+
+fn ensure_quick_capture_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("quick-capture") {
+        window.hide().map_err(|error| error.to_string())?;
+        return Ok(());
+    }
+    let policy = quick_capture_window_policy();
+    let url = quick_capture_webview_url();
+    WebviewWindowBuilder::new(app, "quick-capture", url)
         .title("Cute Screen Quick Capture")
         .decorations(false)
         .always_on_top(true)
         .skip_taskbar(true)
         .fullscreen(true)
+        .visible(policy.visible)
+        .focused(policy.focused)
+        .background_color(Color(5, 6, 9, 255))
+        .background_throttling(BackgroundThrottlingPolicy::Disabled)
         .build()
-    {
-        eprintln!("cute-screen quick capture window failed: {error}");
-        if let Some(controller) = app.try_state::<CaptureController>() {
-            let _ = controller.cancel();
-        }
-    }
+        .map(|_| ())
+        .map_err(|error| error.to_string())
 }
 
-/// Hides the X11 editor before the scoped capture connection reads the root.
-/// On cancellation the caller restores it, keeping the pre-capture visible
-/// state without letting the editor leak into the frozen source frame.
-fn hide_editor_for_x11_capture<R: tauri::Runtime>(
+fn quick_capture_draft_matches(active_draft_id: Option<&str>, requested_draft_id: &str) -> bool {
+    active_draft_id == Some(requested_draft_id)
+}
+
+/// Hides the editor before a native desktop capture. On cancellation the
+/// caller restores it; an Area quick draft keeps it hidden until a terminal
+/// action so the editor cannot leak into the selected compositor pixels.
+fn hide_editor_for_native_capture<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
     correlation_id: &str,
 ) -> Result<bool, PlatformError> {
-    if current_session() != SessionKind::X11 {
+    #[cfg(target_os = "windows")]
+    let native_desktop_capture = true;
+    #[cfg(not(target_os = "windows"))]
+    let native_desktop_capture = current_session() == SessionKind::X11;
+    if !native_desktop_capture {
         return Ok(false);
     }
     let Some(window) = app.get_webview_window("main") else {
@@ -1306,7 +1381,21 @@ fn publish_capture_progress<R: tauri::Runtime>(
     state: CaptureProgressState,
 ) {
     if state == CaptureProgressState::QuickEditing {
-        show_quick_capture(app);
+        let preparation = ensure_quick_capture_window(app).and_then(|()| {
+            app.get_webview_window("quick-capture")
+                .ok_or_else(|| "quick capture window is unavailable".to_owned())?
+                .emit(
+                    "cute-screen:quick-capture-available",
+                    correlation_id.to_owned(),
+                )
+                .map_err(|error| error.to_string())
+        });
+        if let Err(error) = preparation {
+            eprintln!("cute-screen quick capture preparation failed: {error}");
+            if let Some(controller) = app.try_state::<CaptureController>() {
+                let _cancelled = controller.cancel();
+            }
+        }
     }
     let _ = app.emit(
         "cute-screen:capture-progress",
@@ -1337,9 +1426,21 @@ async fn capture_with_preflight<R: tauri::Runtime>(
         diagnostics.begin(&request);
     }
     publish_capture_progress(app, &request.correlation_id, CaptureProgressState::Probing);
+    if request.action == capture::CaptureAction::Area
+        && should_ensure_quick_capture_window(
+            QuickCapturePrewarmMoment::AreaPreflight,
+            controller.active_quick_draft().is_some(),
+        )
+        && let Err(error) = ensure_quick_capture_window(app)
+    {
+        eprintln!("cute-screen quick capture prewarm failed: {error}");
+        let outcome = failed_capture(request.correlation_id);
+        publish_capture_outcome(app, &outcome);
+        return outcome;
+    }
     let preflight = app.state::<CapturePreflightService>();
     let Some(approval) = preflight.begin(&request.correlation_id) else {
-        let restore_editor = match hide_editor_for_x11_capture(app, &request.correlation_id) {
+        let restore_editor = match hide_editor_for_native_capture(app, &request.correlation_id) {
             Ok(restore_editor) => restore_editor,
             Err(_) => {
                 let outcome = failed_capture(request.correlation_id);
@@ -1387,7 +1488,7 @@ async fn capture_with_preflight<R: tauri::Runtime>(
     }
 
     publish_capture_progress(app, &request.correlation_id, CaptureProgressState::Ready);
-    let restore_editor = match hide_editor_for_x11_capture(app, &request.correlation_id) {
+    let restore_editor = match hide_editor_for_native_capture(app, &request.correlation_id) {
         Ok(restore_editor) => restore_editor,
         Err(_) => {
             let outcome = failed_capture(request.correlation_id);
@@ -1595,6 +1696,12 @@ pub fn run() {
             app.manage(QuickSaveTargetService::default());
             app.manage(CaptureDiagnosticsService::default());
 
+            if should_ensure_quick_capture_window(QuickCapturePrewarmMoment::Startup, false)
+                && let Err(error) = ensure_quick_capture_window(app.handle())
+            {
+                eprintln!("cute-screen quick capture startup prewarm failed: {error}");
+            }
+
             #[cfg(target_os = "linux")]
             app.manage(linux_platform::PortalHotkeyService::default());
 
@@ -1648,6 +1755,8 @@ pub fn run() {
         capture_request,
         capture_cancel,
         quick_capture_get_active,
+        quick_capture_present,
+        quick_capture_dismiss,
         quick_capture_commit,
         quick_capture_editor_mounted,
         quick_capture_open_editor,
@@ -1690,6 +1799,8 @@ pub fn run() {
         capture_request,
         capture_cancel,
         quick_capture_get_active,
+        quick_capture_present,
+        quick_capture_dismiss,
         quick_capture_commit,
         quick_capture_editor_mounted,
         quick_capture_open_editor,
@@ -1807,6 +1918,54 @@ mod tests {
             .build()
             .expect("runtime");
         assert!(runtime.block_on(receiver).expect("mount acknowledgement"));
+    }
+
+    #[test]
+    fn packaged_quick_capture_uses_the_app_asset_url() {
+        match super::quick_capture_webview_url() {
+            tauri::WebviewUrl::App(path) => {
+                assert_eq!(path.to_string_lossy(), "index.html?quickCapture=1");
+            }
+            other => panic!("expected app asset URL, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn prewarmed_quick_capture_window_starts_hidden_and_unfocused() {
+        let policy = super::quick_capture_window_policy();
+
+        assert!(!policy.visible);
+        assert!(!policy.focused);
+        assert!(policy.background_throttling_disabled);
+    }
+
+    #[test]
+    fn resident_process_prewarms_quick_capture_before_the_first_area_request() {
+        assert!(super::should_ensure_quick_capture_window(
+            super::QuickCapturePrewarmMoment::Startup,
+            false,
+        ));
+        assert!(super::should_ensure_quick_capture_window(
+            super::QuickCapturePrewarmMoment::AreaPreflight,
+            false,
+        ));
+        assert!(!super::should_ensure_quick_capture_window(
+            super::QuickCapturePrewarmMoment::AreaPreflight,
+            true,
+        ));
+    }
+
+    #[test]
+    fn only_the_active_quick_draft_can_cross_the_present_boundary() {
+        assert!(super::quick_capture_draft_matches(
+            Some("draft-current"),
+            "draft-current"
+        ));
+        assert!(!super::quick_capture_draft_matches(
+            Some("draft-current"),
+            "draft-stale"
+        ));
+        assert!(!super::quick_capture_draft_matches(None, "draft-stale"));
     }
 
     #[test]

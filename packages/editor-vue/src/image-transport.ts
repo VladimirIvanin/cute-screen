@@ -137,18 +137,20 @@ export async function loadImageWithBinaryFallback<Resource>(
 
   const decodeImage = options.decodeImage ?? decodeBrowserImage
   const assetUrl = metadata.assetUrl
-  try {
-    const image = await decodeImage(assetUrl)
-    assertDimensions(image, metadata)
-    return {
-      resource: await options.createResource(image, metadata),
-      metadata,
-      transport: 'asset',
+  if (assetUrl) {
+    try {
+      const image = await decodeImage(assetUrl)
+      assertDimensions(image, metadata)
+      return {
+        resource: await options.createResource(image, metadata),
+        metadata,
+        transport: 'asset',
+      }
+    } catch (error) {
+      options.onPrimaryFailure?.(error, assetUrl)
+      // Asset denial, decode failure and texture-source failure all retry from
+      // the same opaque token over Tauri's binary IPC response.
     }
-  } catch (error) {
-    options.onPrimaryFailure?.(error, assetUrl)
-    // Asset denial, decode failure and texture-source failure all retry from the
-    // same opaque token over Tauri's binary IPC response.
   }
 
   let bytes: ArrayBuffer

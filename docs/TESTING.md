@@ -1190,6 +1190,176 @@ defaults are unchanged.
 - `pnpm typecheck` and scoped Prettier verification passed. No browser or
   real-Tauri evidence is claimed for this focused interaction repair.
 
+## Windows selector and standalone quick-capture repair (2026-08-23)
+
+Windows 10 22H2 build 19045, AMD64. The repair is limited to native Windows
+Area/Window selection, controller cancellation, editor visibility during
+native capture and Tauri frontend packaging; document schema, `EditorCommand`,
+immutable originals and renderer/export are unchanged.
+
+- Red-first Rust compilation failed on the new moving-hint, dim-layer,
+  crosshair and packaged-app-URL contracts before their helpers existed. The
+  final focused Windows module run passed 13 tests with its one interactive
+  DXGI probe explicitly ignored. A stray button-up without a preceding down is
+  also ignored instead of terminating the selector.
+- Physical Win32 input moved the cursor to two distant points and the camera
+  hint followed in `artifacts/selector-follow-a2.png` and
+  `artifacts/selector-follow-b2.png`. A 500×375 injected physical drag produced
+  the DPI-adjusted 625×469 dashed selection in
+  `artifacts/selector-drag-final2.png`; the desktop remained dimmed throughout.
+  The hint has no Cancel button; Escape is the cancellation path.
+- `GetCursorInfo` returned handle `0x10009`, exactly matching the loaded
+  `IDC_CROSS` handle while the selector was active. Injected Escape then
+  returned CLI JSON `outcome: cancelled` and removed the selector.
+- The first standalone replay exposed `asset not found: index.html`, proving
+  that redirecting a development build to the app protocol cannot substitute
+  for embedded assets. Adding the standard `custom-protocol` Cargo feature,
+  rebuilding `apps/desktop/dist` and compiling with that feature produced
+  `artifacts/quick-capture-packaged-final.png`: the selected image, crop frame,
+  annotation toolbars and Editor/Copy/Save/Close actions rendered without a
+  running Vite server. Escape closed it and the CLI returned
+  `outcome: cancelled`.
+- `cargo test --workspace` passed 89 tests with the interactive DXGI probe
+  ignored. `pnpm check:rust` passed formatting plus every configured Clippy
+  feature combination, including `--all-features`; scoped Prettier,
+  `pnpm docs:check` and `git diff --check` passed after the evidence update.
+
+## Quick-capture overlay geometry repair (2026-08-23)
+
+Windows 10 22H2 build 19045, AMD64; standalone Tauri custom-protocol build.
+The change is limited to quick-mode viewport/chrome geometry and its crop
+gesture boundary; normal editor Crop, document schema, renderer/export and
+immutable originals are unchanged.
+
+- The red-first layout test failed because no shared quick-capture geometry
+  function existed. Final pure layout coverage maps source crop coordinates to
+  the fitted frozen frame, moves both action/tool groups with the crop and
+  flips actions right→left plus tools below→above at viewport collisions.
+- CanvasViewport component coverage streams transient quick-frame bounds on
+  pointermove and emits exactly one `setCrop` command on pointerup. The first
+  full suite exposed an unintended normal-editor Crop commit; the behavior was
+  narrowed to `quickFrameMode`, and focused normal/quick coverage then passed
+  74/74.
+- A physical Windows replay selected a 1501×850 area, opened the packaged
+  quick surface and resized it to 1063×625. The frozen desktop fills the
+  frameless viewport with no dotted workspace, padding or scrolling. Visual
+  evidence in `artifacts/quick-layout-before-resize.png`,
+  `artifacts/quick-layout-during-resize.png` and
+  `artifacts/quick-layout-after-resize.png` shows actions following the right
+  edge and annotation/context/history chrome following the bottom edge during
+  the drag, not only after release. Escape returned CLI `outcome: cancelled`.
+- Final `pnpm test` passed 49 files and 442/442 tests. `pnpm check` passed ESLint,
+  TypeScript/package builds, repository-wide Prettier, Markdown links, 7/7
+  boundary tests and every configured Rust fmt/Clippy feature combination.
+
+## Quick-capture terminal-action repair (2026-08-23)
+
+Windows 10 22H2 build 19045, AMD64. The change is limited to Area quick-mode
+Copy/Save/Editor selection normalization and Close error handling; document
+schema, renderer/export contracts and immutable originals are unchanged.
+
+- The red-first Vue test failed to resolve the not-yet-created terminal-action
+  module. Final coverage converts fractional transient crop edges such as
+  `678.0000152587891` to bounded integer physical-pixel edges, and rejects
+  invalid/non-finite selection geometry.
+- The same normalized selection is now used for Canvas2D PNG extraction,
+  immutable-source dimensions, quick-document rebasing and the
+  `quick_capture_commit` IPC argument. This prevents the Tauri `expected u32`
+  deserialization failure without allowing PNG/document/metadata dimensions to
+  diverge.
+- Close-path coverage proves that the visible Close button reaches the native
+  window close call before a draft has mounted, starts close without waiting
+  for `quick_capture_cancel` to settle, and still attempts close when that IPC
+  rejects. A close failure remains a visible error rather than an unhandled
+  Promise rejection.
+- Focused quick terminal/layout/viewport coverage passed 40/40 before the
+  explicit button-wiring regression was added; the final terminal-action file
+  passes 5/5. The final full `pnpm test` run passed 50 files and 447/447 tests.
+  `pnpm check` covers lint, typecheck, formatting, documentation, boundaries and
+  Rust checks; no additional real-Tauri terminal-action evidence is claimed by
+  this section.
+
+## Production quick-capture lifecycle permission repair (2026-08-23)
+
+Windows 10 22H2 build 19045, AMD64. The change is limited to production Tauri
+capability scoping and the reusable quick-window lifecycle; document state,
+immutable originals and export contracts are unchanged.
+
+- The earlier close-path boundary required `core:window:allow-close` while the
+  WebView destroyed itself. The reusable surface now presents and dismisses
+  only through draft-checked native commands, so the WebView no longer owns
+  close authority and that permission was removed again.
+- The main and quick-capture windows continue to use separate production
+  capabilities; the main window keeps its previous permissions.
+- Final `pnpm test:boundaries` passed 8/8, the focused quick-capture terminal
+  action suite passed 5/5 and `pnpm test` passed 50 files with 447/447 tests.
+  `pnpm check` passed all configured frontend, documentation, boundary and Rust
+  gates. `pnpm tauri build --debug --no-bundle` validated the production
+  capability configuration and built `target/debug/cute-screen.exe`. No
+  physical Escape/Copy runtime smoke is claimed by this section.
+
+## Hidden quick-capture presentation handoff (2026-08-23)
+
+Windows 10 22H2 build 19045, AMD64; standalone production custom-protocol
+build. The change is limited to the Area quick-window lifecycle and its first
+visible frame; document schema, editor commands, immutable originals and
+renderer/export output are unchanged.
+
+- Red-first Rust tests failed to compile before the hidden/unfocused window
+  policy and active-draft presentation boundary existed. The red-first Vue
+  test also observed action chrome in an idle prewarmed WebView.
+- The native window is created hidden during Area preflight with background
+  throttling disabled. It is not focused or shown by `QuickEditing`; the
+  frontend loads the binary image, renders the committed scene and interaction
+  overlay, waits for layout plus two animation frames, then presents through a
+  command that rejects stale draft IDs. Terminal actions hide and reset the
+  same WebView for the next capture.
+- A physical Win32 drag against `target/debug/cute-screen.exe` sampled three
+  small screen regions after mouse-up without retaining screen content. Across
+  67 samples it produced two stable visual runs: the restored desktop beginning
+  79 ms after mouse-up and the ready quick surface beginning 2252 ms after
+  mouse-up. The only other runs were single-sample transition boundaries; no
+  stable blank/loading surface or oscillation was observed. A separate window
+  probe confirmed the visible `Cute Screen Quick Capture` surface.
+- `cargo test --workspace` passed 91 tests with the interactive DXGI probe
+  ignored. `pnpm test` passed 50 files and 449/449 tests. `pnpm check` passed
+  lint, typecheck/builds, formatting, docs, boundary tests and all configured
+  Rust Clippy feature combinations. `pnpm tauri build --debug --no-bundle`
+  produced the standalone binary used by the physical replay.
+
+## Resident quick-capture latency repair (2026-08-24)
+
+Windows 10 22H2 build 19045, AMD64; standalone optimized Tauri
+`custom-protocol` build. The change is limited to the resident Area quick-mode
+handoff and its temporary preview transport; committed originals and exported
+results remain PNG and continue through the normal repository transaction.
+
+- Red-first Rust tests failed before process-start quick-window prewarm, DXGI
+  pointer-resource acceptance, opaque top-down BMP encoding, transparent
+  non-activating compositor pulse and memory-owned preview staging existed.
+  The red-first Vue transport test observed an attempted empty asset URL before
+  native memory previews selected the existing binary IPC path directly.
+- DXGI duplication is prepared before the selector, but acquisition still
+  occurs only after mouse-up, selector destruction, foreground restoration and
+  DWM flush. The selector lifecycle itself therefore supplies a queued final
+  compositor update instead of waiting up to two seconds for an unrelated next
+  desktop present.
+- The temporary full-desktop Area preview uses an uncompressed top-down BMP,
+  remains in native memory and transfers as a binary Tauri response. It is not
+  JSON/base64 and is discarded on cancel or after the final normalized PNG has
+  been committed. Hashing is performed once at native import.
+- Three optimized physical replays on a 2560×1440 framebuffer (2048×1152
+  logical desktop at 125% DPI) measured 450, 460 and 472 ms from mouse-up to
+  visible interactive chrome, down from 2252 ms. Native stage telemetry was
+  14–17 ms for the final compositor frame, 4–6 ms for BMP encoding and 25–27 ms
+  for memory import.
+- A 1000 ms visual-state replay retained hashes only during sampling. It found
+  one stable restored-desktop run through 474 ms, two single-sample transition
+  boundaries, then one stable ready quick surface from 559 ms onward. Visual
+  inspection confirmed a normally lit selected region, dimmed outside crop and
+  fully positioned tool/action chrome; no selector contamination, blank WebView
+  or oscillation appeared.
+
 ## CI gates
 
 ### Каждый PR

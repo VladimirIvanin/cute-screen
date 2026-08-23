@@ -78,6 +78,7 @@ x11rb = { version = "=0.14.0", default-features = false, features = ["composite"
 
 [features]
 default = ["x11-capture"]
+custom-protocol = ["tauri/custom-protocol"]
 fake-platform = []
 platform-smoke = []
 x11-capture = ["dep:x11rb"]

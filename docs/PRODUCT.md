@@ -240,7 +240,14 @@ Cute Screen — полноценный local-first редактор снимко
 - `REQ-UI-010` — Area quick-mode использует frameless chrome: dimension badge,
   annotation toolbar у нижней стороны рамки и action bar Editor/Copy/Save/Close
   справа. Панели меняют сторону при collision, остаются keyboard-accessible и
-  не содержат OCR, AI/cloud, print, Pin, layers, beautify или watermark.
+  не содержат OCR, AI/cloud, print, Pin, layers, beautify или watermark. После
+  подтверждения selector quick surface не показывает пользователю пустой,
+  loading или частично разложенный WebView: окно остаётся скрытым до decoded
+  frozen frame, первого renderer flush и окончательной раскладки chrome.
+  Создание WebView не входит в критический путь Area capture: резидентное
+  приложение прогревает hidden quick surface заранее; для уже запущенного
+  Windows-приложения reference target mouse-up → interactive chrome составляет
+  не более 500 ms на 1920×1080.
 
 ## Качество и поставка
 

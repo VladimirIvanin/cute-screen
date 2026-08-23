@@ -3,7 +3,7 @@ use std::{
     fs::{self, File},
     io::{Read, Write},
     path::{Path, PathBuf},
-    sync::RwLock,
+    sync::{Arc, RwLock},
 };
 
 use serde::Serialize;
@@ -19,6 +19,8 @@ pub struct RegisteredImage {
     width: u32,
     height: u32,
     authoritative: bool,
+    sha256: Option<String>,
+    memory_bytes: Option<Arc<Vec<u8>>>,
 }
 
 impl RegisteredImage {
@@ -34,7 +36,14 @@ impl RegisteredImage {
             width,
             height,
             authoritative: false,
+            sha256: None,
+            memory_bytes: None,
         }
+    }
+
+    fn with_sha256(mut self, sha256: String) -> Self {
+        self.sha256 = Some(sha256);
+        self
     }
 }
 
@@ -134,6 +143,8 @@ impl ImageTransportService {
             width: source.metadata.width,
             height: source.metadata.height,
             authoritative: true,
+            sha256: Some(source.hash),
+            memory_bytes: None,
         };
         self.images
             .write()
@@ -162,6 +173,8 @@ impl ImageTransportService {
             width: source.metadata.width,
             height: source.metadata.height,
             authoritative: true,
+            sha256: Some(source.hash),
+            memory_bytes: None,
         };
         self.images
             .write()
@@ -193,15 +206,15 @@ impl ImageTransportService {
             ));
         }
         let mime_type = mime_type.into();
-        let extension = if mime_type == "image/png" {
-            "png"
-        } else {
-            "image"
+        let extension = match mime_type.as_str() {
+            "image/png" => "png",
+            "image/bmp" => "bmp",
+            _ => "image",
         };
         let owned_source = self.source_root.join(format!("{token}.{extension}"));
         let mut temporary = NamedTempFile::new_in(&self.source_root)
             .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?;
-        copy_and_hash(&canonical_source, temporary.as_file_mut())
+        let sha256 = copy_and_hash(&canonical_source, temporary.as_file_mut())
             .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?;
         temporary
             .as_file()
@@ -212,7 +225,7 @@ impl ImageTransportService {
             .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?;
         self.register(
             token,
-            RegisteredImage::new(owned_source, mime_type, width, height),
+            RegisteredImage::new(owned_source, mime_type, width, height).with_sha256(sha256),
         )
     }
 
@@ -230,25 +243,60 @@ impl ImageTransportService {
     ) -> Result<(), PlatformError> {
         validate_token(token, correlation_id)?;
         let mime_type = mime_type.into();
-        let extension = if mime_type == "image/png" {
-            "png"
-        } else {
-            "image"
+        let extension = match mime_type.as_str() {
+            "image/png" => "png",
+            "image/bmp" => "bmp",
+            _ => "image",
         };
         let owned_source = self.source_root.join(format!("{token}.{extension}"));
         let mut temporary = NamedTempFile::new_in(&self.source_root)
             .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?;
+        let sha256 = format!("{:x}", Sha256::digest(bytes));
         temporary
             .write_all(bytes)
-            .and_then(|()| temporary.as_file().sync_all())
             .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?;
         temporary
             .persist_noclobber(&owned_source)
             .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?;
         self.register(
             token,
-            RegisteredImage::new(owned_source, mime_type, width, height),
+            RegisteredImage::new(owned_source, mime_type, width, height).with_sha256(sha256),
         )
+    }
+
+    /// Keeps an ephemeral native preview off disk while preserving the opaque
+    /// token and binary IPC boundary used by the WebView.
+    pub fn import_owned_memory(
+        &self,
+        token: &str,
+        bytes: Vec<u8>,
+        mime_type: impl Into<String>,
+        width: u32,
+        height: u32,
+        correlation_id: &str,
+    ) -> Result<(), PlatformError> {
+        validate_token(token, correlation_id)?;
+        let image = RegisteredImage {
+            source: self.source_root.clone(),
+            mime_type: mime_type.into(),
+            width,
+            height,
+            authoritative: false,
+            sha256: Some(format!("{:x}", Sha256::digest(&bytes))),
+            memory_bytes: Some(Arc::new(bytes)),
+        };
+        let mut images = self
+            .images
+            .write()
+            .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?;
+        if images.contains_key(token) {
+            return Err(transport_error(
+                PlatformErrorCode::CaptureFailed,
+                correlation_id,
+            ));
+        }
+        images.insert(token.to_owned(), image);
+        Ok(())
     }
 
     /// Consumes a capture-owned staging file after native persistence has either
@@ -266,16 +314,23 @@ impl ImageTransportService {
             .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?
             .remove(token)
             .ok_or_else(|| transport_error(PlatformErrorCode::InvalidUri, correlation_id))?;
-        if image.authoritative || !image.source.starts_with(&self.source_root) {
+        if image.authoritative
+            || (image.memory_bytes.is_none() && !image.source.starts_with(&self.source_root))
+        {
             return Err(transport_error(
                 PlatformErrorCode::PermissionDenied,
                 correlation_id,
             ));
         }
-        let bytes = fs::read(&image.source)
-            .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?;
-        fs::remove_file(&image.source)
-            .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?;
+        let bytes = if let Some(bytes) = image.memory_bytes {
+            Arc::try_unwrap(bytes).unwrap_or_else(|bytes| (*bytes).clone())
+        } else {
+            let bytes = fs::read(&image.source)
+                .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?;
+            fs::remove_file(&image.source)
+                .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?;
+            bytes
+        };
         Ok(OwnedImage {
             bytes,
             mime_type: image.mime_type,
@@ -297,6 +352,19 @@ impl ImageTransportService {
             .get(token)
             .cloned()
             .ok_or_else(|| transport_error(PlatformErrorCode::InvalidUri, correlation_id))?;
+        if image.memory_bytes.is_some() {
+            return Ok(StagedImageMetadata {
+                token: token.to_owned(),
+                asset_url: String::new(),
+                mime_type: image.mime_type,
+                width: image.width,
+                height: image.height,
+                sha256: image.sha256.ok_or_else(|| {
+                    transport_error(PlatformErrorCode::CaptureFailed, correlation_id)
+                })?,
+                correlation_id: correlation_id.to_owned(),
+            });
+        }
         let canonical_source = image
             .source
             .canonicalize()
@@ -308,8 +376,11 @@ impl ImageTransportService {
             ));
         }
 
-        let sha256 = hash_file(&canonical_source)
-            .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?;
+        let sha256 = match image.sha256 {
+            Some(sha256) => sha256,
+            None => hash_file(&canonical_source)
+                .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))?,
+        };
 
         Ok(StagedImageMetadata {
             token: token.to_owned(),
@@ -336,6 +407,9 @@ impl ImageTransportService {
             .get(token)
             .cloned()
             .ok_or_else(|| transport_error(PlatformErrorCode::InvalidUri, correlation_id))?;
+        if let Some(bytes) = image.memory_bytes {
+            return Ok((*bytes).clone());
+        }
         fs::read(image.source)
             .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, correlation_id))
     }
@@ -497,6 +571,61 @@ mod tests {
             .import_owned_image("owned-token", &second, "image/png", 1, 1, "transport-test")
             .expect_err("existing token must not overwrite its immutable original");
         assert_eq!(error.code, PlatformErrorCode::CaptureFailed);
+    }
+
+    #[test]
+    fn native_owned_bytes_cache_their_digest_before_frontend_staging() {
+        let tree = TempTree::new();
+        let source_root = tree.path().join("library");
+        let stage_root = tree.path().join("cache");
+        let service = ImageTransportService::new(&source_root, &stage_root)
+            .expect("service should initialize");
+
+        service
+            .import_owned_bytes(
+                "preview-token",
+                b"preview-bytes",
+                "image/bmp",
+                1,
+                1,
+                "transport-test",
+            )
+            .expect("preview should import");
+
+        let registered = service.images.read().unwrap();
+        assert!(registered["preview-token"].sha256.is_some());
+    }
+
+    #[test]
+    fn native_memory_preview_stages_without_creating_a_transport_file() {
+        let tree = TempTree::new();
+        let source_root = tree.path().join("library");
+        let stage_root = tree.path().join("cache");
+        let service = ImageTransportService::new(&source_root, &stage_root)
+            .expect("service should initialize");
+
+        service
+            .import_owned_memory(
+                "memory-preview",
+                b"preview-bytes".to_vec(),
+                "image/bmp",
+                1,
+                1,
+                "transport-test",
+            )
+            .expect("memory preview should import");
+        let metadata = service
+            .stage_image("memory-preview", "transport-test")
+            .expect("memory preview should stage");
+
+        assert!(metadata.asset_url.is_empty());
+        assert_eq!(fs::read_dir(&source_root).unwrap().count(), 0);
+        assert_eq!(
+            service
+                .read_image_bytes("memory-preview", "transport-test")
+                .unwrap(),
+            b"preview-bytes"
+        );
     }
 
     #[test]

@@ -182,6 +182,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
   hostsReady: [hosts: CanvasViewportHosts]
+  frameReady: [documentId: string]
   selectLayer: [id: string, toggle: boolean]
   moveLayer: [id: string, deltaX: number, deltaY: number]
   transformLayer: [id: string, transform: Transform2D]
@@ -213,6 +214,9 @@ const emit = defineEmits<{
   colorSampleError: [message: string]
   colorSampleCancel: []
   toolError: [message: string]
+  quickFrameChange: [
+    crop: { x: number; y: number; width: number; height: number },
+  ]
 }>()
 const scene = ref<HTMLCanvasElement>()
 const overlay = ref<HTMLCanvasElement>()
@@ -866,6 +870,7 @@ function invalidateGesturePreview(): void {
 }
 async function drawDocument(): Promise<void> {
   const revision = ++drawRevision
+  let readyDocumentId: string | undefined
   const bounds = viewportOutputBounds.value
   if (!scene.value || !props.canvas || !bounds) return
   rendererError.value = undefined
@@ -914,6 +919,7 @@ async function drawDocument(): Promise<void> {
     }
     setCommittedScene(runtime)
     runtime.render(['scene'])
+    if (props.quickFrameMode) readyDocumentId = props.document.id
   } catch (error) {
     if (revision !== drawRevision) return
     renderer?.dispose()
@@ -922,7 +928,10 @@ async function drawDocument(): Promise<void> {
     imageResources = new Map()
     rendererError.value = error instanceof Error ? error.message : String(error)
   }
-  if (componentMounted && revision === drawRevision) invalidateOverlay()
+  if (componentMounted && revision === drawRevision) {
+    invalidateOverlay()
+    if (readyDocumentId) emit('frameReady', readyDocumentId)
+  }
 }
 function fitCanvas(): void {
   const container = scrollContainer.value
@@ -3224,6 +3233,9 @@ function onPointerMove(event: PointerEvent): void {
       gesture.action === 'move'
         ? moveCrop(gesture.initial, delta)
         : resizeCrop(gesture.initial, gesture.handle!, delta)
+    if (props.quickFrameMode) {
+      emit('quickFrameChange', { ...cropSession.crop })
+    }
     invalidateOverlay()
     return
   }
@@ -3396,6 +3408,18 @@ function finishGesture(event: PointerEvent): void {
     const deltaY = completed.current.y - completed.start.y
     if (deltaX !== 0 || deltaY !== 0) {
       emit('moveLayer', completed.id, deltaX, deltaY)
+    }
+  }
+  if (completed?.kind === 'crop' && cropSession && props.quickFrameMode) {
+    const before = completed.initial.crop
+    const after = cropSession.crop
+    if (
+      before.x !== after.x ||
+      before.y !== after.y ||
+      before.width !== after.width ||
+      before.height !== after.height
+    ) {
+      emit('documentCommand', applyCropSession(cropSession))
     }
   }
   if (completed?.kind === 'resize') {

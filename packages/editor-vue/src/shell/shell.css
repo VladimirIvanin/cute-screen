@@ -695,6 +695,27 @@ button:focus-visible {
   box-shadow: var(--shadow-overlay);
   backdrop-filter: blur(16px) saturate(1.12);
 }
+
+/* Quick capture is a screen overlay, not an editor workspace. The frozen
+   desktop owns the viewport; any aspect-ratio remainder is neutral black and
+   never exposes the editor's dotted infinite-canvas treatment. */
+.cs-editor-shell.is-quick-mode,
+.cs-editor-shell.is-quick-mode .cs-workbench,
+.cs-editor-shell.is-quick-mode .cs-viewport {
+  background: #050609;
+  background-image: none;
+}
+
+.cs-editor-shell.is-quick-mode .cs-canvas-scroll {
+  overflow: hidden;
+  padding: 0;
+}
+
+.cs-editor-shell.is-quick-mode .cs-canvas-stage {
+  min-width: 100%;
+  min-height: 100%;
+  place-items: center;
+}
 .cs-context-icon {
   display: grid;
   width: 32px;

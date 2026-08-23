@@ -146,7 +146,11 @@ const props = withDefaults(
 )
 const emit = defineEmits<{
   hostsReady: [hosts: CanvasViewportHosts]
+  frameReady: [documentId: string]
   retryLoad: []
+  quickFrameChange: [
+    crop: { x: number; y: number; width: number; height: number },
+  ]
 }>()
 const store = useEditorShellStore()
 const state = storeToRefs(store)
@@ -4325,7 +4329,7 @@ watch(
     :theme-overrides="cuteScreenThemeOverrides"
     :abstract="false"
   >
-    <div class="cs-editor-shell">
+    <div class="cs-editor-shell" :class="{ 'is-quick-mode': props.quickMode }">
       <TopBar
         v-if="!props.quickMode"
         :locale="store.locale"
@@ -4459,6 +4463,8 @@ watch(
           :quick-frame-mode="props.quickMode"
           :t="translate"
           @hosts-ready="emit('hostsReady', $event)"
+          @frame-ready="emit('frameReady', $event)"
+          @quick-frame-change="emit('quickFrameChange', $event)"
           @select-layer="selectLayer"
           @move-layer="moveLayer"
           @transform-layer="transformLayer"
