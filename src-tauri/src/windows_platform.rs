@@ -762,6 +762,10 @@ fn selector_cursor_resource() -> windows_sys::core::PCWSTR {
     IDC_CROSS
 }
 
+fn selector_dimension_label(width: u32, height: u32) -> String {
+    format!("{width} x {height}")
+}
+
 fn repaint_selector(window: HWND) {
     unsafe {
         InvalidateRect(window, null(), 1);
@@ -822,7 +826,7 @@ fn paint_selector(window: HWND) {
         }
         let width = (rect.right - rect.left).unsigned_abs();
         let height = (rect.bottom - rect.top).unsigned_abs();
-        let label = format!("{width} × {height}");
+        let label = selector_dimension_label(width, height);
         let label_w = 18 + i32::try_from(label.encode_utf16().count()).unwrap_or(12) * 8;
         let label_top = (rect.top - 34).max(8);
         let label_rect = RECT {
@@ -1491,6 +1495,14 @@ mod tests {
     #[test]
     fn selector_uses_crosshair_for_the_whole_native_gesture() {
         assert_eq!(super::selector_cursor_resource(), super::IDC_CROSS);
+    }
+
+    #[test]
+    fn selector_dimension_label_uses_only_stock_font_safe_ascii() {
+        let label = super::selector_dimension_label(377, 513);
+
+        assert_eq!(label, "377 x 513");
+        assert!(label.is_ascii());
     }
 
     #[test]
