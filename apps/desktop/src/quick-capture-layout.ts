@@ -49,6 +49,39 @@ export interface QuickCaptureLayout {
   }
 }
 
+export interface StableQuickCaptureLayoutOptions<T> {
+  readonly measure: () => T | undefined
+  readonly nextFrame: () => Promise<void>
+  readonly maximumFrames?: number
+  readonly equals?: (previous: T, current: T) => boolean
+}
+
+/**
+ * A hidden quick-capture webview can mount before Fit zoom and floating chrome
+ * have reached their final dimensions. Native presentation is allowed only
+ * after two consecutive animation frames report the same complete geometry.
+ */
+export async function waitForStableQuickCaptureLayout<T>(
+  options: StableQuickCaptureLayoutOptions<T>,
+): Promise<T | undefined> {
+  const maximumFrames = Math.max(1, options.maximumFrames ?? 6)
+  const equals = options.equals ?? Object.is
+  let previous = options.measure()
+  for (let frame = 0; frame < maximumFrames; frame += 1) {
+    await options.nextFrame()
+    const current = options.measure()
+    if (
+      previous !== undefined &&
+      current !== undefined &&
+      equals(previous, current)
+    ) {
+      return current
+    }
+    previous = current
+  }
+  return undefined
+}
+
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.max(minimum, Math.min(maximum, value))
 }

@@ -1,6 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
-import { computeQuickCaptureLayout } from '../../../apps/desktop/src/quick-capture-layout'
+import {
+  computeQuickCaptureLayout,
+  waitForStableQuickCaptureLayout,
+} from '../../../apps/desktop/src/quick-capture-layout'
 
 const base = {
   viewport: { width: 1440, height: 900 },
@@ -11,6 +14,30 @@ const base = {
 }
 
 describe('quick capture overlay layout', () => {
+  it('waits for two matching layout frames before native presentation', async () => {
+    const measurements = ['initial', 'fitted', 'fitted']
+    const nextFrame = vi.fn().mockResolvedValue(undefined)
+
+    const stable = await waitForStableQuickCaptureLayout({
+      measure: () => measurements.shift(),
+      nextFrame,
+      maximumFrames: 4,
+    })
+
+    expect(stable).toBe('fitted')
+    expect(nextFrame).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not approve missing chrome measurements for presentation', async () => {
+    const stable = await waitForStableQuickCaptureLayout({
+      measure: () => undefined,
+      nextFrame: async () => undefined,
+      maximumFrames: 3,
+    })
+
+    expect(stable).toBeUndefined()
+  })
+
   it('moves both chrome groups with the live crop geometry', () => {
     const first = computeQuickCaptureLayout({
       ...base,

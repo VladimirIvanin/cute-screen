@@ -17,6 +17,12 @@ body {
   inset: 0;
   overflow: hidden;
 }
+.cs-quick-capture:not(.is-layout-ready) .cs-quick-actions,
+.cs-quick-capture:not(.is-layout-ready) .cs-quick-toolrail-group,
+.cs-quick-capture:not(.is-layout-ready) .cs-context-toolbar,
+.cs-quick-capture:not(.is-layout-ready) .cs-quick-portal-limit {
+  visibility: hidden;
+}
 .cs-quick-actions {
   position: fixed;
   right: 18px;

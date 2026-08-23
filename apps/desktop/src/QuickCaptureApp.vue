@@ -18,6 +18,7 @@ import {
 import {
   computeQuickCaptureLayout,
   type QuickRect,
+  waitForStableQuickCaptureLayout,
 } from './quick-capture-layout'
 
 const draft = shallowRef<QuickCaptureDraftV1>()
@@ -28,6 +29,7 @@ const documentState = ref<ShellDocumentState>({ kind: 'loading' })
 const pending = ref(false)
 const materialized = ref(false)
 const error = ref<string>()
+const quickLayoutReady = ref(false)
 const russian = navigator.language.toLowerCase().startsWith('ru')
 const labels = russian
   ? {
@@ -62,8 +64,10 @@ function onHostsReady(value: CanvasViewportHosts): void {
   requestAnimationFrame(() => updateQuickLayout())
 }
 
-function updateQuickLayout(crop: QuickRect = currentCrop.value): void {
-  if (!hosts.value || crop.width <= 0) return
+function updateQuickLayout(
+  crop: QuickRect = currentCrop.value,
+): string | undefined {
+  if (!hosts.value || crop.width <= 0 || crop.height <= 0) return undefined
   const bounds = hosts.value.scene.getBoundingClientRect()
   const sourceWidth = session.value?.snapshot.core.document.canvas.width ?? 1
   const sourceHeight = session.value?.snapshot.core.document.canvas.height ?? 1
@@ -73,7 +77,17 @@ function updateQuickLayout(crop: QuickRect = currentCrop.value): void {
     '.cs-quick-toolrail-group',
   )
   const context = quickRoot?.querySelector<HTMLElement>('.cs-context-toolbar')
-  if (!actions || !toolRow) return
+  if (
+    !actions ||
+    !toolRow ||
+    bounds.width <= 0 ||
+    bounds.height <= 0 ||
+    actions.offsetWidth <= 0 ||
+    actions.offsetHeight <= 0 ||
+    toolRow.offsetWidth <= 0 ||
+    toolRow.offsetHeight <= 0
+  )
+    return undefined
   const contextHeight = context?.offsetHeight ?? 0
   const verticalGap = context ? 6 : 0
   const groupHeight = contextHeight + verticalGap + toolRow.offsetHeight
@@ -89,12 +103,12 @@ function updateQuickLayout(crop: QuickRect = currentCrop.value): void {
     source: { width: sourceWidth, height: sourceHeight },
     crop,
     actionSize: {
-      width: actions.offsetWidth || 124,
-      height: actions.offsetHeight || 220,
+      width: actions.offsetWidth,
+      height: actions.offsetHeight,
     },
     toolSize: {
-      width: groupWidth || 620,
-      height: groupHeight || 96,
+      width: groupWidth,
+      height: groupHeight,
     },
   })
   actions.style.left = `${Math.round(layout.actions.left)}px`
@@ -113,6 +127,38 @@ function updateQuickLayout(crop: QuickRect = currentCrop.value): void {
   toolRow.style.bottom = 'auto'
   toolRow.style.transform = 'none'
   toolRow.dataset.placement = layout.tools.side
+  return [
+    window.innerWidth,
+    window.innerHeight,
+    bounds.left,
+    bounds.top,
+    bounds.width,
+    bounds.height,
+    sourceWidth,
+    sourceHeight,
+    crop.x,
+    crop.y,
+    crop.width,
+    crop.height,
+    actions.offsetWidth,
+    actions.offsetHeight,
+    groupWidth,
+    groupHeight,
+  ].join(':')
+}
+
+function nextLayoutFrame(): Promise<void> {
+  return new Promise((resolve) => {
+    let settled = false
+    const finish = (): void => {
+      if (settled) return
+      settled = true
+      window.clearTimeout(timeout)
+      resolve()
+    }
+    const timeout = window.setTimeout(finish, 32)
+    requestAnimationFrame(finish)
+  })
 }
 
 function onQuickFrameChange(crop: QuickRect): void {
@@ -154,6 +200,7 @@ function resetDraftSession(): void {
   currentCrop.value = { x: 0, y: 0, width: 0, height: 0 }
   documentState.value = { kind: 'loading' }
   materialized.value = false
+  quickLayoutReady.value = false
   error.value = undefined
   presentedDraftId = undefined
   presentingDraftId = undefined
@@ -171,7 +218,16 @@ async function presentPreparedDraft(draftId: string): Promise<void> {
   try {
     await nextTick()
     if (draft.value?.draftId !== draftId) return
-    updateQuickLayout()
+    const stableLayout = await waitForStableQuickCaptureLayout({
+      measure: () => updateQuickLayout(),
+      nextFrame: nextLayoutFrame,
+    })
+    if (draft.value?.draftId !== draftId) return
+    if (!stableLayout && documentState.value.kind !== 'error') {
+      throw new Error('Quick capture chrome layout is unavailable')
+    }
+    quickLayoutReady.value = stableLayout !== undefined
+    await nextTick()
     if (draft.value?.draftId !== draftId) return
     const presented = await tauriDesktopBridge.quickCapturePresent(draftId)
     if (!presented) throw new Error('Quick capture draft is no longer active')
@@ -486,7 +542,11 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="cs-quick-capture" data-testid="quick-capture-shell">
+  <main
+    class="cs-quick-capture"
+    :class="{ 'is-layout-ready': quickLayoutReady }"
+    data-testid="quick-capture-shell"
+  >
     <EditorShell
       quick-mode
       :initial-document-state="documentState"

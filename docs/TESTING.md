@@ -1360,6 +1360,33 @@ results remain PNG and continue through the normal repository transaction.
   fully positioned tool/action chrome; no selector contamination, blank WebView
   or oscillation appeared.
 
+## Quick-capture first-frame placement and native dash repair (2026-08-24)
+
+Windows 10 22H2 build 19045, AMD64. The change is limited to transient Area
+selector/quick-mode chrome; document commands, immutable originals and export
+bytes are unchanged.
+
+- Red-first Vue tests failed because no stable-layout presentation gate
+  existed. Red-first Rust compilation failed because the native selector had
+  no explicit transparent background contract for dashed-pen gaps.
+- The hidden quick WebView now refuses fallback toolbar dimensions and waits
+  until the scene, action panel and tool group have positive measured sizes
+  with identical geometry in two consecutive layout frames. Only then is its
+  chrome marked ready and the native window presented; pre-layout default CSS
+  positions remain invisible.
+- The Windows GDI selector sets `TRANSPARENT` background mode before drawing
+  the `PS_DASH` frame. This prevents the default opaque white background from
+  filling the spaces between white strokes and making the in-drag frame appear
+  solid.
+- Focused red/green evidence: quick-layout Vitest 5/5 and the Windows native
+  dash regression 1/1. Final `pnpm test` passed 50 files and 452/452 tests;
+  `cargo test --workspace` passed 99 tests with one interactive DXGI test
+  ignored; `pnpm check` passed lint, typecheck/builds, formatting, docs,
+  boundary tests and configured Rust Clippy feature combinations.
+  `pnpm tauri build --debug --no-bundle` produced
+  `target/debug/cute-screen.exe`. Physical Win32 no-jump/dashed-drag visual
+  replay remains pending.
+
 ## CI gates
 
 ### Каждый PR

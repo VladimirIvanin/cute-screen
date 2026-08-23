@@ -766,6 +766,10 @@ fn selector_dimension_label(width: u32, height: u32) -> String {
     format!("{width} x {height}")
 }
 
+const fn selector_border_background_mode() -> i32 {
+    TRANSPARENT.cast_signed()
+}
+
 fn repaint_selector(window: HWND) {
     unsafe {
         InvalidateRect(window, null(), 1);
@@ -795,6 +799,10 @@ fn paint_selector(window: HWND) {
     unsafe {
         GetClientRect(window, &mut client);
         FillRect(dc, &client, GetStockObject(BLACK_BRUSH).cast());
+        // PS_DASH uses the DC background mode for the spaces between strokes.
+        // The opaque default paints those spaces white too, making the native
+        // drag frame look solid until Canvas2D replaces it after selection.
+        SetBkMode(dc, selector_border_background_mode());
     }
     let state = SELECTOR_STATE.lock().ok().map(|state| *state);
     if let Some(state) = state
@@ -1503,6 +1511,14 @@ mod tests {
 
         assert_eq!(label, "377 x 513");
         assert!(label.is_ascii());
+    }
+
+    #[test]
+    fn selector_dash_gaps_are_transparent_during_the_native_drag() {
+        assert_eq!(
+            super::selector_border_background_mode(),
+            super::TRANSPARENT.cast_signed()
+        );
     }
 
     #[test]
