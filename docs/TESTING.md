@@ -1387,6 +1387,29 @@ bytes are unchanged.
   `target/debug/cute-screen.exe`. Physical Win32 no-jump/dashed-drag visual
   replay remains pending.
 
+## Tauri multi-WebView context-selection repair (2026-08-24)
+
+Windows 10 22H2 build 19045, x64; Node 22.23.1, pnpm 10.33.2 and Rust 1.97.0.
+The repair is limited to the test-driver bootstrap and does not disable the
+production startup prewarm of the hidden `quick-capture` WebView.
+
+- Linux CI run 32670839063 reached real Tauri E2E after the resident quick
+  WebView was introduced. Only 3 of 14 isolated scenarios passed; the remaining
+  scenarios timed out while looking for their main-window harness, including
+  `tauri-renderer-corrupted.e2e.ts` with `M01 harness did not mount`.
+- The embedded service defaults its logical label to `main`, but an initial
+  WebDriver context may still point at another prewarmed WebView. The runner now
+  explicitly calls `browser.tauri.switchWindow('main')` in its `before` hook,
+  after the service has initialized and before any spec hook or selector runs.
+- The red-first focused boundary run failed at module resolution before the
+  main-window selector existed. The final focused run passed 2/2; the complete
+  boundary suite passed 10/10. `pnpm exec tsc --noEmit -p
+tests/e2e/tsconfig.json`, scoped formatting, `git diff --check` and the full
+  `pnpm check` gate passed.
+- This host cannot run the Linux WebKitGTK scenario. Run 32670839063 remains the
+  failing reproduction; a post-repair `xvfb-run --auto-servernum pnpm
+test:e2e:tauri` rerun is required before recording new real-WebKit evidence.
+
 ## CI gates
 
 ### Каждый PR

@@ -3,6 +3,8 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
+import { focusMainTauriWindow } from '../e2e/main-window'
+
 interface PackageManifest {
   scripts?: Record<string, string>
 }
@@ -30,5 +32,24 @@ describe('Tauri build boundary', () => {
 
     expect(frontendBuildIndex).toBeGreaterThanOrEqual(0)
     expect(customProtocolCompileIndex).toBeGreaterThan(frontendBuildIndex)
+  })
+
+  it('selects the editor WebView before a real-Tauri scenario starts', async () => {
+    const selectedLabels: string[] = []
+    const configSource = await readFile(
+      path.join(process.cwd(), 'tests', 'e2e', 'wdio.tauri.conf.ts'),
+      'utf8',
+    )
+
+    await focusMainTauriWindow({
+      tauri: {
+        switchWindow: async (label) => {
+          selectedLabels.push(label)
+        },
+      },
+    })
+
+    expect(selectedLabels).toEqual(['main'])
+    expect(configSource).toContain('await focusMainTauriWindow(browser)')
   })
 })

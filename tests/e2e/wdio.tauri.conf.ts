@@ -1,6 +1,7 @@
 import path from 'node:path'
 
 import { saveFailureScreenshot } from './failure-artifacts'
+import { focusMainTauriWindow } from './main-window'
 
 const appBinaryPath = process.env.CUTE_SCREEN_WDIO_APP_BINARY
 const outputDir = path.resolve(
@@ -58,6 +59,9 @@ export const config: WebdriverIO.Config = {
   mochaOpts: {
     ui: 'bdd',
     timeout: process.env.CUTE_SCREEN_REFERENCE_PASS ? 180_000 : 60_000,
+  },
+  before: async (_capabilities, _specs, browser) => {
+    await focusMainTauriWindow(browser)
   },
   afterTest: async (test, _context, { passed }) => {
     await saveFailureScreenshot(outputDir, test.title, passed)
