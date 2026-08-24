@@ -65,12 +65,20 @@ export function describeError(error: unknown, fallback: string): string {
     const nativeError = error as {
       readonly message?: unknown
       readonly error?: unknown
+      readonly olderSchema?: { readonly schema_version?: unknown }
+      readonly newerSchema?: { readonly schema_version?: unknown }
     }
     if (typeof nativeError.message === 'string' && nativeError.message.trim()) {
       return nativeError.message
     }
     if (typeof nativeError.error === 'string' && nativeError.error.trim()) {
       return nativeError.error
+    }
+    const unsupportedSchema =
+      nativeError.olderSchema?.schema_version ??
+      nativeError.newerSchema?.schema_version
+    if (Number.isInteger(unsupportedSchema)) {
+      return `This document uses unsupported schema version ${String(unsupportedSchema)}. Capture or open an image to continue.`
     }
   }
   return fallback

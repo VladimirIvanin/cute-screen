@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import {
+  describeError,
   DocumentSessionController,
   DocumentSessionCoordinator,
 } from '@cute-screen/editor-vue'
@@ -34,6 +35,17 @@ const document: EditorDocumentV1 = {
 }
 
 describe('M03 document persistence session', () => {
+  it('describes an unsupported native document schema without object stringification', () => {
+    const message = describeError(
+      { olderSchema: { schema_version: 4 } },
+      'Unable to open the document.',
+    )
+
+    expect(message).toBe(
+      'This document uses unsupported schema version 4. Capture or open an image to continue.',
+    )
+  })
+
   it('opens legacy non-image scale normalized without dirty state or history', () => {
     const layer = createDrawingLayer({
       id: '019c1f62-058e-7000-8000-000000000088',

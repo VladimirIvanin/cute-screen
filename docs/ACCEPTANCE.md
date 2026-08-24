@@ -448,6 +448,33 @@ remain pending.
    подтвердить системный selector, fragment-only surface и disabled expansion.
 9. Screen, Window, Active Window и Repeat по-прежнему открывают полный editor.
 
+Локальное доказательство 2026-08-24: Ubuntu 24.04, GNOME 46,
+X11, packaged-debug binary и чистый профиль. CLI Area → physical drag 600×400
+→ видимый 2560×1440 quick WebView с frozen frame и полным chrome → Close
+вернул typed `cancelled`. Артефакт визуальной проверки:
+`/tmp/codex-shot-2026-08-24_18-15-32.png`. После пользовательского
+воспроизведения накопления transient-следов selector переведён с XOR на
+damage redraw из frozen backing pixmap. Packaged binary обработал 472 движения
+cursor hint и 120 изменений рамки при удерживаемой кнопке; screenshots
+`/tmp/codex-shot-2026-08-24_18-31-00.png` и
+`/tmp/codex-shot-2026-08-24_18-31-30.png` содержат только последнее состояние,
+без следов предыдущих координат. Mixed-DPI/cross-monitor и Wayland acceptance
+остаются отдельными gates.
+
+Follow-up local proof, 2026-08-24: the rebuilt debug binary ran in an isolated
+X11 profile through `cute-screen capture --mode area --json`; `xdotool` sent
+only `300,220 → 900,620` primary-pointer drag. It mapped `Cute Screen Quick
+Capture` at `2560×1440` before any `Enter` key was sent. Escape then returned
+the typed terminal JSON `cancelled`; the temporary profile was removed.
+
+The final primary-window regression smoke started a resident editor first and
+clicked its actual Capture button. It waited for the X11 server to confirm the
+main-process windows were unmapped, then sent a physical `500,350 → 1400,850`
+primary drag. The inspected frozen quick frame contained the desktop behind the
+editor, not the editor itself; `xwininfo` reported `main` as `IsUnMapped` and
+`Cute Screen Quick Capture` as `IsViewable`. Escape restored `main` and hid the
+quick window. Screenshot: `/tmp/cutescreen-ui-after-unmap-wait.png`.
+
 Отдельно проверить GitHub version check:
 
 1. При равном/старом теге приложение показывает, что текущая версия актуальна.

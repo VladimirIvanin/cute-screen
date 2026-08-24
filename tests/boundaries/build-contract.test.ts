@@ -60,4 +60,44 @@ describe('Tauri build boundary', () => {
     expect(mainSource).not.toContain("import App from './App.vue'")
     expect(mainSource).toContain("(await import('./App.vue')).default")
   })
+
+  it('grants the main WebView the window permissions required to sequence X11 capture', async () => {
+    const capability = JSON.parse(
+      await readFile(
+        path.join(process.cwd(), 'src-tauri', 'capabilities', 'default.json'),
+        'utf8',
+      ),
+    ) as { permissions?: readonly string[] }
+
+    expect(capability.permissions).toEqual(
+      expect.arrayContaining([
+        'core:window:allow-hide',
+        'core:window:allow-show',
+      ]),
+    )
+  })
+
+  it('keeps native file dialogs asynchronous and parented', async () => {
+    const hostSource = await readFile(
+      path.join(process.cwd(), 'src-tauri', 'src', 'lib.rs'),
+      'utf8',
+    )
+
+    expect(hostSource).not.toContain('.blocking_pick_file()')
+    expect(hostSource).not.toContain('.blocking_save_file()')
+    expect(hostSource).toContain('.set_parent(&window)')
+  })
+
+  it('renders the X11 selector from canonical RGBA instead of a captured native image', async () => {
+    const x11Source = await readFile(
+      path.join(process.cwd(), 'src-tauri', 'src', 'x11_platform.rs'),
+      'utf8',
+    )
+
+    expect(x11Source).not.toContain('native.put(connection, overlay')
+    expect(x11Source).toContain('encode_selector_image(')
+    expect(x11Source).not.toContain('.function(GX::XOR)')
+    expect(x11Source).toContain('.background_pixmap(frozen_pixmap)')
+    expect(x11Source).toContain('restore_selector_visual(')
+  })
 })

@@ -2,6 +2,7 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 import {
   createEditorDocumentFromImage,
+  describeError,
   DocumentSessionController,
   EditorShell,
   loadImageWithBinaryFallback,
@@ -17,8 +18,8 @@ import {
 } from './quick-capture-actions'
 import {
   computeQuickCaptureLayout,
+  presentThenWaitForStableQuickCaptureLayout,
   type QuickRect,
-  waitForStableQuickCaptureLayout,
 } from './quick-capture-layout'
 
 const draft = shallowRef<QuickCaptureDraftV1>()
@@ -218,22 +219,43 @@ async function presentPreparedDraft(draftId: string): Promise<void> {
   try {
     await nextTick()
     if (draft.value?.draftId !== draftId) return
-    const stableLayout = await waitForStableQuickCaptureLayout({
+    const presentation = await presentThenWaitForStableQuickCaptureLayout({
+      present: () => tauriDesktopBridge.quickCapturePresent(draftId),
       measure: () => updateQuickLayout(),
       nextFrame: nextLayoutFrame,
     })
     if (draft.value?.draftId !== draftId) return
-    if (!stableLayout && documentState.value.kind !== 'error') {
-      throw new Error('Quick capture chrome layout is unavailable')
+    if (!presentation.presented) {
+      throw new Error('Quick capture draft is no longer active')
     }
-    quickLayoutReady.value = stableLayout !== undefined
-    await nextTick()
-    if (draft.value?.draftId !== draftId) return
-    const presented = await tauriDesktopBridge.quickCapturePresent(draftId)
-    if (!presented) throw new Error('Quick capture draft is no longer active')
+    quickLayoutReady.value = true
+    if (!presentation.layout && documentState.value.kind !== 'error') {
+      error.value = russian
+        ? 'Не удалось точно расположить панели; используется безопасная раскладка.'
+        : 'Chrome could not be positioned precisely; using the safe layout.'
+    }
     presentedDraftId = draftId
   } finally {
     if (presentingDraftId === draftId) presentingDraftId = undefined
+  }
+}
+
+async function terminateFailedPresentation(
+  draftId: string,
+  cause: unknown,
+): Promise<void> {
+  console.warn('cute-screen quick capture presentation failed', cause)
+  try {
+    await cancelQuickCaptureAction({
+      draftId,
+      cancelDraft: (id) => tauriDesktopBridge.quickCaptureCancel(id),
+      closeWindow: dismissWindow,
+    })
+  } catch (cleanupError) {
+    console.warn(
+      'cute-screen quick capture presentation cleanup failed',
+      cleanupError,
+    )
   }
 }
 
@@ -242,7 +264,7 @@ function onFrameReady(documentId: string): void {
   if (!activeDraft || session.value?.snapshot.core.document.id !== documentId)
     return
   void presentPreparedDraft(activeDraft.draftId).catch((cause) => {
-    error.value = cause instanceof Error ? cause.message : String(cause)
+    void terminateFailedPresentation(activeDraft.draftId, cause)
   })
 }
 
@@ -318,11 +340,20 @@ async function prepareActiveDraft(): Promise<void> {
   try {
     await loadDraft()
   } catch (cause) {
-    const message = cause instanceof Error ? cause.message : String(cause)
+    const message = describeError(cause, 'Quick capture could not be prepared')
     documentState.value = { kind: 'error', message }
     error.value = message
     const activeDraft = draft.value
-    if (activeDraft) await presentPreparedDraft(activeDraft.draftId)
+    if (activeDraft) {
+      try {
+        await presentPreparedDraft(activeDraft.draftId)
+      } catch (presentationError) {
+        await terminateFailedPresentation(
+          activeDraft.draftId,
+          presentationError,
+        )
+      }
+    }
   }
 }
 

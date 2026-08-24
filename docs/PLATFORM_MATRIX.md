@@ -2,17 +2,17 @@
 
 ## Поддерживаемые цели
 
-| Платформа       | Архитектура    | Захват                                                                                             | Горячие клавиши                        | Неофициальный CI artifact |
-| --------------- | -------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------- |
-| Linux X11       | x86_64         | `x11rb` visible drawable + собственный frozen overlay; compositor runtime re-smoke pending         | Tauri/global-hotkey                    | deb, AppImage             |
-| Linux X11       | aarch64        | `x11rb` visible drawable + собственный frozen overlay; compositor runtime re-smoke pending         | Tauri/global-hotkey                    | deb, AppImage             |
-| GNOME Wayland   | x86_64/aarch64 | XDG Screenshot portal                                                                              | XDG GlobalShortcuts или CLI fallback   | deb, AppImage             |
-| KDE Wayland     | x86_64/aarch64 | XDG Screenshot portal                                                                              | XDG GlobalShortcuts или CLI fallback   | deb, AppImage             |
-| wlroots Wayland | x86_64/aarch64 | Portal при наличии                                                                                 | Portal при наличии, иначе CLI fallback | deb, AppImage             |
-| Windows         | x86_64         | DXGI/D3D11 compositor frozen-frame adapter with area/window selector; topmost-window smoke pending | Tauri/global-hotkey                    | NSIS exe                  |
-| Windows 11      | ARM64          | DXGI/D3D11 compositor frozen-frame adapter with area/window selector; runtime smoke pending        | Tauri/global-hotkey                    | NSIS exe                  |
-| macOS           | Intel          | Screen capture adapter + overlay                                                                   | Tauri/global-hotkey                    | universal DMG             |
-| macOS           | Apple Silicon  | Screen capture adapter + overlay                                                                   | Tauri/global-hotkey                    | universal DMG             |
+| Платформа       | Архитектура    | Захват                                                                                                    | Горячие клавиши                        | Неофициальный CI artifact |
+| --------------- | -------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------- |
+| Linux X11       | x86_64         | `x11rb` visible drawable + target-visual frozen overlay; local compositor/quick runtime passed 2026-08-24 | Tauri/global-hotkey                    | deb, AppImage             |
+| Linux X11       | aarch64        | `x11rb` visible drawable + собственный frozen overlay; compositor runtime re-smoke pending                | Tauri/global-hotkey                    | deb, AppImage             |
+| GNOME Wayland   | x86_64/aarch64 | XDG Screenshot portal                                                                                     | XDG GlobalShortcuts или CLI fallback   | deb, AppImage             |
+| KDE Wayland     | x86_64/aarch64 | XDG Screenshot portal                                                                                     | XDG GlobalShortcuts или CLI fallback   | deb, AppImage             |
+| wlroots Wayland | x86_64/aarch64 | Portal при наличии                                                                                        | Portal при наличии, иначе CLI fallback | deb, AppImage             |
+| Windows         | x86_64         | DXGI/D3D11 compositor frozen-frame adapter with area/window selector; topmost-window smoke pending        | Tauri/global-hotkey                    | NSIS exe                  |
+| Windows 11      | ARM64          | DXGI/D3D11 compositor frozen-frame adapter with area/window selector; runtime smoke pending               | Tauri/global-hotkey                    | NSIS exe                  |
+| macOS           | Intel          | Screen capture adapter + overlay                                                                          | Tauri/global-hotkey                    | universal DMG             |
+| macOS           | Apple Silicon  | Screen capture adapter + overlay                                                                          | Tauri/global-hotkey                    | universal DMG             |
 
 Точные минимальные версии ОС фиксируются во время финальной runtime-проверки
 capture API и webview. Release baseline не повышается без ADR и CI-доказательства.
@@ -75,7 +75,10 @@ UI получает `CaptureCapabilities` и не показывает непо�
 - On composited X11, `_NET_WM_CM_Sn` selects the Composite Overlay Window as
   the frozen source. A non-composited session uses root; an active compositor
   with no usable Composite 0.3 overlay fails instead of returning a known
-  incomplete root frame. Compositor-backed runtime re-smoke remains pending.
+  incomplete root frame. The selector converts canonical RGBA into the target
+  root visual/depth instead of replaying the Composite Overlay Window image.
+  Local GNOME X11 compositor/quick runtime passed on 2026-08-24; mixed-DPI and
+  cross-monitor runtime remain pending.
 
 ### macOS
 
@@ -190,9 +193,30 @@ coverage, но остаются без runtime support claim. Полный сп�
   overlay, used an automated 100,100→400,300 drag, and persisted the resulting
   300×200 document. Evidence: `artifacts/m04/x11-area.json`. `xdotool` is only
   the local smoke driver, never a product dependency. The overlay keeps the
-  resulting selection until Enter/double-click, supports arrow-key physical-pixel
-  nudge, move-by-drag and Shift+arrow resize; keyboard behavior has X11 unit
-  coverage, while a physical keyboard smoke remains pending.
+  first valid Area drag completes on primary pointer release and opens quick
+  mode; `Enter` is the equivalent keyboard confirm path before a selection is
+  made. Move/resize, arrow-key physical-pixel nudge and Shift+arrow resize are
+  available in quick mode. The isolated 2026-08-24 Ubuntu/GNOME X11 smoke
+  completed a 600×400 primary-pointer drag and mapped quick mode without an
+  injected `Enter`. The later resident-editor button smoke waits for the X11
+  server to observe the main process unmapped before frozen-frame acquisition:
+  its inspected `500,350 → 1400,850` quick frame contains no editor,
+  `main` is `IsUnMapped`, `Cute Screen Quick Capture` is `IsViewable`, and
+  Escape restores `main`. Mixed-DPI/cross-monitor interaction remains pending.
+- Ubuntu 24.04/GNOME 46 X11 packaged-debug repair smoke (2026-08-24): a clean
+  isolated profile accepted CLI Area, the native selector completed a physical
+  300,220→900,620 drag, and WebKitGTK mapped `Cute Screen Quick Capture` at
+  2560×1440 with the exact 600×400 frozen crop, visible annotation/action
+  chrome and no foreign-visual corruption. Close returned typed terminal
+  `cancelled` without materialization. Screenshot:
+  `/tmp/codex-shot-2026-08-24_18-15-32.png`. The historical
+  `smoke:m04:x11:area` driver now stops at the quick-draft terminal boundary and
+  requires a harness update before it can again claim a complete persisted flow.
+- The follow-up continuous-motion smoke moved the X11 cursor hint 472 times and
+  changed a pressed Area rectangle 120 times. Frozen-background damage restore
+  left only one current hint/rectangle in
+  `/tmp/codex-shot-2026-08-24_18-31-00.png` and
+  `/tmp/codex-shot-2026-08-24_18-31-30.png`; no XOR trails remained.
 - M04 local Ubuntu/GNOME X11 x86_64 selector-cancel smoke (2026-08-09):
   `pnpm smoke:m04:x11:area-cancel` cancelled an active Area operation through
   the shared controller, returned terminal `cancelled` without a document, and

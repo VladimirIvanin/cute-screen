@@ -29,6 +29,7 @@ import {
   type ClipboardBridge,
 } from '@cute-screen/editor-vue'
 import { writeResultCanvasToClipboard } from './result-clipboard'
+import { dispatchNativeCapture } from './capture-request'
 
 declare global {
   interface Window {
@@ -192,12 +193,21 @@ const desktopActions: ShellActionAdapter | undefined =
               const captureAction = capabilities.capture.interactiveSelector
                 ? 'area'
                 : 'screen'
-              const outcome = await tauriDesktopBridge.captureRequest({
-                correlationId: correlationId(),
-                action: captureAction,
-                delayMs: 0,
-                cursor: false,
-                invocationSource: 'ui',
+              const { getCurrentWindow } =
+                await import('@tauri-apps/api/window')
+              const outcome = await dispatchNativeCapture({
+                session: capabilities.session,
+                mainWindow: getCurrentWindow(),
+                waitForMainWindowUnmap: () =>
+                  tauriDesktopBridge.captureWaitForEditorUnmap(correlationId()),
+                capture: () =>
+                  tauriDesktopBridge.captureRequest({
+                    correlationId: correlationId(),
+                    action: captureAction,
+                    delayMs: 0,
+                    cursor: false,
+                    invocationSource: 'ui',
+                  }),
               })
               if (outcome.outcome === 'captured') {
                 const mounted = await mountCapturedDocument()
@@ -421,7 +431,7 @@ async function loadPersistedDocument(): Promise<boolean> {
   } catch (error) {
     documentState.value = {
       kind: 'error',
-      message: error instanceof Error ? error.message : String(error),
+      message: describeError(error, 'Unable to open the saved document.'),
     }
     return false
   }

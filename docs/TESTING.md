@@ -1410,6 +1410,74 @@ tests/e2e/tsconfig.json`, scoped formatting, `git diff --check` and the full
   failing reproduction; a post-repair `xvfb-run --auto-servernum pnpm
 test:e2e:tauri` rerun is required before recording new real-WebKit evidence.
 
+## Ubuntu X11 startup/dialog/quick-capture repair (2026-08-24)
+
+Ubuntu 24.04.4 LTS, GNOME Shell 46, x86_64 X11. The repair is limited to
+recoverable startup errors, native file-dialog scheduling, hidden WebKitGTK
+quick-window presentation and X11 frozen-frame presentation. Document v7,
+immutable originals and renderer/export output are unchanged.
+
+- Red-first focused Vitest failed 4 cases: native `olderSchema` fell back to a
+  generic message, the present-before-measure helper did not exist, five
+  production commands still contained blocking dialog calls and the X11
+  selector replayed a captured native image. The red-first Rust selector test
+  failed to compile before the target-visual RGBA writer existed.
+- Последующая пользовательская проверка с непрерывным движением выявила
+  накопление следов X11 transient UI, которое одиночный синтетический переход
+  не покрывал. Для `REQ-CAP-009` добавляется отдельный red-first damage test:
+  старые рамка, badge и cursor hint должны восстанавливаться из frozen backing
+  pixmap до отрисовки следующего состояния; XOR redraw запрещён.
+- Final focused evidence passed 21/21 Vitest tests and the target-visual Rust
+  pixel test. After the continuous-motion regression was added,
+  `cargo test --workspace` passed 95/95. The first parallel
+  `pnpm test` run lost one worker while Rust compiled concurrently; the isolated
+  rerun passed 50/50 files and 454/454 tests. `pnpm check` passed lint,
+  TypeScript/Vue builds, formatting, docs, 13/13 boundary tests and every
+  configured Rust Clippy feature combination. `pnpm test:render` passed its
+  13/13 renderer golden tests.
+- `pnpm tauri build --debug --no-bundle` produced the embedded-frontend debug
+  binary. A clean isolated profile accepted CLI Area; the X11 selector encoded
+  its 2560×1440 canonical RGBA frame for root visual/depth in 376–382 ms in an
+  unoptimized build, completed a 600×400 physical drag, then mapped the
+  2560×1440 quick WebView. The frozen frame, crop, action bar and tool rail were
+  visually inspected in `/tmp/codex-shot-2026-08-24_18-15-32.png`; Close
+  returned terminal `cancelled` and did not materialize the draft.
+- After the continuous-motion damage repair, the rebuilt packaged binary was
+  exercised with 472 cursor-hint moves and 120 pressed-drag rectangle updates.
+  The inspected `/tmp/codex-shot-2026-08-24_18-31-00.png` and
+  `/tmp/codex-shot-2026-08-24_18-31-30.png` contain exactly one current
+  transient visual and no accumulated trail. The selector reached its normal
+  60-second cancellation boundary without an X11 drawing error.
+- The locally installed Ubuntu package `gnome-shell 46.0-0ubuntu6~24.04.14`
+  was inspected through its bundled `/org/gnome/shell/ui/screenshot.js`
+  resource. GNOME keeps the captured stage as content and moves/resizes a
+  retained selection widget for motion events. Cute Screen adopts only that
+  architectural observation (immutable backing plus transient state), without
+  copying or linking GPL implementation code.
+- GNOME Open image remained responsive for more than one minute and cancelled
+  normally after the command moved from `blocking_pick_file` to callback/async
+  completion with the main window as parent. The historical
+  `smoke:m04:x11:area` script still assumes pre-quick direct persistence and
+  therefore cannot complete the current terminal draft contract; it is not
+  recorded as a passing end-to-end run.
+- Follow-up pointer-release smoke (2026-08-24): after `pnpm tauri build --debug
+--no-bundle`, an isolated Ubuntu/GNOME X11 profile ran
+  `target/debug/cute-screen capture --mode area --json`. `xdotool` issued only
+  a `300,220 → 900,620` primary drag; the selector returned, and
+  `Cute Screen Quick Capture` mapped at `2560×1440` before any `Enter` was
+  injected. Escape produced typed terminal JSON `cancelled`; the profile was
+  removed. The resident-editor regression additionally inspected X11 map state:
+  `main` was `IsUnMapped` while `Cute Screen Quick Capture` was `IsViewable`.
+- Resident-editor frozen-frame regression (2026-08-24): the rebuilt debug
+  binary was launched under another isolated X11 profile. An actual click on
+  the main-window Capture button awaited `hide` followed by the native X11
+  current-process-unmap confirmation, then `xdotool` sent
+  `500,350 → 1400,850`. The inspected
+  `/tmp/cutescreen-ui-after-unmap-wait.png` shows the frozen quick frame without
+  the previously visible editor. `xwininfo` reported main `IsUnMapped` and
+  quick `IsViewable`; Escape reversed those states. This specifically covers
+  the GTK asynchronous-unmap race, not the CLI capture path.
+
 ## CI gates
 
 ### Каждый PR

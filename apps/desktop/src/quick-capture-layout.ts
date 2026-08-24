@@ -56,6 +56,17 @@ export interface StableQuickCaptureLayoutOptions<T> {
   readonly equals?: (previous: T, current: T) => boolean
 }
 
+export interface PresentQuickCaptureLayoutOptions<
+  T,
+> extends StableQuickCaptureLayoutOptions<T> {
+  readonly present: () => Promise<boolean>
+}
+
+export interface PresentedQuickCaptureLayout<T> {
+  readonly presented: boolean
+  readonly layout?: T | undefined
+}
+
 /**
  * A hidden quick-capture webview can mount before Fit zoom and floating chrome
  * have reached their final dimensions. Native presentation is allowed only
@@ -80,6 +91,20 @@ export async function waitForStableQuickCaptureLayout<T>(
     previous = current
   }
   return undefined
+}
+
+/**
+ * GTK/WebKitGTK does not allocate a hidden WebView. Map the native surface
+ * after the decoded frame is ready, then refine floating chrome from visible
+ * layout frames. Callers retain safe CSS placement while measurement settles.
+ */
+export async function presentThenWaitForStableQuickCaptureLayout<T>(
+  options: PresentQuickCaptureLayoutOptions<T>,
+): Promise<PresentedQuickCaptureLayout<T>> {
+  const presented = await options.present()
+  if (!presented) return { presented: false }
+  const layout = await waitForStableQuickCaptureLayout(options)
+  return { presented: true, layout }
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {

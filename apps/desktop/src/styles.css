@@ -32,16 +32,27 @@ body {
   gap: 8px;
   padding: 8px;
   border-radius: 12px;
-  background: color-mix(in srgb, var(--cs-surface, #fff) 92%, transparent);
-  box-shadow: 0 8px 28px #0005;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface-raised) 94%, transparent);
+  box-shadow: var(--shadow-overlay);
   z-index: 30;
 }
 .cs-quick-actions button {
   min-width: 92px;
   padding: 9px 12px;
-  border: 0;
+  border: 1px solid var(--border);
   border-radius: 8px;
+  color: var(--text);
+  background: var(--surface-hover);
   cursor: pointer;
+}
+.cs-quick-actions button:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.cs-quick-actions button:disabled {
+  cursor: wait;
+  opacity: 0.58;
 }
 .cs-quick-size-a11y {
   position: fixed;
@@ -70,8 +81,8 @@ body {
   margin: 0;
   padding: 8px 10px;
   border-radius: 10px;
-  color: var(--cs-text, #202124);
-  background: color-mix(in srgb, var(--cs-surface, #fff) 94%, transparent);
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface-raised) 94%, transparent);
   box-shadow: 0 6px 20px #0003;
   font-size: 12px;
   z-index: 30;

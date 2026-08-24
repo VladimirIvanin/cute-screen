@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   computeQuickCaptureLayout,
+  presentThenWaitForStableQuickCaptureLayout,
   waitForStableQuickCaptureLayout,
 } from '../../../apps/desktop/src/quick-capture-layout'
 
@@ -14,6 +15,29 @@ const base = {
 }
 
 describe('quick capture overlay layout', () => {
+  it('maps the hidden native window before measuring WebKitGTK layout', async () => {
+    const order: string[] = []
+    let mapped = false
+
+    const result = await presentThenWaitForStableQuickCaptureLayout({
+      present: async () => {
+        order.push('present')
+        mapped = true
+        return true
+      },
+      measure: () => {
+        order.push('measure')
+        return mapped ? 'visible-layout' : undefined
+      },
+      nextFrame: async () => {
+        order.push('frame')
+      },
+    })
+
+    expect(result).toEqual({ presented: true, layout: 'visible-layout' })
+    expect(order[0]).toBe('present')
+  })
+
   it('waits for two matching layout frames before native presentation', async () => {
     const measurements = ['initial', 'fitted', 'fitted']
     const nextFrame = vi.fn().mockResolvedValue(undefined)

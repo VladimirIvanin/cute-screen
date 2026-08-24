@@ -32,7 +32,7 @@ use tauri::{
     utils::config::BackgroundThrottlingPolicy,
     webview::Color,
 };
-use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_dialog::{DialogExt, FileDialogBuilder, FilePath};
 use tauri_plugin_notification::NotificationExt;
 
 #[cfg(unix)]
@@ -223,6 +223,34 @@ struct QuickSaveTargetService {
     destination: Mutex<Option<std::path::PathBuf>>,
 }
 
+async fn pick_file<R: tauri::Runtime>(
+    dialog: FileDialogBuilder<R>,
+) -> Result<Option<FilePath>, RepositoryError> {
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    dialog.pick_file(move |selection| {
+        if sender.send(selection).is_err() {
+            eprintln!("cute-screen file dialog result receiver was dropped");
+        }
+    });
+    receiver
+        .await
+        .map_err(|_| RepositoryError::Io("file dialog closed without a result".to_owned()))
+}
+
+async fn save_file<R: tauri::Runtime>(
+    dialog: FileDialogBuilder<R>,
+) -> Result<Option<FilePath>, RepositoryError> {
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    dialog.save_file(move |selection| {
+        if sender.send(selection).is_err() {
+            eprintln!("cute-screen save dialog result receiver was dropped");
+        }
+    });
+    receiver
+        .await
+        .map_err(|_| RepositoryError::Io("save dialog closed without a result".to_owned()))
+}
+
 impl QuickEditorMountService {
     fn begin(
         &self,
@@ -356,19 +384,22 @@ fn repository_save_document(
 }
 
 #[tauri::command]
-fn repository_import_texture(
+async fn repository_import_texture(
     correlation_id: String,
     app: tauri::AppHandle,
     repository: State<'_, LibraryRepository>,
     transport: State<'_, Arc<ImageTransportService>>,
 ) -> Result<TextureImportOutcome, RepositoryError> {
-    let Some(source) = app
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| RepositoryError::Io("main window is unavailable".to_owned()))?;
+    let dialog = app
         .dialog()
         .file()
+        .set_parent(&window)
         .set_title("Import texture")
-        .add_filter("Raster textures", &["png", "jpg", "jpeg", "webp"])
-        .blocking_pick_file()
-    else {
+        .add_filter("Raster textures", &["png", "jpg", "jpeg", "webp"]);
+    let Some(source) = pick_file(dialog).await? else {
         return Ok(TextureImportOutcome::Cancelled);
     };
     let path = source
@@ -394,19 +425,22 @@ fn repository_import_texture(
 }
 
 #[tauri::command]
-fn repository_import_content_image(
+async fn repository_import_content_image(
     correlation_id: String,
     app: tauri::AppHandle,
     repository: State<'_, LibraryRepository>,
     transport: State<'_, Arc<ImageTransportService>>,
 ) -> Result<TextureImportOutcome, RepositoryError> {
-    let Some(source) = app
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| RepositoryError::Io("main window is unavailable".to_owned()))?;
+    let dialog = app
         .dialog()
         .file()
+        .set_parent(&window)
         .set_title("Import image")
-        .add_filter("Images", &["png", "jpg", "jpeg", "webp", "svg"])
-        .blocking_pick_file()
-    else {
+        .add_filter("Images", &["png", "jpg", "jpeg", "webp", "svg"]);
+    let Some(source) = pick_file(dialog).await? else {
         return Ok(TextureImportOutcome::Cancelled);
     };
     let path = source
@@ -515,19 +549,22 @@ fn clipboard_open_image(
 }
 
 #[tauri::command]
-fn repository_open_image(
+async fn repository_open_image(
     correlation_id: String,
     app: tauri::AppHandle,
     repository: State<'_, LibraryRepository>,
     transport: State<'_, Arc<ImageTransportService>>,
 ) -> Result<OpenImageOutcome, RepositoryError> {
-    let Some(source) = app
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| RepositoryError::Io("main window is unavailable".to_owned()))?;
+    let dialog = app
         .dialog()
         .file()
+        .set_parent(&window)
         .set_title("Open image")
-        .add_filter("Images", &["png", "jpg", "jpeg", "webp", "svg"])
-        .blocking_pick_file()
-    else {
+        .add_filter("Images", &["png", "jpg", "jpeg", "webp", "svg"]);
+    let Some(source) = pick_file(dialog).await? else {
         return Ok(OpenImageOutcome::Cancelled);
     };
     let path = source
@@ -596,14 +633,17 @@ async fn repository_export_recovery_bundle(
     repository: State<'_, LibraryRepository>,
 ) -> Result<RecoveryExportOutcome, RepositoryError> {
     let suggested_name = format!("{document_id}.cutescreen-recovery");
-    let Some(destination) = app
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| RepositoryError::Io("main window is unavailable".to_owned()))?;
+    let dialog = app
         .dialog()
         .file()
+        .set_parent(&window)
         .set_title("Export document recovery")
         .set_file_name(suggested_name)
-        .add_filter("Cute Screen recovery", &["cutescreen-recovery"])
-        .blocking_save_file()
-    else {
+        .add_filter("Cute Screen recovery", &["cutescreen-recovery"]);
+    let Some(destination) = save_file(dialog).await? else {
         return Ok(RecoveryExportOutcome::Cancelled);
     };
     let destination = destination
@@ -867,18 +907,21 @@ fn quick_capture_prepare_png(
 }
 
 #[tauri::command]
-fn quick_capture_choose_save_png(
+async fn quick_capture_choose_save_png(
     app: tauri::AppHandle,
     service: State<'_, QuickSaveTargetService>,
 ) -> Result<bool, RepositoryError> {
-    let Some(destination) = app
+    let window = app
+        .get_webview_window("quick-capture")
+        .ok_or_else(|| RepositoryError::Io("quick capture window is unavailable".to_owned()))?;
+    let dialog = app
         .dialog()
         .file()
+        .set_parent(&window)
         .set_title("Save quick capture")
         .set_file_name("cute-screen.png")
-        .add_filter("PNG image", &["png"])
-        .blocking_save_file()
-    else {
+        .add_filter("PNG image", &["png"]);
+    let Some(destination) = save_file(dialog).await? else {
         if let Ok(mut current) = service.destination.lock() {
             *current = None;
         }
@@ -948,6 +991,15 @@ fn write_verified_png(
 #[tauri::command]
 fn capture_cancel(controller: State<'_, CaptureController>) -> bool {
     controller.cancel()
+}
+
+#[tauri::command]
+fn capture_wait_for_editor_unmap(correlation_id: String) -> Result<(), PlatformError> {
+    #[cfg(all(target_os = "linux", feature = "x11-capture"))]
+    if current_session() == SessionKind::X11 {
+        x11_platform::X11CaptureAdapter.wait_for_current_process_unmapped(&correlation_id)?;
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -1193,6 +1245,12 @@ fn quick_capture_draft_matches(active_draft_id: Option<&str>, requested_draft_id
     active_draft_id == Some(requested_draft_id)
 }
 
+/// Native GTK/X11 visibility reports can be stale while the WebView is mapped.
+/// Capture must always issue `hide`, regardless of that advisory state.
+fn should_hide_editor_for_native_capture(_visible: Option<bool>) -> bool {
+    true
+}
+
 /// Hides the editor before a native desktop capture. On cancellation the
 /// caller restores it; an Area quick draft keeps it hidden until a terminal
 /// action so the editor cannot leak into the selected compositor pixels.
@@ -1210,8 +1268,7 @@ fn hide_editor_for_native_capture<R: tauri::Runtime>(
     let Some(window) = app.get_webview_window("main") else {
         return Ok(false);
     };
-    let was_visible = window.is_visible().unwrap_or(false);
-    if !was_visible {
+    if !should_hide_editor_for_native_capture(window.is_visible().ok()) {
         return Ok(false);
     }
     window
@@ -1440,14 +1497,15 @@ async fn capture_with_preflight<R: tauri::Runtime>(
     }
     let preflight = app.state::<CapturePreflightService>();
     let Some(approval) = preflight.begin(&request.correlation_id) else {
-        let restore_editor = match hide_editor_for_native_capture(app, &request.correlation_id) {
-            Ok(restore_editor) => restore_editor,
+        let hid_editor = match hide_editor_for_native_capture(app, &request.correlation_id) {
+            Ok(hid_editor) => hid_editor,
             Err(_) => {
                 let outcome = failed_capture(request.correlation_id);
                 publish_capture_outcome(app, &outcome);
                 return outcome;
             }
         };
+        let restore_editor = hid_editor && request.invocation_source == CaptureInvocationSource::Ui;
         publish_capture_progress(app, &request.correlation_id, CaptureProgressState::Ready);
         let progress_app = app.clone();
         let progress_correlation_id = request.correlation_id.clone();
@@ -1488,14 +1546,15 @@ async fn capture_with_preflight<R: tauri::Runtime>(
     }
 
     publish_capture_progress(app, &request.correlation_id, CaptureProgressState::Ready);
-    let restore_editor = match hide_editor_for_native_capture(app, &request.correlation_id) {
-        Ok(restore_editor) => restore_editor,
+    let hid_editor = match hide_editor_for_native_capture(app, &request.correlation_id) {
+        Ok(hid_editor) => hid_editor,
         Err(_) => {
             let outcome = failed_capture(request.correlation_id);
             publish_capture_outcome(app, &outcome);
             return outcome;
         }
     };
+    let restore_editor = hid_editor && request.invocation_source == CaptureInvocationSource::Ui;
     let progress_app = app.clone();
     let progress_correlation_id = request.correlation_id.clone();
     let outcome = controller
@@ -1754,6 +1813,7 @@ pub fn run() {
         ping,
         capture_request,
         capture_cancel,
+        capture_wait_for_editor_unmap,
         quick_capture_get_active,
         quick_capture_present,
         quick_capture_dismiss,
@@ -1798,6 +1858,7 @@ pub fn run() {
         ping,
         capture_request,
         capture_cancel,
+        capture_wait_for_editor_unmap,
         quick_capture_get_active,
         quick_capture_present,
         quick_capture_dismiss,
@@ -1937,6 +1998,13 @@ mod tests {
         assert!(!policy.visible);
         assert!(!policy.focused);
         assert!(policy.background_throttling_disabled);
+    }
+
+    #[test]
+    fn failed_editor_visibility_probe_does_not_skip_native_hide() {
+        assert!(super::should_hide_editor_for_native_capture(Some(true)));
+        assert!(super::should_hide_editor_for_native_capture(None));
+        assert!(super::should_hide_editor_for_native_capture(Some(false)));
     }
 
     #[test]

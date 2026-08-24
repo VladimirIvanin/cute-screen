@@ -39,11 +39,17 @@ Cute Screen — полноценный local-first редактор снимко
 - `REQ-CAP-006` — задержка перед захватом с отменой.
 - `REQ-CAP-007` — настройка включения курсора там, где это поддерживает backend.
 - `REQ-CAP-008` — multi-monitor и mixed-DPI без смещения итоговой области.
-- `REQ-CAP-009` — X11 использует frozen-screen overlay; Wayland использует системный XDG selector.
+- `REQ-CAP-009` — X11 использует frozen-screen overlay; Wayland использует
+  системный XDG selector. Временная рамка, размер и подсказка X11 selector
+  восстанавливаются из frozen frame при каждом перемещении и не накапливают
+  следы курсора или предыдущих состояний.
 - `REQ-CAP-010` — Screen, Window, Active Window и Repeat сразу сохраняют
   неизменяемый оригинал и открывают редактируемый документ. Явный Area capture
   сначала создаёт неперсистентный quick-capture draft и материализует original,
-  capture и editable document только по Copy, Save PNG или Editor.
+  capture и editable document только по Copy, Save PNG или Editor. На X11
+  запущенный из editor захват ждёт, пока сервер применит скрытие `main`, до
+  создания frozen frame; editor не остаётся активным и не попадает в selector
+  или quick draft.
 - `REQ-CAP-011` — quick-capture draft существует только во временном приватном
   staging, не попадает в series/library и полностью очищается по Close/Escape,
   crash, app exit или failed staging до materialization.
@@ -53,7 +59,9 @@ Cute Screen — полноценный local-first редактор снимко
   clip-ятся новой рамкой. До начала drag нативный selector показывает
   непрозрачную закруглённую подсказку «Выделите область» с иконкой камеры;
   во время drag показывает пунктирную рамку и читаемый размер. Escape отменяет
-  selector без создания draft.
+  selector без создания draft. Отпускание primary pointer после валидного
+  первого drag немедленно подтверждает selector и открывает quick-capture
+  draft; `Enter` остаётся только keyboard-маршрутом подтверждения.
 - `REQ-CAP-013` — Windows/X11/macOS Area quick-mode показывает frozen desktop
   в исходных physical coordinates. Wayland сохраняет системный XDG selector,
   показывает возвращённый portal fragment на нейтральном фоне и не разрешает
@@ -211,6 +219,10 @@ Cute Screen — полноценный local-first редактор снимко
 - `REQ-LIB-006` — серия и кадр переименовываются и удаляются с recoverable confirmation.
 - `REQ-LIB-007` — pin открывает отдельное always-on-top окно выбранного результата.
 - `REQ-LIB-008` — после перезапуска сохраняются редактируемые аннотации и последний активный кадр.
+- `REQ-LIB-009` — unsupported/corrupt последний активный документ не блокирует
+  запуск shell: приложение показывает typed recoverable state, не изменяет raw
+  document/original и оставляет доступными Capture и Open image. Нативный
+  structured error никогда не отображается как `[object Object]`.
 
 ## Оформление и вывод
 
@@ -248,6 +260,10 @@ Cute Screen — полноценный local-first редактор снимко
   приложение прогревает hidden quick surface заранее; для уже запущенного
   Windows-приложения reference target mouse-up → interactive chrome составляет
   не более 500 ms на 1920×1080.
+- `REQ-UI-011` — системные Open/Import/Save dialogs открываются асинхронно,
+  имеют parent window, различают cancel и error и не блокируют native UI event
+  loop. На GTK/X11 и Wayland окно приложения остаётся responsive всё время
+  жизни системного dialog.
 
 ## Качество и поставка
 
