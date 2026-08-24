@@ -50,4 +50,14 @@ describe('Tauri build boundary', () => {
     expect(selectedLabels).toEqual(['main'])
     expect(configSource).toContain('await focusMainTauriWindow(browser)')
   })
+
+  it('resolves an E2E harness query before evaluating the desktop app module', async () => {
+    const mainSource = await readFile(
+      path.join(process.cwd(), 'apps', 'desktop', 'src', 'main.ts'),
+      'utf8',
+    )
+
+    expect(mainSource).not.toContain("import App from './App.vue'")
+    expect(mainSource).toContain("(await import('./App.vue')).default")
+  })
 })

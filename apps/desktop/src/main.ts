@@ -1,7 +1,6 @@
 import { createApp } from 'vue'
 import { createEditorShellPinia } from '@cute-screen/editor-vue'
 
-import App from './App.vue'
 import { resolveHarnessSearch } from './e2e-harness-query'
 import './styles.css'
 
@@ -32,6 +31,6 @@ const Root = isM01Harness
   ? (await import('./M01Harness.vue')).default
   : isQuickCapture
     ? (await import('./QuickCaptureApp.vue')).default
-    : App
+    : (await import('./App.vue')).default
 
 createApp(Root).use(createEditorShellPinia()).mount('#app')
