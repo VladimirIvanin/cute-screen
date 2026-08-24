@@ -1,7 +1,5 @@
 interface TauriWindowSelector {
-  tauri: {
-    switchWindow(label: string): Promise<void>
-  }
+  switchToWindow(handle: string): Promise<unknown>
 }
 
 /**
@@ -11,5 +9,5 @@ interface TauriWindowSelector {
 export async function focusMainTauriWindow(
   browser: TauriWindowSelector,
 ): Promise<void> {
-  await browser.tauri.switchWindow('main')
+  await browser.switchToWindow('main')
 }
