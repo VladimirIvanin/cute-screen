@@ -42,10 +42,8 @@ describe('Tauri build boundary', () => {
     )
 
     await focusMainTauriWindow({
-      tauri: {
-        switchWindow: async (label) => {
-          selectedLabels.push(label)
-        },
+      switchToWindow: async (label) => {
+        selectedLabels.push(label)
       },
     })
 
