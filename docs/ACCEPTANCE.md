@@ -468,12 +468,14 @@ Capture` at `2560×1440` before any `Enter` key was sent. Escape then returned
 the typed terminal JSON `cancelled`; the temporary profile was removed.
 
 The final primary-window regression smoke started a resident editor first and
-clicked its actual Capture button. It waited for the X11 server to confirm the
-main-process windows were unmapped, then sent a physical `500,350 → 1400,850`
-primary drag. The inspected frozen quick frame contained the desktop behind the
-editor, not the editor itself; `xwininfo` reported `main` as `IsUnMapped` and
-`Cute Screen Quick Capture` as `IsViewable`. Escape restored `main` and hid the
-quick window. Screenshot: `/tmp/cutescreen-ui-after-unmap-wait.png`.
+clicked its actual Capture button. The earlier client-only `IsUnMapped` check
+was insufficient: user evidence showed Mutter's separate blank decoration with
+the selector. The repaired gate now waits for both the client and its mapped
+`_MUTTER_FRAME_FOR` decoration to disappear and stay absent for the compositor
+settle interval. In the rebuilt debug smoke the old frame was destroyed, the
+client remained `IsUnMapped`, and the selector showed only the frozen VS Code
+desktop. Escape recreated/restored the editor frame. Screenshot:
+`/tmp/cutescreen-frame-settled-selector-hint.png`.
 
 Отдельно проверить GitHub version check:
 

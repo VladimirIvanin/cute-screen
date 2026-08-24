@@ -1468,15 +1468,16 @@ immutable originals and renderer/export output are unchanged.
   injected. Escape produced typed terminal JSON `cancelled`; the profile was
   removed. The resident-editor regression additionally inspected X11 map state:
   `main` was `IsUnMapped` while `Cute Screen Quick Capture` was `IsViewable`.
-- Resident-editor frozen-frame regression (2026-08-24): the rebuilt debug
-  binary was launched under another isolated X11 profile. An actual click on
-  the main-window Capture button awaited `hide` followed by the native X11
-  current-process-unmap confirmation, then `xdotool` sent
-  `500,350 → 1400,850`. The inspected
-  `/tmp/cutescreen-ui-after-unmap-wait.png` shows the frozen quick frame without
-  the previously visible editor. `xwininfo` reported main `IsUnMapped` and
-  quick `IsViewable`; Escape reversed those states. This specifically covers
-  the GTK asynchronous-unmap race, not the CLI capture path.
+- Resident-editor frozen-frame regression (2026-08-24): the first client-only
+  gate was rejected by user runtime evidence because Mutter's separately owned
+  `_MUTTER_FRAME_FOR` decoration remained visible as a blank grey editor window.
+  The rebuilt isolated X11 debug smoke clicked the actual Capture button and
+  confirmed the client became `IsUnMapped`, the linked Mutter frame was
+  destroyed, and both remained absent through the 100 ms compositor-settle
+  interval. After a post-map pointer move,
+  `/tmp/cutescreen-frame-settled-selector-hint.png` shows the selector hint over
+  the frozen VS Code desktop with no editor client, grey surface, title bar or
+  shadow. Escape restored the client and created a new visible decoration.
 
 ## CI gates
 

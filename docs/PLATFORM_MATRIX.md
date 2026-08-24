@@ -199,10 +199,11 @@ coverage, но остаются без runtime support claim. Полный сп�
   available in quick mode. The isolated 2026-08-24 Ubuntu/GNOME X11 smoke
   completed a 600×400 primary-pointer drag and mapped quick mode without an
   injected `Enter`. The later resident-editor button smoke waits for the X11
-  server to observe the main process unmapped before frozen-frame acquisition:
-  its inspected `500,350 → 1400,850` quick frame contains no editor,
-  `main` is `IsUnMapped`, `Cute Screen Quick Capture` is `IsViewable`, and
-  Escape restores `main`. Mixed-DPI/cross-monitor interaction remains pending.
+  server to observe both the main client unmapped and Mutter's separately owned
+  `_MUTTER_FRAME_FOR` decoration destroyed, then holds that state through a
+  compositor-settle interval before acquiring pixels. The inspected selector
+  frame contains only the desktop behind the editor; Escape restores `main`.
+  Mixed-DPI/cross-monitor interaction remains pending.
 - Ubuntu 24.04/GNOME 46 X11 packaged-debug repair smoke (2026-08-24): a clean
   isolated profile accepted CLI Area, the native selector completed a physical
   300,220→900,620 drag, and WebKitGTK mapped `Cute Screen Quick Capture` at

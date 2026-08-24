@@ -48,8 +48,8 @@ Cute Screen — полноценный local-first редактор снимко
   сначала создаёт неперсистентный quick-capture draft и материализует original,
   capture и editable document только по Copy, Save PNG или Editor. На X11
   запущенный из editor захват ждёт, пока сервер применит скрытие `main`, до
-  создания frozen frame; editor не остаётся активным и не попадает в selector
-  или quick draft.
+  создания frozen frame; editor, его системная рамка и тень не остаются
+  видимыми или активными и не попадают в selector или quick draft.
 - `REQ-CAP-011` — quick-capture draft существует только во временном приватном
   staging, не попадает в series/library и полностью очищается по Close/Escape,
   crash, app exit или failed staging до materialization.

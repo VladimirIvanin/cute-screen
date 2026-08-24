@@ -66,6 +66,8 @@ pub struct X11GateEvidence {
 #[derive(Debug, Default)]
 pub struct X11CaptureAdapter;
 
+const X11_COMPOSITOR_UNMAP_SETTLE: Duration = Duration::from_millis(100);
+
 struct X11HotkeyWorker {
     stop: Arc<AtomicBool>,
     commands: Sender<X11HotkeyCommand>,
@@ -589,10 +591,10 @@ impl X11CaptureAdapter {
         Ok(())
     }
 
-    /// Waits for the X server to report that every top-level window owned by
-    /// this process is unmapped. Tauri's GTK `hide()` acknowledgement can
-    /// arrive before GTK has submitted its X11 unmap request, so a round trip
-    /// alone is insufficient before acquiring a frozen desktop frame.
+    /// Waits for the X server to report that every top-level client owned by
+    /// this process and its Mutter decoration are gone. Tauri's GTK `hide()`
+    /// acknowledgement can arrive before the window manager removes its frame,
+    /// so a round trip alone is insufficient before acquiring a frozen frame.
     pub fn wait_for_current_process_unmapped(
         &self,
         correlation_id: &str,
@@ -606,17 +608,26 @@ impl X11CaptureAdapter {
             .map(|screen| screen.root)
             .ok_or_else(|| gate_error(correlation_id, "unmapWaitScreen"))?;
         let window_pid = intern_atom(&connection, b"_NET_WM_PID", correlation_id)?;
+        let mutter_frame_for = intern_atom(&connection, b"_MUTTER_FRAME_FOR", correlation_id)?;
         let deadline = Instant::now() + Duration::from_secs(2);
+        let mut unmapped_since = None;
 
         loop {
-            if current_process_windows_are_unmapped(
+            let windows_are_unmapped = current_process_windows_and_frames_are_unmapped(
                 &connection,
                 root,
                 window_pid,
+                mutter_frame_for,
                 std::process::id(),
                 correlation_id,
-            )? {
-                return Ok(());
+            )?;
+            if windows_are_unmapped {
+                let hidden_since = unmapped_since.get_or_insert_with(Instant::now);
+                if compositor_unmap_has_settled(hidden_since.elapsed()) {
+                    return Ok(());
+                }
+            } else {
+                unmapped_since = None;
             }
             if Instant::now() >= deadline {
                 return Err(gate_error(correlation_id, "unmapWaitTimeout"));
@@ -1354,6 +1365,14 @@ struct WindowSelectionMetadata<'a> {
     minimized: bool,
     process_id: Option<u32>,
     types: &'a [u32],
+}
+
+#[derive(Debug, Clone, Copy)]
+struct X11TopLevelWindowState {
+    window: u32,
+    process_id: Option<u32>,
+    map_state: MapState,
+    mutter_frame_for: Option<u32>,
 }
 
 #[allow(clippy::too_many_arguments)] // X11 overlay setup needs the root visual/depth and frozen frame explicitly.
@@ -2283,10 +2302,11 @@ fn window_process_id<C: Connection>(connection: &C, window: u32, window_pid: u32
         .and_then(|reply| reply.value32().and_then(|mut values| values.next()))
 }
 
-fn current_process_windows_are_unmapped<C: Connection>(
+fn current_process_windows_and_frames_are_unmapped<C: Connection>(
     connection: &C,
     root: u32,
     window_pid: u32,
+    mutter_frame_for: u32,
     current_process_id: u32,
     correlation_id: &str,
 ) -> Result<bool, PlatformError> {
@@ -2299,27 +2319,55 @@ fn current_process_windows_are_unmapped<C: Connection>(
     let mut states = Vec::with_capacity(windows.len());
     for window in windows {
         let process_id = window_process_id(connection, window, window_pid);
-        if process_id != Some(current_process_id) {
+        let frame_for = window_reference(connection, window, mutter_frame_for);
+        if process_id != Some(current_process_id) && frame_for.is_none() {
             continue;
         }
-        let map_state = connection
-            .get_window_attributes(window)
-            .map_err(|_| gate_error(correlation_id, "unmapWaitAttributesRequest"))?
-            .reply()
-            .map_err(|_| gate_error(correlation_id, "unmapWaitAttributesReply"))?
-            .map_state;
-        states.push((process_id, map_state));
+        let Ok(attributes) = connection.get_window_attributes(window) else {
+            continue;
+        };
+        let Ok(attributes) = attributes.reply() else {
+            continue;
+        };
+        states.push(X11TopLevelWindowState {
+            window,
+            process_id,
+            map_state: attributes.map_state,
+            mutter_frame_for: frame_for,
+        });
     }
-    Ok(process_windows_are_unmapped(&states, current_process_id))
+    Ok(process_windows_and_frames_are_unmapped(
+        &states,
+        current_process_id,
+    ))
 }
 
-fn process_windows_are_unmapped(
-    windows: &[(Option<u32>, MapState)],
+fn window_reference<C: Connection>(connection: &C, window: u32, atom: u32) -> Option<u32> {
+    connection
+        .get_property(false, window, atom, AtomEnum::WINDOW, 0, 1)
+        .ok()
+        .and_then(|request| request.reply().ok())
+        .and_then(|reply| reply.value32().and_then(|mut values| values.next()))
+}
+
+fn process_windows_and_frames_are_unmapped(
+    windows: &[X11TopLevelWindowState],
     current_process_id: u32,
 ) -> bool {
-    !windows.iter().any(|(process_id, map_state)| {
-        *process_id == Some(current_process_id) && *map_state == MapState::VIEWABLE
+    !windows.iter().any(|state| {
+        state.map_state == MapState::VIEWABLE
+            && (state.process_id == Some(current_process_id)
+                || state.mutter_frame_for.is_some_and(|client| {
+                    windows.iter().any(|candidate| {
+                        candidate.window == client
+                            && candidate.process_id == Some(current_process_id)
+                    })
+                }))
     })
+}
+
+fn compositor_unmap_has_settled(hidden_for: Duration) -> bool {
+    hidden_for >= X11_COMPOSITOR_UNMAP_SETTLE
 }
 
 fn overlay_rectangle(bounds: (i32, i32, u16, u16)) -> Option<Rectangle> {
@@ -2647,16 +2695,19 @@ fn hotkey_error(correlation_id: &str, operation: &str) -> PlatformError {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use crate::platform::{PlatformErrorCode, SessionKind};
 
     use super::{
         RgbaFrame, WindowCandidate, WindowSelectionContext, WindowSelectionMetadata,
-        X11CaptureAdapter, X11HotkeyBinding, X11MonitorLayout, apply_frame_extents,
-        compositor_owner_requires_overlay, crop_root_frame, current_monitor_id_for_bounds,
-        monitor_ids_for_bounds, move_rectangle, parse_hotkey_trigger, process_windows_are_unmapped,
-        rectangle_contains, replacement_plan, resize_rectangle, selector_visual_damage,
-        should_complete_area_release, size_badge_rectangle, window_at,
-        window_selection_policy_allows, write_rgba_pixels,
+        X11_COMPOSITOR_UNMAP_SETTLE, X11CaptureAdapter, X11HotkeyBinding, X11MonitorLayout,
+        X11TopLevelWindowState, apply_frame_extents, compositor_owner_requires_overlay,
+        compositor_unmap_has_settled, crop_root_frame, current_monitor_id_for_bounds,
+        monitor_ids_for_bounds, move_rectangle, parse_hotkey_trigger,
+        process_windows_and_frames_are_unmapped, rectangle_contains, replacement_plan,
+        resize_rectangle, selector_visual_damage, should_complete_area_release,
+        size_badge_rectangle, window_at, window_selection_policy_allows, write_rgba_pixels,
     };
     use x11rb::image::{BitsPerPixel, ColorComponent, Image, ImageOrder, PixelLayout, ScanlinePad};
     use x11rb::protocol::xproto::{MapState, Rectangle};
@@ -2671,20 +2722,52 @@ mod tests {
 
     #[test]
     fn current_process_must_be_unmapped_before_the_frozen_frame_starts() {
-        assert!(!process_windows_are_unmapped(
-            &[
-                (Some(73), MapState::VIEWABLE),
-                (Some(91), MapState::UNMAPPED)
-            ],
-            73,
-        ));
-        assert!(process_windows_are_unmapped(
-            &[
-                (Some(73), MapState::UNMAPPED),
-                (Some(91), MapState::VIEWABLE)
-            ],
-            73,
-        ));
+        let windows = [
+            X11TopLevelWindowState {
+                window: 11,
+                process_id: Some(73),
+                map_state: MapState::VIEWABLE,
+                mutter_frame_for: None,
+            },
+            X11TopLevelWindowState {
+                window: 12,
+                process_id: Some(91),
+                map_state: MapState::UNMAPPED,
+                mutter_frame_for: None,
+            },
+        ];
+
+        assert!(!process_windows_and_frames_are_unmapped(&windows, 73));
+    }
+
+    #[test]
+    fn mapped_mutter_decoration_must_disappear_before_the_frozen_frame_starts() {
+        let windows = [
+            X11TopLevelWindowState {
+                window: 11,
+                process_id: Some(73),
+                map_state: MapState::UNMAPPED,
+                mutter_frame_for: None,
+            },
+            X11TopLevelWindowState {
+                window: 22,
+                process_id: Some(91),
+                map_state: MapState::VIEWABLE,
+                mutter_frame_for: Some(11),
+            },
+        ];
+
+        assert!(!process_windows_and_frames_are_unmapped(&windows, 73));
+    }
+
+    #[test]
+    fn unmapped_windows_must_remain_absent_until_the_compositor_has_settled() {
+        assert!(!compositor_unmap_has_settled(Duration::ZERO));
+    }
+
+    #[test]
+    fn stable_unmapped_interval_allows_the_frozen_frame_to_start() {
+        assert!(compositor_unmap_has_settled(X11_COMPOSITOR_UNMAP_SETTLE));
     }
 
     #[test]
