@@ -1545,6 +1545,24 @@ silhouette, incomplete cursor camera and white-on-white Area frame.
   repository-wide formatting, 34-file documentation validation, 14/14
   boundary tests and every configured Rust fmt/Clippy feature combination.
 
+## X11 selector Lucide camera follow-up (2026-08-28)
+
+- The native X11 hint now uses the official 24×24 Lucide Camera SVG matched to
+  the existing `@lucide/vue` 1.31.0 dependency. The vendored source URL and the
+  complete ISC notice live beside the asset. Capture performs no network
+  request and does not parse SVG while the selector is active.
+- The red-first Rust test initially failed because the asset/decode boundary did
+  not exist. Final tests prove the source remains a Lucide `camera` SVG and its
+  pre-rasterized native derivative is bounded, opaque 24×24 RGBA. X11 uploads
+  the derivative once to a pixmap and motion only copies that pixmap.
+- Ubuntu 24.04/GNOME 46 X11 physical replay showed the Lucide camera inside the
+  rounded pre-drag hint. Escape returned typed terminal JSON `cancelled`.
+  Evidence: `/tmp/cutescreen-selector-lucide-camera-2026-08-28.png`.
+- `cargo test --workspace` and `cargo test --workspace --features x11-capture`
+  each passed 108/108. `pnpm check` passed lint, typechecks/builds, formatting,
+  35-file documentation validation, 14/14 boundary tests and every configured
+  Rust fmt/Clippy feature combination.
+
 ## CI gates
 
 ### Каждый PR

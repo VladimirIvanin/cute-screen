@@ -499,6 +499,14 @@ visible on white content. Escape returned typed `cancelled`. Evidence:
 `/tmp/cutescreen-selector-white-page-drag-final-2026-08-28.png`. Packaged
 optimized, mixed-DPI and cross-monitor repetition remains pending.
 
+Camera-asset follow-up, 2026-08-28: the X11 pre-drag hint replaced its
+hand-built camera geometry with the official Lucide Camera SVG and a
+pre-rasterized 24×24 native derivative. Source URL and the complete ISC notice
+are retained with the asset; capture performs no network request or active SVG
+parsing. The physical replay was inspected in
+`/tmp/cutescreen-selector-lucide-camera-2026-08-28.png`; Escape returned typed
+`cancelled`.
+
 Отдельно проверить GitHub version check:
 
 1. При равном/старом теге приложение показывает, что текущая версия актуальна.

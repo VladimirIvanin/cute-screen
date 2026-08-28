@@ -87,7 +87,10 @@ UI получает `CaptureCapabilities` и не показывает непо�
   same gate in the native orchestration path. The absence must remain stable
   for 300 ms before root acquisition. The X11 selector uses a dark solid
   underlay below its white dash and an opaque white camera hint so Area remains
-  readable over both light and dark content.
+  readable over both light and dark content. The hint camera is sourced from
+  the permissively licensed Lucide SVG, uploaded once as a 24×24 native pixmap;
+  cursor motion only copies the prepared pixmap and requires no network or SVG
+  parsing.
 
 ### macOS
 
