@@ -1473,8 +1473,9 @@ immutable originals and renderer/export output are unchanged.
   `_MUTTER_FRAME_FOR` decoration remained visible as a blank grey editor window.
   The rebuilt isolated X11 debug smoke clicked the actual Capture button and
   confirmed the client became `IsUnMapped`, the linked Mutter frame was
-  destroyed, and both remained absent through the 100 ms compositor-settle
-  interval. After a post-map pointer move,
+  destroyed, and both remained absent through the then-configured 100 ms
+  compositor-settle interval. The 2026-08-28 visibility follow-up below
+  supersedes that boundary with 300 ms. After a post-map pointer move,
   `/tmp/cutescreen-frame-settled-selector-hint.png` shows the selector hint over
   the frozen VS Code desktop with no editor client, grey surface, title bar or
   shadow. Escape restored the client and created a new visible decoration.

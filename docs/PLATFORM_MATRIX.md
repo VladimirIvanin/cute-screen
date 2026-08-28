@@ -82,6 +82,12 @@ UI получает `CaptureCapabilities` и не показывает непо�
   staging are outside the mouse-up presentation path. Local GNOME X11
   compositor/quick runtime passed on 2026-08-28; mixed-DPI, cross-monitor and
   repeated optimized latency evidence remain pending.
+- UI capture waits for the hidden main client and its Mutter frame before the
+  request crosses into native capture. CLI, tray and hotkey ingress enforce the
+  same gate in the native orchestration path. The absence must remain stable
+  for 300 ms before root acquisition. The X11 selector uses a dark solid
+  underlay below its white dash and an opaque white camera hint so Area remains
+  readable over both light and dark content.
 
 ### macOS
 
@@ -221,6 +227,14 @@ coverage, но остаются без runtime support claim. Полный сп�
   left only one current hint/rectangle in
   `/tmp/codex-shot-2026-08-24_18-31-00.png` and
   `/tmp/codex-shot-2026-08-24_18-31-30.png`; no XOR trails remained.
+- Selector-visibility follow-up (2026-08-28): warm CLI activation hid a visible
+  resident editor, held the selector for more than four seconds and acquired a
+  frozen Chrome frame without the editor or its compositor fade. A physical
+  600×650 drag across a white LibreOffice page kept the full two-tone Area frame
+  visible. The hint rendered readable text plus a camera body, top and centred
+  lens. Evidence:
+  `/tmp/cutescreen-selector-predrag-final-2026-08-28.png` and
+  `/tmp/cutescreen-selector-white-page-drag-final-2026-08-28.png`.
 - M04 local Ubuntu/GNOME X11 x86_64 selector-cancel smoke (2026-08-09):
   `pnpm smoke:m04:x11:area-cancel` cancelled an active Area operation through
   the shared controller, returned terminal `cancelled` without a document, and

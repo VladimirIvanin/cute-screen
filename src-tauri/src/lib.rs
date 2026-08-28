@@ -1283,8 +1283,8 @@ fn hide_editor_for_native_capture<R: tauri::Runtime>(
     {
         x11_platform::X11CaptureAdapter.round_trip_barrier(correlation_id)?;
         if should_wait_for_native_x11_unmap(invocation_source)
-            && let Err(error) = x11_platform::X11CaptureAdapter
-                .wait_for_current_process_unmapped(correlation_id)
+            && let Err(error) =
+                x11_platform::X11CaptureAdapter.wait_for_current_process_unmapped(correlation_id)
         {
             window.show().map_err(|_| {
                 PlatformError::new(PlatformErrorCode::CaptureFailed, correlation_id)
