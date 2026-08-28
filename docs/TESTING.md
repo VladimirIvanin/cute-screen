@@ -1511,6 +1511,34 @@ before the test and production change.
   repository-wide formatting, 34-file documentation validation, 14/14 boundary
   tests and every configured Rust fmt/Clippy feature combination.
 
+## X11 selector visibility follow-up (2026-08-28)
+
+Ubuntu 24.04.4 LTS, GNOME Shell 46, x86_64 X11; resident Tauri dev/Vite
+process at 2560×1440. This follow-up covers the user-reported delayed editor
+silhouette, incomplete cursor camera and white-on-white Area frame.
+
+- The red-first Rust tests initially failed because the 300 ms compositor
+  boundary, two-stroke selection plan and complete camera geometry did not
+  exist. The text-background regression was then reproduced physically as a
+  black X11 `ImageText8` box and locked by a separate foreground/background
+  color contract before its implementation.
+- Native CLI, tray and hotkey ingress now perform the same post-hide X11 unmap
+  gate that UI ingress already performs before `capture_request`. The old
+  100 ms interval is rejected; client/frame absence must remain stable for
+  300 ms before the frozen frame is acquired. A failed native wait restores
+  the hidden editor and returns a typed capture failure.
+- The selector draws a 4 px dark solid frame first and a 2 px white dashed
+  frame above it. The pre-drag hint is an opaque rounded white card with dark
+  text and an outlined camera body, top and centred lens.
+- In a warm CLI replay, Area remained open for more than four seconds over
+  Chrome without an editor client, grey compositor actor, frame or shadow.
+  `/tmp/cutescreen-selector-predrag-final-2026-08-28.png` records the hint.
+  A second replay dragged 600×650 physical pixels across the white Writer page;
+  `/tmp/cutescreen-selector-white-page-drag-final-2026-08-28.png` shows the
+  complete high-contrast border and dimension badge. Escape returned terminal
+  JSON `cancelled` in both runs. Optimized, mixed-DPI and cross-monitor replay
+  remain separate platform gates.
+
 ## CI gates
 
 ### Каждый PR

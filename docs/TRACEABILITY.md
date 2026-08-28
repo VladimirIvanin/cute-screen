@@ -131,6 +131,26 @@ WebKitGTK/X11 smoke.
   performs PNG compression or disk staging after pointer release. Repeated
   optimized-build, mixed-DPI and cross-monitor evidence remain pending.
 
+## X11 selector visibility follow-up (2026-08-28)
+
+- Requirements: `REQ-CAP-009`, `REQ-CAP-012`.
+- Automatic evidence planned before implementation: the compositor gate must
+  reject the old 100 ms boundary; selector geometry must expose a complete
+  camera body/top/lens; selection strokes must use a dark solid underlay below
+  the white dashed foreground.
+- Runtime evidence: a resident GNOME/X11 replay must keep the editor and its
+  compositor fade absent for the selector lifetime, show a recognizable camera
+  hint before drag and keep the in-drag frame visible over a white page.
+- Status: passed on Ubuntu 24.04/GNOME 46 X11 in the resident dev/Vite
+  process. Red-first Rust coverage rejects the old 100 ms settle boundary and
+  proves the camera/text/stroke contracts. A warm CLI replay kept Area open for
+  more than four seconds without an editor fade, rendered the opaque rounded
+  hint with camera body/top/lens, and showed the dark-underlaid white dash over
+  a LibreOffice white page. Evidence:
+  `/tmp/cutescreen-selector-predrag-final-2026-08-28.png` and
+  `/tmp/cutescreen-selector-white-page-drag-final-2026-08-28.png`. Optimized,
+  mixed-DPI and cross-monitor confirmation remain platform acceptance gates.
+
 ## Short arrow endpoint repair gate (2026-08-22)
 
 `REQ-TOL-001` requires a red-first editor-core scene test proving that a straight

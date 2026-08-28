@@ -1251,12 +1251,17 @@ fn should_hide_editor_for_native_capture(_visible: Option<bool>) -> bool {
     true
 }
 
+fn should_wait_for_native_x11_unmap(source: &CaptureInvocationSource) -> bool {
+    *source != CaptureInvocationSource::Ui
+}
+
 /// Hides the editor before a native desktop capture. On cancellation the
 /// caller restores it; an Area quick draft keeps it hidden until a terminal
 /// action so the editor cannot leak into the selected compositor pixels.
 fn hide_editor_for_native_capture<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
     correlation_id: &str,
+    invocation_source: &CaptureInvocationSource,
 ) -> Result<bool, PlatformError> {
     #[cfg(target_os = "windows")]
     let native_desktop_capture = true;
@@ -1275,7 +1280,20 @@ fn hide_editor_for_native_capture<R: tauri::Runtime>(
         .hide()
         .map_err(|_| PlatformError::new(PlatformErrorCode::CaptureFailed, correlation_id))?;
     #[cfg(all(target_os = "linux", feature = "x11-capture"))]
-    x11_platform::X11CaptureAdapter.round_trip_barrier(correlation_id)?;
+    {
+        x11_platform::X11CaptureAdapter.round_trip_barrier(correlation_id)?;
+        if should_wait_for_native_x11_unmap(invocation_source)
+            && let Err(error) = x11_platform::X11CaptureAdapter
+                .wait_for_current_process_unmapped(correlation_id)
+        {
+            window.show().map_err(|_| {
+                PlatformError::new(PlatformErrorCode::CaptureFailed, correlation_id)
+            })?;
+            return Err(error);
+        }
+    }
+    #[cfg(not(all(target_os = "linux", feature = "x11-capture")))]
+    let _ = invocation_source;
     Ok(true)
 }
 
@@ -1497,7 +1515,11 @@ async fn capture_with_preflight<R: tauri::Runtime>(
     }
     let preflight = app.state::<CapturePreflightService>();
     let Some(approval) = preflight.begin(&request.correlation_id) else {
-        let hid_editor = match hide_editor_for_native_capture(app, &request.correlation_id) {
+        let hid_editor = match hide_editor_for_native_capture(
+            app,
+            &request.correlation_id,
+            &request.invocation_source,
+        ) {
             Ok(hid_editor) => hid_editor,
             Err(_) => {
                 let outcome = failed_capture(request.correlation_id);
@@ -1546,7 +1568,11 @@ async fn capture_with_preflight<R: tauri::Runtime>(
     }
 
     publish_capture_progress(app, &request.correlation_id, CaptureProgressState::Ready);
-    let hid_editor = match hide_editor_for_native_capture(app, &request.correlation_id) {
+    let hid_editor = match hide_editor_for_native_capture(
+        app,
+        &request.correlation_id,
+        &request.invocation_source,
+    ) {
         Ok(hid_editor) => hid_editor,
         Err(_) => {
             let outcome = failed_capture(request.correlation_id);
@@ -2005,6 +2031,24 @@ mod tests {
         assert!(super::should_hide_editor_for_native_capture(Some(true)));
         assert!(super::should_hide_editor_for_native_capture(None));
         assert!(super::should_hide_editor_for_native_capture(Some(false)));
+    }
+
+    #[test]
+    fn non_ui_ingress_waits_for_the_x11_editor_to_finish_unmapping() {
+        use crate::capture::CaptureInvocationSource;
+
+        assert!(super::should_wait_for_native_x11_unmap(
+            &CaptureInvocationSource::Cli
+        ));
+        assert!(super::should_wait_for_native_x11_unmap(
+            &CaptureInvocationSource::Tray
+        ));
+        assert!(super::should_wait_for_native_x11_unmap(
+            &CaptureInvocationSource::Hotkey
+        ));
+        assert!(!super::should_wait_for_native_x11_unmap(
+            &CaptureInvocationSource::Ui
+        ));
     }
 
     #[test]

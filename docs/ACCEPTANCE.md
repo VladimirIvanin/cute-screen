@@ -488,6 +488,17 @@ replay measured 486 ms and Escape returned typed `cancelled`. A third automated
 attempt cancelled before presentation and is not counted as performance
 evidence. Repeated optimized-build measurement remains pending.
 
+Selector-visibility follow-up, 2026-08-28: the same resident X11 process ran a
+warm CLI Area selector for more than four seconds after hiding a visible main
+editor. The inspected frozen frame contains no editor, grey compositor actor,
+frame or shadow; the rounded white hint has readable text and a complete camera
+outline. A separate 600×650 drag across a white LibreOffice Writer page shows a
+4 px dark solid underlay below the 2 px white dash, so the complete frame stays
+visible on white content. Escape returned typed `cancelled`. Evidence:
+`/tmp/cutescreen-selector-predrag-final-2026-08-28.png` and
+`/tmp/cutescreen-selector-white-page-drag-final-2026-08-28.png`. Packaged
+optimized, mixed-DPI and cross-monitor repetition remains pending.
+
 Отдельно проверить GitHub version check:
 
 1. При равном/старом теге приложение показывает, что текущая версия актуальна.

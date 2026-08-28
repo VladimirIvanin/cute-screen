@@ -23,9 +23,9 @@ use x11rb::{
         randr::ConnectionExt as _,
         xfixes::ConnectionExt as _,
         xproto::{
-            AtomEnum, ButtonIndex, ChangeWindowAttributesAux, ConnectionExt as _, CreateGCAux,
-            CreateWindowAux, EventMask, GX, GrabMode, GrabStatus, LineStyle, MapState, Rectangle,
-            WindowClass,
+            Arc as XArc, AtomEnum, ButtonIndex, ChangeWindowAttributesAux, ConnectionExt as _,
+            CreateGCAux, CreateWindowAux, EventMask, GX, GrabMode, GrabStatus, LineStyle, MapState,
+            Rectangle, WindowClass,
         },
     },
     rust_connection::RustConnection,
@@ -66,7 +66,7 @@ pub struct X11GateEvidence {
 #[derive(Debug, Default)]
 pub struct X11CaptureAdapter;
 
-const X11_COMPOSITOR_UNMAP_SETTLE: Duration = Duration::from_millis(100);
+const X11_COMPOSITOR_UNMAP_SETTLE: Duration = Duration::from_millis(300);
 
 struct X11HotkeyWorker {
     stop: Arc<AtomicBool>,
@@ -1398,6 +1398,13 @@ fn select_frozen_target<C: Connection>(
     let selection_gc = connection
         .generate_id()
         .map_err(|_| gate_error(correlation_id, "overlaySelectionGcId"))?;
+    let selection_underlay_gc = connection
+        .generate_id()
+        .map_err(|_| gate_error(correlation_id, "overlaySelectionUnderlayGcId"))?;
+    let hint_background_gc = connection
+        .generate_id()
+        .map_err(|_| gate_error(correlation_id, "overlayHintBackgroundGcId"))?;
+    let [underlay_stroke, foreground_stroke] = selection_stroke_plan();
     connection
         .create_pixmap(root_depth, frozen_pixmap, root, frame.width, frame.height)
         .map_err(|_| gate_error(correlation_id, "overlayFrozenPixmap"))?;
@@ -1430,20 +1437,48 @@ fn select_frozen_target<C: Connection>(
         .create_gc(
             background_gc,
             frozen_pixmap,
-            &CreateGCAux::new().foreground(0),
+            &CreateGCAux::new()
+                .foreground(area_hint_text_colors().0)
+                .background(area_hint_text_colors().1),
         )
         .map_err(|_| gate_error(correlation_id, "overlayBackgroundGc"))?;
+    connection
+        .create_gc(
+            selection_underlay_gc,
+            overlay,
+            &CreateGCAux::new()
+                .function(GX::COPY)
+                .foreground(underlay_stroke.pixel)
+                .line_width(underlay_stroke.width)
+                .line_style(if underlay_stroke.dashed {
+                    LineStyle::ON_OFF_DASH
+                } else {
+                    LineStyle::SOLID
+                }),
+        )
+        .map_err(|_| gate_error(correlation_id, "overlaySelectionUnderlayGc"))?;
     connection
         .create_gc(
             selection_gc,
             overlay,
             &CreateGCAux::new()
                 .function(GX::COPY)
-                .foreground(u32::MAX)
-                .line_width(2)
-                .line_style(LineStyle::ON_OFF_DASH),
+                .foreground(foreground_stroke.pixel)
+                .line_width(foreground_stroke.width)
+                .line_style(if foreground_stroke.dashed {
+                    LineStyle::ON_OFF_DASH
+                } else {
+                    LineStyle::SOLID
+                }),
         )
         .map_err(|_| gate_error(correlation_id, "overlaySelectionGc"))?;
+    connection
+        .create_gc(
+            hint_background_gc,
+            overlay,
+            &CreateGCAux::new().function(GX::COPY).foreground(u32::MAX),
+        )
+        .map_err(|_| gate_error(correlation_id, "overlayHintBackgroundGc"))?;
     connection
         .set_dashes(selection_gc, 0, &[7, 5])
         .map_err(|_| gate_error(correlation_id, "overlaySelectionDash"))?;
@@ -1513,7 +1548,9 @@ fn select_frozen_target<C: Connection>(
             SelectorCanvas {
                 overlay,
                 background_gc,
+                selection_underlay_gc,
                 foreground_gc: selection_gc,
+                hint_background_gc,
                 width: frame.width,
                 height: frame.height,
             },
@@ -1524,7 +1561,9 @@ fn select_frozen_target<C: Connection>(
     })();
     let _ = connection.ungrab_pointer(CURRENT_TIME);
     let _ = connection.ungrab_keyboard(CURRENT_TIME);
+    let _ = connection.free_gc(hint_background_gc);
     let _ = connection.free_gc(selection_gc);
+    let _ = connection.free_gc(selection_underlay_gc);
     let _ = connection.free_gc(background_gc);
     let _ = connection.destroy_window(overlay);
     let _ = connection.free_pixmap(frozen_pixmap);
@@ -1536,9 +1575,37 @@ fn select_frozen_target<C: Connection>(
 struct SelectorCanvas {
     overlay: u32,
     background_gc: u32,
+    selection_underlay_gc: u32,
     foreground_gc: u32,
+    hint_background_gc: u32,
     width: u16,
     height: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SelectionStroke {
+    pixel: u32,
+    width: u32,
+    dashed: bool,
+}
+
+const fn selection_stroke_plan() -> [SelectionStroke; 2] {
+    [
+        SelectionStroke {
+            pixel: 0x0018_1818,
+            width: 4,
+            dashed: false,
+        },
+        SelectionStroke {
+            pixel: u32::MAX,
+            width: 2,
+            dashed: true,
+        },
+    ]
+}
+
+const fn area_hint_text_colors() -> (u32, u32) {
+    (0x0018_1818, u32::MAX)
 }
 
 fn interaction_loop<C: Connection>(
@@ -1814,9 +1881,7 @@ fn redraw_selection<C: Connection>(
     }
     *rendered = rectangle_for(anchor, current);
     if let Some(next) = *rendered {
-        connection
-            .poly_rectangle(canvas.overlay, canvas.foreground_gc, &[next])
-            .map_err(|_| gate_error(correlation_id, "overlayDrawSelection"))?;
+        draw_selection_frame(connection, canvas, next, correlation_id)?;
         draw_size_badge(
             connection,
             canvas.overlay,
@@ -1831,6 +1896,135 @@ fn redraw_selection<C: Connection>(
         .map_err(|_| gate_error(correlation_id, "overlayDrawSelection"))
 }
 
+fn draw_selection_frame<C: Connection>(
+    connection: &C,
+    canvas: SelectorCanvas,
+    rectangle: Rectangle,
+    correlation_id: &str,
+) -> Result<(), PlatformError> {
+    connection
+        .poly_rectangle(canvas.overlay, canvas.selection_underlay_gc, &[rectangle])
+        .map_err(|_| gate_error(correlation_id, "overlayDrawSelectionUnderlay"))?;
+    connection
+        .poly_rectangle(canvas.overlay, canvas.foreground_gc, &[rectangle])
+        .map_err(|_| gate_error(correlation_id, "overlayDrawSelection"))?;
+    Ok(())
+}
+
+#[derive(Debug, Clone, Copy)]
+struct AreaHintCameraGeometry {
+    body: Rectangle,
+    top: Rectangle,
+    lens: XArc,
+}
+
+fn area_hint_camera_geometry(card: Rectangle) -> AreaHintCameraGeometry {
+    AreaHintCameraGeometry {
+        body: Rectangle {
+            x: card.x.saturating_add(184),
+            y: card.y.saturating_add(14),
+            width: 30,
+            height: 23,
+        },
+        top: Rectangle {
+            x: card.x.saturating_add(192),
+            y: card.y.saturating_add(10),
+            width: 13,
+            height: 5,
+        },
+        lens: XArc {
+            x: card.x.saturating_add(193),
+            y: card.y.saturating_add(19),
+            width: 12,
+            height: 12,
+            angle1: 0,
+            angle2: 360 * 64,
+        },
+    }
+}
+
+fn fill_rounded_rectangle<C: Connection>(
+    connection: &C,
+    drawable: u32,
+    gc: u32,
+    rectangle: Rectangle,
+    radius: u16,
+    correlation_id: &str,
+) -> Result<(), PlatformError> {
+    let diameter = radius.saturating_mul(2);
+    let inner_width = rectangle.width.saturating_sub(diameter);
+    let inner_height = rectangle.height.saturating_sub(diameter);
+    let right = rectangle
+        .x
+        .saturating_add(i16::try_from(inner_width).unwrap_or(i16::MAX));
+    let bottom = rectangle
+        .y
+        .saturating_add(i16::try_from(inner_height).unwrap_or(i16::MAX));
+    connection
+        .poly_fill_rectangle(
+            drawable,
+            gc,
+            &[
+                Rectangle {
+                    x: rectangle
+                        .x
+                        .saturating_add(i16::try_from(radius).unwrap_or(0)),
+                    width: inner_width,
+                    ..rectangle
+                },
+                Rectangle {
+                    y: rectangle
+                        .y
+                        .saturating_add(i16::try_from(radius).unwrap_or(0)),
+                    height: inner_height,
+                    ..rectangle
+                },
+            ],
+        )
+        .map_err(|_| gate_error(correlation_id, "overlayHintCard"))?;
+    connection
+        .poly_fill_arc(
+            drawable,
+            gc,
+            &[
+                XArc {
+                    x: rectangle.x,
+                    y: rectangle.y,
+                    width: diameter,
+                    height: diameter,
+                    angle1: 0,
+                    angle2: 360 * 64,
+                },
+                XArc {
+                    x: right,
+                    y: rectangle.y,
+                    width: diameter,
+                    height: diameter,
+                    angle1: 0,
+                    angle2: 360 * 64,
+                },
+                XArc {
+                    x: rectangle.x,
+                    y: bottom,
+                    width: diameter,
+                    height: diameter,
+                    angle1: 0,
+                    angle2: 360 * 64,
+                },
+                XArc {
+                    x: right,
+                    y: bottom,
+                    width: diameter,
+                    height: diameter,
+                    angle1: 0,
+                    angle2: 360 * 64,
+                },
+            ],
+        )
+        .map_err(|_| gate_error(correlation_id, "overlayHintCard"))?;
+    Ok(())
+}
+
 fn redraw_area_hint<C: Connection>(
     connection: &C,
     canvas: SelectorCanvas,
@@ -1838,35 +2032,36 @@ fn redraw_area_hint<C: Connection>(
     cursor: Option<(i16, i16)>,
     correlation_id: &str,
 ) -> Result<(), PlatformError> {
-    const HINT_WIDTH: u16 = 190;
-    const HINT_HEIGHT: u16 = 42;
+    const HINT_WIDTH: u16 = 226;
+    const HINT_HEIGHT: u16 = 48;
     let draw = |card: Rectangle| -> Result<(), PlatformError> {
-        connection
-            .poly_fill_rectangle(canvas.overlay, canvas.background_gc, &[card])
-            .map_err(|_| gate_error(correlation_id, "overlayHintCard"))?;
+        fill_rounded_rectangle(
+            connection,
+            canvas.overlay,
+            canvas.hint_background_gc,
+            card,
+            8,
+            correlation_id,
+        )?;
         connection
             .image_text8(
                 canvas.overlay,
-                canvas.foreground_gc,
-                card.x.saturating_add(12),
-                card.y.saturating_add(26),
+                canvas.background_gc,
+                card.x.saturating_add(14),
+                card.y.saturating_add(30),
                 b"Select area",
             )
             .map_err(|_| gate_error(correlation_id, "overlayHintText"))?;
-        let camera = Rectangle {
-            x: card.x.saturating_add(151),
-            y: card.y.saturating_add(11),
-            width: 26,
-            height: 20,
-        };
-        let camera_top = Rectangle {
-            x: camera.x.saturating_add(7),
-            y: camera.y.saturating_sub(4),
-            width: 12,
-            height: 5,
-        };
+        let camera = area_hint_camera_geometry(card);
         connection
-            .poly_rectangle(canvas.overlay, canvas.foreground_gc, &[camera, camera_top])
+            .poly_rectangle(
+                canvas.overlay,
+                canvas.background_gc,
+                &[camera.body, camera.top],
+            )
+            .map_err(|_| gate_error(correlation_id, "overlayHintIcon"))?;
+        connection
+            .poly_arc(canvas.overlay, canvas.background_gc, &[camera.lens])
             .map_err(|_| gate_error(correlation_id, "overlayHintIcon"))?;
         Ok(())
     };
@@ -1933,9 +2128,7 @@ fn redraw_rectangle<C: Connection>(
         )?;
     }
     if let Some(next) = next {
-        connection
-            .poly_rectangle(canvas.overlay, canvas.foreground_gc, &[next])
-            .map_err(|_| gate_error(correlation_id, "overlayDrawSelection"))?;
+        draw_selection_frame(connection, canvas, next, correlation_id)?;
         *rendered = Some(next);
     }
     connection
@@ -2784,12 +2977,14 @@ mod tests {
     use super::{
         RgbaFrame, WindowCandidate, WindowSelectionContext, WindowSelectionMetadata,
         X11_COMPOSITOR_UNMAP_SETTLE, X11CaptureAdapter, X11HotkeyBinding, X11MonitorLayout,
-        X11TopLevelWindowState, apply_frame_extents, compositor_owner_requires_overlay,
-        compositor_unmap_has_settled, crop_root_frame, current_monitor_id_for_bounds,
-        import_quick_rgba_preview, monitor_ids_for_bounds, move_rectangle, parse_hotkey_trigger,
+        X11TopLevelWindowState, apply_frame_extents, area_hint_camera_geometry,
+        area_hint_text_colors, compositor_owner_requires_overlay, compositor_unmap_has_settled,
+        crop_root_frame, current_monitor_id_for_bounds, import_quick_rgba_preview,
+        monitor_ids_for_bounds, move_rectangle, parse_hotkey_trigger,
         process_windows_and_frames_are_unmapped, rectangle_contains, replacement_plan,
-        resize_rectangle, selector_visual_damage, should_complete_area_release,
-        size_badge_rectangle, window_at, window_selection_policy_allows, write_rgba_pixels,
+        resize_rectangle, selection_stroke_plan, selector_visual_damage,
+        should_complete_area_release, size_badge_rectangle, window_at,
+        window_selection_policy_allows, write_rgba_pixels,
     };
     use x11rb::image::{BitsPerPixel, ColorComponent, Image, ImageOrder, PixelLayout, ScanlinePad};
     use x11rb::protocol::xproto::{MapState, Rectangle};
@@ -2850,6 +3045,61 @@ mod tests {
     #[test]
     fn stable_unmapped_interval_allows_the_frozen_frame_to_start() {
         assert!(compositor_unmap_has_settled(X11_COMPOSITOR_UNMAP_SETTLE));
+    }
+
+    #[test]
+    fn old_unmap_boundary_does_not_capture_the_mutter_fade_actor() {
+        assert!(!compositor_unmap_has_settled(Duration::from_millis(100)));
+        assert!(compositor_unmap_has_settled(Duration::from_millis(300)));
+    }
+
+    #[test]
+    fn selection_frame_has_a_dark_solid_outline_below_the_white_dash() {
+        let [underlay, foreground] = selection_stroke_plan();
+
+        assert_eq!(underlay.pixel, 0x0018_1818);
+        assert_eq!(underlay.width, 4);
+        assert!(!underlay.dashed);
+        assert_eq!(foreground.pixel, u32::MAX);
+        assert_eq!(foreground.width, 2);
+        assert!(foreground.dashed);
+    }
+
+    #[test]
+    fn area_hint_camera_has_a_body_top_and_centered_lens() {
+        let card = Rectangle {
+            x: 100,
+            y: 200,
+            width: 226,
+            height: 48,
+        };
+        let camera = area_hint_camera_geometry(card);
+
+        assert_eq!(
+            (
+                camera.body.x,
+                camera.body.y,
+                camera.body.width,
+                camera.body.height,
+            ),
+            (284, 214, 30, 23),
+        );
+        assert_eq!(
+            (
+                camera.top.x,
+                camera.top.y,
+                camera.top.width,
+                camera.top.height,
+            ),
+            (292, 210, 13, 5),
+        );
+        assert_eq!((camera.lens.x, camera.lens.y), (293, 219));
+        assert_eq!((camera.lens.width, camera.lens.height), (12, 12));
+    }
+
+    #[test]
+    fn area_hint_text_uses_the_card_color_instead_of_a_black_image_text_box() {
+        assert_eq!(area_hint_text_colors(), (0x0018_1818, u32::MAX));
     }
 
     #[test]
