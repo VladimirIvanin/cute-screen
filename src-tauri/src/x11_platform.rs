@@ -67,6 +67,12 @@ pub struct X11GateEvidence {
 pub struct X11CaptureAdapter;
 
 const X11_COMPOSITOR_UNMAP_SETTLE: Duration = Duration::from_millis(300);
+#[cfg(test)]
+const AREA_HINT_CAMERA_SVG: &[u8] = include_bytes!("../assets/third-party/lucide/camera.svg");
+const AREA_HINT_CAMERA_PNG: &[u8] = include_bytes!("../assets/third-party/lucide/camera-24.png");
+#[cfg(test)]
+const AREA_HINT_CAMERA_LICENSE: &[u8] = include_bytes!("../assets/third-party/lucide/LICENSE");
+const AREA_HINT_CAMERA_SIZE: u16 = 24;
 
 struct X11HotkeyWorker {
     stop: Arc<AtomicBool>,
@@ -1404,10 +1410,30 @@ fn select_frozen_target<C: Connection>(
     let hint_background_gc = connection
         .generate_id()
         .map_err(|_| gate_error(correlation_id, "overlayHintBackgroundGcId"))?;
+    let hint_camera_pixmap = if matches!(&mode, SelectorMode::Area) {
+        Some(
+            connection
+                .generate_id()
+                .map_err(|_| gate_error(correlation_id, "overlayHintCameraPixmapId"))?,
+        )
+    } else {
+        None
+    };
     let [underlay_stroke, foreground_stroke] = selection_stroke_plan();
     connection
         .create_pixmap(root_depth, frozen_pixmap, root, frame.width, frame.height)
         .map_err(|_| gate_error(correlation_id, "overlayFrozenPixmap"))?;
+    if let Some(camera_pixmap) = hint_camera_pixmap {
+        connection
+            .create_pixmap(
+                root_depth,
+                camera_pixmap,
+                root,
+                AREA_HINT_CAMERA_SIZE,
+                AREA_HINT_CAMERA_SIZE,
+            )
+            .map_err(|_| gate_error(correlation_id, "overlayHintCameraPixmap"))?;
+    }
     let window_aux = CreateWindowAux::new()
         .background_pixmap(frozen_pixmap)
         .override_redirect(1)
@@ -1537,6 +1563,24 @@ fn select_frozen_target<C: Connection>(
                 .check()
                 .map_err(|_| gate_error(correlation_id, "overlayFrozenFrame"))?;
         }
+        if let Some(camera_pixmap) = hint_camera_pixmap {
+            let camera_frame = decode_area_hint_camera(correlation_id)?;
+            let camera = encode_selector_image(
+                connection,
+                root_visual,
+                root_depth,
+                &camera_frame,
+                correlation_id,
+            )?;
+            for cookie in camera
+                .put(connection, camera_pixmap, background_gc, 0, 0)
+                .map_err(|_| gate_error(correlation_id, "overlayHintCameraFrame"))?
+            {
+                cookie
+                    .check()
+                    .map_err(|_| gate_error(correlation_id, "overlayHintCameraFrame"))?;
+            }
+        }
         connection
             .map_window(overlay)
             .map_err(|_| gate_error(correlation_id, "overlayMap"))?;
@@ -1551,6 +1595,7 @@ fn select_frozen_target<C: Connection>(
                 selection_underlay_gc,
                 foreground_gc: selection_gc,
                 hint_background_gc,
+                hint_camera_pixmap,
                 width: frame.width,
                 height: frame.height,
             },
@@ -1565,6 +1610,9 @@ fn select_frozen_target<C: Connection>(
     let _ = connection.free_gc(selection_gc);
     let _ = connection.free_gc(selection_underlay_gc);
     let _ = connection.free_gc(background_gc);
+    if let Some(camera_pixmap) = hint_camera_pixmap {
+        let _ = connection.free_pixmap(camera_pixmap);
+    }
     let _ = connection.destroy_window(overlay);
     let _ = connection.free_pixmap(frozen_pixmap);
     let _ = connection.flush();
@@ -1578,6 +1626,7 @@ struct SelectorCanvas {
     selection_underlay_gc: u32,
     foreground_gc: u32,
     hint_background_gc: u32,
+    hint_camera_pixmap: Option<u32>,
     width: u16,
     height: u16,
 }
@@ -1606,6 +1655,41 @@ const fn selection_stroke_plan() -> [SelectionStroke; 2] {
 
 const fn area_hint_text_colors() -> (u32, u32) {
     (0x0018_1818, u32::MAX)
+}
+
+fn decode_area_hint_camera(correlation_id: &str) -> Result<RgbaFrame, PlatformError> {
+    let mut decoder = png::Decoder::new(std::io::Cursor::new(AREA_HINT_CAMERA_PNG));
+    decoder.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
+    let mut reader = decoder
+        .read_info()
+        .map_err(|_| gate_error(correlation_id, "overlayHintCameraDecode"))?;
+    let output_size = reader
+        .output_buffer_size()
+        .ok_or_else(|| gate_error(correlation_id, "overlayHintCameraSize"))?;
+    let mut decoded = vec![0; output_size];
+    let info = reader
+        .next_frame(&mut decoded)
+        .map_err(|_| gate_error(correlation_id, "overlayHintCameraDecode"))?;
+    if info.width != u32::from(AREA_HINT_CAMERA_SIZE)
+        || info.height != u32::from(AREA_HINT_CAMERA_SIZE)
+    {
+        return Err(gate_error(correlation_id, "overlayHintCameraSize"));
+    }
+    let pixels = &decoded[..info.buffer_size()];
+    let rgba = match info.color_type {
+        png::ColorType::Rgba => pixels.to_vec(),
+        png::ColorType::Rgb => pixels
+            .chunks_exact(3)
+            .flat_map(|pixel| [pixel[0], pixel[1], pixel[2], u8::MAX])
+            .collect(),
+        _ => return Err(gate_error(correlation_id, "overlayHintCameraColor")),
+    };
+    Ok(RgbaFrame {
+        width: AREA_HINT_CAMERA_SIZE,
+        height: AREA_HINT_CAMERA_SIZE,
+        rgba,
+        cursor_included: false,
+    })
 }
 
 fn interaction_loop<C: Connection>(
@@ -1911,38 +1995,6 @@ fn draw_selection_frame<C: Connection>(
     Ok(())
 }
 
-#[derive(Debug, Clone, Copy)]
-struct AreaHintCameraGeometry {
-    body: Rectangle,
-    top: Rectangle,
-    lens: XArc,
-}
-
-fn area_hint_camera_geometry(card: Rectangle) -> AreaHintCameraGeometry {
-    AreaHintCameraGeometry {
-        body: Rectangle {
-            x: card.x.saturating_add(184),
-            y: card.y.saturating_add(14),
-            width: 30,
-            height: 23,
-        },
-        top: Rectangle {
-            x: card.x.saturating_add(192),
-            y: card.y.saturating_add(10),
-            width: 13,
-            height: 5,
-        },
-        lens: XArc {
-            x: card.x.saturating_add(193),
-            y: card.y.saturating_add(19),
-            width: 12,
-            height: 12,
-            angle1: 0,
-            angle2: 360 * 64,
-        },
-    }
-}
-
 fn fill_rounded_rectangle<C: Connection>(
     connection: &C,
     drawable: u32,
@@ -2052,16 +2104,21 @@ fn redraw_area_hint<C: Connection>(
                 b"Select area",
             )
             .map_err(|_| gate_error(correlation_id, "overlayHintText"))?;
-        let camera = area_hint_camera_geometry(card);
+        let camera_pixmap = canvas
+            .hint_camera_pixmap
+            .ok_or_else(|| gate_error(correlation_id, "overlayHintCameraMissing"))?;
         connection
-            .poly_rectangle(
+            .copy_area(
+                camera_pixmap,
                 canvas.overlay,
                 canvas.background_gc,
-                &[camera.body, camera.top],
+                0,
+                0,
+                card.x.saturating_add(190),
+                card.y.saturating_add(12),
+                AREA_HINT_CAMERA_SIZE,
+                AREA_HINT_CAMERA_SIZE,
             )
-            .map_err(|_| gate_error(correlation_id, "overlayHintIcon"))?;
-        connection
-            .poly_arc(canvas.overlay, canvas.background_gc, &[camera.lens])
             .map_err(|_| gate_error(correlation_id, "overlayHintIcon"))?;
         Ok(())
     };
@@ -2975,14 +3032,14 @@ mod tests {
     };
 
     use super::{
-        RgbaFrame, WindowCandidate, WindowSelectionContext, WindowSelectionMetadata,
-        X11_COMPOSITOR_UNMAP_SETTLE, X11CaptureAdapter, X11HotkeyBinding, X11MonitorLayout,
-        X11TopLevelWindowState, apply_frame_extents, area_hint_camera_geometry,
-        area_hint_text_colors, compositor_owner_requires_overlay, compositor_unmap_has_settled,
-        crop_root_frame, current_monitor_id_for_bounds, import_quick_rgba_preview,
-        monitor_ids_for_bounds, move_rectangle, parse_hotkey_trigger,
-        process_windows_and_frames_are_unmapped, rectangle_contains, replacement_plan,
-        resize_rectangle, selection_stroke_plan, selector_visual_damage,
+        AREA_HINT_CAMERA_LICENSE, AREA_HINT_CAMERA_SVG, RgbaFrame, WindowCandidate,
+        WindowSelectionContext, WindowSelectionMetadata, X11_COMPOSITOR_UNMAP_SETTLE,
+        X11CaptureAdapter, X11HotkeyBinding, X11MonitorLayout, X11TopLevelWindowState,
+        apply_frame_extents, area_hint_text_colors, compositor_owner_requires_overlay,
+        compositor_unmap_has_settled, crop_root_frame, current_monitor_id_for_bounds,
+        decode_area_hint_camera, import_quick_rgba_preview, monitor_ids_for_bounds, move_rectangle,
+        parse_hotkey_trigger, process_windows_and_frames_are_unmapped, rectangle_contains,
+        replacement_plan, resize_rectangle, selection_stroke_plan, selector_visual_damage,
         should_complete_area_release, size_badge_rectangle, window_at,
         window_selection_policy_allows, write_rgba_pixels,
     };
@@ -3066,40 +3123,34 @@ mod tests {
     }
 
     #[test]
-    fn area_hint_camera_has_a_body_top_and_centered_lens() {
-        let card = Rectangle {
-            x: 100,
-            y: 200,
-            width: 226,
-            height: 48,
-        };
-        let camera = area_hint_camera_geometry(card);
-
-        assert_eq!(
-            (
-                camera.body.x,
-                camera.body.y,
-                camera.body.width,
-                camera.body.height,
-            ),
-            (284, 214, 30, 23),
-        );
-        assert_eq!(
-            (
-                camera.top.x,
-                camera.top.y,
-                camera.top.width,
-                camera.top.height,
-            ),
-            (292, 210, 13, 5),
-        );
-        assert_eq!((camera.lens.x, camera.lens.y), (293, 219));
-        assert_eq!((camera.lens.width, camera.lens.height), (12, 12));
+    fn area_hint_text_uses_the_card_color_instead_of_a_black_image_text_box() {
+        assert_eq!(area_hint_text_colors(), (0x0018_1818, u32::MAX));
     }
 
     #[test]
-    fn area_hint_text_uses_the_card_color_instead_of_a_black_image_text_box() {
-        assert_eq!(area_hint_text_colors(), (0x0018_1818, u32::MAX));
+    fn area_hint_camera_uses_the_vendored_permissive_lucide_svg() {
+        let svg = std::str::from_utf8(AREA_HINT_CAMERA_SVG).expect("Lucide camera SVG");
+        let license = std::str::from_utf8(AREA_HINT_CAMERA_LICENSE).expect("Lucide license");
+
+        assert!(svg.contains(r#"viewBox="0 0 24 24""#));
+        assert!(svg.contains(r#"class="lucide lucide-camera""#));
+        assert!(svg.contains("<path"));
+        assert!(svg.contains("<circle"));
+        assert!(license.contains("ISC License"));
+    }
+
+    #[test]
+    fn area_hint_camera_native_derivative_is_a_bounded_opaque_rgba_icon() {
+        let icon = decode_area_hint_camera("lucide-camera-test").expect("native camera icon");
+
+        assert_eq!((icon.width, icon.height), (24, 24));
+        assert!(icon.rgba.chunks_exact(4).all(|pixel| pixel[3] == u8::MAX));
+        assert_eq!(&icon.rgba[0..4], &[255, 255, 255, 255]);
+        assert!(
+            icon.rgba
+                .chunks_exact(4)
+                .any(|pixel| pixel[0] < 64 && pixel[1] < 64 && pixel[2] < 64)
+        );
     }
 
     #[test]

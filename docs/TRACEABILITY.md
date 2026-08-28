@@ -151,6 +151,20 @@ WebKitGTK/X11 smoke.
   `/tmp/cutescreen-selector-white-page-drag-final-2026-08-28.png`. Optimized,
   mixed-DPI and cross-monitor confirmation remain platform acceptance gates.
 
+## X11 selector SVG camera follow-up (2026-08-28)
+
+- Requirements: `REQ-CAP-012`.
+- Source/licence boundary: use the official Lucide Camera SVG already matched by
+  the repository's `@lucide/vue` 1.31.0 dependency; retain its source URL and
+  ISC notice beside the vendored asset. No network or SVG parsing is allowed in
+  the capture interaction path.
+- Red-first Rust evidence: the vendored source must remain a 24×24 Lucide SVG,
+  and its pre-rasterized native derivative must decode to the expected bounded
+  opaque RGBA image before an X11 selector can use it.
+- Runtime evidence: the physical pre-drag X11 replay must show the Lucide camera
+  without changing hint motion responsiveness or reintroducing transient
+  trails. Status: implementation pending.
+
 ## Short arrow endpoint repair gate (2026-08-22)
 
 `REQ-TOL-001` requires a red-first editor-core scene test proving that a straight

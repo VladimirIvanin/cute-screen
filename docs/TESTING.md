@@ -1539,6 +1539,11 @@ silhouette, incomplete cursor camera and white-on-white Area frame.
   complete high-contrast border and dimension badge. Escape returned terminal
   JSON `cancelled` in both runs. Optimized, mixed-DPI and cross-monitor replay
   remain separate platform gates.
+- `cargo test --workspace` and `cargo test --workspace --features x11-capture`
+  each passed 107/107. `pnpm test` passed 51 files and 457/457 tests.
+  `pnpm check` passed lint, package/app/test/E2E typechecks and builds,
+  repository-wide formatting, 34-file documentation validation, 14/14
+  boundary tests and every configured Rust fmt/Clippy feature combination.
 
 ## CI gates
 
