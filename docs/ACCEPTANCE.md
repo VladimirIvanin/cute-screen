@@ -447,6 +447,9 @@ remain pending.
 8. Повторить на Windows/X11 mixed-DPI и cross-monitor layouts. На Wayland
    подтвердить системный selector, fragment-only surface и disabled expansion.
 9. Screen, Window, Active Window и Repeat по-прежнему открывают полный editor.
+10. Для resident X11/Windows процесса измерить mouse-up → `IsViewable`
+    interactive quick chrome; временный preview не должен синхронно сжимать
+    full-desktop PNG или записывать transport-файл.
 
 Локальное доказательство 2026-08-24: Ubuntu 24.04, GNOME 46,
 X11, packaged-debug binary и чистый профиль. CLI Area → physical drag 600×400
@@ -476,6 +479,14 @@ settle interval. In the rebuilt debug smoke the old frame was destroyed, the
 client remained `IsUnMapped`, and the selector showed only the frozen VS Code
 desktop. Escape recreated/restored the editor frame. Screenshot:
 `/tmp/cutescreen-frame-settled-selector-hint.png`.
+
+Latency follow-up, 2026-08-28: on the resident Ubuntu 24.04/GNOME X11
+debug/Vite process at 2560×1440, the Area preview used a memory-owned top-down
+32-bit BMP instead of synchronous full-frame PNG compression and file staging.
+The first observed mouse-up → viewable presentation measured 700 ms; the warm
+replay measured 486 ms and Escape returned typed `cancelled`. A third automated
+attempt cancelled before presentation and is not counted as performance
+evidence. Repeated optimized-build measurement remains pending.
 
 Отдельно проверить GitHub version check:
 

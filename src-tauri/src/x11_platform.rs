@@ -834,7 +834,7 @@ impl X11CaptureAdapter {
             &monitors,
             correlation_id,
         )?;
-        let mut result = import_rgba_frame(transport, correlation_id, root_frame)?;
+        let mut result = import_quick_rgba_preview(transport, correlation_id, root_frame)?;
         result.geometry = Some(geometry);
         result.quick_frame_geometry = Some(frame_geometry);
         Ok(result)
@@ -2592,6 +2592,85 @@ fn import_rgba_frame(
     })
 }
 
+fn import_quick_rgba_preview(
+    transport: &ImageTransportService,
+    correlation_id: &str,
+    frame: RgbaFrame,
+) -> Result<CaptureResult, PlatformError> {
+    let started = Instant::now();
+    let width = u32::from(frame.width);
+    let height = u32::from(frame.height);
+    let encoded = encode_rgba_bmp(&frame.rgba, width, height, correlation_id)?;
+    let token = format!("x11-{}", Uuid::now_v7().simple());
+    transport.import_owned_memory(&token, encoded, "image/bmp", width, height, correlation_id)?;
+    if std::env::var_os("CUTE_SCREEN_CAPTURE_DEBUG").is_some() {
+        eprintln!(
+            "cute-screen x11 quick preview encoded and imported in {} ms",
+            started.elapsed().as_millis()
+        );
+    }
+    Ok(CaptureResult {
+        image_token: token,
+        correlation_id: correlation_id.to_owned(),
+        width,
+        height,
+        geometry: None,
+        quick_frame_geometry: None,
+        cursor_included: Some(frame.cursor_included),
+    })
+}
+
+fn encode_rgba_bmp(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    correlation_id: &str,
+) -> Result<Vec<u8>, PlatformError> {
+    let expected_len = usize::try_from(width)
+        .ok()
+        .and_then(|width| {
+            usize::try_from(height)
+                .ok()
+                .and_then(|height| width.checked_mul(height))
+        })
+        .and_then(|pixels| pixels.checked_mul(4))
+        .ok_or_else(|| gate_error(correlation_id, "bmpPixelLength"))?;
+    if rgba.len() != expected_len {
+        return Err(gate_error(correlation_id, "bmpPixelLength"));
+    }
+    let bmp_width = i32::try_from(width).map_err(|_| gate_error(correlation_id, "bmpWidth"))?;
+    let bmp_height = i32::try_from(height).map_err(|_| gate_error(correlation_id, "bmpHeight"))?;
+    let pixel_length =
+        u32::try_from(rgba.len()).map_err(|_| gate_error(correlation_id, "bmpPixelLength"))?;
+    let file_size = 54_u32
+        .checked_add(pixel_length)
+        .ok_or_else(|| gate_error(correlation_id, "bmpFileSize"))?;
+    let capacity =
+        usize::try_from(file_size).map_err(|_| gate_error(correlation_id, "bmpCapacity"))?;
+    let mut bmp = Vec::with_capacity(capacity);
+    bmp.extend_from_slice(b"BM");
+    bmp.extend_from_slice(&file_size.to_le_bytes());
+    bmp.extend_from_slice(&0_u32.to_le_bytes());
+    bmp.extend_from_slice(&54_u32.to_le_bytes());
+    bmp.extend_from_slice(&40_u32.to_le_bytes());
+    bmp.extend_from_slice(&bmp_width.to_le_bytes());
+    bmp.extend_from_slice(&bmp_height.saturating_neg().to_le_bytes());
+    bmp.extend_from_slice(&1_u16.to_le_bytes());
+    bmp.extend_from_slice(&32_u16.to_le_bytes());
+    bmp.extend_from_slice(&0_u32.to_le_bytes());
+    bmp.extend_from_slice(&pixel_length.to_le_bytes());
+    bmp.extend_from_slice(&0_i32.to_le_bytes());
+    bmp.extend_from_slice(&0_i32.to_le_bytes());
+    bmp.extend_from_slice(&0_u32.to_le_bytes());
+    bmp.extend_from_slice(&0_u32.to_le_bytes());
+    bmp.extend_from_slice(rgba);
+    for pixel in bmp[54..].chunks_exact_mut(4) {
+        pixel.swap(0, 2);
+        pixel[3] = u8::MAX;
+    }
+    Ok(bmp)
+}
+
 fn decode_rgba<C: Connection>(
     connection: &C,
     visual_id: u32,
@@ -2697,14 +2776,17 @@ fn hotkey_error(correlation_id: &str, operation: &str) -> PlatformError {
 mod tests {
     use std::time::Duration;
 
-    use crate::platform::{PlatformErrorCode, SessionKind};
+    use crate::{
+        image_transport::ImageTransportService,
+        platform::{PlatformErrorCode, SessionKind},
+    };
 
     use super::{
         RgbaFrame, WindowCandidate, WindowSelectionContext, WindowSelectionMetadata,
         X11_COMPOSITOR_UNMAP_SETTLE, X11CaptureAdapter, X11HotkeyBinding, X11MonitorLayout,
         X11TopLevelWindowState, apply_frame_extents, compositor_owner_requires_overlay,
         compositor_unmap_has_settled, crop_root_frame, current_monitor_id_for_bounds,
-        monitor_ids_for_bounds, move_rectangle, parse_hotkey_trigger,
+        import_quick_rgba_preview, monitor_ids_for_bounds, move_rectangle, parse_hotkey_trigger,
         process_windows_and_frames_are_unmapped, rectangle_contains, replacement_plan,
         resize_rectangle, selector_visual_damage, should_complete_area_release,
         size_badge_rectangle, window_at, window_selection_policy_allows, write_rgba_pixels,
@@ -2801,6 +2883,50 @@ mod tests {
 
         assert_eq!((screen.width, screen.height), (2, 1));
         assert_eq!(screen.rgba, vec![1, 2, 3, 255, 4, 5, 6, 255]);
+    }
+
+    #[test]
+    fn area_quick_preview_uses_a_memory_owned_top_down_bmp() {
+        let directory = tempfile::tempdir().expect("transport directory");
+        let source = directory.path().join("source");
+        let stage = directory.path().join("stage");
+        let transport = ImageTransportService::new(&source, &stage).expect("transport");
+        let frame = RgbaFrame {
+            width: 2,
+            height: 1,
+            rgba: vec![255, 0, 0, 7, 0, 128, 255, 9],
+            cursor_included: false,
+        };
+
+        let result = import_quick_rgba_preview(&transport, "x11-quick-preview", frame)
+            .expect("quick preview");
+        let metadata = transport
+            .stage_image(&result.image_token, "x11-quick-preview")
+            .expect("staged preview");
+        let bytes = transport
+            .read_image_bytes(&result.image_token, "x11-quick-preview")
+            .expect("preview bytes");
+
+        assert_eq!(metadata.mime_type, "image/bmp");
+        assert_eq!(metadata.asset_url, "");
+        assert_eq!((metadata.width, metadata.height), (2, 1));
+        assert_eq!(&bytes[0..2], b"BM");
+        assert_eq!(
+            i32::from_le_bytes(bytes[18..22].try_into().expect("width")),
+            2
+        );
+        assert_eq!(
+            i32::from_le_bytes(bytes[22..26].try_into().expect("height")),
+            -1
+        );
+        assert_eq!(&bytes[54..], &[0, 0, 255, 255, 255, 128, 0, 255]);
+        assert!(
+            std::fs::read_dir(&source)
+                .expect("source directory")
+                .next()
+                .is_none(),
+            "quick preview must not create a synchronous transport file"
+        );
     }
 
     #[test]

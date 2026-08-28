@@ -77,8 +77,11 @@ UI получает `CaptureCapabilities` и не показывает непо�
   with no usable Composite 0.3 overlay fails instead of returning a known
   incomplete root frame. The selector converts canonical RGBA into the target
   root visual/depth instead of replaying the Composite Overlay Window image.
-  Local GNOME X11 compositor/quick runtime passed on 2026-08-24; mixed-DPI and
-  cross-monitor runtime remain pending.
+  After Area confirmation, the same canonical RGBA becomes a top-down 32-bit
+  BMP held by native memory transport; full-desktop PNG compression and disk
+  staging are outside the mouse-up presentation path. Local GNOME X11
+  compositor/quick runtime passed on 2026-08-28; mixed-DPI, cross-monitor and
+  repeated optimized latency evidence remain pending.
 
 ### macOS
 

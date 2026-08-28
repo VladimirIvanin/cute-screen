@@ -1479,6 +1479,38 @@ immutable originals and renderer/export output are unchanged.
   the frozen VS Code desktop with no editor client, grey surface, title bar or
   shadow. Escape restored the client and created a new visible decoration.
 
+## X11 resident quick-preview latency repair (2026-08-28)
+
+Ubuntu 24.04.4 LTS, GNOME Shell 46, x86_64 X11; resident Tauri dev/Vite
+process at a 2560×1440 physical framebuffer. `docs/TRACEABILITY.md` was updated
+before the test and production change.
+
+- The red-first focused Rust command failed to compile because the new
+  `import_quick_rgba_preview` boundary did not exist. The unchanged focused
+  test then passed and proves a top-down 32-bit BMP with exact BGR pixels,
+  opaque alpha, empty asset URL and no source-root transport file.
+- X11 Area now imports that BMP through native-owned memory after pointer
+  release. Screen, Window, Active Window and Repeat retain their PNG path;
+  Copy, Save and Editor still materialize the normalized final PNG through the
+  existing quick-result transaction. No JSON/base64 image transport was added.
+- The Electron prototype was inspected only to explain the perceived latency:
+  it cropped the selection immediately and restored its resident editor,
+  whereas the current product intentionally retains a full frozen desktop so
+  the quick crop can expand. No implementation code was copied.
+- Local replay measured 700 ms for the first observed mouse-up → viewable quick
+  surface and 486 ms for the warm replay in the unoptimized dev/Vite process.
+  Escape returned typed `cancelled` without materialization. A third automated
+  attempt cancelled before presentation and is not reported as a latency
+  failure or success. Repeated optimized-build measurement remains pending.
+- `cargo test --workspace` and `cargo test --workspace --features x11-capture`
+  each passed 102/102. Production-only all-features Clippy passed with
+  `unwrap_used` and `expect_used` denied. `pnpm test` passed 51 files and
+  457/457 tests. The first `pnpm check` reached repository formatting and
+  stopped only because the new traceability row needed Prettier; the complete
+  rerun then passed lint, package/app/test/E2E typechecks and builds,
+  repository-wide formatting, 34-file documentation validation, 14/14 boundary
+  tests and every configured Rust fmt/Clippy feature combination.
+
 ## CI gates
 
 ### Каждый PR
