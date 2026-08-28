@@ -163,7 +163,10 @@ WebKitGTK/X11 smoke.
   opaque RGBA image before an X11 selector can use it.
 - Runtime evidence: the physical pre-drag X11 replay must show the Lucide camera
   without changing hint motion responsiveness or reintroducing transient
-  trails. Status: implementation pending.
+  trails. Status: passed on Ubuntu 24.04/GNOME 46 X11; the 24×24 asset was
+  visually inspected in
+  `/tmp/cutescreen-selector-lucide-camera-2026-08-28.png`. Both Rust feature
+  configurations passed 108/108 and the complete `pnpm check` gate passed.
 
 ## Short arrow endpoint repair gate (2026-08-22)
 
