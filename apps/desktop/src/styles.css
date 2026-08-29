@@ -31,7 +31,7 @@ body,
   padding: 8px;
   border-radius: 12px;
   border: 1px solid var(--border);
-  background: color-mix(in srgb, var(--surface-raised) 94%, transparent);
+  background: var(--chrome-94);
   box-shadow: var(--shadow-overlay);
   z-index: 30;
 }
@@ -80,7 +80,7 @@ body,
   padding: 8px 10px;
   border-radius: 10px;
   color: var(--text);
-  background: color-mix(in srgb, var(--surface-raised) 94%, transparent);
+  background: var(--chrome-94);
   box-shadow: 0 6px 20px #0003;
   font-size: 12px;
   z-index: 30;

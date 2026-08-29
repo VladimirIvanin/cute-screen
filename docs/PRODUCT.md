@@ -269,6 +269,12 @@ Cute Screen — полноценный local-first редактор снимко
   имеют parent window, различают cancel и error и не блокируют native UI event
   loop. На GTK/X11 и Wayland окно приложения остаётся responsive всё время
   жизни системного dialog.
+- `REQ-UI-012` — постоянный и transient chrome сохраняет непрозрачный читаемый
+  фон, границы и тени в целевых WebView, включая WKWebView macOS 12. CSS не
+  полагается без фолбека на `color-mix()`, современный space-separated
+  `rgb(... / ...)` или unprefixed-only `backdrop-filter`; отсутствие blur не
+  должно делать `ToolRail`, contextual/transient panels или quick actions
+  прозрачными.
 
 ## Качество и поставка
 

@@ -10,6 +10,29 @@ interface PackageManifest {
 }
 
 describe('Tauri build boundary', () => {
+  it('keeps shipped chrome CSS parseable by the oldest target WebView', async () => {
+    const cssSources = await Promise.all(
+      [
+        path.join('packages', 'editor-vue', 'src', 'shell', 'shell.css'),
+        path.join('apps', 'desktop', 'src', 'styles.css'),
+      ].map(async (relativePath) => ({
+        relativePath,
+        source: await readFile(path.join(process.cwd(), relativePath), 'utf8'),
+      })),
+    )
+
+    for (const { relativePath, source } of cssSources) {
+      expect(source, relativePath).not.toContain('color-mix(')
+      expect(source, relativePath).not.toMatch(/rgb\([^,)]*\s\/\s[^)]*\)/)
+
+      const unprefixedBlurCount =
+        source.match(/(?<!-)backdrop-filter:/g)?.length ?? 0
+      const prefixedBlurCount =
+        source.match(/-webkit-backdrop-filter:/g)?.length ?? 0
+      expect(prefixedBlurCount, relativePath).toBe(unprefixedBlurCount)
+    }
+  })
+
   it('builds frontendDist before compiling the custom protocol feature', async () => {
     const root = process.cwd()
     const manifest = JSON.parse(

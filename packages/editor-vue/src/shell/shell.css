@@ -13,9 +13,22 @@
   --accent-contrast: #ffffff;
   --danger: #c93f52;
   --focus-ring: #537cda;
+  --chrome-94: rgba(255, 255, 255, 0.94);
+  --chrome-96: rgba(255, 255, 255, 0.96);
+  --canvas-dot: rgba(113, 109, 118, 0.2);
+  --locked-border: #bfc0c6;
+  --locked-surface: rgba(232, 233, 237, 0.72);
+  --hover-surface: rgba(237, 236, 240, 0.7);
+  --accent-16: rgba(209, 75, 124, 0.16);
+  --accent-22: rgba(209, 75, 124, 0.22);
+  --accent-border-35: #d5a9ba;
+  --accent-border-55: #d88eaa;
+  --accent-muted-border: #8c6477;
+  --selected-locked-surface: #f6d7e2;
+  --text-border-35: rgba(39, 36, 42, 0.35);
   --radius-sm: 6px;
   --radius-md: 10px;
-  --shadow-overlay: 0 12px 32px rgb(35 30 40 / 16%);
+  --shadow-overlay: 0 12px 32px rgba(35, 30, 40, 0.16);
   --motion: 180ms ease;
   color: var(--text);
   background: var(--surface);
@@ -45,7 +58,20 @@ html[data-theme='dark'] {
   --accent-contrast: #321220;
   --danger: #f27a83;
   --focus-ring: #9ebaff;
-  --shadow-overlay: 0 16px 38px rgb(0 0 0 / 42%);
+  --chrome-94: rgba(37, 38, 43, 0.94);
+  --chrome-96: rgba(37, 38, 43, 0.96);
+  --canvas-dot: rgba(171, 166, 176, 0.2);
+  --locked-border: #5a595f;
+  --locked-surface: rgba(24, 25, 28, 0.72);
+  --hover-surface: rgba(48, 49, 55, 0.7);
+  --accent-16: rgba(241, 127, 174, 0.16);
+  --accent-22: rgba(241, 127, 174, 0.22);
+  --accent-border-35: #7a5367;
+  --accent-border-55: #9f627d;
+  --accent-muted-border: #bf7295;
+  --selected-locked-surface: #3c2230;
+  --text-border-35: rgba(244, 240, 244, 0.35);
+  --shadow-overlay: 0 16px 38px rgba(0, 0, 0, 0.42);
 }
 
 * {
@@ -324,10 +350,7 @@ button:focus-visible {
   min-height: 0;
   overflow: hidden;
   background-color: var(--canvas);
-  background-image: radial-gradient(
-    color-mix(in srgb, var(--text-muted) 20%, transparent) 1px,
-    transparent 1px
-  );
+  background-image: radial-gradient(var(--canvas-dot) 1px, transparent 1px);
   background-size: 16px 16px;
 }
 .cs-canvas-scroll {
@@ -522,8 +545,8 @@ button:focus-visible {
   user-select: none;
 }
 .cs-layer-row.is-locked {
-  border-color: color-mix(in srgb, var(--text-muted) 28%, var(--border));
-  background: color-mix(in srgb, var(--surface-sunken) 72%, transparent);
+  border-color: var(--locked-border);
+  background: var(--locked-surface);
 }
 .cs-layer-row.is-locked .cs-layer-name {
   opacity: 0.78;
@@ -550,7 +573,7 @@ button:focus-visible {
   text-align: left;
 }
 .cs-layer-select:hover:not([aria-disabled='true']) {
-  background: color-mix(in srgb, var(--surface-hover) 70%, transparent);
+  background: var(--hover-surface);
 }
 .cs-layer-select[aria-disabled='true'] {
   cursor: not-allowed;
@@ -594,7 +617,7 @@ button:focus-visible {
 }
 .cs-layer-lock.is-locked {
   color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  background: var(--accent-16);
 }
 .cs-layer-lock.is-locked svg {
   stroke-width: 2.2;
@@ -609,19 +632,15 @@ button:focus-visible {
 }
 .cs-layer-row.is-selected .cs-layer-lock.is-locked {
   color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  background: var(--accent-22);
 }
 .cs-layer-row.is-selected {
-  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-color: var(--accent-border-35);
   background: var(--accent-soft);
 }
 .cs-layer-row.is-selected.is-locked {
-  border-color: color-mix(in srgb, var(--accent) 28%, var(--text-muted));
-  background: color-mix(
-    in srgb,
-    var(--accent-soft) 72%,
-    var(--surface-sunken) 28%
-  );
+  border-color: var(--accent-muted-border);
+  background: var(--selected-locked-surface);
 }
 .cs-layer-row.is-selected::before {
   position: absolute;
@@ -692,8 +711,9 @@ button:focus-visible {
   padding: 5px;
   border: 1px solid var(--border);
   border-radius: 13px;
-  background: color-mix(in srgb, var(--surface-raised) 94%, transparent);
+  background: var(--chrome-94);
   box-shadow: var(--shadow-overlay);
+  -webkit-backdrop-filter: blur(16px) saturate(1.12);
   backdrop-filter: blur(16px) saturate(1.12);
 }
 
@@ -1013,7 +1033,7 @@ button:focus-visible {
 .cs-arrow-toolbar-trigger:focus-visible,
 .cs-color-more--compact:hover:not(:disabled),
 .cs-color-more--compact:focus-visible {
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  border-color: var(--accent-border-55);
   outline: none;
   background: var(--surface-hover);
 }
@@ -1042,7 +1062,7 @@ button:focus-visible {
 .cs-color-compact-swatch {
   width: 21px;
   height: 21px;
-  border: 1px solid color-mix(in srgb, var(--text) 35%, transparent);
+  border: 1px solid var(--text-border-35);
   border-radius: 5px;
 }
 .cs-arrow-toolbar-popover {
@@ -1296,8 +1316,9 @@ button:focus-visible {
   pointer-events: auto;
   border: 1px solid var(--border);
   border-radius: 12px;
-  background: color-mix(in srgb, var(--surface-raised) 94%, transparent);
+  background: var(--chrome-94);
   box-shadow: var(--shadow-overlay);
+  -webkit-backdrop-filter: blur(16px) saturate(1.12);
   backdrop-filter: blur(16px) saturate(1.12);
 }
 
@@ -1360,8 +1381,9 @@ button:focus-visible {
   overflow-y: hidden;
   border: 1px solid var(--border);
   border-radius: 13px;
-  background: color-mix(in srgb, var(--surface-raised) 94%, transparent);
+  background: var(--chrome-94);
   box-shadow: var(--shadow-overlay);
+  -webkit-backdrop-filter: blur(16px) saturate(1.12);
   backdrop-filter: blur(16px) saturate(1.12);
   transform: translateX(-50%);
 }
@@ -1399,7 +1421,8 @@ button:focus-visible {
   bottom: var(--bottom-chrome-reserve);
   width: min(320px, calc(100vw - 96px));
   border-radius: 13px;
-  background: color-mix(in srgb, var(--surface-raised) 96%, transparent);
+  background: var(--chrome-96);
+  -webkit-backdrop-filter: blur(16px) saturate(1.12);
   backdrop-filter: blur(16px) saturate(1.12);
 }
 
@@ -1430,7 +1453,8 @@ button:focus-visible {
   padding: 5px 8px;
   border-radius: 13px;
   transform: translateX(-50%);
-  background: color-mix(in srgb, var(--surface-raised) 96%, transparent);
+  background: var(--chrome-96);
+  -webkit-backdrop-filter: blur(16px) saturate(1.12);
   backdrop-filter: blur(16px) saturate(1.12);
 }
 
@@ -1508,7 +1532,7 @@ button:focus-visible {
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface-raised);
-  box-shadow: 0 14px 40px rgb(0 0 0 / 28%);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.28);
 }
 .cs-color-head {
   display: grid;
@@ -1525,7 +1549,7 @@ button:focus-visible {
   height: 28px;
   border: 1px solid var(--border-strong);
   border-radius: 8px;
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 16%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
 }
 .cs-color-current-small {
   width: 22px;
@@ -1549,10 +1573,10 @@ button:focus-visible {
   aspect-ratio: 1;
   min-width: 0;
   padding: 0;
-  border: 1px solid rgb(255 255 255 / 14%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 6px;
   cursor: pointer;
-  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 8%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
 .cs-color-tile:hover {
   transform: translateY(-1px);
@@ -1570,7 +1594,7 @@ button:focus-visible {
   content: '';
   border: 2px solid #fff;
   border-radius: 50%;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 62%);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.62);
   transform: translate(-50%, -50%);
 }
 .cs-color-hue {
@@ -1594,7 +1618,7 @@ button:focus-visible {
   border: 3px solid #fff;
   border-radius: 50%;
   background: transparent;
-  box-shadow: 0 0 0 1px rgb(0 0 0 / 48%);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.48);
 }
 .cs-color-value-row {
   display: grid;
@@ -1775,12 +1799,12 @@ button:focus-visible {
   align-items: center;
   gap: 12px;
   padding: 8px 14px 8px 8px;
-  border: 1px solid rgb(255 255 255 / 12%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 14px;
   background: #28282a;
   box-shadow:
-    0 14px 36px rgb(0 0 0 / 34%),
-    0 2px 8px rgb(0 0 0 / 24%);
+    0 14px 36px rgba(0, 0, 0, 0.34),
+    0 2px 8px rgba(0, 0, 0, 0.24);
   color: #f7f7f8;
   pointer-events: none;
   transform: translate3d(0, 0, 0);
@@ -1794,7 +1818,7 @@ button:focus-visible {
   height: 72px;
   flex: 0 0 72px;
   overflow: hidden;
-  border: 1px solid rgb(255 255 255 / 18%);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 8px;
   background-color: #fff;
   background-image:
@@ -1825,12 +1849,12 @@ button:focus-visible {
     repeating-linear-gradient(
       to right,
       transparent 0 7px,
-      rgb(35 35 37 / 22%) 7px 8px
+      rgba(35, 35, 37, 0.22) 7px 8px
     ),
     repeating-linear-gradient(
       to bottom,
       transparent 0 7px,
-      rgb(35 35 37 / 22%) 7px 8px
+      rgba(35, 35, 37, 0.22) 7px 8px
     );
 }
 .cs-eyedropper-loupe-target {
@@ -1842,8 +1866,8 @@ button:focus-visible {
   border: 2px solid #fff;
   border-radius: 2px;
   box-shadow:
-    0 0 0 1px rgb(0 0 0 / 88%),
-    0 1px 3px rgb(0 0 0 / 72%);
+    0 0 0 1px rgba(0, 0, 0, 0.88),
+    0 1px 3px rgba(0, 0, 0, 0.72);
 }
 .cs-eyedropper-loupe-details {
   display: flex;
@@ -1874,9 +1898,9 @@ button:focus-visible {
   width: 20px;
   height: 20px;
   flex: 0 0 20px;
-  border: 1px solid rgb(255 255 255 / 28%);
+  border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 6px;
-  box-shadow: 0 1px 2px rgb(0 0 0 / 35%);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 .cs-eyedropper-loupe-hint {
   overflow: hidden;
@@ -1902,7 +1926,7 @@ button:focus-visible {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface-raised);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
   color: var(--text);
   font-size: 11px;
   display: flex;
@@ -1942,7 +1966,8 @@ button:focus-visible {
   border-radius: calc(
     var(--cs-zoom-button-radius) + var(--cs-zoom-shell-inset)
   );
-  background: color-mix(in srgb, var(--surface-raised) 96%, transparent);
+  background: var(--chrome-96);
+  -webkit-backdrop-filter: blur(16px) saturate(1.12);
   backdrop-filter: blur(16px) saturate(1.12);
 }
 
@@ -2010,8 +2035,9 @@ button:focus-visible {
   padding: 6px;
   border: 1px solid var(--border);
   border-radius: 13px;
-  background: color-mix(in srgb, var(--surface-raised) 96%, transparent);
+  background: var(--chrome-96);
   box-shadow: var(--shadow-overlay);
+  -webkit-backdrop-filter: blur(16px) saturate(1.12);
   backdrop-filter: blur(16px) saturate(1.12);
 }
 
