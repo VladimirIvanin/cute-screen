@@ -477,3 +477,9 @@ including quick-capture. Its capability grants only
 `notification:allow-is-permission-granted`; notification sending, permission
 requests and the broad notification default remain unavailable to the capture
 window. The capability boundary test enforces this least-privilege contract.
+
+Retina quick-frame overlay evidence must derive its inverse drawing scale from
+the canvas's actual CSS rect versus backing dimensions, not only from the
+possibly stale fit-zoom store value. Focused tests cover a 2× mismatch and the
+runtime overlay is redrawn after fit zoom so handles remain 8 CSS px and the
+dimension badge remains 28 CSS px high.

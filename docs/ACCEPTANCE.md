@@ -76,6 +76,13 @@ tests passed 15/15, macOS bridge tests passed 16/16 and boundary tests passed
 15/15. The already-running `tauri dev` process predates the rebuilt binary, so
 a restarted visual Area smoke remains required and is not claimed here.
 
+The next macOS visual pass exposed Retina-sized quick-frame handles/badge and a
+notification-plugin capability rejection in the quick WebView. Overlay sizing
+now uses actual CSS-to-backing canvas scale and redraws after fit zoom; focused
+Vue coverage passed 44/44. Quick capture grants only the plugin's injected
+read-only permission-state probe, with notify/request permissions rejected by
+the passing boundary suite. Restarted visual confirmation remains pending.
+
 ## A02 — Hotkey capture из скрытого приложения
 
 M04 partial evidence: local Ubuntu/GNOME X11 `screen` and frozen `area` capture

@@ -93,6 +93,7 @@ import {
   type RulerAngleGuide,
 } from '@cute-screen/editor-renderer'
 import { drawClampedHandleSquare } from '../overlay-handle-bounds'
+import { overlayVisualScale } from '../overlay-visual-scale'
 
 export interface TextToolDefaults {
   readonly fontFamily: string
@@ -1638,11 +1639,26 @@ function cropHandleAtPoint(
   session: CropSession,
   point: CanvasPoint,
 ): CropResizeHandle | undefined {
-  const tolerance = 9 / ((props.zoom ?? 100) / 100)
+  const tolerance = 9 / cropOverlayScale()
   return cropHandlePositions(session).find(
     ([, position]) =>
       Math.hypot(position.x - point.x, position.y - point.y) <= tolerance,
   )?.[0]
+}
+function cropOverlayScale(): number {
+  const canvas = overlay.value ?? scene.value
+  const fallback = (props.zoom ?? 100) / 100
+  if (!canvas) return fallback
+  const rect = canvas.getBoundingClientRect()
+  return overlayVisualScale(
+    {
+      backingWidth: canvas.width,
+      backingHeight: canvas.height,
+      clientWidth: rect.width,
+      clientHeight: rect.height,
+    },
+    fallback,
+  )
 }
 function drawCropOverlay(
   context: CanvasRenderingContext2D,
@@ -1666,7 +1682,7 @@ function drawCropOverlay(
   context.fillRect(0, y, x, height)
   context.fillRect(right, y, props.canvas!.width - right, height)
   context.strokeStyle = '#ffffff'
-  const zoomScale = (props.zoom ?? 100) / 100
+  const zoomScale = cropOverlayScale()
   context.lineWidth = 1 / zoomScale
   context.setLineDash(
     props.quickFrameMode ? [7 / zoomScale, 5 / zoomScale] : [],
@@ -2019,10 +2035,11 @@ watch(
 watch(
   () => props.zoom,
   async (zoom) => {
+    await nextTick()
+    invalidateOverlay()
     const anchor = pendingZoomAnchor
     if (!anchor || !scrollContainer.value || !scene.value || !zoom) return
     pendingZoomAnchor = undefined
-    await nextTick()
     const viewport = scrollContainer.value.getBoundingClientRect()
     const scale = zoom / 100
     const bounds = viewportOutputBounds.value
