@@ -53,6 +53,36 @@ place a separate composited/layered control window above the base fixture and
 verify its pixels in the frozen result. Existing non-composited root smokes do
 not satisfy this regression.
 
+macOS first Screen slice (2026-08-28, host darwin 21 / Intel): CoreGraphics
+adapter, Screen Recording `permissionDenied` and hide-before-snapshot are in
+code. Local grant/deny plus decoded-PNG smoke remains the gate before any
+`supported` claim. ADR-038 defines the next Area/Window architecture, but does
+not constitute runtime evidence for it.
+
+macOS 12.7.6 x64 launch smoke (2026-08-29): `pnpm tauri dev` with a saved last
+document and with a clean profile both left the `loading` screen without a
+click, Shift+Tab or other focus event. Capture and Open image stayed
+available; the hidden `quick-capture` window was not created. This is A01
+startup/empty evidence only, not a Screen `supported` claim.
+
+macOS quick-presentation follow-up (2026-08-29): the photographed duplicate
+menu bar identifies AppKit window-frame constraining, not missing captured
+pixels: the live menu bar remained above a selector whose frozen image already
+contained another menu bar. The selector window now overrides that constraint
+and retains the complete `NSScreen.frame`. Quick capture now maps its real
+WKWebView at 1% opacity with pointer input disabled, waits for stable canvas and
+chrome frames, and only then reveals and focuses the window. Focused frontend
+tests passed 15/15, macOS bridge tests passed 16/16 and boundary tests passed
+15/15. The already-running `tauri dev` process predates the rebuilt binary, so
+a restarted visual Area smoke remains required and is not claimed here.
+
+The next macOS visual pass exposed Retina-sized quick-frame handles/badge and a
+notification-plugin capability rejection in the quick WebView. Overlay sizing
+now uses actual CSS-to-backing canvas scale and redraws after fit zoom; focused
+Vue coverage passed 44/44. Quick capture grants only the plugin's injected
+read-only permission-state probe, with notify/request permissions rejected by
+the passing boundary suite. Restarted visual confirmation remains pending.
+
 ## A02 — Hotkey capture из скрытого приложения
 
 M04 partial evidence: local Ubuntu/GNOME X11 `screen` and frozen `area` capture
@@ -404,7 +434,7 @@ and are not inferred from this evidence.
 - Видимый focus и логический order.
 - Selected tool/object/frame различимы без опоры только на цвет.
 - Icon controls имеют names/tooltips.
-- 1024 px без горизонтального overflow основных действий.
+- 1024 px без горизонтального overflow основных действий; нижний chrome (серия, ToolRail, zoom) остаётся внутри окна по вертикали.
 - Reduced motion.
 - RU/EN строки не обрезают primary actions.
 
@@ -432,8 +462,11 @@ remain pending.
 2. До drag проверить стабильную непрозрачную закруглённую подсказку
    «Выделите область» с иконкой камеры; во время drag — пунктирную рамку и
    читаемый dimension badge без мерцания. Escape на этом этапе отменяет capture.
-3. После selector проверить frameless surface, dimension badge, полный набор
-   quick annotation tools и action bar Editor/Copy/Save/Close.
+3. На mouse-up frozen frame, затемнение и рамка не исчезают ни на один кадр;
+   панели редактора добавляются к той же визуальной сцене без пустого кадра или
+   повторного появления overlay. После handoff проверить frameless surface,
+   dimension badge, полный набор quick annotation tools и action bar
+   Editor/Copy/Save/Close.
 4. Создать аннотацию, затем move/resize рамку: annotation остаётся над теми же
    pixels frozen desktop, crop clip изменяется, undo/redo возвращает рамку.
 5. Close/Escape до commit не оставляет capture, document, series frame или
@@ -444,12 +477,22 @@ remain pending.
 7. Save cancel не материализует draft; успешный Save создаёт document, атомарный
    PNG и проходит повторный decode. Editor открывает тот же editable document с
    сохранёнными слоями и history-compatible geometry.
-8. Повторить на Windows/X11 mixed-DPI и cross-monitor layouts. На Wayland
-   подтвердить системный selector, fragment-only surface и disabled expansion.
+8. Повторить на Windows/X11/macOS mixed-DPI и cross-monitor layouts. На macOS
+   Area должен использовать native AppKit selector и единый frozen
+   multi-display frame. На Wayland подтвердить системный selector,
+   fragment-only surface и disabled expansion.
 9. Screen, Window, Active Window и Repeat по-прежнему открывают полный editor.
 10. Для resident X11/Windows процесса измерить mouse-up → `IsViewable`
     interactive quick chrome; временный preview не должен синхронно сжимать
     full-desktop PNG или записывать transport-файл.
+
+Для macOS 12+ отдельно выполнить acceptance на 12.0–12.2, 12.3–13 и 14+.
+Проверить фактическую ветку CoreGraphics fallback, one-shot `SCStream` и
+`SCScreenshotManager`/system window picker соответственно; grant/deny Screen
+Recording, cancel и отсутствие selector pixels. Area должен открыть quick-mode
+с frozen multi-display pixels и корректными Retina/mixed-scale bounds; Window
+должен сразу создать и смонтировать direct document без quick-mode. До этих
+реальных decoded-pixel прогонов runtime support остаётся pending.
 
 Локальное доказательство 2026-08-24: Ubuntu 24.04, GNOME 46,
 X11, packaged-debug binary и чистый профиль. CLI Area → physical drag 600×400

@@ -46,10 +46,9 @@ Cute Screen — полноценный local-first редактор снимко
 - `REQ-CAP-010` — Screen, Window, Active Window и Repeat сразу сохраняют
   неизменяемый оригинал и открывают редактируемый документ. Явный Area capture
   сначала создаёт неперсистентный quick-capture draft и материализует original,
-  capture и editable document только по Copy, Save PNG или Editor. На X11
-  запущенный из editor захват ждёт, пока сервер применит скрытие `main`, до
-  создания frozen frame; editor, его системная рамка и тень не остаются
-  видимыми или активными и не попадают в selector или quick draft.
+  capture и editable document только по Copy, Save PNG или Editor. На X11 и
+  macOS запущенный из editor захват скрывает `main` до native capture; editor
+  не остаётся видимым и не попадает в кадр.
 - `REQ-CAP-011` — quick-capture draft существует только во временном приватном
   staging, не попадает в series/library и полностью очищается по Close/Escape,
   crash, app exit или failed staging до materialization.
@@ -61,7 +60,10 @@ Cute Screen — полноценный local-first редактор снимко
   во время drag показывает пунктирную рамку и читаемый размер. Escape отменяет
   selector без создания draft. Отпускание primary pointer после валидного
   первого drag немедленно подтверждает selector и открывает quick-capture
-  draft; `Enter` остаётся только keyboard-маршрутом подтверждения.
+  draft; `Enter` остаётся только keyboard-маршрутом подтверждения. Frozen frame,
+  затемнение и выбранная рамка остаются непрерывно видимыми до первого готового
+  кадра quick editor: между selector и редактированием запрещены пустой кадр,
+  исчезновение overlay и повторное появление рамки.
 - `REQ-CAP-013` — Windows/X11/macOS Area quick-mode показывает frozen desktop
   в исходных physical coordinates. Wayland сохраняет системный XDG selector,
   показывает возвращённый portal fragment на нейтральном фоне и не разрешает
@@ -69,6 +71,10 @@ Cute Screen — полноценный local-first редактор снимко
 - `REQ-CAP-014` — один Area draft блокирует параллельный capture. Copy, Save PNG
   и Editor дают terminal `captured` с различимым completion; Close даёт
   ожидаемый `cancelled` без скрытой очереди.
+- `REQ-CAP-015` — на macOS Screen Recording проверяется до захвата. Отказ даёт
+  `permissionDenied` без overlay и без зависших окон. UI объясняет переход в
+  System Settings и повторную попытку. Intel и Apple Silicon используют один
+  adapter; capability не объявляется `supported` без runtime smoke.
 
 ## Запуск и горячие клавиши
 
@@ -244,6 +250,8 @@ Cute Screen — полноценный local-first редактор снимко
 - `REQ-UI-002` — system/light/dark темы и одна тёплая accent-группа.
 - `REQ-UI-003` — русский и английский интерфейс без перезапуска; системная локаль `ru-*` выбирает русский, остальные неподдерживаемые локали используют английский.
 - `REQ-UI-004` — primary capture/edit/export доступны при ширине 1024 px.
+  Нижний chrome (серия, `ToolRail`, zoom) остаётся внутри окна и не
+  перекрывается.
 - `REQ-UI-005` — выбранный tool, object и frame различимы не только цветом.
 - `REQ-UI-006` — controls используют настоящую HTML-семантику, tooltips и accessible names.
 - `REQ-UI-007` — focus order следует визуальному порядку, reduced motion уважается.
@@ -264,6 +272,12 @@ Cute Screen — полноценный local-first редактор снимко
   имеют parent window, различают cancel и error и не блокируют native UI event
   loop. На GTK/X11 и Wayland окно приложения остаётся responsive всё время
   жизни системного dialog.
+- `REQ-UI-012` — постоянный и transient chrome сохраняет непрозрачный читаемый
+  фон, границы и тени в целевых WebView, включая WKWebView macOS 12. CSS не
+  полагается без фолбека на `color-mix()`, современный space-separated
+  `rgb(... / ...)` или unprefixed-only `backdrop-filter`; отсутствие blur не
+  должно делать `ToolRail`, contextual/transient panels или quick actions
+  прозрачными.
 
 ## Качество и поставка
 

@@ -30,6 +30,8 @@ import {
 } from '@cute-screen/editor-vue'
 import { writeResultCanvasToClipboard } from './result-clipboard'
 import { dispatchNativeCapture } from './capture-request'
+import { runEditorStartup } from './editor-startup'
+import { EditorFirstFrameGate } from './editor-first-frame'
 
 declare global {
   interface Window {
@@ -166,7 +168,7 @@ const desktopActions: ShellActionAdapter | undefined =
               }
               return 'Image opened'
             }
-            if (action !== 'capture') {
+            if (action !== 'capture' && action !== 'captureWindow') {
               throw new Error(`${action} is not available yet`)
             }
             const onAbort = () => {
@@ -190,9 +192,18 @@ const desktopActions: ShellActionAdapter | undefined =
                 )
               }
               reportCaptureProgress?.('ready')
-              const captureAction = capabilities.capture.interactiveSelector
-                ? 'area'
-                : 'screen'
+              const captureAction =
+                action === 'captureWindow'
+                  ? 'window'
+                  : capabilities.capture.interactiveSelector
+                    ? 'area'
+                    : 'screen'
+              if (
+                captureAction === 'window' &&
+                !capabilities.capture.windowTarget
+              ) {
+                throw new Error('Window capture is unavailable')
+              }
               const { getCurrentWindow } =
                 await import('@tauri-apps/api/window')
               const outcome = await dispatchNativeCapture({
@@ -221,6 +232,17 @@ const desktopActions: ShellActionAdapter | undefined =
               if (outcome.outcome === 'cancelled') {
                 throw new ActionCancelledError('Capture cancelled')
               }
+              if (outcome.outcome === 'permissionDenied') {
+                try {
+                  await tauriDesktopBridge.openScreenRecordingSettings()
+                } catch (error) {
+                  console.warn(
+                    'cute-screen Screen Recording settings could not be opened',
+                    error,
+                  )
+                }
+                throw new Error('permissionDenied')
+              }
               throw new Error(`Capture ${outcome.outcome}`)
             } finally {
               signal.removeEventListener('abort', onAbort)
@@ -240,6 +262,7 @@ const contentImageBridge = shallowRef<ContentImageBridge>()
 const clipboardBridge = shallowRef<ClipboardBridge>()
 const systemFonts = shallowRef<readonly SystemFontFace[]>([])
 const canvasViewportHosts = shallowRef<CanvasViewportHosts>()
+const editorFirstFrame = new EditorFirstFrameGate()
 let m08BrowserClipboardText: string | undefined
 let capturedDocumentMount: Promise<boolean> | undefined
 const documentState = shallowRef<ShellDocumentState>({ kind: 'loading' })
@@ -257,6 +280,9 @@ const captureAvailable = computed(() =>
     ? true
     : (platformCapabilities.value?.capture.available ?? false),
 )
+const captureWindowAvailable = computed(
+  () => platformCapabilities.value?.capture.windowTarget ?? false,
+)
 const openImageAvailable = computed(() => '__TAURI_INTERNALS__' in window)
 const captureFallbackCommand = computed(() =>
   m04FallbackHarness
@@ -272,6 +298,10 @@ function correlationId(): string {
 
 function onCanvasViewportHostsReady(hosts: CanvasViewportHosts): void {
   canvasViewportHosts.value = hosts
+}
+
+function onEditorFrameReady(): void {
+  editorFirstFrame.frameReady()
 }
 
 function installM08HarnessFacade(): void {
@@ -336,6 +366,18 @@ async function refreshPlatformCapabilities(): Promise<void> {
       await tauriDesktopBridge.platformCapabilities(correlationId())
   } catch (error) {
     console.warn('cute-screen platform capability probe failed', error)
+  }
+}
+
+async function loadSystemFonts(): Promise<void> {
+  if (import.meta.env.VITE_TEST_HARNESS === 'true') return
+  if (!('__TAURI_INTERNALS__' in window)) return
+  try {
+    const { tauriDesktopBridge } = await import('./desktop-bridge')
+    systemFonts.value =
+      await tauriDesktopBridge.listSystemFonts(correlationId())
+  } catch (error) {
+    console.warn('cute-screen system font catalog failed', error)
   }
 }
 
@@ -722,11 +764,25 @@ async function installLifecycleGuards(): Promise<void> {
         captureProgress.value = undefined
         if (event.payload.outcome !== 'captured') return
         let mounted = false
+        const documentId = event.payload.document?.documentId
+        const waitsForEditorFrame =
+          event.payload.completion === 'editor' && documentId !== undefined
+        const firstFrame = waitsForEditorFrame
+          ? editorFirstFrame.waitForNextFrame()
+          : undefined
         try {
           mounted = await mountCapturedDocument()
+          if (mounted && firstFrame) await firstFrame
+          if (!mounted && firstFrame) {
+            editorFirstFrame.fail(new Error('editor document mount failed'))
+            await firstFrame
+          }
+        } catch (error) {
+          mounted = false
+          editorFirstFrame.fail(error)
+          await firstFrame?.catch(() => undefined)
         } finally {
-          const documentId = event.payload.document?.documentId
-          if (event.payload.completion === 'editor' && documentId) {
+          if (waitsForEditorFrame) {
             await tauriDesktopBridge.quickCaptureEditorMounted(
               documentId,
               mounted,
@@ -779,14 +835,6 @@ onMounted(() => {
       contentImageBridge.value = tauriDesktopBridge
       clipboardBridge.value = tauriDesktopBridge
       installM08HarnessFacade()
-      if (import.meta.env.VITE_TEST_HARNESS !== 'true') {
-        try {
-          systemFonts.value =
-            await tauriDesktopBridge.listSystemFonts(correlationId())
-        } catch (error) {
-          console.warn('cute-screen system font catalog failed', error)
-        }
-      }
     }
     if (m05ReferencePerfHarness) return
     if (m05Harness) {
@@ -802,9 +850,12 @@ onMounted(() => {
     }
     // Do not acknowledge native tray/hotkey preflight until the persisted
     // session, if any, is mounted and can actually be flushed.
-    await loadPersistedDocument()
-    await refreshPlatformCapabilities()
-    await installLifecycleGuards()
+    await runEditorStartup({
+      loadPersistedDocument,
+      loadSystemFonts,
+      refreshPlatformCapabilities,
+      installLifecycleGuards,
+    })
   })()
 })
 
@@ -835,6 +886,7 @@ onBeforeUnmount(() => {
     :document-session="documentSession"
     :actions="desktopActions"
     :capture-available="captureAvailable"
+    :capture-window-available="captureWindowAvailable"
     :open-image-available="openImageAvailable"
     :capture-fallback-command="captureFallbackCommand"
     :capture-progress="captureProgress"
@@ -845,6 +897,7 @@ onBeforeUnmount(() => {
     :clipboard-bridge="clipboardBridge"
     :system-fonts="systemFonts"
     @hosts-ready="onCanvasViewportHostsReady"
+    @frame-ready="onEditorFrameReady"
     @retry-load="loadPersistedDocument"
   />
 </template>

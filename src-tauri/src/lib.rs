@@ -51,6 +51,8 @@ use lifecycle::{LaunchIntentV1, LifecycleState, parse_launch};
 use storage::CreateCaptureRequest;
 use storage::{BlobMetadata, CaptureMetadataV1, LibraryRepository, OpenDocument, RepositoryError};
 
+#[cfg(target_os = "macos")]
+mod macos_platform;
 #[cfg(target_os = "windows")]
 mod windows_platform;
 
@@ -739,9 +741,12 @@ async fn platform_capabilities(correlation_id: String) -> PlatformCapabilities {
     let native_adapter_available = x11_platform::X11CaptureAdapter.available();
     #[cfg(target_os = "windows")]
     let native_adapter_available = windows_platform::WindowsCompositorCaptureAdapter.available();
+    #[cfg(target_os = "macos")]
+    let native_adapter_available = macos_platform::MacosScreenCaptureAdapter.available();
     #[cfg(not(any(
         all(target_os = "linux", feature = "x11-capture"),
-        target_os = "windows"
+        target_os = "windows",
+        target_os = "macos"
     )))]
     let native_adapter_available = false;
     let mut capabilities = PlatformCapabilities::for_session(
@@ -760,6 +765,19 @@ async fn platform_capabilities(correlation_id: String) -> PlatformCapabilities {
         capabilities.cli_fallback_command = lifecycle::current_cli_fallback_command();
     }
     capabilities
+}
+
+#[tauri::command]
+fn open_screen_recording_settings() -> Result<(), PlatformError> {
+    #[cfg(target_os = "macos")]
+    {
+        macos_platform::open_screen_recording_settings()
+    }
+    #[cfg(not(target_os = "macos"))]
+    Err(PlatformError::new(
+        PlatformErrorCode::CaptureFailed,
+        "macos-screen-recording-settings",
+    ))
 }
 
 #[cfg(all(target_os = "linux", feature = "x11-capture"))]
@@ -803,17 +821,57 @@ fn quick_capture_present(
     let window = app
         .get_webview_window("quick-capture")
         .ok_or_else(|| "quick capture window is unavailable".to_owned())?;
+    #[cfg(target_os = "macos")]
+    {
+        macos_platform::fit_quick_capture_to_pointer_screen(&window)?;
+        macos_platform::set_quick_capture_presentation(&window, false)?;
+    }
+    #[cfg(not(target_os = "macos"))]
+    window
+        .set_fullscreen(true)
+        .map_err(|error| error.to_string())?;
     window.show().map_err(|error| error.to_string())?;
+    #[cfg(not(target_os = "macos"))]
+    window.set_focus().map_err(|error| error.to_string())?;
+    Ok(true)
+}
+
+#[tauri::command]
+fn quick_capture_reveal(
+    draft_id: String,
+    app: tauri::AppHandle,
+    controller: State<'_, CaptureController>,
+) -> Result<bool, String> {
+    let active = controller.active_quick_draft();
+    if !quick_capture_draft_matches(
+        active.as_ref().map(|draft| draft.draft_id.as_str()),
+        &draft_id,
+    ) {
+        return Ok(false);
+    }
+    let window = app
+        .get_webview_window("quick-capture")
+        .ok_or_else(|| "quick capture window is unavailable".to_owned())?;
+    #[cfg(target_os = "macos")]
+    {
+        macos_platform::set_quick_capture_presentation(&window, true)?;
+        macos_platform::complete_selector_handoff();
+    }
     window.set_focus().map_err(|error| error.to_string())?;
     Ok(true)
 }
 
 #[tauri::command]
 fn quick_capture_dismiss(app: tauri::AppHandle) -> Result<bool, String> {
+    #[cfg(target_os = "macos")]
+    macos_platform::complete_selector_handoff();
     let Some(window) = app.get_webview_window("quick-capture") else {
         return Ok(false);
     };
     window.hide().map_err(|error| error.to_string())?;
+    window
+        .set_fullscreen(false)
+        .map_err(|error| error.to_string())?;
     Ok(true)
 }
 
@@ -999,6 +1057,7 @@ fn capture_wait_for_editor_unmap(correlation_id: String) -> Result<(), PlatformE
     if current_session() == SessionKind::X11 {
         x11_platform::X11CaptureAdapter.wait_for_current_process_unmapped(&correlation_id)?;
     }
+    let _ = correlation_id;
     Ok(())
 }
 
@@ -1192,6 +1251,7 @@ fn quick_capture_webview_url() -> WebviewUrl {
 struct QuickCaptureWindowPolicy {
     visible: bool,
     focused: bool,
+    fullscreen: bool,
     background_throttling_disabled: bool,
 }
 
@@ -1205,23 +1265,76 @@ const fn quick_capture_window_policy() -> QuickCaptureWindowPolicy {
     QuickCaptureWindowPolicy {
         visible: false,
         focused: false,
+        fullscreen: false,
         background_throttling_disabled: true,
     }
+}
+
+const fn area_quick_capture_supported_for_backend(backend: platform::CaptureBackendKind) -> bool {
+    matches!(
+        backend,
+        platform::CaptureBackendKind::X11
+            | platform::CaptureBackendKind::WaylandPortal
+            | platform::CaptureBackendKind::WindowsDxgi
+            | platform::CaptureBackendKind::MacosScreenCapture
+    )
+}
+
+fn area_quick_capture_supported() -> bool {
+    area_quick_capture_supported_for_backend(platform::select_capture_backend(
+        current_session(),
+        current_session() == SessionKind::Wayland,
+        true,
+    ))
 }
 
 const fn should_ensure_quick_capture_window(
     moment: QuickCapturePrewarmMoment,
     has_active_draft: bool,
+    area_quick_capture_supported: bool,
 ) -> bool {
+    if !area_quick_capture_supported {
+        return false;
+    }
     match moment {
         QuickCapturePrewarmMoment::Startup => true,
         QuickCapturePrewarmMoment::AreaPreflight => !has_active_draft,
     }
 }
 
+/// A hidden non-fullscreen WebView is safe to preload on macOS. Fullscreen is
+/// applied only after the decoded frozen frame is ready for presentation.
+const fn should_prewarm_quick_capture_at_startup(
+    _is_macos: bool,
+    area_quick_capture_supported: bool,
+) -> bool {
+    should_ensure_quick_capture_window(
+        QuickCapturePrewarmMoment::Startup,
+        false,
+        area_quick_capture_supported,
+    )
+}
+
+/// The preloaded macOS WebView stays non-fullscreen and can remain available
+/// throughout native selection without mapping over the frozen desktop.
+const fn should_prewarm_quick_capture_at_area_preflight(
+    _is_macos: bool,
+    has_active_draft: bool,
+    area_quick_capture_supported: bool,
+) -> bool {
+    should_ensure_quick_capture_window(
+        QuickCapturePrewarmMoment::AreaPreflight,
+        has_active_draft,
+        area_quick_capture_supported,
+    )
+}
+
 fn ensure_quick_capture_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("quick-capture") {
         window.hide().map_err(|error| error.to_string())?;
+        window
+            .set_fullscreen(false)
+            .map_err(|error| error.to_string())?;
         return Ok(());
     }
     let policy = quick_capture_window_policy();
@@ -1231,7 +1344,7 @@ fn ensure_quick_capture_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> 
         .decorations(false)
         .always_on_top(true)
         .skip_taskbar(true)
-        .fullscreen(true)
+        .fullscreen(policy.fullscreen)
         .visible(policy.visible)
         .focused(policy.focused)
         .background_color(Color(5, 6, 9, 255))
@@ -1251,6 +1364,7 @@ fn should_hide_editor_for_native_capture(_visible: Option<bool>) -> bool {
     true
 }
 
+#[cfg(all(target_os = "linux", feature = "x11-capture"))]
 fn should_wait_for_native_x11_unmap(source: &CaptureInvocationSource) -> bool {
     *source != CaptureInvocationSource::Ui
 }
@@ -1265,7 +1379,9 @@ fn hide_editor_for_native_capture<R: tauri::Runtime>(
 ) -> Result<bool, PlatformError> {
     #[cfg(target_os = "windows")]
     let native_desktop_capture = true;
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "macos")]
+    let native_desktop_capture = true;
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     let native_desktop_capture = current_session() == SessionKind::X11;
     if !native_desktop_capture {
         return Ok(false);
@@ -1483,12 +1599,32 @@ fn publish_capture_progress<R: tauri::Runtime>(
 }
 
 fn failed_capture(correlation_id: String) -> CaptureOutcomeV1 {
+    terminal_capture(correlation_id, CaptureTerminalOutcome::Failed)
+}
+
+fn terminal_capture(correlation_id: String, outcome: CaptureTerminalOutcome) -> CaptureOutcomeV1 {
     CaptureOutcomeV1 {
         version: 2,
         correlation_id,
-        outcome: CaptureTerminalOutcome::Failed,
+        outcome,
         completion: None,
         document: None,
+    }
+}
+
+fn capture_action_supported(
+    action: capture::CaptureAction,
+    capabilities: &PlatformCapabilities,
+) -> bool {
+    match action {
+        capture::CaptureAction::Area => capabilities.capture.interactive_selector,
+        capture::CaptureAction::Repeat => {
+            capabilities.capture.interactive_selector
+                && capabilities.capture.backend != platform::CaptureBackendKind::MacosScreenCapture
+        }
+        capture::CaptureAction::Screen => capabilities.capture.monitor_target,
+        capture::CaptureAction::Window => capabilities.capture.window_target,
+        capture::CaptureAction::ActiveWindow => capabilities.capture.active_window_target,
     }
 }
 
@@ -1501,10 +1637,17 @@ async fn capture_with_preflight<R: tauri::Runtime>(
         diagnostics.begin(&request);
     }
     publish_capture_progress(app, &request.correlation_id, CaptureProgressState::Probing);
+    let capabilities = platform_capabilities(request.correlation_id.clone()).await;
+    if !capture_action_supported(request.action, &capabilities) {
+        let outcome = terminal_capture(request.correlation_id, CaptureTerminalOutcome::Unavailable);
+        publish_capture_outcome(app, &outcome);
+        return outcome;
+    }
     if request.action == capture::CaptureAction::Area
-        && should_ensure_quick_capture_window(
-            QuickCapturePrewarmMoment::AreaPreflight,
+        && should_prewarm_quick_capture_at_area_preflight(
+            cfg!(target_os = "macos"),
             controller.active_quick_draft().is_some(),
+            area_quick_capture_supported(),
         )
         && let Err(error) = ensure_quick_capture_window(app)
     {
@@ -1781,8 +1924,10 @@ pub fn run() {
             app.manage(QuickSaveTargetService::default());
             app.manage(CaptureDiagnosticsService::default());
 
-            if should_ensure_quick_capture_window(QuickCapturePrewarmMoment::Startup, false)
-                && let Err(error) = ensure_quick_capture_window(app.handle())
+            if should_prewarm_quick_capture_at_startup(
+                cfg!(target_os = "macos"),
+                area_quick_capture_supported(),
+            ) && let Err(error) = ensure_quick_capture_window(app.handle())
             {
                 eprintln!("cute-screen quick capture startup prewarm failed: {error}");
             }
@@ -1842,6 +1987,7 @@ pub fn run() {
         capture_wait_for_editor_unmap,
         quick_capture_get_active,
         quick_capture_present,
+        quick_capture_reveal,
         quick_capture_dismiss,
         quick_capture_commit,
         quick_capture_editor_mounted,
@@ -1856,6 +2002,7 @@ pub fn run() {
         capture_preflight_complete,
         hotkeys_bind,
         platform_capabilities,
+        open_screen_recording_settings,
         get_e2e_harness_query,
         read_image_bytes,
         repository_open_last,
@@ -1887,6 +2034,7 @@ pub fn run() {
         capture_wait_for_editor_unmap,
         quick_capture_get_active,
         quick_capture_present,
+        quick_capture_reveal,
         quick_capture_dismiss,
         quick_capture_commit,
         quick_capture_editor_mounted,
@@ -1901,6 +2049,7 @@ pub fn run() {
         capture_preflight_complete,
         hotkeys_bind,
         platform_capabilities,
+        open_screen_recording_settings,
         read_image_bytes,
         repository_open_last,
         repository_list_active_series_frames,
@@ -2023,6 +2172,7 @@ mod tests {
 
         assert!(!policy.visible);
         assert!(!policy.focused);
+        assert!(!policy.fullscreen);
         assert!(policy.background_throttling_disabled);
     }
 
@@ -2033,6 +2183,7 @@ mod tests {
         assert!(super::should_hide_editor_for_native_capture(Some(false)));
     }
 
+    #[cfg(all(target_os = "linux", feature = "x11-capture"))]
     #[test]
     fn non_ui_ingress_waits_for_the_x11_editor_to_finish_unmapping() {
         use crate::capture::CaptureInvocationSource;
@@ -2056,14 +2207,71 @@ mod tests {
         assert!(super::should_ensure_quick_capture_window(
             super::QuickCapturePrewarmMoment::Startup,
             false,
+            true,
         ));
         assert!(super::should_ensure_quick_capture_window(
             super::QuickCapturePrewarmMoment::AreaPreflight,
             false,
+            true,
         ));
         assert!(!super::should_ensure_quick_capture_window(
             super::QuickCapturePrewarmMoment::AreaPreflight,
             true,
+            true,
+        ));
+    }
+
+    #[test]
+    fn macos_area_backend_preloads_a_nonfullscreen_quick_capture_window() {
+        assert!(super::should_prewarm_quick_capture_at_startup(true, true));
+        assert!(super::should_prewarm_quick_capture_at_startup(false, true));
+        assert!(super::should_prewarm_quick_capture_at_area_preflight(
+            true, false, true,
+        ));
+        assert!(super::should_prewarm_quick_capture_at_area_preflight(
+            false, false, true,
+        ));
+        assert!(super::area_quick_capture_supported_for_backend(
+            crate::platform::CaptureBackendKind::MacosScreenCapture
+        ));
+        assert!(super::area_quick_capture_supported_for_backend(
+            crate::platform::CaptureBackendKind::WindowsDxgi
+        ));
+        assert!(super::area_quick_capture_supported_for_backend(
+            crate::platform::CaptureBackendKind::X11
+        ));
+        assert!(super::area_quick_capture_supported_for_backend(
+            crate::platform::CaptureBackendKind::WaylandPortal
+        ));
+    }
+
+    #[test]
+    fn capture_action_gate_follows_advertised_macos_capabilities() {
+        let capabilities = crate::platform::PlatformCapabilities::for_session(
+            "macos-gate".to_owned(),
+            crate::platform::SessionKind::Macos,
+            None,
+            Some(true),
+        );
+        assert!(super::capture_action_supported(
+            crate::capture::CaptureAction::Area,
+            &capabilities
+        ));
+        assert!(super::capture_action_supported(
+            crate::capture::CaptureAction::Window,
+            &capabilities
+        ));
+        assert!(super::capture_action_supported(
+            crate::capture::CaptureAction::Screen,
+            &capabilities
+        ));
+        assert!(!super::capture_action_supported(
+            crate::capture::CaptureAction::ActiveWindow,
+            &capabilities
+        ));
+        assert!(!super::capture_action_supported(
+            crate::capture::CaptureAction::Repeat,
+            &capabilities
         ));
     }
 

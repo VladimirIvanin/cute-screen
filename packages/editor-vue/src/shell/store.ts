@@ -32,6 +32,13 @@ export class ActionCancelledError extends Error {
   }
 }
 
+function actionErrorMessage(error: unknown, locale: SupportedLocale): string {
+  if (error instanceof Error && error.message === 'permissionDenied') {
+    return t(locale, 'captureScreenRecordingDenied')
+  }
+  return error instanceof Error ? error.message : String(error)
+}
+
 export const useEditorShellStore = defineStore(
   'cute-screen-editor-shell',
   () => {
@@ -210,11 +217,12 @@ export const useEditorShellStore = defineStore(
     function setCaptureProgress(progress: CaptureProgressState): void {
       if (
         actionState.value.status === 'pending' &&
-        actionState.value.action === 'capture'
+        (actionState.value.action === 'capture' ||
+          actionState.value.action === 'captureWindow')
       ) {
         actionState.value = {
           status: 'pending',
-          action: 'capture',
+          action: actionState.value.action,
           captureProgress: progress,
         }
       }
@@ -223,7 +231,7 @@ export const useEditorShellStore = defineStore(
     async function runAction(action: AsyncActionName): Promise<void> {
       if (!options?.actions) {
         const key =
-          action === 'capture'
+          action === 'capture' || action === 'captureWindow'
             ? 'captureUnavailable'
             : action === 'openImage'
               ? 'openImageUnavailable'
@@ -241,14 +249,16 @@ export const useEditorShellStore = defineStore(
       const actionController = new AbortController()
       controller = actionController
       actionState.value =
-        action === 'capture'
+        action === 'capture' || action === 'captureWindow'
           ? { status: 'pending', action, captureProgress: 'probing' }
           : { status: 'pending', action }
       try {
         const message = await options.actions.run(
           action,
           actionController.signal,
-          action === 'capture' ? setCaptureProgress : undefined,
+          action === 'capture' || action === 'captureWindow'
+            ? setCaptureProgress
+            : undefined,
         )
         actionState.value = { status: 'success', action, message }
       } catch (error) {
@@ -269,7 +279,7 @@ export const useEditorShellStore = defineStore(
         actionState.value = {
           status: 'error',
           action,
-          message: error instanceof Error ? error.message : String(error),
+          message: actionErrorMessage(error, locale.value),
         }
       } finally {
         if (controller === actionController) controller = undefined

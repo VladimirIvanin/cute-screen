@@ -60,6 +60,7 @@ export interface PresentQuickCaptureLayoutOptions<
   T,
 > extends StableQuickCaptureLayoutOptions<T> {
   readonly present: () => Promise<boolean>
+  readonly reveal?: () => Promise<void>
 }
 
 export interface PresentedQuickCaptureLayout<T> {
@@ -104,6 +105,7 @@ export async function presentThenWaitForStableQuickCaptureLayout<T>(
   const presented = await options.present()
   if (!presented) return { presented: false }
   const layout = await waitForStableQuickCaptureLayout(options)
+  if (layout !== undefined) await options.reveal?.()
   return { presented: true, layout }
 }
 

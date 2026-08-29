@@ -10,6 +10,29 @@ interface PackageManifest {
 }
 
 describe('Tauri build boundary', () => {
+  it('keeps shipped chrome CSS parseable by the oldest target WebView', async () => {
+    const cssSources = await Promise.all(
+      [
+        path.join('packages', 'editor-vue', 'src', 'shell', 'shell.css'),
+        path.join('apps', 'desktop', 'src', 'styles.css'),
+      ].map(async (relativePath) => ({
+        relativePath,
+        source: await readFile(path.join(process.cwd(), relativePath), 'utf8'),
+      })),
+    )
+
+    for (const { relativePath, source } of cssSources) {
+      expect(source, relativePath).not.toContain('color-mix(')
+      expect(source, relativePath).not.toMatch(/rgb\([^,)]*\s\/\s[^)]*\)/)
+
+      const unprefixedBlurCount =
+        source.match(/(?<!-)backdrop-filter:/g)?.length ?? 0
+      const prefixedBlurCount =
+        source.match(/-webkit-backdrop-filter:/g)?.length ?? 0
+      expect(prefixedBlurCount, relativePath).toBe(unprefixedBlurCount)
+    }
+  })
+
   it('builds frontendDist before compiling the custom protocol feature', async () => {
     const root = process.cwd()
     const manifest = JSON.parse(
@@ -99,5 +122,28 @@ describe('Tauri build boundary', () => {
     expect(x11Source).not.toContain('.function(GX::XOR)')
     expect(x11Source).toContain('.background_pixmap(frozen_pixmap)')
     expect(x11Source).toContain('restore_selector_visual(')
+  })
+
+  it('keeps the accepted macOS Area selector visible until quick chrome reveals', async () => {
+    const bridgeSource = await readFile(
+      path.join(process.cwd(), 'src-tauri', 'src', 'macos_capture_bridge.m'),
+      'utf8',
+    )
+    const platformSource = await readFile(
+      path.join(process.cwd(), 'src-tauri', 'src', 'macos_platform.rs'),
+      'utf8',
+    )
+    const hostSource = await readFile(
+      path.join(process.cwd(), 'src-tauri', 'src', 'lib.rs'),
+      'utf8',
+    )
+
+    expect(bridgeSource).toContain('cute_selector_complete_handoff')
+    expect(bridgeSource).toContain('CuteRetainAreaSelectorHandoff')
+    expect(platformSource).toContain('complete_selector_handoff')
+    expect(hostSource).toContain('macos_platform::complete_selector_handoff()')
+    expect(hostSource).toMatch(
+      /fn quick_capture_dismiss[\s\S]*macos_platform::complete_selector_handoff\(\)/,
+    )
   })
 })

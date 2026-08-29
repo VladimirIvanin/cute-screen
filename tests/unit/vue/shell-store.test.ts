@@ -125,6 +125,28 @@ describe('M04 capture action feedback', () => {
     })
   })
 
+  it('maps Screen Recording denial to retryable capture copy', async () => {
+    const store = useEditorShellStore(createEditorShellPinia())
+    store.initialize({
+      preferences: { load: () => undefined, save: () => undefined },
+      languages: ['en'],
+      systemDark: () => false,
+      actions: {
+        run: async () => {
+          throw new Error('permissionDenied')
+        },
+      },
+    })
+
+    await store.runAction('capture')
+
+    expect(store.actionState).toEqual({
+      status: 'error',
+      action: 'capture',
+      message: 'Allow Screen Recording in System Settings, then retry Capture.',
+    })
+  })
+
   it('keeps Open image cancellation distinct from an error', async () => {
     const store = useEditorShellStore(createEditorShellPinia())
     store.initialize({

@@ -16,6 +16,7 @@ const props = withDefaults(
     saveError?: string | undefined
     pending?: boolean
     captureAvailable?: boolean
+    captureWindowAvailable?: boolean
     captureUnavailableReason?: string | undefined
     openImageAvailable?: boolean
     t: (key: Parameters<typeof import('../i18n').t>[1]) => string
@@ -25,12 +26,15 @@ const props = withDefaults(
     saveError: undefined,
     pending: false,
     captureAvailable: true,
+    captureWindowAvailable: false,
     captureUnavailableReason: undefined,
     openImageAvailable: false,
   },
 )
 const emit = defineEmits<{
-  action: [name: 'capture' | 'openImage' | 'copy' | 'export']
+  action: [
+    name: 'capture' | 'captureWindow' | 'openImage' | 'copy' | 'export',
+  ]
   undo: []
   redo: []
   retrySave: []
@@ -87,6 +91,21 @@ function selectLocale(value: SupportedLocale): void {
           </NButton>
         </template>
         {{ t('undo') }}
+      </NTooltip>
+      <NTooltip v-if="captureWindowAvailable">
+        <template #trigger>
+          <NButton
+            secondary
+            class="cs-button cs-button-quiet"
+            :disabled="disabled"
+            :aria-label="t('captureWindow')"
+            :title="t('captureWindow')"
+            @click="emit('action', 'captureWindow')"
+          >
+            <UiIcon name="camera" /><span>{{ t('captureWindow') }}</span>
+          </NButton>
+        </template>
+        {{ t('captureWindow') }}
       </NTooltip>
       <NTooltip>
         <template #trigger>

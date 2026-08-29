@@ -772,7 +772,30 @@ impl CaptureController {
                 )),
             }
         };
-        #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+        #[cfg(target_os = "macos")]
+        let result = {
+            let target = request.action.target();
+            let correlation_id = request.correlation_id.clone();
+            let transport = Arc::clone(&self.transport);
+            let cancel_signal = Arc::clone(&self.cancel_signal);
+            match tokio::task::spawn_blocking(move || {
+                crate::macos_platform::MacosScreenCaptureAdapter.capture_to_transport(
+                    target,
+                    &correlation_id,
+                    transport,
+                    cancel_signal,
+                )
+            })
+            .await
+            {
+                Ok(result) => result,
+                Err(_) => Err(crate::platform::PlatformError::new(
+                    PlatformErrorCode::CaptureFailed,
+                    &request.correlation_id,
+                )),
+            }
+        };
+        #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
         let result: Result<CaptureResult, crate::platform::PlatformError> =
             Err(crate::platform::PlatformError::new(
                 PlatformErrorCode::PortalUnavailable,
@@ -991,6 +1014,8 @@ fn fake_capture_frame(
 fn capture_backend_metadata_name() -> &'static str {
     if cfg!(target_os = "windows") {
         "windowsDxgi"
+    } else if cfg!(target_os = "macos") {
+        "macosScreenCapture"
     } else if cfg!(target_os = "linux")
         && std::env::var("XDG_SESSION_TYPE")
             .is_ok_and(|session| session.eq_ignore_ascii_case("x11"))
@@ -1396,6 +1421,12 @@ mod tests {
                 "result": "unsupported",
             }))
         );
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_capture_metadata_names_the_native_backend() {
+        assert_eq!(super::capture_backend_metadata_name(), "macosScreenCapture");
     }
 
     #[test]

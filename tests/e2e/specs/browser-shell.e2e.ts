@@ -55,7 +55,7 @@ describe('M02 editor shell in browser mode', () => {
     )
   })
 
-  it('keeps capture, copy and export reachable without horizontal overflow at 1024 px', async () => {
+  it('keeps capture, copy and export reachable without overflow at 1024 px', async () => {
     await browser.setWindowSize(1024, 700)
     await openShell('ready')
 
@@ -64,6 +64,64 @@ describe('M02 editor shell in browser mode', () => {
         () => document.documentElement.scrollWidth <= window.innerWidth,
       ),
     ).toBe(true)
+    expect(
+      await browser.execute(() => {
+        const app = document.querySelector('#app')
+        const provider = document.querySelector('.n-config-provider')
+        const workbench = document.querySelector('.cs-workbench')
+        const rail = document.querySelector('.cs-toolrail')
+        const zoom = document.querySelector('.cs-zoom-controls')
+        const film = document.querySelector('.cs-filmstrip')
+        if (
+          !(app instanceof HTMLElement) ||
+          !(provider instanceof HTMLElement) ||
+          !(workbench instanceof HTMLElement)
+        ) {
+          throw new Error('Missing app, config provider or workbench')
+        }
+        if (!(rail instanceof HTMLElement) || !(zoom instanceof HTMLElement)) {
+          throw new Error('Missing bottom chrome')
+        }
+        const overlap = (a: DOMRect, b: DOMRect) =>
+          a.left < b.right - 1 &&
+          b.left < a.right - 1 &&
+          a.top < b.bottom - 1 &&
+          b.top < a.bottom - 1
+        const within = (box: DOMRect) =>
+          box.left >= -1 &&
+          box.right <= window.innerWidth + 1 &&
+          box.top >= -1 &&
+          box.bottom <= window.innerHeight + 1
+        const appBox = app.getBoundingClientRect()
+        const providerBox = provider.getBoundingClientRect()
+        const workbenchBox = workbench.getBoundingClientRect()
+        const railBox = rail.getBoundingClientRect()
+        const zoomBox = zoom.getBoundingClientRect()
+        const filmBox =
+          film instanceof HTMLElement ? film.getBoundingClientRect() : null
+        return {
+          providerFillsApp:
+            providerBox.height > 0 &&
+            Math.abs(providerBox.height - appBox.height) <= 1,
+          workbenchWithinApp: workbenchBox.height <= appBox.height + 1,
+          railWithin: within(railBox),
+          zoomWithin: within(zoomBox),
+          filmWithin: filmBox ? within(filmBox) : true,
+          railZoomOverlap: overlap(railBox, zoomBox),
+          railFilmOverlap: filmBox ? overlap(railBox, filmBox) : false,
+          filmZoomOverlap: filmBox ? overlap(filmBox, zoomBox) : false,
+        }
+      }),
+    ).toEqual({
+      providerFillsApp: true,
+      workbenchWithinApp: true,
+      railWithin: true,
+      zoomWithin: true,
+      filmWithin: true,
+      railZoomOverlap: false,
+      railFilmOverlap: false,
+      filmZoomOverlap: false,
+    })
     await expect($('button[aria-label="Capture"]')).toBeEnabled()
     await expect($('button[aria-label="Copy"]')).toBeEnabled()
     await expect($('button[aria-label="Export"]')).toBeEnabled()
