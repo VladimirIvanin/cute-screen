@@ -31,6 +31,7 @@ import {
 import { writeResultCanvasToClipboard } from './result-clipboard'
 import { dispatchNativeCapture } from './capture-request'
 import { runEditorStartup } from './editor-startup'
+import { EditorFirstFrameGate } from './editor-first-frame'
 
 declare global {
   interface Window {
@@ -261,6 +262,7 @@ const contentImageBridge = shallowRef<ContentImageBridge>()
 const clipboardBridge = shallowRef<ClipboardBridge>()
 const systemFonts = shallowRef<readonly SystemFontFace[]>([])
 const canvasViewportHosts = shallowRef<CanvasViewportHosts>()
+const editorFirstFrame = new EditorFirstFrameGate()
 let m08BrowserClipboardText: string | undefined
 let capturedDocumentMount: Promise<boolean> | undefined
 const documentState = shallowRef<ShellDocumentState>({ kind: 'loading' })
@@ -296,6 +298,10 @@ function correlationId(): string {
 
 function onCanvasViewportHostsReady(hosts: CanvasViewportHosts): void {
   canvasViewportHosts.value = hosts
+}
+
+function onEditorFrameReady(): void {
+  editorFirstFrame.frameReady()
 }
 
 function installM08HarnessFacade(): void {
@@ -758,11 +764,25 @@ async function installLifecycleGuards(): Promise<void> {
         captureProgress.value = undefined
         if (event.payload.outcome !== 'captured') return
         let mounted = false
+        const documentId = event.payload.document?.documentId
+        const waitsForEditorFrame =
+          event.payload.completion === 'editor' && documentId !== undefined
+        const firstFrame = waitsForEditorFrame
+          ? editorFirstFrame.waitForNextFrame()
+          : undefined
         try {
           mounted = await mountCapturedDocument()
+          if (mounted && firstFrame) await firstFrame
+          if (!mounted && firstFrame) {
+            editorFirstFrame.fail(new Error('editor document mount failed'))
+            await firstFrame
+          }
+        } catch (error) {
+          mounted = false
+          editorFirstFrame.fail(error)
+          await firstFrame?.catch(() => undefined)
         } finally {
-          const documentId = event.payload.document?.documentId
-          if (event.payload.completion === 'editor' && documentId) {
+          if (waitsForEditorFrame) {
             await tauriDesktopBridge.quickCaptureEditorMounted(
               documentId,
               mounted,
@@ -877,6 +897,7 @@ onBeforeUnmount(() => {
     :clipboard-bridge="clipboardBridge"
     :system-fonts="systemFonts"
     @hosts-ready="onCanvasViewportHostsReady"
+    @frame-ready="onEditorFrameReady"
     @retry-load="loadPersistedDocument"
   />
 </template>

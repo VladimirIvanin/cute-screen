@@ -108,6 +108,12 @@ UI получает `CaptureCapabilities` и не показывает непо�
 - Локальный macOS 12.7.6 x64 startup smoke (2026-08-29) подтвердил только
   Screen-only поведение существующего среза и отсутствие prewarmed
   `quick-capture` окна; он не подтверждает новую Area/Window архитектуру.
+- macOS Area follow-up (2026-08-29) исправляет два code-level дефекта,
+  обнаруженных по первому визуальному кадру: AppKit menu-bar constraint для
+  borderless selector и преждевременный reveal hidden WKWebView до готового
+  composited chrome. Frontend 15/15, native bridge 16/16 и boundary 15/15
+  прошли; runtime visual status остаётся pending до перезапуска локального
+  `tauri dev` и проверки полного menu bar плюс первого видимого quick-frame.
 - Intel и Apple Silicon делят один versioned adapter. Compile evidence идёт
   через CI `macos-15` / `macos-15-intel`; runtime support Area/Window не
   заявляется до реальных decoded-pixel smokes на ветках 12.0–12.2, 12.3–13 и

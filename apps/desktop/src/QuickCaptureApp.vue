@@ -221,6 +221,14 @@ async function presentPreparedDraft(draftId: string): Promise<void> {
     if (draft.value?.draftId !== draftId) return
     const presentation = await presentThenWaitForStableQuickCaptureLayout({
       present: () => tauriDesktopBridge.quickCapturePresent(draftId),
+      reveal: async () => {
+        quickLayoutReady.value = true
+        await nextTick()
+        await nextLayoutFrame()
+        if (!(await tauriDesktopBridge.quickCaptureReveal(draftId))) {
+          throw new Error('Quick capture draft is no longer active')
+        }
+      },
       measure: () => updateQuickLayout(),
       nextFrame: nextLayoutFrame,
     })
@@ -228,11 +236,8 @@ async function presentPreparedDraft(draftId: string): Promise<void> {
     if (!presentation.presented) {
       throw new Error('Quick capture draft is no longer active')
     }
-    quickLayoutReady.value = true
-    if (!presentation.layout && documentState.value.kind !== 'error') {
-      error.value = russian
-        ? 'Не удалось точно расположить панели; используется безопасная раскладка.'
-        : 'Chrome could not be positioned precisely; using the safe layout.'
+    if (!presentation.layout) {
+      throw new Error('Quick capture chrome did not reach a stable layout')
     }
     presentedDraftId = draftId
   } finally {

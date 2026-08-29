@@ -822,12 +822,38 @@ fn quick_capture_present(
         .get_webview_window("quick-capture")
         .ok_or_else(|| "quick capture window is unavailable".to_owned())?;
     #[cfg(target_os = "macos")]
-    fit_quick_capture_to_pointer_monitor(&window)?;
+    {
+        macos_platform::fit_quick_capture_to_pointer_screen(&window)?;
+        macos_platform::set_quick_capture_presentation(&window, false)?;
+    }
     #[cfg(not(target_os = "macos"))]
     window
         .set_fullscreen(true)
         .map_err(|error| error.to_string())?;
     window.show().map_err(|error| error.to_string())?;
+    #[cfg(not(target_os = "macos"))]
+    window.set_focus().map_err(|error| error.to_string())?;
+    Ok(true)
+}
+
+#[tauri::command]
+fn quick_capture_reveal(
+    draft_id: String,
+    app: tauri::AppHandle,
+    controller: State<'_, CaptureController>,
+) -> Result<bool, String> {
+    let active = controller.active_quick_draft();
+    if !quick_capture_draft_matches(
+        active.as_ref().map(|draft| draft.draft_id.as_str()),
+        &draft_id,
+    ) {
+        return Ok(false);
+    }
+    let window = app
+        .get_webview_window("quick-capture")
+        .ok_or_else(|| "quick capture window is unavailable".to_owned())?;
+    #[cfg(target_os = "macos")]
+    macos_platform::set_quick_capture_presentation(&window, true)?;
     window.set_focus().map_err(|error| error.to_string())?;
     Ok(true)
 }
@@ -1325,36 +1351,6 @@ fn ensure_quick_capture_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> 
 
 fn quick_capture_draft_matches(active_draft_id: Option<&str>, requested_draft_id: &str) -> bool {
     active_draft_id == Some(requested_draft_id)
-}
-
-#[cfg(target_os = "macos")]
-fn fit_quick_capture_to_pointer_monitor<R: tauri::Runtime>(
-    window: &tauri::WebviewWindow<R>,
-) -> Result<(), String> {
-    let cursor = window
-        .cursor_position()
-        .map_err(|error| error.to_string())?;
-    let monitors = window
-        .available_monitors()
-        .map_err(|error| error.to_string())?;
-    let monitor = monitors
-        .into_iter()
-        .find(|monitor| {
-            let position = monitor.position();
-            let size = monitor.size();
-            cursor.x >= f64::from(position.x)
-                && cursor.y >= f64::from(position.y)
-                && cursor.x < f64::from(position.x) + f64::from(size.width)
-                && cursor.y < f64::from(position.y) + f64::from(size.height)
-        })
-        .ok_or_else(|| "pointer monitor is unavailable".to_owned())?;
-    window
-        .set_position(*monitor.position())
-        .map_err(|error| error.to_string())?;
-    window
-        .set_size(*monitor.size())
-        .map_err(|error| error.to_string())?;
-    Ok(())
 }
 
 /// Native GTK/X11 visibility reports can be stale while the WebView is mapped.
@@ -1986,6 +1982,7 @@ pub fn run() {
         capture_wait_for_editor_unmap,
         quick_capture_get_active,
         quick_capture_present,
+        quick_capture_reveal,
         quick_capture_dismiss,
         quick_capture_commit,
         quick_capture_editor_mounted,
@@ -2032,6 +2029,7 @@ pub fn run() {
         capture_wait_for_editor_unmap,
         quick_capture_get_active,
         quick_capture_present,
+        quick_capture_reveal,
         quick_capture_dismiss,
         quick_capture_commit,
         quick_capture_editor_mounted,

@@ -65,6 +65,17 @@ click, Shift+Tab or other focus event. Capture and Open image stayed
 available; the hidden `quick-capture` window was not created. This is A01
 startup/empty evidence only, not a Screen `supported` claim.
 
+macOS quick-presentation follow-up (2026-08-29): the photographed duplicate
+menu bar identifies AppKit window-frame constraining, not missing captured
+pixels: the live menu bar remained above a selector whose frozen image already
+contained another menu bar. The selector window now overrides that constraint
+and retains the complete `NSScreen.frame`. Quick capture now maps its real
+WKWebView at 1% opacity with pointer input disabled, waits for stable canvas and
+chrome frames, and only then reveals and focuses the window. Focused frontend
+tests passed 15/15, macOS bridge tests passed 16/16 and boundary tests passed
+15/15. The already-running `tauri dev` process predates the rebuilt binary, so
+a restarted visual Area smoke remains required and is not claimed here.
+
 ## A02 — Hotkey capture из скрытого приложения
 
 M04 partial evidence: local Ubuntu/GNOME X11 `screen` and frozen `area` capture

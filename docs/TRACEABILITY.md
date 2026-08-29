@@ -442,3 +442,38 @@ Save As, JPEG/WebP encoding, clipboard, or complete stitch orchestration.
 | Requirements                          | Required contract evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Required runtime evidence                                                                                                                                                                                                                                                                                                                                          | Status                                                                                                                                                                                                                                                                                                                                                                            |
 | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `REQ-CAP-001/003/008/009/012/013/014` | Native AppKit selector contract; macOS 12.0 availability checks; CoreGraphics fallback routing for 12.0–12.2; ScreenCaptureKit routing to `SCStream` on 12.3–13 and `SCScreenshotManager` plus the system window picker on 14+; frozen multi-display Area quick draft; direct Window document creation; selector window frame equals each `NSScreen.frame`; frozen preview fills that frame via AppKit `NSImage` without a CTM flip; flipped-view top-left maps to the top-left of the frozen image. | Real macOS 12.0–12.2, 12.3–13 and 14+ smokes on Intel/Apple Silicon: permission grant/deny, cancel, Retina and mixed-scale multi-display bounds, decoded pixels, selector exclusion, Area quick-mode cleanup/materialization and Window direct document mount. Overlay orientation/fill must be re-smoked on the owner Intel laptop after the preview-draw repair. | implemented in code (2026-08-29): `macos_capture_pixel_backend` / `macos_window_picker_kind` units, AppKit selector + Area full-frame/Window crop contracts, capability advertisement and `pnpm smoke:m04:macos:{screen,area,window}`. Selector fill/orientation contracts are in `macos_platform.rs`. Runtime grant/deny, decoded-pixel and mixed-scale evidence remain pending. |
+
+## Quick capture → editor first-frame readiness gate (2026-08-29)
+
+For `REQ-CAP-010` and `REQ-QLT-003`, a red-first frontend lifecycle test requires
+quick-capture mount acknowledgement to remain pending after document decode and
+mount, resolving only after the editor renderer reports its first completed
+frame. Timeout and render failure remain distinguishable from success. This
+gates presentation of the already-resident main WebView; it does not claim GPU
+backend startup, native capture latency or platform support. Status:
+implemented; the focused test passed after the expected red-first failure.
+
+## macOS selector coverage and composited quick-presentation gate (2026-08-29)
+
+For `REQ-CAP-001/008/010/012/013` and `REQ-QLT-003`, native contract tests must
+prove that the borderless selector refuses AppKit's menu-bar-constrained window
+frame and retains the complete `NSScreen.frame`. A frontend lifecycle test must
+also prove a two-phase quick-window presentation: map the real WKWebView while
+transparent and pointer-inert, wait for two equal complete layout frames, then
+reveal and focus it. Missing stable geometry must remain a visible failure and
+must never reveal an intermediate compositor surface. Runtime verification on
+the owner macOS 12 machine remains required. Status: implemented in code;
+focused frontend and native Objective-C bridge tests passed after the expected
+red-first failures.
+
+The first restarted visual smoke showed a separate quick-window defect: after
+the native selector closed, Tauri positioned the frameless WKWebView against
+macOS `visibleFrame`, leaving the live menu bar exposed. The quick window must
+instead use the pointer monitor's complete `NSScreen.frame` and a level above
+the menu bar before its transparent mapped warmup begins.
+
+The notification plugin injects a permission-state probe into every WebView,
+including quick-capture. Its capability grants only
+`notification:allow-is-permission-granted`; notification sending, permission
+requests and the broad notification default remain unavailable to the capture
+window. The capability boundary test enforces this least-privilege contract.

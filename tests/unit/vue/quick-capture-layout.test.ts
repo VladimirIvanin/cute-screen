@@ -32,10 +32,29 @@ describe('quick capture overlay layout', () => {
       nextFrame: async () => {
         order.push('frame')
       },
+      reveal: async () => {
+        order.push('reveal')
+      },
     })
 
     expect(result).toEqual({ presented: true, layout: 'visible-layout' })
     expect(order[0]).toBe('present')
+    expect(order.at(-1)).toBe('reveal')
+    expect(order.indexOf('reveal')).toBeGreaterThan(order.lastIndexOf('frame'))
+  })
+
+  it('never reveals a mapped surface without stable complete geometry', async () => {
+    const reveal = vi.fn()
+    const result = await presentThenWaitForStableQuickCaptureLayout({
+      present: async () => true,
+      measure: () => undefined,
+      nextFrame: async () => undefined,
+      reveal,
+      maximumFrames: 2,
+    })
+
+    expect(result).toEqual({ presented: true })
+    expect(reveal).not.toHaveBeenCalled()
   })
 
   it('waits for two matching layout frames before native presentation', async () => {

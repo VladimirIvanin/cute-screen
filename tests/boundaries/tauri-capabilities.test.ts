@@ -38,6 +38,14 @@ describe('production Tauri capability boundary', () => {
 
     expect(config.app?.security?.capabilities).toContain('quick-capture')
     expect(capability.windows).toContain('quick-capture')
+    expect(permissionIdentifiers).toContain(
+      'notification:allow-is-permission-granted',
+    )
+    expect(permissionIdentifiers).not.toContain('notification:default')
+    expect(permissionIdentifiers).not.toContain('notification:allow-notify')
+    expect(permissionIdentifiers).not.toContain(
+      'notification:allow-request-permission',
+    )
     expect(permissionIdentifiers).not.toContain('core:window:allow-close')
     expect(defaultCapability.windows).not.toContain('quick-capture')
   })

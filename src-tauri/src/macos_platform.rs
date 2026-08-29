@@ -54,6 +54,33 @@ unsafe extern "C" {
         result: *mut NativeCaptureSelection,
     ) -> c_int;
     fn cute_macos_pixel_backend() -> c_int;
+    fn cute_quick_capture_set_presentation(window: *mut std::ffi::c_void, revealed: bool);
+    fn cute_quick_capture_fit_pointer_screen(window: *mut std::ffi::c_void) -> bool;
+}
+
+pub fn set_quick_capture_presentation<R: tauri::Runtime>(
+    window: &tauri::WebviewWindow<R>,
+    revealed: bool,
+) -> Result<(), String> {
+    let native = window.ns_window().map_err(|error| error.to_string())?;
+    // SAFETY: Tauri owns this NSWindow for the lifetime of `window`; the
+    // Objective-C bridge performs the mutation synchronously on AppKit's main
+    // queue and does not retain the pointer.
+    unsafe { cute_quick_capture_set_presentation(native, revealed) };
+    Ok(())
+}
+
+pub fn fit_quick_capture_to_pointer_screen<R: tauri::Runtime>(
+    window: &tauri::WebviewWindow<R>,
+) -> Result<(), String> {
+    let native = window.ns_window().map_err(|error| error.to_string())?;
+    // SAFETY: the bridge synchronously resolves and applies an NSScreen frame
+    // on AppKit's main queue without retaining the Tauri-owned NSWindow.
+    if unsafe { cute_quick_capture_fit_pointer_screen(native) } {
+        Ok(())
+    } else {
+        Err("pointer monitor is unavailable".to_owned())
+    }
 }
 
 #[cfg(test)]
@@ -69,6 +96,7 @@ struct CuteRect {
 #[cfg(test)]
 unsafe extern "C" {
     fn cute_selector_window_frame(screen_frame: CuteRect) -> CuteRect;
+    fn cute_selector_constrained_frame(proposed: CuteRect, screen_frame: CuteRect) -> CuteRect;
     fn cute_selector_draws_with_flipped_ctm() -> bool;
     fn cute_selector_image_rect_for_screen(
         screen: CuteRect,
@@ -618,6 +646,16 @@ mod tests {
     fn selector_window_uses_the_full_screen_frame() {
         let screen = rect(0.0, 0.0, 1440.0, 900.0);
         let frame = unsafe { super::cute_selector_window_frame(screen) };
+        assert_eq!(frame, screen);
+    }
+
+    #[test]
+    fn selector_refuses_the_appkit_menu_bar_constraint() {
+        let screen = rect(0.0, 0.0, 1440.0, 900.0);
+        let constrained_below_menu = rect(0.0, 0.0, 1440.0, 875.0);
+        let frame = unsafe {
+            super::cute_selector_constrained_frame(constrained_below_menu, screen)
+        };
         assert_eq!(frame, screen);
     }
 

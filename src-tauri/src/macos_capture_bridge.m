@@ -41,6 +41,70 @@ static CuteRect CuteRectFromCGRect(CGRect rect) {
 
 CuteRect cute_selector_window_frame(CuteRect screen_frame) { return screen_frame; }
 
+CuteRect cute_selector_constrained_frame(CuteRect proposed, CuteRect screen_frame) {
+  (void)proposed;
+  return screen_frame;
+}
+
+void cute_quick_capture_set_presentation(void *windowPointer, bool revealed) {
+  if (windowPointer == NULL) {
+    return;
+  }
+  void (^apply)(void) = ^{
+    NSWindow *window = (__bridge NSWindow *)windowPointer;
+    window.ignoresMouseEvents = !revealed;
+    // A fully transparent NSWindow may be classified as occluded, allowing
+    // WKWebView/CoreAnimation to postpone the first composited surface. Keep a
+    // practically invisible 1% mapped veil until the frontend has committed
+    // stable canvas and chrome frames.
+    window.alphaValue = revealed ? 1.0 : 0.01;
+    if (revealed) {
+      [window makeKeyAndOrderFront:nil];
+    }
+  };
+  if (NSThread.isMainThread) {
+    apply();
+  } else {
+    dispatch_sync(dispatch_get_main_queue(), apply);
+  }
+}
+
+bool cute_quick_capture_fit_pointer_screen(void *windowPointer) {
+  if (windowPointer == NULL) {
+    return false;
+  }
+  __block BOOL fitted = NO;
+  void (^apply)(void) = ^{
+    NSPoint pointer = NSEvent.mouseLocation;
+    NSScreen *target = nil;
+    for (NSScreen *screen in NSScreen.screens) {
+      if (NSPointInRect(pointer, screen.frame)) {
+        target = screen;
+        break;
+      }
+    }
+    if (target == nil) {
+      target = NSScreen.mainScreen ?: NSScreen.screens.firstObject;
+    }
+    if (target == nil) {
+      return;
+    }
+    NSWindow *window = (__bridge NSWindow *)windowPointer;
+    window.level = NSScreenSaverWindowLevel;
+    window.collectionBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces |
+                                NSWindowCollectionBehaviorFullScreenAuxiliary |
+                                NSWindowCollectionBehaviorStationary;
+    [window setFrame:target.frame display:NO animate:NO];
+    fitted = NSEqualRects(window.frame, target.frame);
+  };
+  if (NSThread.isMainThread) {
+    apply();
+  } else {
+    dispatch_sync(dispatch_get_main_queue(), apply);
+  }
+  return fitted;
+}
+
 bool cute_selector_draws_with_flipped_ctm(void) { return false; }
 
 CuteRect cute_selector_image_rect_for_screen(CuteRect screen, CuteRect desktop,
@@ -72,6 +136,7 @@ CuteRect cute_selector_view_rect_for_window_bounds(CuteRect window_bounds,
 }
 
 @interface CuteCaptureWindow : NSWindow
+@property(nonatomic) NSRect captureScreenFrame;
 @end
 
 @implementation CuteCaptureWindow
@@ -80,6 +145,13 @@ CuteRect cute_selector_view_rect_for_window_bounds(CuteRect window_bounds,
 }
 - (BOOL)canBecomeMainWindow {
   return YES;
+}
+- (NSRect)constrainFrameRect:(NSRect)frameRect toScreen:(NSScreen *)screen {
+  if (!NSIsEmptyRect(self.captureScreenFrame)) {
+    return CuteRectToCGRect(cute_selector_constrained_frame(
+        CuteRectFromCGRect(frameRect), CuteRectFromCGRect(self.captureScreenFrame)));
+  }
+  return frameRect;
 }
 @end
 
@@ -330,6 +402,7 @@ static NSWindow *CuteMakeOverlayWindow(NSScreen *screen, CuteCaptureView **outVi
                                              backing:NSBackingStoreBuffered
                                                defer:NO
                                               screen:screen];
+  window.captureScreenFrame = windowFrame;
   [window setFrame:windowFrame display:NO];
   window.level = NSScreenSaverWindowLevel;
   window.opaque = YES;
