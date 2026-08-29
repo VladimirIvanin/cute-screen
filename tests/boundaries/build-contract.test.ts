@@ -123,4 +123,27 @@ describe('Tauri build boundary', () => {
     expect(x11Source).toContain('.background_pixmap(frozen_pixmap)')
     expect(x11Source).toContain('restore_selector_visual(')
   })
+
+  it('keeps the accepted macOS Area selector visible until quick chrome reveals', async () => {
+    const bridgeSource = await readFile(
+      path.join(process.cwd(), 'src-tauri', 'src', 'macos_capture_bridge.m'),
+      'utf8',
+    )
+    const platformSource = await readFile(
+      path.join(process.cwd(), 'src-tauri', 'src', 'macos_platform.rs'),
+      'utf8',
+    )
+    const hostSource = await readFile(
+      path.join(process.cwd(), 'src-tauri', 'src', 'lib.rs'),
+      'utf8',
+    )
+
+    expect(bridgeSource).toContain('cute_selector_complete_handoff')
+    expect(bridgeSource).toContain('CuteRetainAreaSelectorHandoff')
+    expect(platformSource).toContain('complete_selector_handoff')
+    expect(hostSource).toContain('macos_platform::complete_selector_handoff()')
+    expect(hostSource).toMatch(
+      /fn quick_capture_dismiss[\s\S]*macos_platform::complete_selector_handoff\(\)/,
+    )
+  })
 })

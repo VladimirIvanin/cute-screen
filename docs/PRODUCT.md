@@ -60,7 +60,10 @@ Cute Screen — полноценный local-first редактор снимко
   во время drag показывает пунктирную рамку и читаемый размер. Escape отменяет
   selector без создания draft. Отпускание primary pointer после валидного
   первого drag немедленно подтверждает selector и открывает quick-capture
-  draft; `Enter` остаётся только keyboard-маршрутом подтверждения.
+  draft; `Enter` остаётся только keyboard-маршрутом подтверждения. Frozen frame,
+  затемнение и выбранная рамка остаются непрерывно видимыми до первого готового
+  кадра quick editor: между selector и редактированием запрещены пустой кадр,
+  исчезновение overlay и повторное появление рамки.
 - `REQ-CAP-013` — Windows/X11/macOS Area quick-mode показывает frozen desktop
   в исходных physical coordinates. Wayland сохраняет системный XDG selector,
   показывает возвращённый portal fragment на нейтральном фоне и не разрешает

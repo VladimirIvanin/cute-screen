@@ -14,6 +14,11 @@ Foundation harness не создаёт отдельного продуктово
 
 ## Linux startup, dialog and quick-capture repair gate (2026-08-24)
 
+Дополнение `REQ-CAP-012` (2026-08-29): `build-contract.test.ts` требует, чтобы
+принятый macOS Area selector оставался видимым handoff-слоем до явного
+подтверждения первого готового кадра quick WebView. Runtime-проверка отсутствия
+пустого кадра на mouse-up остаётся обязательной.
+
 Эта таблица зафиксирована до реализации пользовательских воспроизведений на
 Ubuntu 24.04 / GNOME 46 / X11. Unit/component evidence не заменяет реальный
 WebKitGTK/X11 smoke.

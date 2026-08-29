@@ -56,6 +56,23 @@ unsafe extern "C" {
     fn cute_macos_pixel_backend() -> c_int;
     fn cute_quick_capture_set_presentation(window: *mut std::ffi::c_void, revealed: bool);
     fn cute_quick_capture_fit_pointer_screen(window: *mut std::ffi::c_void) -> bool;
+    fn cute_selector_complete_handoff();
+}
+
+pub fn complete_selector_handoff() {
+    // SAFETY: the bridge synchronously closes only selector windows retained
+    // for the Area-to-quick-editor visual handoff.
+    unsafe { cute_selector_complete_handoff() };
+}
+
+struct SelectorHandoffFailureGuard(bool);
+
+impl Drop for SelectorHandoffFailureGuard {
+    fn drop(&mut self) {
+        if self.0 {
+            complete_selector_handoff();
+        }
+    }
 }
 
 pub fn set_quick_capture_presentation<R: tauri::Runtime>(
@@ -251,6 +268,7 @@ fn capture_interactive_target(
             return Err(error);
         }
     }
+    let mut handoff_failure = SelectorHandoffFailureGuard(target == CaptureTarget::Area);
     if selection.width == 0
         || selection.height == 0
         || selection.frame_width == 0
@@ -273,7 +291,7 @@ fn capture_interactive_target(
         height,
         correlation_id,
     )?;
-    Ok(CaptureResult {
+    let result = CaptureResult {
         image_token,
         correlation_id: correlation_id.to_owned(),
         width,
@@ -281,7 +299,9 @@ fn capture_interactive_target(
         geometry: Some(geometry),
         quick_frame_geometry,
         cursor_included: Some(false),
-    })
+    };
+    handoff_failure.0 = false;
+    Ok(result)
 }
 
 fn geometry_from_native_selection(

@@ -853,13 +853,18 @@ fn quick_capture_reveal(
         .get_webview_window("quick-capture")
         .ok_or_else(|| "quick capture window is unavailable".to_owned())?;
     #[cfg(target_os = "macos")]
-    macos_platform::set_quick_capture_presentation(&window, true)?;
+    {
+        macos_platform::set_quick_capture_presentation(&window, true)?;
+        macos_platform::complete_selector_handoff();
+    }
     window.set_focus().map_err(|error| error.to_string())?;
     Ok(true)
 }
 
 #[tauri::command]
 fn quick_capture_dismiss(app: tauri::AppHandle) -> Result<bool, String> {
+    #[cfg(target_os = "macos")]
+    macos_platform::complete_selector_handoff();
     let Some(window) = app.get_webview_window("quick-capture") else {
         return Ok(false);
     };

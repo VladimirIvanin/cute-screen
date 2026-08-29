@@ -462,8 +462,11 @@ remain pending.
 2. До drag проверить стабильную непрозрачную закруглённую подсказку
    «Выделите область» с иконкой камеры; во время drag — пунктирную рамку и
    читаемый dimension badge без мерцания. Escape на этом этапе отменяет capture.
-3. После selector проверить frameless surface, dimension badge, полный набор
-   quick annotation tools и action bar Editor/Copy/Save/Close.
+3. На mouse-up frozen frame, затемнение и рамка не исчезают ни на один кадр;
+   панели редактора добавляются к той же визуальной сцене без пустого кадра или
+   повторного появления overlay. После handoff проверить frameless surface,
+   dimension badge, полный набор quick annotation tools и action bar
+   Editor/Copy/Save/Close.
 4. Создать аннотацию, затем move/resize рамку: annotation остаётся над теми же
    pixels frozen desktop, crop clip изменяется, undo/redo возвращает рамку.
 5. Close/Escape до commit не оставляет capture, document, series frame или

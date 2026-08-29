@@ -26,6 +26,47 @@ typedef NS_ENUM(NSInteger, CuteCaptureMode) {
   CuteCaptureModeWindow = 2,
 };
 
+static NSArray<NSWindow *> *CuteAreaSelectorHandoffWindows = nil;
+
+static void CuteCloseAreaSelectorHandoff(void) {
+  NSArray<NSWindow *> *windows = CuteAreaSelectorHandoffWindows;
+  CuteAreaSelectorHandoffWindows = nil;
+  for (NSWindow *window in windows) {
+    [window orderOut:nil];
+    [window close];
+  }
+}
+
+static void CuteRetainAreaSelectorHandoff(NSArray<NSWindow *> *windows) {
+  CuteCloseAreaSelectorHandoff();
+  CuteAreaSelectorHandoffWindows = [windows copy];
+  for (NSWindow *window in CuteAreaSelectorHandoffWindows) {
+    window.ignoresMouseEvents = YES;
+  }
+}
+
+void cute_selector_complete_handoff(void) {
+  void (^complete)(void) = ^{
+    NSArray<NSWindow *> *windows = CuteAreaSelectorHandoffWindows;
+    CuteAreaSelectorHandoffWindows = nil;
+    // `makeKeyAndOrderFront:` commits the new WebView asynchronously through
+    // CoreAnimation. Retain the accepted selector for two display intervals so
+    // the compositor always has an opaque predecessor during that commit.
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 34 * NSEC_PER_MSEC),
+                   dispatch_get_main_queue(), ^{
+      for (NSWindow *window in windows) {
+        [window orderOut:nil];
+        [window close];
+      }
+    });
+  };
+  if (NSThread.isMainThread) {
+    complete();
+  } else {
+    dispatch_sync(dispatch_get_main_queue(), complete);
+  }
+}
+
 static CuteRect CuteRectMake(double x, double y, double width, double height) {
   CuteRect rect = {x, y, width, height};
   return rect;
@@ -442,6 +483,8 @@ static int32_t CuteRunSelection(CuteCaptureMode mode, const char *outputPath,
     return 1;
   }
 
+  cute_selector_complete_handoff();
+
   CGRect quartzBounds = CuteActiveDisplayBounds();
   if (CGRectIsNull(quartzBounds) || CGRectIsEmpty(quartzBounds)) {
     result->status = 3;
@@ -518,13 +561,21 @@ static int32_t CuteRunSelection(CuteCaptureMode mode, const char *outputPath,
         }
       }
     }
-    for (NSWindow *window in overlayWindows) {
-      [window orderOut:nil];
-      [window close];
+    if (!cancelled && finishedView != nil && mode == CuteCaptureModeArea) {
+      // Keep the exact accepted frozen frame and selection above the desktop.
+      // The ready quick WebView is ordered over it and explicitly completes
+      // this handoff after its canvas and chrome have composited.
+      CuteRetainAreaSelectorHandoff(overlayWindows);
+    } else {
+      for (NSWindow *window in overlayWindows) {
+        [window orderOut:nil];
+        [window close];
+      }
     }
   });
 
   if (cancelled || NSIsEmptyRect(selected)) {
+    cute_selector_complete_handoff();
     if (selectedFrozen != NULL) {
       CGImageRelease(selectedFrozen);
     }
@@ -533,6 +584,7 @@ static int32_t CuteRunSelection(CuteCaptureMode mode, const char *outputPath,
   }
 
   if (selectedFrozen == NULL) {
+    cute_selector_complete_handoff();
     result->status = 3;
     return 3;
   }
@@ -544,6 +596,7 @@ static int32_t CuteRunSelection(CuteCaptureMode mode, const char *outputPath,
   CGRect clamped = CGRectIntersection(CuteRectToCGRect(pixelSelection),
                                       CGRectMake(0, 0, imageWidth, imageHeight));
   if (CGRectIsEmpty(clamped)) {
+    cute_selector_complete_handoff();
     CGImageRelease(selectedFrozen);
     result->status = 3;
     return 3;
@@ -553,6 +606,7 @@ static int32_t CuteRunSelection(CuteCaptureMode mode, const char *outputPath,
   if (mode == CuteCaptureModeWindow) {
     output = CGImageCreateWithImageInRect(selectedFrozen, clamped);
     if (output == NULL) {
+      cute_selector_complete_handoff();
       CGImageRelease(selectedFrozen);
       result->status = 3;
       return 3;
@@ -563,6 +617,7 @@ static int32_t CuteRunSelection(CuteCaptureMode mode, const char *outputPath,
     CGImageRelease(output);
   }
   if (!written) {
+    cute_selector_complete_handoff();
     CGImageRelease(selectedFrozen);
     result->status = 3;
     return 3;
