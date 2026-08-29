@@ -821,6 +821,12 @@ fn quick_capture_present(
     let window = app
         .get_webview_window("quick-capture")
         .ok_or_else(|| "quick capture window is unavailable".to_owned())?;
+    #[cfg(target_os = "macos")]
+    fit_quick_capture_to_pointer_monitor(&window)?;
+    #[cfg(not(target_os = "macos"))]
+    window
+        .set_fullscreen(true)
+        .map_err(|error| error.to_string())?;
     window.show().map_err(|error| error.to_string())?;
     window.set_focus().map_err(|error| error.to_string())?;
     Ok(true)
@@ -832,6 +838,9 @@ fn quick_capture_dismiss(app: tauri::AppHandle) -> Result<bool, String> {
         return Ok(false);
     };
     window.hide().map_err(|error| error.to_string())?;
+    window
+        .set_fullscreen(false)
+        .map_err(|error| error.to_string())?;
     Ok(true)
 }
 
@@ -1211,6 +1220,7 @@ fn quick_capture_webview_url() -> WebviewUrl {
 struct QuickCaptureWindowPolicy {
     visible: bool,
     focused: bool,
+    fullscreen: bool,
     background_throttling_disabled: bool,
 }
 
@@ -1224,6 +1234,7 @@ const fn quick_capture_window_policy() -> QuickCaptureWindowPolicy {
     QuickCaptureWindowPolicy {
         visible: false,
         focused: false,
+        fullscreen: false,
         background_throttling_disabled: true,
     }
 }
@@ -1260,41 +1271,39 @@ const fn should_ensure_quick_capture_window(
     }
 }
 
-/// A fullscreen hidden WebView can be mapped by AppKit while Tauri applies the
-/// fullscreen collection state. Create it lazily during Area preflight on
-/// macOS so an idle quick-capture shell can never replace the main editor at
-/// launch.
+/// A hidden non-fullscreen WebView is safe to preload on macOS. Fullscreen is
+/// applied only after the decoded frozen frame is ready for presentation.
 const fn should_prewarm_quick_capture_at_startup(
-    is_macos: bool,
+    _is_macos: bool,
     area_quick_capture_supported: bool,
 ) -> bool {
-    !is_macos
-        && should_ensure_quick_capture_window(
-            QuickCapturePrewarmMoment::Startup,
-            false,
-            area_quick_capture_supported,
-        )
+    should_ensure_quick_capture_window(
+        QuickCapturePrewarmMoment::Startup,
+        false,
+        area_quick_capture_supported,
+    )
 }
 
-/// AppKit may map a fullscreen WebView while applying its collection state,
-/// even when Tauri creates it with `visible(false)`. On macOS the native
-/// selector must therefore finish before the quick-capture window exists.
+/// The preloaded macOS WebView stays non-fullscreen and can remain available
+/// throughout native selection without mapping over the frozen desktop.
 const fn should_prewarm_quick_capture_at_area_preflight(
-    is_macos: bool,
+    _is_macos: bool,
     has_active_draft: bool,
     area_quick_capture_supported: bool,
 ) -> bool {
-    !is_macos
-        && should_ensure_quick_capture_window(
-            QuickCapturePrewarmMoment::AreaPreflight,
-            has_active_draft,
-            area_quick_capture_supported,
-        )
+    should_ensure_quick_capture_window(
+        QuickCapturePrewarmMoment::AreaPreflight,
+        has_active_draft,
+        area_quick_capture_supported,
+    )
 }
 
 fn ensure_quick_capture_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("quick-capture") {
         window.hide().map_err(|error| error.to_string())?;
+        window
+            .set_fullscreen(false)
+            .map_err(|error| error.to_string())?;
         return Ok(());
     }
     let policy = quick_capture_window_policy();
@@ -1304,7 +1313,7 @@ fn ensure_quick_capture_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> 
         .decorations(false)
         .always_on_top(true)
         .skip_taskbar(true)
-        .fullscreen(true)
+        .fullscreen(policy.fullscreen)
         .visible(policy.visible)
         .focused(policy.focused)
         .background_color(Color(5, 6, 9, 255))
@@ -1316,6 +1325,36 @@ fn ensure_quick_capture_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> 
 
 fn quick_capture_draft_matches(active_draft_id: Option<&str>, requested_draft_id: &str) -> bool {
     active_draft_id == Some(requested_draft_id)
+}
+
+#[cfg(target_os = "macos")]
+fn fit_quick_capture_to_pointer_monitor<R: tauri::Runtime>(
+    window: &tauri::WebviewWindow<R>,
+) -> Result<(), String> {
+    let cursor = window
+        .cursor_position()
+        .map_err(|error| error.to_string())?;
+    let monitors = window
+        .available_monitors()
+        .map_err(|error| error.to_string())?;
+    let monitor = monitors
+        .into_iter()
+        .find(|monitor| {
+            let position = monitor.position();
+            let size = monitor.size();
+            cursor.x >= f64::from(position.x)
+                && cursor.y >= f64::from(position.y)
+                && cursor.x < f64::from(position.x) + f64::from(size.width)
+                && cursor.y < f64::from(position.y) + f64::from(size.height)
+        })
+        .ok_or_else(|| "pointer monitor is unavailable".to_owned())?;
+    window
+        .set_position(*monitor.position())
+        .map_err(|error| error.to_string())?;
+    window
+        .set_size(*monitor.size())
+        .map_err(|error| error.to_string())?;
+    Ok(())
 }
 
 /// Native GTK/X11 visibility reports can be stale while the WebView is mapped.
@@ -1593,7 +1632,6 @@ async fn capture_with_preflight<R: tauri::Runtime>(
     controller: &CaptureController,
     request: CaptureRequestV1,
 ) -> CaptureOutcomeV1 {
-    let is_macos_area = cfg!(target_os = "macos") && request.action == capture::CaptureAction::Area;
     if let Some(diagnostics) = app.try_state::<CaptureDiagnosticsService>() {
         diagnostics.begin(&request);
     }
@@ -1640,21 +1678,6 @@ async fn capture_with_preflight<R: tauri::Runtime>(
                 publish_capture_progress(&progress_app, &progress_correlation_id, state);
             })
             .await;
-        if outcome.outcome == CaptureTerminalOutcome::Captured
-            && is_macos_area
-            && let Err(error) = ensure_quick_capture_window(app)
-        {
-            eprintln!("cute-screen quick capture post-capture creation failed: {error}");
-            if let Some(draft) = controller.active_quick_draft() {
-                let _ = controller.cancel_quick_draft(&draft.draft_id);
-            }
-            let outcome = failed_capture(outcome.correlation_id);
-            publish_capture_outcome(app, &outcome);
-            if restore_editor {
-                show_editor(app);
-            }
-            return outcome;
-        }
         publish_capture_outcome(app, &outcome);
         if outcome.outcome != CaptureTerminalOutcome::Captured && restore_editor {
             show_editor(app);
@@ -1707,21 +1730,6 @@ async fn capture_with_preflight<R: tauri::Runtime>(
             publish_capture_progress(&progress_app, &progress_correlation_id, state);
         })
         .await;
-    if outcome.outcome == CaptureTerminalOutcome::Captured
-        && is_macos_area
-        && let Err(error) = ensure_quick_capture_window(app)
-    {
-        eprintln!("cute-screen quick capture post-capture creation failed: {error}");
-        if let Some(draft) = controller.active_quick_draft() {
-            let _ = controller.cancel_quick_draft(&draft.draft_id);
-        }
-        let outcome = failed_capture(outcome.correlation_id);
-        publish_capture_outcome(app, &outcome);
-        if restore_editor {
-            show_editor(app);
-        }
-        return outcome;
-    }
     publish_capture_outcome(app, &outcome);
     if outcome.outcome != CaptureTerminalOutcome::Captured && restore_editor {
         show_editor(app);
@@ -2161,6 +2169,7 @@ mod tests {
 
         assert!(!policy.visible);
         assert!(!policy.focused);
+        assert!(!policy.fullscreen);
         assert!(policy.background_throttling_disabled);
     }
 
@@ -2210,10 +2219,10 @@ mod tests {
     }
 
     #[test]
-    fn macos_area_backend_creates_quick_capture_only_after_native_selection() {
-        assert!(!super::should_prewarm_quick_capture_at_startup(true, true));
+    fn macos_area_backend_preloads_a_nonfullscreen_quick_capture_window() {
+        assert!(super::should_prewarm_quick_capture_at_startup(true, true));
         assert!(super::should_prewarm_quick_capture_at_startup(false, true));
-        assert!(!super::should_prewarm_quick_capture_at_area_preflight(
+        assert!(super::should_prewarm_quick_capture_at_area_preflight(
             true, false, true,
         ));
         assert!(super::should_prewarm_quick_capture_at_area_preflight(
