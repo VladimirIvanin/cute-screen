@@ -1260,6 +1260,38 @@ const fn should_ensure_quick_capture_window(
     }
 }
 
+/// A fullscreen hidden WebView can be mapped by AppKit while Tauri applies the
+/// fullscreen collection state. Create it lazily during Area preflight on
+/// macOS so an idle quick-capture shell can never replace the main editor at
+/// launch.
+const fn should_prewarm_quick_capture_at_startup(
+    is_macos: bool,
+    area_quick_capture_supported: bool,
+) -> bool {
+    !is_macos
+        && should_ensure_quick_capture_window(
+            QuickCapturePrewarmMoment::Startup,
+            false,
+            area_quick_capture_supported,
+        )
+}
+
+/// AppKit may map a fullscreen WebView while applying its collection state,
+/// even when Tauri creates it with `visible(false)`. On macOS the native
+/// selector must therefore finish before the quick-capture window exists.
+const fn should_prewarm_quick_capture_at_area_preflight(
+    is_macos: bool,
+    has_active_draft: bool,
+    area_quick_capture_supported: bool,
+) -> bool {
+    !is_macos
+        && should_ensure_quick_capture_window(
+            QuickCapturePrewarmMoment::AreaPreflight,
+            has_active_draft,
+            area_quick_capture_supported,
+        )
+}
+
 fn ensure_quick_capture_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("quick-capture") {
         window.hide().map_err(|error| error.to_string())?;
@@ -1561,6 +1593,7 @@ async fn capture_with_preflight<R: tauri::Runtime>(
     controller: &CaptureController,
     request: CaptureRequestV1,
 ) -> CaptureOutcomeV1 {
+    let is_macos_area = cfg!(target_os = "macos") && request.action == capture::CaptureAction::Area;
     if let Some(diagnostics) = app.try_state::<CaptureDiagnosticsService>() {
         diagnostics.begin(&request);
     }
@@ -1572,8 +1605,8 @@ async fn capture_with_preflight<R: tauri::Runtime>(
         return outcome;
     }
     if request.action == capture::CaptureAction::Area
-        && should_ensure_quick_capture_window(
-            QuickCapturePrewarmMoment::AreaPreflight,
+        && should_prewarm_quick_capture_at_area_preflight(
+            cfg!(target_os = "macos"),
             controller.active_quick_draft().is_some(),
             area_quick_capture_supported(),
         )
@@ -1607,6 +1640,21 @@ async fn capture_with_preflight<R: tauri::Runtime>(
                 publish_capture_progress(&progress_app, &progress_correlation_id, state);
             })
             .await;
+        if outcome.outcome == CaptureTerminalOutcome::Captured
+            && is_macos_area
+            && let Err(error) = ensure_quick_capture_window(app)
+        {
+            eprintln!("cute-screen quick capture post-capture creation failed: {error}");
+            if let Some(draft) = controller.active_quick_draft() {
+                let _ = controller.cancel_quick_draft(&draft.draft_id);
+            }
+            let outcome = failed_capture(outcome.correlation_id);
+            publish_capture_outcome(app, &outcome);
+            if restore_editor {
+                show_editor(app);
+            }
+            return outcome;
+        }
         publish_capture_outcome(app, &outcome);
         if outcome.outcome != CaptureTerminalOutcome::Captured && restore_editor {
             show_editor(app);
@@ -1659,6 +1707,21 @@ async fn capture_with_preflight<R: tauri::Runtime>(
             publish_capture_progress(&progress_app, &progress_correlation_id, state);
         })
         .await;
+    if outcome.outcome == CaptureTerminalOutcome::Captured
+        && is_macos_area
+        && let Err(error) = ensure_quick_capture_window(app)
+    {
+        eprintln!("cute-screen quick capture post-capture creation failed: {error}");
+        if let Some(draft) = controller.active_quick_draft() {
+            let _ = controller.cancel_quick_draft(&draft.draft_id);
+        }
+        let outcome = failed_capture(outcome.correlation_id);
+        publish_capture_outcome(app, &outcome);
+        if restore_editor {
+            show_editor(app);
+        }
+        return outcome;
+    }
     publish_capture_outcome(app, &outcome);
     if outcome.outcome != CaptureTerminalOutcome::Captured && restore_editor {
         show_editor(app);
@@ -1852,9 +1915,8 @@ pub fn run() {
             app.manage(QuickSaveTargetService::default());
             app.manage(CaptureDiagnosticsService::default());
 
-            if should_ensure_quick_capture_window(
-                QuickCapturePrewarmMoment::Startup,
-                false,
+            if should_prewarm_quick_capture_at_startup(
+                cfg!(target_os = "macos"),
                 area_quick_capture_supported(),
             ) && let Err(error) = ensure_quick_capture_window(app.handle())
             {
@@ -2148,16 +2210,14 @@ mod tests {
     }
 
     #[test]
-    fn macos_area_backend_prewarms_quick_capture() {
-        assert!(super::should_ensure_quick_capture_window(
-            super::QuickCapturePrewarmMoment::Startup,
-            false,
-            true,
+    fn macos_area_backend_creates_quick_capture_only_after_native_selection() {
+        assert!(!super::should_prewarm_quick_capture_at_startup(true, true));
+        assert!(super::should_prewarm_quick_capture_at_startup(false, true));
+        assert!(!super::should_prewarm_quick_capture_at_area_preflight(
+            true, false, true,
         ));
-        assert!(super::should_ensure_quick_capture_window(
-            super::QuickCapturePrewarmMoment::AreaPreflight,
-            false,
-            true,
+        assert!(super::should_prewarm_quick_capture_at_area_preflight(
+            false, false, true,
         ));
         assert!(super::area_quick_capture_supported_for_backend(
             crate::platform::CaptureBackendKind::MacosScreenCapture

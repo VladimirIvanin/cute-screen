@@ -635,12 +635,12 @@ mod tests {
     }
 
     #[test]
-    fn selector_image_rect_keeps_top_left_for_a_lower_display() {
+    fn selector_image_rect_is_local_to_each_frozen_display() {
         let desktop = rect(0.0, -900.0, 1440.0, 1800.0);
         let lower = rect(0.0, -900.0, 1440.0, 900.0);
         let image =
             unsafe { super::cute_selector_image_rect_for_screen(lower, desktop, 2880, 3600) };
-        assert_eq!(image, rect(0.0, 1800.0, 2880.0, 1800.0));
+        assert_eq!(image, rect(0.0, 0.0, 2880.0, 3600.0));
     }
 
     #[test]

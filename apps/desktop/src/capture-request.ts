@@ -14,9 +14,9 @@ interface NativeCaptureDispatchOptions<T> {
 
 /**
  * The X11 server must observe the main window's unmap before its frozen frame
- * is acquired. macOS hides the editor before the native snapshot so the host
- * window is not in the Screen Recording frame. Keeping this await in the
- * UI-to-native boundary prevents the shell from racing native capture.
+ * is acquired. The macOS Rust lifecycle owns hide/restore around its native
+ * selector; duplicating that transition here briefly remaps the editor between
+ * the selector and quick mode.
  */
 export async function dispatchNativeCapture<T>({
   session,
@@ -24,9 +24,7 @@ export async function dispatchNativeCapture<T>({
   waitForMainWindowUnmap,
   capture,
 }: NativeCaptureDispatchOptions<T>): Promise<T> {
-  if (session === 'macos') {
-    return runHiddenNativeCapture(mainWindow, () => mainWindow.hide(), capture)
-  }
+  if (session === 'macos') return capture()
   if (session !== 'x11') return capture()
   return runHiddenNativeCapture(
     mainWindow,

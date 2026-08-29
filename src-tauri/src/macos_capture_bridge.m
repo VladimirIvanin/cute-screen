@@ -45,13 +45,9 @@ bool cute_selector_draws_with_flipped_ctm(void) { return false; }
 
 CuteRect cute_selector_image_rect_for_screen(CuteRect screen, CuteRect desktop,
                                              uint32_t image_width, uint32_t image_height) {
-  double desktop_width = desktop.width > 0.0 ? desktop.width : 1.0;
-  double desktop_height = desktop.height > 0.0 ? desktop.height : 1.0;
-  double top_from_desktop_top = (desktop.y + desktop.height) - (screen.y + screen.height);
-  return CuteRectMake(floor((screen.x - desktop.x) / desktop_width * (double)image_width),
-                      floor(top_from_desktop_top / desktop_height * (double)image_height),
-                      ceil(screen.width / desktop_width * (double)image_width),
-                      ceil(screen.height / desktop_height * (double)image_height));
+  (void)screen;
+  (void)desktop;
+  return CuteRectMake(0.0, 0.0, (double)image_width, (double)image_height);
 }
 
 CuteRect cute_selector_pixels_from_view_rect(CuteRect selected, double view_width,
@@ -313,9 +309,17 @@ static BOOL CuteWritePng(CGImageRef image, NSString *path) {
   return written;
 }
 
+static CGImageRef CuteCreateDisplayImage(NSScreen *screen) {
+  NSNumber *screenNumber = screen.deviceDescription[@"NSScreenNumber"];
+  if (screenNumber == nil) {
+    return NULL;
+  }
+  return CGDisplayCreateImage((CGDirectDisplayID)screenNumber.unsignedIntValue);
+}
+
 static NSWindow *CuteMakeOverlayWindow(NSScreen *screen, CuteCaptureView **outView,
                                        CuteCaptureMode mode, CGImageRef frozen,
-                                       CuteRect desktopFrame, CuteRect mainScreenFrame,
+                                       CuteRect mainScreenFrame,
                                        NSArray<NSDictionary *> *windows, size_t imageWidth,
                                        size_t imageHeight) {
   CuteRect screenFrame = cute_selector_window_frame(CuteRectFromCGRect(screen.frame));
@@ -344,15 +348,9 @@ static NSWindow *CuteMakeOverlayWindow(NSScreen *screen, CuteCaptureView **outVi
   captureView.mode = mode;
   captureView.screenFrame = screenFrame;
   captureView.mainScreenFrame = mainScreenFrame;
-  captureView.imageRect = cute_selector_image_rect_for_screen(screenFrame, desktopFrame,
+  captureView.imageRect = cute_selector_image_rect_for_screen(screenFrame, screenFrame,
                                                               (uint32_t)imageWidth, (uint32_t)imageHeight);
-  CGRect sliceBounds = CGRectIntersection(CuteRectToCGRect(captureView.imageRect),
-                                          CGRectMake(0, 0, (CGFloat)imageWidth, (CGFloat)imageHeight));
-  CGImageRef slice = CGImageCreateWithImageInRect(frozen, sliceBounds);
-  captureView.frozenImage = slice != NULL ? slice : frozen;
-  if (slice != NULL) {
-    CGImageRelease(slice);
-  }
+  captureView.frozenImage = frozen;
   captureView.windows = mode == CuteCaptureModeWindow ? windows : @[];
   window.contentView = captureView;
   *outView = captureView;
@@ -376,16 +374,10 @@ static int32_t CuteRunSelection(CuteCaptureMode mode, const char *outputPath,
     result->status = 3;
     return 3;
   }
-  CGImageRef frozen =
-      CGWindowListCreateImage(CGRectNull, kCGWindowListOptionOnScreenOnly, kCGNullWindowID,
-                              kCGWindowImageBestResolution | kCGWindowImageShouldBeOpaque);
-  if (frozen == NULL) {
-    result->status = 2;
-    return 2;
-  }
 
   __block BOOL cancelled = NO;
   __block NSRect selected = NSZeroRect;
+  __block CGImageRef selectedFrozen = NULL;
   __block CuteRect selectedImageRect = {0};
   __block CGFloat selectedViewWidth = 1.0;
   __block CGFloat selectedViewHeight = 1.0;
@@ -396,26 +388,31 @@ static int32_t CuteRunSelection(CuteCaptureMode mode, const char *outputPath,
       cancelled = YES;
       return;
     }
-    CuteRect desktopFrame = CuteRectFromCGRect(screens.firstObject.frame);
-    for (NSScreen *screen in screens) {
-      desktopFrame =
-          CuteRectFromCGRect(NSUnionRect(CuteRectToCGRect(desktopFrame), screen.frame));
-    }
     NSScreen *mainScreen = NSScreen.mainScreen ?: screens.firstObject;
     CuteRect mainScreenFrame = CuteRectFromCGRect(mainScreen.frame);
     NSArray<NSDictionary *> *windowCandidates =
         mode == CuteCaptureModeWindow ? CuteWindowCandidates() : @[];
-    size_t imageWidth = CGImageGetWidth(frozen);
-    size_t imageHeight = CGImageGetHeight(frozen);
     NSMutableArray<NSWindow *> *overlayWindows = [NSMutableArray array];
     NSMutableArray<CuteCaptureView *> *views = [NSMutableArray array];
     for (NSScreen *screen in screens) {
+      CGImageRef displayImage = CuteCreateDisplayImage(screen);
+      if (displayImage == NULL) {
+        cancelled = YES;
+        break;
+      }
+      size_t imageWidth = CGImageGetWidth(displayImage);
+      size_t imageHeight = CGImageGetHeight(displayImage);
       CuteCaptureView *view = nil;
-      NSWindow *window = CuteMakeOverlayWindow(screen, &view, mode, frozen, desktopFrame,
+      NSWindow *window = CuteMakeOverlayWindow(screen, &view, mode, displayImage,
                                                mainScreenFrame, windowCandidates, imageWidth,
                                                imageHeight);
+      CGImageRelease(displayImage);
       [overlayWindows addObject:window];
       [views addObject:view];
+    }
+    for (NSUInteger index = 0; index < overlayWindows.count; index++) {
+      NSWindow *window = overlayWindows[index];
+      CuteCaptureView *view = views[index];
       [window makeKeyAndOrderFront:nil];
       [window makeFirstResponder:view];
       [window invalidateCursorRectsForView:view];
@@ -440,6 +437,7 @@ static int32_t CuteRunSelection(CuteCaptureMode mode, const char *outputPath,
           finishedView = view;
           cancelled = view.cancelled;
           selected = view.selection;
+          selectedFrozen = CGImageRetain(view.frozenImage);
           selectedImageRect = view.imageRect;
           selectedViewWidth = MAX(NSWidth(view.bounds), 1.0);
           selectedViewHeight = MAX(NSHeight(view.bounds), 1.0);
@@ -454,29 +452,35 @@ static int32_t CuteRunSelection(CuteCaptureMode mode, const char *outputPath,
   });
 
   if (cancelled || NSIsEmptyRect(selected)) {
-    CGImageRelease(frozen);
+    if (selectedFrozen != NULL) {
+      CGImageRelease(selectedFrozen);
+    }
     result->status = 1;
     return 1;
   }
 
-  size_t imageWidth = CGImageGetWidth(frozen);
-  size_t imageHeight = CGImageGetHeight(frozen);
+  if (selectedFrozen == NULL) {
+    result->status = 3;
+    return 3;
+  }
+  size_t imageWidth = CGImageGetWidth(selectedFrozen);
+  size_t imageHeight = CGImageGetHeight(selectedFrozen);
   CuteRect pixelSelection = cute_selector_pixels_from_view_rect(
       CuteRectFromCGRect(NSRectToCGRect(selected)), selectedViewWidth, selectedViewHeight,
       selectedImageRect);
   CGRect clamped = CGRectIntersection(CuteRectToCGRect(pixelSelection),
                                       CGRectMake(0, 0, imageWidth, imageHeight));
   if (CGRectIsEmpty(clamped)) {
-    CGImageRelease(frozen);
+    CGImageRelease(selectedFrozen);
     result->status = 3;
     return 3;
   }
 
-  CGImageRef output = frozen;
+  CGImageRef output = selectedFrozen;
   if (mode == CuteCaptureModeWindow) {
-    output = CGImageCreateWithImageInRect(frozen, clamped);
+    output = CGImageCreateWithImageInRect(selectedFrozen, clamped);
     if (output == NULL) {
-      CGImageRelease(frozen);
+      CGImageRelease(selectedFrozen);
       result->status = 3;
       return 3;
     }
@@ -486,7 +490,7 @@ static int32_t CuteRunSelection(CuteCaptureMode mode, const char *outputPath,
     CGImageRelease(output);
   }
   if (!written) {
-    CGImageRelease(frozen);
+    CGImageRelease(selectedFrozen);
     result->status = 3;
     return 3;
   }
@@ -498,7 +502,7 @@ static int32_t CuteRunSelection(CuteCaptureMode mode, const char *outputPath,
   result->height = (uint32_t)CGRectGetHeight(clamped);
   result->frame_width = mode == CuteCaptureModeArea ? (uint32_t)imageWidth : result->width;
   result->frame_height = mode == CuteCaptureModeArea ? (uint32_t)imageHeight : result->height;
-  CGImageRelease(frozen);
+  CGImageRelease(selectedFrozen);
   return 0;
 }
 
@@ -513,11 +517,8 @@ int32_t cute_capture_window(const char *outputPath, const volatile bool *cancelS
 }
 
 int32_t cute_macos_pixel_backend(void) {
-  if (@available(macOS 14.0, *)) {
-    return 2;
-  }
-  if (@available(macOS 12.3, *)) {
-    return 1;
-  }
+  // The current bridge captures still images through CoreGraphics on every
+  // supported release. Do not label diagnostics as ScreenCaptureKit until the
+  // SCStream/SCScreenshotManager implementation is actually wired in.
   return 0;
 }
