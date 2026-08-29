@@ -38,6 +38,7 @@ export interface DesktopBridge
   captureRequest(request: CaptureRequestV1): Promise<CaptureOutcomeV1>
   captureCancel(): Promise<boolean>
   captureWaitForEditorUnmap(correlationId: string): Promise<void>
+  openScreenRecordingSettings(): Promise<void>
   quickCaptureGetActive(): Promise<QuickCaptureDraftV1 | null>
   quickCapturePresent(draftId: string): Promise<boolean>
   quickCaptureDismiss(): Promise<boolean>
@@ -145,6 +146,8 @@ export const tauriDesktopBridge: DesktopBridge = {
   captureCancel: () => invoke<boolean>('capture_cancel'),
   captureWaitForEditorUnmap: (correlationId) =>
     invoke<void>('capture_wait_for_editor_unmap', { correlationId }),
+  openScreenRecordingSettings: () =>
+    invoke<void>('open_screen_recording_settings'),
   quickCaptureGetActive: () =>
     invoke<QuickCaptureDraftV1 | null>('quick_capture_get_active'),
   quickCapturePresent: (draftId) =>

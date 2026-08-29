@@ -9,6 +9,7 @@ defineProps<{
       | 'cancel'
       | 'retry'
       | 'captureAction'
+      | 'captureWindowAction'
       | 'openImageAction'
       | 'copyAction'
       | 'exportAction'
@@ -24,9 +25,14 @@ defineProps<{
 const emit = defineEmits<{ cancel: []; retry: [] }>()
 const actionKey: Record<
   AsyncActionName,
-  'captureAction' | 'openImageAction' | 'copyAction' | 'exportAction'
+  | 'captureAction'
+  | 'captureWindowAction'
+  | 'openImageAction'
+  | 'copyAction'
+  | 'exportAction'
 > = {
   capture: 'captureAction',
+  captureWindow: 'captureWindowAction',
   openImage: 'openImageAction',
   copy: 'copyAction',
   export: 'exportAction',
@@ -60,7 +66,8 @@ const progressKey: Record<
   >
     <span v-if="state.status === 'pending'">
       {{
-        state.action === 'capture' && state.captureProgress
+        (state.action === 'capture' || state.action === 'captureWindow') &&
+        state.captureProgress
           ? t(progressKey[state.captureProgress])
           : `${t(actionKey[state.action])}…`
       }}

@@ -11,27 +11,29 @@
 | wlroots Wayland | x86_64/aarch64 | Portal при наличии                                                                                        | Portal при наличии, иначе CLI fallback | deb, AppImage             |
 | Windows         | x86_64         | DXGI/D3D11 compositor frozen-frame adapter with area/window selector; topmost-window smoke pending        | Tauri/global-hotkey                    | NSIS exe                  |
 | Windows 11      | ARM64          | DXGI/D3D11 compositor frozen-frame adapter with area/window selector; runtime smoke pending               | Tauri/global-hotkey                    | NSIS exe                  |
-| macOS           | Intel          | Screen capture adapter + overlay                                                                          | Tauri/global-hotkey                    | universal DMG             |
-| macOS           | Apple Silicon  | Screen capture adapter + overlay                                                                          | Tauri/global-hotkey                    | universal DMG             |
+| macOS           | Intel          | Native AppKit Area/Window; CG 12.0–12.2, intended SCKit 12.3+ routing; runtime smoke pending               | later slice: Tauri/global-hotkey       | universal DMG             |
+| macOS           | Apple Silicon  | Same versioned native adapter as Intel; compile/CI until owner runtime                                    | later slice: Tauri/global-hotkey       | universal DMG             |
 
-Точные минимальные версии ОС фиксируются во время финальной runtime-проверки
-capture API и webview. Release baseline не повышается без ADR и CI-доказательства.
+macOS deployment baseline зафиксирован ADR-038 как 12.0. Остальные точные
+минимальные версии ОС фиксируются во время финальной runtime-проверки capture
+API и webview. Release baseline не повышается без ADR и CI-доказательства.
 
 ## Capture capabilities
 
-| Возможность      | X11                                            | Wayland portal                                         | Windows                               | macOS                   |
-| ---------------- | ---------------------------------------------- | ------------------------------------------------------ | ------------------------------------- | ----------------------- |
-| Area             | Custom frozen overlay                          | System selector                                        | Live selector; DXGI freeze on confirm | Custom frozen overlay   |
-| Screen           | Root or Composite Overlay Window               | Portal target/capability                               | DXGI virtual screen                   | Direct after permission |
-| Window           | Direct/window list                             | Portal target/capability                               | Direct/window list                    | Direct/window list      |
-| Active window    | Window manager adapter                         | Portal when exposed, otherwise clear unavailable state | Native                                | Native                  |
-| Repeat last area | Stored physical/image geometry with validation | New portal interaction if silent reuse is unavailable  | Stored geometry                       | Stored geometry         |
-| Delay            | App countdown before backend invocation        | App countdown before portal                            | App countdown                         | App countdown           |
-| Cursor           | Capability-dependent                           | Portal-dependent                                       | Backend option                        | Backend option          |
+| Возможность      | X11                                            | Wayland portal                                         | Windows                               | macOS                                |
+| ---------------- | ---------------------------------------------- | ------------------------------------------------------ | ------------------------------------- | ------------------------------------ |
+| Area             | Custom frozen overlay                          | System selector                                        | Live selector; DXGI freeze on confirm | AppKit; frozen quick-mode             |
+| Screen           | Root or Composite Overlay Window               | Portal target/capability                               | DXGI virtual screen                   | Direct after permission              |
+| Window           | Direct/window list                             | Portal target/capability                               | Direct/window list                    | Native; direct document              |
+| Active window    | Window manager adapter                         | Portal when exposed, otherwise clear unavailable state | Native                                | Not advertised (later slice)         |
+| Repeat last area | Stored physical/image geometry with validation | New portal interaction if silent reuse is unavailable  | Stored geometry                       | Not advertised (later slice)         |
+| Delay            | App countdown before backend invocation        | App countdown before portal                            | App countdown                         | App countdown                        |
+| Cursor           | Capability-dependent                           | Portal-dependent                                       | Backend option                        | Not advertised                       |
 
 Area является единственной capture action, которая заканчивается в quick-mode.
-На X11/Windows/macOS quick surface сохраняет frozen desktop и physical selection
-coordinates. Wayland сначала завершает системный XDG selector, затем показывает
+На X11/Windows/macOS quick surface сохраняет frozen desktop и physical
+selection coordinates; macOS Area использует единый frozen multi-display
+frame. Wayland сначала завершает системный XDG selector, затем показывает
 только возвращённый fragment на нейтральном фоне; рамку можно перемещать и
 уменьшать внутри fragment, но нельзя расширять за его границы. Screen, Window,
 Active Window и Repeat продолжают direct-to-editor flow.
@@ -94,9 +96,22 @@ UI получает `CaptureCapabilities` и не показывает непо�
 
 ### macOS
 
-- Screen Recording permission проверяется до custom overlay.
-- UI даёт кнопку перехода в System Settings и повторную проверку.
-- Отказ не оставляет прозрачные окна или зависший capture session.
+- Screen Recording permission проверяется до Screen snapshot. Отказ —
+  typed `permissionDenied`, без прозрачных окон и без overlay.
+- UI объясняет переход в System Settings (`Privacy_ScreenCapture`) и Retry.
+- Deployment baseline — macOS 12.0. Native AppKit selector обслуживает Area и
+  Window. Intended pixel routing: legacy CoreGraphics fallback на 12.0–12.2,
+  one-shot `SCStream` на 12.3–13, `SCScreenshotManager` и system window picker
+  на 14+; API availability проверяется во время выполнения.
+- Area использует frozen multi-display frame и quick-mode. Window создаёт
+  direct document без quick-mode.
+- Локальный macOS 12.7.6 x64 startup smoke (2026-08-29) подтвердил только
+  Screen-only поведение существующего среза и отсутствие prewarmed
+  `quick-capture` окна; он не подтверждает новую Area/Window архитектуру.
+- Intel и Apple Silicon делят один versioned adapter. Compile evidence идёт
+  через CI `macos-15` / `macos-15-intel`; runtime support Area/Window не
+  заявляется до реальных decoded-pixel smokes на ветках 12.0–12.2, 12.3–13 и
+  14+.
 
 ### Windows
 

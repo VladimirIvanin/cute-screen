@@ -324,6 +324,31 @@ mod unix {
             assert_eq!(dispatch, ActivationDispatch::NoPrimary);
             assert!(reply.is_none());
         }
+
+        #[test]
+        fn runtime_dir_falls_back_without_xdg_runtime_dir() {
+            let fallback = std::path::PathBuf::from("/tmp/cute-screen-fallback");
+            assert_eq!(
+                super::super::resolve_runtime_dir(None, None, fallback.clone()),
+                fallback
+            );
+            assert_eq!(
+                super::super::resolve_runtime_dir(
+                    None,
+                    Some(std::ffi::OsString::from("/var/folders/tmp")),
+                    fallback.clone(),
+                ),
+                std::path::PathBuf::from("/var/folders/tmp")
+            );
+            assert_eq!(
+                super::super::resolve_runtime_dir(
+                    Some(std::ffi::OsString::from("/run/user/1000")),
+                    Some(std::ffi::OsString::from("/tmp")),
+                    fallback,
+                ),
+                std::path::PathBuf::from("/run/user/1000")
+            );
+        }
     }
 }
 
@@ -334,7 +359,11 @@ pub use unix::ActivationServer;
 pub fn endpoint_for_current_session() -> Result<PathBuf, ActivationError> {
     use sha2::{Digest, Sha256};
 
-    let runtime = std::env::var_os("XDG_RUNTIME_DIR").ok_or(ActivationError::Unavailable)?;
+    let runtime = resolve_runtime_dir(
+        std::env::var_os("XDG_RUNTIME_DIR"),
+        std::env::var_os("TMPDIR"),
+        std::env::temp_dir(),
+    );
     let scope = [
         "XDG_SESSION_ID",
         "WAYLAND_DISPLAY",
@@ -346,7 +375,20 @@ pub fn endpoint_for_current_session() -> Result<PathBuf, ActivationError> {
     .collect::<Vec<_>>()
     .join("\u{1f}");
     let digest = format!("{:x}", Sha256::digest(scope.as_bytes()));
-    Ok(PathBuf::from(runtime).join(format!("cute-screen-{}.sock", &digest[..16])))
+    Ok(runtime.join(format!("cute-screen-{}.sock", &digest[..16])))
+}
+
+#[cfg(unix)]
+fn resolve_runtime_dir(
+    xdg_runtime_dir: Option<std::ffi::OsString>,
+    tmpdir: Option<std::ffi::OsString>,
+    temp_dir: PathBuf,
+) -> PathBuf {
+    xdg_runtime_dir
+        .or(tmpdir)
+        .map(PathBuf::from)
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or(temp_dir)
 }
 
 #[cfg(unix)]

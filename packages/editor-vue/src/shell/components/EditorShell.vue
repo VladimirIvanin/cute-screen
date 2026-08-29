@@ -112,6 +112,7 @@ const props = withDefaults(
     initialDocumentState?: ShellDocumentState | undefined
     readOnlyDocument?: boolean
     captureAvailable?: boolean
+    captureWindowAvailable?: boolean
     captureUnavailableReason?: string | undefined
     openImageAvailable?: boolean
     captureFallbackCommand?: string | undefined
@@ -131,6 +132,7 @@ const props = withDefaults(
     initialDocumentState: undefined,
     readOnlyDocument: false,
     captureAvailable: true,
+    captureWindowAvailable: false,
     captureUnavailableReason: undefined,
     openImageAvailable: false,
     captureFallbackCommand: undefined,
@@ -4341,6 +4343,7 @@ watch(
         :save-error="store.documentHistory.error"
         :pending="store.actionState.status === 'pending'"
         :capture-available="props.captureAvailable"
+        :capture-window-available="props.captureWindowAvailable"
         :capture-unavailable-reason="
           props.captureUnavailableReason ?? translate('captureUnavailable')
         "
@@ -4420,14 +4423,38 @@ watch(
             </NButton>
           </div>
         </div>
-        <ToolRail
-          v-else
-          :tools="tools"
-          :active-tool-id="store.activeToolId"
-          :t="translate"
-          @select="selectTool"
-          @configure="openToolConfigure"
-        />
+        <div v-else class="cs-bottom-chrome">
+          <SeriesFilmstrip
+            :frames="store.frames"
+            :active-frame-id="store.activeFrameId"
+            :t="translate"
+            @select="store.selectFrame"
+          />
+          <div class="cs-bottom-chrome-center">
+            <ContextToolbar
+              :schema="contextSchema"
+              :label="translate('toolSettings')"
+              :recent-colors="drawingPreferences.recentColors"
+              :picker-locale="state.locale.value"
+              @action="onContextAction"
+              @change="onColorChange"
+              @eyedropper="startEyedropper"
+            />
+            <ToolRail
+              :tools="tools"
+              :active-tool-id="store.activeToolId"
+              :t="translate"
+              @select="selectTool"
+              @configure="openToolConfigure"
+            />
+          </div>
+          <ZoomControls
+            :zoom="store.zoom"
+            :t="translate"
+            @zoom="store.setZoom"
+            @fit="fitCanvas"
+          />
+        </div>
         <CanvasViewport
           ref="canvasViewport"
           :document-state="store.documentState"
@@ -4500,14 +4527,8 @@ watch(
           @rotation="onLayerRotation"
           @reorder-to="onLayerReorderTo"
         />
-        <ZoomControls
-          v-if="!props.quickMode"
-          :zoom="store.zoom"
-          :t="translate"
-          @zoom="store.setZoom"
-          @fit="fitCanvas"
-        />
         <ContextToolbar
+          v-if="props.quickMode"
           :schema="contextSchema"
           :label="translate('toolSettings')"
           :recent-colors="drawingPreferences.recentColors"
@@ -4517,13 +4538,6 @@ watch(
           @eyedropper="startEyedropper"
         />
       </div>
-      <SeriesFilmstrip
-        v-if="!props.quickMode"
-        :frames="store.frames"
-        :active-frame-id="store.activeFrameId"
-        :t="translate"
-        @select="store.selectFrame"
-      />
       <ActionFeedback
         :state="store.actionState"
         :t="translate"

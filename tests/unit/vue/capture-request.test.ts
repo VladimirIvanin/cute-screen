@@ -54,6 +54,69 @@ describe('native capture dispatch', () => {
     expect(capture).toHaveBeenCalledOnce()
   })
 
+  it('hides the macOS editor before the native screen snapshot', async () => {
+    const hide = vi.fn().mockResolvedValue(undefined)
+    const show = vi.fn().mockResolvedValue(undefined)
+    const capture = vi.fn().mockResolvedValue('captured')
+    const waitForMainWindowUnmap = vi.fn()
+
+    await expect(
+      dispatchNativeCapture({
+        session: 'macos',
+        mainWindow: { hide, show },
+        waitForMainWindowUnmap,
+        capture,
+      }),
+    ).resolves.toBe('captured')
+
+    expect(hide).toHaveBeenCalledOnce()
+    expect(waitForMainWindowUnmap).not.toHaveBeenCalled()
+    expect(capture).toHaveBeenCalledOnce()
+    expect(show).toHaveBeenCalledOnce()
+    expect(hide.mock.invocationCallOrder[0]).toBeLessThan(
+      capture.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    )
+    expect(capture.mock.invocationCallOrder[0]).toBeLessThan(
+      show.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    )
+  })
+
+  it('restores the X11 editor after a successful capture', async () => {
+    const hide = vi.fn().mockResolvedValue(undefined)
+    const show = vi.fn().mockResolvedValue(undefined)
+    const capture = vi.fn().mockResolvedValue('captured')
+
+    await expect(
+      dispatchNativeCapture({
+        session: 'x11',
+        mainWindow: { hide, show },
+        waitForMainWindowUnmap: vi.fn().mockResolvedValue(undefined),
+        capture,
+      }),
+    ).resolves.toBe('captured')
+
+    expect(show).toHaveBeenCalledOnce()
+    expect(capture.mock.invocationCallOrder[0]).toBeLessThan(
+      show.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    )
+  })
+
+  it('restores the macOS editor if native dispatch rejects after hide', async () => {
+    const failure = new Error('capture IPC rejected')
+    const show = vi.fn().mockResolvedValue(undefined)
+
+    await expect(
+      dispatchNativeCapture({
+        session: 'macos',
+        mainWindow: { hide: vi.fn().mockResolvedValue(undefined), show },
+        waitForMainWindowUnmap: vi.fn(),
+        capture: vi.fn().mockRejectedValue(failure),
+      }),
+    ).rejects.toBe(failure)
+
+    expect(show).toHaveBeenCalledOnce()
+  })
+
   it('restores the X11 editor if native dispatch rejects after preparation', async () => {
     const failure = new Error('capture IPC rejected')
     const show = vi.fn().mockResolvedValue(undefined)

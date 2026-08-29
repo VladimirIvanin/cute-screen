@@ -56,6 +56,7 @@ pub enum CaptureBackendKind {
     WaylandPortal,
     WindowsDxgi,
     X11,
+    MacosScreenCapture,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -127,6 +128,7 @@ impl PlatformCapabilities {
             backend == CaptureBackendKind::WaylandPortal && probe.screenshot_version >= 3;
         let x11 = backend == CaptureBackendKind::X11;
         let windows_dxgi = backend == CaptureBackendKind::WindowsDxgi;
+        let macos_screen = backend == CaptureBackendKind::MacosScreenCapture;
         let capture_available = backend != CaptureBackendKind::Unavailable;
         let hotkeys = if session == SessionKind::X11 && native_adapter_available {
             HotkeyCapabilities {
@@ -158,14 +160,16 @@ impl PlatformCapabilities {
             capture: CaptureCapabilities {
                 available: capture_available,
                 backend,
-                // Native X11 and Windows adapters own a frozen-frame
-                // selector; Wayland's remains exclusively portal-driven.
-                interactive_selector: portal_v2 || x11 || windows_dxgi,
+                // Native desktop adapters own a frozen-frame selector;
+                // Wayland's remains exclusively portal-driven.
+                interactive_selector: portal_v2 || x11 || windows_dxgi || macos_screen,
                 monitor_target: x11
                     || windows_dxgi
+                    || macos_screen
                     || (portal_v3 && probe.available_targets & 1 != 0),
                 window_target: x11
                     || windows_dxgi
+                    || macos_screen
                     || (portal_v3 && probe.available_targets & 2 != 0),
                 active_window_target: x11
                     || windows_dxgi
@@ -176,6 +180,39 @@ impl PlatformCapabilities {
             cli_fallback,
             cli_fallback_command: None,
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MacosCapturePixelBackend {
+    CoreGraphicsLegacy,
+    ScreenCaptureKitStream,
+    ScreenCaptureKitScreenshot,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MacosWindowPickerKind {
+    NativeOverlay,
+    SystemContentSharing,
+}
+
+/// ADR-038 version routing. The actual pixel backend may still fall back to
+/// CoreGraphics when ScreenCaptureKit is unavailable at compile or runtime.
+pub const fn macos_capture_pixel_backend(major: u32, minor: u32) -> MacosCapturePixelBackend {
+    if major >= 14 {
+        MacosCapturePixelBackend::ScreenCaptureKitScreenshot
+    } else if major > 12 || (major == 12 && minor >= 3) {
+        MacosCapturePixelBackend::ScreenCaptureKitStream
+    } else {
+        MacosCapturePixelBackend::CoreGraphicsLegacy
+    }
+}
+
+pub const fn macos_window_picker_kind(major: u32, _minor: u32) -> MacosWindowPickerKind {
+    if major >= 14 {
+        MacosWindowPickerKind::SystemContentSharing
+    } else {
+        MacosWindowPickerKind::NativeOverlay
     }
 }
 
@@ -191,6 +228,8 @@ pub fn select_capture_backend(
         SessionKind::X11 => CaptureBackendKind::Unavailable,
         SessionKind::Windows if x11_gate_passed => CaptureBackendKind::WindowsDxgi,
         SessionKind::Windows => CaptureBackendKind::Unavailable,
+        SessionKind::Macos if x11_gate_passed => CaptureBackendKind::MacosScreenCapture,
+        SessionKind::Macos => CaptureBackendKind::Unavailable,
         _ => CaptureBackendKind::Unavailable,
     }
 }
@@ -299,8 +338,9 @@ pub trait PortalClient {
 #[cfg(test)]
 mod tests {
     use super::{
-        CaptureBackendKind, PlatformCapabilities, PlatformError, PlatformErrorCode, SessionKind,
-        select_capture_backend,
+        CaptureBackendKind, MacosCapturePixelBackend, MacosWindowPickerKind, PlatformCapabilities,
+        PlatformError, PlatformErrorCode, SessionKind, macos_capture_pixel_backend,
+        macos_window_picker_kind, select_capture_backend,
     };
 
     #[test]
@@ -414,5 +454,89 @@ mod tests {
         assert!(capabilities.capture.window_target);
         assert!(capabilities.capture.active_window_target);
         assert!(!capabilities.capture.cursor);
+    }
+
+    #[test]
+    fn macos_adapter_advertises_area_screen_and_window_targets() {
+        let capabilities = PlatformCapabilities::for_session(
+            "macos-screen".to_owned(),
+            SessionKind::Macos,
+            None,
+            Some(true),
+        );
+
+        assert!(capabilities.capture.available);
+        assert_eq!(
+            capabilities.capture.backend,
+            CaptureBackendKind::MacosScreenCapture
+        );
+        assert!(capabilities.capture.monitor_target);
+        assert!(capabilities.capture.interactive_selector);
+        assert!(capabilities.capture.window_target);
+        assert!(!capabilities.capture.active_window_target);
+        assert!(!capabilities.capture.cursor);
+    }
+
+    #[test]
+    fn macos_without_adapter_probe_is_unavailable() {
+        assert_eq!(
+            select_capture_backend(SessionKind::Macos, false, false),
+            CaptureBackendKind::Unavailable,
+        );
+        let capabilities = PlatformCapabilities::for_session(
+            "macos-unprobed".to_owned(),
+            SessionKind::Macos,
+            None,
+            Some(false),
+        );
+        assert!(!capabilities.capture.available);
+        assert_eq!(
+            capabilities.capture.backend,
+            CaptureBackendKind::Unavailable
+        );
+    }
+
+    #[test]
+    fn macos_pixel_backend_follows_adr_038_version_routing() {
+        assert_eq!(
+            macos_capture_pixel_backend(12, 0),
+            MacosCapturePixelBackend::CoreGraphicsLegacy
+        );
+        assert_eq!(
+            macos_capture_pixel_backend(12, 2),
+            MacosCapturePixelBackend::CoreGraphicsLegacy
+        );
+        assert_eq!(
+            macos_capture_pixel_backend(12, 3),
+            MacosCapturePixelBackend::ScreenCaptureKitStream
+        );
+        assert_eq!(
+            macos_capture_pixel_backend(13, 6),
+            MacosCapturePixelBackend::ScreenCaptureKitStream
+        );
+        assert_eq!(
+            macos_capture_pixel_backend(14, 0),
+            MacosCapturePixelBackend::ScreenCaptureKitScreenshot
+        );
+        assert_eq!(
+            macos_capture_pixel_backend(15, 6),
+            MacosCapturePixelBackend::ScreenCaptureKitScreenshot
+        );
+    }
+
+    #[test]
+    fn macos_window_picker_uses_system_ui_only_from_sonoma() {
+        assert_eq!(
+            macos_window_picker_kind(12, 7),
+            MacosWindowPickerKind::NativeOverlay
+        );
+        assert_eq!(
+            macos_window_picker_kind(13, 0),
+            MacosWindowPickerKind::NativeOverlay
+        );
+        assert_eq!(
+            macos_window_picker_kind(14, 0),
+            MacosWindowPickerKind::SystemContentSharing
+        );
     }
 }

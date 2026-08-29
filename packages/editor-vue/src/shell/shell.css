@@ -61,7 +61,8 @@ button:focus-visible {
 .cs-editor-shell {
   display: grid;
   grid-template-rows: 52px minmax(0, 1fr) auto;
-  height: 100dvh;
+  height: 100%;
+  max-height: 100%;
   min-height: 0;
   overflow: hidden;
   background: var(--surface);
@@ -1201,10 +1202,21 @@ button:focus-visible {
    The editor owns placement; Naive UI owns only control and overlay behaviour.
    These rules intentionally come last so legacy component-local geometry cannot
    compete with the prototype-derived floating workspace. */
+.n-config-provider {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .cs-editor-shell {
   position: relative;
   display: block;
-  height: 100dvh;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
   overflow: hidden;
   background: var(--canvas);
 }
@@ -1222,6 +1234,36 @@ button:focus-visible {
   inset: 0;
   display: block;
   overflow: hidden;
+}
+
+.cs-bottom-chrome {
+  position: absolute;
+  z-index: 21;
+  right: 14px;
+  bottom: var(--bottom-rail-offset);
+  left: 14px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-items: end;
+  gap: var(--bottom-rail-gap);
+  pointer-events: none;
+}
+
+.cs-bottom-chrome > * {
+  pointer-events: auto;
+}
+
+.cs-bottom-chrome-center {
+  grid-column: 2;
+  grid-row: 1 / -1;
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--bottom-rail-gap);
 }
 
 .cs-viewport {
@@ -1920,6 +1962,44 @@ button:focus-visible {
   border-radius: var(--cs-zoom-button-radius);
 }
 
+.cs-bottom-chrome .cs-filmstrip {
+  grid-column: 1;
+  grid-row: 2;
+  position: static;
+  z-index: auto;
+  bottom: auto;
+  left: auto;
+  width: max-content;
+  max-width: min(220px, 28vw);
+}
+
+.cs-bottom-chrome .cs-zoom-controls {
+  grid-column: 3;
+  grid-row: 2;
+  position: static;
+  z-index: auto;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  flex: none;
+}
+
+.cs-bottom-chrome .cs-toolrail,
+.cs-bottom-chrome .cs-context-toolbar {
+  position: static;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  width: max-content;
+  min-width: 0;
+  max-width: 100%;
+  transform: none;
+}
+
+.cs-bottom-chrome .cs-toolrail {
+  justify-content: flex-start;
+}
+
 .cs-filmstrip {
   position: absolute;
   z-index: 21;
@@ -1985,13 +2065,6 @@ button:focus-visible {
     width: 34px;
     padding: 0;
   }
-  .cs-context-toolbar {
-    max-width: min(760px, calc(100vw - 320px));
-  }
-
-  .cs-toolrail {
-    max-width: min(760px, calc(100vw - 320px));
-  }
 }
 
 @media (max-width: 760px) {
@@ -1999,9 +2072,5 @@ button:focus-visible {
   .cs-history,
   .cs-save-status {
     display: none;
-  }
-  .cs-context-toolbar,
-  .cs-toolrail {
-    max-width: calc(100vw - 28px);
   }
 }

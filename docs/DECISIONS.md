@@ -570,3 +570,52 @@ contenteditable. Text/Callout/Numbered Marker делят rich-text contract.
 **Проверяемое основание:** codec reject legacy bubble/tail; factory/scene/hit-test
 tests для elbow+markers+text; Vue drag/commit и contextual stroke+text toolbar;
 browser e2e multiline callout с сохранением active tool.
+
+## ADR-037 — macOS Screen capture adapter без xcap
+
+**Статус:** accepted
+
+**Контекст:** `SessionKind::Macos` существовал, но capture backend всегда был
+`Unavailable`. `xcap` отклонён ADR-019. `SCScreenshotManager` доступен только с
+macOS 14, а текущая машина владельца — macOS 12. Нужен один исходник для Intel
+и Apple Silicon.
+
+**Решение:** отдельный `macos_platform` adapter за `cfg(target_os = "macos")`.
+Первый вертикальный срез — Screen: `CGWindowListCreateImage` / display snapshot
+через permissive `core-graphics` 0.25, Screen Recording через
+`CGPreflightScreenCaptureAccess` / `CGRequestScreenCaptureAccess`, hide `main`
+до кадра, owned PNG transport. Area, Window, Active Window и Repeat не
+рекламируются, пока нет selector/crop slice. `SCStream` one-shot может заменить
+источник кадра отдельным ADR, если runtime докажет недостаточную compositor
+fidelity. Activation socket на unix использует `XDG_RUNTIME_DIR`, иначе
+`TMPDIR` / `temp_dir()`, чтобы macOS host запускался без Linux session vars.
+
+**Проверка:** `select_capture_backend(Macos)` unit; packed-BGRA/PNG и
+`invalidTarget` tests; `permissionDenied` без overlay; Vue mapping; `cargo test`
+на macos-15 ARM и macos-15-intel compile jobs. Local Intel Screen smoke с
+повторным decode PNG обязателен до status `supported`. Apple Silicon runtime по
+ADR-020 отложен, пока нет машины владельца.
+
+## ADR-038 — Native macOS Area/Window selector и versioned capture routing
+
+**Статус:** accepted
+
+**Контекст:** ADR-037 фиксирует первый Screen-only срез и не определяет
+Area/Window selector, минимальную версию macOS или маршрутизацию между
+CoreGraphics и ScreenCaptureKit. Продукту нужен единый native UX на Intel и
+Apple Silicon без повышения baseline выше macOS 12.
+
+**Решение:** deployment baseline — macOS 12.0. Area и Window используют native
+AppKit selector. На macOS 12.0–12.2 pixels получает legacy CoreGraphics
+fallback; на 12.3–13 intended routing использует one-shot `SCStream`; на 14+
+используются `SCScreenshotManager` и системный window picker. Area замораживает
+единый multi-display frame с physical display bounds и открывает quick-mode;
+Window выбирается нативно и создаёт документ напрямую, без quick-mode.
+Availability проверяется во время выполнения, а не только версией SDK.
+
+**Проверяемое основание:** deterministic routing/availability, coordinate,
+cancel и cleanup tests; compile checks для Intel/Apple Silicon; реальные smokes
+на 12.0–12.2, 12.3–13 и 14+ с permission grant/deny, Retina, mixed-scale
+multi-display, decoded pixels и отсутствием selector pixels. До этих прогонов
+capability может быть реализована, но runtime support не считается
+подтверждённым.

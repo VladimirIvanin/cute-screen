@@ -390,6 +390,36 @@ describe('M02 editor shell', () => {
     )
   })
 
+  it('exposes window capture only when the native backend advertises it', async () => {
+    const hidden = render(TopBar, {
+      props: {
+        locale: 'en',
+        theme: 'system',
+        canCopyOrExport: false,
+        captureWindowAvailable: false,
+        t: (key) => key,
+      },
+    })
+    expect(
+      screen.queryByRole('button', { name: 'captureWindow' }),
+    ).not.toBeInTheDocument()
+    hidden.unmount()
+
+    const available = render(TopBar, {
+      props: {
+        locale: 'en',
+        theme: 'system',
+        canCopyOrExport: false,
+        captureWindowAvailable: true,
+        t: (key) => key,
+      },
+    })
+    await fireEvent.click(
+      screen.getByRole('button', { name: 'captureWindow' }),
+    )
+    expect(available.emitted('action')).toEqual([['captureWindow']])
+  })
+
   it('routes Open image to the native action only when the desktop bridge is available', async () => {
     const view = render(TopBar, {
       props: {
@@ -836,6 +866,27 @@ describe('M02 editor shell', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Захват станет доступен после подключения native backend.',
     )
+  })
+
+  it('docks filmstrip, tool rail and zoom in one bottom chrome row', async () => {
+    window.localStorage.clear()
+    const view = render(EditorShell, {
+      props: { fixture: 'ready' },
+      global: { plugins: [createEditorShellPinia()] },
+    })
+
+    const chrome = view.container.querySelector('.cs-bottom-chrome')
+    expect(chrome).toBeTruthy()
+    expect(
+      chrome?.querySelector('.cs-bottom-chrome-center .cs-toolrail'),
+    ).toBeTruthy()
+    expect(chrome?.querySelector('.cs-zoom-controls')).toBeTruthy()
+    expect(
+      view.container.querySelector('.cs-workbench > .cs-toolrail'),
+    ).toBeNull()
+    await vi.waitFor(() => {
+      expect(chrome?.querySelector('.cs-filmstrip')).toBeTruthy()
+    })
   })
 
   it('uses the quick-mode tool contract and hides full editor chrome', () => {

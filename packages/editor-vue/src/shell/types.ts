@@ -191,7 +191,12 @@ export interface CanvasViewportHosts {
   readonly scrollContainer: HTMLDivElement
 }
 
-export type AsyncActionName = 'capture' | 'openImage' | 'copy' | 'export'
+export type AsyncActionName =
+  | 'capture'
+  | 'captureWindow'
+  | 'openImage'
+  | 'copy'
+  | 'export'
 
 export type AsyncActionState =
   | { readonly status: 'idle' }
@@ -272,7 +277,9 @@ export const translationKeys = [
   'appName',
   'canvasViewport',
   'capture',
+  'captureWindow',
   'captureAction',
+  'captureWindowAction',
   'captureProbing',
   'captureReady',
   'captureDelay',
@@ -306,6 +313,7 @@ export const translationKeys = [
   'emptyDescription',
   'readyLoadError',
   'captureUnavailable',
+  'captureScreenRecordingDenied',
   'captureFallback',
   'copyCaptureFallback',
   'captureFallbackCopied',

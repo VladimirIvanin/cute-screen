@@ -1,5 +1,5 @@
 export type CaptureBackendKind =
-  'unavailable' | 'waylandPortal' | 'windowsDxgi' | 'x11'
+  'unavailable' | 'waylandPortal' | 'windowsDxgi' | 'x11' | 'macosScreenCapture'
 
 export interface CaptureCapabilities {
   readonly available: boolean

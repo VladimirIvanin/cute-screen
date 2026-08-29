@@ -606,13 +606,101 @@ mod linux {
     }
 }
 
+#[cfg(target_os = "macos")]
+mod macos {
+    use std::{env, fs, path::PathBuf, sync::Arc};
+
+    use cute_screen_desktop::{
+        capture::{CaptureAction, CaptureController, CaptureInvocationSource, CaptureRequestV1},
+        image_transport::ImageTransportService,
+        storage::LibraryRepository,
+    };
+    use serde::Serialize;
+
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct SmokeEvidence {
+        schema_version: u8,
+        os: String,
+        architecture: String,
+        session: String,
+        action: String,
+        outcome: cute_screen_desktop::capture::CaptureOutcomeV1,
+    }
+
+    pub fn run() -> Result<(), Box<dyn std::error::Error>> {
+        let args = env::args().skip(1).collect::<Vec<_>>();
+        match args.first().map(String::as_str) {
+            Some("macos-screen") => capture_smoke(&args, CaptureAction::Screen, "screen"),
+            Some("macos-area") => capture_smoke(&args, CaptureAction::Area, "area"),
+            Some("macos-window") => capture_smoke(&args, CaptureAction::Window, "window"),
+            _ => Err(
+                "usage: m04-platform-smoke macos-screen|macos-area|macos-window --data-dir <path> --output <path>"
+                    .into(),
+            ),
+        }
+    }
+
+    fn capture_smoke(
+        args: &[String],
+        action: CaptureAction,
+        action_name: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let data_dir = required_option(args, "--data-dir")?;
+        let output = required_option(args, "--output")?;
+        let repository = LibraryRepository::initialize(&data_dir, &data_dir)?;
+        let transport = Arc::new(ImageTransportService::new(
+            data_dir.join("capture-staging"),
+            data_dir.join("asset-staging"),
+        )?);
+        let controller = CaptureController::new(repository, transport);
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()?;
+        let outcome = runtime.block_on(controller.capture(CaptureRequestV1 {
+            correlation_id: uuid::Uuid::now_v7().to_string(),
+            action,
+            delay_ms: 0,
+            cursor: false,
+            series_id: None,
+            invocation_source: CaptureInvocationSource::Cli,
+        }));
+        let evidence = SmokeEvidence {
+            schema_version: 1,
+            os: env::consts::OS.to_owned(),
+            architecture: env::consts::ARCH.to_owned(),
+            session: "macos".to_owned(),
+            action: action_name.to_owned(),
+            outcome,
+        };
+        if let Some(parent) = output.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(&output, serde_json::to_vec_pretty(&evidence)?)?;
+        println!("{}", output.display());
+        Ok(())
+    }
+
+    fn required_option(args: &[String], name: &str) -> Result<PathBuf, String> {
+        args.windows(2)
+            .find(|pair| pair[0] == name)
+            .map(|pair| PathBuf::from(&pair[1]))
+            .ok_or_else(|| format!("missing required {name} <path>"))
+    }
+}
+
 #[cfg(target_os = "linux")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     linux::run()
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(target_os = "macos")]
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    macos::run()
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
 fn main() {
-    eprintln!("m04-platform-smoke is available only on Linux");
+    eprintln!("m04-platform-smoke is available only on Linux and macOS");
     std::process::exit(2);
 }

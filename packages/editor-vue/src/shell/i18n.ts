@@ -9,7 +9,9 @@ const dictionaries: Record<SupportedLocale, Record<TranslationKey, string>> = {
     appName: 'Cute Screen',
     canvasViewport: 'Canvas viewport',
     capture: 'Capture',
+    captureWindow: 'Capture window',
     captureAction: 'Capture',
+    captureWindowAction: 'Capture window',
     captureProbing: 'Checking capture capability…',
     captureReady: 'Capture is ready…',
     captureDelay: 'Waiting for capture delay…',
@@ -38,6 +40,8 @@ const dictionaries: Record<SupportedLocale, Record<TranslationKey, string>> = {
     readyLoadError: 'The document could not be loaded.',
     captureUnavailable:
       'Capture will be available after the native backend is connected.',
+    captureScreenRecordingDenied:
+      'Allow Screen Recording in System Settings, then retry Capture.',
     captureFallback: 'Global shortcut is unavailable. Use this command:',
     copyCaptureFallback: 'Copy capture command',
     captureFallbackCopied: 'Capture command copied',
@@ -126,7 +130,9 @@ const dictionaries: Record<SupportedLocale, Record<TranslationKey, string>> = {
     appName: 'Cute Screen',
     canvasViewport: 'Область холста',
     capture: 'Снимок',
+    captureWindow: 'Снимок окна',
     captureAction: 'Снимок',
+    captureWindowAction: 'Снимок окна',
     captureProbing: 'Проверяем доступность захвата…',
     captureReady: 'Захват готов…',
     captureDelay: 'Ожидание задержки захвата…',
@@ -155,6 +161,8 @@ const dictionaries: Record<SupportedLocale, Record<TranslationKey, string>> = {
     readyLoadError: 'Не удалось загрузить документ.',
     captureUnavailable:
       'Захват станет доступен после подключения native backend.',
+    captureScreenRecordingDenied:
+      'Разрешите запись экрана в Системных настройках и повторите захват.',
     captureFallback:
       'Глобальная горячая клавиша недоступна. Используйте эту команду:',
     copyCaptureFallback: 'Скопировать команду захвата',

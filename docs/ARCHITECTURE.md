@@ -195,8 +195,10 @@ document-command boundary.
 
 Явный Area capture после platform selector создаёт `QuickCaptureDraftV1`, а не
 library record. Windows/X11/macOS draft может ссылаться на frozen virtual
-desktop и physical selection bounds; Wayland draft содержит только portal
-fragment. Pixels доступны Vue только через scoped/binary transport token.
+desktop и physical selection bounds; на macOS это единый frozen multi-display
+frame native AppKit selector. Wayland draft содержит только portal fragment.
+Pixels доступны Vue только через scoped/binary transport token. macOS Window
+после native selection создаёт документ напрямую и quick-mode не открывает.
 
 `QuickCaptureShell` использует тот же document, renderer, `CanvasViewport`,
 tool defaults и `EditorCommand`, но не монтирует TopBar, LayersPanel,
@@ -218,6 +220,12 @@ base64 для изображения запрещены.
 
 - `CaptureController` — выбирает backend и координирует capture lifecycle.
 - `HotkeyService` — Tauri/global-hotkey для X11/Windows/macOS, XDG portal для Wayland.
+- `macos_platform` — Screen Recording probe, native AppKit Area/Window selector
+  и versioned capture routing при deployment baseline macOS 12.0:
+  CoreGraphics fallback на 12.0–12.2, intended one-shot `SCStream` на 12.3–13,
+  `SCScreenshotManager` и system window picker на 14+. Area передаёт frozen
+  multi-display draft в quick-mode; Window создаёт direct document. Runtime
+  availability проверяется динамически; реальные platform smokes ещё pending.
 - `LibraryRepository` — SQLite, blobs, thumbnails и recovery.
 - `ClipboardService` — bitmap/text/custom editor MIME.
 - `ExportService` — dialogs, atomic output, format encoding.

@@ -53,6 +53,9 @@ pnpm smoke:m01:portal:probe
 pnpm smoke:m01:portal:screenshot
 pnpm smoke:m01:portal:shortcuts
 pnpm smoke:m01:portal:invalid-uri
+pnpm smoke:m04:macos:screen
+pnpm smoke:m04:macos:area
+pnpm smoke:m04:macos:window
 ```
 
 `pnpm check` включает Rust format, три CI-конфигурации Clippy с `-D warnings` и production-only gate против `unwrap()`/`expect()`; изменения Rust не передаются в CI без этого локального gate.
@@ -248,7 +251,9 @@ Acceptance criterion формулируется наблюдаемым резу�
 - file/save dialogs;
 - global shortcuts;
 - XDG portals;
-- Screen Recording permission на macOS;
+- Screen Recording permission и native AppKit selector на macOS;
+- фактическая маршрутизация CoreGraphics/`SCStream`/`SCScreenshotManager`,
+  system window picker и отсутствие selector pixels в результате на macOS;
 - mixed-DPI и multi-monitor coordinates.
 
 Для каждой границы в `docs/TRACEABILITY.md` указывается browser/Tauri/system proof.
@@ -418,8 +423,23 @@ shortcuts могут конфликтовать.
 - GNOME/KDE Wayland: real Screenshot и GlobalShortcuts portals;
 - Wayland без shortcut portal: CLI fallback;
 - Windows x64/ARM64: hotkey, overlay, mixed DPI;
-- macOS Intel/Apple Silicon: permission, hotkey, overlay, Retina;
+- macOS Intel/Apple Silicon: Screen Recording permission; Area/Window native
+  selector; CoreGraphics fallback на 12.0–12.2, `SCStream` на 12.3–13 и
+  `SCScreenshotManager`/system window picker на 14+; Area frozen multi-display
+  quick-mode, Window direct document, cancel, Retina и mixed-scale displays;
 - install/update/uninstall на каждом артефакте.
+
+macOS unit/contract suite обязана независимо от runtime проверить availability
+routing по версиям 12.0, 12.2, 12.3, 13 и 14; преобразование AppKit logical
+coordinates в physical multi-display bounds; что selector занимает каждый
+`NSScreen.frame` и рисует frozen preview без CTM-flip (верх кадра остаётся
+верхом изображения); terminal cancel и cleanup; выбор Area quick draft
+против Window direct document. Эти tests и compile jobs не
+дают статус runtime support: нужны реальные grant/deny и decoded-pixel smokes
+на каждой API-ветке. Воспроизводимые команды — `pnpm smoke:m04:macos:screen`,
+`pnpm smoke:m04:macos:area` и `pnpm smoke:m04:macos:window`; они пишут JSON
+evidence и требуют повторный decode результата. Успех команды без decoded
+pixels не даёт статус `supported`.
 
 ## Performance
 
@@ -1562,6 +1582,57 @@ silhouette, incomplete cursor camera and white-on-white Area frame.
   each passed 108/108. `pnpm check` passed lint, typechecks/builds, formatting,
   35-file documentation validation, 14/14 boundary tests and every configured
   Rust fmt/Clippy feature combination.
+
+## macOS 12 startup without focus (2026-08-29)
+
+macOS 12.7.6 (21H1320), x86_64 Intel, WKWebView 605.1.15. The repair is limited
+to last-document / empty-profile launch leaving `loading` without a click,
+Shift+Tab or other focus event, and to skipping the hidden `quick-capture`
+WebView on the current Screen-only macOS backend. Area, Window, hotkey and
+decoded-PNG Screen capture remain outside this record.
+
+- Focused Vue: `app-startup.test.ts` 2/2; `App.test.ts` plus capture/store
+  regressions 38/38. Isolated `App.test.ts` later 22/22, then 21/22 on a
+  second pair with `m08-precision-interactions.test.ts` because one unrelated
+  M02 Arrow default test hit the 5s timeout.
+- `cargo test -p cute-screen-desktop --lib prewarm` 3/3, including
+  `macos_screen_backend_does_not_prewarm_quick_capture`.
+- `pnpm test` after `fixtures:generate:m01`: 458/463. The five failures were
+  5s timeouts in unrelated M02/M08 Vue cases under full-suite load, not
+  startup/mount. `cargo test --workspace` 108/108. Scoped Prettier/ESLint on
+  the startup files and `cargo clippy -p cute-screen-desktop --lib
+--all-targets -- -D warnings` passed. Full `pnpm check` was not rerun
+  against the already dirty tree.
+- `pnpm tauri dev` with the existing last document
+  (`session.activeCaptureId` `01a0491c-f9eb-7251-9473-810f9456395b`, schema 7) left `loading` and mounted the persisted document without a click or
+  Shift+Tab. Capture and Open image stayed available. CGWindow list had one
+  `Cute Screen` window and no `Cute Screen Quick Capture`. Evidence:
+  `artifacts/macos-startup/last-document.png`.
+- The same command on a moved-aside app-local-data/cache profile left
+  `loading` for the empty title «Сделайте первый снимок» with Capture and
+  Open image available. Again no `quick-capture` window. Evidence:
+  `artifacts/macos-startup/empty-profile.png`. The previous library was
+  restored afterwards.
+- This does not claim macOS Screen capture `supported`, Area/quick-mode, or
+  Windows/Linux startup runtime.
+
+## Editor shell height chain (2026-08-29)
+
+macOS 12.7.6 (21H1320), x86_64, Node `22.23.1`, Chrome `150.0.7871.125`.
+`.cs-editor-shell` no longer uses `100dvh`. `#app`, `.n-config-provider` and
+the shell share `height: 100%` so the absolutely positioned workbench cannot
+exceed the window.
+
+- Focused `CUTE_SCREEN_BROWSER_E2E_PORT=5179 pnpm exec wdio run
+  tests/e2e/wdio.browser.conf.ts --spec tests/e2e/specs/browser-shell.e2e.ts`
+  passed 6/7. The 1024×700 case asserted `.n-config-provider` fills `#app`,
+  `.cs-workbench` is not taller than `#app`, and filmstrip/rail/zoom stay
+  inside `window.innerHeight`. Screenshot:
+  `artifacts/browser-e2e/m02-ready-1024x700.png`.
+- The remaining `loading` / recoverable-error / keyboard-focus case timed out
+  at 30s after the layout cases; a later isolated retry was interrupted by
+  unrelated HMR. That case is outside this height-chain change.
+- `pnpm test:e2e:tauri` was not run on this machine.
 
 ## CI gates
 
