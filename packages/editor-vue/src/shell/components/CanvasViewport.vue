@@ -931,7 +931,7 @@ async function drawDocument(): Promise<void> {
     }
     setCommittedScene(runtime)
     runtime.render(['scene'])
-    if (props.quickFrameMode) readyDocumentId = props.document.id
+    readyDocumentId = props.document.id
   } catch (error) {
     if (revision !== drawRevision) return
     renderer?.dispose()

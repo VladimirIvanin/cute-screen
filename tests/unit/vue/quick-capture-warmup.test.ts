@@ -2,7 +2,10 @@ import { render } from '@testing-library/vue'
 import { defineComponent } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createEditorShellPinia } from '@cute-screen/editor-vue'
+import {
+  createEditorShellPinia,
+  useEditorShellStore,
+} from '@cute-screen/editor-vue'
 
 const mocks = vi.hoisted(() => ({
   getActive: vi.fn(),
@@ -91,5 +94,20 @@ describe('GTK quick capture mapped warmup', () => {
     )
     expect(mocks.present).not.toHaveBeenCalled()
     expect(mocks.reveal).not.toHaveBeenCalled()
+  })
+
+  it('replaces the loading overlay after the pending full-frame session mounts', async () => {
+    const pinia = createEditorShellPinia()
+    const view = render(QuickCaptureApp, {
+      global: { plugins: [pinia] },
+    })
+
+    await vi.waitFor(() => expect(mocks.loadImage).toHaveBeenCalledOnce())
+    await vi.waitFor(() =>
+      expect(view.container.querySelector('.cs-loading')).toBeNull(),
+    )
+    expect(useEditorShellStore(pinia).documentState).toMatchObject({
+      kind: 'ready',
+    })
   })
 })

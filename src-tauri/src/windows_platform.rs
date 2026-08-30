@@ -64,9 +64,9 @@ use crate::{
 /// Direct Windows desktop capture using DWM's composited DXGI outputs.
 ///
 /// Captures a composited virtual desktop into an application-owned BGRA buffer.
-/// Interactive targets resolve and destroy their selector first, then acquire
-/// one immutable frame, so the latest pixels are used and the selector itself
-/// never appears in the result.
+/// Window capture resolves and destroys its selector before acquiring the
+/// immutable frame. Area capture acquires the full virtual desktop directly;
+/// the mounted Quick Capture surface owns selection and editing as one mode.
 pub struct WindowsCompositorCaptureAdapter;
 
 impl WindowsCompositorCaptureAdapter {
@@ -87,15 +87,27 @@ impl WindowsCompositorCaptureAdapter {
             ThreadDpiAwarenessGuard::enter().map_err(|stage| failure(correlation_id, stage))?;
         let source_geometry =
             virtual_screen_geometry().map_err(|stage| failure(correlation_id, stage))?;
+        if cancel_signal.load(Ordering::Acquire) {
+            return Err(PlatformError::new(
+                PlatformErrorCode::Cancelled,
+                correlation_id,
+            ));
+        }
         let (geometry, source_bgra) = match capture_execution_order(target) {
+            CaptureExecutionOrder::FrameForQuickSelection => {
+                let frame_started = Instant::now();
+                let frame = capture_fresh_compositor_frame(&source_geometry, correlation_id)?;
+                log_capture_timing(
+                    correlation_id,
+                    "compositor-for-quick-selection",
+                    frame_started,
+                );
+                (source_geometry.clone(), frame)
+            }
             CaptureExecutionOrder::SelectThenFrame => {
                 let prepared = prepare_compositor_capture(&source_geometry, correlation_id)?;
-                let geometry = resolve_target_geometry(
-                    target,
-                    &source_geometry,
-                    correlation_id,
-                    &cancel_signal,
-                )?;
+                let geometry =
+                    selected_window_geometry(&source_geometry, correlation_id, &cancel_signal)?;
                 let _pulse = CompositorPulse::show(&source_geometry, correlation_id)?;
                 flush_desktop_composition(correlation_id)?;
                 let frame_started = Instant::now();
@@ -108,12 +120,15 @@ impl WindowsCompositorCaptureAdapter {
                 let frame_started = Instant::now();
                 let frame = capture_compositor_frame(&source_geometry, correlation_id)?;
                 log_capture_timing(correlation_id, "compositor-before-selection", frame_started);
-                let geometry = resolve_target_geometry(
-                    target,
-                    &source_geometry,
-                    correlation_id,
-                    &cancel_signal,
-                )?;
+                let geometry = match target {
+                    CaptureTarget::Monitor => source_geometry.clone(),
+                    CaptureTarget::ActiveWindow => {
+                        active_window_geometry(&source_geometry, correlation_id)?
+                    }
+                    CaptureTarget::Area | CaptureTarget::Window => {
+                        return Err(failure(correlation_id, "captureExecutionOrder"));
+                    }
+                };
                 (geometry, frame)
             }
         };
@@ -177,7 +192,7 @@ impl WindowsCompositorCaptureAdapter {
             height,
             geometry: Some(geometry),
             quick_frame_geometry,
-            quick_selection_pending: false,
+            quick_selection_pending: uses_mounted_quick_selection(target),
             cursor_included: Some(false),
         })
     }
@@ -194,31 +209,23 @@ fn log_capture_timing(correlation_id: &str, stage: &str, started: Instant) {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CaptureExecutionOrder {
+    FrameForQuickSelection,
     SelectThenFrame,
     FrameThenResolve,
 }
 
 fn capture_execution_order(target: CaptureTarget) -> CaptureExecutionOrder {
     match target {
-        CaptureTarget::Area | CaptureTarget::Window => CaptureExecutionOrder::SelectThenFrame,
+        CaptureTarget::Area => CaptureExecutionOrder::FrameForQuickSelection,
+        CaptureTarget::Window => CaptureExecutionOrder::SelectThenFrame,
         CaptureTarget::Monitor | CaptureTarget::ActiveWindow => {
             CaptureExecutionOrder::FrameThenResolve
         }
     }
 }
 
-fn resolve_target_geometry(
-    target: CaptureTarget,
-    source: &CaptureGeometry,
-    correlation_id: &str,
-    cancel_signal: &AtomicBool,
-) -> Result<CaptureGeometry, PlatformError> {
-    match target {
-        CaptureTarget::Monitor => Ok(source.clone()),
-        CaptureTarget::Area => area_geometry(source, correlation_id, cancel_signal),
-        CaptureTarget::Window => selected_window_geometry(source, correlation_id, cancel_signal),
-        CaptureTarget::ActiveWindow => active_window_geometry(source, correlation_id),
-    }
+const fn uses_mounted_quick_selection(target: CaptureTarget) -> bool {
+    matches!(target, CaptureTarget::Area)
 }
 
 fn capture_compositor_frame(
@@ -226,6 +233,17 @@ fn capture_compositor_frame(
     correlation_id: &str,
 ) -> Result<Vec<u8>, PlatformError> {
     let outputs = capture_compositor_outputs(source, correlation_id)?;
+    compose_compositor_outputs(source, &outputs, correlation_id)
+}
+
+fn capture_fresh_compositor_frame(
+    source: &CaptureGeometry,
+    correlation_id: &str,
+) -> Result<Vec<u8>, PlatformError> {
+    let prepared = prepare_compositor_capture(source, correlation_id)?;
+    let _pulse = CompositorPulse::show(source, correlation_id)?;
+    flush_desktop_composition(correlation_id)?;
+    let outputs = capture_prepared_compositor_outputs(&prepared, correlation_id)?;
     compose_compositor_outputs(source, &outputs, correlation_id)
 }
 
@@ -273,27 +291,6 @@ static SELECTOR_STATE: Mutex<SelectionState> = Mutex::new(SelectionState {
 static SELECTOR_CLASS_REGISTERED: OnceLock<bool> = OnceLock::new();
 const SELECTOR_CLIENT_HIT: LRESULT = 1;
 const SELECTOR_DIM_ALPHA: u8 = 128;
-
-fn area_geometry(
-    source: &CaptureGeometry,
-    correlation_id: &str,
-    cancel_signal: &AtomicBool,
-) -> Result<CaptureGeometry, PlatformError> {
-    let selection = select_on_virtual_desktop(source, correlation_id, cancel_signal)?;
-    let (Some(start), Some(end)) = (selection.start, selection.end) else {
-        return Err(PlatformError::new(
-            PlatformErrorCode::Cancelled,
-            correlation_id,
-        ));
-    };
-    let left = start.x.min(end.x);
-    let top = start.y.min(end.y);
-    let right = start.x.max(end.x);
-    let bottom = start.y.max(end.y);
-    let geometry = intersect_rect(source, left, top, right - left, bottom - top)
-        .ok_or_else(|| PlatformError::new(PlatformErrorCode::Cancelled, correlation_id))?;
-    Ok(geometry)
-}
 
 fn selected_window_geometry(
     source: &CaptureGeometry,
@@ -558,6 +555,9 @@ struct CompositorPulse(HWND);
 
 impl CompositorPulse {
     fn show(desktop: &CaptureGeometry, correlation_id: &str) -> Result<Self, PlatformError> {
+        if !*SELECTOR_CLASS_REGISTERED.get_or_init(register_selector_class) {
+            return Err(last_error(correlation_id, "registerCompositorPulseClass"));
+        }
         let (extended_style, alpha) = compositor_pulse_policy();
         let class_name = selector_class_name();
         let window = unsafe {
@@ -1409,7 +1409,7 @@ mod tests {
     use super::{
         CaptureExecutionOrder, CompositorOutputFrame, capture_execution_order,
         compose_compositor_outputs, crop_bgra, encode_bgra_png, foreground_restore_candidate,
-        intersect_rect,
+        intersect_rect, uses_mounted_quick_selection,
     };
     use crate::platform::CaptureGeometry;
 
@@ -1563,10 +1563,10 @@ mod tests {
     }
 
     #[test]
-    fn interactive_targets_resolve_before_their_final_compositor_frame() {
+    fn area_uses_the_mounted_quick_surface_while_window_keeps_native_selection() {
         assert_eq!(
             capture_execution_order(crate::platform::CaptureTarget::Area),
-            CaptureExecutionOrder::SelectThenFrame
+            CaptureExecutionOrder::FrameForQuickSelection
         );
         assert_eq!(
             capture_execution_order(crate::platform::CaptureTarget::Window),
@@ -1576,6 +1576,12 @@ mod tests {
             capture_execution_order(crate::platform::CaptureTarget::Monitor),
             CaptureExecutionOrder::FrameThenResolve
         );
+        assert!(uses_mounted_quick_selection(
+            crate::platform::CaptureTarget::Area
+        ));
+        assert!(!uses_mounted_quick_selection(
+            crate::platform::CaptureTarget::Window
+        ));
     }
 
     #[test]
@@ -1630,10 +1636,8 @@ mod tests {
     fn compositor_runtime_probe_reads_the_visible_desktop() {
         let _dpi_awareness = super::ThreadDpiAwarenessGuard::enter().expect("DPI awareness");
         let desktop = super::virtual_screen_geometry().expect("virtual desktop");
-        let outputs = super::capture_compositor_outputs(&desktop, "dxgi-runtime-probe")
-            .expect("DXGI compositor outputs");
-        let frame = super::compose_compositor_outputs(&desktop, &outputs, "dxgi-runtime-probe")
-            .expect("composited virtual desktop");
+        let frame = super::capture_fresh_compositor_frame(&desktop, "dxgi-runtime-probe")
+            .expect("fresh composited virtual desktop");
 
         assert_eq!(
             frame.len(),

@@ -184,6 +184,67 @@ describe('Tauri build boundary', () => {
     )
   })
 
+  it('keeps Windows Area selection inside the mounted Quick surface', async () => {
+    const platformSource = await readFile(
+      path.join(process.cwd(), 'src-tauri', 'src', 'windows_platform.rs'),
+      'utf8',
+    )
+    const captureStart = platformSource.indexOf('pub fn capture_to_transport')
+    const captureEnd = platformSource.indexOf(
+      'fn log_capture_timing',
+      captureStart,
+    )
+    const captureSource = platformSource.slice(captureStart, captureEnd)
+
+    expect(captureStart).toBeGreaterThanOrEqual(0)
+    expect(captureEnd).toBeGreaterThan(captureStart)
+    expect(platformSource).toContain(
+      'CaptureTarget::Area => CaptureExecutionOrder::FrameForQuickSelection',
+    )
+    expect(platformSource).toContain(
+      'quick_selection_pending: uses_mounted_quick_selection(target)',
+    )
+    expect(platformSource).not.toContain('fn area_geometry(')
+    expect(captureSource).not.toContain('select_on_virtual_desktop(')
+    expect(captureSource).toContain(
+      'capture_fresh_compositor_frame(&source_geometry, correlation_id)',
+    )
+    expect(platformSource).toMatch(
+      /fn capture_fresh_compositor_frame[\s\S]*prepare_compositor_capture\([\s\S]*CompositorPulse::show\([\s\S]*flush_desktop_composition\([\s\S]*capture_prepared_compositor_outputs\(/,
+    )
+    expect(platformSource).toMatch(
+      /impl CompositorPulse[\s\S]*SELECTOR_CLASS_REGISTERED\.get_or_init\(register_selector_class\)/,
+    )
+  })
+
+  it('hands Windows Quick Capture to the editor once without remapping the dismissed window', async () => {
+    const hostSource = await readFile(
+      path.join(process.cwd(), 'src-tauri', 'src', 'lib.rs'),
+      'utf8',
+    )
+    const dismissStart = hostSource.indexOf('fn quick_capture_dismiss')
+    const dismissEnd = hostSource.indexOf('#[tauri::command]', dismissStart + 1)
+    const dismissSource = hostSource.slice(dismissStart, dismissEnd)
+    const windowsDismissSource = dismissSource.match(
+      /#\[cfg\(target_os = "windows"\)\]\s*\{([\s\S]*?)\n\s*\}/,
+    )?.[1]
+
+    expect(hostSource).toMatch(
+      /fn quick_capture_commit[\s\S]*commit_quick_draft\([\s\S]*prepare_quick_capture_editor_handoff\([\s\S]*timeout\(/,
+    )
+    expect(hostSource).toMatch(
+      /fn prepare_quick_capture_editor_handoff[\s\S]*show_editor\([\s\S]*set_always_on_top\(false\)/,
+    )
+    expect(dismissSource).toMatch(
+      /target_os = "windows"[\s\S]*set_always_on_top\(false\)[\s\S]*window\.hide\(\)/,
+    )
+    expect(windowsDismissSource).toBeDefined()
+    expect(windowsDismissSource).not.toContain('set_fullscreen(false)')
+    expect(hostSource).toMatch(
+      /fn quick_capture_present[\s\S]*target_os = "windows"[\s\S]*set_always_on_top\(true\)[\s\S]*set_fullscreen\(true\)/,
+    )
+  })
+
   it('stages the X11 Area frame before the single Quick selection surface maps', async () => {
     const platformSource = await readFile(
       path.join(process.cwd(), 'src-tauri', 'src', 'x11_platform.rs'),

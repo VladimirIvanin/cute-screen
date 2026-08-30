@@ -1693,6 +1693,68 @@ tests/e2e/wdio.browser.conf.ts --spec tests/e2e/specs/browser-shell.e2e.ts`
   unrelated HMR. That case is outside this height-chain change.
 - `pnpm test:e2e:tauri` was not run on this machine.
 
+## Windows unified Quick selection surface (2026-08-30)
+
+Windows x64. The change is limited to Area capture presentation: Area and its
+editor now share one fullscreen Quick surface. Window capture retains the
+native selector and direct-document flow; immutable originals, materialization
+and export contracts are unchanged.
+
+- Red-first `cargo test -p cute-screen-desktop
+windows_platform::tests::area_uses_the_mounted_quick_surface_while_window_keeps_native_selection`
+  failed because `FrameForQuickSelection` did not exist. After implementation it
+  passed: Area freezes the full DXGI virtual desktop and marks the draft pending,
+  while Window alone keeps `SelectThenFrame`.
+- `build-contract.test.ts` verifies that the Windows Area capture route cannot
+  call `select_on_virtual_desktop` or define a separate `area_geometry` path.
+  It also pins prepared duplication → registered transparent compositor pulse →
+  `DwmFlush` → output acquisition. Shared Vue coverage keeps the mounted
+  `CanvasViewport`, emits one `setCrop`, changes only `selecting → editing`, and
+  now mounts the real pending Quick session to prove Pinia reaches `ready` and
+  removes `.cs-loading`.
+- Red-first interactive Rust probe initially received a correctly sized but
+  all-zero first DXGI frame on a controlled non-black desktop. The first repair
+  attempt failed with Win32 error 1407 because Area no longer created the native
+  selector class. After `CompositorPulse::show` registered that class and the
+  Area route used the fresh-frame sequence, the same ignored runtime probe
+  passed with non-zero visible-desktop pixels.
+- `pnpm tauri build --debug --no-bundle` produced the standalone binary used for
+  the repair replay.
+- Windows 10 Home 22H2 build 19045 x64, single 2560×1440 physical display at
+  125% scale: Area opened directly as one fullscreen `Cute Screen Quick Capture`
+  HWND `0x4078C`. No second Cute Screen/selector HWND appeared. The selecting
+  screenshot contains the actual frozen desktop rather than a black frame. The
+  same HWND remained after an injected `420,300 → 1400,900` drag; the existing
+  surface showed the expected 1225×750 physical crop, preserved its frozen
+  pixels/dashed frame, added tools/actions and did not show
+  `Подготавливаем редактор…`. Escape removed the Quick window. Evidence:
+  `artifacts/windows-area-repair/selecting.png` and
+  `artifacts/windows-area-repair/editing.png`.
+- Cross-monitor bounds remain a separate runtime gate.
+- Windows Editor handoff red-first evidence: a regular (non-quick)
+  `CanvasViewport` emitted no `frameReady`, so the focused component regression
+  failed with `frameReady = undefined`. The persisted document was already
+  visible in main, but `quick_capture_commit` timed out waiting for an event the
+  main renderer could never emit. The repair emits readiness after every
+  completed document render, lowers the Windows Quick window before the native
+  mount wait, and prevents post-hide fullscreen mutation.
+- Windows 10 dev replay without CLI `--json`: after one UI Automation Invoke of
+  `Редактор`, main became visible at 104 ms and Quick became invisible at 163 ms.
+  Three seconds later only main remained visible and the resident process was
+  alive. The former failed replay retained both HWNDs and showed a 654×487 Quick
+  window after the materialized fallback. Evidence:
+  `artifacts/windows-area-repair/editor-handoff-one-click.png`.
+- Final stable checks for this slice: `cargo test --workspace` passed 123 tests
+  with the interactive DXGI probe ignored; `pnpm test` passed 55 files and
+  476/476 tests; the ignored interactive DXGI probe passed separately.
+  `pnpm lint`, `pnpm typecheck`, `pnpm docs:check`, focused
+  `build-contract.test.ts` 12/12 and `pnpm check:rust` passed;
+  `pnpm tauri build --debug --no-bundle` passed.
+  Repository-wide `pnpm check` remains blocked by pre-existing Prettier drift in
+  39 untouched files. Full `pnpm test:boundaries` also retains one unrelated
+  failure in `editor-core.test.ts` because its regex no longer finds the current
+  `IconName` declaration; 19/20 boundary tests passed.
+
 ## CI gates
 
 ### Каждый PR

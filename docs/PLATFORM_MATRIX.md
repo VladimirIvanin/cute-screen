@@ -9,8 +9,8 @@
 | GNOME Wayland   | x86_64/aarch64 | XDG Screenshot portal                                                                                     | XDG GlobalShortcuts или CLI fallback   | deb, AppImage             |
 | KDE Wayland     | x86_64/aarch64 | XDG Screenshot portal                                                                                     | XDG GlobalShortcuts или CLI fallback   | deb, AppImage             |
 | wlroots Wayland | x86_64/aarch64 | Portal при наличии                                                                                        | Portal при наличии, иначе CLI fallback | deb, AppImage             |
-| Windows         | x86_64         | DXGI/D3D11 compositor frozen-frame adapter with area/window selector; topmost-window smoke pending        | Tauri/global-hotkey                    | NSIS exe                  |
-| Windows 11      | ARM64          | DXGI/D3D11 compositor frozen-frame adapter with area/window selector; runtime smoke pending               | Tauri/global-hotkey                    | NSIS exe                  |
+| Windows         | x86_64         | DXGI/D3D11 frozen Area Quick surface; single-HWND/pixel replay passed; cross-monitor smoke pending        | Tauri/global-hotkey                    | NSIS exe                  |
+| Windows 11      | ARM64          | DXGI/D3D11 frozen Area Quick surface; native Window selector; runtime smoke pending                       | Tauri/global-hotkey                    | NSIS exe                  |
 | macOS           | Intel          | Native AppKit Area/Window; CG 12.0–12.2, intended SCKit 12.3+ routing; runtime smoke pending              | later slice: Tauri/global-hotkey       | universal DMG             |
 | macOS           | Apple Silicon  | Same versioned native adapter as Intel; compile/CI until owner runtime                                    | later slice: Tauri/global-hotkey       | universal DMG             |
 
@@ -20,15 +20,15 @@ API и webview. Release baseline не повышается без ADR и CI-до
 
 ## Capture capabilities
 
-| Возможность      | X11                                            | Wayland portal                                         | Windows                               | macOS                        |
-| ---------------- | ---------------------------------------------- | ------------------------------------------------------ | ------------------------------------- | ---------------------------- |
-| Area             | One fullscreen Quick surface: select → edit    | System selector                                        | Live selector; DXGI freeze on confirm | AppKit; frozen quick-mode    |
-| Screen           | Root or Composite Overlay Window               | Portal target/capability                               | DXGI virtual screen                   | Direct after permission      |
-| Window           | Direct/window list                             | Portal target/capability                               | Direct/window list                    | Native; direct document      |
-| Active window    | Window manager adapter                         | Portal when exposed, otherwise clear unavailable state | Native                                | Not advertised (later slice) |
-| Repeat last area | Stored physical/image geometry with validation | New portal interaction if silent reuse is unavailable  | Stored geometry                       | Not advertised (later slice) |
-| Delay            | App countdown before backend invocation        | App countdown before portal                            | App countdown                         | App countdown                |
-| Cursor           | Capability-dependent                           | Portal-dependent                                       | Backend option                        | Not advertised               |
+| Возможность      | X11                                            | Wayland portal                                         | Windows                                     | macOS                        |
+| ---------------- | ---------------------------------------------- | ------------------------------------------------------ | ------------------------------------------- | ---------------------------- |
+| Area             | One fullscreen Quick surface: select → edit    | System selector                                        | One fullscreen Quick surface: select → edit | AppKit; frozen quick-mode    |
+| Screen           | Root or Composite Overlay Window               | Portal target/capability                               | DXGI virtual screen                         | Direct after permission      |
+| Window           | Direct/window list                             | Portal target/capability                               | Direct/window list                          | Native; direct document      |
+| Active window    | Window manager adapter                         | Portal when exposed, otherwise clear unavailable state | Native                                      | Not advertised (later slice) |
+| Repeat last area | Stored physical/image geometry with validation | New portal interaction if silent reuse is unavailable  | Stored geometry                             | Not advertised (later slice) |
+| Delay            | App countdown before backend invocation        | App countdown before portal                            | App countdown                               | App countdown                |
+| Cursor           | Capability-dependent                           | Portal-dependent                                       | Backend option                              | Not advertised               |
 
 Area является единственной capture action, которая заканчивается в quick-mode.
 На X11/Windows/macOS quick surface сохраняет frozen desktop и physical
@@ -133,15 +133,25 @@ UI получает `CaptureCapabilities` и не показывает непо�
 - Windows backend uses DXGI Desktop Duplication plus a D3D11 CPU-readable
   staging texture for every attached output. It assembles one physical
   virtual-desktop frame under a per-monitor-v2 DPI context. Screen and Active
-  Window are direct snapshots. Area and Window prepare DXGI duplication before
-  selection, then destroy the selector, restore the foreground window, issue a
-  fully transparent non-activating compositor pulse, flush DWM and only then
-  acquire/crop the immutable frame. A pointer-only update is retried only when
+  Window are direct snapshots. Area prepares duplication after the editor is
+  hidden, registers/shows a transparent non-activating compositor pulse, waits
+  for `DwmFlush`, then acquires one full frozen frame and opens the prewarmed
+  fullscreen Quick WebView directly in `selecting`; the first crop and later
+  annotation chrome share its mounted scene/overlay hosts. Window alone keeps
+  the native selector, foreground
+  restore, transparent compositor pulse, DWM flush and final acquire/crop. A
+  pointer-only update is retried only when
   it has no desktop resource; protected-content masking and rotated outputs fail
   explicitly, and there is no GDI fallback. Unit assembly/crop and
   a local interactive-desktop compositor probe pass on Windows x64 (2026-08-12);
   the Task Manager/topmost-window pixel smoke is still required before a
   `supported` claim.
+- Windows 10 build 19045 x64 repair replay (2026-08-30) kept fullscreen Quick
+  HWND `0x4078C` before and after the first drag, showed no native Area selector
+  HWND and preserved visible frozen desktop pixels while changing the same
+  surface from selecting hint to a 1225×750 physical crop with tools/actions.
+  The loading overlay was absent and Escape removed the Quick window.
+  Cross-monitor validation remains pending.
 - Локальный M01 smoke на Windows x64 подтвердил WebView2 runtime: asset decode,
   binary IPC/Blob fallback и typed error для corrupted PNG.
 - Повторная локальная regression-проверка 2026-08-10 на Windows 10 Home 22H2

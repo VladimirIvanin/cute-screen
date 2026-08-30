@@ -433,7 +433,7 @@ typed capture failure. Существующие non-composited X11 smoke ост�
 
 ## ADR-029 — Windows interactive capture freezes on confirmation
 
-**Статус:** accepted; момент materialization Area original superseded by ADR-036
+**Статус:** superseded для Area by ADR-040; Window behavior remains accepted
 
 **Контекст:** ADR-027 исправил источник pixels, но сохранил неверный момент
 заморозки: DXGI frame создавался до selector. Если пользователь открывал Area,
@@ -459,7 +459,8 @@ immutable original определяется в момент подтвержде
 ## ADR-036 — Area capture использует временный quick draft
 
 **Статус:** accepted; supersedes only the Area immutable-original timing of
-ADR-029; X11 Area presentation superseded by ADR-039
+ADR-029; X11 Area presentation superseded by ADR-039; Windows Area presentation
+superseded by ADR-040
 
 **Контекст:** обязательное открытие полного редактора после Area мешает
 сценарию «выделить → скопировать». При этом custom annotation chrome нельзя
@@ -514,6 +515,47 @@ handoff из Quick reveal/dismiss. Resident GNOME/X11 smoke проверяет �
 native окном. UI-start from a visible editor по-прежнему ждёт его безопасного
 исчезновения из compositor frame. Wayland и macOS/Windows presentation не
 меняются этим ADR.
+
+## ADR-040 — Windows Area выбирается внутри единой Quick Capture surface
+
+**Статус:** accepted; supersedes Windows Area selection/presentation portions of
+ADR-029 and ADR-036; Windows Window behavior remains unchanged
+
+**Контекст:** Windows сохранял отдельный Win32 Area selector: mouse-up закрывал
+его, после чего DXGI получал новый frame и только затем показывал Quick WebView.
+После перехода X11 на единую surface это оставляло на Windows два окна, два
+interaction lifecycle и визуальную смену режима между выделением и
+аннотированием, хотя продуктовый контракт `REQ-CAP-012/013` требует один режим.
+
+**Решение:** Windows Area после скрытия editor получает один frozen physical
+virtual-desktop frame через DXGI и передаёт его в owned binary transport как
+full-frame quick draft с `selectionPending`. Чтобы первая acquisition не вернула
+нулевой queued frame, backend сначала создаёт duplication, регистрирует и
+показывает прозрачный non-activating compositor pulse, ждёт `DwmFlush` и только
+затем читает outputs. Prewarmed fullscreen Quick WebView один раз показывается в
+фазе `selecting`; первый валидный drag создаёт crop одной `EditorCommand` и
+переводит ту же mounted surface в `editing`. Отдельный Win32 Area selector,
+selector destruction и повторный DXGI acquire на mouse-up из этого маршрута
+удаляются. Window capture сохраняет native selector и `SelectThenFrame`, потому
+что оно создаёт direct document и не является Area quick-mode.
+
+Terminal Editor handoff сохраняет first-frame gate, но устраняет Windows
+occlusion cycle: после успешной materialization native host показывает main,
+снимает `always_on_top` с Quick и повторно фокусирует main до ожидания renderer
+acknowledgement. Обычный editor `CanvasViewport` обязан отправлять `frameReady`
+после завершённого render, а не только в `quickFrameMode`. После acknowledgement
+Windows Quick снимает topmost и скрывается без post-hide `set_fullscreen(false)`,
+который WebView2/Win32 мог интерпретировать как повторный show обычного окна.
+
+**Проверяемое основание:** red-first Windows Rust contract различает
+`FrameForQuickSelection` для Area и `SelectThenFrame` для Window, boundary test
+запрещает вызов native selector из Area capture route, а общие Vue tests требуют
+один `setCrop` и неизменные scene/overlay hosts при `selecting → editing`.
+Windows runtime smoke проверяет один fullscreen Quick HWND, неизменный frozen
+frame и физические mixed-DPI/cross-monitor bounds до, во время и после drag.
+Отдельные component/boundary regressions требуют main-mode `frameReady`, lowering
+до mount wait и Windows dismiss без fullscreen mutation; runtime replay проверяет
+один клик Editor и отсутствие видимого Quick HWND после задержки.
 
 ## ADR-030 — Naive UI как слой интерактивных Vue-примитивов
 

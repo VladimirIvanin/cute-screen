@@ -872,6 +872,10 @@ fn quick_capture_present(
     let window = app
         .get_webview_window("quick-capture")
         .ok_or_else(|| "quick capture window is unavailable".to_owned())?;
+    #[cfg(target_os = "windows")]
+    window
+        .set_always_on_top(true)
+        .map_err(|error| error.to_string())?;
     #[cfg(target_os = "macos")]
     {
         macos_platform::fit_quick_capture_to_pointer_screen(&window)?;
@@ -931,12 +935,22 @@ fn quick_capture_dismiss(app: tauri::AppHandle) -> Result<bool, String> {
     let Some(window) = app.get_webview_window("quick-capture") else {
         return Ok(false);
     };
-    window.hide().map_err(|error| error.to_string())?;
+    #[cfg(target_os = "windows")]
+    {
+        window
+            .set_always_on_top(false)
+            .map_err(|error| error.to_string())?;
+        window.hide().map_err(|error| error.to_string())?;
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        window.hide().map_err(|error| error.to_string())?;
+        window
+            .set_fullscreen(false)
+            .map_err(|error| error.to_string())?;
+    }
     #[cfg(all(target_os = "linux", feature = "x11-capture"))]
     x11_platform::note_app_surface_hidden();
-    window
-        .set_fullscreen(false)
-        .map_err(|error| error.to_string())?;
     Ok(true)
 }
 
@@ -946,6 +960,7 @@ async fn quick_capture_commit(
     document_json: String,
     completion: CaptureCompletion,
     selection: QuickCaptureSelectionV1,
+    app: tauri::AppHandle,
     controller: State<'_, CaptureController>,
     mounts: State<'_, QuickEditorMountService>,
 ) -> Result<CaptureOutcomeV2, RepositoryError> {
@@ -975,6 +990,9 @@ async fn quick_capture_commit(
                 return Err(error);
             }
         };
+    if completion == CaptureCompletion::Editor {
+        prepare_quick_capture_editor_handoff(&app)?;
+    }
     if let (Some(document_id), Some(acknowledgement)) = (document_id, acknowledgement) {
         let mounted = matches!(
             tokio::time::timeout(std::time::Duration::from_secs(10), acknowledgement).await,
@@ -1308,6 +1326,27 @@ fn show_editor<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     }
 }
 
+fn prepare_quick_capture_editor_handoff<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+) -> Result<(), RepositoryError> {
+    #[cfg(target_os = "windows")]
+    {
+        show_editor(app);
+        if let Some(window) = app.get_webview_window("quick-capture") {
+            window
+                .set_always_on_top(false)
+                .map_err(|error| RepositoryError::Io(error.to_string()))?;
+            // The first focus attempt can still land behind the former topmost
+            // window. Repeat it after lowering Quick so WebView2 can render and
+            // acknowledge the editor's first frame without an occlusion timeout.
+            show_editor(app);
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    let _ = app;
+    Ok(())
+}
+
 fn quick_capture_webview_url() -> WebviewUrl {
     WebviewUrl::App("index.html?quickCapture=1".into())
 }
@@ -1396,10 +1435,20 @@ const fn should_prewarm_quick_capture_at_area_preflight(
 
 fn ensure_quick_capture_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("quick-capture") {
-        window.hide().map_err(|error| error.to_string())?;
-        window
-            .set_fullscreen(false)
-            .map_err(|error| error.to_string())?;
+        #[cfg(target_os = "windows")]
+        {
+            window
+                .set_always_on_top(false)
+                .map_err(|error| error.to_string())?;
+            window.hide().map_err(|error| error.to_string())?;
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            window.hide().map_err(|error| error.to_string())?;
+            window
+                .set_fullscreen(false)
+                .map_err(|error| error.to_string())?;
+        }
         return Ok(());
     }
     let policy = quick_capture_window_policy();

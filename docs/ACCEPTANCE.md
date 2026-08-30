@@ -477,10 +477,11 @@ remain pending.
 7. Save cancel не материализует draft; успешный Save создаёт document, атомарный
    PNG и проходит повторный decode. Editor открывает тот же editable document с
    сохранёнными слоями и history-compatible geometry.
-8. Повторить на Windows/X11/macOS mixed-DPI и cross-monitor layouts. На macOS
-   Area должен использовать native AppKit selector и единый frozen
-   multi-display frame. На Wayland подтвердить системный selector,
-   fragment-only surface и disabled expansion.
+8. Повторить на Windows/X11/macOS mixed-DPI и cross-monitor layouts. На Windows
+   и X11 Area должен использовать единственную fullscreen Quick surface без
+   отдельного native Area selector. На macOS Area должен использовать native
+   AppKit selector и единый frozen multi-display frame. На Wayland подтвердить
+   системный selector, fragment-only surface и disabled expansion.
 9. Screen, Window, Active Window и Repeat по-прежнему открывают полный editor.
 10. Для resident X11/Windows процесса измерить mouse-up → `IsViewable`
     interactive quick chrome; временный preview не должен синхронно сжимать
@@ -495,6 +496,15 @@ remain pending.
     остаток интервала, а видимый editor становится `IsUnMapped` до snapshot.
     Первый drag на показанной Quick surface принимается без дополнительной
     подготовки; Escape возвращает typed `cancelled` и не материализует draft.
+13. На Windows проверить тот же single-surface lifecycle: до drag существует
+    один fullscreen `Cute Screen Quick Capture` HWND, первый physical drag не
+    закрывает и не заменяет его, а после mouse-up те же scene/overlay canvas
+    сохраняют frozen frame и рамку, добавляя tools/actions. Win32 Area selector
+    не должен появляться; Window capture по-прежнему использует native selector.
+14. В Windows editing нажать `Редактор` ровно один раз. Main должен стать видимым
+    с materialized document и получить первый renderer frame; Quick должен
+    потерять topmost и скрыться без timeout. Через три секунды видим только main;
+    Quick не remap-ится уменьшенным non-fullscreen окном.
 
 Resident Ubuntu 24.04 / GNOME 46 / X11 replay (2026-08-30) подтвердил пункт 11:
 одна fullscreen Quick surface сохранила XID `0x42000fc` до и после физического
@@ -503,6 +513,21 @@ dim/crosshair и подсказку; editing frame сохранил точную
 tools/actions. Dev/debug command → focused selecting составил 723 ms из
 видимого editor и 607 ms из скрытого процесса. Escape скрыл тот же XID,
 ожидавший CLI получил typed `cancelled`.
+
+Windows 10 Home 22H2 build 19045 x64 repair replay (2026-08-30) подтвердил
+single-display часть пункта 13: до и после первого drag оставался один fullscreen
+Quick HWND `0x4078C`, отдельного selector HWND не было, а та же surface сохранила
+видимые frozen desktop pixels и сменила hint-only selecting на рамку 1225×750 с
+tools/actions. `Подготавливаем редактор…` после drag отсутствует; Escape убрал
+Quick window. Артефакты: `artifacts/windows-area-repair/selecting.png` и
+`artifacts/windows-area-repair/editing.png`. Cross-monitor/mixed-DPI layout
+остаётся отдельным pending gate.
+
+Windows dev replay terminal Editor handoff (2026-08-30) подтвердил пункт 14:
+после одного UI Automation Invoke main HWND стал видим через 104 ms, Quick HWND
+скрылся к 163 ms; через три секунды `Quick=false`, `Main=true`, resident process
+продолжал работать. Артефакт:
+`artifacts/windows-area-repair/editor-handoff-one-click.png`.
 
 Для macOS 12+ отдельно выполнить acceptance на 12.0–12.2, 12.3–13 и 14+.
 Проверить фактическую ветку CoreGraphics fallback, one-shot `SCStream` и

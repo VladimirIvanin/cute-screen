@@ -169,6 +169,14 @@ function mountViewport(
 }
 
 describe('M05 CanvasViewport transforms', () => {
+  it('signals regular editor readiness after its document frame renders', async () => {
+    const { emitted } = mountViewport()
+
+    await vi.waitFor(() =>
+      expect(emitted().frameReady).toEqual([[document.id]]),
+    )
+  })
+
   it('signals quick-mode readiness only after the document frame renders', async () => {
     const { emitted } = mountViewport(
       undefined,

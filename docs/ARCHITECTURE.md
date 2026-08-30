@@ -194,13 +194,13 @@ document-command boundary.
 ### Area quick capture
 
 Явный Area capture создаёт `QuickCaptureDraftV1`, а не library record. Windows
-и macOS создают его после platform selector; X11 создаёт full-frame draft с
-`selectionPending`, а первый crop выбирается уже в Quick surface. Draft может
+и X11 создают full-frame draft с `selectionPending`, а первый crop выбирается
+уже в Quick surface. macOS создаёт draft после platform selector. Draft может
 ссылаться на frozen virtual desktop и physical selection bounds; на macOS это
 единый frozen multi-display frame native AppKit selector. Wayland draft
 содержит только portal fragment. Pixels доступны Vue только через scoped/binary
-transport token. macOS Window после native selection создаёт документ напрямую
-и quick-mode не открывает.
+transport token. Windows/macOS Window после native selection создаёт документ
+напрямую и quick-mode не открывает.
 
 Для X11 Area backend получает один root snapshot до показа capture UI,
 декодирует его в canonical RGBA и передаёт как memory-owned BMP transport в
@@ -221,12 +221,30 @@ overlay canvas, frozen image, dim layer и dash остаются теми же D
 show/hide/focus и без повторного layout-ready gate. Wayland сохраняет
 portal-owned system selector и не использует этот X11 маршрут.
 
+Windows Area использует тот же frontend lifecycle: после скрытия `main` backend
+подготавливает DXGI duplication, показывает прозрачный non-activating
+compositor pulse, ждёт `DwmFlush` и собирает один physical virtual-desktop frame.
+Top-down BMP preview кладётся в owned memory transport, а draft помечается
+`selectionPending`. Win32 selector в этом маршруте не создаётся; его window
+class переиспользуется для pulse, а сам selector остаётся только для Window
+target. Prewarmed Quick WebView загружает frozen frame скрытой, затем один раз
+показывается в `selecting`; первый валидный drag и переход в `editing`
+обслуживают те же `CanvasViewport`, scene и overlay hosts.
+
 `QuickCaptureShell` использует тот же document, renderer, `CanvasViewport`,
 tool defaults и `EditorCommand`, но не монтирует TopBar, LayersPanel,
 SeriesFilmstrip, beautify или watermark. Crop остаётся изменяемым; committed
 layers хранят full-frame coordinates и clip-ятся crop. Перед Copy/Save/Editor
 DOM-free materializer вычитает crop origin из geometry, заменяет base на hash
 cropped original, устанавливает canvas в размер crop и очищает document crop.
+
+При terminal action Editor controller публикует persisted outcome в main
+WebView. Обычный (не quick-mode) `CanvasViewport` подтверждает `frameReady` после
+фактического `runtime.render(['scene'])`. На Windows native handoff сначала
+показывает main и снимает `always_on_top` с Quick, чтобы WebView2 main не был
+полностью occluded во время первого frame. После acknowledgement Quick выполняет
+`set_always_on_top(false) → hide`; `set_fullscreen(false)` после hide запрещён,
+поскольку Windows может remap-нуть скрытое окно как обычное top-level окно.
 
 Draft store допускает одну активную сессию и удаляет staging по cancel, crash,
 shutdown и timeout. Подготовка cropped source и финальный repository commit —

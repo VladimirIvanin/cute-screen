@@ -51,7 +51,10 @@ Cute Screen — полноценный local-first редактор снимко
   сначала создаёт неперсистентный quick-capture draft и материализует original,
   capture и editable document только по Copy, Save PNG или Editor. На X11 и
   macOS запущенный из editor захват скрывает `main` до native capture; editor
-  не остаётся видимым и не попадает в кадр.
+  не остаётся видимым и не попадает в кадр. Terminal action Editor одним кликом
+  показывает main WebView, монтирует materialized document, ждёт его первый
+  renderer frame и скрывает Quick Capture; timeout не требует повторного клика,
+  а скрытое Quick-окно не должно возвращаться в non-fullscreen размере.
 - `REQ-CAP-011` — quick-capture draft существует только во временном приватном
   staging, не попадает в series/library и полностью очищается по Close/Escape,
   crash, app exit или failed staging до materialization.
@@ -68,9 +71,11 @@ Cute Screen — полноценный local-first редактор снимко
   перехода в `editing` оно выполняет quick action Copy. Между фазами запрещены
   loading state, blank frame, смена native window и повторное появление рамки.
 - `REQ-CAP-013` — Windows/X11/macOS Area quick-mode показывает frozen desktop
-  в исходных physical coordinates. Wayland сохраняет системный XDG selector,
-  показывает возвращённый portal fragment на нейтральном фоне и не разрешает
-  расширять рамку за его пределы.
+  в исходных physical coordinates. На Windows и X11 первый Area drag выполняется
+  внутри той же fullscreen Quick surface, что затем показывает editor chrome;
+  отдельный native Area selector запрещён. Wayland сохраняет системный XDG
+  selector, показывает возвращённый portal fragment на нейтральном фоне и не
+  разрешает расширять рамку за его пределы.
 - `REQ-CAP-014` — один Area draft блокирует параллельный capture. Copy, Save PNG
   и Editor дают terminal `captured` с различимым completion; Close даёт
   ожидаемый `cancelled` без скрытой очереди.
