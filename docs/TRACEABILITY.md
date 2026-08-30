@@ -262,23 +262,16 @@ WebKitGTK/X11 smoke.
 
 ## X11 selector SVG camera follow-up (2026-08-28)
 
-- Historical status: superseded for Area by ADR-039. The asset remains vendored
-  with regression-covered legacy selector helpers but is not part of current
-  Area presentation.
-- Requirements: `REQ-CAP-012`.
-- Source/licence boundary: use the official Lucide Camera SVG already matched by
-  the repository's `@lucide/vue` 1.31.0 dependency; retain its source URL and
-  ISC notice beside the vendored asset. No network or SVG parsing is allowed in
-  the capture interaction path.
-- Red-first Rust evidence: the vendored source must remain a 24×24 Lucide SVG,
-  and its pre-rasterized native derivative must decode to the expected bounded
-  opaque RGBA image before an X11 selector can use it.
-- Runtime evidence: the physical pre-drag X11 replay must show the Lucide camera
-  without changing hint motion responsiveness or reintroducing transient
-  trails. Status: passed on Ubuntu 24.04/GNOME 46 X11; the 24×24 asset was
-  visually inspected in
+- Historical status: superseded for Area by ADR-039. Legacy native Area
+  selector helpers and their dedicated vendored asset were removed on
+  2026-08-31; this section records old evidence and is not a current gate.
+- Archived evidence: the former native selector used an offline 24×24 Lucide
+  Camera derivative and passed an Ubuntu 24.04/GNOME 46 X11 replay. The asset
+  was visually inspected in
   `/tmp/cutescreen-selector-lucide-camera-2026-08-28.png`. Both Rust feature
-  configurations passed 108/108 and the complete `pnpm check` gate passed.
+  configurations passed 108/108 and the complete `pnpm check` gate passed at
+  that time. Current `REQ-CAP-012` evidence belongs to the Quick WebView
+  component/runtime tests and has no native-camera asset contract.
 
 ## Short arrow endpoint repair gate (2026-08-22)
 

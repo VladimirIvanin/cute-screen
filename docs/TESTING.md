@@ -1626,6 +1626,10 @@ silhouette, incomplete cursor camera and white-on-white Area frame.
 
 ## X11 selector Lucide camera follow-up (2026-08-28)
 
+Историческое evidence, superseded ADR-039. Native Area selector, его hint
+renderer и vendored camera assets удалены 2026-08-31; текущий X11 Area hint
+проверяется только внутри mounted Quick WebView.
+
 - The native X11 hint now uses the official 24×24 Lucide Camera SVG matched to
   the existing `@lucide/vue` 1.31.0 dependency. The vendored source URL and the
   complete ISC notice live beside the asset. Capture performs no network

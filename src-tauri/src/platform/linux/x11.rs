@@ -23,9 +23,9 @@ use x11rb::{
         randr::ConnectionExt as _,
         xfixes::ConnectionExt as _,
         xproto::{
-            Arc as XArc, AtomEnum, ButtonIndex, ChangeWindowAttributesAux, ConnectionExt as _,
-            CreateGCAux, CreateWindowAux, EventMask, GX, GrabMode, GrabStatus, LineStyle, MapState,
-            Rectangle, WindowClass,
+            AtomEnum, ButtonIndex, ChangeWindowAttributesAux, ConnectionExt as _, CreateGCAux,
+            CreateWindowAux, EventMask, GX, GrabMode, GrabStatus, LineStyle, MapState, Rectangle,
+            WindowClass,
         },
     },
     rust_connection::RustConnection,
@@ -67,14 +67,6 @@ pub struct X11GateEvidence {
 pub struct X11CaptureAdapter;
 
 const X11_COMPOSITOR_UNMAP_SETTLE: Duration = Duration::from_millis(300);
-#[cfg(test)]
-const AREA_HINT_CAMERA_SVG: &[u8] = include_bytes!("../../../assets/third-party/lucide/camera.svg");
-const AREA_HINT_CAMERA_PNG: &[u8] =
-    include_bytes!("../../../assets/third-party/lucide/camera-24.png");
-#[cfg(test)]
-const AREA_HINT_CAMERA_LICENSE: &[u8] =
-    include_bytes!("../../../assets/third-party/lucide/LICENSE");
-const AREA_HINT_CAMERA_SIZE: u16 = 24;
 static LAST_APP_SURFACE_HIDDEN: OnceLock<Mutex<Option<Instant>>> = OnceLock::new();
 
 fn recent_surface_settle_remaining(elapsed: Duration) -> Option<Duration> {
@@ -973,13 +965,13 @@ impl X11CaptureAdapter {
             correlation_id,
             cursor,
         )?;
-        let bounds = select_frozen_target(
+        let bounds = select_frozen_window(
             &connection,
             screen.root,
             screen.root_depth,
             screen.root_visual,
             &root_frame,
-            SelectorMode::Window(candidates),
+            &candidates,
             cancel_signal,
             correlation_id,
         )?;
@@ -1463,13 +1455,6 @@ fn composite_xfixes_cursor<C: Connection>(
     Ok(())
 }
 
-enum SelectorMode {
-    // Area moved to Quick WebView; helpers remain for selector regression coverage.
-    #[expect(dead_code, reason = "Window selector still shares tested Area helpers")]
-    Area,
-    Window(Vec<WindowCandidate>),
-}
-
 #[derive(Debug, Clone, Copy)]
 struct WindowCandidate {
     window: u32,
@@ -1502,18 +1487,17 @@ struct X11TopLevelWindowState {
     mutter_frame_for: Option<u32>,
 }
 
-#[allow(clippy::too_many_arguments)] // X11 overlay setup needs the root visual/depth and frozen frame explicitly.
 #[expect(
-    clippy::too_many_lines,
-    reason = "window selector setup is one failure-atomic X11 resource lifetime"
+    clippy::too_many_arguments,
+    reason = "X11 overlay setup needs the root visual/depth and frozen frame explicitly"
 )]
-fn select_frozen_target<C: Connection>(
+fn select_frozen_window<C: Connection>(
     connection: &C,
     root: u32,
     root_depth: u8,
     root_visual: u32,
     frame: &RgbaFrame,
-    mode: SelectorMode,
+    candidates: &[WindowCandidate],
     cancel_signal: &AtomicBool,
     correlation_id: &str,
 ) -> Result<(i32, i32, u16, u16), PlatformError> {
@@ -1532,33 +1516,10 @@ fn select_frozen_target<C: Connection>(
     let selection_underlay_gc = connection
         .generate_id()
         .map_err(|_| gate_error(correlation_id, "overlaySelectionUnderlayGcId"))?;
-    let hint_background_gc = connection
-        .generate_id()
-        .map_err(|_| gate_error(correlation_id, "overlayHintBackgroundGcId"))?;
-    let hint_camera_pixmap = if matches!(&mode, SelectorMode::Area) {
-        Some(
-            connection
-                .generate_id()
-                .map_err(|_| gate_error(correlation_id, "overlayHintCameraPixmapId"))?,
-        )
-    } else {
-        None
-    };
     let [underlay_stroke, foreground_stroke] = selection_stroke_plan();
     connection
         .create_pixmap(root_depth, frozen_pixmap, root, frame.width, frame.height)
         .map_err(|_| gate_error(correlation_id, "overlayFrozenPixmap"))?;
-    if let Some(camera_pixmap) = hint_camera_pixmap {
-        connection
-            .create_pixmap(
-                root_depth,
-                camera_pixmap,
-                root,
-                AREA_HINT_CAMERA_SIZE,
-                AREA_HINT_CAMERA_SIZE,
-            )
-            .map_err(|_| gate_error(correlation_id, "overlayHintCameraPixmap"))?;
-    }
     let window_aux = CreateWindowAux::new()
         .background_pixmap(frozen_pixmap)
         .override_redirect(1)
@@ -1585,13 +1546,7 @@ fn select_frozen_target<C: Connection>(
         )
         .map_err(|_| gate_error(correlation_id, "overlayCreate"))?;
     connection
-        .create_gc(
-            background_gc,
-            frozen_pixmap,
-            &CreateGCAux::new()
-                .foreground(area_hint_text_colors().0)
-                .background(area_hint_text_colors().1),
-        )
+        .create_gc(background_gc, frozen_pixmap, &CreateGCAux::new())
         .map_err(|_| gate_error(correlation_id, "overlayBackgroundGc"))?;
     connection
         .create_gc(
@@ -1623,13 +1578,6 @@ fn select_frozen_target<C: Connection>(
                 }),
         )
         .map_err(|_| gate_error(correlation_id, "overlaySelectionGc"))?;
-    connection
-        .create_gc(
-            hint_background_gc,
-            overlay,
-            &CreateGCAux::new().function(GX::COPY).foreground(u32::MAX),
-        )
-        .map_err(|_| gate_error(correlation_id, "overlayHintBackgroundGc"))?;
     connection
         .set_dashes(selection_gc, 0, &[7, 5])
         .map_err(|_| gate_error(correlation_id, "overlaySelectionDash"))?;
@@ -1688,56 +1636,31 @@ fn select_frozen_target<C: Connection>(
                 upload_started.elapsed().as_millis()
             );
         }
-        if let Some(camera_pixmap) = hint_camera_pixmap {
-            let camera_frame = decode_area_hint_camera(correlation_id)?;
-            let camera = encode_selector_image(
-                connection,
-                root_visual,
-                root_depth,
-                &camera_frame,
-                correlation_id,
-            )?;
-            for cookie in camera
-                .put(connection, camera_pixmap, background_gc, 0, 0)
-                .map_err(|_| gate_error(correlation_id, "overlayHintCameraFrame"))?
-            {
-                cookie
-                    .check()
-                    .map_err(|_| gate_error(correlation_id, "overlayHintCameraFrame"))?;
-            }
-        }
         connection
             .map_window(overlay)
             .map_err(|_| gate_error(correlation_id, "overlayMap"))?;
         connection
             .flush()
             .map_err(|_| gate_error(correlation_id, "overlayFlush"))?;
-        interaction_loop(
+        window_interaction_loop(
             connection,
             SelectorCanvas {
                 overlay,
-                background_gc,
                 selection_underlay_gc,
                 foreground_gc: selection_gc,
-                hint_background_gc,
-                hint_camera_pixmap,
                 width: frame.width,
                 height: frame.height,
             },
-            &mode,
+            candidates,
             cancel_signal,
             correlation_id,
         )
     })();
     let _ = connection.ungrab_pointer(CURRENT_TIME);
     let _ = connection.ungrab_keyboard(CURRENT_TIME);
-    let _ = connection.free_gc(hint_background_gc);
     let _ = connection.free_gc(selection_gc);
     let _ = connection.free_gc(selection_underlay_gc);
     let _ = connection.free_gc(background_gc);
-    if let Some(camera_pixmap) = hint_camera_pixmap {
-        let _ = connection.free_pixmap(camera_pixmap);
-    }
     let _ = connection.destroy_window(overlay);
     let _ = connection.free_pixmap(frozen_pixmap);
     let _ = connection.flush();
@@ -1747,11 +1670,8 @@ fn select_frozen_target<C: Connection>(
 #[derive(Clone, Copy)]
 struct SelectorCanvas {
     overlay: u32,
-    background_gc: u32,
     selection_underlay_gc: u32,
     foreground_gc: u32,
-    hint_background_gc: u32,
-    hint_camera_pixmap: Option<u32>,
     width: u16,
     height: u16,
 }
@@ -1778,65 +1698,16 @@ const fn selection_stroke_plan() -> [SelectionStroke; 2] {
     ]
 }
 
-const fn area_hint_text_colors() -> (u32, u32) {
-    (0x0018_1818, u32::MAX)
-}
-
-fn decode_area_hint_camera(correlation_id: &str) -> Result<RgbaFrame, PlatformError> {
-    let mut decoder = png::Decoder::new(std::io::Cursor::new(AREA_HINT_CAMERA_PNG));
-    decoder.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
-    let mut reader = decoder
-        .read_info()
-        .map_err(|_| gate_error(correlation_id, "overlayHintCameraDecode"))?;
-    let output_size = reader
-        .output_buffer_size()
-        .ok_or_else(|| gate_error(correlation_id, "overlayHintCameraSize"))?;
-    let mut decoded = vec![0; output_size];
-    let info = reader
-        .next_frame(&mut decoded)
-        .map_err(|_| gate_error(correlation_id, "overlayHintCameraDecode"))?;
-    if info.width != u32::from(AREA_HINT_CAMERA_SIZE)
-        || info.height != u32::from(AREA_HINT_CAMERA_SIZE)
-    {
-        return Err(gate_error(correlation_id, "overlayHintCameraSize"));
-    }
-    let pixels = &decoded[..info.buffer_size()];
-    let rgba = match info.color_type {
-        png::ColorType::Rgba => pixels.to_vec(),
-        png::ColorType::Rgb => pixels
-            .chunks_exact(3)
-            .flat_map(|pixel| [pixel[0], pixel[1], pixel[2], u8::MAX])
-            .collect(),
-        _ => return Err(gate_error(correlation_id, "overlayHintCameraColor")),
-    };
-    Ok(RgbaFrame {
-        width: AREA_HINT_CAMERA_SIZE,
-        height: AREA_HINT_CAMERA_SIZE,
-        rgba,
-        cursor_included: false,
-    })
-}
-
-#[expect(
-    clippy::too_many_lines,
-    reason = "legacy window selector event loop remains isolated from Area quick capture"
-)]
-fn interaction_loop<C: Connection>(
+fn window_interaction_loop<C: Connection>(
     connection: &C,
     canvas: SelectorCanvas,
-    mode: &SelectorMode,
+    candidates: &[WindowCandidate],
     cancel_signal: &AtomicBool,
     correlation_id: &str,
 ) -> Result<(i32, i32, u16, u16), PlatformError> {
-    let (width, height) = (canvas.width, canvas.height);
     let deadline = Instant::now() + Duration::from_secs(60);
-    let mut anchor = None;
-    let mut current = None;
     let mut window_current = None;
     let mut rendered = None;
-    let mut rendered_hint = None;
-    let mut area_drag = None;
-    let mut last_area_click: Option<(Instant, (i16, i16))> = None;
     while Instant::now() < deadline {
         if cancel_signal.load(Ordering::Acquire) {
             return Err(PlatformError::new(
@@ -1851,150 +1722,36 @@ fn interaction_loop<C: Connection>(
             thread::sleep(Duration::from_millis(8));
             continue;
         };
-        if let SelectorMode::Window(candidates) = mode {
-            match event {
-                Event::MotionNotify(event) => {
-                    let selected = window_at(candidates, event.event_x, event.event_y);
-                    redraw_rectangle(
-                        connection,
-                        canvas,
-                        &mut rendered,
-                        selected.map(|candidate| candidate.rectangle),
-                        correlation_id,
-                    )?;
-                    window_current = selected;
-                }
-                Event::ButtonPress(event) if event.detail == u8::from(ButtonIndex::M1) => {
-                    let selected = window_at(candidates, event.event_x, event.event_y);
-                    redraw_rectangle(
-                        connection,
-                        canvas,
-                        &mut rendered,
-                        selected.map(|candidate| candidate.rectangle),
-                        correlation_id,
-                    )?;
-                    window_current = selected;
-                }
-                Event::ButtonRelease(event) if event.detail == u8::from(ButtonIndex::M1) => {
-                    return window_at(candidates, event.event_x, event.event_y)
-                        .map(|candidate| candidate.bounds)
-                        .ok_or_else(|| {
-                            PlatformError::new(PlatformErrorCode::Cancelled, correlation_id)
-                        });
-                }
-                Event::KeyPress(event) if event.detail == 9 => {
-                    return Err(PlatformError::new(
-                        PlatformErrorCode::Cancelled,
-                        correlation_id,
-                    ));
-                }
-                Event::KeyPress(event) if event.detail == 36 => {
-                    return window_current
-                        .map(|candidate| candidate.bounds)
-                        .ok_or_else(|| {
-                            PlatformError::new(PlatformErrorCode::Cancelled, correlation_id)
-                        });
-                }
-                Event::FocusOut(_) => {
-                    return Err(PlatformError::new(
-                        PlatformErrorCode::Cancelled,
-                        correlation_id,
-                    ));
-                }
-                _ => {}
-            }
-            continue;
-        }
         match event {
-            Event::ButtonPress(event) if event.detail == u8::from(ButtonIndex::M1) => {
-                redraw_area_hint(connection, canvas, &mut rendered_hint, None, correlation_id)?;
-                let point = clamp_point(event.event_x, event.event_y, width, height);
-                let selected = rectangle_for(anchor, current);
-                if let Some(rectangle) = selected
-                    && rectangle_contains(rectangle, point)
-                    && last_area_click.is_some_and(|(at, previous)| {
-                        at.elapsed() <= Duration::from_millis(500) && previous == point
-                    })
-                {
-                    return normalized_selection(anchor, current, correlation_id);
-                }
-                if let Some(rectangle) =
-                    selected.filter(|rectangle| rectangle_contains(*rectangle, point))
-                {
-                    area_drag = Some(AreaDrag::Move {
-                        offset_x: point.0.saturating_sub(rectangle.x),
-                        offset_y: point.1.saturating_sub(rectangle.y),
-                    });
-                } else {
-                    anchor = Some(point);
-                    current = Some(point);
-                    area_drag = Some(AreaDrag::Create);
-                }
-            }
-            Event::MotionNotify(event) if area_drag.is_some() => {
-                let point = clamp_point(event.event_x, event.event_y, width, height);
-                match area_drag {
-                    Some(AreaDrag::Create) => current = Some(point),
-                    Some(AreaDrag::Move { offset_x, offset_y }) => {
-                        if let Some(rectangle) = rectangle_for(anchor, current) {
-                            let moved = move_rectangle(
-                                rectangle,
-                                i32::from(point.0.saturating_sub(offset_x))
-                                    - i32::from(rectangle.x),
-                                i32::from(point.1.saturating_sub(offset_y))
-                                    - i32::from(rectangle.y),
-                                width,
-                                height,
-                            );
-                            anchor = Some((moved.x, moved.y));
-                            current = rectangle_endpoint(moved);
-                        }
-                    }
-                    None => {}
-                }
-                redraw_selection(
+            Event::MotionNotify(event) => {
+                let selected = window_at(candidates, event.event_x, event.event_y);
+                redraw_rectangle(
                     connection,
                     canvas,
                     &mut rendered,
-                    anchor,
-                    current,
+                    selected.map(|candidate| candidate.rectangle),
                     correlation_id,
                 )?;
+                window_current = selected;
             }
-            Event::MotionNotify(event) if anchor.is_none() => {
-                redraw_area_hint(
+            Event::ButtonPress(event) if event.detail == u8::from(ButtonIndex::M1) => {
+                let selected = window_at(candidates, event.event_x, event.event_y);
+                redraw_rectangle(
                     connection,
                     canvas,
-                    &mut rendered_hint,
-                    Some(clamp_point(event.event_x, event.event_y, width, height)),
+                    &mut rendered,
+                    selected.map(|candidate| candidate.rectangle),
                     correlation_id,
                 )?;
+                window_current = selected;
             }
             Event::ButtonRelease(event) if event.detail == u8::from(ButtonIndex::M1) => {
-                let created_area = matches!(area_drag, Some(AreaDrag::Create));
-                if created_area {
-                    current = Some(clamp_point(event.event_x, event.event_y, width, height));
-                }
-                redraw_selection(
-                    connection,
-                    canvas,
-                    &mut rendered,
-                    anchor,
-                    current,
-                    correlation_id,
-                )?;
-                area_drag = None;
-                last_area_click = Some((
-                    Instant::now(),
-                    clamp_point(event.event_x, event.event_y, width, height),
-                ));
-                if should_complete_area_release(created_area, anchor, current) {
-                    return normalized_selection(anchor, current, correlation_id);
-                }
+                return window_at(candidates, event.event_x, event.event_y)
+                    .map(|candidate| candidate.bounds)
+                    .ok_or_else(|| {
+                        PlatformError::new(PlatformErrorCode::Cancelled, correlation_id)
+                    });
             }
-            // Return remains available for keyboard confirmation before a
-            // pointer selection. A completed primary-pointer drag confirms at
-            // its ButtonRelease boundary above.
             Event::KeyPress(event) if event.detail == 9 => {
                 return Err(PlatformError::new(
                     PlatformErrorCode::Cancelled,
@@ -2002,35 +1759,11 @@ fn interaction_loop<C: Connection>(
                 ));
             }
             Event::KeyPress(event) if event.detail == 36 => {
-                return normalized_selection(anchor, current, correlation_id);
-            }
-            Event::KeyPress(event) if matches!(event.detail, 111 | 113 | 114 | 116) => {
-                if let Some(rectangle) = rectangle_for(anchor, current) {
-                    let Some((dx, dy)) = (match event.detail {
-                        111 => Some((0, -1)),
-                        113 => Some((-1, 0)),
-                        114 => Some((1, 0)),
-                        116 => Some((0, 1)),
-                        _ => None,
-                    }) else {
-                        continue;
-                    };
-                    let moved = if u16::from(event.state) & 1 != 0 {
-                        resize_rectangle(rectangle, event.detail, width, height)
-                    } else {
-                        move_rectangle(rectangle, dx, dy, width, height)
-                    };
-                    anchor = Some((moved.x, moved.y));
-                    current = rectangle_endpoint(moved);
-                    redraw_selection(
-                        connection,
-                        canvas,
-                        &mut rendered,
-                        anchor,
-                        current,
-                        correlation_id,
-                    )?;
-                }
+                return window_current
+                    .map(|candidate| candidate.bounds)
+                    .ok_or_else(|| {
+                        PlatformError::new(PlatformErrorCode::Cancelled, correlation_id)
+                    });
             }
             Event::FocusOut(_) => {
                 return Err(PlatformError::new(
@@ -2047,68 +1780,6 @@ fn interaction_loop<C: Connection>(
     ))
 }
 
-#[derive(Debug, Clone, Copy)]
-enum AreaDrag {
-    Create,
-    Move { offset_x: i16, offset_y: i16 },
-}
-
-fn should_complete_area_release(
-    created_area: bool,
-    anchor: Option<(i16, i16)>,
-    current: Option<(i16, i16)>,
-) -> bool {
-    created_area
-        && rectangle_for(anchor, current)
-            .is_some_and(|rectangle| rectangle.width > 0 && rectangle.height > 0)
-}
-
-fn clamp_point(x: i16, y: i16, width: u16, height: u16) -> (i16, i16) {
-    (
-        x.clamp(
-            0,
-            i16::try_from(width.saturating_sub(1)).unwrap_or(i16::MAX),
-        ),
-        y.clamp(
-            0,
-            i16::try_from(height.saturating_sub(1)).unwrap_or(i16::MAX),
-        ),
-    )
-}
-
-fn redraw_selection<C: Connection>(
-    connection: &C,
-    canvas: SelectorCanvas,
-    rendered: &mut Option<Rectangle>,
-    anchor: Option<(i16, i16)>,
-    current: Option<(i16, i16)>,
-    correlation_id: &str,
-) -> Result<(), PlatformError> {
-    if let Some(previous) = *rendered {
-        restore_selector_visual(
-            connection,
-            canvas.overlay,
-            &selector_visual_damage(previous, canvas.width, canvas.height),
-            correlation_id,
-        )?;
-    }
-    *rendered = rectangle_for(anchor, current);
-    if let Some(next) = *rendered {
-        draw_selection_frame(connection, canvas, next, correlation_id)?;
-        draw_size_badge(
-            connection,
-            canvas.overlay,
-            canvas.background_gc,
-            canvas.foreground_gc,
-            next,
-            correlation_id,
-        )?;
-    }
-    connection
-        .flush()
-        .map_err(|_| gate_error(correlation_id, "overlayDrawSelection"))
-}
-
 fn draw_selection_frame<C: Connection>(
     connection: &C,
     canvas: SelectorCanvas,
@@ -2121,180 +1792,6 @@ fn draw_selection_frame<C: Connection>(
     connection
         .poly_rectangle(canvas.overlay, canvas.foreground_gc, &[rectangle])
         .map_err(|_| gate_error(correlation_id, "overlayDrawSelection"))?;
-    Ok(())
-}
-
-fn fill_rounded_rectangle<C: Connection>(
-    connection: &C,
-    drawable: u32,
-    gc: u32,
-    rectangle: Rectangle,
-    radius: u16,
-    correlation_id: &str,
-) -> Result<(), PlatformError> {
-    let diameter = radius.saturating_mul(2);
-    let inner_width = rectangle.width.saturating_sub(diameter);
-    let inner_height = rectangle.height.saturating_sub(diameter);
-    let right = rectangle
-        .x
-        .saturating_add(i16::try_from(inner_width).unwrap_or(i16::MAX));
-    let bottom = rectangle
-        .y
-        .saturating_add(i16::try_from(inner_height).unwrap_or(i16::MAX));
-    connection
-        .poly_fill_rectangle(
-            drawable,
-            gc,
-            &[
-                Rectangle {
-                    x: rectangle
-                        .x
-                        .saturating_add(i16::try_from(radius).unwrap_or(0)),
-                    width: inner_width,
-                    ..rectangle
-                },
-                Rectangle {
-                    y: rectangle
-                        .y
-                        .saturating_add(i16::try_from(radius).unwrap_or(0)),
-                    height: inner_height,
-                    ..rectangle
-                },
-            ],
-        )
-        .map_err(|_| gate_error(correlation_id, "overlayHintCard"))?;
-    connection
-        .poly_fill_arc(
-            drawable,
-            gc,
-            &[
-                XArc {
-                    x: rectangle.x,
-                    y: rectangle.y,
-                    width: diameter,
-                    height: diameter,
-                    angle1: 0,
-                    angle2: 360 * 64,
-                },
-                XArc {
-                    x: right,
-                    y: rectangle.y,
-                    width: diameter,
-                    height: diameter,
-                    angle1: 0,
-                    angle2: 360 * 64,
-                },
-                XArc {
-                    x: rectangle.x,
-                    y: bottom,
-                    width: diameter,
-                    height: diameter,
-                    angle1: 0,
-                    angle2: 360 * 64,
-                },
-                XArc {
-                    x: right,
-                    y: bottom,
-                    width: diameter,
-                    height: diameter,
-                    angle1: 0,
-                    angle2: 360 * 64,
-                },
-            ],
-        )
-        .map_err(|_| gate_error(correlation_id, "overlayHintCard"))?;
-    Ok(())
-}
-
-fn redraw_area_hint<C: Connection>(
-    connection: &C,
-    canvas: SelectorCanvas,
-    rendered: &mut Option<Rectangle>,
-    cursor: Option<(i16, i16)>,
-    correlation_id: &str,
-) -> Result<(), PlatformError> {
-    const HINT_WIDTH: u16 = 226;
-    const HINT_HEIGHT: u16 = 48;
-    let draw = |card: Rectangle| -> Result<(), PlatformError> {
-        fill_rounded_rectangle(
-            connection,
-            canvas.overlay,
-            canvas.hint_background_gc,
-            card,
-            8,
-            correlation_id,
-        )?;
-        connection
-            .image_text8(
-                canvas.overlay,
-                canvas.background_gc,
-                card.x.saturating_add(14),
-                card.y.saturating_add(30),
-                b"Select area",
-            )
-            .map_err(|_| gate_error(correlation_id, "overlayHintText"))?;
-        let camera_pixmap = canvas
-            .hint_camera_pixmap
-            .ok_or_else(|| gate_error(correlation_id, "overlayHintCameraMissing"))?;
-        connection
-            .copy_area(
-                camera_pixmap,
-                canvas.overlay,
-                canvas.background_gc,
-                0,
-                0,
-                card.x.saturating_add(190),
-                card.y.saturating_add(12),
-                AREA_HINT_CAMERA_SIZE,
-                AREA_HINT_CAMERA_SIZE,
-            )
-            .map_err(|_| gate_error(correlation_id, "overlayHintIcon"))?;
-        Ok(())
-    };
-    if let Some(previous) = rendered.take() {
-        restore_selector_visual(connection, canvas.overlay, &[previous], correlation_id)?;
-    }
-    if let Some((cursor_x, cursor_y)) = cursor {
-        let max_x = i32::from(canvas.width.saturating_sub(HINT_WIDTH).saturating_sub(8));
-        let max_y = i32::from(canvas.height.saturating_sub(HINT_HEIGHT).saturating_sub(8));
-        let x = (i32::from(cursor_x) + 18).clamp(8, max_x.max(8));
-        let y = (i32::from(cursor_y) + 22).clamp(8, max_y.max(8));
-        let card = Rectangle {
-            x: i16::try_from(x).unwrap_or(i16::MAX),
-            y: i16::try_from(y).unwrap_or(i16::MAX),
-            width: HINT_WIDTH,
-            height: HINT_HEIGHT,
-        };
-        draw(card)?;
-        *rendered = Some(card);
-    }
-    connection
-        .flush()
-        .map_err(|_| gate_error(correlation_id, "overlayHintFlush"))
-}
-
-fn draw_size_badge<C: Connection>(
-    connection: &C,
-    overlay: u32,
-    background_gc: u32,
-    foreground_gc: u32,
-    rectangle: Rectangle,
-    correlation_id: &str,
-) -> Result<(), PlatformError> {
-    let badge = size_badge_rectangle(rectangle);
-    let label = format!("{} x {}", rectangle.width, rectangle.height);
-    connection
-        .poly_fill_rectangle(overlay, background_gc, &[badge])
-        .map_err(|_| gate_error(correlation_id, "overlaySizeBadge"))?;
-    connection
-        .image_text8(
-            overlay,
-            foreground_gc,
-            badge.x.saturating_add(7),
-            badge.y.saturating_add(17),
-            label.as_bytes(),
-        )
-        .map_err(|_| gate_error(correlation_id, "overlaySizeText"))?;
     Ok(())
 }
 
@@ -2343,32 +1840,6 @@ fn restore_selector_visual<C: Connection>(
     Ok(())
 }
 
-fn size_badge_rectangle(rectangle: Rectangle) -> Rectangle {
-    let label = format!("{} x {}", rectangle.width, rectangle.height);
-    let width = u16::try_from(label.len().saturating_mul(8).saturating_add(14)).unwrap_or(u16::MAX);
-    let x = rectangle.x.max(4);
-    let y = if rectangle.y >= 28 {
-        rectangle.y - 28
-    } else {
-        rectangle
-            .y
-            .saturating_add(i16::try_from(rectangle.height).unwrap_or(i16::MAX))
-            .saturating_add(4)
-    };
-    Rectangle {
-        x,
-        y,
-        width,
-        height: 24,
-    }
-}
-
-fn selector_visual_damage(rectangle: Rectangle, width: u16, height: u16) -> Vec<Rectangle> {
-    let mut damage = selector_border_damage(rectangle, width, height);
-    damage.push(size_badge_rectangle(rectangle));
-    damage
-}
-
 fn selector_border_damage(rectangle: Rectangle, width: u16, height: u16) -> Vec<Rectangle> {
     const PAD: i32 = 3;
     let max_x = i32::from(width.saturating_sub(1));
@@ -2413,87 +1884,6 @@ fn selector_border_damage(rectangle: Rectangle, width: u16, height: u16) -> Vec<
             height: outer_height,
         },
     ]
-}
-
-fn rectangle_for(anchor: Option<(i16, i16)>, current: Option<(i16, i16)>) -> Option<Rectangle> {
-    let (start_x, start_y) = anchor?;
-    let (end_x, end_y) = current?;
-    let x = start_x.min(end_x);
-    let y = start_y.min(end_y);
-    let width = u16::try_from(i32::from(start_x.max(end_x)) - i32::from(x)).ok()?;
-    let height = u16::try_from(i32::from(start_y.max(end_y)) - i32::from(y)).ok()?;
-    (width > 0 && height > 0).then_some(Rectangle {
-        x,
-        y,
-        width,
-        height,
-    })
-}
-
-fn rectangle_contains(rectangle: Rectangle, point: (i16, i16)) -> bool {
-    let right = i32::from(rectangle.x).saturating_add(i32::from(rectangle.width));
-    let bottom = i32::from(rectangle.y).saturating_add(i32::from(rectangle.height));
-    i32::from(point.0) >= i32::from(rectangle.x)
-        && i32::from(point.0) < right
-        && i32::from(point.1) >= i32::from(rectangle.y)
-        && i32::from(point.1) < bottom
-}
-
-fn rectangle_endpoint(rectangle: Rectangle) -> Option<(i16, i16)> {
-    Some((
-        i16::try_from(i32::from(rectangle.x).checked_add(i32::from(rectangle.width))?).ok()?,
-        i16::try_from(i32::from(rectangle.y).checked_add(i32::from(rectangle.height))?).ok()?,
-    ))
-}
-
-fn move_rectangle(rectangle: Rectangle, dx: i32, dy: i32, width: u16, height: u16) -> Rectangle {
-    let max_x = i32::from(width).saturating_sub(i32::from(rectangle.width));
-    let max_y = i32::from(height).saturating_sub(i32::from(rectangle.height));
-    Rectangle {
-        x: i16::try_from(i32::from(rectangle.x).saturating_add(dx).clamp(0, max_x))
-            .unwrap_or(i16::MAX),
-        y: i16::try_from(i32::from(rectangle.y).saturating_add(dy).clamp(0, max_y))
-            .unwrap_or(i16::MAX),
-        ..rectangle
-    }
-}
-
-fn resize_rectangle(rectangle: Rectangle, keycode: u8, width: u16, height: u16) -> Rectangle {
-    let max_x = i32::from(width);
-    let max_y = i32::from(height);
-    let (mut x, mut y) = (i32::from(rectangle.x), i32::from(rectangle.y));
-    let (mut right, mut bottom) = (
-        x + i32::from(rectangle.width),
-        y + i32::from(rectangle.height),
-    );
-    match keycode {
-        113 if x > 0 => x -= 1,
-        114 if right < max_x => right += 1,
-        111 if y > 0 => y -= 1,
-        116 if bottom < max_y => bottom += 1,
-        _ => {}
-    }
-    Rectangle {
-        x: i16::try_from(x).unwrap_or(i16::MAX),
-        y: i16::try_from(y).unwrap_or(i16::MAX),
-        width: u16::try_from(right - x).unwrap_or(u16::MAX),
-        height: u16::try_from(bottom - y).unwrap_or(u16::MAX),
-    }
-}
-
-fn normalized_selection(
-    anchor: Option<(i16, i16)>,
-    current: Option<(i16, i16)>,
-    correlation_id: &str,
-) -> Result<(i32, i32, u16, u16), PlatformError> {
-    let rectangle = rectangle_for(anchor, current)
-        .ok_or_else(|| PlatformError::new(PlatformErrorCode::Cancelled, correlation_id))?;
-    Ok((
-        i32::from(rectangle.x),
-        i32::from(rectangle.y),
-        rectangle.width,
-        rectangle.height,
-    ))
 }
 
 fn capture_geometry(
@@ -3278,17 +2668,14 @@ mod tests {
     };
 
     use super::{
-        AREA_HINT_CAMERA_LICENSE, AREA_HINT_CAMERA_SVG, RgbaFrame, WindowCandidate,
-        WindowSelectionContext, WindowSelectionMetadata, X11_COMPOSITOR_UNMAP_SETTLE,
-        X11CaptureAdapter, X11HotkeyBinding, X11MonitorLayout, X11TopLevelWindowState,
-        apply_frame_extents, area_hint_text_colors, compositor_owner_requires_overlay,
+        RgbaFrame, WindowCandidate, WindowSelectionContext, WindowSelectionMetadata,
+        X11_COMPOSITOR_UNMAP_SETTLE, X11CaptureAdapter, X11HotkeyBinding, X11MonitorLayout,
+        X11TopLevelWindowState, apply_frame_extents, compositor_owner_requires_overlay,
         compositor_unmap_has_settled, crop_root_frame, current_monitor_id_for_bounds,
-        decode_area_hint_camera, decode_standard_xrgb32, effective_top_level_process_id,
-        encode_standard_xrgb32_bmp, import_quick_rgba_preview, monitor_ids_for_bounds,
-        move_rectangle, parse_hotkey_trigger, process_windows_and_frames_are_unmapped,
-        recent_surface_settle_remaining, rectangle_contains, replacement_plan, resize_rectangle,
-        selection_stroke_plan, selector_visual_damage, should_complete_area_release,
-        size_badge_rectangle, window_at, window_selection_policy_allows, write_rgba_pixels,
+        decode_standard_xrgb32, effective_top_level_process_id, encode_standard_xrgb32_bmp,
+        import_quick_rgba_preview, monitor_ids_for_bounds, parse_hotkey_trigger,
+        process_windows_and_frames_are_unmapped, recent_surface_settle_remaining, replacement_plan,
+        selection_stroke_plan, window_at, window_selection_policy_allows, write_rgba_pixels,
     };
     use x11rb::image::{BitsPerPixel, ColorComponent, Image, ImageOrder, PixelLayout, ScanlinePad};
     use x11rb::protocol::xproto::{MapState, Rectangle};
@@ -3386,37 +2773,6 @@ mod tests {
         assert_eq!(foreground.pixel, u32::MAX);
         assert_eq!(foreground.width, 2);
         assert!(foreground.dashed);
-    }
-
-    #[test]
-    fn area_hint_text_uses_the_card_color_instead_of_a_black_image_text_box() {
-        assert_eq!(area_hint_text_colors(), (0x0018_1818, u32::MAX));
-    }
-
-    #[test]
-    fn area_hint_camera_uses_the_vendored_permissive_lucide_svg() {
-        let svg = std::str::from_utf8(AREA_HINT_CAMERA_SVG).expect("Lucide camera SVG");
-        let license = std::str::from_utf8(AREA_HINT_CAMERA_LICENSE).expect("Lucide license");
-
-        assert!(svg.contains(r#"viewBox="0 0 24 24""#));
-        assert!(svg.contains(r#"class="lucide lucide-camera""#));
-        assert!(svg.contains("<path"));
-        assert!(svg.contains("<circle"));
-        assert!(license.contains("ISC License"));
-    }
-
-    #[test]
-    fn area_hint_camera_native_derivative_is_a_bounded_opaque_rgba_icon() {
-        let icon = decode_area_hint_camera("lucide-camera-test").expect("native camera icon");
-
-        assert_eq!((icon.width, icon.height), (24, 24));
-        assert!(icon.rgba.chunks_exact(4).all(|pixel| pixel[3] == u8::MAX));
-        assert_eq!(&icon.rgba[0..4], &[255, 255, 255, 255]);
-        assert!(
-            icon.rgba
-                .chunks_exact(4)
-                .any(|pixel| pixel[0] < 64 && pixel[1] < 64 && pixel[2] < 64)
-        );
     }
 
     #[test]
@@ -3592,72 +2948,6 @@ mod tests {
             i32::from_le_bytes(bmp[22..26].try_into().expect("height")),
             -1
         );
-    }
-
-    #[test]
-    fn continuous_selector_motion_restores_every_previous_transient_visual() {
-        let prior_states = [
-            Rectangle {
-                x: 100,
-                y: 100,
-                width: 400,
-                height: 300,
-            },
-            Rectangle {
-                x: 100,
-                y: 100,
-                width: 520,
-                height: 360,
-            },
-        ];
-
-        for previous in prior_states {
-            let damage = selector_visual_damage(previous, 1920, 1080);
-            let badge = size_badge_rectangle(previous);
-
-            assert_eq!(damage.len(), 5);
-            assert!(
-                damage
-                    .iter()
-                    .any(|region| rectangle_contains(*region, (previous.x, previous.y)))
-            );
-            assert!(damage.iter().any(|region| {
-                rectangle_contains(
-                    *region,
-                    (
-                        previous
-                            .x
-                            .saturating_add(i16::try_from(previous.width).expect("width")),
-                        previous
-                            .y
-                            .saturating_add(i16::try_from(previous.height).expect("height")),
-                    ),
-                )
-            }));
-            assert!(damage.iter().any(|region| {
-                (region.x, region.y, region.width, region.height)
-                    == (badge.x, badge.y, badge.width, badge.height)
-            }));
-        }
-    }
-
-    #[test]
-    fn initial_area_drag_completes_on_primary_pointer_release() {
-        assert!(should_complete_area_release(
-            true,
-            Some((100, 120)),
-            Some((500, 360)),
-        ));
-        assert!(!should_complete_area_release(
-            true,
-            Some((100, 120)),
-            Some((100, 120)),
-        ));
-        assert!(!should_complete_area_release(
-            false,
-            Some((100, 120)),
-            Some((500, 360)),
-        ));
     }
 
     #[test]
@@ -3923,38 +3213,5 @@ mod tests {
             Some((92, 48, 816, 640))
         );
         assert_eq!(apply_frame_extents((0, 0, 2, 2), (u32::MAX, 0, 0, 0)), None);
-    }
-
-    #[test]
-    fn area_selection_nudge_clamps_without_changing_the_selected_size() {
-        let selected = Rectangle {
-            x: 90,
-            y: 90,
-            width: 10,
-            height: 10,
-        };
-        let moved = move_rectangle(selected, 1, 1, 100, 100);
-
-        assert_eq!(
-            (moved.x, moved.y, moved.width, moved.height),
-            (90, 90, 10, 10)
-        );
-        assert!(rectangle_contains(moved, (99, 99)));
-        assert!(!rectangle_contains(moved, (100, 99)));
-    }
-
-    #[test]
-    fn area_selection_shift_arrow_expands_the_relevant_edge_within_bounds() {
-        let selected = Rectangle {
-            x: 10,
-            y: 10,
-            width: 20,
-            height: 20,
-        };
-        let resized = resize_rectangle(selected, 113, 100, 100);
-        assert_eq!(
-            (resized.x, resized.y, resized.width, resized.height),
-            (9, 10, 21, 20)
-        );
     }
 }

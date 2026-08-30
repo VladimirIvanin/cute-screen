@@ -111,7 +111,7 @@ describe('Tauri build boundary', () => {
     expect(hostSource).toContain('.set_parent(&window)')
   })
 
-  it('renders the X11 selector from canonical RGBA instead of a captured native image', async () => {
+  it('renders the X11 Window selector from canonical RGBA instead of a captured native image', async () => {
     const x11Source = await readFile(
       path.join(
         process.cwd(),
@@ -190,7 +190,9 @@ describe('Tauri build boundary', () => {
 
     expect(areaStart).toBeGreaterThanOrEqual(0)
     expect(areaEnd).toBeGreaterThan(areaStart)
-    expect(areaSource).not.toContain('select_frozen_target(')
+    expect(platformSource).not.toContain('SelectorMode')
+    expect(platformSource).toContain('fn select_frozen_window')
+    expect(areaSource).not.toContain('select_frozen_window(')
     expect(areaSource).toContain('result.quick_selection_pending = true')
     expect(hostSource).not.toContain('x11_platform::complete_selector_handoff')
     expect(quickSource).toContain(':quick-selection-mode="selectionPending"')
