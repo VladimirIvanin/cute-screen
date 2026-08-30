@@ -1,0 +1,178 @@
+{
+  "version": 1,
+  "budgets": {
+    "productionLines": 500,
+    "testLines": 600,
+    "functionLines": 120,
+    "complexity": 20,
+    "depth": 4
+  },
+  "temporaryLineExceptions": [
+    {
+      "path": "apps/desktop/src/App.vue",
+      "max": 870,
+      "removeBy": "desktop",
+      "reason": "desktop composition root awaiting controller extraction"
+    },
+    {
+      "path": "apps/desktop/src/QuickCaptureApp.vue",
+      "max": 674,
+      "removeBy": "desktop",
+      "reason": "quick-capture composition root awaiting controller extraction"
+    },
+    {
+      "path": "packages/editor-core/src/content-tools.ts",
+      "max": 676,
+      "removeBy": "core",
+      "reason": "content factories and clipboard commands are still co-located"
+    },
+    {
+      "path": "packages/editor-core/src/document/codec.ts",
+      "max": 1598,
+      "removeBy": "core",
+      "reason": "all schema-v7 codecs are still co-located"
+    },
+    {
+      "path": "packages/editor-core/src/document/scene.ts",
+      "max": 1093,
+      "removeBy": "core",
+      "reason": "all layer scene projections are still co-located"
+    },
+    {
+      "path": "packages/editor-core/src/precision-tools.ts",
+      "max": 883,
+      "removeBy": "core",
+      "reason": "precision tool models are still co-located"
+    },
+    {
+      "path": "packages/editor-core/src/render-scene.ts",
+      "max": 857,
+      "removeBy": "core",
+      "reason": "renderer-neutral contracts and validation are still co-located"
+    },
+    {
+      "path": "packages/editor-core/src/rich-text-editing.ts",
+      "max": 710,
+      "removeBy": "core",
+      "reason": "rich-text normalization and editing operations are still co-located"
+    },
+    {
+      "path": "packages/editor-renderer/src/canvas2d.ts",
+      "max": 1126,
+      "removeBy": "renderer",
+      "reason": "Canvas2D paint, nodes and lifecycle are still co-located"
+    },
+    {
+      "path": "packages/editor-renderer/src/canvaskit.ts",
+      "max": 2258,
+      "removeBy": "renderer",
+      "reason": "CanvasKit API, paint, nodes and lifecycle are still co-located"
+    },
+    {
+      "path": "packages/editor-vue/src/shell/components/CanvasViewport.vue",
+      "max": 4201,
+      "removeBy": "vue",
+      "reason": "canvas runtime, gestures and overlay are still co-located"
+    },
+    {
+      "path": "packages/editor-vue/src/shell/components/EditorShell.vue",
+      "max": 3878,
+      "removeBy": "vue",
+      "reason": "shell composition and tool settings are still co-located"
+    },
+    {
+      "path": "packages/editor-core/src/document/scene.test.ts",
+      "max": 1054,
+      "removeBy": "core",
+      "reason": "scene tests are awaiting domain split"
+    },
+    {
+      "path": "packages/editor-core/src/precision-tools.test.ts",
+      "max": 817,
+      "removeBy": "core",
+      "reason": "precision tests are awaiting tool split"
+    },
+    {
+      "path": "packages/editor-renderer/src/canvas2d.test.ts",
+      "max": 601,
+      "removeBy": "renderer",
+      "reason": "Canvas2D tests are awaiting node-family split"
+    },
+    {
+      "path": "packages/editor-renderer/src/canvaskit.test.ts",
+      "max": 666,
+      "removeBy": "renderer",
+      "reason": "CanvasKit tests are awaiting node-family split"
+    },
+    {
+      "path": "packages/editor-renderer/src/precision-rendering.test.ts",
+      "max": 731,
+      "removeBy": "renderer",
+      "reason": "precision parity tests are awaiting backend split"
+    },
+    {
+      "path": "tests/e2e/specs/browser-m06-drawing-tools.e2e.ts",
+      "max": 629,
+      "removeBy": "tests",
+      "reason": "drawing browser scenarios are awaiting feature split"
+    },
+    {
+      "path": "tests/e2e/specs/browser-m08-crop-precision.e2e.ts",
+      "max": 1229,
+      "removeBy": "tests",
+      "reason": "crop and precision browser scenarios are still co-located"
+    },
+    {
+      "path": "tests/e2e/specs/browser-v7-rich-text.e2e.ts",
+      "max": 640,
+      "removeBy": "tests",
+      "reason": "rich-text browser scenarios are awaiting feature split"
+    },
+    {
+      "path": "tests/harness/render/golden.test.ts",
+      "max": 889,
+      "removeBy": "tests",
+      "reason": "golden cases are awaiting renderer-domain split"
+    },
+    {
+      "path": "tests/unit/vue/App.test.ts",
+      "max": 760,
+      "removeBy": "desktop",
+      "reason": "desktop and shell tests are still co-located"
+    },
+    {
+      "path": "tests/unit/vue/canvas-viewport.test.ts",
+      "max": 1461,
+      "removeBy": "vue",
+      "reason": "canvas interaction scenarios are still co-located"
+    },
+    {
+      "path": "tests/unit/vue/m08-precision-interactions.test.ts",
+      "max": 1775,
+      "removeBy": "vue",
+      "reason": "crop, precision and eyedropper scenarios are still co-located"
+    }
+  ],
+  "temporaryTauriImports": [
+    {
+      "path": "apps/desktop/src/App.vue",
+      "removeBy": "desktop",
+      "reason": "application root still owns lifecycle window integration"
+    },
+    {
+      "path": "apps/desktop/src/QuickCaptureApp.vue",
+      "removeBy": "desktop",
+      "reason": "quick-capture root still owns native window integration"
+    },
+    {
+      "path": "apps/desktop/src/e2e-harness-query.ts",
+      "removeBy": "desktop",
+      "reason": "harness query still reads the current WebView label directly"
+    },
+    {
+      "path": "apps/desktop/src/test-harness.ts",
+      "removeBy": "desktop",
+      "reason": "test-only WebDriver adapter is awaiting platform isolation"
+    }
+  ]
+}

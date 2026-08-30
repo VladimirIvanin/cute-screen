@@ -1,22 +1,16 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2023",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
     "paths": {
       "canvaskit-wasm": ["./src/canvaskit-wasm-shim.d.ts"]
     },
-    "strict": true,
     "skipLibCheck": true,
     "composite": true,
     "declaration": true,
     "declarationMap": true,
     "outDir": "dist",
     "rootDir": "src",
-    "lib": ["ES2023", "DOM", "DOM.Iterable"],
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
-    "verbatimModuleSyntax": true
+    "lib": ["ES2023", "DOM", "DOM.Iterable"]
   },
   "include": ["src/**/*.ts"],
   "exclude": ["src/**/*.test.ts"],

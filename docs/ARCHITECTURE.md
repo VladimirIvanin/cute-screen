@@ -30,6 +30,27 @@ editor-core ← editor-renderer ← editor-vue ← desktop shell
 
 `editor-core` не импортирует Vue, DOM, Tauri или CanvasKit.
 
+### Внутренние TypeScript-модули
+
+Каждый TypeScript package организован по предметным доменам, а внутри домена —
+по слоям `contracts → model → adapters/ui`. `shared` содержит только действительно
+общие primitives и не импортирует предметные домены. Package root `index.ts`
+является публичным compatibility barrel; код того же package не импортирует
+собственный root barrel.
+
+- `editor-core`: shared geometry/validation, document, tools, commands/history,
+  interaction и renderer-neutral scene.
+- `editor-renderer`: contracts, resources/text, независимые Canvas2D/CanvasKit
+  backends и runtime/scheduler.
+- `editor-vue`: shared UI, session/resources, tools, text, canvas и shell.
+- `desktop`: generated DTO, platform/Tauri adapters, startup/document/capture
+  features и composition roots.
+
+Границы и отсутствие циклов проверяются TypeScript AST test. Vue components не
+владеют scene graph: renderer resources, gestures и pointer-move state остаются
+в imperative controllers, а Pinia получает только компактную UI/session
+projection. Tauri API импортируется только desktop platform adapters.
+
 ## Модель документа
 
 ```ts
