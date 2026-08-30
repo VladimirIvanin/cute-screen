@@ -21,18 +21,6 @@
       "reason": "quick-capture composition root awaiting controller extraction"
     },
     {
-      "path": "packages/editor-renderer/src/canvas2d.ts",
-      "max": 1126,
-      "removeBy": "renderer",
-      "reason": "Canvas2D paint, nodes and lifecycle are still co-located"
-    },
-    {
-      "path": "packages/editor-renderer/src/canvaskit.ts",
-      "max": 2258,
-      "removeBy": "renderer",
-      "reason": "CanvasKit API, paint, nodes and lifecycle are still co-located"
-    },
-    {
       "path": "packages/editor-vue/src/shell/components/CanvasViewport.vue",
       "max": 4201,
       "removeBy": "vue",
@@ -43,24 +31,6 @@
       "max": 3878,
       "removeBy": "vue",
       "reason": "shell composition and tool settings are still co-located"
-    },
-    {
-      "path": "packages/editor-renderer/src/canvas2d.test.ts",
-      "max": 601,
-      "removeBy": "renderer",
-      "reason": "Canvas2D tests are awaiting node-family split"
-    },
-    {
-      "path": "packages/editor-renderer/src/canvaskit.test.ts",
-      "max": 666,
-      "removeBy": "renderer",
-      "reason": "CanvasKit tests are awaiting node-family split"
-    },
-    {
-      "path": "packages/editor-renderer/src/precision-rendering.test.ts",
-      "max": 731,
-      "removeBy": "renderer",
-      "reason": "precision parity tests are awaiting backend split"
     },
     {
       "path": "tests/e2e/specs/browser-m06-drawing-tools.e2e.ts",
@@ -215,30 +185,6 @@
       "maxDepth": 4,
       "removeBy": "core-cleanup",
       "reason": "ruler factory validation awaits settings parser"
-    },
-    {
-      "path": "packages/editor-renderer/src/canvas2d.ts",
-      "maxFunctionLines": 211,
-      "maxComplexity": 30,
-      "maxDepth": 4,
-      "removeBy": "renderer",
-      "reason": "Canvas2D node dispatcher and export lifecycle are co-located"
-    },
-    {
-      "path": "packages/editor-renderer/src/canvaskit.ts",
-      "maxFunctionLines": 344,
-      "maxComplexity": 26,
-      "maxDepth": 6,
-      "removeBy": "renderer",
-      "reason": "CanvasKit node dispatcher and resource lifecycle are co-located"
-    },
-    {
-      "path": "packages/editor-renderer/src/rich-text-layout.ts",
-      "maxFunctionLines": 182,
-      "maxComplexity": 26,
-      "maxDepth": 4,
-      "removeBy": "renderer",
-      "reason": "rich-text layout and line breaking are co-located"
     },
     {
       "path": "packages/editor-vue/src/shell/store.ts",
