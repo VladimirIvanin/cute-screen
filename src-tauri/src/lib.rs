@@ -40,24 +40,37 @@ use activation::ActivationServer;
 use activation::{
     ACTIVATION_PROTOCOL_VERSION, ActivationDispatch, ActivationReplyV1, ActivationRequestV1,
 };
+use app::commands::error::CommandErrorV1;
 use capture::{
-    CaptureCompletion, CaptureController, CaptureInvocationSource, CaptureOutcomeV1,
-    CaptureOutcomeV2, CaptureProgressState, CaptureRequestV1, CaptureTerminalOutcome,
-    CreateDocumentFromImageRequest, ImageProvenance, QuickCaptureDraftV1, QuickCaptureSelectionV1,
-    create_document_from_image,
+    CaptureCompletion, CaptureController, CaptureInvocationSource, CaptureOutcomeV2,
+    CaptureProgressState, CaptureRequestV1, CaptureTerminalOutcome, CreateDocumentFromImageRequest,
+    ImageProvenance, QuickCaptureDraftV1, QuickCaptureSelectionV1, create_document_from_image,
 };
 use lifecycle::{LaunchIntentV1, LifecycleState, parse_launch};
 #[cfg(feature = "test-harness")]
 use storage::CreateCaptureRequest;
-use storage::{BlobMetadata, CaptureMetadataV1, LibraryRepository, OpenDocument, RepositoryError};
+use storage::{
+    BlobMetadata, CaptureMetadataV1, LibraryRepository, OpenDocument, RepositoryError,
+    StorageHandle,
+};
 
+#[cfg(any(test, target_os = "macos"))]
+#[path = "platform/macos/ffi.rs"]
+mod macos_ffi;
 #[cfg(target_os = "macos")]
+#[path = "platform/macos/capture.rs"]
 mod macos_platform;
+#[cfg(test)]
+#[path = "platform/macos/virtual_desktop.rs"]
+mod macos_virtual_desktop;
 #[cfg(target_os = "windows")]
+#[path = "platform/windows/capture.rs"]
 mod windows_platform;
 
 const CAPTURE_PREFLIGHT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 const CAPTURE_DIAGNOSTIC_CAPACITY: usize = 64;
+
+type CommandResult<T> = Result<T, CommandErrorV1>;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -132,7 +145,7 @@ impl CaptureDiagnosticsService {
         }
     }
 
-    fn finish(&self, outcome: &CaptureOutcomeV1) {
+    fn finish(&self, outcome: &CaptureOutcomeV2) {
         let source = self
             .active_sources
             .lock()
@@ -222,7 +235,19 @@ struct QuickEditorMountService {
 
 #[derive(Default)]
 struct QuickSaveTargetService {
-    destination: Mutex<Option<std::path::PathBuf>>,
+    target: Mutex<Option<QuickSaveTarget>>,
+}
+
+#[derive(Debug, Clone)]
+struct QuickSaveTarget {
+    draft_id: String,
+    destination: std::path::PathBuf,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum QuickEditorHandoffStatus {
+    Ready,
+    Degraded,
 }
 
 async fn pick_file<R: tauri::Runtime>(
@@ -281,17 +306,25 @@ impl QuickEditorMountService {
     }
 }
 
+#[path = "services/activation.rs"]
 pub mod activation;
 pub mod capture;
+#[path = "services/clipboard.rs"]
 mod clipboard;
+#[path = "services/fonts.rs"]
 mod fonts;
+#[path = "services/image_transport.rs"]
 pub mod image_transport;
+#[path = "services/lifecycle.rs"]
 pub mod lifecycle;
 #[cfg(target_os = "linux")]
+#[path = "platform/linux/portal.rs"]
 pub mod linux_platform;
 pub mod platform;
-pub mod storage;
+pub use cute_screen_storage as storage;
+pub mod app;
 #[cfg(all(feature = "x11-capture", any(target_os = "linux", test)))]
+#[path = "platform/linux/x11.rs"]
 pub mod x11_platform;
 
 #[cfg(feature = "fake-platform")]
@@ -332,8 +365,8 @@ fn stage_image(
     token: String,
     correlation_id: String,
     transport: State<'_, Arc<ImageTransportService>>,
-) -> Result<StagedImageMetadata, PlatformError> {
-    transport.stage_image(&token, &correlation_id)
+) -> CommandResult<StagedImageMetadata> {
+    Ok(transport.stage_image(&token, &correlation_id)?)
 }
 
 #[tauri::command]
@@ -341,23 +374,24 @@ fn read_image_bytes(
     token: String,
     correlation_id: String,
     transport: State<'_, Arc<ImageTransportService>>,
-) -> Result<tauri::ipc::Response, PlatformError> {
-    transport
+) -> CommandResult<tauri::ipc::Response> {
+    Ok(transport
         .read_image_bytes(&token, &correlation_id)
-        .map(tauri::ipc::Response::new)
+        .map(tauri::ipc::Response::new)?)
 }
 
 #[tauri::command]
-fn repository_open_last(
+async fn repository_open_last(
     _correlation_id: String,
-    repository: State<'_, LibraryRepository>,
+    repository: State<'_, StorageHandle>,
     transport: State<'_, Arc<ImageTransportService>>,
-) -> Result<Option<OpenDocument>, RepositoryError> {
-    let Some(mut document) = repository.open_last()? else {
+) -> CommandResult<Option<OpenDocument>> {
+    let Some(mut document) = repository.open_last().await? else {
         return Ok(None);
     };
     let source = repository
-        .resolve_capture_source(document.capture_id.clone(), document.source_hash.clone())?;
+        .resolve_capture_source(document.capture_id.clone(), document.source_hash.clone())
+        .await?;
     let token = Uuid::now_v7().simple().to_string();
     transport
         .register_authoritative(token.clone(), source)
@@ -367,31 +401,33 @@ fn repository_open_last(
 }
 
 #[tauri::command]
-fn repository_list_active_series_frames(
+async fn repository_list_active_series_frames(
     _correlation_id: String,
-    repository: State<'_, LibraryRepository>,
-) -> Result<Vec<storage::SeriesFrame>, RepositoryError> {
-    repository.list_active_series_frames()
+    repository: State<'_, StorageHandle>,
+) -> CommandResult<Vec<storage::SeriesFrame>> {
+    Ok(repository.list_active_series_frames().await?)
 }
 
 #[tauri::command]
-fn repository_save_document(
+async fn repository_save_document(
     _correlation_id: String,
     document_id: String,
     expected_revision: i64,
     document_json: String,
-    repository: State<'_, LibraryRepository>,
-) -> Result<i64, RepositoryError> {
-    repository.save_document(document_id, expected_revision, document_json)
+    repository: State<'_, StorageHandle>,
+) -> CommandResult<i64> {
+    Ok(repository
+        .save_document(document_id, expected_revision, document_json)
+        .await?)
 }
 
 #[tauri::command]
 async fn repository_import_texture(
     correlation_id: String,
     app: tauri::AppHandle,
-    repository: State<'_, LibraryRepository>,
+    repository: State<'_, StorageHandle>,
     transport: State<'_, Arc<ImageTransportService>>,
-) -> Result<TextureImportOutcome, RepositoryError> {
+) -> CommandResult<TextureImportOutcome> {
     let window = app
         .get_webview_window("main")
         .ok_or_else(|| RepositoryError::Io("main window is unavailable".to_owned()))?;
@@ -409,8 +445,8 @@ async fn repository_import_texture(
         .map_err(|error| RepositoryError::Io(error.to_string()))?;
     let bytes = fs::read(path)?;
     let metadata = storage::inspect_texture_bytes(&bytes)?;
-    let stored = repository.import_blob(bytes, metadata)?;
-    let resource = repository.resolve_blob_source(stored.hash.clone())?;
+    let stored = repository.import_blob(bytes, metadata).await?;
+    let resource = repository.resolve_blob_source(stored.hash.clone()).await?;
     let resource_token = Uuid::now_v7().simple().to_string();
     transport
         .register_authoritative_blob(resource_token.clone(), resource)
@@ -430,9 +466,9 @@ async fn repository_import_texture(
 async fn repository_import_content_image(
     correlation_id: String,
     app: tauri::AppHandle,
-    repository: State<'_, LibraryRepository>,
+    repository: State<'_, StorageHandle>,
     transport: State<'_, Arc<ImageTransportService>>,
-) -> Result<TextureImportOutcome, RepositoryError> {
+) -> CommandResult<TextureImportOutcome> {
     let window = app
         .get_webview_window("main")
         .ok_or_else(|| RepositoryError::Io("main window is unavailable".to_owned()))?;
@@ -450,8 +486,8 @@ async fn repository_import_content_image(
         .map_err(|error| RepositoryError::Io(error.to_string()))?;
     let bytes = fs::read(path)?;
     let metadata = storage::inspect_content_image_bytes(&bytes)?;
-    let stored = repository.import_blob(bytes, metadata)?;
-    let resource = repository.resolve_blob_source(stored.hash.clone())?;
+    let stored = repository.import_blob(bytes, metadata).await?;
+    let resource = repository.resolve_blob_source(stored.hash.clone()).await?;
     let resource_token = Uuid::now_v7().simple().to_string();
     transport
         .register_authoritative_blob(resource_token.clone(), resource)
@@ -472,7 +508,7 @@ fn clipboard_read_snapshot(
     correlation_id: String,
     repository: State<'_, LibraryRepository>,
     transport: State<'_, Arc<ImageTransportService>>,
-) -> Result<ClipboardReadSnapshot, RepositoryError> {
+) -> CommandResult<ClipboardReadSnapshot> {
     let snapshot = clipboard::read_native_snapshot().map_err(RepositoryError::Io)?;
     let bitmap = snapshot
         .bitmap
@@ -504,16 +540,14 @@ fn clipboard_read_snapshot(
 }
 
 #[tauri::command]
-fn clipboard_write_text(text: String, correlation_id: String) -> Result<(), RepositoryError> {
+fn clipboard_write_text(text: String, correlation_id: String) -> CommandResult<()> {
     clipboard::write_native_text(&text).map_err(RepositoryError::Io)?;
     let _ = correlation_id;
     Ok(())
 }
 
 #[tauri::command]
-fn font_catalog_list(
-    correlation_id: String,
-) -> Result<Vec<fonts::SystemFontFace>, RepositoryError> {
+fn font_catalog_list(correlation_id: String) -> CommandResult<Vec<fonts::SystemFontFace>> {
     let fonts = fonts::list_system_font_faces().map_err(RepositoryError::Io)?;
     let _ = correlation_id;
     Ok(fonts)
@@ -524,7 +558,7 @@ fn clipboard_open_image(
     correlation_id: String,
     repository: State<'_, LibraryRepository>,
     transport: State<'_, Arc<ImageTransportService>>,
-) -> Result<ClipboardOpenImageOutcome, RepositoryError> {
+) -> CommandResult<ClipboardOpenImageOutcome> {
     let snapshot = clipboard::read_native_snapshot().map_err(RepositoryError::Io)?;
     let Some(bitmap) = snapshot.bitmap else {
         return Ok(ClipboardOpenImageOutcome::NoBitmap);
@@ -556,7 +590,7 @@ async fn repository_open_image(
     app: tauri::AppHandle,
     repository: State<'_, LibraryRepository>,
     transport: State<'_, Arc<ImageTransportService>>,
-) -> Result<OpenImageOutcome, RepositoryError> {
+) -> CommandResult<OpenImageOutcome> {
     let window = app
         .get_webview_window("main")
         .ok_or_else(|| RepositoryError::Io("main window is unavailable".to_owned()))?;
@@ -595,18 +629,18 @@ async fn repository_open_image(
 }
 
 #[tauri::command]
-fn repository_resolve_texture(
+async fn repository_resolve_texture(
     _correlation_id: String,
     blob_hash: String,
-    repository: State<'_, LibraryRepository>,
+    repository: State<'_, StorageHandle>,
     transport: State<'_, Arc<ImageTransportService>>,
-) -> Result<TextureImportOutcome, RepositoryError> {
-    let resource = repository.resolve_blob_source(blob_hash)?;
+) -> CommandResult<TextureImportOutcome> {
+    let resource = repository.resolve_blob_source(blob_hash).await?;
     if !matches!(
         resource.metadata.format.as_str(),
         "png" | "jpeg" | "webp" | "svg"
     ) {
-        return Err(RepositoryError::InvalidImage);
+        return Err(RepositoryError::InvalidImage.into());
     }
     let resource_token = Uuid::now_v7().simple().to_string();
     let hash = resource.hash.clone();
@@ -632,8 +666,8 @@ async fn repository_export_recovery_bundle(
     _correlation_id: String,
     document_id: String,
     app: tauri::AppHandle,
-    repository: State<'_, LibraryRepository>,
-) -> Result<RecoveryExportOutcome, RepositoryError> {
+    repository: State<'_, StorageHandle>,
+) -> CommandResult<RecoveryExportOutcome> {
     let suggested_name = format!("{document_id}.cutescreen-recovery");
     let window = app
         .get_webview_window("main")
@@ -651,7 +685,9 @@ async fn repository_export_recovery_bundle(
     let destination = destination
         .into_path()
         .map_err(|error| RepositoryError::Io(error.to_string()))?;
-    repository.export_recovery_bundle(document_id, destination)?;
+    repository
+        .export_recovery_bundle(document_id, destination)
+        .await?;
     Ok(RecoveryExportOutcome::Saved)
 }
 
@@ -691,23 +727,26 @@ fn lifecycle_finish_quit(app: tauri::AppHandle) {
 }
 
 #[tauri::command]
-fn settings_get(
+async fn settings_get(
     _correlation_id: String,
     key: String,
-    repository: State<'_, LibraryRepository>,
-) -> Result<Option<String>, RepositoryError> {
-    repository.get_setting(key)
+    repository: State<'_, StorageHandle>,
+) -> CommandResult<Option<String>> {
+    Ok(repository.get_setting(key).await?)
 }
 
 #[tauri::command]
-fn settings_put(
+async fn settings_put(
     _correlation_id: String,
     key: String,
     schema_version: u32,
     value_json: String,
-    repository: State<'_, LibraryRepository>,
-) -> Result<(), RepositoryError> {
-    repository.put_setting(key, schema_version, value_json)
+    repository: State<'_, StorageHandle>,
+) -> CommandResult<()> {
+    repository
+        .put_setting(key, schema_version, value_json)
+        .await?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -768,16 +807,17 @@ async fn platform_capabilities(correlation_id: String) -> PlatformCapabilities {
 }
 
 #[tauri::command]
-fn open_screen_recording_settings() -> Result<(), PlatformError> {
+fn open_screen_recording_settings() -> CommandResult<()> {
     #[cfg(target_os = "macos")]
     {
-        macos_platform::open_screen_recording_settings()
+        Ok(macos_platform::open_screen_recording_settings()?)
     }
     #[cfg(not(target_os = "macos"))]
     Err(PlatformError::new(
         PlatformErrorCode::CaptureFailed,
         "macos-screen-recording-settings",
-    ))
+    )
+    .into())
 }
 
 #[cfg(all(target_os = "linux", feature = "x11-capture"))]
@@ -794,7 +834,7 @@ async fn capture_request(
     request: CaptureRequestV1,
     app: tauri::AppHandle,
     controller: State<'_, CaptureController>,
-) -> Result<CaptureOutcomeV1, PlatformError> {
+) -> CommandResult<CaptureOutcomeV2> {
     Ok(capture_with_preflight(&app, controller.inner(), request).await)
 }
 
@@ -810,10 +850,10 @@ fn quick_capture_confirm_selection(
     draft_id: String,
     selection: QuickCaptureSelectionV1,
     controller: State<'_, CaptureController>,
-) -> Result<bool, String> {
-    controller
+) -> CommandResult<bool> {
+    Ok(controller
         .confirm_quick_selection(&draft_id, selection)
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string())?)
 }
 
 #[tauri::command]
@@ -821,7 +861,7 @@ fn quick_capture_warmup(
     draft_id: String,
     app: tauri::AppHandle,
     controller: State<'_, CaptureController>,
-) -> Result<bool, String> {
+) -> CommandResult<bool> {
     let active = controller.active_quick_draft();
     if !quick_capture_draft_matches(
         active.as_ref().map(|draft| draft.draft_id.as_str()),
@@ -861,7 +901,7 @@ fn quick_capture_present(
     draft_id: String,
     app: tauri::AppHandle,
     controller: State<'_, CaptureController>,
-) -> Result<bool, String> {
+) -> CommandResult<bool> {
     let active = controller.active_quick_draft();
     if !quick_capture_draft_matches(
         active.as_ref().map(|draft| draft.draft_id.as_str()),
@@ -896,7 +936,7 @@ fn quick_capture_reveal(
     draft_id: String,
     app: tauri::AppHandle,
     controller: State<'_, CaptureController>,
-) -> Result<bool, String> {
+) -> CommandResult<bool> {
     let active = controller.active_quick_draft();
     if !quick_capture_draft_matches(
         active.as_ref().map(|draft| draft.draft_id.as_str()),
@@ -929,7 +969,13 @@ fn quick_capture_reveal(
 }
 
 #[tauri::command]
-fn quick_capture_dismiss(app: tauri::AppHandle) -> Result<bool, String> {
+fn quick_capture_dismiss(app: tauri::AppHandle) -> CommandResult<bool> {
+    Ok(dismiss_quick_capture_window(&app)?)
+}
+
+fn dismiss_quick_capture_window<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+) -> Result<bool, String> {
     #[cfg(target_os = "macos")]
     macos_platform::complete_selector_handoff();
     let Some(window) = app.get_webview_window("quick-capture") else {
@@ -963,7 +1009,7 @@ async fn quick_capture_commit(
     app: tauri::AppHandle,
     controller: State<'_, CaptureController>,
     mounts: State<'_, QuickEditorMountService>,
-) -> Result<CaptureOutcomeV2, RepositoryError> {
+) -> CommandResult<CaptureOutcomeV2> {
     let document_id = (completion == CaptureCompletion::Editor)
         .then(|| {
             serde_json::from_str::<serde_json::Value>(&document_json)
@@ -987,25 +1033,61 @@ async fn quick_capture_commit(
                 if let Some(document_id) = document_id.as_deref() {
                     mounts.remove(document_id);
                 }
-                return Err(error);
+                return Err(error.into());
             }
         };
-    if completion == CaptureCompletion::Editor {
-        prepare_quick_capture_editor_handoff(&app)?;
+    if completion == CaptureCompletion::Editor
+        && let Err(error) = prepare_quick_capture_editor_handoff(&app)
+    {
+        eprintln!(
+            "quick capture {} committed but editor handoff preparation failed: {error}",
+            outcome.correlation_id
+        );
+        degrade_quick_editor_handoff(&app, &outcome.correlation_id);
     }
     if let (Some(document_id), Some(acknowledgement)) = (document_id, acknowledgement) {
-        let mounted = matches!(
-            tokio::time::timeout(std::time::Duration::from_secs(10), acknowledgement).await,
-            Ok(Ok(true))
-        );
+        let status =
+            await_quick_editor_mount(acknowledgement, std::time::Duration::from_secs(10)).await;
         mounts.remove(&document_id);
-        if !mounted {
-            return Err(RepositoryError::Io(
-                "editor did not acknowledge the quick capture mount".to_owned(),
-            ));
+        if status == QuickEditorHandoffStatus::Degraded {
+            eprintln!(
+                "quick capture {} committed but editor did not acknowledge its first frame",
+                outcome.correlation_id
+            );
+            degrade_quick_editor_handoff(&app, &outcome.correlation_id);
         }
     }
     Ok(outcome)
+}
+
+async fn await_quick_editor_mount(
+    acknowledgement: tokio::sync::oneshot::Receiver<bool>,
+    timeout: std::time::Duration,
+) -> QuickEditorHandoffStatus {
+    if matches!(
+        tokio::time::timeout(timeout, acknowledgement).await,
+        Ok(Ok(true))
+    ) {
+        QuickEditorHandoffStatus::Ready
+    } else {
+        QuickEditorHandoffStatus::Degraded
+    }
+}
+
+fn degrade_quick_editor_handoff<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    correlation_id: &str,
+) {
+    if app.get_webview_window("main").is_none() {
+        eprintln!(
+            "quick capture {correlation_id} cannot degrade editor handoff: main window is unavailable"
+        );
+        return;
+    }
+    show_editor(app);
+    if let Err(error) = dismiss_quick_capture_window(app) {
+        eprintln!("quick capture {correlation_id} fallback dismiss failed: {error}");
+    }
 }
 
 #[tauri::command]
@@ -1023,35 +1105,49 @@ fn quick_capture_open_editor(app: tauri::AppHandle) {
 }
 
 #[tauri::command]
-fn quick_capture_cancel(draft_id: String, controller: State<'_, CaptureController>) -> bool {
-    controller.cancel_quick_draft(&draft_id)
+fn quick_capture_cancel(
+    draft_id: String,
+    controller: State<'_, CaptureController>,
+    save_target: State<'_, QuickSaveTargetService>,
+) -> bool {
+    let cancelled = controller.cancel_quick_draft(&draft_id);
+    if cancelled && let Ok(mut target) = save_target.target.lock() {
+        *target = None;
+    }
+    cancelled
 }
 
 #[tauri::command]
-fn quick_capture_copy_png(request: tauri::ipc::Request<'_>) -> Result<(), RepositoryError> {
+fn quick_capture_copy_png(request: tauri::ipc::Request<'_>) -> CommandResult<()> {
     let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
-        return Err(RepositoryError::InvalidImage);
+        return Err(RepositoryError::InvalidImage.into());
     };
     storage::inspect_content_image_bytes(bytes)?;
-    clipboard::write_native_png(bytes).map_err(RepositoryError::Io)
+    clipboard::write_native_png(bytes).map_err(RepositoryError::Io)?;
+    Ok(())
 }
 
 #[tauri::command]
 fn quick_capture_prepare_png(
     request: tauri::ipc::Request<'_>,
     controller: State<'_, CaptureController>,
-) -> Result<(), RepositoryError> {
+) -> CommandResult<()> {
     let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
-        return Err(RepositoryError::InvalidImage);
+        return Err(RepositoryError::InvalidImage.into());
     };
-    controller.prepare_quick_result(bytes)
+    Ok(controller.prepare_quick_result(bytes)?)
 }
 
 #[tauri::command]
 async fn quick_capture_choose_save_png(
     app: tauri::AppHandle,
+    controller: State<'_, CaptureController>,
     service: State<'_, QuickSaveTargetService>,
-) -> Result<bool, RepositoryError> {
+) -> CommandResult<bool> {
+    let draft_id = controller
+        .active_quick_draft()
+        .map(|draft| draft.draft_id)
+        .ok_or_else(|| RepositoryError::InvalidDocument("quick draft is not active".to_owned()))?;
     let window = app
         .get_webview_window("quick-capture")
         .ok_or_else(|| RepositoryError::Io("quick capture window is unavailable".to_owned()))?;
@@ -1063,7 +1159,7 @@ async fn quick_capture_choose_save_png(
         .set_file_name("cute-screen.png")
         .add_filter("PNG image", &["png"]);
     let Some(destination) = save_file(dialog).await? else {
-        if let Ok(mut current) = service.destination.lock() {
+        if let Ok(mut current) = service.target.lock() {
             *current = None;
         }
         return Ok(false);
@@ -1072,10 +1168,13 @@ async fn quick_capture_choose_save_png(
         .into_path()
         .map_err(|error| RepositoryError::Io(error.to_string()))?;
     *service
-        .destination
+        .target
         .lock()
         .map_err(|_| RepositoryError::Io("quick save target lock poisoned".to_owned()))? =
-        Some(destination);
+        Some(QuickSaveTarget {
+            draft_id,
+            destination,
+        });
     Ok(true)
 }
 
@@ -1083,23 +1182,23 @@ async fn quick_capture_choose_save_png(
 fn quick_capture_write_save_png(
     request: tauri::ipc::Request<'_>,
     service: State<'_, QuickSaveTargetService>,
-) -> Result<(), RepositoryError> {
+) -> CommandResult<()> {
     let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
-        return Err(RepositoryError::InvalidImage);
+        return Err(RepositoryError::InvalidImage.into());
     };
     let metadata = storage::inspect_content_image_bytes(bytes)?;
     if metadata.format != "png" {
-        return Err(RepositoryError::InvalidImage);
+        return Err(RepositoryError::InvalidImage.into());
     }
-    let destination = service
-        .destination
+    let target = service
+        .target
         .lock()
         .map_err(|_| RepositoryError::Io("quick save target lock poisoned".to_owned()))?
-        .clone()
+        .take()
         .ok_or_else(|| RepositoryError::Io("quick save target is not selected".to_owned()))?;
-    write_verified_png(&destination, bytes, &metadata)?;
-    if let Ok(mut current) = service.destination.lock() {
-        *current = None;
+    if let Err(error) = write_verified_png(&target.destination, bytes, &metadata) {
+        eprintln!("quick save for draft {} failed: {error}", target.draft_id);
+        return Err(error.into());
     }
     Ok(())
 }
@@ -1135,7 +1234,7 @@ fn capture_cancel(controller: State<'_, CaptureController>) -> bool {
 }
 
 #[tauri::command]
-fn capture_wait_for_editor_unmap(correlation_id: String) -> Result<(), PlatformError> {
+fn capture_wait_for_editor_unmap(correlation_id: String) -> CommandResult<()> {
     #[cfg(all(target_os = "linux", feature = "x11-capture"))]
     if current_session() == SessionKind::X11 {
         x11_platform::X11CaptureAdapter.wait_for_current_process_unmapped(&correlation_id)?;
@@ -1167,6 +1266,14 @@ fn capture_preflight_complete(
 
 #[tauri::command]
 async fn hotkeys_bind(
+    shortcuts: Vec<ShortcutSpec>,
+    correlation_id: String,
+    app: tauri::AppHandle,
+) -> CommandResult<Vec<ShortcutBindingResult>> {
+    Ok(hotkeys_bind_inner(shortcuts, correlation_id, app).await?)
+}
+
+async fn hotkeys_bind_inner(
     shortcuts: Vec<ShortcutSpec>,
     correlation_id: String,
     app: tauri::AppHandle,
@@ -1229,18 +1336,19 @@ fn get_e2e_harness_query() -> Option<String> {
 
 #[cfg(feature = "test-harness")]
 #[tauri::command]
-async fn test_portal_probe(correlation_id: String) -> Result<PortalCapabilityProbe, PlatformError> {
+async fn test_portal_probe(correlation_id: String) -> CommandResult<PortalCapabilityProbe> {
     #[cfg(target_os = "linux")]
     {
-        return linux_platform::AshpdPortalClient::default()
+        return Ok(linux_platform::AshpdPortalClient::default()
             .probe(&correlation_id)
-            .await;
+            .await?);
     }
     #[cfg(not(target_os = "linux"))]
     Err(PlatformError::new(
         platform::PlatformErrorCode::PortalUnavailable,
         correlation_id,
-    ))
+    )
+    .into())
 }
 
 #[cfg(all(feature = "test-harness", target_os = "linux"))]
@@ -1248,8 +1356,8 @@ async fn test_portal_probe(correlation_id: String) -> Result<PortalCapabilityPro
 async fn test_portal_capture(
     correlation_id: String,
     transport: State<'_, Arc<ImageTransportService>>,
-) -> Result<CaptureResult, PlatformError> {
-    linux_platform::AshpdPortalClient::default()
+) -> CommandResult<CaptureResult> {
+    Ok(linux_platform::AshpdPortalClient::default()
         .capture_to_transport(
             CaptureRequest {
                 correlation_id,
@@ -1257,7 +1365,7 @@ async fn test_portal_capture(
             },
             transport.inner(),
         )
-        .await
+        .await?)
 }
 
 #[cfg(all(feature = "test-harness", not(target_os = "linux")))]
@@ -1265,11 +1373,12 @@ async fn test_portal_capture(
 async fn test_portal_capture(
     correlation_id: String,
     _transport: State<'_, Arc<ImageTransportService>>,
-) -> Result<platform::CaptureResult, PlatformError> {
+) -> CommandResult<platform::CaptureResult> {
     Err(PlatformError::new(
         platform::PlatformErrorCode::PortalUnavailable,
         correlation_id,
-    ))
+    )
+    .into())
 }
 
 fn current_session() -> SessionKind {
@@ -1665,7 +1774,7 @@ fn hotkey_capture_callback<R: tauri::Runtime>(
 
 fn publish_capture_outcome<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
-    outcome: &CaptureOutcomeV1,
+    outcome: &CaptureOutcomeV2,
 ) {
     if let Some(diagnostics) = app.try_state::<CaptureDiagnosticsService>() {
         diagnostics.finish(outcome);
@@ -1717,12 +1826,12 @@ fn publish_capture_progress<R: tauri::Runtime>(
     );
 }
 
-fn failed_capture(correlation_id: String) -> CaptureOutcomeV1 {
+fn failed_capture(correlation_id: String) -> CaptureOutcomeV2 {
     terminal_capture(correlation_id, CaptureTerminalOutcome::Failed)
 }
 
-fn terminal_capture(correlation_id: String, outcome: CaptureTerminalOutcome) -> CaptureOutcomeV1 {
-    CaptureOutcomeV1 {
+fn terminal_capture(correlation_id: String, outcome: CaptureTerminalOutcome) -> CaptureOutcomeV2 {
+    CaptureOutcomeV2 {
         version: 2,
         correlation_id,
         outcome,
@@ -1751,7 +1860,7 @@ async fn capture_with_preflight<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
     controller: &CaptureController,
     request: CaptureRequestV1,
-) -> CaptureOutcomeV1 {
+) -> CaptureOutcomeV2 {
     if let Some(diagnostics) = app.try_state::<CaptureDiagnosticsService>() {
         diagnostics.begin(&request);
     }
@@ -1954,7 +2063,7 @@ fn seed_m03_document(repository: &LibraryRepository) -> Result<(), RepositoryErr
     let document = serde_json::json!({
         "schemaVersion": 7,
         "id": document_id,
-        "source": { "blobHash": hash, "format": "png", "mimeType": "image/png", "width": 3840, "height": 2160, "orientationApplied": true, "color": { "colorSpace": "srgb", "hasIccProfile": false } },
+        "source": { "blobHash": hash, "format": "png", "mimeType": "image/png", "width": 3840, "height": 2160, "orientationApplied": true, "provenance": "capture", "color": { "colorSpace": "srgb", "hasIccProfile": false } },
         "canvas": { "width": 3840, "height": 2160 }, "crop": null, "layers": [],
         "presentation": { "beautify": { "enabled": false }, "watermark": { "enabled": false } },
         "createdAt": "2026-08-09T00:00:00.000Z", "updatedAt": "2026-08-09T00:00:00.000Z"
@@ -1980,6 +2089,10 @@ fn seed_m03_document(repository: &LibraryRepository) -> Result<(), RepositoryErr
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+#[expect(
+    clippy::too_many_lines,
+    reason = "declarative Tauri builder lists managed state and stable IPC handlers"
+)]
 pub fn run() {
     let launch_intent = match parse_launch(env::args_os()) {
         Ok(intent) => intent,
@@ -2035,6 +2148,7 @@ pub fn run() {
             seed_m03_document(&repository)?;
             let transport = initialize_image_transport(app)?;
             let controller = CaptureController::new(repository.clone(), Arc::clone(&transport));
+            app.manage(repository.handle());
             app.manage(repository);
             app.manage(transport);
             app.manage(controller.clone());
@@ -2202,8 +2316,8 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::{
-        CapturePreflightService, PingResponse, QuickEditorMountService, action_for_shortcut_id,
-        write_verified_png,
+        CapturePreflightService, PingResponse, QuickEditorHandoffStatus, QuickEditorMountService,
+        action_for_shortcut_id, await_quick_editor_mount, write_verified_png,
     };
 
     #[test]
@@ -2277,6 +2391,39 @@ mod tests {
             .build()
             .expect("runtime");
         assert!(runtime.block_on(receiver).expect("mount acknowledgement"));
+    }
+
+    #[test]
+    fn quick_editor_mount_timeout_degrades_after_durable_commit() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .expect("runtime");
+        let (_sender, receiver) = tokio::sync::oneshot::channel();
+
+        let status = runtime.block_on(await_quick_editor_mount(
+            receiver,
+            std::time::Duration::ZERO,
+        ));
+
+        assert_eq!(status, QuickEditorHandoffStatus::Degraded);
+    }
+
+    #[test]
+    fn quick_editor_first_frame_acknowledgement_completes_handoff() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .expect("runtime");
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        sender.send(true).expect("mount acknowledgement");
+
+        let status = runtime.block_on(await_quick_editor_mount(
+            receiver,
+            std::time::Duration::from_secs(1),
+        ));
+
+        assert_eq!(status, QuickEditorHandoffStatus::Ready);
     }
 
     #[test]
@@ -2448,7 +2595,7 @@ mod tests {
             invocation_source: crate::capture::CaptureInvocationSource::Hotkey,
         };
         diagnostics.begin(&request);
-        diagnostics.finish(&crate::capture::CaptureOutcomeV1 {
+        diagnostics.finish(&crate::capture::CaptureOutcomeV2 {
             version: 2,
             correlation_id: request.correlation_id,
             outcome: crate::capture::CaptureTerminalOutcome::Failed,

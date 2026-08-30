@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  shallowRef,
+} from 'vue'
 import {
   createEditorDocumentFromImage,
   describeError,
@@ -21,6 +28,7 @@ import {
   presentThenWaitForStableQuickCaptureLayout,
   type QuickRect,
 } from './quick-capture-layout'
+import { useQuickCaptureCoordinator } from './use-quick-capture-coordinator'
 
 const draft = shallowRef<QuickCaptureDraftV1>()
 const session = shallowRef<DocumentSessionController>()
@@ -31,7 +39,8 @@ const pending = ref(false)
 const materialized = ref(false)
 const error = ref<string>()
 const quickLayoutReady = ref(false)
-const selectionPending = ref(false)
+const coordinator = useQuickCaptureCoordinator(tauriDesktopBridge)
+const selectionPending = computed(() => coordinator.phase.value === 'selecting')
 const russian = navigator.language.toLowerCase().startsWith('ru')
 const labels = russian
   ? {
@@ -179,17 +188,11 @@ async function onQuickSelectionComplete(crop: QuickRect): Promise<void> {
       width: active.width,
       height: active.height,
     })
-    if (
-      !(await tauriDesktopBridge.quickCaptureConfirmSelection(
-        active.draftId,
-        selection,
-      ))
-    ) {
+    if (!(await coordinator.confirmSelection(active.draftId, selection))) {
       throw new Error('Quick capture selection is no longer active')
     }
     currentCrop.value = selection
     await nextTick()
-    selectionPending.value = false
     await nextTick()
     updateQuickLayout(selection)
   } catch (cause) {
@@ -236,7 +239,7 @@ function resetDraftSession(): void {
   documentState.value = { kind: 'loading' }
   materialized.value = false
   quickLayoutReady.value = false
-  selectionPending.value = false
+  coordinator.reset()
   error.value = undefined
   presentedDraftId = undefined
   presentingDraftId = undefined
@@ -301,7 +304,7 @@ async function terminateFailedPresentation(
   try {
     await cancelQuickCaptureAction({
       draftId,
-      cancelDraft: (id) => tauriDesktopBridge.quickCaptureCancel(id),
+      cancelDraft: coordinator.cancel,
       closeWindow: dismissWindow,
     })
   } catch (cleanupError) {
@@ -331,7 +334,7 @@ async function loadDraft(): Promise<void> {
   }
   resetDraftSession()
   draft.value = active
-  selectionPending.value = Boolean(active.selectionPending)
+  coordinator.projectDraft(active)
   if (!(await tauriDesktopBridge.quickCaptureWarmup(active.draftId))) {
     throw new Error('Quick capture draft is no longer active')
   }
@@ -477,9 +480,9 @@ async function commit(
       updatedAt: new Date().toISOString(),
     },
   )
-  await tauriDesktopBridge.quickCapturePreparePng(png)
-  await tauriDesktopBridge.quickCaptureCommit(
+  await coordinator.commit(
     draft.value.draftId,
+    png,
     JSON.stringify(materializedDocument),
     completion,
     selection,
@@ -492,8 +495,11 @@ async function detectMaterializedAfterError(): Promise<void> {
   try {
     materialized.value =
       (await tauriDesktopBridge.quickCaptureGetActive()) === null
-  } catch {
-    // Preserve the original actionable error if the diagnostic probe fails.
+  } catch (diagnosticError) {
+    console.warn('Quick capture materialization probe failed', {
+      draftId: draft.value.draftId,
+      diagnosticError,
+    })
   }
 }
 
@@ -591,7 +597,7 @@ async function cancel(): Promise<void> {
   try {
     await cancelQuickCaptureAction({
       draftId: draft.value?.draftId,
-      cancelDraft: tauriDesktopBridge.quickCaptureCancel,
+      cancelDraft: coordinator.cancel,
       closeWindow: dismissWindow,
     })
   } catch (cause) {

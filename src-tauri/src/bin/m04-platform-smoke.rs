@@ -26,7 +26,7 @@ mod linux {
         architecture: String,
         session: String,
         action: String,
-        outcome: cute_screen_desktop::capture::CaptureOutcomeV1,
+        outcome: cute_screen_desktop::capture::CaptureOutcomeV2,
     }
 
     #[derive(Serialize)]
@@ -48,8 +48,8 @@ mod linux {
         os: String,
         architecture: String,
         session: String,
-        initial: cute_screen_desktop::capture::CaptureOutcomeV1,
-        repeat: cute_screen_desktop::capture::CaptureOutcomeV1,
+        initial: cute_screen_desktop::capture::CaptureOutcomeV2,
+        repeat: cute_screen_desktop::capture::CaptureOutcomeV2,
     }
 
     #[derive(Serialize)]
@@ -625,7 +625,7 @@ mod macos {
         architecture: String,
         session: String,
         action: String,
-        outcome: cute_screen_desktop::capture::CaptureOutcomeV1,
+        outcome: cute_screen_desktop::capture::CaptureOutcomeV2,
     }
 
     pub fn run() -> Result<(), Box<dyn std::error::Error>> {

@@ -113,7 +113,14 @@ describe('Tauri build boundary', () => {
 
   it('renders the X11 selector from canonical RGBA instead of a captured native image', async () => {
     const x11Source = await readFile(
-      path.join(process.cwd(), 'src-tauri', 'src', 'x11_platform.rs'),
+      path.join(
+        process.cwd(),
+        'src-tauri',
+        'src',
+        'platform',
+        'linux',
+        'x11.rs',
+      ),
       'utf8',
     )
 
@@ -130,7 +137,14 @@ describe('Tauri build boundary', () => {
       'utf8',
     )
     const platformSource = await readFile(
-      path.join(process.cwd(), 'src-tauri', 'src', 'macos_platform.rs'),
+      path.join(
+        process.cwd(),
+        'src-tauri',
+        'src',
+        'platform',
+        'macos',
+        'capture.rs',
+      ),
       'utf8',
     )
     const hostSource = await readFile(
@@ -149,7 +163,14 @@ describe('Tauri build boundary', () => {
 
   it('keeps X11 Area selection inside the mounted Quick surface', async () => {
     const platformSource = await readFile(
-      path.join(process.cwd(), 'src-tauri', 'src', 'x11_platform.rs'),
+      path.join(
+        process.cwd(),
+        'src-tauri',
+        'src',
+        'platform',
+        'linux',
+        'x11.rs',
+      ),
       'utf8',
     )
     const hostSource = await readFile(
@@ -186,7 +207,14 @@ describe('Tauri build boundary', () => {
 
   it('keeps Windows Area selection inside the mounted Quick surface', async () => {
     const platformSource = await readFile(
-      path.join(process.cwd(), 'src-tauri', 'src', 'windows_platform.rs'),
+      path.join(
+        process.cwd(),
+        'src-tauri',
+        'src',
+        'platform',
+        'windows',
+        'capture.rs',
+      ),
       'utf8',
     )
     const captureStart = platformSource.indexOf('pub fn capture_to_transport')
@@ -247,7 +275,14 @@ describe('Tauri build boundary', () => {
 
   it('stages the X11 Area frame before the single Quick selection surface maps', async () => {
     const platformSource = await readFile(
-      path.join(process.cwd(), 'src-tauri', 'src', 'x11_platform.rs'),
+      path.join(
+        process.cwd(),
+        'src-tauri',
+        'src',
+        'platform',
+        'linux',
+        'x11.rs',
+      ),
       'utf8',
     )
     const hostSource = await readFile(

@@ -1,5 +1,5 @@
 [workspace]
-members = ["src-tauri"]
+members = ["crates/cute-screen-storage", "src-tauri"]
 resolver = "2"
 
 [workspace.package]
@@ -12,6 +12,9 @@ version = "0.0.0"
 cast_possible_truncation = "deny"
 cast_possible_wrap = "deny"
 cast_sign_loss = "deny"
+cognitive_complexity = "deny"
+too_many_arguments = "deny"
+too_many_lines = "deny"
 
 [profile.release]
 codegen-units = 1

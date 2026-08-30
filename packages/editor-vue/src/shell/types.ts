@@ -192,11 +192,7 @@ export interface CanvasViewportHosts {
 }
 
 export type AsyncActionName =
-  | 'capture'
-  | 'captureWindow'
-  | 'openImage'
-  | 'copy'
-  | 'export'
+  'capture' | 'captureWindow' | 'openImage' | 'copy' | 'export'
 
 export type AsyncActionState =
   | { readonly status: 'idle' }

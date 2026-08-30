@@ -12,6 +12,21 @@ system smoke record. Во время разработки отсутствующ
 
 Foundation harness не создаёт отдельного продуктового требования. Его локальные и CI-доказательства определены в [стратегии тестирования](TESTING.md) и [CI workflow](../.github/workflows/ci.yml); статусы `REQ-*` ниже M00 не меняет.
 
+## Rust core refactor gate (2026-08-30)
+
+Рефакторинг по ADR-041 не создаёт новый capture workflow: Area quick capture
+остаётся единым сценарием `selecting → editing → terminal`. До механического
+переноса модулей red-first Rust tests обязаны доказать атомарный переход draft в
+commit, невозможность persisted-but-cancelled и exactly-once terminal outcome.
+`REQ-CAP-010` дополнительно требует, чтобы renderer timeout после durable commit
+деградировал только presentation handoff и не превращал сохранённый документ в
+ошибку либо необходимость второго клика.
+
+Для `REQ-CAP-008/013/015` macOS FFI contract запрещает неатомарное чтение Rust
+`AtomicBool` через C pointer и требует ABI/layout coverage. Multi-display Area
+evidence использует единый frozen virtual-desktop frame; отдельные per-display
+снимки не считаются реализацией cross-monitor выбора.
+
 ## Linux startup, dialog and quick-capture repair gate (2026-08-24)
 
 Дополнение `REQ-CAP-012/013` (2026-08-30, Windows): Windows Area больше не

@@ -91,6 +91,25 @@ const scenarios = [
   },
 ]
 
+const requestedScenarioIds = new Set(
+  (process.env.CUTE_SCREEN_E2E_SCENARIOS ?? '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean),
+)
+const selectedScenarios =
+  requestedScenarioIds.size === 0
+    ? scenarios
+    : scenarios.filter(({ id }) => requestedScenarioIds.has(id))
+const unknownScenarioIds = [...requestedScenarioIds].filter(
+  (id) => !scenarios.some((scenario) => scenario.id === id),
+)
+if (unknownScenarioIds.length > 0) {
+  throw new Error(
+    `Unknown Tauri E2E scenarios: ${unknownScenarioIds.join(', ')}`,
+  )
+}
+
 function isolatedAppDataEnvironment(directory) {
   const environment = { CUTE_SCREEN_E2E_APP_DATA: directory }
 
@@ -196,7 +215,7 @@ try {
     },
   )
 
-  for (const scenario of scenarios) {
+  for (const scenario of selectedScenarios) {
     const appData =
       scenario.persistenceGroup === 'm03'
         ? (m03AppData ??= await mkdtemp(

@@ -1,12 +1,11 @@
+//! SQLite metadata, immutable blobs and recovery for Cute Screen.
+
 use std::{
     collections::BTreeSet,
     fs::{self, File, OpenOptions},
     io::{Read, Write},
     path::{Component, Path, PathBuf},
-    sync::{
-        Arc,
-        mpsc::{self, Sender},
-    },
+    sync::{Arc, mpsc},
     thread,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -16,10 +15,17 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
+use tokio::sync::mpsc::Sender;
+use ts_rs::TS;
 use uuid::Uuid;
 use zip::{ZipArchive, ZipWriter, write::SimpleFileOptions};
 
 use image::{ImageDecoder, codecs::jpeg::JpegDecoder, metadata::Orientation};
+
+mod migrations;
+use migrations::migrate;
+#[cfg(test)]
+use migrations::{LEGACY_MIGRATIONS, legacy_migration_table_exists};
 
 const MAX_ENCODED_BYTES: u64 = 512 * 1024 * 1024;
 const MAX_SVG_ENCODED_BYTES: usize = 10 * 1024 * 1024;
@@ -63,6 +69,8 @@ pub enum RepositoryError {
     Database(String),
     #[error("storage worker stopped")]
     WorkerStopped,
+    #[error("storage worker queue is full")]
+    WorkerBusy,
 }
 
 impl From<rusqlite::Error> for RepositoryError {
@@ -174,15 +182,18 @@ pub struct CreateCaptureRequest {
     pub captured_at: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
 pub struct OpenDocument {
     pub document_id: String,
     pub capture_id: String,
+    #[ts(type = "number")]
     pub revision: i64,
     pub document_json: String,
     pub source_hash: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub image_token: Option<String>,
 }
 
@@ -260,6 +271,12 @@ pub struct LibraryRepository {
     sender: Sender<Job>,
 }
 
+/// Async facade over the same bounded, single-owner SQLite worker.
+#[derive(Clone)]
+pub struct StorageHandle {
+    sender: Sender<Job>,
+}
+
 impl LibraryRepository {
     pub fn initialize(
         root: impl AsRef<Path>,
@@ -279,7 +296,7 @@ impl LibraryRepository {
     ) -> Result<Self, RepositoryError> {
         let root = root.as_ref().to_path_buf();
         let resources_root = resources_root.as_ref().to_path_buf();
-        let (sender, receiver) = mpsc::channel::<Job>();
+        let (sender, mut receiver) = tokio::sync::mpsc::channel::<Job>(64);
         let (ready_sender, ready_receiver) = mpsc::sync_channel(1);
         thread::Builder::new()
             .name("cute-screen-storage".to_owned())
@@ -287,7 +304,7 @@ impl LibraryRepository {
                 let initialized = StorageState::open(&root, &resources_root, fault_injector);
                 let _ = ready_sender.send(initialized.as_ref().map(|_| ()).map_err(Clone::clone));
                 let Ok(mut state) = initialized else { return };
-                while let Ok(job) = receiver.recv() {
+                while let Some(job) = receiver.blocking_recv() {
                     job(&mut state);
                 }
             })
@@ -296,6 +313,12 @@ impl LibraryRepository {
             .recv()
             .map_err(|_| RepositoryError::WorkerStopped)??;
         Ok(Self { sender })
+    }
+
+    pub fn handle(&self) -> StorageHandle {
+        StorageHandle {
+            sender: self.sender.clone(),
+        }
     }
 
     pub fn create_capture(
@@ -396,13 +419,115 @@ impl LibraryRepository {
     ) -> Result<T, RepositoryError> {
         let (sender, receiver) = mpsc::sync_channel(1);
         self.sender
-            .send(Box::new(move |state| {
+            .try_send(Box::new(move |state| {
                 let _ = sender.send(operation(state));
             }))
-            .map_err(|_| RepositoryError::WorkerStopped)?;
+            .map_err(|error| match error {
+                tokio::sync::mpsc::error::TrySendError::Full(_) => RepositoryError::WorkerBusy,
+                tokio::sync::mpsc::error::TrySendError::Closed(_) => RepositoryError::WorkerStopped,
+            })?;
         receiver
             .recv()
             .map_err(|_| RepositoryError::WorkerStopped)?
+    }
+}
+
+impl StorageHandle {
+    pub async fn create_capture(
+        &self,
+        request: CreateCaptureRequest,
+    ) -> Result<OpenDocument, RepositoryError> {
+        self.call(move |state| state.create_capture(request)).await
+    }
+
+    pub async fn open_last(&self) -> Result<Option<OpenDocument>, RepositoryError> {
+        self.call(StorageState::open_last).await
+    }
+
+    pub async fn import_blob(
+        &self,
+        bytes: Vec<u8>,
+        metadata: BlobMetadata,
+    ) -> Result<StoredBlob, RepositoryError> {
+        self.call(move |state| state.import_blob(&bytes, &metadata))
+            .await
+    }
+
+    pub async fn list_active_series_frames(&self) -> Result<Vec<SeriesFrame>, RepositoryError> {
+        self.call(StorageState::list_active_series_frames).await
+    }
+
+    pub async fn save_document(
+        &self,
+        document_id: String,
+        expected_revision: i64,
+        document_json: String,
+    ) -> Result<i64, RepositoryError> {
+        self.call(move |state| state.save_document(&document_id, expected_revision, &document_json))
+            .await
+    }
+
+    pub async fn get_setting(&self, key: String) -> Result<Option<String>, RepositoryError> {
+        self.call(move |state| state.get_setting(&key)).await
+    }
+
+    pub async fn put_setting(
+        &self,
+        key: String,
+        schema_version: u32,
+        value_json: String,
+    ) -> Result<(), RepositoryError> {
+        self.call(move |state| state.put_setting(&key, schema_version, &value_json))
+            .await
+    }
+
+    pub async fn resolve_capture_source(
+        &self,
+        capture_id: String,
+        source_hash: String,
+    ) -> Result<AuthorizedCaptureSource, RepositoryError> {
+        self.call(move |state| state.resolve_capture_source(&capture_id, &source_hash))
+            .await
+    }
+
+    pub async fn resolve_blob_source(
+        &self,
+        hash: String,
+    ) -> Result<AuthorizedBlobSource, RepositoryError> {
+        self.call(move |state| state.resolve_blob_source(&hash))
+            .await
+    }
+
+    pub async fn export_recovery_bundle(
+        &self,
+        document_id: String,
+        destination: PathBuf,
+    ) -> Result<(), RepositoryError> {
+        self.call(move |state| state.export_recovery_bundle(&document_id, &destination))
+            .await
+    }
+
+    pub async fn import_recovery_bundle(
+        &self,
+        source: PathBuf,
+        captured_at: i64,
+    ) -> Result<OpenDocument, RepositoryError> {
+        self.call(move |state| state.import_recovery_bundle(&source, captured_at))
+            .await
+    }
+
+    async fn call<T: Send + 'static>(
+        &self,
+        operation: impl FnOnce(&mut StorageState) -> Result<T, RepositoryError> + Send + 'static,
+    ) -> Result<T, RepositoryError> {
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        self.sender
+            .send(Box::new(move |state| {
+                let _ = sender.send(operation(state));
+            }))
+            .await
+            .map_err(|_| RepositoryError::WorkerStopped)?;
+        receiver.await.map_err(|_| RepositoryError::WorkerStopped)?
     }
 }
 
@@ -1066,92 +1191,6 @@ impl StorageState {
     }
 }
 
-struct Migration {
-    version: i64,
-    name: &'static str,
-    checksum: &'static str,
-    sql: &'static str,
-}
-
-const MIGRATIONS: [Migration; 2] = [
-    Migration {
-        version: 1,
-        name: "m03-initial",
-        checksum: "m03-initial-v1",
-        sql: "
-        CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, checksum TEXT NOT NULL, applied_at INTEGER NOT NULL);
-        CREATE TABLE IF NOT EXISTS series (id TEXT PRIMARY KEY, title TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, deleted_at INTEGER);
-        CREATE TABLE IF NOT EXISTS blobs (hash TEXT PRIMARY KEY, format TEXT NOT NULL, mime_type TEXT NOT NULL, byte_size INTEGER NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, color_metadata_json TEXT NOT NULL, created_at INTEGER NOT NULL);
-        CREATE TABLE IF NOT EXISTS captures (id TEXT PRIMARY KEY, series_id TEXT NOT NULL REFERENCES series(id), original_blob_hash TEXT NOT NULL REFERENCES blobs(hash), captured_at INTEGER NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, deleted_at INTEGER);
-        CREATE TABLE IF NOT EXISTS documents (id TEXT PRIMARY KEY, capture_id TEXT NOT NULL UNIQUE REFERENCES captures(id), schema_version INTEGER NOT NULL, revision INTEGER NOT NULL, content_json TEXT NOT NULL, content_sha256 TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
-        CREATE TABLE IF NOT EXISTS blob_references (owner_kind TEXT NOT NULL, owner_id TEXT NOT NULL, role TEXT NOT NULL, blob_hash TEXT NOT NULL REFERENCES blobs(hash), PRIMARY KEY(owner_kind, owner_id, role, blob_hash));
-        CREATE TABLE IF NOT EXISTS blob_derivatives (source_hash TEXT NOT NULL REFERENCES blobs(hash), variant TEXT NOT NULL, generator_version INTEGER NOT NULL, cache_path TEXT NOT NULL, content_hash TEXT NOT NULL, byte_size INTEGER NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY(source_hash, variant, generator_version));
-        CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, schema_version INTEGER NOT NULL, value_json TEXT NOT NULL, updated_at INTEGER NOT NULL);
-        CREATE TABLE IF NOT EXISTS recovery_journal (operation_id TEXT PRIMARY KEY, kind TEXT NOT NULL, state TEXT NOT NULL, payload_json TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
-        CREATE INDEX IF NOT EXISTS captures_series_recent ON captures(series_id, captured_at DESC) WHERE deleted_at IS NULL;
-        CREATE INDEX IF NOT EXISTS captures_recent ON captures(captured_at DESC) WHERE deleted_at IS NULL;
-        CREATE INDEX IF NOT EXISTS documents_updated ON documents(updated_at DESC);
-        CREATE INDEX IF NOT EXISTS blob_references_hash ON blob_references(blob_hash);
-        CREATE INDEX IF NOT EXISTS recovery_journal_state ON recovery_journal(state, updated_at);
-        ",
-    },
-    Migration {
-        version: 2,
-        name: "m03-capture-metadata-v1",
-        checksum: "m03-capture-metadata-v1",
-        sql: "ALTER TABLE captures ADD COLUMN capture_metadata_json TEXT NOT NULL DEFAULT '{\"schemaVersion\":1,\"backend\":\"unknown\",\"target\":\"unknown\",\"geometry\":null,\"monitorSnapshot\":null,\"cursor\":null,\"invocationSource\":\"unknown\"}';",
-    },
-];
-
-fn migrate(connection: &mut Connection) -> Result<(), RepositoryError> {
-    connection.execute_batch(
-        "CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, checksum TEXT NOT NULL, applied_at INTEGER NOT NULL);",
-    )?;
-    let mut statement = connection
-        .prepare("SELECT version, name, checksum FROM schema_migrations ORDER BY version ASC")?;
-    let rows = statement
-        .query_map([], |row| {
-            Ok((
-                row.get::<_, i64>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-            ))
-        })?
-        .collect::<Result<Vec<_>, _>>()?;
-    drop(statement);
-
-    let supported = MIGRATIONS.last().map_or(0, |migration| migration.version);
-    if let Some((found, _, _)) = rows.last()
-        && *found > supported
-    {
-        return Err(RepositoryError::UnsupportedDatabaseSchema {
-            found: *found,
-            supported,
-        });
-    }
-    for (index, (version, name, checksum)) in rows.iter().enumerate() {
-        let expected = MIGRATIONS.get(index).ok_or_else(|| {
-            RepositoryError::MigrationIntegrity(format!("unknown migration version {version}"))
-        })?;
-        if *version != expected.version || name != expected.name || checksum != expected.checksum {
-            return Err(RepositoryError::MigrationIntegrity(format!(
-                "migration {version} does not match the registered version/name/checksum"
-            )));
-        }
-    }
-
-    for migration in MIGRATIONS.iter().skip(rows.len()) {
-        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        transaction.execute_batch(migration.sql)?;
-        transaction.execute(
-            "INSERT INTO schema_migrations (version, name, checksum, applied_at) VALUES (?1, ?2, ?3, ?4)",
-            params![migration.version, migration.name, migration.checksum, now_millis()?],
-        )?;
-        transaction.commit()?;
-    }
-    Ok(())
-}
-
 fn replace_document_references(
     transaction: &Transaction<'_>,
     document_id: &str,
@@ -1730,7 +1769,7 @@ mod tests {
     fn fixture_bytes() -> Vec<u8> {
         fs::read(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../tests/fixtures/generated/ui-4k.png"
+            "/../../tests/fixtures/generated/ui-4k.png"
         ))
         .expect("production-shaped PNG fixture")
     }
@@ -1840,39 +1879,41 @@ mod tests {
     }
 
     #[test]
-    fn migration_registry_rejects_damaged_history_and_newer_versions() {
-        let directory = tempdir().expect("temp directory");
-        let database = directory.path().join("library.sqlite3");
-        let mut connection = Connection::open(&database).expect("database");
-        super::migrate(&mut connection).expect("migrate empty database");
+    fn user_version_migrations_reject_damaged_legacy_history_and_future_versions() {
+        let mut fresh = Connection::open_in_memory().expect("fresh database");
+        super::migrate(&mut fresh).expect("migrate empty database");
         assert_eq!(
-            connection
-                .query_row("SELECT COUNT(*) FROM schema_migrations", [], |row| row
-                    .get::<_, i64>(0))
-                .expect("migration count"),
-            2
+            fresh
+                .query_row("PRAGMA user_version", [], |row| row.get::<_, i64>(0))
+                .expect("user version"),
+            3
         );
-        connection
+        assert!(!super::legacy_migration_table_exists(&fresh).expect("legacy table probe"));
+
+        let mut damaged = Connection::open_in_memory().expect("damaged database");
+        damaged
+            .execute_batch(super::LEGACY_MIGRATIONS[0].sql)
+            .expect("legacy schema");
+        damaged
             .execute(
-                "UPDATE schema_migrations SET checksum = 'damaged' WHERE version = 1",
+                "INSERT INTO schema_migrations (version, name, checksum, applied_at) VALUES (1, 'm03-initial', 'damaged', 0)",
                 [],
             )
             .expect("damage checksum");
         assert!(matches!(
-            super::migrate(&mut connection),
+            super::migrate(&mut damaged),
             Err(RepositoryError::MigrationIntegrity(_))
         ));
-        connection
-            .execute(
-                "UPDATE schema_migrations SET checksum = 'm03-initial-v1' WHERE version = 1",
-                [],
-            )
-            .expect("restore checksum");
-        connection
+
+        let mut future = Connection::open_in_memory().expect("future database");
+        future
+            .execute_batch(super::LEGACY_MIGRATIONS[0].sql)
+            .expect("legacy schema");
+        future
             .execute("INSERT INTO schema_migrations (version, name, checksum, applied_at) VALUES (3, 'future', 'future', 0)", [])
             .expect("insert future migration");
         assert!(matches!(
-            super::migrate(&mut connection),
+            super::migrate(&mut future),
             Err(RepositoryError::UnsupportedDatabaseSchema { .. })
         ));
     }
@@ -1883,7 +1924,7 @@ mod tests {
         let database = directory.path().join("library.sqlite3");
         let mut connection = Connection::open(&database).expect("database");
         connection
-            .execute_batch(super::MIGRATIONS[0].sql)
+            .execute_batch(super::LEGACY_MIGRATIONS[0].sql)
             .expect("v1 fixture schema");
         connection
             .execute(
@@ -1893,6 +1934,14 @@ mod tests {
             .expect("v1 fixture migration record");
 
         super::migrate(&mut connection).expect("upgrade fixture");
+
+        assert_eq!(
+            connection
+                .query_row("PRAGMA user_version", [], |row| row.get::<_, i64>(0))
+                .expect("user version"),
+            3
+        );
+        assert!(!super::legacy_migration_table_exists(&connection).expect("legacy table probe"));
 
         let columns = connection
             .prepare("PRAGMA table_info(captures)")
@@ -1906,6 +1955,21 @@ mod tests {
                 .iter()
                 .any(|column| column == "capture_metadata_json")
         );
+    }
+
+    #[test]
+    fn async_handle_uses_the_same_single_owner_worker() {
+        let directory = tempdir().expect("temp directory");
+        let repository =
+            LibraryRepository::initialize(directory.path(), directory.path()).expect("repository");
+        let handle = repository.handle();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .expect("runtime");
+
+        let opened = runtime.block_on(handle.open_last()).expect("open last");
+
+        assert!(opened.is_none());
     }
 
     #[test]

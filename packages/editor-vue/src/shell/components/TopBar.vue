@@ -32,9 +32,7 @@ const props = withDefaults(
   },
 )
 const emit = defineEmits<{
-  action: [
-    name: 'capture' | 'captureWindow' | 'openImage' | 'copy' | 'export',
-  ]
+  action: [name: 'capture' | 'captureWindow' | 'openImage' | 'copy' | 'export']
   undo: []
   redo: []
   retrySave: []

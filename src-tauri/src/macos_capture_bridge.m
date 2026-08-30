@@ -3,6 +3,7 @@
 #import <ImageIO/ImageIO.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #include <stdbool.h>
+#include <stddef.h>
 
 typedef struct {
   int32_t status;
@@ -13,6 +14,22 @@ typedef struct {
   uint32_t frame_width;
   uint32_t frame_height;
 } CuteCaptureSelection;
+
+_Static_assert(sizeof(CuteCaptureSelection) == 28, "CuteCaptureSelection size drift");
+_Static_assert(_Alignof(CuteCaptureSelection) == 4, "CuteCaptureSelection alignment drift");
+_Static_assert(offsetof(CuteCaptureSelection, status) == 0, "status offset drift");
+_Static_assert(offsetof(CuteCaptureSelection, x) == 4, "x offset drift");
+_Static_assert(offsetof(CuteCaptureSelection, y) == 8, "y offset drift");
+_Static_assert(offsetof(CuteCaptureSelection, width) == 12, "width offset drift");
+_Static_assert(offsetof(CuteCaptureSelection, height) == 16, "height offset drift");
+_Static_assert(offsetof(CuteCaptureSelection, frame_width) == 20, "frame_width offset drift");
+_Static_assert(offsetof(CuteCaptureSelection, frame_height) == 24, "frame_height offset drift");
+
+typedef bool (*CuteCancellationProbe)(const void *context);
+
+static bool CuteCancellationRequested(const void *context, CuteCancellationProbe probe) {
+  return probe != NULL && probe(context);
+}
 
 typedef struct {
   double x;
@@ -26,38 +43,55 @@ typedef NS_ENUM(NSInteger, CuteCaptureMode) {
   CuteCaptureModeWindow = 2,
 };
 
-static NSArray<NSWindow *> *CuteAreaSelectorHandoffWindows = nil;
+@interface CuteSelectorHandoffSession : NSObject
+@property(nonatomic, copy) NSArray<NSWindow *> *windows;
+- (void)closeImmediately;
+@end
 
-static void CuteCloseAreaSelectorHandoff(void) {
-  NSArray<NSWindow *> *windows = CuteAreaSelectorHandoffWindows;
-  CuteAreaSelectorHandoffWindows = nil;
-  for (NSWindow *window in windows) {
+@implementation CuteSelectorHandoffSession
+
+- (void)closeImmediately {
+  for (NSWindow *window in self.windows) {
     [window orderOut:nil];
     [window close];
   }
+  self.windows = @[];
+}
+
+@end
+
+// The bridge retains at most one completed handoff session between the native
+// selector and the quick WebView. Window ownership and cleanup live on the
+// session itself; replacing the session deterministically closes the previous
+// one.
+static CuteSelectorHandoffSession *CutePendingAreaHandoff = nil;
+
+static void CuteCloseAreaSelectorHandoff(void) {
+  CuteSelectorHandoffSession *session = CutePendingAreaHandoff;
+  CutePendingAreaHandoff = nil;
+  [session closeImmediately];
 }
 
 static void CuteRetainAreaSelectorHandoff(NSArray<NSWindow *> *windows) {
   CuteCloseAreaSelectorHandoff();
-  CuteAreaSelectorHandoffWindows = [windows copy];
-  for (NSWindow *window in CuteAreaSelectorHandoffWindows) {
+  CuteSelectorHandoffSession *session = [[CuteSelectorHandoffSession alloc] init];
+  session.windows = windows;
+  CutePendingAreaHandoff = session;
+  for (NSWindow *window in session.windows) {
     window.ignoresMouseEvents = YES;
   }
 }
 
 void cute_selector_complete_handoff(void) {
   void (^complete)(void) = ^{
-    NSArray<NSWindow *> *windows = CuteAreaSelectorHandoffWindows;
-    CuteAreaSelectorHandoffWindows = nil;
+    CuteSelectorHandoffSession *session = CutePendingAreaHandoff;
+    CutePendingAreaHandoff = nil;
     // `makeKeyAndOrderFront:` commits the new WebView asynchronously through
     // CoreAnimation. Retain the accepted selector for two display intervals so
     // the compositor always has an opaque predecessor during that commit.
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 34 * NSEC_PER_MSEC),
                    dispatch_get_main_queue(), ^{
-      for (NSWindow *window in windows) {
-        [window orderOut:nil];
-        [window close];
-      }
+      [session closeImmediately];
     });
   };
   if (NSThread.isMainThread) {
@@ -150,9 +184,12 @@ bool cute_selector_draws_with_flipped_ctm(void) { return false; }
 
 CuteRect cute_selector_image_rect_for_screen(CuteRect screen, CuteRect desktop,
                                              uint32_t image_width, uint32_t image_height) {
-  (void)screen;
-  (void)desktop;
-  return CuteRectMake(0.0, 0.0, (double)image_width, (double)image_height);
+  double desktopWidth = desktop.width > 0.0 ? desktop.width : 1.0;
+  double desktopHeight = desktop.height > 0.0 ? desktop.height : 1.0;
+  return CuteRectMake(floor((screen.x - desktop.x) / desktopWidth * image_width),
+                      floor((screen.y - desktop.y) / desktopHeight * image_height),
+                      ceil(screen.width / desktopWidth * image_width),
+                      ceil(screen.height / desktopHeight * image_height));
 }
 
 CuteRect cute_selector_pixels_from_view_rect(CuteRect selected, double view_width,
@@ -196,6 +233,18 @@ CuteRect cute_selector_view_rect_for_window_bounds(CuteRect window_bounds,
 }
 @end
 
+@class CuteCaptureView;
+
+@interface CuteCaptureSession : NSObject
+@property(nonatomic) NSPoint dragStartGlobal;
+@property(nonatomic) NSRect selectionGlobal;
+@property(nonatomic) BOOL dragging;
+@property(nonatomic) BOOL accepted;
+@property(nonatomic) BOOL cancelled;
+@property(nonatomic, copy) NSArray<CuteCaptureView *> *views;
+- (void)selectionDidChange;
+@end
+
 @interface CuteCaptureView : NSView
 @property(nonatomic) CuteCaptureMode mode;
 @property(nonatomic) CuteRect screenFrame;
@@ -204,11 +253,21 @@ CuteRect cute_selector_view_rect_for_window_bounds(CuteRect window_bounds,
 @property(nonatomic) CGImageRef frozenImage;
 @property(nonatomic, strong) NSImage *frozenNSImage;
 @property(nonatomic, copy) NSArray<NSDictionary *> *windows;
-@property(nonatomic) NSPoint dragStart;
 @property(nonatomic) NSRect selection;
-@property(nonatomic) BOOL dragging;
 @property(nonatomic) BOOL accepted;
 @property(nonatomic) BOOL cancelled;
+@property(nonatomic, weak) CuteCaptureSession *session;
+- (void)updateAreaSelectionFromSession;
+@end
+
+@implementation CuteCaptureSession
+
+- (void)selectionDidChange {
+  for (CuteCaptureView *view in self.views) {
+    [view updateAreaSelectionFromSession];
+  }
+}
+
 @end
 
 @implementation CuteCaptureView
@@ -248,7 +307,7 @@ CuteRect cute_selector_view_rect_for_window_bounds(CuteRect window_bounds,
     return;
   }
   [self.frozenNSImage drawInRect:bounds
-                        fromRect:NSZeroRect
+                        fromRect:CuteRectToCGRect(self.imageRect)
                        operation:NSCompositingOperationCopy
                         fraction:1.0
                   respectFlipped:YES
@@ -279,6 +338,21 @@ CuteRect cute_selector_view_rect_for_window_bounds(CuteRect window_bounds,
 
 - (NSPoint)localPointForEvent:(NSEvent *)event {
   return [self convertPoint:event.locationInWindow fromView:nil];
+}
+
+- (NSPoint)globalPointForEvent:(NSEvent *)event {
+  return [self.window convertPointToScreen:event.locationInWindow];
+}
+
+- (void)updateAreaSelectionFromSession {
+  NSRect intersection = NSIntersectionRect(self.session.selectionGlobal, self.window.frame);
+  if (NSIsEmptyRect(intersection)) {
+    self.selection = NSZeroRect;
+  } else {
+    NSRect windowRect = [self.window convertRectFromScreen:intersection];
+    self.selection = [self convertRect:windowRect fromView:nil];
+  }
+  [self setNeedsDisplay:YES];
 }
 
 - (void)updateWindowSelection:(NSPoint)local {
@@ -318,31 +392,33 @@ CuteRect cute_selector_view_rect_for_window_bounds(CuteRect window_bounds,
     }
     return;
   }
-  self.dragging = YES;
-  self.dragStart = point;
-  self.selection = NSZeroRect;
+  self.session.dragging = YES;
+  self.session.dragStartGlobal = [self globalPointForEvent:event];
+  self.session.selectionGlobal = NSZeroRect;
+  [self.session selectionDidChange];
 }
 
 - (void)mouseDragged:(NSEvent *)event {
-  if (!self.dragging || self.mode != CuteCaptureModeArea) {
+  if (!self.session.dragging || self.mode != CuteCaptureModeArea) {
     return;
   }
-  NSPoint point = [self localPointForEvent:event];
-  CGFloat x = MIN(self.dragStart.x, point.x);
-  CGFloat y = MIN(self.dragStart.y, point.y);
-  self.selection = NSIntersectionRect(
-      NSMakeRect(x, y, fabs(point.x - self.dragStart.x), fabs(point.y - self.dragStart.y)),
-      self.bounds);
-  [self setNeedsDisplay:YES];
+  NSPoint point = [self globalPointForEvent:event];
+  CGFloat x = MIN(self.session.dragStartGlobal.x, point.x);
+  CGFloat y = MIN(self.session.dragStartGlobal.y, point.y);
+  self.session.selectionGlobal =
+      NSMakeRect(x, y, fabs(point.x - self.session.dragStartGlobal.x),
+                 fabs(point.y - self.session.dragStartGlobal.y));
+  [self.session selectionDidChange];
 }
 
 - (void)mouseUp:(NSEvent *)event {
-  if (!self.dragging || self.mode != CuteCaptureModeArea) {
+  if (!self.session.dragging || self.mode != CuteCaptureModeArea) {
     return;
   }
   [self mouseDragged:event];
-  self.dragging = NO;
-  if (NSWidth(self.selection) >= 2.0 && NSHeight(self.selection) >= 2.0) {
+  self.session.dragging = NO;
+  if (NSWidth(self.session.selectionGlobal) >= 2.0 &&
+      NSHeight(self.session.selectionGlobal) >= 2.0) {
     [self finish:YES];
   }
 }
@@ -356,6 +432,11 @@ CuteRect cute_selector_view_rect_for_window_bounds(CuteRect window_bounds,
 }
 
 - (void)finish:(BOOL)accepted {
+  if (self.mode == CuteCaptureModeArea) {
+    self.session.accepted = accepted;
+    self.session.cancelled = !accepted;
+    return;
+  }
   self.accepted = accepted;
   self.cancelled = !accepted;
 }
@@ -422,17 +503,24 @@ static BOOL CuteWritePng(CGImageRef image, NSString *path) {
   return written;
 }
 
-static CGImageRef CuteCreateDisplayImage(NSScreen *screen) {
+static CGRect CuteDisplayBounds(NSScreen *screen) {
   NSNumber *screenNumber = screen.deviceDescription[@"NSScreenNumber"];
   if (screenNumber == nil) {
-    return NULL;
+    return CGRectNull;
   }
-  return CGDisplayCreateImage((CGDirectDisplayID)screenNumber.unsignedIntValue);
+  return CGDisplayBounds((CGDirectDisplayID)screenNumber.unsignedIntValue);
+}
+
+static CGImageRef CuteCreateVirtualDesktopImage(CGRect desktopBounds) {
+  return CGWindowListCreateImage(desktopBounds, kCGWindowListOptionOnScreenOnly,
+                                 kCGNullWindowID,
+                                 kCGWindowImageBestResolution | kCGWindowImageShouldBeOpaque);
 }
 
 static NSWindow *CuteMakeOverlayWindow(NSScreen *screen, CuteCaptureView **outView,
                                        CuteCaptureMode mode, CGImageRef frozen,
-                                       CuteRect mainScreenFrame,
+                                       CuteRect mainScreenFrame, CuteRect desktopPixelFrame,
+                                       CuteRect displayPixelFrame,
                                        NSArray<NSDictionary *> *windows, size_t imageWidth,
                                        size_t imageHeight) {
   CuteRect screenFrame = cute_selector_window_frame(CuteRectFromCGRect(screen.frame));
@@ -462,8 +550,8 @@ static NSWindow *CuteMakeOverlayWindow(NSScreen *screen, CuteCaptureView **outVi
   captureView.mode = mode;
   captureView.screenFrame = screenFrame;
   captureView.mainScreenFrame = mainScreenFrame;
-  captureView.imageRect = cute_selector_image_rect_for_screen(screenFrame, screenFrame,
-                                                              (uint32_t)imageWidth, (uint32_t)imageHeight);
+  captureView.imageRect = cute_selector_image_rect_for_screen(
+      displayPixelFrame, desktopPixelFrame, (uint32_t)imageWidth, (uint32_t)imageHeight);
   captureView.frozenImage = frozen;
   captureView.windows = mode == CuteCaptureModeWindow ? windows : @[];
   window.contentView = captureView;
@@ -471,14 +559,15 @@ static NSWindow *CuteMakeOverlayWindow(NSScreen *screen, CuteCaptureView **outVi
   return window;
 }
 
-static int32_t CuteRunSelection(CuteCaptureMode mode, const char *outputPath,
-                                const volatile bool *cancelSignal,
-                                CuteCaptureSelection *result) {
+static int32_t CuteRunSelectionInner(CuteCaptureMode mode, const char *outputPath,
+                                     const void *cancelContext,
+                                     CuteCancellationProbe cancelProbe,
+                                     CuteCaptureSelection *result) {
   if (outputPath == NULL || result == NULL) {
     return 3;
   }
   memset(result, 0, sizeof(*result));
-  if (cancelSignal != NULL && *cancelSignal) {
+  if (CuteCancellationRequested(cancelContext, cancelProbe)) {
     result->status = 1;
     return 1;
   }
@@ -490,6 +579,13 @@ static int32_t CuteRunSelection(CuteCaptureMode mode, const char *outputPath,
     result->status = 3;
     return 3;
   }
+  CGImageRef virtualFrozen = CuteCreateVirtualDesktopImage(quartzBounds);
+  if (virtualFrozen == NULL) {
+    result->status = 3;
+    return 3;
+  }
+  size_t virtualImageWidth = CGImageGetWidth(virtualFrozen);
+  size_t virtualImageHeight = CGImageGetHeight(virtualFrozen);
 
   __block BOOL cancelled = NO;
   __block NSRect selected = NSZeroRect;
@@ -497,7 +593,8 @@ static int32_t CuteRunSelection(CuteCaptureMode mode, const char *outputPath,
   __block CuteRect selectedImageRect = {0};
   __block CGFloat selectedViewWidth = 1.0;
   __block CGFloat selectedViewHeight = 1.0;
-  dispatch_sync(dispatch_get_main_queue(), ^{
+  __block CGRect selectedPixels = CGRectNull;
+  void (^runSelection)(void) = ^{
     [NSApplication sharedApplication];
     NSArray<NSScreen *> *screens = NSScreen.screens;
     if (screens.count == 0) {
@@ -510,21 +607,24 @@ static int32_t CuteRunSelection(CuteCaptureMode mode, const char *outputPath,
         mode == CuteCaptureModeWindow ? CuteWindowCandidates() : @[];
     NSMutableArray<NSWindow *> *overlayWindows = [NSMutableArray array];
     NSMutableArray<CuteCaptureView *> *views = [NSMutableArray array];
+    CuteCaptureSession *session = [[CuteCaptureSession alloc] init];
     for (NSScreen *screen in screens) {
-      CGImageRef displayImage = CuteCreateDisplayImage(screen);
-      if (displayImage == NULL) {
+      CGRect displayBounds = CuteDisplayBounds(screen);
+      if (CGRectIsNull(displayBounds) || CGRectIsEmpty(displayBounds)) {
         cancelled = YES;
         break;
       }
-      size_t imageWidth = CGImageGetWidth(displayImage);
-      size_t imageHeight = CGImageGetHeight(displayImage);
       CuteCaptureView *view = nil;
-      NSWindow *window = CuteMakeOverlayWindow(screen, &view, mode, displayImage,
-                                               mainScreenFrame, windowCandidates, imageWidth,
-                                               imageHeight);
-      CGImageRelease(displayImage);
+      NSWindow *window = CuteMakeOverlayWindow(
+          screen, &view, mode, virtualFrozen, mainScreenFrame,
+          CuteRectFromCGRect(quartzBounds), CuteRectFromCGRect(displayBounds), windowCandidates,
+          virtualImageWidth, virtualImageHeight);
       [overlayWindows addObject:window];
       [views addObject:view];
+    }
+    session.views = views;
+    for (CuteCaptureView *view in views) {
+      view.session = session;
     }
     for (NSUInteger index = 0; index < overlayWindows.count; index++) {
       NSWindow *window = overlayWindows[index];
@@ -536,7 +636,7 @@ static int32_t CuteRunSelection(CuteCaptureMode mode, const char *outputPath,
     [NSApp activateIgnoringOtherApps:YES];
 
     CuteCaptureView *finishedView = nil;
-    while (finishedView == nil && !cancelled) {
+    while (finishedView == nil && !session.accepted && !session.cancelled && !cancelled) {
       NSEvent *event = [NSApp nextEventMatchingMask:NSEventMaskAny
                                           untilDate:[NSDate dateWithTimeIntervalSinceNow:0.05]
                                              inMode:NSDefaultRunLoopMode
@@ -544,7 +644,7 @@ static int32_t CuteRunSelection(CuteCaptureMode mode, const char *outputPath,
       if (event != nil) {
         [NSApp sendEvent:event];
       }
-      if (cancelSignal != NULL && *cancelSignal) {
+      if (CuteCancellationRequested(cancelContext, cancelProbe)) {
         cancelled = YES;
         break;
       }
@@ -561,6 +661,24 @@ static int32_t CuteRunSelection(CuteCaptureMode mode, const char *outputPath,
         }
       }
     }
+    if (mode == CuteCaptureModeArea && (session.accepted || session.cancelled)) {
+      cancelled = session.cancelled;
+      if (!cancelled) {
+        selectedFrozen = CGImageRetain(virtualFrozen);
+        for (CuteCaptureView *view in views) {
+          if (NSIsEmptyRect(view.selection)) {
+            continue;
+          }
+          CuteRect pixels = cute_selector_pixels_from_view_rect(
+              CuteRectFromCGRect(NSRectToCGRect(view.selection)), MAX(NSWidth(view.bounds), 1.0),
+              MAX(NSHeight(view.bounds), 1.0), view.imageRect);
+          CGRect pixelRect = CuteRectToCGRect(pixels);
+          selectedPixels = CGRectIsNull(selectedPixels) ? pixelRect
+                                                        : CGRectUnion(selectedPixels, pixelRect);
+        }
+        selected = NSRectFromCGRect(selectedPixels);
+      }
+    }
     if (!cancelled && finishedView != nil && mode == CuteCaptureModeArea) {
       // Keep the exact accepted frozen frame and selection above the desktop.
       // The ready quick WebView is ordered over it and explicitly completes
@@ -572,7 +690,13 @@ static int32_t CuteRunSelection(CuteCaptureMode mode, const char *outputPath,
         [window close];
       }
     }
-  });
+  };
+  if (NSThread.isMainThread) {
+    runSelection();
+  } else {
+    dispatch_sync(dispatch_get_main_queue(), runSelection);
+  }
+  CGImageRelease(virtualFrozen);
 
   if (cancelled || NSIsEmptyRect(selected)) {
     cute_selector_complete_handoff();
@@ -590,9 +714,11 @@ static int32_t CuteRunSelection(CuteCaptureMode mode, const char *outputPath,
   }
   size_t imageWidth = CGImageGetWidth(selectedFrozen);
   size_t imageHeight = CGImageGetHeight(selectedFrozen);
-  CuteRect pixelSelection = cute_selector_pixels_from_view_rect(
-      CuteRectFromCGRect(NSRectToCGRect(selected)), selectedViewWidth, selectedViewHeight,
-      selectedImageRect);
+  CuteRect pixelSelection = mode == CuteCaptureModeArea
+                                ? CuteRectFromCGRect(selectedPixels)
+                                : cute_selector_pixels_from_view_rect(
+                                      CuteRectFromCGRect(NSRectToCGRect(selected)),
+                                      selectedViewWidth, selectedViewHeight, selectedImageRect);
   CGRect clamped = CGRectIntersection(CuteRectToCGRect(pixelSelection),
                                       CGRectMake(0, 0, imageWidth, imageHeight));
   if (CGRectIsEmpty(clamped)) {
@@ -634,14 +760,23 @@ static int32_t CuteRunSelection(CuteCaptureMode mode, const char *outputPath,
   return 0;
 }
 
-int32_t cute_capture_area(const char *outputPath, const volatile bool *cancelSignal,
-                          CuteCaptureSelection *result) {
-  return CuteRunSelection(CuteCaptureModeArea, outputPath, cancelSignal, result);
+static int32_t CuteRunSelection(CuteCaptureMode mode, const char *outputPath,
+                                const void *cancelContext,
+                                CuteCancellationProbe cancelProbe,
+                                CuteCaptureSelection *result) {
+  @autoreleasepool {
+    return CuteRunSelectionInner(mode, outputPath, cancelContext, cancelProbe, result);
+  }
 }
 
-int32_t cute_capture_window(const char *outputPath, const volatile bool *cancelSignal,
-                            CuteCaptureSelection *result) {
-  return CuteRunSelection(CuteCaptureModeWindow, outputPath, cancelSignal, result);
+int32_t cute_capture_area(const char *outputPath, const void *cancelContext,
+                          CuteCancellationProbe cancelProbe, CuteCaptureSelection *result) {
+  return CuteRunSelection(CuteCaptureModeArea, outputPath, cancelContext, cancelProbe, result);
+}
+
+int32_t cute_capture_window(const char *outputPath, const void *cancelContext,
+                            CuteCancellationProbe cancelProbe, CuteCaptureSelection *result) {
+  return CuteRunSelection(CuteCaptureModeWindow, outputPath, cancelContext, cancelProbe, result);
 }
 
 int32_t cute_macos_pixel_backend(void) {

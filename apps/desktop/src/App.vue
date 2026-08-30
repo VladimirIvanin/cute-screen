@@ -14,7 +14,6 @@ import {
   describeError,
   loadImageWithBinaryFallback,
   parsePersistedDocument,
-  type CaptureOutcomeV1,
   type CaptureProgressState,
   type CaptureProgressV1,
   type CanvasViewportHosts,
@@ -28,6 +27,7 @@ import {
   type ContentImageBridge,
   type ClipboardBridge,
 } from '@cute-screen/editor-vue'
+import type { CaptureOutcomeV2 } from './generated/desktop-ipc'
 import { writeResultCanvasToClipboard } from './result-clipboard'
 import { dispatchNativeCapture } from './capture-request'
 import { runEditorStartup } from './editor-startup'
@@ -758,7 +758,7 @@ async function installLifecycleGuards(): Promise<void> {
     }),
   )
   lifecycleCleanup.push(
-    await listen<CaptureOutcomeV1>(
+    await listen<CaptureOutcomeV2>(
       'cute-screen:capture-outcome',
       async (event) => {
         captureProgress.value = undefined

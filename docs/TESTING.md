@@ -1755,6 +1755,39 @@ windows_platform::tests::area_uses_the_mounted_quick_surface_while_window_keeps_
   failure in `editor-core.test.ts` because its regex no longer finds the current
   `IconName` declaration; 19/20 boundary tests passed.
 
+## Rust/Tauri core refactor evidence (2026-08-30)
+
+Portable evidence этого изменения не заменяет platform runtime smoke:
+
+- Linux/X11, Debian-based build host: `cargo test --workspace --locked
+--no-fail-fast` — quick commit/cancel barrier,
+  degraded post-commit handoff, storage fresh/legacy/damaged/future fixtures,
+  recovery faults и async single-owner worker;
+- macOS-portable tests проверяют ABI size/alignment, opaque-context atomic
+  cancellation и virtual desktop geometry для negative origins, Retina/
+  mixed-scale, horizontal/vertical cross-monitor selection. Objective-C bridge
+  по-прежнему требует отдельной сборки и runtime replay на macOS;
+- focused Vue coverage проверяет frontend phase projection
+  `selecting → editing → preparing → committing → committed`, возврат в
+  `editing` при materialization failure и exactly-one prepare/commit invoke;
+- `pnpm test:boundaries` проверяет, что X11/Windows Area production routes не
+  вызывают native Area selector, а Window routing и compositor pulse остаются;
+- `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`
+  является gate; workspace дополнительно запрещает excessive function length,
+  cognitive complexity и excessive argument counts (изолированные legacy X11
+  window loop и declarative Tauri builder документированы локальным `expect`).
+- На том же host успешно выполнены `pnpm check`, `pnpm test` (478 tests),
+  `pnpm test:render` (13 tests), `pnpm test:e2e:browser`, `pnpm test:perf` и
+  `pnpm tauri build`; release artifacts: `Cute Screen_0.0.0_amd64.deb` и
+  `Cute Screen_0.0.0_amd64.AppImage` в `target/release/bundle`.
+- Focused real-Tauri/WebKitGTK сценарий `m04-clean-profile-capture` проходит
+  новый `Area → Quick editing → durable commit → main editor` lifecycle. Полный
+  `pnpm test:e2e:tauri` пока не является зелёным evidence: Arrow, rich text,
+  viewport и post-handoff Crop/Eyedropper gesture scenarios нестабильны на
+  WebKitGTK. Capability regression, запрещавший `event.listen` для тестового
+  Quick WebView, исправлен; platform evidence Windows/macOS/Wayland остаётся
+  обязательным отдельно.
+
 ## CI gates
 
 ### Каждый PR

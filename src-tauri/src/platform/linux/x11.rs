@@ -68,10 +68,12 @@ pub struct X11CaptureAdapter;
 
 const X11_COMPOSITOR_UNMAP_SETTLE: Duration = Duration::from_millis(300);
 #[cfg(test)]
-const AREA_HINT_CAMERA_SVG: &[u8] = include_bytes!("../assets/third-party/lucide/camera.svg");
-const AREA_HINT_CAMERA_PNG: &[u8] = include_bytes!("../assets/third-party/lucide/camera-24.png");
+const AREA_HINT_CAMERA_SVG: &[u8] = include_bytes!("../../../assets/third-party/lucide/camera.svg");
+const AREA_HINT_CAMERA_PNG: &[u8] =
+    include_bytes!("../../../assets/third-party/lucide/camera-24.png");
 #[cfg(test)]
-const AREA_HINT_CAMERA_LICENSE: &[u8] = include_bytes!("../assets/third-party/lucide/LICENSE");
+const AREA_HINT_CAMERA_LICENSE: &[u8] =
+    include_bytes!("../../../assets/third-party/lucide/LICENSE");
 const AREA_HINT_CAMERA_SIZE: u16 = 24;
 static LAST_APP_SURFACE_HIDDEN: OnceLock<Mutex<Option<Instant>>> = OnceLock::new();
 
@@ -1501,6 +1503,10 @@ struct X11TopLevelWindowState {
 }
 
 #[allow(clippy::too_many_arguments)] // X11 overlay setup needs the root visual/depth and frozen frame explicitly.
+#[expect(
+    clippy::too_many_lines,
+    reason = "window selector setup is one failure-atomic X11 resource lifetime"
+)]
 fn select_frozen_target<C: Connection>(
     connection: &C,
     root: u32,
@@ -1811,6 +1817,10 @@ fn decode_area_hint_camera(correlation_id: &str) -> Result<RgbaFrame, PlatformEr
     })
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "legacy window selector event loop remains isolated from Area quick capture"
+)]
 fn interaction_loop<C: Connection>(
     connection: &C,
     canvas: SelectorCanvas,

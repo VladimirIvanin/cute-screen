@@ -7,10 +7,6 @@ import type {
   ContentImageBridge,
   ClipboardBridge,
   NativeClipboardSnapshot,
-  CaptureOutcomeV1,
-  CaptureCompletion,
-  QuickCaptureDraftV1,
-  CaptureRequestV1,
   CaptureResult,
   PlatformCapabilities,
   PortalCapabilityProbe,
@@ -20,6 +16,12 @@ import type {
   TextureFillBridge,
   TextureImportOutcome,
 } from '@cute-screen/editor-vue'
+import type {
+  CaptureOutcomeV2,
+  CaptureCompletion,
+  CaptureRequestV1,
+  QuickCaptureDraftV1,
+} from './generated/desktop-ipc'
 
 export interface PingResponse {
   readonly message: 'pong'
@@ -35,7 +37,7 @@ export interface DesktopBridge
     SystemFontCatalogBridge {
   ping(): Promise<PingResponse>
   platformCapabilities(correlationId: string): Promise<PlatformCapabilities>
-  captureRequest(request: CaptureRequestV1): Promise<CaptureOutcomeV1>
+  captureRequest(request: CaptureRequestV1): Promise<CaptureOutcomeV2>
   captureCancel(): Promise<boolean>
   captureWaitForEditorUnmap(correlationId: string): Promise<void>
   openScreenRecordingSettings(): Promise<void>
@@ -53,7 +55,7 @@ export interface DesktopBridge
     documentJson: string,
     completion: CaptureCompletion,
     selection: QuickCaptureDraftV1['selection'],
-  ): Promise<CaptureOutcomeV1>
+  ): Promise<CaptureOutcomeV2>
   quickCaptureCancel(draftId: string): Promise<boolean>
   quickCaptureEditorMounted(
     documentId: string,
@@ -148,7 +150,7 @@ export const tauriDesktopBridge: DesktopBridge = {
   platformCapabilities: (correlationId) =>
     invoke<PlatformCapabilities>('platform_capabilities', { correlationId }),
   captureRequest: (request) =>
-    invoke<CaptureOutcomeV1>('capture_request', { request }),
+    invoke<CaptureOutcomeV2>('capture_request', { request }),
   captureCancel: () => invoke<boolean>('capture_cancel'),
   captureWaitForEditorUnmap: (correlationId) =>
     invoke<void>('capture_wait_for_editor_unmap', { correlationId }),
@@ -166,7 +168,7 @@ export const tauriDesktopBridge: DesktopBridge = {
     invoke<boolean>('quick_capture_reveal', { draftId }),
   quickCaptureDismiss: () => invoke<boolean>('quick_capture_dismiss'),
   quickCaptureCommit: (draftId, documentJson, completion, selection) =>
-    invoke<CaptureOutcomeV1>('quick_capture_commit', {
+    invoke<CaptureOutcomeV2>('quick_capture_commit', {
       draftId,
       documentJson,
       completion,

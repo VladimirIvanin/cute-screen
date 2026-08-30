@@ -696,3 +696,38 @@ cancel и cleanup tests; compile checks для Intel/Apple Silicon; реальн
 multi-display, decoded pixels и отсутствием selector pixels. До этих прогонов
 capability может быть реализована, но runtime support не считается
 подтверждённым.
+
+## ADR-041 — Семантические Rust-модули и атомарный Area Quick Capture lifecycle
+
+**Статус:** accepted
+
+**Контекст:** после ADR-039/040 Area quick capture на X11 и Windows стал одним
+mounted WebView lifecycle, но native host по-прежнему смешивает Tauri commands,
+platform routing, draft locks, persistence и window handoff в крупных файлах.
+Раздельные `active`/`cancel_requested` flags и `Option<QuickCaptureDraftRecord>`
+не выражают допустимые переходы и позволяют cancel забрать draft между началом
+commit и durable persistence. Ручной SQL registry дублирует ответственность
+SQLite `user_version` и удерживает repository внутри Tauri crate.
+
+**Решение:** Area quick capture моделируется runtime state machine
+`Idle → Selecting/Editing/Preparing → Committing → Committed/Idle`. Переход в
+`Committing` атомарно забирает право завершить draft; cancel разрешён только до
+этого перехода, terminal outcome публикуется один раз. Durable commit отделён от
+presentation handoff: renderer timeout после сохранения даёт degraded handoff,
+а не failed capture. X11/Windows Area остаётся внутри одной Quick WebView;
+AppKit и XDG portal остаются платформенными selector boundaries, после которых
+используется тот же draft lifecycle.
+
+Rust host делится по смыслу на `app`, `capture`, `platform` и `services`, а
+SQLite repository переносится в независимый `cute-screen-storage` workspace
+crate. Миграции использует `rusqlite_migration`/`PRAGMA user_version`; legacy
+`schema_migrations` принимается только после строгой проверки известных
+version/name/checksum. Tauri commands являются тонкими adapters, сохраняют
+текущие command names и успешные wire payloads и возвращают versioned typed
+errors. Изображения продолжают передаваться только бинарным transport.
+
+**Проверяемое основание:** state-transition и barrier tests для commit/cancel,
+legacy/future/corrupt SQLite fixtures, generated DTO drift check, X11/Windows
+boundary tests без native Area selector, macOS atomic-cancel/ABI/virtual-desktop
+tests и реальные platform smokes из A15. Source-text existence tests остаются
+architecture guards и не заменяют runtime evidence.

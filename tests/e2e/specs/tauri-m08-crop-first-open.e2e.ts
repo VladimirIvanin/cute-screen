@@ -2,6 +2,7 @@ import path from 'node:path'
 
 import { $, browser, expect } from '@wdio/globals'
 import { Key } from 'webdriverio'
+import { finishAreaQuickCaptureInEditor } from '../quick-capture'
 
 type CropMountSnapshot = {
   readonly document: {
@@ -55,6 +56,7 @@ describe('M08 clean crop mount in a real Tauri webview', () => {
     await browser.setWindowSize(1024, 700)
     await expect($('h1')).toHaveText('Capture your first screen')
     await $('button[aria-label="Capture"]').click()
+    await finishAreaQuickCaptureInEditor()
     await expect($('[aria-label="Scene canvas"]')).toExist()
     await browser.waitUntil(async () => {
       const mounted = await snapshot()

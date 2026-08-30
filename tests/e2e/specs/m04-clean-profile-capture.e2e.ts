@@ -1,4 +1,5 @@
 import { $, browser, expect } from '@wdio/globals'
+import { finishAreaQuickCaptureInEditor } from '../quick-capture'
 
 describe('M04 clean-profile capture', () => {
   it('creates and mounts the first persisted document through the production request flow', async () => {
@@ -6,6 +7,7 @@ describe('M04 clean-profile capture', () => {
     await expect($('h1')).toHaveText('Capture your first screen')
 
     await $('button[aria-label="Capture"]').click()
+    await finishAreaQuickCaptureInEditor()
 
     await expect($('button[aria-label="Copy"]')).toBeEnabled()
     await expect($('button[aria-label="Export"]')).toBeEnabled()

@@ -255,17 +255,26 @@ base64 для изображения запрещены.
 
 ## Rust host
 
+Rust host организован по смысловым границам. `capture/quick` владеет runtime
+state machine Area draft; `platform/{linux,windows,macos}` содержит только
+платформенные adapters; clipboard, activation, fonts, lifecycle и binary image
+transport находятся в `services`. Tauri handlers сохраняют прежние command
+names и успешные wire shapes, но возвращают единый `CommandErrorV1` и
+делегируют durable storage через `StorageHandle`.
+
 ### Сервисы
 
 - `CaptureController` — выбирает backend и координирует capture lifecycle.
 - `HotkeyService` — Tauri/global-hotkey для X11/Windows/macOS, XDG portal для Wayland.
-- `macos_platform` — Screen Recording probe, native AppKit Area/Window selector
+- `platform/macos` — Screen Recording probe, native AppKit Area/Window selector
   и versioned capture routing при deployment baseline macOS 12.0:
   CoreGraphics fallback на 12.0–12.2, intended one-shot `SCStream` на 12.3–13,
   `SCScreenshotManager` и system window picker на 14+. Area передаёт frozen
   multi-display draft в quick-mode; Window создаёт direct document. Runtime
   availability проверяется динамически; реальные platform smokes ещё pending.
-- `LibraryRepository` — SQLite, blobs, thumbnails и recovery.
+- `cute-screen-storage` — независимый от Tauri workspace crate: синхронный
+  `LibraryRepository` принадлежит одному worker, клонируемый `StorageHandle`
+  использует bounded Tokio channel и oneshot responses.
 - `ClipboardService` — bitmap/text/custom editor MIME.
 - `ExportService` — dialogs, atomic output, format encoding.
 - `WindowService` — editor, overlay, pin, tray и single-instance.
@@ -291,7 +300,9 @@ Backends не возвращают UI-строки. Они возвращают 
 
 ## IPC и диагностика
 
-- DTO объявляются в Rust, сериализуются Serde и генерируют/проверяют TypeScript types.
+- DTO объявляются в Rust, сериализуются Serde и через `ts-rs` генерируют
+  `apps/desktop/src/generated/desktop-ipc.ts`. `pnpm ipc:check` форматирует
+  результат только во временном файле и проверяет tracked binding на drift.
 - Большие изображения передаются как scoped URL или binary response/channel.
 - Долгие команды получают `operationId`; progress/cancel относятся к конкретной операции.
 - Каждый frontend invoke создаёт correlation ID, который попадает в Vue log, Rust span и error object.
@@ -301,15 +312,20 @@ Backends не возвращают UI-строки. Они возвращают 
 
 ## Хранение и восстановление
 
-SQLite содержит как минимум:
+SQLite schema v3 содержит как минимум:
 
-- `schema_migrations`
 - `series`
 - `captures`
 - `documents`
 - `blobs`
 - `settings`
 - `recovery_journal`
+
+Новые изменения схемы являются immutable entries `rusqlite_migration` и
+версионируются `PRAGMA user_version`. При `user_version = 0` legacy
+`schema_migrations` сначала проверяется по точным version/name/checksum, затем
+история принимается без изменения данных; migration 3 удаляет legacy-таблицу.
+Повреждённая и future history возвращает typed error до mutation базы.
 
 `captures.capture_metadata_json` хранит versioned provenance v1: backend,
 target, geometry, monitor snapshot, cursor и invocation source. Все ключи

@@ -6,7 +6,12 @@ use std::sync::{
 use chrono::{SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use ts_rs::TS;
 use uuid::Uuid;
+
+mod quick;
+
+use quick::state::{QuickCaptureState, QuickStateError};
 
 use crate::{
     image_transport::{ImageTransportService, OwnedImage},
@@ -22,8 +27,9 @@ use crate::platform::{CaptureRequest, PortalClient};
 
 const CAPTURE_OUTCOME_VERSION: u8 = 2;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
 pub enum CaptureAction {
     Area,
     Screen,
@@ -53,8 +59,9 @@ impl CaptureAction {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
 pub enum CaptureInvocationSource {
     Cli,
     Tray,
@@ -73,41 +80,47 @@ impl CaptureInvocationSource {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
 pub struct CaptureRequestV1 {
     pub correlation_id: String,
     pub action: CaptureAction,
     pub delay_ms: u32,
     pub cursor: bool,
+    #[ts(optional)]
     pub series_id: Option<String>,
     pub invocation_source: CaptureInvocationSource,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
 pub struct CaptureOutcomeV2 {
+    #[ts(type = "2")]
     pub version: u8,
     pub correlation_id: String,
     pub outcome: CaptureTerminalOutcome,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub completion: Option<CaptureCompletion>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub document: Option<OpenDocument>,
 }
 
-pub type CaptureOutcomeV1 = CaptureOutcomeV2;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
 pub enum CaptureCompletion {
     Copied,
     Saved,
     Editor,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
 pub struct QuickCaptureSelectionV1 {
     pub x: u32,
     pub y: u32,
@@ -115,9 +128,11 @@ pub struct QuickCaptureSelectionV1 {
     pub height: u32,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
 pub struct QuickCaptureDraftV1 {
+    #[ts(type = "1")]
     pub version: u8,
     pub draft_id: String,
     pub correlation_id: String,
@@ -140,8 +155,9 @@ struct QuickCaptureDraftRecord {
     terminal: Option<tokio::sync::oneshot::Sender<CaptureOutcomeV2>>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
 pub enum CaptureTerminalOutcome {
     Captured,
     Cancelled,
@@ -241,7 +257,7 @@ pub struct CaptureController {
     transport: Arc<ImageTransportService>,
     state: Arc<Mutex<CaptureState>>,
     cancel_signal: Arc<AtomicBool>,
-    quick_draft: Arc<Mutex<Option<QuickCaptureDraftRecord>>>,
+    quick_draft: Arc<Mutex<QuickCaptureState>>,
     #[cfg(all(target_os = "linux", feature = "x11-capture"))]
     last_x11_area: Arc<Mutex<Option<CaptureGeometry>>>,
 }
@@ -259,7 +275,7 @@ impl CaptureController {
             transport,
             state: Arc::new(Mutex::new(CaptureState::default())),
             cancel_signal: Arc::new(AtomicBool::new(false)),
-            quick_draft: Arc::new(Mutex::new(None)),
+            quick_draft: Arc::new(Mutex::new(QuickCaptureState::default())),
             #[cfg(all(target_os = "linux", feature = "x11-capture"))]
             last_x11_area: Arc::new(Mutex::new(None)),
         }
@@ -267,7 +283,7 @@ impl CaptureController {
 
     /// The controller is the sole owner of the M04 capture state machine. A
     /// second activation observes `busy`; it never creates a hidden queue.
-    pub async fn capture(&self, request: CaptureRequestV1) -> CaptureOutcomeV1 {
+    pub async fn capture(&self, request: CaptureRequestV1) -> CaptureOutcomeV2 {
         self.capture_with_progress(request, |_| {}).await
     }
 
@@ -275,7 +291,7 @@ impl CaptureController {
         self.quick_draft
             .lock()
             .ok()
-            .and_then(|active| active.as_ref().map(|record| record.descriptor.clone()))
+            .and_then(|active| active.active_descriptor().cloned())
     }
 
     pub fn stage_quick_frame(
@@ -304,12 +320,6 @@ impl CaptureController {
                 &request.correlation_id,
             )
         })?;
-        if active.is_some() {
-            return Err(crate::platform::PlatformError::new(
-                PlatformErrorCode::Busy,
-                &request.correlation_id,
-            ));
-        }
         let (selection, can_expand_selection) =
             match (frame.quick_frame_geometry.as_ref(), frame.geometry.as_ref()) {
                 (Some(frame_geometry), Some(selection_geometry)) => {
@@ -372,15 +382,27 @@ impl CaptureController {
             can_expand_selection,
             selection_pending: frame.quick_selection_pending,
         };
-        *active = Some(QuickCaptureDraftRecord {
-            descriptor: descriptor.clone(),
-            request: request.clone(),
-            geometry: frame.geometry,
-            frame_geometry: frame.quick_frame_geometry,
-            cursor_included: frame.cursor_included,
-            prepared_token: None,
-            terminal,
-        });
+        active
+            .stage(QuickCaptureDraftRecord {
+                descriptor: descriptor.clone(),
+                request: request.clone(),
+                geometry: frame.geometry,
+                frame_geometry: frame.quick_frame_geometry,
+                cursor_included: frame.cursor_included,
+                prepared_token: None,
+                terminal,
+            })
+            .map_err(|error| {
+                crate::platform::PlatformError::new(
+                    match error {
+                        QuickStateError::Busy => PlatformErrorCode::Busy,
+                        QuickStateError::Inactive | QuickStateError::InvalidPhase => {
+                            PlatformErrorCode::CaptureFailed
+                        }
+                    },
+                    &request.correlation_id,
+                )
+            })?;
         Ok(descriptor)
     }
 
@@ -427,13 +449,7 @@ impl CaptureController {
             let Ok(mut active) = self.quick_draft.lock() else {
                 return false;
             };
-            if active
-                .as_ref()
-                .is_none_or(|record| record.descriptor.draft_id != draft_id)
-            {
-                return false;
-            }
-            active.take()
+            active.cancel(draft_id)
         };
         let Some(record) = record else {
             return false;
@@ -467,16 +483,17 @@ impl CaptureController {
                 .quick_draft
                 .lock()
                 .map_err(|_| RepositoryError::Io("quick draft lock poisoned".to_owned()))?;
-            let record = active
-                .as_mut()
-                .filter(|record| record.descriptor.draft_id == draft_id)
-                .ok_or_else(|| {
-                    RepositoryError::InvalidDocument("quick draft is not active".to_owned())
-                })?;
-            if !record.descriptor.selection_pending {
+            let descriptor = active
+                .active_descriptor()
+                .filter(|descriptor| descriptor.draft_id == draft_id)
+                .ok_or_else(quick_draft_inactive)?;
+            if !descriptor.selection_pending {
                 return Ok(false);
             }
-            validate_quick_selection(&record.descriptor, selection)?;
+            validate_quick_selection(descriptor, selection)?;
+            let record = active
+                .confirm_selection(draft_id)
+                .map_err(quick_state_repository_error)?;
             record.descriptor.selection = selection;
             record.descriptor.selection_pending = false;
             if let Some(frame) = record.frame_geometry.as_ref() {
@@ -503,46 +520,45 @@ impl CaptureController {
             return Err(RepositoryError::InvalidImage);
         }
         let (draft_id, correlation_id) = {
-            let active = self
+            let mut active = self
                 .quick_draft
                 .lock()
                 .map_err(|_| RepositoryError::Io("quick draft lock poisoned".to_owned()))?;
-            let record = active.as_ref().ok_or_else(|| {
-                RepositoryError::InvalidDocument("quick draft is not active".to_owned())
-            })?;
-            (
-                record.descriptor.draft_id.clone(),
-                record.descriptor.correlation_id.clone(),
-            )
+            let descriptor = active
+                .active_descriptor()
+                .ok_or_else(quick_draft_inactive)?;
+            let draft_id = descriptor.draft_id.clone();
+            let correlation_id = descriptor.correlation_id.clone();
+            active
+                .begin_prepare(&draft_id)
+                .map_err(quick_state_repository_error)?;
+            (draft_id, correlation_id)
         };
         let token = format!("quick-result-{}", Uuid::now_v7().simple());
-        self.transport
-            .import_owned_bytes(
-                &token,
-                bytes,
-                "image/png",
-                metadata.width,
-                metadata.height,
-                &correlation_id,
-            )
-            .map_err(|error| RepositoryError::Io(error.to_string()))?;
+        if let Err(error) = self.transport.import_owned_bytes(
+            &token,
+            bytes,
+            "image/png",
+            metadata.width,
+            metadata.height,
+            &correlation_id,
+        ) {
+            if let Ok(mut active) = self.quick_draft.lock() {
+                let _ = active.finish_prepare(&draft_id);
+            }
+            return Err(RepositoryError::Io(error.to_string()));
+        }
         let previous = {
             let mut active = self
                 .quick_draft
                 .lock()
                 .map_err(|_| RepositoryError::Io("quick draft lock poisoned".to_owned()))?;
-            let Some(record) = active.as_mut() else {
+            let Ok(record) = active.finish_prepare(&draft_id) else {
                 let _ = self.transport.take_owned_image(&token, &correlation_id);
                 return Err(RepositoryError::InvalidDocument(
                     "quick draft is not active".to_owned(),
                 ));
             };
-            if record.descriptor.draft_id != draft_id {
-                let _ = self.transport.take_owned_image(&token, &correlation_id);
-                return Err(RepositoryError::InvalidDocument(
-                    "quick draft changed while preparing result".to_owned(),
-                ));
-            }
             record.prepared_token.replace(token)
         };
         if let Some(previous) = previous {
@@ -558,36 +574,32 @@ impl CaptureController {
         completion: CaptureCompletion,
         selection: QuickCaptureSelectionV1,
     ) -> Result<CaptureOutcomeV2, RepositoryError> {
-        let (request, mut geometry, cursor_included, correlation_id, image_token, prepared_token) = {
-            let active = self
+        let mut record = {
+            let mut active = self
                 .quick_draft
                 .lock()
                 .map_err(|_| RepositoryError::Io("quick draft lock poisoned".to_owned()))?;
-            let record = active
-                .as_ref()
-                .filter(|record| record.descriptor.draft_id == draft_id)
-                .ok_or_else(|| {
-                    RepositoryError::InvalidDocument("quick draft is not active".to_owned())
-                })?;
-            if record.descriptor.selection_pending {
+            let descriptor = active
+                .active_descriptor()
+                .filter(|descriptor| descriptor.draft_id == draft_id)
+                .ok_or_else(quick_draft_inactive)?;
+            if descriptor.selection_pending {
                 return Err(RepositoryError::InvalidDocument(
                     "quick selection is not confirmed".to_owned(),
                 ));
             }
-            validate_quick_selection(&record.descriptor, selection)?;
-            let mut geometry = record.geometry.clone();
-            if let Some(frame) = record.frame_geometry.as_ref() {
-                geometry = Some(quick_selection_geometry(frame, selection));
-            }
-            (
-                record.request.clone(),
-                geometry,
-                record.cursor_included,
-                record.descriptor.correlation_id.clone(),
-                record.descriptor.image_token.clone(),
-                record.prepared_token.clone(),
-            )
+            validate_quick_selection(descriptor, selection)?;
+            active
+                .begin_commit(draft_id)
+                .map_err(quick_state_repository_error)?
         };
+        let mut geometry = record.geometry.clone();
+        if let Some(frame) = record.frame_geometry.as_ref() {
+            geometry = Some(quick_selection_geometry(frame, selection));
+        }
+        let correlation_id = record.descriptor.correlation_id.clone();
+        let image_token = record.descriptor.image_token.clone();
+        let prepared_token = record.prepared_token.clone();
         #[cfg(all(target_os = "linux", feature = "x11-capture"))]
         if std::env::var("XDG_SESSION_TYPE")
             .is_ok_and(|session| session.eq_ignore_ascii_case("x11"))
@@ -597,10 +609,16 @@ impl CaptureController {
             *last_area = Some(geometry.clone());
         }
         let result_token = prepared_token.as_deref().unwrap_or(&image_token);
-        let owned = self
+        let owned = match self
             .transport
             .take_owned_image(result_token, &correlation_id)
-            .map_err(|error| RepositoryError::Io(error.to_string()))?;
+        {
+            Ok(owned) => owned,
+            Err(error) => {
+                self.restore_failed_quick_commit(record);
+                return Err(RepositoryError::Io(error.to_string()));
+            }
+        };
         if owned.width != selection.width || owned.height != selection.height {
             let _ = self.transport.import_owned_bytes(
                 result_token,
@@ -610,13 +628,14 @@ impl CaptureController {
                 owned.height,
                 &correlation_id,
             );
+            self.restore_failed_quick_commit(record);
             return Err(RepositoryError::InvalidImage);
         }
         let recovery = owned.clone();
         let document = match self.persist_quick_owned(
-            &request,
+            &record.request,
             geometry.take(),
-            cursor_included,
+            record.cursor_included,
             owned,
             document_json,
         ) {
@@ -630,32 +649,44 @@ impl CaptureController {
                     recovery.height,
                     &correlation_id,
                 );
+                self.restore_failed_quick_commit(record);
                 return Err(error);
             }
-        };
-        let record = {
-            let mut active = self
-                .quick_draft
-                .lock()
-                .map_err(|_| RepositoryError::Io("quick draft lock poisoned".to_owned()))?;
-            active.take().ok_or_else(|| {
-                RepositoryError::InvalidDocument("quick draft is not active".to_owned())
-            })?
         };
         if prepared_token.is_some() {
             let _ = self
                 .transport
                 .take_owned_image(&image_token, &correlation_id);
         }
-        let source = self
-            .repository
-            .resolve_capture_source(document.capture_id.clone(), document.source_hash.clone())?;
         let token = Uuid::now_v7().simple().to_string();
-        self.transport
-            .register_authoritative(token.clone(), source)
-            .map_err(|error| RepositoryError::Io(error.to_string()))?;
         let mut document = document;
-        document.image_token = Some(token);
+        let authoritative = self
+            .repository
+            .resolve_capture_source(document.capture_id.clone(), document.source_hash.clone())
+            .and_then(|source| {
+                self.transport
+                    .register_authoritative(token.clone(), source)
+                    .map_err(|error| RepositoryError::Io(error.to_string()))
+            });
+        if authoritative.is_ok()
+            || self
+                .transport
+                .import_owned_bytes(
+                    &token,
+                    &recovery.bytes,
+                    &recovery.mime_type,
+                    recovery.width,
+                    recovery.height,
+                    &correlation_id,
+                )
+                .is_ok()
+        {
+            document.image_token = Some(token);
+        } else if let Err(error) = authoritative {
+            eprintln!(
+                "quick capture {correlation_id} committed but image registration failed: {error}"
+            );
+        }
         let outcome = CaptureOutcomeV2 {
             version: CAPTURE_OUTCOME_VERSION,
             correlation_id,
@@ -663,10 +694,40 @@ impl CaptureController {
             completion: Some(completion),
             document: Some(document),
         };
-        if let Some(sender) = record.terminal {
+        self.release_committed_quick_state(draft_id, &outcome);
+        if let Some(sender) = record.terminal.take() {
             let _ = sender.send(outcome.clone());
         }
         Ok(outcome)
+    }
+
+    fn restore_failed_quick_commit(&self, record: QuickCaptureDraftRecord) {
+        let correlation_id = record.descriptor.correlation_id.clone();
+        let restored = self
+            .quick_draft
+            .lock()
+            .map_err(|_| QuickStateError::InvalidPhase)
+            .and_then(|mut state| state.restore_after_failed_commit(record));
+        if let Err(error) = restored {
+            eprintln!("quick capture {correlation_id} could not restore failed commit: {error}");
+        }
+    }
+
+    fn release_committed_quick_state(&self, draft_id: &str, outcome: &CaptureOutcomeV2) {
+        let released = self
+            .quick_draft
+            .lock()
+            .map_err(|_| QuickStateError::InvalidPhase)
+            .and_then(|mut state| {
+                state.complete_commit(draft_id, outcome.clone())?;
+                state.release_committed(draft_id).map(|_| ())
+            });
+        if let Err(error) = released {
+            eprintln!(
+                "quick capture {} committed but lifecycle cleanup failed: {error}",
+                outcome.correlation_id
+            );
+        }
     }
 
     /// Runs capture while synchronously publishing state transitions to the
@@ -677,7 +738,7 @@ impl CaptureController {
         &self,
         request: CaptureRequestV1,
         progress: F,
-    ) -> CaptureOutcomeV1
+    ) -> CaptureOutcomeV2
     where
         F: Fn(CaptureProgressState),
     {
@@ -871,7 +932,7 @@ impl CaptureController {
         true
     }
 
-    fn persist_frame(&self, request: &CaptureRequestV1, frame: CaptureResult) -> CaptureOutcomeV1 {
+    fn persist_frame(&self, request: &CaptureRequestV1, frame: CaptureResult) -> CaptureOutcomeV2 {
         let geometry = frame.geometry.clone();
         let cursor_included = frame.cursor_included;
         let owned = match self
@@ -1022,6 +1083,14 @@ fn validate_quick_selection(
         ));
     }
     Ok(())
+}
+
+fn quick_draft_inactive() -> RepositoryError {
+    RepositoryError::InvalidDocument("quick draft is not active".to_owned())
+}
+
+fn quick_state_repository_error(error: QuickStateError) -> RepositoryError {
+    RepositoryError::InvalidDocument(error.to_string())
 }
 
 fn quick_selection_geometry(
@@ -1256,8 +1325,8 @@ fn terminal(
     correlation_id: &str,
     outcome: CaptureTerminalOutcome,
     document: Option<OpenDocument>,
-) -> CaptureOutcomeV1 {
-    CaptureOutcomeV1 {
+) -> CaptureOutcomeV2 {
+    CaptureOutcomeV2 {
         version: CAPTURE_OUTCOME_VERSION,
         correlation_id: correlation_id.to_owned(),
         outcome,

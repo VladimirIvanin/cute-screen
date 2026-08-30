@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[cfg(unix)]
-use crate::capture::CaptureOutcomeV1;
+use crate::capture::CaptureOutcomeV2;
 use crate::capture::{CaptureRequestV1, CaptureTerminalOutcome};
 
 pub const ACTIVATION_PROTOCOL_VERSION: u8 = 1;
@@ -79,7 +79,7 @@ mod unix {
     impl ActivationServer {
         pub fn start(
             endpoint: PathBuf,
-            handler: Arc<dyn Fn(CaptureRequestV1) -> CaptureOutcomeV1 + Send + Sync>,
+            handler: Arc<dyn Fn(CaptureRequestV1) -> CaptureOutcomeV2 + Send + Sync>,
         ) -> Result<Self, ActivationError> {
             if let Some(parent) = endpoint.parent() {
                 fs::create_dir_all(parent).map_err(io_error)?;
@@ -178,7 +178,7 @@ mod unix {
 
     fn handle_connection(
         mut stream: UnixStream,
-        handler: Arc<dyn Fn(CaptureRequestV1) -> CaptureOutcomeV1 + Send + Sync>,
+        handler: Arc<dyn Fn(CaptureRequestV1) -> CaptureOutcomeV2 + Send + Sync>,
     ) {
         let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
         let request: ActivationRequestV1 = match read_frame::<ActivationRequestV1>(&mut stream) {
@@ -254,7 +254,7 @@ mod unix {
             let endpoint = directory.path().join("activation.sock");
             let server = ActivationServer::start(
                 endpoint.clone(),
-                Arc::new(|_capture| CaptureOutcomeV1 {
+                Arc::new(|_capture| CaptureOutcomeV2 {
                     version: 2,
                     correlation_id: "capture-1".to_owned(),
                     outcome: CaptureTerminalOutcome::Cancelled,
@@ -276,7 +276,7 @@ mod unix {
             let endpoint = directory.path().join("activation.sock");
             let server = ActivationServer::start(
                 endpoint.clone(),
-                Arc::new(|_capture| CaptureOutcomeV1 {
+                Arc::new(|_capture| CaptureOutcomeV2 {
                     version: 2,
                     correlation_id: "capture-1".to_owned(),
                     outcome: CaptureTerminalOutcome::Cancelled,
@@ -302,7 +302,7 @@ mod unix {
             drop(stale_listener);
             let server = ActivationServer::start(
                 endpoint.clone(),
-                Arc::new(|_capture| CaptureOutcomeV1 {
+                Arc::new(|_capture| CaptureOutcomeV2 {
                     version: 2,
                     correlation_id: "capture-1".to_owned(),
                     outcome: CaptureTerminalOutcome::Cancelled,

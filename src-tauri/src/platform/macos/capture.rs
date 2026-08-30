@@ -20,6 +20,7 @@ use core_graphics::{
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
+use crate::macos_ffi::{CancellationProbe, NativeCaptureSelection, atomic_cancel_requested};
 use crate::{
     image_transport::ImageTransportService,
     platform::{CaptureGeometry, CaptureResult, CaptureTarget, PlatformError, PlatformErrorCode},
@@ -30,27 +31,17 @@ use crate::{
 /// to CoreGraphics when ScreenCaptureKit is unavailable.
 pub struct MacosScreenCaptureAdapter;
 
-#[repr(C)]
-#[derive(Debug, Default)]
-struct NativeCaptureSelection {
-    status: i32,
-    x: i32,
-    y: i32,
-    width: u32,
-    height: u32,
-    frame_width: u32,
-    frame_height: u32,
-}
-
 unsafe extern "C" {
     fn cute_capture_area(
         output_path: *const c_char,
-        cancel_signal: *const bool,
+        cancel_context: *const std::ffi::c_void,
+        cancel_probe: Option<CancellationProbe>,
         result: *mut NativeCaptureSelection,
     ) -> c_int;
     fn cute_capture_window(
         output_path: *const c_char,
-        cancel_signal: *const bool,
+        cancel_context: *const std::ffi::c_void,
+        cancel_probe: Option<CancellationProbe>,
         result: *mut NativeCaptureSelection,
     ) -> c_int;
     fn cute_macos_pixel_backend() -> c_int;
@@ -233,16 +224,24 @@ fn capture_interactive_target(
         .map_err(|_| failure(correlation_id, "selectorTemporaryPath"))?;
     let mut selection = NativeCaptureSelection::default();
     // SAFETY: the Objective-C bridge is linked only for macOS. The path,
-    // cancellation flag and output record remain alive for the synchronous
-    // call; the bridge never retains any of these pointers after returning.
+    // cancellation context and output record remain alive for the synchronous
+    // call; the bridge invokes the no-unwind Rust probe synchronously and never
+    // retains any of these pointers after returning.
+    let cancel_context = std::ptr::from_ref(cancel_signal).cast::<std::ffi::c_void>();
     let status = unsafe {
         match target {
-            CaptureTarget::Area => {
-                cute_capture_area(path.as_ptr(), cancel_signal.as_ptr(), &mut selection)
-            }
-            CaptureTarget::Window => {
-                cute_capture_window(path.as_ptr(), cancel_signal.as_ptr(), &mut selection)
-            }
+            CaptureTarget::Area => cute_capture_area(
+                path.as_ptr(),
+                cancel_context,
+                Some(atomic_cancel_requested),
+                &mut selection,
+            ),
+            CaptureTarget::Window => cute_capture_window(
+                path.as_ptr(),
+                cancel_context,
+                Some(atomic_cancel_requested),
+                &mut selection,
+            ),
             _ => return Err(failure(correlation_id, "selectorTarget")),
         }
     };
