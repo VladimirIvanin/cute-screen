@@ -459,7 +459,7 @@ immutable original определяется в момент подтвержде
 ## ADR-036 — Area capture использует временный quick draft
 
 **Статус:** accepted; supersedes only the Area immutable-original timing of
-ADR-029
+ADR-029; X11 Area presentation superseded by ADR-039
 
 **Контекст:** обязательное открытие полного редактора после Area мешает
 сценарию «выделить → скопировать». При этом custom annotation chrome нельзя
@@ -479,6 +479,41 @@ frozen frame, Wayland использует только fragment, возвращ
 stage/commit/cancel and transaction-fault tests, Vue toolbar/keyboard tests и
 real-Tauri platform smokes. Screen, Window, Active Window и Repeat сохраняют
 старый direct-to-editor flow.
+
+## ADR-039 — X11 Area выбирается внутри единой Quick Capture surface
+
+**Статус:** accepted; supersedes the X11 Area presentation portion of ADR-036
+
+**Контекст:** отдельный native X11 selector и последующий fullscreen Quick
+WebView удовлетворяли пиксельной непрерывности только через composited handoff,
+но оставались двумя окнами, двумя interaction models и двумя реализациями
+пунктирной рамки. Даже без пустого кадра пользователь ощущал загрузку и смену
+режима после mouse-up. Требование продукта теперь сильнее: выбор области — это
+первая фаза Quick Capture, а не отдельный предшествующий интерфейс.
+
+**Решение:** X11 backend до показа UI получает один frozen compositor frame и
+передаёт его в заранее созданную Quick WebView через owned binary transport.
+После первого renderer flush эта WebView мапится ровно один раз в фазе
+`selecting`. Canvas interaction overlay рисует dim, crosshair, подсказку,
+dimension badge и crop dash. Первый валидный drag создаёт crop через
+`EditorCommand` и переключает ту же mounted surface в фазу `editing`, добавляя
+toolbar/actions без native show/hide/focus и без повторного renderer mount.
+Native X11 selector остаётся допустимым для Window target; Wayland сохраняет
+системный portal selector.
+
+**Проверяемое основание:** red-first Vue test обязан провести pointer drag по
+mounted Quick `CanvasViewport`, получить ровно одну `setCrop` command и затем
+показать chrome без замены DOM/canvas hosts. Rust contract обязан staged full
+frame пометить как pending selection и отклонять commit до явного подтверждения.
+Boundary test запрещает вызов X11 native Area selector и retained-selector
+handoff из Quick reveal/dismiss. Resident GNOME/X11 smoke проверяет один и тот
+же top-level XID и canvas hosts до drag, во время drag и после появления chrome.
+
+**Последствия:** frozen pixels должны быть decoded до первого видимого кадра,
+поэтому command-to-surface latency измеряется отдельно и не маскируется вторым
+native окном. UI-start from a visible editor по-прежнему ждёт его безопасного
+исчезновения из compositor frame. Wayland и macOS/Windows presentation не
+меняются этим ADR.
 
 ## ADR-030 — Naive UI как слой интерактивных Vue-примитивов
 

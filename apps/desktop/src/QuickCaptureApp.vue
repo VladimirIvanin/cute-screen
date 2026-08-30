@@ -31,6 +31,7 @@ const pending = ref(false)
 const materialized = ref(false)
 const error = ref<string>()
 const quickLayoutReady = ref(false)
+const selectionPending = ref(false)
 const russian = navigator.language.toLowerCase().startsWith('ru')
 const labels = russian
   ? {
@@ -39,6 +40,7 @@ const labels = russian
       copy: 'Копировать',
       save: 'Сохранить PNG',
       close: 'Закрыть',
+      selectArea: 'Выделите область',
       portalLimit: 'Область можно уменьшать только внутри фрагмента портала',
     }
   : {
@@ -47,6 +49,7 @@ const labels = russian
       copy: 'Copy',
       save: 'Save PNG',
       close: 'Close',
+      selectArea: 'Select an area',
       portalLimit: 'The frame can only be reduced inside the portal fragment',
     }
 const currentCrop = ref({ x: 0, y: 0, width: 0, height: 0 })
@@ -166,11 +169,42 @@ function onQuickFrameChange(crop: QuickRect): void {
   updateQuickLayout(crop)
 }
 
+async function onQuickSelectionComplete(crop: QuickRect): Promise<void> {
+  const active = draft.value
+  if (!active || !selectionPending.value || pending.value) return
+  pending.value = true
+  error.value = undefined
+  try {
+    const selection = normalizeQuickCaptureSelection(crop, {
+      width: active.width,
+      height: active.height,
+    })
+    if (
+      !(await tauriDesktopBridge.quickCaptureConfirmSelection(
+        active.draftId,
+        selection,
+      ))
+    ) {
+      throw new Error('Quick capture selection is no longer active')
+    }
+    currentCrop.value = selection
+    await nextTick()
+    selectionPending.value = false
+    await nextTick()
+    updateQuickLayout(selection)
+  } catch (cause) {
+    await terminateFailedPresentation(active.draftId, cause)
+  } finally {
+    pending.value = false
+  }
+}
+
 function onWindowResize(): void {
   updateQuickLayout()
 }
 
 function onSceneDoubleClick(event: MouseEvent): void {
+  if (selectionPending.value) return
   if ((session.value?.snapshot.core.document.layers.length ?? 0) !== 1) return
   if (!hosts.value || !session.value) return
   const bounds = hosts.value.scene.getBoundingClientRect()
@@ -202,6 +236,7 @@ function resetDraftSession(): void {
   documentState.value = { kind: 'loading' }
   materialized.value = false
   quickLayoutReady.value = false
+  selectionPending.value = false
   error.value = undefined
   presentedDraftId = undefined
   presentingDraftId = undefined
@@ -219,6 +254,19 @@ async function presentPreparedDraft(draftId: string): Promise<void> {
   try {
     await nextTick()
     if (draft.value?.draftId !== draftId) return
+    if (selectionPending.value) {
+      if (!(await tauriDesktopBridge.quickCapturePresent(draftId))) {
+        throw new Error('Quick capture draft is no longer active')
+      }
+      quickLayoutReady.value = true
+      await nextTick()
+      await nextLayoutFrame()
+      if (!(await tauriDesktopBridge.quickCaptureReveal(draftId))) {
+        throw new Error('Quick capture draft is no longer active')
+      }
+      presentedDraftId = draftId
+      return
+    }
     const presentation = await presentThenWaitForStableQuickCaptureLayout({
       present: () => tauriDesktopBridge.quickCapturePresent(draftId),
       reveal: async () => {
@@ -283,6 +331,12 @@ async function loadDraft(): Promise<void> {
   }
   resetDraftSession()
   draft.value = active
+  selectionPending.value = Boolean(active.selectionPending)
+  if (!(await tauriDesktopBridge.quickCaptureWarmup(active.draftId))) {
+    throw new Error('Quick capture draft is no longer active')
+  }
+  if (revision !== loadRevision || draft.value?.draftId !== active.draftId)
+    return
   const loaded = await loadImageWithBinaryFallback({
     token: active.imageToken,
     correlationId: active.correlationId,
@@ -309,12 +363,14 @@ async function loadDraft(): Promise<void> {
   })
   const document = {
     ...created,
-    crop: {
-      x: active.selection.x,
-      y: active.selection.y,
-      width: active.selection.width,
-      height: active.selection.height,
-    },
+    crop: active.selectionPending
+      ? null
+      : {
+          x: active.selection.x,
+          y: active.selection.y,
+          width: active.selection.width,
+          height: active.selection.height,
+        },
   }
   session.value = new DocumentSessionController({
     document,
@@ -385,6 +441,8 @@ function hexDigest(bytes: ArrayBuffer): string {
 
 function physicalSelection(): QuickRect {
   if (!draft.value) throw new Error('Quick capture draft is not ready')
+  if (selectionPending.value)
+    throw new Error('Quick capture selection is not confirmed')
   return normalizeQuickCaptureSelection(currentCrop.value, {
     width: draft.value.width,
     height: draft.value.height,
@@ -553,6 +611,7 @@ function onKeydown(event: KeyboardEvent): void {
   )
     return
   if (event.key === 'Enter' && !event.repeat) {
+    if (selectionPending.value) return
     event.preventDefault()
     void copy()
   } else if (event.key === 'Escape' && !event.repeat) {
@@ -580,11 +639,15 @@ onBeforeUnmount(() => {
 <template>
   <main
     class="cs-quick-capture"
-    :class="{ 'is-layout-ready': quickLayoutReady }"
+    :class="{
+      'is-layout-ready': quickLayoutReady,
+      'is-selecting': selectionPending,
+    }"
     data-testid="quick-capture-shell"
   >
     <EditorShell
       quick-mode
+      :quick-selection-mode="selectionPending"
       :initial-document-state="documentState"
       :document-session="session"
       :source-image="sourceImage"
@@ -592,11 +655,23 @@ onBeforeUnmount(() => {
       @hosts-ready="onHostsReady"
       @frame-ready="onFrameReady"
       @quick-frame-change="onQuickFrameChange"
+      @quick-selection-complete="onQuickSelectionComplete"
     />
     <div v-if="draft" class="cs-quick-size-a11y" aria-live="polite">
       {{ currentCrop.width }} × {{ currentCrop.height }}
     </div>
-    <nav v-if="draft" class="cs-quick-actions" :aria-label="labels.actions">
+    <p
+      v-if="draft && selectionPending"
+      class="cs-quick-selection-hint"
+      role="status"
+    >
+      {{ labels.selectArea }}
+    </p>
+    <nav
+      v-if="draft && !selectionPending"
+      class="cs-quick-actions"
+      :aria-label="labels.actions"
+    >
       <button type="button" :disabled="pending" @click="openEditor">
         {{ labels.editor }}
       </button>
@@ -611,7 +686,7 @@ onBeforeUnmount(() => {
       </button>
     </nav>
     <p
-      v-if="draft && !draft.canExpandSelection"
+      v-if="draft && !selectionPending && !draft.canExpandSelection"
       class="cs-quick-portal-limit"
       role="note"
     >

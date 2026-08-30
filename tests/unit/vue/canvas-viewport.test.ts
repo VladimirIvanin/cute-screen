@@ -121,6 +121,7 @@ function mountViewport(
   textToolbarSchema?: typeof TEXT_TOOLBAR_SCHEMA,
   arrowToolbarSchema?: typeof ARROW_TOOLBAR_SCHEMA,
   quickFrameMode = false,
+  quickSelectionMode = false,
 ) {
   const rendered = render(CanvasViewport, {
     props: {
@@ -131,6 +132,7 @@ function mountViewport(
       activeTool,
       sampling,
       quickFrameMode,
+      quickSelectionMode,
       ...(textDefaults === undefined ? {} : { textDefaults }),
       ...(textToolbarSchema === undefined ? {} : { textToolbarSchema }),
       ...(arrowToolbarSchema === undefined ? {} : { arrowToolbarSchema }),
@@ -182,6 +184,88 @@ describe('M05 CanvasViewport transforms', () => {
     await vi.waitFor(() =>
       expect(emitted().frameReady).toEqual([[document.id]]),
     )
+  })
+
+  it('creates the first Quick crop on the same mounted canvas interaction surface', async () => {
+    const { scene, emitted, rerender, getByLabelText } = mountViewport(
+      'select',
+      document,
+      '',
+      undefined,
+      false,
+      undefined,
+      undefined,
+      true,
+      true,
+    )
+
+    await fireEvent.pointerDown(scene, {
+      pointerId: 8,
+      button: 0,
+      clientX: 20,
+      clientY: 30,
+    })
+    await fireEvent.pointerMove(scene, {
+      pointerId: 8,
+      clientX: 70,
+      clientY: 80,
+    })
+    await fireEvent.pointerUp(scene, {
+      pointerId: 8,
+      clientX: 70,
+      clientY: 80,
+    })
+
+    expect(emitted().documentCommand).toEqual([
+      [
+        {
+          type: 'setCrop',
+          before: null,
+          after: { x: 20, y: 30, width: 50, height: 50 },
+        },
+      ],
+    ])
+    expect(emitted().quickSelectionComplete).toEqual([
+      [{ x: 20, y: 30, width: 50, height: 50 }],
+    ])
+
+    await rerender({
+      quickSelectionMode: false,
+      document: {
+        ...document,
+        crop: { x: 20, y: 30, width: 50, height: 50 },
+      },
+    })
+    expect(getByLabelText('sceneCanvas')).toBe(scene)
+  })
+
+  it('keeps Quick selection active after a click without an area', async () => {
+    const { scene, emitted } = mountViewport(
+      'select',
+      document,
+      '',
+      undefined,
+      false,
+      undefined,
+      undefined,
+      true,
+      true,
+    )
+
+    await fireEvent.pointerDown(scene, {
+      pointerId: 9,
+      button: 0,
+      clientX: 20,
+      clientY: 30,
+    })
+    await fireEvent.pointerUp(scene, {
+      pointerId: 9,
+      clientX: 20,
+      clientY: 30,
+    })
+
+    expect(emitted().documentCommand).toBeUndefined()
+    expect(emitted().quickSelectionComplete).toBeUndefined()
   })
 
   it('streams quick-frame geometry and commits one crop command on release', async () => {

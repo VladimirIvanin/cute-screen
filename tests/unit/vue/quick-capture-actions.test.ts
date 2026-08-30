@@ -13,6 +13,7 @@ const bridgeMocks = vi.hoisted(() => ({
 vi.mock('../../../apps/desktop/src/desktop-bridge', () => ({
   tauriDesktopBridge: {
     quickCaptureGetActive: bridgeMocks.getActive,
+    quickCaptureWarmup: vi.fn().mockResolvedValue(true),
     quickCapturePresent: bridgeMocks.presentWindow,
     quickCaptureDismiss: bridgeMocks.dismissWindow,
   },

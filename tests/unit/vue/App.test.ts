@@ -414,9 +414,7 @@ describe('M02 editor shell', () => {
         t: (key) => key,
       },
     })
-    await fireEvent.click(
-      screen.getByRole('button', { name: 'captureWindow' }),
-    )
+    await fireEvent.click(screen.getByRole('button', { name: 'captureWindow' }))
     expect(available.emitted('action')).toEqual([['captureWindow']])
   })
 
@@ -927,5 +925,21 @@ describe('M02 editor shell', () => {
     ).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Redo' })).toBeInTheDocument()
+  })
+
+  it('keeps all editor chrome hidden while quick mode is selecting', () => {
+    const view = render(EditorShell, {
+      props: {
+        quickMode: true,
+        quickSelectionMode: true,
+        fixture: 'ready',
+      },
+      global: { plugins: [createEditorShellPinia()] },
+    })
+
+    expect(view.container.querySelector('.cs-bottom-chrome')).toBeNull()
+    expect(view.container.querySelector('.cs-quick-toolrail-group')).toBeNull()
+    expect(view.container.querySelector('.cs-context-toolbar')).toBeNull()
+    expect(view.container.querySelector('.cs-zoom-controls')).toBeNull()
   })
 })

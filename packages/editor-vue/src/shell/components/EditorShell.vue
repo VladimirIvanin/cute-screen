@@ -124,6 +124,7 @@ const props = withDefaults(
     clipboardBridge?: ClipboardBridge | undefined
     systemFonts?: readonly SystemFontFace[] | undefined
     quickMode?: boolean
+    quickSelectionMode?: boolean
   }>(),
   {
     actions: undefined,
@@ -144,6 +145,7 @@ const props = withDefaults(
     clipboardBridge: undefined,
     systemFonts: undefined,
     quickMode: false,
+    quickSelectionMode: false,
   },
 )
 const emit = defineEmits<{
@@ -151,6 +153,9 @@ const emit = defineEmits<{
   frameReady: [documentId: string]
   retryLoad: []
   quickFrameChange: [
+    crop: { x: number; y: number; width: number; height: number },
+  ]
+  quickSelectionComplete: [
     crop: { x: number; y: number; width: number; height: number },
   ]
 }>()
@@ -4388,7 +4393,10 @@ watch(
         </button>
       </div>
       <div class="cs-workbench">
-        <div v-if="props.quickMode" class="cs-quick-toolrail-group">
+        <div
+          v-if="props.quickMode && !props.quickSelectionMode"
+          class="cs-quick-toolrail-group"
+        >
           <ToolRail
             :tools="tools"
             :active-tool-id="store.activeToolId"
@@ -4423,7 +4431,7 @@ watch(
             </NButton>
           </div>
         </div>
-        <div v-else class="cs-bottom-chrome">
+        <div v-else-if="!props.quickMode" class="cs-bottom-chrome">
           <SeriesFilmstrip
             :frames="store.frames"
             :active-frame-id="store.activeFrameId"
@@ -4488,10 +4496,12 @@ watch(
           :zoom="store.zoom"
           :fit-mode="store.zoomMode === 'fit'"
           :quick-frame-mode="props.quickMode"
+          :quick-selection-mode="props.quickSelectionMode"
           :t="translate"
           @hosts-ready="emit('hostsReady', $event)"
           @frame-ready="emit('frameReady', $event)"
           @quick-frame-change="emit('quickFrameChange', $event)"
+          @quick-selection-complete="emit('quickSelectionComplete', $event)"
           @select-layer="selectLayer"
           @move-layer="moveLayer"
           @transform-layer="transformLayer"
@@ -4528,7 +4538,7 @@ watch(
           @reorder-to="onLayerReorderTo"
         />
         <ContextToolbar
-          v-if="props.quickMode"
+          v-if="props.quickMode && !props.quickSelectionMode"
           :schema="contextSchema"
           :label="translate('toolSettings')"
           :recent-colors="drawingPreferences.recentColors"

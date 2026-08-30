@@ -485,6 +485,24 @@ remain pending.
 10. Для resident X11/Windows процесса измерить mouse-up → `IsViewable`
     interactive quick chrome; временный preview не должен синхронно сжимать
     full-desktop PNG или записывать transport-файл.
+11. На X11 Area проверить единственный fullscreen top-level Quick XID до drag,
+    во время него и после появления editor chrome. В `selecting` не должно быть
+    ToolRail, Zoom или actions; первый валидный drag создаёт одну `setCrop`
+    command. После mouse-up scene/overlay canvas и пунктирная рамка не заменяются,
+    а инструменты появляются без нового map/show/focus или loading frame.
+12. На resident X11 измерить command → focused interactive Quick: уже скрытый процесс
+    не начинает новый compositor-settle, недавно скрытая app surface ждёт только
+    остаток интервала, а видимый editor становится `IsUnMapped` до snapshot.
+    Первый drag на показанной Quick surface принимается без дополнительной
+    подготовки; Escape возвращает typed `cancelled` и не материализует draft.
+
+Resident Ubuntu 24.04 / GNOME 46 / X11 replay (2026-08-30) подтвердил пункт 11:
+одна fullscreen Quick surface сохранила XID `0x42000fc` до и после физического
+drag `300,250 → 1000,700`. Selecting frame содержал только frozen desktop,
+dim/crosshair и подсказку; editing frame сохранил точную рамку 700×450 и добавил
+tools/actions. Dev/debug command → focused selecting составил 723 ms из
+видимого editor и 607 ms из скрытого процесса. Escape скрыл тот же XID,
+ожидавший CLI получил typed `cancelled`.
 
 Для macOS 12+ отдельно выполнить acceptance на 12.0–12.2, 12.3–13 и 14+.
 Проверить фактическую ветку CoreGraphics fallback, one-shot `SCStream` и

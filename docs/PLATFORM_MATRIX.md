@@ -11,7 +11,7 @@
 | wlroots Wayland | x86_64/aarch64 | Portal при наличии                                                                                        | Portal при наличии, иначе CLI fallback | deb, AppImage             |
 | Windows         | x86_64         | DXGI/D3D11 compositor frozen-frame adapter with area/window selector; topmost-window smoke pending        | Tauri/global-hotkey                    | NSIS exe                  |
 | Windows 11      | ARM64          | DXGI/D3D11 compositor frozen-frame adapter with area/window selector; runtime smoke pending               | Tauri/global-hotkey                    | NSIS exe                  |
-| macOS           | Intel          | Native AppKit Area/Window; CG 12.0–12.2, intended SCKit 12.3+ routing; runtime smoke pending               | later slice: Tauri/global-hotkey       | universal DMG             |
+| macOS           | Intel          | Native AppKit Area/Window; CG 12.0–12.2, intended SCKit 12.3+ routing; runtime smoke pending              | later slice: Tauri/global-hotkey       | universal DMG             |
 | macOS           | Apple Silicon  | Same versioned native adapter as Intel; compile/CI until owner runtime                                    | later slice: Tauri/global-hotkey       | universal DMG             |
 
 macOS deployment baseline зафиксирован ADR-038 как 12.0. Остальные точные
@@ -20,15 +20,15 @@ API и webview. Release baseline не повышается без ADR и CI-до
 
 ## Capture capabilities
 
-| Возможность      | X11                                            | Wayland portal                                         | Windows                               | macOS                                |
-| ---------------- | ---------------------------------------------- | ------------------------------------------------------ | ------------------------------------- | ------------------------------------ |
-| Area             | Custom frozen overlay                          | System selector                                        | Live selector; DXGI freeze on confirm | AppKit; frozen quick-mode             |
-| Screen           | Root or Composite Overlay Window               | Portal target/capability                               | DXGI virtual screen                   | Direct after permission              |
-| Window           | Direct/window list                             | Portal target/capability                               | Direct/window list                    | Native; direct document              |
-| Active window    | Window manager adapter                         | Portal when exposed, otherwise clear unavailable state | Native                                | Not advertised (later slice)         |
-| Repeat last area | Stored physical/image geometry with validation | New portal interaction if silent reuse is unavailable  | Stored geometry                       | Not advertised (later slice)         |
-| Delay            | App countdown before backend invocation        | App countdown before portal                            | App countdown                         | App countdown                        |
-| Cursor           | Capability-dependent                           | Portal-dependent                                       | Backend option                        | Not advertised                       |
+| Возможность      | X11                                            | Wayland portal                                         | Windows                               | macOS                        |
+| ---------------- | ---------------------------------------------- | ------------------------------------------------------ | ------------------------------------- | ---------------------------- |
+| Area             | One fullscreen Quick surface: select → edit    | System selector                                        | Live selector; DXGI freeze on confirm | AppKit; frozen quick-mode    |
+| Screen           | Root or Composite Overlay Window               | Portal target/capability                               | DXGI virtual screen                   | Direct after permission      |
+| Window           | Direct/window list                             | Portal target/capability                               | Direct/window list                    | Native; direct document      |
+| Active window    | Window manager adapter                         | Portal when exposed, otherwise clear unavailable state | Native                                | Not advertised (later slice) |
+| Repeat last area | Stored physical/image geometry with validation | New portal interaction if silent reuse is unavailable  | Stored geometry                       | Not advertised (later slice) |
+| Delay            | App countdown before backend invocation        | App countdown before portal                            | App countdown                         | App countdown                |
+| Cursor           | Capability-dependent                           | Portal-dependent                                       | Backend option                        | Not advertised               |
 
 Area является единственной capture action, которая заканчивается в quick-mode.
 На X11/Windows/macOS quick surface сохраняет frozen desktop и physical
@@ -86,13 +86,22 @@ UI получает `CaptureCapabilities` и не показывает непо�
   repeated optimized latency evidence remain pending.
 - UI capture waits for the hidden main client and its Mutter frame before the
   request crosses into native capture. CLI, tray and hotkey ingress enforce the
-  same gate in the native orchestration path. The absence must remain stable
-  for 300 ms before root acquisition. The X11 selector uses a dark solid
-  underlay below its white dash and an opaque white camera hint so Area remains
-  readable over both light and dark content. The hint camera is sourced from
-  the permissively licensed Lucide SVG, uploaded once as a 24×24 native pixmap;
-  cursor motion only copies the prepared pixmap and requires no network or SVG
-  parsing.
+  same gate in the native orchestration path. A visible client/frame must remain
+  absent for 300 ms before root acquisition; an already-hidden resident process
+  skips a newly-started settle interval, while a just-hidden Quick surface waits
+  only its unexpired remainder so Mutter's fade actor cannot enter the frame.
+- X11 Area decodes the captured root into owned binary transport before its
+  first visible frame, then maps one prewarmed fullscreen Quick WebView. The
+  same scene and overlay canvas own both the initial crosshair/dim/dashed crop
+  gesture and subsequent annotation state. No native Area selector, retained
+  overlay, second top-level XID or reveal-time window replacement is allowed.
+  The native selector code remains available only for Window target. Resident
+  GNOME 46/X11 runtime evidence on 2026-08-30 kept XID `0x42000fc` across a
+  physical `300,250 → 1000,700` drag and showed the same 700×450 dash before
+  adding Quick tools/actions; Escape returned typed `cancelled`. Direct xRGB32
+  → top-down BMP staging and overlapped GTK warmup reduced the resident
+  dev/debug command → focused selecting measurement to 723 ms from a visible
+  editor and 607 ms from an already-hidden process.
 
 ### macOS
 

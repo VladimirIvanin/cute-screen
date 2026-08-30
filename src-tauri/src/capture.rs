@@ -126,6 +126,7 @@ pub struct QuickCaptureDraftV1 {
     pub height: u32,
     pub selection: QuickCaptureSelectionV1,
     pub can_expand_selection: bool,
+    pub selection_pending: bool,
 }
 
 #[derive(Debug)]
@@ -369,6 +370,7 @@ impl CaptureController {
             height: frame.height,
             selection,
             can_expand_selection,
+            selection_pending: frame.quick_selection_pending,
         };
         *active = Some(QuickCaptureDraftRecord {
             descriptor: descriptor.clone(),
@@ -455,6 +457,46 @@ impl CaptureController {
         true
     }
 
+    pub fn confirm_quick_selection(
+        &self,
+        draft_id: &str,
+        selection: QuickCaptureSelectionV1,
+    ) -> Result<bool, RepositoryError> {
+        let geometry = {
+            let mut active = self
+                .quick_draft
+                .lock()
+                .map_err(|_| RepositoryError::Io("quick draft lock poisoned".to_owned()))?;
+            let record = active
+                .as_mut()
+                .filter(|record| record.descriptor.draft_id == draft_id)
+                .ok_or_else(|| {
+                    RepositoryError::InvalidDocument("quick draft is not active".to_owned())
+                })?;
+            if !record.descriptor.selection_pending {
+                return Ok(false);
+            }
+            validate_quick_selection(&record.descriptor, selection)?;
+            record.descriptor.selection = selection;
+            record.descriptor.selection_pending = false;
+            if let Some(frame) = record.frame_geometry.as_ref() {
+                record.geometry = Some(quick_selection_geometry(frame, selection));
+            }
+            record.geometry.clone()
+        };
+        #[cfg(all(target_os = "linux", feature = "x11-capture"))]
+        if std::env::var("XDG_SESSION_TYPE")
+            .is_ok_and(|session| session.eq_ignore_ascii_case("x11"))
+            && let Some(geometry) = geometry
+            && let Ok(mut last_area) = self.last_x11_area.lock()
+        {
+            *last_area = Some(geometry);
+        }
+        #[cfg(not(all(target_os = "linux", feature = "x11-capture")))]
+        let _ = geometry;
+        Ok(true)
+    }
+
     pub fn prepare_quick_result(&self, bytes: &[u8]) -> Result<(), RepositoryError> {
         let metadata = inspect_content_image_bytes(bytes)?;
         if metadata.format != "png" {
@@ -527,37 +569,15 @@ impl CaptureController {
                 .ok_or_else(|| {
                     RepositoryError::InvalidDocument("quick draft is not active".to_owned())
                 })?;
-            if selection
-                .x
-                .checked_add(selection.width)
-                .is_none_or(|right| right > record.descriptor.width)
-                || selection
-                    .y
-                    .checked_add(selection.height)
-                    .is_none_or(|bottom| bottom > record.descriptor.height)
-                || selection.width == 0
-                || selection.height == 0
-            {
+            if record.descriptor.selection_pending {
                 return Err(RepositoryError::InvalidDocument(
-                    "quick selection exceeds the frozen frame".to_owned(),
+                    "quick selection is not confirmed".to_owned(),
                 ));
             }
+            validate_quick_selection(&record.descriptor, selection)?;
             let mut geometry = record.geometry.clone();
             if let Some(frame) = record.frame_geometry.as_ref() {
-                geometry = Some(CaptureGeometry {
-                    x: frame
-                        .x
-                        .saturating_add(i32::try_from(selection.x).unwrap_or(i32::MAX)),
-                    y: frame
-                        .y
-                        .saturating_add(i32::try_from(selection.y).unwrap_or(i32::MAX)),
-                    width: selection.width,
-                    height: selection.height,
-                    source_width: frame.source_width,
-                    source_height: frame.source_height,
-                    layout_fingerprint: frame.layout_fingerprint.clone(),
-                    monitor_ids: None,
-                });
+                geometry = Some(quick_selection_geometry(frame, selection));
             }
             (
                 record.request.clone(),
@@ -568,6 +588,14 @@ impl CaptureController {
                 record.prepared_token.clone(),
             )
         };
+        #[cfg(all(target_os = "linux", feature = "x11-capture"))]
+        if std::env::var("XDG_SESSION_TYPE")
+            .is_ok_and(|session| session.eq_ignore_ascii_case("x11"))
+            && let Some(geometry) = geometry.as_ref()
+            && let Ok(mut last_area) = self.last_x11_area.lock()
+        {
+            *last_area = Some(geometry.clone());
+        }
         let result_token = prepared_token.as_deref().unwrap_or(&image_token);
         let owned = self
             .transport
@@ -974,6 +1002,48 @@ fn progress_before_backend(action: CaptureAction) -> CaptureProgressState {
     }
 }
 
+fn validate_quick_selection(
+    draft: &QuickCaptureDraftV1,
+    selection: QuickCaptureSelectionV1,
+) -> Result<(), RepositoryError> {
+    if selection
+        .x
+        .checked_add(selection.width)
+        .is_none_or(|right| right > draft.width)
+        || selection
+            .y
+            .checked_add(selection.height)
+            .is_none_or(|bottom| bottom > draft.height)
+        || selection.width == 0
+        || selection.height == 0
+    {
+        return Err(RepositoryError::InvalidDocument(
+            "quick selection exceeds the frozen frame".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+fn quick_selection_geometry(
+    frame: &CaptureGeometry,
+    selection: QuickCaptureSelectionV1,
+) -> CaptureGeometry {
+    CaptureGeometry {
+        x: frame
+            .x
+            .saturating_add(i32::try_from(selection.x).unwrap_or(i32::MAX)),
+        y: frame
+            .y
+            .saturating_add(i32::try_from(selection.y).unwrap_or(i32::MAX)),
+        width: selection.width,
+        height: selection.height,
+        source_width: frame.source_width,
+        source_height: frame.source_height,
+        layout_fingerprint: frame.layout_fingerprint.clone(),
+        monitor_ids: None,
+    }
+}
+
 #[cfg(feature = "fake-platform")]
 fn fake_capture_frame(
     transport: &ImageTransportService,
@@ -1007,6 +1077,7 @@ fn fake_capture_frame(
         height: HEIGHT,
         geometry: None,
         quick_frame_geometry: None,
+        quick_selection_pending: false,
         cursor_included: None,
     })
 }
@@ -1083,21 +1154,13 @@ fn capture_x11_target_blocking(
                 transport,
                 request.cursor,
             ),
-        CaptureAction::Area => {
-            let frame = crate::x11_platform::X11CaptureAdapter.capture_area_to_transport(
-                crate::platform::SessionKind::X11,
-                &request.correlation_id,
-                transport,
-                cancel_signal,
-                request.cursor,
-            )?;
-            if let Some(geometry) = frame.geometry.clone()
-                && let Ok(mut last_area) = last_x11_area.lock()
-            {
-                *last_area = Some(geometry);
-            }
-            Ok(frame)
-        }
+        CaptureAction::Area => crate::x11_platform::X11CaptureAdapter.capture_area_to_transport(
+            crate::platform::SessionKind::X11,
+            &request.correlation_id,
+            transport,
+            cancel_signal,
+            request.cursor,
+        ),
         CaptureAction::Repeat => {
             let geometry = last_x11_area
                 .lock()
@@ -1262,8 +1325,8 @@ mod tests {
     use super::{
         ActiveOperation, CaptureAction, CaptureController, CaptureInvocationSource,
         CaptureProgressState, CaptureRequestV1, CaptureTerminalOutcome,
-        CreateDocumentFromImageRequest, ImageProvenance, create_document_from_image,
-        progress_before_backend, terminal, terminal_from_error,
+        CreateDocumentFromImageRequest, ImageProvenance, QuickCaptureSelectionV1,
+        create_document_from_image, progress_before_backend, terminal, terminal_from_error,
     };
     use crate::{
         image_transport::{ImageTransportService, OwnedImage},
@@ -1609,6 +1672,7 @@ mod tests {
                 height: 1,
                 geometry: None,
                 quick_frame_geometry: None,
+                quick_selection_pending: false,
                 cursor_included: None,
             },
         );
@@ -1664,6 +1728,7 @@ mod tests {
                 height: 1,
                 geometry: None,
                 quick_frame_geometry: None,
+                quick_selection_pending: false,
                 cursor_included: None,
             },
         );
@@ -1719,6 +1784,7 @@ mod tests {
                     height: 1,
                     geometry: None,
                     quick_frame_geometry: None,
+                    quick_selection_pending: false,
                     cursor_included: None,
                 },
             )
@@ -1781,6 +1847,7 @@ mod tests {
                     height: 1,
                     geometry: None,
                     quick_frame_geometry: None,
+                    quick_selection_pending: false,
                     cursor_included: None,
                 },
             )
@@ -1849,16 +1916,6 @@ mod tests {
             series_id: None,
             invocation_source: CaptureInvocationSource::Ui,
         };
-        let selection_geometry = CaptureGeometry {
-            x: -99,
-            y: 50,
-            width: 1,
-            height: 2,
-            source_width: 3,
-            source_height: 2,
-            layout_fingerprint: Some("layout".to_owned()),
-            monitor_ids: Some(vec!["display".to_owned()]),
-        };
         let frame_geometry = CaptureGeometry {
             x: -100,
             y: 50,
@@ -1877,14 +1934,40 @@ mod tests {
                     correlation_id: "quick-full".to_owned(),
                     width: 3,
                     height: 2,
-                    geometry: Some(selection_geometry),
+                    geometry: Some(frame_geometry.clone()),
                     quick_frame_geometry: Some(frame_geometry),
+                    quick_selection_pending: true,
                     cursor_included: Some(false),
                 },
             )
             .expect("full-frame draft");
         assert!(draft.can_expand_selection);
-        assert_eq!(draft.selection.x, 1);
+        assert!(draft.selection_pending);
+        assert_eq!(draft.selection.x, 0);
+        let final_selection = QuickCaptureSelectionV1 {
+            x: 1,
+            y: 0,
+            width: 1,
+            height: 2,
+        };
+        let pending_error = controller
+            .commit_quick_draft(
+                &draft.draft_id,
+                "{}".to_owned(),
+                super::CaptureCompletion::Copied,
+                final_selection,
+            )
+            .expect_err("pending selection must not commit");
+        assert!(matches!(
+            pending_error,
+            RepositoryError::InvalidDocument(ref message)
+                if message == "quick selection is not confirmed"
+        ));
+        assert!(
+            controller
+                .confirm_quick_selection(&draft.draft_id, final_selection)
+                .expect("confirm selection")
+        );
 
         let cropped = png_rgba(1, 2, [200, 10, 20, 255]);
         controller
@@ -1912,7 +1995,7 @@ mod tests {
                 &draft.draft_id,
                 document_json,
                 super::CaptureCompletion::Copied,
-                draft.selection,
+                final_selection,
             )
             .expect("cropped commit");
         let opened = outcome.document.expect("materialized document");

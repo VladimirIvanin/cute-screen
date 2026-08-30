@@ -212,6 +212,7 @@ impl MacosScreenCaptureAdapter {
             height: geometry.height,
             geometry: Some(geometry),
             quick_frame_geometry: None,
+            quick_selection_pending: false,
             cursor_included: Some(false),
         })
     }
@@ -298,6 +299,7 @@ fn capture_interactive_target(
         height,
         geometry: Some(geometry),
         quick_frame_geometry,
+        quick_selection_pending: false,
         cursor_included: Some(false),
     };
     handoff_failure.0 = false;
@@ -673,9 +675,8 @@ mod tests {
     fn selector_refuses_the_appkit_menu_bar_constraint() {
         let screen = rect(0.0, 0.0, 1440.0, 900.0);
         let constrained_below_menu = rect(0.0, 0.0, 1440.0, 875.0);
-        let frame = unsafe {
-            super::cute_selector_constrained_frame(constrained_below_menu, screen)
-        };
+        let frame =
+            unsafe { super::cute_selector_constrained_frame(constrained_below_menu, screen) };
         assert_eq!(frame, screen);
     }
 

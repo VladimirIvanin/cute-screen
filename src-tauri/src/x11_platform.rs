@@ -2,7 +2,7 @@ use std::{
     collections::BTreeSet,
     sync::mpsc::{self, Receiver, Sender},
     sync::{
-        Arc, Mutex,
+        Arc, Mutex, OnceLock,
         atomic::{AtomicBool, Ordering},
     },
     thread,
@@ -16,7 +16,7 @@ use uuid::Uuid;
 use x11rb::{
     CURRENT_TIME, NONE,
     connection::Connection,
-    image::{Image, PixelLayout},
+    image::{BitsPerPixel, Image, ImageOrder, PixelLayout},
     protocol::{
         Event,
         composite::ConnectionExt as _,
@@ -73,6 +73,37 @@ const AREA_HINT_CAMERA_PNG: &[u8] = include_bytes!("../assets/third-party/lucide
 #[cfg(test)]
 const AREA_HINT_CAMERA_LICENSE: &[u8] = include_bytes!("../assets/third-party/lucide/LICENSE");
 const AREA_HINT_CAMERA_SIZE: u16 = 24;
+static LAST_APP_SURFACE_HIDDEN: OnceLock<Mutex<Option<Instant>>> = OnceLock::new();
+
+fn recent_surface_settle_remaining(elapsed: Duration) -> Option<Duration> {
+    X11_COMPOSITOR_UNMAP_SETTLE
+        .checked_sub(elapsed)
+        .filter(|remaining| !remaining.is_zero())
+}
+
+/// Records a Quick/main app surface hide so an immediately repeated capture
+/// cannot freeze Mutter's remaining fade actor into the next draft.
+pub fn note_app_surface_hidden() {
+    let hidden = LAST_APP_SURFACE_HIDDEN.get_or_init(|| Mutex::new(None));
+    let mut hidden = hidden
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    *hidden = Some(Instant::now());
+}
+
+/// An app with no mapped X11 clients is normally ready immediately. A surface
+/// hidden only moments ago is different: its compositor actor can outlive the
+/// client, so wait only the unexpired part of the normal settle interval.
+pub fn wait_for_recent_app_surface_settle() {
+    let hidden = LAST_APP_SURFACE_HIDDEN.get_or_init(|| Mutex::new(None));
+    let hidden_at = *hidden
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if let Some(remaining) = hidden_at.and_then(|at| recent_surface_settle_remaining(at.elapsed()))
+    {
+        thread::sleep(remaining);
+    }
+}
 
 struct X11HotkeyWorker {
     stop: Arc<AtomicBool>,
@@ -597,6 +628,33 @@ impl X11CaptureAdapter {
         Ok(())
     }
 
+    /// Reports whether this process already has no viewable client or Mutter
+    /// frame. Background/tray capture can skip a newly-started compositor
+    /// settle interval when the application was absent before the request.
+    pub fn current_process_windows_unmapped(
+        &self,
+        correlation_id: &str,
+    ) -> Result<bool, PlatformError> {
+        let (connection, screen_number) =
+            x11rb::connect(None).map_err(|_| gate_error(correlation_id, "unmapProbeConnect"))?;
+        let root = connection
+            .setup()
+            .roots
+            .get(screen_number)
+            .map(|screen| screen.root)
+            .ok_or_else(|| gate_error(correlation_id, "unmapProbeScreen"))?;
+        let window_pid = intern_atom(&connection, b"_NET_WM_PID", correlation_id)?;
+        let mutter_frame_for = intern_atom(&connection, b"_MUTTER_FRAME_FOR", correlation_id)?;
+        current_process_windows_and_frames_are_unmapped(
+            &connection,
+            root,
+            window_pid,
+            mutter_frame_for,
+            std::process::id(),
+            correlation_id,
+        )
+    }
+
     /// Waits for the X server to report that every top-level client owned by
     /// this process and its Mutter decoration are gone. Tauri's GTK `hide()`
     /// acknowledgement can arrive before the window manager removes its frame,
@@ -803,6 +861,12 @@ impl X11CaptureAdapter {
                 correlation_id,
             ));
         }
+        if cancel_signal.load(Ordering::SeqCst) {
+            return Err(PlatformError::new(
+                PlatformErrorCode::Cancelled,
+                correlation_id,
+            ));
+        }
         let (connection, screen_number) =
             x11rb::connect(None).map_err(|_| gate_error(correlation_id, "connect"))?;
         let screen = connection
@@ -811,38 +875,60 @@ impl X11CaptureAdapter {
             .get(screen_number)
             .ok_or_else(|| gate_error(correlation_id, "screen"))?;
         let root = screen.root;
-        let root_depth = screen.root_depth;
-        let root_visual = screen.root_visual;
+        let native = capture_native_root_frame(&connection, screen_number, root, correlation_id)?;
+        enum PreviewPixels {
+            EncodedBmp(Vec<u8>),
+            Rgba(RgbaFrame),
+        }
+        let preview = if cursor {
+            PreviewPixels::Rgba(decode_native_root_frame(
+                &connection,
+                &native,
+                correlation_id,
+                true,
+            )?)
+        } else {
+            let layout = pixel_layout_for_visual(&connection, native.visual_id, correlation_id)?;
+            match encode_standard_xrgb32_bmp(&native.image, layout, correlation_id)? {
+                Some(encoded) => PreviewPixels::EncodedBmp(encoded),
+                None => PreviewPixels::Rgba(decode_native_root_frame(
+                    &connection,
+                    &native,
+                    correlation_id,
+                    false,
+                )?),
+            }
+        };
+        if cancel_signal.load(Ordering::SeqCst) {
+            return Err(PlatformError::new(
+                PlatformErrorCode::Cancelled,
+                correlation_id,
+            ));
+        }
         let monitors = randr_monitor_layout(&connection, root, correlation_id)?;
-        let root_frame =
-            capture_root_frame(&connection, screen_number, root, correlation_id, cursor)?;
-        let bounds = select_frozen_target(
-            &connection,
-            root,
-            root_depth,
-            root_visual,
-            &root_frame,
-            SelectorMode::Area,
-            cancel_signal,
-            correlation_id,
-        )?;
-        let geometry = capture_geometry_with_layout(
-            bounds,
-            root_frame.width,
-            root_frame.height,
-            &monitors,
-            correlation_id,
-        )?;
         let frame_geometry = capture_geometry_with_layout(
-            (0, 0, root_frame.width, root_frame.height),
-            root_frame.width,
-            root_frame.height,
+            (0, 0, native.width, native.height),
+            native.width,
+            native.height,
             &monitors,
             correlation_id,
         )?;
-        let mut result = import_quick_rgba_preview(transport, correlation_id, root_frame)?;
-        result.geometry = Some(geometry);
+        let mut result = match preview {
+            PreviewPixels::EncodedBmp(encoded) => import_quick_bmp_preview(
+                transport,
+                correlation_id,
+                encoded,
+                u32::from(native.width),
+                u32::from(native.height),
+                false,
+            )?,
+            PreviewPixels::Rgba(frame) => {
+                import_quick_rgba_preview(transport, correlation_id, frame)?
+            }
+        };
+        result.geometry = Some(frame_geometry.clone());
         result.quick_frame_geometry = Some(frame_geometry);
+        result.quick_selection_pending = true;
         Ok(result)
     }
 
@@ -1167,13 +1253,19 @@ struct RgbaFrame {
     cursor_included: bool,
 }
 
-fn capture_root_frame<C: Connection>(
+struct NativeRootFrame {
+    width: u16,
+    height: u16,
+    image: Image<'static>,
+    visual_id: u32,
+}
+
+fn capture_native_root_frame<C: Connection>(
     connection: &C,
     screen_number: usize,
     root: u32,
     correlation_id: &str,
-    cursor: bool,
-) -> Result<RgbaFrame, PlatformError> {
+) -> Result<NativeRootFrame, PlatformError> {
     let geometry = connection
         .get_geometry(root)
         .map_err(|_| gate_error(correlation_id, "rootGeometryRequest"))?
@@ -1194,10 +1286,24 @@ fn capture_root_frame<C: Connection>(
     .map_err(|_| gate_error(correlation_id, drawable.image_stage()));
     let released = drawable.release(connection, correlation_id);
     let (image, visual_id) = captured.and_then(|frame| released.map(|()| frame))?;
-    let mut frame = RgbaFrame {
+    Ok(NativeRootFrame {
         width: geometry.width,
         height: geometry.height,
-        rgba: decode_rgba(connection, visual_id, &image, correlation_id)?,
+        image,
+        visual_id,
+    })
+}
+
+fn decode_native_root_frame<C: Connection>(
+    connection: &C,
+    native: &NativeRootFrame,
+    correlation_id: &str,
+    cursor: bool,
+) -> Result<RgbaFrame, PlatformError> {
+    let mut frame = RgbaFrame {
+        width: native.width,
+        height: native.height,
+        rgba: decode_rgba(connection, native.visual_id, &native.image, correlation_id)?,
         cursor_included: false,
     };
     if cursor {
@@ -1210,6 +1316,17 @@ fn capture_root_frame<C: Connection>(
         }
     }
     Ok(frame)
+}
+
+fn capture_root_frame<C: Connection>(
+    connection: &C,
+    screen_number: usize,
+    root: u32,
+    correlation_id: &str,
+    cursor: bool,
+) -> Result<RgbaFrame, PlatformError> {
+    let native = capture_native_root_frame(connection, screen_number, root, correlation_id)?;
+    decode_native_root_frame(connection, &native, correlation_id, cursor)
 }
 
 #[derive(Clone, Copy)]
@@ -1345,6 +1462,8 @@ fn composite_xfixes_cursor<C: Connection>(
 }
 
 enum SelectorMode {
+    // Area moved to Quick WebView; helpers remain for selector regression coverage.
+    #[expect(dead_code, reason = "Window selector still shares tested Area helpers")]
     Area,
     Window(Vec<WindowCandidate>),
 }
@@ -1509,9 +1628,9 @@ fn select_frozen_target<C: Connection>(
         .set_dashes(selection_gc, 0, &[7, 5])
         .map_err(|_| gate_error(correlation_id, "overlaySelectionDash"))?;
     let selection = (|| -> Result<(i32, i32, u16, u16), PlatformError> {
-        // Secure input on the already-viewable root before the debug-build
-        // RGBA conversion. The selector window stays unmapped until its frozen
-        // frame is complete, so users never see an uninitialized surface.
+        // Secure input before uploading the already captured native frame. The
+        // selector stays unmapped until its backing pixmap is complete, so the
+        // first visible surface is already interactive and fully initialized.
         let pointer = connection
             .grab_pointer(
                 false,
@@ -1546,15 +1665,9 @@ fn select_frozen_target<C: Connection>(
             }
             return Err(PlatformError::new(PlatformErrorCode::Busy, correlation_id));
         }
-        let encode_started = Instant::now();
+        let upload_started = Instant::now();
         let frozen =
             encode_selector_image(connection, root_visual, root_depth, frame, correlation_id)?;
-        if std::env::var_os("CUTE_SCREEN_CAPTURE_DEBUG").is_some() {
-            eprintln!(
-                "cute-screen x11 selector frame encoded in {} ms",
-                encode_started.elapsed().as_millis()
-            );
-        }
         for cookie in frozen
             .put(connection, frozen_pixmap, background_gc, 0, 0)
             .map_err(|_| gate_error(correlation_id, "overlayFrozenFrame"))?
@@ -1562,6 +1675,12 @@ fn select_frozen_target<C: Connection>(
             cookie
                 .check()
                 .map_err(|_| gate_error(correlation_id, "overlayFrozenFrame"))?;
+        }
+        if std::env::var_os("CUTE_SCREEN_CAPTURE_DEBUG").is_some() {
+            eprintln!(
+                "cute-screen x11 selector frame uploaded from RGBA in {} ms",
+                upload_started.elapsed().as_millis()
+            );
         }
         if let Some(camera_pixmap) = hint_camera_pixmap {
             let camera_frame = decode_area_hint_camera(correlation_id)?;
@@ -2568,8 +2687,11 @@ fn current_process_windows_and_frames_are_unmapped<C: Connection>(
         .children;
     let mut states = Vec::with_capacity(windows.len());
     for window in windows {
-        let process_id = window_process_id(connection, window, window_pid);
         let frame_for = window_reference(connection, window, mutter_frame_for);
+        let process_id = effective_top_level_process_id(
+            window_process_id(connection, window, window_pid),
+            frame_for.and_then(|client| window_process_id(connection, client, window_pid)),
+        );
         if process_id != Some(current_process_id) && frame_for.is_none() {
             continue;
         }
@@ -2590,6 +2712,13 @@ fn current_process_windows_and_frames_are_unmapped<C: Connection>(
         &states,
         current_process_id,
     ))
+}
+
+fn effective_top_level_process_id(
+    window_process_id: Option<u32>,
+    framed_client_process_id: Option<u32>,
+) -> Option<u32> {
+    framed_client_process_id.or(window_process_id)
 }
 
 fn window_reference<C: Connection>(connection: &C, window: u32, atom: u32) -> Option<u32> {
@@ -2838,7 +2967,30 @@ fn import_rgba_frame(
         height: u32::from(frame.height),
         geometry: None,
         quick_frame_geometry: None,
+        quick_selection_pending: false,
         cursor_included: Some(frame.cursor_included),
+    })
+}
+
+fn import_quick_bmp_preview(
+    transport: &ImageTransportService,
+    correlation_id: &str,
+    encoded: Vec<u8>,
+    width: u32,
+    height: u32,
+    cursor_included: bool,
+) -> Result<CaptureResult, PlatformError> {
+    let token = format!("x11-{}", Uuid::now_v7().simple());
+    transport.import_owned_memory(&token, encoded, "image/bmp", width, height, correlation_id)?;
+    Ok(CaptureResult {
+        image_token: token,
+        correlation_id: correlation_id.to_owned(),
+        width,
+        height,
+        geometry: None,
+        quick_frame_geometry: None,
+        quick_selection_pending: false,
+        cursor_included: Some(cursor_included),
     })
 }
 
@@ -2851,47 +3003,33 @@ fn import_quick_rgba_preview(
     let width = u32::from(frame.width);
     let height = u32::from(frame.height);
     let encoded = encode_rgba_bmp(&frame.rgba, width, height, correlation_id)?;
-    let token = format!("x11-{}", Uuid::now_v7().simple());
-    transport.import_owned_memory(&token, encoded, "image/bmp", width, height, correlation_id)?;
+    let result = import_quick_bmp_preview(
+        transport,
+        correlation_id,
+        encoded,
+        width,
+        height,
+        frame.cursor_included,
+    )?;
     if std::env::var_os("CUTE_SCREEN_CAPTURE_DEBUG").is_some() {
         eprintln!(
             "cute-screen x11 quick preview encoded and imported in {} ms",
             started.elapsed().as_millis()
         );
     }
-    Ok(CaptureResult {
-        image_token: token,
-        correlation_id: correlation_id.to_owned(),
-        width,
-        height,
-        geometry: None,
-        quick_frame_geometry: None,
-        cursor_included: Some(frame.cursor_included),
-    })
+    Ok(result)
 }
 
-fn encode_rgba_bmp(
-    rgba: &[u8],
+fn top_down_bmp_prefix(
     width: u32,
     height: u32,
+    pixel_length: usize,
     correlation_id: &str,
 ) -> Result<Vec<u8>, PlatformError> {
-    let expected_len = usize::try_from(width)
-        .ok()
-        .and_then(|width| {
-            usize::try_from(height)
-                .ok()
-                .and_then(|height| width.checked_mul(height))
-        })
-        .and_then(|pixels| pixels.checked_mul(4))
-        .ok_or_else(|| gate_error(correlation_id, "bmpPixelLength"))?;
-    if rgba.len() != expected_len {
-        return Err(gate_error(correlation_id, "bmpPixelLength"));
-    }
     let bmp_width = i32::try_from(width).map_err(|_| gate_error(correlation_id, "bmpWidth"))?;
     let bmp_height = i32::try_from(height).map_err(|_| gate_error(correlation_id, "bmpHeight"))?;
     let pixel_length =
-        u32::try_from(rgba.len()).map_err(|_| gate_error(correlation_id, "bmpPixelLength"))?;
+        u32::try_from(pixel_length).map_err(|_| gate_error(correlation_id, "bmpPixelLength"))?;
     let file_size = 54_u32
         .checked_add(pixel_length)
         .ok_or_else(|| gate_error(correlation_id, "bmpFileSize"))?;
@@ -2913,12 +3051,107 @@ fn encode_rgba_bmp(
     bmp.extend_from_slice(&0_i32.to_le_bytes());
     bmp.extend_from_slice(&0_u32.to_le_bytes());
     bmp.extend_from_slice(&0_u32.to_le_bytes());
+    Ok(bmp)
+}
+
+fn encode_rgba_bmp(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    correlation_id: &str,
+) -> Result<Vec<u8>, PlatformError> {
+    let expected_len = usize::try_from(width)
+        .ok()
+        .and_then(|width| {
+            usize::try_from(height)
+                .ok()
+                .and_then(|height| width.checked_mul(height))
+        })
+        .and_then(|pixels| pixels.checked_mul(4))
+        .ok_or_else(|| gate_error(correlation_id, "bmpPixelLength"))?;
+    if rgba.len() != expected_len {
+        return Err(gate_error(correlation_id, "bmpPixelLength"));
+    }
+    let mut bmp = top_down_bmp_prefix(width, height, rgba.len(), correlation_id)?;
     bmp.extend_from_slice(rgba);
     for pixel in bmp[54..].chunks_exact_mut(4) {
         pixel.swap(0, 2);
         pixel[3] = u8::MAX;
     }
     Ok(bmp)
+}
+
+fn is_standard_xrgb32(image: &Image<'_>, layout: PixelLayout) -> bool {
+    image.bits_per_pixel() == BitsPerPixel::B32
+        && layout.decode(0x00ff_0000) == (u16::MAX, 0, 0)
+        && layout.decode(0x0000_ff00) == (0, u16::MAX, 0)
+        && layout.decode(0x0000_00ff) == (0, 0, u16::MAX)
+}
+
+fn encode_standard_xrgb32_bmp(
+    image: &Image<'_>,
+    layout: PixelLayout,
+    correlation_id: &str,
+) -> Result<Option<Vec<u8>>, PlatformError> {
+    if !is_standard_xrgb32(image, layout) {
+        return Ok(None);
+    }
+    let length = usize::from(image.width())
+        .checked_mul(usize::from(image.height()))
+        .and_then(|pixels| pixels.checked_mul(4))
+        .ok_or_else(|| gate_error(correlation_id, "bmpPixelLength"))?;
+    let source = image
+        .data()
+        .get(..length)
+        .ok_or_else(|| gate_error(correlation_id, "bmpPixelLength"))?;
+    let mut bmp = top_down_bmp_prefix(
+        u32::from(image.width()),
+        u32::from(image.height()),
+        length,
+        correlation_id,
+    )?;
+    match image.byte_order() {
+        ImageOrder::LsbFirst => {
+            bmp.extend_from_slice(source);
+            for pixel in bmp[54..].chunks_exact_mut(4) {
+                pixel[3] = u8::MAX;
+            }
+        }
+        ImageOrder::MsbFirst => {
+            for pixel in source.chunks_exact(4) {
+                bmp.extend_from_slice(&[pixel[3], pixel[2], pixel[1], u8::MAX]);
+            }
+        }
+    }
+    Ok(Some(bmp))
+}
+
+fn decode_standard_xrgb32(image: &Image<'_>, layout: PixelLayout) -> Option<Vec<u8>> {
+    if !is_standard_xrgb32(image, layout) {
+        return None;
+    }
+    let length = usize::from(image.width())
+        .checked_mul(usize::from(image.height()))?
+        .checked_mul(4)?;
+    let source = image.data().get(..length)?;
+    let mut rgba = vec![u8::MAX; length];
+    match image.byte_order() {
+        ImageOrder::LsbFirst => {
+            for (source, target) in source.chunks_exact(4).zip(rgba.chunks_exact_mut(4)) {
+                target[0] = source[2];
+                target[1] = source[1];
+                target[2] = source[0];
+            }
+        }
+        ImageOrder::MsbFirst => {
+            for (source, target) in source.chunks_exact(4).zip(rgba.chunks_exact_mut(4)) {
+                target[0] = source[1];
+                target[1] = source[2];
+                target[2] = source[3];
+            }
+        }
+    }
+    Some(rgba)
 }
 
 fn decode_rgba<C: Connection>(
@@ -2936,6 +3169,9 @@ fn decode_rgba<C: Connection>(
     let capacity = pixels
         .checked_mul(4)
         .ok_or_else(|| gate_error(correlation_id, "allocation"))?;
+    if let Some(rgba) = decode_standard_xrgb32(image, layout) {
+        return Ok(rgba);
+    }
     let mut rgba = Vec::with_capacity(capacity);
     for y in 0..image.height() {
         for x in 0..image.width() {
@@ -3037,11 +3273,12 @@ mod tests {
         X11CaptureAdapter, X11HotkeyBinding, X11MonitorLayout, X11TopLevelWindowState,
         apply_frame_extents, area_hint_text_colors, compositor_owner_requires_overlay,
         compositor_unmap_has_settled, crop_root_frame, current_monitor_id_for_bounds,
-        decode_area_hint_camera, import_quick_rgba_preview, monitor_ids_for_bounds, move_rectangle,
-        parse_hotkey_trigger, process_windows_and_frames_are_unmapped, rectangle_contains,
-        replacement_plan, resize_rectangle, selection_stroke_plan, selector_visual_damage,
-        should_complete_area_release, size_badge_rectangle, window_at,
-        window_selection_policy_allows, write_rgba_pixels,
+        decode_area_hint_camera, decode_standard_xrgb32, effective_top_level_process_id,
+        encode_standard_xrgb32_bmp, import_quick_rgba_preview, monitor_ids_for_bounds,
+        move_rectangle, parse_hotkey_trigger, process_windows_and_frames_are_unmapped,
+        recent_surface_settle_remaining, rectangle_contains, replacement_plan, resize_rectangle,
+        selection_stroke_plan, selector_visual_damage, should_complete_area_release,
+        size_badge_rectangle, window_at, window_selection_policy_allows, write_rgba_pixels,
     };
     use x11rb::image::{BitsPerPixel, ColorComponent, Image, ImageOrder, PixelLayout, ScanlinePad};
     use x11rb::protocol::xproto::{MapState, Rectangle};
@@ -3095,8 +3332,27 @@ mod tests {
     }
 
     #[test]
+    fn reparented_mutter_frame_inherits_the_referenced_client_process() {
+        assert_eq!(effective_top_level_process_id(None, Some(73)), Some(73));
+        assert_eq!(effective_top_level_process_id(Some(91), Some(73)), Some(73));
+        assert_eq!(effective_top_level_process_id(None, None), None);
+    }
+
+    #[test]
     fn unmapped_windows_must_remain_absent_until_the_compositor_has_settled() {
         assert!(!compositor_unmap_has_settled(Duration::ZERO));
+    }
+
+    #[test]
+    fn recently_hidden_quick_surface_waits_out_the_remaining_compositor_settle() {
+        assert_eq!(
+            recent_surface_settle_remaining(Duration::from_millis(80)),
+            Some(Duration::from_millis(220))
+        );
+        assert_eq!(
+            recent_surface_settle_remaining(Duration::from_millis(300)),
+            None
+        );
     }
 
     #[test]
@@ -3262,6 +3518,70 @@ mod tests {
 
         assert_eq!(layout.decode(image.get_pixel(0, 0)), (65535, 0, 0));
         assert_eq!(layout.decode(image.get_pixel(1, 0)), (0, 32896, 65535));
+    }
+
+    #[test]
+    fn standard_xrgb32_decode_preserves_channels_and_opaque_alpha() {
+        let layout = PixelLayout::new(
+            ColorComponent::new(8, 16).expect("red component"),
+            ColorComponent::new(8, 8).expect("green component"),
+            ColorComponent::new(8, 0).expect("blue component"),
+        );
+        let mut lsb = Image::allocate(
+            1,
+            1,
+            ScanlinePad::Pad32,
+            24,
+            BitsPerPixel::B32,
+            ImageOrder::LsbFirst,
+        );
+        lsb.data_mut().copy_from_slice(&[3, 2, 1, 0]);
+        let mut msb = Image::allocate(
+            1,
+            1,
+            ScanlinePad::Pad32,
+            24,
+            BitsPerPixel::B32,
+            ImageOrder::MsbFirst,
+        );
+        msb.data_mut().copy_from_slice(&[0, 1, 2, 3]);
+
+        assert_eq!(
+            decode_standard_xrgb32(&lsb, layout),
+            Some(vec![1, 2, 3, 255])
+        );
+        assert_eq!(
+            decode_standard_xrgb32(&msb, layout),
+            Some(vec![1, 2, 3, 255])
+        );
+    }
+
+    #[test]
+    fn standard_xrgb32_encodes_directly_as_opaque_top_down_bmp() {
+        let layout = PixelLayout::new(
+            ColorComponent::new(8, 16).expect("red component"),
+            ColorComponent::new(8, 8).expect("green component"),
+            ColorComponent::new(8, 0).expect("blue component"),
+        );
+        let mut image = Image::allocate(
+            1,
+            1,
+            ScanlinePad::Pad32,
+            24,
+            BitsPerPixel::B32,
+            ImageOrder::LsbFirst,
+        );
+        image.data_mut().copy_from_slice(&[3, 2, 1, 0]);
+
+        let bmp = encode_standard_xrgb32_bmp(&image, layout, "direct-bmp-test")
+            .expect("valid native frame")
+            .expect("standard xRGB32 frame");
+
+        assert_eq!(&bmp[54..], &[3, 2, 1, 255]);
+        assert_eq!(
+            i32::from_le_bytes(bmp[22..26].try_into().expect("height")),
+            -1
+        );
     }
 
     #[test]

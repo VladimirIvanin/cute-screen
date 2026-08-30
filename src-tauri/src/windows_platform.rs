@@ -177,6 +177,7 @@ impl WindowsCompositorCaptureAdapter {
             height,
             geometry: Some(geometry),
             quick_frame_geometry,
+            quick_selection_pending: false,
             cursor_included: Some(false),
         })
     }

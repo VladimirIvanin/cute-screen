@@ -1500,11 +1500,70 @@ immutable originals and renderer/export output are unchanged.
   the frozen VS Code desktop with no editor client, grey surface, title bar or
   shadow. Escape restored the client and created a new visible decoration.
 
+## X11 selector-to-ready-quick handoff (2026-08-30)
+
+Historical evidence only. ADR-039 supersedes this design: X11 Area must not
+retain a native selector or perform a selector-to-WebView handoff. The old
+runtime samples explain why the product contract was replaced, but they no
+longer qualify as acceptance evidence.
+
+## X11 command-to-selector latency repair (2026-08-30)
+
+Historical Area timing evidence only; ADR-039 changes the target metric to
+command → single Quick surface `IsViewable`. The capture-exclusion repair from
+this work remains active: a visible editor must disappear before root capture,
+an already hidden process skips a new settle interval, and a recently hidden
+surface waits only the remaining compositor interval.
+
+## X11 unified Quick selection surface (2026-08-30)
+
+Ubuntu 24.04 / GNOME 46 / X11, x86_64, 2560×1440. The ADR-039 traceability gate
+was added before implementation.
+
+- Red-first Vue coverage failed because the first Quick drag did not create a
+  crop command. It now emits exactly one `setCrop`, rejects a click with no
+  area and preserves the scene canvas DOM node across `selecting → editing`.
+  A separate component test first reproduced the accidental main-editor
+  ToolRail/Zoom branch and now requires all editor chrome to remain absent in
+  selecting.
+- Red-first Rust coverage failed to compile until full-frame drafts carried a
+  pending-selection state and exposed explicit validated confirmation. Commit
+  rejects an unconfirmed draft. A second red-first settle test protects rapid
+  repeated capture from Mutter's recently hidden fade actor.
+- Startup latency had two additional red-first gates. Vue now maps the
+  non-focusable GTK warmup before binary decode so WebKit allocation overlaps
+  image work. The common X11 TrueColor/xRGB32 test then required direct opaque
+  top-down BMP encoding, avoiding the former native → RGBA → BGRA pair of
+  full-frame pixel loops while retaining the generic fallback and cursor path.
+- Boundary coverage rejects any call from X11 Area to native
+  `select_frozen_target` and rejects retained X11 selector handoff calls from
+  the Tauri host. Window target remains native; Wayland remains portal-owned.
+- Resident GNOME/X11 runtime replay showed one 2560×1440 Quick top-level XID,
+  `0x42000fc`, before and after a physical `300,250 → 1000,700` drag. Selecting
+  contained only frozen desktop, dim/crosshair and the hint. Editing kept the
+  exact 700×450 dash on the same surface and added tools/actions. Escape hid
+  the same XID and the waiting CLI returned typed `cancelled`. A 10 ms focus
+  sampler measured command → focused selecting at 723 ms from the visible
+  editor and 607 ms from the hidden resident dev/debug process; the earlier
+  sequential/generic path measured about 1.56 s and 1.15 s respectively.
+- Final automatic evidence: `cargo test --workspace` passed 119/119; `pnpm
+test` passed 474/474; `pnpm test:boundaries` passed 18/18; `pnpm lint`, all
+  TypeScript/Vue package and app typechecks, `pnpm docs:check`, `cargo fmt` and
+  every configured Clippy feature gate passed. `pnpm tauri build --debug
+--no-bundle` produced `target/debug/cute-screen` with the embedded frontend.
+  Focused Prettier and `git diff --check` passed every file changed by this
+  contract. Repository-wide `pnpm format:check` remains red only on the two
+  unrelated pre-existing worktree files `TopBar.vue` and `shell/types.ts`.
+
 ## X11 resident quick-preview latency repair (2026-08-28)
 
 Ubuntu 24.04.4 LTS, GNOME Shell 46, x86_64 X11; resident Tauri dev/Vite
 process at a 2560×1440 physical framebuffer. `docs/TRACEABILITY.md` was updated
 before the test and production change.
+
+Historical timing evidence: ADR-039 moved BMP import before the single Quick
+surface becomes visible, so the mouse-up-to-second-window interpretation below
+no longer describes current X11 Area behavior.
 
 - The red-first focused Rust command failed to compile because the new
   `import_quick_rgba_preview` boundary did not exist. The unchanged focused
@@ -1624,7 +1683,7 @@ the shell share `height: 100%` so the absolutely positioned workbench cannot
 exceed the window.
 
 - Focused `CUTE_SCREEN_BROWSER_E2E_PORT=5179 pnpm exec wdio run
-  tests/e2e/wdio.browser.conf.ts --spec tests/e2e/specs/browser-shell.e2e.ts`
+tests/e2e/wdio.browser.conf.ts --spec tests/e2e/specs/browser-shell.e2e.ts`
   passed 6/7. The 1024×700 case asserted `.n-config-provider` fills `#app`,
   `.cs-workbench` is not taller than `#app`, and filmstrip/rail/zoom stay
   inside `window.innerHeight`. Screenshot:

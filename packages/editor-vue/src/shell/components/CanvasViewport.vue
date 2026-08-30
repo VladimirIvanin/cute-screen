@@ -164,6 +164,7 @@ const props = defineProps<{
   zoom?: number | undefined
   fitMode?: boolean | undefined
   quickFrameMode?: boolean | undefined
+  quickSelectionMode?: boolean | undefined
   t: (
     key:
       | 'canvasViewport'
@@ -216,6 +217,9 @@ const emit = defineEmits<{
   colorSampleCancel: []
   toolError: [message: string]
   quickFrameChange: [
+    crop: { x: number; y: number; width: number; height: number },
+  ]
+  quickSelectionComplete: [
     crop: { x: number; y: number; width: number; height: number },
   ]
 }>()
@@ -414,6 +418,8 @@ let cycle:
   | { readonly key: string; readonly at: number; readonly index: number }
   | undefined
 let cropSession: CropSession | undefined
+let quickSelectionDraft:
+  { x: number; y: number; width: number; height: number } | undefined
 let rulerGuide: RulerAngleGuide | undefined
 let gesture:
   | {
@@ -514,6 +520,11 @@ let gesture:
       readonly handle?: CropResizeHandle
       readonly start: CanvasPoint
       readonly initial: CropSession
+    }
+  | {
+      readonly kind: 'quickSelect'
+      readonly start: CanvasPoint
+      readonly current: CanvasPoint
     }
   | undefined
 
@@ -1203,6 +1214,7 @@ function previewTransform(layer: LayerNode): Transform2D {
     gesture.kind === 'text' ||
     gesture.kind === 'precision' ||
     gesture.kind === 'crop' ||
+    gesture.kind === 'quickSelect' ||
     gesture.id !== layer.id
   ) {
     return layer.transform
@@ -1239,6 +1251,7 @@ function gesturePreviewLayer(): LayerNode | undefined {
     gesture.kind === 'text' ||
     gesture.kind === 'precision' ||
     gesture.kind === 'crop' ||
+    gesture.kind === 'quickSelect' ||
     gesture.kind === 'loupeSource'
   ) {
     return undefined
@@ -1609,6 +1622,7 @@ function drawPrecisionDraft(context: CanvasRenderingContext2D): void {
   context.restore()
 }
 function ensureCropSession(): CropSession | undefined {
+  if (props.quickSelectionMode) return undefined
   if ((props.activeTool !== 'crop' && !props.quickFrameMode) || !props.document)
     return undefined
   if (!cropSession) {
@@ -1664,23 +1678,28 @@ function drawCropOverlay(
   context: CanvasRenderingContext2D,
   outputBounds: ViewportOutputBounds,
 ): boolean {
-  const session = ensureCropSession()
-  if (!session || (props.activeTool !== 'crop' && !props.quickFrameMode))
+  const session = props.quickSelectionMode ? undefined : ensureCropSession()
+  const crop = props.quickSelectionMode ? quickSelectionDraft : session?.crop
+  if (
+    (!props.quickSelectionMode &&
+      (!session || (props.activeTool !== 'crop' && !props.quickFrameMode))) ||
+    !props.canvas
+  )
     return false
-  const { x, y, width, height } = session.crop
-  const right = x + width
-  const bottom = y + height
   context.save()
   context.fillStyle = 'rgba(8, 12, 18, 0.58)'
-  context.fillRect(0, 0, props.canvas!.width, y)
-  context.fillRect(
-    0,
-    bottom,
-    props.canvas!.width,
-    props.canvas!.height - bottom,
-  )
+  if (!crop) {
+    context.fillRect(0, 0, props.canvas.width, props.canvas.height)
+    context.restore()
+    return true
+  }
+  const { x, y, width, height } = crop
+  const right = x + width
+  const bottom = y + height
+  context.fillRect(0, 0, props.canvas.width, y)
+  context.fillRect(0, bottom, props.canvas.width, props.canvas.height - bottom)
   context.fillRect(0, y, x, height)
-  context.fillRect(right, y, props.canvas!.width - right, height)
+  context.fillRect(right, y, props.canvas.width - right, height)
   context.strokeStyle = '#ffffff'
   const zoomScale = cropOverlayScale()
   context.lineWidth = 1 / zoomScale
@@ -1705,7 +1724,7 @@ function drawCropOverlay(
     const badgeWidth = (label.length * 8 + 18) / zoomScale
     const badgeX = Math.max(
       6 / zoomScale,
-      Math.min(x, props.canvas!.width - badgeWidth - 6 / zoomScale),
+      Math.min(x, props.canvas.width - badgeWidth - 6 / zoomScale),
     )
     const above = y - badgeHeight - 7 / zoomScale
     const badgeY = above >= 6 / zoomScale ? above : y + 7 / zoomScale
@@ -1722,11 +1741,13 @@ function drawCropOverlay(
     context.textBaseline = 'middle'
     context.fillText(label, badgeX + 9 / zoomScale, badgeY + badgeHeight / 2)
   }
-  const half = 4 / zoomScale
-  context.fillStyle = '#ffffff'
-  context.strokeStyle = '#d9773b'
-  for (const [, position] of cropHandlePositions(session)) {
-    drawClampedHandleSquare(context, position, half, outputBounds)
+  if (session) {
+    const half = 4 / zoomScale
+    context.fillStyle = '#ffffff'
+    context.strokeStyle = '#d9773b'
+    for (const [, position] of cropHandlePositions(session)) {
+      drawClampedHandleSquare(context, position, half, outputBounds)
+    }
   }
   context.restore()
   return true
@@ -2015,6 +2036,24 @@ watch(
       fitCanvas()
     })
   },
+)
+watch(
+  () => props.quickSelectionMode,
+  (selecting) => {
+    cancelGesture()
+    if (selecting) {
+      cropSession = undefined
+      quickSelectionDraft = undefined
+      setDirectCursor('crosshair')
+      void nextTick(() => scene.value?.focus({ preventScroll: true }))
+    } else {
+      quickSelectionDraft = undefined
+      setDirectCursor('')
+      if (props.quickFrameMode) ensureCropSession()
+    }
+    invalidateOverlay()
+  },
+  { immediate: true },
 )
 watch(
   () => editingText.value?.existing?.id,
@@ -2435,6 +2474,10 @@ function setDirectCursor(cursor: string, rotate = false): void {
 function updateHoverCursor(point: CanvasPoint): void {
   const canvas = scene.value
   const document = props.document
+  if (props.quickSelectionMode) {
+    setDirectCursor('crosshair')
+    return
+  }
   if (
     !canvas ||
     !document ||
@@ -2553,6 +2596,20 @@ function onPointerDown(event: PointerEvent): void {
     return
   }
   if (event.button !== 0) return
+  if (props.quickSelectionMode) {
+    event.preventDefault()
+    scene.value.setPointerCapture(event.pointerId)
+    quickSelectionDraft = {
+      x: point.x,
+      y: point.y,
+      width: 1,
+      height: 1,
+    }
+    gesture = { kind: 'quickSelect', start: point, current: point }
+    emit('quickFrameChange', { ...quickSelectionDraft })
+    invalidateOverlay()
+    return
+  }
   if (props.activeTool === 'crop' || props.quickFrameMode) {
     const session = ensureCropSession()
     if (!session) return
@@ -3241,6 +3298,18 @@ function onPointerMove(event: PointerEvent): void {
       gesture.scrollTop - (event.clientY - gesture.clientY)
     return
   }
+  if (gesture.kind === 'quickSelect') {
+    quickSelectionDraft = {
+      x: Math.min(gesture.start.x, point.x),
+      y: Math.min(gesture.start.y, point.y),
+      width: Math.max(1, Math.abs(point.x - gesture.start.x)),
+      height: Math.max(1, Math.abs(point.y - gesture.start.y)),
+    }
+    gesture = { ...gesture, current: point }
+    emit('quickFrameChange', { ...quickSelectionDraft })
+    invalidateOverlay()
+    return
+  }
   if (gesture.kind === 'crop') {
     const delta = {
       x: point.x - gesture.start.x,
@@ -3439,6 +3508,23 @@ function finishGesture(event: PointerEvent): void {
       emit('documentCommand', applyCropSession(cropSession))
     }
   }
+  if (
+    completed?.kind === 'quickSelect' &&
+    quickSelectionDraft &&
+    completed.current.x !== completed.start.x &&
+    completed.current.y !== completed.start.y
+  ) {
+    const crop = { ...quickSelectionDraft }
+    emit('documentCommand', {
+      type: 'setCrop',
+      before: null,
+      after: crop,
+    })
+    emit('quickSelectionComplete', crop)
+  } else if (completed?.kind === 'quickSelect') {
+    quickSelectionDraft = undefined
+    invalidateOverlay()
+  }
   if (completed?.kind === 'resize') {
     const layer = props.document?.layers.find(
       (candidate) => candidate.id === completed.id,
@@ -3636,6 +3722,7 @@ function finishGesture(event: PointerEvent): void {
 }
 function cancelGesture(event?: PointerEvent): void {
   const cancelledCrop = gesture?.kind === 'crop' ? gesture.initial : undefined
+  const cancelledQuickSelection = gesture?.kind === 'quickSelect'
   const restoreCommittedScene =
     gesture?.kind === 'move' ||
     gesture?.kind === 'resize' ||
@@ -3647,6 +3734,7 @@ function cancelGesture(event?: PointerEvent): void {
   gesture = undefined
   isPanning.value = false
   if (cancelledCrop) cropSession = cancelledCrop
+  if (cancelledQuickSelection) quickSelectionDraft = undefined
   rulerGuide = undefined
   if (event && scene.value?.hasPointerCapture(event.pointerId)) {
     scene.value.releasePointerCapture(event.pointerId)
@@ -3955,13 +4043,16 @@ onBeforeUnmount(() => {
             :style="{
               cursor: isPanning
                 ? 'grabbing'
-                : activeTool === 'hand'
-                  ? 'grab'
-                  : undefined,
+                : quickSelectionMode
+                  ? 'crosshair'
+                  : activeTool === 'hand'
+                    ? 'grab'
+                    : undefined,
             }"
             :aria-label="t('sceneCanvas')"
             :tabindex="
               sampling ||
+              quickSelectionMode ||
               activeTool === 'crop' ||
               activeTool === 'censor' ||
               activeTool === 'spotlight' ||

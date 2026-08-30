@@ -39,10 +39,13 @@ Cute Screen — полноценный local-first редактор снимко
 - `REQ-CAP-006` — задержка перед захватом с отменой.
 - `REQ-CAP-007` — настройка включения курсора там, где это поддерживает backend.
 - `REQ-CAP-008` — multi-monitor и mixed-DPI без смещения итоговой области.
-- `REQ-CAP-009` — X11 использует frozen-screen overlay; Wayland использует
-  системный XDG selector. Временная рамка, размер и подсказка X11 selector
-  восстанавливаются из frozen frame при каждом перемещении и не накапливают
-  следы курсора или предыдущих состояний.
+- `REQ-CAP-009` — X11 Area использует fullscreen Quick Capture как единственную
+  видимую capture surface: она сначала показывает frozen desktop в состоянии
+  выбора области, а после подтверждения на той же WebView и в том же renderer
+  lifecycle открывает annotation chrome. Wayland использует системный XDG
+  selector. Временная рамка, размер и подсказка X11 восстанавливаются из frozen
+  frame при каждом перемещении и не накапливают следы курсора или предыдущих
+  состояний.
 - `REQ-CAP-010` — Screen, Window, Active Window и Repeat сразу сохраняют
   неизменяемый оригинал и открывают редактируемый документ. Явный Area capture
   сначала создаёт неперсистентный quick-capture draft и материализует original,
@@ -52,18 +55,18 @@ Cute Screen — полноценный local-first редактор снимко
 - `REQ-CAP-011` — quick-capture draft существует только во временном приватном
   staging, не попадает в series/library и полностью очищается по Close/Escape,
   crash, app exit или failed staging до materialization.
-- `REQ-CAP-012` — рамка Area остаётся move/resize-доступной после появления
-  инструментов и изменяется одной undoable `setCrop` command на gesture;
-  аннотации остаются привязаны к physical pixels frozen frame и только
-  clip-ятся новой рамкой. До начала drag нативный selector показывает
-  непрозрачную закруглённую подсказку «Выделите область» с иконкой камеры;
-  во время drag показывает пунктирную рамку и читаемый размер. Escape отменяет
-  selector без создания draft. Отпускание primary pointer после валидного
-  первого drag немедленно подтверждает selector и открывает quick-capture
-  draft; `Enter` остаётся только keyboard-маршрутом подтверждения. Frozen frame,
-  затемнение и выбранная рамка остаются непрерывно видимыми до первого готового
-  кадра quick editor: между selector и редактированием запрещены пустой кадр,
-  исчезновение overlay и повторное появление рамки.
+- `REQ-CAP-012` — рамка Area создаётся и остаётся move/resize-доступной внутри
+  одного Quick Capture document; каждый завершённый gesture проходит одной
+  undoable `setCrop` command. Аннотации остаются привязаны к physical pixels
+  frozen frame и только clip-ятся рамкой. До первого drag та же Quick WebView
+  показывает непрозрачную подсказку «Выделите область», crosshair и затемнение;
+  во время drag — пунктирную рамку и читаемый размер. Escape отменяет временный
+  draft. Отпускание primary pointer после валидного первого drag только меняет
+  внутреннюю фазу `selecting → editing`: окно, renderer, frozen image, dim layer
+  и сама пунктирная рамка не уничтожаются, не создаются повторно и не теряют
+  focus. Нажатие `Enter` до валидного drag ничего не подтверждает; после
+  перехода в `editing` оно выполняет quick action Copy. Между фазами запрещены
+  loading state, blank frame, смена native window и повторное появление рамки.
 - `REQ-CAP-013` — Windows/X11/macOS Area quick-mode показывает frozen desktop
   в исходных physical coordinates. Wayland сохраняет системный XDG selector,
   показывает возвращённый portal fragment на нейтральном фоне и не разрешает
@@ -257,13 +260,18 @@ Cute Screen — полноценный local-first редактор снимко
 - `REQ-UI-007` — focus order следует визуальному порядку, reduced motion уважается.
 - `REQ-UI-008` — main editor использует системные window decorations; overlays/pin могут быть frameless.
 - `REQ-UI-009` — локальные rotating logs и ручной diagnostic bundle без отправки данных.
-- `REQ-UI-010` — Area quick-mode использует frameless chrome: dimension badge,
+- `REQ-UI-010` — Area quick-mode использует одну frameless fullscreen surface:
+  состояние выбора содержит frozen desktop, crosshair, dim layer, одну
+  пунктирную crop-рамку и dimension badge; состояние редактирования добавляет
   annotation toolbar у нижней стороны рамки и action bar Editor/Copy/Save/Close
   справа. Панели меняют сторону при collision, остаются keyboard-accessible и
   не содержат OCR, AI/cloud, print, Pin, layers, beautify или watermark. После
-  подтверждения selector quick surface не показывает пользователю пустой,
-  loading или частично разложенный WebView: окно остаётся скрытым до decoded
-  frozen frame, первого renderer flush и окончательной раскладки chrome.
+  первого drag переход выполняется только изменением UI state существующей
+  WebView; повторные show/hide/focus, native selector handoff и второй renderer
+  mount запрещены. Surface не становится визуально доступной до decoded frozen
+  frame и первого renderer flush; GTK может заранее map-нуть её non-focusable с
+  opacity `0.01`, чтобы WebKit allocation шёл параллельно decode. Пользователю
+  не показываются loading, blank или частично разложенный WebView.
   Создание WebView не входит в критический путь Area capture: резидентное
   приложение прогревает hidden quick surface заранее; для уже запущенного
   Windows-приложения reference target mouse-up → interactive chrome составляет

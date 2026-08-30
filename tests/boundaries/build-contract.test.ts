@@ -146,4 +146,59 @@ describe('Tauri build boundary', () => {
       /fn quick_capture_dismiss[\s\S]*macos_platform::complete_selector_handoff\(\)/,
     )
   })
+
+  it('keeps X11 Area selection inside the mounted Quick surface', async () => {
+    const platformSource = await readFile(
+      path.join(process.cwd(), 'src-tauri', 'src', 'x11_platform.rs'),
+      'utf8',
+    )
+    const hostSource = await readFile(
+      path.join(process.cwd(), 'src-tauri', 'src', 'lib.rs'),
+      'utf8',
+    )
+    const quickSource = await readFile(
+      path.join(process.cwd(), 'apps', 'desktop', 'src', 'QuickCaptureApp.vue'),
+      'utf8',
+    )
+    const areaStart = platformSource.indexOf('pub fn capture_area_to_transport')
+    const areaEnd = platformSource.indexOf(
+      'pub fn capture_window_to_transport',
+      areaStart,
+    )
+    const areaSource = platformSource.slice(areaStart, areaEnd)
+
+    expect(areaStart).toBeGreaterThanOrEqual(0)
+    expect(areaEnd).toBeGreaterThan(areaStart)
+    expect(areaSource).not.toContain('select_frozen_target(')
+    expect(areaSource).toContain('result.quick_selection_pending = true')
+    expect(hostSource).not.toContain('x11_platform::complete_selector_handoff')
+    expect(quickSource).toContain(':quick-selection-mode="selectionPending"')
+    expect(quickSource).toContain(
+      '@quick-selection-complete="onQuickSelectionComplete"',
+    )
+    expect(hostSource).toMatch(
+      /fn quick_capture_warmup[\s\S]*set_focusable\(false\)[\s\S]*set_opacity\(0\.01\)[\s\S]*window\.show\(\)/,
+    )
+    expect(hostSource).toMatch(
+      /fn quick_capture_reveal[\s\S]*set_opacity\(1\.0\)[\s\S]*set_focusable\(true\)[\s\S]*window\.set_focus\(\)/,
+    )
+  })
+
+  it('stages the X11 Area frame before the single Quick selection surface maps', async () => {
+    const platformSource = await readFile(
+      path.join(process.cwd(), 'src-tauri', 'src', 'x11_platform.rs'),
+      'utf8',
+    )
+    const hostSource = await readFile(
+      path.join(process.cwd(), 'src-tauri', 'src', 'lib.rs'),
+      'utf8',
+    )
+
+    expect(platformSource).toMatch(
+      /fn capture_area_to_transport[\s\S]*capture_native_root_frame\([\s\S]*decode_native_root_frame\([\s\S]*import_quick_rgba_preview\(/,
+    )
+    expect(hostSource).toMatch(
+      /fn hide_editor_for_native_capture[\s\S]*current_process_windows_unmapped\([\s\S]*window[\s\S]*\.hide\(\)/,
+    )
+  })
 })

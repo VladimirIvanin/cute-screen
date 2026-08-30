@@ -193,12 +193,33 @@ document-command boundary.
 
 ### Area quick capture
 
-Явный Area capture после platform selector создаёт `QuickCaptureDraftV1`, а не
-library record. Windows/X11/macOS draft может ссылаться на frozen virtual
-desktop и physical selection bounds; на macOS это единый frozen multi-display
-frame native AppKit selector. Wayland draft содержит только portal fragment.
-Pixels доступны Vue только через scoped/binary transport token. macOS Window
-после native selection создаёт документ напрямую и quick-mode не открывает.
+Явный Area capture создаёт `QuickCaptureDraftV1`, а не library record. Windows
+и macOS создают его после platform selector; X11 создаёт full-frame draft с
+`selectionPending`, а первый crop выбирается уже в Quick surface. Draft может
+ссылаться на frozen virtual desktop и physical selection bounds; на macOS это
+единый frozen multi-display frame native AppKit selector. Wayland draft
+содержит только portal fragment. Pixels доступны Vue только через scoped/binary
+transport token. macOS Window после native selection создаёт документ напрямую
+и quick-mode не открывает.
+
+Для X11 Area backend получает один root snapshot до показа capture UI,
+декодирует его в canonical RGBA и передаёт как memory-owned BMP transport в
+заранее созданную Quick WebView. Native Area selector и selector-to-WebView
+handoff в этом маршруте отсутствуют; native X11 selector остаётся только у
+Window target. Если client и Mutter frame процесса уже unmapped до команды
+(tray, hotkey или CLI), orchestration не начинает новый 300 ms settle. После
+недавнего hide оно ждёт только остаток этого интервала, чтобы compositor fade
+не попал в новый frozen frame. Если editor видим, hide и проверка фактического
+исчезновения client и Mutter frame обязательны до root snapshot.
+
+WebKitGTK получает decoded frame, document session и canvas hosts до reveal.
+Quick WebView мапится fullscreen в фазе `selecting`; первый валидный drag
+исполняет одну `setCrop` command, подтверждает physical selection в native
+draft и меняет только Vue state на `editing`. `EditorShell`, renderer, scene и
+overlay canvas, frozen image, dim layer и dash остаются теми же DOM/native
+объектами. Toolbar и actions добавляются вокруг существующего crop без
+show/hide/focus и без повторного layout-ready gate. Wayland сохраняет
+portal-owned system selector и не использует этот X11 маршрут.
 
 `QuickCaptureShell` использует тот же document, renderer, `CanvasViewport`,
 tool defaults и `EditorCommand`, но не монтирует TopBar, LayersPanel,

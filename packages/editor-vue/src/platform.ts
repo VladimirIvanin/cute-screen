@@ -136,6 +136,7 @@ export interface QuickCaptureDraftV1 {
     height: number
   }>
   readonly canExpandSelection: boolean
+  readonly selectionPending: boolean
 }
 
 export interface ShortcutSpec {

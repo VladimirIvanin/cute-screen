@@ -18,8 +18,30 @@ body,
 .cs-quick-capture:not(.is-layout-ready) .cs-quick-actions,
 .cs-quick-capture:not(.is-layout-ready) .cs-quick-toolrail-group,
 .cs-quick-capture:not(.is-layout-ready) .cs-context-toolbar,
-.cs-quick-capture:not(.is-layout-ready) .cs-quick-portal-limit {
+.cs-quick-capture:not(.is-layout-ready) .cs-quick-portal-limit,
+.cs-quick-capture:not(.is-layout-ready) .cs-quick-selection-hint {
   visibility: hidden;
+}
+.cs-quick-capture.is-selecting .cs-quick-actions,
+.cs-quick-capture.is-selecting .cs-quick-toolrail-group,
+.cs-quick-capture.is-selecting .cs-context-toolbar,
+.cs-quick-capture.is-selecting .cs-quick-history {
+  display: none;
+}
+.cs-quick-selection-hint {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  z-index: 30;
+  margin: 0;
+  padding: 9px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  background: var(--chrome-94);
+  box-shadow: var(--shadow-overlay);
+  font-size: 13px;
+  transform: translateX(-50%);
 }
 .cs-quick-actions {
   position: fixed;

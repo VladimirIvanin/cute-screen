@@ -806,6 +806,57 @@ fn quick_capture_get_active(
 }
 
 #[tauri::command]
+fn quick_capture_confirm_selection(
+    draft_id: String,
+    selection: QuickCaptureSelectionV1,
+    controller: State<'_, CaptureController>,
+) -> Result<bool, String> {
+    controller
+        .confirm_quick_selection(&draft_id, selection)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn quick_capture_warmup(
+    draft_id: String,
+    app: tauri::AppHandle,
+    controller: State<'_, CaptureController>,
+) -> Result<bool, String> {
+    let active = controller.active_quick_draft();
+    if !quick_capture_draft_matches(
+        active.as_ref().map(|draft| draft.draft_id.as_str()),
+        &draft_id,
+    ) {
+        return Ok(false);
+    }
+    #[cfg(target_os = "linux")]
+    {
+        use gtk::prelude::WidgetExt;
+
+        // WebKitGTK may not allocate or paint a fully hidden top-level window.
+        // Map the already decoded frozen frame without focus and reveal this
+        // same surface only after its renderer reports frame readiness.
+        let window = app
+            .get_webview_window("quick-capture")
+            .ok_or_else(|| "quick capture window is unavailable".to_owned())?;
+        window
+            .set_focusable(false)
+            .map_err(|error| error.to_string())?;
+        window
+            .set_fullscreen(true)
+            .map_err(|error| error.to_string())?;
+        window
+            .gtk_window()
+            .map_err(|error| error.to_string())?
+            .set_opacity(0.01);
+        window.show().map_err(|error| error.to_string())?;
+    }
+    #[cfg(not(target_os = "linux"))]
+    let _ = app;
+    Ok(true)
+}
+
+#[tauri::command]
 fn quick_capture_present(
     draft_id: String,
     app: tauri::AppHandle,
@@ -831,7 +882,7 @@ fn quick_capture_present(
         .set_fullscreen(true)
         .map_err(|error| error.to_string())?;
     window.show().map_err(|error| error.to_string())?;
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
     window.set_focus().map_err(|error| error.to_string())?;
     Ok(true)
 }
@@ -857,6 +908,18 @@ fn quick_capture_reveal(
         macos_platform::set_quick_capture_presentation(&window, true)?;
         macos_platform::complete_selector_handoff();
     }
+    #[cfg(target_os = "linux")]
+    {
+        use gtk::prelude::WidgetExt;
+
+        window
+            .gtk_window()
+            .map_err(|error| error.to_string())?
+            .set_opacity(1.0);
+        window
+            .set_focusable(true)
+            .map_err(|error| error.to_string())?;
+    }
     window.set_focus().map_err(|error| error.to_string())?;
     Ok(true)
 }
@@ -869,6 +932,8 @@ fn quick_capture_dismiss(app: tauri::AppHandle) -> Result<bool, String> {
         return Ok(false);
     };
     window.hide().map_err(|error| error.to_string())?;
+    #[cfg(all(target_os = "linux", feature = "x11-capture"))]
+    x11_platform::note_app_surface_hidden();
     window
         .set_fullscreen(false)
         .map_err(|error| error.to_string())?;
@@ -1384,6 +1449,11 @@ fn hide_editor_for_native_capture<R: tauri::Runtime>(
     #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     let native_desktop_capture = current_session() == SessionKind::X11;
     if !native_desktop_capture {
+        return Ok(false);
+    }
+    #[cfg(all(target_os = "linux", feature = "x11-capture"))]
+    if x11_platform::X11CaptureAdapter.current_process_windows_unmapped(correlation_id)? {
+        x11_platform::wait_for_recent_app_surface_settle();
         return Ok(false);
     }
     let Some(window) = app.get_webview_window("main") else {
@@ -1986,6 +2056,8 @@ pub fn run() {
         capture_cancel,
         capture_wait_for_editor_unmap,
         quick_capture_get_active,
+        quick_capture_confirm_selection,
+        quick_capture_warmup,
         quick_capture_present,
         quick_capture_reveal,
         quick_capture_dismiss,
@@ -2033,6 +2105,8 @@ pub fn run() {
         capture_cancel,
         capture_wait_for_editor_unmap,
         quick_capture_get_active,
+        quick_capture_confirm_selection,
+        quick_capture_warmup,
         quick_capture_present,
         quick_capture_reveal,
         quick_capture_dismiss,

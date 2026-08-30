@@ -280,6 +280,8 @@ pub struct CaptureResult {
     /// initially selected physical rectangle for capture metadata.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub quick_frame_geometry: Option<CaptureGeometry>,
+    /// The single Quick surface owns the initial Area gesture when true.
+    pub quick_selection_pending: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cursor_included: Option<bool>,
 }

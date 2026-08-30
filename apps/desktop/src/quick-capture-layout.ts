@@ -95,9 +95,10 @@ export async function waitForStableQuickCaptureLayout<T>(
 }
 
 /**
- * GTK/WebKitGTK does not allocate a hidden WebView. Map the native surface
- * after the decoded frame is ready, then refine floating chrome from visible
- * layout frames. Callers retain safe CSS placement while measurement settles.
+ * After GTK's nearly transparent mapped warmup has allowed the decoded frame
+ * to render, acknowledge native presentation and refine floating chrome from
+ * mapped layout frames. Callers retain safe CSS placement while measurement
+ * settles; `reveal` only changes the prepared surface's presentation state.
  */
 export async function presentThenWaitForStableQuickCaptureLayout<T>(
   options: PresentQuickCaptureLayoutOptions<T>,
