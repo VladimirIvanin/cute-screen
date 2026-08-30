@@ -5,11 +5,11 @@ import {
   calloutPathPoints,
   calloutSelectionHandles,
   calloutTextRect,
-  createCalloutLayer,
   defaultCalloutRoute,
   rebaseCalloutLayer,
   updateCalloutHandle,
-} from './index'
+} from './callout-geometry'
+import { createCalloutLayer } from './tools/content/callout'
 
 const STROKE = Object.freeze({
   color: Object.freeze({ red: 0.5, green: 0.5, blue: 0.5, alpha: 1 }),

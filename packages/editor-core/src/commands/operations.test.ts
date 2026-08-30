@@ -1,18 +1,15 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 
+import type { EditorDocumentV1, LayerNode, Matrix2D } from '../document/types'
+import { multiplyMatrices, transformToMatrix } from '../geometry'
+import { createLoupeLayer } from '../tools/precision/loupe'
+import { CommandManager } from './manager'
 import {
   applyEditorCommand,
-  CommandManager,
   createFlipCanvasCommand,
-  createLoupeLayer,
-  multiplyMatrices,
   revertEditorCommand,
-  transformToMatrix,
-  type EditorDocumentV1,
-  type LayerNode,
-  type Matrix2D,
-} from '../index'
+} from './operations'
 
 const DOCUMENT_ID = '019c1f62-058e-7000-8000-000000000000'
 const IDS = {

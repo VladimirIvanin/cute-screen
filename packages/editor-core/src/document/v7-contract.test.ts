@@ -4,17 +4,18 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 
 import {
   CLIPBOARD_LAYERS_MIME,
-  createEditorDocumentFromImage,
   decodeClipboardLayersV2,
   encodeClipboardLayersV2,
-  parseEditorDocument,
-  serializeEditorDocument,
-  type LayerNode,
-  type RichTextParagraph,
-  type RichTextSpan,
-  type TextLayer,
-  type TextLayerPayload,
-} from '../index'
+} from '../tools/content/clipboard-codec'
+import { parseEditorDocument, serializeEditorDocument } from './codec'
+import { createEditorDocumentFromImage } from './factory'
+import type {
+  LayerNode,
+  RichTextParagraph,
+  RichTextSpan,
+  TextLayer,
+  TextLayerPayload,
+} from './types'
 
 const source = {
   blobHash: 'a'.repeat(64),

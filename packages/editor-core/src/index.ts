@@ -158,15 +158,14 @@ export {
 } from './crop-session'
 export {
   assertValidFreeformPolygon,
-  assertValidLoupeSourceRegion,
-  createCensorLayer,
-  createLoupeLayer,
-  createRulerLayer,
-  createSpotlightLayer,
-  measureRuler,
   pointInPolygon,
   pointsBounds,
-  precisionLayerHitPart,
+} from './tools/precision/polygon'
+export { createCensorLayer } from './tools/precision/censor'
+export { createSpotlightLayer } from './tools/precision/spotlight'
+export {
+  createRulerLayer,
+  measureRuler,
   rebaseRulerLayer,
   rulerVisualBoundsAreConservative,
   rulerVisualGeometry,
@@ -175,25 +174,36 @@ export {
   type RulerMeasurement,
   type RulerSnapResult,
   type RulerVisualGeometry,
-} from './precision-tools'
+} from './tools/precision/ruler'
+export { createLoupeLayer } from './tools/precision/loupe'
+export { precisionLayerHitPart } from './tools/precision/hit-test'
+export { assertValidLoupeSourceRegion } from './tools/precision/shared'
 export {
   CLIPBOARD_LAYERS_MIME,
-  createCalloutLayer,
-  createContentImageLayer,
-  createDuplicateLayerCommand,
-  createEmojiLayer,
-  createNumberedMarkerLayer,
-  createPasteLayersCommand,
-  createTextCommitCommand,
-  createTextLayer,
   decodeClipboardLayersV2,
   encodeClipboardLayersV2,
-  nextNumberedMarkerSequence,
+  type ClipboardLayersV2,
+} from './tools/content/clipboard-codec'
+export {
   pasteClipboardLayers,
   routeClipboardSnapshot,
   type ClipboardDispatch,
-  type ClipboardLayersV2,
-} from './content-tools'
+} from './tools/content/clipboard-route'
+export { createTextLayer } from './tools/content/text'
+export {
+  createNumberedMarkerLayer,
+  nextNumberedMarkerSequence,
+} from './tools/content/marker'
+export { createCalloutLayer } from './tools/content/callout'
+export {
+  createContentImageLayer,
+  createEmojiLayer,
+} from './tools/content/media'
+export {
+  createDuplicateLayerCommand,
+  createPasteLayersCommand,
+  createTextCommitCommand,
+} from './tools/content/commands'
 export {
   invertMatrix,
   multiplyMatrices,
@@ -252,8 +262,8 @@ export {
   TransientEditorStateController,
   type EditorTransientState,
 } from './transient'
+export { createRenderSceneSnapshot } from './scene/snapshot'
 export {
-  createRenderSceneSnapshot,
   type EditorCoreBoundary,
   type RenderEllipseNode,
   type RenderLineNode,
@@ -279,7 +289,7 @@ export {
   type RenderSceneInput,
   type RenderSceneSnapshot,
   type RgbaColor,
-} from './render-scene'
+} from './scene/contracts'
 export {
   DEFAULT_RICH_TEXT_PARAGRAPH_STYLE,
   DEFAULT_RICH_TEXT_SPAN_STYLE,
@@ -302,4 +312,4 @@ export {
   type RichTextRange,
   type RichTextSelection,
   type RichTextSpanStyle,
-} from './rich-text-editing'
+} from './tools/text'

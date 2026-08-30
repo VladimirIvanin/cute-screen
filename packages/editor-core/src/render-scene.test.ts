@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { createRenderSceneSnapshot } from './index'
+import { createRenderSceneSnapshot } from './scene/snapshot'
 
 describe('render scene validation', () => {
   it('freezes a canvas-space output bounds contract and defaults to the full canvas', () => {

@@ -3,7 +3,7 @@ import type {
   RichTextParagraph,
   RichTextSpan,
   SrgbColor,
-} from './document/types'
+} from '../../document/types'
 
 export type RichTextSelection = Readonly<{
   readonly anchor: number
@@ -47,11 +47,11 @@ export const DEFAULT_RICH_TEXT_SPAN_STYLE: RichTextSpanStyle = Object.freeze({
 export const DEFAULT_RICH_TEXT_PARAGRAPH_STYLE: RichTextParagraphStyle =
   Object.freeze({ alignment: 'start', listKind: 'none' })
 
-function isHighSurrogate(value: number): boolean {
+export function isHighSurrogate(value: number): boolean {
   return value >= 0xd800 && value <= 0xdbff
 }
 
-function isLowSurrogate(value: number): boolean {
+export function isLowSurrogate(value: number): boolean {
   return value >= 0xdc00 && value <= 0xdfff
 }
 
@@ -66,7 +66,7 @@ export function isUtf16Boundary(text: string, offset: number): boolean {
   )
 }
 
-function normalizeOffset(
+export function normalizeOffset(
   text: string,
   offset: number,
   bias: 'backward' | 'forward',
@@ -108,7 +108,7 @@ export function richTextSelectionRange(
   })
 }
 
-function freezeColor(color: SrgbColor): SrgbColor {
+export function freezeColor(color: SrgbColor): SrgbColor {
   return Object.freeze({
     red: color.red,
     green: color.green,
@@ -117,7 +117,7 @@ function freezeColor(color: SrgbColor): SrgbColor {
   })
 }
 
-function spanStyle(span: RichTextSpan): RichTextSpanStyle {
+export function spanStyle(span: RichTextSpan): RichTextSpanStyle {
   return Object.freeze({
     fontFamily: span.fontFamily,
     fontSize: span.fontSize,
@@ -128,14 +128,16 @@ function spanStyle(span: RichTextSpan): RichTextSpanStyle {
   })
 }
 
-function paragraphStyle(paragraph: RichTextParagraph): RichTextParagraphStyle {
+export function paragraphStyle(
+  paragraph: RichTextParagraph,
+): RichTextParagraphStyle {
   return Object.freeze({
     alignment: paragraph.alignment,
     listKind: paragraph.listKind,
   })
 }
 
-function freezeSpan(
+export function freezeSpan(
   start: number,
   end: number,
   style: RichTextSpanStyle,
@@ -152,7 +154,7 @@ function freezeSpan(
   })
 }
 
-function freezeParagraph(
+export function freezeParagraph(
   start: number,
   end: number,
   style: RichTextParagraphStyle,
@@ -188,7 +190,9 @@ function equalSpanStyle(
   )
 }
 
-function mergeSpans(spans: readonly RichTextSpan[]): readonly RichTextSpan[] {
+export function mergeSpans(
+  spans: readonly RichTextSpan[],
+): readonly RichTextSpan[] {
   const result: RichTextSpan[] = []
   for (const span of spans) {
     if (span.end <= span.start) continue
@@ -271,7 +275,7 @@ function assertParagraphCoverage(
   }
 }
 
-function logicalParagraphRanges(text: string): readonly RichTextRange[] {
+export function logicalParagraphRanges(text: string): readonly RichTextRange[] {
   if (text.length === 0) return Object.freeze([])
   const result: RichTextRange[] = []
   let start = 0
@@ -288,7 +292,7 @@ function logicalParagraphRanges(text: string): readonly RichTextRange[] {
   return Object.freeze(result)
 }
 
-function paragraphAt(
+export function paragraphAt(
   paragraphs: readonly RichTextParagraph[],
   textLength: number,
   offset: number,
@@ -416,341 +420,5 @@ export function setRichTextSelection(
     selection: safeSelection,
     typingStyle: richTextSpanStyleAt(state.content, range.start),
     paragraphStyle: richTextParagraphStyleAt(state.content, range.start),
-  })
-}
-
-function patchedSpanStyle(
-  style: RichTextSpanStyle,
-  patch: Partial<RichTextSpanStyle>,
-): RichTextSpanStyle {
-  return Object.freeze({
-    ...style,
-    ...patch,
-    color: freezeColor(patch.color ?? style.color),
-  })
-}
-
-export function applyRichTextSpanStyle(
-  state: RichTextEditingState,
-  patch: Partial<RichTextSpanStyle>,
-): RichTextEditingState {
-  const selection = normalizeRichTextSelection(
-    state.content.text,
-    state.selection,
-  )
-  const range = richTextSelectionRange(selection)
-  const typingStyle = patchedSpanStyle(state.typingStyle, patch)
-  if (range.start === range.end) {
-    return Object.freeze({ ...state, selection, typingStyle })
-  }
-
-  const spans: RichTextSpan[] = []
-  for (const span of state.content.spans) {
-    if (span.end <= range.start || span.start >= range.end) {
-      spans.push(span)
-      continue
-    }
-    if (span.start < range.start) {
-      spans.push(freezeSpan(span.start, range.start, spanStyle(span)))
-    }
-    spans.push(
-      freezeSpan(
-        Math.max(span.start, range.start),
-        Math.min(span.end, range.end),
-        patchedSpanStyle(spanStyle(span), patch),
-      ),
-    )
-    if (span.end > range.end) {
-      spans.push(freezeSpan(range.end, span.end, spanStyle(span)))
-    }
-  }
-  return Object.freeze({
-    ...state,
-    selection,
-    typingStyle,
-    content: Object.freeze({
-      ...state.content,
-      spans: mergeSpans(spans),
-    }),
-  })
-}
-
-export function applyRichTextParagraphStyle(
-  state: RichTextEditingState,
-  patch: Partial<RichTextParagraphStyle>,
-): RichTextEditingState {
-  const content = normalizeRichTextContent(state.content)
-  const selection = normalizeRichTextSelection(content.text, state.selection)
-  const range = richTextSelectionRange(selection)
-  const currentIndex = content.paragraphs.findIndex(
-    (paragraph) =>
-      paragraph ===
-      paragraphAt(content.paragraphs, content.text.length, range.start),
-  )
-  const paragraphs = content.paragraphs.map((paragraph, index) => {
-    const touched =
-      range.start === range.end
-        ? index === currentIndex
-        : paragraph.start < range.end && paragraph.end > range.start
-    return touched
-      ? freezeParagraph(paragraph.start, paragraph.end, {
-          ...paragraphStyle(paragraph),
-          ...patch,
-        })
-      : paragraph
-  })
-  return Object.freeze({
-    ...state,
-    selection,
-    paragraphStyle: Object.freeze({ ...state.paragraphStyle, ...patch }),
-    content: Object.freeze({
-      ...content,
-      paragraphs: Object.freeze(paragraphs),
-    }),
-  })
-}
-
-function paragraphsAfterReplacement(
-  previous: RichTextContent,
-  nextText: string,
-  range: RichTextRange,
-  insertedText: string,
-  insertionStyle: RichTextParagraphStyle,
-): readonly RichTextParagraph[] {
-  if (nextText.length === 0) return Object.freeze([])
-  const delta = insertedText.length - (range.end - range.start)
-  const insertedEnd = range.start + insertedText.length
-  return Object.freeze(
-    logicalParagraphRanges(nextText).map((paragraph) => {
-      let style: RichTextParagraphStyle
-      if (paragraph.start === 0) {
-        style =
-          range.start === 0
-            ? insertionStyle
-            : richTextParagraphStyleAt(previous, 0)
-      } else {
-        const separator = paragraph.start - 1
-        if (separator >= range.start && separator < insertedEnd) {
-          style = insertionStyle
-        } else {
-          const oldOffset =
-            paragraph.start <= range.start
-              ? paragraph.start
-              : paragraph.start - delta
-          style = richTextParagraphStyleAt(previous, oldOffset)
-        }
-      }
-      return freezeParagraph(paragraph.start, paragraph.end, style)
-    }),
-  )
-}
-
-export function replaceRichTextSelection(
-  state: RichTextEditingState,
-  insertedText: string,
-): RichTextEditingState {
-  const content = normalizeRichTextContent(state.content)
-  const selection = normalizeRichTextSelection(content.text, state.selection)
-  const range = richTextSelectionRange(selection)
-  const text =
-    content.text.slice(0, range.start) +
-    insertedText +
-    content.text.slice(range.end)
-  const delta = insertedText.length - (range.end - range.start)
-  const spans: RichTextSpan[] = []
-
-  for (const span of content.spans) {
-    if (span.start < range.start) {
-      const end = Math.min(span.end, range.start)
-      if (end > span.start) {
-        spans.push(freezeSpan(span.start, end, spanStyle(span)))
-      }
-    }
-  }
-  if (insertedText.length > 0) {
-    spans.push(
-      freezeSpan(
-        range.start,
-        range.start + insertedText.length,
-        state.typingStyle,
-      ),
-    )
-  }
-  for (const span of content.spans) {
-    if (span.end <= range.end) continue
-    const sourceStart = Math.max(span.start, range.end)
-    spans.push(
-      freezeSpan(sourceStart + delta, span.end + delta, spanStyle(span)),
-    )
-  }
-
-  const caret = normalizeOffset(
-    text,
-    range.start + insertedText.length,
-    'backward',
-  )
-  return Object.freeze({
-    content: Object.freeze({
-      text,
-      wrap: content.wrap,
-      ...(content.fixedWidth === undefined
-        ? {}
-        : { fixedWidth: content.fixedWidth }),
-      spans: text.length === 0 ? Object.freeze([]) : mergeSpans(spans),
-      paragraphs: paragraphsAfterReplacement(
-        content,
-        text,
-        range,
-        insertedText,
-        state.paragraphStyle,
-      ),
-    }),
-    selection: Object.freeze({ anchor: caret, focus: caret }),
-    typingStyle: state.typingStyle,
-    paragraphStyle: state.paragraphStyle,
-  })
-}
-
-function codePointOffsets(text: string): readonly number[] {
-  const offsets = [0]
-  let offset = 0
-  for (const codePoint of text) {
-    offset += codePoint.length
-    offsets.push(offset)
-  }
-  return offsets
-}
-
-export function reconcileRichTextText(
-  state: RichTextEditingState,
-  nextText: string,
-  nextSelection: RichTextSelection,
-): RichTextEditingState {
-  if (state.content.text === nextText) {
-    return Object.freeze({
-      ...state,
-      selection: normalizeRichTextSelection(nextText, nextSelection),
-    })
-  }
-  const oldPoints = Array.from(state.content.text)
-  const nextPoints = Array.from(nextText)
-  let prefix = 0
-  while (
-    prefix < oldPoints.length &&
-    prefix < nextPoints.length &&
-    oldPoints[prefix] === nextPoints[prefix]
-  ) {
-    prefix += 1
-  }
-  let suffix = 0
-  while (
-    suffix < oldPoints.length - prefix &&
-    suffix < nextPoints.length - prefix &&
-    oldPoints[oldPoints.length - 1 - suffix] ===
-      nextPoints[nextPoints.length - 1 - suffix]
-  ) {
-    suffix += 1
-  }
-  const oldOffsets = codePointOffsets(state.content.text)
-  const nextOffsets = codePointOffsets(nextText)
-  const oldStart = oldOffsets[prefix]!
-  const oldEnd = oldOffsets[oldPoints.length - suffix]!
-  const nextStart = nextOffsets[prefix]!
-  const nextEnd = nextOffsets[nextPoints.length - suffix]!
-  const replacing = Object.freeze({
-    ...state,
-    selection: Object.freeze({ anchor: oldStart, focus: oldEnd }),
-  })
-  const replaced = replaceRichTextSelection(
-    replacing,
-    nextText.slice(nextStart, nextEnd),
-  )
-  return Object.freeze({
-    ...replaced,
-    selection: normalizeRichTextSelection(nextText, nextSelection),
-  })
-}
-
-function currentParagraph(
-  state: RichTextEditingState,
-): RichTextParagraph | undefined {
-  const range = richTextSelectionRange(state.selection)
-  return paragraphAt(
-    state.content.paragraphs,
-    state.content.text.length,
-    range.start,
-  )
-}
-
-function paragraphIsEmpty(text: string, paragraph: RichTextParagraph): boolean {
-  const contentEnd =
-    paragraph.end > paragraph.start && text[paragraph.end - 1] === '\n'
-      ? paragraph.end - 1
-      : paragraph.end
-  return paragraph.start === contentEnd
-}
-
-export function handleRichTextEnter(
-  state: RichTextEditingState,
-): RichTextEditingState {
-  let current = state
-  const initialRange = richTextSelectionRange(current.selection)
-  if (initialRange.start !== initialRange.end) {
-    current = replaceRichTextSelection(current, '')
-  }
-  const paragraph = currentParagraph(current)
-  if (
-    paragraph?.listKind === 'bullet' &&
-    paragraphIsEmpty(current.content.text, paragraph)
-  ) {
-    return applyRichTextParagraphStyle(current, { listKind: 'none' })
-  }
-  return replaceRichTextSelection(current, '\n')
-}
-
-export function handleRichTextBackspace(
-  state: RichTextEditingState,
-): Readonly<{ handled: boolean; state: RichTextEditingState }> {
-  const selection = normalizeRichTextSelection(
-    state.content.text,
-    state.selection,
-  )
-  const range = richTextSelectionRange(selection)
-  const normalizedState = Object.freeze({ ...state, selection })
-  if (range.start !== range.end) {
-    return Object.freeze({
-      handled: true,
-      state: replaceRichTextSelection(normalizedState, ''),
-    })
-  }
-  const paragraph = currentParagraph(normalizedState)
-  if (paragraph?.listKind === 'bullet' && range.start === paragraph.start) {
-    return Object.freeze({
-      handled: true,
-      state: applyRichTextParagraphStyle(normalizedState, {
-        listKind: 'none',
-      }),
-    })
-  }
-  if (range.start === 0) {
-    return Object.freeze({ handled: false, state: normalizedState })
-  }
-  let previous = range.start - 1
-  if (
-    previous > 0 &&
-    isLowSurrogate(state.content.text.charCodeAt(previous)) &&
-    isHighSurrogate(state.content.text.charCodeAt(previous - 1))
-  ) {
-    previous -= 1
-  }
-  return Object.freeze({
-    handled: true,
-    state: replaceRichTextSelection(
-      Object.freeze({
-        ...normalizedState,
-        selection: Object.freeze({ anchor: previous, focus: range.start }),
-      }),
-      '',
-    ),
   })
 }

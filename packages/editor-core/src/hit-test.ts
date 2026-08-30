@@ -13,7 +13,7 @@ import type {
   Point,
 } from './document/types'
 import { invertMatrix, transformPoint, transformToMatrix } from './geometry'
-import { precisionLayerHitPart } from './precision-tools'
+import { precisionLayerHitPart } from './tools/precision/hit-test'
 
 export type HitPart = 'fill' | 'handle' | 'stroke'
 

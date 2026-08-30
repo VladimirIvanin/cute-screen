@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  CommandManager,
-  TransientEditorStateController,
-  type EditorDocumentV1,
-} from './index'
+import { CommandManager } from './commands'
+import type { EditorDocumentV1 } from './document/types'
+import { TransientEditorStateController } from './transient'
 
 const document: EditorDocumentV1 = {
   schemaVersion: 7,

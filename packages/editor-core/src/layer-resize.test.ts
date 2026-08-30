@@ -1,23 +1,23 @@
 import { describe, expect, it } from 'vitest'
 
+import { CommandManager } from './commands'
 import {
   applyEditorCommand,
-  CommandManager,
-  createCensorLayer,
-  createDrawingLayer,
-  createEmojiLayer,
-  createLoupeLayer,
   createFlipCanvasCommand,
-  createRulerLayer,
-  createTextLayer,
+} from './commands/operations'
+import { parseEditorDocument, serializeEditorDocument } from './document/codec'
+import type { EditorDocumentV1, LayerNode } from './document/types'
+import { createDrawingLayer } from './drawing'
+import {
   layerResizeCapability,
   normalizeEditableDocumentScales,
-  parseEditorDocument,
   resizeLayerGeometry,
-  serializeEditorDocument,
-  type EditorDocumentV1,
-  type LayerNode,
-} from './index'
+} from './layer-resize'
+import { createEmojiLayer } from './tools/content/media'
+import { createTextLayer } from './tools/content/text'
+import { createCensorLayer } from './tools/precision/censor'
+import { createLoupeLayer } from './tools/precision/loupe'
+import { createRulerLayer } from './tools/precision/ruler'
 
 const DOCUMENT_ID = '019c1f62-058e-7000-8000-000000000000'
 const CANVAS = Object.freeze({ width: 400, height: 300 })

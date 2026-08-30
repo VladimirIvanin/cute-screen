@@ -21,42 +21,6 @@
       "reason": "quick-capture composition root awaiting controller extraction"
     },
     {
-      "path": "packages/editor-core/src/content-tools.ts",
-      "max": 676,
-      "removeBy": "core",
-      "reason": "content factories and clipboard commands are still co-located"
-    },
-    {
-      "path": "packages/editor-core/src/document/codec.ts",
-      "max": 1598,
-      "removeBy": "core",
-      "reason": "all schema-v7 codecs are still co-located"
-    },
-    {
-      "path": "packages/editor-core/src/document/scene.ts",
-      "max": 1093,
-      "removeBy": "core",
-      "reason": "all layer scene projections are still co-located"
-    },
-    {
-      "path": "packages/editor-core/src/precision-tools.ts",
-      "max": 883,
-      "removeBy": "core",
-      "reason": "precision tool models are still co-located"
-    },
-    {
-      "path": "packages/editor-core/src/render-scene.ts",
-      "max": 857,
-      "removeBy": "core",
-      "reason": "renderer-neutral contracts and validation are still co-located"
-    },
-    {
-      "path": "packages/editor-core/src/rich-text-editing.ts",
-      "max": 710,
-      "removeBy": "core",
-      "reason": "rich-text normalization and editing operations are still co-located"
-    },
-    {
       "path": "packages/editor-renderer/src/canvas2d.ts",
       "max": 1126,
       "removeBy": "renderer",
@@ -79,18 +43,6 @@
       "max": 3878,
       "removeBy": "vue",
       "reason": "shell composition and tool settings are still co-located"
-    },
-    {
-      "path": "packages/editor-core/src/document/scene.test.ts",
-      "max": 1054,
-      "removeBy": "core",
-      "reason": "scene tests are awaiting domain split"
-    },
-    {
-      "path": "packages/editor-core/src/precision-tools.test.ts",
-      "max": 817,
-      "removeBy": "core",
-      "reason": "precision tests are awaiting tool split"
     },
     {
       "path": "packages/editor-renderer/src/canvas2d.test.ts",
@@ -173,6 +125,144 @@
       "path": "apps/desktop/src/test-harness.ts",
       "removeBy": "desktop",
       "reason": "test-only WebDriver adapter is awaiting platform isolation"
+    }
+  ],
+  "temporaryStructureExceptions": [
+    {
+      "path": "apps/desktop/src/App.vue",
+      "maxFunctionLines": 125,
+      "maxComplexity": 24,
+      "maxDepth": 4,
+      "removeBy": "desktop",
+      "reason": "startup and document lifecycle callbacks await controller extraction"
+    },
+    {
+      "path": "packages/editor-core/src/color-picker.ts",
+      "maxFunctionLines": 120,
+      "maxComplexity": 20,
+      "maxDepth": 5,
+      "removeBy": "core-cleanup",
+      "reason": "HSV sector selection awaits lookup extraction"
+    },
+    {
+      "path": "packages/editor-core/src/drawing.ts",
+      "maxFunctionLines": 193,
+      "maxComplexity": 44,
+      "maxDepth": 4,
+      "removeBy": "core-cleanup",
+      "reason": "drawing compatibility factory awaits per-tool strategies"
+    },
+    {
+      "path": "packages/editor-core/src/layer-resize.ts",
+      "maxFunctionLines": 146,
+      "maxComplexity": 20,
+      "maxDepth": 4,
+      "removeBy": "core-cleanup",
+      "reason": "resize dispatcher awaits per-layer handlers"
+    },
+    {
+      "path": "packages/editor-core/src/commands/manager.ts",
+      "maxFunctionLines": 120,
+      "maxComplexity": 20,
+      "maxDepth": 5,
+      "removeBy": "core-cleanup",
+      "reason": "UTF-8 accounting helper awaits branch flattening"
+    },
+    {
+      "path": "packages/editor-core/src/document/scene/arrow.ts",
+      "maxFunctionLines": 126,
+      "maxComplexity": 20,
+      "maxDepth": 4,
+      "removeBy": "core-cleanup",
+      "reason": "arrow cap projection awaits node-family helpers"
+    },
+    {
+      "path": "packages/editor-core/src/document/scene/drawing.ts",
+      "maxFunctionLines": 130,
+      "maxComplexity": 20,
+      "maxDepth": 4,
+      "removeBy": "core-cleanup",
+      "reason": "shape projection awaits polygon helper extraction"
+    },
+    {
+      "path": "packages/editor-core/src/document/scene/shared.ts",
+      "maxFunctionLines": 120,
+      "maxComplexity": 22,
+      "maxDepth": 4,
+      "removeBy": "core-cleanup",
+      "reason": "paint projection awaits paint-kind strategies"
+    },
+    {
+      "path": "packages/editor-core/src/tools/content/text.ts",
+      "maxFunctionLines": 120,
+      "maxComplexity": 25,
+      "maxDepth": 4,
+      "removeBy": "core-cleanup",
+      "reason": "text factory validation awaits value readers"
+    },
+    {
+      "path": "packages/editor-core/src/tools/precision/loupe.ts",
+      "maxFunctionLines": 120,
+      "maxComplexity": 21,
+      "maxDepth": 4,
+      "removeBy": "core-cleanup",
+      "reason": "loupe factory validation awaits settings parser"
+    },
+    {
+      "path": "packages/editor-core/src/tools/precision/ruler.ts",
+      "maxFunctionLines": 120,
+      "maxComplexity": 21,
+      "maxDepth": 4,
+      "removeBy": "core-cleanup",
+      "reason": "ruler factory validation awaits settings parser"
+    },
+    {
+      "path": "packages/editor-renderer/src/canvas2d.ts",
+      "maxFunctionLines": 211,
+      "maxComplexity": 30,
+      "maxDepth": 4,
+      "removeBy": "renderer",
+      "reason": "Canvas2D node dispatcher and export lifecycle are co-located"
+    },
+    {
+      "path": "packages/editor-renderer/src/canvaskit.ts",
+      "maxFunctionLines": 344,
+      "maxComplexity": 26,
+      "maxDepth": 6,
+      "removeBy": "renderer",
+      "reason": "CanvasKit node dispatcher and resource lifecycle are co-located"
+    },
+    {
+      "path": "packages/editor-renderer/src/rich-text-layout.ts",
+      "maxFunctionLines": 182,
+      "maxComplexity": 26,
+      "maxDepth": 4,
+      "removeBy": "renderer",
+      "reason": "rich-text layout and line breaking are co-located"
+    },
+    {
+      "path": "packages/editor-vue/src/shell/store.ts",
+      "maxFunctionLines": 287,
+      "maxComplexity": 20,
+      "maxDepth": 4,
+      "removeBy": "vue",
+      "reason": "store definition awaits action and snapshot extraction"
+    },
+    {
+      "path": "packages/editor-vue/src/shell/components/CanvasViewport.vue",
+      "maxFunctionLines": 358,
+      "maxComplexity": 84,
+      "maxDepth": 5,
+      "removeBy": "vue",
+      "reason": "canvas gestures and runtime await imperative controllers"
+    },
+    {
+      "path": "packages/editor-vue/src/shell/components/EditorShell.vue",
+      "maxFunctionLines": 566,
+      "maxComplexity": 146,
+      "maxDepth": 23,
+      "removeBy": "vue",
+      "reason": "shell settings and composition await domain controllers"
     }
   ]
 }

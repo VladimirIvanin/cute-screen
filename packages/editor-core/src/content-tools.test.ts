@@ -1,21 +1,29 @@
 import { describe, expect, it } from 'vitest'
 
+import type { EditorCommand } from './commands/types'
+import { createDrawingLayer } from './drawing'
+import { createCalloutLayer } from './tools/content/callout'
 import {
-  createCalloutLayer,
-  createContentImageLayer,
-  createDuplicateLayerCommand,
-  createDrawingLayer,
-  createEmojiLayer,
-  createNumberedMarkerLayer,
-  createTextCommitCommand,
-  createTextLayer,
   decodeClipboardLayersV2,
   encodeClipboardLayersV2,
+} from './tools/content/clipboard-codec'
+import {
+  createDuplicateLayerCommand,
+  createTextCommitCommand,
+} from './tools/content/commands'
+import {
+  createContentImageLayer,
+  createEmojiLayer,
+} from './tools/content/media'
+import {
+  createNumberedMarkerLayer,
   nextNumberedMarkerSequence,
+} from './tools/content/marker'
+import {
   pasteClipboardLayers,
   routeClipboardSnapshot,
-  type EditorCommand,
-} from './index'
+} from './tools/content/clipboard-route'
+import { createTextLayer } from './tools/content/text'
 
 const ids = [
   '019c1f62-058e-7000-8000-000000000001',

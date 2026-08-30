@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { snapPoint } from './index'
+import { snapPoint } from './snap'
 
 describe('M05 snapping', () => {
   it('uses a six CSS pixel threshold regardless of zoom', () => {

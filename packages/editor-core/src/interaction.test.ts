@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { InteractionController } from './index'
+import { InteractionController } from './interaction'
 
 describe('M05 interaction state', () => {
   it('keeps selection out of document history and cycles overlap deterministically', () => {

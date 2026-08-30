@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { createRenderSceneSnapshot } from './index'
+import { createRenderSceneSnapshot } from './scene/snapshot'
 
 describe('M01 render scene snapshot', () => {
   it('creates an immutable, DOM-free snapshot', () => {

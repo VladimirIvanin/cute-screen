@@ -7,10 +7,8 @@ import type {
   RichTextContent,
 } from './document/types'
 import { invertMatrix, transformPoint, transformToMatrix } from './geometry'
-import {
-  assertValidLoupeSourceRegion,
-  rebaseRulerLayer,
-} from './precision-tools'
+import { assertValidLoupeSourceRegion } from './tools/precision/shared'
+import { rebaseRulerLayer } from './tools/precision/ruler'
 
 export const BOUNDS_RESIZE_HANDLES = [
   'nw',
