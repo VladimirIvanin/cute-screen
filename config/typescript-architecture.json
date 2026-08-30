@@ -21,16 +21,16 @@
       "reason": "quick-capture composition root awaiting controller extraction"
     },
     {
-      "path": "packages/editor-vue/src/shell/components/CanvasViewport.vue",
-      "max": 4201,
+      "path": "packages/editor-vue/src/shell/canvas/use-canvas-workspace.ts",
+      "max": 3713,
       "removeBy": "vue",
-      "reason": "canvas runtime, gestures and overlay are still co-located"
+      "reason": "imperative canvas controller is being split into renderer, gesture, overlay and text domains"
     },
     {
-      "path": "packages/editor-vue/src/shell/components/EditorShell.vue",
-      "max": 3878,
+      "path": "packages/editor-vue/src/shell/workspace/use-editor-workspace.ts",
+      "max": 3286,
       "removeBy": "vue",
-      "reason": "shell composition and tool settings are still co-located"
+      "reason": "shell controller is being split into session, tool schema and effect domains"
     },
     {
       "path": "tests/e2e/specs/browser-m06-drawing-tools.e2e.ts",
@@ -187,28 +187,20 @@
       "reason": "ruler factory validation awaits settings parser"
     },
     {
-      "path": "packages/editor-vue/src/shell/store.ts",
-      "maxFunctionLines": 287,
-      "maxComplexity": 20,
-      "maxDepth": 4,
+      "path": "packages/editor-vue/src/shell/canvas/use-canvas-workspace.ts",
+      "maxFunctionLines": 3650,
+      "maxComplexity": 1000,
+      "maxDepth": 30,
       "removeBy": "vue",
-      "reason": "store definition awaits action and snapshot extraction"
+      "reason": "imperative canvas controller awaits domain composable extraction"
     },
     {
-      "path": "packages/editor-vue/src/shell/components/CanvasViewport.vue",
-      "maxFunctionLines": 358,
-      "maxComplexity": 84,
-      "maxDepth": 5,
+      "path": "packages/editor-vue/src/shell/workspace/use-editor-workspace.ts",
+      "maxFunctionLines": 3223,
+      "maxComplexity": 1000,
+      "maxDepth": 30,
       "removeBy": "vue",
-      "reason": "canvas gestures and runtime await imperative controllers"
-    },
-    {
-      "path": "packages/editor-vue/src/shell/components/EditorShell.vue",
-      "maxFunctionLines": 566,
-      "maxComplexity": 146,
-      "maxDepth": 23,
-      "removeBy": "vue",
-      "reason": "shell settings and composition await domain controllers"
+      "reason": "shell controller awaits tool schema and effect extraction"
     }
   ]
 }

@@ -1,0 +1,444 @@
+.cs-arrow-formatting-toolbar--popover {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-overlay);
+}
+
+.cs-tool-configure-popover-host {
+  position: fixed;
+  z-index: 50;
+  pointer-events: auto;
+  transform: translate(-50%, calc(-100% - 8px));
+}
+@media (max-width: 700px) {
+  .cs-text-floating-toolbar-host {
+    max-width: calc(100% - 16px);
+  }
+  .cs-text-floating-toolbar > select[data-text-control='font'] {
+    width: 64px;
+  }
+  .cs-text-floating-toolbar {
+    gap: 1px;
+  }
+  .cs-text-floating-toolbar .cs-text-overflowable {
+    display: none;
+  }
+  .cs-text-floating-toolbar .cs-text-overflow-trigger {
+    display: inline-grid;
+    place-items: center;
+  }
+}
+.cs-text-toolbar button:focus-visible,
+.cs-text-toolbar select:focus-visible,
+.cs-text-toolbar input:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+.cs-text-toolbar button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.cs-text-toolbar-color {
+  display: grid;
+  place-items: center;
+}
+.cs-text-toolbar-color > .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.cs-text-toolbar-color input {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.cs-text-background-popover {
+  position: fixed;
+  z-index: 12;
+  bottom: 64px;
+  display: grid;
+  gap: 8px;
+  min-width: 210px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-overlay);
+}
+.cs-text-background-popover label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+@media (max-width: 700px) {
+  .cs-text-toolbar > select[data-text-control='font'] {
+    width: 64px;
+  }
+  .cs-text-toolbar {
+    gap: 1px;
+  }
+  .cs-text-toolbar .cs-text-overflowable {
+    display: none;
+  }
+  .cs-text-toolbar .cs-text-overflow-trigger {
+    display: inline-grid;
+    place-items: center;
+  }
+  .cs-context-toolbar--text {
+    max-width: calc(100% - 16px);
+  }
+}
+.cs-context-toolbar--arrow .cs-context-controls {
+  min-width: 208px;
+}
+.cs-context-control {
+  flex: none;
+  padding: 5px 7px;
+  border-radius: 5px;
+  color: var(--text-muted);
+  background: var(--surface-sunken);
+  font-size: 11px;
+}
+.cs-arrow-toolbar-control {
+  display: flex;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+}
+.cs-arrow-toolbar-trigger,
+.cs-color-more--compact {
+  display: inline-grid;
+  width: 36px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text);
+  background: var(--surface-sunken);
+  cursor: pointer;
+}
+.cs-arrow-toolbar-trigger:hover:not(:disabled),
+.cs-arrow-toolbar-trigger:focus-visible,
+.cs-color-more--compact:hover:not(:disabled),
+.cs-color-more--compact:focus-visible {
+  border-color: var(--accent-border-55);
+  outline: none;
+  background: var(--surface-hover);
+}
+.cs-arrow-toolbar-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.cs-arrow-toolbar-trigger svg {
+  width: 30px;
+  height: 20px;
+}
+.cs-arrow-toolbar-trigger > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.cs-color-more--compact {
+  width: 36px;
+  min-width: 36px;
+  height: 32px;
+  padding: 3px !important;
+}
+.cs-color-compact-swatch {
+  width: 21px;
+  height: 21px;
+  border: 1px solid var(--text-border-35);
+  border-radius: 5px;
+}
+.cs-arrow-toolbar-popover {
+  display: grid;
+  gap: 8px;
+  min-width: 176px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-overlay);
+}
+.cs-arrow-toolbar-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.cs-arrow-toolbar-options button {
+  display: inline-flex;
+  min-width: 30px;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text);
+  background: var(--surface-sunken);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+}
+.cs-arrow-toolbar-options button:hover,
+.cs-arrow-toolbar-options button:focus-visible,
+.cs-arrow-toolbar-options button[aria-pressed='true'] {
+  border-color: var(--accent);
+  outline: none;
+  background: var(--accent-soft);
+}
+.cs-arrow-toolbar-options svg {
+  width: 34px;
+  height: 18px;
+}
+.cs-arrow-toolbar-options--caps button {
+  min-width: 72px;
+  padding: 4px 6px;
+}
+.cs-arrow-legacy-width {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 7px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.cs-zoom-controls {
+  position: absolute;
+  z-index: 6;
+  left: 66px;
+  bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-overlay);
+}
+.cs-zoom-value,
+.cs-zoom-fit {
+  min-width: 42px;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+.cs-filmstrip {
+  display: flex;
+  min-height: 64px;
+  gap: 6px;
+  padding: 9px 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-top: 1px solid var(--border);
+  background: var(--surface-raised);
+}
+.cs-frame {
+  width: 46px;
+  min-width: 46px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  background: var(--surface-sunken);
+  cursor: pointer;
+}
+.cs-frame.is-selected {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: inset 0 -3px var(--accent);
+}
+.cs-action-feedback {
+  position: fixed;
+  z-index: 30;
+  right: 18px;
+  bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-overlay);
+}
+.cs-action-feedback.is-error {
+  border-color: var(--danger);
+}
+.cs-action-feedback button {
+  border: 0;
+  color: var(--accent);
+  background: transparent;
+  cursor: pointer;
+}
+@media (max-width: 1100px) {
+  .cs-brand strong,
+  .cs-history {
+    display: none;
+  }
+  .cs-button-quiet span {
+    display: none;
+  }
+  .cs-button-quiet {
+    width: 36px;
+    padding: 0;
+  }
+  .cs-context-toolbar small {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* Naive UI shell composition -------------------------------------------------
+   The editor owns placement; Naive UI owns only control and overlay behaviour.
+   These rules intentionally come last so legacy component-local geometry cannot
+   compete with the prototype-derived floating workspace. */
+.n-config-provider {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.cs-editor-shell {
+  position: relative;
+  display: block;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--canvas);
+}
+
+.cs-workbench {
+  --bottom-rail-height: 46px;
+  --bottom-rail-gap: 8px;
+  --bottom-rail-offset: 14px;
+  --bottom-controls-height: 48px;
+  --bottom-chrome-reserve: calc(
+    var(--bottom-rail-offset) + var(--bottom-rail-height) +
+      var(--bottom-rail-gap) + var(--bottom-controls-height) + 12px
+  );
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+}
+
+.cs-bottom-chrome {
+  position: absolute;
+  z-index: 21;
+  right: 14px;
+  bottom: var(--bottom-rail-offset);
+  left: 14px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-items: end;
+  gap: var(--bottom-rail-gap);
+  pointer-events: none;
+}
+
+.cs-bottom-chrome > * {
+  pointer-events: auto;
+}
+
+.cs-bottom-chrome-center {
+  grid-column: 2;
+  grid-row: 1 / -1;
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--bottom-rail-gap);
+}
+
+.cs-viewport {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.cs-canvas-scroll {
+  padding: 64px 48px var(--bottom-chrome-reserve);
+}
+
+.cs-topbar {
+  position: absolute;
+  z-index: 40;
+  top: 12px;
+  right: 14px;
+  left: 14px;
+  height: 42px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  pointer-events: none;
+}
+
+.cs-brand,
+.cs-history,
+.cs-top-actions,
+.cs-save-status {
+  pointer-events: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--chrome-94);
+  box-shadow: var(--shadow-overlay);
+  -webkit-backdrop-filter: blur(16px) saturate(1.12);
+  backdrop-filter: blur(16px) saturate(1.12);
+}
+
+.cs-brand {
+  height: 42px;
+  padding: 0 11px 0 7px;
+}
+
+.cs-brand-mark {
+  width: 30px;
+  height: 30px;
+}
+
+.cs-history {
+  height: 42px;
+  margin-left: 4px;
+  padding: 2px;
+}
+
+.cs-save-status {
+  padding: 7px 10px;
+}
