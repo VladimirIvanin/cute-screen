@@ -1,4 +1,4 @@
-import { computed, nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
+import { computed } from 'vue'
 import {
   type EditorDocumentV1,
   type LayerNode,
@@ -6,7 +6,6 @@ import {
   type StrokeStyle,
   applyCropSession,
   cancelCropSession,
-  createCropSession,
   resetCrop,
   setCropPreset,
   type CropPreset,
@@ -54,6 +53,11 @@ import {
   finishCanvasGesture,
 } from './gesture-finish-controller'
 import { KeyboardController } from './keyboard-controller'
+import {
+  registerInputLifecycle,
+  registerRenderLifecycle,
+  type ZoomAnchor,
+} from './workspace-lifecycle'
 
 export function useCanvasWorkspace(
   props: CanvasViewportProps,
@@ -73,15 +77,8 @@ export function useCanvasWorkspace(
     isPanning,
     editingText,
   } = createCanvasWorkspaceState()
-  let resizeObserver: ResizeObserver | undefined
   let lastFitZoom: number | undefined
-  let pendingZoomAnchor:
-    | {
-        readonly canvas: CanvasPoint
-        readonly clientX: number
-        readonly clientY: number
-      }
-    | undefined
+  let pendingZoomAnchor: ZoomAnchor | undefined
   let spacePressed = false
   let cycle:
     | { readonly key: string; readonly at: number; readonly index: number }
@@ -526,120 +523,6 @@ export function useCanvasWorkspace(
     drawOverlay()
     updateTransientArrowToolbarLayout()
   }
-  onMounted(() => {
-    rendererController.mount()
-    if (scene.value && overlay.value && scrollContainer.value)
-      emit('hostsReady', {
-        scene: scene.value,
-        overlay: overlay.value,
-        scrollContainer: scrollContainer.value,
-      })
-    void drawDocument()
-    if (typeof ResizeObserver !== 'undefined') {
-      resizeObserver = new ResizeObserver(fitCanvas)
-      if (scrollContainer.value) resizeObserver.observe(scrollContainer.value)
-    }
-    void nextTick(fitCanvas)
-  })
-  watch(
-    () => [
-      props.canvas,
-      props.image,
-      props.imageLayer,
-      props.document,
-      props.textureImages,
-    ],
-    () => void drawDocument(),
-  )
-  watch(
-    () => props.document,
-    () => {
-      cropController.session = undefined
-      if (props.activeTool === 'crop' || props.quickFrameMode)
-        ensureCropSession()
-      invalidateOverlay()
-    },
-  )
-  watch(
-    () => props.activeTool,
-    (tool) => {
-      cancelGesture()
-      cropController.session =
-        tool === 'crop' && props.document
-          ? createCropSession(props.document)
-          : undefined
-      invalidateOverlay()
-      if (
-        tool === 'crop' ||
-        tool === 'censor' ||
-        tool === 'spotlight' ||
-        tool === 'ruler' ||
-        tool === 'loupe'
-      ) {
-        void nextTick(() => scene.value?.focus({ preventScroll: true }))
-      }
-      void nextTick(() => {
-        void drawDocument()
-        fitCanvas()
-      })
-    },
-  )
-  watch(
-    () => props.quickSelectionMode,
-    (selecting) => {
-      cancelGesture()
-      if (selecting) {
-        cropController.session = undefined
-        cropController.quickDraft = undefined
-        setDirectCursor('crosshair')
-        void nextTick(() => scene.value?.focus({ preventScroll: true }))
-      } else {
-        cropController.quickDraft = undefined
-        setDirectCursor('')
-        if (props.quickFrameMode) ensureCropSession()
-      }
-      invalidateOverlay()
-    },
-    { immediate: true },
-  )
-  watch(
-    () => editingText.value?.existing?.id,
-    () => void drawDocument(),
-  )
-  watch(
-    () => [props.selectedLayerId, props.selectedLayerIds],
-    () => invalidateOverlay(),
-  )
-  watch(
-    () => [
-      viewportOutputBounds.value?.width,
-      viewportOutputBounds.value?.height,
-      props.fitMode,
-    ],
-    () => void nextTick(fitCanvas),
-  )
-  watch(
-    () => props.zoom,
-    async (zoom) => {
-      await nextTick()
-      invalidateOverlay()
-      const anchor = pendingZoomAnchor
-      if (!anchor || !scrollContainer.value || !scene.value || !zoom) return
-      pendingZoomAnchor = undefined
-      const viewport = scrollContainer.value.getBoundingClientRect()
-      const scale = zoom / 100
-      const bounds = viewportOutputBounds.value
-      if (!bounds) return
-      scrollContainer.value.scrollLeft = Math.max(
-        0,
-        (anchor.canvas.x - bounds.x) * scale - (anchor.clientX - viewport.left),
-      )
-      scrollContainer.value.scrollTop = Math.max(
-        0,
-        (anchor.canvas.y - bounds.y) * scale - (anchor.clientY - viewport.top),
-      )
-    },
-  )
   function canvasPoint(event: {
     readonly clientX: number
     readonly clientY: number
@@ -749,39 +632,6 @@ export function useCanvasWorkspace(
   function onWindowKeydown(event: KeyboardEvent): void {
     keyboardController.keydown(event)
   }
-  watch(
-    () => props.sampling,
-    (sampling) => {
-      if (!sampling) {
-        setDirectCursor('')
-        samplingCursor.value = undefined
-        hideEyedropperPreview()
-        invalidateOverlay()
-        return
-      }
-      setDirectCursor('')
-      eyedropper.resetCache(true)
-      const initial = initialSamplingCursor()
-      samplingCursor.value = initial
-      invalidateOverlay()
-      void nextTick(() => {
-        scene.value?.focus({ preventScroll: true })
-        if (initial) scheduleEyedropperPreview(initial)
-      })
-    },
-  )
-  watch(
-    () => [props.samplingBlocked, props.zoom, viewportOutputBounds.value],
-    () => {
-      if (!props.sampling || !samplingCursor.value) return
-      eyedropper.resetCache()
-      void nextTick(() => {
-        if (samplingCursor.value) {
-          scheduleEyedropperPreview(samplingCursor.value)
-        }
-      })
-    },
-  )
   function onWindowKeyup(event: KeyboardEvent): void {
     keyboardController.keyup(event)
   }
@@ -792,31 +642,43 @@ export function useCanvasWorkspace(
     textEditorController.documentPointerDown(event)
   const onDocumentSelectionChange = () =>
     textEditorController.documentSelectionChange()
-  onMounted(() => {
-    window.addEventListener('keydown', onWindowKeydown)
-    window.addEventListener('keyup', onWindowKeyup)
-    window.addEventListener('blur', onWindowBlur)
-    document.addEventListener('pointerdown', onDocumentPointerDown, true)
-    document.addEventListener('selectionchange', onDocumentSelectionChange)
-    if (props.sampling) {
-      void nextTick(() => {
-        const initial = initialSamplingCursor()
-        samplingCursor.value = initial
-        if (initial) scheduleEyedropperPreview(initial)
-        invalidateOverlay()
-      })
-    }
+  registerRenderLifecycle({
+    props,
+    emit,
+    scene,
+    overlay,
+    scrollContainer,
+    editingText,
+    outputBounds: viewportOutputBounds,
+    renderer: rendererController,
+    crop: cropController,
+    drawDocument,
+    invalidateOverlay,
+    cancelGesture: () => cancelGesture(),
+    setCursor: setDirectCursor,
+    fitCanvas,
+    takeZoomAnchor: () => {
+      const anchor = pendingZoomAnchor
+      pendingZoomAnchor = undefined
+      return anchor
+    },
   })
-  onBeforeUnmount(() => {
-    hideEyedropperPreview()
-    resizeObserver?.disconnect()
-    resizeObserver = undefined
-    rendererController.dispose()
-    window.removeEventListener('keydown', onWindowKeydown)
-    window.removeEventListener('keyup', onWindowKeyup)
-    window.removeEventListener('blur', onWindowBlur)
-    document.removeEventListener('pointerdown', onDocumentPointerDown, true)
-    document.removeEventListener('selectionchange', onDocumentSelectionChange)
+  registerInputLifecycle({
+    props,
+    scene,
+    outputBounds: viewportOutputBounds,
+    samplingCursor,
+    eyedropper,
+    initialSamplingCursor,
+    scheduleEyedropper: scheduleEyedropperPreview,
+    hideEyedropper: hideEyedropperPreview,
+    setCursor: setDirectCursor,
+    invalidateOverlay,
+    onKeydown: onWindowKeydown,
+    onKeyup: onWindowKeyup,
+    onBlur: onWindowBlur,
+    onDocumentPointerDown,
+    onDocumentSelectionChange,
   })
   return {
     viewportRoot,
