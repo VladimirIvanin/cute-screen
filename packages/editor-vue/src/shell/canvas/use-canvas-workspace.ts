@@ -14,9 +14,7 @@ import {
   restoreRichTextDomSelection,
 } from '../../rich-text-editor'
 import {
-  Canvas2DRenderer,
   createDocumentRenderScene,
-  createRenderSceneSnapshot,
   drawNodes2D,
   hitTestDocument,
   hitTestDocumentAll,
@@ -28,7 +26,6 @@ import {
   type LayerNode,
   type SnapCandidate,
   type Transform2D,
-  type ImageResource,
   type SrgbColor,
   createDrawingLayer,
   arrowSelectionHandles,
@@ -97,6 +94,7 @@ import {
   createFloatingToolbarController,
   isFloatingToolbarTarget,
 } from './floating-toolbar-controller'
+import { CanvasRendererController } from './renderer-controller'
 
 export function useCanvasWorkspace(
   props: CanvasViewportProps,
@@ -116,16 +114,7 @@ export function useCanvasWorkspace(
     isPanning,
     editingText,
   } = createCanvasWorkspaceState()
-  let renderer: Canvas2DRenderer | undefined
-  let rendererInitialization: Promise<Canvas2DRenderer | undefined> | undefined
-  let rendererSceneReady = false
-  let drawRevision = 0
-  let imageResources = new Map<
-    string,
-    { readonly key: string; readonly resource: ImageResource }
-  >()
   let resizeObserver: ResizeObserver | undefined
-  let componentMounted = false
   let textToolbarPointerDown = false
   let lastFitZoom: number | undefined
   let pendingZoomAnchor:
@@ -180,6 +169,23 @@ export function useCanvasWorkspace(
     layerBounds,
     transformPoint,
   })
+  const rendererController = new CanvasRendererController({
+    props,
+    emit,
+    scene,
+    overlay,
+    rendererError,
+    editingText,
+    outputBounds: viewportOutputBounds,
+    documentForScene: documentWithoutGestureLayer,
+    previewLayer: gesturePreviewLayer,
+    invalidateOverlay,
+  })
+  const drawDocument = () => rendererController.drawDocument()
+  const renderCommittedSceneForGesture = () =>
+    rendererController.renderCommittedSceneForGesture()
+  const invalidateGesturePreview = () =>
+    rendererController.invalidateGesturePreview()
   const eyedropper = new EyedropperController({
     props,
     emit,
@@ -376,40 +382,6 @@ export function useCanvasWorkspace(
     },
     { immediate: true },
   )
-  async function ensureRenderer(): Promise<Canvas2DRenderer | undefined> {
-    if (!scene.value || !overlay.value || !props.canvas) return undefined
-    if (renderer) return renderer
-    if (rendererInitialization) return rendererInitialization
-    const next = new Canvas2DRenderer()
-    const initialization = (async () => {
-      await next.initialize({
-        scene: scene.value!,
-        overlay: overlay.value!,
-        dpr: window.devicePixelRatio || 1,
-        correlationId: 'editor-viewport',
-      })
-      if (!componentMounted) {
-        next.dispose()
-        return undefined
-      }
-      renderer = next
-      rendererSceneReady = false
-      return next
-    })()
-    rendererInitialization = initialization
-    try {
-      return await initialization
-    } catch (error) {
-      if (renderer === next) renderer = undefined
-      rendererSceneReady = false
-      next.dispose()
-      throw error
-    } finally {
-      if (rendererInitialization === initialization) {
-        rendererInitialization = undefined
-      }
-    }
-  }
   function documentWithoutGestureLayer(): EditorDocumentV1 | undefined {
     const document = props.document
     if (!document) return undefined
@@ -447,120 +419,6 @@ export function useCanvasWorkspace(
     return {
       ...document,
       layers: document.layers.filter((layer) => layer.id !== hiddenLayerId),
-    }
-  }
-  function setCommittedScene(runtime: Canvas2DRenderer): void {
-    const document = documentWithoutGestureLayer()
-    if (!document) return
-    const documentScene = createDocumentRenderScene(
-      (props.activeTool === 'crop' || props.quickFrameMode) && document.crop
-        ? { ...document, crop: null }
-        : document,
-    )
-    const editing = editingText.value
-    if (!editing?.existing) {
-      runtime.setScene(documentScene)
-      rendererSceneReady = true
-      return
-    }
-    // The contenteditable owns the text projection during direct editing.
-    // Keep non-text callout/marker container nodes in the committed scene.
-    const hiddenNodeIds =
-      editing.existing.kind === 'text'
-        ? new Set([editing.id, `${editing.id}:background`])
-        : editing.existing.kind === 'callout'
-          ? new Set([`${editing.id}:text`, `${editing.id}:background`])
-          : new Set([`${editing.id}:label`])
-    runtime.setScene(
-      createRenderSceneSnapshot({
-        width: documentScene.width,
-        height: documentScene.height,
-        outputBounds: documentScene.outputBounds,
-        nodes: documentScene.nodes.filter(
-          (candidate) => !hiddenNodeIds.has(candidate.id),
-        ),
-      }),
-    )
-    rendererSceneReady = true
-  }
-  function renderCommittedSceneForGesture(): void {
-    if (renderer && rendererSceneReady) {
-      setCommittedScene(renderer)
-      renderer.render(['scene'])
-    }
-    if (componentMounted) invalidateOverlay()
-  }
-  function invalidateGesturePreview(): void {
-    if (gesturePreviewLayer()?.kind === 'loupe') {
-      renderCommittedSceneForGesture()
-      return
-    }
-    invalidateOverlay()
-  }
-  async function drawDocument(): Promise<void> {
-    const revision = ++drawRevision
-    let readyDocumentId: string | undefined
-    const bounds = viewportOutputBounds.value
-    if (!scene.value || !props.canvas || !bounds) return
-    rendererError.value = undefined
-    scene.value.width = Math.max(1, Math.round(bounds.width))
-    scene.value.height = Math.max(1, Math.round(bounds.height))
-    if (overlay.value) {
-      overlay.value.width = Math.max(1, Math.round(bounds.width))
-      overlay.value.height = Math.max(1, Math.round(bounds.height))
-    }
-    const layer = props.imageLayer
-    if (!props.document) {
-      const context = scene.value.getContext('2d')
-      context?.clearRect(0, 0, scene.value.width, scene.value.height)
-      invalidateOverlay()
-      return
-    }
-    try {
-      const runtime = await ensureRenderer()
-      if (!runtime || !componentMounted || revision !== drawRevision) return
-      const imageInputs = new Map<string, HTMLImageElement>([
-        ...(layer && props.image
-          ? ([[layer.payload.blobHash, props.image]] as const)
-          : []),
-        ...(props.textureImages ?? new Map()),
-      ])
-      for (const [id, image] of imageInputs) {
-        const key = `${id}:${image.currentSrc || image.src}`
-        if (imageResources.get(id)?.key === key) continue
-        imageResources.get(id)?.resource.dispose()
-        const resource = await runtime.createImageResource({
-          id,
-          width: image.naturalWidth,
-          height: image.naturalHeight,
-          source: image,
-        })
-        if (!componentMounted || revision !== drawRevision) {
-          resource.dispose()
-          return
-        }
-        imageResources.set(id, { key, resource })
-      }
-      for (const [id, resource] of imageResources) {
-        if (imageInputs.has(id)) continue
-        resource.resource.dispose()
-        imageResources.delete(id)
-      }
-      setCommittedScene(runtime)
-      runtime.render(['scene'])
-      readyDocumentId = props.document.id
-    } catch (error) {
-      if (revision !== drawRevision) return
-      renderer?.dispose()
-      renderer = undefined
-      rendererSceneReady = false
-      imageResources = new Map()
-      rendererError.value =
-        error instanceof Error ? error.message : String(error)
-    }
-    if (componentMounted && revision === drawRevision) {
-      invalidateOverlay()
-      if (readyDocumentId) emit('frameReady', readyDocumentId)
     }
   }
   function fitCanvas(): void {
@@ -1403,17 +1261,15 @@ export function useCanvasWorkspace(
     const context = overlay.value.getContext('2d')
     if (!context || typeof context.clearRect !== 'function') return
     const previewNodes = gesturePreviewNodes()
-    if (renderer && rendererSceneReady) {
-      renderer.setOverlay(previewNodes)
-      renderer.render(['overlay'])
-    } else {
+    const renderedByBackend = rendererController.renderOverlay(previewNodes)
+    if (!renderedByBackend) {
       context.setTransform?.(1, 0, 0, 1, 0, 0)
       context.clearRect(0, 0, overlay.value.width, overlay.value.height)
     }
     // Overlay primitives are expressed in document canvas coordinates even
     // though the visible bitmap is output-local after a committed crop.
     context.setTransform?.(1, 0, 0, 1, -outputBounds.x, -outputBounds.y)
-    if (!renderer) drawNodes2D(context, previewNodes)
+    if (!renderedByBackend) drawNodes2D(context, previewNodes)
     drawDraft(context)
     drawCalloutDraft(context)
     drawPrecisionDraft(context)
@@ -1627,7 +1483,7 @@ export function useCanvasWorkspace(
     updateTransientArrowToolbarLayout()
   }
   onMounted(() => {
-    componentMounted = true
+    rendererController.mount()
     if (scene.value && overlay.value && scrollContainer.value)
       emit('hostsReady', {
         scene: scene.value,
@@ -3382,15 +3238,9 @@ export function useCanvasWorkspace(
   })
   onBeforeUnmount(() => {
     hideEyedropperPreview()
-    componentMounted = false
-    drawRevision += 1
     resizeObserver?.disconnect()
     resizeObserver = undefined
-    for (const { resource } of imageResources.values()) resource.dispose()
-    imageResources.clear()
-    renderer?.dispose()
-    renderer = undefined
-    rendererSceneReady = false
+    rendererController.dispose()
     window.removeEventListener('keydown', onWindowKeydown)
     window.removeEventListener('keyup', onWindowKeyup)
     window.removeEventListener('blur', onWindowBlur)
