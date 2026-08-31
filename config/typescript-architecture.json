@@ -51,17 +51,6 @@
       "reason": "crop, precision and eyedropper scenarios are still co-located"
     }
   ],
-  "temporaryTauriImports": [
-    {
-      "path": "apps/desktop/src/e2e-harness-query.ts",
-      "removeBy": "desktop",
-      "reason": "harness query still reads the current WebView label directly"
-    },
-    {
-      "path": "apps/desktop/src/test-harness.ts",
-      "removeBy": "desktop",
-      "reason": "test-only WebDriver adapter is awaiting platform isolation"
-    }
-  ],
+  "temporaryTauriImports": [],
   "temporaryStructureExceptions": []
 }
