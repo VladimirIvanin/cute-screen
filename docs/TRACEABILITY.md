@@ -30,6 +30,9 @@ Pointer move остаётся imperative/transient path: он не создаё�
 ровно один command. Quick `selecting → editing` сохраняет те же scene/overlay
 canvas hosts. Перемещение или дробление тестов не является новым evidence:
 количество сценариев, project names и stable commands должны сохраниться.
+Фактическая локальная матрица, бюджеты и baseline-сравнение real-Tauri
+зафиксированы в разделе
+[TypeScript/Vue architecture refactor evidence](TESTING.md#typescriptvue-architecture-refactor-evidence-2026-08-31).
 
 ## Rust core refactor gate (2026-08-30)
 
