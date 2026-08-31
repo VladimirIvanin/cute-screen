@@ -1,7 +1,5 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
 import {
-  hitTestDocument,
-  hitTestDocumentAll,
   resizeLayerGeometry,
   snapPoint,
   type EditorDocumentV1,
@@ -9,9 +7,7 @@ import {
   type Transform2D,
   createDrawingLayer,
   updateArrowHandle,
-  createNumberedMarkerLayer,
   updateCalloutHandle,
-  calloutTextLayout,
   type StrokeStyle,
   applyCropSession,
   cancelCropSession,
@@ -23,7 +19,6 @@ import {
   setCropPreset,
   snapRulerEndpoint,
   type CropPreset,
-  type CropSession,
   type RulerAngleGuide,
 } from '@cute-screen/editor-renderer'
 import type {
@@ -66,6 +61,7 @@ import {
   PointerGeometryController,
   calloutTextEditorOrigin,
 } from './pointer-geometry-controller'
+import { handlePointerDown } from './pointer-down-controller'
 
 export function useCanvasWorkspace(
   props: CanvasViewportProps,
@@ -241,6 +237,48 @@ export function useCanvasWorkspace(
   const eyedropperHex = eyedropper.hex
   const eyedropperHint = eyedropper.hint
   const samplingCursor = eyedropper.cursor
+  const pointerDownContext = {
+    props,
+    emit,
+    scene,
+    scrollContainer,
+    isPanning,
+    editingText,
+    crop: cropController,
+    spacePressed: () => spacePressed,
+    cycle: () => cycle,
+    setCycle: (next: NonNullable<typeof cycle>) => {
+      cycle = next
+    },
+    setGesture: (next: NonNullable<CanvasGesture>) => {
+      gesture = next
+    },
+    clearRulerGuide: () => {
+      rulerGuide = undefined
+    },
+    canvasPoint,
+    commitText: () => textEditorController.commit(),
+    samplingCursor,
+    hideEyedropper: hideEyedropperPreview,
+    scheduleEyedropper: scheduleEyedropperPreview,
+    sampleScene,
+    visibleCanvasCenter,
+    selectedLayer,
+    loupeSourceHandle: loupeSourceHandleAtPoint,
+    calloutHandle: calloutHandleAtPoint,
+    arrowHandle: arrowHandleAtPoint,
+    intrinsicEndpoint: intrinsicEndpointAtPoint,
+    resizeHandle: boundsResizeHandleAtPoint,
+    rotationCorner: rotationCornerAtPoint,
+    resizeCursor,
+    setCursor: setDirectCursor,
+    layerBounds,
+    transformPoint,
+    startText: (input: TextEditorStartInput) =>
+      textEditorController.start(input),
+    invalidateOverlay,
+    renderCommittedScene: renderCommittedSceneForGesture,
+  }
   function scheduleEyedropperPreview(
     point: CanvasPoint,
     client?: Readonly<{ clientX: number; clientY: number }>,
@@ -405,9 +443,6 @@ export function useCanvasWorkspace(
   }
   function ensureCropSession() {
     return cropController.ensureSession()
-  }
-  function cropHandleAtPoint(session: CropSession, point: CanvasPoint) {
-    return cropController.handleAtPoint(session, point)
   }
   function drawCropOverlay(
     context: CanvasRenderingContext2D,
@@ -575,368 +610,11 @@ export function useCanvasWorkspace(
     return pointerGeometry.arrowHandle(layer, point)
   }
   function onPointerDown(event: PointerEvent): void {
-    // A canvas click is the direct confirmation gesture for the transient text
-    // editor. Commit it before starting another canvas gesture so the next text
-    // session cannot replace this one while its blur handler is still pending.
-    if (editingText.value) {
-      if (event.button === 0 && !editingText.value.controller.composing) {
-        event.preventDefault()
-        commitTextEditor()
-      }
-      return
-    }
-    const point = canvasPoint(event)
-    if (!point || !scene.value || !props.document) return
-    if (props.sampling) {
-      event.preventDefault()
-      if (event.button > 0) {
-        samplingCursor.value = undefined
-        hideEyedropperPreview()
-        emit('colorSampleCancel')
-        return
-      }
-      samplingCursor.value = point
-      scheduleEyedropperPreview(point, {
-        clientX: event.clientX,
-        clientY: event.clientY,
-      })
-      sampleScene(point)
-      return
-    }
-    const pan =
-      event.button === 1 || props.activeTool === 'hand' || spacePressed
-    if (pan && scrollContainer.value) {
-      event.preventDefault()
-      scene.value.setPointerCapture(event.pointerId)
-      isPanning.value = true
-      gesture = {
-        kind: 'pan',
-        clientX: event.clientX,
-        clientY: event.clientY,
-        scrollLeft: scrollContainer.value.scrollLeft,
-        scrollTop: scrollContainer.value.scrollTop,
-      }
-      return
-    }
-    if (event.button !== 0) return
-    if (props.quickSelectionMode) {
-      event.preventDefault()
-      scene.value.setPointerCapture(event.pointerId)
-      cropController.quickDraft = {
-        x: point.x,
-        y: point.y,
-        width: 1,
-        height: 1,
-      }
-      gesture = { kind: 'quickSelect', start: point, current: point }
-      emit('quickFrameChange', { ...cropController.quickDraft })
-      invalidateOverlay()
-      return
-    }
-    if (props.activeTool === 'crop' || props.quickFrameMode) {
-      const session = ensureCropSession()
-      if (!session) return
-      const handle = cropHandleAtPoint(session, point)
-      const inside =
-        point.x >= session.crop.x &&
-        point.x <= session.crop.x + session.crop.width &&
-        point.y >= session.crop.y &&
-        point.y <= session.crop.y + session.crop.height
-      const tolerance = 7 / ((props.zoom ?? 100) / 100)
-      const nearBorder =
-        inside &&
-        Math.min(
-          Math.abs(point.x - session.crop.x),
-          Math.abs(point.x - session.crop.x - session.crop.width),
-          Math.abs(point.y - session.crop.y),
-          Math.abs(point.y - session.crop.y - session.crop.height),
-        ) <= tolerance
-      if (handle || (props.quickFrameMode ? nearBorder : inside)) {
-        event.preventDefault()
-        scene.value.setPointerCapture(event.pointerId)
-        gesture = {
-          kind: 'crop',
-          action: handle ? 'resize' : 'move',
-          ...(handle ? { handle } : {}),
-          start: point,
-          initial: session,
-        }
-        return
-      }
-      if (props.activeTool === 'crop') return
-    }
-    const selected = selectedLayer()
-    const loupeSource =
-      selected?.kind === 'loupe' && !selected.locked
-        ? loupeSourceHandleAtPoint(selected, point)
-        : false
-    if (selected?.kind === 'loupe' && loupeSource) {
-      event.preventDefault()
-      scene.value.setPointerCapture(event.pointerId)
-      setDirectCursor('crosshair')
-      gesture = {
-        kind: 'loupeSource',
-        id: selected.id,
-        start: point,
-        current: point,
-        initial: selected,
-      }
-      renderCommittedSceneForGesture()
-      return
-    }
-    if (
-      props.activeTool === 'censor' ||
-      props.activeTool === 'spotlight' ||
-      props.activeTool === 'ruler' ||
-      props.activeTool === 'loupe'
-    ) {
-      event.preventDefault()
-      scene.value.setPointerCapture(event.pointerId)
-      gesture = {
-        kind: 'precision',
-        tool: props.activeTool,
-        start: point,
-        current: point,
-        points: [point],
-        guidesHeld: event.altKey,
-      }
-      rulerGuide = undefined
-      invalidateOverlay()
-      return
-    }
-    if (props.activeTool === 'image') {
-      event.preventDefault()
-      const center = visibleCanvasCenter() ?? point
-      emit('requestImageImport', { x: center.x, y: center.y })
-      return
-    }
-    if (props.activeTool === 'numberedMarker') {
-      event.preventDefault()
-      const sequence = props.nextMarkerSequence ?? 1
-      emit(
-        'addLayer',
-        createNumberedMarkerLayer({
-          id: crypto.randomUUID(),
-          sequence,
-          origin: point,
-          shape: props.markerShape ?? 'circle',
-        }),
-      )
-      return
-    }
-    if (props.activeTool === 'callout') {
-      event.preventDefault()
-      scene.value.setPointerCapture(event.pointerId)
-      gesture = {
-        kind: 'calloutDraw',
-        start: point,
-        current: point,
-        constrainAngle: event.shiftKey,
-      }
-      invalidateOverlay()
-      return
-    }
-    if (props.activeTool === 'text') {
-      event.preventDefault()
-      const text = props.document.layers.find(
-        (layer) =>
-          layer.id === hitTestDocument(props.document!, point)?.nodeId &&
-          (layer.kind === 'text' ||
-            layer.kind === 'callout' ||
-            layer.kind === 'numberedMarker'),
-      )
-      if (
-        text?.kind === 'text' ||
-        text?.kind === 'callout' ||
-        text?.kind === 'numberedMarker'
-      ) {
-        const layout =
-          text.kind === 'callout' ? calloutTextLayout(text.payload) : undefined
-        const bounds = layerBounds(text)
-        startTextEditor({
-          origin: layout
-            ? {
-                x: text.transform.translateX + layout.text.x,
-                y: text.transform.translateY + layout.text.y,
-              }
-            : {
-                x: text.transform.translateX + bounds.x,
-                y: text.transform.translateY + bounds.y,
-              },
-          existing: text,
-        })
-      } else {
-        scene.value.setPointerCapture(event.pointerId)
-        gesture = { kind: 'text', start: point, current: point }
-      }
-      return
-    }
-    if (
-      props.activeTool === 'arrow' ||
-      props.activeTool === 'shape' ||
-      props.activeTool === 'pencil' ||
-      props.activeTool === 'marker'
-    ) {
-      event.preventDefault()
-      scene.value.setPointerCapture(event.pointerId)
-      gesture = {
-        kind: 'draw',
-        tool: props.activeTool,
-        start: point,
-        current: point,
-        constrainAngle: event.shiftKey,
-        drawFromCenter: event.altKey,
-        points: [point],
-      }
-      invalidateOverlay()
-      return
-    }
-    const calloutHandle =
-      selected?.kind === 'callout' && !selected.locked
-        ? calloutHandleAtPoint(selected, point)
-        : undefined
-    if (selected && calloutHandle) {
-      scene.value.setPointerCapture(event.pointerId)
-      gesture = {
-        kind: 'calloutHandle',
-        id: selected.id,
-        handle: calloutHandle,
-        start: point,
-        current: point,
-      }
-      renderCommittedSceneForGesture()
-      return
-    }
-    const arrowHandle =
-      selected && !selected.locked
-        ? arrowHandleAtPoint(selected, point)
-        : undefined
-    if (selected && arrowHandle) {
-      scene.value.setPointerCapture(event.pointerId)
-      gesture = {
-        kind: 'arrowHandle',
-        id: selected.id,
-        handle: arrowHandle,
-        start: point,
-        current: point,
-      }
-      renderCommittedSceneForGesture()
-      return
-    }
-    const intrinsicEndpoint =
-      selected && !selected.locked
-        ? intrinsicEndpointAtPoint(selected, point)
-        : undefined
-    if (selected && intrinsicEndpoint) {
-      scene.value.setPointerCapture(event.pointerId)
-      setDirectCursor('crosshair')
-      gesture = {
-        kind: 'intrinsicResize',
-        id: selected.id,
-        handle: intrinsicEndpoint,
-        start: point,
-        current: point,
-        initial: selected,
-        preserveAspect: false,
-        centerResize: false,
-      }
-      renderCommittedSceneForGesture()
-      return
-    }
-    const resizeHandle =
-      selected && !selected.locked
-        ? boundsResizeHandleAtPoint(selected, point)
-        : undefined
-    if (selected && resizeHandle) {
-      scene.value.setPointerCapture(event.pointerId)
-      setDirectCursor(resizeCursor(resizeHandle))
-      if (selected.kind === 'image') {
-        gesture = {
-          kind: 'resize',
-          id: selected.id,
-          handle: resizeHandle,
-          start: point,
-          current: point,
-          initial: selected.transform,
-          freeResize: event.shiftKey,
-          centerResize: event.altKey,
-        }
-      } else {
-        gesture = {
-          kind: 'intrinsicResize',
-          id: selected.id,
-          handle: resizeHandle,
-          start: point,
-          current: point,
-          initial: selected,
-          preserveAspect:
-            event.shiftKey ||
-            selected.kind === 'emoji' ||
-            selected.kind === 'loupe',
-          centerResize: event.altKey,
-        }
-      }
-      renderCommittedSceneForGesture()
-      return
-    }
-    const rotationCorner =
-      selected && !selected.locked
-        ? rotationCornerAtPoint(selected, point)
-        : undefined
-    if (selected && rotationCorner) {
-      scene.value.setPointerCapture(event.pointerId)
-      setDirectCursor('', true)
-      const bounds = layerBounds(selected)
-      const center = transformPoint(selected.transform, {
-        x: bounds.x + bounds.width / 2,
-        y: bounds.y + bounds.height / 2,
-      })
-      const angle = Math.atan2(point.y - center.y, point.x - center.x)
-      gesture = {
-        kind: 'rotate',
-        id: selected.id,
-        center,
-        startAngle: angle,
-        initial: selected.transform,
-        currentAngle: selected.transform.rotation,
-      }
-      renderCommittedSceneForGesture()
-      return
-    }
-    const hits = hitTestDocumentAll(props.document, point)
-    const key = hits.map((hit) => hit.nodeId).join(':')
-    const now = performance.now()
-    const previousCycle = cycle
-    const shouldCycle =
-      event.detail > 1 &&
-      previousCycle !== undefined &&
-      previousCycle.key === key &&
-      now - previousCycle.at <= 1000
-    const index =
-      hits.length === 0
-        ? 0
-        : shouldCycle
-          ? (previousCycle.index + 1) % hits.length
-          : 0
-    cycle = { key, at: now, index }
-    const hit = hits[index] ?? hitTestDocument(props.document, point)
-    if (!hit) return
-    emit('selectLayer', hit.nodeId, event.metaKey || event.ctrlKey)
-    scene.value.setPointerCapture(event.pointerId)
-    gesture = {
-      kind: 'move',
-      id: hit.nodeId,
-      start: point,
-      current: point,
-      guides: [],
-      guidesVisible: false,
-    }
-    renderCommittedSceneForGesture()
+    handlePointerDown(pointerDownContext, event)
   }
   function startTextEditor(input: TextEditorStartInput): void {
     textEditorController.start(input)
   }
-  const commitTextEditor = () => textEditorController.commit()
   const cancelTextEditor = () => textEditorController.cancel()
   const onTextEditorInput = () => textEditorController.input()
   const onTextEditorCompositionStart = () =>
