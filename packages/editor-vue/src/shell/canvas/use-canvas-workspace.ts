@@ -2,23 +2,16 @@ import { computed, nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
 import {
   hitTestDocument,
   hitTestDocumentAll,
-  BOUNDS_RESIZE_HANDLES,
-  layerIntrinsicResizeHandles,
   resizeLayerGeometry,
   snapPoint,
   type EditorDocumentV1,
   type LayerNode,
   type Transform2D,
   createDrawingLayer,
-  arrowSelectionHandles,
   updateArrowHandle,
   createNumberedMarkerLayer,
-  calloutSelectionHandles,
   updateCalloutHandle,
-  calloutMarkerRadius,
   calloutTextLayout,
-  type ArrowHandleKind,
-  type CalloutHandleKind,
   type StrokeStyle,
   applyCropSession,
   cancelCropSession,
@@ -69,6 +62,10 @@ import {
 import { CropController } from './crop-controller'
 import { DraftController } from './draft-controller'
 import { CanvasOverlayController } from './overlay-controller'
+import {
+  PointerGeometryController,
+  calloutTextEditorOrigin,
+} from './pointer-geometry-controller'
 
 export function useCanvasWorkspace(
   props: CanvasViewportProps,
@@ -123,6 +120,16 @@ export function useCanvasWorkspace(
   const geometryController = new CanvasGeometryController({
     props,
     gesture: () => gesture,
+  })
+  const pointerGeometry = new PointerGeometryController({
+    props,
+    scene,
+    outputBounds: viewportOutputBounds,
+    selectedLayer,
+    layerBounds,
+    worldHandlePositions: worldBoundsHandlePositions,
+    transformPoint,
+    loupeSourceCenter,
   })
   const cropController = new CropController({
     props,
@@ -536,191 +543,36 @@ export function useCanvasWorkspace(
     readonly clientY: number
     readonly pressure?: number
     readonly pointerType?: string
-  }): CanvasPoint | undefined {
-    const bounds = viewportOutputBounds.value
-    if (!scene.value || !props.document || !bounds) return undefined
-    const rect = scene.value.getBoundingClientRect()
-    if (rect.width <= 0 || rect.height <= 0) return undefined
-    return {
-      x:
-        bounds.x +
-        ((event.clientX - rect.left) * scene.value.width) / rect.width,
-      y:
-        bounds.y +
-        ((event.clientY - rect.top) * scene.value.height) / rect.height,
-      pressure:
-        event.pointerType === 'pen' &&
-        typeof event.pressure === 'number' &&
-        Number.isFinite(event.pressure)
-          ? Math.max(0, Math.min(1, event.pressure))
-          : 0.5,
-    }
+  }) {
+    return pointerGeometry.canvasPoint(event)
   }
-  function boundsResizeHandleAtPoint(
-    layer: LayerNode,
-    point: CanvasPoint,
-  ): ResizeHandle | undefined {
-    const handles =
-      layer.kind === 'image'
-        ? BOUNDS_RESIZE_HANDLES
-        : layerIntrinsicResizeHandles(layer).filter(
-            (handle): handle is ResizeHandle =>
-              handle !== 'start' && handle !== 'end',
-          )
-    const positions = worldBoundsHandlePositions(layer)
-    const tolerance = 9 / ((props.zoom ?? 100) / 100)
-    for (const handle of handles) {
-      const position = positions[handle]
-      if (Math.hypot(position.x - point.x, position.y - point.y) <= tolerance) {
-        return handle
-      }
-    }
-    return undefined
+  function boundsResizeHandleAtPoint(layer: LayerNode, point: CanvasPoint) {
+    return pointerGeometry.boundsResizeHandle(layer, point)
   }
-  function rotationCornerAtPoint(
-    layer: LayerNode,
-    point: CanvasPoint,
-  ): ResizeHandle | undefined {
-    const positions = worldBoundsHandlePositions(layer)
-    const bounds = layerBounds(layer)
-    const center = transformPoint(layer.transform, {
-      x: bounds.x + bounds.width / 2,
-      y: bounds.y + bounds.height / 2,
-    })
-    const cornerHandles = ['nw', 'ne', 'se', 'sw'] as const
-    const resizeCorners = new Set(
-      (layer.kind === 'image'
-        ? BOUNDS_RESIZE_HANDLES
-        : layerIntrinsicResizeHandles(layer)
-      ).filter((handle) => cornerHandles.includes(handle as never)),
-    )
-    const tolerance = 9 / ((props.zoom ?? 100) / 100)
-    const offset = 14 / ((props.zoom ?? 100) / 100)
-    for (const handle of cornerHandles) {
-      const corner = positions[handle]
-      const length = Math.hypot(corner.x - center.x, corner.y - center.y) || 1
-      const target = resizeCorners.has(handle)
-        ? {
-            x: corner.x + ((corner.x - center.x) / length) * offset,
-            y: corner.y + ((corner.y - center.y) / length) * offset,
-          }
-        : corner
-      if (Math.hypot(target.x - point.x, target.y - point.y) <= tolerance) {
-        return handle
-      }
-    }
-    return undefined
+  function rotationCornerAtPoint(layer: LayerNode, point: CanvasPoint) {
+    return pointerGeometry.rotationCorner(layer, point)
   }
-  function intrinsicEndpointAtPoint(
-    layer: LayerNode,
-    point: CanvasPoint,
-  ): 'start' | 'end' | undefined {
-    if (layer.kind !== 'ruler') return undefined
-    const tolerance = 9 / ((props.zoom ?? 100) / 100)
-    for (const handle of ['start', 'end'] as const) {
-      const candidate = transformPoint(layer.transform, layer.payload[handle])
-      if (
-        Math.hypot(candidate.x - point.x, candidate.y - point.y) <= tolerance
-      ) {
-        return handle
-      }
-    }
-    return undefined
+  function intrinsicEndpointAtPoint(layer: LayerNode, point: CanvasPoint) {
+    return pointerGeometry.intrinsicEndpoint(layer, point)
   }
   function resizeCursor(handle: ResizeHandle): string {
-    if (handle === 'n' || handle === 's') return 'ns-resize'
-    if (handle === 'e' || handle === 'w') return 'ew-resize'
-    return handle === 'nw' || handle === 'se' ? 'nwse-resize' : 'nesw-resize'
+    return pointerGeometry.resizeCursor(handle)
   }
   function setDirectCursor(cursor: string, rotate = false): void {
-    if (!scene.value) return
-    scene.value.classList.toggle('cs-canvas-rotate-cursor', rotate)
-    scene.value.style.cursor = cursor
+    pointerGeometry.setCursor(cursor, rotate)
   }
   function updateHoverCursor(point: CanvasPoint): void {
-    const canvas = scene.value
-    const document = props.document
-    if (props.quickSelectionMode) {
-      setDirectCursor('crosshair')
-      return
-    }
-    if (
-      !canvas ||
-      !document ||
-      props.activeTool === 'hand' ||
-      props.activeTool === 'crop'
-    )
-      return
-    const layer = selectedLayer()
-    if (!layer || layer.locked || !layer.visible) {
-      setDirectCursor('')
-      return
-    }
-    if (
-      calloutHandleAtPoint(layer, point) ||
-      arrowHandleAtPoint(layer, point) ||
-      intrinsicEndpointAtPoint(layer, point) ||
-      loupeSourceHandleAtPoint(layer, point)
-    ) {
-      setDirectCursor('crosshair')
-      return
-    }
-    const resize = boundsResizeHandleAtPoint(layer, point)
-    if (resize) {
-      setDirectCursor(resizeCursor(resize))
-      return
-    }
-    if (rotationCornerAtPoint(layer, point)) {
-      setDirectCursor('', true)
-      return
-    }
-    setDirectCursor(hitTestDocument(document, point) ? 'move' : '')
+    pointerGeometry.updateHoverCursor(point)
   }
-  function calloutHandleAtPoint(
-    layer: LayerNode,
-    point: CanvasPoint,
-  ): CalloutHandleKind | undefined {
-    if (layer.kind !== 'callout') return undefined
-    const tolerance = 9 / ((props.zoom ?? 100) / 100)
-    return calloutSelectionHandles(layer).find(({ point: local }) => {
-      const candidate = transformPoint(layer.transform, local)
-      return (
-        Math.hypot(candidate.x - point.x, candidate.y - point.y) <= tolerance
-      )
-    })?.kind
+  function calloutHandleAtPoint(layer: LayerNode, point: CanvasPoint) {
+    return pointerGeometry.calloutHandle(layer, point)
   }
-  function loupeSourceHandleAtPoint(
-    layer: LayerNode,
-    point: CanvasPoint,
-  ): boolean {
-    if (layer.kind !== 'loupe') return false
-    const source = loupeSourceCenter(layer)
-    const tolerance = 9 / ((props.zoom ?? 100) / 100)
-    return Math.hypot(source.x - point.x, source.y - point.y) <= tolerance
+  function loupeSourceHandleAtPoint(layer: LayerNode, point: CanvasPoint) {
+    return pointerGeometry.loupeSourceHandle(layer, point)
   }
-  function calloutEditorOrigin(
-    label: CanvasPoint,
-    stroke: StrokeStyle,
-    fontSize: number,
-  ): CanvasPoint {
-    const markerRadius = calloutMarkerRadius(stroke.width)
-    return {
-      x: label.x + markerRadius + 6,
-      y: label.y - (fontSize * 1.25) / 2,
-    }
-  }
-  function arrowHandleAtPoint(
-    layer: LayerNode,
-    point: CanvasPoint,
-  ): ArrowHandleKind | undefined {
-    if (layer.kind !== 'arrow') return undefined
-    const tolerance = 9 / ((props.zoom ?? 100) / 100)
-    return arrowSelectionHandles(layer).find(({ point: local }) => {
-      const candidate = transformPoint(layer.transform, local)
-      return (
-        Math.hypot(candidate.x - point.x, candidate.y - point.y) <= tolerance
-      )
-    })?.kind
+  const calloutEditorOrigin = calloutTextEditorOrigin
+  function arrowHandleAtPoint(layer: LayerNode, point: CanvasPoint) {
+    return pointerGeometry.arrowHandle(layer, point)
   }
   function onPointerDown(event: PointerEvent): void {
     // A canvas click is the direct confirmation gesture for the transient text
