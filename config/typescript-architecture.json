@@ -21,12 +21,6 @@
       "reason": "quick-capture composition root awaiting controller extraction"
     },
     {
-      "path": "packages/editor-vue/src/shell/canvas/use-canvas-workspace.ts",
-      "max": 3713,
-      "removeBy": "vue",
-      "reason": "imperative canvas controller is being split into renderer, gesture, overlay and text domains"
-    },
-    {
       "path": "tests/e2e/specs/browser-m06-drawing-tools.e2e.ts",
       "max": 629,
       "removeBy": "tests",
@@ -179,14 +173,6 @@
       "maxDepth": 4,
       "removeBy": "core-cleanup",
       "reason": "ruler factory validation awaits settings parser"
-    },
-    {
-      "path": "packages/editor-vue/src/shell/canvas/use-canvas-workspace.ts",
-      "maxFunctionLines": 3650,
-      "maxComplexity": 1000,
-      "maxDepth": 30,
-      "removeBy": "vue",
-      "reason": "imperative canvas controller awaits domain composable extraction"
     }
   ]
 }
