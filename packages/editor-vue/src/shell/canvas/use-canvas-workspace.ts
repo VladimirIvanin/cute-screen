@@ -1,18 +1,4 @@
-import {
-  computed,
-  markRaw,
-  nextTick,
-  onBeforeUnmount,
-  onMounted,
-  watch,
-} from 'vue'
-import {
-  RichTextEditorController,
-  readRichTextDomSelection,
-  readRichTextProjection,
-  renderRichTextProjection,
-  restoreRichTextDomSelection,
-} from '../../rich-text-editor'
+import { computed, nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
 import {
   createDocumentRenderScene,
   drawNodes2D,
@@ -29,20 +15,15 @@ import {
   createDrawingLayer,
   arrowSelectionHandles,
   updateArrowHandle,
-  createTextLayer,
-  createTextCommitCommand,
   createNumberedMarkerLayer,
-  createCalloutLayer,
   calloutSelectionHandles,
   updateCalloutHandle,
   calloutPathPoints,
   calloutMarkerRadius,
   calloutTextLayout,
   defaultCalloutRoute,
-  rebaseCalloutLayer,
   type ArrowHandleKind,
   type CalloutHandleKind,
-  type RichTextContent,
   type StrokeStyle,
   applyCropSession,
   cancelCropSession,
@@ -80,22 +61,19 @@ import {
   DEFAULT_PRECISION_TOOLS,
   DEFAULT_TEXT_TOOL,
   type CanvasGesture,
-  type EditableTextLayer,
   type ResizeHandle,
 } from './workspace-state'
-import {
-  createFloatingToolbarController,
-  isFloatingToolbarTarget,
-} from './floating-toolbar-controller'
+import { createFloatingToolbarController } from './floating-toolbar-controller'
 import { CanvasRendererController } from './renderer-controller'
 import {
-  copyTextStyle,
   createTextFormattingController,
   cssTextBackground,
   cssTextColor,
-  paragraphStyleFromDefaults,
-  spanStyleFromDefaults,
 } from './text-formatting-controller'
+import {
+  TextEditorController,
+  type TextEditorStartInput,
+} from './text-editor-controller'
 
 export function useCanvasWorkspace(
   props: CanvasViewportProps,
@@ -116,7 +94,6 @@ export function useCanvasWorkspace(
     editingText,
   } = createCanvasWorkspaceState()
   let resizeObserver: ResizeObserver | undefined
-  let textToolbarPointerDown = false
   let lastFitZoom: number | undefined
   let pendingZoomAnchor:
     | {
@@ -170,14 +147,30 @@ export function useCanvasWorkspace(
     layerBounds,
     transformPoint,
   })
-  const { editorTextStyle, emitTextEditing } = createTextFormattingController({
+  const textFormatting = createTextFormattingController({
     props,
     emit,
     editingText,
-    renderProjection: renderTextEditorProjection,
+    renderProjection: () => textEditorController.renderProjection(),
     updateTextToolbarLayout: updateFloatingToolbarLayout,
     updateArrowToolbarLayout: updateFloatingArrowToolbarLayout,
   })
+  const textEditorController = new TextEditorController({
+    props,
+    emit,
+    editingText,
+    floatingToolbarLayout,
+    textEditor,
+    layerBounds,
+    canvasPoint,
+    resolveCalloutStroke,
+    updateToolbarLayout: updateFloatingToolbarLayout,
+    emitEditing: () => textFormatting.emitTextEditing(),
+    recordCycle: (next) => {
+      cycle = next
+    },
+  })
+  const editorTextStyle = textFormatting.editorTextStyle
   const rendererController = new CanvasRendererController({
     props,
     emit,
@@ -1995,376 +1988,29 @@ export function useCanvasWorkspace(
     }
     renderCommittedSceneForGesture()
   }
-  function startTextEditor(input: {
-    readonly origin: CanvasPoint
-    readonly existing?: EditableTextLayer
-    readonly kind?: 'text' | 'callout'
-    readonly width?: number
-    readonly fixedWidth?: boolean
-    readonly calloutDraft?: {
-      readonly target: CanvasPoint
-      readonly label: CanvasPoint
-    }
-    readonly calloutStroke?: StrokeStyle
-  }): void {
-    const bounds = input.existing ? layerBounds(input.existing) : undefined
-    const defaults = copyTextStyle(props.textDefaults ?? DEFAULT_TEXT_TOOL)
-    const fixedWidth =
-      input.fixedWidth ??
-      (input.existing?.kind === 'text'
-        ? input.existing.payload.content.wrap === 'fixedWidth'
-        : false)
-    const existingContent =
-      input.existing?.kind === 'numberedMarker'
-        ? input.existing.payload.label
-        : input.existing?.payload.content
-    const initialContent: RichTextContent =
-      existingContent ??
-      Object.freeze({
-        text: '',
-        wrap: fixedWidth ? ('fixedWidth' as const) : ('autoSize' as const),
-        ...(fixedWidth
-          ? {
-              fixedWidth:
-                input.width ??
-                Math.max(
-                  160,
-                  props.canvas?.width ? props.canvas.width / 3 : 160,
-                ),
-            }
-          : {}),
-        spans: Object.freeze([]),
-        paragraphs: Object.freeze([]),
-      })
-    editingText.value = {
-      id: input.existing?.id ?? crypto.randomUUID(),
-      origin: input.origin,
-      width:
-        input.width ??
-        bounds?.width ??
-        Math.max(160, props.canvas?.width ? props.canvas.width / 3 : 160),
-      fixedWidth,
-      controller: markRaw(
-        new RichTextEditorController(
-          initialContent,
-          {
-            anchor: initialContent.text.length,
-            focus: initialContent.text.length,
-          },
-          {
-            typingStyle: spanStyleFromDefaults(defaults),
-            paragraphStyle: paragraphStyleFromDefaults(defaults),
-          },
-        ),
-      ),
-      background:
-        input.existing?.kind === 'text'
-          ? input.existing.payload.background
-          : input.existing?.kind === 'callout'
-            ? input.existing.payload.background
-            : input.existing?.kind === 'numberedMarker'
-              ? {
-                  color: input.existing.payload.badge.color,
-                  padding: 0,
-                  radius: 0,
-                }
-              : defaults.background,
-      kind: input.existing?.kind ?? input.kind ?? 'text',
-      ...(input.existing === undefined ? {} : { existing: input.existing }),
-      ...(input.calloutDraft === undefined
-        ? {}
-        : { calloutDraft: input.calloutDraft }),
-      ...(input.calloutStroke === undefined
-        ? {}
-        : { calloutStroke: input.calloutStroke }),
-    }
-    emitTextEditing()
-    void nextTick(() => {
-      const editor = textEditor.value
-      if (!editor || !editingText.value) return
-      // The DOM is a short-lived editing projection. The document continues to
-      // store only plain Unicode and typed ranges, never HTML.
-      editor.focus()
-      renderTextEditorProjection()
-      void nextTick(updateFloatingToolbarLayout)
-    })
+  function startTextEditor(input: TextEditorStartInput): void {
+    textEditorController.start(input)
   }
-  function syncTextEditorSelection(): void {
-    const editor = textEditor.value
-    const editing = editingText.value
-    if (!editor || !editing) return
-    editing.controller.setSelection(readRichTextDomSelection(editor))
-    emitTextEditing()
-    void nextTick(updateFloatingToolbarLayout)
-  }
-  function renderTextEditorProjection(): void {
-    const editor = textEditor.value
-    const editing = editingText.value
-    if (!editor || !editing) return
-    renderRichTextProjection(
-      editor,
-      editing.controller.state,
-      (props.zoom ?? 100) / 100,
-    )
-    restoreRichTextDomSelection(editor, editing.controller.state.selection)
-    void nextTick(updateFloatingToolbarLayout)
-  }
-  function readEditorText(): string {
-    const editor = textEditor.value
-    if (!editor) return editingText.value?.controller.state.content.text ?? ''
-    return readRichTextProjection(editor)
-  }
-  function onTextEditorInput(): void {
-    const editing = editingText.value
-    if (!editing) return
-    const editor = textEditor.value
-    if (!editor) return
-    const result = editing.controller.reconcileBrowserText(
-      readEditorText(),
-      readRichTextDomSelection(editor),
-    )
-    if (result === 'applied') renderTextEditorProjection()
-    emitTextEditing()
-  }
-  function onTextEditorCompositionStart(): void {
-    editingText.value?.controller.compositionStart()
-  }
-  function onTextEditorCompositionEnd(): void {
-    const editing = editingText.value
-    const editor = textEditor.value
-    if (!editing || !editor) return
-    editing.controller.compositionEnd(
-      readEditorText(),
-      readRichTextDomSelection(editor),
-    )
-    renderTextEditorProjection()
-    emitTextEditing()
-  }
-  function onTextEditorPaste(event: ClipboardEvent): void {
-    const text = event.clipboardData?.getData('text/plain')
-    if (text === undefined) return
-    event.preventDefault()
-    syncTextEditorSelection()
-    editingText.value?.controller.replaceSelectionPlainText(text)
-    renderTextEditorProjection()
-    emitTextEditing()
-  }
-  function onTextEditorCopy(event: ClipboardEvent): void {
-    const editing = editingText.value
-    if (!editing || !event.clipboardData) return
-    syncTextEditorSelection()
-    event.preventDefault()
-    event.clipboardData.clearData()
-    event.clipboardData.setData(
-      'text/plain',
-      editing.controller.selectedPlainText(),
-    )
-  }
-  function onTextEditorCut(event: ClipboardEvent): void {
-    const editing = editingText.value
-    if (!editing || !event.clipboardData) return
-    onTextEditorCopy(event)
-    editing.controller.replaceSelectionPlainText('')
-    renderTextEditorProjection()
-    emitTextEditing()
-  }
-  function onTextEditorBlur(event: FocusEvent): void {
-    // A toolbar click belongs to the active editing session, not to the canvas.
-    // Capture relatedTarget before Vue updates the toolbar: a formatting change
-    // can replace the focused control before this deferred check runs.
-    const movedIntoToolbar =
-      textToolbarPointerDown || isFloatingToolbarTarget(event.relatedTarget)
-    window.setTimeout(() => {
-      if (!editingText.value) return
-      const active = document.activeElement
-      if (movedIntoToolbar || isFloatingToolbarTarget(active)) {
-        return
-      }
-      commitTextEditor()
-    }, 0)
-  }
-  function onDocumentPointerDown(event: PointerEvent): void {
-    textToolbarPointerDown = isFloatingToolbarTarget(event.target)
-    window.setTimeout(() => {
-      textToolbarPointerDown = false
-    }, 0)
-  }
-  function commitTextEditor(): void {
-    const editing = editingText.value
-    if (!editing || editing.controller.composing) return
-    editingText.value = undefined
-    floatingToolbarLayout.value = undefined
-    emitTextEditing()
-    const content = editing.controller.state.content
-    const style = content.spans[0] ?? editing.controller.state.typingStyle
-    const paragraph =
-      content.paragraphs[0] ?? editing.controller.state.paragraphStyle
-    const existing = editing.existing
-    if (content.text.length === 0) {
-      if (!existing) return
-      const index = props.document?.layers.findIndex(
-        (layer) => layer.id === existing.id,
-      )
-      if (index === undefined || index < 0) return
-      emit(
-        'documentCommand',
-        createTextCommitCommand({ existing, next: null, index }),
-      )
-      return
-    }
-
-    let next: EditableTextLayer | null = null
-    if (existing?.kind === 'numberedMarker') {
-      next = {
-        ...existing,
-        payload: {
-          ...existing.payload,
-          label: content,
-          badge: editing.background
-            ? { ...existing.payload.badge, color: editing.background.color }
-            : existing.payload.badge,
-        },
-      }
-    } else if (existing?.kind === 'callout') {
-      next = rebaseCalloutLayer(existing, {
-        ...existing.payload,
-        content,
-        background: editing.background ?? existing.payload.background,
-      })
-    } else if (editing.kind === 'callout') {
-      const draft = editing.calloutDraft
-      if (!draft) return
-      const layer = createCalloutLayer({
-        id: editing.id,
-        text: content.text,
-        target: draft.target,
-        label: draft.label,
-        fontFamily: style.fontFamily,
-        color: style.color,
-        background: editing.background,
-        stroke: editing.calloutStroke ?? resolveCalloutStroke(),
-      })
-      next = layer ? { ...layer, payload: { ...layer.payload, content } } : null
-    } else {
-      const draft = createTextLayer({
-        id: editing.id,
-        text: content.text,
-        origin: existing
-          ? {
-              x: existing.transform.translateX,
-              y: existing.transform.translateY,
-            }
-          : editing.origin,
-        fontFamily: style.fontFamily,
-        fontSize: style.fontSize,
-        weight: style.weight,
-        italic: style.italic,
-        strikethrough: style.strikethrough,
-        alignment: paragraph.alignment,
-        listKind: paragraph.listKind,
-        ...(editing.fixedWidth ? { fixedWidth: editing.width } : {}),
-        color: style.color,
-        background: editing.background,
-      })
-      if (draft) {
-        next = {
-          ...draft,
-          ...(existing
-            ? { id: existing.id, transform: existing.transform }
-            : {}),
-          payload: { ...draft.payload, content },
-        }
-      }
-    }
-    if (!next) return
-    emit(
-      'documentCommand',
-      createTextCommitCommand(existing ? { existing, next } : { next }),
-    )
-  }
-  function cancelTextEditor(): void {
-    editingText.value = undefined
-    floatingToolbarLayout.value = undefined
-    emitTextEditing()
-    emit('textEditingCancelled', 'escape')
-  }
-  function onTextEditorKeydown(event: KeyboardEvent): void {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      event.stopPropagation()
-      cancelTextEditor()
-      return
-    }
-    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-      event.preventDefault()
-      event.stopPropagation()
-      commitTextEditor()
-      return
-    }
-    if (event.key === 'Enter' || event.key === 'Backspace') {
-      syncTextEditorSelection()
-      if (editingText.value?.controller.keydown(event.key)) {
-        event.preventDefault()
-        event.stopPropagation()
-        renderTextEditorProjection()
-        emitTextEditing()
-      }
-    }
-  }
-  function onTextEditorBeforeInput(event: InputEvent): void {
-    if (editingText.value?.controller.composing) return
-    const key =
-      event.inputType === 'insertParagraph' ||
-      event.inputType === 'insertLineBreak'
-        ? 'Enter'
-        : event.inputType === 'deleteContentBackward'
-          ? 'Backspace'
-          : undefined
-    if (!key) return
-    syncTextEditorSelection()
-    if (editingText.value?.controller.keydown(key)) {
-      event.preventDefault()
-      renderTextEditorProjection()
-      emitTextEditing()
-    }
-  }
-  function onDoubleClick(event: MouseEvent): void {
-    const point = canvasPoint(event)
-    if (!point || !props.document) return
-    const hits = hitTestDocumentAll(props.document, point)
-    const text = props.document.layers.find(
-      (layer) =>
-        layer.id === hits[0]?.nodeId &&
-        (layer.kind === 'text' ||
-          layer.kind === 'callout' ||
-          layer.kind === 'numberedMarker'),
-    )
-    if (
-      text?.kind === 'text' ||
-      text?.kind === 'callout' ||
-      text?.kind === 'numberedMarker'
-    ) {
-      event.preventDefault()
-      const bounds = layerBounds(text)
-      startTextEditor({
-        origin: {
-          x: text.transform.translateX + bounds.x,
-          y: text.transform.translateY + bounds.y,
-        },
-        existing: text,
-        kind: 'text',
-      })
-      return
-    }
-    if (hits.length < 2) return
-    const key = hits.map((hit) => hit.nodeId).join(':')
-    const currentIndex = hits.findIndex(
-      (hit) => hit.nodeId === props.selectedLayerId,
-    )
-    const index = currentIndex < 0 ? 0 : (currentIndex + 1) % hits.length
-    cycle = { key, at: performance.now(), index }
-    emit('selectLayer', hits[index]!.nodeId, event.metaKey || event.ctrlKey)
-  }
+  const commitTextEditor = () => textEditorController.commit()
+  const cancelTextEditor = () => textEditorController.cancel()
+  const onTextEditorInput = () => textEditorController.input()
+  const onTextEditorCompositionStart = () =>
+    textEditorController.compositionStart()
+  const onTextEditorCompositionEnd = () => textEditorController.compositionEnd()
+  const onTextEditorPaste = (event: ClipboardEvent) =>
+    textEditorController.paste(event)
+  const onTextEditorCopy = (event: ClipboardEvent) =>
+    textEditorController.copy(event)
+  const onTextEditorCut = (event: ClipboardEvent) =>
+    textEditorController.cut(event)
+  const onTextEditorBlur = (event: FocusEvent) =>
+    textEditorController.blur(event)
+  const onTextEditorKeydown = (event: KeyboardEvent) =>
+    textEditorController.keydown(event)
+  const onTextEditorBeforeInput = (event: InputEvent) =>
+    textEditorController.beforeInput(event)
+  const onDoubleClick = (event: MouseEvent) =>
+    textEditorController.doubleClick(event)
   function onPointerMove(event: PointerEvent): void {
     const point = canvasPoint(event)
     if (!point) return
@@ -3057,19 +2703,10 @@ export function useCanvasWorkspace(
     rulerGuide = undefined
     cancelGesture()
   }
-  function onDocumentSelectionChange(): void {
-    const editor = textEditor.value
-    const selection = window.getSelection()
-    if (
-      editor &&
-      selection?.anchorNode &&
-      selection.focusNode &&
-      editor.contains(selection.anchorNode) &&
-      editor.contains(selection.focusNode)
-    ) {
-      syncTextEditorSelection()
-    }
-  }
+  const onDocumentPointerDown = (event: PointerEvent) =>
+    textEditorController.documentPointerDown(event)
+  const onDocumentSelectionChange = () =>
+    textEditorController.documentSelectionChange()
   onMounted(() => {
     window.addEventListener('keydown', onWindowKeydown)
     window.addEventListener('keyup', onWindowKeyup)
