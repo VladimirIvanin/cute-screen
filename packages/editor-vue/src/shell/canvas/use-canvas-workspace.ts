@@ -1,12 +1,8 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
 import {
-  resizeLayerGeometry,
   type EditorDocumentV1,
   type LayerNode,
   type Transform2D,
-  createDrawingLayer,
-  updateArrowHandle,
-  updateCalloutHandle,
   type StrokeStyle,
   applyCropSession,
   cancelCropSession,
@@ -31,7 +27,6 @@ import {
 import {
   createCanvasWorkspaceState,
   DEFAULT_PRECISION_TOOLS,
-  DEFAULT_TEXT_TOOL,
   type CanvasGesture,
   type ResizeHandle,
 } from './workspace-state'
@@ -54,12 +49,13 @@ import {
 import { CropController } from './crop-controller'
 import { DraftController } from './draft-controller'
 import { CanvasOverlayController } from './overlay-controller'
-import {
-  PointerGeometryController,
-  calloutTextEditorOrigin,
-} from './pointer-geometry-controller'
+import { PointerGeometryController } from './pointer-geometry-controller'
 import { handlePointerDown } from './pointer-down-controller'
 import { handlePointerMove } from './pointer-move-controller'
+import {
+  cancelCanvasGesture,
+  finishCanvasGesture,
+} from './gesture-finish-controller'
 
 export function useCanvasWorkspace(
   props: CanvasViewportProps,
@@ -297,6 +293,32 @@ export function useCanvasWorkspace(
     invalidateOverlay,
     invalidateGesturePreview,
     renderCommittedScene: renderCommittedSceneForGesture,
+  }
+  const gestureFinishContext = {
+    props,
+    emit,
+    scene,
+    isPanning,
+    crop: cropController,
+    gesture: () => gesture,
+    clearGesture: () => {
+      gesture = undefined
+    },
+    clearRulerGuide: () => {
+      rulerGuide = undefined
+    },
+    precisionLayer: (id: string) => precisionDraftLayer(id),
+    samplingError,
+    resizeTransform,
+    toLocal,
+    moveLoupeSource: moveLoupeSourceMarker,
+    resolveCalloutStroke,
+    startText: startTextEditor,
+    canvasPoint,
+    updateHoverCursor,
+    invalidateOverlay,
+    renderCommittedScene: renderCommittedSceneForGesture,
+    updateArrowToolbar: updateFloatingArrowToolbarLayout,
   }
   function scheduleEyedropperPreview(
     point: CanvasPoint,
@@ -624,7 +646,6 @@ export function useCanvasWorkspace(
   function loupeSourceHandleAtPoint(layer: LayerNode, point: CanvasPoint) {
     return pointerGeometry.loupeSourceHandle(layer, point)
   }
-  const calloutEditorOrigin = calloutTextEditorOrigin
   function arrowHandleAtPoint(layer: LayerNode, point: CanvasPoint) {
     return pointerGeometry.arrowHandle(layer, point)
   }
@@ -657,294 +678,10 @@ export function useCanvasWorkspace(
     handlePointerMove(pointerMoveContext, event)
   }
   function finishGesture(event: PointerEvent): void {
-    const completed = gesture
-    let completedPrecisionLayer: LayerNode | undefined
-    if (completed?.kind === 'precision') {
-      try {
-        completedPrecisionLayer = precisionDraftLayer(crypto.randomUUID())
-      } catch (error) {
-        emit(
-          'toolError',
-          error instanceof Error
-            ? error.message
-            : samplingError(
-                'The tool gesture could not be created',
-                'Не удалось создать элемент',
-              ),
-        )
-      }
-    }
-    gesture = undefined
-    isPanning.value = false
-    rulerGuide = undefined
-    if (scene.value?.hasPointerCapture(event.pointerId)) {
-      scene.value.releasePointerCapture(event.pointerId)
-    }
-    if (completed?.kind === 'move') {
-      const deltaX = completed.current.x - completed.start.x
-      const deltaY = completed.current.y - completed.start.y
-      if (deltaX !== 0 || deltaY !== 0) {
-        emit('moveLayer', completed.id, deltaX, deltaY)
-      }
-    }
-    if (
-      completed?.kind === 'crop' &&
-      cropController.session &&
-      props.quickFrameMode
-    ) {
-      const before = completed.initial.crop
-      const after = cropController.session.crop
-      if (
-        before.x !== after.x ||
-        before.y !== after.y ||
-        before.width !== after.width ||
-        before.height !== after.height
-      ) {
-        emit('documentCommand', applyCropSession(cropController.session))
-      }
-    }
-    if (
-      completed?.kind === 'quickSelect' &&
-      cropController.quickDraft &&
-      completed.current.x !== completed.start.x &&
-      completed.current.y !== completed.start.y
-    ) {
-      const crop = { ...cropController.quickDraft }
-      emit('documentCommand', {
-        type: 'setCrop',
-        before: null,
-        after: crop,
-      })
-      emit('quickSelectionComplete', crop)
-    } else if (completed?.kind === 'quickSelect') {
-      cropController.quickDraft = undefined
-      invalidateOverlay()
-    }
-    if (completed?.kind === 'resize') {
-      const layer = props.document?.layers.find(
-        (candidate) => candidate.id === completed.id,
-      )
-      if (
-        layer &&
-        (completed.current.x !== completed.start.x ||
-          completed.current.y !== completed.start.y)
-      ) {
-        const transform = resizeTransform(
-          layer,
-          completed.handle,
-          completed.current,
-          completed.freeResize,
-          completed.centerResize,
-        )
-        emit('transformLayer', completed.id, transform)
-      }
-    }
-    if (
-      completed?.kind === 'intrinsicResize' &&
-      (completed.current.x !== completed.start.x ||
-        completed.current.y !== completed.start.y)
-    ) {
-      try {
-        const after = resizeLayerGeometry(
-          completed.initial,
-          completed.handle,
-          completed.current,
-          {
-            preserveAspect: completed.preserveAspect,
-            fromCenter: completed.centerResize,
-            ...(props.document === undefined
-              ? {}
-              : { canvas: props.document.canvas }),
-          },
-        )
-        if (JSON.stringify(after) !== JSON.stringify(completed.initial)) {
-          emit('documentCommand', {
-            type: 'updateLayer',
-            before: completed.initial,
-            after,
-          })
-        }
-      } catch (error) {
-        emit(
-          'toolError',
-          error instanceof Error
-            ? error.message
-            : samplingError(
-                'The layer geometry could not be resized',
-                'Не удалось изменить геометрию слоя',
-              ),
-        )
-      }
-    }
-    if (
-      completed?.kind === 'rotate' &&
-      completed.currentAngle !== completed.initial.rotation
-    ) {
-      emit('transformLayer', completed.id, {
-        ...completed.initial,
-        rotation: completed.currentAngle,
-      })
-    }
-    if (completed?.kind === 'arrowHandle') {
-      const layer = props.document?.layers.find(
-        (candidate) => candidate.id === completed.id,
-      )
-      if (
-        layer?.kind === 'arrow' &&
-        (completed.current.x !== completed.start.x ||
-          completed.current.y !== completed.start.y)
-      ) {
-        const after = updateArrowHandle(
-          layer,
-          completed.handle,
-          toLocal(layer, completed.current),
-        )
-        emit('documentCommand', {
-          type: 'updateLayer',
-          before: layer,
-          after,
-        })
-      }
-    }
-    if (completed?.kind === 'calloutHandle') {
-      const layer = props.document?.layers.find(
-        (candidate) => candidate.id === completed.id,
-      )
-      if (
-        layer?.kind === 'callout' &&
-        (completed.current.x !== completed.start.x ||
-          completed.current.y !== completed.start.y)
-      ) {
-        const after = updateCalloutHandle(
-          layer,
-          completed.handle,
-          toLocal(layer, completed.current),
-        )
-        emit('documentCommand', {
-          type: 'updateLayer',
-          before: layer,
-          after,
-        })
-      }
-    }
-    if (
-      completed?.kind === 'loupeSource' &&
-      (completed.current.x !== completed.start.x ||
-        completed.current.y !== completed.start.y)
-    ) {
-      const after = moveLoupeSourceMarker(completed.initial, completed.current)
-      if (JSON.stringify(after) !== JSON.stringify(completed.initial)) {
-        emit('documentCommand', {
-          type: 'updateLayer',
-          before: completed.initial,
-          after,
-        })
-      }
-    }
-    if (completed?.kind === 'calloutDraw') {
-      if (
-        completed.start.x !== completed.current.x ||
-        completed.start.y !== completed.current.y
-      ) {
-        const stroke = resolveCalloutStroke()
-        startTextEditor({
-          origin: calloutEditorOrigin(
-            completed.current,
-            stroke,
-            props.textDefaults?.fontSize ?? DEFAULT_TEXT_TOOL.fontSize,
-          ),
-          kind: 'callout',
-          calloutDraft: {
-            target: completed.start,
-            label: completed.current,
-          },
-          calloutStroke: stroke,
-        })
-      }
-    }
-    if (completed?.kind === 'draw') {
-      const layer = createDrawingLayer({
-        id: crypto.randomUUID(),
-        tool: completed.tool,
-        start: completed.start,
-        end: completed.current,
-        ...(props.drawingDefaults === undefined
-          ? {}
-          : { defaults: props.drawingDefaults }),
-        constrainAngle: completed.constrainAngle,
-        drawFromCenter: completed.drawFromCenter,
-        points: completed.points,
-      })
-      if (layer) emit('addLayer', layer)
-    }
-    if (completed?.kind === 'precision' && completedPrecisionLayer) {
-      emit(
-        'addLayer',
-        completedPrecisionLayer,
-        completedPrecisionLayer.kind === 'loupe',
-      )
-    }
-    if (completed?.kind === 'text') {
-      const width = Math.abs(completed.current.x - completed.start.x)
-      const fixedWidth = width >= 4
-      startTextEditor({
-        origin: fixedWidth
-          ? {
-              x: Math.min(completed.start.x, completed.current.x),
-              y: Math.min(completed.start.y, completed.current.y),
-            }
-          : completed.start,
-        ...(fixedWidth ? { width, fixedWidth: true } : {}),
-      })
-    }
-    invalidateOverlay()
-    const hoverPoint = canvasPoint(event)
-    if (hoverPoint) updateHoverCursor(hoverPoint)
-    if (
-      completed?.kind === 'move' ||
-      completed?.kind === 'resize' ||
-      completed?.kind === 'intrinsicResize' ||
-      completed?.kind === 'rotate' ||
-      completed?.kind === 'arrowHandle' ||
-      completed?.kind === 'calloutHandle' ||
-      completed?.kind === 'loupeSource'
-    ) {
-      void nextTick(() => {
-        renderCommittedSceneForGesture()
-        updateFloatingArrowToolbarLayout()
-      })
-    }
+    finishCanvasGesture(gestureFinishContext, event)
   }
   function cancelGesture(event?: PointerEvent): void {
-    const cancelledCrop = gesture?.kind === 'crop' ? gesture.initial : undefined
-    const cancelledQuickSelection = gesture?.kind === 'quickSelect'
-    const restoreCommittedScene =
-      gesture?.kind === 'move' ||
-      gesture?.kind === 'resize' ||
-      gesture?.kind === 'intrinsicResize' ||
-      gesture?.kind === 'rotate' ||
-      gesture?.kind === 'arrowHandle' ||
-      gesture?.kind === 'calloutHandle' ||
-      gesture?.kind === 'loupeSource'
-    gesture = undefined
-    isPanning.value = false
-    if (cancelledCrop) cropController.session = cancelledCrop
-    if (cancelledQuickSelection) cropController.quickDraft = undefined
-    rulerGuide = undefined
-    if (event && scene.value?.hasPointerCapture(event.pointerId)) {
-      scene.value.releasePointerCapture(event.pointerId)
-    }
-    if (event) {
-      const hoverPoint = canvasPoint(event)
-      if (hoverPoint) updateHoverCursor(hoverPoint)
-    }
-    invalidateOverlay()
-    if (restoreCommittedScene) {
-      void nextTick(() => {
-        renderCommittedSceneForGesture()
-        updateFloatingArrowToolbarLayout()
-      })
-    }
+    cancelCanvasGesture(gestureFinishContext, event)
   }
   function onWheel(event: WheelEvent): void {
     if (!event.ctrlKey && !event.metaKey) return
