@@ -13,7 +13,6 @@ import {
   DocumentSessionController,
   EditorShell,
   loadImageWithBinaryFallback,
-  materializeQuickCaptureDocument,
   type CanvasViewportHosts,
   type QuickCaptureDraftV1,
   type ShellDocumentState,
@@ -24,11 +23,14 @@ import {
   normalizeQuickCaptureSelection,
 } from './quick-capture-actions'
 import {
-  computeQuickCaptureLayout,
   presentThenWaitForStableQuickCaptureLayout,
   type QuickRect,
 } from './quick-capture-layout'
 import { useQuickCaptureCoordinator } from './use-quick-capture-coordinator'
+import { QuickCaptureLayoutController } from './quick-capture-layout-controller'
+import { QuickCaptureCommitController } from './quick-capture-commit-controller'
+import { QuickCaptureActionController } from './quick-capture-action-controller'
+import { listenQuickCaptureAvailable } from './platform/tauri/quick-capture-events'
 
 const draft = shallowRef<QuickCaptureDraftV1>()
 const session = shallowRef<DocumentSessionController>()
@@ -62,6 +64,31 @@ const labels = russian
       portalLimit: 'The frame can only be reduced inside the portal fragment',
     }
 const currentCrop = ref({ x: 0, y: 0, width: 0, height: 0 })
+const layoutController = new QuickCaptureLayoutController({
+  hosts,
+  session,
+  currentCrop,
+})
+const commitController = new QuickCaptureCommitController({
+  draft,
+  session,
+  hosts,
+  currentCrop,
+  materialized,
+  selectionPending,
+  coordinator,
+})
+const actionController = new QuickCaptureActionController({
+  hosts,
+  draft,
+  pending,
+  error,
+  materialized,
+  selectionPending,
+  coordinator,
+  commit: commitController,
+  dismissWindow,
+})
 let unsubscribeSession: (() => void) | undefined
 let unsubscribeQuickCaptureAvailable: (() => void) | undefined
 let sceneElement: HTMLCanvasElement | undefined
@@ -77,101 +104,12 @@ function onHostsReady(value: CanvasViewportHosts): void {
   requestAnimationFrame(() => updateQuickLayout())
 }
 
-function updateQuickLayout(
-  crop: QuickRect = currentCrop.value,
-): string | undefined {
-  if (!hosts.value || crop.width <= 0 || crop.height <= 0) return undefined
-  const bounds = hosts.value.scene.getBoundingClientRect()
-  const sourceWidth = session.value?.snapshot.core.document.canvas.width ?? 1
-  const sourceHeight = session.value?.snapshot.core.document.canvas.height ?? 1
-  const quickRoot = document.querySelector<HTMLElement>('.cs-quick-capture')
-  const actions = quickRoot?.querySelector<HTMLElement>('.cs-quick-actions')
-  const toolRow = quickRoot?.querySelector<HTMLElement>(
-    '.cs-quick-toolrail-group',
-  )
-  const context = quickRoot?.querySelector<HTMLElement>('.cs-context-toolbar')
-  if (
-    !actions ||
-    !toolRow ||
-    bounds.width <= 0 ||
-    bounds.height <= 0 ||
-    actions.offsetWidth <= 0 ||
-    actions.offsetHeight <= 0 ||
-    toolRow.offsetWidth <= 0 ||
-    toolRow.offsetHeight <= 0
-  )
-    return undefined
-  const contextHeight = context?.offsetHeight ?? 0
-  const verticalGap = context ? 6 : 0
-  const groupHeight = contextHeight + verticalGap + toolRow.offsetHeight
-  const groupWidth = Math.max(toolRow.offsetWidth, context?.offsetWidth ?? 0)
-  const layout = computeQuickCaptureLayout({
-    viewport: { width: window.innerWidth, height: window.innerHeight },
-    scene: {
-      left: bounds.left,
-      top: bounds.top,
-      width: bounds.width,
-      height: bounds.height,
-    },
-    source: { width: sourceWidth, height: sourceHeight },
-    crop,
-    actionSize: {
-      width: actions.offsetWidth,
-      height: actions.offsetHeight,
-    },
-    toolSize: {
-      width: groupWidth,
-      height: groupHeight,
-    },
-  })
-  actions.style.left = `${Math.round(layout.actions.left)}px`
-  actions.style.right = 'auto'
-  actions.style.top = `${Math.round(layout.actions.top)}px`
-  actions.style.transform = 'none'
-  actions.dataset.placement = layout.actions.side
-  if (context) {
-    context.style.left = `${Math.round(layout.tools.left)}px`
-    context.style.top = `${Math.round(layout.tools.top)}px`
-    context.style.bottom = 'auto'
-    context.style.transform = 'none'
-  }
-  toolRow.style.left = `${Math.round(layout.tools.left)}px`
-  toolRow.style.top = `${Math.round(layout.tools.top + contextHeight + verticalGap)}px`
-  toolRow.style.bottom = 'auto'
-  toolRow.style.transform = 'none'
-  toolRow.dataset.placement = layout.tools.side
-  return [
-    window.innerWidth,
-    window.innerHeight,
-    bounds.left,
-    bounds.top,
-    bounds.width,
-    bounds.height,
-    sourceWidth,
-    sourceHeight,
-    crop.x,
-    crop.y,
-    crop.width,
-    crop.height,
-    actions.offsetWidth,
-    actions.offsetHeight,
-    groupWidth,
-    groupHeight,
-  ].join(':')
+function updateQuickLayout(crop: QuickRect = currentCrop.value) {
+  return layoutController.update(crop)
 }
 
 function nextLayoutFrame(): Promise<void> {
-  return new Promise((resolve) => {
-    let settled = false
-    const finish = (): void => {
-      if (settled) return
-      settled = true
-      window.clearTimeout(timeout)
-      resolve()
-    }
-    const timeout = window.setTimeout(finish, 32)
-    requestAnimationFrame(finish)
-  })
+  return layoutController.nextFrame()
 }
 
 function onQuickFrameChange(crop: QuickRect): void {
@@ -428,203 +366,17 @@ function recordPreparationError(cause: unknown): void {
 }
 
 async function initializeQuickCaptureWindow(): Promise<void> {
-  const { listen } = await import('@tauri-apps/api/event')
-  unsubscribeQuickCaptureAvailable = await listen(
-    'cute-screen:quick-capture-available',
+  unsubscribeQuickCaptureAvailable = await listenQuickCaptureAvailable(
     () => void prepareActiveDraft().catch(recordPreparationError),
   )
   await prepareActiveDraft()
 }
 
-function hexDigest(bytes: ArrayBuffer): string {
-  return Array.from(new Uint8Array(bytes), (value) =>
-    value.toString(16).padStart(2, '0'),
-  ).join('')
-}
-
-function physicalSelection(): QuickRect {
-  if (!draft.value) throw new Error('Quick capture draft is not ready')
-  if (selectionPending.value)
-    throw new Error('Quick capture selection is not confirmed')
-  return normalizeQuickCaptureSelection(currentCrop.value, {
-    width: draft.value.width,
-    height: draft.value.height,
-  })
-}
-
-async function commit(
-  completion: 'copied' | 'saved' | 'editor',
-  preparedPng?: Uint8Array,
-  preparedSelection?: QuickRect,
-): Promise<void> {
-  if (materialized.value) return
-  if (!draft.value || !session.value) return
-  const selection = preparedSelection ?? physicalSelection()
-  const png = preparedPng ?? (await resultPng(selection))
-  const sourceHash = hexDigest(
-    await crypto.subtle.digest('SHA-256', Uint8Array.from(png).buffer),
-  )
-  const materializedDocument = materializeQuickCaptureDocument(
-    { ...session.value.snapshot.core.document, crop: selection },
-    {
-      source: {
-        blobHash: sourceHash,
-        format: 'png',
-        mimeType: 'image/png',
-        width: selection.width,
-        height: selection.height,
-        orientationApplied: true,
-        provenance: 'capture',
-        color: { colorSpace: 'srgb', hasIccProfile: false },
-      },
-      updatedAt: new Date().toISOString(),
-    },
-  )
-  await coordinator.commit(
-    draft.value.draftId,
-    png,
-    JSON.stringify(materializedDocument),
-    completion,
-    selection,
-  )
-  materialized.value = true
-}
-
-async function detectMaterializedAfterError(): Promise<void> {
-  if (!draft.value || materialized.value) return
-  try {
-    materialized.value =
-      (await tauriDesktopBridge.quickCaptureGetActive()) === null
-  } catch (diagnosticError) {
-    console.warn('Quick capture materialization probe failed', {
-      draftId: draft.value.draftId,
-      diagnosticError,
-    })
-  }
-}
-
-async function resultPng(
-  selection: QuickRect = physicalSelection(),
-): Promise<Uint8Array> {
-  if (!hosts.value) throw new Error('Rendered capture is not ready')
-  const source = hosts.value.scene
-  const output = document.createElement('canvas')
-  output.width = selection.width
-  output.height = selection.height
-  const context = output.getContext('2d')
-  if (!context) throw new Error('PNG canvas is unavailable')
-  context.drawImage(
-    source,
-    selection.x,
-    selection.y,
-    selection.width,
-    selection.height,
-    0,
-    0,
-    selection.width,
-    selection.height,
-  )
-  const blob = await new Promise<Blob>((resolve, reject) =>
-    output.toBlob(
-      (value) =>
-        value ? resolve(value) : reject(new Error('PNG encoding failed')),
-      'image/png',
-    ),
-  )
-  return new Uint8Array(await blob.arrayBuffer())
-}
-
-async function copy(): Promise<void> {
-  if (!hosts.value) return
-  pending.value = true
-  error.value = undefined
-  try {
-    const selection = physicalSelection()
-    const png = await resultPng(selection)
-    await commit('copied', png, selection)
-    await tauriDesktopBridge.quickCaptureCopyPng(png)
-    await dismissWindow()
-  } catch (cause) {
-    await detectMaterializedAfterError()
-    error.value = cause instanceof Error ? cause.message : String(cause)
-  } finally {
-    pending.value = false
-  }
-}
-
-async function save(): Promise<void> {
-  if (!hosts.value) return
-  pending.value = true
-  error.value = undefined
-  try {
-    const selection = physicalSelection()
-    const png = await resultPng(selection)
-    const selected = await tauriDesktopBridge.quickCaptureChooseSavePng()
-    if (!selected) return
-    await commit('saved', png, selection)
-    await tauriDesktopBridge.quickCaptureWriteSavePng(png)
-    await dismissWindow()
-  } catch (cause) {
-    await detectMaterializedAfterError()
-    error.value = cause instanceof Error ? cause.message : String(cause)
-  } finally {
-    pending.value = false
-  }
-}
-
-async function openEditor(): Promise<void> {
-  pending.value = true
-  error.value = undefined
-  try {
-    if (materialized.value) {
-      await tauriDesktopBridge.quickCaptureOpenEditor()
-    } else {
-      await commit('editor')
-    }
-    await dismissWindow()
-  } catch (cause) {
-    await detectMaterializedAfterError()
-    error.value = cause instanceof Error ? cause.message : String(cause)
-  } finally {
-    pending.value = false
-  }
-}
-
-async function cancel(): Promise<void> {
-  if (pending.value) return
-  pending.value = true
-  error.value = undefined
-  try {
-    await cancelQuickCaptureAction({
-      draftId: draft.value?.draftId,
-      cancelDraft: coordinator.cancel,
-      closeWindow: dismissWindow,
-    })
-  } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : String(cause)
-  } finally {
-    pending.value = false
-  }
-}
-
-function onKeydown(event: KeyboardEvent): void {
-  if (event.defaultPrevented || pending.value) return
-  const target = event.target
-  if (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLTextAreaElement ||
-    (target instanceof HTMLElement && target.isContentEditable)
-  )
-    return
-  if (event.key === 'Enter' && !event.repeat) {
-    if (selectionPending.value) return
-    event.preventDefault()
-    void copy()
-  } else if (event.key === 'Escape' && !event.repeat) {
-    event.preventDefault()
-    void cancel()
-  }
-}
+const copy = () => actionController.copy()
+const save = () => actionController.save()
+const openEditor = () => actionController.openEditor()
+const cancel = () => actionController.cancel()
+const onKeydown = (event: KeyboardEvent) => actionController.keydown(event)
 
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)

@@ -9,12 +9,6 @@
   },
   "temporaryLineExceptions": [
     {
-      "path": "apps/desktop/src/QuickCaptureApp.vue",
-      "max": 674,
-      "removeBy": "desktop",
-      "reason": "quick-capture composition root awaiting controller extraction"
-    },
-    {
       "path": "tests/e2e/specs/browser-m06-drawing-tools.e2e.ts",
       "max": 629,
       "removeBy": "tests",
@@ -58,11 +52,6 @@
     }
   ],
   "temporaryTauriImports": [
-    {
-      "path": "apps/desktop/src/QuickCaptureApp.vue",
-      "removeBy": "desktop",
-      "reason": "quick-capture root still owns native window integration"
-    },
     {
       "path": "apps/desktop/src/e2e-harness-query.ts",
       "removeBy": "desktop",
