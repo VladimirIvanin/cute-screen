@@ -547,6 +547,16 @@ fn clipboard_write_text(text: String, correlation_id: String) -> CommandResult<(
 }
 
 #[tauri::command]
+fn clipboard_write_png(request: tauri::ipc::Request<'_>) -> CommandResult<()> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err(RepositoryError::InvalidImage.into());
+    };
+    storage::inspect_content_image_bytes(bytes)?;
+    clipboard::write_native_png(bytes).map_err(RepositoryError::Io)?;
+    Ok(())
+}
+
+#[tauri::command]
 fn font_catalog_list(correlation_id: String) -> CommandResult<Vec<fonts::SystemFontFace>> {
     let fonts = fonts::list_system_font_faces().map_err(RepositoryError::Io)?;
     let _ = correlation_id;
@@ -2247,6 +2257,7 @@ pub fn run() {
         repository_import_content_image,
         clipboard_read_snapshot,
         clipboard_write_text,
+        clipboard_write_png,
         font_catalog_list,
         clipboard_open_image,
         repository_open_image,
@@ -2295,6 +2306,7 @@ pub fn run() {
         repository_import_content_image,
         clipboard_read_snapshot,
         clipboard_write_text,
+        clipboard_write_png,
         font_catalog_list,
         clipboard_open_image,
         repository_open_image,

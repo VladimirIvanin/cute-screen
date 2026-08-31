@@ -1,10 +1,5 @@
-export interface ClipboardImageWriter {
-  write(items: readonly unknown[]): Promise<void>
-}
-
 export interface ResultClipboardDependencies {
-  readonly clipboard: ClipboardImageWriter
-  readonly createItem: (items: Record<'image/png', Blob>) => unknown
+  readonly writePng: (bytes: Uint8Array) => Promise<void>
 }
 
 function canvasPngBlob(canvas: HTMLCanvasElement): Promise<Blob> {
@@ -28,18 +23,13 @@ function canvasPngBlob(canvas: HTMLCanvasElement): Promise<Blob> {
 }
 
 /**
- * Copies the fully rendered editor scene through the webview's native
+ * Copies the fully rendered editor scene through the desktop host's native
  * clipboard implementation. PNG bytes never travel through Tauri JSON IPC.
  */
 export async function writeResultCanvasToClipboard(
   canvas: HTMLCanvasElement,
-  dependencies: ResultClipboardDependencies = {
-    clipboard: navigator.clipboard,
-    createItem: (items) => new ClipboardItem(items),
-  },
+  dependencies: ResultClipboardDependencies,
 ): Promise<void> {
   const blob = await canvasPngBlob(canvas)
-  await dependencies.clipboard.write([
-    dependencies.createItem({ 'image/png': blob }),
-  ])
+  await dependencies.writePng(new Uint8Array(await blob.arrayBuffer()))
 }

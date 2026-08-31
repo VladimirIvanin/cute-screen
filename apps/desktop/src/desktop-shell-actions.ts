@@ -55,7 +55,10 @@ async function copyRenderedResult(
   const scene = ports.canvasHosts.value?.scene
   if (!scene) throw new Error('The rendered result is not ready')
   if (signal.aborted) throw new ActionCancelledError('Copy cancelled')
-  await writeResultCanvasToClipboard(scene)
+  const { tauriDesktopBridge } = await import('./desktop-bridge')
+  await writeResultCanvasToClipboard(scene, {
+    writePng: tauriDesktopBridge.writeClipboardPng,
+  })
   if (signal.aborted) throw new ActionCancelledError('Copy cancelled')
   return 'Result copied'
 }

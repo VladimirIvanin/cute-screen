@@ -696,9 +696,13 @@ mod tests {
     fn selector_image_rect_is_local_to_each_frozen_display() {
         let desktop = rect(0.0, -900.0, 1440.0, 1800.0);
         let lower = rect(0.0, -900.0, 1440.0, 900.0);
-        let image =
+        let upper = rect(0.0, 0.0, 1440.0, 900.0);
+        let lower_image =
             unsafe { super::cute_selector_image_rect_for_screen(lower, desktop, 2880, 3600) };
-        assert_eq!(image, rect(0.0, 0.0, 2880.0, 3600.0));
+        let upper_image =
+            unsafe { super::cute_selector_image_rect_for_screen(upper, desktop, 2880, 3600) };
+        assert_eq!(lower_image, rect(0.0, 0.0, 2880.0, 1800.0));
+        assert_eq!(upper_image, rect(0.0, 1800.0, 2880.0, 1800.0));
     }
 
     #[test]

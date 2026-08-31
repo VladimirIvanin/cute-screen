@@ -86,6 +86,7 @@ export interface DesktopBridge
   importContentImage(correlationId: string): Promise<TextureImportOutcome>
   readClipboardSnapshot(correlationId: string): Promise<NativeClipboardSnapshot>
   writeClipboardText(text: string, correlationId: string): Promise<void>
+  writeClipboardPng(bytes: Uint8Array): Promise<void>
   listSystemFonts(correlationId: string): Promise<readonly SystemFontFace[]>
   clipboardOpenImage(correlationId: string): Promise<ClipboardOpenImageOutcome>
   repositoryListActiveSeriesFrames(
@@ -215,6 +216,7 @@ export const tauriDesktopBridge: DesktopBridge = {
     }),
   writeClipboardText: (text, correlationId) =>
     invoke<void>('clipboard_write_text', { text, correlationId }),
+  writeClipboardPng: (bytes) => invoke<void>('clipboard_write_png', bytes),
   listSystemFonts: (correlationId) =>
     invoke<readonly SystemFontFace[]>('font_catalog_list', { correlationId }),
   clipboardOpenImage: (correlationId) =>
