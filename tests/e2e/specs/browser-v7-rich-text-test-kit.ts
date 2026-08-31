@@ -94,6 +94,12 @@ export async function setEditorSelection(
     },
     { start, end },
   )
+  await browser.execute(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  )
 }
 
 export async function waitForEditorFocus(): Promise<void> {

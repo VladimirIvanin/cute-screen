@@ -128,7 +128,9 @@ function textToolbar(
     spans.map((span) => span.color),
     defaults.color,
   )
-  const background = snapshot?.background ?? backgroundFor(context, selected)
+  const background = snapshot
+    ? snapshot.background
+    : backgroundFor(context, selected)
   return {
     kind,
     color: snapshot
@@ -138,19 +140,19 @@ function textToolbar(
       : selectedColor
         ? context.hexColor(selectedColor)
         : null,
-    fontFamily:
-      snapshot?.fontFamily ??
-      sameValue(
-        spans.map((span) => span.fontFamily),
-        defaults.fontFamily,
-      ),
+    fontFamily: snapshot
+      ? snapshot.fontFamily
+      : sameValue(
+          spans.map((span) => span.fontFamily),
+          defaults.fontFamily,
+        ),
     fonts: fontFamilies(context, snapshot, spans[0]),
-    fontSize:
-      snapshot?.fontSize ??
-      sameValue(
-        spans.map((span) => span.fontSize),
-        defaults.fontSize,
-      ),
+    fontSize: snapshot
+      ? snapshot.fontSize
+      : sameValue(
+          spans.map((span) => span.fontSize),
+          defaults.fontSize,
+        ),
     bold:
       snapshot?.weight === null
         ? null
@@ -160,30 +162,30 @@ function textToolbar(
               spans.map((span) => span.weight >= 700),
               defaults.weight >= 700,
             ),
-    italic:
-      snapshot?.italic ??
-      sameValue(
-        spans.map((span) => span.italic),
-        defaults.italic,
-      ),
-    strikethrough:
-      snapshot?.strikethrough ??
-      sameValue(
-        spans.map((span) => span.strikethrough),
-        defaults.strikethrough,
-      ),
-    listKind:
-      snapshot?.listKind ??
-      sameValue(
-        paragraphs.map((paragraph) => paragraph.listKind),
-        defaults.listKind,
-      ),
-    alignment:
-      snapshot?.alignment ??
-      sameValue(
-        paragraphs.map((paragraph) => paragraph.alignment),
-        defaults.alignment,
-      ),
+    italic: snapshot
+      ? snapshot.italic
+      : sameValue(
+          spans.map((span) => span.italic),
+          defaults.italic,
+        ),
+    strikethrough: snapshot
+      ? snapshot.strikethrough
+      : sameValue(
+          spans.map((span) => span.strikethrough),
+          defaults.strikethrough,
+        ),
+    listKind: snapshot
+      ? snapshot.listKind
+      : sameValue(
+          paragraphs.map((paragraph) => paragraph.listKind),
+          defaults.listKind,
+        ),
+    alignment: snapshot
+      ? snapshot.alignment
+      : sameValue(
+          paragraphs.map((paragraph) => paragraph.alignment),
+          defaults.alignment,
+        ),
     background: background
       ? {
           color: context.hexColor(background.color),

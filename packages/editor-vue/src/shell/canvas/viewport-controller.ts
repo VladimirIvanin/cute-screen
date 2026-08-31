@@ -39,7 +39,6 @@ export class ViewportController {
   })
 
   readonly #context: ViewportControllerContext
-  #lastFitZoom: number | undefined
   #pendingZoomAnchor: ZoomAnchor | undefined
 
   constructor(context: ViewportControllerContext) {
@@ -66,8 +65,7 @@ export class ViewportController {
       availableHeight / bounds.height,
     )
     const nextZoom = Math.round(scale * 100)
-    if (nextZoom === props.zoom || nextZoom === this.#lastFitZoom) return
-    this.#lastFitZoom = nextZoom
+    if (nextZoom === props.zoom) return
     emit('fitZoom', nextZoom)
   }
 
