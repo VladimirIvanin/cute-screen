@@ -31,7 +31,6 @@ import {
   DEFAULT_RULER_THICKNESS,
   rememberDrawingColor,
   rebaseArrowLayer,
-  rebaseCalloutLayer,
   rebaseRulerLayer,
   type DrawingDefaults,
   type DrawingToolPreferencesV2,
@@ -41,12 +40,6 @@ import {
   type JsonObject,
   type LayerNode,
   type CropPreset,
-  type SrgbColor,
-  type TextBackground,
-  type RichTextParagraphStyle,
-  type RichTextSpanStyle,
-  applyRichTextParagraphStyle,
-  applyRichTextSpanStyle,
   type Transform2D,
 } from '@cute-screen/editor-renderer'
 import CanvasViewport, {
@@ -61,6 +54,7 @@ import { createTextSchema } from '../tools/text-schema'
 import { createContextSchema } from '../tools/context-schema'
 import { createToolCatalog } from '../tools/catalog'
 import { createPrecisionEffects } from '../tools/effects/precision-effects'
+import { createTextEffects } from '../tools/effects/text-effects'
 
 export function useEditorWorkspace(props: ResolvedEditorShellProps) {
   const store = useEditorShellStore()
@@ -91,7 +85,6 @@ export function useEditorWorkspace(props: ResolvedEditorShellProps) {
     background: null,
   })
   const textFormatting = shallowRef<TextFormattingPatch>()
-  let textFormattingRevision = 0
   const textDraft = ref<
     | {
         readonly id: string
@@ -251,6 +244,14 @@ export function useEditorWorkspace(props: ResolvedEditorShellProps) {
       precisionDefaults,
       selectedPrecisionLayer,
     })
+  const { applyV7TextChange, applyCalloutStrokeChange } = createTextEffects({
+    props,
+    store,
+    activeDocument,
+    textDefaults,
+    textFormatting,
+    textDraft,
+  })
   async function onContextAction(id: string): Promise<void> {
     if (id === 'cropReset') {
       cropPreset.value = 'free'
@@ -346,259 +347,6 @@ export function useEditorWorkspace(props: ResolvedEditorShellProps) {
         ),
       )
     }
-  }
-  function parseTextColor(value: string): SrgbColor | undefined {
-    const match = /^#([0-9a-f]{6})$/iu.exec(value)
-    if (!match) return undefined
-    const hex = match[1]!
-    return {
-      red: Number.parseInt(hex.slice(0, 2), 16) / 255,
-      green: Number.parseInt(hex.slice(2, 4), 16) / 255,
-      blue: Number.parseInt(hex.slice(4, 6), 16) / 255,
-      alpha: 1,
-    }
-  }
-  function selectedTextBearingLayer():
-    | Extract<
-        LayerNode,
-        { readonly kind: 'text' | 'callout' | 'numberedMarker' }
-      >
-    | undefined {
-    if (store.selectedLayerIds.length !== 1) return undefined
-    const layer = activeDocument.value?.layers.find(
-      (candidate) => candidate.id === store.selectedLayerId,
-    )
-    return layer?.kind === 'text' ||
-      layer?.kind === 'callout' ||
-      layer?.kind === 'numberedMarker'
-      ? layer
-      : undefined
-  }
-  function updateWholeTextLayer(
-    span: { -readonly [K in keyof RichTextSpanStyle]?: RichTextSpanStyle[K] },
-    paragraph: {
-      -readonly [K in keyof RichTextParagraphStyle]?: RichTextParagraphStyle[K]
-    },
-    background?: TextBackground | null,
-  ): void {
-    const layer = selectedTextBearingLayer()
-    if (!layer || layer.locked || !props.documentSession || textDraft.value)
-      return
-    const content =
-      layer.kind === 'numberedMarker'
-        ? layer.payload.label
-        : layer.payload.content
-    const firstSpan = content.spans[0]
-    const firstParagraph = content.paragraphs[0]
-    if (!firstSpan || !firstParagraph) return
-    const selection = { anchor: 0, focus: content.text.length }
-    const styled = applyRichTextSpanStyle(
-      {
-        content,
-        selection,
-        typingStyle: firstSpan,
-        paragraphStyle: firstParagraph,
-      },
-      span,
-    )
-    const formatted = applyRichTextParagraphStyle(styled, paragraph)
-    const after =
-      layer.kind === 'text'
-        ? {
-            ...layer,
-            payload: {
-              ...layer.payload,
-              content: formatted.content,
-              ...(background === undefined ? {} : { background }),
-            },
-          }
-        : layer.kind === 'callout'
-          ? {
-              ...layer,
-              payload: {
-                ...layer.payload,
-                content: formatted.content,
-                ...(background === undefined
-                  ? {}
-                  : { background: background ?? layer.payload.background }),
-              },
-            }
-          : {
-              ...layer,
-              payload: {
-                ...layer.payload,
-                label: formatted.content,
-                ...(background === undefined
-                  ? {}
-                  : {
-                      badge: {
-                        ...layer.payload.badge,
-                        color: background?.color ?? layer.payload.badge.color,
-                      },
-                    }),
-              },
-            }
-    props.documentSession.execute({ type: 'updateLayer', before: layer, after })
-  }
-  function applyV7TextChange(id: string, value: string): boolean {
-    const span: {
-      -readonly [K in keyof RichTextSpanStyle]?: RichTextSpanStyle[K]
-    } = {}
-    const paragraph: {
-      -readonly [K in keyof RichTextParagraphStyle]?: RichTextParagraphStyle[K]
-    } = {}
-    let background: TextBackground | null | undefined
-    if (id === 'textColor') {
-      const color = parseTextColor(value)
-      if (!color) return true
-      textDefaults.value = { ...textDefaults.value, color }
-      span.color = color
-    } else if (id === 'textFont') {
-      if (!value.trim()) return true
-      textDefaults.value = { ...textDefaults.value, fontFamily: value }
-      span.fontFamily = value
-    } else if (id === 'textFontSize') {
-      const fontSize = Number(value)
-      if (!Number.isInteger(fontSize) || fontSize < 8 || fontSize > 256)
-        return true
-      textDefaults.value = { ...textDefaults.value, fontSize }
-      span.fontSize = fontSize
-    } else if (id === 'textBold') {
-      const weight = value === 'true' ? 700 : 400
-      textDefaults.value = {
-        ...textDefaults.value,
-        weight: weight as TextToolDefaults['weight'],
-      }
-      span.weight = weight as TextToolDefaults['weight']
-    } else if (id === 'textItalic' || id === 'textStrikethrough') {
-      const enabled = value === 'true'
-      if (id === 'textItalic') {
-        textDefaults.value = { ...textDefaults.value, italic: enabled }
-        span.italic = enabled
-      } else {
-        textDefaults.value = { ...textDefaults.value, strikethrough: enabled }
-        span.strikethrough = enabled
-      }
-    } else if (id === 'textList') {
-      if (value !== 'none' && value !== 'bullet') return true
-      textDefaults.value = { ...textDefaults.value, listKind: value }
-      paragraph.listKind = value
-    } else if (id === 'textAlign') {
-      if (value !== 'start' && value !== 'center' && value !== 'end')
-        return true
-      textDefaults.value = { ...textDefaults.value, alignment: value }
-      paragraph.alignment = value
-    } else if (id === 'textBackground') {
-      let parsed: unknown
-      try {
-        parsed = JSON.parse(value)
-      } catch (error) {
-        console.warn('cute-screen text background draft is invalid', error)
-        return true
-      }
-      if (parsed === null) background = null
-      else if (typeof parsed === 'object' && parsed !== null) {
-        const draft = parsed as {
-          color?: unknown
-          padding?: unknown
-          radius?: unknown
-        }
-        const color =
-          typeof draft.color === 'string'
-            ? parseTextColor(draft.color)
-            : undefined
-        const padding = Number(draft.padding)
-        const radius = Number(draft.radius)
-        if (
-          !color ||
-          !Number.isInteger(padding) ||
-          !Number.isInteger(radius) ||
-          padding < 0 ||
-          padding > 256 ||
-          radius < 0 ||
-          radius > 256
-        )
-          return true
-        background = { color, padding, radius }
-      } else return true
-      textDefaults.value = { ...textDefaults.value, background }
-    } else return false
-    if (textDraft.value) {
-      textFormatting.value = {
-        revision: ++textFormattingRevision,
-        ...(Object.keys(span).length > 0 ? { span } : {}),
-        ...(Object.keys(paragraph).length > 0 ? { paragraph } : {}),
-        ...(background === undefined ? {} : { background }),
-      }
-      return true
-    }
-    updateWholeTextLayer(span, paragraph, background)
-    return true
-  }
-  function applyCalloutStrokeChange(id: string, value: string): boolean {
-    if (id !== 'color' && id !== 'stroke') return false
-    const selected = activeDocument.value?.layers.find(
-      (layer) => layer.id === store.selectedLayerId,
-    )
-    if (
-      selected?.kind !== 'callout' ||
-      selected.locked ||
-      !props.documentSession
-    ) {
-      return false
-    }
-    if (id === 'color') {
-      const color = parseTextColor(value)
-      if (!color) return true
-      const after = rebaseCalloutLayer(selected, {
-        ...selected.payload,
-        stroke: { ...selected.payload.stroke, color },
-      })
-      props.documentSession.execute({
-        type: 'updateLayer',
-        before: selected,
-        after,
-      })
-      return true
-    }
-    if (id === 'stroke') {
-      let parsed: unknown
-      try {
-        parsed = JSON.parse(value)
-      } catch (error) {
-        console.warn('cute-screen callout stroke draft is invalid', error)
-        return true
-      }
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        return true
-      }
-      const draft = parsed as { width?: unknown; style?: unknown }
-      const width = Number(draft.width)
-      const style = draft.style
-      if (
-        !Number.isFinite(width) ||
-        width < 1 ||
-        width > 24 ||
-        (style !== 'solid' && style !== 'dashed' && style !== 'dotted')
-      ) {
-        return true
-      }
-      const after = rebaseCalloutLayer(selected, {
-        ...selected.payload,
-        stroke: {
-          ...selected.payload.stroke,
-          width,
-          style,
-        },
-      })
-      props.documentSession.execute({
-        type: 'updateLayer',
-        before: selected,
-        after,
-      })
-      return true
-    }
-    return false
   }
   function onContextChange(id: string, value: string): void {
     if (applyV7TextChange(id, value)) return
