@@ -26,7 +26,6 @@ import {
   type LayerNode,
   type SnapCandidate,
   type Transform2D,
-  type SrgbColor,
   createDrawingLayer,
   arrowSelectionHandles,
   updateArrowHandle,
@@ -44,11 +43,7 @@ import {
   type ArrowHandleKind,
   type CalloutHandleKind,
   type RichTextContent,
-  type RichTextParagraphStyle,
   type StrokeStyle,
-  type TextBackground,
-  type RichTextSpanStyle,
-  richTextSelectionRange,
   applyCropSession,
   cancelCropSession,
   createCropSession,
@@ -72,8 +67,6 @@ import { overlayVisualScale } from '../overlay-visual-scale'
 import type {
   CanvasPoint,
   CanvasViewportProps,
-  TextToolbarSnapshot,
-  TextToolDefaults,
   ViewportOutputBounds,
 } from '../canvas/contracts'
 import type { CanvasViewportEmit } from './contracts'
@@ -95,6 +88,14 @@ import {
   isFloatingToolbarTarget,
 } from './floating-toolbar-controller'
 import { CanvasRendererController } from './renderer-controller'
+import {
+  copyTextStyle,
+  createTextFormattingController,
+  cssTextBackground,
+  cssTextColor,
+  paragraphStyleFromDefaults,
+  spanStyleFromDefaults,
+} from './text-formatting-controller'
 
 export function useCanvasWorkspace(
   props: CanvasViewportProps,
@@ -169,6 +170,14 @@ export function useCanvasWorkspace(
     layerBounds,
     transformPoint,
   })
+  const { editorTextStyle, emitTextEditing } = createTextFormattingController({
+    props,
+    emit,
+    editingText,
+    renderProjection: renderTextEditorProjection,
+    updateTextToolbarLayout: updateFloatingToolbarLayout,
+    updateArrowToolbarLayout: updateFloatingArrowToolbarLayout,
+  })
   const rendererController = new CanvasRendererController({
     props,
     emit,
@@ -222,166 +231,6 @@ export function useCanvasWorkspace(
   function samplingError(english: string, russian: string): string {
     return document.documentElement.lang === 'ru' ? russian : english
   }
-
-  function cssTextColor(color: SrgbColor): string {
-    return `rgba(${Math.round(color.red * 255)}, ${Math.round(color.green * 255)}, ${Math.round(color.blue * 255)}, ${color.alpha})`
-  }
-  function cssTextBackground(
-    background: TextBackground | null,
-  ): string | undefined {
-    return background ? cssTextColor(background.color) : undefined
-  }
-  const editorTextStyle = computed(() => {
-    return (
-      editingText.value?.controller.state.typingStyle ??
-      props.textDefaults ??
-      DEFAULT_TEXT_TOOL
-    )
-  })
-  function copyTextStyle(value: TextToolDefaults): TextToolDefaults {
-    // Props may be Vue proxies; structuredClone deliberately rejects them.
-    return JSON.parse(JSON.stringify(value)) as TextToolDefaults
-  }
-  function spanStyleFromDefaults(
-    defaults: TextToolDefaults,
-  ): RichTextSpanStyle {
-    return {
-      fontFamily: defaults.fontFamily,
-      fontSize: defaults.fontSize,
-      color: defaults.color,
-      weight: defaults.weight,
-      italic: defaults.italic,
-      strikethrough: defaults.strikethrough,
-    }
-  }
-  function paragraphStyleFromDefaults(
-    defaults: TextToolDefaults,
-  ): RichTextParagraphStyle {
-    return {
-      alignment: defaults.alignment,
-      listKind: defaults.listKind,
-    }
-  }
-  function common<T>(
-    values: readonly T[],
-    equal: (left: T, right: T) => boolean,
-  ): T | null {
-    const first = values[0]
-    return first !== undefined && values.every((value) => equal(first, value))
-      ? first
-      : null
-  }
-  function toolbarSnapshot(): TextToolbarSnapshot {
-    const editing = editingText.value
-    if (!editing)
-      throw new Error('text toolbar snapshot requires editing state')
-    const state = editing.controller.state
-    const range = richTextSelectionRange(state.selection)
-    const spans =
-      range.start === range.end
-        ? [state.typingStyle]
-        : state.content.spans.filter(
-            (span) => span.start < range.end && span.end > range.start,
-          )
-    const paragraphs =
-      range.start === range.end
-        ? [state.paragraphStyle]
-        : state.content.paragraphs.filter(
-            (paragraph) =>
-              paragraph.start < range.end && paragraph.end > range.start,
-          )
-    const sameColor = (left: SrgbColor, right: SrgbColor) =>
-      left.red === right.red &&
-      left.green === right.green &&
-      left.blue === right.blue &&
-      left.alpha === right.alpha
-    return Object.freeze({
-      fontFamily: common(
-        spans.map((span) => span.fontFamily),
-        (a, b) => a === b,
-      ),
-      fontSize: common(
-        spans.map((span) => span.fontSize),
-        (a, b) => a === b,
-      ),
-      color: common(
-        spans.map((span) => span.color),
-        sameColor,
-      ),
-      weight: common(
-        spans.map((span) => span.weight),
-        (a, b) => a === b,
-      ),
-      italic: common(
-        spans.map((span) => span.italic),
-        (a, b) => a === b,
-      ),
-      strikethrough: common(
-        spans.map((span) => span.strikethrough),
-        (a, b) => a === b,
-      ),
-      alignment: common(
-        paragraphs.map((paragraph) => paragraph.alignment),
-        (a, b) => a === b,
-      ),
-      listKind: common(
-        paragraphs.map((paragraph) => paragraph.listKind),
-        (a, b) => a === b,
-      ),
-      background: editing.background,
-    })
-  }
-  function emitTextEditing(): void {
-    const editing = editingText.value
-    emit(
-      'textEditing',
-      editing
-        ? { id: editing.id, kind: editing.kind, snapshot: toolbarSnapshot() }
-        : undefined,
-    )
-  }
-  watch(
-    () => props.textFormatting,
-    (patch) => {
-      const editing = editingText.value
-      if (!editing || !patch) return
-      if (patch.span) editing.controller.applySpanStyle(patch.span)
-      if (patch.paragraph)
-        editing.controller.applyParagraphStyle(patch.paragraph)
-      if (patch.background !== undefined) editing.background = patch.background
-      renderTextEditorProjection()
-      emitTextEditing()
-    },
-  )
-  watch(
-    () => props.zoom,
-    () => {
-      if (editingText.value) {
-        void nextTick(() => {
-          renderTextEditorProjection()
-          updateFloatingToolbarLayout()
-        })
-      }
-    },
-  )
-  watch(
-    () => props.textToolbarSchema,
-    () => {
-      if (editingText.value) void nextTick(updateFloatingToolbarLayout)
-    },
-  )
-  watch(
-    () => [
-      props.selectedLayerId,
-      props.selectedLayerIds,
-      props.arrowToolbarSchema,
-      props.zoom,
-    ],
-    () => {
-      void nextTick(updateFloatingArrowToolbarLayout)
-    },
-    { immediate: true },
-  )
   function documentWithoutGestureLayer(): EditorDocumentV1 | undefined {
     const document = props.document
     if (!document) return undefined
