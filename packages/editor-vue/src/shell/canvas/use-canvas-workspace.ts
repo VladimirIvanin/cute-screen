@@ -91,9 +91,12 @@ import {
   DEFAULT_TEXT_TOOL,
   type CanvasGesture,
   type EditableTextLayer,
-  type FloatingToolbarLayout,
   type ResizeHandle,
 } from './workspace-state'
+import {
+  createFloatingToolbarController,
+  isFloatingToolbarTarget,
+} from './floating-toolbar-controller'
 
 export function useCanvasWorkspace(
   props: CanvasViewportProps,
@@ -124,117 +127,6 @@ export function useCanvasWorkspace(
   let resizeObserver: ResizeObserver | undefined
   let componentMounted = false
   let textToolbarPointerDown = false
-  const FLOATING_TOOLBAR_SELECTOR =
-    '.cs-context-toolbar, .cs-text-floating-toolbar, .cs-arrow-floating-toolbar, .cs-arrow-formatting-toolbar, .cs-text-size-popover, .cs-text-background-popover, .cs-text-overflow-popover, .cs-arrow-toolbar-popover'
-  function isFloatingToolbarTarget(target: EventTarget | null): boolean {
-    return (
-      target instanceof HTMLElement &&
-      target.closest(FLOATING_TOOLBAR_SELECTOR) !== null
-    )
-  }
-  function canvasSurfaceElement(
-    host: HTMLElement | undefined,
-  ): HTMLElement | undefined {
-    if (host?.offsetParent instanceof HTMLElement) return host.offsetParent
-    const surface = scrollContainer.value?.querySelector('.cs-canvas-surface')
-    return surface instanceof HTMLElement ? surface : undefined
-  }
-  function updateFloatingToolbarLayout(): void {
-    const editor = textEditor.value
-    const toolbarHost = textFloatingToolbar.value
-    const surface = canvasSurfaceElement(editor ?? toolbarHost)
-    if (!editor || !surface || !editingText.value || !props.textToolbarSchema) {
-      floatingToolbarLayout.value = undefined
-      return
-    }
-    const editorRect = editor.getBoundingClientRect()
-    const surfaceRect = surface.getBoundingClientRect()
-    const toolbarHeight = toolbarHost?.offsetHeight ?? 44
-    const toolbarWidth = toolbarHost?.offsetWidth ?? 320
-    const gap = 10
-    const centerX = editorRect.left - surfaceRect.left + editorRect.width / 2
-    const minLeft = toolbarWidth / 2 + 4
-    const maxLeft = Math.max(
-      minLeft,
-      surface.clientWidth - toolbarWidth / 2 - 4,
-    )
-    const left = Math.max(minLeft, Math.min(maxLeft, centerX))
-    const aboveTop = editorRect.top - surfaceRect.top - toolbarHeight - gap
-    let top = aboveTop
-    let placement: 'above' | 'below' = 'above'
-    if (aboveTop < 4) {
-      top = editorRect.bottom - surfaceRect.top + gap
-      placement = 'below'
-    }
-    floatingToolbarLayout.value = Object.freeze({ left, top, placement })
-  }
-  function floatingArrowToolbarLayoutFor(
-    layer: LayerNode | undefined,
-    toolbarHost: HTMLElement | undefined,
-  ): FloatingToolbarLayout | undefined {
-    const surface = canvasSurfaceElement(toolbarHost)
-    if (
-      !layer ||
-      layer.kind !== 'arrow' ||
-      !surface ||
-      !props.arrowToolbarSchema
-    ) {
-      return undefined
-    }
-    const bounds = layerBounds(layer)
-    const topCenter = transformPoint(layer.transform, {
-      x: bounds.x + bounds.width / 2,
-      y: bounds.y,
-    })
-    const outputBounds = viewportOutputBounds.value
-    const scale = (props.zoom ?? 100) / 100
-    const canvasX = (topCenter.x - (outputBounds?.x ?? 0)) * scale
-    const canvasY = (topCenter.y - (outputBounds?.y ?? 0)) * scale
-    const toolbarHeight = toolbarHost?.offsetHeight ?? 44
-    const toolbarWidth = toolbarHost?.offsetWidth ?? 320
-    const gap = 10
-    const minLeft = toolbarWidth / 2 + 4
-    const maxLeft = Math.max(
-      minLeft,
-      surface.clientWidth - toolbarWidth / 2 - 4,
-    )
-    const left = Math.max(minLeft, Math.min(maxLeft, canvasX))
-    const aboveTop = canvasY - toolbarHeight - gap
-    let top = aboveTop
-    let placement: 'above' | 'below' = 'above'
-    if (aboveTop < 4) {
-      top = canvasY + gap
-      placement = 'below'
-    }
-    return Object.freeze({ left, top, placement })
-  }
-  function updateFloatingArrowToolbarLayout(): void {
-    floatingArrowToolbarLayout.value = floatingArrowToolbarLayoutFor(
-      selectedLayer(),
-      arrowFloatingToolbar.value,
-    )
-  }
-  function updateTransientArrowToolbarLayout(): void {
-    const toolbarHost = arrowFloatingToolbar.value
-    const selected = selectedLayer()
-    const preview = gesturePreviewLayer()
-    if (
-      !toolbarHost ||
-      preview?.id !== selected?.id ||
-      preview?.kind !== 'arrow'
-    ) {
-      return
-    }
-    const layout = floatingArrowToolbarLayoutFor(preview, toolbarHost)
-    if (!layout) return
-    // Pointer moves must not update Vue state: the overlay and this host both
-    // consume the same transient layer geometry directly.
-    toolbarHost.style.left = `${layout.left}px`
-    toolbarHost.style.top = `${layout.top}px`
-    toolbarHost.style.transform = 'translateX(-50%)'
-    toolbarHost.style.visibility = ''
-    toolbarHost.dataset.placement = layout.placement
-  }
   let lastFitZoom: number | undefined
   let pendingZoomAnchor:
     | {
@@ -269,6 +161,25 @@ export function useCanvasWorkspace(
       )
     },
   )
+  const {
+    updateFloatingToolbarLayout,
+    updateFloatingArrowToolbarLayout,
+    updateTransientArrowToolbarLayout,
+  } = createFloatingToolbarController({
+    props,
+    textEditor,
+    textFloatingToolbar,
+    arrowFloatingToolbar,
+    scrollContainer,
+    floatingToolbarLayout,
+    floatingArrowToolbarLayout,
+    editing: () => Boolean(editingText.value),
+    outputBounds: viewportOutputBounds,
+    selectedLayer,
+    previewLayer: gesturePreviewLayer,
+    layerBounds,
+    transformPoint,
+  })
   const eyedropper = new EyedropperController({
     props,
     emit,
