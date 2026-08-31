@@ -1,7 +1,6 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
 import {
   resizeLayerGeometry,
-  snapPoint,
   type EditorDocumentV1,
   type LayerNode,
   type Transform2D,
@@ -12,10 +11,8 @@ import {
   applyCropSession,
   cancelCropSession,
   createCropSession,
-  moveCrop,
   nudgeCrop,
   resetCrop,
-  resizeCrop,
   setCropPreset,
   snapRulerEndpoint,
   type CropPreset,
@@ -62,6 +59,7 @@ import {
   calloutTextEditorOrigin,
 } from './pointer-geometry-controller'
 import { handlePointerDown } from './pointer-down-controller'
+import { handlePointerMove } from './pointer-move-controller'
 
 export function useCanvasWorkspace(
   props: CanvasViewportProps,
@@ -277,6 +275,27 @@ export function useCanvasWorkspace(
     startText: (input: TextEditorStartInput) =>
       textEditorController.start(input),
     invalidateOverlay,
+    renderCommittedScene: renderCommittedSceneForGesture,
+  }
+  const pointerMoveContext = {
+    props,
+    emit,
+    scrollContainer,
+    crop: cropController,
+    gesture: () => gesture,
+    setGesture: (next: NonNullable<CanvasGesture>) => {
+      gesture = next
+    },
+    setRulerGuide: (next: RulerAngleGuide | undefined) => {
+      rulerGuide = next
+    },
+    canvasPoint,
+    samplingCursor,
+    scheduleEyedropper: scheduleEyedropperPreview,
+    updateHoverCursor,
+    snapCandidates,
+    invalidateOverlay,
+    invalidateGesturePreview,
     renderCommittedScene: renderCommittedSceneForGesture,
   }
   function scheduleEyedropperPreview(
@@ -635,195 +654,7 @@ export function useCanvasWorkspace(
   const onDoubleClick = (event: MouseEvent) =>
     textEditorController.doubleClick(event)
   function onPointerMove(event: PointerEvent): void {
-    const point = canvasPoint(event)
-    if (!point) return
-    if (props.sampling) {
-      samplingCursor.value = point
-      scheduleEyedropperPreview(point, {
-        clientX: event.clientX,
-        clientY: event.clientY,
-      })
-      invalidateOverlay()
-      return
-    }
-    if (!gesture) {
-      updateHoverCursor(point)
-      return
-    }
-    if (gesture.kind === 'pan' && scrollContainer.value) {
-      scrollContainer.value.scrollLeft =
-        gesture.scrollLeft - (event.clientX - gesture.clientX)
-      scrollContainer.value.scrollTop =
-        gesture.scrollTop - (event.clientY - gesture.clientY)
-      return
-    }
-    if (gesture.kind === 'quickSelect') {
-      cropController.quickDraft = {
-        x: Math.min(gesture.start.x, point.x),
-        y: Math.min(gesture.start.y, point.y),
-        width: Math.max(1, Math.abs(point.x - gesture.start.x)),
-        height: Math.max(1, Math.abs(point.y - gesture.start.y)),
-      }
-      gesture = { ...gesture, current: point }
-      emit('quickFrameChange', { ...cropController.quickDraft })
-      invalidateOverlay()
-      return
-    }
-    if (gesture.kind === 'crop') {
-      const delta = {
-        x: point.x - gesture.start.x,
-        y: point.y - gesture.start.y,
-      }
-      cropController.session =
-        gesture.action === 'move'
-          ? moveCrop(gesture.initial, delta)
-          : resizeCrop(gesture.initial, gesture.handle!, delta)
-      if (props.quickFrameMode) {
-        emit('quickFrameChange', { ...cropController.session.crop })
-      }
-      invalidateOverlay()
-      return
-    }
-    if (gesture.kind === 'precision') {
-      const defaults = props.precisionDefaults ?? DEFAULT_PRECISION_TOOLS
-      let current = point
-      rulerGuide = undefined
-      if (
-        gesture.tool === 'ruler' &&
-        defaults.ruler.snap &&
-        (event.altKey || gesture.guidesHeld)
-      ) {
-        const snapped = snapRulerEndpoint(
-          gesture.start,
-          point,
-          defaults.ruler.snapAngleIncrementDegrees,
-        )
-        current = snapped.end
-        rulerGuide = snapped.guide
-      }
-      const previous = gesture.points[gesture.points.length - 1]
-      gesture = {
-        ...gesture,
-        current,
-        guidesHeld: event.altKey,
-        points:
-          gesture.tool === 'censor' &&
-          defaults.censor.region === 'freeform' &&
-          (!previous ||
-            Math.hypot(point.x - previous.x, point.y - previous.y) >= 0.5)
-            ? [...gesture.points, point]
-            : gesture.points,
-      }
-      invalidateOverlay()
-      return
-    }
-    if (gesture.kind === 'move') {
-      const result = snapPoint(
-        point,
-        snapCandidates(gesture.id),
-        (props.zoom ?? 100) / 100,
-        !event.ctrlKey && !event.metaKey,
-      )
-      gesture = {
-        ...gesture,
-        current: { x: result.x, y: result.y },
-        guides: result.guides,
-        guidesVisible: event.altKey,
-      }
-      invalidateGesturePreview()
-      return
-    }
-    if (gesture.kind === 'resize') {
-      gesture = {
-        ...gesture,
-        current: point,
-        freeResize: event.shiftKey,
-        centerResize: event.altKey,
-      }
-      invalidateGesturePreview()
-      return
-    }
-    if (gesture.kind === 'intrinsicResize') {
-      gesture = {
-        ...gesture,
-        current: point,
-        preserveAspect:
-          event.shiftKey ||
-          gesture.initial.kind === 'emoji' ||
-          gesture.initial.kind === 'loupe',
-        centerResize:
-          gesture.handle === 'start' || gesture.handle === 'end'
-            ? false
-            : event.altKey,
-      }
-      invalidateGesturePreview()
-      return
-    }
-    if (gesture.kind === 'rotate') {
-      const angle = Math.atan2(
-        point.y - gesture.center.y,
-        point.x - gesture.center.x,
-      )
-      let rotation =
-        gesture.initial.rotation +
-        ((angle - gesture.startAngle) * 180) / Math.PI
-      if (event.shiftKey) rotation = Math.round(rotation / 15) * 15
-      gesture = { ...gesture, currentAngle: rotation }
-      invalidateGesturePreview()
-      return
-    }
-    if (gesture.kind === 'arrowHandle') {
-      gesture = { ...gesture, current: point }
-      invalidateOverlay()
-      return
-    }
-    if (gesture.kind === 'calloutHandle') {
-      gesture = { ...gesture, current: point }
-      invalidateOverlay()
-      return
-    }
-    if (gesture.kind === 'loupeSource') {
-      gesture = { ...gesture, current: point }
-      renderCommittedSceneForGesture()
-      return
-    }
-    if (gesture.kind === 'calloutDraw') {
-      gesture = { ...gesture, current: point, constrainAngle: event.shiftKey }
-      invalidateOverlay()
-      return
-    }
-    if (gesture.kind === 'draw') {
-      const coalesced = event.getCoalescedEvents?.() ?? [event]
-      const samples: CanvasPoint[] = []
-      if (gesture.tool === 'pencil' || gesture.tool === 'marker') {
-        let previous = gesture.points[gesture.points.length - 1]
-        for (const sample of coalesced) {
-          const candidate = canvasPoint(sample)
-          if (
-            candidate &&
-            (!previous ||
-              Math.hypot(candidate.x - previous.x, candidate.y - previous.y) >=
-                0.5)
-          ) {
-            samples.push(candidate)
-            previous = candidate
-          }
-        }
-      }
-      gesture = {
-        ...gesture,
-        current: point,
-        constrainAngle: event.shiftKey,
-        drawFromCenter: event.altKey,
-        points:
-          samples.length > 0 ? [...gesture.points, ...samples] : gesture.points,
-      }
-      invalidateOverlay()
-      return
-    }
-    if (gesture.kind === 'text') {
-      gesture = { ...gesture, current: point }
-    }
+    handlePointerMove(pointerMoveContext, event)
   }
   function finishGesture(event: PointerEvent): void {
     const completed = gesture
