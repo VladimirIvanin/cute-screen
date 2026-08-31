@@ -9,12 +9,6 @@
   },
   "temporaryLineExceptions": [
     {
-      "path": "apps/desktop/src/App.vue",
-      "max": 870,
-      "removeBy": "desktop",
-      "reason": "desktop composition root awaiting controller extraction"
-    },
-    {
       "path": "apps/desktop/src/QuickCaptureApp.vue",
       "max": 674,
       "removeBy": "desktop",
@@ -65,11 +59,6 @@
   ],
   "temporaryTauriImports": [
     {
-      "path": "apps/desktop/src/App.vue",
-      "removeBy": "desktop",
-      "reason": "application root still owns lifecycle window integration"
-    },
-    {
       "path": "apps/desktop/src/QuickCaptureApp.vue",
       "removeBy": "desktop",
       "reason": "quick-capture root still owns native window integration"
@@ -86,14 +75,6 @@
     }
   ],
   "temporaryStructureExceptions": [
-    {
-      "path": "apps/desktop/src/App.vue",
-      "maxFunctionLines": 125,
-      "maxComplexity": 24,
-      "maxDepth": 4,
-      "removeBy": "desktop",
-      "reason": "startup and document lifecycle callbacks await controller extraction"
-    },
     {
       "path": "packages/editor-core/src/color-picker.ts",
       "maxFunctionLines": 120,
