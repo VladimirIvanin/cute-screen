@@ -4,10 +4,8 @@ import {
   nextTick,
   onBeforeUnmount,
   onMounted,
-  ref,
   watch,
 } from 'vue'
-import type { PrecisionToolDefaults } from '../types'
 import {
   RichTextEditorController,
   readRichTextDomSelection,
@@ -17,9 +15,6 @@ import {
 } from '../../rich-text-editor'
 import {
   Canvas2DRenderer,
-  DEFAULT_RULER_COLOR,
-  DEFAULT_RULER_FONT_SIZE,
-  DEFAULT_RULER_THICKNESS,
   createDocumentRenderScene,
   createRenderSceneSnapshot,
   drawNodes2D,
@@ -30,8 +25,6 @@ import {
   resizeLayerGeometry,
   snapPoint,
   type EditorDocumentV1,
-  type BoundsResizeHandle,
-  type IntrinsicResizeHandle,
   type LayerNode,
   type SnapCandidate,
   type Transform2D,
@@ -51,17 +44,13 @@ import {
   calloutTextLayout,
   defaultCalloutRoute,
   rebaseCalloutLayer,
-  type DrawingTool,
   type ArrowHandleKind,
   type CalloutHandleKind,
-  type CalloutLayer,
-  type NumberedMarkerLayer,
   type RichTextContent,
   type RichTextParagraphStyle,
   type StrokeStyle,
   type TextBackground,
   type RichTextSpanStyle,
-  type TextLayer,
   richTextSelectionRange,
   applyCropSession,
   cancelCropSession,
@@ -95,53 +84,35 @@ import {
   EyedropperController,
   EYEDROPPER_GRID_SIZE,
 } from './eyedropper-controller'
+import {
+  createCanvasWorkspaceState,
+  DEFAULT_CALLOUT_STROKE,
+  DEFAULT_PRECISION_TOOLS,
+  DEFAULT_TEXT_TOOL,
+  type CanvasGesture,
+  type EditableTextLayer,
+  type FloatingToolbarLayout,
+  type ResizeHandle,
+} from './workspace-state'
 
 export function useCanvasWorkspace(
   props: CanvasViewportProps,
   emit: CanvasViewportEmit,
 ) {
-  type EditableTextLayer = TextLayer | CalloutLayer | NumberedMarkerLayer
-  const scene = ref<HTMLCanvasElement>()
-  const overlay = ref<HTMLCanvasElement>()
-  const viewportRoot = ref<HTMLElement>()
-  const textEditor = ref<HTMLDivElement>()
-  const textFloatingToolbar = ref<HTMLDivElement>()
-  const arrowFloatingToolbar = ref<HTMLDivElement>()
-  const scrollContainer = ref<HTMLDivElement>()
-  const floatingToolbarLayout = ref<
-    | {
-        readonly left: number
-        readonly top: number
-        readonly placement: 'above' | 'below'
-      }
-    | undefined
-  >()
-  type FloatingToolbarLayout = {
-    readonly left: number
-    readonly top: number
-    readonly placement: 'above' | 'below'
-  }
-  const floatingArrowToolbarLayout = ref<FloatingToolbarLayout | undefined>()
-  const rendererError = ref<string>()
-  const isPanning = ref(false)
-  const editingText = ref<
-    | {
-        readonly origin: CanvasPoint
-        readonly width: number
-        readonly fixedWidth: boolean
-        readonly id: string
-        readonly controller: RichTextEditorController
-        background: TextBackground | null
-        readonly kind: 'text' | 'callout' | 'numberedMarker'
-        readonly existing?: EditableTextLayer
-        readonly calloutDraft?: {
-          readonly target: CanvasPoint
-          readonly label: CanvasPoint
-        }
-        calloutStroke?: StrokeStyle
-      }
-    | undefined
-  >()
+  const {
+    scene,
+    overlay,
+    viewportRoot,
+    textEditor,
+    textFloatingToolbar,
+    arrowFloatingToolbar,
+    scrollContainer,
+    floatingToolbarLayout,
+    floatingArrowToolbarLayout,
+    rendererError,
+    isPanning,
+    editingText,
+  } = createCanvasWorkspaceState()
   let renderer: Canvas2DRenderer | undefined
   let rendererInitialization: Promise<Canvas2DRenderer | undefined> | undefined
   let rendererSceneReady = false
@@ -280,162 +251,7 @@ export function useCanvasWorkspace(
   let quickSelectionDraft:
     { x: number; y: number; width: number; height: number } | undefined
   let rulerGuide: RulerAngleGuide | undefined
-  let gesture:
-    | {
-        readonly kind: 'pan'
-        readonly clientX: number
-        readonly clientY: number
-        readonly scrollLeft: number
-        readonly scrollTop: number
-      }
-    | {
-        readonly kind: 'move'
-        readonly id: string
-        readonly start: { x: number; y: number }
-        readonly current: { x: number; y: number }
-        readonly guides: readonly SnapCandidate[]
-        readonly guidesVisible: boolean
-      }
-    | {
-        readonly kind: 'resize'
-        readonly id: string
-        readonly handle: ResizeHandle
-        readonly start: { x: number; y: number }
-        readonly current: { x: number; y: number }
-        readonly initial: Transform2D
-        readonly freeResize: boolean
-        readonly centerResize: boolean
-      }
-    | {
-        readonly kind: 'intrinsicResize'
-        readonly id: string
-        readonly handle: IntrinsicResizeHandle
-        readonly start: { x: number; y: number }
-        readonly current: { x: number; y: number }
-        readonly initial: LayerNode
-        readonly preserveAspect: boolean
-        readonly centerResize: boolean
-      }
-    | {
-        readonly kind: 'rotate'
-        readonly id: string
-        readonly center: { x: number; y: number }
-        readonly startAngle: number
-        readonly initial: Transform2D
-        readonly currentAngle: number
-      }
-    | {
-        readonly kind: 'arrowHandle'
-        readonly id: string
-        readonly handle: ArrowHandleKind
-        readonly start: { x: number; y: number }
-        readonly current: { x: number; y: number }
-      }
-    | {
-        readonly kind: 'calloutHandle'
-        readonly id: string
-        readonly handle: CalloutHandleKind
-        readonly start: { x: number; y: number }
-        readonly current: { x: number; y: number }
-      }
-    | {
-        readonly kind: 'loupeSource'
-        readonly id: string
-        readonly start: { x: number; y: number }
-        readonly current: { x: number; y: number }
-        readonly initial: Extract<LayerNode, { readonly kind: 'loupe' }>
-      }
-    | {
-        readonly kind: 'calloutDraw'
-        readonly start: CanvasPoint
-        readonly current: CanvasPoint
-        readonly constrainAngle: boolean
-      }
-    | {
-        readonly kind: 'draw'
-        readonly tool: DrawingTool
-        readonly start: CanvasPoint
-        readonly current: CanvasPoint
-        readonly constrainAngle: boolean
-        readonly drawFromCenter: boolean
-        readonly points: readonly CanvasPoint[]
-      }
-    | {
-        readonly kind: 'text'
-        readonly start: CanvasPoint
-        readonly current: CanvasPoint
-      }
-    | {
-        readonly kind: 'precision'
-        readonly tool: 'censor' | 'spotlight' | 'ruler' | 'loupe'
-        readonly start: CanvasPoint
-        readonly current: CanvasPoint
-        readonly points: readonly CanvasPoint[]
-        readonly guidesHeld: boolean
-      }
-    | {
-        readonly kind: 'crop'
-        readonly action: 'move' | 'resize'
-        readonly handle?: CropResizeHandle
-        readonly start: CanvasPoint
-        readonly initial: CropSession
-      }
-    | {
-        readonly kind: 'quickSelect'
-        readonly start: CanvasPoint
-        readonly current: CanvasPoint
-      }
-    | undefined
-  type ResizeHandle = BoundsResizeHandle
-  const DEFAULT_CALLOUT_STROKE: StrokeStyle = Object.freeze({
-    color: Object.freeze({ red: 0.55, green: 0.55, blue: 0.55, alpha: 1 }),
-    width: 2,
-    style: 'solid',
-    cap: 'round',
-    join: 'round',
-  })
-  const DEFAULT_TEXT_TOOL: TextToolDefaults = Object.freeze({
-    fontFamily: 'Roboto',
-    fontSize: 24,
-    weight: 400,
-    italic: false,
-    strikethrough: false,
-    alignment: 'start',
-    listKind: 'none',
-    color: { red: 0, green: 0, blue: 0, alpha: 1 },
-    background: null,
-  })
-  const DEFAULT_PRECISION_TOOLS: PrecisionToolDefaults = Object.freeze({
-    censor: Object.freeze({
-      region: 'rectangle',
-      mode: 'pixelate',
-      blockSize: 12,
-      blurStrength: 12,
-      solidColor: Object.freeze({ red: 0, green: 0, blue: 0, alpha: 1 }),
-    }),
-    spotlight: Object.freeze({
-      shape: 'rectangle',
-      dimColor: Object.freeze({ red: 0, green: 0, blue: 0, alpha: 1 }),
-      dimOpacity: 0.65,
-      feather: 'soft',
-    }),
-    ruler: Object.freeze({
-      unit: 'pixels',
-      snap: true,
-      snapAngleIncrementDegrees: 15,
-      color: DEFAULT_RULER_COLOR,
-      thickness: DEFAULT_RULER_THICKNESS,
-      fontSize: DEFAULT_RULER_FONT_SIZE,
-    }),
-    loupe: Object.freeze({
-      zoom: 2,
-      size: 120,
-      shape: 'circle',
-      borderColor: Object.freeze({ red: 1, green: 1, blue: 1, alpha: 1 }),
-      borderWidth: 3,
-      shadow: true,
-    }),
-  })
+  let gesture: CanvasGesture
   const viewportOutputBounds = computed<ViewportOutputBounds | undefined>(
     () => {
       const canvas = props.canvas
