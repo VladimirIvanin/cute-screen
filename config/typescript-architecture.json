@@ -27,12 +27,6 @@
       "reason": "imperative canvas controller is being split into renderer, gesture, overlay and text domains"
     },
     {
-      "path": "packages/editor-vue/src/shell/workspace/use-editor-workspace.ts",
-      "max": 3286,
-      "removeBy": "vue",
-      "reason": "shell controller is being split into session, tool schema and effect domains"
-    },
-    {
       "path": "tests/e2e/specs/browser-m06-drawing-tools.e2e.ts",
       "max": 629,
       "removeBy": "tests",
@@ -193,14 +187,6 @@
       "maxDepth": 30,
       "removeBy": "vue",
       "reason": "imperative canvas controller awaits domain composable extraction"
-    },
-    {
-      "path": "packages/editor-vue/src/shell/workspace/use-editor-workspace.ts",
-      "maxFunctionLines": 3223,
-      "maxComplexity": 1000,
-      "maxDepth": 30,
-      "removeBy": "vue",
-      "reason": "shell controller awaits tool schema and effect extraction"
     }
   ]
 }
