@@ -99,7 +99,7 @@ function countedLines(source: string): number {
 }
 
 function isTestFile(filename: string): boolean {
-  return /(?:(?:test|spec)\.ts|\.e2e\.ts)$/u.test(filename)
+  return /(?:(?:test-kit|test|spec)\.ts|\.e2e\.ts)$/u.test(filename)
 }
 
 interface FunctionMetric {

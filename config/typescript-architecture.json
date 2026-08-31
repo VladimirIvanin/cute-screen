@@ -7,50 +7,7 @@
     "complexity": 20,
     "depth": 4
   },
-  "temporaryLineExceptions": [
-    {
-      "path": "tests/e2e/specs/browser-m06-drawing-tools.e2e.ts",
-      "max": 629,
-      "removeBy": "tests",
-      "reason": "drawing browser scenarios are awaiting feature split"
-    },
-    {
-      "path": "tests/e2e/specs/browser-m08-crop-precision.e2e.ts",
-      "max": 1229,
-      "removeBy": "tests",
-      "reason": "crop and precision browser scenarios are still co-located"
-    },
-    {
-      "path": "tests/e2e/specs/browser-v7-rich-text.e2e.ts",
-      "max": 640,
-      "removeBy": "tests",
-      "reason": "rich-text browser scenarios are awaiting feature split"
-    },
-    {
-      "path": "tests/harness/render/golden.test.ts",
-      "max": 889,
-      "removeBy": "tests",
-      "reason": "golden cases are awaiting renderer-domain split"
-    },
-    {
-      "path": "tests/unit/vue/App.test.ts",
-      "max": 760,
-      "removeBy": "desktop",
-      "reason": "desktop and shell tests are still co-located"
-    },
-    {
-      "path": "tests/unit/vue/canvas-viewport.test.ts",
-      "max": 1461,
-      "removeBy": "vue",
-      "reason": "canvas interaction scenarios are still co-located"
-    },
-    {
-      "path": "tests/unit/vue/m08-precision-interactions.test.ts",
-      "max": 1775,
-      "removeBy": "vue",
-      "reason": "crop, precision and eyedropper scenarios are still co-located"
-    }
-  ],
+  "temporaryLineExceptions": [],
   "temporaryTauriImports": [],
   "temporaryStructureExceptions": []
 }
