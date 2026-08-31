@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { fitViewport, panViewport, transformPoint, zoomAt } from './index'
+import { transformPoint } from './geometry'
+import { fitViewport, panViewport, zoomAt } from './viewport'
 
 describe('viewport state', () => {
   it('fits the independent canvas with 24 CSS px padding', () => {

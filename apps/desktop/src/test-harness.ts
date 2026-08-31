@@ -1,6 +1,5 @@
-import '@wdio/tauri-plugin'
-import { getCurrentWindow } from '@tauri-apps/api/window'
 import type { EditorDocumentV1 } from '@cute-screen/editor-vue'
+import { e2eWindowAdapter } from './platform/tauri/e2e-window-adapter'
 
 declare global {
   interface Window {
@@ -27,9 +26,4 @@ declare global {
  * Test-only facade over the real Tauri window API. It is available exclusively
  * in the harness bundle and allows E2E to assert native window behaviour.
  */
-window.__cuteScreenE2eWindow = {
-  close: () => getCurrentWindow().close(),
-  hide: () => getCurrentWindow().hide(),
-  isDecorated: () => getCurrentWindow().isDecorated(),
-  isVisible: () => getCurrentWindow().isVisible(),
-}
+window.__cuteScreenE2eWindow = e2eWindowAdapter

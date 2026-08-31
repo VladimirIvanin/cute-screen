@@ -1,12 +1,8 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 
-import {
-  parseEditorDocument,
-  serializeEditorDocument,
-  type EditorDocument,
-  type LayerNode,
-} from '../index'
+import { parseEditorDocument, serializeEditorDocument } from './codec'
+import type { EditorDocument, LayerNode } from './types'
 
 const shape: LayerNode = {
   id: '019c1f62-058e-7000-8000-000000000001',

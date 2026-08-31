@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { CommandManager, type EditorDocumentV1, type LayerNode } from '../index'
+import type { EditorDocumentV1, LayerNode } from '../document/types'
+import { CommandManager } from './manager'
 
 const DOCUMENT_ID = '019c1f62-058e-7000-8000-000000000000'
 const BASE_ID = '019c1f62-058e-7000-8000-000000000001'

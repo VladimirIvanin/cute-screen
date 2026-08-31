@@ -1,16 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  applyEditorCommand,
-  CommandManager,
-  invertMatrix,
-  parseEditorDocument,
-  serializeEditorDocument,
-  transformPoint,
-  transformToMatrix,
-  type EditorDocumentV1,
-  type LayerNode,
-} from './index'
+import { CommandManager } from './commands'
+import { applyEditorCommand } from './commands/operations'
+import { parseEditorDocument, serializeEditorDocument } from './document/codec'
+import type { EditorDocumentV1, LayerNode } from './document/types'
+import { invertMatrix, transformPoint, transformToMatrix } from './geometry'
 
 const layer: LayerNode = {
   id: '019c1f62-058e-7000-8000-000000000001',

@@ -1,7 +1,7 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 
-import { invertMatrix, transformPoint, transformToMatrix } from './index'
+import { invertMatrix, transformPoint, transformToMatrix } from './geometry'
 
 describe('geometry', () => {
   it('round-trips finite points through an invertible transform', () => {

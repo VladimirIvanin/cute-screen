@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
+import { rebaseArrowLayer } from './arrow-geometry'
+import type { EditorDocumentV1 } from './document/types'
 import {
   DocumentSpatialIndex,
   hitTestDocument,
   hitTestDocumentAll,
-  rebaseArrowLayer,
-  type EditorDocumentV1,
-} from './index'
+} from './hit-test'
 
 const source = {
   blobHash: 'a'.repeat(64),

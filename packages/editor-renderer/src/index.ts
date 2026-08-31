@@ -162,30 +162,32 @@ export {
   type RichTextSpanStyle,
 } from '@cute-screen/editor-core'
 
-export {
-  Canvas2DRenderer,
-  drawNodes2D,
-  type Canvas2DLike,
-  type Canvas2DRendererOptions,
-} from './canvas2d'
+export { Canvas2DRenderer } from './backends/canvas2d/renderer'
+export { drawNodes2D } from './backends/canvas2d/nodes'
+export type {
+  Canvas2DLike,
+  Canvas2DRendererOptions,
+} from './backends/canvas2d/contracts'
 export {
   CanvasKitRenderer,
-  drawNodesCanvasKit,
   renderHeadlessCanvasKitPng,
-  type CanvasKitApi,
-  type CanvasKitFontData,
-} from './canvaskit'
+} from './backends/canvaskit/renderer'
+export { drawNodesCanvasKit } from './backends/canvaskit/nodes'
+export type {
+  CanvasKitApi,
+  CanvasKitFontData,
+} from './backends/canvaskit/contracts'
 export { loadBundledCanvasKit } from './bundled-canvaskit'
-export {
-  layoutRichText,
-  type RichTextBullet,
-  type RichTextLayout,
-  type RichTextLayoutFragment,
-  type RichTextLayoutLine,
-  type RichTextMeasure,
-  type RichTextMeasureResult,
-  type RichTextStrike,
-} from './rich-text-layout'
+export { layoutRichText } from './rich-text/layout'
+export type {
+  RichTextBullet,
+  RichTextLayout,
+  RichTextLayoutFragment,
+  RichTextLayoutLine,
+  RichTextMeasure,
+  RichTextMeasureResult,
+  RichTextStrike,
+} from './rich-text/contracts'
 export {
   ImageResourceManager,
   selectImageVariant,

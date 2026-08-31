@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core'
+import { readE2eHarnessQuery } from './platform/tauri/harness-query-adapter'
 
 export async function resolveHarnessSearch(): Promise<string> {
   if (window.location.search) {
@@ -10,7 +10,7 @@ export async function resolveHarnessSearch(): Promise<string> {
   }
 
   try {
-    const query = await invoke<string | null>('get_e2e_harness_query')
+    const query = await readE2eHarnessQuery()
     if (query) {
       return query.startsWith('?') ? query : `?${query}`
     }

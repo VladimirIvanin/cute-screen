@@ -731,3 +731,33 @@ legacy/future/corrupt SQLite fixtures, generated DTO drift check, X11/Windows
 boundary tests без native Area selector, macOS atomic-cancel/ABI/virtual-desktop
 tests и реальные platform smokes из A15. Source-text existence tests остаются
 architecture guards и не заменяют runtime evidence.
+
+## ADR-042 — Семантические TypeScript-домены и тонкие Vue composition roots
+
+**Статус:** accepted
+
+**Контекст:** package direction из ADR-002 соблюдается, но несколько Vue SFC,
+renderer implementations, codecs и tests накопили несколько тысяч строк и
+смешивают lifecycle, orchestration, domain rules и presentation. Формальные
+папки `components`, `composables`, `utils` не выражают владельца поведения и не
+предотвращают повторное слипание кода.
+
+**Решение:** существующие packages и их публичные exports сохраняются, а
+внутренний TypeScript организуется по предметным доменам и слоям
+`contracts → model → adapters/ui`. `EditorShell`, `CanvasViewport`, desktop App
+и Quick Capture остаются compatibility composition roots над typed controllers.
+Scene graph, renderer resources и pointer gestures не переходят в глубокую
+Vue-reactivity. Canvas2D и CanvasKit остаются независимыми backends и разделяют
+только renderer-neutral contracts/algorithms. CSS делится по тем же доменам с
+неизменным публичным `shell.css`, selectors и cascade order.
+
+**Границы:** document schema v7, `EditorCommand`, IPC names/wire payloads,
+package exports, Vue props/emits, DOM/E2E selectors и визуальный результат не
+меняются. Новые production dependencies не добавляются. AST boundary tests,
+type-level API contracts и обязательные size/complexity budgets блокируют
+обратные зависимости, циклы и новые монолиты.
+
+**Проверяемое основание:** полный core/renderer/Vue test набор, неизменённые
+renderer goldens, browser/real-Tauri flows, performance suite, `ipc:check` и
+architecture budget gate. Перенос теста или source-text assertion не заменяет
+проверку пользовательского действия.

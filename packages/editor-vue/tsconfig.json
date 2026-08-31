@@ -1,9 +1,6 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2023",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "strict": true,
     "composite": true,
     "declaration": true,
     "declarationMap": true,
@@ -11,9 +8,6 @@
     "rootDir": "src",
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "jsx": "preserve",
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
-    "verbatimModuleSyntax": true,
     "types": ["vite/client"]
   },
   "include": ["src/**/*.ts", "src/**/*.vue"],

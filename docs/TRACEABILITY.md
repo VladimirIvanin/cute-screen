@@ -12,6 +12,28 @@ system smoke record. Во время разработки отсутствующ
 
 Foundation harness не создаёт отдельного продуктового требования. Его локальные и CI-доказательства определены в [стратегии тестирования](TESTING.md) и [CI workflow](../.github/workflows/ci.yml); статусы `REQ-*` ниже M00 не меняет.
 
+## TypeScript/Vue architecture refactor gate (2026-08-31)
+
+Рефакторинг по ADR-042 не создаёт нового пользовательского сценария и не меняет
+document schema v7, `EditorCommand`, IPC, package exports или DOM/E2E contract.
+До переноса модулей compatibility tests фиксируют публичные TypeScript exports,
+Vue props/emits, generated capture DTO, CSS entrypoint/selectors и renderer
+contracts. `REQ-EDT-001/002/005/006`, `REQ-UI-001/005/010`,
+`REQ-CAP-010/012/013` и `REQ-QLT-001/003` продолжают использовать существующие
+core, renderer, Vue, browser и real-Tauri evidence без ослабления assertions.
+
+Архитектурный gate отдельно проверяет направление импортов
+`editor-core → editor-renderer → editor-vue → desktop`, отсутствие Vue/DOM/Tauri
+в нижних слоях, отсутствие циклов между доменами и бюджеты размера/сложности.
+Pointer move остаётся imperative/transient path: он не создаёт document command
+и не передаёт scene graph в глубокую Vue-reactivity; завершённый gesture создаёт
+ровно один command. Quick `selecting → editing` сохраняет те же scene/overlay
+canvas hosts. Перемещение или дробление тестов не является новым evidence:
+количество сценариев, project names и stable commands должны сохраниться.
+Фактическая локальная матрица, бюджеты и baseline-сравнение real-Tauri
+зафиксированы в разделе
+[TypeScript/Vue architecture refactor evidence](TESTING.md#typescriptvue-architecture-refactor-evidence-2026-08-31).
+
 ## Rust core refactor gate (2026-08-30)
 
 Рефакторинг по ADR-041 не создаёт новый capture workflow: Area quick capture

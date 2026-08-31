@@ -1,25 +1,25 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 
+import { CommandManager } from './commands'
+import {
+  applyEditorCommand,
+  createFlipCanvasCommand,
+  revertEditorCommand,
+} from './commands/operations'
 import {
   CROP_RESIZE_HANDLES,
-  CommandManager,
   applyCropSession,
-  applyEditorCommand,
   cancelCropSession,
   createCropSession,
-  createFlipCanvasCommand,
   moveCrop,
   nudgeCrop,
   resetCrop,
   resizeCrop,
-  revertEditorCommand,
   setCropPreset,
   type CropPreset,
-  type EditorDocument,
-  type ImageLayer,
-  type Rect,
-} from './index'
+} from './crop-session'
+import type { EditorDocument, ImageLayer, Rect } from './document/types'
 
 const DOCUMENT_ID = '019c1f62-058e-7000-8000-000000000000'
 const BASE_ID = '019c1f62-058e-7000-8000-000000000001'

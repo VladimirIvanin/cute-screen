@@ -15,7 +15,7 @@ import {
   normalizeRichTextSelection,
   replaceRichTextSelection,
   setRichTextSelection,
-} from './rich-text-editing'
+} from './tools/text'
 
 const BLACK = Object.freeze({ red: 0, green: 0, blue: 0, alpha: 1 })
 

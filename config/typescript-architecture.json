@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "budgets": {
+    "productionLines": 500,
+    "testLines": 600,
+    "functionLines": 120,
+    "complexity": 20,
+    "depth": 4
+  },
+  "temporaryLineExceptions": [],
+  "temporaryTauriImports": [],
+  "temporaryStructureExceptions": []
+}

@@ -1,7 +1,7 @@
 import type { RenderTextNode, RenderTextStyle } from '@cute-screen/editor-core'
 import { describe, expect, it } from 'vitest'
 
-import { layoutRichText } from './rich-text-layout'
+import { layoutRichText } from './rich-text/layout'
 
 const black = { red: 0, green: 0, blue: 0, alpha: 1 } as const
 const red = { red: 1, green: 0, blue: 0, alpha: 1 } as const

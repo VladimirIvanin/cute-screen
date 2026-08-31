@@ -10,12 +10,10 @@ import {
   DocumentSessionController,
   DocumentSessionCoordinator,
   EditorShell,
-  ActionCancelledError,
   describeError,
   loadImageWithBinaryFallback,
   parsePersistedDocument,
   type CaptureProgressState,
-  type CaptureProgressV1,
   type CanvasViewportHosts,
   type FrameSummary,
   type EditorDocumentV1,
@@ -27,11 +25,13 @@ import {
   type ContentImageBridge,
   type ClipboardBridge,
 } from '@cute-screen/editor-vue'
-import type { CaptureOutcomeV2 } from './generated/desktop-ipc'
-import { writeResultCanvasToClipboard } from './result-clipboard'
-import { dispatchNativeCapture } from './capture-request'
 import { runEditorStartup } from './editor-startup'
 import { EditorFirstFrameGate } from './editor-first-frame'
+import { readAppHarnessConfig } from './app-harness-config'
+import { mountM05HarnessDocument as mountM05Harness } from './m05-harness'
+import { createDesktopShellActions } from './desktop-shell-actions'
+import { installDesktopLifecycleGuards } from './platform/tauri/lifecycle-adapter'
+import { M08HarnessController } from './m08-harness'
 
 declare global {
   interface Window {
@@ -65,46 +65,13 @@ declare global {
   }
 }
 
-const fixture =
-  import.meta.env.VITE_TEST_HARNESS === 'true'
-    ? ((new URLSearchParams(window.location.search).get('m02') as
-        'empty' | 'error' | 'loading' | 'ready' | null) ?? 'empty')
-    : 'empty'
-const m03Harness =
-  import.meta.env.VITE_TEST_HARNESS === 'true' &&
-  new URLSearchParams(window.location.search).get('m03') === '1'
-const m04CaptureHarness =
-  import.meta.env.VITE_TEST_HARNESS === 'true' &&
-  new URLSearchParams(window.location.search).get('m04') === '1'
-const m04FallbackHarness =
-  import.meta.env.VITE_TEST_HARNESS === 'true' &&
-  new URLSearchParams(window.location.search).get('m04fallback') === '1'
-const m05Harness =
-  import.meta.env.VITE_TEST_HARNESS === 'true' &&
-  new URLSearchParams(window.location.search).get('m05') === '1'
-const m08Harness =
-  import.meta.env.VITE_TEST_HARNESS === 'true' &&
-  new URLSearchParams(window.location.search).get('m08') === '1'
-const m08SourceNotReady =
-  m08Harness &&
-  new URLSearchParams(window.location.search).get('m08notready') === '1'
-const m08ClipboardError =
-  m08Harness &&
-  new URLSearchParams(window.location.search).get('m08clipboarderror') === '1'
-const m08AlphaQuery = new URLSearchParams(window.location.search).get(
-  'm08alpha',
-)
-const m08SourceAlpha =
-  m08Harness &&
-  (m08AlphaQuery === '0' || m08AlphaQuery === '128' || m08AlphaQuery === '255')
-    ? Number(m08AlphaQuery)
-    : 255
-const m05ViewportHarness =
-  m05Harness &&
-  new URLSearchParams(window.location.search).get('m05viewport') === '1'
-const m05ReferencePerfHarness =
-  import.meta.env.VITE_TEST_HARNESS === 'true' &&
-  new URLSearchParams(window.location.search).get('m05perf') === '1'
+const harness = readAppHarnessConfig()
+const fixture = harness.fixture
+const m03Harness = harness.m03
+const m04CaptureHarness = harness.m04Capture
+const m04FallbackHarness = harness.m04Fallback
+const m05Harness = harness.m05
+const m05ReferencePerfHarness = harness.m05ReferencePerf
 const M05ReferencePerformance =
   import.meta.env.VITE_TEST_HARNESS === 'true'
     ? defineAsyncComponent(() => import('./M05ReferencePerformance.vue'))
@@ -131,126 +98,6 @@ const testActions: ShellActionAdapter | undefined =
       }
     : undefined
 
-const desktopActions: ShellActionAdapter | undefined =
-  import.meta.env.VITE_TEST_HARNESS === 'true' && !m04CaptureHarness
-    ? testActions
-    : '__TAURI_INTERNALS__' in window
-      ? {
-          run: async (action, signal, reportCaptureProgress) => {
-            if (action === 'copy') {
-              const scene = canvasViewportHosts.value?.scene
-              if (!scene) throw new Error('The rendered result is not ready')
-              if (signal.aborted) {
-                throw new ActionCancelledError('Copy cancelled')
-              }
-              await writeResultCanvasToClipboard(scene)
-              if (signal.aborted) {
-                throw new ActionCancelledError('Copy cancelled')
-              }
-              return 'Result copied'
-            }
-            const flush = await documentSession.value?.flush()
-            if (flush?.kind === 'failed') {
-              throw new Error(flush.error)
-            }
-            const { tauriDesktopBridge } = await import('./desktop-bridge')
-            if (action === 'openImage') {
-              const outcome =
-                await tauriDesktopBridge.repositoryOpenImage(correlationId())
-              if (signal.aborted || outcome.kind === 'cancelled') {
-                throw new ActionCancelledError('Open image cancelled')
-              }
-              const mounted = await mountCapturedDocument()
-              if (!mounted) {
-                throw new Error(
-                  'Image was saved, but the editor could not open it',
-                )
-              }
-              return 'Image opened'
-            }
-            if (action !== 'capture' && action !== 'captureWindow') {
-              throw new Error(`${action} is not available yet`)
-            }
-            const onAbort = () => {
-              void tauriDesktopBridge.captureCancel().catch((error) => {
-                console.warn('cute-screen capture cancellation failed', error)
-              })
-            }
-            signal.addEventListener('abort', onAbort, { once: true })
-            try {
-              reportCaptureProgress?.('probing')
-              const capabilities =
-                platformCapabilities.value ??
-                (await tauriDesktopBridge.platformCapabilities(correlationId()))
-              platformCapabilities.value = capabilities
-              if (signal.aborted) {
-                throw new DOMException('Cancelled', 'AbortError')
-              }
-              if (!capabilities.capture.available) {
-                throw new Error(
-                  'Capture is unavailable in this desktop session',
-                )
-              }
-              reportCaptureProgress?.('ready')
-              const captureAction =
-                action === 'captureWindow'
-                  ? 'window'
-                  : capabilities.capture.interactiveSelector
-                    ? 'area'
-                    : 'screen'
-              if (
-                captureAction === 'window' &&
-                !capabilities.capture.windowTarget
-              ) {
-                throw new Error('Window capture is unavailable')
-              }
-              const { getCurrentWindow } =
-                await import('@tauri-apps/api/window')
-              const outcome = await dispatchNativeCapture({
-                session: capabilities.session,
-                mainWindow: getCurrentWindow(),
-                waitForMainWindowUnmap: () =>
-                  tauriDesktopBridge.captureWaitForEditorUnmap(correlationId()),
-                capture: () =>
-                  tauriDesktopBridge.captureRequest({
-                    correlationId: correlationId(),
-                    action: captureAction,
-                    delayMs: 0,
-                    cursor: false,
-                    invocationSource: 'ui',
-                  }),
-              })
-              if (outcome.outcome === 'captured') {
-                const mounted = await mountCapturedDocument()
-                if (!mounted) {
-                  throw new Error(
-                    'Capture was saved, but the editor could not open it',
-                  )
-                }
-                return 'Capture opened'
-              }
-              if (outcome.outcome === 'cancelled') {
-                throw new ActionCancelledError('Capture cancelled')
-              }
-              if (outcome.outcome === 'permissionDenied') {
-                try {
-                  await tauriDesktopBridge.openScreenRecordingSettings()
-                } catch (error) {
-                  console.warn(
-                    'cute-screen Screen Recording settings could not be opened',
-                    error,
-                  )
-                }
-                throw new Error('permissionDenied')
-              }
-              throw new Error(`Capture ${outcome.outcome}`)
-            } finally {
-              signal.removeEventListener('abort', onAbort)
-            }
-          },
-        }
-      : undefined
-
 const documentSession = shallowRef<DocumentSessionController>()
 const documentCoordinator = shallowRef<DocumentSessionCoordinator>()
 const platformCapabilities = shallowRef<PlatformCapabilities>()
@@ -262,8 +109,23 @@ const contentImageBridge = shallowRef<ContentImageBridge>()
 const clipboardBridge = shallowRef<ClipboardBridge>()
 const systemFonts = shallowRef<readonly SystemFontFace[]>([])
 const canvasViewportHosts = shallowRef<CanvasViewportHosts>()
+const m08HarnessController = new M08HarnessController(harness, {
+  documentSession,
+  sourceImage,
+  clipboardBridge,
+  correlationId,
+})
+const desktopActions: ShellActionAdapter | undefined =
+  import.meta.env.VITE_TEST_HARNESS === 'true' && !m04CaptureHarness
+    ? testActions
+    : createDesktopShellActions({
+        canvasHosts: canvasViewportHosts,
+        documentSession,
+        platformCapabilities,
+        correlationId,
+        mountCapturedDocument,
+      })
 const editorFirstFrame = new EditorFirstFrameGate()
-let m08BrowserClipboardText: string | undefined
 let capturedDocumentMount: Promise<boolean> | undefined
 const documentState = shallowRef<ShellDocumentState>({ kind: 'loading' })
 const readOnlyDocument = shallowRef(false)
@@ -302,59 +164,6 @@ function onCanvasViewportHostsReady(hosts: CanvasViewportHosts): void {
 
 function onEditorFrameReady(): void {
   editorFirstFrame.frameReady()
-}
-
-function installM08HarnessFacade(): void {
-  if (!m08Harness) return
-  window.__cuteScreenE2eM08 = {
-    snapshot: () => {
-      const document = documentSession.value?.snapshot.core.document
-      if (!document) return undefined
-      const image = sourceImage.value
-      return {
-        document,
-        ...(image
-          ? {
-              decodedSource: {
-                width: image.naturalWidth,
-                height: image.naturalHeight,
-              },
-            }
-          : {}),
-        ...(m08BrowserClipboardText
-          ? { clipboardText: m08BrowserClipboardText }
-          : {}),
-      }
-    },
-    readClipboardText: async () => {
-      const bridge = clipboardBridge.value
-      if (!bridge) return m08BrowserClipboardText
-      const snapshot = await bridge.readClipboardSnapshot(correlationId())
-      return snapshot.text
-    },
-  }
-}
-
-function installM08BrowserClipboardBridge(): void {
-  // Browser mode injects a command-interception-shaped `__TAURI_INTERNALS__`
-  // object as well, so the explicit M05 document harness is the reliable
-  // boundary between this local adapter and a real Tauri M08 scenario.
-  if (!m08Harness || !m05Harness) return
-  clipboardBridge.value = {
-    readClipboardSnapshot: async () => ({
-      ...(m08BrowserClipboardText ? { text: m08BrowserClipboardText } : {}),
-    }),
-    writeClipboardText: async (text) => {
-      if (m08ClipboardError) throw new Error('clipboard busy')
-      m08BrowserClipboardText = text
-    },
-    stageImage: async () => {
-      throw new Error('M08 browser clipboard does not provide bitmap data')
-    },
-    readImageBytes: async () => {
-      throw new Error('M08 browser clipboard does not provide image bytes')
-    },
-  }
 }
 
 async function refreshPlatformCapabilities(): Promise<void> {
@@ -445,7 +254,7 @@ async function loadPersistedDocument(): Promise<boolean> {
       created.openInitial(incoming)
       documentCoordinator.value = created
     }
-    installM08HarnessFacade()
+    m08HarnessController.installFacade()
     if (m03Harness) {
       window.__cuteScreenE2eDocument = {
         setCrop: () => {
@@ -510,147 +319,15 @@ function onWindowClipboardKeydown(event: KeyboardEvent): void {
   void pasteClipboardIntoEmptyDocument()
 }
 
-function loadM05HarnessImage(
-  dimensions: Readonly<{ width: number; height: number }>,
-): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const image = new Image()
-    image.addEventListener('load', () => resolve(image), { once: true })
-    image.addEventListener(
-      'error',
-      () => reject(new Error('M05 fixture failed')),
-      { once: true },
-    )
-    image.src = `data:image/svg+xml,${encodeURIComponent(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="${dimensions.width}" height="${dimensions.height}"><rect width="100%" height="100%" fill="#273d5a" fill-opacity="${m08SourceAlpha / 255}"/></svg>`,
-    )}`
-  })
-}
-
 async function mountM05HarnessDocument(): Promise<void> {
-  const hash = 'f'.repeat(64)
-  const dimensions = m05ViewportHarness
-    ? { width: 2560, height: 1440 }
-    : m08Harness
-      ? { width: 400, height: 300 }
-      : { width: 160, height: 120 }
-  const document: EditorDocumentV1 = {
-    schemaVersion: 7,
-    id: '019c1f62-058e-7000-8000-000000000005',
-    source: {
-      blobHash: hash,
-      format: 'svg',
-      mimeType: 'image/svg+xml',
-      width: dimensions.width,
-      height: dimensions.height,
-      orientationApplied: true,
-      color: { colorSpace: 'srgb', hasIccProfile: false },
-    },
-    canvas: dimensions,
-    crop: m08Harness ? null : { x: 20, y: 15, width: 100, height: 80 },
-    layers: [
-      {
-        id: '019c1f62-058e-7000-8000-000000000101',
-        kind: 'image',
-        localBounds: {
-          x: 0,
-          y: 0,
-          width: dimensions.width,
-          height: dimensions.height,
-        },
-        transform: {
-          translateX: 0,
-          translateY: 0,
-          rotation: 0,
-          scaleX: 1,
-          scaleY: 1,
-        },
-        opacity: 1,
-        blendMode: 'normal',
-        shadows: [],
-        visible: true,
-        locked: true,
-        payload: {
-          blobHash: hash,
-          intrinsicWidth: dimensions.width,
-          intrinsicHeight: dimensions.height,
-          format: 'svg',
-          orientationApplied: true,
-          color: { colorSpace: 'srgb', hasIccProfile: false },
-          role: 'base',
-          border: null,
-          radius: 0,
-          crop: null,
-          mask: null,
-        },
-      },
-      ...[
-        '019c1f62-058e-7000-8000-000000000102',
-        '019c1f62-058e-7000-8000-000000000103',
-        '019c1f62-058e-7000-8000-000000000104',
-      ].map((id, index) => ({
-        id,
-        kind: 'shape' as const,
-        localBounds: { x: 0, y: 0, width: 60, height: 40 },
-        transform: {
-          translateX: 40,
-          translateY: 30,
-          rotation: index * 5,
-          scaleX: 1,
-          scaleY: 1,
-        },
-        opacity: 1,
-        blendMode: 'normal' as const,
-        shadows: [],
-        visible: true,
-        locked: false,
-        payload: {
-          shape: 'rectangle',
-          fill: {
-            kind: 'solid',
-            color: { red: 0.898, green: 0.282, blue: 0.302, alpha: 1 },
-            opacity: 1,
-          },
-          stroke: {
-            color: { red: 0.898, green: 0.282, blue: 0.302, alpha: 1 },
-            width: 3,
-            style: 'solid',
-            cap: 'round',
-            join: 'round',
-          },
-          cornerRadius: 0,
-          starPoints: 5,
-          starInnerRatio: 0.45,
-        },
-      })),
-    ],
-    presentation: {
-      beautify: { enabled: false },
-      watermark: { enabled: false },
-    },
-    createdAt: '2026-08-10T00:00:00.000Z',
-    updatedAt: '2026-08-10T00:00:00.000Z',
-  }
-  const session = new DocumentSessionController({
-    document,
-    revision: 0,
-    debounceMs: 0,
-    bridge: {
-      saveDocument: async (record) => record.revision + 1,
-      exportRecoveryBundle: async () => ({ kind: 'saved' }),
-    },
+  await mountM05Harness(harness, {
+    documentSession,
+    sourceImage,
     correlationId,
+    installClipboardBridge: () =>
+      m08HarnessController.installBrowserClipboardBridge(),
+    installHarnessFacade: () => m08HarnessController.installFacade(),
   })
-  documentSession.value = session
-  window.__cuteScreenE2eM05 = {
-    snapshot: () => documentSession.value?.snapshot.core.document,
-    versionToken: () => documentSession.value?.snapshot.core.versionToken,
-  }
-  sourceImage.value = m08SourceNotReady
-    ? undefined
-    : await loadM05HarnessImage(dimensions)
-  installM08BrowserClipboardBridge()
-  installM08HarnessFacade()
 }
 
 /** Shares the native outcome event and the command response for one capture. */
@@ -716,114 +393,19 @@ async function flushBeforeLifecycleAction(): Promise<boolean> {
 }
 
 async function installLifecycleGuards(): Promise<void> {
-  if (
-    import.meta.env.VITE_TEST_HARNESS === 'true' &&
-    !m03Harness &&
-    !m04CaptureHarness
-  )
-    return
-  if (!('__TAURI_INTERNALS__' in window)) return
-  const [{ getCurrentWindow }, { listen }, { tauriDesktopBridge }] =
-    await Promise.all([
-      import('@tauri-apps/api/window'),
-      import('@tauri-apps/api/event'),
-      import('./desktop-bridge'),
-    ])
-  const currentWindow = getCurrentWindow()
   lifecycleCleanup.push(
-    await currentWindow.onCloseRequested(async (event) => {
-      event.preventDefault()
-      if (!(await flushBeforeLifecycleAction())) return
-      try {
-        await tauriDesktopBridge.lifecycleCompleteMainWindowClose()
-      } catch (error) {
-        documentState.value = {
-          kind: 'error',
-          message: error instanceof Error ? error.message : String(error),
-        }
-      }
-    }),
+    ...(await installDesktopLifecycleGuards({
+      enabled:
+        import.meta.env.VITE_TEST_HARNESS !== 'true' ||
+        m03Harness ||
+        m04CaptureHarness,
+      documentState,
+      captureProgress,
+      firstFrame: editorFirstFrame,
+      flushBeforeAction: flushBeforeLifecycleAction,
+      mountCapturedDocument,
+    })),
   )
-  lifecycleCleanup.push(
-    await listen('cute-screen:request-quit', async () => {
-      if (!(await flushBeforeLifecycleAction())) return
-      try {
-        await tauriDesktopBridge.lifecycleFinishQuit()
-      } catch (error) {
-        documentState.value = {
-          kind: 'error',
-          message: error instanceof Error ? error.message : String(error),
-        }
-      }
-    }),
-  )
-  lifecycleCleanup.push(
-    await listen<CaptureOutcomeV2>(
-      'cute-screen:capture-outcome',
-      async (event) => {
-        captureProgress.value = undefined
-        if (event.payload.outcome !== 'captured') return
-        let mounted = false
-        const documentId = event.payload.document?.documentId
-        const waitsForEditorFrame =
-          event.payload.completion === 'editor' && documentId !== undefined
-        const firstFrame = waitsForEditorFrame
-          ? editorFirstFrame.waitForNextFrame()
-          : undefined
-        try {
-          mounted = await mountCapturedDocument()
-          if (mounted && firstFrame) await firstFrame
-          if (!mounted && firstFrame) {
-            editorFirstFrame.fail(new Error('editor document mount failed'))
-            await firstFrame
-          }
-        } catch (error) {
-          mounted = false
-          editorFirstFrame.fail(error)
-          await firstFrame?.catch(() => undefined)
-        } finally {
-          if (waitsForEditorFrame) {
-            await tauriDesktopBridge.quickCaptureEditorMounted(
-              documentId,
-              mounted,
-            )
-          }
-        }
-      },
-    ),
-  )
-  lifecycleCleanup.push(
-    await listen<CaptureProgressV1>('cute-screen:capture-progress', (event) => {
-      if (event.payload.version === 1)
-        captureProgress.value = event.payload.state
-    }),
-  )
-  lifecycleCleanup.push(
-    await listen<string>('cute-screen:capture-preflight', async (event) => {
-      let allowed = false
-      try {
-        allowed = await flushBeforeLifecycleAction()
-      } catch (error) {
-        console.warn('cute-screen capture preflight save failed', error)
-      }
-      try {
-        await tauriDesktopBridge.capturePreflightComplete(
-          event.payload,
-          allowed,
-        )
-      } catch (error) {
-        console.warn(
-          'cute-screen capture preflight acknowledgement failed',
-          error,
-        )
-      }
-    }),
-  )
-  try {
-    await tauriDesktopBridge.capturePreflightSetReady(true)
-  } catch (error) {
-    console.warn('cute-screen capture preflight registration failed', error)
-  }
 }
 
 onMounted(() => {
@@ -834,7 +416,7 @@ onMounted(() => {
       textureBridge.value = tauriDesktopBridge
       contentImageBridge.value = tauriDesktopBridge
       clipboardBridge.value = tauriDesktopBridge
-      installM08HarnessFacade()
+      m08HarnessController.installFacade()
     }
     if (m05ReferencePerfHarness) return
     if (m05Harness) {

@@ -93,18 +93,15 @@ export function hsvToSrgb(hsv: HsvColor): SrgbColor {
   const chroma = value * saturation
   const sector = hue / 60
   const x = chroma * (1 - Math.abs((sector % 2) - 1))
-  const [red, green, blue] =
-    sector < 1
-      ? [chroma, x, 0]
-      : sector < 2
-        ? [x, chroma, 0]
-        : sector < 3
-          ? [0, chroma, x]
-          : sector < 4
-            ? [0, x, chroma]
-            : sector < 5
-              ? [x, 0, chroma]
-              : [chroma, 0, x]
+  const sectors = [
+    [chroma, x, 0],
+    [x, chroma, 0],
+    [0, chroma, x],
+    [0, x, chroma],
+    [x, 0, chroma],
+    [chroma, 0, x],
+  ] as const
+  const [red, green, blue] = sectors[Math.min(5, Math.floor(sector))]!
   const match = value - chroma
   return Object.freeze({
     red: red + match,

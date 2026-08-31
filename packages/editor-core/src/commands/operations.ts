@@ -2,7 +2,7 @@ import { normalizeEditorDocument } from '../document/codec'
 import { jsonEquals } from '../document/json'
 import type { EditorDocumentV1, LayerNode } from '../document/types'
 import { assertLayerEditableScale } from '../layer-resize'
-import { rebaseRulerLayer } from '../precision-tools'
+import { rebaseRulerLayer } from '../tools/precision/ruler'
 import type { EditorCommand } from './types'
 
 function assertNever(value: never): never {

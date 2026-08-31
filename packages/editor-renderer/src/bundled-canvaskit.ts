@@ -1,7 +1,7 @@
 import CanvasKitInit from 'canvaskit-wasm'
 import canvasKitWasmUrl from 'canvaskit-wasm/bin/canvaskit.wasm?url'
 
-import type { CanvasKitApi } from './canvaskit'
+import type { CanvasKitApi } from './backends/canvaskit/contracts'
 
 let bundledCanvasKit: Promise<CanvasKitApi> | undefined
 

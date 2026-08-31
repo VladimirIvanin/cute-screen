@@ -1792,6 +1792,43 @@ Portable evidence этого изменения не заменяет platform r
   Quick WebView, исправлен; platform evidence Windows/macOS/Wayland остаётся
   обязательным отдельно.
 
+## TypeScript/Vue architecture refactor evidence (2026-08-31)
+
+Ubuntu 24.04.4 LTS, Linux `6.8.0-138-generic` x86_64, X11,
+WebKitGTK `605.1.15`, Node `22.23.1`, pnpm `10.33.2`. Это evidence
+поведенчески нейтрального рефакторинга по ADR-042; оно не расширяет platform
+support claims и не заменяет Windows/macOS/Wayland runtime matrix.
+
+- `pnpm check` прошёл полностью: lint, TypeScript builds/typechecks, formatting,
+  Markdown links, 6 boundary files / 29 tests, IPC/build contracts и все
+  настроенные Rust fmt/Clippy feature combinations. AST architecture guard
+  подтвердил package/domain direction, отсутствие циклов и root-barrel imports,
+  platform import boundaries и бюджеты 500/600/120/20/4. Все три temporary
+  allowlist в `config/typescript-architecture.json` пусты.
+- `pnpm test` прошёл 75 files / 478 tests; `cargo test --workspace` прошёл
+  123 tests. Вместе с 29 boundary tests это 507 TypeScript scenarios против
+  исследованного baseline 494; skipped tests не добавлялись.
+- `pnpm test:render` прошёл 2 files / 13 tests без изменения golden files.
+  `pnpm test:e2e:browser` прошёл 16/16 spec files. `pnpm test:perf` прошёл
+  4/4 controlled software metrics; pointer path остаётся transient и не создаёт
+  document command до завершения gesture. `pnpm ipc:check` прошёл без изменения
+  generated DTO или wire payloads.
+- Полный `pnpm test:e2e:tauri` был выполнен на текущем host. Прошли foundation,
+  shell, clean-profile capture и четыре renderer transport/decode сценария.
+  Семь interactive WebKitGTK scenarios остались красными: embedded WebDriver
+  отправляет canvas action как Mouse Events без Pointer Events; viewport fit и
+  post-handoff keyboard scenarios также сохраняют известный platform blocker.
+  Для проверки на regression тот же `arrow`, `m05-viewport`,
+  `m08-crop-first-open` и `m08-eyedropper-clipboard` набор был собран и запущен
+  из snapshot `81d1ca8` непосредственно до Vue decomposition: результаты и
+  строки падения идентичны. Production fallback, synthetic event substitution,
+  skip или ослабление assertions не добавлялись. Логи и failure screenshots
+  находятся в `artifacts/tauri-e2e`.
+- `pnpm tauri build` прошёл. Собраны
+  `target/release/bundle/deb/Cute Screen_0.0.0_amd64.deb` и
+  `target/release/bundle/appimage/Cute Screen_0.0.0_amd64.AppImage`. Новых
+  production dependencies, schema/preferences migrations и golden updates нет.
+
 ## CI gates
 
 ### Каждый PR
