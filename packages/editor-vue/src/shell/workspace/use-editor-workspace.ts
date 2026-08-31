@@ -15,11 +15,7 @@ import {
   createBrowserPreferencesStorage,
 } from '../preferences'
 import { useEditorShellStore, type ShellStoreOptions } from '../store'
-import type {
-  ContextToolbarSchema,
-  PrecisionToolDefaults,
-  ToolDescriptor,
-} from '../types'
+import type { PrecisionToolDefaults, ToolDescriptor } from '../types'
 import type { DocumentSessionSnapshot } from '../../document-session'
 import { loadImageWithBinaryFallback } from '../../image-transport'
 import { TextureResourceResolver } from '../../texture-fill'
@@ -47,7 +43,6 @@ import {
   type CropPreset,
   type SrgbColor,
   type TextBackground,
-  type RichTextContent,
   type RichTextParagraphStyle,
   type RichTextSpanStyle,
   applyRichTextParagraphStyle,
@@ -63,6 +58,8 @@ import type { ResolvedEditorShellProps } from '../contracts'
 import { createDrawingSchema } from '../tools/drawing-schema'
 import { createPrecisionSchema } from '../tools/precision-schema'
 import type { PrecisionTool } from '../tools/precision-schema'
+import { createTextSchema } from '../tools/text-schema'
+import { createContextSchema } from '../tools/context-schema'
 
 export function useEditorWorkspace(props: ResolvedEditorShellProps) {
   const store = useEditorShellStore()
@@ -372,414 +369,39 @@ export function useEditorWorkspace(props: ResolvedEditorShellProps) {
       translate,
       hexColor,
     })
-  function buildTextContextSchema(
-    selectedCandidate: LayerNode | undefined,
-    tool: string,
-  ): ContextToolbarSchema | undefined {
-    const selectedText =
-      selectedCandidate?.kind === 'text' ||
-      selectedCandidate?.kind === 'callout' ||
-      selectedCandidate?.kind === 'numberedMarker'
-        ? selectedCandidate
-        : undefined
-    const textKind =
-      textDraft.value?.kind ??
-      (selectedText?.kind === 'text' ||
-      selectedText?.kind === 'callout' ||
-      selectedText?.kind === 'numberedMarker'
-        ? selectedText.kind
-        : tool === 'text' || tool === 'callout' || tool === 'numberedMarker'
-          ? tool
-          : undefined)
-    if (!textKind) return undefined
-    const snapshot = textDraft.value?.snapshot
-    const content: RichTextContent | undefined = selectedText
-      ? selectedText.kind === 'numberedMarker'
-        ? selectedText.payload.label
-        : selectedText.payload.content
-      : undefined
-    const spans = content?.spans ?? []
-    const paragraphs = content?.paragraphs ?? []
-    const same = <T>(values: readonly T[], fallback: T): T | null =>
-      values.length === 0 || values.every((value) => value === values[0])
-        ? (values[0] ?? fallback)
-        : null
-    const sameColor = (values: readonly SrgbColor[]): SrgbColor | null => {
-      const firstColor = values[0]
-      if (firstColor === undefined) return textDefaults.value.color
-      return values.every(
-        (color) =>
-          color.red === firstColor.red &&
-          color.green === firstColor.green &&
-          color.blue === firstColor.blue &&
-          color.alpha === firstColor.alpha,
-      )
-        ? firstColor
-        : null
-    }
-    const first = spans[0]
-    const selectedColor = sameColor(spans.map((span) => span.color))
-    const background =
-      selectedText?.kind === 'text'
-        ? selectedText.payload.background
-        : selectedText?.kind === 'callout'
-          ? selectedText.payload.background
-          : selectedText?.kind === 'numberedMarker'
-            ? { color: selectedText.payload.badge.color, padding: 0, radius: 0 }
-            : textDefaults.value.background
-    const calloutStroke =
-      selectedText?.kind === 'callout' ? selectedText.payload.stroke : undefined
-    const textToolbar = {
-      kind: textKind,
-      color: snapshot
-        ? snapshot.color
-          ? hexColor(snapshot.color)
-          : null
-        : selectedColor
-          ? hexColor(selectedColor)
-          : null,
-      fontFamily: snapshot
-        ? snapshot.fontFamily
-        : same(
-            spans.map((span) => span.fontFamily),
-            textDefaults.value.fontFamily,
-          ),
-      fonts: [
-        ...new Set([
-          'Roboto',
-          'Arial',
-          'Georgia',
-          'monospace',
-          ...(props.systemFonts ?? []).map((face) => face.family),
-          snapshot?.fontFamily ??
-            first?.fontFamily ??
-            textDefaults.value.fontFamily,
-        ]),
-      ],
-      fontSize: snapshot
-        ? snapshot.fontSize
-        : same(
-            spans.map((span) => span.fontSize),
-            textDefaults.value.fontSize,
-          ),
-      bold: snapshot
-        ? snapshot.weight === null
-          ? null
-          : snapshot.weight >= 700
-        : same(
-            spans.map((span) => span.weight >= 700),
-            textDefaults.value.weight >= 700,
-          ),
-      italic: snapshot
-        ? snapshot.italic
-        : same(
-            spans.map((span) => span.italic),
-            textDefaults.value.italic,
-          ),
-      strikethrough: snapshot
-        ? snapshot.strikethrough
-        : same(
-            spans.map((span) => span.strikethrough),
-            textDefaults.value.strikethrough,
-          ),
-      listKind: snapshot
-        ? snapshot.listKind
-        : same(
-            paragraphs.map((paragraph) => paragraph.listKind),
-            textDefaults.value.listKind,
-          ),
-      alignment: snapshot
-        ? snapshot.alignment
-        : same(
-            paragraphs.map((paragraph) => paragraph.alignment),
-            textDefaults.value.alignment,
-          ),
-      background: (snapshot ? snapshot.background : background)
-        ? {
-            color: hexColor(
-              (snapshot ? snapshot.background : background)!.color,
-            ),
-            padding: (snapshot ? snapshot.background : background)!.padding,
-            radius: (snapshot ? snapshot.background : background)!.radius,
-          }
-        : null,
-      disabled:
-        textKind === 'numberedMarker'
-          ? (['list', 'none', 'padding', 'radius'] as const)
-          : [],
-    }
-    return {
-      icon: 'text' as const,
-      title:
-        textKind === 'callout'
-          ? translate('toolCallout')
-          : textKind === 'numberedMarker'
-            ? translate('toolNumberedMarker')
-            : translate('toolText'),
-      hint: translate('canvasViewport'),
-      controls:
-        textKind === 'callout' && calloutStroke
-          ? [
-              {
-                kind: 'color' as const,
-                id: 'color' as const,
-                label: translate('color'),
-                value: hexColor(calloutStroke.color),
-                compact: true,
-                disabled: Boolean(
-                  props.readOnlyDocument ||
-                  (selectedText?.kind === 'callout' && selectedText.locked),
-                ),
-                eyedropper:
-                  Boolean(activeDocument.value) &&
-                  !(
-                    props.readOnlyDocument ||
-                    (selectedText?.kind === 'callout' && selectedText.locked)
-                  ),
-              },
-              {
-                kind: 'arrowStroke' as const,
-                id: 'stroke' as const,
-                label: translate('arrowStroke'),
-                width: calloutStroke.width,
-                style: (calloutStroke.style === 'solid' ||
-                calloutStroke.style === 'dotted'
-                  ? calloutStroke.style
-                  : 'dashed') as 'solid' | 'dashed' | 'dotted',
-                disabled: Boolean(
-                  props.readOnlyDocument ||
-                  (selectedText?.kind === 'callout' && selectedText.locked),
-                ),
-                solidLabel: translate('arrowSolid'),
-                dashedLabel: translate('arrowDashed'),
-                dottedLabel: translate('arrowDotted'),
-              },
-            ]
-          : [],
-      text: textToolbar,
-    }
-  }
-  const floatingTextToolbarSchema = computed(() => {
-    if (!textDraft.value) return undefined
-    const selectedCandidate =
-      store.selectedLayerIds.length === 1
-        ? activeDocument.value?.layers.find(
-            (layer) => layer.id === store.selectedLayerId,
-          )
-        : undefined
-    const schema = buildTextContextSchema(
-      selectedCandidate,
-      state.activeToolId.value ?? 'select',
-    )
-    if (!schema?.text) return undefined
-    return { text: schema.text, title: schema.title }
-  })
-  const floatingArrowToolbarSchema = computed(() => {
-    if ((state.activeToolId.value ?? 'select') !== 'select') return undefined
-    if (store.selectedLayerIds.length !== 1) return undefined
-    const layer = activeDocument.value?.layers.find(
-      (candidate) => candidate.id === store.selectedLayerId,
-    )
-    if (!layer || layer.kind !== 'arrow') return undefined
-    const schema = drawingControl('arrow', layer.payload)
-    return { controls: schema.controls, title: schema.title }
-  })
-  const toolConfigureArrowSchema = computed(() => {
-    if (toolConfigure.value?.toolId !== 'arrow') return undefined
-    const schema = drawingControl('arrow', drawingDefaults.value.arrow)
-    return { controls: schema.controls, title: schema.title }
-  })
-  const contextSchema = computed(() => {
-    const tool = state.activeToolId.value ?? 'select'
-    const selectedCandidate =
-      store.selectedLayerIds.length === 1
-        ? activeDocument.value?.layers.find(
-            (layer) => layer.id === store.selectedLayerId,
-          )
-        : undefined
-    if (tool === 'crop') {
-      return {
-        icon: 'crop' as const,
-        title: translate('toolCrop'),
-        hint: precisionText(
-          'Enter applies · Escape cancels',
-          'Enter применяет · Escape отменяет',
-        ),
-        controls: [
-          {
-            kind: 'select' as const,
-            id: 'cropPreset',
-            label: precisionText('Preset', 'Пропорции'),
-            value: cropPreset.value,
-            options: [
-              { value: 'free', label: precisionText('Free', 'Свободно') },
-              { value: '1:1', label: '1:1' },
-              { value: '4:3', label: '4:3' },
-              { value: '16:9', label: '16:9' },
-              {
-                value: 'original',
-                label: precisionText('Original', 'Оригинал'),
-              },
-            ],
-          },
-          {
-            kind: 'action' as const,
-            id: 'cropReset',
-            label: precisionText('Reset', 'Сбросить'),
-          },
-          {
-            kind: 'action' as const,
-            id: 'cropApply',
-            label: precisionText('Apply', 'Применить'),
-          },
-          {
-            kind: 'action' as const,
-            id: 'cropCancel',
-            label: translate('cancel'),
-          },
-        ],
-      }
-    }
-    const selectedPrecision = selectedPrecisionLayer()
-    const precisionTool =
-      tool === 'censor' ||
-      tool === 'spotlight' ||
-      tool === 'ruler' ||
-      tool === 'loupe'
-        ? tool
-        : tool === 'select'
-          ? selectedPrecision?.kind
-          : undefined
-    if (precisionTool)
-      return precisionToolSchema(precisionTool, selectedPrecision)
-    const textSchema = buildTextContextSchema(
-      selectedCandidate,
-      tool ?? 'select',
-    )
-    if (textSchema) {
-      if (textDraft.value) {
-        return {
-          icon: textSchema.icon,
-          title: textSchema.title,
-          hint: textSchema.hint,
-          controls: textSchema.controls,
-        }
-      }
-      return textSchema
-    }
-    if (tool === 'numberedMarker') {
-      return {
-        icon: 'plus' as const,
-        title: translate('toolNumberedMarker'),
-        hint: translate('canvasViewport'),
-        controls: [
-          {
-            kind: 'select' as const,
-            id: 'markerShape',
-            label: 'Shape',
-            value: markerShape.value,
-            options: ['circle', 'square', 'diamond', 'star'].map((shape) => ({
-              value: shape,
-              label: shape,
-            })),
-          },
-        ],
-      }
-    }
-    if (isDrawingTool(tool)) {
-      if (tool === 'arrow') return undefined
-      const selected = selectedDrawingLayer()
-      return drawingControl(
-        tool,
-        selected?.kind === tool
-          ? selected.payload
-          : drawingDefaults.value[tool],
-      )
-    }
-    const selectedImage =
-      tool === 'select'
-        ? activeDocument.value?.layers.find(
-            (layer) => layer.id === store.selectedLayerId,
-          )
-        : undefined
-    if (
-      selectedImage?.kind === 'image' &&
-      selectedImage.payload.role === 'content'
-    ) {
-      const border = selectedImage.payload.border
-      return {
-        icon: 'image' as const,
-        title: 'Image',
-        hint: translate('canvasViewport'),
-        controls: [
-          {
-            kind: 'range' as const,
-            id: 'imageRadius',
-            label: 'Radius',
-            value: selectedImage.payload.radius ?? 0,
-            min: 0,
-            max: Math.min(
-              128,
-              (selectedImage.localBounds?.width ?? 0) / 2,
-              (selectedImage.localBounds?.height ?? 0) / 2,
-            ),
-            step: 1,
-          },
-          {
-            kind: 'color' as const,
-            id: 'imageBorderColor',
-            label: 'Border',
-            value: hexColor(
-              border?.color ?? { red: 0, green: 0, blue: 0, alpha: 1 },
-            ),
-            disabled: selectedImage.locked,
-            eyedropper: Boolean(activeDocument.value) && !selectedImage.locked,
-          },
-          {
-            kind: 'range' as const,
-            id: 'imageBorderWidth',
-            label: 'Border width',
-            value: border?.width ?? 0,
-            min: 0,
-            max: 16,
-            step: 1,
-          },
-          {
-            kind: 'range' as const,
-            id: 'imageOpacity',
-            label: 'Opacity',
-            value: selectedImage.opacity,
-            min: 0,
-            max: 1,
-            step: 0.05,
-          },
-        ],
-      }
-    }
-    const selected = tool === 'select' ? selectedDrawingLayer() : undefined
-    if (selected && isDrawingTool(selected.kind)) {
-      if (selected.kind === 'arrow') return undefined
-      return drawingControl(selected.kind, selected.payload)
-    }
-    return activeDocument.value
-      ? {
-          icon: 'select' as const,
-          title: translate('canvasActions'),
-          hint: translate('canvasViewport'),
-          controls: [
-            {
-              kind: 'action' as const,
-              id: 'flipHorizontal',
-              label: translate('flipHorizontal'),
-            },
-            {
-              kind: 'action' as const,
-              id: 'flipVertical',
-              label: translate('flipVertical'),
-            },
-          ],
-        }
-      : undefined
+  const { buildTextContextSchema, floatingTextToolbarSchema } =
+    createTextSchema({
+      props,
+      store,
+      activeToolId: state.activeToolId,
+      activeDocument,
+      textDefaults,
+      textDraft,
+      translate,
+      hexColor,
+    })
+  const {
+    contextSchema,
+    floatingArrowToolbarSchema,
+    toolConfigureArrowSchema,
+  } = createContextSchema({
+    store,
+    activeToolId: state.activeToolId,
+    activeDocument,
+    cropPreset,
+    markerShape,
+    textDraft,
+    drawingDefaults,
+    toolConfigure,
+    translate,
+    precisionText,
+    hexColor,
+    selectedPrecisionLayer,
+    precisionToolSchema,
+    buildTextContextSchema,
+    isDrawingTool,
+    selectedDrawingLayer,
+    drawingControl,
   })
   async function onContextAction(id: string): Promise<void> {
     if (id === 'cropReset') {
