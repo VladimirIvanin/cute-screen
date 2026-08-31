@@ -7,10 +7,8 @@ import {
   applyCropSession,
   cancelCropSession,
   createCropSession,
-  nudgeCrop,
   resetCrop,
   setCropPreset,
-  snapRulerEndpoint,
   type CropPreset,
   type RulerAngleGuide,
 } from '@cute-screen/editor-renderer'
@@ -26,7 +24,6 @@ import {
 } from './eyedropper-controller'
 import {
   createCanvasWorkspaceState,
-  DEFAULT_PRECISION_TOOLS,
   type CanvasGesture,
   type ResizeHandle,
 } from './workspace-state'
@@ -56,6 +53,7 @@ import {
   cancelCanvasGesture,
   finishCanvasGesture,
 } from './gesture-finish-controller'
+import { KeyboardController } from './keyboard-controller'
 
 export function useCanvasWorkspace(
   props: CanvasViewportProps,
@@ -320,6 +318,34 @@ export function useCanvasWorkspace(
     renderCommittedScene: renderCommittedSceneForGesture,
     updateArrowToolbar: updateFloatingArrowToolbarLayout,
   }
+  const keyboardController = new KeyboardController({
+    props,
+    emit,
+    scene,
+    outputBounds: viewportOutputBounds,
+    editingText,
+    crop: cropController,
+    samplingCursor,
+    gesture: () => gesture,
+    setGesture: (next: NonNullable<CanvasGesture>) => {
+      gesture = next
+    },
+    setSpacePressed: (pressed: boolean) => {
+      spacePressed = pressed
+    },
+    setRulerGuide: (next: RulerAngleGuide | undefined) => {
+      rulerGuide = next
+    },
+    initialSamplingCursor,
+    sampleScene,
+    hideEyedropper: hideEyedropperPreview,
+    scheduleEyedropper: scheduleEyedropperPreview,
+    applyCrop: applyCropDraft,
+    cancelCrop: cancelCropDraft,
+    cancelText: () => textEditorController.cancel(),
+    cancelGesture: () => cancelGesture(),
+    invalidateOverlay,
+  })
   function scheduleEyedropperPreview(
     point: CanvasPoint,
     client?: Readonly<{ clientX: number; clientY: number }>,
@@ -655,7 +681,6 @@ export function useCanvasWorkspace(
   function startTextEditor(input: TextEditorStartInput): void {
     textEditorController.start(input)
   }
-  const cancelTextEditor = () => textEditorController.cancel()
   const onTextEditorInput = () => textEditorController.input()
   const onTextEditorCompositionStart = () =>
     textEditorController.compositionStart()
@@ -722,131 +747,7 @@ export function useCanvasWorkspace(
     emit('selectTool', 'select')
   }
   function onWindowKeydown(event: KeyboardEvent): void {
-    if (props.sampling && scene.value && props.canvas) {
-      const bounds = viewportOutputBounds.value ?? {
-        x: 0,
-        y: 0,
-        width: props.canvas.width,
-        height: props.canvas.height,
-      }
-      const initial = samplingCursor.value ??
-        initialSamplingCursor() ?? { x: 0, y: 0 }
-      const step = event.shiftKey ? 10 : 1
-      const moves: Record<string, readonly [number, number]> = {
-        ArrowLeft: [-step, 0],
-        ArrowRight: [step, 0],
-        ArrowUp: [0, -step],
-        ArrowDown: [0, step],
-      }
-      if (event.key === 'Enter') {
-        event.preventDefault()
-        sampleScene(initial)
-        return
-      }
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        samplingCursor.value = undefined
-        hideEyedropperPreview()
-        emit('colorSampleCancel')
-        return
-      }
-      const move = moves[event.key]
-      if (move) {
-        event.preventDefault()
-        const next = {
-          x: Math.max(
-            bounds.x,
-            Math.min(bounds.x + bounds.width - 1, initial.x + move[0]),
-          ),
-          y: Math.max(
-            bounds.y,
-            Math.min(bounds.y + bounds.height - 1, initial.y + move[1]),
-          ),
-        }
-        samplingCursor.value = next
-        scheduleEyedropperPreview(next)
-        invalidateOverlay()
-        return
-      }
-    }
-    if (props.activeTool === 'crop' && ensureCropSession()) {
-      const directions = {
-        ArrowLeft: 'left',
-        ArrowRight: 'right',
-        ArrowUp: 'up',
-        ArrowDown: 'down',
-      } as const
-      const direction = directions[event.key as keyof typeof directions]
-      if (direction) {
-        event.preventDefault()
-        cropController.session = nudgeCrop(
-          cropController.session!,
-          direction,
-          event.shiftKey ? 10 : 1,
-        )
-        invalidateOverlay()
-        return
-      }
-      if (event.key === 'Enter') {
-        event.preventDefault()
-        applyCropDraft()
-        return
-      }
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        cancelCropDraft()
-        return
-      }
-    }
-    if (event.key === 'Alt' && gesture?.kind === 'move') {
-      gesture = { ...gesture, guidesVisible: true }
-      invalidateOverlay()
-    }
-    if (event.key === 'Alt' && gesture?.kind === 'precision') {
-      gesture = { ...gesture, guidesHeld: true }
-      const defaults = props.precisionDefaults ?? DEFAULT_PRECISION_TOOLS
-      if (gesture.tool === 'ruler' && defaults.ruler.snap) {
-        const snapped = snapRulerEndpoint(
-          gesture.start,
-          gesture.current,
-          defaults.ruler.snapAngleIncrementDegrees,
-        )
-        gesture = { ...gesture, current: snapped.end }
-        rulerGuide = snapped.guide
-        invalidateOverlay()
-      }
-    }
-    if (
-      event.code === 'Space' &&
-      !(event.target instanceof HTMLInputElement) &&
-      !(event.target instanceof HTMLTextAreaElement) &&
-      !(event.target instanceof HTMLElement && event.target.isContentEditable)
-    ) {
-      spacePressed = true
-    }
-    if (event.key === 'Escape') {
-      if (editingText.value) {
-        cancelTextEditor()
-        return
-      }
-      if (gesture?.kind === 'draw') {
-        cancelGesture()
-      } else if (gesture?.kind === 'calloutDraw') {
-        cancelGesture()
-      } else if (
-        props.activeTool === 'arrow' ||
-        props.activeTool === 'shape' ||
-        props.activeTool === 'pencil' ||
-        props.activeTool === 'marker' ||
-        props.activeTool === 'censor' ||
-        props.activeTool === 'spotlight' ||
-        props.activeTool === 'ruler' ||
-        props.activeTool === 'loupe'
-      ) {
-        cancelGesture()
-        emit('selectTool', 'select')
-      }
-    }
+    keyboardController.keydown(event)
   }
   watch(
     () => props.sampling,
@@ -882,21 +783,10 @@ export function useCanvasWorkspace(
     },
   )
   function onWindowKeyup(event: KeyboardEvent): void {
-    if (event.code === 'Space') spacePressed = false
-    if (event.key === 'Alt' && gesture?.kind === 'move') {
-      gesture = { ...gesture, guidesVisible: false }
-      invalidateOverlay()
-    }
-    if (event.key === 'Alt' && gesture?.kind === 'precision') {
-      gesture = { ...gesture, guidesHeld: false }
-      rulerGuide = undefined
-      invalidateOverlay()
-    }
+    keyboardController.keyup(event)
   }
   function onWindowBlur(): void {
-    spacePressed = false
-    rulerGuide = undefined
-    cancelGesture()
+    keyboardController.blur()
   }
   const onDocumentPointerDown = (event: PointerEvent) =>
     textEditorController.documentPointerDown(event)
