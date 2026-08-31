@@ -28,16 +28,12 @@ import {
   DEFAULT_RULER_FONT_SIZE,
   DEFAULT_RULER_THICKNESS,
   rememberDrawingColor,
-  rebaseRulerLayer,
   type DrawingDefaults,
   type DrawingToolPreferencesV2,
   type EditorDocumentV1,
   type EditorCommand,
   type ImageLayer,
-  type JsonObject,
-  type LayerNode,
   type CropPreset,
-  type Transform2D,
 } from '@cute-screen/editor-renderer'
 import CanvasViewport, {
   type TextFormattingPatch,
@@ -56,6 +52,7 @@ import { createDrawingEffects } from '../tools/effects/drawing-effects'
 import { createImageEffects } from '../tools/effects/image-effects'
 import { createContextEffects } from '../tools/effects/context-effects'
 import { createContextActions } from '../tools/effects/context-actions'
+import { createLayerController } from './layer-controller'
 
 export function useEditorWorkspace(props: ResolvedEditorShellProps) {
   const store = useEditorShellStore()
@@ -405,188 +402,18 @@ export function useEditorWorkspace(props: ResolvedEditorShellProps) {
       eyedropperFeedback.value = undefined
     }
   }
-  function canonicalizeLayerTransform(
-    layer: LayerNode,
-    transform: Transform2D,
-  ): LayerNode {
-    const canvas = activeDocument.value?.canvas
-    if (layer.kind !== 'ruler' || !canvas) return { ...layer, transform }
-    return rebaseRulerLayer({ ...layer, transform }, layer.payload, canvas)
-  }
-  function updateLayerProperty(
-    id: string,
-    property: 'visible' | 'locked' | 'opacity' | 'rotation',
-    value?: number,
-  ): void {
-    const layer = activeDocument.value?.layers.find(
-      (candidate) => candidate.id === id,
-    )
-    if (
-      !layer ||
-      !props.documentSession ||
-      (layer.locked && property !== 'locked')
-    )
-      return
-    if (property === 'opacity') {
-      if (
-        layer.kind === 'text' ||
-        layer.kind === 'callout' ||
-        layer.kind === 'numberedMarker'
-      )
-        return
-      props.documentSession.execute({
-        type: 'updateLayer',
-        before: layer,
-        after: {
-          ...layer,
-          opacity: Math.max(0, Math.min(1, value ?? layer.opacity)),
-        },
-      })
-      return
-    }
-    const after =
-      property === 'visible'
-        ? { ...layer, visible: !layer.visible }
-        : property === 'locked'
-          ? { ...layer, locked: !layer.locked }
-          : canonicalizeLayerTransform(layer, {
-              ...layer.transform,
-              rotation: value ?? layer.transform.rotation,
-            })
-    props.documentSession.execute({
-      type: 'updateLayer',
-      before: layer,
-      after,
-    })
-  }
-  function reorderLayer(id: string, direction: 'up' | 'down'): void {
-    const layers = activeDocument.value?.layers
-    if (!layers || !props.documentSession) return
-    const fromIndex = layers.findIndex((layer) => layer.id === id)
-    const toIndex = fromIndex + (direction === 'up' ? 1 : -1)
-    if (
-      fromIndex < 0 ||
-      toIndex < 0 ||
-      toIndex >= layers.length ||
-      layers[fromIndex]?.locked
-    )
-      return
-    props.documentSession.execute({
-      type: 'reorderLayer',
-      layerId: id,
-      fromIndex,
-      toIndex,
-    })
-  }
-  function onLayerOpacity(id: string, opacity: number): void {
-    updateLayerProperty(id, 'opacity', opacity)
-  }
-  function onLayerRotation(id: string, rotation: number): void {
-    updateLayerProperty(id, 'rotation', rotation)
-  }
-  function resolveLayerReorderToIndex(
-    layerCount: number,
-    fromIndex: number,
-    targetIndex: number,
-    place: 'before' | 'after',
-  ): number {
-    const sourceDisplay = layerCount - 1 - fromIndex
-    const targetDisplay = layerCount - 1 - targetIndex
-    let insertDisplay = place === 'before' ? targetDisplay : targetDisplay + 1
-    if (sourceDisplay < insertDisplay) {
-      insertDisplay -= 1
-    }
-    return layerCount - 1 - insertDisplay
-  }
-  function onLayerReorderTo(
-    id: string,
-    targetId: string,
-    place: 'before' | 'after',
-  ): void {
-    const layers = activeDocument.value?.layers
-    if (!layers || !props.documentSession) return
-    const fromIndex = layers.findIndex((layer) => layer.id === id)
-    const targetIndex = layers.findIndex((layer) => layer.id === targetId)
-    if (
-      fromIndex < 0 ||
-      targetIndex < 0 ||
-      layers[fromIndex]?.locked ||
-      fromIndex === targetIndex
-    )
-      return
-    const toIndex = resolveLayerReorderToIndex(
-      layers.length,
-      fromIndex,
-      targetIndex,
-      place,
-    )
-    if (fromIndex === toIndex) return
-    props.documentSession.execute({
-      type: 'reorderLayer',
-      layerId: id,
-      fromIndex,
-      toIndex,
-    })
-  }
-  function moveLayer(id: string, deltaX: number, deltaY: number): void {
-    const selected = new Set(store.selectedLayerIds)
-    const layers = activeDocument.value?.layers.filter((layer) =>
-      selected.has(layer.id),
-    )
-    if (
-      !layers?.length ||
-      !props.documentSession ||
-      !selected.has(id) ||
-      layers.some((layer) => layer.locked)
-    ) {
-      return
-    }
-    const commands = layers.map((layer) => ({
-      type: 'updateLayer' as const,
-      before: layer,
-      after: canonicalizeLayerTransform(layer, {
-        ...layer.transform,
-        translateX: layer.transform.translateX + deltaX,
-        translateY: layer.transform.translateY + deltaY,
-      }),
-    }))
-    props.documentSession.execute(
-      commands.length === 1 ? commands[0]! : { type: 'batch', commands },
-    )
-  }
-  function selectLayer(id: string, toggle = false, range = false): void {
-    store.selectLayer(id, toggle, range)
-  }
-  function transformLayer(id: string, transform: Transform2D): void {
-    const layer = activeDocument.value?.layers.find(
-      (candidate) => candidate.id === id,
-    )
-    if (!layer || layer.locked || !props.documentSession) return
-    props.documentSession.execute({
-      type: 'updateLayer',
-      before: layer,
-      after: canonicalizeLayerTransform(layer, transform),
-    })
-  }
-  function updateLayerPayload(id: string, payload: JsonObject): void {
-    const layer = activeDocument.value?.layers.find(
-      (candidate) => candidate.id === id,
-    )
-    if (!layer || layer.locked || !props.documentSession) return
-    props.documentSession.execute({
-      type: 'updateLayer',
-      before: layer,
-      after: { ...layer, payload } as LayerNode,
-    })
-  }
-  function addLayer(
-    layer: import('@cute-screen/editor-renderer').LayerNode,
-    selectAfter = false,
-  ): void {
-    if (!props.documentSession || props.readOnlyDocument) return
-    props.documentSession.execute({ type: 'addLayer', layer })
-    if (selectAfter && layer.kind === 'loupe') store.selectLayer(layer.id)
-  }
+  const {
+    updateLayerProperty,
+    reorderLayer,
+    onLayerOpacity,
+    onLayerRotation,
+    onLayerReorderTo,
+    moveLayer,
+    selectLayer,
+    transformLayer,
+    updateLayerPayload,
+    addLayer,
+  } = createLayerController({ props, activeDocument, store })
   async function importContentImage(origin: {
     readonly x: number
     readonly y: number
@@ -925,17 +752,10 @@ export function useEditorWorkspace(props: ResolvedEditorShellProps) {
       if (layers?.length && !layers.some((layer) => layer.locked)) {
         event.preventDefault()
         const multiplier = event.shiftKey ? 10 : 1
-        const commands = layers.map((layer) => ({
-          type: 'updateLayer' as const,
-          before: layer,
-          after: canonicalizeLayerTransform(layer, {
-            ...layer.transform,
-            translateX: layer.transform.translateX + delta[0] * multiplier,
-            translateY: layer.transform.translateY + delta[1] * multiplier,
-          }),
-        }))
-        props.documentSession?.execute(
-          commands.length === 1 ? commands[0]! : { type: 'batch', commands },
+        moveLayer(
+          store.selectedLayerIds[0]!,
+          delta[0] * multiplier,
+          delta[1] * multiplier,
         )
       }
       return
