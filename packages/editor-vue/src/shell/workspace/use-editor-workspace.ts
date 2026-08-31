@@ -30,7 +30,6 @@ import {
   DEFAULT_RULER_FONT_SIZE,
   DEFAULT_RULER_THICKNESS,
   rememberDrawingColor,
-  rebaseArrowLayer,
   rebaseRulerLayer,
   type DrawingDefaults,
   type DrawingToolPreferencesV2,
@@ -55,6 +54,9 @@ import { createContextSchema } from '../tools/context-schema'
 import { createToolCatalog } from '../tools/catalog'
 import { createPrecisionEffects } from '../tools/effects/precision-effects'
 import { createTextEffects } from '../tools/effects/text-effects'
+import { createDrawingEffects } from '../tools/effects/drawing-effects'
+import { createImageEffects } from '../tools/effects/image-effects'
+import { createContextEffects } from '../tools/effects/context-effects'
 
 export function useEditorWorkspace(props: ResolvedEditorShellProps) {
   const store = useEditorShellStore()
@@ -252,6 +254,33 @@ export function useEditorWorkspace(props: ResolvedEditorShellProps) {
     textFormatting,
     textDraft,
   })
+  const { applyDrawingChange } = createDrawingEffects({
+    props,
+    activeToolId: state.activeToolId,
+    configureDefaultsTool,
+    drawingDefaults,
+    drawingPreferences,
+    isDrawingTool,
+    selectedDrawingLayer,
+    savePreferences: (value) =>
+      createBrowserDrawingToolPreferencesStorage(browserStorage()).save(value),
+  })
+  const { applyImageChange } = createImageEffects({
+    props,
+    selectedLayerId: state.selectedLayerId,
+    activeDocument,
+  })
+  const { onContextChange } = createContextEffects({
+    activeToolId: state.activeToolId,
+    cropPreset,
+    markerShape,
+    canvas: canvasViewport,
+    applyTextChange: applyV7TextChange,
+    applyCalloutChange: applyCalloutStrokeChange,
+    applyPrecisionChange,
+    applyImageChange,
+    applyDrawingChange,
+  })
   async function onContextAction(id: string): Promise<void> {
     if (id === 'cropReset') {
       cropPreset.value = 'free'
@@ -347,418 +376,6 @@ export function useEditorWorkspace(props: ResolvedEditorShellProps) {
         ),
       )
     }
-  }
-  function onContextChange(id: string, value: string): void {
-    if (applyV7TextChange(id, value)) return
-    if (applyCalloutStrokeChange(id, value)) return
-    if (id === 'cropPreset') {
-      if (!['free', '1:1', '4:3', '16:9', 'original'].includes(value)) return
-      cropPreset.value = value as CropPreset
-      canvasViewport.value?.setCropPresetValue(cropPreset.value)
-      return
-    }
-    if (applyPrecisionChange(id, value)) return
-    const activeTool = state.activeToolId.value
-    if (
-      id === 'imageRadius' ||
-      id === 'imageBorderColor' ||
-      id === 'imageBorderWidth' ||
-      id === 'imageOpacity'
-    ) {
-      const image = activeDocument.value?.layers.find(
-        (layer) => layer.id === store.selectedLayerId,
-      )
-      if (
-        !image ||
-        image.kind !== 'image' ||
-        image.payload.role !== 'content' ||
-        !props.documentSession ||
-        image.locked
-      ) {
-        return
-      }
-      const currentBorder = image.payload.border
-      const defaultBorder = {
-        color: { red: 0, green: 0, blue: 0, alpha: 1 },
-        width: 2,
-        style: 'solid' as const,
-        cap: 'round' as const,
-        join: 'round' as const,
-      }
-      let payload = image.payload
-      let opacity = image.opacity
-      if (id === 'imageRadius') {
-        const radius = Number(value)
-        const maxRadius =
-          Math.min(
-            image.localBounds?.width ?? 0,
-            image.localBounds?.height ?? 0,
-          ) / 2
-        if (!Number.isFinite(radius) || radius < 0 || radius > maxRadius) return
-        payload = { ...payload, radius }
-      } else if (id === 'imageOpacity') {
-        const nextOpacity = Number(value)
-        if (!Number.isFinite(nextOpacity) || nextOpacity < 0 || nextOpacity > 1)
-          return
-        opacity = nextOpacity
-      } else if (id === 'imageBorderWidth') {
-        const width = Number(value)
-        if (!Number.isFinite(width) || width < 0 || width > 16) return
-        payload = {
-          ...payload,
-          border:
-            width === 0 ? null : { ...(currentBorder ?? defaultBorder), width },
-        }
-      } else {
-        const match = /^#([0-9a-f]{6})$/iu.exec(value)
-        if (!match) return
-        const hex = match[1]!
-        payload = {
-          ...payload,
-          border: {
-            ...(currentBorder ?? defaultBorder),
-            color: {
-              red: Number.parseInt(hex.slice(0, 2), 16) / 255,
-              green: Number.parseInt(hex.slice(2, 4), 16) / 255,
-              blue: Number.parseInt(hex.slice(4, 6), 16) / 255,
-              alpha: 1,
-            },
-          },
-        }
-      }
-      props.documentSession.execute({
-        type: 'updateLayer',
-        before: image,
-        after: { ...image, payload, opacity },
-      })
-      return
-    }
-    if (activeTool === 'numberedMarker') {
-      if (['circle', 'square', 'diamond', 'star'].includes(value)) {
-        markerShape.value = value as typeof markerShape.value
-      }
-      return
-    }
-    const selectedCandidate = selectedDrawingLayer()
-    const selected = configureDefaultsTool.value
-      ? undefined
-      : isDrawingTool(activeTool)
-        ? selectedCandidate?.kind === activeTool
-          ? selectedCandidate
-          : undefined
-        : activeTool === 'select'
-          ? selectedCandidate
-          : undefined
-    const tool = configureDefaultsTool.value
-      ? configureDefaultsTool.value
-      : isDrawingTool(activeTool)
-        ? activeTool
-        : selected && isDrawingTool(selected.kind)
-          ? selected.kind
-          : undefined
-    if (
-      ![
-        'color',
-        'width',
-        'cornerRadius',
-        'starPoints',
-        'starInnerRatio',
-        'shapeKind',
-        'arrowPath',
-        'startCap',
-        'endCap',
-        'strokeStyle',
-        'brush',
-        'markerMode',
-        'layerOpacity',
-        'blendMode',
-        'fillKind',
-        'fillOpacity',
-      ].includes(id) ||
-      !tool
-    )
-      return
-    const current = selected ? selected.payload : drawingDefaults.value[tool]
-    let payload: JsonObject
-    if (id === 'layerOpacity') {
-      const opacity = Number(value) / 100
-      if (!Number.isFinite(opacity) || opacity < 0 || opacity > 1) return
-      payload = { ...current, layerOpacity: opacity }
-    } else if (id === 'blendMode') {
-      if (
-        ![
-          'normal',
-          'multiply',
-          'screen',
-          'overlay',
-          'darken',
-          'lighten',
-          'softLight',
-          'hardLight',
-        ].includes(value)
-      )
-        return
-      payload = { ...current, blendMode: value }
-    } else if (id === 'shapeKind') {
-      if (
-        tool !== 'shape' ||
-        !['rectangle', 'circle', 'oval', 'diamond', 'star'].includes(value)
-      )
-        return
-      payload = { ...current, shape: value }
-    } else if (id === 'arrowPath') {
-      if (
-        tool !== 'arrow' ||
-        (value !== 'straight' && value !== 'quadratic' && value !== 'elbow')
-      )
-        return
-      const start = current.start as {
-        readonly x?: unknown
-        readonly y?: unknown
-      }
-      const end = current.end as { readonly x?: unknown; readonly y?: unknown }
-      const midpoint = {
-        x:
-          typeof start?.x === 'number' && typeof end?.x === 'number'
-            ? (start.x + end.x) / 2
-            : 0,
-        y:
-          typeof start?.y === 'number' && typeof end?.y === 'number'
-            ? (start.y + end.y) / 2
-            : 0,
-      }
-      const { bend: _bend, elbow: _elbow, ...pathIndependent } = current
-      void _bend
-      void _elbow
-      payload =
-        value === 'quadratic'
-          ? {
-              ...pathIndependent,
-              path: value,
-              bend:
-                current.bend && typeof current.bend === 'object'
-                  ? current.bend
-                  : midpoint,
-            }
-          : value === 'elbow'
-            ? {
-                ...pathIndependent,
-                path: value,
-                elbow:
-                  current.elbow && typeof current.elbow === 'object'
-                    ? current.elbow
-                    : { axis: 'y', offset: 0 },
-              }
-            : { ...pathIndependent, path: value }
-    } else if (id === 'startCap' || id === 'endCap') {
-      if (
-        tool !== 'arrow' ||
-        ![
-          'none',
-          'lineArrow',
-          'solidArrow',
-          'triangle',
-          'circle',
-          'diamond',
-        ].includes(value)
-      )
-        return
-      payload = { ...current, [id]: value }
-    } else if (id === 'strokeStyle') {
-      if (
-        tool !== 'arrow' ||
-        (value !== 'solid' && value !== 'dashed' && value !== 'dotted')
-      )
-        return
-      payload = {
-        ...current,
-        stroke: {
-          ...(current.stroke as Record<string, unknown>),
-          style: value,
-        },
-      }
-    } else if (id === 'brush') {
-      if (tool !== 'pencil' || !['pen', 'pencil', 'brush'].includes(value))
-        return
-      payload = { ...current, brush: value }
-    } else if (id === 'markerMode') {
-      if (tool !== 'marker' || (value !== 'highlight' && value !== 'darken'))
-        return
-      payload = { ...current, mode: value }
-    } else if (id === 'fillKind') {
-      if (
-        tool !== 'shape' ||
-        !['none', 'solid', 'linearGradient', 'radialGradient'].includes(value)
-      )
-        return
-      const candidateStrokeColor = (
-        current.stroke as Record<string, unknown> | undefined
-      )?.color
-      const strokeColor: JsonObject =
-        candidateStrokeColor && typeof candidateStrokeColor === 'object'
-          ? (candidateStrokeColor as JsonObject)
-          : { red: 0.898, green: 0.282, blue: 0.302, alpha: 1 }
-      payload = {
-        ...current,
-        fill:
-          value === 'none'
-            ? { kind: 'none' }
-            : value === 'solid'
-              ? { kind: 'solid', color: strokeColor, opacity: 1 }
-              : value === 'linearGradient'
-                ? {
-                    kind: 'linearGradient',
-                    start: { x: 0, y: 0 },
-                    end: { x: 1, y: 1 },
-                    opacity: 1,
-                    stops: [
-                      { position: 0, color: strokeColor },
-                      {
-                        position: 1,
-                        color: { red: 1, green: 1, blue: 1, alpha: 0 },
-                      },
-                    ],
-                  }
-                : {
-                    kind: 'radialGradient',
-                    center: { x: 0.5, y: 0.5 },
-                    radius: 0.5,
-                    opacity: 1,
-                    stops: [
-                      { position: 0, color: strokeColor },
-                      {
-                        position: 1,
-                        color: { red: 1, green: 1, blue: 1, alpha: 0 },
-                      },
-                    ],
-                  },
-      }
-    } else if (id === 'fillOpacity') {
-      if (tool !== 'shape') return
-      const opacity = Number(value) / 100
-      const fill = current.fill
-      if (
-        !Number.isFinite(opacity) ||
-        opacity < 0 ||
-        opacity > 1 ||
-        !fill ||
-        typeof fill !== 'object' ||
-        (fill as Record<string, unknown>).kind === 'none'
-      )
-        return
-      payload = {
-        ...current,
-        fill: { ...(fill as Record<string, unknown>), opacity },
-      }
-    } else if (
-      id === 'width' ||
-      id === 'cornerRadius' ||
-      id === 'starPoints' ||
-      id === 'starInnerRatio'
-    ) {
-      const width = Number(value)
-      if (
-        !Number.isFinite(width) ||
-        (id === 'width' && width <= 0) ||
-        (id === 'cornerRadius' && width < 0) ||
-        (id === 'starPoints' &&
-          (!Number.isInteger(width) || width < 3 || width > 32)) ||
-        (id === 'starInnerRatio' && (width <= 0 || width >= 1))
-      )
-        return
-      if (id === 'cornerRadius') {
-        if (tool !== 'shape' || width < 0) return
-        payload = { ...current, cornerRadius: width }
-      } else if (id === 'starPoints' || id === 'starInnerRatio') {
-        if (tool !== 'shape') return
-        payload = { ...current, [id]: width }
-      } else {
-        payload =
-          tool === 'arrow' || tool === 'shape'
-            ? {
-                ...current,
-                stroke: {
-                  ...(current.stroke as Record<string, unknown>),
-                  width,
-                },
-              }
-            : { ...current, width }
-      }
-    } else {
-      const match = /^#([0-9a-f]{6})$/iu.exec(value)
-      if (!match) return
-      const hex = match[1]!
-      const color = {
-        red: Number.parseInt(hex.slice(0, 2), 16) / 255,
-        green: Number.parseInt(hex.slice(2, 4), 16) / 255,
-        blue: Number.parseInt(hex.slice(4, 6), 16) / 255,
-        alpha: 1,
-      }
-      payload =
-        tool === 'arrow' || tool === 'shape'
-          ? {
-              ...current,
-              stroke: { ...(current.stroke as Record<string, unknown>), color },
-            }
-          : { ...current, color }
-    }
-    if (selected) {
-      if (!props.documentSession || selected.locked) return
-      let after: LayerNode = {
-        ...selected,
-        ...(id === 'layerOpacity'
-          ? { opacity: payload.layerOpacity as number }
-          : {}),
-        ...(id === 'blendMode'
-          ? {
-              blendMode:
-                payload.blendMode as import('@cute-screen/editor-renderer').BlendMode,
-            }
-          : {}),
-        ...(id === 'layerOpacity' || id === 'blendMode' ? {} : { payload }),
-        ...(id === 'markerMode'
-          ? {
-              blendMode:
-                value === 'darken'
-                  ? ('darken' as const)
-                  : ('multiply' as const),
-            }
-          : {}),
-      } as LayerNode
-      if (
-        selected.kind === 'arrow' &&
-        id !== 'layerOpacity' &&
-        id !== 'blendMode'
-      ) {
-        after = rebaseArrowLayer(selected, payload as typeof selected.payload)
-      }
-      props.documentSession.execute({
-        type: 'updateLayer',
-        before: selected,
-        after,
-      })
-      return
-    }
-    drawingDefaults.value = { ...drawingDefaults.value, [tool]: payload }
-    drawingPreferences.value = {
-      ...drawingPreferences.value,
-      defaults: drawingDefaults.value,
-    }
-    if (id === 'color') {
-      const candidate =
-        tool === 'arrow' || tool === 'shape'
-          ? (payload.stroke as Record<string, unknown> | undefined)?.color
-          : payload.color
-      if (candidate && typeof candidate === 'object') {
-        drawingPreferences.value = rememberDrawingColor(
-          drawingPreferences.value,
-          candidate as import('@cute-screen/editor-renderer').SrgbColor,
-        )
-      }
-    }
-    createBrowserDrawingToolPreferencesStorage(browserStorage()).save(
-      drawingPreferences.value,
-    )
   }
   function rememberColor(value: string): void {
     const match = /^#([\da-f]{6})$/iu.exec(value)
