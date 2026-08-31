@@ -1,6 +1,5 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
 import {
-  drawNodes2D,
   hitTestDocument,
   hitTestDocumentAll,
   BOUNDS_RESIZE_HANDLES,
@@ -34,7 +33,6 @@ import {
   type CropSession,
   type RulerAngleGuide,
 } from '@cute-screen/editor-renderer'
-import { drawClampedHandleSquare } from '../overlay-handle-bounds'
 import type {
   CanvasPoint,
   CanvasViewportProps,
@@ -70,6 +68,7 @@ import {
 } from './geometry-controller'
 import { CropController } from './crop-controller'
 import { DraftController } from './draft-controller'
+import { CanvasOverlayController } from './overlay-controller'
 
 export function useCanvasWorkspace(
   props: CanvasViewportProps,
@@ -192,6 +191,28 @@ export function useCanvasWorkspace(
     documentForScene: documentWithoutGestureLayer,
     previewLayer: gesturePreviewLayer,
     invalidateOverlay,
+  })
+  const overlayController = new CanvasOverlayController({
+    props,
+    overlay,
+    outputBounds: viewportOutputBounds,
+    renderer: rendererController,
+    gesture: () => gesture,
+    previewNodes: gesturePreviewNodes,
+    previewLayer: gesturePreviewLayer,
+    selectedLayer,
+    drawDrafts: (context) => {
+      drawDraft(context)
+      drawCalloutDraft(context)
+      drawPrecisionDraft(context)
+    },
+    drawCrop: drawCropOverlay,
+    layerBounds,
+    worldHandlePositions: worldBoundsHandlePositions,
+    transformPoint,
+    toLocal,
+    loupeSourceCenter,
+    moveLoupeSource: moveLoupeSourceMarker,
   })
   const drawDocument = () => rendererController.drawDocument()
   const renderCommittedSceneForGesture = () =>
@@ -388,225 +409,7 @@ export function useCanvasWorkspace(
     return cropController.draw(context, outputBounds)
   }
   function drawOverlay(): void {
-    const outputBounds = viewportOutputBounds.value
-    if (!overlay.value || !props.canvas || !outputBounds) return
-    const context = overlay.value.getContext('2d')
-    if (!context || typeof context.clearRect !== 'function') return
-    const previewNodes = gesturePreviewNodes()
-    const renderedByBackend = rendererController.renderOverlay(previewNodes)
-    if (!renderedByBackend) {
-      context.setTransform?.(1, 0, 0, 1, 0, 0)
-      context.clearRect(0, 0, overlay.value.width, overlay.value.height)
-    }
-    // Overlay primitives are expressed in document canvas coordinates even
-    // though the visible bitmap is output-local after a committed crop.
-    context.setTransform?.(1, 0, 0, 1, -outputBounds.x, -outputBounds.y)
-    if (!renderedByBackend) drawNodes2D(context, previewNodes)
-    drawDraft(context)
-    drawCalloutDraft(context)
-    drawPrecisionDraft(context)
-    if (drawCropOverlay(context, outputBounds)) return
-    const committedLayer = selectedLayer()
-    const previewLayer = gesturePreviewLayer()
-    const layer =
-      previewLayer && previewLayer.id === committedLayer?.id
-        ? previewLayer
-        : committedLayer
-    if (!layer || !layer.visible) return
-    // `gesturePreviewLayer` already includes the transient transform. Applying
-    // `previewTransform` again made the selection frame drift by a second delta.
-    const transform = layer.transform
-    const bounds = layerBounds(layer)
-    context.save()
-    context.translate(transform.translateX, transform.translateY)
-    context.rotate((transform.rotation * Math.PI) / 180)
-    context.scale(transform.scaleX, transform.scaleY)
-    context.lineWidth =
-      1 / Math.max(Math.abs(transform.scaleX), Math.abs(transform.scaleY), 1)
-    context.strokeStyle = '#d9773b'
-    context.setLineDash([4, 3])
-    context.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height)
-    context.setLineDash([])
-    context.restore()
-    if (layer.locked) return
-    const handleHalfSize = 3 / ((props.zoom ?? 100) / 100)
-    context.fillStyle = '#fff'
-    context.strokeStyle = '#d9773b'
-    const intrinsicHandles = layerIntrinsicResizeHandles(layer).filter(
-      (handle): handle is ResizeHandle =>
-        handle !== 'start' && handle !== 'end',
-    )
-    const resizeHandles =
-      layer.kind === 'image' ? BOUNDS_RESIZE_HANDLES : intrinsicHandles
-    const handlesToDraw =
-      resizeHandles.length > 0
-        ? resizeHandles
-        : (['nw', 'ne', 'se', 'sw'] as const)
-    const boundsPositions = worldBoundsHandlePositions(layer, transform)
-    for (const handle of handlesToDraw) {
-      drawClampedHandleSquare(
-        context,
-        boundsPositions[handle],
-        handleHalfSize,
-        outputBounds,
-      )
-    }
-    if (layer.kind === 'callout') {
-      for (const { kind: name, point: saved } of calloutSelectionHandles(
-        layer,
-      )) {
-        const local =
-          gesture?.kind === 'calloutHandle' &&
-          gesture.id === layer.id &&
-          gesture.handle === name
-            ? toLocal(layer, gesture.current)
-            : saved
-        const position = transformPoint(transform, local)
-        context.beginPath()
-        context.arc(position.x, position.y, handleHalfSize + 2, 0, Math.PI * 2)
-        context.fill()
-        context.stroke()
-      }
-    }
-    if (layer.kind === 'arrow') {
-      for (const { kind: name, point: saved } of arrowSelectionHandles(layer)) {
-        const local =
-          gesture?.kind === 'arrowHandle' &&
-          gesture.id === layer.id &&
-          gesture.handle === name
-            ? toLocal(layer, gesture.current)
-            : saved
-        const position = transformPoint(transform, local)
-        context.beginPath()
-        context.arc(position.x, position.y, handleHalfSize + 2, 0, Math.PI * 2)
-        context.fill()
-        context.stroke()
-      }
-    }
-    if (layer.kind === 'ruler') {
-      for (const saved of [layer.payload.start, layer.payload.end]) {
-        const position = transformPoint(transform, saved)
-        context.beginPath()
-        context.arc(position.x, position.y, handleHalfSize + 2, 0, Math.PI * 2)
-        context.fill()
-        context.stroke()
-      }
-    }
-    if (layer.kind === 'loupe') {
-      const source =
-        gesture?.kind === 'loupeSource' && gesture.id === layer.id
-          ? loupeSourceCenter(moveLoupeSourceMarker(layer, gesture.current))
-          : undefined
-      drawSelectedLoupeOverlay(context, layer, transform, source)
-    }
-    if (gesture?.kind === 'move' && gesture.guidesVisible) {
-      context.save()
-      context.strokeStyle = '#d9773b'
-      context.lineWidth = 1 / ((props.zoom ?? 100) / 100)
-      context.setLineDash([
-        3 / ((props.zoom ?? 100) / 100),
-        3 / ((props.zoom ?? 100) / 100),
-      ])
-      for (const guide of gesture.guides) {
-        context.beginPath()
-        context.moveTo(guide.x, 0)
-        context.lineTo(guide.x, props.canvas.height)
-        context.moveTo(0, guide.y)
-        context.lineTo(props.canvas.width, guide.y)
-        context.stroke()
-      }
-      context.restore()
-    }
-  }
-  function roundedOverlayPath(
-    context: CanvasRenderingContext2D,
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    radius: number,
-  ): void {
-    const right = x + width
-    const bottom = y + height
-    const safeRadius = Math.min(radius, width / 2, height / 2)
-    context.beginPath()
-    context.moveTo(x + safeRadius, y)
-    context.lineTo(right - safeRadius, y)
-    context.quadraticCurveTo(right, y, right, y + safeRadius)
-    context.lineTo(right, bottom - safeRadius)
-    context.quadraticCurveTo(right, bottom, right - safeRadius, bottom)
-    context.lineTo(x + safeRadius, bottom)
-    context.quadraticCurveTo(x, bottom, x, bottom - safeRadius)
-    context.lineTo(x, y + safeRadius)
-    context.quadraticCurveTo(x, y, x + safeRadius, y)
-    context.closePath()
-  }
-  function drawSelectedLoupeOverlay(
-    context: CanvasRenderingContext2D,
-    layer: Extract<LayerNode, { readonly kind: 'loupe' }>,
-    transform: Transform2D,
-    sourceOverride?: CanvasPoint,
-  ): void {
-    const scale = (props.zoom ?? 100) / 100
-    const source = sourceOverride ?? loupeSourceCenter(layer)
-    const markerHalf = 4 / scale
-    context.save()
-    context.fillStyle = '#ffffff'
-    context.strokeStyle = '#d9773b'
-    context.lineWidth = 1.5 / scale
-    context.fillRect(
-      source.x - markerHalf,
-      source.y - markerHalf,
-      markerHalf * 2,
-      markerHalf * 2,
-    )
-    context.strokeRect(
-      source.x - markerHalf,
-      source.y - markerHalf,
-      markerHalf * 2,
-      markerHalf * 2,
-    )
-
-    const bounds = layerBounds(layer)
-    const lensBottom = transformPoint(transform, {
-      x: bounds.x + bounds.width / 2,
-      y: bounds.y + bounds.height,
-    })
-    const lensTop = transformPoint(transform, {
-      x: bounds.x + bounds.width / 2,
-      y: bounds.y,
-    })
-    const labels = [
-      `${String(layer.payload.zoom).replace(/\.0$/, '')}×`,
-      `${Math.round(layer.payload.lens.size)}`,
-    ]
-    context.font = `600 ${11 / scale}px system-ui, sans-serif`
-    context.textAlign = 'center'
-    context.textBaseline = 'middle'
-    const height = 18 / scale
-    const gap = 6 / scale
-    const widths = labels.map(
-      (label) => context.measureText(label).width + 14 / scale,
-    )
-    const totalWidth = widths[0]! + widths[1]! + gap
-    const belowY = lensBottom.y + 8 / scale
-    const y =
-      belowY + height <= (props.canvas?.height ?? Number.POSITIVE_INFINITY)
-        ? belowY
-        : lensTop.y - 8 / scale - height
-    let x = lensBottom.x - totalWidth / 2
-    for (const [index, label] of labels.entries()) {
-      const width = widths[index]!
-      roundedOverlayPath(context, x, y, width, height, height / 2)
-      context.fillStyle = '#ffffff'
-      context.strokeStyle = '#d9773b'
-      context.fill()
-      context.stroke()
-      context.fillStyle = '#d9773b'
-      context.fillText(label, x + width / 2, y + height / 2)
-      x += width + gap
-    }
-    context.restore()
+    overlayController.draw()
   }
   function invalidateOverlay(): void {
     // Interaction state is non-reactive; only the lightweight overlay updates
