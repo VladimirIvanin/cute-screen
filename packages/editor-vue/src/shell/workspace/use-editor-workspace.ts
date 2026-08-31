@@ -18,9 +18,7 @@ import { useEditorShellStore, type ShellStoreOptions } from '../store'
 import type { PrecisionToolDefaults } from '../types'
 import type { DocumentSessionSnapshot } from '../../document-session'
 import { loadImageWithBinaryFallback } from '../../image-transport'
-import { TextureResourceResolver } from '../../texture-fill'
 import {
-  createFlipCanvasCommand,
   createContentImageLayer,
   createDuplicateLayerCommand,
   createTextLayer,
@@ -57,6 +55,7 @@ import { createTextEffects } from '../tools/effects/text-effects'
 import { createDrawingEffects } from '../tools/effects/drawing-effects'
 import { createImageEffects } from '../tools/effects/image-effects'
 import { createContextEffects } from '../tools/effects/context-effects'
+import { createContextActions } from '../tools/effects/context-actions'
 
 export function useEditorWorkspace(props: ResolvedEditorShellProps) {
   const store = useEditorShellStore()
@@ -151,7 +150,6 @@ export function useEditorWorkspace(props: ResolvedEditorShellProps) {
   const eyedropperFeedback = ref<string>()
   const eyedropperColor = ref<string>()
   const toolError = ref<string>()
-  let textureResolver: TextureResourceResolver | undefined
   const textureImages = ref<ReadonlyMap<string, HTMLImageElement>>(new Map())
   const activeDocument = ref<EditorDocumentV1>()
   const baseImageLayer = computed(() =>
@@ -281,102 +279,18 @@ export function useEditorWorkspace(props: ResolvedEditorShellProps) {
     applyImageChange,
     applyDrawingChange,
   })
-  async function onContextAction(id: string): Promise<void> {
-    if (id === 'cropReset') {
-      cropPreset.value = 'free'
-      canvasViewport.value?.resetCropDraft()
-      return
-    }
-    if (id === 'cropApply') {
-      canvasViewport.value?.applyCropDraft()
-      return
-    }
-    if (id === 'cropCancel') {
-      canvasViewport.value?.cancelCropDraft()
-      return
-    }
-    /* Legacy style-preset and text-texture actions are intentionally absent. */
-    if (id === 'importTexture') {
-      if (!props.textureBridge) return
-      textureResolver ??= new TextureResourceResolver({
-        bridge: props.textureBridge,
-        correlationId: () => crypto.randomUUID(),
-      })
-      const imported = await textureResolver.import()
-      if (imported.kind !== 'imported') return
-      const resource = textureResolver.get(imported.blobHash)
-      if (resource?.kind === 'ready') {
-        textureImages.value = new Map(textureImages.value).set(
-          imported.blobHash,
-          resource.image,
-        )
-      }
-      const selected = selectedDrawingLayer()
-      const target = selected?.kind === 'shape' ? selected : undefined
-      const current = target ? target.payload : drawingDefaults.value.shape
-      const payload: JsonObject = {
-        ...current,
-        fill: {
-          kind: 'imageTexture',
-          blobHash: imported.blobHash,
-          format: imported.format,
-          intrinsicWidth: imported.width,
-          intrinsicHeight: imported.height,
-          fit: 'fit',
-          transform: { scale: 1, rotation: 0, offsetX: 0, offsetY: 0 },
-          opacity: 1,
-        },
-      }
-      if (target) {
-        if (!props.documentSession || target.locked) return
-        props.documentSession.execute({
-          type: 'updateLayer',
-          before: target,
-          after: { ...target, payload },
-        })
-      } else {
-        drawingDefaults.value = { ...drawingDefaults.value, shape: payload }
-        drawingPreferences.value = {
-          ...drawingPreferences.value,
-          defaults: drawingDefaults.value,
-        }
-        createBrowserDrawingToolPreferencesStorage(browserStorage()).save(
-          drawingPreferences.value,
-        )
-      }
-      return
-    }
-    if (id === 'removeTexture') {
-      const selected = selectedDrawingLayer()
-      if (!selected || selected.kind !== 'shape' || !props.documentSession)
-        return
-      const fill = selected.payload.fill as Record<string, unknown> | undefined
-      if (fill?.kind !== 'imageTexture') return
-      textureResolver?.remove(String(fill.blobHash))
-      const nextImages = new Map(textureImages.value)
-      nextImages.delete(String(fill.blobHash))
-      textureImages.value = nextImages
-      props.documentSession.execute({
-        type: 'updateLayer',
-        before: selected,
-        after: {
-          ...selected,
-          payload: { ...selected.payload, fill: { kind: 'none' } },
-        },
-      })
-      return
-    }
-    const document = activeDocument.value
-    if (!document || !props.documentSession) return
-    if (id === 'flipHorizontal' || id === 'flipVertical') {
-      props.documentSession.execute(
-        createFlipCanvasCommand(
-          document,
-          id === 'flipHorizontal' ? 'horizontal' : 'vertical',
-        ),
-      )
-    }
-  }
+  const { onContextAction, resolveDocumentTextures } = createContextActions({
+    props,
+    canvas: canvasViewport,
+    cropPreset,
+    activeDocument,
+    textureImages,
+    drawingDefaults,
+    drawingPreferences,
+    selectedDrawingLayer,
+    saveDrawingPreferences: (value) =>
+      createBrowserDrawingToolPreferencesStorage(browserStorage()).save(value),
+  })
   function rememberColor(value: string): void {
     const match = /^#([\da-f]{6})$/iu.exec(value)
     if (!match) return
@@ -1167,39 +1081,6 @@ export function useEditorWorkspace(props: ResolvedEditorShellProps) {
         error: outcome.error,
       })
     }
-  }
-  async function resolveDocumentTextures(
-    document: EditorDocumentV1,
-  ): Promise<void> {
-    if (!props.textureBridge) return
-    textureResolver ??= new TextureResourceResolver({
-      bridge: props.textureBridge,
-      correlationId: () => crypto.randomUUID(),
-    })
-    const nextImages = new Map(textureImages.value)
-    const textureBlobHash = (fill: unknown): string | undefined => {
-      if (!fill || typeof fill !== 'object') return undefined
-      const candidate = fill as Record<string, unknown>
-      return candidate.kind === 'imageTexture' &&
-        typeof candidate.blobHash === 'string'
-        ? candidate.blobHash
-        : undefined
-    }
-    for (const layer of document.layers) {
-      const blobHashes =
-        layer.kind === 'image' && layer.payload.role === 'content'
-          ? [layer.payload.blobHash]
-          : layer.kind === 'shape'
-            ? [textureBlobHash(layer.payload.fill)]
-            : []
-      for (const blobHash of blobHashes) {
-        if (!blobHash) continue
-        const resource = await textureResolver.resolve(blobHash)
-        if (resource.kind === 'ready') nextImages.set(blobHash, resource.image)
-        else nextImages.delete(blobHash)
-      }
-    }
-    textureImages.value = nextImages
   }
   watch(
     () => props.textureBridge,
