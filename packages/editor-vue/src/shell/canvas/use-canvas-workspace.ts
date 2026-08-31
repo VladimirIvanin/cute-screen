@@ -1,6 +1,5 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
 import {
-  createDocumentRenderScene,
   drawNodes2D,
   hitTestDocument,
   hitTestDocumentAll,
@@ -17,10 +16,8 @@ import {
   createNumberedMarkerLayer,
   calloutSelectionHandles,
   updateCalloutHandle,
-  calloutPathPoints,
   calloutMarkerRadius,
   calloutTextLayout,
-  defaultCalloutRoute,
   type ArrowHandleKind,
   type CalloutHandleKind,
   type StrokeStyle,
@@ -32,18 +29,12 @@ import {
   resetCrop,
   resizeCrop,
   setCropPreset,
-  createCensorLayer,
-  createLoupeLayer,
-  createRulerLayer,
-  createSpotlightLayer,
   snapRulerEndpoint,
   type CropPreset,
-  type CropResizeHandle,
   type CropSession,
   type RulerAngleGuide,
 } from '@cute-screen/editor-renderer'
 import { drawClampedHandleSquare } from '../overlay-handle-bounds'
-import { overlayVisualScale } from '../overlay-visual-scale'
 import type {
   CanvasPoint,
   CanvasViewportProps,
@@ -56,7 +47,6 @@ import {
 } from './eyedropper-controller'
 import {
   createCanvasWorkspaceState,
-  DEFAULT_CALLOUT_STROKE,
   DEFAULT_PRECISION_TOOLS,
   DEFAULT_TEXT_TOOL,
   type CanvasGesture,
@@ -78,6 +68,8 @@ import {
   canvasLayerBounds,
   transformCanvasPoint,
 } from './geometry-controller'
+import { CropController } from './crop-controller'
+import { DraftController } from './draft-controller'
 
 export function useCanvasWorkspace(
   props: CanvasViewportProps,
@@ -110,9 +102,6 @@ export function useCanvasWorkspace(
   let cycle:
     | { readonly key: string; readonly at: number; readonly index: number }
     | undefined
-  let cropSession: CropSession | undefined
-  let quickSelectionDraft:
-    { x: number; y: number; width: number; height: number } | undefined
   let rulerGuide: RulerAngleGuide | undefined
   let gesture: CanvasGesture
   const viewportOutputBounds = computed<ViewportOutputBounds | undefined>(
@@ -135,6 +124,19 @@ export function useCanvasWorkspace(
   const geometryController = new CanvasGeometryController({
     props,
     gesture: () => gesture,
+  })
+  const cropController = new CropController({
+    props,
+    emit,
+    overlay,
+    scene,
+    rendererError,
+  })
+  const draftController = new DraftController({
+    props,
+    editingText,
+    gesture: () => gesture,
+    rulerGuide: () => rulerGuide,
   })
   const {
     updateFloatingToolbarLayout,
@@ -359,473 +361,31 @@ export function useCanvasWorkspace(
     return geometryController.gesturePreviewNodes()
   }
   function drawDraft(context: CanvasRenderingContext2D): void {
-    if (!gesture || gesture.kind !== 'draw') return
-    const layer = createDrawingLayer({
-      id: '__drawing-draft__',
-      tool: gesture.tool,
-      start: gesture.start,
-      end: gesture.current,
-      ...(props.drawingDefaults === undefined
-        ? {}
-        : { defaults: props.drawingDefaults }),
-      constrainAngle: gesture.constrainAngle,
-      drawFromCenter: gesture.drawFromCenter,
-      points: gesture.points,
-    })
-    if (!layer || !props.document) return
-    drawNodes2D(
-      context,
-      createDocumentRenderScene({ ...props.document, layers: [layer] }).nodes,
-    )
+    draftController.drawDrawing(context)
   }
   function resolveCalloutStroke(): StrokeStyle {
-    const arrowStroke = props.drawingDefaults?.arrow?.stroke
-    if (arrowStroke && typeof arrowStroke === 'object') {
-      return arrowStroke as StrokeStyle
-    }
-    return DEFAULT_CALLOUT_STROKE
+    return draftController.resolveCalloutStroke()
   }
   function drawCalloutDraft(context: CanvasRenderingContext2D): void {
-    let target: CanvasPoint | undefined
-    let label: CanvasPoint | undefined
-    let stroke = resolveCalloutStroke()
-    if (gesture?.kind === 'calloutDraw') {
-      target = gesture.start
-      label = gesture.current
-    } else {
-      const editing = editingText.value
-      if (
-        editing?.kind !== 'callout' ||
-        editing.existing ||
-        !editing.calloutDraft
-      ) {
-        return
-      }
-      target = editing.calloutDraft.target
-      label = editing.calloutDraft.label
-      stroke = editing.calloutStroke ?? stroke
-    }
-    if (!target || !label || (target.x === label.x && target.y === label.y)) {
-      return
-    }
-    const route = defaultCalloutRoute(target, label)
-    const points = calloutPathPoints({
-      target,
-      label,
-      route,
-      stroke,
-      content: {
-        text: '',
-        wrap: 'autoSize',
-        spans: [],
-        paragraphs: [],
-      },
-      background: null,
-      targetMarker: 'circle',
-      labelMarker: 'circle',
-    })
-    const markerRadius = calloutMarkerRadius(stroke.width)
-    const scale = 1 / ((props.zoom ?? 100) / 100)
-    context.save()
-    context.strokeStyle = `rgba(${Math.round(stroke.color.red * 255)}, ${Math.round(stroke.color.green * 255)}, ${Math.round(stroke.color.blue * 255)}, ${stroke.color.alpha})`
-    context.lineWidth = stroke.width * scale
-    context.lineCap = 'round'
-    context.lineJoin = 'round'
-    context.beginPath()
-    context.moveTo(points[0]!.x, points[0]!.y)
-    for (const point of points.slice(1)) {
-      context.lineTo(point.x, point.y)
-    }
-    context.stroke()
-    context.fillStyle = context.strokeStyle
-    for (const point of [points[0]!, points[points.length - 1]!]) {
-      context.beginPath()
-      context.arc(point.x, point.y, markerRadius, 0, Math.PI * 2)
-      context.fill()
-    }
-    context.restore()
+    draftController.drawCallout(context)
   }
-  function rectFromPoints(start: CanvasPoint, end: CanvasPoint) {
-    return {
-      x: Math.min(start.x, end.x),
-      y: Math.min(start.y, end.y),
-      width: Math.abs(end.x - start.x),
-      height: Math.abs(end.y - start.y),
-    }
-  }
-  function freeformDraftPoints(
-    points: readonly CanvasPoint[],
-    start: CanvasPoint,
-    end: CanvasPoint,
-  ): readonly CanvasPoint[] {
-    if (points.length >= 3) {
-      const area = points.reduce((sum, point, index) => {
-        const next = points[(index + 1) % points.length]!
-        return sum + point.x * next.y - next.x * point.y
-      }, 0)
-      if (Math.abs(area) > 0.5) return points
-    }
-    const bounds = rectFromPoints(start, end)
-    return [
-      { x: bounds.x, y: bounds.y },
-      { x: bounds.x + bounds.width, y: bounds.y },
-      { x: bounds.x + bounds.width, y: bounds.y + bounds.height },
-      { x: bounds.x, y: bounds.y + bounds.height },
-    ]
-  }
-  function precisionDraftLayer(
-    id = '__precision-draft__',
-  ): LayerNode | undefined {
-    if (!gesture || gesture.kind !== 'precision') return undefined
-    const defaults = props.precisionDefaults ?? DEFAULT_PRECISION_TOOLS
-    const bounds = rectFromPoints(gesture.start, gesture.current)
-    if (gesture.tool === 'censor') {
-      if (bounds.width < 1 || bounds.height < 1) return undefined
-      const effect =
-        defaults.censor.mode === 'pixelate'
-          ? ({
-              mode: 'pixelate',
-              blockSize: defaults.censor.blockSize,
-            } as const)
-          : defaults.censor.mode === 'blur'
-            ? ({
-                mode: 'blur',
-                strength: defaults.censor.blurStrength,
-              } as const)
-            : ({ mode: 'solid', color: defaults.censor.solidColor } as const)
-      return createCensorLayer({
-        id,
-        region:
-          defaults.censor.region === 'freeform'
-            ? {
-                kind: 'freeform',
-                points: freeformDraftPoints(
-                  gesture.points,
-                  gesture.start,
-                  gesture.current,
-                ),
-              }
-            : { kind: 'rectangle', bounds },
-        effect,
-      })
-    }
-    if (gesture.tool === 'spotlight') {
-      if (bounds.width < 1 || bounds.height < 1) return undefined
-      return createSpotlightLayer({
-        id,
-        bounds,
-        shape: defaults.spotlight.shape,
-        dimColor: defaults.spotlight.dimColor,
-        dimOpacity: defaults.spotlight.dimOpacity,
-        feather: defaults.spotlight.feather,
-      })
-    }
-    if (gesture.tool === 'ruler') {
-      if (!props.canvas) return undefined
-      if (
-        gesture.start.x === gesture.current.x &&
-        gesture.start.y === gesture.current.y
-      ) {
-        return undefined
-      }
-      return createRulerLayer({
-        id,
-        canvas: props.canvas,
-        start: gesture.start,
-        end: gesture.current,
-        unit: defaults.ruler.unit,
-        snapAngleIncrementDegrees: defaults.ruler.snapAngleIncrementDegrees,
-        color: defaults.ruler.color,
-        thickness: defaults.ruler.thickness,
-        fontSize: defaults.ruler.fontSize,
-      })
-    }
-    if (!props.canvas) return undefined
-    const zoom = defaults.loupe.zoom
-    const maximumSourceSize = Math.min(props.canvas.width, props.canvas.height)
-    const size = Math.min(defaults.loupe.size, maximumSourceSize * zoom)
-    const sourceSize = size / zoom
-    const sourceX = Math.max(
-      0,
-      Math.min(
-        props.canvas.width - sourceSize,
-        gesture.start.x - sourceSize / 2,
-      ),
-    )
-    const sourceY = Math.max(
-      0,
-      Math.min(
-        props.canvas.height - sourceSize,
-        gesture.start.y - sourceSize / 2,
-      ),
-    )
-    return createLoupeLayer({
-      id,
-      canvas: props.canvas,
-      sourceRegion: {
-        x: sourceX,
-        y: sourceY,
-        width: sourceSize,
-        height: sourceSize,
-      },
-      destination: {
-        x: gesture.current.x - size / 2,
-        y: gesture.current.y - size / 2,
-      },
-      zoom,
-      size,
-      shape: defaults.loupe.shape,
-      borderColor: defaults.loupe.borderColor,
-      borderWidth: defaults.loupe.borderWidth,
-      shadow: defaults.loupe.shadow
-        ? {
-            color: { red: 0, green: 0, blue: 0, alpha: 0.35 },
-            offsetX: 0,
-            offsetY: 6,
-            blur: 14,
-          }
-        : null,
-    })
+  function precisionDraftLayer(id?: string) {
+    return draftController.precisionLayer(id)
   }
   function drawPrecisionDraft(context: CanvasRenderingContext2D): void {
-    if (!gesture || gesture.kind !== 'precision') return
-    const defaults = props.precisionDefaults ?? DEFAULT_PRECISION_TOOLS
-    const bounds = rectFromPoints(gesture.start, gesture.current)
-    const scale = (props.zoom ?? 100) / 100
-    context.save()
-    context.strokeStyle = '#d9773b'
-    context.fillStyle = 'rgba(217, 119, 59, 0.14)'
-    context.lineWidth = 2 / scale
-    context.setLineDash([5 / scale, 3 / scale])
-    context.beginPath()
-    if (gesture.tool === 'censor' && defaults.censor.region === 'freeform') {
-      const points = freeformDraftPoints(
-        gesture.points,
-        gesture.start,
-        gesture.current,
-      )
-      const first = points[0]
-      if (first) {
-        context.moveTo(first.x, first.y)
-        for (const point of points.slice(1)) context.lineTo(point.x, point.y)
-        context.closePath()
-      }
-    } else if (gesture.tool === 'ruler') {
-      context.moveTo(gesture.start.x, gesture.start.y)
-      context.lineTo(gesture.current.x, gesture.current.y)
-    } else if (gesture.tool === 'loupe') {
-      const sourceSize = defaults.loupe.size / defaults.loupe.zoom
-      context.moveTo(gesture.current.x, gesture.current.y)
-      context.lineTo(gesture.start.x, gesture.start.y)
-      context.rect(
-        gesture.start.x - sourceSize / 2,
-        gesture.start.y - sourceSize / 2,
-        sourceSize,
-        sourceSize,
-      )
-      if (defaults.loupe.shape === 'circle') {
-        context.moveTo(
-          gesture.current.x + defaults.loupe.size / 2,
-          gesture.current.y,
-        )
-        context.arc(
-          gesture.current.x,
-          gesture.current.y,
-          defaults.loupe.size / 2,
-          0,
-          Math.PI * 2,
-        )
-      } else {
-        context.rect(
-          gesture.current.x - defaults.loupe.size / 2,
-          gesture.current.y - defaults.loupe.size / 2,
-          defaults.loupe.size,
-          defaults.loupe.size,
-        )
-      }
-    } else if (
-      gesture.tool === 'spotlight' &&
-      defaults.spotlight.shape === 'ellipse'
-    ) {
-      context.ellipse(
-        bounds.x + bounds.width / 2,
-        bounds.y + bounds.height / 2,
-        bounds.width / 2,
-        bounds.height / 2,
-        0,
-        0,
-        Math.PI * 2,
-      )
-    } else if (
-      gesture.tool === 'spotlight' &&
-      defaults.spotlight.shape === 'diamond'
-    ) {
-      context.moveTo(bounds.x + bounds.width / 2, bounds.y)
-      context.lineTo(bounds.x + bounds.width, bounds.y + bounds.height / 2)
-      context.lineTo(bounds.x + bounds.width / 2, bounds.y + bounds.height)
-      context.lineTo(bounds.x, bounds.y + bounds.height / 2)
-      context.closePath()
-    } else {
-      context.rect(bounds.x, bounds.y, bounds.width, bounds.height)
-    }
-    context.fill()
-    context.stroke()
-    context.restore()
-    if (!rulerGuide) return
-    context.save()
-    context.strokeStyle = '#d9773b'
-    context.lineWidth = 1 / ((props.zoom ?? 100) / 100)
-    context.setLineDash([4, 3])
-    context.beginPath()
-    context.moveTo(rulerGuide.start.x, rulerGuide.start.y)
-    context.lineTo(rulerGuide.end.x, rulerGuide.end.y)
-    context.stroke()
-    context.restore()
+    draftController.drawPrecision(context)
   }
-  function ensureCropSession(): CropSession | undefined {
-    if (props.quickSelectionMode) return undefined
-    if (
-      (props.activeTool !== 'crop' && !props.quickFrameMode) ||
-      !props.document
-    )
-      return undefined
-    if (!cropSession) {
-      try {
-        cropSession = createCropSession(props.document)
-      } catch (error) {
-        rendererError.value =
-          error instanceof Error ? error.message : String(error)
-        return undefined
-      }
-    }
-    return cropSession
+  function ensureCropSession() {
+    return cropController.ensureSession()
   }
-  function cropHandlePositions(session: CropSession) {
-    const { x, y, width, height } = session.crop
-    return [
-      ['northWest', { x, y }],
-      ['north', { x: x + width / 2, y }],
-      ['northEast', { x: x + width, y }],
-      ['east', { x: x + width, y: y + height / 2 }],
-      ['southEast', { x: x + width, y: y + height }],
-      ['south', { x: x + width / 2, y: y + height }],
-      ['southWest', { x, y: y + height }],
-      ['west', { x, y: y + height / 2 }],
-    ] as const
-  }
-  function cropHandleAtPoint(
-    session: CropSession,
-    point: CanvasPoint,
-  ): CropResizeHandle | undefined {
-    const tolerance = 9 / cropOverlayScale()
-    return cropHandlePositions(session).find(
-      ([, position]) =>
-        Math.hypot(position.x - point.x, position.y - point.y) <= tolerance,
-    )?.[0]
-  }
-  function cropOverlayScale(): number {
-    const canvas = overlay.value ?? scene.value
-    const fallback = (props.zoom ?? 100) / 100
-    if (!canvas) return fallback
-    const rect = canvas.getBoundingClientRect()
-    return overlayVisualScale(
-      {
-        backingWidth: canvas.width,
-        backingHeight: canvas.height,
-        clientWidth: rect.width,
-        clientHeight: rect.height,
-      },
-      fallback,
-    )
+  function cropHandleAtPoint(session: CropSession, point: CanvasPoint) {
+    return cropController.handleAtPoint(session, point)
   }
   function drawCropOverlay(
     context: CanvasRenderingContext2D,
     outputBounds: ViewportOutputBounds,
-  ): boolean {
-    const session = props.quickSelectionMode ? undefined : ensureCropSession()
-    const crop = props.quickSelectionMode ? quickSelectionDraft : session?.crop
-    if (
-      (!props.quickSelectionMode &&
-        (!session || (props.activeTool !== 'crop' && !props.quickFrameMode))) ||
-      !props.canvas
-    )
-      return false
-    context.save()
-    context.fillStyle = 'rgba(8, 12, 18, 0.58)'
-    if (!crop) {
-      context.fillRect(0, 0, props.canvas.width, props.canvas.height)
-      context.restore()
-      return true
-    }
-    const { x, y, width, height } = crop
-    const right = x + width
-    const bottom = y + height
-    context.fillRect(0, 0, props.canvas.width, y)
-    context.fillRect(
-      0,
-      bottom,
-      props.canvas.width,
-      props.canvas.height - bottom,
-    )
-    context.fillRect(0, y, x, height)
-    context.fillRect(right, y, props.canvas.width - right, height)
-    context.strokeStyle = '#ffffff'
-    const zoomScale = cropOverlayScale()
-    context.lineWidth = 1 / zoomScale
-    context.setLineDash(
-      props.quickFrameMode ? [7 / zoomScale, 5 / zoomScale] : [],
-    )
-    context.strokeRect(x, y, width, height)
-    context.setLineDash([])
-    if (!props.quickFrameMode) {
-      context.strokeStyle = 'rgba(255,255,255,0.72)'
-      context.beginPath()
-      for (const fraction of [1 / 3, 2 / 3]) {
-        context.moveTo(x + width * fraction, y)
-        context.lineTo(x + width * fraction, bottom)
-        context.moveTo(x, y + height * fraction)
-        context.lineTo(right, y + height * fraction)
-      }
-      context.stroke()
-    } else {
-      const label = `${Math.round(width)} × ${Math.round(height)}`
-      const badgeHeight = 28 / zoomScale
-      const badgeWidth = (label.length * 8 + 18) / zoomScale
-      const badgeX = Math.max(
-        6 / zoomScale,
-        Math.min(x, props.canvas.width - badgeWidth - 6 / zoomScale),
-      )
-      const above = y - badgeHeight - 7 / zoomScale
-      const badgeY = above >= 6 / zoomScale ? above : y + 7 / zoomScale
-      context.fillStyle = 'rgba(24, 26, 30, 0.94)'
-      context.beginPath()
-      if (typeof context.roundRect === 'function') {
-        context.roundRect(
-          badgeX,
-          badgeY,
-          badgeWidth,
-          badgeHeight,
-          8 / zoomScale,
-        )
-        context.fill()
-      } else {
-        context.fillRect(badgeX, badgeY, badgeWidth, badgeHeight)
-      }
-      context.fillStyle = '#ffffff'
-      context.font = `${13 / zoomScale}px Roboto, sans-serif`
-      context.textBaseline = 'middle'
-      context.fillText(label, badgeX + 9 / zoomScale, badgeY + badgeHeight / 2)
-    }
-    if (session) {
-      const half = 4 / zoomScale
-      context.fillStyle = '#ffffff'
-      context.strokeStyle = '#d9773b'
-      for (const [, position] of cropHandlePositions(session)) {
-        drawClampedHandleSquare(context, position, half, outputBounds)
-      }
-    }
-    context.restore()
-    return true
+  ) {
+    return cropController.draw(context, outputBounds)
   }
   function drawOverlay(): void {
     const outputBounds = viewportOutputBounds.value
@@ -1082,7 +642,7 @@ export function useCanvasWorkspace(
   watch(
     () => props.document,
     () => {
-      cropSession = undefined
+      cropController.session = undefined
       if (props.activeTool === 'crop' || props.quickFrameMode)
         ensureCropSession()
       invalidateOverlay()
@@ -1092,7 +652,7 @@ export function useCanvasWorkspace(
     () => props.activeTool,
     (tool) => {
       cancelGesture()
-      cropSession =
+      cropController.session =
         tool === 'crop' && props.document
           ? createCropSession(props.document)
           : undefined
@@ -1117,12 +677,12 @@ export function useCanvasWorkspace(
     (selecting) => {
       cancelGesture()
       if (selecting) {
-        cropSession = undefined
-        quickSelectionDraft = undefined
+        cropController.session = undefined
+        cropController.quickDraft = undefined
         setDirectCursor('crosshair')
         void nextTick(() => scene.value?.focus({ preventScroll: true }))
       } else {
-        quickSelectionDraft = undefined
+        cropController.quickDraft = undefined
         setDirectCursor('')
         if (props.quickFrameMode) ensureCropSession()
       }
@@ -1407,14 +967,14 @@ export function useCanvasWorkspace(
     if (props.quickSelectionMode) {
       event.preventDefault()
       scene.value.setPointerCapture(event.pointerId)
-      quickSelectionDraft = {
+      cropController.quickDraft = {
         x: point.x,
         y: point.y,
         width: 1,
         height: 1,
       }
       gesture = { kind: 'quickSelect', start: point, current: point }
-      emit('quickFrameChange', { ...quickSelectionDraft })
+      emit('quickFrameChange', { ...cropController.quickDraft })
       invalidateOverlay()
       return
     }
@@ -1765,14 +1325,14 @@ export function useCanvasWorkspace(
       return
     }
     if (gesture.kind === 'quickSelect') {
-      quickSelectionDraft = {
+      cropController.quickDraft = {
         x: Math.min(gesture.start.x, point.x),
         y: Math.min(gesture.start.y, point.y),
         width: Math.max(1, Math.abs(point.x - gesture.start.x)),
         height: Math.max(1, Math.abs(point.y - gesture.start.y)),
       }
       gesture = { ...gesture, current: point }
-      emit('quickFrameChange', { ...quickSelectionDraft })
+      emit('quickFrameChange', { ...cropController.quickDraft })
       invalidateOverlay()
       return
     }
@@ -1781,12 +1341,12 @@ export function useCanvasWorkspace(
         x: point.x - gesture.start.x,
         y: point.y - gesture.start.y,
       }
-      cropSession =
+      cropController.session =
         gesture.action === 'move'
           ? moveCrop(gesture.initial, delta)
           : resizeCrop(gesture.initial, gesture.handle!, delta)
       if (props.quickFrameMode) {
-        emit('quickFrameChange', { ...cropSession.crop })
+        emit('quickFrameChange', { ...cropController.session.crop })
       }
       invalidateOverlay()
       return
@@ -1963,25 +1523,29 @@ export function useCanvasWorkspace(
         emit('moveLayer', completed.id, deltaX, deltaY)
       }
     }
-    if (completed?.kind === 'crop' && cropSession && props.quickFrameMode) {
+    if (
+      completed?.kind === 'crop' &&
+      cropController.session &&
+      props.quickFrameMode
+    ) {
       const before = completed.initial.crop
-      const after = cropSession.crop
+      const after = cropController.session.crop
       if (
         before.x !== after.x ||
         before.y !== after.y ||
         before.width !== after.width ||
         before.height !== after.height
       ) {
-        emit('documentCommand', applyCropSession(cropSession))
+        emit('documentCommand', applyCropSession(cropController.session))
       }
     }
     if (
       completed?.kind === 'quickSelect' &&
-      quickSelectionDraft &&
+      cropController.quickDraft &&
       completed.current.x !== completed.start.x &&
       completed.current.y !== completed.start.y
     ) {
-      const crop = { ...quickSelectionDraft }
+      const crop = { ...cropController.quickDraft }
       emit('documentCommand', {
         type: 'setCrop',
         before: null,
@@ -1989,7 +1553,7 @@ export function useCanvasWorkspace(
       })
       emit('quickSelectionComplete', crop)
     } else if (completed?.kind === 'quickSelect') {
-      quickSelectionDraft = undefined
+      cropController.quickDraft = undefined
       invalidateOverlay()
     }
     if (completed?.kind === 'resize') {
@@ -2200,8 +1764,8 @@ export function useCanvasWorkspace(
       gesture?.kind === 'loupeSource'
     gesture = undefined
     isPanning.value = false
-    if (cancelledCrop) cropSession = cancelledCrop
-    if (cancelledQuickSelection) quickSelectionDraft = undefined
+    if (cancelledCrop) cropController.session = cancelledCrop
+    if (cancelledQuickSelection) cropController.quickDraft = undefined
     rulerGuide = undefined
     if (event && scene.value?.hasPointerCapture(event.pointerId)) {
       scene.value.releasePointerCapture(event.pointerId)
@@ -2235,13 +1799,13 @@ export function useCanvasWorkspace(
   function setCropPresetValue(preset: CropPreset): void {
     const session = ensureCropSession()
     if (!session) return
-    cropSession = setCropPreset(session, preset)
+    cropController.session = setCropPreset(session, preset)
     invalidateOverlay()
   }
   function resetCropDraft(): void {
     const session = ensureCropSession()
     if (!session) return
-    cropSession = resetCrop(session)
+    cropController.session = resetCrop(session)
     invalidateOverlay()
   }
   function applyCropDraft(): void {
@@ -2250,9 +1814,9 @@ export function useCanvasWorkspace(
     emit('documentCommand', applyCropSession(session))
   }
   function cancelCropDraft(): void {
-    const session = cropSession
+    const session = cropController.session
     if (session) cancelCropSession(session)
-    cropSession = undefined
+    cropController.session = undefined
     cancelGesture()
     emit('selectTool', 'select')
   }
@@ -2314,8 +1878,8 @@ export function useCanvasWorkspace(
       const direction = directions[event.key as keyof typeof directions]
       if (direction) {
         event.preventDefault()
-        cropSession = nudgeCrop(
-          cropSession!,
+        cropController.session = nudgeCrop(
+          cropController.session!,
           direction,
           event.shiftKey ? 10 : 1,
         )
