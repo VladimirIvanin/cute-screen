@@ -10,7 +10,6 @@ import {
   snapPoint,
   type EditorDocumentV1,
   type LayerNode,
-  type SnapCandidate,
   type Transform2D,
   createDrawingLayer,
   arrowSelectionHandles,
@@ -74,6 +73,11 @@ import {
   TextEditorController,
   type TextEditorStartInput,
 } from './text-editor-controller'
+import {
+  CanvasGeometryController,
+  canvasLayerBounds,
+  transformCanvasPoint,
+} from './geometry-controller'
 
 export function useCanvasWorkspace(
   props: CanvasViewportProps,
@@ -128,6 +132,10 @@ export function useCanvasWorkspace(
       )
     },
   )
+  const geometryController = new CanvasGeometryController({
+    props,
+    gesture: () => gesture,
+  })
   const {
     updateFloatingToolbarLayout,
     updateFloatingArrowToolbarLayout,
@@ -297,173 +305,37 @@ export function useCanvasWorkspace(
   function retryRender(): void {
     void drawDocument()
   }
-  function selectedLayer(): LayerNode | undefined {
-    return props.document?.layers.find(
-      (layer) => layer.id === props.selectedLayerId,
-    )
+  function selectedLayer() {
+    return geometryController.selectedLayer()
   }
   function loupeSourceCenter(
     layer: Extract<LayerNode, { readonly kind: 'loupe' }>,
-  ): CanvasPoint {
-    const { sourceRegion } = layer.payload
-    return {
-      x: sourceRegion.x + sourceRegion.width / 2,
-      y: sourceRegion.y + sourceRegion.height / 2,
-    }
+  ) {
+    return geometryController.loupeSourceCenter(layer)
   }
   function moveLoupeSourceMarker(
     layer: Extract<LayerNode, { readonly kind: 'loupe' }>,
     point: CanvasPoint,
-  ): Extract<LayerNode, { readonly kind: 'loupe' }> {
-    const canvas = props.canvas
-    if (!canvas) return layer
-    const center = {
-      x: Math.max(0, Math.min(canvas.width, point.x)),
-      y: Math.max(0, Math.min(canvas.height, point.y)),
-    }
-    const source = layer.payload.sourceRegion
-    return Object.freeze({
-      ...layer,
-      payload: Object.freeze({
-        ...layer.payload,
-        sourceRegion: Object.freeze({
-          x: center.x - source.width / 2,
-          y: center.y - source.height / 2,
-          width: source.width,
-          height: source.height,
-        }),
-      }),
-    })
+  ) {
+    return geometryController.moveLoupeSourceMarker(layer, point)
   }
-  function transformPoint(
-    transform: Transform2D,
-    point: CanvasPoint,
-  ): CanvasPoint {
-    const radians = (transform.rotation * Math.PI) / 180
-    const cosine = Math.cos(radians)
-    const sine = Math.sin(radians)
-    return {
-      x:
-        point.x * transform.scaleX * cosine -
-        point.y * transform.scaleY * sine +
-        transform.translateX,
-      y:
-        point.x * transform.scaleX * sine +
-        point.y * transform.scaleY * cosine +
-        transform.translateY,
-    }
+  function transformPoint(transform: Transform2D, point: CanvasPoint) {
+    return transformCanvasPoint(transform, point)
   }
-  function toLocal(layer: LayerNode, point: CanvasPoint): CanvasPoint {
-    const radians = (-layer.transform.rotation * Math.PI) / 180
-    const cosine = Math.cos(radians)
-    const sine = Math.sin(radians)
-    const x = point.x - layer.transform.translateX
-    const y = point.y - layer.transform.translateY
-    return {
-      x: (x * cosine - y * sine) / layer.transform.scaleX,
-      y: (x * sine + y * cosine) / layer.transform.scaleY,
-    }
+  function toLocal(layer: LayerNode, point: CanvasPoint) {
+    return geometryController.toLocal(layer, point)
   }
   function layerBounds(layer: LayerNode) {
-    return layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
-  }
-  function localBoundsHandlePositions(
-    bounds: ReturnType<typeof layerBounds>,
-  ): Readonly<Record<ResizeHandle, CanvasPoint>> {
-    return {
-      nw: { x: bounds.x, y: bounds.y },
-      n: { x: bounds.x + bounds.width / 2, y: bounds.y },
-      ne: { x: bounds.x + bounds.width, y: bounds.y },
-      e: {
-        x: bounds.x + bounds.width,
-        y: bounds.y + bounds.height / 2,
-      },
-      se: { x: bounds.x + bounds.width, y: bounds.y + bounds.height },
-      s: {
-        x: bounds.x + bounds.width / 2,
-        y: bounds.y + bounds.height,
-      },
-      sw: { x: bounds.x, y: bounds.y + bounds.height },
-      w: { x: bounds.x, y: bounds.y + bounds.height / 2 },
-    }
+    return canvasLayerBounds(layer)
   }
   function worldBoundsHandlePositions(
     layer: LayerNode,
-    transform: Transform2D = layer.transform,
-  ): Readonly<Record<ResizeHandle, CanvasPoint>> {
-    const local = localBoundsHandlePositions(layerBounds(layer))
-    return Object.fromEntries(
-      BOUNDS_RESIZE_HANDLES.map((handle) => [
-        handle,
-        transformPoint(transform, local[handle]),
-      ]),
-    ) as Readonly<Record<ResizeHandle, CanvasPoint>>
+    transform?: Transform2D,
+  ) {
+    return geometryController.worldBoundsHandlePositions(layer, transform)
   }
-  function snapCandidates(excludingId: string): readonly SnapCandidate[] {
-    const document = props.document
-    if (!document) return []
-    const candidates: SnapCandidate[] = [
-      { id: 'canvas-top-left', x: 0, y: 0 },
-      {
-        id: 'canvas-center',
-        x: document.canvas.width / 2,
-        y: document.canvas.height / 2,
-      },
-      {
-        id: 'canvas-bottom-right',
-        x: document.canvas.width,
-        y: document.canvas.height,
-      },
-    ]
-    if (document.crop) {
-      candidates.push(
-        { id: 'crop-top-left', x: document.crop.x, y: document.crop.y },
-        {
-          id: 'crop-bottom-right',
-          x: document.crop.x + document.crop.width,
-          y: document.crop.y + document.crop.height,
-        },
-        {
-          id: 'crop-center',
-          x: document.crop.x + document.crop.width / 2,
-          y: document.crop.y + document.crop.height / 2,
-        },
-      )
-    }
-    for (const layer of document.layers) {
-      if (layer.id === excludingId || !layer.visible) continue
-      const bounds = layerBounds(layer)
-      candidates.push(
-        {
-          id: `${layer.id}:start`,
-          x: transformPoint(layer.transform, { x: bounds.x, y: bounds.y }).x,
-          y: transformPoint(layer.transform, { x: bounds.x, y: bounds.y }).y,
-        },
-        {
-          id: `${layer.id}:center`,
-          x: transformPoint(layer.transform, {
-            x: bounds.x + bounds.width / 2,
-            y: bounds.y + bounds.height / 2,
-          }).x,
-          y: transformPoint(layer.transform, {
-            x: bounds.x + bounds.width / 2,
-            y: bounds.y + bounds.height / 2,
-          }).y,
-        },
-        {
-          id: `${layer.id}:end`,
-          x: transformPoint(layer.transform, {
-            x: bounds.x + bounds.width,
-            y: bounds.y + bounds.height,
-          }).x,
-          y: transformPoint(layer.transform, {
-            x: bounds.x + bounds.width,
-            y: bounds.y + bounds.height,
-          }).y,
-        },
-      )
-    }
-    return candidates
+  function snapCandidates(excludingId: string) {
+    return geometryController.snapCandidates(excludingId)
   }
   function resizeTransform(
     layer: LayerNode,
@@ -471,162 +343,20 @@ export function useCanvasWorkspace(
     point: CanvasPoint,
     freeResize: boolean,
     centerResize: boolean,
-  ): Transform2D {
-    const bounds = layerBounds(layer)
-    const local = toLocal(layer, point)
-    const resizesX = handle.includes('w') || handle.includes('e')
-    const resizesY = handle.includes('n') || handle.includes('s')
-    const opposite = centerResize
-      ? { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 }
-      : {
-          x: handle.includes('w') ? bounds.x + bounds.width : bounds.x,
-          y: handle.includes('n') ? bounds.y + bounds.height : bounds.y,
-        }
-    const corner = {
-      x: handle.includes('w') ? bounds.x : bounds.x + bounds.width,
-      y: handle.includes('n') ? bounds.y : bounds.y + bounds.height,
-    }
-    const minScale = 1 / Math.max(bounds.width, bounds.height)
-    let factorX = resizesX
-      ? (local.x - opposite.x) / (corner.x - opposite.x)
-      : 1
-    let factorY = resizesY
-      ? (local.y - opposite.y) / (corner.y - opposite.y)
-      : 1
-    factorX = Math.max(minScale, factorX)
-    factorY = Math.max(minScale, factorY)
-    if (layer.kind === 'image' && !freeResize) {
-      const factor =
-        resizesX && !resizesY
-          ? factorX
-          : !resizesX && resizesY
-            ? factorY
-            : Math.abs(factorX - 1) >= Math.abs(factorY - 1)
-              ? factorX
-              : factorY
-      factorX = factor
-      factorY = factor
-    }
-    const nextScaleX = layer.transform.scaleX * factorX
-    const nextScaleY = layer.transform.scaleY * factorY
-    const anchor = transformPoint(layer.transform, opposite)
-    const rotation = (layer.transform.rotation * Math.PI) / 180
-    const cosine = Math.cos(rotation)
-    const sine = Math.sin(rotation)
-    return {
-      scaleX: nextScaleX,
-      scaleY: nextScaleY,
-      rotation: layer.transform.rotation,
-      translateX:
-        anchor.x -
-        opposite.x * nextScaleX * cosine +
-        opposite.y * nextScaleY * sine,
-      translateY:
-        anchor.y -
-        opposite.x * nextScaleX * sine -
-        opposite.y * nextScaleY * cosine,
-    }
-  }
-  function previewTransform(layer: LayerNode): Transform2D {
-    if (
-      !gesture ||
-      gesture.kind === 'pan' ||
-      gesture.kind === 'draw' ||
-      gesture.kind === 'calloutDraw' ||
-      gesture.kind === 'text' ||
-      gesture.kind === 'precision' ||
-      gesture.kind === 'crop' ||
-      gesture.kind === 'quickSelect' ||
-      gesture.id !== layer.id
-    ) {
-      return layer.transform
-    }
-    if (gesture.kind === 'move') {
-      return {
-        ...layer.transform,
-        translateX:
-          layer.transform.translateX + gesture.current.x - gesture.start.x,
-        translateY:
-          layer.transform.translateY + gesture.current.y - gesture.start.y,
-      }
-    }
-    if (gesture.kind === 'resize') {
-      return resizeTransform(
-        layer,
-        gesture.handle,
-        gesture.current,
-        gesture.freeResize,
-        gesture.centerResize,
-      )
-    }
-    if (gesture.kind === 'rotate') {
-      return { ...gesture.initial, rotation: gesture.currentAngle }
-    }
-    return layer.transform
-  }
-  function gesturePreviewLayer(): LayerNode | undefined {
-    if (
-      !gesture ||
-      gesture.kind === 'pan' ||
-      gesture.kind === 'draw' ||
-      gesture.kind === 'calloutDraw' ||
-      gesture.kind === 'text' ||
-      gesture.kind === 'precision' ||
-      gesture.kind === 'crop' ||
-      gesture.kind === 'quickSelect' ||
-      gesture.kind === 'loupeSource'
-    ) {
-      return undefined
-    }
-    const activeGesture = gesture
-    const layer = props.document?.layers.find(
-      (candidate) => candidate.id === activeGesture.id,
+  ) {
+    return geometryController.resizeTransform(
+      layer,
+      handle,
+      point,
+      freeResize,
+      centerResize,
     )
-    if (!layer) return undefined
-    if (activeGesture.kind === 'intrinsicResize') {
-      return resizeLayerGeometry(
-        layer,
-        activeGesture.handle,
-        activeGesture.current,
-        {
-          preserveAspect: activeGesture.preserveAspect,
-          fromCenter: activeGesture.centerResize,
-          ...(props.document === undefined
-            ? {}
-            : { canvas: props.document.canvas }),
-        },
-      )
-    }
-    if (activeGesture.kind === 'arrowHandle') {
-      return layer.kind === 'arrow'
-        ? updateArrowHandle(
-            layer,
-            activeGesture.handle,
-            toLocal(layer, activeGesture.current),
-          )
-        : undefined
-    }
-    if (activeGesture.kind === 'calloutHandle') {
-      return layer.kind === 'callout'
-        ? updateCalloutHandle(
-            layer,
-            activeGesture.handle,
-            toLocal(layer, activeGesture.current),
-          )
-        : undefined
-    }
-    return { ...layer, transform: previewTransform(layer) }
+  }
+  function gesturePreviewLayer() {
+    return geometryController.gesturePreviewLayer()
   }
   function gesturePreviewNodes() {
-    const layer = gesturePreviewLayer()
-    // Loupe rendering needs the ordered scene surface to sample layers beneath
-    // it. Its transient geometry is therefore rendered in the scene, never the
-    // generic overlay node list.
-    if (!layer || layer.kind === 'loupe' || !props.document) return []
-    return createDocumentRenderScene({
-      ...props.document,
-      layers: [layer],
-    }).nodes
+    return geometryController.gesturePreviewNodes()
   }
   function drawDraft(context: CanvasRenderingContext2D): void {
     if (!gesture || gesture.kind !== 'draw') return
