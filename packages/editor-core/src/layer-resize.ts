@@ -293,6 +293,119 @@ function resizeRuler(
   )
 }
 
+function resizeText(
+  layer: Extract<LayerNode, { readonly kind: 'text' }>,
+  requested: Rect,
+): LayerNode {
+  const bounds = Object.freeze({
+    ...requested,
+    y: layer.localBounds.y,
+    height: estimatedTextHeight(layer.payload.content, requested.width),
+  })
+  return Object.freeze({
+    ...layer,
+    localBounds: bounds,
+    payload: Object.freeze({
+      ...layer.payload,
+      content: Object.freeze({
+        ...layer.payload.content,
+        wrap: 'fixedWidth' as const,
+        fixedWidth: bounds.width,
+      }),
+    }),
+  })
+}
+
+function resizeLoupe(
+  layer: Extract<LayerNode, { readonly kind: 'loupe' }>,
+  requested: Rect,
+  handle: BoundsResizeHandle,
+  options: ResizeLayerGeometryOptions,
+): LayerNode {
+  if (!options.canvas)
+    throw new Error('loupe resize requires canvas dimensions')
+  const source = layer.payload.sourceRegion
+  const sourceCentre = {
+    x: source.x + source.width / 2,
+    y: source.y + source.height / 2,
+  }
+  const minimumSourceHalfSize = Math.max(
+    0,
+    -sourceCentre.x,
+    sourceCentre.x - options.canvas.width,
+    -sourceCentre.y,
+    sourceCentre.y - options.canvas.height,
+  )
+  const bounds = squareBounds(
+    layer.localBounds,
+    requested,
+    handle,
+    options.fromCenter === true,
+    Math.max(16, (minimumSourceHalfSize * 2 + 1e-6) * layer.payload.zoom),
+    2_048,
+  )
+  const sourceSize = bounds.width / layer.payload.zoom
+  const sourceRegion = Object.freeze({
+    x: sourceCentre.x - sourceSize / 2,
+    y: sourceCentre.y - sourceSize / 2,
+    width: sourceSize,
+    height: sourceSize,
+  })
+  assertValidLoupeSourceRegion(sourceRegion, options.canvas)
+  return Object.freeze({
+    ...layer,
+    localBounds: bounds,
+    payload: Object.freeze({
+      ...layer.payload,
+      sourceRegion,
+      lens: Object.freeze({ ...layer.payload.lens, size: bounds.width }),
+    }),
+  })
+}
+
+function resizePointLayer(
+  layer: Extract<LayerNode, { readonly kind: 'pencil' | 'marker' }>,
+  requested: Rect,
+): LayerNode {
+  const points = (
+    layer.payload.points as unknown as readonly (Point &
+      Readonly<{ readonly pressure: number }>)[]
+  ).map((sample) =>
+    Object.freeze({
+      ...mapPoint(sample, layer.localBounds, requested),
+      pressure: sample.pressure,
+    }),
+  )
+  return Object.freeze({
+    ...layer,
+    localBounds: requested,
+    payload: Object.freeze({ ...layer.payload, points: Object.freeze(points) }),
+  }) as LayerNode
+}
+
+function resizeFreeformCensor(
+  layer: Extract<LayerNode, { readonly kind: 'censor' }>,
+  requested: Rect,
+): LayerNode {
+  const points =
+    layer.payload.region.kind === 'freeform'
+      ? layer.payload.region.points.map(
+          (sample) =>
+            Object.freeze({
+              ...mapPoint(sample, layer.localBounds, requested),
+            }) as Point & JsonObject,
+        )
+      : []
+  return Object.freeze({
+    ...layer,
+    localBounds: requested,
+    payload: Object.freeze({
+      ...layer.payload,
+      region: Object.freeze({ kind: 'freeform' as const, points }),
+    }),
+  })
+}
+
 export function resizeLayerGeometry(
   layer: LayerNode,
   handle: IntrinsicResizeHandle,
@@ -318,25 +431,7 @@ export function resizeLayerGeometry(
   const local = localPoint(layer, point)
   const requested = resizedBounds(layer.localBounds, handle, local, options)
 
-  if (layer.kind === 'text') {
-    const bounds = Object.freeze({
-      ...requested,
-      y: layer.localBounds.y,
-      height: estimatedTextHeight(layer.payload.content, requested.width),
-    })
-    return Object.freeze({
-      ...layer,
-      localBounds: bounds,
-      payload: Object.freeze({
-        ...layer.payload,
-        content: Object.freeze({
-          ...layer.payload.content,
-          wrap: 'fixedWidth' as const,
-          fixedWidth: bounds.width,
-        }),
-      }),
-    })
-  }
+  if (layer.kind === 'text') return resizeText(layer, requested)
 
   if (layer.kind === 'emoji') {
     return Object.freeze({
@@ -350,84 +445,14 @@ export function resizeLayerGeometry(
     })
   }
 
-  if (layer.kind === 'loupe') {
-    if (!options.canvas)
-      throw new Error('loupe resize requires canvas dimensions')
-    const source = layer.payload.sourceRegion
-    const sourceCentre = {
-      x: source.x + source.width / 2,
-      y: source.y + source.height / 2,
-    }
-    const minimumSourceHalfSize = Math.max(
-      0,
-      -sourceCentre.x,
-      sourceCentre.x - options.canvas.width,
-      -sourceCentre.y,
-      sourceCentre.y - options.canvas.height,
-    )
-    const bounds = squareBounds(
-      layer.localBounds,
-      requested,
-      handle,
-      options.fromCenter === true,
-      Math.max(16, (minimumSourceHalfSize * 2 + 1e-6) * layer.payload.zoom),
-      2_048,
-    )
-    const sourceSize = bounds.width / layer.payload.zoom
-    const sourceRegion = Object.freeze({
-      x: sourceCentre.x - sourceSize / 2,
-      y: sourceCentre.y - sourceSize / 2,
-      width: sourceSize,
-      height: sourceSize,
-    })
-    assertValidLoupeSourceRegion(sourceRegion, options.canvas)
-    return Object.freeze({
-      ...layer,
-      localBounds: bounds,
-      payload: Object.freeze({
-        ...layer.payload,
-        sourceRegion,
-        lens: Object.freeze({ ...layer.payload.lens, size: bounds.width }),
-      }),
-    })
-  }
+  if (layer.kind === 'loupe')
+    return resizeLoupe(layer, requested, handle, options)
 
-  if (layer.kind === 'pencil' || layer.kind === 'marker') {
-    const points = (
-      layer.payload.points as unknown as readonly (Point &
-        Readonly<{ readonly pressure: number }>)[]
-    ).map((sample) =>
-      Object.freeze({
-        ...mapPoint(sample, layer.localBounds, requested),
-        pressure: sample.pressure,
-      }),
-    )
-    return Object.freeze({
-      ...layer,
-      localBounds: requested,
-      payload: Object.freeze({
-        ...layer.payload,
-        points: Object.freeze(points),
-      }),
-    }) as LayerNode
-  }
+  if (layer.kind === 'pencil' || layer.kind === 'marker')
+    return resizePointLayer(layer, requested)
 
-  if (layer.kind === 'censor' && layer.payload.region.kind === 'freeform') {
-    const points = layer.payload.region.points.map(
-      (sample) =>
-        Object.freeze({
-          ...mapPoint(sample, layer.localBounds, requested),
-        }) as Point & JsonObject,
-    )
-    return Object.freeze({
-      ...layer,
-      localBounds: requested,
-      payload: Object.freeze({
-        ...layer.payload,
-        region: Object.freeze({ kind: 'freeform' as const, points }),
-      }),
-    })
-  }
+  if (layer.kind === 'censor' && layer.payload.region.kind === 'freeform')
+    return resizeFreeformCensor(layer, requested)
 
   if (
     layer.kind === 'shape' ||

@@ -2,6 +2,46 @@ import type { RenderNode } from '../../scene/contracts'
 import type { MarkerLayer, PencilLayer, ShapeLayer } from '../types'
 import { bounds, color, fill, lineNode, localPoint, stroke } from './shared'
 
+type ShapeGeometry = Readonly<{
+  x: number
+  y: number
+  width: number
+  height: number
+}>
+
+function polygonCorners(
+  shape: unknown,
+  geometry: ShapeGeometry,
+  payload: ShapeLayer['payload'],
+): readonly { readonly x: number; readonly y: number }[] {
+  if (shape === 'diamond')
+    return [
+      { x: geometry.x + geometry.width / 2, y: geometry.y },
+      { x: geometry.x + geometry.width, y: geometry.y + geometry.height / 2 },
+      { x: geometry.x + geometry.width / 2, y: geometry.y + geometry.height },
+      { x: geometry.x, y: geometry.y + geometry.height / 2 },
+    ]
+  const count = Number(payload.starPoints) || 5
+  const innerRatio = Math.max(
+    0,
+    Math.min(1, Number(payload.starInnerRatio) || 0.45),
+  )
+  return Array.from({ length: count * 2 }, (_, index) => {
+    const radius = index % 2 === 0 ? 1 : innerRatio
+    const angle = -Math.PI / 2 + (Math.PI * index) / count
+    return {
+      x:
+        geometry.x +
+        geometry.width / 2 +
+        Math.cos(angle) * (geometry.width / 2) * radius,
+      y:
+        geometry.y +
+        geometry.height / 2 +
+        Math.sin(angle) * (geometry.height / 2) * radius,
+    }
+  })
+}
+
 export function shapeNodes(layer: ShapeLayer): readonly RenderNode[] {
   const payload = layer.payload
   const localBounds = bounds(layer)
@@ -73,46 +113,7 @@ export function shapeNodes(layer: ShapeLayer): readonly RenderNode[] {
       },
     ]
   }
-  const corners: readonly { readonly x: number; readonly y: number }[] =
-    shape === 'diamond'
-      ? [
-          { x: geometry.x + geometry.width / 2, y: geometry.y },
-          {
-            x: geometry.x + geometry.width,
-            y: geometry.y + geometry.height / 2,
-          },
-          {
-            x: geometry.x + geometry.width / 2,
-            y: geometry.y + geometry.height,
-          },
-          { x: geometry.x, y: geometry.y + geometry.height / 2 },
-        ]
-      : Array.from(
-          { length: (Number(payload.starPoints) || 5) * 2 },
-          (_, index) => {
-            const count = Number(payload.starPoints) || 5
-            const innerRatio = Math.max(
-              0,
-              Math.min(1, Number(payload.starInnerRatio) || 0.45),
-            )
-            const outer = index % 2 === 0
-            const angle = -Math.PI / 2 + (Math.PI * index) / count
-            return {
-              x:
-                geometry.x +
-                geometry.width / 2 +
-                Math.cos(angle) *
-                  (geometry.width / 2) *
-                  (outer ? 1 : innerRatio),
-              y:
-                geometry.y +
-                geometry.height / 2 +
-                Math.sin(angle) *
-                  (geometry.height / 2) *
-                  (outer ? 1 : innerRatio),
-            }
-          },
-        )
+  const corners = polygonCorners(shape, geometry, payload)
   return [
     {
       kind: 'polygon' as const,

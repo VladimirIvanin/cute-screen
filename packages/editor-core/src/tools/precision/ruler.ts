@@ -25,6 +25,35 @@ import {
   freezeRect,
 } from './shared'
 
+function rulerUnit(value: RulerUnit | undefined): RulerUnit {
+  const unit = value ?? 'pixels'
+  if (unit !== 'pixels' && unit !== 'percent')
+    throw new RangeError('ruler unit is invalid')
+  return unit
+}
+
+function rulerSnap(value: number | undefined): number {
+  const snap = value ?? 15
+  if (!Number.isFinite(snap) || snap <= 0 || snap > 90)
+    throw new RangeError('ruler snap angle increment must be between 0 and 90')
+  return snap
+}
+
+function integerInBounds(
+  value: number,
+  bounds: Readonly<{ min: number; max: number }>,
+  message: string,
+): number {
+  if (
+    !Number.isFinite(value) ||
+    !Number.isInteger(value) ||
+    value < bounds.min ||
+    value > bounds.max
+  )
+    throw new RangeError(message)
+  return value
+}
+
 export function createRulerLayer(input: {
   readonly id: string
   readonly start: Point
@@ -41,38 +70,20 @@ export function createRulerLayer(input: {
   if (input.start.x === input.end.x && input.start.y === input.end.y) {
     throw new RangeError('ruler endpoints must be distinct')
   }
-  const unit = input.unit ?? 'pixels'
-  if (unit !== 'pixels' && unit !== 'percent') {
-    throw new RangeError('ruler unit is invalid')
-  }
-  const snapAngleIncrementDegrees = input.snapAngleIncrementDegrees ?? 15
-  if (
-    !Number.isFinite(snapAngleIncrementDegrees) ||
-    snapAngleIncrementDegrees <= 0 ||
-    snapAngleIncrementDegrees > 90
-  ) {
-    throw new RangeError('ruler snap angle increment must be between 0 and 90')
-  }
+  const unit = rulerUnit(input.unit)
+  const snapAngleIncrementDegrees = rulerSnap(input.snapAngleIncrementDegrees)
   const color = input.color ?? DEFAULT_RULER_COLOR
   assertUnitColor(color, 'ruler color')
-  const thickness = input.thickness ?? DEFAULT_RULER_THICKNESS
-  if (
-    !Number.isFinite(thickness) ||
-    !Number.isInteger(thickness) ||
-    thickness < RULER_THICKNESS_BOUNDS.min ||
-    thickness > RULER_THICKNESS_BOUNDS.max
-  ) {
-    throw new RangeError('ruler thickness must be between 1 and 12')
-  }
-  const fontSize = input.fontSize ?? DEFAULT_RULER_FONT_SIZE
-  if (
-    !Number.isFinite(fontSize) ||
-    !Number.isInteger(fontSize) ||
-    fontSize < RULER_FONT_SIZE_BOUNDS.min ||
-    fontSize > RULER_FONT_SIZE_BOUNDS.max
-  ) {
-    throw new RangeError('ruler fontSize must be between 10 and 48')
-  }
+  const thickness = integerInBounds(
+    input.thickness ?? DEFAULT_RULER_THICKNESS,
+    RULER_THICKNESS_BOUNDS,
+    'ruler thickness must be between 1 and 12',
+  )
+  const fontSize = integerInBounds(
+    input.fontSize ?? DEFAULT_RULER_FONT_SIZE,
+    RULER_FONT_SIZE_BOUNDS,
+    'ruler fontSize must be between 10 and 48',
+  )
   assertCanvasSize(input.canvas, 'ruler canvas')
   const payload = Object.freeze({
     start: freezePoint(input.start),

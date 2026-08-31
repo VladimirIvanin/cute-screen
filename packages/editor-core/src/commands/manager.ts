@@ -33,15 +33,11 @@ function utf8ByteLength(text: string): number {
   let bytes = 0
   for (let index = 0; index < text.length; index += 1) {
     const code = text.charCodeAt(index)
-    if (code <= 0x7f) bytes += 1
-    else if (code <= 0x7ff) bytes += 2
-    else if (code >= 0xd800 && code <= 0xdbff && index + 1 < text.length) {
-      const next = text.charCodeAt(index + 1)
-      if (next >= 0xdc00 && next <= 0xdfff) {
-        bytes += 4
-        index += 1
-      } else bytes += 3
-    } else bytes += 3
+    const next = text.charCodeAt(index + 1)
+    const surrogatePair =
+      code >= 0xd800 && code <= 0xdbff && next >= 0xdc00 && next <= 0xdfff
+    bytes += surrogatePair ? 4 : code <= 0x7f ? 1 : code <= 0x7ff ? 2 : 3
+    if (surrogatePair) index += 1
   }
   return bytes
 }

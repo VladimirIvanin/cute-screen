@@ -20,6 +20,15 @@ import {
   stroke,
 } from './shared'
 
+function capNodeCommon(layer: LayerNode) {
+  return {
+    rotation: layer.transform.rotation,
+    opacity: layerOpacity(layer),
+    visible: layer.visible,
+    blendMode: layerBlendMode(layer),
+  }
+}
+
 function arrowCapNodes(
   layer: LayerNode,
   id: string,
@@ -62,16 +71,10 @@ function arrowCapNodes(
     x: behind.x - perpendicular.x * size * 0.55,
     y: behind.y - perpendicular.y * size * 0.55,
   }
-  const common = {
-    rotation: layer.transform.rotation,
-    opacity: layerOpacity(layer),
-    visible: layer.visible,
-    blendMode: layerBlendMode(layer),
-  }
   if (cap === 'circle') {
     return [
       {
-        ...common,
+        ...capNodeCommon(layer),
         kind: 'ellipse' as const,
         id,
         centerX: anchor.x,
@@ -88,7 +91,7 @@ function arrowCapNodes(
   if (cap === 'solidArrow' || cap === 'triangle') {
     return [
       {
-        ...common,
+        ...capNodeCommon(layer),
         kind: 'polygon' as const,
         id,
         points: [anchor, left, right],
@@ -103,7 +106,7 @@ function arrowCapNodes(
   if (cap === 'lineArrow') {
     return [
       {
-        ...common,
+        ...capNodeCommon(layer),
         kind: 'path' as const,
         id,
         points: [left, anchor, right],
@@ -133,7 +136,7 @@ function arrowCapNodes(
     }
     return [
       {
-        ...common,
+        ...capNodeCommon(layer),
         kind: 'polygon' as const,
         id,
         points: [forward, diamondLeft, back, diamondRight],

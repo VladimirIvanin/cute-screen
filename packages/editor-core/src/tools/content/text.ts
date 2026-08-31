@@ -9,6 +9,36 @@ import {
   solidColor,
 } from './shared'
 
+function textFontFamily(value: string | undefined): string {
+  const family = value ?? DEFAULT_TEXT_FONT_FAMILY
+  if (family.length === 0) throw new Error('text font family is required')
+  return family
+}
+
+function textFontSize(value: number | undefined): number {
+  const size = value ?? DEFAULT_TEXT_FONT_SIZE
+  if (!Number.isFinite(size) || size < 8 || size > 256)
+    throw new Error('text font size must be between 8 and 256')
+  return size
+}
+
+function textWeight(value: number | undefined) {
+  const weight = value ?? 400
+  if (
+    !Number.isInteger(weight) ||
+    weight < 100 ||
+    weight > 900 ||
+    weight % 100 !== 0
+  )
+    throw new Error('text weight must be a portable CSS weight')
+  return weight as 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900
+}
+
+function assertFixedWidth(value: number | undefined): void {
+  if (value !== undefined && (!Number.isFinite(value) || value <= 0))
+    throw new Error('fixed-width text requires a positive finite width')
+}
+
 /**
  * Builds an uncommitted layer. The session controller decides whether it becomes
  * one addLayer or updateLayer command; a blank new session intentionally yields
@@ -31,27 +61,10 @@ export function createTextLayer(input: {
 }): TextLayer | null {
   if (input.text.length === 0) return null
   assertFinitePoint(input.origin)
-  if (
-    input.fixedWidth !== undefined &&
-    (!Number.isFinite(input.fixedWidth) || input.fixedWidth <= 0)
-  ) {
-    throw new Error('fixed-width text requires a positive finite width')
-  }
-  const fontFamily = input.fontFamily ?? DEFAULT_TEXT_FONT_FAMILY
-  if (fontFamily.length === 0) throw new Error('text font family is required')
-  const fontSize = input.fontSize ?? DEFAULT_TEXT_FONT_SIZE
-  if (!Number.isFinite(fontSize) || fontSize < 8 || fontSize > 256) {
-    throw new Error('text font size must be between 8 and 256')
-  }
-  const weight = input.weight ?? 400
-  if (
-    !Number.isInteger(weight) ||
-    weight < 100 ||
-    weight > 900 ||
-    weight % 100 !== 0
-  ) {
-    throw new Error('text weight must be a portable CSS weight')
-  }
+  assertFixedWidth(input.fixedWidth)
+  const fontFamily = textFontFamily(input.fontFamily)
+  const fontSize = textFontSize(input.fontSize)
+  const weight = textWeight(input.weight)
   if (input.background) assertTextBackground(input.background)
   const width =
     input.fixedWidth ?? Math.max(fontSize, input.text.length * fontSize * 0.6)

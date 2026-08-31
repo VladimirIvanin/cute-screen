@@ -43,6 +43,40 @@ function freezeShadow(shadow: ShadowStyle): ShadowStyle {
   })
 }
 
+function loupeZoom(value: number | undefined): number {
+  const zoom = value ?? 2
+  if (!Number.isFinite(zoom) || zoom < 1 || zoom > 16)
+    throw new RangeError('loupe zoom must be between 1 and 16')
+  return zoom
+}
+
+function loupeSize(
+  value: number | undefined,
+  sourceWidth: number,
+  zoom: number,
+): number {
+  const size = value ?? sourceWidth * zoom
+  if (!Number.isFinite(size) || size < 16 || size > 2_048)
+    throw new RangeError('loupe size must be between 16 and 2048')
+  if (Math.abs(sourceWidth * zoom - size) > GEOMETRY_EPSILON)
+    throw new RangeError('loupe sourceRegion size must equal lens size / zoom')
+  return size
+}
+
+function loupeShape(value: 'circle' | 'rectangle' | undefined) {
+  const shape = value ?? 'circle'
+  if (shape !== 'circle' && shape !== 'rectangle')
+    throw new RangeError('loupe shape is invalid')
+  return shape
+}
+
+function loupeBorderWidth(value: number | undefined): number {
+  const width = value ?? 3
+  if (!Number.isFinite(width) || width < 0 || width > 64)
+    throw new RangeError('loupe borderWidth must be between 0 and 64')
+  return width
+}
+
 export function createLoupeLayer(input: {
   readonly id: string
   readonly sourceRegion: Rect
@@ -65,27 +99,12 @@ export function createLoupeLayer(input: {
   ) {
     throw new RangeError('loupe sourceRegion must be square')
   }
-  const zoom = input.zoom ?? 2
-  if (!Number.isFinite(zoom) || zoom < 1 || zoom > 16) {
-    throw new RangeError('loupe zoom must be between 1 and 16')
-  }
-  const size = input.size ?? input.sourceRegion.width * zoom
-  if (!Number.isFinite(size) || size < 16 || size > 2_048) {
-    throw new RangeError('loupe size must be between 16 and 2048')
-  }
-  if (Math.abs(input.sourceRegion.width * zoom - size) > GEOMETRY_EPSILON) {
-    throw new RangeError('loupe sourceRegion size must equal lens size / zoom')
-  }
-  const shape = input.shape ?? 'circle'
-  if (shape !== 'circle' && shape !== 'rectangle') {
-    throw new RangeError('loupe shape is invalid')
-  }
+  const zoom = loupeZoom(input.zoom)
+  const size = loupeSize(input.size, input.sourceRegion.width, zoom)
+  const shape = loupeShape(input.shape)
   const borderColor = input.borderColor ?? WHITE
   assertUnitColor(borderColor, 'loupe borderColor')
-  const borderWidth = input.borderWidth ?? 3
-  if (!Number.isFinite(borderWidth) || borderWidth < 0 || borderWidth > 64) {
-    throw new RangeError('loupe borderWidth must be between 0 and 64')
-  }
+  const borderWidth = loupeBorderWidth(input.borderWidth)
   const shadow =
     input.shadow === null
       ? null

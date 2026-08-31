@@ -20,6 +20,18 @@ export interface DrawingDefaults {
   readonly marker: JsonObject
 }
 
+interface DrawingLayerInput {
+  readonly id: string
+  readonly tool: DrawingTool
+  readonly start: Point
+  readonly end: Point
+  readonly defaults?: DrawingDefaults
+  readonly constrainAngle?: boolean
+  readonly drawFromCenter?: boolean
+  readonly points?: readonly (Point &
+    Readonly<{ readonly pressure?: number }>)[]
+}
+
 export const DEFAULT_DRAWING_DEFAULTS: DrawingDefaults = Object.freeze({
   arrow: Object.freeze({
     path: 'straight',
@@ -151,114 +163,60 @@ function layerBlendMode(
     : 'normal'
 }
 
-/** Builds one current drawing layer; callers only commit it on pointer-up. */
-export function createDrawingLayer(input: {
-  readonly id: string
-  readonly tool: DrawingTool
-  readonly start: Point
-  readonly end: Point
-  readonly defaults?: DrawingDefaults
-  readonly constrainAngle?: boolean
-  readonly drawFromCenter?: boolean
-  /** Pointer samples remain local only after the gesture commits. */
-  readonly points?: readonly (Point &
-    Readonly<{ readonly pressure?: number }>)[]
-}): LayerNode | undefined {
-  const defaults = input.defaults ?? DEFAULT_DRAWING_DEFAULTS
-  const requestedShape = defaults.shape.shape
-  const shape =
-    typeof requestedShape === 'string' ? requestedShape : 'rectangle'
-  const end =
-    input.tool === 'arrow'
-      ? constrainedEnd(input.start, input.end, input.constrainAngle === true)
-      : input.tool === 'shape' &&
-          (input.constrainAngle === true || shape === 'circle')
-        ? constrainedShapeEnd(input.start, input.end)
-        : input.end
+function drawingEnd(input: DrawingLayerInput, shape: string): Point {
+  if (input.tool === 'arrow')
+    return constrainedEnd(input.start, input.end, input.constrainAngle === true)
   if (
-    input.tool !== 'pencil' &&
-    input.tool !== 'marker' &&
-    end.x === input.start.x &&
-    end.y === input.start.y
-  ) {
-    return undefined
+    input.tool === 'shape' &&
+    (input.constrainAngle === true || shape === 'circle')
+  )
+    return constrainedShapeEnd(input.start, input.end)
+  return input.end
+}
+
+function drawingStrokeWidth(
+  input: DrawingLayerInput,
+  defaults: DrawingDefaults,
+): number {
+  if (input.tool === 'pencil' || input.tool === 'marker') {
+    const values = input.tool === 'pencil' ? defaults.pencil : defaults.marker
+    return positiveWidth(values.width, input.tool === 'marker' ? 18 : 3)
   }
-  const samples: readonly (Point & Readonly<{ readonly pressure?: number }>)[] =
-    input.points?.length ? input.points : [input.start, end]
-  const freehandDefaults =
-    input.tool === 'pencil' ? defaults.pencil : defaults.marker
+  const values = input.tool === 'arrow' ? defaults.arrow : defaults.shape
+  const strokeValue =
+    values.stroke instanceof Object
+      ? (values.stroke as JsonObject).width
+      : undefined
+  return positiveWidth(strokeValue, 3)
+}
+
+function drawingGeometry(
+  input: DrawingLayerInput,
+  end: Point,
+  samples: readonly Point[],
+  strokeWidth: number,
+): Rect {
+  if (input.tool === 'pencil' || input.tool === 'marker')
+    return pointsBounds(samples, strokeWidth / 2)
+  if (input.tool === 'arrow') return bounds({ x: 0, y: 0 }, { x: 0, y: 0 })
+  if (input.drawFromCenter)
+    return bounds(
+      { x: input.start.x * 2 - end.x, y: input.start.y * 2 - end.y },
+      end,
+      1,
+      strokeWidth / 2,
+    )
+  return bounds(input.start, end, 1, strokeWidth / 2)
+}
+
+function commonDrawingLayer(
+  input: DrawingLayerInput,
+  defaults: DrawingDefaults,
+  geometry: Rect,
+) {
   const layerDefaults = defaults[input.tool]
-  const strokeWidth =
-    input.tool === 'arrow' || input.tool === 'shape'
-      ? positiveWidth(
-          (input.tool === 'arrow' ? defaults.arrow : defaults.shape)
-            .stroke instanceof Object
-            ? (
-                (input.tool === 'arrow' ? defaults.arrow : defaults.shape)
-                  .stroke as JsonObject
-              ).width
-            : undefined,
-          3,
-        )
-      : positiveWidth(freehandDefaults.width, input.tool === 'marker' ? 18 : 3)
-  const arrowCurveBend =
-    input.tool === 'arrow' && defaults.arrow.path === 'quadratic'
-      ? {
-          x: (input.start.x + end.x) / 2,
-          y:
-            (input.start.y + end.y) / 2 -
-            Math.max(
-              8,
-              Math.hypot(end.x - input.start.x, end.y - input.start.y) / 4,
-            ),
-        }
-      : undefined
-  const requestedArrowPath = defaults.arrow.path
-  const arrowPath =
-    requestedArrowPath === 'quadratic' || requestedArrowPath === 'elbow'
-      ? requestedArrowPath
-      : 'straight'
-  const requestedElbow =
-    defaults.arrow.elbow &&
-    typeof defaults.arrow.elbow === 'object' &&
-    !Array.isArray(defaults.arrow.elbow)
-      ? (defaults.arrow.elbow as JsonObject)
-      : undefined
-  const arrowElbow =
-    arrowPath === 'elbow'
-      ? {
-          axis: requestedElbow?.axis === 'x' ? ('x' as const) : ('y' as const),
-          offset:
-            typeof requestedElbow?.offset === 'number' &&
-            Number.isFinite(requestedElbow.offset)
-              ? requestedElbow.offset
-              : 0,
-        }
-      : undefined
-  const arrowCap = (value: unknown, fallback: ArrowCap): ArrowCap =>
-    value === 'none' ||
-    value === 'lineArrow' ||
-    value === 'solidArrow' ||
-    value === 'triangle' ||
-    value === 'circle' ||
-    value === 'diamond'
-      ? value
-      : fallback
-  const inset = strokeWidth / 2
-  const geometry =
-    input.tool === 'pencil' || input.tool === 'marker'
-      ? pointsBounds(samples, strokeWidth / 2)
-      : input.tool === 'arrow'
-        ? bounds({ x: 0, y: 0 }, { x: 0, y: 0 })
-        : input.drawFromCenter
-          ? bounds(
-              { x: input.start.x * 2 - end.x, y: input.start.y * 2 - end.y },
-              end,
-              1,
-              inset,
-            )
-          : bounds(input.start, end, 1, inset)
-  const common = {
+  const markerBlend = defaults.marker.mode === 'darken' ? 'darken' : 'multiply'
+  return {
     id: input.id,
     transform: {
       ...IDENTITY_TRANSFORM,
@@ -273,64 +231,104 @@ export function createDrawingLayer(input: {
     visible: true,
     locked: false,
     blendMode:
-      input.tool === 'marker' && defaults.marker.mode === 'darken'
-        ? ('darken' as const)
-        : input.tool === 'marker'
-          ? ('multiply' as const)
-          : layerBlendMode(layerDefaults.blendMode),
+      input.tool === 'marker'
+        ? markerBlend
+        : layerBlendMode(layerDefaults.blendMode),
     shadows: [],
+  } as const
+}
+
+function arrowCap(value: unknown, fallback: ArrowCap): ArrowCap {
+  const caps: readonly ArrowCap[] = [
+    'none',
+    'lineArrow',
+    'solidArrow',
+    'triangle',
+    'circle',
+    'diamond',
+  ]
+  return caps.includes(value as ArrowCap) ? (value as ArrowCap) : fallback
+}
+
+function createArrowDrawing(
+  input: DrawingLayerInput,
+  defaults: DrawingDefaults,
+  end: Point,
+  common: ReturnType<typeof commonDrawingLayer>,
+): ArrowLayer {
+  const requestedPath = defaults.arrow.path
+  const path =
+    requestedPath === 'quadratic' || requestedPath === 'elbow'
+      ? requestedPath
+      : 'straight'
+  const requestedElbow =
+    defaults.arrow.elbow &&
+    typeof defaults.arrow.elbow === 'object' &&
+    !Array.isArray(defaults.arrow.elbow)
+      ? (defaults.arrow.elbow as JsonObject)
+      : undefined
+  const elbow =
+    path === 'elbow'
+      ? {
+          axis: requestedElbow?.axis === 'x' ? ('x' as const) : ('y' as const),
+          offset:
+            typeof requestedElbow?.offset === 'number' &&
+            Number.isFinite(requestedElbow.offset)
+              ? requestedElbow.offset
+              : 0,
+        }
+      : undefined
+  const arrowStyle = { ...defaults.arrow }
+  delete arrowStyle.bend
+  delete arrowStyle.elbow
+  delete arrowStyle.end
+  delete arrowStyle.start
+  const payload: ArrowLayerPayload = {
+    ...arrowStyle,
+    path,
+    start: { x: input.start.x, y: input.start.y },
+    end: { x: end.x, y: end.y },
+    stroke: defaults.arrow.stroke as ArrowLayerPayload['stroke'],
+    startCap: arrowCap(defaults.arrow.startCap, 'none'),
+    endCap: arrowCap(defaults.arrow.endCap, 'solidArrow'),
+    ...(path === 'quadratic'
+      ? {
+          bend: {
+            x: (input.start.x + end.x) / 2,
+            y:
+              (input.start.y + end.y) / 2 -
+              Math.max(
+                8,
+                Math.hypot(end.x - input.start.x, end.y - input.start.y) / 4,
+              ),
+          },
+        }
+      : {}),
+    ...(elbow ? { elbow } : {}),
   }
-  if (input.tool === 'arrow') {
-    const arrowStroke = defaults.arrow.stroke as ArrowLayerPayload['stroke']
-    const arrowStyle = { ...defaults.arrow }
-    delete arrowStyle.bend
-    delete arrowStyle.elbow
-    delete arrowStyle.end
-    delete arrowStyle.start
-    const payload: ArrowLayerPayload = {
-      ...arrowStyle,
-      path: arrowPath,
-      start: { x: input.start.x, y: input.start.y },
-      end: { x: end.x, y: end.y },
-      stroke: arrowStroke,
-      startCap: arrowCap(defaults.arrow.startCap, 'none'),
-      endCap: arrowCap(defaults.arrow.endCap, 'solidArrow'),
-      ...(arrowPath === 'quadratic'
-        ? {
-            bend: arrowCurveBend ?? {
-              x: (input.start.x + end.x) / 2,
-              y: input.start.y,
-            },
-          }
-        : {}),
-      ...(arrowElbow === undefined ? {} : { elbow: arrowElbow }),
-    }
-    const seed: ArrowLayer = {
-      ...common,
-      kind: 'arrow' as const,
-      transform: IDENTITY_TRANSFORM,
-      localBounds: { x: 0, y: 0, width: 1, height: 1 },
-      payload,
-    }
-    return rebaseArrowLayer(seed, payload)
+  const seed: ArrowLayer = {
+    ...common,
+    kind: 'arrow',
+    transform: IDENTITY_TRANSFORM,
+    localBounds: { x: 0, y: 0, width: 1, height: 1 },
+    payload,
   }
-  if (input.tool === 'shape') {
-    const square = shape === 'circle'
-    const side = Math.max(geometry.width, geometry.height)
-    return Object.freeze({
-      ...common,
-      localBounds: square
-        ? { x: 0, y: 0, width: side, height: side }
-        : common.localBounds,
-      kind: 'shape' as const,
-      payload: { ...defaults.shape, shape },
-    })
-  }
+  return rebaseArrowLayer(seed, payload)
+}
+
+function createFreehandDrawing(
+  input: DrawingLayerInput,
+  defaults: DrawingDefaults,
+  samples: readonly (Point & Readonly<{ readonly pressure?: number }>)[],
+  geometry: Rect,
+  common: ReturnType<typeof commonDrawingLayer>,
+): LayerNode {
+  const values = input.tool === 'pencil' ? defaults.pencil : defaults.marker
   return Object.freeze({
     ...common,
     kind: input.tool,
     payload: {
-      ...freehandDefaults,
+      ...values,
       points: simplifySampledPoints(
         samples.map((point) => ({
           x: point.x - geometry.x,
@@ -344,6 +342,45 @@ export function createDrawingLayer(input: {
       ),
     },
   }) as LayerNode
+}
+
+/** Builds one current drawing layer; callers only commit it on pointer-up. */
+export function createDrawingLayer(
+  input: DrawingLayerInput,
+): LayerNode | undefined {
+  const defaults = input.defaults ?? DEFAULT_DRAWING_DEFAULTS
+  const requestedShape = defaults.shape.shape
+  const shape =
+    typeof requestedShape === 'string' ? requestedShape : 'rectangle'
+  const end = drawingEnd(input, shape)
+  if (
+    input.tool !== 'pencil' &&
+    input.tool !== 'marker' &&
+    end.x === input.start.x &&
+    end.y === input.start.y
+  ) {
+    return undefined
+  }
+  const samples: readonly (Point & Readonly<{ readonly pressure?: number }>)[] =
+    input.points?.length ? input.points : [input.start, end]
+  const strokeWidth = drawingStrokeWidth(input, defaults)
+  const geometry = drawingGeometry(input, end, samples, strokeWidth)
+  const common = commonDrawingLayer(input, defaults, geometry)
+  if (input.tool === 'arrow')
+    return createArrowDrawing(input, defaults, end, common)
+  if (input.tool === 'shape') {
+    const square = shape === 'circle'
+    const side = Math.max(geometry.width, geometry.height)
+    return Object.freeze({
+      ...common,
+      localBounds: square
+        ? { x: 0, y: 0, width: side, height: side }
+        : common.localBounds,
+      kind: 'shape' as const,
+      payload: { ...defaults.shape, shape },
+    })
+  }
+  return createFreehandDrawing(input, defaults, samples, geometry, common)
 }
 
 /** Keeps the first/last sample while removing points closer than the tolerance. */

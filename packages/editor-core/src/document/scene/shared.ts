@@ -48,6 +48,32 @@ function paintOpacity(value: unknown): number {
     : 1
 }
 
+function imageTexture(input: Record<string, unknown>): RenderPaint | undefined {
+  if (input.kind !== 'imageTexture') return undefined
+  const transform =
+    input.transform && typeof input.transform === 'object'
+      ? (input.transform as Record<string, unknown>)
+      : {}
+  if (
+    typeof input.blobHash !== 'string' ||
+    input.blobHash.length !== 64 ||
+    !/^[a-f0-9]+$/u.test(input.blobHash)
+  )
+    return undefined
+  return Object.freeze({
+    kind: 'imageTexture' as const,
+    resourceId: input.blobHash,
+    opacity: paintOpacity(input.opacity),
+    scale:
+      typeof transform.scale === 'number' && transform.scale > 0
+        ? transform.scale
+        : 1,
+    rotation: typeof transform.rotation === 'number' ? transform.rotation : 0,
+    offsetX: typeof transform.offsetX === 'number' ? transform.offsetX : 0,
+    offsetY: typeof transform.offsetY === 'number' ? transform.offsetY : 0,
+  })
+}
+
 export function fill(
   value: unknown,
   geometry: {
@@ -108,31 +134,8 @@ export function fill(
       stops: Object.freeze(stops),
     })
   }
-  if (input.kind === 'imageTexture') {
-    const transform =
-      input.transform && typeof input.transform === 'object'
-        ? (input.transform as Record<string, unknown>)
-        : {}
-    if (
-      typeof input.blobHash === 'string' &&
-      input.blobHash.length === 64 &&
-      /^[a-f0-9]+$/u.test(input.blobHash)
-    ) {
-      return Object.freeze({
-        kind: 'imageTexture' as const,
-        resourceId: input.blobHash,
-        opacity: paintOpacity(input.opacity),
-        scale:
-          typeof transform.scale === 'number' && transform.scale > 0
-            ? transform.scale
-            : 1,
-        rotation:
-          typeof transform.rotation === 'number' ? transform.rotation : 0,
-        offsetX: typeof transform.offsetX === 'number' ? transform.offsetX : 0,
-        offsetY: typeof transform.offsetY === 'number' ? transform.offsetY : 0,
-      })
-    }
-  }
+  const texture = imageTexture(input)
+  if (texture) return texture
   // Bundled patterns and a missing/corrupt texture are recoverable visible
   // fallbacks until their resource/shader compiler is attached.
   return Object.freeze({ red: 0.898, green: 0.282, blue: 0.302, alpha: 0.16 })
