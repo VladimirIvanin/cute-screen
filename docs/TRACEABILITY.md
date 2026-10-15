@@ -1,5 +1,21 @@
 # Трассируемость требований
 
+## Windows: исключение следа редактора при захвате (2026-10-15)
+
+`REQ-CAP-001/002/010/013`: перед native capture Windows должен завершить
+скрытие main на оконном потоке без DWM hide-animation и дождаться compositor
+barrier. Rust regression проверяет отказ для invalid HWND; real-WebView
+сценарий `windows-capture-exclusion` проверяет decoded frozen pixels поверх
+контрольного рабочего стола, отмену и повторный захват. До реализации и
+runtime replay статус repair — planned; fake-platform evidence недостаточно.
+
+Для `REQ-EDT-008` инструмент Marker использует Tabler `brush` через общий
+`UiIcon` в editor и Quick Capture; SVG проверяется в `ui-icon.test.ts`.
+
+Для `REQ-EDT-008` инструмент Callout использует Tabler `stroke-dynamic` через
+общий `UiIcon` в editor и Quick Capture; native SVG assertion в
+`tests/e2e/quick-capture.ts` использует новое обозначение.
+
 Для `REQ-EDT-008` инструмент Select использует Tabler `pointer-2` через общий
 `UiIcon` в editor и Quick Capture. Проверка — существующий runtime SVG assertion
 в `quick-context-toolbar.test.ts`; команды и результаты фиксируются в `TESTING.md`.

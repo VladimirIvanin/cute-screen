@@ -29,7 +29,7 @@ use windows::{
 };
 use windows_sys::Win32::{
     Foundation::{GetLastError, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM},
-    Graphics::Dwm::DwmFlush,
+    Graphics::Dwm::{DWMWA_TRANSITIONS_FORCEDISABLED, DwmFlush, DwmSetWindowAttribute},
     Graphics::Gdi::{
         BLACK_BRUSH, BeginPaint, CreatePen, CreateSolidBrush, DeleteObject, Ellipse, EndPaint,
         FillRect, GetStockObject, InvalidateRect, LineTo, MoveToEx, PAINTSTRUCT, PS_DASH, PS_SOLID,
@@ -45,13 +45,13 @@ use windows_sys::Win32::{
     UI::WindowsAndMessaging::{
         CS_HREDRAW, CS_VREDRAW, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
         GA_ROOT, GetAncestor, GetClientRect, GetForegroundWindow, GetPhysicalCursorPos,
-        GetSystemMetrics, GetWindowRect, IDC_CROSS, IsWindow, LWA_ALPHA, LoadCursorW, MSG,
-        PM_REMOVE, PeekMessageW, PostQuitMessage, RegisterClassW, SM_CXVIRTUALSCREEN,
-        SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SW_SHOW, SW_SHOWNOACTIVATE,
-        SetCursor, SetForegroundWindow, SetLayeredWindowAttributes, ShowWindow, WA_INACTIVE,
-        WM_ACTIVATE, WM_CLOSE, WM_DESTROY, WM_KEYDOWN, WM_LBUTTONDOWN, WM_LBUTTONUP,
-        WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_NCHITTEST, WM_PAINT, WM_SETCURSOR, WNDCLASSW,
-        WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+        GetSystemMetrics, GetWindowRect, IDC_CROSS, IsWindow, IsWindowVisible, LWA_ALPHA,
+        LoadCursorW, MSG, PM_REMOVE, PeekMessageW, PostQuitMessage, RegisterClassW,
+        SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SW_HIDE,
+        SW_SHOW, SW_SHOWNOACTIVATE, SetCursor, SetForegroundWindow, SetLayeredWindowAttributes,
+        ShowWindow, WA_INACTIVE, WM_ACTIVATE, WM_CLOSE, WM_DESTROY, WM_KEYDOWN, WM_LBUTTONDOWN,
+        WM_LBUTTONUP, WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_NCHITTEST, WM_PAINT, WM_SETCURSOR,
+        WNDCLASSW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
         WindowFromPoint,
     },
 };
@@ -68,6 +68,49 @@ use crate::{
 /// immutable frame. Area capture acquires the full virtual desktop directly;
 /// the mounted Quick Capture surface owns selection and editing as one mode.
 pub struct WindowsCompositorCaptureAdapter;
+
+/// Runs on the window's owning thread, before creating any capture session.
+/// A queued Tauri hide and a DWM present alone can still leave the editor's
+/// animated disappearance in the frozen desktop. Disable that transition for
+/// this hide only, and acknowledge it after DWM has presented the hidden state.
+pub(crate) fn hide_window_for_capture(
+    window: HWND,
+    correlation_id: &str,
+) -> Result<(), PlatformError> {
+    if unsafe { IsWindow(window) } == 0 {
+        return Err(failure(correlation_id, "invalidCaptureWindow"));
+    }
+    set_window_transitions_disabled(window, true, correlation_id)?;
+    unsafe { ShowWindow(window, SW_HIDE) };
+    let hidden = if unsafe { IsWindowVisible(window) } != 0 {
+        Err(failure(correlation_id, "captureWindowStillVisible"))
+    } else {
+        flush_desktop_composition(correlation_id)
+    };
+    // Restore normal editor animations on both success and failure.
+    let restored = set_window_transitions_disabled(window, false, correlation_id);
+    hidden.and(restored)
+}
+
+fn set_window_transitions_disabled(
+    window: HWND,
+    disabled: bool,
+    correlation_id: &str,
+) -> Result<(), PlatformError> {
+    let disabled = i32::from(disabled);
+    let result = unsafe {
+        DwmSetWindowAttribute(
+            window,
+            DWMWA_TRANSITIONS_FORCEDISABLED as u32,
+            std::ptr::from_ref(&disabled).cast(),
+            std::mem::size_of_val(&disabled) as u32,
+        )
+    };
+    if result < 0 {
+        return Err(failure(correlation_id, "setCaptureWindowTransitions"));
+    }
+    Ok(())
+}
 
 impl WindowsCompositorCaptureAdapter {
     pub fn available(&self) -> bool {
@@ -1424,6 +1467,15 @@ mod tests {
             layout_fingerprint: None,
             monitor_ids: None,
         }
+    }
+
+    #[test]
+    fn capture_window_hide_rejects_invalid_hwnd() {
+        let result = super::hide_window_for_capture(std::ptr::null_mut(), "invalid-window");
+        assert!(
+            result.is_err(),
+            "capture must not continue after a failed native hide"
+        );
     }
 
     #[test]

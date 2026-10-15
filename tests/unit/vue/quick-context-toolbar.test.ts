@@ -85,7 +85,7 @@ describe('Quick Capture context toolbar', () => {
     for (const [label, icon] of [
       ['Select', 'pointer-2'],
       ['Text', 'typography'],
-      ['Callout', 'text-caption'],
+      ['Callout', 'stroke-dynamic'],
       ['Numbered marker', 'circle-number-1'],
     ] as const) {
       expect(within(rail).getByRole('button', { name: label }).querySelector(`svg.tabler-icon-${icon}`)).toBeTruthy()

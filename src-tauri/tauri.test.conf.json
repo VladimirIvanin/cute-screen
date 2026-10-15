@@ -1,4 +1,5 @@
 {
+  "identifier": "io.github.vladimirivanin.cute-screen.e2e",
   "app": {
     "withGlobalTauri": true,
     "security": {

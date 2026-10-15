@@ -1627,7 +1627,7 @@ fn should_wait_for_native_x11_unmap(source: &CaptureInvocationSource) -> bool {
 /// Hides the editor before a native desktop capture. On cancellation the
 /// caller restores it; an Area quick draft keeps it hidden until a terminal
 /// action so the editor cannot leak into the selected compositor pixels.
-fn hide_editor_for_native_capture<R: tauri::Runtime>(
+async fn hide_editor_for_native_capture<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
     correlation_id: &str,
     invocation_source: &CaptureInvocationSource,
@@ -1652,6 +1652,35 @@ fn hide_editor_for_native_capture<R: tauri::Runtime>(
     if !should_hide_editor_for_native_capture(window.is_visible().ok()) {
         return Ok(false);
     }
+    #[cfg(target_os = "windows")]
+    {
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        let native_window = window.clone();
+        let correlation = correlation_id.to_owned();
+        window
+            .run_on_main_thread(move || {
+                let result = native_window
+                    .hwnd()
+                    .map_err(|_| PlatformError::new(PlatformErrorCode::CaptureFailed, &correlation))
+                    .and_then(|hwnd| {
+                        windows_platform::hide_window_for_capture(hwnd.0, &correlation)
+                    });
+                let _ = sender.send(result);
+            })
+            .map_err(|_| PlatformError::new(PlatformErrorCode::CaptureFailed, correlation_id))?;
+        let hidden = tokio::time::timeout(CAPTURE_PREFLIGHT_TIMEOUT, receiver).await;
+        if !matches!(hidden, Ok(Ok(Ok(())))) {
+            eprintln!("cute-screen native editor hide failed ({correlation_id}): {hidden:?}");
+            window.show().map_err(|_| {
+                PlatformError::new(PlatformErrorCode::CaptureFailed, correlation_id)
+            })?;
+            return Err(PlatformError::new(
+                PlatformErrorCode::CaptureFailed,
+                correlation_id,
+            ));
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
     window
         .hide()
         .map_err(|_| PlatformError::new(PlatformErrorCode::CaptureFailed, correlation_id))?;
@@ -1917,7 +1946,9 @@ async fn capture_with_preflight<R: tauri::Runtime>(
             app,
             &request.correlation_id,
             &request.invocation_source,
-        ) {
+        )
+        .await
+        {
             Ok(hid_editor) => hid_editor,
             Err(_) => {
                 let outcome = failed_capture(request.correlation_id);
@@ -1970,7 +2001,9 @@ async fn capture_with_preflight<R: tauri::Runtime>(
         app,
         &request.correlation_id,
         &request.invocation_source,
-    ) {
+    )
+    .await
+    {
         Ok(hid_editor) => hid_editor,
         Err(_) => {
             let outcome = failed_capture(request.correlation_id);

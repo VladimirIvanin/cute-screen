@@ -258,6 +258,12 @@ target. Prewarmed Quick WebView загружает frozen frame скрытой, 
 показывается в `selecting`; первый валидный drag и переход в `editing`
 обслуживают те же `CanvasViewport`, scene и overlay hosts.
 
+Windows скрывает main на его оконном потоке через синхронный Win32 hide с
+временно отключённым `DWMWA_TRANSITIONS_FORCEDISABLED`. Подтверждение приходит
+после проверки native visibility и `DwmFlush`; только затем начинается backend.
+Ошибка/timeout скрытия останавливает capture и восстанавливает editor.
+После barrier обычные переходы окна снова включаются (ADR-049).
+
 `QuickCaptureShell` использует тот же document, renderer, `CanvasViewport`,
 tool defaults и `EditorCommand`, но не монтирует TopBar, LayersPanel,
 SeriesFilmstrip, beautify или watermark. Crop остаётся изменяемым; committed

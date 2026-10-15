@@ -49,8 +49,8 @@ Cute Screen — полноценный local-first редактор снимко
 - `REQ-CAP-010` — Screen, Window, Active Window и Repeat сразу сохраняют
   неизменяемый оригинал и открывают редактируемый документ. Явный Area capture
   сначала создаёт неперсистентный quick-capture draft и материализует original,
-  capture и editable document только по Copy, Save PNG или Editor. На X11 и
-  macOS запущенный из editor захват скрывает `main` до native capture; editor
+  capture и editable document только по Copy, Save PNG или Editor. На Windows,
+  X11 и macOS запущенный из editor захват скрывает `main` до native capture; editor
   не остаётся видимым и не попадает в кадр. Terminal action Editor одним кликом
   показывает main WebView, монтирует materialized document, ждёт его первый
   renderer frame и скрывает Quick Capture; timeout не требует повторного клика,

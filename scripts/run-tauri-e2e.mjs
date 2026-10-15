@@ -20,6 +20,12 @@ const embeddedWebDriverPort = Number.parseInt(process.env.TAURI_WEBDRIVER_PORT ?
 
 const scenarios = [
   {
+    id: 'windows-capture-exclusion',
+    spec: 'tests/e2e/specs/tauri-windows-capture-exclusion.e2e.ts',
+    harnessQuery: '?m04=1',
+    interactiveWindows: true,
+  },
+  {
     id: 'foundation',
     spec: 'tests/e2e/specs/tauri-foundation.e2e.ts',
   },
@@ -108,7 +114,12 @@ const requestedScenarioIds = new Set(
     .filter(Boolean),
 )
 const selectedScenarios =
-  requestedScenarioIds.size === 0 ? scenarios : scenarios.filter(({ id }) => requestedScenarioIds.has(id))
+  requestedScenarioIds.size === 0
+    ? scenarios.filter((scenario) => !scenario.interactiveWindows)
+    : scenarios.filter(({ id }) => requestedScenarioIds.has(id))
+if (selectedScenarios.some((scenario) => scenario.interactiveWindows) && process.platform !== 'win32') {
+  throw new Error('windows-capture-exclusion requires an interactive Windows desktop')
+}
 const unknownScenarioIds = [...requestedScenarioIds].filter((id) => !scenarios.some((scenario) => scenario.id === id))
 if (unknownScenarioIds.length > 0) {
   throw new Error(`Unknown Tauri E2E scenarios: ${unknownScenarioIds.join(', ')}`)

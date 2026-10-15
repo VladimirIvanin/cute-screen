@@ -891,3 +891,25 @@ settings. Undo/redo меняет документ, а не preferences. LayersPa
 `browser-tool-ux.e2e.ts`, RU/EN light/dark screenshots. Фактические результаты,
 доступность WebView и ограничения записываются в TESTING.md. Document v7,
 immutable originals, binary image transport и platform adapters сохраняются.
+
+## ADR-049 — Подтверждённое скрытие Windows editor до capture
+
+**Статус:** accepted.
+
+**Контекст:** успешный Tauri `hide()` из capture task означает постановку
+команды в оконную очередь. DWM может продолжать hide-animation, и её полупрозрачный
+след попадает в frozen desktop даже после одного compositor present.
+
+**Решение:** Windows main скрывается на owning thread через Win32 `SW_HIDE`,
+с временным per-window `DWMWA_TRANSITIONS_FORCEDISABLED`. Проверка visibility
+и `DwmFlush` предшествуют acknowledgement в capture task; только затем backend
+создаёт duplication. Обычные переходы восстанавливаются при успехе и ошибке.
+Ошибка/timeout даёт failed capture и возвращает editor. Глобальные animation
+settings не меняются. Это уточнение реализации существующего исключения editor,
+а не замена Area lifecycle или pixel transport.
+
+**Проверяемое основание:** Rust regression отклоняет invalid HWND; interactive
+`windows-capture-exclusion` через production Capture проверяет decoded pixels
+реального DXGI desktop под editor marker в трёх циклах с Escape/retry.
+Результаты и ограничения — в `TESTING.md`. Семантика hide-animation описана
+в [Microsoft DWM documentation](https://devblogs.microsoft.com/oldnewthing/20121003-00/?p=6423).

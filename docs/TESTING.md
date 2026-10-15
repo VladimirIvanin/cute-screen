@@ -1,5 +1,26 @@
 # Стратегия тестирования
 
+## Marker: иконка brush (2026-10-15)
+
+Windows x64 / PowerShell: `REQ-EDT-008` — общий `UiIcon` использует Tabler
+`brush` для маркера в editor и Quick Capture.
+`pnpm exec vitest run --project vue tests/unit/vue/ui-icon.test.ts
+tests/unit/vue/quick-context-toolbar.test.ts` прошёл 39/39;
+лог — `artifacts/marker-icon/vue-tests.log`.
+`pnpm typecheck`, `pnpm format` и `pnpm format:check` прошли.
+Native E2E для этой замены не запускался.
+
+## Callout: иконка stroke-dynamic (2026-10-15)
+
+Windows x64 / PowerShell: `REQ-EDT-008` — общий `UiIcon` использует Tabler
+`stroke-dynamic` для выноски. Обновлены существующие SVG assertions в Vue и
+Quick Capture E2E. `pnpm exec vitest run --project vue
+tests/unit/vue/ui-icon.test.ts tests/unit/vue/quick-context-toolbar.test.ts`
+прошёл 39/39; лог — `artifacts/callout-icon/vue-tests.log`. Первый запуск выявил
+старое ожидание `text-caption` в toolbar test; после обновления тесты прошли.
+`pnpm typecheck`, `pnpm lint`, `pnpm format` и `pnpm format:check` прошли.
+Native E2E для этой замены не запускался.
+
 ## Итог UX tools/styles и real WebView (2026-10-15)
 
 Windows x64 / PowerShell, Node 22.23.1, pnpm 10.33.2, Tauri 2.11.5,
