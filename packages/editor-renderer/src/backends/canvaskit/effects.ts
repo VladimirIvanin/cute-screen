@@ -28,8 +28,14 @@ import {
   resolveCanvasKitVisualCenterBaseline,
   withTransform,
 } from './geometry'
-import { blendMode, configurePaint } from './paint'
-import { censorPath, spotlightPath } from './paths'
+import {
+  blendMode,
+  configurePaint,
+} from './paint'
+import {
+  censorPath,
+  spotlightPath,
+} from './paths'
 
 export function drawSnapshotCanvasKit(
   canvasKit: CanvasKitApi,
@@ -45,9 +51,7 @@ export function drawSnapshotCanvasKit(
       image,
       source,
       destination,
-      nearest
-        ? (canvasKit.FilterMode.Nearest ?? canvasKit.FilterMode.Linear)
-        : canvasKit.FilterMode.Linear,
+      nearest ? (canvasKit.FilterMode.Nearest ?? canvasKit.FilterMode.Linear) : canvasKit.FilterMode.Linear,
       canvasKit.MipmapMode?.None,
       paint,
     )
@@ -73,12 +77,8 @@ export function drawCensorCanvasKit(
           y: node.region.y + node.region.height / 2,
         }
       : {
-          x:
-            node.region.points.reduce((sum, point) => sum + point.x, 0) /
-            node.region.points.length,
-          y:
-            node.region.points.reduce((sum, point) => sum + point.y, 0) /
-            node.region.points.length,
+          x: node.region.points.reduce((sum, point) => sum + point.x, 0) / node.region.points.length,
+          y: node.region.points.reduce((sum, point) => sum + point.y, 0) / node.region.points.length,
         }
   try {
     if (node.effect.mode === 'solid') {
@@ -86,9 +86,7 @@ export function drawCensorCanvasKit(
         configurePaint(
           canvasKit,
           paint,
-          node.effect.mode === 'solid'
-            ? node.effect.color
-            : { red: 0, green: 0, blue: 0, alpha: 0 },
+          node.effect.mode === 'solid' ? node.effect.color : { red: 0, green: 0, blue: 0, alpha: 0 },
           node.opacity,
           'fill',
         )
@@ -120,12 +118,7 @@ export function drawCensorCanvasKit(
               canvasKit,
               canvas,
               below,
-              canvasKit.XYWHRect(
-                0,
-                0,
-                scene.width * scale,
-                scene.height * scale,
-              ),
+              canvasKit.XYWHRect(0, 0, scene.width * scale, scene.height * scale),
               canvasKit.XYWHRect(0, 0, scene.width, scene.height),
               paint,
             )
@@ -143,10 +136,8 @@ export function drawCensorCanvasKit(
             for (let x = 0; x < scene.width; x += effect.blockSize) {
               const width = Math.min(effect.blockSize, scene.width - x)
               const height = Math.min(effect.blockSize, scene.height - y)
-              const sampleX =
-                Math.min(scene.width - 0.5, x + effect.blockSize / 2) * scale
-              const sampleY =
-                Math.min(scene.height - 0.5, y + effect.blockSize / 2) * scale
+              const sampleX = Math.min(scene.width - 0.5, x + effect.blockSize / 2) * scale
+              const sampleY = Math.min(scene.height - 0.5, y + effect.blockSize / 2) * scale
               drawSnapshotCanvasKit(
                 canvasKit,
                 canvas,
@@ -185,13 +176,7 @@ export function drawSpotlightCanvasKit(
   const centerY = node.aperture.y + node.aperture.height / 2
   let featherFilter: CanvasKitMaskFilter | undefined
   try {
-    configurePaint(
-      canvasKit,
-      paint,
-      node.dimColor,
-      node.opacity * node.dimOpacity,
-      'fill',
-    )
+    configurePaint(canvasKit, paint, node.dimColor, node.opacity * node.dimOpacity, 'fill')
     paint.setBlendMode(blendMode(canvasKit, node.blendMode))
     canvas.drawRect(canvasKit.XYWHRect(0, 0, scene.width, scene.height), paint)
 
@@ -212,21 +197,14 @@ export function drawSpotlightCanvasKit(
 
     const feather = spotlightFeatherWidth(node.feather)
     if (feather > 0) {
-      configurePaint(
-        canvasKit,
-        paint,
-        node.dimColor,
-        node.opacity * node.dimOpacity * 0.8,
-        'stroke',
-        feather * 0.9,
-      )
+      configurePaint(canvasKit, paint, node.dimColor, node.opacity * node.dimOpacity * 0.8, 'stroke', feather * 0.9)
       paint.setBlendMode(blendMode(canvasKit, node.blendMode))
-      if (canvasKit.MaskFilter && canvasKit.BlurStyle && paint.setMaskFilter) {
-        featherFilter = canvasKit.MaskFilter.MakeBlur(
-          canvasKit.BlurStyle.Normal,
-          Math.max(0.5, feather / 2),
-          true,
-        )
+      if (
+        canvasKit.MaskFilter &&
+        canvasKit.BlurStyle &&
+        paint.setMaskFilter
+      ) {
+        featherFilter = canvasKit.MaskFilter.MakeBlur(canvasKit.BlurStyle.Normal, Math.max(0.5, feather / 2), true)
         paint.setMaskFilter(featherFilter)
       }
       withTransform(canvas, node, centerX, centerY, () => {
@@ -260,14 +238,7 @@ export function drawRulerCanvasKit(
       const length = Math.hypot(dx, dy)
       const perpendicular = { x: -dy / length, y: dx / length }
       const tickHalf = rulerEndpointTickHalfLength(node.thickness)
-      configurePaint(
-        canvasKit,
-        stroke,
-        node.color,
-        node.opacity,
-        'stroke',
-        node.thickness,
-      )
+      configurePaint(canvasKit, stroke, node.color, node.opacity, 'stroke', node.thickness)
       stroke.setStrokeCap(canvasKit.StrokeCap.Butt)
       stroke.setBlendMode(blendMode(canvasKit, node.blendMode))
       canvas.drawLine(node.x1, node.y1, node.x2, node.y2, stroke)
@@ -286,10 +257,7 @@ export function drawRulerCanvasKit(
     })
     if (!canvasKit.Font || !canvas.drawText) return
     const resolved = typefaces?.resolve('Roboto', label)
-    const fallback = resolved
-      ? undefined
-      : (canvasKit.Typeface?.MakeDefault?.() ??
-        canvasKit.Typeface?.GetDefault?.())
+    const fallback = resolved ? undefined : (canvasKit.Typeface?.MakeDefault?.() ?? canvasKit.Typeface?.GetDefault?.())
     const typeface = resolved?.typeface ?? fallback
     if (!typeface) return
     const font = new canvasKit.Font(typeface, node.fontSize)
@@ -298,12 +266,7 @@ export function drawRulerCanvasKit(
       const labelWidth = canvasKitTextWidth(font, label, node.fontSize)
       const badge = rulerBadgeBox(labelWidth, node.fontSize)
       const palette = rulerBadgePalette(node.color)
-      const badgeRect = canvasKit.XYWHRect(
-        -badge.width / 2,
-        -badge.height / 2,
-        badge.width,
-        badge.height,
-      )
+      const badgeRect = canvasKit.XYWHRect(-badge.width / 2, -badge.height / 2, badge.width, badge.height)
       const rounded = canvasKit.RRectXY(badgeRect, badge.radius, badge.radius)
       const endpoints = rulerWorldEndpoints(node)
       const badgeCenterX = (endpoints.start.x + endpoints.end.x) / 2
@@ -312,13 +275,7 @@ export function drawRulerCanvasKit(
       try {
         canvas.translate(badgeCenterX, badgeCenterY)
         canvas.rotate(rulerBadgeRotationDegrees(node), 0, 0)
-        configurePaint(
-          canvasKit,
-          fill,
-          palette.background,
-          node.opacity,
-          'fill',
-        )
+        configurePaint(canvasKit, fill, palette.background, node.opacity, 'fill')
         fill.setBlendMode(blendMode(canvasKit, node.blendMode))
         if (canvas.drawRRect) canvas.drawRRect(rounded, fill)
         else canvas.drawRect(badgeRect, fill)

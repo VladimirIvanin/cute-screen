@@ -1,16 +1,13 @@
-import type { Ref, ShallowRef } from 'vue'
+import type { Ref } from 'vue'
 import {
   createFlipCanvasCommand,
   type CropPreset,
-  type DrawingDefaults,
-  type DrawingToolPreferencesV2,
   type EditorDocumentV1,
   type JsonObject,
 } from '@cute-screen/editor-renderer'
 import { TextureResourceResolver } from '../../../texture-fill'
 import type { ResolvedEditorShellProps } from '../../contracts'
 import type { CanvasViewportExpose } from '../../canvas/contracts'
-import type { DrawingLayerNode } from '../drawing-schema'
 
 export interface ContextActionsContext {
   readonly props: ResolvedEditorShellProps
@@ -18,19 +15,14 @@ export interface ContextActionsContext {
   readonly cropPreset: Ref<CropPreset>
   readonly activeDocument: Ref<EditorDocumentV1 | undefined>
   readonly textureImages: Ref<ReadonlyMap<string, HTMLImageElement>>
-  readonly drawingDefaults: Ref<DrawingDefaults>
-  readonly drawingPreferences: ShallowRef<DrawingToolPreferencesV2>
-  readonly selectedDrawingLayer: () => DrawingLayerNode | undefined
-  readonly saveDrawingPreferences: (value: DrawingToolPreferencesV2) => void
+  readonly applyTextureFill: (fill: JsonObject) => void
+  readonly reportResourceError: (message: string) => void
 }
 
 function textureBlobHash(fill: unknown): string | undefined {
   if (!fill || typeof fill !== 'object') return undefined
   const candidate = fill as Record<string, unknown>
-  return candidate.kind === 'imageTexture' &&
-    typeof candidate.blobHash === 'string'
-    ? candidate.blobHash
-    : undefined
+  return candidate.kind === 'imageTexture' && typeof candidate.blobHash === 'string' ? candidate.blobHash : undefined
 }
 
 function documentTextureHashes(document: EditorDocumentV1): readonly string[] {
@@ -85,71 +77,28 @@ export function createContextActions(context: ContextActionsContext) {
     if (imported.kind !== 'imported') return
     const resource = resources.get(imported.blobHash)
     if (resource?.kind === 'ready') {
-      context.textureImages.value = new Map(context.textureImages.value).set(
-        imported.blobHash,
-        resource.image,
-      )
+      context.textureImages.value = new Map(context.textureImages.value).set(imported.blobHash, resource.image)
     }
-    const selected = context.selectedDrawingLayer()
-    const target = selected?.kind === 'shape' ? selected : undefined
-    const current = target
-      ? target.payload
-      : context.drawingDefaults.value.shape
-    const payload = importedShapePayload(current, imported)
-    if (target) {
-      if (!context.props.documentSession || target.locked) return
-      context.props.documentSession.execute({
-        type: 'updateLayer',
-        before: target,
-        after: { ...target, payload },
-      })
+    if (resource?.kind !== 'ready') {
+      context.reportResourceError('Texture is unavailable. Select the resource again.')
       return
     }
-    context.drawingDefaults.value = {
-      ...context.drawingDefaults.value,
-      shape: payload,
-    }
-    context.drawingPreferences.value = {
-      ...context.drawingPreferences.value,
-      defaults: context.drawingDefaults.value,
-    }
-    context.saveDrawingPreferences(context.drawingPreferences.value)
+    context.applyTextureFill(importedShapePayload({}, imported).fill as JsonObject)
   }
   function removeTexture(): void {
-    const selected = context.selectedDrawingLayer()
-    if (
-      selected?.kind !== 'shape' ||
-      !context.props.documentSession ||
-      selected.locked
-    ) {
-      return
-    }
-    const fill = selected.payload.fill as Record<string, unknown> | undefined
-    if (fill?.kind !== 'imageTexture') return
-    const blobHash = String(fill.blobHash)
-    textureResolver?.remove(blobHash)
-    const images = new Map(context.textureImages.value)
-    images.delete(blobHash)
-    context.textureImages.value = images
-    context.props.documentSession.execute({
-      type: 'updateLayer',
-      before: selected,
-      after: {
-        ...selected,
-        payload: { ...selected.payload, fill: { kind: 'none' } },
-      },
-    })
+    context.applyTextureFill({ kind: 'none' })
   }
-  async function resolveDocumentTextures(
-    document: EditorDocumentV1,
-  ): Promise<void> {
+  async function resolveDocumentTextures(document: EditorDocumentV1): Promise<void> {
     const resources = resolver()
     if (!resources) return
     const images = new Map(context.textureImages.value)
     for (const blobHash of documentTextureHashes(document)) {
       const resource = await resources.resolve(blobHash)
       if (resource.kind === 'ready') images.set(blobHash, resource.image)
-      else images.delete(blobHash)
+      else {
+        images.delete(blobHash)
+        context.reportResourceError('Texture is unavailable. Select the resource again.')
+      }
     }
     context.textureImages.value = images
   }
@@ -161,16 +110,20 @@ export function createContextActions(context: ContextActionsContext) {
     }
     if (id === 'cropApply') return context.canvas.value?.applyCropDraft()
     if (id === 'cropCancel') return context.canvas.value?.cancelCropDraft()
-    if (id === 'importTexture') return importTexture()
+    if (id === 'importTexture') {
+      try {
+        await importTexture()
+      } catch (error) {
+        context.reportResourceError(error instanceof Error ? error.message : 'Texture import failed')
+      }
+      return
+    }
     if (id === 'removeTexture') return removeTexture()
     if (id !== 'flipHorizontal' && id !== 'flipVertical') return
     const document = context.activeDocument.value
     if (!document || !context.props.documentSession) return
     context.props.documentSession.execute(
-      createFlipCanvasCommand(
-        document,
-        id === 'flipHorizontal' ? 'horizontal' : 'vertical',
-      ),
+      createFlipCanvasCommand(document, id === 'flipHorizontal' ? 'horizontal' : 'vertical'),
     )
   }
   return { onContextAction, resolveDocumentTextures }

@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 import type { RichTextContent } from '@cute-screen/editor-core'
 import { RichTextEditorController } from '../../../packages/editor-vue/src/rich-text-editor'
@@ -48,12 +52,8 @@ describe('RichTextEditorController', () => {
     })
     controller.compositionStart()
 
-    expect(
-      controller.reconcileBrowserText('A😀Bに', { anchor: 5, focus: 5 }),
-    ).toBe('deferred')
-    expect(
-      controller.reconcileBrowserText('A😀B日本', { anchor: 6, focus: 6 }),
-    ).toBe('deferred')
+    expect(controller.reconcileBrowserText('A😀Bに', { anchor: 5, focus: 5 })).toBe('deferred')
+    expect(controller.reconcileBrowserText('A😀B日本', { anchor: 6, focus: 6 })).toBe('deferred')
     expect(controller.state.content.text).toBe('A😀B')
     expect(controller.revision).toBe(0)
 
@@ -68,9 +68,7 @@ describe('RichTextEditorController', () => {
       ...CONTENT,
       text: 'item',
       spans: [{ ...CONTENT.spans[0]!, end: 4 }],
-      paragraphs: [
-        { start: 0, end: 4, alignment: 'start', listKind: 'bullet' },
-      ],
+      paragraphs: [{ start: 0, end: 4, alignment: 'start', listKind: 'bullet' }],
     })
     controller.setSelection({ anchor: 4, focus: 4 })
 
@@ -99,8 +97,6 @@ describe('RichTextEditorController', () => {
     controller.replaceSelectionPlainText('plain\r\n<b>text</b>')
     expect(controller.state.content.text).toBe('Aplain\n<b>text</b>B')
     expect(controller.state.content.text).not.toContain('\r')
-    expect(controller.state.content.spans.at(-1)?.end).toBe(
-      controller.state.content.text.length,
-    )
+    expect(controller.state.content.spans.at(-1)?.end).toBe(controller.state.content.text.length)
   })
 })

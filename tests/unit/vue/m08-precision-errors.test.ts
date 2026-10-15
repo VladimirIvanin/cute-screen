@@ -1,6 +1,17 @@
-import { fireEvent, render, screen } from '@testing-library/vue'
+import {
+  fireEvent,
+  render,
+  screen,
+} from '@testing-library/vue'
 import { markRaw } from 'vue'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 import {
   createEditorShellPinia,
   DocumentSessionController,
@@ -16,9 +27,7 @@ import {
 beforeEach(() => {
   window.localStorage.clear()
   contextFixture.current = canvasContext()
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
-    contextFixture.current,
-  )
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(contextFixture.current)
 })
 
 afterEach(() => {
@@ -64,9 +73,7 @@ describe('M08 shell lifecycle and contextual settings', () => {
     expect(preset).toBeInTheDocument()
     await fireEvent.click(preset)
     for (const option of ['Free', '1:1', '4:3', '16:9', 'Original']) {
-      expect(
-        await screen.findByRole('option', { name: option }),
-      ).toBeInTheDocument()
+      expect(await screen.findByRole('option', { name: option })).toBeInTheDocument()
     }
     await fireEvent.pointerDown(document.body)
     await fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
@@ -129,17 +136,10 @@ describe('M08 shell lifecycle and contextual settings', () => {
     })
 
     await vi.waitFor(() =>
-      expect(screen.getByRole('status')).toHaveTextContent(
-        'There is no opaque colour at this point',
-      ),
-    )
+      expect(screen.getByRole('status')).toHaveTextContent('There is no opaque colour at this point'))
     expect(writeClipboardText).not.toHaveBeenCalled()
-    expect(
-      view.container.querySelector('.cs-eyedropper-swatch'),
-    ).not.toBeInTheDocument()
-    expect(
-      window.localStorage.getItem('cute-screen.drawing-tool-preferences.v1'),
-    ).toBeNull()
+    expect(view.container.querySelector('.cs-eyedropper-swatch')).not.toBeInTheDocument()
+    expect(window.localStorage.getItem('cute-screen.drawing-tool-preferences.v1')).toBeNull()
     expect(session.snapshot.core.canUndo).toBe(false)
 
     session.dispose()
@@ -157,9 +157,7 @@ describe('M08 shell lifecycle and contextual settings', () => {
       correlationId: () => 'm08-eyedropper',
       debounceMs: 60_000,
     })
-    const writeClipboardText = vi
-      .fn()
-      .mockRejectedValue(new Error('clipboard busy'))
+    const writeClipboardText = vi.fn().mockRejectedValue(new Error('clipboard busy'))
     const view = render(EditorShell, {
       props: {
         documentSession: markRaw(session),
@@ -189,20 +187,12 @@ describe('M08 shell lifecycle and contextual settings', () => {
     })
 
     await vi.waitFor(() =>
-      expect(screen.getByRole('status')).toHaveTextContent(
-        'Colour selected: #ABCDEF. HEX could not be copied.',
-      ),
-    )
+      expect(screen.getByRole('status')).toHaveTextContent('Colour selected: #ABCDEF. HEX could not be copied.'))
     expect(screen.getByLabelText('Colour swatch #ABCDEF')).toHaveStyle({
       backgroundColor: '#ABCDEF',
     })
-    expect(writeClipboardText).toHaveBeenCalledWith(
-      '#ABCDEF',
-      expect.any(String),
-    )
-    expect(
-      window.localStorage.getItem('cute-screen.drawing-tool-preferences.v1'),
-    ).toContain('0.670588')
+    expect(writeClipboardText).toHaveBeenCalledWith('#ABCDEF', expect.any(String))
+    expect(window.localStorage.getItem('cute-screen.drawing-tool-preferences.v1')).toContain('0.670588')
     expect(session.snapshot.core.canUndo).toBe(false)
 
     session.dispose()

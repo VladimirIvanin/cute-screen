@@ -1,5 +1,8 @@
 import type { CommandManager } from './commands/manager'
-import type { EditorCommand, EditorSnapshot } from './commands/types'
+import type {
+  EditorCommand,
+  EditorSnapshot,
+} from './commands/types'
 import type { EditorDocumentV1 } from './document/types'
 
 /** UI-only interaction state which must never be persisted with a document. */
@@ -45,8 +48,7 @@ export class TransientEditorStateController<TDraft> {
   }
 
   beginDraft(draft: TDraft): EditorTransientState<TDraft> {
-    if (this.#draft !== null)
-      throw new Error('a transient draft is already active')
+    if (this.#draft !== null) throw new Error('a transient draft is already active')
     this.#draft = draft
     return this.snapshot
   }
@@ -62,7 +64,10 @@ export class TransientEditorStateController<TDraft> {
     return this.snapshot
   }
 
-  commitDraft(manager: CommandManager, command: EditorCommand): EditorSnapshot {
+  commitDraft(
+    manager: CommandManager,
+    command: EditorCommand,
+  ): EditorSnapshot {
     if (this.#draft === null) throw new Error('no transient draft is active')
     const committed = manager.execute(command)
     this.#draft = null
@@ -72,9 +77,7 @@ export class TransientEditorStateController<TDraft> {
 
   reconcile(document: EditorDocumentV1): EditorTransientState<TDraft> {
     const ids = new Set(document.layers.map((layer) => layer.id))
-    this.#selectionIds = Object.freeze(
-      this.#selectionIds.filter((id) => ids.has(id)),
-    )
+    this.#selectionIds = Object.freeze(this.#selectionIds.filter((id) => ids.has(id)))
     if (this.#hoveredLayerId && !ids.has(this.#hoveredLayerId)) {
       this.#hoveredLayerId = undefined
     }

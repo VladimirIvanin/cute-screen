@@ -9,3 +9,10 @@ pnpm-lock.yaml
 Cargo.lock
 screenshots
 prototype-html
+
+# ESLint Stylistic owns source layout; do not collapse its structural line breaks.
+**/*.js
+**/*.mjs
+**/*.ts
+**/*.vue
+!apps/desktop/src/generated/desktop-ipc.ts

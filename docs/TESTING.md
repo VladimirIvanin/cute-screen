@@ -1,8 +1,119 @@
 # Стратегия тестирования
 
+## Windows real-WebView: восстановление harness (2026-10-15)
+
+Платформа: Windows x64, WebView2 Evergreen/EdgeDriver `155.0.4283.45`,
+`tauri-driver 2.1.0`, Tauri `2.11.5`, WDIO `9.30.1`, tauri-service/plugins `1.3.0`.
+Восстановлен production mount-flow реального binary; установка WebKit на Windows
+не требуется. Windows использует external provider, другие ОС сохраняют embedded.
+
+Причины и исправления:
+
+- Ошибка worker «No browserName ...» была вторичной: launcher удалял browserName
+  и падал на EdgeDriver check до назначения endpoint. Включено автоматическое
+  получение подходящего EdgeDriver; установлен официальный tauri-driver.
+- Embedded 1.3.0 исполняет pointer/keyboard через DOM dispatch и не создаёт
+  contextmenu. Native-input acceptance на Windows использует external provider;
+  тест наблюдает `isTrusted=true` для contextmenu и keydown.
+- Window labels переключаются через `browser.tauri.switchWindow/listWindows`,
+  поскольку внешние handles отличаются от Tauri labels. Встроенный HTTP server
+  отключается только при test-harness external provider, исключая конфликт портов.
+- pnpm patch `patches/@wdio__native-core@1.1.0.patch` убирает cmd-wrapper для exe
+  и завершает только дерево собственного driver PID. Два последовательных
+  сценария больше не оставляют tauri-driver/msedgedriver и listener 4444/4445.
+- Runner останавливается при failed fixtures/build и не запускает stale binary;
+  subprocess regression tests проверяют оба отказа (2/2).
+- Test-only tracing делает ошибки embedded startup видимыми. Quick layout
+  измеряет только нижний defaults toolbar, configure panel ограничена viewport
+  и остаётся интерактивной у верхнего края.
+- Rust asset URL использует WebView2 HTTP mapping и кодирует Windows separators.
+  Два failing URL tests зафиксированы до исправления; transport tests 8/8 green.
+  Windows-запуск локального IPC formatter через node вместо cmd shim также
+  проверен red/green Rust test.
+
+Фактическая команда PowerShell:
+
+```powershell
+$env:CUTE_SCREEN_E2E_SCENARIOS='quick-chrome,renderer-alpha'
+pnpm test:e2e:tauri
+```
+
+Результат: exit 0, Quick chrome 4/4 (ПКМ, nested SVG stroke controls, layered
+Escape, trusted keyboard, Tab focus, Editor handoff, Copy, cancel/restart),
+затем alpha transport 1/1 через scoped asset и CanvasKit texture. Лог:
+`artifacts/tool-ux/tauri-native-success.log`; JUnit и captured logs:
+`artifacts/tauri-e2e/`. Скриншот `quick-native-tool-settings.png` сохранён и
+просмотрен: панель и вложенные stroke controls видимы внутри viewport.
+`pnpm test` — 81 files / 544 tests; focused layout 8/8 и tool UX 15/15.
+Это scoped native evidence с fake-platform capture, не physical capture и не
+полная Tauri/platform matrix. Полный native suite, другие ОС, mixed DPI и native
+Save PNG dialog/redecode остаются pending до отдельного подтверждения.
+
+В пользовательский каталог установлен skill `tauri-webview-testing`;
+`python -X utf8 .../skill-creator/scripts/quick_validate.py .../tauri-webview-testing`
+прошёл. Навык содержит проверенные причины, выбор provider, scoped cleanup,
+production mount-flow и требования к native-input evidence.
+
+## Иконка Select pointer-2 (2026-10-15)
+
+Windows 10 x64, PowerShell: `pnpm test --project vue tests/unit/vue/ui-icon.test.ts
+tests/unit/vue/quick-context-toolbar.test.ts` — passed, 39/39. Runtime SVG
+assertion кнопки Select проверяет `tabler-icon-pointer-2`.
+Лог: `artifacts/select-pointer-2-tests.log`. `pnpm format` остановился на шести
+ошибках `@stylistic/max-len` в существующих `selection-actions-controller.ts`,
+`tool-settings-validation.ts` и `tool-style-defaults.ts`. Финальный
+`pnpm format:check` также не прошёл: 953 ошибки в текущем рабочем дереве,
+включая CRLF и длину строк. Логи: `artifacts/select-pointer-2-format.log` и
+`artifacts/select-pointer-2-format-check.log`. Визуальный browser/Tauri smoke
+для этой замены не запускался.
+
 ## Цель
 
 Тестовый harness должен доказывать пользовательское действие в подходящей среде. Unit-тест механизма не заменяет проверку реального Tauri webview, а ручной smoke не заменяет детерминированную проверку core.
+
+## Форматирование исходников
+
+`pnpm format` применяет Prettier для CSS/JSON/YAML/Markdown/HTML и затем ESLint
+Stylistic 5.10.0 (MIT) для JS/TS/Vue. `pnpm format:check` проверяет оба набора
+без записи и входит в `pnpm check` и CI. Ширина строки — 120, отступ — 2 пробела,
+окончания — LF. Generated IPC bindings сохраняют Prettier-контракт генератора.
+
+`eslint.format.config.js` и `scripts/eslint-readability.mjs` задают структурные
+переносы: named imports/exports с двумя и более именами, объявления функций с
+двумя и более параметрами, несколько базовых интерфейсов в `extends`, условия с
+тремя и более проверками. В каждом случае элементы располагаются по одному на
+строку. Короткие вызовы/callbacks остаются компактными; существующие переносы
+объектов, массивов и вызовов не схлопываются. Блоки со скобками многострочные,
+допускается одна инструкция на строку. Длинные строки данных, URL, комментарии
+и значения HTML-атрибутов освобождены от жёсткого лимита длины.
+
+В VS Code JS/TS/Vue использует ESLint с layout-only fixes, остальные поддерживаемые
+языки — Prettier. Расширения рекомендованы через `.vscode/extensions.json`;
+Prettier исключает JS/TS/Vue через `.prettierignore`, поэтому повторное сохранение
+не отменяет структурные переносы. Rust проверяется отдельно через `cargo fmt`.
+
+Регрессии: `tests/boundaries/formatting-contract.test.ts` проверяет примеры со
+скриншотов, Vue script/template, сохранение комментариев и повторное применение
+форматирования без изменений. Команда: `pnpm test:boundaries`.
+
+Финальная проверка структурных правил 2026-10-15, Windows 10 build 19045 x64,
+Node 22.23.1 / pnpm 10.33.2: `pnpm format`, `pnpm format:check`, `pnpm typecheck`,
+`pnpm docs:check` и `git diff --check` — passed. Все 8 formatting regressions
+прошли; логи — `artifacts/formatting-style-check.log` и
+`artifacts/formatting-regressions.log`. Общий `pnpm test:boundaries` на момент
+проверки: 36/37, оставшийся failure — function size/complexity/depth в текущих
+изменениях tool UX. Последний `pnpm check` остановился на неиспользуемой `props`
+в `workspace-bindings.ts`; последующие IPC/Rust gates в этом прогоне не запускались.
+Это tooling evidence, runtime/platform guarantees не меняются.
+
+Первоначальная проверка Prettier 2026-10-15: Windows 10 build 19045 x64, Node 22.23.1,
+pnpm 10.33.2. Выполнены `pnpm format`, `pnpm format:check` (passed),
+`pnpm docs:check` (34 Markdown-файла) и `git diff --check` (passed).
+`pnpm check` остановился на ESLint: неиспользуемые `floatingArrowToolbarSchema`
+и `toolConfigureArrowSchema` в текущем `EditorWorkspace.vue`.
+`pnpm test:boundaries` — 28/29: оставшаяся ошибка относится к лимитам длины,
+сложности и вложенности функций в текущих изменениях инструментов/стилей.
+Runtime/platform guarantees от настройки форматирования не меняются.
 
 ## Пирамида тестов
 

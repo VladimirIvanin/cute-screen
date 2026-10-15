@@ -23,7 +23,7 @@ export async function mountM05HarnessDocument(
       ? { width: 400, height: 300 }
       : { width: 160, height: 120 }
   const session = new DocumentSessionController({
-    document: createM05Document(dimensions, config.m08),
+    document: createM05Document(dimensions, config.m08 || config.m05Viewport),
     revision: 0,
     debounceMs: 0,
     bridge: {
@@ -32,14 +32,15 @@ export async function mountM05HarnessDocument(
     },
     correlationId: ports.correlationId,
   })
+  const image = config.m08SourceNotReady
+    ? undefined
+    : await loadM05HarnessImage(dimensions, config.m08SourceAlpha)
+  ports.sourceImage.value = image
   ports.documentSession.value = session
   window.__cuteScreenE2eM05 = {
     snapshot: () => ports.documentSession.value?.snapshot.core.document,
     versionToken: () => ports.documentSession.value?.snapshot.core.versionToken,
   }
-  ports.sourceImage.value = config.m08SourceNotReady
-    ? undefined
-    : await loadM05HarnessImage(dimensions, config.m08SourceAlpha)
   ports.installClipboardBridge()
   ports.installHarnessFacade()
 }
@@ -50,21 +51,18 @@ function loadM05HarnessImage(
 ): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image()
-    image.addEventListener('load', () => resolve(image), { once: true })
-    image.addEventListener(
-      'error',
-      () => reject(new Error('M05 fixture failed')),
-      { once: true },
-    )
-    image.src = `data:image/svg+xml,${encodeURIComponent(
+    const url = URL.createObjectURL(new Blob([
       `<svg xmlns="http://www.w3.org/2000/svg" width="${dimensions.width}" height="${dimensions.height}"><rect width="100%" height="100%" fill="#273d5a" fill-opacity="${alpha / 255}"/></svg>`,
-    )}`
+    ], { type: 'image/svg+xml' }))
+    image.addEventListener('load', () => { URL.revokeObjectURL(url); resolve(image) }, { once: true })
+    image.addEventListener('error', () => { URL.revokeObjectURL(url); reject(new Error('M05 fixture failed')) }, { once: true })
+    image.src = url
   })
 }
 
 function createM05Document(
   dimensions: Readonly<{ width: number; height: number }>,
-  m08: boolean,
+  uncropped: boolean,
 ): EditorDocumentV1 {
   const hash = 'f'.repeat(64)
   return {
@@ -80,7 +78,7 @@ function createM05Document(
       color: { colorSpace: 'srgb', hasIccProfile: false },
     },
     canvas: dimensions,
-    crop: m08 ? null : { x: 20, y: 15, width: 100, height: 80 },
+    crop: uncropped ? null : { x: 20, y: 15, width: 100, height: 80 },
     layers: [baseImageLayer(hash, dimensions), ...fixtureShapes()],
     presentation: {
       beautify: { enabled: false },

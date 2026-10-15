@@ -1,6 +1,9 @@
 import type { RenderNode } from '@cute-screen/editor-core'
 import type { ImageResourceInput } from '../../types'
-import type { Canvas2DRendererOptions, Context2D } from './contracts'
+import type {
+  Canvas2DRendererOptions,
+  Context2D,
+} from './contracts'
 import { drawRuler2D } from './effects'
 import {
   drawEllipseNode2D,
@@ -15,9 +18,7 @@ export function drawNodes2D(
   context: Context2D,
   nodes: readonly RenderNode[],
   resources: ReadonlyMap<string, ImageResourceInput['source']> = new Map(),
-  resolveFontFamily: NonNullable<
-    Canvas2DRendererOptions['resolveFontFamily']
-  > = (_text, style) => style.fontFamily,
+  resolveFontFamily: NonNullable<Canvas2DRendererOptions['resolveFontFamily']> = (_text, style) => style.fontFamily,
 ): void {
   for (const node of nodes) {
     if (!node.visible || node.opacity === 0) continue
@@ -49,9 +50,7 @@ export function drawNodes2D(
       case 'censor':
       case 'spotlight':
       case 'loupe':
-        throw new Error(
-          `${node.kind} rendering requires an ordered Canvas2D surface`,
-        )
+        throw new Error(`${node.kind} rendering requires an ordered Canvas2D surface`)
     }
   }
 }

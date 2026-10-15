@@ -1,4 +1,9 @@
-import { $, $$, browser, expect } from '@wdio/globals'
+import {
+  $,
+  $$,
+  browser,
+  expect,
+} from '@wdio/globals'
 import path from 'node:path'
 import {
   chooseArrowConfigureOption,
@@ -33,21 +38,15 @@ describe('M06 drawing tools in browser mode', () => {
         await setShellPreferences(preference.locale, preference.theme)
         await openArrowConfigurePopover()
         const layout = await browser.execute(() => {
-          const toolbar = document.querySelector<HTMLElement>(
-            '.cs-tool-configure-popover-host',
-          )
-          const controls = toolbar?.querySelector<HTMLElement>(
-            '.cs-arrow-formatting-toolbar',
-          )
+          const toolbar = document.querySelector<HTMLElement>('.cs-tool-configure-popover-host')
+          const controls = toolbar?.querySelector<HTMLElement>('.cs-arrow-formatting-toolbar')
           if (!toolbar || !controls) throw new Error('Arrow toolbar is missing')
           const bounds = toolbar.getBoundingClientRect()
-          const controlIds = [
-            ...controls.querySelectorAll<HTMLElement>('[data-control]'),
-          ].map((control) => control.dataset.control)
+          const controlIds = [...controls.querySelectorAll<HTMLElement>('[data-control]')].map(
+            (control) => control.dataset.control,
+          )
           const observable = [
-            ...controls.querySelectorAll<HTMLElement>(
-              '.cs-arrow-toolbar-trigger, .cs-color-more--compact',
-            ),
+            ...controls.querySelectorAll<HTMLElement>('.cs-arrow-toolbar-trigger, .cs-color-more--compact'),
           ].filter((control) => {
             const rect = control.getBoundingClientRect()
             return rect.width > 0 && rect.height > 0
@@ -55,9 +54,7 @@ describe('M06 drawing tools in browser mode', () => {
           return {
             controlIds,
             observableCount: observable.length,
-            observableLabels: observable.map((control) =>
-              control.getAttribute('aria-label'),
-            ),
+            observableLabels: observable.map((control) => control.getAttribute('aria-label')),
             controlsClientWidth: controls.clientWidth,
             controlsScrollWidth: controls.scrollWidth,
             controlsFit: controls.scrollWidth <= controls.clientWidth,
@@ -66,8 +63,7 @@ describe('M06 drawing tools in browser mode', () => {
               bounds.right <= window.innerWidth &&
               bounds.top >= 0 &&
               bounds.bottom <= window.innerHeight,
-            documentFits:
-              document.documentElement.scrollWidth <= window.innerWidth,
+            documentFits: document.documentElement.scrollWidth <= window.innerWidth,
           }
         })
         expect({ size, preference, ...layout }).toEqual({
@@ -77,20 +73,8 @@ describe('M06 drawing tools in browser mode', () => {
           observableCount: 5,
           observableLabels:
             preference.locale === 'ru'
-              ? [
-                  'Цвет: #E5484D',
-                  'Линия: 3 px',
-                  'Хвост: Нет',
-                  'Геометрия: Прямая',
-                  'Наконечник: Заполненная стрелка',
-                ]
-              : [
-                  'Color: #E5484D',
-                  'Stroke: 3 px',
-                  'Tail: None',
-                  'Geometry: Straight',
-                  'Head: Solid arrow',
-                ],
+              ? ['Цвет: #E5484D', 'Линия: 3 px', 'Хвост: Нет', 'Геометрия: Прямая', 'Наконечник: Заполненная стрелка']
+              : ['Color: #E5484D', 'Stroke: 3 px', 'Tail: None', 'Geometry: Straight', 'Head: Solid arrow'],
           controlsClientWidth: layout.controlsClientWidth,
           controlsScrollWidth: layout.controlsClientWidth,
           controlsFit: true,
@@ -103,9 +87,7 @@ describe('M06 drawing tools in browser mode', () => {
           ),
         )
         await browser.execute(() => {
-          document.body.dispatchEvent(
-            new PointerEvent('pointerdown', { bubbles: true }),
-          )
+          document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
         })
       }
     }
@@ -122,11 +104,7 @@ describe('M06 drawing tools in browser mode', () => {
       context.fillStyle = '#123456'
       context.fillRect(0, 0, canvas.width, canvas.height)
       const raw = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob(
-          (blob) =>
-            blob ? resolve(blob) : reject(new Error('JPEG encode failed')),
-          'image/jpeg',
-        )
+        canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('JPEG encode failed'))), 'image/jpeg')
       })
       const encoded = new Uint8Array(await raw.arrayBuffer())
       const exif = new Uint8Array([
@@ -168,9 +146,7 @@ describe('M06 drawing tools in browser mode', () => {
       oriented.set([0xff, 0xe1, 0, exif.length + 2], 2)
       oriented.set(exif, 6)
       oriented.set(encoded.subarray(2), exif.length + 6)
-      const url = URL.createObjectURL(
-        new Blob([oriented], { type: 'image/jpeg' }),
-      )
+      const url = URL.createObjectURL(new Blob([oriented], { type: 'image/jpeg' }))
       try {
         const image = new Image()
         image.src = url
@@ -184,7 +160,7 @@ describe('M06 drawing tools in browser mode', () => {
     expect(dimensions).toEqual({ width: 2, height: 3 })
   })
 
-  it('commits two arrow gestures without changing the active tool and cancels a draft', async () => {
+  it('re-invokes Arrow between completed objects and cancels a draft', async () => {
     await openDrawingHarness()
     const arrowTool = $('button[aria-label="Arrow"]')
     await arrowTool.click()
@@ -199,6 +175,8 @@ describe('M06 drawing tools in browser mode', () => {
       .up({ button: 'left' })
       .perform()
     await browser.waitUntil(async () => (await snapshot()).layers.length === 5)
+    await expect(arrowTool).toHaveAttribute('aria-pressed', 'false')
+    await browser.keys('a')
 
     await browser
       .action('pointer')
@@ -208,7 +186,8 @@ describe('M06 drawing tools in browser mode', () => {
       .up({ button: 'left' })
       .perform()
     await browser.waitUntil(async () => (await snapshot()).layers.length === 6)
-    await expect(arrowTool).toHaveAttribute('aria-pressed', 'true')
+    await expect(arrowTool).toHaveAttribute('aria-pressed', 'false')
+    await browser.keys('a')
 
     await browser
       .action('pointer')
@@ -220,7 +199,7 @@ describe('M06 drawing tools in browser mode', () => {
     expect((await snapshot()).layers).toHaveLength(6)
   })
 
-  it('keeps a new elbow unselected, drags its middle segment once, and restores it through undo/redo', async () => {
+  it('selects a new elbow, drags its middle segment once, and restores it through undo/redo', async () => {
     await browser.setWindowSize(1280, 720)
     await openDrawingHarness()
     await $('button[aria-label="Show layers"]').click()
@@ -229,9 +208,7 @@ describe('M06 drawing tools in browser mode', () => {
     await openArrowConfigurePopover()
     await chooseArrowConfigureOption('arrowPath', 'Elbow')
     await browser.execute(() => {
-      document.body.dispatchEvent(
-        new PointerEvent('pointerdown', { bubbles: true }),
-      )
+      document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
     })
     const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
     const beforeCount = (await snapshot()).layers.length
@@ -242,11 +219,9 @@ describe('M06 drawing tools in browser mode', () => {
       .move({ origin: 'pointer', x: 104, y: 36, duration: 80 })
       .up({ button: 'left' })
       .perform()
-    await browser.waitUntil(
-      async () => (await snapshot()).layers.length === beforeCount + 1,
-    )
-    await expect(arrowTool).toHaveAttribute('aria-pressed', 'true')
-    expect(await $$('.cs-layer-row.is-selected').length).toBe(0)
+    await browser.waitUntil(async () => (await snapshot()).layers.length === beforeCount + 1)
+    await expect(arrowTool).toHaveAttribute('aria-pressed', 'false')
+    expect(await $$('.cs-layer-row.is-selected').length).toBe(1)
 
     const created = (await snapshot()).layers.at(-1)!
     expect(created.payload?.path).toBe('elbow')
@@ -259,9 +234,7 @@ describe('M06 drawing tools in browser mode', () => {
       .down({ button: 'left' })
       .up({ button: 'left' })
       .perform()
-    await browser.waitUntil(
-      async () => (await $$('.cs-layer-row.is-selected').length) === 1,
-    )
+    await browser.waitUntil(async () => (await $$('.cs-layer-row.is-selected').length) === 1)
     await browser
       .action('pointer')
       .move({ origin: 'viewport', x: handle.x, y: handle.y, duration: 0 })
@@ -271,26 +244,17 @@ describe('M06 drawing tools in browser mode', () => {
       .perform()
     await browser.waitUntil(async () => {
       const arrow = (await snapshot()).layers.at(-1)
-      return (
-        (arrow?.payload?.elbow as { offset?: number } | undefined)?.offset !==
-        originalOffset
-      )
+      return (arrow?.payload?.elbow as { offset?: number } | undefined)?.offset !== originalOffset
     })
-    const draggedOffset = (
-      (await snapshot()).layers.at(-1)?.payload?.elbow as { offset: number }
-    ).offset
+    const draggedOffset = ((await snapshot()).layers.at(-1)?.payload?.elbow as { offset: number }).offset
 
     await $('button[aria-label="Undo"]').click()
     await browser.waitUntil(
-      async () =>
-        ((await snapshot()).layers.at(-1)?.payload?.elbow as { offset: number })
-          .offset === originalOffset,
+      async () => ((await snapshot()).layers.at(-1)?.payload?.elbow as { offset: number }).offset === originalOffset,
     )
     await $('button[aria-label="Redo"]').click()
     await browser.waitUntil(
-      async () =>
-        ((await snapshot()).layers.at(-1)?.payload?.elbow as { offset: number })
-          .offset === draggedOffset,
+      async () => ((await snapshot()).layers.at(-1)?.payload?.elbow as { offset: number }).offset === draggedOffset,
     )
   })
 })

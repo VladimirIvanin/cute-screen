@@ -1,6 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
-import type { EditorDocumentV1, LayerNode } from '../document/types'
+import type {
+  EditorDocumentV1,
+  LayerNode,
+} from '../document/types'
 import { CommandManager } from './manager'
 
 const DOCUMENT_ID = '019c1f62-058e-7000-8000-000000000000'
@@ -89,16 +96,9 @@ describe('CommandManager history identity', () => {
       layer: { ...baseLayer, id: SECOND_ID },
     })
 
-    expect(manager.undo().document.layers.map(({ id }) => id)).toEqual([
-      BASE_ID,
-      FIRST_ID,
-    ])
+    expect(manager.undo().document.layers.map(({ id }) => id)).toEqual([BASE_ID, FIRST_ID])
     expect(manager.snapshot.canUndo).toBe(false)
-    expect(manager.redo().document.layers.map(({ id }) => id)).toEqual([
-      BASE_ID,
-      FIRST_ID,
-      SECOND_ID,
-    ])
+    expect(manager.redo().document.layers.map(({ id }) => id)).toEqual([BASE_ID, FIRST_ID, SECOND_ID])
     manager.undo()
     manager.execute({
       type: 'addLayer',
@@ -108,9 +108,7 @@ describe('CommandManager history identity', () => {
   })
 
   it('rejects invalid history limits and unknown saved tokens', () => {
-    expect(() => new CommandManager(document, { maxEntries: 0 })).toThrow(
-      /maxEntries/u,
-    )
+    expect(() => new CommandManager(document, { maxEntries: 0 })).toThrow(/maxEntries/u)
     const manager = new CommandManager(document)
     expect(() => manager.markSaved(1)).toThrow(/versionToken/u)
   })

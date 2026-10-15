@@ -16,7 +16,10 @@ import type {
 } from './contracts'
 import { drawSnapshotCanvasKit } from './effects'
 import { withTransform } from './geometry'
-import { blendMode, configurePaint } from './paint'
+import {
+  blendMode,
+  configurePaint,
+} from './paint'
 import { loupePath } from './paths'
 
 function drawConnector(
@@ -31,13 +34,7 @@ function drawConnector(
   paint.setBlendMode(blendMode(canvasKit, node.blendMode))
   paint.setStrokeCap(canvasKit.StrokeCap.Round)
   paint.setStrokeJoin(canvasKit.StrokeJoin.Round)
-  canvas.drawLine(
-    connector.lensCenter.x,
-    connector.lensCenter.y,
-    connector.lineEnd.x,
-    connector.lineEnd.y,
-    paint,
-  )
+  canvas.drawLine(connector.lensCenter.x, connector.lensCenter.y, connector.lineEnd.x, connector.lineEnd.y, paint)
   const builder = new canvasKit.PathBuilder()
   builder.moveTo(connector.source.x, connector.source.y)
   builder.lineTo(connector.arrowLeft.x, connector.arrowLeft.y)
@@ -62,21 +59,10 @@ function drawShadow(
   paint: CanvasKitPaint,
 ): void {
   if (!node.shadow) return
-  configurePaint(
-    canvasKit,
-    paint,
-    node.shadow.color,
-    node.opacity,
-    'stroke',
-    Math.max(1, node.border.width),
-  )
+  configurePaint(canvasKit, paint, node.shadow.color, node.opacity, 'stroke', Math.max(1, node.border.width))
   const filter =
     canvasKit.MaskFilter && canvasKit.BlurStyle && paint.setMaskFilter
-      ? canvasKit.MaskFilter.MakeBlur(
-          canvasKit.BlurStyle.Normal,
-          Math.max(0.5, node.shadow.blur / 2),
-          true,
-        )
+      ? canvasKit.MaskFilter.MakeBlur(canvasKit.BlurStyle.Normal, Math.max(0.5, node.shadow.blur / 2), true)
       : undefined
   try {
     if (filter) paint.setMaskFilter?.(filter)
@@ -106,15 +92,7 @@ function drawLensContents(
     paint.setAntiAlias(false)
     paint.setColorComponents(0, 0, 0, 0)
     paint.setBlendMode(canvasKit.BlendMode.Src)
-    canvas.drawRect(
-      canvasKit.XYWHRect(
-        node.lens.x,
-        node.lens.y,
-        node.lens.size,
-        node.lens.size,
-      ),
-      paint,
-    )
+    canvas.drawRect(canvasKit.XYWHRect(node.lens.x, node.lens.y, node.lens.size, node.lens.size), paint)
     const source = intersectPixelRects(node.sourceRegion, {
       x: 0,
       y: 0,
@@ -124,26 +102,14 @@ function drawLensContents(
     if (!source) return
     paint.setColorComponents(1, 1, 1, node.opacity)
     paint.setBlendMode(blendMode(canvasKit, node.blendMode))
-    const destinationX =
-      node.lens.x + (source.x - node.sourceRegion.x) * node.zoom
-    const destinationY =
-      node.lens.y + (source.y - node.sourceRegion.y) * node.zoom
+    const destinationX = node.lens.x + (source.x - node.sourceRegion.x) * node.zoom
+    const destinationY = node.lens.y + (source.y - node.sourceRegion.y) * node.zoom
     drawSnapshotCanvasKit(
       canvasKit,
       canvas,
       below,
-      canvasKit.XYWHRect(
-        source.x * scale,
-        source.y * scale,
-        source.width * scale,
-        source.height * scale,
-      ),
-      canvasKit.XYWHRect(
-        destinationX,
-        destinationY,
-        source.width * node.zoom,
-        source.height * node.zoom,
-      ),
+      canvasKit.XYWHRect(source.x * scale, source.y * scale, source.width * scale, source.height * scale),
+      canvasKit.XYWHRect(destinationX, destinationY, source.width * node.zoom, source.height * node.zoom),
       paint,
       true,
     )
@@ -160,14 +126,7 @@ function drawBorder(
   paint: CanvasKitPaint,
 ): void {
   if (node.border.width <= 0) return
-  configurePaint(
-    canvasKit,
-    paint,
-    node.border.color,
-    node.opacity,
-    'stroke',
-    node.border.width,
-  )
+  configurePaint(canvasKit, paint, node.border.color, node.opacity, 'stroke', node.border.width)
   paint.setBlendMode(blendMode(canvasKit, node.blendMode))
   canvas.drawPath(path, paint)
 }
@@ -187,26 +146,11 @@ export function drawLoupeCanvasKit(
   const radius = node.lens.size / 2
   try {
     drawConnector(canvasKit, canvas, node, paint)
-    withTransform(
-      canvas,
-      node,
-      node.lens.x + radius,
-      node.lens.y + radius,
-      () => {
-        drawShadow(canvasKit, canvas, path, node, paint)
-        drawLensContents(
-          canvasKit,
-          canvas,
-          below,
-          scene,
-          node,
-          scale,
-          path,
-          paint,
-        )
-        drawBorder(canvasKit, canvas, path, node, paint)
-      },
-    )
+    withTransform(canvas, node, node.lens.x + radius, node.lens.y + radius, () => {
+      drawShadow(canvasKit, canvas, path, node, paint)
+      drawLensContents(canvasKit, canvas, below, scene, node, scale, path, paint)
+      drawBorder(canvasKit, canvas, path, node, paint)
+    })
   } finally {
     paint.setMaskFilter?.(null)
     paint.delete()

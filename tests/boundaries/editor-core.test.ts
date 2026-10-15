@@ -2,7 +2,11 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
 import fg from 'fast-glob'
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 const restrictedImports = [
   /^vue(?:\/|$)/u,
@@ -14,12 +18,7 @@ const restrictedImports = [
 describe('editor-core dependency boundary', () => {
   it('has no DOM TypeScript library and imports no upper layer', async () => {
     const root = process.cwd()
-    const config = JSON.parse(
-      await readFile(
-        path.join(root, 'packages/editor-core/tsconfig.json'),
-        'utf8',
-      ),
-    )
+    const config = JSON.parse(await readFile(path.join(root, 'packages/editor-core/tsconfig.json'), 'utf8'))
     expect(config.compilerOptions.lib).toEqual(['ES2023'])
 
     const sources = await fg('packages/editor-core/src/**/*.ts', { cwd: root })
@@ -27,9 +26,7 @@ describe('editor-core dependency boundary', () => {
 
     for (const source of sources) {
       const code = await readFile(path.join(root, source), 'utf8')
-      const specifiers = code.matchAll(
-        /(?:from\s+|import\s*\()['"]([^'"]+)['"]/gu,
-      )
+      const specifiers = code.matchAll(/(?:from\s+|import\s*\()['"]([^'"]+)['"]/gu)
       for (const match of specifiers) {
         const specifier = match[1] ?? ''
         if (restrictedImports.some((pattern) => pattern.test(specifier))) {
@@ -51,12 +48,9 @@ describe('editor-core dependency boundary', () => {
     ])
 
     for (const [manifestPath, expected] of expectedInternalDependencies) {
-      const manifest = JSON.parse(
-        await readFile(path.join(root, manifestPath), 'utf8'),
-      )
-      const dependencies = Object.keys(manifest.dependencies ?? {}).filter(
-        (dependency) => dependency.startsWith('@cute-screen/'),
-      )
+      const manifest = JSON.parse(await readFile(path.join(root, manifestPath), 'utf8'))
+      const dependencies = Object.keys(manifest.dependencies ?? {}).filter((dependency) =>
+        dependency.startsWith('@cute-screen/'))
 
       expect(dependencies, manifestPath).toEqual(expected)
     }
@@ -76,10 +70,7 @@ describe('M05 icon-system boundary', () => {
     const violations: string[] = []
     for (const source of sources) {
       const code = await readFile(path.join(root, source), 'utf8')
-      if (
-        source !== 'packages/editor-vue/src/shell/icon.ts' &&
-        /['"]@tabler\/icons-vue(?:\/[^'"]*)?['"]/u.test(code)
-      ) {
+      if (source !== 'packages/editor-vue/src/shell/icon.ts' && /['"]@tabler\/icons-vue(?:\/[^'"]*)?['"]/u.test(code)) {
         violations.push(`${source}: direct Tabler import`)
       }
       if (/['"](?:@lucide\/vue|lucide-vue-next)['"]/u.test(code)) {
@@ -99,18 +90,10 @@ describe('M05 icon-system boundary', () => {
   it('maps every declared semantic IconName in the central adapter', async () => {
     const root = process.cwd()
     const [types, icon] = await Promise.all([
-      readFile(
-        path.join(root, 'packages/editor-vue/src/shell/types.ts'),
-        'utf8',
-      ),
-      readFile(
-        path.join(root, 'packages/editor-vue/src/shell/icon.ts'),
-        'utf8',
-      ),
+      readFile(path.join(root, 'packages/editor-vue/src/shell/types.ts'), 'utf8'),
+      readFile(path.join(root, 'packages/editor-vue/src/shell/icon.ts'), 'utf8'),
     ])
-    const iconType = types.match(
-      /export type IconName =([\s\S]*?)\n\nexport const/u,
-    )?.[1]
+    const iconType = types.match(/export type IconName =([\s\S]*?)\n\nexport const/u)?.[1]
     if (!iconType) throw new Error('IconName declaration is missing')
     const names = [...iconType.matchAll(/\| '([A-Za-z]+)'/gu)]
       .map((match) => match[1])

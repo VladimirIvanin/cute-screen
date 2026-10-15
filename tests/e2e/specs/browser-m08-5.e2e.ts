@@ -1,4 +1,8 @@
-import { $, browser, expect } from '@wdio/globals'
+import {
+  $,
+  browser,
+  expect,
+} from '@wdio/globals'
 import {
   baseId,
   m08Snapshot,
@@ -22,9 +26,7 @@ describe('M08 crop and precision acceptance in browser mode', () => {
     const row = $(`[data-layer-id="${created.id}"]`)
     await row.$('.cs-layer-select').click()
     await row.$('button[aria-label="Lock layer"]').click()
-    await browser.waitUntil(
-      async () => (await m08Snapshot()).document.layers.at(-1)?.locked === true,
-    )
+    await browser.waitUntil(async () => (await m08Snapshot()).document.layers.at(-1)?.locked === true)
 
     const effect = $('[role="combobox"][aria-label="Effect"]')
     const blockSize = $('[role="slider"][aria-label="Block size"]')
@@ -33,9 +35,9 @@ describe('M08 crop and precision acceptance in browser mode', () => {
     const before = await m08Snapshot()
     const versionBefore = await m08VersionToken()
     const disabledFocusState = await browser.execute(() => {
-      const target = [
-        ...document.querySelectorAll<HTMLElement>('[role="combobox"]'),
-      ].find((element) => element.getAttribute('aria-label') === 'Effect')
+      const target = [...document.querySelectorAll<HTMLElement>('[role="combobox"]')].find(
+        (element) => element.getAttribute('aria-label') === 'Effect',
+      )
       if (!target) throw new Error('Effect control is missing')
       target.focus()
       target.dispatchEvent(
@@ -64,13 +66,12 @@ describe('M08 crop and precision acceptance in browser mode', () => {
     expect(await recentColourHex()).toBeUndefined()
 
     await $(`[data-layer-id="${baseId}"] .cs-layer-select`).click()
+    await $('button[aria-label="Hide data"]').click({ button: 'right' })
     await expect(effect).toHaveText('Pixelate')
+    await browser.keys('Escape')
     await row.$('.cs-layer-select').click()
     await row.$('button[aria-label="Unlock layer"]').click()
-    await browser.waitUntil(
-      async () =>
-        (await m08Snapshot()).document.layers.at(-1)?.locked === false,
-    )
+    await browser.waitUntil(async () => (await m08Snapshot()).document.layers.at(-1)?.locked === false)
     const versionAfterUnlock = await m08VersionToken()
     await chooseOption('Effect', 'Blur')
     await browser.waitUntil(

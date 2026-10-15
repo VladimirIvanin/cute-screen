@@ -1,4 +1,8 @@
-import type { Ref, ShallowRef } from 'vue'
+import {
+  nextTick,
+  type Ref,
+  type ShallowRef,
+} from 'vue'
 import {
   rememberDrawingColor,
   type DrawingToolPreferencesV2,
@@ -21,23 +25,21 @@ export interface ToolUiControllerContext {
   readonly eyedropperColor: Ref<string | undefined>
   readonly toolError: Ref<string | undefined>
   readonly toolConfigure: Ref<ToolConfigureState | undefined>
-  readonly toolConfigureLayout: Ref<
-    { readonly left: number; readonly top: number } | undefined
-  >
-  readonly configureDefaultsTool: Ref<'arrow' | undefined>
+  readonly toolConfigureLayout: Ref<{ readonly left: number; readonly top: number } | undefined>
+  readonly configureDefaultsTool: Ref<string | undefined>
   readonly precisionChangeBlocked: (id: string) => boolean
   readonly onContextChange: (id: string, value: string) => void
   readonly translate: (key: 'readOnlyDocument') => string
   readonly saveDrawingPreferences: (value: DrawingToolPreferencesV2) => void
 }
 
-function rememberColor(context: ToolUiControllerContext, value: string): void {
+function rememberColor(
+  context: ToolUiControllerContext,
+  value: string,
+): void {
   const color = parseHexColor(value)
   if (!color) return
-  context.drawingPreferences.value = rememberDrawingColor(
-    context.drawingPreferences.value,
-    color,
-  )
+  context.drawingPreferences.value = rememberDrawingColor(context.drawingPreferences.value, color)
   context.saveDrawingPreferences(context.drawingPreferences.value)
 }
 
@@ -56,10 +58,7 @@ async function writeSampleToClipboard(
   value: string,
 ): Promise<void> {
   if (context.props.clipboardBridge?.writeClipboardText) {
-    await context.props.clipboardBridge.writeClipboardText(
-      value,
-      crypto.randomUUID(),
-    )
+    await context.props.clipboardBridge.writeClipboardText(value, crypto.randomUUID())
   } else if (navigator.clipboard) {
     await navigator.clipboard.writeText(value)
   }
@@ -82,9 +81,7 @@ async function onColorSample(
   context.samplingControl.value = undefined
   context.eyedropperColor.value = normalized
   context.eyedropperFeedback.value =
-    context.locale.value === 'ru'
-      ? `Цвет выбран: ${normalized}`
-      : `Colour selected: ${normalized}`
+    context.locale.value === 'ru' ? `Цвет выбран: ${normalized}` : `Colour selected: ${normalized}`
   try {
     await writeSampleToClipboard(context, normalized)
   } catch (error) {
@@ -97,8 +94,10 @@ async function onColorSample(
 }
 
 function closeToolConfigure(context: ToolUiControllerContext): void {
+  const anchor = context.toolConfigure.value?.anchor
   context.toolConfigure.value = undefined
   context.toolConfigureLayout.value = undefined
+  anchor?.focus({ preventScroll: true })
 }
 
 function onToolConfigureOutsidePointer(
@@ -111,9 +110,9 @@ function onToolConfigureOutsidePointer(
   if (!(target instanceof Node)) return
   if (
     configure.anchor.contains(target) ||
-    (target instanceof HTMLElement &&
+    (target instanceof Element &&
       target.closest(
-        '.cs-tool-configure-popover-host, .cs-arrow-toolbar-popover',
+        '.cs-tool-configure-popover-host, .cs-arrow-toolbar-popover, .cs-overlay-root, .n-popover, .n-base-select-menu, .cs-color-picker-popover',
       ))
   ) {
     return
@@ -123,8 +122,26 @@ function onToolConfigureOutsidePointer(
 
 export function createToolUiController(context: ToolUiControllerContext) {
   return {
-    onColorChange: (id: string, value: string) =>
-      onColorChange(context, id, value),
+    onToolConfigureKeydown: (event: KeyboardEvent) => {
+      if (
+        event.key !== 'Escape' ||
+        !context.toolConfigure.value ||
+        event.defaultPrevented
+      ) return
+      const nestedOpen = document.querySelector(
+        '.cs-tool-configure-popover-host [aria-haspopup="dialog"][aria-expanded="true"], .cs-tool-configure-popover-host [role="combobox"][aria-expanded="true"]',
+      )
+      if (
+        nestedOpen &&
+        event.target instanceof Element &&
+        event.target.closest('[role="dialog"], [role="listbox"]')
+      )
+        return
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      closeToolConfigure(context)
+    },
+    onColorChange: (id: string, value: string) => onColorChange(context, id, value),
     startEyedropper: (id: string) => {
       if (context.precisionChangeBlocked(id)) return
       context.samplingControl.value = id
@@ -139,24 +156,49 @@ export function createToolUiController(context: ToolUiControllerContext) {
       context.samplingControl.value = undefined
       context.eyedropperColor.value = undefined
       context.eyedropperFeedback.value =
-        context.locale.value === 'ru'
-          ? 'Выбор цвета отменён'
-          : 'Colour sampling cancelled'
+        context.locale.value === 'ru' ? 'Выбор цвета отменён' : 'Colour sampling cancelled'
     },
-    onToolConfigureOutsidePointer: (event: PointerEvent) =>
-      onToolConfigureOutsidePointer(context, event),
+    onToolConfigureOutsidePointer: (event: PointerEvent) => onToolConfigureOutsidePointer(context, event),
     openToolConfigure: (toolId: string, anchor: HTMLElement) => {
-      if (toolId !== 'arrow') return
+      context.store.selectTool(toolId)
+      if (
+        ![
+          'arrow',
+          'shape',
+          'pencil',
+          'marker',
+          'text',
+          'callout',
+          'numberedMarker',
+          'censor',
+          'spotlight',
+          'ruler',
+          'loupe',
+          'crop',
+        ].includes(toolId)
+      ) {
+        closeToolConfigure(context)
+        return
+      }
       const rect = anchor.getBoundingClientRect()
       context.toolConfigure.value = { toolId, anchor }
       context.toolConfigureLayout.value = {
-        left: rect.left + rect.width / 2,
+        left: Math.max(
+          Math.min(340, window.innerWidth / 2),
+          Math.min(window.innerWidth - Math.min(340, window.innerWidth / 2), rect.left + rect.width / 2),
+        ),
         top: rect.top,
       }
+      void nextTick(() =>
+        document
+          .querySelector<HTMLElement>(
+            '.cs-tool-configure-popover-host button:not(:disabled), .cs-tool-configure-popover-host select',
+          )
+          ?.focus({ preventScroll: true }))
     },
     closeToolConfigure: () => closeToolConfigure(context),
     onToolConfigureChange: (id: string, value: string) => {
-      context.configureDefaultsTool.value = 'arrow'
+      context.configureDefaultsTool.value = context.toolConfigure.value?.toolId
       try {
         context.onContextChange(id, value)
       } finally {

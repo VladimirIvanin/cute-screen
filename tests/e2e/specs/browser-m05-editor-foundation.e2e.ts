@@ -1,4 +1,8 @@
-import { $, browser, expect } from '@wdio/globals'
+import {
+  $,
+  browser,
+  expect,
+} from '@wdio/globals'
 import path from 'node:path'
 import { Key } from 'webdriverio'
 
@@ -64,9 +68,7 @@ async function viewportLayout() {
         bottom: bounds.bottom,
       }
     }
-    const zoomText =
-      document.querySelector('.cs-zoom-controls')?.getAttribute('data-zoom') ??
-      ''
+    const zoomText = document.querySelector('.cs-zoom-controls')?.getAttribute('data-zoom') ?? ''
     const scene = document.querySelector('.cs-canvas:not(.cs-canvas-overlay)')
     if (!(scene instanceof HTMLCanvasElement)) {
       throw new Error('Missing scene canvas')
@@ -90,10 +92,7 @@ async function waitForSurfaceSize(
 ): Promise<void> {
   await browser.waitUntil(async () => {
     const layout = await viewportLayout()
-    return (
-      Math.abs(layout.surface.width - width) < 0.5 &&
-      Math.abs(layout.surface.height - height) < 0.5
-    )
+    return Math.abs(layout.surface.width - width) < 0.5 && Math.abs(layout.surface.height - height) < 0.5
   })
 }
 
@@ -106,18 +105,12 @@ async function canvasPoint(
   const outputY = harnessDocument.crop?.y ?? 0
   return browser.execute(
     ({ canvasX, canvasY, originX, originY }) => {
-      const scene = document.querySelector<HTMLCanvasElement>(
-        '.cs-canvas:not(.cs-canvas-overlay)',
-      )
+      const scene = document.querySelector<HTMLCanvasElement>('.cs-canvas:not(.cs-canvas-overlay)')
       if (!scene) throw new Error('Scene canvas is missing')
       const bounds = scene.getBoundingClientRect()
       return {
-        x: Math.round(
-          bounds.left + ((canvasX - originX) / scene.width) * bounds.width,
-        ),
-        y: Math.round(
-          bounds.top + ((canvasY - originY) / scene.height) * bounds.height,
-        ),
+        x: Math.round(bounds.left + ((canvasX - originX) / scene.width) * bounds.width),
+        y: Math.round(bounds.top + ((canvasY - originY) / scene.height) * bounds.height),
       }
     },
     { canvasX: x, canvasY: y, originX: outputX, originY: outputY },
@@ -129,9 +122,7 @@ async function canvasPoint(
  * state is rendered by Vue on its next update.  Waiting for the control keeps
  * the test coupled to the user-visible contract instead of racing that update.
  */
-async function clickEnabledHistoryAction(
-  label: 'Undo' | 'Redo',
-): Promise<void> {
+async function clickEnabledHistoryAction(label: 'Undo' | 'Redo'): Promise<void> {
   const action = $(`button[aria-label="${label}"]`)
   await expect(action).toBeEnabled()
   await action.click()
@@ -150,9 +141,7 @@ describe('M05 editor foundation in browser mode', () => {
     expect(fit.surface.height).toBeCloseTo((outputHeight * fit.zoom) / 100, 0)
     expect(fit.shell.bottom).toBeLessThanOrEqual(fit.windowHeight + 1)
     expect(fit.zoomControls.bottom).toBeLessThanOrEqual(fit.viewport.bottom + 1)
-    await browser.saveScreenshot(
-      path.resolve('artifacts/browser-e2e/m05-viewport-fit-1024x700.png'),
-    )
+    await browser.saveScreenshot(path.resolve('artifacts/browser-e2e/m05-viewport-fit-1024x700.png'))
 
     await $('.cs-zoom-value').click()
     await expect($('.cs-zoom-controls')).toHaveAttribute('data-zoom', '100')
@@ -161,30 +150,18 @@ describe('M05 editor foundation in browser mode', () => {
     expect(actualSize.surface.width).toBeCloseTo(outputWidth, 0)
     expect(actualSize.surface.height).toBeCloseTo(outputHeight, 0)
     expect(actualSize.viewport.height).toBeCloseTo(fit.viewport.height, 0)
-    expect(actualSize.zoomControls.bottom).toBeLessThanOrEqual(
-      actualSize.viewport.bottom + 1,
-    )
-    await browser.saveScreenshot(
-      path.resolve('artifacts/browser-e2e/m05-viewport-100-1024x700.png'),
-    )
+    expect(actualSize.zoomControls.bottom).toBeLessThanOrEqual(actualSize.viewport.bottom + 1)
+    await browser.saveScreenshot(path.resolve('artifacts/browser-e2e/m05-viewport-100-1024x700.png'))
 
     await $('button[aria-label="Fit canvas"]').click()
     await browser.waitUntil(async () => (await viewportLayout()).zoom !== 100)
     const refitZoom = (await viewportLayout()).zoom
-    await waitForSurfaceSize(
-      (outputWidth * refitZoom) / 100,
-      (outputHeight * refitZoom) / 100,
-    )
+    await waitForSurfaceSize((outputWidth * refitZoom) / 100, (outputHeight * refitZoom) / 100)
     const refit = await viewportLayout()
     expect(refit.surface.width).toBeCloseTo((outputWidth * refit.zoom) / 100, 0)
-    expect(refit.surface.height).toBeCloseTo(
-      (outputHeight * refit.zoom) / 100,
-      0,
-    )
+    expect(refit.surface.height).toBeCloseTo((outputHeight * refit.zoom) / 100, 0)
     expect(refit.viewport.height).toBeCloseTo(fit.viewport.height, 0)
-    expect(refit.zoomControls.bottom).toBeLessThanOrEqual(
-      refit.viewport.bottom + 1,
-    )
+    expect(refit.zoomControls.bottom).toBeLessThanOrEqual(refit.viewport.bottom + 1)
     await browser.setWindowSize(1600, 1000)
   })
 
@@ -199,14 +176,10 @@ describe('M05 editor foundation in browser mode', () => {
     await baseRow.$('button[aria-label="Unlock layer"]').click()
     await baseRow.$('.cs-layer-select').click()
     await browser.keys('Delete')
-    await browser.waitUntil(async () =>
-      (await snapshot()).layers.every((layer) => layer.id !== baseId),
-    )
+    await browser.waitUntil(async () => (await snapshot()).layers.every((layer) => layer.id !== baseId))
 
     await clickEnabledHistoryAction('Undo')
-    await browser.waitUntil(async () =>
-      (await snapshot()).layers.some((layer) => layer.id === baseId),
-    )
+    await browser.waitUntil(async () => (await snapshot()).layers.some((layer) => layer.id === baseId))
     const restored = await snapshot()
     const restoredBase = restored.layers.find((layer) => layer.id === baseId)
     expect(restoredBase?.payload.blobHash).toBe('f'.repeat(64))
@@ -217,17 +190,11 @@ describe('M05 editor foundation in browser mode', () => {
     await $('button=Flip horizontally').click()
     await browser.waitUntil(async () => (await snapshot()).crop?.x === 40)
     const flipped = await snapshot()
-    expect(
-      flipped.layers.find((layer) => layer.id === frontId)?.transform
-        .translateX,
-    ).toBe(120)
+    expect(flipped.layers.find((layer) => layer.id === frontId)?.transform.translateX).toBe(120)
 
     await clickEnabledHistoryAction('Undo')
     await browser.waitUntil(async () => (await snapshot()).crop?.x === 20)
-    expect(
-      (await snapshot()).layers.find((layer) => layer.id === frontId)?.transform
-        .translateX,
-    ).toBe(40)
+    expect((await snapshot()).layers.find((layer) => layer.id === frontId)?.transform.translateX).toBe(40)
   })
 
   it('cycles overlapping layers through real canvas pointer clicks', async () => {
@@ -235,21 +202,15 @@ describe('M05 editor foundation in browser mode', () => {
     await $('button[aria-label="Show layers"]').click()
     const canvas = $('.cs-canvas[aria-label="Scene canvas"]')
     await canvas.click()
-    await expect(
-      $('[data-layer-id="019c1f62-058e-7000-8000-000000000104"]'),
-    ).toHaveAttribute('aria-selected', 'true')
+    await expect($('[data-layer-id="019c1f62-058e-7000-8000-000000000104"]')).toHaveAttribute('aria-selected', 'true')
     await canvas.doubleClick()
-    await expect(
-      $('[data-layer-id="019c1f62-058e-7000-8000-000000000103"]'),
-    ).toHaveAttribute('aria-selected', 'true')
+    await expect($('[data-layer-id="019c1f62-058e-7000-8000-000000000103"]')).toHaveAttribute('aria-selected', 'true')
   })
 
   it('commits one pointer move and restores it through undo and redo', async () => {
     await openM05()
     const canvas = $('.cs-canvas[aria-label="Scene canvas"]')
-    const before = (await snapshot()).layers.find(
-      (layer) => layer.id === frontId,
-    )
+    const before = (await snapshot()).layers.find((layer) => layer.id === frontId)
     expect(before).toBeDefined()
 
     await browser
@@ -260,18 +221,11 @@ describe('M05 editor foundation in browser mode', () => {
       .perform(true)
 
     const transientPreview = await browser.execute(() => {
-      const overlay = document.querySelector<HTMLCanvasElement>(
-        '.cs-canvas-overlay[aria-label="Interaction overlay"]',
-      )
+      const overlay = document.querySelector<HTMLCanvasElement>('.cs-canvas-overlay[aria-label="Interaction overlay"]')
       if (!overlay) throw new Error('Interaction overlay is missing')
       const context = overlay.getContext('2d')
       if (!context) throw new Error('Interaction overlay context is missing')
-      const pixels = context.getImageData(
-        0,
-        0,
-        overlay.width,
-        overlay.height,
-      ).data
+      const pixels = context.getImageData(0, 0, overlay.width, overlay.height).data
       let warmOpaque = 0
       for (let index = 0; index < pixels.length; index += 4) {
         if (
@@ -286,39 +240,25 @@ describe('M05 editor foundation in browser mode', () => {
       return warmOpaque
     })
     expect(transientPreview).toBeGreaterThan(50)
-    expect(
-      (await snapshot()).layers.find((layer) => layer.id === frontId)
-        ?.transform,
-    ).toEqual(before?.transform)
+    expect((await snapshot()).layers.find((layer) => layer.id === frontId)?.transform).toEqual(before?.transform)
 
-    await browser
-      .action('pointer', { id: 'm05-move-pointer' })
-      .up({ button: 'left' })
-      .perform()
+    await browser.action('pointer', { id: 'm05-move-pointer' }).up({ button: 'left' }).perform()
 
     await browser.waitUntil(async () => {
-      const layer = (await snapshot()).layers.find(
-        (item) => item.id === frontId,
-      )
+      const layer = (await snapshot()).layers.find((item) => item.id === frontId)
       return layer?.transform.translateX !== before?.transform.translateX
     })
-    const moved = (await snapshot()).layers.find(
-      (layer) => layer.id === frontId,
-    )
+    const moved = (await snapshot()).layers.find((layer) => layer.id === frontId)
     expect(moved?.transform.translateY).not.toBe(before?.transform.translateY)
 
     await clickEnabledHistoryAction('Undo')
     await browser.waitUntil(async () => {
-      const layer = (await snapshot()).layers.find(
-        (item) => item.id === frontId,
-      )
+      const layer = (await snapshot()).layers.find((item) => item.id === frontId)
       return layer?.transform.translateX === before?.transform.translateX
     })
     await clickEnabledHistoryAction('Redo')
     await browser.waitUntil(async () => {
-      const layer = (await snapshot()).layers.find(
-        (item) => item.id === frontId,
-      )
+      const layer = (await snapshot()).layers.find((item) => item.id === frontId)
       return layer?.transform.translateX === moved?.transform.translateX
     })
   })
@@ -336,16 +276,11 @@ describe('M05 editor foundation in browser mode', () => {
       .move({ origin: 'viewport', x: next.x, y: next.y, duration: 40 })
       .perform(true)
     const withoutGuides = await browser.execute(() => {
-      const overlay = document.querySelector<HTMLCanvasElement>(
-        '.cs-canvas-overlay[aria-label="Interaction overlay"]',
-      )
+      const overlay = document.querySelector<HTMLCanvasElement>('.cs-canvas-overlay[aria-label="Interaction overlay"]')
       if (!overlay) throw new Error('Interaction overlay is missing')
       return overlay.toDataURL()
     })
-    await browser
-      .action('key', { id: 'm05-guide-key' })
-      .down(Key.Alt)
-      .perform(true)
+    await browser.action('key', { id: 'm05-guide-key' }).down(Key.Alt).perform(true)
     const readOverlay = () =>
       browser.execute(() => {
         const overlay = document.querySelector<HTMLCanvasElement>(
@@ -358,25 +293,17 @@ describe('M05 editor foundation in browser mode', () => {
     const heldGuides = await readOverlay()
     expect(heldGuides).not.toBe(withoutGuides)
 
-    await browser
-      .action('key', { id: 'm05-guide-key' })
-      .up(Key.Alt)
-      .perform(true)
+    await browser.action('key', { id: 'm05-guide-key' }).up(Key.Alt).perform(true)
     await browser.waitUntil(async () => (await readOverlay()) === withoutGuides)
     const releasedGuides = await readOverlay()
     expect(releasedGuides).toBe(withoutGuides)
-    await browser
-      .action('pointer', { id: 'm05-guide-pointer' })
-      .up({ button: 'left' })
-      .perform()
+    await browser.action('pointer', { id: 'm05-guide-pointer' }).up({ button: 'left' }).perform()
   })
 
   it('recovers from pointer cancellation without leaving a transient gesture', async () => {
     await openM05()
     const canvas = $('.cs-canvas[aria-label="Scene canvas"]')
-    const before = (await snapshot()).layers.find(
-      (layer) => layer.id === frontId,
-    )
+    const before = (await snapshot()).layers.find((layer) => layer.id === frontId)
     expect(before).toBeDefined()
 
     await browser
@@ -386,9 +313,7 @@ describe('M05 editor foundation in browser mode', () => {
       .move({ origin: 'pointer', x: 16, y: 8, duration: 50 })
       .cancel()
       .perform()
-    const afterCancel = (await snapshot()).layers.find(
-      (layer) => layer.id === frontId,
-    )
+    const afterCancel = (await snapshot()).layers.find((layer) => layer.id === frontId)
     expect(afterCancel?.transform).toEqual(before?.transform)
 
     await browser
@@ -399,9 +324,7 @@ describe('M05 editor foundation in browser mode', () => {
       .up({ button: 'left' })
       .perform()
     await browser.waitUntil(async () => {
-      const layer = (await snapshot()).layers.find(
-        (item) => item.id === frontId,
-      )
+      const layer = (await snapshot()).layers.find((item) => item.id === frontId)
       return layer?.transform.translateX !== afterCancel?.transform.translateX
     })
   })

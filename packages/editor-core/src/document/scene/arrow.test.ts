@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 import { createDocumentRenderScene } from './index'
 import { documentFixture as document } from './test-kit'
@@ -40,11 +44,7 @@ describe('document render scene: arrows', () => {
         },
       ],
     })
-    expect(scene.nodes.map((node) => node.kind)).toEqual([
-      'path',
-      'ellipse',
-      'polygon',
-    ])
+    expect(scene.nodes.map((node) => node.kind)).toEqual(['path', 'ellipse', 'polygon'])
     expect(scene.nodes[0]).toMatchObject({ dash: [6, 4], lineCap: 'round' })
   })
 
@@ -271,8 +271,7 @@ describe('document render scene: arrows', () => {
       strokeWidth: 20,
     })
     const triangle = scene.nodes[1]
-    if (!triangle || triangle.kind !== 'polygon')
-      throw new Error('expected triangle cap')
+    if (!triangle || triangle.kind !== 'polygon') throw new Error('expected triangle cap')
     expect(triangle.points).toEqual([
       { x: 100, y: 10 },
       { x: 40, y: 43 },
@@ -321,8 +320,7 @@ describe('document render scene: arrows', () => {
 
       expect(scene.nodes).toHaveLength(1)
       const triangle = scene.nodes[0]
-      if (!triangle || triangle.kind !== 'polygon')
-        throw new Error('expected triangle cap')
+      if (!triangle || triangle.kind !== 'polygon') throw new Error('expected triangle cap')
       expect(triangle.points[0]).toEqual({ x: 14, y: 10 })
       expect(triangle.points[1]!.x).toBeCloseTo(10)
       expect(triangle.points[2]!.x).toBeCloseTo(10)
@@ -371,8 +369,7 @@ describe('document render scene: arrows', () => {
     const body = scene.nodes[0]
     const startCap = scene.nodes[1]
     if (!body || body.kind !== 'path') throw new Error('expected arrow body')
-    if (!startCap || startCap.kind !== 'polygon')
-      throw new Error('expected solid start cap')
+    if (!startCap || startCap.kind !== 'polygon') throw new Error('expected solid start cap')
     const bodyStart = body.points[0]!
     const baseCenter = {
       x: (startCap.points[1]!.x + startCap.points[2]!.x) / 2,
@@ -382,16 +379,8 @@ describe('document render scene: arrows', () => {
     expect(baseCenter.x).toBeCloseTo(bodyStart.x, 10)
     expect(baseCenter.y).toBeCloseTo(bodyStart.y, 10)
     const anchor = startCap.points[0]!
-    expect(
-      Math.hypot(
-        anchor.x - startCap.points[1]!.x,
-        anchor.y - startCap.points[1]!.y,
-      ),
-    ).toBeCloseTo(
-      Math.hypot(
-        anchor.x - startCap.points[2]!.x,
-        anchor.y - startCap.points[2]!.y,
-      ),
+    expect(Math.hypot(anchor.x - startCap.points[1]!.x, anchor.y - startCap.points[1]!.y)).toBeCloseTo(
+      Math.hypot(anchor.x - startCap.points[2]!.x, anchor.y - startCap.points[2]!.y),
       10,
     )
   })

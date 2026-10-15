@@ -12,11 +12,18 @@ export interface QuickCaptureMaterialization {
   readonly updatedAt?: string
 }
 
-function assertCrop(document: EditorDocument, source: SourceImageRef): Rect {
+function assertCrop(
+  document: EditorDocument,
+  source: SourceImageRef,
+): Rect {
   const crop = document.crop
   if (!crop) throw new Error('quick capture requires a crop')
   const values = [crop.x, crop.y, crop.width, crop.height]
-  if (!values.every(Number.isFinite) || crop.width <= 0 || crop.height <= 0) {
+  if (
+    !values.every(Number.isFinite) ||
+    crop.width <= 0 ||
+    crop.height <= 0
+  ) {
     throw new Error('quick capture crop is invalid')
   }
   if (
@@ -62,7 +69,10 @@ function materializedBase(
   }
 }
 
-function rebaseLayer(layer: LayerNode, crop: Rect): LayerNode {
+function rebaseLayer(
+  layer: LayerNode,
+  crop: Rect,
+): LayerNode {
   const transform = {
     ...layer.transform,
     translateX: layer.transform.translateX - crop.x,
@@ -95,8 +105,7 @@ export function materializeQuickCaptureDocument(
 ): EditorDocument {
   const crop = assertCrop(document, input.source)
   const base = document.layers.find(
-    (layer): layer is ImageLayer =>
-      layer.kind === 'image' && layer.payload.role === 'base',
+    (layer): layer is ImageLayer => layer.kind === 'image' && layer.payload.role === 'base',
   )
   if (!base) throw new Error('quick capture document has no base layer')
 
@@ -107,10 +116,7 @@ export function materializeQuickCaptureDocument(
     canvas: { width: input.source.width, height: input.source.height },
     crop: null,
     layers: document.layers.map((layer) =>
-      layer.id === base.id
-        ? materializedBase(base, input.source)
-        : rebaseLayer(layer, crop),
-    ),
+      layer.id === base.id ? materializedBase(base, input.source) : rebaseLayer(layer, crop)),
     updatedAt: input.updatedAt ?? document.updatedAt,
   }
 }

@@ -1,6 +1,14 @@
-import { describe, expect, expectTypeOf, it } from 'vitest'
+import {
+  describe,
+  expect,
+  expectTypeOf,
+  it,
+} from 'vitest'
 
-import { parseEditorDocument, serializeEditorDocument } from './document/codec'
+import {
+  parseEditorDocument,
+  serializeEditorDocument,
+} from './document/codec'
 import {
   CENSOR_MODES,
   LOUPE_SHAPES,
@@ -31,21 +39,10 @@ describe('M08 precision-tool document contracts', () => {
     expect(RULER_UNITS).toEqual(['pixels', 'percent'])
     expect(LOUPE_SHAPES).toEqual(['circle', 'rectangle'])
     expectTypeOf<CensorLayer['payload']>().toEqualTypeOf<CensorLayerPayload>()
-    expectTypeOf<keyof CensorLayerPayload>().toEqualTypeOf<
-      'region' | 'effect' | 'sampleSource'
-    >()
-    expectTypeOf<keyof SpotlightLayerPayload>().toEqualTypeOf<
-      'shape' | 'dimColor' | 'dimOpacity' | 'feather'
-    >()
+    expectTypeOf<keyof CensorLayerPayload>().toEqualTypeOf<'region' | 'effect' | 'sampleSource'>()
+    expectTypeOf<keyof SpotlightLayerPayload>().toEqualTypeOf<'shape' | 'dimColor' | 'dimOpacity' | 'feather'>()
     expectTypeOf<keyof RulerLayerPayload>().toEqualTypeOf<
-      | 'start'
-      | 'end'
-      | 'unit'
-      | 'percentBasis'
-      | 'snapAngleIncrementDegrees'
-      | 'color'
-      | 'thickness'
-      | 'fontSize'
+      'start' | 'end' | 'unit' | 'percentBasis' | 'snapAngleIncrementDegrees' | 'color' | 'thickness' | 'fontSize'
     >()
     expectTypeOf<keyof LoupeLayerPayload>().toEqualTypeOf<
       'sourceRegion' | 'lens' | 'zoom' | 'border' | 'shadow' | 'sampleSource'
@@ -117,67 +114,34 @@ describe('M08 precision-tool document contracts', () => {
   it('strictly round-trips all precision layers through the production v7 codec', () => {
     const { censor, spotlight, ruler, loupe } = precisionLayers()
     const parsed = parseEditorDocument(
-      serializeEditorDocument(
-        withLayers([
-          baseDocument().layers[0]!,
-          censor,
-          spotlight,
-          ruler,
-          loupe,
-        ]),
-      ),
+      serializeEditorDocument(withLayers([baseDocument().layers[0]!, censor, spotlight, ruler, loupe])),
     )
 
     expect(parsed).toMatchObject({ kind: 'editable' })
     if (parsed.kind !== 'editable') throw new Error('expected editable v7')
-    expect(parsed.document.layers.slice(1)).toEqual([
-      censor,
-      spotlight,
-      ruler,
-      loupe,
-    ])
-    expect(serializeEditorDocument(parsed.document)).not.toMatch(
-      /ocr|automatic|detect|eraser|guide/iu,
-    )
+    expect(parsed.document.layers.slice(1)).toEqual([censor, spotlight, ruler, loupe])
+    expect(serializeEditorDocument(parsed.document)).not.toMatch(/ocr|automatic|detect|eraser|guide/iu)
   })
 
   it('requires persisted ruler colour, thickness and font size in strict v7', () => {
     const { ruler } = precisionLayers()
-    const document = structuredClone(
-      withLayers([baseDocument().layers[0]!, ruler]),
-    )
+    const document = structuredClone(withLayers([baseDocument().layers[0]!, ruler]))
     for (const field of ['color', 'thickness', 'fontSize'] as const) {
       const candidate = structuredClone(document)
       Reflect.deleteProperty(candidate.layers[1]!.payload, field)
-      expect(() => parseEditorDocument(candidate)).toThrow(
-        new RegExp(field, 'iu'),
-      )
+      expect(() => parseEditorDocument(candidate)).toThrow(new RegExp(field, 'iu'))
     }
   })
 
   it('rejects a strict-v7 ruler whose bounds contain its endpoints but not its derived badge and ticks', () => {
     const { ruler } = precisionLayers()
-    const candidate = structuredClone(
-      withLayers([baseDocument().layers[0]!, ruler]),
-    )
+    const candidate = structuredClone(withLayers([baseDocument().layers[0]!, ruler]))
     const persisted = candidate.layers[1]!
     if (persisted.kind !== 'ruler') throw new Error('expected ruler fixture')
-    const minimumX = Math.min(
-      persisted.payload.start.x,
-      persisted.payload.end.x,
-    )
-    const maximumX = Math.max(
-      persisted.payload.start.x,
-      persisted.payload.end.x,
-    )
-    const minimumY = Math.min(
-      persisted.payload.start.y,
-      persisted.payload.end.y,
-    )
-    const maximumY = Math.max(
-      persisted.payload.start.y,
-      persisted.payload.end.y,
-    )
+    const minimumX = Math.min(persisted.payload.start.x, persisted.payload.end.x)
+    const maximumX = Math.max(persisted.payload.start.x, persisted.payload.end.x)
+    const minimumY = Math.min(persisted.payload.start.y, persisted.payload.end.y)
+    const maximumY = Math.max(persisted.payload.start.y, persisted.payload.end.y)
     Reflect.set(persisted, 'localBounds', {
       x: minimumX - 0.5,
       y: minimumY - 0.5,
@@ -209,18 +173,14 @@ describe('M08 precision-tool document contracts', () => {
       },
       effect,
     })
-    const parsed = parseEditorDocument(
-      withLayers([baseDocument().layers[0]!, layer]),
-    )
+    const parsed = parseEditorDocument(withLayers([baseDocument().layers[0]!, layer]))
     expect(parsed).toMatchObject({ kind: 'editable' })
     if (parsed.kind !== 'editable') throw new Error('expected editable v7')
     const reopened = parsed.document.layers[1]
     expect(reopened?.kind).toBe('censor')
     if (reopened?.kind !== 'censor') throw new Error('expected censor')
     expect(reopened.payload.effect).toEqual(effect)
-    expect(Object.keys(reopened.payload.effect).sort()).toEqual(
-      Object.keys(effect).sort(),
-    )
+    expect(Object.keys(reopened.payload.effect).sort()).toEqual(Object.keys(effect).sort())
   })
 
   it.each([
@@ -234,13 +194,9 @@ describe('M08 precision-tool document contracts', () => {
     const layers = precisionLayers()
     const layer = Object.values(layers).find((candidate) => candidate.id === id)
     if (!layer) throw new Error('fixture layer was not found')
-    const candidate = structuredClone(
-      withLayers([baseDocument().layers[0]!, layer]),
-    )
+    const candidate = structuredClone(withLayers([baseDocument().layers[0]!, layer]))
     Reflect.set(candidate.layers[1]!.payload, field, value)
-    expect(() => parseEditorDocument(candidate)).toThrow(
-      /invalid|removed|unexpected|unsupported/u,
-    )
+    expect(() => parseEditorDocument(candidate)).toThrow(/invalid|removed|unexpected|unsupported/u)
   })
 
   it('rejects transient selection and unknown transform/bounds fields', () => {
@@ -250,20 +206,12 @@ describe('M08 precision-tool document contracts', () => {
       [spotlight.transform, 'skewX'],
       [spotlight.localBounds, 'radius'],
     ] as const) {
-      const candidate = structuredClone(
-        withLayers([baseDocument().layers[0]!, spotlight]),
-      )
+      const candidate = structuredClone(withLayers([baseDocument().layers[0]!, spotlight]))
       const layer = candidate.layers[1]!
       const mutationTarget =
-        target === spotlight
-          ? layer
-          : target === spotlight.transform
-            ? layer.transform
-            : layer.localBounds
+        target === spotlight ? layer : target === spotlight.transform ? layer.transform : layer.localBounds
       Reflect.set(mutationTarget, key, 1)
-      expect(() => parseEditorDocument(candidate)).toThrow(
-        /unexpected|removed/u,
-      )
+      expect(() => parseEditorDocument(candidate)).toThrow(/unexpected|removed/u)
     }
   })
 
@@ -328,11 +276,7 @@ describe('M08 precision-tool document contracts', () => {
     ]
 
     for (const layer of invalid) {
-      expect(() =>
-        parseEditorDocument(
-          withLayers([baseDocument().layers[0]!, layer as typeof censor]),
-        ),
-      ).toThrow()
+      expect(() => parseEditorDocument(withLayers([baseDocument().layers[0]!, layer as typeof censor]))).toThrow()
     }
   })
 
@@ -369,26 +313,18 @@ describe('M08 precision-tool document contracts', () => {
 
     expect(parseEditorDocument(valid)).toMatchObject({ kind: 'editable' })
 
-    expect(() =>
-      parseEditorDocument(candidate({ x: -61, y: 560, width: 60, height: 60 })),
-    ).toThrow(/sourceRegion/u)
+    expect(() => parseEditorDocument(candidate({ x: -61, y: 560, width: 60, height: 60 }))).toThrow(/sourceRegion/u)
     expect(() =>
       parseEditorDocument(
-        candidate(
-          { x: 1_000_001, y: 20, width: 60, height: 60 },
-          { ...valid.canvas, width: 2_000_000 },
-        ),
-      ),
-    ).toThrow(/sourceRegion/u)
+        candidate({ x: 1_000_001, y: 20, width: 60, height: 60 }, { ...valid.canvas, width: 2_000_000 }),
+      )).toThrow(/sourceRegion/u)
 
     for (const sourceRegion of [
       { x: Number.NaN, y: 20, width: 60, height: 60 },
       { x: -20, y: 20, width: 0, height: 60 },
       { x: -20, y: 20, width: 60, height: -1 },
     ]) {
-      expect(() => parseEditorDocument(candidate(sourceRegion))).toThrow(
-        /sourceRegion/u,
-      )
+      expect(() => parseEditorDocument(candidate(sourceRegion))).toThrow(/sourceRegion/u)
     }
   })
 })

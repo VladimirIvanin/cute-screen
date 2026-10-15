@@ -14,7 +14,10 @@ import {
   freezeColor,
 } from './validation'
 
-export function freezePoint(point: Point2D, field: string): Point2D {
+export function freezePoint(
+  point: Point2D,
+  field: string,
+): Point2D {
   assertFinite(point.x, `${field}.x`)
   assertFinite(point.y, `${field}.y`)
   return Object.freeze({ x: point.x, y: point.y })
@@ -40,9 +43,7 @@ export function freezeCensorNode(node: RenderCensorNode): RenderCensorNode {
           return Object.freeze({
             kind: 'freeform' as const,
             points: Object.freeze(
-              node.region.points.map((point, index) =>
-                freezePoint(point, `${node.id}.region.points[${index}]`),
-              ),
+              node.region.points.map((point, index) => freezePoint(point, `${node.id}.region.points[${index}]`)),
             ),
           })
         })()
@@ -74,9 +75,7 @@ export function freezeCensorNode(node: RenderCensorNode): RenderCensorNode {
   return Object.freeze({ ...node, region, effect })
 }
 
-export function freezeSpotlightNode(
-  node: RenderSpotlightNode,
-): RenderSpotlightNode {
+export function freezeSpotlightNode(node: RenderSpotlightNode): RenderSpotlightNode {
   if (!['rectangle', 'ellipse', 'diamond'].includes(node.aperture.shape)) {
     throw new RangeError(`${node.id}.aperture.shape is invalid`)
   }
@@ -117,12 +116,17 @@ export function freezeRulerNode(node: RenderRulerNode): RenderRulerNode {
   })) {
     assertFinite(value, `${node.id}.${field}`)
   }
-  if (node.length <= 0 || node.percent < 0 || !node.label) {
+  if (
+    node.length <= 0 ||
+    node.percent < 0 ||
+    !node.label
+  ) {
     throw new RangeError(`${node.id} ruler measurement is invalid`)
   }
   if (
     node.percentBasis !== 'canvasDiagonal' ||
-    (node.unit !== 'pixels' && node.unit !== 'percent')
+    (node.unit !== 'pixels' &&
+      node.unit !== 'percent')
   ) {
     throw new RangeError(`${node.id} ruler unit is invalid`)
   }
@@ -160,7 +164,11 @@ export function freezeLoupeNode(node: RenderLoupeNode): RenderLoupeNode {
   assertFinite(node.lens.x, `${node.id}.lens.x`)
   assertFinite(node.lens.y, `${node.id}.lens.y`)
   assertPositive(node.lens.size, `${node.id}.lens.size`)
-  if (!Number.isFinite(node.zoom) || node.zoom < 1 || node.zoom > 16) {
+  if (
+    !Number.isFinite(node.zoom) ||
+    node.zoom < 1 ||
+    node.zoom > 16
+  ) {
     throw new RangeError(`${node.id}.zoom is invalid`)
   }
   if (

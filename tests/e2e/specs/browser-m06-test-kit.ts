@@ -1,4 +1,9 @@
-import { $, browser, expect } from '@wdio/globals'
+import {
+  $,
+  browser,
+  expect,
+} from '@wdio/globals'
+import { waitForStableCanvas } from '../canvas-ready'
 
 export type HarnessSnapshot = {
   readonly canvas: { readonly width: number; readonly height: number }
@@ -40,49 +45,43 @@ export async function openDrawingHarness(): Promise<void> {
   await browser.url('/?m05=1')
   await expect($('.cs-canvas-ready')).toExist()
   await browser.waitUntil(async () => (await snapshot()).layers.length === 4)
+  await waitForStableCanvas()
 }
 
 export async function chooseOption(
   controlName: string,
   optionName: string,
 ): Promise<void> {
+  await browser.execute((name) => {
+    if (document.querySelector(`[role="combobox"][aria-label="${name}"]`)) return
+    for (const toolbar of document.querySelectorAll('.cs-context-toolbar')) {
+      const more = [...toolbar.querySelectorAll('button')].find((button) => ['More', 'Ещё'].includes(button.textContent?.trim() ?? ''))
+      more?.click()
+    }
+  }, controlName)
   const control = $(`[role="combobox"][aria-label="${controlName}"]`)
   await browser.execute((name) => {
-    const target = [
-      ...document.querySelectorAll<HTMLElement>('[role="combobox"]'),
-    ].find((element) => element.getAttribute('aria-label') === name)
+    const target = [...document.querySelectorAll<HTMLElement>('[role="combobox"]')].find(
+      (element) => element.getAttribute('aria-label') === name,
+    )
     if (!target) throw new Error(`Missing combobox: ${name}`)
     target.click()
   }, controlName)
   await browser.waitUntil(() =>
     browser.execute(
       (name) =>
-        [
-          ...document.querySelectorAll<HTMLElement>(
-            '.cs-overlay-root [role="option"]',
-          ),
-        ].some((element) => {
+        [...document.querySelectorAll<HTMLElement>('.cs-overlay-root [role="option"]')].some((element) => {
           const text = element.textContent?.trim() ?? ''
           const numericName = name.replace(/[^0-9.]/g, '')
-          return (
-            text === name ||
-            (numericName !== '' && text.startsWith(numericName))
-          )
+          return text === name || (numericName !== '' && text.startsWith(numericName))
         }),
       optionName,
-    ),
-  )
+    ))
   await browser.execute((name) => {
-    const target = [
-      ...document.querySelectorAll<HTMLElement>(
-        '.cs-overlay-root [role="option"]',
-      ),
-    ].find((element) => {
+    const target = [...document.querySelectorAll<HTMLElement>('.cs-overlay-root [role="option"]')].find((element) => {
       const text = element.textContent?.trim() ?? ''
       const numericName = name.replace(/[^0-9.]/g, '')
-      return (
-        text === name || (numericName !== '' && text.startsWith(numericName))
-      )
+      return text === name || (numericName !== '' && text.startsWith(numericName))
     })
     if (!target) throw new Error(`Missing select option: ${name}`)
     target.click()
@@ -94,40 +93,26 @@ export async function setShellPreferences(
   locale: 'en' | 'ru',
   theme: 'light' | 'dark',
 ): Promise<void> {
-  const currentLocale = await browser.execute(
-    () => document.documentElement.lang,
-  )
+  const currentLocale = await browser.execute(() => document.documentElement.lang)
   if (currentLocale !== locale) {
-    await $(
-      `button[aria-label="${currentLocale === 'ru' ? 'Другие действия' : 'More actions'}"]`,
-    ).click()
+    await $(`button[aria-label="${currentLocale === 'ru' ? 'Другие действия' : 'More actions'}"]`).click()
     await $(`button=${locale === 'ru' ? 'RU' : 'EN'}`).click()
   }
-  const currentTheme = await browser.execute(
-    () => document.documentElement.dataset.theme,
-  )
+  const currentTheme = await browser.execute(() => document.documentElement.dataset.theme)
   if (currentTheme !== theme) {
+    await $(`button[aria-label="${locale === 'ru' ? 'Другие действия' : 'More actions'}"]`).click()
     await $(
-      `button[aria-label="${locale === 'ru' ? 'Другие действия' : 'More actions'}"]`,
-    ).click()
-    await $(
-      `button=${
-        locale === 'ru'
-          ? theme === 'light'
-            ? 'Светлая'
-            : 'Тёмная'
-          : theme === 'light'
-            ? 'Light'
-            : 'Dark'
-      }`,
+      `button=${locale === 'ru' ? (theme === 'light' ? 'Светлая' : 'Тёмная') : theme === 'light' ? 'Light' : 'Dark'}`,
     ).click()
   }
   await browser.waitUntil(
     async () =>
       (await browser.execute(() => document.documentElement.lang)) === locale &&
-      (await browser.execute(() => document.documentElement.dataset.theme)) ===
-        theme,
+      (await browser.execute(() => document.documentElement.dataset.theme)) === theme,
   )
+  await expect($('.cs-menu')).not.toExist()
+  await browser.waitUntil(() => browser.execute(() => document.getAnimations().every((animation) =>
+    animation.effect?.getTiming().iterations === Infinity || animation.playState !== 'running')))
 }
 
 export async function arrowHandleViewportPoint(
@@ -143,8 +128,7 @@ export async function arrowHandleViewportPoint(
   const payload = arrow.payload
   const start = payload?.start as { x: number; y: number }
   const end = payload?.end as { x: number; y: number }
-  const transform = arrow.transform as
-    { translateX: number; translateY: number } | undefined
+  const transform = arrow.transform as { translateX: number; translateY: number } | undefined
   const elbow = payload?.elbow as { axis: 'x' | 'y'; offset: number }
   const midpoint = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 }
   const local =
@@ -153,20 +137,12 @@ export async function arrowHandleViewportPoint(
       : { x: midpoint.x + elbow.offset, y: midpoint.y }
   return browser.execute(
     ({ x, y, translateX, translateY, outputX, outputY }) => {
-      const scene = document.querySelector<HTMLCanvasElement>(
-        '.cs-canvas:not(.cs-canvas-overlay)',
-      )
+      const scene = document.querySelector<HTMLCanvasElement>('.cs-canvas:not(.cs-canvas-overlay)')
       if (!scene) throw new Error('Scene canvas is missing')
       const bounds = scene.getBoundingClientRect()
       return {
-        x: Math.round(
-          bounds.left +
-            ((translateX + x - outputX) / scene.width) * bounds.width,
-        ),
-        y: Math.round(
-          bounds.top +
-            ((translateY + y - outputY) / scene.height) * bounds.height,
-        ),
+        x: Math.round(bounds.left + ((translateX + x - outputX) / scene.width) * bounds.width),
+        y: Math.round(bounds.top + ((translateY + y - outputY) / scene.height) * bounds.height),
       }
     },
     {

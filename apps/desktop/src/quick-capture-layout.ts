@@ -56,9 +56,7 @@ export interface StableQuickCaptureLayoutOptions<T> {
   readonly equals?: (previous: T, current: T) => boolean
 }
 
-export interface PresentQuickCaptureLayoutOptions<
-  T,
-> extends StableQuickCaptureLayoutOptions<T> {
+export interface PresentQuickCaptureLayoutOptions<T> extends StableQuickCaptureLayoutOptions<T> {
   readonly present: () => Promise<boolean>
   readonly reveal?: () => Promise<void>
 }
@@ -110,13 +108,15 @@ export async function presentThenWaitForStableQuickCaptureLayout<T>(
   return { presented: true, layout }
 }
 
-function clamp(value: number, minimum: number, maximum: number): number {
+function clamp(
+  value: number,
+  minimum: number,
+  maximum: number,
+): number {
   return Math.max(minimum, Math.min(maximum, value))
 }
 
-export function computeQuickCaptureLayout(
-  input: QuickCaptureLayoutInput,
-): QuickCaptureLayout {
+export function computeQuickCaptureLayout(input: QuickCaptureLayoutInput): QuickCaptureLayout {
   const margin = input.margin ?? 8
   const gap = input.gap ?? 12
   const scaleX = input.scene.width / Math.max(1, input.source.width)
@@ -128,12 +128,9 @@ export function computeQuickCaptureLayout(
   const right = left + width
   const bottom = top + height
 
-  const actionFitsRight =
-    input.viewport.width - right >= input.actionSize.width + gap + margin
+  const actionFitsRight = input.viewport.width - right >= input.actionSize.width + gap + margin
   const actionSide: 'left' | 'right' = actionFitsRight ? 'right' : 'left'
-  const preferredActionLeft = actionFitsRight
-    ? right + gap
-    : left - gap - input.actionSize.width
+  const preferredActionLeft = actionFitsRight ? right + gap : left - gap - input.actionSize.width
   const actionLeft = clamp(
     preferredActionLeft,
     margin,
@@ -145,12 +142,9 @@ export function computeQuickCaptureLayout(
     Math.max(margin, input.viewport.height - input.actionSize.height - margin),
   )
 
-  const toolsFitBelow =
-    input.viewport.height - bottom >= input.toolSize.height + gap + margin
+  const toolsFitBelow = input.viewport.height - bottom >= input.toolSize.height + gap + margin
   const toolSide: 'above' | 'below' = toolsFitBelow ? 'below' : 'above'
-  const preferredToolTop = toolsFitBelow
-    ? bottom + gap
-    : top - gap - input.toolSize.height
+  const preferredToolTop = toolsFitBelow ? bottom + gap : top - gap - input.toolSize.height
   const toolTop = clamp(
     preferredToolTop,
     margin,

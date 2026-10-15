@@ -26,31 +26,22 @@ import CanvasWorkspace from './CanvasWorkspace.vue'
 const props = defineProps(canvasViewportRuntimeProps)
 const emit = defineEmits(canvasViewportRuntimeEmits) as CanvasViewportEmit
 const workspace = ref<CanvasViewportExpose>()
-const forwardSelectLayer = (...args: CanvasViewportEmits['selectLayer']) =>
-  emit('selectLayer', ...args)
-const forwardMoveLayer = (...args: CanvasViewportEmits['moveLayer']) =>
-  emit('moveLayer', ...args)
-const forwardTransformLayer = (
-  ...args: CanvasViewportEmits['transformLayer']
-) => emit('transformLayer', ...args)
-const forwardUpdateLayerPayload = (
-  ...args: CanvasViewportEmits['updateLayerPayload']
-) => emit('updateLayerPayload', ...args)
-const forwardAddLayer = (...args: CanvasViewportEmits['addLayer']) =>
-  emit('addLayer', ...args)
-const forwardTextToolbarChange = (
-  ...args: CanvasViewportEmits['textToolbarChange']
-) => emit('textToolbarChange', ...args)
-const forwardArrowToolbarChange = (
-  ...args: CanvasViewportEmits['arrowToolbarChange']
-) => emit('arrowToolbarChange', ...args)
+const forwardSelectLayer = (...args: CanvasViewportEmits['selectLayer']) => emit('selectLayer', ...args)
+const forwardMoveLayer = (...args: CanvasViewportEmits['moveLayer']) => emit('moveLayer', ...args)
+const forwardTransformLayer = (...args: CanvasViewportEmits['transformLayer']) => emit('transformLayer', ...args)
+const forwardUpdateLayerPayload = (...args: CanvasViewportEmits['updateLayerPayload']) =>
+  emit('updateLayerPayload', ...args)
+const forwardAddLayer = (...args: CanvasViewportEmits['addLayer']) => emit('addLayer', ...args)
+const forwardTextToolbarChange = (...args: CanvasViewportEmits['textToolbarChange']) =>
+  emit('textToolbarChange', ...args)
+const forwardArrowToolbarChange = (...args: CanvasViewportEmits['arrowToolbarChange']) =>
+  emit('arrowToolbarChange', ...args)
 
 const exposed: CanvasViewportExpose = {
   applyCropDraft: () => workspace.value?.applyCropDraft(),
   cancelCropDraft: () => workspace.value?.cancelCropDraft(),
   resetCropDraft: () => workspace.value?.resetCropDraft(),
-  setCropPresetValue: (preset: CropPreset) =>
-    workspace.value?.setCropPresetValue(preset),
+  setCropPresetValue: (preset: CropPreset) => workspace.value?.setCropPresetValue(preset),
   refitCanvas: () => workspace.value?.refitCanvas(),
 }
 defineExpose(exposed)
@@ -61,6 +52,7 @@ defineExpose(exposed)
     ref="workspace"
     v-bind="props"
     @hosts-ready="emit('hostsReady', $event)"
+    @context-menu="emit('contextMenu', $event)"
     @frame-ready="emit('frameReady', $event)"
     @select-layer="forwardSelectLayer"
     @move-layer="forwardMoveLayer"

@@ -44,10 +44,15 @@ export interface RenderLifecycleContext {
 
 export function registerRenderLifecycle(context: RenderLifecycleContext): void {
   let resizeObserver: ResizeObserver | undefined
+  let resizeFrame: number | undefined
   onMounted(() => {
     context.renderer.mount()
     const { scene, overlay, scrollContainer } = context
-    if (scene.value && overlay.value && scrollContainer.value) {
+    if (
+      scene.value &&
+      overlay.value &&
+      scrollContainer.value
+    ) {
       context.emit('hostsReady', {
         scene: scene.value,
         overlay: overlay.value,
@@ -57,8 +62,12 @@ export function registerRenderLifecycle(context: RenderLifecycleContext): void {
     void context.drawDocument()
     if (typeof ResizeObserver !== 'undefined') {
       resizeObserver = new ResizeObserver(() => {
-        context.fitCanvas()
-        context.invalidateOverlay()
+        if (resizeFrame !== undefined) return
+        resizeFrame = requestAnimationFrame(() => {
+          resizeFrame = undefined
+          context.fitCanvas()
+          context.invalidateOverlay()
+        })
       })
       if (scrollContainer.value) resizeObserver.observe(scrollContainer.value)
     }
@@ -78,6 +87,7 @@ export function registerRenderLifecycle(context: RenderLifecycleContext): void {
   registerViewportWatches(context)
   onBeforeUnmount(() => {
     resizeObserver?.disconnect()
+    if (resizeFrame !== undefined) cancelAnimationFrame(resizeFrame)
     context.renderer.dispose()
   })
 }
@@ -122,19 +132,12 @@ function registerDocumentWatches(context: RenderLifecycleContext): void {
     () => context.editingText.value?.existing?.id,
     () => void context.drawDocument(),
   )
-  watch(
-    () => [context.props.selectedLayerId, context.props.selectedLayerIds],
-    context.invalidateOverlay,
-  )
+  watch(() => [context.props.selectedLayerId, context.props.selectedLayerIds], context.invalidateOverlay)
 }
 
 function registerViewportWatches(context: RenderLifecycleContext): void {
   watch(
-    () => [
-      context.outputBounds.value?.width,
-      context.outputBounds.value?.height,
-      context.props.fitMode,
-    ],
+    () => [context.outputBounds.value?.width, context.outputBounds.value?.height, context.props.fitMode],
     () => void nextTick(context.fitCanvas),
   )
   watch(
@@ -154,27 +157,21 @@ function restoreZoomAnchor(
 ): void {
   const scroll = context.scrollContainer.value
   const bounds = context.outputBounds.value
-  if (!anchor || !scroll || !context.scene.value || !zoom || !bounds) return
+  if (
+    !anchor ||
+    !scroll ||
+    !context.scene.value ||
+    !zoom ||
+    !bounds
+  ) return
   const viewport = scroll.getBoundingClientRect()
   const scale = zoom / 100
-  scroll.scrollLeft = Math.max(
-    0,
-    (anchor.canvas.x - bounds.x) * scale - (anchor.clientX - viewport.left),
-  )
-  scroll.scrollTop = Math.max(
-    0,
-    (anchor.canvas.y - bounds.y) * scale - (anchor.clientY - viewport.top),
-  )
+  scroll.scrollLeft = Math.max(0, (anchor.canvas.x - bounds.x) * scale - (anchor.clientX - viewport.left))
+  scroll.scrollTop = Math.max(0, (anchor.canvas.y - bounds.y) * scale - (anchor.clientY - viewport.top))
 }
 
 function isCanvasTool(tool: string | undefined): boolean {
-  return (
-    tool === 'crop' ||
-    tool === 'censor' ||
-    tool === 'spotlight' ||
-    tool === 'ruler' ||
-    tool === 'loupe'
-  )
+  return tool === 'crop' || tool === 'censor' || tool === 'spotlight' || tool === 'ruler' || tool === 'loupe'
 }
 
 export interface InputLifecycleContext {
@@ -201,15 +198,8 @@ export function registerInputLifecycle(context: InputLifecycleContext): void {
     window.addEventListener('keydown', context.onKeydown)
     window.addEventListener('keyup', context.onKeyup)
     window.addEventListener('blur', context.onBlur)
-    document.addEventListener(
-      'pointerdown',
-      context.onDocumentPointerDown,
-      true,
-    )
-    document.addEventListener(
-      'selectionchange',
-      context.onDocumentSelectionChange,
-    )
+    document.addEventListener('pointerdown', context.onDocumentPointerDown, true)
+    document.addEventListener('selectionchange', context.onDocumentSelectionChange)
     if (context.props.sampling) initializeSampling(context)
   })
   onBeforeUnmount(() => {
@@ -217,15 +207,8 @@ export function registerInputLifecycle(context: InputLifecycleContext): void {
     window.removeEventListener('keydown', context.onKeydown)
     window.removeEventListener('keyup', context.onKeyup)
     window.removeEventListener('blur', context.onBlur)
-    document.removeEventListener(
-      'pointerdown',
-      context.onDocumentPointerDown,
-      true,
-    )
-    document.removeEventListener(
-      'selectionchange',
-      context.onDocumentSelectionChange,
-    )
+    document.removeEventListener('pointerdown', context.onDocumentPointerDown, true)
+    document.removeEventListener('selectionchange', context.onDocumentSelectionChange)
   })
 }
 
@@ -245,11 +228,7 @@ function registerSamplingWatches(context: InputLifecycleContext): void {
     },
   )
   watch(
-    () => [
-      context.props.samplingBlocked,
-      context.props.zoom,
-      context.outputBounds.value,
-    ],
+    () => [context.props.samplingBlocked, context.props.zoom, context.outputBounds.value],
     () => {
       if (!context.props.sampling || !context.samplingCursor.value) return
       context.eyedropper.resetCache()

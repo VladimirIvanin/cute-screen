@@ -18,7 +18,10 @@ import {
 
 export type BrowserTextReconcileResult = 'applied' | 'unchanged' | 'deferred'
 
-function sameContent(left: RichTextContent, right: RichTextContent): boolean {
+function sameContent(
+  left: RichTextContent,
+  right: RichTextContent,
+): boolean {
   return JSON.stringify(left) === JSON.stringify(right)
 }
 
@@ -57,8 +60,7 @@ export class RichTextEditorController {
   setSelection(selection: RichTextSelection): void {
     const next = setRichTextSelection(this.#state, selection)
     this.#state =
-      next.selection.anchor === this.#state.selection.anchor &&
-      next.selection.focus === this.#state.selection.focus
+      next.selection.anchor === this.#state.selection.anchor && next.selection.focus === this.#state.selection.focus
         ? Object.freeze({
             ...next,
             typingStyle: this.#state.typingStyle,
@@ -76,10 +78,7 @@ export class RichTextEditorController {
   }
 
   replaceSelectionPlainText(text: string): void {
-    this.#replaceState(
-      replaceRichTextSelection(this.#state, text.replace(/\r\n?/gu, '\n')),
-      true,
-    )
+    this.#replaceState(replaceRichTextSelection(this.#state, text.replace(/\r\n?/gu, '\n')), true)
   }
 
   selectedPlainText(): string {
@@ -107,7 +106,10 @@ export class RichTextEditorController {
     return 'applied'
   }
 
-  compositionEnd(text: string, selection: RichTextSelection): void {
+  compositionEnd(
+    text: string,
+    selection: RichTextSelection,
+  ): void {
     this.#composing = false
     this.reconcileBrowserText(text, selection)
   }
@@ -123,13 +125,14 @@ export class RichTextEditorController {
     return result.handled
   }
 
-  #replaceState(next: RichTextEditingState, countChange: boolean): void {
+  #replaceState(
+    next: RichTextEditingState,
+    countChange: boolean,
+  ): void {
     const changed =
       !sameContent(this.#state.content, next.content) ||
-      JSON.stringify(this.#state.typingStyle) !==
-        JSON.stringify(next.typingStyle) ||
-      JSON.stringify(this.#state.paragraphStyle) !==
-        JSON.stringify(next.paragraphStyle)
+      JSON.stringify(this.#state.typingStyle) !== JSON.stringify(next.typingStyle) ||
+      JSON.stringify(this.#state.paragraphStyle) !== JSON.stringify(next.paragraphStyle)
     this.#state = next
     if (countChange && changed) this.#revision += 1
   }
@@ -143,9 +146,7 @@ function paragraphContentEnd(
   text: string,
   paragraph: RichTextParagraph,
 ): number {
-  return paragraph.end > paragraph.start && text[paragraph.end - 1] === '\n'
-    ? paragraph.end - 1
-    : paragraph.end
+  return paragraph.end > paragraph.start && text[paragraph.end - 1] === '\n' ? paragraph.end - 1 : paragraph.end
 }
 
 /** Rebuilds the transient DOM projection without persisting any HTML. */
@@ -187,9 +188,7 @@ export function renderRichTextProjection(
       element.style.fontSize = `${span.fontSize * scale}px`
       element.style.fontWeight = String(span.weight)
       element.style.fontStyle = span.italic ? 'italic' : 'normal'
-      element.style.textDecoration = span.strikethrough
-        ? 'line-through'
-        : 'none'
+      element.style.textDecoration = span.strikethrough ? 'line-through' : 'none'
       element.style.color = cssColor(span.color)
       element.textContent = state.content.text.slice(start, end)
       block.append(element)
@@ -202,14 +201,9 @@ export function renderRichTextProjection(
 
 /** Reads only text nodes and logical block boundaries; markup is discarded. */
 export function readRichTextProjection(editor: HTMLDivElement): string {
-  const paragraphs = Array.from(
-    editor.querySelectorAll<HTMLElement>('[data-rich-text-paragraph]'),
-  )
+  const paragraphs = Array.from(editor.querySelectorAll<HTMLElement>('[data-rich-text-paragraph]'))
   if (paragraphs.length === 0) {
-    return (editor.innerText || editor.textContent || '').replace(
-      /\r\n?/gu,
-      '\n',
-    )
+    return (editor.innerText || editor.textContent || '').replace(/\r\n?/gu, '\n')
   }
   return paragraphs.map((paragraph) => paragraph.textContent ?? '').join('\n')
 }
@@ -231,14 +225,9 @@ function endpointOffset(
   if (!paragraph || !editor.contains(paragraph)) return 0
   const start = Number(paragraph.dataset.start ?? 0)
   if (node instanceof Text) {
-    const span = node.parentElement?.closest<HTMLElement>(
-      '[data-rich-text-span]',
-    )
+    const span = node.parentElement?.closest<HTMLElement>('[data-rich-text-span]')
     if (span) {
-      return (
-        Number(span.dataset.start ?? start) +
-        Math.max(0, Math.min(node.data.length, offset))
-      )
+      return Number(span.dataset.start ?? start) + Math.max(0, Math.min(node.data.length, offset))
     }
   }
   const range = document.createRange()
@@ -252,9 +241,7 @@ function endpointOffset(
   return start + range.toString().length
 }
 
-export function readRichTextDomSelection(
-  editor: HTMLDivElement,
-): RichTextSelection {
+export function readRichTextDomSelection(editor: HTMLDivElement): RichTextSelection {
   const selection = window.getSelection()
   if (
     !selection?.anchorNode ||
@@ -266,11 +253,7 @@ export function readRichTextDomSelection(
     return Object.freeze({ anchor: end, focus: end })
   }
   return Object.freeze({
-    anchor: endpointOffset(
-      editor,
-      selection.anchorNode,
-      selection.anchorOffset,
-    ),
+    anchor: endpointOffset(editor, selection.anchorNode, selection.anchorOffset),
     focus: endpointOffset(editor, selection.focusNode, selection.focusOffset),
   })
 }
@@ -279,17 +262,10 @@ function domPointAtOffset(
   editor: HTMLDivElement,
   offset: number,
 ): Readonly<{ node: Node; offset: number }> {
-  const spans = Array.from(
-    editor.querySelectorAll<HTMLElement>('[data-rich-text-span]'),
-  )
+  const spans = Array.from(editor.querySelectorAll<HTMLElement>('[data-rich-text-span]'))
   const exact = spans.find((span) => Number(span.dataset.start) === offset)
   const containing =
-    exact ??
-    spans.find(
-      (span) =>
-        Number(span.dataset.start) <= offset &&
-        offset <= Number(span.dataset.end),
-    )
+    exact ?? spans.find((span) => Number(span.dataset.start) <= offset && offset <= Number(span.dataset.end))
   const text = containing?.firstChild
   if (containing && text instanceof Text) {
     return Object.freeze({
@@ -297,14 +273,10 @@ function domPointAtOffset(
       offset: Math.max(0, offset - Number(containing.dataset.start)),
     })
   }
-  const paragraphs = Array.from(
-    editor.querySelectorAll<HTMLElement>('[data-rich-text-paragraph]'),
-  )
+  const paragraphs = Array.from(editor.querySelectorAll<HTMLElement>('[data-rich-text-paragraph]'))
   const paragraph =
     paragraphs.find(
-      (candidate) =>
-        Number(candidate.dataset.start) === offset &&
-        Number(candidate.dataset.end) === offset,
+      (candidate) => Number(candidate.dataset.start) === offset && Number(candidate.dataset.end) === offset,
     ) ?? paragraphs.at(-1)
   return Object.freeze({ node: paragraph ?? editor, offset: 0 })
 }
@@ -319,12 +291,7 @@ export function restoreRichTextDomSelection(
   const focus = domPointAtOffset(editor, selection.focus)
   browserSelection.removeAllRanges()
   if (typeof browserSelection.setBaseAndExtent === 'function') {
-    browserSelection.setBaseAndExtent(
-      anchor.node,
-      anchor.offset,
-      focus.node,
-      focus.offset,
-    )
+    browserSelection.setBaseAndExtent(anchor.node, anchor.offset, focus.node, focus.offset)
     return
   }
   const range = document.createRange()

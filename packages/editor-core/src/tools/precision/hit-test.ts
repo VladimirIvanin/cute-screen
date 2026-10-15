@@ -22,17 +22,8 @@ function pointToSegmentDistance(
   const dy = end.y - start.y
   const squared = dx * dx + dy * dy
   if (squared === 0) return Math.hypot(point.x - start.x, point.y - start.y)
-  const progress = Math.max(
-    0,
-    Math.min(
-      1,
-      ((point.x - start.x) * dx + (point.y - start.y) * dy) / squared,
-    ),
-  )
-  return Math.hypot(
-    point.x - (start.x + dx * progress),
-    point.y - (start.y + dy * progress),
-  )
+  const progress = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / squared))
+  return Math.hypot(point.x - (start.x + dx * progress), point.y - (start.y + dy * progress))
 }
 
 export function precisionLayerHitPart(
@@ -42,8 +33,7 @@ export function precisionLayerHitPart(
 ): 'fill' | 'stroke' | undefined {
   const bounds = layer.localBounds
   if (layer.kind === 'censor') {
-    return layer.payload.region.kind === 'rectangle' ||
-      pointInPolygon(point, layer.payload.region.points)
+    return layer.payload.region.kind === 'rectangle' || pointInPolygon(point, layer.payload.region.points)
       ? 'fill'
       : undefined
   }
@@ -68,10 +58,7 @@ export function precisionLayerHitPart(
     const length = Math.hypot(dx, dy)
     const perpendicular = { x: -dy / length, y: dx / length }
     const tickHalf = rulerTickHalfLength(layer.payload.thickness)
-    const strokePadding = Math.max(
-      RULER_HIT_PADDING,
-      layer.payload.thickness / 2,
-    )
+    const strokePadding = Math.max(RULER_HIT_PADDING, layer.payload.thickness / 2)
     if (pointToSegmentDistance(point, start, end) <= strokePadding) {
       return 'stroke'
     }
@@ -88,13 +75,7 @@ export function precisionLayerHitPart(
         return 'stroke'
       }
     }
-    if (
-      canvas &&
-      pointInPolygon(
-        point,
-        rulerVisualGeometry(layer, layer.payload, canvas).badgePolygon,
-      )
-    ) {
+    if (canvas && pointInPolygon(point, rulerVisualGeometry(layer, layer.payload, canvas).badgePolygon)) {
       return 'fill'
     }
     return undefined
@@ -103,7 +84,5 @@ export function precisionLayerHitPart(
   const centerY = bounds.y + bounds.height / 2
   if (layer.payload.lens.shape === 'rectangle') return 'fill'
   const radius = layer.payload.lens.size / 2
-  return Math.hypot(point.x - centerX, point.y - centerY) <= radius
-    ? 'fill'
-    : undefined
+  return Math.hypot(point.x - centerX, point.y - centerY) <= radius ? 'fill' : undefined
 }

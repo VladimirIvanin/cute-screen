@@ -1,6 +1,13 @@
-import type { Matrix2D, Point, Transform2D } from './document/types'
+import type {
+  Matrix2D,
+  Point,
+  Transform2D,
+} from './document/types'
 
-function assertFinite(value: number, field: string): void {
+function assertFinite(
+  value: number,
+  field: string,
+): void {
   if (!Number.isFinite(value)) throw new Error(`${field} must be finite`)
 }
 
@@ -23,7 +30,10 @@ export function transformToMatrix(transform: Transform2D): Matrix2D {
   })
 }
 
-export function multiplyMatrices(left: Matrix2D, right: Matrix2D): Matrix2D {
+export function multiplyMatrices(
+  left: Matrix2D,
+  right: Matrix2D,
+): Matrix2D {
   for (const [field, value] of Object.entries({ ...left, ...right })) {
     assertFinite(value, `matrix.${field}`)
   }
@@ -53,7 +63,10 @@ export function invertMatrix(matrix: Matrix2D): Matrix2D {
   })
 }
 
-export function transformPoint(matrix: Matrix2D, point: Point): Point {
+export function transformPoint(
+  matrix: Matrix2D,
+  point: Point,
+): Point {
   for (const [field, value] of Object.entries(matrix)) {
     assertFinite(value, `matrix.${field}`)
   }

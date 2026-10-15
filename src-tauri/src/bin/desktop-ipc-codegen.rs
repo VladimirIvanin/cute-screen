@@ -49,12 +49,9 @@ fn formatted_bindings() -> Result<String, String> {
         .write_all(generated_bindings().as_bytes())
         .map_err(|error| error.to_string())?;
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
-    let status = Command::new("pnpm")
-        .args(["exec", "prettier"])
+    let status = Command::new("node")
+        .arg(root.join("scripts/format-desktop-ipc.mjs"))
         .arg(temporary.path())
-        .arg("--config")
-        .arg(root.join(".prettierrc.json"))
-        .arg("--write")
         .current_dir(root)
         .status()
         .map_err(|error| format!("cannot run prettier: {error}"))?;
@@ -91,6 +88,19 @@ fn main() -> ExitCode {
         Err(error) => {
             eprintln!("cannot write {}: {error}", destination.display());
             ExitCode::FAILURE
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn formats_generated_bindings_with_the_local_formatter() {
+        let result = super::formatted_bindings();
+        assert!(result.is_ok(), "local formatter must run: {result:?}");
+        if let Ok(source) = result {
+            assert!(source.contains("export type CaptureAction"));
+            assert!(source.starts_with(super::HEADER));
         }
     }
 }

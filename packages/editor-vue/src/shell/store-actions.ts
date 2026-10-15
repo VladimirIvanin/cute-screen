@@ -3,7 +3,10 @@ import { t } from './i18n'
 import type { ShellStoreOptions } from './store-contracts'
 import type { ShellStoreState } from './store-state'
 import { setCaptureProgress } from './store-state'
-import type { AsyncActionName, SupportedLocale } from './types'
+import type {
+  AsyncActionName,
+  SupportedLocale,
+} from './types'
 
 export class ActionCancelledError extends Error {
   constructor(message: string) {
@@ -12,7 +15,10 @@ export class ActionCancelledError extends Error {
   }
 }
 
-function actionErrorMessage(error: unknown, locale: SupportedLocale): string {
+function actionErrorMessage(
+  error: unknown,
+  locale: SupportedLocale,
+): string {
   if (error instanceof Error && error.message === 'permissionDenied') {
     return t(locale, 'captureScreenRecordingDenied')
   }
@@ -67,23 +73,15 @@ export function createActionActions(
       const message = await options.actions.run(
         action,
         actionController.signal,
-        captures
-          ? (progress) => setCaptureProgress(state, progress)
-          : undefined,
+        captures ? (progress) => setCaptureProgress(state, progress) : undefined,
       )
       state.actionState.value = { status: 'success', action, message }
     } catch (error) {
-      if (
-        actionController.signal.aborted ||
-        error instanceof ActionCancelledError
-      ) {
+      if (actionController.signal.aborted || error instanceof ActionCancelledError) {
         state.actionState.value = {
           status: 'cancelled',
           action,
-          message:
-            error instanceof ActionCancelledError
-              ? error.message
-              : t(locale.value, 'captureCancelled'),
+          message: error instanceof ActionCancelledError ? error.message : t(locale.value, 'captureCancelled'),
         }
       } else {
         state.actionState.value = {

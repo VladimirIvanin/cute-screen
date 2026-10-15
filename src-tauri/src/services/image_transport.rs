@@ -470,7 +470,14 @@ fn asset_url(path: &Path) -> Result<String, ()> {
     url.path_segments_mut()
         .map_err(|_| ())?
         .push(&path.to_string_lossy());
-    Ok(url.into())
+    let encoded = url.to_string().replace('\\', "%5C");
+    // WebView2 exposes Tauri custom protocols through their HTTP host mapping.
+    // Encode backslashes before browser URL normalization can treat them as separators.
+    Ok(if cfg!(windows) {
+        encoded.replacen("asset://localhost/", "http://asset.localhost/", 1)
+    } else {
+        encoded
+    })
 }
 
 #[cfg(test)]
@@ -517,7 +524,11 @@ mod tests {
         let metadata = service
             .stage_image("alpha-token", "transport-test")
             .expect("registered image should stage");
-        assert!(metadata.asset_url.starts_with("asset://localhost/"));
+        assert!(metadata.asset_url.starts_with(if cfg!(windows) {
+            "http://asset.localhost/"
+        } else {
+            "asset://localhost/"
+        }));
         assert_eq!(metadata.correlation_id, "transport-test");
         assert_eq!(
             service
@@ -643,6 +654,21 @@ mod tests {
         let url = asset_url(Path::new("/tmp/m01 fixture.png"))
             .expect("asset URL should be formed for an absolute path");
 
-        assert_eq!(url, "asset://localhost/%2Ftmp%2Fm01%20fixture.png");
+        let expected = if cfg!(windows) {
+            "http://asset.localhost/%2Ftmp%2Fm01%20fixture.png"
+        } else {
+            "asset://localhost/%2Ftmp%2Fm01%20fixture.png"
+        };
+        assert_eq!(url, expected);
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn asset_url_uses_webview2_http_mapping_and_encodes_windows_separators() {
+        let url = asset_url(Path::new(r"\\?\C:\capture fixtures\alpha #1.png")).unwrap();
+        assert!(url.starts_with("http://asset.localhost/"));
+        assert!(!url.contains('\\'));
+        assert!(url.contains("%5C"));
+        assert!(url.contains("%23"));
     }
 }

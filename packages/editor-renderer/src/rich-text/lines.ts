@@ -8,7 +8,12 @@ import {
   type RichTextLayoutLine,
   type RichTextMeasure,
 } from './contracts'
-import { glyphWidth, sameStyle, styledCodePoints, wrapParagraph } from './wrap'
+import {
+  glyphWidth,
+  sameStyle,
+  styledCodePoints,
+  wrapParagraph,
+} from './wrap'
 
 export interface LineMetrics {
   readonly heights: readonly number[]
@@ -25,25 +30,15 @@ export function buildPendingLines(
 ): readonly PendingLine[] {
   const pending: PendingLine[] = []
   for (const [paragraphIndex, paragraph] of node.paragraphs.entries()) {
-    const glyphs = styledCodePoints(
-      node,
-      paragraph.start,
-      paragraph.end,
-      measure,
-    )
+    const glyphs = styledCodePoints(node, paragraph.start, paragraph.end, measure)
     const paragraphFontSize = glyphs.reduce(
       (largest, glyph) => Math.max(largest, glyph.style.fontSize),
       node.runs[0]?.fontSize ?? 1,
     )
-    const listIndent =
-      paragraph.listKind === 'bullet' ? paragraphFontSize * 1.1 : 0
+    const listIndent = paragraph.listKind === 'bullet' ? paragraphFontSize * 1.1 : 0
     const contentX = node.x + listIndent
     const contentWidth = Math.max(1, layoutWidth - listIndent)
-    const wrapped = wrapParagraph(
-      glyphs,
-      contentWidth,
-      node.wrap === 'fixedWidth',
-    )
+    const wrapped = wrapParagraph(glyphs, contentWidth, node.wrap === 'fixedWidth')
     for (const [paragraphLineIndex, line] of wrapped.entries()) {
       pending.push({
         glyphs: line,
@@ -71,8 +66,7 @@ function lineHeight(line: PendingLine): number {
 function baselineOffset(line: PendingLine): number {
   const fallback =
     line.paragraphFontSize *
-    (FALLBACK_LINE_ASCENT +
-      (TEXT_LINE_HEIGHT - FALLBACK_LINE_ASCENT - FALLBACK_LINE_DESCENT) / 2)
+    (FALLBACK_LINE_ASCENT + (TEXT_LINE_HEIGHT - FALLBACK_LINE_ASCENT - FALLBACK_LINE_DESCENT) / 2)
   return Math.max(fallback, ...line.glyphs.map((glyph) => glyph.baselineOffset))
 }
 
@@ -86,14 +80,8 @@ function visualBounds(
   for (const [lineIndex, line] of pending.entries()) {
     const baseline = tops[lineIndex]! + baselineOffsets[lineIndex]!
     if (line.glyphs.length === 0) {
-      top = Math.min(
-        top,
-        baseline - line.paragraphFontSize * FALLBACK_LINE_ASCENT,
-      )
-      bottom = Math.max(
-        bottom,
-        baseline + line.paragraphFontSize * FALLBACK_LINE_DESCENT,
-      )
+      top = Math.min(top, baseline - line.paragraphFontSize * FALLBACK_LINE_ASCENT)
+      bottom = Math.max(bottom, baseline + line.paragraphFontSize * FALLBACK_LINE_DESCENT)
       continue
     }
     for (const glyph of line.glyphs) {
@@ -126,7 +114,10 @@ export function buildLineMetrics(
   return { heights, tops, baselineOffsets, totalHeight, verticalShift }
 }
 
-function lineX(line: PendingLine, width: number): number {
+function lineX(
+  line: PendingLine,
+  width: number,
+): number {
   if (line.alignment === 'center') {
     return line.contentX + (line.contentWidth - width) / 2
   }
@@ -202,9 +193,7 @@ export function layoutPendingLine(
     width,
     height,
     baseline,
-    fragments: Object.freeze(
-      fragments.map((fragment) => Object.freeze(fragment)),
-    ),
+    fragments: Object.freeze(fragments.map((fragment) => Object.freeze(fragment))),
     strikes: Object.freeze(strikes.map((strike) => Object.freeze(strike))),
     ...(line.listKind === 'bullet' && line.paragraphLineIndex === 0
       ? {

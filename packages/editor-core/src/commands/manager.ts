@@ -23,7 +23,10 @@ interface Entry {
 const DEFAULT_MAX_ENTRIES = 200
 const DEFAULT_MAX_BYTES = 64 * 1024 * 1024
 
-function assertLimit(value: number, field: string): void {
+function assertLimit(
+  value: number,
+  field: string,
+): void {
   if (!Number.isSafeInteger(value) || value <= 0) {
     throw new RangeError(`${field} must be a positive safe integer`)
   }
@@ -34,8 +37,7 @@ function utf8ByteLength(text: string): number {
   for (let index = 0; index < text.length; index += 1) {
     const code = text.charCodeAt(index)
     const next = text.charCodeAt(index + 1)
-    const surrogatePair =
-      code >= 0xd800 && code <= 0xdbff && next >= 0xdc00 && next <= 0xdfff
+    const surrogatePair = code >= 0xd800 && code <= 0xdbff && next >= 0xdc00 && next <= 0xdfff
     bytes += surrogatePair ? 4 : code <= 0x7f ? 1 : code <= 0x7ff ? 2 : 3
     if (surrogatePair) index += 1
   }
@@ -65,7 +67,10 @@ export class CommandManager {
   readonly #maxBytes: number
   #bytes = 0
 
-  constructor(document: EditorDocumentV1, options: CommandManagerOptions = {}) {
+  constructor(
+    document: EditorDocumentV1,
+    options: CommandManagerOptions = {},
+  ) {
     this.#document = normalizeEditorDocument(document)
     this.#maxEntries = options.maxEntries ?? DEFAULT_MAX_ENTRIES
     this.#maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES
@@ -144,7 +149,8 @@ export class CommandManager {
   #trim(): void {
     while (
       this.#undo.length > 1 &&
-      (this.#undo.length > this.#maxEntries || this.#bytes > this.#maxBytes)
+      (this.#undo.length > this.#maxEntries ||
+        this.#bytes > this.#maxBytes)
     ) {
       const entry = this.#undo.shift()
       if (entry) this.#bytes -= entry.bytes

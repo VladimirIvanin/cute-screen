@@ -13,7 +13,10 @@ import {
   type RulerAngleGuide,
   type StrokeStyle,
 } from '@cute-screen/editor-renderer'
-import type { CanvasPoint, CanvasViewportProps } from './contracts'
+import type {
+  CanvasPoint,
+  CanvasViewportProps,
+} from './contracts'
 import {
   DEFAULT_CALLOUT_STROKE,
   DEFAULT_PRECISION_TOOLS,
@@ -30,7 +33,10 @@ export interface DraftControllerContext {
   readonly rulerGuide: () => RulerAngleGuide | undefined
 }
 
-function rectFromPoints(start: CanvasPoint, end: CanvasPoint) {
+function rectFromPoints(
+  start: CanvasPoint,
+  end: CanvasPoint,
+) {
   return {
     x: Math.min(start.x, end.x),
     y: Math.min(start.y, end.y),
@@ -68,6 +74,7 @@ export class DraftController {
   }
 
   resolveCalloutStroke(): StrokeStyle {
+    if (this.#context.props.calloutStroke) return this.#context.props.calloutStroke
     const arrowStroke = this.#context.props.drawingDefaults?.arrow?.stroke
     if (arrowStroke && typeof arrowStroke === 'object') {
       return arrowStroke as StrokeStyle
@@ -84,18 +91,13 @@ export class DraftController {
       tool: gesture.tool,
       start: gesture.start,
       end: gesture.current,
-      ...(props.drawingDefaults === undefined
-        ? {}
-        : { defaults: props.drawingDefaults }),
+      ...(props.drawingDefaults === undefined ? {} : { defaults: props.drawingDefaults }),
       constrainAngle: gesture.constrainAngle,
       drawFromCenter: gesture.drawFromCenter,
       points: gesture.points,
     })
     if (!layer || !props.document) return
-    drawNodes2D(
-      context,
-      createDocumentRenderScene({ ...props.document, layers: [layer] }).nodes,
-    )
+    drawNodes2D(context, createDocumentRenderScene({ ...props.document, layers: [layer] }).nodes)
   }
 
   drawCallout(context: CanvasRenderingContext2D): void {
@@ -120,7 +122,12 @@ export class DraftController {
       label = editing.calloutDraft.label
       stroke = editing.calloutStroke ?? stroke
     }
-    if (!target || !label || (target.x === label.x && target.y === label.y)) {
+    if (
+      !target ||
+      !label ||
+      (target.x === label.x &&
+        target.y === label.y)
+    ) {
       return
     }
     const points = calloutPathPoints({
@@ -162,11 +169,7 @@ export class DraftController {
           defaults.censor.region === 'freeform'
             ? {
                 kind: 'freeform',
-                points: freeformDraftPoints(
-                  gesture.points,
-                  gesture.start,
-                  gesture.current,
-                ),
+                points: freeformDraftPoints(gesture.points, gesture.start, gesture.current),
               }
             : { kind: 'rectangle', bounds },
         effect,
@@ -211,10 +214,7 @@ export class DraftController {
 
   #tracePrecisionPath(
     context: CanvasRenderingContext2D,
-    gesture: Extract<
-      NonNullable<CanvasGesture>,
-      { readonly kind: 'precision' }
-    >,
+    gesture: Extract<NonNullable<CanvasGesture>, { readonly kind: 'precision' }>,
     defaults: typeof DEFAULT_PRECISION_TOOLS,
     bounds: { x: number; y: number; width: number; height: number },
   ): void {
@@ -281,10 +281,7 @@ export class DraftController {
 
   #rulerLayer(
     id: string,
-    gesture: Extract<
-      NonNullable<CanvasGesture>,
-      { readonly kind: 'precision' }
-    >,
+    gesture: Extract<NonNullable<CanvasGesture>, { readonly kind: 'precision' }>,
     defaults: typeof DEFAULT_PRECISION_TOOLS,
   ): LayerNode | undefined {
     const canvas = this.#context.props.canvas
@@ -310,28 +307,16 @@ export class DraftController {
 
   #loupeLayer(
     id: string,
-    gesture: Extract<
-      NonNullable<CanvasGesture>,
-      { readonly kind: 'precision' }
-    >,
+    gesture: Extract<NonNullable<CanvasGesture>, { readonly kind: 'precision' }>,
     defaults: typeof DEFAULT_PRECISION_TOOLS,
   ): LayerNode | undefined {
     const canvas = this.#context.props.canvas
     if (!canvas) return undefined
     const zoom = defaults.loupe.zoom
-    const size = Math.min(
-      defaults.loupe.size,
-      Math.min(canvas.width, canvas.height) * zoom,
-    )
+    const size = Math.min(defaults.loupe.size, Math.min(canvas.width, canvas.height) * zoom)
     const sourceSize = size / zoom
-    const sourceX = Math.max(
-      0,
-      Math.min(canvas.width - sourceSize, gesture.start.x - sourceSize / 2),
-    )
-    const sourceY = Math.max(
-      0,
-      Math.min(canvas.height - sourceSize, gesture.start.y - sourceSize / 2),
-    )
+    const sourceX = Math.max(0, Math.min(canvas.width - sourceSize, gesture.start.x - sourceSize / 2))
+    const sourceY = Math.max(0, Math.min(canvas.height - sourceSize, gesture.start.y - sourceSize / 2))
     return createLoupeLayer({
       id,
       canvas,
@@ -363,16 +348,9 @@ export class DraftController {
 
   #freeformPath(
     context: CanvasRenderingContext2D,
-    gesture: Extract<
-      NonNullable<CanvasGesture>,
-      { readonly kind: 'precision' }
-    >,
+    gesture: Extract<NonNullable<CanvasGesture>, { readonly kind: 'precision' }>,
   ): void {
-    const points = freeformDraftPoints(
-      gesture.points,
-      gesture.start,
-      gesture.current,
-    )
+    const points = freeformDraftPoints(gesture.points, gesture.start, gesture.current)
     const first = points[0]
     if (!first) return
     context.moveTo(first.x, first.y)
@@ -382,33 +360,16 @@ export class DraftController {
 
   #loupePath(
     context: CanvasRenderingContext2D,
-    gesture: Extract<
-      NonNullable<CanvasGesture>,
-      { readonly kind: 'precision' }
-    >,
+    gesture: Extract<NonNullable<CanvasGesture>, { readonly kind: 'precision' }>,
     defaults: typeof DEFAULT_PRECISION_TOOLS,
   ): void {
     const sourceSize = defaults.loupe.size / defaults.loupe.zoom
     context.moveTo(gesture.current.x, gesture.current.y)
     context.lineTo(gesture.start.x, gesture.start.y)
-    context.rect(
-      gesture.start.x - sourceSize / 2,
-      gesture.start.y - sourceSize / 2,
-      sourceSize,
-      sourceSize,
-    )
+    context.rect(gesture.start.x - sourceSize / 2, gesture.start.y - sourceSize / 2, sourceSize, sourceSize)
     if (defaults.loupe.shape === 'circle') {
-      context.moveTo(
-        gesture.current.x + defaults.loupe.size / 2,
-        gesture.current.y,
-      )
-      context.arc(
-        gesture.current.x,
-        gesture.current.y,
-        defaults.loupe.size / 2,
-        0,
-        Math.PI * 2,
-      )
+      context.moveTo(gesture.current.x + defaults.loupe.size / 2, gesture.current.y)
+      context.arc(gesture.current.x, gesture.current.y, defaults.loupe.size / 2, 0, Math.PI * 2)
     } else {
       context.rect(
         gesture.current.x - defaults.loupe.size / 2,

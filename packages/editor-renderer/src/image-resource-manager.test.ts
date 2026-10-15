@@ -1,4 +1,9 @@
-import { describe, expect, it, vi } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 
 import {
   ImageResourceManager,
@@ -19,9 +24,7 @@ describe('M03 image resource manager', () => {
       variant: 'interactive-2048' as const,
       colorProfile: 'srgb',
     }
-    const leases = await Promise.all(
-      Array.from({ length: 20 }, () => manager.acquire(key)),
-    )
+    const leases = await Promise.all(Array.from({ length: 20 }, () => manager.acquire(key)))
     expect(load).toHaveBeenCalledTimes(1)
     for (const lease of leases) lease.release()
     const other = await manager.acquire({ ...key, blobHash: 'b'.repeat(64) })

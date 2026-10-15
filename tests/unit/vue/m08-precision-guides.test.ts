@@ -1,6 +1,16 @@
-import { fireEvent, render } from '@testing-library/vue'
+import {
+  fireEvent,
+  render,
+} from '@testing-library/vue'
 import { nextTick } from 'vue'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 import { createDrawingLayer } from '@cute-screen/editor-renderer'
 import CanvasViewport from '../../../packages/editor-vue/src/shell/components/CanvasViewport.vue'
 import {
@@ -14,9 +24,7 @@ import {
 beforeEach(() => {
   window.localStorage.clear()
   contextFixture.current = canvasContext()
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
-    contextFixture.current,
-  )
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(contextFixture.current)
 })
 
 afterEach(() => {
@@ -44,15 +52,13 @@ describe('M08 manual precision tools', () => {
     const scene = view.getByLabelText('sceneCanvas') as HTMLCanvasElement
     prepareScene(scene)
     expect(scene.classList).toContain('cs-canvas-eyedropper-cursor')
-    const getImageData = vi.fn(
-      (_x: number, _y: number, width: number, height: number) => {
-        const data = new Uint8ClampedArray(width * height * 4)
-        for (let index = 0; index < data.length; index += 4) {
-          data.set([171, 205, 239, 255], index)
-        }
-        return { data, width, height }
-      },
-    )
+    const getImageData = vi.fn((_x: number, _y: number, width: number, height: number) => {
+      const data = new Uint8ClampedArray(width * height * 4)
+      for (let index = 0; index < data.length; index += 4) {
+        data.set([171, 205, 239, 255], index)
+      }
+      return { data, width, height }
+    })
     Object.defineProperty(scene, 'getContext', {
       configurable: true,
       value: vi.fn(() => ({ getImageData })),
@@ -106,12 +112,7 @@ describe('M08 manual precision tools', () => {
     Object.defineProperty(scene, 'getContext', {
       configurable: true,
       value: vi.fn(() => ({
-        getImageData: (
-          _x: number,
-          _y: number,
-          width: number,
-          height: number,
-        ) => ({
+        getImageData: (_x: number, _y: number, width: number, height: number) => ({
           data: new Uint8ClampedArray(width * height * 4),
           width,
           height,
@@ -152,49 +153,45 @@ describe('M08 manual precision tools', () => {
     [0, false],
     [128, false],
     [255, true],
-  ] as const)(
-    'accepts a sampled scene pixel only when alpha is opaque (%s)',
-    async (alpha, accepted) => {
-      const view = render(CanvasViewport, {
-        props: {
-          documentState: {
-            kind: 'ready',
-            title: 'M08',
-            dimensions: '120 × 80',
-          },
-          canvas: { width: 120, height: 80 },
-          document: documentFixture(),
-          sampling: true,
-          zoom: 100,
-          fitMode: false,
-          t: (key: string) => key,
-        } as never,
-      })
-      const scene = view.getByLabelText('sceneCanvas') as HTMLCanvasElement
-      prepareScene(scene)
-      vi.spyOn(scene, 'getContext').mockReturnValue({
-        getImageData: () => ({
-          data: new Uint8ClampedArray([171, 205, 239, alpha]),
-        }),
-      } as unknown as CanvasRenderingContext2D)
+  ] as const)('accepts a sampled scene pixel only when alpha is opaque (%s)', async (alpha, accepted) => {
+    const view = render(CanvasViewport, {
+      props: {
+        documentState: {
+          kind: 'ready',
+          title: 'M08',
+          dimensions: '120 × 80',
+        },
+        canvas: { width: 120, height: 80 },
+        document: documentFixture(),
+        sampling: true,
+        zoom: 100,
+        fitMode: false,
+        t: (key: string) => key,
+      } as never,
+    })
+    const scene = view.getByLabelText('sceneCanvas') as HTMLCanvasElement
+    prepareScene(scene)
+    vi.spyOn(scene, 'getContext').mockReturnValue({
+      getImageData: () => ({
+        data: new Uint8ClampedArray([171, 205, 239, alpha]),
+      }),
+    } as unknown as CanvasRenderingContext2D)
 
-      await fireEvent.pointerDown(scene, {
-        pointerId: alpha + 30,
-        clientX: 30,
-        clientY: 20,
-      })
+    await fireEvent.pointerDown(scene, {
+      pointerId: alpha + 30,
+      clientX: 30,
+      clientY: 20,
+    })
 
-      if (accepted) {
-        expect(view.emitted().colorSample).toEqual([['#ABCDEF']])
-        expect(view.emitted().colorSampleError).toBeUndefined()
-      } else {
-        expect(view.emitted().colorSample).toBeUndefined()
-        const errors = view.emitted()
-          .colorSampleError as unknown as readonly (readonly unknown[])[]
-        expect(errors[0]?.[0]).toBe('There is no opaque colour at this point')
-      }
-    },
-  )
+    if (accepted) {
+      expect(view.emitted().colorSample).toEqual([['#ABCDEF']])
+      expect(view.emitted().colorSampleError).toBeUndefined()
+    } else {
+      expect(view.emitted().colorSample).toBeUndefined()
+      const errors = view.emitted().colorSampleError as unknown as readonly (readonly unknown[])[]
+      expect(errors[0]?.[0]).toBe('There is no opaque colour at this point')
+    }
+  })
 
   it('shows snapping guides only while Alt is held and clears them on keyup and blur', async () => {
     const createdShape = createDrawingLayer({
@@ -274,27 +271,15 @@ describe('M08 manual precision tools', () => {
     vi.mocked(contextFixture.current.moveTo).mockClear()
 
     await fireEvent.keyDown(window, { key: 'Alt' })
-    expect(
-      vi
-        .mocked(contextFixture.current.moveTo)
-        .mock.calls.filter(([x, y]) => x === 20 && y === 20),
-    ).toHaveLength(2)
+    expect(vi.mocked(contextFixture.current.moveTo).mock.calls.filter(([x, y]) => x === 20 && y === 20)).toHaveLength(2)
     vi.mocked(contextFixture.current.moveTo).mockClear()
     await fireEvent.keyUp(window, { key: 'Alt' })
-    expect(
-      vi
-        .mocked(contextFixture.current.moveTo)
-        .mock.calls.filter(([x, y]) => x === 20 && y === 20),
-    ).toHaveLength(1)
+    expect(vi.mocked(contextFixture.current.moveTo).mock.calls.filter(([x, y]) => x === 20 && y === 20)).toHaveLength(1)
 
     await fireEvent.keyDown(window, { key: 'Alt' })
     vi.mocked(contextFixture.current.moveTo).mockClear()
     await fireEvent(window, new Event('blur'))
-    expect(
-      vi
-        .mocked(contextFixture.current.moveTo)
-        .mock.calls.filter(([x, y]) => x === 20 && y === 20),
-    ).toHaveLength(0)
+    expect(vi.mocked(contextFixture.current.moveTo).mock.calls.filter(([x, y]) => x === 20 && y === 20)).toHaveLength(0)
     expect(emitted().addLayer).toBeUndefined()
     expect(emitted().documentCommand).toBeUndefined()
   })

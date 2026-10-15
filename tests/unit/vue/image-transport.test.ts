@@ -1,4 +1,9 @@
-import { describe, expect, it, vi } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 
 import {
   ImageTransportError,
@@ -19,9 +24,7 @@ const metadata = {
 function bridge(): ImageTransportBridge {
   return {
     stageImage: vi.fn().mockResolvedValue(metadata),
-    readImageBytes: vi
-      .fn()
-      .mockResolvedValue(Uint8Array.from([137, 80, 78, 71]).buffer),
+    readImageBytes: vi.fn().mockResolvedValue(Uint8Array.from([137, 80, 78, 71]).buffer),
   }
 }
 
@@ -52,18 +55,13 @@ describe('image transport', () => {
   it('uses raw binary IPC and revokes its Blob URL exactly once', async () => {
     const adapter = bridge()
     const revoke = vi.fn()
-    const decodeImage = vi
-      .fn()
-      .mockRejectedValueOnce(new Error('asset denied'))
-      .mockResolvedValueOnce(decodedImage())
+    const decodeImage = vi.fn().mockRejectedValueOnce(new Error('asset denied')).mockResolvedValueOnce(decodedImage())
     const result = await loadImageWithBinaryFallback({
       token: metadata.token,
       correlationId: metadata.correlationId,
       bridge: adapter,
       decodeImage,
-      createResource: vi
-        .fn()
-        .mockResolvedValue({ id: 'resource', dispose: vi.fn() }),
+      createResource: vi.fn().mockResolvedValue({ id: 'resource', dispose: vi.fn() }),
       objectUrls: {
         create: vi.fn().mockReturnValue('blob:m01'),
         revoke,
@@ -88,9 +86,7 @@ describe('image transport', () => {
       correlationId: metadata.correlationId,
       bridge: adapter,
       decodeImage,
-      createResource: vi
-        .fn()
-        .mockResolvedValue({ id: 'resource', dispose: vi.fn() }),
+      createResource: vi.fn().mockResolvedValue({ id: 'resource', dispose: vi.fn() }),
       objectUrls: {
         create: vi.fn().mockReturnValue('blob:memory-preview'),
         revoke: vi.fn(),

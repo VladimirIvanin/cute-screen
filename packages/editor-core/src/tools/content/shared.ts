@@ -41,7 +41,11 @@ export function cloneLayer(layer: LayerNode): LayerNode {
 }
 
 export function stripTransientLayerFields(value: unknown): unknown {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return value
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value)
+  ) return value
   const input = value as Record<string, unknown>
   const { transient, draft, selection, ...layer } = input
   void transient
@@ -54,11 +58,7 @@ export function stripTransientLayerFields(value: unknown): unknown {
   ) {
     return layer
   }
-  const {
-    transient: payloadTransient,
-    draft: payloadDraft,
-    ...payload
-  } = layer.payload as Record<string, unknown>
+  const { transient: payloadTransient, draft: payloadDraft, ...payload } = layer.payload as Record<string, unknown>
   void payloadTransient
   void payloadDraft
   return { ...layer, payload }
@@ -79,25 +79,30 @@ export function assertFinitePoint(origin: Point): void {
   }
 }
 
-export function assertPositiveFinite(value: number, field: string): void {
+export function assertPositiveFinite(
+  value: number,
+  field: string,
+): void {
   if (!Number.isFinite(value) || value <= 0) {
     throw new Error(`${field} must be positive and finite`)
   }
 }
 
-export function assertNonEmptyString(value: string, field: string): void {
+export function assertNonEmptyString(
+  value: string,
+  field: string,
+): void {
   if (value.length === 0) throw new Error(`${field} must not be empty`)
 }
 
-export function solidColor(color: SrgbColor | undefined, field = 'text color') {
+export function solidColor(
+  color: SrgbColor | undefined,
+  field = 'text color',
+) {
   const value = color ?? BLACK_COLOR
   if (
     ![value.red, value.green, value.blue, value.alpha].every(
-      (channel) =>
-        typeof channel === 'number' &&
-        Number.isFinite(channel) &&
-        channel >= 0 &&
-        channel <= 1,
+      (channel) => typeof channel === 'number' && Number.isFinite(channel) && channel >= 0 && channel <= 1,
     )
   ) {
     throw new Error(`${field} must use finite sRGB channels from 0 to 1`)
@@ -110,9 +115,7 @@ export function solidColor(color: SrgbColor | undefined, field = 'text color') {
   })
 }
 
-export function assertTextBackground(
-  background: NonNullable<TextLayer['payload']['background']>,
-): void {
+export function assertTextBackground(background: NonNullable<TextLayer['payload']['background']>): void {
   solidColor(background.color, 'text background color')
   if (
     !Number.isFinite(background.padding) ||

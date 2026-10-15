@@ -1,6 +1,15 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
-import { NButton, NPopover, NTooltip } from 'naive-ui'
+import {
+  computed,
+  nextTick,
+  ref,
+  watch,
+} from 'vue'
+import {
+  NButton,
+  NPopover,
+  NTooltip,
+} from 'naive-ui'
 import {
   colorPalette,
   colorSuggestions,
@@ -46,22 +55,12 @@ const hueDragging = ref(false)
 const hexError = ref<string>()
 
 const draftColor = computed(() => hexToSrgb(draft.value)!)
-const palette = computed(() =>
-  colorPalette(draftColor.value, preservedHue.value),
-)
-const suggestions = computed(() =>
-  colorSuggestions(draftColor.value, preservedHue.value),
-)
+const palette = computed(() => colorPalette(draftColor.value, preservedHue.value))
+const suggestions = computed(() => colorSuggestions(draftColor.value, preservedHue.value))
 const hue = computed(() => srgbToHsv(draftColor.value).hue)
 const recent = computed(() => props.recentColors.slice(0, 2))
 const quickColors = computed(() => {
-  const values = [
-    draft.value,
-    ...props.recentColors.map(srgbToHex),
-    '#F2C84B',
-    '#52B788',
-    '#202226',
-  ]
+  const values = [draft.value, ...props.recentColors.map(srgbToHex), '#F2C84B', '#52B788', '#202226']
   return [...new Set(values)].slice(0, 5)
 })
 
@@ -94,8 +93,7 @@ function setDraft(
   if (!normalized) return false
   draft.value = normalized
   const hsv = srgbToHsv(hexToSrgb(normalized)!)
-  if (options.preserveHue !== true && hsv.saturation >= 1)
-    preservedHue.value = hsv.hue
+  if (options.preserveHue !== true && hsv.saturation >= 1) preservedHue.value = hsv.hue
   hexError.value = undefined
   return true
 }
@@ -160,28 +158,30 @@ function applyHex(): void {
   commit()
 }
 
-function gridKeydown(event: KeyboardEvent, index: number): void {
+function gridKeydown(
+  event: KeyboardEvent,
+  index: number,
+): void {
   const moves: Record<string, number> = {
     ArrowLeft: -1,
     ArrowRight: 1,
     ArrowUp: -8,
     ArrowDown: 8,
   }
-  if (!(event.key in moves) && event.key !== 'Home' && event.key !== 'End')
-    return
+  if (
+    !(event.key in moves) &&
+    event.key !== 'Home' &&
+    event.key !== 'End'
+  ) return
   event.preventDefault()
   const next =
     event.key === 'Home'
       ? 0
       : event.key === 'End'
         ? palette.value.length - 1
-        : Math.max(
-            0,
-            Math.min(palette.value.length - 1, index + moves[event.key]!),
-          )
-  ;(popover.value ?? document)
-    .querySelector<HTMLElement>(`[data-color-palette-index="${next}"]`)
-    ?.focus()
+        : Math.max(0, Math.min(palette.value.length - 1, index + moves[event.key]!))
+  ;
+  (popover.value ?? document).querySelector<HTMLElement>(`[data-color-palette-index="${next}"]`)?.focus()
 }
 
 function keydown(event: KeyboardEvent): void {
@@ -262,20 +262,17 @@ function requestEyedropper(): void {
               quaternary
               circle
               size="small"
-              :aria-label="
-                locale === 'ru' ? 'Закрыть палитру' : 'Close colour palette'
-              "
+              :aria-label="locale === 'ru' ? 'Закрыть палитру' : 'Close colour palette'"
               @click="close"
-              ><UiIcon name="close"
-            /></NButton>
+            >
+              <UiIcon name="close"/>
+            </NButton>
           </header>
           <div class="cs-color-editor">
             <div
               class="cs-color-grid"
               role="listbox"
-              :aria-label="
-                locale === 'ru' ? 'Готовые оттенки' : 'Colour swatches'
-              "
+              :aria-label="locale === 'ru' ? 'Готовые оттенки' : 'Colour swatches'"
             >
               <button
                 v-for="(color, index) in palette"
@@ -294,65 +291,61 @@ function requestEyedropper(): void {
                 @keydown="gridKeydown($event, index)"
               />
             </div>
-            <label class="cs-color-hue"
-              ><span
-                class="cs-color-current cs-color-current-small"
-                :style="{ backgroundColor: draft }"
-                aria-hidden="true" /><input
-                type="range"
-                min="0"
-                max="360"
-                :value="Math.round(hue || preservedHue)"
-                :aria-label="locale === 'ru' ? 'Оттенок' : 'Hue'"
-                :disabled="disabled"
-                @pointerdown="hueDragging = true"
-                @input="onHueInput"
-                @change="onHueChange"
+            <label class="cs-color-hue"><span
+              class="cs-color-current cs-color-current-small"
+              :style="{ backgroundColor: draft }"
+              aria-hidden="true"
+            /><input
+              type="range"
+              min="0"
+              max="360"
+              :value="Math.round(hue || preservedHue)"
+              :aria-label="locale === 'ru' ? 'Оттенок' : 'Hue'"
+              :disabled="disabled"
+              @pointerdown="hueDragging = true"
+              @input="onHueInput"
+              @change="onHueChange"
             /></label>
             <div class="cs-color-value-row">
-              <label class="cs-color-hex" :class="{ 'is-invalid': hexError }"
-                ><span>HEX</span
-                ><input
-                  ref="hexInput"
-                  :value="draft"
-                  maxlength="7"
-                  spellcheck="false"
-                  :aria-label="
-                    locale === 'ru' ? 'HEX-код цвета' : 'HEX colour code'
-                  "
-                  :aria-invalid="Boolean(hexError)"
-                  :disabled="disabled"
-                  @change="applyHex"
-                  @keydown.enter.prevent="applyHex"
+              <label
+                class="cs-color-hex"
+                :class="{ 'is-invalid': hexError }"
+              ><span>HEX</span><input
+                ref="hexInput"
+                :value="draft"
+                maxlength="7"
+                spellcheck="false"
+                :aria-label="locale === 'ru' ? 'HEX-код цвета' : 'HEX colour code'"
+                :aria-invalid="Boolean(hexError)"
+                :disabled="disabled"
+                @change="applyHex"
+                @keydown.enter.prevent="applyHex"
               /></label>
-              <NTooltip v-if="eyedropper"
-                ><template #trigger
-                  ><NButton
+              <NTooltip v-if="eyedropper">
+                <template #trigger>
+                  <NButton
                     class="cs-color-eyedropper"
                     quaternary
                     :disabled="disabled"
-                    :aria-label="
-                      locale === 'ru'
-                        ? 'Взять цвет со снимка'
-                        : 'Sample colour from canvas'
-                    "
+                    :aria-label="locale === 'ru' ? 'Взять цвет со снимка' : 'Sample colour from canvas'"
                     @click="requestEyedropper"
-                    ><UiIcon name="eyedropper" /></NButton></template
-                >{{ locale === 'ru' ? 'Пипетка' : 'Eyedropper' }}</NTooltip
-              >
+                  >
+                    <UiIcon name="eyedropper" />
+                  </NButton>
+                </template>{{ locale === 'ru' ? 'Пипетка' : 'Eyedropper' }}
+              </NTooltip>
             </div>
-            <p v-if="hexError" class="cs-color-error" role="alert">
-              {{
-                locale === 'ru'
-                  ? 'Введите HEX в формате #D14B7C'
-                  : 'Enter HEX in the #D14B7C format'
-              }}
+            <p
+              v-if="hexError"
+              class="cs-color-error"
+              role="alert"
+            >
+              {{ locale === 'ru' ? 'Введите HEX в формате #D14B7C' : 'Enter HEX in the #D14B7C format' }}
             </p>
           </div>
           <section class="cs-color-section">
             <div class="cs-color-section-title">
-              <span>{{ locale === 'ru' ? 'Недавние' : 'Recent' }}</span
-              ><small>{{ recent.length }} / 2</small>
+              <span>{{ locale === 'ru' ? 'Недавние' : 'Recent' }}</span><small>{{ recent.length }} / 2</small>
             </div>
             <div v-if="recent.length" class="cs-color-recent">
               <button
@@ -365,40 +358,31 @@ function requestEyedropper(): void {
                 :disabled="disabled"
                 @click="choose(srgbToHex(color))"
               >
-                <span
-                  :style="{ backgroundColor: srgbToHex(color) }"
-                /><strong>{{ srgbToHex(color) }}</strong>
+                <span :style="{ backgroundColor: srgbToHex(color) }" /><strong>{{ srgbToHex(color) }}</strong>
               </button>
             </div>
             <p v-else class="cs-color-empty">
-              {{
-                locale === 'ru'
-                  ? 'Пока нет выбранных цветов'
-                  : 'No recent colours yet'
-              }}
+              {{ locale === 'ru' ? 'Пока нет выбранных цветов' : 'No recent colours yet' }}
             </p>
           </section>
           <section class="cs-color-section">
             <div class="cs-color-section-title">
-              <span
-                ><UiIcon name="sparkles" />{{
-                  locale === 'ru' ? 'Предлагаемые' : 'Suggested'
-                }}</span
-              >
+              <span><UiIcon name="sparkles" />{{ locale === 'ru' ? 'Предлагаемые' : 'Suggested' }}</span>
             </div>
             <div class="cs-color-suggestions">
-              <NTooltip v-for="suggestion in suggestions" :key="suggestion.id"
-                ><template #trigger
-                  ><button
+              <NTooltip
+                v-for="suggestion in suggestions"
+                :key="suggestion.id"
+              >
+                <template #trigger>
+                  <button
                     class="cs-color-suggestion"
                     type="button"
                     :aria-label="`${suggestion.id}: ${srgbToHex(suggestion.color)}`"
                     :disabled="disabled"
                     @click="choose(srgbToHex(suggestion.color))"
                   >
-                    <span
-                      :style="{ backgroundColor: srgbToHex(suggestion.color) }"
-                    /><strong>{{
+                    <span :style="{ backgroundColor: srgbToHex(suggestion.color) }" /><strong>{{
                       suggestion.id === 'contrast'
                         ? locale === 'ru'
                           ? 'Контраст'
@@ -411,13 +395,13 @@ function requestEyedropper(): void {
                             ? 'Аналог.'
                             : 'Analogous'
                     }}</strong>
-                  </button></template
-                >{{
+                  </button>
+                </template>{{
                   suggestion.id === 'contrast'
                     ? `${locale === 'ru' ? 'Контраст' : 'Contrast'} ${suggestion.contrastRatio?.toFixed(1)} : 1`
                     : srgbToHex(suggestion.color)
-                }}</NTooltip
-              >
+                }}
+              </NTooltip>
             </div>
           </section>
         </section>

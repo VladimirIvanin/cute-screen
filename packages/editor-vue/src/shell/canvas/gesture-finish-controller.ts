@@ -8,7 +8,10 @@ import {
   type StrokeStyle,
   type Transform2D,
 } from '@cute-screen/editor-renderer'
-import { nextTick, type Ref } from 'vue'
+import {
+  nextTick,
+  type Ref,
+} from 'vue'
 import type {
   CanvasPoint,
   CanvasViewportEmit,
@@ -110,10 +113,7 @@ function createCompletedPrecisionLayer(
       'toolError',
       error instanceof Error
         ? error.message
-        : context.samplingError(
-            'The tool gesture could not be created',
-            'Не удалось создать элемент',
-          ),
+        : context.samplingError('The tool gesture could not be created', 'Не удалось создать элемент'),
     )
     return undefined
   }
@@ -148,7 +148,11 @@ function commitCrop(
   gesture: CanvasGesture,
 ): void {
   const session = context.crop.session
-  if (gesture?.kind !== 'crop' || !session || !context.props.quickFrameMode) {
+  if (
+    gesture?.kind !== 'crop' ||
+    !session ||
+    !context.props.quickFrameMode
+  ) {
     return
   }
   const before = gesture.initial.crop
@@ -195,10 +199,7 @@ function commitTransform(
   if (gesture?.kind === 'intrinsicResize') {
     commitIntrinsicResize(context, gesture)
   }
-  if (
-    gesture?.kind === 'rotate' &&
-    gesture.currentAngle !== gesture.initial.rotation
-  ) {
+  if (gesture?.kind === 'rotate' && gesture.currentAngle !== gesture.initial.rotation) {
     context.emit('transformLayer', gesture.id, {
       ...gesture.initial,
       rotation: gesture.currentAngle,
@@ -210,9 +211,7 @@ function commitBoundsResize(
   context: GestureFinishContext,
   gesture: Extract<NonNullable<CanvasGesture>, { readonly kind: 'resize' }>,
 ): void {
-  const layer = context.props.document?.layers.find(
-    (candidate) => candidate.id === gesture.id,
-  )
+  const layer = context.props.document?.layers.find((candidate) => candidate.id === gesture.id)
   if (
     !layer ||
     (gesture.current.x === gesture.start.x &&
@@ -223,42 +222,23 @@ function commitBoundsResize(
   context.emit(
     'transformLayer',
     gesture.id,
-    context.resizeTransform(
-      layer,
-      gesture.handle,
-      gesture.current,
-      gesture.freeResize,
-      gesture.centerResize,
-    ),
+    context.resizeTransform(layer, gesture.handle, gesture.current, gesture.freeResize, gesture.centerResize),
   )
 }
 
 function commitIntrinsicResize(
   context: GestureFinishContext,
-  gesture: Extract<
-    NonNullable<CanvasGesture>,
-    { readonly kind: 'intrinsicResize' }
-  >,
+  gesture: Extract<NonNullable<CanvasGesture>, { readonly kind: 'intrinsicResize' }>,
 ): void {
-  if (
-    gesture.current.x === gesture.start.x &&
-    gesture.current.y === gesture.start.y
-  ) {
+  if (gesture.current.x === gesture.start.x && gesture.current.y === gesture.start.y) {
     return
   }
   try {
-    const after = resizeLayerGeometry(
-      gesture.initial,
-      gesture.handle,
-      gesture.current,
-      {
-        preserveAspect: gesture.preserveAspect,
-        fromCenter: gesture.centerResize,
-        ...(context.props.document
-          ? { canvas: context.props.document.canvas }
-          : {}),
-      },
-    )
+    const after = resizeLayerGeometry(gesture.initial, gesture.handle, gesture.current, {
+      preserveAspect: gesture.preserveAspect,
+      fromCenter: gesture.centerResize,
+      ...(context.props.document ? { canvas: context.props.document.canvas } : {}),
+    })
     if (JSON.stringify(after) !== JSON.stringify(gesture.initial)) {
       context.emit('documentCommand', {
         type: 'updateLayer',
@@ -271,10 +251,7 @@ function commitIntrinsicResize(
       'toolError',
       error instanceof Error
         ? error.message
-        : context.samplingError(
-            'The layer geometry could not be resized',
-            'Не удалось изменить геометрию слоя',
-          ),
+        : context.samplingError('The layer geometry could not be resized', 'Не удалось изменить геометрию слоя'),
     )
   }
 }
@@ -288,27 +265,17 @@ function commitLayerHandle(
     (gesture.kind !== 'arrowHandle' &&
       gesture.kind !== 'calloutHandle' &&
       gesture.kind !== 'loupeSource') ||
-    !moved(gesture)
+      !moved(gesture)
   ) {
     return
   }
-  let layer = context.props.document?.layers.find(
-    (candidate) => candidate.id === gesture.id,
-  )
+  let layer = context.props.document?.layers.find((candidate) => candidate.id === gesture.id)
   let after: LayerNode | undefined
   if (gesture.kind === 'arrowHandle' && layer?.kind === 'arrow') {
-    after = updateArrowHandle(
-      layer,
-      gesture.handle,
-      context.toLocal(layer, gesture.current),
-    )
+    after = updateArrowHandle(layer, gesture.handle, context.toLocal(layer, gesture.current))
   }
   if (gesture.kind === 'calloutHandle' && layer?.kind === 'callout') {
-    after = updateCalloutHandle(
-      layer,
-      gesture.handle,
-      context.toLocal(layer, gesture.current),
-    )
+    after = updateCalloutHandle(layer, gesture.handle, context.toLocal(layer, gesture.current))
   }
   if (gesture.kind === 'loupeSource') {
     after = context.moveLoupeSource(gesture.initial, gesture.current)
@@ -324,14 +291,8 @@ function commitLayerHandle(
   }
 }
 
-function moved(
-  gesture: Extract<NonNullable<CanvasGesture>, { readonly start: CanvasPoint }>,
-): boolean {
-  return (
-    'current' in gesture &&
-    (gesture.current.x !== gesture.start.x ||
-      gesture.current.y !== gesture.start.y)
-  )
+function moved(gesture: Extract<NonNullable<CanvasGesture>, { readonly start: CanvasPoint }>): boolean {
+  return 'current' in gesture && (gesture.current.x !== gesture.start.x || gesture.current.y !== gesture.start.y)
 }
 
 function commitCreation(
@@ -358,9 +319,7 @@ function commitCreation(
       tool: gesture.tool,
       start: gesture.start,
       end: gesture.current,
-      ...(context.props.drawingDefaults
-        ? { defaults: context.props.drawingDefaults }
-        : {}),
+      ...(context.props.drawingDefaults ? { defaults: context.props.drawingDefaults } : {}),
       constrainAngle: gesture.constrainAngle,
       drawFromCenter: gesture.drawFromCenter,
       points: gesture.points,

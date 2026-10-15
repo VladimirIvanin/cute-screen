@@ -2,7 +2,10 @@ import type {
   CanvasViewportHosts,
   QuickCaptureDraftV1,
 } from '@cute-screen/editor-vue'
-import type { Ref, ShallowRef } from 'vue'
+import type {
+  Ref,
+  ShallowRef,
+} from 'vue'
 import { tauriDesktopBridge } from './desktop-bridge'
 import { cancelQuickCaptureAction } from './quick-capture-actions'
 import type { QuickCaptureCommitController } from './quick-capture-commit-controller'

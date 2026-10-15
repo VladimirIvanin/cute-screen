@@ -1,5 +1,15 @@
-import { fireEvent, render, screen, within } from '@testing-library/vue'
-import { describe, expect, it, vi } from 'vitest'
+import {
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/vue'
+import {
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 import { markRaw } from 'vue'
 import { selectLayerFromPanel } from './layer-selection'
 import ActionFeedback from '../../../packages/editor-vue/src/shell/components/ActionFeedback.vue'
@@ -175,12 +185,7 @@ describe('M02 editor shell', () => {
 
     await selectLayerFromPanel(view, { activateSelect: false })
     await fireEvent.keyDown(window, { key: 'x', ctrlKey: true })
-    await vi.waitFor(() =>
-      expect(writeClipboardText).toHaveBeenCalledWith(
-        'Copy me',
-        expect.any(String),
-      ),
-    )
+    await vi.waitFor(() => expect(writeClipboardText).toHaveBeenCalledWith('Copy me', expect.any(String)))
     expect(session.snapshot.core.document.layers).toEqual([])
 
     session.dispose()
@@ -238,9 +243,7 @@ describe('M02 editor shell', () => {
     const borderWidth = await screen.findByRole('slider', {
       name: 'Border width',
     })
-    const toolbar = view.container.querySelector<HTMLElement>(
-      '.cs-context-toolbar',
-    )
+    const toolbar = view.container.querySelector<HTMLElement>('.cs-context-toolbar')
     if (!toolbar) throw new Error('context toolbar should be rendered')
     const opacity = await within(toolbar).findByRole('slider', {
       name: 'Opacity',
@@ -321,9 +324,7 @@ describe('M02 editor shell', () => {
     })
 
     expect(screen.getByRole('status')).toHaveTextContent('Capture cancelled')
-    expect(
-      screen.queryByRole('button', { name: 'retry' }),
-    ).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'retry' })).not.toBeInTheDocument()
   })
 
   it('shows, copies, and lets the user dismiss the CLI fallback snackbar', async () => {
@@ -335,35 +336,19 @@ describe('M02 editor shell', () => {
     })
     render(EditorShell, {
       props: {
-        captureFallbackCommand:
-          "'/opt/Cute Screen/cute-screen' capture --mode area",
+        captureFallbackCommand: "'/opt/Cute Screen/cute-screen' capture --mode area",
       },
       global: { plugins: [createEditorShellPinia()] },
     })
 
-    expect(
-      screen.getByText("'/opt/Cute Screen/cute-screen' capture --mode area"),
-    ).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveAttribute(
-      'data-placement',
-      'overlay',
-    )
-    expect(
-      screen.getByRole('button', { name: 'Copy capture command' }),
-    ).toBeInTheDocument()
-    await fireEvent.click(
-      screen.getByRole('button', { name: 'Copy capture command' }),
-    )
-    expect(writeText).toHaveBeenCalledWith(
-      "'/opt/Cute Screen/cute-screen' capture --mode area",
-    )
+    expect(screen.getByText("'/opt/Cute Screen/cute-screen' capture --mode area")).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveAttribute('data-placement', 'overlay')
+    expect(screen.getByRole('button', { name: 'Copy capture command' })).toBeInTheDocument()
+    await fireEvent.click(screen.getByRole('button', { name: 'Copy capture command' }))
+    expect(writeText).toHaveBeenCalledWith("'/opt/Cute Screen/cute-screen' capture --mode area")
     expect(screen.getByText('Capture command copied')).toBeInTheDocument()
-    await fireEvent.click(
-      screen.getByRole('button', { name: 'Dismiss capture fallback notice' }),
-    )
-    expect(
-      screen.queryByText("'/opt/Cute Screen/cute-screen' capture --mode area"),
-    ).not.toBeInTheDocument()
+    await fireEvent.click(screen.getByRole('button', { name: 'Dismiss capture fallback notice' }))
+    expect(screen.queryByText("'/opt/Cute Screen/cute-screen' capture --mode area")).not.toBeInTheDocument()
     if (descriptor) Object.defineProperty(navigator, 'clipboard', descriptor)
     else Reflect.deleteProperty(navigator, 'clipboard')
   })
@@ -371,31 +356,21 @@ describe('M02 editor shell', () => {
   it('mounts from a clean state with a useful empty canvas', () => {
     renderApp()
 
-    expect(
-      screen.getByRole('heading', { name: 'Capture your first screen' }),
-    ).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Capture your first screen' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Copy' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Export' })).toBeDisabled()
-    expect(
-      screen.queryByRole('navigation', { name: 'Series frames' }),
-    ).not.toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Series frames' })).not.toBeInTheDocument()
   })
 
   it('keeps familiar compact actions accessible and labels every icon control', async () => {
     renderApp()
     expect(screen.getByRole('button', { name: 'Capture' })).toBeEnabled()
-    expect(
-      screen.getByRole('button', { name: 'More actions' }),
-    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'More actions' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Zoom out' })).toBeInTheDocument()
 
     await fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
-    expect(
-      screen.getByRole('menuitemradio', { name: 'Dark' }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole('menuitemradio', { name: 'RU' }),
-    ).toBeInTheDocument()
+    expect(screen.getByRole('menuitemradio', { name: 'Dark' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitemradio', { name: 'RU' })).toBeInTheDocument()
   })
 
   it('uses the product locale fallback for corrupt preferences', () => {
@@ -405,10 +380,9 @@ describe('M02 editor shell', () => {
       locale: 'ru',
       theme: 'system',
     })
-    expect(
-      parsePreferences('{"schemaVersion":1,"locale":"fr","theme":"night"}', [
-        'en-US',
-      ]),
-    ).toMatchObject({ locale: 'en', theme: 'system' })
+    expect(parsePreferences('{"schemaVersion":1,"locale":"fr","theme":"night"}', ['en-US'])).toMatchObject({
+      locale: 'en',
+      theme: 'system',
+    })
   })
 })

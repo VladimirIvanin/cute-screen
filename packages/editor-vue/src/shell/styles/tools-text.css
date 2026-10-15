@@ -14,6 +14,9 @@
   z-index: 50;
   pointer-events: auto;
   transform: translate(-50%, calc(-100% - 8px));
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 24px);
+  overflow: auto;
 }
 @media (max-width: 700px) {
   .cs-text-floating-toolbar-host {
@@ -348,8 +351,8 @@
   --bottom-rail-offset: 14px;
   --bottom-controls-height: 48px;
   --bottom-chrome-reserve: calc(
-    var(--bottom-rail-offset) + var(--bottom-rail-height) +
-      var(--bottom-rail-gap) + var(--bottom-controls-height) + 12px
+    var(--bottom-rail-offset) + var(--bottom-rail-height) + var(--bottom-rail-gap) + var(--bottom-controls-height) +
+      12px
   );
   position: absolute;
   inset: 0;

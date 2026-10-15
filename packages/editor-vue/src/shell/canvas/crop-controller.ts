@@ -29,8 +29,7 @@ export interface CropControllerContext {
 export class CropController {
   readonly #context: CropControllerContext
   #session: CropSession | undefined
-  #quickDraft:
-    { x: number; y: number; width: number; height: number } | undefined
+  #quickDraft: { x: number; y: number; width: number; height: number } | undefined
 
   constructor(context: CropControllerContext) {
     this.#context = context
@@ -48,9 +47,7 @@ export class CropController {
     return this.#quickDraft
   }
 
-  set quickDraft(
-    value: { x: number; y: number; width: number; height: number } | undefined,
-  ) {
+  set quickDraft(value: { x: number; y: number; width: number; height: number } | undefined) {
     this.#quickDraft = value
   }
 
@@ -58,8 +55,9 @@ export class CropController {
     const { props, rendererError } = this.#context
     if (props.quickSelectionMode) return undefined
     if (
-      (props.activeTool !== 'crop' && !props.quickFrameMode) ||
-      !props.document
+      (props.activeTool !== 'crop' &&
+        !props.quickFrameMode) ||
+        !props.document
     ) {
       return undefined
     }
@@ -67,8 +65,7 @@ export class CropController {
       try {
         this.#session = createCropSession(props.document)
       } catch (error) {
-        rendererError.value =
-          error instanceof Error ? error.message : String(error)
+        rendererError.value = error instanceof Error ? error.message : String(error)
         return undefined
       }
     }
@@ -81,8 +78,7 @@ export class CropController {
   ): CropResizeHandle | undefined {
     const tolerance = 9 / this.#overlayScale()
     return this.#handlePositions(session).find(
-      ([, position]) =>
-        Math.hypot(position.x - point.x, position.y - point.y) <= tolerance,
+      ([, position]) => Math.hypot(position.x - point.x, position.y - point.y) <= tolerance,
     )?.[0]
   }
 
@@ -95,8 +91,10 @@ export class CropController {
     const crop = props.quickSelectionMode ? this.#quickDraft : session?.crop
     if (
       (!props.quickSelectionMode &&
-        (!session || (props.activeTool !== 'crop' && !props.quickFrameMode))) ||
-      !props.canvas
+        (!session ||
+          (props.activeTool !== 'crop' &&
+            !props.quickFrameMode))) ||
+            !props.canvas
     ) {
       return false
     }
@@ -111,9 +109,7 @@ export class CropController {
     const zoomScale = this.#overlayScale()
     context.strokeStyle = '#ffffff'
     context.lineWidth = 1 / zoomScale
-    context.setLineDash(
-      props.quickFrameMode ? [7 / zoomScale, 5 / zoomScale] : [],
-    )
+    context.setLineDash(props.quickFrameMode ? [7 / zoomScale, 5 / zoomScale] : [])
     context.strokeRect(crop.x, crop.y, crop.width, crop.height)
     context.setLineDash([])
     if (props.quickFrameMode) {
@@ -128,19 +124,14 @@ export class CropController {
 
   documentChanged(): void {
     this.#session = undefined
-    if (
-      this.#context.props.activeTool === 'crop' ||
-      this.#context.props.quickFrameMode
-    ) {
+    if (this.#context.props.activeTool === 'crop' || this.#context.props.quickFrameMode) {
       this.ensureSession()
     }
   }
 
   activeToolChanged(tool: string | undefined): void {
     this.#session =
-      tool === 'crop' && this.#context.props.document
-        ? createCropSession(this.#context.props.document)
-        : undefined
+      tool === 'crop' && this.#context.props.document ? createCropSession(this.#context.props.document) : undefined
   }
 
   quickSelectionChanged(selecting: boolean): void {
@@ -163,8 +154,7 @@ export class CropController {
 
   apply(): void {
     const session = this.ensureSession()
-    if (session)
-      this.#context.emit('documentCommand', applyCropSession(session))
+    if (session) this.#context.emit('documentCommand', applyCropSession(session))
   }
 
   cancel(): void {
@@ -244,10 +234,7 @@ export class CropController {
     const label = `${Math.round(crop.width)} × ${Math.round(crop.height)}`
     const height = 28 / scale
     const width = (label.length * 8 + 18) / scale
-    const x = Math.max(
-      6 / scale,
-      Math.min(crop.x, canvas.width - width - 6 / scale),
-    )
+    const x = Math.max(6 / scale, Math.min(crop.x, canvas.width - width - 6 / scale))
     const above = crop.y - height - 7 / scale
     const y = above >= 6 / scale ? above : crop.y + 7 / scale
     context.fillStyle = 'rgba(24, 26, 30, 0.94)'

@@ -1,5 +1,13 @@
-import { fireEvent, render, screen } from '@testing-library/vue'
-import { describe, expect, it } from 'vitest'
+import {
+  fireEvent,
+  render,
+  screen,
+} from '@testing-library/vue'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 import DeferredColorPicker from '../../../packages/editor-vue/src/shell/ui/DeferredColorPicker.vue'
 import DeferredNumberInput from '../../../packages/editor-vue/src/shell/ui/DeferredNumberInput.vue'
@@ -44,9 +52,7 @@ describe('Naive UI editor control adapters', () => {
     })
     const slider = view.container.querySelector('.n-slider')
     expect(slider).toBeTruthy()
-    expect(
-      await view.findByRole('slider', { name: 'Opacity' }),
-    ).toBeInTheDocument()
+    expect(await view.findByRole('slider', { name: 'Opacity' })).toBeInTheDocument()
 
     const emitted = view.emitted('commit') ?? []
     expect(emitted).toHaveLength(0)

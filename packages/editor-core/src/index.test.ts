@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 import { createRenderSceneSnapshot } from './scene/snapshot'
 
@@ -44,9 +48,7 @@ describe('M01 render scene snapshot', () => {
   })
 
   it('rejects invalid geometry and duplicate node IDs', () => {
-    expect(() =>
-      createRenderSceneSnapshot({ width: 0, height: 100, nodes: [] }),
-    ).toThrow(/width/u)
+    expect(() => createRenderSceneSnapshot({ width: 0, height: 100, nodes: [] })).toThrow(/width/u)
 
     const node = {
       kind: 'line' as const,
@@ -66,7 +68,6 @@ describe('M01 render scene snapshot', () => {
         width: 100,
         height: 100,
         nodes: [node, node],
-      }),
-    ).toThrow(/duplicate/u)
+      })).toThrow(/duplicate/u)
   })
 })

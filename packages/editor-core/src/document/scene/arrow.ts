@@ -97,8 +97,7 @@ function arrowCapNodes(
         points: [anchor, left, right],
         fill: cap === 'solidArrow' ? style.color : TRANSPARENT,
         stroke: style.color,
-        strokeWidth:
-          cap === 'solidArrow' ? Math.max(1, style.width / 2) : style.width,
+        strokeWidth: cap === 'solidArrow' ? Math.max(1, style.width / 2) : style.width,
         lineJoin: style.join,
       },
     ]
@@ -154,23 +153,11 @@ export function arrowNodes(layer: ArrowLayer): readonly RenderNode[] {
   const arrow = layer.payload as ArrowLayerPayload
   const style = stroke(arrow.stroke)
   const points = arrowPathPoints(arrow)
-  const bodyPoints = trimArrowBodyPoints(
-    points,
-    arrow.startCap,
-    arrow.endCap,
-    style.width,
-  )
+  const bodyPoints = trimArrowBodyPoints(points, arrow.startCap, arrow.endCap, style.width)
   const angles = arrowEndpointAngles(points)
-  const capSizes = scaledClosedArrowCapSizes(
-    points,
-    arrow.startCap,
-    arrow.endCap,
-    style.width,
-  )
+  const capSizes = scaledClosedArrowCapSizes(points, arrow.startCap, arrow.endCap, style.width)
   return [
-    ...(bodyPoints.length >= 2
-      ? [pathNode(layer, `${layer.id}:body`, bodyPoints, style)]
-      : []),
+    ...(bodyPoints.length >= 2 ? [pathNode(layer, `${layer.id}:body`, bodyPoints, style)] : []),
     ...arrowCapNodes(
       layer,
       `${layer.id}:start-cap`,
@@ -179,9 +166,7 @@ export function arrowNodes(layer: ArrowLayer): readonly RenderNode[] {
       arrow.startCap,
       style,
       bodyPoints[0],
-      arrow.startCap === 'solidArrow' || arrow.startCap === 'triangle'
-        ? capSizes.start
-        : undefined,
+      arrow.startCap === 'solidArrow' || arrow.startCap === 'triangle' ? capSizes.start : undefined,
     ),
     ...arrowCapNodes(
       layer,
@@ -191,9 +176,7 @@ export function arrowNodes(layer: ArrowLayer): readonly RenderNode[] {
       arrow.endCap,
       style,
       bodyPoints.at(-1),
-      arrow.endCap === 'solidArrow' || arrow.endCap === 'triangle'
-        ? capSizes.end
-        : undefined,
+      arrow.endCap === 'solidArrow' || arrow.endCap === 'triangle' ? capSizes.end : undefined,
     ),
   ]
 }

@@ -29,11 +29,19 @@ export function createSpotlightLayer(input: {
   const dimColor = input.dimColor ?? BLACK
   assertUnitColor(dimColor, 'spotlight dimColor')
   const dimOpacity = input.dimOpacity ?? 0.65
-  if (!Number.isFinite(dimOpacity) || dimOpacity < 0 || dimOpacity > 1) {
+  if (
+    !Number.isFinite(dimOpacity) ||
+    dimOpacity < 0 ||
+    dimOpacity > 1
+  ) {
     throw new RangeError('spotlight dimOpacity must be between 0 and 1')
   }
   const feather = input.feather ?? null
-  if (feather !== null && feather !== 'soft' && feather !== 'strong') {
+  if (
+    feather !== null &&
+    feather !== 'soft' &&
+    feather !== 'strong'
+  ) {
     throw new RangeError('spotlight feather preset is invalid')
   }
   return Object.freeze({

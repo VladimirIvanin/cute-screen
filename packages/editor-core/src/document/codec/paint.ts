@@ -14,7 +14,10 @@ import {
   readSha256,
 } from './primitives'
 
-export function parseUnitInterval(value: unknown, field: string): number {
+export function parseUnitInterval(
+  value: unknown,
+  field: string,
+): number {
   const number = readFiniteNumber(value, field)
   if (number < 0 || number > 1) {
     throw new Error(`${field} must be between 0 and 1`)
@@ -22,7 +25,10 @@ export function parseUnitInterval(value: unknown, field: string): number {
   return number
 }
 
-export function parseSrgbColor(value: unknown, field: string): JsonObject {
+export function parseSrgbColor(
+  value: unknown,
+  field: string,
+): JsonObject {
   const input = readJsonObject(value, field)
   assertOnlyFields(input, ['red', 'green', 'blue', 'alpha'], field)
   return Object.freeze({
@@ -33,7 +39,10 @@ export function parseSrgbColor(value: unknown, field: string): JsonObject {
   })
 }
 
-export function parsePointPayload(value: unknown, field: string): JsonObject {
+export function parsePointPayload(
+  value: unknown,
+  field: string,
+): JsonObject {
   const input = readJsonObject(value, field)
   return Object.freeze({
     x: readFiniteNumber(input.x, `${field}.x`),
@@ -41,7 +50,10 @@ export function parsePointPayload(value: unknown, field: string): JsonObject {
   })
 }
 
-export function parseStroke(value: unknown, field: string): JsonObject {
+export function parseStroke(
+  value: unknown,
+  field: string,
+): JsonObject {
   const input = readJsonObject(value, field)
   if (
     input.style !== 'solid' &&
@@ -50,7 +62,11 @@ export function parseStroke(value: unknown, field: string): JsonObject {
   ) {
     throw new Error(`${field}.style is invalid`)
   }
-  if (input.cap !== 'butt' && input.cap !== 'round' && input.cap !== 'square') {
+  if (
+    input.cap !== 'butt' &&
+    input.cap !== 'round' &&
+    input.cap !== 'square'
+  ) {
     throw new Error(`${field}.cap is invalid`)
   }
   if (
@@ -69,7 +85,10 @@ export function parseStroke(value: unknown, field: string): JsonObject {
   })
 }
 
-function parsePaintTransform(value: unknown, field: string): JsonObject {
+function parsePaintTransform(
+  value: unknown,
+  field: string,
+): JsonObject {
   const input = readJsonObject(value, field)
   return Object.freeze({
     scale: readPositiveNumber(input.scale, `${field}.scale`),
@@ -83,16 +102,17 @@ function parseGradientStops(
   value: unknown,
   field: string,
 ): readonly JsonObject[] {
-  if (!Array.isArray(value) || value.length < 2 || value.length > 8) {
+  if (
+    !Array.isArray(value) ||
+    value.length < 2 ||
+    value.length > 8
+  ) {
     throw new Error(`${field} must contain 2 to 8 stops`)
   }
   let previous = -Infinity
   const stops = value.map((stop, index) => {
     const input = readJsonObject(stop, `${field}[${index}]`)
-    const position = parseUnitInterval(
-      input.position,
-      `${field}[${index}].position`,
-    )
+    const position = parseUnitInterval(input.position, `${field}[${index}].position`)
     if (position < previous) throw new Error(`${field} must be ordered`)
     previous = position
     return Object.freeze({
@@ -103,7 +123,10 @@ function parseGradientStops(
   return Object.freeze(stops)
 }
 
-function parseFill(value: unknown, field: string): JsonObject {
+function parseFill(
+  value: unknown,
+  field: string,
+): JsonObject {
   const input = readJsonObject(value, field)
   switch (input.kind) {
     case 'none':
@@ -155,20 +178,18 @@ function parseFill(value: unknown, field: string): JsonObject {
         input.format !== 'webp'
       )
         throw new Error(`${field}.format is invalid`)
-      if (input.fit !== 'repeat' && input.fit !== 'fit' && input.fit !== 'fill')
+      if (
+        input.fit !== 'repeat' &&
+        input.fit !== 'fit' &&
+        input.fit !== 'fill'
+      )
         throw new Error(`${field}.fit is invalid`)
       return Object.freeze({
         kind: 'imageTexture',
         blobHash: readSha256(input.blobHash, `${field}.blobHash`),
         format: input.format,
-        intrinsicWidth: readPositiveNumber(
-          input.intrinsicWidth,
-          `${field}.intrinsicWidth`,
-        ),
-        intrinsicHeight: readPositiveNumber(
-          input.intrinsicHeight,
-          `${field}.intrinsicHeight`,
-        ),
+        intrinsicWidth: readPositiveNumber(input.intrinsicWidth, `${field}.intrinsicWidth`),
+        intrinsicHeight: readPositiveNumber(input.intrinsicHeight, `${field}.intrinsicHeight`),
         fit: input.fit,
         transform: parsePaintTransform(input.transform, `${field}.transform`),
         opacity: parseUnitInterval(input.opacity, `${field}.opacity`),
@@ -191,8 +212,7 @@ export function parseArrowPayload(
   )
     throw new Error(`${field}.path is invalid`)
   const parseCap = (value: unknown, cap: string) => {
-    if (ARROW_CAPS.includes(value as (typeof ARROW_CAPS)[number]))
-      return value as (typeof ARROW_CAPS)[number]
+    if (ARROW_CAPS.includes(value as (typeof ARROW_CAPS)[number])) return value as (typeof ARROW_CAPS)[number]
     throw new Error(`${field}.${cap} is invalid`)
   }
   const startCap = parseCap(input.startCap, 'startCap')
@@ -201,14 +221,12 @@ export function parseArrowPayload(
     throw new Error(`${field}.bend is required for a quadratic path`)
   if (input.path === 'elbow' && input.elbow === undefined)
     throw new Error(`${field}.elbow is required for an elbow path`)
-  if (input.text !== undefined || input.label !== undefined)
-    throw new Error(`${field} connector text is not supported`)
+  if (input.text !== undefined || input.label !== undefined) throw new Error(`${field} connector text is not supported`)
   const elbow =
     input.path === 'elbow'
       ? (() => {
           const route = readJsonObject(input.elbow, `${field}.elbow`)
-          if (route.axis !== 'x' && route.axis !== 'y')
-            throw new Error(`${field}.elbow.axis is invalid`)
+          if (route.axis !== 'x' && route.axis !== 'y') throw new Error(`${field}.elbow.axis is invalid`)
           return Object.freeze({
             axis: route.axis,
             offset: readFiniteNumber(route.offset, `${field}.elbow.offset`),
@@ -217,27 +235,15 @@ export function parseArrowPayload(
       : undefined
   return Object.freeze({
     path: input.path,
-    start: parsePointPayload(
-      input.start,
-      `${field}.start`,
-    ) as ArrowLayerPayload['start'],
-    end: parsePointPayload(
-      input.end,
-      `${field}.end`,
-    ) as ArrowLayerPayload['end'],
+    start: parsePointPayload(input.start, `${field}.start`) as ArrowLayerPayload['start'],
+    end: parsePointPayload(input.end, `${field}.end`) as ArrowLayerPayload['end'],
     ...(input.path !== 'quadratic'
       ? {}
       : {
-          bend: parsePointPayload(
-            input.bend,
-            `${field}.bend`,
-          ) as ArrowLayerPayload['start'],
+          bend: parsePointPayload(input.bend, `${field}.bend`) as ArrowLayerPayload['start'],
         }),
     ...(elbow === undefined ? {} : { elbow }),
-    stroke: parseStroke(
-      input.stroke,
-      `${field}.stroke`,
-    ) as ArrowLayerPayload['stroke'],
+    stroke: parseStroke(input.stroke, `${field}.stroke`) as ArrowLayerPayload['stroke'],
     startCap,
     endCap,
   })
@@ -248,22 +254,12 @@ export function parseShapePayload(
   field: string,
 ): ShapeLayerPayload {
   const input = readJsonObject(value, field)
-  if (
-    !['rectangle', 'circle', 'oval', 'diamond', 'star'].includes(
-      String(input.shape),
-    )
-  )
+  if (!['rectangle', 'circle', 'oval', 'diamond', 'star'].includes(String(input.shape)))
     throw new Error(`${field}.shape is invalid`)
   const fill = parseFill(input.fill, `${field}.fill`)
-  const cornerRadius = readFiniteNumber(
-    input.cornerRadius,
-    `${field}.cornerRadius`,
-  )
+  const cornerRadius = readFiniteNumber(input.cornerRadius, `${field}.cornerRadius`)
   const starPoints = readFiniteNumber(input.starPoints, `${field}.starPoints`)
-  const starInnerRatio = parseUnitInterval(
-    input.starInnerRatio,
-    `${field}.starInnerRatio`,
-  )
+  const starInnerRatio = parseUnitInterval(input.starInnerRatio, `${field}.starInnerRatio`)
   if (
     cornerRadius < 0 ||
     starPoints < 3 ||
@@ -274,10 +270,7 @@ export function parseShapePayload(
   return Object.freeze({
     shape: input.shape as ShapeLayerPayload['shape'],
     fill: fill as ShapeLayerPayload['fill'],
-    stroke: parseStroke(
-      input.stroke,
-      `${field}.stroke`,
-    ) as ShapeLayerPayload['stroke'],
+    stroke: parseStroke(input.stroke, `${field}.stroke`) as ShapeLayerPayload['stroke'],
     cornerRadius,
     starPoints,
     starInnerRatio,
@@ -290,17 +283,13 @@ export function parseSampledPayload(
   marker: boolean,
 ): PencilLayerPayload | MarkerLayerPayload {
   const input = readJsonObject(value, field)
-  if (!Array.isArray(input.points) || input.points.length === 0)
-    throw new Error(`${field}.points must not be empty`)
+  if (!Array.isArray(input.points) || input.points.length === 0) throw new Error(`${field}.points must not be empty`)
   const points = input.points.map((point, index) => {
     const parsed = readJsonObject(point, `${field}.points[${index}]`)
     return Object.freeze({
       x: readFiniteNumber(parsed.x, `${field}.points[${index}].x`),
       y: readFiniteNumber(parsed.y, `${field}.points[${index}].y`),
-      pressure: parseUnitInterval(
-        parsed.pressure,
-        `${field}.points[${index}].pressure`,
-      ),
+      pressure: parseUnitInterval(parsed.pressure, `${field}.points[${index}].pressure`),
     })
   })
   const common = {
@@ -310,7 +299,6 @@ export function parseSampledPayload(
     smoothing: parseUnitInterval(input.smoothing, `${field}.smoothing`),
   }
   if (marker) return Object.freeze(common) as MarkerLayerPayload
-  if (!['pen', 'pencil', 'brush'].includes(String(input.brush)))
-    throw new Error(`${field}.brush is invalid`)
+  if (!['pen', 'pencil', 'brush'].includes(String(input.brush))) throw new Error(`${field}.brush is invalid`)
   return Object.freeze({ ...common, brush: input.brush }) as PencilLayerPayload
 }

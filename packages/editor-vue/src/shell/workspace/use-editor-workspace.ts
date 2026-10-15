@@ -1,6 +1,15 @@
-import { computed, nextTick } from 'vue'
+import {
+  computed,
+  nextTick,
+} from 'vue'
 import { storeToRefs } from 'pinia'
-import { darkTheme, dateEnUS, dateRuRU, enUS, ruRU } from 'naive-ui'
+import {
+  darkTheme,
+  dateEnUS,
+  dateRuRU,
+  enUS,
+  ruRU,
+} from 'naive-ui'
 import { t } from '../i18n'
 import { createBrowserDrawingToolPreferencesStorage } from '../preferences'
 import { useEditorShellStore } from '../store'
@@ -9,6 +18,8 @@ import {
   type ImageLayer,
 } from '@cute-screen/editor-renderer'
 import type { ResolvedEditorShellProps } from '../contracts'
+import { useToolSettingsMemory } from './tool-settings-memory'
+import { createSelectionActions } from './selection-actions-controller'
 import { createKeyboardController } from './keyboard-controller'
 import { createSessionController } from './session-controller'
 import { createWorkspaceState } from './workspace-state'
@@ -22,19 +33,13 @@ function createWorkspaceCore(props: ResolvedEditorShellProps) {
   const store = useEditorShellStore()
   const state = storeToRefs(store)
   const workspace = createWorkspaceState()
-  const naiveTheme = computed(() =>
-    state.resolvedTheme.value === 'dark' ? darkTheme : null,
-  )
+  const naiveTheme = computed(() => (state.resolvedTheme.value === 'dark' ? darkTheme : null))
   const naiveLocale = computed(() => (store.locale === 'ru' ? ruRU : enUS))
-  const naiveDateLocale = computed(() =>
-    store.locale === 'ru' ? dateRuRU : dateEnUS,
-  )
+  const naiveDateLocale = computed(() => (store.locale === 'ru' ? dateRuRU : dateEnUS))
   const baseImageLayer = computed(() =>
     workspace.activeDocument.value?.layers.find(
-      (layer): layer is ImageLayer =>
-        layer.kind === 'image' && layer.payload.role === 'base',
-    ),
-  )
+      (layer): layer is ImageLayer => layer.kind === 'image' && layer.payload.role === 'base',
+    ))
   const sceneTexturesReady = computed(() => {
     const document = workspace.activeDocument.value
     if (!document) return false
@@ -50,12 +55,14 @@ function createWorkspaceCore(props: ResolvedEditorShellProps) {
   const environment = createWorkspaceEnvironment(props)
   const saveDrawingPreferences = (value: DrawingToolPreferencesV2) =>
     createBrowserDrawingToolPreferencesStorage(environment.storage).save(value)
+  const memory = useToolSettingsMemory(workspace, store, environment.storage)
   const bindings = createWorkspaceBindings({
     props,
     store,
     workspace,
     translate,
     saveDrawingPreferences,
+    rememberTextDefaults: memory.rememberTextDefaults,
   })
   const session = createSessionController({
     props,
@@ -64,6 +71,17 @@ function createWorkspaceCore(props: ResolvedEditorShellProps) {
     textDraft: workspace.textDraft,
     translate,
     resolveDocumentTextures: bindings.resolveDocumentTextures,
+  })
+  const selectionActions = createSelectionActions({
+    props,
+    store,
+    document: workspace.activeDocument,
+    error: workspace.toolError,
+    rememberedStyles: workspace.rememberedStyles,
+    paste: bindings.pasteNativeClipboard,
+    undo: session.undoDocument,
+    redo: session.redoDocument,
+    fit: () => store.enableFit(),
   })
   const { onKeydown } = createKeyboardController({
     props,
@@ -76,6 +94,7 @@ function createWorkspaceCore(props: ResolvedEditorShellProps) {
     pasteNativeClipboard: bindings.pasteNativeClipboard,
     reorderLayer: bindings.reorderLayer,
     moveLayer: bindings.moveLayer,
+    selectionActions,
   })
   return {
     props,
@@ -85,6 +104,8 @@ function createWorkspaceCore(props: ResolvedEditorShellProps) {
     environment,
     bindings,
     session,
+    selectionActions,
+    memory,
     onKeydown,
     naiveTheme,
     naiveLocale,
@@ -95,9 +116,7 @@ function createWorkspaceCore(props: ResolvedEditorShellProps) {
   }
 }
 
-function createWorkspaceUiActions(
-  core: ReturnType<typeof createWorkspaceCore>,
-) {
+function createWorkspaceUiActions(core: ReturnType<typeof createWorkspaceCore>) {
   async function copyCaptureFallback(): Promise<void> {
     const command = core.props.captureFallbackCommand
     if (!command || !navigator.clipboard) return
@@ -125,11 +144,7 @@ function createWorkspaceUiActions(
   }
   function fitCanvas(): void {
     core.store.enableFit()
-    void nextTick(() =>
-      window.requestAnimationFrame(() =>
-        core.workspace.canvasViewport.value?.refitCanvas(),
-      ),
-    )
+    void nextTick(() => window.requestAnimationFrame(() => core.workspace.canvasViewport.value?.refitCanvas()))
   }
   return { copyCaptureFallback, dismissCaptureFallback, fitCanvas }
 }
@@ -144,6 +159,8 @@ function createWorkspaceViewModel(
     naiveLocale: core.naiveLocale,
     naiveDateLocale: core.naiveDateLocale,
     store: core.store,
+    ...core.selectionActions,
+    ...core.memory,
     state: core.state,
     translate: core.translate,
     fallbackCopied: workspace.fallbackCopied,
@@ -153,8 +170,11 @@ function createWorkspaceViewModel(
     tools: bindings.tools,
     selectTool: bindings.selectTool,
     openToolConfigure: bindings.openToolConfigure,
+    closeToolConfigure: bindings.closeToolConfigure,
     activeDocument: workspace.activeDocument,
     contextSchema: bindings.contextSchema,
+    selectionSchema: bindings.selectionSchema,
+    toolConfigureSchema: bindings.toolConfigureSchema,
     drawingPreferences: workspace.drawingPreferences,
     onContextAction: bindings.onContextAction,
     onContextChange: bindings.onContextChange,
@@ -168,6 +188,7 @@ function createWorkspaceViewModel(
     drawingDefaults: workspace.drawingDefaults,
     precisionDefaults: workspace.precisionDefaults,
     textDefaults: workspace.textDefaults,
+    calloutStroke: workspace.calloutStroke,
     textFormatting: workspace.textFormatting,
     floatingTextToolbarSchema: bindings.floatingTextToolbarSchema,
     floatingArrowToolbarSchema: bindings.floatingArrowToolbarSchema,
@@ -190,6 +211,7 @@ function createWorkspaceViewModel(
     onLayerReorderTo: bindings.onLayerReorderTo,
     toolConfigureArrowSchema: bindings.toolConfigureArrowSchema,
     toolConfigureLayout: workspace.toolConfigureLayout,
+    toolConfigure: workspace.toolConfigure,
     onToolConfigureChange: bindings.onToolConfigureChange,
     eyedropperFeedback: workspace.eyedropperFeedback,
     eyedropperColor: workspace.eyedropperColor,
@@ -214,6 +236,7 @@ export function useEditorWorkspace(props: ResolvedEditorShellProps) {
     locale: core.state.locale,
     onKeydown: core.onKeydown,
     onToolConfigureOutsidePointer: core.bindings.onToolConfigureOutsidePointer,
+    onToolConfigureKeydown: core.bindings.onToolConfigureKeydown,
     loadFixture: core.session.loadFixture,
     applyDocumentSnapshot: core.session.applyDocumentSnapshot,
     resolveDocumentTextures: core.bindings.resolveDocumentTextures,

@@ -1,5 +1,15 @@
-import { fireEvent, render, screen, within } from '@testing-library/vue'
-import { describe, expect, it, vi } from 'vitest'
+import {
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/vue'
+import {
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 import EditorShell from '../../../packages/editor-vue/src/shell/components/EditorShell.vue'
 import {
   assertLocaleCompleteness,
@@ -19,17 +29,11 @@ describe('M02 editor shell', () => {
     await fireEvent.click(screen.getByRole('menuitemradio', { name: 'RU' }))
 
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
-    expect(
-      screen.getByRole('complementary', { name: 'Инструменты' }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole('main', { name: 'Область холста' }),
-    ).toBeInTheDocument()
+    expect(screen.getByRole('complementary', { name: 'Инструменты' })).toBeInTheDocument()
+    expect(screen.getByRole('main', { name: 'Область холста' })).toBeInTheDocument()
 
     await fireEvent.click(screen.getByRole('button', { name: 'Снимок' }))
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'Захват станет доступен после подключения native backend.',
-    )
+    expect(screen.getByRole('alert')).toHaveTextContent('Захват станет доступен после подключения native backend.')
   })
 
   it('docks filmstrip, tool rail and zoom in one bottom chrome row', async () => {
@@ -41,13 +45,9 @@ describe('M02 editor shell', () => {
 
     const chrome = view.container.querySelector('.cs-bottom-chrome')
     expect(chrome).toBeTruthy()
-    expect(
-      chrome?.querySelector('.cs-bottom-chrome-center .cs-toolrail'),
-    ).toBeTruthy()
+    expect(chrome?.querySelector('.cs-bottom-chrome-center .cs-toolrail')).toBeTruthy()
     expect(chrome?.querySelector('.cs-zoom-controls')).toBeTruthy()
-    expect(
-      view.container.querySelector('.cs-workbench > .cs-toolrail'),
-    ).toBeNull()
+    expect(view.container.querySelector('.cs-workbench > .cs-toolrail')).toBeNull()
     await vi.waitFor(() => {
       expect(chrome?.querySelector('.cs-filmstrip')).toBeTruthy()
     })
@@ -59,9 +59,7 @@ describe('M02 editor shell', () => {
       global: { plugins: [createEditorShellPinia()] },
     })
 
-    expect(view.container.querySelector('.cs-editor-shell')).toHaveClass(
-      'is-quick-mode',
-    )
+    expect(view.container.querySelector('.cs-editor-shell')).toHaveClass('is-quick-mode')
 
     const rail = screen.getByRole('complementary', { name: 'Tools' })
     const labels = within(rail)
@@ -83,12 +81,8 @@ describe('M02 editor shell', () => {
       'Ruler',
       'Loupe',
     ])
-    expect(
-      screen.queryByRole('button', { name: 'Crop' }),
-    ).not.toBeInTheDocument()
-    expect(
-      screen.queryByRole('button', { name: 'Layers' }),
-    ).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Crop' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Layers' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Redo' })).toBeInTheDocument()
   })

@@ -1,4 +1,7 @@
-import type { RenderNode, RenderSceneSnapshot } from '@cute-screen/editor-core'
+import type {
+  RenderNode,
+  RenderSceneSnapshot,
+} from '@cute-screen/editor-core'
 import { scaledOutputSize } from '../../precision-rendering'
 import type { InvalidationReason } from '../../scheduler'
 import type {
@@ -22,9 +25,7 @@ export class Canvas2DRenderer implements Renderer {
   readonly backend = 'canvas2d' as const
   readonly #now: () => number
   readonly #exportCanvas?: Canvas2DRendererOptions['exportCanvas']
-  readonly #resolveFontFamily: NonNullable<
-    Canvas2DRendererOptions['resolveFontFamily']
-  >
+  readonly #resolveFontFamily: NonNullable<Canvas2DRendererOptions['resolveFontFamily']>
   readonly #resources = new Map<string, Canvas2DImageResource>()
   #stack: CanvasStack | undefined
   #scene: RenderSceneSnapshot | undefined
@@ -34,8 +35,7 @@ export class Canvas2DRenderer implements Renderer {
   constructor(options: Canvas2DRendererOptions = {}) {
     this.#now = options.now ?? (() => performance.now())
     this.#exportCanvas = options.exportCanvas
-    this.#resolveFontFamily =
-      options.resolveFontFamily ?? ((_text, style) => style.fontFamily)
+    this.#resolveFontFamily = options.resolveFontFamily ?? ((_text, style) => style.fontFamily)
   }
 
   async initialize(stack: CanvasStack): Promise<void> {
@@ -50,7 +50,9 @@ export class Canvas2DRenderer implements Renderer {
     this.#assertActive()
     const resource: Canvas2DImageResource = {
       ...input,
-      dispose: () => this.#resources.delete(input.id),
+      dispose: () => {
+        if (this.#resources.get(input.id) === resource) this.#resources.delete(input.id)
+      },
     }
     this.#resources.set(resource.id, resource)
     return resource
@@ -71,11 +73,7 @@ export class Canvas2DRenderer implements Renderer {
     const startedAt = this.#now()
     const scene = this.#scene!
     const stack = this.#stack!
-    if (
-      reasons.some((reason) =>
-        ['scene', 'viewport', 'resource', 'export'].includes(reason),
-      )
-    ) {
+    if (reasons.some((reason) => ['scene', 'viewport', 'resource', 'export'].includes(reason))) {
       this.#drawScene(stack.scene, scene)
     }
     if (reasons.includes('overlay') || reasons.includes('viewport')) {
@@ -86,12 +84,7 @@ export class Canvas2DRenderer implements Renderer {
       context.setTransform(1, 0, 0, 1, 0, 0)
       context.clearRect(0, 0, stack.overlay.width, stack.overlay.height)
       context.setTransform(1, 0, 0, 1, -bounds.x, -bounds.y)
-      drawNodes2D(
-        context,
-        this.#overlay,
-        this.#resourceSources(),
-        this.#resolveFontFamily,
-      )
+      drawNodes2D(context, this.#overlay, this.#resourceSources(), this.#resolveFontFamily)
     }
     return {
       backend: this.backend,
@@ -139,7 +132,10 @@ export class Canvas2DRenderer implements Renderer {
     )
   }
 
-  #newCanvas(width: number, height: number): Canvas2DLike {
+  #newCanvas(
+    width: number,
+    height: number,
+  ): Canvas2DLike {
     return (this.#exportCanvas ?? defaultCanvas)(width, height)
   }
 
@@ -155,12 +151,7 @@ export class Canvas2DRenderer implements Renderer {
   }
 
   #resourceSources(): ReadonlyMap<string, ImageResourceInput['source']> {
-    return new Map(
-      [...this.#resources.entries()].map(([id, resource]) => [
-        id,
-        resource.source,
-      ]),
-    )
+    return new Map([...this.#resources.entries()].map(([id, resource]) => [id, resource.source]))
   }
 
   #assertActive(): void {

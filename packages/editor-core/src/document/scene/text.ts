@@ -4,8 +4,16 @@ import {
   calloutTextLayout,
 } from '../../callout-geometry'
 import type { RenderNode } from '../../scene/contracts'
-import type { LayerNode, RichTextContent } from '../types'
-import { TEXT_BLACK, color, pathNode, stroke } from './shared'
+import type {
+  LayerNode,
+  RichTextContent,
+} from '../types'
+import {
+  TEXT_BLACK,
+  color,
+  pathNode,
+  stroke,
+} from './shared'
 
 function richTextNode(
   id: string,
@@ -16,10 +24,7 @@ function richTextNode(
     width: number
     height: number
   }>,
-  layer: Extract<
-    LayerNode,
-    { readonly kind: 'text' | 'numberedMarker' | 'callout' }
-  >,
+  layer: Extract<LayerNode, { readonly kind: 'text' | 'numberedMarker' | 'callout' }>,
   verticalAlign?: 'visualCenter',
 ): Extract<RenderNode, { readonly kind: 'text' }> {
   return {
@@ -28,9 +33,7 @@ function richTextNode(
     text: content.text,
     ...geometry,
     wrap: content.wrap,
-    ...(content.fixedWidth === undefined
-      ? {}
-      : { fixedWidth: content.fixedWidth }),
+    ...(content.fixedWidth === undefined ? {} : { fixedWidth: content.fixedWidth }),
     runs: content.spans.map((span) => ({
       start: span.start,
       end: span.end,
@@ -50,9 +53,7 @@ function richTextNode(
   }
 }
 
-export function textNodes(
-  layer: Extract<LayerNode, { readonly kind: 'text' }>,
-): readonly RenderNode[] {
+export function textNodes(layer: Extract<LayerNode, { readonly kind: 'text' }>): readonly RenderNode[] {
   const bounds = layer.localBounds
   const { content } = layer.payload
   const text = richTextNode(
@@ -80,11 +81,7 @@ export function textNodes(
       id: `${layer.id}:background`,
       kind: 'rect',
       ...backgroundBounds,
-      cornerRadius: Math.min(
-        background.radius,
-        backgroundBounds.width / 2,
-        backgroundBounds.height / 2,
-      ),
+      cornerRadius: Math.min(background.radius, backgroundBounds.width / 2, backgroundBounds.height / 2),
       rotation: layer.transform.rotation,
       opacity: 1,
       visible: layer.visible,
@@ -146,16 +143,8 @@ export function numberedMarkerNodes(
                     const outer = index % 2 === 0
                     const angle = -Math.PI / 2 + (Math.PI * index) / 5
                     return {
-                      x:
-                        centerX +
-                        Math.cos(angle) *
-                          (bounds.width / 2) *
-                          (outer ? 1 : 0.45),
-                      y:
-                        centerY +
-                        Math.sin(angle) *
-                          (bounds.height / 2) *
-                          (outer ? 1 : 0.45),
+                      x: centerX + Math.cos(angle) * (bounds.width / 2) * (outer ? 1 : 0.45),
+                      y: centerY + Math.sin(angle) * (bounds.height / 2) * (outer ? 1 : 0.45),
                     }
                   }),
           }
@@ -171,9 +160,7 @@ export function numberedMarkerNodes(
   ]
 }
 
-export function calloutNodes(
-  layer: Extract<LayerNode, { readonly kind: 'callout' }>,
-): readonly RenderNode[] {
+export function calloutNodes(layer: Extract<LayerNode, { readonly kind: 'callout' }>): readonly RenderNode[] {
   const payload = layer.payload
   if (
     payload.target === undefined ||
@@ -193,12 +180,7 @@ export function calloutNodes(
   const markerRadius = calloutMarkerRadius(payload.stroke.width)
   const markerFill = color(payload.stroke.color)
   const pathPoints = calloutPathPoints(payload)
-  const connector = pathNode(
-    layer,
-    `${layer.id}:connector`,
-    pathPoints,
-    strokeStyle,
-  )
+  const connector = pathNode(layer, `${layer.id}:connector`, pathPoints, strokeStyle)
   const targetMarker: RenderNode = {
     ...common,
     id: `${layer.id}:target-marker`,
@@ -244,19 +226,13 @@ export function calloutNodes(
     y: layer.transform.translateY + bounds.y,
     width: bounds.width,
     height: bounds.height,
-    cornerRadius: Math.min(
-      background.radius,
-      bounds.width / 2,
-      bounds.height / 2,
-    ),
+    cornerRadius: Math.min(background.radius, bounds.width / 2, bounds.height / 2),
     fill: color(background.color),
   }
   return [connector, targetMarker, labelMarker, backgroundNode, text]
 }
 
-function calloutTextRectFromLayout(
-  layout: ReturnType<typeof calloutTextLayout>,
-): {
+function calloutTextRectFromLayout(layout: ReturnType<typeof calloutTextLayout>): {
   readonly x: number
   readonly y: number
   readonly width: number

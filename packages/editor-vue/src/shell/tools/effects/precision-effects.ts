@@ -1,4 +1,7 @@
-import type { Ref, ShallowRef } from 'vue'
+import type {
+  Ref,
+  ShallowRef,
+} from 'vue'
 import type { EditorDocumentV1 } from '@cute-screen/editor-renderer'
 import type { ResolvedEditorShellProps } from '../../contracts'
 import type { PrecisionToolDefaults } from '../../types'
@@ -18,9 +21,7 @@ export interface PrecisionEffectsContext {
 }
 
 export function precisionToolForControl(id: string): PrecisionTool | undefined {
-  return (['censor', 'spotlight', 'ruler', 'loupe'] as const).find((tool) =>
-    id.startsWith(tool),
-  )
+  return (['censor', 'spotlight', 'ruler', 'loupe'] as const).find((tool) => id.startsWith(tool))
 }
 
 function resolvePrecisionEffect(
@@ -33,7 +34,11 @@ function resolvePrecisionEffect(
   const document = context.activeDocument.value
   const candidate = context.selectedPrecisionLayer()
   const selected = candidate?.kind === tool ? candidate : undefined
-  if (!document || context.props.readOnlyDocument || selected?.locked) {
+  if (
+    !document ||
+    context.props.readOnlyDocument ||
+    selected?.locked
+  ) {
     return { kind: 'handled' }
   }
   const common = { defaults: context.precisionDefaults.value, document }
@@ -62,7 +67,10 @@ function resolvePrecisionEffect(
 }
 
 export function createPrecisionEffects(context: PrecisionEffectsContext) {
-  function applyPrecisionChange(id: string, value: string): boolean {
+  function applyPrecisionChange(
+    id: string,
+    value: string,
+  ): boolean {
     const effect = resolvePrecisionEffect(context, id, value)
     if (effect.kind === 'unhandled') return false
     if (effect.kind === 'defaults') {

@@ -1,4 +1,7 @@
-import { markRaw, nextTick } from 'vue'
+import {
+  markRaw,
+  nextTick,
+} from 'vue'
 import {
   createCalloutLayer,
   createTextCommitCommand,
@@ -61,18 +64,11 @@ export interface TextEditorContext {
     width: number
     height: number
   }
-  readonly canvasPoint: (event: {
-    readonly clientX: number
-    readonly clientY: number
-  }) => CanvasPoint | undefined
+  readonly canvasPoint: (event: { readonly clientX: number; readonly clientY: number }) => CanvasPoint | undefined
   readonly resolveCalloutStroke: () => StrokeStyle
   readonly updateToolbarLayout: () => void
   readonly emitEditing: () => void
-  readonly recordCycle: (cycle: {
-    readonly key: string
-    readonly at: number
-    readonly index: number
-  }) => void
+  readonly recordCycle: (cycle: { readonly key: string; readonly at: number; readonly index: number }) => void
 }
 
 export class TextEditorController {
@@ -85,24 +81,14 @@ export class TextEditorController {
 
   start(input: TextEditorStartInput): void {
     const { props, editingText } = this.#context
-    const bounds = input.existing
-      ? this.#context.layerBounds(input.existing)
-      : undefined
+    const bounds = input.existing ? this.#context.layerBounds(input.existing) : undefined
     const defaults = copyTextStyle(props.textDefaults ?? DEFAULT_TEXT_TOOL)
     const fixedWidth =
       input.fixedWidth ??
-      (input.existing?.kind === 'text'
-        ? input.existing.payload.content.wrap === 'fixedWidth'
-        : false)
+      (input.existing?.kind === 'text' ? input.existing.payload.content.wrap === 'fixedWidth' : false)
     const existingContent =
-      input.existing?.kind === 'numberedMarker'
-        ? input.existing.payload.label
-        : input.existing?.payload.content
-    const initialContent = this.#initialContent(
-      existingContent,
-      fixedWidth,
-      input.width,
-    )
+      input.existing?.kind === 'numberedMarker' ? input.existing.payload.label : input.existing?.payload.content
+    const initialContent = this.#initialContent(existingContent, fixedWidth, input.width)
     editingText.value = {
       id: input.existing?.id ?? crypto.randomUUID(),
       origin: input.origin,
@@ -124,12 +110,8 @@ export class TextEditorController {
       background: this.#initialBackground(input.existing, defaults.background),
       kind: input.existing?.kind ?? input.kind ?? 'text',
       ...(input.existing === undefined ? {} : { existing: input.existing }),
-      ...(input.calloutDraft === undefined
-        ? {}
-        : { calloutDraft: input.calloutDraft }),
-      ...(input.calloutStroke === undefined
-        ? {}
-        : { calloutStroke: input.calloutStroke }),
+      ...(input.calloutDraft === undefined ? {} : { calloutDraft: input.calloutDraft }),
+      ...(input.calloutStroke === undefined ? {} : { calloutStroke: input.calloutStroke }),
     }
     this.#context.emitEditing()
     void nextTick(() => this.#focus())
@@ -150,11 +132,7 @@ export class TextEditorController {
     const editor = textEditor.value
     const editing = editingText.value
     if (!editor || !editing) return
-    renderRichTextProjection(
-      editor,
-      editing.controller.state,
-      (props.zoom ?? 100) / 100,
-    )
+    renderRichTextProjection(editor, editing.controller.state, (props.zoom ?? 100) / 100)
     restoreRichTextDomSelection(editor, editing.controller.state.selection)
     void nextTick(this.#context.updateToolbarLayout)
   }
@@ -164,10 +142,7 @@ export class TextEditorController {
     const editing = editingText.value
     const editor = textEditor.value
     if (!editing || !editor) return
-    const result = editing.controller.reconcileBrowserText(
-      this.#readText(),
-      readRichTextDomSelection(editor),
-    )
+    const result = editing.controller.reconcileBrowserText(this.#readText(), readRichTextDomSelection(editor))
     if (result === 'applied') this.renderProjection()
     this.#context.emitEditing()
   }
@@ -181,10 +156,7 @@ export class TextEditorController {
     const editing = editingText.value
     const editor = textEditor.value
     if (!editing || !editor) return
-    editing.controller.compositionEnd(
-      this.#readText(),
-      readRichTextDomSelection(editor),
-    )
+    editing.controller.compositionEnd(this.#readText(), readRichTextDomSelection(editor))
     this.renderProjection()
     this.#context.emitEditing()
   }
@@ -205,10 +177,7 @@ export class TextEditorController {
     this.syncSelection()
     event.preventDefault()
     event.clipboardData.clearData()
-    event.clipboardData.setData(
-      'text/plain',
-      editing.controller.selectedPlainText(),
-    )
+    event.clipboardData.setData('text/plain', editing.controller.selectedPlainText())
   }
 
   cut(event: ClipboardEvent): void {
@@ -221,8 +190,7 @@ export class TextEditorController {
   }
 
   blur(event: FocusEvent): void {
-    const movedIntoToolbar =
-      this.#toolbarPointerDown || isFloatingToolbarTarget(event.relatedTarget)
+    const movedIntoToolbar = this.#toolbarPointerDown || isFloatingToolbarTarget(event.relatedTarget)
     window.setTimeout(() => {
       if (!this.#context.editingText.value) return
       const active = document.activeElement
@@ -247,27 +215,18 @@ export class TextEditorController {
     this.#context.emitEditing()
     const content = editing.controller.state.content
     const style = content.spans[0] ?? editing.controller.state.typingStyle
-    const paragraph =
-      content.paragraphs[0] ?? editing.controller.state.paragraphStyle
+    const paragraph = content.paragraphs[0] ?? editing.controller.state.paragraphStyle
     const existing = editing.existing
     if (content.text.length === 0) {
       if (!existing) return
-      const index = props.document?.layers.findIndex(
-        (layer) => layer.id === existing.id,
-      )
+      const index = props.document?.layers.findIndex((layer) => layer.id === existing.id)
       if (index === undefined || index < 0) return
-      emit(
-        'documentCommand',
-        createTextCommitCommand({ existing, next: null, index }),
-      )
+      emit('documentCommand', createTextCommitCommand({ existing, next: null, index }))
       return
     }
     const next = this.#committedLayer(editing, style, paragraph.alignment)
     if (!next) return
-    emit(
-      'documentCommand',
-      createTextCommitCommand(existing ? { existing, next } : { next }),
-    )
+    emit('documentCommand', createTextCommitCommand(existing ? { existing, next } : { next }))
   }
 
   cancel(): void {
@@ -284,7 +243,11 @@ export class TextEditorController {
       this.cancel()
       return
     }
-    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+    if (
+      (event.metaKey ||
+        event.ctrlKey) &&
+        event.key === 'Enter'
+    ) {
       event.preventDefault()
       event.stopPropagation()
       this.commit()
@@ -303,8 +266,7 @@ export class TextEditorController {
   beforeInput(event: InputEvent): void {
     if (this.#context.editingText.value?.controller.composing) return
     const key =
-      event.inputType === 'insertParagraph' ||
-      event.inputType === 'insertLineBreak'
+      event.inputType === 'insertParagraph' || event.inputType === 'insertLineBreak'
         ? 'Enter'
         : event.inputType === 'deleteContentBackward'
           ? 'Backspace'
@@ -326,9 +288,7 @@ export class TextEditorController {
     const text = props.document.layers.find(
       (layer) =>
         layer.id === hits[0]?.nodeId &&
-        (layer.kind === 'text' ||
-          layer.kind === 'callout' ||
-          layer.kind === 'numberedMarker'),
+        (layer.kind === 'text' || layer.kind === 'callout' || layer.kind === 'numberedMarker'),
     )
     if (
       text?.kind === 'text' ||
@@ -349,9 +309,7 @@ export class TextEditorController {
     }
     if (hits.length < 2) return
     const key = hits.map((hit) => hit.nodeId).join(':')
-    const current = hits.findIndex(
-      (hit) => hit.nodeId === props.selectedLayerId,
-    )
+    const current = hits.findIndex((hit) => hit.nodeId === props.selectedLayerId)
     const index = current < 0 ? 0 : (current + 1) % hits.length
     this.#context.recordCycle({ key, at: performance.now(), index })
     emit('selectLayer', hits[index]!.nodeId, event.metaKey || event.ctrlKey)
@@ -372,12 +330,7 @@ export class TextEditorController {
   }
 
   #defaultWidth(): number {
-    return Math.max(
-      160,
-      this.#context.props.canvas?.width
-        ? this.#context.props.canvas.width / 3
-        : 160,
-    )
+    return Math.max(160, this.#context.props.canvas?.width ? this.#context.props.canvas.width / 3 : 160)
   }
 
   #initialContent(
@@ -454,9 +407,7 @@ export class TextEditorController {
       italic: style.italic,
       strikethrough: style.strikethrough,
       alignment,
-      listKind:
-        content.paragraphs[0]?.listKind ??
-        editing.controller.state.paragraphStyle.listKind,
+      listKind: content.paragraphs[0]?.listKind ?? editing.controller.state.paragraphStyle.listKind,
       ...(editing.fixedWidth ? { fixedWidth: editing.width } : {}),
       color: style.color,
       background: editing.background,
@@ -507,9 +458,7 @@ export class TextEditorController {
   #readText(): string {
     const editor = this.#context.textEditor.value
     if (!editor) {
-      return (
-        this.#context.editingText.value?.controller.state.content.text ?? ''
-      )
+      return this.#context.editingText.value?.controller.state.content.text ?? ''
     }
     return readRichTextProjection(editor)
   }

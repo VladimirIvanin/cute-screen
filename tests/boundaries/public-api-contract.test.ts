@@ -1,6 +1,11 @@
 import { readFile } from 'node:fs/promises'
 
-import { describe, expect, expectTypeOf, it } from 'vitest'
+import {
+  describe,
+  expect,
+  expectTypeOf,
+  it,
+} from 'vitest'
 
 import type {
   CaptureOutcomeV2 as CompatibilityCaptureOutcomeV2,

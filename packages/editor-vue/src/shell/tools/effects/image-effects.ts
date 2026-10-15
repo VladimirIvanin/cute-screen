@@ -1,11 +1,13 @@
 import type { Ref } from 'vue'
-import type { EditorDocumentV1, ImageLayer } from '@cute-screen/editor-renderer'
+import type {
+  EditorDocumentV1,
+  ImageLayer,
+} from '@cute-screen/editor-renderer'
 import type { ResolvedEditorShellProps } from '../../contracts'
 import type { ToolSettingsEffect } from './contracts'
 import { parseHexColor } from './color'
 
-type ImageControlId =
-  'imageRadius' | 'imageBorderColor' | 'imageBorderWidth' | 'imageOpacity'
+type ImageControlId = 'imageRadius' | 'imageBorderColor' | 'imageBorderWidth' | 'imageOpacity'
 
 const IMAGE_CONTROL_IDS = new Set<ImageControlId>([
   'imageRadius',
@@ -21,12 +23,8 @@ export interface ImageEffectsContext {
 }
 
 function selectedImage(context: ImageEffectsContext): ImageLayer | undefined {
-  const layer = context.activeDocument.value?.layers.find(
-    (candidate) => candidate.id === context.selectedLayerId.value,
-  )
-  return layer?.kind === 'image' && layer.payload.role === 'content'
-    ? layer
-    : undefined
+  const layer = context.activeDocument.value?.layers.find((candidate) => candidate.id === context.selectedLayerId.value)
+  return layer?.kind === 'image' && layer.payload.role === 'content' ? layer : undefined
 }
 
 function updatedImage(
@@ -44,28 +42,27 @@ function updatedImage(
   }
   if (id === 'imageRadius') {
     const radius = Number(value)
-    const maxRadius =
-      Math.min(image.localBounds?.width ?? 0, image.localBounds?.height ?? 0) /
-      2
+    const maxRadius = Math.min(image.localBounds?.width ?? 0, image.localBounds?.height ?? 0) / 2
     return Number.isFinite(radius) && radius >= 0 && radius <= maxRadius
       ? { ...image, payload: { ...image.payload, radius } }
       : undefined
   }
   if (id === 'imageOpacity') {
     const opacity = Number(value)
-    return Number.isFinite(opacity) && opacity >= 0 && opacity <= 1
-      ? { ...image, opacity }
-      : undefined
+    return Number.isFinite(opacity) && opacity >= 0 && opacity <= 1 ? { ...image, opacity } : undefined
   }
   if (id === 'imageBorderWidth') {
     const width = Number(value)
-    if (!Number.isFinite(width) || width < 0 || width > 16) return undefined
+    if (
+      !Number.isFinite(width) ||
+      width < 0 ||
+      width > 16
+    ) return undefined
     return {
       ...image,
       payload: {
         ...image.payload,
-        border:
-          width === 0 ? null : { ...(currentBorder ?? defaultBorder), width },
+        border: width === 0 ? null : { ...(currentBorder ?? defaultBorder), width },
       },
     }
   }
@@ -89,7 +86,11 @@ function resolveImageEffect(
     return { kind: 'unhandled' }
   }
   const image = selectedImage(context)
-  if (!image || !context.props.documentSession || image.locked) {
+  if (
+    !image ||
+    !context.props.documentSession ||
+    image.locked
+  ) {
     return { kind: 'handled' }
   }
   const after = updatedImage(image, id as ImageControlId, value)
@@ -102,7 +103,10 @@ function resolveImageEffect(
 }
 
 export function createImageEffects(context: ImageEffectsContext) {
-  function applyImageChange(id: string, value: string): boolean {
+  function applyImageChange(
+    id: string,
+    value: string,
+  ): boolean {
     const effect = resolveImageEffect(context, id, value)
     if (effect.kind === 'unhandled') return false
     if (effect.kind === 'command') {

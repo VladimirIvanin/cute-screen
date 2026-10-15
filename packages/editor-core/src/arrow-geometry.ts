@@ -26,14 +26,8 @@ export function arrowPathPoints(payload: ArrowLayerPayload): readonly Point[] {
         const progress = index / QUADRATIC_SEGMENTS
         const inverse = 1 - progress
         return point({
-          x:
-            inverse * inverse * start.x +
-            2 * inverse * progress * bend.x +
-            progress * progress * end.x,
-          y:
-            inverse * inverse * start.y +
-            2 * inverse * progress * bend.y +
-            progress * progress * end.y,
+          x: inverse * inverse * start.x + 2 * inverse * progress * bend.x + progress * progress * end.x,
+          y: inverse * inverse * start.y + 2 * inverse * progress * bend.y + progress * progress * end.y,
         })
       }),
     )
@@ -42,26 +36,17 @@ export function arrowPathPoints(payload: ArrowLayerPayload): readonly Point[] {
   if (!elbow) throw new Error('elbow arrow routing is required')
   if (elbow.axis === 'x') {
     const middleY = (start.y + end.y) / 2 + elbow.offset
-    return Object.freeze([
-      start,
-      point({ x: start.x, y: middleY }),
-      point({ x: end.x, y: middleY }),
-      end,
-    ])
+    return Object.freeze([start, point({ x: start.x, y: middleY }), point({ x: end.x, y: middleY }), end])
   }
   const middleX = (start.x + end.x) / 2 + elbow.offset
-  return Object.freeze([
-    start,
-    point({ x: middleX, y: start.y }),
-    point({ x: middleX, y: end.y }),
-    end,
-  ])
+  return Object.freeze([start, point({ x: middleX, y: start.y }), point({ x: middleX, y: end.y }), end])
 }
 
-function segmentAngle(start: Point, end: Point): number | undefined {
-  return start.x === end.x && start.y === end.y
-    ? undefined
-    : Math.atan2(end.y - start.y, end.x - start.x)
+function segmentAngle(
+  start: Point,
+  end: Point,
+): number | undefined {
+  return start.x === end.x && start.y === end.y ? undefined : Math.atan2(end.y - start.y, end.x - start.x)
 }
 
 /** Cap angles skip collapsed segments instead of producing unstable NaN output. */
@@ -88,7 +73,10 @@ export function arrowEndpointAngles(points: readonly Point[]): Readonly<{
   return Object.freeze({ start: first + Math.PI, end: last })
 }
 
-export function arrowCapSize(cap: ArrowCap, strokeWidth: number): number {
+export function arrowCapSize(
+  cap: ArrowCap,
+  strokeWidth: number,
+): number {
   return cap === 'none' ? 0 : Math.max(strokeWidth * 3, 8)
 }
 
@@ -113,7 +101,10 @@ function arrowGeometryBounds(payload: ArrowLayerPayload): Rect {
   })
 }
 
-function shifted(value: Point, origin: Point): Point & JsonObject {
+function shifted(
+  value: Point,
+  origin: Point,
+): Point & JsonObject {
   return Object.freeze({
     x: value.x - origin.x,
     y: value.y - origin.y,
@@ -133,22 +124,14 @@ export function rebaseArrowLayer(
   const radians = (layer.transform.rotation * Math.PI) / 180
   const cosine = Math.cos(radians)
   const sine = Math.sin(radians)
-  const deltaX =
-    cosine * layer.transform.scaleX * origin.x -
-    sine * layer.transform.scaleY * origin.y
-  const deltaY =
-    sine * layer.transform.scaleX * origin.x +
-    cosine * layer.transform.scaleY * origin.y
+  const deltaX = cosine * layer.transform.scaleX * origin.x - sine * layer.transform.scaleY * origin.y
+  const deltaY = sine * layer.transform.scaleX * origin.x + cosine * layer.transform.scaleY * origin.y
   const nextPayload: ArrowLayerPayload = Object.freeze({
     ...payload,
     start: shifted(payload.start, origin),
     end: shifted(payload.end, origin),
-    ...(payload.path === 'quadratic' && payload.bend
-      ? { bend: shifted(payload.bend, origin) }
-      : {}),
-    ...(payload.path === 'elbow' && payload.elbow
-      ? { elbow: Object.freeze({ ...payload.elbow }) }
-      : {}),
+    ...(payload.path === 'quadratic' && payload.bend ? { bend: shifted(payload.bend, origin) } : {}),
+    ...(payload.path === 'elbow' && payload.elbow ? { elbow: Object.freeze({ ...payload.elbow }) } : {}),
   })
   return Object.freeze({
     ...layer,
@@ -174,9 +157,7 @@ export interface ArrowSelectionHandle {
   readonly point: Point
 }
 
-export function arrowSelectionHandles(
-  layer: ArrowLayer,
-): readonly ArrowSelectionHandle[] {
+export function arrowSelectionHandles(layer: ArrowLayer): readonly ArrowSelectionHandle[] {
   const handles: ArrowSelectionHandle[] = [
     { kind: 'start', point: point(layer.payload.start) },
     { kind: 'end', point: point(layer.payload.end) },
@@ -202,7 +183,11 @@ export function updateArrowHandle(
   nextPoint: Point,
 ): ArrowLayer {
   let payload: ArrowLayerPayload
-  if (handle === 'start' || handle === 'end' || handle === 'bend') {
+  if (
+    handle === 'start' ||
+    handle === 'end' ||
+    handle === 'bend'
+  ) {
     if (handle === 'bend' && layer.payload.path !== 'quadratic') return layer
     payload = { ...layer.payload, [handle]: point(nextPoint) }
   } else {
@@ -215,20 +200,18 @@ export function updateArrowHandle(
       ...layer.payload,
       elbow: {
         ...layer.payload.elbow,
-        offset:
-          layer.payload.elbow.axis === 'x'
-            ? nextPoint.y - midpoint.y
-            : nextPoint.x - midpoint.x,
+        offset: layer.payload.elbow.axis === 'x' ? nextPoint.y - midpoint.y : nextPoint.x - midpoint.x,
       },
     }
   }
   return rebaseArrowLayer(layer, payload)
 }
 
-function capBodyInset(cap: ArrowCap, strokeWidth: number): number {
-  return cap === 'solidArrow' || cap === 'triangle'
-    ? arrowCapSize(cap, strokeWidth)
-    : 0
+function capBodyInset(
+  cap: ArrowCap,
+  strokeWidth: number,
+): number {
+  return cap === 'solidArrow' || cap === 'triangle' ? arrowCapSize(cap, strokeWidth) : 0
 }
 
 export function scaledClosedArrowCapSizes(
@@ -257,22 +240,15 @@ export function trimArrowBodyPoints(
 ): readonly Point[] {
   const requestedStartInset = capBodyInset(startCap, strokeWidth)
   const requestedEndInset = capBodyInset(endCap, strokeWidth)
-  const { start: startInset, end: endInset } = scaledClosedArrowCapSizes(
-    points,
-    startCap,
-    endCap,
-    strokeWidth,
-  )
+  const { start: startInset, end: endInset } = scaledClosedArrowCapSizes(points, startCap, endCap, strokeWidth)
   if (
-    (requestedStartInset === 0 && requestedEndInset === 0) ||
-    points.length < 2
-  )
-    return points
+    (requestedStartInset === 0 &&
+      requestedEndInset === 0) ||
+      points.length < 2
+  ) return points
   const lengths = points
     .slice(1)
-    .map((entry, index) =>
-      Math.hypot(entry.x - points[index]!.x, entry.y - points[index]!.y),
-    )
+    .map((entry, index) => Math.hypot(entry.x - points[index]!.x, entry.y - points[index]!.y))
   const total = lengths.reduce((sum, length) => sum + length, 0)
   if (total === 0) return Object.freeze([])
   const bodyStart = startInset
@@ -302,8 +278,7 @@ export function trimArrowBodyPoints(
   let travelled = 0
   for (let index = 0; index < lengths.length - 1; index += 1) {
     travelled += lengths[index]!
-    if (travelled > bodyStart && travelled < bodyEnd)
-      body.push(point(points[index + 1]!))
+    if (travelled > bodyStart && travelled < bodyEnd) body.push(point(points[index + 1]!))
   }
   body.push(at(bodyEnd))
   return Object.freeze(body)

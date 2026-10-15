@@ -1,6 +1,10 @@
 import path from 'node:path'
 
-import { $, browser, expect } from '@wdio/globals'
+import {
+  $,
+  browser,
+  expect,
+} from '@wdio/globals'
 import { Key } from 'webdriverio'
 import { finishAreaQuickCaptureInEditor } from '../quick-capture'
 
@@ -40,15 +44,15 @@ async function choosePreset(option: string): Promise<void> {
           (element) => element.textContent?.trim() === name,
         ),
       option,
-    ),
-  )
+    ))
   await browser.execute((name) => {
-    const target = [
-      ...document.querySelectorAll<HTMLElement>('[role="option"]'),
-    ].find((element) => element.textContent?.trim() === name)
+    const target = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+      (element) => element.textContent?.trim() === name,
+    )
     if (!target) throw new Error(`Missing crop preset: ${name}`)
     target.click()
   }, option)
+  await $('.cs-canvas:not(.cs-canvas-overlay)').click()
 }
 
 describe('M08 clean crop mount in a real Tauri webview', () => {
@@ -70,9 +74,7 @@ describe('M08 clean crop mount in a real Tauri webview', () => {
     await $('button[aria-label="Crop"]').click()
     await expect($('[role="combobox"][aria-label="Preset"]')).toExist()
     const overlayEvidence = await browser.execute(() => {
-      const overlay = document.querySelector<HTMLCanvasElement>(
-        '.cs-canvas-overlay[aria-label="Interaction overlay"]',
-      )
+      const overlay = document.querySelector<HTMLCanvasElement>('.cs-canvas-overlay[aria-label="Interaction overlay"]')
       if (!overlay) throw new Error('Crop overlay is missing')
       const data = overlay.getContext('2d')?.getImageData(0, 0, 400, 300).data
       if (!data) throw new Error('Crop overlay pixels are unavailable')
@@ -91,9 +93,7 @@ describe('M08 clean crop mount in a real Tauri webview', () => {
     await choosePreset('1:1')
     await browser.keys([Key.Shift, 'ArrowRight'])
     await browser.keys('Enter')
-    await browser.waitUntil(
-      async () => (await snapshot()).document.crop?.x === 60,
-    )
+    await browser.waitUntil(async () => (await snapshot()).document.crop?.x === 60)
     expect((await snapshot()).document.crop).toEqual({
       x: 60,
       y: 0,
@@ -101,14 +101,9 @@ describe('M08 clean crop mount in a real Tauri webview', () => {
       height: 300,
     })
     await $('button[aria-label="Undo"]').click()
-    await browser.waitUntil(
-      async () => (await snapshot()).document.crop === null,
-    )
+    await browser.waitUntil(async () => (await snapshot()).document.crop === null)
     await browser.saveScreenshot(
-      path.resolve(
-        process.env.CUTE_SCREEN_WDIO_ARTIFACTS ?? 'artifacts/tauri-e2e',
-        'm08-crop-first-open-1024x700.png',
-      ),
+      path.resolve(process.env.CUTE_SCREEN_WDIO_ARTIFACTS ?? 'artifacts/tauri-e2e', 'm08-crop-first-open-1024x700.png'),
     )
   })
 })

@@ -28,7 +28,10 @@ export {
   type ObjectUrlLifecycle,
   type StagedImageMetadata,
 } from './image-transport'
-export type { SystemFontCatalogBridge, SystemFontFace } from './font-catalog'
+export type {
+  SystemFontCatalogBridge,
+  SystemFontFace,
+} from './font-catalog'
 export {
   TextureResourceResolver,
   type ContentImageBridge,
@@ -90,7 +93,11 @@ export {
   createEditorShellPinia,
   useEditorShellStore,
 } from './shell/store'
-export { assertLocaleCompleteness, resolveSystemLocale, t } from './shell/i18n'
+export {
+  assertLocaleCompleteness,
+  resolveSystemLocale,
+  t,
+} from './shell/i18n'
 export {
   createBrowserPreferencesStorage,
   defaultPreferences,

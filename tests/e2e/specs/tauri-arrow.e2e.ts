@@ -1,4 +1,9 @@
-import { $, $$, browser, expect } from '@wdio/globals'
+import {
+  $,
+  $$,
+  browser,
+  expect,
+} from '@wdio/globals'
 import path from 'node:path'
 
 import {
@@ -8,6 +13,8 @@ import {
 } from '../arrow-toolbar'
 
 type ArrowSnapshot = {
+  readonly canvas: { readonly width: number; readonly height: number }
+  readonly crop?: { readonly x: number; readonly y: number; readonly width: number; readonly height: number } | null
   readonly layers: readonly {
     readonly id: string
     readonly kind: string
@@ -36,43 +43,26 @@ async function setPreferences(
   locale: 'en' | 'ru',
   theme: 'light' | 'dark',
 ): Promise<void> {
-  const currentLocale = await browser.execute(
-    () => document.documentElement.lang,
-  )
+  const currentLocale = await browser.execute(() => document.documentElement.lang)
   if (currentLocale !== locale) {
-    await $(
-      `button[aria-label="${currentLocale === 'ru' ? 'Другие действия' : 'More actions'}"]`,
-    ).click()
+    await $(`button[aria-label="${currentLocale === 'ru' ? 'Другие действия' : 'More actions'}"]`).click()
     await $(`button=${locale === 'ru' ? 'RU' : 'EN'}`).click()
   }
-  if (
-    (await browser.execute(() => document.documentElement.dataset.theme)) !==
-    theme
-  ) {
-    await $(
-      `button[aria-label="${locale === 'ru' ? 'Другие действия' : 'More actions'}"]`,
-    ).click()
-    const label =
-      locale === 'ru'
-        ? theme === 'light'
-          ? 'Светлая'
-          : 'Тёмная'
-        : theme === 'light'
-          ? 'Light'
-          : 'Dark'
+  if ((await browser.execute(() => document.documentElement.dataset.theme)) !== theme) {
+    await $(`button[aria-label="${locale === 'ru' ? 'Другие действия' : 'More actions'}"]`).click()
+    const label = locale === 'ru' ? (theme === 'light' ? 'Светлая' : 'Тёмная') : theme === 'light' ? 'Light' : 'Dark'
     await $(`button=${label}`).click()
   }
   await browser.waitUntil(
     async () =>
       (await browser.execute(() => document.documentElement.lang)) === locale &&
-      (await browser.execute(() => document.documentElement.dataset.theme)) ===
-        theme,
+      (await browser.execute(() => document.documentElement.dataset.theme)) === theme,
   )
 }
 
-async function elbowHandlePoint(
-  arrow: ArrowSnapshot['layers'][number],
-): Promise<Readonly<{ x: number; y: number }>> {
+async function elbowHandlePoint(arrow: ArrowSnapshot['layers'][number]): Promise<Readonly<{ x: number; y: number }>> {
+  const mounted = await snapshot()
+  const output = mounted.crop ?? { ...mounted.canvas, x: 0, y: 0 }
   const start = arrow.payload?.start as { x: number; y: number }
   const end = arrow.payload?.end as { x: number; y: number }
   const elbow = arrow.payload?.elbow as { axis: 'x' | 'y'; offset: number }
@@ -82,19 +72,13 @@ async function elbowHandlePoint(
       ? { x: midpoint.x, y: midpoint.y + elbow.offset }
       : { x: midpoint.x + elbow.offset, y: midpoint.y }
   return browser.execute(
-    ({ x, y, translateX, translateY }) => {
-      const scene = document.querySelector<HTMLCanvasElement>(
-        '.cs-canvas:not(.cs-canvas-overlay)',
-      )
+    ({ x, y, translateX, translateY, output }) => {
+      const scene = document.querySelector<HTMLCanvasElement>('.cs-canvas:not(.cs-canvas-overlay)')
       if (!scene) throw new Error('Scene canvas is missing')
       const bounds = scene.getBoundingClientRect()
       return {
-        x: Math.round(
-          bounds.left + ((translateX + x) / scene.width) * bounds.width,
-        ),
-        y: Math.round(
-          bounds.top + ((translateY + y) / scene.height) * bounds.height,
-        ),
+        x: Math.round(bounds.left + ((translateX + x - output.x) / output.width) * bounds.width),
+        y: Math.round(bounds.top + ((translateY + y - output.y) / output.height) * bounds.height),
       }
     },
     {
@@ -102,6 +86,7 @@ async function elbowHandlePoint(
       y: local.y,
       translateX: arrow.transform?.translateX ?? 0,
       translateY: arrow.transform?.translateY ?? 0,
+      output,
     },
   )
 }
@@ -129,29 +114,22 @@ describe('Arrow toolbar and engine in a real Tauri WebView2', () => {
         await $(`button[aria-label="${arrowLabel}"]`).click()
         await openArrowConfigurePopover()
         const layout = await browser.execute(() => {
-          const toolbar = document.querySelector<HTMLElement>(
-            '.cs-tool-configure-popover-host',
-          )
-          const controls = toolbar?.querySelector<HTMLElement>(
-            '.cs-arrow-formatting-toolbar',
-          )
+          const toolbar = document.querySelector<HTMLElement>('.cs-tool-configure-popover-host')
+          const controls = toolbar?.querySelector<HTMLElement>('.cs-arrow-formatting-toolbar')
           if (!toolbar || !controls) throw new Error('Arrow toolbar is missing')
           const bounds = toolbar.getBoundingClientRect()
           return {
-            controlIds: [
-              ...controls.querySelectorAll<HTMLElement>('[data-control]'),
-            ].map((control) => control.dataset.control),
-            observableCount: controls.querySelectorAll(
-              '.cs-arrow-toolbar-trigger, .cs-color-more--compact',
-            ).length,
+            controlIds: [...controls.querySelectorAll<HTMLElement>('[data-control]')].map(
+              (control) => control.dataset.control,
+            ),
+            observableCount: controls.querySelectorAll('.cs-arrow-toolbar-trigger, .cs-color-more--compact').length,
             controlsFit: controls.scrollWidth <= controls.clientWidth,
             toolbarFits:
               bounds.left >= 0 &&
               bounds.right <= window.innerWidth &&
               bounds.top >= 0 &&
               bounds.bottom <= window.innerHeight,
-            documentFits:
-              document.documentElement.scrollWidth <= window.innerWidth,
+            documentFits: document.documentElement.scrollWidth <= window.innerWidth,
           }
         })
         expect(layout).toEqual({
@@ -187,11 +165,9 @@ describe('Arrow toolbar and engine in a real Tauri WebView2', () => {
       .move({ origin: 'pointer', x: 104, y: 36, duration: 80 })
       .up({ button: 'left' })
       .perform()
-    await browser.waitUntil(
-      async () => (await snapshot()).layers.length === beforeCount + 1,
-    )
-    await expect(arrowTool).toHaveAttribute('aria-pressed', 'true')
-    expect(await $$('.cs-layer-row.is-selected').length).toBe(0)
+    await browser.waitUntil(async () => (await snapshot()).layers.length === beforeCount + 1)
+    await expect(arrowTool).toHaveAttribute('aria-pressed', 'false')
+    expect(await $$('.cs-layer-row.is-selected').length).toBe(1)
 
     const arrow = (await snapshot()).layers.at(-1)!
     const originalOffset = (arrow.payload?.elbow as { offset: number }).offset
@@ -203,9 +179,7 @@ describe('Arrow toolbar and engine in a real Tauri WebView2', () => {
       .down({ button: 'left' })
       .up({ button: 'left' })
       .perform()
-    await browser.waitUntil(
-      async () => (await $$('.cs-layer-row.is-selected').length) === 1,
-    )
+    await browser.waitUntil(async () => (await $$('.cs-layer-row.is-selected').length) === 1)
     await browser
       .action('pointer')
       .move({ origin: 'viewport', x: handle.x, y: handle.y, duration: 0 })
@@ -215,26 +189,17 @@ describe('Arrow toolbar and engine in a real Tauri WebView2', () => {
       .perform()
     await browser.waitUntil(async () => {
       const current = (await snapshot()).layers.at(-1)
-      return (
-        (current?.payload?.elbow as { offset?: number } | undefined)?.offset !==
-        originalOffset
-      )
+      return (current?.payload?.elbow as { offset?: number } | undefined)?.offset !== originalOffset
     })
-    const draggedOffset = (
-      (await snapshot()).layers.at(-1)?.payload?.elbow as { offset: number }
-    ).offset
+    const draggedOffset = ((await snapshot()).layers.at(-1)?.payload?.elbow as { offset: number }).offset
 
     await $('button[aria-label="Undo"]').click()
     await browser.waitUntil(
-      async () =>
-        ((await snapshot()).layers.at(-1)?.payload?.elbow as { offset: number })
-          .offset === originalOffset,
+      async () => ((await snapshot()).layers.at(-1)?.payload?.elbow as { offset: number }).offset === originalOffset,
     )
     await $('button[aria-label="Redo"]').click()
     await browser.waitUntil(
-      async () =>
-        ((await snapshot()).layers.at(-1)?.payload?.elbow as { offset: number })
-          .offset === draggedOffset,
+      async () => ((await snapshot()).layers.at(-1)?.payload?.elbow as { offset: number }).offset === draggedOffset,
     )
   })
 })

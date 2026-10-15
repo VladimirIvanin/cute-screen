@@ -1,5 +1,14 @@
-import { fireEvent, render, screen, within } from '@testing-library/vue'
-import { describe, expect, it } from 'vitest'
+import {
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/vue'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 import ArrowFormattingToolbar from '../../../packages/editor-vue/src/shell/components/ArrowFormattingToolbar.vue'
 import type { ContextControl } from '../../../packages/editor-vue/src/shell/types'
@@ -70,9 +79,13 @@ describe('arrow contextual toolbar', () => {
 
     const controls = container.querySelectorAll('.cs-arrow-toolbar-control')
     expect(controls).toHaveLength(5)
-    expect(
-      [...controls].map((control) => control.getAttribute('data-control')),
-    ).toEqual(['color', 'stroke', 'startCap', 'arrowPath', 'endCap'])
+    expect([...controls].map((control) => control.getAttribute('data-control'))).toEqual([
+      'color',
+      'stroke',
+      'startCap',
+      'arrowPath',
+      'endCap',
+    ])
     expect(screen.queryByText('Opacity')).not.toBeInTheDocument()
     expect(screen.queryByText('Blend')).not.toBeInTheDocument()
     expect(screen.queryByText('Text')).not.toBeInTheDocument()
@@ -101,9 +114,7 @@ describe('arrow contextual toolbar', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Geometry' })
     await fireEvent.keyDown(dialog, { key: 'Escape' })
 
-    expect(
-      screen.queryByRole('dialog', { name: 'Geometry' }),
-    ).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Geometry' })).not.toBeInTheDocument()
     expect(trigger).toHaveFocus()
   })
 
@@ -113,14 +124,10 @@ describe('arrow contextual toolbar', () => {
     })
 
     await fireEvent.click(screen.getByRole('button', { name: 'Tail: None' }))
-    expect(
-      await screen.findByRole('dialog', { name: 'Tail' }),
-    ).toBeInTheDocument()
+    expect(await screen.findByRole('dialog', { name: 'Tail' })).toBeInTheDocument()
     await fireEvent.pointerDown(document.body)
 
-    expect(
-      screen.queryByRole('dialog', { name: 'Tail' }),
-    ).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Tail' })).not.toBeInTheDocument()
   })
 
   it('emits a cap choice from a keyboard-accessible popover', async () => {
@@ -130,9 +137,7 @@ describe('arrow contextual toolbar', () => {
 
     const trigger = screen.getByRole('button', { name: 'Head: Solid arrow' })
     await fireEvent.keyDown(trigger, { key: 'Enter' })
-    await fireEvent.click(
-      await screen.findByRole('button', { name: 'Diamond' }),
-    )
+    await fireEvent.click(await screen.findByRole('button', { name: 'Diamond' }))
 
     expect(view.emitted('change')).toEqual([['endCap', 'diamond']])
     expect(trigger).toHaveFocus()

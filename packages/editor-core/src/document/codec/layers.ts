@@ -1,4 +1,8 @@
-import { collectExtras, freezeJsonObject, readJsonObject } from '../json'
+import {
+  collectExtras,
+  freezeJsonObject,
+  readJsonObject,
+} from '../json'
 import {
   BLEND_MODES,
   type BlendMode,
@@ -99,11 +103,7 @@ function parseLayerShadows(
     value.map((shadow, shadowIndex) => {
       const shadowField = `${field}.shadows[${shadowIndex}]`
       const parsed = readJsonObject(shadow, shadowField)
-      assertOnlyFields(
-        parsed,
-        ['color', 'offsetX', 'offsetY', 'blur'],
-        shadowField,
-      )
+      assertOnlyFields(parsed, ['color', 'offsetX', 'offsetY', 'blur'], shadowField)
       const blur = readFiniteNumber(parsed.blur, `${shadowField}.blur`)
       if (blur < 0) throw new Error(`${shadowField}.blur is invalid`)
       return Object.freeze({
@@ -117,12 +117,7 @@ function parseLayerShadows(
 }
 
 function isPrecisionLayer(kind: LayerKind): boolean {
-  return (
-    kind === 'censor' ||
-    kind === 'spotlight' ||
-    kind === 'ruler' ||
-    kind === 'loupe'
-  )
+  return kind === 'censor' || kind === 'spotlight' || kind === 'ruler' || kind === 'loupe'
 }
 
 function isTextBearingLayer(kind: LayerKind): boolean {
@@ -135,35 +130,26 @@ function assertPrecisionLayerShape(
 ): void {
   assertOnlyFields(
     input,
-    [
-      'id',
-      'kind',
-      'transform',
-      'localBounds',
-      'opacity',
-      'visible',
-      'locked',
-      'blendMode',
-      'shadows',
-      'payload',
-    ],
+    ['id', 'kind', 'transform', 'localBounds', 'opacity', 'visible', 'locked', 'blendMode', 'shadows', 'payload'],
     field,
   )
   const transform = readJsonObject(input.transform, `${field}.transform`)
-  assertOnlyFields(
-    transform,
-    ['translateX', 'translateY', 'rotation', 'scaleX', 'scaleY'],
-    `${field}.transform`,
-  )
+  assertOnlyFields(transform, ['translateX', 'translateY', 'rotation', 'scaleX', 'scaleY'], `${field}.transform`)
 }
 
-function parseStrictLayerRect(value: unknown, field: string) {
+function parseStrictLayerRect(
+  value: unknown,
+  field: string,
+) {
   const input = readJsonObject(value, field)
   assertOnlyFields(input, ['x', 'y', 'width', 'height'], field)
   return parseRect(input, field)
 }
 
-export function parseLayer(value: unknown, index: number): LayerNode {
+export function parseLayer(
+  value: unknown,
+  index: number,
+): LayerNode {
   const field = `layers[${index}]`
   const input = readJsonObject(value, field)
   if (!isLayerKind(input.kind)) throw new Error(`${field}.kind is invalid`)
@@ -190,11 +176,7 @@ export function parseLayer(value: unknown, index: number): LayerNode {
     'shadows',
     'payload',
   ])
-  const payload = parseLayerPayload(
-    input.kind,
-    input.payload,
-    `${field}.payload`,
-  )
+  const payload = parseLayerPayload(input.kind, input.payload, `${field}.payload`)
   const localBounds = precisionLayer
     ? parseStrictLayerRect(input.localBounds, `${field}.localBounds`)
     : parseRect(input.localBounds, `${field}.localBounds`)

@@ -12,7 +12,5 @@ export async function saveFailureScreenshot(
 
   await mkdir(outputDirectory, { recursive: true })
   const safeTitle = title.replace(/[^a-z0-9]+/giu, '-').replace(/^-|-$/gu, '')
-  await browser.saveScreenshot(
-    path.join(outputDirectory, `failure-${safeTitle || 'test'}.png`),
-  )
+  await browser.saveScreenshot(path.join(outputDirectory, `failure-${safeTitle || 'test'}.png`))
 }

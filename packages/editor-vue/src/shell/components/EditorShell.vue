@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import type { EditorShellEmit } from '../contracts'
-import { editorShellRuntimeEmits, editorShellRuntimeProps } from '../contracts'
+import {
+  editorShellRuntimeEmits,
+  editorShellRuntimeProps,
+} from '../contracts'
 import EditorWorkspace from './EditorWorkspace.vue'
 
 const props = defineProps(editorShellRuntimeProps)

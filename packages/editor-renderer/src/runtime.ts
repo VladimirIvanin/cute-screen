@@ -1,6 +1,12 @@
-import type { RenderNode, RenderSceneSnapshot } from '@cute-screen/editor-core'
+import type {
+  RenderNode,
+  RenderSceneSnapshot,
+} from '@cute-screen/editor-core'
 
-import { FrameScheduler, type InvalidationReason } from './scheduler'
+import {
+  FrameScheduler,
+  type InvalidationReason,
+} from './scheduler'
 import type {
   CanvasStack,
   FrameProbe,
@@ -56,10 +62,8 @@ export class RendererRuntime {
     this.#options = options
     this.#originalStack = options.stack
     this.#scheduler = new FrameScheduler({
-      requestFrame:
-        options.requestFrame ?? ((callback) => requestAnimationFrame(callback)),
-      cancelFrame:
-        options.cancelFrame ?? ((handle) => cancelAnimationFrame(handle)),
+      requestFrame: options.requestFrame ?? ((callback) => requestAnimationFrame(callback)),
+      cancelFrame: options.cancelFrame ?? ((handle) => cancelAnimationFrame(handle)),
       render: ({ reasons }) => {
         if (!this.#active || !this.#scene) return
         options.frameProbe?.beforeFrame(reasons)
@@ -80,14 +84,8 @@ export class RendererRuntime {
 
   async initialize(): Promise<void> {
     this.#assertActive()
-    this.#originalStack.scene.addEventListener(
-      'webglcontextlost',
-      this.#onContextLost,
-    )
-    this.#originalStack.scene.addEventListener(
-      'webglcontextrestored',
-      this.#onContextRestored,
-    )
+    this.#originalStack.scene.addEventListener('webglcontextlost', this.#onContextLost)
+    this.#originalStack.scene.addEventListener('webglcontextrestored', this.#onContextRestored)
     try {
       const primary = await this.#options.createPrimary()
       await this.#activate(primary, this.#originalStack)
@@ -154,14 +152,8 @@ export class RendererRuntime {
     if (this.#disposed) return
     this.#disposed = true
     this.#scheduler.dispose()
-    this.#originalStack.scene.removeEventListener(
-      'webglcontextlost',
-      this.#onContextLost,
-    )
-    this.#originalStack.scene.removeEventListener(
-      'webglcontextrestored',
-      this.#onContextRestored,
-    )
+    this.#originalStack.scene.removeEventListener('webglcontextlost', this.#onContextLost)
+    this.#originalStack.scene.removeEventListener('webglcontextrestored', this.#onContextRestored)
     const backend = this.#active?.backend ?? 'canvas2d'
     this.#resources.clear()
     this.#active?.dispose()
@@ -174,20 +166,22 @@ export class RendererRuntime {
     if (this.#disposed || this.#contextLost) return
     this.#contextLost = true
     this.#restoreAttempted = false
-    this.#fallbackActivation = this.#activateFallback('contextLost').catch(
-      (error: unknown) => {
-        this.#setState({
-          status: 'fallback',
-          backend: 'canvas2d',
-          reason: 'recoveryFailure',
-        })
-        this.#lastError = asError(error)
-      },
-    )
+    this.#fallbackActivation = this.#activateFallback('contextLost').catch((error: unknown) => {
+      this.#setState({
+        status: 'fallback',
+        backend: 'canvas2d',
+        reason: 'recoveryFailure',
+      })
+      this.#lastError = asError(error)
+    })
   }
 
   readonly #onContextRestored = (): void => {
-    if (this.#disposed || !this.#contextLost || this.#restoreAttempted) return
+    if (
+      this.#disposed ||
+      !this.#contextLost ||
+      this.#restoreAttempted
+    ) return
     this.#restoreAttempted = true
     void this.#restorePrimary()
   }
@@ -220,9 +214,7 @@ export class RendererRuntime {
     }
   }
 
-  async #activateFallback(
-    reason: 'startupFailure' | 'contextLost',
-  ): Promise<void> {
+  async #activateFallback(reason: 'startupFailure' | 'contextLost'): Promise<void> {
     const replacement = this.#options.createReplacementSceneCanvas()
     const stack: CanvasStack = { ...this.#originalStack, scene: replacement }
     const fallback = await this.#options.createFallback()
@@ -240,7 +232,10 @@ export class RendererRuntime {
     if (this.#scene) this.#scheduler.invalidate('resource')
   }
 
-  async #activate(renderer: Renderer, stack: CanvasStack): Promise<void> {
+  async #activate(
+    renderer: Renderer,
+    stack: CanvasStack,
+  ): Promise<void> {
     await renderer.initialize(stack)
     if (this.#scene) renderer.setScene(this.#scene)
     renderer.setOverlay(this.#overlay)

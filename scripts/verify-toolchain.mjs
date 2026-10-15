@@ -7,9 +7,7 @@ const pnpmVersion = userAgent.match(/pnpm\/([^\s]+)/)?.[1]
 const errors = []
 
 if (process.versions.node !== expectedNode) {
-  errors.push(
-    `Node ${expectedNode} is required; found ${process.versions.node}.`,
-  )
+  errors.push(`Node ${expectedNode} is required; found ${process.versions.node}.`)
 }
 
 if (pnpmVersion !== expectedPnpm) {

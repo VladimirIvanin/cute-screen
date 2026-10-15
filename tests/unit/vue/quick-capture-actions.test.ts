@@ -1,5 +1,13 @@
-import { render, screen } from '@testing-library/vue'
-import { describe, expect, it, vi } from 'vitest'
+import {
+  render,
+  screen,
+} from '@testing-library/vue'
+import {
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 
 import { createEditorShellPinia } from '@cute-screen/editor-vue'
 
@@ -41,9 +49,7 @@ describe('quick capture terminal actions', () => {
         name: /Quick capture actions|Действия со снимком/u,
       }),
     ).not.toBeInTheDocument()
-    expect(
-      screen.queryByText('Quick capture draft is no longer available.'),
-    ).not.toBeInTheDocument()
+    expect(screen.queryByText('Quick capture draft is no longer available.')).not.toBeInTheDocument()
   })
 
   it('normalizes fractional crop edges to bounded integer physical pixels', () => {
@@ -60,10 +66,7 @@ describe('quick capture terminal actions', () => {
     ).toEqual({ x: 45, y: 36, width: 1404, height: 679 })
 
     expect(
-      normalizeQuickCaptureSelection(
-        { x: -12.4, y: 900.2, width: 100, height: 300 },
-        { width: 1920, height: 1080 },
-      ),
+      normalizeQuickCaptureSelection({ x: -12.4, y: 900.2, width: 100, height: 300 }, { width: 1920, height: 1080 }),
     ).toEqual({ x: 0, y: 900, width: 88, height: 180 })
   })
 

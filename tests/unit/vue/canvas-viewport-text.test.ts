@@ -1,5 +1,11 @@
 import { fireEvent } from '@testing-library/vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 import type { EditorDocumentV1 } from '@cute-screen/editor-renderer'
 import {
   TEXT_TOOLBAR_SCHEMA,
@@ -181,9 +187,7 @@ describe('M05 CanvasViewport transforms', () => {
     })
     await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 30, clientY: 40 })
     const editor = getByLabelText('Text editor') as HTMLDivElement
-    expect(
-      container.querySelector('.cs-text-floating-toolbar-host'),
-    ).toBeTruthy()
+    expect(container.querySelector('.cs-text-floating-toolbar-host')).toBeTruthy()
     expect(container.querySelector('.cs-text-floating-toolbar')).toBeTruthy()
 
     editor.textContent = 'Toolbar focus'
@@ -193,9 +197,7 @@ describe('M05 CanvasViewport transforms', () => {
     expect(emitted().textToolbarChange).toContainEqual(['textBold', 'true'])
 
     await fireEvent.blur(editor, { relatedTarget: bold })
-    await vi.waitFor(() =>
-      expect(emitted().documentCommand ?? []).toHaveLength(0),
-    )
+    await vi.waitFor(() => expect(emitted().documentCommand ?? []).toHaveLength(0))
     await fireEvent.keyDown(editor, { key: 'Enter', ctrlKey: true })
     expect(emitted().documentCommand).toHaveLength(1)
     expect(container.querySelector('.cs-text-floating-toolbar-host')).toBeNull()
@@ -238,16 +240,8 @@ describe('M05 CanvasViewport transforms', () => {
         },
       ],
     }
-    const withoutSchema = mountViewport(
-      'select',
-      arrowDocument,
-      'arrow',
-      undefined,
-      false,
-    )
-    expect(
-      withoutSchema.container.querySelector('.cs-arrow-floating-toolbar-host'),
-    ).toBeNull()
+    const withoutSchema = mountViewport('select', arrowDocument, 'arrow', undefined, false)
+    expect(withoutSchema.container.querySelector('.cs-arrow-floating-toolbar-host')).toBeNull()
     withoutSchema.unmount()
 
     const withSchema = mountViewport(
@@ -259,12 +253,8 @@ describe('M05 CanvasViewport transforms', () => {
       undefined,
       ARROW_TOOLBAR_SCHEMA,
     )
-    expect(
-      withSchema.container.querySelector('.cs-arrow-floating-toolbar-host'),
-    ).toBeTruthy()
-    expect(
-      withSchema.container.querySelector('.cs-arrow-floating-toolbar'),
-    ).toBeTruthy()
+    expect(withSchema.container.querySelector('.cs-arrow-floating-toolbar-host')).toBeTruthy()
+    expect(withSchema.container.querySelector('.cs-arrow-floating-toolbar')).toBeTruthy()
   })
 
   it('keeps a moving selected arrow, selection frame and floating toolbar on one transient geometry', async () => {
@@ -314,9 +304,7 @@ describe('M05 CanvasViewport transforms', () => {
       ARROW_TOOLBAR_SCHEMA,
     )
     const surface = container.querySelector('.cs-canvas-surface') as HTMLElement
-    const toolbar = container.querySelector(
-      '.cs-arrow-floating-toolbar-host',
-    ) as HTMLDivElement
+    const toolbar = container.querySelector('.cs-arrow-floating-toolbar-host') as HTMLDivElement
     Object.defineProperty(surface, 'clientWidth', {
       configurable: true,
       value: 1_000,

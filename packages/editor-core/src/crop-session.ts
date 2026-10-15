@@ -1,5 +1,9 @@
 import type { EditorCommand } from './commands/types'
-import type { EditorDocument, Point, Rect } from './document/types'
+import type {
+  EditorDocument,
+  Point,
+  Rect,
+} from './document/types'
 
 export const CROP_PRESETS = ['free', '1:1', '4:3', '16:9', 'original'] as const
 
@@ -39,13 +43,14 @@ export interface CropSession {
 
 const DEFAULT_MINIMUM_SIZE = 1
 
-function assertFinite(value: number, field: string): void {
+function assertFinite(
+  value: number,
+  field: string,
+): void {
   if (!Number.isFinite(value)) throw new RangeError(`${field} must be finite`)
 }
 
-function assertCanvas(
-  canvas: Readonly<{ width: number; height: number }>,
-): void {
+function assertCanvas(canvas: Readonly<{ width: number; height: number }>): void {
   assertFinite(canvas.width, 'canvas.width')
   assertFinite(canvas.height, 'canvas.height')
   if (canvas.width <= 0 || canvas.height <= 0) {
@@ -107,8 +112,7 @@ function freezeSession(session: CropSession): CropSession {
   return Object.freeze({
     canvas: Object.freeze({ ...session.canvas }),
     originalAspectRatio: session.originalAspectRatio,
-    initialCrop:
-      session.initialCrop === null ? null : freezeRect(session.initialCrop),
+    initialCrop: session.initialCrop === null ? null : freezeRect(session.initialCrop),
     crop: freezeRect(session.crop),
     preset: session.preset,
     minimumSize: session.minimumSize,
@@ -124,7 +128,11 @@ function updateSession(
   return freezeSession({ ...session, crop, preset })
 }
 
-function clamp(value: number, minimum: number, maximum: number): number {
+function clamp(
+  value: number,
+  minimum: number,
+  maximum: number,
+): number {
   return Math.min(Math.max(value, minimum), maximum)
 }
 
@@ -147,25 +155,17 @@ function ratioForPreset(
   }
 }
 
-function fitRatioInside(session: CropSession, ratio: number): Rect {
+function fitRatioInside(
+  session: CropSession,
+  ratio: number,
+): Rect {
   const { crop: rect, canvas } = session
   const currentRatio = rect.width / rect.height
-  const fittedWidth =
-    currentRatio === ratio
-      ? rect.width
-      : currentRatio > ratio
-        ? rect.height * ratio
-        : rect.width
+  const fittedWidth = currentRatio === ratio ? rect.width : currentRatio > ratio ? rect.height * ratio : rect.width
   const fittedHeight = currentRatio >= ratio ? rect.height : rect.width / ratio
   const canvasMaximumWidth = Math.min(canvas.width, canvas.height * ratio)
-  const requestedMinimumWidth = Math.max(
-    session.minimumSize,
-    session.minimumSize * ratio,
-  )
-  const width = Math.max(
-    fittedWidth,
-    effectiveMinimum(requestedMinimumWidth, canvasMaximumWidth),
-  )
+  const requestedMinimumWidth = Math.max(session.minimumSize, session.minimumSize * ratio)
+  const width = Math.max(fittedWidth, effectiveMinimum(requestedMinimumWidth, canvasMaximumWidth))
   const height = width === fittedWidth ? fittedHeight : width / ratio
   const centerX = rect.x + rect.width / 2
   const centerY = rect.y + rect.height / 2
@@ -177,7 +177,10 @@ function fitRatioInside(session: CropSession, ratio: number): Rect {
   }
 }
 
-function effectiveMinimum(requested: number, maximum: number): number {
+function effectiveMinimum(
+  requested: number,
+  maximum: number,
+): number {
   return Math.min(requested, maximum)
 }
 
@@ -191,15 +194,8 @@ function clampAspectWidth(
   const heightLimitedWidth = maximumHeight * ratio
   const limitedByHeight = heightLimitedWidth <= maximumWidth
   const aspectMaximumWidth = limitedByHeight ? heightLimitedWidth : maximumWidth
-  const width = clamp(
-    candidateWidth,
-    effectiveMinimum(requestedMinimumWidth, aspectMaximumWidth),
-    aspectMaximumWidth,
-  )
-  const height =
-    limitedByHeight && width === aspectMaximumWidth
-      ? maximumHeight
-      : width / ratio
+  const width = clamp(candidateWidth, effectiveMinimum(requestedMinimumWidth, aspectMaximumWidth), aspectMaximumWidth)
+  const height = limitedByHeight && width === aspectMaximumWidth ? maximumHeight : width / ratio
   return { width, height }
 }
 
@@ -234,10 +230,7 @@ function freeResize(
 
 function fixedCornerResize(
   session: CropSession,
-  handle: Extract<
-    CropResizeHandle,
-    'northEast' | 'southEast' | 'southWest' | 'northWest'
-  >,
+  handle: Extract<CropResizeHandle, 'northEast' | 'southEast' | 'southWest' | 'northWest'>,
   delta: Point,
   ratio: number,
 ): Rect {
@@ -246,19 +239,14 @@ function fixedCornerResize(
   const anchorX = east ? session.crop.x : session.crop.x + session.crop.width
   const anchorY = south ? session.crop.y : session.crop.y + session.crop.height
   const candidateFromX = session.crop.width + (east ? delta.x : -delta.x)
-  const candidateFromY =
-    (session.crop.height + (south ? delta.y : -delta.y)) * ratio
+  const candidateFromY = (session.crop.height + (south ? delta.y : -delta.y)) * ratio
   const candidateWidth =
-    Math.abs(candidateFromX - session.crop.width) >=
-    Math.abs(candidateFromY - session.crop.width)
+    Math.abs(candidateFromX - session.crop.width) >= Math.abs(candidateFromY - session.crop.width)
       ? candidateFromX
       : candidateFromY
   const horizontalMaximum = east ? session.canvas.width - anchorX : anchorX
   const verticalMaximum = south ? session.canvas.height - anchorY : anchorY
-  const requestedMinimumWidth = Math.max(
-    session.minimumSize,
-    session.minimumSize * ratio,
-  )
+  const requestedMinimumWidth = Math.max(session.minimumSize, session.minimumSize * ratio)
   const { width, height } = clampAspectWidth(
     candidateWidth,
     requestedMinimumWidth,
@@ -268,11 +256,7 @@ function fixedCornerResize(
   )
   return {
     x: clamp(east ? anchorX : anchorX - width, 0, session.canvas.width - width),
-    y: clamp(
-      south ? anchorY : anchorY - height,
-      0,
-      session.canvas.height - height,
-    ),
+    y: clamp(south ? anchorY : anchorY - height, 0, session.canvas.height - height),
     width,
     height,
   }
@@ -288,12 +272,8 @@ function fixedHorizontalResize(
   const anchorX = east ? session.crop.x : session.crop.x + session.crop.width
   const centerY = session.crop.y + session.crop.height / 2
   const horizontalMaximum = east ? session.canvas.width - anchorX : anchorX
-  const centeredHeightMaximum =
-    2 * Math.min(centerY, session.canvas.height - centerY)
-  const requestedMinimumWidth = Math.max(
-    session.minimumSize,
-    session.minimumSize * ratio,
-  )
+  const centeredHeightMaximum = 2 * Math.min(centerY, session.canvas.height - centerY)
+  const requestedMinimumWidth = Math.max(session.minimumSize, session.minimumSize * ratio)
   const { width, height } = clampAspectWidth(
     session.crop.width + (east ? delta.x : -delta.x),
     requestedMinimumWidth,
@@ -319,12 +299,8 @@ function fixedVerticalResize(
   const anchorY = south ? session.crop.y : session.crop.y + session.crop.height
   const centerX = session.crop.x + session.crop.width / 2
   const verticalMaximum = south ? session.canvas.height - anchorY : anchorY
-  const centeredWidthMaximum =
-    2 * Math.min(centerX, session.canvas.width - centerX)
-  const requestedMinimumWidth = Math.max(
-    session.minimumSize,
-    session.minimumSize * ratio,
-  )
+  const centeredWidthMaximum = 2 * Math.min(centerX, session.canvas.width - centerX)
+  const requestedMinimumWidth = Math.max(session.minimumSize, session.minimumSize * ratio)
   const { width, height } = clampAspectWidth(
     (session.crop.height + (south ? delta.y : -delta.y)) * ratio,
     requestedMinimumWidth,
@@ -334,11 +310,7 @@ function fixedVerticalResize(
   )
   return {
     x: clamp(centerX - width / 2, 0, session.canvas.width - width),
-    y: clamp(
-      south ? anchorY : anchorY - height,
-      0,
-      session.canvas.height - height,
-    ),
+    y: clamp(south ? anchorY : anchorY - height, 0, session.canvas.height - height),
     width,
     height,
   }
@@ -376,25 +348,16 @@ export function setCropPreset(
   preset: CropPreset,
 ): CropSession {
   const ratio = ratioForPreset(session, preset)
-  return updateSession(
-    session,
-    ratio === null ? session.crop : fitRatioInside(session, ratio),
-    preset,
-  )
+  return updateSession(session, ratio === null ? session.crop : fitRatioInside(session, ratio), preset)
 }
 
-export function moveCrop(session: CropSession, delta: Point): CropSession {
+export function moveCrop(
+  session: CropSession,
+  delta: Point,
+): CropSession {
   assertDelta(delta)
-  const x = clamp(
-    session.crop.x + delta.x,
-    0,
-    session.canvas.width - session.crop.width,
-  )
-  const y = clamp(
-    session.crop.y + delta.y,
-    0,
-    session.canvas.height - session.crop.height,
-  )
+  const x = clamp(session.crop.x + delta.x, 0, session.canvas.width - session.crop.width)
+  const y = clamp(session.crop.y + delta.y, 0, session.canvas.height - session.crop.height)
   return updateSession(session, { ...session.crop, x, y })
 }
 
@@ -410,21 +373,12 @@ export function resizeCrop(
     return updateSession(session, freeResize(session, handle, delta))
   }
   if (handle === 'east' || handle === 'west') {
-    return updateSession(
-      session,
-      fixedHorizontalResize(session, handle, delta, ratio),
-    )
+    return updateSession(session, fixedHorizontalResize(session, handle, delta, ratio))
   }
   if (handle === 'north' || handle === 'south') {
-    return updateSession(
-      session,
-      fixedVerticalResize(session, handle, delta, ratio),
-    )
+    return updateSession(session, fixedVerticalResize(session, handle, delta, ratio))
   }
-  return updateSession(
-    session,
-    fixedCornerResize(session, handle, delta, ratio),
-  )
+  return updateSession(session, fixedCornerResize(session, handle, delta, ratio))
 }
 
 export function nudgeCrop(
@@ -444,18 +398,12 @@ export function nudgeCrop(
     case 'left':
       return moveCrop(session, { x: -amount, y: 0 })
     default:
-      throw new RangeError(
-        `unsupported crop nudge direction: ${String(direction)}`,
-      )
+      throw new RangeError(`unsupported crop nudge direction: ${String(direction)}`)
   }
 }
 
 export function resetCrop(session: CropSession): CropSession {
-  return updateSession(
-    session,
-    { x: 0, y: 0, width: session.canvas.width, height: session.canvas.height },
-    'free',
-  )
+  return updateSession(session, { x: 0, y: 0, width: session.canvas.width, height: session.canvas.height }, 'free')
 }
 
 function isFullCanvas(session: CropSession): boolean {
@@ -467,23 +415,18 @@ function isFullCanvas(session: CropSession): boolean {
   )
 }
 
-function rectEquals(left: Rect, right: Rect): boolean {
-  return (
-    left.x === right.x &&
-    left.y === right.y &&
-    left.width === right.width &&
-    left.height === right.height
-  )
+function rectEquals(
+  left: Rect,
+  right: Rect,
+): boolean {
+  return left.x === right.x && left.y === right.y && left.width === right.width && left.height === right.height
 }
 
-export function applyCropSession(
-  session: CropSession,
-): Extract<EditorCommand, { type: 'setCrop' }> {
+export function applyCropSession(session: CropSession): Extract<EditorCommand, { type: 'setCrop' }> {
   assertCanvas(session.canvas)
   assertCropInsideCanvas(session.crop, session.canvas)
   const after =
-    session.initialCrop !== null &&
-    rectEquals(session.crop, session.initialCrop)
+    session.initialCrop !== null && rectEquals(session.crop, session.initialCrop)
       ? session.initialCrop
       : isFullCanvas(session)
         ? null

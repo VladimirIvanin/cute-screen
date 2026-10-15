@@ -118,7 +118,11 @@ function onQuickFrameChange(crop: QuickRect): void {
 
 async function onQuickSelectionComplete(crop: QuickRect): Promise<void> {
   const active = draft.value
-  if (!active || !selectionPending.value || pending.value) return
+  if (
+    !active ||
+    !selectionPending.value ||
+    pending.value
+  ) return
   pending.value = true
   error.value = undefined
   try {
@@ -160,8 +164,7 @@ function onSceneDoubleClick(event: MouseEvent): void {
     point.y < crop.y ||
     point.x > crop.x + crop.width ||
     point.y > crop.y + crop.height
-  )
-    return
+  ) return
   event.preventDefault()
   void copy()
 }
@@ -246,17 +249,13 @@ async function terminateFailedPresentation(
       closeWindow: dismissWindow,
     })
   } catch (cleanupError) {
-    console.warn(
-      'cute-screen quick capture presentation cleanup failed',
-      cleanupError,
-    )
+    console.warn('cute-screen quick capture presentation cleanup failed', cleanupError)
   }
 }
 
 function onFrameReady(documentId: string): void {
   const activeDraft = draft.value
-  if (!activeDraft || session.value?.snapshot.core.document.id !== documentId)
-    return
+  if (!activeDraft || session.value?.snapshot.core.document.id !== documentId) return
   void presentPreparedDraft(activeDraft.draftId).catch((cause) => {
     void terminateFailedPresentation(activeDraft.draftId, cause)
   })
@@ -276,8 +275,7 @@ async function loadDraft(): Promise<void> {
   if (!(await tauriDesktopBridge.quickCaptureWarmup(active.draftId))) {
     throw new Error('Quick capture draft is no longer active')
   }
-  if (revision !== loadRevision || draft.value?.draftId !== active.draftId)
-    return
+  if (revision !== loadRevision || draft.value?.draftId !== active.draftId) return
   const loaded = await loadImageWithBinaryFallback({
     token: active.imageToken,
     correlationId: active.correlationId,
@@ -325,9 +323,7 @@ async function loadDraft(): Promise<void> {
   })
   unsubscribeSession = session.value.subscribe((snapshot) => {
     const crop = snapshot.core.document.crop
-    currentCrop.value = crop
-      ? { ...crop }
-      : { x: 0, y: 0, width: active.width, height: active.height }
+    currentCrop.value = crop ? { ...crop } : { x: 0, y: 0, width: active.width, height: active.height }
     requestAnimationFrame(() => updateQuickLayout())
   })
   documentState.value = {
@@ -350,10 +346,7 @@ async function prepareActiveDraft(): Promise<void> {
       try {
         await presentPreparedDraft(activeDraft.draftId)
       } catch (presentationError) {
-        await terminateFailedPresentation(
-          activeDraft.draftId,
-          presentationError,
-        )
+        await terminateFailedPresentation(activeDraft.draftId, presentationError)
       }
     }
   }
@@ -415,7 +408,11 @@ onBeforeUnmount(() => {
       @quick-frame-change="onQuickFrameChange"
       @quick-selection-complete="onQuickSelectionComplete"
     />
-    <div v-if="draft" class="cs-quick-size-a11y" aria-live="polite">
+    <div
+      v-if="draft"
+      class="cs-quick-size-a11y"
+      aria-live="polite"
+    >
       {{ currentCrop.width }} × {{ currentCrop.height }}
     </div>
     <p
@@ -430,16 +427,32 @@ onBeforeUnmount(() => {
       class="cs-quick-actions"
       :aria-label="labels.actions"
     >
-      <button type="button" :disabled="pending" @click="openEditor">
+      <button
+        type="button"
+        :disabled="pending"
+        @click="openEditor"
+      >
         {{ labels.editor }}
       </button>
-      <button type="button" :disabled="pending" @click="copy">
+      <button
+        type="button"
+        :disabled="pending"
+        @click="copy"
+      >
         {{ labels.copy }}
       </button>
-      <button type="button" :disabled="pending" @click="save">
+      <button
+        type="button"
+        :disabled="pending"
+        @click="save"
+      >
         {{ labels.save }}
       </button>
-      <button type="button" :disabled="pending" @click="cancel">
+      <button
+        type="button"
+        :disabled="pending"
+        @click="cancel"
+      >
         {{ labels.close }}
       </button>
     </nav>
@@ -450,6 +463,12 @@ onBeforeUnmount(() => {
     >
       {{ labels.portalLimit }}
     </p>
-    <p v-if="error" class="cs-quick-error" role="alert">{{ error }}</p>
+    <p
+      v-if="error"
+      class="cs-quick-error"
+      role="alert"
+    >
+      {{ error }}
+    </p>
   </main>
 </template>

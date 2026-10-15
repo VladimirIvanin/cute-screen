@@ -22,13 +22,10 @@ export interface DesktopShellActionPorts {
   readonly mountCapturedDocument: () => Promise<boolean>
 }
 
-export function createDesktopShellActions(
-  ports: DesktopShellActionPorts,
-): ShellActionAdapter | undefined {
+export function createDesktopShellActions(ports: DesktopShellActionPorts): ShellActionAdapter | undefined {
   if (!('__TAURI_INTERNALS__' in window)) return undefined
   return {
-    run: (action, signal, reportProgress) =>
-      runDesktopAction(ports, action, signal, reportProgress),
+    run: (action, signal, reportProgress) => runDesktopAction(ports, action, signal, reportProgress),
   }
 }
 
@@ -68,9 +65,7 @@ async function openImage(
   signal: AbortSignal,
 ): Promise<string> {
   const { tauriDesktopBridge } = await import('./desktop-bridge')
-  const outcome = await tauriDesktopBridge.repositoryOpenImage(
-    ports.correlationId(),
-  )
+  const outcome = await tauriDesktopBridge.repositoryOpenImage(ports.correlationId())
   if (signal.aborted || outcome.kind === 'cancelled') {
     throw new ActionCancelledError('Open image cancelled')
   }
@@ -96,8 +91,7 @@ async function capture(
   try {
     reportProgress?.('probing')
     const capabilities =
-      ports.platformCapabilities.value ??
-      (await tauriDesktopBridge.platformCapabilities(ports.correlationId()))
+      ports.platformCapabilities.value ?? (await tauriDesktopBridge.platformCapabilities(ports.correlationId()))
     ports.platformCapabilities.value = capabilities
     validateCapture(capabilities, action, signal)
     reportProgress?.('ready')
@@ -105,8 +99,7 @@ async function capture(
     const outcome = await dispatchNativeCapture({
       session: capabilities.session,
       mainWindow: await currentDesktopWindow(),
-      waitForMainWindowUnmap: () =>
-        tauriDesktopBridge.captureWaitForEditorUnmap(ports.correlationId()),
+      waitForMainWindowUnmap: () => tauriDesktopBridge.captureWaitForEditorUnmap(ports.correlationId()),
       capture: () =>
         tauriDesktopBridge.captureRequest({
           correlationId: ports.correlationId(),
@@ -162,10 +155,7 @@ async function handleCaptureOutcome(
     try {
       await tauriDesktopBridge.openScreenRecordingSettings()
     } catch (error) {
-      console.warn(
-        'cute-screen Screen Recording settings could not be opened',
-        error,
-      )
+      console.warn('cute-screen Screen Recording settings could not be opened', error)
     }
     throw new Error('permissionDenied')
   }

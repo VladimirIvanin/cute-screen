@@ -10,9 +10,7 @@
       "dimensions": { "width": 1, "height": 1 },
       "format": "ppm",
       "expectedDecode": "success",
-      "pixelProbes": [
-        { "x": 0, "y": 0, "rgba": [255, 0, 0, 255], "tolerance": 0 }
-      ],
+      "pixelProbes": [{ "x": 0, "y": 0, "rgba": [255, 0, 0, 255], "tolerance": 0 }],
       "metadata": { "alpha": false, "icc": false, "exifOrientation": 1 },
       "source": "Created in-repository for M00 harness validation",
       "license": "CC0-1.0",
@@ -27,9 +25,7 @@
       "dimensions": { "width": 3840, "height": 2160 },
       "format": "png",
       "expectedDecode": "success",
-      "pixelProbes": [
-        { "x": 0, "y": 0, "rgba": [24, 38, 52, 255], "tolerance": 2 }
-      ],
+      "pixelProbes": [{ "x": 0, "y": 0, "rgba": [24, 38, 52, 255], "tolerance": 2 }],
       "nodeCount": 500,
       "metadata": { "alpha": false, "icc": false, "exifOrientation": 1 },
       "source": "Deterministically generated in-repository for M01",
@@ -45,9 +41,7 @@
       "dimensions": { "width": 7680, "height": 4320 },
       "format": "png",
       "expectedDecode": "success",
-      "pixelProbes": [
-        { "x": 0, "y": 0, "rgba": [24, 38, 52, 255], "tolerance": 2 }
-      ],
+      "pixelProbes": [{ "x": 0, "y": 0, "rgba": [24, 38, 52, 255], "tolerance": 2 }],
       "nodeCount": 1000,
       "metadata": { "alpha": false, "icc": false, "exifOrientation": 1 },
       "source": "Deterministically generated in-repository for M01",
@@ -63,9 +57,7 @@
       "dimensions": { "width": 64, "height": 64 },
       "format": "png",
       "expectedDecode": "success",
-      "pixelProbes": [
-        { "x": 0, "y": 0, "rgba": [24, 38, 52, 0], "tolerance": 2 }
-      ],
+      "pixelProbes": [{ "x": 0, "y": 0, "rgba": [24, 38, 52, 0], "tolerance": 2 }],
       "metadata": { "alpha": true, "icc": false, "exifOrientation": 1 },
       "source": "Deterministically generated in-repository for M01",
       "license": "CC0-1.0",
@@ -80,9 +72,7 @@
       "dimensions": { "width": 64, "height": 64 },
       "format": "png",
       "expectedDecode": "success",
-      "pixelProbes": [
-        { "x": 0, "y": 0, "rgba": [24, 38, 52, 255], "tolerance": 2 }
-      ],
+      "pixelProbes": [{ "x": 0, "y": 0, "rgba": [24, 38, 52, 255], "tolerance": 2 }],
       "metadata": { "alpha": false, "icc": true, "exifOrientation": 1 },
       "source": "Deterministically generated in-repository for M01",
       "license": "CC0-1.0",
@@ -97,9 +87,7 @@
       "dimensions": { "width": 64, "height": 32 },
       "format": "png",
       "expectedDecode": "success",
-      "pixelProbes": [
-        { "x": 0, "y": 0, "rgba": [24, 38, 52, 255], "tolerance": 2 }
-      ],
+      "pixelProbes": [{ "x": 0, "y": 0, "rgba": [24, 38, 52, 255], "tolerance": 2 }],
       "metadata": { "alpha": false, "icc": false, "exifOrientation": 6 },
       "source": "Deterministically generated in-repository for M01",
       "license": "CC0-1.0",

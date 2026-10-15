@@ -1,11 +1,20 @@
-import { onBeforeUnmount, onMounted, watch, type Ref } from 'vue'
+import { loadToolSettings } from './tool-settings-memory'
+import {
+  onBeforeUnmount,
+  onMounted,
+  watch,
+  type Ref,
+} from 'vue'
 import type { DrawingToolPreferencesV2 } from '@cute-screen/editor-renderer'
 import {
   createBrowserDrawingToolPreferencesStorage,
   createBrowserPreferencesStorage,
 } from '../preferences'
 import type { ResolvedEditorShellProps } from '../contracts'
-import type { ShellStoreOptions, useEditorShellStore } from '../store'
+import type {
+  ShellStoreOptions,
+  useEditorShellStore,
+} from '../store'
 import type { createWorkspaceState } from './workspace-state'
 import type { DocumentSessionSnapshot } from '../../document-session'
 
@@ -14,16 +23,11 @@ type WorkspaceState = ReturnType<typeof createWorkspaceState>
 
 export interface WorkspaceEnvironment {
   readonly storage: Storage | undefined
-  readonly media: Pick<
-    MediaQueryList,
-    'matches' | 'addEventListener' | 'removeEventListener'
-  >
+  readonly media: Pick<MediaQueryList, 'matches' | 'addEventListener' | 'removeEventListener'>
   readonly preferencesOptions: ShellStoreOptions
 }
 
-export function createWorkspaceEnvironment(
-  props: ResolvedEditorShellProps,
-): WorkspaceEnvironment {
+export function createWorkspaceEnvironment(props: ResolvedEditorShellProps): WorkspaceEnvironment {
   let storage: Storage | undefined
   try {
     storage = window.localStorage
@@ -38,10 +42,7 @@ export function createWorkspaceEnvironment(
           addEventListener: () => undefined,
           removeEventListener: () => undefined,
         }
-  const languages =
-    import.meta.env.VITE_TEST_HARNESS === 'true'
-      ? (['en'] as const)
-      : navigator.languages
+  const languages = import.meta.env.VITE_TEST_HARNESS === 'true' ? (['en'] as const) : navigator.languages
   return {
     storage,
     media,
@@ -64,11 +65,10 @@ export interface WorkspaceLifecycleContext {
   readonly locale: Ref<'en' | 'ru'>
   readonly onKeydown: (event: KeyboardEvent) => void
   readonly onToolConfigureOutsidePointer: (event: PointerEvent) => void
+  readonly onToolConfigureKeydown: (event: KeyboardEvent) => void
   readonly loadFixture: () => void
   readonly applyDocumentSnapshot: (snapshot: DocumentSessionSnapshot) => void
-  readonly resolveDocumentTextures: (
-    document: NonNullable<WorkspaceState['activeDocument']['value']>,
-  ) => Promise<void>
+  readonly resolveDocumentTextures: (document: NonNullable<WorkspaceState['activeDocument']['value']>) => Promise<void>
 }
 
 function registerResourceWatches(context: WorkspaceLifecycleContext): void {
@@ -143,16 +143,19 @@ function mountWorkspace(
   onMediaChange: (event: MediaQueryListEvent) => void,
 ): void {
   onMounted(() => {
-    const preferences = createBrowserDrawingToolPreferencesStorage(
+    let preferences = createBrowserDrawingToolPreferencesStorage(
       context.environment.storage,
     ).load() as DrawingToolPreferencesV2
+    try {
+      preferences = loadToolSettings(context.environment.storage).drawing
+    } catch (error) {
+      console.warn('Tool preference migration failed', error)
+    }
     context.workspace.drawingPreferences.value = preferences
     context.workspace.drawingDefaults.value = preferences.defaults
     context.store.initialize(context.environment.preferencesOptions)
     if (!context.props.documentSession) {
-      context.store.setDocumentState(
-        context.props.initialDocumentState ?? { kind: 'empty' },
-      )
+      context.store.setDocumentState(context.props.initialDocumentState ?? { kind: 'empty' })
       if (!context.props.initialDocumentState) context.loadFixture()
       if (context.props.readOnlyDocument) {
         context.store.setDocumentHistory({
@@ -164,11 +167,8 @@ function mountWorkspace(
     }
     context.environment.media.addEventListener('change', onMediaChange)
     window.addEventListener('keydown', context.onKeydown)
-    document.addEventListener(
-      'pointerdown',
-      context.onToolConfigureOutsidePointer,
-      true,
-    )
+    document.addEventListener('keydown', context.onToolConfigureKeydown, true)
+    document.addEventListener('pointerdown', context.onToolConfigureOutsidePointer, true)
   })
 }
 
@@ -184,17 +184,13 @@ function unmountWorkspace(
     }
     context.environment.media.removeEventListener('change', onMediaChange)
     window.removeEventListener('keydown', context.onKeydown)
-    document.removeEventListener(
-      'pointerdown',
-      context.onToolConfigureOutsidePointer,
-      true,
-    )
+    document.removeEventListener('keydown', context.onToolConfigureKeydown, true)
+    document.removeEventListener('pointerdown', context.onToolConfigureOutsidePointer, true)
   })
 }
 
 export function useWorkspaceLifecycle(context: WorkspaceLifecycleContext) {
-  const onMediaChange = (event: MediaQueryListEvent) =>
-    context.store.setSystemDark(event.matches)
+  const onMediaChange = (event: MediaQueryListEvent) => context.store.setSystemDark(event.matches)
   registerResourceWatches(context)
   registerPropWatches(context)
   mountWorkspace(context, onMediaChange)

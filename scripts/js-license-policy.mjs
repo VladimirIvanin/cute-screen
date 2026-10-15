@@ -13,13 +13,11 @@ const generallyAllowedLicenses = new Set([
 
 // Keep asset-license exceptions version-specific so dependency upgrades fail
 // closed until their bundled files and license metadata are audited again.
-const packageSpecificLicenses = new Map([
-  ['@fontsource/roboto@5.3.0', new Set(['OFL-1.1'])],
-])
+const packageSpecificLicenses = new Map([['@fontsource/roboto@5.3.0', new Set(['OFL-1.1'])]])
 
-export function isAllowedProductionLicense(packageKey, license) {
-  return (
-    generallyAllowedLicenses.has(license) ||
-    packageSpecificLicenses.get(packageKey)?.has(license) === true
-  )
+export function isAllowedProductionLicense(
+  packageKey,
+  license,
+) {
+  return generallyAllowedLicenses.has(license) || packageSpecificLicenses.get(packageKey)?.has(license) === true
 }

@@ -1,4 +1,9 @@
-import { describe, expect, it, vi } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 
 import { EditorFirstFrameGate } from '../../../apps/desktop/src/editor-first-frame'
 
@@ -21,9 +26,7 @@ describe('quick capture editor first-frame readiness', () => {
     vi.useFakeTimers()
     const gate = new EditorFirstFrameGate()
     const ready = gate.waitForNextFrame(100)
-    const rejection = expect(ready).rejects.toThrow(
-      'editor first frame timed out',
-    )
+    const rejection = expect(ready).rejects.toThrow('editor first frame timed out')
 
     await vi.advanceTimersByTimeAsync(100)
     await rejection

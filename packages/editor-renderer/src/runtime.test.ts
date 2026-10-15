@@ -1,8 +1,16 @@
 import { createRenderSceneSnapshot } from '@cute-screen/editor-core'
-import { describe, expect, it, vi } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 
 import { RendererRuntime } from './runtime'
-import type { CanvasStack, Renderer } from './types'
+import type {
+  CanvasStack,
+  Renderer,
+} from './types'
 
 function canvas(): HTMLCanvasElement {
   const target = new EventTarget() as HTMLCanvasElement
@@ -87,16 +95,12 @@ describe('RendererRuntime', () => {
     await runtime.initialize()
     runtime.setScene(scene)
 
-    sceneCanvas.dispatchEvent(
-      new Event('webglcontextlost', { cancelable: true }),
-    )
+    sceneCanvas.dispatchEvent(new Event('webglcontextlost', { cancelable: true }))
     await vi.waitFor(() => expect(runtime.state.status).toBe('recovering'))
     expect(fallback.setScene).toHaveBeenCalledWith(scene)
 
     sceneCanvas.dispatchEvent(new Event('webglcontextrestored'))
-    await vi.waitFor(() =>
-      expect(runtime.state).toEqual({ status: 'ready', backend: 'canvaskit' }),
-    )
+    await vi.waitFor(() => expect(runtime.state).toEqual({ status: 'ready', backend: 'canvaskit' }))
     expect(restoredPrimary.setScene).toHaveBeenCalledWith(scene)
     expect(activateSceneCanvas).toHaveBeenLastCalledWith(sceneCanvas)
 
@@ -151,16 +155,10 @@ describe('RendererRuntime', () => {
       source: {} as ImageBitmap,
     })
 
-    sceneCanvas.dispatchEvent(
-      new Event('webglcontextlost', { cancelable: true }),
-    )
-    await vi.waitFor(() =>
-      expect(fallback.createImageResource).toHaveBeenCalledTimes(1),
-    )
+    sceneCanvas.dispatchEvent(new Event('webglcontextlost', { cancelable: true }))
+    await vi.waitFor(() => expect(fallback.createImageResource).toHaveBeenCalledTimes(1))
     sceneCanvas.dispatchEvent(new Event('webglcontextrestored'))
-    await vi.waitFor(() =>
-      expect(restoredPrimary.createImageResource).toHaveBeenCalledTimes(1),
-    )
+    await vi.waitFor(() => expect(restoredPrimary.createImageResource).toHaveBeenCalledTimes(1))
   })
 
   it('brackets scheduled renderer frames with the optional probe', async () => {
@@ -187,15 +185,11 @@ describe('RendererRuntime', () => {
       frameProbe: { beforeFrame, afterFrame },
     })
     await runtime.initialize()
-    runtime.setScene(
-      createRenderSceneSnapshot({ width: 1, height: 1, nodes: [] }),
-    )
+    runtime.setScene(createRenderSceneSnapshot({ width: 1, height: 1, nodes: [] }))
     runtime.invalidate('scene')
     callback?.(1)
 
     expect(beforeFrame).toHaveBeenCalledWith(['scene'])
-    expect(afterFrame).toHaveBeenCalledWith(
-      expect.objectContaining({ backend: 'canvaskit' }),
-    )
+    expect(afterFrame).toHaveBeenCalledWith(expect.objectContaining({ backend: 'canvaskit' }))
   })
 })

@@ -4,14 +4,17 @@ import {
   decodeClipboardLayersV2,
   type ClipboardLayersV2,
 } from './clipboard-codec'
-import { cloneLayer, contentImage } from './shared'
+import {
+  cloneLayer,
+  contentImage,
+} from './shared'
 
 export type ClipboardDispatch =
   | Readonly<{
-      kind: 'internal'
-      payload: ClipboardLayersV2
-      warning?: 'internalPayloadInvalid'
-    }>
+    kind: 'internal'
+    payload: ClipboardLayersV2
+    warning?: 'internalPayloadInvalid'
+  }>
   | Readonly<{ kind: 'bitmap'; warning?: 'internalPayloadInvalid' }>
   | Readonly<{ kind: 'text'; text: string }>
   | Readonly<{ kind: 'emptyHint' }>
@@ -71,12 +74,9 @@ export function pasteClipboardLayers(
   return Object.freeze(
     payload.layers.map((source) => {
       const id = input.id()
-      if (ids.has(id))
-        throw new Error('clipboard paste id generator returned a duplicate')
+      if (ids.has(id)) throw new Error('clipboard paste id generator returned a duplicate')
       ids.add(id)
-      const layer = normalizeEditableLayerScale(
-        contentImage(cloneLayer(source)),
-      )
+      const layer = normalizeEditableLayerScale(contentImage(cloneLayer(source)))
       return Object.freeze({
         ...layer,
         id,

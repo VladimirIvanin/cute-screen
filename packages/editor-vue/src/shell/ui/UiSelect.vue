@@ -1,6 +1,14 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref, watch } from 'vue'
-import { NSelect, type SelectOption } from 'naive-ui'
+import {
+  nextTick,
+  onMounted,
+  ref,
+  watch,
+} from 'vue'
+import {
+  NSelect,
+  type SelectOption,
+} from 'naive-ui'
 
 const props = defineProps<{
   modelValue: string | number
@@ -23,17 +31,10 @@ function labelInteractivePart(): void {
 }
 
 function labelOptions(): void {
-  document
-    .querySelectorAll<HTMLElement>('.cs-overlay-root .n-base-select-option')
-    .forEach((option) => {
-      option.setAttribute('role', 'option')
-      option.setAttribute(
-        'aria-selected',
-        option.classList.contains('n-base-select-option--selected')
-          ? 'true'
-          : 'false',
-      )
-    })
+  document.querySelectorAll<HTMLElement>('.cs-overlay-root .n-base-select-option').forEach((option) => {
+    option.setAttribute('role', 'option')
+    option.setAttribute('aria-selected', option.classList.contains('n-base-select-option--selected') ? 'true' : 'false')
+  })
 }
 
 function scheduleOptionLabels(): void {
@@ -48,7 +49,11 @@ watch(
 </script>
 
 <template>
-  <div ref="host" :class="props.class" @click="scheduleOptionLabels">
+  <div
+    ref="host"
+    :class="props.class"
+    @click="scheduleOptionLabels"
+  >
     <NSelect
       :value="modelValue"
       :size="size ?? 'small'"

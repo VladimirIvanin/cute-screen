@@ -20,8 +20,15 @@ function result(
   return state.selected ? HANDLED : defaultsEffect(defaults)
 }
 
-function shapeEffect(value: string, state: State): PrecisionSettingsEffect {
-  if (value !== 'rectangle' && value !== 'ellipse' && value !== 'diamond') {
+function shapeEffect(
+  value: string,
+  state: State,
+): PrecisionSettingsEffect {
+  if (
+    value !== 'rectangle' &&
+    value !== 'ellipse' &&
+    value !== 'diamond'
+  ) {
     return HANDLED
   }
   const defaults: State['defaults'] = {
@@ -37,7 +44,10 @@ function shapeEffect(value: string, state: State): PrecisionSettingsEffect {
   return result(state, defaults, after)
 }
 
-function colorEffect(value: string, state: State): PrecisionSettingsEffect {
+function colorEffect(
+  value: string,
+  state: State,
+): PrecisionSettingsEffect {
   const dimColor = parseHexColor(value)
   if (!dimColor) return HANDLED
   const defaults: State['defaults'] = {
@@ -53,9 +63,16 @@ function colorEffect(value: string, state: State): PrecisionSettingsEffect {
   return result(state, defaults, after)
 }
 
-function opacityEffect(value: string, state: State): PrecisionSettingsEffect {
+function opacityEffect(
+  value: string,
+  state: State,
+): PrecisionSettingsEffect {
   const number = Number(value)
-  if (!Number.isFinite(number) || number < 0 || number > 100) return HANDLED
+  if (
+    !Number.isFinite(number) ||
+    number < 0 ||
+    number > 100
+  ) return HANDLED
   const dimOpacity = number / 100
   const defaults: State['defaults'] = {
     ...state.defaults,
@@ -70,8 +87,15 @@ function opacityEffect(value: string, state: State): PrecisionSettingsEffect {
   return result(state, defaults, after)
 }
 
-function featherEffect(value: string, state: State): PrecisionSettingsEffect {
-  if (value !== 'none' && value !== 'soft' && value !== 'strong') return HANDLED
+function featherEffect(
+  value: string,
+  state: State,
+): PrecisionSettingsEffect {
+  if (
+    value !== 'none' &&
+    value !== 'soft' &&
+    value !== 'strong'
+  ) return HANDLED
   const feather: 'soft' | 'strong' | null = value === 'none' ? null : value
   const defaults: State['defaults'] = {
     ...state.defaults,

@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 import {
   calloutGeometryBounds,
@@ -61,16 +65,10 @@ describe('callout leader-line geometry', () => {
     })
     if (!layer) throw new Error('expected callout layer')
     expect(calloutGeometryBounds(layer.payload).width).toBeGreaterThan(40)
-    expect(calloutTextRect(layer.payload).x).toBeGreaterThan(
-      layer.payload.label.x,
-    )
-    expect(calloutSelectionHandles(layer).map((handle) => handle.kind)).toEqual(
-      ['target', 'label', 'elbow'],
-    )
+    expect(calloutTextRect(layer.payload).x).toBeGreaterThan(layer.payload.label.x)
+    expect(calloutSelectionHandles(layer).map((handle) => handle.kind)).toEqual(['target', 'label', 'elbow'])
     const moved = updateCalloutHandle(layer, 'label', { x: 220, y: 140 })
     expect(moved.payload.label).toEqual({ x: 220, y: 140 })
-    expect(
-      rebaseCalloutLayer(layer, moved.payload).localBounds.width,
-    ).toBeGreaterThan(0)
+    expect(rebaseCalloutLayer(layer, moved.payload).localBounds.width).toBeGreaterThan(0)
   })
 })

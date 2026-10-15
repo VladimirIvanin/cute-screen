@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 import { serializeEditorDocument } from './document/codec'
 import { createDocumentRenderScene } from './document/scene'
@@ -56,13 +60,9 @@ describe('M08 geometry, hit testing and renderer-neutral scene', () => {
     const { spotlight, loupe } = precisionLayers()
     const document = withLayers([spotlight, loupe])
     expect(hitTestDocument(document, { x: 500, y: 260 })).toBeUndefined()
-    expect(hitTestDocument(document, { x: 590, y: 350 })?.nodeId).toBe(
-      IDS.loupe,
-    )
+    expect(hitTestDocument(document, { x: 590, y: 350 })?.nodeId).toBe(IDS.loupe)
     expect(hitTestDocument(document, { x: 501, y: 261 })).toBeUndefined()
-    expect(hitTestDocument(document, { x: 200, y: 80 })?.nodeId).toBe(
-      IDS.spotlight,
-    )
+    expect(hitTestDocument(document, { x: 200, y: 80 })?.nodeId).toBe(IDS.spotlight)
     expect(hitTestDocument(document, { x: 142, y: 42 })).toBeUndefined()
 
     expect(createDocumentRenderScene(document).nodes).toEqual([
@@ -99,9 +99,7 @@ describe('M08 geometry, hit testing and renderer-neutral scene', () => {
       bounds: { x: 140, y: 40, width: 120, height: 80 },
       shape,
     })
-    expect(hitTestDocument(withLayers([layer]), point) !== undefined).toBe(
-      expected,
-    )
+    expect(hitTestDocument(withLayers([layer]), point) !== undefined).toBe(expected)
   })
 
   it('hit-tests a rectangular loupe by its destination lens', () => {
@@ -114,9 +112,7 @@ describe('M08 geometry, hit testing and renderer-neutral scene', () => {
       size: 80,
       shape: 'rectangle',
     })
-    expect(
-      hitTestDocument(withLayers([layer]), { x: 201, y: 221 })?.nodeId,
-    ).toBe(IDS.loupe)
+    expect(hitTestDocument(withLayers([layer]), { x: 201, y: 221 })?.nodeId).toBe(IDS.loupe)
   })
 
   it('measures pixels/percent against the canvas diagonal and snaps deterministically', () => {
@@ -135,10 +131,8 @@ describe('M08 geometry, hit testing and renderer-neutral scene', () => {
       label: '500 px',
     })
     expect(
-      measureRuler(
-        { ...pixelRuler, payload: { ...pixelRuler.payload, unit: 'percent' } },
-        { width: 300, height: 400 },
-      ).label,
+      measureRuler({ ...pixelRuler, payload: { ...pixelRuler.payload, unit: 'percent' } }, { width: 300, height: 400 })
+        .label,
     ).toBe('100%')
 
     const fractionalPixelRuler = createRulerLayer({
@@ -148,9 +142,7 @@ describe('M08 geometry, hit testing and renderer-neutral scene', () => {
       end: { x: 4, y: 3.2 },
       unit: 'pixels',
     })
-    expect(
-      measureRuler(fractionalPixelRuler, { width: 300, height: 400 }).label,
-    ).toBe('5 px')
+    expect(measureRuler(fractionalPixelRuler, { width: 300, height: 400 }).label).toBe('5 px')
 
     const candidate = {
       x: Math.cos((7 * Math.PI) / 180) * 100,

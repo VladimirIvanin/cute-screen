@@ -1,5 +1,13 @@
-import { fireEvent, render } from '@testing-library/vue'
-import { describe, expect, it, vi } from 'vitest'
+import {
+  fireEvent,
+  render,
+} from '@testing-library/vue'
+import {
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 
 import LayersPanel from '../../../packages/editor-vue/src/shell/components/LayersPanel.vue'
 
@@ -33,10 +41,7 @@ async function pointerReorder(
     toJSON: () => ({}),
   } as DOMRect)
   const elementFromPoint = vi.fn(() => target)
-  vi.stubGlobal(
-    'elementFromPoint',
-    elementFromPoint as typeof document.elementFromPoint,
-  )
+  vi.stubGlobal('elementFromPoint', elementFromPoint as typeof document.elementFromPoint)
   Object.defineProperty(document, 'elementFromPoint', {
     configurable: true,
     value: elementFromPoint,
@@ -72,6 +77,16 @@ async function pointerReorder(
 }
 
 describe('M05 LayersPanel reorder', () => {
+  it('selects a locked layer with the pointer without beginning a reorder', async () => {
+    const rendered = render(LayersPanel, {
+      props: { layers: [{ ...layers[0]!, locked: true }], open: true, t: (key: string) => key },
+    })
+    const target = rendered.container.querySelector('.cs-layer-select')!
+    await fireEvent.pointerDown(target, { button: 0, pointerId: 1 })
+    await fireEvent.pointerUp(target, { button: 0, pointerId: 1 })
+    expect(rendered.emitted().select).toEqual([['top', false, false]])
+    expect(rendered.emitted().reorderTo).toBeUndefined()
+  })
   it('emits reorder target with before/after placement for pointer drag', async () => {
     const rendered = render(LayersPanel, {
       props: {
@@ -80,20 +95,14 @@ describe('M05 LayersPanel reorder', () => {
         t: (key: string) => key,
       },
     })
-    const source = rendered.container.querySelector(
-      '[data-layer-id="top"] .cs-layer-select',
-    )!
+    const source = rendered.container.querySelector('[data-layer-id="top"] .cs-layer-select')!
     const target = rendered.container.querySelector('[data-layer-id="bottom"]')!
 
     await pointerReorder(source, target, 'before')
     expect(rendered.emitted().reorderTo).toEqual([['top', 'bottom', 'before']])
 
     await pointerReorder(source, target, 'after')
-    expect(rendered.emitted().reorderTo?.[1]).toEqual([
-      'top',
-      'bottom',
-      'after',
-    ])
+    expect(rendered.emitted().reorderTo?.[1]).toEqual(['top', 'bottom', 'after'])
   })
 
   it('selects on tap and ignores visibility control for reorder', async () => {
@@ -105,9 +114,7 @@ describe('M05 LayersPanel reorder', () => {
       },
     })
     const row = rendered.container.querySelector('[data-layer-id="top"]')!
-    const name = rendered.container.querySelector(
-      '[data-layer-id="top"] .cs-layer-select',
-    )!
+    const name = rendered.container.querySelector('[data-layer-id="top"] .cs-layer-select')!
     const eye = row.querySelector('.cs-layer-action')!
     const target = rendered.container.querySelector('[data-layer-id="bottom"]')!
 
@@ -190,13 +197,9 @@ describe('M05 LayersPanel reorder', () => {
       },
     })
 
-    expect(
-      rendered.container.querySelector('.cs-layers-controls'),
-    ).not.toBeNull()
+    expect(rendered.container.querySelector('.cs-layers-controls')).not.toBeNull()
     expect(rendered.container.querySelector('.cs-layer-properties')).toBeNull()
-    expect(
-      await rendered.findByRole('slider', { name: 'opacity' }),
-    ).toBeInTheDocument()
+    expect(await rendered.findByRole('slider', { name: 'opacity' })).toBeInTheDocument()
     const rotationInput = rendered.container.querySelector(
       '.cs-layers-controls .cs-ui-number-input input',
     ) as HTMLInputElement

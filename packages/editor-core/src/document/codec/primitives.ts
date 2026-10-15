@@ -1,4 +1,7 @@
-import { collectExtras, readJsonObject } from '../json'
+import {
+  collectExtras,
+  readJsonObject,
+} from '../json'
 import {
   DEFAULT_PRESENTATION_SETTINGS,
   LAYER_KINDS,
@@ -12,22 +15,18 @@ import {
 } from '../types'
 
 const imageFormats = ['png', 'jpeg', 'webp', 'svg'] as const
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu
 const ULID_PATTERN = /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/u
 const SHA256_PATTERN = /^[a-f0-9]{64}$/u
 
-export const INLINE_IMAGE_FIELDS = [
-  'data',
-  'base64',
-  'bytes',
-  'dataUrl',
-  'src',
-] as const
+export const INLINE_IMAGE_FIELDS = ['data', 'base64', 'bytes', 'dataUrl', 'src'] as const
 
 export type ImageFormat = (typeof imageFormats)[number]
 
-export function readNonEmptyString(value: unknown, field: string): string {
+export function readNonEmptyString(
+  value: unknown,
+  field: string,
+): string {
   if (typeof value !== 'string' || value.length === 0) {
     throw new Error(`${field} must be a non-empty string`)
   }
@@ -46,7 +45,10 @@ export function assertOnlyFields(
   }
 }
 
-export function readStableId(value: unknown, field: string): string {
+export function readStableId(
+  value: unknown,
+  field: string,
+): string {
   const id = readNonEmptyString(value, field)
   if (!UUID_PATTERN.test(id) && !ULID_PATTERN.test(id)) {
     throw new Error(`${field} must be a UUID or ULID`)
@@ -54,7 +56,10 @@ export function readStableId(value: unknown, field: string): string {
   return id
 }
 
-export function readSha256(value: unknown, field: string): string {
+export function readSha256(
+  value: unknown,
+  field: string,
+): string {
   const hash = readNonEmptyString(value, field)
   if (!SHA256_PATTERN.test(hash)) {
     throw new Error(`${field} must be a lowercase SHA-256 hash`)
@@ -62,35 +67,45 @@ export function readSha256(value: unknown, field: string): string {
   return hash
 }
 
-export function readFiniteNumber(value: unknown, field: string): number {
+export function readFiniteNumber(
+  value: unknown,
+  field: string,
+): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     throw new Error(`${field} must be a finite number`)
   }
   return value
 }
 
-export function readPositiveNumber(value: unknown, field: string): number {
+export function readPositiveNumber(
+  value: unknown,
+  field: string,
+): number {
   const number = readFiniteNumber(value, field)
   if (number <= 0) throw new Error(`${field} must be positive`)
   return number
 }
 
-export function readBoolean(value: unknown, field: string): boolean {
+export function readBoolean(
+  value: unknown,
+  field: string,
+): boolean {
   if (typeof value !== 'boolean') throw new Error(`${field} must be boolean`)
   return value
 }
 
 export function isImageFormat(value: unknown): value is ImageFormat {
-  return (
-    typeof value === 'string' && imageFormats.includes(value as ImageFormat)
-  )
+  return typeof value === 'string' && imageFormats.includes(value as ImageFormat)
 }
 
 export function isLayerKind(value: unknown): value is LayerKind {
   return typeof value === 'string' && LAYER_KINDS.includes(value as LayerKind)
 }
 
-export function parseTransform(value: unknown, field: string): Transform2D {
+export function parseTransform(
+  value: unknown,
+  field: string,
+): Transform2D {
   const input = readJsonObject(value, field)
   const transform = {
     translateX: readFiniteNumber(input.translateX, `${field}.translateX`),
@@ -105,7 +120,10 @@ export function parseTransform(value: unknown, field: string): Transform2D {
   return Object.freeze(transform)
 }
 
-export function parseColor(value: unknown, field: string): ColorMetadata {
+export function parseColor(
+  value: unknown,
+  field: string,
+): ColorMetadata {
   const input = readJsonObject(value, field)
   const colorSpace = input.colorSpace
   if (
@@ -115,14 +133,8 @@ export function parseColor(value: unknown, field: string): ColorMetadata {
   ) {
     throw new Error(`${field}.colorSpace is invalid`)
   }
-  const dpiX =
-    input.dpiX === undefined
-      ? undefined
-      : readPositiveNumber(input.dpiX, `${field}.dpiX`)
-  const dpiY =
-    input.dpiY === undefined
-      ? undefined
-      : readPositiveNumber(input.dpiY, `${field}.dpiY`)
+  const dpiX = input.dpiX === undefined ? undefined : readPositiveNumber(input.dpiX, `${field}.dpiX`)
+  const dpiY = input.dpiY === undefined ? undefined : readPositiveNumber(input.dpiY, `${field}.dpiY`)
   return Object.freeze({
     colorSpace,
     hasIccProfile: readBoolean(input.hasIccProfile, `${field}.hasIccProfile`),
@@ -181,7 +193,10 @@ export function sourceToJson(source: SourceImageRef): JsonObject {
   }
 }
 
-export function parseRect(value: unknown, field: string): Rect {
+export function parseRect(
+  value: unknown,
+  field: string,
+): Rect {
   const input = readJsonObject(value, field)
   return Object.freeze({
     x: readFiniteNumber(input.x, `${field}.x`),
@@ -217,9 +232,7 @@ export function parseBoundedNonNegative(
   return number
 }
 
-export function collectDocumentExtras(
-  input: Record<string, unknown>,
-): JsonObject | undefined {
+export function collectDocumentExtras(input: Record<string, unknown>): JsonObject | undefined {
   return collectExtras(input, [
     'schemaVersion',
     'id',

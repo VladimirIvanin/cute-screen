@@ -1,5 +1,10 @@
 import path from 'node:path'
-import { $, $$, browser, expect } from '@wdio/globals'
+import {
+  $,
+  $$,
+  browser,
+  expect,
+} from '@wdio/globals'
 import {
   m08Snapshot,
   openM08,
@@ -8,7 +13,7 @@ import {
 } from './browser-m08-test-kit'
 
 describe('M08 crop and precision acceptance in browser mode', () => {
-  it('creates precision layers with loupe-only auto-selection and preserves active tools', async () => {
+  it('selects each completed precision layer and preserves the document after cancellation', async () => {
     await browser.setWindowSize(1280, 800)
     await openM08()
     await $('button[aria-label="Show layers"]').click()
@@ -19,15 +24,14 @@ describe('M08 crop and precision acceptance in browser mode', () => {
       [2, 'Ruler', 'ruler'],
     ] as const) {
       await drawPrecisionTool(label, kind, index)
-      expect(await $$('.cs-layer-row.is-selected')).toHaveLength(0)
+      expect(await $$('.cs-layer-row.is-selected')).toHaveLength(1)
       if (kind === 'ruler') {
-        await browser.saveScreenshot(
-          path.resolve('artifacts/browser-e2e/m08-ruler-visual.png'),
-        )
+        await browser.saveScreenshot(path.resolve('artifacts/browser-e2e/m08-ruler-visual.png'))
       }
     }
 
     const beforeCancel = (await m08Snapshot()).document.layers.length
+    await $('button[aria-label="Hide data"]').click()
     const start = await canvasPoint(280, 40)
     const end = await canvasPoint(330, 80)
     await browser
@@ -43,9 +47,6 @@ describe('M08 crop and precision acceptance in browser mode', () => {
     const selected = await $$('.cs-layer-row.is-selected')
     expect(selected).toHaveLength(1)
     await expect(selected[0]!).toHaveAttribute('data-layer-id')
-    await expect($('button[aria-label="Loupe"]')).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
+    await expect($('button[aria-label="Loupe"]')).toHaveAttribute('aria-pressed', 'false')
   })
 })

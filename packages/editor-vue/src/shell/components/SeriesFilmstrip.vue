@@ -22,11 +22,7 @@ const emit = defineEmits<{ select: [id: string] }>()
       class="cs-frame"
       :class="{ 'is-selected': frame.id === activeFrameId }"
       :aria-selected="frame.id === activeFrameId"
-      :aria-label="
-        frame.id === activeFrameId
-          ? `${frame.label}: ${t('selectedFrame')}`
-          : frame.label
-      "
+      :aria-label="frame.id === activeFrameId ? `${frame.label}: ${t('selectedFrame')}` : frame.label"
       @click="emit('select', frame.id)"
     >
       <span>{{ frame.label }}</span>

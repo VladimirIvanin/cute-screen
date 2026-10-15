@@ -1,10 +1,12 @@
-import { $, browser, expect } from '@wdio/globals'
+import {
+  $,
+  browser,
+  expect,
+} from '@wdio/globals'
 
 export async function openArrowConfigurePopover(): Promise<void> {
   await browser.execute(() => {
-    const button = document.querySelector<HTMLButtonElement>(
-      'button[aria-label="Arrow"], button[aria-label="Стрелка"]',
-    )
+    const button = document.querySelector<HTMLButtonElement>('button[aria-label="Arrow"], button[aria-label="Стрелка"]')
     if (!button) throw new Error('Arrow tool button is missing')
     button.dispatchEvent(
       new MouseEvent('contextmenu', {
@@ -19,9 +21,7 @@ export async function openArrowConfigurePopover(): Promise<void> {
 
 export async function closeArrowConfigurePopover(): Promise<void> {
   await browser.execute(() => {
-    document.body.dispatchEvent(
-      new PointerEvent('pointerdown', { bubbles: true }),
-    )
+    document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
   })
   await expect($('.cs-tool-configure-popover-host')).not.toExist()
 }
@@ -43,27 +43,17 @@ export async function chooseArrowConfigureOption(
     () =>
       browser.execute((optionName) => {
         return [
-          ...document.querySelectorAll<HTMLButtonElement>(
-            '.cs-overlay-root .cs-arrow-toolbar-popover button',
-          ),
+          ...document.querySelectorAll<HTMLButtonElement>('.cs-overlay-root .cs-arrow-toolbar-popover button'),
         ].some(
-          (button) =>
-            button.textContent?.trim() === optionName ||
-            button.getAttribute('aria-label') === optionName,
+          (button) => button.textContent?.trim() === optionName || button.getAttribute('aria-label') === optionName,
         )
       }, option),
     { timeoutMsg: `Arrow popover option is missing: ${option}` },
   )
   await browser.execute((optionName) => {
     const target = [
-      ...document.querySelectorAll<HTMLButtonElement>(
-        '.cs-overlay-root .cs-arrow-toolbar-popover button',
-      ),
-    ].find(
-      (button) =>
-        button.textContent?.trim() === optionName ||
-        button.getAttribute('aria-label') === optionName,
-    )
+      ...document.querySelectorAll<HTMLButtonElement>('.cs-overlay-root .cs-arrow-toolbar-popover button'),
+    ].find((button) => button.textContent?.trim() === optionName || button.getAttribute('aria-label') === optionName)
     if (!target) {
       throw new Error(`Missing arrow popover option: ${optionName}`)
     }

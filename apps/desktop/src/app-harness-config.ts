@@ -15,9 +15,7 @@ export interface AppHarnessConfig {
 export function readAppHarnessConfig(): AppHarnessConfig {
   const enabled = import.meta.env.VITE_TEST_HARNESS === 'true'
   const query = new URLSearchParams(window.location.search)
-  const fixture = enabled
-    ? ((query.get('m02') as AppHarnessConfig['fixture'] | null) ?? 'empty')
-    : 'empty'
+  const fixture = enabled ? ((query.get('m02') as AppHarnessConfig['fixture'] | null) ?? 'empty') : 'empty'
   const m05 = enabled && query.get('m05') === '1'
   const m08 = enabled && query.get('m08') === '1'
   const alpha = query.get('m08alpha')
@@ -32,9 +30,6 @@ export function readAppHarnessConfig(): AppHarnessConfig {
     m08,
     m08SourceNotReady: m08 && query.get('m08notready') === '1',
     m08ClipboardError: m08 && query.get('m08clipboarderror') === '1',
-    m08SourceAlpha:
-      m08 && (alpha === '0' || alpha === '128' || alpha === '255')
-        ? Number(alpha)
-        : 255,
+    m08SourceAlpha: m08 && (alpha === '0' || alpha === '128' || alpha === '255') ? Number(alpha) : 255,
   }
 }

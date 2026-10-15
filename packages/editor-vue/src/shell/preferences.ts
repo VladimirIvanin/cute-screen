@@ -1,4 +1,8 @@
-import type { SupportedLocale, ThemePreference, UiPreferencesV1 } from './types'
+import type {
+  SupportedLocale,
+  ThemePreference,
+  UiPreferencesV1,
+} from './types'
 import { resolveSystemLocale } from './i18n'
 import {
   defaultDrawingToolPreferences,
@@ -7,8 +11,7 @@ import {
 } from '@cute-screen/editor-renderer'
 
 export const UI_PREFERENCES_STORAGE_KEY = 'cute-screen.ui-preferences.v1'
-export const DRAWING_TOOL_PREFERENCES_STORAGE_KEY =
-  'cute-screen.drawing-tool-preferences.v1'
+export const DRAWING_TOOL_PREFERENCES_STORAGE_KEY = 'cute-screen.drawing-tool-preferences.v1'
 
 export interface UiPreferencesStorage {
   load(): UiPreferencesV1 | undefined
@@ -23,9 +26,7 @@ function isTheme(value: unknown): value is ThemePreference {
   return value === 'dark' || value === 'light' || value === 'system'
 }
 
-export function defaultPreferences(
-  languages: readonly string[],
-): UiPreferencesV1 {
+export function defaultPreferences(languages: readonly string[]): UiPreferencesV1 {
   return {
     schemaVersion: 1,
     locale: resolveSystemLocale(languages),
@@ -65,10 +66,7 @@ export function createBrowserPreferencesStorage(
     load: () => {
       if (!storage) return defaultPreferences(languages)
       try {
-        return parsePreferences(
-          storage.getItem(UI_PREFERENCES_STORAGE_KEY),
-          languages,
-        )
+        return parsePreferences(storage.getItem(UI_PREFERENCES_STORAGE_KEY), languages)
       } catch (error) {
         void error
         return defaultPreferences(languages)
@@ -103,10 +101,7 @@ export function createBrowserDrawingToolPreferencesStorage(
     save: (preferences) => {
       if (!storage) return
       try {
-        storage.setItem(
-          DRAWING_TOOL_PREFERENCES_STORAGE_KEY,
-          JSON.stringify(preferences),
-        )
+        storage.setItem(DRAWING_TOOL_PREFERENCES_STORAGE_KEY, JSON.stringify(preferences))
       } catch (error) {
         void error
       }

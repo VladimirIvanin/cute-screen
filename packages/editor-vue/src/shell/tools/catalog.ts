@@ -1,8 +1,11 @@
-import { computed, type ComputedRef, type Ref } from 'vue'
+import {
+  computed,
+  type ComputedRef,
+  type Ref,
+} from 'vue'
 import type { ToolDescriptor } from '../types'
 
-type Availability =
-  'interactive' | 'editable' | 'canvas' | 'editableCanvas' | 'contentImage'
+type Availability = 'interactive' | 'editable' | 'canvas' | 'editableCanvas' | 'contentImage'
 
 interface ToolCatalogEntry extends Omit<ToolDescriptor, 'disabled'> {
   readonly availability: Availability
@@ -91,6 +94,7 @@ const TOOL_CATALOG: readonly ToolCatalogEntry[] = [
   },
   {
     id: 'image',
+    shortcut: 'G',
     group: 'annotate',
     icon: 'image',
     labelKey: 'toolImage',
@@ -107,6 +111,7 @@ const TOOL_CATALOG: readonly ToolCatalogEntry[] = [
   },
   {
     id: 'censor',
+    shortcut: 'B',
     group: 'more',
     icon: 'privacy',
     labelKey: 'toolPrivacy',
@@ -114,6 +119,7 @@ const TOOL_CATALOG: readonly ToolCatalogEntry[] = [
   },
   {
     id: 'spotlight',
+    shortcut: 'F',
     group: 'more',
     icon: 'spotlight',
     labelKey: 'toolSpotlight',
@@ -212,13 +218,8 @@ function availabilityReason(
 }
 
 export function createToolCatalog(context: ToolCatalogContext) {
-  const allTools = computed<readonly ToolDescriptor[]>(() =>
-    TOOL_CATALOG.map((entry) => resolveTool(entry, context)),
-  )
+  const allTools = computed<readonly ToolDescriptor[]>(() => TOOL_CATALOG.map((entry) => resolveTool(entry, context)))
   const tools = computed<readonly ToolDescriptor[]>(() =>
-    context.quickMode
-      ? allTools.value.filter((tool) => QUICK_TOOL_IDS.has(tool.id))
-      : allTools.value,
-  )
+    context.quickMode ? allTools.value.filter((tool) => QUICK_TOOL_IDS.has(tool.id)) : allTools.value)
   return { tools }
 }

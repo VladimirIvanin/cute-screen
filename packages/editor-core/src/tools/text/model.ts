@@ -17,9 +17,7 @@ export type RichTextRange = Readonly<{
 
 export type RichTextSpanStyle = Readonly<Omit<RichTextSpan, 'start' | 'end'>>
 
-export type RichTextParagraphStyle = Readonly<
-  Omit<RichTextParagraph, 'start' | 'end'>
->
+export type RichTextParagraphStyle = Readonly<Omit<RichTextParagraph, 'start' | 'end'>>
 
 export type RichTextEditingState = Readonly<{
   readonly content: RichTextContent
@@ -44,8 +42,10 @@ export const DEFAULT_RICH_TEXT_SPAN_STYLE: RichTextSpanStyle = Object.freeze({
   strikethrough: false,
 })
 
-export const DEFAULT_RICH_TEXT_PARAGRAPH_STYLE: RichTextParagraphStyle =
-  Object.freeze({ alignment: 'start', listKind: 'none' })
+export const DEFAULT_RICH_TEXT_PARAGRAPH_STYLE: RichTextParagraphStyle = Object.freeze({
+  alignment: 'start',
+  listKind: 'none',
+})
 
 export function isHighSurrogate(value: number): boolean {
   return value >= 0xd800 && value <= 0xdbff
@@ -55,15 +55,19 @@ export function isLowSurrogate(value: number): boolean {
   return value >= 0xdc00 && value <= 0xdfff
 }
 
-export function isUtf16Boundary(text: string, offset: number): boolean {
-  if (!Number.isInteger(offset) || offset < 0 || offset > text.length) {
+export function isUtf16Boundary(
+  text: string,
+  offset: number,
+): boolean {
+  if (
+    !Number.isInteger(offset) ||
+    offset < 0 ||
+    offset > text.length
+  ) {
     return false
   }
   if (offset === 0 || offset === text.length) return true
-  return !(
-    isHighSurrogate(text.charCodeAt(offset - 1)) &&
-    isLowSurrogate(text.charCodeAt(offset))
-  )
+  return !(isHighSurrogate(text.charCodeAt(offset - 1)) && isLowSurrogate(text.charCodeAt(offset)))
 }
 
 export function normalizeOffset(
@@ -99,9 +103,7 @@ export function normalizeRichTextSelection(
   })
 }
 
-export function richTextSelectionRange(
-  selection: RichTextSelection,
-): RichTextRange {
+export function richTextSelectionRange(selection: RichTextSelection): RichTextRange {
   return Object.freeze({
     start: Math.min(selection.anchor, selection.focus),
     end: Math.max(selection.anchor, selection.focus),
@@ -128,9 +130,7 @@ export function spanStyle(span: RichTextSpan): RichTextSpanStyle {
   })
 }
 
-export function paragraphStyle(
-  paragraph: RichTextParagraph,
-): RichTextParagraphStyle {
+export function paragraphStyle(paragraph: RichTextParagraph): RichTextParagraphStyle {
   return Object.freeze({
     alignment: paragraph.alignment,
     listKind: paragraph.listKind,
@@ -167,13 +167,11 @@ export function freezeParagraph(
   })
 }
 
-function equalColor(left: SrgbColor, right: SrgbColor): boolean {
-  return (
-    left.red === right.red &&
-    left.green === right.green &&
-    left.blue === right.blue &&
-    left.alpha === right.alpha
-  )
+function equalColor(
+  left: SrgbColor,
+  right: SrgbColor,
+): boolean {
+  return left.red === right.red && left.green === right.green && left.blue === right.blue && left.alpha === right.alpha
 }
 
 function equalSpanStyle(
@@ -190,9 +188,7 @@ function equalSpanStyle(
   )
 }
 
-export function mergeSpans(
-  spans: readonly RichTextSpan[],
-): readonly RichTextSpan[] {
+export function mergeSpans(spans: readonly RichTextSpan[]): readonly RichTextSpan[] {
   const result: RichTextSpan[] = []
   for (const span of spans) {
     if (span.end <= span.start) continue
@@ -202,11 +198,7 @@ export function mergeSpans(
       previous.end === span.start &&
       equalSpanStyle(spanStyle(previous), spanStyle(span))
     ) {
-      result[result.length - 1] = freezeSpan(
-        previous.start,
-        span.end,
-        spanStyle(previous),
-      )
+      result[result.length - 1] = freezeSpan(previous.start, span.end, spanStyle(previous))
     } else {
       result.push(freezeSpan(span.start, span.end, spanStyle(span)))
     }
@@ -260,13 +252,12 @@ function assertParagraphCoverage(
       text.endsWith('\n')
     if (
       paragraph.start !== end ||
-      (paragraph.end <= paragraph.start && !terminalEmpty) ||
-      !isUtf16Boundary(text, paragraph.start) ||
-      !isUtf16Boundary(text, paragraph.end)
+      (paragraph.end <= paragraph.start &&
+        !terminalEmpty) ||
+        !isUtf16Boundary(text, paragraph.start) ||
+        !isUtf16Boundary(text, paragraph.end)
     ) {
-      throw new RangeError(
-        'rich-text paragraphs must cover complete code points',
-      )
+      throw new RangeError('rich-text paragraphs must cover complete code points')
     }
     end = paragraph.end
   }
@@ -298,18 +289,14 @@ export function paragraphAt(
   offset: number,
 ): RichTextParagraph | undefined {
   const terminal = paragraphs.find(
-    (paragraph) =>
-      paragraph.start === offset &&
-      paragraph.end === offset &&
-      offset === textLength,
+    (paragraph) => paragraph.start === offset && paragraph.end === offset && offset === textLength,
   )
   if (terminal) return terminal
   return (
     paragraphs.find(
       (paragraph) =>
         offset >= paragraph.start &&
-        (offset < paragraph.end ||
-          (offset === textLength && paragraph.end === textLength)),
+        (offset < paragraph.end || (offset === textLength && paragraph.end === textLength)),
     ) ?? paragraphs.at(-1)
   )
 }
@@ -332,18 +319,14 @@ function normalizedParagraphs(
   )
 }
 
-export function normalizeRichTextContent(
-  content: RichTextContent,
-): RichTextContent {
+export function normalizeRichTextContent(content: RichTextContent): RichTextContent {
   assertSpanCoverage(content.text, content.spans)
   const spans = mergeSpans(content.spans)
   const paragraphs = normalizedParagraphs(content.text, content.paragraphs)
   return Object.freeze({
     text: content.text,
     wrap: content.wrap,
-    ...(content.fixedWidth === undefined
-      ? {}
-      : { fixedWidth: content.fixedWidth }),
+    ...(content.fixedWidth === undefined ? {} : { fixedWidth: content.fixedWidth }),
     spans,
     paragraphs,
   })
@@ -355,9 +338,7 @@ export function richTextSpanStyleAt(
 ): RichTextSpanStyle {
   const normalized = normalizeRichTextContent(content)
   const safe = normalizeOffset(normalized.text, offset, 'backward')
-  const source =
-    normalized.spans.find((span) => safe >= span.start && safe < span.end) ??
-    normalized.spans.at(-1)
+  const source = normalized.spans.find((span) => safe >= span.start && safe < span.end) ?? normalized.spans.at(-1)
   return source ? spanStyle(source) : DEFAULT_RICH_TEXT_SPAN_STYLE
 }
 
@@ -367,11 +348,7 @@ export function richTextParagraphStyleAt(
 ): RichTextParagraphStyle {
   const normalized = normalizeRichTextContent(content)
   const safe = normalizeOffset(normalized.text, offset, 'backward')
-  const source = paragraphAt(
-    normalized.paragraphs,
-    normalized.text.length,
-    safe,
-  )
+  const source = paragraphAt(normalized.paragraphs, normalized.text.length, safe)
   return source ? paragraphStyle(source) : DEFAULT_RICH_TEXT_PARAGRAPH_STYLE
 }
 
@@ -410,10 +387,7 @@ export function setRichTextSelection(
   state: RichTextEditingState,
   selection: RichTextSelection,
 ): RichTextEditingState {
-  const safeSelection = normalizeRichTextSelection(
-    state.content.text,
-    selection,
-  )
+  const safeSelection = normalizeRichTextSelection(state.content.text, selection)
   const range = richTextSelectionRange(safeSelection)
   return Object.freeze({
     content: state.content,

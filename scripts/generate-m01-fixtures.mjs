@@ -1,8 +1,14 @@
 import { createHash } from 'node:crypto'
-import { mkdir, writeFile } from 'node:fs/promises'
+import {
+  mkdir,
+  writeFile,
+} from 'node:fs/promises'
 import path from 'node:path'
 import { deflateSync } from 'node:zlib'
-import { format } from 'prettier'
+import {
+  format,
+  resolveConfig,
+} from 'prettier'
 
 const root = process.cwd()
 const fixtureRoot = path.join(root, 'tests', 'fixtures')
@@ -26,7 +32,10 @@ function crc32(bytes) {
   return (crc ^ 0xffffffff) >>> 0
 }
 
-function chunk(type, data) {
+function chunk(
+  type,
+  data,
+) {
   const name = Buffer.from(type, 'ascii')
   const length = Buffer.alloc(4)
   length.writeUInt32BE(data.length)
@@ -69,7 +78,11 @@ function exifOrientation() {
   return exif
 }
 
-function createPng(width, height, options = {}) {
+function createPng(
+  width,
+  height,
+  options = {},
+) {
   const rowLength = 1 + width * 4
   const raw = Buffer.allocUnsafe(rowLength * height)
   for (let y = 0; y < height; y += 1) {
@@ -95,38 +108,23 @@ function createPng(width, height, options = {}) {
     chunks.push(
       chunk(
         'iCCP',
-        Buffer.concat([
-          Buffer.from('Cute Screen sRGB\0\0', 'ascii'),
-          deflateSync(iccProfile(), { level: 9 }),
-        ]),
+        Buffer.concat([Buffer.from('Cute Screen sRGB\0\0', 'ascii'), deflateSync(iccProfile(), { level: 9 })]),
       ),
     )
   }
   if (options.exif) chunks.push(chunk('eXIf', exifOrientation()))
   chunks.push(chunk('IDAT', deflateSync(raw, { level: 9 })))
   chunks.push(chunk('IEND', Buffer.alloc(0)))
-  return Buffer.concat([
-    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
-    ...chunks,
-  ])
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), ...chunks])
 }
 
 function sha256(bytes) {
   return createHash('sha256').update(bytes).digest('hex')
 }
 
-async function generatedImage({
-  id,
-  file,
-  width,
-  height,
-  expectedDecode,
-  options,
-  nodeCount,
-}) {
+async function generatedImage({ id, file, width, height, expectedDecode, options, nodeCount }) {
   const valid = createPng(width, height, options)
-  const bytes =
-    expectedDecode === 'failure' ? Buffer.from(valid.subarray(0, 40)) : valid
+  const bytes = expectedDecode === 'failure' ? Buffer.from(valid.subarray(0, 40)) : valid
   if (expectedDecode === 'failure') bytes[0] = 0
   await writeFile(path.join(fixtureRoot, file), bytes)
   return {
@@ -201,8 +199,7 @@ const fixtures = [
     metadata: { alpha: false, icc: false, exifOrientation: 1 },
     source: 'Created in-repository for M00 harness validation',
     license: 'CC0-1.0',
-    acquisition:
-      'Included in the repository at tests/fixtures/harness/red-1x1.ppm',
+    acquisition: 'Included in the repository at tests/fixtures/harness/red-1x1.ppm',
     harnessOnly: true,
   },
   await generatedImage({
@@ -274,7 +271,7 @@ await writeFile(
       schemaVersion: 2,
       fixtures,
     }),
-    { filepath: manifestPath },
+    { ...await resolveConfig(manifestPath), filepath: manifestPath },
   ),
 )
 

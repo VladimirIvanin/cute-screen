@@ -1,4 +1,7 @@
-import { createCanvas, GlobalFonts } from '@napi-rs/canvas'
+import {
+  createCanvas,
+  GlobalFonts,
+} from '@napi-rs/canvas'
 import {
   createDocumentRenderScene,
   createRenderSceneSnapshot,
@@ -21,18 +24,11 @@ import path from 'node:path'
 
 export async function prepareGoldenRuntime(): Promise<void> {
   canvasKit = (await CanvasKitInit({
-    locateFile: () =>
-      path.resolve(
-        'packages/editor-renderer/node_modules/canvaskit-wasm/bin/canvaskit.wasm',
-      ),
+    locateFile: () => path.resolve('packages/editor-renderer/node_modules/canvaskit-wasm/bin/canvaskit.wasm'),
   })) as CanvasKitApi
-  const loadFont = async (
-    subset: CanvasKitFontData['subset'],
-  ): Promise<CanvasKitFontData> => {
+  const loadFont = async (subset: CanvasKitFontData['subset']): Promise<CanvasKitFontData> => {
     const bytes = await readFile(
-      path.resolve(
-        `packages/editor-vue/node_modules/@fontsource/roboto/files/roboto-${subset}-400-normal.woff2`,
-      ),
+      path.resolve(`packages/editor-vue/node_modules/@fontsource/roboto/files/roboto-${subset}-400-normal.woff2`),
     )
     if (!GlobalFonts.register(bytes, `Roboto ${subset}`)) {
       throw new Error(`Canvas2D could not register bundled Roboto ${subset}`)
@@ -40,10 +36,7 @@ export async function prepareGoldenRuntime(): Promise<void> {
     return {
       family: 'Roboto',
       subset,
-      data: bytes.buffer.slice(
-        bytes.byteOffset,
-        bytes.byteOffset + bytes.byteLength,
-      ) as ArrayBuffer,
+      data: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
     }
   }
   canvasKitFonts = await Promise.all([loadFont('latin'), loadFont('cyrillic')])
@@ -116,22 +109,14 @@ export async function canvas2dPngs(
   dpr: 1 | 2,
   exportScale = 1,
 ): Promise<Readonly<{ preview: Uint8Array; exported: Uint8Array }>> {
-  const sceneCanvas = createCanvas(
-    snapshot.outputBounds.width,
-    snapshot.outputBounds.height,
-  )
+  const sceneCanvas = createCanvas(snapshot.outputBounds.width, snapshot.outputBounds.height)
   const renderer = new Canvas2DRenderer({
-    exportCanvas: (width, height) =>
-      createCanvas(width, height) as unknown as Canvas2DLike,
-    resolveFontFamily: (text) =>
-      /[\u0400-\u052f]/u.test(text) ? 'Roboto cyrillic' : 'Roboto latin',
+    exportCanvas: (width, height) => createCanvas(width, height) as unknown as Canvas2DLike,
+    resolveFontFamily: (text) => (/[\u0400-\u052f]/u.test(text) ? 'Roboto cyrillic' : 'Roboto latin'),
   })
   await renderer.initialize({
     scene: sceneCanvas as unknown as HTMLCanvasElement,
-    overlay: createCanvas(
-      snapshot.outputBounds.width,
-      snapshot.outputBounds.height,
-    ) as unknown as HTMLCanvasElement,
+    overlay: createCanvas(snapshot.outputBounds.width, snapshot.outputBounds.height) as unknown as HTMLCanvasElement,
     dpr,
     correlationId: `golden-canvas2d-dpr-${dpr}`,
   })
@@ -317,9 +302,7 @@ export const arrowCaps = [
   'diamond',
 ] as const satisfies readonly ArrowCap[]
 
-export function persistedArrowScene(
-  route: 'straight' | 'quadratic' | 'elbow',
-): RenderSceneSnapshot {
+export function persistedArrowScene(route: 'straight' | 'quadratic' | 'elbow'): RenderSceneSnapshot {
   const layers: ArrowLayer[] = []
   for (const [styleIndex, style] of ['solid', 'dashed'].entries()) {
     for (const [capIndex, cap] of arrowCaps.entries()) {
@@ -390,7 +373,6 @@ export function persistedArrowScene(
     updatedAt: '2026-08-13T00:00:00.000Z',
   }
   const parsed = parseEditorDocument(serializeEditorDocument(document))
-  if (parsed.kind !== 'editable')
-    throw new Error('arrow golden must be editable')
+  if (parsed.kind !== 'editable') throw new Error('arrow golden must be editable')
   return createDocumentRenderScene(parsed.document)
 }

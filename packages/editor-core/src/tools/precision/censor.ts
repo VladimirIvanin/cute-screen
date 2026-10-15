@@ -5,7 +5,10 @@ import type {
   Point,
   Rect,
 } from '../../document/types'
-import { assertValidFreeformPolygon, pointsBounds } from './polygon'
+import {
+  assertValidFreeformPolygon,
+  pointsBounds,
+} from './polygon'
 import {
   assertRect,
   assertUnitColor,
@@ -22,9 +25,7 @@ function freezeCensorEffect(effect: CensorEffect): CensorEffect {
         effect.blockSize < 2 ||
         effect.blockSize > 128
       ) {
-        throw new RangeError(
-          'pixelate blockSize must be an integer from 2 to 128',
-        )
+        throw new RangeError('pixelate blockSize must be an integer from 2 to 128')
       }
       return Object.freeze({ mode: 'pixelate', blockSize: effect.blockSize })
     case 'blur':
@@ -49,9 +50,7 @@ export function createCensorLayer(input: {
     | Readonly<{ readonly kind: 'freeform'; readonly points: readonly Point[] }>
   readonly effect?: CensorEffect
 }): CensorLayer {
-  const effect = freezeCensorEffect(
-    input.effect ?? { mode: 'pixelate', blockSize: 12 },
-  )
+  const effect = freezeCensorEffect(input.effect ?? { mode: 'pixelate', blockSize: 12 })
   let canvasBounds: Rect
   let region: CensorRegion
   if (input.region.kind === 'rectangle') {
@@ -69,8 +68,7 @@ export function createCensorLayer(input: {
           Object.freeze({
             x: point.x - canvasBounds.x,
             y: point.y - canvasBounds.y,
-          }),
-        ),
+          })),
       ),
     })
   }

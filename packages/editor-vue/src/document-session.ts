@@ -11,8 +11,7 @@ import {
   type ParsedEditorDocument,
 } from '@cute-screen/editor-renderer'
 
-export type DocumentSaveState =
-  'saved' | 'dirty' | 'saving' | 'error' | 'readOnly'
+export type DocumentSaveState = 'saved' | 'dirty' | 'saving' | 'error' | 'readOnly'
 
 export interface PersistedDocumentRecord {
   readonly documentId: string
@@ -21,20 +20,12 @@ export interface PersistedDocumentRecord {
 }
 
 export interface DocumentPersistenceBridge {
-  saveDocument(
-    record: PersistedDocumentRecord,
-    correlationId: string,
-  ): Promise<number>
-  exportRecoveryBundle(
-    documentId: string,
-    correlationId: string,
-  ): Promise<DocumentRecoveryExportOutcome>
+  saveDocument(record: PersistedDocumentRecord, correlationId: string): Promise<number>
+  exportRecoveryBundle(documentId: string, correlationId: string): Promise<DocumentRecoveryExportOutcome>
 }
 
 export type DocumentRecoveryExportOutcome =
-  | { readonly kind: 'saved' }
-  | { readonly kind: 'cancelled' }
-  | { readonly kind: 'failed'; readonly error: string }
+  { readonly kind: 'saved' } | { readonly kind: 'cancelled' } | { readonly kind: 'failed'; readonly error: string }
 
 export interface DocumentSessionSnapshot {
   readonly core: EditorSnapshot
@@ -44,9 +35,7 @@ export interface DocumentSessionSnapshot {
 }
 
 export type DocumentFlushOutcome =
-  | { readonly kind: 'saved' }
-  | { readonly kind: 'noChanges' }
-  | { readonly kind: 'failed'; readonly error: string }
+  { readonly kind: 'saved' } | { readonly kind: 'noChanges' } | { readonly kind: 'failed'; readonly error: string }
 
 export interface DocumentSessionOptions {
   readonly document: EditorDocumentV1
@@ -58,7 +47,10 @@ export interface DocumentSessionOptions {
 }
 
 /** Extracts a useful message from native/Tauri rejections, which are plain objects. */
-export function describeError(error: unknown, fallback: string): string {
+export function describeError(
+  error: unknown,
+  fallback: string,
+): string {
   if (error instanceof Error && error.message.trim()) return error.message
   if (typeof error === 'string' && error.trim()) return error
   if (typeof error === 'object' && error !== null) {
@@ -74,9 +66,7 @@ export function describeError(error: unknown, fallback: string): string {
     if (typeof nativeError.error === 'string' && nativeError.error.trim()) {
       return nativeError.error
     }
-    const unsupportedSchema =
-      nativeError.olderSchema?.schema_version ??
-      nativeError.newerSchema?.schema_version
+    const unsupportedSchema = nativeError.olderSchema?.schema_version ?? nativeError.newerSchema?.schema_version
     if (Number.isInteger(unsupportedSchema)) {
       return `This document uses unsupported schema version ${String(unsupportedSchema)}. Capture or open an image to continue.`
     }
@@ -99,9 +89,7 @@ export class DocumentSessionController {
   #inFlight: Promise<DocumentFlushOutcome> | undefined
 
   constructor(options: DocumentSessionOptions) {
-    this.#manager = new CommandManager(
-      normalizeEditableDocumentScales(options.document),
-    )
+    this.#manager = new CommandManager(normalizeEditableDocumentScales(options.document))
     this.#manager.markSaved()
     this.#revision = options.revision
     this.#bridge = options.bridge
@@ -155,10 +143,7 @@ export class DocumentSessionController {
   }
 
   exportRecoveryBundle(): Promise<DocumentRecoveryExportOutcome> {
-    return this.#bridge.exportRecoveryBundle(
-      this.#manager.snapshot.document.id,
-      this.#correlationId(),
-    )
+    return this.#bridge.exportRecoveryBundle(this.#manager.snapshot.document.id, this.#correlationId())
   }
 
   subscribe(listener: (snapshot: DocumentSessionSnapshot) => void): () => void {
@@ -205,9 +190,7 @@ export class DocumentSessionController {
         {
           documentId: this.#manager.snapshot.document.id,
           revision: this.#revision,
-          documentJson: serializeEditorDocument(
-            this.#manager.snapshot.document,
-          ),
+          documentJson: serializeEditorDocument(this.#manager.snapshot.document),
         },
         this.#correlationId(),
       )
@@ -235,8 +218,6 @@ export class DocumentSessionController {
   }
 }
 
-export function parsePersistedDocument(
-  record: PersistedDocumentRecord,
-): ParsedEditorDocument {
+export function parsePersistedDocument(record: PersistedDocumentRecord): ParsedEditorDocument {
   return parseEditorDocument(record.documentJson)
 }

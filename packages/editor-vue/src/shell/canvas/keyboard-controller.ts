@@ -3,7 +3,10 @@ import {
   snapRulerEndpoint,
   type RulerAngleGuide,
 } from '@cute-screen/editor-renderer'
-import type { ComputedRef, Ref } from 'vue'
+import type {
+  ComputedRef,
+  Ref,
+} from 'vue'
 import type {
   CanvasPoint,
   CanvasViewportEmit,
@@ -50,13 +53,23 @@ export class KeyboardController {
   }
 
   keydown(event: KeyboardEvent): void {
+    if (event.defaultPrevented || isEditableTarget(event.target)) return
     if (this.#handleSampling(event)) return
     if (this.#handleCrop(event)) return
     this.#handleAltDown(event)
     if (event.code === 'Space' && !isEditableTarget(event.target)) {
       this.#context.setSpacePressed(true)
     }
-    if (event.key === 'Escape') this.#handleEscape()
+    if (event.key === 'Escape') {
+      if (
+        this.#context.gesture() ||
+        this.#context.editingText.value ||
+        (this.#context.props.activeTool &&
+          this.#context.props.activeTool !== 'select')
+      )
+        event.preventDefault()
+      this.#handleEscape()
+    }
   }
 
   keyup(event: KeyboardEvent): void {
@@ -81,7 +94,11 @@ export class KeyboardController {
 
   #handleSampling(event: KeyboardEvent): boolean {
     const { props, scene, outputBounds, samplingCursor } = this.#context
-    if (!props.sampling || !scene.value || !props.canvas) return false
+    if (
+      !props.sampling ||
+      !scene.value ||
+      !props.canvas
+    ) return false
     const bounds = outputBounds.value ?? {
       x: 0,
       y: 0,
@@ -90,9 +107,9 @@ export class KeyboardController {
     }
     const initial = samplingCursor.value ??
       this.#context.initialSamplingCursor() ?? {
-        x: 0,
-        y: 0,
-      }
+      x: 0,
+      y: 0,
+    }
     if (event.key === 'Enter') {
       event.preventDefault()
       this.#context.sampleScene(initial)
@@ -109,14 +126,8 @@ export class KeyboardController {
     if (!move) return false
     event.preventDefault()
     const next = {
-      x: Math.max(
-        bounds.x,
-        Math.min(bounds.x + bounds.width - 1, initial.x + move[0]),
-      ),
-      y: Math.max(
-        bounds.y,
-        Math.min(bounds.y + bounds.height - 1, initial.y + move[1]),
-      ),
+      x: Math.max(bounds.x, Math.min(bounds.x + bounds.width - 1, initial.x + move[0])),
+      y: Math.max(bounds.y, Math.min(bounds.y + bounds.height - 1, initial.y + move[1])),
     }
     samplingCursor.value = next
     this.#context.scheduleEyedropper(next)
@@ -157,14 +168,9 @@ export class KeyboardController {
     }
     if (event.key !== 'Alt' || gesture?.kind !== 'precision') return
     let next = { ...gesture, guidesHeld: true }
-    const defaults =
-      this.#context.props.precisionDefaults ?? DEFAULT_PRECISION_TOOLS
+    const defaults = this.#context.props.precisionDefaults ?? DEFAULT_PRECISION_TOOLS
     if (gesture.tool === 'ruler' && defaults.ruler.snap) {
-      const snapped = snapRulerEndpoint(
-        gesture.start,
-        gesture.current,
-        defaults.ruler.snapAngleIncrementDegrees,
-      )
+      const snapped = snapRulerEndpoint(gesture.start, gesture.current, defaults.ruler.snapAngleIncrementDegrees)
       next = { ...next, current: snapped.end }
       this.#context.setRulerGuide(snapped.guide)
     }
@@ -199,9 +205,7 @@ export class KeyboardController {
   }
 }
 
-function samplingMove(
-  event: KeyboardEvent,
-): readonly [number, number] | undefined {
+function samplingMove(event: KeyboardEvent): readonly [number, number] | undefined {
   const step = event.shiftKey ? 10 : 1
   return {
     ArrowLeft: [-step, 0] as const,
@@ -211,9 +215,7 @@ function samplingMove(
   }[event.key]
 }
 
-function cropDirection(
-  key: string,
-): 'left' | 'right' | 'up' | 'down' | undefined {
+function cropDirection(key: string): 'left' | 'right' | 'up' | 'down' | undefined {
   return {
     ArrowLeft: 'left' as const,
     ArrowRight: 'right' as const,
@@ -226,6 +228,8 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return (
     target instanceof HTMLInputElement ||
     target instanceof HTMLTextAreaElement ||
-    (target instanceof HTMLElement && target.isContentEditable)
+    (target instanceof HTMLElement && (target.isContentEditable || Boolean(
+      target.closest('select, [role="slider"], [role="combobox"], [role="dialog"], [role="menu"]'),
+    )))
   )
 }

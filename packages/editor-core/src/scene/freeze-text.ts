@@ -1,5 +1,9 @@
 import type { RenderTextNode } from './contracts'
-import { assertFinite, assertPositive, freezeColor } from './validation'
+import {
+  assertFinite,
+  assertPositive,
+  freezeColor,
+} from './validation'
 
 export function freezeTextNode(node: RenderTextNode): RenderTextNode {
   assertFinite(node.x, `${node.id}.x`)
@@ -18,22 +22,18 @@ export function freezeTextNode(node: RenderTextNode): RenderTextNode {
     }
     assertPositive(node.fixedWidth, `${node.id}.fixedWidth`)
   } else if (node.fixedWidth !== undefined) {
-    throw new RangeError(
-      `${node.id}.fixedWidth is only valid for fixedWidth text`,
-    )
+    throw new RangeError(`${node.id}.fixedWidth is only valid for fixedWidth text`)
   }
   const isBoundary = (offset: number): boolean => {
-    if (!Number.isInteger(offset) || offset < 0 || offset > node.text.length)
-      return false
+    if (
+      !Number.isInteger(offset) ||
+      offset < 0 ||
+      offset > node.text.length
+    ) return false
     if (offset === 0 || offset === node.text.length) return true
     const previous = node.text.charCodeAt(offset - 1)
     const next = node.text.charCodeAt(offset)
-    return !(
-      previous >= 0xd800 &&
-      previous <= 0xdbff &&
-      next >= 0xdc00 &&
-      next <= 0xdfff
-    )
+    return !(previous >= 0xd800 && previous <= 0xdbff && next >= 0xdc00 && next <= 0xdfff)
   }
   let runEnd = 0
   const runs = node.runs.map((run, index) => {
@@ -43,13 +43,10 @@ export function freezeTextNode(node: RenderTextNode): RenderTextNode {
       !isBoundary(run.start) ||
       !isBoundary(run.end)
     ) {
-      throw new RangeError(
-        `${node.id}.runs[${index}] must be contiguous UTF-16 ranges`,
-      )
+      throw new RangeError(`${node.id}.runs[${index}] must be contiguous UTF-16 ranges`)
     }
     runEnd = run.end
-    if (!run.fontFamily)
-      throw new Error(`${node.id}.runs[${index}].fontFamily is empty`)
+    if (!run.fontFamily) throw new Error(`${node.id}.runs[${index}].fontFamily is empty`)
     assertPositive(run.fontSize, `${node.id}.runs[${index}].fontSize`)
     if (
       !Number.isInteger(run.fontWeight) ||
@@ -73,35 +70,31 @@ export function freezeTextNode(node: RenderTextNode): RenderTextNode {
       node.text.endsWith('\n')
     if (
       paragraph.start !== paragraphEnd ||
-      (paragraph.end <= paragraph.start && !terminalEmpty) ||
-      !isBoundary(paragraph.start) ||
-      !isBoundary(paragraph.end)
+      (paragraph.end <= paragraph.start &&
+        !terminalEmpty) ||
+        !isBoundary(paragraph.start) ||
+        !isBoundary(paragraph.end)
     ) {
-      throw new RangeError(
-        `${node.id}.paragraphs[${index}] must be contiguous UTF-16 ranges`,
-      )
+      throw new RangeError(`${node.id}.paragraphs[${index}] must be contiguous UTF-16 ranges`)
     }
     paragraphEnd = paragraph.end
     if (!['start', 'center', 'end'].includes(paragraph.alignment)) {
-      throw new RangeError(
-        `${node.id}.paragraphs[${index}].alignment is invalid`,
-      )
+      throw new RangeError(`${node.id}.paragraphs[${index}].alignment is invalid`)
     }
     if (paragraph.listKind !== 'none' && paragraph.listKind !== 'bullet') {
-      throw new RangeError(
-        `${node.id}.paragraphs[${index}].listKind is invalid`,
-      )
+      throw new RangeError(`${node.id}.paragraphs[${index}].listKind is invalid`)
     }
     return Object.freeze({ ...paragraph })
   })
   if (
     (node.text.length === 0 &&
-      (runs.length !== 0 || paragraphs.length !== 0)) ||
-    (node.text.length > 0 &&
-      (runs.length === 0 ||
-        paragraphs.length === 0 ||
-        runEnd !== node.text.length ||
-        paragraphEnd !== node.text.length))
+      (runs.length !== 0 ||
+        paragraphs.length !== 0)) ||
+        (node.text.length > 0 &&
+          (runs.length === 0 ||
+            paragraphs.length === 0 ||
+            runEnd !== node.text.length ||
+            paragraphEnd !== node.text.length))
   ) {
     throw new RangeError(`${node.id} rich text ranges must cover text exactly`)
   }

@@ -45,8 +45,11 @@ function freezeShadow(shadow: ShadowStyle): ShadowStyle {
 
 function loupeZoom(value: number | undefined): number {
   const zoom = value ?? 2
-  if (!Number.isFinite(zoom) || zoom < 1 || zoom > 16)
-    throw new RangeError('loupe zoom must be between 1 and 16')
+  if (
+    !Number.isFinite(zoom) ||
+    zoom < 1 ||
+    zoom > 16
+  ) throw new RangeError('loupe zoom must be between 1 and 16')
   return zoom
 }
 
@@ -56,7 +59,11 @@ function loupeSize(
   zoom: number,
 ): number {
   const size = value ?? sourceWidth * zoom
-  if (!Number.isFinite(size) || size < 16 || size > 2_048)
+  if (
+    !Number.isFinite(size) ||
+    size < 16 ||
+    size > 2_048
+  )
     throw new RangeError('loupe size must be between 16 and 2048')
   if (Math.abs(sourceWidth * zoom - size) > GEOMETRY_EPSILON)
     throw new RangeError('loupe sourceRegion size must equal lens size / zoom')
@@ -65,14 +72,17 @@ function loupeSize(
 
 function loupeShape(value: 'circle' | 'rectangle' | undefined) {
   const shape = value ?? 'circle'
-  if (shape !== 'circle' && shape !== 'rectangle')
-    throw new RangeError('loupe shape is invalid')
+  if (shape !== 'circle' && shape !== 'rectangle') throw new RangeError('loupe shape is invalid')
   return shape
 }
 
 function loupeBorderWidth(value: number | undefined): number {
   const width = value ?? 3
-  if (!Number.isFinite(width) || width < 0 || width > 64)
+  if (
+    !Number.isFinite(width) ||
+    width < 0 ||
+    width > 64
+  )
     throw new RangeError('loupe borderWidth must be between 0 and 64')
   return width
 }
@@ -93,10 +103,7 @@ export function createLoupeLayer(input: {
   assertRect(input.sourceRegion, 'loupe sourceRegion')
   assertValidLoupeSourceRegion(input.sourceRegion, input.canvas)
   assertPoint(input.destination, 'loupe destination')
-  if (
-    Math.abs(input.sourceRegion.width - input.sourceRegion.height) >
-    GEOMETRY_EPSILON
-  ) {
+  if (Math.abs(input.sourceRegion.width - input.sourceRegion.height) > GEOMETRY_EPSILON) {
     throw new RangeError('loupe sourceRegion must be square')
   }
   const zoom = loupeZoom(input.zoom)

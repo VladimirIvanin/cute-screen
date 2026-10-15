@@ -1,7 +1,11 @@
 import '@testing-library/jest-dom/vitest'
 
 import { cleanup } from '@testing-library/vue'
-import { afterEach, beforeEach, vi } from 'vitest'
+import {
+  afterEach,
+  beforeEach,
+  vi,
+} from 'vitest'
 
 if (typeof window.matchMedia !== 'function') {
   Object.defineProperty(window, 'matchMedia', {

@@ -1,4 +1,7 @@
-import type { RenderNode, RenderSceneSnapshot } from '@cute-screen/editor-core'
+import type {
+  RenderNode,
+  RenderSceneSnapshot,
+} from '@cute-screen/editor-core'
 import { scaledOutputSize } from '../../precision-rendering'
 import type { RenderExportOptions } from '../../types'
 import type {
@@ -29,62 +32,28 @@ interface SceneContext {
   readonly scale: number
 }
 
-function drawOrderedNode(context: SceneContext, node: RenderNode): void {
+function drawOrderedNode(
+  context: SceneContext,
+  node: RenderNode,
+): void {
   switch (node.kind) {
     case 'censor':
-      drawCensorCanvasKit(
-        context.canvasKit,
-        context.surface,
-        context.canvas,
-        context.scene,
-        node,
-        context.scale,
-      )
+      drawCensorCanvasKit(context.canvasKit, context.surface, context.canvas, context.scene, node, context.scale)
       return
     case 'spotlight':
-      drawSpotlightCanvasKit(
-        context.canvasKit,
-        context.surface,
-        context.canvas,
-        context.scene,
-        node,
-        context.scale,
-      )
+      drawSpotlightCanvasKit(context.canvasKit, context.surface, context.canvas, context.scene, node, context.scale)
       return
     case 'ruler':
-      drawRulerCanvasKit(
-        context.canvasKit,
-        context.canvas,
-        node,
-        context.typefaces,
-      )
+      drawRulerCanvasKit(context.canvasKit, context.canvas, node, context.typefaces)
       return
     case 'loupe':
-      drawLoupeCanvasKit(
-        context.canvasKit,
-        context.surface,
-        context.canvas,
-        context.scene,
-        node,
-        context.scale,
-      )
+      drawLoupeCanvasKit(context.canvasKit, context.surface, context.canvas, context.scene, node, context.scale)
       return
     case 'image':
-      drawImageNodeCanvasKit(
-        context.canvasKit,
-        context.canvas,
-        node,
-        context.resources,
-      )
+      drawImageNodeCanvasKit(context.canvasKit, context.canvas, node, context.resources)
       return
     default:
-      drawNodesCanvasKit(
-        context.canvasKit,
-        context.canvas,
-        [node],
-        context.resources,
-        context.typefaces,
-      )
+      drawNodesCanvasKit(context.canvasKit, context.canvas, [node], context.resources, context.typefaces)
   }
 }
 
@@ -123,7 +92,10 @@ export function drawScene(
   surface.flush()
 }
 
-function encodePng(canvasKit: CanvasKitApi, image: CanvasKitImage): Uint8Array {
+function encodePng(
+  canvasKit: CanvasKitApi,
+  image: CanvasKitImage,
+): Uint8Array {
   const bytes = image.encodeToBytes(canvasKit.ImageFormat.PNG)
   if (!bytes) throw new Error('CanvasKit PNG encoding failed')
   return new Uint8Array(bytes)
@@ -197,9 +169,7 @@ function encodeSceneSurface(
       scene.outputBounds.y === 0 &&
       scene.outputBounds.width === scene.width &&
       scene.outputBounds.height === scene.height
-    return fullOutput
-      ? encodePng(canvasKit, image)
-      : encodeCroppedPng(canvasKit, image, scene, scale)
+    return fullOutput ? encodePng(canvasKit, image) : encodeCroppedPng(canvasKit, image, scene, scale)
   } finally {
     image.delete()
   }

@@ -1,5 +1,11 @@
-import type { JsonObject, SrgbColor } from './document/types'
-import { DEFAULT_DRAWING_DEFAULTS, type DrawingDefaults } from './drawing'
+import type {
+  JsonObject,
+  SrgbColor,
+} from './document/types'
+import {
+  DEFAULT_DRAWING_DEFAULTS,
+  type DrawingDefaults,
+} from './drawing'
 
 export interface DrawingToolPreferencesV2 {
   readonly schemaVersion: 2
@@ -20,7 +26,11 @@ function cloneDefaults(defaults: DrawingDefaults): DrawingDefaults {
 }
 
 function isColor(value: unknown): value is SrgbColor {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value)
+  ) return false
   const color = value as Record<string, unknown>
   return ['red', 'green', 'blue', 'alpha'].every(
     (channel) =>
@@ -47,7 +57,11 @@ function normalizedStroke(value: unknown): JsonObject | undefined {
   ) {
     return undefined
   }
-  if (value.cap !== 'butt' && value.cap !== 'round' && value.cap !== 'square') {
+  if (
+    value.cap !== 'butt' &&
+    value.cap !== 'round' &&
+    value.cap !== 'square'
+  ) {
     return undefined
   }
   if (
@@ -73,7 +87,11 @@ function normalizedArrow(
 ): JsonObject {
   if (!isJsonObject(value)) return fallback
   const path = value.path
-  if (path !== 'straight' && path !== 'quadratic' && path !== 'elbow') {
+  if (
+    path !== 'straight' &&
+    path !== 'quadratic' &&
+    path !== 'elbow'
+  ) {
     return fallback
   }
   const stroke = normalizedStroke(value.stroke)
@@ -86,14 +104,7 @@ function normalizedArrow(
         : cap
   const startCap = migrateCap(value.startCap)
   const endCap = migrateCap(value.endCap)
-  const caps = [
-    'none',
-    'lineArrow',
-    'solidArrow',
-    'triangle',
-    'circle',
-    'diamond',
-  ]
+  const caps = ['none', 'lineArrow', 'solidArrow', 'triangle', 'circle', 'diamond']
   if (!caps.includes(String(startCap)) || !caps.includes(String(endCap))) {
     return fallback
   }
@@ -101,10 +112,7 @@ function normalizedArrow(
   if (path === 'elbow') {
     if (!isJsonObject(value.elbow)) return fallback
     if (value.elbow.axis !== 'x' && value.elbow.axis !== 'y') return fallback
-    if (
-      typeof value.elbow.offset !== 'number' ||
-      !Number.isFinite(value.elbow.offset)
-    ) {
+    if (typeof value.elbow.offset !== 'number' || !Number.isFinite(value.elbow.offset)) {
       return fallback
     }
     elbow = { axis: value.elbow.axis, offset: value.elbow.offset }
@@ -126,8 +134,15 @@ function normalizedArrow(
   }
 }
 
-function defaults(value: unknown, schemaVersion: 1 | 2): DrawingDefaults {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+function defaults(
+  value: unknown,
+  schemaVersion: 1 | 2,
+): DrawingDefaults {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value)
+  ) {
     return cloneDefaults(DEFAULT_DRAWING_DEFAULTS)
   }
   const input = value as Record<string, unknown>
@@ -153,10 +168,12 @@ export function defaultDrawingToolPreferences(): DrawingToolPreferencesV2 {
 }
 
 /** Invalid settings are intentionally recoverable: callers continue with defaults. */
-export function parseDrawingToolPreferences(
-  value: unknown,
-): DrawingToolPreferencesV2 {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+export function parseDrawingToolPreferences(value: unknown): DrawingToolPreferencesV2 {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value)
+  ) {
     return defaultDrawingToolPreferences()
   }
   const input = value as Record<string, unknown>
@@ -185,9 +202,7 @@ export function rememberDrawingColor(
   const recentColors = [
     Object.freeze({ ...color }),
     ...preferences.recentColors.filter(
-      (current) =>
-        `${current.red}:${current.green}:${current.blue}:${current.alpha}` !==
-        key,
+      (current) => `${current.red}:${current.green}:${current.blue}:${current.alpha}` !== key,
     ),
   ].slice(0, 12)
   return Object.freeze({

@@ -20,7 +20,10 @@ import {
   assertValidFreeformPolygon,
   pointsBounds,
 } from '../../tools/precision/polygon'
-import { parseSrgbColor, parseUnitInterval } from './paint'
+import {
+  parseSrgbColor,
+  parseUnitInterval,
+} from './paint'
 import {
   assertOnlyFields,
   readFiniteNumber,
@@ -48,7 +51,10 @@ function parseStrictPoint(
   })
 }
 
-function parseStrictRect(value: unknown, field: string): Rect & JsonObject {
+function parseStrictRect(
+  value: unknown,
+  field: string,
+): Rect & JsonObject {
   const input = readJsonObject(value, field)
   assertOnlyFields(input, ['x', 'y', 'width', 'height'], field)
   return Object.freeze({
@@ -90,10 +96,7 @@ function parseCensorEffect(
   assertOnlyFields(input, ['mode', 'color'], field)
   return Object.freeze({
     mode: 'solid',
-    color: parseSrgbColor(
-      input.color,
-      `${field}.color`,
-    ) as unknown as SrgbColor,
+    color: parseSrgbColor(input.color, `${field}.color`) as unknown as SrgbColor,
   })
 }
 
@@ -116,9 +119,7 @@ export function parseCensorPayload(
     if (!Array.isArray(rawRegion.points)) {
       throw new Error(`${field}.region.points must be an array`)
     }
-    const points = rawRegion.points.map((point, index) =>
-      parseStrictPoint(point, `${field}.region.points[${index}]`),
-    )
+    const points = rawRegion.points.map((point, index) => parseStrictPoint(point, `${field}.region.points[${index}]`))
     assertValidFreeformPolygon(points, `${field}.region.points`)
     region = Object.freeze({
       kind: 'freeform',
@@ -140,25 +141,18 @@ export function parseSpotlightPayload(
 ): SpotlightLayerPayload {
   const input = readJsonObject(value, field)
   assertOnlyFields(input, ['shape', 'dimColor', 'dimOpacity', 'feather'], field)
-  if (
-    !SPOTLIGHT_SHAPES.includes(input.shape as (typeof SPOTLIGHT_SHAPES)[number])
-  ) {
+  if (!SPOTLIGHT_SHAPES.includes(input.shape as (typeof SPOTLIGHT_SHAPES)[number])) {
     throw new Error(`${field}.shape is invalid`)
   }
   if (
     input.feather !== null &&
-    !SPOTLIGHT_FEATHER_PRESETS.includes(
-      input.feather as (typeof SPOTLIGHT_FEATHER_PRESETS)[number],
-    )
+    !SPOTLIGHT_FEATHER_PRESETS.includes(input.feather as (typeof SPOTLIGHT_FEATHER_PRESETS)[number])
   ) {
     throw new Error(`${field}.feather is invalid`)
   }
   return Object.freeze({
     shape: input.shape as SpotlightLayerPayload['shape'],
-    dimColor: parseSrgbColor(
-      input.dimColor,
-      `${field}.dimColor`,
-    ) as unknown as SrgbColor,
+    dimColor: parseSrgbColor(input.dimColor, `${field}.dimColor`) as unknown as SrgbColor,
     dimOpacity: parseUnitInterval(input.dimOpacity, `${field}.dimOpacity`),
     feather: input.feather as SpotlightLayerPayload['feather'],
   })
@@ -171,16 +165,7 @@ export function parseRulerPayload(
   const input = readJsonObject(value, field)
   assertOnlyFields(
     input,
-    [
-      'start',
-      'end',
-      'unit',
-      'percentBasis',
-      'snapAngleIncrementDegrees',
-      'color',
-      'thickness',
-      'fontSize',
-    ],
+    ['start', 'end', 'unit', 'percentBasis', 'snapAngleIncrementDegrees', 'color', 'thickness', 'fontSize'],
     field,
   )
   if (!RULER_UNITS.includes(input.unit as (typeof RULER_UNITS)[number])) {
@@ -194,10 +179,7 @@ export function parseRulerPayload(
   if (start.x === end.x && start.y === end.y) {
     throw new Error(`${field} endpoints must be distinct`)
   }
-  const increment = readFiniteNumber(
-    input.snapAngleIncrementDegrees,
-    `${field}.snapAngleIncrementDegrees`,
-  )
+  const increment = readFiniteNumber(input.snapAngleIncrementDegrees, `${field}.snapAngleIncrementDegrees`)
   if (increment <= 0 || increment > 90) {
     throw new Error(`${field}.snapAngleIncrementDegrees is invalid`)
   }
@@ -223,10 +205,7 @@ export function parseRulerPayload(
     unit: input.unit as RulerLayerPayload['unit'],
     percentBasis: 'canvasDiagonal',
     snapAngleIncrementDegrees: increment,
-    color: parseSrgbColor(
-      input.color,
-      `${field}.color`,
-    ) as unknown as SrgbColor,
+    color: parseSrgbColor(input.color, `${field}.color`) as unknown as SrgbColor,
     thickness,
     fontSize,
   }) as RulerLayerPayload
@@ -251,10 +230,7 @@ function parseLoupeShadow(
     throw new Error(`${field} is outside supported bounds`)
   }
   return Object.freeze({
-    color: parseSrgbColor(
-      input.color,
-      `${field}.color`,
-    ) as unknown as SrgbColor,
+    color: parseSrgbColor(input.color, `${field}.color`) as unknown as SrgbColor,
     offsetX,
     offsetY,
     blur,
@@ -266,18 +242,11 @@ export function parseLoupePayload(
   field: string,
 ): LoupeLayerPayload {
   const input = readJsonObject(value, field)
-  assertOnlyFields(
-    input,
-    ['sourceRegion', 'lens', 'zoom', 'border', 'shadow', 'sampleSource'],
-    field,
-  )
+  assertOnlyFields(input, ['sourceRegion', 'lens', 'zoom', 'border', 'shadow', 'sampleSource'], field)
   if (input.sampleSource !== 'compositeBelow') {
     throw new Error(`${field}.sampleSource must be compositeBelow`)
   }
-  const sourceRegion = parseStrictRect(
-    input.sourceRegion,
-    `${field}.sourceRegion`,
-  )
+  const sourceRegion = parseStrictRect(input.sourceRegion, `${field}.sourceRegion`)
   if (Math.abs(sourceRegion.width - sourceRegion.height) > GEOMETRY_EPSILON) {
     throw new Error(`${field}.sourceRegion must be square`)
   }
@@ -311,10 +280,7 @@ export function parseLoupePayload(
     }),
     zoom,
     border: Object.freeze({
-      color: parseSrgbColor(
-        border.color,
-        `${field}.border.color`,
-      ) as unknown as SrgbColor,
+      color: parseSrgbColor(border.color, `${field}.border.color`) as unknown as SrgbColor,
       width: borderWidth,
     }),
     shadow: parseLoupeShadow(input.shadow, `${field}.shadow`),

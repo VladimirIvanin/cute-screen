@@ -1,7 +1,16 @@
 import { fireEvent } from '@testing-library/vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 import type { EditorDocumentV1 } from '@cute-screen/editor-renderer'
-import { document, mountViewport } from './canvas-viewport-test-kit'
+import {
+  document,
+  mountViewport,
+} from './canvas-viewport-test-kit'
 
 beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
@@ -32,26 +41,12 @@ beforeEach(() => {
 describe('M05 CanvasViewport transforms', () => {
   it('keeps the Quick overlay at display resolution across document redraws', async () => {
     vi.stubGlobal('devicePixelRatio', 2)
-    const view = mountViewport(
-      'select',
-      document,
-      '',
-      undefined,
-      false,
-      undefined,
-      undefined,
-      true,
-    )
-    const overlay = view.container.querySelector(
-      '.cs-canvas-overlay',
-    ) as HTMLCanvasElement
-    overlay.getBoundingClientRect = () =>
-      ({ width: 360, height: 360 }) as DOMRect
+    const view = mountViewport('select', document, '', undefined, false, undefined, undefined, true)
+    const overlay = view.container.querySelector('.cs-canvas-overlay') as HTMLCanvasElement
+    overlay.getBoundingClientRect = () => ({ width: 360, height: 360 }) as DOMRect
     view.scene.getBoundingClientRect = overlay.getBoundingClientRect
     try {
-      await vi.waitFor(() =>
-        expect(view.emitted().frameReady).toEqual([[document.id]]),
-      )
+      await vi.waitFor(() => expect(view.emitted().frameReady).toEqual([[document.id]]))
       await view.rerender({ zoom: 360 })
       expect([overlay.width, overlay.height]).toEqual([720, 720])
       expect([view.scene.width, view.scene.height]).toEqual([100, 100])
@@ -61,9 +56,7 @@ describe('M05 CanvasViewport transforms', () => {
           crop: { x: 10, y: 10, width: 60, height: 60 },
         },
       })
-      await vi.waitFor(() =>
-        expect([overlay.width, overlay.height]).toEqual([720, 720]),
-      )
+      await vi.waitFor(() => expect([overlay.width, overlay.height]).toEqual([720, 720]))
       expect(view.scene.width).toBe(100)
     } finally {
       view.unmount()
@@ -74,26 +67,13 @@ describe('M05 CanvasViewport transforms', () => {
   it('signals regular editor readiness after its document frame renders', async () => {
     const { emitted } = mountViewport()
 
-    await vi.waitFor(() =>
-      expect(emitted().frameReady).toEqual([[document.id]]),
-    )
+    await vi.waitFor(() => expect(emitted().frameReady).toEqual([[document.id]]))
   })
 
   it('signals quick-mode readiness only after the document frame renders', async () => {
-    const { emitted } = mountViewport(
-      undefined,
-      document,
-      'shape',
-      undefined,
-      false,
-      undefined,
-      undefined,
-      true,
-    )
+    const { emitted } = mountViewport(undefined, document, 'shape', undefined, false, undefined, undefined, true)
 
-    await vi.waitFor(() =>
-      expect(emitted().frameReady).toEqual([[document.id]]),
-    )
+    await vi.waitFor(() => expect(emitted().frameReady).toEqual([[document.id]]))
   })
 
   it('creates the first Quick crop on the same mounted canvas interaction surface', async () => {
@@ -135,9 +115,7 @@ describe('M05 CanvasViewport transforms', () => {
         },
       ],
     ])
-    expect(emitted().quickSelectionComplete).toEqual([
-      [{ x: 20, y: 30, width: 50, height: 50 }],
-    ])
+    expect(emitted().quickSelectionComplete).toEqual([[{ x: 20, y: 30, width: 50, height: 50 }]])
 
     await rerender({
       quickSelectionMode: false,
@@ -150,17 +128,7 @@ describe('M05 CanvasViewport transforms', () => {
   })
 
   it('keeps Quick selection active after a click without an area', async () => {
-    const { scene, emitted } = mountViewport(
-      'select',
-      document,
-      '',
-      undefined,
-      false,
-      undefined,
-      undefined,
-      true,
-      true,
-    )
+    const { scene, emitted } = mountViewport('select', document, '', undefined, false, undefined, undefined, true, true)
 
     await fireEvent.pointerDown(scene, {
       pointerId: 9,
@@ -211,9 +179,7 @@ describe('M05 CanvasViewport transforms', () => {
       clientY: 75,
     })
 
-    expect(emitted().quickFrameChange).toEqual([
-      [{ x: 10, y: 10, width: 70, height: 65 }],
-    ])
+    expect(emitted().quickFrameChange).toEqual([[{ x: 10, y: 10, width: 70, height: 65 }]])
     expect(emitted().documentCommand).toEqual([
       [
         {
@@ -226,13 +192,7 @@ describe('M05 CanvasViewport transforms', () => {
   })
 
   it('samples one opaque scene pixel without reading the interaction overlay', async () => {
-    const { scene, emitted } = mountViewport(
-      undefined,
-      document,
-      'shape',
-      undefined,
-      true,
-    )
+    const { scene, emitted } = mountViewport(undefined, document, 'shape', undefined, true)
     const getImageData = vi.fn(() => ({
       data: new Uint8ClampedArray([18, 52, 86, 255]),
     }))
@@ -252,13 +212,7 @@ describe('M05 CanvasViewport transforms', () => {
   })
 
   it('keeps sampling available after a transparent scene pixel', async () => {
-    const { scene, emitted } = mountViewport(
-      undefined,
-      document,
-      'shape',
-      undefined,
-      true,
-    )
+    const { scene, emitted } = mountViewport(undefined, document, 'shape', undefined, true)
     const getImageData = vi.fn(() => ({
       data: new Uint8ClampedArray([18, 52, 86, 0]),
     }))
@@ -295,9 +249,7 @@ describe('M05 CanvasViewport transforms', () => {
       },
     )
     const { container, emitted, unmount } = mountViewport()
-    const scroll = container.querySelector(
-      '.cs-canvas-scroll',
-    ) as HTMLDivElement
+    const scroll = container.querySelector('.cs-canvas-scroll') as HTMLDivElement
     Object.defineProperties(scroll, {
       clientWidth: { configurable: true, value: 848 },
       clientHeight: { configurable: true, value: 648 },
@@ -332,13 +284,8 @@ describe('M05 CanvasViewport transforms', () => {
       ...document,
       crop: { x: 20, y: 30, width: 50, height: 25 },
     }
-    const { container, emitted, unmount } = mountViewport(
-      'select',
-      croppedDocument,
-    )
-    const scroll = container.querySelector(
-      '.cs-canvas-scroll',
-    ) as HTMLDivElement
+    const { container, emitted, unmount } = mountViewport('select', croppedDocument)
+    const scroll = container.querySelector('.cs-canvas-scroll') as HTMLDivElement
     Object.defineProperties(scroll, {
       clientWidth: { configurable: true, value: 848 },
       clientHeight: { configurable: true, value: 648 },

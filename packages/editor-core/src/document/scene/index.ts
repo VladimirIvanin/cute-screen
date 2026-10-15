@@ -1,11 +1,21 @@
 import type { RenderNode } from '../../scene/contracts'
 import { createRenderSceneSnapshot } from '../../scene/snapshot'
-import type { EditorDocumentV1, LayerNode } from '../types'
+import type {
+  EditorDocumentV1,
+  LayerNode,
+} from '../types'
 import { arrowNodes } from './arrow'
-import { freehandNodes, shapeNodes } from './drawing'
+import {
+  freehandNodes,
+  shapeNodes,
+} from './drawing'
 import { precisionNodes } from './precision'
 import { stroke } from './shared'
-import { calloutNodes, numberedMarkerNodes, textNodes } from './text'
+import {
+  calloutNodes,
+  numberedMarkerNodes,
+  textNodes,
+} from './text'
 
 function assertNever(value: never): never {
   throw new Error(`Unsupported document layer: ${String(value)}`)
@@ -41,17 +51,10 @@ function projectAnnotationLayer(
   }
 }
 
-function imageNode(
-  layer: Extract<LayerNode, { readonly kind: 'image' }>,
-): RenderNode {
+function imageNode(layer: Extract<LayerNode, { readonly kind: 'image' }>): RenderNode {
   const bounds = layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
-  const imageBorder = layer.payload.border
-    ? stroke(layer.payload.border)
-    : undefined
-  const imageRadius = Math.max(
-    0,
-    Math.min(layer.payload.radius ?? 0, bounds.width / 2, bounds.height / 2),
-  )
+  const imageBorder = layer.payload.border ? stroke(layer.payload.border) : undefined
+  const imageRadius = Math.max(0, Math.min(layer.payload.radius ?? 0, bounds.width / 2, bounds.height / 2))
   return {
     id: layer.id,
     kind: 'image',

@@ -1,6 +1,9 @@
 import RBush from 'rbush'
 
-import { arrowCapSize, arrowPathPoints } from './arrow-geometry'
+import {
+  arrowCapSize,
+  arrowPathPoints,
+} from './arrow-geometry'
 import {
   calloutMarkerRadius,
   calloutPathPoints,
@@ -12,7 +15,11 @@ import type {
   JsonObject,
   Point,
 } from './document/types'
-import { invertMatrix, transformPoint, transformToMatrix } from './geometry'
+import {
+  invertMatrix,
+  transformPoint,
+  transformToMatrix,
+} from './geometry'
 import { precisionLayerHitPart } from './tools/precision/hit-test'
 
 export type HitPart = 'fill' | 'handle' | 'stroke'
@@ -43,19 +50,23 @@ export class DocumentSpatialIndex {
     this.#insertAll(document)
   }
 
-  update(document: EditorDocumentV1, changedLayerIds: readonly string[]): void {
+  update(
+    document: EditorDocumentV1,
+    changedLayerIds: readonly string[],
+  ): void {
     this.#document = document
     for (const id of changedLayerIds) {
       const previous = this.#itemsById.get(id)
       if (previous) {
-        this.#tree.remove(
-          previous,
-          (left, right) => left.layerId === right.layerId,
-        )
+        this.#tree.remove(previous, (left, right) => left.layerId === right.layerId)
         this.#itemsById.delete(id)
       }
       const layer = document.layers.find((candidate) => candidate.id === id)
-      if (!layer || !layer.visible || layer.locked) continue
+      if (
+        !layer ||
+        !layer.visible ||
+        layer.locked
+      ) continue
       const item = spatialItem(layer)
       this.#tree.insert(item)
       this.#itemsById.set(id, item)
@@ -84,9 +95,7 @@ export class DocumentSpatialIndex {
   }
 
   #insertAll(document: EditorDocumentV1): void {
-    const items = document.layers
-      .filter((layer) => layer.visible && !layer.locked)
-      .map(spatialItem)
+    const items = document.layers.filter((layer) => layer.visible && !layer.locked).map(spatialItem)
     this.#tree.load(items)
     this.#itemsById = new Map(items.map((item) => [item.layerId, item]))
   }
@@ -123,7 +132,11 @@ export function hitTestDocument(
 ): HitTestResult | undefined {
   for (let index = document.layers.length - 1; index >= 0; index -= 1) {
     const layer = document.layers[index]
-    if (!layer || !layer.visible || layer.locked) continue
+    if (
+      !layer ||
+      !layer.visible ||
+      layer.locked
+    ) continue
     const hit = hitLayer(layer, canvasPoint, index, document.canvas)
     if (hit) return hit
   }
@@ -138,7 +151,11 @@ export function hitTestDocumentAll(
   const hits: HitTestResult[] = []
   for (let index = document.layers.length - 1; index >= 0; index -= 1) {
     const layer = document.layers[index]
-    if (!layer || !layer.visible || layer.locked) continue
+    if (
+      !layer ||
+      !layer.visible ||
+      layer.locked
+    ) continue
     const hit = hitLayer(layer, canvasPoint, index, document.canvas)
     if (hit) hits.push(hit)
   }
@@ -152,10 +169,7 @@ function hitLayer(
   canvas: EditorDocumentV1['canvas'],
 ): HitTestResult | undefined {
   const bounds = layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
-  const local = transformPoint(
-    invertMatrix(transformToMatrix(layer.transform)),
-    canvasPoint,
-  )
+  const local = transformPoint(invertMatrix(transformToMatrix(layer.transform)), canvasPoint)
   if (
     local.x < bounds.x ||
     local.x > bounds.x + bounds.width ||
@@ -173,7 +187,10 @@ function hitLayer(
   })
 }
 
-function payloadPoint(value: unknown, fallback: Point): Point {
+function payloadPoint(
+  value: unknown,
+  fallback: Point,
+): Point {
   if (!value || typeof value !== 'object') return fallback
   const point = value as Record<string, unknown>
   return typeof point.x === 'number' &&
@@ -184,17 +201,25 @@ function payloadPoint(value: unknown, fallback: Point): Point {
     : fallback
 }
 
-function payloadStrokeWidth(payload: JsonObject, fallback = 1): number {
+function payloadStrokeWidth(
+  payload: JsonObject,
+  fallback = 1,
+): number {
   const stroke = payload.stroke
-  if (stroke && typeof stroke === 'object' && !Array.isArray(stroke)) {
+  if (
+    stroke &&
+    typeof stroke === 'object' &&
+    !Array.isArray(stroke)
+  ) {
     const width = (stroke as Record<string, unknown>).width
-    if (typeof width === 'number' && Number.isFinite(width) && width > 0)
-      return width
+    if (
+      typeof width === 'number' &&
+      Number.isFinite(width) &&
+      width > 0
+    ) return width
   }
   const width = payload.width
-  return typeof width === 'number' && Number.isFinite(width) && width > 0
-    ? width
-    : fallback
+  return typeof width === 'number' && Number.isFinite(width) && width > 0 ? width : fallback
 }
 
 function pointInRect(
@@ -206,12 +231,7 @@ function pointInRect(
     readonly height: number
   },
 ): boolean {
-  return (
-    point.x >= rect.x &&
-    point.x <= rect.x + rect.width &&
-    point.y >= rect.y &&
-    point.y <= rect.y + rect.height
-  )
+  return point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y && point.y <= rect.y + rect.height
 }
 
 function pointToSegmentDistance(
@@ -222,36 +242,22 @@ function pointToSegmentDistance(
   const dx = end.x - start.x
   const dy = end.y - start.y
   const lengthSquared = dx * dx + dy * dy
-  if (lengthSquared === 0)
-    return Math.hypot(point.x - start.x, point.y - start.y)
-  const progress = Math.max(
-    0,
-    Math.min(
-      1,
-      ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared,
-    ),
-  )
-  return Math.hypot(
-    point.x - (start.x + dx * progress),
-    point.y - (start.y + dy * progress),
-  )
+  if (lengthSquared === 0) return Math.hypot(point.x - start.x, point.y - start.y)
+  const progress = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared))
+  return Math.hypot(point.x - (start.x + dx * progress), point.y - (start.y + dy * progress))
 }
 
-function pointInPolygon(point: Point, points: readonly Point[]): boolean {
+function pointInPolygon(
+  point: Point,
+  points: readonly Point[],
+): boolean {
   let inside = false
-  for (
-    let index = 0, previous = points.length - 1;
-    index < points.length;
-    previous = index++
-  ) {
+  for (let index = 0, previous = points.length - 1; index < points.length; previous = index++) {
     const current = points[index]!
     const before = points[previous]!
     const intersects =
       current.y > point.y !== before.y > point.y &&
-      point.x <
-        ((before.x - current.x) * (point.y - current.y)) /
-          (before.y - current.y) +
-          current.x
+      point.x < ((before.x - current.x) * (point.y - current.y)) / (before.y - current.y) + current.x
     if (intersects) inside = !inside
   }
   return inside
@@ -264,12 +270,7 @@ function polygonStrokeHit(
 ): boolean {
   return vertices.some(
     (vertex, index) =>
-      pointToSegmentDistance(
-        point,
-        vertex,
-        vertices[(index + 1) % vertices.length]!,
-      ) <=
-      strokeWidth / 2,
+      pointToSegmentDistance(point, vertex, vertices[(index + 1) % vertices.length]!) <= strokeWidth / 2,
   )
 }
 
@@ -293,15 +294,10 @@ function drawingHitPart(
     const strokeWidth = callout.stroke.width
     const bodyHit = samples
       .slice(1)
-      .some(
-        (sample, index) =>
-          pointToSegmentDistance(point, samples[index]!, sample) <=
-          strokeWidth / 2,
-      )
+      .some((sample, index) => pointToSegmentDistance(point, samples[index]!, sample) <= strokeWidth / 2)
     if (bodyHit) return 'stroke'
     const markerRadius = calloutMarkerRadius(strokeWidth)
-    const markerHit = (anchor: Point) =>
-      Math.hypot(point.x - anchor.x, point.y - anchor.y) <= markerRadius
+    const markerHit = (anchor: Point) => Math.hypot(point.x - anchor.x, point.y - anchor.y) <= markerRadius
     if (markerHit(callout.target) || markerHit(callout.label)) return 'stroke'
     const textRect = calloutTextRect(callout)
     return pointInRect(point, textRect) ? 'fill' : undefined
@@ -322,37 +318,21 @@ function drawingHitPart(
     const samples = arrowPathPoints(arrow)
     const bodyHit = samples
       .slice(1)
-      .some(
-        (sample, index) =>
-          pointToSegmentDistance(point, samples[index]!, sample) <=
-          strokeWidth / 2,
-      )
+      .some((sample, index) => pointToSegmentDistance(point, samples[index]!, sample) <= strokeWidth / 2)
     if (bodyHit) return 'stroke'
     const capHit = (cap: ArrowLayerPayload['startCap'], anchor: Point) =>
-      cap !== 'none' &&
-      Math.hypot(point.x - anchor.x, point.y - anchor.y) <=
-        arrowCapSize(cap, strokeWidth)
-    return capHit(arrow.startCap, arrow.start) ||
-      capHit(arrow.endCap, arrow.end)
-      ? 'stroke'
-      : undefined
+      cap !== 'none' && Math.hypot(point.x - anchor.x, point.y - anchor.y) <= arrowCapSize(cap, strokeWidth)
+    return capHit(arrow.startCap, arrow.start) || capHit(arrow.endCap, arrow.end) ? 'stroke' : undefined
   }
   if (layer.kind === 'pencil' || layer.kind === 'marker') {
     const samples = Array.isArray(payload.points)
       ? payload.points.map((sample) => payloadPoint(sample, { x: 0, y: 0 }))
       : []
     if (samples.length === 1)
-      return pointToSegmentDistance(point, samples[0]!, samples[0]!) <=
-        strokeWidth / 2
-        ? 'stroke'
-        : undefined
+      return pointToSegmentDistance(point, samples[0]!, samples[0]!) <= strokeWidth / 2 ? 'stroke' : undefined
     return samples
       .slice(1)
-      .some(
-        (sample, index) =>
-          pointToSegmentDistance(point, samples[index]!, sample) <=
-          strokeWidth / 2,
-      )
+      .some((sample, index) => pointToSegmentDistance(point, samples[index]!, sample) <= strokeWidth / 2)
       ? 'stroke'
       : undefined
   }
@@ -379,13 +359,9 @@ function drawingHitPart(
     point.y >= geometry.y &&
     point.y <= geometry.y + geometry.height
   const ellipse =
-    ((point.x - centerX) / (geometry.width / 2)) ** 2 +
-      ((point.y - centerY) / (geometry.height / 2)) ** 2 <=
-    1
+    ((point.x - centerX) / (geometry.width / 2)) ** 2 + ((point.y - centerY) / (geometry.height / 2)) ** 2 <= 1
   const diamond =
-    Math.abs((point.x - centerX) / (geometry.width / 2)) +
-      Math.abs((point.y - centerY) / (geometry.height / 2)) <=
-    1
+    Math.abs((point.x - centerX) / (geometry.width / 2)) + Math.abs((point.y - centerY) / (geometry.height / 2)) <= 1
   const diamondVertices: readonly Point[] = [
     { x: centerX, y: geometry.y },
     { x: geometry.x + geometry.width, y: centerY },
@@ -400,27 +376,17 @@ function drawingHitPart(
       ? payload.starPoints
       : 5
   const starInnerRatio =
-    typeof payload.starInnerRatio === 'number' &&
-    Number.isFinite(payload.starInnerRatio)
+    typeof payload.starInnerRatio === 'number' && Number.isFinite(payload.starInnerRatio)
       ? Math.max(0, Math.min(1, payload.starInnerRatio))
       : 0.45
-  const starVertices: readonly Point[] = Array.from(
-    { length: starCount * 2 },
-    (_, index) => {
-      const outer = index % 2 === 0
-      const angle = -Math.PI / 2 + (Math.PI * index) / starCount
-      return {
-        x:
-          centerX +
-          Math.cos(angle) * (geometry.width / 2) * (outer ? 1 : starInnerRatio),
-        y:
-          centerY +
-          Math.sin(angle) *
-            (geometry.height / 2) *
-            (outer ? 1 : starInnerRatio),
-      }
-    },
-  )
+  const starVertices: readonly Point[] = Array.from({ length: starCount * 2 }, (_, index) => {
+    const outer = index % 2 === 0
+    const angle = -Math.PI / 2 + (Math.PI * index) / starCount
+    return {
+      x: centerX + Math.cos(angle) * (geometry.width / 2) * (outer ? 1 : starInnerRatio),
+      y: centerY + Math.sin(angle) * (geometry.height / 2) * (outer ? 1 : starInnerRatio),
+    }
+  })
   const inside =
     shape === 'circle' || shape === 'oval'
       ? ellipse
@@ -433,14 +399,9 @@ function drawingHitPart(
   if (shape === 'circle' || shape === 'oval') {
     const radiusX = geometry.width / 2
     const radiusY = geometry.height / 2
-    const normalizedDistance = Math.hypot(
-      (point.x - centerX) / radiusX,
-      (point.y - centerY) / radiusY,
-    )
+    const normalizedDistance = Math.hypot((point.x - centerX) / radiusX, (point.y - centerY) / radiusY)
     const normalizedTolerance = strokeWidth / (2 * Math.min(radiusX, radiusY))
-    return Math.abs(normalizedDistance - 1) <= normalizedTolerance
-      ? 'stroke'
-      : undefined
+    return Math.abs(normalizedDistance - 1) <= normalizedTolerance ? 'stroke' : undefined
   }
   const rectangleVertices: readonly Point[] = [
     { x: geometry.x, y: geometry.y },
@@ -448,11 +409,6 @@ function drawingHitPart(
     { x: geometry.x + geometry.width, y: geometry.y + geometry.height },
     { x: geometry.x, y: geometry.y + geometry.height },
   ]
-  const vertices =
-    shape === 'diamond'
-      ? diamondVertices
-      : shape === 'star'
-        ? starVertices
-        : rectangleVertices
+  const vertices = shape === 'diamond' ? diamondVertices : shape === 'star' ? starVertices : rectangleVertices
   return polygonStrokeHit(point, vertices, strokeWidth) ? 'stroke' : undefined
 }

@@ -1,4 +1,7 @@
-import type { EditorCommand, LayerNode } from '@cute-screen/editor-renderer'
+import type {
+  EditorCommand,
+  LayerNode,
+} from '@cute-screen/editor-renderer'
 import type { PrecisionToolDefaults } from '../../types'
 
 export type ToolSettingsEffect<TDefaults = never> =
@@ -6,9 +9,9 @@ export type ToolSettingsEffect<TDefaults = never> =
   | { readonly kind: 'handled' }
   | { readonly kind: 'defaults'; readonly value: TDefaults }
   | {
-      readonly kind: 'command'
-      readonly command: EditorCommand
-    }
+    readonly kind: 'command'
+    readonly command: EditorCommand
+  }
 
 export type PrecisionSettingsEffect = ToolSettingsEffect<PrecisionToolDefaults>
 

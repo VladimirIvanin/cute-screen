@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref, watch } from 'vue'
+import {
+  nextTick,
+  onMounted,
+  onUpdated,
+  ref,
+  watch,
+} from 'vue'
 import { NSlider } from 'naive-ui'
 
 const props = defineProps<{
@@ -16,9 +22,7 @@ const dragging = ref(false)
 const host = ref<HTMLElement>()
 
 function labelHandle(): void {
-  host.value
-    ?.querySelector<HTMLElement>('[role="slider"]')
-    ?.setAttribute('aria-label', props.ariaLabel)
+  host.value?.querySelector<HTMLElement>('[role="slider"]')?.setAttribute('aria-label', props.ariaLabel)
 }
 
 function scheduleLabel(): void {
@@ -26,6 +30,7 @@ function scheduleLabel(): void {
 }
 
 onMounted(scheduleLabel)
+onUpdated(labelHandle)
 watch(() => props.ariaLabel, scheduleLabel)
 
 watch(

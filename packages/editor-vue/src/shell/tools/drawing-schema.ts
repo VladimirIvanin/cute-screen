@@ -9,10 +9,7 @@ import type { ResolvedEditorShellProps } from '../contracts'
 import type { ContextToolbarSchema } from '../types'
 
 type DrawingTool = 'arrow' | 'shape' | 'pencil' | 'marker'
-export type DrawingLayerNode = Extract<
-  LayerNode,
-  { readonly kind: DrawingTool }
->
+export type DrawingLayerNode = Extract<LayerNode, { readonly kind: DrawingTool }>
 
 export interface DrawingSchemaContext {
   readonly props: ResolvedEditorShellProps
@@ -36,24 +33,13 @@ interface DrawingValues {
 }
 
 export function isDrawingTool(value: string | undefined): value is DrawingTool {
-  return (
-    value === 'arrow' ||
-    value === 'shape' ||
-    value === 'pencil' ||
-    value === 'marker'
-  )
+  return value === 'arrow' || value === 'shape' || value === 'pencil' || value === 'marker'
 }
 
-function selectedDrawingLayer(
-  context: DrawingSchemaContext,
-): DrawingLayerNode | undefined {
+function selectedDrawingLayer(context: DrawingSchemaContext): DrawingLayerNode | undefined {
   if (context.store.selectedLayerIds.length !== 1) return undefined
-  const layer = context.activeDocument.value?.layers.find(
-    (candidate) => candidate.id === context.store.selectedLayerId,
-  )
-  return layer && isDrawingTool(layer.kind)
-    ? (layer as DrawingLayerNode)
-    : undefined
+  const layer = context.activeDocument.value?.layers.find((candidate) => candidate.id === context.store.selectedLayerId)
+  return layer && isDrawingTool(layer.kind) ? (layer as DrawingLayerNode) : undefined
 }
 
 function resolveValues(
@@ -66,9 +52,7 @@ function resolveValues(
   return {
     values,
     selected,
-    colorDisabled:
-      context.props.readOnlyDocument ||
-      (selected?.kind === tool && selected.locked),
+    colorDisabled: context.props.readOnlyDocument || (selected?.kind === tool && selected.locked),
     stroke,
     color: tool === 'arrow' || tool === 'shape' ? stroke?.color : values.color,
     width: tool === 'arrow' || tool === 'shape' ? stroke?.width : values.width,
@@ -89,8 +73,7 @@ function arrowSchema(
     ['circle', 'arrowCircle'],
     ['diamond', 'arrowDiamond'],
   ].map(([value, key]) => ({
-    value: value as
-      'none' | 'lineArrow' | 'solidArrow' | 'triangle' | 'circle' | 'diamond',
+    value: value as 'none' | 'lineArrow' | 'solidArrow' | 'triangle' | 'circle' | 'diamond',
     label: translate(key as Parameters<typeof translate>[0]),
   }))
   return {
@@ -112,10 +95,7 @@ function arrowSchema(
         id: 'stroke',
         label: translate('arrowStroke'),
         width: typeof width === 'number' ? width : 3,
-        style:
-          stroke?.style === 'solid' || stroke?.style === 'dotted'
-            ? stroke.style
-            : 'dashed',
+        style: stroke?.style === 'solid' || stroke?.style === 'dotted' ? stroke.style : 'dashed',
         disabled: colorDisabled,
         solidLabel: translate('arrowSolid'),
         dashedLabel: translate('arrowDashed'),
@@ -125,9 +105,7 @@ function arrowSchema(
         kind: 'arrowCap',
         id: 'startCap',
         label: translate('arrowTail'),
-        value: (typeof values.startCap === 'string'
-          ? values.startCap
-          : 'none') as (typeof capOptions)[number]['value'],
+        value: (typeof values.startCap === 'string' ? values.startCap : 'none') as (typeof capOptions)[number]['value'],
         disabled: colorDisabled,
         options: capOptions,
       },
@@ -135,10 +113,7 @@ function arrowSchema(
         kind: 'arrowPath',
         id: 'arrowPath',
         label: translate('arrowGeometry'),
-        value:
-          values.path === 'quadratic' || values.path === 'elbow'
-            ? values.path
-            : 'straight',
+        value: values.path === 'quadratic' || values.path === 'elbow' ? values.path : 'straight',
         disabled: colorDisabled,
         options: [
           { value: 'straight', label: translate('arrowStraight') },
@@ -211,42 +186,26 @@ function baseControls(
           : tool === 'marker'
             ? 'multiply'
             : 'normal'),
-      options: [
-        'normal',
-        'multiply',
-        'screen',
-        'overlay',
-        'darken',
-        'lighten',
-        'softLight',
-        'hardLight',
-      ].map((value) => ({ value, label: value })),
+      options: ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'softLight', 'hardLight'].map(
+        (value) => ({ value, label: value }),
+      ),
     },
   ]
 }
 
 function shapeControls(state: DrawingValues): ContextToolbarSchema['controls'] {
   const values = state.values
-  const fill =
-    values.fill && typeof values.fill === 'object'
-      ? (values.fill as Record<string, unknown>)
-      : undefined
-  const selectedFill =
-    state.selected?.kind === 'shape'
-      ? (state.selected.payload.fill as Record<string, unknown>)
-      : undefined
+  const fill = values.fill && typeof values.fill === 'object' ? (values.fill as Record<string, unknown>) : undefined
   const controls: ContextToolbarSchema['controls'] = [
     {
       kind: 'select',
       id: 'shapeKind',
       label: 'Shape',
       value: typeof values.shape === 'string' ? values.shape : 'rectangle',
-      options: ['rectangle', 'circle', 'oval', 'diamond', 'star'].map(
-        (value) => ({
-          value,
-          label: value,
-        }),
-      ),
+      options: ['rectangle', 'circle', 'oval', 'diamond', 'star'].map((value) => ({
+        value,
+        label: value,
+      })),
     },
     {
       kind: 'range',
@@ -270,10 +229,7 @@ function shapeControls(state: DrawingValues): ContextToolbarSchema['controls'] {
       kind: 'range',
       id: 'starInnerRatio',
       label: 'Star inner',
-      value:
-        typeof values.starInnerRatio === 'number'
-          ? values.starInnerRatio
-          : 0.45,
+      value: typeof values.starInnerRatio === 'number' ? values.starInnerRatio : 0.45,
       min: 0.1,
       max: 0.9,
       step: 0.01,
@@ -301,11 +257,8 @@ function shapeControls(state: DrawingValues): ContextToolbarSchema['controls'] {
     },
     { kind: 'action', id: 'importTexture', label: 'Import texture' },
   ]
-  if (selectedFill?.kind === 'imageTexture') {
-    return [
-      ...controls,
-      { kind: 'action', id: 'removeTexture', label: 'Remove texture' },
-    ]
+  if (fill?.kind === 'imageTexture') {
+    return [...controls, { kind: 'action', id: 'removeTexture', label: 'Remove texture' }]
   }
   return controls
 }
@@ -350,13 +303,7 @@ function standardSchema(
 ): ContextToolbarSchema {
   return {
     icon: tool === 'shape' ? 'shape' : tool,
-    title: context.translate(
-      tool === 'shape'
-        ? 'toolShape'
-        : tool === 'pencil'
-          ? 'toolPencil'
-          : 'toolMarker',
-    ),
+    title: context.translate(tool === 'shape' ? 'toolShape' : tool === 'pencil' ? 'toolPencil' : 'toolMarker'),
     hint: context.translate('canvasViewport'),
     controls: [
       ...baseControls(context, tool, state),
@@ -370,17 +317,23 @@ function drawingControl(
   context: DrawingSchemaContext,
   tool: DrawingTool,
   values = context.drawingDefaults.value[tool],
+  defaultsOnly = false,
 ): ContextToolbarSchema {
-  const state = resolveValues(context, tool, values)
-  return tool === 'arrow'
-    ? arrowSchema(context, state)
-    : standardSchema(context, tool, state)
+  const resolved = resolveValues(context, tool, values)
+  const state = defaultsOnly
+    ? {
+        ...resolved,
+        colorDisabled: context.props.readOnlyDocument,
+        selected: undefined,
+      }
+    : resolved
+  return tool === 'arrow' ? arrowSchema(context, state) : standardSchema(context, tool, state)
 }
 
 export function createDrawingSchema(context: DrawingSchemaContext) {
   return {
-    drawingControl: (tool: DrawingTool, values?: JsonObject) =>
-      drawingControl(context, tool, values),
+    drawingControl: (tool: DrawingTool, values?: JsonObject, defaultsOnly?: boolean) =>
+      drawingControl(context, tool, values, defaultsOnly),
     isDrawingTool,
     selectedDrawingLayer: () => selectedDrawingLayer(context),
   }

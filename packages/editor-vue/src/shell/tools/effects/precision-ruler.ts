@@ -1,4 +1,7 @@
-import { rebaseRulerLayer, type LayerNode } from '@cute-screen/editor-renderer'
+import {
+  rebaseRulerLayer,
+  type LayerNode,
+} from '@cute-screen/editor-renderer'
 import type { PrecisionSettingsEffect } from './contracts'
 import { updateLayerEffect } from './contracts'
 import { parseHexColor } from './color'
@@ -17,10 +20,7 @@ function result(
   after?: LayerNode,
 ): PrecisionSettingsEffect {
   if (state.selected && after?.kind === 'ruler') {
-    return updateLayerEffect(
-      state.selected,
-      rebaseRulerLayer(state.selected, after.payload, state.document.canvas),
-    )
+    return updateLayerEffect(state.selected, rebaseRulerLayer(state.selected, after.payload, state.document.canvas))
   }
   return state.selected ? HANDLED : defaultsEffect(defaults)
 }
@@ -55,8 +55,7 @@ function numericEffect(
             snapAngleIncrementDegrees: number,
           }
     : undefined
-  const after =
-    state.selected && payload ? { ...state.selected, payload } : undefined
+  const after = state.selected && payload ? { ...state.selected, payload } : undefined
   return result(state, defaults, after)
 }
 
@@ -87,7 +86,11 @@ export function resolveRulerEffect(
   ) {
     return numericEffect(id, value, state)
   }
-  if (id === 'rulerUnit' && (value === 'pixels' || value === 'percent')) {
+  if (
+    id === 'rulerUnit' &&
+    (value === 'pixels' ||
+      value === 'percent')
+  ) {
     const defaults: State['defaults'] = {
       ...state.defaults,
       ruler: { ...state.defaults.ruler, unit: value },
@@ -103,7 +106,11 @@ export function resolveRulerEffect(
       : undefined
     return result(state, defaults, after)
   }
-  if (id === 'rulerSnap' && (value === 'on' || value === 'off')) {
+  if (
+    id === 'rulerSnap' &&
+    (value === 'on' ||
+      value === 'off')
+  ) {
     const defaults: State['defaults'] = {
       ...state.defaults,
       ruler: { ...state.defaults.ruler, snap: value === 'on' },

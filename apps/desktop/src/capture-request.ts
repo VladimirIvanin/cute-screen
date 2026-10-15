@@ -57,11 +57,9 @@ async function runHiddenNativeCapture<T>(
   try {
     await mainWindow.show()
   } catch (restoreError) {
-    throw new AggregateError(
-      [restoreError],
-      'Capture finished but the editor could not be restored',
-      { cause: restoreError },
-    )
+    throw new AggregateError([restoreError], 'Capture finished but the editor could not be restored', {
+      cause: restoreError,
+    })
   }
   return result
 }

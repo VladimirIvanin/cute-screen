@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import {
+  ref,
+  watch,
+} from 'vue'
 import { NInputNumber } from 'naive-ui'
 
 const props = defineProps<{

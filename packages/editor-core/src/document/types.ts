@@ -61,42 +61,42 @@ export interface PaintTransform extends JsonObject {
 export type FillPaint =
   | Readonly<{ readonly kind: 'none' }>
   | Readonly<{
-      readonly kind: 'solid'
-      readonly color: SrgbColor
-      readonly opacity: number
-    }>
+    readonly kind: 'solid'
+    readonly color: SrgbColor
+    readonly opacity: number
+  }>
   | Readonly<{
-      readonly kind: 'linearGradient'
-      readonly stops: readonly GradientStop[]
-      readonly start: Point
-      readonly end: Point
-      readonly opacity: number
-    }>
+    readonly kind: 'linearGradient'
+    readonly stops: readonly GradientStop[]
+    readonly start: Point
+    readonly end: Point
+    readonly opacity: number
+  }>
   | Readonly<{
-      readonly kind: 'radialGradient'
-      readonly stops: readonly GradientStop[]
-      readonly center: Point
-      readonly radius: number
-      readonly opacity: number
-    }>
+    readonly kind: 'radialGradient'
+    readonly stops: readonly GradientStop[]
+    readonly center: Point
+    readonly radius: number
+    readonly opacity: number
+  }>
   | Readonly<{
-      readonly kind: 'pattern'
-      readonly pattern: 'dots' | 'grid' | 'diagonal' | 'crosshatch' | 'checker'
-      readonly color: SrgbColor
-      readonly background: SrgbColor
-      readonly transform: PaintTransform
-      readonly opacity: number
-    }>
+    readonly kind: 'pattern'
+    readonly pattern: 'dots' | 'grid' | 'diagonal' | 'crosshatch' | 'checker'
+    readonly color: SrgbColor
+    readonly background: SrgbColor
+    readonly transform: PaintTransform
+    readonly opacity: number
+  }>
   | Readonly<{
-      readonly kind: 'imageTexture'
-      readonly blobHash: string
-      readonly format: 'png' | 'jpeg' | 'webp'
-      readonly intrinsicWidth: number
-      readonly intrinsicHeight: number
-      readonly fit: 'repeat' | 'fit' | 'fill'
-      readonly transform: PaintTransform
-      readonly opacity: number
-    }>
+    readonly kind: 'imageTexture'
+    readonly blobHash: string
+    readonly format: 'png' | 'jpeg' | 'webp'
+    readonly intrinsicWidth: number
+    readonly intrinsicHeight: number
+    readonly fit: 'repeat' | 'fit' | 'fill'
+    readonly transform: PaintTransform
+    readonly opacity: number
+  }>
 
 export interface StrokeStyle extends JsonObject {
   readonly color: SrgbColor
@@ -153,11 +153,10 @@ export interface PresentationSettingsV1 {
   readonly watermark: Readonly<{ enabled: false }>
 }
 
-export const DEFAULT_PRESENTATION_SETTINGS: PresentationSettingsV1 =
-  Object.freeze({
-    beautify: Object.freeze({ enabled: false }),
-    watermark: Object.freeze({ enabled: false }),
-  })
+export const DEFAULT_PRESENTATION_SETTINGS: PresentationSettingsV1 = Object.freeze({
+  beautify: Object.freeze({ enabled: false }),
+  watermark: Object.freeze({ enabled: false }),
+})
 
 export const LAYER_KINDS = [
   'arrow',
@@ -191,10 +190,10 @@ export interface LayerBase<K extends LayerKind, P extends JsonObject> {
 }
 
 /** Text-bearing v7 layers intentionally cannot persist common visual effects. */
-export type TextBearingLayerBase<
-  K extends 'text' | 'numberedMarker' | 'callout',
-  P extends JsonObject,
-> = LayerBase<K, P>
+export type TextBearingLayerBase<K extends 'text' | 'numberedMarker' | 'callout', P extends JsonObject> = LayerBase<
+  K,
+  P
+>
 
 export interface CompositedLayerBase<
   K extends Exclude<LayerKind, 'text' | 'numberedMarker' | 'callout'>,
@@ -281,7 +280,7 @@ export type CalloutRoute = Readonly<{
     /** Signed displacement of the middle segment from the endpoint midpoint. */
     readonly offset: number
   }> &
-    JsonObject
+  JsonObject
 }>
 
 export type CalloutMarker = 'circle'
@@ -318,20 +317,13 @@ export interface ArrowLayerPayload extends JsonObject {
     /** Signed displacement of the middle segment from the endpoint midpoint. */
     readonly offset: number
   }> &
-    JsonObject
+  JsonObject
   readonly stroke: StrokeStyle
   readonly startCap: ArrowCap
   readonly endCap: ArrowCap
 }
 
-export const ARROW_CAPS = [
-  'none',
-  'lineArrow',
-  'solidArrow',
-  'triangle',
-  'circle',
-  'diamond',
-] as const
+export const ARROW_CAPS = ['none', 'lineArrow', 'solidArrow', 'triangle', 'circle', 'diamond'] as const
 
 export type ArrowCap = (typeof ARROW_CAPS)[number]
 
@@ -365,10 +357,10 @@ export type CensorMode = (typeof CENSOR_MODES)[number]
 export type CensorRegion =
   | Readonly<{ readonly kind: 'rectangle' }>
   | Readonly<{
-      readonly kind: 'freeform'
-      /** An implicitly closed, simple polygon in layer-local coordinates. */
-      readonly points: readonly (Point & JsonObject)[]
-    }>
+    readonly kind: 'freeform'
+    /** An implicitly closed, simple polygon in layer-local coordinates. */
+    readonly points: readonly (Point & JsonObject)[]
+  }>
 
 export type CensorEffect =
   | Readonly<{ readonly mode: 'pixelate'; readonly blockSize: number }>
@@ -452,16 +444,10 @@ export type ShapeLayer = CompositedLayerBase<'shape', JsonObject>
 export type PencilLayer = CompositedLayerBase<'pencil', JsonObject>
 export type MarkerLayer = CompositedLayerBase<'marker', JsonObject>
 export type TextLayer = TextBearingLayerBase<'text', TextLayerPayload>
-export type NumberedMarkerLayer = TextBearingLayerBase<
-  'numberedMarker',
-  NumberedMarkerPayload
->
+export type NumberedMarkerLayer = TextBearingLayerBase<'numberedMarker', NumberedMarkerPayload>
 export type CalloutLayer = TextBearingLayerBase<'callout', CalloutPayload>
 export type CensorLayer = CompositedLayerBase<'censor', CensorLayerPayload>
-export type SpotlightLayer = CompositedLayerBase<
-  'spotlight',
-  SpotlightLayerPayload
->
+export type SpotlightLayer = CompositedLayerBase<'spotlight', SpotlightLayerPayload>
 export type RulerLayer = CompositedLayerBase<'ruler', RulerLayerPayload>
 export type LoupeLayer = CompositedLayerBase<'loupe', LoupeLayerPayload>
 export type EmojiLayer = CompositedLayerBase<'emoji', EmojiPayload>
@@ -510,14 +496,14 @@ export type EditorDocumentV6 = EditorDocumentV7
 export type ParsedEditorDocument =
   | Readonly<{ kind: 'editable'; document: EditorDocument }>
   | Readonly<{
-      kind: 'unsupported'
-      schemaVersion: number
-      raw: JsonObject
-      reason: 'olderSchema'
-    }>
+    kind: 'unsupported'
+    schemaVersion: number
+    raw: JsonObject
+    reason: 'olderSchema'
+  }>
   | Readonly<{
-      kind: 'readOnly'
-      schemaVersion: number
-      raw: JsonObject
-      reason: 'newerSchema'
-    }>
+    kind: 'readOnly'
+    schemaVersion: number
+    raw: JsonObject
+    reason: 'newerSchema'
+  }>

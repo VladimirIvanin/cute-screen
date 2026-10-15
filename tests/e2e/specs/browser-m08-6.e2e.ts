@@ -1,5 +1,9 @@
 import path from 'node:path'
-import { $, browser, expect } from '@wdio/globals'
+import {
+  $,
+  browser,
+  expect,
+} from '@wdio/globals'
 import {
   transformedLayerPoint,
   baseId,
@@ -35,11 +39,10 @@ describe('M08 crop and precision acceptance in browser mode', () => {
     const fontFrame = await overlayAlphaBounds()
     expect(
       afterFont.localBounds.width > created.localBounds.width ||
-        afterFont.localBounds.height > created.localBounds.height,
+      afterFont.localBounds.height > created.localBounds.height,
     ).toBe(true)
     expect(
-      (fontFrame?.width ?? 0) > (initialFrame?.width ?? 0) ||
-        (fontFrame?.height ?? 0) > (initialFrame?.height ?? 0),
+      (fontFrame?.width ?? 0) > (initialFrame?.width ?? 0) || (fontFrame?.height ?? 0) > (initialFrame?.height ?? 0),
     ).toBe(true)
 
     await clickSliderProgress('Thickness', 0.95, 'm08-ruler-thickness')
@@ -50,25 +53,19 @@ describe('M08 crop and precision acceptance in browser mode', () => {
     const afterThickness = (await m08Snapshot()).document.layers.at(-1)!
     expect(
       afterThickness.localBounds.width > afterFont.localBounds.width ||
-        afterThickness.localBounds.height > afterFont.localBounds.height,
+      afterThickness.localBounds.height > afterFont.localBounds.height,
     ).toBe(true)
 
     await clickHistory('Undo')
-    expect((await m08Snapshot()).document.layers.at(-1)?.payload).toMatchObject(
-      {
-        thickness: 2,
-        fontSize: afterFont.payload.fontSize,
-      },
-    )
+    expect((await m08Snapshot()).document.layers.at(-1)?.payload).toMatchObject({
+      thickness: 2,
+      fontSize: afterFont.payload.fontSize,
+    })
     await clickHistory('Undo')
-    expect((await m08Snapshot()).document.layers.at(-1)?.localBounds).toEqual(
-      created.localBounds,
-    )
+    expect((await m08Snapshot()).document.layers.at(-1)?.localBounds).toEqual(created.localBounds)
     await clickHistory('Redo')
     await clickHistory('Redo')
-    expect((await m08Snapshot()).document.layers.at(-1)?.localBounds).toEqual(
-      afterThickness.localBounds,
-    )
+    expect((await m08Snapshot()).document.layers.at(-1)?.localBounds).toEqual(afterThickness.localBounds)
 
     await $('button[aria-label="Select"]').click()
     const beforeResize = (await m08Snapshot()).document.layers.at(-1)!
@@ -83,9 +80,7 @@ describe('M08 crop and precision acceptance in browser mode', () => {
     const resizeEnd = { x: resizeStart.x + 35, y: resizeStart.y + 24 }
     const versionBeforeResize = await m08VersionToken()
     await dragCanvas(resizeStart, resizeEnd, 'm08-ruler-endpoint-resize')
-    await browser.waitUntil(
-      async () => (await m08VersionToken()) === versionBeforeResize + 1,
-    )
+    await browser.waitUntil(async () => (await m08VersionToken()) === versionBeforeResize + 1)
     expect(await m08VersionToken()).toBe(versionBeforeResize + 1)
     const afterResize = (await m08Snapshot()).document.layers.at(-1)!
     expect(afterResize.transform.scaleX).toBe(1)
@@ -95,12 +90,8 @@ describe('M08 crop and precision acceptance in browser mode', () => {
       fontSize: payloadBefore.fontSize,
     })
     const resizedFrame = await overlayAlphaBounds()
-    expect(
-      Math.max(resizedFrame?.width ?? 0, resizedFrame?.height ?? 0),
-    ).toBeGreaterThan(50)
-    expect(
-      Math.min(resizedFrame?.width ?? 0, resizedFrame?.height ?? 0),
-    ).toBeGreaterThan(16)
+    expect(Math.max(resizedFrame?.width ?? 0, resizedFrame?.height ?? 0)).toBeGreaterThan(50)
+    expect(Math.min(resizedFrame?.width ?? 0, resizedFrame?.height ?? 0)).toBeGreaterThan(16)
 
     const payloadAfter = afterResize.payload as typeof payloadBefore
     const actualEndpoints = [
@@ -132,17 +123,12 @@ describe('M08 crop and precision acceptance in browser mode', () => {
       .down({ button: 'left' })
       .up({ button: 'left' })
       .perform()
-    await expect($(`[data-layer-id="${afterResize.id}"]`)).toHaveAttribute(
-      'aria-selected',
-      'true',
-    )
+    await expect($(`[data-layer-id="${afterResize.id}"]`)).toHaveAttribute('aria-selected', 'true')
 
     await clickHistory('Undo')
     expect((await m08Snapshot()).document.layers.at(-1)).toEqual(beforeResize)
     await clickHistory('Redo')
     expect((await m08Snapshot()).document.layers.at(-1)).toEqual(afterResize)
-    await browser.saveScreenshot(
-      path.resolve('artifacts/browser-e2e/m08-ruler-bounds-after-style.png'),
-    )
+    await browser.saveScreenshot(path.resolve('artifacts/browser-e2e/m08-ruler-bounds-after-style.png'))
   })
 })

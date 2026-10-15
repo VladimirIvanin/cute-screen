@@ -1,5 +1,8 @@
 import type { RenderTextStyle } from '@cute-screen/editor-core'
-import type { ImageResource, ImageResourceInput } from '../../types'
+import type {
+  ImageResource,
+  ImageResourceInput,
+} from '../../types'
 
 export type Context2D = Pick<
   CanvasRenderingContext2D,

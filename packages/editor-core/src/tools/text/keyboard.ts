@@ -10,38 +10,28 @@ import {
 } from './model'
 import { replaceRichTextSelection } from './replacement'
 
-function currentParagraph(
-  state: RichTextEditingState,
-): RichTextParagraph | undefined {
+function currentParagraph(state: RichTextEditingState): RichTextParagraph | undefined {
   const range = richTextSelectionRange(state.selection)
-  return paragraphAt(
-    state.content.paragraphs,
-    state.content.text.length,
-    range.start,
-  )
+  return paragraphAt(state.content.paragraphs, state.content.text.length, range.start)
 }
 
-function paragraphIsEmpty(text: string, paragraph: RichTextParagraph): boolean {
+function paragraphIsEmpty(
+  text: string,
+  paragraph: RichTextParagraph,
+): boolean {
   const contentEnd =
-    paragraph.end > paragraph.start && text[paragraph.end - 1] === '\n'
-      ? paragraph.end - 1
-      : paragraph.end
+    paragraph.end > paragraph.start && text[paragraph.end - 1] === '\n' ? paragraph.end - 1 : paragraph.end
   return paragraph.start === contentEnd
 }
 
-export function handleRichTextEnter(
-  state: RichTextEditingState,
-): RichTextEditingState {
+export function handleRichTextEnter(state: RichTextEditingState): RichTextEditingState {
   let current = state
   const initialRange = richTextSelectionRange(current.selection)
   if (initialRange.start !== initialRange.end) {
     current = replaceRichTextSelection(current, '')
   }
   const paragraph = currentParagraph(current)
-  if (
-    paragraph?.listKind === 'bullet' &&
-    paragraphIsEmpty(current.content.text, paragraph)
-  ) {
+  if (paragraph?.listKind === 'bullet' && paragraphIsEmpty(current.content.text, paragraph)) {
     return applyRichTextParagraphStyle(current, { listKind: 'none' })
   }
   return replaceRichTextSelection(current, '\n')
@@ -50,10 +40,7 @@ export function handleRichTextEnter(
 export function handleRichTextBackspace(
   state: RichTextEditingState,
 ): Readonly<{ handled: boolean; state: RichTextEditingState }> {
-  const selection = normalizeRichTextSelection(
-    state.content.text,
-    state.selection,
-  )
+  const selection = normalizeRichTextSelection(state.content.text, state.selection)
   const range = richTextSelectionRange(selection)
   const normalizedState = Object.freeze({ ...state, selection })
   if (range.start !== range.end) {

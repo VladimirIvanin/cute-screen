@@ -39,10 +39,10 @@ declare global {
       setCrop(): void
       snapshot():
         | {
-            crop: unknown
-            layers: EditorDocumentV1['layers']
-            saveState: string
-          }
+          crop: unknown
+          layers: EditorDocumentV1['layers']
+          saveState: string
+        }
         | undefined
     }
     __cuteScreenE2eM05?: {
@@ -52,13 +52,13 @@ declare global {
     __cuteScreenE2eM08?: {
       snapshot():
         | {
-            document: EditorDocumentV1
-            decodedSource?: {
-              width: number
-              height: number
-            }
-            clipboardText?: string
+          document: EditorDocumentV1
+          decodedSource?: {
+            width: number
+            height: number
           }
+          clipboardText?: string
+        }
         | undefined
       readClipboardText(): Promise<string | undefined>
     }
@@ -82,10 +82,7 @@ const testActions: ShellActionAdapter | undefined =
     ? {
         run: (action, signal) =>
           new Promise((resolve, reject) => {
-            const timer = window.setTimeout(
-              () => resolve(`${action} completed`),
-              150,
-            )
+            const timer = window.setTimeout(() => resolve(`${action} completed`), 150)
             signal.addEventListener(
               'abort',
               () => {
@@ -130,29 +127,20 @@ let capturedDocumentMount: Promise<boolean> | undefined
 const documentState = shallowRef<ShellDocumentState>({ kind: 'loading' })
 const readOnlyDocument = shallowRef(false)
 const initialDocumentState =
-  import.meta.env.VITE_TEST_HARNESS === 'true' &&
-  !m03Harness &&
-  !m04CaptureHarness
-    ? undefined
-    : documentState
+  import.meta.env.VITE_TEST_HARNESS === 'true' && !m03Harness && !m04CaptureHarness ? undefined : documentState
 const lifecycleCleanup: Array<() => void> = []
 const captureAvailable = computed(() =>
-  import.meta.env.VITE_TEST_HARNESS === 'true' ||
-  !('__TAURI_INTERNALS__' in window)
+  import.meta.env.VITE_TEST_HARNESS === 'true' || !('__TAURI_INTERNALS__' in window)
     ? true
-    : (platformCapabilities.value?.capture.available ?? false),
-)
-const captureWindowAvailable = computed(
-  () => platformCapabilities.value?.capture.windowTarget ?? false,
-)
+    : (platformCapabilities.value?.capture.available ?? false))
+const captureWindowAvailable = computed(() => platformCapabilities.value?.capture.windowTarget ?? false)
 const openImageAvailable = computed(() => '__TAURI_INTERNALS__' in window)
 const captureFallbackCommand = computed(() =>
   m04FallbackHarness
     ? "'/opt/Cute Screen/cute-screen' capture --mode area"
     : platformCapabilities.value?.cliFallback
       ? platformCapabilities.value.cliFallbackCommand
-      : undefined,
-)
+      : undefined)
 
 function correlationId(): string {
   return `m03-${Date.now()}-${Math.random().toString(16).slice(2)}`
@@ -171,8 +159,7 @@ async function refreshPlatformCapabilities(): Promise<void> {
   if (!('__TAURI_INTERNALS__' in window)) return
   try {
     const { tauriDesktopBridge } = await import('./desktop-bridge')
-    platformCapabilities.value =
-      await tauriDesktopBridge.platformCapabilities(correlationId())
+    platformCapabilities.value = await tauriDesktopBridge.platformCapabilities(correlationId())
   } catch (error) {
     console.warn('cute-screen platform capability probe failed', error)
   }
@@ -183,8 +170,7 @@ async function loadSystemFonts(): Promise<void> {
   if (!('__TAURI_INTERNALS__' in window)) return
   try {
     const { tauriDesktopBridge } = await import('./desktop-bridge')
-    systemFonts.value =
-      await tauriDesktopBridge.listSystemFonts(correlationId())
+    systemFonts.value = await tauriDesktopBridge.listSystemFonts(correlationId())
   } catch (error) {
     console.warn('cute-screen system font catalog failed', error)
   }
@@ -193,10 +179,9 @@ async function loadSystemFonts(): Promise<void> {
 async function loadPersistedDocument(): Promise<boolean> {
   if (
     import.meta.env.VITE_TEST_HARNESS === 'true' &&
-    !m03Harness &&
-    !m04CaptureHarness
-  )
-    return true
+      !m03Harness &&
+      !m04CaptureHarness
+  ) return true
   documentState.value = { kind: 'loading' }
   readOnlyDocument.value = false
   try {
@@ -209,8 +194,7 @@ async function loadPersistedDocument(): Promise<boolean> {
       documentState.value = { kind: 'empty' }
       return false
     }
-    const frames =
-      await tauriDesktopBridge.repositoryListActiveSeriesFrames(correlationId())
+    const frames = await tauriDesktopBridge.repositoryListActiveSeriesFrames(correlationId())
     seriesFrames.value = frames.map((frame, index) => ({
       id: frame.captureId,
       label: String(index + 1),
@@ -311,7 +295,8 @@ function onWindowClipboardKeydown(event: KeyboardEvent): void {
   if (
     event.target instanceof HTMLInputElement ||
     event.target instanceof HTMLTextAreaElement ||
-    (event.target instanceof HTMLElement && event.target.isContentEditable)
+    (event.target instanceof HTMLElement &&
+      event.target.isContentEditable)
   ) {
     return
   }
@@ -324,8 +309,7 @@ async function mountM05HarnessDocument(): Promise<void> {
     documentSession,
     sourceImage,
     correlationId,
-    installClipboardBridge: () =>
-      m08HarnessController.installBrowserClipboardBridge(),
+    installClipboardBridge: () => m08HarnessController.installBrowserClipboardBridge(),
     installHarnessFacade: () => m08HarnessController.installFacade(),
   })
 }
@@ -348,25 +332,14 @@ function createDocumentCoordinator(
   return new DocumentSessionCoordinator({
     bridge: {
       saveDocument: (save, correlation) =>
-        bridge.repositorySaveDocument(
-          save.documentId,
-          save.revision,
-          save.documentJson,
-          correlation,
-        ),
+        bridge.repositorySaveDocument(save.documentId, save.revision, save.documentJson, correlation),
       exportRecoveryBundle: async (documentId, correlation) => {
         try {
-          return await bridge.repositoryExportRecoveryBundle(
-            documentId,
-            correlation,
-          )
+          return await bridge.repositoryExportRecoveryBundle(documentId, correlation)
         } catch (error) {
           return {
             kind: 'failed' as const,
-            error: describeError(
-              error,
-              'Unable to export the recovery bundle.',
-            ),
+            error: describeError(error, 'Unable to export the recovery bundle.'),
           }
         }
       },
@@ -395,10 +368,7 @@ async function flushBeforeLifecycleAction(): Promise<boolean> {
 async function installLifecycleGuards(): Promise<void> {
   lifecycleCleanup.push(
     ...(await installDesktopLifecycleGuards({
-      enabled:
-        import.meta.env.VITE_TEST_HARNESS !== 'true' ||
-        m03Harness ||
-        m04CaptureHarness,
+      enabled: import.meta.env.VITE_TEST_HARNESS !== 'true' || m03Harness || m04CaptureHarness,
       documentState,
       captureProgress,
       firstFrame: editorFirstFrame,
@@ -447,8 +417,7 @@ onBeforeUnmount(() => {
     void import('./desktop-bridge').then(({ tauriDesktopBridge }) =>
       tauriDesktopBridge.capturePreflightSetReady(false).catch((error) => {
         console.warn('cute-screen capture preflight shutdown failed', error)
-      }),
-    )
+      }))
   }
   for (const cleanup of lifecycleCleanup.splice(0)) cleanup()
   documentCoordinator.value?.dispose()
@@ -456,10 +425,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <component
-    :is="M05ReferencePerformance"
-    v-if="m05ReferencePerfHarness && M05ReferencePerformance"
-  />
+  <component :is="M05ReferencePerformance" v-if="m05ReferencePerfHarness && M05ReferencePerformance" />
   <EditorShell
     v-else
     :fixture="fixture"

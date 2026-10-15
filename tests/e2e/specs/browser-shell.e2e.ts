@@ -1,10 +1,12 @@
-import { $, browser, expect } from '@wdio/globals'
+import {
+  $,
+  browser,
+  expect,
+} from '@wdio/globals'
 import path from 'node:path'
 
 describe('M02 editor shell in browser mode', () => {
-  async function openShell(
-    fixture: 'empty' | 'error' | 'loading' | 'ready',
-  ): Promise<void> {
+  async function openShell(fixture: 'empty' | 'error' | 'loading' | 'ready'): Promise<void> {
     await browser.url('/')
     await browser.execute(() => window.localStorage.clear())
     await browser.url(`/?m02=${fixture}`)
@@ -15,10 +17,7 @@ describe('M02 editor shell in browser mode', () => {
     await browser.setWindowSize(1600, 1000)
     await openShell('ready')
 
-    await expect($('button[aria-label="Arrow"]')).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
+    await expect($('button[aria-label="Arrow"]')).toHaveAttribute('aria-pressed', 'true')
     await expect($('.cs-toolrail--horizontal')).toExist()
     await expect($('.cs-context-toolbar')).not.toExist()
     await $('button[aria-label="Marker"]').click()
@@ -34,8 +33,7 @@ describe('M02 editor shell in browser mode', () => {
         const rail = document.querySelector('.cs-toolrail')
         if (!(context instanceof HTMLElement) || !(zoom instanceof HTMLElement))
           throw new Error('Missing bottom workbench controls')
-        if (!(rail instanceof HTMLElement))
-          throw new Error('Missing bottom tool rail')
+        if (!(rail instanceof HTMLElement)) throw new Error('Missing bottom tool rail')
         const contextBounds = context.getBoundingClientRect()
         const zoomBounds = zoom.getBoundingClientRect()
         const railBounds = rail.getBoundingClientRect()
@@ -44,26 +42,20 @@ describe('M02 editor shell in browser mode', () => {
             zoomBounds.right <= contextBounds.left ||
             contextBounds.bottom <= zoomBounds.top ||
             zoomBounds.bottom <= contextBounds.top) &&
-          contextBounds.bottom <= railBounds.top + 1
+            contextBounds.bottom <= railBounds.top + 1
         )
       }),
     ).toBe(true)
     await $('button[aria-label="Zoom in"]').click()
     await expect($('.cs-zoom-controls')).toHaveAttribute('data-zoom', '110')
-    await browser.saveScreenshot(
-      path.resolve('artifacts/browser-e2e/m02-ready-1600x1000.png'),
-    )
+    await browser.saveScreenshot(path.resolve('artifacts/browser-e2e/m02-ready-1600x1000.png'))
   })
 
   it('keeps capture, copy and export reachable without overflow at 1024 px', async () => {
     await browser.setWindowSize(1024, 700)
     await openShell('ready')
 
-    expect(
-      await browser.execute(
-        () => document.documentElement.scrollWidth <= window.innerWidth,
-      ),
-    ).toBe(true)
+    expect(await browser.execute(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
     expect(
       await browser.execute(() => {
         const app = document.querySelector('#app')
@@ -83,26 +75,17 @@ describe('M02 editor shell in browser mode', () => {
           throw new Error('Missing bottom chrome')
         }
         const overlap = (a: DOMRect, b: DOMRect) =>
-          a.left < b.right - 1 &&
-          b.left < a.right - 1 &&
-          a.top < b.bottom - 1 &&
-          b.top < a.bottom - 1
+          a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1
         const within = (box: DOMRect) =>
-          box.left >= -1 &&
-          box.right <= window.innerWidth + 1 &&
-          box.top >= -1 &&
-          box.bottom <= window.innerHeight + 1
+          box.left >= -1 && box.right <= window.innerWidth + 1 && box.top >= -1 && box.bottom <= window.innerHeight + 1
         const appBox = app.getBoundingClientRect()
         const providerBox = provider.getBoundingClientRect()
         const workbenchBox = workbench.getBoundingClientRect()
         const railBox = rail.getBoundingClientRect()
         const zoomBox = zoom.getBoundingClientRect()
-        const filmBox =
-          film instanceof HTMLElement ? film.getBoundingClientRect() : null
+        const filmBox = film instanceof HTMLElement ? film.getBoundingClientRect() : null
         return {
-          providerFillsApp:
-            providerBox.height > 0 &&
-            Math.abs(providerBox.height - appBox.height) <= 1,
+          providerFillsApp: providerBox.height > 0 && Math.abs(providerBox.height - appBox.height) <= 1,
           workbenchWithinApp: workbenchBox.height <= appBox.height + 1,
           railWithin: within(railBox),
           zoomWithin: within(zoomBox),
@@ -125,9 +108,7 @@ describe('M02 editor shell in browser mode', () => {
     await expect($('button[aria-label="Capture"]')).toBeEnabled()
     await expect($('button[aria-label="Copy"]')).toBeEnabled()
     await expect($('button[aria-label="Export"]')).toBeEnabled()
-    await browser.saveScreenshot(
-      path.resolve('artifacts/browser-e2e/m02-ready-1024x700.png'),
-    )
+    await browser.saveScreenshot(path.resolve('artifacts/browser-e2e/m02-ready-1024x700.png'))
   })
 
   it('keeps the CLI fallback snackbar out of the zoomed workbench layout', async () => {
@@ -138,10 +119,7 @@ describe('M02 editor shell in browser mode', () => {
     const before = await browser.execute(() => {
       const fallback = document.querySelector('.cs-capture-fallback')
       const workbench = document.querySelector('.cs-workbench')
-      if (
-        !(fallback instanceof HTMLElement) ||
-        !(workbench instanceof HTMLElement)
-      ) {
+      if (!(fallback instanceof HTMLElement) || !(workbench instanceof HTMLElement)) {
         throw new Error('Missing fallback snackbar or workbench')
       }
       const bounds = workbench.getBoundingClientRect()
@@ -158,16 +136,13 @@ describe('M02 editor shell in browser mode', () => {
 
     const after = await browser.execute(() => {
       const workbench = document.querySelector('.cs-workbench')
-      if (!(workbench instanceof HTMLElement))
-        throw new Error('Missing workbench')
+      if (!(workbench instanceof HTMLElement)) throw new Error('Missing workbench')
       const bounds = workbench.getBoundingClientRect()
       return { top: bounds.top, height: bounds.height }
     })
 
     expect(after).toEqual(before.workbench)
-    await browser.saveScreenshot(
-      path.resolve('artifacts/browser-e2e/m04-fallback-snackbar-1024x700.png'),
-    )
+    await browser.saveScreenshot(path.resolve('artifacts/browser-e2e/m04-fallback-snackbar-1024x700.png'))
   })
 
   it('switches locale and theme live with localized accessible names', async () => {
@@ -176,23 +151,15 @@ describe('M02 editor shell in browser mode', () => {
 
     await $('button[aria-label="More actions"]').click()
     await $('button=RU').click()
-    expect(await browser.execute(() => document.documentElement.lang)).toBe(
-      'ru',
-    )
+    expect(await browser.execute(() => document.documentElement.lang)).toBe('ru')
     await expect($('aside[aria-label="Инструменты"]')).toExist()
     await $('button[aria-label="Стрелка"]').click()
-    await expect(
-      $('section[aria-label="Настройки инструмента"] .cs-context-copy'),
-    ).not.toExist()
+    await expect($('section[aria-label="Настройки инструмента"] .cs-context-copy')).not.toExist()
 
     await $('button[aria-label="Другие действия"]').click()
     await $('button=Тёмная').click()
-    expect(
-      await browser.execute(() => document.documentElement.dataset.theme),
-    ).toBe('dark')
-    await browser.saveScreenshot(
-      path.resolve('artifacts/browser-e2e/m02-ready-ru-dark.png'),
-    )
+    expect(await browser.execute(() => document.documentElement.dataset.theme)).toBe('dark')
+    await browser.saveScreenshot(path.resolve('artifacts/browser-e2e/m02-ready-ru-dark.png'))
   })
 
   it('renders the light theme at desktop scale', async () => {
@@ -201,12 +168,8 @@ describe('M02 editor shell in browser mode', () => {
 
     await $('button[aria-label="More actions"]').click()
     await $('button=Light').click()
-    expect(
-      await browser.execute(() => document.documentElement.dataset.theme),
-    ).toBe('light')
-    await browser.saveScreenshot(
-      path.resolve('artifacts/browser-e2e/m02-ready-light-1600x1000.png'),
-    )
+    expect(await browser.execute(() => document.documentElement.dataset.theme)).toBe('light')
+    await browser.saveScreenshot(path.resolve('artifacts/browser-e2e/m02-ready-light-1600x1000.png'))
   })
 
   it('places the overflow menu through the overlay without a second absolute offset', async () => {
@@ -219,9 +182,7 @@ describe('M02 editor shell in browser mode', () => {
 
     const placement = await browser.execute(() => {
       const menu = document.querySelector('.cs-menu')
-      const trigger = document.querySelector(
-        'button[aria-label="More actions"]',
-      )
+      const trigger = document.querySelector('button[aria-label="More actions"]')
       if (!(menu instanceof HTMLElement) || !(trigger instanceof HTMLElement)) {
         throw new Error('Missing overflow menu or trigger')
       }
@@ -244,20 +205,12 @@ describe('M02 editor shell in browser mode', () => {
     await expect($('[role="status"]')).toHaveText('Preparing editor…')
 
     await openShell('error')
-    await expect($('[role="alert"] h1')).toHaveText(
-      'The document could not be loaded.',
-    )
+    await expect($('[role="alert"] h1')).toHaveText('The document could not be loaded.')
     await expect($('button=Retry')).toBeEnabled()
 
     await openShell('empty')
     await browser.keys(['Tab'])
-    expect(
-      await browser.execute(() =>
-        document.activeElement?.getAttribute('aria-label'),
-      ),
-    ).toBe('Capture')
-    await browser.saveScreenshot(
-      path.resolve('artifacts/browser-e2e/m02-empty-focus-1024x700.png'),
-    )
+    expect(await browser.execute(() => document.activeElement?.getAttribute('aria-label'))).toBe('Capture')
+    await browser.saveScreenshot(path.resolve('artifacts/browser-e2e/m02-empty-focus-1024x700.png'))
   })
 })

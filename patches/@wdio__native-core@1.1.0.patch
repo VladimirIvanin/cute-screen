@@ -1,0 +1,72 @@
+diff --git a/dist/cjs/index.js b/dist/cjs/index.js
+index 454012c491d38002a18d07d7d531b94a4a8a991e..46dba92267ca7b92d610071778571f2e303bab17 100644
+--- a/dist/cjs/index.js
++++ b/dist/cjs/index.js
+@@ -140,7 +140,8 @@ class DriverProcess {
+                     stdio: ['ignore', 'pipe', 'pipe'],
+                     detached: false,
+                     env: spawnEnv,
+-                    shell: process.platform === 'win32',
++                    shell: process.platform === 'win32' && !/\.(exe|com)$/i.test(driverPath),
++                    windowsHide: true,
+                 });
+                 log$6.info(`[${identifier}] Spawned process with PID: ${this._proc.pid ?? 'unknown'}`);
+                 this.startupTimeout = setTimeout(() => {
+@@ -306,8 +307,19 @@ class DriverProcess {
+             return;
+         }
+         log$6.debug(`Stopping ${driverName}...`);
+-        this._proc.kill('SIGTERM');
+-        await this.waitForExit(driverName);
++        if (process.platform === 'win32' && this._proc.pid) {
++            const pid = this._proc.pid;
++            await new Promise((resolve, reject) => {
++                const killer = node_child_process.spawn('taskkill', ['/PID', String(pid), '/T', '/F'], {
++                    stdio: 'ignore', windowsHide: true,
++                });
++                killer.once('error', reject);
++                killer.once('exit', (code) => code === 0 ? resolve() : reject(new Error('Unable to stop driver tree ' + pid + ': ' + code)));
++            });
++        } else {
++            this._proc.kill('SIGTERM');
++            await this.waitForExit(driverName);
++        }
+         this.cleanup();
+         // Additional delay to ensure the port is fully released.
+         await new Promise((resolve) => setTimeout(resolve, 500));
+diff --git a/dist/esm/index.js b/dist/esm/index.js
+index 391d14a16f4c31525c6aa6d479b1702401dac1ad..aa5c7a7f3a74321c3c425a410c8ea2c96be91c18 100644
+--- a/dist/esm/index.js
++++ b/dist/esm/index.js
+@@ -138,7 +138,8 @@ class DriverProcess {
+                     stdio: ['ignore', 'pipe', 'pipe'],
+                     detached: false,
+                     env: spawnEnv,
+-                    shell: process.platform === 'win32',
++                    shell: process.platform === 'win32' && !/\.(exe|com)$/i.test(driverPath),
++                    windowsHide: true,
+                 });
+                 log$6.info(`[${identifier}] Spawned process with PID: ${this._proc.pid ?? 'unknown'}`);
+                 this.startupTimeout = setTimeout(() => {
+@@ -304,8 +305,19 @@ class DriverProcess {
+             return;
+         }
+         log$6.debug(`Stopping ${driverName}...`);
+-        this._proc.kill('SIGTERM');
+-        await this.waitForExit(driverName);
++        if (process.platform === 'win32' && this._proc.pid) {
++            const pid = this._proc.pid;
++            await new Promise((resolve, reject) => {
++                const killer = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], {
++                    stdio: 'ignore', windowsHide: true,
++                });
++                killer.once('error', reject);
++                killer.once('exit', (code) => code === 0 ? resolve() : reject(new Error('Unable to stop driver tree ' + pid + ': ' + code)));
++            });
++        } else {
++            this._proc.kill('SIGTERM');
++            await this.waitForExit(driverName);
++        }
+         this.cleanup();
+         // Additional delay to ensure the port is fully released.
+         await new Promise((resolve) => setTimeout(resolve, 500));

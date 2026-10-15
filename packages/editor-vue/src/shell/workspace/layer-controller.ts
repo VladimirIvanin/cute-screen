@@ -1,5 +1,6 @@
 import type { Ref } from 'vue'
 import {
+  creationPolicy,
   rebaseRulerLayer,
   type EditorDocumentV1,
   type JsonObject,
@@ -9,10 +10,12 @@ import {
 import type { ResolvedEditorShellProps } from '../contracts'
 
 export interface LayerControllerContext {
+  readonly prepareLayer?: (layer: LayerNode) => LayerNode
   readonly props: ResolvedEditorShellProps
   readonly activeDocument: Ref<EditorDocumentV1 | undefined>
   readonly store: {
     readonly selectedLayerIds: readonly string[]
+    selectTool(id: string): void
     selectLayer(id: string, toggle?: boolean, range?: boolean): void
   }
 }
@@ -33,13 +36,12 @@ function updateLayerProperty(
   property: 'visible' | 'locked' | 'opacity' | 'rotation',
   value?: number,
 ): void {
-  const layer = context.activeDocument.value?.layers.find(
-    (candidate) => candidate.id === id,
-  )
+  const layer = context.activeDocument.value?.layers.find((candidate) => candidate.id === id)
   if (
     !layer ||
     !context.props.documentSession ||
-    (layer.locked && property !== 'locked')
+    (layer.locked &&
+      property !== 'locked')
   ) {
     return
   }
@@ -150,9 +152,7 @@ function moveLayer(
   deltaY: number,
 ): void {
   const selected = new Set(context.store.selectedLayerIds)
-  const layers = context.activeDocument.value?.layers.filter((layer) =>
-    selected.has(layer.id),
-  )
+  const layers = context.activeDocument.value?.layers.filter((layer) => selected.has(layer.id))
   if (
     !layers?.length ||
     !context.props.documentSession ||
@@ -170,9 +170,7 @@ function moveLayer(
       translateY: layer.transform.translateY + deltaY,
     }),
   }))
-  context.props.documentSession.execute(
-    commands.length === 1 ? commands[0]! : { type: 'batch', commands },
-  )
+  context.props.documentSession.execute(commands.length === 1 ? commands[0]! : { type: 'batch', commands })
 }
 
 function transformLayer(
@@ -180,10 +178,12 @@ function transformLayer(
   id: string,
   transform: Transform2D,
 ): void {
-  const layer = context.activeDocument.value?.layers.find(
-    (candidate) => candidate.id === id,
-  )
-  if (!layer || layer.locked || !context.props.documentSession) return
+  const layer = context.activeDocument.value?.layers.find((candidate) => candidate.id === id)
+  if (
+    !layer ||
+    layer.locked ||
+    !context.props.documentSession
+  ) return
   context.props.documentSession.execute({
     type: 'updateLayer',
     before: layer,
@@ -196,10 +196,12 @@ function updateLayerPayload(
   id: string,
   payload: JsonObject,
 ): void {
-  const layer = context.activeDocument.value?.layers.find(
-    (candidate) => candidate.id === id,
-  )
-  if (!layer || layer.locked || !context.props.documentSession) return
+  const layer = context.activeDocument.value?.layers.find((candidate) => candidate.id === id)
+  if (
+    !layer ||
+    layer.locked ||
+    !context.props.documentSession
+  ) return
   context.props.documentSession.execute({
     type: 'updateLayer',
     before: layer,
@@ -213,37 +215,31 @@ function addLayer(
   selectAfter = false,
 ): void {
   if (!context.props.documentSession || context.props.readOnlyDocument) return
+  layer = context.prepareLayer?.(layer) ?? layer
   context.props.documentSession.execute({ type: 'addLayer', layer })
-  if (selectAfter && layer.kind === 'loupe') context.store.selectLayer(layer.id)
+  if (creationPolicy(layer.kind) === 'select') {
+    context.store.selectTool('select')
+    context.store.selectLayer(layer.id)
+  }
+  void selectAfter
 }
 
 export function createLayerController(context: LayerControllerContext) {
   return {
-    updateLayerProperty: (
-      id: string,
-      property: 'visible' | 'locked' | 'opacity' | 'rotation',
-      value?: number,
-    ) => updateLayerProperty(context, id, property, value),
-    reorderLayer: (id: string, direction: 'up' | 'down') =>
-      reorderLayer(context, id, direction),
-    onLayerOpacity: (id: string, value: number) =>
-      updateLayerProperty(context, id, 'opacity', value),
-    onLayerRotation: (id: string, value: number) =>
-      updateLayerProperty(context, id, 'rotation', value),
-    onLayerReorderTo: (
-      id: string,
-      targetId: string,
-      place: 'before' | 'after',
-    ) => reorderLayerTo(context, id, targetId, place),
-    moveLayer: (id: string, deltaX: number, deltaY: number) =>
-      moveLayer(context, id, deltaX, deltaY),
-    selectLayer: (id: string, toggle = false, range = false) =>
-      context.store.selectLayer(id, toggle, range),
-    transformLayer: (id: string, transform: Transform2D) =>
-      transformLayer(context, id, transform),
-    updateLayerPayload: (id: string, payload: JsonObject) =>
-      updateLayerPayload(context, id, payload),
-    addLayer: (layer: LayerNode, selectAfter = false) =>
-      addLayer(context, layer, selectAfter),
+    updateLayerProperty: (id: string, property: 'visible' | 'locked' | 'opacity' | 'rotation', value?: number) =>
+      updateLayerProperty(context, id, property, value),
+    reorderLayer: (id: string, direction: 'up' | 'down') => reorderLayer(context, id, direction),
+    onLayerOpacity: (id: string, value: number) => updateLayerProperty(context, id, 'opacity', value),
+    onLayerRotation: (id: string, value: number) => updateLayerProperty(context, id, 'rotation', value),
+    onLayerReorderTo: (id: string, targetId: string, place: 'before' | 'after') =>
+      reorderLayerTo(context, id, targetId, place),
+    moveLayer: (id: string, deltaX: number, deltaY: number) => moveLayer(context, id, deltaX, deltaY),
+    selectLayer: (id: string, toggle = false, range = false) => {
+      context.store.selectTool('select')
+      context.store.selectLayer(id, toggle, range)
+    },
+    transformLayer: (id: string, transform: Transform2D) => transformLayer(context, id, transform),
+    updateLayerPayload: (id: string, payload: JsonObject) => updateLayerPayload(context, id, payload),
+    addLayer: (layer: LayerNode, selectAfter = false) => addLayer(context, layer, selectAfter),
   }
 }

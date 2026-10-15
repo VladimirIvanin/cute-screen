@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 import {
   colorPalette,
   colorSuggestions,
@@ -17,9 +21,7 @@ describe('colour picker primitives', () => {
   })
 
   it('keeps an explicit hue while building a palette from an achromatic colour', () => {
-    expect(srgbToHex(colorPalette(hexToSrgb('#FFFFFF')!, 120)[11]!)).toBe(
-      '#B0F5B0',
-    )
+    expect(srgbToHex(colorPalette(hexToSrgb('#FFFFFF')!, 120)[11]!)).toBe('#B0F5B0')
   })
 
   it('provides 32 palette options with a complete neutral row', () => {
@@ -39,14 +41,8 @@ describe('colour picker primitives', () => {
 
   it('returns contrast, complementary and analogous suggestions deterministically', () => {
     const suggestions = colorSuggestions(hexToSrgb('#D14B7C')!)
-    expect(suggestions.map(({ id }) => id)).toEqual([
-      'contrast',
-      'complementary',
-      'analogous',
-    ])
+    expect(suggestions.map(({ id }) => id)).toEqual(['contrast', 'complementary', 'analogous'])
     expect(srgbToHex(suggestions[0]!.color)).toBe('#171719')
-    expect(srgbToHex(hsvToSrgb({ hue: 0, saturation: 100, value: 100 }))).toBe(
-      '#FF0000',
-    )
+    expect(srgbToHex(hsvToSrgb({ hue: 0, saturation: 100, value: 100 }))).toBe('#FF0000')
   })
 })

@@ -19,20 +19,12 @@ export function transformedPoint(
   const cosine = Math.cos(radians)
   const sine = Math.sin(radians)
   return {
-    x:
-      point.x * transform.scaleX * cosine -
-      point.y * transform.scaleY * sine +
-      transform.translateX,
-    y:
-      point.x * transform.scaleX * sine +
-      point.y * transform.scaleY * cosine +
-      transform.translateY,
+    x: point.x * transform.scaleX * cosine - point.y * transform.scaleY * sine + transform.translateX,
+    y: point.x * transform.scaleX * sine + point.y * transform.scaleY * cosine + transform.translateY,
   }
 }
 
-export const documentFixture = (
-  crop: EditorDocumentV1['crop'] = null,
-): EditorDocumentV1 => ({
+export const documentFixture = (crop: EditorDocumentV1['crop'] = null): EditorDocumentV1 => ({
   schemaVersion: 7,
   id: '019c1f62-058e-7000-8000-000000000800',
   source: {

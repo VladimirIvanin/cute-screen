@@ -1,4 +1,7 @@
-import type { Ref, ShallowRef } from 'vue'
+import type {
+  Ref,
+  ShallowRef,
+} from 'vue'
 import {
   createContentImageLayer,
   createTextLayer,
@@ -10,12 +13,15 @@ import type { TextToolDefaults } from '../canvas/contracts'
 import type { ResolvedEditorShellProps } from '../contracts'
 
 export interface ContentControllerContext {
+  readonly error: Ref<string | undefined>
   readonly props: ResolvedEditorShellProps
   readonly activeDocument: Ref<EditorDocumentV1 | undefined>
   readonly contentImageImporting: Ref<boolean>
   readonly textureImages: Ref<ReadonlyMap<string, HTMLImageElement>>
   readonly textDefaults: ShallowRef<TextToolDefaults>
   readonly selectedLayerId: Ref<string | undefined>
+  readonly rememberTextDefaults: (layer: import('@cute-screen/editor-renderer').LayerNode) => void
+  readonly addLayer: (layer: import('@cute-screen/editor-renderer').LayerNode) => void
 }
 
 async function importContentImage(
@@ -41,10 +47,7 @@ async function importContentImage(
       bridge,
       createResource: async (image) => image,
     })
-    context.textureImages.value = new Map(context.textureImages.value).set(
-      imported.blobHash,
-      resource.resource,
-    )
+    context.textureImages.value = new Map(context.textureImages.value).set(imported.blobHash, resource.resource)
     const layer = createContentImageLayer({
       id: crypto.randomUUID(),
       blobHash: imported.blobHash,
@@ -56,15 +59,15 @@ async function importContentImage(
         y: origin.y - imported.height / 2,
       },
     })
-    context.props.documentSession.execute({ type: 'addLayer', layer })
+    context.addLayer(layer)
+  } catch (error) {
+    context.error.value = error instanceof Error ? error.message : String(error)
   } finally {
     context.contentImageImporting.value = false
   }
 }
 
-async function pasteNativeClipboard(
-  context: ContentControllerContext,
-): Promise<void> {
+async function pasteNativeClipboard(context: ContentControllerContext): Promise<void> {
   const bridge = context.props.clipboardBridge
   const document = context.activeDocument.value
   if (
@@ -89,10 +92,7 @@ async function pasteNativeClipboard(
         bridge,
         createResource: async (image) => image,
       })
-      context.textureImages.value = new Map(context.textureImages.value).set(
-        bitmap.blobHash,
-        loaded.resource,
-      )
+      context.textureImages.value = new Map(context.textureImages.value).set(bitmap.blobHash, loaded.resource)
       context.props.documentSession.execute({
         type: 'addLayer',
         layer: createContentImageLayer({
@@ -125,8 +125,7 @@ async function pasteNativeClipboard(
       color: defaults.color,
       background: defaults.background,
     })
-    if (layer)
-      context.props.documentSession.execute({ type: 'addLayer', layer })
+    if (layer) context.addLayer(layer)
   } catch (error) {
     console.warn('cute-screen native clipboard paste failed', error)
   }
@@ -152,10 +151,7 @@ async function copySelectedTextLayer(
   const layer = document.layers[index]
   if (layer?.kind !== 'text' || layer.locked) return
   try {
-    await bridge.writeClipboardText(
-      layer.payload.content.text,
-      crypto.randomUUID(),
-    )
+    await bridge.writeClipboardText(layer.payload.content.text, crypto.randomUUID())
     if (cut) {
       context.props.documentSession.execute({
         type: 'removeLayer',
@@ -170,15 +166,17 @@ async function copySelectedTextLayer(
 
 export function createContentController(context: ContentControllerContext) {
   return {
-    importContentImage: (origin: { readonly x: number; readonly y: number }) =>
-      importContentImage(context, origin),
+    importContentImage: (origin: { readonly x: number; readonly y: number }) => importContentImage(context, origin),
     pasteNativeClipboard: () => pasteNativeClipboard(context),
-    copySelectedTextLayer: (cut: boolean) =>
-      copySelectedTextLayer(context, cut),
+    copySelectedTextLayer: (cut: boolean) => copySelectedTextLayer(context, cut),
     executeDocumentCommand: (command: unknown) => {
-      if (!context.props.documentSession || context.props.readOnlyDocument)
-        return
-      context.props.documentSession.execute(command as EditorCommand)
+      if (!context.props.documentSession || context.props.readOnlyDocument) return
+      const typed = command as EditorCommand | null
+      if (!typed) return
+      if (typed.type === 'addLayer') context.addLayer(typed.layer)
+      else context.props.documentSession.execute(typed)
+      if (typed.type === 'addLayer') context.rememberTextDefaults(typed.layer)
+      else if (typed.type === 'updateLayer') context.rememberTextDefaults(typed.after)
     },
   }
 }

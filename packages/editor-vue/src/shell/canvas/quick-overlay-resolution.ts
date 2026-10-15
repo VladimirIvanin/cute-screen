@@ -9,26 +9,13 @@ export function prepareQuickOverlay(
   dpr: number,
 ): void {
   const rect = overlay.getBoundingClientRect()
-  const width = Math.max(
-    1,
-    Math.round((rect.width || bounds.width * zoom) * dpr),
-  )
-  const height = Math.max(
-    1,
-    Math.round((rect.height || bounds.height * zoom) * dpr),
-  )
+  const width = Math.max(1, Math.round((rect.width || bounds.width * zoom) * dpr))
+  const height = Math.max(1, Math.round((rect.height || bounds.height * zoom) * dpr))
   if (overlay.width !== width) overlay.width = width
   if (overlay.height !== height) overlay.height = height
   context.setTransform(1, 0, 0, 1, 0, 0)
   context.clearRect(0, 0, width, height)
   const scaleX = width / bounds.width
   const scaleY = height / bounds.height
-  context.setTransform(
-    scaleX,
-    0,
-    0,
-    scaleY,
-    -bounds.x * scaleX,
-    -bounds.y * scaleY,
-  )
+  context.setTransform(scaleX, 0, 0, scaleY, -bounds.x * scaleX, -bounds.y * scaleY)
 }

@@ -1,5 +1,11 @@
-import type { Point, Rect } from '../../document/types'
-import { GEOMETRY_EPSILON, assertPoint } from './shared'
+import type {
+  Point,
+  Rect,
+} from '../../document/types'
+import {
+  GEOMETRY_EPSILON,
+  assertPoint,
+} from './shared'
 
 function polygonArea(points: readonly Point[]): number {
   let twiceArea = 0
@@ -11,18 +17,27 @@ function polygonArea(points: readonly Point[]): number {
   return twiceArea / 2
 }
 
-function orientation(a: Point, b: Point, c: Point): number {
+function orientation(
+  a: Point,
+  b: Point,
+  c: Point,
+): number {
   return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
 }
 
-function between(value: number, start: number, end: number): boolean {
-  return (
-    value >= Math.min(start, end) - GEOMETRY_EPSILON &&
-    value <= Math.max(start, end) + GEOMETRY_EPSILON
-  )
+function between(
+  value: number,
+  start: number,
+  end: number,
+): boolean {
+  return value >= Math.min(start, end) - GEOMETRY_EPSILON && value <= Math.max(start, end) + GEOMETRY_EPSILON
 }
 
-function pointOnSegment(point: Point, start: Point, end: Point): boolean {
+function pointOnSegment(
+  point: Point,
+  start: Point,
+  end: Point,
+): boolean {
   return (
     Math.abs(orientation(start, end, point)) <= GEOMETRY_EPSILON &&
     between(point.x, start.x, end.x) &&
@@ -30,25 +45,29 @@ function pointOnSegment(point: Point, start: Point, end: Point): boolean {
   )
 }
 
-function segmentsIntersect(a: Point, b: Point, c: Point, d: Point): boolean {
+function segmentsIntersect(
+  a: Point,
+  b: Point,
+  c: Point,
+  d: Point,
+): boolean {
   const abC = orientation(a, b, c)
   const abD = orientation(a, b, d)
   const cdA = orientation(c, d, a)
   const cdB = orientation(c, d, b)
   if (
-    ((abC > GEOMETRY_EPSILON && abD < -GEOMETRY_EPSILON) ||
-      (abC < -GEOMETRY_EPSILON && abD > GEOMETRY_EPSILON)) &&
-    ((cdA > GEOMETRY_EPSILON && cdB < -GEOMETRY_EPSILON) ||
-      (cdA < -GEOMETRY_EPSILON && cdB > GEOMETRY_EPSILON))
+    ((abC > GEOMETRY_EPSILON &&
+      abD < -GEOMETRY_EPSILON) ||
+      (abC < -GEOMETRY_EPSILON &&
+        abD > GEOMETRY_EPSILON)) &&
+        ((cdA > GEOMETRY_EPSILON &&
+          cdB < -GEOMETRY_EPSILON) ||
+          (cdA < -GEOMETRY_EPSILON &&
+            cdB > GEOMETRY_EPSILON))
   ) {
     return true
   }
-  return (
-    pointOnSegment(c, a, b) ||
-    pointOnSegment(d, a, b) ||
-    pointOnSegment(a, c, d) ||
-    pointOnSegment(b, c, d)
-  )
+  return pointOnSegment(c, a, b) || pointOnSegment(d, a, b) || pointOnSegment(a, c, d) || pointOnSegment(b, c, d)
 }
 
 export function assertValidFreeformPolygon(
@@ -74,19 +93,9 @@ export function assertValidFreeformPolygon(
     for (let second = first + 1; second < points.length; second += 1) {
       const secondNext = (second + 1) % points.length
       const adjacent =
-        first === second ||
-        firstNext === second ||
-        secondNext === first ||
-        (first === 0 && secondNext === 0)
+        first === second || firstNext === second || secondNext === first || (first === 0 && secondNext === 0)
       if (adjacent) continue
-      if (
-        segmentsIntersect(
-          points[first]!,
-          points[firstNext]!,
-          points[second]!,
-          points[secondNext]!,
-        )
-      ) {
+      if (segmentsIntersect(points[first]!, points[firstNext]!, points[second]!, points[secondNext]!)) {
         throw new RangeError(`${field} must be a simple polygon`)
       }
     }
@@ -113,30 +122,17 @@ export function pointInPolygon(
   points: readonly Point[],
 ): boolean {
   for (let index = 0; index < points.length; index += 1) {
-    if (
-      pointOnSegment(
-        point,
-        points[index]!,
-        points[(index + 1) % points.length]!,
-      )
-    ) {
+    if (pointOnSegment(point, points[index]!, points[(index + 1) % points.length]!)) {
       return true
     }
   }
   let inside = false
-  for (
-    let index = 0, previous = points.length - 1;
-    index < points.length;
-    previous = index++
-  ) {
+  for (let index = 0, previous = points.length - 1; index < points.length; previous = index++) {
     const current = points[index]!
     const before = points[previous]!
     if (
       current.y > point.y !== before.y > point.y &&
-      point.x <
-        ((before.x - current.x) * (point.y - current.y)) /
-          (before.y - current.y) +
-          current.x
+      point.x < ((before.x - current.x) * (point.y - current.y)) / (before.y - current.y) + current.x
     ) {
       inside = !inside
     }

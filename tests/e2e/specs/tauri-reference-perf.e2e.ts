@@ -1,5 +1,11 @@
-import { browser, expect } from '@wdio/globals'
-import { mkdir, writeFile } from 'node:fs/promises'
+import {
+  browser,
+  expect,
+} from '@wdio/globals'
+import {
+  mkdir,
+  writeFile,
+} from 'node:fs/promises'
 import path from 'node:path'
 
 type ReferenceReport = {
@@ -20,11 +26,7 @@ describe('M05 designated reference performance gate', () => {
   it('measures the real Tauri CanvasKit GPU path', async () => {
     await browser.setWindowSize(1600, 1000)
     await browser.waitUntil(
-      async () =>
-        browser.execute(
-          () =>
-            (window as ReferenceWindow).__cuteScreenReferencePerf !== undefined,
-        ),
+      async () => browser.execute(() => (window as ReferenceWindow).__cuteScreenReferencePerf !== undefined),
       {
         timeout: 30_000,
         timeoutMsg: 'Reference performance harness did not mount',
@@ -32,8 +34,7 @@ describe('M05 designated reference performance gate', () => {
     )
     const report = (await browser.execute(async () => {
       const harness = (window as ReferenceWindow).__cuteScreenReferencePerf
-      if (!harness)
-        throw new Error('Reference performance harness is unavailable')
+      if (!harness) throw new Error('Reference performance harness is unavailable')
       return harness.run()
     })) as ReferenceReport
     const output = path.resolve(

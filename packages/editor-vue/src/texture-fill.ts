@@ -6,23 +6,19 @@ import {
 export type TextureImportOutcome =
   | Readonly<{ readonly kind: 'cancelled' }>
   | Readonly<{
-      readonly kind: 'imported'
-      readonly blobHash: string
-      readonly format: 'png' | 'jpeg' | 'webp' | 'svg'
-      readonly mimeType:
-        'image/png' | 'image/jpeg' | 'image/webp' | 'image/svg+xml'
-      readonly width: number
-      readonly height: number
-      readonly resourceToken: string
-    }>
+    readonly kind: 'imported'
+    readonly blobHash: string
+    readonly format: 'png' | 'jpeg' | 'webp' | 'svg'
+    readonly mimeType: 'image/png' | 'image/jpeg' | 'image/webp' | 'image/svg+xml'
+    readonly width: number
+    readonly height: number
+    readonly resourceToken: string
+  }>
 
 /** Native picker and repository boundary; never transports image data as JSON. */
 export interface TextureFillBridge extends ImageTransportBridge {
   importTexture(correlationId: string): Promise<TextureImportOutcome>
-  resolveTexture(
-    blobHash: string,
-    correlationId: string,
-  ): Promise<TextureImportOutcome>
+  resolveTexture(blobHash: string, correlationId: string): Promise<TextureImportOutcome>
 }
 
 /** Separate from texture selection: the result becomes a document image layer. */
@@ -43,10 +39,7 @@ export class TextureResourceResolver {
   readonly #correlationId: () => string
   #resources = new Map<string, TextureResourceState>()
 
-  constructor(options: {
-    readonly bridge: TextureFillBridge
-    readonly correlationId: () => string
-  }) {
+  constructor(options: { readonly bridge: TextureFillBridge; readonly correlationId: () => string }) {
     this.#bridge = options.bridge
     this.#correlationId = options.correlationId
   }
@@ -65,10 +58,7 @@ export class TextureResourceResolver {
     const existing = this.#resources.get(blobHash)
     if (existing?.kind === 'ready') return existing
     try {
-      const outcome = await this.#bridge.resolveTexture(
-        blobHash,
-        this.#correlationId(),
-      )
+      const outcome = await this.#bridge.resolveTexture(blobHash, this.#correlationId())
       if (outcome.kind === 'cancelled') {
         throw new Error('Texture resolution was cancelled')
       }
@@ -76,8 +66,7 @@ export class TextureResourceResolver {
     } catch (error) {
       const missing: TextureResourceState = {
         kind: 'missing',
-        error:
-          error instanceof Error ? error.message : 'Texture is unavailable',
+        error: error instanceof Error ? error.message : 'Texture is unavailable',
       }
       this.#resources.set(blobHash, missing)
       return missing
@@ -88,9 +77,7 @@ export class TextureResourceResolver {
     this.#resources.delete(blobHash)
   }
 
-  async #load(
-    outcome: Extract<TextureImportOutcome, { kind: 'imported' }>,
-  ): Promise<TextureResourceState> {
+  async #load(outcome: Extract<TextureImportOutcome, { kind: 'imported' }>): Promise<TextureResourceState> {
     try {
       const loaded = await loadImageWithBinaryFallback({
         token: outcome.resourceToken,
@@ -107,8 +94,7 @@ export class TextureResourceResolver {
     } catch (error) {
       const missing: TextureResourceState = {
         kind: 'missing',
-        error:
-          error instanceof Error ? error.message : 'Texture is unavailable',
+        error: error instanceof Error ? error.message : 'Texture is unavailable',
       }
       this.#resources.set(outcome.blobHash, missing)
       return missing

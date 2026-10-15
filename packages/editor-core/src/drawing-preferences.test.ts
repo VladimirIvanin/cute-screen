@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 import {
   defaultDrawingToolPreferences,
@@ -6,15 +10,16 @@ import {
   rememberDrawingColor,
 } from './drawing-preferences'
 import { createDrawingLayer } from './drawing'
-import { parseEditorDocument, serializeEditorDocument } from './document/codec'
+import {
+  parseEditorDocument,
+  serializeEditorDocument,
+} from './document/codec'
 import type { EditorDocumentV1 } from './document/types'
 
 const documentId = '019c1f62-058e-7000-8000-0000000000f0'
 const arrowId = '019c1f62-058e-7000-8000-0000000000f1'
 
-function documentWithRecoveredArrow(
-  preferences: ReturnType<typeof parseDrawingToolPreferences>,
-): EditorDocumentV1 {
+function documentWithRecoveredArrow(preferences: ReturnType<typeof parseDrawingToolPreferences>): EditorDocumentV1 {
   const arrow = createDrawingLayer({
     id: arrowId,
     tool: 'arrow',
@@ -149,60 +154,46 @@ describe('DrawingToolPreferencesV2', () => {
     ['v1 zero width', 1, { width: 0 }],
     ['v1 non-number width', 1, { width: 'wide' }],
     ['v1 invalid style', 1, { style: 'zigzag' }],
-    [
-      'v2 invalid colour',
-      2,
-      { color: { red: 2, green: 0, blue: 0, alpha: 1 } },
-    ],
+    ['v2 invalid colour', 2, { color: { red: 2, green: 0, blue: 0, alpha: 1 } }],
     ['v2 invalid cap', 2, { cap: 'triangle' }],
     ['v2 invalid join', 2, { join: 'curve' }],
-  ] as const)(
-    'recovers a corrupt %s stroke and creates a serializable Arrow',
-    (_name, schemaVersion, strokePatch) => {
-      const fallback = defaultDrawingToolPreferences().defaults.arrow
-      const fallbackStroke = fallback.stroke as Record<string, unknown>
-      const parsed = parseDrawingToolPreferences({
-        schemaVersion,
-        defaults: {
-          arrow: {
-            path: 'straight',
-            stroke: { ...fallbackStroke, ...strokePatch },
-            startCap: 'none',
-            endCap: 'solidArrow',
-          },
+  ] as const)('recovers a corrupt %s stroke and creates a serializable Arrow', (_name, schemaVersion, strokePatch) => {
+    const fallback = defaultDrawingToolPreferences().defaults.arrow
+    const fallbackStroke = fallback.stroke as Record<string, unknown>
+    const parsed = parseDrawingToolPreferences({
+      schemaVersion,
+      defaults: {
+        arrow: {
+          path: 'straight',
+          stroke: { ...fallbackStroke, ...strokePatch },
+          startCap: 'none',
+          endCap: 'solidArrow',
         },
-        recentColors: [],
-      })
+      },
+      recentColors: [],
+    })
 
-      expect(parsed.defaults.arrow).toEqual(fallback)
-      const recovered = documentWithRecoveredArrow(parsed)
-      expect(
-        parseEditorDocument(serializeEditorDocument(recovered)),
-      ).toMatchObject({ kind: 'editable' })
-    },
-  )
+    expect(parsed.defaults.arrow).toEqual(fallback)
+    const recovered = documentWithRecoveredArrow(parsed)
+    expect(parseEditorDocument(serializeEditorDocument(recovered))).toMatchObject({ kind: 'editable' })
+  })
 
   it.each([
     [1, { path: 'loop' }],
     [2, { path: 'elbow', elbow: { axis: 'z', offset: Number.NaN } }],
-  ] as const)(
-    'recovers corrupt v%s Arrow route preferences before document creation',
-    (schemaVersion, route) => {
-      const fallback = defaultDrawingToolPreferences().defaults.arrow
-      const parsed = parseDrawingToolPreferences({
-        schemaVersion,
-        defaults: { arrow: { ...fallback, ...route } },
-        recentColors: [],
-      })
+  ] as const)('recovers corrupt v%s Arrow route preferences before document creation', (schemaVersion, route) => {
+    const fallback = defaultDrawingToolPreferences().defaults.arrow
+    const parsed = parseDrawingToolPreferences({
+      schemaVersion,
+      defaults: { arrow: { ...fallback, ...route } },
+      recentColors: [],
+    })
 
-      expect(parsed.defaults.arrow).toEqual(fallback)
-      const recovered = documentWithRecoveredArrow(parsed)
-      expect(() => serializeEditorDocument(recovered)).not.toThrow()
-      expect(
-        parseEditorDocument(serializeEditorDocument(recovered)),
-      ).toMatchObject({ kind: 'editable' })
-    },
-  )
+    expect(parsed.defaults.arrow).toEqual(fallback)
+    const recovered = documentWithRecoveredArrow(parsed)
+    expect(() => serializeEditorDocument(recovered)).not.toThrow()
+    expect(parseEditorDocument(serializeEditorDocument(recovered))).toMatchObject({ kind: 'editable' })
+  })
 
   it('keeps at most twelve unique recent colors', () => {
     let preferences = defaultDrawingToolPreferences()

@@ -1,4 +1,7 @@
-import type { RenderNode, RenderSceneSnapshot } from '@cute-screen/editor-core'
+import type {
+  RenderNode,
+  RenderSceneSnapshot,
+} from '@cute-screen/editor-core'
 import { scaledOutputSize } from '../../precision-rendering'
 import type { ImageResourceInput } from '../../types'
 import type {
@@ -14,7 +17,10 @@ import {
   drawSpotlight2D,
 } from './effects'
 import { drawNodes2D } from './nodes'
-import { cssBlendMode, cssColor } from './paint'
+import {
+  cssBlendMode,
+  cssColor,
+} from './paint'
 import { roundedRectPath } from './paths'
 
 type ImageNode = Extract<RenderNode, { kind: 'image' }>
@@ -32,18 +38,17 @@ interface SceneContext {
   readonly resolveFontFamily: FontResolver
 }
 
-function imagePath(context: Context2D, node: ImageNode): void {
-  roundedRectPath(
-    context,
-    0,
-    0,
-    node.width,
-    node.height,
-    node.cornerRadius ?? 0,
-  )
+function imagePath(
+  context: Context2D,
+  node: ImageNode,
+): void {
+  roundedRectPath(context, 0, 0, node.width, node.height, node.cornerRadius ?? 0)
 }
 
-function drawMissingImage(context: Context2D, node: ImageNode): void {
+function drawMissingImage(
+  context: Context2D,
+  node: ImageNode,
+): void {
   context.fillStyle = 'rgba(184, 71, 71, 0.16)'
   context.strokeStyle = 'rgba(184, 71, 71, 0.9)'
   context.lineWidth = 1
@@ -57,7 +62,10 @@ function drawMissingImage(context: Context2D, node: ImageNode): void {
   context.strokeRect(0, 0, node.width, node.height)
 }
 
-function drawImageStroke(context: Context2D, node: ImageNode): void {
+function drawImageStroke(
+  context: Context2D,
+  node: ImageNode,
+): void {
   if (!node.stroke || (node.strokeWidth ?? 0) <= 0) return
   context.strokeStyle = cssColor(node.stroke)
   context.lineWidth = node.strokeWidth ?? 1
@@ -70,7 +78,10 @@ function drawImageStroke(context: Context2D, node: ImageNode): void {
   }
 }
 
-function drawImageNode(context: SceneContext, node: ImageNode): void {
+function drawImageNode(
+  context: SceneContext,
+  node: ImageNode,
+): void {
   const { context: canvas, resources } = context
   const resource = resources.get(node.resourceId)
   canvas.save()
@@ -95,50 +106,28 @@ function drawImageNode(context: SceneContext, node: ImageNode): void {
   }
 }
 
-function drawOrderedNode(context: SceneContext, node: RenderNode): void {
+function drawOrderedNode(
+  context: SceneContext,
+  node: RenderNode,
+): void {
   switch (node.kind) {
     case 'censor':
-      drawCensor2D(
-        context.context,
-        context.working,
-        node,
-        context.scale,
-        context.newCanvas,
-      )
+      drawCensor2D(context.context, context.working, node, context.scale, context.newCanvas)
       return
     case 'spotlight':
-      drawSpotlight2D(
-        context.context,
-        context.working,
-        context.scene,
-        node,
-        context.scale,
-        context.newCanvas,
-      )
+      drawSpotlight2D(context.context, context.working, context.scene, node, context.scale, context.newCanvas)
       return
     case 'ruler':
       drawRuler2D(context.context, node, context.resolveFontFamily)
       return
     case 'loupe':
-      drawLoupe2D(
-        context.context,
-        context.working,
-        context.scene,
-        node,
-        context.scale,
-        context.newCanvas,
-      )
+      drawLoupe2D(context.context, context.working, context.scene, node, context.scale, context.newCanvas)
       return
     case 'image':
       drawImageNode(context, node)
       return
     default:
-      drawNodes2D(
-        context.context,
-        [node],
-        context.resourceSources,
-        context.resolveFontFamily,
-      )
+      drawNodes2D(context.context, [node], context.resourceSources, context.resolveFontFamily)
   }
 }
 

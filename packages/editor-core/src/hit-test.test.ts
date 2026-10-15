@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 import { rebaseArrowLayer } from './arrow-geometry'
 import type { EditorDocumentV1 } from './document/types'
@@ -25,7 +29,10 @@ const transform = {
   scaleX: 1,
   scaleY: 1,
 }
-function layer(id: string, overrides: Record<string, unknown> = {}) {
+function layer(
+  id: string,
+  overrides: Record<string, unknown> = {},
+) {
   return {
     id,
     kind: 'shape' as const,
@@ -73,11 +80,7 @@ describe('M05 hit testing', () => {
   it('skips locked and hidden layers for canvas transforms', () => {
     expect(
       hitTestDocument(
-        document([
-          layer('bottom'),
-          layer('locked', { locked: true }),
-          layer('hidden', { visible: false }),
-        ]),
+        document([layer('bottom'), layer('locked', { locked: true }), layer('hidden', { visible: false })]),
         { x: 10, y: 10 },
       ),
     ).toMatchObject({ nodeId: 'bottom' })
@@ -85,46 +88,28 @@ describe('M05 hit testing', () => {
 
   it('returns overlap candidates from top to bottom for cycling', () => {
     expect(
-      hitTestDocumentAll(
-        document([layer('bottom'), layer('middle'), layer('top')]),
-        {
-          x: 10,
-          y: 10,
-        },
-      ).map((hit) => hit.nodeId),
+      hitTestDocumentAll(document([layer('bottom'), layer('middle'), layer('top')]), {
+        x: 10,
+        y: 10,
+      }).map((hit) => hit.nodeId),
     ).toEqual(['top', 'middle', 'bottom'])
   })
 
   it('updates only affected bounds while preserving z-ordered point results', () => {
     const initial = document([layer('bottom'), layer('top')])
     const index = new DocumentSpatialIndex(initial)
-    expect(index.hitAll({ x: 10, y: 10 }).map((hit) => hit.nodeId)).toEqual([
-      'top',
-      'bottom',
-    ])
-    const moved = document([
-      layer('bottom'),
-      layer('top', { transform: { ...transform, translateX: 40 } }),
-    ])
+    expect(index.hitAll({ x: 10, y: 10 }).map((hit) => hit.nodeId)).toEqual(['top', 'bottom'])
+    const moved = document([layer('bottom'), layer('top', { transform: { ...transform, translateX: 40 } })])
     index.update(moved, ['top'])
-    expect(index.hitAll({ x: 10, y: 10 }).map((hit) => hit.nodeId)).toEqual([
-      'bottom',
-    ])
-    expect(index.hitAll({ x: 45, y: 10 }).map((hit) => hit.nodeId)).toEqual([
-      'top',
-    ])
+    expect(index.hitAll({ x: 10, y: 10 }).map((hit) => hit.nodeId)).toEqual(['bottom'])
+    expect(index.hitAll({ x: 45, y: 10 }).map((hit) => hit.nodeId)).toEqual(['top'])
   })
 
   it('does not return candidates outside the spatial query bounds', () => {
     const index = new DocumentSpatialIndex(
-      document([
-        layer('near'),
-        layer('far', { transform: { ...transform, translateX: 70 } }),
-      ]),
+      document([layer('near'), layer('far', { transform: { ...transform, translateX: 70 } })]),
     )
-    expect(index.hitAll({ x: 10, y: 10 }).map((hit) => hit.nodeId)).toEqual([
-      'near',
-    ])
+    expect(index.hitAll({ x: 10, y: 10 }).map((hit) => hit.nodeId)).toEqual(['near'])
   })
 
   it('does not treat a transparent shape interior as a fill hit', () => {
@@ -135,12 +120,8 @@ describe('M05 hit testing', () => {
         stroke: { width: 2 },
       },
     })
-    expect(
-      hitTestDocument(document([transparent]), { x: 10, y: 10 }),
-    ).toBeUndefined()
-    expect(
-      hitTestDocument(document([transparent]), { x: 0, y: 10 }),
-    ).toMatchObject({
+    expect(hitTestDocument(document([transparent]), { x: 10, y: 10 })).toBeUndefined()
+    expect(hitTestDocument(document([transparent]), { x: 0, y: 10 })).toMatchObject({
       nodeId: 'outline',
       part: 'stroke',
     })
@@ -209,10 +190,7 @@ describe('M05 hit testing', () => {
   })
 
   it('hits a 10 px Arrow cap outside its previous local bounds after rebasing', () => {
-    const before: Extract<
-      EditorDocumentV1['layers'][number],
-      { kind: 'arrow' }
-    > = {
+    const before: Extract<EditorDocumentV1['layers'][number], { kind: 'arrow' }> = {
       id: 'wide-cap',
       kind: 'arrow',
       localBounds: { x: 0, y: 0, width: 60, height: 20 },
@@ -242,9 +220,7 @@ describe('M05 hit testing', () => {
       stroke: { ...before.payload.stroke, width: 10 },
     })
 
-    expect(
-      hitTestDocument(document([before]), { x: 95, y: 30 }),
-    ).toBeUndefined()
+    expect(hitTestDocument(document([before]), { x: 95, y: 30 })).toBeUndefined()
     expect(hitTestDocument(document([after]), { x: 95, y: 30 })).toMatchObject({
       nodeId: 'wide-cap',
       part: 'stroke',

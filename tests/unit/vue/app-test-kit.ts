@@ -68,9 +68,7 @@ export function arrowDocument(locked = false): EditorDocumentV1 {
   }
 }
 
-export function arrowSession(
-  document = arrowDocument(),
-): DocumentSessionController {
+export function arrowSession(document = arrowDocument()): DocumentSessionController {
   return new DocumentSessionController({
     document,
     revision: 1,

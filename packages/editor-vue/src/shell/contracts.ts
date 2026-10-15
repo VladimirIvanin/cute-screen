@@ -3,7 +3,10 @@ import type { PropType } from 'vue'
 import type { SystemFontFace } from '../font-catalog'
 import type { ClipboardBridge } from '../image-transport'
 import type { CaptureProgressState } from '../platform'
-import type { ContentImageBridge, TextureFillBridge } from '../texture-fill'
+import type {
+  ContentImageBridge,
+  TextureFillBridge,
+} from '../texture-fill'
 import type {
   CanvasViewportHosts,
   FrameSummary,
@@ -51,18 +54,11 @@ export type EditorShellEmits = {
   hostsReady: [hosts: CanvasViewportHosts]
   frameReady: [documentId: string]
   retryLoad: []
-  quickFrameChange: [
-    crop: { x: number; y: number; width: number; height: number },
-  ]
-  quickSelectionComplete: [
-    crop: { x: number; y: number; width: number; height: number },
-  ]
+  quickFrameChange: [crop: { x: number; y: number; width: number; height: number }]
+  quickSelectionComplete: [crop: { x: number; y: number; width: number; height: number }]
 }
 
-export type EditorShellEmit = <K extends keyof EditorShellEmits>(
-  event: K,
-  ...args: EditorShellEmits[K]
-) => void
+export type EditorShellEmit = <K extends keyof EditorShellEmits>(event: K, ...args: EditorShellEmits[K]) => void
 
 export const editorShellRuntimeProps = {
   actions: Object as PropType<EditorShellProps['actions']>,
@@ -71,9 +67,7 @@ export const editorShellRuntimeProps = {
     type: String as PropType<EditorShellProps['fixture']>,
     default: 'empty',
   },
-  initialDocumentState: Object as PropType<
-    EditorShellProps['initialDocumentState']
-  >,
+  initialDocumentState: Object as PropType<EditorShellProps['initialDocumentState']>,
   readOnlyDocument: { type: Boolean, default: false },
   captureAvailable: { type: Boolean, default: true },
   captureWindowAvailable: { type: Boolean, default: false },
@@ -90,9 +84,7 @@ export const editorShellRuntimeProps = {
   frames: Array as PropType<EditorShellProps['frames']>,
   sourceImage: Object as PropType<EditorShellProps['sourceImage']>,
   textureBridge: Object as PropType<EditorShellProps['textureBridge']>,
-  contentImageBridge: Object as PropType<
-    EditorShellProps['contentImageBridge']
-  >,
+  contentImageBridge: Object as PropType<EditorShellProps['contentImageBridge']>,
   clipboardBridge: Object as PropType<EditorShellProps['clipboardBridge']>,
   systemFonts: Array as PropType<EditorShellProps['systemFonts']>,
   quickMode: { type: Boolean, default: false },

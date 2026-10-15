@@ -1,4 +1,8 @@
-import { $, browser, expect } from '@wdio/globals'
+import {
+  $,
+  browser,
+  expect,
+} from '@wdio/globals'
 import { finishAreaQuickCaptureInEditor } from '../quick-capture'
 
 describe('M04 clean-profile capture', () => {
@@ -16,18 +20,13 @@ describe('M04 clean-profile capture', () => {
     await expect(scene).toExist()
     expect(
       await browser.execute(() => {
-        const canvas = document.querySelector(
-          '[aria-label="Scene canvas"]',
-        ) as HTMLCanvasElement | null
+        const canvas = document.querySelector('[aria-label="Scene canvas"]') as HTMLCanvasElement | null
         return canvas ? [canvas.width, canvas.height] : undefined
       }),
     ).toEqual([400, 300])
 
     const zoomBefore = await $('.cs-zoom-controls').getAttribute('data-zoom')
     await browser.setWindowSize(1600, 1000)
-    await browser.waitUntil(
-      async () =>
-        (await $('.cs-zoom-controls').getAttribute('data-zoom')) !== zoomBefore,
-    )
+    await browser.waitUntil(async () => (await $('.cs-zoom-controls').getAttribute('data-zoom')) !== zoomBefore)
   })
 })

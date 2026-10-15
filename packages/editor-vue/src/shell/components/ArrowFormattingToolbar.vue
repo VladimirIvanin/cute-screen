@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import {
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+} from 'vue'
 import { NPopover } from 'naive-ui'
 import type { ContextControl } from '../types'
 import type { SrgbColor } from '@cute-screen/editor-renderer'
@@ -20,16 +25,28 @@ const openPopover = ref<Record<string, boolean>>({})
 const triggers = ref<Record<string, HTMLButtonElement | undefined>>({})
 const popoverRoots = ref<Record<string, HTMLElement | undefined>>({})
 
-function setTrigger(id: string, element: HTMLButtonElement | null): void {
+function setTrigger(
+  id: string,
+  element: HTMLButtonElement | null,
+): void {
   triggers.value[id] = element ?? undefined
 }
 
-function setPopoverRoot(id: string, element: HTMLElement | null): void {
+function setPopoverRoot(
+  id: string,
+  element: HTMLElement | null,
+): void {
   popoverRoots.value[id] = element ?? undefined
 }
 
-function onPopoverShown(id: string, shown: boolean): void {
+function onPopoverShown(
+  id: string,
+  shown: boolean,
+): void {
   openPopover.value = { ...openPopover.value, [id]: shown }
+  if (shown)
+    void nextTick(() =>
+      popoverRoots.value[id]?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true }))
   if (!shown) {
     void nextTick(() => triggers.value[id]?.focus({ preventScroll: true }))
   }
@@ -39,27 +56,35 @@ function closePopover(id: string): void {
   onPopoverShown(id, false)
 }
 
-function togglePopover(event: KeyboardEvent, id: string): void {
+function togglePopover(
+  event: KeyboardEvent,
+  id: string,
+): void {
   event.preventDefault()
   onPopoverShown(id, !(openPopover.value[id] ?? false))
 }
 
-function choose(id: string, value: string): void {
+function choose(
+  id: string,
+  value: string,
+): void {
   emit('change', id, value)
-  closePopover(id)
+  closePopover(id === 'width' || id === 'strokeStyle' ? 'stroke' : id)
 }
 
 function arrowStrokeStyles(
   control: Extract<ContextControl, { readonly kind: 'arrowStroke' }>,
 ): readonly ('solid' | 'dashed' | 'dotted')[] {
-  return control.style === 'dotted'
-    ? (['solid', 'dashed', 'dotted'] as const)
-    : (['solid', 'dashed'] as const)
+  return control.style === 'dotted' ? (['solid', 'dashed', 'dotted'] as const) : (['solid', 'dashed'] as const)
 }
 
-function popoverKeydown(event: KeyboardEvent, id: string): void {
+function popoverKeydown(
+  event: KeyboardEvent,
+  id: string,
+): void {
   if (event.key !== 'Escape') return
   event.preventDefault()
+  event.stopPropagation()
   closePopover(id)
 }
 
@@ -68,22 +93,15 @@ function closeOnOutsidePointer(event: PointerEvent): void {
   if (!(target instanceof Node)) return
   for (const [id, shown] of Object.entries(openPopover.value)) {
     if (!shown) continue
-    if (
-      triggers.value[id]?.contains(target) ||
-      popoverRoots.value[id]?.contains(target)
-    ) {
+    if (triggers.value[id]?.contains(target) || popoverRoots.value[id]?.contains(target)) {
       continue
     }
     closePopover(id)
   }
 }
 
-onMounted(() =>
-  document.addEventListener('pointerdown', closeOnOutsidePointer, true),
-)
-onBeforeUnmount(() =>
-  document.removeEventListener('pointerdown', closeOnOutsidePointer, true),
-)
+onMounted(() => document.addEventListener('pointerdown', closeOnOutsidePointer, true))
+onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOnOutsidePointer, true))
 </script>
 
 <template>
@@ -129,10 +147,7 @@ onBeforeUnmount(() =>
         >
           <template #trigger>
             <button
-              :ref="
-                (element) =>
-                  setTrigger(control.id, element as HTMLButtonElement | null)
-              "
+              :ref="(element) => setTrigger(control.id, element as HTMLButtonElement | null)"
               class="cs-arrow-toolbar-trigger"
               type="button"
               :disabled="control.disabled ?? false"
@@ -142,7 +157,11 @@ onBeforeUnmount(() =>
               aria-haspopup="dialog"
               @keydown.enter.space="togglePopover($event, control.id)"
             >
-              <svg viewBox="0 0 36 18" aria-hidden="true" focusable="false">
+              <svg
+                viewBox="0 0 36 18"
+                aria-hidden="true"
+                focusable="false"
+              >
                 <path
                   d="M3 9h30"
                   fill="none"
@@ -150,11 +169,7 @@ onBeforeUnmount(() =>
                   :stroke-width="Math.min(control.width, 7)"
                   stroke-linecap="round"
                   :stroke-dasharray="
-                    control.style === 'dashed'
-                      ? '7 4'
-                      : control.style === 'dotted'
-                        ? '1 4'
-                        : undefined
+                    control.style === 'dashed' ? '7 4' : control.style === 'dotted' ? '1 4' : undefined
                   "
                 />
               </svg>
@@ -162,10 +177,7 @@ onBeforeUnmount(() =>
             </button>
           </template>
           <section
-            :ref="
-              (element) =>
-                setPopoverRoot(control.id, element as HTMLElement | null)
-            "
+            :ref="(element) => setPopoverRoot(control.id, element as HTMLElement | null)"
             class="cs-arrow-toolbar-popover"
             role="dialog"
             :aria-label="control.label"
@@ -190,20 +202,18 @@ onBeforeUnmount(() =>
                 :aria-pressed="control.style === style"
                 @click="choose('strokeStyle', style)"
               >
-                <svg viewBox="0 0 42 16" aria-hidden="true" focusable="false">
+                <svg
+                  viewBox="0 0 42 16"
+                  aria-hidden="true"
+                  focusable="false"
+                >
                   <path
                     d="M3 8h36"
                     fill="none"
                     stroke="currentColor"
                     stroke-width="3"
                     stroke-linecap="round"
-                    :stroke-dasharray="
-                      style === 'dashed'
-                        ? '7 4'
-                        : style === 'dotted'
-                          ? '1 4'
-                          : undefined
-                    "
+                    :stroke-dasharray="style === 'dashed' ? '7 4' : style === 'dotted' ? '1 4' : undefined"
                   />
                 </svg>
                 <span>{{
@@ -220,10 +230,7 @@ onBeforeUnmount(() =>
               role="group"
               aria-label="Width presets"
             >
-              <span
-                v-if="![2, 4, 6, 8, 10].includes(control.width)"
-                class="cs-arrow-legacy-width"
-              >
+              <span v-if="![2, 4, 6, 8, 10].includes(control.width)" class="cs-arrow-legacy-width">
                 {{ control.width }} px
               </span>
               <button
@@ -234,7 +241,11 @@ onBeforeUnmount(() =>
                 :aria-pressed="control.width === width"
                 @click="choose('width', String(width))"
               >
-                <svg viewBox="0 0 24 22" aria-hidden="true" focusable="false">
+                <svg
+                  viewBox="0 0 24 22"
+                  aria-hidden="true"
+                  focusable="false"
+                >
                   <path
                     d="M3 11h18"
                     fill="none"
@@ -265,10 +276,7 @@ onBeforeUnmount(() =>
         >
           <template #trigger>
             <button
-              :ref="
-                (element) =>
-                  setTrigger(control.id, element as HTMLButtonElement | null)
-              "
+              :ref="(element) => setTrigger(control.id, element as HTMLButtonElement | null)"
               class="cs-arrow-toolbar-trigger"
               type="button"
               :disabled="control.disabled ?? false"
@@ -278,7 +286,11 @@ onBeforeUnmount(() =>
               aria-haspopup="dialog"
               @keydown.enter.space="togglePopover($event, control.id)"
             >
-              <svg viewBox="0 0 36 22" aria-hidden="true" focusable="false">
+              <svg
+                viewBox="0 0 36 22"
+                aria-hidden="true"
+                focusable="false"
+              >
                 <path
                   d="M4 11h18"
                   fill="none"
@@ -329,10 +341,7 @@ onBeforeUnmount(() =>
             </button>
           </template>
           <section
-            :ref="
-              (element) =>
-                setPopoverRoot(control.id, element as HTMLElement | null)
-            "
+            :ref="(element) => setPopoverRoot(control.id, element as HTMLElement | null)"
             class="cs-arrow-toolbar-popover"
             role="dialog"
             :aria-label="control.label"
@@ -373,10 +382,7 @@ onBeforeUnmount(() =>
         >
           <template #trigger>
             <button
-              :ref="
-                (element) =>
-                  setTrigger(control.id, element as HTMLButtonElement | null)
-              "
+              :ref="(element) => setTrigger(control.id, element as HTMLButtonElement | null)"
               class="cs-arrow-toolbar-trigger"
               type="button"
               :disabled="control.disabled ?? false"
@@ -386,7 +392,11 @@ onBeforeUnmount(() =>
               aria-haspopup="dialog"
               @keydown.enter.space="togglePopover($event, control.id)"
             >
-              <svg viewBox="0 0 38 22" aria-hidden="true" focusable="false">
+              <svg
+                viewBox="0 0 38 22"
+                aria-hidden="true"
+                focusable="false"
+              >
                 <path
                   v-if="control.value === 'straight'"
                   d="M4 17 30 5"
@@ -416,10 +426,7 @@ onBeforeUnmount(() =>
             </button>
           </template>
           <section
-            :ref="
-              (element) =>
-                setPopoverRoot(control.id, element as HTMLElement | null)
-            "
+            :ref="(element) => setPopoverRoot(control.id, element as HTMLElement | null)"
             class="cs-arrow-toolbar-popover"
             role="dialog"
             :aria-label="control.label"

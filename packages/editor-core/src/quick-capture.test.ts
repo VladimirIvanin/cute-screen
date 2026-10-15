@@ -1,7 +1,15 @@
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 import { createEditorDocumentFromImage } from './document'
-import type { LoupeLayer, ShapeLayer, SourceImageRef } from './document/types'
+import type {
+  LoupeLayer,
+  ShapeLayer,
+  SourceImageRef,
+} from './document/types'
 import { materializeQuickCaptureDocument } from './quick-capture'
 
 const FULL_HASH = 'a'.repeat(64)
@@ -135,18 +143,15 @@ describe('quick capture materialization', () => {
         {
           source: source(CROP_HASH, 360, 240),
         },
-      ),
-    ).toThrow(/crop/u)
+      )).toThrow(/crop/u)
     expect(() =>
       materializeQuickCaptureDocument(draft, {
         source: source(CROP_HASH, 359, 240),
-      }),
-    ).toThrow(/dimensions/u)
+      })).toThrow(/dimensions/u)
     expect(() =>
       materializeQuickCaptureDocument(
         { ...draft, crop: { x: 700, y: 500, width: 200, height: 200 } },
         { source: source(CROP_HASH, 200, 200) },
-      ),
-    ).toThrow(/bounds/u)
+      )).toThrow(/bounds/u)
   })
 })

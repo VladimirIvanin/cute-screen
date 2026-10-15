@@ -12,18 +12,13 @@ export interface ColorSuggestion {
   readonly contrastRatio?: number
 }
 
-const NEUTRALS = Object.freeze([
-  '#FFFFFF',
-  '#E7E7E8',
-  '#C7C7CA',
-  '#9A9A9F',
-  '#68686E',
-  '#414146',
-  '#202024',
-  '#000000',
-])
+const NEUTRALS = Object.freeze(['#FFFFFF', '#E7E7E8', '#C7C7CA', '#9A9A9F', '#68686E', '#414146', '#202024', '#000000'])
 
-function clamp(value: number, min: number, max: number): number {
+function clamp(
+  value: number,
+  min: number,
+  max: number,
+): number {
   return Math.max(min, Math.min(max, value))
 }
 
@@ -58,15 +53,11 @@ export function hexToSrgb(value: string): SrgbColor | undefined {
   })
 }
 
-export function srgbToHex(
-  color: Pick<SrgbColor, 'red' | 'green' | 'blue'>,
-): string {
+export function srgbToHex(color: Pick<SrgbColor, 'red' | 'green' | 'blue'>): string {
   return `#${hexPart(channel(color.red))}${hexPart(channel(color.green))}${hexPart(channel(color.blue))}`
 }
 
-export function srgbToHsv(
-  color: Pick<SrgbColor, 'red' | 'green' | 'blue'>,
-): HsvColor {
+export function srgbToHsv(color: Pick<SrgbColor, 'red' | 'green' | 'blue'>): HsvColor {
   const red = clamp(color.red, 0, 1)
   const green = clamp(color.green, 0, 1)
   const blue = clamp(color.blue, 0, 1)
@@ -126,26 +117,23 @@ export function colorPalette(
   ]
   return Object.freeze([
     ...neutral,
-    ...profiles.flatMap((profile) =>
-      offsets.map((offset) => hsvToSrgb({ hue: hue + offset, ...profile })),
-    ),
+    ...profiles.flatMap((profile) => offsets.map((offset) => hsvToSrgb({ hue: hue + offset, ...profile }))),
   ])
 }
 
 function luminance(color: SrgbColor): number {
   const linear = [color.red, color.green, color.blue].map((value) => {
     const normalized = clamp(value, 0, 1)
-    return normalized <= 0.03928
-      ? normalized / 12.92
-      : ((normalized + 0.055) / 1.055) ** 2.4
+    return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4
   })
   return 0.2126 * linear[0]! + 0.7152 * linear[1]! + 0.0722 * linear[2]!
 }
 
-export function contrastRatio(first: SrgbColor, second: SrgbColor): number {
-  const [light, dark] = [luminance(first), luminance(second)].sort(
-    (a, b) => b - a,
-  )
+export function contrastRatio(
+  first: SrgbColor,
+  second: SrgbColor,
+): number {
+  const [light, dark] = [luminance(first), luminance(second)].sort((a, b) => b - a)
   return (light! + 0.05) / (dark! + 0.05)
 }
 

@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 import { snapPoint } from './snap'
 
@@ -20,12 +24,7 @@ describe('M05 snapping', () => {
   })
 
   it('can be disabled for the active gesture without mutating candidates', () => {
-    const result = snapPoint(
-      { x: 101, y: 101 },
-      [{ id: 'center', x: 100, y: 100 }],
-      1,
-      false,
-    )
+    const result = snapPoint({ x: 101, y: 101 }, [{ id: 'center', x: 100, y: 100 }], 1, false)
     expect(result).toEqual({ x: 101, y: 101, guides: [] })
   })
 })

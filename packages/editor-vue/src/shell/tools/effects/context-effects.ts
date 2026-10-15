@@ -41,7 +41,10 @@ function applyMarkerChange(
 }
 
 export function createContextEffects(context: ContextEffectsContext) {
-  function onContextChange(id: string, value: string): void {
+  function onContextChange(
+    id: string,
+    value: string,
+  ): void {
     if (context.applyTextChange(id, value)) return
     if (context.applyCalloutChange(id, value)) return
     if (applyCropChange(context, id, value)) return

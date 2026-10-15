@@ -1,5 +1,4 @@
-export type CaptureBackendKind =
-  'unavailable' | 'waylandPortal' | 'windowsDxgi' | 'x11' | 'macosScreenCapture'
+export type CaptureBackendKind = 'unavailable' | 'waylandPortal' | 'windowsDxgi' | 'x11' | 'macosScreenCapture'
 
 export interface CaptureCapabilities {
   readonly available: boolean
@@ -66,26 +65,13 @@ export interface CaptureResult {
   }
 }
 
-export type CaptureAction =
-  'area' | 'screen' | 'window' | 'activeWindow' | 'repeat'
+export type CaptureAction = 'area' | 'screen' | 'window' | 'activeWindow' | 'repeat'
 export type CaptureInvocationSource = 'cli' | 'tray' | 'ui' | 'hotkey'
 export type CaptureTerminalOutcome =
-  | 'captured'
-  | 'cancelled'
-  | 'busy'
-  | 'permissionDenied'
-  | 'unavailable'
-  | 'invalidTarget'
-  | 'failed'
+  'captured' | 'cancelled' | 'busy' | 'permissionDenied' | 'unavailable' | 'invalidTarget' | 'failed'
 
 export type CaptureProgressState =
-  | 'probing'
-  | 'ready'
-  | 'delay'
-  | 'selecting'
-  | 'capturing'
-  | 'persisting'
-  | 'quickEditing'
+  'probing' | 'ready' | 'delay' | 'selecting' | 'capturing' | 'persisting' | 'quickEditing'
 
 export interface CaptureProgressV1 {
   readonly version: 1

@@ -1,4 +1,8 @@
-import type { EditorDocumentV1, LayerNode, Rect } from '../document/types'
+import type {
+  EditorDocumentV1,
+  LayerNode,
+  Rect,
+} from '../document/types'
 
 export interface IdGenerator {
   next(): string
@@ -9,22 +13,22 @@ export type EditorCommand =
   | Readonly<{ type: 'removeLayer'; layer: LayerNode; index: number }>
   | Readonly<{ type: 'updateLayer'; before: LayerNode; after: LayerNode }>
   | Readonly<{
-      type: 'reorderLayer'
-      layerId: string
-      fromIndex: number
-      toIndex: number
-    }>
+    type: 'reorderLayer'
+    layerId: string
+    fromIndex: number
+    toIndex: number
+  }>
   | Readonly<{ type: 'duplicateLayer'; sourceId: string; layer: LayerNode }>
   | Readonly<{ type: 'setCrop'; before: Rect | null; after: Rect | null }>
   | Readonly<{ type: 'batch'; commands: readonly EditorCommand[] }>
   | Readonly<{
-      type: 'flipCanvas'
-      axis: 'horizontal' | 'vertical'
-      beforeLayers: readonly LayerNode[]
-      afterLayers: readonly LayerNode[]
-      beforeCrop: Rect | null
-      afterCrop: Rect | null
-    }>
+    type: 'flipCanvas'
+    axis: 'horizontal' | 'vertical'
+    beforeLayers: readonly LayerNode[]
+    afterLayers: readonly LayerNode[]
+    beforeCrop: Rect | null
+    afterCrop: Rect | null
+  }>
 
 export interface EditorSnapshot {
   readonly document: EditorDocumentV1

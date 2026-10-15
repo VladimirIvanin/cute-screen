@@ -1,6 +1,13 @@
-import { createCanvas, type Canvas } from '@napi-rs/canvas'
+import {
+  createCanvas,
+  type Canvas,
+} from '@napi-rs/canvas'
 import { createRenderSceneSnapshot } from '@cute-screen/editor-core'
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 import type { Canvas2DLike } from './backends/canvas2d/contracts'
 import { Canvas2DRenderer } from './backends/canvas2d/renderer'
@@ -10,9 +17,7 @@ function asHtmlCanvas(canvas: unknown): HTMLCanvasElement {
 }
 
 function verticalInkCenter(canvas: Canvas): number {
-  const { data, width, height } = canvas
-    .getContext('2d')
-    .getImageData(0, 0, canvas.width, canvas.height)
+  const { data, width, height } = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height)
   let top = height
   let bottom = -1
   for (let y = 0; y < height; y += 1) {
@@ -75,12 +80,8 @@ describe('Canvas2D renderer text and paints', () => {
     )
 
     renderer.render(['scene'])
-    const alpha = sceneCanvas
-      .getContext('2d')
-      ?.getImageData(12, 20, 24, 30).data
-    expect(alpha?.some((value, index) => index % 4 === 3 && value > 0)).toBe(
-      true,
-    )
+    const alpha = sceneCanvas.getContext('2d')?.getImageData(12, 20, 24, 30).data
+    expect(alpha?.some((value, index) => index % 4 === 3 && value > 0)).toBe(true)
   })
 
   it('visually centers numbered-marker digits from measured glyph ink', async () => {
@@ -118,9 +119,7 @@ describe('Canvas2D renderer text and paints', () => {
                 strikethrough: false,
               },
             ],
-            paragraphs: [
-              { start: 0, end: 1, alignment: 'center', listKind: 'none' },
-            ],
+            paragraphs: [{ start: 0, end: 1, alignment: 'center', listKind: 'none' }],
             verticalAlign: 'visualCenter',
             rotation: 0,
             opacity: 1,
@@ -132,9 +131,7 @@ describe('Canvas2D renderer text and paints', () => {
 
     renderer.render(['scene'])
 
-    expect(Math.abs(verticalInkCenter(sceneCanvas) - 32)).toBeLessThanOrEqual(
-      0.5,
-    )
+    expect(Math.abs(verticalInkCenter(sceneCanvas) - 32)).toBeLessThanOrEqual(0.5)
   })
 
   it('renders mixed run colors, a metadata bullet and strikethrough', async () => {
@@ -183,9 +180,7 @@ describe('Canvas2D renderer text and paints', () => {
                 strikethrough: true,
               },
             ],
-            paragraphs: [
-              { start: 0, end: 3, alignment: 'start', listKind: 'bullet' },
-            ],
+            paragraphs: [{ start: 0, end: 3, alignment: 'start', listKind: 'bullet' }],
             rotation: 0,
             opacity: 1,
             visible: true,
@@ -195,31 +190,22 @@ describe('Canvas2D renderer text and paints', () => {
     )
 
     renderer.render(['scene'])
-    const pixels = sceneCanvas
-      .getContext('2d')
-      ?.getImageData(10, 10, 120, 48).data
+    const pixels = sceneCanvas.getContext('2d')?.getImageData(10, 10, 120, 48).data
     expect(
       pixels?.some(
-        (value, index) =>
-          index % 4 === 2 &&
-          value > (pixels[index - 2] ?? 0) &&
-          (pixels[index + 1] ?? 0) > 0,
+        (value, index) => index % 4 === 2 && value > (pixels[index - 2] ?? 0) && (pixels[index + 1] ?? 0) > 0,
       ),
     ).toBe(true)
     expect(
       pixels?.some(
-        (value, index) =>
-          index % 4 === 0 &&
-          value > (pixels[index + 2] ?? 0) &&
-          (pixels[index + 3] ?? 0) > 0,
+        (value, index) => index % 4 === 0 && value > (pixels[index + 2] ?? 0) && (pixels[index + 3] ?? 0) > 0,
       ),
     ).toBe(true)
   })
 
   it('renders renderer-neutral linear gradients in exported output', async () => {
     const renderer = new Canvas2DRenderer({
-      exportCanvas: (width, height) =>
-        createCanvas(width, height) as unknown as Canvas2DLike,
+      exportCanvas: (width, height) => createCanvas(width, height) as unknown as Canvas2DLike,
     })
     const sceneCanvas = createCanvas(32, 8)
     const overlayCanvas = createCanvas(32, 8)
@@ -262,9 +248,7 @@ describe('Canvas2D renderer text and paints', () => {
     )
     renderer.render(['scene'])
     const context = sceneCanvas.getContext('2d')!
-    expect(context.getImageData(2, 4, 1, 1).data[0] ?? 0).toBeGreaterThan(
-      context.getImageData(2, 4, 1, 1).data[2] ?? 0,
-    )
+    expect(context.getImageData(2, 4, 1, 1).data[0] ?? 0).toBeGreaterThan(context.getImageData(2, 4, 1, 1).data[2] ?? 0)
     expect(context.getImageData(29, 4, 1, 1).data[2] ?? 0).toBeGreaterThan(
       context.getImageData(29, 4, 1, 1).data[0] ?? 0,
     )

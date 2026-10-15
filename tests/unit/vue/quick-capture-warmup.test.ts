@@ -1,6 +1,12 @@
 import { render } from '@testing-library/vue'
 import { defineComponent } from 'vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 
 import {
   createEditorShellPinia,
@@ -85,13 +91,9 @@ describe('GTK quick capture mapped warmup', () => {
       },
     })
 
-    await vi.waitFor(() =>
-      expect(mocks.warmup).toHaveBeenCalledWith('draft-gtk'),
-    )
+    await vi.waitFor(() => expect(mocks.warmup).toHaveBeenCalledWith('draft-gtk'))
     expect(mocks.loadImage).toHaveBeenCalledOnce()
-    expect(mocks.warmup.mock.invocationCallOrder[0]).toBeLessThan(
-      mocks.loadImage.mock.invocationCallOrder[0]!,
-    )
+    expect(mocks.warmup.mock.invocationCallOrder[0]).toBeLessThan(mocks.loadImage.mock.invocationCallOrder[0]!)
     expect(mocks.present).not.toHaveBeenCalled()
     expect(mocks.reveal).not.toHaveBeenCalled()
   })
@@ -103,9 +105,7 @@ describe('GTK quick capture mapped warmup', () => {
     })
 
     await vi.waitFor(() => expect(mocks.loadImage).toHaveBeenCalledOnce())
-    await vi.waitFor(() =>
-      expect(view.container.querySelector('.cs-loading')).toBeNull(),
-    )
+    await vi.waitFor(() => expect(view.container.querySelector('.cs-loading')).toBeNull())
     expect(useEditorShellStore(pinia).documentState).toMatchObject({
       kind: 'ready',
     })

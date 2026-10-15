@@ -1,4 +1,7 @@
-import { freezeJsonObject, readJsonObject } from '../json'
+import {
+  freezeJsonObject,
+  readJsonObject,
+} from '../json'
 import {
   EDITOR_DOCUMENT_SCHEMA_VERSION,
   type EditorDocument,
@@ -70,9 +73,7 @@ function documentToJson(document: EditorDocument): JsonObject {
   }
 }
 
-function validateLayerRelationships(
-  document: Pick<EditorDocument, 'source' | 'canvas' | 'layers'>,
-): void {
+function validateLayerRelationships(document: Pick<EditorDocument, 'source' | 'canvas' | 'layers'>): void {
   const ids = new Set<string>()
   let baseCount = 0
   for (const layer of document.layers) {
@@ -87,13 +88,8 @@ function validateLayerRelationships(
     if (layer.kind === 'loupe') {
       assertValidLoupeSourceRegion(layer.payload.sourceRegion, document.canvas)
     }
-    if (
-      layer.kind === 'ruler' &&
-      !rulerVisualBoundsAreConservative(layer, document.canvas)
-    ) {
-      throw new Error(
-        `layer ${layer.id} must use conservative localBounds containing its ruler line, ticks and badge`,
-      )
+    if (layer.kind === 'ruler' && !rulerVisualBoundsAreConservative(layer, document.canvas)) {
+      throw new Error(`layer ${layer.id} must use conservative localBounds containing its ruler line, ticks and badge`)
     }
   }
   if (baseCount > 1) {
@@ -111,10 +107,7 @@ function parseCurrentDocument(object: Record<string, unknown>): EditorDocument {
   const source = parseSource(object.source)
   const layers = Object.freeze(object.layers.map(parseLayer))
   validateLayerRelationships({ source, canvas: canvasSize, layers })
-  const crop =
-    object.crop === null || object.crop === undefined
-      ? null
-      : parseRect(object.crop, 'crop')
+  const crop = object.crop === null || object.crop === undefined ? null : parseRect(object.crop, 'crop')
   if (
     crop !== null &&
     (crop.x < 0 ||
@@ -168,9 +161,7 @@ export function parseEditorDocument(input: unknown): ParsedEditorDocument {
   })
 }
 
-export function normalizeEditorDocument(
-  document: EditorDocument,
-): EditorDocument {
+export function normalizeEditorDocument(document: EditorDocument): EditorDocument {
   const parsed = parseEditorDocument(documentToJson(document))
   if (parsed.kind !== 'editable') {
     throw new Error('current schema unexpectedly read-only')

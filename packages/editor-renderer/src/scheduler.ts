@@ -1,10 +1,4 @@
-export const INVALIDATION_REASONS = [
-  'scene',
-  'overlay',
-  'viewport',
-  'resource',
-  'export',
-] as const
+export const INVALIDATION_REASONS = ['scene', 'overlay', 'viewport', 'resource', 'export'] as const
 
 export type InvalidationReason = (typeof INVALIDATION_REASONS)[number]
 
@@ -52,16 +46,12 @@ export class FrameScheduler {
     this.#handle = undefined
     if (this.#disposed || this.#dirty.size === 0) return
 
-    const reasons = INVALIDATION_REASONS.filter((reason) =>
-      this.#dirty.has(reason),
-    )
+    const reasons = INVALIDATION_REASONS.filter((reason) => this.#dirty.has(reason))
     this.#dirty.clear()
     this.#render({ timestamp, reasons })
 
     if (this.#dirty.size > 0 && this.#handle === undefined) {
-      this.#handle = this.#requestFrame((nextTimestamp) =>
-        this.#flush(nextTimestamp),
-      )
+      this.#handle = this.#requestFrame((nextTimestamp) => this.#flush(nextTimestamp))
     }
   }
 }

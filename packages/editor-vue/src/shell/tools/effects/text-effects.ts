@@ -1,4 +1,7 @@
-import type { Ref, ShallowRef } from 'vue'
+import type {
+  Ref,
+  ShallowRef,
+} from 'vue'
 import {
   applyRichTextParagraphStyle,
   applyRichTextSpanStyle,
@@ -17,10 +20,7 @@ import type {
 import type { TextDraft } from '../text-schema'
 import { parseHexColor } from './color'
 
-type TextLayer = Extract<
-  LayerNode,
-  { readonly kind: 'text' | 'callout' | 'numberedMarker' }
->
+type TextLayer = Extract<LayerNode, { readonly kind: 'text' | 'callout' | 'numberedMarker' }>
 type SpanPatch = {
   -readonly [K in keyof RichTextSpanStyle]?: RichTextSpanStyle[K]
 }
@@ -41,6 +41,8 @@ type ResolvedTextChange =
   | { readonly kind: 'change'; readonly change: TextChange }
 
 export interface TextEffectsContext {
+  readonly calloutStroke?: Ref<import('@cute-screen/editor-renderer').StrokeStyle>
+  readonly configuringCallout?: () => boolean
   readonly props: ResolvedEditorShellProps
   readonly store: {
     readonly selectedLayerIds: readonly string[]
@@ -54,14 +56,8 @@ export interface TextEffectsContext {
 
 function selectedTextLayer(context: TextEffectsContext): TextLayer | undefined {
   if (context.store.selectedLayerIds.length !== 1) return undefined
-  const layer = context.activeDocument.value?.layers.find(
-    (candidate) => candidate.id === context.store.selectedLayerId,
-  )
-  return layer?.kind === 'text' ||
-    layer?.kind === 'callout' ||
-    layer?.kind === 'numberedMarker'
-    ? layer
-    : undefined
+  const layer = context.activeDocument.value?.layers.find((candidate) => candidate.id === context.store.selectedLayerId)
+  return layer?.kind === 'text' || layer?.kind === 'callout' || layer?.kind === 'numberedMarker' ? layer : undefined
 }
 
 function changed(
@@ -88,14 +84,10 @@ function resolveSpanChange(
 ): ResolvedTextChange {
   if (id === 'textColor') {
     const color = parseHexColor(value)
-    return color
-      ? changed({ ...defaults, color }, { color })
-      : { kind: 'handled' }
+    return color ? changed({ ...defaults, color }, { color }) : { kind: 'handled' }
   }
   if (id === 'textFont') {
-    return value.trim()
-      ? changed({ ...defaults, fontFamily: value }, { fontFamily: value })
-      : { kind: 'handled' }
+    return value.trim() ? changed({ ...defaults, fontFamily: value }, { fontFamily: value }) : { kind: 'handled' }
   }
   if (id === 'textFontSize') {
     const fontSize = Number(value)
@@ -111,10 +103,7 @@ function resolveSpanChange(
     const enabled = value === 'true'
     return id === 'textItalic'
       ? changed({ ...defaults, italic: enabled }, { italic: enabled })
-      : changed(
-          { ...defaults, strikethrough: enabled },
-          { strikethrough: enabled },
-        )
+      : changed({ ...defaults, strikethrough: enabled }, { strikethrough: enabled })
   }
   return { kind: 'unhandled' }
 }
@@ -152,8 +141,7 @@ function parseBackground(value: string): TextBackground | null | undefined {
     padding?: unknown
     radius?: unknown
   }
-  const color =
-    typeof draft.color === 'string' ? parseHexColor(draft.color) : undefined
+  const color = typeof draft.color === 'string' ? parseHexColor(draft.color) : undefined
   const padding = Number(draft.padding)
   const radius = Number(draft.radius)
   if (
@@ -181,9 +169,7 @@ function resolveTextChange(
   if (paragraph.kind !== 'unhandled') return paragraph
   if (id !== 'textBackground') return { kind: 'unhandled' }
   const background = parseBackground(value)
-  return background === undefined
-    ? { kind: 'handled' }
-    : changed({ ...defaults, background }, {}, {}, background)
+  return background === undefined ? { kind: 'handled' } : changed({ ...defaults, background }, {}, {}, background)
 }
 
 function updatedTextLayer(
@@ -207,9 +193,7 @@ function updatedTextLayer(
       payload: {
         ...layer.payload,
         content,
-        ...(background === undefined
-          ? {}
-          : { background: background ?? layer.payload.background }),
+        ...(background === undefined ? {} : { background: background ?? layer.payload.background }),
       },
     }
   }
@@ -243,10 +227,7 @@ function updateWholeTextLayer(
   ) {
     return
   }
-  const content =
-    layer.kind === 'numberedMarker'
-      ? layer.payload.label
-      : layer.payload.content
+  const content = layer.kind === 'numberedMarker' ? layer.payload.label : layer.payload.content
   const firstSpan = content.spans[0]
   const firstParagraph = content.paragraphs[0]
   if (!firstSpan || !firstParagraph) return
@@ -267,61 +248,68 @@ function updateWholeTextLayer(
   })
 }
 
+function changedCalloutStroke(
+  current: import('@cute-screen/editor-renderer').StrokeStyle,
+  id: string,
+  value: string,
+): typeof current | undefined {
+  if (id === 'color') {
+    const color = parseHexColor(value)
+    return color ? { ...current, color } : undefined
+  }
+  try {
+    const parsed: unknown = JSON.parse(value)
+    if (
+      !parsed ||
+      typeof parsed !== 'object' ||
+      Array.isArray(parsed)
+    ) return undefined
+    const draft = parsed as { width?: unknown; style?: unknown }
+    const width = Number(draft.width)
+    if (
+      !Number.isFinite(width) ||
+      width < 1 ||
+      width > 24 ||
+      !['solid', 'dashed', 'dotted'].includes(String(draft.style))
+    ) return undefined
+    return { ...current, width, style: draft.style as typeof current.style }
+  } catch (error) {
+    console.warn('Invalid callout stroke settings', error)
+    return undefined
+  }
+}
 function applyCalloutStrokeChange(
   context: TextEffectsContext,
   id: string,
   value: string,
 ): boolean {
-  if (id !== 'color' && id !== 'stroke') return false
-  const selected = context.activeDocument.value?.layers.find(
-    (layer) => layer.id === context.store.selectedLayerId,
-  )
+  if (!['color', 'stroke', 'width', 'strokeStyle'].includes(id)) return false
+  const selected = selectedTextLayer(context)
+  const defaults = context.configuringCallout?.() && context.calloutStroke
+  const current = defaults ? defaults.value : selected?.kind === 'callout' ? selected.payload.stroke : undefined
+  if (!current) return false
+  const serialized = id === 'width' ? JSON.stringify({ ...current, width: Number(value) }) : id === 'strokeStyle' ? JSON.stringify({ ...current, style: value }) : value
+  const stroke = changedCalloutStroke(current, id, serialized)
+  if (!stroke) return true
+  if (defaults) {
+    defaults.value = stroke
+    return true
+  }
   if (
     selected?.kind !== 'callout' ||
     selected.locked ||
     !context.props.documentSession
-  ) {
-    return false
-  }
-  let stroke = selected.payload.stroke
-  if (id === 'color') {
-    const color = parseHexColor(value)
-    if (!color) return true
-    stroke = { ...stroke, color }
-  } else {
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(value)
-    } catch (error) {
-      console.warn('cute-screen callout stroke draft is invalid', error)
-      return true
-    }
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
-      return true
-    const draft = parsed as { width?: unknown; style?: unknown }
-    const width = Number(draft.width)
-    const style = draft.style
-    if (
-      !Number.isFinite(width) ||
-      width < 1 ||
-      width > 24 ||
-      (style !== 'solid' && style !== 'dashed' && style !== 'dotted')
-    ) {
-      return true
-    }
-    stroke = { ...stroke, width, style }
-  }
-  context.props.documentSession.execute({
-    type: 'updateLayer',
-    before: selected,
-    after: rebaseCalloutLayer(selected, { ...selected.payload, stroke }),
-  })
+  ) return true
+  context.props.documentSession.execute({ type: 'updateLayer', before: selected, after: rebaseCalloutLayer(selected, { ...selected.payload, stroke }) })
   return true
 }
 
 export function createTextEffects(context: TextEffectsContext) {
   let revision = 0
-  function applyV7TextChange(id: string, value: string): boolean {
+  function applyV7TextChange(
+    id: string,
+    value: string,
+  ): boolean {
     const resolved = resolveTextChange(id, value, context.textDefaults.value)
     if (resolved.kind === 'unhandled') return false
     if (resolved.kind === 'handled') return true
@@ -331,12 +319,8 @@ export function createTextEffects(context: TextEffectsContext) {
       context.textFormatting.value = {
         revision: ++revision,
         ...(Object.keys(change.span).length > 0 ? { span: change.span } : {}),
-        ...(Object.keys(change.paragraph).length > 0
-          ? { paragraph: change.paragraph }
-          : {}),
-        ...(change.background === undefined
-          ? {}
-          : { background: change.background }),
+        ...(Object.keys(change.paragraph).length > 0 ? { paragraph: change.paragraph } : {}),
+        ...(change.background === undefined ? {} : { background: change.background }),
       }
     } else {
       updateWholeTextLayer(context, change)
@@ -345,7 +329,6 @@ export function createTextEffects(context: TextEffectsContext) {
   }
   return {
     applyV7TextChange,
-    applyCalloutStrokeChange: (id: string, value: string) =>
-      applyCalloutStrokeChange(context, id, value),
+    applyCalloutStrokeChange: (id: string, value: string) => applyCalloutStrokeChange(context, id, value),
   }
 }

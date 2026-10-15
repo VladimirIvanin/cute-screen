@@ -1,4 +1,7 @@
-import { $, expect } from '@wdio/globals'
+import {
+  $,
+  expect,
+} from '@wdio/globals'
 
 import {
   expectCanvasKitStartup,
@@ -13,11 +16,7 @@ describe('M01 renderer and transport in a real Tauri webview', () => {
 
   it('creates a CanvasKit texture from a scoped alpha fixture', async () => {
     await $('button=Verify image transport').click()
-    expect(
-      await $('.diagnostic-shell').getAttribute('data-primary-diagnostic'),
-    ).toBe('none')
-    await expect($('.diagnostic-metrics')).toHaveText(
-      expect.stringContaining('asset · 64×64'),
-    )
+    expect(await $('.diagnostic-shell').getAttribute('data-primary-diagnostic')).toBe('none')
+    await expect($('.diagnostic-metrics')).toHaveText(expect.stringContaining('asset · 64×64'))
   })
 })

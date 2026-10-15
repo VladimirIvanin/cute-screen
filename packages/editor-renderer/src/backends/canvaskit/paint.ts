@@ -20,15 +20,8 @@ export function configurePaint(
   strokeWidth = 1,
 ): void {
   paint.setAntiAlias(true)
-  paint.setColorComponents(
-    color.red,
-    color.green,
-    color.blue,
-    color.alpha * opacity,
-  )
-  paint.setStyle(
-    style === 'fill' ? canvasKit.PaintStyle.Fill : canvasKit.PaintStyle.Stroke,
-  )
+  paint.setColorComponents(color.red, color.green, color.blue, color.alpha * opacity)
+  paint.setStyle(style === 'fill' ? canvasKit.PaintStyle.Fill : canvasKit.PaintStyle.Stroke)
   if (style === 'stroke') paint.setStrokeWidth(strokeWidth)
 }
 
@@ -77,26 +70,10 @@ export function configureFillPaint(
         canvasKit.TileMode.Repeat ?? canvasKit.TileMode.Clamp,
         canvasKit.FilterMode?.Linear,
         canvasKit.MipmapMode?.None,
-        new Float32Array([
-          fill.scale,
-          0,
-          fill.offsetX,
-          0,
-          fill.scale,
-          fill.offsetY,
-          0,
-          0,
-          1,
-        ]),
+        new Float32Array([fill.scale, 0, fill.offsetX, 0, fill.scale, fill.offsetY, 0, 0, 1]),
       )
     if (shader) {
-      configurePaint(
-        canvasKit,
-        paint,
-        { red: 1, green: 1, blue: 1, alpha: fill.opacity },
-        opacity,
-        'fill',
-      )
+      configurePaint(canvasKit, paint, { red: 1, green: 1, blue: 1, alpha: fill.opacity }, opacity, 'fill')
       paint.setShader(shader)
       paint.setBlendMode(blendMode(canvasKit, blend))
       return shader
@@ -104,23 +81,12 @@ export function configureFillPaint(
     // Image shaders are supplied by the next CanvasKit texture compiler. Keep
     // the missing-resource placeholder explicit until then, rather than
     // rendering a different silent solid fill than Canvas2D.
-    configurePaint(
-      canvasKit,
-      paint,
-      { red: 0.898, green: 0.282, blue: 0.302, alpha: 0.16 },
-      opacity,
-      'fill',
-    )
+    configurePaint(canvasKit, paint, { red: 0.898, green: 0.282, blue: 0.302, alpha: 0.16 }, opacity, 'fill')
     paint.setBlendMode(blendMode(canvasKit, blend))
     return undefined
   }
   const colors = new Float32Array(
-    fill.stops.flatMap((stop) => [
-      stop.color.red,
-      stop.color.green,
-      stop.color.blue,
-      stop.color.alpha,
-    ]),
+    fill.stops.flatMap((stop) => [stop.color.red, stop.color.green, stop.color.blue, stop.color.alpha]),
   )
   const positions = fill.stops.map((stop) => stop.position)
   const shader =
@@ -139,13 +105,7 @@ export function configureFillPaint(
           positions,
           canvasKit.TileMode.Clamp,
         )
-  configurePaint(
-    canvasKit,
-    paint,
-    { red: 1, green: 1, blue: 1, alpha: 1 },
-    opacity,
-    'fill',
-  )
+  configurePaint(canvasKit, paint, { red: 1, green: 1, blue: 1, alpha: 1 }, opacity, 'fill')
   paint.setShader(shader)
   paint.setBlendMode(blendMode(canvasKit, blend))
   return shader
@@ -165,10 +125,9 @@ export function configureStrokePaint(
   paint.setStrokeCap(
     (node.kind === 'line' || node.kind === 'path') && node.lineCap === 'round'
       ? canvasKit.StrokeCap.Round
-      : (node.kind === 'line' || node.kind === 'path') &&
-          node.lineCap === 'square'
-        ? canvasKit.StrokeCap.Square
-        : canvasKit.StrokeCap.Butt,
+      : (node.kind === 'line' || node.kind === 'path') && node.lineCap === 'square'
+          ? canvasKit.StrokeCap.Square
+          : canvasKit.StrokeCap.Butt,
   )
   paint.setStrokeJoin(
     node.lineJoin === 'round'
@@ -177,7 +136,11 @@ export function configureStrokePaint(
         ? canvasKit.StrokeJoin.Bevel
         : canvasKit.StrokeJoin.Miter,
   )
-  if ((node.kind === 'line' || node.kind === 'path') && node.dash) {
+  if (
+    (node.kind === 'line' ||
+      node.kind === 'path') &&
+      node.dash
+  ) {
     const effect = canvasKit.PathEffect.MakeDash([...node.dash])
     paint.setPathEffect(effect)
     return effect

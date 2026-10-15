@@ -17,15 +17,10 @@ export function createPreferenceActions(
 ) {
   function initialize(options: ShellStoreOptions): void {
     setOptions(options)
-    state.preferences.value =
-      options.preferences.load() ?? defaultPreferences(options.languages)
+    state.preferences.value = options.preferences.load() ?? defaultPreferences(options.languages)
     state.systemDark.value = options.systemDark()
   }
-  function updatePreferences(
-    partial: Partial<
-      Pick<(typeof state.preferences)['value'], 'locale' | 'theme'>
-    >,
-  ): void {
+  function updatePreferences(partial: Partial<Pick<(typeof state.preferences)['value'], 'locale' | 'theme'>>): void {
     state.preferences.value = {
       ...state.preferences.value,
       ...partial,
@@ -56,12 +51,8 @@ export function createSnapshotActions(state: ShellStoreState) {
     state.frames.value = value.frames ?? []
     state.activeToolId.value = value.activeToolId
     state.selectedLayerId.value = value.selectedLayerId
-    state.selectedLayerIds.value = value.selectedLayerId
-      ? [value.selectedLayerId]
-      : []
-    state.activeFrameId.value = value.frames?.find(
-      (frame) => frame.selected,
-    )?.id
+    state.selectedLayerIds.value = value.selectedLayerId ? [value.selectedLayerId] : []
+    state.activeFrameId.value = value.frames?.find((frame) => frame.selected)?.id
   }
   return {
     setDocumentHistory: (value: DocumentHistoryState) => {

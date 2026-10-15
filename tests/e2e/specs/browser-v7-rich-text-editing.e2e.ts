@@ -1,4 +1,8 @@
-import { $, browser, expect } from '@wdio/globals'
+import {
+  $,
+  browser,
+  expect,
+} from '@wdio/globals'
 import {
   snapshot,
   versionToken,
@@ -30,14 +34,8 @@ describe('Document v7 rich text in browser mode', () => {
     await waitForEditorFocus()
 
     await setEditorSelection(0, 10)
-    await expect($('button[aria-label="Bold: mixed"]')).toHaveAttribute(
-      'aria-pressed',
-      'mixed',
-    )
-    await expect($('button[aria-label="Italic: mixed"]')).toHaveAttribute(
-      'aria-pressed',
-      'mixed',
-    )
+    await expect($('button[aria-label="Bold: mixed"]')).toHaveAttribute('aria-pressed', 'mixed')
+    await expect($('button[aria-label="Italic: mixed"]')).toHaveAttribute('aria-pressed', 'mixed')
     await setNativeSelect('Font family', 'Georgia')
     await waitForEditorFocus()
     await $('button[data-text-control="size"]').click()
@@ -87,9 +85,7 @@ describe('Document v7 rich text in browser mode', () => {
       }[]
     }
     expect(content.text).toBe('Alpha Beta!')
-    expect(content.spans.every((span) => span.fontFamily === 'Georgia')).toBe(
-      true,
-    )
+    expect(content.spans.every((span) => span.fontFamily === 'Georgia')).toBe(true)
     expect(content.spans.every((span) => span.fontSize === 37)).toBe(true)
     expect(
       content.spans.some(
@@ -101,17 +97,9 @@ describe('Document v7 rich text in browser mode', () => {
           Math.abs(span.color.green - 0.4) < 0.0001,
       ),
     ).toBe(true)
-    expect(
-      content.spans.some(
-        (span) => span.start <= 6 && span.end >= 10 && span.italic,
-      ),
-    ).toBe(true)
-    expect(
-      content.spans.some((span) => span.end === 11 && span.strikethrough),
-    ).toBe(true)
-    expect(content.paragraphs).toEqual([
-      expect.objectContaining({ alignment: 'center', listKind: 'none' }),
-    ])
+    expect(content.spans.some((span) => span.start <= 6 && span.end >= 10 && span.italic)).toBe(true)
+    expect(content.spans.some((span) => span.end === 11 && span.strikethrough)).toBe(true)
+    expect(content.paragraphs).toEqual([expect.objectContaining({ alignment: 'center', listKind: 'none' })])
     expect(layer?.payload.background).toMatchObject({
       padding: 6,
       radius: 4,
@@ -133,37 +121,26 @@ describe('Document v7 rich text in browser mode', () => {
     await setEditorSelection(4)
     await browser.keys('Enter')
     let lists = await browser.execute(() =>
-      [
-        ...document.querySelectorAll<HTMLElement>(
-          '[contenteditable="true"] [data-rich-text-paragraph]',
-        ),
-      ].map((paragraph) => paragraph.dataset.listKind),
-    )
+      [...document.querySelectorAll<HTMLElement>('[contenteditable="true"] [data-rich-text-paragraph]')].map(
+        (paragraph) => paragraph.dataset.listKind,
+      ))
     expect(lists).toEqual(['bullet', 'bullet'])
     await browser.keys('Enter')
     lists = await browser.execute(() =>
-      [
-        ...document.querySelectorAll<HTMLElement>(
-          '[contenteditable="true"] [data-rich-text-paragraph]',
-        ),
-      ].map((paragraph) => paragraph.dataset.listKind),
-    )
+      [...document.querySelectorAll<HTMLElement>('[contenteditable="true"] [data-rich-text-paragraph]')].map(
+        (paragraph) => paragraph.dataset.listKind,
+      ))
     expect(lists).toEqual(['bullet', 'none'])
     await browser.keys('Backspace')
     lists = await browser.execute(() =>
-      [
-        ...document.querySelectorAll<HTMLElement>(
-          '[contenteditable="true"] [data-rich-text-paragraph]',
-        ),
-      ].map((paragraph) => paragraph.dataset.listKind),
-    )
+      [...document.querySelectorAll<HTMLElement>('[contenteditable="true"] [data-rich-text-paragraph]')].map(
+        (paragraph) => paragraph.dataset.listKind,
+      ))
     expect(lists).toEqual(['bullet'])
 
     await setEditorSelection(0, 4)
     await browser.execute(() => {
-      const editor = document.querySelector<HTMLDivElement>(
-        '[contenteditable="true"]',
-      )
+      const editor = document.querySelector<HTMLDivElement>('[contenteditable="true"]')
       if (!editor) throw new Error('Rich-text editor is missing')
       const data = new DataTransfer()
       data.setData('text/plain', '<plain>')
@@ -178,17 +155,10 @@ describe('Document v7 rich text in browser mode', () => {
     })
     await setEditorSelection(7)
     await browser.execute(() => {
-      const editor = document.querySelector<HTMLDivElement>(
-        '[contenteditable="true"]',
-      )
-      const text = editor?.querySelector<HTMLElement>(
-        '[data-rich-text-span]',
-      )?.firstChild
-      if (!editor || !(text instanceof Text))
-        throw new Error('Rich-text projection is missing')
-      editor.dispatchEvent(
-        new CompositionEvent('compositionstart', { bubbles: true, data: '' }),
-      )
+      const editor = document.querySelector<HTMLDivElement>('[contenteditable="true"]')
+      const text = editor?.querySelector<HTMLElement>('[data-rich-text-span]')?.firstChild
+      if (!editor || !(text instanceof Text)) throw new Error('Rich-text projection is missing')
+      editor.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true, data: '' }))
       text.data += 'Ж'
       const selection = window.getSelection()
       const range = document.createRange()
@@ -204,21 +174,18 @@ describe('Document v7 rich text in browser mode', () => {
           isComposing: true,
         }),
       )
-      editor.dispatchEvent(
-        new CompositionEvent('compositionend', { bubbles: true, data: 'Ж' }),
-      )
+      editor.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: 'Ж' }))
     })
     expect(await versionToken()).toBe(0)
     await browser.keys(['Control', 'Enter'])
     await browser.waitUntil(async () => (await snapshot()).layers.length === 5)
     expect(await versionToken()).toBe(1)
     const committed = (await snapshot()).layers.at(-1)
-    expect((committed?.payload.content as { readonly text: string }).text).toBe(
-      '<plain>Ж',
-    )
+    expect((committed?.payload.content as { readonly text: string }).text).toBe('<plain>Ж')
     expect(JSON.stringify(committed)).not.toContain('HTML must not survive')
 
     const beforeRollback = JSON.stringify(committed)
+    await $('button[aria-label="Text"]').click()
     await $('.cs-canvas:not(.cs-canvas-overlay)').click({ x: 24, y: 24 })
     const reopened = $('[contenteditable="true"][aria-label="Text editor"]')
     await expect(reopened).toExist()
@@ -226,8 +193,6 @@ describe('Document v7 rich text in browser mode', () => {
     await browser.keys('Escape')
     await expect($('[contenteditable="true"]')).not.toExist()
     expect(await versionToken()).toBe(1)
-    expect(JSON.stringify((await snapshot()).layers.at(-1))).toBe(
-      beforeRollback,
-    )
+    expect(JSON.stringify((await snapshot()).layers.at(-1))).toBe(beforeRollback)
   })
 })

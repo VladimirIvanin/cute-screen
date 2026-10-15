@@ -1,8 +1,18 @@
 import fc from 'fast-check'
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
-import { parseEditorDocument, serializeEditorDocument } from './codec'
-import type { EditorDocument, LayerNode } from './types'
+import {
+  parseEditorDocument,
+  serializeEditorDocument,
+} from './codec'
+import type {
+  EditorDocument,
+  LayerNode,
+} from './types'
 
 const shape: LayerNode = {
   id: '019c1f62-058e-7000-8000-000000000001',
@@ -58,10 +68,7 @@ const document: EditorDocument = {
 }
 
 function rawDocument(): Record<string, unknown> {
-  return JSON.parse(serializeEditorDocument(document)) as Record<
-    string,
-    unknown
-  >
+  return JSON.parse(serializeEditorDocument(document)) as Record<string, unknown>
 }
 
 describe('editor document v7 codec', () => {
@@ -82,14 +89,7 @@ describe('editor document v7 codec', () => {
   })
 
   it('round-trips every arrow path and endpoint type', () => {
-    const caps = [
-      'none',
-      'lineArrow',
-      'solidArrow',
-      'triangle',
-      'circle',
-      'diamond',
-    ] as const
+    const caps = ['none', 'lineArrow', 'solidArrow', 'triangle', 'circle', 'diamond'] as const
     const raw = rawDocument()
     raw.layers = caps.map((cap, index) => ({
       ...shape,
@@ -97,18 +97,11 @@ describe('editor document v7 codec', () => {
       kind: 'arrow',
       localBounds: { x: 0, y: 0, width: 80, height: 40 },
       payload: {
-        path:
-          index % 3 === 0
-            ? 'straight'
-            : index % 3 === 1
-              ? 'quadratic'
-              : 'elbow',
+        path: index % 3 === 0 ? 'straight' : index % 3 === 1 ? 'quadratic' : 'elbow',
         start: { x: 4, y: 20 },
         end: { x: 76, y: 20 },
         ...(index % 3 === 1 ? { bend: { x: 40, y: 4 } } : {}),
-        ...(index % 3 === 2
-          ? { elbow: { axis: index % 2 === 0 ? 'x' : 'y', offset: 20 } }
-          : {}),
+        ...(index % 3 === 2 ? { elbow: { axis: index % 2 === 0 ? 'x' : 'y', offset: 20 } } : {}),
         stroke: {
           color: { red: 1, green: 0, blue: 0, alpha: 1 },
           width: 3,
@@ -123,9 +116,7 @@ describe('editor document v7 codec', () => {
 
     const parsed = parseEditorDocument(raw)
     if (parsed.kind !== 'editable') throw new Error('expected editable v7')
-    expect(
-      parseEditorDocument(serializeEditorDocument(parsed.document)),
-    ).toEqual(parsed)
+    expect(parseEditorDocument(serializeEditorDocument(parsed.document))).toEqual(parsed)
   })
 
   it('rejects malformed path-specific arrow data', () => {
@@ -187,7 +178,8 @@ describe('editor document v7 codec', () => {
     expect(() => parseEditorDocument(id)).toThrow(/id/u)
 
     const hash = rawDocument()
-    ;(hash.source as Record<string, unknown>).blobHash = 'not-a-hash'
+    ;
+    (hash.source as Record<string, unknown>).blobHash = 'not-a-hash'
     expect(() => parseEditorDocument(hash)).toThrow(/blobHash/u)
   })
 
@@ -212,20 +204,17 @@ describe('editor document v7 codec', () => {
       },
     ]
     expect(() => parseEditorDocument(raw)).toThrow(/role/u)
-    ;(
-      raw.layers as Array<{ payload: Record<string, unknown> }>
-    )[0]!.payload.role = 'base'
-    ;(
-      raw.layers as Array<{ payload: Record<string, unknown> }>
-    )[0]!.payload.base64 = 'AAAA'
+    ;
+    (raw.layers as Array<{ payload: Record<string, unknown> }>)[0]!.payload.role = 'base'
+    ;
+    (raw.layers as Array<{ payload: Record<string, unknown> }>)[0]!.payload.base64 = 'AAAA'
     expect(() => parseEditorDocument(raw)).toThrow(/immutable image bytes/u)
   })
 
   it('rejects malformed non-text paint payloads', () => {
     const raw = rawDocument()
-    ;(
-      raw.layers as Array<{ payload: Record<string, unknown> }>
-    )[0]!.payload.fill = {
+    ;
+    (raw.layers as Array<{ payload: Record<string, unknown> }>)[0]!.payload.fill = {
       kind: 'linearGradient',
       stops: [{ position: 0, color: { red: 0, green: 0, blue: 0, alpha: 1 } }],
       start: { x: 0, y: 0 },
@@ -237,19 +226,13 @@ describe('editor document v7 codec', () => {
 
   it('round-trips generated valid crop values', () => {
     fc.assert(
-      fc.property(
-        fc.integer({ min: 1, max: 100 }),
-        fc.integer({ min: 1, max: 100 }),
-        (width, height) => {
-          const candidate: EditorDocument = {
-            ...document,
-            crop: { x: 0, y: 0, width, height },
-          }
-          expect(
-            parseEditorDocument(serializeEditorDocument(candidate)),
-          ).toMatchObject({ kind: 'editable' })
-        },
-      ),
+      fc.property(fc.integer({ min: 1, max: 100 }), fc.integer({ min: 1, max: 100 }), (width, height) => {
+        const candidate: EditorDocument = {
+          ...document,
+          crop: { x: 0, y: 0, width, height },
+        }
+        expect(parseEditorDocument(serializeEditorDocument(candidate))).toMatchObject({ kind: 'editable' })
+      }),
     )
   })
 
@@ -308,9 +291,7 @@ describe('editor document v7 codec', () => {
     const parsed = parseEditorDocument(raw)
     if (parsed.kind !== 'editable') throw new Error('expected editable v7')
     expect(
-      parsed.document.layers[0]?.kind === 'text'
-        ? parsed.document.layers[0].payload.content.paragraphs
-        : undefined,
+      parsed.document.layers[0]?.kind === 'text' ? parsed.document.layers[0].payload.content.paragraphs : undefined,
     ).toEqual([
       { start: 0, end: 5, alignment: 'start', listKind: 'bullet' },
       { start: 5, end: 5, alignment: 'start', listKind: 'none' },

@@ -78,20 +78,21 @@ export interface CanvasViewportProps {
   samplingBlocked?: boolean | undefined
   precisionDefaults?: PrecisionToolDefaults | undefined
   drawingDefaults?: DrawingDefaults | undefined
+  calloutStroke?: import('@cute-screen/editor-renderer').StrokeStyle | undefined
   textDefaults?: TextToolDefaults | undefined
   textFormatting?: TextFormattingPatch | undefined
   textToolbarSchema?:
     | Readonly<{
-        readonly text: NonNullable<ContextToolbarSchema['text']>
-        readonly title: string
-      }>
+      readonly text: NonNullable<ContextToolbarSchema['text']>
+      readonly title: string
+    }>
     | undefined
   textToolbarLocale?: 'en' | 'ru' | undefined
   arrowToolbarSchema?:
     | Readonly<{
-        readonly controls: ContextToolbarSchema['controls']
-        readonly title: string
-      }>
+      readonly controls: ContextToolbarSchema['controls']
+      readonly title: string
+    }>
     | undefined
   arrowToolbarLocale?: 'en' | 'ru' | undefined
   nextMarkerSequence?: number | undefined
@@ -105,6 +106,7 @@ export interface CanvasViewportProps {
 }
 
 export type CanvasViewportEmits = {
+  contextMenu: [request: { clientX: number; clientY: number; layerId?: string }]
   hostsReady: [hosts: CanvasViewportHosts]
   frameReady: [documentId: string]
   selectLayer: [id: string, toggle: boolean]
@@ -116,10 +118,10 @@ export type CanvasViewportEmits = {
   textEditing: [
     draft:
       | {
-          readonly id: string
-          readonly kind: 'text' | 'callout' | 'numberedMarker'
-          readonly snapshot: TextToolbarSnapshot
-        }
+        readonly id: string
+        readonly kind: 'text' | 'callout' | 'numberedMarker'
+        readonly snapshot: TextToolbarSnapshot
+      }
       | undefined,
   ]
   textEditingCancelled: [reason: 'escape']
@@ -135,12 +137,8 @@ export type CanvasViewportEmits = {
   colorSampleError: [message: string]
   colorSampleCancel: []
   toolError: [message: string]
-  quickFrameChange: [
-    crop: { x: number; y: number; width: number; height: number },
-  ]
-  quickSelectionComplete: [
-    crop: { x: number; y: number; width: number; height: number },
-  ]
+  quickFrameChange: [crop: { x: number; y: number; width: number; height: number }]
+  quickSelectionComplete: [crop: { x: number; y: number; width: number; height: number }]
 }
 
 export type CanvasViewportEmit = <K extends keyof CanvasViewportEmits>(
@@ -152,9 +150,7 @@ export interface CanvasViewportExpose {
   applyCropDraft(): void
   cancelCropDraft(): void
   resetCropDraft(): void
-  setCropPresetValue(
-    preset: import('@cute-screen/editor-renderer').CropPreset,
-  ): void
+  setCropPresetValue(preset: import('@cute-screen/editor-renderer').CropPreset): void
   refitCanvas(): void
 }
 
@@ -179,22 +175,16 @@ export const canvasViewportRuntimeProps = {
   },
   sampling: Boolean,
   samplingBlocked: Boolean,
-  precisionDefaults: Object as PropType<
-    CanvasViewportProps['precisionDefaults']
-  >,
+  precisionDefaults: Object as PropType<CanvasViewportProps['precisionDefaults']>,
   drawingDefaults: Object as PropType<CanvasViewportProps['drawingDefaults']>,
   textDefaults: Object as PropType<CanvasViewportProps['textDefaults']>,
   textFormatting: Object as PropType<CanvasViewportProps['textFormatting']>,
-  textToolbarSchema: Object as PropType<
-    CanvasViewportProps['textToolbarSchema']
-  >,
+  textToolbarSchema: Object as PropType<CanvasViewportProps['textToolbarSchema']>,
   textToolbarLocale: {
     type: String as PropType<CanvasViewportProps['textToolbarLocale']>,
     default: undefined,
   },
-  arrowToolbarSchema: Object as PropType<
-    CanvasViewportProps['arrowToolbarSchema']
-  >,
+  arrowToolbarSchema: Object as PropType<CanvasViewportProps['arrowToolbarSchema']>,
   arrowToolbarLocale: {
     type: String as PropType<CanvasViewportProps['arrowToolbarLocale']>,
     default: undefined,
@@ -205,6 +195,10 @@ export const canvasViewportRuntimeProps = {
   },
   markerShape: {
     type: String as PropType<CanvasViewportProps['markerShape']>,
+    default: undefined,
+  },
+  calloutStroke: {
+    type: Object as PropType<CanvasViewportProps['calloutStroke']>,
     default: undefined,
   },
   openImageAvailable: Boolean,
@@ -219,6 +213,7 @@ export const canvasViewportRuntimeProps = {
 } as const
 
 export const canvasViewportRuntimeEmits = [
+  'contextMenu',
   'hostsReady',
   'frameReady',
   'selectLayer',

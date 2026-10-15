@@ -247,7 +247,11 @@ export {
   type EditorToolId,
   type InteractionState,
 } from './interaction'
-export { snapPoint, type SnapCandidate, type SnapResult } from './snap'
+export {
+  snapPoint,
+  type SnapCandidate,
+  type SnapResult,
+} from './snap'
 export {
   applyEditorCommand,
   CommandManager,
@@ -313,3 +317,15 @@ export {
   type RichTextSelection,
   type RichTextSpanStyle,
 } from './tools/text'
+export {
+  creationPolicy,
+  extractLayerStyle,
+  commonLayerStyle,
+  applyLayerStyle,
+  styleCommand,
+  type LayerStyle,
+} from './styles'
+export {
+  parseToolSettingsPreferences,
+  type ToolSettingsPreferencesV3,
+} from './tool-preferences'

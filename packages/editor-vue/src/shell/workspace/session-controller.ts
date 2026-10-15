@@ -13,9 +13,7 @@ export interface SessionControllerContext {
   readonly activeDocument: Ref<EditorDocumentV1 | undefined>
   readonly textDraft: Ref<TextDraft | undefined>
   readonly translate: (key: 'readyLoadError' | 'baseImage') => string
-  readonly resolveDocumentTextures: (
-    document: EditorDocumentV1,
-  ) => Promise<void>
+  readonly resolveDocumentTextures: (document: EditorDocumentV1) => Promise<void>
 }
 
 function loadFixture(context: SessionControllerContext): void {
@@ -106,25 +104,17 @@ function syncLayerSummaries(
     ...[...document.layers].reverse().map((layer) => ({
       id: layer.id,
       icon:
-        layer.kind === 'text' ||
-        layer.kind === 'callout' ||
-        layer.kind === 'numberedMarker'
+        layer.kind === 'text' || layer.kind === 'callout' || layer.kind === 'numberedMarker'
           ? layer.kind
           : layer.kind === 'image'
             ? ('image' as const)
             : ('shape' as const),
-      name:
-        layer.kind === 'image' && layer.payload.role === 'base'
-          ? context.translate('baseImage')
-          : layer.kind,
+      name: layer.kind === 'image' && layer.payload.role === 'base' ? context.translate('baseImage') : layer.kind,
       visible: layer.visible,
       locked: layer.locked,
       opacity: 'opacity' in layer ? layer.opacity : 1,
       rotation: layer.transform.rotation,
-      opacityEditable:
-        layer.kind !== 'text' &&
-        layer.kind !== 'callout' &&
-        layer.kind !== 'numberedMarker',
+      opacityEditable: layer.kind !== 'text' && layer.kind !== 'callout' && layer.kind !== 'numberedMarker',
     })),
   ])
 }
@@ -161,8 +151,7 @@ function applyDocumentSnapshot(
 export function createSessionController(context: SessionControllerContext) {
   return {
     loadFixture: () => loadFixture(context),
-    applyDocumentSnapshot: (snapshot: DocumentSessionSnapshot) =>
-      applyDocumentSnapshot(context, snapshot),
+    applyDocumentSnapshot: (snapshot: DocumentSessionSnapshot) => applyDocumentSnapshot(context, snapshot),
     setTextDraft: (draft: TextDraft | undefined) => {
       context.textDraft.value = draft
       if (context.activeDocument.value) {
@@ -173,8 +162,7 @@ export function createSessionController(context: SessionControllerContext) {
     redoDocument: () => context.props.documentSession?.redo(),
     retryDocumentSave: () => void context.props.documentSession?.retry(),
     exportDocumentRecovery: async () => {
-      const outcome =
-        await context.props.documentSession?.exportRecoveryBundle()
+      const outcome = await context.props.documentSession?.exportRecoveryBundle()
       if (outcome?.kind === 'failed') {
         context.store.setDocumentHistory({
           ...context.store.documentHistory,

@@ -1,5 +1,11 @@
 import { fireEvent } from '@testing-library/vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 import { mountViewport } from './canvas-viewport-test-kit'
 
 beforeEach(() => {
@@ -46,9 +52,7 @@ describe('M05 CanvasViewport transforms', () => {
     expect(emitted().transformLayer).toBeUndefined()
     await fireEvent.pointerUp(scene, { pointerId: 1, clientX: -1, clientY: 41 })
 
-    expect(emitted().transformLayer).toEqual([
-      ['shape', expect.objectContaining({ rotation: 90 })],
-    ])
+    expect(emitted().transformLayer).toEqual([['shape', expect.objectContaining({ rotation: 90 })]])
   })
 
   it('does not rotate from the removed detached top handle position', async () => {
@@ -109,8 +113,7 @@ describe('M05 CanvasViewport transforms', () => {
     })
     await fireEvent.pointerUp(scene, { pointerId: 2, clientX: 25, clientY: 10 })
 
-    const addLayer = emitted().addLayer as unknown as
-      readonly [unknown][] | undefined
+    const addLayer = emitted().addLayer as unknown as readonly [unknown][] | undefined
     expect(addLayer).toHaveLength(2)
     expect(addLayer?.[0]?.[0]).toMatchObject({
       kind: 'arrow',
@@ -134,9 +137,7 @@ describe('M05 CanvasViewport transforms', () => {
 
   it('routes an Image-tool click to one native import request at the visible canvas centre', async () => {
     const { container, scene, emitted } = mountViewport('image')
-    const scroll = container.querySelector(
-      '.cs-canvas-scroll',
-    ) as HTMLDivElement
+    const scroll = container.querySelector('.cs-canvas-scroll') as HTMLDivElement
     vi.spyOn(scroll, 'getBoundingClientRect').mockReturnValue({
       x: 0,
       y: 0,
@@ -171,8 +172,7 @@ describe('M05 CanvasViewport transforms', () => {
       clientY: 40,
     })
 
-    const addLayer = emitted().addLayer as unknown as
-      readonly [unknown][] | undefined
+    const addLayer = emitted().addLayer as unknown as readonly [unknown][] | undefined
     const layer = (addLayer?.[0]?.[0] ?? null) as {
       readonly transform: {
         readonly translateX: number
@@ -187,14 +187,8 @@ describe('M05 CanvasViewport transforms', () => {
     } | null
     expect(layer).not.toBeNull()
     expect({
-      x:
-        layer!.transform.translateX +
-        layer!.localBounds.x +
-        layer!.localBounds.width / 2,
-      y:
-        layer!.transform.translateY +
-        layer!.localBounds.y +
-        layer!.localBounds.height / 2,
+      x: layer!.transform.translateX + layer!.localBounds.x + layer!.localBounds.width / 2,
+      y: layer!.transform.translateY + layer!.localBounds.y + layer!.localBounds.height / 2,
     }).toEqual({ x: 30, y: 40 })
     vi.unstubAllGlobals()
   })
@@ -212,9 +206,7 @@ describe('M05 CanvasViewport transforms', () => {
     })
     await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 30, clientY: 40 })
     const editor = getByLabelText('Text editor') as HTMLDivElement
-    expect(emitted().textEditing).toEqual([
-      [expect.objectContaining({ kind: 'text' })],
-    ])
+    expect(emitted().textEditing).toEqual([[expect.objectContaining({ kind: 'text' })]])
     editor.textContent = 'Click text'
     await fireEvent.input(editor)
     await fireEvent.keyDown(editor, { key: 'Enter', ctrlKey: true })

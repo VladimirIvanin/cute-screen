@@ -32,14 +32,8 @@ function sourceRegion(
   if (side > Math.min(canvas.width, canvas.height)) return undefined
   const source = selected.payload.sourceRegion
   return {
-    x: Math.max(
-      0,
-      Math.min(canvas.width - side, source.x + source.width / 2 - side / 2),
-    ),
-    y: Math.max(
-      0,
-      Math.min(canvas.height - side, source.y + source.height / 2 - side / 2),
-    ),
+    x: Math.max(0, Math.min(canvas.width - side, source.x + source.width / 2 - side / 2)),
+    y: Math.max(0, Math.min(canvas.height - side, source.y + source.height / 2 - side / 2)),
     width: side,
     height: side,
   }
@@ -56,17 +50,11 @@ function sizeEffect(
     ? Number.isFinite(number) && number >= 1 && number <= 16
     : Number.isFinite(number) && number >= 16 && number <= 2048
   if (!valid) return HANDLED
-  const lensSize = zoomChange
-    ? (state.selected?.payload.lens.size ?? state.defaults.loupe.size)
-    : number
-  const zoom = zoomChange
-    ? number
-    : (state.selected?.payload.zoom ?? state.defaults.loupe.zoom)
+  const lensSize = zoomChange ? (state.selected?.payload.lens.size ?? state.defaults.loupe.size) : number
+  const zoom = zoomChange ? number : (state.selected?.payload.zoom ?? state.defaults.loupe.zoom)
   const region = sourceRegion(state, lensSize, zoom)
   if (state.selected && !region) return HANDLED
-  const loupe = zoomChange
-    ? { ...state.defaults.loupe, zoom: number }
-    : { ...state.defaults.loupe, size: number }
+  const loupe = zoomChange ? { ...state.defaults.loupe, zoom: number } : { ...state.defaults.loupe, size: number }
   const defaults: State['defaults'] = { ...state.defaults, loupe }
   const after = state.selected
     ? {
@@ -99,7 +87,11 @@ function appearanceEffect(
   value: string,
   state: State,
 ): PrecisionSettingsEffect {
-  if (id === 'loupeShape' && (value === 'circle' || value === 'rectangle')) {
+  if (
+    id === 'loupeShape' &&
+    (value === 'circle' ||
+      value === 'rectangle')
+  ) {
     const defaults: State['defaults'] = {
       ...state.defaults,
       loupe: { ...state.defaults.loupe, shape: value },
@@ -146,7 +138,11 @@ function borderOrShadowEffect(
 ): PrecisionSettingsEffect {
   if (id === 'loupeBorderWidth') {
     const number = Number(value)
-    if (!Number.isFinite(number) || number < 0 || number > 64) return HANDLED
+    if (
+      !Number.isFinite(number) ||
+      number < 0 ||
+      number > 64
+    ) return HANDLED
     const defaults: State['defaults'] = {
       ...state.defaults,
       loupe: { ...state.defaults.loupe, borderWidth: number },
@@ -162,7 +158,11 @@ function borderOrShadowEffect(
       : undefined
     return result(state, defaults, after)
   }
-  if (id === 'loupeShadow' && (value === 'on' || value === 'off')) {
+  if (
+    id === 'loupeShadow' &&
+    (value === 'on' ||
+      value === 'off')
+  ) {
     const enabled = value === 'on'
     const defaults: State['defaults'] = {
       ...state.defaults,
@@ -198,7 +198,5 @@ export function resolveLoupeEffect(
     return sizeEffect(id, value, state)
   }
   const appearance = appearanceEffect(id, value, state)
-  return appearance.kind === 'unhandled'
-    ? borderOrShadowEffect(id, value, state)
-    : appearance
+  return appearance.kind === 'unhandled' ? borderOrShadowEffect(id, value, state) : appearance
 }

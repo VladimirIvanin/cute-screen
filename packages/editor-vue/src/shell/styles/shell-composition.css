@@ -98,10 +98,7 @@
   position: absolute;
   z-index: 20;
   right: auto;
-  bottom: calc(
-    var(--bottom-rail-offset) + var(--bottom-rail-height) +
-      var(--bottom-rail-gap)
-  );
+  bottom: calc(var(--bottom-rail-offset) + var(--bottom-rail-height) + var(--bottom-rail-gap));
   left: 50%;
   width: auto;
   max-width: min(920px, calc(100vw - 360px));
@@ -443,4 +440,54 @@
 .cs-color-suggestion:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
+}
+.cs-canvas-context-menu {
+  position: fixed;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  min-width: 224px;
+  max-height: calc(100vh - 16px);
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-raised);
+  color: var(--text);
+  box-shadow: 0 8px 32px #0003;
+}
+.cs-canvas-context-menu button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 6px;
+  padding: 6px 12px;
+  background: transparent;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.cs-canvas-context-menu button:hover,
+.cs-canvas-context-menu button:focus-visible {
+  background: var(--accent-soft);
+  outline: 2px solid var(--accent);
+}
+.cs-canvas-context-menu button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.cs-selection-floating-toolbar .cs-context-toolbar,
+.cs-tool-configure-popover-host .cs-context-toolbar {
+  position: static;
+  transform: none;
+  margin: 0;
+  width: max-content;
+  max-width: min(680px, calc(100vw - 24px));
+}
+.cs-selection-floating-toolbar .cs-context-controls,
+.cs-tool-configure-popover-host .cs-context-controls {
+  flex-wrap: wrap;
+  max-width: min(640px, calc(100vw - 64px));
+}
+.cs-tool-configure-trigger {
+  align-self: center;
 }

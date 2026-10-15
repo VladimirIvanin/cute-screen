@@ -5,18 +5,9 @@ export default defineConfig({
   plugins: [vue()],
   resolve: {
     alias: {
-      '@cute-screen/editor-core': new URL(
-        './packages/editor-core/src/index.ts',
-        import.meta.url,
-      ).pathname,
-      '@cute-screen/editor-renderer': new URL(
-        './packages/editor-renderer/src/index.ts',
-        import.meta.url,
-      ).pathname,
-      '@cute-screen/editor-vue': new URL(
-        './packages/editor-vue/src/index.ts',
-        import.meta.url,
-      ).pathname,
+      '@cute-screen/editor-core': new URL('./packages/editor-core/src/index.ts', import.meta.url).pathname,
+      '@cute-screen/editor-renderer': new URL('./packages/editor-renderer/src/index.ts', import.meta.url).pathname,
+      '@cute-screen/editor-vue': new URL('./packages/editor-vue/src/index.ts', import.meta.url).pathname,
     },
   },
   test: {

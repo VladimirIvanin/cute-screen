@@ -1,4 +1,8 @@
-import { $, browser, expect } from '@wdio/globals'
+import {
+  $,
+  browser,
+  expect,
+} from '@wdio/globals'
 
 type HarnessSnapshot = {
   readonly schemaVersion: number
@@ -35,8 +39,7 @@ async function token(): Promise<number> {
       }
     ).__cuteScreenE2eM05
     const value = harness?.versionToken()
-    if (value === undefined)
-      throw new Error('WebView2 history token is missing')
+    if (value === undefined) throw new Error('WebView2 history token is missing')
     return value
   })
 }
@@ -57,8 +60,7 @@ describe('Document v7 rich text in a real Tauri webview', () => {
       if (!toolbar) throw new Error('Text toolbar is missing')
       return {
         scrolls: toolbar.scrollWidth > toolbar.clientWidth,
-        documentScrolls:
-          document.documentElement.scrollWidth > window.innerWidth,
+        documentScrolls: document.documentElement.scrollWidth > window.innerWidth,
       }
     })
     expect(layout).toEqual({ scrolls: false, documentScrolls: false })
@@ -69,11 +71,7 @@ describe('Document v7 rich text in a real Tauri webview', () => {
     await editor.addValue('Привет WebView2')
     await $('button[aria-label="Bold"]').click()
     await browser.waitUntil(() =>
-      browser.execute(
-        () =>
-          document.activeElement?.getAttribute('contenteditable') === 'true',
-      ),
-    )
+      browser.execute(() => document.activeElement?.getAttribute('contenteditable') === 'true'))
     expect(await token()).toBe(0)
     await browser.keys(['Control', 'Enter'])
     await browser.waitUntil(async () => (await snapshot()).layers.length === 5)
@@ -86,6 +84,6 @@ describe('Document v7 rich text in a real Tauri webview', () => {
     expect(layer).not.toHaveProperty('opacity')
     expect(layer).not.toHaveProperty('blendMode')
     expect(layer).not.toHaveProperty('shadows')
-    await expect(textTool).toHaveAttribute('aria-pressed', 'true')
+    await expect(textTool).toHaveAttribute('aria-pressed', 'false')
   })
 })

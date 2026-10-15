@@ -1,13 +1,21 @@
 import { readFileSync } from 'node:fs'
 
-import { describe, expect, expectTypeOf, it } from 'vitest'
+import {
+  describe,
+  expect,
+  expectTypeOf,
+  it,
+} from 'vitest'
 
 import {
   CLIPBOARD_LAYERS_MIME,
   decodeClipboardLayersV2,
   encodeClipboardLayersV2,
 } from '../tools/content/clipboard-codec'
-import { parseEditorDocument, serializeEditorDocument } from './codec'
+import {
+  parseEditorDocument,
+  serializeEditorDocument,
+} from './codec'
 import { createEditorDocumentFromImage } from './factory'
 import type {
   LayerNode,
@@ -91,26 +99,13 @@ function documentWith(layers: readonly unknown[]) {
 describe('document schema v7 contract', () => {
   it('removes legacy text fields from the public TypeScript contract', () => {
     expectTypeOf<
-      Extract<
-        keyof RichTextSpan,
-        'font' | 'underline' | 'letterSpacing' | 'opacity'
-      >
+      Extract<keyof RichTextSpan, 'font' | 'underline' | 'letterSpacing' | 'opacity'>
     >().toEqualTypeOf<never>()
-    expectTypeOf<
-      Extract<keyof RichTextParagraph, 'justify' | 'lineHeight'>
-    >().toEqualTypeOf<never>()
-    expectTypeOf<RichTextParagraph['alignment']>().toEqualTypeOf<
-      'start' | 'center' | 'end'
-    >()
-    expectTypeOf<RichTextParagraph['listKind']>().toEqualTypeOf<
-      'none' | 'bullet'
-    >()
-    expectTypeOf<
-      Extract<keyof TextLayerPayload, 'font' | 'fill' | 'outline' | 'presetId'>
-    >().toEqualTypeOf<never>()
-    expectTypeOf<
-      Extract<keyof TextLayer, 'opacity' | 'blendMode' | 'shadows'>
-    >().toEqualTypeOf<never>()
+    expectTypeOf<Extract<keyof RichTextParagraph, 'justify' | 'lineHeight'>>().toEqualTypeOf<never>()
+    expectTypeOf<RichTextParagraph['alignment']>().toEqualTypeOf<'start' | 'center' | 'end'>()
+    expectTypeOf<RichTextParagraph['listKind']>().toEqualTypeOf<'none' | 'bullet'>()
+    expectTypeOf<Extract<keyof TextLayerPayload, 'font' | 'fill' | 'outline' | 'presetId'>>().toEqualTypeOf<never>()
+    expectTypeOf<Extract<keyof TextLayer, 'opacity' | 'blendMode' | 'shadows'>>().toEqualTypeOf<never>()
   })
 
   it('round-trips strict UTF-16 rich text and each text-bearing container', () => {
@@ -157,9 +152,7 @@ describe('document schema v7 contract', () => {
     expect(parsed).toMatchObject({ kind: 'editable' })
     if (parsed.kind !== 'editable') throw new Error('expected editable v7')
     expect(parsed.document.layers).toHaveLength(3)
-    expect(
-      parseEditorDocument(serializeEditorDocument(parsed.document)),
-    ).toEqual(parsed)
+    expect(parseEditorDocument(serializeEditorDocument(parsed.document))).toEqual(parsed)
   })
 
   it('rejects surrogate-splitting ranges and out-of-bounds text values', () => {
@@ -169,44 +162,21 @@ describe('document schema v7 contract', () => {
 
     const oversized = structuredClone(textLayer())
     oversized.payload.content.spans[0]!.fontSize = 513
-    expect(() => parseEditorDocument(documentWith([oversized]))).toThrow(
-      /fontSize/u,
-    )
+    expect(() => parseEditorDocument(documentWith([oversized]))).toThrow(/fontSize/u)
 
     const padded = structuredClone(textLayer())
     padded.payload.background.padding = 257
-    expect(() => parseEditorDocument(documentWith([padded]))).toThrow(
-      /padding/u,
-    )
+    expect(() => parseEditorDocument(documentWith([padded]))).toThrow(/padding/u)
   })
 
   it.each([
     ['common opacity', (layer: object) => Reflect.set(layer, 'opacity', 0.5)],
-    [
-      'common blend',
-      (layer: object) => Reflect.set(layer, 'blendMode', 'screen'),
-    ],
+    ['common blend', (layer: object) => Reflect.set(layer, 'blendMode', 'screen')],
     ['common shadows', (layer: object) => Reflect.set(layer, 'shadows', [])],
-    [
-      'legacy text fill',
-      (layer: ReturnType<typeof textLayer>) =>
-        Reflect.set(layer.payload, 'fill', { kind: 'none' }),
-    ],
-    [
-      'legacy preset',
-      (layer: ReturnType<typeof textLayer>) =>
-        Reflect.set(layer.payload, 'presetId', 'title'),
-    ],
-    [
-      'legacy outline',
-      (layer: ReturnType<typeof textLayer>) =>
-        Reflect.set(layer.payload, 'outline', null),
-    ],
-    [
-      'legacy layer font',
-      (layer: ReturnType<typeof textLayer>) =>
-        Reflect.set(layer.payload, 'font', {}),
-    ],
+    ['legacy text fill', (layer: ReturnType<typeof textLayer>) => Reflect.set(layer.payload, 'fill', { kind: 'none' })],
+    ['legacy preset', (layer: ReturnType<typeof textLayer>) => Reflect.set(layer.payload, 'presetId', 'title')],
+    ['legacy outline', (layer: ReturnType<typeof textLayer>) => Reflect.set(layer.payload, 'outline', null)],
+    ['legacy layer font', (layer: ReturnType<typeof textLayer>) => Reflect.set(layer.payload, 'font', {})],
     [
       'legacy background fill',
       (layer: ReturnType<typeof textLayer>) =>
@@ -218,25 +188,20 @@ describe('document schema v7 contract', () => {
     ],
     [
       'underline',
-      (layer: ReturnType<typeof textLayer>) =>
-        Reflect.set(layer.payload.content.spans[0]!, 'underline', true),
+      (layer: ReturnType<typeof textLayer>) => Reflect.set(layer.payload.content.spans[0]!, 'underline', true),
     ],
     [
       'letter spacing',
-      (layer: ReturnType<typeof textLayer>) =>
-        Reflect.set(layer.payload.content.spans[0]!, 'letterSpacing', 2),
+      (layer: ReturnType<typeof textLayer>) => Reflect.set(layer.payload.content.spans[0]!, 'letterSpacing', 2),
     ],
     [
       'line height',
-      (layer: ReturnType<typeof textLayer>) =>
-        Reflect.set(layer.payload.content.paragraphs[0]!, 'lineHeight', 1.5),
+      (layer: ReturnType<typeof textLayer>) => Reflect.set(layer.payload.content.paragraphs[0]!, 'lineHeight', 1.5),
     ],
   ])('rejects removed v7 field: %s', (_name, mutate) => {
     const candidate = structuredClone(textLayer())
     mutate(candidate)
-    expect(() => parseEditorDocument(documentWith([candidate]))).toThrow(
-      /removed|unsupported|unexpected/u,
-    )
+    expect(() => parseEditorDocument(documentWith([candidate]))).toThrow(/removed|unsupported|unexpected/u)
   })
 
   it('rejects legacy callout bubble/tail payload fields', () => {
@@ -253,9 +218,7 @@ describe('document schema v7 contract', () => {
         tailAnchor: { x: 90, y: 70 },
       },
     }
-    expect(() => parseEditorDocument(documentWith([legacy]))).toThrow(
-      /legacy callout bubble\/tail fields are removed/u,
-    )
+    expect(() => parseEditorDocument(documentWith([legacy]))).toThrow(/legacy callout bubble\/tail fields are removed/u)
   })
 
   it.each([
@@ -294,9 +257,7 @@ describe('document schema v7 contract', () => {
     ],
   ])('rejects common effects on the %s text-bearing layer', (kind, payload) => {
     const candidate = { ...textLayer(), kind, payload, opacity: 1 }
-    expect(() => parseEditorDocument(documentWith([candidate]))).toThrow(
-      /text-bearing common effects are removed/u,
-    )
+    expect(() => parseEditorDocument(documentWith([candidate]))).toThrow(/text-bearing common effects are removed/u)
   })
 
   it('returns typed older and newer schema states without mutating raw data', () => {
@@ -312,14 +273,12 @@ describe('document schema v7 contract', () => {
       expect(raw).toEqual(snapshot)
       expect(Object.isFrozen(raw)).toBe(false)
     }
-    expect(parseEditorDocument({ schemaVersion: 8, marker: 'future' })).toEqual(
-      {
-        kind: 'readOnly',
-        schemaVersion: 8,
-        raw: { schemaVersion: 8, marker: 'future' },
-        reason: 'newerSchema',
-      },
-    )
+    expect(parseEditorDocument({ schemaVersion: 8, marker: 'future' })).toEqual({
+      kind: 'readOnly',
+      schemaVersion: 8,
+      raw: { schemaVersion: 8, marker: 'future' },
+      reason: 'newerSchema',
+    })
   })
 
   it('creates a v7 image document that reopens through the production parser', () => {
@@ -338,10 +297,7 @@ describe('document schema v7 contract', () => {
   })
 
   it('opens the exact native Rust v7 factory fixture', () => {
-    const nativeDocument = readFileSync(
-      new URL('./fixtures/native-v7-document.json', import.meta.url),
-      'utf8',
-    )
+    const nativeDocument = readFileSync(new URL('./fixtures/native-v7-document.json', import.meta.url), 'utf8')
     const parsed = parseEditorDocument(nativeDocument)
     expect(parsed).toMatchObject({ kind: 'editable' })
     expect(nativeDocument).not.toMatch(/base64|data:/iu)
@@ -350,9 +306,7 @@ describe('document schema v7 contract', () => {
   it('rejects inline image bytes at both source and layer boundaries', () => {
     const inlineSource = documentWith([])
     Reflect.set(inlineSource.source, 'dataUrl', 'data:image/png;base64,AA==')
-    expect(() => parseEditorDocument(inlineSource)).toThrow(
-      /immutable image bytes by hash/u,
-    )
+    expect(() => parseEditorDocument(inlineSource)).toThrow(/immutable image bytes by hash/u)
 
     const created = createEditorDocumentFromImage({
       id: '019c1f62-058e-7000-8000-000000000000',
@@ -364,27 +318,19 @@ describe('document schema v7 contract', () => {
     const base = inlineLayer.layers[0]
     if (!base || base.kind !== 'image') throw new Error('expected image layer')
     Reflect.set(base.payload, 'base64', 'AA==')
-    expect(() => parseEditorDocument(inlineLayer)).toThrow(
-      /immutable image bytes by hash/u,
-    )
+    expect(() => parseEditorDocument(inlineLayer)).toThrow(/immutable image bytes by hash/u)
   })
 
   it('round-trips v7 text-bearing layers through clipboard v2', () => {
-    expect(CLIPBOARD_LAYERS_MIME).toBe(
-      'application/x-cute-screen-layers+json;version=2',
-    )
-    const encoded = encodeClipboardLayersV2([
-      textLayer() as unknown as LayerNode,
-    ])
+    expect(CLIPBOARD_LAYERS_MIME).toBe('application/x-cute-screen-layers+json;version=2')
+    const encoded = encodeClipboardLayersV2([textLayer() as unknown as LayerNode])
     expect(JSON.parse(encoded)).toMatchObject({
       version: 2,
       documentSchemaVersion: 7,
     })
     expect(decodeClipboardLayersV2(encoded).layers).toEqual([textLayer()])
-    expect(() =>
-      decodeClipboardLayersV2(
-        JSON.stringify({ version: 1, documentSchemaVersion: 6, layers: [] }),
-      ),
-    ).toThrow(/unsupported version/u)
+    expect(() => decodeClipboardLayersV2(JSON.stringify({ version: 1, documentSchemaVersion: 6, layers: [] }))).toThrow(
+      /unsupported version/u,
+    )
   })
 })

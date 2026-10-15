@@ -181,8 +181,7 @@
   opacity: 0;
 }
 .cs-layer-lock:not(.is-locked):hover:not(:disabled) .cs-layer-lock-idle,
-.cs-layer-lock:not(.is-locked):focus-visible:not(:disabled)
-  .cs-layer-lock-idle {
+.cs-layer-lock:not(.is-locked):focus-visible:not(:disabled) .cs-layer-lock-idle {
   opacity: 0.55;
 }
 .cs-layer-row.is-selected .cs-layer-lock.is-locked {
@@ -221,16 +220,11 @@
   position: absolute;
   z-index: 6;
   bottom: 14px;
-  left: calc(
-    var(--bottom-zoom-lane) +
-      (100% - var(--bottom-zoom-lane) - var(--bottom-inspector-lane)) / 2
-  );
+  left: calc(var(--bottom-zoom-lane) + (100% - var(--bottom-zoom-lane) - var(--bottom-inspector-lane)) / 2);
   display: flex;
   min-width: 0;
   min-height: 46px;
-  max-width: calc(
-    100% - var(--bottom-zoom-lane) - var(--bottom-inspector-lane)
-  );
+  max-width: calc(100% - var(--bottom-zoom-lane) - var(--bottom-inspector-lane));
   align-items: center;
   gap: 9px;
   padding: 5px 8px;
@@ -418,15 +412,9 @@
   transform: translateX(-50%);
   z-index: 12;
 }
-.cs-text-floating-toolbar-host[data-placement='below']
-  .cs-text-floating-toolbar
-  .cs-text-size-popover,
-.cs-text-floating-toolbar-host[data-placement='below']
-  .cs-text-floating-toolbar
-  .cs-text-overflow-popover,
-.cs-text-floating-toolbar-host[data-placement='below']
-  .cs-text-floating-toolbar
-  .cs-text-background-popover {
+.cs-text-floating-toolbar-host[data-placement='below'] .cs-text-floating-toolbar .cs-text-size-popover,
+.cs-text-floating-toolbar-host[data-placement='below'] .cs-text-floating-toolbar .cs-text-overflow-popover,
+.cs-text-floating-toolbar-host[data-placement='below'] .cs-text-floating-toolbar .cs-text-background-popover {
   top: auto;
   bottom: calc(100% + 8px);
 }

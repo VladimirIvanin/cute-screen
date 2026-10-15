@@ -13,10 +13,10 @@ declare global {
       setCrop(): void
       snapshot():
         | {
-            crop: unknown
-            layers: EditorDocumentV1['layers']
-            saveState: string
-          }
+          crop: unknown
+          layers: EditorDocumentV1['layers']
+          saveState: string
+        }
         | undefined
     }
   }

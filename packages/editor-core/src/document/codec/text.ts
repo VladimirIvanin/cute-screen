@@ -22,16 +22,14 @@ const MAX_TEXT_FONT_SIZE = 512
 const MAX_TEXT_PADDING = 256
 const MAX_IMAGE_RADIUS = 16_384
 
-function isUtf16Boundary(text: string, offset: number): boolean {
+function isUtf16Boundary(
+  text: string,
+  offset: number,
+): boolean {
   if (offset <= 0 || offset >= text.length) return true
   const before = text.charCodeAt(offset - 1)
   const after = text.charCodeAt(offset)
-  return !(
-    before >= 0xd800 &&
-    before <= 0xdbff &&
-    after >= 0xdc00 &&
-    after <= 0xdfff
-  )
+  return !(before >= 0xd800 && before <= 0xdbff && after >= 0xdc00 && after <= 0xdfff)
 }
 
 function parseTextRange(
@@ -56,17 +54,17 @@ function parseTextRange(
   return Object.freeze({ start, end })
 }
 
-function canonicalizeRichTextSpans(
-  spans: readonly RichTextSpan[],
-): readonly RichTextSpan[] {
+function canonicalizeRichTextSpans(spans: readonly RichTextSpan[]): readonly RichTextSpan[] {
   const result: RichTextSpan[] = []
   for (const span of spans) {
     const previous = result.at(-1)
-    const previousStyle = previous
-      ? JSON.stringify({ ...previous, start: 0, end: 0 })
-      : undefined
+    const previousStyle = previous ? JSON.stringify({ ...previous, start: 0, end: 0 }) : undefined
     const style = JSON.stringify({ ...span, start: 0, end: 0 })
-    if (previous && previous.end === span.start && previousStyle === style) {
+    if (
+      previous &&
+      previous.end === span.start &&
+      previousStyle === style
+    ) {
       result[result.length - 1] = Object.freeze({ ...previous, end: span.end })
     } else {
       result.push(span)
@@ -87,16 +85,7 @@ function parseRichTextSpan(
   const item = readJsonObject(value, itemField)
   assertOnlyFields(
     item,
-    [
-      'start',
-      'end',
-      'fontFamily',
-      'fontSize',
-      'color',
-      'weight',
-      'italic',
-      'strikethrough',
-    ],
+    ['start', 'end', 'fontFamily', 'fontSize', 'color', 'weight', 'italic', 'strikethrough'],
     itemField,
   )
   if (range.start !== expectedStart || range.end <= range.start) {
@@ -119,16 +108,10 @@ function parseRichTextSpan(
     ...range,
     fontFamily: readNonEmptyString(item.fontFamily, `${itemField}.fontFamily`),
     fontSize,
-    color: parseSrgbColor(
-      item.color,
-      `${itemField}.color`,
-    ) as unknown as SrgbColor,
+    color: parseSrgbColor(item.color, `${itemField}.color`) as unknown as SrgbColor,
     weight: weight as RichTextSpan['weight'],
     italic: readBoolean(item.italic, `${itemField}.italic`),
-    strikethrough: readBoolean(
-      item.strikethrough,
-      `${itemField}.strikethrough`,
-    ),
+    strikethrough: readBoolean(item.strikethrough, `${itemField}.strikethrough`),
   })
 }
 
@@ -144,8 +127,11 @@ function parseRichTextSpans(
     return span
   })
   if (
-    (text.length === 0 && spans.length !== 0) ||
-    (text.length > 0 && (spans.length === 0 || previousEnd !== text.length))
+    (text.length === 0 &&
+      spans.length !== 0) ||
+      (text.length > 0 &&
+        (spans.length === 0 ||
+          previousEnd !== text.length))
   ) {
     throw new Error(`${field}.spans must cover text exactly`)
   }
@@ -165,13 +151,11 @@ function parseRichTextParagraph(
   const item = readJsonObject(value, itemField)
   assertOnlyFields(item, ['start', 'end', 'alignment', 'listKind'], itemField)
   const terminalEmpty =
-    index === count - 1 &&
-    range.start === text.length &&
-    range.end === text.length &&
-    text.endsWith('\n')
+    index === count - 1 && range.start === text.length && range.end === text.length && text.endsWith('\n')
   if (
     range.start !== expectedStart ||
-    (range.end <= range.start && !terminalEmpty)
+    (range.end <= range.start &&
+      !terminalEmpty)
   ) {
     throw new Error(`${field}.paragraphs must be contiguous non-empty ranges`)
   }
@@ -195,21 +179,16 @@ function parseRichTextParagraphs(
 ): readonly RichTextParagraph[] {
   let previousEnd = 0
   const paragraphs = values.map((value, index) => {
-    const paragraph = parseRichTextParagraph(
-      value,
-      index,
-      values.length,
-      field,
-      text,
-      previousEnd,
-    )
+    const paragraph = parseRichTextParagraph(value, index, values.length, field, text, previousEnd)
     previousEnd = paragraph.end
     return paragraph
   })
   if (
-    (text.length === 0 && paragraphs.length !== 0) ||
-    (text.length > 0 &&
-      (paragraphs.length === 0 || previousEnd !== text.length))
+    (text.length === 0 &&
+      paragraphs.length !== 0) ||
+      (text.length > 0 &&
+        (paragraphs.length === 0 ||
+          previousEnd !== text.length))
   ) {
     throw new Error(`${field}.paragraphs must cover text exactly`)
   }
@@ -221,11 +200,7 @@ export function parseRichTextContent(
   field: string,
 ): RichTextContent {
   const input = readJsonObject(value, field)
-  assertOnlyFields(
-    input,
-    ['text', 'wrap', 'fixedWidth', 'spans', 'paragraphs'],
-    field,
-  )
+  assertOnlyFields(input, ['text', 'wrap', 'fixedWidth', 'spans', 'paragraphs'], field)
   const text = typeof input.text === 'string' ? input.text : undefined
   if (text === undefined || text.length > MAX_TEXT_UTF16_LENGTH) {
     throw new Error(`${field}.text is invalid`)
@@ -234,9 +209,7 @@ export function parseRichTextContent(
     throw new Error(`${field}.wrap is invalid`)
   }
   const fixedWidth =
-    input.wrap === 'fixedWidth'
-      ? readPositiveNumber(input.fixedWidth, `${field}.fixedWidth`)
-      : undefined
+    input.wrap === 'fixedWidth' ? readPositiveNumber(input.fixedWidth, `${field}.fixedWidth`) : undefined
   if (input.wrap === 'autoSize' && input.fixedWidth !== undefined) {
     throw new Error(`${field}.fixedWidth is only valid for fixedWidth text`)
   }
@@ -265,16 +238,8 @@ export function parseTextBackground(
   assertOnlyFields(input, ['color', 'padding', 'radius'], field)
   return Object.freeze({
     color: parseSrgbColor(input.color, `${field}.color`),
-    padding: parseBoundedNonNegative(
-      input.padding,
-      `${field}.padding`,
-      MAX_TEXT_PADDING,
-    ),
-    radius: parseBoundedNonNegative(
-      input.radius,
-      `${field}.radius`,
-      MAX_IMAGE_RADIUS,
-    ),
+    padding: parseBoundedNonNegative(input.padding, `${field}.padding`, MAX_TEXT_PADDING),
+    radius: parseBoundedNonNegative(input.radius, `${field}.radius`, MAX_IMAGE_RADIUS),
   }) as NonNullable<TextLayerPayload['background']>
 }
 
@@ -286,9 +251,6 @@ export function parseTextPayload(
   assertOnlyFields(input, ['content', 'background'], field)
   return Object.freeze({
     content: parseRichTextContent(input.content, `${field}.content`),
-    background:
-      input.background === null
-        ? null
-        : parseTextBackground(input.background, `${field}.background`),
+    background: input.background === null ? null : parseTextBackground(input.background, `${field}.background`),
   })
 }

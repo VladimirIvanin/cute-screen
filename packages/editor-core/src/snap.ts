@@ -29,9 +29,7 @@ export function snapPoint(
     candidates.map((candidate) => candidate.y),
     threshold,
   )
-  const guides = candidates.filter(
-    (candidate) => candidate.x === x.value || candidate.y === y.value,
-  )
+  const guides = candidates.filter((candidate) => candidate.x === x.value || candidate.y === y.value)
   return Object.freeze({
     x: x.value,
     y: y.value,
@@ -39,7 +37,11 @@ export function snapPoint(
   })
 }
 
-function nearest(value: number, values: readonly number[], threshold: number) {
+function nearest(
+  value: number,
+  values: readonly number[],
+  threshold: number,
+) {
   const candidate = values
     .map((current) => ({ current, distance: Math.abs(current - value) }))
     .filter(({ distance }) => distance <= threshold)

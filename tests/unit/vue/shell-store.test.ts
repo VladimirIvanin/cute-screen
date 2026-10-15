@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 import {
   ActionCancelledError,
@@ -82,8 +86,7 @@ describe('M04 capture action feedback', () => {
       actions: {
         run: async (_action, _signal, report) =>
           new Promise<string>((resolve) => {
-            reportProgress = report as
-              ((state: 'selecting') => void) | undefined
+            reportProgress = report as ((state: 'selecting') => void) | undefined
             complete = resolve
           }),
       },

@@ -1,5 +1,11 @@
-import type { RenderTextNode, RenderTextStyle } from '@cute-screen/editor-core'
-import type { RichTextMeasure, StyledCodePoint } from './contracts'
+import type {
+  RenderTextNode,
+  RenderTextStyle,
+} from '@cute-screen/editor-core'
+import type {
+  RichTextMeasure,
+  StyledCodePoint,
+} from './contracts'
 
 const TEXT_LINE_HEIGHT = 1.25
 const FALLBACK_LINE_ASCENT = 0.8
@@ -17,8 +23,7 @@ export function styledCodePoints(
   for (const text of node.text.slice(start, end)) {
     while (runIndex >= 0 && offset >= node.runs[runIndex]!.end) runIndex += 1
     const style = node.runs[runIndex]
-    if (!style || offset < style.start)
-      throw new RangeError(`No rich-text run covers UTF-16 offset ${offset}`)
+    if (!style || offset < style.start) throw new RangeError(`No rich-text run covers UTF-16 offset ${offset}`)
     const next = offset + text.length
     const measurement = measure(text, style)
     const measured =
@@ -29,12 +34,9 @@ export function styledCodePoints(
             descent: style.fontSize * FALLBACK_LINE_DESCENT,
           }
         : measurement
-    const lineAscent =
-      measured.lineAscent ?? style.fontSize * FALLBACK_LINE_ASCENT
-    const lineDescent =
-      measured.lineDescent ?? style.fontSize * FALLBACK_LINE_DESCENT
-    const halfLeading =
-      (style.fontSize * TEXT_LINE_HEIGHT - lineAscent - lineDescent) / 2
+    const lineAscent = measured.lineAscent ?? style.fontSize * FALLBACK_LINE_ASCENT
+    const lineDescent = measured.lineDescent ?? style.fontSize * FALLBACK_LINE_DESCENT
+    const halfLeading = (style.fontSize * TEXT_LINE_HEIGHT - lineAscent - lineDescent) / 2
     glyphs.push({
       text,
       start: offset,
@@ -56,17 +58,13 @@ export function glyphWidth(glyphs: readonly StyledCodePoint[]): number {
   return glyphs.reduce((total, glyph) => total + glyph.width, 0)
 }
 
-export function trimTrailingWhitespace(
-  glyphs: readonly StyledCodePoint[],
-): readonly StyledCodePoint[] {
+export function trimTrailingWhitespace(glyphs: readonly StyledCodePoint[]): readonly StyledCodePoint[] {
   let end = glyphs.length
   while (end > 0 && glyphs[end - 1]!.whitespace) end -= 1
   return glyphs.slice(0, end)
 }
 
-export function trimLeadingWhitespace(
-  glyphs: readonly StyledCodePoint[],
-): readonly StyledCodePoint[] {
+export function trimLeadingWhitespace(glyphs: readonly StyledCodePoint[]): readonly StyledCodePoint[] {
   let start = 0
   while (start < glyphs.length && glyphs[start]!.whitespace) start += 1
   return glyphs.slice(start)
@@ -132,8 +130,11 @@ export function wrapParagraph(
       pendingWidth += glyph.width
     }
   }
-  if (pending.length > 0 || (lines.length === 0 && !endedWithNewline))
-    commit(pending)
+  if (
+    pending.length > 0 ||
+    (lines.length === 0 &&
+      !endedWithNewline)
+  ) commit(pending)
   return lines
 }
 

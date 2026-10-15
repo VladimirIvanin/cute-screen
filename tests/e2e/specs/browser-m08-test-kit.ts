@@ -1,4 +1,9 @@
-import { $, browser, expect } from '@wdio/globals'
+import {
+  $,
+  browser,
+  expect,
+} from '@wdio/globals'
+import { waitForStableCanvas } from '../canvas-ready'
 
 export type M08Layer = {
   readonly id: string
@@ -28,14 +33,8 @@ export function transformedLayerPoint(
   const cosine = Math.cos(radians)
   const sine = Math.sin(radians)
   return {
-    x:
-      point.x * layer.transform.scaleX * cosine -
-      point.y * layer.transform.scaleY * sine +
-      layer.transform.translateX,
-    y:
-      point.x * layer.transform.scaleX * sine +
-      point.y * layer.transform.scaleY * cosine +
-      layer.transform.translateY,
+    x: point.x * layer.transform.scaleX * cosine - point.y * layer.transform.scaleY * sine + layer.transform.translateX,
+    y: point.x * layer.transform.scaleX * sine + point.y * layer.transform.scaleY * cosine + layer.transform.translateY,
   }
 }
 
@@ -101,9 +100,7 @@ export async function m08VersionToken(): Promise<number> {
 
 export async function recentColourHex(): Promise<string | undefined> {
   return browser.execute(() => {
-    const raw = window.localStorage.getItem(
-      'cute-screen.drawing-tool-preferences.v1',
-    )
+    const raw = window.localStorage.getItem('cute-screen.drawing-tool-preferences.v1')
     if (!raw) return undefined
     const recent = (
       JSON.parse(raw) as {
@@ -119,8 +116,7 @@ export async function recentColourHex(): Promise<string | undefined> {
       .map((channel) =>
         Math.round(channel * 255)
           .toString(16)
-          .padStart(2, '0'),
-      )
+          .padStart(2, '0'))
       .join('')
       .toUpperCase()}`
   })
@@ -150,68 +146,56 @@ export async function openM08(
 export async function setLocale(locale: 'en' | 'ru'): Promise<void> {
   const current = await browser.execute(() => document.documentElement.lang)
   if (current === locale) return
-  await $(
-    `button[aria-label="${current === 'ru' ? 'Другие действия' : 'More actions'}"]`,
-  ).click()
+  await $(`button[aria-label="${current === 'ru' ? 'Другие действия' : 'More actions'}"]`).click()
   await $(`button=${locale === 'ru' ? 'RU' : 'EN'}`).click()
-  await browser.waitUntil(
-    async () =>
-      (await browser.execute(() => document.documentElement.lang)) === locale,
-  )
+  await browser.waitUntil(async () => (await browser.execute(() => document.documentElement.lang)) === locale)
 }
 
 export async function chooseOption(
   label: string,
   option: string,
 ): Promise<void> {
+  const targetControl = $(`[role="combobox"][aria-label="${label}"]`)
+  if (!(await targetControl.isExisting())) {
+    const more = $('button=More')
+    if (await more.isExisting()) await more.click()
+  }
   await browser.execute((name) => {
-    const target = [
-      ...document.querySelectorAll<HTMLElement>('[role="combobox"]'),
-    ].find((element) => element.getAttribute('aria-label') === name)
+    const target = [...document.querySelectorAll<HTMLElement>('[role="combobox"]')].find(
+      (element) => element.getAttribute('aria-label') === name,
+    )
     if (!target) throw new Error(`Missing combobox: ${name}`)
     target.click()
   }, label)
   await browser.waitUntil(() =>
     browser.execute(
       (name) =>
-        [
-          ...document.querySelectorAll<HTMLElement>(
-            '.cs-overlay-root [role="option"]',
-          ),
-        ].some((element) => element.textContent?.trim() === name),
+        [...document.querySelectorAll<HTMLElement>('.cs-overlay-root [role="option"]')].some(
+          (element) => element.textContent?.trim() === name,
+        ),
       option,
-    ),
-  )
+    ))
   await browser.execute((name) => {
-    const target = [
-      ...document.querySelectorAll<HTMLElement>(
-        '.cs-overlay-root [role="option"]',
-      ),
-    ].find((element) => element.textContent?.trim() === name)
+    const target = [...document.querySelectorAll<HTMLElement>('.cs-overlay-root [role="option"]')].find(
+      (element) => element.textContent?.trim() === name,
+    )
     if (!target) throw new Error(`Missing option: ${name}`)
     target.click()
   }, option)
+  if (label === 'Preset') await $('.cs-canvas:not(.cs-canvas-overlay)').click()
 }
 
 export async function canvasPoint(
   x: number,
   y: number,
-): Promise<
-  Readonly<{ x: number; y: number; canvasX: number; canvasY: number }>
-> {
+): Promise<Readonly<{ x: number; y: number; canvasX: number; canvasY: number }>> {
   return browser.execute(
     ({ canvasX, canvasY }) => {
-      const scene = document.querySelector<HTMLCanvasElement>(
-        '.cs-canvas:not(.cs-canvas-overlay)',
-      )
+      const scene = document.querySelector<HTMLCanvasElement>('.cs-canvas:not(.cs-canvas-overlay)')
       if (!scene) throw new Error('Scene canvas is missing')
       const bounds = scene.getBoundingClientRect()
-      const clientX = Math.round(
-        bounds.left + (canvasX / scene.width) * bounds.width,
-      )
-      const clientY = Math.round(
-        bounds.top + (canvasY / scene.height) * bounds.height,
-      )
+      const clientX = Math.round(bounds.left + (canvasX / scene.width) * bounds.width)
+      const clientY = Math.round(bounds.top + (canvasY / scene.height) * bounds.height)
       return {
         x: clientX,
         y: clientY,
@@ -233,6 +217,7 @@ export async function dragCanvas(
     end: Readonly<{ canvasX: number; canvasY: number }>
   }>
 > {
+  await waitForStableCanvas()
   const from = await canvasPoint(start.x, start.y)
   const to = await canvasPoint(end.x, end.y)
   await browser
@@ -258,9 +243,7 @@ export async function overlayStats(): Promise<{
   readonly maxWarmColumn: number
 }> {
   return browser.execute(() => {
-    const overlay = document.querySelector<HTMLCanvasElement>(
-      '.cs-canvas-overlay[aria-label="Interaction overlay"]',
-    )
+    const overlay = document.querySelector<HTMLCanvasElement>('.cs-canvas-overlay[aria-label="Interaction overlay"]')
     if (!overlay) throw new Error('Interaction overlay is missing')
     const context = overlay.getContext('2d')
     if (!context) throw new Error('Interaction overlay context is missing')
@@ -280,8 +263,18 @@ export async function overlayStats(): Promise<{
         const green = data[offset + 1] ?? 0
         const blue = data[offset + 2] ?? 0
         const alpha = data[offset + 3] ?? 0
-        if (alpha > 80 && red < 80 && green < 90 && blue < 110) dimPixels += 1
-        if (alpha > 20 && red > 225 && green > 225 && blue > 225) {
+        if (
+          alpha > 80 &&
+          red < 80 &&
+          green < 90 &&
+          blue < 110
+        ) dimPixels += 1
+        if (
+          alpha > 20 &&
+          red > 225 &&
+          green > 225 &&
+          blue > 225
+        ) {
           whitePixels += 1
           minX = Math.min(minX, x)
           maxX = Math.max(maxX, x)
@@ -312,9 +305,7 @@ export async function overlayStats(): Promise<{
 
 export async function overlayImage(): Promise<string> {
   return browser.execute(() => {
-    const overlay = document.querySelector<HTMLCanvasElement>(
-      '.cs-canvas-overlay[aria-label="Interaction overlay"]',
-    )
+    const overlay = document.querySelector<HTMLCanvasElement>('.cs-canvas-overlay[aria-label="Interaction overlay"]')
     if (!overlay) throw new Error('Interaction overlay is missing')
     return overlay.toDataURL()
   })
@@ -322,27 +313,20 @@ export async function overlayImage(): Promise<string> {
 
 export async function overlayAlphaBounds(): Promise<
   | Readonly<{
-      minX: number
-      minY: number
-      maxX: number
-      maxY: number
-      width: number
-      height: number
-    }>
+    minX: number
+    minY: number
+    maxX: number
+    maxY: number
+    width: number
+    height: number
+  }>
   | undefined
 > {
   return browser.execute(() => {
-    const overlay = document.querySelector<HTMLCanvasElement>(
-      '.cs-canvas-overlay[aria-label="Interaction overlay"]',
-    )
+    const overlay = document.querySelector<HTMLCanvasElement>('.cs-canvas-overlay[aria-label="Interaction overlay"]')
     const context = overlay?.getContext('2d')
     if (!overlay || !context) throw new Error('Interaction overlay is missing')
-    const pixels = context.getImageData(
-      0,
-      0,
-      overlay.width,
-      overlay.height,
-    ).data
+    const pixels = context.getImageData(0, 0, overlay.width, overlay.height).data
     let minX = overlay.width
     let minY = overlay.height
     let maxX = -1
@@ -384,12 +368,9 @@ export async function clickSliderProgress(
   await expect(slider).toExist()
   const geometry = await browser.execute(
     (accessibleLabel, nextProgress) => {
-      const handle = document.querySelector<HTMLElement>(
-        `[role="slider"][aria-label="${accessibleLabel}"]`,
-      )
+      const handle = document.querySelector<HTMLElement>(`[role="slider"][aria-label="${accessibleLabel}"]`)
       const rail = handle?.closest<HTMLElement>('.n-slider')
-      if (!handle || !rail)
-        throw new Error(`Slider ${accessibleLabel} is missing`)
+      if (!handle || !rail) throw new Error(`Slider ${accessibleLabel} is missing`)
       const handleBounds = handle.getBoundingClientRect()
       const railBounds = rail.getBoundingClientRect()
       return {
@@ -438,9 +419,7 @@ export async function drawPrecisionTool(
   if ((await m08Snapshot()).document.layers.length === before) {
     await dragCanvas(start, end, `m08-${kind}-retry`)
   }
-  await browser.waitUntil(
-    async () => (await m08Snapshot()).document.layers.length === before + 1,
-  )
+  await browser.waitUntil(async () => (await m08Snapshot()).document.layers.length === before + 1)
   expect((await m08Snapshot()).document.layers.at(-1)?.kind).toBe(kind)
-  await expect(tool).toHaveAttribute('aria-pressed', 'true')
+  await expect(tool).toHaveAttribute('aria-pressed', 'false')
 }

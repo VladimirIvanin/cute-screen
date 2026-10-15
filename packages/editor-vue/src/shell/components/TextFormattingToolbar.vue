@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import {
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+} from 'vue'
 import { UiIcon } from '../icon'
 import type { ContextToolbarSchema } from '../types'
 
@@ -83,7 +88,10 @@ function textLabel(
   return labels[key]
 }
 
-function textValue<T>(value: T | null, fallback: T): T {
+function textValue<T>(
+  value: T | null,
+  fallback: T,
+): T {
   return value ?? fallback
 }
 
@@ -91,7 +99,10 @@ function textMixed(value: unknown): boolean {
   return value === null
 }
 
-function textToggle(id: string, value: boolean | null): void {
+function textToggle(
+  id: string,
+  value: boolean | null,
+): void {
   emit('change', id, String(!textValue(value, false)))
 }
 
@@ -106,7 +117,11 @@ function closeTextSize(): void {
 }
 
 function applyTextSize(value = Number(textSizeDraft.value)): void {
-  if (!Number.isInteger(value) || value < 8 || value > 256) return
+  if (
+    !Number.isInteger(value) ||
+    value < 8 ||
+    value > 256
+  ) return
   emit('change', 'textFontSize', String(value))
   closeTextSize()
 }
@@ -125,11 +140,7 @@ function validTextBackground(value: typeof textBackgroundDraft.value): boolean {
 }
 
 function chooseOverflowList(): void {
-  emit(
-    'change',
-    'textList',
-    props.text.listKind === 'bullet' ? 'none' : 'bullet',
-  )
+  emit('change', 'textList', props.text.listKind === 'bullet' ? 'none' : 'bullet')
   closeTextOverflow()
 }
 
@@ -146,9 +157,7 @@ function openOverflowBackground(): void {
 function openTextBackground(returnTrigger = textBackgroundTrigger.value): void {
   textBackgroundReturnTrigger.value = returnTrigger
   const current = props.text.background
-  textBackgroundDraft.value = current
-    ? { ...current }
-    : { color: '#fff2a8', padding: 0, radius: 0 }
+  textBackgroundDraft.value = current ? { ...current } : { color: '#fff2a8', padding: 0, radius: 0 }
   textBackgroundOpen.value = true
 }
 
@@ -177,9 +186,7 @@ function closeOpenTextPopover(event: KeyboardEvent): void {
   event.stopPropagation()
 }
 
-function commitTextBackground(
-  value: typeof textBackgroundDraft.value | null,
-): void {
+function commitTextBackground(value: typeof textBackgroundDraft.value | null): void {
   if (value && !validTextBackground(value)) return
   emit('change', 'textBackground', JSON.stringify(value))
   closeTextBackground()
@@ -211,12 +218,8 @@ function closeOnOutsidePointer(event: PointerEvent): void {
   }
 }
 
-onMounted(() =>
-  document.addEventListener('pointerdown', closeOnOutsidePointer, true),
-)
-onBeforeUnmount(() =>
-  document.removeEventListener('pointerdown', closeOnOutsidePointer, true),
-)
+onMounted(() => document.addEventListener('pointerdown', closeOnOutsidePointer, true))
+onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOnOutsidePointer, true))
 </script>
 
 <template>
@@ -233,27 +236,26 @@ onBeforeUnmount(() =>
         type="color"
         :value="text.color ?? '#000000'"
         :aria-label="`${textLabel('color')}${textMixed(text.color) ? `: ${textLabel('mixed')}` : ''}`"
-        @change="
-          emit('change', 'textColor', ($event.target as HTMLInputElement).value)
-        "
+        @change="emit('change', 'textColor', ($event.target as HTMLInputElement).value)"
       />
     </label>
     <select
       data-text-control="font"
       :value="text.fontFamily ?? ''"
       :aria-label="`${textLabel('font')}${textMixed(text.fontFamily) ? `: ${textLabel('mixed')}` : ''}`"
-      @change="
-        emit('change', 'textFont', ($event.target as HTMLSelectElement).value)
-      "
+      @change="emit('change', 'textFont', ($event.target as HTMLSelectElement).value)"
     >
-      <option value="" disabled>{{ textLabel('mixed') }}</option>
-      <option
-        v-if="text.fontFamily && !text.fonts.includes(text.fontFamily)"
-        :value="text.fontFamily"
-      >
+      <option value="" disabled>
+        {{ textLabel('mixed') }}
+      </option>
+      <option v-if="text.fontFamily && !text.fonts.includes(text.fontFamily)" :value="text.fontFamily">
         {{ text.fontFamily }}
       </option>
-      <option v-for="font in text.fonts" :key="font" :value="font">
+      <option
+        v-for="font in text.fonts"
+        :key="font"
+        :value="font"
+      >
         {{ font }}
       </option>
     </select>
@@ -284,22 +286,17 @@ onBeforeUnmount(() =>
       >
         {{ size }}
       </button>
-      <label
-        >{{ textLabel('size') }}
+      <label>{{ textLabel('size') }}
         <input
           v-model="textSizeDraft"
           type="number"
           min="8"
           max="256"
           :aria-label="textLabel('size') + ' value'"
-      /></label>
+        /></label>
       <button
         type="button"
-        :disabled="
-          !Number.isInteger(Number(textSizeDraft)) ||
-          Number(textSizeDraft) < 8 ||
-          Number(textSizeDraft) > 256
-        "
+        :disabled="!Number.isInteger(Number(textSizeDraft)) || Number(textSizeDraft) < 8 || Number(textSizeDraft) > 256"
         @click="applyTextSize()"
       >
         {{ textLabel('apply') }}
@@ -330,9 +327,7 @@ onBeforeUnmount(() =>
       data-text-control="strikethrough"
       type="button"
       :aria-label="`${textLabel('strike')}${textMixed(text.strikethrough) ? `: ${textLabel('mixed')}` : ''}`"
-      :aria-pressed="
-        textMixed(text.strikethrough) ? 'mixed' : (text.strikethrough ?? false)
-      "
+      :aria-pressed="textMixed(text.strikethrough) ? 'mixed' : (text.strikethrough ?? false)"
       @click="textToggle('textStrikethrough', text.strikethrough)"
     >
       <s>S</s>
@@ -342,23 +337,27 @@ onBeforeUnmount(() =>
       class="cs-text-overflowable"
       type="button"
       :aria-label="textLabel('list')"
-      :aria-pressed="
-        textMixed(text.listKind) ? 'mixed' : text.listKind === 'bullet'
-      "
+      :aria-pressed="textMixed(text.listKind) ? 'mixed' : text.listKind === 'bullet'"
       :disabled="text.disabled.includes('list')"
       :title="text.disabled.includes('list') ? text.disabledReason : undefined"
-      @click="
-        emit(
-          'change',
-          'textList',
-          text.listKind === 'bullet' ? 'none' : 'bullet',
-        )
-      "
+      @click="emit('change', 'textList', text.listKind === 'bullet' ? 'none' : 'bullet')"
     >
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="5" cy="6" r="1.5" />
-        <circle cx="5" cy="12" r="1.5" />
-        <circle cx="5" cy="18" r="1.5" />
+        <circle
+          cx="5"
+          cy="6"
+          r="1.5"
+        />
+        <circle
+          cx="5"
+          cy="12"
+          r="1.5"
+        />
+        <circle
+          cx="5"
+          cy="18"
+          r="1.5"
+        />
         <path d="M10 6h9M10 12h9M10 18h9" />
       </svg>
     </button>
@@ -367,11 +366,11 @@ onBeforeUnmount(() =>
       class="cs-text-overflowable"
       :aria-label="textLabel('alignment')"
       :value="text.alignment ?? ''"
-      @change="
-        emit('change', 'textAlign', ($event.target as HTMLSelectElement).value)
-      "
+      @change="emit('change', 'textAlign', ($event.target as HTMLSelectElement).value)"
     >
-      <option value="" disabled>{{ textLabel('mixed') }}</option>
+      <option value="" disabled>
+        {{ textLabel('mixed') }}
+      </option>
       <option value="start">Start</option>
       <option value="center">Center</option>
       <option value="end">End</option>
@@ -387,7 +386,13 @@ onBeforeUnmount(() =>
       @click="openDirectTextBackground"
     >
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <rect x="4" y="4" width="16" height="16" rx="3" />
+        <rect
+          x="4"
+          y="4"
+          width="16"
+          height="16"
+          rx="3"
+        />
         <path d="M8 8h8v8H8z" />
       </svg>
     </button>
@@ -402,44 +407,35 @@ onBeforeUnmount(() =>
       <button
         type="button"
         :disabled="text.disabled.includes('none')"
-        :title="
-          text.disabled.includes('none') ? text.disabledReason : undefined
-        "
+        :title="text.disabled.includes('none') ? text.disabledReason : undefined"
         @click="commitTextBackground(null)"
       >
         {{ textLabel('none') }}
       </button>
-      <label
-        >{{ textLabel('color') }}
+      <label>{{ textLabel('color') }}
         <input
           v-model="textBackgroundDraft.color"
           type="color"
           :aria-label="textLabel('background') + ' ' + textLabel('color')"
-      /></label>
-      <label
-        >{{ textLabel('padding') }}
+        /></label>
+      <label>{{ textLabel('padding') }}
         <input
           v-model.number="textBackgroundDraft.padding"
           type="number"
           min="0"
           max="256"
           :disabled="text.disabled.includes('padding')"
-          :title="
-            text.disabled.includes('padding') ? text.disabledReason : undefined
-          "
-      /></label>
-      <label
-        >{{ textLabel('radius') }}
+          :title="text.disabled.includes('padding') ? text.disabledReason : undefined"
+        /></label>
+      <label>{{ textLabel('radius') }}
         <input
           v-model.number="textBackgroundDraft.radius"
           type="number"
           min="0"
           max="256"
           :disabled="text.disabled.includes('radius')"
-          :title="
-            text.disabled.includes('radius') ? text.disabledReason : undefined
-          "
-      /></label>
+          :title="text.disabled.includes('radius') ? text.disabledReason : undefined"
+        /></label>
       <button
         type="button"
         :disabled="!validTextBackground(textBackgroundDraft)"
@@ -455,11 +451,7 @@ onBeforeUnmount(() =>
       ref="textOverflowTrigger"
       class="cs-text-overflow-trigger"
       type="button"
-      :aria-label="
-        pickerLocale === 'ru'
-          ? 'Дополнительные настройки текста'
-          : 'More text settings'
-      "
+      :aria-label="pickerLocale === 'ru' ? 'Дополнительные настройки текста' : 'More text settings'"
       :aria-expanded="textOverflowOpen"
       aria-haspopup="dialog"
       @click="textOverflowOpen = !textOverflowOpen"
@@ -471,23 +463,15 @@ onBeforeUnmount(() =>
       ref="textOverflowRoot"
       class="cs-text-overflow-popover"
       role="dialog"
-      :aria-label="
-        pickerLocale === 'ru'
-          ? 'Дополнительные настройки текста'
-          : 'More text settings'
-      "
+      :aria-label="pickerLocale === 'ru' ? 'Дополнительные настройки текста' : 'More text settings'"
       @keydown.escape.prevent.stop="closeTextOverflow"
     >
       <button
         type="button"
         :aria-label="textLabel('list')"
-        :aria-pressed="
-          textMixed(text.listKind) ? 'mixed' : text.listKind === 'bullet'
-        "
+        :aria-pressed="textMixed(text.listKind) ? 'mixed' : text.listKind === 'bullet'"
         :disabled="text.disabled.includes('list')"
-        :title="
-          text.disabled.includes('list') ? text.disabledReason : undefined
-        "
+        :title="text.disabled.includes('list') ? text.disabledReason : undefined"
         @click="chooseOverflowList"
       >
         {{ textLabel('list') }}
@@ -497,7 +481,9 @@ onBeforeUnmount(() =>
         :value="text.alignment ?? ''"
         @change="chooseOverflowAlign"
       >
-        <option value="" disabled>{{ textLabel('mixed') }}</option>
+        <option value="" disabled>
+          {{ textLabel('mixed') }}
+        </option>
         <option value="start">Start</option>
         <option value="center">Center</option>
         <option value="end">End</option>

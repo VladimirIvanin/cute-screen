@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 import { createRenderSceneSnapshot } from '@cute-screen/editor-core'
 import {
   canvas2dPng,
@@ -30,12 +34,8 @@ describe('M08 Canvas2D precision renderer/export', () => {
       background: { red: 0.08, green: 0.07, blue: 0.09, alpha: 0.94 },
       text: { red: 1, green: 1, blue: 1, alpha: 1 },
     })
-    expect(rulerBadgeRotationDegrees({ x1: 0, y1: 0, x2: -10, y2: 1 })).toBe(
-      -5.710593137499643,
-    )
-    expect(rulerBadgeRotationDegrees({ x1: 0, y1: 0, x2: -10, y2: -1 })).toBe(
-      5.710593137499643,
-    )
+    expect(rulerBadgeRotationDegrees({ x1: 0, y1: 0, x2: -10, y2: 1 })).toBe(-5.710593137499643)
+    expect(rulerBadgeRotationDegrees({ x1: 0, y1: 0, x2: -10, y2: -1 })).toBe(5.710593137499643)
 
     const rotated = {
       x1: 20,
@@ -73,10 +73,7 @@ describe('M08 Canvas2D precision renderer/export', () => {
       start: { x: 20, y: 40 },
       end: { x: 80, y: 20 },
     })
-    expect(rulerBadgeRotationDegrees(verticallyReflected)).toBeCloseTo(
-      -18.4349488229,
-      10,
-    )
+    expect(rulerBadgeRotationDegrees(verticallyReflected)).toBeCloseTo(-18.4349488229, 10)
   })
 
   it('crops and scales decoded export pixels without mutating scene coordinates', async () => {
@@ -84,10 +81,7 @@ describe('M08 Canvas2D precision renderer/export', () => {
       width: 32,
       height: 24,
       outputBounds: { x: 8, y: 4, width: 16, height: 12 },
-      nodes: [
-        rect('outside', 0, 0, 32, 24, [0, 0, 1, 1]),
-        rect('inside', 8, 4, 8, 12, [1, 0, 0, 1]),
-      ],
+      nodes: [rect('outside', 0, 0, 32, 24, [0, 0, 1, 1]), rect('inside', 8, 4, 8, 12, [1, 0, 0, 1])],
     })
     const before = JSON.stringify(scene)
     const decoded = await decodedPixels(await canvas2dPng(scene, { scale: 2 }))
@@ -111,12 +105,8 @@ describe('M08 Canvas2D precision renderer/export', () => {
       outputBounds: { x: 11, y: 3, width: 18, height: 16 },
       nodes: full.nodes,
     })
-    const fullPixels = await decodedPixels(
-      await canvas2dPng(full, { scale: 2 }),
-    )
-    const cropPixels = await decodedPixels(
-      await canvas2dPng(cropped, { scale: 2 }),
-    )
+    const fullPixels = await decodedPixels(await canvas2dPng(full, { scale: 2 }))
+    const cropPixels = await decodedPixels(await canvas2dPng(cropped, { scale: 2 }))
 
     expect([cropPixels.width, cropPixels.height]).toEqual([36, 32])
     for (const point of [
@@ -124,10 +114,7 @@ describe('M08 Canvas2D precision renderer/export', () => {
       { x: 9, y: 8 },
       { x: 30, y: 20 },
     ]) {
-      expectPixelClose(
-        pixel(cropPixels, point.x, point.y),
-        pixel(fullPixels, point.x + 22, point.y + 6),
-      )
+      expectPixelClose(pixel(cropPixels, point.x, point.y), pixel(fullPixels, point.x + 22, point.y + 6))
     }
   })
 
@@ -158,9 +145,7 @@ describe('M08 Canvas2D precision renderer/export', () => {
   })
 
   it('blurs only the lower composite with a stable toleranced transition', async () => {
-    const decoded = await decodedPixels(
-      await canvas2dPng(censorScene({ mode: 'blur', strength: 4 })),
-    )
+    const decoded = await decodedPixels(await canvas2dPng(censorScene({ mode: 'blur', strength: 4 })))
     const transition = pixel(decoded, 20, 6)
 
     expect(transition[0]).toBeGreaterThan(40)
@@ -229,11 +214,8 @@ describe('M08 Canvas2D precision renderer/export', () => {
   it.each([1, 2] as const)(
     'renders a pink horizontal ruler with perpendicular ticks, no endpoint dots and an overlapping badge at scale %i',
     async (scale) => {
-      const decoded = await decodedPixels(
-        await canvas2dPng(horizontalRulerScene(), { scale }),
-      )
-      const at = (x: number, y: number) =>
-        pixel(decoded, Math.round(x * scale), Math.round(y * scale))
+      const decoded = await decodedPixels(await canvas2dPng(horizontalRulerScene(), { scale }))
+      const at = (x: number, y: number) => pixel(decoded, Math.round(x * scale), Math.round(y * scale))
 
       expectPixelClose(at(20, 30), [227, 72, 143, 255], 2)
       expectPixelClose(at(12, 25), [227, 72, 143, 255], 8)
@@ -246,64 +228,37 @@ describe('M08 Canvas2D precision renderer/export', () => {
     ['rotation 180°', { rotation: 180 }],
     ['horizontal reflection', { scaleX: -1 }],
     ['vertical reflection', { scaleY: -1 }],
-  ] as const)(
-    'keeps the ruler badge pixels world-upright after %s',
-    async (_label, transform) => {
-      const baseline = await decodedPixels(
-        await canvas2dPng(horizontalRulerScene()),
-      )
-      const transformed = await decodedPixels(
-        await canvas2dPng(transformedHorizontalRulerScene(transform)),
-      )
-      expect(Array.from(transformed.data)).toEqual(Array.from(baseline.data))
-    },
-  )
+  ] as const)('keeps the ruler badge pixels world-upright after %s', async (_label, transform) => {
+    const baseline = await decodedPixels(await canvas2dPng(horizontalRulerScene()))
+    const transformed = await decodedPixels(await canvas2dPng(transformedHorizontalRulerScene(transform)))
+    expect(Array.from(transformed.data)).toEqual(Array.from(baseline.data))
+  })
 
   it.each([
     ['circle', 1],
     ['circle', 2],
     ['rectangle', 1],
     ['rectangle', 2],
-  ] as const)(
-    'clears old destination pixels for a partially outside %s loupe at scale %i',
-    async (shape, scale) => {
-      const decoded = await decodedPixels(
-        await canvas2dPng(outsideLoupeScene(shape), { scale }),
-      )
-      expectPixelClose(pixel(decoded, 32 * scale, 20 * scale), [0, 0, 0, 0])
-      expectPixelClose(
-        pixel(decoded, 52 * scale, 20 * scale),
-        [255, 0, 0, 255],
-        2,
-      )
-      if (scale === 1) {
-        const preview = await decodedPixels(
-          await canvas2dPng(outsideLoupeScene(shape), { preview: true }),
-        )
-        expectPixelClose(pixel(preview, 32, 20), [0, 0, 0, 0])
-        expectPixelClose(pixel(preview, 52, 20), [255, 0, 0, 255], 2)
-      }
-    },
-  )
+  ] as const)('clears old destination pixels for a partially outside %s loupe at scale %i', async (shape, scale) => {
+    const decoded = await decodedPixels(await canvas2dPng(outsideLoupeScene(shape), { scale }))
+    expectPixelClose(pixel(decoded, 32 * scale, 20 * scale), [0, 0, 0, 0])
+    expectPixelClose(pixel(decoded, 52 * scale, 20 * scale), [255, 0, 0, 255], 2)
+    if (scale === 1) {
+      const preview = await decodedPixels(await canvas2dPng(outsideLoupeScene(shape), { preview: true }))
+      expectPixelClose(pixel(preview, 32, 20), [0, 0, 0, 0])
+      expectPixelClose(pixel(preview, 52, 20), [255, 0, 0, 255], 2)
+    }
+  })
 
   it.each([
     ['circle', 1],
     ['circle', 2],
     ['rectangle', 1],
     ['rectangle', 2],
-  ] as const)(
-    'renders a %s loupe callout connector at export scale %i',
-    async (shape, scale) => {
-      const decoded = await decodedPixels(
-        await canvas2dPng(calloutLoupeScene(shape), { scale }),
-      )
-      expectPixelClose(
-        pixel(decoded, 40 * scale, 30 * scale),
-        [255, 255, 255, 255],
-        3,
-      )
-    },
-  )
+  ] as const)('renders a %s loupe callout connector at export scale %i', async (shape, scale) => {
+    const decoded = await decodedPixels(await canvas2dPng(calloutLoupeScene(shape), { scale }))
+    expectPixelClose(pixel(decoded, 40 * scale, 30 * scale), [255, 255, 255, 255], 3)
+  })
 
   it('samples loupe below only, clips the lens, and excludes overlay from export', async () => {
     const scene = createRenderSceneSnapshot({

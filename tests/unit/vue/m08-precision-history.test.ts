@@ -1,6 +1,21 @@
-import { fireEvent, render, screen, within } from '@testing-library/vue'
-import { markRaw, nextTick } from 'vue'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/vue'
+import {
+  markRaw,
+  nextTick,
+} from 'vue'
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 import {
   hitTestDocument,
   rulerVisualBoundsAreConservative,
@@ -25,9 +40,7 @@ import {
 beforeEach(() => {
   window.localStorage.clear()
   contextFixture.current = canvasContext()
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
-    contextFixture.current,
-  )
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(contextFixture.current)
 })
 
 afterEach(() => {
@@ -74,19 +87,15 @@ describe('M08 shell lifecycle and contextual settings', () => {
       clientY: 54,
     })
 
-    expect(censorTool).toHaveAttribute('aria-pressed', 'true')
+    expect(censorTool).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Select' })).toHaveAttribute('aria-pressed', 'true')
     expect(session.snapshot.core.document.layers[0]).toMatchObject({
       kind: 'censor',
       payload: { effect: { mode: 'pixelate' } },
     })
     await selectLayerFromPanel(view, { activateSelect: false })
-    const layerButton = view.container.querySelector(
-      '.cs-layer-select',
-    ) as HTMLButtonElement
-    expect(layerButton.closest('.cs-layer-row')).toHaveAttribute(
-      'aria-selected',
-      'true',
-    )
+    const layerButton = view.container.querySelector('.cs-layer-select') as HTMLButtonElement
+    expect(layerButton.closest('.cs-layer-row')).toHaveAttribute('aria-selected', 'true')
     await fireEvent.click(screen.getByRole('combobox', { name: 'Effect' }))
     await fireEvent.click(await screen.findByRole('option', { name: 'Blur' }))
 
@@ -94,7 +103,8 @@ describe('M08 shell lifecycle and contextual settings', () => {
       kind: 'censor',
       payload: { effect: { mode: 'blur', strength: 12 } },
     })
-    expect(censorTool).toHaveAttribute('aria-pressed', 'true')
+    expect(censorTool).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Select' })).toHaveAttribute('aria-pressed', 'true')
     session.undo()
     expect(session.snapshot.core.document.layers[0]).toMatchObject({
       kind: 'censor',
@@ -243,9 +253,7 @@ describe('M08 shell lifecycle and contextual settings', () => {
       color: ruler.payload.color,
       unit: ruler.payload.unit,
     })
-    expect(rulerVisualBoundsAreConservative(after, beforeDocument.canvas)).toBe(
-      true,
-    )
+    expect(rulerVisualBoundsAreConservative(after, beforeDocument.canvas)).toBe(true)
     const actualEndpoints = [
       transformedPoint(after.transform, after.payload.start),
       transformedPoint(after.transform, after.payload.end),
@@ -260,9 +268,10 @@ describe('M08 shell lifecycle and contextual settings', () => {
       x: (start.x + end.x) / 2 - ((end.y - start.y) / length) * 8,
       y: (start.y + end.y) / 2 + ((end.x - start.x) / length) * 8,
     }
-    expect(
-      hitTestDocument(session.snapshot.core.document, badgePoint),
-    ).toMatchObject({ nodeId: ruler.id, part: 'fill' })
+    expect(hitTestDocument(session.snapshot.core.document, badgePoint)).toMatchObject({
+      nodeId: ruler.id,
+      part: 'fill',
+    })
 
     session.undo()
     expect(session.snapshot.core.document.layers[0]).toEqual(ruler)
@@ -289,54 +298,33 @@ describe('M08 shell lifecycle and contextual settings', () => {
       props: { documentSession: markRaw(session) },
       global: { plugins: [pinia] },
     })
-    const toolbar = view.container.querySelector(
-      '.cs-context-toolbar',
-    ) as HTMLElement
+    const toolbar = view.container.querySelector('.cs-context-toolbar') as HTMLElement
     const english = [
       ['Hide data', ['Region', 'Effect']],
       ['Spotlight', ['Shape', 'Dim color', 'Dim opacity', 'Feather']],
-      [
-        'Ruler',
-        ['Colour', 'Thickness', 'Label size', 'Unit', 'Snapping', 'Angle step'],
-      ],
-      [
-        'Loupe',
-        ['Zoom', 'Size', 'Shape', 'Border color', 'Border width', 'Shadow'],
-      ],
+      ['Ruler', ['Colour', 'Thickness', 'Label size', 'Unit', 'Snapping', 'Angle step']],
+      ['Loupe', ['Zoom', 'Size', 'Shape', 'Border color', 'Border width', 'Shadow']],
     ] as const
     for (const [tool, labels] of english) {
       await fireEvent.click(screen.getByRole('button', { name: tool }))
+      const more = within(toolbar).queryByRole('button', { name: /More|Ещё/ })
+      if (more) await fireEvent.click(more)
       for (const label of labels) {
         expect(within(toolbar).getByText(label)).toBeInTheDocument()
       }
     }
 
     useEditorShellStore(pinia).setLocale('ru')
-    await fireEvent.click(
-      await screen.findByRole('button', { name: 'Скрыть данные' }),
-    )
+    await fireEvent.click(await screen.findByRole('button', { name: 'Скрыть данные' }))
     expect(within(toolbar).getByText('Область')).toBeInTheDocument()
     expect(within(toolbar).getByText('Эффект')).toBeInTheDocument()
 
-    await fireEvent.click(
-      await screen.findByRole('button', { name: 'Линейка' }),
-    )
-    for (const label of [
-      'Цвет',
-      'Толщина',
-      'Размер подписи',
-      'Единицы',
-      'Привязка',
-      'Шаг угла',
-    ]) {
+    await fireEvent.click(await screen.findByRole('button', { name: 'Линейка' }))
+    for (const label of ['Цвет', 'Толщина', 'Размер подписи', 'Единицы', 'Привязка', 'Шаг угла']) {
       expect(within(toolbar).getByText(label)).toBeInTheDocument()
     }
-    await fireEvent.click(
-      await screen.findByRole('button', { name: 'Показать слои' }),
-    )
-    expect(
-      view.container.querySelector('.cs-layers-panel'),
-    ).not.toHaveTextContent(/Размер подписи|Шаг угла|Привязка/u)
+    await fireEvent.click(await screen.findByRole('button', { name: 'Показать слои' }))
+    expect(view.container.querySelector('.cs-layers-panel')).not.toHaveTextContent(/Размер подписи|Шаг угла|Привязка/u)
 
     session.dispose()
     view.unmount()

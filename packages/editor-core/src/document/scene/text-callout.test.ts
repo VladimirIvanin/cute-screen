@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 import { createDocumentRenderScene } from './index'
 import { documentFixture as document } from './test-kit'
@@ -279,21 +283,14 @@ describe('document render scene: rich text and callouts', () => {
       ],
     })
 
-    expect(scene.nodes.map((node) => node.kind)).toEqual([
-      'path',
-      'ellipse',
-      'ellipse',
-      'text',
-    ])
+    expect(scene.nodes.map((node) => node.kind)).toEqual(['path', 'ellipse', 'ellipse', 'text'])
     expect(scene.nodes[0]).toMatchObject({
       id: expect.stringMatching(/:connector$/u),
     })
     expect(scene.nodes[3]).toMatchObject({
       text: 'Line one\nLine two',
       runs: [expect.objectContaining({ fontFamily: 'Roboto', fontSize: 24 })],
-      paragraphs: [
-        expect.objectContaining({ alignment: 'start', listKind: 'none' }),
-      ],
+      paragraphs: [expect.objectContaining({ alignment: 'start', listKind: 'none' })],
     })
   })
 })

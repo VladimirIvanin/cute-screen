@@ -1,5 +1,11 @@
-import type { ComputedRef, Ref } from 'vue'
-import type { LayerNode, Transform2D } from '@cute-screen/editor-renderer'
+import type {
+  ComputedRef,
+  Ref,
+} from 'vue'
+import type {
+  LayerNode,
+  Transform2D,
+} from '@cute-screen/editor-renderer'
 import type {
   CanvasPoint,
   CanvasViewportProps,
@@ -28,17 +34,11 @@ export interface FloatingToolbarContext {
     readonly width: number
     readonly height: number
   }
-  readonly transformPoint: (
-    transform: Transform2D,
-    point: CanvasPoint,
-  ) => CanvasPoint
+  readonly transformPoint: (transform: Transform2D, point: CanvasPoint) => CanvasPoint
 }
 
 export function isFloatingToolbarTarget(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLElement &&
-    target.closest(FLOATING_TOOLBAR_SELECTOR) !== null
-  )
+  return target instanceof HTMLElement && target.closest(FLOATING_TOOLBAR_SELECTOR) !== null
 }
 
 function canvasSurfaceElement(
@@ -46,8 +46,7 @@ function canvasSurfaceElement(
   host: HTMLElement | undefined,
 ): HTMLElement | undefined {
   if (host?.offsetParent instanceof HTMLElement) return host.offsetParent
-  const surface =
-    context.scrollContainer.value?.querySelector('.cs-canvas-surface')
+  const surface = context.scrollContainer.value?.querySelector('.cs-canvas-surface')
   return surface instanceof HTMLElement ? surface : undefined
 }
 
@@ -139,9 +138,7 @@ function updateTransientArrowLayout(context: FloatingToolbarContext): void {
   toolbarHost.dataset.placement = layout.placement
 }
 
-export function createFloatingToolbarController(
-  context: FloatingToolbarContext,
-) {
+export function createFloatingToolbarController(context: FloatingToolbarContext) {
   return {
     updateFloatingToolbarLayout: () => updateTextLayout(context),
     updateFloatingArrowToolbarLayout: () => {
@@ -151,7 +148,6 @@ export function createFloatingToolbarController(
         context.arrowFloatingToolbar.value,
       )
     },
-    updateTransientArrowToolbarLayout: () =>
-      updateTransientArrowLayout(context),
+    updateTransientArrowToolbarLayout: () => updateTransientArrowLayout(context),
   }
 }

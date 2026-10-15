@@ -18,7 +18,11 @@ import {
   freezeRulerNode,
   freezeSpotlightNode,
 } from './freeze-precision'
-import { assertNodeBase, assertNonNegative, assertPositive } from './validation'
+import {
+  assertNodeBase,
+  assertNonNegative,
+  assertPositive,
+} from './validation'
 
 function assertNever(value: never): never {
   throw new Error(`unsupported render node: ${String(value)}`)
@@ -54,9 +58,7 @@ function freezeNode(node: RenderNode): RenderNode {
   }
 }
 
-export function createRenderSceneSnapshot(
-  input: RenderSceneInput,
-): RenderSceneSnapshot {
+export function createRenderSceneSnapshot(input: RenderSceneInput): RenderSceneSnapshot {
   assertPositive(input.width, 'width')
   assertPositive(input.height, 'height')
   const outputBounds = input.outputBounds ?? {
@@ -69,16 +71,12 @@ export function createRenderSceneSnapshot(
   assertNonNegative(outputBounds.y, 'outputBounds.y')
   assertPositive(outputBounds.width, 'outputBounds.width')
   assertPositive(outputBounds.height, 'outputBounds.height')
-  if (
-    outputBounds.x + outputBounds.width > input.width ||
-    outputBounds.y + outputBounds.height > input.height
-  ) {
+  if (outputBounds.x + outputBounds.width > input.width || outputBounds.y + outputBounds.height > input.height) {
     throw new RangeError('outputBounds must remain inside the scene canvas')
   }
   const ids = new Set<string>()
   const nodes = input.nodes.map((node) => {
-    if (ids.has(node.id))
-      throw new Error(`Duplicate render node id: ${node.id}`)
+    if (ids.has(node.id)) throw new Error(`Duplicate render node id: ${node.id}`)
     ids.add(node.id)
     return freezeNode(node)
   })

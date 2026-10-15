@@ -1,11 +1,20 @@
 import { fireEvent } from '@testing-library/vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 import {
   rebaseArrowLayer,
   type ArrowLayer,
   type EditorDocumentV1,
 } from '@cute-screen/editor-renderer'
-import { document, mountViewport } from './canvas-viewport-test-kit'
+import {
+  document,
+  mountViewport,
+} from './canvas-viewport-test-kit'
 
 beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
@@ -94,11 +103,11 @@ describe('M05 CanvasViewport transforms', () => {
 
     const updates = emitted().documentCommand as unknown as
       | readonly [
-          {
-            readonly type: 'updateLayer'
-            readonly after: EditorDocumentV1['layers'][number]
-          },
-        ][]
+        {
+          readonly type: 'updateLayer'
+          readonly after: EditorDocumentV1['layers'][number]
+        },
+      ][]
       | undefined
     expect(updates).toHaveLength(1)
     const after = updates?.[0]?.[0].after
@@ -171,13 +180,12 @@ describe('M05 CanvasViewport transforms', () => {
     expect(emitted().documentCommand).toBeUndefined()
     await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 60, clientY: 50 })
 
-    const commands = emitted().documentCommand as unknown as
-      readonly [unknown][] | undefined
+    const commands = emitted().documentCommand as unknown as readonly [unknown][] | undefined
     const command = commands?.[0]?.[0] as
       | {
-          readonly type: string
-          readonly after: EditorDocumentV1['layers'][number]
-        }
+        readonly type: string
+        readonly after: EditorDocumentV1['layers'][number]
+      }
       | undefined
     expect(commands).toHaveLength(1)
     expect(command?.type).toBe('updateLayer')
@@ -187,9 +195,7 @@ describe('M05 CanvasViewport transforms', () => {
       readonly elbow: { readonly offset: number }
     }
     expect(
-      command!.after.transform.translateX +
-        (afterPayload.start.x + afterPayload.end.x) / 2 +
-        afterPayload.elbow.offset,
+      command!.after.transform.translateX + (afterPayload.start.x + afterPayload.end.x) / 2 + afterPayload.elbow.offset,
     ).toBe(60)
   })
 
@@ -231,11 +237,7 @@ describe('M05 CanvasViewport transforms', () => {
         },
       ],
     }
-    const { scene, emitted } = mountViewport(
-      undefined,
-      quadraticDocument,
-      'quadratic',
-    )
+    const { scene, emitted } = mountViewport(undefined, quadraticDocument, 'quadratic')
     await fireEvent.pointerDown(scene, {
       pointerId: 1,
       clientX: 20,
@@ -249,8 +251,7 @@ describe('M05 CanvasViewport transforms', () => {
     expect(emitted().documentCommand).toBeUndefined()
     await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 20, clientY: 0 })
 
-    const commands = emitted().documentCommand as unknown as
-      readonly [unknown][] | undefined
+    const commands = emitted().documentCommand as unknown as readonly [unknown][] | undefined
     expect(commands).toHaveLength(1)
     expect(commands?.[0]?.[0]).toMatchObject({
       type: 'updateLayer',
@@ -296,9 +297,7 @@ describe('M05 CanvasViewport transforms', () => {
       stroke: { ...before.payload.stroke, width: 10 },
     })
     const getContext = vi.mocked(HTMLCanvasElement.prototype.getContext)
-    const context = window.document
-      .createElement('canvas')
-      .getContext('2d') as CanvasRenderingContext2D
+    const context = window.document.createElement('canvas').getContext('2d') as CanvasRenderingContext2D
     getContext.mockClear()
     vi.mocked(context.strokeRect).mockClear()
     mountViewport(undefined, { ...document, layers: [after] }, 'wide-cap')

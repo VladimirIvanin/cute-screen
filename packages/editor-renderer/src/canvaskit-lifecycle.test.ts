@@ -1,5 +1,10 @@
 import { createRenderSceneSnapshot } from '@cute-screen/editor-core'
-import { describe, expect, it, vi } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 
 import { CanvasKitRenderer } from './backends/canvaskit/renderer'
 import type { CanvasKitApi } from './backends/canvaskit/contracts'
@@ -17,11 +22,7 @@ describe('CanvasKit renderer lifecycle', () => {
       readonly drawImageRect: ReturnType<typeof vi.fn>
     }[] = []
     let nextContext = 1
-    const makeSurface = (
-      kind: 'webgl' | 'working',
-      width: number,
-      height: number,
-    ) => {
+    const makeSurface = (kind: 'webgl' | 'working', width: number, height: number) => {
       const drawImageRect = vi.fn()
       const canvas = {
         clear: vi.fn(),
@@ -96,15 +97,12 @@ describe('CanvasKit renderer lifecycle', () => {
       Typeface: {
         MakeFreeTypeFaceFromData: () => ({ delete: typefaceDelete }),
       },
-      XYWHRect: (x: number, y: number, width: number, height: number) =>
-        new Float32Array([x, y, width, height]),
+      XYWHRect: (x: number, y: number, width: number, height: number) => new Float32Array([x, y, width, height]),
       RRectXY: (rect: Float32Array) => rect,
       LTRBRect: (left: number, top: number, right: number, bottom: number) =>
         new Float32Array([left, top, right, bottom]),
-      MakeSurface: (width: number, height: number) =>
-        makeSurface('working', width, height),
-      MakeWebGLCanvasSurface: (canvas: HTMLCanvasElement) =>
-        makeSurface('webgl', canvas.width, canvas.height),
+      MakeSurface: (width: number, height: number) => makeSurface('working', width, height),
+      MakeWebGLCanvasSurface: (canvas: HTMLCanvasElement) => makeSurface('webgl', canvas.width, canvas.height),
       deleteContext: (handle: number) => deletedContexts.push(handle),
     } as unknown as CanvasKitApi
     const sceneCanvas = {
@@ -167,25 +165,15 @@ describe('CanvasKit renderer lifecycle', () => {
     renderer.render(['scene', 'overlay'])
 
     expect([sceneCanvas.width, sceneCanvas.height]).toEqual([120, 80])
-    expect([sceneCanvas.style.width, sceneCanvas.style.height]).toEqual([
-      '120px',
-      '80px',
-    ])
+    expect([sceneCanvas.style.width, sceneCanvas.style.height]).toEqual(['120px', '80px'])
 
     renderer.setScene(croppedScene)
     renderer.render(['scene', 'overlay'])
     expect([sceneCanvas.width, sceneCanvas.height]).toEqual([60, 40])
     expect([overlayCanvas.width, overlayCanvas.height]).toEqual([60, 40])
-    expect([sceneCanvas.style.width, sceneCanvas.style.height]).toEqual([
-      '60px',
-      '40px',
-    ])
-    expect(surfaces.filter((surface) => surface.kind === 'webgl')).toHaveLength(
-      2,
-    )
-    expect(
-      surfaces.filter((surface) => surface.kind === 'webgl')[1]?.drawImageRect,
-    ).toHaveBeenCalledWith(
+    expect([sceneCanvas.style.width, sceneCanvas.style.height]).toEqual(['60px', '40px'])
+    expect(surfaces.filter((surface) => surface.kind === 'webgl')).toHaveLength(2)
+    expect(surfaces.filter((surface) => surface.kind === 'webgl')[1]?.drawImageRect).toHaveBeenCalledWith(
       expect.anything(),
       expect.anything(),
       new Float32Array([0, 0, 60, 40]),
@@ -198,14 +186,8 @@ describe('CanvasKit renderer lifecycle', () => {
     expect([sceneCanvas.width, sceneCanvas.height]).toEqual([120, 80])
     const webglSurfaces = surfaces.filter((surface) => surface.kind === 'webgl')
     expect(webglSurfaces).toHaveLength(3)
-    expect(
-      webglSurfaces.map((surface) => surface.textureUploads.mock.calls.length),
-    ).toEqual([1, 1, 1])
-    expect(
-      webglSurfaces
-        .slice(0, 2)
-        .every((surface) => surface.dispose.mock.calls.length === 1),
-    ).toBe(true)
+    expect(webglSurfaces.map((surface) => surface.textureUploads.mock.calls.length)).toEqual([1, 1, 1])
+    expect(webglSurfaces.slice(0, 2).every((surface) => surface.dispose.mock.calls.length === 1)).toBe(true)
     expect(deletedContexts).toEqual([1, 2])
     expect(typefaceDelete).not.toHaveBeenCalled()
 

@@ -1,5 +1,12 @@
-import type { RenderTextNode, RenderTextStyle } from '@cute-screen/editor-core'
-import { describe, expect, it } from 'vitest'
+import type {
+  RenderTextNode,
+  RenderTextStyle,
+} from '@cute-screen/editor-core'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 import { layoutRichText } from './rich-text/layout'
 
@@ -46,8 +53,7 @@ function textNode(overrides: Partial<RenderTextNode> = {}): RenderTextNode {
   }
 }
 
-const measure = (text: string, style: RenderTextStyle): number =>
-  Array.from(text).length * (style.fontSize / 2)
+const measure = (text: string, style: RenderTextStyle): number => Array.from(text).length * (style.fontSize / 2)
 
 describe('renderer-neutral rich text layout', () => {
   it('traverses UTF-16 ranges without splitting surrogate pairs and wraps mixed runs', () => {
@@ -56,9 +62,7 @@ describe('renderer-neutral rich text layout', () => {
 
     expect(node.text).toBe('A😀 B')
     expect(layout.lines).toHaveLength(2)
-    expect(layout.lines[0]?.fragments).toEqual([
-      expect.objectContaining({ text: 'A😀', start: 0, end: 3 }),
-    ])
+    expect(layout.lines[0]?.fragments).toEqual([expect.objectContaining({ text: 'A😀', start: 0, end: 3 })])
     expect(layout.lines[1]?.fragments).toEqual([
       expect.objectContaining({
         text: 'B',
@@ -71,9 +75,7 @@ describe('renderer-neutral rich text layout', () => {
         color: red,
       }),
     ])
-    expect(layout.lines[1]?.strikes).toEqual([
-      expect.objectContaining({ width: 10, color: red }),
-    ])
+    expect(layout.lines[1]?.strikes).toEqual([expect.objectContaining({ width: 10, color: red })])
   })
 
   it('uses paragraph metadata for bullets and alignment without inserting content characters', () => {
@@ -103,9 +105,7 @@ describe('renderer-neutral rich text layout', () => {
 
     expect(node.text).toBe('one\ntwo')
     expect(layout.lines.map((line) => line.text)).toEqual(['one', 'two'])
-    expect(layout.lines[0]?.bullet).toEqual(
-      expect.objectContaining({ color: black }),
-    )
+    expect(layout.lines[0]?.bullet).toEqual(expect.objectContaining({ color: black }))
     expect(layout.lines[0]?.fragments[0]?.x).toBeGreaterThan(node.x)
     expect(layout.lines[1]?.bullet).toBeUndefined()
     expect(layout.lines[1]?.x).toBe(node.x + node.width - 30)
@@ -140,9 +140,7 @@ describe('renderer-neutral rich text layout', () => {
             strikethrough: false,
           },
         ],
-        paragraphs: [
-          { start: 0, end: 2, alignment: 'center', listKind: 'none' },
-        ],
+        paragraphs: [{ start: 0, end: 2, alignment: 'center', listKind: 'none' }],
       }),
       measure,
     )
@@ -151,9 +149,7 @@ describe('renderer-neutral rich text layout', () => {
     expect(layout.lines[0]?.height).toBe(30)
     expect(layout.lines[0]?.top).toBe(35)
     expect(layout.lines[0]?.baseline).toBeCloseTo(57.2)
-    expect(
-      layout.lines[0]?.fragments.map((fragment) => fragment.fontSize),
-    ).toEqual([16, 24])
+    expect(layout.lines[0]?.fragments.map((fragment) => fragment.fontSize)).toEqual([16, 24])
   })
 
   it('keeps a CSS-like line baseline stable when glyph ink bounds change', () => {

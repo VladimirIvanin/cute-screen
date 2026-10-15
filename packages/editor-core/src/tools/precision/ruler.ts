@@ -1,4 +1,8 @@
-import { invertMatrix, transformPoint, transformToMatrix } from '../../geometry'
+import {
+  invertMatrix,
+  transformPoint,
+  transformToMatrix,
+} from '../../geometry'
 import type {
   JsonObject,
   Point,
@@ -27,14 +31,17 @@ import {
 
 function rulerUnit(value: RulerUnit | undefined): RulerUnit {
   const unit = value ?? 'pixels'
-  if (unit !== 'pixels' && unit !== 'percent')
-    throw new RangeError('ruler unit is invalid')
+  if (unit !== 'pixels' && unit !== 'percent') throw new RangeError('ruler unit is invalid')
   return unit
 }
 
 function rulerSnap(value: number | undefined): number {
   const snap = value ?? 15
-  if (!Number.isFinite(snap) || snap <= 0 || snap > 90)
+  if (
+    !Number.isFinite(snap) ||
+    snap <= 0 ||
+    snap > 90
+  )
     throw new RangeError('ruler snap angle increment must be between 0 and 90')
   return snap
 }
@@ -115,13 +122,9 @@ function rulerBadgeDimensions(
   readonly height: number
 } {
   const height = fontSize + 8
-  const conservativeTextWidth =
-    Array.from(label).length * fontSize * RULER_BADGE_TEXT_WIDTH_FACTOR
+  const conservativeTextWidth = Array.from(label).length * fontSize * RULER_BADGE_TEXT_WIDTH_FACTOR
   return Object.freeze({
-    width: Math.max(
-      height,
-      conservativeTextWidth + Math.max(12, fontSize * 0.9),
-    ),
+    width: Math.max(height, conservativeTextWidth + Math.max(12, fontSize * 0.9)),
     height,
   })
 }
@@ -143,10 +146,7 @@ export function rulerVisualGeometry(
   const inverse = invertMatrix(matrix)
   const worldStart = transformPoint(matrix, payload.start)
   const worldEnd = transformPoint(matrix, payload.end)
-  const worldLength = Math.hypot(
-    worldEnd.x - worldStart.x,
-    worldEnd.y - worldStart.y,
-  )
+  const worldLength = Math.hypot(worldEnd.x - worldStart.x, worldEnd.y - worldStart.y)
   if (worldLength <= 0) throw new RangeError('ruler endpoints must be distinct')
   const diagonal = Math.hypot(canvas.width, canvas.height)
   const label =
@@ -171,8 +171,7 @@ export function rulerVisualGeometry(
       transformPoint(inverse, {
         x: center.x + cosine * corner.x - sine * corner.y,
         y: center.y + sine * corner.x + cosine * corner.y,
-      }),
-    ),
+      })),
   )
   const localDx = payload.end.x - payload.start.x
   const localDy = payload.end.y - payload.start.y
@@ -208,7 +207,10 @@ export function rulerVisualGeometry(
   })
 }
 
-function shiftedPoint(point: Point, origin: Point): Point & JsonObject {
+function shiftedPoint(
+  point: Point,
+  origin: Point,
+): Point & JsonObject {
   return freezePoint({ x: point.x - origin.x, y: point.y - origin.y })
 }
 
@@ -225,10 +227,8 @@ export function rebaseRulerLayer(
     ...layer,
     transform: Object.freeze({
       ...layer.transform,
-      translateX:
-        layer.transform.translateX + matrix.a * origin.x + matrix.c * origin.y,
-      translateY:
-        layer.transform.translateY + matrix.b * origin.x + matrix.d * origin.y,
+      translateX: layer.transform.translateX + matrix.a * origin.x + matrix.c * origin.y,
+      translateY: layer.transform.translateY + matrix.b * origin.x + matrix.d * origin.y,
     }),
     localBounds: freezeRect({
       x: 0,
@@ -252,10 +252,8 @@ export function rulerVisualBoundsAreConservative(
   return (
     bounds.x >= layer.localBounds.x - GEOMETRY_EPSILON &&
     bounds.y >= layer.localBounds.y - GEOMETRY_EPSILON &&
-    bounds.x + bounds.width <=
-      layer.localBounds.x + layer.localBounds.width + GEOMETRY_EPSILON &&
-    bounds.y + bounds.height <=
-      layer.localBounds.y + layer.localBounds.height + GEOMETRY_EPSILON
+    bounds.x + bounds.width <= layer.localBounds.x + layer.localBounds.width + GEOMETRY_EPSILON &&
+    bounds.y + bounds.height <= layer.localBounds.y + layer.localBounds.height + GEOMETRY_EPSILON
   )
 }
 
@@ -300,10 +298,7 @@ export function measureRuler(
     angleDegrees,
     percent,
     percentBasis: 'canvasDiagonal',
-    label:
-      layer.payload.unit === 'pixels'
-        ? `${formatMeasurement(length, 0)} px`
-        : `${formatMeasurement(percent, 2)}%`,
+    label: layer.payload.unit === 'pixels' ? `${formatMeasurement(length, 0)} px` : `${formatMeasurement(percent, 2)}%`,
   })
 }
 
@@ -347,8 +342,7 @@ export function snapRulerEndpoint(
     })
   }
   const angle = (Math.atan2(dy, dx) * 180) / Math.PI
-  const snappedAngle =
-    Math.round(angle / angleIncrementDegrees) * angleIncrementDegrees
+  const snappedAngle = Math.round(angle / angleIncrementDegrees) * angleIncrementDegrees
   const radians = (snappedAngle * Math.PI) / 180
   const end = freezePoint({
     x: start.x + Math.cos(radians) * length,

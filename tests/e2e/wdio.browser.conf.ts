@@ -36,10 +36,7 @@ async function startBrowserDevServer(): Promise<{
   return {
     url: devServerUrl,
     close: async () => {
-      if (
-        devServerProcess.exitCode !== null ||
-        devServerProcess.signalCode !== null
-      ) {
+      if (devServerProcess.exitCode !== null || devServerProcess.signalCode !== null) {
         return
       }
       devServerProcess.kill()

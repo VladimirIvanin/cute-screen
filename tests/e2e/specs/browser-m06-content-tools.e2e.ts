@@ -1,4 +1,8 @@
-import { $, browser, expect } from '@wdio/globals'
+import {
+  $,
+  browser,
+  expect,
+} from '@wdio/globals'
 import {
   snapshot,
   openDrawingHarness,
@@ -20,18 +24,14 @@ describe('M06 drawing tools in browser mode', () => {
         .move({ origin: 'pointer', x: 8, y: 6, duration: 50 })
         .up({ button: 'left' })
         .perform()
-      await browser.waitUntil(
-        async () => (await snapshot()).layers.length === before + 1,
-      )
+      await browser.waitUntil(async () => (await snapshot()).layers.length === before + 1)
     }
 
     await draw('Shape', 12)
     await draw('Pencil', 48)
     await draw('Marker', 82)
 
-    expect(
-      (await snapshot()).layers.slice(-3).map((layer) => layer.kind),
-    ).toEqual(['shape', 'pencil', 'marker'])
+    expect((await snapshot()).layers.slice(-3).map((layer) => layer.kind)).toEqual(['shape', 'pencil', 'marker'])
   })
 
   it('persists a gradient fill through the contextual tool defaults', async () => {
@@ -63,25 +63,18 @@ describe('M06 drawing tools in browser mode', () => {
     await $('button=32').click()
     await $('button[aria-label="Bold"]').click()
     await browser.execute(() => {
-      const input = document.querySelector<HTMLInputElement>(
-        'input[aria-label="Text color"]',
-      )
+      const input = document.querySelector<HTMLInputElement>('input[aria-label="Text color"]')
       if (!input) throw new Error('Text color input is missing')
       input.value = '#336699'
       input.dispatchEvent(new Event('change', { bubbles: true }))
     })
     await $('button[aria-label="Background"]').click()
     await browser.execute(() => {
-      const color = document.querySelector<HTMLInputElement>(
-        'input[aria-label="Background Text color"]',
-      )
+      const color = document.querySelector<HTMLInputElement>('input[aria-label="Background Text color"]')
       const inputs = [
-        ...document.querySelectorAll<HTMLInputElement>(
-          '.cs-text-background-popover input[type="number"]',
-        ),
+        ...document.querySelectorAll<HTMLInputElement>('.cs-text-background-popover input[type="number"]'),
       ]
-      if (!color || inputs.length !== 2)
-        throw new Error('Text background controls are missing')
+      if (!color || inputs.length !== 2) throw new Error('Text background controls are missing')
       color.value = '#fff2a8'
       color.dispatchEvent(new Event('input', { bubbles: true }))
       inputs[0]!.value = '6'
@@ -119,15 +112,15 @@ describe('M06 drawing tools in browser mode', () => {
     expect(background.color.alpha).toBeCloseTo(1)
     const spans = (
       created?.payload?.content as
-        | {
-            readonly spans?: readonly {
-              readonly fontFamily?: string
-              readonly fontSize?: number
-              readonly weight?: number
-              readonly color?: Record<string, number>
-            }[]
-          }
-        | undefined
+      | {
+        readonly spans?: readonly {
+          readonly fontFamily?: string
+          readonly fontSize?: number
+          readonly weight?: number
+          readonly color?: Record<string, number>
+        }[]
+      }
+      | undefined
     )?.spans
     expect(spans?.[0]).toMatchObject({
       fontFamily: 'Georgia',
@@ -143,7 +136,7 @@ describe('M06 drawing tools in browser mode', () => {
     expect(created).not.toHaveProperty('opacity')
     expect(created).not.toHaveProperty('blendMode')
     expect(created).not.toHaveProperty('shadows')
-    await expect(textTool).toHaveAttribute('aria-pressed', 'true')
+    await expect(textTool).toHaveAttribute('aria-pressed', 'false')
   })
 
   it('allocates numbered markers independently from layer order and keeps the tool active', async () => {
@@ -154,15 +147,13 @@ describe('M06 drawing tools in browser mode', () => {
     await scene.click({ x: 24, y: 24 })
     await scene.click({ x: 72, y: 48 })
     await browser.waitUntil(async () => (await snapshot()).layers.length === 6)
-    const markers = (await snapshot()).layers.filter(
-      (layer) => layer.kind === 'numberedMarker',
-    )
+    const markers = (await snapshot()).layers.filter((layer) => layer.kind === 'numberedMarker')
     expect(markers.map((layer) => layer.payload?.sequence)).toEqual([1, 2])
     expect(markers[0]?.payload?.badge).toMatchObject({ shape: 'circle' })
     await expect(markerTool).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('creates a multiline callout through drag target→label and preserves the active tool', async () => {
+  it('creates a multiline callout through drag target→label and selects the completed object', async () => {
     await openDrawingHarness()
     const calloutTool = $('button[aria-label="Callout"]')
     const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
@@ -187,6 +178,6 @@ describe('M06 drawing tools in browser mode', () => {
         labelMarker: 'circle',
       },
     })
-    await expect(calloutTool).toHaveAttribute('aria-pressed', 'true')
+    await expect(calloutTool).toHaveAttribute('aria-pressed', 'false')
   })
 })

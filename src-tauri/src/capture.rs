@@ -1129,7 +1129,7 @@ fn fake_capture_frame(
             crate::platform::PlatformError::new(PlatformErrorCode::CaptureFailed, correlation_id)
         })?;
         writer
-            .write_image_data(&vec![0x7f; (WIDTH * HEIGHT * 4) as usize])
+            .write_image_data(&[0x7f, 0x7f, 0x7f, 0xff].repeat((WIDTH * HEIGHT) as usize))
             .map_err(|_| {
                 crate::platform::PlatformError::new(
                     PlatformErrorCode::CaptureFailed,
@@ -1391,6 +1391,23 @@ impl Drop for ActiveOperation {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "fake-platform")]
+    #[test]
+    fn fake_capture_decodes_to_opaque_screen_pixels() {
+        let directory = tempfile::tempdir().expect("temporary transport");
+        let transport =
+            ImageTransportService::new(directory.path(), directory.path().join("stage"))
+                .expect("transport");
+        let captured = super::fake_capture_frame(&transport, "opaque-capture").expect("capture");
+        let image = transport
+            .take_owned_image(&captured.image_token, "opaque-capture")
+            .expect("owned image");
+        let decoded = image::load_from_memory(&image.bytes)
+            .expect("PNG decode")
+            .to_rgba8();
+        assert_eq!(decoded.dimensions(), (400, 300));
+        assert_eq!(decoded.get_pixel(200, 150).0, [127, 127, 127, 255]);
+    }
     use super::{
         ActiveOperation, CaptureAction, CaptureController, CaptureInvocationSource,
         CaptureProgressState, CaptureRequestV1, CaptureTerminalOutcome,

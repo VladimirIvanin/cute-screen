@@ -41,34 +41,16 @@ export interface PointerDownContext {
   readonly commitText: () => void
   readonly samplingCursor: Ref<CanvasPoint | undefined>
   readonly hideEyedropper: () => void
-  readonly scheduleEyedropper: (
-    point: CanvasPoint,
-    client: { clientX: number; clientY: number },
-  ) => void
+  readonly scheduleEyedropper: (point: CanvasPoint, client: { clientX: number; clientY: number }) => void
   readonly sampleScene: (point: CanvasPoint) => void
   readonly visibleCanvasCenter: () => CanvasPoint | undefined
   readonly selectedLayer: () => LayerNode | undefined
   readonly loupeSourceHandle: (layer: LayerNode, point: CanvasPoint) => boolean
-  readonly calloutHandle: (
-    layer: LayerNode,
-    point: CanvasPoint,
-  ) => CalloutHandleKind | undefined
-  readonly arrowHandle: (
-    layer: LayerNode,
-    point: CanvasPoint,
-  ) => ArrowHandleKind | undefined
-  readonly intrinsicEndpoint: (
-    layer: LayerNode,
-    point: CanvasPoint,
-  ) => 'start' | 'end' | undefined
-  readonly resizeHandle: (
-    layer: LayerNode,
-    point: CanvasPoint,
-  ) => ResizeHandle | undefined
-  readonly rotationCorner: (
-    layer: LayerNode,
-    point: CanvasPoint,
-  ) => ResizeHandle | undefined
+  readonly calloutHandle: (layer: LayerNode, point: CanvasPoint) => CalloutHandleKind | undefined
+  readonly arrowHandle: (layer: LayerNode, point: CanvasPoint) => ArrowHandleKind | undefined
+  readonly intrinsicEndpoint: (layer: LayerNode, point: CanvasPoint) => 'start' | 'end' | undefined
+  readonly resizeHandle: (layer: LayerNode, point: CanvasPoint) => ResizeHandle | undefined
+  readonly rotationCorner: (layer: LayerNode, point: CanvasPoint) => ResizeHandle | undefined
   readonly resizeCursor: (handle: ResizeHandle) => string
   readonly setCursor: (cursor: string, rotate?: boolean) => void
   readonly layerBounds: (layer: LayerNode) => {
@@ -77,10 +59,7 @@ export interface PointerDownContext {
     width: number
     height: number
   }
-  readonly transformPoint: (
-    transform: LayerNode['transform'],
-    point: CanvasPoint,
-  ) => CanvasPoint
+  readonly transformPoint: (transform: LayerNode['transform'], point: CanvasPoint) => CanvasPoint
   readonly startText: (input: TextEditorStartInput) => void
   readonly invalidateOverlay: () => void
   readonly renderCommittedScene: () => void

@@ -35,13 +35,10 @@ const dictionaries: Record<SupportedLocale, Record<TranslationKey, string>> = {
     sceneCanvas: 'Scene canvas',
     interactionOverlay: 'Interaction overlay',
     emptyTitle: 'Capture your first screen',
-    emptyDescription:
-      'Start a capture to open it here and add clarifying annotations.',
+    emptyDescription: 'Start a capture to open it here and add clarifying annotations.',
     readyLoadError: 'The document could not be loaded.',
-    captureUnavailable:
-      'Capture will be available after the native backend is connected.',
-    captureScreenRecordingDenied:
-      'Allow Screen Recording in System Settings, then retry Capture.',
+    captureUnavailable: 'Capture will be available after the native backend is connected.',
+    captureScreenRecordingDenied: 'Allow Screen Recording in System Settings, then retry Capture.',
     captureFallback: 'Global shortcut is unavailable. Use this command:',
     copyCaptureFallback: 'Copy capture command',
     captureFallbackCopied: 'Capture command copied',
@@ -156,15 +153,11 @@ const dictionaries: Record<SupportedLocale, Record<TranslationKey, string>> = {
     sceneCanvas: 'Холст сцены',
     interactionOverlay: 'Слой взаимодействия',
     emptyTitle: 'Сделайте первый снимок',
-    emptyDescription:
-      'Запустите захват — здесь откроется снимок и появятся инструменты уточнения.',
+    emptyDescription: 'Запустите захват — здесь откроется снимок и появятся инструменты уточнения.',
     readyLoadError: 'Не удалось загрузить документ.',
-    captureUnavailable:
-      'Захват станет доступен после подключения native backend.',
-    captureScreenRecordingDenied:
-      'Разрешите запись экрана в Системных настройках и повторите захват.',
-    captureFallback:
-      'Глобальная горячая клавиша недоступна. Используйте эту команду:',
+    captureUnavailable: 'Захват станет доступен после подключения native backend.',
+    captureScreenRecordingDenied: 'Разрешите запись экрана в Системных настройках и повторите захват.',
+    captureFallback: 'Глобальная горячая клавиша недоступна. Используйте эту команду:',
     copyCaptureFallback: 'Скопировать команду захвата',
     captureFallbackCopied: 'Команда захвата скопирована',
     dismissCaptureFallback: 'Скрыть уведомление о команде захвата',
@@ -250,25 +243,20 @@ const dictionaries: Record<SupportedLocale, Record<TranslationKey, string>> = {
   },
 }
 
-export function resolveSystemLocale(
-  languages: readonly string[],
-): SupportedLocale {
-  return languages.some((language) =>
-    language.toLocaleLowerCase().startsWith('ru'),
-  )
-    ? 'ru'
-    : 'en'
+export function resolveSystemLocale(languages: readonly string[]): SupportedLocale {
+  return languages.some((language) => language.toLocaleLowerCase().startsWith('ru')) ? 'ru' : 'en'
 }
 
-export function t(locale: SupportedLocale, key: TranslationKey): string {
+export function t(
+  locale: SupportedLocale,
+  key: TranslationKey,
+): string {
   return dictionaries[locale][key]
 }
 
 export function assertLocaleCompleteness(): boolean {
   return (
-    (Object.keys(dictionaries.en) as TranslationKey[]).length ===
-      translationKeys.length &&
-    (Object.keys(dictionaries.ru) as TranslationKey[]).length ===
-      translationKeys.length
+    (Object.keys(dictionaries.en) as TranslationKey[]).length === translationKeys.length &&
+    (Object.keys(dictionaries.ru) as TranslationKey[]).length === translationKeys.length
   )
 }

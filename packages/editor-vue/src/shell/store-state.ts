@@ -1,4 +1,7 @@
-import { computed, ref } from 'vue'
+import {
+  computed,
+  ref,
+} from 'vue'
 import type { CaptureProgressState } from '../platform'
 import { defaultPreferences } from './preferences'
 import type {
@@ -18,10 +21,7 @@ export function createShellStoreState() {
   const activeFrameId = ref<string>()
   const zoom = ref(100)
   const zoomMode = ref<'fit' | 'custom'>('fit')
-  const frameViewports = new Map<
-    string,
-    { readonly zoom: number; readonly mode: 'fit' | 'custom' }
-  >()
+  const frameViewports = new Map<string, { readonly zoom: number; readonly mode: 'fit' | 'custom' }>()
   const layersOpen = ref(false)
   const preferences = ref(defaultPreferences(navigator.languages))
   const systemDark = ref(false)
@@ -35,12 +35,7 @@ export function createShellStoreState() {
   })
   const locale = computed(() => preferences.value.locale)
   const resolvedTheme = computed<ResolvedTheme>(() =>
-    preferences.value.theme === 'system'
-      ? systemDark.value
-        ? 'dark'
-        : 'light'
-      : preferences.value.theme,
-  )
+    preferences.value.theme === 'system' ? (systemDark.value ? 'dark' : 'light') : preferences.value.theme)
   const hasFrames = computed(() => frames.value.length > 0)
   const canCopyOrExport = computed(() => documentState.value.kind === 'ready')
   return {
@@ -75,7 +70,8 @@ export function setCaptureProgress(
   const current = state.actionState.value
   if (
     current.status === 'pending' &&
-    (current.action === 'capture' || current.action === 'captureWindow')
+    (current.action === 'capture' ||
+      current.action === 'captureWindow')
   ) {
     state.actionState.value = {
       status: 'pending',

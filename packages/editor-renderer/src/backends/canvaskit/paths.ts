@@ -3,7 +3,10 @@ import type {
   RenderLoupeNode,
   RenderSpotlightNode,
 } from '@cute-screen/editor-core'
-import type { CanvasKitApi, CanvasKitPath } from './contracts'
+import type {
+  CanvasKitApi,
+  CanvasKitPath,
+} from './contracts'
 
 export function censorPath(
   canvasKit: CanvasKitApi,
@@ -13,10 +16,7 @@ export function censorPath(
   if (node.region.kind === 'rectangle') {
     builder.moveTo(node.region.x, node.region.y)
     builder.lineTo(node.region.x + node.region.width, node.region.y)
-    builder.lineTo(
-      node.region.x + node.region.width,
-      node.region.y + node.region.height,
-    )
+    builder.lineTo(node.region.x + node.region.width, node.region.y + node.region.height)
     builder.lineTo(node.region.x, node.region.y + node.region.height)
   } else {
     const first = node.region.points[0]!
@@ -39,14 +39,7 @@ export function spotlightPath(
   const builder = new canvasKit.PathBuilder()
   if (aperture.shape === 'ellipse') {
     if (builder.addOval) {
-      builder.addOval(
-        canvasKit.XYWHRect(
-          aperture.x,
-          aperture.y,
-          aperture.width,
-          aperture.height,
-        ),
-      )
+      builder.addOval(canvasKit.XYWHRect(aperture.x, aperture.y, aperture.width, aperture.height))
     } else {
       const centerX = aperture.x + aperture.width / 2
       const centerY = aperture.y + aperture.height / 2
@@ -118,14 +111,7 @@ export function loupePath(
 ): CanvasKitPath {
   const builder = new canvasKit.PathBuilder()
   if (node.lens.shape === 'circle' && builder.addOval) {
-    builder.addOval(
-      canvasKit.XYWHRect(
-        node.lens.x,
-        node.lens.y,
-        node.lens.size,
-        node.lens.size,
-      ),
-    )
+    builder.addOval(canvasKit.XYWHRect(node.lens.x, node.lens.y, node.lens.size, node.lens.size))
   } else {
     const x = node.lens.x
     const y = node.lens.y

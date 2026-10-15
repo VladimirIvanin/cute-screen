@@ -1,4 +1,9 @@
-import { describe, expect, it, vi } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 
 import { writeResultCanvasToClipboard } from '../../../apps/desktop/src/result-clipboard'
 
@@ -17,9 +22,7 @@ describe('result clipboard', () => {
       writePng,
     })
 
-    expect(writePng).toHaveBeenCalledWith(
-      new Uint8Array(await blob.arrayBuffer()),
-    )
+    expect(writePng).toHaveBeenCalledWith(new Uint8Array(await blob.arrayBuffer()))
   })
 
   it('reports when PNG encoding is unavailable instead of copying the original image', async () => {

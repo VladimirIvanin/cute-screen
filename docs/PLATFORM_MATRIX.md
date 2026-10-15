@@ -1,5 +1,14 @@
 # Платформенная матрица
 
+## Windows WebView harness (2026-10-15)
+
+Windows x64 / WebView2 Evergreen 155.0.4283.45 подтверждён scoped native-input
+прогоном: Quick chrome 4/4 и alpha asset transport 1/1. Harness использует
+external tauri-driver 2.1.0 + подходящий EdgeDriver; embedded 1.3.0 DOM input
+не считается доказательством настоящих ПКМ/клавиатуры. Runtime и cleanup fixes,
+команды, screenshot и ограничения описаны в TESTING.md. Linux/macOS provider
+не изменён; новая полная cross-platform приёмка и physical capture остаются pending.
+
 ## Поддерживаемые цели
 
 | Платформа       | Архитектура    | Захват                                                                                                    | Горячие клавиши                        | Неофициальный CI artifact |

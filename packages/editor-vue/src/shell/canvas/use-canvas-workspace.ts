@@ -1,4 +1,7 @@
-import type { CanvasViewportEmit, CanvasViewportProps } from './contracts'
+import type {
+  CanvasViewportEmit,
+  CanvasViewportProps,
+} from './contracts'
 import { CanvasWorkspaceController } from './canvas-workspace-controller'
 
 export function useCanvasWorkspace(

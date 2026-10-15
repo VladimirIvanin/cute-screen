@@ -1,4 +1,8 @@
-import type { RenderNode, RenderPaint, RgbaColor } from '../../scene/contracts'
+import type {
+  RenderNode,
+  RenderPaint,
+  RgbaColor,
+} from '../../scene/contracts'
 import type { LayerNode } from '../types'
 
 export const TRANSPARENT: RgbaColor = Object.freeze({
@@ -20,17 +24,16 @@ export const TEXT_BLACK: RgbaColor = Object.freeze({
   alpha: 1,
 })
 
-export function color(value: unknown, fallback = FALLBACK_STROKE): RgbaColor {
+export function color(
+  value: unknown,
+  fallback = FALLBACK_STROKE,
+): RgbaColor {
   if (!value || typeof value !== 'object') return fallback
   const input = value as Record<string, unknown>
   const channels = [input.red, input.green, input.blue, input.alpha]
   if (
     !channels.every(
-      (channel) =>
-        typeof channel === 'number' &&
-        Number.isFinite(channel) &&
-        channel >= 0 &&
-        channel <= 1,
+      (channel) => typeof channel === 'number' && Number.isFinite(channel) && channel >= 0 && channel <= 1,
     )
   )
     return fallback
@@ -43,17 +46,13 @@ export function color(value: unknown, fallback = FALLBACK_STROKE): RgbaColor {
 }
 
 function paintOpacity(value: unknown): number {
-  return typeof value === 'number' && Number.isFinite(value)
-    ? Math.max(0, Math.min(1, value))
-    : 1
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 1
 }
 
 function imageTexture(input: Record<string, unknown>): RenderPaint | undefined {
   if (input.kind !== 'imageTexture') return undefined
   const transform =
-    input.transform && typeof input.transform === 'object'
-      ? (input.transform as Record<string, unknown>)
-      : {}
+    input.transform && typeof input.transform === 'object' ? (input.transform as Record<string, unknown>) : {}
   if (
     typeof input.blobHash !== 'string' ||
     input.blobHash.length !== 64 ||
@@ -64,10 +63,7 @@ function imageTexture(input: Record<string, unknown>): RenderPaint | undefined {
     kind: 'imageTexture' as const,
     resourceId: input.blobHash,
     opacity: paintOpacity(input.opacity),
-    scale:
-      typeof transform.scale === 'number' && transform.scale > 0
-        ? transform.scale
-        : 1,
+    scale: typeof transform.scale === 'number' && transform.scale > 0 ? transform.scale : 1,
     rotation: typeof transform.rotation === 'number' ? transform.rotation : 0,
     offsetX: typeof transform.offsetX === 'number' ? transform.offsetX : 0,
     offsetY: typeof transform.offsetY === 'number' ? transform.offsetY : 0,
@@ -101,9 +97,7 @@ export function fill(
           position: typeof entry.position === 'number' ? entry.position : 0,
           color: Object.freeze({
             ...color(entry.color, TRANSPARENT),
-            alpha:
-              color(entry.color, TRANSPARENT).alpha *
-              paintOpacity(input.opacity),
+            alpha: color(entry.color, TRANSPARENT).alpha * paintOpacity(input.opacity),
           }),
         })
       })
@@ -127,10 +121,7 @@ export function fill(
       kind: 'radialGradient' as const,
       centerX: geometry.x + center.x * geometry.width,
       centerY: geometry.y + center.y * geometry.height,
-      radius: Math.max(
-        0.001,
-        radius * Math.max(geometry.width, geometry.height),
-      ),
+      radius: Math.max(0.001, radius * Math.max(geometry.width, geometry.height)),
       stops: Object.freeze(stops),
     })
   }
@@ -148,25 +139,16 @@ export function stroke(value: unknown): {
   readonly join: 'miter' | 'round' | 'bevel'
   readonly dash?: readonly number[]
 } {
-  if (!value || typeof value !== 'object')
-    return { color: FALLBACK_STROKE, width: 1, cap: 'butt', join: 'miter' }
+  if (!value || typeof value !== 'object') return { color: FALLBACK_STROKE, width: 1, cap: 'butt', join: 'miter' }
   const input = value as Record<string, unknown>
-  const width =
-    typeof input.width === 'number' &&
-    Number.isFinite(input.width) &&
-    input.width > 0
-      ? input.width
-      : 1
+  const width = typeof input.width === 'number' && Number.isFinite(input.width) && input.width > 0 ? input.width : 1
   const style = input.style
   return {
     color: color(input.color),
     width,
     cap: input.cap === 'round' || input.cap === 'square' ? input.cap : 'butt',
-    join:
-      input.join === 'round' || input.join === 'bevel' ? input.join : 'miter',
-    ...(style === 'dashed'
-      ? { dash: Object.freeze([width * 3, width * 2]) }
-      : {}),
+    join: input.join === 'round' || input.join === 'bevel' ? input.join : 'miter',
+    ...(style === 'dashed' ? { dash: Object.freeze([width * 3, width * 2]) } : {}),
     ...(style === 'dotted' ? { dash: Object.freeze([width, width * 2]) } : {}),
   }
 }
@@ -190,14 +172,8 @@ export function localPoint(
   if (!value || typeof value !== 'object') return fallback
   const input = value as Record<string, unknown>
   return {
-    x:
-      typeof input.x === 'number' && Number.isFinite(input.x)
-        ? input.x
-        : fallback.x,
-    y:
-      typeof input.y === 'number' && Number.isFinite(input.y)
-        ? input.y
-        : fallback.y,
+    x: typeof input.x === 'number' && Number.isFinite(input.x) ? input.x : fallback.x,
+    y: typeof input.y === 'number' && Number.isFinite(input.y) ? input.y : fallback.y,
   }
 }
 

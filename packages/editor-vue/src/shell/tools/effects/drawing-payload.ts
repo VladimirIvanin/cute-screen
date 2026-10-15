@@ -50,21 +50,10 @@ function layerPayload(
 ): JsonObject | undefined {
   if (id === 'layerOpacity') {
     const opacity = Number(value) / 100
-    return Number.isFinite(opacity) && opacity >= 0 && opacity <= 1
-      ? { ...current, layerOpacity: opacity }
-      : undefined
+    return Number.isFinite(opacity) && opacity >= 0 && opacity <= 1 ? { ...current, layerOpacity: opacity } : undefined
   }
   if (id !== 'blendMode') return undefined
-  const modes = [
-    'normal',
-    'multiply',
-    'screen',
-    'overlay',
-    'darken',
-    'lighten',
-    'softLight',
-    'hardLight',
-  ]
+  const modes = ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'softLight', 'hardLight']
   return modes.includes(value) ? { ...current, blendMode: value } : undefined
 }
 
@@ -74,9 +63,7 @@ function shapeKindPayload(
   current: JsonObject,
 ): JsonObject | undefined {
   const shapes = ['rectangle', 'circle', 'oval', 'diamond', 'star']
-  return tool === 'shape' && shapes.includes(value)
-    ? { ...current, shape: value }
-    : undefined
+  return tool === 'shape' && shapes.includes(value) ? { ...current, shape: value } : undefined
 }
 
 function arrowPathPayload(
@@ -86,21 +73,17 @@ function arrowPathPayload(
 ): JsonObject | undefined {
   if (
     tool !== 'arrow' ||
-    (value !== 'straight' && value !== 'quadratic' && value !== 'elbow')
+    (value !== 'straight' &&
+      value !== 'quadratic' &&
+      value !== 'elbow')
   ) {
     return undefined
   }
   const start = current.start as { readonly x?: unknown; readonly y?: unknown }
   const end = current.end as { readonly x?: unknown; readonly y?: unknown }
   const midpoint = {
-    x:
-      typeof start?.x === 'number' && typeof end?.x === 'number'
-        ? (start.x + end.x) / 2
-        : 0,
-    y:
-      typeof start?.y === 'number' && typeof end?.y === 'number'
-        ? (start.y + end.y) / 2
-        : 0,
+    x: typeof start?.x === 'number' && typeof end?.x === 'number' ? (start.x + end.x) / 2 : 0,
+    y: typeof start?.y === 'number' && typeof end?.y === 'number' ? (start.y + end.y) / 2 : 0,
   }
   const { bend: _bend, elbow: _elbow, ...pathIndependent } = current
   void _bend
@@ -109,20 +92,14 @@ function arrowPathPayload(
     return {
       ...pathIndependent,
       path: value,
-      bend:
-        current.bend && typeof current.bend === 'object'
-          ? current.bend
-          : midpoint,
+      bend: current.bend && typeof current.bend === 'object' ? current.bend : midpoint,
     }
   }
   if (value === 'elbow') {
     return {
       ...pathIndependent,
       path: value,
-      elbow:
-        current.elbow && typeof current.elbow === 'object'
-          ? current.elbow
-          : { axis: 'y', offset: 0 },
+      elbow: current.elbow && typeof current.elbow === 'object' ? current.elbow : { axis: 'y', offset: 0 },
     }
   }
   return { ...pathIndependent, path: value }
@@ -136,18 +113,15 @@ function arrowStylePayload(
 ): JsonObject | undefined {
   if (tool !== 'arrow') return undefined
   if (id === 'startCap' || id === 'endCap') {
-    const caps = [
-      'none',
-      'lineArrow',
-      'solidArrow',
-      'triangle',
-      'circle',
-      'diamond',
-    ]
+    const caps = ['none', 'lineArrow', 'solidArrow', 'triangle', 'circle', 'diamond']
     return caps.includes(value) ? { ...current, [id]: value } : undefined
   }
   if (id !== 'strokeStyle') return undefined
-  if (value !== 'solid' && value !== 'dashed' && value !== 'dotted') {
+  if (
+    value !== 'solid' &&
+    value !== 'dashed' &&
+    value !== 'dotted'
+  ) {
     return undefined
   }
   return {
@@ -166,14 +140,10 @@ function specializedPayload(
   current: JsonObject,
 ): JsonObject | undefined {
   if (id === 'brush') {
-    return tool === 'pencil' && ['pen', 'pencil', 'brush'].includes(value)
-      ? { ...current, brush: value }
-      : undefined
+    return tool === 'pencil' && ['pen', 'pencil', 'brush'].includes(value) ? { ...current, brush: value } : undefined
   }
   if (id !== 'markerMode') return undefined
-  return tool === 'marker' && (value === 'highlight' || value === 'darken')
-    ? { ...current, mode: value }
-    : undefined
+  return tool === 'marker' && (value === 'highlight' || value === 'darken') ? { ...current, mode: value } : undefined
 }
 
 function fillKindPayload(
@@ -181,14 +151,10 @@ function fillKindPayload(
   tool: DrawingTool,
   current: JsonObject,
 ): JsonObject | undefined {
-  if (
-    tool !== 'shape' ||
-    !['none', 'solid', 'linearGradient', 'radialGradient'].includes(value)
-  ) {
+  if (tool !== 'shape' || !['none', 'solid', 'linearGradient', 'radialGradient'].includes(value)) {
     return undefined
   }
-  const candidate = (current.stroke as Record<string, unknown> | undefined)
-    ?.color
+  const candidate = (current.stroke as Record<string, unknown> | undefined)?.color
   const color: JsonObject =
     candidate && typeof candidate === 'object'
       ? (candidate as JsonObject)
@@ -254,22 +220,15 @@ function dimensionPayload(
   const number = Number(value)
   if (!Number.isFinite(number)) return undefined
   if (id === 'cornerRadius') {
-    return tool === 'shape' && number >= 0
-      ? { ...current, cornerRadius: number }
-      : undefined
+    return tool === 'shape' && number >= 0 ? { ...current, cornerRadius: number } : undefined
   }
   if (id === 'starPoints') {
-    return tool === 'shape' &&
-      Number.isInteger(number) &&
-      number >= 3 &&
-      number <= 32
+    return tool === 'shape' && Number.isInteger(number) && number >= 3 && number <= 32
       ? { ...current, starPoints: number }
       : undefined
   }
   if (id === 'starInnerRatio') {
-    return tool === 'shape' && number > 0 && number < 1
-      ? { ...current, starInnerRatio: number }
-      : undefined
+    return tool === 'shape' && number > 0 && number < 1 ? { ...current, starInnerRatio: number } : undefined
   }
   if (id !== 'width' || number <= 0) return undefined
   return tool === 'arrow' || tool === 'shape'
@@ -309,7 +268,11 @@ export function resolveDrawingPayload(
   }
   if (id === 'shapeKind') return shapeKindPayload(value, tool, current)
   if (id === 'arrowPath') return arrowPathPayload(value, tool, current)
-  if (id === 'startCap' || id === 'endCap' || id === 'strokeStyle') {
+  if (
+    id === 'startCap' ||
+    id === 'endCap' ||
+    id === 'strokeStyle'
+  ) {
     return arrowStylePayload(id, value, tool, current)
   }
   if (id === 'brush' || id === 'markerMode') {

@@ -1,9 +1,19 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { NButton, NPopover, NTooltip } from 'naive-ui'
+import {
+  computed,
+  ref,
+} from 'vue'
+import {
+  NButton,
+  NPopover,
+  NTooltip,
+} from 'naive-ui'
 import { UiIcon } from '../icon'
 import brandUrl from '../assets/brand.svg?no-inline'
-import type { SupportedLocale, ThemePreference } from '../types'
+import type {
+  SupportedLocale,
+  ThemePreference,
+} from '../types'
 import type { DocumentSaveState } from '../types'
 
 const props = withDefaults(
@@ -43,19 +53,11 @@ const emit = defineEmits<{
 }>()
 const menuOpen = ref(false)
 const disabled = computed(() => props.pending)
-const captureDisabled = computed(
-  () => disabled.value || !props.captureAvailable,
-)
+const captureDisabled = computed(() => disabled.value || !props.captureAvailable)
 const captureTitle = computed(() =>
-  props.captureAvailable
-    ? props.t('capture')
-    : (props.captureUnavailableReason ?? props.t('captureUnavailable')),
-)
+  props.captureAvailable ? props.t('capture') : (props.captureUnavailableReason ?? props.t('captureUnavailable')))
 const openImageTitle = computed(() =>
-  props.openImageAvailable
-    ? props.t('openImage')
-    : props.t('openImageUnavailable'),
-)
+  props.openImageAvailable ? props.t('openImage') : props.t('openImageUnavailable'))
 function selectTheme(value: ThemePreference): void {
   menuOpen.value = false
   emit('theme', value)
@@ -70,11 +72,20 @@ function selectLocale(value: SupportedLocale): void {
   <header class="cs-topbar">
     <div class="cs-brand" :aria-label="t('appName')">
       <span class="cs-brand-mark" aria-hidden="true">
-        <img :src="brandUrl" alt="" width="30" height="30" />
+        <img
+          :src="brandUrl"
+          alt=""
+          width="30"
+          height="30"
+        />
       </span>
       <strong>Cute Screen</strong>
     </div>
-    <div class="cs-history" role="group" :aria-label="t('undo')">
+    <div
+      class="cs-history"
+      role="group"
+      :aria-label="t('undo')"
+    >
       <NTooltip>
         <template #trigger>
           <NButton
@@ -230,15 +241,7 @@ function selectLocale(value: SupportedLocale): void {
             :aria-checked="theme === value"
             @click="selectTheme(value)"
           >
-            {{
-              t(
-                value === 'system'
-                  ? 'systemTheme'
-                  : value === 'light'
-                    ? 'lightTheme'
-                    : 'darkTheme',
-              )
-            }}
+            {{ t(value === 'system' ? 'systemTheme' : value === 'light' ? 'lightTheme' : 'darkTheme') }}
           </NButton>
           <p>{{ t('language') }}</p>
           <NButton

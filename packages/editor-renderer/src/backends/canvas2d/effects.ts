@@ -22,7 +22,12 @@ import type {
   Canvas2DRendererOptions,
   Context2D,
 } from './contracts'
-import { canvasFont, cssBlendMode, cssColor, withTransform } from './paint'
+import {
+  canvasFont,
+  cssBlendMode,
+  cssColor,
+  withTransform,
+} from './paint'
 import {
   censorRegionPath,
   loupeLensPath,
@@ -43,7 +48,10 @@ export function copyCanvas(
   return copy
 }
 
-export function pixelateImageData(image: ImageData, blockSize: number): void {
+export function pixelateImageData(
+  image: ImageData,
+  blockSize: number,
+): void {
   const source = new Uint8ClampedArray(image.data)
   for (let y = 0; y < image.height; y += blockSize) {
     const sampleY = Math.min(image.height - 1, y + Math.floor(blockSize / 2))
@@ -67,7 +75,10 @@ export function pixelateImageData(image: ImageData, blockSize: number): void {
 
 /** Deterministic separable box blur. CanvasKit uses a Gaussian filter, so
  * cross-backend assertions intentionally use a documented pixel tolerance. */
-export function blurImageData(image: ImageData, radius: number): void {
+export function blurImageData(
+  image: ImageData,
+  radius: number,
+): void {
   const width = image.width
   const height = image.height
   const source = new Uint8ClampedArray(image.data)
@@ -92,8 +103,7 @@ export function blurImageData(image: ImageData, radius: number): void {
       const removeOffset = (y * width + removeX) * 4
       const addOffset = (y * width + addX) * 4
       for (let channel = 0; channel < 4; channel += 1) {
-        sums[channel]! +=
-          source[addOffset + channel]! - source[removeOffset + channel]!
+        sums[channel]! += source[addOffset + channel]! - source[removeOffset + channel]!
       }
     }
   }
@@ -116,8 +126,7 @@ export function blurImageData(image: ImageData, radius: number): void {
       const removeOffset = (removeY * width + x) * 4
       const addOffset = (addY * width + x) * 4
       for (let channel = 0; channel < 4; channel += 1) {
-        sums[channel]! +=
-          horizontal[addOffset + channel]! - horizontal[removeOffset + channel]!
+        sums[channel]! += horizontal[addOffset + channel]! - horizontal[removeOffset + channel]!
       }
     }
   }
@@ -137,12 +146,8 @@ export function drawCensor2D(
           y: node.region.y + node.region.height / 2,
         }
       : {
-          x:
-            node.region.points.reduce((sum, point) => sum + point.x, 0) /
-            node.region.points.length,
-          y:
-            node.region.points.reduce((sum, point) => sum + point.y, 0) /
-            node.region.points.length,
+          x: node.region.points.reduce((sum, point) => sum + point.x, 0) / node.region.points.length,
+          y: node.region.points.reduce((sum, point) => sum + point.y, 0) / node.region.points.length,
         }
   if (node.effect.mode === 'solid') {
     const effect = node.effect
@@ -156,24 +161,12 @@ export function drawCensor2D(
 
   const processed = copyCanvas(factory, canvas)
   const processedContext = processed.getContext('2d')
-  if (!processedContext)
-    throw new Error('Canvas2D censor context is unavailable')
-  const image = processedContext.getImageData(
-    0,
-    0,
-    processed.width,
-    processed.height,
-  )
+  if (!processedContext) throw new Error('Canvas2D censor context is unavailable')
+  const image = processedContext.getImageData(0, 0, processed.width, processed.height)
   if (node.effect.mode === 'pixelate') {
-    pixelateImageData(
-      image,
-      Math.max(1, Math.round(node.effect.blockSize * scale)),
-    )
+    pixelateImageData(image, Math.max(1, Math.round(node.effect.blockSize * scale)))
   } else {
-    blurImageData(
-      image,
-      Math.max(1, Math.round((node.effect.strength * scale) / 2)),
-    )
+    blurImageData(image, Math.max(1, Math.round((node.effect.strength * scale) / 2)))
   }
   processedContext.putImageData(image, 0, 0)
   withTransform(context, node, center.x, center.y, () => {
@@ -258,14 +251,8 @@ export function drawRuler2D(
       { x: node.x2, y: node.y2 },
     ]) {
       context.beginPath()
-      context.moveTo(
-        endpoint.x - perpendicular.x * tickHalf,
-        endpoint.y - perpendicular.y * tickHalf,
-      )
-      context.lineTo(
-        endpoint.x + perpendicular.x * tickHalf,
-        endpoint.y + perpendicular.y * tickHalf,
-      )
+      context.moveTo(endpoint.x - perpendicular.x * tickHalf, endpoint.y - perpendicular.y * tickHalf)
+      context.lineTo(endpoint.x + perpendicular.x * tickHalf, endpoint.y + perpendicular.y * tickHalf)
       context.stroke()
     }
   })
@@ -288,14 +275,7 @@ export function drawRuler2D(
       : node.fontSize * 0.2
     context.translate(badgeCenterX, badgeCenterY)
     context.rotate((rulerBadgeRotationDegrees(node) * Math.PI) / 180)
-    roundedRectPath(
-      context,
-      -badge.width / 2,
-      -badge.height / 2,
-      badge.width,
-      badge.height,
-      badge.radius,
-    )
+    roundedRectPath(context, -badge.width / 2, -badge.height / 2, badge.width, badge.height, badge.radius)
     context.fillStyle = cssColor(palette.background)
     context.fill()
     context.strokeStyle = cssColor(node.color)
@@ -381,10 +361,8 @@ export function drawLoupe2D(
       height: scene.height,
     })
     if (sourceIntersection) {
-      const destinationX =
-        node.lens.x + (sourceIntersection.x - node.sourceRegion.x) * node.zoom
-      const destinationY =
-        node.lens.y + (sourceIntersection.y - node.sourceRegion.y) * node.zoom
+      const destinationX = node.lens.x + (sourceIntersection.x - node.sourceRegion.x) * node.zoom
+      const destinationY = node.lens.y + (sourceIntersection.y - node.sourceRegion.y) * node.zoom
       context.imageSmoothingEnabled = false
       context.drawImage(
         below as unknown as CanvasImageSource,

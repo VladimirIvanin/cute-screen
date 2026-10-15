@@ -4,7 +4,10 @@ import type {
   CanvasKitCanvas,
   CanvasKitImageResource,
 } from './contracts'
-import { blendMode, configurePaint } from './paint'
+import {
+  blendMode,
+  configurePaint,
+} from './paint'
 
 type ImageNode = Extract<RenderNode, { kind: 'image' }>
 
@@ -13,14 +16,7 @@ function configureImageStroke(
   node: ImageNode,
   stroke: InstanceType<CanvasKitApi['Paint']>,
 ): void {
-  configurePaint(
-    canvasKit,
-    stroke,
-    node.stroke!,
-    node.opacity,
-    'stroke',
-    node.strokeWidth ?? 1,
-  )
+  configurePaint(canvasKit, stroke, node.stroke!, node.opacity, 'stroke', node.strokeWidth ?? 1)
   stroke.setStrokeJoin(
     node.lineJoin === 'round'
       ? canvasKit.StrokeJoin.Round
@@ -47,11 +43,7 @@ export function drawImageNodeCanvasKit(
     const bounds = canvasKit.XYWHRect(0, 0, node.width, node.height)
     const rounded =
       (node.cornerRadius ?? 0) > 0
-        ? canvasKit.RRectXY(
-            bounds,
-            node.cornerRadius ?? 0,
-            node.cornerRadius ?? 0,
-          )
+        ? canvasKit.RRectXY(bounds, node.cornerRadius ?? 0, node.cornerRadius ?? 0)
         : undefined
     if (rounded) canvas.clipRRect?.(rounded, canvasKit.ClipOp?.Intersect, true)
     if (resource) {
@@ -66,20 +58,8 @@ export function drawImageNodeCanvasKit(
         false,
       )
     } else {
-      configurePaint(
-        canvasKit,
-        fill,
-        { red: 0.72, green: 0.28, blue: 0.28, alpha: 0.16 },
-        node.opacity,
-        'fill',
-      )
-      configurePaint(
-        canvasKit,
-        stroke,
-        { red: 0.72, green: 0.28, blue: 0.28, alpha: 0.9 },
-        node.opacity,
-        'stroke',
-      )
+      configurePaint(canvasKit, fill, { red: 0.72, green: 0.28, blue: 0.28, alpha: 0.16 }, node.opacity, 'fill')
+      configurePaint(canvasKit, stroke, { red: 0.72, green: 0.28, blue: 0.28, alpha: 0.9 }, node.opacity, 'stroke')
       if (rounded && canvas.drawRRect) {
         canvas.drawRRect(rounded, fill)
         canvas.drawRRect(rounded, stroke)

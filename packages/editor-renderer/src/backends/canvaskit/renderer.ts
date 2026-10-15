@@ -1,4 +1,7 @@
-import type { RenderNode, RenderSceneSnapshot } from '@cute-screen/editor-core'
+import type {
+  RenderNode,
+  RenderSceneSnapshot,
+} from '@cute-screen/editor-core'
 import { drawNodes2D } from '../canvas2d/nodes'
 import type { InvalidationReason } from '../../scheduler'
 import type {
@@ -22,7 +25,10 @@ import { CanvasKitTypefaceStore } from './geometry'
 import { drawNodesCanvasKit } from './nodes'
 import { drawSnapshotCanvasKit } from './effects'
 import { configurePaint } from './paint'
-import { drawScene, renderCanvasKitPng } from './scene'
+import {
+  drawScene,
+  renderCanvasKitPng,
+} from './scene'
 
 export function renderHeadlessCanvasKitPng(
   canvasKit: CanvasKitApi,
@@ -93,7 +99,8 @@ export class CanvasKitRenderer implements Renderer {
       source: input.source,
       image,
       dispose: () => {
-        if (this.#resources.delete(input.id)) {
+        if (this.#resources.get(input.id) === resource) {
+          this.#resources.delete(input.id)
           this.#disposePicture()
           resource.image.delete()
         }
@@ -121,11 +128,7 @@ export class CanvasKitRenderer implements Renderer {
   render(reasons: readonly InvalidationReason[]): FrameMetric {
     this.#assertReady()
     const startedAt = this.#now()
-    if (
-      reasons.some((reason) =>
-        ['scene', 'viewport', 'resource', 'export'].includes(reason),
-      )
-    ) {
+    if (reasons.some((reason) => ['scene', 'viewport', 'resource', 'export'].includes(reason))) {
       this.#drawCommittedScene()
     }
     if (reasons.includes('overlay') || reasons.includes('viewport')) {
@@ -151,13 +154,7 @@ export class CanvasKitRenderer implements Renderer {
 
   async exportPng(options: RenderExportOptions = {}): Promise<Uint8Array> {
     this.#assertReady()
-    return renderCanvasKitPng(
-      this.#canvasKit,
-      this.#scene!,
-      this.#resources,
-      this.#typefaces,
-      options,
-    )
+    return renderCanvasKitPng(this.#canvasKit, this.#scene!, this.#resources, this.#typefaces, options)
   }
 
   dispose(): void {
@@ -188,13 +185,7 @@ export class CanvasKitRenderer implements Renderer {
       const working = this.#canvasKit.MakeSurface(scene.width, scene.height)
       if (!working) throw new Error('CanvasKit crop surface creation failed')
       try {
-        drawScene(
-          this.#canvasKit,
-          working,
-          scene,
-          this.#resources,
-          this.#typefaces,
-        )
+        drawScene(this.#canvasKit, working, scene, this.#resources, this.#typefaces)
         const image = working.makeImageSnapshot()
         try {
           const canvas = this.#surface!.getCanvas()
@@ -213,12 +204,7 @@ export class CanvasKitRenderer implements Renderer {
                 scene.outputBounds.width,
                 scene.outputBounds.height,
               ),
-              this.#canvasKit.XYWHRect(
-                0,
-                0,
-                scene.outputBounds.width,
-                scene.outputBounds.height,
-              ),
+              this.#canvasKit.XYWHRect(0, 0, scene.outputBounds.width, scene.outputBounds.height),
               paint,
             )
           } finally {
@@ -242,18 +228,11 @@ export class CanvasKitRenderer implements Renderer {
       this.#surface!.flush()
       return
     }
-    drawScene(
-      this.#canvasKit,
-      this.#surface!,
-      this.#scene!,
-      this.#resources,
-      this.#typefaces,
-    )
+    drawScene(this.#canvasKit, this.#surface!, this.#scene!, this.#resources, this.#typefaces)
   }
 
   #pictureForScene(): CanvasKitPicture | undefined {
-    if (this.#picture && this.#pictureScene === this.#scene)
-      return this.#picture
+    if (this.#picture && this.#pictureScene === this.#scene) return this.#picture
     const PictureRecorder = this.#canvasKit.PictureRecorder
     if (!PictureRecorder || !this.#scene) return undefined
     const scene = this.#scene
@@ -262,30 +241,17 @@ export class CanvasKitRenderer implements Renderer {
       scene.outputBounds.y === 0 &&
       scene.outputBounds.width === scene.width &&
       scene.outputBounds.height === scene.height
-    if (
-      !fullOutput ||
-      scene.nodes.some((node) =>
-        ['censor', 'spotlight', 'loupe'].includes(node.kind),
-      )
-    ) {
+    if (!fullOutput || scene.nodes.some((node) => ['censor', 'spotlight', 'loupe'].includes(node.kind))) {
       return undefined
     }
     const recorder = new PictureRecorder()
     try {
-      const recording = recorder.beginRecording(
-        this.#canvasKit.XYWHRect(0, 0, this.#scene.width, this.#scene.height),
-      )
+      const recording = recorder.beginRecording(this.#canvasKit.XYWHRect(0, 0, this.#scene.width, this.#scene.height))
       for (const node of this.#scene.nodes) {
         if (node.kind === 'image') {
           this.#drawImageNode(recording, node)
         } else {
-          drawNodesCanvasKit(
-            this.#canvasKit,
-            recording,
-            [node],
-            this.#resources,
-            this.#typefaces,
-          )
+          drawNodesCanvasKit(this.#canvasKit, recording, [node], this.#resources, this.#typefaces)
         }
       }
       this.#picture = recorder.finishRecordingAsPicture()
@@ -312,11 +278,7 @@ export class CanvasKitRenderer implements Renderer {
       const bounds = this.#canvasKit.XYWHRect(0, 0, node.width, node.height)
       const rounded =
         (node.cornerRadius ?? 0) > 0
-          ? this.#canvasKit.RRectXY(
-              bounds,
-              node.cornerRadius ?? 0,
-              node.cornerRadius ?? 0,
-            )
+          ? this.#canvasKit.RRectXY(bounds, node.cornerRadius ?? 0, node.cornerRadius ?? 0)
           : undefined
       if (rounded) {
         canvas.clipRRect?.(rounded, this.#canvasKit.ClipOp?.Intersect, true)
@@ -332,13 +294,7 @@ export class CanvasKitRenderer implements Renderer {
           false,
         )
       } else {
-        configurePaint(
-          this.#canvasKit,
-          fill,
-          { red: 0.72, green: 0.28, blue: 0.28, alpha: 0.16 },
-          node.opacity,
-          'fill',
-        )
+        configurePaint(this.#canvasKit, fill, { red: 0.72, green: 0.28, blue: 0.28, alpha: 0.16 }, node.opacity, 'fill')
         configurePaint(
           this.#canvasKit,
           stroke,
@@ -355,14 +311,7 @@ export class CanvasKitRenderer implements Renderer {
         }
       }
       if (node.stroke && (node.strokeWidth ?? 0) > 0) {
-        configurePaint(
-          this.#canvasKit,
-          stroke,
-          node.stroke,
-          node.opacity,
-          'stroke',
-          node.strokeWidth ?? 1,
-        )
+        configurePaint(this.#canvasKit, stroke, node.stroke, node.opacity, 'stroke', node.strokeWidth ?? 1)
         stroke.setStrokeJoin(
           node.lineJoin === 'round'
             ? this.#canvasKit.StrokeJoin.Round
@@ -386,15 +335,15 @@ export class CanvasKitRenderer implements Renderer {
     this.#pictureScene = undefined
   }
 
-  #replaceSurface(width: number, height: number): void {
+  #replaceSurface(
+    width: number,
+    height: number,
+  ): void {
     const stack = this.#stack
     if (!stack) return
     const targetWidth = Math.max(1, Math.round(width))
     const targetHeight = Math.max(1, Math.round(height))
-    const sizeChanged =
-      stack.scene.width !== targetWidth ||
-      stack.scene.height !== targetHeight ||
-      !this.#surface
+    const sizeChanged = stack.scene.width !== targetWidth || stack.scene.height !== targetHeight || !this.#surface
     stack.scene.style.width = `${targetWidth}px`
     stack.scene.style.height = `${targetHeight}px`
     stack.overlay.style.width = `${targetWidth}px`
@@ -425,9 +374,7 @@ export class CanvasKitRenderer implements Renderer {
       if (contextHandle !== undefined) {
         this.#canvasKit.deleteContext(contextHandle)
       }
-      throw new Error(
-        'CanvasKit replaced the scene canvas with a software surface',
-      )
+      throw new Error('CanvasKit replaced the scene canvas with a software surface')
     }
 
     const replacements = new Map<string, CanvasKitImage>()

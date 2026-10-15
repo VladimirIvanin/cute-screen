@@ -15,25 +15,21 @@ export interface CoordinatedDocumentRecord {
 export type DocumentHandoffOutcome =
   | { readonly kind: 'switched' }
   | {
-      readonly kind: 'failed'
-      readonly flush: Extract<DocumentFlushOutcome, { kind: 'failed' }>
-    }
+    readonly kind: 'failed'
+    readonly flush: Extract<DocumentFlushOutcome, { kind: 'failed' }>
+  }
 
 export interface DocumentSessionCoordinatorOptions {
   readonly bridge: DocumentPersistenceBridge
   readonly correlationId: () => string
-  readonly onActiveSession: (
-    session: DocumentSessionController | undefined,
-  ) => void
+  readonly onActiveSession: (session: DocumentSessionController | undefined) => void
 }
 
 /** Serializes session replacement without putting editor-core into Vue reactivity. */
 export class DocumentSessionCoordinator {
   readonly #bridge: DocumentPersistenceBridge
   readonly #correlationId: () => string
-  readonly #onActiveSession: (
-    session: DocumentSessionController | undefined,
-  ) => void
+  readonly #onActiveSession: (session: DocumentSessionController | undefined) => void
   #active: DocumentSessionController | undefined
   #pending: CoordinatedDocumentRecord | undefined
 
@@ -56,9 +52,7 @@ export class DocumentSessionCoordinator {
     this.#install(record)
   }
 
-  async handoff(
-    record: CoordinatedDocumentRecord,
-  ): Promise<DocumentHandoffOutcome> {
+  async handoff(record: CoordinatedDocumentRecord): Promise<DocumentHandoffOutcome> {
     if (this.#active) {
       const flush = await this.#active.flush()
       if (flush.kind === 'failed') {

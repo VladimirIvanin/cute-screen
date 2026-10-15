@@ -14,39 +14,32 @@ export interface RenderGradientStop {
 export type RenderPaint =
   | RgbaColor
   | Readonly<{
-      readonly kind: 'linearGradient'
-      readonly startX: number
-      readonly startY: number
-      readonly endX: number
-      readonly endY: number
-      readonly stops: readonly RenderGradientStop[]
-    }>
+    readonly kind: 'linearGradient'
+    readonly startX: number
+    readonly startY: number
+    readonly endX: number
+    readonly endY: number
+    readonly stops: readonly RenderGradientStop[]
+  }>
   | Readonly<{
-      readonly kind: 'radialGradient'
-      readonly centerX: number
-      readonly centerY: number
-      readonly radius: number
-      readonly stops: readonly RenderGradientStop[]
-    }>
+    readonly kind: 'radialGradient'
+    readonly centerX: number
+    readonly centerY: number
+    readonly radius: number
+    readonly stops: readonly RenderGradientStop[]
+  }>
   | Readonly<{
-      readonly kind: 'imageTexture'
-      readonly resourceId: string
-      readonly opacity: number
-      readonly scale: number
-      readonly rotation: number
-      readonly offsetX: number
-      readonly offsetY: number
-    }>
+    readonly kind: 'imageTexture'
+    readonly resourceId: string
+    readonly opacity: number
+    readonly scale: number
+    readonly rotation: number
+    readonly offsetX: number
+    readonly offsetY: number
+  }>
 
 export type RenderBlendMode =
-  | 'normal'
-  | 'multiply'
-  | 'screen'
-  | 'overlay'
-  | 'darken'
-  | 'lighten'
-  | 'softLight'
-  | 'hardLight'
+  'normal' | 'multiply' | 'screen' | 'overlay' | 'darken' | 'lighten' | 'softLight' | 'hardLight'
 
 export type RenderLineCap = 'butt' | 'round' | 'square'
 export type RenderLineJoin = 'miter' | 'round' | 'bevel'
@@ -186,16 +179,16 @@ export interface RenderTextNode extends RenderNodeBase {
 
 export type RenderCensorRegion =
   | Readonly<{
-      readonly kind: 'rectangle'
-      readonly x: number
-      readonly y: number
-      readonly width: number
-      readonly height: number
-    }>
+    readonly kind: 'rectangle'
+    readonly x: number
+    readonly y: number
+    readonly width: number
+    readonly height: number
+  }>
   | Readonly<{
-      readonly kind: 'freeform'
-      readonly points: readonly Point2D[]
-    }>
+    readonly kind: 'freeform'
+    readonly points: readonly Point2D[]
+  }>
 
 export interface Point2D {
   readonly x: number
@@ -303,10 +296,7 @@ export interface RenderSceneSnapshot {
   readonly nodes: readonly RenderNode[]
 }
 
-export type RenderSceneInput = Omit<
-  RenderSceneSnapshot,
-  'nodes' | 'outputBounds'
-> & {
+export type RenderSceneInput = Omit<RenderSceneSnapshot, 'nodes' | 'outputBounds'> & {
   readonly outputBounds?: RenderOutputBounds
   readonly nodes: readonly RenderNode[]
 }

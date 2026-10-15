@@ -1,6 +1,17 @@
 import type { RenderNode } from '../../scene/contracts'
-import type { MarkerLayer, PencilLayer, ShapeLayer } from '../types'
-import { bounds, color, fill, lineNode, localPoint, stroke } from './shared'
+import type {
+  MarkerLayer,
+  PencilLayer,
+  ShapeLayer,
+} from '../types'
+import {
+  bounds,
+  color,
+  fill,
+  lineNode,
+  localPoint,
+  stroke,
+} from './shared'
 
 type ShapeGeometry = Readonly<{
   x: number
@@ -22,22 +33,13 @@ function polygonCorners(
       { x: geometry.x, y: geometry.y + geometry.height / 2 },
     ]
   const count = Number(payload.starPoints) || 5
-  const innerRatio = Math.max(
-    0,
-    Math.min(1, Number(payload.starInnerRatio) || 0.45),
-  )
+  const innerRatio = Math.max(0, Math.min(1, Number(payload.starInnerRatio) || 0.45))
   return Array.from({ length: count * 2 }, (_, index) => {
     const radius = index % 2 === 0 ? 1 : innerRatio
     const angle = -Math.PI / 2 + (Math.PI * index) / count
     return {
-      x:
-        geometry.x +
-        geometry.width / 2 +
-        Math.cos(angle) * (geometry.width / 2) * radius,
-      y:
-        geometry.y +
-        geometry.height / 2 +
-        Math.sin(angle) * (geometry.height / 2) * radius,
+      x: geometry.x + geometry.width / 2 + Math.cos(angle) * (geometry.width / 2) * radius,
+      y: geometry.y + geometry.height / 2 + Math.sin(angle) * (geometry.height / 2) * radius,
     }
   })
 }
@@ -83,15 +85,8 @@ export function shapeNodes(layer: ShapeLayer): readonly RenderNode[] {
   }
   if (shape === 'rectangle') {
     const radius =
-      typeof payload.cornerRadius === 'number' &&
-      Number.isFinite(payload.cornerRadius)
-        ? Math.max(
-            0,
-            Math.min(
-              payload.cornerRadius,
-              Math.min(geometry.width, geometry.height) / 2,
-            ),
-          )
+      typeof payload.cornerRadius === 'number' && Number.isFinite(payload.cornerRadius)
+        ? Math.max(0, Math.min(payload.cornerRadius, Math.min(geometry.width, geometry.height) / 2))
         : 0
     return [
       {
@@ -134,9 +129,7 @@ export function shapeNodes(layer: ShapeLayer): readonly RenderNode[] {
   ]
 }
 
-export function freehandNodes(
-  layer: PencilLayer | MarkerLayer,
-): readonly RenderNode[] {
+export function freehandNodes(layer: PencilLayer | MarkerLayer): readonly RenderNode[] {
   const payload = layer.payload
   const points = Array.isArray(payload.points)
     ? payload.points.map((point) => {
@@ -144,8 +137,7 @@ export function freehandNodes(
         return {
           ...localPoint(sample, { x: 0, y: 0 }),
           pressure:
-            typeof sample.pressure === 'number' &&
-            Number.isFinite(sample.pressure)
+            typeof sample.pressure === 'number' && Number.isFinite(sample.pressure)
               ? Math.max(0, Math.min(1, sample.pressure))
               : 0.5,
         }
@@ -165,10 +157,7 @@ export function freehandNodes(
     join: 'round' as const,
   }
   if (points.length === 1) {
-    const radius = Math.max(
-      0.5,
-      (style.width * (layer.kind === 'pencil' ? points[0]!.pressure : 1)) / 2,
-    )
+    const radius = Math.max(0.5, (style.width * (layer.kind === 'pencil' ? points[0]!.pressure : 1)) / 2)
     return [
       {
         kind: 'ellipse' as const,
@@ -194,8 +183,7 @@ export function freehandNodes(
           Object.freeze({
             x: layer.transform.translateX + point.x,
             y: layer.transform.translateY + point.y,
-          }),
-        ),
+          })),
         rotation: layer.transform.rotation,
         opacity: layer.opacity,
         visible: layer.visible,
@@ -211,6 +199,5 @@ export function freehandNodes(
     lineNode(layer, `${layer.id}:stroke:${index}`, points[index]!, point, {
       ...style,
       width: style.width * ((points[index]!.pressure + point.pressure) / 2),
-    }),
-  )
+    }))
 }

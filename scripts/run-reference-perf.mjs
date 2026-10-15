@@ -1,5 +1,14 @@
-import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import {
+  execFileSync,
+  spawnSync,
+} from 'node:child_process'
+import {
+  mkdtemp,
+  mkdir,
+  readFile,
+  rm,
+  writeFile,
+} from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
@@ -7,25 +16,30 @@ const root = process.cwd()
 const artifactDir = path.join(root, 'artifacts', 'reference-perf')
 const executable = path.join(root, 'target', 'debug', 'cute-screen')
 
-function command(command, args, options = {}) {
+function command(
+  command,
+  args,
+  options = {},
+) {
   const result = spawnSync(command, args, {
     cwd: root,
     env: { ...process.env, ...(options.env ?? {}) },
     stdio: 'inherit',
   })
   if (result.error) throw result.error
-  if (result.status !== 0)
-    throw new Error(`${command} ${args.join(' ')} failed`)
+  if (result.status !== 0) throw new Error(`${command} ${args.join(' ')} failed`)
 }
 
-function output(command, args) {
+function output(
+  command,
+  args,
+) {
   return execFileSync(command, args, { encoding: 'utf8' }).trim()
 }
 
 async function preflight() {
   const failures = []
-  if (process.platform !== 'linux')
-    throw new Error('Reference runner must be Linux')
+  if (process.platform !== 'linux') throw new Error('Reference runner must be Linux')
   if (process.env.XDG_SESSION_TYPE !== 'x11' || !process.env.DISPLAY) {
     throw new Error('Reference runner requires an interactive X11 session')
   }
@@ -40,31 +54,25 @@ async function preflight() {
     '--query-gpu=name,driver_version,temperature.gpu,utilization.gpu,pstate',
     '--format=csv,noheader,nounits',
   ])
-  const [name, driver, temperature, utilization, pstate] = gpu
-    .split(',')
-    .map((value) => value.trim())
+  const [name, driver, temperature, utilization, pstate] = gpu.split(',').map((value) => value.trim())
   if (name !== 'NVIDIA GeForce RTX 2070 SUPER' || driver !== '595.84') {
     failures.push(`GPU fingerprint does not match: ${gpu}`)
   }
-  if (Number(temperature) > 65 || Number(utilization) > 5 || pstate === 'P0') {
+  if (
+    Number(temperature) > 65 ||
+    Number(utilization) > 5 ||
+    pstate === 'P0'
+  ) {
     failures.push(`GPU is not idle/stable: ${gpu}`)
   }
-  const governor = (
-    await readFile(
-      '/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor',
-      'utf8',
-    )
-  ).trim()
+  const governor = (await readFile('/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor', 'utf8')).trim()
   if (governor !== 'performance') {
     failures.push(`CPU governor must be performance, got ${governor}`)
   }
   const webkit = output('pkg-config', ['--modversion', 'webkit2gtk-4.1'])
-  if (webkit !== '2.52.3')
-    failures.push(`WebKitGTK must be 2.52.3, got ${webkit}`)
+  if (webkit !== '2.52.3') failures.push(`WebKitGTK must be 2.52.3, got ${webkit}`)
   if (failures.length > 0) {
-    throw new Error(
-      `Reference runner preflight failed:\n- ${failures.join('\n- ')}`,
-    )
+    throw new Error(`Reference runner preflight failed:\n- ${failures.join('\n- ')}`)
   }
   return { os: 'Ubuntu 24.04', gpu, governor, webkit, host: os.hostname() }
 }
@@ -101,9 +109,7 @@ command(
 const reports = []
 try {
   for (let pass = 1; pass <= 3; pass += 1) {
-    const appData = await mkdtemp(
-      path.join(os.tmpdir(), `cute-screen-reference-${pass}-`),
-    )
+    const appData = await mkdtemp(path.join(os.tmpdir(), `cute-screen-reference-${pass}-`))
     try {
       command(
         'pnpm',
@@ -126,11 +132,7 @@ try {
           },
         },
       )
-      reports.push(
-        JSON.parse(
-          await readFile(path.join(artifactDir, `run-${pass}.json`), 'utf8'),
-        ),
-      )
+      reports.push(JSON.parse(await readFile(path.join(artifactDir, `run-${pass}.json`), 'utf8')))
     } finally {
       await rm(appData, { recursive: true, force: true })
     }
@@ -143,7 +145,5 @@ try {
 }
 
 if (reports.length !== 3 || reports.some((report) => report.gpuP95 > 16.7)) {
-  throw new Error(
-    'Reference performance gate did not produce three passing GPU reports',
-  )
+  throw new Error('Reference performance gate did not produce three passing GPU reports')
 }

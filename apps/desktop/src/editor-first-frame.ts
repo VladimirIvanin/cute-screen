@@ -34,8 +34,7 @@ export class EditorFirstFrameGate {
   }
 
   fail(cause: unknown): void {
-    const error =
-      cause instanceof Error ? cause : new Error('editor document mount failed')
+    const error = cause instanceof Error ? cause : new Error('editor document mount failed')
     for (const entry of this.pending) {
       window.clearTimeout(entry.timeout)
       entry.reject(error)

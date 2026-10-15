@@ -3,10 +3,5 @@
   "identifier": "default",
   "description": "Production permissions for the main Cute Screen window.",
   "windows": ["main"],
-  "permissions": [
-    "core:default",
-    "core:window:allow-hide",
-    "core:window:allow-show",
-    "notification:default"
-  ]
+  "permissions": ["core:default", "core:window:allow-hide", "core:window:allow-show", "notification:default"]
 }

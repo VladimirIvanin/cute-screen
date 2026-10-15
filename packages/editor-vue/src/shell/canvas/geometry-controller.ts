@@ -8,8 +8,14 @@ import {
   type SnapCandidate,
   type Transform2D,
 } from '@cute-screen/editor-renderer'
-import type { CanvasPoint, CanvasViewportProps } from './contracts'
-import type { CanvasGesture, ResizeHandle } from './workspace-state'
+import type {
+  CanvasPoint,
+  CanvasViewportProps,
+} from './contracts'
+import type {
+  CanvasGesture,
+  ResizeHandle,
+} from './workspace-state'
 
 export interface LayerBounds {
   readonly x: number
@@ -26,14 +32,8 @@ export function transformCanvasPoint(
   const cosine = Math.cos(radians)
   const sine = Math.sin(radians)
   return {
-    x:
-      point.x * transform.scaleX * cosine -
-      point.y * transform.scaleY * sine +
-      transform.translateX,
-    y:
-      point.x * transform.scaleX * sine +
-      point.y * transform.scaleY * cosine +
-      transform.translateY,
+    x: point.x * transform.scaleX * cosine - point.y * transform.scaleY * sine + transform.translateX,
+    y: point.x * transform.scaleX * sine + point.y * transform.scaleY * cosine + transform.translateY,
   }
 }
 
@@ -55,14 +55,10 @@ export class CanvasGeometryController {
 
   selectedLayer(): LayerNode | undefined {
     const { props } = this.#context
-    return props.document?.layers.find(
-      (layer) => layer.id === props.selectedLayerId,
-    )
+    return props.document?.layers.find((layer) => layer.id === props.selectedLayerId)
   }
 
-  loupeSourceCenter(
-    layer: Extract<LayerNode, { readonly kind: 'loupe' }>,
-  ): CanvasPoint {
+  loupeSourceCenter(layer: Extract<LayerNode, { readonly kind: 'loupe' }>): CanvasPoint {
     const { sourceRegion } = layer.payload
     return {
       x: sourceRegion.x + sourceRegion.width / 2,
@@ -95,7 +91,10 @@ export class CanvasGeometryController {
     })
   }
 
-  toLocal(layer: LayerNode, point: CanvasPoint): CanvasPoint {
+  toLocal(
+    layer: LayerNode,
+    point: CanvasPoint,
+  ): CanvasPoint {
     const radians = (-layer.transform.rotation * Math.PI) / 180
     const cosine = Math.cos(radians)
     const sine = Math.sin(radians)
@@ -107,9 +106,7 @@ export class CanvasGeometryController {
     }
   }
 
-  localBoundsHandlePositions(
-    bounds: LayerBounds,
-  ): Readonly<Record<ResizeHandle, CanvasPoint>> {
+  localBoundsHandlePositions(bounds: LayerBounds): Readonly<Record<ResizeHandle, CanvasPoint>> {
     return {
       nw: { x: bounds.x, y: bounds.y },
       n: { x: bounds.x + bounds.width / 2, y: bounds.y },
@@ -131,10 +128,7 @@ export class CanvasGeometryController {
   ): Readonly<Record<ResizeHandle, CanvasPoint>> {
     const local = this.localBoundsHandlePositions(canvasLayerBounds(layer))
     return Object.fromEntries(
-      BOUNDS_RESIZE_HANDLES.map((handle) => [
-        handle,
-        transformCanvasPoint(transform, local[handle]),
-      ]),
+      BOUNDS_RESIZE_HANDLES.map((handle) => [handle, transformCanvasPoint(transform, local[handle])]),
     ) as Readonly<Record<ResizeHandle, CanvasPoint>>
   }
 
@@ -184,47 +178,33 @@ export class CanvasGeometryController {
       y: handle.includes('n') ? bounds.y : bounds.y + bounds.height,
     }
     const minScale = 1 / Math.max(bounds.width, bounds.height)
-    let factorX = resizesX
-      ? (local.x - opposite.x) / (corner.x - opposite.x)
-      : 1
-    let factorY = resizesY
-      ? (local.y - opposite.y) / (corner.y - opposite.y)
-      : 1
+    let factorX = resizesX ? (local.x - opposite.x) / (corner.x - opposite.x) : 1
+    let factorY = resizesY ? (local.y - opposite.y) / (corner.y - opposite.y) : 1
     factorX = Math.max(minScale, factorX)
     factorY = Math.max(minScale, factorY)
-    ;[factorX, factorY] = this.#preserveImageAspect(
-      layer,
-      freeResize,
-      resizesX,
-      resizesY,
-      factorX,
-      factorY,
-    )
+    ;
+    [factorX, factorY] = this.#preserveImageAspect(layer, freeResize, resizesX, resizesY, factorX, factorY)
     return this.#anchoredTransform(layer, opposite, factorX, factorY)
   }
 
   previewTransform(layer: LayerNode): Transform2D {
     const gesture = this.#context.gesture()
-    if (!gesture || !('id' in gesture) || gesture.id !== layer.id) {
+    if (
+      !gesture ||
+      !('id' in gesture) ||
+      gesture.id !== layer.id
+    ) {
       return layer.transform
     }
     if (gesture.kind === 'move') {
       return {
         ...layer.transform,
-        translateX:
-          layer.transform.translateX + gesture.current.x - gesture.start.x,
-        translateY:
-          layer.transform.translateY + gesture.current.y - gesture.start.y,
+        translateX: layer.transform.translateX + gesture.current.x - gesture.start.x,
+        translateY: layer.transform.translateY + gesture.current.y - gesture.start.y,
       }
     }
     if (gesture.kind === 'resize') {
-      return this.resizeTransform(
-        layer,
-        gesture.handle,
-        gesture.current,
-        gesture.freeResize,
-        gesture.centerResize,
-      )
+      return this.resizeTransform(layer, gesture.handle, gesture.current, gesture.freeResize, gesture.centerResize)
     }
     if (gesture.kind === 'rotate') {
       return { ...gesture.initial, rotation: gesture.currentAngle }
@@ -234,38 +214,30 @@ export class CanvasGeometryController {
 
   gesturePreviewLayer(): LayerNode | undefined {
     const gesture = this.#context.gesture()
-    if (!gesture || !('id' in gesture) || gesture.kind === 'loupeSource') {
+    if (
+      !gesture ||
+      !('id' in gesture) ||
+      gesture.kind === 'loupeSource'
+    ) {
       return undefined
     }
-    const layer = this.#context.props.document?.layers.find(
-      (candidate) => candidate.id === gesture.id,
-    )
+    const layer = this.#context.props.document?.layers.find((candidate) => candidate.id === gesture.id)
     if (!layer) return undefined
     if (gesture.kind === 'intrinsicResize') {
       return resizeLayerGeometry(layer, gesture.handle, gesture.current, {
         preserveAspect: gesture.preserveAspect,
         fromCenter: gesture.centerResize,
-        ...(this.#context.props.document === undefined
-          ? {}
-          : { canvas: this.#context.props.document.canvas }),
+        ...(this.#context.props.document === undefined ? {} : { canvas: this.#context.props.document.canvas }),
       })
     }
     if (gesture.kind === 'arrowHandle') {
       return layer.kind === 'arrow'
-        ? updateArrowHandle(
-            layer,
-            gesture.handle,
-            this.toLocal(layer, gesture.current),
-          )
+        ? updateArrowHandle(layer, gesture.handle, this.toLocal(layer, gesture.current))
         : undefined
     }
     if (gesture.kind === 'calloutHandle') {
       return layer.kind === 'callout'
-        ? updateCalloutHandle(
-            layer,
-            gesture.handle,
-            this.toLocal(layer, gesture.current),
-          )
+        ? updateCalloutHandle(layer, gesture.handle, this.toLocal(layer, gesture.current))
         : undefined
     }
     return { ...layer, transform: this.previewTransform(layer) }
@@ -273,7 +245,11 @@ export class CanvasGeometryController {
 
   gesturePreviewNodes() {
     const layer = this.gesturePreviewLayer()
-    if (!layer || layer.kind === 'loupe' || !this.#context.props.document) {
+    if (
+      !layer ||
+      layer.kind === 'loupe' ||
+      !this.#context.props.document
+    ) {
       return []
     }
     return createDocumentRenderScene({
@@ -300,7 +276,10 @@ export class CanvasGeometryController {
     )
   }
 
-  #appendLayerCandidates(candidates: SnapCandidate[], layer: LayerNode): void {
+  #appendLayerCandidates(
+    candidates: SnapCandidate[],
+    layer: LayerNode,
+  ): void {
     const bounds = canvasLayerBounds(layer)
     const points = [
       { id: 'start', point: { x: bounds.x, y: bounds.y } },
@@ -335,10 +314,10 @@ export class CanvasGeometryController {
       resizesX && !resizesY
         ? factorX
         : !resizesX && resizesY
-          ? factorY
-          : Math.abs(factorX - 1) >= Math.abs(factorY - 1)
-            ? factorX
-            : factorY
+            ? factorY
+            : Math.abs(factorX - 1) >= Math.abs(factorY - 1)
+              ? factorX
+              : factorY
     return [factor, factor]
   }
 
@@ -358,14 +337,8 @@ export class CanvasGeometryController {
       scaleX: nextScaleX,
       scaleY: nextScaleY,
       rotation: layer.transform.rotation,
-      translateX:
-        anchor.x -
-        opposite.x * nextScaleX * cosine +
-        opposite.y * nextScaleY * sine,
-      translateY:
-        anchor.y -
-        opposite.x * nextScaleX * sine -
-        opposite.y * nextScaleY * cosine,
+      translateX: anchor.x - opposite.x * nextScaleX * cosine + opposite.y * nextScaleY * sine,
+      translateY: anchor.y - opposite.x * nextScaleX * sine - opposite.y * nextScaleY * cosine,
     }
   }
 }

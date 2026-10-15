@@ -1,3 +1,5 @@
+#[cfg(any(test, feature = "test-harness"))]
+mod e2e_paths;
 mod tray_icon;
 
 use std::collections::{HashMap, VecDeque};
@@ -1415,18 +1417,24 @@ fn current_session() -> SessionKind {
 fn initialize_image_transport<R: tauri::Runtime>(
     app: &tauri::App<R>,
 ) -> Result<Arc<ImageTransportService>, Box<dyn std::error::Error>> {
-    let local_data = app.path().app_local_data_dir()?;
+    let (local_data, _cache) = application_directories(app)?;
     let stage_root = local_data.join("blobs");
 
     #[cfg(feature = "test-harness")]
-    let source_root = app.path().app_cache_dir()?.join("m01-fixtures");
+    let source_root = _cache.join("m01-fixtures");
     #[cfg(not(feature = "test-harness"))]
     let source_root = local_data.join("library");
 
     let transport = Arc::new(ImageTransportService::new(&source_root, stage_root)?);
 
     #[cfg(feature = "test-harness")]
-    register_test_fixtures(&transport, &source_root)?;
+    {
+        app.asset_protocol_scope()
+            .allow_directory(&source_root, true)?;
+        app.asset_protocol_scope()
+            .allow_directory(local_data.join("blobs"), true)?;
+        register_test_fixtures(&transport, &source_root)?;
+    }
 
     Ok(transport)
 }
@@ -1434,9 +1442,21 @@ fn initialize_image_transport<R: tauri::Runtime>(
 fn initialize_repository<R: tauri::Runtime>(
     app: &tauri::App<R>,
 ) -> Result<LibraryRepository, Box<dyn std::error::Error>> {
-    let local_data = app.path().app_local_data_dir()?;
-    let cache = app.path().app_cache_dir()?;
+    let (local_data, cache) = application_directories(app)?;
     Ok(LibraryRepository::initialize(local_data, cache)?)
+}
+
+fn application_directories<R: tauri::Runtime>(
+    app: &tauri::App<R>,
+) -> Result<(std::path::PathBuf, std::path::PathBuf), Box<dyn std::error::Error>> {
+    #[cfg(feature = "test-harness")]
+    if let Some(root) = env::var_os("CUTE_SCREEN_E2E_APP_DATA") {
+        return Ok(e2e_paths::profile_paths(std::path::Path::new(&root))?);
+    }
+    Ok((
+        app.path().app_local_data_dir()?,
+        app.path().app_cache_dir()?,
+    ))
 }
 
 fn show_editor<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
@@ -2038,7 +2058,7 @@ fn register_test_fixtures(
         ("m01-ui-8k", "ui-8k.png", 7680, 4320),
         ("m01-alpha-png", "alpha.png", 64, 64),
         ("m01-icc-png", "icc.png", 64, 64),
-        ("m01-exif-png", "exif.png", 64, 32),
+        ("m01-exif-png", "exif.png", 32, 64),
         ("m01-corrupted-png", "corrupted.png", 64, 64),
     ];
     fs::create_dir_all(source_root)?;
@@ -2101,6 +2121,15 @@ fn seed_m03_document(repository: &LibraryRepository) -> Result<(), RepositoryErr
     reason = "declarative Tauri builder lists managed state and stable IPC handlers"
 )]
 pub fn run() {
+    #[cfg(feature = "test-harness")]
+    if let Err(error) = tracing_subscriber::fmt()
+        .with_ansi(false)
+        .with_writer(std::io::stderr)
+        .try_init()
+    {
+        eprintln!("cute-screen test tracing warning: {error}");
+    }
+
     let launch_intent = match parse_launch(env::args_os()) {
         Ok(intent) => intent,
         Err(error) => {
@@ -2215,9 +2244,15 @@ pub fn run() {
         });
 
     #[cfg(feature = "test-harness")]
-    let builder = builder
-        .plugin(tauri_plugin_wdio::init())
-        .plugin(tauri_plugin_wdio_webdriver::init());
+    let builder = builder.plugin(tauri_plugin_wdio::init());
+
+    #[cfg(feature = "test-harness")]
+    let builder = if env::var("CUTE_SCREEN_E2E_DRIVER_PROVIDER").ok().as_deref() == Some("external")
+    {
+        builder
+    } else {
+        builder.plugin(tauri_plugin_wdio_webdriver::init())
+    };
 
     #[cfg(feature = "test-harness")]
     let builder = builder.invoke_handler(tauri::generate_handler![

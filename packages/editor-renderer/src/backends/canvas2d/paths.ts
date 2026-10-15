@@ -19,12 +19,7 @@ export function roundedRectPath(
   context.lineTo(x + width - corner, y)
   context.quadraticCurveTo(x + width, y, x + width, y + corner)
   context.lineTo(x + width, y + height - corner)
-  context.quadraticCurveTo(
-    x + width,
-    y + height,
-    x + width - corner,
-    y + height,
-  )
+  context.quadraticCurveTo(x + width, y + height, x + width - corner, y + height)
   context.lineTo(x + corner, y + height)
   context.quadraticCurveTo(x, y + height, x, y + height - corner)
   context.lineTo(x, y + corner)
@@ -38,12 +33,7 @@ export function censorRegionPath(
 ): void {
   context.beginPath()
   if (node.region.kind === 'rectangle') {
-    context.rect(
-      node.region.x,
-      node.region.y,
-      node.region.width,
-      node.region.height,
-    )
+    context.rect(node.region.x, node.region.y, node.region.width, node.region.height)
     return
   }
   const first = node.region.points[0]!
@@ -74,32 +64,21 @@ export function spotlightAperturePath(
     )
   } else {
     context.moveTo(aperture.x + aperture.width / 2, aperture.y)
-    context.lineTo(
-      aperture.x + aperture.width,
-      aperture.y + aperture.height / 2,
-    )
-    context.lineTo(
-      aperture.x + aperture.width / 2,
-      aperture.y + aperture.height,
-    )
+    context.lineTo(aperture.x + aperture.width, aperture.y + aperture.height / 2)
+    context.lineTo(aperture.x + aperture.width / 2, aperture.y + aperture.height)
     context.lineTo(aperture.x, aperture.y + aperture.height / 2)
     context.closePath()
   }
 }
 
-export function loupeLensPath(context: Context2D, node: RenderLoupeNode): void {
+export function loupeLensPath(
+  context: Context2D,
+  node: RenderLoupeNode,
+): void {
   context.beginPath()
   if (node.lens.shape === 'circle') {
     const radius = node.lens.size / 2
-    context.ellipse(
-      node.lens.x + radius,
-      node.lens.y + radius,
-      radius,
-      radius,
-      0,
-      0,
-      Math.PI * 2,
-    )
+    context.ellipse(node.lens.x + radius, node.lens.y + radius, radius, radius, 0, 0, Math.PI * 2)
   } else {
     context.rect(node.lens.x, node.lens.y, node.lens.size, node.lens.size)
   }

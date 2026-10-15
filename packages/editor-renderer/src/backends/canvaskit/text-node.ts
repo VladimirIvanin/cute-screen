@@ -1,4 +1,7 @@
-import type { RenderNode, RenderTextStyle } from '@cute-screen/editor-core'
+import type {
+  RenderNode,
+  RenderTextStyle,
+} from '@cute-screen/editor-core'
 import { layoutRichText } from '../../rich-text/layout'
 import type {
   CanvasKitApi,
@@ -16,7 +19,10 @@ import {
   requiresCyrillicCoverage,
   withTransform,
 } from './geometry'
-import { blendMode, configurePaint } from './paint'
+import {
+  blendMode,
+  configurePaint,
+} from './paint'
 
 type TextNode = Extract<RenderNode, { kind: 'text' }>
 
@@ -26,9 +32,7 @@ function unavailableFont(
   text: string,
 ): Error {
   if (requiresCyrillicCoverage(text)) {
-    return new Error(
-      `CanvasKit glyph coverage is unavailable for "${node.text}" in ${style.fontFamily}`,
-    )
+    return new Error(`CanvasKit glyph coverage is unavailable for "${node.text}" in ${style.fontFamily}`)
   }
   return new Error(`CanvasKit typeface is unavailable for ${style.fontFamily}`)
 }
@@ -44,12 +48,7 @@ function createFontResolver(
     const resolved = typefaces?.resolve(style.fontFamily, text)
     const typeface = resolved?.typeface ?? defaultTypeface
     if (!typeface) throw unavailableFont(node, style, text)
-    const key = [
-      resolved?.key ?? 'default',
-      style.fontSize,
-      style.fontWeight,
-      style.fontStyle,
-    ].join('\u0000')
+    const key = [resolved?.key ?? 'default', style.fontSize, style.fontWeight, style.fontStyle].join('\u0000')
     const existing = fonts.get(key)
     if (existing) {
       if (requiresCyrillicCoverage(text) && !hasGlyphCoverage(existing, text)) {
@@ -106,31 +105,12 @@ function drawTextLayout(
     for (const fragment of line.fragments) {
       configurePaint(canvasKit, fill, fragment.color, node.opacity, 'fill')
       fill.setBlendMode(blendMode(canvasKit, node.blendMode))
-      canvas.drawText!(
-        fragment.text,
-        fragment.x,
-        fragment.baseline,
-        fill,
-        fontForStyle(fragment, fragment.text),
-      )
+      canvas.drawText!(fragment.text, fragment.x, fragment.baseline, fill, fontForStyle(fragment, fragment.text))
     }
     for (const strike of line.strikes) {
-      configurePaint(
-        canvasKit,
-        stroke,
-        strike.color,
-        node.opacity,
-        'stroke',
-        strike.thickness,
-      )
+      configurePaint(canvasKit, stroke, strike.color, node.opacity, 'stroke', strike.thickness)
       stroke.setBlendMode(blendMode(canvasKit, node.blendMode))
-      canvas.drawLine(
-        strike.x,
-        strike.y,
-        strike.x + strike.width,
-        strike.y,
-        stroke,
-      )
+      canvas.drawLine(strike.x, strike.y, strike.x + strike.width, strike.y, stroke)
     }
   }
 }
@@ -141,28 +121,20 @@ export function drawTextNodeCanvasKit(
   node: TextNode,
   typefaces?: CanvasKitTypefaceStore,
 ): void {
-  if (!canvasKit.Font || !canvasKit.Typeface || !canvas.drawText) return
-  const defaultTypeface =
-    canvasKit.Typeface.MakeDefault?.() ?? canvasKit.Typeface.GetDefault?.()
+  if (
+    !canvasKit.Font ||
+    !canvasKit.Typeface ||
+    !canvas.drawText
+  ) return
+  const defaultTypeface = canvasKit.Typeface.MakeDefault?.() ?? canvasKit.Typeface.GetDefault?.()
   if (!defaultTypeface && !typefaces) return
   const fonts = new Map<string, CanvasKitFont>()
   const fill = new canvasKit.Paint()
   const stroke = new canvasKit.Paint()
-  const fontForStyle = createFontResolver(
-    canvasKit,
-    node,
-    typefaces,
-    defaultTypeface,
-    fonts,
-  )
+  const fontForStyle = createFontResolver(canvasKit, node, typefaces, defaultTypeface, fonts)
   try {
-    withTransform(
-      canvas,
-      node,
-      node.x + node.width / 2,
-      node.y + node.height / 2,
-      () => drawTextLayout(canvasKit, canvas, node, fill, stroke, fontForStyle),
-    )
+    withTransform(canvas, node, node.x + node.width / 2, node.y + node.height / 2, () =>
+      drawTextLayout(canvasKit, canvas, node, fill, stroke, fontForStyle))
   } finally {
     fill.delete()
     stroke.delete()

@@ -20,7 +20,10 @@ function result(
   return state.selected ? HANDLED : defaultsEffect(defaults)
 }
 
-function regionEffect(value: string, state: State): PrecisionSettingsEffect {
+function regionEffect(
+  value: string,
+  state: State,
+): PrecisionSettingsEffect {
   if (value !== 'rectangle' && value !== 'freeform') return HANDLED
   const defaults: State['defaults'] = {
     ...state.defaults,
@@ -53,8 +56,15 @@ function regionEffect(value: string, state: State): PrecisionSettingsEffect {
   return result(state, defaults, after)
 }
 
-function modeEffect(value: string, state: State): PrecisionSettingsEffect {
-  if (value !== 'pixelate' && value !== 'blur' && value !== 'solid') {
+function modeEffect(
+  value: string,
+  state: State,
+): PrecisionSettingsEffect {
+  if (
+    value !== 'pixelate' &&
+    value !== 'blur' &&
+    value !== 'solid'
+  ) {
     return HANDLED
   }
   const defaults: State['defaults'] = {
@@ -103,7 +113,10 @@ function numberEffect(
   return result(state, defaults, after)
 }
 
-function colorEffect(value: string, state: State): PrecisionSettingsEffect {
+function colorEffect(
+  value: string,
+  state: State,
+): PrecisionSettingsEffect {
   const color = parseHexColor(value)
   if (!color) return HANDLED
   const defaults: State['defaults'] = {

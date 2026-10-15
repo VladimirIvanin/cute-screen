@@ -8,7 +8,10 @@ import {
   type RulerAngleGuide,
   type Transform2D,
 } from '@cute-screen/editor-renderer'
-import type { CanvasPoint, CanvasViewportProps } from './contracts'
+import type {
+  CanvasPoint,
+  CanvasViewportProps,
+} from './contracts'
 import type { CanvasViewportEmit } from './contracts'
 import { CropController } from './crop-controller'
 import { DraftController } from './draft-controller'
@@ -82,11 +85,12 @@ export class CanvasWorkspaceController {
   #gesture: CanvasGesture
   #rulerGuide: RulerAngleGuide | undefined
   #spacePressed = false
-  #cycle:
-    | { readonly key: string; readonly at: number; readonly index: number }
-    | undefined
+  #cycle: { readonly key: string; readonly at: number; readonly index: number } | undefined
 
-  constructor(props: CanvasViewportProps, emit: CanvasViewportEmit) {
+  constructor(
+    props: CanvasViewportProps,
+    emit: CanvasViewportEmit,
+  ) {
     this.#props = props
     this.#emit = emit
     this.#viewport = new ViewportController({
@@ -131,12 +135,7 @@ export class CanvasWorkspaceController {
     this.#pointerMove = createPointerMoveContext(ports)
     this.#finish = createGestureFinishContext(ports)
     this.#keyboard = new KeyboardController(
-      createKeyboardContext(
-        ports,
-        this.applyCrop,
-        this.cancelCrop,
-        this.cancelGesture,
-      ),
+      createKeyboardContext(ports, this.applyCrop, this.cancelCrop, this.cancelGesture),
     )
     this.#registerLifecycle()
   }
@@ -149,14 +148,10 @@ export class CanvasWorkspaceController {
       viewportOutputBounds: this.#viewport.outputBounds,
       scene: state.scene,
       isPanning: state.isPanning,
-      onPointerDown: (event: PointerEvent) =>
-        handlePointerDown(this.#pointerDown, event),
-      onPointerMove: (event: PointerEvent) =>
-        handlePointerMove(this.#pointerMove, event),
-      finishGesture: (event: PointerEvent) =>
-        finishCanvasGesture(this.#finish, event),
-      cancelGesture: (event?: PointerEvent) =>
-        cancelCanvasGesture(this.#finish, event),
+      onPointerDown: (event: PointerEvent) => handlePointerDown(this.#pointerDown, event),
+      onPointerMove: (event: PointerEvent) => handlePointerMove(this.#pointerMove, event),
+      finishGesture: (event: PointerEvent) => finishCanvasGesture(this.#finish, event),
+      cancelGesture: (event?: PointerEvent) => cancelCanvasGesture(this.#finish, event),
       onDoubleClick: (event: MouseEvent) => this.#textEditor.doubleClick(event),
       onWheel: (event: WheelEvent) => this.#viewport.wheel(event),
       editingText: state.editingText,
@@ -227,14 +222,10 @@ export class CanvasWorkspaceController {
   readonly selectedLayer = () => this.#geometry.selectedLayer()
   readonly gesturePreviewLayer = () => this.#geometry.gesturePreviewLayer()
   readonly layerBounds = (layer: LayerNode) => canvasLayerBounds(layer)
-  readonly transformPoint = (transform: Transform2D, point: CanvasPoint) =>
-    transformCanvasPoint(transform, point)
-  readonly toLocal = (layer: LayerNode, point: CanvasPoint) =>
-    this.#geometry.toLocal(layer, point)
-  readonly moveLoupeSource = (
-    layer: Extract<LayerNode, { readonly kind: 'loupe' }>,
-    point: CanvasPoint,
-  ) => this.#geometry.moveLoupeSourceMarker(layer, point)
+  readonly transformPoint = (transform: Transform2D, point: CanvasPoint) => transformCanvasPoint(transform, point)
+  readonly toLocal = (layer: LayerNode, point: CanvasPoint) => this.#geometry.toLocal(layer, point)
+  readonly moveLoupeSource = (layer: Extract<LayerNode, { readonly kind: 'loupe' }>, point: CanvasPoint) =>
+    this.#geometry.moveLoupeSourceMarker(layer, point)
   readonly invalidateOverlay = (): void => {
     this.#overlay.draw()
     this.#toolbars.updateTransientArrowToolbarLayout()
@@ -247,8 +238,7 @@ export class CanvasWorkspaceController {
       outputBounds: this.#viewport.outputBounds,
       selectedLayer: this.selectedLayer,
       layerBounds: this.layerBounds,
-      worldHandlePositions: (layer) =>
-        this.#geometry.worldBoundsHandlePositions(layer),
+      worldHandlePositions: (layer) => this.#geometry.worldBoundsHandlePositions(layer),
       transformPoint: this.transformPoint,
       loupeSourceCenter: (layer) => this.#geometry.loupeSourceCenter(layer),
     })
@@ -336,8 +326,7 @@ export class CanvasWorkspaceController {
       },
       drawCrop: (context, bounds) => this.#crop.draw(context, bounds),
       layerBounds: this.layerBounds,
-      worldHandlePositions: (layer, transform) =>
-        this.#geometry.worldBoundsHandlePositions(layer, transform),
+      worldHandlePositions: (layer, transform) => this.#geometry.worldBoundsHandlePositions(layer, transform),
       transformPoint: this.transformPoint,
       toLocal: this.toLocal,
       loupeSourceCenter: (layer) => this.#geometry.loupeSourceCenter(layer),
@@ -400,15 +389,12 @@ export class CanvasWorkspaceController {
     return {
       onTextEditorCompositionStart: () => this.#textEditor.compositionStart(),
       onTextEditorCompositionEnd: () => this.#textEditor.compositionEnd(),
-      onTextEditorBeforeInput: (event: InputEvent) =>
-        this.#textEditor.beforeInput(event),
+      onTextEditorBeforeInput: (event: InputEvent) => this.#textEditor.beforeInput(event),
       onTextEditorInput: () => this.#textEditor.input(),
       onTextEditorCopy: (event: ClipboardEvent) => this.#textEditor.copy(event),
       onTextEditorCut: (event: ClipboardEvent) => this.#textEditor.cut(event),
-      onTextEditorPaste: (event: ClipboardEvent) =>
-        this.#textEditor.paste(event),
-      onTextEditorKeydown: (event: KeyboardEvent) =>
-        this.#textEditor.keydown(event),
+      onTextEditorPaste: (event: ClipboardEvent) => this.#textEditor.paste(event),
+      onTextEditorKeydown: (event: KeyboardEvent) => this.#textEditor.keydown(event),
       onTextEditorBlur: (event: FocusEvent) => this.#textEditor.blur(event),
     }
   }
@@ -445,10 +431,8 @@ export class CanvasWorkspaceController {
       onKeydown: (event) => this.#keyboard.keydown(event),
       onKeyup: (event) => this.#keyboard.keyup(event),
       onBlur: () => this.#keyboard.blur(),
-      onDocumentPointerDown: (event) =>
-        this.#textEditor.documentPointerDown(event),
-      onDocumentSelectionChange: () =>
-        this.#textEditor.documentSelectionChange(),
+      onDocumentPointerDown: (event) => this.#textEditor.documentPointerDown(event),
+      onDocumentSelectionChange: () => this.#textEditor.documentSelectionChange(),
     })
   }
 }

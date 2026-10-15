@@ -9,9 +9,7 @@ export interface EditorStartupSteps {
  * Last-document mount is the only step that may keep the editor on `loading`.
  * Font catalog and capability probes must not block that transition.
  */
-export async function runEditorStartup(
-  steps: EditorStartupSteps,
-): Promise<void> {
+export async function runEditorStartup(steps: EditorStartupSteps): Promise<void> {
   await steps.loadPersistedDocument()
   void steps.loadSystemFonts()
   void steps.refreshPlatformCapabilities()

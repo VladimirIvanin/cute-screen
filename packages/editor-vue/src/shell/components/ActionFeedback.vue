@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { NButton } from 'naive-ui'
 import type { CaptureProgressState } from '../../platform'
-import type { AsyncActionName, AsyncActionState } from '../types'
+import type {
+  AsyncActionName,
+  AsyncActionState,
+} from '../types'
 defineProps<{
   state: AsyncActionState
   t: (
@@ -25,11 +28,7 @@ defineProps<{
 const emit = defineEmits<{ cancel: []; retry: [] }>()
 const actionKey: Record<
   AsyncActionName,
-  | 'captureAction'
-  | 'captureWindowAction'
-  | 'openImageAction'
-  | 'copyAction'
-  | 'exportAction'
+  'captureAction' | 'captureWindowAction' | 'openImageAction' | 'copyAction' | 'exportAction'
 > = {
   capture: 'captureAction',
   captureWindow: 'captureWindowAction',
@@ -66,17 +65,24 @@ const progressKey: Record<
   >
     <span v-if="state.status === 'pending'">
       {{
-        (state.action === 'capture' || state.action === 'captureWindow') &&
-        state.captureProgress
+        (state.action === 'capture' || state.action === 'captureWindow') && state.captureProgress
           ? t(progressKey[state.captureProgress])
           : `${t(actionKey[state.action])}…`
       }}
     </span>
     <span v-else>{{ state.message }}</span>
-    <NButton v-if="state.status === 'pending'" text @click="emit('cancel')">
+    <NButton
+      v-if="state.status === 'pending'"
+      text
+      @click="emit('cancel')"
+    >
       {{ t('cancel') }}
     </NButton>
-    <NButton v-else-if="state.status === 'error'" text @click="emit('retry')">
+    <NButton
+      v-else-if="state.status === 'error'"
+      text
+      @click="emit('retry')"
+    >
       {{ t('retry') }}
     </NButton>
   </div>

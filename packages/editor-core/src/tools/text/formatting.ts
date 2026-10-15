@@ -30,10 +30,7 @@ export function applyRichTextSpanStyle(
   state: RichTextEditingState,
   patch: Partial<RichTextSpanStyle>,
 ): RichTextEditingState {
-  const selection = normalizeRichTextSelection(
-    state.content.text,
-    state.selection,
-  )
+  const selection = normalizeRichTextSelection(state.content.text, state.selection)
   const range = richTextSelectionRange(selection)
   const typingStyle = patchedSpanStyle(state.typingStyle, patch)
   if (range.start === range.end) {
@@ -79,15 +76,11 @@ export function applyRichTextParagraphStyle(
   const selection = normalizeRichTextSelection(content.text, state.selection)
   const range = richTextSelectionRange(selection)
   const currentIndex = content.paragraphs.findIndex(
-    (paragraph) =>
-      paragraph ===
-      paragraphAt(content.paragraphs, content.text.length, range.start),
+    (paragraph) => paragraph === paragraphAt(content.paragraphs, content.text.length, range.start),
   )
   const paragraphs = content.paragraphs.map((paragraph, index) => {
     const touched =
-      range.start === range.end
-        ? index === currentIndex
-        : paragraph.start < range.end && paragraph.end > range.start
+      range.start === range.end ? index === currentIndex : paragraph.start < range.end && paragraph.end > range.start
     return touched
       ? freezeParagraph(paragraph.start, paragraph.end, {
           ...paragraphStyle(paragraph),

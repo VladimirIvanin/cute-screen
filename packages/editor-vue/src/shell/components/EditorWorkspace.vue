@@ -1,18 +1,26 @@
 <script setup lang="ts">
-import { NButton, NConfigProvider } from 'naive-ui'
+import {
+  NButton,
+  NConfigProvider,
+} from 'naive-ui'
 import { nextNumberedMarkerSequence } from '@cute-screen/editor-renderer'
 import { UiIcon } from '../icon'
 import ActionFeedback from './ActionFeedback.vue'
-import ArrowFormattingToolbar from './ArrowFormattingToolbar.vue'
+import SelectionFormattingToolbar from './SelectionFormattingToolbar.vue'
 import CanvasViewport from './CanvasViewport.vue'
+import CanvasContextMenu from './CanvasContextMenu.vue'
 import ContextToolbar from './ContextToolbar.vue'
+import ToolConfigurePopover from './ToolConfigurePopover.vue'
 import LayersPanel from './LayersPanel.vue'
 import SeriesFilmstrip from './SeriesFilmstrip.vue'
 import ToolRail from './ToolRail.vue'
 import TopBar from './TopBar.vue'
 import ZoomControls from './ZoomControls.vue'
 import { cuteScreenThemeOverrides } from '../ui/theme'
-import { editorShellRuntimeEmits, editorShellRuntimeProps } from '../contracts'
+import {
+  editorShellRuntimeEmits,
+  editorShellRuntimeProps,
+} from '../contracts'
 import { useEditorWorkspace } from '../workspace/use-editor-workspace'
 
 const props = defineProps(editorShellRuntimeProps)
@@ -31,8 +39,15 @@ const {
   tools,
   selectTool,
   openToolConfigure,
+  closeToolConfigure,
   activeDocument,
+  canvasMenu,
+  canvasMenuItems,
+  canvasMenuAction,
+  openCanvasMenu,
   contextSchema,
+  selectionSchema,
+  toolConfigureSchema,
   drawingPreferences,
   onContextAction,
   onContextChange,
@@ -46,9 +61,9 @@ const {
   drawingDefaults,
   precisionDefaults,
   textDefaults,
+  calloutStroke,
   textFormatting,
   floatingTextToolbarSchema,
-  floatingArrowToolbarSchema,
   markerShape,
   selectLayer,
   moveLayer,
@@ -57,6 +72,7 @@ const {
   addLayer,
   executeDocumentCommand,
   setTextDraft,
+  cancelTextDefaults,
   importContentImage,
   onColorSample,
   onColorSampleError,
@@ -66,8 +82,7 @@ const {
   onLayerOpacity,
   onLayerRotation,
   onLayerReorderTo,
-  toolConfigureArrowSchema,
-  toolConfigureLayout,
+  toolConfigure,
   onToolConfigureChange,
   eyedropperFeedback,
   eyedropperColor,
@@ -77,6 +92,11 @@ const {
   exportDocumentRecovery,
   fitCanvas,
 } = useEditorWorkspace(props)
+
+function onTextCancelled(): void {
+  cancelTextDefaults()
+  selectTool('select')
+}
 </script>
 
 <template>
@@ -100,9 +120,7 @@ const {
         :pending="store.actionState.status === 'pending'"
         :capture-available="props.captureAvailable"
         :capture-window-available="props.captureWindowAvailable"
-        :capture-unavailable-reason="
-          props.captureUnavailableReason ?? translate('captureUnavailable')
-        "
+        :capture-unavailable-reason="props.captureUnavailableReason ?? translate('captureUnavailable')"
         :open-image-available="props.openImageAvailable"
         :t="translate"
         @action="store.runAction"
@@ -127,11 +145,7 @@ const {
           :aria-label="translate('copyCaptureFallback')"
           @click="copyCaptureFallback"
         >
-          {{
-            fallbackCopied
-              ? translate('captureFallbackCopied')
-              : translate('copyCaptureFallback')
-          }}
+          {{ fallbackCopied ? translate('captureFallbackCopied') : translate('copyCaptureFallback') }}
         </button>
         <button
           class="cs-capture-fallback-dismiss"
@@ -144,10 +158,7 @@ const {
         </button>
       </div>
       <div class="cs-workbench">
-        <div
-          v-if="props.quickMode && !props.quickSelectionMode"
-          class="cs-quick-toolrail-group"
-        >
+        <div v-if="props.quickMode && !props.quickSelectionMode" class="cs-quick-toolrail-group">
           <ToolRail
             :tools="tools"
             :active-tool-id="store.activeToolId"
@@ -224,24 +235,19 @@ const {
           :document="activeDocument"
           :selected-layer-id="store.selectedLayerId"
           :selected-layer-ids="store.selectedLayerIds"
-          :active-tool="store.activeToolId"
-          :sampling="
-            Boolean(samplingControl || store.activeToolId === 'eyedropper')
-          "
+          :active-tool="store.activeToolId ?? 'select'"
+          :sampling="Boolean(samplingControl || store.activeToolId === 'eyedropper')"
           :sampling-blocked="!sceneTexturesReady"
           :drawing-defaults="drawingDefaults"
           :precision-defaults="precisionDefaults"
           :text-defaults="textDefaults"
+          :callout-stroke="calloutStroke"
           :text-formatting="textFormatting"
           :text-toolbar-schema="floatingTextToolbarSchema"
           :text-toolbar-locale="state.locale.value"
-          :arrow-toolbar-schema="floatingArrowToolbarSchema"
+          :arrow-toolbar-schema="undefined"
           :arrow-toolbar-locale="state.locale.value"
-          :next-marker-sequence="
-            activeDocument
-              ? nextNumberedMarkerSequence(activeDocument.layers)
-              : undefined
-          "
+          :next-marker-sequence="activeDocument ? nextNumberedMarkerSequence(activeDocument.layers) : undefined"
           :marker-shape="markerShape"
           :open-image-available="props.openImageAvailable"
           :zoom="store.zoom"
@@ -253,6 +259,7 @@ const {
           @frame-ready="emit('frameReady', $event)"
           @quick-frame-change="emit('quickFrameChange', $event)"
           @quick-selection-complete="emit('quickSelectionComplete', $event)"
+          @context-menu="openCanvasMenu"
           @select-layer="selectLayer"
           @move-layer="moveLayer"
           @transform-layer="transformLayer"
@@ -260,6 +267,7 @@ const {
           @add-layer="addLayer"
           @document-command="executeDocumentCommand"
           @text-editing="setTextDraft"
+          @text-editing-cancelled="onTextCancelled"
           @text-toolbar-change="onContextChange"
           @arrow-toolbar-change="onContextChange"
           @request-image-import="importContentImage"
@@ -272,6 +280,18 @@ const {
           @zoom="store.setZoom"
           @fit-zoom="store.setFitZoom"
           @retry="emit('retryLoad')"
+        />
+        <SelectionFormattingToolbar
+          :layers-open="store.layersOpen"
+          :schema="selectionSchema"
+          :document="activeDocument"
+          :selected-ids="store.selectedLayerIds"
+          :zoom="store.zoom"
+          :locale="state.locale.value"
+          :recent-colors="drawingPreferences.recentColors"
+          @change="onColorChange"
+          @action="onContextAction"
+          @eyedropper="startEyedropper"
         />
         <LayersPanel
           v-if="!props.quickMode"
@@ -290,6 +310,7 @@ const {
         />
         <ContextToolbar
           v-if="props.quickMode && !props.quickSelectionMode"
+          class="cs-tool-defaults-toolbar"
           :schema="contextSchema"
           :label="translate('toolSettings')"
           :recent-colors="drawingPreferences.recentColors"
@@ -303,48 +324,52 @@ const {
         :state="store.actionState"
         :t="translate"
         @cancel="store.cancelAction"
-        @retry="
-          store.runAction(
-            store.actionState.status === 'error'
-              ? store.actionState.action
-              : 'capture',
-          )
-        "
+        @retry="store.runAction(store.actionState.status === 'error' ? store.actionState.action : 'capture')"
+      />
+      <CanvasContextMenu
+        :request="canvasMenu"
+        :items="canvasMenuItems"
+        @action="canvasMenuAction"
+        @close="canvasMenu = undefined"
       />
       <div class="cs-overlay-root" aria-live="polite">
-        <div
-          v-if="toolConfigureArrowSchema && toolConfigureLayout"
-          class="cs-tool-configure-popover-host"
-          :style="{
-            left: `${toolConfigureLayout.left}px`,
-            top: `${toolConfigureLayout.top}px`,
-          }"
+        <ToolConfigurePopover
+          v-if="toolConfigureSchema && toolConfigure"
+          :anchor="toolConfigure.anchor"
+          @keydown.esc.prevent.stop="closeToolConfigure"
           @pointerdown.stop
         >
-          <ArrowFormattingToolbar
-            variant="popover"
-            :controls="toolConfigureArrowSchema.controls"
+          <ContextToolbar
+            :schema="toolConfigureSchema"
+            :label="translate('toolSettings')"
             :recent-colors="drawingPreferences.recentColors"
             :picker-locale="state.locale.value"
             @change="onToolConfigureChange"
+            @action="onContextAction"
             @eyedropper="startEyedropper"
           />
-        </div>
+        </ToolConfigurePopover>
       </div>
-      <p v-if="eyedropperFeedback" class="cs-eyedropper-feedback" role="status">
+      <p
+        v-if="eyedropperFeedback"
+        class="cs-eyedropper-feedback"
+        role="status"
+      >
         <span
           v-if="eyedropperColor"
           class="cs-eyedropper-swatch"
           :style="{ backgroundColor: eyedropperColor }"
           :aria-label="
-            state.locale.value === 'ru'
-              ? `Образец цвета ${eyedropperColor}`
-              : `Colour swatch ${eyedropperColor}`
+            state.locale.value === 'ru' ? `Образец цвета ${eyedropperColor}` : `Colour swatch ${eyedropperColor}`
           "
         />
         <span>{{ eyedropperFeedback }}</span>
       </p>
-      <p v-if="toolError" class="cs-tool-error" role="alert">
+      <p
+        v-if="toolError"
+        class="cs-tool-error"
+        role="alert"
+      >
         {{ toolError }}
       </p>
     </div>

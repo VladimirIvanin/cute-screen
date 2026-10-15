@@ -52,9 +52,7 @@ export function drawNodesCanvasKit(
       case 'censor':
       case 'spotlight':
       case 'loupe':
-        throw new Error(
-          `${node.kind} rendering requires an ordered CanvasKit surface`,
-        )
+        throw new Error(`${node.kind} rendering requires an ordered CanvasKit surface`)
     }
   }
 }

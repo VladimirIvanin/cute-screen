@@ -14,7 +14,12 @@ export function handlePointerDown(
 ): void {
   if (handleEditingText(context, event)) return
   const point = context.canvasPoint(event)
-  if (!point || !context.scene.value || !context.props.document) return
+  if (
+    !point ||
+    !context.scene.value ||
+    !context.props.document
+  ) return
+  if (event.button === 0) context.scene.value.focus({ preventScroll: true })
   if (handleSampling(context, event, point)) return
   if (handlePan(context, event)) return
   if (event.button !== 0) return
@@ -61,13 +66,18 @@ function handleSampling(
   return true
 }
 
-function handlePan(context: PointerDownContext, event: PointerEvent): boolean {
-  const pan =
-    event.button === 1 ||
-    context.props.activeTool === 'hand' ||
-    context.spacePressed()
+function handlePan(
+  context: PointerDownContext,
+  event: PointerEvent,
+): boolean {
+  if (event.button > 1) return false
+  const pan = event.button === 1 || context.props.activeTool === 'hand' || context.spacePressed()
   const scroll = context.scrollContainer.value
-  if (!pan || !scroll || !context.scene.value) return false
+  if (
+    !pan ||
+    !scroll ||
+    !context.scene.value
+  ) return false
   event.preventDefault()
   context.scene.value.setPointerCapture(event.pointerId)
   context.isPanning.value = true
@@ -272,17 +282,14 @@ function beginText(
   const text = document.layers.find(
     (layer) =>
       layer.id === hit?.nodeId &&
-      (layer.kind === 'text' ||
-        layer.kind === 'callout' ||
-        layer.kind === 'numberedMarker'),
+      (layer.kind === 'text' || layer.kind === 'callout' || layer.kind === 'numberedMarker'),
   )
   if (
     text?.kind === 'text' ||
     text?.kind === 'callout' ||
     text?.kind === 'numberedMarker'
   ) {
-    const layout =
-      text.kind === 'callout' ? calloutTextLayout(text.payload) : undefined
+    const layout = text.kind === 'callout' ? calloutTextLayout(text.payload) : undefined
     const bounds = context.layerBounds(text)
     context.startText({
       origin: layout

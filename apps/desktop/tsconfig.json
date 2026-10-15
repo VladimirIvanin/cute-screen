@@ -5,9 +5,7 @@
     "ignoreDeprecations": "6.0",
     "paths": {
       "@cute-screen/editor-vue": ["packages/editor-vue/src/index.ts"],
-      "@cute-screen/editor-vue/shell.css": [
-        "packages/editor-vue/src/shell/shell.css"
-      ]
+      "@cute-screen/editor-vue/shell.css": ["packages/editor-vue/src/shell/shell.css"]
     },
     "noEmit": true,
     "lib": ["ES2023", "DOM", "DOM.Iterable"],

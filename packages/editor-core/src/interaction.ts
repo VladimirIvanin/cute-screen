@@ -2,8 +2,7 @@ import type { Point } from './document/types'
 
 /** Tools with a document-changing gesture are intentionally explicit here so
  * the DOM adapter cannot invent a persisted tool id. */
-export type EditorToolId =
-  'select' | 'hand' | 'arrow' | 'shape' | 'pencil' | 'marker'
+export type EditorToolId = 'select' | 'hand' | 'arrow' | 'shape' | 'pencil' | 'marker'
 
 export interface InteractionState {
   readonly activeTool: EditorToolId
@@ -19,9 +18,7 @@ export class InteractionController {
   #selectionIds: string[] = []
   #hoverId: string | undefined
   #guidesVisible = false
-  #cycle:
-    | { point: Point; at: number; ids: readonly string[]; index: number }
-    | undefined
+  #cycle: { point: Point; at: number; ids: readonly string[]; index: number } | undefined
 
   get snapshot(): InteractionState {
     return Object.freeze({
@@ -39,7 +36,10 @@ export class InteractionController {
     return this.snapshot
   }
 
-  select(id: string, toggle = false): InteractionState {
+  select(
+    id: string,
+    toggle = false,
+  ): InteractionState {
     this.#selectionIds = toggle
       ? this.#selectionIds.includes(id)
         ? this.#selectionIds.filter((selected) => selected !== id)
@@ -72,10 +72,7 @@ export class InteractionController {
     const canContinue =
       previous &&
       input.now - previous.at <= 1000 &&
-      Math.hypot(
-        input.point.x - previous.point.x,
-        input.point.y - previous.point.y,
-      ) <= 4 &&
+      Math.hypot(input.point.x - previous.point.x, input.point.y - previous.point.y) <= 4 &&
       sameIds(input.ids, previous.ids)
     const index = canContinue ? (previous.index + 1) % input.ids.length : 0
     const selected = input.ids[index]
@@ -94,9 +91,9 @@ export class InteractionController {
   }
 }
 
-function sameIds(left: readonly string[], right: readonly string[]): boolean {
-  return (
-    left.length === right.length &&
-    left.every((value, index) => value === right[index])
-  )
+function sameIds(
+  left: readonly string[],
+  right: readonly string[],
+): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index])
 }

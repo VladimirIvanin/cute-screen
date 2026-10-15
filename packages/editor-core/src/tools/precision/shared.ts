@@ -24,16 +24,25 @@ export const GEOMETRY_EPSILON = 1e-9
 const MAX_LOUPE_SOURCE_COORDINATE = 1_000_000
 export const RULER_BADGE_TEXT_WIDTH_FACTOR = 0.85
 
-export function assertFinite(value: number, field: string): void {
+export function assertFinite(
+  value: number,
+  field: string,
+): void {
   if (!Number.isFinite(value)) throw new RangeError(`${field} must be finite`)
 }
 
-export function assertPoint(point: Point, field: string): void {
+export function assertPoint(
+  point: Point,
+  field: string,
+): void {
   assertFinite(point.x, `${field}.x`)
   assertFinite(point.y, `${field}.y`)
 }
 
-export function assertRect(rect: Rect, field: string): void {
+export function assertRect(
+  rect: Rect,
+  field: string,
+): void {
   assertPoint(rect, field)
   assertFinite(rect.width, `${field}.width`)
   assertFinite(rect.height, `${field}.height`)
@@ -65,23 +74,26 @@ export function assertValidLoupeSourceRegion(
     Math.abs(region.x + region.width) > MAX_LOUPE_SOURCE_COORDINATE ||
     Math.abs(region.y + region.height) > MAX_LOUPE_SOURCE_COORDINATE
   ) {
-    throw new RangeError(
-      'loupe sourceRegion coordinates exceed supported bounds',
-    )
+    throw new RangeError('loupe sourceRegion coordinates exceed supported bounds')
   }
-  const intersectionWidth =
-    Math.min(region.x + region.width, canvas.width) - Math.max(region.x, 0)
-  const intersectionHeight =
-    Math.min(region.y + region.height, canvas.height) - Math.max(region.y, 0)
+  const intersectionWidth = Math.min(region.x + region.width, canvas.width) - Math.max(region.x, 0)
+  const intersectionHeight = Math.min(region.y + region.height, canvas.height) - Math.max(region.y, 0)
   if (intersectionWidth <= 0 || intersectionHeight <= 0) {
     throw new RangeError('loupe sourceRegion must intersect the canvas')
   }
 }
 
-export function assertUnitColor(color: SrgbColor, field: string): void {
+export function assertUnitColor(
+  color: SrgbColor,
+  field: string,
+): void {
   for (const channel of ['red', 'green', 'blue', 'alpha'] as const) {
     const value = color[channel]
-    if (!Number.isFinite(value) || value < 0 || value > 1) {
+    if (
+      !Number.isFinite(value) ||
+      value < 0 ||
+      value > 1
+    ) {
       throw new RangeError(`${field}.${channel} must be between 0 and 1`)
     }
   }
@@ -109,7 +121,12 @@ export function freezeColor(color: SrgbColor): SrgbColor {
   })
 }
 
-export function commonLayer(id: string, x: number, y: number, bounds: Rect) {
+export function commonLayer(
+  id: string,
+  x: number,
+  y: number,
+  bounds: Rect,
+) {
   return {
     id,
     transform: Object.freeze({ ...IDENTITY, translateX: x, translateY: y }),

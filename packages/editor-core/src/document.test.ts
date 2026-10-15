@@ -1,10 +1,24 @@
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 import { CommandManager } from './commands'
 import { applyEditorCommand } from './commands/operations'
-import { parseEditorDocument, serializeEditorDocument } from './document/codec'
-import type { EditorDocumentV1, LayerNode } from './document/types'
-import { invertMatrix, transformPoint, transformToMatrix } from './geometry'
+import {
+  parseEditorDocument,
+  serializeEditorDocument,
+} from './document/codec'
+import type {
+  EditorDocumentV1,
+  LayerNode,
+} from './document/types'
+import {
+  invertMatrix,
+  transformPoint,
+  transformToMatrix,
+} from './geometry'
 
 const layer: LayerNode = {
   id: '019c1f62-058e-7000-8000-000000000001',
@@ -61,10 +75,7 @@ const document: EditorDocumentV1 = {
 
 describe('M03 document core', () => {
   it('round-trips future fields in a supported schema', () => {
-    const raw = JSON.parse(serializeEditorDocument(document)) as Record<
-      string,
-      unknown
-    >
+    const raw = JSON.parse(serializeEditorDocument(document)) as Record<string, unknown>
     raw.futureDocumentField = { preserved: true }
     const layers = raw.layers as Array<Record<string, unknown>>
     const firstLayer = layers[0]
@@ -74,20 +85,13 @@ describe('M03 document core', () => {
     const parsed = parseEditorDocument(JSON.stringify(raw))
     expect(parsed.kind).toBe('editable')
     if (parsed.kind !== 'editable') return
-    const roundTrip = JSON.parse(
-      serializeEditorDocument(parsed.document),
-    ) as Record<string, unknown>
+    const roundTrip = JSON.parse(serializeEditorDocument(parsed.document)) as Record<string, unknown>
     expect(roundTrip.futureDocumentField).toEqual({ preserved: true })
-    expect(
-      (roundTrip.layers as Array<Record<string, unknown>>)[0]?.futureLayerField,
-    ).toBe('kept')
+    expect((roundTrip.layers as Array<Record<string, unknown>>)[0]?.futureLayerField).toBe('kept')
   })
 
   it('types older documents as unsupported and newer documents read-only', () => {
-    const v0 = JSON.parse(serializeEditorDocument(document)) as Record<
-      string,
-      unknown
-    >
+    const v0 = JSON.parse(serializeEditorDocument(document)) as Record<string, unknown>
     v0.schemaVersion = 0
     delete v0.crop
     delete v0.presentation
@@ -106,9 +110,7 @@ describe('M03 document core', () => {
   it('applies, undoes, redoes and checkpoints document commands', () => {
     const manager = new CommandManager(document)
     const added = { ...layer, id: '019c1f62-058e-7000-8000-000000000002' }
-    expect(
-      manager.execute({ type: 'addLayer', layer: added }).document.layers,
-    ).toHaveLength(2)
+    expect(manager.execute({ type: 'addLayer', layer: added }).document.layers).toHaveLength(2)
     expect(manager.snapshot.dirty).toBe(true)
     expect(manager.undo().document.layers).toHaveLength(1)
     expect(manager.redo().document.layers).toHaveLength(2)
@@ -130,15 +132,13 @@ describe('M03 document core', () => {
         type: 'removeLayer',
         layer: locked,
         index: 0,
-      }),
-    ).toThrow(/locked/u)
+      })).toThrow(/locked/u)
     expect(() =>
       applyEditorCommand(document, {
         type: 'setCrop',
         before: null,
         after: { x: 0, y: 0, width: 120, height: 10 },
-      }),
-    ).toThrow(/crop/u)
+      })).toThrow(/crop/u)
   })
 
   it('round-trips image-to-screen geometry', () => {

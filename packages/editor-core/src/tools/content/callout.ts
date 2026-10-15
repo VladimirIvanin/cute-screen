@@ -1,4 +1,7 @@
-import { defaultCalloutRoute, rebaseCalloutLayer } from '../../callout-geometry'
+import {
+  defaultCalloutRoute,
+  rebaseCalloutLayer,
+} from '../../callout-geometry'
 import type {
   CalloutLayer,
   Point,
@@ -38,8 +41,7 @@ export function createCalloutLayer(input: {
   assertFinitePoint(input.target)
   assertFinitePoint(input.label)
   const fontFamily = input.fontFamily ?? DEFAULT_TEXT_FONT_FAMILY
-  if (fontFamily.length === 0)
-    throw new Error('callout font family is required')
+  if (fontFamily.length === 0) throw new Error('callout font family is required')
   const fontSize = DEFAULT_TEXT_FONT_SIZE
   const stroke = input.stroke ?? DEFAULT_CALLOUT_STROKE
   const route = input.route ?? defaultCalloutRoute(input.target, input.label)

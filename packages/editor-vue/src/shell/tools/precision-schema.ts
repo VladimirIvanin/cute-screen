@@ -14,8 +14,7 @@ import type {
   SupportedLocale,
 } from '../types'
 
-export type PrecisionLayer =
-  CensorLayer | SpotlightLayer | RulerLayer | LoupeLayer
+export type PrecisionLayer = CensorLayer | SpotlightLayer | RulerLayer | LoupeLayer
 export type PrecisionTool = PrecisionLayer['kind']
 
 export interface PrecisionSchemaContext {
@@ -34,9 +33,7 @@ export function hexColor(value: unknown): string {
   if (!value || typeof value !== 'object') return '#e5484d'
   const color = value as Record<string, unknown>
   const channel = (name: string) =>
-    typeof color[name] === 'number'
-      ? Math.round(Math.max(0, Math.min(1, color[name] as number)) * 255)
-      : 0
+    typeof color[name] === 'number' ? Math.round(Math.max(0, Math.min(1, color[name] as number)) * 255) : 0
   return `#${[channel('red'), channel('green'), channel('blue')]
     .map((item) => item.toString(16).padStart(2, '0'))
     .join('')}`
@@ -50,18 +47,11 @@ function localizedText(
   return context.state.locale.value === 'ru' ? russian : english
 }
 
-function selectedPrecisionLayer(
-  context: PrecisionSchemaContext,
-): PrecisionLayer | undefined {
+function selectedPrecisionLayer(context: PrecisionSchemaContext): PrecisionLayer | undefined {
   const { store, activeDocument } = context
   if (store.selectedLayerIds.length !== 1) return undefined
-  const layer = activeDocument.value?.layers.find(
-    (candidate) => candidate.id === store.selectedLayerId,
-  )
-  return layer?.kind === 'censor' ||
-    layer?.kind === 'spotlight' ||
-    layer?.kind === 'ruler' ||
-    layer?.kind === 'loupe'
+  const layer = activeDocument.value?.layers.find((candidate) => candidate.id === store.selectedLayerId)
+  return layer?.kind === 'censor' || layer?.kind === 'spotlight' || layer?.kind === 'ruler' || layer?.kind === 'loupe'
     ? layer
     : undefined
 }
@@ -72,31 +62,24 @@ function censorSchema(
 ): ContextToolbarSchema {
   const { props, activeDocument, precisionDefaults, translate } = context
   const defaults = precisionDefaults.value
-  const precisionText = (english: string, russian: string) =>
-    localizedText(context, english, russian)
+  const precisionText = (english: string, russian: string) => localizedText(context, english, russian)
   const layer = selected?.kind === 'censor' ? selected : undefined
-  const controlsDisabled =
-    props.readOnlyDocument || !activeDocument.value || Boolean(layer?.locked)
+  const controlsDisabled = props.readOnlyDocument || !activeDocument.value || Boolean(layer?.locked)
   const selectedEffect = layer?.payload.effect as
     | {
-        readonly mode: 'pixelate' | 'blur' | 'solid'
-        readonly blockSize?: number
-        readonly strength?: number
-        readonly color?: SrgbColor
-      }
+      readonly mode: 'pixelate' | 'blur' | 'solid'
+      readonly blockSize?: number
+      readonly strength?: number
+      readonly color?: SrgbColor
+    }
     | undefined
   const mode = selectedEffect?.mode ?? defaults.censor.mode
   const selectedSolidColor =
-    selectedEffect?.mode === 'solid' && selectedEffect.color
-      ? selectedEffect.color
-      : defaults.censor.solidColor
+    selectedEffect?.mode === 'solid' && selectedEffect.color ? selectedEffect.color : defaults.censor.solidColor
   return {
     icon: 'privacy',
     title: translate('toolPrivacy'),
-    hint: precisionText(
-      'Drag to hide data manually',
-      'Потяните, чтобы скрыть данные вручную',
-    ),
+    hint: precisionText('Drag to hide data manually', 'Потяните, чтобы скрыть данные вручную'),
     controls: [
       {
         kind: 'select',
@@ -185,11 +168,9 @@ function spotlightSchema(
 ): ContextToolbarSchema {
   const { props, activeDocument, precisionDefaults, translate } = context
   const defaults = precisionDefaults.value
-  const precisionText = (english: string, russian: string) =>
-    localizedText(context, english, russian)
+  const precisionText = (english: string, russian: string) => localizedText(context, english, russian)
   const layer = selected?.kind === 'spotlight' ? selected : undefined
-  const controlsDisabled =
-    props.readOnlyDocument || !activeDocument.value || Boolean(layer?.locked)
+  const controlsDisabled = props.readOnlyDocument || !activeDocument.value || Boolean(layer?.locked)
   return {
     icon: 'spotlight',
     title: translate('toolSpotlight'),
@@ -222,8 +203,7 @@ function spotlightSchema(
         kind: 'range',
         id: 'spotlightDimOpacity',
         label: precisionText('Dim opacity', 'Непрозрачность затемнения'),
-        value:
-          (layer?.payload.dimOpacity ?? defaults.spotlight.dimOpacity) * 100,
+        value: (layer?.payload.dimOpacity ?? defaults.spotlight.dimOpacity) * 100,
         min: 0,
         max: 100,
         step: 1,
@@ -251,18 +231,13 @@ function rulerSchema(
 ): ContextToolbarSchema {
   const { props, activeDocument, precisionDefaults, translate } = context
   const defaults = precisionDefaults.value
-  const precisionText = (english: string, russian: string) =>
-    localizedText(context, english, russian)
+  const precisionText = (english: string, russian: string) => localizedText(context, english, russian)
   const layer = selected?.kind === 'ruler' ? selected : undefined
-  const controlsDisabled =
-    props.readOnlyDocument || !activeDocument.value || Boolean(layer?.locked)
+  const controlsDisabled = props.readOnlyDocument || !activeDocument.value || Boolean(layer?.locked)
   return {
     icon: 'ruler',
     title: translate('toolRuler'),
-    hint: precisionText(
-      'Hold Alt for angle guides',
-      'Удерживайте Alt для угловых направляющих',
-    ),
+    hint: precisionText('Hold Alt for angle guides', 'Удерживайте Alt для угловых направляющих'),
     controls: [
       {
         kind: 'color',
@@ -318,9 +293,7 @@ function rulerSchema(
         kind: 'range',
         id: 'rulerAngle',
         label: precisionText('Angle step', 'Шаг угла'),
-        value:
-          layer?.payload.snapAngleIncrementDegrees ??
-          defaults.ruler.snapAngleIncrementDegrees,
+        value: layer?.payload.snapAngleIncrementDegrees ?? defaults.ruler.snapAngleIncrementDegrees,
         min: 1,
         max: 90,
         step: 1,
@@ -336,18 +309,13 @@ function loupeSchema(
 ): ContextToolbarSchema {
   const { props, activeDocument, precisionDefaults, translate } = context
   const defaults = precisionDefaults.value
-  const precisionText = (english: string, russian: string) =>
-    localizedText(context, english, russian)
+  const precisionText = (english: string, russian: string) => localizedText(context, english, russian)
   const layer = selected?.kind === 'loupe' ? selected : undefined
-  const controlsDisabled =
-    props.readOnlyDocument || !activeDocument.value || Boolean(layer?.locked)
+  const controlsDisabled = props.readOnlyDocument || !activeDocument.value || Boolean(layer?.locked)
   return {
     icon: 'loupe',
     title: translate('toolLoupe'),
-    hint: precisionText(
-      'Drag from source to lens',
-      'Потяните от источника к линзе',
-    ),
+    hint: precisionText('Drag from source to lens', 'Потяните от источника к линзе'),
     controls: [
       {
         kind: 'range',
@@ -387,9 +355,7 @@ function loupeSchema(
         kind: 'color',
         id: 'loupeBorderColor',
         label: precisionText('Border color', 'Цвет рамки'),
-        value: hexColor(
-          layer?.payload.border.color ?? defaults.loupe.borderColor,
-        ),
+        value: hexColor(layer?.payload.border.color ?? defaults.loupe.borderColor),
         disabled: controlsDisabled,
         eyedropper: Boolean(activeDocument.value) && !controlsDisabled,
       },
@@ -407,9 +373,7 @@ function loupeSchema(
         kind: 'select',
         id: 'loupeShadow',
         label: precisionText('Shadow', 'Тень'),
-        value: (layer ? layer.payload.shadow !== null : defaults.loupe.shadow)
-          ? 'on'
-          : 'off',
+        value: (layer ? layer.payload.shadow !== null : defaults.loupe.shadow) ? 'on' : 'off',
         disabled: controlsDisabled,
         options: [
           { value: 'on', label: precisionText('On', 'Вкл.') },
@@ -434,8 +398,7 @@ function precisionToolSchema(
 export function createPrecisionSchema(context: PrecisionSchemaContext) {
   return {
     hexColor,
-    precisionText: (english: string, russian: string) =>
-      localizedText(context, english, russian),
+    precisionText: (english: string, russian: string) => localizedText(context, english, russian),
     precisionToolSchema: (tool: PrecisionTool, selected?: PrecisionLayer) =>
       precisionToolSchema(context, tool, selected),
     selectedPrecisionLayer: () => selectedPrecisionLayer(context),

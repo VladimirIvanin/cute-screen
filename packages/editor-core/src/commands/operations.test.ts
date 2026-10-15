@@ -1,8 +1,19 @@
 import fc from 'fast-check'
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
-import type { EditorDocumentV1, LayerNode, Matrix2D } from '../document/types'
-import { multiplyMatrices, transformToMatrix } from '../geometry'
+import type {
+  EditorDocumentV1,
+  LayerNode,
+  Matrix2D,
+} from '../document/types'
+import {
+  multiplyMatrices,
+  transformToMatrix,
+} from '../geometry'
 import { createLoupeLayer } from '../tools/precision/loupe'
 import { CommandManager } from './manager'
 import {
@@ -92,9 +103,7 @@ describe('editor command operations', () => {
 
     const after = applyEditorCommand(before, command)
     expect(after.layers.map(({ id }) => id)).toEqual([IDS.first, IDS.last])
-    expect(
-      revertEditorCommand(after, command).layers.map(({ id }) => id),
-    ).toEqual([IDS.first, IDS.middle, IDS.last])
+    expect(revertEditorCommand(after, command).layers.map(({ id }) => id)).toEqual([IDS.first, IDS.middle, IDS.last])
   })
 
   it('allows an explicit unlock but blocks other locked-layer mutations', () => {
@@ -115,8 +124,7 @@ describe('editor command operations', () => {
         type: 'updateLayer',
         before: locked,
         after: { ...locked, opacity: 0.5 },
-      }),
-    ).toThrow(/locked/u)
+      })).toThrow(/locked/u)
   })
 
   it('reverts a generated removal to the equivalent document', () => {
@@ -183,10 +191,7 @@ describe('editor command operations', () => {
         axis === 'horizontal'
           ? { a: -1, b: 0, c: 0, d: 1, e: before.canvas.width, f: 0 }
           : { a: 1, b: 0, c: 0, d: -1, e: 0, f: before.canvas.height }
-      const expected = multiplyMatrices(
-        reflection,
-        transformToMatrix(transformed.transform),
-      )
+      const expected = multiplyMatrices(reflection, transformToMatrix(transformed.transform))
 
       for (const field of ['a', 'b', 'c', 'd', 'e', 'f'] as const) {
         expect(actual[field]).toBeCloseTo(expected[field], 12)

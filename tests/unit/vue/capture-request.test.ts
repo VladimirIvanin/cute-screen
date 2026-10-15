@@ -1,4 +1,9 @@
-import { describe, expect, it, vi } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 
 import { dispatchNativeCapture } from '../../../apps/desktop/src/capture-request'
 
@@ -29,8 +34,7 @@ describe('native capture dispatch', () => {
     expect(waitForMainWindowUnmap).toHaveBeenCalledOnce()
     expect(capture).toHaveBeenCalledOnce()
     expect(hide.mock.invocationCallOrder[0]).toBeLessThan(
-      waitForMainWindowUnmap.mock.invocationCallOrder[0] ??
-        Number.POSITIVE_INFINITY,
+      waitForMainWindowUnmap.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
     )
     expect(waitForMainWindowUnmap.mock.invocationCallOrder[0]).toBeLessThan(
       capture.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,

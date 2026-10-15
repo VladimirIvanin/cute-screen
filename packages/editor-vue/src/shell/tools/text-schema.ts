@@ -1,4 +1,8 @@
-import { computed, type Ref, type ShallowRef } from 'vue'
+import {
+  computed,
+  type Ref,
+  type ShallowRef,
+} from 'vue'
 import type {
   EditorDocumentV1,
   LayerNode,
@@ -6,7 +10,10 @@ import type {
   SrgbColor,
 } from '@cute-screen/editor-renderer'
 import type { ResolvedEditorShellProps } from '../contracts'
-import type { TextToolDefaults, TextToolbarSnapshot } from '../canvas/contracts'
+import type {
+  TextToolDefaults,
+  TextToolbarSnapshot,
+} from '../canvas/contracts'
 import type { ContextToolbarSchema } from '../types'
 
 type TextKind = 'text' | 'callout' | 'numberedMarker'
@@ -19,6 +26,7 @@ export interface TextDraft {
 }
 
 export interface TextSchemaContext {
+  readonly calloutStroke?: Ref<import('@cute-screen/editor-renderer').StrokeStyle>
   readonly props: ResolvedEditorShellProps
   readonly store: {
     readonly selectedLayerIds: readonly string[]
@@ -33,11 +41,7 @@ export interface TextSchemaContext {
 }
 
 function isTextLayer(layer: LayerNode | undefined): layer is TextLayer {
-  return (
-    layer?.kind === 'text' ||
-    layer?.kind === 'callout' ||
-    layer?.kind === 'numberedMarker'
-  )
+  return layer?.kind === 'text' || layer?.kind === 'callout' || layer?.kind === 'numberedMarker'
 }
 
 function textKindFor(
@@ -47,15 +51,14 @@ function textKindFor(
 ): TextKind | undefined {
   if (context.textDraft.value) return context.textDraft.value.kind
   if (selected) return selected.kind
-  return tool === 'text' || tool === 'callout' || tool === 'numberedMarker'
-    ? tool
-    : undefined
+  return tool === 'text' || tool === 'callout' || tool === 'numberedMarker' ? tool : undefined
 }
 
-function sameValue<T>(values: readonly T[], fallback: T): T | null {
-  return values.length === 0 || values.every((value) => value === values[0])
-    ? (values[0] ?? fallback)
-    : null
+function sameValue<T>(
+  values: readonly T[],
+  fallback: T,
+): T | null {
+  return values.length === 0 || values.every((value) => value === values[0]) ? (values[0] ?? fallback) : null
 }
 
 function sameColor(
@@ -77,9 +80,7 @@ function sameColor(
 
 function contentFor(layer: TextLayer | undefined): RichTextContent | undefined {
   if (!layer) return undefined
-  return layer.kind === 'numberedMarker'
-    ? layer.payload.label
-    : layer.payload.content
+  return layer.kind === 'numberedMarker' ? layer.payload.label : layer.payload.content
 }
 
 function backgroundFor(
@@ -107,9 +108,7 @@ function fontFamilies(
       'Georgia',
       'monospace',
       ...(context.props.systemFonts ?? []).map((face) => face.family),
-      snapshot?.fontFamily ??
-        first?.fontFamily ??
-        context.textDefaults.value.fontFamily,
+      snapshot?.fontFamily ?? first?.fontFamily ?? context.textDefaults.value.fontFamily,
     ]),
   ]
 }
@@ -128,9 +127,7 @@ function textToolbar(
     spans.map((span) => span.color),
     defaults.color,
   )
-  const background = snapshot
-    ? snapshot.background
-    : backgroundFor(context, selected)
+  const background = snapshot ? snapshot.background : backgroundFor(context, selected)
   return {
     kind,
     color: snapshot
@@ -193,10 +190,7 @@ function textToolbar(
           radius: background.radius,
         }
       : null,
-    disabled:
-      kind === 'numberedMarker'
-        ? (['list', 'none', 'padding', 'radius'] as const)
-        : [],
+    disabled: kind === 'numberedMarker' ? (['list', 'none', 'padding', 'radius'] as const) : [],
   }
 }
 
@@ -204,9 +198,9 @@ function calloutControls(
   context: TextSchemaContext,
   selected: TextLayer | undefined,
 ): ContextToolbarSchema['controls'] {
-  if (selected?.kind !== 'callout') return []
-  const stroke = selected.payload.stroke
-  const disabled = context.props.readOnlyDocument || selected.locked
+  const stroke = selected?.kind === 'callout' ? selected.payload.stroke : context.calloutStroke?.value
+  if (!stroke) return []
+  const disabled = context.props.readOnlyDocument || Boolean(selected?.locked)
   return [
     {
       kind: 'color',
@@ -222,10 +216,7 @@ function calloutControls(
       id: 'stroke',
       label: context.translate('arrowStroke'),
       width: stroke.width,
-      style:
-        stroke.style === 'solid' || stroke.style === 'dotted'
-          ? stroke.style
-          : 'dashed',
+      style: stroke.style === 'solid' || stroke.style === 'dotted' ? stroke.style : 'dashed',
       disabled,
       solidLabel: context.translate('arrowSolid'),
       dashedLabel: context.translate('arrowDashed'),
@@ -234,13 +225,12 @@ function calloutControls(
   ]
 }
 
-function titleFor(context: TextSchemaContext, kind: TextKind): string {
+function titleFor(
+  context: TextSchemaContext,
+  kind: TextKind,
+): string {
   return context.translate(
-    kind === 'callout'
-      ? 'toolCallout'
-      : kind === 'numberedMarker'
-        ? 'toolNumberedMarker'
-        : 'toolText',
+    kind === 'callout' ? 'toolCallout' : kind === 'numberedMarker' ? 'toolNumberedMarker' : 'toolText',
   )
 }
 
@@ -249,9 +239,7 @@ function buildTextContextSchema(
   selectedCandidate: LayerNode | undefined,
   tool: string,
 ): ContextToolbarSchema | undefined {
-  const selected = isTextLayer(selectedCandidate)
-    ? selectedCandidate
-    : undefined
+  const selected = isTextLayer(selectedCandidate) ? selectedCandidate : undefined
   const kind = textKindFor(context, selected, tool)
   if (!kind) return undefined
   return {
@@ -265,25 +253,23 @@ function buildTextContextSchema(
 
 function selectedLayer(context: TextSchemaContext): LayerNode | undefined {
   if (context.store.selectedLayerIds.length !== 1) return undefined
-  return context.activeDocument.value?.layers.find(
-    (layer) => layer.id === context.store.selectedLayerId,
-  )
+  return context.activeDocument.value?.layers.find((layer) => layer.id === context.store.selectedLayerId)
 }
 
 export function createTextSchema(context: TextSchemaContext) {
   const floatingTextToolbarSchema = computed(() => {
     if (!context.textDraft.value) return undefined
-    const schema = buildTextContextSchema(
-      context,
-      selectedLayer(context),
-      context.activeToolId.value ?? 'select',
-    )
+    const schema = buildTextContextSchema(context, selectedLayer(context), context.activeToolId.value ?? 'select')
     if (!schema?.text) return undefined
     return { text: schema.text, title: schema.title }
   })
   return {
-    buildTextContextSchema: (selected: LayerNode | undefined, tool: string) =>
-      buildTextContextSchema(context, selected, tool),
+    buildTextContextSchema: (selected: LayerNode | undefined, tool: string, defaultsOnly = false) =>
+      buildTextContextSchema(
+        defaultsOnly ? { ...context, textDraft: computed(() => undefined) } : context,
+        selected,
+        tool,
+      ),
     floatingTextToolbarSchema,
   }
 }

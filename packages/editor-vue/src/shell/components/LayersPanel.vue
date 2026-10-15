@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import {
+  computed,
+  ref,
+} from 'vue'
 import { NButton } from 'naive-ui'
 
 import { UiIcon } from '../icon'
@@ -41,10 +44,7 @@ const pointerReorder = ref<{
 }>()
 
 const selectedLayer = computed(() =>
-  props.selectedLayerId
-    ? props.layers.find((layer) => layer.id === props.selectedLayerId)
-    : undefined,
-)
+  props.selectedLayerId ? props.layers.find((layer) => layer.id === props.selectedLayerId) : undefined)
 
 const controlsDisabled = computed(() => {
   const layer = selectedLayer.value
@@ -72,8 +72,7 @@ function updateDropFromPointer(
     return
   }
   const rect = row.getBoundingClientRect()
-  const place: DropPlace =
-    clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+  const place: DropPlace = clientY < rect.top + rect.height / 2 ? 'before' : 'after'
   dropTarget.value = { id: targetId, place }
 }
 
@@ -92,8 +91,15 @@ function finishPointerReorder(): void {
   clearReorder()
 }
 
-function onLayerPointerDown(event: PointerEvent, layer: LayerSummary): void {
-  if (!canReorderLayer(layer) || event.button !== 0) return
+function onLayerPointerDown(
+  event: PointerEvent,
+  layer: LayerSummary,
+): void {
+  if (event.button !== 0 || layer.transient) return
+  if (!canReorderLayer(layer)) {
+    selectLayer(layer.id, event)
+    return
+  }
   const handle = event.currentTarget
   if (!(handle instanceof HTMLElement)) return
   pointerReorder.value = {
@@ -110,10 +116,7 @@ function onLayerPointerMove(event: PointerEvent): void {
   const state = pointerReorder.value
   if (!state || state.pointerId !== event.pointerId) return
   if (!state.dragging) {
-    const distance = Math.hypot(
-      event.clientX - state.startX,
-      event.clientY - state.startY,
-    )
+    const distance = Math.hypot(event.clientX - state.startX, event.clientY - state.startY)
     if (distance < DRAG_THRESHOLD_PX) return
     state.dragging = true
     dragLayerId.value = state.layerId
@@ -121,14 +124,14 @@ function onLayerPointerMove(event: PointerEvent): void {
   updateDropFromPointer(event.clientX, event.clientY, state.layerId)
 }
 
-function onLayerPointerUp(event: PointerEvent, layer: LayerSummary): void {
+function onLayerPointerUp(
+  event: PointerEvent,
+  layer: LayerSummary,
+): void {
   const state = pointerReorder.value
   if (!state || state.pointerId !== event.pointerId) return
   const handle = event.currentTarget
-  if (
-    handle instanceof HTMLElement &&
-    handle.hasPointerCapture?.(event.pointerId)
-  ) {
+  if (handle instanceof HTMLElement && handle.hasPointerCapture?.(event.pointerId)) {
     handle.releasePointerCapture(event.pointerId)
   }
   if (state.dragging) {
@@ -154,7 +157,10 @@ function isDropAfter(layerId: string): boolean {
   return dropTarget.value?.id === layerId && dropTarget.value.place === 'after'
 }
 
-function selectLayer(layerId: string, event: MouseEvent | KeyboardEvent): void {
+function selectLayer(
+  layerId: string,
+  event: MouseEvent | KeyboardEvent,
+): void {
   emit('select', layerId, event.metaKey || event.ctrlKey, event.shiftKey)
 }
 
@@ -181,7 +187,11 @@ const emit = defineEmits<{
   >
     <UiIcon name="layers" />
   </NButton>
-  <aside v-else class="cs-layers-panel" aria-label="Layers">
+  <aside
+    v-else
+    class="cs-layers-panel"
+    aria-label="Layers"
+  >
     <header>
       <strong>{{ t('layers') }}</strong>
       <NButton
@@ -229,25 +239,26 @@ const emit = defineEmits<{
     <p v-if="layers.length === 0" class="cs-layers-empty">
       {{ t('layersEmpty') }}
     </p>
-    <div v-else class="cs-layers-list" role="listbox" :aria-label="t('layers')">
+    <div
+      v-else
+      class="cs-layers-list"
+      role="listbox"
+      :aria-label="t('layers')"
+    >
       <div
         v-for="layer in layers"
         :key="layer.id"
         class="cs-layer-row"
         :data-layer-id="layer.id"
         :class="{
-          'is-selected':
-            selectedLayerIds?.includes(layer.id) ??
-            layer.id === selectedLayerId,
+          'is-selected': selectedLayerIds?.includes(layer.id) ?? layer.id === selectedLayerId,
           'is-locked': layer.locked,
           'is-dragging': dragLayerId === layer.id,
           'is-drop-before': isDropBefore(layer.id),
           'is-drop-after': isDropAfter(layer.id),
         }"
         role="option"
-        :aria-selected="
-          selectedLayerIds?.includes(layer.id) ?? layer.id === selectedLayerId
-        "
+        :aria-selected="selectedLayerIds?.includes(layer.id) ?? layer.id === selectedLayerId"
       >
         <NButton
           quaternary
@@ -285,7 +296,11 @@ const emit = defineEmits<{
           @click.stop="emit('lock', layer.id)"
         >
           <UiIcon v-if="layer.locked" name="lock" />
-          <UiIcon v-else name="unlock" class="cs-layer-lock-idle" />
+          <UiIcon
+            v-else
+            name="unlock"
+            class="cs-layer-lock-idle"
+          />
         </button>
       </div>
     </div>

@@ -1,4 +1,7 @@
-import type { ImageResource, ImageResourceInput } from '../../types'
+import type {
+  ImageResource,
+  ImageResourceInput,
+} from '../../types'
 
 export interface CanvasKitImageResource extends ImageResource {
   readonly source: ImageResourceInput['source']
@@ -11,12 +14,7 @@ export interface CanvasKitDeletable {
 
 export interface CanvasKitPaint extends CanvasKitDeletable {
   setAntiAlias(value: boolean): void
-  setColorComponents(
-    red: number,
-    green: number,
-    blue: number,
-    alpha: number,
-  ): void
+  setColorComponents(red: number, green: number, blue: number, alpha: number): void
   setStyle(style: unknown): void
   setStrokeWidth(width: number): void
   setStrokeCap(value: unknown): void
@@ -46,14 +44,7 @@ export interface CanvasKitFontData {
 export interface CanvasKitPathBuilder extends CanvasKitDeletable {
   moveTo(x: number, y: number): void
   lineTo(x: number, y: number): void
-  cubicTo(
-    control1X: number,
-    control1Y: number,
-    control2X: number,
-    control2Y: number,
-    endX: number,
-    endY: number,
-  ): void
+  cubicTo(control1X: number, control1Y: number, control2X: number, control2Y: number, endX: number, endY: number): void
   close(): void
   addOval?(oval: Float32Array, isCounterClockwise?: boolean): void
   addRect?(rect: Float32Array, isCounterClockwise?: boolean): void
@@ -80,13 +71,7 @@ export interface CanvasKitCanvas {
   scale(x: number, y: number): void
   drawRect(rect: Float32Array, paint: CanvasKitPaint): void
   drawOval(rect: Float32Array, paint: CanvasKitPaint): void
-  drawLine(
-    x1: number,
-    y1: number,
-    x2: number,
-    y2: number,
-    paint: CanvasKitPaint,
-  ): void
+  drawLine(x1: number, y1: number, x2: number, y2: number, paint: CanvasKitPaint): void
   drawPath(path: CanvasKitPath, paint: CanvasKitPaint): void
   drawImageRect(
     image: CanvasKitImage,
@@ -108,13 +93,7 @@ export interface CanvasKitCanvas {
   clipRRect?(rrect: Float32Array, op?: unknown, antiAlias?: boolean): void
   drawRRect?(rrect: Float32Array, paint: CanvasKitPaint): void
   drawPicture?(picture: CanvasKitPicture): void
-  drawText?(
-    text: string,
-    x: number,
-    y: number,
-    paint: CanvasKitPaint,
-    font: CanvasKitFont,
-  ): void
+  drawText?(text: string, x: number, y: number, paint: CanvasKitPaint, font: CanvasKitFont): void
 }
 
 export type CanvasKitPicture = CanvasKitDeletable
@@ -132,7 +111,9 @@ export interface CanvasKitFontMetricsSource {
 }
 
 export interface CanvasKitFont
-  extends CanvasKitDeletable, CanvasKitFontMetricsSource {
+  extends
+    CanvasKitDeletable,
+    CanvasKitFontMetricsSource {
   setEmbolden?(embolden: boolean): void
   setSkewX?(skew: number): void
 }
@@ -147,9 +128,7 @@ export interface CanvasKitSurface {
   getCanvas(): CanvasKitCanvas
   flush(): void
   makeImageSnapshot(): CanvasKitImage
-  makeImageFromTextureSource(
-    source: ImageResourceInput['source'],
-  ): CanvasKitImage | null
+  makeImageFromTextureSource(source: ImageResourceInput['source']): CanvasKitImage | null
   dispose(): void
 }
 
@@ -201,11 +180,7 @@ export interface CanvasKitApi {
     MakeDash(intervals: number[], phase?: number): CanvasKitPathEffect
   }>
   readonly MaskFilter?: Readonly<{
-    MakeBlur(
-      style: unknown,
-      sigma: number,
-      respectCTM: boolean,
-    ): CanvasKitMaskFilter
+    MakeBlur(style: unknown, sigma: number, respectCTM: boolean): CanvasKitMaskFilter
   }>
   readonly ImageFilter?: Readonly<{
     MakeBlur(
@@ -220,10 +195,7 @@ export interface CanvasKitApi {
   readonly ImageFormat: Readonly<{ PNG: unknown }>
   readonly TRANSPARENT: unknown
   readonly PictureRecorder?: new () => CanvasKitPictureRecorder
-  readonly Font?: new (
-    typeface: CanvasKitTypeface,
-    size: number,
-  ) => CanvasKitFont
+  readonly Font?: new (typeface: CanvasKitTypeface, size: number) => CanvasKitFont
   readonly Typeface?: Readonly<{
     MakeDefault?: () => CanvasKitTypeface
     GetDefault?: () => CanvasKitTypeface
@@ -231,12 +203,7 @@ export interface CanvasKitApi {
   }>
   XYWHRect(x: number, y: number, width: number, height: number): Float32Array
   RRectXY(rect: Float32Array, radiusX: number, radiusY: number): Float32Array
-  LTRBRect(
-    left: number,
-    top: number,
-    right: number,
-    bottom: number,
-  ): Float32Array
+  LTRBRect(left: number, top: number, right: number, bottom: number): Float32Array
   MakeSurface(width: number, height: number): CanvasKitSurface | null
   MakeWebGLCanvasSurface(canvas: HTMLCanvasElement): CanvasKitSurface | null
   deleteContext(handle: number): void

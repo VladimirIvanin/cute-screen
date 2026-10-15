@@ -2,7 +2,10 @@ import type {
   CanvasViewportHosts,
   DocumentSessionController,
 } from '@cute-screen/editor-vue'
-import type { Ref, ShallowRef } from 'vue'
+import type {
+  Ref,
+  ShallowRef,
+} from 'vue'
 import {
   computeQuickCaptureLayout,
   type QuickRect,
@@ -23,7 +26,11 @@ export class QuickCaptureLayoutController {
 
   update(crop: QuickRect = this.#ports.currentCrop.value): string | undefined {
     const { hosts, session } = this.#ports
-    if (!hosts.value || crop.width <= 0 || crop.height <= 0) return undefined
+    if (
+      !hosts.value ||
+      crop.width <= 0 ||
+      crop.height <= 0
+    ) return undefined
     const bounds = hosts.value.scene.getBoundingClientRect()
     const source = session.value?.snapshot.core.document.canvas ?? {
       width: 1,
@@ -31,10 +38,8 @@ export class QuickCaptureLayoutController {
     }
     const quickRoot = document.querySelector<HTMLElement>('.cs-quick-capture')
     const actions = quickRoot?.querySelector<HTMLElement>('.cs-quick-actions')
-    const toolRow = quickRoot?.querySelector<HTMLElement>(
-      '.cs-quick-toolrail-group',
-    )
-    const context = quickRoot?.querySelector<HTMLElement>('.cs-context-toolbar')
+    const toolRow = quickRoot?.querySelector<HTMLElement>('.cs-quick-toolrail-group')
+    const context = quickRoot?.querySelector<HTMLElement>('.cs-tool-defaults-toolbar')
     if (!hasMeasurableChrome(actions, toolRow, bounds)) return undefined
     const tools = toolRow!
     const contextHeight = context?.offsetHeight ?? 0

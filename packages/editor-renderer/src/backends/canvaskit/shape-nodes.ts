@@ -8,8 +8,14 @@ import type {
   CanvasKitPathEffect,
   CanvasKitShader,
 } from './contracts'
-import { roundedRectPath, withTransform } from './geometry'
-import { configureFillPaint, configureStrokePaint } from './paint'
+import {
+  roundedRectPath,
+  withTransform,
+} from './geometry'
+import {
+  configureFillPaint,
+  configureStrokePaint,
+} from './paint'
 
 type Node<K extends RenderNode['kind']> = Extract<RenderNode, { kind: K }>
 type Resources = ReadonlyMap<string, CanvasKitImageResource>
@@ -56,43 +62,17 @@ export function drawRectNodeCanvasKit(
 ): void {
   withPaints(canvasKit, ({ fill, stroke, setShader, setPathEffect }) => {
     const rect = canvasKit.XYWHRect(node.x, node.y, node.width, node.height)
-    const rounded =
-      (node.cornerRadius ?? 0) > 0
-        ? roundedRectPath(canvasKit, node)
-        : undefined
+    const rounded = (node.cornerRadius ?? 0) > 0 ? roundedRectPath(canvasKit, node) : undefined
     try {
-      withTransform(
-        canvas,
-        node,
-        node.x + node.width / 2,
-        node.y + node.height / 2,
-        () => {
-          setShader(
-            configureFillPaint(
-              canvasKit,
-              fill,
-              node.fill,
-              node.opacity,
-              node.blendMode,
-              resources,
-            ),
-          )
-          if (rounded) canvas.drawPath(rounded, fill)
-          else canvas.drawRect(rect, fill)
-          if (!node.stroke || (node.strokeWidth ?? 0) <= 0) return
-          setPathEffect(
-            configureStrokePaint(
-              canvasKit,
-              stroke,
-              node,
-              node.stroke,
-              node.strokeWidth ?? 1,
-            ),
-          )
-          if (rounded) canvas.drawPath(rounded, stroke)
-          else canvas.drawRect(rect, stroke)
-        },
-      )
+      withTransform(canvas, node, node.x + node.width / 2, node.y + node.height / 2, () => {
+        setShader(configureFillPaint(canvasKit, fill, node.fill, node.opacity, node.blendMode, resources))
+        if (rounded) canvas.drawPath(rounded, fill)
+        else canvas.drawRect(rect, fill)
+        if (!node.stroke || (node.strokeWidth ?? 0) <= 0) return
+        setPathEffect(configureStrokePaint(canvasKit, stroke, node, node.stroke, node.strokeWidth ?? 1))
+        if (rounded) canvas.drawPath(rounded, stroke)
+        else canvas.drawRect(rect, stroke)
+      })
     } finally {
       rounded?.delete()
     }
@@ -113,27 +93,10 @@ export function drawEllipseNodeCanvasKit(
       node.centerY + node.radiusY,
     )
     withTransform(canvas, node, node.centerX, node.centerY, () => {
-      setShader(
-        configureFillPaint(
-          canvasKit,
-          fill,
-          node.fill,
-          node.opacity,
-          node.blendMode,
-          resources,
-        ),
-      )
+      setShader(configureFillPaint(canvasKit, fill, node.fill, node.opacity, node.blendMode, resources))
       canvas.drawOval(oval, fill)
       if (!node.stroke || (node.strokeWidth ?? 0) <= 0) return
-      setPathEffect(
-        configureStrokePaint(
-          canvasKit,
-          stroke,
-          node,
-          node.stroke,
-          node.strokeWidth ?? 1,
-        ),
-      )
+      setPathEffect(configureStrokePaint(canvasKit, stroke, node, node.stroke, node.strokeWidth ?? 1))
       canvas.drawOval(oval, stroke)
     })
   })
@@ -145,24 +108,10 @@ export function drawLineNodeCanvasKit(
   node: Node<'line'>,
 ): void {
   withPaints(canvasKit, ({ stroke, setPathEffect }) => {
-    withTransform(
-      canvas,
-      node,
-      (node.x1 + node.x2) / 2,
-      (node.y1 + node.y2) / 2,
-      () => {
-        setPathEffect(
-          configureStrokePaint(
-            canvasKit,
-            stroke,
-            node,
-            node.stroke,
-            node.strokeWidth,
-          ),
-        )
-        canvas.drawLine(node.x1, node.y1, node.x2, node.y2, stroke)
-      },
-    )
+    withTransform(canvas, node, (node.x1 + node.x2) / 2, (node.y1 + node.y2) / 2, () => {
+      setPathEffect(configureStrokePaint(canvasKit, stroke, node, node.stroke, node.strokeWidth))
+      canvas.drawLine(node.x1, node.y1, node.x2, node.y2, stroke)
+    })
   })
 }
 
@@ -197,15 +146,7 @@ export function drawPathNodeCanvasKit(
         (Math.min(...xs) + Math.max(...xs)) / 2,
         (Math.min(...ys) + Math.max(...ys)) / 2,
         () => {
-          setPathEffect(
-            configureStrokePaint(
-              canvasKit,
-              stroke,
-              node,
-              node.stroke,
-              node.strokeWidth,
-            ),
-          )
+          setPathEffect(configureStrokePaint(canvasKit, stroke, node, node.stroke, node.strokeWidth))
           canvas.drawPath(path, stroke)
         },
       )
@@ -222,34 +163,15 @@ export function drawPolygonNodeCanvasKit(
   resources: Resources,
 ): void {
   const path = buildPointPath(canvasKit, node)
-  const centerX =
-    node.points.reduce((sum, point) => sum + point.x, 0) / node.points.length
-  const centerY =
-    node.points.reduce((sum, point) => sum + point.y, 0) / node.points.length
+  const centerX = node.points.reduce((sum, point) => sum + point.x, 0) / node.points.length
+  const centerY = node.points.reduce((sum, point) => sum + point.y, 0) / node.points.length
   try {
     withPaints(canvasKit, ({ fill, stroke, setShader, setPathEffect }) => {
       withTransform(canvas, node, centerX, centerY, () => {
-        setShader(
-          configureFillPaint(
-            canvasKit,
-            fill,
-            node.fill,
-            node.opacity,
-            node.blendMode,
-            resources,
-          ),
-        )
+        setShader(configureFillPaint(canvasKit, fill, node.fill, node.opacity, node.blendMode, resources))
         canvas.drawPath(path, fill)
         if (!node.stroke || (node.strokeWidth ?? 0) <= 0) return
-        setPathEffect(
-          configureStrokePaint(
-            canvasKit,
-            stroke,
-            node,
-            node.stroke,
-            node.strokeWidth ?? 1,
-          ),
-        )
+        setPathEffect(configureStrokePaint(canvasKit, stroke, node, node.stroke, node.strokeWidth ?? 1))
         canvas.drawPath(path, stroke)
       })
     })

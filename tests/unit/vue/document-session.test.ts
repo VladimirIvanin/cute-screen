@@ -1,4 +1,9 @@
-import { describe, expect, it, vi } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 
 import {
   describeError,
@@ -36,14 +41,9 @@ const document: EditorDocumentV1 = {
 
 describe('M03 document persistence session', () => {
   it('describes an unsupported native document schema without object stringification', () => {
-    const message = describeError(
-      { olderSchema: { schema_version: 4 } },
-      'Unable to open the document.',
-    )
+    const message = describeError({ olderSchema: { schema_version: 4 } }, 'Unable to open the document.')
 
-    expect(message).toBe(
-      'This document uses unsupported schema version 4. Capture or open an image to continue.',
-    )
+    expect(message).toBe('This document uses unsupported schema version 4. Capture or open an image to continue.')
   })
 
   it('opens legacy non-image scale normalized without dirty state or history', () => {
@@ -160,9 +160,7 @@ describe('M03 document persistence session', () => {
     expect(parseEditorDocument(saved.documentJson)).toMatchObject({
       kind: 'editable',
     })
-    expect(serializeEditorDocument(session.snapshot.core.document)).toBe(
-      saved.documentJson,
-    )
+    expect(serializeEditorDocument(session.snapshot.core.document)).toBe(saved.documentJson)
     vi.useRealTimers()
   })
 
@@ -195,14 +193,12 @@ describe('M03 document persistence session', () => {
       defaults: preferences.defaults,
     })
     if (!arrow) throw new Error('expected recovered Arrow')
-    const saveDocument = vi.fn(
-      async (record: { readonly documentJson: string }) => {
-        expect(parseEditorDocument(record.documentJson)).toMatchObject({
-          kind: 'editable',
-        })
-        return 2
-      },
-    )
+    const saveDocument = vi.fn(async (record: { readonly documentJson: string }) => {
+      expect(parseEditorDocument(record.documentJson)).toMatchObject({
+        kind: 'editable',
+      })
+      return 2
+    })
     const session = new DocumentSessionController({
       document,
       revision: 1,

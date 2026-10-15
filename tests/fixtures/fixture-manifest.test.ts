@@ -1,6 +1,10 @@
 import path from 'node:path'
 
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 import {
   FixtureValidationError,
@@ -18,16 +22,12 @@ describe('fixture manifest harness', () => {
     const fixture = manifest.fixtures[0]
 
     expect(fixture).toBeDefined()
-    await expect(verifyFixture(fixture!, fixtureRoot)).resolves.toBe(
-      path.join(fixtureRoot, 'harness/red-1x1.ppm'),
-    )
+    await expect(verifyFixture(fixture!, fixtureRoot)).resolves.toBe(path.join(fixtureRoot, 'harness/red-1x1.ppm'))
   })
 
   it('contains production-shaped M01 image and monitor fixtures', async () => {
     const manifest = await loadFixtureManifest(manifestPath, schemaPath)
-    const byId = new Map(
-      manifest.fixtures.map((fixture) => [fixture.id, fixture]),
-    )
+    const byId = new Map(manifest.fixtures.map((fixture) => [fixture.id, fixture]))
 
     expect(byId.get('m01-ui-4k')).toMatchObject({
       kind: 'image',
@@ -58,12 +58,7 @@ describe('fixture manifest harness', () => {
 
     await expect(verifyFixture(missing, fixtureRoot)).rejects.toEqual(
       expect.objectContaining<Partial<FixtureValidationError>>({
-        message: expect.stringMatching(
-          new RegExp(
-            `${fixture.id}.*${fixture.sha256}.*Included in the repository`,
-            'u',
-          ),
-        ),
+        message: expect.stringMatching(new RegExp(`${fixture.id}.*${fixture.sha256}.*Included in the repository`, 'u')),
       }),
     )
   })

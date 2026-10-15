@@ -22,7 +22,7 @@ import {
   IconPencil,
   IconPhoto,
   IconPlus,
-  IconPointer,
+  IconPointer2,
   IconRuler2,
   IconScanEye,
   IconSparkles,
@@ -34,7 +34,11 @@ import {
   IconZoomIn,
   IconZoomOut,
 } from '@tabler/icons-vue'
-import { h, type Component, type FunctionalComponent } from 'vue'
+import {
+  h,
+  type Component,
+  type FunctionalComponent,
+} from 'vue'
 
 import type { IconName } from './types'
 
@@ -66,7 +70,7 @@ const icons = {
   sparkles: IconSparkles,
   redo: IconArrowForwardUp,
   ruler: IconRuler2,
-  select: IconPointer,
+  select: IconPointer2,
   shape: IconSquare,
   spotlight: IconFocus2,
   text: IconTypography,

@@ -24,8 +24,8 @@
     "check:rust": "pnpm build:frontend && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo clippy --workspace --all-targets --features fake-platform,test-harness -- -D warnings && cargo clippy --workspace --all-targets --features x11-capture -- -D warnings && cargo clippy --workspace --lib --bins --all-features -- -D clippy::unwrap_used -D clippy::expect_used",
     "lint": "eslint .",
     "typecheck": "pnpm build:packages && vue-tsc --noEmit -p apps/desktop/tsconfig.json && vue-tsc --noEmit -p tests/tsconfig.json && tsc --noEmit -p tests/e2e/tsconfig.json",
-    "format": "prettier . --write",
-    "format:check": "prettier . --check",
+    "format": "prettier . --write && eslint . --config eslint.format.config.js --fix",
+    "format:check": "prettier . --check && eslint . --config eslint.format.config.js",
     "docs:check": "node scripts/check-markdown-links.mjs",
     "doctor": "node scripts/check-tauri-prerequisites.mjs",
     "test": "pnpm fixtures:generate:m01 && vitest run --project core --project renderer --project vue --project fixtures --project fake-platform",
@@ -70,6 +70,7 @@
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@napi-rs/canvas": "1.0.2",
+    "@stylistic/eslint-plugin": "5.10.0",
     "@tauri-apps/cli": "2.11.4",
     "@testing-library/dom": "10.4.1",
     "@testing-library/jest-dom": "7.0.0",
@@ -92,8 +93,8 @@
     "eslint": "10.8.0",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-vue": "10.10.0",
-    "fast-glob": "3.3.3",
     "fast-check": "4.9.0",
+    "fast-glob": "3.3.3",
     "globals": "17.9.0",
     "jsdom": "30.0.1",
     "license-checker-rseidelsohn": "4.4.2",
@@ -113,6 +114,9 @@
     },
     "onlyBuiltDependencies": [
       "esbuild"
-    ]
+    ],
+    "patchedDependencies": {
+      "@wdio/native-core@1.1.0": "patches/@wdio__native-core@1.1.0.patch"
+    }
   }
 }

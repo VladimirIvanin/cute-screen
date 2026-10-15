@@ -1,10 +1,20 @@
-import { describe, expect, it, vi } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 
 import {
   computeQuickCaptureLayout,
   presentThenWaitForStableQuickCaptureLayout,
   waitForStableQuickCaptureLayout,
 } from '../../../apps/desktop/src/quick-capture-layout'
+import { QuickCaptureLayoutController } from '../../../apps/desktop/src/quick-capture-layout-controller'
+import {
+  ref,
+  shallowRef,
+} from 'vue'
 
 const base = {
   viewport: { width: 1440, height: 900 },
@@ -15,6 +25,33 @@ const base = {
 }
 
 describe('quick capture overlay layout', () => {
+  it('keeps configure and selection panels outside the bottom chrome measurements', () => {
+    const root = document.createElement('div')
+    root.className = 'cs-quick-capture'
+    root.innerHTML = '<div class="cs-quick-actions"></div><div class="cs-quick-toolrail-group"></div><div class="cs-tool-configure-popover-host"><div class="cs-context-toolbar"></div></div>'
+    document.body.append(root)
+    const scene = document.createElement('canvas')
+    scene.getBoundingClientRect = () => new DOMRect(0, 0, 1000, 700)
+    for (const element of root.querySelectorAll<HTMLElement>('div')) {
+      Object.defineProperties(element, {
+        offsetWidth: { value: 200 },
+        offsetHeight: { value: 40 },
+      })
+    }
+    const popup = root.querySelector<HTMLElement>('.cs-context-toolbar')!
+    try {
+      const controller = new QuickCaptureLayoutController({
+        hosts: shallowRef({ scene } as NonNullable<ConstructorParameters<typeof QuickCaptureLayoutController>[0]['hosts']['value']>),
+        session: shallowRef(undefined),
+        currentCrop: ref({ x: 0, y: 0, width: 1, height: 1 }),
+      })
+      controller.update()
+      expect(popup.style.top).toBe('')
+      expect(popup.style.transform).toBe('')
+    } finally {
+      root.remove()
+    }
+  })
   it('maps the hidden native window before measuring WebKitGTK layout', async () => {
     const order: string[] = []
     let mapped = false
@@ -107,9 +144,7 @@ describe('quick capture overlay layout', () => {
     expect(layout.tools.side).toBe('above')
     expect(layout.actions.left).toBeGreaterThanOrEqual(8)
     expect(layout.tools.left).toBeGreaterThanOrEqual(8)
-    expect(layout.tools.left + base.toolSize.width).toBeLessThanOrEqual(
-      base.viewport.width - 8,
-    )
+    expect(layout.tools.left + base.toolSize.width).toBeLessThanOrEqual(base.viewport.width - 8)
   })
 
   it('maps a source crop through a full-viewport frozen frame', () => {

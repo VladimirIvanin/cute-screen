@@ -1,4 +1,8 @@
-import { browser, expect, $ } from '@wdio/globals'
+import {
+  browser,
+  expect,
+  $,
+} from '@wdio/globals'
 
 describe('foundation shell in browser mode', () => {
   it('mounts the empty editor and completes the test capture action', async () => {

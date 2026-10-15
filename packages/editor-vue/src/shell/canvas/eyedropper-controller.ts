@@ -1,4 +1,7 @@
-import { ref, type Ref } from 'vue'
+import {
+  ref,
+  type Ref,
+} from 'vue'
 import type {
   CanvasPoint,
   CanvasViewportEmit,
@@ -27,20 +30,23 @@ export interface EyedropperPorts {
   readonly viewportRoot: Ref<HTMLElement | undefined>
   readonly scrollContainer: Ref<HTMLDivElement | undefined>
   readonly outputBounds: Ref<ViewportOutputBounds | undefined>
-  readonly canvasPoint: (event: {
-    readonly clientX: number
-    readonly clientY: number
-  }) => CanvasPoint | undefined
+  readonly canvasPoint: (event: { readonly clientX: number; readonly clientY: number }) => CanvasPoint | undefined
 }
 
-function pixelHex(data: Uint8ClampedArray, offset = 0): string {
+function pixelHex(
+  data: Uint8ClampedArray,
+  offset = 0,
+): string {
   return `#${[data[offset], data[offset + 1], data[offset + 2]]
     .map((channel) => (channel ?? 0).toString(16).padStart(2, '0'))
     .join('')
     .toUpperCase()}`
 }
 
-function samplingError(english: string, russian: string): string {
+function samplingError(
+  english: string,
+  russian: string,
+): string {
   return document.documentElement.lang === 'ru' ? russian : english
 }
 
@@ -61,41 +67,39 @@ export class EyedropperController {
     this.#ports = ports
   }
 
-  #scenePixel(
-    point: CanvasPoint,
-  ): Readonly<{ x: number; y: number }> | undefined {
+  #scenePixel(point: CanvasPoint): Readonly<{ x: number; y: number }> | undefined {
     const canvas = this.#ports.scene.value
     const bounds = this.#ports.outputBounds.value
-    if (!canvas || !bounds || canvas.width <= 0 || canvas.height <= 0) {
+    if (
+      !canvas ||
+      !bounds ||
+      canvas.width <= 0 ||
+      canvas.height <= 0
+    ) {
       return undefined
     }
     return {
-      x: Math.max(
-        0,
-        Math.min(canvas.width - 1, Math.round(point.x - bounds.x)),
-      ),
-      y: Math.max(
-        0,
-        Math.min(canvas.height - 1, Math.round(point.y - bounds.y)),
-      ),
+      x: Math.max(0, Math.min(canvas.width - 1, Math.round(point.x - bounds.x))),
+      y: Math.max(0, Math.min(canvas.height - 1, Math.round(point.y - bounds.y))),
     }
   }
 
-  #samplingClientPoint(
-    point: CanvasPoint,
-  ): Readonly<{ clientX: number; clientY: number }> | undefined {
+  #samplingClientPoint(point: CanvasPoint): Readonly<{ clientX: number; clientY: number }> | undefined {
     const canvas = this.#ports.scene.value
     const bounds = this.#ports.outputBounds.value
-    if (!canvas || !bounds || canvas.width <= 0 || canvas.height <= 0) {
+    if (
+      !canvas ||
+      !bounds ||
+      canvas.width <= 0 ||
+      canvas.height <= 0
+    ) {
       return undefined
     }
     const rect = canvas.getBoundingClientRect()
     if (rect.width <= 0 || rect.height <= 0) return undefined
     return {
-      clientX:
-        rect.left + ((point.x - bounds.x + 0.5) * rect.width) / canvas.width,
-      clientY:
-        rect.top + ((point.y - bounds.y + 0.5) * rect.height) / canvas.height,
+      clientX: rect.left + ((point.x - bounds.x + 0.5) * rect.width) / canvas.width,
+      clientY: rect.top + ((point.y - bounds.y + 0.5) * rect.height) / canvas.height,
     }
   }
 
@@ -112,32 +116,21 @@ export class EyedropperController {
     const left = localX - CARD_GAP - width
     const below = localY + CARD_GAP
     const above = localY - CARD_GAP - height
-    const horizontal =
-      right + width <= rootRect.width - VIEWPORT_MARGIN ? 'right' : 'left'
-    const vertical =
-      below + height <= rootRect.height - VIEWPORT_MARGIN ? 'below' : 'above'
-    const maxLeft = Math.max(
-      VIEWPORT_MARGIN,
-      rootRect.width - width - VIEWPORT_MARGIN,
-    )
-    const maxTop = Math.max(
-      VIEWPORT_MARGIN,
-      rootRect.height - height - VIEWPORT_MARGIN,
-    )
-    const x = Math.max(
-      VIEWPORT_MARGIN,
-      Math.min(maxLeft, horizontal === 'right' ? right : left),
-    )
-    const y = Math.max(
-      VIEWPORT_MARGIN,
-      Math.min(maxTop, vertical === 'below' ? below : above),
-    )
+    const horizontal = right + width <= rootRect.width - VIEWPORT_MARGIN ? 'right' : 'left'
+    const vertical = below + height <= rootRect.height - VIEWPORT_MARGIN ? 'below' : 'above'
+    const maxLeft = Math.max(VIEWPORT_MARGIN, rootRect.width - width - VIEWPORT_MARGIN)
+    const maxTop = Math.max(VIEWPORT_MARGIN, rootRect.height - height - VIEWPORT_MARGIN)
+    const x = Math.max(VIEWPORT_MARGIN, Math.min(maxLeft, horizontal === 'right' ? right : left))
+    const y = Math.max(VIEWPORT_MARGIN, Math.min(maxTop, vertical === 'below' ? below : above))
     loupe.dataset.horizontalPlacement = horizontal
     loupe.dataset.verticalPlacement = vertical
     loupe.style.transform = `translate3d(${Math.round(x)}px, ${Math.round(y)}px, 0)`
   }
 
-  #setState(state: PreviewState, hex?: string): void {
+  #setState(
+    state: PreviewState,
+    hex?: string,
+  ): void {
     if (this.loupe.value) this.loupe.value.dataset.state = state
     if (this.hex.value) this.hex.value.textContent = hex ?? '—'
     if (this.swatch.value) {
@@ -168,24 +161,12 @@ export class EyedropperController {
     const sourceHeight = sourceBottom - sourceY
     const sourceContext = canvas.getContext('2d')
     if (!sourceContext) return this.#setState('error')
-    const pixels = sourceContext.getImageData(
-      sourceX,
-      sourceY,
-      sourceWidth,
-      sourceHeight,
-    )
-    previewContext.putImageData(
-      pixels,
-      sourceX - (pixel.x - GRID_RADIUS),
-      sourceY - (pixel.y - GRID_RADIUS),
-    )
-    const centerOffset =
-      ((pixel.y - sourceY) * sourceWidth + (pixel.x - sourceX)) * 4
+    const pixels = sourceContext.getImageData(sourceX, sourceY, sourceWidth, sourceHeight)
+    previewContext.putImageData(pixels, sourceX - (pixel.x - GRID_RADIUS), sourceY - (pixel.y - GRID_RADIUS))
+    const centerOffset = ((pixel.y - sourceY) * sourceWidth + (pixel.x - sourceX)) * 4
     this.#setState(
       pixels.data[centerOffset + 3] === 255 ? 'opaque' : 'unavailable',
-      pixels.data[centerOffset + 3] === 255
-        ? pixelHex(pixels.data, centerOffset)
-        : undefined,
+      pixels.data[centerOffset + 3] === 255 ? pixelHex(pixels.data, centerOffset) : undefined,
     )
   }
 
@@ -194,15 +175,19 @@ export class EyedropperController {
     const preview = this.preview.value
     const loupe = this.loupe.value
     const pixel = this.#scenePixel(request.point)
-    if (!canvas || !preview || !loupe || !pixel) return
+    if (
+      !canvas ||
+      !preview ||
+      !loupe ||
+      !pixel
+    ) return
     loupe.style.visibility = 'visible'
     this.#position(request)
     const key = `${pixel.x}:${pixel.y}:${this.#ports.props.samplingBlocked ? 'blocked' : 'ready'}`
     if (key === this.#lastPreviewKey) return
     this.#lastPreviewKey = key
     const context = preview.getContext('2d')
-    if (!context?.clearRect || !context.putImageData)
-      return this.#setState('error')
+    if (!context?.clearRect || !context.putImageData) return this.#setState('error')
     context.clearRect(0, 0, EYEDROPPER_GRID_SIZE, EYEDROPPER_GRID_SIZE)
     if (this.#ports.props.samplingBlocked) return this.#setState('loading')
     try {
@@ -253,10 +238,7 @@ export class EyedropperController {
     if (!canvas) {
       this.#ports.emit(
         'colorSampleError',
-        samplingError(
-          'Canvas is unavailable for colour sampling',
-          'Холст недоступен для выбора цвета',
-        ),
+        samplingError('Canvas is unavailable for colour sampling', 'Холст недоступен для выбора цвета'),
       )
       return
     }
@@ -273,16 +255,11 @@ export class EyedropperController {
     const pixel = this.#scenePixel(point)
     if (!pixel) return
     try {
-      const data = canvas
-        .getContext('2d')
-        ?.getImageData(pixel.x, pixel.y, 1, 1).data
+      const data = canvas.getContext('2d')?.getImageData(pixel.x, pixel.y, 1, 1).data
       if (!data || data[3] !== 255) {
         this.#ports.emit(
           'colorSampleError',
-          samplingError(
-            'There is no opaque colour at this point',
-            'В этой точке нет непрозрачного цвета',
-          ),
+          samplingError('There is no opaque colour at this point', 'В этой точке нет непрозрачного цвета'),
         )
         return
       }
@@ -291,10 +268,7 @@ export class EyedropperController {
       console.warn('cute-screen scene colour sampling failed', error)
       this.#ports.emit(
         'colorSampleError',
-        samplingError(
-          'The canvas colour could not be read',
-          'Не удалось прочитать цвет с холста',
-        ),
+        samplingError('The canvas colour could not be read', 'Не удалось прочитать цвет с холста'),
       )
     }
   }

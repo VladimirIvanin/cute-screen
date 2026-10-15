@@ -21,9 +21,7 @@ export interface LoupeConnectorGeometry {
 }
 
 /** Derived callout geometry; it is intentionally not part of the persisted v7 schema. */
-export function loupeConnectorGeometry(
-  node: RenderLoupeNode,
-): LoupeConnectorGeometry | null {
+export function loupeConnectorGeometry(node: RenderLoupeNode): LoupeConnectorGeometry | null {
   const source = {
     x: node.sourceRegion.x + node.sourceRegion.width / 2,
     y: node.sourceRegion.y + node.sourceRegion.height / 2,
@@ -37,9 +35,7 @@ export function loupeConnectorGeometry(
   const distance = Math.hypot(dx, dy)
   const radius = node.lens.size / 2
   const sourceInsideLens =
-    node.lens.shape === 'circle'
-      ? distance <= radius
-      : Math.abs(dx) <= radius && Math.abs(dy) <= radius
+    node.lens.shape === 'circle' ? distance <= radius : Math.abs(dx) <= radius && Math.abs(dy) <= radius
   if (sourceInsideLens || distance === 0) return null
 
   const direction = { x: dx / distance, y: dy / distance }
@@ -77,17 +73,9 @@ export function rulerEndpointTickHalfLength(thickness: number): number {
   return Math.max(6, Math.min(12, thickness))
 }
 
-export function rulerBadgeRotationDegrees(
-  node: RulerTransformGeometry,
-): number {
+export function rulerBadgeRotationDegrees(node: RulerTransformGeometry): number {
   const endpoints = rulerWorldEndpoints(node)
-  let angle =
-    (Math.atan2(
-      endpoints.end.y - endpoints.start.y,
-      endpoints.end.x - endpoints.start.x,
-    ) *
-      180) /
-    Math.PI
+  let angle = (Math.atan2(endpoints.end.y - endpoints.start.y, endpoints.end.x - endpoints.start.x) * 180) / Math.PI
   if (angle > 90) angle -= 180
   if (angle < -90) angle += 180
   return Object.is(angle, -0) ? 0 : angle
@@ -121,27 +109,17 @@ export function rulerWorldEndpoints(node: RulerTransformGeometry): Readonly<{
 }
 
 type RulerTransformGeometry = Pick<RenderRulerNode, 'x1' | 'y1' | 'x2' | 'y2'> &
-  Partial<
-    Pick<
-      RenderRulerNode,
-      'rotation' | 'scaleX' | 'scaleY' | 'transformOriginX' | 'transformOriginY'
-    >
-  >
+  Partial<Pick<RenderRulerNode, 'rotation' | 'scaleX' | 'scaleY' | 'transformOriginX' | 'transformOriginY'>>
 
 function linearized(channel: number): number {
-  return channel <= 0.04045
-    ? channel / 12.92
-    : ((channel + 0.055) / 1.055) ** 2.4
+  return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
 }
 
 export function rulerBadgePalette(color: RgbaColor): Readonly<{
   readonly background: RgbaColor
   readonly text: RgbaColor
 }> {
-  const luminance =
-    linearized(color.red) * 0.2126 +
-    linearized(color.green) * 0.7152 +
-    linearized(color.blue) * 0.0722
+  const luminance = linearized(color.red) * 0.2126 + linearized(color.green) * 0.7152 + linearized(color.blue) * 0.0722
   return luminance >= 0.55
     ? {
         background: { red: 0.08, green: 0.07, blue: 0.09, alpha: 0.94 },
@@ -162,9 +140,7 @@ export function rulerBadgeBox(
   return { width, height, radius: Math.min(6, height / 2) }
 }
 
-export function spotlightFeatherWidth(
-  preset: 'soft' | 'strong' | null,
-): number {
+export function spotlightFeatherWidth(preset: 'soft' | 'strong' | null): number {
   if (preset === 'soft') return 6
   if (preset === 'strong') return 14
   return 0
@@ -186,10 +162,12 @@ export function scaledOutputSize(
   bounds: RenderOutputBounds,
   scale: number,
 ): Readonly<{ width: number; height: number }> {
-  if (!Number.isFinite(scale) || scale <= 0 || scale > 16) {
-    throw new RangeError(
-      'export scale must be finite, greater than 0 and at most 16',
-    )
+  if (
+    !Number.isFinite(scale) ||
+    scale <= 0 ||
+    scale > 16
+  ) {
+    throw new RangeError('export scale must be finite, greater than 0 and at most 16')
   }
   return {
     width: Math.max(1, Math.round(bounds.width * scale)),

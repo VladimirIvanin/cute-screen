@@ -1,5 +1,11 @@
-import type { Matrix2D, Point } from './document/types'
-import { invertMatrix, transformPoint } from './geometry'
+import type {
+  Matrix2D,
+  Point,
+} from './document/types'
+import {
+  invertMatrix,
+  transformPoint,
+} from './geometry'
 
 export type ViewportFitMode = 'fit' | 'actual' | 'custom'
 
@@ -18,7 +24,10 @@ const MIN_ZOOM = 0.1
 const MAX_ZOOM = 16
 const FIT_PADDING = 24
 
-function matrix(zoom: number, pan: Point): Matrix2D {
+function matrix(
+  zoom: number,
+  pan: Point,
+): Matrix2D {
   return Object.freeze({ a: zoom, b: 0, c: 0, d: zoom, e: pan.x, f: pan.y })
 }
 
@@ -30,7 +39,11 @@ export function createViewportState(input: {
   readonly pan?: Point
   readonly fitMode?: ViewportFitMode
 }): ViewportState {
-  if (input.width <= 0 || input.height <= 0 || input.dpr <= 0) {
+  if (
+    input.width <= 0 ||
+    input.height <= 0 ||
+    input.dpr <= 0
+  ) {
     throw new RangeError('viewport dimensions and DPR must be positive')
   }
   const zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, input.zoom))
@@ -98,10 +111,7 @@ export function panViewport(
   const minX = Math.min(overscroll, viewport.width - scaledWidth + overscroll)
   const maxX = Math.max(-overscroll, viewport.width - scaledWidth - overscroll)
   const minY = Math.min(overscroll, viewport.height - scaledHeight + overscroll)
-  const maxY = Math.max(
-    -overscroll,
-    viewport.height - scaledHeight - overscroll,
-  )
+  const maxY = Math.max(-overscroll, viewport.height - scaledHeight - overscroll)
   const lowerX = Math.min(minX, maxX)
   const upperX = Math.max(minX, maxX)
   const lowerY = Math.min(minY, maxY)

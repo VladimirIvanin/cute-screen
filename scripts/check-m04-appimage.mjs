@@ -1,16 +1,13 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, readdirSync } from 'node:fs'
+import {
+  existsSync,
+  readdirSync,
+} from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 
 const root = process.cwd()
-const bundleDirectory = path.join(
-  root,
-  'target',
-  'release',
-  'bundle',
-  'appimage',
-)
+const bundleDirectory = path.join(root, 'target', 'release', 'bundle', 'appimage')
 const artifacts = existsSync(bundleDirectory)
   ? readdirSync(bundleDirectory)
       .filter((entry) => entry.endsWith('.AppImage'))
@@ -18,9 +15,7 @@ const artifacts = existsSync(bundleDirectory)
   : []
 
 if (artifacts.length !== 1) {
-  throw new Error(
-    `expected exactly one AppImage artifact in ${bundleDirectory}, found ${artifacts.length}`,
-  )
+  throw new Error(`expected exactly one AppImage artifact in ${bundleDirectory}, found ${artifacts.length}`)
 }
 
 const [artifact] = artifacts

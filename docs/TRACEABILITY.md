@@ -1,5 +1,24 @@
 # Трассируемость требований
 
+Для `REQ-EDT-008` инструмент Select использует Tabler `pointer-2` через общий
+`UiIcon` в editor и Quick Capture. Проверка — существующий runtime SVG assertion
+в `quick-context-toolbar.test.ts`; команды и результаты фиксируются в `TESTING.md`.
+
+## Согласованный UX инструментов и стилей (ADR-048)
+
+| Требования      | Проверки                                                                  | Статус  |
+| --------------- | ------------------------------------------------------------------------- | ------- |
+| REQ-EDT-002/003 | creation policy, empty/cancel/error, physical-key shortcuts               | planned |
+| REQ-EDT-015     | tool configure, canvas context menu, nested focus/Escape, real WebView    | planned |
+| REQ-EDT-016     | style compatibility/mixed/batch/history, floating toolbar, decoded export | planned |
+| REQ-EDT-017     | per-tool preferences, legacy migration, restart, storage failure          | planned |
+
+Диагностика real-WebView (2026-10-15): устранить startup отказ EdgeDriver,
+сохранить backend tracing в test-harness и подтвердить native-input сценарий
+`quick-chrome` через production mount-flow. Выполнено на Windows x64:
+4/4 trusted-input Quick tests + 1/1 alpha asset test; результаты — в TESTING.md;
+сборка и Chrome browser mode не заменяют native runtime evidence.
+
 Статусы: `planned`, `implemented`, `verified`, `blocked`. `implemented` означает
 наличие реализации и применимые automated/local-runtime evidence текущей системы;
 `verified` — подтверждённое пользовательское поведение в полной финальной
@@ -11,6 +30,18 @@ system smoke record. Во время разработки отсутствующ
 не позволяет получить `verified` или статус platform `supported`.
 
 Foundation harness не создаёт отдельного продуктового требования. Его локальные и CI-доказательства определены в [стратегии тестирования](TESTING.md) и [CI workflow](../.github/workflows/ci.yml); статусы `REQ-*` ниже M00 не меняет.
+
+Форматирование исходников относится к foundation tooling и не добавляет нового
+`REQ-*`: локальная команда `pnpm format:check` и существующий gate `pnpm check`
+проверяют единые правила: ESLint Stylistic для JS/TS/Vue, Prettier для остальных
+поддерживаемых текстовых файлов. Контракт включает перенос named imports с двумя
+и более именами, многострочные объявления функций с двумя и более параметрами,
+одну инструкцию на строку и сохранение существующих структурных переносов.
+Также многострочными остаются списки базовых интерфейсов и условия из трёх
+и более проверок. Regression evidence — `tests/boundaries/formatting-contract.test.ts`.
+Проверяется также повторное форматирование без изменения результата.
+Автоформатирование редактора и обязательная
+проверка для агентов описаны в `../AGENTS.md` и `TESTING.md`.
 
 ## Читаемый знак приложения и трея (2026-10-15)
 

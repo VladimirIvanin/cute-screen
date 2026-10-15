@@ -1,14 +1,15 @@
-import { $, browser, expect } from '@wdio/globals'
+import {
+  $,
+  browser,
+  expect,
+} from '@wdio/globals'
 
-export const startupBackendPattern =
-  /^(canvaskit ready|Canvas2D fallback · startupFailure)$/
+export const startupBackendPattern = /^(canvaskit ready|Canvas2D fallback · startupFailure)$/
 
 export async function waitForHarnessMount(): Promise<void> {
   await browser.waitUntil(
     async () => {
-      const mounted = await browser.execute(
-        () => document.querySelector('.backend-state') !== null,
-      )
+      const mounted = await browser.execute(() => document.querySelector('.backend-state') !== null)
       return mounted === true
     },
     {

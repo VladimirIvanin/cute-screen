@@ -117,7 +117,7 @@ mixed/disabled, focus/blur без commit, responsive overflow 1024/640, пози
 
 ## ADR-034 — Нижний tool rail и transient панели у объекта
 
-**Статус:** accepted; supersedes ADR-012 and the toolbar-layout portion of
+**Статус:** superseded by ADR-048; supersedes ADR-012 and the toolbar-layout portion of
 ADR-033
 
 **Контекст:** FigJam-like chrome держит основной tool rail внизу, а controls
@@ -863,3 +863,31 @@ runtime и команды зафиксированы в `TESTING.md`.
 **Проверяемое основание:** PNG decode/alpha tests требуют отсутствие capture
 corners, сплошную крупную форму и прозрачный промежуток между ушами; размерный
 review и GNOME tray smoke описаны в `TESTING.md`.
+
+## ADR-048 — Жизненный цикл инструментов и стили у выделения
+
+**Статус:** accepted; supersedes ADR-034.
+
+**Контекст:** единое sticky-поведение вынуждало вручную выходить из стрелки и
+фигур, ПКМ настраивала только arrow, а параметры экземпляра и defaults смешивались.
+Пользователь утвердил разные creation policies, автонаследование стиля и память
+между запусками. FigJam используется как UX-ориентир для панели у выделения.
+
+**Решение:** pencil/marker/numberedMarker создают серии без auto-selection;
+arrow/shape/precision/image переходят в select с выделением, text/callout — после
+commit. ПКМ активирует инструмент и открывает defaults, поддерживая вложенные
+controls; клавиатурный эквивалент Shift+F10. Выделение получает одну floating
+панель с compatible/mixed свойствами; group changes используют batch. Меню
+объекта сохраняет мультивыбор и предоставляет atomic actions. Style clipboard
+переносит визуальные каналы без content/geometry/identity. Настройки text,
+callout и numberedMarker раздельны, versioned preferences читают legacy drawing
+settings. Undo/redo меняет документ, а не preferences. LayersPanel не становится
+инспектором. ToolRail остаётся снизу; defaults и специальные режимы используют
+нижний chrome, inline text — собственный transient host. Quick не получает
+общие canvas actions полного редактора.
+
+**Проверяемое основание:** red-first `styles.test.ts` и
+`tool-preferences.test.ts`; mounted-shell `tool-ux.test.ts`; native-input
+`browser-tool-ux.e2e.ts`, RU/EN light/dark screenshots. Фактические результаты,
+доступность WebView и ограничения записываются в TESTING.md. Document v7,
+immutable originals, binary image transport и platform adapters сохраняются.

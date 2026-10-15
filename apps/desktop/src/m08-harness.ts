@@ -17,7 +17,10 @@ export class M08HarnessController {
   readonly #ports: M08HarnessPorts
   #browserClipboardText: string | undefined
 
-  constructor(config: AppHarnessConfig, ports: M08HarnessPorts) {
+  constructor(
+    config: AppHarnessConfig,
+    ports: M08HarnessPorts,
+  ) {
     this.#config = config
     this.#ports = ports
   }
@@ -26,8 +29,7 @@ export class M08HarnessController {
     if (!this.#config.m08) return
     window.__cuteScreenE2eM08 = {
       snapshot: () => {
-        const document =
-          this.#ports.documentSession.value?.snapshot.core.document
+        const document = this.#ports.documentSession.value?.snapshot.core.document
         if (!document) return undefined
         const image = this.#ports.sourceImage.value
         return {
@@ -40,17 +42,13 @@ export class M08HarnessController {
                 },
               }
             : {}),
-          ...(this.#browserClipboardText
-            ? { clipboardText: this.#browserClipboardText }
-            : {}),
+          ...(this.#browserClipboardText ? { clipboardText: this.#browserClipboardText } : {}),
         }
       },
       readClipboardText: async () => {
         const bridge = this.#ports.clipboardBridge.value
         if (!bridge) return this.#browserClipboardText
-        const snapshot = await bridge.readClipboardSnapshot(
-          this.#ports.correlationId(),
-        )
+        const snapshot = await bridge.readClipboardSnapshot(this.#ports.correlationId())
         return snapshot.text
       },
     }
@@ -60,9 +58,7 @@ export class M08HarnessController {
     if (!this.#config.m08 || !this.#config.m05) return
     this.#ports.clipboardBridge.value = {
       readClipboardSnapshot: async () => ({
-        ...(this.#browserClipboardText
-          ? { text: this.#browserClipboardText }
-          : {}),
+        ...(this.#browserClipboardText ? { text: this.#browserClipboardText } : {}),
       }),
       writeClipboardText: async (text) => {
         if (this.#config.m08ClipboardError) throw new Error('clipboard busy')

@@ -4,14 +4,7 @@
   "title": "FakePlatformScenario",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "clock",
-    "ids",
-    "monitors",
-    "permissions",
-    "dialogs",
-    "conflicts"
-  ],
+  "required": ["clock", "ids", "monitors", "permissions", "dialogs", "conflicts"],
   "properties": {
     "clock": { "type": "string", "minLength": 1 },
     "ids": {

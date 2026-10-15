@@ -1,7 +1,19 @@
 import { fireEvent } from '@testing-library/vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { EditorDocumentV1, LayerNode } from '@cute-screen/editor-renderer'
-import { document, mountViewport } from './canvas-viewport-test-kit'
+import {
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
+import type {
+  EditorDocumentV1,
+  LayerNode,
+} from '@cute-screen/editor-renderer'
+import {
+  document,
+  mountViewport,
+} from './canvas-viewport-test-kit'
 
 beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
@@ -33,9 +45,7 @@ describe('M05 CanvasViewport transforms', () => {
   it('keeps the exact zoomed canvas surface separate from its centering stage', () => {
     const { container } = mountViewport()
     const stage = container.querySelector('.cs-canvas-stage')
-    const surface = container.querySelector(
-      '.cs-canvas-surface',
-    ) as HTMLDivElement
+    const surface = container.querySelector('.cs-canvas-surface') as HTMLDivElement
 
     expect(stage).not.toBeNull()
     expect(stage).toContainElement(surface)
@@ -45,9 +55,7 @@ describe('M05 CanvasViewport transforms', () => {
 
   it('pans the scroll surface when Hand is active', async () => {
     const { container, scene } = mountViewport('hand')
-    const scroll = container.querySelector(
-      '.cs-canvas-scroll',
-    ) as HTMLDivElement
+    const scroll = container.querySelector('.cs-canvas-scroll') as HTMLDivElement
     scroll.scrollLeft = 50
     scroll.scrollTop = 60
 
@@ -135,9 +143,7 @@ describe('M05 CanvasViewport transforms', () => {
       ],
     }
     const getContext = vi.mocked(HTMLCanvasElement.prototype.getContext)
-    const context = window.document
-      .createElement('canvas')
-      .getContext('2d') as CanvasRenderingContext2D
+    const context = window.document.createElement('canvas').getContext('2d') as CanvasRenderingContext2D
     const { scene, emitted } = mountViewport(undefined, arrowDocument, 'arrow')
     vi.mocked(context.moveTo).mockClear()
     vi.mocked(context.lineTo).mockClear()
@@ -209,9 +215,8 @@ describe('M05 CanvasViewport transforms', () => {
     })
     await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 50, clientY: 40 })
 
-    const command = (
-      emitted().documentCommand as unknown[][] | undefined
-    )?.[0]?.[0] as { readonly after?: LayerNode } | undefined
+    const command = (emitted().documentCommand as unknown[][] | undefined)?.[0]?.[0] as
+      { readonly after?: LayerNode } | undefined
     expect(command?.after?.localBounds).toEqual({
       x: -20,
       y: -20,
@@ -286,9 +291,7 @@ describe('M05 CanvasViewport transforms', () => {
     })
     await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 50, clientY: 50 })
 
-    expect(emitted().transformLayer).toEqual([
-      ['image', expect.objectContaining({ scaleX: 2, scaleY: 2 })],
-    ])
+    expect(emitted().transformLayer).toEqual([['image', expect.objectContaining({ scaleX: 2, scaleY: 2 })]])
   })
 
   it('allows Shift free-resize for image layers', async () => {
@@ -323,11 +326,7 @@ describe('M05 CanvasViewport transforms', () => {
         },
       ],
     }
-    const { scene, emitted } = mountViewport(
-      undefined,
-      imageDocument,
-      'image-free-resize',
-    )
+    const { scene, emitted } = mountViewport(undefined, imageDocument, 'image-free-resize')
 
     await fireEvent.pointerDown(scene, {
       pointerId: 1,
@@ -344,10 +343,7 @@ describe('M05 CanvasViewport transforms', () => {
     await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 50, clientY: 40 })
 
     expect(emitted().transformLayer).toEqual([
-      [
-        'image-free-resize',
-        expect.objectContaining({ scaleX: 2, scaleY: 1.5 }),
-      ],
+      ['image-free-resize', expect.objectContaining({ scaleX: 2, scaleY: 1.5 })],
     ])
   })
 })

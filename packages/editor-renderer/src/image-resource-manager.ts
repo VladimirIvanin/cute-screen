@@ -50,8 +50,7 @@ export class ImageResourceManager<T> {
 
   constructor(options: ImageResourceManagerOptions<T>) {
     this.#budget = options.byteBudget ?? DEFAULT_BYTE_BUDGET
-    if (!Number.isFinite(this.#budget) || this.#budget <= 0)
-      throw new RangeError('byteBudget must be positive')
+    if (!Number.isFinite(this.#budget) || this.#budget <= 0) throw new RangeError('byteBudget must be positive')
     this.#load = options.load
   }
 
@@ -100,9 +99,7 @@ export class ImageResourceManager<T> {
     const promise = this.#load(key)
       .then((resource) => {
         if (!Number.isFinite(resource.byteSize) || resource.byteSize < 0)
-          throw new RangeError(
-            'image resource byteSize must be finite and non-negative',
-          )
+          throw new RangeError('image resource byteSize must be finite and non-negative')
         const entry: Entry<T> = {
           key: serialized,
           resource,

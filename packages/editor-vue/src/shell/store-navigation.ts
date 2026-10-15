@@ -4,19 +4,18 @@ export function createSelectionActions(state: ShellStoreState) {
   function selectTool(id: string): void {
     state.activeToolId.value = id
   }
-  function selectLayer(id: string, toggle = false, range = false): void {
+  function selectLayer(
+    id: string,
+    toggle = false,
+    range = false,
+  ): void {
     const anchor = state.selectedLayerId.value
-    const anchorIndex = anchor
-      ? state.layers.value.findIndex((layer) => layer.id === anchor)
-      : -1
+    const anchorIndex = anchor ? state.layers.value.findIndex((layer) => layer.id === anchor) : -1
     const targetIndex = state.layers.value.findIndex((layer) => layer.id === id)
     const selected =
       range && anchorIndex >= 0 && targetIndex >= 0
         ? state.layers.value
-            .slice(
-              Math.min(anchorIndex, targetIndex),
-              Math.max(anchorIndex, targetIndex) + 1,
-            )
+            .slice(Math.min(anchorIndex, targetIndex), Math.max(anchorIndex, targetIndex) + 1)
             .map((layer) => layer.id)
         : toggle
           ? state.selectedLayerIds.value.includes(id)
@@ -49,7 +48,10 @@ export function createViewportActions(state: ShellStoreState) {
     state.zoom.value = preserved.zoom
     state.zoomMode.value = preserved.mode
   }
-  function setZoomState(value: number, mode: 'fit' | 'custom'): void {
+  function setZoomState(
+    value: number,
+    mode: 'fit' | 'custom',
+  ): void {
     state.zoom.value = Math.max(10, Math.min(1600, value))
     state.zoomMode.value = mode
     rememberActiveFrame()

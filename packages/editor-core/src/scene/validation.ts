@@ -6,16 +6,25 @@ import type {
   RenderPathNode,
 } from './contracts'
 
-export function assertFinite(value: number, field: string): void {
+export function assertFinite(
+  value: number,
+  field: string,
+): void {
   if (!Number.isFinite(value)) throw new RangeError(`${field} must be finite`)
 }
 
-export function assertPositive(value: number, field: string): void {
+export function assertPositive(
+  value: number,
+  field: string,
+): void {
   assertFinite(value, field)
   if (value <= 0) throw new RangeError(`${field} must be positive`)
 }
 
-export function assertNonNegative(value: number, field: string): void {
+export function assertNonNegative(
+  value: number,
+  field: string,
+): void {
   assertFinite(value, field)
   if (value < 0) throw new RangeError(`${field} must be non-negative`)
 }
@@ -28,7 +37,11 @@ export function freezeColor(color: RgbaColor): RgbaColor {
     ['alpha', color.alpha],
   ] as const
   for (const [channel, value] of channels) {
-    if (!Number.isFinite(value) || value < 0 || value > 1) {
+    if (
+      !Number.isFinite(value) ||
+      value < 0 ||
+      value > 1
+    ) {
       throw new RangeError(`${channel} color channel must be between 0 and 1`)
     }
   }
@@ -39,7 +52,10 @@ function isSolidPaint(paint: RenderPaint): paint is RgbaColor {
   return !('kind' in paint)
 }
 
-export function freezePaint(paint: RenderPaint, field: string): RenderPaint {
+export function freezePaint(
+  paint: RenderPaint,
+  field: string,
+): RenderPaint {
   if (isSolidPaint(paint)) return freezeColor(paint)
   if (paint.kind === 'imageTexture') {
     if (!paint.resourceId) throw new RangeError(`${field}.resourceId is empty`)
@@ -52,7 +68,11 @@ export function freezePaint(paint: RenderPaint, field: string): RenderPaint {
     })) {
       assertFinite(value, `${field}.${name}`)
     }
-    if (paint.opacity < 0 || paint.opacity > 1 || paint.scale <= 0) {
+    if (
+      paint.opacity < 0 ||
+      paint.opacity > 1 ||
+      paint.scale <= 0
+    ) {
       throw new RangeError(`${field} image texture values are invalid`)
     }
     return Object.freeze({ ...paint })
@@ -93,18 +113,13 @@ export function freezePaint(paint: RenderPaint, field: string): RenderPaint {
   return Object.freeze({ ...paint, stops: Object.freeze(stops) })
 }
 
-export function validateStrokeStyle(
-  node: RenderLineNode | RenderPathNode,
-): void {
+export function validateStrokeStyle(node: RenderLineNode | RenderPathNode): void {
   if (node.lineCap && !['butt', 'round', 'square'].includes(node.lineCap))
     throw new RangeError(`${node.id}.lineCap is invalid`)
   if (node.lineJoin && !['miter', 'round', 'bevel'].includes(node.lineJoin))
     throw new RangeError(`${node.id}.lineJoin is invalid`)
   if (node.dash) {
-    if (
-      node.dash.length === 0 ||
-      node.dash.some((value) => !Number.isFinite(value) || value <= 0)
-    ) {
+    if (node.dash.length === 0 || node.dash.some((value) => !Number.isFinite(value) || value <= 0)) {
       throw new RangeError(`${node.id}.dash is invalid`)
     }
   }
@@ -118,21 +133,18 @@ export function assertNodeBase(node: RenderNode): void {
   if (node.scaleX === 0 || node.scaleY === 0) {
     throw new RangeError(`Render node ${node.id} scale must not be zero`)
   }
-  if (
-    (node.transformOriginX === undefined) !==
-    (node.transformOriginY === undefined)
-  ) {
-    throw new RangeError(
-      `Render node ${node.id} transform origin must contain both coordinates`,
-    )
+  if ((node.transformOriginX === undefined) !== (node.transformOriginY === undefined)) {
+    throw new RangeError(`Render node ${node.id} transform origin must contain both coordinates`)
   }
   if (node.transformOriginX !== undefined) {
     assertFinite(node.transformOriginX, `${node.id}.transformOriginX`)
     assertFinite(node.transformOriginY!, `${node.id}.transformOriginY`)
   }
-  if (!Number.isFinite(node.opacity) || node.opacity < 0 || node.opacity > 1) {
-    throw new RangeError(
-      `Render node ${node.id} opacity must be between 0 and 1`,
-    )
+  if (
+    !Number.isFinite(node.opacity) ||
+    node.opacity < 0 ||
+    node.opacity > 1
+  ) {
+    throw new RangeError(`Render node ${node.id} opacity must be between 0 and 1`)
   }
 }

@@ -1,5 +1,9 @@
 import path from 'node:path'
-import { $, browser, expect } from '@wdio/globals'
+import {
+  $,
+  browser,
+  expect,
+} from '@wdio/globals'
 import { Key } from 'webdriverio'
 import {
   baseId,
@@ -25,9 +29,7 @@ describe('M08 crop and precision acceptance in browser mode', () => {
     await baseRow.$('.cs-layer-select').click()
     await dragCanvas({ x: 399, y: 299 }, { x: 300, y: 225 }, 'm08-base-resize')
     await browser.waitUntil(async () => {
-      const base = (await m08Snapshot()).document.layers.find(
-        (layer) => layer.id === baseId,
-      )
+      const base = (await m08Snapshot()).document.layers.find((layer) => layer.id === baseId)
       return Boolean(base && base.transform.scaleX < 0.9)
     })
     expect((await m08Snapshot()).document.canvas).toEqual({
@@ -38,11 +40,7 @@ describe('M08 crop and precision acceptance in browser mode', () => {
     const cropTool = $('button[aria-label="Crop"]')
     await cropTool.click()
     await expect(cropTool).toHaveAttribute('aria-pressed', 'true')
-    expect(
-      await browser.execute(() =>
-        document.activeElement?.getAttribute('aria-label'),
-      ),
-    ).toBe('Scene canvas')
+    expect(await browser.execute(() => document.activeElement?.getAttribute('aria-label'))).toBe('Scene canvas')
     const full = await overlayStats()
     expect(full.whitePixels).toBeGreaterThan(50)
     expect(full.dimPixels).toBe(0)
@@ -67,29 +65,20 @@ describe('M08 crop and precision acceptance in browser mode', () => {
     expect(widescreen.whiteBounds?.maxY).toBeLessThanOrEqual(269)
 
     await chooseOption('Preset', '1:1')
-    await dragCanvas(
-      { x: 350, y: 150 },
-      { x: 320, y: 150 },
-      'm08-crop-east-handle',
-    )
+    await dragCanvas({ x: 350, y: 150 }, { x: 320, y: 150 }, 'm08-crop-east-handle')
     expect((await overlayStats()).dimPixels).toBeGreaterThan(square.dimPixels)
     await $('button=Reset').click()
     expect((await overlayStats()).dimPixels).toBe(0)
     await chooseOption('Preset', '16:9')
     await browser.keys('Escape')
     expect((await m08Snapshot()).document.crop).toBeNull()
-    await expect($('button[aria-label="Select"]')).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
+    await expect($('button[aria-label="Select"]')).toHaveAttribute('aria-pressed', 'true')
 
     await cropTool.click()
     await chooseOption('Preset', '1:1')
     await browser.keys([Key.Shift, 'ArrowRight'])
     await browser.keys('Enter')
-    await browser.waitUntil(async () =>
-      Boolean((await m08Snapshot()).document.crop),
-    )
+    await browser.waitUntil(async () => Boolean((await m08Snapshot()).document.crop))
     expect((await m08Snapshot()).document.crop).toEqual({
       x: 60,
       y: 0,
@@ -97,9 +86,7 @@ describe('M08 crop and precision acceptance in browser mode', () => {
       height: 300,
     })
     await clickHistory('Undo')
-    await browser.waitUntil(
-      async () => (await m08Snapshot()).document.crop === null,
-    )
+    await browser.waitUntil(async () => (await m08Snapshot()).document.crop === null)
 
     const restoredBaseRow = $(`[data-layer-id="${baseId}"]`)
     if (!(await restoredBaseRow.isExisting())) {
@@ -107,11 +94,7 @@ describe('M08 crop and precision acceptance in browser mode', () => {
     }
     await $(`[data-layer-id="${baseId}"]`).$('.cs-layer-select').click()
     await browser.keys('Delete')
-    await browser.waitUntil(async () =>
-      (await m08Snapshot()).document.layers.every(
-        (layer) => layer.id !== baseId,
-      ),
-    )
+    await browser.waitUntil(async () => (await m08Snapshot()).document.layers.every((layer) => layer.id !== baseId))
     expect((await m08Snapshot()).document.canvas).toEqual({
       width: 400,
       height: 300,
@@ -123,24 +106,14 @@ describe('M08 crop and precision acceptance in browser mode', () => {
     await chooseOption('Preset', '1:1')
     await browser.keys([Key.Shift, 'ArrowRight'])
     await $('button=Apply').click()
-    await browser.waitUntil(
-      async () => (await m08Snapshot()).document.crop?.x === 60,
-    )
+    await browser.waitUntil(async () => (await m08Snapshot()).document.crop?.x === 60)
     await $('button[aria-label="Select"]').click()
     await $('button=Flip horizontally').click()
-    await browser.waitUntil(
-      async () => (await m08Snapshot()).document.crop?.x === 40,
-    )
+    await browser.waitUntil(async () => (await m08Snapshot()).document.crop?.x === 40)
     await clickHistory('Undo')
-    await browser.waitUntil(
-      async () => (await m08Snapshot()).document.crop?.x === 60,
-    )
+    await browser.waitUntil(async () => (await m08Snapshot()).document.crop?.x === 60)
     await clickHistory('Redo')
-    await browser.waitUntil(
-      async () => (await m08Snapshot()).document.crop?.x === 40,
-    )
-    await browser.saveScreenshot(
-      path.resolve('artifacts/browser-e2e/m08-crop-resized-deleted-base.png'),
-    )
+    await browser.waitUntil(async () => (await m08Snapshot()).document.crop?.x === 40)
+    await browser.saveScreenshot(path.resolve('artifacts/browser-e2e/m08-crop-resized-deleted-base.png'))
   })
 })

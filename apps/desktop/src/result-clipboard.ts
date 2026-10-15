@@ -10,11 +10,7 @@ function canvasPngBlob(canvas: HTMLCanvasElement): Promise<Blob> {
         return
       }
       if (blob.type !== 'image/png') {
-        reject(
-          new Error(
-            `Result PNG encoding returned ${blob.type || 'no MIME type'}`,
-          ),
-        )
+        reject(new Error(`Result PNG encoding returned ${blob.type || 'no MIME type'}`))
         return
       }
       resolve(blob)

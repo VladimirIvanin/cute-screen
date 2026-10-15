@@ -1,4 +1,7 @@
-import { $, expect } from '@wdio/globals'
+import {
+  $,
+  expect,
+} from '@wdio/globals'
 
 describe('foundation shell in a real Tauri webview', () => {
   it('boots the empty editor and completes the test capture action', async () => {

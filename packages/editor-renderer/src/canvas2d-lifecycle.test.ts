@@ -1,6 +1,13 @@
-import { createCanvas, loadImage } from '@napi-rs/canvas'
+import {
+  createCanvas,
+  loadImage,
+} from '@napi-rs/canvas'
 import { createRenderSceneSnapshot } from '@cute-screen/editor-core'
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 import type { Canvas2DLike } from './backends/canvas2d/contracts'
 import { Canvas2DRenderer } from './backends/canvas2d/renderer'
@@ -10,6 +17,26 @@ function asHtmlCanvas(canvas: unknown): HTMLCanvasElement {
 }
 
 describe('Canvas2D renderer lifecycle and vector nodes', () => {
+  it('keeps the current texture when an older resource with the same id is disposed', async () => {
+    const renderer = new Canvas2DRenderer()
+    const scene = createCanvas(4, 4)
+    await renderer.initialize({ scene: asHtmlCanvas(scene), overlay: asHtmlCanvas(createCanvas(4, 4)), dpr: 1, correlationId: 'resource-replacement' })
+    const source = createCanvas(4, 4)
+    source.getContext('2d').fillStyle = '#00ff00'
+    source.getContext('2d').fillRect(0, 0, 4, 4)
+    const decoded = await loadImage(source.toBuffer('image/png'))
+    const input = { id: 'capture', width: 4, height: 4, source: decoded as unknown as HTMLImageElement }
+    const old = await renderer.createImageResource(input)
+    await renderer.createImageResource(input)
+    old.dispose()
+    renderer.setScene(createRenderSceneSnapshot({ width: 4, height: 4, nodes: [{
+      kind: 'image', id: 'base', resourceId: 'capture', x: 0, y: 0, width: 4, height: 4,
+      rotation: 0, scaleX: 1, scaleY: 1, opacity: 1, visible: true,
+    }] }))
+    renderer.render(['scene'])
+    expect([...scene.getContext('2d').getImageData(2, 2, 1, 1).data]).toEqual([0, 255, 0, 255])
+    renderer.dispose()
+  })
   it('applies a shared negative layer scale to vector annotations', async () => {
     const renderer = new Canvas2DRenderer()
     const sceneCanvas = createCanvas(64, 64)
@@ -87,9 +114,7 @@ describe('Canvas2D renderer lifecycle and vector nodes', () => {
     )
 
     renderer.render(['scene'])
-    expect(
-      sceneCanvas.getContext('2d')?.getImageData(32, 40, 1, 1).data[3],
-    ).toBeGreaterThan(0)
+    expect(sceneCanvas.getContext('2d')?.getImageData(32, 40, 1, 1).data[3]).toBeGreaterThan(0)
   })
 
   it('continues an arrow dash phase through an elbow corner', async () => {
@@ -137,8 +162,7 @@ describe('Canvas2D renderer lifecycle and vector nodes', () => {
     let time = 10
     const renderer = new Canvas2DRenderer({
       now: () => time++,
-      exportCanvas: (width, height) =>
-        createCanvas(width, height) as unknown as Canvas2DLike,
+      exportCanvas: (width, height) => createCanvas(width, height) as unknown as Canvas2DLike,
     })
     const sceneCanvas = createCanvas(64, 64)
     const overlayCanvas = createCanvas(64, 64)
@@ -216,9 +240,7 @@ describe('Canvas2D renderer lifecycle and vector nodes', () => {
     )
 
     renderer.render(['scene'])
-    expect(
-      sceneCanvas.getContext('2d')?.getImageData(16, 16, 1, 1).data[3],
-    ).toBeGreaterThan(0)
+    expect(sceneCanvas.getContext('2d')?.getImageData(16, 16, 1, 1).data[3]).toBeGreaterThan(0)
   })
 
   it('clips a rounded content-image placeholder and draws its border', async () => {

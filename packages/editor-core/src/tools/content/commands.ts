@@ -17,16 +17,12 @@ export function createTextCommitCommand(input: {
   readonly index?: number
 }): EditorCommand | null {
   if (input.existing === undefined) {
-    return input.next === null
-      ? null
-      : Object.freeze({ type: 'addLayer', layer: input.next })
+    return input.next === null ? null : Object.freeze({ type: 'addLayer', layer: input.next })
   }
   if (input.next === null) {
     const index = input.index
     if (!Number.isInteger(index) || (index as number) < 0) {
-      throw new Error(
-        'removing committed text requires its non-negative layer index',
-      )
+      throw new Error('removing committed text requires its non-negative layer index')
     }
     return Object.freeze({
       type: 'removeLayer',
@@ -72,9 +68,7 @@ export function createDuplicateLayerCommand(
 }
 
 /** A multi-layer paste remains one undo/redo entry. */
-export function createPasteLayersCommand(
-  layers: readonly LayerNode[],
-): EditorCommand | null {
+export function createPasteLayersCommand(layers: readonly LayerNode[]): EditorCommand | null {
   if (layers.length === 0) return null
   if (layers.length === 1) {
     const layer = layers[0]
@@ -83,8 +77,6 @@ export function createPasteLayersCommand(
   }
   return Object.freeze({
     type: 'batch',
-    commands: Object.freeze(
-      layers.map((layer) => ({ type: 'addLayer', layer }) as const),
-    ),
+    commands: Object.freeze(layers.map((layer) => ({ type: 'addLayer', layer }) as const)),
   })
 }

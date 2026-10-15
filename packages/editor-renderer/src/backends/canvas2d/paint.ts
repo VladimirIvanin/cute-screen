@@ -5,9 +5,15 @@ import type {
   RgbaColor,
 } from '@cute-screen/editor-core'
 import type { ImageResourceInput } from '../../types'
-import type { Canvas2DLike, Context2D } from './contracts'
+import type {
+  Canvas2DLike,
+  Context2D,
+} from './contracts'
 
-export function defaultCanvas(width: number, height: number): Canvas2DLike {
+export function defaultCanvas(
+  width: number,
+  height: number,
+): Canvas2DLike {
   if (typeof OffscreenCanvas !== 'undefined') {
     return new OffscreenCanvas(width, height) as unknown as Canvas2DLike
   }
@@ -26,9 +32,7 @@ export function cssColor(color: RgbaColor): string {
   )}, ${Math.round(color.blue * 255)}, ${color.alpha})`
 }
 
-export function cssBlendMode(
-  mode: RenderNode['blendMode'],
-): GlobalCompositeOperation {
+export function cssBlendMode(mode: RenderNode['blendMode']): GlobalCompositeOperation {
   switch (mode) {
     case 'multiply':
       return 'multiply'
@@ -60,10 +64,7 @@ export function paintStyle(
     if (!resource) return 'rgba(229, 72, 77, 0.16)'
     const pattern = context.createPattern(resource, 'repeat')
     if (!pattern) return 'rgba(229, 72, 77, 0.16)'
-    if (
-      typeof pattern.setTransform === 'function' &&
-      typeof DOMMatrix !== 'undefined'
-    ) {
+    if (typeof pattern.setTransform === 'function' && typeof DOMMatrix !== 'undefined') {
       const transform = new DOMMatrix()
         .translate(paint.offsetX, paint.offsetY)
         .rotate(paint.rotation)
@@ -74,26 +75,16 @@ export function paintStyle(
   }
   const gradient =
     paint.kind === 'linearGradient'
-      ? context.createLinearGradient(
-          paint.startX,
-          paint.startY,
-          paint.endX,
-          paint.endY,
-        )
-      : context.createRadialGradient(
-          paint.centerX,
-          paint.centerY,
-          0,
-          paint.centerX,
-          paint.centerY,
-          paint.radius,
-        )
-  for (const stop of paint.stops)
-    gradient.addColorStop(stop.position, cssColor(stop.color))
+      ? context.createLinearGradient(paint.startX, paint.startY, paint.endX, paint.endY)
+      : context.createRadialGradient(paint.centerX, paint.centerY, 0, paint.centerX, paint.centerY, paint.radius)
+  for (const stop of paint.stops) gradient.addColorStop(stop.position, cssColor(stop.color))
   return gradient
 }
 
-export function canvasFont(style: RenderTextStyle, fontFamily: string): string {
+export function canvasFont(
+  style: RenderTextStyle,
+  fontFamily: string,
+): string {
   return `${style.fontStyle} ${style.fontWeight} ${style.fontSize}px "${fontFamily.replaceAll('"', '')}", sans-serif`
 }
 
@@ -111,7 +102,11 @@ export function withTransform(
   const originY = node.transformOriginY ?? centerY
   const scaleX = node.scaleX ?? 1
   const scaleY = node.scaleY ?? 1
-  if (node.rotation !== 0 || scaleX !== 1 || scaleY !== 1) {
+  if (
+    node.rotation !== 0 ||
+    scaleX !== 1 ||
+    scaleY !== 1
+  ) {
     context.translate(originX, originY)
     context.rotate((node.rotation * Math.PI) / 180)
     context.scale(scaleX, scaleY)

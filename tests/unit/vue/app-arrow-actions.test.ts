@@ -1,11 +1,23 @@
-import { fireEvent, render, screen } from '@testing-library/vue'
-import { describe, expect, it, vi } from 'vitest'
+import {
+  fireEvent,
+  render,
+  screen,
+} from '@testing-library/vue'
+import {
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 import { markRaw } from 'vue'
 import CanvasViewport from '../../../packages/editor-vue/src/shell/components/CanvasViewport.vue'
 import EditorShell from '../../../packages/editor-vue/src/shell/components/EditorShell.vue'
 import TopBar from '../../../packages/editor-vue/src/shell/components/TopBar.vue'
 import ZoomControls from '../../../packages/editor-vue/src/shell/components/ZoomControls.vue'
-import { createEditorShellPinia, t } from '@cute-screen/editor-vue'
+import {
+  createEditorShellPinia,
+  t,
+} from '@cute-screen/editor-vue'
 import {
   hitTestDocument,
   parseEditorDocument,
@@ -28,19 +40,12 @@ describe('M02 editor shell', () => {
     })
 
     await fireEvent.click(screen.getByRole('button', { name: 'Arrow' }))
-    expect(
-      screen.queryByRole('button', { name: 'Stroke: 3 px' }),
-    ).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Stroke: 3 px' })).not.toBeInTheDocument()
     await fireEvent.contextMenu(screen.getByRole('button', { name: 'Arrow' }))
-    await fireEvent.click(
-      await screen.findByRole('button', { name: 'Stroke: 3 px' }),
-    )
+    await fireEvent.click(await screen.findByRole('button', { name: 'Stroke: 3 px' }))
     await fireEvent.click(await screen.findByRole('button', { name: '2 px' }))
 
-    expect(screen.getByRole('button', { name: 'Arrow' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
+    expect(screen.getByRole('button', { name: 'Arrow' })).toHaveAttribute('aria-pressed', 'true')
     expect(session.snapshot.core.canUndo).toBe(false)
     expect(session.snapshot.core.document.layers[0]).toMatchObject({
       payload: { stroke: { width: 3, style: 'dotted' } },
@@ -53,9 +58,7 @@ describe('M02 editor shell', () => {
       global: { plugins: [createEditorShellPinia()] },
     })
     await fireEvent.contextMenu(screen.getByRole('button', { name: 'Arrow' }))
-    expect(
-      await screen.findByRole('button', { name: 'Stroke: 2 px' }),
-    ).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Stroke: 2 px' })).toBeInTheDocument()
   })
 
   it('shows a selected unlocked Arrow payload instead of active-tool defaults and commits one change', async () => {
@@ -69,20 +72,12 @@ describe('M02 editor shell', () => {
     await selectArrowLayer(view)
 
     await vi.waitFor(() => {
-      expect(
-        view.container.querySelector('.cs-arrow-floating-toolbar-host'),
-      ).toBeTruthy()
+      expect(view.container.querySelector('.cs-arrow-floating-toolbar-host')).toBeTruthy()
     })
     await fireEvent.click(screen.getByRole('button', { name: 'Stroke: 3 px' }))
-    expect(
-      await screen.findByRole('button', { name: 'Dotted' }),
-    ).toHaveAttribute('aria-pressed', 'true')
-    expect(
-      screen.getByRole('button', { name: 'Tail: Line arrow' }),
-    ).toBeVisible()
-    expect(
-      screen.getByRole('button', { name: 'Geometry: Curved' }),
-    ).toBeVisible()
+    expect(await screen.findByRole('button', { name: 'Dotted' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Tail: Line arrow' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Geometry: Curved' })).toBeVisible()
     expect(screen.getByRole('button', { name: 'Head: Diamond' })).toBeVisible()
 
     const execute = vi.spyOn(session, 'execute')
@@ -102,10 +97,7 @@ describe('M02 editor shell', () => {
         },
       },
     })
-    expect(screen.getByRole('button', { name: 'Select' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
+    expect(screen.getByRole('button', { name: 'Select' })).toHaveAttribute('aria-pressed', 'true')
 
     session.dispose()
     view.unmount()
@@ -127,26 +119,17 @@ describe('M02 editor shell', () => {
 
     expect(execute).toHaveBeenCalledTimes(1)
     const updated = session.snapshot.core.document
-    expect(updated.layers[0]?.localBounds?.width).toBeGreaterThan(
-      before?.localBounds?.width ?? 0,
-    )
-    expect(updated.layers[0]?.localBounds?.height).toBeGreaterThan(
-      before?.localBounds?.height ?? 0,
-    )
+    expect(updated.layers[0]?.localBounds?.width).toBeGreaterThan(before?.localBounds?.width ?? 0)
+    expect(updated.layers[0]?.localBounds?.height).toBeGreaterThan(before?.localBounds?.height ?? 0)
     expect(hitTestDocument(updated, { x: 95, y: 30 })).toMatchObject({
       nodeId: '019c1f62-058e-7000-8000-0000000000ab',
       part: 'stroke',
     })
-    expect(parseEditorDocument(serializeEditorDocument(updated))).toMatchObject(
-      { kind: 'editable' },
-    )
+    expect(parseEditorDocument(serializeEditorDocument(updated))).toMatchObject({ kind: 'editable' })
 
     session.undo()
     expect(session.snapshot.core.document.layers[0]).toEqual(before)
-    expect(screen.getByRole('button', { name: 'Select' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
+    expect(screen.getByRole('button', { name: 'Select' })).toHaveAttribute('aria-pressed', 'true')
 
     session.dispose()
     view.unmount()
@@ -174,9 +157,7 @@ describe('M02 editor shell', () => {
       payload: { stroke: { width: 3, style: 'dotted' } },
     })
 
-    await fireEvent.click(
-      screen.getByRole('button', { name: 'Geometry: Straight' }),
-    )
+    await fireEvent.click(screen.getByRole('button', { name: 'Geometry: Straight' }))
     await fireEvent.click(await screen.findByRole('button', { name: 'Elbow' }))
     expect(session.snapshot.core.document.layers[0]).toMatchObject({
       opacity: 0.4,
@@ -206,12 +187,8 @@ describe('M02 editor shell', () => {
 
     expect(screen.getByRole('button', { name: 'Stroke: 3 px' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Tail: None' })).toBeDisabled()
-    expect(
-      screen.getByRole('button', { name: 'Geometry: Straight' }),
-    ).toBeDisabled()
-    expect(
-      screen.getByRole('button', { name: 'Head: Solid arrow' }),
-    ).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Geometry: Straight' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Head: Solid arrow' })).toBeDisabled()
 
     session.dispose()
     view.unmount()
@@ -220,9 +197,7 @@ describe('M02 editor shell', () => {
       global: { plugins: [createEditorShellPinia()] },
     })
     await fireEvent.contextMenu(screen.getByRole('button', { name: 'Arrow' }))
-    expect(
-      await screen.findByRole('button', { name: 'Stroke: 3 px' }),
-    ).toBeDisabled()
+    expect(await screen.findByRole('button', { name: 'Stroke: 3 px' })).toBeDisabled()
   })
 
   it('localizes Arrow toolbar labels in Russian', async () => {
@@ -242,12 +217,8 @@ describe('M02 editor shell', () => {
     const hud = screen.getByRole('group', { name: 'zoom' })
     expect(hud).toHaveAttribute('data-zoom', '22')
     expect(screen.getByRole('button', { name: 'zoomOut' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'fitZoom' })).toHaveTextContent(
-      'Fit',
-    )
-    expect(screen.getByRole('button', { name: 'zoomValue' })).toHaveTextContent(
-      '1:1',
-    )
+    expect(screen.getByRole('button', { name: 'fitZoom' })).toHaveTextContent('Fit')
+    expect(screen.getByRole('button', { name: 'zoomValue' })).toHaveTextContent('1:1')
     expect(screen.getByRole('button', { name: 'zoomIn' })).toBeInTheDocument()
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
     expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
@@ -271,10 +242,7 @@ describe('M02 editor shell', () => {
     })
 
     expect(screen.getByRole('button', { name: 'capture' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'capture' })).toHaveAttribute(
-      'title',
-      'Portal backend is unavailable',
-    )
+    expect(screen.getByRole('button', { name: 'capture' })).toHaveAttribute('title', 'Portal backend is unavailable')
   })
 
   it('exposes window capture only when the native backend advertises it', async () => {
@@ -287,9 +255,7 @@ describe('M02 editor shell', () => {
         t: (key) => key,
       },
     })
-    expect(
-      screen.queryByRole('button', { name: 'captureWindow' }),
-    ).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'captureWindow' })).not.toBeInTheDocument()
     hidden.unmount()
 
     const available = render(TopBar, {

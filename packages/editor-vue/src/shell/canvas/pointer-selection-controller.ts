@@ -118,10 +118,7 @@ function beginResize(
           start: point,
           current: point,
           initial: selected,
-          preserveAspect:
-            event.shiftKey ||
-            selected.kind === 'emoji' ||
-            selected.kind === 'loupe',
+          preserveAspect: event.shiftKey || selected.kind === 'emoji' || selected.kind === 'loupe',
           centerResize: event.altKey,
         },
   )
@@ -163,14 +160,8 @@ function selectHitLayer(
   const key = hits.map((hit) => hit.nodeId).join(':')
   const now = performance.now()
   const previous = context.cycle()
-  const shouldCycle =
-    event.detail > 1 && previous?.key === key && now - previous.at <= 1000
-  const index =
-    hits.length === 0
-      ? 0
-      : shouldCycle
-        ? ((previous?.index ?? 0) + 1) % hits.length
-        : 0
+  const shouldCycle = event.detail > 1 && previous?.key === key && now - previous.at <= 1000
+  const index = hits.length === 0 ? 0 : shouldCycle ? ((previous?.index ?? 0) + 1) % hits.length : 0
   context.setCycle({ key, at: now, index })
   const hit = hits[index] ?? hitTestDocument(document, point)
   if (!hit) return

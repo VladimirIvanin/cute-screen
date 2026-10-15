@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 import type {
   RichTextContent,
@@ -43,16 +47,9 @@ function content(
   return Object.freeze({
     text,
     wrap: 'autoSize' as const,
-    spans:
-      input.spans ??
-      (text.length === 0
-        ? []
-        : [Object.freeze({ start: 0, end: text.length, ...BASE_STYLE })]),
+    spans: input.spans ?? (text.length === 0 ? [] : [Object.freeze({ start: 0, end: text.length, ...BASE_STYLE })]),
     paragraphs:
-      input.paragraphs ??
-      (text.length === 0
-        ? []
-        : [Object.freeze({ start: 0, end: text.length, ...BASE_PARAGRAPH })]),
+      input.paragraphs ?? (text.length === 0 ? [] : [Object.freeze({ start: 0, end: text.length, ...BASE_PARAGRAPH })]),
   })
 }
 
@@ -83,14 +80,9 @@ describe('v7 rich-text editing operations', () => {
 
     expect(replaced.content.text).toBe('AxB')
     expect(replaced.selection).toEqual({ anchor: 2, focus: 2 })
-    expect(replaced.content.spans).toEqual([
-      { start: 0, end: 3, ...BASE_STYLE },
-    ])
+    expect(replaced.content.spans).toEqual([{ start: 0, end: 3, ...BASE_STYLE }])
 
-    const afterEmoji = setRichTextSelection(
-      createRichTextEditingState(content('A😀B')),
-      { anchor: 3, focus: 3 },
-    )
+    const afterEmoji = setRichTextSelection(createRichTextEditingState(content('A😀B')), { anchor: 3, focus: 3 })
     const deleted = handleRichTextBackspace(afterEmoji)
     expect(deleted.handled).toBe(true)
     expect(deleted.state.content.text).toBe('AB')
@@ -175,16 +167,12 @@ describe('v7 rich-text editing operations', () => {
     expect(state.content.text).toBe('on😀wo')
     expect(state.content.spans.at(-1)?.end).toBe(state.content.text.length)
     expect(state.content.paragraphs).toEqual([{ start: 0, end: 6, ...bullet }])
-    expect(
-      state.content.spans.every((span) => span.start !== 3 && span.end !== 3),
-    ).toBe(true)
+    expect(state.content.spans.every((span) => span.start !== 3 && span.end !== 3)).toBe(true)
   })
 
   it('stores bullets only as paragraph metadata and continues them on Enter', () => {
     const bulletContent = content('item', {
-      paragraphs: [
-        { start: 0, end: 4, alignment: 'start', listKind: 'bullet' },
-      ],
+      paragraphs: [{ start: 0, end: 4, alignment: 'start', listKind: 'bullet' }],
     })
     let state = createRichTextEditingState(bulletContent, {
       anchor: 4,
@@ -204,9 +192,7 @@ describe('v7 rich-text editing operations', () => {
     let state = handleRichTextEnter(
       createRichTextEditingState(
         content('item', {
-          paragraphs: [
-            { start: 0, end: 4, alignment: 'start', listKind: 'bullet' },
-          ],
+          paragraphs: [{ start: 0, end: 4, alignment: 'start', listKind: 'bullet' }],
         }),
         { anchor: 4, focus: 4 },
       ),

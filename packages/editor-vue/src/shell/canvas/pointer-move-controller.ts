@@ -13,7 +13,10 @@ import type {
   CanvasViewportProps,
 } from './contracts'
 import type { CropController } from './crop-controller'
-import { DEFAULT_PRECISION_TOOLS, type CanvasGesture } from './workspace-state'
+import {
+  DEFAULT_PRECISION_TOOLS,
+  type CanvasGesture,
+} from './workspace-state'
 
 export interface PointerMoveContext {
   readonly props: CanvasViewportProps
@@ -30,10 +33,7 @@ export interface PointerMoveContext {
     readonly pointerType?: string
   }) => CanvasPoint | undefined
   readonly samplingCursor: Ref<CanvasPoint | undefined>
-  readonly scheduleEyedropper: (
-    point: CanvasPoint,
-    client: { clientX: number; clientY: number },
-  ) => void
+  readonly scheduleEyedropper: (point: CanvasPoint, client: { clientX: number; clientY: number }) => void
   readonly updateHoverCursor: (point: CanvasPoint) => void
   readonly snapCandidates: (id: string) => readonly SnapCandidate[]
   readonly invalidateOverlay: () => void
@@ -122,10 +122,7 @@ function movePan(
 function moveQuickSelection(
   context: PointerMoveContext,
   point: CanvasPoint,
-  gesture: Extract<
-    NonNullable<CanvasGesture>,
-    { readonly kind: 'quickSelect' }
-  >,
+  gesture: Extract<NonNullable<CanvasGesture>, { readonly kind: 'quickSelect' }>,
 ): void {
   const crop = {
     x: Math.min(gesture.start.x, point.x),
@@ -146,9 +143,7 @@ function moveCropGesture(
 ): void {
   const delta = { x: point.x - gesture.start.x, y: point.y - gesture.start.y }
   const session =
-    gesture.action === 'move'
-      ? moveCrop(gesture.initial, delta)
-      : resizeCrop(gesture.initial, gesture.handle!, delta)
+    gesture.action === 'move' ? moveCrop(gesture.initial, delta) : resizeCrop(gesture.initial, gesture.handle!, delta)
   context.crop.session = session
   if (context.props.quickFrameMode) {
     context.emit('quickFrameChange', { ...session.crop })
@@ -168,13 +163,10 @@ function movePrecision(
   if (
     gesture.tool === 'ruler' &&
     defaults.ruler.snap &&
-    (event.altKey || gesture.guidesHeld)
+    (event.altKey ||
+      gesture.guidesHeld)
   ) {
-    const snapped = snapRulerEndpoint(
-      gesture.start,
-      point,
-      defaults.ruler.snapAngleIncrementDegrees,
-    )
+    const snapped = snapRulerEndpoint(gesture.start, point, defaults.ruler.snapAngleIncrementDegrees)
     current = snapped.end
     context.setRulerGuide(snapped.guide)
   }
@@ -217,10 +209,7 @@ function moveTransform(
   context: PointerMoveContext,
   event: PointerEvent,
   point: CanvasPoint,
-  gesture: Extract<
-    NonNullable<CanvasGesture>,
-    { readonly kind: 'resize' | 'intrinsicResize' | 'rotate' }
-  >,
+  gesture: Extract<NonNullable<CanvasGesture>, { readonly kind: 'resize' | 'intrinsicResize' | 'rotate' }>,
 ): void {
   if (gesture.kind === 'resize') {
     context.setGesture({
@@ -233,22 +222,12 @@ function moveTransform(
     context.setGesture({
       ...gesture,
       current: point,
-      preserveAspect:
-        event.shiftKey ||
-        gesture.initial.kind === 'emoji' ||
-        gesture.initial.kind === 'loupe',
-      centerResize:
-        gesture.handle === 'start' || gesture.handle === 'end'
-          ? false
-          : event.altKey,
+      preserveAspect: event.shiftKey || gesture.initial.kind === 'emoji' || gesture.initial.kind === 'loupe',
+      centerResize: gesture.handle === 'start' || gesture.handle === 'end' ? false : event.altKey,
     })
   } else {
-    const angle = Math.atan2(
-      point.y - gesture.center.y,
-      point.x - gesture.center.x,
-    )
-    let rotation =
-      gesture.initial.rotation + ((angle - gesture.startAngle) * 180) / Math.PI
+    const angle = Math.atan2(point.y - gesture.center.y, point.x - gesture.center.x)
+    let rotation = gesture.initial.rotation + ((angle - gesture.startAngle) * 180) / Math.PI
     if (event.shiftKey) rotation = Math.round(rotation / 15) * 15
     context.setGesture({ ...gesture, currentAngle: rotation })
   }
@@ -281,8 +260,7 @@ function moveDrawing(
     current: point,
     constrainAngle: event.shiftKey,
     drawFromCenter: event.altKey,
-    points:
-      samples.length > 0 ? [...gesture.points, ...samples] : gesture.points,
+    points: samples.length > 0 ? [...gesture.points, ...samples] : gesture.points,
   })
   context.invalidateOverlay()
 }

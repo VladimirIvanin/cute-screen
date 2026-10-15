@@ -1,7 +1,14 @@
-import type { JsonObject, JsonValue } from './types'
+import type {
+  JsonObject,
+  JsonValue,
+} from './types'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    Array.isArray(value)
+  ) {
     return false
   }
   const prototype = Object.getPrototypeOf(value)
@@ -33,18 +40,14 @@ function freezeJsonValue(
     return value
   }
   if (Array.isArray(value)) {
-    if (ancestors.has(value))
-      throw new Error(`${field} must not contain cycles`)
+    if (ancestors.has(value)) throw new Error(`${field} must not contain cycles`)
     ancestors.add(value)
-    const items = value.map((item, index) =>
-      freezeJsonValue(item, `${field}[${index}]`, ancestors),
-    )
+    const items = value.map((item, index) => freezeJsonValue(item, `${field}[${index}]`, ancestors))
     ancestors.delete(value)
     return Object.freeze(items)
   }
   if (isRecord(value)) {
-    if (ancestors.has(value))
-      throw new Error(`${field} must not contain cycles`)
+    if (ancestors.has(value)) throw new Error(`${field} must not contain cycles`)
     ancestors.add(value)
     const result: Record<string, JsonValue> = {}
     for (const [key, item] of Object.entries(value)) {
@@ -56,7 +59,10 @@ function freezeJsonValue(
   throw new Error(`${field} must contain only JSON values`)
 }
 
-export function freezeJsonObject(value: unknown, field: string): JsonObject {
+export function freezeJsonObject(
+  value: unknown,
+  field: string,
+): JsonObject {
   const source = readJsonObject(value, field)
   return freezeJsonValue(source, field, new WeakSet()) as JsonObject
 }
@@ -70,14 +76,19 @@ export function collectExtras(
   for (const [key, value] of Object.entries(source)) {
     if (!known.has(key)) extras[key] = value
   }
-  return Object.keys(extras).length === 0
-    ? undefined
-    : freezeJsonObject(extras, 'extras')
+  return Object.keys(extras).length === 0 ? undefined : freezeJsonObject(extras, 'extras')
 }
 
-export function jsonEquals(left: unknown, right: unknown): boolean {
+export function jsonEquals(
+  left: unknown,
+  right: unknown,
+): boolean {
   if (Object.is(left, right)) return true
-  if (typeof left !== typeof right || left === null || right === null) {
+  if (
+    typeof left !== typeof right ||
+    left === null ||
+    right === null
+  ) {
     return false
   }
   if (Array.isArray(left) || Array.isArray(right)) {
@@ -94,7 +105,5 @@ export function jsonEquals(left: unknown, right: unknown): boolean {
   const leftKeys = Object.keys(left)
   const rightKeys = Object.keys(right)
   if (leftKeys.length !== rightKeys.length) return false
-  return leftKeys.every(
-    (key) => Object.hasOwn(right, key) && jsonEquals(left[key], right[key]),
-  )
+  return leftKeys.every((key) => Object.hasOwn(right, key) && jsonEquals(left[key], right[key]))
 }

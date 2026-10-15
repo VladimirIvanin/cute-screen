@@ -12,17 +12,14 @@
             "core:window:default",
             "core:window:allow-close",
             "core:window:allow-hide",
+            "core:window:allow-show",
             "wdio:default"
           ]
         }
       ],
       "assetProtocol": {
         "enable": true,
-        "scope": [
-          "$APPLOCALDATA/blobs/**",
-          "$APPCACHE/resources/**",
-          "$APPCACHE/m01-fixtures/**"
-        ]
+        "scope": ["$APPLOCALDATA/blobs/**", "$APPCACHE/resources/**", "$APPCACHE/m01-fixtures/**"]
       }
     }
   }

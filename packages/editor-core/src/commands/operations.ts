@@ -1,6 +1,9 @@
 import { normalizeEditorDocument } from '../document/codec'
 import { jsonEquals } from '../document/json'
-import type { EditorDocumentV1, LayerNode } from '../document/types'
+import type {
+  EditorDocumentV1,
+  LayerNode,
+} from '../document/types'
 import { assertLayerEditableScale } from '../layer-resize'
 import { rebaseRulerLayer } from '../tools/precision/ruler'
 import type { EditorCommand } from './types'
@@ -17,39 +20,19 @@ export function createFlipCanvasCommand(
   const afterLayers = document.layers.map((layer) => {
     const { transform } = layer
     const radians = (transform.rotation * Math.PI) / 180
-    const scaleX = Math.hypot(
-      transform.scaleX * Math.cos(radians),
-      transform.scaleX * Math.sin(radians),
-    )
+    const scaleX = Math.hypot(transform.scaleX * Math.cos(radians), transform.scaleX * Math.sin(radians))
     const nextRotation =
       axis === 'horizontal'
-        ? (Math.atan2(
-            transform.scaleX * Math.sin(radians),
-            -transform.scaleX * Math.cos(radians),
-          ) *
-            180) /
-          Math.PI
-        : Math.atan2(
-            -transform.scaleX * Math.sin(radians),
-            transform.scaleX * Math.cos(radians),
-          ) *
-          (180 / Math.PI)
+        ? (Math.atan2(transform.scaleX * Math.sin(radians), -transform.scaleX * Math.cos(radians)) * 180) / Math.PI
+        : Math.atan2(-transform.scaleX * Math.sin(radians), transform.scaleX * Math.cos(radians)) * (180 / Math.PI)
     const reflected = {
       ...layer,
       transform: {
-        translateX:
-          axis === 'horizontal'
-            ? document.canvas.width - transform.translateX
-            : transform.translateX,
-        translateY:
-          axis === 'vertical'
-            ? document.canvas.height - transform.translateY
-            : transform.translateY,
+        translateX: axis === 'horizontal' ? document.canvas.width - transform.translateX : transform.translateX,
+        translateY: axis === 'vertical' ? document.canvas.height - transform.translateY : transform.translateY,
         rotation: nextRotation,
         scaleX,
-        scaleY:
-          -Math.sign(transform.scaleX * transform.scaleY) *
-          Math.abs(transform.scaleY),
+        scaleY: -Math.sign(transform.scaleX * transform.scaleY) * Math.abs(transform.scaleY),
       },
     } as LayerNode
     if (reflected.kind === 'ruler') {
@@ -94,7 +77,10 @@ function replaceDocument(
   return normalizeEditorDocument({ ...document, ...next })
 }
 
-function findLayer(document: EditorDocumentV1, id: string): LayerNode {
+function findLayer(
+  document: EditorDocumentV1,
+  id: string,
+): LayerNode {
   const layer = document.layers.find((candidate) => candidate.id === id)
   if (!layer) throw new Error(`layer ${id} was not found`)
   return layer
@@ -112,12 +98,11 @@ function assertCurrentLayer(
   if (!jsonEquals(current, expected)) throw new Error(message)
 }
 
-function isUnlockOnlyChange(before: LayerNode, after: LayerNode): boolean {
-  return (
-    before.locked &&
-    !after.locked &&
-    jsonEquals({ ...before, locked: false }, after)
-  )
+function isUnlockOnlyChange(
+  before: LayerNode,
+  after: LayerNode,
+): boolean {
+  return before.locked && !after.locked && jsonEquals({ ...before, locked: false }, after)
 }
 
 function applyAddLayer(
@@ -144,11 +129,7 @@ function applyRemoveLayer(
   if (!current || current.id !== command.layer.id) {
     throw new Error('remove source no longer matches')
   }
-  assertCurrentLayer(
-    current,
-    command.layer,
-    `layer ${command.layer.id} changed before removal`,
-  )
+  assertCurrentLayer(current, command.layer, `layer ${command.layer.id} changed before removal`)
   assertLayerIsUnlocked(current)
   return replaceDocument(document, {
     layers: document.layers.filter((_, index) => index !== command.index),
@@ -160,15 +141,8 @@ function applyUpdateLayer(
   command: Extract<EditorCommand, { type: 'updateLayer' }>,
 ): EditorDocumentV1 {
   const current = findLayer(document, command.before.id)
-  assertCurrentLayer(
-    current,
-    command.before,
-    `layer ${command.before.id} changed before update`,
-  )
-  if (
-    command.before.id !== command.after.id ||
-    command.before.kind !== command.after.kind
-  ) {
+  assertCurrentLayer(current, command.before, `layer ${command.before.id} changed before update`)
+  if (command.before.id !== command.after.id || command.before.kind !== command.after.kind) {
     throw new Error('updateLayer cannot change id or kind')
   }
   if (current.locked && !isUnlockOnlyChange(command.before, command.after)) {
@@ -176,9 +150,7 @@ function applyUpdateLayer(
   }
   assertLayerEditableScale(command.after)
   return replaceDocument(document, {
-    layers: document.layers.map((layer) =>
-      layer.id === command.before.id ? command.after : layer,
-    ),
+    layers: document.layers.map((layer) => (layer.id === command.before.id ? command.after : layer)),
   })
 }
 
@@ -213,13 +185,7 @@ function applyReorderLayer(
   document: EditorDocumentV1,
   command: Extract<EditorCommand, { type: 'reorderLayer' }>,
 ): EditorDocumentV1 {
-  return reorderLayers(
-    document,
-    command.layerId,
-    command.fromIndex,
-    command.toIndex,
-    true,
-  )
+  return reorderLayers(document, command.layerId, command.fromIndex, command.toIndex, true)
 }
 
 function applyDuplicateLayer(
@@ -259,10 +225,7 @@ function applyFlipCanvas(
   document: EditorDocumentV1,
   command: Extract<EditorCommand, { type: 'flipCanvas' }>,
 ): EditorDocumentV1 {
-  if (
-    !jsonEquals(document.layers, command.beforeLayers) ||
-    !jsonEquals(document.crop, command.beforeCrop)
-  ) {
+  if (!jsonEquals(document.layers, command.beforeLayers) || !jsonEquals(document.crop, command.beforeCrop)) {
     throw new Error('flip source no longer matches')
   }
   return replaceDocument(document, {
@@ -301,17 +264,10 @@ function revertAddLayer(
   document: EditorDocumentV1,
   command: Extract<EditorCommand, { type: 'addLayer' }>,
 ): EditorDocumentV1 {
-  const index = document.layers.findIndex(
-    (layer) => layer.id === command.layer.id,
-  )
+  const index = document.layers.findIndex((layer) => layer.id === command.layer.id)
   const current = document.layers[index]
-  if (index < 0 || !current)
-    throw new Error(`layer ${command.layer.id} was not found`)
-  assertCurrentLayer(
-    current,
-    command.layer,
-    `layer ${command.layer.id} changed before revert`,
-  )
+  if (index < 0 || !current) throw new Error(`layer ${command.layer.id} was not found`)
+  assertCurrentLayer(current, command.layer, `layer ${command.layer.id} changed before revert`)
   return replaceDocument(document, {
     layers: document.layers.filter((_, layerIndex) => layerIndex !== index),
   })
@@ -341,15 +297,9 @@ function revertUpdateLayer(
   command: Extract<EditorCommand, { type: 'updateLayer' }>,
 ): EditorDocumentV1 {
   const current = findLayer(document, command.after.id)
-  assertCurrentLayer(
-    current,
-    command.after,
-    `layer ${command.after.id} changed before revert`,
-  )
+  assertCurrentLayer(current, command.after, `layer ${command.after.id} changed before revert`)
   return replaceDocument(document, {
-    layers: document.layers.map((layer) =>
-      layer.id === command.after.id ? command.before : layer,
-    ),
+    layers: document.layers.map((layer) => (layer.id === command.after.id ? command.before : layer)),
   })
 }
 
@@ -357,13 +307,7 @@ function revertReorderLayer(
   document: EditorDocumentV1,
   command: Extract<EditorCommand, { type: 'reorderLayer' }>,
 ): EditorDocumentV1 {
-  return reorderLayers(
-    document,
-    command.layerId,
-    command.toIndex,
-    command.fromIndex,
-    false,
-  )
+  return reorderLayers(document, command.layerId, command.toIndex, command.fromIndex, false)
 }
 
 function revertDuplicateLayer(
@@ -394,10 +338,7 @@ function revertFlipCanvas(
   document: EditorDocumentV1,
   command: Extract<EditorCommand, { type: 'flipCanvas' }>,
 ): EditorDocumentV1 {
-  if (
-    !jsonEquals(document.layers, command.afterLayers) ||
-    !jsonEquals(document.crop, command.afterCrop)
-  ) {
+  if (!jsonEquals(document.layers, command.afterLayers) || !jsonEquals(document.crop, command.afterCrop)) {
     throw new Error('flip result no longer matches')
   }
   return replaceDocument(document, {

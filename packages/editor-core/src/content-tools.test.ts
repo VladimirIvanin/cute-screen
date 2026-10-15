@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 import type { EditorCommand } from './commands/types'
 import { createDrawingLayer } from './drawing'
@@ -90,8 +94,7 @@ describe('v7 content-layer core contracts', () => {
         text: 'invalid',
         origin: { x: 8, y: 12 },
         background: { ...background, padding: 257 },
-      }),
-    ).toThrow(/padding/u)
+      })).toThrow(/padding/u)
   })
 
   it('allocates the minimal free marker number and preserves badge semantics', () => {
@@ -120,14 +123,8 @@ describe('v7 content-layer core contracts', () => {
     })
 
     expect({
-      x:
-        marker.transform.translateX +
-        marker.localBounds.x +
-        marker.localBounds.width / 2,
-      y:
-        marker.transform.translateY +
-        marker.localBounds.y +
-        marker.localBounds.height / 2,
+      x: marker.transform.translateX + marker.localBounds.x + marker.localBounds.width / 2,
+      y: marker.transform.translateY + marker.localBounds.y + marker.localBounds.height / 2,
     }).toEqual(origin)
   })
 
@@ -140,9 +137,7 @@ describe('v7 content-layer core contracts', () => {
       intrinsicHeight: 100,
       origin: { x: 0, y: 0 },
     })
-    const encoded = encodeClipboardLayersV2([
-      { ...base, locked: true, payload: { ...base.payload, role: 'base' } },
-    ])
+    const encoded = encodeClipboardLayersV2([{ ...base, locked: true, payload: { ...base.payload, role: 'base' } }])
     const decoded = decodeClipboardLayersV2(encoded)
     const pasted = pasteClipboardLayers(decoded, {
       id: () => ids[2],
@@ -188,9 +183,7 @@ describe('v7 content-layer core contracts', () => {
   })
 
   it('does not allocate content commands for an empty new text layer', () => {
-    expect(
-      createTextLayer({ id: ids[0], text: '', origin: { x: 0, y: 0 } }),
-    ).toBeNull()
+    expect(createTextLayer({ id: ids[0], text: '', origin: { x: 0, y: 0 } })).toBeNull()
   })
 
   it('commits text as exactly one add, update or removal command', () => {
@@ -208,12 +201,11 @@ describe('v7 content-layer core contracts', () => {
     expect(createTextCommitCommand({ next: created })).toMatchObject({
       type: 'addLayer',
     })
-    expect(
-      createTextCommitCommand({ existing: created, next: updated }),
-    ).toMatchObject({ type: 'updateLayer' })
-    expect(
-      createTextCommitCommand({ existing: created, next: null, index: 0 }),
-    ).toMatchObject({ type: 'removeLayer', index: 0 })
+    expect(createTextCommitCommand({ existing: created, next: updated })).toMatchObject({ type: 'updateLayer' })
+    expect(createTextCommitCommand({ existing: created, next: null, index: 0 })).toMatchObject({
+      type: 'removeLayer',
+      index: 0,
+    })
   })
 
   it('creates one duplicate command with the shared screen-space offset', () => {
@@ -283,9 +275,7 @@ describe('v7 content-layer core contracts', () => {
       target: { x: 10, y: 12 },
       label: { x: 40, y: 80 },
     })
-    expect(layer?.localBounds.width).toBeGreaterThan(
-      24 * 'wide line'.length * 0.6,
-    )
+    expect(layer?.localBounds.width).toBeGreaterThan(24 * 'wide line'.length * 0.6)
     expect(layer?.localBounds.height).toBeGreaterThan(24 * 1.25 * 2)
   })
 
@@ -312,11 +302,10 @@ describe('v7 content-layer core contracts', () => {
         bitmapAvailable: true,
       }),
     ).toMatchObject({ kind: 'bitmap', warning: 'internalPayloadInvalid' })
-    expect(
-      routeClipboardSnapshot({ activeDocument: true, text: 'plain text' }),
-    ).toEqual({ kind: 'text', text: 'plain text' })
-    expect(routeClipboardSnapshot({ activeDocument: false, internal })).toEqual(
-      { kind: 'emptyHint' },
-    )
+    expect(routeClipboardSnapshot({ activeDocument: true, text: 'plain text' })).toEqual({
+      kind: 'text',
+      text: 'plain text',
+    })
+    expect(routeClipboardSnapshot({ activeDocument: false, internal })).toEqual({ kind: 'emptyHint' })
   })
 })

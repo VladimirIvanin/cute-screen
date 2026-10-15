@@ -20,7 +20,11 @@ export function withTransform(
   const originY = node.transformOriginY ?? centerY
   const scaleX = node.scaleX ?? 1
   const scaleY = node.scaleY ?? 1
-  if (node.rotation !== 0 || scaleX !== 1 || scaleY !== 1) {
+  if (
+    node.rotation !== 0 ||
+    scaleX !== 1 ||
+    scaleY !== 1
+  ) {
     canvas.translate(originX, originY)
     canvas.rotate(node.rotation, 0, 0)
     canvas.scale(scaleX, scaleY)
@@ -42,7 +46,11 @@ export function cancelNodeTransform(
   const originY = node.transformOriginY ?? centerY
   const scaleX = node.scaleX ?? 1
   const scaleY = node.scaleY ?? 1
-  if (node.rotation === 0 && scaleX === 1 && scaleY === 1) return
+  if (
+    node.rotation === 0 &&
+    scaleX === 1 &&
+    scaleY === 1
+  ) return
   canvas.translate(originX, originY)
   canvas.scale(1 / scaleX, 1 / scaleY)
   canvas.rotate(-node.rotation, 0, 0)
@@ -55,11 +63,7 @@ export function roundedRectPath(
 ): CanvasKitPath {
   const builder = new canvasKit.PathBuilder()
   try {
-    const radius = Math.min(
-      node.cornerRadius ?? 0,
-      node.width / 2,
-      node.height / 2,
-    )
+    const radius = Math.min(node.cornerRadius ?? 0, node.width / 2, node.height / 2)
     if (radius <= 0) {
       builder.moveTo(node.x, node.y)
       builder.lineTo(node.x + node.width, node.y)
@@ -100,14 +104,7 @@ export function roundedRectPath(
       node.y + node.height - radius,
     )
     builder.lineTo(node.x, node.y + radius)
-    builder.cubicTo(
-      node.x,
-      node.y + radius - kappa,
-      node.x + radius - kappa,
-      node.y,
-      node.x + radius,
-      node.y,
-    )
+    builder.cubicTo(node.x, node.y + radius - kappa, node.x + radius - kappa, node.y, node.x + radius, node.y)
     builder.close()
     return builder.detach()
   } finally {
@@ -120,7 +117,11 @@ function glyphInkBounds(
   text: string,
 ): Readonly<{ top: number; bottom: number }> | undefined {
   const glyphs = font.getGlyphIDs?.(text)
-  if (!glyphs || glyphs.length === 0 || !font.getGlyphBounds) return undefined
+  if (
+    !glyphs ||
+    glyphs.length === 0 ||
+    !font.getGlyphBounds
+  ) return undefined
   const bounds = font.getGlyphBounds(glyphs)
   let top = Number.POSITIVE_INFINITY
   let bottom = Number.NEGATIVE_INFINITY
@@ -131,14 +132,10 @@ function glyphInkBounds(
     top = Math.min(top, glyphTop)
     bottom = Math.max(bottom, glyphBottom)
   }
-  return Number.isFinite(top) && Number.isFinite(bottom) && bottom > top
-    ? { top, bottom }
-    : undefined
+  return Number.isFinite(top) && Number.isFinite(bottom) && bottom > top ? { top, bottom } : undefined
 }
 
-function metricInkBounds(
-  font: CanvasKitFontMetricsSource,
-): Readonly<{ top: number; bottom: number }> | undefined {
+function metricInkBounds(font: CanvasKitFontMetricsSource): Readonly<{ top: number; bottom: number }> | undefined {
   const metrics = font.getMetrics?.()
   if (!metrics) return undefined
   if (
@@ -150,9 +147,7 @@ function metricInkBounds(
   }
   const top = metrics.bounds?.[1] ?? Number.NaN
   const bottom = metrics.bounds?.[3] ?? Number.NaN
-  return Number.isFinite(top) && Number.isFinite(bottom) && bottom > top
-    ? { top, bottom }
-    : undefined
+  return Number.isFinite(top) && Number.isFinite(bottom) && bottom > top ? { top, bottom } : undefined
 }
 
 export function canvasKitInkBounds(
@@ -160,10 +155,7 @@ export function canvasKitInkBounds(
   text: string,
   fontSize: number,
 ): Readonly<{ top: number; bottom: number }> {
-  return (
-    glyphInkBounds(font, text) ??
-    metricInkBounds(font) ?? { top: -fontSize * 0.8, bottom: fontSize * 0.2 }
-  )
+  return glyphInkBounds(font, text) ?? metricInkBounds(font) ?? { top: -fontSize * 0.8, bottom: fontSize * 0.2 }
 }
 
 export function canvasKitLineMetrics(
@@ -175,8 +167,7 @@ export function canvasKitLineMetrics(
   const descent = metrics?.descent ?? Number.NaN
   return {
     ascent: Number.isFinite(ascent) && ascent >= 0 ? ascent : fontSize * 0.8,
-    descent:
-      Number.isFinite(descent) && descent >= 0 ? descent : fontSize * 0.2,
+    descent: Number.isFinite(descent) && descent >= 0 ? descent : fontSize * 0.2,
   }
 }
 
@@ -214,9 +205,7 @@ export function canvasKitTextWidth(
   if (typeof measured === 'number' && Number.isFinite(measured)) return measured
   const glyphs = font.getGlyphIDs?.(text)
   if (glyphs && font.getGlyphWidths) {
-    return font
-      .getGlyphWidths(glyphs)
-      .reduce((total, width) => total + width, 0)
+    return font.getGlyphWidths(glyphs).reduce((total, width) => total + width, 0)
   }
   return Array.from(text).length * fontSize * 0.6
 }
@@ -246,38 +235,44 @@ export function hasGlyphCoverage(
 export class CanvasKitTypefaceStore {
   readonly #typefaces = new Map<string, CanvasKitTypeface>()
 
-  constructor(canvasKit: CanvasKitApi, fontData: readonly CanvasKitFontData[]) {
+  constructor(
+    canvasKit: CanvasKitApi,
+    fontData: readonly CanvasKitFontData[],
+  ) {
     const makeTypeface = canvasKit.Typeface?.MakeFreeTypeFaceFromData
     if (!makeTypeface) return
     for (const font of fontData) {
       const typeface = makeTypeface(font.data.slice(0))
       if (typeface) {
-        this.#typefaces.set(
-          `${font.family.toLowerCase()}\u0000${font.subset}`,
-          typeface,
-        )
+        this.#typefaces.set(`${font.family.toLowerCase()}\u0000${font.subset}`, typeface)
       }
     }
   }
 
-  resolve(family: string, text: string): ResolvedCanvasKitTypeface | undefined {
+  resolve(
+    family: string,
+    text: string,
+  ): ResolvedCanvasKitTypeface | undefined {
     const requireCoverage = requiresCyrillicCoverage(text)
     const subset = requireCoverage ? 'cyrillic' : 'latin'
     const normalizedFamily = family.toLowerCase()
     const exactKey = `${normalizedFamily}\u0000${subset}`
     const exact = this.#typefaces.get(exactKey)
-    if (exact && (!requireCoverage || hasGlyphCoverage(exact, text)))
-      return { key: exactKey, typeface: exact }
+    if (
+      exact &&
+      (!requireCoverage ||
+        hasGlyphCoverage(exact, text))
+    ) return { key: exactKey, typeface: exact }
     for (const [key, typeface] of this.#typefaces) {
       if (
         key.endsWith(`\u0000${subset}`) &&
-        (!requireCoverage || hasGlyphCoverage(typeface, text))
+        (!requireCoverage ||
+          hasGlyphCoverage(typeface, text))
       )
         return { key, typeface }
     }
     if (!requireCoverage) {
-      const fallback = this.#typefaces.entries().next().value as
-        readonly [string, CanvasKitTypeface] | undefined
+      const fallback = this.#typefaces.entries().next().value as readonly [string, CanvasKitTypeface] | undefined
       return fallback ? { key: fallback[0], typeface: fallback[1] } : undefined
     }
     for (const [key, typeface] of this.#typefaces) {

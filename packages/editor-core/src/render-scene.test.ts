@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 import { createRenderSceneSnapshot } from './scene/snapshot'
 
@@ -25,8 +29,7 @@ describe('render scene validation', () => {
         height: 80,
         outputBounds: { x: 90, y: 0, width: 20, height: 30 },
         nodes: [],
-      }),
-    ).toThrow(/outputBounds/u)
+      })).toThrow(/outputBounds/u)
   })
 
   it('rejects non-finite geometry and freezes optional stroke data', () => {
@@ -48,8 +51,7 @@ describe('render scene validation', () => {
             fill: { red: 0, green: 0, blue: 0, alpha: 1 },
           },
         ],
-      }),
-    ).toThrow(/rect\.x/u)
+      })).toThrow(/rect\.x/u)
 
     const scene = createRenderSceneSnapshot({
       width: 100,

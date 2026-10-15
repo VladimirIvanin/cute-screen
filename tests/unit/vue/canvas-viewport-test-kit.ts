@@ -53,7 +53,11 @@ export const document: EditorDocumentV1 = {
       shadows: [],
       visible: true,
       locked: false,
-      payload: {},
+      payload: {
+        shape: 'rectangle',
+        fill: { kind: 'solid', color: { red: 0.2, green: 0.3, blue: 0.4, alpha: 1 }, opacity: 1 },
+        stroke: null,
+      },
     },
   ],
   presentation: {

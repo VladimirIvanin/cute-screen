@@ -1,5 +1,14 @@
-import { fireEvent, render } from '@testing-library/vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  fireEvent,
+  render,
+} from '@testing-library/vue'
+import {
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 
 import CanvasViewport, {
   type TextFormattingPatch,
@@ -138,9 +147,7 @@ function mount(
   return { ...rendered, scene }
 }
 
-async function openExistingEditor(
-  layer: LayerNode,
-): Promise<ReturnType<typeof mount>> {
+async function openExistingEditor(layer: LayerNode): Promise<ReturnType<typeof mount>> {
   const rendered = mount(layer)
   let clientX = layer.transform.translateX + 2
   let clientY = layer.transform.translateY + 2
@@ -169,16 +176,14 @@ function selectWithinFirstSpan(
   document.dispatchEvent(new Event('selectionchange'))
 }
 
-function firstCommand(
-  emitted: (event?: string) => Record<string, unknown[][]>,
-) {
+function firstCommand(emitted: (event?: string) => Record<string, unknown[][]>) {
   return emitted().documentCommand?.[0]?.[0] as
     | {
-        readonly type: string
-        readonly before?: LayerNode
-        readonly after?: LayerNode
-        readonly layer?: LayerNode
-      }
+      readonly type: string
+      readonly before?: LayerNode
+      readonly after?: LayerNode
+      readonly layer?: LayerNode
+    }
     | undefined
 }
 
@@ -200,9 +205,7 @@ describe('v7 rich-text component editing', () => {
       } satisfies TextFormattingPatch,
     })
     await fireEvent.keyDown(editor, { key: 'Enter', ctrlKey: true })
-    await vi.waitFor(() =>
-      expect(rendered.emitted().documentCommand).toHaveLength(1),
-    )
+    await vi.waitFor(() => expect(rendered.emitted().documentCommand).toHaveLength(1))
 
     const command = firstCommand(rendered.emitted)
     expect(command?.type).toBe('updateLayer')
@@ -235,9 +238,7 @@ describe('v7 rich-text component editing', () => {
       clipboardData: { getData: () => 'x' },
     })
     await fireEvent.blur(editor)
-    await vi.waitFor(() =>
-      expect(rendered.emitted().documentCommand).toHaveLength(1),
-    )
+    await vi.waitFor(() => expect(rendered.emitted().documentCommand).toHaveLength(1))
 
     const command = firstCommand(rendered.emitted)
     if (command?.after?.kind !== 'text') throw new Error('expected text update')
@@ -270,8 +271,7 @@ describe('v7 rich-text component editing', () => {
     selectWithinFirstSpan(editor, 1, 3)
 
     const emitted = rendered.emitted() as Record<string, unknown[][]>
-    const draft = emitted.textEditing?.at(-1)?.[0] as
-      { readonly snapshot: Record<string, unknown> } | undefined
+    const draft = emitted.textEditing?.at(-1)?.[0] as { readonly snapshot: Record<string, unknown> } | undefined
     expect(draft?.snapshot).toMatchObject({
       fontFamily: 'Georgia',
       fontSize: 48,
@@ -288,9 +288,7 @@ describe('v7 rich-text component editing', () => {
       } satisfies TextFormattingPatch,
     })
     await fireEvent.keyDown(editor, { key: 'Enter', ctrlKey: true })
-    await vi.waitFor(() =>
-      expect(rendered.emitted().documentCommand).toHaveLength(1),
-    )
+    await vi.waitFor(() => expect(rendered.emitted().documentCommand).toHaveLength(1))
 
     const command = firstCommand(rendered.emitted)
     if (command?.after?.kind !== 'text') throw new Error('expected text update')
@@ -335,11 +333,11 @@ describe('v7 rich-text component editing', () => {
       const layer =
         kind === 'callout'
           ? createCalloutLayer({
-              id,
-              text: 'old',
-              target: { x: 10, y: 60 },
-              label: { x: 120, y: 20 },
-            })!
+            id,
+            text: 'old',
+            target: { x: 10, y: 60 },
+            label: { x: 120, y: 20 },
+          })!
           : createNumberedMarkerLayer({
               id,
               sequence: 1,
@@ -358,9 +356,7 @@ describe('v7 rich-text component editing', () => {
       })
       const editor = rendered.getByRole('textbox') as HTMLDivElement
       await fireEvent.keyDown(editor, { key: 'Enter', ctrlKey: true })
-      await vi.waitFor(() =>
-        expect(rendered.emitted().documentCommand).toHaveLength(1),
-      )
+      await vi.waitFor(() => expect(rendered.emitted().documentCommand).toHaveLength(1))
       const command = firstCommand(rendered.emitted)
       if (kind === 'callout') {
         expect(command?.after).toMatchObject({
@@ -403,9 +399,7 @@ describe('v7 rich-text component editing', () => {
     await fireEvent.compositionEnd(editor)
     expect(rendered.emitted().documentCommand).toBeUndefined()
     await fireEvent.blur(editor)
-    await vi.waitFor(() =>
-      expect(rendered.emitted().documentCommand).toHaveLength(1),
-    )
+    await vi.waitFor(() => expect(rendered.emitted().documentCommand).toHaveLength(1))
     const command = firstCommand(rendered.emitted)
     expect(command?.layer?.kind).toBe('text')
     if (command?.layer?.kind !== 'text') throw new Error('expected text add')
@@ -427,9 +421,7 @@ describe('v7 rich-text component editing', () => {
     await fireEvent.keyDown(editor, { key: 'Enter' })
     await fireEvent.keyDown(editor, { key: 'Enter' })
     await fireEvent.blur(editor)
-    await vi.waitFor(() =>
-      expect(rendered.emitted().documentCommand).toHaveLength(1),
-    )
+    await vi.waitFor(() => expect(rendered.emitted().documentCommand).toHaveLength(1))
 
     const command = firstCommand(rendered.emitted)
     if (command?.after?.kind !== 'text') throw new Error('expected text update')
@@ -462,14 +454,11 @@ describe('v7 rich-text component editing', () => {
 
     await fireEvent.paste(editor, {
       clipboardData: {
-        getData: (type: string) =>
-          type === 'text/plain' ? 'plain\r\n<b>text</b>' : '<b>ignored</b>',
+        getData: (type: string) => (type === 'text/plain' ? 'plain\r\n<b>text</b>' : '<b>ignored</b>'),
       },
     })
     await fireEvent.blur(editor)
-    await vi.waitFor(() =>
-      expect(rendered.emitted().documentCommand).toHaveLength(1),
-    )
+    await vi.waitFor(() => expect(rendered.emitted().documentCommand).toHaveLength(1))
     const command = firstCommand(rendered.emitted)
     if (command?.after?.kind !== 'text') throw new Error('expected text update')
     expect(command.after.payload.content.text).toBe('Aplain\n<b>text</b>B')
@@ -501,11 +490,11 @@ describe('v7 rich-text component editing', () => {
           ? createTextLayer({ id, text: 'old', origin: { x: 10, y: 10 } })!
           : kind === 'callout'
             ? createCalloutLayer({
-                id,
-                text: 'old',
-                target: { x: 10, y: 60 },
-                label: { x: 120, y: 20 },
-              })!
+              id,
+              text: 'old',
+              target: { x: 10, y: 60 },
+              label: { x: 120, y: 20 },
+            })!
             : createNumberedMarkerLayer({
                 id,
                 sequence: 1,
@@ -518,9 +507,7 @@ describe('v7 rich-text component editing', () => {
         clipboardData: { getData: () => 'new' },
       })
       await fireEvent.blur(editor)
-      await vi.waitFor(() =>
-        expect(rendered.emitted().documentCommand).toHaveLength(1),
-      )
+      await vi.waitFor(() => expect(rendered.emitted().documentCommand).toHaveLength(1))
 
       expect(firstCommand(rendered.emitted)).toMatchObject({
         type: 'updateLayer',
@@ -537,51 +524,33 @@ describe('v7 rich-text component editing', () => {
       origin: { x: 10, y: 10 },
     })!
     const scenes: RenderSceneSnapshot[] = []
-    const setScene = vi
-      .spyOn(Canvas2DRenderer.prototype, 'setScene')
-      .mockImplementation((scene) => {
-        scenes.push(scene)
-      })
-    const renderScene = vi
-      .spyOn(Canvas2DRenderer.prototype, 'render')
-      .mockReturnValue({
-        backend: 'canvas2d',
-        correlationId: 'text-projection-test',
-        reasons: ['scene'],
-        nodeCount: 0,
-        startedAt: 0,
-        duration: 0,
-      })
+    const setScene = vi.spyOn(Canvas2DRenderer.prototype, 'setScene').mockImplementation((scene) => {
+      scenes.push(scene)
+    })
+    const renderScene = vi.spyOn(Canvas2DRenderer.prototype, 'render').mockReturnValue({
+      backend: 'canvas2d',
+      correlationId: 'text-projection-test',
+      reasons: ['scene'],
+      nodeCount: 0,
+      startedAt: 0,
+      duration: 0,
+    })
 
     try {
       const rendered = mount(layer, 'select', true)
-      await vi.waitFor(() =>
-        expect(scenes.at(-1)?.nodes.some((node) => node.id === layer.id)).toBe(
-          true,
-        ),
-      )
+      await vi.waitFor(() => expect(scenes.at(-1)?.nodes.some((node) => node.id === layer.id)).toBe(true))
 
       await fireEvent.dblClick(rendered.scene, {
         clientX: layer.transform.translateX + 2,
         clientY: layer.transform.translateY + 2,
       })
-      await expect(
-        rendered.findByLabelText('Text editor'),
-      ).resolves.toBeTruthy()
-      await vi.waitFor(() =>
-        expect(scenes.at(-1)?.nodes.some((node) => node.id === layer.id)).toBe(
-          false,
-        ),
-      )
+      await expect(rendered.findByLabelText('Text editor')).resolves.toBeTruthy()
+      await vi.waitFor(() => expect(scenes.at(-1)?.nodes.some((node) => node.id === layer.id)).toBe(false))
 
       await fireEvent.keyDown(rendered.getByLabelText('Text editor'), {
         key: 'Escape',
       })
-      await vi.waitFor(() =>
-        expect(scenes.at(-1)?.nodes.some((node) => node.id === layer.id)).toBe(
-          true,
-        ),
-      )
+      await vi.waitFor(() => expect(scenes.at(-1)?.nodes.some((node) => node.id === layer.id)).toBe(true))
       expect(rendered.emitted().documentCommand).toBeUndefined()
     } finally {
       setScene.mockRestore()

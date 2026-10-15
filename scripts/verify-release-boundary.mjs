@@ -1,5 +1,9 @@
 import { spawnSync } from 'node:child_process'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import {
+  mkdir,
+  readFile,
+  writeFile,
+} from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 
@@ -13,7 +17,10 @@ const forbidden = [
   'cute-screen:test-harness',
 ]
 
-function capture(command, args) {
+function capture(
+  command,
+  args,
+) {
   const result = spawnSync(command, args, {
     cwd: root,
     encoding: 'utf8',
@@ -37,13 +44,7 @@ const tree = capture('cargo', [
 const graphViolations = forbidden.filter((entry) => tree.includes(entry))
 
 capture('pnpm', ['build'])
-capture('cargo', [
-  'build',
-  '--release',
-  '--package',
-  'cute-screen-desktop',
-  '--no-default-features',
-])
+capture('cargo', ['build', '--release', '--package', 'cute-screen-desktop', '--no-default-features'])
 
 const executable = path.join(
   root,
@@ -52,13 +53,8 @@ const executable = path.join(
   process.platform === 'win32' ? 'cute-screen.exe' : 'cute-screen',
 )
 const binary = await readFile(executable)
-const binaryViolations = forbidden.filter((entry) =>
-  binary.includes(Buffer.from(entry)),
-)
-const config = await readFile(
-  path.join(root, 'src-tauri', 'tauri.conf.json'),
-  'utf8',
-)
+const binaryViolations = forbidden.filter((entry) => binary.includes(Buffer.from(entry)))
+const config = await readFile(path.join(root, 'src-tauri', 'tauri.conf.json'), 'utf8')
 const configViolations = forbidden.filter((entry) => config.includes(entry))
 const frontendFiles = await fg('apps/desktop/dist/**/*', {
   cwd: root,
@@ -84,24 +80,12 @@ const report = {
 }
 const reportDirectory = path.join(root, 'artifacts')
 await mkdir(reportDirectory, { recursive: true })
-await writeFile(
-  path.join(reportDirectory, 'release-boundary.json'),
-  `${JSON.stringify(report, null, 2)}\n`,
-)
+await writeFile(path.join(reportDirectory, 'release-boundary.json'), `${JSON.stringify(report, null, 2)}\n`)
 
-const violations = [
-  ...graphViolations,
-  ...binaryViolations,
-  ...configViolations,
-  ...frontendViolations,
-]
+const violations = [...graphViolations, ...binaryViolations, ...configViolations, ...frontendViolations]
 if (violations.length > 0) {
-  console.error(
-    `Release boundary contains test-only markers: ${[...new Set(violations)].join(', ')}`,
-  )
+  console.error(`Release boundary contains test-only markers: ${[...new Set(violations)].join(', ')}`)
   process.exitCode = 1
 } else {
-  console.log(
-    'Release boundary verified: fake-platform and WebDriver are absent.',
-  )
+  console.log('Release boundary verified: fake-platform and WebDriver are absent.')
 }

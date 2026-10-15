@@ -1,0 +1,14 @@
+{
+  "[javascript][typescript][vue]": {
+    "editor.defaultFormatter": "dbaeumer.vscode-eslint",
+    "editor.formatOnSave": true
+  },
+  "[json][jsonc][css][scss][html][markdown][yaml]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true
+  },
+  "eslint.format.enable": true,
+  "eslint.options": { "fixTypes": ["layout"] },
+  "eslint.validate": ["javascript", "typescript", "vue"],
+  "prettier.requireConfig": true
+}

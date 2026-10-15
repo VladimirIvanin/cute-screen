@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { NButton, NTooltip } from 'naive-ui'
+import {
+  NButton,
+  NTooltip,
+} from 'naive-ui'
 import { UiIcon } from '../icon'
 import type { ToolDescriptor } from '../types'
 
@@ -22,9 +25,7 @@ function toolTitle(
   if (tool.disabled && tool.disabledReasonKey) {
     return translate(tool.disabledReasonKey)
   }
-  return tool.shortcut
-    ? `${translate(tool.labelKey)} (${tool.shortcut})`
-    : translate(tool.labelKey)
+  return tool.shortcut ? `${translate(tool.labelKey)} (${tool.shortcut})` : translate(tool.labelKey)
 }
 
 function onConfigure(
@@ -37,8 +38,15 @@ function onConfigure(
   emit('configure', tool.id, anchor)
 }
 
-function onToolKeydown(tool: ToolDescriptor, event: KeyboardEvent): void {
-  if ((event.key === 'F10' && event.shiftKey) || event.key === 'ContextMenu') {
+function onToolKeydown(
+  tool: ToolDescriptor,
+  event: KeyboardEvent,
+): void {
+  if (
+    (event.key === 'F10' &&
+      event.shiftKey) ||
+      event.key === 'ContextMenu'
+  ) {
     onConfigure(tool, event)
   }
 }
@@ -52,10 +60,7 @@ function onToolKeydown(tool: ToolDescriptor, event: KeyboardEvent): void {
         class="cs-tool-group-separator"
         aria-hidden="true"
       />
-      <div
-        v-if="tools.some((tool) => tool.group === group)"
-        class="cs-tool-group"
-      >
+      <div v-if="tools.some((tool) => tool.group === group)" class="cs-tool-group">
         <NTooltip
           v-for="tool in tools.filter((item) => item.group === group)"
           :key="tool.id"
@@ -82,6 +87,41 @@ function onToolKeydown(tool: ToolDescriptor, event: KeyboardEvent): void {
           </template>
           {{ toolTitle(tool, t) }}
         </NTooltip>
+        <NButton
+          v-if="
+            tools.some(
+              (tool) =>
+                tool.group === group &&
+                tool.id === activeToolId &&
+                [
+                  'arrow',
+                  'shape',
+                  'pencil',
+                  'marker',
+                  'text',
+                  'callout',
+                  'numberedMarker',
+                  'censor',
+                  'spotlight',
+                  'ruler',
+                  'loupe',
+                  'crop',
+                ].includes(tool.id),
+            )
+          "
+          quaternary
+          size="tiny"
+          class="cs-tool-configure-trigger"
+          :aria-label="`${t(tools.find((tool) => tool.id === activeToolId)!.labelKey)} · …`"
+          @click="
+            onConfigure(
+              tools.find((tool) => tool.id === activeToolId)!,
+              $event,
+            )
+          "
+        >
+          ⌄
+        </NButton>
       </div>
     </template>
   </aside>

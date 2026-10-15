@@ -3,6 +3,7 @@ import prettier from 'eslint-config-prettier'
 import vue from 'eslint-plugin-vue'
 import globals from 'globals'
 import tseslint from 'typescript-eslint'
+import formatting from './eslint.format.config.js'
 
 export default tseslint.config(
   {
@@ -47,15 +48,8 @@ export default tseslint.config(
         {
           patterns: [
             {
-              group: [
-                'vue',
-                'vue/**',
-                '@tauri-apps/**',
-                '@cute-screen/editor-renderer',
-                '@cute-screen/editor-vue',
-              ],
-              message:
-                'editor-core must remain independent from Vue, Tauri, DOM, and upper layers.',
+              group: ['vue', 'vue/**', '@tauri-apps/**', '@cute-screen/editor-renderer', '@cute-screen/editor-vue'],
+              message: 'editor-core must remain independent from Vue, Tauri, DOM, and upper layers.',
             },
           ],
         },
@@ -70,15 +64,8 @@ export default tseslint.config(
         {
           patterns: [
             {
-              group: [
-                'vue',
-                'vue/**',
-                '@tauri-apps/**',
-                '@cute-screen/editor-vue',
-                '@cute-screen/desktop',
-              ],
-              message:
-                'editor-renderer may depend on editor-core, not Vue, Tauri, or upper layers.',
+              group: ['vue', 'vue/**', '@tauri-apps/**', '@cute-screen/editor-vue', '@cute-screen/desktop'],
+              message: 'editor-renderer may depend on editor-core, not Vue, Tauri, or upper layers.',
             },
           ],
         },
@@ -94,8 +81,7 @@ export default tseslint.config(
           patterns: [
             {
               group: ['@tauri-apps/**', '@cute-screen/desktop'],
-              message:
-                'editor-vue may depend on editor-renderer and Vue, not Tauri or desktop.',
+              message: 'editor-vue may depend on editor-renderer and Vue, not Tauri or desktop.',
             },
           ],
         },
@@ -103,4 +89,5 @@ export default tseslint.config(
     },
   },
   prettier,
+  ...formatting,
 )

@@ -1,7 +1,15 @@
 import fc from 'fast-check'
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
-import { invertMatrix, transformPoint, transformToMatrix } from './geometry'
+import {
+  invertMatrix,
+  transformPoint,
+  transformToMatrix,
+} from './geometry'
 
 describe('geometry', () => {
   it('round-trips finite points through an invertible transform', () => {
@@ -20,10 +28,7 @@ describe('geometry', () => {
             scaleX,
             scaleY,
           })
-          const restored = transformPoint(
-            invertMatrix(matrix),
-            transformPoint(matrix, { x, y }),
-          )
+          const restored = transformPoint(invertMatrix(matrix), transformPoint(matrix, { x, y }))
           expect(restored.x).toBeCloseTo(x, 8)
           expect(restored.y).toBeCloseTo(y, 8)
         },

@@ -1,4 +1,8 @@
-import { computed, nextTick, watch } from 'vue'
+import {
+  computed,
+  nextTick,
+  watch,
+} from 'vue'
 import {
   richTextSelectionRange,
   type RichTextParagraphStyle,
@@ -23,9 +27,7 @@ export function cssTextColor(color: SrgbColor): string {
   return `rgba(${Math.round(color.red * 255)}, ${Math.round(color.green * 255)}, ${Math.round(color.blue * 255)}, ${color.alpha})`
 }
 
-export function cssTextBackground(
-  background: TextBackground | null,
-): string | undefined {
+export function cssTextBackground(background: TextBackground | null): string | undefined {
   return background ? cssTextColor(background.color) : undefined
 }
 
@@ -33,9 +35,7 @@ export function copyTextStyle(value: TextToolDefaults): TextToolDefaults {
   return JSON.parse(JSON.stringify(value)) as TextToolDefaults
 }
 
-export function spanStyleFromDefaults(
-  defaults: TextToolDefaults,
-): RichTextSpanStyle {
+export function spanStyleFromDefaults(defaults: TextToolDefaults): RichTextSpanStyle {
   return {
     fontFamily: defaults.fontFamily,
     fontSize: defaults.fontSize,
@@ -46,9 +46,7 @@ export function spanStyleFromDefaults(
   }
 }
 
-export function paragraphStyleFromDefaults(
-  defaults: TextToolDefaults,
-): RichTextParagraphStyle {
+export function paragraphStyleFromDefaults(defaults: TextToolDefaults): RichTextParagraphStyle {
   return { alignment: defaults.alignment, listKind: defaults.listKind }
 }
 
@@ -57,9 +55,7 @@ function common<T>(
   equal: (left: T, right: T) => boolean,
 ): T | null {
   const first = values[0]
-  return first !== undefined && values.every((value) => equal(first, value))
-    ? first
-    : null
+  return first !== undefined && values.every((value) => equal(first, value)) ? first : null
 }
 
 function toolbarSnapshot(editing: NonNullable<EditingText['value']>) {
@@ -68,21 +64,13 @@ function toolbarSnapshot(editing: NonNullable<EditingText['value']>) {
   const spans =
     range.start === range.end
       ? [state.typingStyle]
-      : state.content.spans.filter(
-          (span) => span.start < range.end && span.end > range.start,
-        )
+      : state.content.spans.filter((span) => span.start < range.end && span.end > range.start)
   const paragraphs =
     range.start === range.end
       ? [state.paragraphStyle]
-      : state.content.paragraphs.filter(
-          (paragraph) =>
-            paragraph.start < range.end && paragraph.end > range.start,
-        )
+      : state.content.paragraphs.filter((paragraph) => paragraph.start < range.end && paragraph.end > range.start)
   const sameColor = (left: SrgbColor, right: SrgbColor) =>
-    left.red === right.red &&
-    left.green === right.green &&
-    left.blue === right.blue &&
-    left.alpha === right.alpha
+    left.red === right.red && left.green === right.green && left.blue === right.blue && left.alpha === right.alpha
   return Object.freeze<TextToolbarSnapshot>({
     fontFamily: common(
       spans.map((span) => span.fontFamily),
@@ -192,10 +180,7 @@ export function createTextFormattingController(context: TextFormattingContext) {
   registerFormattingWatches(context)
   return {
     editorTextStyle: computed(
-      () =>
-        context.editingText.value?.controller.state.typingStyle ??
-        context.props.textDefaults ??
-        DEFAULT_TEXT_TOOL,
+      () => context.editingText.value?.controller.state.typingStyle ?? context.props.textDefaults ?? DEFAULT_TEXT_TOOL,
     ),
     emitTextEditing: () => emitTextEditing(context),
   }

@@ -1,4 +1,9 @@
-import { describe, expect, it, vi } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 
 import { FrameScheduler } from './scheduler'
 
@@ -21,9 +26,7 @@ describe('FrameScheduler', () => {
 
     expect(requestFrame).toHaveBeenCalledTimes(1)
     callback?.(12)
-    expect(render).toHaveBeenCalledWith(
-      expect.objectContaining({ reasons: ['scene', 'overlay'] }),
-    )
+    expect(render).toHaveBeenCalledWith(expect.objectContaining({ reasons: ['scene', 'overlay'] }))
     expect(requestFrame).toHaveBeenCalledTimes(1)
   })
 

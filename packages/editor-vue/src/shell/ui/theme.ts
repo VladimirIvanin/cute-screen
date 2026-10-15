@@ -15,8 +15,7 @@ export const cuteScreenThemeOverrides: GlobalThemeOverrides = {
     errorColor: '#c93f52',
     borderRadius: '8px',
     borderRadiusSmall: '6px',
-    fontFamily:
-      "Roboto, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    fontFamily: "Roboto, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
     fontSize: '13px',
   },
   Button: {

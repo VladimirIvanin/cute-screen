@@ -1,4 +1,7 @@
-import type { EditorDocumentV1, LayerNode } from '@cute-screen/editor-renderer'
+import type {
+  EditorDocumentV1,
+  LayerNode,
+} from '@cute-screen/editor-renderer'
 import type { CanvasViewportProps } from './contracts'
 import type { CanvasGesture } from './workspace-state'
 
@@ -29,17 +32,14 @@ export class SceneDocumentController {
         layers: document.layers.map((layer) =>
           layer.id === gesture.id && layer.kind === 'loupe'
             ? this.#context.moveLoupeSource(layer, gesture.current)
-            : layer,
-        ),
+            : layer),
       }
     }
     const preview = this.#context.previewLayer()
     if (preview?.kind === 'loupe') {
       return {
         ...document,
-        layers: document.layers.map((layer) =>
-          layer.id === preview.id ? preview : layer,
-        ),
+        layers: document.layers.map((layer) => (layer.id === preview.id ? preview : layer)),
       }
     }
     const hiddenLayerId = transientLayerId(gesture)

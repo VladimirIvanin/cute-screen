@@ -368,3 +368,13 @@ target, geometry, monitor snapshot, cursor и invocation source. Все ключ
 - SVG image layer декодируется как изображение; скрипты и внешние ресурсы не исполняются.
 - Clipboard и file dialogs вызываются только пользовательским действием.
 - Diagnostic bundle исключает содержимое снимков по умолчанию.
+
+## Tool UX и styles (ADR-048)
+
+DOM-free `styles` определяет creation policy и совместимые визуальные каналы;
+style clipboard не переносит идентичность, geometry и content. UI явно разделяет
+defaults, inline text и selection; selection changes собираются до одной
+`updateLayer`/`batch` command. Floating panel читает компактную UI projection и
+обновляет позицию при document/viewport/resize/scroll, скрываясь на canvas gesture.
+Scene graph не становится deeply reactive. Preferences v3 независимы от document
+v7 и command history, читают legacy drawing settings и хранят per-tool defaults.

@@ -1,9 +1,19 @@
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 import { CommandManager } from './commands'
 import type { RulerLayer } from './document/types'
-import { transformPoint, transformToMatrix } from './geometry'
-import { DocumentSpatialIndex, hitTestDocument } from './hit-test'
+import {
+  transformPoint,
+  transformToMatrix,
+} from './geometry'
+import {
+  DocumentSpatialIndex,
+  hitTestDocument,
+} from './hit-test'
 import {
   CANVAS,
   IDS,
@@ -25,15 +35,8 @@ describe('M08 command and lifecycle boundary', () => {
     for (const layer of [censor, spotlight, ruler, loupe]) {
       manager.execute({ type: 'addLayer', layer })
     }
-    expect(manager.snapshot.document.layers.slice(1)).toEqual([
-      censor,
-      spotlight,
-      ruler,
-      loupe,
-    ])
-    expect(JSON.stringify(manager.snapshot.document)).not.toMatch(
-      /selection|selected/iu,
-    )
+    expect(manager.snapshot.document.layers.slice(1)).toEqual([censor, spotlight, ruler, loupe])
+    expect(JSON.stringify(manager.snapshot.document)).not.toMatch(/selection|selected/iu)
 
     const updated = {
       ...censor,
@@ -91,15 +94,9 @@ describe('M08 command and lifecycle boundary', () => {
       },
     ]
     expect(ruler.localBounds.width).toBeGreaterThan(60)
-    expect(
-      hitTestDocument(withLayers([ruler]), { x: 104, y: 106 }),
-    ).toMatchObject({ nodeId: IDS.ruler })
+    expect(hitTestDocument(withLayers([ruler]), { x: 104, y: 106 })).toMatchObject({ nodeId: IDS.ruler })
 
-    const styled = rebaseRulerLayer(
-      ruler,
-      { ...ruler.payload, thickness: 12, fontSize: 48 },
-      baseDocument().canvas,
-    )
+    const styled = rebaseRulerLayer(ruler, { ...ruler.payload, thickness: 12, fontSize: 48 }, baseDocument().canvas)
     const afterWorld = [
       {
         x: styled.transform.translateX + styled.payload.start.x,
@@ -113,9 +110,7 @@ describe('M08 command and lifecycle boundary', () => {
     expect(afterWorld).toEqual(beforeWorld)
     expect(styled.localBounds.width).toBeGreaterThan(ruler.localBounds.width)
     expect(styled.localBounds.height).toBeGreaterThan(ruler.localBounds.height)
-    expect(
-      hitTestDocument(withLayers([styled]), { x: 104, y: 120 }),
-    ).toMatchObject({ nodeId: IDS.ruler, part: 'fill' })
+    expect(hitTestDocument(withLayers([styled]), { x: 104, y: 120 })).toMatchObject({ nodeId: IDS.ruler, part: 'fill' })
 
     const manager = new CommandManager(withLayers([ruler]))
     manager.execute({ type: 'updateLayer', before: ruler, after: styled })
@@ -150,41 +145,19 @@ describe('M08 command and lifecycle boundary', () => {
         },
       } satisfies RulerLayer
       const expectedWorldEndpoints = [
-        transformPoint(
-          transformToMatrix(transformed.transform),
-          transformed.payload.start,
-        ),
-        transformPoint(
-          transformToMatrix(transformed.transform),
-          transformed.payload.end,
-        ),
+        transformPoint(transformToMatrix(transformed.transform), transformed.payload.start),
+        transformPoint(transformToMatrix(transformed.transform), transformed.payload.end),
       ] as const
       expect(rulerVisualBoundsAreConservative(transformed, CANVAS)).toBe(false)
 
-      const canonical = rebaseRulerLayer(
-        transformed,
-        transformed.payload,
-        CANVAS,
-      )
+      const canonical = rebaseRulerLayer(transformed, transformed.payload, CANVAS)
       const actualWorldEndpoints = [
-        transformPoint(
-          transformToMatrix(canonical.transform),
-          canonical.payload.start,
-        ),
-        transformPoint(
-          transformToMatrix(canonical.transform),
-          canonical.payload.end,
-        ),
+        transformPoint(transformToMatrix(canonical.transform), canonical.payload.start),
+        transformPoint(transformToMatrix(canonical.transform), canonical.payload.end),
       ] as const
       for (const index of [0, 1] as const) {
-        expect(actualWorldEndpoints[index].x).toBeCloseTo(
-          expectedWorldEndpoints[index].x,
-          10,
-        )
-        expect(actualWorldEndpoints[index].y).toBeCloseTo(
-          expectedWorldEndpoints[index].y,
-          10,
-        )
+        expect(actualWorldEndpoints[index].x).toBeCloseTo(expectedWorldEndpoints[index].x, 10)
+        expect(actualWorldEndpoints[index].y).toBeCloseTo(expectedWorldEndpoints[index].y, 10)
       }
       expect(canonical.transform).toMatchObject({ rotation, scaleX, scaleY })
       expect(rulerVisualBoundsAreConservative(canonical, CANVAS)).toBe(true)
@@ -192,13 +165,9 @@ describe('M08 command and lifecycle boundary', () => {
       const visual = rulerVisualGeometry(canonical, canonical.payload, CANVAS)
       for (const point of visual.badgePolygon) {
         expect(point.x).toBeGreaterThanOrEqual(canonical.localBounds.x - 1e-9)
-        expect(point.x).toBeLessThanOrEqual(
-          canonical.localBounds.x + canonical.localBounds.width + 1e-9,
-        )
+        expect(point.x).toBeLessThanOrEqual(canonical.localBounds.x + canonical.localBounds.width + 1e-9)
         expect(point.y).toBeGreaterThanOrEqual(canonical.localBounds.y - 1e-9)
-        expect(point.y).toBeLessThanOrEqual(
-          canonical.localBounds.y + canonical.localBounds.height + 1e-9,
-        )
+        expect(point.y).toBeLessThanOrEqual(canonical.localBounds.y + canonical.localBounds.height + 1e-9)
       }
 
       const [start, end] = actualWorldEndpoints

@@ -1,4 +1,7 @@
-import { collectExtras, readJsonObject } from '../json'
+import {
+  collectExtras,
+  readJsonObject,
+} from '../json'
 import {
   type CalloutPayload,
   type EmojiPayload,
@@ -6,7 +9,11 @@ import {
   type NumberedMarkerPayload,
   type SrgbColor,
 } from '../types'
-import { parsePointPayload, parseSrgbColor, parseStroke } from './paint'
+import {
+  parsePointPayload,
+  parseSrgbColor,
+  parseStroke,
+} from './paint'
 import {
   INLINE_IMAGE_FIELDS,
   assertOnlyFields,
@@ -19,7 +26,10 @@ import {
   readPositiveNumber,
   readSha256,
 } from './primitives'
-import { parseRichTextContent, parseTextBackground } from './text'
+import {
+  parseRichTextContent,
+  parseTextBackground,
+} from './text'
 
 const MAX_IMAGE_RADIUS = 16_384
 
@@ -43,10 +53,7 @@ export function parseNumberedMarkerPayload(
     label: parseRichTextContent(input.label, `${field}.label`),
     badge: Object.freeze({
       shape: badge.shape as NumberedMarkerPayload['badge']['shape'],
-      color: parseSrgbColor(
-        badge.color,
-        `${field}.badge.color`,
-      ) as unknown as SrgbColor,
+      color: parseSrgbColor(badge.color, `${field}.badge.color`) as unknown as SrgbColor,
     }),
   })
 }
@@ -86,52 +93,29 @@ export function parseCalloutPayload(
 ): CalloutPayload {
   const input = readJsonObject(value, field)
   if (Object.hasOwn(input, 'bubble') || Object.hasOwn(input, 'tailAnchor')) {
-    throw new Error(
-      `${field} legacy callout bubble/tail fields are removed in v7`,
-    )
+    throw new Error(`${field} legacy callout bubble/tail fields are removed in v7`)
   }
   assertOnlyFields(
     input,
-    [
-      'content',
-      'background',
-      'target',
-      'label',
-      'route',
-      'stroke',
-      'targetMarker',
-      'labelMarker',
-    ],
+    ['content', 'background', 'target', 'label', 'route', 'stroke', 'targetMarker', 'labelMarker'],
     field,
   )
   return Object.freeze({
     content: parseRichTextContent(input.content, `${field}.content`),
-    background:
-      input.background === null
-        ? null
-        : parseTextBackground(input.background, `${field}.background`),
-    target: parsePointPayload(
-      input.target,
-      `${field}.target`,
-    ) as CalloutPayload['target'],
-    label: parsePointPayload(
-      input.label,
-      `${field}.label`,
-    ) as CalloutPayload['label'],
+    background: input.background === null ? null : parseTextBackground(input.background, `${field}.background`),
+    target: parsePointPayload(input.target, `${field}.target`) as CalloutPayload['target'],
+    label: parsePointPayload(input.label, `${field}.label`) as CalloutPayload['label'],
     route: parseCalloutRoute(input.route, `${field}.route`),
-    stroke: parseStroke(
-      input.stroke,
-      `${field}.stroke`,
-    ) as CalloutPayload['stroke'],
-    targetMarker: parseCalloutMarker(
-      input.targetMarker,
-      `${field}.targetMarker`,
-    ),
+    stroke: parseStroke(input.stroke, `${field}.stroke`) as CalloutPayload['stroke'],
+    targetMarker: parseCalloutMarker(input.targetMarker, `${field}.targetMarker`),
     labelMarker: parseCalloutMarker(input.labelMarker, `${field}.labelMarker`),
   })
 }
 
-export function parseEmojiPayload(value: unknown, field: string): EmojiPayload {
+export function parseEmojiPayload(
+  value: unknown,
+  field: string,
+): EmojiPayload {
   const input = readJsonObject(value, field)
   const grapheme = readNonEmptyString(input.grapheme, `${field}.grapheme`)
   if ([...grapheme].length > 16) throw new Error(`${field}.grapheme is invalid`)
@@ -157,8 +141,7 @@ export function parseImagePayload(
   if (INLINE_IMAGE_FIELDS.some((key) => Object.hasOwn(input, key))) {
     throw new Error(`${field} must reference immutable image bytes by hash`)
   }
-  if (!isImageFormat(input.format))
-    throw new Error(`${field}.format is invalid`)
+  if (!isImageFormat(input.format)) throw new Error(`${field}.format is invalid`)
   if (input.orientationApplied !== true) {
     throw new Error(`${field}.orientationApplied must be true`)
   }
@@ -184,14 +167,8 @@ export function parseImagePayload(
   return Object.freeze({
     ...(extras ?? {}),
     blobHash: readSha256(input.blobHash, `${field}.blobHash`),
-    intrinsicWidth: readPositiveNumber(
-      input.intrinsicWidth,
-      `${field}.intrinsicWidth`,
-    ),
-    intrinsicHeight: readPositiveNumber(
-      input.intrinsicHeight,
-      `${field}.intrinsicHeight`,
-    ),
+    intrinsicWidth: readPositiveNumber(input.intrinsicWidth, `${field}.intrinsicWidth`),
+    intrinsicHeight: readPositiveNumber(input.intrinsicHeight, `${field}.intrinsicHeight`),
     format: input.format,
     orientationApplied: true,
     color: colorToJson(parseColor(input.color, `${field}.color`)),
@@ -199,15 +176,8 @@ export function parseImagePayload(
     border:
       input.border === null
         ? null
-        : (parseStroke(input.border, `${field}.border`) as Exclude<
-            ImageLayerPayload['border'],
-            undefined
-          >),
-    radius: parseBoundedNonNegative(
-      input.radius,
-      `${field}.radius`,
-      MAX_IMAGE_RADIUS,
-    ),
+        : (parseStroke(input.border, `${field}.border`) as Exclude<ImageLayerPayload['border'], undefined>),
+    radius: parseBoundedNonNegative(input.radius, `${field}.radius`, MAX_IMAGE_RADIUS),
     crop: null,
     mask: null,
   })

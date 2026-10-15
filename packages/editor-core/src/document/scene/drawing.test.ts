@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 import { createDocumentRenderScene } from './index'
 import { documentFixture as document } from './test-kit'

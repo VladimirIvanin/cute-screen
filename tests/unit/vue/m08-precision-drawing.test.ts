@@ -1,5 +1,15 @@
-import { fireEvent, render } from '@testing-library/vue'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  fireEvent,
+  render,
+} from '@testing-library/vue'
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 import CanvasViewport from '../../../packages/editor-vue/src/shell/components/CanvasViewport.vue'
 import {
   documentFixture,
@@ -15,9 +25,7 @@ import {
 beforeEach(() => {
   window.localStorage.clear()
   contextFixture.current = canvasContext()
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
-    contextFixture.current,
-  )
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(contextFixture.current)
 })
 
 afterEach(() => {
@@ -32,9 +40,7 @@ describe('M08 manual precision tools', () => {
     ['loupe', 'loupe'],
   ] as const)('commits one %s layer only on pointer-up', async (tool, kind) => {
     vi.stubGlobal('crypto', {
-      randomUUID: vi.fn(
-        () => `019c1f62-058e-7000-8000-00000000080${kind.length}`,
-      ),
+      randomUUID: vi.fn(() => `019c1f62-058e-7000-8000-00000000080${kind.length}`),
     })
     const { scene, emitted } = mountViewport(tool)
 
@@ -52,8 +58,7 @@ describe('M08 manual precision tools', () => {
     await fireEvent.pointerUp(scene, { pointerId: 2, clientX: 76, clientY: 58 })
 
     expect(emitted().addLayer).toHaveLength(1)
-    const additions = emitted()
-      .addLayer as unknown as readonly (readonly unknown[])[]
+    const additions = emitted().addLayer as unknown as readonly (readonly unknown[])[]
     const layer = additions[0]?.[0]
     expect(layer).toMatchObject({ kind })
     if (kind === 'censor') {
@@ -98,30 +103,12 @@ describe('M08 manual precision tools', () => {
 
   it('shows source marker and zoom/size chips only for a selected loupe', async () => {
     const loupe = precisionLayerFixture('loupe')
-    mountViewportDocument(
-      'select',
-      { ...documentFixture(), layers: [loupe] },
-      precisionDefaults,
-      loupe.id,
-    )
+    mountViewportDocument('select', { ...documentFixture(), layers: [loupe] }, precisionDefaults, loupe.id)
 
     await vi.waitFor(() => {
-      expect(contextFixture.current.strokeRect).toHaveBeenCalledWith(
-        18,
-        18,
-        8,
-        8,
-      )
-      expect(contextFixture.current.fillText).toHaveBeenCalledWith(
-        '2×',
-        expect.any(Number),
-        expect.any(Number),
-      )
-      expect(contextFixture.current.fillText).toHaveBeenCalledWith(
-        '48',
-        expect.any(Number),
-        expect.any(Number),
-      )
+      expect(contextFixture.current.strokeRect).toHaveBeenCalledWith(18, 18, 8, 8)
+      expect(contextFixture.current.fillText).toHaveBeenCalledWith('2×', expect.any(Number), expect.any(Number))
+      expect(contextFixture.current.fillText).toHaveBeenCalledWith('48', expect.any(Number), expect.any(Number))
     })
   })
 
@@ -177,11 +164,7 @@ describe('M08 manual precision tools', () => {
       ...precisionDefaults,
       censor: { ...precisionDefaults.censor, region: 'freeform' as const },
     }
-    const { scene, emitted } = mountViewportDocument(
-      'censor',
-      documentFixture(),
-      defaults,
-    )
+    const { scene, emitted } = mountViewportDocument('censor', documentFixture(), defaults)
 
     await fireEvent.pointerDown(scene, {
       pointerId: 20,
@@ -205,8 +188,7 @@ describe('M08 manual precision tools', () => {
       clientY: 14,
     })
 
-    const additions = emitted()
-      .addLayer as unknown as readonly (readonly unknown[])[]
+    const additions = emitted().addLayer as unknown as readonly (readonly unknown[])[]
     expect(additions[0]?.[0]).toMatchObject({
       kind: 'censor',
       payload: {
@@ -244,8 +226,7 @@ describe('M08 manual precision tools', () => {
       clientX: 12,
       clientY: 14,
     })
-    const errors = view.emitted()
-      .colorSampleError as unknown as readonly (readonly unknown[])[]
+    const errors = view.emitted().colorSampleError as unknown as readonly (readonly unknown[])[]
     expect(errors[0]?.[0]).toMatch(/loading|ready/i)
     await fireEvent.pointerDown(scene, {
       pointerId: 4,

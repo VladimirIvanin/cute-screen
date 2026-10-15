@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 import { runEditorStartup } from '../../../apps/desktop/src/editor-startup'
 
@@ -27,12 +31,7 @@ describe('desktop startup mount order', () => {
     })
 
     expect(order[0]).toBe('repositoryOpenLast')
-    expect(order).toEqual([
-      'repositoryOpenLast',
-      'listSystemFonts',
-      'platformCapabilities',
-      'lifecycleGuards',
-    ])
+    expect(order).toEqual(['repositoryOpenLast', 'listSystemFonts', 'platformCapabilities', 'lifecycleGuards'])
     resolveFonts?.()
     await fontsPending
   })

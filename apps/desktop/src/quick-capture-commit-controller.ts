@@ -4,7 +4,10 @@ import {
   type DocumentSessionController,
   type QuickCaptureDraftV1,
 } from '@cute-screen/editor-vue'
-import type { Ref, ShallowRef } from 'vue'
+import type {
+  Ref,
+  ShallowRef,
+} from 'vue'
 import { tauriDesktopBridge } from './desktop-bridge'
 import { normalizeQuickCaptureSelection } from './quick-capture-actions'
 import type { QuickRect } from './quick-capture-layout'
@@ -47,12 +50,14 @@ export class QuickCaptureCommitController {
     preparedSelection?: QuickRect,
   ): Promise<void> {
     const { draft, session, coordinator, materialized } = this.#ports
-    if (materialized.value || !draft.value || !session.value) return
+    if (
+      materialized.value ||
+      !draft.value ||
+      !session.value
+    ) return
     const selection = preparedSelection ?? this.physicalSelection()
     const png = preparedPng ?? (await this.resultPng(selection))
-    const sourceHash = hexDigest(
-      await crypto.subtle.digest('SHA-256', Uint8Array.from(png).buffer),
-    )
+    const sourceHash = hexDigest(await crypto.subtle.digest('SHA-256', Uint8Array.from(png).buffer))
     const document = materializeQuickCaptureDocument(
       { ...session.value.snapshot.core.document, crop: selection },
       {
@@ -69,13 +74,7 @@ export class QuickCaptureCommitController {
         updatedAt: new Date().toISOString(),
       },
     )
-    await coordinator.commit(
-      draft.value.draftId,
-      png,
-      JSON.stringify(document),
-      completion,
-      selection,
-    )
+    await coordinator.commit(draft.value.draftId, png, JSON.stringify(document), completion, selection)
     materialized.value = true
   }
 
@@ -83,8 +82,7 @@ export class QuickCaptureCommitController {
     const { draft, materialized } = this.#ports
     if (!draft.value || materialized.value) return
     try {
-      materialized.value =
-        (await tauriDesktopBridge.quickCaptureGetActive()) === null
+      materialized.value = (await tauriDesktopBridge.quickCaptureGetActive()) === null
     } catch (diagnosticError) {
       console.warn('Quick capture materialization probe failed', {
         draftId: draft.value.draftId,
@@ -93,9 +91,7 @@ export class QuickCaptureCommitController {
     }
   }
 
-  async resultPng(
-    selection: QuickRect = this.physicalSelection(),
-  ): Promise<Uint8Array> {
+  async resultPng(selection: QuickRect = this.physicalSelection()): Promise<Uint8Array> {
     const hosts = this.#ports.hosts.value
     if (!hosts) throw new Error('Rendered capture is not ready')
     const output = document.createElement('canvas')
@@ -120,17 +116,10 @@ export class QuickCaptureCommitController {
 }
 
 function hexDigest(bytes: ArrayBuffer): string {
-  return Array.from(new Uint8Array(bytes), (value) =>
-    value.toString(16).padStart(2, '0'),
-  ).join('')
+  return Array.from(new Uint8Array(bytes), (value) => value.toString(16).padStart(2, '0')).join('')
 }
 
 function encodePng(canvas: HTMLCanvasElement): Promise<Blob> {
   return new Promise((resolve, reject) =>
-    canvas.toBlob(
-      (value) =>
-        value ? resolve(value) : reject(new Error('PNG encoding failed')),
-      'image/png',
-    ),
-  )
+    canvas.toBlob((value) => (value ? resolve(value) : reject(new Error('PNG encoding failed'))), 'image/png'))
 }

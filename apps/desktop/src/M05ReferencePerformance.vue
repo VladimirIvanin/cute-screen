@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import {
+  onBeforeUnmount,
+  onMounted,
+  ref,
+} from 'vue'
 
 import {
   Canvas2DRenderer,
@@ -120,7 +124,10 @@ const scene = createRenderSceneSnapshot({
   }),
 })
 
-function percentile(samples: readonly number[], quantile: number): number {
+function percentile(
+  samples: readonly number[],
+  quantile: number,
+): number {
   const ordered = [...samples].sort((left, right) => left - right)
   return ordered[Math.max(0, Math.ceil(quantile * ordered.length) - 1)]!
 }
@@ -137,15 +144,11 @@ async function loadReferenceImage(): Promise<HTMLImageElement> {
 }
 
 async function runReferenceBenchmark(): Promise<ReferenceReport> {
-  if (!runtime || !sceneCanvas.value)
-    throw new Error('Reference runtime is not ready')
+  if (!runtime || !sceneCanvas.value) throw new Error('Reference runtime is not ready')
   const gl = sceneCanvas.value.getContext('webgl2')
   if (!gl) throw new Error('WebGL2 is unavailable on reference Tauri canvas')
-  const extension = gl.getExtension(
-    'EXT_disjoint_timer_query_webgl2',
-  ) as GpuTimerExtension | null
-  if (!extension)
-    throw new Error('EXT_disjoint_timer_query_webgl2 is unavailable')
+  const extension = gl.getExtension('EXT_disjoint_timer_query_webgl2') as GpuTimerExtension | null
+  if (!extension) throw new Error('EXT_disjoint_timer_query_webgl2 is unavailable')
   const debug = gl.getExtension('WEBGL_debug_renderer_info') as {
     readonly UNMASKED_RENDERER_WEBGL: number
   } | null
@@ -219,8 +222,7 @@ async function runReferenceBenchmark(): Promise<ReferenceReport> {
     return performance.now() - started
   })
   return {
-    fixtureSha256:
-      'b4c84b61cc04d893e1523f81bc56fff1d127ca702c0c8220bf0224cd9915fa98',
+    fixtureSha256: 'b4c84b61cc04d893e1523f81bc56fff1d127ca702c0c8220bf0224cd9915fa98',
     backend: 'canvaskit',
     renderer,
     userAgent: navigator.userAgent,
@@ -248,11 +250,8 @@ async function runReferenceBenchmark(): Promise<ReferenceReport> {
   }
 }
 
-async function createRuntime(
-  frameProbe?: FrameProbe,
-): Promise<RendererRuntime> {
-  if (!sceneCanvas.value || !overlayCanvas.value)
-    throw new Error('Canvas stack is missing')
+async function createRuntime(frameProbe?: FrameProbe): Promise<RendererRuntime> {
+  if (!sceneCanvas.value || !overlayCanvas.value) throw new Error('Canvas stack is missing')
   const next = new RendererRuntime({
     stack: {
       scene: sceneCanvas.value,
@@ -260,8 +259,7 @@ async function createRuntime(
       dpr: window.devicePixelRatio,
       correlationId: 'm05-reference-performance',
     },
-    createPrimary: async () =>
-      new CanvasKitRenderer(await loadBundledCanvasKit()),
+    createPrimary: async () => new CanvasKitRenderer(await loadBundledCanvasKit()),
     createFallback: () => new Canvas2DRenderer(),
     createReplacementSceneCanvas: () => {
       throw new Error('CanvasKit fallback is forbidden on the reference runner')
@@ -273,8 +271,7 @@ async function createRuntime(
     },
   })
   await next.initialize()
-  if (next.state.backend !== 'canvaskit')
-    throw new Error('CanvasKit fallback is forbidden')
+  if (next.state.backend !== 'canvaskit') throw new Error('CanvasKit fallback is forbidden')
   return next
 }
 
@@ -297,8 +294,16 @@ onBeforeUnmount(() => {
 
 <template>
   <main class="reference-perf" aria-label="M05 reference performance harness">
-    <canvas ref="sceneCanvas" width="3840" height="2160"></canvas>
-    <canvas ref="overlayCanvas" width="1600" height="1000"></canvas>
+    <canvas
+      ref="sceneCanvas"
+      width="3840"
+      height="2160"
+    ></canvas>
+    <canvas
+      ref="overlayCanvas"
+      width="1600"
+      height="1000"
+    ></canvas>
     <p role="status">{{ status }}</p>
   </main>
 </template>

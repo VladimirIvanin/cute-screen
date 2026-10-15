@@ -38,8 +38,7 @@ export function precisionNodes(
                 Object.freeze({
                   x: layer.transform.translateX + point.x,
                   y: layer.transform.translateY + point.y,
-                }),
-              ),
+                })),
             ),
           })
     return [

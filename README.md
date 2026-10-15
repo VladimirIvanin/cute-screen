@@ -34,6 +34,13 @@ Windows development requires the Microsoft C++ Build Tools and WebView2. macOS d
 
 ## Stable commands
 
+Format sources with `pnpm format` and verify them with `pnpm format:check`.
+`pnpm check` includes the formatting gate. ESLint Stylistic formats JS/TS/Vue;
+Prettier handles CSS, JSON, YAML, Markdown and HTML. VS Code recommends both
+extensions and uses the matching formatter on save. Width is 120; named imports,
+function declarations and interface base lists wrap by structure, while short
+calls stay compact. Format Rust with `cargo fmt --all`.
+
 ```text
 pnpm check
 pnpm test

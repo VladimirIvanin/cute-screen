@@ -1,6 +1,10 @@
 import path from 'node:path'
 
-import { $, browser, expect } from '@wdio/globals'
+import {
+  $,
+  browser,
+  expect,
+} from '@wdio/globals'
 import { finishAreaQuickCaptureInEditor } from '../quick-capture'
 
 describe('M08 eyedropper native clipboard in a real Tauri webview', () => {
@@ -13,9 +17,7 @@ describe('M08 eyedropper native clipboard in a real Tauri webview', () => {
     await $('button[aria-label="Zoom in"]').click()
     await $('button[aria-label="Eyedropper"]').click()
     await browser.keys('Enter')
-    await expect($('.cs-eyedropper-feedback')).toHaveText(
-      'Colour selected: #7F7F7F',
-    )
+    await expect($('.cs-eyedropper-feedback')).toHaveText('Colour selected: #7F7F7F')
     await expect($('[aria-label="Colour swatch #7F7F7F"]')).toExist()
 
     const clipboardText = await browser.execute(async () => {

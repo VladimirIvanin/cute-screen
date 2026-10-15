@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { hitTestDocument } from '@cute-screen/editor-renderer'
 import { UiIcon } from '../icon'
 import TextFormattingToolbar from './TextFormattingToolbar.vue'
 import ArrowFormattingToolbar from './ArrowFormattingToolbar.vue'
@@ -56,6 +57,24 @@ const {
   setCropPresetValue,
   refitCanvas,
 } = useCanvasWorkspace(props, emit)
+function onContextMenu(event: MouseEvent): void {
+  if (editingText.value || props.quickSelectionMode) return
+  event.preventDefault()
+  const canvas = scene.value
+  if (!canvas || !props.document) return
+  const rect = canvas.getBoundingClientRect()
+  const scale = (props.zoom ?? 100) / 100
+  const point = {
+    x: (event.clientX - rect.left) / scale + (props.document.crop?.x ?? 0),
+    y: (event.clientY - rect.top) / scale + (props.document.crop?.y ?? 0),
+  }
+  const hit = hitTestDocument(props.document, point)
+  emit('contextMenu', {
+    clientX: event.clientX,
+    clientY: event.clientY,
+    ...(hit ? { layerId: hit.nodeId } : {}),
+  })
+}
 defineExpose({
   applyCropDraft,
   cancelCropDraft,
@@ -78,9 +97,9 @@ defineExpose({
           :style="
             viewportOutputBounds
               ? {
-                  width: `${viewportOutputBounds.width * ((zoom ?? 100) / 100)}px`,
-                  height: `${viewportOutputBounds.height * ((zoom ?? 100) / 100)}px`,
-                }
+                width: `${viewportOutputBounds.width * ((zoom ?? 100) / 100)}px`,
+                height: `${viewportOutputBounds.height * ((zoom ?? 100) / 100)}px`,
+              }
               : undefined
           "
         >
@@ -100,16 +119,17 @@ defineExpose({
             :aria-label="t('sceneCanvas')"
             :tabindex="
               sampling ||
-              quickSelectionMode ||
-              activeTool === 'crop' ||
-              activeTool === 'censor' ||
-              activeTool === 'spotlight' ||
-              activeTool === 'ruler' ||
-              activeTool === 'loupe'
+                quickSelectionMode ||
+                activeTool === 'crop' ||
+                activeTool === 'censor' ||
+                activeTool === 'spotlight' ||
+                activeTool === 'ruler' ||
+                activeTool === 'loupe'
                 ? 0
                 : -1
             "
             @pointerdown="onPointerDown"
+            @contextmenu="onContextMenu"
             @pointermove="onPointerMove"
             @pointerup="finishGesture"
             @pointercancel="cancelGesture"
@@ -124,10 +144,10 @@ defineExpose({
             :style="
               floatingToolbarLayout
                 ? {
-                    left: `${floatingToolbarLayout.left}px`,
-                    top: `${floatingToolbarLayout.top}px`,
-                    transform: 'translateX(-50%)',
-                  }
+                  left: `${floatingToolbarLayout.left}px`,
+                  top: `${floatingToolbarLayout.top}px`,
+                  transform: 'translateX(-50%)',
+                }
                 : { visibility: 'hidden' }
             "
             :data-placement="floatingToolbarLayout?.placement"
@@ -148,10 +168,10 @@ defineExpose({
             :style="
               floatingArrowToolbarLayout
                 ? {
-                    left: `${floatingArrowToolbarLayout.left}px`,
-                    top: `${floatingArrowToolbarLayout.top}px`,
-                    transform: 'translateX(-50%)',
-                  }
+                  left: `${floatingArrowToolbarLayout.left}px`,
+                  top: `${floatingArrowToolbarLayout.top}px`,
+                  transform: 'translateX(-50%)',
+                }
                 : { visibility: 'hidden' }
             "
             :data-placement="floatingArrowToolbarLayout?.placement"
@@ -182,9 +202,7 @@ defineExpose({
               fontFamily: editorTextStyle.fontFamily,
               fontWeight: String(editorTextStyle.weight),
               fontStyle: editorTextStyle.italic ? 'italic' : 'normal',
-              textDecoration: editorTextStyle.strikethrough
-                ? 'line-through'
-                : 'none',
+              textDecoration: editorTextStyle.strikethrough ? 'line-through' : 'none',
               color: cssTextColor(editorTextStyle.color),
               backgroundColor: cssTextBackground(editingText.background),
               borderRadius: editingText.background
@@ -213,9 +231,17 @@ defineExpose({
             class="cs-canvas cs-canvas-overlay"
             :aria-label="t('interactionOverlay')"
           ></canvas>
-          <section v-if="rendererError" class="cs-empty-state" role="alert">
+          <section
+            v-if="rendererError"
+            class="cs-empty-state"
+            role="alert"
+          >
             <h1>{{ rendererError }}</h1>
-            <button type="button" class="cs-button" @click="retryRender">
+            <button
+              type="button"
+              class="cs-button"
+              @click="retryRender"
+            >
               {{ t('retry') }}
             </button>
           </section>
@@ -249,11 +275,19 @@ defineExpose({
             role="alert"
           >
             <h1>{{ documentState.message }}</h1>
-            <button type="button" class="cs-button" @click="emit('retry')">
+            <button
+              type="button"
+              class="cs-button"
+              @click="emit('retry')"
+            >
               {{ t('retry') }}
             </button>
           </section>
-          <p v-else class="cs-canvas-ready" aria-live="polite">
+          <p
+            v-else
+            class="cs-canvas-ready"
+            aria-live="polite"
+          >
             {{ documentState.title }} · {{ documentState.dimensions }}
           </p>
         </div>
@@ -277,10 +311,7 @@ defineExpose({
       </span>
       <span class="cs-eyedropper-loupe-details">
         <span class="cs-eyedropper-loupe-value">
-          <span
-            ref="eyedropperSwatch"
-            class="cs-eyedropper-loupe-swatch"
-          ></span>
+          <span ref="eyedropperSwatch" class="cs-eyedropper-loupe-swatch"></span>
           <span ref="eyedropperHex" class="cs-eyedropper-loupe-hex">—</span>
         </span>
         <span ref="eyedropperHint" class="cs-eyedropper-loupe-hint">

@@ -1,4 +1,8 @@
-import type { Point, SrgbColor, TextLayer } from '../../document/types'
+import type {
+  Point,
+  SrgbColor,
+  TextLayer,
+} from '../../document/types'
 import {
   DEFAULT_TEXT_FONT_FAMILY,
   DEFAULT_TEXT_FONT_SIZE,
@@ -17,8 +21,11 @@ function textFontFamily(value: string | undefined): string {
 
 function textFontSize(value: number | undefined): number {
   const size = value ?? DEFAULT_TEXT_FONT_SIZE
-  if (!Number.isFinite(size) || size < 8 || size > 256)
-    throw new Error('text font size must be between 8 and 256')
+  if (
+    !Number.isFinite(size) ||
+    size < 8 ||
+    size > 256
+  ) throw new Error('text font size must be between 8 and 256')
   return size
 }
 
@@ -35,7 +42,11 @@ function textWeight(value: number | undefined) {
 }
 
 function assertFixedWidth(value: number | undefined): void {
-  if (value !== undefined && (!Number.isFinite(value) || value <= 0))
+  if (
+    value !== undefined &&
+    (!Number.isFinite(value) ||
+      value <= 0)
+  )
     throw new Error('fixed-width text requires a positive finite width')
 }
 
@@ -66,8 +77,7 @@ export function createTextLayer(input: {
   const fontSize = textFontSize(input.fontSize)
   const weight = textWeight(input.weight)
   if (input.background) assertTextBackground(input.background)
-  const width =
-    input.fixedWidth ?? Math.max(fontSize, input.text.length * fontSize * 0.6)
+  const width = input.fixedWidth ?? Math.max(fontSize, input.text.length * fontSize * 0.6)
   return Object.freeze({
     id: input.id,
     kind: 'text',
@@ -90,11 +100,8 @@ export function createTextLayer(input: {
     payload: {
       content: {
         text: input.text,
-        wrap: (input.fixedWidth === undefined ? 'autoSize' : 'fixedWidth') as
-          'autoSize' | 'fixedWidth',
-        ...(input.fixedWidth === undefined
-          ? {}
-          : { fixedWidth: input.fixedWidth }),
+        wrap: (input.fixedWidth === undefined ? 'autoSize' : 'fixedWidth') as 'autoSize' | 'fixedWidth',
+        ...(input.fixedWidth === undefined ? {} : { fixedWidth: input.fixedWidth }),
         spans: [
           {
             start: 0,
@@ -120,10 +127,7 @@ export function createTextLayer(input: {
         input.background == null
           ? null
           : {
-              color: solidColor(
-                input.background.color,
-                'text background color',
-              ),
+              color: solidColor(input.background.color, 'text background color'),
               padding: input.background.padding,
               radius: input.background.radius,
             },

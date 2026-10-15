@@ -26,10 +26,7 @@ function normalizeAxis(
     throw new RangeError('quick capture selection is invalid')
   }
   const normalizedStart = Math.min(Math.max(Math.round(start), 0), limit - 1)
-  const normalizedEnd = Math.min(
-    Math.max(Math.round(start + length), normalizedStart + 1),
-    limit,
-  )
+  const normalizedEnd = Math.min(Math.max(Math.round(start + length), normalizedStart + 1), limit)
   return [normalizedStart, normalizedEnd - normalizedStart]
 }
 
@@ -51,9 +48,7 @@ export async function cancelQuickCaptureAction({
 }: CancelQuickCaptureActionOptions): Promise<void> {
   let cancellationAttempt: Promise<unknown>
   try {
-    cancellationAttempt = draftId
-      ? Promise.resolve(cancelDraft(draftId))
-      : Promise.resolve()
+    cancellationAttempt = draftId ? Promise.resolve(cancelDraft(draftId)) : Promise.resolve()
   } catch (cause) {
     cancellationAttempt = Promise.reject(cause)
   }
@@ -65,10 +60,7 @@ export async function cancelQuickCaptureAction({
     closeAttempt = Promise.reject(cause)
   }
 
-  const [cancellation, close] = await Promise.allSettled([
-    cancellationAttempt,
-    closeAttempt,
-  ])
+  const [cancellation, close] = await Promise.allSettled([cancellationAttempt, closeAttempt])
   if (cancellation.status === 'rejected' && close.status === 'rejected') {
     throw new AggregateError(
       [cancellation.reason, close.reason],

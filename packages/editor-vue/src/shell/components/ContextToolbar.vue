@@ -7,6 +7,19 @@ import DeferredColorPicker from '../ui/DeferredColorPicker.vue'
 import DeferredSlider from '../ui/DeferredSlider.vue'
 import UiSelect from '../ui/UiSelect.vue'
 import TextFormattingToolbar from './TextFormattingToolbar.vue'
+import ArrowFormattingToolbar from './ArrowFormattingToolbar.vue'
+import { ref } from 'vue'
+const expanded = ref(false)
+function controlsFor(schema: ContextToolbarSchema) {
+  const order = schema.icon === 'ruler' ? ['rulerColor', 'rulerThickness', 'rulerFontSize', 'rulerUnit'] : []
+  const controls = order.length
+    ? [...schema.controls].sort((a, b) => {
+        const rank = (id: string) => (order.includes(id) ? order.indexOf(id) : order.length)
+        return rank(a.id) - rank(b.id)
+      })
+    : schema.controls
+  return expanded.value ? controls : controls.slice(0, 4)
+}
 defineProps<{
   schema?: ContextToolbarSchema | undefined
   label: string
@@ -21,18 +34,14 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <section
+  <fieldset
     v-if="schema"
+    :disabled="schema.disabled ?? false"
+    :title="schema.disabledReason"
     class="cs-context-toolbar"
     :class="{
       'cs-context-toolbar--text': schema.text,
-      'cs-context-toolbar--precision': [
-        'crop',
-        'privacy',
-        'spotlight',
-        'ruler',
-        'loupe',
-      ].includes(schema.icon),
+      'cs-context-toolbar--precision': ['crop', 'privacy', 'spotlight', 'ruler', 'loupe'].includes(schema.icon),
     }"
     :aria-label="label"
     :aria-description="schema.hint"
@@ -51,10 +60,25 @@ const emit = defineEmits<{
       v-else
       class="cs-context-icon"
       :class="`cs-context-icon--${schema.icon}`"
-      ><UiIcon :name="schema.icon"
-    /></span>
-    <div class="cs-context-controls">
-      <template v-for="control in schema.controls" :key="control.id">
+    ><UiIcon :name="schema.icon"/></span>
+    <ArrowFormattingToolbar
+      v-if="schema.icon === 'arrow'"
+      variant="floating"
+      :controls="schema.controls"
+      :picker-locale="pickerLocale ?? 'en'"
+      :recent-colors="recentColors ?? []"
+      @change="(id, value) => emit('change', id, value)"
+      @eyedropper="emit('eyedropper', $event)"
+    />
+    <div v-else class="cs-context-controls">
+      <ArrowFormattingToolbar
+        v-if="schema.controls.some((control) => control.kind === 'arrowStroke')"
+        variant="floating"
+        :controls="schema.controls.filter((control) => control.kind === 'arrowStroke')"
+        :picker-locale="pickerLocale ?? 'en'"
+        @change="(id, value) => emit('change', id, value)"
+      />
+      <template v-for="control in controlsFor(schema)" :key="control.id">
         <NButton
           v-if="control.kind === 'action'"
           size="small"
@@ -66,7 +90,7 @@ const emit = defineEmits<{
           {{ control.label }}
         </NButton>
         <label v-else-if="control.kind === 'color'" class="cs-context-control">
-          <span v-if="!control.compact">{{ control.label }}</span>
+          <span v-if="!control.compact">{{ control.label }}{{ control.mixed ? ' · —' : '' }}</span>
           <DeferredColorPicker
             :model-value="control.value"
             :recent-colors="recentColors ?? []"
@@ -80,7 +104,7 @@ const emit = defineEmits<{
           />
         </label>
         <label v-else-if="control.kind === 'range'" class="cs-context-control">
-          <span>{{ control.label }}</span>
+          <span>{{ control.label }}{{ control.mixed ? ' · —' : '' }}</span>
           <DeferredSlider
             :model-value="control.value"
             :min="control.min"
@@ -92,7 +116,7 @@ const emit = defineEmits<{
           />
         </label>
         <label v-else-if="control.kind === 'select'" class="cs-context-control">
-          <span>{{ control.label }}</span>
+          <span>{{ control.label }}{{ control.mixed ? ' · —' : '' }}</span>
           <UiSelect
             class="cs-ui-select"
             :model-value="control.value"
@@ -103,6 +127,16 @@ const emit = defineEmits<{
           />
         </label>
       </template>
+      <NButton
+        v-if="schema.controls.length > 4"
+        size="small"
+        :aria-expanded="expanded"
+        @click="expanded = !expanded"
+      >
+        {{
+          pickerLocale === 'ru' ? (expanded ? 'Свернуть' : 'Ещё') : expanded ? 'Less' : 'More'
+        }}
+      </NButton>
     </div>
-  </section>
+  </fieldset>
 </template>

@@ -19,5 +19,11 @@ export {
   applyRichTextParagraphStyle,
   applyRichTextSpanStyle,
 } from './formatting'
-export { reconcileRichTextText, replaceRichTextSelection } from './replacement'
-export { handleRichTextBackspace, handleRichTextEnter } from './keyboard'
+export {
+  reconcileRichTextText,
+  replaceRichTextSelection,
+} from './replacement'
+export {
+  handleRichTextBackspace,
+  handleRichTextEnter,
+} from './keyboard'

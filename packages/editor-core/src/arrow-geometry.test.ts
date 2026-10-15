@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 import {
   arrowCapSize,
@@ -8,8 +12,14 @@ import {
   rebaseArrowLayer,
   updateArrowHandle,
 } from './arrow-geometry'
-import type { ArrowLayer, ArrowLayerPayload } from './document/types'
-import { transformPoint, transformToMatrix } from './geometry'
+import type {
+  ArrowLayer,
+  ArrowLayerPayload,
+} from './document/types'
+import {
+  transformPoint,
+  transformToMatrix,
+} from './geometry'
 
 const stroke = {
   color: { red: 1, green: 0, blue: 0, alpha: 1 },
@@ -19,7 +29,10 @@ const stroke = {
   join: 'round' as const,
 }
 
-function elbowPayload(axis: 'x' | 'y' = 'x', offset = -20): ArrowLayerPayload {
+function elbowPayload(
+  axis: 'x' | 'y' = 'x',
+  offset = -20,
+): ArrowLayerPayload {
   return {
     path: 'elbow',
     start: { x: 0, y: 10 },
@@ -146,12 +159,8 @@ describe('arrow geometry', () => {
     expect(actualEnd.x).toBeCloseTo(expectedEnd.x)
     expect(actualEnd.y).toBeCloseTo(expectedEnd.y)
     expect(rebased.localBounds?.width).toBeGreaterThan(layer.localBounds!.width)
-    expect(rebased.localBounds?.height).toBeGreaterThan(
-      layer.localBounds!.height,
-    )
-    expect(
-      rebased.payload.end.x + arrowCapSize('solidArrow', 10),
-    ).toBeLessThanOrEqual(rebased.localBounds!.width)
+    expect(rebased.localBounds?.height).toBeGreaterThan(layer.localBounds!.height)
+    expect(rebased.payload.end.x + arrowCapSize('solidArrow', 10)).toBeLessThanOrEqual(rebased.localBounds!.width)
   })
 
   it('exposes the editable midpoint of an elbow middle segment', () => {
@@ -207,19 +216,13 @@ describe('arrow geometry', () => {
         endCap: 'solidArrow',
       },
     }
-    expect(arrowSelectionHandles(layer).map((handle) => handle.kind)).toEqual([
-      'start',
-      'end',
-      'bend',
-    ])
+    expect(arrowSelectionHandles(layer).map((handle) => handle.kind)).toEqual(['start', 'end', 'bend'])
 
     const updated = updateArrowHandle(layer, 'bend', { x: 50, y: -20 })
     expect(updated.transform.translateX + updated.payload.start.x).toBe(40)
     expect(updated.transform.translateY + updated.payload.start.y).toBe(80)
     expect(updated.transform.translateX + updated.payload.end.x).toBe(120)
     expect(updated.transform.translateY + updated.payload.end.y).toBe(80)
-    expect(
-      updated.transform.translateY + (updated.payload.bend?.y ?? Number.NaN),
-    ).toBe(20)
+    expect(updated.transform.translateY + (updated.payload.bend?.y ?? Number.NaN)).toBe(20)
   })
 })

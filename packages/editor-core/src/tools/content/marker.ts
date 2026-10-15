@@ -69,14 +69,8 @@ export function createNumberedMarkerLayer(input: {
   })
 }
 
-export function nextNumberedMarkerSequence(
-  layers: readonly LayerNode[],
-): number {
-  const used = new Set(
-    layers.flatMap((layer) =>
-      layer.kind === 'numberedMarker' ? [layer.payload.sequence] : [],
-    ),
-  )
+export function nextNumberedMarkerSequence(layers: readonly LayerNode[]): number {
+  const used = new Set(layers.flatMap((layer) => (layer.kind === 'numberedMarker' ? [layer.payload.sequence] : [])))
   let candidate = 1
   while (used.has(candidate)) candidate += 1
   return candidate

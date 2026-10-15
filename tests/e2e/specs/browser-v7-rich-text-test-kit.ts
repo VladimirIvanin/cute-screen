@@ -1,4 +1,8 @@
-import { $, browser, expect } from '@wdio/globals'
+import {
+  $,
+  browser,
+  expect,
+} from '@wdio/globals'
 
 export type HarnessSnapshot = {
   readonly schemaVersion: number
@@ -59,9 +63,7 @@ export async function setEditorSelection(
 ): Promise<void> {
   await browser.execute(
     ({ start, end }) => {
-      const editor = document.querySelector<HTMLDivElement>(
-        '[contenteditable="true"]',
-      )
+      const editor = document.querySelector<HTMLDivElement>('[contenteditable="true"]')
       if (!editor) throw new Error('Rich-text editor is missing')
       const textNodes: Text[] = []
       const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT)
@@ -76,8 +78,7 @@ export async function setEditorSelection(
           consumed += length
         }
         const node = textNodes.at(-1)
-        if (!node || offset !== consumed)
-          throw new Error(`Selection offset ${offset} is outside the editor`)
+        if (!node || offset !== consumed) throw new Error(`Selection offset ${offset} is outside the editor`)
         return { node, offset: node.data.length }
       }
       const anchor = locate(start)
@@ -95,26 +96,18 @@ export async function setEditorSelection(
     { start, end },
   )
   await browser.execute(
-    () =>
-      new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-      ),
+    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
   )
 }
 
 export async function waitForEditorFocus(): Promise<void> {
   await browser.execute(() => {
-    const editor = document.querySelector<HTMLElement>(
-      '[contenteditable="true"]',
-    )
+    const editor = document.querySelector<HTMLElement>('[contenteditable="true"]')
     if (!editor) throw new Error('Rich-text editor is missing')
     editor.focus()
   })
   await browser.waitUntil(() =>
-    browser.execute(
-      () => document.activeElement?.getAttribute('contenteditable') === 'true',
-    ),
-  )
+    browser.execute(() => document.activeElement?.getAttribute('contenteditable') === 'true'))
 }
 
 export async function setNativeColor(
@@ -123,9 +116,9 @@ export async function setNativeColor(
 ): Promise<void> {
   await browser.execute(
     ({ label, value }) => {
-      const input = [
-        ...document.querySelectorAll<HTMLInputElement>('input[type="color"]'),
-      ].find((candidate) => candidate.getAttribute('aria-label') === label)
+      const input = [...document.querySelectorAll<HTMLInputElement>('input[type="color"]')].find(
+        (candidate) => candidate.getAttribute('aria-label') === label,
+      )
       if (!input) throw new Error(`Missing colour input: ${label}`)
       input.value = value
       input.dispatchEvent(new Event('change', { bubbles: true }))
@@ -140,9 +133,9 @@ export async function setNativeSelect(
 ): Promise<void> {
   await browser.execute(
     ({ label, value }) => {
-      const select = [
-        ...document.querySelectorAll<HTMLSelectElement>('select'),
-      ].find((candidate) => candidate.getAttribute('aria-label') === label)
+      const select = [...document.querySelectorAll<HTMLSelectElement>('select')].find(
+        (candidate) => candidate.getAttribute('aria-label') === label,
+      )
       if (!select) throw new Error(`Missing select: ${label}`)
       select.focus()
       select.value = value
@@ -159,15 +152,15 @@ export async function applyBackground(input: {
 }): Promise<void> {
   await $('button[aria-label="Background"]').click()
   await browser.execute((draft) => {
-    const root = document.querySelector<HTMLElement>(
-      '.cs-text-background-popover',
-    )
+    const root = document.querySelector<HTMLElement>('.cs-text-background-popover')
     const color = root?.querySelector<HTMLInputElement>('input[type="color"]')
-    const numbers = root?.querySelectorAll<HTMLInputElement>(
-      'input[type="number"]',
-    )
-    if (!root || !color || !numbers || numbers.length !== 2)
-      throw new Error('Text background controls are missing')
+    const numbers = root?.querySelectorAll<HTMLInputElement>('input[type="number"]')
+    if (
+      !root ||
+      !color ||
+      !numbers ||
+      numbers.length !== 2
+    ) throw new Error('Text background controls are missing')
     color.value = draft.color
     color.dispatchEvent(new Event('input', { bubbles: true }))
     numbers[0]!.value = String(draft.padding)
@@ -178,7 +171,10 @@ export async function applyBackground(input: {
   await $('.cs-text-background-popover').$('button=Apply').click()
 }
 
-export async function startTextAt(x: number, y: number) {
+export async function startTextAt(
+  x: number,
+  y: number,
+) {
   await $('button[aria-label="Text"]').click()
   await $('.cs-canvas:not(.cs-canvas-overlay)').click({ x, y })
   const editor = $('[contenteditable="true"][aria-label="Text editor"]')

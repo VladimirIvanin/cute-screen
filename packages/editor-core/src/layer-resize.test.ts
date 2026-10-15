@@ -1,12 +1,22 @@
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 import { CommandManager } from './commands'
 import {
   applyEditorCommand,
   createFlipCanvasCommand,
 } from './commands/operations'
-import { parseEditorDocument, serializeEditorDocument } from './document/codec'
-import type { EditorDocumentV1, LayerNode } from './document/types'
+import {
+  parseEditorDocument,
+  serializeEditorDocument,
+} from './document/codec'
+import type {
+  EditorDocumentV1,
+  LayerNode,
+} from './document/types'
 import { createDrawingLayer } from './drawing'
 import {
   layerResizeCapability,
@@ -102,9 +112,7 @@ describe('image-only transform scale policy', () => {
       },
     } satisfies LayerNode
 
-    const normalized = normalizeEditableDocumentScales(
-      document([resized, reflected, image]),
-    )
+    const normalized = normalizeEditableDocumentScales(document([resized, reflected, image]))
 
     expect(normalized.layers[0]!.transform).toEqual({
       ...resized.transform,
@@ -128,18 +136,14 @@ describe('image-only transform scale policy', () => {
         type: 'updateLayer',
         before,
         after,
-      }),
-    ).toThrow(/non-image.*scale/u)
-    expect(() =>
-      applyEditorCommand(document([]), { type: 'addLayer', layer: after }),
-    ).toThrow(/non-image.*scale/u)
+      })).toThrow(/non-image.*scale/u)
+    expect(() => applyEditorCommand(document([]), { type: 'addLayer', layer: after })).toThrow(/non-image.*scale/u)
     expect(() =>
       applyEditorCommand(document([before]), {
         type: 'duplicateLayer',
         sourceId: before.id,
         layer: { ...after, id: '019c1f62-058e-7000-8000-000000000099' },
-      }),
-    ).toThrow(/non-image.*scale/u)
+      })).toThrow(/non-image.*scale/u)
   })
 
   it('preserves a pure canvas reflection through persistence and exact undo/redo', () => {
@@ -154,11 +158,8 @@ describe('image-only transform scale policy', () => {
     expect(normalizeEditableDocumentScales(flipped)).toBe(flipped)
     const parsed = parseEditorDocument(serializeEditorDocument(flipped))
     expect(parsed.kind).toBe('editable')
-    if (parsed.kind !== 'editable')
-      throw new Error('expected editable document')
-    expect(parsed.document.layers[0]!.transform).toEqual(
-      flipped.layers[0]!.transform,
-    )
+    if (parsed.kind !== 'editable') throw new Error('expected editable document')
+    expect(parsed.document.layers[0]!.transform).toEqual(flipped.layers[0]!.transform)
 
     expect(manager.undo().document).toEqual(normalizedBefore)
     expect(manager.redo().document).toEqual(flipped)
@@ -230,11 +231,10 @@ describe('intrinsic layer resize', () => {
 
     expect(after.payload.width).toBe(before.payload.width)
     expect(after.payload.points).not.toEqual(before.payload.points)
-    expect(
-      (after.payload.points as readonly { readonly pressure: number }[]).map(
-        ({ pressure }) => pressure,
-      ),
-    ).toEqual([0.2, 0.8])
+    expect((after.payload.points as readonly { readonly pressure: number }[]).map(({ pressure }) => pressure)).toEqual([
+      0.2,
+      0.8,
+    ])
     expect(after.transform.scaleX).toBe(1)
   })
 
@@ -255,9 +255,7 @@ describe('intrinsic layer resize', () => {
     expect(after.payload.content.fixedWidth).toBeCloseTo(90)
     expect(after.payload.content.spans).toEqual(before.payload.content.spans)
     expect(after.transform.scaleX).toBe(1)
-    expect(after.localBounds.height).toBeGreaterThanOrEqual(
-      before.localBounds.height,
-    )
+    expect(after.localBounds.height).toBeGreaterThanOrEqual(before.localBounds.height)
   })
 
   it('resizes loupe lens and source square at fixed zoom and source centre', () => {
@@ -269,25 +267,14 @@ describe('intrinsic layer resize', () => {
       size: 80,
       canvas: CANVAS,
     })
-    const after = resizeLayerGeometry(
-      before,
-      'se',
-      { x: 240, y: 220 },
-      { preserveAspect: true, canvas: CANVAS },
-    )
+    const after = resizeLayerGeometry(before, 'se', { x: 240, y: 220 }, { preserveAspect: true, canvas: CANVAS })
     if (after.kind !== 'loupe') throw new Error('expected loupe layer')
 
     expect(after.payload.zoom).toBe(before.payload.zoom)
     expect(after.payload.lens.size).toBe(after.localBounds.width)
-    expect(after.payload.sourceRegion.width).toBeCloseTo(
-      after.payload.lens.size / after.payload.zoom,
-    )
-    expect(
-      after.payload.sourceRegion.x + after.payload.sourceRegion.width / 2,
-    ).toBeCloseTo(60)
-    expect(
-      after.payload.sourceRegion.y + after.payload.sourceRegion.height / 2,
-    ).toBeCloseTo(70)
+    expect(after.payload.sourceRegion.width).toBeCloseTo(after.payload.lens.size / after.payload.zoom)
+    expect(after.payload.sourceRegion.x + after.payload.sourceRegion.width / 2).toBeCloseTo(60)
+    expect(after.payload.sourceRegion.y + after.payload.sourceRegion.height / 2).toBeCloseTo(70)
   })
 
   it('moves ruler endpoints without changing its factual style', () => {
@@ -299,12 +286,7 @@ describe('intrinsic layer resize', () => {
       fontSize: 18,
       canvas: CANVAS,
     })
-    const after = resizeLayerGeometry(
-      before,
-      'end',
-      { x: 180, y: 80 },
-      { canvas: CANVAS },
-    )
+    const after = resizeLayerGeometry(before, 'end', { x: 180, y: 80 }, { canvas: CANVAS })
     if (after.kind !== 'ruler') throw new Error('expected ruler layer')
 
     expect(after.payload.end).not.toEqual(before.payload.end)
@@ -322,12 +304,7 @@ describe('intrinsic layer resize', () => {
       origin: { x: 10, y: 10 },
       size: 32,
     })
-    const resizedEmoji = resizeLayerGeometry(
-      emoji,
-      'se',
-      { x: 90, y: 50 },
-      { preserveAspect: true },
-    )
+    const resizedEmoji = resizeLayerGeometry(emoji, 'se', { x: 90, y: 50 }, { preserveAspect: true })
     const censor = createCensorLayer({
       id: '019c1f62-058e-7000-8000-000000000012',
       region: {

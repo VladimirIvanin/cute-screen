@@ -1,19 +1,24 @@
 import path from 'node:path'
+import type { TauriCapabilities } from '@wdio/tauri-service'
 
 import { saveFailureScreenshot } from './failure-artifacts'
 import { focusMainTauriWindow } from './main-window'
 
 const appBinaryPath = process.env.CUTE_SCREEN_WDIO_APP_BINARY
-const outputDir = path.resolve(
-  process.env.CUTE_SCREEN_WDIO_ARTIFACTS ?? 'artifacts/tauri-e2e',
-)
+const outputDir = path.resolve(process.env.CUTE_SCREEN_WDIO_ARTIFACTS ?? 'artifacts/tauri-e2e')
 const scenarioId = process.env.CUTE_SCREEN_E2E_SCENARIO ?? 'default'
 const harnessQuery = process.env.CUTE_SCREEN_E2E_HARNESS_QUERY
 
 if (!appBinaryPath) {
-  throw new Error(
-    'CUTE_SCREEN_WDIO_APP_BINARY must point to the test-harness binary',
-  )
+  throw new Error('CUTE_SCREEN_WDIO_APP_BINARY must point to the test-harness binary')
+}
+
+const tauriCapability: TauriCapabilities = {
+  browserName: 'tauri',
+  'tauri:options': {
+    application: appBinaryPath,
+    args: harnessQuery ? [`--e2e-harness-query=${harnessQuery}`] : [],
+  },
 }
 
 export const config: WebdriverIO.Config = {
@@ -29,19 +34,18 @@ export const config: WebdriverIO.Config = {
         appBinaryPath,
         captureBackendLogs: true,
         captureFrontendLogs: true,
-        autoDownloadEdgeDriver: false,
-        driverProvider: 'embedded',
+        autoDownloadEdgeDriver: true,
+        autoInstallTauriDriver: process.platform === 'win32',
+        driverProvider: process.platform === 'win32' ? 'external' : 'embedded',
         appArgs: harnessQuery ? [`--e2e-harness-query=${harnessQuery}`] : [],
         env: {
           CUTE_SCREEN_E2E_SCENARIO: scenarioId,
-          ...(harnessQuery
-            ? { CUTE_SCREEN_E2E_HARNESS_QUERY: harnessQuery }
-            : {}),
+          ...(harnessQuery ? { CUTE_SCREEN_E2E_HARNESS_QUERY: harnessQuery } : {}),
         },
       },
     ],
   ],
-  capabilities: [{ browserName: 'tauri' }],
+  capabilities: [tauriCapability],
   framework: 'mocha',
   reporters: [
     'spec',

@@ -198,7 +198,10 @@ export {
   type ImageVariantSelection,
   type ManagedImageResource,
 } from './image-resource-manager'
-export { RendererRuntime, type RendererRuntimeOptions } from './runtime'
+export {
+  RendererRuntime,
+  type RendererRuntimeOptions,
+} from './runtime'
 export { formatRulerDisplayLabel } from './precision-rendering'
 export {
   FrameScheduler,
@@ -223,3 +226,15 @@ export type EditorRendererBoundary = Readonly<{
   core: EditorCoreBoundary
   package: 'editor-renderer'
 }>
+export {
+  creationPolicy,
+  extractLayerStyle,
+  commonLayerStyle,
+  applyLayerStyle,
+  styleCommand,
+  type LayerStyle,
+} from '@cute-screen/editor-core'
+export {
+  parseToolSettingsPreferences,
+  type ToolSettingsPreferencesV3,
+} from '@cute-screen/editor-core'

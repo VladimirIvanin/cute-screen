@@ -1,7 +1,13 @@
-import { mkdir, writeFile } from 'node:fs/promises'
+import {
+  mkdir,
+  writeFile,
+} from 'node:fs/promises'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { createCanvas, loadImage } from '@napi-rs/canvas'
+import {
+  createCanvas,
+  loadImage,
+} from '@napi-rs/canvas'
 
 // Original Cute Screen artwork, MIT. Keep the same bold geometry in every size.
 const cat = 'M5 5L12 11H20L27 5V23A4 4 0 0 1 23 27H9A4 4 0 0 1 5 23Z'
@@ -15,18 +21,12 @@ const app = svg(
   <path d="${cat}" fill="#FFFFFF"/>`,
   512,
 )
-const tray = svg(
-  `<path d="${cat}" fill="#FFFFFF" stroke="#231F26" stroke-width="2" stroke-linejoin="round"/>`,
-)
+const tray = svg(`<path d="${cat}" fill="#FFFFFF" stroke="#231F26" stroke-width="2" stroke-linejoin="round"/>`)
 const template = svg(`<path d="${cat}" fill="#000000"/>`)
 const root = fileURLToPath(new URL('../', import.meta.url))
-const save = (path, content) =>
-  writeFile(new URL(path, new URL('../', import.meta.url)), content)
+const save = (path, content) => writeFile(new URL(path, new URL('../', import.meta.url)), content)
 
-await mkdir(
-  new URL('../packages/editor-vue/src/shell/assets/', import.meta.url),
-  { recursive: true },
-)
+await mkdir(new URL('../packages/editor-vue/src/shell/assets/', import.meta.url), { recursive: true })
 await mkdir(new URL('../apps/desktop/public/', import.meta.url), {
   recursive: true,
 })
@@ -44,20 +44,13 @@ for (const [name, source] of [
   ['tray-template', template],
 ]) {
   const canvas = createCanvas(32, 32)
-  canvas
-    .getContext('2d')
-    .drawImage(await loadImage(Buffer.from(source)), 0, 0, 32, 32)
+  canvas.getContext('2d').drawImage(await loadImage(Buffer.from(source)), 0, 0, 32, 32)
   await save(`src-tauri/icons/${name}.png`, canvas.toBuffer('image/png'))
 }
 
-const result = spawnSync(
-  'pnpm',
-  ['tauri', 'icon', 'src-tauri/icons/foundation.svg'],
-  {
-    cwd: root,
-    stdio: 'inherit',
-  },
-)
+const result = spawnSync('pnpm', ['tauri', 'icon', 'src-tauri/icons/foundation.svg'], {
+  cwd: root,
+  stdio: 'inherit',
+})
 if (result.error) throw result.error
-if (result.status !== 0)
-  throw new Error(`Tauri icon generation exited with ${result.status}`)
+if (result.status !== 0) throw new Error(`Tauri icon generation exited with ${result.status}`)

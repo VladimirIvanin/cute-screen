@@ -1,5 +1,8 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, readdirSync } from 'node:fs'
+import {
+  existsSync,
+  readdirSync,
+} from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 
@@ -12,9 +15,7 @@ const packages = existsSync(bundleDirectory)
   : []
 
 if (packages.length !== 1) {
-  throw new Error(
-    `expected exactly one deb artifact in ${bundleDirectory}, found ${packages.length}`,
-  )
+  throw new Error(`expected exactly one deb artifact in ${bundleDirectory}, found ${packages.length}`)
 }
 
 const [artifact] = packages
@@ -31,10 +32,7 @@ const architecture = execFileSync('dpkg', ['--print-architecture'], {
   encoding: 'utf8',
 }).trim()
 
-for (const expected of [
-  'Package: cute-screen',
-  `Architecture: ${architecture}`,
-]) {
+for (const expected of ['Package: cute-screen', `Architecture: ${architecture}`]) {
   if (!info.includes(expected)) {
     throw new Error(`deb control metadata is missing ${expected}`)
   }
@@ -47,9 +45,7 @@ if (!contents.includes('usr/share/applications/')) {
 }
 for (const forbidden of ['m01-platform-smoke', 'm04-platform-smoke']) {
   if (contents.includes(forbidden)) {
-    throw new Error(
-      `test-only executable leaked into deb artifact: ${forbidden}`,
-    )
+    throw new Error(`test-only executable leaked into deb artifact: ${forbidden}`)
   }
 }
 

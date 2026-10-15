@@ -1,4 +1,7 @@
-import type { Ref, ShallowRef } from 'vue'
+import type {
+  Ref,
+  ShallowRef,
+} from 'vue'
 import {
   rebaseArrowLayer,
   rememberDrawingColor,
@@ -33,14 +36,12 @@ interface DrawingDefaultsEffect {
   readonly payload: JsonObject
 }
 
-type DrawingEffect =
-  | Exclude<ToolSettingsEffect<DrawingDefaults>, { readonly kind: 'defaults' }>
-  | DrawingDefaultsEffect
+type DrawingEffect = Exclude<ToolSettingsEffect<DrawingDefaults>, { readonly kind: 'defaults' }> | DrawingDefaultsEffect
 
 export interface DrawingEffectsContext {
   readonly props: ResolvedEditorShellProps
   readonly activeToolId: Ref<string | undefined>
-  readonly configureDefaultsTool: Ref<'arrow' | undefined>
+  readonly configureDefaultsTool: Ref<string | undefined>
   readonly drawingDefaults: Ref<DrawingDefaults>
   readonly drawingPreferences: ShallowRef<DrawingToolPreferencesV2>
   readonly isDrawingTool: (value: string | undefined) => value is DrawingTool
@@ -67,7 +68,7 @@ function targetFor(context: DrawingEffectsContext): DrawingTarget | undefined {
       : selected && context.isDrawingTool(selected.kind)
         ? selected.kind
         : undefined)
-  if (!tool) return undefined
+  if (!tool || !context.isDrawingTool(tool)) return undefined
   return {
     tool,
     selected,
@@ -83,17 +84,12 @@ function selectedAfter(
 ): LayerNode {
   let after = {
     ...selected,
-    ...(id === 'layerOpacity'
-      ? { opacity: payload.layerOpacity as number }
-      : {}),
-    ...(id === 'blendMode'
-      ? { blendMode: payload.blendMode as BlendMode }
-      : {}),
+    ...(id === 'layerOpacity' ? { opacity: payload.layerOpacity as number } : {}),
+    ...(id === 'blendMode' ? { blendMode: payload.blendMode as BlendMode } : {}),
     ...(id === 'layerOpacity' || id === 'blendMode' ? {} : { payload }),
     ...(id === 'markerMode'
       ? {
-          blendMode:
-            value === 'darken' ? ('darken' as const) : ('multiply' as const),
+          blendMode: value === 'darken' ? ('darken' as const) : ('multiply' as const),
         }
       : {}),
   } as LayerNode
@@ -147,13 +143,14 @@ function colorFrom(
     tool === 'arrow' || tool === 'shape'
       ? (payload.stroke as Record<string, unknown> | undefined)?.color
       : payload.color
-  return candidate && typeof candidate === 'object'
-    ? (candidate as SrgbColor)
-    : undefined
+  return candidate && typeof candidate === 'object' ? (candidate as SrgbColor) : undefined
 }
 
 export function createDrawingEffects(context: DrawingEffectsContext) {
-  function applyDrawingChange(id: string, value: string): boolean {
+  function applyDrawingChange(
+    id: string,
+    value: string,
+  ): boolean {
     const effect = resolveDrawingEffect(context, id, value)
     if (effect.kind === 'unhandled') return false
     if (effect.kind === 'command') {

@@ -1,5 +1,9 @@
 import fc from 'fast-check'
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 import { CommandManager } from './commands'
 import {
@@ -19,7 +23,11 @@ import {
   setCropPreset,
   type CropPreset,
 } from './crop-session'
-import type { EditorDocument, ImageLayer, Rect } from './document/types'
+import type {
+  EditorDocument,
+  ImageLayer,
+  Rect,
+} from './document/types'
 
 const DOCUMENT_ID = '019c1f62-058e-7000-8000-000000000000'
 const BASE_ID = '019c1f62-058e-7000-8000-000000000001'
@@ -147,14 +155,8 @@ describe('crop session canvas contract', () => {
   })
 
   it('rejects a session until finite positive production canvas dimensions exist', () => {
-    expect(() =>
-      createCropSession(editorDocument({ canvas: { width: 0, height: 300 } })),
-    ).toThrow(/canvas/u)
-    expect(() =>
-      createCropSession(
-        editorDocument({ canvas: { width: 400, height: Number.NaN } }),
-      ),
-    ).toThrow(/canvas/u)
+    expect(() => createCropSession(editorDocument({ canvas: { width: 0, height: 300 } }))).toThrow(/canvas/u)
+    expect(() => createCropSession(editorDocument({ canvas: { width: 400, height: Number.NaN } }))).toThrow(/canvas/u)
   })
 })
 
@@ -165,15 +167,11 @@ describe('crop presets', () => {
     ['16:9', { x: 0, y: 37.5, width: 400, height: 225 }],
     ['original', { x: 0, y: 0, width: 400, height: 300 }],
   ] as const)('applies the %s preset deterministically', (preset, expected) => {
-    expect(
-      setCropPreset(createCropSession(editorDocument()), preset).crop,
-    ).toEqual(expected)
+    expect(setCropPreset(createCropSession(editorDocument()), preset).crop).toEqual(expected)
   })
 
   it('keeps free geometry and fits original ratio inside a reopened crop', () => {
-    const session = createCropSession(
-      editorDocument({ crop: { x: 100, y: 50, width: 200, height: 200 } }),
-    )
+    const session = createCropSession(editorDocument({ crop: { x: 100, y: 50, width: 200, height: 200 } }))
 
     expect(setCropPreset(session, 'free').crop).toEqual(session.crop)
     expect(setCropPreset(session, 'original').crop).toEqual({
@@ -185,35 +183,18 @@ describe('crop presets', () => {
   })
 
   it('keeps every fixed preset positive, bounded and at its exact ratio', () => {
-    const presets: readonly Exclude<CropPreset, 'free'>[] = [
-      '1:1',
-      '4:3',
-      '16:9',
-      'original',
-    ]
+    const presets: readonly Exclude<CropPreset, 'free'>[] = ['1:1', '4:3', '16:9', 'original']
     fc.assert(
       fc.property(
         fc.integer({ min: 1, max: 8_192 }),
         fc.integer({ min: 1, max: 8_192 }),
         fc.constantFrom(...presets),
         (width, height, preset) => {
-          const session = setCropPreset(
-            createCropSession(editorDocument({ canvas: { width, height } })),
-            preset,
-          )
+          const session = setCropPreset(createCropSession(editorDocument({ canvas: { width, height } })), preset)
           const expectedRatio =
-            preset === '1:1'
-              ? 1
-              : preset === '4:3'
-                ? 4 / 3
-                : preset === '16:9'
-                  ? 16 / 9
-                  : width / height
+            preset === '1:1' ? 1 : preset === '4:3' ? 4 / 3 : preset === '16:9' ? 16 / 9 : width / height
           expectInsideCanvas(session.crop, session.canvas)
-          expect(session.crop.width / session.crop.height).toBeCloseTo(
-            expectedRatio,
-            10,
-          )
+          expect(session.crop.width / session.crop.height).toBeCloseTo(expectedRatio, 10)
         },
       ),
     )
@@ -222,9 +203,7 @@ describe('crop presets', () => {
 
 describe('crop manipulation', () => {
   it('moves and nudges without changing size or escaping the canvas', () => {
-    const session = createCropSession(
-      editorDocument({ crop: { x: 20, y: 10, width: 60, height: 40 } }),
-    )
+    const session = createCropSession(editorDocument({ crop: { x: 20, y: 10, width: 60, height: 40 } }))
 
     expect(moveCrop(session, { x: 500, y: -500 }).crop).toEqual({
       x: 340,
@@ -272,10 +251,7 @@ describe('crop manipulation', () => {
   })
 
   it('preserves a fixed ratio for edge and corner resize', () => {
-    const square = setCropPreset(
-      createCropSession(editorDocument({ canvas: { width: 120, height: 80 } })),
-      '1:1',
-    )
+    const square = setCropPreset(createCropSession(editorDocument({ canvas: { width: 120, height: 80 } })), '1:1')
 
     expect(resizeCrop(square, 'east', { x: -30, y: 999 }).crop).toEqual({
       x: 20,
@@ -319,20 +295,9 @@ describe('crop manipulation', () => {
       fc.property(
         fc.integer({ min: -10_000, max: 10_000 }),
         fc.integer({ min: -10_000, max: 10_000 }),
-        fc.constantFrom(
-          'north',
-          'northEast',
-          'east',
-          'southEast',
-          'south',
-          'southWest',
-          'west',
-          'northWest',
-        ),
+        fc.constantFrom('north', 'northEast', 'east', 'southEast', 'south', 'southWest', 'west', 'northWest'),
         (x, y, handle) => {
-          const session = createCropSession(
-            editorDocument({ crop: { x: 40, y: 30, width: 200, height: 120 } }),
-          )
+          const session = createCropSession(editorDocument({ crop: { x: 40, y: 30, width: 200, height: 120 } }))
           const resized = resizeCrop(session, handle, { x, y }).crop
           expectInsideCanvas(resized, session.canvas)
           expect(resized.width).toBeGreaterThanOrEqual(1)
@@ -352,19 +317,9 @@ describe('crop manipulation', () => {
         fc.constantFrom(...CROP_RESIZE_HANDLES),
         fc.constantFrom(...presets),
         (x, y, handle, preset) => {
-          const session = setCropPreset(
-            createCropSession(editorDocument()),
-            preset,
-          )
+          const session = setCropPreset(createCropSession(editorDocument()), preset)
           const resized = resizeCrop(session, handle, { x, y }).crop
-          const ratio =
-            preset === '1:1'
-              ? 1
-              : preset === '4:3'
-                ? 4 / 3
-                : preset === '16:9'
-                  ? 16 / 9
-                  : 4 / 3
+          const ratio = preset === '1:1' ? 1 : preset === '4:3' ? 4 / 3 : preset === '16:9' ? 16 / 9 : 4 / 3
           expectInsideCanvas(resized, session.canvas)
           expect(resized.width).toBeGreaterThanOrEqual(1)
           expect(resized.height).toBeGreaterThanOrEqual(1)
@@ -384,19 +339,9 @@ describe('crop manipulation', () => {
         fc.constantFrom(...CROP_RESIZE_HANDLES),
         fc.constantFrom('1:1', '4:3', '16:9', 'original'),
         (width, height, x, y, handle, preset) => {
-          const session = setCropPreset(
-            createCropSession(editorDocument({ canvas: { width, height } })),
-            preset,
-          )
+          const session = setCropPreset(createCropSession(editorDocument({ canvas: { width, height } })), preset)
           const resized = resizeCrop(session, handle, { x, y }).crop
-          const ratio =
-            preset === '1:1'
-              ? 1
-              : preset === '4:3'
-                ? 4 / 3
-                : preset === '16:9'
-                  ? 16 / 9
-                  : width / height
+          const ratio = preset === '1:1' ? 1 : preset === '4:3' ? 4 / 3 : preset === '16:9' ? 16 / 9 : width / height
           expectInsideCanvas(resized, session.canvas)
           expect(resized.width / resized.height).toBeCloseTo(ratio, 10)
         },
@@ -469,19 +414,13 @@ describe('crop completion and history', () => {
     const before = editorDocument()
     const source = structuredClone(before.source)
     const layers = structuredClone(before.layers)
-    const session = resizeCrop(
-      setCropPreset(createCropSession(before), '16:9'),
-      'southEast',
-      { x: -50, y: -30 },
-    )
+    const session = resizeCrop(setCropPreset(createCropSession(before), '16:9'), 'southEast', { x: -50, y: -30 })
 
     const after = applyEditorCommand(before, applyCropSession(session))
 
     expect(after.source).toEqual(source)
     expect(after.layers).toEqual(layers)
-    expect(JSON.stringify(applyCropSession(session))).not.toMatch(
-      /base64|blobHash|intrinsicWidth/u,
-    )
+    expect(JSON.stringify(applyCropSession(session))).not.toMatch(/base64|blobHash|intrinsicWidth/u)
   })
 
   it.each(['horizontal', 'vertical'] as const)(
@@ -501,9 +440,7 @@ describe('crop completion and history', () => {
       )
       expect(cropSession.crop).toEqual(crop)
       cropThenFlip.execute(applyCropSession(cropSession))
-      cropThenFlip.execute(
-        createFlipCanvasCommand(cropThenFlip.snapshot.document, axis),
-      )
+      cropThenFlip.execute(createFlipCanvasCommand(cropThenFlip.snapshot.document, axis))
       const expected = cropThenFlip.snapshot.document
       cropThenFlip.undo()
       cropThenFlip.undo()
@@ -518,14 +455,10 @@ describe('crop completion and history', () => {
           ? { ...crop, x: before.canvas.width - crop.x - crop.width }
           : { ...crop, y: before.canvas.height - crop.y - crop.height }
       const flippedSession = resizeCrop(
-        resizeCrop(
-          createCropSession(flipThenCrop.snapshot.document),
-          'southEast',
-          {
-            x: mirroredCrop.x + mirroredCrop.width - before.canvas.width,
-            y: mirroredCrop.y + mirroredCrop.height - before.canvas.height,
-          },
-        ),
+        resizeCrop(createCropSession(flipThenCrop.snapshot.document), 'southEast', {
+          x: mirroredCrop.x + mirroredCrop.width - before.canvas.width,
+          y: mirroredCrop.y + mirroredCrop.height - before.canvas.height,
+        }),
         'northWest',
         { x: mirroredCrop.x, y: mirroredCrop.y },
       )
@@ -537,19 +470,15 @@ describe('crop completion and history', () => {
 
   it('round-trips generated applied crops through command revert', () => {
     fc.assert(
-      fc.property(
-        fc.integer({ min: -1_000, max: 1_000 }),
-        fc.integer({ min: -1_000, max: 1_000 }),
-        (x, y) => {
-          const before = editorDocument({
-            crop: { x: 50, y: 40, width: 200, height: 100 },
-          })
-          const session = moveCrop(createCropSession(before), { x, y })
-          const command = applyCropSession(session)
-          const after = applyEditorCommand(before, command)
-          expect(revertEditorCommand(after, command)).toEqual(before)
-        },
-      ),
+      fc.property(fc.integer({ min: -1_000, max: 1_000 }), fc.integer({ min: -1_000, max: 1_000 }), (x, y) => {
+        const before = editorDocument({
+          crop: { x: 50, y: 40, width: 200, height: 100 },
+        })
+        const session = moveCrop(createCropSession(before), { x, y })
+        const command = applyCropSession(session)
+        const after = applyEditorCommand(before, command)
+        expect(revertEditorCommand(after, command)).toEqual(before)
+      }),
     )
   })
 })

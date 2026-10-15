@@ -1,5 +1,15 @@
-import { fireEvent, render } from '@testing-library/vue'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  fireEvent,
+  render,
+} from '@testing-library/vue'
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 import type { RenderSceneSnapshot } from '@cute-screen/editor-core'
 import {
   Canvas2DRenderer,
@@ -19,9 +29,7 @@ import {
 beforeEach(() => {
   window.localStorage.clear()
   contextFixture.current = canvasContext()
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
-    contextFixture.current,
-  )
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(contextFixture.current)
 })
 
 afterEach(() => {
@@ -32,30 +40,19 @@ describe('M08 crop interaction', () => {
   it('uses committed output bounds normally and the full canvas while editing crop', async () => {
     const committed = { x: 20, y: 10, width: 60, height: 40 }
     const normal = mountViewport('censor', committed)
-    const normalSurface = normal.container.querySelector(
-      '.cs-canvas-surface',
-    ) as HTMLDivElement
+    const normalSurface = normal.container.querySelector('.cs-canvas-surface') as HTMLDivElement
 
     expect(normalSurface.style.width).toBe('60px')
     expect(normalSurface.style.height).toBe('40px')
     await vi.waitFor(() => {
       expect(normal.scene.width).toBe(60)
       expect(normal.scene.height).toBe(40)
-      expect(contextFixture.current.setTransform).toHaveBeenCalledWith(
-        1,
-        0,
-        0,
-        1,
-        -20,
-        -10,
-      )
+      expect(contextFixture.current.setTransform).toHaveBeenCalledWith(1, 0, 0, 1, -20, -10)
     })
     normal.unmount()
 
     const cropEdit = mountViewport('crop', committed)
-    const cropSurface = cropEdit.container.querySelector(
-      '.cs-canvas-surface',
-    ) as HTMLDivElement
+    const cropSurface = cropEdit.container.querySelector('.cs-canvas-surface') as HTMLDivElement
     expect(cropSurface.style.width).toBe('120px')
     expect(cropSurface.style.height).toBe('80px')
     await vi.waitFor(() => {
@@ -121,22 +118,10 @@ describe('M08 crop interaction', () => {
             readonly end: { readonly x: number; readonly y: number }
           }
         }
-        expect(ruler.transform.translateX + ruler.payload.start.x).toBeCloseTo(
-          25,
-          10,
-        )
-        expect(ruler.transform.translateY + ruler.payload.start.y).toBeCloseTo(
-          16,
-          10,
-        )
-        expect(ruler.transform.translateX + ruler.payload.end.x).toBeCloseTo(
-          55,
-          10,
-        )
-        expect(ruler.transform.translateY + ruler.payload.end.y).toBeCloseTo(
-          36,
-          10,
-        )
+        expect(ruler.transform.translateX + ruler.payload.start.x).toBeCloseTo(25, 10)
+        expect(ruler.transform.translateY + ruler.payload.start.y).toBeCloseTo(16, 10)
+        expect(ruler.transform.translateX + ruler.payload.end.x).toBeCloseTo(55, 10)
+        expect(ruler.transform.translateY + ruler.payload.end.y).toBeCloseTo(36, 10)
       }
       view.unmount()
     }
@@ -152,9 +137,7 @@ describe('M08 crop interaction', () => {
         t: (key: string) => key,
       } as never,
     })
-    const sampledScene = sampled.getByLabelText(
-      'sceneCanvas',
-    ) as HTMLCanvasElement
+    const sampledScene = sampled.getByLabelText('sceneCanvas') as HTMLCanvasElement
     prepareScene(sampledScene, 60, 40)
     const getImageData = vi.fn(() => ({
       data: new Uint8ClampedArray([39, 61, 90, 255]),
@@ -206,8 +189,7 @@ describe('M08 crop interaction', () => {
     expect(editor.style.left).toBe('10px')
     expect(editor.style.top).toBe('10px')
     await vi.waitFor(() => {
-      const rebuilt = setScene.mock.calls.at(-1)?.[0] as
-        RenderSceneSnapshot | undefined
+      const rebuilt = setScene.mock.calls.at(-1)?.[0] as RenderSceneSnapshot | undefined
       expect(rebuilt?.outputBounds).toEqual(crop)
     })
   })
@@ -324,14 +306,7 @@ describe('M08 crop interaction', () => {
 
     for (const document of variants) {
       const view = mountViewportDocument('crop', document)
-      await vi.waitFor(() =>
-        expect(contextFixture.current.strokeRect).toHaveBeenCalledWith(
-          10,
-          8,
-          80,
-          50,
-        ),
-      )
+      await vi.waitFor(() => expect(contextFixture.current.strokeRect).toHaveBeenCalledWith(10, 8, 80, 50))
       await fireEvent.keyDown(window, { key: 'ArrowRight', shiftKey: true })
       await fireEvent.keyDown(window, { key: 'Enter' })
       expect(view.emitted().documentCommand).toEqual([

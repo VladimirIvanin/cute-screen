@@ -65,8 +65,7 @@ export function curvedStartCapRepairScene(): RenderSceneSnapshot {
     updatedAt: '2026-08-14T00:00:00.000Z',
   }
   const parsed = parseEditorDocument(serializeEditorDocument(document))
-  if (parsed.kind !== 'editable')
-    throw new Error('curved start-cap repair golden must be editable')
+  if (parsed.kind !== 'editable') throw new Error('curved start-cap repair golden must be editable')
   const arrowScene = createDocumentRenderScene(parsed.document)
   return createRenderSceneSnapshot({
     width: arrowScene.width,
@@ -146,9 +145,7 @@ export function persistedRichTextScene(): RenderSceneSnapshot {
                 strikethrough: true,
               },
             ],
-            paragraphs: [
-              { start: 0, end: 25, alignment: 'center', listKind: 'bullet' },
-            ],
+            paragraphs: [{ start: 0, end: 25, alignment: 'center', listKind: 'bullet' }],
           },
           background: {
             color: { red: 1, green: 0.87, blue: 0.42, alpha: 1 },
@@ -250,9 +247,7 @@ export function persistedRichTextScene(): RenderSceneSnapshot {
                 strikethrough: true,
               },
             ],
-            paragraphs: [
-              { start: 0, end: 1, alignment: 'center', listKind: 'none' },
-            ],
+            paragraphs: [{ start: 0, end: 1, alignment: 'center', listKind: 'none' }],
           },
           badge: {
             shape: 'circle',
@@ -269,7 +264,6 @@ export function persistedRichTextScene(): RenderSceneSnapshot {
     updatedAt: '2026-08-14T00:00:00.000Z',
   }
   const parsed = parseEditorDocument(serializeEditorDocument(document))
-  if (parsed.kind !== 'editable')
-    throw new Error('rich-text golden must be editable')
+  if (parsed.kind !== 'editable') throw new Error('rich-text golden must be editable')
   return createDocumentRenderScene(parsed.document)
 }

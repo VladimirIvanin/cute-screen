@@ -4,10 +4,13 @@ import {
   type JsonObject,
   type LayerNode,
 } from '../../document/types'
-import { cloneLayer, contentImage, stripTransientLayerFields } from './shared'
+import {
+  cloneLayer,
+  contentImage,
+  stripTransientLayerFields,
+} from './shared'
 
-export const CLIPBOARD_LAYERS_MIME =
-  'application/x-cute-screen-layers+json;version=2' as const
+export const CLIPBOARD_LAYERS_MIME = 'application/x-cute-screen-layers+json;version=2' as const
 
 export interface ClipboardLayersV2 {
   readonly version: 2
@@ -35,8 +38,7 @@ export function decodeClipboardLayersV2(serialized: string): ClipboardLayersV2 {
     !candidate ||
     typeof candidate !== 'object' ||
     (candidate as { version?: unknown }).version !== 2 ||
-    (candidate as { documentSchemaVersion?: unknown }).documentSchemaVersion !==
-      EDITOR_DOCUMENT_SCHEMA_VERSION ||
+    (candidate as { documentSchemaVersion?: unknown }).documentSchemaVersion !== EDITOR_DOCUMENT_SCHEMA_VERSION ||
     !Array.isArray((candidate as { layers?: unknown }).layers)
   ) {
     throw new Error('clipboard layer payload has an unsupported version')
@@ -46,9 +48,7 @@ export function decodeClipboardLayersV2(serialized: string): ClipboardLayersV2 {
     throw new Error('clipboard layer payload has an invalid layer count')
   }
   const parsedLayers = layers.map((rawLayer, index) => {
-    const normalizedInput = contentImage(
-      cloneLayer(stripTransientLayerFields(rawLayer) as LayerNode),
-    )
+    const normalizedInput = contentImage(cloneLayer(stripTransientLayerFields(rawLayer) as LayerNode))
     const parsed = parseEditorDocument({
       schemaVersion: EDITOR_DOCUMENT_SCHEMA_VERSION,
       id: '019c1f62-058e-7000-8000-000000000000',
@@ -76,8 +76,7 @@ export function decodeClipboardLayersV2(serialized: string): ClipboardLayersV2 {
       throw new Error(`clipboard layer ${index} uses a newer document schema`)
     }
     const layer = parsed.document.layers[0]
-    if (!layer)
-      throw new Error(`clipboard layer ${index} is missing after validation`)
+    if (!layer) throw new Error(`clipboard layer ${index} is missing after validation`)
     return contentImage(layer)
   })
   return Object.freeze({

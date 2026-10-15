@@ -1,4 +1,9 @@
-import { describe, expect, it, vi } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 
 import { useQuickCaptureCoordinator } from '../../../apps/desktop/src/use-quick-capture-coordinator'
 
@@ -33,13 +38,7 @@ describe('quick capture coordinator', () => {
     await coordinator.confirmSelection(draft.draftId, draft.selection)
     expect(coordinator.phase.value).toBe('editing')
 
-    await coordinator.commit(
-      draft.draftId,
-      new Uint8Array([1]),
-      '{}',
-      'copied',
-      draft.selection,
-    )
+    await coordinator.commit(draft.draftId, new Uint8Array([1]), '{}', 'copied', draft.selection)
     expect(coordinator.phase.value).toBe('committed')
     expect(bridge.quickCapturePreparePng).toHaveBeenCalledOnce()
     expect(bridge.quickCaptureCommit).toHaveBeenCalledOnce()
@@ -56,13 +55,7 @@ describe('quick capture coordinator', () => {
     coordinator.projectDraft({ ...draft, selectionPending: false })
 
     await expect(
-      coordinator.commit(
-        draft.draftId,
-        new Uint8Array([1]),
-        '{}',
-        'saved',
-        draft.selection,
-      ),
+      coordinator.commit(draft.draftId, new Uint8Array([1]), '{}', 'saved', draft.selection),
     ).rejects.toThrow('encode')
     expect(coordinator.phase.value).toBe('editing')
     expect(bridge.quickCaptureCommit).not.toHaveBeenCalled()

@@ -3,7 +3,11 @@ import path from 'node:path'
 
 import fg from 'fast-glob'
 import ts from 'typescript'
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 interface ArchitectureConfig {
   readonly budgets: {
@@ -34,18 +38,17 @@ interface ArchitectureConfig {
   }[]
 }
 
-const sourcePatterns: string[] = [
-  'apps/desktop/src/**/*.{ts,vue}',
-  'packages/*/src/**/*.{ts,vue}',
-  'tests/**/*.ts',
-]
+const sourcePatterns: string[] = ['apps/desktop/src/**/*.{ts,vue}', 'packages/*/src/**/*.{ts,vue}', 'tests/**/*.ts']
 
 function implementationSource(source: string): string {
   const match = source.match(/<script[^>]*>([\s\S]*?)<\/script>/u)
   return match?.[1] ?? source
 }
 
-function importSpecifiers(source: string, filename: string): readonly string[] {
+function importSpecifiers(
+  source: string,
+  filename: string,
+): readonly string[] {
   const file = ts.createSourceFile(
     filename,
     implementationSource(source),
@@ -56,9 +59,10 @@ function importSpecifiers(source: string, filename: string): readonly string[] {
   const specifiers: string[] = []
   const visit = (node: ts.Node): void => {
     if (
-      (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
-      node.moduleSpecifier &&
-      ts.isStringLiteral(node.moduleSpecifier)
+      (ts.isImportDeclaration(node) ||
+        ts.isExportDeclaration(node)) &&
+        node.moduleSpecifier &&
+        ts.isStringLiteral(node.moduleSpecifier)
     ) {
       specifiers.push(node.moduleSpecifier.text)
     }
@@ -208,15 +212,8 @@ function resolveLocalImport(
   files: ReadonlySet<string>,
 ): string | undefined {
   if (!specifier.startsWith('.')) return undefined
-  const candidate = path.posix.normalize(
-    path.posix.join(path.posix.dirname(filename), specifier),
-  )
-  return [
-    candidate,
-    `${candidate}.ts`,
-    `${candidate}.vue`,
-    `${candidate}/index.ts`,
-  ].find((entry) => files.has(entry))
+  const candidate = path.posix.normalize(path.posix.join(path.posix.dirname(filename), specifier))
+  return [candidate, `${candidate}.ts`, `${candidate}.vue`, `${candidate}/index.ts`].find((entry) => files.has(entry))
 }
 
 describe('TypeScript architecture', () => {
@@ -228,9 +225,7 @@ describe('TypeScript architecture', () => {
       for (const specifier of importSpecifiers(source, filename)) {
         if (
           filename.startsWith('packages/editor-core/') &&
-          /^(?:vue|@tauri-apps|@cute-screen\/editor-(?:renderer|vue))/u.test(
-            specifier,
-          )
+          /^(?:vue|@tauri-apps|@cute-screen\/editor-(?:renderer|vue))/u.test(specifier)
         ) {
           violations.push(`${filename}: ${specifier}`)
         }
@@ -240,10 +235,7 @@ describe('TypeScript architecture', () => {
         ) {
           violations.push(`${filename}: ${specifier}`)
         }
-        if (
-          filename.startsWith('packages/editor-vue/') &&
-          /^(?:@tauri-apps|@cute-screen\/desktop)/u.test(specifier)
-        ) {
+        if (filename.startsWith('packages/editor-vue/') && /^(?:@tauri-apps|@cute-screen\/desktop)/u.test(specifier)) {
           violations.push(`${filename}: ${specifier}`)
         }
       }
@@ -252,23 +244,15 @@ describe('TypeScript architecture', () => {
   })
 
   it('allows Tauri imports only through the desktop platform facade', async () => {
-    const config = JSON.parse(
-      await readFile('config/typescript-architecture.json', 'utf8'),
-    ) as ArchitectureConfig
-    const temporaryImports = new Set(
-      config.temporaryTauriImports.map((entry) => entry.path),
-    )
+    const config = JSON.parse(await readFile('config/typescript-architecture.json', 'utf8')) as ArchitectureConfig
+    const temporaryImports = new Set(config.temporaryTauriImports.map((entry) => entry.path))
     const files = await fg('apps/desktop/src/**/*.{ts,vue}')
     const violations: string[] = []
     for (const filename of files) {
       const source = await readFile(filename, 'utf8')
-      const importsTauri = importSpecifiers(source, filename).some((value) =>
-        value.startsWith('@tauri-apps/'),
-      )
+      const importsTauri = importSpecifiers(source, filename).some((value) => value.startsWith('@tauri-apps/'))
       const isCurrentFacade = filename === 'apps/desktop/src/desktop-bridge.ts'
-      const isTargetFacade = filename.startsWith(
-        'apps/desktop/src/platform/tauri/',
-      )
+      const isTargetFacade = filename.startsWith('apps/desktop/src/platform/tauri/')
       if (
         importsTauri &&
         !isCurrentFacade &&
@@ -286,12 +270,8 @@ describe('TypeScript architecture', () => {
   })
 
   it('ratchets implementation and test file sizes', async () => {
-    const config = JSON.parse(
-      await readFile('config/typescript-architecture.json', 'utf8'),
-    ) as ArchitectureConfig
-    const exceptions = new Map(
-      config.temporaryLineExceptions.map((entry) => [entry.path, entry]),
-    )
+    const config = JSON.parse(await readFile('config/typescript-architecture.json', 'utf8')) as ArchitectureConfig
+    const exceptions = new Map(config.temporaryLineExceptions.map((entry) => [entry.path, entry]))
     const files = await fg(sourcePatterns)
     const violations: string[] = []
     for (const filename of files) {
@@ -303,9 +283,7 @@ describe('TypeScript architecture', () => {
         continue
       }
       const count = countedLines(await readFile(filename, 'utf8'))
-      const budget = isTestFile(filename)
-        ? config.budgets.testLines
-        : config.budgets.productionLines
+      const budget = isTestFile(filename) ? config.budgets.testLines : config.budgets.productionLines
       const exception = exceptions.get(filename)
       const limit = exception?.max ?? budget
       if (count > limit) violations.push(`${filename}: ${count} > ${limit}`)
@@ -336,20 +314,14 @@ describe('TypeScript architecture', () => {
   })
 
   it('keeps local TypeScript module dependencies acyclic', async () => {
-    const productionFiles = new Set(
-      (await fg(sourcePatterns)).filter((filename) => !isTestFile(filename)),
-    )
+    const productionFiles = new Set((await fg(sourcePatterns)).filter((filename) => !isTestFile(filename)))
     const graph = new Map<string, readonly string[]>()
     for (const filename of productionFiles) {
       const source = await readFile(filename, 'utf8')
       graph.set(
         filename,
         importSpecifiers(source, filename).flatMap((specifier) => {
-          const resolved = resolveLocalImport(
-            filename,
-            specifier,
-            productionFiles,
-          )
+          const resolved = resolveLocalImport(filename, specifier, productionFiles)
           return resolved === undefined ? [] : [resolved]
         }),
       )
@@ -376,15 +348,8 @@ describe('TypeScript architecture', () => {
   })
 
   it('ratchets function size, complexity and control-flow depth', async () => {
-    const config = JSON.parse(
-      await readFile('config/typescript-architecture.json', 'utf8'),
-    ) as ArchitectureConfig
-    const exceptions = new Map(
-      (config.temporaryStructureExceptions ?? []).map((entry) => [
-        entry.path,
-        entry,
-      ]),
-    )
+    const config = JSON.parse(await readFile('config/typescript-architecture.json', 'utf8')) as ArchitectureConfig
+    const exceptions = new Map((config.temporaryStructureExceptions ?? []).map((entry) => [entry.path, entry]))
     const violations: string[] = []
     const files = await fg(sourcePatterns)
     for (const filename of files) {
@@ -410,8 +375,8 @@ describe('TypeScript architecture', () => {
         ) {
           violations.push(
             `${filename}:${metric.line} lines=${metric.lines}/${limits.lines} ` +
-              `complexity=${metric.complexity}/${limits.complexity} ` +
-              `depth=${metric.depth}/${limits.depth}`,
+            `complexity=${metric.complexity}/${limits.complexity} ` +
+            `depth=${metric.depth}/${limits.depth}`,
           )
         }
       }

@@ -1,7 +1,15 @@
 import { createRenderSceneSnapshot } from '@cute-screen/editor-core'
 import { renderHeadlessCanvasKitPng } from '@cute-screen/editor-renderer'
-import { beforeAll, describe, expect, it } from 'vitest'
-import { compareRgba, semanticParityTolerance } from './golden'
+import {
+  beforeAll,
+  describe,
+  expect,
+  it,
+} from 'vitest'
+import {
+  compareRgba,
+  semanticParityTolerance,
+} from './golden'
 import {
   canvasKit,
   scene,
@@ -9,7 +17,11 @@ import {
   persistedArrowScene,
   prepareGoldenRuntime,
 } from './golden-runtime-test-kit'
-import { rgba, alphaBounds, assertGolden } from './golden-assertion-test-kit'
+import {
+  rgba,
+  alphaBounds,
+  assertGolden,
+} from './golden-assertion-test-kit'
 
 beforeAll(prepareGoldenRuntime)
 
@@ -31,23 +43,16 @@ describe('renderer golden harness self-test', () => {
       await assertGolden(`canvaskit-dpr-${dpr}`, canvasKitPng)
       await assertGolden(`canvas2d-dpr-${dpr}`, fallback.exported)
 
-      expect(
-        compareRgba(
-          await rgba(fallback.preview),
-          await rgba(fallback.exported),
-        ),
-      ).toEqual({ changedChannels: 0, maximumDelta: 0 })
+      expect(compareRgba(await rgba(fallback.preview), await rgba(fallback.exported))).toEqual({
+        changedChannels: 0,
+        maximumDelta: 0,
+      })
 
-      const difference = compareRgba(
-        await rgba(canvasKitPng),
-        await rgba(fallback.exported),
+      const difference = compareRgba(await rgba(canvasKitPng), await rgba(fallback.exported))
+      expect(difference.changedChannels / (scene(dpr).width * scene(dpr).height * 4)).toBeLessThanOrEqual(
+        semanticParityTolerance.maximumChangedChannelRatio,
       )
-      expect(
-        difference.changedChannels / (scene(dpr).width * scene(dpr).height * 4),
-      ).toBeLessThanOrEqual(semanticParityTolerance.maximumChangedChannelRatio)
-      expect(difference.maximumDelta).toBeLessThanOrEqual(
-        semanticParityTolerance.maximumDelta,
-      )
+      expect(difference.maximumDelta).toBeLessThanOrEqual(semanticParityTolerance.maximumDelta)
     })
   }
 
@@ -76,28 +81,12 @@ describe('renderer golden harness self-test', () => {
       })
       const canvasKitPng = renderHeadlessCanvasKitPng(canvasKit, snapshot)
       const fallback = await canvas2dPngs(snapshot, dpr)
-      const canvasKitBounds = alphaBounds(
-        await rgba(canvasKitPng),
-        snapshot.width,
-        snapshot.height,
-      )
-      const canvas2dBounds = alphaBounds(
-        await rgba(fallback.exported),
-        snapshot.width,
-        snapshot.height,
-      )
-      expect(
-        Math.abs(canvasKitBounds.left - canvas2dBounds.left),
-      ).toBeLessThanOrEqual(1)
-      expect(
-        Math.abs(canvasKitBounds.top - canvas2dBounds.top),
-      ).toBeLessThanOrEqual(1)
-      expect(
-        Math.abs(canvasKitBounds.right - canvas2dBounds.right),
-      ).toBeLessThanOrEqual(1)
-      expect(
-        Math.abs(canvasKitBounds.bottom - canvas2dBounds.bottom),
-      ).toBeLessThanOrEqual(1)
+      const canvasKitBounds = alphaBounds(await rgba(canvasKitPng), snapshot.width, snapshot.height)
+      const canvas2dBounds = alphaBounds(await rgba(fallback.exported), snapshot.width, snapshot.height)
+      expect(Math.abs(canvasKitBounds.left - canvas2dBounds.left)).toBeLessThanOrEqual(1)
+      expect(Math.abs(canvasKitBounds.top - canvas2dBounds.top)).toBeLessThanOrEqual(1)
+      expect(Math.abs(canvasKitBounds.right - canvas2dBounds.right)).toBeLessThanOrEqual(1)
+      expect(Math.abs(canvasKitBounds.bottom - canvas2dBounds.bottom)).toBeLessThanOrEqual(1)
     })
   }
 
@@ -109,23 +98,16 @@ describe('renderer golden harness self-test', () => {
 
       await assertGolden(`arrow-${route}-canvaskit`, canvasKitPng)
       await assertGolden(`arrow-${route}-canvas2d`, fallback.exported)
-      expect(
-        compareRgba(
-          await rgba(fallback.preview),
-          await rgba(fallback.exported),
-        ),
-      ).toEqual({ changedChannels: 0, maximumDelta: 0 })
+      expect(compareRgba(await rgba(fallback.preview), await rgba(fallback.exported))).toEqual({
+        changedChannels: 0,
+        maximumDelta: 0,
+      })
 
-      const difference = compareRgba(
-        await rgba(canvasKitPng),
-        await rgba(fallback.exported),
+      const difference = compareRgba(await rgba(canvasKitPng), await rgba(fallback.exported))
+      expect(difference.changedChannels / (snapshot.width * snapshot.height * 4)).toBeLessThanOrEqual(
+        semanticParityTolerance.maximumChangedChannelRatio,
       )
-      expect(
-        difference.changedChannels / (snapshot.width * snapshot.height * 4),
-      ).toBeLessThanOrEqual(semanticParityTolerance.maximumChangedChannelRatio)
-      expect(difference.maximumDelta).toBeLessThanOrEqual(
-        semanticParityTolerance.maximumDelta,
-      )
+      expect(difference.maximumDelta).toBeLessThanOrEqual(semanticParityTolerance.maximumDelta)
     })
   }
 })

@@ -1,5 +1,14 @@
-import { fireEvent, render, waitFor, within } from '@testing-library/vue'
-import { describe, expect, it } from 'vitest'
+import {
+  fireEvent,
+  render,
+  waitFor,
+  within,
+} from '@testing-library/vue'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 import ContextToolbar from '../../../packages/editor-vue/src/shell/components/ContextToolbar.vue'
 import TextFormattingToolbar from '../../../packages/editor-vue/src/shell/components/TextFormattingToolbar.vue'
@@ -22,8 +31,7 @@ const schema = {
     alignment: 'start' as const,
     background: null,
     disabled: ['list', 'none', 'padding', 'radius'] as const,
-    disabledReason:
-      'Lists, padding and radius are unavailable for numbered markers.',
+    disabledReason: 'Lists, padding and radius are unavailable for numbered markers.',
   },
 }
 
@@ -33,37 +41,17 @@ describe('v7 text contextual toolbar', () => {
       props: { schema, label: 'Tool settings', pickerLocale: 'en' },
     })
     expect(
-      [...rendered.container.querySelectorAll('[data-text-control]')].map(
-        (node) => node.getAttribute('data-text-control'),
-      ),
-    ).toEqual([
-      'color',
-      'font',
-      'size',
-      'bold',
-      'italic',
-      'strikethrough',
-      'list',
-      'alignment',
-      'background',
-    ])
-    expect(rendered.getByLabelText('Bold: mixed')).toHaveAttribute(
-      'aria-pressed',
-      'mixed',
-    )
+      [...rendered.container.querySelectorAll('[data-text-control]')].map((node) =>
+        node.getAttribute('data-text-control')),
+    ).toEqual(['color', 'font', 'size', 'bold', 'italic', 'strikethrough', 'list', 'alignment', 'background'])
+    expect(rendered.getByLabelText('Bold: mixed')).toHaveAttribute('aria-pressed', 'mixed')
     expect(rendered.getByLabelText('Bullet list')).toBeDisabled()
-    expect(rendered.getByLabelText('Bullet list')).toHaveAttribute(
-      'title',
-      schema.text.disabledReason,
-    )
+    expect(rendered.getByLabelText('Bullet list')).toHaveAttribute('title', schema.text.disabledReason)
     await fireEvent.click(rendered.getByLabelText('Background'))
     expect(rendered.getByRole('button', { name: 'None' })).toBeDisabled()
     for (const name of ['Padding', 'Radius']) {
       expect(rendered.getByLabelText(name)).toBeDisabled()
-      expect(rendered.getByLabelText(name)).toHaveAttribute(
-        'title',
-        schema.text.disabledReason,
-      )
+      expect(rendered.getByLabelText(name)).toHaveAttribute('title', schema.text.disabledReason)
     }
   })
 
@@ -89,10 +77,7 @@ describe('v7 text contextual toolbar', () => {
     expect(rendered.getByLabelText('Text color: mixed')).toBeInTheDocument()
     expect(rendered.getByLabelText('Font family: mixed')).toHaveValue('')
     expect(rendered.getByLabelText('Font size: mixed')).toHaveTextContent('—')
-    expect(rendered.getByLabelText('Bullet list')).toHaveAttribute(
-      'aria-pressed',
-      'mixed',
-    )
+    expect(rendered.getByLabelText('Bullet list')).toHaveAttribute('aria-pressed', 'mixed')
     expect(rendered.getByLabelText('Text alignment')).toHaveValue('')
   })
 
@@ -111,14 +96,9 @@ describe('v7 text contextual toolbar', () => {
     expect(rendered.emitted().change).toContainEqual(['textFont', 'Georgia'])
     const size = rendered.getByLabelText('Font size')
     await fireEvent.click(size)
-    const arbitrary = rendered.getByLabelText(
-      'Font size value',
-    ) as HTMLInputElement
+    const arbitrary = rendered.getByLabelText('Font size value') as HTMLInputElement
     await fireEvent.update(arbitrary, '257')
-    expect(rendered.emitted().change).not.toContainEqual([
-      'textFontSize',
-      '257',
-    ])
+    expect(rendered.emitted().change).not.toContainEqual(['textFontSize', '257'])
     expect(rendered.getByRole('button', { name: 'Apply' })).toBeDisabled()
     await fireEvent.update(arbitrary, '32')
     await fireEvent.click(rendered.getByRole('button', { name: 'Apply' }))
@@ -131,9 +111,7 @@ describe('v7 text contextual toolbar', () => {
     const backgroundDialog = rendered.getByRole('dialog')
     const padding = rendered.getByLabelText('Padding') as HTMLInputElement
     await fireEvent.update(padding, '257')
-    expect(
-      within(backgroundDialog).getByRole('button', { name: 'Apply' }),
-    ).toBeDisabled()
+    expect(within(backgroundDialog).getByRole('button', { name: 'Apply' })).toBeDisabled()
     await fireEvent.pointerDown(document.body)
     await waitFor(() => expect(background).toHaveFocus())
   })
@@ -142,33 +120,23 @@ describe('v7 text contextual toolbar', () => {
     const rendered = render(ContextToolbar, {
       props: { schema, label: 'Настройки инструмента', pickerLocale: 'ru' },
     })
-    expect(rendered.getByLabelText('Полужирный: смешанное')).toHaveAttribute(
-      'aria-pressed',
-      'mixed',
-    )
+    expect(rendered.getByLabelText('Полужирный: смешанное')).toHaveAttribute('aria-pressed', 'mixed')
     const overflow = rendered.getByLabelText('Дополнительные настройки текста')
     await fireEvent.click(overflow)
-    expect(
-      rendered.getByRole('dialog', { name: 'Дополнительные настройки текста' }),
-    ).toBeInTheDocument()
-    expect(
-      rendered.container.querySelector('.cs-text-toolbar'),
-    ).not.toHaveStyle({ overflowX: 'auto' })
+    expect(rendered.getByRole('dialog', { name: 'Дополнительные настройки текста' })).toBeInTheDocument()
+    expect(rendered.container.querySelector('.cs-text-toolbar')).not.toHaveStyle({ overflowX: 'auto' })
 
     const overflowDialog = rendered.getByRole('dialog', {
       name: 'Дополнительные настройки текста',
     })
-    await fireEvent.click(
-      within(overflowDialog).getByRole('button', { name: 'Фон' }),
-    )
+    await fireEvent.click(within(overflowDialog).getByRole('button', { name: 'Фон' }))
     await fireEvent.keyDown(rendered.getByRole('dialog'), { key: 'Escape' })
     expect(overflow).toHaveFocus()
 
     await fireEvent.click(overflow)
-    await fireEvent.keyDown(
-      rendered.getByRole('dialog', { name: 'Дополнительные настройки текста' }),
-      { key: 'Escape' },
-    )
+    await fireEvent.keyDown(rendered.getByRole('dialog', { name: 'Дополнительные настройки текста' }), {
+      key: 'Escape',
+    })
     expect(overflow).toHaveFocus()
   })
 
@@ -181,23 +149,10 @@ describe('v7 text contextual toolbar', () => {
         variant: 'floating',
       },
     })
+    expect(rendered.container.querySelector('.cs-text-floating-toolbar')).toBeTruthy()
     expect(
-      rendered.container.querySelector('.cs-text-floating-toolbar'),
-    ).toBeTruthy()
-    expect(
-      [...rendered.container.querySelectorAll('[data-text-control]')].map(
-        (node) => node.getAttribute('data-text-control'),
-      ),
-    ).toEqual([
-      'color',
-      'font',
-      'size',
-      'bold',
-      'italic',
-      'strikethrough',
-      'list',
-      'alignment',
-      'background',
-    ])
+      [...rendered.container.querySelectorAll('[data-text-control]')].map((node) =>
+        node.getAttribute('data-text-control')),
+    ).toEqual(['color', 'font', 'size', 'bold', 'italic', 'strikethrough', 'list', 'alignment', 'background'])
   })
 })

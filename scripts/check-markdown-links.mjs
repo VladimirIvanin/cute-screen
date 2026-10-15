@@ -1,4 +1,7 @@
-import { readFile, stat } from 'node:fs/promises'
+import {
+  readFile,
+  stat,
+} from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 
@@ -53,16 +56,12 @@ for (const file of markdownFiles) {
 
     const [rawTarget = '', rawAnchor] = href.split('#', 2)
     const decodedTarget = decodeURIComponent(rawTarget)
-    const target = decodedTarget
-      ? path.resolve(path.dirname(file), decodedTarget)
-      : file
+    const target = decodedTarget ? path.resolve(path.dirname(file), decodedTarget) : file
 
     try {
       const metadata = await stat(target)
       if (!metadata.isFile()) {
-        failures.push(
-          `${path.relative(root, file)}: target is not a file: ${href}`,
-        )
+        failures.push(`${path.relative(root, file)}: target is not a file: ${href}`)
         continue
       }
     } catch (error) {
@@ -91,7 +90,5 @@ if (failures.length > 0) {
   console.error(`Markdown link check failed:\n${failures.join('\n')}`)
   process.exitCode = 1
 } else {
-  console.log(
-    `Checked relative links and anchors in ${markdownFiles.length} Markdown files.`,
-  )
+  console.log(`Checked relative links and anchors in ${markdownFiles.length} Markdown files.`)
 }

@@ -1,4 +1,7 @@
-import type { RenderTextStyle, RgbaColor } from '@cute-screen/editor-core'
+import type {
+  RenderTextStyle,
+  RgbaColor,
+} from '@cute-screen/editor-core'
 
 export const TEXT_LINE_HEIGHT = 1.25
 export const FALLBACK_LINE_ASCENT = 0.8
@@ -7,19 +10,16 @@ export const FALLBACK_LINE_DESCENT = 0.2
 export type RichTextMeasureResult =
   | number
   | Readonly<{
-      width: number
-      /** Actual glyph ink bounds used for visual centering. */
-      ascent: number
-      descent: number
-      /** Font box metrics used for a CSS-compatible line baseline. */
-      lineAscent?: number
-      lineDescent?: number
-    }>
+    width: number
+    /** Actual glyph ink bounds used for visual centering. */
+    ascent: number
+    descent: number
+    /** Font box metrics used for a CSS-compatible line baseline. */
+    lineAscent?: number
+    lineDescent?: number
+  }>
 
-export type RichTextMeasure = (
-  text: string,
-  style: RenderTextStyle,
-) => RichTextMeasureResult
+export type RichTextMeasure = (text: string, style: RenderTextStyle) => RichTextMeasureResult
 
 export interface RichTextLayoutFragment extends RenderTextStyle {
   readonly text: string

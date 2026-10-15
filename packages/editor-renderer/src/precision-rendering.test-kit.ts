@@ -1,4 +1,8 @@
-import { createCanvas, loadImage, type Canvas } from '@napi-rs/canvas'
+import {
+  createCanvas,
+  loadImage,
+  type Canvas,
+} from '@napi-rs/canvas'
 import {
   createRenderSceneSnapshot,
   type RenderCensorEffect,
@@ -69,27 +73,19 @@ export async function canvas2dPng(
   }> = {},
 ): Promise<Uint8Array> {
   const renderer = new Canvas2DRenderer({
-    exportCanvas: (width, height) =>
-      createCanvas(width, height) as unknown as Canvas2DLike,
+    exportCanvas: (width, height) => createCanvas(width, height) as unknown as Canvas2DLike,
   })
-  const preview = createCanvas(
-    scene.outputBounds.width,
-    scene.outputBounds.height,
-  )
+  const preview = createCanvas(scene.outputBounds.width, scene.outputBounds.height)
   await renderer.initialize({
     scene: asHtmlCanvas(preview),
-    overlay: asHtmlCanvas(
-      createCanvas(scene.outputBounds.width, scene.outputBounds.height),
-    ),
+    overlay: asHtmlCanvas(createCanvas(scene.outputBounds.width, scene.outputBounds.height)),
     dpr: 1,
     correlationId: 'm08-precision-rendering',
   })
   renderer.setScene(scene)
   renderer.setOverlay(options.overlay ?? [])
   renderer.render(['scene', 'overlay'])
-  const bytes = options.preview
-    ? await preview.encode('png')
-    : await renderer.exportPng({ scale: options.scale ?? 1 })
+  const bytes = options.preview ? await preview.encode('png') : await renderer.exportPng({ scale: options.scale ?? 1 })
   renderer.dispose()
   return bytes
 }
@@ -202,9 +198,7 @@ export function transformedHorizontalRulerScene(
   })
 }
 
-export function outsideLoupeScene(
-  shape: 'circle' | 'rectangle',
-): RenderSceneSnapshot {
+export function outsideLoupeScene(shape: 'circle' | 'rectangle'): RenderSceneSnapshot {
   return createRenderSceneSnapshot({
     width: 64,
     height: 40,
@@ -231,9 +225,7 @@ export function outsideLoupeScene(
   })
 }
 
-export function calloutLoupeScene(
-  shape: 'circle' | 'rectangle',
-): RenderSceneSnapshot {
+export function calloutLoupeScene(shape: 'circle' | 'rectangle'): RenderSceneSnapshot {
   return createRenderSceneSnapshot({
     width: 120,
     height: 60,

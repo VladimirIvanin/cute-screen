@@ -34,19 +34,13 @@ function paragraphsAfterReplacement(
     logicalParagraphRanges(nextText).map((paragraph) => {
       let style: RichTextParagraphStyle
       if (paragraph.start === 0) {
-        style =
-          range.start === 0
-            ? insertionStyle
-            : richTextParagraphStyleAt(previous, 0)
+        style = range.start === 0 ? insertionStyle : richTextParagraphStyleAt(previous, 0)
       } else {
         const separator = paragraph.start - 1
         if (separator >= range.start && separator < insertedEnd) {
           style = insertionStyle
         } else {
-          const oldOffset =
-            paragraph.start <= range.start
-              ? paragraph.start
-              : paragraph.start - delta
+          const oldOffset = paragraph.start <= range.start ? paragraph.start : paragraph.start - delta
           style = richTextParagraphStyleAt(previous, oldOffset)
         }
       }
@@ -62,10 +56,7 @@ export function replaceRichTextSelection(
   const content = normalizeRichTextContent(state.content)
   const selection = normalizeRichTextSelection(content.text, state.selection)
   const range = richTextSelectionRange(selection)
-  const text =
-    content.text.slice(0, range.start) +
-    insertedText +
-    content.text.slice(range.end)
+  const text = content.text.slice(0, range.start) + insertedText + content.text.slice(range.end)
   const delta = insertedText.length - (range.end - range.start)
   const spans: RichTextSpan[] = []
 
@@ -78,42 +69,22 @@ export function replaceRichTextSelection(
     }
   }
   if (insertedText.length > 0) {
-    spans.push(
-      freezeSpan(
-        range.start,
-        range.start + insertedText.length,
-        state.typingStyle,
-      ),
-    )
+    spans.push(freezeSpan(range.start, range.start + insertedText.length, state.typingStyle))
   }
   for (const span of content.spans) {
     if (span.end <= range.end) continue
     const sourceStart = Math.max(span.start, range.end)
-    spans.push(
-      freezeSpan(sourceStart + delta, span.end + delta, spanStyle(span)),
-    )
+    spans.push(freezeSpan(sourceStart + delta, span.end + delta, spanStyle(span)))
   }
 
-  const caret = normalizeOffset(
-    text,
-    range.start + insertedText.length,
-    'backward',
-  )
+  const caret = normalizeOffset(text, range.start + insertedText.length, 'backward')
   return Object.freeze({
     content: Object.freeze({
       text,
       wrap: content.wrap,
-      ...(content.fixedWidth === undefined
-        ? {}
-        : { fixedWidth: content.fixedWidth }),
+      ...(content.fixedWidth === undefined ? {} : { fixedWidth: content.fixedWidth }),
       spans: text.length === 0 ? Object.freeze([]) : mergeSpans(spans),
-      paragraphs: paragraphsAfterReplacement(
-        content,
-        text,
-        range,
-        insertedText,
-        state.paragraphStyle,
-      ),
+      paragraphs: paragraphsAfterReplacement(content, text, range, insertedText, state.paragraphStyle),
     }),
     selection: Object.freeze({ anchor: caret, focus: caret }),
     typingStyle: state.typingStyle,
@@ -156,8 +127,7 @@ export function reconcileRichTextText(
   while (
     suffix < oldPoints.length - prefix &&
     suffix < nextPoints.length - prefix &&
-    oldPoints[oldPoints.length - 1 - suffix] ===
-      nextPoints[nextPoints.length - 1 - suffix]
+    oldPoints[oldPoints.length - 1 - suffix] === nextPoints[nextPoints.length - 1 - suffix]
   ) {
     suffix += 1
   }
@@ -171,10 +141,7 @@ export function reconcileRichTextText(
     ...state,
     selection: Object.freeze({ anchor: oldStart, focus: oldEnd }),
   })
-  const replaced = replaceRichTextSelection(
-    replacing,
-    nextText.slice(nextStart, nextEnd),
-  )
+  const replaced = replaceRichTextSelection(replacing, nextText.slice(nextStart, nextEnd))
   return Object.freeze({
     ...replaced,
     selection: normalizeRichTextSelection(nextText, nextSelection),

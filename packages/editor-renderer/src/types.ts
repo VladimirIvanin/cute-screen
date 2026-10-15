@@ -1,4 +1,7 @@
-import type { RenderNode, RenderSceneSnapshot } from '@cute-screen/editor-core'
+import type {
+  RenderNode,
+  RenderSceneSnapshot,
+} from '@cute-screen/editor-core'
 
 import type { InvalidationReason } from './scheduler'
 
@@ -59,13 +62,13 @@ export type RendererRuntimeState =
   | Readonly<{ status: 'initializing'; backend: 'canvaskit' }>
   | Readonly<{ status: 'ready'; backend: RendererBackend }>
   | Readonly<{
-      status: 'recovering'
-      backend: 'canvas2d'
-      reason: 'contextLost'
-    }>
+    status: 'recovering'
+    backend: 'canvas2d'
+    reason: 'contextLost'
+  }>
   | Readonly<{
-      status: 'fallback'
-      backend: 'canvas2d'
-      reason: 'startupFailure' | 'recoveryFailure'
-    }>
+    status: 'fallback'
+    backend: 'canvas2d'
+    reason: 'startupFailure' | 'recoveryFailure'
+  }>
   | Readonly<{ status: 'disposed'; backend: RendererBackend }>

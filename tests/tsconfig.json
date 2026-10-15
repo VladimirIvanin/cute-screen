@@ -3,13 +3,9 @@
   "compilerOptions": {
     "paths": {
       "@cute-screen/editor-core": ["../packages/editor-core/src/index.ts"],
-      "@cute-screen/editor-renderer": [
-        "../packages/editor-renderer/src/index.ts"
-      ],
+      "@cute-screen/editor-renderer": ["../packages/editor-renderer/src/index.ts"],
       "@cute-screen/editor-vue": ["../packages/editor-vue/src/index.ts"],
-      "canvaskit-wasm": [
-        "./../packages/editor-renderer/src/canvaskit-wasm-shim.d.ts"
-      ]
+      "canvaskit-wasm": ["./../packages/editor-renderer/src/canvaskit-wasm-shim.d.ts"]
     },
     "skipLibCheck": true,
     "noEmit": true,

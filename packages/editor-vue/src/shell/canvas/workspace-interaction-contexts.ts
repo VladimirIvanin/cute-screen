@@ -62,9 +62,7 @@ export interface WorkspaceInteractionPorts {
   readonly updateArrowToolbar: () => void
 }
 
-export function createPointerDownContext(
-  ports: WorkspaceInteractionPorts,
-): PointerDownContext {
+export function createPointerDownContext(ports: WorkspaceInteractionPorts): PointerDownContext {
   const { state, pointerGeometry, eyedropper } = ports
   return {
     props: ports.props,
@@ -87,17 +85,12 @@ export function createPointerDownContext(
     sampleScene: (point) => eyedropper.sample(point),
     visibleCanvasCenter: () => eyedropper.visibleCanvasCenter(),
     selectedLayer: ports.selectedLayer,
-    loupeSourceHandle: (layer, point) =>
-      pointerGeometry.loupeSourceHandle(layer, point),
-    calloutHandle: (layer, point) =>
-      pointerGeometry.calloutHandle(layer, point),
+    loupeSourceHandle: (layer, point) => pointerGeometry.loupeSourceHandle(layer, point),
+    calloutHandle: (layer, point) => pointerGeometry.calloutHandle(layer, point),
     arrowHandle: (layer, point) => pointerGeometry.arrowHandle(layer, point),
-    intrinsicEndpoint: (layer, point) =>
-      pointerGeometry.intrinsicEndpoint(layer, point),
-    resizeHandle: (layer, point) =>
-      pointerGeometry.boundsResizeHandle(layer, point),
-    rotationCorner: (layer, point) =>
-      pointerGeometry.rotationCorner(layer, point),
+    intrinsicEndpoint: (layer, point) => pointerGeometry.intrinsicEndpoint(layer, point),
+    resizeHandle: (layer, point) => pointerGeometry.boundsResizeHandle(layer, point),
+    rotationCorner: (layer, point) => pointerGeometry.rotationCorner(layer, point),
     resizeCursor: (handle) => pointerGeometry.resizeCursor(handle),
     setCursor: (cursor, rotate) => pointerGeometry.setCursor(cursor, rotate),
     layerBounds: ports.layerBounds,
@@ -108,9 +101,7 @@ export function createPointerDownContext(
   }
 }
 
-export function createPointerMoveContext(
-  ports: WorkspaceInteractionPorts,
-): PointerMoveContext {
+export function createPointerMoveContext(ports: WorkspaceInteractionPorts): PointerMoveContext {
   return {
     props: ports.props,
     emit: ports.emit,
@@ -121,10 +112,8 @@ export function createPointerMoveContext(
     setRulerGuide: ports.setRulerGuide,
     canvasPoint: ports.canvasPoint,
     samplingCursor: ports.eyedropper.cursor,
-    scheduleEyedropper: (point, client) =>
-      ports.eyedropper.schedule(point, client),
-    updateHoverCursor: (point) =>
-      ports.pointerGeometry.updateHoverCursor(point),
+    scheduleEyedropper: (point, client) => ports.eyedropper.schedule(point, client),
+    updateHoverCursor: (point) => ports.pointerGeometry.updateHoverCursor(point),
     snapCandidates: (id) => ports.geometry.snapCandidates(id),
     invalidateOverlay: ports.invalidateOverlay,
     invalidateGesturePreview: () => ports.renderer.invalidateGesturePreview(),
@@ -132,9 +121,7 @@ export function createPointerMoveContext(
   }
 }
 
-export function createGestureFinishContext(
-  ports: WorkspaceInteractionPorts,
-): GestureFinishContext {
+export function createGestureFinishContext(ports: WorkspaceInteractionPorts): GestureFinishContext {
   return {
     props: ports.props,
     emit: ports.emit,
@@ -145,23 +132,15 @@ export function createGestureFinishContext(
     clearGesture: () => ports.setGesture(undefined),
     clearRulerGuide: () => ports.setRulerGuide(undefined),
     precisionLayer: (id) => ports.draft.precisionLayer(id),
-    samplingError: (english, russian) =>
-      document.documentElement.lang === 'ru' ? russian : english,
+    samplingError: (english, russian) => (document.documentElement.lang === 'ru' ? russian : english),
     resizeTransform: (layer, handle, point, freeResize, centerResize) =>
-      ports.geometry.resizeTransform(
-        layer,
-        handle,
-        point,
-        freeResize,
-        centerResize,
-      ),
+      ports.geometry.resizeTransform(layer, handle, point, freeResize, centerResize),
     toLocal: ports.toLocal,
     moveLoupeSource: ports.moveLoupeSource,
     resolveCalloutStroke: () => ports.draft.resolveCalloutStroke(),
     startText: (input) => ports.textEditor.start(input),
     canvasPoint: ports.canvasPoint,
-    updateHoverCursor: (point) =>
-      ports.pointerGeometry.updateHoverCursor(point),
+    updateHoverCursor: (point) => ports.pointerGeometry.updateHoverCursor(point),
     invalidateOverlay: ports.invalidateOverlay,
     renderCommittedScene: () => rendererCommitted(ports.renderer),
     updateArrowToolbar: ports.updateArrowToolbar,

@@ -1,4 +1,12 @@
 import { computed } from 'vue'
+import {
+  applyLayerStyle,
+  extractLayerStyle,
+  styleCommand,
+  type JsonObject,
+  type EditorCommand,
+  type LayerNode,
+} from '@cute-screen/editor-renderer'
 import { storeToRefs } from 'pinia'
 import type { DrawingToolPreferencesV2 } from '@cute-screen/editor-renderer'
 import type { ResolvedEditorShellProps } from '../contracts'
@@ -24,6 +32,7 @@ type WorkspaceState = ReturnType<typeof createWorkspaceState>
 type Translate = (key: Parameters<typeof import('../i18n').t>[1]) => string
 
 export interface WorkspaceBindingsContext {
+  readonly rememberTextDefaults: (layer: LayerNode) => void
   readonly props: ResolvedEditorShellProps
   readonly store: ShellStore
   readonly workspace: WorkspaceState
@@ -34,9 +43,7 @@ export interface WorkspaceBindingsContext {
 function createSchemas(context: WorkspaceBindingsContext) {
   const { props, store, workspace, translate } = context
   const state = storeToRefs(store)
-  const hasInteractiveDocument = computed(
-    () => props.documentSession !== undefined || props.fixture === 'ready',
-  )
+  const hasInteractiveDocument = computed(() => props.documentSession !== undefined || props.fixture === 'ready')
   const { tools } = createToolCatalog({
     quickMode: props.quickMode,
     readOnlyDocument: props.readOnlyDocument,
@@ -67,12 +74,14 @@ function createSchemas(context: WorkspaceBindingsContext) {
     activeToolId: state.activeToolId,
     activeDocument: workspace.activeDocument,
     textDefaults: workspace.textDefaults,
+    calloutStroke: workspace.calloutStroke,
     textDraft: workspace.textDraft,
     translate,
     hexColor: precision.hexColor,
   })
   const contextSchema = createContextSchema({
     quickMode: computed(() => props.quickMode),
+    readOnly: computed(() => props.readOnlyDocument),
     store,
     activeToolId: state.activeToolId,
     activeDocument: workspace.activeDocument,
@@ -94,42 +103,113 @@ function createSchemas(context: WorkspaceBindingsContext) {
   return { state, tools, precision, drawing, text, contextSchema }
 }
 
+function isSelectionStyleTarget(
+  context: WorkspaceBindingsContext,
+  layers: readonly LayerNode[],
+): boolean {
+  return !context.workspace.configureDefaultsTool.value && !context.workspace.textDraft.value && context.store.activeToolId === 'select' && layers.length > 0
+}
+function createSettingsTarget(context: WorkspaceBindingsContext) {
+  const { props, store, workspace } = context
+  let captured: EditorCommand[] | undefined
+  const settingsStore = {
+    get selectedLayerIds() {
+      if (
+        workspace.configureDefaultsTool.value ||
+        (!workspace.settingsLayerId.value &&
+          store.activeToolId !== 'select')
+      )
+        return []
+      return workspace.settingsLayerId.value ? [workspace.settingsLayerId.value] : store.selectedLayerIds
+    },
+    get selectedLayerId() {
+      return this.selectedLayerIds[0]
+    },
+  }
+  const settingsTool = computed(
+    () => workspace.configureDefaultsTool.value ?? (workspace.settingsLayerId.value ? 'select' : store.activeToolId),
+  )
+  const selected = () =>
+    workspace.activeDocument.value?.layers.find((layer) => layer.id === settingsStore.selectedLayerId)
+  const effectProps = new Proxy(props, {
+    get(
+      target,
+      key,
+    ) {
+      const value = Reflect.get(target, key)
+      if (key !== 'documentSession' || !value) return value
+      return new Proxy(value, {
+        get(
+          session,
+          property,
+        ) {
+          if (property === 'execute')
+            return (command: EditorCommand) => (captured ? captured.push(command) : session.execute(command))
+          const member = Reflect.get(session, property, session)
+          return typeof member === 'function' ? member.bind(session) : member
+        },
+      })
+    },
+  })
+  return { settingsStore, settingsTool, selected, effectProps, capture: (commands: EditorCommand[]) => {
+    captured = commands
+  }, release: () => {
+    captured = undefined
+  } }
+}
+
 function createEffects(
   context: WorkspaceBindingsContext,
   schemas: ReturnType<typeof createSchemas>,
 ) {
-  const { props, store, workspace } = context
+  const { store, workspace } = context
+  const target = createSettingsTarget(context)
+  const { settingsStore, settingsTool, selected, effectProps } = target
   const precision = createPrecisionEffects({
-    props,
+    props: effectProps,
     activeDocument: workspace.activeDocument,
     precisionDefaults: workspace.precisionDefaults,
-    selectedPrecisionLayer: schemas.precision.selectedPrecisionLayer,
+    selectedPrecisionLayer: () => {
+      const layer = selected()
+      return layer && ['censor', 'spotlight', 'ruler', 'loupe'].includes(layer.kind)
+        ? (layer as ReturnType<typeof schemas.precision.selectedPrecisionLayer>)
+        : undefined
+    },
   })
   const text = createTextEffects({
-    props,
-    store,
+    props: effectProps,
+    store: settingsStore,
     activeDocument: workspace.activeDocument,
     textDefaults: workspace.textDefaults,
+    calloutStroke: workspace.calloutStroke,
+    configuringCallout: () =>
+      workspace.configureDefaultsTool.value === 'callout' ||
+      (!workspace.settingsLayerId.value && store.activeToolId === 'callout'),
     textFormatting: workspace.textFormatting,
-    textDraft: workspace.textDraft,
+    textDraft: computed(() => (workspace.configureDefaultsTool.value ? undefined : workspace.textDraft.value)),
   })
   const drawing = createDrawingEffects({
-    props,
-    activeToolId: schemas.state.activeToolId,
+    props: effectProps,
+    activeToolId: settingsTool,
     configureDefaultsTool: workspace.configureDefaultsTool,
     drawingDefaults: workspace.drawingDefaults,
     drawingPreferences: workspace.drawingPreferences,
     isDrawingTool: schemas.drawing.isDrawingTool,
-    selectedDrawingLayer: schemas.drawing.selectedDrawingLayer,
+    selectedDrawingLayer: () => {
+      const layer = selected()
+      return layer && schemas.drawing.isDrawingTool(layer.kind)
+        ? (layer as ReturnType<typeof schemas.drawing.selectedDrawingLayer>)
+        : undefined
+    },
     savePreferences: context.saveDrawingPreferences,
   })
   const image = createImageEffects({
-    props,
-    selectedLayerId: schemas.state.selectedLayerId,
+    props: effectProps,
+    selectedLayerId: computed(() => settingsStore.selectedLayerId),
     activeDocument: workspace.activeDocument,
   })
   const contextEffects = createContextEffects({
-    activeToolId: schemas.state.activeToolId,
+    activeToolId: settingsTool,
     cropPreset: workspace.cropPreset,
     markerShape: workspace.markerShape,
     canvas: workspace.canvasViewport,
@@ -139,7 +219,113 @@ function createEffects(
     applyImageChange: image.applyImageChange,
     applyDrawingChange: drawing.applyDrawingChange,
   })
-  return { precision, contextEffects }
+  return { precision, contextEffects: createSelectionSettingsChange(context, contextEffects, target) }
+}
+
+function createSelectionSettingsChange(
+  context: WorkspaceBindingsContext,
+  contextEffects: { onContextChange(id: string, value: string): void },
+  target: ReturnType<typeof createSettingsTarget>,
+) {
+  const { props, store, workspace } = context
+  const { capture, release } = target
+  function onContextChange(
+    id: string,
+    value: string,
+  ): void {
+    const layers =
+      workspace.activeDocument.value?.layers.filter((layer) => store.selectedLayerIds.includes(layer.id)) ?? []
+    if (!isSelectionStyleTarget(context, layers)) {
+      const tool = workspace.configureDefaultsTool.value ?? store.activeToolId
+      if (
+        !workspace.textDraft.value &&
+        tool &&
+        tool !== 'select' &&
+        workspace.rememberedStyles.value[tool as LayerNode['kind']]
+      ) workspace.rememberedStyles.value = { ...workspace.rememberedStyles.value, [tool]: {} }
+      contextEffects.onContextChange(id, value)
+      return
+    }
+    if (props.readOnlyDocument || layers.some((layer) => layer.locked)) return
+    const textBefore = workspace.textDefaults.value
+    const commands: EditorCommand[] = []
+    capture(commands)
+    try {
+      for (const layer of layers) {
+        workspace.settingsLayerId.value = layer.id
+        if (
+          id === 'markerShape' &&
+          layer.kind === 'numberedMarker' &&
+          ['circle', 'square', 'diamond', 'star'].includes(value)
+        )
+          commands.push({
+            type: 'updateLayer',
+            before: layer,
+            after: applyLayerStyle(layer, { badgeShape: value }),
+          })
+        else contextEffects.onContextChange(id === 'width' && layer.kind === 'ruler' ? 'rulerThickness' : id, value)
+      }
+    } finally {
+      workspace.settingsLayerId.value = undefined
+      release()
+      workspace.textDefaults.value = textBefore
+    }
+    const changed = commands.filter(
+      (command) => command.type !== 'updateLayer' || JSON.stringify(command.before) !== JSON.stringify(command.after),
+    )
+    if (!changed.length) return
+    props.documentSession?.execute(changed.length === 1 ? changed[0]! : { type: 'batch', commands: changed })
+    if (layers.every((layer) => layer.kind === layers[0]!.kind)) {
+      workspace.configureDefaultsTool.value = layers[0]!.kind
+      try {
+        contextEffects.onContextChange(id, value)
+      } finally {
+        workspace.configureDefaultsTool.value = undefined
+      }
+      const command = changed.find((entry) => entry.type === 'updateLayer')
+      if (command?.type === 'updateLayer') {
+        const before = extractLayerStyle(command.before)
+        const after = extractLayerStyle(command.after)
+        const patch = Object.fromEntries(
+          Object.entries(after).filter(([key, entry]) => JSON.stringify(entry) !== JSON.stringify(before[key])),
+        )
+        workspace.rememberedStyles.value = {
+          ...workspace.rememberedStyles.value,
+          [command.after.kind]: {
+            ...workspace.rememberedStyles.value[command.after.kind],
+            ...patch,
+          },
+        }
+      }
+    }
+  }
+  return { onContextChange }
+}
+
+function applyTextureFill(
+  context: WorkspaceBindingsContext,
+  fill: JsonObject,
+): void {
+  const { props, store, workspace } = context
+  if (props.readOnlyDocument) return
+  const document = workspace.activeDocument.value
+  const selection = store.activeToolId === 'select' && !workspace.toolConfigure.value
+    ? document?.layers.filter((layer) => store.selectedLayerIds.includes(layer.id)) ?? []
+    : []
+  if (selection.some((layer) => layer.kind !== 'shape' || layer.locked)) return
+  if (selection.length) {
+    const command = styleCommand(selection, { fill }, document?.canvas)
+    if (!command) return
+    props.documentSession?.execute(command)
+  }
+  workspace.rememberedStyles.value = {
+    ...workspace.rememberedStyles.value,
+    shape: { ...workspace.rememberedStyles.value.shape, fill },
+  }
+  workspace.drawingDefaults.value = {
+    ...workspace.drawingDefaults.value,
+    shape: { ...workspace.drawingDefaults.value.shape, fill },
+  }
 }
 
 function createControllers(
@@ -154,10 +340,10 @@ function createControllers(
     cropPreset: workspace.cropPreset,
     activeDocument: workspace.activeDocument,
     textureImages: workspace.textureImages,
-    drawingDefaults: workspace.drawingDefaults,
-    drawingPreferences: workspace.drawingPreferences,
-    selectedDrawingLayer: schemas.drawing.selectedDrawingLayer,
-    saveDrawingPreferences: context.saveDrawingPreferences,
+    applyTextureFill: (fill) => applyTextureFill(context, fill),
+    reportResourceError: (message) => {
+      workspace.toolError.value = message
+    },
   })
   const toolUi = createToolUiController({
     props,
@@ -180,14 +366,23 @@ function createControllers(
     props,
     activeDocument: workspace.activeDocument,
     store,
+    prepareLayer: (layer) => {
+      const style = workspace.rememberedStyles.value[layer.kind]
+      return style && !['text', 'callout'].includes(layer.kind)
+        ? applyLayerStyle(layer, style, workspace.activeDocument.value?.canvas)
+        : layer
+    },
   })
   const content = createContentController({
+    error: workspace.toolError,
     props,
     activeDocument: workspace.activeDocument,
     contentImageImporting: workspace.contentImageImporting,
     textureImages: workspace.textureImages,
     textDefaults: workspace.textDefaults,
     selectedLayerId: schemas.state.selectedLayerId,
+    addLayer: layers.addLayer,
+    rememberTextDefaults: context.rememberTextDefaults,
   })
   return { actions, toolUi, layers, content }
 }
@@ -200,8 +395,9 @@ export function createWorkspaceBindings(context: WorkspaceBindingsContext) {
     tools: schemas.tools,
     floatingTextToolbarSchema: schemas.text.floatingTextToolbarSchema,
     contextSchema: schemas.contextSchema.contextSchema,
-    floatingArrowToolbarSchema:
-      schemas.contextSchema.floatingArrowToolbarSchema,
+    selectionSchema: schemas.contextSchema.selectionSchema,
+    toolConfigureSchema: schemas.contextSchema.toolConfigureSchema,
+    floatingArrowToolbarSchema: schemas.contextSchema.floatingArrowToolbarSchema,
     toolConfigureArrowSchema: schemas.contextSchema.toolConfigureArrowSchema,
     onContextChange: effects.contextEffects.onContextChange,
     ...controllers.actions,

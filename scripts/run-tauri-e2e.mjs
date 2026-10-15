@@ -1,6 +1,10 @@
 import { spawnSync } from 'node:child_process'
 import net from 'node:net'
-import { mkdtemp, mkdir, rm } from 'node:fs/promises'
+import {
+  mkdtemp,
+  mkdir,
+  rm,
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
@@ -9,10 +13,7 @@ const root = process.cwd()
 const artifacts = path.join(root, 'artifacts', 'tauri-e2e')
 await mkdir(artifacts, { recursive: true })
 
-const embeddedWebDriverPort = Number.parseInt(
-  process.env.TAURI_WEBDRIVER_PORT ?? '4445',
-  10,
-)
+const embeddedWebDriverPort = Number.parseInt(process.env.TAURI_WEBDRIVER_PORT ?? '4445', 10)
 
 const scenarios = [
   {
@@ -104,16 +105,10 @@ const requestedScenarioIds = new Set(
     .filter(Boolean),
 )
 const selectedScenarios =
-  requestedScenarioIds.size === 0
-    ? scenarios
-    : scenarios.filter(({ id }) => requestedScenarioIds.has(id))
-const unknownScenarioIds = [...requestedScenarioIds].filter(
-  (id) => !scenarios.some((scenario) => scenario.id === id),
-)
+  requestedScenarioIds.size === 0 ? scenarios : scenarios.filter(({ id }) => requestedScenarioIds.has(id))
+const unknownScenarioIds = [...requestedScenarioIds].filter((id) => !scenarios.some((scenario) => scenario.id === id))
 if (unknownScenarioIds.length > 0) {
-  throw new Error(
-    `Unknown Tauri E2E scenarios: ${unknownScenarioIds.join(', ')}`,
-  )
+  throw new Error(`Unknown Tauri E2E scenarios: ${unknownScenarioIds.join(', ')}`)
 }
 
 function isolatedAppDataEnvironment(directory) {
@@ -134,13 +129,18 @@ function isolatedAppDataEnvironment(directory) {
       ...environment,
       APPDATA: path.join(directory, 'roaming'),
       LOCALAPPDATA: path.join(directory, 'local'),
+      WEBVIEW2_USER_DATA_FOLDER: path.join(directory, 'webview2'),
     }
   }
 
   return environment
 }
 
-function run(command, args, extraEnv = {}) {
+function run(
+  command,
+  args,
+  extraEnv = {},
+) {
   const result = spawnSync(command, args, {
     cwd: root,
     env: { ...process.env, ...extraEnv },
@@ -168,7 +168,10 @@ function isPortInUse(port) {
   })
 }
 
-async function waitForPortFree(port, timeoutMs = 30_000) {
+async function waitForPortFree(
+  port,
+  timeoutMs = 30_000,
+) {
   const startedAt = Date.now()
   while (Date.now() - startedAt < timeoutMs) {
     const inUse = await isPortInUse(port)
@@ -182,28 +185,18 @@ async function waitForPortFree(port, timeoutMs = 30_000) {
   )
 }
 
-const executable = path.join(
-  root,
-  'target',
-  'debug',
-  process.platform === 'win32' ? 'cute-screen.exe' : 'cute-screen',
-)
-const wdioCli = path.join(
-  root,
-  'node_modules',
-  '@wdio',
-  'cli',
-  'bin',
-  'wdio.js',
-)
+const executable = path.join(root, 'target', 'debug', process.platform === 'win32' ? 'cute-screen.exe' : 'cute-screen')
+const wdioCli = path.join(root, 'node_modules', '@wdio', 'cli', 'bin', 'wdio.js')
 
 const failedScenarios = []
 const retainedAppDataDirs = []
 let m03AppData
 
 try {
-  run('pnpm', ['fixtures:generate:m01'])
-  run(
+  if (run('pnpm', ['fixtures:generate:m01']) !== 0) {
+    throw new Error('Tauri E2E fixture generation failed; application will not be launched')
+  }
+  const buildStatus = run(
     'pnpm',
     [
       'tauri',
@@ -221,12 +214,14 @@ try {
     },
   )
 
+  if (buildStatus !== 0) {
+    throw new Error('Tauri E2E build failed; refusing to test a stale application binary')
+  }
+
   for (const scenario of selectedScenarios) {
     const appData =
       scenario.persistenceGroup === 'm03'
-        ? (m03AppData ??= await mkdtemp(
-            path.join(tmpdir(), 'cute-screen-e2e-m03-'),
-          ))
+        ? (m03AppData ??= await mkdtemp(path.join(tmpdir(), 'cute-screen-e2e-m03-')))
         : await mkdtemp(path.join(tmpdir(), `cute-screen-e2e-${scenario.id}-`))
 
     await waitForPortFree(embeddedWebDriverPort)
@@ -236,6 +231,7 @@ try {
       CUTE_SCREEN_WDIO_APP_BINARY: executable,
       CUTE_SCREEN_WDIO_ARTIFACTS: artifacts,
       CUTE_SCREEN_E2E_SCENARIO: scenario.id,
+      CUTE_SCREEN_E2E_DRIVER_PROVIDER: process.platform === 'win32' ? 'external' : 'embedded',
     }
     if (scenario.harnessQuery) {
       scenarioEnv.CUTE_SCREEN_E2E_HARNESS_QUERY = scenario.harnessQuery

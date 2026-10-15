@@ -1,7 +1,12 @@
 import CanvasKitInit from 'canvaskit-wasm'
 import { createRenderSceneSnapshot } from '@cute-screen/editor-core'
 import path from 'node:path'
-import { beforeAll, describe, expect, it } from 'vitest'
+import {
+  beforeAll,
+  describe,
+  expect,
+  it,
+} from 'vitest'
 import type { CanvasKitApi } from './backends/canvaskit/contracts'
 import { renderHeadlessCanvasKitPng } from './backends/canvaskit/renderer'
 import {
@@ -23,10 +28,7 @@ describe('M08 CanvasKit precision renderer/export', () => {
   beforeAll(async () => {
     canvasKit = (await CanvasKitInit({
       locateFile: () =>
-        path.resolve(
-          process.cwd(),
-          'packages/editor-renderer/node_modules/canvaskit-wasm/bin/canvaskit.wasm',
-        ),
+        path.resolve(process.cwd(), 'packages/editor-renderer/node_modules/canvaskit-wasm/bin/canvaskit.wasm'),
     })) as CanvasKitApi
   })
 
@@ -49,64 +51,42 @@ describe('M08 CanvasKit precision renderer/export', () => {
     ['rotation 180°', { rotation: 180 }],
     ['horizontal reflection', { scaleX: -1 }],
     ['vertical reflection', { scaleY: -1 }],
-  ] as const)(
-    'keeps the ruler badge pixels world-upright after %s',
-    async (_label, transform) => {
-      const baseline = await decodedPixels(
-        renderHeadlessCanvasKitPng(canvasKit, horizontalRulerScene()),
-      )
-      const transformed = await decodedPixels(
-        renderHeadlessCanvasKitPng(
-          canvasKit,
-          transformedHorizontalRulerScene(transform),
-        ),
-      )
-      expect(Array.from(transformed.data)).toEqual(Array.from(baseline.data))
-    },
-  )
+  ] as const)('keeps the ruler badge pixels world-upright after %s', async (_label, transform) => {
+    const baseline = await decodedPixels(renderHeadlessCanvasKitPng(canvasKit, horizontalRulerScene()))
+    const transformed = await decodedPixels(
+      renderHeadlessCanvasKitPng(canvasKit, transformedHorizontalRulerScene(transform)),
+    )
+    expect(Array.from(transformed.data)).toEqual(Array.from(baseline.data))
+  })
 
   it.each([
     ['circle', 1],
     ['circle', 2],
     ['rectangle', 1],
     ['rectangle', 2],
-  ] as const)(
-    'clears old destination pixels for a partially outside %s loupe at scale %i',
-    async (shape, scale) => {
-      const decoded = await decodedPixels(
-        renderHeadlessCanvasKitPng(canvasKit, outsideLoupeScene(shape), [], {
-          scale,
-        }),
-      )
-      expectPixelClose(pixel(decoded, 32 * scale, 20 * scale), [0, 0, 0, 0])
-      expectPixelClose(
-        pixel(decoded, 52 * scale, 20 * scale),
-        [255, 0, 0, 255],
-        3,
-      )
-    },
-  )
+  ] as const)('clears old destination pixels for a partially outside %s loupe at scale %i', async (shape, scale) => {
+    const decoded = await decodedPixels(
+      renderHeadlessCanvasKitPng(canvasKit, outsideLoupeScene(shape), [], {
+        scale,
+      }),
+    )
+    expectPixelClose(pixel(decoded, 32 * scale, 20 * scale), [0, 0, 0, 0])
+    expectPixelClose(pixel(decoded, 52 * scale, 20 * scale), [255, 0, 0, 255], 3)
+  })
 
   it.each([
     ['circle', 1],
     ['circle', 2],
     ['rectangle', 1],
     ['rectangle', 2],
-  ] as const)(
-    'renders a %s loupe callout connector at export scale %i',
-    async (shape, scale) => {
-      const decoded = await decodedPixels(
-        renderHeadlessCanvasKitPng(canvasKit, calloutLoupeScene(shape), [], {
-          scale,
-        }),
-      )
-      expectPixelClose(
-        pixel(decoded, 40 * scale, 30 * scale),
-        [255, 255, 255, 255],
-        4,
-      )
-    },
-  )
+  ] as const)('renders a %s loupe callout connector at export scale %i', async (shape, scale) => {
+    const decoded = await decodedPixels(
+      renderHeadlessCanvasKitPng(canvasKit, calloutLoupeScene(shape), [], {
+        scale,
+      }),
+    )
+    expectPixelClose(pixel(decoded, 40 * scale, 30 * scale), [255, 255, 255, 255], 4)
+  })
 
   it('consumes censor/spotlight/ruler/loupe nodes with crop and below-layer order', async () => {
     const scene = createRenderSceneSnapshot({

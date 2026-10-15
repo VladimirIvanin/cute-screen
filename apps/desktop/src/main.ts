@@ -11,22 +11,15 @@ if (import.meta.env.VITE_TEST_HARNESS === 'true') {
 const harnessSearch = await resolveHarnessSearch()
 if (
   import.meta.env.VITE_TEST_HARNESS === 'true' &&
-  harnessSearch &&
-  !window.location.search
+    harnessSearch &&
+    !window.location.search
 ) {
-  window.history.replaceState(
-    null,
-    '',
-    `${window.location.pathname}${harnessSearch}`,
-  )
+  window.history.replaceState(null, '', `${window.location.pathname}${harnessSearch}`)
 }
 const harnessParams = new URLSearchParams(harnessSearch)
-const isM01Harness =
-  import.meta.env.VITE_M01_HARNESS === 'true' &&
-  harnessParams.get('m01') === '1'
+const isM01Harness = import.meta.env.VITE_M01_HARNESS === 'true' && harnessParams.get('m01') === '1'
 
-const isQuickCapture =
-  new URLSearchParams(window.location.search).get('quickCapture') === '1'
+const isQuickCapture = new URLSearchParams(window.location.search).get('quickCapture') === '1'
 const Root = isM01Harness
   ? (await import('./M01Harness.vue')).default
   : isQuickCapture

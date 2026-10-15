@@ -34,8 +34,7 @@ export interface ClipboardBridge extends ImageTransportBridge {
   writeClipboardText?(text: string, correlationId: string): Promise<void>
 }
 
-export type ImageTransportErrorCode =
-  'dimensionMismatch' | 'imageCorrupt' | 'transportDenied'
+export type ImageTransportErrorCode = 'dimensionMismatch' | 'imageCorrupt' | 'transportDenied'
 
 export class ImageTransportError extends Error {
   readonly code: ImageTransportErrorCode
@@ -65,10 +64,7 @@ export interface LoadImageOptions<Resource> {
   readonly token: string
   readonly correlationId: string
   readonly bridge: ImageTransportBridge
-  readonly createResource: (
-    image: HTMLImageElement,
-    metadata: StagedImageMetadata,
-  ) => Promise<Resource>
+  readonly createResource: (image: HTMLImageElement, metadata: StagedImageMetadata) => Promise<Resource>
   readonly decodeImage?: (url: string) => Promise<HTMLImageElement>
   readonly objectUrls?: ObjectUrlLifecycle
   /** Test/evidence hook; production callers should not surface filesystem URLs. */
@@ -101,10 +97,7 @@ function assertDimensions(
   image: HTMLImageElement,
   metadata: StagedImageMetadata,
 ): void {
-  if (
-    image.naturalWidth !== metadata.width ||
-    image.naturalHeight !== metadata.height
-  ) {
+  if (image.naturalWidth !== metadata.width || image.naturalHeight !== metadata.height) {
     throw new ImageTransportError(
       'dimensionMismatch',
       metadata.correlationId,
@@ -122,17 +115,9 @@ export async function loadImageWithBinaryFallback<Resource>(
 ): Promise<LoadedImageResource<Resource>> {
   let metadata: StagedImageMetadata
   try {
-    metadata = await options.bridge.stageImage(
-      options.token,
-      options.correlationId,
-    )
+    metadata = await options.bridge.stageImage(options.token, options.correlationId)
   } catch (error) {
-    throw new ImageTransportError(
-      'transportDenied',
-      options.correlationId,
-      'Native image staging failed',
-      error,
-    )
+    throw new ImageTransportError('transportDenied', options.correlationId, 'Native image staging failed', error)
   }
 
   const decodeImage = options.decodeImage ?? decodeBrowserImage
@@ -155,17 +140,9 @@ export async function loadImageWithBinaryFallback<Resource>(
 
   let bytes: ArrayBuffer
   try {
-    bytes = await options.bridge.readImageBytes(
-      options.token,
-      options.correlationId,
-    )
+    bytes = await options.bridge.readImageBytes(options.token, options.correlationId)
   } catch (error) {
-    throw new ImageTransportError(
-      'transportDenied',
-      options.correlationId,
-      'Native binary image read failed',
-      error,
-    )
+    throw new ImageTransportError('transportDenied', options.correlationId, 'Native binary image read failed', error)
   }
 
   const objectUrls = options.objectUrls ?? browserObjectUrls

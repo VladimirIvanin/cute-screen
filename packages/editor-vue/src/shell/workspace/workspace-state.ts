@@ -1,4 +1,7 @@
-import { ref, shallowRef } from 'vue'
+import {
+  ref,
+  shallowRef,
+} from 'vue'
 import {
   defaultDrawingToolPreferences,
   DEFAULT_DRAWING_DEFAULTS,
@@ -68,28 +71,30 @@ export function createWorkspaceState() {
     fallbackCopied: ref(false),
     fallbackVisible: ref(true),
     fallbackCopiedTimer: ref<number>(),
-    drawingDefaults: ref<DrawingDefaults>(
-      structuredClone(DEFAULT_DRAWING_DEFAULTS),
-    ),
+    drawingDefaults: ref<DrawingDefaults>(structuredClone(DEFAULT_DRAWING_DEFAULTS)),
     textDefaults: shallowRef<TextToolDefaults>({ ...DEFAULT_TEXT_TOOL }),
+    calloutStroke: shallowRef<import('@cute-screen/editor-renderer').StrokeStyle>(
+      structuredClone(DEFAULT_DRAWING_DEFAULTS.arrow.stroke as import('@cute-screen/editor-renderer').StrokeStyle),
+    ),
     textFormatting: shallowRef<TextFormattingPatch>(),
     textDraft: ref<TextDraft>(),
-    toolConfigure: ref<
-      { readonly toolId: string; readonly anchor: HTMLElement } | undefined
-    >(),
-    toolConfigureLayout: ref<
-      { readonly left: number; readonly top: number } | undefined
-    >(),
-    configureDefaultsTool: ref<'arrow'>(),
+    toolConfigure: ref<{ readonly toolId: string; readonly anchor: HTMLElement } | undefined>(),
+    toolConfigureLayout: ref<{ readonly left: number; readonly top: number } | undefined>(),
+    configureDefaultsTool: ref<string>(),
+    settingsLayerId: ref<string>(),
+    rememberedStyles: shallowRef<
+      Partial<
+        Record<
+          import('@cute-screen/editor-renderer').LayerNode['kind'],
+          import('@cute-screen/editor-renderer').LayerStyle
+        >
+      >
+    >({}),
     markerShape: ref<'circle' | 'square' | 'diamond' | 'star'>('circle'),
     cropPreset: ref<CropPreset>('free'),
-    precisionDefaults: shallowRef<PrecisionToolDefaults>(
-      structuredClone(DEFAULT_PRECISION_TOOLS),
-    ),
+    precisionDefaults: shallowRef<PrecisionToolDefaults>(structuredClone(DEFAULT_PRECISION_TOOLS)),
     contentImageImporting: ref(false),
-    drawingPreferences: shallowRef<DrawingToolPreferencesV2>(
-      defaultDrawingToolPreferences(),
-    ),
+    drawingPreferences: shallowRef<DrawingToolPreferencesV2>(defaultDrawingToolPreferences()),
     samplingControl: ref<string>(),
     eyedropperFeedback: ref<string>(),
     eyedropperColor: ref<string>(),

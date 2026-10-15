@@ -65,17 +65,12 @@ export async function loadFixtureManifest(
   ])
   const manifest: unknown = JSON.parse(manifestSource)
   const schema: object = JSON.parse(schemaSource)
-  const validate = new Ajv2020({ allErrors: true, strict: true }).compile(
-    schema,
-  )
+  const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema)
 
   if (!validate(manifest)) {
     throw new FixtureValidationError(
       `Invalid fixture manifest: ${validate.errors
-        ?.map(
-          (error) =>
-            `${error.instancePath || '/'} ${error.message ?? 'is invalid'}`,
-        )
+        ?.map((error) => `${error.instancePath || '/'} ${error.message ?? 'is invalid'}`)
         .join('; ')}`,
     )
   }

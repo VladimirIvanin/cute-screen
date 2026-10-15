@@ -1,5 +1,12 @@
-import { createCanvas, loadImage } from '@napi-rs/canvas'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import {
+  createCanvas,
+  loadImage,
+} from '@napi-rs/canvas'
+import {
+  mkdir,
+  readFile,
+  writeFile,
+} from 'node:fs/promises'
 import path from 'node:path'
 import { expect } from 'vitest'
 import { compareRgba } from './golden'
@@ -10,9 +17,7 @@ export async function rgba(png: Uint8Array): Promise<Uint8Array> {
   const canvas = createCanvas(image.width, image.height)
   const context = canvas.getContext('2d')
   context.drawImage(image, 0, 0)
-  return new Uint8Array(
-    context.getImageData(0, 0, image.width, image.height).data,
-  )
+  return new Uint8Array(context.getImageData(0, 0, image.width, image.height).data)
 }
 
 export function alphaBounds(

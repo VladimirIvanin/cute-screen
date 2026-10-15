@@ -1,6 +1,18 @@
-import { fireEvent, render, screen, within } from '@testing-library/vue'
+import {
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/vue'
 import { markRaw } from 'vue'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 import {
   createEditorShellPinia,
   DocumentSessionController,
@@ -19,9 +31,7 @@ import {
 beforeEach(() => {
   window.localStorage.clear()
   contextFixture.current = canvasContext()
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
-    contextFixture.current,
-  )
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(contextFixture.current)
 })
 
 afterEach(() => {
@@ -29,7 +39,7 @@ afterEach(() => {
 })
 
 describe('M08 shell lifecycle and contextual settings', () => {
-  it('keeps precision settings in the bottom toolbar and auto-selects only loupe', async () => {
+  it('keeps creation defaults below and selects completed precision objects', async () => {
     const session = new DocumentSessionController({
       document: documentFixture(),
       revision: 1,
@@ -46,23 +56,17 @@ describe('M08 shell lifecycle and contextual settings', () => {
     })
 
     await fireEvent.click(screen.getByRole('button', { name: 'Hide data' }))
-    const toolbar = view.container.querySelector(
-      '.cs-context-toolbar',
-    ) as HTMLElement
+    const toolbar = view.container.querySelector('.cs-context-toolbar') as HTMLElement
     expect(within(toolbar).getByText('Effect')).toBeInTheDocument()
     expect(within(toolbar).getByText('Region')).toBeInTheDocument()
     const effect = within(toolbar).getByRole('combobox', { name: 'Effect' })
     await fireEvent.click(effect)
     for (const option of ['Pixelate', 'Blur', 'Solid']) {
-      expect(
-        await screen.findByRole('option', { name: option }),
-      ).toBeInTheDocument()
+      expect(await screen.findByRole('option', { name: option })).toBeInTheDocument()
     }
     await fireEvent.pointerDown(document.body)
     await fireEvent.click(screen.getByRole('button', { name: 'Show layers' }))
-    expect(
-      view.container.querySelector('.cs-layers-panel'),
-    ).not.toHaveTextContent('Effect')
+    expect(view.container.querySelector('.cs-layers-panel')).not.toHaveTextContent('Effect')
 
     await fireEvent.click(screen.getByRole('button', { name: 'Loupe' }))
     const scene = screen.getByLabelText('Scene canvas') as HTMLCanvasElement
@@ -80,14 +84,8 @@ describe('M08 shell lifecycle and contextual settings', () => {
     await fireEvent.pointerUp(scene, { pointerId: 5, clientX: 80, clientY: 50 })
 
     expect(session.snapshot.core.document.layers).toHaveLength(1)
-    expect(screen.getByRole('button', { name: 'Loupe' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
-    expect(view.container.querySelector('.cs-layer-row')).toHaveAttribute(
-      'aria-selected',
-      'true',
-    )
+    expect(screen.getByRole('button', { name: 'Select' })).toHaveAttribute('aria-pressed', 'true')
+    expect(view.container.querySelector('.cs-layer-row')).toHaveAttribute('aria-selected', 'true')
 
     session.dispose()
     view.unmount()
@@ -120,36 +118,26 @@ describe('M08 shell lifecycle and contextual settings', () => {
       })
       await fireEvent.click(screen.getByRole('button', { name: toolLabel }))
       await selectLayerFromPanel(view, { activateSelect: false })
-      const layerButton = view.container.querySelector(
-        '.cs-layer-select',
-      ) as HTMLButtonElement
-      expect(layerButton.closest('.cs-layer-row')).toHaveAttribute(
-        'aria-selected',
-        'true',
-      )
+      const layerButton = view.container.querySelector('.cs-layer-select') as HTMLButtonElement
+      expect(layerButton.closest('.cs-layer-row')).toHaveAttribute('aria-selected', 'true')
       await fireEvent.click(screen.getByRole('button', { name: 'Lock layer' }))
-      await vi.waitFor(() =>
-        expect(session.snapshot.core.document.layers[0]?.locked).toBe(true),
-      )
+      await vi.waitFor(() => expect(session.snapshot.core.document.layers[0]?.locked).toBe(true))
       expect(useEditorShellStore(pinia).selectedLayerIds).toEqual([layer.id])
       execute.mockClear()
 
       await screen.findByRole(kind === 'ruler' ? 'slider' : 'combobox', {
         name: controlLabel,
       })
-      const toolbar = view.container.querySelector(
-        '.cs-context-toolbar',
-      ) as HTMLElement
+      let toolbar = view.container.querySelector('.cs-selection-floating-toolbar .cs-context-toolbar') as HTMLElement
       const toolbarButtons = within(toolbar).queryAllByRole('button')
       const toolbarComboboxes = within(toolbar).queryAllByRole('combobox')
       const toolbarSliders = within(toolbar).queryAllByRole('slider')
-      expect(
-        toolbarButtons.length +
-          toolbarComboboxes.length +
-          toolbarSliders.length,
-      ).toBeGreaterThan(0)
+      expect(toolbarButtons.length + toolbarComboboxes.length + toolbarSliders.length).toBeGreaterThan(0)
       for (const button of toolbarButtons) {
-        if (!(button as HTMLButtonElement).disabled) {
+        if (
+          !(button as HTMLButtonElement).matches(':disabled') &&
+          !['More', 'Ещё'].includes(button.textContent?.trim() ?? '')
+        ) {
           throw new Error(
             `enabled precision toolbar button: ${button.getAttribute('aria-label') ?? button.textContent?.trim() ?? '<unlabelled>'}`,
           )
@@ -162,10 +150,9 @@ describe('M08 shell lifecycle and contextual settings', () => {
         expect(slider).toHaveAttribute('aria-disabled', 'true')
       }
 
-      const probe = within(toolbar).getByRole(
-        kind === 'ruler' ? 'slider' : 'combobox',
-        { name: controlLabel },
-      ) as HTMLElement
+      const probe = within(toolbar).getByRole(kind === 'ruler' ? 'slider' : 'combobox', {
+        name: controlLabel,
+      }) as HTMLElement
       const before = structuredClone(session.snapshot.core.document)
       probe.focus()
       await fireEvent.keyDown(probe, { key: 'ArrowRight' })
@@ -174,46 +161,36 @@ describe('M08 shell lifecycle and contextual settings', () => {
       expect(probe).toHaveAttribute('tabindex', '-1')
       expect(execute).not.toHaveBeenCalled()
       expect(session.snapshot.core.document).toEqual(before)
-      expect(
-        window.localStorage.getItem('cute-screen.drawing-tool-preferences.v1'),
-      ).toBeNull()
+      expect(window.localStorage.getItem('cute-screen.drawing-tool-preferences.v1')).toBeNull()
 
       useEditorShellStore(pinia).clearLayerSelection()
       await fireEvent.click(screen.getByRole('button', { name: toolLabel }))
-      const defaultControl = within(toolbar).getByRole(
-        kind === 'ruler' ? 'slider' : 'combobox',
-        { name: controlLabel },
-      )
+      toolbar = view.container.querySelector('.cs-bottom-chrome-center .cs-context-toolbar') as HTMLElement
+      const defaultControl = await within(toolbar).findByRole(kind === 'ruler' ? 'slider' : 'combobox', {
+        name: controlLabel,
+      })
       if (kind === 'ruler') {
         expect(defaultControl).toHaveAttribute('aria-valuenow', '2')
       } else {
         expect(defaultControl).toHaveTextContent(
-          kind === 'censor'
-            ? 'Pixelate'
-            : kind === 'spotlight'
-              ? 'Rectangle'
-              : 'Circle',
+          kind === 'censor' ? 'Pixelate' : kind === 'spotlight' ? 'Rectangle' : 'Circle',
         )
       }
 
       layerButton.focus()
       await fireEvent.keyDown(layerButton, { key: 'Enter' })
-      await fireEvent.click(
-        screen.getByRole('button', { name: 'Unlock layer' }),
-      )
+      await fireEvent.click(screen.getByRole('button', { name: 'Unlock layer' }))
       execute.mockClear()
-      const enabledControl = within(toolbar).getByRole(
-        kind === 'ruler' ? 'slider' : 'combobox',
-        { name: controlLabel },
-      )
+      toolbar = view.container.querySelector('.cs-selection-floating-toolbar .cs-context-toolbar') as HTMLElement
+      const enabledControl = await within(toolbar).findByRole(kind === 'ruler' ? 'slider' : 'combobox', {
+        name: controlLabel,
+      })
       if (kind === 'ruler') {
         enabledControl.focus()
         await fireEvent.keyDown(enabledControl, { key: 'ArrowRight' })
       } else {
         await fireEvent.click(enabledControl)
-        await fireEvent.click(
-          await screen.findByRole('option', { name: optionLabel }),
-        )
+        await fireEvent.click(await screen.findByRole('option', { name: optionLabel }))
       }
       expect(execute).toHaveBeenCalledTimes(1)
       expect(session.snapshot.core.document.layers[0]).toMatchObject(
@@ -300,9 +277,7 @@ describe('M08 shell lifecycle and contextual settings', () => {
     store.selectLayer(layer.id)
     store.selectTool('ruler')
     const execute = vi.spyOn(session, 'execute')
-    const toolbar = view.container.querySelector(
-      '.cs-context-toolbar',
-    ) as HTMLElement
+    const toolbar = view.container.querySelector('.cs-context-toolbar') as HTMLElement
     const thickness = await within(toolbar).findByRole('slider', {
       name: 'Thickness',
     })

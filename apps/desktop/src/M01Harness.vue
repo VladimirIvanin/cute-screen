@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import {
+  computed,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+} from 'vue'
 
 import {
   Canvas2DRenderer,
@@ -28,11 +33,11 @@ const transportState = ref<
   | { status: 'idle' }
   | { status: 'loading' }
   | {
-      status: 'ready'
-      transport: 'asset' | 'binary'
-      dimensions: string
-      pixel: string
-    }
+    status: 'ready'
+    transport: 'asset' | 'binary'
+    dimensions: string
+    pixel: string
+  }
   | { status: 'error'; message: string }
 >({ status: 'idle' })
 let runtime: RendererRuntime | undefined
@@ -105,9 +110,7 @@ function createSceneCanvas(): HTMLCanvasElement {
 function activateSceneCanvas(canvas: HTMLCanvasElement): void {
   const host = sceneHost.value
   if (!host) return
-  for (const existing of host.querySelectorAll<HTMLCanvasElement>(
-    '.diagnostic-scene',
-  )) {
+  for (const existing of host.querySelectorAll<HTMLCanvasElement>('.diagnostic-scene')) {
     existing.hidden = existing !== canvas
   }
   if (!canvas.isConnected) host.prepend(canvas)
@@ -125,10 +128,7 @@ onMounted(async () => {
       correlationId: 'm01-renderer-harness',
     },
     createPrimary: async () => {
-      if (
-        requestedBackend === 'broken-wasm' ||
-        requestedBackend === 'canvas2d'
-      ) {
+      if (requestedBackend === 'broken-wasm' || requestedBackend === 'canvas2d') {
         throw new Error('Forced CanvasKit startup failure')
       }
       return new CanvasKitRenderer(await loadBundledCanvasKit())
@@ -201,10 +201,7 @@ async function verifyTransport(): Promise<void> {
         ? {
             ...tauriDesktopBridge,
             readImageBytes: async (token: string, correlationId: string) => {
-              const serialized = (await tauriDesktopBridge.readImageBytes(
-                token,
-                correlationId,
-              )) as unknown as number[]
+              const serialized = (await tauriDesktopBridge.readImageBytes(token, correlationId)) as unknown as number[]
               return Uint8Array.from(serialized).buffer
             },
           }
@@ -213,9 +210,7 @@ async function verifyTransport(): Promise<void> {
       token: harnessParameters.get('token') ?? 'm01-alpha-png',
       correlationId: 'm01-transport-harness',
       bridge,
-      ...(harnessParameters.get('assetFailure') === '1'
-        ? { decodeImage: decodeHarnessImage }
-        : {}),
+      ...(harnessParameters.get('assetFailure') === '1' ? { decodeImage: decodeHarnessImage } : {}),
       onPrimaryFailure: (error, assetUrl) => {
         primaryDiagnostic.value = `${assetUrl} :: ${error instanceof Error ? `${error.name}: ${error.message}` : String(error)}`
       },
@@ -225,9 +220,7 @@ async function verifyTransport(): Promise<void> {
         probe.height = 1
         const context = probe.getContext('2d')
         context?.drawImage(image, 0, 0, 1, 1, 0, 0, 1, 1)
-        pixel = context
-          ? [...context.getImageData(0, 0, 1, 1).data].join(',')
-          : 'unavailable'
+        pixel = context ? [...context.getImageData(0, 0, 1, 1).data].join(',') : 'unavailable'
         return runtime!.createImageResource({
           id: metadata.token,
           width: metadata.width,
@@ -259,7 +252,11 @@ async function verifyTransport(): Promise<void> {
         <p class="eyebrow">M01 · test harness only</p>
         <h1>Renderer and image transport</h1>
       </div>
-      <p class="backend-state" role="status" aria-live="polite">
+      <p
+        class="backend-state"
+        role="status"
+        aria-live="polite"
+      >
         <span class="state-indicator" aria-hidden="true"></span>
         {{ statusLabel }}
       </p>
@@ -286,10 +283,18 @@ async function verifyTransport(): Promise<void> {
 
     <footer class="diagnostic-footer">
       <div class="diagnostic-actions">
-        <button type="button" class="secondary-action" @click="loseContext">
+        <button
+          type="button"
+          class="secondary-action"
+          @click="loseContext"
+        >
           Lose context
         </button>
-        <button type="button" class="secondary-action" @click="restoreContext">
+        <button
+          type="button"
+          class="secondary-action"
+          @click="restoreContext"
+        >
           Restore context
         </button>
         <button
@@ -297,11 +302,7 @@ async function verifyTransport(): Promise<void> {
           :disabled="transportState.status === 'loading'"
           @click="verifyTransport"
         >
-          {{
-            transportState.status === 'loading'
-              ? 'Decoding…'
-              : 'Verify image transport'
-          }}
+          {{ transportState.status === 'loading' ? 'Decoding…' : 'Verify image transport' }}
         </button>
       </div>
       <dl class="diagnostic-metrics">
@@ -316,8 +317,7 @@ async function verifyTransport(): Promise<void> {
         <div>
           <dt>Transport</dt>
           <dd v-if="transportState.status === 'ready'" role="status">
-            {{ transportState.transport }} · {{ transportState.dimensions }} ·
-            rgba({{ transportState.pixel }})
+            {{ transportState.transport }} · {{ transportState.dimensions }} · rgba({{ transportState.pixel }})
           </dd>
           <dd
             v-else-if="transportState.status === 'error'"
@@ -410,8 +410,7 @@ async function verifyTransport(): Promise<void> {
     linear-gradient(45deg, var(--surface-sunken) 25%, transparent 25%),
     linear-gradient(-45deg, var(--surface-sunken) 25%, transparent 25%),
     linear-gradient(45deg, transparent 75%, var(--surface-sunken) 75%),
-    linear-gradient(-45deg, transparent 75%, var(--surface-sunken) 75%),
-    var(--surface-raised);
+    linear-gradient(-45deg, transparent 75%, var(--surface-sunken) 75%), var(--surface-raised);
   background-position:
     0 0,
     0 8px,

@@ -1,17 +1,22 @@
-import { createCanvas, loadImage } from '@napi-rs/canvas'
+import {
+  createCanvas,
+  loadImage,
+} from '@napi-rs/canvas'
 import { createRenderSceneSnapshot } from '@cute-screen/editor-core'
 import CanvasKitInit from 'canvaskit-wasm'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 
 import { renderHeadlessCanvasKitPng } from './backends/canvaskit/renderer'
 import type { CanvasKitFontData } from './backends/canvaskit/contracts'
 import { resolveCanvasKitVisualCenterBaseline } from './backends/canvaskit/geometry'
 
-async function robotoFontData(
-  subset: CanvasKitFontData['subset'],
-): Promise<CanvasKitFontData> {
+async function robotoFontData(subset: CanvasKitFontData['subset']): Promise<CanvasKitFontData> {
   const bytes = await readFile(
     path.resolve(
       process.cwd(),
@@ -21,10 +26,7 @@ async function robotoFontData(
   return {
     family: 'Roboto',
     subset,
-    data: bytes.buffer.slice(
-      bytes.byteOffset,
-      bytes.byteOffset + bytes.byteLength,
-    ) as ArrayBuffer,
+    data: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
   }
 }
 
@@ -32,10 +34,7 @@ describe('CanvasKit renderer nodes and headless output', () => {
   it('applies a shared negative layer scale to vector annotations', async () => {
     const canvasKit = (await CanvasKitInit({
       locateFile: () =>
-        path.resolve(
-          process.cwd(),
-          'packages/editor-renderer/node_modules/canvaskit-wasm/bin/canvaskit.wasm',
-        ),
+        path.resolve(process.cwd(), 'packages/editor-renderer/node_modules/canvaskit-wasm/bin/canvaskit.wasm'),
     })) as import('./backends/canvaskit/contracts').CanvasKitApi
     const png = renderHeadlessCanvasKitPng(
       canvasKit,
@@ -74,10 +73,7 @@ describe('CanvasKit renderer nodes and headless output', () => {
   it('renders a contiguous marker path headlessly', async () => {
     const canvasKit = (await CanvasKitInit({
       locateFile: () =>
-        path.resolve(
-          process.cwd(),
-          'packages/editor-renderer/node_modules/canvaskit-wasm/bin/canvaskit.wasm',
-        ),
+        path.resolve(process.cwd(), 'packages/editor-renderer/node_modules/canvaskit-wasm/bin/canvaskit.wasm'),
     })) as import('./backends/canvaskit/contracts').CanvasKitApi
     const png = renderHeadlessCanvasKitPng(
       canvasKit,
@@ -113,10 +109,7 @@ describe('CanvasKit renderer nodes and headless output', () => {
   it('continues an arrow dash phase through an elbow corner', async () => {
     const canvasKit = (await CanvasKitInit({
       locateFile: () =>
-        path.resolve(
-          process.cwd(),
-          'packages/editor-renderer/node_modules/canvaskit-wasm/bin/canvaskit.wasm',
-        ),
+        path.resolve(process.cwd(), 'packages/editor-renderer/node_modules/canvaskit-wasm/bin/canvaskit.wasm'),
     })) as import('./backends/canvaskit/contracts').CanvasKitApi
     const png = renderHeadlessCanvasKitPng(
       canvasKit,
@@ -156,10 +149,7 @@ describe('CanvasKit renderer nodes and headless output', () => {
   it('creates a software surface and returns decoded PNG bytes', async () => {
     const canvasKit = (await CanvasKitInit({
       locateFile: () =>
-        path.resolve(
-          process.cwd(),
-          'packages/editor-renderer/node_modules/canvaskit-wasm/bin/canvaskit.wasm',
-        ),
+        path.resolve(process.cwd(), 'packages/editor-renderer/node_modules/canvaskit-wasm/bin/canvaskit.wasm'),
     })) as import('./backends/canvaskit/contracts').CanvasKitApi
     const scene = createRenderSceneSnapshot({
       width: 64,
@@ -189,10 +179,7 @@ describe('CanvasKit renderer nodes and headless output', () => {
   it('keeps a missing image recoverable in headless output', async () => {
     const canvasKit = (await CanvasKitInit({
       locateFile: () =>
-        path.resolve(
-          process.cwd(),
-          'packages/editor-renderer/node_modules/canvaskit-wasm/bin/canvaskit.wasm',
-        ),
+        path.resolve(process.cwd(), 'packages/editor-renderer/node_modules/canvaskit-wasm/bin/canvaskit.wasm'),
     })) as import('./backends/canvaskit/contracts').CanvasKitApi
     const png = renderHeadlessCanvasKitPng(
       canvasKit,
@@ -233,10 +220,7 @@ describe('CanvasKit renderer nodes and headless output', () => {
   it('renders a renderer-neutral radial gradient headlessly', async () => {
     const canvasKit = (await CanvasKitInit({
       locateFile: () =>
-        path.resolve(
-          process.cwd(),
-          'packages/editor-renderer/node_modules/canvaskit-wasm/bin/canvaskit.wasm',
-        ),
+        path.resolve(process.cwd(), 'packages/editor-renderer/node_modules/canvaskit-wasm/bin/canvaskit.wasm'),
     })) as import('./backends/canvaskit/contracts').CanvasKitApi
     const png = renderHeadlessCanvasKitPng(
       canvasKit,
@@ -291,15 +275,9 @@ describe('CanvasKit renderer nodes and headless output', () => {
   it('renders mixed rich-text runs, bullet metadata and strikethrough headlessly', async () => {
     const canvasKit = (await CanvasKitInit({
       locateFile: () =>
-        path.resolve(
-          process.cwd(),
-          'packages/editor-renderer/node_modules/canvaskit-wasm/bin/canvaskit.wasm',
-        ),
+        path.resolve(process.cwd(), 'packages/editor-renderer/node_modules/canvaskit-wasm/bin/canvaskit.wasm'),
     })) as import('./backends/canvaskit/contracts').CanvasKitApi
-    const fontData = await Promise.all([
-      robotoFontData('latin'),
-      robotoFontData('cyrillic'),
-    ])
+    const fontData = await Promise.all([robotoFontData('latin'), robotoFontData('cyrillic')])
     const png = renderHeadlessCanvasKitPng(
       canvasKit,
       createRenderSceneSnapshot({
@@ -338,9 +316,7 @@ describe('CanvasKit renderer nodes and headless output', () => {
                 strikethrough: true,
               },
             ],
-            paragraphs: [
-              { start: 0, end: 8, alignment: 'start', listKind: 'bullet' },
-            ],
+            paragraphs: [{ start: 0, end: 8, alignment: 'start', listKind: 'bullet' }],
             rotation: 0,
             opacity: 1,
             visible: true,
@@ -356,18 +332,12 @@ describe('CanvasKit renderer nodes and headless output', () => {
     const pixels = context.getImageData(0, 0, image.width, image.height).data
     expect(
       pixels.some(
-        (value, index) =>
-          index % 4 === 2 &&
-          value > (pixels[index - 2] ?? 0) &&
-          (pixels[index + 1] ?? 0) > 0,
+        (value, index) => index % 4 === 2 && value > (pixels[index - 2] ?? 0) && (pixels[index + 1] ?? 0) > 0,
       ),
     ).toBe(true)
     expect(
       pixels.some(
-        (value, index) =>
-          index % 4 === 0 &&
-          value > (pixels[index + 2] ?? 0) &&
-          (pixels[index + 3] ?? 0) > 0,
+        (value, index) => index % 4 === 0 && value > (pixels[index + 2] ?? 0) && (pixels[index + 3] ?? 0) > 0,
       ),
     ).toBe(true)
   })
@@ -375,10 +345,7 @@ describe('CanvasKit renderer nodes and headless output', () => {
   it('rejects Cyrillic text when no supplied typeface covers its glyphs', async () => {
     const canvasKit = (await CanvasKitInit({
       locateFile: () =>
-        path.resolve(
-          process.cwd(),
-          'packages/editor-renderer/node_modules/canvaskit-wasm/bin/canvaskit.wasm',
-        ),
+        path.resolve(process.cwd(), 'packages/editor-renderer/node_modules/canvaskit-wasm/bin/canvaskit.wasm'),
     })) as import('./backends/canvaskit/contracts').CanvasKitApi
     const latin = await robotoFontData('latin')
     const snapshot = createRenderSceneSnapshot({
@@ -406,9 +373,7 @@ describe('CanvasKit renderer nodes and headless output', () => {
               strikethrough: false,
             },
           ],
-          paragraphs: [
-            { start: 0, end: 6, alignment: 'start', listKind: 'none' },
-          ],
+          paragraphs: [{ start: 0, end: 6, alignment: 'start', listKind: 'none' }],
           rotation: 0,
           opacity: 1,
           visible: true,
@@ -416,18 +381,13 @@ describe('CanvasKit renderer nodes and headless output', () => {
       ],
     })
 
-    expect(() =>
-      renderHeadlessCanvasKitPng(canvasKit, snapshot, [latin]),
-    ).toThrow(/glyph coverage.*справа/u)
+    expect(() => renderHeadlessCanvasKitPng(canvasKit, snapshot, [latin])).toThrow(/glyph coverage.*справа/u)
   })
 
   it('preserves scene-node z-order across image and vector nodes', async () => {
     const canvasKit = (await CanvasKitInit({
       locateFile: () =>
-        path.resolve(
-          process.cwd(),
-          'packages/editor-renderer/node_modules/canvaskit-wasm/bin/canvaskit.wasm',
-        ),
+        path.resolve(process.cwd(), 'packages/editor-renderer/node_modules/canvaskit-wasm/bin/canvaskit.wasm'),
     })) as import('./backends/canvaskit/contracts').CanvasKitApi
     const png = renderHeadlessCanvasKitPng(
       canvasKit,

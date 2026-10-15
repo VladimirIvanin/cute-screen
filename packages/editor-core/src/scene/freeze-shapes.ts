@@ -62,8 +62,7 @@ export function freezeLineNode(node: RenderLineNode): RenderLineNode {
 }
 
 export function freezePathNode(node: RenderPathNode): RenderPathNode {
-  if (node.points.length < 2)
-    throw new RangeError(`${node.id}.points must contain at least 2 entries`)
+  if (node.points.length < 2) throw new RangeError(`${node.id}.points must contain at least 2 entries`)
   assertPositive(node.strokeWidth, `${node.id}.strokeWidth`)
   validateStrokeStyle(node)
   const points = node.points.map((point, index) => {
@@ -79,10 +78,8 @@ export function freezePathNode(node: RenderPathNode): RenderPathNode {
 }
 
 export function freezePolygonNode(node: RenderPolygonNode): RenderPolygonNode {
-  if (node.points.length < 3)
-    throw new RangeError(`${node.id}.points must contain at least 3 entries`)
-  if (node.strokeWidth !== undefined)
-    assertNonNegative(node.strokeWidth, `${node.id}.strokeWidth`)
+  if (node.points.length < 3) throw new RangeError(`${node.id}.points must contain at least 3 entries`)
+  if (node.strokeWidth !== undefined) assertNonNegative(node.strokeWidth, `${node.id}.strokeWidth`)
   const points = node.points.map((point, index) => {
     assertFinite(point.x, `${node.id}.points[${index}].x`)
     assertFinite(point.y, `${node.id}.points[${index}].y`)
@@ -97,8 +94,7 @@ export function freezePolygonNode(node: RenderPolygonNode): RenderPolygonNode {
 }
 
 export function freezeImageNode(node: RenderImageNode): RenderImageNode {
-  if (!node.resourceId)
-    throw new Error(`${node.id}.resourceId must not be empty`)
+  if (!node.resourceId) throw new Error(`${node.id}.resourceId must not be empty`)
   assertFinite(node.x, `${node.id}.x`)
   assertFinite(node.y, `${node.id}.y`)
   assertPositive(node.width, `${node.id}.width`)
@@ -118,10 +114,7 @@ export function freezeImageNode(node: RenderImageNode): RenderImageNode {
   if (node.strokeWidth !== undefined) {
     assertNonNegative(node.strokeWidth, `${node.id}.strokeWidth`)
   }
-  if (
-    node.lineJoin !== undefined &&
-    !['miter', 'round', 'bevel'].includes(node.lineJoin)
-  ) {
+  if (node.lineJoin !== undefined && !['miter', 'round', 'bevel'].includes(node.lineJoin)) {
     throw new RangeError(`${node.id}.lineJoin is invalid`)
   }
   return Object.freeze({
