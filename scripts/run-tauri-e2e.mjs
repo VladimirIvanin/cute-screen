@@ -5,13 +5,16 @@ import {
   mkdir,
   rm,
 } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
+import { cacheDownloadedEdgeDriver } from './tauri-driver-cache.mjs'
 
 const root = process.cwd()
 const artifacts = path.join(root, 'artifacts', 'tauri-e2e')
 await mkdir(artifacts, { recursive: true })
+const runtimeDirectory = path.join(artifacts, 'runtime')
+const driverCache = path.join(artifacts, 'driver-cache')
+await mkdir(runtimeDirectory, { recursive: true })
 
 const embeddedWebDriverPort = Number.parseInt(process.env.TAURI_WEBDRIVER_PORT ?? '4445', 10)
 
@@ -221,8 +224,8 @@ try {
   for (const scenario of selectedScenarios) {
     const appData =
       scenario.persistenceGroup === 'm03'
-        ? (m03AppData ??= await mkdtemp(path.join(tmpdir(), 'cute-screen-e2e-m03-')))
-        : await mkdtemp(path.join(tmpdir(), `cute-screen-e2e-${scenario.id}-`))
+        ? (m03AppData ??= await mkdtemp(path.join(runtimeDirectory, 'cute-screen-e2e-m03-')))
+        : await mkdtemp(path.join(runtimeDirectory, `cute-screen-e2e-${scenario.id}-`))
 
     await waitForPortFree(embeddedWebDriverPort)
 
@@ -232,6 +235,11 @@ try {
       CUTE_SCREEN_WDIO_ARTIFACTS: artifacts,
       CUTE_SCREEN_E2E_SCENARIO: scenario.id,
       CUTE_SCREEN_E2E_DRIVER_PROVIDER: process.platform === 'win32' ? 'external' : 'embedded',
+      ...(process.platform === 'win32' ? {
+        TEMP: runtimeDirectory,
+        TMP: runtimeDirectory,
+        PATH: `${driverCache}${path.delimiter}${process.env.PATH ?? ''}`,
+      } : {}),
     }
     if (scenario.harnessQuery) {
       scenarioEnv.CUTE_SCREEN_E2E_HARNESS_QUERY = scenario.harnessQuery
@@ -245,6 +253,7 @@ try {
       [wdioCli, 'run', 'tests/e2e/wdio.tauri.conf.ts', '--spec', scenario.spec],
       scenarioEnv,
     )
+    if (process.platform === 'win32') await cacheDownloadedEdgeDriver(path.join(runtimeDirectory, 'msedgedriver'), driverCache)
 
     if (status === 0 && scenario.persistenceGroup !== 'm03') {
       await rm(appData, { recursive: true, force: true })

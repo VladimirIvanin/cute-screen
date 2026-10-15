@@ -6,6 +6,8 @@ import {
 } from 'vitest'
 import { createDrawingLayer } from './drawing'
 import { createTextLayer } from './tools/content/text'
+import { CommandManager } from './commands/manager'
+import { withLayers } from './precision-tools.test-kit'
 import {
   applyLayerStyle,
   extractLayerStyle,
@@ -22,6 +24,33 @@ const arrow = () =>
     end: { x: 100, y: 80 },
   }) as ArrowLayer
 describe('tool UX style contract', () => {
+  it('undoes and redoes a heterogeneous style batch without flattening its other properties', () => {
+    const first = arrow()
+    const shape = createDrawingLayer({
+      id: '019c1f62-058e-7000-8000-000000000012', tool: 'shape', start: { x: 150, y: 160 }, end: { x: 200, y: 220 },
+    })!
+    const before = withLayers([first, shape])
+    const manager = new CommandManager(before)
+    const command = styleCommand(before.layers, { opacity: 0.5 }, before.canvas)!
+    expect(command.type).toBe('batch')
+    const after = manager.execute(command).document
+    expect(after.layers.map((layer) => 'opacity' in layer ? layer.opacity : undefined)).toEqual([0.5, 0.5])
+    expect(after.layers.map((layer) => layer.payload)).toEqual(before.layers.map((layer) => layer.payload))
+    expect(after.layers.map((layer) => layer.transform)).toEqual(before.layers.map((layer) => layer.transform))
+    expect(manager.undo().document).toEqual(before)
+    expect(manager.snapshot.canUndo).toBe(false)
+    expect(manager.redo().document).toEqual(after)
+  })
+  it('transfers compatible channels across kinds without copying text or stroke fields into text content', () => {
+    const text = createTextLayer({
+      id: '019c1f62-058e-7000-8000-000000000012', text: 'Unchanged', origin: { x: 150, y: 160 },
+    })!
+    const next = applyLayerStyle(text, { ...extractLayerStyle(arrow()), opacity: 0.7 })
+    expect(next.payload).toEqual(text.payload)
+    expect(next.transform).toEqual(text.transform)
+    expect(next).toEqual(text)
+    expect(next.payload).not.toHaveProperty('stroke')
+  })
   it('uses explicit repeated versus one-shot creation policies', () => {
     for (const kind of ['numberedMarker', 'pencil', 'marker']) expect(creationPolicy(kind)).toBe('repeat')
     for (const kind of ['arrow', 'shape', 'text', 'callout', 'censor', 'spotlight', 'ruler', 'loupe', 'image'])

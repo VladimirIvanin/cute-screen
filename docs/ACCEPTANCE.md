@@ -2,13 +2,18 @@
 
 ## Windows native harness и tool settings (2026-10-15)
 
-Windows x64 / WebView2 155.0.4283.45: filtered stable `pnpm test:e2e:tauri`
-с `quick-chrome,renderer-alpha` прошёл 4/4 + 1/1 через external tauri-driver.
+Windows x64 / WebView2 155.0.4283.45: полный stable `pnpm test:e2e:tauri`
+прошёл 15 scenarios / 18 tests через external tauri-driver.
 ПКМ и Escape имеют `isTrusted=true`; nested stroke panel, keyboard focus,
 handoff, Copy и повторный capture проверены через production mount-flow.
 Следующий сценарий запускается после освобождения портов и остановки driver tree.
 Скриншот `artifacts/tauri-e2e/quick-native-tool-settings.png` просмотрен.
-Подробности и лог — в TESTING.md. Полная UX/platform matrix остаётся pending;
+Большой viewport проверяет декодированный цвет исходника; Quick→Editor —
+отрисованные пиксели; пипетка читает HEX обратно из system clipboard.
+Browser matrix — 17/17 specs, включая RU/EN light/dark 1024×700 screenshots.
+Настройки drawing v3 проверяются также между двумя нативными запусками с общим
+WebView2 userDataFolder; временный профиль EdgeDriver не подходит для этой проверки.
+Подробности и логи — в TESTING.md. Полная UX/platform matrix остаётся pending;
 fake-platform не подтверждает physical capture permissions или native Save As.
 
 ## Правила

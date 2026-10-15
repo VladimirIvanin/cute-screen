@@ -1,0 +1,44 @@
+diff --git a/dist/cjs/index.js b/dist/cjs/index.js
+index 6b7af77b7d4e8b59ff12771e6cf35bbc92fcea31..416bc707b879bafb42963999c132f469b3f9c7e3 100644
+--- a/dist/cjs/index.js
++++ b/dist/cjs/index.js
+@@ -1354,7 +1354,7 @@ async function findMsEdgeDriver() {
+         const { stdout: pathResult } = await execAsync('where msedgedriver.exe 2>nul', {
+             encoding: 'utf8',
+         });
+-        const driverPath = pathResult.trim().split('\n')[0];
++        const driverPath = pathResult.trim().split('\n')[0]?.trim();
+         if (driverPath && node_fs.existsSync(driverPath)) {
+             // Get version
+             try {
+@@ -1362,7 +1362,7 @@ async function findMsEdgeDriver() {
+                     encoding: 'utf8',
+                     timeout: 5000,
+                 });
+-                const match = versionOutput.match(/MSEdgeDriver ([\d.]+)/);
++                const match = versionOutput.match(/(?:MSEdgeDriver|Microsoft Edge WebDriver) ([\d.]+)/);
+                 if (match) {
+                     log$8.debug(`Found msedgedriver ${match[1]} at ${driverPath}`);
+                     return { path: driverPath, version: match[1] };
+diff --git a/dist/esm/index.js b/dist/esm/index.js
+index 160a6f513fd6897758a08e00f7b1d4c79d821234..a1a5fc53c1dd99874b63c33bc17f98d918189afb 100644
+--- a/dist/esm/index.js
++++ b/dist/esm/index.js
+@@ -1350,7 +1350,7 @@ async function findMsEdgeDriver() {
+         const { stdout: pathResult } = await execAsync('where msedgedriver.exe 2>nul', {
+             encoding: 'utf8',
+         });
+-        const driverPath = pathResult.trim().split('\n')[0];
++        const driverPath = pathResult.trim().split('\n')[0]?.trim();
+         if (driverPath && existsSync(driverPath)) {
+             // Get version
+             try {
+@@ -1358,7 +1358,7 @@ async function findMsEdgeDriver() {
+                     encoding: 'utf8',
+                     timeout: 5000,
+                 });
+-                const match = versionOutput.match(/MSEdgeDriver ([\d.]+)/);
++                const match = versionOutput.match(/(?:MSEdgeDriver|Microsoft Edge WebDriver) ([\d.]+)/);
+                 if (match) {
+                     log$8.debug(`Found msedgedriver ${match[1]} at ${driverPath}`);
+                     return { path: driverPath, version: match[1] };

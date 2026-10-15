@@ -68,6 +68,11 @@ describe('M05 viewport in a real Tauri webview', () => {
     }
 
     const fit = await viewportLayout()
+    const sourcePixel = await browser.execute(() => {
+      const scene = document.querySelector<HTMLCanvasElement>('.cs-canvas:not(.cs-canvas-overlay)')
+      return scene ? [...scene.getContext('2d')!.getImageData(1280, 720, 1, 1).data] : []
+    })
+    expect(sourcePixel).toEqual([39, 61, 90, 255])
     expect(fit.surface.width).toBeCloseTo((fit.canvasWidth * fit.zoom) / 100, 0)
     expect(fit.surface.height).toBeCloseTo((fit.canvasHeight * fit.zoom) / 100, 0)
     expect(fit.shell.bottom).toBeLessThanOrEqual(fit.windowHeight + 1)

@@ -205,7 +205,7 @@ function selectionMenuItems(
 
   const disabled = blocked()
   const layers = selected()
-  const reason = context.props.readOnlyDocument
+  const reason = context.props.readOnlyDocument || !context.props.documentSession
     ? text('Read-only document', 'Документ только для чтения')
     : text('Unlock the entire selection', 'Разблокируйте всё выделение')
   if (!menu?.layerId)
@@ -214,18 +214,21 @@ function selectionMenuItems(
         id: 'paste',
         label: text('Paste', 'Вставить'),
         disabled: context.props.readOnlyDocument || !context.props.clipboardBridge,
+        reason: context.props.readOnlyDocument ? text('Read-only document', 'Документ только для чтения') : text('Clipboard is unavailable', 'Буфер обмена недоступен'),
       },
       ...(!context.props.quickMode
         ? [
             {
               id: 'undo',
               label: text('Undo', 'Отменить'),
-              disabled: !store.documentHistory.canUndo,
+              disabled: context.props.readOnlyDocument || !store.documentHistory.canUndo,
+              reason: context.props.readOnlyDocument ? reason : text('No action to undo', 'Нечего отменять'),
             },
             {
               id: 'redo',
               label: text('Redo', 'Повторить'),
-              disabled: !store.documentHistory.canRedo,
+              disabled: context.props.readOnlyDocument || !store.documentHistory.canRedo,
+              reason: context.props.readOnlyDocument ? reason : text('No action to redo', 'Нечего повторять'),
             },
             { id: 'fit', label: text('Fit', 'Вместить'), disabled: false },
             { id: 'actual', label: '1:1', disabled: false },
@@ -237,12 +240,13 @@ function selectionMenuItems(
       id: 'copyStyle',
       label: text('Copy style', 'Копировать стиль'),
       disabled: layers.length !== 1,
+      reason: text('Select one object', 'Выберите один объект'),
     },
     {
       id: 'pasteStyle',
       label: text('Paste style', 'Вставить стиль'),
       disabled: disabled || !styleClipboard.value,
-      ...(disabled ? { reason } : {}),
+      reason: disabled ? reason : text('Copy a style first', 'Сначала скопируйте стиль'),
     },
     ...(['duplicate', 'delete', 'up', 'down', 'hide'] as const).map((id, index) => ({
       id,
@@ -253,13 +257,26 @@ function selectionMenuItems(
         text('Send backward', 'На слой ниже'),
         text('Hide', 'Скрыть'),
       ][index]!,
-      disabled,
-      ...(disabled ? { reason } : {}),
+      disabled: disabled || (id === 'up' || id === 'down') && !canMoveSelection(context, id),
+      reason: disabled ? reason : text('Already at the edge of the layer stack', 'Уже на краю списка слоёв'),
     })),
     {
       id: 'lock',
       label: layers.some((layer) => layer.locked) ? text('Unlock', 'Разблокировать') : text('Lock', 'Заблокировать'),
-      disabled: context.props.readOnlyDocument,
+      disabled: context.props.readOnlyDocument || !context.props.documentSession,
+      reason,
     },
   ]
+}
+
+function canMoveSelection(
+  context: SelectionContext,
+  direction: 'up' | 'down',
+): boolean {
+  const layers = context.document.value?.layers ?? []
+  const ids = new Set(context.store.selectedLayerIds)
+  return layers.some((layer, index) => {
+    const neighbor = layers[index + (direction === 'up' ? 1 : -1)]
+    return ids.has(layer.id) && neighbor !== undefined && !ids.has(neighbor.id)
+  })
 }

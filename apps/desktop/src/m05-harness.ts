@@ -54,8 +54,14 @@ function loadM05HarnessImage(
     const url = URL.createObjectURL(new Blob([
       `<svg xmlns="http://www.w3.org/2000/svg" width="${dimensions.width}" height="${dimensions.height}"><rect width="100%" height="100%" fill="#273d5a" fill-opacity="${alpha / 255}"/></svg>`,
     ], { type: 'image/svg+xml' }))
-    image.addEventListener('load', () => { URL.revokeObjectURL(url); resolve(image) }, { once: true })
-    image.addEventListener('error', () => { URL.revokeObjectURL(url); reject(new Error('M05 fixture failed')) }, { once: true })
+    image.addEventListener('load', () => {
+      URL.revokeObjectURL(url)
+      resolve(image)
+    }, { once: true })
+    image.addEventListener('error', () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('M05 fixture failed'))
+    }, { once: true })
     image.src = url
   })
 }

@@ -13,11 +13,18 @@ if (!appBinaryPath) {
   throw new Error('CUTE_SCREEN_WDIO_APP_BINARY must point to the test-harness binary')
 }
 
-const tauriCapability: TauriCapabilities = {
+// tauri-driver 2.1.0 forwards this native option; service 1.3.0 only types width/height.
+type NativeTauriOptions = NonNullable<TauriCapabilities['tauri:options']> & {
+  webviewOptions?: { userDataFolder: string }
+}
+const tauriCapability: Omit<TauriCapabilities, 'tauri:options'> & { 'tauri:options': NativeTauriOptions } = {
   browserName: 'tauri',
   'tauri:options': {
     application: appBinaryPath,
     args: harnessQuery ? [`--e2e-harness-query=${harnessQuery}`] : [],
+    ...(process.platform === 'win32' && process.env.WEBVIEW2_USER_DATA_FOLDER ? {
+      webviewOptions: { userDataFolder: process.env.WEBVIEW2_USER_DATA_FOLDER },
+    } : {}),
   },
 }
 

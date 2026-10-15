@@ -2,6 +2,11 @@
 
 ## Windows WebView harness (2026-10-15)
 
+Полный native suite: 15 scenarios / 18 tests, Windows x64 / WebView2
+155.0.4283.45, `artifacts/tool-ux/tauri-verified.log`. Проверки используют
+scoped app data и явный EdgeDriver userDataFolder; defaults и native repository
+проверяются раздельно. Driver cache/patches входят в lockfile. См. TESTING.md.
+
 Windows x64 / WebView2 Evergreen 155.0.4283.45 подтверждён scoped native-input
 прогоном: Quick chrome 4/4 и alpha asset transport 1/1. Harness использует
 external tauri-driver 2.1.0 + подходящий EdgeDriver; embedded 1.3.0 DOM input

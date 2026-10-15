@@ -46,6 +46,7 @@ describe('M03 persisted document write', () => {
     await arrowTool.click()
     await openArrowConfigurePopover()
     await chooseArrowConfigureOption('arrowPath', 'Elbow')
+    await chooseArrowConfigureOption('stroke', '10 px')
     const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
     await browser
       .action('pointer')

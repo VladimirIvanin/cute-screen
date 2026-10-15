@@ -1,4 +1,5 @@
 import {
+  $,
   browser,
   expect,
 } from '@wdio/globals'
@@ -35,7 +36,11 @@ describe('M03 persisted document reopen', () => {
     expect(reopened?.layers).toHaveLength(1)
     expect(reopened?.layers[0]).toMatchObject({
       kind: 'arrow',
-      payload: { path: 'elbow' },
+      payload: { path: 'elbow', stroke: { width: 10 } },
     })
+    await $('button[aria-label="Arrow"]').click({ button: 'right' })
+    await expect($('.cs-tool-configure-popover-host [data-control="stroke"] button')).toHaveAttribute('aria-label', 'Stroke: 10 px')
+    await expect($('.cs-tool-configure-popover-host [data-control="arrowPath"] button')).toHaveAttribute('aria-label', 'Geometry: Elbow')
+    await browser.keys('Escape')
   })
 })

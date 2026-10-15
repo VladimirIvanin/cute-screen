@@ -93,6 +93,21 @@ async function draw(
   })
 }
 describe('consistent tool UX through the mounted shell', () => {
+  it('restores defaults configured before any object was created from v3 preferences alone', async () => {
+    const app = mount()
+    await fireEvent.contextMenu(screen.getByRole('button', { name: 'Arrow' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Stroke: 3 px' }))
+    await fireEvent.click(screen.getByRole('button', { name: '8 px' }))
+    await nextTick()
+    const preferences = localStorage.getItem(TOOL_SETTINGS_STORAGE_KEY)!
+    app.close()
+    localStorage.clear()
+    localStorage.setItem(TOOL_SETTINGS_STORAGE_KEY, preferences)
+    const reopened = mount()
+    await fireEvent.contextMenu(screen.getByRole('button', { name: 'Arrow' }))
+    expect(screen.getByRole('button', { name: 'Stroke: 8 px' })).toBeTruthy()
+    reopened.close()
+  })
   it('keeps the first selection drag alive when the initial tool is implicit Select', async () => {
     const shape = createDrawingLayer({
       id: '019c1f62-058e-7000-8000-000000000010',
@@ -269,6 +284,22 @@ describe('consistent tool UX through the mounted shell', () => {
     expect(app.session.snapshot.core.document.layers).toHaveLength(2)
     app.session.undo()
     expect(app.session.snapshot.core.document.layers).toHaveLength(4)
+    app.close()
+  })
+  it('explains disabled ordering and unavailable empty-canvas commands', async () => {
+    const app = mount(arrowDocument())
+    app.store.selectTool('select')
+    app.store.selectLayer(app.session.snapshot.core.document.layers[0]!.id)
+    await fireEvent.contextMenu(app.scene, { clientX: 40, clientY: 20 })
+    const forward = screen.getByRole('menuitem', { name: 'Bring forward' })
+    expect(forward).toBeDisabled()
+    expect(forward).toHaveAttribute('title', 'Already at the edge of the layer stack')
+    await fireEvent.keyDown(forward, { key: 'Escape' })
+    await fireEvent.contextMenu(app.scene, { clientX: 180, clientY: 120 })
+    const undo = screen.getByRole('menuitem', { name: 'Undo' })
+    expect(undo).toBeDisabled()
+    expect(undo).toHaveAttribute('title', 'No action to undo')
+    expect(screen.getByRole('menuitem', { name: 'Paste' })).toHaveAttribute('title', 'Clipboard is unavailable')
     app.close()
   })
   it('commits text once, keeps text/callout/number defaults independent and cancels drafts', async () => {

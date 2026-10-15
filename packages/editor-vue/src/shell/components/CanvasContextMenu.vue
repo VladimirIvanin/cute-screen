@@ -81,7 +81,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', outside, true)
       type="button"
       role="menuitem"
       :disabled="item.disabled"
-      :title="item.reason"
+      :title="item.disabled ? item.reason : undefined"
       @click="emit('action', item.id)"
     >
       {{ item.label }}

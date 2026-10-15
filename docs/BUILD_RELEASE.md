@@ -1,5 +1,21 @@
 # CI-сборки и проверка версии через GitHub
 
+## Локальная real-WebView проверка Windows
+
+`pnpm install --frozen-lockfile` применяет зафиксированные patches native-core
+и tauri-service. Нужны установленный WebView2 и официальный tauri-driver
+(`cargo install tauri-driver --locked`, проверено 2.1.0). Подходящий EdgeDriver
+проверяется service и при необходимости скачивается автоматически; последующие
+сценарии используют `artifacts/tauri-e2e/driver-cache`. WebKitGTK на Windows
+для этого не устанавливается.
+
+Стабильная команда — `pnpm test:e2e:tauri`. Она собирает test-harness binary,
+отказывается запускать stale executable после build failure и изолирует
+профили в `artifacts/tauri-e2e/runtime`. Фильтр `CUTE_SCREEN_E2E_SCENARIOS`
+предназначен для повторной проверки конкретной причины; полный запуск идёт
+без фильтра. Production build не включает WDIO plugins/test permissions.
+Linux/macOS гарантии этим запуском не подтверждаются. Evidence — TESTING.md.
+
 ## Принцип
 
 Проект не создаёт официальный канал релизов. Нет code signing, notarization, GitHub Releases, Tauri updater или автоматической установки обновлений.

@@ -6,17 +6,17 @@
 
 ## Согласованный UX инструментов и стилей (ADR-048)
 
-| Требования      | Проверки                                                                  | Статус  |
-| --------------- | ------------------------------------------------------------------------- | ------- |
-| REQ-EDT-002/003 | creation policy, empty/cancel/error, physical-key shortcuts               | planned |
-| REQ-EDT-015     | tool configure, canvas context menu, nested focus/Escape, real WebView    | planned |
-| REQ-EDT-016     | style compatibility/mixed/batch/history, floating toolbar, decoded export | planned |
-| REQ-EDT-017     | per-tool preferences, legacy migration, restart, storage failure          | planned |
+| Требования      | Проверки                                                                                           | Статус      |
+| --------------- | -------------------------------------------------------------------------------------------------- | ----------- |
+| REQ-EDT-002/003 | styles.test.ts, tool-ux.test.ts, browser-tool-ux.e2e.ts: creation/cancel, physical shortcuts       | implemented |
+| REQ-EDT-015     | tool-ux.test.ts, tauri-quick-chrome.e2e.ts: defaults, menu, nested focus/Escape, trusted input     | implemented |
+| REQ-EDT-016     | styles.test.ts: compatible/mixed/batch/history; tool-ux.test.ts; render decode; RU/EN screenshots  | implemented |
+| REQ-EDT-017     | tool-preferences.test.ts: legacy; tool-ux.test.ts: memory; browser reload; native persistence pair | implemented |
 
 Диагностика real-WebView (2026-10-15): устранить startup отказ EdgeDriver,
 сохранить backend tracing в test-harness и подтвердить native-input сценарий
 `quick-chrome` через production mount-flow. Выполнено на Windows x64:
-4/4 trusted-input Quick tests + 1/1 alpha asset test; результаты — в TESTING.md;
+15 scenarios / 18 tests, включая 4/4 trusted-input Quick tests; результаты — в TESTING.md;
 сборка и Chrome browser mode не заменяют native runtime evidence.
 
 Статусы: `planned`, `implemented`, `verified`, `blocked`. `implemented` означает

@@ -261,9 +261,13 @@ describe('M05 CanvasViewport transforms', () => {
       paddingLeft: '72px',
     } as CSSStyleDeclaration)
 
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    const fitsBeforeResize = emitted().fitZoom?.length ?? 0
     notify?.()
-    await Promise.resolve()
-    expect(emitted().fitZoom).toEqual([[508]])
+    notify?.()
+    expect(emitted().fitZoom?.length ?? 0).toBe(fitsBeforeResize)
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    expect(emitted().fitZoom?.slice(fitsBeforeResize)).toEqual([[508]])
     unmount()
     vi.unstubAllGlobals()
   })
@@ -297,9 +301,11 @@ describe('M05 CanvasViewport transforms', () => {
       paddingLeft: '72px',
     } as CSSStyleDeclaration)
 
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    const fitsBeforeResize = emitted().fitZoom?.length ?? 0
     notify?.()
-    await Promise.resolve()
-    expect(emitted().fitZoom).toEqual([[1408]])
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    expect(emitted().fitZoom?.slice(fitsBeforeResize)).toEqual([[1408]])
     unmount()
     vi.unstubAllGlobals()
   })

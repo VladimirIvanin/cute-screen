@@ -1,6 +1,16 @@
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import {
+  mkdtemp,
+  mkdir,
+  readFile,
+  rm,
+  writeFile,
+} from 'node:fs/promises'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import {
+  describe,
+  expect,
+  it,
+} from 'vitest'
 import { cacheDownloadedEdgeDriver } from '../../scripts/tauri-driver-cache.mjs'
 
 describe('Windows native driver cache', () => {

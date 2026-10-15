@@ -1,6 +1,74 @@
 # Стратегия тестирования
 
-## Windows real-WebView: восстановление harness (2026-10-15)
+## Итог UX tools/styles и real WebView (2026-10-15)
+
+Windows x64 / PowerShell, Node 22.23.1, pnpm 10.33.2, Tauri 2.11.5,
+WDIO 9.30.1, tauri-service/plugins 1.3.0, tauri-driver 2.1.0,
+WebView2/EdgeDriver 155.0.4283.45. Изменения проверяются в dirty checkout;
+не относящиеся к UX параллельные formatting/toolchain изменения сохранены.
+
+`pnpm test:e2e:tauri` — exit 0, 15 scenarios / 18 tests
+(`artifacts/tool-ux/tauri-verified.log`). Проверены foundation/shell, arrow,
+rich text, большой viewport, document persistence, clean capture, Quick chrome,
+crop first-open, native eyedropper clipboard, alpha/EXIF/corrupted assets и
+binary fallback. Quick chrome 4/4 проверяет настоящие ПКМ/keyboard
+(`isTrusted=true`), nested SVG controls, layered Escape, Tab, Editor handoff,
+Copy и cancel/restart. JUnit и backend/frontend logs — `artifacts/tauri-e2e/`.
+
+`pnpm test:e2e:browser` — exit 0, 17/17 spec files
+(`artifacts/tool-ux/browser-release.log`). `pnpm test:render` — 13/13
+(`render-complete.log`, PNG/pixel decode assertions). Остальные итоговые логи:
+`unit-accepted.log`, `check-accepted.log`, `rust-accepted.log`,
+`tauri-cached-verified.log` в `artifacts/tool-ux/`.
+
+Просмотрены native screenshots `quick-native-tool-settings.png`,
+`m05-viewport-fit-webview.png`, `m08-crop-first-open-1024x700.png`,
+`m08-eyedropper-native-clipboard.png`. В большом viewport виден исходник вместо
+missing-image placeholder; панель Quick и вложенные controls внутри viewport.
+Browser screenshots `tool-ux-1024-{en,ru}-{light,dark}.png` сохранены после
+закрытия меню и окончания анимаций; RU/light screenshot просмотрен.
+
+Дополнительные найденные причины и исправления:
+
+- Windows library/cache явно читают test-only app data override. EdgeDriver
+  получает `tauri:options.webviewOptions.userDataFolder`: одного env override
+  недостаточно, driver иначе создаёт временный UDF на каждую session.
+  APPDATA/LOCALAPPDATA также не заменяют Tauri Known Folders. Production paths
+  и asset scope сохранены.
+- Fake capture PNG теперь opaque `#7F7F7F`: прежняя fixture записывала `0x7f`
+  также в alpha. Red/green Rust decode test — `fake-capture-{red,green}.log`.
+  Test capability получил production `allow-show`; иначе успешный capture
+  сопровождался ошибкой восстановления main window.
+- M05 SVG fixture использует Blob URL, разрешённый production CSP. Decode
+  завершается до document mount; большой viewport fixture не обрезан. Native
+  test проверяет пиксель `[39,61,90,255]`, Quick handoff — opaque scene pixel.
+- Runtime/TEMP/TMP WDIO находятся в `artifacts/tauri-e2e/runtime`. Кэш драйвера
+  добавляется только в PATH дочернего runner. Patch
+  `patches/@wdio__tauri-service@1.3.0.patch` распознаёт строку версии
+  `Microsoft Edge WebDriver` и CRLF из `where`; без этого driver скачивался
+  заново для каждого сценария, что привело к ENOSPC системного диска.
+  Старые Temp-копии сохранены; новые запуски используют каталог артефактов.
+- Dispose старого image resource с тем же ID больше не удаляет новую texture
+  из backend cache. Red/green pixel test — `resource-race-{red,green}.log`.
+  Resize fit объединяется через animation frame; pointer helpers ждут
+  стабильных CSS/backing bounds. Два resize события дают один fit за frame.
+
+REQ-EDT-002/003/015/016/017, ADR-048: creation policies, явные цели
+defaults/selection/inline, configure tools, object/empty-canvas menu, floating
+formatting, mixed/locked batch, session style clipboard и v3 preferences.
+Core contracts — `styles.test.ts`, `tool-preferences.test.ts`; mounted shell —
+`tool-ux.test.ts`; browser — `browser-tool-ux.e2e.ts`. Покрыты content/geometry,
+undo/redo, RU physical shortcuts, texture resolver, cancel text, per-type memory
+и disabled reasons. Pan/scroll positioning меняет DOM без Vue render на каждый
+pointermove. Document v7 и существующие updateLayer/batch сохранены.
+
+Локальное Windows evidence использует fake-platform capture. Linux/macOS,
+mixed DPI, physical capture/permissions и native Save PNG dialog/redecode
+остаются pending; browser mode их не заменяет. Controlled perf запускается
+отдельно после остановки E2E. Последующая профильная проверка defaults и
+повторного использования driver — `tauri-cached-verified.log`.
+
+## Промежуточная диагностика Windows harness (2026-10-15)
 
 Платформа: Windows x64, WebView2 Evergreen/EdgeDriver `155.0.4283.45`,
 `tauri-driver 2.1.0`, Tauri `2.11.5`, WDIO `9.30.1`, tauri-service/plugins `1.3.0`.
