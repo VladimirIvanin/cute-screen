@@ -8,7 +8,7 @@ WebView2/EdgeDriver 155.0.4283.45. Изменения проверяются в 
 не относящиеся к UX параллельные formatting/toolchain изменения сохранены.
 
 `pnpm test:e2e:tauri` — exit 0, 15 scenarios / 18 tests
-(`artifacts/tool-ux/tauri-verified.log`). Проверены foundation/shell, arrow,
+(`artifacts/tool-ux/tauri-final-accepted.log`). Проверены foundation/shell, arrow,
 rich text, большой viewport, document persistence, clean capture, Quick chrome,
 crop first-open, native eyedropper clipboard, alpha/EXIF/corrupted assets и
 binary fallback. Quick chrome 4/4 проверяет настоящие ПКМ/keyboard
@@ -18,15 +18,32 @@ Copy и cancel/restart. JUnit и backend/frontend logs — `artifacts/tauri-e2e/
 `pnpm test:e2e:browser` — exit 0, 17/17 spec files
 (`artifacts/tool-ux/browser-release.log`). `pnpm test:render` — 13/13
 (`render-complete.log`, PNG/pixel decode assertions). Остальные итоговые логи:
-`unit-accepted.log`, `check-accepted.log`, `rust-accepted.log`,
-`tauri-cached-verified.log` в `artifacts/tool-ux/`.
+`unit-accepted.log`, `check-final-accepted.log`, `rust-accepted.log`,
+`tauri-final-accepted.log` в `artifacts/tool-ux/`.
+
+`pnpm test` — 81 files / 552 tests, exit 0 (`unit-accepted.log`).
+`cargo test --workspace` — 132 passed / 1 ignored, exit 0 (`rust-accepted.log`).
+`pnpm check` — exit 0 (`check-final-accepted.log`: lint/typecheck/format/docs,
+40 boundary tests, IPC check, Rust fmt и четыре Clippy feature configurations).
+Дополнительный browser style clipboard/multiselect сценарий — 4/4 tool UX tests,
+`browser-style-transfer.log`: native copy → multi-selection → paste → one Undo.
+`pnpm test:perf` — 4/4, exit 0 (`perf-accepted.log`), отдельно от E2E и сборок;
+4K/500 и 8K/1000, 30 warmups / 120 measurements, zero idle frames.
+Это controlled software trend evidence, не новый native GPU budget claim.
+
+Финальный native прогон включает проверку width 10 px / Elbow после перезапуска
+приложения. `driver-cache-proof.json`: exit 0, downloads before/after 19/19.
+После teardown listener 4444/4445 отсутствует; Windows profile cleanup имеет
+ограниченные retries при кратковременном EBUSY chrome_debug.log.
+`acceptance.json` содержит base commit, dirty-tree пометку, SHA256 binary,
+версии, fixture IDs, команды, exit codes и pending platform checks.
 
 Просмотрены native screenshots `quick-native-tool-settings.png`,
 `m05-viewport-fit-webview.png`, `m08-crop-first-open-1024x700.png`,
 `m08-eyedropper-native-clipboard.png`. В большом viewport виден исходник вместо
 missing-image placeholder; панель Quick и вложенные controls внутри viewport.
 Browser screenshots `tool-ux-1024-{en,ru}-{light,dark}.png` сохранены после
-закрытия меню и окончания анимаций; RU/light screenshot просмотрен.
+закрытия меню и окончания анимаций; все четыре screenshots просмотрены.
 
 Дополнительные найденные причины и исправления:
 
@@ -64,9 +81,9 @@ pointermove. Document v7 и существующие updateLayer/batch сохр�
 
 Локальное Windows evidence использует fake-platform capture. Linux/macOS,
 mixed DPI, physical capture/permissions и native Save PNG dialog/redecode
-остаются pending; browser mode их не заменяет. Controlled perf запускается
+остаются pending; browser mode их не заменяет. Controlled perf выполнен
 отдельно после остановки E2E. Последующая профильная проверка defaults и
-повторного использования driver — `tauri-cached-verified.log`.
+повторного использования driver — `tauri-final-accepted.log`.
 
 ## Промежуточная диагностика Windows harness (2026-10-15)
 

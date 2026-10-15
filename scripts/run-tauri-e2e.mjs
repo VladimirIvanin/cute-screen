@@ -256,7 +256,7 @@ try {
     if (process.platform === 'win32') await cacheDownloadedEdgeDriver(path.join(runtimeDirectory, 'msedgedriver'), driverCache)
 
     if (status === 0 && scenario.persistenceGroup !== 'm03') {
-      await rm(appData, { recursive: true, force: true })
+      await rm(appData, { recursive: true, force: true, maxRetries: 10, retryDelay: 250 })
       continue
     }
 
@@ -274,7 +274,7 @@ if (m03AppData) {
   if (failedScenarios.some((id) => id.startsWith('document-'))) {
     retainedAppDataDirs.push(m03AppData)
   } else {
-    await rm(m03AppData, { recursive: true, force: true })
+    await rm(m03AppData, { recursive: true, force: true, maxRetries: 10, retryDelay: 250 })
   }
 }
 

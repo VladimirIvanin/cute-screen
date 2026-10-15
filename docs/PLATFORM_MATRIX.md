@@ -3,7 +3,7 @@
 ## Windows WebView harness (2026-10-15)
 
 Полный native suite: 15 scenarios / 18 tests, Windows x64 / WebView2
-155.0.4283.45, `artifacts/tool-ux/tauri-verified.log`. Проверки используют
+155.0.4283.45, `artifacts/tool-ux/tauri-final-accepted.log`. Проверки используют
 scoped app data и явный EdgeDriver userDataFolder; defaults и native repository
 проверяются раздельно. Driver cache/patches входят в lockfile. См. TESTING.md.
 

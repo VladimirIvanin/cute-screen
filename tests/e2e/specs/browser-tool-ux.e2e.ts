@@ -4,6 +4,7 @@ import {
   expect,
 } from '@wdio/globals'
 import path from 'node:path'
+import { Key } from 'webdriverio'
 import {
   openDrawingHarness,
   snapshot,
@@ -23,6 +24,39 @@ async function draw(
     .perform()
 }
 describe('consistent tool UX with native browser input', () => {
+  it('pastes a copied style into a multi-selection as one undoable edit', async () => {
+    await openDrawingHarness()
+    await $('button[aria-label="Arrow"]').click()
+    await draw()
+    await $('.cs-selection-floating-toolbar button[aria-label="Stroke: 3 px"]').click()
+    await $('.cs-arrow-toolbar-popover').$('button=10 px').click()
+    const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
+    await scene.click({ x: -42, y: -36 })
+    await browser.keys([Key.Control, Key.Alt, 'c'])
+    await $('button[aria-label="Arrow"]').click({ button: 'right' })
+    await $('.cs-tool-configure-popover-host button[aria-label="Stroke: 10 px"]').click()
+    await $('.cs-arrow-toolbar-popover').$('button=2 px').click()
+    await browser.keys('Escape')
+    await draw(-100, 35)
+    const second = (await snapshot()).layers.at(-1)!
+    await $('button[aria-label="Arrow"]').click()
+    await draw(40, 35)
+    const third = (await snapshot()).layers.at(-1)!
+    await $('button[aria-label="Show layers"]').click()
+    await $(`[data-layer-id="${second.id}"] .cs-layer-select`).click()
+    await browser.action('key').down(Key.Control).perform(true)
+    await $(`[data-layer-id="${third.id}"] .cs-layer-select`).click()
+    await browser.action('key').up(Key.Control).perform()
+    await expect($(`[data-layer-id="${second.id}"]`)).toHaveElementClass('is-selected')
+    await expect($(`[data-layer-id="${third.id}"]`)).toHaveElementClass('is-selected')
+    await scene.click({ x: -62, y: 49, button: 'right' })
+    await $('.cs-canvas-context-menu').$('button=Paste style').click()
+    const styled = (await snapshot()).layers.filter((layer) => [second.id, third.id].includes(layer.id))
+    expect(styled.map((layer) => (layer.payload?.stroke as { width: number }).width)).toEqual([10, 10])
+    await $('button[aria-label="Undo"]').click()
+    const restored = (await snapshot()).layers.filter((layer) => [second.id, third.id].includes(layer.id))
+    expect(restored.map((layer) => (layer.payload?.stroke as { width: number }).width)).toEqual([2, 2])
+  })
   it('configures with right click, creates once, edits nearby and remembers defaults after reload', async () => {
     await openDrawingHarness()
     await $('button[aria-label="Arrow"]').click({ button: 'right' })
