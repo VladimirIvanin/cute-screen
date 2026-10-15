@@ -259,7 +259,7 @@ target. Prewarmed Quick WebView загружает frozen frame скрытой, 
 обслуживают те же `CanvasViewport`, scene и overlay hosts.
 
 Windows скрывает main на его оконном потоке через синхронный Win32 hide с
-временно отключённым `DWMWA_TRANSITIONS_FORCEDISABLED`. Подтверждение приходит
+временно отключённой через `DWMWA_TRANSITIONS_FORCEDISABLED` анимацией. Подтверждение приходит
 после проверки native visibility и `DwmFlush`; только затем начинается backend.
 Ошибка/timeout скрытия останавливает capture и восстанавливает editor.
 После barrier обычные переходы окна снова включаются (ADR-049).

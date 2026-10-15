@@ -56,6 +56,7 @@ describe('Windows physical capture excludes the editor', () => {
         await browser.waitUntil(async () => (await browser.tauri.listWindows()).includes('quick-capture'))
         await browser.tauri.switchWindow('quick-capture')
         await expect($('.cs-quick-capture')).toHaveAttribute('class', expect.stringContaining('is-selecting'))
+        await expect($('.cs-quick-capture')).toHaveAttribute('class', expect.stringContaining('is-layout-ready'))
         await browser.waitUntil(() => browser.execute(() => !!document.querySelector('.cs-canvas:not(.cs-canvas-overlay)')))
         const pixels = await browser.execute((points) => {
           const canvas = document.querySelector<HTMLCanvasElement>('.cs-canvas:not(.cs-canvas-overlay)')
@@ -72,7 +73,9 @@ describe('Windows physical capture excludes the editor', () => {
         await writeFile(path.resolve('artifacts/tauri-e2e/windows-capture-exclusion-pixels.json'), JSON.stringify(evidence, null, 2))
         await browser.saveScreenshot(path.resolve(`artifacts/tauri-e2e/windows-capture-after-${attempt}.png`))
         for (const pixel of pixels) expect(pixel).toEqual([37, 71, 105, 255])
+        await $('.cs-canvas-overlay').click()
         await browser.keys('Escape')
+        await expect($('.cs-quick-capture.is-layout-ready')).not.toExist()
         await browser.tauri.switchWindow('main')
         await expect($('button[aria-label="Capture"]')).toBeEnabled()
         await browser.execute(() => document.getElementById('capture-exclusion-marker')?.remove())
