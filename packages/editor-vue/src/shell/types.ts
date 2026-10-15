@@ -238,6 +238,7 @@ export interface ShellActionAdapter {
 export type IconName =
   | 'arrow'
   | 'camera'
+  | 'callout'
   | 'check'
   | 'close'
   | 'chevronDown'
@@ -254,6 +255,7 @@ export type IconName =
   | 'loupe'
   | 'marker'
   | 'more'
+  | 'numberedMarker'
   | 'pencil'
   | 'plus'
   | 'privacy'

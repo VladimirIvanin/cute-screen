@@ -49,7 +49,7 @@ png = "=0.18.1"
 image = { version = "=0.25.10", default-features = false, features = ["jpeg"] }
 arboard = { version = "=3.6.1", features = ["wayland-data-control"] }
 futures-util = "=0.3.33"
-tauri = { version = "=2.11.5", features = ["protocol-asset", "tray-icon"] }
+tauri = { version = "=2.11.5", features = ["protocol-asset", "tray-icon", "image-png"] }
 clap = { version = "=4.6.4", features = ["derive"] }
 tauri-plugin-single-instance = "=2.4.3"
 tauri-plugin-autostart = "=2.5.1"

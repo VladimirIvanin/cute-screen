@@ -72,6 +72,7 @@ function createSchemas(context: WorkspaceBindingsContext) {
     hexColor: precision.hexColor,
   })
   const contextSchema = createContextSchema({
+    quickMode: computed(() => props.quickMode),
     store,
     activeToolId: state.activeToolId,
     activeDocument: workspace.activeDocument,

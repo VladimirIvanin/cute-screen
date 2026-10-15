@@ -16,6 +16,7 @@ import type {
 } from './contracts'
 import type { CanvasRendererController } from './renderer-controller'
 import type { CanvasGesture, ResizeHandle } from './workspace-state'
+import { prepareQuickOverlay } from './quick-overlay-resolution'
 
 type PreviewNodes =
   ReturnType<CanvasRendererController['renderOverlay']> extends boolean
@@ -75,11 +76,31 @@ export class CanvasOverlayController {
     if (!context || typeof context.clearRect !== 'function') return
     const previewNodes = this.#context.previewNodes()
     const renderedByBackend = renderer.renderOverlay(previewNodes)
-    if (!renderedByBackend) {
-      context.setTransform?.(1, 0, 0, 1, 0, 0)
-      context.clearRect(0, 0, overlay.value.width, overlay.value.height)
+    if (props.quickFrameMode) {
+      prepareQuickOverlay(
+        overlay.value,
+        context,
+        bounds,
+        (props.zoom ?? 100) / 100,
+        window.devicePixelRatio || 1,
+      )
+      const preview = renderer.overlaySurface
+      if (renderedByBackend && preview && previewNodes.length > 0) {
+        context.drawImage(
+          preview,
+          bounds.x,
+          bounds.y,
+          bounds.width,
+          bounds.height,
+        )
+      }
+    } else {
+      if (!renderedByBackend) {
+        context.setTransform?.(1, 0, 0, 1, 0, 0)
+        context.clearRect(0, 0, overlay.value.width, overlay.value.height)
+      }
+      context.setTransform?.(1, 0, 0, 1, -bounds.x, -bounds.y)
     }
-    context.setTransform?.(1, 0, 0, 1, -bounds.x, -bounds.y)
     if (!renderedByBackend) drawNodes2D(context, previewNodes)
     this.#context.drawDrafts(context)
     if (this.#context.drawCrop(context, bounds)) return

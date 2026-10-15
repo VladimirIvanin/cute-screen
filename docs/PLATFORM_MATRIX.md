@@ -355,3 +355,27 @@ coverage, но остаются без runtime support claim. Полный сп�
 - Отсутствие portal или неподдерживаемый capture target нельзя объявлять
   success. CLI fallback пока является конкретной альтернативой binding flow,
   а не доказательством поддержки Wayland hotkey.
+
+## Знак системного трея (2026-10-15)
+
+Windows и Linux используют отдельный прозрачный двухтонный знак; светлый
+знак виден на тёмной панели, тёмный контур — на светлой. macOS использует
+alpha template с прозрачным фоном и системным tint. App/Dock/launcher icon
+использует тёмную плитку с белым силуэтом кота и не используется как tray image. Linux GNOME runtime
+проверяется на текущей системе; Windows/macOS light/dark + HiDPI остаются pending.
+Это не изменяет capture/hotkey capabilities и support matrix.
+
+## Quick Capture chrome и Tabler Icons (2026-10-15)
+
+Общие UI-иконки используют MIT `@tabler/icons-vue@3.49.0`; quick mode не
+показывает canvas flip и пустую fallback-панель. На Ubuntu 24.04.5 x86_64/X11
+Chrome 154 проверяет browser shell, WebKitGTK 605.1.15 — production Area request
+с fake-platform capture, tool settings и handoff в editor. Это real-WebView
+evidence интерфейса, а не новый physical capture/portal smoke. Windows/macOS и
+Wayland runtime для этого UI-среза остаются pending; capture capabilities и
+release guarantees не меняются. Команды и ограничения — в `TESTING.md`.
+
+Quick frame sharpness: WebKitGTK на текущем X11 host подтвердил display-sized
+UI backing и резкие frame/size badge (quick-chrome 3/3). DPR 2 проверен
+pixel/controller tests; это не physical mixed-DPI evidence. См. before/after
+и ограничения в `TESTING.md`.

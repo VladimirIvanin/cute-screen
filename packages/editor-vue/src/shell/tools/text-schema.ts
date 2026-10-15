@@ -255,7 +255,7 @@ function buildTextContextSchema(
   const kind = textKindFor(context, selected, tool)
   if (!kind) return undefined
   return {
-    icon: 'text',
+    icon: kind,
     title: titleFor(context, kind),
     hint: context.translate('canvasViewport'),
     controls: kind === 'callout' ? calloutControls(context, selected) : [],

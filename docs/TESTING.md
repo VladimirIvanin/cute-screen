@@ -1858,3 +1858,143 @@ support claims и не заменяет Windows/macOS/Wayland runtime matrix.
 - отсутствие updater/download/install кода и фоновых запросов без opt-in;
 - SBOM, checksums и license report;
 - заполненная traceability matrix без `planned`/`blocked` строк.
+
+### Capture brand and dedicated tray icon, Ubuntu X11, 2026-10-15
+
+`REQ-ACT-006`, `REQ-UI-013`, ADR-047. Host: Ubuntu 24.04.5 LTS,
+Linux 6.8.0-142, x86_64, GNOME/X11, 1920×1080. Before implementation,
+`cargo test -p cute-screen-desktop --lib tray_icon::tests -- --nocapture`
+failed both contracts against the previous PNG before the new solid-cat
+assets were generated.
+The final tests decode embedded PNGs through the same Tauri loader used at startup,
+check the gap between cat ears, a large solid silhouette, absence of capture
+corners and transparent surroundings in the macOS template. This is asset evidence, not
+Windows/macOS native rendering evidence.
+
+Commands and results:
+
+- `pnpm icons:generate` — regenerated app/editor/favicon SVG, all bundle PNG,
+  ICO/ICNS, and separate tray/template PNG from the shared generator.
+- `pnpm test` — passed: 77 files, 517 tests.
+- `cargo test --workspace` — passed: desktop 104, storage 21; both tray tests pass.
+- `pnpm check` — passed: lint, TypeScript/Vue, format, docs, 6 boundary files /
+  29 tests, IPC drift check, frontend build, Rust fmt and all four Clippy gates.
+- Pillow reopened and decoded `icon.ico` (256×256), `icon.icns` (1024×1024),
+  `32x32.png` and `128x128.png`; the final PNG generation uses the same pipeline.
+- GNOME StatusNotifierWatcher registered the real resident application's item;
+  its IconName resolves to the generated tray PNG, and the 16 px panel screenshot
+  shows the solid white cat silhouette without corners or a coloured tile.
+- `com.canonical.dbusmenu.GetLayout` exposed the real capture/Open Editor/Quit
+  items; the Open Editor `clicked` event opened a mapped 1280×800 Cute Screen
+  window. This exercises the published menu API, not a physical panel-menu click.
+- Browser review at 1280×720 showed the 30 px logo in light and system/dark themes;
+  production output emits a separate `brand-*.svg` asset via `?no-inline`, keeping
+  it compatible with the existing CSP. Browser-only startup reports missing
+  native `invoke`; this review covers the brand chrome, not capture functionality.
+
+Visual artifacts: `artifacts/branding/icon-review.png` contains app 128/32/48 px
+and tray 16/20/24/32 px on light/dark backgrounds;
+`artifacts/branding/gnome-tray.png` is the actual GNOME panel region.
+Native screenshot helper: `/home/vladimir/.codex/skills/screenshot/scripts/take_screenshot.py`
+with `--mode temp --region 1560,0,360,34`.
+Windows notification-area, macOS light/dark/Retina and physical tray-menu click
+remain pending. No new platform support claim or packaged installer smoke.
+
+## Quick Capture chrome и Tabler Icons (2026-10-15)
+
+Платформа: Ubuntu 24.04.5 LTS x86_64, X11, Node 22.23.1, pnpm 10.33.2;
+Chrome 154.0.8037.57 и Tauri/WebKitGTK 605.1.15. Срез реализует ADR-043:
+quick mode не возвращает canvas actions/fallback toolbar; full editor
+сохраняет flip commands/history; 34 semantic icons переходят на Tabler MIT.
+
+- `pnpm check` — passed, включая TS/Vue builds, lint, formatting, docs,
+  29 boundary tests, generated IPC и все Rust Clippy gates. После добавления
+  native scenario отдельно повторены E2E typecheck, ESLint и formatting.
+- `pnpm test` — passed, 77 files / 517 tests. Включены 34 SVG checks,
+  caller-class preservation и quick/full-editor context/history tests.
+- `pnpm audit:licenses` — passed; `@tabler/icons-vue@3.49.0` и
+  `@tabler/icons@3.49.0` имеют MIT. Lucide production dependency удалена.
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5187 pnpm test:e2e:browser` — 14/16 files
+  passed. M06 direct text не открыл contenteditable; M08 non-origin crop
+  завис на pointer gesture. На исходном `HEAD` в отдельном `/tmp` snapshot
+  M06 также воспроизводит pointer timeout. Focused M08 в рабочем дереве
+  отдельно дал geometry mismatch, а исходный HEAD прошёл 1/1 дважды.
+- В чистом snapshot исходного HEAD с наложенными только production changes
+  этого среза (без параллельных branding edits), `pnpm install --offline
+--frozen-lockfile`, `pnpm build:packages` и
+  `CUTE_SCREEN_BROWSER_E2E_PORT=5195 pnpm test:e2e:browser --spec
+tests/e2e/specs/browser-m08-2.e2e.ts --spec
+tests/e2e/specs/browser-m06-content-tools.e2e.ts` — passed, 2 files / 6 tests.
+  Полный browser suite нельзя объявлять зелёным на основании focused replay.
+  Последующий полный прогон в том же неизменяемом snapshot дал 13/16 files:
+  M05 move/undo timeout, M06 drawing timeout/text-tooltip interception и v7
+  text selection timeout; M08 прошёл. Различающиеся failures и baseline M06
+  подтверждают нестабильность suite, но не доказывают каждый failure как
+  pre-existing; эти полные прогоны остаются failed evidence.
+- `CUTE_SCREEN_E2E_SCENARIOS=m04-clean-profile-capture pnpm test:e2e:tauri`
+  успешно собрал test binary, но обычный запуск завершился до WebDriver из-за
+  уже работающего single-instance app. Повтор внутри `dbus-run-session` с
+  отдельным временным `XDG_RUNTIME_DIR` — passed 1/1: production Area request
+  с fake-platform → Quick → Select без flip/пустой панели → Pencil settings
+  → Editor и первый document frame.
+- Расширенный native probe подтвердил Copy и Escape/restart (2 tests passed),
+  но synthetic WebDriver drag не создал аннотацию: Undo остался disabled и при
+  element-relative, и при viewport coordinates. Этот probe не является
+  доказательством physical gesture. Shipping quick-chrome scenario ограничен
+  tool settings, keyboard focus, Editor/Copy/Escape/Close.
+- Финальный `CUTE_SCREEN_E2E_SCENARIOS=quick-chrome pnpm test:e2e:tauri`
+  внутри изолированной D-Bus session — passed 3/3: tool settings и Tab focus,
+  handoff в Editor, Copy до закрытия surface, Escape/restart и Close. Native
+  gesture не включён в зелёное evidence. Исходный failed drag probe сохранён
+  в `artifacts/ui-tabler/tauri-drag-probe.log`.
+
+Ручная приёмка первого physical Area drag, drawing → handoff и Save PNG
+с настоящим file dialog/cancel/redecode остаётся pending; unit/controller
+coverage этих действий не подменяет platform smoke. Backend/capture support
+и renderer parity не расширяются этим изменением. В рабочем дереве параллельно
+менялся branding; его изменения сохранены.
+
+Скриншоты: `artifacts/tauri-e2e/quick-tabler-pencil.png` (реальная Quick WebView),
+`artifacts/browser-e2e/m02-ready-1024x700.png` и
+`artifacts/browser-e2e/m02-ready-light-1600x1000.png` (browser shell). Визуальная
+проверка: единый контур/толщина, Text/Callout/Numbered Marker различимы,
+существующие размеры и расположение controls сохранены.
+
+Логи этого среза сохранены в `artifacts/ui-tabler/`: `check.log`, `unit.log`,
+`licenses.log`, `browser-full.log`, `browser-isolated-full.log`,
+`browser-isolated-focused.log`, `browser-baseline.log`,
+`tauri-mount.log`, `tauri-chrome.log` и `tauri-drag-probe.log`.
+Дополнительные скриншоты real WebView: `artifacts/tauri-e2e/quick-tabler-select.png`
+(Select без панели), `artifacts/tauri-e2e/quick-tabler-focus.png` (keyboard focus).
+
+### Follow-up: резкость Quick рамки и размера (2026-10-15)
+
+Приложенный владельцем кадр показал растяжение всего UI bitmap: frozen image
+400×300 отображалась в 1440×1080 CSS px, но overlay backing оставался 400×300.
+Обратный font scale сохранял размер букв, однако они растеризовались до CSS
+увеличения. Quick adapter теперь использует отдельный document-space backend
+preview и visible overlay с backing `client rect × DPR`; frame/handles/badge
+рисуются после display transform. `CropController` определяет visual scale по
+document dimensions, а не новому overlay backing. Resize invalidates overlay
+без сброса viewport или history. Scene и export не меняют resolution.
+
+- `pnpm check` — passed, включая boundary/IPC/Rust gates.
+- `pnpm test` — passed, 78 files / 522 tests. Focused
+  `quick-overlay-resolution.test.ts` + `canvas-viewport-quick.test.ts` — 14/14:
+  native raster pixels one-CSS-pixel edge при DPR 1/2, constant badge/dash
+  scale, non-origin bounds, clearing и повторный document draw без сброса
+  high-resolution overlay.
+- `CUTE_SCREEN_E2E_SCENARIOS=quick-chrome pnpm test:e2e:tauri` внутри
+  `dbus-run-session` с отдельным `XDG_RUNTIME_DIR` — passed 3/3, тот же
+  Ubuntu/X11/WebKitGTK. Production Quick mount дополнительно проверяет
+  `overlay.width/height === round(client rect × DPR)` перед handoff.
+  Screenshot review: пунктир и handles теперь тонкие и резкие, `400 × 300`
+  читается при исходном display scale.
+
+Before/after: `artifacts/ui-tabler/quick-before.png` и
+`artifacts/ui-tabler/quick-after.png`. Логи: `sharp-check.log`, `sharp-unit.log`,
+`sharp-focused.log`, `sharp-tauri.log` в той же папке. Retina DPR 2 имеет
+deterministic raster/controller evidence; physical mixed-DPI replay остаётся
+pending. Полные browser failures предыдущего среза не переобъявляются зелёными
+и не перезапускались ради этого Quick-only fix. Native Save dialog и physical
+drag acceptance остаются открытыми, как указано выше.

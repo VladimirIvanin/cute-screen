@@ -141,6 +141,12 @@ JSON как bytes/base64.
   отдельного неуправляемого screenshot-background pass нет.
 - Второй canvas рисует hover, selection handles, crop overlay, guides и in-progress gesture.
 - Dirty flags разделены на scene, overlay, viewport, resource и export.
+- Quick Capture UI overlay (рамка, handles, размер) имеет backing store в
+  отображаемых CSS pixels × DPR, независимо от resolution frozen image.
+  Vue adapter композитит document-space annotation preview из отдельного
+  временного canvas и рисует UI-векторы в display resolution. Scene pixels,
+  pointer mapping и export сохраняют document coordinates; при неизменном
+  layout visible overlay не пересоздаётся на pointermove.
 - Scheduler объединяет несколько invalidations в один `requestAnimationFrame`.
 - Для статичных узлов используются cached pictures; spatial index отбрасывает невидимые узлы.
 - Каждый immutable raster/texture blob декодируется один раз, дедуплицируется

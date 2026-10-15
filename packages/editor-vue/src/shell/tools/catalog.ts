@@ -76,7 +76,7 @@ const TOOL_CATALOG: readonly ToolCatalogEntry[] = [
   {
     id: 'numberedMarker',
     group: 'annotate',
-    icon: 'plus',
+    icon: 'numberedMarker',
     labelKey: 'toolNumberedMarker',
     shortcut: 'N',
     availability: 'editable',
@@ -84,7 +84,7 @@ const TOOL_CATALOG: readonly ToolCatalogEntry[] = [
   {
     id: 'callout',
     group: 'annotate',
-    icon: 'text',
+    icon: 'callout',
     labelKey: 'toolCallout',
     shortcut: 'O',
     availability: 'editable',

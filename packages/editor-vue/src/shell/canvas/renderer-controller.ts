@@ -29,6 +29,7 @@ export interface RendererControllerContext {
 
 export class CanvasRendererController {
   private renderer: Canvas2DRenderer | undefined
+  private overlayTarget: HTMLCanvasElement | undefined
   private initialization: Promise<Canvas2DRenderer | undefined> | undefined
   private sceneReady = false
   private revision = 0
@@ -39,6 +40,10 @@ export class CanvasRendererController {
   >()
 
   constructor(private readonly context: RendererControllerContext) {}
+
+  get overlaySurface(): HTMLCanvasElement | undefined {
+    return this.overlayTarget
+  }
 
   mount(): void {
     this.mounted = true
@@ -51,6 +56,7 @@ export class CanvasRendererController {
     this.resources.clear()
     this.renderer?.dispose()
     this.renderer = undefined
+    this.overlayTarget = undefined
     this.sceneReady = false
   }
 
@@ -60,10 +66,15 @@ export class CanvasRendererController {
     if (this.renderer) return this.renderer
     if (this.initialization) return this.initialization
     const next = new Canvas2DRenderer()
+    // Backend annotation previews retain document pixels; Quick chrome gets its
+    // own display-resolution target instead of scaling this bitmap in CSS.
+    const overlayTarget = props.quickFrameMode
+      ? document.createElement('canvas')
+      : overlay.value
     const initialization = (async () => {
       await next.initialize({
         scene: scene.value!,
-        overlay: overlay.value!,
+        overlay: overlayTarget,
         dpr: window.devicePixelRatio || 1,
         correlationId: 'editor-viewport',
       })
@@ -72,6 +83,7 @@ export class CanvasRendererController {
         return undefined
       }
       this.renderer = next
+      this.overlayTarget = overlayTarget
       this.sceneReady = false
       return next
     })()
@@ -167,7 +179,7 @@ export class CanvasRendererController {
     rendererError.value = undefined
     scene.value.width = Math.max(1, Math.round(bounds.width))
     scene.value.height = Math.max(1, Math.round(bounds.height))
-    if (overlay.value) {
+    if (overlay.value && !props.quickFrameMode) {
       overlay.value.width = Math.max(1, Math.round(bounds.width))
       overlay.value.height = Math.max(1, Math.round(bounds.height))
     }

@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { NButton, NPopover, NTooltip } from 'naive-ui'
 import { UiIcon } from '../icon'
+import brandUrl from '../assets/brand.svg?no-inline'
 import type { SupportedLocale, ThemePreference } from '../types'
 import type { DocumentSaveState } from '../types'
 
@@ -68,9 +69,9 @@ function selectLocale(value: SupportedLocale): void {
 <template>
   <header class="cs-topbar">
     <div class="cs-brand" :aria-label="t('appName')">
-      <span class="cs-brand-mark" aria-hidden="true"
-        ><UiIcon name="camera"
-      /></span>
+      <span class="cs-brand-mark" aria-hidden="true">
+        <img :src="brandUrl" alt="" width="30" height="30" />
+      </span>
       <strong>Cute Screen</strong>
     </div>
     <div class="cs-history" role="group" :aria-label="t('undo')">

@@ -17,6 +17,7 @@
     "build:packages": "vue-tsc -b packages/editor-core packages/editor-renderer && pnpm --filter @cute-screen/editor-vue build",
     "build:frontend": "vite build --config apps/desktop/vite.config.ts",
     "tauri": "tauri",
+    "icons:generate": "node scripts/generate-brand-assets.mjs",
     "check": "pnpm lint && pnpm typecheck && pnpm format:check && pnpm docs:check && pnpm test:boundaries && pnpm ipc:check && pnpm check:rust",
     "ipc:codegen": "cargo run --quiet --bin desktop-ipc-codegen",
     "ipc:check": "cargo run --quiet --bin desktop-ipc-codegen -- --check",

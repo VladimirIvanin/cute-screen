@@ -25,7 +25,10 @@ webview, capture/hotkey, permissions и install/launch. Только этот э
 
 1. Запустить приложение без аргументов.
 2. Убедиться, что создана schema, но нет пустых фиктивных снимков.
-3. Проверить tray, empty state и доступность Capture.
+3. Проверить tray, empty state и доступность Capture. В трее нет розовой
+   плитки: крупный сплошной силуэт кота без рамок различим при 16/20/24/32 px на
+   светлой и тёмной панели; на macOS системный template меняет окраску вместе
+   с панелью. Открыть tray menu и проверить «Открыть редактор».
 4. Переключить RU/EN и theme без перезапуска.
 5. Закрыть editor и убедиться, что tray остаётся активен.
 6. Завершить через Quit.
@@ -467,6 +470,11 @@ remain pending.
    повторного появления overlay. После handoff проверить frameless surface,
    dimension badge, полный набор quick annotation tools и action bar
    Editor/Copy/Save/Close.
+   В Select без selection нет horizontal/vertical flip и пустой панели настроек.
+   Pencil/Shape и precision tools сохраняют контекстные настройки; selected
+   arrow использует transient-панель. Text, Callout и Numbered Marker имеют
+   разные контурные Tabler-иконки; Undo/Redo сохраняют disabled/focus состояния.
+   В полном editor оба flip доступны и проходят click → Undo → Redo.
 4. Создать аннотацию, затем move/resize рамку: annotation остаётся над теми же
    pixels frozen desktop, crop clip изменяется, undo/redo возвращает рамку.
 5. Close/Escape до commit не оставляет capture, document, series frame или
@@ -618,3 +626,24 @@ parsing. The physical replay was inspected in
 | Guides                         | configurable hold key | не активирует в text edit                       | Показывает только пока клавиша удерживается  |
 
 Точные platform key combinations фиксируются перед реализацией shortcuts и отображаются в tooltips/settings.
+
+## A15 UI-срез — Tabler и отсутствие quick flip (2026-10-15)
+
+Ubuntu 24.04.5 x86_64/X11, WebKitGTK 605.1.15: clean-profile production request
+с fake capture прошёл 1/1; отдельный quick-chrome scenario прошёл 3/3:
+нет flip/пустой панели в Select, есть Pencil settings, distinct text-tool
+icons, keyboard focus, Editor handoff, Copy, Escape/restart и Close.
+Скриншоты: `artifacts/tauri-e2e/quick-tabler-select.png`,
+`artifacts/tauri-e2e/quick-tabler-pencil.png`,
+`artifacts/tauri-e2e/quick-tabler-focus.png`.
+
+Physical first-drag/annotation и native Save PNG dialog/cancel/redecode остаются
+pending. Full browser suite не зелёный; команды, failures и baseline comparison
+зафиксированы в `TESTING.md`. Это UI acceptance текущей системы, а не полная
+платформенная приёмка A15.
+
+Quick frame sharpness follow-up: тот же native scenario прошёл 3/3 с
+проверкой display-resolution overlay. Пунктир/handles/размер визуально проверены
+на `artifacts/ui-tabler/quick-after.png` против приложенного blurred
+`quick-before.png`; DPR 1/2 и redraw покрыты pixel/component tests. Physical
+mixed-DPI replay остаётся pending; source/exports не масштабируются этим fix.

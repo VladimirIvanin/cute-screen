@@ -14,7 +14,10 @@ export default defineConfig({
     rollupOptions: {
       external: ['vue', 'pinia', '@cute-screen/editor-renderer'],
       output: {
-        assetFileNames: 'shell.css',
+        assetFileNames: (asset) =>
+          asset.names.some((name) => name.endsWith('.css'))
+            ? 'shell.css'
+            : 'assets/[name]-[hash][extname]',
       },
     },
   },

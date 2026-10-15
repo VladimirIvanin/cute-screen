@@ -173,9 +173,9 @@ importers:
       '@fontsource/roboto':
         specifier: 5.3.0
         version: 5.3.0
-      '@lucide/vue':
-        specifier: 1.31.0
-        version: 1.31.0(vue@3.5.41(typescript@7.0.2))
+      '@tabler/icons-vue':
+        specifier: 3.49.0
+        version: 3.49.0(vue@3.5.41(typescript@7.0.2))
       katex:
         specifier: 0.16.22
         version: 0.16.22
@@ -686,11 +686,6 @@ packages:
   '@juggle/resize-observer@3.4.0':
     resolution: {integrity: sha512-dfLbk+PwWvFzSxwk3n5ySL0hfBog779o8h68wK/7/APo/7cgyWp5jcXockbxdk5kFRkbeXWm4Fbi9FrdN381sA==}
 
-  '@lucide/vue@1.31.0':
-    resolution: {integrity: sha512-NtjEHhcAa7umPh40wrRmlESJqNGdnpc7LziBKFnW3fmlrW0g2xMCDpdWU7WeEHRSl3xOpxbqiFTLKxoK3CoVCg==}
-    peerDependencies:
-      vue: '>=3.0.1'
-
   '@napi-rs/canvas-android-arm64@1.0.2':
     resolution: {integrity: sha512-IMXKVQod0ol4vt3gmClUfXz4JAgHYESGPCUqmH3lQxBoL0K/2greJaQE1HVBVxWWFKfLc4OLZVdxg7kXVyXv+g==}
     engines: {node: '>= 10'}
@@ -908,6 +903,14 @@ packages:
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
+
+  '@tabler/icons-vue@3.49.0':
+    resolution: {integrity: sha512-p/g2/aVsUTdGaLwgV+X/E3vc+j8XkXWV2NgXAVT31/6sMf/CFAI3uvJ1r6YCi/UT8U2ctaF5fXUWr18bNVVr7g==}
+    peerDependencies:
+      vue: '>=3.0.1'
+
+  '@tabler/icons@3.49.0':
+    resolution: {integrity: sha512-l+GnSkFETx0U26icxv1VUFnxxiTqXfCcVRiRAnyMwibupM2S2L/hSaZ9gmSgz01rkrsH/93NvLsxykqdanc6lw==}
 
   '@tauri-apps/api@2.11.1':
     resolution: {integrity: sha512-M2FPuYND2m+wh5hfW9ZpSdxMPdEJovPBWwoHJmwUpysTYNHaOkVFN419m/K0LIgjb/7KU2vBgsUepJWugQCvAA==}
@@ -4405,10 +4408,6 @@ snapshots:
 
   '@juggle/resize-observer@3.4.0': {}
 
-  '@lucide/vue@1.31.0(vue@3.5.41(typescript@7.0.2))':
-    dependencies:
-      vue: 3.5.41(typescript@7.0.2)
-
   '@napi-rs/canvas-android-arm64@1.0.2':
     optional: true
 
@@ -4551,6 +4550,13 @@ snapshots:
   '@sindresorhus/merge-streams@4.0.0': {}
 
   '@standard-schema/spec@1.1.0': {}
+
+  '@tabler/icons-vue@3.49.0(vue@3.5.41(typescript@7.0.2))':
+    dependencies:
+      '@tabler/icons': 3.49.0
+      vue: 3.5.41(typescript@7.0.2)
+
+  '@tabler/icons@3.49.0': {}
 
   '@tauri-apps/api@2.11.1': {}
 

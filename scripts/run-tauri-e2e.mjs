@@ -58,6 +58,12 @@ const scenarios = [
     fakeCapture: true,
   },
   {
+    id: 'quick-chrome',
+    spec: 'tests/e2e/specs/tauri-quick-chrome.e2e.ts',
+    harnessQuery: '?m04=1',
+    fakeCapture: true,
+  },
+  {
     id: 'm08-crop-first-open',
     spec: 'tests/e2e/specs/tauri-m08-crop-first-open.e2e.ts',
     harnessQuery: '?m04=1&m08=1',

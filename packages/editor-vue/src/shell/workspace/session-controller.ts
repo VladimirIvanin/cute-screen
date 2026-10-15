@@ -92,7 +92,7 @@ function syncLayerSummaries(
       ? [
           {
             id: context.textDraft.value.id,
-            icon: 'text' as const,
+            icon: context.textDraft.value.kind,
             name: 'Text · Editing…',
             visible: true,
             locked: true,
@@ -105,7 +105,14 @@ function syncLayerSummaries(
       : []),
     ...[...document.layers].reverse().map((layer) => ({
       id: layer.id,
-      icon: (layer.kind === 'image' ? 'image' : 'shape') as 'image' | 'shape',
+      icon:
+        layer.kind === 'text' ||
+        layer.kind === 'callout' ||
+        layer.kind === 'numberedMarker'
+          ? layer.kind
+          : layer.kind === 'image'
+            ? ('image' as const)
+            : ('shape' as const),
       name:
         layer.kind === 'image' && layer.payload.role === 'base'
           ? context.translate('baseImage')

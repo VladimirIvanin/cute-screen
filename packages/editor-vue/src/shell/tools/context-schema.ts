@@ -15,6 +15,7 @@ type DrawingTool = 'arrow' | 'shape' | 'pencil' | 'marker'
 type PrecisionLayer = Extract<LayerNode, { readonly kind: PrecisionTool }>
 
 export interface ContextSchemaContext {
+  readonly quickMode: Ref<boolean>
   readonly store: {
     readonly selectedLayerIds: readonly string[]
     readonly selectedLayerId: string | undefined
@@ -103,7 +104,7 @@ function numberedMarkerSchema(
   context: ContextSchemaContext,
 ): ContextToolbarSchema {
   return {
-    icon: 'plus',
+    icon: 'numberedMarker',
     title: context.translate('toolNumberedMarker'),
     hint: context.translate('canvasViewport'),
     controls: [
@@ -179,7 +180,7 @@ function imageSchema(
 function documentSchema(
   context: ContextSchemaContext,
 ): ContextToolbarSchema | undefined {
-  if (!context.activeDocument.value) return undefined
+  if (context.quickMode.value || !context.activeDocument.value) return undefined
   return {
     icon: 'select',
     title: context.translate('canvasActions'),

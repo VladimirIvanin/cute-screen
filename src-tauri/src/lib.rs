@@ -1,3 +1,5 @@
+mod tray_icon;
+
 use std::collections::{HashMap, VecDeque};
 use std::env;
 use std::fs;
@@ -1652,13 +1654,7 @@ fn hide_editor_for_native_capture<R: tauri::Runtime>(
 }
 
 fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()> {
-    // TrayIconBuilder does not inherit the window icon. In particular, Windows
-    // registers a notification-area entry without a visible glyph when no tray
-    // image is supplied explicitly.
-    let icon = app
-        .default_window_icon()
-        .cloned()
-        .ok_or_else(|| tauri::Error::AssetNotFound("default tray icon".to_owned()))?;
+    let icon = tray_icon::load_icon(cfg!(target_os = "macos"))?;
     let capture_area = MenuItem::with_id(app, "capture-area", "Capture Area", false, None::<&str>)?;
     let capture_screen =
         MenuItem::with_id(app, "capture-screen", "Capture Screen", false, None::<&str>)?;
@@ -1692,6 +1688,7 @@ fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()
 
     TrayIconBuilder::with_id("main-tray")
         .icon(icon)
+        .icon_as_template(cfg!(target_os = "macos"))
         .tooltip("Cute Screen")
         .menu(&menu)
         .show_menu_on_left_click(true)

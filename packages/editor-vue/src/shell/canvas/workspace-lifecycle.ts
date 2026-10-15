@@ -56,7 +56,10 @@ export function registerRenderLifecycle(context: RenderLifecycleContext): void {
     }
     void context.drawDocument()
     if (typeof ResizeObserver !== 'undefined') {
-      resizeObserver = new ResizeObserver(context.fitCanvas)
+      resizeObserver = new ResizeObserver(() => {
+        context.fitCanvas()
+        context.invalidateOverlay()
+      })
       if (scrollContainer.value) resizeObserver.observe(scrollContainer.value)
     }
     void nextTick(context.fitCanvas)

@@ -64,19 +64,32 @@ describe('editor-core dependency boundary', () => {
 })
 
 describe('M05 icon-system boundary', () => {
-  it('keeps Lucide imports and SVG markup behind the typed UiIcon adapter', async () => {
+  it('keeps Tabler imports behind UiIcon and allows only parameter-preview SVGs', async () => {
     const root = process.cwd()
-    const sources = await fg('packages/editor-vue/src/**/*.ts', { cwd: root })
+    const sources = await fg('packages/editor-vue/src/**/*.{ts,vue}', {
+      cwd: root,
+    })
+    const parameterPreviews = new Set([
+      'packages/editor-vue/src/shell/components/ArrowFormattingToolbar.vue',
+      'packages/editor-vue/src/shell/components/TextFormattingToolbar.vue',
+    ])
     const violations: string[] = []
     for (const source of sources) {
       const code = await readFile(path.join(root, source), 'utf8')
       if (
         source !== 'packages/editor-vue/src/shell/icon.ts' &&
-        code.includes("from '@lucide/vue'")
+        /['"]@tabler\/icons-vue(?:\/[^'"]*)?['"]/u.test(code)
       ) {
-        violations.push(`${source}: direct Lucide import`)
+        violations.push(`${source}: direct Tabler import`)
       }
-      if (source.includes('/shell/components/') && /<svg(?:\s|>)/u.test(code)) {
+      if (/['"](?:@lucide\/vue|lucide-vue-next)['"]/u.test(code)) {
+        violations.push(`${source}: legacy Lucide import`)
+      }
+      if (
+        source.includes('/shell/') &&
+        !parameterPreviews.has(source) &&
+        /<svg(?:\s|>)/u.test(code)
+      ) {
         violations.push(`${source}: inline SVG`)
       }
     }

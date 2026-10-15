@@ -30,6 +30,47 @@ beforeEach(() => {
 })
 
 describe('M05 CanvasViewport transforms', () => {
+  it('keeps the Quick overlay at display resolution across document redraws', async () => {
+    vi.stubGlobal('devicePixelRatio', 2)
+    const view = mountViewport(
+      'select',
+      document,
+      '',
+      undefined,
+      false,
+      undefined,
+      undefined,
+      true,
+    )
+    const overlay = view.container.querySelector(
+      '.cs-canvas-overlay',
+    ) as HTMLCanvasElement
+    overlay.getBoundingClientRect = () =>
+      ({ width: 360, height: 360 }) as DOMRect
+    view.scene.getBoundingClientRect = overlay.getBoundingClientRect
+    try {
+      await vi.waitFor(() =>
+        expect(view.emitted().frameReady).toEqual([[document.id]]),
+      )
+      await view.rerender({ zoom: 360 })
+      expect([overlay.width, overlay.height]).toEqual([720, 720])
+      expect([view.scene.width, view.scene.height]).toEqual([100, 100])
+      await view.rerender({
+        document: {
+          ...document,
+          crop: { x: 10, y: 10, width: 60, height: 60 },
+        },
+      })
+      await vi.waitFor(() =>
+        expect([overlay.width, overlay.height]).toEqual([720, 720]),
+      )
+      expect(view.scene.width).toBe(100)
+    } finally {
+      view.unmount()
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('signals regular editor readiness after its document frame renders', async () => {
     const { emitted } = mountViewport()
 

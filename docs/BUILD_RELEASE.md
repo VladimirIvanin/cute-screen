@@ -188,3 +188,13 @@ Network error не перезаписывает последний успешн�
 - Для private repository без пользовательского GitHub token version check не поддерживается. План рассчитан на публичный repository.
 - Unsigned Windows/macOS artifacts неизбежно могут вызывать OS warnings.
 - Если в будущем потребуется официальный подписанный канал или auto-update, он проектируется отдельным ADR, а не добавляется скрыто в этот workflow.
+
+## Перегенерация иконок
+
+`pnpm icons:generate` воспроизводит SVG логотипа/редактора/favicon, отдельные
+tray/template PNG и все bundle icons (PNG/ICO/ICNS) из единой геометрии в
+`scripts/generate-brand-assets.mjs`. Команда использует существующие
+`@napi-rs/canvas` и Tauri CLI; новые зависимости не требуются. Generated assets
+хранятся в Git и не генерируются при каждом запуске приложения. После изменения
+проверить декодированные PNG и системный tray; app tile нельзя подставлять
+вместо tray asset.

@@ -196,8 +196,8 @@ export class CropController {
     const rect = canvas.getBoundingClientRect()
     return overlayVisualScale(
       {
-        backingWidth: canvas.width,
-        backingHeight: canvas.height,
+        backingWidth: props.canvas?.width ?? canvas.width,
+        backingHeight: props.canvas?.height ?? canvas.height,
         clientWidth: rect.width,
         clientHeight: rect.height,
       },

@@ -70,6 +70,9 @@ Cute Screen — полноценный local-first редактор снимко
   focus. Нажатие `Enter` до валидного drag ничего не подтверждает; после
   перехода в `editing` оно выполняет quick action Copy. Между фазами запрещены
   loading state, blank frame, смена native window и повторное появление рамки.
+  Пунктир, resize handles и размер рисуются в разрешении отображения с учётом
+  device pixel ratio; увеличение preview не растягивает низкоразрешённый bitmap
+  интерфейсного overlay. CSS-размеры этих элементов не зависят от zoom.
 - `REQ-CAP-013` — Windows/X11/macOS Area quick-mode показывает frozen desktop
   в исходных physical coordinates. На Windows и X11 первый Area drag выполняется
   внутри той же fullscreen Quick surface, что затем показывает editor chrome;
@@ -91,7 +94,7 @@ Cute Screen — полноценный local-first редактор снимко
 - `REQ-ACT-003` — Wayland использует XDG GlobalShortcuts portal при наличии.
 - `REQ-ACT-004` — при отсутствии portal приложение показывает и копирует CLI-команду для системных настроек.
 - `REQ-ACT-005` — один бинарник поддерживает GUI, tray, single-instance и CLI dispatch.
-- `REQ-ACT-006` — скрытый tray-процесс принимает hotkey/CLI и открывает capture без ручного показа редактора.
+- `REQ-ACT-006` — скрытый tray-процесс принимает hotkey/CLI и открывает capture без ручного показа редактора. Tray использует отдельный прозрачный контрастный знак, читаемый при 16–32 px на светлой и тёмной панели; macOS использует системную template-окраску.
 - `REQ-ACT-007` — autostart выключен по умолчанию и управляется настройкой.
 
 ## Базовое поведение редактора
@@ -121,7 +124,12 @@ Cute Screen — полноценный local-first редактор снимко
   настраиваются через context menu/tool configure popover на кнопке инструмента.
   Цветовые controls используют product-owned picker с палитрой, HEX,
   recent/suggestions и canvas-only пипеткой; draft не создаёт document history
-  entry до завершения взаимодействия.
+  entry до завершения взаимодействия. В Quick Capture общие действия холста
+  не показываются; без настроек инструмента или выбранной аннотации
+  `ContextToolbar` отсутствует, а не занимает пустое место. Общие иконки
+  интерфейса используют единый контурный MIT-набор Tabler Icons через `UiIcon`;
+  Text, Callout и Numbered Marker имеют разные обозначения. Миниатюры параметров
+  сохраняют собственную геометрию результата.
 - `REQ-EDT-009` — layers panel ограничена выбором, порядком, visibility, lock, rotation и opacity.
 - `REQ-EDT-010` — clipboard различает внутренние слои, bitmap и plain text.
 - `REQ-EDT-011` — keyboard duplicate создаёт копию с предсказуемым offset.
@@ -135,7 +143,8 @@ Cute Screen — полноценный local-first редактор снимко
   от `1`, нормализуется в `+1/+1` без компенсации geometry, history entry или
   dirty state; чистые unit reflections сохраняются.
 - `REQ-EDT-014` — horizontal/vertical flip преобразует все canvas layers и crop
-  одной undoable document command и совпадает в preview/export.
+  одной undoable document command и совпадает в preview/export. Оба действия
+  доступны в полном редакторе и отсутствуют в Quick Capture.
 
 ## Инструменты аннотации
 
@@ -291,6 +300,11 @@ Cute Screen — полноценный local-first редактор снимко
   `rgb(... / ...)` или unprefixed-only `backdrop-filter`; отсутствие blur не
   должно делать `ToolRail`, contextual/transient panels или quick actions
   прозрачными.
+
+- `REQ-UI-013` — логотип редактора и иконки приложения используют единый простой
+  крупный сплошной силуэт кота без рамок, мимики и мелких деталей; цветная плитка
+  принадлежит app icon, а tray показывает только знак. Все варианты
+  воспроизводимо генерируются из одной геометрии.
 
 ## Качество и поставка
 
