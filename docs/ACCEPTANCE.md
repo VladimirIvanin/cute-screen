@@ -1,5 +1,15 @@
 # Сквозная приёмка
 
+## Windows: новый снимок без следа editor (2026-10-15)
+
+На Windows 10 x64 / WebView2 155.0.4283.45 сценарий
+`windows-capture-exclusion` нажимает production Capture поверх заметного
+editor marker и контрольного fullscreen desktop. После скрытия main frozen
+scene содержит точный desktop colour в 9 точках прежнего editor; три цикла
+с trusted Escape/retry дают 27/27 совпадений. Before/after screenshots
+просмотрены, фактический прогон и ограничения — в TESTING.md. Захват настоящий;
+fake-platform проверяет Quick chrome и не заменяет это pixel evidence.
+
 ## Windows native harness и tool settings (2026-10-15)
 
 Windows x64 / WebView2 155.0.4283.45: полный stable `pnpm test:e2e:tauri`

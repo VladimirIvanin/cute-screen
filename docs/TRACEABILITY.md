@@ -7,7 +7,15 @@
 barrier. Rust regression проверяет отказ для invalid HWND; real-WebView
 сценарий `windows-capture-exclusion` проверяет decoded frozen pixels поверх
 контрольного рабочего стола, отмену и повторный захват. До реализации и
-runtime replay статус repair — planned; fake-platform evidence недостаточно.
+runtime replay: Windows 10 x64 / WebView2 155.0.4283.45 — три capture/cancel/retry,
+27/27 decoded pixels совпали с контрольным desktop; screenshots просмотрены.
+Статус repair — implemented; mixed-DPI и другие платформы остаются pending.
+
+Этот physical replay также требует `REQ-CAP-012/014`: Escape в начальной фазе
+selecting закрывает draft даже при перехвате клавиши вложенным canvas handler.
+Regression — mounted Quick Capture с consuming child и native Escape/retry.
+`REQ-QLT-003`: single-instance identity test-harness также изолируется по
+абсолютному E2E profile, чтобы WDIO/CLI не подключались к resident developer app.
 
 Для `REQ-EDT-008` инструмент Marker использует Tabler `brush` через общий
 `UiIcon` в editor и Quick Capture; SVG проверяется в `ui-icon.test.ts`.

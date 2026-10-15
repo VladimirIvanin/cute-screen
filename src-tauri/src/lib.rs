@@ -2384,7 +2384,16 @@ pub fn run() {
         stage_image
     ]);
 
-    if let Err(error) = builder.run(tauri::generate_context!()) {
+    #[allow(unused_mut)]
+    let mut context = tauri::generate_context!();
+    #[cfg(feature = "test-harness")]
+    if let Some(profile) = env::var_os("CUTE_SCREEN_E2E_APP_DATA") {
+        context.config_mut().identifier = e2e_paths::profile_identifier(
+            &context.config().identifier,
+            std::path::Path::new(&profile),
+        );
+    }
+    if let Err(error) = builder.run(context) {
         eprintln!("cute-screen startup failed: {error}");
         std::process::exit(1);
     }

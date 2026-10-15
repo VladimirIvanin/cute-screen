@@ -1,5 +1,51 @@
 # Стратегия тестирования
 
+## Windows: след editor при захвате (2026-10-15)
+
+Windows 10 Home 19045 x64 / PowerShell, WebView2 и EdgeDriver 155.0.4283.45,
+external tauri-driver 2.1.0. Native main hide выполняется на owning thread без
+DWM transition, с visibility check и `DwmFlush` до DXGI. Начальная selecting
+фаза обрабатывает Escape до вложенного canvas handler.
+
+`windows-capture-exclusion` проходит production Capture с настоящим DXGI,
+контрольным fullscreen WinForms desktop и заметным marker поверх editor.
+Три цикла capture → trusted Escape → retry: 27/27 decoded scene pixels равны
+`[37,71,105,255]`; marker/editor отсутствуют. Просмотрены
+`artifacts/tauri-e2e/windows-capture-before-0.png` и
+`windows-capture-after-2.png`; числа — `windows-capture-exclusion-pixels.json`.
+Физический сценарий интерактивный, Windows-only и запускается явным фильтром:
+
+```powershell
+$env:CUTE_SCREEN_E2E_SCENARIOS='windows-capture-exclusion,quick-chrome,document-write,document-reopen,renderer-alpha'
+pnpm test:e2e:tauri
+```
+
+Лог — `artifacts/capture-exclusion/tauri-profile-isolated.log`. Test-harness
+single-instance identifier включает hash абсолютного E2E profile: resident
+developer app и разные профили не принимают команды друг друга; persistence
+pair использует один профиль/identifier. GUI fixture явно показывается после
+hidden-console startup. До этой изоляции прогоны попадали в resident app и
+не считаются evidence; build failures из-за locked EXE также сохранены в каталоге.
+Resident executable был переименован внутри `target/debug`, без завершения app.
+
+Rust red/green — `rust-red.log`, `rust-green.log`, `identity-{red,green}.log`;
+mounted selecting Escape red/green — `escape-{red,green}.log` (3/3 green).
+Полная final platform matrix, mixed-DPI и Window target этой проверкой не покрыты.
+
+Итог native — exit 0, 5 scenarios / 8 tests. `pnpm test` — exit 0,
+81 files / 553 tests (`unit-final.log`); `cargo test --workspace` — exit 0,
+134 passed / 1 ignored (`rust-final.log`). SHA256 test binary, base commit,
+dirty flag и platform записаны в `artifacts/capture-exclusion/native-evidence.json`;
+critical before/after PNG, pixel JSON и JUnit скопированы в тот же каталог.
+
+`pnpm format` и `pnpm check` — exit 0 (`format-complete.log`,
+`check-complete.log`): lint/typecheck/format/docs, 40 boundary tests, IPC,
+Rust fmt и четыре Clippy feature configurations. `pnpm tauri build --debug
+--no-bundle` — exit 0 (`production-build.log`), собран обычный
+`target/debug/cute-screen.exe` без test-harness. Финальная проверка форматирования
+сохраняется в `format-check-final.log`. Большие renderer/browser/perf suites
+повторно не запускались: renderer и document geometry не менялись.
+
 ## Marker: иконка brush (2026-10-15)
 
 Windows x64 / PowerShell: `REQ-EDT-008` — общий `UiIcon` использует Tabler

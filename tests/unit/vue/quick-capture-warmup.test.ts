@@ -1,4 +1,7 @@
-import { render } from '@testing-library/vue'
+import {
+  fireEvent,
+  render,
+} from '@testing-library/vue'
 import { defineComponent } from 'vue'
 import {
   beforeEach,
@@ -19,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   present: vi.fn(),
   reveal: vi.fn(),
   dismiss: vi.fn(),
+  cancel: vi.fn(),
   listen: vi.fn(),
   loadImage: vi.fn(),
 }))
@@ -35,6 +39,7 @@ vi.mock('../../../apps/desktop/src/desktop-bridge', () => ({
     quickCapturePresent: mocks.present,
     quickCaptureReveal: mocks.reveal,
     quickCaptureDismiss: mocks.dismiss,
+    quickCaptureCancel: mocks.cancel,
   },
 }))
 
@@ -80,7 +85,24 @@ describe('GTK quick capture mapped warmup', () => {
     mocks.present.mockResolvedValue(true)
     mocks.reveal.mockResolvedValue(true)
     mocks.dismiss.mockResolvedValue(true)
+    mocks.cancel.mockResolvedValue(true)
     mocks.listen.mockResolvedValue(() => undefined)
+  })
+
+  it('cancels initial selection before the nested canvas consumes Escape', async () => {
+    const view = render(QuickCaptureApp, {
+      global: {
+        plugins: [createEditorShellPinia()],
+        stubs: {
+          EditorShell: defineComponent({
+            template: '<div data-testid="consuming-canvas" tabindex="0" @keydown.prevent />',
+          }),
+        },
+      },
+    })
+    await vi.waitFor(() => expect(mocks.warmup).toHaveBeenCalledWith('draft-gtk'))
+    await fireEvent.keyDown(view.getByTestId('consuming-canvas'), { key: 'Escape' })
+    await vi.waitFor(() => expect(mocks.dismiss).toHaveBeenCalledOnce())
   })
 
   it('overlaps mapped warmup with frozen-frame decode', async () => {

@@ -371,6 +371,10 @@ const openEditor = () => actionController.openEditor()
 const cancel = () => actionController.cancel()
 const onKeydown = (event: KeyboardEvent) => actionController.keydown(event)
 
+function onSelectingKeydown(event: KeyboardEvent): void {
+  if (selectionPending.value && event.key === 'Escape') actionController.keydown(event)
+}
+
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
   window.addEventListener('resize', onWindowResize)
@@ -395,6 +399,7 @@ onBeforeUnmount(() => {
       'is-selecting': selectionPending,
     }"
     data-testid="quick-capture-shell"
+    @keydown.capture="onSelectingKeydown"
   >
     <EditorShell
       quick-mode

@@ -39,8 +39,14 @@ describe('Windows physical capture excludes the editor', () => {
       })
       await browser.setWindowSize(1024, 700)
       for (let attempt = 0; attempt < 3; attempt += 1) {
-        await executeFile(executable, ['show'])
         await browser.tauri.switchWindow('main')
+        await browser.execute(async () => {
+          const tauri = (window as typeof window & {
+            __TAURI__: { core: { invoke(command: string, args: Record<string, unknown>): Promise<void> } }
+          }).__TAURI__
+          await tauri.core.invoke('plugin:window|set_always_on_top', { label: 'main', value: true })
+        })
+        await executeFile(executable, ['show'])
         await expect($('button[aria-label="Capture"]')).toBeEnabled()
         const samples = await browser.execute(() => {
           const marker = document.createElement('div')
@@ -73,8 +79,19 @@ describe('Windows physical capture excludes the editor', () => {
         await writeFile(path.resolve('artifacts/tauri-e2e/windows-capture-exclusion-pixels.json'), JSON.stringify(evidence, null, 2))
         await browser.saveScreenshot(path.resolve(`artifacts/tauri-e2e/windows-capture-after-${attempt}.png`))
         for (const pixel of pixels) expect(pixel).toEqual([37, 71, 105, 255])
-        await $('.cs-canvas-overlay').click()
+        await browser.execute(() => {
+          document.querySelector<HTMLCanvasElement>('.cs-canvas:not(.cs-canvas-overlay)')?.focus()
+          window.addEventListener('keydown', (event) => {
+            document.documentElement.dataset.captureEscape = JSON.stringify({
+              key: event.key,
+              trusted: event.isTrusted,
+            })
+          }, { capture: true, once: true })
+        })
         await browser.keys('Escape')
+        const escapeEvent = await browser.execute(() => document.documentElement.dataset.captureEscape)
+        expect(escapeEvent).toBe('{"key":"Escape","trusted":true}')
+        await writeFile(path.resolve('artifacts/tauri-e2e/windows-capture-escape.json'), JSON.stringify({ escapeEvent }))
         await expect($('.cs-quick-capture.is-layout-ready')).not.toExist()
         await browser.tauri.switchWindow('main')
         await expect($('button[aria-label="Capture"]')).toBeEnabled()

@@ -1,5 +1,15 @@
 # Платформенная матрица
 
+## Windows: исключение editor из frozen desktop (2026-10-15)
+
+Windows 10 Home 19045 x64 / WebView2 155.0.4283.45: production Area через
+реальный DXGI прошёл три capture/cancel/retry на контролируемом desktop;
+27 decoded pixels и просмотренные screenshots подтверждают отсутствие editor.
+Main hide подтверждается на оконном потоке после suppression hide-animation
+и DWM barrier. Это single-display local evidence; ARM64, mixed-DPI, Window
+target, Linux/macOS и полная release matrix остаются отдельными проверками.
+Команда, scoped test identity и артефакты — в TESTING.md.
+
 ## Windows WebView harness (2026-10-15)
 
 Полный native suite: 15 scenarios / 18 tests, Windows x64 / WebView2

@@ -16,6 +16,12 @@
 без фильтра. Production build не включает WDIO plugins/test permissions.
 Linux/macOS гарантии этим запуском не подтверждаются. Evidence — TESTING.md.
 
+Test-harness использует отдельный identifier с hash абсолютного E2E profile,
+чтобы single-instance dispatch не подключался к resident developer app. CLI
+того же профиля сохраняет тот же identifier. Интерактивная physical проверка
+Windows запускается через `CUTE_SCREEN_E2E_SCENARIOS=windows-capture-exclusion`;
+обычный unattended suite её пропускает. Production identity не меняется.
+
 ## Принцип
 
 Проект не создаёт официальный канал релизов. Нет code signing, notarization, GitHub Releases, Tauri updater или автоматической установки обновлений.

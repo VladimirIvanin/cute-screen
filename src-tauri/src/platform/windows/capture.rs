@@ -98,12 +98,14 @@ fn set_window_transitions_disabled(
     correlation_id: &str,
 ) -> Result<(), PlatformError> {
     let disabled = i32::from(disabled);
+    let attribute_size = u32::try_from(std::mem::size_of_val(&disabled))
+        .map_err(|_| failure(correlation_id, "captureWindowAttributeSize"))?;
     let result = unsafe {
         DwmSetWindowAttribute(
             window,
             DWMWA_TRANSITIONS_FORCEDISABLED as u32,
             std::ptr::from_ref(&disabled).cast(),
-            std::mem::size_of_val(&disabled) as u32,
+            attribute_size,
         )
     };
     if result < 0 {
