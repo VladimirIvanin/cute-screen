@@ -4,6 +4,7 @@ import type {
   RenderNode,
   RenderPaint,
   RenderPathNode,
+  RenderVectorNode,
 } from './contracts'
 
 export function assertFinite(
@@ -113,7 +114,7 @@ export function freezePaint(
   return Object.freeze({ ...paint, stops: Object.freeze(stops) })
 }
 
-export function validateStrokeStyle(node: RenderLineNode | RenderPathNode): void {
+export function validateStrokeStyle(node: RenderLineNode | RenderPathNode | RenderVectorNode): void {
   if (node.lineCap && !['butt', 'round', 'square'].includes(node.lineCap))
     throw new RangeError(`${node.id}.lineCap is invalid`)
   if (node.lineJoin && !['miter', 'round', 'bevel'].includes(node.lineJoin))

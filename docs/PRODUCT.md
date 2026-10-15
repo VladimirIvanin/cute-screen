@@ -162,13 +162,27 @@ Cute Screen — полноценный local-first редактор снимко
   configure popover (context menu / Shift+F10) на кнопке инструмента arrow.
   Изменение размера выполняется endpoint/bend/middle-segment anchors без
   generic transform-scale и без масштабирования stroke/caps.
-- `REQ-TOL-002` — shapes: rectangle, circle, oval, diamond, star; stroke,
+- `REQ-TOL-002` — общий каталог геометрических фигур, блочных стрелок, облачков,
+  скобок и символов блок-схем: 30 сохраняемых видов и один пресет скруглённого
+  прямоугольника на существующем rectangle/radius. Прежние rectangle, circle,
+  oval, diamond и star совместимы. Палитра имеет до семи колонок, ячейки 32×32,
+  иконки 20×20 и строку применимых параметров под сеткой без повторного заголовка.
+  Все фигуры поддерживают обводку; открытые скобки не имеют заливки.
+  Закрытые фигуры поддерживают
   solid/gradient/pattern/texture fills, fill/layer opacity, blend modes и
   визуальный corner radius. Bounds handles меняют intrinsic geometry, сохраняя
-  paint/stroke values.
+  paint/stroke values. Общая компактная панель имеет четыре контрола: форма,
+  заливка, обводка и наложение (иконка blend-mode с текущей непрозрачностью).
+  Параметры раскрываются в popover; скругление показывается для прямоугольника,
+  лучи — для звезды. Цвет сплошной заливки редактируется независимо от обводки.
 - `REQ-TOL-003` — pencil: базовые кисти, толщина, opacity, smoothing и цвет;
   bounds handles преобразуют sampled points, но не толщину кисти.
-- `REQ-TOL-004` — marker: толщина, opacity и blend modes highlight/darken;
+- `REQ-TOL-004` — выделитель (marker): толщина, интенсивность и один выбор
+  «Авто / Выделить / Подсветить / Окрасить». Авто анализирует весь original
+  один раз после первого frame в фоне; resolved blend фиксируется при начале
+  штриха и сохраняется в документе. Preview и export совпадают. Цвет выбирается
+  из восьми образцов; «Свой цвет» открывает расширенный picker. Фигуры и стрелки
+  используют ту же двухуровневую палитру с основными и светлыми цветами;
   bounds handles преобразуют sampled points, но не толщину marker.
 - `REQ-TOL-005` — text: FigJam-like direct WYSIWYG editing through a transient
   `contenteditable` projection (never persisted as HTML) с transient-панелью
@@ -332,3 +346,7 @@ Cute Screen — полноценный local-first редактор снимко
 - Cloud sync, аккаунты и совместное редактирование.
 - Телеметрия или автоматическая отправка crash reports.
 - Миграция библиотеки и аннотаций Electron-альфы.
+
+### Object-aware editing popovers
+
+`REQ-UI-001`, `REQ-EDT-015/016`: editing popovers consider the selected object and occupied chrome as well as viewport edges. Prefer a nearby non-overlapping position; when impossible, limit panel dimensions and minimize overlap without moving the canvas. Keep placement stable during value entry, preserve Escape/focus return and reevaluate on layout/viewport changes.

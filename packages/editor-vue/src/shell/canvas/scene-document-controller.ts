@@ -36,7 +36,7 @@ export class SceneDocumentController {
       }
     }
     const preview = this.#context.previewLayer()
-    if (preview?.kind === 'loupe') {
+    if (preview?.kind === 'loupe' || preview?.kind === 'marker') {
       return {
         ...document,
         layers: document.layers.map((layer) => (layer.id === preview.id ? preview : layer)),

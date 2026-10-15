@@ -1,4 +1,10 @@
+import { SHAPE_CATALOG } from '@cute-screen/editor-renderer'
 import type { Ref } from 'vue'
+import {
+  highlighterModeForLayer,
+  isHighlighterMode,
+} from '@cute-screen/editor-renderer'
+import type { HighlighterAnalysis } from '../workspace/highlighter-background'
 import type {
   DrawingDefaults,
   EditorDocumentV1,
@@ -6,12 +12,16 @@ import type {
   LayerNode,
 } from '@cute-screen/editor-renderer'
 import type { ResolvedEditorShellProps } from '../contracts'
-import type { ContextToolbarSchema } from '../types'
+import type {
+  ContextToolbarSchema,
+  ShapeFill,
+} from '../types'
 
 type DrawingTool = 'arrow' | 'shape' | 'pencil' | 'marker'
 export type DrawingLayerNode = Extract<LayerNode, { readonly kind: DrawingTool }>
 
 export interface DrawingSchemaContext {
+  readonly highlighterAnalysis?: Ref<HighlighterAnalysis>
   readonly props: ResolvedEditorShellProps
   readonly store: {
     readonly selectedLayerIds: readonly string[]
@@ -193,7 +203,10 @@ function baseControls(
   ]
 }
 
-function shapeControls(state: DrawingValues): ContextToolbarSchema['controls'] {
+function shapeControls(
+  context: DrawingSchemaContext,
+  state: DrawingValues,
+): ContextToolbarSchema['controls'] {
   const values = state.values
   const fill = values.fill && typeof values.fill === 'object' ? (values.fill as Record<string, unknown>) : undefined
   const controls: ContextToolbarSchema['controls'] = [
@@ -202,9 +215,9 @@ function shapeControls(state: DrawingValues): ContextToolbarSchema['controls'] {
       id: 'shapeKind',
       label: 'Shape',
       value: typeof values.shape === 'string' ? values.shape : 'rectangle',
-      options: ['rectangle', 'circle', 'oval', 'diamond', 'star'].map((value) => ({
-        value,
-        label: value,
+      options: SHAPE_CATALOG.map((entry) => ({
+        value: entry.id,
+        label: entry.en,
       })),
     },
     {
@@ -247,6 +260,14 @@ function shapeControls(state: DrawingValues): ContextToolbarSchema['controls'] {
       ],
     },
     {
+      kind: 'color',
+      id: 'fillColor',
+      label: context.translate('color'),
+      value: context.hexColor(fill?.color ?? state.color),
+      disabled: state.colorDisabled,
+      eyedropper: Boolean(context.activeDocument.value) && !state.colorDisabled,
+    },
+    {
       kind: 'range',
       id: 'fillOpacity',
       label: 'Fill opacity',
@@ -255,7 +276,7 @@ function shapeControls(state: DrawingValues): ContextToolbarSchema['controls'] {
       max: 100,
       step: 1,
     },
-    { kind: 'action', id: 'importTexture', label: 'Import texture' },
+    { kind: 'action', id: 'importTexture', label: 'Import texture', disabled: !context.props.textureBridge },
   ]
   if (fill?.kind === 'imageTexture') {
     return [...controls, { kind: 'action', id: 'removeTexture', label: 'Remove texture' }]
@@ -281,19 +302,7 @@ function specializedControls(
       },
     ]
   }
-  if (tool !== 'marker') return []
-  return [
-    {
-      kind: 'select',
-      id: 'markerMode',
-      label: 'Mode',
-      value: values.mode === 'darken' ? 'darken' : 'highlight',
-      options: [
-        { value: 'highlight', label: 'Highlight' },
-        { value: 'darken', label: 'Darken' },
-      ],
-    },
-  ]
+  return []
 }
 
 function standardSchema(
@@ -301,13 +310,38 @@ function standardSchema(
   tool: Exclude<DrawingTool, 'arrow'>,
   state: DrawingValues,
 ): ContextToolbarSchema {
+  if (tool === 'marker') {
+    const values = state.values
+    const selected = state.selected?.kind === 'marker' ? state.selected : undefined
+    const blend = selected?.blendMode ?? values.blendMode
+    const mode = typeof blend === 'string'
+      ? highlighterModeForLayer(values, blend as import('@cute-screen/editor-renderer').BlendMode)
+      : isHighlighterMode(values.highlighterMode) ? values.highlighterMode : 'highlight'
+    const analysis = context.highlighterAnalysis?.value ?? { status: 'unavailable' as const, effect: 'highlight' as const }
+    return {
+      icon: 'marker', title: context.translate('toolMarker'), hint: context.translate('canvasViewport'),
+      highlighter: values.highlighterMode === 'auto' && typeof blend === 'string'
+        ? { status: 'ready', effect: blend === 'screen' ? 'illuminate' : blend === 'normal' ? 'veil' : 'highlight' }
+        : analysis,
+      controls: [
+        ...baseControls(context, tool, state).filter((control) => control.id !== 'blendMode'),
+        { kind: 'select', id: 'markerMode', label: 'Mode', value: mode, options: ['auto', 'highlight', 'illuminate', 'veil'].map((value) => ({ value, label: value })) },
+      ],
+    }
+  }
   return {
+    ...(tool === 'shape' ? { shape: {
+      fill: state.values.fill as ShapeFill,
+      fillSupported: !['braceLeft', 'braceRight'].includes(String(state.values.shape)),
+      fillColorEditable: ['none', 'solid'].includes((state.values.fill as ShapeFill).kind),
+      fillOpacityEditable: (state.values.fill as ShapeFill).kind !== 'none',
+    } } : {}),
     icon: tool === 'shape' ? 'shape' : tool,
     title: context.translate(tool === 'shape' ? 'toolShape' : tool === 'pencil' ? 'toolPencil' : 'toolMarker'),
     hint: context.translate('canvasViewport'),
     controls: [
       ...baseControls(context, tool, state),
-      ...(tool === 'shape' ? shapeControls(state) : []),
+      ...(tool === 'shape' ? shapeControls(context, state) : []),
       ...specializedControls(tool, state.values),
     ],
   }

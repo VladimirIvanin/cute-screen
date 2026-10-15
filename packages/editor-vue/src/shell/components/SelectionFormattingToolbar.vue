@@ -19,6 +19,7 @@ const props = defineProps<{
   selectedIds: readonly string[]
   layersOpen: boolean
   zoom: number
+  quickMode?: boolean
   locale: 'en' | 'ru'
   recentColors: readonly SrgbColor[]
 }>()
@@ -41,6 +42,11 @@ function scheduleResize(): void {
   })
 }
 function update(): void {
+  if (!props.document || !props.selectedIds.length) {
+    if (host.value) delete host.value.dataset.previewBounds
+    positioned.value = false
+    return
+  }
   const root = host.value?.closest('.cs-workbench')
   const canvas = root?.querySelector('.cs-canvas-surface')
   const viewport = root?.querySelector('.cs-viewport')
@@ -52,8 +58,10 @@ function update(): void {
   ) return
   const canvasRect = canvas.getBoundingClientRect()
   const view = viewport.getBoundingClientRect()
-  const crop = props.document.crop
-  const scale = props.zoom / 100
+  const crop = props.quickMode ? null : props.document.crop
+  const output = crop ?? props.document.canvas
+  const scaleX = canvasRect.width / output.width
+  const scaleY = canvasRect.height / output.height
   const points = props.document.layers
     .filter((layer) => props.selectedIds.includes(layer.id))
     .flatMap((layer) => {
@@ -68,17 +76,27 @@ function update(): void {
       ].map(([x = 0, y = 0]) => ({
         x:
           canvasRect.left +
-          (t.translateX + x * t.scaleX * Math.cos(radians) - y * t.scaleY * Math.sin(radians) - (crop?.x ?? 0)) * scale,
+          (t.translateX + x * t.scaleX * Math.cos(radians) - y * t.scaleY * Math.sin(radians) - (crop?.x ?? 0)) *
+          scaleX,
         y:
           canvasRect.top +
-          (t.translateY + x * t.scaleX * Math.sin(radians) + y * t.scaleY * Math.cos(radians) - (crop?.y ?? 0)) * scale,
+          (t.translateY + x * t.scaleX * Math.sin(radians) + y * t.scaleY * Math.cos(radians) - (crop?.y ?? 0)) *
+          scaleY,
       }))
     })
-  if (!points.length) return
+  if (!points.length) {
+    delete host.value.dataset.previewBounds
+    positioned.value = false
+    return
+  }
   const left = Math.min(...points.map((point) => point.x))
   const right = Math.max(...points.map((point) => point.x))
   const top = Math.min(...points.map((point) => point.y))
   const bottom = Math.max(...points.map((point) => point.y))
+  const previewBounds = [left, top, right - left, bottom - top].join(',')
+  const boundsChanged = host.value.dataset.previewBounds !== previewBounds
+  host.value.dataset.previewBounds = previewBounds
+  if (boundsChanged) document.dispatchEvent(new Event('cs-preview-layout'))
   const width = host.value.offsetWidth
   const height = host.value.offsetHeight
   const above = top - height - 10
@@ -93,12 +111,13 @@ function update(): void {
     top: Math.max(view.top + 8, Math.min(view.bottom - height - 8, Math.max(preferredTop, panelBottom))),
     placement: above >= view.top + 8 ? 'above' : 'below',
   }
+  positioned.value = true
   if (JSON.stringify(layout) === JSON.stringify(nextLayout)) return
   layout = nextLayout
   host.value.style.left = `${nextLayout.left}px`
   host.value.style.top = `${nextLayout.top}px`
   host.value.dataset.placement = nextLayout.placement
-  positioned.value = true
+  document.dispatchEvent(new Event('cs-preview-layout'))
 }
 function pointerDown(event: PointerEvent): void {
   if (event.button === 0 && event.target instanceof HTMLCanvasElement) dragging.value = true
@@ -108,7 +127,7 @@ function pointerUp(): void {
   void nextTick(update)
 }
 watch(
-  () => [props.schema, props.document, props.selectedIds, props.zoom, props.layersOpen],
+  () => [props.schema, props.document, props.selectedIds, props.zoom, props.layersOpen, props.quickMode],
   () => {
     void nextTick(update)
   },
@@ -154,14 +173,17 @@ onBeforeUnmount(() => {
 
 <template>
   <div
-    v-if="schema"
     ref="host"
-    class="cs-selection-floating-toolbar cs-context-toolbar-surface"
-    :class="{ 'cs-arrow-floating-toolbar-host': schema.icon === 'arrow' }"
+    class="cs-selection-preview-host"
+    :class="{
+      'cs-selection-floating-toolbar': Boolean(schema),
+      'cs-context-toolbar-surface': Boolean(schema),
+      'cs-arrow-floating-toolbar-host': schema?.icon === 'arrow',
+    }"
     :style="{
       position: 'fixed',
       width: 'max-content',
-      visibility: dragging || !positioned ? 'hidden' : 'visible',
+      visibility: dragging || !schema || !positioned ? 'hidden' : 'visible',
       zIndex: 30,
       maxWidth: 'calc(100vw - 24px)',
     }"
@@ -169,7 +191,7 @@ onBeforeUnmount(() => {
   >
     <ContextToolbar
       :schema="schema"
-      :label="schema.title"
+      :label="schema?.title ?? ''"
       :picker-locale="locale"
       :recent-colors="recentColors"
       @change="(id, value) => emit('change', id, value)"

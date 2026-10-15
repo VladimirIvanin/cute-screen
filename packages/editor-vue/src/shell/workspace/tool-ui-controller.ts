@@ -67,6 +67,7 @@ async function writeSampleToClipboard(
 async function onColorSample(
   context: ToolUiControllerContext,
   value: string,
+  defaultsTool: string | undefined,
 ): Promise<void> {
   const normalized = value.toUpperCase()
   const target = context.samplingControl.value
@@ -76,8 +77,14 @@ async function onColorSample(
     context.eyedropperFeedback.value = context.translate('readOnlyDocument')
     return
   }
-  if (target) onColorChange(context, target, normalized)
-  else rememberColor(context, normalized)
+  if (target) {
+    context.configureDefaultsTool.value = defaultsTool
+    try {
+      onColorChange(context, target, normalized)
+    } finally {
+      context.configureDefaultsTool.value = undefined
+    }
+  } else rememberColor(context, normalized)
   context.samplingControl.value = undefined
   context.eyedropperColor.value = normalized
   context.eyedropperFeedback.value =
@@ -121,6 +128,7 @@ function onToolConfigureOutsidePointer(
 }
 
 export function createToolUiController(context: ToolUiControllerContext) {
+  let samplingDefaultsTool: string | undefined
   return {
     onToolConfigureKeydown: (event: KeyboardEvent) => {
       if (
@@ -144,11 +152,17 @@ export function createToolUiController(context: ToolUiControllerContext) {
     onColorChange: (id: string, value: string) => onColorChange(context, id, value),
     startEyedropper: (id: string) => {
       if (context.precisionChangeBlocked(id)) return
+      samplingDefaultsTool = context.toolConfigure.value?.toolId
+      closeToolConfigure(context)
       context.samplingControl.value = id
       context.eyedropperColor.value = undefined
       context.eyedropperFeedback.value = undefined
     },
-    onColorSample: (value: string) => onColorSample(context, value),
+    onColorSample: (value: string) => {
+      const defaultsTool = samplingDefaultsTool
+      samplingDefaultsTool = undefined
+      return onColorSample(context, value, defaultsTool)
+    },
     onColorSampleError: (message: string) => {
       context.eyedropperFeedback.value = message
     },

@@ -120,7 +120,17 @@ export type ContextControl = (
   }
 ) & { readonly mixed?: boolean }
 
+export type ShapeFill = import('@cute-screen/editor-renderer').FillPaint
+
 export interface ContextToolbarSchema {
+  readonly highlighter?: import('./workspace/highlighter-background').HighlighterAnalysis
+  /** Present only when all targets are shapes; null fill denotes mixed paint. */
+  readonly shape?: Readonly<{
+    fill: ShapeFill | null
+    fillSupported?: boolean
+    fillColorEditable?: boolean
+    fillOpacityEditable?: boolean
+  }>
   readonly disabled?: boolean
   readonly disabledReason?: string
   readonly icon: IconName
@@ -230,6 +240,7 @@ export interface ShellActionAdapter {
 }
 
 export type IconName =
+  | 'blendMode'
   | 'arrow'
   | 'camera'
   | 'callout'

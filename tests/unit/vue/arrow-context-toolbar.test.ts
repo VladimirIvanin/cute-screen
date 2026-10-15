@@ -142,4 +142,30 @@ describe('arrow contextual toolbar', () => {
     expect(view.emitted('change')).toEqual([['endCap', 'diamond']])
     expect(trigger).toHaveFocus()
   })
+
+  it('shows named icon choices and keeps just one nested menu open', async () => {
+    render(ArrowFormattingToolbar, {
+      props: { controls: arrowControls, variant: 'floating' },
+    })
+    await fireEvent.click(screen.getByRole('button', { name: 'Tail: None' }))
+    const tail = await screen.findByRole('dialog', { name: 'Tail' })
+    const choices = within(tail).getAllByRole('button')
+    expect(choices).toHaveLength(6)
+    for (const choice of choices) {
+      expect(choice).toHaveAccessibleName()
+      expect(choice.querySelector('svg')).not.toBeNull()
+      expect(choice.textContent?.trim()).toBe('')
+    }
+    await fireEvent.click(screen.getByRole('button', { name: 'Geometry: Elbow' }))
+    expect(screen.queryByRole('dialog', { name: 'Tail' })).not.toBeInTheDocument()
+    const paths = await screen.findByRole('dialog', { name: 'Geometry' })
+    expect(within(paths).getByRole('button', { name: 'Elbow' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('disables every style trigger for a locked selection', () => {
+    const { container } = render(ArrowFormattingToolbar, {
+      props: { controls: arrowControls.map((control) => ({ ...control, disabled: true })), variant: 'floating' },
+    })
+    for (const button of container.querySelectorAll('.cs-arrow-toolbar-trigger')) expect(button).toBeDisabled()
+  })
 })

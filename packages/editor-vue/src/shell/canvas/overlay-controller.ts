@@ -22,7 +22,7 @@ import type {
   CanvasGesture,
   ResizeHandle,
 } from './workspace-state'
-import { prepareQuickOverlay } from './quick-overlay-resolution'
+import { prepareDisplayOverlay } from './display-overlay-resolution'
 
 type PreviewNodes =
   ReturnType<CanvasRendererController['renderOverlay']> extends boolean
@@ -39,6 +39,7 @@ export interface CanvasOverlayContext {
   readonly previewLayer: () => LayerNode | undefined
   readonly selectedLayer: () => LayerNode | undefined
   readonly drawDrafts: (context: CanvasRenderingContext2D) => void
+  readonly drawingLayer: () => LayerNode | undefined
   readonly drawCrop: (context: CanvasRenderingContext2D, bounds: ViewportOutputBounds) => boolean
   readonly layerBounds: (layer: LayerNode) => {
     x: number
@@ -76,28 +77,28 @@ export class CanvasOverlayController {
     ) return
     const context = overlay.value.getContext('2d')
     if (!context || typeof context.clearRect !== 'function') return
-    const previewNodes = this.#context.previewNodes()
+    const draft = this.#context.drawingLayer()
+    renderer.renderHighlighterDraft(draft?.kind === 'marker' ? draft : undefined)
+    const previewNodes = this.#context.previewLayer()?.kind === 'marker' ? [] : this.#context.previewNodes()
     const renderedByBackend = renderer.renderOverlay(previewNodes)
-    if (props.quickFrameMode) {
-      prepareQuickOverlay(overlay.value, context, bounds, (props.zoom ?? 100) / 100, window.devicePixelRatio || 1)
-      const preview = renderer.overlaySurface
-      if (
-        renderedByBackend &&
-        preview &&
-        previewNodes.length > 0
-      ) {
-        context.drawImage(preview, bounds.x, bounds.y, bounds.width, bounds.height)
-      }
-    } else {
-      if (!renderedByBackend) {
-        context.setTransform?.(1, 0, 0, 1, 0, 0)
-        context.clearRect(0, 0, overlay.value.width, overlay.value.height)
-      }
-      context.setTransform?.(1, 0, 0, 1, -bounds.x, -bounds.y)
+    prepareDisplayOverlay(overlay.value, context, bounds, (props.zoom ?? 100) / 100, window.devicePixelRatio || 1)
+    const preview = renderer.overlaySurface
+    if (
+      renderedByBackend &&
+      preview &&
+      previewNodes.length > 0
+    ) {
+      context.drawImage(preview, bounds.x, bounds.y, bounds.width, bounds.height)
     }
     if (!renderedByBackend) drawNodes2D(context, previewNodes)
     this.#context.drawDrafts(context)
-    if (this.#context.drawCrop(context, bounds)) return
+    const cropDrawn = this.#context.drawCrop(context, bounds)
+    if (
+      cropDrawn &&
+      (!props.quickFrameMode ||
+        props.quickSelectionMode ||
+        props.activeTool === 'crop')
+    ) return
     this.#drawSelection(context, bounds)
   }
 
@@ -126,9 +127,11 @@ export class CanvasOverlayController {
     context.translate(transform.translateX, transform.translateY)
     context.rotate((transform.rotation * Math.PI) / 180)
     context.scale(transform.scaleX, transform.scaleY)
-    context.lineWidth = 1 / Math.max(Math.abs(transform.scaleX), Math.abs(transform.scaleY), 1)
-    context.strokeStyle = '#d9773b'
-    context.setLineDash([4, 3])
+    const zoom = (this.#context.props.zoom ?? 100) / 100
+    const scale = zoom * Math.max(Math.abs(transform.scaleX), Math.abs(transform.scaleY), 1)
+    context.lineWidth = 1 / scale
+    context.strokeStyle = '#0d99ff'
+    context.setLineDash([4 / scale, 3 / scale])
     context.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height)
     context.setLineDash([])
     context.restore()
@@ -141,7 +144,8 @@ export class CanvasOverlayController {
   ): void {
     const half = 3 / ((this.#context.props.zoom ?? 100) / 100)
     context.fillStyle = '#fff'
-    context.strokeStyle = '#d9773b'
+    context.strokeStyle = '#0d99ff'
+    context.lineWidth = 1 / ((this.#context.props.zoom ?? 100) / 100)
     const intrinsic = layerIntrinsicResizeHandles(layer).filter(
       (handle): handle is ResizeHandle => handle !== 'start' && handle !== 'end',
     )
@@ -210,7 +214,7 @@ export class CanvasOverlayController {
     half: number,
   ): void {
     context.beginPath()
-    context.arc(point.x, point.y, half + 2, 0, Math.PI * 2)
+    context.arc(point.x, point.y, half * (5 / 3), 0, Math.PI * 2)
     context.fill()
     context.stroke()
   }

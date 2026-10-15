@@ -16,6 +16,7 @@ import type {
 } from './contracts'
 import type { CanvasViewportEmit } from './contracts'
 import type { createCanvasWorkspaceState } from './workspace-state'
+import { HighlighterPreview } from './highlighter-preview'
 
 type EditingText = ReturnType<typeof createCanvasWorkspaceState>['editingText']
 type RenderNode = ReturnType<typeof createDocumentRenderScene>['nodes'][number]
@@ -34,6 +35,7 @@ export interface RendererControllerContext {
 }
 
 export class CanvasRendererController {
+  private readonly highlighterPreview = new HighlighterPreview()
   private renderer: Canvas2DRenderer | undefined
   private overlayTarget: HTMLCanvasElement | undefined
   private initialization: Promise<Canvas2DRenderer | undefined> | undefined
@@ -53,6 +55,7 @@ export class CanvasRendererController {
   }
 
   dispose(): void {
+    this.highlighterPreview.invalidate()
     this.mounted = false
     this.revision += 1
     for (const { resource } of this.resources.values()) resource.dispose()
@@ -73,9 +76,9 @@ export class CanvasRendererController {
     if (this.renderer) return this.renderer
     if (this.initialization) return this.initialization
     const next = new Canvas2DRenderer()
-    // Backend annotation previews retain document pixels; Quick chrome gets its
-    // own display-resolution target instead of scaling this bitmap in CSS.
-    const overlayTarget = props.quickFrameMode ? document.createElement('canvas') : overlay.value
+    // Annotation previews retain document pixels; selection chrome uses a separate
+    // display-resolution surface in both the editor and Quick Capture.
+    const overlayTarget = document.createElement('canvas')
     const initialization = (async () => {
       await next.initialize({
         scene: scene.value!,
@@ -171,7 +174,7 @@ export class CanvasRendererController {
 
   async drawDocument(): Promise<void> {
     const revision = ++this.revision
-    const { scene, overlay, props, rendererError } = this.context
+    const { scene, props, rendererError } = this.context
     const bounds = this.context.outputBounds.value
     if (
       !scene.value ||
@@ -181,10 +184,6 @@ export class CanvasRendererController {
     rendererError.value = undefined
     scene.value.width = Math.max(1, Math.round(bounds.width))
     scene.value.height = Math.max(1, Math.round(bounds.height))
-    if (overlay.value && !props.quickFrameMode) {
-      overlay.value.width = Math.max(1, Math.round(bounds.width))
-      overlay.value.height = Math.max(1, Math.round(bounds.height))
-    }
     if (!props.document) {
       scene.value.getContext('2d')?.clearRect(0, 0, scene.value.width, scene.value.height)
       this.context.invalidateOverlay()
@@ -200,6 +199,7 @@ export class CanvasRendererController {
       ) return
       if (!(await this.syncImageResources(runtime, revision))) return
       this.setCommittedScene(runtime)
+      this.highlighterPreview.invalidate()
       runtime.render(['scene'])
       readyDocumentId = props.document.id
     } catch (error) {
@@ -225,7 +225,7 @@ export class CanvasRendererController {
   }
 
   invalidateGesturePreview(): void {
-    if (this.context.previewLayer()?.kind === 'loupe') {
+    if (['loupe', 'marker'].includes(this.context.previewLayer()?.kind ?? '')) {
       this.renderCommittedSceneForGesture()
     } else {
       this.context.invalidateOverlay()
@@ -237,5 +237,17 @@ export class CanvasRendererController {
     this.renderer.setOverlay(nodes)
     this.renderer.render(['overlay'])
     return true
+  }
+
+  renderHighlighterDraft(layer: LayerNode | undefined): void {
+    const scene = this.context.scene.value
+    const bounds = this.context.outputBounds.value
+    const document = this.context.props.document
+    if (
+      scene &&
+      bounds &&
+      document &&
+      this.sceneReady
+    ) this.highlighterPreview.draw(scene, layer, bounds, document)
   }
 }

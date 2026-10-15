@@ -65,6 +65,7 @@ export type CanvasTranslationKey =
   | 'retry'
 
 export interface CanvasViewportProps {
+  highlighterEffect?: import('@cute-screen/editor-renderer').HighlighterEffect | undefined
   documentState: ShellDocumentState
   canvas?: { readonly width: number; readonly height: number } | undefined
   image?: HTMLImageElement | undefined
@@ -155,6 +156,7 @@ export interface CanvasViewportExpose {
 }
 
 export const canvasViewportRuntimeProps = {
+  highlighterEffect: String as PropType<CanvasViewportProps['highlighterEffect']>,
   documentState: {
     type: Object as PropType<CanvasViewportProps['documentState']>,
     required: true,

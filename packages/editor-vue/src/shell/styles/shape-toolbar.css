@@ -1,0 +1,213 @@
+.cs-context-toolbar--shape {
+  min-height: 0;
+  padding: 5px;
+  gap: 0;
+}
+.cs-shape-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-wrap: nowrap;
+}
+.cs-shape-toolbar-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 54px;
+  height: 36px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+.cs-shape-toolbar-trigger + .cs-shape-toolbar-trigger {
+  border-left: 1px solid var(--border);
+}
+.cs-shape-toolbar-trigger > svg {
+  width: 24px;
+  height: 24px;
+}
+.cs-shape-toolbar-trigger .cs-shape-chevron {
+  width: 12px;
+  height: 12px;
+}
+.cs-shape-fill-swatch {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+}
+.cs-shape-fill-swatch.is-none {
+  background: linear-gradient(135deg, transparent 46%, var(--text-muted) 47% 53%, transparent 54%);
+}
+.cs-shape-fill-swatch.is-mixed {
+  background: repeating-linear-gradient(45deg, var(--text-muted) 0 2px, transparent 2px 5px);
+}
+.cs-shape-fill-swatch svg {
+  width: 16px;
+  height: 16px;
+}
+.cs-shape-popover {
+  box-sizing: border-box;
+  width: 324px;
+  max-width: calc(100vw - 24px);
+  max-height: min(620px, calc(100vh - 110px));
+  overflow-y: auto;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-raised);
+  color: var(--text);
+  box-shadow: var(--shadow-overlay);
+  font-size: 12px;
+  overscroll-behavior: contain;
+}
+.cs-shape-popover-title {
+  display: block;
+  margin-bottom: 12px;
+}
+.cs-shape-grid,
+.cs-shape-presets {
+  display: flex;
+  gap: 6px;
+  margin: 8px 0;
+}
+.cs-shape-grid button {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 44px;
+}
+.cs-shape-grid svg {
+  width: 27px;
+  height: 27px;
+}
+.cs-shape-popover button {
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.cs-shape-grid button,
+.cs-shape-presets button,
+.cs-shape-fill-options button,
+.cs-shape-texture-action {
+  padding: 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+}
+.cs-shape-fill-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.cs-shape-toolbar-trigger:hover:not(:disabled),
+.cs-shape-toolbar-trigger[aria-expanded='true'],
+.cs-shape-popover button[aria-pressed='true'] {
+  background: var(--accent-soft);
+}
+.cs-shape-toolbar-trigger:focus-visible,
+.cs-shape-popover button:focus-visible,
+.cs-shape-popover input:focus-visible,
+.cs-shape-popover select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.cs-shape-toolbar-trigger:disabled,
+.cs-shape-popover button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.cs-shape-number,
+.cs-shape-blend {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+}
+.cs-shape-number input,
+.cs-shape-blend select {
+  box-sizing: border-box;
+  max-width: 156px;
+  min-height: 30px;
+  padding: 4px 7px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text);
+  background: var(--surface);
+  font: inherit;
+}
+.cs-shape-number input {
+  width: 76px;
+}
+.cs-shape-number input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+.cs-shape-texture-action {
+  margin-top: 12px;
+}
+.cs-shape-popover .cs-color-popover--embedded {
+  width: 100%;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.cs-shape-popover .cs-color-head {
+  display: none;
+}
+
+.cs-shape-popover .cs-color-quick > div {
+  width: 100%;
+}
+
+/* Geometry palette keeps the preview visible by using compact cells and one parameter row. */
+.cs-shape-popover--geometry {
+  width: 254px;
+  padding: 8px;
+}
+.cs-shape-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, 32px);
+  gap: 2px;
+  margin: 0;
+}
+.cs-shape-grid button {
+  width: 32px;
+  height: 32px;
+  padding: 4px;
+  border-color: transparent;
+}
+.cs-shape-grid svg {
+  width: 20px;
+  height: 20px;
+}
+.cs-shape-dimensions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.cs-shape-dimensions .cs-shape-number {
+  gap: 4px;
+  margin-top: 0;
+  font-size: 11px;
+}
+.cs-shape-dimensions .cs-shape-number input {
+  width: 46px;
+  max-width: 46px;
+  padding-inline: 3px;
+}

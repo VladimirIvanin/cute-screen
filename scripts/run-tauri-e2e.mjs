@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import net from 'node:net'
 import {
+  copyFile,
   mkdtemp,
   mkdir,
   rm,
@@ -19,6 +20,24 @@ await mkdir(runtimeDirectory, { recursive: true })
 const embeddedWebDriverPort = Number.parseInt(process.env.TAURI_WEBDRIVER_PORT ?? '4445', 10)
 
 const scenarios = [
+  {
+    id: 'highlighter',
+    spec: 'tests/e2e/specs/tauri-highlighter.e2e.ts',
+    harnessQuery: '?m04=1&m08=1',
+    fakeCapture: true,
+  },
+  {
+    id: 'quick-editor-handoff',
+    spec: 'tests/e2e/specs/tauri-quick-editor-handoff.e2e.ts',
+    harnessQuery: '?m04=1&m08=1',
+    fakeCapture: true,
+  },
+  {
+    id: 'shape-toolbar',
+    spec: 'tests/e2e/specs/tauri-shape-toolbar.e2e.ts',
+    harnessQuery: '?m04=1&m08=1',
+    fakeCapture: true,
+  },
   {
     id: 'windows-capture-exclusion',
     spec: 'tests/e2e/specs/tauri-windows-capture-exclusion.e2e.ts',
@@ -199,7 +218,14 @@ async function waitForPortFree(
   )
 }
 
-const executable = path.join(root, 'target', 'debug', process.platform === 'win32' ? 'cute-screen.exe' : 'cute-screen')
+const cargoTargetDirectory = process.env.CARGO_TARGET_DIR
+  ? path.resolve(root, process.env.CARGO_TARGET_DIR)
+  : path.join(root, 'target')
+const builtExecutable = path.join(
+  cargoTargetDirectory,
+  'debug',
+  process.platform === 'win32' ? 'cute-screen.exe' : 'cute-screen',
+)
 const wdioCli = path.join(root, 'node_modules', '@wdio', 'cli', 'bin', 'wdio.js')
 
 const failedScenarios = []
@@ -225,12 +251,27 @@ try {
     {
       VITE_TEST_HARNESS: 'true',
       VITE_M01_HARNESS: 'true',
+      CARGO_TARGET_DIR: cargoTargetDirectory,
     },
   )
 
   if (buildStatus !== 0) {
     throw new Error('Tauri E2E build failed; refusing to test a stale application binary')
   }
+
+  // Other desktop tasks may rebuild target/debug while this suite is running.
+  // Pin the successfully built harness before starting any driver or scenario.
+  const binaryDirectory = await mkdtemp(path.join(runtimeDirectory, 'cute-screen-e2e-binary-'))
+  const executable = path.join(binaryDirectory, path.basename(builtExecutable))
+  await copyFile(builtExecutable, executable)
+  const help = spawnSync(executable, ['--e2e-harness-query=?m04=1', '--help'], {
+    encoding: 'utf8',
+    windowsHide: true,
+  })
+  if (help.status !== 0) {
+    throw new Error('Built binary is not the test harness; another build may have replaced target/debug')
+  }
+  console.info(`Pinned Tauri test binary: ${executable}`)
 
   for (const scenario of selectedScenarios) {
     const appData =

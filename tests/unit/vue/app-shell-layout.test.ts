@@ -70,7 +70,7 @@ describe('M02 editor shell', () => {
       'Arrow',
       'Shape',
       'Pencil',
-      'Marker',
+      'Highlighter',
       'Text',
       'Numbered marker',
       'Callout',

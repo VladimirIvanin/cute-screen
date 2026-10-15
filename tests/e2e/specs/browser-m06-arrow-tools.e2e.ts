@@ -46,7 +46,7 @@ describe('M06 drawing tools in browser mode', () => {
             (control) => control.dataset.control,
           )
           const observable = [
-            ...controls.querySelectorAll<HTMLElement>('.cs-arrow-toolbar-trigger, .cs-color-more--compact'),
+            ...controls.querySelectorAll<HTMLElement>('.cs-arrow-toolbar-trigger, .cs-simple-color-trigger'),
           ].filter((control) => {
             const rect = control.getBoundingClientRect()
             return rect.width > 0 && rect.height > 0
@@ -73,8 +73,8 @@ describe('M06 drawing tools in browser mode', () => {
           observableCount: 5,
           observableLabels:
             preference.locale === 'ru'
-              ? ['Цвет: #E5484D', 'Линия: 3 px', 'Хвост: Нет', 'Геометрия: Прямая', 'Наконечник: Заполненная стрелка']
-              : ['Color: #E5484D', 'Stroke: 3 px', 'Tail: None', 'Geometry: Straight', 'Head: Solid arrow'],
+              ? ['Цвет', 'Линия: 3 px', 'Хвост: Нет', 'Геометрия: Прямая', 'Наконечник: Заполненная стрелка']
+              : ['Color', 'Stroke: 3 px', 'Tail: None', 'Geometry: Straight', 'Head: Solid arrow'],
           controlsClientWidth: layout.controlsClientWidth,
           controlsScrollWidth: layout.controlsClientWidth,
           controlsFit: true,

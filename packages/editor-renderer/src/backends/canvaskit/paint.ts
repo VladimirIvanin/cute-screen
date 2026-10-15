@@ -115,7 +115,7 @@ export function configureStrokePaint(
   canvasKit: CanvasKitApi,
   paint: CanvasKitPaint,
   node:
-    | Extract<RenderNode, { readonly kind: 'line' | 'path' }>
+    | Extract<RenderNode, { readonly kind: 'line' | 'path' | 'vector' }>
     | Extract<RenderNode, { readonly kind: 'rect' | 'ellipse' | 'polygon' }>,
   color: RgbaColor,
   width: number,
@@ -123,9 +123,13 @@ export function configureStrokePaint(
   configurePaint(canvasKit, paint, color, node.opacity, 'stroke', width)
   paint.setBlendMode(blendMode(canvasKit, node.blendMode))
   paint.setStrokeCap(
-    (node.kind === 'line' || node.kind === 'path') && node.lineCap === 'round'
+    (node.kind === 'line' ||
+      node.kind === 'path' ||
+      node.kind === 'vector') && node.lineCap === 'round'
       ? canvasKit.StrokeCap.Round
-      : (node.kind === 'line' || node.kind === 'path') && node.lineCap === 'square'
+      : (node.kind === 'line' ||
+        node.kind === 'path' ||
+        node.kind === 'vector') && node.lineCap === 'square'
           ? canvasKit.StrokeCap.Square
           : canvasKit.StrokeCap.Butt,
   )
@@ -138,7 +142,8 @@ export function configureStrokePaint(
   )
   if (
     (node.kind === 'line' ||
-      node.kind === 'path') &&
+      node.kind === 'path' ||
+      node.kind === 'vector') &&
       node.dash
   ) {
     const effect = canvasKit.PathEffect.MakeDash([...node.dash])

@@ -127,7 +127,7 @@ function drawOrderedNode(
       drawImageNode(context, node)
       return
     default:
-      drawNodes2D(context.context, [node], context.resourceSources, context.resolveFontFamily)
+      drawNodes2D(context.context, [node], context.resourceSources, context.resolveFontFamily, context.newCanvas)
   }
 }
 

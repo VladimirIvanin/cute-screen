@@ -190,6 +190,15 @@ function unmountWorkspace(
 }
 
 export function useWorkspaceLifecycle(context: WorkspaceLifecycleContext) {
+  const stopToolSampling = context.store.$onAction(({ name }) => {
+    if (name !== 'selectTool') return
+    // Observe the intent, including reselecting the same tool via a shortcut.
+    // Watching activeToolId alone misses those explicit cancellations.
+    context.workspace.samplingControl.value = undefined
+    context.workspace.eyedropperColor.value = undefined
+    context.workspace.eyedropperFeedback.value = undefined
+  })
+  onBeforeUnmount(stopToolSampling)
   const onMediaChange = (event: MediaQueryListEvent) => context.store.setSystemDark(event.matches)
   registerResourceWatches(context)
   registerPropWatches(context)

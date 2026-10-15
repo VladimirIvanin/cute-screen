@@ -19,6 +19,7 @@ export interface QuickCaptureCommitPorts {
   readonly draft: ShallowRef<QuickCaptureDraftV1 | undefined>
   readonly session: ShallowRef<DocumentSessionController | undefined>
   readonly hosts: ShallowRef<CanvasViewportHosts | undefined>
+  readonly sourceImage: ShallowRef<HTMLImageElement | undefined>
   readonly currentCrop: Ref<QuickRect>
   readonly materialized: Ref<boolean>
   readonly selectionPending: Ref<boolean>
@@ -46,8 +47,7 @@ export class QuickCaptureCommitController {
 
   async commit(
     completion: 'copied' | 'saved' | 'editor',
-    preparedPng?: Uint8Array,
-    preparedSelection?: QuickRect,
+    selection: QuickRect = this.physicalSelection(),
   ): Promise<void> {
     const { draft, session, coordinator, materialized } = this.#ports
     if (
@@ -55,8 +55,10 @@ export class QuickCaptureCommitController {
       !draft.value ||
       !session.value
     ) return
-    const selection = preparedSelection ?? this.physicalSelection()
-    const png = preparedPng ?? (await this.resultPng(selection))
+    const image = this.#ports.sourceImage.value
+    if (!image) throw new Error('Frozen capture is not ready')
+    // The persisted source remains clean; annotations stay editable layers.
+    const png = await cropPng(image, selection)
     const sourceHash = hexDigest(await crypto.subtle.digest('SHA-256', Uint8Array.from(png).buffer))
     const document = materializeQuickCaptureDocument(
       { ...session.value.snapshot.core.document, crop: selection },
@@ -94,25 +96,32 @@ export class QuickCaptureCommitController {
   async resultPng(selection: QuickRect = this.physicalSelection()): Promise<Uint8Array> {
     const hosts = this.#ports.hosts.value
     if (!hosts) throw new Error('Rendered capture is not ready')
-    const output = document.createElement('canvas')
-    output.width = selection.width
-    output.height = selection.height
-    const context = output.getContext('2d')
-    if (!context) throw new Error('PNG canvas is unavailable')
-    context.drawImage(
-      hosts.scene,
-      selection.x,
-      selection.y,
-      selection.width,
-      selection.height,
-      0,
-      0,
-      selection.width,
-      selection.height,
-    )
-    const blob = await encodePng(output)
-    return new Uint8Array(await blob.arrayBuffer())
+    return cropPng(hosts.scene, selection)
   }
+}
+
+async function cropPng(
+  source: CanvasImageSource,
+  selection: QuickRect,
+): Promise<Uint8Array> {
+  const output = document.createElement('canvas')
+  output.width = selection.width
+  output.height = selection.height
+  const context = output.getContext('2d')
+  if (!context) throw new Error('PNG canvas is unavailable')
+  context.drawImage(
+    source,
+    selection.x,
+    selection.y,
+    selection.width,
+    selection.height,
+    0,
+    0,
+    selection.width,
+    selection.height,
+  )
+  const blob = await encodePng(output)
+  return new Uint8Array(await blob.arrayBuffer())
 }
 
 function hexDigest(bytes: ArrayBuffer): string {

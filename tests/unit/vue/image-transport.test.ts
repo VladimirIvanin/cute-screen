@@ -10,6 +10,7 @@ import {
   loadImageWithBinaryFallback,
   type ImageTransportBridge,
 } from '@cute-screen/editor-vue'
+import { imageAnalysisSource } from '../../../packages/editor-vue/src/image-transport'
 
 const metadata = {
   token: 'm01-alpha-png',
@@ -55,7 +56,8 @@ describe('image transport', () => {
   it('uses raw binary IPC and revokes its Blob URL exactly once', async () => {
     const adapter = bridge()
     const revoke = vi.fn()
-    const decodeImage = vi.fn().mockRejectedValueOnce(new Error('asset denied')).mockResolvedValueOnce(decodedImage())
+    const image = decodedImage()
+    const decodeImage = vi.fn().mockRejectedValueOnce(new Error('asset denied')).mockResolvedValueOnce(image)
     const result = await loadImageWithBinaryFallback({
       token: metadata.token,
       correlationId: metadata.correlationId,
@@ -71,6 +73,9 @@ describe('image transport', () => {
     expect(result.transport).toBe('binary')
     expect(adapter.readImageBytes).toHaveBeenCalledTimes(1)
     expect(revoke).toHaveBeenCalledExactlyOnceWith('blob:m01')
+    const source = imageAnalysisSource(image)
+    expect(source).toBeInstanceOf(Blob)
+    expect(await (source as Blob).arrayBuffer()).toEqual(Uint8Array.from([137, 80, 78, 71]).buffer)
   })
 
   it('loads a native memory preview without attempting an asset URL', async () => {

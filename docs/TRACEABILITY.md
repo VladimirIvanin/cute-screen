@@ -1,5 +1,90 @@
 # Трассируемость требований
 
+## Expanded shape palette and unobscured preview (2026-10-15)
+
+`REQ-TOL-002`, `REQ-EDT-008/015/016`, `REQ-UI-001/003/004/006/007`: shared shape catalogue, compact seven-column palette, conditional geometry controls, contour-aware selection, identical preview/export and object-aware overlay placement. New core contracts require red-first codec/geometry/history tests; browser and real-WebView evidence must use production mount and creation flows. Status: implemented; core/component 642/642 and renderer 17/17 passed; Windows real WebView2 4 scenarios / 5 tests passed, including production Capture → Quick → Editor, every palette kind, Arrow focus/history and cylinder persistence across restart. Browser final 2 files / 8 tests passed; commands and artifacts recorded in TESTING.md. Physical capture and Linux/macOS remain separate gates.
+
+## Выделитель и простые палитры (2026-10-15)
+
+Уточнение `REQ-TOL-004`: название normal-эффекта — «Окрасить» / Tint;
+подсказка поясняет полупрозрачный цвет поверх изображения и текста.
+Существующие toolbar и group-edit tests проверяют новые подписи.
+
+`REQ-TOL-004`, `REQ-EDT-008/015/016/017`: планируемое evidence — red-first
+core tests классификации фона, resolver и legacy preferences; Vue tests четырёх
+режимов, атомарного group edit и двухуровневой палитры; renderer parity draft /
+commit / decoded export; browser и real Tauri production-flow E2E. Анализ всего
+original выполняется один раз после первого frame в Worker, не блокирует UI,
+не меняет существующие штрихи и не повторяется при zoom/crop/annotation.
+Evidence выделителя: 9 core/Vue files / 83 tests, browser UI и 4K/8K Worker E2E,
+native Quick/editor (1 test), shape palette (1 test) и arrow regression (2 tests)
+прошли на Windows x64. Preview/commit/decoded PNG и обе renderer goldens проверены.
+`pnpm check`, полный unit/component suite (644/644), renderer suite (17/17),
+Rust и perf прошли. Расширенный browser replay: 5/6 files passed, один failure
+нового shape catalogue на `arrowLeft`; полный browser suite зелёным не объявляется.
+Фактические команды, артефакты и ограничения перечислены в TESTING.md.
+
+## Выход из пипетки при выборе инструмента (2026-10-15)
+
+`REQ-TOL-012`, `REQ-EDT-003/015/016`: transient sampling из палитры отменяется
+при любом явном выборе инструмента, включая повторный выбор текущего, shortcut
+и configure через ПКМ. Палитра не меняет документ/defaults при отмене; следующий
+canvas gesture создаёт выбранную аннотацию. Mounted shell и native WebView
+проверяют palette → eyedropper → tool → draw в editor и Quick. Configure popover
+закрывается при старте sampling, сохраняя defaults target. Windows native
+final — 7/7 вместе с Quick handoff/chrome; полный unit suite — 578/578,
+`pnpm check` — exit 0. Команды и artifacts — TESTING.md.
+
+## Quick → Editor: переход с аннотацией (2026-10-15)
+
+`REQ-CAP-010/012/014`, `REQ-EDT-006/013`: native regression создаёт non-origin
+crop и стрелку через обычный input, нажимает Editor один раз, проверяет первый
+кадр main и скрытие Quick, размеры materialized canvas, editable arrow и
+удаление/Undo/Redo без следа аннотации в immutable base. Источником редактора
+должен быть чистый crop frozen image; rendered annotation PNG предназначен для
+Copy/Save, не для замены base при сохранении редактируемых слоёв. Native
+regression до исправления воспроизвёл оставшуюся ink после Delete. После исправления
+Windows WebView2: handoff 1/1, один клик 228 ms, crop 320×240 из (80,60),
+Delete/Undo/Redo проходит. Артефакты — `artifacts/quick-editor-handoff/`.
+
+## Компактная панель фигур (2026-10-15)
+
+`REQ-TOL-002`, `REQ-EDT-015/016/017`, `REQ-UI-003/004/006/007`: четыре контрола
+формы, заливки, обводки и наложения в selection/defaults/Quick; независимые
+цвета, контекстные параметры, mixed/locked, одна undoable command на commit,
+отмена draft и keyboard focus. `shape-context-toolbar.test.ts` и mounted-shell
+`tool-ux.test.ts` проверяют значения документа, историю и prefs; focused
+Vue/boundary gate — 72/72. Полный `pnpm test` — 574/574, render goldens — 13/13.
+Chrome 155 / Windows: три spec-файла, 12 tests, RU/EN × light/dark, 1024/1280 px.
+Real WebView2 155.0.4283.45: `shape-toolbar`, 1/1, production fake capture → Quick
+shape gesture → HEX/opacity/blend/undo/redo → Editor → native ПКМ defaults.
+Артефакты и команды — в TESTING.md. Document v7, binary resources и ADR-048
+сохраняются; Linux/macOS и physical capture этим evidence не подтверждаются.
+
+## Чёткое выделение и компактные меню стрелок (2026-10-15)
+
+Дополнительная geometry-проверка `REQ-EDT-008/016`: сравнить верхний и нижний
+inset controls относительно самой панели, а не только центры кнопок друг с
+другом. Разделитель у цвета прямой, без border radius, не выше swatch и
+вертикально центрирован. Проверить normal/hover/focus/disabled и nested menu.
+
+`REQ-CAP-012/013`, `REQ-EDT-016`: в Quick Capture selection toolbar использует
+полный frozen frame, без повторного вычитания crop; editor использует cropped
+output. Геометрия привязана к фактическому CSS-размеру canvas. Regression:
+создать crop не в origin, затем стрелку через настоящий pointer input, проверить
+панель над bounds стрелки и доступность controls внутри viewport.
+Рамка Quick Capture не должна прерывать отрисовку selection frame/handles
+выбранной аннотации; пиксельный regression сначала воспроизводит их отсутствие.
+
+`REQ-EDT-005/008/015/016`, `REQ-TOL-001`: экранный overlay редактора и Quick
+Capture рисуется в CSS pixels × DPR; толщина рамки, пунктир и handles сохраняют
+экранный размер при zoom. Corner rotation использует Tabler `rotate-clockwise`
+с контрастной обводкой. Панель стрелки имеет одинаковую высоту controls и
+chevrons; меню наконечников и геометрии показывает миниатюры, доступные через
+RU/EN labels, selected/disabled/focus и Escape. Настройки применяются прежними
+undoable commands. Проверки: pixel overlay regression, mounted Vue toolbar,
+browser и real WebView; результаты будут записаны в TESTING.md.
+
 ## Windows: исключение следа редактора при захвате (2026-10-15)
 
 `REQ-CAP-001/002/010/013`: перед native capture Windows должен завершить

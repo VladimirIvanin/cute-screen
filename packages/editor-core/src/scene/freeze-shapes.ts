@@ -5,6 +5,7 @@ import type {
   RenderPathNode,
   RenderPolygonNode,
   RenderRectNode,
+  RenderVectorNode,
 } from './contracts'
 import {
   assertFinite,
@@ -14,6 +15,33 @@ import {
   freezePaint,
   validateStrokeStyle,
 } from './validation'
+
+export function freezeVectorNode(node: RenderVectorNode): RenderVectorNode {
+  assertFinite(node.x, `${node.id}.x`)
+  assertFinite(node.y, `${node.id}.y`)
+  assertPositive(node.width, `${node.id}.width`)
+  assertPositive(node.height, `${node.id}.height`)
+  assertNonNegative(node.strokeWidth, `${node.id}.strokeWidth`)
+  const freezePath = (path: RenderVectorNode['outline'], required: boolean): RenderVectorNode['outline'] => {
+    if (
+      (required ||
+        path.length) &&
+        path[0]?.[0] !== 'M'
+    ) throw new RangeError('vector path must begin with M')
+    return Object.freeze(path.map((command) => {
+      const size = command[0] === 'C' ? 7 : command[0] === 'Z' ? 1 : 3
+      if (!['M', 'L', 'C', 'Z'].includes(command[0]) || command.length !== size) throw new RangeError('invalid vector command')
+      command.slice(1).forEach((value) => assertFinite(value as number, `${node.id}.path`))
+      return Object.freeze([...command]) as typeof command
+    }))
+  }
+  validateStrokeStyle(node)
+  return Object.freeze({ ...node,
+    outline: freezePath(node.outline, true), details: freezePath(node.details, false),
+    fill: freezePaint(node.fill, `${node.id}.fill`), stroke: freezeColor(node.stroke),
+    ...(node.dash ? { dash: Object.freeze([...node.dash]) } : {}),
+  })
+}
 
 export function freezeRectNode(node: RenderRectNode): RenderRectNode {
   assertFinite(node.x, `${node.id}.x`)

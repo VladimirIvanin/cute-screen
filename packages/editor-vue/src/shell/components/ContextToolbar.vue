@@ -4,10 +4,13 @@ import { UiIcon } from '../icon'
 import type { ContextToolbarSchema } from '../types'
 import type { SrgbColor } from '@cute-screen/editor-renderer'
 import DeferredColorPicker from '../ui/DeferredColorPicker.vue'
+import SimpleColorPicker from '../ui/SimpleColorPicker.vue'
 import DeferredSlider from '../ui/DeferredSlider.vue'
 import UiSelect from '../ui/UiSelect.vue'
 import TextFormattingToolbar from './TextFormattingToolbar.vue'
 import ArrowFormattingToolbar from './ArrowFormattingToolbar.vue'
+import ShapeFormattingToolbar from './ShapeFormattingToolbar.vue'
+import HighlighterFormattingToolbar from './HighlighterFormattingToolbar.vue'
 import { ref } from 'vue'
 const expanded = ref(false)
 function controlsFor(schema: ContextToolbarSchema) {
@@ -41,6 +44,9 @@ const emit = defineEmits<{
     class="cs-context-toolbar"
     :class="{
       'cs-context-toolbar--text': schema.text,
+      'cs-context-toolbar--arrow': schema.icon === 'arrow',
+      'cs-context-toolbar--shape': Boolean(schema.shape),
+      'cs-context-toolbar--highlighter': Boolean(schema.highlighter),
       'cs-context-toolbar--precision': ['crop', 'privacy', 'spotlight', 'ruler', 'loupe'].includes(schema.icon),
     }"
     :aria-label="label"
@@ -57,7 +63,7 @@ const emit = defineEmits<{
       />
     </template>
     <span
-      v-else
+      v-else-if="schema.icon !== 'arrow' && !schema.shape && !schema.highlighter"
       class="cs-context-icon"
       :class="`cs-context-icon--${schema.icon}`"
     ><UiIcon :name="schema.icon"/></span>
@@ -68,6 +74,23 @@ const emit = defineEmits<{
       :picker-locale="pickerLocale ?? 'en'"
       :recent-colors="recentColors ?? []"
       @change="(id, value) => emit('change', id, value)"
+      @eyedropper="emit('eyedropper', $event)"
+    />
+    <HighlighterFormattingToolbar
+      v-else-if="schema.highlighter"
+      :schema="schema"
+      :locale="pickerLocale ?? 'en'"
+      :recent-colors="recentColors ?? []"
+      @change="(id, value) => emit('change', id, value)"
+      @eyedropper="emit('eyedropper', $event)"
+    />
+    <ShapeFormattingToolbar
+      v-else-if="schema.shape"
+      :schema="schema"
+      :locale="pickerLocale ?? 'en'"
+      :recent-colors="recentColors ?? []"
+      @change="(id, value) => emit('change', id, value)"
+      @action="emit('action', $event)"
       @eyedropper="emit('eyedropper', $event)"
     />
     <div v-else class="cs-context-controls">
@@ -91,7 +114,10 @@ const emit = defineEmits<{
         </NButton>
         <label v-else-if="control.kind === 'color'" class="cs-context-control">
           <span v-if="!control.compact">{{ control.label }}{{ control.mixed ? ' · —' : '' }}</span>
-          <DeferredColorPicker
+          <component
+            :is="['marker', 'shape'].includes(schema.icon) ? SimpleColorPicker : DeferredColorPicker"
+            :palette="schema.icon === 'marker' ? 'highlighter' : 'drawing'"
+            :mixed="control.mixed ?? false"
             :model-value="control.value"
             :recent-colors="recentColors ?? []"
             :disabled="control.disabled ?? false"

@@ -1,3 +1,5 @@
+import type { ShapeKind } from '../shapes'
+
 /** v7 is the only editable persisted document schema. */
 export const EDITOR_DOCUMENT_SCHEMA_VERSION = 7 as const
 
@@ -328,7 +330,7 @@ export const ARROW_CAPS = ['none', 'lineArrow', 'solidArrow', 'triangle', 'circl
 export type ArrowCap = (typeof ARROW_CAPS)[number]
 
 export interface ShapeLayerPayload extends JsonObject {
-  readonly shape: 'rectangle' | 'circle' | 'oval' | 'diamond' | 'star'
+  readonly shape: ShapeKind
   readonly fill: FillPaint & JsonObject
   readonly stroke: StrokeStyle
   readonly cornerRadius: number

@@ -21,7 +21,7 @@ function drawingStyle(
     const stroke = { ...(payload.stroke as JsonObject), ...pick(style, ['color', 'width']) }
     if ('strokeStyle' in style) stroke.style = style.strokeStyle!
     payload.stroke = stroke
-  } else Object.assign(payload, pick(style, ['color', 'width', 'brush', 'smoothing']))
+  } else Object.assign(payload, pick(style, ['color', 'width', 'brush', 'smoothing', ...(id === 'marker' ? ['highlighterMode'] : [])]))
   Object.assign(
     payload,
     pick(
@@ -31,6 +31,11 @@ function drawingStyle(
   )
   if ('opacity' in style) payload.layerOpacity = style.opacity!
   if ('blendMode' in style) payload.blendMode = style.blendMode!
+  if (id === 'marker') {
+    delete payload.mode
+    if (payload.highlighterMode === 'auto') delete payload.blendMode
+    else if ('blendMode' in style) payload.highlighterMode = ({ screen: 'illuminate', normal: 'veil' } as Record<string, string>)[String(style.blendMode)] ?? 'highlight'
+  }
   workspace.drawingDefaults.value = { ...workspace.drawingDefaults.value, [id]: payload }
 }
 function textStyle(

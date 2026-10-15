@@ -61,6 +61,7 @@ function createSchemas(context: WorkspaceBindingsContext) {
     translate,
   })
   const drawing = createDrawingSchema({
+    highlighterAnalysis: workspace.highlighterAnalysis,
     props,
     store,
     activeDocument: workspace.activeDocument,
@@ -189,6 +190,7 @@ function createEffects(
     textDraft: computed(() => (workspace.configureDefaultsTool.value ? undefined : workspace.textDraft.value)),
   })
   const drawing = createDrawingEffects({
+    highlighterAnalysis: workspace.highlighterAnalysis,
     props: effectProps,
     activeToolId: settingsTool,
     configureDefaultsTool: workspace.configureDefaultsTool,
@@ -368,6 +370,14 @@ function createControllers(
     store,
     prepareLayer: (layer) => {
       const style = workspace.rememberedStyles.value[layer.kind]
+      if (style && layer.kind === 'marker') {
+        // The gesture already resolved Auto for this source. A remembered resolved
+        // blend from another screenshot must never replace that frozen decision.
+        const { blendMode: _blend, highlighterMode: _mode, ...appearance } = style
+        void _blend
+        void _mode
+        return applyLayerStyle(layer, appearance, workspace.activeDocument.value?.canvas)
+      }
       return style && !['text', 'callout'].includes(layer.kind)
         ? applyLayerStyle(layer, style, workspace.activeDocument.value?.canvas)
         : layer

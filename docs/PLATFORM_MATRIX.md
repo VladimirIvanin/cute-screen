@@ -1,5 +1,48 @@
 # Платформенная матрица
 
+## Расширенный каталог фигур и popover placement (ADR-051)
+
+Windows x64 / WebView2 155.0.4283.45: четыре native сценария / пять tests passed. Проверены Capture → Quick → Editor, 31 palette item, реальные keyboard/pointer actions, nested focus/history, сохранение cylinder и повторный запуск. Рендеринг Canvas2D/CanvasKit и decoded exports 1×/2× покрывают общий каталог. Browser Chrome 155 — 2 files / 8 tests passed; команды и артефакты — TESTING.md. Physical capture, macOS/WKWebView и Linux/WebKitGTK не проверены этим срезом. Schema v7 и IPC сохраняются; старые сборки не читают новые shape enum values.
+
+## Выделитель: фоновый анализ
+
+Общий Vue/core contract использует Worker, worker-side createImageBitmap и
+OffscreenCanvas. При недоступности этих API или чтения source автоподбор показывает
+объяснимый fallback «Выделить»; все ручные эффекты доступны. Windows/WebView2 и
+Chromium проверяются отдельными runtime E2E. Результаты Windows не являются
+подтверждением WKWebView/WebKitGTK, Linux capture или Wayland; их runtime evidence
+остаётся отдельной проверкой. CSP не добавляет внешние сетевые источники.
+
+## Quick handoff и palette sampling (2026-10-15)
+
+Windows 10 Home 19045 x64 / WebView2 155.0.4283.45, external tauri-driver 2.1.0:
+`quick-editor-handoff` 1/1 и `quick-chrome` 6/6. Production fake capture →
+non-origin crop → arrow → один Editor click → Delete/Undo/Redo подтверждает
+editable annotations без ink в immutable source. Palette → eyedropper →
+click/keyboard/ПКМ tool → draw проверен в Quick и main. Test-only focus
+capability не меняет production permissions. Physical capture, Linux/macOS
+и mixed-DPI этим evidence не расширяются; команды и artifacts — TESTING.md.
+
+## Компактные shape controls (2026-10-15)
+
+Windows 10 Home 19045 x64 / WebView2 155.0.4283.45: native `shape-toolbar`
+прошёл production fake capture, создание/форматирование в Quick, перенос в
+editor и defaults через trusted ПКМ/keyboard. Browser Chrome 155.0.8059.79
+дополняет это RU/EN × light/dark и размерами окна 1024/1280 px. Оба режима
+используют общий `ShapeFormattingToolbar`; document/IPC/platform adapters
+сохраняются. Это evidence интерфейса, не новая гарантия physical capture либо
+Linux/macOS. Команды, screenshots и ограничения — TESTING.md.
+
+## Arrow selection и Quick toolbar (2026-10-15)
+
+Windows 10 Home 19045 x64 / WebView2 155.0.4283.45: Arrow 2/2, viewport 1/1
+и Quick chrome 5/5 прошли с external tauri-driver 2.1.0. Non-origin Quick
+frame → создание стрелки проверяет позицию панели относительно нарисованных
+bounds, nested menu/Escape и selection handles. Insets 5/5 px и прямой
+UiSeparator подтверждены browser и native geometry. Pixel tests включают DPR 2
+и bounded 8K overlay, но не заменяют mixed-DPI/native WebKit проверки.
+Fake capture, команды, snapshots и ограничения — TESTING.md.
+
 ## Windows: исключение editor из frozen desktop (2026-10-15)
 
 Windows 10 Home 19045 x64 / WebView2 155.0.4283.45: production Area через

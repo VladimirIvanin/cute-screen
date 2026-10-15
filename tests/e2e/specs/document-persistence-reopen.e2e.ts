@@ -33,11 +33,12 @@ describe('M03 persisted document reopen', () => {
       crop: { x: 0, y: 0, width: 120, height: 80 },
       saveState: 'saved',
     })
-    expect(reopened?.layers).toHaveLength(1)
+    expect(reopened?.layers).toHaveLength(2)
     expect(reopened?.layers[0]).toMatchObject({
       kind: 'arrow',
       payload: { path: 'elbow', stroke: { width: 10 } },
     })
+    expect(reopened?.layers[1]).toMatchObject({ kind: 'shape', payload: { shape: 'cylinder' } })
     await $('button[aria-label="Arrow"]').click({ button: 'right' })
     await expect($('.cs-tool-configure-popover-host [data-control="stroke"] button')).toHaveAttribute('aria-label', 'Stroke: 10 px')
     await expect($('.cs-tool-configure-popover-host [data-control="arrowPath"] button')).toHaveAttribute('aria-label', 'Geometry: Elbow')

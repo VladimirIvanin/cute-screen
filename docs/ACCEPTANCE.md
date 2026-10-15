@@ -1,5 +1,46 @@
 # Сквозная приёмка
 
+## Выделитель и простые палитры
+
+`REQ-TOL-004`, `REQ-EDT-008/015/016/017`, ADR-051:
+
+- Светлый документ с чёрным текстом: «Выделить» сохраняет чёрные пиксели.
+- Тёмный терминал с белым текстом: «Подсветить» сохраняет белые пиксели.
+- Фото/смешанный фон: «Окрасить» явно окрашивает также текст.
+- Авто анализирует весь original один раз после первого frame; поздний результат
+  действует только на следующие штрихи. Проверить 4K/8K, pending, unsupported,
+  error, timeout и смену документа; UI остаётся доступным.
+- Проверить preset/custom colour, HEX validation, вложенный Escape, focus,
+  ПКМ defaults, атомарную правку группы, locked/read-only, Undo/Redo и reopen.
+- Сравнить draft/commit/decoded export, пересечения и Canvas2D/CanvasKit goldens.
+- Пройти browser и native Tauri в editor/Quick, обе темы и RU/EN.
+
+Фактические результаты и ограничения текущей платформы — TESTING.md.
+
+## Расширенная палитра и видимый предпросмотр (ADR-051)
+
+1. Через обычный Capture/Open создать фигуру; открыть её геометрию. Доступен 31 именованный вариант, до семи колонок с ячейками 32×32 и иконками 20×20. Заголовок «Форма» не занимает отдельную строку.
+2. Звезда показывает лучи и внутренний радиус в одной строке; rectangle — скругление. Rounded rectangle — пресет, а не дополнительный persisted kind.
+3. Переключить геометрию, Undo/Redo, изменить intrinsic size и stroke/fill; сохранить и открыть документ повторно. Прежние пять форм остаются совместимыми. Braces выбираются по штриху, прозрачные углы фигур не дают fill hit.
+4. На 1024 px, у краёв окна, при zoom и non-origin Quick crop открыть shape/arrow/defaults popovers. При доступной свободной позиции объект не закрыт; при невозможности полного обхода controls остаются в viewport и доступны через scroll. Canvas не сдвигается сам.
+5. Проверить RU/EN, light/dark, keyboard/focus, locked/mixed, Escape и cancel. Сопоставить preview и повторно декодированный экспорт обоих renderers, включая внутренние линии, кривые и opacity/blend.
+
+Фактические platform results и артефакты находятся в TESTING.md; наличие этого сценария само по себе не означает pass.
+
+## Компактная панель фигур (2026-10-15)
+
+Windows 10 x64: форма, заливка, обводка и наложение образуют одну строку без
+«Ещё»; кнопки показывают состояние и имеют локализованные accessible names.
+Chrome 155 подтверждает RU/EN × light/dark при 1024×700 и работу при 1280×800.
+Real WebView2 155.0.4283.45 через production fake capture создаёт фигуру в Quick,
+меняет скругление, независимый цвет заливки `#336699`, толщину, непрозрачность и
+blend; Undo/Redo восстанавливают paint. Один Editor click переносит редактируемый
+слой в main. Native ПКМ меняет defaults без правки выделения; следующая фигура
+получает новую толщину. Locked/mixed, invalid/cancel, batch и preferences
+проверены component/mounted-shell тестами. Логи и просмотренные screenshots —
+в TESTING.md. Physical capture, Linux/macOS и вся release matrix остаются
+отдельными gates.
+
 ## Windows: новый снимок без следа editor (2026-10-15)
 
 На Windows 10 x64 / WebView2 155.0.4283.45 сценарий
@@ -673,3 +714,39 @@ Quick frame sharpness follow-up: тот же native scenario прошёл 3/3 с
 на `artifacts/ui-tabler/quick-after.png` против приложенного blurred
 `quick-before.png`; DPR 1/2 и redraw покрыты pixel/component tests. Physical
 mixed-DPI replay остаётся pending; source/exports не масштабируются этим fix.
+
+## Панель стрелки и выделение (ADR-050)
+
+`REQ-EDT-005/008/015/016`, `REQ-TOL-001`:
+
+1. Создать стрелку обычным drag: активен Select, у выделения одна компактная
+   панель без дополнительной иконки Arrow; цвет и четыре controls выровнены.
+2. Открыть Head/Tail: шесть миниатюр, хвост направлен влево, наконечник вправо;
+   текущий вариант выделен, hover показывает RU/EN название.
+3. Escape закрывает ближайшее меню и возвращает focus на trigger; выбор
+   Circle меняет стрелку, один Undo восстанавливает прежний наконечник.
+4. Навести на corner rotation zone: виден контрастный `rotate-clockwise`.
+5. При zoom 50/100/200% и DPR 1/2 рамка остаётся тонкой, пунктир и handles
+   сохраняют экранный размер. Повторить в editor и Quick Capture.
+6. Locked selection блокирует controls; ПКМ на tool по-прежнему меняет defaults.
+7. В Quick уменьшить рамку с верхнего левого угла, создать стрелку внутри неё:
+   панель находится над стрелкой, по центру её bounds; рамка, действия и ToolRail
+   остаются внутри viewport. Crop не сдвигает панель в левый верхний угол.
+
+Фактические browser/WebView результаты и ограничения — TESTING.md;
+полная Linux/macOS runtime-проверка остаётся отдельной platform gate.
+
+## Quick → Editor и выход из пипетки (2026-10-15)
+
+1. Из палитры Arrow запустить sampling, затем выбрать инструмент кликом,
+   shortcut или ПКМ, включая тот же Arrow: лупа/курсор sampling исчезают,
+   следующий drag создаёт выбранную аннотацию. Повторить в Quick и editor.
+2. Configure popover закрывается при запуске sampling; успешный образец
+   меняет defaults выбранного tool без изменения существующей аннотации.
+3. В Quick уменьшить crop с верхнего левого угла, нарисовать стрелку и нажать
+   Editor один раз: main открыт, Quick скрыт, размеры crop сохранены.
+   Delete полностью убирает ink, Undo возвращает стрелку, Redo снова убирает.
+
+Windows WebView2 155.0.4283.45: native 7/7, полный unit suite 578/578 и общий
+`pnpm check` прошли. Использован fake capture; физический захват и другие
+платформы остаются отдельными gates. Числа и screenshots — TESTING.md.

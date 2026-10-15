@@ -1,6 +1,8 @@
 import {
   computed,
   nextTick,
+  watch,
+  onBeforeUnmount,
 } from 'vue'
 import { storeToRefs } from 'pinia'
 import {
@@ -19,6 +21,7 @@ import {
 } from '@cute-screen/editor-renderer'
 import type { ResolvedEditorShellProps } from '../contracts'
 import { useToolSettingsMemory } from './tool-settings-memory'
+import { HighlighterBackgroundController } from './highlighter-background'
 import { createSelectionActions } from './selection-actions-controller'
 import { createKeyboardController } from './keyboard-controller'
 import { createSessionController } from './session-controller'
@@ -33,6 +36,18 @@ function createWorkspaceCore(props: ResolvedEditorShellProps) {
   const store = useEditorShellStore()
   const state = storeToRefs(store)
   const workspace = createWorkspaceState()
+  const background = new HighlighterBackgroundController((value) => {
+    workspace.highlighterAnalysis.value = value
+  })
+  watch(
+    [() => workspace.activeDocument.value?.id, () => props.sourceImage],
+    () => background.reset(),
+    { flush: 'sync' },
+  )
+  onBeforeUnmount(() => background.dispose())
+  const onHighlighterFrameReady = (id: string) => {
+    if (id === workspace.activeDocument.value?.id) background.start(props.sourceImage)
+  }
   const naiveTheme = computed(() => (state.resolvedTheme.value === 'dark' ? darkTheme : null))
   const naiveLocale = computed(() => (store.locale === 'ru' ? ruRU : enUS))
   const naiveDateLocale = computed(() => (store.locale === 'ru' ? dateRuRU : dateEnUS))
@@ -112,6 +127,7 @@ function createWorkspaceCore(props: ResolvedEditorShellProps) {
     naiveDateLocale,
     baseImageLayer,
     sceneTexturesReady,
+    onHighlighterFrameReady,
     translate,
   }
 }
@@ -184,6 +200,8 @@ function createWorkspaceViewModel(
     textureImages: workspace.textureImages,
     baseImageLayer: core.baseImageLayer,
     sceneTexturesReady: core.sceneTexturesReady,
+    highlighterAnalysis: workspace.highlighterAnalysis,
+    onHighlighterFrameReady: core.onHighlighterFrameReady,
     samplingControl: workspace.samplingControl,
     drawingDefaults: workspace.drawingDefaults,
     precisionDefaults: workspace.precisionDefaults,

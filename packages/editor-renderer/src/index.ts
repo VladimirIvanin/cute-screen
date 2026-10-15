@@ -1,4 +1,23 @@
+export {
+  SHAPE_CATALOG,
+  SHAPE_KINDS,
+  isShapeKind,
+  shapeGeometry,
+  mapShapePath,
+  shapePathSvg,
+  type ShapePathCommand,
+  type ShapePreset,
+} from '@cute-screen/editor-core'
 import type { EditorCoreBoundary } from '@cute-screen/editor-core'
+export {
+  classifyHighlighterBackground,
+  resolveHighlighterBlend,
+  normalizeHighlighterDefaults,
+  highlighterModeForLayer,
+  isHighlighterMode,
+  type HighlighterEffect,
+  type HighlighterMode,
+} from '@cute-screen/editor-core'
 
 export {
   applyEditorCommand,
@@ -39,10 +58,12 @@ export {
   type JsonObject,
   type SrgbColor,
   type StrokeStyle,
+  type FillPaint,
   type BlendMode,
   type LayerNode,
   type RenderImageNode,
   type RenderPolygonNode,
+  type RenderVectorNode,
   type RenderPathNode,
   type RenderPaint,
   type RenderGradientStop,

@@ -1,3 +1,4 @@
+import { isShapeKind } from './shapes'
 import type {
   ArrowCap,
   ArrowLayer,
@@ -9,9 +10,14 @@ import type {
   Transform2D,
 } from './document/types'
 import { rebaseArrowLayer } from './arrow-geometry'
+import {
+  isHighlighterMode,
+  resolveHighlighterBlend,
+  type HighlighterEffect,
+} from './highlighter'
 
 export type DrawingTool = 'arrow' | 'shape' | 'pencil' | 'marker'
-export type ShapeKind = 'rectangle' | 'circle' | 'oval' | 'diamond' | 'star'
+export type { ShapeKind } from './shapes'
 
 export interface DrawingDefaults {
   readonly arrow: JsonObject
@@ -21,11 +27,12 @@ export interface DrawingDefaults {
 }
 
 interface DrawingLayerInput {
+  readonly highlighterEffect?: HighlighterEffect
   readonly id: string
   readonly tool: DrawingTool
   readonly start: Point
   readonly end: Point
-  readonly defaults?: DrawingDefaults
+  readonly defaults?: DrawingDefaults | undefined
   readonly constrainAngle?: boolean
   readonly drawFromCenter?: boolean
   readonly points?: readonly (Point & Readonly<{ readonly pressure?: number }>)[]
@@ -68,7 +75,7 @@ export const DEFAULT_DRAWING_DEFAULTS: DrawingDefaults = Object.freeze({
     width: 18,
     color: Object.freeze({ red: 1, green: 0.835, blue: 0.29, alpha: 1 }),
     smoothing: 0.5,
-    mode: 'highlight',
+    highlighterMode: 'auto',
   }),
 })
 
@@ -210,7 +217,10 @@ function commonDrawingLayer(
   geometry: Rect,
 ) {
   const layerDefaults = defaults[input.tool]
-  const markerBlend = defaults.marker.mode === 'darken' ? 'darken' : 'multiply'
+  const marker = defaults.marker
+  const markerBlend = marker.mode === 'darken' || marker.blendMode === 'darken'
+    ? 'darken'
+    : resolveHighlighterBlend(isHighlighterMode(marker.highlighterMode) ? marker.highlighterMode : 'highlight', input.highlighterEffect)
   return {
     id: input.id,
     transform: {
@@ -321,7 +331,7 @@ function createFreehandDrawing(
 export function createDrawingLayer(input: DrawingLayerInput): LayerNode | undefined {
   const defaults = input.defaults ?? DEFAULT_DRAWING_DEFAULTS
   const requestedShape = defaults.shape.shape
-  const shape = typeof requestedShape === 'string' ? requestedShape : 'rectangle'
+  const shape = isShapeKind(requestedShape) ? requestedShape : 'rectangle'
   const end = drawingEnd(input, shape)
   if (
     input.tool !== 'pencil' &&

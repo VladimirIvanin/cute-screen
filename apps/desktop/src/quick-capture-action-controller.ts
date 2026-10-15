@@ -37,7 +37,7 @@ export class QuickCaptureActionController {
     await this.#run(async () => {
       const selection = this.#ports.commit.physicalSelection()
       const png = await this.#ports.commit.resultPng(selection)
-      await this.#ports.commit.commit('copied', png, selection)
+      await this.#ports.commit.commit('copied', selection)
       await tauriDesktopBridge.quickCaptureCopyPng(png)
       await this.#ports.dismissWindow()
     })
@@ -50,7 +50,7 @@ export class QuickCaptureActionController {
       const png = await this.#ports.commit.resultPng(selection)
       const selected = await tauriDesktopBridge.quickCaptureChooseSavePng()
       if (!selected) return
-      await this.#ports.commit.commit('saved', png, selection)
+      await this.#ports.commit.commit('saved', selection)
       await tauriDesktopBridge.quickCaptureWriteSavePng(png)
       await this.#ports.dismissWindow()
     })

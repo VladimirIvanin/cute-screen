@@ -1,5 +1,28 @@
 # Архитектура Cute Screen
 
+## Выделитель (ADR-051)
+
+DOM-free highlighter resolver и brightness classifier принадлежат editor-core.
+Marker payload сохраняет highlighterMode, а layer.blendMode — конкретный эффект;
+legacy appearance не пересчитывается. Настройки жеста фиксируются в CanvasGesture.
+HighlighterPreview сохраняет committed backdrop один раз, восстанавливает только
+повреждённую область и композитит непрерывный путь с теми же nodes, что export.
+Существующий marker при transform-preview композитится в порядке document layers.
+
+HighlighterBackgroundController запускается из frameReady один раз на source load.
+Worker сам читает immutable local asset или получает binary Blob structured clone,
+декодирует и уменьшает его до 256 px, затем читает OffscreenCanvas. Уменьшение
+ImageBitmap на основном потоке исключено: 8K runtime experiment обнаружил long task.
+Binary fallback сохраняет Blob в WeakMap, привязанном к decoded image: worker не
+зависит от уже revoked object URL. CSP разрешает worker fetch только существующих
+local asset/blob источников. Отмена/timeout завершают Worker; stale replies игнорируются.
+Результат анализа не входит в document history и не запускается при pointermove.
+
+SimpleColorPicker обслуживает выделитель, stroke стрелок и stroke/solid fill фигур;
+первый уровень содержит фиксированные образцы. Custom colour встраивает существующий
+DeferredColorPicker. Palette trigger остаётся вне manually positioned NPopover,
+чтобы изменение координат не удаляло его из DOM.
+
 ## Цели архитектуры
 
 - Стабильные 60 FPS на типичном 4K-документе без Vue-render на pointer events.
@@ -141,12 +164,18 @@ JSON как bytes/base64.
   отдельного неуправляемого screenshot-background pass нет.
 - Второй canvas рисует hover, selection handles, crop overlay, guides и in-progress gesture.
 - Dirty flags разделены на scene, overlay, viewport, resource и export.
-- Quick Capture UI overlay (рамка, handles, размер) имеет backing store в
-  отображаемых CSS pixels × DPR, независимо от resolution frozen image.
+- Editor и Quick Capture UI overlay (рамка, handles, размер) имеют backing store
+  видимой части canvas в CSS pixels × DPR, независимо от resolution изображения.
+  Отсечение по scroll viewport ограничивает bitmap при увеличении 8K-документа;
+  прокрутка перерисовывает chrome без переноса scene graph в Vue.
   Vue adapter композитит document-space annotation preview из отдельного
   временного canvas и рисует UI-векторы в display resolution. Scene pixels,
   pointer mapping и export сохраняют document coordinates; при неизменном
   layout visible overlay не пересоздаётся на pointermove.
+- Selection toolbar использует фактические CSS-размеры canvas. В Quick Capture
+  координаты относятся к полному frozen frame; crop вычитается только для
+  cropped output полного редактора. `UiSeparator` задаёт независимую геометрию
+  декоративных разделителей ToolRail и transient controls.
 - Scheduler объединяет несколько invalidations в один `requestAnimationFrame`.
 - Для статичных узлов используются cached pictures; spatial index отбрасывает невидимые узлы.
 - Каждый immutable raster/texture blob декодируется один раз, дедуплицируется
@@ -384,3 +413,19 @@ defaults, inline text и selection; selection changes собираются до 
 обновляет позицию при document/viewport/resize/scroll, скрываясь на canvas gesture.
 Scene graph не становится deeply reactive. Preferences v3 независимы от document
 v7 и command history, читают legacy drawing settings и хранят per-tool defaults.
+
+`ShapeFormattingToolbar` использует тот же `ContextToolbar` в selection,
+creation defaults и tool configure, включая Quick Capture. Его typed shape
+projection содержит paint и совместимость редактирования заливки; значения
+остальных параметров и mixed/disabled остаются в существующих controls.
+Палитра `DeferredColorPicker` может встраиваться в popover без второго trigger;
+HEX draft и числовой draft локальны. `fillColor` меняет только solid fill,
+не затрагивая stroke, geometry, gradient/pattern/texture resources. Изменения
+проходят через существующий selection command collector и defaults preferences;
+document v7, renderer contracts и IPC не меняются.
+
+## Каталог фигур и размещение выпадающих панелей (ADR-051)
+
+`editor-core/shapes` хранит нормализованную геометрию и стабильные идентификаторы каталога: 30 shape kinds и rectangle preset с radius. Curved/compound shape компилируется в один `RenderVectorNode` с outline, detail paths и open-contour flag. Stroke-only braces не имеют fill hit area. Hit testing адаптивно аппроксимирует cubic curves; миниатюры используют те же команды. Canvas2D использует scratch composition, CanvasKit — saveLayer, чтобы opacity/blend применялись один раз ко всей фигуре.
+
+`preview-placement` сравнивает верхние, нижние и боковые кандидаты относительно trigger и препятствий. Selection host публикует компактные CSS bounds объекта; popup adapter использует реальный viewport, размеры панели и занятый chrome. Layout observers и resize/scroll notifications не переносят scene или pointermove в Vue state. Defaults, shape, arrow и simple colour popovers сохраняют Naive UI и общий overlay root.

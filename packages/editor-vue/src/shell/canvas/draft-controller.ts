@@ -82,22 +82,33 @@ export class DraftController {
     return DEFAULT_CALLOUT_STROKE
   }
 
-  drawDrawing(context: CanvasRenderingContext2D): void {
+  drawingLayer(): LayerNode | undefined {
     const { props } = this.#context
     const gesture = this.#context.gesture()
-    if (!gesture || gesture.kind !== 'draw') return
-    const layer = createDrawingLayer({
+    if (!gesture || gesture.kind !== 'draw') return undefined
+    const defaults = gesture.drawingDefaults ?? props.drawingDefaults
+    return createDrawingLayer({
       id: '__drawing-draft__',
       tool: gesture.tool,
       start: gesture.start,
       end: gesture.current,
-      ...(props.drawingDefaults === undefined ? {} : { defaults: props.drawingDefaults }),
+      ...(defaults ? { defaults } : {}),
+      ...(gesture.highlighterEffect ? { highlighterEffect: gesture.highlighterEffect } : {}),
       constrainAngle: gesture.constrainAngle,
       drawFromCenter: gesture.drawFromCenter,
       points: gesture.points,
     })
-    if (!layer || !props.document) return
-    drawNodes2D(context, createDocumentRenderScene({ ...props.document, layers: [layer] }).nodes)
+  }
+
+  drawDrawing(context: CanvasRenderingContext2D): void {
+    const layer = this.drawingLayer()
+    const document = this.#context.props.document
+    if (
+      !layer ||
+      !document ||
+      layer.kind === 'marker'
+    ) return
+    drawNodes2D(context, createDocumentRenderScene({ ...document, layers: [layer] }).nodes)
   }
 
   drawCallout(context: CanvasRenderingContext2D): void {

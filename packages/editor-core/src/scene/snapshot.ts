@@ -10,6 +10,7 @@ import {
   freezePathNode,
   freezePolygonNode,
   freezeRectNode,
+  freezeVectorNode,
 } from './freeze-shapes'
 import { freezeTextNode } from './freeze-text'
 import {
@@ -31,6 +32,8 @@ function assertNever(value: never): never {
 function freezeNode(node: RenderNode): RenderNode {
   assertNodeBase(node)
   switch (node.kind) {
+    case 'vector':
+      return freezeVectorNode(node)
     case 'rect':
       return freezeRectNode(node)
     case 'ellipse':

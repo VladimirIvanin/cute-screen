@@ -31,6 +31,7 @@ const props = withDefaults(
     eyedropper?: boolean
     locale?: 'en' | 'ru'
     compact?: boolean
+    embedded?: boolean
   }>(),
   {
     recentColors: () => [],
@@ -38,11 +39,13 @@ const props = withDefaults(
     eyedropper: true,
     locale: 'en',
     compact: false,
+    embedded: false,
   },
 )
 const emit = defineEmits<{
   commit: [value: string]
   eyedropper: []
+  dismiss: []
 }>()
 
 const shown = ref(false)
@@ -50,6 +53,7 @@ const trigger = ref<{ $el?: HTMLElement }>()
 const hexInput = ref<HTMLInputElement>()
 const popover = ref<HTMLElement>()
 const draft = ref(normalizeHex(props.modelValue) ?? '#E5484D')
+const hexDraft = ref(draft.value)
 const preservedHue = ref(srgbToHsv(hexToSrgb(draft.value)!).hue)
 const hueDragging = ref(false)
 const hexError = ref<string>()
@@ -67,6 +71,7 @@ const quickColors = computed(() => {
 function resetDraft(): void {
   const next = normalizeHex(props.modelValue) ?? '#E5484D'
   draft.value = next
+  hexDraft.value = next
   const hsv = srgbToHsv(hexToSrgb(next)!)
   if (hsv.saturation >= 1) preservedHue.value = hsv.hue
   hexError.value = undefined
@@ -92,6 +97,7 @@ function setDraft(
   const normalized = normalizeHex(value)
   if (!normalized) return false
   draft.value = normalized
+  hexDraft.value = normalized
   const hsv = srgbToHsv(hexToSrgb(normalized)!)
   if (options.preserveHue !== true && hsv.saturation >= 1) preservedHue.value = hsv.hue
   hexError.value = undefined
@@ -120,6 +126,11 @@ function onShown(next: boolean): void {
 }
 
 function close(): void {
+  if (props.embedded) {
+    resetDraft()
+    emit('dismiss')
+    return
+  }
   onShown(false)
 }
 
@@ -150,7 +161,7 @@ function onHueChange(): void {
 
 function applyHex(): void {
   if (props.disabled) return
-  const input = hexInput.value?.value ?? ''
+  const input = hexInput.value?.value ?? hexDraft.value
   if (!setDraft(input)) {
     hexError.value = 'Invalid HEX colour'
     return
@@ -187,6 +198,7 @@ function gridKeydown(
 function keydown(event: KeyboardEvent): void {
   if (event.key !== 'Escape') return
   event.preventDefault()
+  event.stopPropagation()
   close()
 }
 
@@ -200,7 +212,7 @@ function requestEyedropper(): void {
 <template>
   <div class="cs-ui-color-picker">
     <div class="cs-color-quick" :aria-label="ariaLabel">
-      <template v-if="!compact">
+      <template v-if="!compact && !embedded">
         <button
           v-for="color in quickColors"
           :key="color"
@@ -213,17 +225,12 @@ function requestEyedropper(): void {
           @click="choose(color)"
         />
       </template>
-      <NPopover
-        v-model:show="shown"
-        :disabled="disabled"
-        trigger="click"
-        placement="top-start"
-        :show-arrow="false"
-        raw
-        to=".cs-overlay-root"
+      <component
+        :is="embedded ? 'div' : NPopover"
+        v-bind="embedded ? {} : { show: shown, disabled, trigger: 'click', placement: 'top-start', showArrow: false, raw: true, to: '.cs-overlay-root' }"
         @update:show="onShown"
       >
-        <template #trigger>
+        <template v-if="!embedded" #trigger>
           <NButton
             ref="trigger"
             class="cs-color-more"
@@ -246,8 +253,10 @@ function requestEyedropper(): void {
           </NButton>
         </template>
         <section
+          ref="popover"
           class="cs-color-popover"
-          role="dialog"
+          :class="{ 'cs-color-popover--embedded': embedded }"
+          :role="embedded ? 'group' : 'dialog'"
           :aria-label="ariaLabel"
           @keydown="keydown"
         >
@@ -312,12 +321,13 @@ function requestEyedropper(): void {
                 :class="{ 'is-invalid': hexError }"
               ><span>HEX</span><input
                 ref="hexInput"
-                :value="draft"
+                :value="hexDraft"
                 maxlength="7"
                 spellcheck="false"
                 :aria-label="locale === 'ru' ? 'HEX-код цвета' : 'HEX colour code'"
                 :aria-invalid="Boolean(hexError)"
                 :disabled="disabled"
+                @input="hexDraft = ($event.target as HTMLInputElement).value"
                 @change="applyHex"
                 @keydown.enter.prevent="applyHex"
               /></label>
@@ -405,7 +415,7 @@ function requestEyedropper(): void {
             </div>
           </section>
         </section>
-      </NPopover>
+      </component>
     </div>
   </div>
 </template>

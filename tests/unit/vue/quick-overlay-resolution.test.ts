@@ -6,19 +6,43 @@ import {
   it,
   vi,
 } from 'vitest'
-import { prepareQuickOverlay } from '../../../packages/editor-vue/src/shell/canvas/quick-overlay-resolution'
+import { prepareDisplayOverlay } from '../../../packages/editor-vue/src/shell/canvas/display-overlay-resolution'
 import { CropController } from '../../../packages/editor-vue/src/shell/canvas/crop-controller'
 import type { CanvasViewportProps } from '../../../packages/editor-vue/src/shell/canvas/contracts'
 
 describe('Quick Capture display resolution overlay', () => {
+  it('clips an 8K zoomed overlay to the viewport and preserves world coordinates while scrolling', () => {
+    const canvas = createCanvas(1, 1)
+    let surfaceLeft = -1200
+    const overlay = Object.assign(canvas, {
+      style: {},
+      closest: (selector: string) => ({
+        getBoundingClientRect: () => selector === '.cs-canvas-surface'
+          ? { left: surfaceLeft, top: -600, right: surfaceLeft + 32000, bottom: 17400, width: 32000, height: 18000 }
+          : { left: 0, top: 0, right: 1200, bottom: 800, width: 1200, height: 800 },
+      }),
+    }) as unknown as HTMLCanvasElement
+    const context = overlay.getContext('2d')!
+    const bounds = { x: 50, y: 60, width: 8000, height: 4500 }
+    for (const x of [350, 351]) {
+      prepareDisplayOverlay(overlay, context, bounds, 4, 2)
+      expect([overlay.width, overlay.height]).toEqual([2400, 1600])
+      context.fillStyle = '#fff'
+      context.fillRect(x, 210, 0.25, 0.25)
+      expect([...context.getImageData(0, 0, 1, 1).data]).toEqual([255, 255, 255, 255])
+      surfaceLeft -= 4
+    }
+  })
+
   it.each([1, 2])('rasterizes UI at CSS pixels × DPR %s without enlarging image pixels', (dpr) => {
     const canvas = createCanvas(400, 300)
     const overlay = Object.assign(canvas, {
+      closest: () => null,
       getBoundingClientRect: () => ({ width: 1440, height: 1080 }),
     }) as unknown as HTMLCanvasElement
     const bounds = { x: 0, y: 0, width: 400, height: 300 }
     const context = overlay.getContext('2d')!
-    prepareQuickOverlay(overlay, context, bounds, 3.6, dpr)
+    prepareDisplayOverlay(overlay, context, bounds, 3.6, dpr)
     expect([overlay.width, overlay.height]).toEqual([1440 * dpr, 1080 * dpr])
     // A one CSS-pixel UI line occupies native display pixels, never a scaled source texel.
     context.fillStyle = '#fff'
@@ -75,15 +99,16 @@ describe('Quick Capture display resolution overlay', () => {
   it('clears stale pixels and maps non-origin bounds without resetting document coordinates', () => {
     const canvas = createCanvas(400, 300)
     const overlay = Object.assign(canvas, {
+      closest: () => null,
       getBoundingClientRect: () => ({ width: 150, height: 100 }),
     }) as unknown as HTMLCanvasElement
     const context = overlay.getContext('2d')!
-    prepareQuickOverlay(overlay, context, { x: 60, y: 20, width: 300, height: 200 }, 0.5, 2)
+    prepareDisplayOverlay(overlay, context, { x: 60, y: 20, width: 300, height: 200 }, 0.5, 2)
     expect([overlay.width, overlay.height]).toEqual([300, 200])
     context.fillStyle = '#fff'
     context.fillRect(60, 20, 1, 1)
     expect(context.getImageData(0, 0, 1, 1).data[3]).toBe(255)
-    prepareQuickOverlay(overlay, context, { x: 60, y: 20, width: 300, height: 200 }, 0.5, 2)
+    prepareDisplayOverlay(overlay, context, { x: 60, y: 20, width: 300, height: 200 }, 0.5, 2)
     expect(context.getImageData(0, 0, 1, 1).data[3]).toBe(0)
   })
 })

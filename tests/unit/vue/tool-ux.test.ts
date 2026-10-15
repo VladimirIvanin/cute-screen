@@ -36,6 +36,7 @@ import {
 } from '@cute-screen/editor-renderer'
 import { TOOL_SETTINGS_STORAGE_KEY } from '../../../packages/editor-vue/src/shell/workspace/tool-settings-memory'
 import { TextureResourceResolver } from '../../../packages/editor-vue/src/texture-fill'
+import { HighlighterBackgroundController } from '../../../packages/editor-vue/src/shell/workspace/highlighter-background'
 
 beforeEach(() => {
   localStorage.clear()
@@ -93,6 +94,88 @@ async function draw(
   })
 }
 describe('consistent tool UX through the mounted shell', () => {
+  it('does not reset source analysis on annotation, undo, crop or zoom changes', async () => {
+    const reset = vi.spyOn(HighlighterBackgroundController.prototype, 'reset')
+    const app = mount()
+    await nextTick()
+    reset.mockClear()
+    await fireEvent.click(screen.getByRole('button', { name: 'Highlighter' }))
+    await draw(app.scene)
+    app.session.undo()
+    app.session.redo()
+    app.session.execute({ type: 'setCrop', before: null, after: { x: 0, y: 0, width: 60, height: 60 } })
+    app.store.setZoom(150)
+    await nextTick()
+    expect(reset).not.toHaveBeenCalled()
+    app.close()
+  })
+  it('changes a highlighter group atomically and keeps automatic creation defaults after style edits', async () => {
+    const first = createDrawingLayer({ id: '019c1f62-058e-7000-8000-000000000010', tool: 'marker', start: { x: 5, y: 20 }, end: { x: 60, y: 20 } })!
+    const second = { ...first, id: '019c1f62-058e-7000-8000-000000000011', blendMode: 'screen' as const }
+    const app = mount({ ...arrowDocument(), layers: [first, second] })
+    app.store.selectTool('select')
+    app.store.selectLayer(first.id)
+    app.store.selectLayer(second.id, true)
+    await nextTick()
+    const execute = vi.spyOn(app.session, 'execute')
+    const toolbar = app.view.container.querySelector('.cs-selection-floating-toolbar') as HTMLElement
+    await fireEvent.click(await within(toolbar).findByRole('button', { name: 'Effect' }))
+    await fireEvent.click(await screen.findByRole('button', { name: 'Tint' }))
+    expect(execute).toHaveBeenCalledTimes(1)
+    expect(execute.mock.calls[0]![0].type).toBe('batch')
+    expect(app.session.snapshot.core.document.layers.map((layer) => 'blendMode' in layer ? layer.blendMode : null)).toEqual(['normal', 'normal'])
+    app.session.undo()
+    expect(app.session.snapshot.core.document.layers.map((layer) => 'blendMode' in layer ? layer.blendMode : null)).toEqual(['multiply', 'screen'])
+    app.session.redo()
+    await fireEvent.click(screen.getByRole('button', { name: 'Highlighter' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Effect' }))
+    await fireEvent.click(await screen.findByRole('button', { name: 'Auto' }))
+    await draw(app.scene)
+    expect(app.session.snapshot.core.document.layers.at(-1)).toMatchObject({ payload: { highlighterMode: 'auto' } })
+    app.close()
+  })
+  it.each(['click', 'keyboard', 'configure'] as const)('cancels palette sampling on an explicit tool %s, including the same tool', async (method) => {
+    const app = mount()
+    const arrow = screen.getByRole('button', { name: 'Arrow' })
+    await fireEvent.contextMenu(arrow)
+    await fireEvent.click(screen.getByRole('button', { name: 'Color' }))
+    await fireEvent.click(await screen.findByRole('button', { name: 'Custom colour' }))
+    await fireEvent.click(await screen.findByRole('button', { name: 'Sample colour from canvas' }))
+    expect(app.scene).toHaveClass('cs-canvas-eyedropper-cursor')
+    expect(app.view.container.querySelector('.cs-tool-configure-popover-host')).toBeNull()
+    const before = app.session.snapshot.core.document
+    if (method === 'click') await fireEvent.click(arrow)
+    else if (method === 'configure') await fireEvent.contextMenu(arrow)
+    else await fireEvent.keyDown(window, { key: 'a', code: 'KeyA' })
+    await nextTick()
+    expect(app.scene).not.toHaveClass('cs-canvas-eyedropper-cursor')
+    expect(app.session.snapshot.core.document).toEqual(before)
+    await draw(app.scene)
+    expect(app.session.snapshot.core.document.layers.map((layer) => layer.kind)).toEqual(['arrow'])
+    app.close()
+  })
+  it('keeps the defaults target after hiding configure controls for canvas sampling', async () => {
+    const context = Object.assign(canvasContext(), {
+      getImageData: vi.fn(() => ({ data: new Uint8ClampedArray([51, 102, 153, 255]) })),
+    })
+    vi.mocked(HTMLCanvasElement.prototype.getContext).mockReturnValue(context)
+    const app = mount(arrowDocument())
+    const original = app.session.snapshot.core.document.layers[0]
+    const arrow = screen.getByRole('button', { name: 'Arrow' })
+    await fireEvent.contextMenu(arrow)
+    await fireEvent.click(screen.getByRole('button', { name: 'Color' }))
+    await fireEvent.click(await screen.findByRole('button', { name: 'Custom colour' }))
+    await fireEvent.click(await screen.findByRole('button', { name: 'Sample colour from canvas' }))
+    await fireEvent.pointerDown(app.scene, { button: 0, pointerId: 1, clientX: 30, clientY: 30 })
+    await fireEvent.pointerUp(app.scene, { button: 0, pointerId: 1, clientX: 30, clientY: 30 })
+    expect(app.scene).not.toHaveClass('cs-canvas-eyedropper-cursor')
+    expect(app.session.snapshot.core.document.layers[0]).toEqual(original)
+    await draw(app.scene)
+    const created = app.session.snapshot.core.document.layers.at(-1)!
+    if (created.kind !== 'arrow') throw new Error('Expected a new arrow after sampling')
+    expect(created.payload.stroke.color).toEqual({ red: 0.2, green: 0.4, blue: 0.6, alpha: 1 })
+    app.close()
+  })
   it('restores defaults configured before any object was created from v3 preferences alone', async () => {
     const app = mount()
     await fireEvent.contextMenu(screen.getByRole('button', { name: 'Arrow' }))
@@ -139,8 +222,8 @@ describe('consistent tool UX through the mounted shell', () => {
     app.store.selectLayer(shape.id)
     await fireEvent.contextMenu(screen.getByRole('button', { name: 'Shape' }))
     const popover = app.view.container.querySelector('.cs-tool-configure-popover-host') as HTMLElement
-    await fireEvent.click(within(popover).getByRole('button', { name: 'More' }))
-    await fireEvent.click(within(popover).getByRole('button', { name: 'Import texture' }))
+    await fireEvent.click(within(popover).getByRole('button', { name: /Fill:/ }))
+    await fireEvent.click(await screen.findByRole('button', { name: 'Import texture' }))
     await nextTick()
     expect(shapePayload(app.session.snapshot.core.document.layers[0]!).fill).toEqual(shapePayload(shape).fill)
     await fireEvent.keyDown(document, { key: 'Escape', code: 'Escape' })
@@ -168,7 +251,7 @@ describe('consistent tool UX through the mounted shell', () => {
       app.close()
     },
   )
-  it.each(['Pencil', 'Marker', 'Numbered marker'])(
+  it.each(['Pencil', 'Highlighter', 'Numbered marker'])(
     '%s remains active without selecting the new instance in Quick Capture',
     async (label) => {
       const app = mount(undefined, true)
@@ -237,9 +320,8 @@ describe('consistent tool UX through the mounted shell', () => {
     await nextTick()
     const spy = vi.spyOn(app.session, 'execute')
     const toolbar = app.view.container.querySelector('.cs-selection-floating-toolbar') as HTMLElement
-    const width = await within(toolbar).findByRole('slider', { name: 'Width' })
-    width.focus()
-    await fireEvent.keyDown(width, { key: 'ArrowRight' })
+    await fireEvent.click(await within(toolbar).findByRole('button', { name: /Stroke:/ }))
+    await fireEvent.click(await screen.findByRole('button', { name: '8 px' }))
     expect(spy).toHaveBeenCalledTimes(1)
     expect(spy.mock.calls[0]![0].type).toBe('batch')
     expect(app.session.snapshot.core.document.layers.map((layer) => layer.kind === 'shape' ? layer.payload.cornerRadius : null)).toEqual([0, 8])
@@ -256,6 +338,36 @@ describe('consistent tool UX through the mounted shell', () => {
     await draw(reopened.scene)
     expect(shapePayload(reopened.session.snapshot.core.document.layers[0]!).stroke).toEqual(current)
     reopened.close()
+  })
+  it.each([false, true])('edits a created shape with independent fill, one-command history and cancel (quick=%s)', async (quickMode) => {
+    const app = mount(undefined, quickMode)
+    await fireEvent.click(screen.getByRole('button', { name: 'Shape' }))
+    await draw(app.scene)
+    expect(app.store.activeToolId).toBe('select')
+    const before = app.session.snapshot.core.document.layers.at(-1)!
+    const toolbar = app.view.container.querySelector('.cs-selection-floating-toolbar') as HTMLElement
+    await fireEvent.click(await within(toolbar).findByRole('button', { name: /Fill:/ }))
+    const spy = vi.spyOn(app.session, 'execute')
+    await fireEvent.click(await screen.findByRole('button', { name: 'Custom colour' }))
+    await fireEvent.change(await screen.findByRole('textbox', { name: 'HEX colour code' }), { target: { value: '#336699' } })
+    expect(spy).toHaveBeenCalledTimes(1)
+    const after = app.session.snapshot.core.document.layers.at(-1)!
+    expect(shapePayload(after).stroke).toEqual(shapePayload(before).stroke)
+    expect(after.transform).toEqual(before.transform)
+    expect(shapePayload(after).fill).toMatchObject({ kind: 'solid', opacity: 1 })
+    app.session.undo()
+    expect(shapePayload(app.session.snapshot.core.document.layers.at(-1)!).fill).toEqual(shapePayload(before).fill)
+    app.session.redo()
+    expect(shapePayload(app.session.snapshot.core.document.layers.at(-1)!).fill).toEqual(shapePayload(after).fill)
+    await fireEvent.keyDown(screen.getByRole('textbox', { name: 'HEX colour code' }), { key: 'Escape' })
+    await fireEvent.click(await within(toolbar).findByRole('button', { name: /Shape:/ }))
+    const radius = await screen.findByRole('spinbutton', { name: 'Corner radius' })
+    const count = spy.mock.calls.length
+    await fireEvent.input(radius, { target: { value: '17' } })
+    await fireEvent.keyDown(radius, { key: 'Escape' })
+    expect(spy).toHaveBeenCalledTimes(count)
+    expect(app.store.activeToolId).toBe('select')
+    app.close()
   })
   it('opens an object menu, preserves multi-selection and duplicates/deletes atomically', async () => {
     const document = arrowDocument()

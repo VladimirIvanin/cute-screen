@@ -4,6 +4,7 @@ import {
   NTooltip,
 } from 'naive-ui'
 import { UiIcon } from '../icon'
+import UiSeparator from '../ui/UiSeparator.vue'
 import type { ToolDescriptor } from '../types'
 
 defineProps<{
@@ -55,10 +56,10 @@ function onToolKeydown(
 <template>
   <aside class="cs-toolrail cs-toolrail--horizontal" :aria-label="t('tools')">
     <template v-for="(group, groupIndex) in toolGroups" :key="group">
-      <div
+      <UiSeparator
         v-if="groupIndex > 0 && tools.some((tool) => tool.group === group)"
         class="cs-tool-group-separator"
-        aria-hidden="true"
+        :length="24"
       />
       <div v-if="tools.some((tool) => tool.group === group)" class="cs-tool-group">
         <NTooltip

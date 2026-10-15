@@ -5,6 +5,7 @@ import {
   expect,
 } from '@wdio/globals'
 import path from 'node:path'
+import { verifyArrowSelectionMenu } from '../arrow-selection-menu'
 
 import {
   chooseArrowConfigureOption,
@@ -92,6 +93,13 @@ async function elbowHandlePoint(arrow: ArrowSnapshot['layers'][number]): Promise
 }
 
 describe('Arrow toolbar and engine in a real Tauri WebView2', () => {
+  it('aligns icon menus, restores nested focus and preserves undo in the native webview', async () => {
+    await browser.waitUntil(async () => (await snapshot()).layers.length === 4)
+    await setPreferences('en', 'dark')
+    await verifyArrowSelectionMenu('artifacts/tauri-e2e')
+    await $('button[aria-label="Undo"]').click()
+    await browser.waitUntil(async () => (await snapshot()).layers.length === 4)
+  })
   it('keeps five controls visible across sizes/locales/themes and edits one elbow command', async () => {
     await browser.waitUntil(async () => (await snapshot()).layers.length === 4)
     const sizes = [
@@ -122,7 +130,7 @@ describe('Arrow toolbar and engine in a real Tauri WebView2', () => {
             controlIds: [...controls.querySelectorAll<HTMLElement>('[data-control]')].map(
               (control) => control.dataset.control,
             ),
-            observableCount: controls.querySelectorAll('.cs-arrow-toolbar-trigger, .cs-color-more--compact').length,
+            observableCount: controls.querySelectorAll('.cs-arrow-toolbar-trigger, .cs-simple-color-trigger').length,
             controlsFit: controls.scrollWidth <= controls.clientWidth,
             toolbarFits:
               bounds.left >= 0 &&

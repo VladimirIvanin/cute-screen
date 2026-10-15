@@ -88,6 +88,13 @@ async function decodeBrowserImage(url: string): Promise<HTMLImageElement> {
   return image
 }
 
+const analysisBlobs = new WeakMap<HTMLImageElement, Blob>()
+
+/** A fallback object URL is revoked after decode; keep its immutable binary source with the image. */
+export function imageAnalysisSource(image: HTMLImageElement): Blob | string | undefined {
+  return analysisBlobs.get(image) ?? (image.currentSrc || image.src || undefined)
+}
+
 const browserObjectUrls: ObjectUrlLifecycle = {
   create: (blob) => URL.createObjectURL(blob),
   revoke: (url) => URL.revokeObjectURL(url),
@@ -146,9 +153,11 @@ export async function loadImageWithBinaryFallback<Resource>(
   }
 
   const objectUrls = options.objectUrls ?? browserObjectUrls
-  const url = objectUrls.create(new Blob([bytes], { type: metadata.mimeType }))
+  const blob = new Blob([bytes], { type: metadata.mimeType })
+  const url = objectUrls.create(blob)
   try {
     const image = await decodeImage(url)
+    analysisBlobs.set(image, blob)
     assertDimensions(image, metadata)
     return {
       resource: await options.createResource(image, metadata),

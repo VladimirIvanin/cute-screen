@@ -18,6 +18,11 @@ import type { PrecisionTool } from './precision-schema'
 type DrawingTool = 'arrow' | 'shape' | 'pencil' | 'marker'
 type PrecisionLayer = Extract<LayerNode, { readonly kind: PrecisionTool }>
 
+function highlighterProjection(schemas: readonly (ContextToolbarSchema | undefined)[]): Pick<ContextToolbarSchema, 'highlighter'> {
+  const highlighter = schemas[0]?.highlighter
+  return highlighter && schemas.every((schema) => Boolean(schema?.highlighter)) ? { highlighter } : {}
+}
+
 export interface ContextSchemaContext {
   readonly readOnly?: Ref<boolean>
   readonly quickMode: Ref<boolean>
@@ -272,6 +277,21 @@ function schemaForLayer(
   return layer.kind === 'image' ? imageSchema(context, layer) : undefined
 }
 
+function shapeProjection(schemas: readonly (ContextToolbarSchema | undefined)[]): Pick<ContextToolbarSchema, 'shape'> {
+  const first = schemas[0]?.shape
+  if (!first || !schemas.every((schema) => schema?.shape)) return {}
+  return {
+    shape: {
+      fill: schemas.every((schema) => JSON.stringify(schema?.shape?.fill) === JSON.stringify(first.fill))
+        ? first.fill
+        : null,
+      fillSupported: schemas.every((schema) => schema?.shape?.fillSupported !== false),
+      fillColorEditable: schemas.every((schema) => schema?.shape?.fillColorEditable),
+      fillOpacityEditable: schemas.every((schema) => schema?.shape?.fillOpacityEditable),
+    },
+  }
+}
+
 export function createContextSchema(context: ContextSchemaContext) {
   const floatingArrowToolbarSchema = computed(() => {
     if ((context.activeToolId.value ?? 'select') !== 'select') return undefined
@@ -338,6 +358,8 @@ export function createContextSchema(context: ContextSchemaContext) {
     } else text = undefined
     return {
       disabled,
+      ...highlighterProjection(schemas),
+      ...shapeProjection(schemas),
       ...(disabled
         ? {
             disabledReason: context.precisionText(

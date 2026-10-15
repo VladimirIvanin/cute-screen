@@ -45,9 +45,12 @@ export interface RenderLifecycleContext {
 export function registerRenderLifecycle(context: RenderLifecycleContext): void {
   let resizeObserver: ResizeObserver | undefined
   let resizeFrame: number | undefined
+  let scrollHost: HTMLDivElement | undefined
   onMounted(() => {
     context.renderer.mount()
     const { scene, overlay, scrollContainer } = context
+    scrollHost = scrollContainer.value
+    scrollHost?.addEventListener('scroll', context.invalidateOverlay, { passive: true })
     if (
       scene.value &&
       overlay.value &&
@@ -86,6 +89,7 @@ export function registerRenderLifecycle(context: RenderLifecycleContext): void {
   registerDocumentWatches(context)
   registerViewportWatches(context)
   onBeforeUnmount(() => {
+    scrollHost?.removeEventListener('scroll', context.invalidateOverlay)
     resizeObserver?.disconnect()
     if (resizeFrame !== undefined) cancelAnimationFrame(resizeFrame)
     context.renderer.dispose()

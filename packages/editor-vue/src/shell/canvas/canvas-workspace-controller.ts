@@ -324,6 +324,7 @@ export class CanvasWorkspaceController {
         this.#draft.drawCallout(context)
         this.#draft.drawPrecision(context)
       },
+      drawingLayer: () => this.#draft.drawingLayer(),
       drawCrop: (context, bounds) => this.#crop.draw(context, bounds),
       layerBounds: this.layerBounds,
       worldHandlePositions: (layer, transform) => this.#geometry.worldBoundsHandlePositions(layer, transform),

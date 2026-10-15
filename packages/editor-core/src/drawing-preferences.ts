@@ -2,6 +2,7 @@ import type {
   JsonObject,
   SrgbColor,
 } from './document/types'
+import { normalizeHighlighterDefaults } from './highlighter'
 import {
   DEFAULT_DRAWING_DEFAULTS,
   type DrawingDefaults,
@@ -151,7 +152,7 @@ function defaults(
     arrow: normalizedArrow(input.arrow, schemaVersion, fallback.arrow),
     shape: isJsonObject(input.shape) ? input.shape : fallback.shape,
     pencil: isJsonObject(input.pencil) ? input.pencil : fallback.pencil,
-    marker: isJsonObject(input.marker) ? input.marker : fallback.marker,
+    marker: isJsonObject(input.marker) ? normalizeHighlighterDefaults(input.marker) : fallback.marker,
   }
 }
 

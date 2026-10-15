@@ -20,6 +20,7 @@ import type {
 } from '../canvas/contracts'
 import type { PrecisionToolDefaults } from '../types'
 import type { TextDraft } from '../tools/text-schema'
+import type { HighlighterAnalysis } from './highlighter-background'
 
 const DEFAULT_TEXT_TOOL: TextToolDefaults = {
   fontFamily: 'Roboto',
@@ -67,6 +68,7 @@ const DEFAULT_PRECISION_TOOLS: PrecisionToolDefaults = {
 
 export function createWorkspaceState() {
   return {
+    highlighterAnalysis: shallowRef<HighlighterAnalysis>({ status: 'loading', effect: 'highlight' }),
     canvasViewport: ref<CanvasViewportExpose>(),
     fallbackCopied: ref(false),
     fallbackVisible: ref(true),

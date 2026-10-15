@@ -6,7 +6,6 @@ import {
 import {
   snapshot,
   openDrawingHarness,
-  chooseOption,
 } from './browser-m06-test-kit'
 
 describe('M06 drawing tools in browser mode', () => {
@@ -29,7 +28,7 @@ describe('M06 drawing tools in browser mode', () => {
 
     await draw('Shape', 12)
     await draw('Pencil', 48)
-    await draw('Marker', 82)
+    await draw('Highlighter', 82)
 
     expect((await snapshot()).layers.slice(-3).map((layer) => layer.kind)).toEqual(['shape', 'pencil', 'marker'])
   })
@@ -38,7 +37,9 @@ describe('M06 drawing tools in browser mode', () => {
     await openDrawingHarness()
     const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
     await $('button[aria-label="Shape"]').click()
-    await chooseOption('Fill', 'Linear gradient')
+    await $('[data-shape-control="fill"]').click()
+    await $('.cs-shape-fill-options').$('button=Linear gradient').click()
+    await browser.keys('Escape')
     await browser
       .action('pointer')
       .move({ origin: scene, x: 20, y: 20, duration: 0 })

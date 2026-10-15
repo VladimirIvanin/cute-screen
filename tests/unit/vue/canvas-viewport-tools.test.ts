@@ -7,6 +7,7 @@ import {
   vi,
 } from 'vitest'
 import { mountViewport } from './canvas-viewport-test-kit'
+import { DEFAULT_DRAWING_DEFAULTS } from '@cute-screen/editor-renderer'
 
 beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
@@ -35,6 +36,21 @@ beforeEach(() => {
 })
 
 describe('M05 CanvasViewport transforms', () => {
+  it('freezes automatic highlighter resolution at pointerdown while later strokes use the ready result', async () => {
+    const view = mountViewport('marker')
+    await view.rerender({ drawingDefaults: DEFAULT_DRAWING_DEFAULTS, highlighterEffect: 'highlight' })
+    await fireEvent.pointerDown(view.scene, { button: 0, pointerId: 1, clientX: 5, clientY: 50 })
+    await view.rerender({ highlighterEffect: 'illuminate' })
+    await fireEvent.pointerMove(view.scene, { pointerId: 1, clientX: 75, clientY: 50 })
+    await fireEvent.pointerUp(view.scene, { pointerId: 1, clientX: 75, clientY: 50 })
+    const first = view.emitted('addLayer') as unknown as readonly (readonly unknown[])[]
+    expect(first[0]?.[0]).toMatchObject({ blendMode: 'multiply', payload: { highlighterMode: 'auto' } })
+    await fireEvent.pointerDown(view.scene, { button: 0, pointerId: 2, clientX: 5, clientY: 70 })
+    await fireEvent.pointerMove(view.scene, { pointerId: 2, clientX: 75, clientY: 70 })
+    await fireEvent.pointerUp(view.scene, { pointerId: 2, clientX: 75, clientY: 70 })
+    const second = view.emitted('addLayer') as unknown as readonly (readonly unknown[])[]
+    expect(second[1]?.[0]).toMatchObject({ blendMode: 'screen', payload: { highlighterMode: 'auto' } })
+  })
   it('commits Shift-constrained rotation from an outer corner zone', async () => {
     const { scene, emitted } = mountViewport()
 

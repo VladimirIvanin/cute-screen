@@ -1,3 +1,5 @@
+import { isShapeKind } from '../../shapes'
+import { isHighlighterMode } from '../../highlighter'
 import { readJsonObject } from '../json'
 import {
   ARROW_CAPS,
@@ -254,7 +256,7 @@ export function parseShapePayload(
   field: string,
 ): ShapeLayerPayload {
   const input = readJsonObject(value, field)
-  if (!['rectangle', 'circle', 'oval', 'diamond', 'star'].includes(String(input.shape)))
+  if (!isShapeKind(input.shape))
     throw new Error(`${field}.shape is invalid`)
   const fill = parseFill(input.fill, `${field}.fill`)
   const cornerRadius = readFiniteNumber(input.cornerRadius, `${field}.cornerRadius`)
@@ -298,7 +300,15 @@ export function parseSampledPayload(
     color: parseSrgbColor(input.color, `${field}.color`),
     smoothing: parseUnitInterval(input.smoothing, `${field}.smoothing`),
   }
-  if (marker) return Object.freeze(common) as MarkerLayerPayload
+  if (marker) {
+    if (input.highlighterMode !== undefined && !isHighlighterMode(input.highlighterMode)) {
+      throw new Error(`${field}.highlighterMode is invalid`)
+    }
+    return Object.freeze({
+      ...common,
+      ...(input.highlighterMode === undefined ? {} : { highlighterMode: input.highlighterMode }),
+    }) as MarkerLayerPayload
+  }
   if (!['pen', 'pencil', 'brush'].includes(String(input.brush))) throw new Error(`${field}.brush is invalid`)
   return Object.freeze({ ...common, brush: input.brush }) as PencilLayerPayload
 }

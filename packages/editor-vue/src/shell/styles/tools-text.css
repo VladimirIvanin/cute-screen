@@ -123,14 +123,17 @@
 }
 .cs-arrow-toolbar-trigger,
 .cs-color-more--compact {
-  display: inline-grid;
-  width: 36px;
+  display: inline-flex;
+  width: 48px;
   height: 32px;
-  place-items: center;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 4px;
   border: 1px solid transparent;
   border-radius: 6px;
   color: var(--text);
-  background: var(--surface-sunken);
+  background: transparent;
   cursor: pointer;
 }
 .cs-arrow-toolbar-trigger:hover:not(:disabled),
@@ -146,10 +149,16 @@
   opacity: 0.5;
 }
 .cs-arrow-toolbar-trigger svg {
-  width: 30px;
-  height: 20px;
+  flex: none;
+  width: 28px;
+  height: 24px;
 }
-.cs-arrow-toolbar-trigger > span {
+.cs-arrow-toolbar-trigger .cs-arrow-toolbar-chevron {
+  width: 12px;
+  height: 12px;
+  color: var(--text-muted);
+}
+.cs-arrow-toolbar-trigger > .sr-only {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -172,7 +181,8 @@
 .cs-arrow-toolbar-popover {
   display: grid;
   gap: 8px;
-  min-width: 176px;
+  min-width: 0;
+  max-width: calc(100vw - 16px);
   padding: 8px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -210,9 +220,55 @@
   width: 34px;
   height: 18px;
 }
-.cs-arrow-toolbar-options--caps button {
-  min-width: 72px;
-  padding: 4px 6px;
+.cs-arrow-toolbar-options--caps,
+.cs-arrow-toolbar-options--paths {
+  flex-wrap: nowrap;
+  gap: 2px;
+}
+.cs-arrow-toolbar-options--caps button,
+.cs-arrow-toolbar-options--paths button {
+  width: 36px;
+  min-width: 36px;
+  height: 32px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+}
+.cs-arrow-toolbar-options--caps svg,
+.cs-arrow-toolbar-options--paths svg {
+  width: 28px;
+  height: 24px;
+}
+.cs-arrow-toolbar-options button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.cs-context-toolbar.cs-context-toolbar--arrow {
+  min-height: 0;
+  height: 42px;
+  padding: 4px;
+  border-radius: 12px;
+}
+.cs-context-toolbar--arrow > .cs-arrow-formatting-toolbar--floating {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.cs-arrow-formatting-toolbar .cs-arrow-toolbar-control {
+  align-items: center;
+  padding: 0;
+}
+.cs-arrow-formatting-toolbar .cs-color-more--compact {
+  display: inline-flex;
+  width: 36px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+}
+.cs-arrow-formatting-toolbar > .cs-ui-separator {
+  margin-inline: 2px;
 }
 .cs-arrow-legacy-width {
   display: inline-flex;

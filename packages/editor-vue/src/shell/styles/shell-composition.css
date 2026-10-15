@@ -51,11 +51,7 @@
 }
 
 .cs-tool-group-separator {
-  flex: none;
-  width: 1px;
-  height: 24px;
   margin: 0 4px;
-  background: var(--border);
 }
 .cs-tool-button {
   width: 34px;

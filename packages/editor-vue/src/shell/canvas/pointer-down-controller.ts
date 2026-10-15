@@ -319,6 +319,8 @@ function beginDrawing(
   context.scene.value!.setPointerCapture(event.pointerId)
   context.setGesture({
     kind: 'draw',
+    highlighterEffect: context.props.highlighterEffect,
+    drawingDefaults: context.props.drawingDefaults,
     tool,
     start: point,
     current: point,

@@ -1,3 +1,8 @@
+import {
+  isShapeKind,
+  shapeGeometry,
+  flattenShapePath,
+} from './shapes'
 import RBush from 'rbush'
 
 import {
@@ -263,17 +268,6 @@ function pointInPolygon(
   return inside
 }
 
-function polygonStrokeHit(
-  point: Point,
-  vertices: readonly Point[],
-  strokeWidth: number,
-): boolean {
-  return vertices.some(
-    (vertex, index) =>
-      pointToSegmentDistance(point, vertex, vertices[(index + 1) % vertices.length]!) <= strokeWidth / 2,
-  )
-}
-
 function drawingHitPart(
   layer: EditorDocumentV1['layers'][number],
   point: Point,
@@ -353,62 +347,27 @@ function drawingHitPart(
     payload.fill !== undefined &&
     typeof payload.fill === 'object' &&
     (payload.fill as Record<string, unknown>).kind !== 'none'
-  const rectangle =
-    point.x >= geometry.x &&
-    point.x <= geometry.x + geometry.width &&
-    point.y >= geometry.y &&
-    point.y <= geometry.y + geometry.height
-  const ellipse =
-    ((point.x - centerX) / (geometry.width / 2)) ** 2 + ((point.y - centerY) / (geometry.height / 2)) ** 2 <= 1
-  const diamond =
-    Math.abs((point.x - centerX) / (geometry.width / 2)) + Math.abs((point.y - centerY) / (geometry.height / 2)) <= 1
-  const diamondVertices: readonly Point[] = [
-    { x: centerX, y: geometry.y },
-    { x: geometry.x + geometry.width, y: centerY },
-    { x: centerX, y: geometry.y + geometry.height },
-    { x: geometry.x, y: centerY },
-  ]
-  const starCount =
-    typeof payload.starPoints === 'number' &&
-    Number.isInteger(payload.starPoints) &&
-    payload.starPoints >= 3 &&
-    payload.starPoints <= 32
-      ? payload.starPoints
-      : 5
-  const starInnerRatio =
-    typeof payload.starInnerRatio === 'number' && Number.isFinite(payload.starInnerRatio)
-      ? Math.max(0, Math.min(1, payload.starInnerRatio))
-      : 0.45
-  const starVertices: readonly Point[] = Array.from({ length: starCount * 2 }, (_, index) => {
-    const outer = index % 2 === 0
-    const angle = -Math.PI / 2 + (Math.PI * index) / starCount
-    return {
-      x: centerX + Math.cos(angle) * (geometry.width / 2) * (outer ? 1 : starInnerRatio),
-      y: centerY + Math.sin(angle) * (geometry.height / 2) * (outer ? 1 : starInnerRatio),
-    }
-  })
-  const inside =
-    shape === 'circle' || shape === 'oval'
-      ? ellipse
-      : shape === 'diamond'
-        ? diamond
-        : shape === 'star'
-          ? pointInPolygon(point, starVertices)
-          : rectangle
-  if (hasFill && inside) return 'fill'
+  if (!isShapeKind(shape)) return undefined
   if (shape === 'circle' || shape === 'oval') {
     const radiusX = geometry.width / 2
     const radiusY = geometry.height / 2
-    const normalizedDistance = Math.hypot((point.x - centerX) / radiusX, (point.y - centerY) / radiusY)
-    const normalizedTolerance = strokeWidth / (2 * Math.min(radiusX, radiusY))
-    return Math.abs(normalizedDistance - 1) <= normalizedTolerance ? 'stroke' : undefined
+    const distance = Math.hypot((point.x - centerX) / radiusX, (point.y - centerY) / radiusY)
+    if (hasFill && distance <= 1) return 'fill'
+    return Math.abs(distance - 1) <= strokeWidth / (2 * Math.min(radiusX, radiusY)) ? 'stroke' : undefined
   }
-  const rectangleVertices: readonly Point[] = [
-    { x: geometry.x, y: geometry.y },
-    { x: geometry.x + geometry.width, y: geometry.y },
-    { x: geometry.x + geometry.width, y: geometry.y + geometry.height },
-    { x: geometry.x, y: geometry.y + geometry.height },
-  ]
-  const vertices = shape === 'diamond' ? diamondVertices : shape === 'star' ? starVertices : rectangleVertices
-  return polygonStrokeHit(point, vertices, strokeWidth) ? 'stroke' : undefined
+  const path = shapeGeometry(shape, geometry.width, geometry.height, {
+    cornerRadius: typeof payload.cornerRadius === 'number' ? payload.cornerRadius : 0,
+    starPoints: typeof payload.starPoints === 'number' ? payload.starPoints : 5,
+    starInnerRatio: typeof payload.starInnerRatio === 'number' ? payload.starInnerRatio : 0.45,
+  })
+  const local = { x: point.x - geometry.x, y: point.y - geometry.y }
+  const outline = flattenShapePath(path.outline)
+  if (
+    !path.open &&
+    hasFill &&
+    outline.some((contour) => pointInPolygon(local, contour))
+  ) return 'fill'
+  const contours = [...outline, ...flattenShapePath(path.details)]
+  return contours.some((contour) => contour.slice(1).some((end, i) =>
+    pointToSegmentDistance(local, contour[i]!, end) <= strokeWidth / 2)) ? 'stroke' : undefined
 }

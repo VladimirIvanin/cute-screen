@@ -57,6 +57,8 @@ const {
   textureImages,
   baseImageLayer,
   sceneTexturesReady,
+  highlighterAnalysis,
+  onHighlighterFrameReady,
   samplingControl,
   drawingDefaults,
   precisionDefaults,
@@ -255,8 +257,9 @@ function onTextCancelled(): void {
           :quick-frame-mode="props.quickMode"
           :quick-selection-mode="props.quickSelectionMode"
           :t="translate"
+          :highlighter-effect="highlighterAnalysis.effect"
           @hosts-ready="emit('hostsReady', $event)"
-          @frame-ready="emit('frameReady', $event)"
+          @frame-ready="onHighlighterFrameReady($event); emit('frameReady', $event)"
           @quick-frame-change="emit('quickFrameChange', $event)"
           @quick-selection-complete="emit('quickSelectionComplete', $event)"
           @context-menu="openCanvasMenu"
@@ -282,6 +285,7 @@ function onTextCancelled(): void {
           @retry="emit('retryLoad')"
         />
         <SelectionFormattingToolbar
+          :quick-mode="props.quickMode"
           :layers-open="store.layersOpen"
           :schema="selectionSchema"
           :document="activeDocument"

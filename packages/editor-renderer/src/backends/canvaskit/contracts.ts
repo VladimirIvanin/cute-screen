@@ -64,6 +64,7 @@ export interface CanvasKitImage extends CanvasKitDeletable {
 
 export interface CanvasKitCanvas {
   clear(color: unknown): void
+  saveLayer(paint?: CanvasKitPaint): number
   save(): number
   restore(): void
   rotate(rotation: number, centerX: number, centerY: number): void

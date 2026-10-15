@@ -314,12 +314,14 @@ function commitCreation(
     })
   }
   if (gesture?.kind === 'draw') {
+    const defaults = gesture.drawingDefaults ?? context.props.drawingDefaults
     const layer = createDrawingLayer({
       id: crypto.randomUUID(),
       tool: gesture.tool,
       start: gesture.start,
       end: gesture.current,
-      ...(context.props.drawingDefaults ? { defaults: context.props.drawingDefaults } : {}),
+      ...(defaults ? { defaults } : {}),
+      ...(gesture.highlighterEffect ? { highlighterEffect: gesture.highlighterEffect } : {}),
       constrainAngle: gesture.constrainAngle,
       drawFromCenter: gesture.drawFromCenter,
       points: gesture.points,

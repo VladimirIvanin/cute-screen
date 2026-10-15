@@ -913,3 +913,51 @@ settings не меняются. Это уточнение реализации �
 реального DXGI desktop под editor marker в трёх циклах с Escape/retry.
 Результаты и ограничения — в `TESTING.md`. Семантика hide-animation описана
 в [Microsoft DWM documentation](https://devblogs.microsoft.com/oldnewthing/20121003-00/?p=6423).
+
+## ADR-050 — Экранное разрешение selection chrome и миниатюры стрелок
+
+**Статус:** accepted; уточняет реализацию ADR-035 и ADR-048.
+
+**Контекст:** документный bitmap overlay растягивал рамку выделения при zoom;
+текстовые варианты наконечников раздували меню, а оба конца показывали
+одинаковое направление. Отдельная иконка arrow и вложенная рамка панели
+занимали место без дополнительного действия.
+
+**Решение:** editor и Quick используют отдельный display-resolution canvas
+для transient chrome, CSS pixels × DPR, сохраняя document-space preview
+от renderer. Толщина рамки, длина пунктира и радиус handles зависят от zoom.
+Corner rotation сохраняет прежние hit zones и показывает MIT Tabler
+`rotate-clockwise` с белой контрастной обводкой. Пять arrow controls имеют
+общую высоту и явные chevrons; хвост зеркалится относительно наконечника.
+Варианты cap/path показываются миниатюрами с локализованными accessible names
+и title; открыта максимум одна вложенная панель. Escape возвращает focus,
+выбор закрывает меню; locked selection сохраняет disabled controls.
+
+**Проверяемое основание:** pixel regression `selection-overlay-resolution.test.ts`
+проверяет фактический raster при zoom 2 / DPR 2 в обеих поверхностях;
+`arrow-context-toolbar.test.ts` проверяет именованные варианты и focus.
+Общий `arrow-selection-menu.ts` проходит создание стрелки, nested Escape с
+trusted keyboard input, выравнивание controls, display backing, выбор, Undo
+и corner hover в browser и real Tauri. Результаты — TESTING.md.
+
+## ADR-051 — Понятные эффекты выделителя и фоновый автоподбор
+
+**Статус:** accepted; дополняет ADR-048 и ADR-050.
+
+**Решение:** выделитель имеет один выбор Auto/Highlight/Illuminate/Colour veil:
+auto разрешается в multiply, screen или normal по распределению яркости всего
+неизменяемого original. Не менее 60% opaque samples с яркостью ≤0.4 означают
+screen, ≥0.65 — multiply, иначе normal; прозрачные samples не участвуют.
+Задача запускается после первого frame один раз на загрузку, использует bitmap
+до 256 px и Worker/OffscreenCanvas. Ошибка не блокирует ручные эффекты.
+Результат и defaults фиксируются при pointerdown; сохранённый blend определяет
+вид существующих штрихов, а отдельный highlighterMode хранит намерение Auto.
+Preview рисуется поверх committed pixels сцены, UI overlay остаётся отдельным.
+Палитры выделителя, фигур и стрелок имеют фиксированные образцы; расширенный
+picker доступен через Custom colour. Оригинал, schema v7 и IPC сохраняются.
+
+**Проверяемое основание:** red-first highlighter core tests и codec regression;
+worker lifecycle, gesture freeze, group command и decoded PNG pixel tests;
+Canvas2D/CanvasKit highlighter goldens; browser/native WebView production-flow
+сравнение preview/commit и 4K/8K фоновые задачи. Фактические результаты и
+ограничения фиксируются в TESTING.md.

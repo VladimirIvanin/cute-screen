@@ -1,3 +1,9 @@
+import {
+  shapeGeometry,
+  mapShapePath,
+  isShapeKind,
+  flattenShapePath,
+} from '../../shapes'
 import type { RenderNode } from '../../scene/contracts'
 import type {
   MarkerLayer,
@@ -25,29 +31,19 @@ function polygonCorners(
   geometry: ShapeGeometry,
   payload: ShapeLayer['payload'],
 ): readonly { readonly x: number; readonly y: number }[] {
-  if (shape === 'diamond')
-    return [
-      { x: geometry.x + geometry.width / 2, y: geometry.y },
-      { x: geometry.x + geometry.width, y: geometry.y + geometry.height / 2 },
-      { x: geometry.x + geometry.width / 2, y: geometry.y + geometry.height },
-      { x: geometry.x, y: geometry.y + geometry.height / 2 },
-    ]
-  const count = Number(payload.starPoints) || 5
-  const innerRatio = Math.max(0, Math.min(1, Number(payload.starInnerRatio) || 0.45))
-  return Array.from({ length: count * 2 }, (_, index) => {
-    const radius = index % 2 === 0 ? 1 : innerRatio
-    const angle = -Math.PI / 2 + (Math.PI * index) / count
-    return {
-      x: geometry.x + geometry.width / 2 + Math.cos(angle) * (geometry.width / 2) * radius,
-      y: geometry.y + geometry.height / 2 + Math.sin(angle) * (geometry.height / 2) * radius,
-    }
+  const path = shapeGeometry(isShapeKind(shape) ? shape : 'rectangle', geometry.width, geometry.height, {
+    starPoints: typeof payload.starPoints === 'number' ? payload.starPoints : 5,
+    starInnerRatio: typeof payload.starInnerRatio === 'number' ? payload.starInnerRatio : 0.45,
   })
+  return (flattenShapePath(path.outline)[0] ?? []).slice(0, -1).map((point) => ({
+    x: geometry.x + point.x, y: geometry.y + point.y,
+  }))
 }
 
 export function shapeNodes(layer: ShapeLayer): readonly RenderNode[] {
   const payload = layer.payload
   const localBounds = bounds(layer)
-  const shape = payload.shape
+  const shape = isShapeKind(payload.shape) ? payload.shape : 'rectangle'
   const strokeStyle = stroke(payload.stroke)
   // localBounds includes the stroke. Shapes themselves use the inner geometry
   // so draft, committed scene and export keep the same drag extents.
@@ -63,6 +59,23 @@ export function shapeNodes(layer: ShapeLayer): readonly RenderNode[] {
     x: geometry.x + layer.transform.translateX,
     y: geometry.y + layer.transform.translateY,
   })
+  if (!['rectangle', 'circle', 'oval', 'diamond', 'star'].includes(shape)) {
+    const path = shapeGeometry(shape, geometry.width, geometry.height, {
+      cornerRadius: typeof payload.cornerRadius === 'number' ? payload.cornerRadius : 0,
+      starPoints: typeof payload.starPoints === 'number' ? payload.starPoints : 5,
+      starInnerRatio: typeof payload.starInnerRatio === 'number' ? payload.starInnerRatio : 0.45,
+    })
+    const x = layer.transform.translateX + geometry.x
+    const y = layer.transform.translateY + geometry.y
+    return [{
+      kind: 'vector', id: layer.id, x, y, width: geometry.width, height: geometry.height,
+      outline: mapShapePath(path.outline, 1, 1, x, y), details: mapShapePath(path.details, 1, 1, x, y),
+      open: path.open, rotation: layer.transform.rotation, opacity: layer.opacity, visible: layer.visible,
+      blendMode: layer.blendMode ?? 'normal', fill: fillColor, stroke: strokeStyle.color,
+      strokeWidth: strokeStyle.width, lineJoin: strokeStyle.join, lineCap: strokeStyle.cap,
+      ...(strokeStyle.dash ? { dash: strokeStyle.dash } : {}),
+    }]
+  }
   if (shape === 'circle' || shape === 'oval') {
     return [
       {

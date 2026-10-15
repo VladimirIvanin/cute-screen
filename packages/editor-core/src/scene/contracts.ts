@@ -57,6 +57,24 @@ interface RenderNodeBase {
   readonly blendMode?: RenderBlendMode
 }
 
+/** One composited figure: fill its outline, then stroke outline and internal details. */
+export interface RenderVectorNode extends RenderNodeBase {
+  readonly kind: 'vector'
+  readonly lineCap?: RenderLineCap
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+  readonly outline: readonly import('../shapes').ShapePathCommand[]
+  readonly details: readonly import('../shapes').ShapePathCommand[]
+  readonly open: boolean
+  readonly fill: RenderPaint
+  readonly stroke: RgbaColor
+  readonly strokeWidth: number
+  readonly lineJoin?: RenderLineJoin
+  readonly dash?: readonly number[]
+}
+
 export interface RenderRectNode extends RenderNodeBase {
   readonly kind: 'rect'
   readonly x: number
@@ -277,6 +295,7 @@ export interface RenderOutputBounds {
 }
 
 export type RenderNode =
+  | RenderVectorNode
   | RenderRectNode
   | RenderEllipseNode
   | RenderLineNode

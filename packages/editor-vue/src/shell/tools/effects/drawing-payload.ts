@@ -1,4 +1,8 @@
-import type { JsonObject } from '@cute-screen/editor-renderer'
+import {
+  isShapeKind,
+  isHighlighterMode,
+  type JsonObject,
+} from '@cute-screen/editor-renderer'
 import { parseHexColor } from './color'
 
 export type DrawingTool = 'arrow' | 'shape' | 'pencil' | 'marker'
@@ -18,6 +22,7 @@ export type DrawingControlId =
   | 'layerOpacity'
   | 'blendMode'
   | 'fillKind'
+  | 'fillColor'
   | 'fillOpacity'
 
 const DRAWING_CONTROL_IDS = new Set<DrawingControlId>([
@@ -36,6 +41,7 @@ const DRAWING_CONTROL_IDS = new Set<DrawingControlId>([
   'layerOpacity',
   'blendMode',
   'fillKind',
+  'fillColor',
   'fillOpacity',
 ])
 
@@ -62,8 +68,10 @@ function shapeKindPayload(
   tool: DrawingTool,
   current: JsonObject,
 ): JsonObject | undefined {
-  const shapes = ['rectangle', 'circle', 'oval', 'diamond', 'star']
-  return tool === 'shape' && shapes.includes(value) ? { ...current, shape: value } : undefined
+  if (tool !== 'shape') return undefined
+  if (value === 'roundedRectangle') return { ...current, shape: 'rectangle', cornerRadius: 12 }
+  if (!isShapeKind(value)) return undefined
+  return { ...current, shape: value, ...(value === 'rectangle' ? { cornerRadius: 0 } : {}) }
 }
 
 function arrowPathPayload(
@@ -143,7 +151,11 @@ function specializedPayload(
     return tool === 'pencil' && ['pen', 'pencil', 'brush'].includes(value) ? { ...current, brush: value } : undefined
   }
   if (id !== 'markerMode') return undefined
-  return tool === 'marker' && (value === 'highlight' || value === 'darken') ? { ...current, mode: value } : undefined
+  if (tool !== 'marker' || !isHighlighterMode(value)) return undefined
+  const { mode: _mode, blendMode: _blend, ...next } = current
+  void _mode
+  void _blend
+  return { ...next, highlighterMode: value }
 }
 
 function fillKindPayload(
@@ -257,6 +269,18 @@ function colorPayload(
     : { ...current, color }
 }
 
+function fillColorPayload(
+  value: string,
+  tool: DrawingTool,
+  current: JsonObject,
+): JsonObject | undefined {
+  const color = parseHexColor(value)
+  if (tool !== 'shape' || !color) return undefined
+  const fill = current.fill as Record<string, unknown> | undefined
+  if (fill?.kind !== 'none' && fill?.kind !== 'solid') return undefined
+  return { ...current, fill: { kind: 'solid', color, opacity: typeof fill?.opacity === 'number' ? fill.opacity : 1 } }
+}
+
 export function resolveDrawingPayload(
   id: DrawingControlId,
   value: string,
@@ -279,6 +303,7 @@ export function resolveDrawingPayload(
     return specializedPayload(id, value, tool, current)
   }
   if (id === 'fillKind') return fillKindPayload(value, tool, current)
+  if (id === 'fillColor') return fillColorPayload(value, tool, current)
   if (id === 'fillOpacity') return fillOpacityPayload(value, tool, current)
   if (
     id === 'width' ||

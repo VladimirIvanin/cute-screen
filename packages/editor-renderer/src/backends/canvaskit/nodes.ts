@@ -1,3 +1,4 @@
+import { drawVectorNodeCanvasKit } from './vector-node'
 import type { RenderNode } from '@cute-screen/editor-core'
 import type {
   CanvasKitApi,
@@ -25,6 +26,9 @@ export function drawNodesCanvasKit(
   for (const node of nodes) {
     if (!node.visible || node.opacity === 0) continue
     switch (node.kind) {
+      case 'vector':
+        drawVectorNodeCanvasKit(canvasKit, canvas, node, resources)
+        break
       case 'rect':
         drawRectNodeCanvasKit(canvasKit, canvas, node, resources)
         break

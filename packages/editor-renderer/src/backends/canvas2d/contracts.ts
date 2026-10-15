@@ -20,6 +20,8 @@ export type Context2D = Pick<
   | 'rect'
   | 'clip'
   | 'quadraticCurveTo'
+  | 'bezierCurveTo'
+  | 'getTransform'
   | 'fill'
   | 'stroke'
   | 'save'

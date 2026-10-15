@@ -1,4 +1,25 @@
 export {
+  SHAPE_CATALOG,
+  SHAPE_KINDS,
+  isShapeKind,
+  shapeGeometry,
+  mapShapePath,
+  shapePathSvg,
+  flattenShapePath,
+  type ShapePathCommand,
+  type ShapeGeometry,
+  type ShapePreset,
+} from './shapes'
+export {
+  classifyHighlighterBackground,
+  resolveHighlighterBlend,
+  normalizeHighlighterDefaults,
+  highlighterModeForLayer,
+  isHighlighterMode,
+  type HighlighterEffect,
+  type HighlighterMode,
+} from './highlighter'
+export {
   DEFAULT_PRESENTATION_SETTINGS,
   DEFAULT_RULER_COLOR,
   DEFAULT_RULER_FONT_SIZE,
@@ -273,6 +294,7 @@ export {
   type RenderLineNode,
   type RenderPathNode,
   type RenderPolygonNode,
+  type RenderVectorNode,
   type RenderImageNode,
   type RenderCensorEffect,
   type RenderCensorNode,

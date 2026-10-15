@@ -9,6 +9,7 @@ import {
   chooseArrowConfigureOption,
   openArrowConfigurePopover,
 } from '../arrow-toolbar'
+import { drawShape } from '../shape-toolbar'
 
 declare global {
   interface Window {
@@ -61,6 +62,15 @@ describe('M03 persisted document write', () => {
     )
     await expect(arrowTool).toHaveAttribute('aria-pressed', 'false')
     expect(await $$('.cs-layer-row.is-selected').length).toBe(1)
+    await $('button[aria-label="Shape"]').click({ button: 'right' })
+    await $('.cs-tool-configure-popover-host [data-shape-control="geometry"]').click()
+    await $('[data-shape-id="cylinder"]').click()
+    await browser.keys('Escape')
+    await drawShape()
+    await browser.waitUntil(() => browser.execute(() => {
+      const layers = window.__cuteScreenE2eDocument?.snapshot()?.layers
+      return layers?.length === 2 && layers[1]?.payload.shape === 'cylinder'
+    }), { timeoutMsg: 'New cylinder was not created before the close flush' })
     await browser.execute(() => window.__cuteScreenE2eDocument?.setCrop())
     await browser.execute(() => window.__cuteScreenE2eWindow?.close())
     await browser.waitUntil(

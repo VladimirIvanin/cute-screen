@@ -84,7 +84,13 @@ export class Canvas2DRenderer implements Renderer {
       context.setTransform(1, 0, 0, 1, 0, 0)
       context.clearRect(0, 0, stack.overlay.width, stack.overlay.height)
       context.setTransform(1, 0, 0, 1, -bounds.x, -bounds.y)
-      drawNodes2D(context, this.#overlay, this.#resourceSources(), this.#resolveFontFamily)
+      drawNodes2D(
+        context,
+        this.#overlay,
+        this.#resourceSources(),
+        this.#resolveFontFamily,
+        (width, height) => this.#newCanvas(width, height),
+      )
     }
     return {
       backend: this.backend,

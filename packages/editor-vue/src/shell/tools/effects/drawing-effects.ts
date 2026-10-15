@@ -5,6 +5,8 @@ import type {
 import {
   rebaseArrowLayer,
   rememberDrawingColor,
+  resolveHighlighterBlend,
+  isHighlighterMode,
   type BlendMode,
   type DrawingDefaults,
   type DrawingToolPreferencesV2,
@@ -13,6 +15,7 @@ import {
   type SrgbColor,
 } from '@cute-screen/editor-renderer'
 import type { ResolvedEditorShellProps } from '../../contracts'
+import type { HighlighterAnalysis } from '../../workspace/highlighter-background'
 import type { DrawingLayerNode } from '../drawing-schema'
 import type { ToolSettingsEffect } from './contracts'
 import {
@@ -39,6 +42,7 @@ interface DrawingDefaultsEffect {
 type DrawingEffect = Exclude<ToolSettingsEffect<DrawingDefaults>, { readonly kind: 'defaults' }> | DrawingDefaultsEffect
 
 export interface DrawingEffectsContext {
+  readonly highlighterAnalysis?: Ref<HighlighterAnalysis>
   readonly props: ResolvedEditorShellProps
   readonly activeToolId: Ref<string | undefined>
   readonly configureDefaultsTool: Ref<string | undefined>
@@ -81,6 +85,7 @@ function selectedAfter(
   id: DrawingControlId,
   value: string,
   payload: JsonObject,
+  automatic: import('@cute-screen/editor-renderer').HighlighterEffect = 'highlight',
 ): LayerNode {
   let after = {
     ...selected,
@@ -89,7 +94,7 @@ function selectedAfter(
     ...(id === 'layerOpacity' || id === 'blendMode' ? {} : { payload }),
     ...(id === 'markerMode'
       ? {
-          blendMode: value === 'darken' ? ('darken' as const) : ('multiply' as const),
+          blendMode: resolveHighlighterBlend(isHighlighterMode(value) ? value : 'highlight', automatic),
         }
       : {}),
   } as LayerNode
@@ -122,14 +127,14 @@ function resolveDrawingEffect(
       command: {
         type: 'updateLayer',
         before: target.selected,
-        after: selectedAfter(target.selected, id, value, payload),
+        after: selectedAfter(target.selected, id, value, payload, context.highlighterAnalysis?.value.effect),
       },
     }
   }
   return {
     kind: 'defaults',
     value: { ...context.drawingDefaults.value, [target.tool]: payload },
-    rememberColor: id === 'color',
+    rememberColor: id === 'color' || id === 'fillColor',
     tool: target.tool,
     payload,
   }
@@ -164,7 +169,9 @@ export function createDrawingEffects(context: DrawingEffectsContext) {
       defaults: effect.value,
     }
     if (effect.rememberColor) {
-      const color = colorFrom(effect.tool, effect.payload)
+      const color = id === 'fillColor'
+        ? (effect.payload.fill as Record<string, unknown>).color as SrgbColor
+        : colorFrom(effect.tool, effect.payload)
       if (color) preferences = rememberDrawingColor(preferences, color)
     }
     context.drawingPreferences.value = preferences

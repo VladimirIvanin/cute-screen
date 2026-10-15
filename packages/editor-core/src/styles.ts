@@ -36,7 +36,7 @@ const channels: Partial<Record<LayerNode['kind'], Readonly<Record<string, string
     brush: 'brush',
     smoothing: 'smoothing',
   },
-  marker: { color: 'color', width: 'width', smoothing: 'smoothing' },
+  marker: { color: 'color', width: 'width', smoothing: 'smoothing', highlighterMode: 'highlighterMode' },
   text: { background: 'background' },
   callout: {
     color: 'stroke.color',

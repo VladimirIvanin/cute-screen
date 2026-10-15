@@ -31,9 +31,14 @@ import { QuickCaptureLayoutController } from './quick-capture-layout-controller'
 import { QuickCaptureCommitController } from './quick-capture-commit-controller'
 import { QuickCaptureActionController } from './quick-capture-action-controller'
 import { listenQuickCaptureAvailable } from './platform/tauri/quick-capture-events'
+import { installQuickCaptureTestFacade } from './quick-capture-test-facade'
 
 const draft = shallowRef<QuickCaptureDraftV1>()
 const session = shallowRef<DocumentSessionController>()
+if (import.meta.env.VITE_TEST_HARNESS === 'true') {
+  const disposeFacade = installQuickCaptureTestFacade(() => session.value?.snapshot.core.document)
+  onBeforeUnmount(disposeFacade)
+}
 const sourceImage = shallowRef<HTMLImageElement>()
 const hosts = shallowRef<CanvasViewportHosts>()
 const documentState = ref<ShellDocumentState>({ kind: 'loading' })
@@ -73,6 +78,7 @@ const commitController = new QuickCaptureCommitController({
   draft,
   session,
   hosts,
+  sourceImage,
   currentCrop,
   materialized,
   selectionPending,

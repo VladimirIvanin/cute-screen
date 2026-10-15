@@ -180,7 +180,7 @@ export class CropController {
 
   #overlayScale(): number {
     const { overlay, scene, props } = this.#context
-    const canvas = overlay.value ?? scene.value
+    const canvas = scene.value ?? overlay.value
     const fallback = (props.zoom ?? 100) / 100
     if (!canvas) return fallback
     const rect = canvas.getBoundingClientRect()

@@ -220,3 +220,7 @@ tray/template PNG и все bundle icons (PNG/ICO/ICNS) из единой гео
 хранятся в Git и не генерируются при каждом запуске приложения. После изменения
 проверить декодированные PNG и системный tray; app tile нельзя подставлять
 вместо tray asset.
+
+## Изолированная native E2E сборка
+
+`pnpm test:e2e:tauri` учитывает `CARGO_TARGET_DIR` при сборке и поиске executable; относительный путь нормализуется от корня workspace и передаётся Cargo как абсолютный. Это позволяет проверять UI без перезаписи занятого resident developer executable. Runner по-прежнему копирует успешно собранный test binary в собственный runtime directory перед запуском сценариев. Пример фактического прогона с отдельным target — TESTING.md, ADR-051.

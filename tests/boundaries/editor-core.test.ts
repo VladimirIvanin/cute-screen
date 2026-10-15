@@ -65,6 +65,9 @@ describe('M05 icon-system boundary', () => {
     })
     const parameterPreviews = new Set([
       'packages/editor-vue/src/shell/components/ArrowFormattingToolbar.vue',
+      'packages/editor-vue/src/shell/components/ShapeFormattingToolbar.vue',
+      'packages/editor-vue/src/shell/components/HighlighterFormattingToolbar.vue',
+      'packages/editor-vue/src/shell/components/ArrowStylePreview.vue',
       'packages/editor-vue/src/shell/components/TextFormattingToolbar.vue',
     ])
     const violations: string[] = []

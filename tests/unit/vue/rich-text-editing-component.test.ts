@@ -67,6 +67,8 @@ function editorDocument(layer?: LayerNode): EditorDocument {
 beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
     clearRect: vi.fn(),
+    setTransform: vi.fn(),
+    drawImage: vi.fn(),
   } as unknown as CanvasRenderingContext2D)
 })
 

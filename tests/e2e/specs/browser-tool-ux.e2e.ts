@@ -5,6 +5,7 @@ import {
 } from '@wdio/globals'
 import path from 'node:path'
 import { Key } from 'webdriverio'
+import { verifyArrowSelectionMenu } from '../arrow-selection-menu'
 import {
   openDrawingHarness,
   snapshot,
@@ -24,6 +25,11 @@ async function draw(
     .perform()
 }
 describe('consistent tool UX with native browser input', () => {
+  it('aligns the arrow icon menu and draws selection chrome at display resolution', async () => {
+    await browser.setWindowSize(1280, 800)
+    await openDrawingHarness()
+    await verifyArrowSelectionMenu('artifacts/browser-e2e')
+  })
   it('pastes a copied style into a multi-selection as one undoable edit', async () => {
     await openDrawingHarness()
     await $('button[aria-label="Arrow"]').click()

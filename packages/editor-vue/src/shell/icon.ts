@@ -1,8 +1,9 @@
 import {
+  IconBlendMode,
   IconArrowBackUp,
   IconArrowForwardUp,
   IconArrowUpRight,
-  IconBrush,
+  IconHighlight,
   IconCamera,
   IconCheck,
   IconChevronDown,
@@ -44,6 +45,7 @@ import type { IconName } from './types'
 
 /** The only product-chrome mapping from stable semantics to explicit Tabler imports. */
 const icons = {
+  blendMode: IconBlendMode,
   arrow: IconArrowUpRight,
   camera: IconCamera,
   callout: IconStrokeDynamic,
@@ -60,7 +62,7 @@ const icons = {
   layers: IconLayersIntersect,
   lock: IconLock,
   loupe: IconZoom,
-  marker: IconBrush,
+  marker: IconHighlight,
   more: IconDots,
   numberedMarker: IconCircleNumber1,
   pencil: IconPencil,
