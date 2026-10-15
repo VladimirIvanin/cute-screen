@@ -42,10 +42,25 @@ async function runDesktopAction(
   const flush = await ports.documentSession.value?.flush()
   if (flush?.kind === 'failed') throw new Error(flush.error)
   if (action === 'openImage') return openImage(ports, signal)
+  if (action === 'pin') return pinRenderedResult(ports, signal)
   if (action !== 'capture' && action !== 'captureWindow') {
     throw new Error(`${action} is not available yet`)
   }
   return capture(ports, action, signal, reportProgress)
+}
+
+async function pinRenderedResult(
+  ports: DesktopShellActionPorts,
+  signal: AbortSignal,
+): Promise<string> {
+  const exportPng = ports.canvasHosts.value?.exportCommittedPng
+  if (!exportPng) throw new Error('The committed result is not ready')
+  const bytes = await exportPng()
+  if (signal.aborted) throw new ActionCancelledError('Pin cancelled')
+  const { tauriDesktopBridge } = await import('./desktop-bridge')
+  await tauriDesktopBridge.createPin(bytes)
+  if (signal.aborted) throw new ActionCancelledError('Pin cancelled')
+  return 'Result pinned'
 }
 
 async function copyRenderedResult(

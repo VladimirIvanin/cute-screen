@@ -27,10 +27,13 @@ const isM01Harness =
 
 const isQuickCapture =
   new URLSearchParams(window.location.search).get('quickCapture') === '1'
+const isPin = new URLSearchParams(window.location.search).get('pin') === '1'
 const Root = isM01Harness
   ? (await import('./M01Harness.vue')).default
-  : isQuickCapture
-    ? (await import('./QuickCaptureApp.vue')).default
-    : (await import('./App.vue')).default
+  : isPin
+    ? (await import('./PinApp.vue')).default
+    : isQuickCapture
+      ? (await import('./QuickCaptureApp.vue')).default
+      : (await import('./App.vue')).default
 
 createApp(Root).use(createEditorShellPinia()).mount('#app')

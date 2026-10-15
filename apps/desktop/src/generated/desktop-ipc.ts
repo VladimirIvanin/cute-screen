@@ -34,6 +34,93 @@ export type OpenDocument = {
   imageToken?: string
 }
 
+export type PageQueryV1 = {
+  search: string | null
+  fromInclusive: number | null
+  toExclusive: number | null
+  cursor: string | null
+  limit: number | null
+}
+
+export type SeriesRowV1 = {
+  seriesId: string
+  title: string | null
+  captureCount: number
+  latestCaptureTime: number
+  logicalBytes: number
+}
+
+export type SeriesPageV1 = {
+  items: Array<SeriesRowV1>
+  nextCursor: string | null
+}
+
+export type CaptureRowV1 = {
+  captureId: string
+  seriesId: string
+  title: string | null
+  capturedAt: number
+  format: string
+  width: number
+  height: number
+  originalByteSize: number
+  thumbnailStatus: string
+}
+
+export type CapturePageV1 = {
+  items: Array<CaptureRowV1>
+  nextCursor: string | null
+}
+
+export type StorageReportV1 = {
+  originalsBytes: number
+  editableDocumentsBytes: number
+  thumbnailCacheBytes: number
+  reclaimableBytes: number
+  totalBytes: number
+}
+
+export type CleanupSelectionV1 = {
+  seriesIds: Array<string>
+  captureIds: Array<string>
+  clearCache: boolean
+}
+
+export type CleanupPlanV1 = {
+  token: string
+  seriesIds: Array<string>
+  captureIds: Array<string>
+  cacheEntries: Array<string>
+  protectedSeriesIds: Array<string>
+  protectedCaptureIds: Array<string>
+  reclaimableBytes: number
+  expiresAt: number
+}
+
+export type CleanupResultV1 = {
+  deletedSeriesIds: Array<string>
+  deletedCaptureIds: Array<string>
+  deletedCacheEntries: Array<string>
+  actualReclaimedBytes: number
+  report: StorageReportV1
+}
+
+export type PinBoundsV1 = {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+export type PinWindowStateV1 = {
+  snapshotToken: string
+  bounds: PinBoundsV1
+  opacity: number
+  alwaysOnTop: boolean
+  clickThrough: boolean
+  restorePolicy: string
+}
+
 export type CaptureOutcomeV2 = {
   version: 2
   correlationId: string

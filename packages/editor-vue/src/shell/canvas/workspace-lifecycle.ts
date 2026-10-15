@@ -52,6 +52,7 @@ export function registerRenderLifecycle(context: RenderLifecycleContext): void {
         scene: scene.value,
         overlay: overlay.value,
         scrollContainer: scrollContainer.value,
+        exportCommittedPng: () => context.renderer.exportCommittedPng(),
       })
     }
     void context.drawDocument()

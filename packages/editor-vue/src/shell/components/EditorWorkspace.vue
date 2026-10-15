@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { NButton, NConfigProvider } from 'naive-ui'
+import { nextTick, ref } from 'vue'
 import { nextNumberedMarkerSequence } from '@cute-screen/editor-renderer'
 import { UiIcon } from '../icon'
 import ActionFeedback from './ActionFeedback.vue'
@@ -7,6 +8,7 @@ import ArrowFormattingToolbar from './ArrowFormattingToolbar.vue'
 import CanvasViewport from './CanvasViewport.vue'
 import ContextToolbar from './ContextToolbar.vue'
 import LayersPanel from './LayersPanel.vue'
+import LibraryPanel from './LibraryPanel.vue'
 import SeriesFilmstrip from './SeriesFilmstrip.vue'
 import ToolRail from './ToolRail.vue'
 import TopBar from './TopBar.vue'
@@ -77,6 +79,33 @@ const {
   exportDocumentRecovery,
   fitCanvas,
 } = useEditorWorkspace(props)
+const libraryOpen = ref(false)
+function toggleLibrary(): void {
+  libraryOpen.value = !libraryOpen.value
+  if (libraryOpen.value && store.layersOpen) store.toggleLayers()
+}
+function closeLibrary(): void {
+  libraryOpen.value = false
+  void nextTick(() =>
+    document.querySelector<HTMLElement>('[data-library-trigger]')?.focus(),
+  )
+}
+function toggleLayers(): void {
+  if (libraryOpen.value) libraryOpen.value = false
+  store.toggleLayers()
+}
+async function selectFrame(frameId: string): Promise<void> {
+  if (!props.library) {
+    store.selectFrame(frameId)
+    return
+  }
+  try {
+    await props.library.openCapture(frameId)
+    store.selectFrame(frameId)
+  } catch (error) {
+    console.warn('cute-screen frame switch failed', error)
+  }
+}
 </script>
 
 <template>
@@ -104,6 +133,7 @@ const {
           props.captureUnavailableReason ?? translate('captureUnavailable')
         "
         :open-image-available="props.openImageAvailable"
+        :library-available="Boolean(props.library)"
         :t="translate"
         @action="store.runAction"
         @undo="undoDocument"
@@ -112,6 +142,7 @@ const {
         @export-recovery="exportDocumentRecovery"
         @locale="store.setLocale"
         @theme="store.setTheme"
+        @toggle-library="toggleLibrary"
       />
       <div
         v-if="props.captureFallbackCommand && fallbackVisible"
@@ -187,7 +218,7 @@ const {
             :frames="store.frames"
             :active-frame-id="store.activeFrameId"
             :t="translate"
-            @select="store.selectFrame"
+            @select="selectFrame"
           />
           <div class="cs-bottom-chrome-center">
             <ContextToolbar
@@ -281,12 +312,18 @@ const {
           :selected-layer-ids="store.selectedLayerIds"
           :t="translate"
           @select="selectLayer"
-          @toggle="store.toggleLayers"
+          @toggle="toggleLayers"
           @visibility="updateLayerProperty($event, 'visible')"
           @lock="updateLayerProperty($event, 'locked')"
           @opacity="onLayerOpacity"
           @rotation="onLayerRotation"
           @reorder-to="onLayerReorderTo"
+        />
+        <LibraryPanel
+          v-if="!props.quickMode && libraryOpen && props.library"
+          :adapter="props.library"
+          :locale="store.locale"
+          @close="closeLibrary"
         />
         <ContextToolbar
           v-if="props.quickMode && !props.quickSelectionMode"

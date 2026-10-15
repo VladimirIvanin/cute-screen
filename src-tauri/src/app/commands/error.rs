@@ -34,6 +34,11 @@ impl From<RepositoryError> for CommandErrorV1 {
             RepositoryError::WorkerBusy
                 | RepositoryError::WorkerStopped
                 | RepositoryError::RevisionConflict
+                | RepositoryError::InvalidTitle
+                | RepositoryError::InvalidCursor
+                | RepositoryError::CaptureNotFound
+                | RepositoryError::CleanupTokenInvalid
+                | RepositoryError::CleanupPlanStale
                 | RepositoryError::PermissionDenied
                 | RepositoryError::NoSpace
                 | RepositoryError::Io(_)
@@ -50,6 +55,11 @@ impl From<RepositoryError> for CommandErrorV1 {
             RepositoryError::InjectedFault { .. } => "injectedFault",
             RepositoryError::MissingBlob { .. } => "missingBlob",
             RepositoryError::RevisionConflict => "revisionConflict",
+            RepositoryError::InvalidTitle => "invalidTitle",
+            RepositoryError::InvalidCursor => "invalidCursor",
+            RepositoryError::CaptureNotFound => "captureNotFound",
+            RepositoryError::CleanupTokenInvalid => "cleanupTokenInvalid",
+            RepositoryError::CleanupPlanStale => "cleanupPlanStale",
             RepositoryError::PermissionDenied => "permissionDenied",
             RepositoryError::NoSpace => "noSpace",
             RepositoryError::InvalidRecoveryBundle(_) => "invalidRecoveryBundle",

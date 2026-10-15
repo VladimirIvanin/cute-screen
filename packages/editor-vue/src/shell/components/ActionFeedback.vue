@@ -13,6 +13,7 @@ defineProps<{
       | 'openImageAction'
       | 'copyAction'
       | 'exportAction'
+      | 'pinAction'
       | 'captureProbing'
       | 'captureReady'
       | 'captureDelay'
@@ -30,12 +31,14 @@ const actionKey: Record<
   | 'openImageAction'
   | 'copyAction'
   | 'exportAction'
+  | 'pinAction'
 > = {
   capture: 'captureAction',
   captureWindow: 'captureWindowAction',
   openImage: 'openImageAction',
   copy: 'copyAction',
   export: 'exportAction',
+  pin: 'pinAction',
 }
 const progressKey: Record<
   CaptureProgressState,

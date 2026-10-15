@@ -1,0 +1,168 @@
+.cs-library-panel {
+  position: absolute;
+  z-index: 30;
+  top: 64px;
+  bottom: var(--bottom-chrome-reserve);
+  left: 14px;
+  display: flex;
+  width: min(560px, 78vw);
+  min-width: 320px;
+  flex-direction: column;
+  gap: 10px;
+  box-sizing: border-box;
+  padding: 14px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--chrome-96);
+  box-shadow: var(--shadow-overlay);
+  -webkit-backdrop-filter: blur(16px) saturate(1.12);
+  backdrop-filter: blur(16px) saturate(1.12);
+}
+.cs-library-panel > header,
+.cs-library-panel > header > div,
+.cs-library-series button,
+.cs-library-captures button,
+.cs-library-actions,
+.cs-library-confirm > div {
+  display: flex;
+  align-items: center;
+}
+.cs-library-panel > header {
+  justify-content: space-between;
+}
+.cs-library-panel > header > div,
+.cs-library-series button > span:first-child,
+.cs-library-captures button > span:last-child {
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.cs-library-panel small {
+  color: var(--text-muted);
+}
+.cs-library-state {
+  display: flex;
+  min-height: 120px;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--text-muted);
+}
+.cs-library-state.is-error {
+  flex-direction: column;
+  color: var(--danger);
+}
+.cs-library-series {
+  display: flex;
+  max-height: 174px;
+  flex: none;
+  flex-direction: column;
+  gap: 3px;
+  overflow-y: auto;
+}
+.cs-library-series button,
+.cs-library-captures button {
+  width: 100%;
+  justify-content: space-between;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.cs-library-series button:hover,
+.cs-library-captures button:hover {
+  background: var(--surface-hover);
+}
+.cs-library-series button.is-active,
+.cs-library-captures button.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.cs-library-rename {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 6px;
+}
+.cs-library-captures {
+  position: relative;
+  min-height: 132px;
+  flex: 1;
+  overflow-y: auto;
+  outline: none;
+}
+.cs-library-captures > div {
+  position: relative;
+}
+.cs-library-captures button {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 64px;
+  justify-content: flex-start;
+  gap: 10px;
+}
+.cs-library-thumb {
+  display: grid;
+  width: 48px;
+  height: 42px;
+  flex: none;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--canvas);
+  color: var(--text-muted);
+  font-size: 20px;
+}
+.cs-library-actions {
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.cs-library-storage {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.cs-library-storage > strong {
+  grid-column: 1 / -1;
+  color: var(--text);
+}
+.cs-library-storage > span {
+  display: contents;
+}
+.cs-library-storage .n-button {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+.cs-library-confirm {
+  position: absolute;
+  inset: auto 14px 14px;
+  z-index: 2;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-overlay);
+}
+.cs-library-confirm p {
+  margin: 7px 0;
+  color: var(--text-muted);
+}
+.cs-library-confirm > div {
+  justify-content: flex-end;
+  gap: 8px;
+}
+@media (max-width: 700px) {
+  .cs-library-panel {
+    width: calc(100vw - 28px);
+    min-width: 0;
+  }
+}

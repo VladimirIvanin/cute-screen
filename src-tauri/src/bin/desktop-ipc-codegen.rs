@@ -11,7 +11,11 @@ use cute_screen_desktop::{
         CaptureAction, CaptureCompletion, CaptureInvocationSource, CaptureOutcomeV2,
         CaptureRequestV1, CaptureTerminalOutcome, QuickCaptureDraftV1, QuickCaptureSelectionV1,
     },
-    storage::OpenDocument,
+    storage::{
+        CapturePageV1, CaptureRowV1, CleanupPlanV1, CleanupResultV1, CleanupSelectionV1,
+        OpenDocument, PageQueryV1, PinBoundsV1, PinWindowStateV1, SeriesPageV1, SeriesRowV1,
+        StorageReportV1,
+    },
 };
 use ts_rs::{Config, TS};
 
@@ -29,6 +33,17 @@ fn generated_bindings() -> String {
     output.push_str(&declaration::<CaptureCompletion>());
     output.push_str(&declaration::<CaptureTerminalOutcome>());
     output.push_str(&declaration::<OpenDocument>());
+    output.push_str(&declaration::<PageQueryV1>());
+    output.push_str(&declaration::<SeriesRowV1>());
+    output.push_str(&declaration::<SeriesPageV1>());
+    output.push_str(&declaration::<CaptureRowV1>());
+    output.push_str(&declaration::<CapturePageV1>());
+    output.push_str(&declaration::<StorageReportV1>());
+    output.push_str(&declaration::<CleanupSelectionV1>());
+    output.push_str(&declaration::<CleanupPlanV1>());
+    output.push_str(&declaration::<CleanupResultV1>());
+    output.push_str(&declaration::<PinBoundsV1>());
+    output.push_str(&declaration::<PinWindowStateV1>());
     output.push_str(&declaration::<CaptureOutcomeV2>());
     output.push_str(&declaration::<QuickCaptureSelectionV1>());
     output.push_str(&declaration::<QuickCaptureDraftV1>());

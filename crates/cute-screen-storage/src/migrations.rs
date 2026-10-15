@@ -44,13 +44,24 @@ const MIGRATION_LIST: &[M<'static>] = &[
     M::up(LEGACY_MIGRATIONS[0].sql),
     M::up(LEGACY_MIGRATIONS[1].sql),
     M::up("DROP TABLE IF EXISTS schema_migrations;"),
+    M::up(
+        "ALTER TABLE captures ADD COLUMN title TEXT;
+         ALTER TABLE captures ADD COLUMN title_search TEXT NOT NULL DEFAULT '';
+         ALTER TABLE series ADD COLUMN title_search TEXT NOT NULL DEFAULT '';
+         UPDATE series SET title_search = lower(COALESCE(title, ''));
+         UPDATE captures SET title_search = lower(COALESCE(title, ''));
+         CREATE INDEX IF NOT EXISTS series_live_updated ON series(updated_at DESC, id) WHERE deleted_at IS NULL;
+         CREATE INDEX IF NOT EXISTS series_live_title_search ON series(title_search, id) WHERE deleted_at IS NULL;
+         CREATE INDEX IF NOT EXISTS captures_live_series_recent ON captures(series_id, captured_at DESC, id) WHERE deleted_at IS NULL;
+         CREATE INDEX IF NOT EXISTS captures_live_title_search ON captures(title_search, id) WHERE deleted_at IS NULL;",
+    ),
 ];
 const MIGRATIONS: Migrations<'static> = Migrations::from_slice(MIGRATION_LIST);
 
 pub(crate) fn migrate(connection: &mut Connection) -> Result<(), RepositoryError> {
     let user_version =
         connection.query_row("PRAGMA user_version", [], |row| row.get::<_, i64>(0))?;
-    let supported = 3;
+    let supported = 4;
     if user_version > supported {
         return Err(RepositoryError::UnsupportedDatabaseSchema {
             found: user_version,

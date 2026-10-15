@@ -1,7 +1,7 @@
 //! SQLite metadata, immutable blobs and recovery for Cute Screen.
 
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeSet, HashMap},
     fs::{self, File, OpenOptions},
     io::{Read, Write},
     path::{Component, Path, PathBuf},
@@ -57,6 +57,16 @@ pub enum RepositoryError {
     MissingBlob { hash: String },
     #[error("stored document revision changed before save")]
     RevisionConflict,
+    #[error("title must contain 1 to 120 characters and no control characters")]
+    InvalidTitle,
+    #[error("page cursor does not match the current filters")]
+    InvalidCursor,
+    #[error("capture does not exist")]
+    CaptureNotFound,
+    #[error("cleanup confirmation token is invalid, expired, or already used")]
+    CleanupTokenInvalid,
+    #[error("cleanup preview is stale; create a new preview")]
+    CleanupPlanStale,
     #[error("storage permission was denied")]
     PermissionDenied,
     #[error("not enough storage space")]
@@ -203,6 +213,169 @@ pub struct SeriesFrame {
     pub capture_id: String,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct PageQueryV1 {
+    pub search: Option<String>,
+    #[ts(type = "number | null")]
+    pub from_inclusive: Option<i64>,
+    #[ts(type = "number | null")]
+    pub to_exclusive: Option<i64>,
+    pub cursor: Option<String>,
+    pub limit: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct SeriesRowV1 {
+    pub series_id: String,
+    pub title: Option<String>,
+    #[ts(type = "number")]
+    pub capture_count: u64,
+    #[ts(type = "number")]
+    pub latest_capture_time: i64,
+    #[ts(type = "number")]
+    pub logical_bytes: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct SeriesPageV1 {
+    pub items: Vec<SeriesRowV1>,
+    pub next_cursor: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct CaptureRowV1 {
+    pub capture_id: String,
+    pub series_id: String,
+    pub title: Option<String>,
+    #[ts(type = "number")]
+    pub captured_at: i64,
+    pub format: String,
+    pub width: u32,
+    pub height: u32,
+    #[ts(type = "number")]
+    pub original_byte_size: u64,
+    pub thumbnail_status: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct CapturePageV1 {
+    pub items: Vec<CaptureRowV1>,
+    pub next_cursor: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct CleanupSelectionV1 {
+    pub series_ids: Vec<String>,
+    pub capture_ids: Vec<String>,
+    pub clear_cache: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct StorageReportV1 {
+    #[ts(type = "number")]
+    pub originals_bytes: u64,
+    #[ts(type = "number")]
+    pub editable_documents_bytes: u64,
+    #[ts(type = "number")]
+    pub thumbnail_cache_bytes: u64,
+    #[ts(type = "number")]
+    pub reclaimable_bytes: u64,
+    #[ts(type = "number")]
+    pub total_bytes: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct CleanupPlanV1 {
+    pub token: String,
+    pub series_ids: Vec<String>,
+    pub capture_ids: Vec<String>,
+    pub cache_entries: Vec<String>,
+    pub protected_series_ids: Vec<String>,
+    pub protected_capture_ids: Vec<String>,
+    #[ts(type = "number")]
+    pub reclaimable_bytes: u64,
+    #[ts(type = "number")]
+    pub expires_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct CleanupResultV1 {
+    pub deleted_series_ids: Vec<String>,
+    pub deleted_capture_ids: Vec<String>,
+    pub deleted_cache_entries: Vec<String>,
+    #[ts(type = "number")]
+    pub actual_reclaimed_bytes: u64,
+    pub report: StorageReportV1,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct PinBoundsV1 {
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct PinWindowStateV1 {
+    pub snapshot_token: String,
+    pub bounds: PinBoundsV1,
+    pub opacity: u8,
+    pub always_on_top: bool,
+    pub click_through: bool,
+    pub restore_policy: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CleanupJournalPayload {
+    files: Vec<CleanupFile>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CleanupFile {
+    root: String,
+    relative_path: String,
+    byte_size: u64,
+}
+
+struct PendingCleanupPlan {
+    public: CleanupPlanV1,
+    document_ids: Vec<String>,
+    blob_hashes: Vec<String>,
+    files: Vec<CleanupFile>,
+    fingerprint: String,
+}
+
+#[derive(Debug, Clone)]
+struct PageCursor {
+    at: i64,
+    id: String,
+}
+
 /// Native-only description of an original that has been authorised by the
 /// repository. It is deliberately never serialized across the Tauri boundary.
 #[derive(Debug, Clone)]
@@ -259,6 +432,7 @@ struct StorageState {
     resources_root: PathBuf,
     connection: Connection,
     fault_injector: Arc<dyn StorageFaultInjector>,
+    cleanup_plans: HashMap<String, PendingCleanupPlan>,
 }
 
 type Job = Box<dyn FnOnce(&mut StorageState) + Send + 'static>;
@@ -342,6 +516,52 @@ impl LibraryRepository {
 
     pub fn list_active_series_frames(&self) -> Result<Vec<SeriesFrame>, RepositoryError> {
         self.call(StorageState::list_active_series_frames)
+    }
+
+    pub fn list_series(&self, query: PageQueryV1) -> Result<SeriesPageV1, RepositoryError> {
+        self.call(move |state| state.list_series(query))
+    }
+
+    pub fn list_captures(
+        &self,
+        series_id: String,
+        query: PageQueryV1,
+    ) -> Result<CapturePageV1, RepositoryError> {
+        self.call(move |state| state.list_captures(&series_id, query))
+    }
+
+    pub fn prepare_capture(
+        &self,
+        capture_id: String,
+    ) -> Result<Option<OpenDocument>, RepositoryError> {
+        self.call(move |state| state.prepare_capture(&capture_id))
+    }
+
+    pub fn activate_capture(&self, capture_id: String) -> Result<(), RepositoryError> {
+        self.call(move |state| state.activate_capture(&capture_id))
+    }
+
+    pub fn rename_series(&self, series_id: String, title: String) -> Result<(), RepositoryError> {
+        self.call(move |state| state.rename_series(&series_id, &title))
+    }
+
+    pub fn rename_capture(&self, capture_id: String, title: String) -> Result<(), RepositoryError> {
+        self.call(move |state| state.rename_capture(&capture_id, &title))
+    }
+
+    pub fn storage_report(&self) -> Result<StorageReportV1, RepositoryError> {
+        self.call(StorageState::storage_report)
+    }
+
+    pub fn cleanup_plan(
+        &self,
+        selection: CleanupSelectionV1,
+    ) -> Result<CleanupPlanV1, RepositoryError> {
+        self.call(move |state| state.cleanup_plan(selection))
+    }
+
+    pub fn cleanup_execute(&self, token: String) -> Result<CleanupResultV1, RepositoryError> {
+        self.call(move |state| state.cleanup_execute(&token))
     }
 
     pub fn save_document(
@@ -457,6 +677,65 @@ impl StorageHandle {
         self.call(StorageState::list_active_series_frames).await
     }
 
+    pub async fn list_series(&self, query: PageQueryV1) -> Result<SeriesPageV1, RepositoryError> {
+        self.call(move |state| state.list_series(query)).await
+    }
+
+    pub async fn list_captures(
+        &self,
+        series_id: String,
+        query: PageQueryV1,
+    ) -> Result<CapturePageV1, RepositoryError> {
+        self.call(move |state| state.list_captures(&series_id, query))
+            .await
+    }
+
+    pub async fn prepare_capture(
+        &self,
+        capture_id: String,
+    ) -> Result<Option<OpenDocument>, RepositoryError> {
+        self.call(move |state| state.prepare_capture(&capture_id))
+            .await
+    }
+
+    pub async fn activate_capture(&self, capture_id: String) -> Result<(), RepositoryError> {
+        self.call(move |state| state.activate_capture(&capture_id))
+            .await
+    }
+
+    pub async fn rename_series(
+        &self,
+        series_id: String,
+        title: String,
+    ) -> Result<(), RepositoryError> {
+        self.call(move |state| state.rename_series(&series_id, &title))
+            .await
+    }
+
+    pub async fn rename_capture(
+        &self,
+        capture_id: String,
+        title: String,
+    ) -> Result<(), RepositoryError> {
+        self.call(move |state| state.rename_capture(&capture_id, &title))
+            .await
+    }
+
+    pub async fn storage_report(&self) -> Result<StorageReportV1, RepositoryError> {
+        self.call(StorageState::storage_report).await
+    }
+
+    pub async fn cleanup_plan(
+        &self,
+        selection: CleanupSelectionV1,
+    ) -> Result<CleanupPlanV1, RepositoryError> {
+        self.call(move |state| state.cleanup_plan(selection)).await
+    }
+
+    pub async fn cleanup_execute(&self, token: String) -> Result<CleanupResultV1, RepositoryError> {
+        self.call(move |state| state.cleanup_execute(&token)).await
+    }
+
     pub async fn save_document(
         &self,
         document_id: String,
@@ -554,6 +833,7 @@ impl StorageState {
             resources_root,
             connection,
             fault_injector,
+            cleanup_plans: HashMap::new(),
         };
         state.recover()?;
         Ok(state)
@@ -679,15 +959,454 @@ impl StorageState {
     }
 
     fn open_last(&mut self) -> Result<Option<OpenDocument>, RepositoryError> {
+        let active_capture = self
+            .get_setting("session.activeCaptureId")?
+            .map(|value| {
+                serde_json::from_str::<String>(&value)
+                    .map_err(|error| RepositoryError::InvalidDocument(error.to_string()))
+            })
+            .transpose()?;
+        if let Some(active_capture) = active_capture
+            && let Some(document) = self.prepare_capture(&active_capture)?
+        {
+            return Ok(Some(document));
+        }
         let document = self.connection.query_row(
-            "SELECT d.id, d.capture_id, d.revision, d.content_json, c.original_blob_hash FROM documents d JOIN captures c ON c.id = d.capture_id WHERE c.deleted_at IS NULL ORDER BY c.captured_at DESC LIMIT 1",
+            "SELECT d.id, d.capture_id, d.revision, d.content_json, c.original_blob_hash FROM documents d JOIN captures c ON c.id = d.capture_id WHERE c.deleted_at IS NULL ORDER BY c.captured_at DESC, c.id ASC LIMIT 1",
             [],
-            |row| Ok(OpenDocument { document_id: row.get(0)?, capture_id: row.get(1)?, revision: row.get(2)?, document_json: row.get(3)?, source_hash: row.get(4)?, image_token: None }),
+            open_document_row,
         ).optional()?;
         if let Some(open) = &document {
             validate_document(&open.document_json)?;
         }
         Ok(document)
+    }
+
+    fn prepare_capture(
+        &mut self,
+        capture_id: &str,
+    ) -> Result<Option<OpenDocument>, RepositoryError> {
+        let document = self.connection.query_row(
+            "SELECT d.id, d.capture_id, d.revision, d.content_json, c.original_blob_hash FROM documents d JOIN captures c ON c.id = d.capture_id WHERE c.id = ?1 AND c.deleted_at IS NULL",
+            params![capture_id],
+            open_document_row,
+        ).optional()?;
+        if let Some(open) = &document {
+            validate_document(&open.document_json)?;
+        }
+        Ok(document)
+    }
+
+    fn activate_capture(&mut self, capture_id: &str) -> Result<(), RepositoryError> {
+        let series_id = self
+            .connection
+            .query_row(
+                "SELECT series_id FROM captures WHERE id = ?1 AND deleted_at IS NULL",
+                params![capture_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?
+            .ok_or(RepositoryError::CaptureNotFound)?;
+        let timestamp = now_millis()?;
+        let transaction = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        for (key, value) in [
+            ("session.activeSeriesId", series_id),
+            ("session.activeCaptureId", capture_id.to_owned()),
+        ] {
+            transaction.execute(
+                "INSERT INTO settings (key, schema_version, value_json, updated_at) VALUES (?1, 1, ?2, ?3) ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at",
+                params![key, serde_json::to_string(&value).map_err(|error| RepositoryError::InvalidDocument(error.to_string()))?, timestamp],
+            )?;
+        }
+        transaction.commit()?;
+        Ok(())
+    }
+
+    fn list_series(&mut self, query: PageQueryV1) -> Result<SeriesPageV1, RepositoryError> {
+        let normalized = normalize_page_query(query, "series")?;
+        let mut statement = self.connection.prepare(
+            "WITH page_rows AS (
+                SELECT s.id, s.title, COUNT(c.id) AS capture_count, MAX(c.captured_at) AS latest, SUM(b.byte_size) AS logical_bytes
+                FROM series s
+                JOIN captures c ON c.series_id = s.id AND c.deleted_at IS NULL
+                JOIN blobs b ON b.hash = c.original_blob_hash
+                WHERE s.deleted_at IS NULL
+                  AND (?1 = '' OR s.title_search LIKE '%' || ?1 || '%')
+                  AND (?2 IS NULL OR c.captured_at >= ?2)
+                  AND (?3 IS NULL OR c.captured_at < ?3)
+                GROUP BY s.id, s.title
+            )
+            SELECT id, title, capture_count, latest, logical_bytes FROM page_rows
+            WHERE (?4 IS NULL OR latest < ?4 OR (latest = ?4 AND id > ?5))
+            ORDER BY latest DESC, id ASC LIMIT ?6"
+        )?;
+        let rows = statement
+            .query_map(
+                params![
+                    normalized.search,
+                    normalized.from_inclusive,
+                    normalized.to_exclusive,
+                    normalized.cursor.as_ref().map(|cursor| cursor.at),
+                    normalized.cursor.as_ref().map(|cursor| cursor.id.as_str()),
+                    i64::from(normalized.limit + 1)
+                ],
+                |row| {
+                    Ok(SeriesRowV1 {
+                        series_id: row.get(0)?,
+                        title: row.get(1)?,
+                        capture_count: u64::try_from(row.get::<_, i64>(2)?).unwrap_or_default(),
+                        latest_capture_time: row.get(3)?,
+                        logical_bytes: u64::try_from(row.get::<_, i64>(4)?).unwrap_or_default(),
+                    })
+                },
+            )?
+            .collect::<Result<Vec<_>, _>>()?;
+        page_series(rows, normalized)
+    }
+
+    fn list_captures(
+        &mut self,
+        series_id: &str,
+        query: PageQueryV1,
+    ) -> Result<CapturePageV1, RepositoryError> {
+        let normalized = normalize_page_query(query, &format!("captures:{series_id}"))?;
+        let mut statement = self.connection.prepare(
+            "SELECT c.id, c.series_id, c.title, c.captured_at, b.format, b.width, b.height, b.byte_size,
+                    CASE WHEN EXISTS(SELECT 1 FROM blob_derivatives d WHERE d.source_hash = c.original_blob_hash AND d.variant = 'thumbnail' AND d.generator_version = 1) THEN 'indexed' ELSE 'missing' END
+             FROM captures c JOIN blobs b ON b.hash = c.original_blob_hash
+             WHERE c.series_id = ?1 AND c.deleted_at IS NULL
+               AND (?2 = '' OR c.title_search LIKE '%' || ?2 || '%')
+               AND (?3 IS NULL OR c.captured_at >= ?3)
+               AND (?4 IS NULL OR c.captured_at < ?4)
+               AND (?5 IS NULL OR c.captured_at < ?5 OR (c.captured_at = ?5 AND c.id > ?6))
+             ORDER BY c.captured_at DESC, c.id ASC LIMIT ?7"
+        )?;
+        let rows = statement
+            .query_map(
+                params![
+                    series_id,
+                    normalized.search,
+                    normalized.from_inclusive,
+                    normalized.to_exclusive,
+                    normalized.cursor.as_ref().map(|cursor| cursor.at),
+                    normalized.cursor.as_ref().map(|cursor| cursor.id.as_str()),
+                    i64::from(normalized.limit + 1)
+                ],
+                |row| {
+                    Ok(CaptureRowV1 {
+                        capture_id: row.get(0)?,
+                        series_id: row.get(1)?,
+                        title: row.get(2)?,
+                        captured_at: row.get(3)?,
+                        format: row.get(4)?,
+                        width: row.get(5)?,
+                        height: row.get(6)?,
+                        original_byte_size: u64::try_from(row.get::<_, i64>(7)?)
+                            .unwrap_or_default(),
+                        thumbnail_status: row.get(8)?,
+                    })
+                },
+            )?
+            .collect::<Result<Vec<_>, _>>()?;
+        page_captures(rows, normalized)
+    }
+
+    fn rename_series(&mut self, series_id: &str, title: &str) -> Result<(), RepositoryError> {
+        let title = validated_title(title)?;
+        let changed = self.connection.execute(
+            "UPDATE series SET title = ?2, title_search = ?3, updated_at = ?4 WHERE id = ?1 AND deleted_at IS NULL",
+            params![series_id, title, title.to_lowercase(), now_millis()?],
+        )?;
+        if changed == 0 {
+            return Err(RepositoryError::CaptureNotFound);
+        }
+        Ok(())
+    }
+
+    fn rename_capture(&mut self, capture_id: &str, title: &str) -> Result<(), RepositoryError> {
+        let title = validated_title(title)?;
+        let changed = self.connection.execute(
+            "UPDATE captures SET title = ?2, title_search = ?3, updated_at = ?4 WHERE id = ?1 AND deleted_at IS NULL",
+            params![capture_id, title, title.to_lowercase(), now_millis()?],
+        )?;
+        if changed == 0 {
+            return Err(RepositoryError::CaptureNotFound);
+        }
+        Ok(())
+    }
+
+    fn storage_report(&mut self) -> Result<StorageReportV1, RepositoryError> {
+        let originals = database_sum(
+            &self.connection,
+            "SELECT COALESCE(SUM(byte_size), 0) FROM blobs",
+        )?;
+        let documents = database_sum(
+            &self.connection,
+            "SELECT COALESCE(SUM(length(content_json)), 0) FROM documents",
+        )?;
+        let cache = database_sum(
+            &self.connection,
+            "SELECT COALESCE(SUM(byte_size), 0) FROM blob_derivatives",
+        )?;
+        Ok(StorageReportV1 {
+            originals_bytes: originals,
+            editable_documents_bytes: documents,
+            thumbnail_cache_bytes: cache,
+            reclaimable_bytes: cache,
+            total_bytes: originals.saturating_add(documents).saturating_add(cache),
+        })
+    }
+
+    fn cleanup_plan(
+        &mut self,
+        selection: CleanupSelectionV1,
+    ) -> Result<CleanupPlanV1, RepositoryError> {
+        let active_capture = setting_string(&self.connection, "session.activeCaptureId")?;
+        let active_series = setting_string(&self.connection, "session.activeSeriesId")?;
+        let requested_series = selection.series_ids.into_iter().collect::<BTreeSet<_>>();
+        let mut capture_ids = selection.capture_ids.into_iter().collect::<BTreeSet<_>>();
+        let mut protected_series_ids = BTreeSet::new();
+        let mut protected_capture_ids = BTreeSet::new();
+        for series_id in &requested_series {
+            if active_series.as_deref() == Some(series_id.as_str()) {
+                protected_series_ids.insert(series_id.clone());
+                if let Some(active) = &active_capture {
+                    protected_capture_ids.insert(active.clone());
+                }
+                continue;
+            }
+            let mut statement = self.connection.prepare(
+                "SELECT id FROM captures WHERE series_id = ?1 AND deleted_at IS NULL ORDER BY id",
+            )?;
+            for capture_id in
+                statement.query_map(params![series_id], |row| row.get::<_, String>(0))?
+            {
+                capture_ids.insert(capture_id?);
+            }
+        }
+        if let Some(active) = active_capture
+            && capture_ids.remove(&active)
+        {
+            protected_capture_ids.insert(active);
+        }
+
+        let capture_ids = capture_ids
+            .into_iter()
+            .filter(|capture_id| {
+                self.connection
+                    .query_row(
+                        "SELECT 1 FROM captures WHERE id = ?1 AND deleted_at IS NULL",
+                        params![capture_id],
+                        |_| Ok(()),
+                    )
+                    .optional()
+                    .ok()
+                    .flatten()
+                    .is_some()
+            })
+            .collect::<Vec<_>>();
+        let mut document_ids = Vec::new();
+        let mut affected_series = BTreeSet::new();
+        for capture_id in &capture_ids {
+            if let Some((document_id, series_id)) = self.connection.query_row(
+                "SELECT d.id, c.series_id FROM captures c JOIN documents d ON d.capture_id = c.id WHERE c.id = ?1",
+                params![capture_id], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+            ).optional()? {
+                document_ids.push(document_id);
+                affected_series.insert(series_id);
+            }
+        }
+
+        let document_set = document_ids.iter().cloned().collect::<BTreeSet<_>>();
+        let mut candidate_hashes = BTreeSet::new();
+        for document_id in &document_ids {
+            let mut statement = self.connection.prepare(
+                "SELECT blob_hash FROM blob_references WHERE owner_kind = 'document' AND owner_id = ?1",
+            )?;
+            for hash in statement.query_map(params![document_id], |row| row.get::<_, String>(0))? {
+                candidate_hashes.insert(hash?);
+            }
+        }
+        let mut blob_hashes = Vec::new();
+        for hash in candidate_hashes {
+            let mut statement = self
+                .connection
+                .prepare("SELECT owner_id FROM blob_references WHERE blob_hash = ?1")?;
+            let owners = statement
+                .query_map(params![hash], |row| row.get::<_, String>(0))?
+                .collect::<Result<Vec<_>, _>>()?;
+            if owners.iter().all(|owner| document_set.contains(owner)) {
+                blob_hashes.push(hash);
+            }
+        }
+
+        let mut files = Vec::new();
+        for hash in &blob_hashes {
+            let format = self.connection.query_row(
+                "SELECT format FROM blobs WHERE hash = ?1",
+                params![hash],
+                |row| row.get::<_, String>(0),
+            )?;
+            let path = blob_path(&self.blobs_root, hash, &format)?;
+            files.push(cleanup_file("blobs", &self.blobs_root, &path)?);
+        }
+        let mut cache_entries = BTreeSet::new();
+        let mut derivatives = self.connection.prepare(
+            "SELECT source_hash, cache_path FROM blob_derivatives ORDER BY source_hash, cache_path",
+        )?;
+        let derivative_rows = derivatives
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        drop(derivatives);
+        for (source_hash, relative) in derivative_rows {
+            if selection.clear_cache || blob_hashes.contains(&source_hash) {
+                let path = self.derivative_cache_path(&source_hash, &relative)?;
+                files.push(cleanup_file("resources", &self.resources_root, &path)?);
+                cache_entries.insert(format!("{source_hash}/{relative}"));
+            }
+        }
+        let reclaimable_bytes = files.iter().map(|file| file.byte_size).sum();
+        let token = Uuid::now_v7().to_string();
+        let expires_at = now_millis()?.saturating_add(10 * 60 * 1000);
+        let series_ids = requested_series
+            .difference(&protected_series_ids)
+            .cloned()
+            .collect::<Vec<_>>();
+        let public = CleanupPlanV1 {
+            token: token.clone(),
+            series_ids,
+            capture_ids,
+            cache_entries: cache_entries.into_iter().collect(),
+            protected_series_ids: protected_series_ids.into_iter().collect(),
+            protected_capture_ids: protected_capture_ids.into_iter().collect(),
+            reclaimable_bytes,
+            expires_at,
+        };
+        let fingerprint = cleanup_fingerprint(
+            &self.connection,
+            &public.capture_ids,
+            &files,
+            &self.blobs_root,
+            &self.resources_root,
+        )?;
+        self.cleanup_plans.insert(
+            token,
+            PendingCleanupPlan {
+                public: public.clone(),
+                document_ids,
+                blob_hashes,
+                files,
+                fingerprint,
+            },
+        );
+        Ok(public)
+    }
+
+    fn cleanup_execute(&mut self, token: &str) -> Result<CleanupResultV1, RepositoryError> {
+        let pending = self
+            .cleanup_plans
+            .remove(token)
+            .ok_or(RepositoryError::CleanupTokenInvalid)?;
+        if now_millis()? > pending.public.expires_at {
+            return Err(RepositoryError::CleanupTokenInvalid);
+        }
+        if cleanup_fingerprint(
+            &self.connection,
+            &pending.public.capture_ids,
+            &pending.files,
+            &self.blobs_root,
+            &self.resources_root,
+        )? != pending.fingerprint
+        {
+            return Err(RepositoryError::CleanupPlanStale);
+        }
+        let operation_id = Uuid::now_v7().to_string();
+        let payload = serde_json::to_string(&CleanupJournalPayload {
+            files: pending.files.clone(),
+        })
+        .map_err(|error| RepositoryError::Io(error.to_string()))?;
+        let timestamp = now_millis()?;
+        self.connection.execute(
+            "INSERT INTO recovery_journal (operation_id, kind, state, payload_json, created_at, updated_at) VALUES (?1, 'cleanupDelete', 'prepared', ?2, ?3, ?3)",
+            params![operation_id, payload, timestamp],
+        )?;
+        let transaction = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        for document_id in &pending.document_ids {
+            transaction.execute(
+                "DELETE FROM blob_references WHERE owner_kind = 'document' AND owner_id = ?1",
+                params![document_id],
+            )?;
+            transaction.execute("DELETE FROM documents WHERE id = ?1", params![document_id])?;
+        }
+        for capture_id in &pending.public.capture_ids {
+            transaction.execute("DELETE FROM captures WHERE id = ?1", params![capture_id])?;
+        }
+        for hash in &pending.blob_hashes {
+            transaction.execute(
+                "DELETE FROM blob_derivatives WHERE source_hash = ?1",
+                params![hash],
+            )?;
+            transaction.execute("DELETE FROM blobs WHERE hash = ?1 AND NOT EXISTS (SELECT 1 FROM blob_references WHERE blob_hash = ?1)", params![hash])?;
+        }
+        if !pending.public.cache_entries.is_empty() {
+            for entry in &pending.public.cache_entries {
+                if let Some((hash, path)) = entry.split_once('/') {
+                    transaction.execute(
+                        "DELETE FROM blob_derivatives WHERE source_hash = ?1 AND cache_path = ?2",
+                        params![hash, path],
+                    )?;
+                }
+            }
+        }
+        let mut deleted_series_ids = Vec::new();
+        for series_id in &pending.public.series_ids {
+            if transaction.execute("DELETE FROM series WHERE id = ?1 AND NOT EXISTS (SELECT 1 FROM captures WHERE series_id = ?1 AND deleted_at IS NULL)", params![series_id])? > 0 {
+                deleted_series_ids.push(series_id.clone());
+            }
+        }
+        transaction.execute("DELETE FROM series WHERE deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM captures WHERE captures.series_id = series.id AND captures.deleted_at IS NULL)", [])?;
+        transaction.execute("UPDATE recovery_journal SET state = 'committed', updated_at = ?2 WHERE operation_id = ?1", params![operation_id, now_millis()?])?;
+        transaction.commit()?;
+
+        let reclaimed = self.remove_cleanup_files(&pending.files)?;
+        self.connection.execute(
+            "DELETE FROM recovery_journal WHERE operation_id = ?1",
+            params![operation_id],
+        )?;
+        Ok(CleanupResultV1 {
+            deleted_series_ids,
+            deleted_capture_ids: pending.public.capture_ids,
+            deleted_cache_entries: pending.public.cache_entries,
+            actual_reclaimed_bytes: reclaimed,
+            report: self.storage_report()?,
+        })
+    }
+
+    fn remove_cleanup_files(&self, files: &[CleanupFile]) -> Result<u64, RepositoryError> {
+        let mut reclaimed = 0_u64;
+        for file in files {
+            let root = match file.root.as_str() {
+                "blobs" => &self.blobs_root,
+                "resources" => &self.resources_root,
+                _ => return Err(RepositoryError::PermissionDenied),
+            };
+            if !is_safe_relative_path(&file.relative_path) {
+                return Err(RepositoryError::PermissionDenied);
+            }
+            let path = root.join(&file.relative_path);
+            match fs::remove_file(&path) {
+                Ok(()) => reclaimed = reclaimed.saturating_add(file.byte_size),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error.into()),
+            }
+        }
+        Ok(reclaimed)
     }
 
     fn list_active_series_frames(&mut self) -> Result<Vec<SeriesFrame>, RepositoryError> {
@@ -708,7 +1427,7 @@ impl StorageState {
             return Ok(Vec::new());
         };
         let mut statement = self.connection.prepare(
-            "SELECT id FROM captures WHERE series_id = ?1 AND deleted_at IS NULL ORDER BY captured_at ASC, id ASC",
+            "SELECT id FROM captures WHERE series_id = ?1 AND deleted_at IS NULL ORDER BY captured_at ASC, id ASC LIMIT 100",
         )?;
         statement
             .query_map(params![series_id], |row| {
@@ -1004,9 +1723,27 @@ impl StorageState {
     }
 
     fn recover(&mut self) -> Result<(), RepositoryError> {
-        // A journal can only survive before the metadata transaction commits.
-        // Its final blob is intentionally retained as a diagnosable orphan;
-        // automatic garbage collection is never allowed during startup.
+        let committed = {
+            let mut statement = self.connection.prepare(
+                "SELECT operation_id, payload_json FROM recovery_journal WHERE kind = 'cleanupDelete' AND state = 'committed' ORDER BY created_at",
+            )?;
+            statement
+                .query_map([], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                })?
+                .collect::<Result<Vec<_>, _>>()?
+        };
+        for (operation_id, payload) in committed {
+            let payload: CleanupJournalPayload = serde_json::from_str(&payload)
+                .map_err(|error| RepositoryError::Io(error.to_string()))?;
+            self.remove_cleanup_files(&payload.files)?;
+            self.connection.execute(
+                "DELETE FROM recovery_journal WHERE operation_id = ?1",
+                params![operation_id],
+            )?;
+        }
+        // Pre-commit create/cleanup rows have no committed metadata deletion.
+        // Their files are intentionally retained; startup never scans globally.
         self.connection.execute(
             "DELETE FROM recovery_journal WHERE state IN ('prepared', 'blobReady')",
             [],
@@ -1189,6 +1926,214 @@ impl StorageState {
         };
         self.create_capture(request)
     }
+}
+
+fn database_sum(connection: &Connection, sql: &str) -> Result<u64, RepositoryError> {
+    let value = connection.query_row(sql, [], |row| row.get::<_, i64>(0))?;
+    byte_size_from_database(value)
+}
+
+fn setting_string(connection: &Connection, key: &str) -> Result<Option<String>, RepositoryError> {
+    connection
+        .query_row(
+            "SELECT value_json FROM settings WHERE key = ?1",
+            params![key],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?
+        .map(|value| {
+            serde_json::from_str::<String>(&value)
+                .map_err(|error| RepositoryError::InvalidDocument(error.to_string()))
+        })
+        .transpose()
+}
+
+fn cleanup_file(root_name: &str, root: &Path, path: &Path) -> Result<CleanupFile, RepositoryError> {
+    let relative = path
+        .strip_prefix(root)
+        .map_err(|_| RepositoryError::PermissionDenied)?;
+    let relative_path = relative
+        .to_str()
+        .filter(|value| is_safe_relative_path(value))
+        .ok_or(RepositoryError::PermissionDenied)?
+        .to_owned();
+    let byte_size = match fs::metadata(path) {
+        Ok(metadata) if metadata.is_file() => metadata.len(),
+        Ok(_) => return Err(RepositoryError::PermissionDenied),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => 0,
+        Err(error) => return Err(error.into()),
+    };
+    Ok(CleanupFile {
+        root: root_name.to_owned(),
+        relative_path,
+        byte_size,
+    })
+}
+
+fn cleanup_fingerprint(
+    connection: &Connection,
+    capture_ids: &[String],
+    files: &[CleanupFile],
+    blobs_root: &Path,
+    resources_root: &Path,
+) -> Result<String, RepositoryError> {
+    let mut source = String::new();
+    for capture_id in capture_ids {
+        let state = connection.query_row(
+            "SELECT c.series_id, c.original_blob_hash, d.id, d.revision, d.updated_at FROM captures c JOIN documents d ON d.capture_id = c.id WHERE c.id = ?1 AND c.deleted_at IS NULL",
+            params![capture_id],
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?, row.get::<_, i64>(3)?, row.get::<_, i64>(4)?)),
+        ).optional()?;
+        source.push_str(&format!("{capture_id}:{state:?};"));
+    }
+    for file in files {
+        let root = match file.root.as_str() {
+            "blobs" => blobs_root,
+            "resources" => resources_root,
+            _ => return Err(RepositoryError::PermissionDenied),
+        };
+        if !is_safe_relative_path(&file.relative_path) {
+            return Err(RepositoryError::PermissionDenied);
+        }
+        let actual = fs::metadata(root.join(&file.relative_path))
+            .ok()
+            .filter(|metadata| metadata.is_file())
+            .map(|metadata| metadata.len())
+            .unwrap_or(0);
+        source.push_str(&format!("{}:{}:{actual};", file.root, file.relative_path));
+    }
+    Ok(sha256_hex(source.as_bytes()))
+}
+
+struct NormalizedPageQuery {
+    search: String,
+    from_inclusive: Option<i64>,
+    to_exclusive: Option<i64>,
+    cursor: Option<PageCursor>,
+    limit: u32,
+    fingerprint: String,
+}
+
+fn normalize_page_query(
+    query: PageQueryV1,
+    scope: &str,
+) -> Result<NormalizedPageQuery, RepositoryError> {
+    if query
+        .from_inclusive
+        .zip(query.to_exclusive)
+        .is_some_and(|(from, to)| from >= to)
+    {
+        return Err(RepositoryError::InvalidCursor);
+    }
+    let search = query.search.unwrap_or_default().trim().to_lowercase();
+    let fingerprint = sha256_hex(
+        format!(
+            "{scope}\0{search}\0{:?}\0{:?}",
+            query.from_inclusive, query.to_exclusive
+        )
+        .as_bytes(),
+    );
+    let cursor = query
+        .cursor
+        .map(|value| decode_page_cursor(&value, &fingerprint))
+        .transpose()?;
+    Ok(NormalizedPageQuery {
+        search,
+        from_inclusive: query.from_inclusive,
+        to_exclusive: query.to_exclusive,
+        cursor,
+        limit: query.limit.unwrap_or(50).clamp(1, 100),
+        fingerprint,
+    })
+}
+
+fn decode_page_cursor(
+    value: &str,
+    expected_fingerprint: &str,
+) -> Result<PageCursor, RepositoryError> {
+    let mut parts = value.splitn(3, '|');
+    let fingerprint = parts.next().ok_or(RepositoryError::InvalidCursor)?;
+    let at = parts
+        .next()
+        .ok_or(RepositoryError::InvalidCursor)?
+        .parse::<i64>()
+        .map_err(|_| RepositoryError::InvalidCursor)?;
+    let id = parts
+        .next()
+        .filter(|id| !id.is_empty())
+        .ok_or(RepositoryError::InvalidCursor)?;
+    if fingerprint != expected_fingerprint {
+        return Err(RepositoryError::InvalidCursor);
+    }
+    Ok(PageCursor {
+        at,
+        id: id.to_owned(),
+    })
+}
+
+fn encode_page_cursor(fingerprint: &str, at: i64, id: &str) -> String {
+    format!("{fingerprint}|{at}|{id}")
+}
+
+fn page_series(
+    mut rows: Vec<SeriesRowV1>,
+    query: NormalizedPageQuery,
+) -> Result<SeriesPageV1, RepositoryError> {
+    let has_more = rows.len() > query.limit as usize;
+    if has_more {
+        rows.truncate(query.limit as usize);
+    }
+    let next_cursor = has_more
+        .then(|| {
+            rows.last().map(|row| {
+                encode_page_cursor(&query.fingerprint, row.latest_capture_time, &row.series_id)
+            })
+        })
+        .flatten();
+    Ok(SeriesPageV1 {
+        items: rows,
+        next_cursor,
+    })
+}
+
+fn page_captures(
+    mut rows: Vec<CaptureRowV1>,
+    query: NormalizedPageQuery,
+) -> Result<CapturePageV1, RepositoryError> {
+    let has_more = rows.len() > query.limit as usize;
+    if has_more {
+        rows.truncate(query.limit as usize);
+    }
+    let next_cursor = has_more
+        .then(|| {
+            rows.last()
+                .map(|row| encode_page_cursor(&query.fingerprint, row.captured_at, &row.capture_id))
+        })
+        .flatten();
+    Ok(CapturePageV1 {
+        items: rows,
+        next_cursor,
+    })
+}
+
+fn validated_title(title: &str) -> Result<String, RepositoryError> {
+    let trimmed = title.trim();
+    let length = trimmed.chars().count();
+    if !(1..=120).contains(&length) || trimmed.chars().any(char::is_control) {
+        return Err(RepositoryError::InvalidTitle);
+    }
+    Ok(trimmed.to_owned())
+}
+
+fn open_document_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<OpenDocument> {
+    Ok(OpenDocument {
+        document_id: row.get(0)?,
+        capture_id: row.get(1)?,
+        revision: row.get(2)?,
+        document_json: row.get(3)?,
+        source_hash: row.get(4)?,
+        image_token: None,
+    })
 }
 
 fn replace_document_references(
@@ -1752,8 +2697,8 @@ mod tests {
     use tempfile::tempdir;
 
     use super::{
-        BlobMetadata, CaptureMetadataV1, CreateCaptureRequest, DerivativeMetadata,
-        LibraryRepository, RepositoryError,
+        BlobMetadata, CaptureMetadataV1, CleanupSelectionV1, CreateCaptureRequest,
+        DerivativeMetadata, LibraryRepository, PageQueryV1, RepositoryError,
     };
 
     fn metadata() -> BlobMetadata {
@@ -1886,7 +2831,7 @@ mod tests {
             fresh
                 .query_row("PRAGMA user_version", [], |row| row.get::<_, i64>(0))
                 .expect("user version"),
-            3
+            4
         );
         assert!(!super::legacy_migration_table_exists(&fresh).expect("legacy table probe"));
 
@@ -1939,7 +2884,7 @@ mod tests {
             connection
                 .query_row("PRAGMA user_version", [], |row| row.get::<_, i64>(0))
                 .expect("user version"),
-            3
+            4
         );
         assert!(!super::legacy_migration_table_exists(&connection).expect("legacy table probe"));
 
@@ -2448,6 +3393,220 @@ mod tests {
         assert!(matches!(
             super::json_u32(Some(u64::MAX), "source width"),
             Err(RepositoryError::InvalidDocument(_))
+        ));
+    }
+
+    #[test]
+    fn m09_migration_and_paged_library_contract() {
+        let directory = tempdir().expect("temp directory");
+        let repository =
+            LibraryRepository::initialize(directory.path(), directory.path()).expect("repository");
+        let hash = super::sha256_hex(&fixture_bytes());
+        for (series_id, document_id, capture_id, captured_at) in [
+            ("series-a", "doc-a", "capture-a", 30),
+            ("series-b", "doc-b", "capture-b", 20),
+            ("series-b", "doc-c", "capture-c", 10),
+        ] {
+            repository
+                .create_capture(CreateCaptureRequest {
+                    document_id: document_id.to_owned(),
+                    capture_id: capture_id.to_owned(),
+                    series_id: Some(series_id.to_owned()),
+                    document_json: document(document_id, &hash),
+                    source_bytes: fixture_bytes(),
+                    source_metadata: metadata(),
+                    capture_metadata: CaptureMetadataV1::unknown(),
+                    captured_at,
+                })
+                .expect("capture");
+        }
+        repository
+            .rename_series("series-b".to_owned(), "  Рабочая серия  ".to_owned())
+            .expect("rename series");
+        repository
+            .rename_capture("capture-c".to_owned(), "  Финал  ".to_owned())
+            .expect("rename capture");
+
+        let first = repository
+            .list_series(PageQueryV1 {
+                limit: Some(1),
+                ..PageQueryV1::default()
+            })
+            .expect("first page");
+        assert_eq!(first.items.len(), 1);
+        assert_eq!(first.items[0].series_id, "series-a");
+        let second = repository
+            .list_series(PageQueryV1 {
+                cursor: first.next_cursor,
+                limit: Some(1),
+                ..PageQueryV1::default()
+            })
+            .expect("second page");
+        assert_eq!(second.items[0].title.as_deref(), Some("Рабочая серия"));
+
+        let captures = repository
+            .list_captures(
+                "series-b".to_owned(),
+                PageQueryV1 {
+                    search: Some("фин".to_owned()),
+                    ..PageQueryV1::default()
+                },
+            )
+            .expect("capture search");
+        assert_eq!(captures.items.len(), 1);
+        assert_eq!(captures.items[0].capture_id, "capture-c");
+        assert_eq!(captures.items[0].width, 3840);
+    }
+
+    #[test]
+    fn m09_open_last_prefers_the_active_capture_and_activation_is_explicit() {
+        let directory = tempdir().expect("temp directory");
+        let repository =
+            LibraryRepository::initialize(directory.path(), directory.path()).expect("repository");
+        repository
+            .create_capture(request("doc-old", "capture-old"))
+            .expect("old capture");
+        let mut newest = request("doc-new", "capture-new");
+        newest.captured_at = 2;
+        repository.create_capture(newest).expect("new capture");
+        repository
+            .activate_capture("capture-old".to_owned())
+            .expect("activate old");
+
+        assert_eq!(
+            repository
+                .open_last()
+                .expect("open")
+                .expect("document")
+                .capture_id,
+            "capture-old"
+        );
+        let prepared = repository
+            .prepare_capture("capture-new".to_owned())
+            .expect("prepare")
+            .expect("document");
+        assert_eq!(prepared.capture_id, "capture-new");
+        assert_eq!(
+            repository
+                .open_last()
+                .expect("still active")
+                .expect("document")
+                .capture_id,
+            "capture-old"
+        );
+    }
+
+    #[test]
+    fn m09_rename_validation_preserves_the_previous_title() {
+        let directory = tempdir().expect("temp directory");
+        let repository =
+            LibraryRepository::initialize(directory.path(), directory.path()).expect("repository");
+        repository
+            .create_capture(request("doc", "capture"))
+            .expect("capture");
+        repository
+            .rename_capture("capture".to_owned(), "Good title".to_owned())
+            .expect("valid rename");
+        assert!(matches!(
+            repository.rename_capture("capture".to_owned(), "bad\nname".to_owned()),
+            Err(RepositoryError::InvalidTitle)
+        ));
+        let active_series = repository
+            .list_series(PageQueryV1::default())
+            .expect("series")
+            .items[0]
+            .series_id
+            .clone();
+        let row = repository
+            .list_captures(active_series, PageQueryV1::default())
+            .expect("captures")
+            .items
+            .remove(0);
+        assert_eq!(row.title.as_deref(), Some("Good title"));
+    }
+
+    #[test]
+    fn m09_cleanup_protects_active_series_and_shared_blobs() {
+        let directory = tempdir().expect("temp directory");
+        let repository =
+            LibraryRepository::initialize(directory.path(), directory.path()).expect("repository");
+        let hash = super::sha256_hex(&fixture_bytes());
+        for (series_id, document_id, capture_id, captured_at) in [
+            ("kept", "doc-kept", "capture-kept", 10),
+            ("delete", "doc-delete", "capture-delete", 20),
+        ] {
+            repository
+                .create_capture(CreateCaptureRequest {
+                    document_id: document_id.to_owned(),
+                    capture_id: capture_id.to_owned(),
+                    series_id: Some(series_id.to_owned()),
+                    document_json: document(document_id, &hash),
+                    source_bytes: fixture_bytes(),
+                    source_metadata: metadata(),
+                    capture_metadata: CaptureMetadataV1::unknown(),
+                    captured_at,
+                })
+                .expect("capture");
+        }
+        repository
+            .activate_capture("capture-kept".to_owned())
+            .expect("activate kept");
+
+        let protected = repository
+            .cleanup_plan(CleanupSelectionV1 {
+                series_ids: vec!["kept".to_owned()],
+                capture_ids: Vec::new(),
+                clear_cache: false,
+            })
+            .expect("protected plan");
+        assert!(protected.capture_ids.is_empty());
+        assert_eq!(protected.protected_series_ids, ["kept"]);
+
+        let plan = repository
+            .cleanup_plan(CleanupSelectionV1 {
+                series_ids: vec!["delete".to_owned()],
+                capture_ids: Vec::new(),
+                clear_cache: false,
+            })
+            .expect("cleanup plan");
+        assert_eq!(plan.capture_ids, ["capture-delete"]);
+        assert_eq!(
+            plan.reclaimable_bytes, 0,
+            "shared original remains referenced"
+        );
+        let result = repository
+            .cleanup_execute(plan.token)
+            .expect("execute cleanup");
+        assert_eq!(result.deleted_capture_ids, ["capture-delete"]);
+        assert!(repository.blob_path(hash).expect("shared blob").is_file());
+        assert!(repository.cleanup_execute(protected.token).is_ok());
+    }
+
+    #[test]
+    fn m09_cleanup_tokens_are_single_use_and_storage_report_is_indexed() {
+        let directory = tempdir().expect("temp directory");
+        let repository =
+            LibraryRepository::initialize(directory.path(), directory.path()).expect("repository");
+        repository
+            .create_capture(request("doc", "capture"))
+            .expect("capture");
+        let report = repository.storage_report().expect("report");
+        assert!(report.originals_bytes > 0);
+        assert!(report.editable_documents_bytes > 0);
+        assert_eq!(
+            report.total_bytes,
+            report.originals_bytes + report.editable_documents_bytes + report.thumbnail_cache_bytes
+        );
+
+        let plan = repository
+            .cleanup_plan(CleanupSelectionV1::default())
+            .expect("empty plan");
+        repository
+            .cleanup_execute(plan.token.clone())
+            .expect("first use");
+        assert!(matches!(
+            repository.cleanup_execute(plan.token),
+            Err(RepositoryError::CleanupTokenInvalid)
         ));
     }
 }

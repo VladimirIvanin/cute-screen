@@ -50,8 +50,9 @@ use lifecycle::{LaunchIntentV1, LifecycleState, parse_launch};
 #[cfg(feature = "test-harness")]
 use storage::CreateCaptureRequest;
 use storage::{
-    BlobMetadata, CaptureMetadataV1, LibraryRepository, OpenDocument, RepositoryError,
-    StorageHandle,
+    BlobMetadata, CaptureMetadataV1, CapturePageV1, CleanupPlanV1, CleanupResultV1,
+    CleanupSelectionV1, LibraryRepository, OpenDocument, PageQueryV1, PinBoundsV1,
+    PinWindowStateV1, RepositoryError, SeriesPageV1, StorageHandle, StorageReportV1,
 };
 
 #[cfg(any(test, target_os = "macos"))]
@@ -130,6 +131,11 @@ struct ClipboardReadSnapshot {
 struct CaptureDiagnosticsService {
     active_sources: Mutex<HashMap<String, String>>,
     entries: Mutex<VecDeque<CaptureDiagnosticV1>>,
+}
+
+#[derive(Default)]
+struct PinWindowService {
+    states: Mutex<HashMap<String, PinWindowStateV1>>,
 }
 
 impl CaptureDiagnosticsService {
@@ -398,6 +404,275 @@ async fn repository_open_last(
         .map_err(|error| RepositoryError::Io(error.to_string()))?;
     document.image_token = Some(token);
     Ok(Some(document))
+}
+
+#[tauri::command]
+async fn repository_list_series(
+    _correlation_id: String,
+    query: PageQueryV1,
+    repository: State<'_, StorageHandle>,
+) -> CommandResult<SeriesPageV1> {
+    Ok(repository.list_series(query).await?)
+}
+
+#[tauri::command]
+async fn repository_list_captures(
+    _correlation_id: String,
+    series_id: String,
+    query: PageQueryV1,
+    repository: State<'_, StorageHandle>,
+) -> CommandResult<CapturePageV1> {
+    Ok(repository.list_captures(series_id, query).await?)
+}
+
+#[tauri::command]
+async fn repository_prepare_capture(
+    _correlation_id: String,
+    capture_id: String,
+    repository: State<'_, StorageHandle>,
+    transport: State<'_, Arc<ImageTransportService>>,
+) -> CommandResult<Option<OpenDocument>> {
+    let Some(mut document) = repository.prepare_capture(capture_id).await? else {
+        return Ok(None);
+    };
+    let source = repository
+        .resolve_capture_source(document.capture_id.clone(), document.source_hash.clone())
+        .await?;
+    let token = Uuid::now_v7().simple().to_string();
+    transport
+        .register_authoritative(token.clone(), source)
+        .map_err(|error| RepositoryError::Io(error.to_string()))?;
+    document.image_token = Some(token);
+    Ok(Some(document))
+}
+
+#[tauri::command]
+async fn repository_activate_capture(
+    _correlation_id: String,
+    capture_id: String,
+    repository: State<'_, StorageHandle>,
+) -> CommandResult<()> {
+    Ok(repository.activate_capture(capture_id).await?)
+}
+
+#[tauri::command]
+async fn repository_rename_series(
+    _correlation_id: String,
+    series_id: String,
+    title: String,
+    repository: State<'_, StorageHandle>,
+) -> CommandResult<()> {
+    Ok(repository.rename_series(series_id, title).await?)
+}
+
+#[tauri::command]
+async fn repository_rename_capture(
+    _correlation_id: String,
+    capture_id: String,
+    title: String,
+    repository: State<'_, StorageHandle>,
+) -> CommandResult<()> {
+    Ok(repository.rename_capture(capture_id, title).await?)
+}
+
+#[tauri::command]
+async fn repository_storage_report(
+    _correlation_id: String,
+    repository: State<'_, StorageHandle>,
+) -> CommandResult<StorageReportV1> {
+    Ok(repository.storage_report().await?)
+}
+
+#[tauri::command]
+async fn repository_cleanup_plan(
+    _correlation_id: String,
+    selection: CleanupSelectionV1,
+    repository: State<'_, StorageHandle>,
+) -> CommandResult<CleanupPlanV1> {
+    Ok(repository.cleanup_plan(selection).await?)
+}
+
+#[tauri::command]
+async fn repository_cleanup_execute(
+    _correlation_id: String,
+    token: String,
+    repository: State<'_, StorageHandle>,
+) -> CommandResult<CleanupResultV1> {
+    Ok(repository.cleanup_execute(token).await?)
+}
+
+#[tauri::command]
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+fn pin_create(
+    request: tauri::ipc::Request<'_>,
+    window: tauri::WebviewWindow,
+    app: tauri::AppHandle,
+    service: State<'_, PinWindowService>,
+    transport: State<'_, Arc<ImageTransportService>>,
+) -> CommandResult<PinWindowStateV1> {
+    if window.label() != "main" {
+        return Err(RepositoryError::PermissionDenied.into());
+    }
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err(RepositoryError::InvalidImage.into());
+    };
+    let metadata = storage::inspect_content_image_bytes(bytes)?;
+    if metadata.mime_type != "image/png" {
+        return Err(RepositoryError::InvalidImage.into());
+    }
+    let monitor = window
+        .current_monitor()
+        .map_err(|error| RepositoryError::Io(error.to_string()))?;
+    let (available_width, available_height, origin_x, origin_y) = monitor
+        .map(|monitor| {
+            let scale = monitor.scale_factor();
+            (
+                f64::from(monitor.size().width) / scale,
+                f64::from(monitor.size().height) / scale,
+                (f64::from(monitor.position().x) / scale) as i32,
+                (f64::from(monitor.position().y) / scale) as i32,
+            )
+        })
+        .unwrap_or((1200.0, 800.0, 0, 0));
+    let max_width = available_width * 0.8;
+    let max_height = available_height * 0.8;
+    let scale = (max_width / f64::from(metadata.width))
+        .min(max_height / f64::from(metadata.height))
+        .min(1.0);
+    let width = (f64::from(metadata.width) * scale).max(160.0);
+    let height = (f64::from(metadata.height) * scale).max(120.0);
+    let x = origin_x + ((available_width - width) / 2.0) as i32;
+    let y = origin_y + ((available_height - height) / 2.0) as i32;
+    let label = format!("pin-{}", Uuid::now_v7().simple());
+    let snapshot_token = Uuid::now_v7().simple().to_string();
+    transport.import_owned_memory(
+        &snapshot_token,
+        bytes.to_vec(),
+        "image/png",
+        metadata.width,
+        metadata.height,
+        "pin-create",
+    )?;
+    let state = PinWindowStateV1 {
+        snapshot_token: snapshot_token.clone(),
+        bounds: PinBoundsV1 {
+            x,
+            y,
+            width: width.round() as u32,
+            height: height.round() as u32,
+        },
+        opacity: 100,
+        always_on_top: true,
+        click_through: false,
+        restore_policy: "sessionOnly".to_owned(),
+    };
+    service
+        .states
+        .lock()
+        .map_err(|_| RepositoryError::Io("pin state lock failed".to_owned()))?
+        .insert(label.clone(), state.clone());
+    let url = WebviewUrl::App("index.html?pin=1".into());
+    let built = WebviewWindowBuilder::new(&app, &label, url)
+        .title("Cute Screen Pin")
+        .decorations(false)
+        .resizable(true)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .focused(false)
+        .position(f64::from(x), f64::from(y))
+        .inner_size(width, height)
+        .min_inner_size(160.0, 120.0)
+        .background_color(Color(0, 0, 0, 0))
+        .build();
+    if let Err(error) = built {
+        let _ = service
+            .states
+            .lock()
+            .map(|mut states| states.remove(&label));
+        let _ = transport.discard_owned_image(&snapshot_token, "pin-create-rollback");
+        return Err(RepositoryError::Io(error.to_string()).into());
+    }
+    Ok(state)
+}
+
+fn own_pin_state(
+    window: &tauri::WebviewWindow,
+    service: &PinWindowService,
+) -> Result<PinWindowStateV1, RepositoryError> {
+    if !window.label().starts_with("pin-") {
+        return Err(RepositoryError::PermissionDenied);
+    }
+    service
+        .states
+        .lock()
+        .map_err(|_| RepositoryError::Io("pin state lock failed".to_owned()))?
+        .get(window.label())
+        .cloned()
+        .ok_or(RepositoryError::CaptureNotFound)
+}
+
+#[tauri::command]
+fn pin_get_state(
+    window: tauri::WebviewWindow,
+    service: State<'_, PinWindowService>,
+) -> CommandResult<PinWindowStateV1> {
+    Ok(own_pin_state(&window, &service)?)
+}
+
+#[tauri::command]
+fn pin_update_state(
+    window: tauri::WebviewWindow,
+    opacity: u8,
+    service: State<'_, PinWindowService>,
+) -> CommandResult<PinWindowStateV1> {
+    if !(25..=100).contains(&opacity) {
+        return Err(RepositoryError::InvalidDocument(
+            "pin opacity must be between 25 and 100".to_owned(),
+        )
+        .into());
+    }
+    let mut state = own_pin_state(&window, &service)?;
+    let position = window
+        .outer_position()
+        .map_err(|error| RepositoryError::Io(error.to_string()))?;
+    let size = window
+        .inner_size()
+        .map_err(|error| RepositoryError::Io(error.to_string()))?;
+    state.opacity = opacity;
+    state.bounds = PinBoundsV1 {
+        x: position.x,
+        y: position.y,
+        width: size.width,
+        height: size.height,
+    };
+    service
+        .states
+        .lock()
+        .map_err(|_| RepositoryError::Io("pin state lock failed".to_owned()))?
+        .insert(window.label().to_owned(), state.clone());
+    Ok(state)
+}
+
+#[tauri::command]
+fn pin_close(
+    window: tauri::WebviewWindow,
+    service: State<'_, PinWindowService>,
+    transport: State<'_, Arc<ImageTransportService>>,
+) -> CommandResult<()> {
+    if !window.label().starts_with("pin-") {
+        return Err(RepositoryError::PermissionDenied.into());
+    }
+    let state = service
+        .states
+        .lock()
+        .map_err(|_| RepositoryError::Io("pin state lock failed".to_owned()))?
+        .remove(window.label())
+        .ok_or(RepositoryError::CaptureNotFound)?;
+    transport.discard_owned_image(&state.snapshot_token, "pin-close")?;
+    window
+        .close()
+        .map_err(|error| RepositoryError::Io(error.to_string()))?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -2156,6 +2431,7 @@ pub fn run() {
             app.manage(QuickEditorMountService::default());
             app.manage(QuickSaveTargetService::default());
             app.manage(CaptureDiagnosticsService::default());
+            app.manage(PinWindowService::default());
 
             if should_prewarm_quick_capture_at_startup(
                 cfg!(target_os = "macos"),
@@ -2241,6 +2517,19 @@ pub fn run() {
         get_e2e_harness_query,
         read_image_bytes,
         repository_open_last,
+        repository_list_series,
+        repository_list_captures,
+        repository_prepare_capture,
+        repository_activate_capture,
+        repository_rename_series,
+        repository_rename_capture,
+        repository_storage_report,
+        repository_cleanup_plan,
+        repository_cleanup_execute,
+        pin_create,
+        pin_get_state,
+        pin_update_state,
+        pin_close,
         repository_list_active_series_frames,
         repository_save_document,
         repository_import_texture,
@@ -2289,6 +2578,19 @@ pub fn run() {
         open_screen_recording_settings,
         read_image_bytes,
         repository_open_last,
+        repository_list_series,
+        repository_list_captures,
+        repository_prepare_capture,
+        repository_activate_capture,
+        repository_rename_series,
+        repository_rename_capture,
+        repository_storage_report,
+        repository_cleanup_plan,
+        repository_cleanup_execute,
+        pin_create,
+        pin_get_state,
+        pin_update_state,
+        pin_close,
         repository_list_active_series_frames,
         repository_save_document,
         repository_import_texture,

@@ -761,3 +761,40 @@ type-level API contracts и обязательные size/complexity budgets б�
 renderer goldens, browser/real-Tauri flows, performance suite, `ipc:check` и
 architecture budget gate. Перенос теста или source-text assertion не заменяет
 проверку пользовательского действия.
+
+## ADR-043 — Cleanup journal, lazy thumbnails и session-only Pin
+
+**Статус:** accepted
+
+**Контекст:** M09 добавляет необратимое удаление данных, работу с библиотекой
+из тысяч кадров и отдельные always-on-top окна. Полный filesystem scan при
+старте или открытии Library блокирует первый ответ; восстановление Pin с диска
+создало бы второй persistent document lifecycle; editor Undo не может надёжно
+вернуть уже удалённые immutable blobs.
+
+**Решение:** Library читает страницы и наличие thumbnail только из SQLite.
+Файл thumbnail и checksum проверяются при запросе видимого элемента, а
+генерация ограничена приоритетной очередью. Cleanup имеет две фазы: targeted
+probe формирует точный план с одноразовым токеном на десять минут, затем после
+явного подтверждения journal фиксирует только раскрытые IDs и безопасные пути,
+DB transaction удаляет ссылки и metadata, а post-commit worker удаляет лишь
+доказанно unreferenced files. Startup продолжает только journaled post-commit
+операции и не сканирует библиотеку. Удаление после commit необратимо и не
+попадает в `EditorCommand` history.
+
+Pin получает immutable PNG текущего committed cropped render через binary IPC.
+Его bytes, bounds и opacity существуют только в памяти процесса; отдельный
+`pin-*` route не монтирует `EditorShell`, repository session или mutable
+document и не восстанавливается после restart. Pin всегда остаётся
+`alwaysOnTop`, `clickThrough` равен `false`, а capability и native handlers
+ограничены собственным window label.
+
+**Границы:** document schema v7 и immutable originals не меняются; JSON/base64
+для изображений запрещены; orphan scan остаётся явной maintenance operation;
+auto-series и M10 presentation output не входят в решение.
+
+**Проверяемое основание:** migration/pagination tests без file probe,
+cleanup token/shared-blob/fault-recovery tests, browser virtualization и queue
+trace, real-Tauri restart/cleanup/Pin lifecycle, Linux/X11 stacking smoke.
+Windows/macOS runtime evidence остаётся `pending` по ADR-020 до запуска на
+соответствующей платформе.

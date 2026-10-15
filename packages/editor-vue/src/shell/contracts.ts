@@ -7,6 +7,7 @@ import type { ContentImageBridge, TextureFillBridge } from '../texture-fill'
 import type {
   CanvasViewportHosts,
   FrameSummary,
+  LibraryAdapter,
   ShellActionAdapter,
   ShellDocumentState,
 } from './types'
@@ -24,6 +25,7 @@ export interface EditorShellProps {
   captureFallbackCommand?: string | undefined
   captureProgress?: CaptureProgressState | undefined
   frames?: readonly FrameSummary[] | undefined
+  library?: LibraryAdapter | undefined
   sourceImage?: HTMLImageElement | undefined
   textureBridge?: TextureFillBridge | undefined
   contentImageBridge?: ContentImageBridge | undefined
@@ -88,6 +90,7 @@ export const editorShellRuntimeProps = {
   },
   captureProgress: String as PropType<EditorShellProps['captureProgress']>,
   frames: Array as PropType<EditorShellProps['frames']>,
+  library: Object as PropType<EditorShellProps['library']>,
   sourceImage: Object as PropType<EditorShellProps['sourceImage']>,
   textureBridge: Object as PropType<EditorShellProps['textureBridge']>,
   contentImageBridge: Object as PropType<

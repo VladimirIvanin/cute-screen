@@ -201,6 +201,21 @@ export class CanvasRendererController {
     }
   }
 
+  async exportCommittedPng(): Promise<Uint8Array> {
+    const document = this.context.documentForScene()
+    if (!document) throw new Error('The committed scene is unavailable')
+    await this.drawDocument()
+    const runtime = this.renderer
+    if (!runtime || !this.sceneReady)
+      throw new Error('The committed scene is not ready')
+    runtime.setScene(createDocumentRenderScene(document))
+    try {
+      return await runtime.exportPng()
+    } finally {
+      void this.drawDocument()
+    }
+  }
+
   renderCommittedSceneForGesture(): void {
     if (this.renderer && this.sceneReady) {
       this.setCommittedScene(this.renderer)

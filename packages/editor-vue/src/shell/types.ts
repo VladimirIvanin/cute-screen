@@ -47,6 +47,79 @@ export interface FrameSummary {
   readonly selected: boolean
 }
 
+export interface LibraryPageQueryV1 {
+  readonly search: string | null
+  readonly fromInclusive: number | null
+  readonly toExclusive: number | null
+  readonly cursor: string | null
+  readonly limit: number | null
+}
+
+export interface LibrarySeriesRowV1 {
+  readonly seriesId: string
+  readonly title: string | null
+  readonly captureCount: number
+  readonly latestCaptureTime: number
+  readonly logicalBytes: number
+}
+
+export interface LibraryCaptureRowV1 {
+  readonly captureId: string
+  readonly seriesId: string
+  readonly title: string | null
+  readonly capturedAt: number
+  readonly format: string
+  readonly width: number
+  readonly height: number
+  readonly originalByteSize: number
+  readonly thumbnailStatus: string
+}
+
+export interface LibraryStorageReportV1 {
+  readonly originalsBytes: number
+  readonly editableDocumentsBytes: number
+  readonly thumbnailCacheBytes: number
+  readonly reclaimableBytes: number
+  readonly totalBytes: number
+}
+
+export interface LibraryCleanupPlanV1 {
+  readonly token: string
+  readonly seriesIds: readonly string[]
+  readonly captureIds: readonly string[]
+  readonly cacheEntries: readonly string[]
+  readonly protectedSeriesIds: readonly string[]
+  readonly protectedCaptureIds: readonly string[]
+  readonly reclaimableBytes: number
+  readonly expiresAt: number
+}
+
+export interface LibraryAdapter {
+  listSeries(query: LibraryPageQueryV1): Promise<{
+    readonly items: readonly LibrarySeriesRowV1[]
+    readonly nextCursor: string | null
+  }>
+  listCaptures(
+    seriesId: string,
+    query: LibraryPageQueryV1,
+  ): Promise<{
+    readonly items: readonly LibraryCaptureRowV1[]
+    readonly nextCursor: string | null
+  }>
+  openCapture(captureId: string): Promise<void>
+  renameSeries(seriesId: string, title: string): Promise<void>
+  renameCapture(captureId: string, title: string): Promise<void>
+  storageReport(): Promise<LibraryStorageReportV1>
+  cleanupPlan(selection: {
+    readonly seriesIds: readonly string[]
+    readonly captureIds: readonly string[]
+    readonly clearCache: boolean
+  }): Promise<LibraryCleanupPlanV1>
+  cleanupExecute(token: string): Promise<{
+    readonly report: LibraryStorageReportV1
+  }>
+}
+
 export type ContextControl =
   | {
       readonly kind: 'action'
@@ -189,10 +262,12 @@ export interface CanvasViewportHosts {
   readonly scene: HTMLCanvasElement
   readonly overlay: HTMLCanvasElement
   readonly scrollContainer: HTMLDivElement
+  /** Exports only the committed cropped scene; interaction chrome is excluded. */
+  readonly exportCommittedPng: () => Promise<Uint8Array>
 }
 
 export type AsyncActionName =
-  'capture' | 'captureWindow' | 'openImage' | 'copy' | 'export'
+  'capture' | 'captureWindow' | 'openImage' | 'copy' | 'export' | 'pin'
 
 export type AsyncActionState =
   | { readonly status: 'idle' }
@@ -379,6 +454,7 @@ export const translationKeys = [
   'loadingEditor',
   'copyAction',
   'exportAction',
+  'pinAction',
   'undo',
   'redo',
   'unsavedChanges',

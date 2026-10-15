@@ -339,6 +339,16 @@ impl ImageTransportService {
         })
     }
 
+    /// Releases an ephemeral memory image without ever materialising it on disk.
+    pub fn discard_owned_image(
+        &self,
+        token: &str,
+        correlation_id: &str,
+    ) -> Result<(), PlatformError> {
+        let _ = self.take_owned_image(token, correlation_id)?;
+        Ok(())
+    }
+
     pub fn stage_image(
         &self,
         token: &str,

@@ -32,6 +32,7 @@ import { mountM05HarnessDocument as mountM05Harness } from './m05-harness'
 import { createDesktopShellActions } from './desktop-shell-actions'
 import { installDesktopLifecycleGuards } from './platform/tauri/lifecycle-adapter'
 import { M08HarnessController } from './m08-harness'
+import { createLibraryAdapter } from './library-adapter'
 
 declare global {
   interface Window {
@@ -109,6 +110,23 @@ const contentImageBridge = shallowRef<ContentImageBridge>()
 const clipboardBridge = shallowRef<ClipboardBridge>()
 const systemFonts = shallowRef<readonly SystemFontFace[]>([])
 const canvasViewportHosts = shallowRef<CanvasViewportHosts>()
+async function refreshActiveFrames(activeCaptureId: string): Promise<void> {
+  const { tauriDesktopBridge } = await import('./desktop-bridge')
+  const frames =
+    await tauriDesktopBridge.repositoryListActiveSeriesFrames(correlationId())
+  seriesFrames.value = frames.map((frame, index) => ({
+    id: frame.captureId,
+    label: String(index + 1),
+    selected: frame.captureId === activeCaptureId,
+  }))
+}
+const libraryAdapter = createLibraryAdapter({
+  documentSession,
+  coordinator: documentCoordinator,
+  sourceImage,
+  frames: seriesFrames,
+  correlationId,
+})
 const m08HarnessController = new M08HarnessController(harness, {
   documentSession,
   sourceImage,
@@ -209,13 +227,7 @@ async function loadPersistedDocument(): Promise<boolean> {
       documentState.value = { kind: 'empty' }
       return false
     }
-    const frames =
-      await tauriDesktopBridge.repositoryListActiveSeriesFrames(correlationId())
-    seriesFrames.value = frames.map((frame, index) => ({
-      id: frame.captureId,
-      label: String(index + 1),
-      selected: frame.captureId === record.captureId,
-    }))
+    await refreshActiveFrames(record.captureId)
     const parsed = parsePersistedDocument(record)
     if (record.imageToken) {
       await loadImageWithBinaryFallback({
@@ -473,6 +485,7 @@ onBeforeUnmount(() => {
     :capture-fallback-command="captureFallbackCommand"
     :capture-progress="captureProgress"
     :frames="seriesFrames"
+    :library="libraryAdapter"
     :source-image="sourceImage"
     :texture-bridge="textureBridge"
     :content-image-bridge="contentImageBridge"

@@ -19,6 +19,7 @@ const props = withDefaults(
     captureWindowAvailable?: boolean
     captureUnavailableReason?: string | undefined
     openImageAvailable?: boolean
+    libraryAvailable?: boolean
     t: (key: Parameters<typeof import('../i18n').t>[1]) => string
   }>(),
   {
@@ -29,16 +30,20 @@ const props = withDefaults(
     captureWindowAvailable: false,
     captureUnavailableReason: undefined,
     openImageAvailable: false,
+    libraryAvailable: false,
   },
 )
 const emit = defineEmits<{
-  action: [name: 'capture' | 'captureWindow' | 'openImage' | 'copy' | 'export']
+  action: [
+    name: 'capture' | 'captureWindow' | 'openImage' | 'copy' | 'export' | 'pin',
+  ]
   undo: []
   redo: []
   retrySave: []
   exportRecovery: []
   locale: [value: SupportedLocale]
   theme: [value: ThemePreference]
+  toggleLibrary: []
 }>()
 const menuOpen = ref(false)
 const disabled = computed(() => props.pending)
@@ -62,6 +67,10 @@ function selectTheme(value: ThemePreference): void {
 function selectLocale(value: SupportedLocale): void {
   menuOpen.value = false
   emit('locale', value)
+}
+function runPin(): void {
+  menuOpen.value = false
+  emit('action', 'pin')
 }
 </script>
 
@@ -154,6 +163,21 @@ function selectLocale(value: SupportedLocale): void {
       </NButton>
     </p>
     <div class="cs-top-actions">
+      <NTooltip v-if="libraryAvailable">
+        <template #trigger>
+          <NButton
+            quaternary
+            circle
+            class="cs-icon-button"
+            data-library-trigger
+            :aria-label="locale === 'ru' ? 'Библиотека' : 'Library'"
+            @click="emit('toggleLibrary')"
+          >
+            <UiIcon name="layers" />
+          </NButton>
+        </template>
+        {{ locale === 'ru' ? 'Библиотека' : 'Library' }}
+      </NTooltip>
       <NTooltip>
         <template #trigger>
           <NButton
@@ -220,6 +244,14 @@ function selectLocale(value: SupportedLocale): void {
           </NButton>
         </template>
         <div class="cs-menu" role="menu">
+          <NButton
+            role="menuitem"
+            text
+            :disabled="!canCopyOrExport"
+            @click="runPin"
+          >
+            {{ locale === 'ru' ? 'Закрепить результат' : 'Pin result' }}
+          </NButton>
           <p>{{ t('theme') }}</p>
           <NButton
             v-for="value in ['system', 'light', 'dark'] as const"

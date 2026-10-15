@@ -17,10 +17,18 @@ import type {
   TextureImportOutcome,
 } from '@cute-screen/editor-vue'
 import type {
+  CapturePageV1,
   CaptureOutcomeV2,
   CaptureCompletion,
   CaptureRequestV1,
+  CleanupPlanV1,
+  CleanupResultV1,
+  CleanupSelectionV1,
+  PageQueryV1,
+  PinWindowStateV1,
   QuickCaptureDraftV1,
+  SeriesPageV1,
+  StorageReportV1,
 } from './generated/desktop-ipc'
 
 export interface PingResponse {
@@ -91,6 +99,46 @@ export interface DesktopBridge
   repositoryListActiveSeriesFrames(
     correlationId: string,
   ): Promise<readonly RepositorySeriesFrame[]>
+  repositoryListSeries(
+    query: PageQueryV1,
+    correlationId: string,
+  ): Promise<SeriesPageV1>
+  repositoryListCaptures(
+    seriesId: string,
+    query: PageQueryV1,
+    correlationId: string,
+  ): Promise<CapturePageV1>
+  repositoryPrepareCapture(
+    captureId: string,
+    correlationId: string,
+  ): Promise<RepositoryOpenDocument | null>
+  repositoryActivateCapture(
+    captureId: string,
+    correlationId: string,
+  ): Promise<void>
+  repositoryRenameSeries(
+    seriesId: string,
+    title: string,
+    correlationId: string,
+  ): Promise<void>
+  repositoryRenameCapture(
+    captureId: string,
+    title: string,
+    correlationId: string,
+  ): Promise<void>
+  repositoryStorageReport(correlationId: string): Promise<StorageReportV1>
+  repositoryCleanupPlan(
+    selection: CleanupSelectionV1,
+    correlationId: string,
+  ): Promise<CleanupPlanV1>
+  repositoryCleanupExecute(
+    token: string,
+    correlationId: string,
+  ): Promise<CleanupResultV1>
+  createPin(bytes: Uint8Array): Promise<PinWindowStateV1>
+  getPinState(): Promise<PinWindowStateV1>
+  updatePinState(opacity: number): Promise<PinWindowStateV1>
+  closePin(): Promise<void>
   repositorySaveDocument(
     documentId: string,
     expectedRevision: number,
@@ -228,6 +276,50 @@ export const tauriDesktopBridge: DesktopBridge = {
         correlationId,
       },
     ),
+  repositoryListSeries: (query, correlationId) =>
+    invoke<SeriesPageV1>('repository_list_series', { query, correlationId }),
+  repositoryListCaptures: (seriesId, query, correlationId) =>
+    invoke<CapturePageV1>('repository_list_captures', {
+      seriesId,
+      query,
+      correlationId,
+    }),
+  repositoryPrepareCapture: (captureId, correlationId) =>
+    invoke<RepositoryOpenDocument | null>('repository_prepare_capture', {
+      captureId,
+      correlationId,
+    }),
+  repositoryActivateCapture: (captureId, correlationId) =>
+    invoke<void>('repository_activate_capture', { captureId, correlationId }),
+  repositoryRenameSeries: (seriesId, title, correlationId) =>
+    invoke<void>('repository_rename_series', {
+      seriesId,
+      title,
+      correlationId,
+    }),
+  repositoryRenameCapture: (captureId, title, correlationId) =>
+    invoke<void>('repository_rename_capture', {
+      captureId,
+      title,
+      correlationId,
+    }),
+  repositoryStorageReport: (correlationId) =>
+    invoke<StorageReportV1>('repository_storage_report', { correlationId }),
+  repositoryCleanupPlan: (selection, correlationId) =>
+    invoke<CleanupPlanV1>('repository_cleanup_plan', {
+      selection,
+      correlationId,
+    }),
+  repositoryCleanupExecute: (token, correlationId) =>
+    invoke<CleanupResultV1>('repository_cleanup_execute', {
+      token,
+      correlationId,
+    }),
+  createPin: (bytes) => invoke<PinWindowStateV1>('pin_create', bytes),
+  getPinState: () => invoke<PinWindowStateV1>('pin_get_state'),
+  updatePinState: (opacity) =>
+    invoke<PinWindowStateV1>('pin_update_state', { opacity }),
+  closePin: () => invoke<void>('pin_close'),
   repositorySaveDocument: (
     documentId,
     expectedRevision,
