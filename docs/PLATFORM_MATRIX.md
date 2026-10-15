@@ -1,5 +1,29 @@
 # Платформенная матрица
 
+## Курсоры crop handles (2026-10-15)
+
+Windows x64 / Chrome 155.0.8059.79 и WebView2 155.0.4283.45: все восемь
+направлений resize и move внутри рамки проверены на полном crop и preset 1:1.
+Native production fake capture → Quick → Editor и stroke cursor regression
+прошли (2 scenarios / 2 tests). Linux/WebKitGTK, macOS/WKWebView и physical
+capture остаются отдельными gates. Команды и артефакты — TESTING.md.
+
+## Курсор Pencil / Highlighter (2026-10-15)
+
+Windows x64: Chrome 155.0.8059.79 и настоящий WebView2 155.0.4283.45 подтвердили
+крест на холсте для обоих инструментов, временный `grabbing` и возврат креста.
+Native сценарий проходит Capture → Quick → Editor с fake-platform. Это UI
+evidence; Linux/WebKitGTK, macOS/WKWebView и physical capture не проверялись.
+Команды и артефакты — TESTING.md.
+
+## ToolRail без дополнительной стрелки (ADR-052)
+
+Windows x64 / Chrome 155 и WebView2 155.0.4283.45: browser tool-ux 5/5,
+native quick-chrome 6/6 passed. Общая кнопка инструмента сохраняет ПКМ defaults,
+вложенные controls, Escape и focus; дополнительной кнопки `⌄` нет.
+Native capture использует fake-platform; physical capture, Linux/WebKitGTK
+и macOS/WKWebView остаются отдельными gates. Команды и артефакты — TESTING.md.
+
 ## Расширенный каталог фигур и popover placement (ADR-051)
 
 Windows x64 / WebView2 155.0.4283.45: четыре native сценария / пять tests passed. Проверены Capture → Quick → Editor, 31 palette item, реальные keyboard/pointer actions, nested focus/history, сохранение cylinder и повторный запуск. Рендеринг Canvas2D/CanvasKit и decoded exports 1×/2× покрывают общий каталог. Browser Chrome 155 — 2 files / 8 tests passed; команды и артефакты — TESTING.md. Physical capture, macOS/WKWebView и Linux/WebKitGTK не проверены этим срезом. Schema v7 и IPC сохраняются; старые сборки не читают новые shape enum values.

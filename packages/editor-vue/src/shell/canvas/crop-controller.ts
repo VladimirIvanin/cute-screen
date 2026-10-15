@@ -82,6 +82,38 @@ export class CropController {
     )?.[0]
   }
 
+  canMoveAtPoint(
+    session: CropSession,
+    point: CanvasPoint,
+  ): boolean {
+    const { x, y, width, height } = session.crop
+    const inside =
+      point.x >= x &&
+      point.x <= x + width &&
+      point.y >= y &&
+      point.y <= y + height
+    if (!this.#context.props.quickFrameMode) return inside
+    const tolerance = 7 / ((this.#context.props.zoom ?? 100) / 100)
+    return inside && Math.min(
+      Math.abs(point.x - x),
+      Math.abs(point.x - x - width),
+      Math.abs(point.y - y),
+      Math.abs(point.y - y - height),
+    ) <= tolerance
+  }
+
+  cursorAtPoint(point: CanvasPoint): string | undefined {
+    const session = this.ensureSession()
+    if (!session) return undefined
+    const handle = this.handleAtPoint(session, point)
+    if (handle === 'north' || handle === 'south') return 'ns-resize'
+    if (handle === 'east' || handle === 'west') return 'ew-resize'
+    if (handle === 'northWest' || handle === 'southEast') return 'nwse-resize'
+    if (handle === 'northEast' || handle === 'southWest') return 'nesw-resize'
+    if (this.canMoveAtPoint(session, point)) return 'move'
+    return this.#context.props.activeTool === 'crop' ? '' : undefined
+  }
+
   draw(
     context: CanvasRenderingContext2D,
     outputBounds: ViewportOutputBounds,

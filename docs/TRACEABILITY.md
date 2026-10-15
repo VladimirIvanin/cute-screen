@@ -1,5 +1,30 @@
 # Трассируемость требований
 
+## Курсоры crop handles (2026-10-15)
+
+`REQ-TOL-013`, `REQ-UI-005`: восемь crop handles показывают соответствующие
+`ns/ew/nwse/nesw-resize` при наведении; внутри crop доступен `move`.
+Quick frame показывает resize на handles и move только у перемещаемой границы.
+Hover использует тот же hit testing, что начало жеста, с учётом zoom/crop.
+Проверка — browser и real-WebView production-flow; результаты — TESTING.md.
+
+## Настройки с кнопки инструмента без дополнительной стрелки (2026-10-15)
+
+`REQ-EDT-015`, `REQ-UI-001/006/007`: ToolRail не добавляет отдельную кнопку
+`⌄` при выборе инструмента. Видимый trigger настроек — сама кнопка инструмента:
+ПКМ, Shift+F10 и ContextMenu сохраняют defaults popover, Escape и возврат фокуса.
+Существующие browser tool-ux и native quick-chrome сценарии проверяют
+доступность настроек; screenshots показывают ToolRail без отдельной стрелки.
+Фактические результаты фиксируются в TESTING.md.
+
+## Курсор штриховых инструментов (2026-10-15)
+
+`REQ-TOL-003/004`, `REQ-UI-005`: Pencil и Highlighter показывают `crosshair`
+сразу при выборе и при наведении на холст, включая существующие объекты и
+рисование. Временное панорамирование показывает `grabbing`, затем возвращает
+крест; Select и Hand сохраняют свои курсоры. Проверка — общий browser/native
+highlighter E2E через production mount-flow; результаты — в TESTING.md.
+
 ## Expanded shape palette and unobscured preview (2026-10-15)
 
 `REQ-TOL-002`, `REQ-EDT-008/015/016`, `REQ-UI-001/003/004/006/007`: shared shape catalogue, compact seven-column palette, conditional geometry controls, contour-aware selection, identical preview/export and object-aware overlay placement. New core contracts require red-first codec/geometry/history tests; browser and real-WebView evidence must use production mount and creation flows. Status: implemented; core/component 642/642 and renderer 17/17 passed; Windows real WebView2 4 scenarios / 5 tests passed, including production Capture → Quick → Editor, every palette kind, Arrow focus/history and cylinder persistence across restart. Browser final 2 files / 8 tests passed; commands and artifacts recorded in TESTING.md. Physical capture and Linux/macOS remain separate gates.

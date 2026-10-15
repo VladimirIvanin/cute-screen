@@ -27,6 +27,7 @@ export interface PointerGeometryContext {
   readonly scene: Ref<HTMLCanvasElement | undefined>
   readonly outputBounds: ComputedRef<ViewportOutputBounds | undefined>
   readonly selectedLayer: () => LayerNode | undefined
+  readonly cropCursor: (point: CanvasPoint) => string | undefined
   readonly layerBounds: (layer: LayerNode) => {
     x: number
     y: number
@@ -158,7 +159,16 @@ export class PointerGeometryController {
 
   updateHoverCursor(point: CanvasPoint): void {
     const { props, scene } = this.#context
-    if (props.quickSelectionMode) {
+    const cropCursor = props.quickSelectionMode ? undefined : this.#context.cropCursor(point)
+    if (cropCursor !== undefined) {
+      this.setCursor(cropCursor)
+      return
+    }
+    if (
+      props.quickSelectionMode ||
+      props.activeTool === 'pencil' ||
+      props.activeTool === 'marker'
+    ) {
       this.setCursor('crosshair')
       return
     }

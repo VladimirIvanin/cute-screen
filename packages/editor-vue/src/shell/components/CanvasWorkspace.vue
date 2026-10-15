@@ -114,7 +114,9 @@ defineExpose({
                   ? 'crosshair'
                   : activeTool === 'hand'
                     ? 'grab'
-                    : undefined,
+                    : !sampling && (activeTool === 'pencil' || activeTool === 'marker')
+                      ? 'crosshair'
+                      : undefined,
             }"
             :aria-label="t('sceneCanvas')"
             :tabindex="

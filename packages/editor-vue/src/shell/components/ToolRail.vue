@@ -88,41 +88,6 @@ function onToolKeydown(
           </template>
           {{ toolTitle(tool, t) }}
         </NTooltip>
-        <NButton
-          v-if="
-            tools.some(
-              (tool) =>
-                tool.group === group &&
-                tool.id === activeToolId &&
-                [
-                  'arrow',
-                  'shape',
-                  'pencil',
-                  'marker',
-                  'text',
-                  'callout',
-                  'numberedMarker',
-                  'censor',
-                  'spotlight',
-                  'ruler',
-                  'loupe',
-                  'crop',
-                ].includes(tool.id),
-            )
-          "
-          quaternary
-          size="tiny"
-          class="cs-tool-configure-trigger"
-          :aria-label="`${t(tools.find((tool) => tool.id === activeToolId)!.labelKey)} · …`"
-          @click="
-            onConfigure(
-              tools.find((tool) => tool.id === activeToolId)!,
-              $event,
-            )
-          "
-        >
-          ⌄
-        </NButton>
       </div>
     </template>
   </aside>

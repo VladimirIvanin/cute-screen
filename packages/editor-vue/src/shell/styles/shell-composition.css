@@ -484,6 +484,3 @@
   flex-wrap: wrap;
   max-width: min(640px, calc(100vw - 64px));
 }
-.cs-tool-configure-trigger {
-  align-self: center;
-}

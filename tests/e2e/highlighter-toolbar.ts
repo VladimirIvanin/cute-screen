@@ -26,6 +26,24 @@ export async function verifyHighlighter(
   prefix: string,
   requireAutomatic = false,
 ): Promise<void> {
+  const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
+  for (const label of ['Pencil', 'Highlighter']) {
+    await $(`button[aria-label="${label}"]`).click()
+    await expect(scene).toHaveStyle({ cursor: 'crosshair' })
+    await browser.action('pointer').move({ origin: scene }).perform()
+    await expect(scene).toHaveStyle({ cursor: 'crosshair' })
+    await browser.action('pointer').move({ origin: scene }).down({ button: 'middle' }).perform(true)
+    await expect(scene).toHaveStyle({ cursor: 'grabbing' })
+    await browser.action('pointer').up({ button: 'middle' }).perform()
+    await expect(scene).toHaveStyle({ cursor: 'crosshair' })
+  }
+  if (!(await $('.cs-quick-actions').isExisting())) {
+    await $('button[aria-label="Hand"]').click()
+    await expect(scene).toHaveStyle({ cursor: 'grab' })
+  }
+  await $('button[aria-label="Select"]').click()
+  await browser.action('pointer').move({ origin: scene, x: 1, y: 1 }).perform()
+  expect((await scene.getCSSProperty('cursor')).value).not.toBe('crosshair')
   await $('button[aria-label="Highlighter"]').click()
   await expect($('button[aria-label="Highlighter"] .tabler-icon-highlight')).toExist()
   const toolbar = $('.cs-highlighter-toolbar')
@@ -49,10 +67,12 @@ export async function verifyHighlighter(
     }
   })
   await browser.action('pointer').move({ origin: 'viewport', x: points.x, y: points.y }).down({ button: 'left' }).move({ origin: 'viewport', x: points.endX, y: points.y, duration: 160 }).perform(true)
+  await expect(scene).toHaveStyle({ cursor: 'crosshair' })
   const preview = await sceneChecksum()
   await browser.action('pointer').up({ button: 'left' }).perform()
   await browser.waitUntil(async () => (await shapeDocument()).layers.length === initial + 1)
   await waitForStableCanvas()
+  await expect(scene).toHaveStyle({ cursor: 'crosshair' })
   expect(await sceneChecksum()).toBe(preview)
   await writeFile(path.resolve(directory, `${prefix}-document.json`), JSON.stringify(await shapeDocument(), null, 2))
   expect((await shapeDocument()).layers.at(-1)).toMatchObject({ kind: 'marker', blendMode: 'screen', opacity: 0.35, payload: { highlighterMode: 'illuminate', width: 18 } })

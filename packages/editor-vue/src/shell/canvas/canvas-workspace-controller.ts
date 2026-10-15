@@ -237,6 +237,7 @@ export class CanvasWorkspaceController {
       scene: this.#state.scene,
       outputBounds: this.#viewport.outputBounds,
       selectedLayer: this.selectedLayer,
+      cropCursor: (point) => this.#crop.cursorAtPoint(point),
       layerBounds: this.layerBounds,
       worldHandlePositions: (layer) => this.#geometry.worldBoundsHandlePositions(layer),
       transformPoint: this.transformPoint,

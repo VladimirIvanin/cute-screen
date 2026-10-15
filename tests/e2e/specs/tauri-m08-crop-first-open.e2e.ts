@@ -6,6 +6,7 @@ import {
   expect,
 } from '@wdio/globals'
 import { Key } from 'webdriverio'
+import { verifyCropCursors } from '../crop-cursors'
 import { finishAreaQuickCaptureInEditor } from '../quick-capture'
 
 type CropMountSnapshot = {
@@ -85,12 +86,14 @@ describe('M08 clean crop mount in a real Tauri webview', () => {
       return visible
     })
     expect(overlayEvidence).toBeGreaterThan(1_000)
+    await verifyCropCursors({ x: 0, y: 0, width: 400, height: 300 })
 
     await choosePreset('16:9')
     await browser.keys('Escape')
     expect((await snapshot()).document.crop).toBeNull()
     await $('button[aria-label="Crop"]').click()
     await choosePreset('1:1')
+    await verifyCropCursors({ x: 50, y: 0, width: 300, height: 300 })
     await browser.keys([Key.Shift, 'ArrowRight'])
     await browser.keys('Enter')
     await browser.waitUntil(async () => (await snapshot()).document.crop?.x === 60)

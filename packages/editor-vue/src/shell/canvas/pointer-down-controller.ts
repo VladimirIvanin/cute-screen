@@ -117,24 +117,11 @@ function handleCrop(
   const session = context.crop.ensureSession()
   if (!session) return props.activeTool === 'crop'
   const handle = context.crop.handleAtPoint(session, point)
-  const inside =
-    point.x >= session.crop.x &&
-    point.x <= session.crop.x + session.crop.width &&
-    point.y >= session.crop.y &&
-    point.y <= session.crop.y + session.crop.height
-  const tolerance = 7 / ((props.zoom ?? 100) / 100)
-  const nearBorder =
-    inside &&
-    Math.min(
-      Math.abs(point.x - session.crop.x),
-      Math.abs(point.x - session.crop.x - session.crop.width),
-      Math.abs(point.y - session.crop.y),
-      Math.abs(point.y - session.crop.y - session.crop.height),
-    ) <= tolerance
-  if (!handle && !(props.quickFrameMode ? nearBorder : inside)) {
+  if (!handle && !context.crop.canMoveAtPoint(session, point)) {
     return props.activeTool === 'crop'
   }
   event.preventDefault()
+  context.setCursor(context.crop.cursorAtPoint(point) ?? '')
   context.scene.value!.setPointerCapture(event.pointerId)
   context.setGesture({
     kind: 'crop',

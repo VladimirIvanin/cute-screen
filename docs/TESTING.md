@@ -1,5 +1,86 @@
 # Стратегия тестирования
 
+## Курсоры crop handles — Windows x64, 2026-10-15
+
+`REQ-TOL-013`, `REQ-UI-005`: hover и pointerdown используют общий crop hit testing;
+cursor state не попадает в документ/history. Shared E2E helper проверяет восемь
+направлений resize и move в центре на полной рамке и preset 1:1.
+
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5186 pnpm test:e2e:browser --spec tests/e2e/specs/browser-crop-cursors.e2e.ts`
+  — exit 0, 1/1 test, Chrome 155.0.8059.79;
+  `artifacts/crop-cursor-browser.log`.
+- `pnpm exec vitest run tests/unit/vue/m08-crop-interactions.test.ts tests/unit/vue/canvas-viewport-transform.test.ts tests/unit/vue/canvas-viewport-tools.test.ts`
+  — exit 0, 3 files / 24 tests; `artifacts/crop-cursor-tests.log`.
+- `pnpm lint`, `pnpm typecheck` — exit 0;
+  `artifacts/crop-cursor-{lint,typecheck}.log`.
+- `CUTE_SCREEN_E2E_SCENARIOS=m08-crop-first-open,highlighter CARGO_TARGET_DIR=target/highlighter-e2e pnpm test:e2e:tauri`
+  — exit 0, 2 scenarios / 2 tests, WebView2 155.0.4283.45. Production fake capture
+  → Quick → Editor, crop matrix на полной рамке и 1:1, Escape/Enter/Undo и
+  регрессия stroke cursor. Лог — `artifacts/crop-cursor-tauri.log`, screenshot —
+  `artifacts/tauri-e2e/m08-crop-first-open-1024x700.png`.
+- `pnpm format`, `pnpm format:check`, `pnpm docs:check` — exit 0;
+  `artifacts/crop-cursor-{format,format-check,docs}.log`.
+
+Linux/WebKitGTK, macOS/WKWebView и physical capture этим срезом не проверены.
+
+Предварительный browser-m08-1 replay остановился на старом pixel-bound assertion:
+overlay white maxX 534 вместо ожидаемых 356. Полная cursor matrix прошла до этой
+проверки. Сценарий не изменён; cursor contract проверен отдельным focused spec.
+Полный browser suite зелёным не объявляется.
+
+## Курсор Pencil / Highlighter — Windows x64, 2026-10-15
+
+`REQ-TOL-003/004`, `REQ-UI-005`: общий E2E helper проверяет `crosshair` сразу
+после выбора обоих инструментов и наведения на изображение, `grabbing` при
+удержании средней кнопки, возврат креста после отпускания, переключение на
+Hand/Select и крест во время и после штриха Highlighter.
+
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5186 pnpm test:e2e:browser --spec tests/e2e/specs/browser-highlighter.e2e.ts`
+  — exit 0, 1/1 test, Chrome 155.0.8059.79. Лог:
+  `artifacts/stroke-cursor-browser.log`. Порт 5173 был занят; использован штатный
+  override конфигурации. Исправлена тестовая последовательность middle-down:
+  каждый новый pointer action явно начинает движение на canvas.
+- `pnpm test -- --project vue` — exit 0, 91 files / 644 tests; стабильная команда
+  запускает также core/renderer/fixtures/fake-platform. Лог:
+  `artifacts/stroke-cursor-tests.log`.
+- `pnpm lint`, `pnpm typecheck` — exit 0; логи
+  `artifacts/stroke-cursor-{lint,typecheck}.log`.
+- `CUTE_SCREEN_E2E_SCENARIOS=highlighter CARGO_TARGET_DIR=target/highlighter-e2e pnpm test:e2e:tauri`
+  — exit 0, 1/1 test; настоящий WebView2 155.0.4283.45, Capture → Quick → Editor
+  с fake-platform. Курсоры проверены в обоих окнах. Hand проверяется только
+  в editor, поскольку Quick не показывает этот инструмент. Лог:
+  `artifacts/stroke-cursor-tauri.log`; screenshots/documents:
+  `artifacts/tauri-e2e/highlighter-{quick,editor}-{modes.png,document.json}`.
+- `pnpm format`, `pnpm format:check`, `pnpm docs:check` — exit 0; логи
+  `artifacts/stroke-cursor-{format,format-check,docs}.log`.
+
+Linux/WebKitGTK и macOS/WKWebView этим прогоном не проверены.
+
+## ToolRail без дополнительной стрелки — Windows x64, 2026-10-15
+
+`REQ-EDT-015`, `REQ-UI-001/006/007`, ADR-052. Удалены дополнительная кнопка
+`⌄` и её CSS; обработчики ПКМ/Shift+F10/ContextMenu на самой кнопке сохранены.
+Windows 10 x64 / PowerShell, Chrome 155.0.8059.79, настоящий WebView2
+155.0.4283.45, внешний tauri-driver; WDIO service/Rust plugins 1.3.0.
+
+- `pnpm exec vitest run tests/unit/vue/tool-ux.test.ts`: 27/27 passed.
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5194`,
+  `pnpm test:e2e:browser --spec tests/e2e/specs/browser-tool-ux.e2e.ts`:
+  5/5 passed, включая ПКМ defaults, nested controls, history, persistence и
+  RU/EN light/dark при 1024 px.
+- `CARGO_TARGET_DIR=D:/cutescreen/target/highlighter-e2e`,
+  `CARGO_BUILD_JOBS=4`, `CUTE_SCREEN_E2E_SCENARIOS=quick-chrome`,
+  `pnpm test:e2e:tauri`: 6/6 passed. Production fake capture → Quick → Editor;
+  trusted ПКМ/Escape, focus, eyedropper, Copy и повторный capture сохранены.
+
+`pnpm format` и `pnpm check` завершились с exit 0; общий check включает
+lint/types/format, docs, 40 boundary tests, IPC и Rust fmt/clippy gates.
+Логи команд: `artifacts/toolrail/{format,check,unit,browser,tauri}.log`.
+Просмотрены `artifacts/browser-e2e/tool-ux-1024-ru-dark.png` и
+`artifacts/tauri-e2e/quick-tabler-pencil.png`: отдельной стрелки в rail нет.
+Это проверка UI в настоящем Windows WebView2 с fake-platform capture;
+physical capture и Linux/macOS этим прогоном не подтверждаются.
+
 ## Выделитель и двухуровневые палитры — Windows x64, 2026-10-15
 
 `REQ-TOL-004`, `REQ-EDT-008/015/016/017`, ADR-051. Windows 10 Home

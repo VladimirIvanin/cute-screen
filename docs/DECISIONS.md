@@ -961,3 +961,20 @@ worker lifecycle, gesture freeze, group command и decoded PNG pixel tests;
 Canvas2D/CanvasKit highlighter goldens; browser/native WebView production-flow
 сравнение preview/commit и 4K/8K фоновые задачи. Фактические результаты и
 ограничения фиксируются в TESTING.md.
+
+## ADR-052 — Настройки с самой кнопки инструмента
+
+**Статус:** accepted; дополняет ADR-048.
+
+**Контекст:** отдельная кнопка `⌄` появляется в конце группы при выборе
+инструмента, дублирует вход в defaults и меняет ширину нижней панели.
+Пользователь запросил убрать этот лишний элемент.
+
+**Решение:** удалить дополнительную кнопку из общего ToolRail editor/Quick.
+Настройки открываются на самой кнопке инструмента по ПКМ, Shift+F10 или
+ContextMenu. Defaults, selection, nested controls и Escape сохраняются.
+
+**Проверяемое основание:** существующие mounted-shell tool-ux, browser tool-ux
+и native quick-chrome проверяют открытие настроек и создание объектов.
+Screenshots подтверждают отсутствие отдельной стрелки; результаты и пределы
+platform evidence записываются в TESTING.md.
