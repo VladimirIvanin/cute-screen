@@ -2,6 +2,7 @@ import {
   applyCropSession,
   createDrawingLayer,
   resizeLayerGeometry,
+  rotateLayerTransform,
   updateArrowHandle,
   updateCalloutHandle,
   type LayerNode,
@@ -200,10 +201,14 @@ function commitTransform(
     commitIntrinsicResize(context, gesture)
   }
   if (gesture?.kind === 'rotate' && gesture.currentAngle !== gesture.initial.rotation) {
-    context.emit('transformLayer', gesture.id, {
-      ...gesture.initial,
-      rotation: gesture.currentAngle,
-    })
+    const layer = context.props.document?.layers.find((candidate) => candidate.id === gesture.id)
+    if (layer) {
+      context.emit(
+        'transformLayer',
+        gesture.id,
+        rotateLayerTransform({ ...layer, transform: gesture.initial }, gesture.currentAngle),
+      )
+    }
   }
 }
 

@@ -110,7 +110,9 @@ Cute Screen — полноценный local-first редактор снимко
   z-order и opacity. Generic transform-scale разрешён только image layers;
   non-image tools изменяют размер только через собственную persisted geometry,
   не масштабируя stroke, text или effect style. Поворот на canvas выполняется
-  через corner rotation zones без отдельного вынесенного rotate handle. Для
+  через corner rotation zones без отдельного вынесенного rotate handle.
+  Corner gesture и числовой угол в Layers сохраняют положение центра локальной
+  рамки элемента на canvas; preview и commit совпадают. Для
   bounds/points resize противоположная сторона закреплена в world space;
   `Shift` сохраняет aspect ratio, `Alt` изменяет geometry от центра. Locked
   layer показывает selection frame без активных handles.
@@ -234,7 +236,9 @@ Cute Screen — полноценный local-first редактор снимко
   с `%` и имеет тонкую рамку цвета линии. Угол остаётся отдельной семантикой для
   snapping и contextual UI, но в badge не выводится. Start/end handles меняют
   factual endpoints и пересчитывают conservative bounds, сохраняя thickness,
-  ticks и badge font size.
+  ticks и badge font size. Подпись растеризуется с учётом zoom и DPI экрана;
+  плотность больших preview ограничена по ADR-058, без изменения размера
+  шрифта в документе и размеров экспорта.
 - `REQ-TOL-011` — loupe: zoom, размер, circle/rectangle, border color/width и
   shadow. Настройки используют компактную строку из четырёх controls:
   увеличение, размер, форма и обводка; цвет/толщина рамки и тень раскрываются

@@ -1,5 +1,37 @@
 # Трассируемость требований
 
+## Единое числовое поле (2026-10-16)
+
+`REQ-UI-001/002/003/004/006/007`, `REQ-EDT-015/016`: общий NumericControl
+показывает значение, единицы и горизонтальные −/+ внутри одной рамки высотой
+32 px; кнопки не образуют отдельные выступающие сегменты. Сохраняются точный
+ввод, пресеты, slider, preview/cancel, keyboard, focus, mixed/error/disabled
+и существующая граница undoable commit. Проверка: production ruler label-size
+popover в RU/EN, light/dark и 1024 px; browser и Windows WebView2 evidence,
+существующие numeric component tests. Реализовано: unit 8/8, browser 1/1,
+production WebView2 Quick → Editor 1/1 и `pnpm check` — passed.
+Команды, screenshots и initial failures — TESTING.md; WebKit pending.
+
+## Резкость подписи линейки (2026-10-16)
+
+`REQ-TOL-010`, `REQ-EDT-001`, `REQ-OUT-003`: committed и transient подпись
+растеризуются с учётом zoom × DPR, без изменения document geometry/font size
+и экспортного масштаба. Regression сравнивает пиксели preview с прямым рендером
+в повышенном разрешении; crop, pointer coordinates, sampling и marker preview
+сохраняют document space. Большие preview ограничены pixel budget (ADR-058).
+Unit 733/733, render 20/20, Chrome DPR 1/2 — 2/2 и production WebView2
+Quick → Editor — 1/1 passed. Команды, screenshots и ограничения — TESTING.md.
+
+## Поворот вокруг центра элемента (2026-10-16)
+
+`REQ-EDT-005/006/009/013`: corner gesture и числовой угол в Layers сохраняют
+world position центра `localBounds`, включая non-origin bounds, исходный поворот,
+image scale и отражения. Preview и commit используют один core helper; отмена
+не меняет документ, подтверждение создаёт один undoable updateLayer. Red-first
+core и Vue regression пройдены; Chrome 155 и реальный WebView2 155 подтвердили
+Shape/Arrow через pointer, числовой ввод и undo/redo; native прошёл production
+fake Capture → Quick → Editor. Команды и ограничения — TESTING.md.
+
 ## Переключение панели между объектами (2026-10-16)
 
 `REQ-EDT-016`, `REQ-TOL-009/011`: после выбора лупы и последующего выбора

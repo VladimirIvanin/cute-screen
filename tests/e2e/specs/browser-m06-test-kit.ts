@@ -136,13 +136,13 @@ export async function arrowHandleViewportPoint(
       ? { x: midpoint.x, y: midpoint.y + elbow.offset }
       : { x: midpoint.x + elbow.offset, y: midpoint.y }
   return browser.execute(
-    ({ x, y, translateX, translateY, outputX, outputY }) => {
+    ({ x, y, translateX, translateY, outputX, outputY, outputWidth, outputHeight }) => {
       const scene = document.querySelector<HTMLCanvasElement>('.cs-canvas:not(.cs-canvas-overlay)')
       if (!scene) throw new Error('Scene canvas is missing')
       const bounds = scene.getBoundingClientRect()
       return {
-        x: Math.round(bounds.left + ((translateX + x - outputX) / scene.width) * bounds.width),
-        y: Math.round(bounds.top + ((translateY + y - outputY) / scene.height) * bounds.height),
+        x: Math.round(bounds.left + ((translateX + x - outputX) / outputWidth) * bounds.width),
+        y: Math.round(bounds.top + ((translateY + y - outputY) / outputHeight) * bounds.height),
       }
     },
     {
@@ -152,6 +152,8 @@ export async function arrowHandleViewportPoint(
       translateY: transform?.translateY ?? 0,
       outputX: outputBounds.x,
       outputY: outputBounds.y,
+      outputWidth: outputBounds.width,
+      outputHeight: outputBounds.height,
     },
   )
 }

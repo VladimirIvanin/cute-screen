@@ -231,6 +231,7 @@ export {
   transformPoint,
   transformToMatrix,
 } from './geometry'
+export { rotateLayerTransform } from './layer-rotation'
 export {
   BOUNDS_RESIZE_HANDLES,
   assertLayerEditableScale,

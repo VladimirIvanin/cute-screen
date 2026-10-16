@@ -95,14 +95,17 @@ export class QuickCaptureCommitController {
 
   async resultPng(selection: QuickRect = this.physicalSelection()): Promise<Uint8Array> {
     const hosts = this.#ports.hosts.value
-    if (!hosts) throw new Error('Rendered capture is not ready')
-    return cropPng(hosts.scene, selection)
+    const draft = this.#ports.draft.value
+    if (!hosts || !draft) throw new Error('Rendered capture is not ready')
+    return cropPng(hosts.scene, selection, hosts.scene.width / draft.width, hosts.scene.height / draft.height)
   }
 }
 
 async function cropPng(
   source: CanvasImageSource,
   selection: QuickRect,
+  scaleX = 1,
+  scaleY = 1,
 ): Promise<Uint8Array> {
   const output = document.createElement('canvas')
   output.width = selection.width
@@ -111,10 +114,10 @@ async function cropPng(
   if (!context) throw new Error('PNG canvas is unavailable')
   context.drawImage(
     source,
-    selection.x,
-    selection.y,
-    selection.width,
-    selection.height,
+    selection.x * scaleX,
+    selection.y * scaleY,
+    selection.width * scaleX,
+    selection.height * scaleY,
     0,
     0,
     selection.width,

@@ -1,5 +1,14 @@
 # Архитектура Cute Screen
 
+## Центр поворота элемента
+
+`rotateLayerTransform` в DOM-free core устанавливает абсолютный угол и
+компенсирует translation по разнице преобразованного центра `localBounds`
+до/после поворота. Scale и отражения сохраняются. Corner preview/release и
+числовой preview/commit Layers используют один helper. Persisted Transform2D,
+renderer origin и schema v7 не меняются: старые документы сохраняют внешний
+вид. Это исправление механики ADR-035, а не изменение принятого решения.
+
 ## Предпросмотр ordered effects при выделении
 
 `requiresScenePreview` объединяет loupe, censor, spotlight и marker.
@@ -221,9 +230,10 @@ JSON как bytes/base64.
   видимой части canvas в CSS pixels × DPR, независимо от resolution изображения.
   Отсечение по scroll viewport ограничивает bitmap при увеличении 8K-документа;
   прокрутка перерисовывает chrome без переноса scene graph в Vue.
-  Vue adapter композитит document-space annotation preview из отдельного
-  временного canvas и рисует UI-векторы в display resolution. Scene pixels,
-  pointer mapping и export сохраняют document coordinates; при неизменном
+  Vue adapter композитит annotation preview из отдельного временного canvas
+  с плотностью сцены `max(1, zoom × DPR)` (bounded pixel budget, ADR-058)
+  и рисует UI-векторы в display resolution. Pointer mapping и export сохраняют
+  document coordinates независимо от backing store; при неизменном
   layout visible overlay не пересоздаётся на pointermove.
 - Selection toolbar использует фактические CSS-размеры canvas. В Quick Capture
   координаты относятся к полному frozen frame; crop вычитается только для

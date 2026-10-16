@@ -74,8 +74,8 @@ export class PointerGeometryController {
     const rect = scene.value.getBoundingClientRect()
     if (rect.width <= 0 || rect.height <= 0) return undefined
     return {
-      x: bounds.x + ((event.clientX - rect.left) * scene.value.width) / rect.width,
-      y: bounds.y + ((event.clientY - rect.top) * scene.value.height) / rect.height,
+      x: bounds.x + ((event.clientX - rect.left) * bounds.width) / rect.width,
+      y: bounds.y + ((event.clientY - rect.top) * bounds.height) / rect.height,
       pressure:
         event.pointerType === 'pen' && typeof event.pressure === 'number' && Number.isFinite(event.pressure)
           ? Math.max(0, Math.min(1, event.pressure))

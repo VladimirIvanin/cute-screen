@@ -27,6 +27,7 @@ export class HighlighterPreview {
     layer: LayerNode | undefined,
     bounds: ViewportOutputBounds,
     document: EditorDocumentV1,
+    scale = 1,
   ): boolean {
     const context = scene.getContext('2d')
     if (!context) return false
@@ -63,12 +64,12 @@ export class HighlighterPreview {
       }
       const b = layer.localBounds
       this.dirty = {
-        x: Math.floor(layer.transform.translateX + b.x - bounds.x) - 2,
-        y: Math.floor(layer.transform.translateY + b.y - bounds.y) - 2,
-        width: Math.ceil(b.width) + 4,
-        height: Math.ceil(b.height) + 4,
+        x: Math.floor((layer.transform.translateX + b.x - bounds.x) * scale) - 2,
+        y: Math.floor((layer.transform.translateY + b.y - bounds.y) * scale) - 2,
+        width: Math.ceil(b.width * scale) + 4,
+        height: Math.ceil(b.height * scale) + 4,
       }
-      context.translate(-bounds.x, -bounds.y)
+      context.setTransform(scale, 0, 0, scale, -bounds.x * scale, -bounds.y * scale)
       // The compiler is the same one used for committed freehand nodes.
       const nodes = createDocumentRenderScene({ ...document, crop: null, layers: [layer] }).nodes
       drawNodes2D(context, nodes)

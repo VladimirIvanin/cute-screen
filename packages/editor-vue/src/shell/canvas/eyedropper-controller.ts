@@ -78,10 +78,9 @@ export class EyedropperController {
     ) {
       return undefined
     }
-    return {
-      x: Math.max(0, Math.min(canvas.width - 1, Math.round(point.x - bounds.x))),
-      y: Math.max(0, Math.min(canvas.height - 1, Math.round(point.y - bounds.y))),
-    }
+    const x = Math.floor((Math.floor(point.x - bounds.x) + 0.5) * canvas.width / bounds.width)
+    const y = Math.floor((Math.floor(point.y - bounds.y) + 0.5) * canvas.height / bounds.height)
+    return { x: Math.max(0, Math.min(canvas.width - 1, x)), y: Math.max(0, Math.min(canvas.height - 1, y)) }
   }
 
   #samplingClientPoint(point: CanvasPoint): Readonly<{ clientX: number; clientY: number }> | undefined {
@@ -98,8 +97,8 @@ export class EyedropperController {
     const rect = canvas.getBoundingClientRect()
     if (rect.width <= 0 || rect.height <= 0) return undefined
     return {
-      clientX: rect.left + ((point.x - bounds.x + 0.5) * rect.width) / canvas.width,
-      clientY: rect.top + ((point.y - bounds.y + 0.5) * rect.height) / canvas.height,
+      clientX: rect.left + ((point.x - bounds.x + 0.5) * rect.width) / bounds.width,
+      clientY: rect.top + ((point.y - bounds.y + 0.5) * rect.height) / bounds.height,
     }
   }
 
@@ -153,6 +152,13 @@ export class EyedropperController {
     previewContext: CanvasRenderingContext2D,
     pixel: Readonly<{ x: number; y: number }>,
   ): void {
+    const bounds = this.#ports.outputBounds.value!
+    const scaleX = canvas.width / bounds.width
+    const scaleY = canvas.height / bounds.height
+    if (scaleX !== 1 || scaleY !== 1) {
+      this.#copyScaledPreviewPixels(canvas, previewContext, pixel, scaleX, scaleY)
+      return
+    }
     const sourceX = Math.max(0, pixel.x - GRID_RADIUS)
     const sourceY = Math.max(0, pixel.y - GRID_RADIUS)
     const sourceRight = Math.min(canvas.width, pixel.x + GRID_RADIUS + 1)
@@ -168,6 +174,40 @@ export class EyedropperController {
       pixels.data[centerOffset + 3] === 255 ? 'opaque' : 'unavailable',
       pixels.data[centerOffset + 3] === 255 ? pixelHex(pixels.data, centerOffset) : undefined,
     )
+  }
+
+  #copyScaledPreviewPixels(
+    canvas: HTMLCanvasElement,
+    context: CanvasRenderingContext2D,
+    pixel: Readonly<{ x: number; y: number }>,
+    scaleX: number,
+    scaleY: number,
+  ): void {
+    const left = Math.max(0, Math.floor(pixel.x - GRID_RADIUS * scaleX))
+    const top = Math.max(0, Math.floor(pixel.y - GRID_RADIUS * scaleY))
+    const right = Math.min(canvas.width, Math.ceil(pixel.x + GRID_RADIUS * scaleX + 1))
+    const bottom = Math.min(canvas.height, Math.ceil(pixel.y + GRID_RADIUS * scaleY + 1))
+    const source = canvas.getContext('2d')?.getImageData(left, top, right - left, bottom - top)
+    if (!source) return this.#setState('error')
+    const output = context.createImageData(EYEDROPPER_GRID_SIZE, EYEDROPPER_GRID_SIZE)
+    for (let y = 0; y < EYEDROPPER_GRID_SIZE; y += 1) {
+      for (let x = 0; x < EYEDROPPER_GRID_SIZE; x += 1) {
+        const sampleX = Math.round(pixel.x + (x - GRID_RADIUS) * scaleX) - left
+        const sampleY = Math.round(pixel.y + (y - GRID_RADIUS) * scaleY) - top
+        if (
+          sampleX < 0 ||
+          sampleY < 0 ||
+          sampleX >= source.width ||
+          sampleY >= source.height
+        ) continue
+        const offset = (sampleY * source.width + sampleX) * 4
+        output.data.set(source.data.subarray(offset, offset + 4), (y * EYEDROPPER_GRID_SIZE + x) * 4)
+      }
+    }
+    context.putImageData(output, 0, 0)
+    const center = (GRID_RADIUS * EYEDROPPER_GRID_SIZE + GRID_RADIUS) * 4
+    const opaque = output.data[center + 3] === 255
+    this.#setState(opaque ? 'opaque' : 'unavailable', opaque ? pixelHex(output.data, center) : undefined)
   }
 
   #render(request: PreviewRequest): void {

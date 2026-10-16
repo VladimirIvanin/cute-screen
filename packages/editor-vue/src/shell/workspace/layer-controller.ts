@@ -2,6 +2,7 @@ import type { Ref } from 'vue'
 import {
   creationPolicy,
   rebaseRulerLayer,
+  rotateLayerTransform,
   type EditorDocumentV1,
   type JsonObject,
   type LayerNode,
@@ -68,10 +69,7 @@ function updateLayerProperty(
       ? { ...layer, visible: !layer.visible }
       : property === 'locked'
         ? { ...layer, locked: !layer.locked }
-        : canonicalTransform(context, layer, {
-            ...layer.transform,
-            rotation: value ?? layer.transform.rotation,
-          })
+        : canonicalTransform(context, layer, rotateLayerTransform(layer, value ?? layer.transform.rotation))
   context.props.documentSession.execute({
     type: 'updateLayer',
     before: layer,

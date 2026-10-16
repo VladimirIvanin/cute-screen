@@ -41,10 +41,11 @@ describe('M08 crop and precision acceptance in browser mode', () => {
         intrinsicHeight: scene.height,
         cssWidth: bounds.width,
         cssHeight: bounds.height,
+        dpr: devicePixelRatio,
       }
     })
-    expect(croppedSurface.intrinsicWidth).toBe(300)
-    expect(croppedSurface.intrinsicHeight).toBe(300)
+    expect(croppedSurface.intrinsicWidth).toBeCloseTo(Math.max(300, croppedSurface.cssWidth * croppedSurface.dpr), 0)
+    expect(croppedSurface.intrinsicHeight).toBeCloseTo(Math.max(300, croppedSurface.cssHeight * croppedSurface.dpr), 0)
     expect(croppedSurface.cssWidth / croppedSurface.cssHeight).toBeCloseTo(1, 4)
 
     await $('button[aria-label="Hide data"]').click()

@@ -1,5 +1,143 @@
 # Стратегия тестирования
 
+## Резкость подписи линейки (2026-10-16, ADR-058)
+
+Windows x64 / PowerShell, Node 22.23.1, pnpm 10.33.2.
+Причина: scene и annotation draft имели backing store в document pixels,
+который CSS растягивал при zoom/HiDPI. Canvas2D viewport теперь использует
+bounded density `max(1, zoom × DPR)`. Export scale задаётся независимо;
+Quick crop учитывает плотность, сохраняя исходные physical dimensions.
+
+- Red-first `pnpm exec vitest run --project renderer packages/editor-renderer/src/preview-resolution.test.ts`:
+  3/3 failed до появления `setPreviewScale`. После реализации — 3/3 passed.
+  Preview/draft pixels при 1.3125×, 2×, 4× совпадают с decoded scaled PNG;
+  обычный экспорт побайтно неизменен при смене preview density.
+- `pnpm test --maxWorkers=4` — 101 files / 733 tests passed,
+  `artifacts/ruler-unit-final.log`. Первый прогон: 731/732; старое ожидание
+  document-resolution scene в Quick заменено на density-aware проверку.
+- Дополнительный pixel/controller повтор — 16/16,
+  `artifacts/ruler-focused-final.log`: document coordinates и sampling с non-origin
+  crop, 9×9 magnifier в document pixels при DPR 2, pixel budget, mounted Quick redraw.
+  NAPI canvas fixture помечена `markRaw`, чтобы Vue ref не proxy-ировал native handle.
+  Marker blend/cancel и decoded Quick crop при density 1/2 — в unit suite.
+- `pnpm test:render --maxWorkers=2` — 5 files / 20 tests passed,
+  `artifacts/ruler-render.log`; goldens не обновлялись.
+- `$env:CUTE_SCREEN_BROWSER_E2E_PORT='5187'; pnpm test:e2e:browser --spec tests/e2e/specs/browser-ruler-resolution.e2e.ts`
+  — Chrome 155.0.8059.79, 2/2 passed, `artifacts/ruler-browser.log`.
+  Реальный pointer создаёт ruler при 160%, длина сохраняется при 1:1 и undo/redo.
+  Скриншоты `artifacts/browser-e2e/ruler-dpr-{1,2}-{angled,100}.png` просмотрены.
+
+Первый `pnpm test:e2e:tauri` остановился на `os error 5`: resident
+`target/debug/cute-screen.exe` был занят. Изолированный target:
+`CARGO_TARGET_DIR=D:/cutescreen/target/highlighter-e2e`, `CARGO_BUILD_JOBS=4`,
+`CUTE_SCREEN_E2E_SCENARIOS=ruler-resolution`. Первый isolated scenario обнаружил
+неверное ожидание zoom controls в Quick; helper использует фактический масштаб
+Quick и обычные controls в editor. Следующий повтор остановился на создании
+линейки. После переноса gesture в центр видимой поверхности и проверки target
+`CANVAS` финальный repeat прошёл 1/1 в WebView2 155.0.4283.45 через external
+tauri-driver 2.1.0. Log: `artifacts/ruler-tauri-repeat.log`; screenshots
+`artifacts/tauri-e2e/ruler-{quick,editor}-{angled,100}.png` просмотрены.
+Production fake Capture → Quick (zoom 3.6) → Editor (160%/100%), trusted pointer,
+измеренная длина и undo/redo подтверждены. Это не physical capture evidence.
+
+Linux/WebKitGTK, macOS/WKWebView и physical mixed-DPI не проверены.
+На предельном zoom pixel budget допускает растяжение bounded bitmap (ADR-058).
+
+## Единое числовое поле (2026-10-16)
+
+Windows x64, PowerShell, Node 22.23.1, pnpm 10.33.2. Общий NumericControl
+использует одну рамку NInput высотой 32 px с quaternary −/+ внутри prefix/suffix.
+Команды, draft, parsing и preview controller не меняются; ADR-030/054 сохраняются.
+Логи: `artifacts/numeric-field/`.
+
+- `pnpm test tests/unit/vue/numeric-control.test.ts tests/unit/vue/numeric-shell.test.ts`
+  — exit 0, 8/8 (`unit.log`): точный ввод, comma/invalid, keyboard, preset,
+  mixed, disabled/read-only и commit/cancel.
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5196 pnpm test:e2e:browser --spec tests/e2e/specs/browser-tool-settings.e2e.ts`
+  — exit 0, 1/1 (`browser.log`), Chrome 155.0.8059.79: создание объектов через UI,
+  ввод размера, оба stepper, Escape, 1024/1280 × RU/EN × light/dark.
+  Layout assertion проверяет общую высоту и нахождение кнопок внутри поля.
+  Просмотрены `artifacts/browser-e2e/tool-settings-1024-ru-dark.png` и
+  `tool-settings-1280-en-light.png`: ровное поле рядом с пресетами, линейка видна.
+  Финальный повтор с сохранённой matrix измерения и element screenshots — exit 0,
+  1/1 (`browser-complete.log`); `numeric-field-1024-ru-dark.png` просмотрен.
+  Первый расширенный повтор превысил WDIO wrapper timeout 30 s
+  (`browser-final.log`); timeout перенесён на Mocha test registration.
+  Следующий повтор остановился на старом aperture move до numeric-проверки
+  (`browser-verified.log`): screenshot показал прежнюю ellipse. Перед drag
+  добавлено ожидание завершения закрытия popover; production timing не менялся.
+- `CARGO_TARGET_DIR=D:/cutescreen/target/shape-catalog-native CARGO_BUILD_JOBS=4 CUTE_SCREEN_E2E_SCENARIOS=tool-settings pnpm test:e2e:tauri`
+  (env заданы PowerShell) — exit 0, 1/1 (`native.log`), WebView2 155.0.4283.45,
+  external tauri-driver 2.1.0. Production fake Capture → Quick с non-origin crop
+  → Editor: ввод размера, −/+, Escape в обоих окнах; pointer/keyboard trusted.
+  Просмотрены `artifacts/tauri-e2e/tool-settings-{quick,editor}-numeric-label.png`.
+- `pnpm format` — exit 0 (`format.log`). Первый `pnpm check` остановился
+  на architecture budget 124/120 строк в расширенном E2E helper (`check.log`);
+  шаги проверки размера вынесены в отдельную функцию. Повтор `pnpm check`
+  — exit 0 (`check-final.log`): lint, types, formatting, docs, boundaries 40/40,
+  IPC, frontend build и Rust fmt/clippy. Последующая правка — только этот отчёт
+  и статус traceability; `pnpm format`, `pnpm format:check` сохраняют итоговые
+  логи `format-delivery.log`, `format-check.log`.
+
+WebKitGTK/WKWebView и physical capture этим визуальным изменением не проверены.
+
+## Поворот вокруг центра элемента (2026-10-16)
+
+Windows x64 / PowerShell, Node 22.23.1, pnpm 10.33.2. Evidence:
+`artifacts/center-rotation/`; screenshots — `artifacts/browser-e2e/center-rotation-*`
+и `artifacts/tauri-e2e/center-rotation-{quick,editor}-*`.
+
+UX сверено по официальным руководствам:
+[Illustrator](https://helpx.adobe.com/illustrator/desktop/manage-objects/arrange-objects/rotate-objects.html)
+описывает поворот вокруг центра как для жеста, так и для числового поля;
+[Figma anchor point](https://help.figma.com/hc/en-us/articles/41352588622615-Move-a-layer-s-anchor-point)
+задаёт центр как исходную точку вращения. Код сторонних редакторов не использован.
+Прежний gesture вычислял угол относительно центра, но менял rotation без
+компенсации translation, поэтому рисунок вращался относительно local origin.
+
+- Red-first `pnpm test packages/editor-core/src/layer-rotation.test.ts tests/unit/vue/canvas-viewport-tools.test.ts`
+  — core helper ещё отсутствовал, Vue показал translateX=10 вместо 30 (`red.log`).
+  `pnpm test tests/unit/vue/numeric-preview.test.ts` — числовой preview также
+  оставлял прежнюю translation (`numeric-red.log`).
+- После исправления focused команда с тремя файлами — 20/20 (`green.log`);
+  затем добавлен preview/cancel/click regression; финальный focused повтор —
+  21/21 (`focused-final.log`).
+- `pnpm build:packages` и `pnpm exec tsc --noEmit -p tests/e2e/tsconfig.json`
+  — exit 0 (`build-packages.log`, `e2e-types.log`). Первый browser запуск
+  обнаружил stale package dist без нового export (`browser.log`), после сборки
+  повтор с тем же product code прошёл.
+- `$env:CUTE_SCREEN_BROWSER_E2E_PORT='5201'; pnpm test:e2e:browser --spec tests/e2e/specs/browser-center-rotation.e2e.ts`
+  — exit 0, 1/1, Chrome 155.0.8059.79 (`browser-retry.log`). Новые Shape/Arrow:
+  Shift 90°, неподвижный центр, transient preview, numeric 180°/Escape/Enter,
+  undo/redo. Просмотрены pointer и numeric screenshots.
+- `$env:CARGO_TARGET_DIR='D:/cutescreen/target/shape-catalog-native'; $env:CARGO_BUILD_JOBS='4'; $env:CUTE_SCREEN_E2E_SCENARIOS='center-rotation'; pnpm test:e2e:tauri`
+  — exit 0, 1/1 (`native.log`), WebView2 155.0.4283.45, external tauri-driver 2.1.0.
+  Production fake Capture → Quick → Editor, Shape/Arrow в обоих окнах;
+  числовой угол в editor, pointer/keyboard `isTrusted=true`. Просмотрены
+  Quick committed и editor numeric preview screenshots. Physical capture,
+  WebKitGTK и WKWebView этим сценарием не проверены.
+- `pnpm test:render` — exit 0, 5 files / 20 tests (`render.log`). Renderer origin
+  и persisted document v7 не менялись.
+- `pnpm test` — 731/732, 100/101 files (`test.log`): единственный сбой
+  `canvas-viewport-quick.test.ts` ожидал scene 100×100, получил 200×200 при DPR 2.
+  Он относится к параллельной правке preview resolution; rotation regressions
+  прошли. `pnpm format` первоначально сообщил четыре max-len ошибки в
+  параллельно изменяемых eyedropper-controller/scene-preview-resolution test
+  (`format.log`).
+- Повтор `pnpm test` — 729/732 (`test-final.log`), три 5 s timeout в
+  app-arrow-actions, numeric-shell и highlighter-preview при параллельных
+  проверках workspace. `pnpm test --maxWorkers=2` — exit 0, 101 files / 733 tests
+  (`test-controlled.log`); timeout assertions и product code ради этого не менялись.
+- `pnpm check` сначала остановился на max-len в параллельно изменяемом
+  browser-tool-settings; выполнен только перенос условия. Следующий прогон
+  (`check-final.log`) прошёл lint/types/format/docs и остановился на функции
+  tool-settings.ts длиной 124 при лимите 120. После её независимого разбиения
+  `pnpm test:boundaries` — 40/40 (`boundaries-final.log`), полный `pnpm check`
+  — exit 0 (`check-verified.log`): включая IPC, frontend build и Rust fmt/clippy.
+- `pnpm format` — exit 0 (`format-verified.log`); заключительные команды
+  после записи результатов: `pnpm format` и `pnpm format:check`, логи
+  `format-complete.log` и `format-check-complete.log`.
+
 ## Переключение панели лупа ↔ фонарь (2026-10-16)
 
 Windows x64, Node 22.23.1, pnpm 10.33.2. Evidence/logs:

@@ -31,6 +31,7 @@ export class Canvas2DRenderer implements Renderer {
   #scene: RenderSceneSnapshot | undefined
   #overlay: readonly RenderNode[] = []
   #disposed = false
+  #previewScale = 1
 
   constructor(options: Canvas2DRendererOptions = {}) {
     this.#now = options.now ?? (() => performance.now())
@@ -68,22 +69,31 @@ export class Canvas2DRenderer implements Renderer {
     this.#overlay = nodes
   }
 
+  /** Display density only; export always uses its own explicit scale. */
+  setPreviewScale(scale: number): void {
+    this.#assertActive()
+    if (!Number.isFinite(scale) || scale <= 0) throw new Error('Preview scale must be positive and finite')
+    this.#previewScale = scale
+  }
+
   render(reasons: readonly InvalidationReason[]): FrameMetric {
     this.#assertReady()
     const startedAt = this.#now()
     const scene = this.#scene!
     const stack = this.#stack!
     if (reasons.some((reason) => ['scene', 'viewport', 'resource', 'export'].includes(reason))) {
-      this.#drawScene(stack.scene, scene)
+      this.#drawScene(stack.scene, scene, this.#previewScale)
     }
     if (reasons.includes('overlay') || reasons.includes('viewport')) {
       const bounds = scene.outputBounds
-      stack.overlay.width = Math.max(1, Math.round(bounds.width))
-      stack.overlay.height = Math.max(1, Math.round(bounds.height))
+      const scale = this.#previewScale
+      const size = scaledOutputSize(bounds, scale)
+      stack.overlay.width = size.width
+      stack.overlay.height = size.height
       const context = stack.overlay.getContext('2d')!
       context.setTransform(1, 0, 0, 1, 0, 0)
       context.clearRect(0, 0, stack.overlay.width, stack.overlay.height)
-      context.setTransform(1, 0, 0, 1, -bounds.x, -bounds.y)
+      context.setTransform(scale, 0, 0, scale, -bounds.x * scale, -bounds.y * scale)
       drawNodes2D(
         context,
         this.#overlay,

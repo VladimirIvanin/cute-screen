@@ -69,6 +69,7 @@ export function registerRenderLifecycle(context: RenderLifecycleContext): void {
         resizeFrame = requestAnimationFrame(() => {
           resizeFrame = undefined
           context.fitCanvas()
+          void context.drawDocument()
           context.invalidateOverlay()
         })
       })
@@ -150,6 +151,7 @@ function registerViewportWatches(context: RenderLifecycleContext): void {
       await nextTick()
       context.invalidateOverlay()
       restoreZoomAnchor(context, context.takeZoomAnchor(), zoom)
+      void context.drawDocument()
     },
   )
 }

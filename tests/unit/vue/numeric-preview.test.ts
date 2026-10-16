@@ -12,6 +12,8 @@ import {
 import { NumericPreviewController } from '../../../packages/editor-vue/src/shell/workspace/numeric-preview-controller'
 import { documentFixture } from './m08-precision-test-kit'
 import { arrowSession } from './app-test-kit'
+import { createLayerController } from '../../../packages/editor-vue/src/shell/workspace/layer-controller'
+import { shallowRef } from 'vue'
 
 function setup() {
   const layer = createDrawingLayer({ id: '019c1f62-058e-7000-8000-000000000888', tool: 'shape', start: { x: 10, y: 10 }, end: { x: 70, y: 60 } })!
@@ -48,6 +50,34 @@ function setup() {
 }
 
 describe('display-only numeric preview', () => {
+  it('previews and commits rotation about the same fixed center, with cancel and undo/redo', () => {
+    const app = setup()
+    const original = app.session.snapshot.core.document
+    const owner = Symbol()
+    app.controller.preview(owner, { id: 'rotation', layerId: app.layer.id }, '90')
+    app.frame()
+    const projected = app.display()!.layers[0]!
+    // The 3 px stroke adds 1.5 px on each side; world center is (40, 35).
+    expect(projected.transform.translateX).toBeCloseTo(66.5, 10)
+    expect(projected.transform.translateY).toBeCloseTo(3.5, 10)
+    expect(app.session.snapshot.core.canUndo).toBe(false)
+    app.controller.cancel(owner)
+    expect(app.display()).toBeUndefined()
+    expect(app.session.snapshot.core.document).toEqual(original)
+    const controller = createLayerController({
+      props: { documentSession: app.session } as Parameters<typeof createLayerController>[0]['props'],
+      activeDocument: shallowRef(original),
+      store: { selectedLayerIds: [app.layer.id], selectTool: vi.fn(), selectLayer: vi.fn() },
+    })
+    controller.onLayerRotation(app.layer.id, 90)
+    expect(app.session.snapshot.core.document.layers[0]).toEqual(projected)
+    app.session.undo()
+    expect(app.session.snapshot.core.document.layers).toEqual(original.layers)
+    expect(app.session.snapshot.core.canUndo).toBe(false)
+    app.session.redo()
+    expect(app.session.snapshot.core.document.layers[0]).toEqual(projected)
+    app.session.dispose()
+  })
   it('coalesces movement without changing document/history/save state, then matches one committed command', () => {
     const app = setup()
     const original = app.session.snapshot

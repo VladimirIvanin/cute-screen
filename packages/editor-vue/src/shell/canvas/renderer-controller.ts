@@ -18,6 +18,7 @@ import type { CanvasViewportEmit } from './contracts'
 import type { createCanvasWorkspaceState } from './workspace-state'
 import { HighlighterPreview } from './highlighter-preview'
 import { requiresScenePreview } from './scene-document-controller'
+import { scenePreviewScale } from './scene-preview-scale'
 
 type EditingText = ReturnType<typeof createCanvasWorkspaceState>['editingText']
 type RenderNode = ReturnType<typeof createDocumentRenderScene>['nodes'][number]
@@ -77,8 +78,8 @@ export class CanvasRendererController {
     if (this.renderer) return this.renderer
     if (this.initialization) return this.initialization
     const next = new Canvas2DRenderer()
-    // Annotation previews retain document pixels; selection chrome uses a separate
-    // display-resolution surface in both the editor and Quick Capture.
+    // Annotation previews share scene density; selection chrome has its own
+    // viewport-sized display-resolution surface.
     const overlayTarget = document.createElement('canvas')
     const initialization = (async () => {
       await next.initialize({
@@ -113,6 +114,7 @@ export class CanvasRendererController {
     const { props, editingText } = this.context
     const document = this.context.documentForScene()
     if (!document) return
+    runtime.setPreviewScale(scenePreviewScale(document.canvas, (props.zoom ?? 100) / 100, window.devicePixelRatio || 1))
     const documentScene = createDocumentRenderScene(
       (props.activeTool === 'crop' || props.quickFrameMode) && document.crop ? { ...document, crop: null } : document,
     )
@@ -183,9 +185,9 @@ export class CanvasRendererController {
       !bounds
     ) return
     rendererError.value = undefined
-    scene.value.width = Math.max(1, Math.round(bounds.width))
-    scene.value.height = Math.max(1, Math.round(bounds.height))
     if (!props.document) {
+      scene.value.width = Math.max(1, Math.round(bounds.width))
+      scene.value.height = Math.max(1, Math.round(bounds.height))
       scene.value.getContext('2d')?.clearRect(0, 0, scene.value.width, scene.value.height)
       this.context.invalidateOverlay()
       return
@@ -249,6 +251,12 @@ export class CanvasRendererController {
       bounds &&
       document &&
       this.sceneReady
-    ) this.highlighterPreview.draw(scene, layer, bounds, document)
+    ) this.highlighterPreview.draw(
+      scene,
+      layer,
+      bounds,
+      document,
+      scenePreviewScale(document.canvas, (this.context.props.zoom ?? 100) / 100, window.devicePixelRatio || 1),
+    )
   }
 }

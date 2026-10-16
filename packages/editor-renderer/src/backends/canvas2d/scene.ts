@@ -169,7 +169,6 @@ export function drawScene2D(
   const fullWidth = Math.max(1, Math.round(scene.width * scale))
   const fullHeight = Math.max(1, Math.round(scene.height * scale))
   const usesFullCanvas =
-    scale === 1 &&
     scene.outputBounds.x === 0 &&
     scene.outputBounds.y === 0 &&
     scene.outputBounds.width === scene.width &&

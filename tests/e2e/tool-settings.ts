@@ -4,7 +4,10 @@ import {
   expect,
 } from '@wdio/globals'
 import path from 'node:path'
-import { shapeDocument } from './shape-toolbar'
+import {
+  shapeDocument,
+  waitForShapeAnimation,
+} from './shape-toolbar'
 import { waitForStableCanvas } from './canvas-ready'
 import { setNumericInput } from './numeric-input'
 async function enterNumber(
@@ -56,6 +59,24 @@ async function bounds() {
 }
 async function tool(name: string): Promise<void> {
   await $(`.cs-toolrail button[aria-label="${name}"]`).click()
+}
+async function verifyRulerLabelSize(
+  output: string,
+  prefix: string,
+): Promise<void> {
+  await $('button[aria-label="Label and units"]').click()
+  const labelSize = $('.cs-tool-settings-popover input[aria-label="Label size"]')
+  await setNumericInput(labelSize, '16')
+  await browser.keys('Enter')
+  await $('.cs-tool-settings-popover button[aria-label="Label size +"]').click()
+  expect((await shapeDocument()).layers.at(-1)!.payload.fontSize).toBe(17)
+  await $('.cs-tool-settings-popover button[aria-label="Label size −"]').click()
+  expect((await shapeDocument()).layers.at(-1)!.payload.fontSize).toBe(16)
+  await setNumericInput(labelSize, '24')
+  await browser.keys('Escape')
+  expect((await shapeDocument()).layers.at(-1)!.payload.fontSize).toBe(16)
+  await $('button[aria-label="Label and units"]').click()
+  await browser.saveScreenshot(path.resolve(output, `${prefix}-numeric-label.png`))
 }
 export async function verifyToolSettings(
   output: string,
@@ -111,6 +132,7 @@ export async function verifyToolSettings(
   await $('[role="dialog"] button[aria-label="Ellipse"]').click()
   expect((await apertures())[0]!.shape).toBe('rectangle')
   expect((await apertures())[1]!.shape).toBe('ellipse')
+  await waitForShapeAnimation()
   await drag(c.x + c.w * .63, c.y + c.h * .32, c.x + c.w * .67, c.y + c.h * .36)
   await browser.waitUntil(async () => (await apertures())[1]!.bounds.x !== original[1]!.bounds.x)
   const moved = await apertures()
@@ -138,6 +160,8 @@ export async function verifyToolSettings(
   await $('button[aria-label="Thickness"]').click()
   await enterNumber('[role="dialog"] input[aria-label="Thickness"]', '4')
   expect((await shapeDocument()).layers.at(-1)!.payload.thickness).toBe(4)
+  await browser.keys('Escape')
+  await verifyRulerLabelSize(output, prefix)
   const beforeSnap = (await shapeDocument()).layers.at(-1)!
   await browser.keys('Escape')
   for (const [startX, startY, nextX, nextY] of [

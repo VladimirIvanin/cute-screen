@@ -2,6 +2,7 @@ import {
   BOUNDS_RESIZE_HANDLES,
   createDocumentRenderScene,
   resizeLayerGeometry,
+  rotateLayerTransform,
   updateArrowHandle,
   updateCalloutHandle,
   type LayerNode,
@@ -208,7 +209,7 @@ export class CanvasGeometryController {
       return this.resizeTransform(layer, gesture.handle, gesture.current, gesture.freeResize, gesture.centerResize)
     }
     if (gesture.kind === 'rotate') {
-      return { ...gesture.initial, rotation: gesture.currentAngle }
+      return rotateLayerTransform({ ...layer, transform: gesture.initial }, gesture.currentAngle)
     }
     return layer.transform
   }

@@ -1,5 +1,34 @@
 # Сквозная приёмка
 
+## Резкость линейки (2026-10-16, ADR-058)
+
+Создать горизонтальную и наклонную линейку; сравнить подпись при 100/160/200%
+и DPR 1/2. Glyph raster учитывает масштаб экрана, persisted font size и длина
+не меняются от zoom. Проверить draft, выбор/endpoint drag, crop с non-origin,
+undo/redo, пипетку и выделитель. PNG сохраняет document dimensions, immutable
+original остаётся чистым. На экстремальном zoom действует pixel budget ADR-058.
+Windows browser, pixel tests и WebView2 production fake Capture → Quick → Editor
+пройдены; команды, initial failures и остальные gates — TESTING.md.
+
+## Единое числовое поле (2026-10-16)
+
+`REQ-UI-001/002/003/004/006/007`: создать линейку и открыть «Подпись и единицы».
+Значение, px и −/+ находятся внутри одной рамки высотой 32 px; кнопки не
+выступают сверху/снизу. Проверить точный ввод, оба шага и Escape в editor/Quick,
+RU/EN × light/dark при 1024/1280 px. Существующие numeric component tests
+проверяют mixed, disabled, invalid draft и границу commit. Evidence — TESTING.md.
+
+## Центр поворота (2026-10-16)
+
+`REQ-EDT-005/006/009/013`: создать фигуру и стрелку через ToolRail, повернуть
+внешней угловой зоной с Shift на 90°. Центр локальной рамки остаётся в прежней
+точке canvas во время preview и после release; документ до release неизменен.
+Undo восстанавливает исходную геометрию одним шагом, redo повторяет поворот.
+В editor ввести 180° в Layers, отменить Escape, повторить с Enter и undo/redo.
+Пройдены Chrome и WebView2; native Capture → Quick → Editor, ввод trusted.
+Core дополнительно проверяет non-origin bounds, начальный поворот, image scale,
+отражения и отсутствие дрейфа при неизменном угле. Команды — TESTING.md.
+
 ## Панель после переключения лупа → фонарь (2026-10-16)
 
 `REQ-EDT-016`, `REQ-TOL-008/009/011`: создать лупу и фонарь, несколько раз

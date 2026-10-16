@@ -11,7 +11,6 @@ import {
 } from 'vue'
 import {
   NButton,
-  NButtonGroup,
   NInput,
   NSlider,
 } from 'naive-ui'
@@ -302,47 +301,57 @@ onBeforeUnmount(() => {
           <slot name="preset" :value="preset.value"/>
         </template>
       </NumericPresetGroup>
-      <NButtonGroup class="cs-numeric-entry" size="small">
-        <NButton
-          v-if="stepper"
-          :disabled="blocked || (!mixed && shownValue <= shownMin)"
-          :aria-label="`${label} −`"
-          @click="increment(-1); commit()"
-        >
-          −
-        </NButton>
-        <NInput
-          :value="draft"
-          size="small"
-          :disabled="blocked"
-          :placeholder="mixed ? '—' : ''"
-          v-bind="invalid ? { status: 'error' as const } : {}"
-          :input-props="{
-            role: 'spinbutton',
-            title: blocked ? disabledReason : undefined,
-            inputmode: 'decimal',
-            'aria-label': label,
-            'aria-valuemin': shownMin,
-            'aria-valuemax': shownMax,
-            'aria-valuenow': mixed && !editing ? undefined : shownValue,
-            'aria-valuetext': mixed && !editing ? '—' : `${draft}${unit ?? ''}`,
-            'aria-invalid': invalid,
-          }"
-          @update:value="preview"
-          @blur="blur"
-          @wheel.stop
-        >
-          <template v-if="unit" #suffix><span class="cs-numeric-unit">{{ unit }}</span></template>
-        </NInput>
-        <NButton
-          v-if="stepper"
-          :disabled="blocked || (!mixed && shownMax !== undefined && shownValue >= shownMax)"
-          :aria-label="`${label} +`"
-          @click="increment(1); commit()"
-        >
-          +
-        </NButton>
-      </NButtonGroup>
+      <NInput
+        class="cs-numeric-entry"
+        :class="{ 'cs-numeric-entry--stepper': stepper }"
+        :value="draft"
+        size="small"
+        :theme-overrides="{ heightSmall: '32px', paddingSmall: '0 6px' }"
+        :disabled="blocked"
+        :placeholder="mixed ? '—' : ''"
+        v-bind="invalid ? { status: 'error' as const } : {}"
+        :input-props="{
+          role: 'spinbutton',
+          title: blocked ? disabledReason : undefined,
+          inputmode: 'decimal',
+          'aria-label': label,
+          'aria-valuemin': shownMin,
+          'aria-valuemax': shownMax,
+          'aria-valuenow': mixed && !editing ? undefined : shownValue,
+          'aria-valuetext': mixed && !editing ? '—' : `${draft}${unit ?? ''}`,
+          'aria-invalid': invalid,
+        }"
+        @update:value="preview"
+        @blur="blur"
+        @wheel.stop
+      >
+        <template v-if="stepper" #prefix>
+          <NButton
+            class="cs-numeric-step"
+            quaternary
+            size="small"
+            :disabled="blocked || (!mixed && shownValue <= shownMin)"
+            :aria-label="`${label} −`"
+            @click="increment(-1); commit()"
+          >
+            −
+          </NButton>
+        </template>
+        <template v-if="unit || stepper" #suffix>
+          <span v-if="unit" class="cs-numeric-unit">{{ unit }}</span>
+          <NButton
+            v-if="stepper"
+            class="cs-numeric-step"
+            quaternary
+            size="small"
+            :disabled="blocked || (!mixed && shownMax !== undefined && shownValue >= shownMax)"
+            :aria-label="`${label} +`"
+            @click="increment(1); commit()"
+          >
+            +
+          </NButton>
+        </template>
+      </NInput>
     </div>
     <NSlider
       v-if="slider && max !== undefined"

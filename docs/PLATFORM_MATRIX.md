@@ -1,5 +1,35 @@
 # Платформенная матрица
 
+## Плотность подписи линейки (2026-10-16, ADR-058)
+
+Windows x64 / Chrome 155.0.8059.79: native browser pointer, DPR 1/2,
+160% → 100%, длина и undo/redo — 2/2 passed; screenshots просмотрены.
+Canvas2D decoded preview/export tests, crop/sampling/marker и unit suite — passed.
+WebView2 155.0.4283.45 / external tauri-driver 2.1.0: dedicated production
+fake Capture → Quick (zoom 3.6) → Editor (160%/100%) — 1/1 passed;
+trusted pointer, измеренная длина и undo/redo, screenshots просмотрены.
+Команды и initial failures — TESTING.md. WebKitGTK/WKWebView
+и физический mixed-DPI этим изменением не подтверждены.
+
+## Единое числовое поле (2026-10-16)
+
+Windows x64: Chrome 155.0.8059.79 подтверждает панель размера подписи линейки
+при 1024/1280 px, RU/EN и light/dark; −/+, точный ввод и Escape проходят.
+WebView2 155.0.4283.45, external tauri-driver 2.1.0: production fake Capture
+→ Quick с non-origin crop → Editor, те же действия в обоих окнах — 1/1.
+Оба native screenshot просмотрены; команды и component evidence — TESTING.md.
+WebKitGTK/WKWebView и physical capture не проверены.
+
+## Центр поворота элементов (2026-10-16)
+
+Windows x64: Chrome 155.0.8059.79 и WebView2 155.0.4283.45 подтвердили
+поворот созданных через UI Shape/Arrow вокруг центра локальной рамки.
+Native production fake Capture → Quick → Editor — 1/1, external tauri-driver
+2.1.0, trusted pointer/keyboard; editor также проверяет numeric preview/cancel,
+commit и undo/redo. Скриншоты Quick/editor просмотрены. Это общая DOM-free
+механика transform, но отдельного Linux WebKitGTK/macOS WKWebView evidence
+для данного исправления нет. Фактические команды и артефакты — TESTING.md.
+
 ## Переключение панели лупа ↔ фонарь (2026-10-16)
 
 Windows x64: Chrome 155.0.8059.79 и WebView2 155.0.4283.45 подтверждают

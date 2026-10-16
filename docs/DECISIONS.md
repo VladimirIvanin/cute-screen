@@ -1,5 +1,25 @@
 # Журнал архитектурных решений
 
+## ADR-058 — Плотность preview сцены с учётом zoom и DPI
+
+**Статус:** accepted; заменяет ограничение document-resolution preview в ADR-050.
+
+**Контекст:** подпись линейки растеризовалась в document resolution и затем
+растягивалась браузером. На дробном zoom и HiDPI цифры теряли резкость.
+
+**Решение:** Canvas2D viewport рисует committed scene и annotation draft
+с density `max(1, zoom × DPR)`. Document coordinates, style и экспортный scale
+не меняются. Selection chrome сохраняет отдельный viewport-sized canvas.
+Плотность ограничена 64 Mi pixels или размером исходного canvas, если он больше;
+сторона ограничена 16384 px или исходной стороной, если она больше. На предельном
+zoom допускается увеличение bounded bitmap. На fit сохраняется native sampling.
+Quick PNG берёт crop из соответствующей области плотного preview и выдаёт
+исходные physical dimensions; immutable original по-прежнему берётся из frozen image.
+
+**Проверяемое основание:** pixel comparison preview с decoded scaled export,
+неизменность обычного export, pointer/sampling и marker blend/cancel regressions,
+production browser и real-WebView Quick → Editor. Команды и ограничения — TESTING.md.
+
 ## ADR-056 — Сглаживание карандаша и составной фонарь
 
 **Статус:** accepted; дополняет ADR-048 и общий numeric preview contract.
@@ -934,7 +954,8 @@ settings не меняются. Это уточнение реализации �
 
 ## ADR-050 — Экранное разрешение selection chrome и миниатюры стрелок
 
-**Статус:** accepted; уточняет реализацию ADR-035 и ADR-048.
+**Статус:** superseded в части document-resolution annotation preview: ADR-058.
+Остальные правила selection chrome и миниатюр сохранены.
 
 **Контекст:** документный bitmap overlay растягивал рамку выделения при zoom;
 текстовые варианты наконечников раздували меню, а оба конца показывали

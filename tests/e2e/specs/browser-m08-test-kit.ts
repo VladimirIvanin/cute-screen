@@ -194,13 +194,17 @@ export async function canvasPoint(
       const scene = document.querySelector<HTMLCanvasElement>('.cs-canvas:not(.cs-canvas-overlay)')
       if (!scene) throw new Error('Scene canvas is missing')
       const bounds = scene.getBoundingClientRect()
-      const clientX = Math.round(bounds.left + (canvasX / scene.width) * bounds.width)
-      const clientY = Math.round(bounds.top + (canvasY / scene.height) * bounds.height)
+      const state = window as typeof window & { __cuteScreenE2eM08?: { snapshot(): M08HarnessSnapshot } }
+      const snapshot = state.__cuteScreenE2eM08!.snapshot().document
+      const cropping = document.querySelector('.cs-toolrail button[aria-label="Crop"][aria-pressed="true"]')
+      const output = cropping ? snapshot.canvas : snapshot.crop ?? snapshot.canvas
+      const clientX = Math.round(bounds.left + (canvasX / output.width) * bounds.width)
+      const clientY = Math.round(bounds.top + (canvasY / output.height) * bounds.height)
       return {
         x: clientX,
         y: clientY,
-        canvasX: ((clientX - bounds.left) * scene.width) / bounds.width,
-        canvasY: ((clientY - bounds.top) * scene.height) / bounds.height,
+        canvasX: ((clientX - bounds.left) * output.width) / bounds.width,
+        canvasY: ((clientY - bounds.top) * output.height) / bounds.height,
       }
     },
     { canvasX: x, canvasY: y },

@@ -49,7 +49,7 @@ describe('M05 CanvasViewport transforms', () => {
       await vi.waitFor(() => expect(view.emitted().frameReady).toEqual([[document.id]]))
       await view.rerender({ zoom: 360 })
       expect([overlay.width, overlay.height]).toEqual([720, 720])
-      expect([view.scene.width, view.scene.height]).toEqual([100, 100])
+      await vi.waitFor(() => expect([view.scene.width, view.scene.height]).toEqual([720, 720]))
       await view.rerender({
         document: {
           ...document,
@@ -57,7 +57,7 @@ describe('M05 CanvasViewport transforms', () => {
         },
       })
       await vi.waitFor(() => expect([overlay.width, overlay.height]).toEqual([720, 720]))
-      expect(view.scene.width).toBe(100)
+      await vi.waitFor(() => expect(view.scene.width).toBe(720))
     } finally {
       view.unmount()
       vi.unstubAllGlobals()

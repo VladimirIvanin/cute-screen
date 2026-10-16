@@ -6,8 +6,12 @@ import {
   it,
   vi,
 } from 'vitest'
-import { mountViewport } from './canvas-viewport-test-kit'
+import {
+  document,
+  mountViewport,
+} from './canvas-viewport-test-kit'
 import { DEFAULT_DRAWING_DEFAULTS } from '@cute-screen/editor-renderer'
+import { CanvasGeometryController } from '../../../packages/editor-vue/src/shell/canvas/geometry-controller'
 
 beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
@@ -68,7 +72,11 @@ describe('M05 CanvasViewport transforms', () => {
     expect(emitted().transformLayer).toBeUndefined()
     await fireEvent.pointerUp(scene, { pointerId: 1, clientX: -1, clientY: 41 })
 
-    expect(emitted().transformLayer).toEqual([['shape', expect.objectContaining({ rotation: 90 })]])
+    expect(emitted().transformLayer).toEqual([['shape', expect.objectContaining({
+      rotation: 90,
+      translateX: 30,
+      translateY: 10,
+    })]])
   })
 
   it('does not rotate from the removed detached top handle position', async () => {
@@ -87,6 +95,28 @@ describe('M05 CanvasViewport transforms', () => {
     await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 42, clientY: 20 })
 
     expect(emitted().transformLayer).toBeUndefined()
+  })
+
+  it('previews rotation about the fixed center and leaves cancellation and clicks without a command', async () => {
+    const geometry = new CanvasGeometryController({
+      props: { document } as ConstructorParameters<typeof CanvasGeometryController>[0]['props'],
+      gesture: () => ({
+        kind: 'rotate', id: 'shape', center: { x: 20, y: 20 }, startAngle: 0,
+        initial: document.layers[0]!.transform, currentAngle: 90,
+      }),
+    })
+    expect(geometry.gesturePreviewLayer()?.transform).toMatchObject({
+      rotation: 90, translateX: 30, translateY: 10,
+    })
+    const { scene, emitted } = mountViewport()
+    await fireEvent.pointerDown(scene, { pointerId: 1, clientX: 41, clientY: 41 })
+    await fireEvent.pointerMove(scene, { pointerId: 1, clientX: -1, clientY: 41 })
+    await fireEvent.pointerCancel(scene, { pointerId: 1 })
+    expect(emitted().transformLayer).toBeUndefined()
+    await fireEvent.pointerDown(scene, { pointerId: 2, clientX: 41, clientY: 41 })
+    await fireEvent.pointerUp(scene, { pointerId: 2, clientX: 41, clientY: 41 })
+    expect(emitted().transformLayer).toBeUndefined()
+    expect(document.layers[0]!.transform).toMatchObject({ rotation: 0, translateX: 10, translateY: 10 })
   })
 
   it('uses direct hover cursors for intrinsic resize and corner rotation zones', async () => {

@@ -104,16 +104,18 @@ async function canvasPoint(
   const outputX = harnessDocument.crop?.x ?? 0
   const outputY = harnessDocument.crop?.y ?? 0
   return browser.execute(
-    ({ canvasX, canvasY, originX, originY }) => {
+    ({ canvasX, canvasY, originX, originY, outputWidth, outputHeight }) => {
       const scene = document.querySelector<HTMLCanvasElement>('.cs-canvas:not(.cs-canvas-overlay)')
       if (!scene) throw new Error('Scene canvas is missing')
       const bounds = scene.getBoundingClientRect()
       return {
-        x: Math.round(bounds.left + ((canvasX - originX) / scene.width) * bounds.width),
-        y: Math.round(bounds.top + ((canvasY - originY) / scene.height) * bounds.height),
+        x: Math.round(bounds.left + ((canvasX - originX) / outputWidth) * bounds.width),
+        y: Math.round(bounds.top + ((canvasY - originY) / outputHeight) * bounds.height),
       }
     },
-    { canvasX: x, canvasY: y, originX: outputX, originY: outputY },
+    { canvasX: x, canvasY: y, originX: outputX, originY: outputY,
+      outputWidth: harnessDocument.crop?.width ?? harnessDocument.canvas.width,
+      outputHeight: harnessDocument.crop?.height ?? harnessDocument.canvas.height },
   )
 }
 

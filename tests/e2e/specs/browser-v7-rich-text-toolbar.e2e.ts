@@ -56,7 +56,7 @@ describe('Document v7 rich text in browser mode', () => {
       const metrics = context.measureText(span.textContent ?? '')
       const ascent = metrics.actualBoundingBoxAscent
       const sceneRect = scene.getBoundingClientRect()
-      const scale = sceneRect.width / scene.width
+      const scale = Number(document.querySelector('.cs-zoom-controls')!.getAttribute('data-zoom')) / 100
       return {
         inkTop: (baseline - ascent - sceneRect.top) / scale,
         originTop: (editor.getBoundingClientRect().top - sceneRect.top) / scale,
@@ -104,7 +104,9 @@ describe('Document v7 rich text in browser mode', () => {
             top = Math.min(top, y)
           }
         }
-        return { count, top: Number.isFinite(top) ? top : null }
+        const zoom = Number(document.querySelector('.cs-zoom-controls')!.getAttribute('data-zoom')) / 100
+        const density = scene.width / (scene.getBoundingClientRect().width / zoom)
+        return { count, top: Number.isFinite(top) ? top / density : null }
       })
 
     const committedInk = await greenInk()
@@ -118,22 +120,22 @@ describe('Document v7 rich text in browser mode', () => {
     }
 
     await $('button[aria-label="Text"]').click()
-    await browser.execute(({ translateX, translateY }) => {
+    await browser.execute(({ transform, localBounds }) => {
       const scene = document.querySelector<HTMLCanvasElement>('.cs-canvas:not(.cs-canvas-overlay)')
       if (!scene) throw new Error('Scene canvas is unavailable')
       const rect = scene.getBoundingClientRect()
-      const scale = rect.width / scene.width
+      const scale = Number(document.querySelector('.cs-zoom-controls')!.getAttribute('data-zoom')) / 100
       scene.dispatchEvent(
         new PointerEvent('pointerdown', {
           bubbles: true,
           cancelable: true,
           button: 0,
           pointerId: 7,
-          clientX: rect.left + (translateX + 1) * scale,
-          clientY: rect.top + (translateY + 1) * scale,
+          clientX: rect.left + (transform.translateX + localBounds.x + localBounds.width / 2) * scale,
+          clientY: rect.top + (transform.translateY + localBounds.y + localBounds.height / 2) * scale,
         }),
       )
-    }, committed.transform)
+    }, committed)
     await expect($('[contenteditable="true"][aria-label="Text editor"]')).toExist()
     await browser.waitUntil(async () => (await greenInk()).count === 0)
     await browser.keys('Escape')

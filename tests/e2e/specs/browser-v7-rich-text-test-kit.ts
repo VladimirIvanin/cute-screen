@@ -9,6 +9,7 @@ export type HarnessSnapshot = {
   readonly layers: readonly {
     readonly id: string
     readonly kind: string
+    readonly localBounds: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }
     readonly transform: {
       readonly translateX: number
       readonly translateY: number

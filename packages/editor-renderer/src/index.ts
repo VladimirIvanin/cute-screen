@@ -23,6 +23,7 @@ export {
   applyEditorCommand,
   CommandManager,
   createFlipCanvasCommand,
+  rotateLayerTransform,
   createEditorDocumentFromImage,
   materializeQuickCaptureDocument,
   createRenderSceneSnapshot,

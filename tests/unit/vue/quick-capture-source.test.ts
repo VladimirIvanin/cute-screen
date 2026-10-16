@@ -27,13 +27,14 @@ afterEach(() => {
 })
 
 describe('Quick immutable source versus rendered output', () => {
-  it.each(['editor', 'copied', 'saved'] as const)('persists clean crop pixels for %s and keeps output ink separate', async (completion) => {
+  it.each((['editor', 'copied', 'saved'] as const).flatMap((completion) => [1, 2].map((scale) => ({ completion, scale }))))('persists clean crop pixels for $completion at preview density $scale and keeps output ink separate', async ({ completion, scale }) => {
     vi.stubGlobal('crypto', webcrypto)
     const frozen = createCanvas(100, 100)
     const frozenContext = frozen.getContext('2d')
     frozenContext.fillStyle = '#7f7f7f'
     frozenContext.fillRect(0, 0, 100, 100)
-    const scene = createCanvas(100, 100)
+    const scene = createCanvas(100 * scale, 100 * scale)
+    scene.getContext('2d').scale(scale, scale)
     scene.getContext('2d').drawImage(frozen, 0, 0)
     scene.getContext('2d').fillStyle = '#f00'
     scene.getContext('2d').fillRect(30, 30, 10, 10)
@@ -80,6 +81,7 @@ describe('Quick immutable source versus rendered output', () => {
     expect(materialized.canvas).toEqual({ width: 60, height: 60 })
     const decodedSource = await loadImage(Buffer.from(sourcePng as Uint8Array))
     const decodedOutput = await loadImage(Buffer.from(outputPng))
+    expect([decodedOutput.width, decodedOutput.height]).toEqual([60, 60])
     const decoded = createCanvas(60, 60)
     decoded.getContext('2d').drawImage(decodedSource, 0, 0)
     expect([...decoded.getContext('2d').getImageData(15, 15, 1, 1).data]).toEqual([127, 127, 127, 255])

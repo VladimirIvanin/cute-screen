@@ -19,16 +19,41 @@
   min-width: 0;
   max-width: 100%;
 }
-.cs-numeric-entry {
-  display: flex;
-  align-items: center;
+.cs-numeric-entry.n-input {
   flex: 0 0 auto;
-}
-.cs-numeric-entry > .n-input {
   width: 88px;
   font-variant-numeric: tabular-nums;
 }
-.cs-numeric-entry > .n-button,
+.cs-numeric-entry--stepper.n-input {
+  width: 132px;
+}
+.cs-numeric-entry .n-input__input-el {
+  text-align: center;
+}
+.cs-numeric-entry .n-input__prefix,
+.cs-numeric-entry .n-input__suffix {
+  gap: 6px;
+  margin: 0;
+}
+.cs-numeric-entry .cs-numeric-step.n-button {
+  flex: 0 0 24px;
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 400;
+}
+.cs-numeric-entry .cs-numeric-step:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+.cs-numeric-entry .cs-numeric-step:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
 .cs-numeric-presets > .n-button {
   min-width: 32px;
   height: 32px;
