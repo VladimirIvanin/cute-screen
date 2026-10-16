@@ -24,11 +24,13 @@ export interface QuickCaptureLayoutInput {
   readonly crop: QuickRect
   readonly actionSize: ClientSize
   readonly toolSize: ClientSize
+  readonly settingsSize?: ClientSize
   readonly gap?: number
   readonly margin?: number
 }
 
 export interface QuickCaptureLayout {
+  readonly settingsCollapsed: boolean
   readonly crop: {
     readonly left: number
     readonly top: number
@@ -142,23 +144,55 @@ export function computeQuickCaptureLayout(input: QuickCaptureLayoutInput): Quick
     Math.max(margin, input.viewport.height - input.actionSize.height - margin),
   )
 
+  const toolPlacement = (size: ClientSize, side: 'below' | 'above') => ({
+    left: clamp(left + (width - size.width) / 2, margin,
+      Math.max(margin, input.viewport.width - size.width - margin)),
+    top: side === 'below' ? bottom + gap : top - gap - size.height,
+    side,
+  })
+  const settings = input.settingsSize
+  const expandedSize = {
+    width: Math.max(input.toolSize.width, settings?.width ?? 0),
+    height: input.toolSize.height + (settings ? settings.height + 6 : 0),
+  }
+  const actionRect = { left: actionLeft, top: actionTop, ...input.actionSize }
+  const fits = (candidate: { left: number; top: number }, size: ClientSize) =>
+    candidate.left >= margin &&
+    candidate.top >= margin &&
+    candidate.left + size.width <= input.viewport.width - margin &&
+    candidate.top + size.height <= input.viewport.height - margin &&
+    !(candidate.left < actionRect.left + actionRect.width &&
+      candidate.left + size.width > actionRect.left &&
+      candidate.top < actionRect.top + actionRect.height &&
+      candidate.top + size.height > actionRect.top)
+  const avoidActions = (candidate: { left: number; top: number; side: 'above' | 'below' }) => {
+    const horizontalOverlap = candidate.left < actionRect.left + actionRect.width &&
+      candidate.left + expandedSize.width > actionRect.left
+    if (!horizontalOverlap) return candidate
+    return {
+      ...candidate,
+      top: candidate.side === 'below'
+        ? Math.max(candidate.top, actionRect.top + actionRect.height + gap)
+        : Math.min(candidate.top, actionRect.top - expandedSize.height - gap),
+    }
+  }
+  const expanded = settings
+    ? (['below', 'above'] as const).map((side) => avoidActions(toolPlacement(expandedSize, side)))
+        .find((candidate) => fits(candidate, expandedSize))
+    : undefined
+  const settingsCollapsed = Boolean(settings && !expanded)
   const toolsFitBelow = input.viewport.height - bottom >= input.toolSize.height + gap + margin
-  const toolSide: 'above' | 'below' = toolsFitBelow ? 'below' : 'above'
-  const preferredToolTop = toolsFitBelow ? bottom + gap : top - gap - input.toolSize.height
-  const toolTop = clamp(
-    preferredToolTop,
-    margin,
-    Math.max(margin, input.viewport.height - input.toolSize.height - margin),
-  )
-  const toolLeft = clamp(
-    left + (width - input.toolSize.width) / 2,
-    margin,
-    Math.max(margin, input.viewport.width - input.toolSize.width - margin),
-  )
+  const preferred = expanded ?? toolPlacement(input.toolSize, toolsFitBelow ? 'below' : 'above')
+  const tools = {
+    ...preferred,
+    top: clamp(preferred.top, margin,
+      Math.max(margin, input.viewport.height - (expanded ? expandedSize.height : input.toolSize.height) - margin)),
+  }
 
   return {
+    settingsCollapsed,
     crop: { left, top, right, bottom, width, height },
     actions: { left: actionLeft, top: actionTop, side: actionSide },
-    tools: { left: toolLeft, top: toolTop, side: toolSide },
+    tools,
   }
 }

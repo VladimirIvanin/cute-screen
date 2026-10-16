@@ -440,3 +440,22 @@
   background: var(--surface-raised);
   box-shadow: var(--shadow-overlay);
 }
+
+.cs-quick-defaults {
+  position: absolute;
+  z-index: 20;
+  max-width: calc(100vw - 32px);
+}
+.cs-quick-defaults > .cs-context-toolbar {
+  position: static;
+  max-width: 100%;
+  transform: none;
+}
+.cs-quick-defaults.is-collapsed,
+.cs-quick-defaults.is-sampling {
+  visibility: hidden;
+  pointer-events: none;
+}
+.cs-quick-settings-button {
+  flex: none;
+}

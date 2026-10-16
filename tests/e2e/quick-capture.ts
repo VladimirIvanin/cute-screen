@@ -41,7 +41,10 @@ export async function finishAreaQuickCaptureInEditor(): Promise<void> {
   await expect($('button[aria-label="Numbered marker"] .tabler-icon-circle-number-1')).toExist()
   await expect($('button[aria-label="Callout"] .tabler-icon-stroke-dynamic')).toExist()
   await $('button[aria-label="Pencil"]').click()
-  await expect($('.cs-context-toolbar')).toBeDisplayed()
+  await expect($('.cs-quick-defaults')).toExist()
+  if (!(await $('.cs-quick-defaults').isDisplayed())) {
+    await expect($('.cs-quick-settings-button')).toBeDisplayed()
+  }
   await browser.saveScreenshot(path.resolve('artifacts/tauri-e2e/quick-tabler-pencil.png'))
   await $('button[aria-label="Select"]').click()
   await expect($('.cs-context-toolbar')).not.toExist()

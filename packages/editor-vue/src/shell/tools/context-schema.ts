@@ -1,3 +1,4 @@
+import { showsCreationDefaults } from './settings-policy'
 import { commonLayerStyle } from '@cute-screen/editor-renderer'
 import {
   computed,
@@ -328,8 +329,7 @@ export function createContextSchema(context: ContextSchemaContext) {
     }
   })
   const selectionSchema = computed(() => selectionSchemaFor(context))
-  const toolConfigureSchema = computed(() => {
-    const tool = context.toolConfigure.value?.toolId
+  function defaultsSchema(tool: string | undefined): ContextToolbarSchema | undefined {
     if (!tool)
       return undefined
     if (tool === 'arrow')
@@ -342,8 +342,19 @@ export function createContextSchema(context: ContextSchemaContext) {
       return cropSchema(context)
     const text = context.buildTextContextSchema(undefined, tool, true)
     return text
+  }
+  const toolConfigureSchema = computed(() => defaultsSchema(context.toolConfigure.value?.toolId))
+  const creationSchema = computed(() => {
+    const tool = context.activeToolId.value
+    if (
+      !showsCreationDefaults(tool) ||
+      !context.activeDocument.value ||
+      context.textDraft.value
+    ) return undefined
+    return defaultsSchema(tool)
   })
   return {
+    creationSchema,
     contextSchema: computed(() => (!context.toolConfigure.value && context.activeToolId.value === 'crop' ? cropSchema(context) : undefined)),
     floatingArrowToolbarSchema,
     selectionSchema,

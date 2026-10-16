@@ -1,5 +1,65 @@
 # Стратегия тестирования
 
+## Контекстные настройки инструментов (2026-10-17, ADR-069)
+
+Linux x86_64/X11, Node 22.23.1, pnpm 10.33.2, Chrome 154.0.8037.57,
+Tauri/Wry 0.55.1 и WebKitGTK. Изменения ограничены presentation/defaults routing;
+document v7, IPC и renderer geometry сохранены.
+
+- `pnpm test` — 113 файлов / 884 проверки passed. После уточнения скрытой
+  Quick строки focused lifecycle/context/layout regressions — 48/48;
+  повторная активация того же инструмента закрывает вложенные меню — 59/59
+  lifecycle/tool-ux после добавления двух регрессий. Финальная проверка возврата
+  keyboard focus при удалении старого defaults control — 60/60.
+- `pnpm test:e2e:browser --spec tests/e2e/specs/browser-creation-settings.e2e.ts`
+  с `CUTE_SCREEN_BROWSER_E2E_PORT=5246` — passed. Production shell монтирует
+  документ 2560×1440 через существующий m05viewport harness; все девять
+  defaults проверяются горячими клавишами при 1024 px в RU/EN и light/dark.
+  Tooltip Text (T)/Текст (T), отсутствие нижней панели до клика по canvas и
+  появление inline toolbar проверяются вводом. Визуально проверены снимки
+  `artifacts/browser-e2e/creation-settings-{en,ru}-{light,dark}.png`.
+- `XDG_SESSION_ID=context-settings-quick PATH="$PWD/artifacts/spotlight-fix/tools/bin:$PWD/artifacts/spotlight-fix/tools/webkit/root/usr/bin:$PATH" CUTE_SCREEN_E2E_DRIVER_PROVIDER=external CUTE_SCREEN_E2E_SCENARIOS=creation-settings pnpm test:e2e:tauri`
+  — 1/1 passed. Production Capture → Quick → Editor, реальные pointer gestures:
+  внешнее размещение всей группы при маленькой рамке, фиксация chrome во время
+  resize, сворачивание settings при полном frame и первый штрих после
+  outside-dismiss. Native smoke использует существующий fake-capture source
+  400×300 при полноэкранном CSS viewport; он подтверждает native input/layout,
+  а не реальный захват desktop или обработку больших native изображений.
+  Большой документ проверен отдельно browser matrix.
+- Итоговый browser contract: `CUTE_SCREEN_BROWSER_E2E_PORT=5245 pnpm test:e2e:browser --spec tests/e2e/specs/browser-creation-settings.e2e.ts --spec tests/e2e/specs/browser-tool-lifecycle.e2e.ts --spec tests/e2e/specs/browser-brushes.e2e.ts`
+  — 3 specs / 4 scenarios passed. Дополнительно loupe — 1/1,
+  shape toolbar — 4/4 и arrow tools — 4/4 passed в focused прогонах.
+- Расширенные legacy E2E не полностью зелёные: browser tool-settings
+  останавливается на move/resize aperture; highlighter — на preview/commit
+  checksum. Native tool-lifecycle keyboard прошёл в обоих WebViews, X11
+  context-menu часть остановилась на document focus. В quick-chrome не
+  открылся вложенный custom picker, остальные тесты этого прогона каскадно
+  потеряли чистый draft. Эти результаты не объявляются успешными и не
+  подтверждают sampling/parity в полном native legacy suite.
+- Первый browser matrix выявил обрезку RU numbered-marker defaults на узком
+  окне; max-width теперь ограничен родительской строкой, группы переносятся.
+  Старые configure-only assertions перенесены на persistent defaults.
+  Расширенный highlighter E2E пока не проходит строгое сравнение preview/commit;
+  диагностика зафиксировала дополнительные driver pointerup в (0, 0).
+  Попытки стабилизации input не считаются renderer evidence.
+
+Native PNG в `artifacts/tauri-e2e/creation-settings-quick-outside.png`,
+`creation-settings-quick-manual.png`, `creation-settings-quick-first-stroke.png`
+и `creation-settings-editor.png` просмотрены. Автоматическая строка находится
+вне рамки; явная панель доступна кнопкой и не требует дополнительного клика
+перед рисованием. Windows/macOS/Wayland runtime не запускались.
+
+Итоговый `pnpm check` прошёл полностью: lint, typecheck, formatting/docs,
+43 architecture checks, IPC codegen check и все Rust fmt/clippy configurations.
+
+Первоначальные `pnpm check` остановились на budgets параллельного Settings
+кода и на добавленной строке в createWorkspaceCore; оба участка разделены
+на небольшие функции, последующий architecture suite — 43/43. Первый native
+build остановился на Rust-ошибке is_err_or в shortcuts/operations.rs; после
+исправления повторный native build и новый сценарий прошли.
+Предыдущие неуспешные попытки и итоговые логи сохраняются в
+`artifacts/contextual-tool-settings/`.
+
 ## Измеряемые подписи выносок (2026-10-17, ADR-065)
 
 Linux x86_64/X11, Node 22.23.1, pnpm 10.33.2, Chrome 154.0.8037.57.

@@ -60,7 +60,10 @@ describe('Quick Capture chrome in a real Tauri webview', () => {
     await startCapture()
     await expect($('button[aria-label="Undo"]')).toBeDisabled()
     await $('button[aria-label="Pencil"]').click()
-    await expect($('.cs-context-toolbar')).toBeDisplayed()
+    await expect($('.cs-quick-defaults')).toExist()
+    if (!(await $('.cs-quick-defaults').isDisplayed())) {
+      await expect($('.cs-quick-settings-button')).toBeDisplayed()
+    }
     await expect($('button[aria-label="Pencil"]')).toHaveAttribute('aria-pressed', 'true')
     await browser.keys('Tab')
     expect(await browser.execute(() => document.activeElement?.matches('button:focus-visible'))).toBe(true)

@@ -21,6 +21,23 @@ const embeddedWebDriverPort = Number.parseInt(process.env.TAURI_WEBDRIVER_PORT ?
 
 const scenarios = [
   {
+    id: 'activation-capture',
+    spec: 'tests/e2e/specs/tauri-activation-capture.e2e.ts',
+    harnessQuery: '?m04=1',
+  },
+  {
+    id: 'activation-settings',
+    persistenceGroup: 'activation-settings',
+    spec: 'tests/e2e/specs/tauri-activation-settings.e2e.ts',
+    harnessQuery: '?m02=ready',
+  },
+  {
+    id: 'activation-reopen',
+    persistenceGroup: 'activation-settings',
+    spec: 'tests/e2e/specs/tauri-activation-reopen.e2e.ts',
+    harnessQuery: '?m02=ready',
+  },
+  {
     id: 'brushes',
     persistenceGroup: 'brushes',
     spec: 'tests/e2e/specs/tauri-brushes.e2e.ts',
@@ -184,6 +201,12 @@ const scenarios = [
   {
     id: 'm04-clean-profile-capture',
     spec: 'tests/e2e/specs/m04-clean-profile-capture.e2e.ts',
+    harnessQuery: '?m04=1',
+    fakeCapture: true,
+  },
+  {
+    id: 'creation-settings',
+    spec: 'tests/e2e/specs/tauri-creation-settings.e2e.ts',
     harnessQuery: '?m04=1',
     fakeCapture: true,
   },

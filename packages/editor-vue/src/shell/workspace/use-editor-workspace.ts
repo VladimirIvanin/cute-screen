@@ -35,6 +35,21 @@ import {
   useWorkspaceLifecycle,
 } from './workspace-lifecycle'
 
+function watchMenuTransitions(
+  store: ReturnType<typeof useEditorShellStore>,
+  workspace: ReturnType<typeof createWorkspaceState>,
+  selectionActions: ReturnType<typeof createSelectionActions>,
+): void {
+  const stopMenuTransitions = store.$onAction(({ name }) => {
+    if (name === 'selectTool') workspace.toolActivationRevision.value += 1
+    if (name === 'selectTool' || name === 'clearLayerSelection') selectionActions.canvasMenu.value = undefined
+  })
+  onBeforeUnmount(stopMenuTransitions)
+  watch(() => workspace.activeDocument.value?.id, () => {
+    selectionActions.canvasMenu.value = undefined
+  })
+}
+
 function createWorkspaceCore(props: ResolvedEditorShellProps) {
   const store = useEditorShellStore()
   const state = storeToRefs(store)
@@ -114,13 +129,7 @@ function createWorkspaceCore(props: ResolvedEditorShellProps) {
     redo: session.redoDocument,
     fit: () => store.enableFit(),
   })
-  const stopMenuTransitions = store.$onAction(({ name }) => {
-    if (name === 'selectTool' || name === 'clearLayerSelection') selectionActions.canvasMenu.value = undefined
-  })
-  onBeforeUnmount(stopMenuTransitions)
-  watch(() => workspace.activeDocument.value?.id, () => {
-    selectionActions.canvasMenu.value = undefined
-  })
+  watchMenuTransitions(store, workspace, selectionActions)
   const { onKeydown } = createKeyboardController({
     selectTool: bindings.selectTool,
     props,
@@ -215,6 +224,9 @@ function createWorkspaceViewModel(
     spotlightEditing: workspace.spotlightEditing,
     displayDocument: computed(() => workspace.numericPreviewDocument.value ?? workspace.activeDocument.value),
     contextSchema: bindings.contextSchema,
+    creationSchema: bindings.creationSchema,
+    toolActivationRevision: workspace.toolActivationRevision,
+    onCreationChange: bindings.onCreationChange,
     selectionSchema: bindings.selectionSchema,
     toolConfigureSchema: bindings.toolConfigureSchema,
     drawingPreferences: workspace.drawingPreferences,

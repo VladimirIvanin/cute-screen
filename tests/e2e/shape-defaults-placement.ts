@@ -41,15 +41,15 @@ export async function verifyShapeDefaultsPlacement(
   })
   await $('button[aria-label="Shape"]').click({ button: 'right' })
   expect(await $('html').getAttribute('data-shape-defaults-trusted')).toBe('true')
-  const defaults = $('.cs-tool-configure-popover-host')
+  const defaults = $(':is(.cs-tool-configure-popover-host, .cs-tool-defaults-toolbar:not([aria-hidden="true"]))')
   await expect(defaults).toBeDisplayed()
   for (const [index, menu] of ['appearance', 'stroke', 'appearance'].entries()) {
     await defaults.$(`[data-shape-control="${menu}"]`).click()
     await waitForShapeAnimation()
     const result = await browser.execute((menu) => {
-      const trigger = document.querySelector(`.cs-tool-configure-popover-host [data-shape-control="${menu}"]`)!.getBoundingClientRect()
+      const trigger = document.querySelector(`:is(.cs-tool-configure-popover-host, .cs-tool-defaults-toolbar:not([aria-hidden="true"])) [data-shape-control="${menu}"]`)!.getBoundingClientRect()
       const panel = document.querySelector('.cs-shape-popover')!.getBoundingClientRect()
-      const parent = document.querySelector('.cs-tool-configure-popover-host')!.getBoundingClientRect()
+      const parent = document.querySelector(':is(.cs-tool-configure-popover-host, .cs-tool-defaults-toolbar:not([aria-hidden="true"]))')!.getBoundingClientRect()
       const bounds = document.querySelector<HTMLElement>('[data-preview-bounds]')?.dataset.previewBounds
       return {
         trigger: { left: trigger.left, top: trigger.top, right: trigger.right, bottom: trigger.bottom },

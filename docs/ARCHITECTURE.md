@@ -360,17 +360,14 @@ Outside dismissal не возвращает фокус; Escape закрывае�
 
 Компоненты используют semantic CSS variables: surface, raised, sunken, text, muted, border, accent, danger, focus ring, radii и elevations. Raw brand colors не повторяются в SFC.
 
-Tool settings принадлежат нижнему chrome редактора. Горизонтальный `ToolRail`
-центрирован внизу; `ContextToolbar` появляется над ним для активных
-non-arrow инструментов, precision tools и выбранных слоёв, кроме arrow.
-При inline-редактировании Text/Callout/Numbered Marker shared
-`TextFormattingToolbar` монтируется в transient host `CanvasViewport` над
-`.cs-text-editor`; нижний `ContextToolbar` в это время не дублирует text
-controls. Arrow settings не показываются в нижнем toolbar: shared
-`ArrowFormattingToolbar` монтируется в transient host над выделенной стрелкой
-только при инструменте select, а defaults arrow редактируются через configure
-popover на кнопке инструмента arrow. Defaults и форматирование выбранного,
-но не редактируемого non-arrow слоя остаются в `ContextToolbar` над rail.
+Tool settings используют единые компактные ContextToolbar controls (ADR-069).
+ToolRail центрирован внизу. Для arrow/shape/pencil/marker/numberedMarker и
+precision tools над ним показываются defaults будущих объектов; Crop сохраняет
+Apply/Cancel. Выбранные объекты и группы используют единственную transient-панель
+у выделения. При inline-редактировании Text/Callout/подписи Numbered Marker
+TextFormattingToolbar монтируется над .cs-text-editor без дублирования снизу.
+ПКМ и клавиатурный configure фокусируют видимую строку либо открывают явный
+popover. Quick Capture показывает автоматическую строку только вне crop.
 `LayersPanel` не становится вторым inspector: она управляет выбором, порядком,
 visibility, lock, rotation и opacity. Список слоёв — однострочные ряды;
 opacity и rotation редактируются в шапке панели для выбранного слоя, а не на
@@ -639,3 +636,16 @@ Pointerdown готовит слой без history; pointerup подтвержд
 pointercancel/Escape сохраняют override. Ghost pointer/cache/RAF принадлежат
 canvas controller и не создают Vue updates на каждом pointermove. Schema v7 и
 IPC не расширяются; max+1 не зависит от layer order/visibility/lock.
+
+## Настройки до создания (ADR-069)
+
+Внутренняя settings-policy определяет инструменты с автоматической строкой
+defaults. Строка использует существующие ContextToolbar schemas и defaults
+effects; inline text и selection сохраняют собственные владельцы.
+QuickCaptureLayoutController измеряет settings + tools как группу и показывает
+её вне crop либо сообщает свёрнутое состояние DOM-событием. Скрытая строка
+остаётся измеряемой, но inert и исключена из accessibility tree.
+useQuickChromeLayout наблюдает размеры chrome и фиксирует его положение на
+время canvas gesture; layout updates не передают pointermove в Vue state.
+Numeric drafts и пипетка сохраняют defaults target независимо от показа панели.
+Document v7, renderer geometry, native IPC и persistence не меняются.

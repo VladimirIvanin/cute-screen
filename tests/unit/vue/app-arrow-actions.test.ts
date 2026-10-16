@@ -40,7 +40,7 @@ describe('M02 editor shell', () => {
     })
 
     await fireEvent.click(screen.getByRole('button', { name: 'Arrow' }))
-    expect(screen.queryByRole('button', { name: 'Stroke: 3 px' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Stroke: 3 px' })).toBeInTheDocument()
     await fireEvent.contextMenu(screen.getByRole('button', { name: 'Arrow' }))
     await fireEvent.click(await screen.findByRole('button', { name: 'Stroke: 3 px' }))
     await fireEvent.click(await screen.findByRole('button', { name: '2 px' }))
@@ -53,12 +53,15 @@ describe('M02 editor shell', () => {
     first.unmount()
     session.dispose()
 
-    render(EditorShell, {
-      props: { fixture: 'ready' },
+    const reopened = arrowSession()
+    const second = render(EditorShell, {
+      props: { documentSession: markRaw(reopened) },
       global: { plugins: [createEditorShellPinia()] },
     })
     await fireEvent.contextMenu(screen.getByRole('button', { name: 'Arrow' }))
     expect(await screen.findByRole('button', { name: 'Stroke: 2 px' })).toBeInTheDocument()
+    second.unmount()
+    reopened.dispose()
   })
 
   it('shows a selected unlocked Arrow payload instead of active-tool defaults and commits one change', async () => {
@@ -192,12 +195,15 @@ describe('M02 editor shell', () => {
 
     session.dispose()
     view.unmount()
-    render(EditorShell, {
-      props: { fixture: 'ready', readOnlyDocument: true },
+    const readOnlySession = arrowSession()
+    const readOnlyView = render(EditorShell, {
+      props: { documentSession: markRaw(readOnlySession), readOnlyDocument: true },
       global: { plugins: [createEditorShellPinia()] },
     })
     await fireEvent.contextMenu(screen.getByRole('button', { name: 'Arrow' }))
     expect(await screen.findByRole('button', { name: 'Stroke: 3 px' })).toBeDisabled()
+    readOnlyView.unmount()
+    readOnlySession.dispose()
   })
 
   it('localizes Arrow toolbar labels in Russian', async () => {

@@ -7,9 +7,13 @@ use std::{
 
 use cute_screen_desktop::{
     app::commands::error::CommandErrorV1,
+    autostart::{AutostartSnapshotV1, AutostartStateV1},
     capture::{
         CaptureAction, CaptureCompletion, CaptureInvocationSource, CaptureOutcomeV2,
         CaptureRequestV1, CaptureTerminalOutcome, QuickCaptureDraftV1, QuickCaptureSelectionV1,
+    },
+    shortcuts::{
+        ShortcutAction, ShortcutBackendV1, ShortcutEntryV1, ShortcutSnapshotV1, ShortcutStatusV1,
     },
     storage::OpenDocument,
 };
@@ -33,6 +37,13 @@ fn generated_bindings() -> String {
     output.push_str(&declaration::<QuickCaptureSelectionV1>());
     output.push_str(&declaration::<QuickCaptureDraftV1>());
     output.push_str(&declaration::<CommandErrorV1>());
+    output.push_str(&declaration::<ShortcutAction>());
+    output.push_str(&declaration::<ShortcutBackendV1>());
+    output.push_str(&declaration::<ShortcutStatusV1>());
+    output.push_str(&declaration::<ShortcutEntryV1>());
+    output.push_str(&declaration::<ShortcutSnapshotV1>());
+    output.push_str(&declaration::<AutostartStateV1>());
+    output.push_str(&declaration::<AutostartSnapshotV1>());
     output
 }
 

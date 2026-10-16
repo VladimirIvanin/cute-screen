@@ -165,7 +165,7 @@ describe('M08 shell lifecycle and contextual settings', () => {
 
       useEditorShellStore(pinia).clearLayerSelection()
       await fireEvent.contextMenu(screen.getByRole('button', { name: toolLabel }))
-      toolbar = view.container.querySelector('.cs-tool-configure-popover-host .cs-context-toolbar') as HTMLElement
+      toolbar = view.container.querySelector('.cs-tool-defaults-toolbar') as HTMLElement
       const defaultControl = await within(toolbar).findByRole(role, {
         name: controlLabel,
       })

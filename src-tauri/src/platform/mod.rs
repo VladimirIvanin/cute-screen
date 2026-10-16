@@ -130,7 +130,9 @@ impl PlatformCapabilities {
         let windows_dxgi = backend == CaptureBackendKind::WindowsDxgi;
         let macos_screen = backend == CaptureBackendKind::MacosScreenCapture;
         let capture_available = backend != CaptureBackendKind::Unavailable;
-        let hotkeys = if session == SessionKind::X11 && native_adapter_available {
+        let hotkeys = if (session == SessionKind::X11 && native_adapter_available)
+            || matches!(session, SessionKind::Windows | SessionKind::Macos)
+        {
             HotkeyCapabilities {
                 available: true,
                 backend: HotkeyBackendKind::Native,

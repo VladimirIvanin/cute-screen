@@ -1,5 +1,37 @@
 # Журнал архитектурных решений
 
+## ADR-070 — Системные сочетания и явный выбор запуска при входе
+
+**Статус:** accepted; дополняет ADR-008 и ADR-010.
+
+**Контекст:** existing X11/portal traits не предоставляли пользовательский
+settings flow; Windows/macOS hotkeys были unavailable, Settings tray item
+отключён. Пользователь выбрал автоматическую настройку GNOME без portal,
+готовые предложения с recorder и заранее включённый installer/first-run checkbox.
+
+**Решение:** Rust владеет настройками, регистрациями и восстановлением;
+единственный отдельный Settings WebView доступен из tray/menu/CLI. Native
+замена сначала добавляет новую регистрацию, затем сохраняет preferences,
+затем освобождает старую; persistence failure откатывает staging. GNOME
+создаёт собственную временную custom-keybinding с одноразовым token,
+подтверждает её фактическим CLI-вызовом и сохраняет чужие paths. Wayland
+portal использует стабильные IDs, системную конфигурацию и session-local
+handles; X11 backend на Wayland не выбирается.
+
+Autostart выключен до подтверждения; в вопросе флажок предварительно включён.
+NSIS choice и первый GUI launch являются альтернативными входами в одну
+настройку, обновление сохраняет выбор. Linux использует XDG_CONFIG_HOME,
+Windows per-user Run без записи StartupApproved, macOS 12 LaunchAgent,
+macOS 13+ SMAppService.mainApp. Фактическое состояние ОС показывается отдельно
+от пользовательского выбора; неизвестное состояние не объявляется enabled.
+
+**Проверяемое основание:** red-first Rust transaction contract и mounted
+Settings UI tests, browser recorder/cancel/conflict сценарий, native CLI/window
+и X11 keyboard activation/reopen scenarios. Команды, результаты и pending
+platform/login checks фиксируются в TESTING.md и PLATFORM_MATRIX.md.
+
+Источники и зафиксированные snapshots: [HOTKEYS_RESEARCH.md](HOTKEYS_RESEARCH.md).
+
 ## ADR-059 — Линейка ограничена видимым canvas и подгоняется при crop
 
 **Статус:** accepted; дополняет ADR-056.
@@ -1229,7 +1261,7 @@ selection/source roundtrip, production browser input с long Cyrillic/Latin,
 
 ## ADR-063 — Согласованные переходы инструментов и панелей
 
-**Статус:** accepted; supersedes ADR-048 и ADR-052.
+**Статус:** superseded by [ADR-069](#adr-069-настройки-до-создания-с-приоритетом-свободного-canvas); supersedes ADR-048 и ADR-052.
 
 **Контекст:** пользователь подтвердил defaults только через ПКМ и снятие выбора
 при creation activation. Пустой hit ранее оставлял selection, а hotkey менял tool
@@ -1351,3 +1383,30 @@ Document v7 и IPC сохраняются. Существующий rich-text la
 **Проверяемое основание:** red-first проверка независимости sequence и подписи,
 сохранения центра/размера badge и portable round-trip, browser edit/undo и
 декодирование PNG обоих backend; фактические результаты — TESTING.md.
+
+## ADR-069 — Настройки до создания с приоритетом свободного canvas
+
+**Статус:** accepted; supersedes ADR-063.
+
+**Контекст:** пользователь отказался от скрытого единственного входа в defaults
+и длинных tooltip-инструкций. Настройки кисти/фигуры полезны до первого жеста,
+текстовые — после размещения. В Quick Capture настройки не должны мешать рисованию.
+
+**Решение:** единая внутренняя политика открывает defaults arrow/shape/pencil/
+marker/numberedMarker/censor/spotlight/ruler/loupe при активации. Text/Callout
+оставляют inline controls; Crop — Apply/Cancel. Полный editor показывает строку
+над ToolRail. Quick размещает целую группу вне crop (below, затем above);
+при нехватке места сворачивает настройки в явную кнопку. Явный popover не
+поглощает outside-pointerdown. Во время gesture chrome не перемещается.
+ПКМ и клавиатурный configure фокусируют строку либо открывают явный popover.
+Tooltip содержит только имя и shortcut.
+
+Сохраняются остальные переходы ADR-063: activation очищает selection,
+inline commit завершается перед сменой режима, Escape закрывает один уровень,
+selection styles не дублируются снизу, defaults независимы от undo/redo.
+Document v7, IPC и публичные API остаются прежними.
+
+**Проверяемое основание:** matrix mounted-shell click/hotkey/creation,
+геометрические проверки внешнего размещения и fallback при полном crop,
+browser/native pointer creation после outside-dismiss. Фактические команды,
+платформы, снимки и ограничения фиксируются в TESTING.md.

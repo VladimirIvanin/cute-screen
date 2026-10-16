@@ -183,6 +183,7 @@ impl X11HotkeyService {
             .get(screen_number)
             .ok_or_else(|| hotkey_error(correlation_id, "screen"))?
             .root;
+        enable_detectable_hotkey_repeat(&connection, correlation_id)?;
         let bindings = build_hotkey_bindings(&connection, &shortcuts, correlation_id)?;
         replacement_plan(&[], &bindings, correlation_id)?;
         if std::env::var_os("CUTE_SCREEN_CAPTURE_DEBUG").is_some() {
@@ -198,7 +199,8 @@ impl X11HotkeyService {
         connection
             .change_window_attributes(
                 root,
-                &ChangeWindowAttributesAux::new().event_mask(EventMask::KEY_PRESS),
+                &ChangeWindowAttributesAux::new()
+                    .event_mask(EventMask::KEY_PRESS | EventMask::KEY_RELEASE),
             )
             .map_err(|_| hotkey_error(correlation_id, "selectKeyPress"))?;
         grab_bindings(&connection, root, &bindings, correlation_id)?;
@@ -334,25 +336,27 @@ fn grab_bindings(
 ) -> Result<(), PlatformError> {
     let mut grabbed = Vec::new();
     for binding in bindings {
-        let result = connection
-            .grab_key(
-                false,
-                root,
-                binding.modifiers,
-                binding.keycode,
-                GrabMode::ASYNC,
-                GrabMode::ASYNC,
-            )
-            .map_err(|_| hotkey_error(correlation_id, "grabRequest"))?
-            .check()
-            .map_err(|_| {
-                PlatformError::new(PlatformErrorCode::ShortcutUnavailable, correlation_id)
-            });
-        if let Err(error) = result {
-            ungrab_bindings(connection, root, &grabbed);
-            return Err(error);
+        for modifiers in hotkey_modifier_variants(binding.modifiers) {
+            let result = connection
+                .grab_key(
+                    false,
+                    root,
+                    modifiers,
+                    binding.keycode,
+                    GrabMode::ASYNC,
+                    GrabMode::ASYNC,
+                )
+                .map_err(|_| hotkey_error(correlation_id, "grabRequest"))?
+                .check()
+                .map_err(|_| {
+                    PlatformError::new(PlatformErrorCode::ShortcutUnavailable, correlation_id)
+                });
+            if let Err(error) = result {
+                ungrab_bindings(connection, root, &grabbed);
+                return Err(error);
+            }
+            grabbed.push(binding.clone());
         }
-        grabbed.push(binding.clone());
     }
     if connection.flush().is_err() {
         ungrab_bindings(connection, root, &grabbed);
@@ -363,9 +367,23 @@ fn grab_bindings(
 
 fn ungrab_bindings(connection: &RustConnection, root: u32, bindings: &[X11HotkeyBinding]) {
     for binding in bindings {
-        let _ = connection.ungrab_key(binding.keycode, root, binding.modifiers);
+        for modifiers in hotkey_modifier_variants(binding.modifiers) {
+            let _ = connection.ungrab_key(binding.keycode, root, modifiers);
+        }
     }
     let _ = connection.flush();
+}
+
+fn hotkey_modifier_variants(
+    base: x11rb::protocol::xproto::ModMask,
+) -> [x11rb::protocol::xproto::ModMask; 4] {
+    use x11rb::protocol::xproto::ModMask;
+    [
+        base,
+        base | ModMask::LOCK,
+        base | ModMask::M2,
+        base | ModMask::LOCK | ModMask::M2,
+    ]
 }
 
 fn binding_key(binding: &X11HotkeyBinding) -> (u8, u16) {
@@ -450,6 +468,7 @@ fn parse_hotkey_trigger(
     }
     let key = key.to_ascii_uppercase();
     let keysyms = match key.as_str() {
+        "SPACE" => [0x20, 0x20],
         "PRINT" | "PRINTSCREEN" => [0xff61, 0xff61],
         value if value.len() == 1 && value.as_bytes()[0].is_ascii_alphabetic() => {
             let upper = u32::from(value.as_bytes()[0]);
@@ -512,6 +531,31 @@ fn keycode_for_trigger(
         .ok_or_else(|| PlatformError::new(PlatformErrorCode::ShortcutUnavailable, correlation_id))
 }
 
+fn enable_detectable_hotkey_repeat(
+    connection: &RustConnection,
+    correlation_id: &str,
+) -> Result<(), PlatformError> {
+    use x11rb::protocol::xkb::{BoolCtrl, ConnectionExt as _, ID, PerClientFlag};
+    connection
+        .xkb_use_extension(1, 0)
+        .map_err(|_| hotkey_error(correlation_id, "xkbExtension"))?
+        .reply()
+        .map_err(|_| hotkey_error(correlation_id, "xkbExtension"))?;
+    connection
+        .xkb_per_client_flags(
+            u16::from(ID::USE_CORE_KBD),
+            PerClientFlag::DETECTABLE_AUTO_REPEAT,
+            PerClientFlag::DETECTABLE_AUTO_REPEAT,
+            BoolCtrl::default(),
+            BoolCtrl::default(),
+            BoolCtrl::default(),
+        )
+        .map_err(|_| hotkey_error(correlation_id, "detectableRepeat"))?
+        .reply()
+        .map_err(|_| hotkey_error(correlation_id, "detectableRepeat"))?;
+    Ok(())
+}
+
 fn run_hotkey_worker(
     connection: RustConnection,
     root: u32,
@@ -520,6 +564,7 @@ fn run_hotkey_worker(
     mut on_activated: Arc<dyn Fn(String) + Send + Sync>,
     commands: Receiver<X11HotkeyCommand>,
 ) {
+    let mut pressed = BTreeSet::new();
     while !stop.load(Ordering::Acquire) {
         while let Ok(command) = commands.try_recv() {
             match command {
@@ -545,7 +590,13 @@ fn run_hotkey_worker(
             }
         }
         match connection.poll_for_event() {
+            Ok(Some(Event::KeyRelease(event))) => {
+                pressed.remove(&event.detail);
+            }
             Ok(Some(Event::KeyPress(event))) => {
+                if !pressed.insert(event.detail) {
+                    continue;
+                }
                 if std::env::var_os("CUTE_SCREEN_CAPTURE_DEBUG").is_some() {
                     eprintln!(
                         "cute-screen x11 hotkey event: keycode={} state={}",
@@ -556,7 +607,11 @@ fn run_hotkey_worker(
                 let state = u16::from(event.state);
                 for binding in &bindings {
                     if event.detail == binding.keycode
-                        && state & u16::from(binding.modifiers) == u16::from(binding.modifiers)
+                        && state
+                            & 0xff
+                            & !(u16::from(x11rb::protocol::xproto::ModMask::LOCK)
+                                | u16::from(x11rb::protocol::xproto::ModMask::M2))
+                            == u16::from(binding.modifiers)
                     {
                         on_activated(binding.id.clone());
                     }
@@ -2660,6 +2715,15 @@ fn hotkey_error(correlation_id: &str, operation: &str) -> PlatformError {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn global_shortcuts_grab_caps_and_num_lock_variants() {
+        use x11rb::protocol::xproto::ModMask;
+        let base = ModMask::CONTROL | ModMask::SHIFT;
+        let variants = super::hotkey_modifier_variants(base);
+        assert_eq!(variants.len(), 4);
+        assert!(variants.contains(&(base | ModMask::LOCK | ModMask::M2)));
+    }
+
     use std::time::Duration;
 
     use crate::{

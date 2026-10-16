@@ -771,3 +771,9 @@ macOS/WKWebView и Wayland пока не проверены и не получа
 | Windows / macOS / Wayland                 | В этом срезе не запускались                                                                                                               | Новых supported claims нет                                                |
 
 Команды, red-first evidence, screenshots и промежуточные ограничения — TESTING.md.
+
+## Контекстные настройки (ADR-069)
+
+Политика показа defaults и свободной области Quick Capture общая для всех ОС.
+Runtime evidence для изменения фиксируется в TESTING.md; Linux/WebKitGTK smoke
+не подтверждает Windows/WebView2, macOS или Wayland capture.

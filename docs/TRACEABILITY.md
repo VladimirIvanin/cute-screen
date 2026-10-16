@@ -1,5 +1,16 @@
 # Трассируемость требований
 
+## Горячие клавиши и запуск при входе (2026-10-17)
+
+| Требование              | Вертикальный срез                                                           | Доказательство                                                                                                   |
+| ----------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| REQ-ACT-001/002/009/011 | Rust shortcut service, отдельное окно, recorder, восстановление             | Red-first Rust transaction tests, Vue и browser/native scenarios; platform runtime pending до фактического smoke |
+| REQ-ACT-003/004/010     | Portal configure/list/changed, GNOME owned custom-keybindings, CLI fallback | Rust GNOME ownership/cancel tests, portal runtime matrix                                                         |
+| REQ-ACT-005/006/008     | Tray/menu/CLI settings и общий dispatch                                     | CLI parser tests, singleton window и real-WebView route                                                          |
+| REQ-ACT-007/012         | NSIS choice, first-run choice, platform autostart state                     | Rust path/registration tests; реальный logout/login отдельно на каждой ОС                                        |
+
+План реализации и источники: [исследование](HOTKEYS_RESEARCH.md). Поддержка не выводится из наличия кода или компиляции.
+
 ## Физические буквенные shortcuts редактора (2026-10-16, ADR-064)
 
 `REQ-EDT-003/005/006/016`: запись добавлена до реализации. Все существующие
@@ -1234,3 +1245,17 @@ REQ-TOL-006 / уточнение подписи 2026-10-17: номер всег�
 необязательная multiline подпись находится справа, с фиксированным зазором и
 вертикальным центрированием. Правки подписи не меняют sequence/размер badge.
 Проверки: core caption contract, renderer export, mounted и browser edit/undo.
+
+## Контекстные настройки до создания (2026-10-17, ADR-069)
+
+REQ-EDT-008/015/018, REQ-TOL-001/003/004/005/006/007/008/009/010/011:
+запись добавлена до реализации. Единая политика показывает defaults стрелки,
+фигуры, карандаша, выделителя, номера, цензуры, подсветки, линейки и лупы при
+активации. Text/Callout открывают inline controls после размещения.
+Quick Capture показывает автоматическую строку только вне рамки; при нехватке
+места доступна явная кнопка настроек. Первый pointerdown после outside-dismiss
+должен создавать штрих без дополнительного клика. Проверки: mounted shell,
+геометрия размещения, browser pointer/keyboard, real Tauri Capture → Quick → Editor.
+Статус: implemented; pnpm test — 113 файлов / 884 проверки, затем 48/48 focused regressions.
+Browser matrix на 2560×1440 документе и native creation-settings прошли;
+фактические команды, дополнительные проверки и ограничения — TESTING.md.

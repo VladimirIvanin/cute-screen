@@ -96,7 +96,7 @@ export async function verifyToolSettings(
   await drag(c.x + c.w * .12, c.y + c.h * .3, c.x + c.w * .3, c.y + c.h * .4)
   await browser.waitUntil(async () => (await shapeDocument()).layers.length === count + 1)
   expect((await shapeDocument()).layers.at(-1)!.kind).toBe('pencil')
-  await expect($('[data-tool-settings="pencil"]')).not.toExist()
+  await expect($('[data-tool-settings="pencil"]')).toExist()
   await $('.cs-toolrail button[aria-label="Pencil"]').click({ button: 'right' })
   await expect($('[data-tool-settings="pencil"]')).toBeDisplayed()
   await $('button[aria-label="Correction"]').click()

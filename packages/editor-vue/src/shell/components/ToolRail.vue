@@ -5,6 +5,7 @@ import {
 } from 'naive-ui'
 import { UiIcon } from '../icon'
 import UiSeparator from '../ui/UiSeparator.vue'
+import { hasToolSettings } from '../tools/settings-policy'
 import type { ToolDescriptor } from '../types'
 
 defineProps<{
@@ -20,7 +21,7 @@ const emit = defineEmits<{
 }>()
 
 function configurable(id: string): boolean {
-  return !['select', 'hand', 'image', 'eyedropper'].includes(id)
+  return hasToolSettings(id)
 }
 
 const toolGroups = ['canvas', 'annotate', 'more'] as const
@@ -85,6 +86,7 @@ function onToolKeydown(
               :aria-haspopup="configurable(tool.id) ? 'dialog' : undefined"
               :aria-expanded="configurable(tool.id) ? configuredToolId === tool.id : undefined"
               :aria-controls="configuredToolId === tool.id ? 'cs-tool-defaults' : undefined"
+              :data-tool-id="tool.id"
               :aria-pressed="activeToolId === tool.id"
               :aria-label="t(tool.labelKey)"
               :title="tool.disabled ? toolTitle(tool, t) : undefined"
@@ -95,7 +97,7 @@ function onToolKeydown(
               <UiIcon :name="tool.icon" />
             </NButton>
           </template>
-          {{ toolTitle(tool, t) }}{{ configurable(tool.id) && configureHint ? ` · ${configureHint}` : '' }}
+          {{ toolTitle(tool, t) }}
         </NTooltip>
       </div>
     </template>

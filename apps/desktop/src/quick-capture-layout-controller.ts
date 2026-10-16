@@ -57,10 +57,15 @@ export class QuickCaptureLayoutController {
       source,
       crop,
       actionSize: { width: actions.offsetWidth, height: actions.offsetHeight },
-      toolSize: { width: groupWidth, height: groupHeight },
+      toolSize: { width: tools.offsetWidth, height: tools.offsetHeight },
+      ...(context ? { settingsSize: { width: context.offsetWidth, height: contextHeight } } : {}),
     })
+    context?.dispatchEvent(new CustomEvent('cs-quick-settings-layout', { detail: layout.settingsCollapsed }))
+    const visibleContextHeight = layout.settingsCollapsed ? 0 : contextHeight
+    const visibleWidth = layout.settingsCollapsed ? tools.offsetWidth : groupWidth
     positionActions(actions, layout.actions)
-    positionTools(tools, context, layout.tools, contextHeight, verticalGap)
+    positionTools(tools, context, layout.tools, visibleContextHeight,
+      visibleContextHeight ? verticalGap : 0, visibleWidth)
     return layoutKey(bounds, source, crop, actions, groupWidth, groupHeight)
   }
 
@@ -113,14 +118,15 @@ function positionTools(
   position: { left: number; top: number; side: string },
   contextHeight: number,
   gap: number,
+  groupWidth: number,
 ): void {
   if (context) {
-    context.style.left = `${Math.round(position.left)}px`
+    context.style.left = `${Math.round(position.left + (groupWidth - context.offsetWidth) / 2)}px`
     context.style.top = `${Math.round(position.top)}px`
     context.style.bottom = 'auto'
     context.style.transform = 'none'
   }
-  row.style.left = `${Math.round(position.left)}px`
+  row.style.left = `${Math.round(position.left + (groupWidth - row.offsetWidth) / 2)}px`
   row.style.top = `${Math.round(position.top + contextHeight + gap)}px`
   row.style.bottom = 'auto'
   row.style.transform = 'none'

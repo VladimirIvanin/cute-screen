@@ -312,6 +312,8 @@ impl QuickEditorMountService {
 
 #[path = "services/activation.rs"]
 pub mod activation;
+#[path = "services/autostart/mod.rs"]
+pub mod autostart;
 pub mod capture;
 #[path = "services/clipboard.rs"]
 mod clipboard;
@@ -321,6 +323,11 @@ mod fonts;
 pub mod image_transport;
 #[path = "services/lifecycle.rs"]
 pub mod lifecycle;
+#[path = "services/settings_window.rs"]
+mod settings_window;
+#[path = "services/shortcuts/mod.rs"]
+pub mod shortcuts;
+use shortcuts::commands::*;
 #[cfg(target_os = "linux")]
 #[path = "platform/linux/portal.rs"]
 pub mod linux_platform;
@@ -720,7 +727,22 @@ fn lifecycle_complete_main_window_close(app: tauri::AppHandle) {
 }
 
 #[tauri::command]
-fn lifecycle_finish_quit(app: tauri::AppHandle) {
+async fn lifecycle_finish_quit(app: tauri::AppHandle) {
+    let cleanup_app = app.clone();
+    let cleanup = tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
+        if let Some(service) = cleanup_app.try_state::<shortcuts::host::ShortcutService>() {
+            let _operation = service
+                .operation
+                .lock()
+                .map_err(|error| error.to_string())?;
+            service.cancel_pending()?;
+        }
+        Ok(())
+    })
+    .await;
+    if !matches!(cleanup, Ok(Ok(()))) {
+        eprintln!("cute-screen shortcut quit cleanup: {cleanup:?}");
+    }
     if let Some(controller) = app.try_state::<CaptureController>() {
         let _ = controller.cancel();
     }
@@ -1332,7 +1354,21 @@ async fn hotkeys_bind_inner(
             )),
         }
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
+    {
+        shortcuts::host::apply_native(&app, &shortcuts).map_err(|_| {
+            PlatformError::new(PlatformErrorCode::ShortcutUnavailable, &correlation_id)
+        })?;
+        Ok(shortcuts
+            .into_iter()
+            .map(|shortcut| ShortcutBindingResult {
+                id: shortcut.id,
+                active: true,
+                correlation_id: correlation_id.clone(),
+            })
+            .collect())
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
     {
         let _ = (shortcuts, app);
         Err(PlatformError::new(
@@ -1641,6 +1677,13 @@ async fn hide_editor_for_native_capture<R: tauri::Runtime>(
     if !native_desktop_capture {
         return Ok(false);
     }
+    // Settings is a separate application surface. A shortcut invoked while it is
+    // open must remove it before freezing desktop pixels, just like the editor.
+    if let Some(settings) = app.get_webview_window("settings") {
+        settings
+            .hide()
+            .map_err(|_| PlatformError::new(PlatformErrorCode::CaptureFailed, correlation_id))?;
+    }
     #[cfg(all(target_os = "linux", feature = "x11-capture"))]
     if x11_platform::X11CaptureAdapter.current_process_windows_unmapped(correlation_id)? {
         x11_platform::wait_for_recent_app_surface_settle();
@@ -1719,7 +1762,23 @@ fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()
         "Open Editor"
     };
     let show = MenuItem::with_id(app, "show-editor", editor_label, true, None::<&str>)?;
-    let settings = MenuItem::with_id(app, "settings", "Settings", false, None::<&str>)?;
+    let settings = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
+    let shortcuts_item = MenuItem::with_id(
+        app,
+        "shortcut-settings",
+        "Assign keyboard shortcuts…",
+        true,
+        None::<&str>,
+    )?;
+    let capture_active = MenuItem::with_id(
+        app,
+        "capture-active-window",
+        "Capture Active Window",
+        false,
+        None::<&str>,
+    )?;
+    let capture_repeat =
+        MenuItem::with_id(app, "capture-repeat", "Repeat Area", false, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
     let menu = Menu::with_items(
@@ -1728,8 +1787,11 @@ fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()
             &capture_area,
             &capture_screen,
             &capture_window,
+            &capture_active,
+            &capture_repeat,
             &separator,
             &show,
+            &shortcuts_item,
             &settings,
             &quit,
         ],
@@ -1757,12 +1819,47 @@ fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()
                 capture_request_for_tray(capture::CaptureAction::Window),
                 false,
             ),
+            "capture-active-window" => start_capture(
+                app,
+                capture_request_for_tray(capture::CaptureAction::ActiveWindow),
+                false,
+            ),
+            "capture-repeat" => start_capture(
+                app,
+                capture_request_for_tray(capture::CaptureAction::Repeat),
+                false,
+            ),
+            "settings" | "shortcut-settings" => {
+                if let Err(error) = settings_window::open(app, false) {
+                    eprintln!("cute-screen tray settings: {error}");
+                }
+            }
             "show-editor" => show_editor(app),
             "quit" if app.emit("cute-screen:request-quit", ()).is_err() => app.exit(0),
             _ => {}
         })
         .build(app)?;
+    app.manage(settings_window::TrayShortcutItems(vec![
+        capture_area.clone(),
+        capture_screen.clone(),
+        capture_window.clone(),
+        capture_active.clone(),
+        capture_repeat.clone(),
+        show,
+    ]));
     refresh_tray_capture_items(capture_area, capture_screen, capture_window);
+    tauri::async_runtime::spawn(async move {
+        let capabilities = platform_capabilities("tray-extra-actions".to_owned()).await;
+        if let Err(error) = capture_active.set_enabled(capabilities.capture.active_window_target) {
+            eprintln!("cute-screen tray active window: {error}");
+        }
+        if let Err(error) = capture_repeat.set_enabled(capture_action_supported(
+            capture::CaptureAction::Repeat,
+            &capabilities,
+        )) {
+            eprintln!("cute-screen tray repeat: {error}");
+        }
+    });
     Ok(())
 }
 
@@ -1793,7 +1890,6 @@ fn capture_request_for_tray(action: capture::CaptureAction) -> CaptureRequestV1 
     }
 }
 
-#[cfg(any(target_os = "linux", test))]
 fn action_for_shortcut_id(shortcut_id: &str) -> Option<capture::CaptureAction> {
     match shortcut_id {
         "capture-area" => Some(capture::CaptureAction::Area),
@@ -1840,12 +1936,18 @@ fn publish_capture_outcome<R: tauri::Runtime>(
     {
         show_editor(app);
     } else if outcome.outcome == CaptureTerminalOutcome::Failed {
-        let _ = app
-            .notification()
-            .builder()
-            .title("Cute Screen capture failed")
-            .body("Open Cute Screen to retry or inspect diagnostics.")
-            .show();
+        let app = app.clone();
+        tauri::async_runtime::spawn_blocking(move || {
+            if let Err(error) = app
+                .notification()
+                .builder()
+                .title("Cute Screen capture failed")
+                .body("Open Cute Screen to retry or inspect diagnostics.")
+                .show()
+            {
+                eprintln!("cute-screen capture failure notification: {error}");
+            }
+        });
     }
     let _ = app.emit("cute-screen:capture-outcome", outcome);
 }
@@ -1917,6 +2019,20 @@ async fn capture_with_preflight<R: tauri::Runtime>(
     controller: &CaptureController,
     request: CaptureRequestV1,
 ) -> CaptureOutcomeV2 {
+    if request.invocation_source == CaptureInvocationSource::Cli {
+        let action = match request.action {
+            capture::CaptureAction::Area => shortcuts::ShortcutAction::CaptureArea,
+            capture::CaptureAction::Screen => shortcuts::ShortcutAction::CaptureScreen,
+            capture::CaptureAction::Window => shortcuts::ShortcutAction::CaptureWindow,
+            capture::CaptureAction::ActiveWindow => shortcuts::ShortcutAction::CaptureActiveWindow,
+            capture::CaptureAction::Repeat => shortcuts::ShortcutAction::CaptureRepeat,
+        };
+        if shortcuts::host::intercept_recording(app, action)
+            || shortcuts::host::intercept_test(app, action)
+        {
+            return terminal_capture(request.correlation_id, CaptureTerminalOutcome::Cancelled);
+        }
+    }
     if let Some(diagnostics) = app.try_state::<CaptureDiagnosticsService>() {
         diagnostics.begin(&request);
     }
@@ -1950,7 +2066,8 @@ async fn capture_with_preflight<R: tauri::Runtime>(
         .await
         {
             Ok(hid_editor) => hid_editor,
-            Err(_) => {
+            Err(error) => {
+                eprintln!("cute-screen background capture hide: {error:?}");
                 let outcome = failed_capture(request.correlation_id);
                 publish_capture_outcome(app, &outcome);
                 return outcome;
@@ -1985,12 +2102,14 @@ async fn capture_with_preflight<R: tauri::Runtime>(
         return outcome;
     }
 
-    let allowed = matches!(
-        tokio::time::timeout(CAPTURE_PREFLIGHT_TIMEOUT, approval).await,
-        Ok(Ok(true))
-    );
+    let approval = tokio::time::timeout(CAPTURE_PREFLIGHT_TIMEOUT, approval).await;
+    let allowed = matches!(approval, Ok(Ok(true)));
     preflight.remove(&request.correlation_id);
     if !allowed {
+        eprintln!(
+            "cute-screen capture preflight rejected ({}): {approval:?}",
+            request.correlation_id
+        );
         let outcome = failed_capture(request.correlation_id);
         publish_capture_outcome(app, &outcome);
         return outcome;
@@ -2005,7 +2124,8 @@ async fn capture_with_preflight<R: tauri::Runtime>(
     .await
     {
         Ok(hid_editor) => hid_editor,
-        Err(_) => {
+        Err(error) => {
+            eprintln!("cute-screen capture hide: {error:?}");
             let outcome = failed_capture(request.correlation_id);
             publish_capture_outcome(app, &outcome);
             return outcome;
@@ -2047,7 +2167,42 @@ fn start_capture<R: tauri::Runtime>(
 
 fn handle_launch<R: tauri::Runtime>(app: &tauri::AppHandle<R>, intent: LaunchIntentV1) {
     match intent {
-        LaunchIntentV1::ShowEditor => show_editor(app),
+        LaunchIntentV1::ShowEditor => {
+            if shortcuts::host::intercept_recording(app, shortcuts::ShortcutAction::ShowEditor)
+                || shortcuts::host::intercept_test(app, shortcuts::ShortcutAction::ShowEditor)
+            {
+                return;
+            }
+            let first_run = !cfg!(feature = "test-harness")
+                && app
+                    .try_state::<shortcuts::host::ShortcutService>()
+                    .and_then(|service| service.preferences().ok())
+                    .is_some_and(|preferences| !preferences.setup_completed);
+            if first_run {
+                if let Err(error) = settings_window::open(app, true) {
+                    eprintln!("cute-screen first-run settings: {error}");
+                    show_editor(app);
+                }
+            } else {
+                show_editor(app);
+            }
+        }
+        LaunchIntentV1::Settings => {
+            if let Err(error) = settings_window::open(app, false) {
+                eprintln!("cute-screen settings: {error}");
+            }
+        }
+        LaunchIntentV1::VerifyShortcut { token } => {
+            let app = app.clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                if let Err(error) = app
+                    .state::<shortcuts::host::ShortcutService>()
+                    .verify(&app, &token)
+                {
+                    eprintln!("cute-screen shortcut verification: {error}");
+                }
+            });
+        }
         LaunchIntentV1::Background => {
             let tray_available = app
                 .try_state::<Mutex<LifecycleState>>()
@@ -2195,7 +2350,10 @@ pub fn run() {
         }
     }
 
-    let builder = tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
+    let builder = shortcuts::native::install(builder);
+    let builder = builder
         .plugin(tauri_plugin_single_instance::init(
             |app, args, _cwd| match parse_launch(args) {
                 Ok(intent) => handle_launch(app, intent),
@@ -2204,12 +2362,15 @@ pub fn run() {
                 }
             },
         ))
-        .plugin(tauri_plugin_autostart::init(
-            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            Some(vec!["--background"]),
-        ))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
+        .on_menu_event(|app, event| {
+            if event.id.as_ref() == "app-settings"
+                && let Err(error) = settings_window::open(app, false)
+            {
+                eprintln!("cute-screen app settings: {error}");
+            }
+        })
         .setup(move |app| {
             app.manage(Mutex::new(LifecycleState::default()));
             let repository = initialize_repository(app)?;
@@ -2219,6 +2380,11 @@ pub fn run() {
             let controller = CaptureController::new(repository.clone(), Arc::clone(&transport));
             app.manage(repository.handle());
             app.manage(repository);
+            app.manage(shortcuts::host::ShortcutService::load(
+                &app.state::<LibraryRepository>(),
+            ));
+            #[cfg(any(target_os = "windows", target_os = "macos"))]
+            app.manage(shortcuts::native::NativeRegistry::default());
             app.manage(transport);
             app.manage(controller.clone());
             app.manage(CapturePreflightService::default());
@@ -2258,6 +2424,7 @@ pub fn run() {
             }
 
             let tray_result = create_tray(app.handle());
+            settings_window::install_menu(app.handle())?;
             if let Ok(mut state) = app.state::<Mutex<LifecycleState>>().lock() {
                 state.set_tray_available(tray_result.is_ok());
             }
@@ -2265,7 +2432,45 @@ pub fn run() {
                 eprintln!("cute-screen lifecycle warning: tray unavailable: {error}");
             }
 
-            handle_launch(app.handle(), launch_intent);
+            #[cfg(target_os = "macos")]
+            let launch_intent = if matches!(launch_intent, LaunchIntentV1::ShowEditor)
+                && autostart::macos::login_launch()
+            {
+                LaunchIntentV1::Background
+            } else {
+                launch_intent
+            };
+            let startup_app = app.handle().clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                let service = startup_app.state::<shortcuts::host::ShortcutService>();
+                if let Err(error) = service.restore(&startup_app) {
+                    eprintln!("cute-screen shortcut restore: {error}");
+                    if let Ok(mut state) = service.error.lock() {
+                        *state = Some(error);
+                    }
+                }
+                settings_window::refresh_tray(&startup_app);
+                handle_launch(&startup_app, launch_intent);
+                #[cfg(target_os = "linux")]
+                tauri::async_runtime::spawn(async move {
+                    loop {
+                        tokio::time::sleep(std::time::Duration::from_secs(15)).await;
+                        let app = startup_app.clone();
+                        let result = tauri::async_runtime::spawn_blocking(move || {
+                            let service = app.state::<shortcuts::host::ShortcutService>();
+                            if let Err(error) = service.maintain(&app)
+                                && let Ok(mut state) = service.error.lock()
+                            {
+                                *state = Some(error);
+                            }
+                        })
+                        .await;
+                        if let Err(error) = result {
+                            eprintln!("cute-screen shortcut maintenance: {error}");
+                        }
+                    }
+                });
+            });
 
             #[cfg(feature = "fake-platform")]
             {
@@ -2311,6 +2516,18 @@ pub fn run() {
         capture_preflight_set_ready,
         capture_preflight_complete,
         hotkeys_bind,
+        shortcuts_snapshot,
+        shortcuts_assign,
+        shortcuts_probe,
+        shortcuts_recording,
+        shortcuts_cancel,
+        shortcuts_test,
+        shortcuts_system_settings,
+        autostart_snapshot,
+        autostart_set,
+        autostart_system_settings,
+        activation_setup_complete,
+        open_activation_settings,
         platform_capabilities,
         open_screen_recording_settings,
         get_e2e_harness_query,
@@ -2361,6 +2578,18 @@ pub fn run() {
         capture_preflight_set_ready,
         capture_preflight_complete,
         hotkeys_bind,
+        shortcuts_snapshot,
+        shortcuts_assign,
+        shortcuts_probe,
+        shortcuts_recording,
+        shortcuts_cancel,
+        shortcuts_test,
+        shortcuts_system_settings,
+        autostart_snapshot,
+        autostart_set,
+        autostart_system_settings,
+        activation_setup_complete,
+        open_activation_settings,
         platform_capabilities,
         open_screen_recording_settings,
         read_image_bytes,

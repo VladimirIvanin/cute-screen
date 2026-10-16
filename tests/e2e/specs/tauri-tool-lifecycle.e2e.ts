@@ -32,6 +32,13 @@ async function configureArrowWithSystemPointer(): Promise<void> {
       y: Math.round(rect.y + rect.height / 2),
     }
   })
+  await browser.execute(async () => {
+    const state = window as typeof window & {
+      __TAURI__: { core: { invoke(command: string, args: Record<string, unknown>): Promise<void> } }
+    }
+    await state.__TAURI__.core.invoke('plugin:window|set_focus', { label: 'main' })
+  })
+  await $('button[aria-label="Arrow"]').click()
   await browser.waitUntil(() => browser.execute(() => document.hasFocus()))
   const { stdout } = await executeFile('xdotool', ['getactivewindow'], { timeout: 5000 })
   await executeFile('xdotool', [
@@ -62,17 +69,24 @@ async function keyboardConfigure(surface: string): Promise<void> {
     }, { capture: true })
   })
   await browser.keys([Key.Shift, Key.F10])
-  await expect($('.cs-tool-configure-popover-host')).toBeDisplayed()
+  const settings = surface === 'quick' ? '.cs-tool-configure-popover-host' : '.cs-tool-defaults-toolbar'
+  await expect($(settings)).toBeDisplayed()
   expect(await $('html').getAttribute('data-lifecycle-key-trusted')).toBe('true')
-  await browser.keys('Escape')
-  await expect($('.cs-tool-configure-popover-host')).not.toExist()
-  await expect(arrow).toBeFocused()
+  if (surface === 'quick') {
+    await browser.keys('Escape')
+    await expect($('.cs-tool-configure-popover-host')).not.toExist()
+    await expect(arrow).toBeFocused()
+  } else {
+    expect(await browser.execute(() =>
+      Boolean(document.activeElement?.closest('.cs-tool-defaults-toolbar')))).toBe(true)
+    await arrow.click()
+  }
   await browser.keys([Key.Shift, Key.F10])
-  await expect($('.cs-tool-configure-popover-host')).toBeDisplayed()
+  await expect($(settings)).toBeDisplayed()
   await browser.keys('p')
   await expect($('.cs-tool-configure-popover-host')).not.toExist()
   await expect($('button[aria-label="Pencil"]')).toHaveAttribute('aria-pressed', 'true')
-  await expect($('.cs-tool-defaults-toolbar')).not.toExist()
+  await expect($('.cs-tool-defaults-toolbar')).toExist()
   await browser.saveScreenshot(path.join(output, `native-${surface}-keyboard.png`))
 }
 describe('tool lifecycle through production Capture → Quick → Editor', () => {

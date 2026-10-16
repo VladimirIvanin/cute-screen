@@ -240,12 +240,13 @@ describe('consistent tool UX through the mounted shell', () => {
     } })
     app.store.selectLayer(shape.id)
     await fireEvent.contextMenu(screen.getByRole('button', { name: 'Shape' }))
-    const popover = app.view.container.querySelector('.cs-tool-configure-popover-host') as HTMLElement
+    const popover = app.view.container.querySelector('.cs-tool-defaults-toolbar') as HTMLElement
     await fireEvent.click(within(popover).getByRole('button', { name: /Fill:/ }))
     await fireEvent.click(await screen.findByRole('button', { name: 'Import texture' }))
     await nextTick()
     expect(shapePayload(app.session.snapshot.core.document.layers[0]!).fill).toEqual(shapePayload(shape).fill)
     await fireEvent.keyDown(document, { key: 'Escape', code: 'Escape' })
+    await fireEvent.click(screen.getByRole('button', { name: 'Shape' }))
     await draw(app.scene)
     expect(shapePayload(app.session.snapshot.core.document.layers.at(-1)!).fill).toMatchObject({
       kind: 'imageTexture', blobHash: imported.blobHash,
@@ -289,16 +290,15 @@ describe('consistent tool UX through the mounted shell', () => {
     const before = app.session.snapshot.core.document
     await fireEvent.contextMenu(screen.getByRole('button', { name: 'Arrow' }))
     expect(app.store.activeToolId).toBe('arrow')
-    const host = app.view.container.querySelector('.cs-tool-configure-popover-host') as HTMLElement
+    const host = app.view.container.querySelector('.cs-tool-defaults-toolbar') as HTMLElement
     const stroke = within(host).getByRole('button', { name: 'Stroke: 3 px' })
     await fireEvent.pointerDown(stroke.querySelector('path')!)
-    expect(app.view.container.querySelector('.cs-tool-configure-popover-host')).toBeTruthy()
+    expect(app.view.container.querySelector('.cs-tool-defaults-toolbar')).toBeTruthy()
     await fireEvent.click(stroke)
     await fireEvent.click(await screen.findByRole('button', { name: '6 px' }))
     expect(app.session.snapshot.core.document).toEqual(before)
     await fireEvent.contextMenu(screen.getByRole('button', { name: 'Arrow' }))
-    expect(app.view.container.querySelector('.cs-tool-configure-popover-host')).toBeTruthy()
-    await fireEvent.keyDown(host, { key: 'Escape' })
+    expect(app.view.container.querySelector('.cs-tool-defaults-toolbar')).toBeTruthy()
     expect(app.view.container.querySelector('.cs-tool-configure-popover-host')).toBeNull()
     await draw(app.scene)
     expect(app.session.snapshot.core.document.layers.at(-1)).toMatchObject({
@@ -453,7 +453,7 @@ describe('consistent tool UX through the mounted shell', () => {
   it('commits text once, keeps text/callout/number defaults independent and cancels drafts', async () => {
     const app = mount()
     const rail = within(app.view.container.querySelector<HTMLElement>('.cs-toolrail')!)
-    const fontSize = () => within(app.view.container.querySelector<HTMLElement>('.cs-text-toolbar, .cs-numbered-marker-toolbar')!)
+    const fontSize = () => within(app.view.container.querySelector<HTMLElement>('.cs-tool-configure-popover-host .cs-text-toolbar, .cs-tool-defaults-toolbar .cs-numbered-marker-toolbar')!)
       .getByRole('button', { name: 'Font size' })
     await fireEvent.click(rail.getByRole('button', { name: 'Text' }))
     await draw(app.scene)

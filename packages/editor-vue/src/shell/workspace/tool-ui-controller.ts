@@ -8,6 +8,10 @@ import {
   type DrawingToolPreferencesV2,
 } from '@cute-screen/editor-renderer'
 import type { ResolvedEditorShellProps } from '../contracts'
+import {
+  hasToolSettings,
+  showsCreationDefaults,
+} from '../tools/settings-policy'
 import { ownsSurfaceTarget } from '../ui/transient-surface'
 import { parseHexColor } from '../tools/effects/color'
 
@@ -17,6 +21,7 @@ interface ToolConfigureState {
 }
 
 export interface ToolUiControllerContext {
+  readonly activeToolId: Ref<string | undefined>
   readonly props: ResolvedEditorShellProps
   readonly finishTextEditing: (continuation: () => void) => void
   readonly store: { selectTool(id: string): void }
@@ -125,21 +130,36 @@ function onToolConfigureOutsidePointer(
   closeToolConfigure(context)
 }
 
+function restoreActivationFocus(
+  previous: Element | null,
+  shell: Element | null,
+  toolId: string,
+): void {
+  if (previous?.isConnected !== false || document.activeElement !== document.body) return
+  shell?.querySelector<HTMLElement>(`.cs-toolrail [data-tool-id="${toolId}"]`)?.focus({ preventScroll: true })
+}
+
+function activateTool(
+  context: ToolUiControllerContext,
+  toolId: string,
+  continuation?: () => void,
+): void {
+  const previous = document.activeElement
+  const shell = previous?.closest('.cs-editor-shell') ?? null
+  const transientFocus = Boolean(previous?.closest('.cs-tool-defaults-toolbar, .cs-tool-configure-popover-host, .cs-overlay-root'))
+  context.finishTextEditing(() => {
+    closeToolConfigure(context)
+    context.toolError.value = undefined
+    context.samplingControl.value = undefined
+    context.eyedropperColor.value = undefined
+    context.eyedropperFeedback.value = undefined
+    context.store.selectTool(toolId)
+    if (transientFocus) void nextTick(() => restoreActivationFocus(previous, shell, toolId))
+    continuation?.()
+  })
+}
+
 export function createToolUiController(context: ToolUiControllerContext) {
-  function activate(
-    toolId: string,
-    continuation?: () => void,
-  ): void {
-    context.finishTextEditing(() => {
-      closeToolConfigure(context)
-      context.toolError.value = undefined
-      context.samplingControl.value = undefined
-      context.eyedropperColor.value = undefined
-      context.eyedropperFeedback.value = undefined
-      context.store.selectTool(toolId)
-      continuation?.()
-    })
-  }
   let samplingDefaultsTool: string | undefined
   return {
     onToolConfigureKeydown: (event: KeyboardEvent) => {
@@ -163,7 +183,8 @@ export function createToolUiController(context: ToolUiControllerContext) {
     onColorChange: (id: string, value: string) => onColorChange(context, id, value),
     startEyedropper: (id: string) => {
       if (context.precisionChangeBlocked(id)) return
-      samplingDefaultsTool = context.toolConfigure.value?.toolId
+      samplingDefaultsTool = context.toolConfigure.value?.toolId ??
+        (showsCreationDefaults(context.activeToolId.value) ? context.activeToolId.value : undefined)
       closeToolConfigure(context)
       context.samplingControl.value = id
       context.eyedropperColor.value = undefined
@@ -186,26 +207,24 @@ export function createToolUiController(context: ToolUiControllerContext) {
     onToolConfigureOutsidePointer: (event: PointerEvent) => onToolConfigureOutsidePointer(context, event),
     openToolConfigure: (toolId: string, anchor: HTMLElement) => {
       if (context.toolConfigure.value?.toolId === toolId && context.toolConfigure.value.anchor === anchor) return
-      activate(toolId, () => {
-        if (
-          ![
-            'arrow',
-            'shape',
-            'pencil',
-            'marker',
-            'text',
-            'callout',
-            'numberedMarker',
-            'censor',
-            'spotlight',
-            'ruler',
-            'loupe',
-            'crop',
-          ].includes(toolId)
-        ) {
-          closeToolConfigure(context)
+      activateTool(context, toolId, () => {
+        if (!hasToolSettings(toolId)) return
+        const focusVisibleDefaults = () => {
+          const row = anchor.closest('.cs-editor-shell')?.querySelector<HTMLElement>('.cs-tool-defaults-toolbar')
+          if (
+            !row ||
+            row.classList.contains('is-collapsed') ||
+            row.inert ||
+            getComputedStyle(row).visibility === 'hidden'
+          ) return false
+          row.querySelector<HTMLElement>('button:not(:disabled), select:not(:disabled), input:not(:disabled)')?.focus({ preventScroll: true })
+          return true
+        }
+        if (showsCreationDefaults(toolId) && !context.props.quickMode) {
+          void nextTick(focusVisibleDefaults)
           return
         }
+        if (showsCreationDefaults(toolId) && focusVisibleDefaults()) return
         const rect = anchor.getBoundingClientRect()
         context.toolConfigure.value = { toolId, anchor }
         context.toolConfigureLayout.value = {
@@ -232,6 +251,14 @@ export function createToolUiController(context: ToolUiControllerContext) {
         context.configureDefaultsTool.value = undefined
       }
     },
-    selectTool: (id: string) => activate(id),
+    onCreationChange: (id: string, value: string) => {
+      context.configureDefaultsTool.value = context.activeToolId.value
+      try {
+        onColorChange(context, id, value)
+      } finally {
+        context.configureDefaultsTool.value = undefined
+      }
+    },
+    selectTool: (id: string) => activateTool(context, id),
   }
 }

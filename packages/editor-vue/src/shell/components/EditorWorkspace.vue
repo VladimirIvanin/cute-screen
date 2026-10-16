@@ -3,6 +3,11 @@ import {
   NButton,
   NConfigProvider,
 } from 'naive-ui'
+import {
+  nextTick,
+  ref,
+  watch,
+} from 'vue'
 import { UiIcon } from '../icon'
 import ActionFeedback from './ActionFeedback.vue'
 import SelectionFormattingToolbar from './SelectionFormattingToolbar.vue'
@@ -47,6 +52,9 @@ const {
   canvasMenuAction,
   openCanvasMenu,
   contextSchema,
+  creationSchema,
+  toolActivationRevision,
+  onCreationChange,
   selectionSchema,
   toolConfigureSchema,
   drawingPreferences,
@@ -98,6 +106,21 @@ const {
   exportDocumentRecovery,
   fitCanvas,
 } = useEditorWorkspace(props)
+
+const quickSettingsCollapsed = ref(true)
+watch(() => store.activeToolId, () => {
+  quickSettingsCollapsed.value = true
+}, { flush: 'sync' })
+function onQuickSettingsLayout(event: Event): void {
+  quickSettingsCollapsed.value = (event as CustomEvent<boolean>).detail
+}
+function openQuickSettings(event: MouseEvent): void {
+  if (event.currentTarget instanceof HTMLElement && store.activeToolId)
+    openToolConfigure(store.activeToolId, event.currentTarget)
+}
+watch([creationSchema, toolConfigure, () => state.locale.value], () => {
+  void nextTick(() => document.dispatchEvent(new Event('cs-preview-layout')))
+}, { flush: 'post' })
 
 function onTextCancelled(): void {
   cancelTextDefaults()
@@ -174,16 +197,47 @@ function onTextCancelled(): void {
         </button>
       </div>
       <div class="cs-workbench">
+        <div
+          v-if="props.quickMode && !props.quickSelectionMode && creationSchema && !toolConfigure"
+          class="cs-tool-defaults-toolbar cs-quick-defaults"
+          :class="{ 'is-collapsed': quickSettingsCollapsed, 'is-sampling': Boolean(samplingControl || toolConfigure) }"
+          :inert="quickSettingsCollapsed || Boolean(samplingControl || toolConfigure)"
+          :aria-hidden="quickSettingsCollapsed || Boolean(samplingControl || toolConfigure)"
+          @cs-quick-settings-layout="onQuickSettingsLayout"
+        >
+          <ContextToolbar
+            :key="`${store.activeToolId ?? 'select'}:${toolActivationRevision}`"
+            :schema="creationSchema"
+            :defaults-tool="store.activeToolId ?? 'select'"
+            :label="translate('toolSettings')"
+            :recent-colors="drawingPreferences.recentColors"
+            :picker-locale="state.locale.value"
+            @action="onContextAction"
+            @change="onCreationChange"
+            @eyedropper="startEyedropper"
+          />
+        </div>
         <div v-if="props.quickMode && !props.quickSelectionMode" class="cs-quick-toolrail-group">
           <ToolRail
             :configured-tool-id="toolConfigure?.toolId"
-            :configure-hint="translate('toolConfigureHint')"
             :tools="tools"
             :active-tool-id="store.activeToolId"
             :t="translate"
             @select="selectTool"
             @configure="openToolConfigure"
           />
+          <NButton
+            v-if="creationSchema"
+            v-show="quickSettingsCollapsed"
+            class="cs-quick-settings-button"
+            :aria-label="translate('toolSettings')"
+            aria-haspopup="dialog"
+            :aria-expanded="Boolean(toolConfigure)"
+            @click="openQuickSettings"
+          >
+            <UiIcon name="more" />
+            {{ translate('toolConfigureHint') }}
+          </NButton>
           <div
             class="cs-quick-history"
             role="group"
@@ -220,6 +274,19 @@ function onTextCancelled(): void {
           />
           <div class="cs-bottom-chrome-center">
             <ContextToolbar
+              v-if="creationSchema && !samplingControl"
+              :key="`${store.activeToolId ?? 'select'}:${toolActivationRevision}`"
+              class="cs-tool-defaults-toolbar"
+              :schema="creationSchema"
+              :defaults-tool="store.activeToolId ?? 'select'"
+              :label="translate('toolSettings')"
+              :recent-colors="drawingPreferences.recentColors"
+              :picker-locale="state.locale.value"
+              @action="onContextAction"
+              @change="onCreationChange"
+              @eyedropper="startEyedropper"
+            />
+            <ContextToolbar
               :schema="contextSchema"
               :label="translate('toolSettings')"
               :recent-colors="drawingPreferences.recentColors"
@@ -230,7 +297,6 @@ function onTextCancelled(): void {
             />
             <ToolRail
               :configured-tool-id="toolConfigure?.toolId"
-              :configure-hint="translate('toolConfigureHint')"
               :tools="tools"
               :active-tool-id="store.activeToolId"
               :t="translate"

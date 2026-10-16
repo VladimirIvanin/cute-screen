@@ -27,6 +27,7 @@ import {
   type QuickRect,
 } from './quick-capture-layout'
 import { useQuickCaptureCoordinator } from './use-quick-capture-coordinator'
+import { useQuickChromeLayout } from './use-quick-chrome-layout'
 import { QuickCaptureLayoutController } from './quick-capture-layout-controller'
 import { QuickCaptureCommitController } from './quick-capture-commit-controller'
 import { QuickCaptureActionController } from './quick-capture-action-controller'
@@ -110,9 +111,7 @@ function onHostsReady(value: CanvasViewportHosts): void {
   requestAnimationFrame(() => updateQuickLayout())
 }
 
-function updateQuickLayout(crop: QuickRect = currentCrop.value) {
-  return layoutController.update(crop)
-}
+const updateQuickLayout = useQuickChromeLayout(layoutController)
 
 function nextLayoutFrame(): Promise<void> {
   return layoutController.nextFrame()
@@ -148,10 +147,6 @@ async function onQuickSelectionComplete(crop: QuickRect): Promise<void> {
   } finally {
     pending.value = false
   }
-}
-
-function onWindowResize(): void {
-  updateQuickLayout()
 }
 
 function onSceneDoubleClick(event: MouseEvent): void {
@@ -383,13 +378,11 @@ function onSelectingKeydown(event: KeyboardEvent): void {
 
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
-  window.addEventListener('resize', onWindowResize)
   void initializeQuickCaptureWindow().catch(recordPreparationError)
 })
 onBeforeUnmount(() => {
   loadRevision += 1
   window.removeEventListener('keydown', onKeydown)
-  window.removeEventListener('resize', onWindowResize)
   sceneElement?.removeEventListener('dblclick', onSceneDoubleClick)
   unsubscribeQuickCaptureAvailable?.()
   unsubscribeSession?.()

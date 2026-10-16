@@ -38,7 +38,7 @@ describe('M06 drawing tools in browser mode', () => {
         await setShellPreferences(preference.locale, preference.theme)
         await openArrowConfigurePopover()
         const layout = await browser.execute(() => {
-          const toolbar = document.querySelector<HTMLElement>('.cs-tool-configure-popover-host')
+          const toolbar = document.querySelector<HTMLElement>(':is(.cs-tool-configure-popover-host, .cs-tool-defaults-toolbar:not([aria-hidden="true"]))')
           const controls = toolbar?.querySelector<HTMLElement>('.cs-arrow-formatting-toolbar')
           if (!toolbar || !controls) throw new Error('Arrow toolbar is missing')
           const bounds = toolbar.getBoundingClientRect()

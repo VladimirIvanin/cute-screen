@@ -16,7 +16,7 @@ export async function openArrowConfigurePopover(): Promise<void> {
       }),
     )
   })
-  await expect($('.cs-tool-configure-popover-host')).toExist()
+  await expect($(':is(.cs-tool-configure-popover-host, .cs-tool-defaults-toolbar:not([aria-hidden="true"]))')).toExist()
 }
 
 export async function closeArrowConfigurePopover(): Promise<void> {
@@ -32,7 +32,7 @@ export async function chooseArrowConfigureOption(
 ): Promise<void> {
   await browser.execute((controlId) => {
     const trigger = document.querySelector<HTMLButtonElement>(
-      `.cs-tool-configure-popover-host [data-control="${controlId}"] .cs-arrow-toolbar-trigger`,
+      `:is(.cs-tool-configure-popover-host, .cs-tool-defaults-toolbar:not([aria-hidden="true"])) [data-control="${controlId}"] .cs-arrow-toolbar-trigger`,
     )
     if (!trigger) {
       throw new Error(`Missing arrow toolbar trigger: ${controlId}`)

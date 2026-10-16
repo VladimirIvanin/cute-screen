@@ -4,6 +4,7 @@ import {
   expect,
 } from '@wdio/globals'
 import path from 'node:path'
+import { waitForShapeAnimation } from './shape-toolbar'
 import { waitForStableCanvas } from './canvas-ready'
 
 export async function verifyEyedropperToolSwitch(
@@ -20,8 +21,10 @@ export async function verifyEyedropperToolSwitch(
     }, label)
     const arrow = $('button[aria-label="Arrow"]')
     await arrow.click({ button: 'right' })
-    await $('.cs-tool-configure-popover-host [data-control="color"] button').click()
+    await $(':is(.cs-tool-configure-popover-host, .cs-tool-defaults-toolbar:not([aria-hidden="true"])) [data-control="color"] button').click()
+    await waitForShapeAnimation()
     await $('.cs-simple-color-panel button[aria-label="Custom colour"]').click()
+    await $('.cs-color-popover button[aria-label="Sample colour from canvas"]').waitForDisplayed()
     await $('.cs-color-popover button[aria-label="Sample colour from canvas"]').click()
     await expect(scene).toHaveElementClass('cs-canvas-eyedropper-cursor')
     await expect($('.cs-tool-configure-popover-host')).not.toExist()

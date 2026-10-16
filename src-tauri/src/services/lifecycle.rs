@@ -31,6 +31,8 @@ impl AutostartService for MemoryAutostartService {
 pub enum LaunchIntentV1 {
     ShowEditor,
     Background,
+    Settings,
+    VerifyShortcut { token: String },
     Capture(CaptureLaunchV1),
 }
 
@@ -60,7 +62,31 @@ struct Cli {
 #[derive(Debug, Subcommand)]
 enum Command {
     Show,
+    Settings {
+        #[arg(long, default_value = "shortcuts", value_parser = ["shortcuts"])]
+        section: String,
+    },
+    Shortcuts {
+        #[command(subcommand)]
+        command: ShortcutCommand,
+    },
     Capture(CaptureArgs),
+}
+
+#[derive(Debug, Subcommand)]
+enum ShortcutCommand {
+    Test {
+        #[arg(long, value_parser = validate_verification_token)]
+        token: String,
+    },
+}
+
+fn validate_verification_token(value: &str) -> Result<String, String> {
+    if value.len() == 32 && value.bytes().all(|character| character.is_ascii_hexdigit()) {
+        Ok(value.to_owned())
+    } else {
+        Err("Expected a 32-character verification token".to_owned())
+    }
 }
 
 #[derive(Debug, clap::Args)]
@@ -106,6 +132,10 @@ where
 {
     let cli = Cli::try_parse_from(args)?;
     match cli.command {
+        Some(Command::Settings { .. }) => Ok(LaunchIntentV1::Settings),
+        Some(Command::Shortcuts {
+            command: ShortcutCommand::Test { token },
+        }) => Ok(LaunchIntentV1::VerifyShortcut { token }),
         Some(Command::Capture(capture)) => Ok(LaunchIntentV1::Capture(CaptureLaunchV1 {
             request: CaptureRequestV1 {
                 correlation_id: uuid::Uuid::now_v7().to_string(),
@@ -137,7 +167,7 @@ pub fn cli_fallback_command(current_exe: &Path, appimage: bool) -> String {
 }
 
 pub fn current_cli_fallback_command() -> Option<String> {
-    let current_exe = std::env::current_exe().ok()?;
+    let current_exe = crate::autostart::executable().ok()?;
     Some(cli_fallback_command(
         &current_exe,
         std::env::var_os("APPIMAGE").is_some(),
@@ -192,6 +222,29 @@ impl LifecycleState {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn settings_and_verification_cli_have_distinct_validated_intents() {
+        assert_eq!(
+            super::parse_launch(["cute-screen", "settings", "--section", "shortcuts"]).unwrap(),
+            super::LaunchIntentV1::Settings
+        );
+        assert!(super::parse_launch(["cute-screen", "settings", "--section", "unknown"]).is_err());
+        assert!(
+            super::parse_launch(["cute-screen", "shortcuts", "test", "--token", "bad"]).is_err()
+        );
+        assert!(matches!(
+            super::parse_launch([
+                "cute-screen",
+                "shortcuts",
+                "test",
+                "--token",
+                "0123456789abcdef0123456789abcdef"
+            ])
+            .unwrap(),
+            super::LaunchIntentV1::VerifyShortcut { .. }
+        ));
+    }
+
     use super::{
         AutostartService, CaptureLaunchV1, LaunchIntentV1, LifecycleState, MemoryAutostartService,
         cli_fallback_command, parse_launch,

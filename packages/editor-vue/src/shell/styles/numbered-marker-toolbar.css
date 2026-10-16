@@ -118,3 +118,11 @@
   width: max-content;
   max-width: calc(100vw - 24px);
 }
+
+.cs-bottom-chrome .cs-tool-defaults-toolbar:has(.cs-numbered-marker-toolbar),
+.cs-quick-defaults > .cs-context-toolbar:has(.cs-numbered-marker-toolbar) {
+  max-width: 100%;
+}
+.cs-tool-defaults-toolbar .cs-numbered-marker-toolbar {
+  min-width: 0;
+}

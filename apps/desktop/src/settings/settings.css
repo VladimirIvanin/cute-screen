@@ -1,0 +1,181 @@
+.cs-settings {
+  height: 100%;
+  overflow-y: auto;
+  padding: 24px 32px;
+  color: var(--text);
+  background: var(--surface);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.cs-settings-header,
+.cs-settings-row-actions,
+.cs-settings-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cs-settings-header {
+  justify-content: space-between;
+}
+.cs-settings h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 650;
+}
+.cs-settings h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+.cs-settings-eyebrow {
+  margin: 0 0 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.cs-settings-muted {
+  color: var(--text-muted);
+}
+.cs-suggestion-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  max-width: 200px;
+  font-size: 12px;
+}
+.cs-settings button,
+.cs-settings select {
+  min-height: 32px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  color: var(--text);
+  background: var(--surface-raised);
+  cursor: pointer;
+  font: inherit;
+}
+.cs-settings button:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+.cs-settings button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.cs-settings .cs-settings-primary {
+  color: var(--accent-contrast);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.cs-settings .cs-settings-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+.cs-shortcut-list {
+  margin-top: 16px;
+}
+.cs-shortcut-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.cs-shortcut-description {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cs-shortcut-description strong {
+  font-weight: 600;
+}
+.cs-shortcut-description span {
+  font-size: 12px;
+}
+.cs-settings kbd {
+  padding: 4px 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  white-space: nowrap;
+  background: var(--surface-raised);
+}
+.cs-settings-error {
+  color: var(--danger);
+  overflow-wrap: anywhere;
+}
+.cs-settings-notice,
+.cs-shortcut-recorder,
+.cs-shortcut-suggestions {
+  margin: 16px 0;
+  padding: 16px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.cs-shortcut-suggestions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cs-settings-notice p {
+  margin-top: 0;
+}
+.cs-settings .cs-record-shortcut {
+  min-height: 48px;
+  min-width: 260px;
+  font-size: 16px;
+}
+.cs-settings .is-recording {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.cs-settings-footnote {
+  font-size: 12px;
+  margin: 16px 0 24px;
+}
+.cs-startup-preferences {
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.cs-startup-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 12px 0;
+  cursor: pointer;
+}
+.cs-startup-choice input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+.cs-settings-footer {
+  justify-content: flex-end;
+  padding: 20px 0 0;
+}
+.cs-shortcut-command {
+  grid-column: 1 / -1;
+}
+.cs-shortcut-command code {
+  display: block;
+  overflow-wrap: anywhere;
+  margin-top: 8px;
+  user-select: all;
+}
+@media (max-width: 720px) {
+  .cs-settings {
+    padding: 20px;
+  }
+  .cs-shortcut-row {
+    grid-template-columns: minmax(140px, 1fr) auto;
+  }
+  .cs-shortcut-row > .cs-settings-row-actions {
+    grid-column: 1 / -1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cs-settings * {
+    transition: none;
+  }
+}

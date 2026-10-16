@@ -66,7 +66,7 @@ const names = computed<Record<string, string>>(() => ({
   label: text('Label and units', 'Подпись и единицы'),
   measure: text('Measurement and snapping', 'Измерение и привязка'),
 }))
-const menus = computed(() => kind.value === 'pencil' ? ['brush', 'appearance', 'smoothing'] : kind.value === 'spotlight' ? ['shape', 'dim', 'feather', 'regions'] : ['stroke', 'label', 'measure'])
+const menus = computed(() => kind.value === 'pencil' ? ['brush', 'appearance', 'smoothing'] : kind.value === 'spotlight' ? ['shape', 'dim', 'feather', ...(settings.value.apertures ? ['regions'] : [])] : ['stroke', 'label', 'measure'])
 const labels = computed<Record<string, string>>(() => ({
   width: text('Width', 'Толщина'),
   layerOpacity: text('Opacity', 'Непрозрачность'),

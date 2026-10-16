@@ -1127,3 +1127,14 @@ Windows/macOS/Wayland were not run for this follow-up. See TESTING.md for comman
 Дополнение ADR-067: предпросмотр заменяет курсор на canvas; сменить квадрат/синий
 на ромб/красный в defaults и вернуться в ту же точку — preview и созданная метка
 совпадают с новым стилем. Панели, pan и sampling скрывают preview.
+
+## Настройки инструментов (ADR-069, 2026-10-17)
+
+- Название и shortcut — единственное содержимое tool tooltip в RU/EN.
+- Девять creation tools показывают defaults при активации; Text/Callout — inline
+  после размещения; Select показывает свойства выбранного объекта.
+- Quick: settings + tools целиком вне crop либо явная кнопка настроек.
+  Chrome фиксирован во время gesture; outside-dismiss пропускает первый штрих.
+- Evidence: browser-creation-settings, tool-lifecycle, brushes; native scenario
+  creation-settings через production Capture → Quick → Editor.
+  Результаты и платформенные ограничения записываются в TESTING.md.

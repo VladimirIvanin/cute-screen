@@ -12,7 +12,7 @@
   "app": {
     "withGlobalTauri": false,
     "security": {
-      "capabilities": ["default", "quick-capture"],
+      "capabilities": ["default", "quick-capture", "settings"],
       "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; img-src 'self' asset: http://asset.localhost blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost asset: http://asset.localhost blob:",
       "assetProtocol": {
         "enable": true,
@@ -36,6 +36,12 @@
   "bundle": {
     "active": true,
     "targets": ["deb", "appimage"],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "installerHooks": "installer/activation-hooks.nsh"
+      }
+    },
     "macOS": {
       "minimumSystemVersion": "12.0",
       "infoPlist": "Info.plist"

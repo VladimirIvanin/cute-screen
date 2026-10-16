@@ -382,11 +382,11 @@ describe('M08 shell lifecycle and contextual settings', () => {
     ] as const
     for (const [tool, labels] of english) {
       await fireEvent.contextMenu(screen.getByRole('button', { name: tool }))
-      toolbar = view.container.querySelector('.cs-tool-configure-popover-host .cs-context-toolbar') as HTMLElement
+      toolbar = view.container.querySelector('.cs-tool-defaults-toolbar') as HTMLElement
       const more = within(toolbar).queryByRole('button', { name: /More|Ещё/ })
       if (more) await fireEvent.click(more)
       if (tool === 'Spotlight' || tool === 'Ruler') {
-        const names = tool === 'Spotlight' ? ['Aperture shape', 'Dimming', 'Edge softness', 'Apertures'] : ['Colour', 'Thickness', 'Label and units', 'Measurement and snapping']
+        const names = tool === 'Spotlight' ? ['Aperture shape', 'Dimming', 'Edge softness'] : ['Colour', 'Thickness', 'Label and units', 'Measurement and snapping']
         for (const name of names) expect(within(toolbar).getByRole('button', { name })).toBeInTheDocument()
       } else if (tool === 'Loupe' || tool === 'Hide data') {
         for (const name of labels) expect(within(toolbar).getByRole('button', { name })).toBeInTheDocument()
@@ -395,12 +395,12 @@ describe('M08 shell lifecycle and contextual settings', () => {
 
     useEditorShellStore(pinia).setLocale('ru')
     await fireEvent.contextMenu(await screen.findByRole('button', { name: 'Скрыть данные' }))
-    toolbar = view.container.querySelector('.cs-tool-configure-popover-host .cs-context-toolbar') as HTMLElement
+    toolbar = view.container.querySelector('.cs-tool-defaults-toolbar') as HTMLElement
     expect(within(toolbar).getByRole('button', { name: 'Форма области' })).toBeInTheDocument()
     expect(within(toolbar).getByRole('group', { name: 'Эффект' })).toBeInTheDocument()
 
     await fireEvent.contextMenu(await screen.findByRole('button', { name: 'Линейка' }))
-    toolbar = view.container.querySelector('.cs-tool-configure-popover-host .cs-context-toolbar') as HTMLElement
+    toolbar = view.container.querySelector('.cs-tool-defaults-toolbar') as HTMLElement
     for (const name of ['Цвет', 'Толщина', 'Подпись и единицы', 'Измерение и привязка']) expect(within(toolbar).getByRole('button', { name })).toBeInTheDocument()
     await fireEvent.click(await screen.findByRole('button', { name: 'Показать слои' }))
     expect(view.container.querySelector('.cs-layers-panel')).not.toHaveTextContent(/Размер подписи|Шаг угла|Привязка/u)

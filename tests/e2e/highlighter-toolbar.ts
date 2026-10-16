@@ -109,7 +109,7 @@ export async function verifyHighlighter(
   })
   await $('button[aria-label="Highlighter"]').click({ button: 'right' })
   expect(await $('html').getAttribute('data-highlighter-context-trusted')).toBe('true')
-  const configure = $('.cs-tool-configure-popover-host')
+  const configure = $(':is(.cs-tool-configure-popover-host, .cs-tool-defaults-toolbar:not([aria-hidden="true"]))')
   await expect(configure).toBeDisplayed()
   await configure.$('button[aria-label="Colour"]').click()
   await $('.cs-simple-color-panel button[aria-label="Custom colour"]').click()
@@ -135,7 +135,5 @@ export async function verifyHighlighter(
   await browser.keys('Escape')
   expect(await $('html').getAttribute('data-highlighter-escape-trusted')).toBe('true')
   await expect(configure).toBeDisplayed()
-  await browser.keys('Escape')
-  await expect(configure).not.toExist()
   expect((await shapeDocument()).layers).toHaveLength(initial + 1)
 }

@@ -20,10 +20,16 @@ const harnessParams = new URLSearchParams(harnessSearch)
 const isM01Harness = import.meta.env.VITE_M01_HARNESS === 'true' && harnessParams.get('m01') === '1'
 
 const isQuickCapture = new URLSearchParams(window.location.search).get('quickCapture') === '1'
+const isSettings = new URLSearchParams(window.location.search).get('settings') === 'shortcuts'
 const Root = isM01Harness
   ? (await import('./M01Harness.vue')).default
   : isQuickCapture
     ? (await import('./QuickCaptureApp.vue')).default
-    : (await import('./App.vue')).default
+    : isSettings
+      ? (await import('./SettingsApp.vue')).default
+      : (await import('./App.vue')).default
 
-createApp(Root).use(createEditorShellPinia()).mount('#app')
+const rootProps = import.meta.env.VITE_TEST_HARNESS === 'true' && isSettings && harnessParams.get('settingsHarness') === '1'
+  ? { bridge: (await import('./settings/browser-harness')).createSettingsHarnessBridge() }
+  : {}
+createApp(Root, rootProps).use(createEditorShellPinia()).mount('#app')

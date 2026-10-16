@@ -50,3 +50,38 @@ export type QuickCaptureDraftV1 = {
 }
 
 export type CommandErrorV1 = { code: string; message: string; recoverable: boolean; correlationId: string }
+
+export type ShortcutAction =
+  'capture-area' | 'capture-screen' | 'capture-window' | 'capture-active-window' | 'capture-repeat' | 'show-editor'
+
+export type ShortcutBackendV1 = 'native' | 'portal' | 'gnome' | 'manual'
+
+export type ShortcutStatusV1 =
+  'unassigned' | 'active' | 'conflict' | 'awaitingVerification' | 'requiresApproval' | 'unavailable' | 'error'
+
+export type ShortcutEntryV1 = {
+  action: ShortcutAction
+  trigger: string | null
+  display: string | null
+  status: ShortcutStatusV1
+  supported: boolean
+  message: string | null
+  command: string
+}
+
+export type ShortcutSnapshotV1 = {
+  backend: ShortcutBackendV1
+  platform: string
+  canPreflight: boolean
+  canConfigure: boolean
+  entries: Array<ShortcutEntryV1>
+  setupCompleted: boolean
+  autostartChoice: boolean | null
+  suggested: Array<string>
+  pendingAction: ShortcutAction | null
+  error: string | null
+}
+
+export type AutostartStateV1 = 'enabled' | 'disabled' | 'requiresApproval' | 'unavailable' | 'unknown' | 'needsRepair'
+
+export type AutostartSnapshotV1 = { state: AutostartStateV1; message: string | null }

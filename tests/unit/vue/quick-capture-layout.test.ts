@@ -52,6 +52,48 @@ describe('quick capture overlay layout', () => {
       root.remove()
     }
   })
+  it.each([
+    { x: 200, y: 180, width: 700, height: 300 },
+    { x: 100, y: 650, width: 800, height: 240 },
+    { x: 0, y: 0, width: 500, height: 200 },
+    { x: 900, y: 0, width: 500, height: 200 },
+  ])('places the entire settings group outside crop %o', (crop) => {
+    const settingsSize = { width: 680, height: 46 }
+    const toolSize = { width: 700, height: 46 }
+    const layout = computeQuickCaptureLayout({ ...base, crop, toolSize, settingsSize })
+    expect(layout.settingsCollapsed).toBe(false)
+    const height = settingsSize.height + 6 + toolSize.height
+    expect(layout.tools.top >= layout.crop.bottom + 12 ||
+      layout.tools.top + height <= layout.crop.top - 12).toBe(true)
+    expect(layout.tools.left).toBeGreaterThanOrEqual(8)
+    expect(layout.tools.left + toolSize.width).toBeLessThanOrEqual(base.viewport.width - 8)
+    const overlapsActions = layout.tools.left < layout.actions.left + base.actionSize.width &&
+      layout.tools.left + toolSize.width > layout.actions.left &&
+      layout.tools.top < layout.actions.top + base.actionSize.height &&
+      layout.tools.top + height > layout.actions.top
+    expect(overlapsActions).toBe(false)
+  })
+
+  it.each([
+    { x: 0, y: 0, width: 1440, height: 900 },
+    { x: 10, y: 15, width: 1400, height: 870 },
+    { x: 100, y: 70, width: 800, height: 760 },
+  ])('collapses settings when the entire group cannot fit outside %o', (crop) => {
+    const layout = computeQuickCaptureLayout({
+      ...base, crop, settingsSize: { width: 680, height: 46 },
+    })
+    expect(layout.settingsCollapsed).toBe(true)
+    expect(layout.tools.top).toBeGreaterThanOrEqual(8)
+  })
+
+  it('collapses settings wider than the viewport instead of covering the crop', () => {
+    const layout = computeQuickCaptureLayout({
+      ...base, crop: { x: 100, y: 200, width: 800, height: 300 },
+      settingsSize: { width: 1600, height: 46 },
+    })
+    expect(layout.settingsCollapsed).toBe(true)
+  })
+
   it('maps the hidden native window before measuring WebKitGTK layout', async () => {
     const order: string[] = []
     let mapped = false

@@ -81,6 +81,7 @@ export function createWorkspaceState() {
     ),
     textFormatting: shallowRef<TextFormattingPatch>(),
     textDraft: ref<TextDraft>(),
+    toolActivationRevision: ref(0),
     toolConfigure: ref<{ readonly toolId: string; readonly anchor: HTMLElement } | undefined>(),
     toolConfigureLayout: ref<{ readonly left: number; readonly top: number } | undefined>(),
     configureDefaultsTool: ref<string>(),

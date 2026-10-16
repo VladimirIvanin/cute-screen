@@ -38,7 +38,10 @@ describe('Quick Capture context toolbar', () => {
       await fireEvent.click(screen.getByRole('button', { name: tool }))
       expect(screen.queryByRole('button', { name: 'Flip horizontally' })).toBeNull()
       expect(screen.queryByRole('button', { name: 'Flip vertically' })).toBeNull()
-      expect(view.container.querySelector('.cs-context-toolbar')).toBeNull()
+      if (tool === 'Arrow') {
+        expect(view.container.querySelector('.cs-tool-defaults-toolbar')).toHaveAttribute('aria-hidden', 'true')
+        expect(screen.getByRole('button', { name: 'Tool settings' })).toBeInTheDocument()
+      } else expect(view.container.querySelector('.cs-context-toolbar')).toBeNull()
     }
     store.selectLayer(session.snapshot.core.document.layers[0]!.id)
     await nextTick()
