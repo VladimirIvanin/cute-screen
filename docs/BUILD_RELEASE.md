@@ -1,5 +1,20 @@
 # CI-сборки и проверка версии через GitHub
 
+## Очистка outputs editor-пакетов
+
+`pnpm build:packages` удаляет `packages/editor-core/dist` и
+`packages/editor-renderer/dist`, затем вызывает `vue-tsc -b --force`. Это
+исключает старые файловые модули после переноса кода в одноимённые директории:
+обычный incremental build не удаляет, например, старый `document/scene.js`.
+Desktop Vite в dev, browser E2E и production build использует исходники всех
+трёх editor-пакетов через aliases. Ручная очистка checkout не требуется.
+
+Для `CUTE_SCREEN_E2E_SCENARIOS=spotlight-preview pnpm test:e2e:tauri` выбран
+external provider: в Linux нужны `tauri-driver` и соответствующий установленному
+WebKitGTK `WebKitWebDriver` в PATH. Встроенный драйвер 1.3.0 создаёт synthetic
+MouseEvent и не подтверждает PointerEvent-жесты canvas. Другие сценарии сохраняют
+прежний provider; `CUTE_SCREEN_E2E_DRIVER_PROVIDER` задаёт явный override.
+
 ## Deployment target macOS
 
 Baseline macOS 12.0 из ADR-038 задан и в `bundle.macOS.minimumSystemVersion`,

@@ -4,7 +4,8 @@ use sha2::{Digest, Sha256};
 
 pub fn profile_identifier(base: &str, root: &Path) -> String {
     let digest = format!("{:x}", Sha256::digest(root.as_os_str().as_encoded_bytes()));
-    format!("{base}.profile.{}", &digest[..16])
+    // D-Bus name components cannot start with a digit, even for a hash.
+    format!("{base}.profile.p{}", &digest[..16])
 }
 
 pub fn profile_paths(root: &Path) -> Result<(PathBuf, PathBuf), std::io::Error> {
@@ -19,6 +20,22 @@ pub fn profile_paths(root: &Path) -> Result<(PathBuf, PathBuf), std::io::Error> 
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn profile_identity_components_never_start_with_a_digit() {
+        for index in 0..32 {
+            let root = std::path::PathBuf::from(format!("/test-profile-{index}"));
+            let id = super::profile_identifier("io.cutescreen.e2e", &root);
+            assert!(
+                id.split('.').all(|part| {
+                    part.starts_with(|character: char| {
+                        character.is_ascii_alphabetic() || character == '_'
+                    })
+                }),
+                "invalid D-Bus profile identity: {id}"
+            );
+        }
+    }
+
     #[test]
     fn single_instance_identity_is_stable_only_within_one_test_profile() {
         let first = tempfile::tempdir().unwrap();

@@ -1,5 +1,17 @@
 # Платформенная матрица
 
+## Фонарь и актуальность сборки (2026-10-16)
+
+Linux x86_64 / WebKitGTK 2.52.6, wry 0.55.1, external tauri-driver 2.1.0:
+production fake Capture → Quick → Editor — 1/1 passed. Создание и перемещение
+проверяют пиксели до release, один undoable commit, redo и aperture cancel;
+pointer `isTrusted=true`, screenshots обоих окон просмотрены. Chrome 154.0.8037.57
+— 1/1; software render на 4K/8K с decoded export — passed.
+Native capture fixture — 400×300, physical capture/mixed-DPI не подтверждены.
+Embedded driver не используется как доказательство PointerEvent-жестов.
+Windows/WebView2 и macOS/WKWebView требуют отдельного повтора; источник проблемы
+общий — старые dist modules после file → directory refactor. Команды — TESTING.md.
+
 ## Прямые Cargo-сборки macOS (2026-10-16)
 
 `.cargo/config.toml` задаёт baseline 12.0 для прямых Cargo-команд, согласованный

@@ -1,5 +1,21 @@
 # Трассируемость требований
 
+## Фонарь: создание и перемещение в Quick/editor (2026-10-16)
+
+`REQ-TOL-009`, `REQ-EDT-005/006`, `REQ-OUT-003`: затемнение и прозрачная
+область должны быть видны уже во время создания; при перемещении слоя или
+отдельной области маска следует за pointer до отпускания кнопки. Документ
+остаётся неизменным до commit, Escape отменяет preview, undo/redo восстанавливают
+результат. Проверка: пиксели реального canvas при удерживаемой кнопке,
+production fake Capture → Quick → Editor в Linux WebKitGTK и browser regression.
+Chrome 154 и Linux WebKitGTK 2.52.6 external native Quick → Editor — passed;
+unit 733/733, render 20/20 (включая 4K/8K), boundaries 43/43 и `pnpm check` —
+passed. Актуальные source aliases и чистая сборка исключают старые dist modules.
+Фактические результаты и ограничения — TESTING.md.
+`REQ-REL-001/002`: native regression требует готового window-selector API и
+валидного D-Bus profile ID. Тестовый hash-компонент не может начинаться с цифры;
+это проверяется Rust regression до изменения E2E profile helper.
+
 ## Deployment target прямых Cargo-сборок macOS (2026-10-16)
 
 `REQ-REL-002`, `REQ-CAP-015`: прямые `cargo test`/`cargo check` используют

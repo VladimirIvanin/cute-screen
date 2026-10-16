@@ -9,6 +9,8 @@ export default defineConfig({
   plugins: [vue()],
   resolve: {
     alias: {
+      '@cute-screen/editor-core': fileURLToPath(new URL('../../packages/editor-core/src/index.ts', import.meta.url)),
+      '@cute-screen/editor-renderer': fileURLToPath(new URL('../../packages/editor-renderer/src/index.ts', import.meta.url)),
       '@cute-screen/editor-vue/m01-harness': fileURLToPath(
         new URL('../../packages/editor-vue/src/m01-harness.ts', import.meta.url),
       ),

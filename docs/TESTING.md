@@ -1,5 +1,56 @@
 # Стратегия тестирования
 
+## Фонарь: устаревшие dist и live preview (2026-10-16)
+
+Ubuntu 24.04.5 x86_64, Node 22.23.1, pnpm 10.33.2; evidence:
+`artifacts/spotlight-fix/`. В checkout остались outputs августа:
+`editor-core/dist/document/scene.js` и `render-scene.js`. Vite выбирал старый
+файловый модуль вместо актуального `document/scene/index.js`; новый массив
+apertures попадал в старый single-aperture validator. `browser-red.log`
+содержит фактический `RangeError: __spotlight-draft__.aperture.shape is invalid`.
+Исправлены очистка/forced emission пакетов и desktop source aliases.
+
+- `pnpm exec vitest run --project boundaries tests/boundaries/package-build.test.ts`:
+  red до cleanup helper (`build-red.log`), после — 2/2 (`build-green.log`).
+  `pnpm test:boundaries` — 43/43 (`boundaries-final.log`).
+- `pnpm test --maxWorkers=2` — 101 files / 733 tests (`unit.log`).
+- `pnpm test:render --maxWorkers=2` — 5 files / 20 tests (`render.log`), включая
+  production-shaped 4K/8K source, составную маску и повторно decoded PNG;
+  goldens не менялись. Метрики и pixel checksums — `artifacts/tool-settings/`.
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5207 pnpm test:e2e:browser --spec tests/e2e/specs/browser-spotlight-preview.e2e.ts`
+  — Chrome 154.0.8037.57, 1/1 (`browser-verified.log`). Проверены пиксели во время
+  создания и move, неизменность layers до release, undo/redo, aperture drag/Escape.
+- `PATH="$PWD/artifacts/spotlight-fix/tools/bin:$PWD/artifacts/spotlight-fix/tools/webkit/root/usr/bin:$PATH" CUTE_SCREEN_E2E_SCENARIOS=spotlight-preview pnpm test:e2e:tauri`
+  — external tauri-driver 2.1.0, WebKitGTK 2.52.6 / wry 0.55.1, 1/1
+  (`native-trusted.log`; финальный beforeSuite repeat — `native-suite.log`).
+  Production fake Capture → Quick → Editor, тот же
+  pixel contract в обоих окнах, pointer `isTrusted=true`. Capture fixture —
+  400×300; большие реальные изображения проверяет отдельный render harness,
+  физический capture этим сценарием не подтверждается. Скриншоты
+  `artifacts/tauri-e2e/spotlight-{quick,editor}-{creating,moving,cancelled}.png`
+  и browser counterparts просмотрены.
+- `cargo test --workspace --features test-harness profile_identity_components_never_start_with_a_digit`
+  — red на `profile.7580720c0ed134e1` (`profile-red.log`); после префикса `p`
+  `cargo test --workspace --features test-harness e2e_paths` — 3/3 (`profile-green.log`).
+  `cargo test --workspace` — 129 tests passed (`rust.log`).
+- `pnpm check` — exit 0 (`check-verified.log`), включая fmt/clippy всех конфигураций.
+- `pnpm tauri build --debug --no-bundle` — exit 0 (`build-production.log`),
+  обычный Linux binary `target/debug/cute-screen` без test-harness/fake-platform.
+  `pnpm format`, `pnpm format:check` и `pnpm docs:check` — exit 0;
+  `format-delivery.log`, `format-check-delivery.log`, `docs.log`.
+
+Первые native попытки выявили гонку config/service before-hooks и invalid D-Bus
+profile ID. Выбор main перенесён в первый beforeSuite. Embedded driver 1.3.0
+создаёт только synthetic MouseEvent, поэтому этот сценарий требует external
+provider. Первое external выполнение остановлено при зависшем старом before hook;
+затем helper исправлен для WebKit (`__name` у вложенного именованного callback).
+В ранних browser helpers уточнены skipRelease, стабильный pointer ID и сравнение
+layers без document timestamp. `browser-final.log` — неуспешный параллельный
+UI запуск; финальный изолированный повтор — `browser-verified.log`.
+Первый typecheck потребовал `.d.mts` для cleanup helper; отдельный format запуск
+нашёл max-len в новом helper, строка разбита. Эти неуспехи сохранены в логах.
+Windows/WebView2 и macOS/WKWebView этим исправлением повторно не проверялись.
+
 ## CI: driver cache и macOS deployment target (2026-10-16)
 
 Ubuntu 24.04.5 x86_64, Node 22.23.1, pnpm 10.33.2.

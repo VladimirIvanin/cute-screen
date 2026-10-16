@@ -1,5 +1,17 @@
 # Сквозная приёмка
 
+## Фонарь в Quick и editor (2026-10-16)
+
+`REQ-TOL-009`, `REQ-EDT-005/006`, `REQ-OUT-003`: из production Capture выбрать
+фонарь, начать drag и удерживать кнопку. Затемнение уже видно, центр области
+сохраняет исходные pixels, layers/history до release неизменны. После создания
+переместить область при удерживаемой кнопке: старый центр затемняется, новый
+центр открывается до release. Undo возвращает прежнее положение, redo повторяет
+move. Двойной клик включает aperture editing; drag/Escape восстанавливает маску
+без команды. Повторить после handoff в Editor. Linux external WebKitGTK и Chrome
+прошли; 4K/8K decoded renderer evidence — отдельно. Команды, размер native fixture
+и платформенные ограничения — TESTING.md.
+
 ## CI без подготовленных artifacts и macOS baseline (2026-10-16)
 
 `REQ-REL-001/002/003`: driver-cache boundary test проходит в workspace без

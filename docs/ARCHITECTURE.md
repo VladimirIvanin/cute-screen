@@ -1,5 +1,14 @@
 # Архитектура Cute Screen
 
+## Актуальность модулей editor в desktop build
+
+Desktop Vite разрешает editor-core, editor-renderer и editor-vue из текущих
+исходников. Иначе удалённый `dist/document/scene.js` может перекрыть новый
+`dist/document/scene/index.js`, смешав несовместимые варианты spotlight payload.
+`build:packages` полностью удаляет outputs TypeScript-пакетов и принудительно
+генерирует их заново; incremental metadata не разрешает пропуск emission после
+очистки. Persisted schema и renderer contract остаются по ADR-056/058.
+
 ## Центр поворота элемента
 
 `rotateLayerTransform` в DOM-free core устанавливает абсолютный угол и

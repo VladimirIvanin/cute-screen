@@ -21,6 +21,13 @@ const embeddedWebDriverPort = Number.parseInt(process.env.TAURI_WEBDRIVER_PORT ?
 
 const scenarios = [
   {
+    id: 'spotlight-preview',
+    spec: 'tests/e2e/specs/tauri-spotlight-preview.e2e.ts',
+    harnessQuery: '?m04=1&m08=1',
+    fakeCapture: true,
+    driverProvider: 'external',
+  },
+  {
     id: 'ruler-resolution',
     spec: 'tests/e2e/specs/tauri-ruler-resolution.e2e.ts',
     harnessQuery: '?m04=1&m08=1',
@@ -333,7 +340,8 @@ try {
       CUTE_SCREEN_WDIO_APP_BINARY: executable,
       CUTE_SCREEN_WDIO_ARTIFACTS: artifacts,
       CUTE_SCREEN_E2E_SCENARIO: scenario.id,
-      CUTE_SCREEN_E2E_DRIVER_PROVIDER: process.platform === 'win32' ? 'external' : 'embedded',
+      CUTE_SCREEN_E2E_DRIVER_PROVIDER: process.env.CUTE_SCREEN_E2E_DRIVER_PROVIDER
+        ?? scenario.driverProvider ?? (process.platform === 'win32' ? 'external' : 'embedded'),
       ...(process.platform === 'win32' ? {
         TEMP: runtimeDirectory,
         TMP: runtimeDirectory,
