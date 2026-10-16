@@ -40,6 +40,21 @@ tauri-driver 2.1.0. Log: `artifacts/ruler-tauri-repeat.log`; screenshots
 Production fake Capture → Quick (zoom 3.6) → Editor (160%/100%), trusted pointer,
 измеренная длина и undo/redo подтверждены. Это не physical capture evidence.
 
+`pnpm check` — exit 0 (`artifacts/ruler-check.log`), включая Rust checks;
+`pnpm test:perf --maxWorkers=2` — 4/4 passed (`artifacts/ruler-perf.log`),
+без заявления GPU/reference hardware guarantee. `pnpm tauri build --debug --no-bundle`
+— exit 0, `artifacts/ruler-build.log`, итоговый `target/debug/cute-screen.exe`.
+`pnpm format` и `pnpm format:check` — отдельные финальные логи
+`artifacts/ruler-format-final.log` и `artifacts/ruler-format-check.log`.
+
+Расширенный browser run (`artifacts/ruler-browser-final.log`) подтвердил
+исходный ruler regression, non-origin crop и lifecycle precision tools:
+3/3 spec files passed. Дополнительный rich-text spec сначала остановился на
+synthetic `pointerdown`/`setPointerCapture`: helper больше не приравнивает bitmap
+pixels к document coordinates, учитывает crop и кликает по тексту обычным pointer.
+Повтор — 3/3 passed, `artifacts/ruler-text-browser-final.log`. Метрики committed text raster
+также переводятся из backing pixels обратно в document coordinates.
+
 Linux/WebKitGTK, macOS/WKWebView и physical mixed-DPI не проверены.
 На предельном zoom pixel budget допускает растяжение bounded bitmap (ADR-058).
 

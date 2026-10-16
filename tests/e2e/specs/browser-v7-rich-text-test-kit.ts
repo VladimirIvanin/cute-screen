@@ -6,6 +6,7 @@ import {
 
 export type HarnessSnapshot = {
   readonly schemaVersion: number
+  readonly crop: { readonly x: number; readonly y: number } | null
   readonly layers: readonly {
     readonly id: string
     readonly kind: string

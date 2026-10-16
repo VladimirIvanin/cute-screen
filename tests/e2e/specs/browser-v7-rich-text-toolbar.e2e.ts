@@ -120,22 +120,21 @@ describe('Document v7 rich text in browser mode', () => {
     }
 
     await $('button[aria-label="Text"]').click()
-    await browser.execute(({ transform, localBounds }) => {
+    const editPoint = await browser.execute(({ layer, crop }) => {
       const scene = document.querySelector<HTMLCanvasElement>('.cs-canvas:not(.cs-canvas-overlay)')
       if (!scene) throw new Error('Scene canvas is unavailable')
       const rect = scene.getBoundingClientRect()
       const scale = Number(document.querySelector('.cs-zoom-controls')!.getAttribute('data-zoom')) / 100
-      scene.dispatchEvent(
-        new PointerEvent('pointerdown', {
-          bubbles: true,
-          cancelable: true,
-          button: 0,
-          pointerId: 7,
-          clientX: rect.left + (transform.translateX + localBounds.x + localBounds.width / 2) * scale,
-          clientY: rect.top + (transform.translateY + localBounds.y + localBounds.height / 2) * scale,
-        }),
-      )
-    }, committed)
+      const { transform, localBounds } = layer
+      const x = transform.translateX + localBounds.x + localBounds.width / 2 - (crop?.x ?? 0)
+      const y = transform.translateY + localBounds.y + localBounds.height / 2 - (crop?.y ?? 0)
+      return {
+        x: Math.round(rect.left + x * scale),
+        y: Math.round(rect.top + y * scale),
+      }
+    }, { layer: committed, crop: (await snapshot()).crop })
+    await browser.action('pointer').move({ origin: 'viewport', x: editPoint.x, y: editPoint.y })
+      .down({ button: 'left' }).up({ button: 'left' }).perform()
     await expect($('[contenteditable="true"][aria-label="Text editor"]')).toExist()
     await browser.waitUntil(async () => (await greenInk()).count === 0)
     await browser.keys('Escape')
