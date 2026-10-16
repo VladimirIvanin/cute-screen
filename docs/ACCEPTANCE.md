@@ -1,5 +1,14 @@
 # Сквозная приёмка
 
+## CI без подготовленных artifacts и macOS baseline (2026-10-16)
+
+`REQ-REL-001/002/003`: driver-cache boundary test проходит в workspace без
+`artifacts`; общий `pnpm test:boundaries` — 41/41 на Linux. Для `REQ-REL-002`
+прямой `cargo check --workspace --all-targets` на macOS Intel/ARM должен
+использовать deployment target 12.0 и компилировать Objective-C bridge
+с Xcode 16.4. Согласованность Cargo/Tauri settings проверена boundary test;
+native compile и capture smoke на macOS остаются pending. Команды — TESTING.md.
+
 ## Резкость линейки (2026-10-16, ADR-058)
 
 Создать горизонтальную и наклонную линейку; сравнить подпись при 100/160/200%

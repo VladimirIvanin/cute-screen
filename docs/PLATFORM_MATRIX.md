@@ -4,7 +4,7 @@
 
 `.cargo/config.toml` задаёт baseline 12.0 для прямых Cargo-команд, согласованный
 с Tauri bundle и ADR-038. Boundary regression проверяет совпадение настроек.
-Ошибка cc-rs при host target 15.5 исправлена конфигурацией; Intel/ARM native
+Для ошибки cc-rs при host target 15.5 добавлена конфигурация; Intel/ARM native
 compile с Xcode 16.4 и runtime capture здесь не проверены: текущий host — Linux.
 Поддержка ScreenCaptureKit этим исправлением не подтверждается.
 

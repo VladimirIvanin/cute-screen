@@ -4,7 +4,7 @@
 
 `REQ-REL-002`, `REQ-CAP-015`: прямые `cargo test`/`cargo check` используют
 macOS 12.0 из ADR-038, как и Tauri bundle. `.cargo/config.toml` задаёт
-`MACOSX_DEPLOYMENT_TARGET`, чтобы cc-rs не выбирал версию host SDK 15.5
+`MACOSX_DEPLOYMENT_TARGET`, чтобы cc-rs не выбирал host target 15.5
 и не отклонял legacy CoreGraphics bridge. Boundary regression сверяет baseline
 с `bundle.macOS.minimumSystemVersion`. Native Intel/ARM compile и capture
 smoke требуют macOS; локальный Linux boundary test их не заменяет.

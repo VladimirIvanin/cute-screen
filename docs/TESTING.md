@@ -1,5 +1,28 @@
 # Стратегия тестирования
 
+## CI: driver cache и macOS deployment target (2026-10-16)
+
+Ubuntu 24.04.5 x86_64, Node 22.23.1, pnpm 10.33.2.
+Логи: `artifacts/driver-cache-fix/`.
+
+- `pnpm exec vitest run --project boundaries tests/boundaries/tauri-driver-cache.test.ts`
+  запущен в изолированном temp workspace без `artifacts`: скопированы package.json,
+  vitest.config.ts, тест и cache helper, node_modules подключён symlink.
+  До правки — `ENOENT` в `mkdtemp`, после — 1/1 passed; `artifacts` не создаётся.
+  Логи `isolated-before.log` и `isolated-after.log`.
+- `pnpm exec vitest run --project boundaries tests/boundaries/build-contract.test.ts`:
+  новая macOS baseline regression до `.cargo/config.toml` — 1 failed / 12 passed
+  (`macos-baseline-before.log`). Проверяется согласованность direct Cargo и
+  Tauri baseline 12.0. Native Xcode 16.4 Intel/ARM compile остаётся pending:
+  на текущем Linux host нет macOS SDK. Runtime capture не проверялся.
+- `pnpm test:boundaries` — 9 files / 41 tests passed (`boundaries.log`).
+- `pnpm lint` — exit 0, 60 существующих warnings (`lint.log`).
+- `pnpm typecheck` — exit 0 (`typecheck.log`).
+
+Первый общий boundary/lint запуск был заблокирован отсутствующим локальным
+`@stylistic/eslint-plugin`; `pnpm install --frozen-lockfile` восстановил пакет
+без изменения lockfile (`install.log`). После восстановления проверки повторены.
+
 ## Резкость подписи линейки (2026-10-16, ADR-058)
 
 Windows x64 / PowerShell, Node 22.23.1, pnpm 10.33.2.
