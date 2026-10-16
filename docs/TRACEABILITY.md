@@ -11,8 +11,15 @@ teleport. Escape закрывает ближайший уровень; внеш�
 Crop сохраняет Apply/Cancel; общие flip commands переносятся в More actions.
 Проверки: mounted-shell regressions, browser native input, production Tauri
 Capture → Quick → Editor. Реализовано; browser 20/20 и полный `pnpm check`
-прошли. Native embedded configure не открылся (0/2), acceptance pending;
+прошли. Native external + X11 system context input прошёл 2/2;
 фактические команды и результаты — TESTING.md.
+
+Диагностика native E2E была добавлена до исправления конфигурации. Сценарий
+использует external provider: embedded 1.3.0 не генерирует contextmenu/PointerEvent
+и теряет Shift у F10. На Linux/X11 ПКМ отправляется системным xdotool, поскольку
+WebKitGTK automation 2.52.6 превращает отпускание ПКМ в левый click. Production
+Capture → Quick → Editor проверяет trusted keyboard/contextmenu/pointer input,
+готовность кнопок и фокус после handoff; диагностика событий сохраняется в JSON.
 
 ## Text sizing and wrapping follow-up (2026-10-16, ADR-062)
 

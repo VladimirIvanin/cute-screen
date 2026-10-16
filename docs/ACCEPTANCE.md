@@ -1071,3 +1071,10 @@ WebViews; Windows/macOS и физические pointer-жесты остают�
   empty/loading/read-only/pending блокируют эти команды. В Quick их нет.
 - Запустить mounted-shell, browser и production real-Tauri проверки. Платформу,
   screenshots и ограничения native driver фиксировать в TESTING.md.
+
+Native follow-up: Ubuntu 24.04.5 / X11, external tauri-driver + WebKitGTK 2.52.6,
+2/2. ПКМ вводится системным xdotool; Shift+F10, Escape, hotkey и создание —
+WebDriver. Проверки наблюдают isTrusted, document focus и enabled controls;
+никакие события или document/selection state не инъецируются. Browser lifecycle
+повторяется после изменения общего input helper. Wayland и другие ОС этим
+follow-up не подтверждены; команды и диагностика — TESTING.md.

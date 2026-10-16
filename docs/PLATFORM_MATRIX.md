@@ -731,10 +731,13 @@ WebKitGTK 605.1.15: production Capture → Quick → Editor, настройки 
 Linux x86_64 / Chrome 154.0.8037.57: browser suite — 6/6 файлов, 20/20
 сценариев; native browser pointer/keyboard, selection/defaults/inline text,
 RU/EN, light/dark и DPR 1/2 подтверждены соответствующими сценариями.
-Настоящий Tauri / WebKitGTK 605.1.15 собран и открыл production Capture → Quick,
-но embedded driver не открыл configure ни через ПКМ, ни через Shift+F10
-(0/2 сценариев). `tauri-driver` и `WebKitWebDriver` отсутствуют в PATH;
-native lifecycle acceptance остаётся pending. Это не подтверждает причину
-неудачи на уровне продукта и не заменяет проверку внешним driver/manual input.
+Настоящий Tauri / Ubuntu 24.04.5 X11, WebKitGTK 2.52.6 / wry 0.55.1:
+production Capture → Quick → Editor прошёл 2/2 с external tauri-driver.
+Shift+F10 и обычные pointer/keyboard идут через WebDriver; ПКМ — через системный
+xdotool из-за неверного left mouseup/click в WebKit automation. Проверяются
+trusted события. Runner выбирает этот режим для tool-lifecycle на Linux/X11;
+требуются tauri-driver, WebKitWebDriver в PATH и установленный xdotool.
+Исходный embedded 0/2 не был продуктовой регрессией: driver не создаёт
+contextmenu/PointerEvent и теряет modifier у F10.
 Windows/WebView2, macOS/WKWebView, Wayland и physical capture для этого изменения
 не запускались; новые supported claims не добавлены. Команды и artifacts — TESTING.md.

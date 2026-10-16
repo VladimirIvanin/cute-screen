@@ -3979,19 +3979,56 @@ Red-first: `red.log` — 10/11 новых сценариев воспроизв�
 native build; проверки не ослаблялись, финальный прогон выполняется с одним worker.
 Предупреждения jsdom canvas, существующие ESLint warnings и bundle size не скрыты.
 
-### Настоящий Tauri: неподтверждённая acceptance
+### Настоящий Tauri: диагностика и исправление конфигурации
 
-`XDG_RUNTIME_DIR=$PWD/artifacts/tool-lifecycle/runtime XDG_SESSION_ID=cutescreen-tool-lifecycle CUTE_SCREEN_E2E_SCENARIOS=tool-lifecycle pnpm test:e2e:tauri`
-— `tauri-final.log`. Стабильная команда собрала debug fake-platform/test-harness
-Tauri и открыла production Capture → Quick на WebKitGTK 605.1.15. Два сценария
-остановились на configure: embedded driver не открыл его ни по Shift+F10 со
-сфокусированной кнопки, ни по ПКМ (0/2). Переход к Editor и native creation
-в этом прогоне не подтверждены. `tauri-driver` и `WebKitWebDriver` отсутствуют
-в PATH. Не установлено, является ли это ограничением driver или native input
-регрессией; требуется внешний driver либо ручная проверка. Ошибка не заменена
-инъекцией selection/document state. Первый native attempt — `tauri.log`.
+Ubuntu 24.04.5 / X11, WebKitGTK 2.52.6, wry 0.55.1, external tauri-driver.
+Первоначальный `tauri-final.log` (embedded, 0/2) воспроизводил ограничения
+`tauri-plugin-wdio-webdriver 1.3.0`, а не ошибку открытия defaults в редакторе:
+`dispatch_pointer_event` создаёт MouseEvent без contextmenu/PointerEvent;
+`dispatch_key_event` для специальных клавиш, включая F10, не передаёт shiftKey.
+Драйверы отсутствовали в PATH, но уже находились в `artifacts/spotlight-fix/tools/`.
 
-Нативные failure screenshots сохранены стандартным runner в
-`artifacts/tauri-e2e/`; retained appData path записан в логе. Windows/macOS,
-Wayland, physical capture и mixed-DPI native input не запускались.
-Document v7, binary image transport и IPC не менялись; новых зависимостей нет.
+В runner для tool-lifecycle явно выбран external provider. После handoff тест
+ждёт enabled Arrow и document.hasFocus, затем начинает ввод; стабильные размеры
+canvas сами по себе не подтверждают готовность нового окна. Keyboard contract
+прошёл в обеих WebViews (`tauri-external-focus.log`, 1/2 всего).
+
+Оставшийся отказ ПКМ локализован записью настоящих событий:
+right pointerdown → right mousedown → contextmenu → **left mouseup → left click**
+по Arrow, все isTrusted=true. Лишний левый click выполнял предусмотренную
+контрактом повторную активацию и закрывал defaults. `skipRelease` не помог;
+прямая W3C action chain дала тот же результат (`tauri-external-balanced.log`,
+`tauri-external-actions.log`, `native-input-webdriver.json`). Поэтому это не
+исправляется подавлением обычных click в продукте.
+
+На Linux с XDG_SESSION_TYPE=x11 runner выбирает contextInput=x11: установленный
+системный xdotool делает настоящий ПКМ в центре кнопки в сфокусированном окне.
+Остальные pointer/keyboard действия остаются WebDriver. На других системах
+сохраняется contextInput=webdriver. Для диагностики можно явно задать
+CUTE_SCREEN_E2E_CONTEXT_INPUT=x11 или webdriver; x11 требует xdotool и X11.
+Driver provider и context input выводятся в лог. Новых package dependencies нет.
+
+Команды follow-up из корня репозитория:
+
+- `XDG_RUNTIME_DIR="$PWD/artifacts/tool-lifecycle/runtime" XDG_SESSION_ID=cutescreen-tool-lifecycle-external PATH="$PWD/artifacts/spotlight-fix/tools/bin:$PWD/artifacts/spotlight-fix/tools/webkit/root/usr/bin:$PATH" CUTE_SCREEN_E2E_SCENARIOS=tool-lifecycle pnpm test:e2e:tauri`
+  — `tauri-verified.log`, 2/2; automatic external/X11 mode. Первый успешный прогон с
+  явным CUTE_SCREEN_E2E_CONTEXT_INPUT=x11 — `tauri-external-x11.log`, 2/2.
+- Native проверяет Shift+F10/reopen/Escape/hotkey в Quick и Editor, production
+  handoff, ПКМ, вложенный stroke menu, создание стрелки и снятие выделения пустым
+  кликом. isTrusted=true проверяется у keyboard/contextmenu/canvas pointerdown.
+  `native-input.json` сохраняет последовательность событий, focus и enabled/pressed
+  состояния. Native screenshots просмотрены: `native-quick-keyboard.png`,
+  `native-editor-keyboard.png`, `native-editor-selected.png`, `native-editor-deselected.png`.
+- `pnpm exec eslint scripts/run-tauri-e2e.mjs tests/e2e/specs/tauri-tool-lifecycle.e2e.ts tests/e2e/tool-lifecycle.ts`
+  — `diagnosis-lint.log`; `pnpm exec tsc --noEmit -p tests/e2e/tsconfig.json`
+  — `diagnosis-typecheck.log`.
+- `pnpm exec vitest run --project boundaries tests/boundaries/tauri-runner.test.ts`
+  — `diagnosis-runner.log`, 2/2: failed fixture/build не запускает старый binary.
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5186 pnpm test:e2e:browser --spec tests/e2e/specs/browser-tool-lifecycle.e2e.ts`
+  — `browser-diagnosis.log`, 2/2 после изменения общего input helper.
+- `pnpm format` — `diagnosis-format.log`; `pnpm format:check` — `diagnosis-format-check.log`;
+  `pnpm check` — `diagnosis-check.log`.
+
+Скриншоты и логи — `artifacts/tool-lifecycle/`; стандартные failure screenshots —
+`artifacts/tauri-e2e/`. Windows/macOS, Wayland, physical capture и mixed-DPI native
+input не запускались. Document v7, binary image transport и IPC не менялись.

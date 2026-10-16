@@ -5,18 +5,28 @@ import {
 } from '@wdio/globals'
 import path from 'node:path'
 
+export async function configureArrowWithPointer(): Promise<void> {
+  await browser.action('pointer')
+    .move({ origin: $('button[aria-label="Arrow"]') })
+    .down({ button: 'right' })
+    .pause(50)
+    .up({ button: 'right' })
+    .perform()
+}
+
 export async function verifyToolLifecycle(
   output: string,
   prefix: string,
+  configureArrow: () => Promise<void> = configureArrowWithPointer,
 ): Promise<void> {
   const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
-  await $('button[aria-label="Arrow"]').click({ button: 'right' })
+  await configureArrow()
   await expect($('.cs-tool-configure-popover-host')).toBeDisplayed()
   await browser.keys('p')
   await expect($('button[aria-label="Pencil"]')).toHaveAttribute('aria-pressed', 'true')
   await expect($('.cs-tool-configure-popover-host')).not.toExist()
   await expect($('.cs-tool-defaults-toolbar')).not.toExist()
-  await $('button[aria-label="Arrow"]').click({ button: 'right' })
+  await configureArrow()
   await $('button[aria-label="Stroke: 3 px"]').click()
   await $('.cs-arrow-toolbar-popover button[aria-label="6 px"]').click()
   await expect($('.cs-tool-configure-popover-host')).toBeDisplayed()

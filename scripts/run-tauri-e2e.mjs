@@ -73,6 +73,9 @@ const scenarios = [
     spec: 'tests/e2e/specs/tauri-tool-lifecycle.e2e.ts',
     harnessQuery: '?m04=1&m08=1',
     fakeCapture: true,
+    driverProvider: 'external',
+    // WebKitGTK 2.52.6 automation turns right-button release into a left click.
+    contextInput: process.platform === 'linux' && process.env.XDG_SESSION_TYPE === 'x11' ? 'x11' : 'webdriver',
   },
   {
     id: 'tool-settings',
@@ -377,6 +380,7 @@ try {
       CUTE_SCREEN_E2E_SCENARIO: scenario.id,
       CUTE_SCREEN_E2E_DRIVER_PROVIDER: process.env.CUTE_SCREEN_E2E_DRIVER_PROVIDER
         ?? scenario.driverProvider ?? (process.platform === 'win32' ? 'external' : 'embedded'),
+      CUTE_SCREEN_E2E_CONTEXT_INPUT: process.env.CUTE_SCREEN_E2E_CONTEXT_INPUT ?? scenario.contextInput ?? 'webdriver',
       ...(process.platform === 'win32' ? {
         TEMP: runtimeDirectory,
         TMP: runtimeDirectory,
@@ -389,6 +393,9 @@ try {
     if (scenario.fakeCapture) {
       scenarioEnv.CUTE_SCREEN_E2E_FAKE_CAPTURE = '1'
     }
+    console.info(
+      `Tauri E2E scenario ${scenario.id}: driverProvider=${scenarioEnv.CUTE_SCREEN_E2E_DRIVER_PROVIDER}, contextInput=${scenarioEnv.CUTE_SCREEN_E2E_CONTEXT_INPUT}`,
+    )
 
     const status = run(
       process.execPath,
