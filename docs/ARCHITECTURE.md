@@ -1,5 +1,18 @@
 # Архитектура Cute Screen
 
+## Ограничения линейки и crop (ADR-059)
+
+`ruler-constraints.ts` в DOM-free core ограничивает world endpoints текущим
+crop/canvas. Shared move delta применяется ко всей selection; resize и rotation
+используют те же helpers в transient preview и commit. `CommandManager` готовит
+`setCrop`, сохраняя `rulerChanges` с точными before/after слоями; apply/revert
+атомарно меняют crop и геометрию, включая locked/hidden rulers. Подгонка
+сохраняет направление и style, сокращает длину только при нехватке места.
+Move/crop дополнительно удерживают badge внутри по осям, где он помещается;
+его percent layout использует исходные canvas dimensions.
+Batch без crop не требует дополнительного проигрывания команд. Vue не хранит
+реактивный scene graph; persisted schema и IPC не расширяются.
+
 ## Актуальность модулей editor в desktop build
 
 Desktop Vite разрешает editor-core, editor-renderer и editor-vue из текущих
@@ -517,3 +530,33 @@ shallow-проекцию. Committed activeDocument остаётся источн
 Inline text preview сохраняет полный RichTextEditingState и background до первого
 preview; normal formatting/cancel восстанавливает baseline перед применением.
 Внешние shell props, schema v7, IPC и масштаб холста сохраняются.
+
+## Различимые кисти (ADR-060)
+
+Новый pencil сохраняет `strokeVersion: 2`, исходные samples и `pressureMode`.
+DOM-free resolver возвращает centerline постоянного пера/автокоррекции либо
+pressure outline экспрессивной кисти. Canvas2D/CanvasKit используют одну path
+или polygon node; non-zero winding hit testing сохраняет прозрачные петли.
+Bounds вычисляются по тому же outline. Без strokeVersion действует прежний
+алгоритм с весами 1/2/3/2/1 и множителями толщины; открытие не обновляет штрихи.
+Переход выбранного объекта на новую кисть проходит одной undoable command.
+Preferences хранят отдельные значения коррекции; gesture фиксирует defaults и
+источник давления на pointerdown. Финальный sample берёт координаты pointerup,
+сохраняя последнее активное pressure при нулевом отпускном значении.
+Vue не владеет samples/контуром; обновления preview идут через renderer lifecycle.
+
+## Панель текста и локальные fonts (ADR-061)
+
+UI-реестр содержит 12 bundled family с Latin/Cyrillic static faces 400/700 и
+доступными italic. TextFontPicker показывает 32 code points диапазона или текста;
+loading/error/retry не изменяют document. FontFaceSet loader кеширует готовые
+faces, удаляет failed promise для retry и ждёт обе scripts. Перед scene frame
+загружаются используемые document faces. Опциональный CanvasViewportHosts.waitForRender
+позволяет Copy/Quick terminal actions дождаться последнего кадра и получить
+ошибку renderer вместо предыдущего изображения. Font preview text transient;
+schema v7, IPC и inline one-command commit не меняются.
+
+CanvasKit выбирает отдельный subset для script chunks смешанного фрагмента.
+Canvas2D resolver допускает список family для headless subset fallback;
+production WebView использует штатный unicode-range bundled CSS. Golden runtime
+регистрирует реальные файлы всех 12 гарнитур, включая Latin digits у Cyrillic text.

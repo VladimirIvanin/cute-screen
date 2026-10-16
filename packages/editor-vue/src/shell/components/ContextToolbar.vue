@@ -16,6 +16,7 @@ import LoupeFormattingToolbar from './LoupeFormattingToolbar.vue'
 import ToolFormattingToolbar from './ToolFormattingToolbar.vue'
 import HighlighterFormattingToolbar from './HighlighterFormattingToolbar.vue'
 import {
+  computed,
   ref,
   provide,
 } from 'vue'
@@ -37,6 +38,11 @@ const props = defineProps<{
   recentColors?: readonly SrgbColor[]
   pickerLocale?: 'en' | 'ru'
 }>()
+const cropPresetControl = computed(() => props.schema?.controls.find((control) => control.id === 'cropPreset' && control.kind === 'select'))
+const cropResetControl = computed(() => props.schema?.controls.find((control) => control.id === 'cropReset'))
+const cropActions = computed(() => props.schema?.controls
+  .filter((control) => control.id === 'cropCancel' || control.id === 'cropApply')
+  .sort((left, right) => Number(left.id === 'cropApply') - Number(right.id === 'cropApply')) ?? [])
 provide(numericDefaultsKey, () => props.defaultsTool)
 const emit = defineEmits<{
   action: [id: string]
@@ -52,6 +58,7 @@ const emit = defineEmits<{
     :title="schema.disabledReason"
     class="cs-context-toolbar"
     :class="{
+      'cs-context-toolbar--crop': schema.icon === 'crop',
       'cs-context-toolbar--text': schema.text,
       'cs-context-toolbar--arrow': schema.icon === 'arrow',
       'cs-context-toolbar--shape': Boolean(schema.shape),
@@ -120,6 +127,49 @@ const emit = defineEmits<{
       @action="emit('action', $event)"
       @eyedropper="emit('eyedropper', $event)"
     />
+    <div
+      v-else-if="schema.icon === 'crop'"
+      class="cs-context-controls cs-crop-controls"
+      @keydown.enter.stop
+    >
+      <label v-if="cropPresetControl?.kind === 'select'" class="cs-crop-preset">
+        <span>{{ cropPresetControl.label }}</span>
+        <UiSelect
+          class="cs-ui-select"
+          :model-value="cropPresetControl.value"
+          v-bind="{ ariaLabel: cropPresetControl.label }"
+          :options="cropPresetControl.options"
+          :disabled="Boolean(schema.disabled || cropPresetControl.disabled)"
+          @update:model-value="emit('change', cropPresetControl.id, String($event))"
+        />
+      </label>
+      <NButton
+        v-if="cropResetControl"
+        size="small"
+        quaternary
+        class="cs-crop-button"
+        :disabled="Boolean(schema.disabled || cropResetControl.disabled)"
+        @click="emit('action', cropResetControl.id)"
+      >
+        {{ cropResetControl.label }}
+      </NButton>
+      <span class="cs-crop-separator" aria-hidden="true" />
+      <div class="cs-crop-actions">
+        <NButton
+          v-for="control in cropActions"
+          :key="control.id"
+          size="small"
+          class="cs-crop-button"
+          :type="control.id === 'cropApply' ? 'primary' : 'default'"
+          :disabled="Boolean(schema.disabled || control.disabled)"
+          :aria-keyshortcuts="control.id === 'cropApply' ? 'Enter' : 'Escape'"
+          :title="`${control.label} (${control.id === 'cropApply' ? 'Enter' : 'Escape'})`"
+          @click="emit('action', control.id)"
+        >
+          {{ control.label }}
+        </NButton>
+      </div>
+    </div>
     <div v-else class="cs-context-controls">
       <ArrowFormattingToolbar
         v-if="schema.controls.some((control) => control.kind === 'arrowStroke')"

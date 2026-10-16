@@ -1,3 +1,4 @@
+import { expectCommittedCrop } from '../crop-result'
 import path from 'node:path'
 
 import {
@@ -103,8 +104,23 @@ describe('M08 clean crop mount in a real Tauri webview', () => {
       width: 300,
       height: 300,
     })
+    await expectCommittedCrop(300, 300)
     await $('button[aria-label="Undo"]').click()
     await browser.waitUntil(async () => (await snapshot()).document.crop === null)
+    await $('button[aria-label="Redo"]').click()
+    await browser.waitUntil(async () => (await snapshot()).document.crop?.x === 60)
+    await expectCommittedCrop(300, 300)
+    await $('button[aria-label="Crop"]').click()
+    await choosePreset('16:9')
+    await $('button=Cancel').click()
+    expect((await snapshot()).document.crop).toEqual({ x: 60, y: 0, width: 300, height: 300 })
+    await expectCommittedCrop(300, 300)
+    await $('button[aria-label="Crop"]').click()
+    await $('button=Reset').click()
+    await choosePreset('16:9')
+    await $('button=Apply').click()
+    await browser.waitUntil(async () => (await snapshot()).document.crop?.width === 400)
+    await expectCommittedCrop(400, 225)
     await browser.saveScreenshot(
       path.resolve(process.env.CUTE_SCREEN_WDIO_ARTIFACTS ?? 'artifacts/tauri-e2e', 'm08-crop-first-open-1024x700.png'),
     )

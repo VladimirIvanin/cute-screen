@@ -1,5 +1,44 @@
 # Трассируемость требований
 
+## Панель текста и встроенные шрифты (2026-10-16)
+
+`REQ-TOL-005/006/007`, `REQ-EDT-005/008/016`, `REQ-UI-001/005/006/007`:
+общая панель Text/Callout/Numbered Marker показывает все функции, переносит
+целые группы и сохраняет inline selection. Общая палитра, семантические иконки,
+три кнопки выравнивания и 12 локальных гарнитур с образцами заменяют native controls.
+Предпросмотр только в меню; выбор применяется явно. Загрузка faces предшествует
+рендеру; фон сохраняет Apply/Cancel и ограничения контейнера.
+Проверки: component mixed/disabled/focus/loading/error, browser responsive/selection/history,
+реальные font assets и decoded PNG; фактический статус — TESTING.md.
+
+## Подтверждение кропа и панель (2026-10-16)
+
+`REQ-TOL-013`, `REQ-EDT-005/006`, `REQ-UI-005`: Apply/Enter подтверждают
+одну undoable обрезку и переходят в Select; cropped preview виден сразу без
+дополнительного Cancel/Select. Cancel/Escape отбрасывают только текущий draft,
+Reset восстанавливает полную рамку до подтверждения. Панель кропа выравнивает
+controls по центру, использует одинаковую высоту 32 px и выделяет Apply;
+RU/EN и обе темы остаются доступны при 1024×700.
+Проверки: failing-first Vue regression, browser видимый viewport/overlay и
+production Capture → Quick → Editor в Tauri — 1/1; Chrome — 5 specs / 7 scenarios,
+unit — 750/750 и `pnpm check` — passed. Фактические команды и ограничения — TESTING.md.
+
+## Линейка внутри холста (2026-10-16)
+
+`REQ-TOL-010`, `REQ-EDT-005/006`: при создании и редактировании world-space
+endpoints линейки ограничены видимым canvas (crop при его наличии).
+Перемещение, включая keyboard и группу, сохраняет длину и взаимное положение;
+endpoint drag сохраняет неподвижный конец, Alt — угол привязки до края.
+Кроп автоматически сдвигает линейки внутрь, а слишком длинные сокращает
+с сохранением направления; locked/hidden линейки также подгоняются как часть
+изменения canvas. Кроп и геометрия отменяются одним шагом. Подгонка/move удерживают badge
+внутри, если он помещается, сохраняя доступность edge-to-edge измерения.
+Preview совпадает с commit, Escape не меняет документ, undo/redo точны.
+Проверки: red-first core geometry, mounted shell, 1000 property cases,
+Chrome 1280/1024 — 2/2 и real-WebView production Capture → Editor — 1/1;
+unit 750/750, render 20/20 и `pnpm check` — passed.
+Фактические результаты и платформенные ограничения — TESTING.md.
+
 ## Security audit зависимостей Vue (2026-10-16)
 
 `REQ-REL-001/002/003/005`: production dependency graph должен проходить
@@ -1056,3 +1095,16 @@ both themes and disabled opacity; the root SVG contract is unchanged.
 The initial three-tone version lacked contrast at toolbar size. Final refinement:
 coarser 3×3 checkerboard, full-opacity dark cells and 15% light cells, with grid
 edges aligned to whole device pixels at the actual 18 CSS px size (DPR 1/2).
+
+## Различимые кисти (2026-10-16)
+
+`REQ-TOL-003`, `REQ-EDT-002/005/006/015`, `REQ-OUT-003`: implemented; core/renderer/Vue и focused browser/native passed.
+Red-first core contracts: точное перо, RMS коррекции, pressure/simulated outline,
+legacy codec, bounds/hit testing; затем decoded renderer parity, mounted Vue,
+production Quick → Editor pointer flows и 4K/8K 12 000 samples. Фактические
+команды и ограничения будут записаны в TESTING.md.
+
+Новые проверки кистей: `brushes.test.ts` (core и mounted Vue),
+`golden-brushes.test.ts`, `browser-brushes.e2e.ts`, `tauri-brushes.e2e.ts` и
+`tauri-brushes-reopen.e2e.ts`. Существующая large fixture проверяет один render
+node для 12 000 samples. Общие проверки и сторонние текущие failures — TESTING.md.

@@ -355,6 +355,8 @@ export {
 
 export {
   resolveFreehandGeometry,
+  changePencilBrush,
+  normalizePencilDefaults,
   rebaseFreehandLayer,
 } from './tools/freehand'
 export {
@@ -366,3 +368,10 @@ export {
 } from './tools/precision/spotlight'
 
 export type { SpotlightAperture } from './document/types'
+
+export {
+  rulerCanvasBounds,
+  constrainRulerEndpoint,
+  constrainRulerMove,
+  constrainRulerTransform,
+} from './ruler-constraints'

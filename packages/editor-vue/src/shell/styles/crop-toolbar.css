@@ -1,0 +1,49 @@
+.cs-context-toolbar.cs-context-toolbar--crop {
+  align-items: center;
+  gap: var(--cs-crop-gap);
+}
+
+.cs-context-toolbar--crop .cs-context-icon {
+  width: var(--cs-crop-icon-size);
+  height: var(--cs-crop-icon-size);
+  flex: none;
+}
+
+.cs-context-toolbar--crop .cs-crop-controls,
+.cs-crop-preset,
+.cs-crop-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--cs-crop-gap);
+}
+
+.cs-context-toolbar--crop .cs-crop-controls {
+  flex: none;
+  flex-wrap: nowrap;
+  overflow: visible;
+  padding: 0;
+}
+
+.cs-crop-preset {
+  color: var(--text-muted);
+  font-size: var(--cs-crop-label-size);
+  white-space: nowrap;
+}
+
+.cs-crop-preset .cs-ui-select {
+  width: var(--cs-crop-preset-width);
+}
+
+.cs-crop-preset .n-base-selection {
+  --n-height: var(--cs-crop-control-height) !important;
+}
+
+.cs-crop-button.n-button {
+  height: var(--cs-crop-control-height);
+  border-radius: var(--radius-sm);
+}
+
+.cs-crop-separator {
+  height: var(--cs-crop-control-height);
+  border-left: 1px solid var(--border);
+}

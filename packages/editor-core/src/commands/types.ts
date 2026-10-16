@@ -2,6 +2,7 @@ import type {
   EditorDocumentV1,
   LayerNode,
   Rect,
+  RulerLayer,
 } from '../document/types'
 
 export interface IdGenerator {
@@ -19,7 +20,12 @@ export type EditorCommand =
     toIndex: number
   }>
   | Readonly<{ type: 'duplicateLayer'; sourceId: string; layer: LayerNode }>
-  | Readonly<{ type: 'setCrop'; before: Rect | null; after: Rect | null }>
+  | Readonly<{
+    type: 'setCrop'
+    before: Rect | null
+    after: Rect | null
+    rulerChanges?: readonly Readonly<{ before: RulerLayer; after: RulerLayer }>[]
+  }>
   | Readonly<{ type: 'batch'; commands: readonly EditorCommand[] }>
   | Readonly<{
     type: 'flipCanvas'

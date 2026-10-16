@@ -183,3 +183,20 @@
   opacity: 0.45;
   cursor: default;
 }
+
+.cs-brush-choices {
+  flex-direction: column;
+}
+.cs-brush-choices button {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  justify-items: start;
+  text-align: start;
+}
+.cs-brush-choices svg {
+  grid-row: span 2;
+}
+.cs-brush-choices small {
+  font-size: inherit;
+  color: var(--text-muted);
+}

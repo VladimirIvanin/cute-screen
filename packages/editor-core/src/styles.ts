@@ -1,4 +1,7 @@
-import { rebaseFreehandLayer } from './tools/freehand'
+import {
+  rebaseFreehandLayer,
+  changePencilBrush,
+} from './tools/freehand'
 import type { EditorCommand } from './commands/types'
 import type {
   JsonObject,
@@ -174,9 +177,12 @@ export function applyLayerStyle<T extends LayerNode>(
   canvas?: { readonly width: number; readonly height: number },
 ): T {
   style = boundedStyle(layer, style)
-  const payload = clone(layer.payload) as MutableObject
+  const source = layer.kind === 'pencil' && typeof style.brush === 'string'
+    ? changePencilBrush(layer.payload, style.brush) : layer.payload
+  const payload = clone(source) as MutableObject
+  delete payload.brushSmoothing
   for (const [key, path] of Object.entries(channels[layer.kind] ?? {})) {
-    if (key in style) writePath(payload, path, style[key]!)
+    if (key in style) writePath(payload, path, key === 'brush' && style[key] === 'pencil' ? 'pen' : style[key]!)
   }
   const content = contentFor(layer)
   if (content) payload[layer.kind === 'numberedMarker' ? 'label' : 'content'] = styledContent(content, style)

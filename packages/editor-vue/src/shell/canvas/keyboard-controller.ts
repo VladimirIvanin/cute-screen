@@ -213,7 +213,7 @@ export class KeyboardController {
       return
     }
     const gesture = this.#context.gesture()
-    if (gesture?.kind === 'draw' || gesture?.kind === 'calloutDraw') {
+    if (gesture && gesture.kind !== 'precision') {
       this.#context.cancelGesture()
       return
     }

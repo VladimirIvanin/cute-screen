@@ -83,9 +83,11 @@ export function paintStyle(
 
 export function canvasFont(
   style: RenderTextStyle,
-  fontFamily: string,
+  fontFamily: string | readonly string[],
 ): string {
-  return `${style.fontStyle} ${style.fontWeight} ${style.fontSize}px "${fontFamily.replaceAll('"', '')}", sans-serif`
+  const families = typeof fontFamily === 'string' ? [fontFamily] : fontFamily
+  const cssFamilies = families.map((family) => `"${family.replaceAll('"', '')}"`).join(', ')
+  return `${style.fontStyle} ${style.fontWeight} ${style.fontSize}px ${cssFamilies}, sans-serif`
 }
 
 export function withTransform(

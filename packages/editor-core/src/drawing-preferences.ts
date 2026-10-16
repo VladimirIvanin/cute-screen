@@ -1,3 +1,4 @@
+import { normalizePencilDefaults } from './tools/freehand'
 import type {
   JsonObject,
   SrgbColor,
@@ -151,7 +152,8 @@ function defaults(
   return {
     arrow: normalizedArrow(input.arrow, schemaVersion, fallback.arrow),
     shape: isJsonObject(input.shape) ? input.shape : fallback.shape,
-    pencil: isJsonObject(input.pencil) ? input.pencil : fallback.pencil,
+    pencil: isJsonObject(input.pencil)
+      ? normalizePencilDefaults({ ...fallback.pencil, ...input.pencil }) : fallback.pencil,
     marker: isJsonObject(input.marker) ? normalizeHighlighterDefaults(input.marker) : fallback.marker,
   }
 }

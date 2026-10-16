@@ -8,7 +8,7 @@ import {
   snapshot,
   openHarness,
   waitForEditorFocus,
-  setNativeColor,
+  setTextColor,
   applyBackground,
   startTextAt,
 } from './browser-v7-rich-text-test-kit'
@@ -22,7 +22,7 @@ describe('Document v7 rich text in browser mode', () => {
       await document.fonts.ready
     })
     const editor = await startTextAt(18, 18)
-    await setNativeColor('Text color', '#00ff00')
+    await setTextColor('Text color', '#00ff00')
     await waitForEditorFocus()
     await editor.addValue('Hg')
 
@@ -168,46 +168,24 @@ describe('Document v7 rich text in browser mode', () => {
 
     await browser.setWindowSize(640, 700)
     const layout = await browser.execute(() => {
-      const toolbar = document.querySelector<HTMLElement>('.cs-text-toolbar')
-      const overflow = document.querySelector<HTMLElement>('.cs-text-overflow-trigger')
-      if (!toolbar || !overflow) throw new Error('Text toolbar is missing')
-      const style = getComputedStyle(overflow)
-      const children = [...toolbar.children].filter((child): child is HTMLElement => child instanceof HTMLElement)
-      const rows = new Set(
-        children
-          .filter((child) => getComputedStyle(child).display !== 'none')
-          .map((child) => Math.round(child.getBoundingClientRect().top)),
-      )
-      return {
-        overflowVisible: style.display !== 'none',
-        rows: rows.size,
+      const toolbar = document.querySelector<HTMLElement>('.cs-text-toolbar')!
+      const groups = [...toolbar.querySelectorAll<HTMLElement>('.cs-text-control-group')]
+      return { rows: new Set(groups.map((group) => Math.round(group.getBoundingClientRect().top))).size,
+        visible: groups.every((group) => getComputedStyle(group).display !== 'none'),
         toolbarScrolls: toolbar.scrollWidth > toolbar.clientWidth,
-        documentScrolls: document.documentElement.scrollWidth > window.innerWidth,
-      }
+        documentScrolls: document.documentElement.scrollWidth > window.innerWidth }
     })
-    expect(layout).toEqual({
-      overflowVisible: true,
-      rows: 1,
-      toolbarScrolls: false,
-      documentScrolls: false,
-    })
-    await $('button[aria-label="More text settings"]').click()
-    await expect($('[role="dialog"][aria-label="More text settings"]')).toExist()
-    await browser.keys('Escape')
-    await expect($('button[aria-label="More text settings"]')).toBeFocused()
-
+    expect(layout).toEqual({ rows: 2, visible: true, toolbarScrolls: false, documentScrolls: false })
+    await $('button[aria-label="Align center"]').click()
+    await expect($('button[aria-label="Align center"]')).toHaveAttribute('aria-pressed', 'true')
     await $('button[aria-label="More actions"]').click()
     await $('button=RU').click()
-    await expect($('button[aria-label="Дополнительные настройки текста"]')).toExist()
     await $('button[aria-label="Размер шрифта"]').click()
     await browser.keys('Escape')
     await expect($('button[aria-label="Размер шрифта"]')).toBeFocused()
-    const ruOverflow = $('button[aria-label="Дополнительные настройки текста"]')
-    await ruOverflow.click()
-    const ruOverflowDialog = $('[role="dialog"][aria-label="Дополнительные настройки текста"]')
-    await ruOverflowDialog.$('button[aria-label="Фон"]').click()
-    await browser.execute(() => document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })))
-    await expect(ruOverflow).toBeFocused()
+    await $('button[aria-label="Фон"]').click()
+    await browser.keys('Escape')
+    await expect($('button[aria-label="Фон"]')).toBeFocused()
   })
 
   it('keeps Callout bubble and Numbered badge semantics with disabled container controls', async () => {

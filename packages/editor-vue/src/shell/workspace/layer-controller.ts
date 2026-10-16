@@ -1,6 +1,9 @@
 import type { Ref } from 'vue'
 import {
   creationPolicy,
+  constrainRulerMove,
+  constrainRulerTransform,
+  rulerCanvasBounds,
   rebaseRulerLayer,
   rotateLayerTransform,
   type EditorDocumentV1,
@@ -28,7 +31,14 @@ function canonicalTransform(
 ): LayerNode {
   const canvas = context.activeDocument.value?.canvas
   if (layer.kind !== 'ruler' || !canvas) return { ...layer, transform }
-  return rebaseRulerLayer({ ...layer, transform }, layer.payload, canvas)
+  const constrained = constrainRulerTransform(
+    layer,
+    transform,
+    rulerCanvasBounds(context.activeDocument.value!),
+    canvas,
+  )
+  if (constrained === layer.transform) return layer
+  return rebaseRulerLayer({ ...layer, transform: constrained }, layer.payload, canvas)
 }
 
 function updateLayerProperty(
@@ -159,13 +169,16 @@ function moveLayer(
   ) {
     return
   }
+  const delta = constrainRulerMove(layers, { x: deltaX, y: deltaY },
+    rulerCanvasBounds(context.activeDocument.value!), context.activeDocument.value!.canvas)
+  if (delta.x === 0 && delta.y === 0) return
   const commands = layers.map((layer) => ({
     type: 'updateLayer' as const,
     before: layer,
     after: canonicalTransform(context, layer, {
       ...layer.transform,
-      translateX: layer.transform.translateX + deltaX,
-      translateY: layer.transform.translateY + deltaY,
+      translateX: layer.transform.translateX + delta.x,
+      translateY: layer.transform.translateY + delta.y,
     }),
   }))
   context.props.documentSession.execute(commands.length === 1 ? commands[0]! : { type: 'batch', commands })

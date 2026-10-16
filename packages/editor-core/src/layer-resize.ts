@@ -1,3 +1,4 @@
+import { rebaseFreehandLayer } from './tools/freehand'
 import type {
   EditorDocumentV1,
   JsonObject,
@@ -14,13 +15,14 @@ import {
 import { assertValidLoupeSourceRegion } from './tools/precision/shared'
 import {
   rebaseRulerLayer,
-  snapRulerEndpoint,
 } from './tools/precision/ruler'
+import { constrainRulerEndpoint } from './ruler-constraints'
 export const BOUNDS_RESIZE_HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as const
 export type BoundsResizeHandle = (typeof BOUNDS_RESIZE_HANDLES)[number]
 export type IntrinsicResizeHandle = BoundsResizeHandle | 'start' | 'end'
 export type LayerResizeCapability = 'imageTransform' | 'bounds' | 'points' | 'textWidth' | 'loupe' | 'ruler' | 'semantic' | 'none'
 export interface ResizeLayerGeometryOptions {
+  readonly rulerBounds?: Rect
   readonly snapAngleIncrementDegrees?: number | undefined
   readonly preserveAspect?: boolean
   readonly fromCenter?: boolean
@@ -263,15 +265,14 @@ function resizeRuler(
   if (!options.canvas)
     throw new Error('ruler resize requires canvas dimensions')
   const other = handle === 'start' ? layer.payload.end : layer.payload.start
-  const candidate = options.snapAngleIncrementDegrees
-    ? snapRulerEndpoint(
-      transformPoint(transformToMatrix(layer.transform), other),
-      point,
-      options.snapAngleIncrementDegrees,
-    ).end
-    : point
+  const candidate = constrainRulerEndpoint(
+    transformPoint(transformToMatrix(layer.transform), other),
+    point,
+    options.rulerBounds ?? { x: 0, y: 0, ...options.canvas },
+    options.snapAngleIncrementDegrees,
+  )
   const next = localPoint(layer, candidate)
-  if (next.x === other.x && next.y === other.y)
+  if (Math.hypot(next.x - other.x, next.y - other.y) < 1e-8)
     return layer
   return rebaseRulerLayer(layer, Object.freeze({
     ...layer.payload, [handle]: next,
@@ -363,13 +364,14 @@ function resizePointLayer(
     ...mapPoint(sample, layer.localBounds, requested),
     pressure: sample.pressure,
   }))
-  return Object.freeze({
+  const resized = Object.freeze({
     ...layer,
     localBounds: requested,
     payload: Object.freeze({
       ...layer.payload, points: Object.freeze(points),
     }),
-  }) as LayerNode
+  }) as typeof layer
+  return layer.kind === 'pencil' && layer.payload.strokeVersion === 2 ? rebaseFreehandLayer(resized) : resized
 }
 function resizeFreeformCensor(
   layer: Extract<LayerNode, {

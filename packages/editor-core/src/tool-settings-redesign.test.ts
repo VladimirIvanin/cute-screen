@@ -53,7 +53,7 @@ describe('tool settings redesign contracts', () => {
       ],
       defaults: {
         ...DEFAULT_DRAWING_DEFAULTS,
-        pencil: { ...DEFAULT_DRAWING_DEFAULTS.pencil, width: 1, smoothing: 1 },
+        pencil: { brush: 'pen', color: DEFAULT_DRAWING_DEFAULTS.pencil.color!, width: 1, smoothing: 1 },
       },
     })!
     if (layer.kind !== 'pencil') throw new Error('pencil expected')
@@ -66,7 +66,7 @@ describe('tool settings redesign contracts', () => {
     expect(createDocumentRenderScene(document).nodes[0]).toMatchObject({ kind: 'line', x2: point.x, y2: point.y })
   })
   it('grows freehand bounds after changing brush width while preserving sampled coordinates', () => {
-    const layer = createDrawingLayer({ id: 'pencil', tool: 'pencil', start: { x: 10, y: 10 }, end: { x: 20, y: 20 } })
+    const layer = createDrawingLayer({ id: 'pencil', tool: 'pencil', start: { x: 10, y: 10 }, end: { x: 20, y: 20 }, defaults: { ...DEFAULT_DRAWING_DEFAULTS, pencil: { brush: 'pen', color: DEFAULT_DRAWING_DEFAULTS.pencil.color!, width: 3, smoothing: .5 } } })
     if (layer?.kind !== 'pencil') throw new Error('pencil expected')
     const after = rebaseFreehandLayer({ ...layer, payload: { ...layer.payload, brush: 'brush', width: 10 } })
     expect(after.localBounds.width).toBeCloseTo(25)

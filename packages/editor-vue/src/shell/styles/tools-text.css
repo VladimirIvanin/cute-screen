@@ -18,88 +18,212 @@
   max-height: calc(100vh - 24px);
   overflow: auto;
 }
-@media (max-width: 700px) {
-  .cs-text-floating-toolbar-host {
-    max-width: calc(100% - 16px);
-  }
-  .cs-text-floating-toolbar > select[data-text-control='font'] {
-    width: 64px;
-  }
-  .cs-text-floating-toolbar {
-    gap: 1px;
-  }
-  .cs-text-floating-toolbar .cs-text-overflowable {
-    display: none;
-  }
-  .cs-text-floating-toolbar .cs-text-overflow-trigger {
-    display: inline-grid;
-    place-items: center;
-  }
+/* Text controls use the same semantic surfaces and palette as other tools. */
+.cs-text-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: max-content;
+  max-width: 100%;
+}
+.cs-text-control-group {
+  height: 36px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+  padding-inline: 4px;
+  border-inline-start: 1px solid var(--border);
+}
+.cs-text-control-group:first-child {
+  border-inline-start: 0;
+  padding-inline-start: 0;
+}
+.cs-text-control-group:last-of-type {
+  padding-inline-end: 0;
+}
+.cs-text-control-group > button,
+.cs-text-font-trigger {
+  display: inline-flex;
+  position: relative;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+.cs-text-control-group > button:hover:not(:disabled),
+.cs-text-font-trigger:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+.cs-text-control-group > button[aria-pressed='true'],
+.cs-text-control-group > button[aria-expanded='true'],
+.cs-text-font-trigger[aria-expanded='true'] {
+  background: var(--accent-soft);
+}
+.cs-text-control-group > button[aria-pressed='true'] {
+  box-shadow: inset 0 -2px var(--accent);
+}
+.cs-text-control-group > button[aria-pressed='mixed'] {
+  background: var(--surface-sunken);
+  border-style: dashed;
+  border-color: var(--border);
 }
 .cs-text-toolbar button:focus-visible,
-.cs-text-toolbar select:focus-visible,
-.cs-text-toolbar input:focus-visible {
-  border-color: var(--accent);
-  outline: none;
+.cs-text-font-popover button:focus-visible,
+.cs-text-font-popover:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 .cs-text-toolbar button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
 }
-.cs-text-toolbar-color {
-  display: grid;
-  place-items: center;
+.cs-text-control-group > button[data-text-control='size'] {
+  min-width: 44px;
+  width: auto;
+  padding-inline: 6px;
+  font-variant-numeric: tabular-nums;
 }
-.cs-text-toolbar-color > .sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
+.cs-text-font-trigger {
+  width: 144px;
+  gap: 8px;
+  justify-content: space-between;
+  padding-inline: 8px;
+}
+.cs-text-font-trigger > span {
   overflow: hidden;
-  clip: rect(0, 0, 0, 0);
+  text-overflow: ellipsis;
   white-space: nowrap;
-  border: 0;
 }
-.cs-text-toolbar-color input {
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: 0;
-  background: transparent;
+.cs-text-font-trigger > svg {
+  flex: none;
+  width: 12px;
+  height: 12px;
+}
+.cs-text-toolbar .cs-simple-color-trigger {
+  width: 36px;
+  height: 36px;
+}
+.cs-text-toolbar .cs-simple-color-trigger > svg {
+  display: none;
+}
+.cs-text-toolbar .cs-simple-color-current {
+  border: 1px solid var(--text-border-35);
+}
+.cs-text-floating-toolbar {
+  border-radius: var(--radius-md);
+}
+.cs-text-background-indicator {
+  position: absolute;
+  width: 16px;
+  height: 3px;
+  bottom: 3px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
 }
 .cs-text-background-popover {
-  position: fixed;
-  z-index: 12;
-  bottom: 64px;
   display: grid;
-  gap: 8px;
-  min-width: 210px;
-  padding: 10px;
+  gap: 12px;
+  width: 320px;
+  max-width: calc(100vw - 16px);
+  padding: 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
+  color: var(--text);
   background: var(--surface-raised);
   box-shadow: var(--shadow-overlay);
 }
-.cs-text-background-popover label {
-  display: flex;
-  justify-content: space-between;
+.cs-text-background-color {
+  display: grid;
   gap: 8px;
 }
+.cs-text-font-popover {
+  height: min(480px, calc(100vh - 24px));
+  width: 320px;
+  max-width: calc(100vw - 16px);
+  max-height: min(480px, calc(100vh - 24px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  color: var(--text);
+  box-shadow: var(--shadow-overlay);
+}
+.cs-text-font-row > button[role='option'] {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  min-height: 68px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  text-align: start;
+}
+.cs-text-font-row > button[role='option']:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+.cs-text-font-row > button[aria-selected='true'] {
+  background: var(--accent-soft);
+}
+.cs-text-font-row > button:disabled {
+  cursor: default;
+}
+.cs-text-font-name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+.cs-text-font-name > svg {
+  width: 16px;
+  height: 16px;
+}
+.cs-text-font-sample {
+  font-size: 20px;
+  line-height: 1.35;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.cs-text-font-status,
+.cs-text-font-warning {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.cs-text-font-warning {
+  margin: 8px 10px;
+}
+.cs-text-font-retry {
+  margin: 0 10px 8px;
+  color: var(--text);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  cursor: pointer;
+}
 @media (max-width: 700px) {
-  .cs-text-toolbar > select[data-text-control='font'] {
-    width: 64px;
-  }
   .cs-text-toolbar {
-    gap: 1px;
+    max-width: min(360px, calc(100vw - 32px));
   }
-  .cs-text-toolbar .cs-text-overflowable {
-    display: none;
-  }
-  .cs-text-toolbar .cs-text-overflow-trigger {
-    display: inline-grid;
-    place-items: center;
-  }
+  .cs-text-floating-toolbar-host,
   .cs-context-toolbar--text {
     max-width: calc(100% - 16px);
   }
@@ -500,4 +624,14 @@
 
 .cs-save-status {
   padding: 7px 10px;
+}
+
+.cs-selection-floating-toolbar .cs-context-toolbar--text {
+  max-width: calc(100vw - 32px);
+}
+.cs-context-toolbar--text > .cs-context-icon {
+  display: none;
+}
+.cs-context-toolbar--text > .cs-context-controls:empty {
+  display: none;
 }

@@ -1,4 +1,9 @@
 :root {
+  --cs-crop-control-height: 32px;
+  --cs-crop-icon-size: 36px;
+  --cs-crop-gap: 8px;
+  --cs-crop-preset-width: 120px;
+  --cs-crop-label-size: 12px;
   --surface: #f4f4f6;
   --surface-raised: #ffffff;
   --surface-sunken: #e8e9ed;

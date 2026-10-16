@@ -152,8 +152,18 @@ export function freehandNodes(layer: PencilLayer | MarkerLayer): readonly Render
     cap: 'round' as const,
     join: 'round' as const,
   }
+  if (geometry.outline.length) {
+    return [{
+      kind: 'polygon', id: `${layer.id}:stroke`,
+      points: geometry.outline.map((point) => ({
+        x: layer.transform.translateX + point.x, y: layer.transform.translateY + point.y,
+      })),
+      rotation: layer.transform.rotation, opacity: layer.opacity, visible: layer.visible,
+      blendMode: layer.blendMode ?? 'normal', fill: style.color,
+    }]
+  }
   if (points.length === 1) {
-    const radius = Math.max(0.5, (style.width * (layer.kind === 'pencil' ? points[0]!.pressure : 1)) / 2)
+    const radius = Math.max(0.5, (style.width * (layer.kind === 'pencil' && !geometry.modern ? points[0]!.pressure : 1)) / 2)
     return [
       {
         kind: 'ellipse' as const,
@@ -170,7 +180,7 @@ export function freehandNodes(layer: PencilLayer | MarkerLayer): readonly Render
       },
     ]
   }
-  if (layer.kind === 'marker') {
+  if (layer.kind === 'marker' || geometry.modern) {
     return [
       {
         kind: 'path' as const,

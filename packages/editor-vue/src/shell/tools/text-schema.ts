@@ -1,3 +1,4 @@
+import { TEXT_FONT_FAMILIES } from '../../text-fonts'
 import {
   computed,
   type Ref,
@@ -96,23 +97,6 @@ function backgroundFor(
   return context.textDefaults.value.background
 }
 
-function fontFamilies(
-  context: TextSchemaContext,
-  snapshot: TextToolbarSnapshot | undefined,
-  first: RichTextContent['spans'][number] | undefined,
-): readonly string[] {
-  return [
-    ...new Set([
-      'Roboto',
-      'Arial',
-      'Georgia',
-      'monospace',
-      ...(context.props.systemFonts ?? []).map((face) => face.family),
-      snapshot?.fontFamily ?? first?.fontFamily ?? context.textDefaults.value.fontFamily,
-    ]),
-  ]
-}
-
 function textToolbar(
   context: TextSchemaContext,
   selected: TextLayer | undefined,
@@ -143,7 +127,8 @@ function textToolbar(
           spans.map((span) => span.fontFamily),
           defaults.fontFamily,
         ),
-    fonts: fontFamilies(context, snapshot, spans[0]),
+    fonts: TEXT_FONT_FAMILIES,
+    fontPreviewText: snapshot?.fontPreviewText ?? content?.text,
     fontSize: snapshot
       ? snapshot.fontSize
       : sameValue(

@@ -263,6 +263,8 @@ export {
 
 export {
   resolveFreehandGeometry,
+  changePencilBrush,
+  normalizePencilDefaults,
   rebaseFreehandLayer,
   addSpotlightAperture,
   updateSpotlightAperture,
@@ -271,4 +273,11 @@ export {
   spotlightApertureAt,
   measureRuler,
   type SpotlightAperture,
+} from '@cute-screen/editor-core'
+
+export {
+  rulerCanvasBounds,
+  constrainRulerEndpoint,
+  constrainRulerMove,
+  constrainRulerTransform,
 } from '@cute-screen/editor-core'

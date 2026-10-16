@@ -9,6 +9,9 @@ export function textFormattingLabel(
     | 'strike'
     | 'list'
     | 'alignment'
+    | 'alignStart'
+    | 'alignCenter'
+    | 'alignEnd'
     | 'background'
     | 'none'
     | 'padding'
@@ -28,6 +31,9 @@ export function textFormattingLabel(
         strike: 'Зачёркнутый',
         list: 'Маркированный список',
         alignment: 'Выравнивание текста',
+        alignStart: 'По левому краю',
+        alignCenter: 'По центру',
+        alignEnd: 'По правому краю',
         background: 'Фон',
         none: 'Нет',
         padding: 'Отступ',
@@ -45,6 +51,9 @@ export function textFormattingLabel(
         strike: 'Strikethrough',
         list: 'Bullet list',
         alignment: 'Text alignment',
+        alignStart: 'Align left',
+        alignCenter: 'Align center',
+        alignEnd: 'Align right',
         background: 'Background',
         none: 'None',
         padding: 'Padding',

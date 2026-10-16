@@ -153,6 +153,7 @@ export interface ContextToolbarSchema {
     readonly color: string | null
     readonly fontFamily: string | null
     readonly fonts: readonly string[]
+    readonly fontPreviewText?: string | undefined
     readonly fontSize: number | null
     readonly bold: boolean | null
     readonly italic: boolean | null
@@ -202,6 +203,8 @@ export interface PrecisionToolDefaults {
 }
 
 export interface CanvasViewportHosts {
+  /** Resolves after the latest scene and local text fonts have been rendered. */
+  readonly waitForRender?: () => Promise<void>
   readonly scene: HTMLCanvasElement
   readonly overlay: HTMLCanvasElement
   readonly scrollContainer: HTMLDivElement
@@ -250,6 +253,15 @@ export interface ShellActionAdapter {
 }
 
 export type IconName =
+  | 'bold'
+  | 'italic'
+  | 'strikethrough'
+  | 'list'
+  | 'alignLeft'
+  | 'alignCenter'
+  | 'alignRight'
+  | 'textBackground'
+
   | 'blendMode'
   | 'arrow'
   | 'camera'

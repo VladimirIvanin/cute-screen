@@ -295,7 +295,7 @@ function specializedControls(
         id: 'brush',
         label: 'Brush',
         value: typeof values.brush === 'string' ? values.brush : 'pen',
-        options: ['pen', 'pencil', 'brush'].map((value) => ({
+        options: ['pen', 'stabilized', 'brush'].map((value) => ({
           value,
           label: value,
         })),
@@ -344,7 +344,7 @@ function standardSchema(
       ...baseControls(context, tool, state),
       ...(tool === 'shape' ? shapeControls(context, state) : []),
       ...specializedControls(tool, state.values),
-      ...(tool === 'pencil' ? [{ kind: 'range' as const, id: 'smoothing', label: 'Smoothing', value: Number(state.values.smoothing ?? 0.5) * 100, min: 0, max: 100, step: 1, disabled: state.colorDisabled }] : []),
+      ...(tool === 'pencil' ? [{ kind: 'range' as const, id: 'smoothing', label: 'Smoothing', value: Number(state.values.smoothing ?? 0.5) * 100, min: 0, max: 100, step: 1, disabled: state.colorDisabled || state.values.brush === 'pen' }] : []),
     ],
   }
 }

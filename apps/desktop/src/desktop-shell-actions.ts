@@ -49,6 +49,7 @@ async function copyRenderedResult(
   ports: DesktopShellActionPorts,
   signal: AbortSignal,
 ): Promise<string> {
+  await ports.canvasHosts.value?.waitForRender?.()
   const scene = ports.canvasHosts.value?.scene
   if (!scene) throw new Error('The rendered result is not ready')
   if (signal.aborted) throw new ActionCancelledError('Copy cancelled')

@@ -67,21 +67,24 @@ describe('Document v7 rich text in a real Tauri webview', () => {
     })
     expect(layout).toEqual({ scrolls: false, documentScrolls: false })
 
-    await $('.cs-canvas:not(.cs-canvas-overlay)').click({ x: 18, y: 18 })
+    const point = await browser.execute(() => {
+      const rect = document.querySelector('.cs-canvas:not(.cs-canvas-overlay)')!.getBoundingClientRect()
+      return { x: Math.round(rect.left + 36), y: Math.round(rect.top + 36) }
+    })
+    await browser.action('pointer').move({ origin: 'viewport', ...point })
+      .down({ button: 'left' }).up({ button: 'left' }).perform()
     const editor = $('[contenteditable="true"][aria-label="Text editor"]')
     await expect(editor).toExist()
     await editor.addValue('Привет WebView2')
+    await browser.keys(['Control', 'a'])
     await $('button[aria-label="Bold"]').click()
     await browser.waitUntil(() =>
       browser.execute(() => document.activeElement?.getAttribute('contenteditable') === 'true'))
-    const openBackground = async () => {
-      const trigger = $('button[aria-label="Background"]')
-      if (await trigger.isDisplayed()) await trigger.click()
-      else {
-        await $('button[aria-label="More text settings"]').click()
-        await $('.cs-text-overflow-popover').$('button=Background').click()
-      }
-    }
+    await $('button[aria-label="Font family"]').click()
+    await browser.waitUntil(async () => $('button[role="option"][aria-label="Lora"]').isEnabled())
+    await expect($$('button[role="option"]')).toBeElementsArrayOfSize(12)
+    await $('button[role="option"][aria-label="Lora"]').click()
+    const openBackground = async () => $('button[aria-label="Background"]').click()
     await openBackground()
     await setNumericInput($('.cs-text-background-popover input[aria-label="Padding"]'), '12')
     await setNumericInput($('.cs-text-background-popover input[aria-label="Radius"]'), '8')
@@ -112,6 +115,8 @@ describe('Document v7 rich text in a real Tauri webview', () => {
       kind: 'text',
       payload: { content: { text: 'Привет WebView2' }, background: { padding: 12, radius: 8 } },
     })
+    const spans = (layer?.payload.content as { spans: { fontFamily: string }[] }).spans
+    expect(spans.every((span) => span.fontFamily === 'Lora')).toBe(true)
     expect(layer).not.toHaveProperty('opacity')
     expect(layer).not.toHaveProperty('blendMode')
     expect(layer).not.toHaveProperty('shadows')

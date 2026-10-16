@@ -340,7 +340,9 @@ export interface ShapeLayerPayload extends JsonObject {
 
 export interface PencilLayerPayload extends JsonObject {
   readonly points: readonly SampledPoint[]
-  readonly brush: 'pen' | 'pencil' | 'brush'
+  readonly strokeVersion?: 2
+  readonly pressureMode?: 'pen' | 'simulated'
+  readonly brush: 'pen' | 'pencil' | 'stabilized' | 'brush'
   readonly width: number
   readonly color: SrgbColor
   readonly smoothing: number

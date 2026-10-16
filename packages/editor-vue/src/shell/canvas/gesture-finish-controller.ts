@@ -3,6 +3,7 @@ import {
   createDrawingLayer,
   resizeLayerGeometry,
   rotateLayerTransform,
+  rulerCanvasBounds,
   updateArrowHandle,
   updateCalloutHandle,
   type LayerNode,
@@ -63,7 +64,24 @@ export function finishCanvasGesture(
   context: GestureFinishContext,
   event: PointerEvent,
 ): void {
-  const completed = context.gesture()
+  let completed = context.gesture()
+  if (
+    completed?.kind === 'draw' &&
+    (completed.tool === 'pencil' ||
+      completed.tool === 'marker')
+  ) {
+    const end = context.canvasPoint(event)
+    const previous = completed.points.at(-1)
+    if (end) {
+      const point = {
+        ...end, pressure: end.pressure && end.pressure > 0 ? end.pressure : previous?.pressure ?? .5,
+      }
+      const samePosition = previous && previous.x === point.x && previous.y === point.y
+      completed = {
+        ...completed, current: point, points: samePosition ? completed.points : [...completed.points, point],
+      }
+    }
+  }
   const precisionLayer = createCompletedPrecisionLayer(context, completed)
   clearTransientState(context, event)
   commitMovement(context, completed)
@@ -243,7 +261,10 @@ function commitIntrinsicResize(
       preserveAspect: gesture.preserveAspect,
       snapAngleIncrementDegrees: gesture.snapAngleIncrementDegrees,
       fromCenter: gesture.centerResize,
-      ...(context.props.document ? { canvas: context.props.document.canvas } : {}),
+      ...(context.props.document ? {
+        canvas: context.props.document.canvas,
+        rulerBounds: rulerCanvasBounds(context.props.document),
+      } : {}),
     })
     if (JSON.stringify(after) !== JSON.stringify(gesture.initial)) {
       context.emit('documentCommand', {

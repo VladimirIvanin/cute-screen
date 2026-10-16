@@ -1,6 +1,8 @@
 import {
   computed,
   nextTick,
+  onMounted,
+  onBeforeUnmount,
   watch,
 } from 'vue'
 import {
@@ -73,6 +75,7 @@ function toolbarSnapshot(editing: NonNullable<EditingText['value']>) {
   const sameColor = (left: SrgbColor, right: SrgbColor) =>
     left.red === right.red && left.green === right.green && left.blue === right.blue && left.alpha === right.alpha
   return Object.freeze<TextToolbarSnapshot>({
+    fontPreviewText: range.start === range.end ? state.content.text : state.content.text.slice(range.start, range.end),
     fontFamily: common(
       spans.map((span) => span.fontFamily),
       (a, b) => a === b,
@@ -200,6 +203,8 @@ function emitTextEditing(context: TextFormattingContext): void {
 
 export function createTextFormattingController(context: TextFormattingContext) {
   registerFormattingWatches(context)
+  onMounted(() => document.addEventListener('cs-text-toolbar-resize', context.updateTextToolbarLayout))
+  onBeforeUnmount(() => document.removeEventListener('cs-text-toolbar-resize', context.updateTextToolbarLayout))
   return {
     editorTextStyle: computed(
       () => context.editingText.value?.controller.state.typingStyle ?? context.props.textDefaults ?? DEFAULT_TEXT_TOOL,

@@ -1,4 +1,5 @@
 import {
+  DEFAULT_DRAWING_DEFAULTS,
   calloutTextLayout,
   createNumberedMarkerLayer,
   hitTestDocument,
@@ -308,7 +309,10 @@ function beginDrawing(
   context.setGesture({
     kind: 'draw',
     highlighterEffect: context.props.highlighterEffect,
-    drawingDefaults: context.props.drawingDefaults,
+    drawingDefaults: tool === 'pencil' ? {
+      ...(context.props.drawingDefaults ?? DEFAULT_DRAWING_DEFAULTS),
+      pencil: { ...(context.props.drawingDefaults ?? DEFAULT_DRAWING_DEFAULTS).pencil, pressureMode: event.pointerType === 'pen' ? 'pen' : 'simulated' },
+    } : context.props.drawingDefaults,
     tool,
     start: point,
     current: point,

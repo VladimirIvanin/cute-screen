@@ -8,6 +8,7 @@ import { CommandManager } from './commands'
 import {
   applyEditorCommand,
   createFlipCanvasCommand,
+  revertEditorCommand,
 } from './commands/operations'
 import {
   parseEditorDocument,
@@ -275,6 +276,50 @@ describe('intrinsic layer resize', () => {
     expect(after.payload.sourceRegion.width).toBeCloseTo(after.payload.lens.size / after.payload.zoom)
     expect(after.payload.sourceRegion.x + after.payload.sourceRegion.width / 2).toBeCloseTo(60)
     expect(after.payload.sourceRegion.y + after.payload.sourceRegion.height / 2).toBeCloseTo(70)
+  })
+
+  it('fits even a locked ruler on crop and restores exact geometry with one undo', () => {
+    const ruler = { ...createRulerLayer({
+      id: '019c1f62-058e-7000-8000-000000000010',
+      start: { x: 20, y: 30 },
+      end: { x: 320, y: 180 },
+      canvas: CANVAS,
+    }), locked: true }
+    const manager = new CommandManager(document([ruler]))
+    const original = manager.snapshot.document
+    manager.execute({ type: 'setCrop', before: null, after: { x: 100, y: 100, width: 80, height: 60 } })
+    const cropped = manager.snapshot.document
+    const after = cropped.layers[0]
+    if (after?.kind !== 'ruler') throw new Error('expected ruler')
+    expect(after.payload.end.x - after.payload.start.x).toBeCloseTo(80)
+    expect(after.payload.end.y - after.payload.start.y).toBeCloseTo(40)
+    expect(after.locked).toBe(true)
+    const command = {
+      type: 'setCrop' as const,
+      before: null,
+      after: cropped.crop,
+      rulerChanges: [{ before: ruler, after }],
+    }
+    expect(applyEditorCommand(original, command)).toEqual(cropped)
+    expect(revertEditorCommand(cropped, command)).toEqual(original)
+    manager.undo()
+    expect(manager.snapshot.document).toEqual(original)
+    expect(manager.snapshot.canUndo).toBe(false)
+    manager.redo()
+    expect(manager.snapshot.document).toEqual(cropped)
+  })
+
+  it('stops a ruler endpoint at the canvas edge', () => {
+    const before = createRulerLayer({
+      id: '019c1f62-058e-7000-8000-000000000010',
+      start: { x: 20, y: 30 },
+      end: { x: 120, y: 30 },
+      canvas: CANVAS,
+    })
+    const after = resizeLayerGeometry(before, 'end', { x: 900, y: -200 }, { canvas: CANVAS })
+    if (after.kind !== 'ruler') throw new Error('expected ruler layer')
+    expect(after.transform.translateX + after.payload.end.x).toBeCloseTo(CANVAS.width)
+    expect(after.transform.translateY + after.payload.end.y).toBeCloseTo(0)
   })
 
   it('moves ruler endpoints without changing its factual style', () => {

@@ -1,3 +1,4 @@
+import { expectCommittedCrop } from '../crop-result'
 import path from 'node:path'
 import {
   $,
@@ -27,7 +28,8 @@ describe('M08 crop and precision acceptance in browser mode', () => {
     const baseRow = $(`[data-layer-id="${baseId}"]`)
     await baseRow.$('button[aria-label="Unlock layer"]').click()
     await baseRow.$('.cs-layer-select').click()
-    await dragCanvas({ x: 399, y: 299 }, { x: 300, y: 225 }, 'm08-base-resize')
+    // The selection formatting panel can cover the lower corner; use the unobstructed upper handle.
+    await dragCanvas({ x: 1, y: 1 }, { x: 100, y: 75 }, 'm08-base-resize')
     await browser.waitUntil(async () => {
       const base = (await m08Snapshot()).document.layers.find((layer) => layer.id === baseId)
       return Boolean(base && base.transform.scaleX < 0.9)
@@ -85,6 +87,7 @@ describe('M08 crop and precision acceptance in browser mode', () => {
       width: 300,
       height: 300,
     })
+    await expectCommittedCrop(300, 300)
     await clickHistory('Undo')
     await browser.waitUntil(async () => (await m08Snapshot()).document.crop === null)
 
@@ -107,7 +110,7 @@ describe('M08 crop and precision acceptance in browser mode', () => {
     await browser.keys([Key.Shift, 'ArrowRight'])
     await $('button=Apply').click()
     await browser.waitUntil(async () => (await m08Snapshot()).document.crop?.x === 60)
-    await $('button[aria-label="Select"]').click()
+    await expectCommittedCrop(300, 300)
     await $('button=Flip horizontally').click()
     await browser.waitUntil(async () => (await m08Snapshot()).document.crop?.x === 40)
     await clickHistory('Undo')

@@ -1,5 +1,29 @@
 # Журнал архитектурных решений
 
+## ADR-059 — Линейка ограничена видимым canvas и подгоняется при crop
+
+**Статус:** accepted; дополняет ADR-056.
+
+**Контекст:** move и endpoint drag позволяли унести линейку за изображение.
+Crop мог оставить существующую линейку вне новой рабочей области.
+
+**Решение:** ограничивать world endpoints прямоугольником crop либо полным
+canvas. Move использует общий допустимый delta всей selection; endpoint drag
+фиксирует второй конец, Alt пересекает край вдоль snapped ray. Поворот сдвигает
+линейку внутрь; угол, при котором её длина не помещается, отклоняется.
+При изменении crop линейка сначала сокращается только насколько необходимо
+с сохранением направления, затем сдвигается внутрь. Это распространяется на
+locked/hidden rulers как часть изменения canvas. Style не масштабируется.
+CommandManager дополняет `setCrop` before/after снимками изменённых линеек;
+apply/revert и history сохраняют crop и геометрию одной атомарной правкой.
+Документ v7 и IPC не меняются. Засечки и badge не сокращают доступный диапазон
+измерения между краями изображения. Move и crop учитывают conservative badge
+по каждой оси, если он помещается; на меньшем canvas остаётся ограничение endpoints.
+
+**Проверяемое основание:** red-first endpoint/crop/Escape regressions,
+1000 property cases rotated/reflected non-origin crops, mounted-shell history,
+browser и production real-WebView pointer/crop scenarios. Результаты — TESTING.md.
+
 ## ADR-058 — Плотность preview сцены с учётом zoom и DPI
 
 **Статус:** accepted; заменяет ограничение document-resolution preview в ADR-050.
@@ -22,7 +46,7 @@ production browser и real-WebView Quick → Editor. Команды и огра�
 
 ## ADR-056 — Сглаживание карандаша и составной фонарь
 
-**Статус:** accepted; дополняет ADR-048 и общий numeric preview contract.
+**Статус:** superseded в части карандаша by ADR-060; фонарь и линейка остаются accepted.
 
 Карандаш хранит исходные sampled points и smoothing 0…1. Общий DOM-free resolver
 смешивает внутренние точки с окном весов 1/2/3/2/1, сохраняя endpoints и pressure;
@@ -365,7 +389,7 @@ artifact хранит fingerprint, commit, fixture, CPU/GPU metrics и runtime l
 ## ADR-025 — Portable content resources, staged import и native clipboard
 
 **Статус:** accepted; text-reference and internal clipboard-version portions
-superseded by ADR-031
+superseded by ADR-031; bundled-font baseline superseded by ADR-061
 
 **Контекст:** M07 добавляет переносимый rich text, локальные изображения и
 clipboard. Передача bytes через JSON/base64 расходится с существующим binary
@@ -1133,3 +1157,44 @@ PNG и проверяют оба прищура, stem/foot, прозрачнос
 tray. Размерный review 16/20/24/32 px и повторное декодирование bundle icons —
 asset evidence; runtime tray light/dark/HiDPI на каждой ОС проверяется отдельно.
 Фактические результаты и ограничения фиксируются в `TESTING.md`.
+
+## ADR-060 — Различимые кисти и цельный контур
+
+**Статус:** accepted; supersedes карандашную часть ADR-056.
+
+Точное перо сохраняет траекторию и постоянную толщину. Автокоррекция использует
+стабилизацию perfect-freehand, экспрессивная кисть — переменный pressure outline.
+Зависимость MIT закреплена в editor-core. Новый pencil payload имеет
+`strokeVersion: 2`, `pressureMode: pen | simulated` и brush `pen | stabilized | brush`.
+Отсутствие версии сохраняет прежний renderer; неизвестная версия отклоняется codec.
+Schema v7, original blobs и IPC не меняются. Исходные samples остаются в payload;
+контур вычисляется DOM-free resolver для scene, bounds, hit testing и миниатюр.
+Настройки и pressureMode фиксируются при начале жеста, pointerup сохраняет
+конечную позицию без нулевого отпускного pressure. Один штрих — одна command.
+
+**Проверяемое основание:** red-first тесты разных геометрий, RMS шума ≤50%
+при 65% коррекции, legacy pixel stability, цельное наложение opacity, decoded
+Canvas2D/CanvasKit export, production pointer flow и 12 000 samples на 4K/8K.
+
+## ADR-061 — Панель текста и 12 переносимых гарнитур
+
+**Статус:** accepted; supersedes bundled-font baseline portion of ADR-025.
+
+**Контекст:** native color/font/alignment controls расходятся с остальными
+инструментами, системный каталог перегружен и не показывает внешний вид.
+Пользователь выбрал 12 bundled fonts, образцы только в меню и все функции на виду.
+
+**Решение:** общая панель использует UiIcon, SimpleColorPicker и NumericControl;
+выравнивание задаётся тремя кнопками. Целые группы переносятся на узкой ширине.
+Каталог: Roboto, Manrope, Rubik, Comfortaa, Oswald, PT Serif, Lora, Roboto Slab,
+JetBrains Mono, PT Mono, Caveat, Marck Script. Статические Fontsource 5.3.0,
+Latin/Cyrillic, 400/700 и доступные italic; недоступные faces синтезируются.
+Roboto Slab — Apache-2.0; остальные — OFL-1.1 с version-specific allowlist.
+Образец — 32 Unicode code points выделения/текста либо локализованный пример.
+Клик применяет готовый face; loading/error/retry видимы, hover не меняет документ.
+Старое family сохраняется с предупреждением вне встроенного набора. Документ v7,
+IPC, EditorCommand и общий inline commit сохраняются.
+
+**Проверяемое основание:** component/browser проверки selection, keyboard,
+responsive geometry и undo; локальные реальные faces и decoded PNG, отдельно
+фиксируемые результаты real WebView и обеих renderer-веток в TESTING.md.

@@ -1,3 +1,4 @@
+import { loadDocumentTextFonts } from '../../text-fonts'
 import type {
   ComputedRef,
   Ref,
@@ -44,6 +45,7 @@ export class CanvasRendererController {
   private sceneReady = false
   private revision = 0
   private mounted = false
+  private drawing: Promise<void> = Promise.resolve()
   private resources = new Map<string, { readonly key: string; readonly resource: ImageResource }>()
 
   constructor(private readonly context: RendererControllerContext) {}
@@ -175,7 +177,22 @@ export class CanvasRendererController {
     return true
   }
 
-  async drawDocument(): Promise<void> {
+  drawDocument(): Promise<void> {
+    const drawing = this.drawFrame()
+    this.drawing = drawing
+    return drawing
+  }
+
+  async waitForRender(): Promise<void> {
+    let drawing: Promise<void>
+    do {
+      drawing = this.drawing
+      await drawing
+    } while (drawing !== this.drawing)
+    if (this.context.rendererError.value) throw new Error(this.context.rendererError.value)
+  }
+
+  private async drawFrame(): Promise<void> {
     const revision = ++this.revision
     const { scene, props, rendererError } = this.context
     const bounds = this.context.outputBounds.value
@@ -194,6 +211,7 @@ export class CanvasRendererController {
     }
     let readyDocumentId: string | undefined
     try {
+      await loadDocumentTextFonts(this.context.documentForScene() ?? props.document)
       const runtime = await this.ensureRenderer()
       if (
         !runtime ||

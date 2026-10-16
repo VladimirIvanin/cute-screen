@@ -3,6 +3,8 @@ import {
   createDocumentRenderScene,
   resizeLayerGeometry,
   rotateLayerTransform,
+  rulerCanvasBounds,
+  constrainRulerTransform,
   updateArrowHandle,
   updateCalloutHandle,
   type LayerNode,
@@ -209,7 +211,11 @@ export class CanvasGeometryController {
       return this.resizeTransform(layer, gesture.handle, gesture.current, gesture.freeResize, gesture.centerResize)
     }
     if (gesture.kind === 'rotate') {
-      return rotateLayerTransform({ ...layer, transform: gesture.initial }, gesture.currentAngle)
+      const transform = rotateLayerTransform({ ...layer, transform: gesture.initial }, gesture.currentAngle)
+      return layer.kind === 'ruler' && this.#context.props.document
+        ? constrainRulerTransform(layer, transform,
+            rulerCanvasBounds(this.#context.props.document), this.#context.props.document.canvas)
+        : transform
     }
     return layer.transform
   }
@@ -230,7 +236,10 @@ export class CanvasGeometryController {
         preserveAspect: gesture.preserveAspect,
         snapAngleIncrementDegrees: gesture.snapAngleIncrementDegrees,
         fromCenter: gesture.centerResize,
-        ...(this.#context.props.document === undefined ? {} : { canvas: this.#context.props.document.canvas }),
+        ...(this.#context.props.document === undefined ? {} : {
+          canvas: this.#context.props.document.canvas,
+          rulerBounds: rulerCanvasBounds(this.#context.props.document),
+        }),
       })
     }
     if (gesture.kind === 'arrowHandle') {

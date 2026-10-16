@@ -1,5 +1,45 @@
 # Платформенная матрица
 
+## Панель текста и 12 fonts (2026-10-16, ADR-061)
+
+Ubuntu 24.04.5 x86_64/X11, Chrome 154.0.8037.57: RU/EN × dark/light ×
+640/1024/1440; все controls видимы, шрифты загружаются из bundle, меню
+и editing сохраняют range, PNG повторно декодирован. Native WebKitGTK 605.1.15
+отобразил панель; annotation gesture в embedded-driver не создал editor,
+поэтому native editing/Quick handoff не объявляются подтверждёнными.
+
+12 Latin/Cyrillic families поставляются статическими Fontsource 5.3.0 assets.
+Canvas2D и CanvasKit имеют отдельные decoded renderer goldens. CanvasKit
+сохраняет существующий synthesis B/I; pixel-identical DOM↔CanvasKit claim не
+делается. Windows/macOS и Wayland для этого изменения не запускались.
+Команды, артефакты и известные ограничения — TESTING.md.
+
+## Немедленный результат кропа (2026-10-16)
+
+Linux x86_64, Chrome 154.0.8037.57: 5 specs / 7 scenarios passed для
+Apply/Enter → Select/cropped viewport, Cancel/Escape, reset, undo/redo,
+non-origin annotations и crop cursors. RU/EN × light/dark × окна
+1213×724 / 1024×700: controls 32 px, общая вертикальная ось, keyboard focus,
+полные подписи и доступный Apply справа; восемь screenshots просмотрены.
+WebKitGTK 2.52.6 / wry 0.55.1 с external tauri-driver 2.1.0:
+production fake Capture → Quick → Editor → Crop — 1/1 passed, первый decoded
+400×300 canvas без injected frame state; viewport меняется сразу по Enter/Apply.
+Native screenshot 1024×700 просмотрен. Для параллельного resident editor
+изолирован `XDG_SESSION_ID`; embedded attempt не является native evidence.
+Physical capture/mixed-DPI, Windows и macOS остаются без нового runtime smoke.
+Команды и результаты — TESTING.md, `artifacts/crop-apply/`.
+
+## Линейка внутри canvas и crop (2026-10-16, ADR-059)
+
+Linux x86_64/X11: Chrome 154.0.8037.57 — 2/2 при 1280/1024 px;
+WebKitGTK 2.52.6 / wry 0.55.1, external tauri-driver 2.1.0 — production
+fake Capture → Quick → Editor, 1/1. Подтверждены trusted pointer move/endpoint,
+transient/cancel и crop с точным Undo/Redo; native/browser screenshots просмотрены.
+Core/Vue 750/750, renderer goldens 20/20 и `pnpm check` — passed.
+Runtime-каталог теста изолирован от activation socket resident developer app.
+Fixture 400×300; physical capture, Wayland/mixed-DPI, Windows/WebView2 и
+macOS/WKWebView остаются без нового evidence. Команды/неуспехи — TESTING.md.
+
 ## Фонарь и актуальность сборки (2026-10-16)
 
 Linux x86_64 / WebKitGTK 2.52.6, wry 0.55.1, external tauri-driver 2.1.0:
@@ -645,3 +685,13 @@ Quick frame sharpness: WebKitGTK на текущем X11 host подтверди
 UI backing и резкие frame/size badge (quick-chrome 3/3). DPR 2 проверен
 pixel/controller tests; это не physical mixed-DPI evidence. См. before/after
 и ограничения в `TESTING.md`.
+
+## Различимые кисти (2026-10-16, ADR-060)
+
+Linux x86_64/X11, Chrome 154.0.8037.57 и настоящий Tauri wry 0.55.1 /
+WebKitGTK 2.52.6: три кисти, pointer creation, Cancel/Undo/Redo и settings работают
+в browser и production fake Capture → Quick → Editor. Отдельный native relaunch
+восстановил шесть штрихов и expressive default. RU/EN × light/dark при 1024 px
+подтверждены browser screenshots. Стили pen pressure/simulated покрыты core и
+renderer; физический графический планшет не проверялся. Windows/WebView2 и
+macOS/WKWebView в этом изменении не запускались; новых supported claims нет.

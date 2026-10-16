@@ -31,6 +31,7 @@ export interface TextToolDefaults {
 }
 
 export interface TextToolbarSnapshot {
+  readonly fontPreviewText?: string | undefined
   readonly fontFamily: string | null
   readonly fontSize: number | null
   readonly color: SrgbColor | null

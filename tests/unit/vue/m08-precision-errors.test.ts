@@ -79,7 +79,9 @@ describe('M08 shell lifecycle and contextual settings', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
     await fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
     expect(session.snapshot.core.document.crop).toBeNull()
-    expect(crop).toHaveAttribute('aria-pressed', 'true')
+    expect(crop).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Select' })).toHaveAttribute('aria-pressed', 'true')
+    expect(view.container.querySelector('.cs-context-toolbar--crop')).toBeNull()
 
     session.undo()
     expect(session.snapshot.core.document.crop).toEqual({

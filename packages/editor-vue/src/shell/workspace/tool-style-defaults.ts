@@ -1,4 +1,8 @@
 import type { Ref } from 'vue'
+import {
+  changePencilBrush,
+  normalizePencilDefaults,
+} from '@cute-screen/editor-renderer'
 import type {
   JsonObject,
   LayerStyle,
@@ -16,7 +20,10 @@ function drawingStyle(
 ): void {
   if (!['arrow', 'shape', 'pencil', 'marker'].includes(tool)) return
   const id = tool as 'arrow' | 'shape' | 'pencil' | 'marker'
-  const payload = { ...workspace.drawingDefaults.value[id] }
+  const existing = workspace.drawingDefaults.value[id]
+  const payload = { ...(id === 'pencil' && typeof style.brush === 'string'
+    ? changePencilBrush(existing, style.brush === 'pencil' ? 'pen' : style.brush)
+    : existing) }
   if (id === 'arrow' || id === 'shape') {
     const stroke = { ...(payload.stroke as JsonObject), ...pick(style, ['color', 'width']) }
     if ('strokeStyle' in style) stroke.style = style.strokeStyle!
@@ -36,7 +43,7 @@ function drawingStyle(
     if (payload.highlighterMode === 'auto') delete payload.blendMode
     else if ('blendMode' in style) payload.highlighterMode = ({ screen: 'illuminate', normal: 'veil' } as Record<string, string>)[String(style.blendMode)] ?? 'highlight'
   }
-  workspace.drawingDefaults.value = { ...workspace.drawingDefaults.value, [id]: payload }
+  workspace.drawingDefaults.value = { ...workspace.drawingDefaults.value, [id]: id === 'pencil' ? normalizePencilDefaults(payload) : payload }
 }
 function textStyle(
   workspace: Workspace,

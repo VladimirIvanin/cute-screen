@@ -1,4 +1,5 @@
 import {
+  changePencilBrush,
   isShapeKind,
   isHighlighterMode,
   type JsonObject,
@@ -151,10 +152,22 @@ function specializedPayload(
 ): JsonObject | undefined {
   if (id === 'smoothing') {
     const smoothing = Number(value) / 100
-    return tool === 'pencil' && Number.isFinite(smoothing) && smoothing >= 0 && smoothing <= 1 ? { ...current, smoothing } : undefined
+    if (
+      tool !== 'pencil' ||
+      !Number.isFinite(smoothing) ||
+      smoothing < 0 ||
+      smoothing > 1 ||
+      current.brush === 'pen' &&
+      current.strokeVersion === 2
+    ) return undefined
+    const memories = current.brushSmoothing as JsonObject | undefined
+    return {
+      ...current, smoothing,
+      ...(current.strokeVersion === 2 ? { brushSmoothing: { ...memories, [String(current.brush)]: smoothing } } : {}),
+    }
   }
   if (id === 'brush') {
-    return tool === 'pencil' && ['pen', 'pencil', 'brush'].includes(value) ? { ...current, brush: value } : undefined
+    return tool === 'pencil' && ['pen', 'stabilized', 'brush'].includes(value) ? changePencilBrush(current, value) : undefined
   }
   if (id !== 'markerMode') return undefined
   if (tool !== 'marker' || !isHighlighterMode(value)) return undefined

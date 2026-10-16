@@ -75,10 +75,10 @@ describe('v7 text contextual toolbar', () => {
       },
     })
     expect(rendered.getByLabelText('Text color: mixed')).toBeInTheDocument()
-    expect(rendered.getByLabelText('Font family: mixed')).toHaveValue('')
+    expect(rendered.getByLabelText('Font family: mixed')).toHaveTextContent('—')
     expect(rendered.getByLabelText('Font size: mixed')).toHaveTextContent('—')
     expect(rendered.getByLabelText('Bullet list')).toHaveAttribute('aria-pressed', 'mixed')
-    expect(rendered.getByLabelText('Text alignment')).toHaveValue('')
+    expect(within(rendered.getByRole('group', { name: 'Text alignment' })).getAllByRole('button').every((button) => button.getAttribute('aria-pressed') === 'false')).toBe(true)
   })
 
   it('validates size and restores focus after Escape/cancel in the background popover', async () => {
@@ -91,9 +91,11 @@ describe('v7 text contextual toolbar', () => {
         label: 'Tool settings',
       },
     })
-    const font = rendered.getByLabelText('Font family') as HTMLSelectElement
-    await fireEvent.change(font, { target: { value: 'Georgia' } })
-    expect(rendered.emitted().change).toContainEqual(['textFont', 'Georgia'])
+    await fireEvent.click(rendered.getByRole('button', { name: 'Font family' }))
+    const option = await rendered.findByRole('option', { name: 'Lora' })
+    await waitFor(() => expect(option).not.toBeDisabled())
+    await fireEvent.click(option)
+    expect(rendered.emitted().change).toContainEqual(['textFont', 'Lora'])
     const size = rendered.getByLabelText('Font size')
     await fireEvent.click(size)
     const arbitrary = await rendered.findByRole('spinbutton', { name: 'Font size value' }) as HTMLInputElement
@@ -117,28 +119,37 @@ describe('v7 text contextual toolbar', () => {
     await waitFor(() => expect(background).toHaveFocus())
   })
 
-  it('keeps RU accessible names and exposes a no-scroll overflow menu on narrow layouts', async () => {
-    const rendered = render(ContextToolbar, {
-      props: { schema, label: 'Настройки инструмента', pickerLocale: 'ru' },
-    })
+  it('keeps all groups visible with RU names and real alignment buttons', async () => {
+    const rendered = render(ContextToolbar, { props: { schema, label: 'Настройки инструмента', pickerLocale: 'ru' } })
     expect(rendered.getByLabelText('Полужирный: смешанное')).toHaveAttribute('aria-pressed', 'mixed')
-    const overflow = rendered.getByLabelText('Дополнительные настройки текста')
-    await fireEvent.click(overflow)
-    expect(rendered.getByRole('dialog', { name: 'Дополнительные настройки текста' })).toBeInTheDocument()
-    expect(rendered.container.querySelector('.cs-text-toolbar')).not.toHaveStyle({ overflowX: 'auto' })
+    expect(rendered.queryByLabelText('Дополнительные настройки текста')).not.toBeInTheDocument()
+    await fireEvent.click(rendered.getByRole('button', { name: 'По центру' }))
+    expect(rendered.emitted().change).toContainEqual(['textAlign', 'center'])
+    expect(rendered.getByRole('button', { name: 'По левому краю' })).toHaveAttribute('aria-pressed', 'true')
+    await fireEvent.click(rendered.getByRole('button', { name: 'Фон' }))
+    await fireEvent.keyDown(await rendered.findByRole('dialog', { name: 'Фон' }), { key: 'Escape' })
+    expect(rendered.getByRole('button', { name: 'Фон' })).toHaveFocus()
+  })
 
-    const overflowDialog = rendered.getByRole('dialog', {
-      name: 'Дополнительные настройки текста',
-    })
-    await fireEvent.click(within(overflowDialog).getByRole('button', { name: 'Фон' }))
-    await fireEvent.keyDown(await rendered.findByRole('dialog'), { key: 'Escape' })
-    expect(overflow).toHaveFocus()
+  it('commits a foreground swatch but keeps background swatches in the cancellable draft', async () => {
+    const rendered = render(TextFormattingToolbar, { props: { text: { ...schema.text, kind: 'text', disabled: [] }, title: 'Text' } })
+    await fireEvent.click(rendered.getByRole('button', { name: 'Text color' }))
+    await fireEvent.click(await rendered.findByRole('button', { name: 'Red' }))
+    expect(rendered.emitted().change).toEqual([['textColor', '#FF7556']])
+    await fireEvent.click(rendered.getByRole('button', { name: 'Background' }))
+    await fireEvent.click(within(await rendered.findByRole('dialog', { name: 'Background' })).getByRole('button', { name: 'Blue' }))
+    expect(rendered.emitted().change).toHaveLength(1)
+    await fireEvent.click(rendered.getByRole('button', { name: 'Cancel' }))
+    expect(rendered.emitted().change).toHaveLength(1)
+    await fireEvent.click(rendered.getByRole('button', { name: 'Background' }))
+    await fireEvent.click(within(await rendered.findByRole('dialog', { name: 'Background' })).getByRole('button', { name: 'Green' }))
+    await fireEvent.click(rendered.getByRole('button', { name: 'Apply' }))
+    expect(rendered.emitted().change).toContainEqual(['textBackground', JSON.stringify({ color: '#66D575', padding: 0, radius: 0 })])
+  })
 
-    await fireEvent.click(overflow)
-    await fireEvent.keyDown(rendered.getByRole('dialog', { name: 'Дополнительные настройки текста' }), {
-      key: 'Escape',
-    })
-    expect(overflow).toHaveFocus()
+  it('blocks every text control in a read-only context', () => {
+    const view = render(TextFormattingToolbar, { props: { text: schema.text, title: 'Text', disabled: true } })
+    for (const button of view.getAllByRole('button')) expect(button).toBeDisabled()
   })
 
   it('renders the same control strip in the floating variant', async () => {

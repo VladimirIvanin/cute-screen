@@ -1,4 +1,6 @@
 import {
+  constrainRulerMove,
+  rulerCanvasBounds,
   moveCrop,
   resizeCrop,
   snapPoint,
@@ -197,10 +199,22 @@ function moveLayer(
     (context.props.zoom ?? 100) / 100,
     !event.ctrlKey && !event.metaKey,
   )
+  const document = context.props.document
+  const delta = { x: result.x - gesture.start.x, y: result.y - gesture.start.y }
+  const selected = context.props.selectedLayerIds ?? [gesture.id]
+  const constrained = document
+    ? constrainRulerMove(
+        document.layers.filter((layer) => selected.includes(layer.id)),
+        delta,
+        rulerCanvasBounds(document),
+        document.canvas,
+      )
+    : delta
+  const limited = constrained.x !== delta.x || constrained.y !== delta.y
   context.setGesture({
     ...gesture,
-    current: { x: result.x, y: result.y },
-    guides: result.guides,
+    current: { x: gesture.start.x + constrained.x, y: gesture.start.y + constrained.y },
+    guides: limited ? [] : result.guides,
     guidesVisible: event.altKey,
   })
   context.invalidateGesturePreview()
@@ -245,7 +259,8 @@ function moveDrawing(
   const samples: CanvasPoint[] = []
   if (gesture.tool === 'pencil' || gesture.tool === 'marker') {
     let previous = gesture.points[gesture.points.length - 1]
-    for (const sample of event.getCoalescedEvents?.() ?? [event]) {
+    const coalesced = event.getCoalescedEvents?.()
+    for (const sample of coalesced?.length ? coalesced : [event]) {
       const candidate = context.canvasPoint(sample)
       if (
         candidate &&

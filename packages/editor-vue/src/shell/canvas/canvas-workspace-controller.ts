@@ -213,14 +213,18 @@ export class CanvasWorkspaceController {
 
   readonly applyCrop = (): void => {
     const session = this.#crop.ensureSession()
-    if (session) this.#emit('documentCommand', applyCropSession(session))
+    if (!session) return
+    this.#emit('documentCommand', applyCropSession(session))
+    this.cancelGesture()
+    this.#crop.session = undefined
+    this.#emit('selectTool', 'select')
   }
 
   readonly cancelCrop = (): void => {
     const session = this.#crop.session
     if (session) cancelCropSession(session)
-    this.#crop.session = undefined
     this.cancelGesture()
+    this.#crop.session = undefined
     this.#emit('selectTool', 'select')
   }
 

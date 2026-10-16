@@ -1,3 +1,4 @@
+import { TEXT_FONT_FAMILIES } from '../../../packages/editor-vue/src/text-fonts'
 import {
   createCanvas,
   GlobalFonts,
@@ -40,6 +41,20 @@ export async function prepareGoldenRuntime(): Promise<void> {
     }
   }
   canvasKitFonts = await Promise.all([loadFont('latin'), loadFont('cyrillic')])
+  for (const family of TEXT_FONT_FAMILIES) {
+    if (family === 'Roboto') continue
+    const slug = family.toLowerCase().replaceAll(' ', '-')
+    for (const subset of ['latin', 'cyrillic'] as const) {
+      const fontPath = `packages/editor-vue/node_modules/@fontsource/${slug}/files/${slug}-${subset}-400-normal.woff2`
+      const bytes = await readFile(path.resolve(fontPath))
+      if (!GlobalFonts.register(bytes, `${family} ${subset}`)) throw new Error(`Could not register ${family} ${subset}`)
+      canvasKitFonts = [...canvasKitFonts, {
+        family,
+        subset,
+        data: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
+      }]
+    }
+  }
 }
 
 export const goldenRoot = path.resolve('tests/goldens/m01-renderer')
@@ -112,7 +127,10 @@ export async function canvas2dPngs(
   const sceneCanvas = createCanvas(snapshot.outputBounds.width, snapshot.outputBounds.height)
   const renderer = new Canvas2DRenderer({
     exportCanvas: (width, height) => createCanvas(width, height) as unknown as Canvas2DLike,
-    resolveFontFamily: (text) => (/[\u0400-\u052f]/u.test(text) ? 'Roboto cyrillic' : 'Roboto latin'),
+    resolveFontFamily: (text, style) => {
+      const family = TEXT_FONT_FAMILIES.some((font) => font === style.fontFamily) ? style.fontFamily : 'Roboto'
+      return /[\u0400-\u052f]/u.test(text) ? [`${family} cyrillic`, `${family} latin`] : `${family} latin`
+    },
   })
   await renderer.initialize({
     scene: sceneCanvas as unknown as HTMLCanvasElement,

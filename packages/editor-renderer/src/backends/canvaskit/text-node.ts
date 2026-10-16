@@ -105,7 +105,16 @@ function drawTextLayout(
     for (const fragment of line.fragments) {
       configurePaint(canvasKit, fill, fragment.color, node.opacity, 'fill')
       fill.setBlendMode(blendMode(canvasKit, node.blendMode))
-      canvas.drawText!(fragment.text, fragment.x, fragment.baseline, fill, fontForStyle(fragment, fragment.text))
+      // Fontsource script subsets are separate typefaces. A merged layout
+      // fragment can contain both scripts (including Latin digits and spaces).
+      const chunks = requiresCyrillicCoverage(fragment.text)
+        ? fragment.text.match(/[\u0400-\u052f]+|[^\u0400-\u052f]+/gu) ?? [] : [fragment.text]
+      let x = fragment.x
+      for (const chunk of chunks) {
+        const font = fontForStyle(fragment, chunk)
+        canvas.drawText!(chunk, x, fragment.baseline, fill, font)
+        for (const point of chunk) x += canvasKitTextWidth(font, point, fragment.fontSize)
+      }
     }
     for (const strike of line.strikes) {
       configurePaint(canvasKit, stroke, strike.color, node.opacity, 'stroke', strike.thickness)

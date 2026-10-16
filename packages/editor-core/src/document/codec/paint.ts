@@ -309,6 +309,12 @@ export function parseSampledPayload(
       ...(input.highlighterMode === undefined ? {} : { highlighterMode: input.highlighterMode }),
     }) as MarkerLayerPayload
   }
-  if (!['pen', 'pencil', 'brush'].includes(String(input.brush))) throw new Error(`${field}.brush is invalid`)
-  return Object.freeze({ ...common, brush: input.brush }) as PencilLayerPayload
+  if (input.strokeVersion !== undefined && input.strokeVersion !== 2) throw new Error(`${field}.strokeVersion is invalid`)
+  if (input.strokeVersion === 2 && !['pen', 'simulated'].includes(String(input.pressureMode))) throw new Error(`${field}.pressureMode is invalid`)
+  const brushes = input.strokeVersion === 2 ? ['pen', 'stabilized', 'brush'] : ['pen', 'pencil', 'brush']
+  if (!brushes.includes(String(input.brush))) throw new Error(`${field}.brush is invalid`)
+  return Object.freeze({
+    ...common, brush: input.brush,
+    ...(input.strokeVersion === 2 ? { strokeVersion: 2, pressureMode: input.pressureMode } : {}),
+  }) as PencilLayerPayload
 }

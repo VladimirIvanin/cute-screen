@@ -102,7 +102,7 @@ describe('compact tool settings', () => {
       name: 'Кисть и толщина',
     })
     await fireEvent.click(within(panel).getByRole('button', {
-      name: 'Кисть',
+      name: 'Экспрессивная кисть',
     }))
     expect(view.emitted('change')).toEqual([['brush', 'brush']])
     await view.rerender({
@@ -143,10 +143,10 @@ describe('compact tool settings', () => {
       },
     })
     await fireEvent.click(screen.getByRole('button', {
-      name: 'Smoothing',
+      name: 'Correction',
     }))
     const input = await screen.findByRole('spinbutton', {
-      name: 'Smoothing',
+      name: 'Correction',
     })
     expect(input).toHaveAttribute('placeholder', '—')
     await fireEvent.input(input, {

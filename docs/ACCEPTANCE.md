@@ -1,5 +1,56 @@
 # Сквозная приёмка
 
+## Новая панель текста (2026-10-16, ADR-061)
+
+`REQ-TOL-005/006/007`, `REQ-EDT-005/008/016`, `REQ-UI-001/005/006/007`:
+
+1. Text/Callout/Numbered Marker используют общую панель; три alignment buttons
+   заменяют select, B/I/strike/list/background используют UiIcon.
+2. На 640/1024/1440 px группы остаются видимыми без horizontal overflow;
+   на узкой ширине они переходят на две строки. RU/EN, dark/light проверены в Chrome.
+3. Меню содержит 12 bundled family, собственные образцы и loading/error/retry;
+   hover не меняет документ, Home/End/стрелки/Enter/Escape доступны с клавиатуры.
+4. Цвет текста применяется через общую палитру. Background colour остаётся
+   в общем Apply/Cancel draft; numbered marker сохраняет disabled restrictions.
+5. Выделенный диапазон сохраняется при работе с popover; inline editing
+   подтверждается одной command, undo возвращает предыдущий document.
+6. Все 12 font family проверены в browser через реальное меню, Latin/Cyrillic и
+   decoded PNG. Четыре renderer goldens используют реальные subset assets;
+   цифры у Cyrillic не превращаются в отсутствующие glyphs.
+
+Browser и component evidence — TESTING.md. Native Tauri/WebKitGTK показывает
+панель без overflow, но inline gesture не создаёт contenteditable в текущем
+embedded-driver прогоне; native edit и Quick handoff не подтверждены. Windows,
+macOS и Wayland отдельно не проверялись.
+
+## Немедленное применение кропа (2026-10-16)
+
+`REQ-TOL-013`, `REQ-EDT-005/006`, `REQ-UI-005`: открыть Crop, выбрать 1:1,
+сдвинуть рамку и нажать Apply либо Enter. Сразу видны cropped viewport и Select,
+без затемнения/handles кропа и дополнительного Cancel/Select. Проверить Undo/Redo,
+повторное открытие с другой рамкой → Cancel/Escape, Reset → Escape и
+Reset → Apply. Подтверждённый crop сохраняется при отмене; аннотации и original
+не заменяются. Enter на сфокусированной кнопке Cancel именно отменяет draft,
+Tab достигает Apply с видимым focus ring. Панель выше ToolRail: select и кнопки
+32 px, центры по одной линии, Apply справа; RU/EN, light/dark и окна
+1213×724 / 1024×700 без обрезания controls. Фактические результаты и ограничения
+browser/real WebView — TESTING.md и PLATFORM_MATRIX.md.
+
+## Линейка внутри холста и crop (2026-10-16, ADR-059)
+
+`REQ-TOL-010`, `REQ-EDT-005/006`: создать линейку, перетащить её за верхний/правый
+край, затем конец за нижний/правый. Оба endpoints остаются внутри; move сохраняет
+длину и удерживает badge внутри, когда он помещается. Во время удержания pointer
+документ не меняется; Escape и pointercancel отменяют draft. Нажатия стрелок
+у края не добавляют history. Применить меньший non-origin crop, пересекающий
+линейку: она сдвигается внутрь, при необходимости сокращается с сохранением
+направления и style. Undo/Redo изменяют crop и линейку одним шагом, точно
+восстанавливая прежний документ. Locked/hidden rulers подгоняются также.
+Core property regression проверяет 1000 rotated/reflected crops, включая 1 px;
+Chrome 1280/1024 — 2/2 и production WebKitGTK Capture → Editor — 1/1;
+скриншоты просмотрены. Unit 750/750, render 20/20 и `pnpm check` — passed.
+Фактические команды, native input evidence и ограничения — TESTING.md.
+
 ## Фонарь в Quick и editor (2026-10-16)
 
 `REQ-TOL-009`, `REQ-EDT-005/006`, `REQ-OUT-003`: из production Capture выбрать
@@ -937,3 +988,27 @@ mixed-DPI replay остаётся pending; source/exports не масштаби�
 Windows WebView2 155.0.4283.45: native 7/7, полный unit suite 578/578 и общий
 `pnpm check` прошли. Использован fake capture; физический захват и другие
 платформы остаются отдельными gates. Числа и screenshots — TESTING.md.
+
+## Три разных кисти (2026-10-16, ADR-060)
+
+`REQ-TOL-003`: в инструменте Pencil выбрать по очереди «Точное перо»,
+«Автокоррекция», «Экспрессивная кисть». На одной шумной траектории первое
+сохраняет углы и постоянную толщину, второе убирает дрожание, третье меняет
+толщину. Стартовые настройки: автокоррекция 65%, экспрессивная 35%; точное
+перо отключает control коррекции с пояснением. После смены режима возвращается
+его последнее значение. Миниатюры используют тот же resolver. Проверить RU/EN,
+обе темы, 1024 px, выбор клавиатурой, locked/read-only и смешанное выделение.
+
+До pointerup документ не меняется; release завершает штрих одной command,
+инструмент остаётся активным. Escape/pointercancel не создают объект. Нулевая
+pressure отпускания не обрывает толщину. Undo/Redo, выбор по реальному контуру,
+прозрачная середина петли, move/resize/rotation/reflection, internal clipboard,
+save/reopen и прежний вид legacy штрихов обязательны. Полупрозрачный новый штрих
+не темнеет на стыках или собственном пересечении. Экспорт повторно декодируется.
+
+Linux WebKitGTK: production fake Capture → Quick → Editor проверяет три кисти,
+trusted pointer input, отмену, Undo/Redo; отдельный native launch восстанавливает
+шесть штрихов и выбранную кисть. Chrome проверяет также compact RU/EN × light/dark.
+4K/8K fixtures и 12 000 samples подтверждают decoded preview/export parity;
+software timing не является GPU frame-budget evidence. Фактические результаты
+и ограничения общих проверок — TESTING.md.

@@ -10,8 +10,9 @@ import {
   openHarness,
   setEditorSelection,
   waitForEditorFocus,
-  setNativeColor,
-  setNativeSelect,
+  setTextColor,
+  setTextFont,
+  setTextAlignment,
   applyBackground,
   startTextAt,
 } from './browser-v7-rich-text-test-kit'
@@ -27,7 +28,7 @@ describe('Document v7 rich text in browser mode', () => {
     await setEditorSelection(0, 5)
     await $('button[aria-label="Bold"]').click()
     await waitForEditorFocus()
-    await setNativeColor('Text color', '#336699')
+    await setTextColor('Text color', '#336699')
     await waitForEditorFocus()
 
     await setEditorSelection(6, 10)
@@ -37,7 +38,7 @@ describe('Document v7 rich text in browser mode', () => {
     await setEditorSelection(0, 10)
     await expect($('button[aria-label="Bold: mixed"]')).toHaveAttribute('aria-pressed', 'mixed')
     await expect($('button[aria-label="Italic: mixed"]')).toHaveAttribute('aria-pressed', 'mixed')
-    await setNativeSelect('Font family', 'Georgia')
+    await setTextFont('Lora')
     await waitForEditorFocus()
     await $('button[data-text-control="size"]').click()
     await $('.cs-text-size-popover').$('button=32').click()
@@ -53,7 +54,7 @@ describe('Document v7 rich text in browser mode', () => {
     await browser.keys('Enter')
     await browser.keys('Escape')
     await waitForEditorFocus()
-    await setNativeSelect('Text alignment', 'center')
+    await setTextAlignment('center')
     await waitForEditorFocus()
     await applyBackground({ color: '#fff2a8', padding: 6, radius: 4 })
     await waitForEditorFocus()
@@ -87,7 +88,7 @@ describe('Document v7 rich text in browser mode', () => {
       }[]
     }
     expect(content.text).toBe('Alpha Beta!')
-    expect(content.spans.every((span) => span.fontFamily === 'Georgia')).toBe(true)
+    expect(content.spans.every((span) => span.fontFamily === 'Lora')).toBe(true)
     expect(content.spans.every((span) => span.fontSize === 37)).toBe(true)
     expect(
       content.spans.some(

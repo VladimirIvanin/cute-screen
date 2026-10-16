@@ -13,7 +13,19 @@ const generallyAllowedLicenses = new Set([
 
 // Keep asset-license exceptions version-specific so dependency upgrades fail
 // closed until their bundled files and license metadata are audited again.
-const packageSpecificLicenses = new Map([['@fontsource/roboto@5.3.0', new Set(['OFL-1.1'])]])
+const packageSpecificLicenses = new Map([
+  ['@fontsource/roboto@5.3.0', new Set(['OFL-1.1'])],
+  ['@fontsource/manrope@5.3.0', new Set(['OFL-1.1'])],
+  ['@fontsource/rubik@5.3.0', new Set(['OFL-1.1'])],
+  ['@fontsource/comfortaa@5.3.0', new Set(['OFL-1.1'])],
+  ['@fontsource/oswald@5.3.0', new Set(['OFL-1.1'])],
+  ['@fontsource/pt-serif@5.3.0', new Set(['OFL-1.1'])],
+  ['@fontsource/lora@5.3.0', new Set(['OFL-1.1'])],
+  ['@fontsource/jetbrains-mono@5.3.0', new Set(['OFL-1.1'])],
+  ['@fontsource/pt-mono@5.3.0', new Set(['OFL-1.1'])],
+  ['@fontsource/caveat@5.3.0', new Set(['OFL-1.1'])],
+  ['@fontsource/marck-script@5.3.0', new Set(['OFL-1.1'])],
+])
 
 export function isAllowedProductionLicense(
   packageKey,

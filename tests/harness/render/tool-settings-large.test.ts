@@ -68,6 +68,7 @@ describe('tool settings on production-shaped captures', () => {
       })
     }
     const scene = createDocumentRenderScene({ ...document, layers: [...document.layers, spotlight, pencil] })
+    expect(scene.nodes.filter((node) => node.id.startsWith(pencil.id))).toHaveLength(1)
     const preview = createCanvas(width, height)
     const renderer = new Canvas2DRenderer({
       exportCanvas: (w, h) => createCanvas(w, h) as unknown as Canvas2DLike,

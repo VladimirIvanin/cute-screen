@@ -57,6 +57,7 @@ export function registerRenderLifecycle(context: RenderLifecycleContext): void {
       scrollContainer.value
     ) {
       context.emit('hostsReady', {
+        waitForRender: () => context.renderer.waitForRender(),
         scene: scene.value,
         overlay: overlay.value,
         scrollContainer: scrollContainer.value,

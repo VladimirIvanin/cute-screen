@@ -2,6 +2,10 @@ import {
   normalizeEditorDocument,
   serializeEditorDocument,
 } from '../document/codec'
+import {
+  fitRulerToBounds,
+  rulerCanvasBounds,
+} from '../ruler-constraints'
 import { jsonEquals } from '../document/json'
 import type { EditorDocumentV1 } from '../document/types'
 import { applyEditorCommand } from './operations'
@@ -90,6 +94,7 @@ export class CommandManager {
 
   execute(command: EditorCommand): EditorSnapshot {
     const before = this.#document
+    command = prepareCropRulers(before, command)
     const after = applyEditorCommand(before, command)
     if (jsonEquals(before, after)) return this.snapshot
     if (this.#nextToken > Number.MAX_SAFE_INTEGER) {
@@ -156,4 +161,32 @@ export class CommandManager {
       if (entry) this.#bytes -= entry.bytes
     }
   }
+}
+
+/** Record both geometries in the crop command, including locked/hidden rulers. */
+function prepareCropRulers(
+  document: EditorDocumentV1,
+  command: EditorCommand,
+): EditorCommand {
+  if (command.type === 'batch' && command.commands.some(containsCrop)) {
+    let current = document
+    const commands = command.commands.map((child) => {
+      const prepared = prepareCropRulers(current, child)
+      current = applyEditorCommand(current, prepared)
+      return prepared
+    })
+    return { ...command, commands }
+  }
+  if (command.type !== 'setCrop' || jsonEquals(command.before, command.after)) return command
+  const bounds = rulerCanvasBounds({ ...document, crop: command.after })
+  const rulerChanges = document.layers.flatMap((layer) => {
+    if (layer.kind !== 'ruler') return []
+    const after = fitRulerToBounds(layer, bounds, document.canvas)
+    return jsonEquals(layer, after) ? [] : [{ before: layer, after }]
+  })
+  return rulerChanges.length ? { ...command, rulerChanges } : command
+}
+
+function containsCrop(command: EditorCommand): boolean {
+  return command.type === 'setCrop' || command.type === 'batch' && command.commands.some(containsCrop)
 }

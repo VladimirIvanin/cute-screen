@@ -21,6 +21,29 @@ const embeddedWebDriverPort = Number.parseInt(process.env.TAURI_WEBDRIVER_PORT ?
 
 const scenarios = [
   {
+    id: 'brushes',
+    persistenceGroup: 'brushes',
+    spec: 'tests/e2e/specs/tauri-brushes.e2e.ts',
+    harnessQuery: '?m04=1&m08=1',
+    fakeCapture: true,
+    driverProvider: 'external',
+  },
+  {
+    id: 'brushes-reopen',
+    spec: 'tests/e2e/specs/tauri-brushes-reopen.e2e.ts',
+    harnessQuery: '?m04=1&m08=1',
+    fakeCapture: true,
+    persistenceGroup: 'brushes',
+    driverProvider: 'external',
+  },
+  {
+    id: 'ruler-bounds',
+    spec: 'tests/e2e/specs/tauri-ruler-bounds.e2e.ts',
+    harnessQuery: '?m04=1&m08=1',
+    fakeCapture: true,
+    driverProvider: 'external',
+  },
+  {
     id: 'spotlight-preview',
     spec: 'tests/e2e/specs/tauri-spotlight-preview.e2e.ts',
     harnessQuery: '?m04=1&m08=1',

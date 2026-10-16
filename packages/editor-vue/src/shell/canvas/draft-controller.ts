@@ -6,6 +6,8 @@ import {
   createDrawingLayer,
   createLoupeLayer,
   createRulerLayer,
+  constrainRulerEndpoint,
+  rulerCanvasBounds,
   createSpotlightLayer,
   defaultCalloutRoute,
   drawNodes2D,
@@ -303,11 +305,18 @@ export class DraftController {
     ) {
       return undefined
     }
+    const bounds = this.#context.props.document
+      ? rulerCanvasBounds(this.#context.props.document)
+      : { x: 0, y: 0, ...canvas }
+    const start = constrainRulerEndpoint(gesture.start, gesture.start, bounds)
+    const end = constrainRulerEndpoint(start, gesture.rawCurrent ?? gesture.current, bounds,
+      gesture.guidesHeld ? defaults.ruler.snapAngleIncrementDegrees : undefined)
+    if (start.x === end.x && start.y === end.y) return undefined
     return createRulerLayer({
       id,
       canvas,
-      start: gesture.start,
-      end: gesture.current,
+      start,
+      end,
       unit: defaults.ruler.unit,
       snapAngleIncrementDegrees: defaults.ruler.snapAngleIncrementDegrees,
       color: defaults.ruler.color,

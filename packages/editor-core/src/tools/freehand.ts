@@ -1,3 +1,7 @@
+import {
+  getStroke,
+  getStrokePoints,
+} from 'perfect-freehand'
 import type {
   JsonObject,
   Point,
@@ -8,12 +12,13 @@ import type {
 export function rebaseFreehandLayer<T extends PencilLayer | MarkerLayer>(layer: T): T {
   const geometry = resolveFreehandGeometry(layer.payload, layer.kind === 'pencil')
   if (!geometry.points.length) return layer
-  const padding = Math.max(0.5, geometry.width / 2)
+  const boundary = geometry.outline.length ? geometry.outline : geometry.points
+  const padding = geometry.outline.length ? 0 : Math.max(0.5, geometry.width / 2)
   let x = Infinity
   let y = Infinity
   let right = -Infinity
   let bottom = -Infinity
-  for (const point of geometry.points) {
+  for (const point of boundary) {
     x = Math.min(x, point.x - padding)
     y = Math.min(y, point.y - padding)
     right = Math.max(right, point.x + padding)
@@ -31,6 +36,8 @@ export function resolveFreehandGeometry(
 ): Readonly<{
   points: readonly FreehandSample[]
   width: number
+  outline: readonly Point[]
+  modern: boolean
 }> {
   const source = Array.isArray(payload.points) ? payload.points : []
   const samples = source.map((value) => {
@@ -41,6 +48,32 @@ export function resolveFreehandGeometry(
       pressure: typeof point.pressure === 'number' ? Math.max(0, Math.min(1, point.pressure)) : 0.5,
     }
   })
+  const width = typeof payload.width === 'number' ? payload.width : 1
+  if (pencil && payload.strokeVersion === 2) {
+    const strength = typeof payload.smoothing === 'number' ? payload.smoothing : .65
+    if (
+      payload.brush === 'pen' ||
+      samples.length <= 1 &&
+      payload.brush !== 'brush'
+    ) {
+      return { points: samples, width, outline: [], modern: true }
+    }
+    const input = samples.map((point) => [point.x, point.y, point.pressure])
+    const options = {
+      size: width, streamline: strength, smoothing: .6,
+      thinning: payload.brush === 'brush' ? .65 : 0,
+      simulatePressure: payload.pressureMode !== 'pen', last: true,
+    }
+    const points = strength === 0 ? samples : getStrokePoints(input, options).map((point, index, result) => ({
+      x: point.point[0], y: point.point[1],
+      pressure: index === 0 ? samples[0]!.pressure
+        : index === result.length - 1 ? samples.at(-1)!.pressure : point.pressure,
+    }))
+    return {
+      points, width, modern: true,
+      outline: payload.brush === 'brush' ? getStroke(input, options).map(([x, y]) => ({ x: x!, y: y! })) : [],
+    }
+  }
   const strength = pencil && typeof payload.smoothing === 'number' ? Math.max(0, Math.min(1, payload.smoothing)) : 0
   const points = strength === 0 ? samples : samples.map((sample, index) => {
     if (index === 0 || index === samples.length - 1)
@@ -63,6 +96,80 @@ export function resolveFreehandGeometry(
   })
   const scale = pencil && payload.brush === 'pencil' ? 0.65 : pencil && payload.brush === 'brush' ? 1.5 : 1
   return {
-    points, width: (typeof payload.width === 'number' ? payload.width : 1) * scale,
+    points, width: width * scale, outline: [], modern: false,
+  }
+}
+
+/** Non-zero winding matches the polygon fill rule in both renderer backends. */
+export function freehandOutlineContains(
+  outline: readonly Point[],
+  point: Point,
+): boolean {
+  let winding = 0
+  for (let index = 0; index < outline.length; index++) {
+    const a = outline[index]!
+    const b = outline[(index + 1) % outline.length]!
+    const cross = (b.x - a.x) * (point.y - a.y) - (point.x - a.x) * (b.y - a.y)
+    if (
+      Math.abs(cross) < 1e-8 &&
+      point.x >= Math.min(a.x, b.x) &&
+      point.x <= Math.max(a.x, b.x) &&
+      point.y >= Math.min(a.y, b.y) &&
+      point.y <= Math.max(a.y, b.y)
+    ) return true
+    if (
+      a.y <= point.y &&
+      b.y > point.y &&
+      cross > 0
+    ) winding++
+    if (
+      a.y > point.y &&
+      b.y <= point.y &&
+      cross < 0
+    ) winding--
+  }
+  return winding !== 0
+}
+
+function unitInterval(
+  input: unknown,
+  fallback: number,
+): number {
+  if (
+    typeof input !== 'number' ||
+    !Number.isFinite(input) ||
+    input < 0 ||
+    input > 1
+  ) return fallback
+  return input
+}
+
+/** Preferences-only normalization; persisted legacy documents never use this. */
+export function normalizePencilDefaults(value: JsonObject): JsonObject {
+  const brush = value.brush === 'pencil' ? 'pen'
+    : ['pen', 'brush', 'stabilized'].includes(String(value.brush)) ? String(value.brush) : 'stabilized'
+  const memories = value.brushSmoothing && typeof value.brushSmoothing === 'object'
+    && !Array.isArray(value.brushSmoothing) ? value.brushSmoothing as JsonObject : {}
+  const smoothing = unitInterval(value.smoothing, brush === 'brush' ? .35 : .65)
+  return {
+    ...value, brush, strokeVersion: 2, pressureMode: 'simulated', smoothing,
+    brushSmoothing: {
+      stabilized: unitInterval(memories.stabilized, brush === 'stabilized' ? smoothing : .65),
+      brush: unitInterval(memories.brush, brush === 'brush' ? smoothing : .35),
+    },
+  }
+}
+
+export function changePencilBrush(
+  current: JsonObject,
+  brush: string,
+): JsonObject {
+  const previous = normalizePencilDefaults(current)
+  const memories = { ...previous.brushSmoothing as JsonObject }
+  if (current.brush === 'stabilized' || current.brush === 'brush') memories[current.brush] = previous.smoothing!
+  return {
+    ...previous, brush: brush === 'pencil' ? 'pen' : brush,
+    pressureMode: current.pressureMode === 'pen' ? 'pen' : 'simulated',
+    smoothing: brush === 'pen' || brush === 'pencil' ? 0 : memories[brush]!, brushSmoothing: memories,
   }
 }

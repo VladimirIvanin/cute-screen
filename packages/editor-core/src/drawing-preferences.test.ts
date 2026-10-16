@@ -136,7 +136,7 @@ describe('DrawingToolPreferencesV2', () => {
           startCap: 'diamond',
           endCap: 'circle',
         },
-        pencil: { brush: 'pen', width: 3 },
+        pencil: { brush: 'stabilized', width: 3 },
       },
       recentColors: [],
     })

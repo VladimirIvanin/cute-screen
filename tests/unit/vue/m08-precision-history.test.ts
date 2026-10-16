@@ -191,6 +191,80 @@ describe('M08 shell lifecycle and contextual settings', () => {
     vi.unstubAllGlobals()
   })
 
+  it('keeps ruler move and endpoint edits inside a changed crop with exact history and cancel', async () => {
+    const ruler = precisionLayerFixture('ruler') as RulerLayer
+    const session = new DocumentSessionController({
+      document: { ...documentFixture(), layers: [ruler] },
+      revision: 1,
+      bridge: {
+        saveDocument: async () => 2,
+        exportRecoveryBundle: async () => ({ kind: 'saved' }),
+      },
+      correlationId: () => 'ruler-bounds',
+      debounceMs: 60_000,
+    })
+    const pinia = createEditorShellPinia()
+    const view = render(EditorShell, {
+      props: { documentSession: markRaw(session) },
+      global: { plugins: [pinia] },
+    })
+    const store = useEditorShellStore(pinia)
+    store.selectTool('select')
+    store.selectLayer(ruler.id)
+    await nextTick()
+    const scene = screen.getByLabelText('Scene canvas') as HTMLCanvasElement
+    prepareScene(scene)
+    const execute = vi.spyOn(session, 'execute')
+    const gesture = async (from: { x: number; y: number }, to: { x: number; y: number }, cancel = false) => {
+      await fireEvent.pointerDown(scene, { pointerId: 72, clientX: from.x, clientY: from.y })
+      await fireEvent.pointerMove(scene, { pointerId: 72, clientX: to.x, clientY: to.y, ctrlKey: true })
+      expect(execute).not.toHaveBeenCalled()
+      if (cancel) await fireEvent.keyDown(window, { key: 'Escape' })
+      await fireEvent.pointerUp(scene, { pointerId: 72, clientX: to.x, clientY: to.y })
+    }
+    await gesture({ x: 45, y: 20 }, { x: 1000, y: -1000 }, true)
+    expect(session.snapshot.core.document.layers[0]).toEqual(ruler)
+    expect(session.snapshot.core.canUndo).toBe(false)
+    await gesture({ x: 45, y: 20 }, { x: 1000, y: -1000 })
+    expect(execute).toHaveBeenCalledTimes(1)
+    const moved = session.snapshot.core.document.layers[0] as RulerLayer
+    const movedStart = transformedPoint(moved.transform, moved.payload.start)
+    const movedEnd = transformedPoint(moved.transform, moved.payload.end)
+    expect(movedStart.x).toBeGreaterThanOrEqual(0)
+    expect(movedEnd.x).toBeLessThanOrEqual(120)
+    expect(movedEnd.x - movedStart.x).toBeCloseTo(70)
+    expect(movedStart.y).toBeCloseTo(11)
+    const token = session.snapshot.core.versionToken
+    await fireEvent.keyDown(window, { key: 'ArrowRight', shiftKey: true })
+    expect(session.snapshot.core.versionToken).toBe(token)
+    session.undo()
+    expect(session.snapshot.core.document.layers[0]).toEqual(ruler)
+    session.redo()
+    expect(session.snapshot.core.document.layers[0]).toEqual(moved)
+    session.undo()
+    await nextTick()
+    execute.mockClear()
+    await gesture({ x: 80, y: 20 }, { x: 1000, y: 1000 })
+    const resized = session.snapshot.core.document.layers[0] as RulerLayer
+    expect(transformedPoint(resized.transform, resized.payload.start)).toEqual({ x: 10, y: 20 })
+    expect(transformedPoint(resized.transform, resized.payload.end)).toEqual({ x: 120, y: 80 })
+    session.undo()
+    await nextTick()
+    execute.mockClear()
+    await gesture({ x: 45, y: 20 }, { x: 1000, y: -1000 })
+    session.execute({ type: 'setCrop', before: null, after: { x: 30, y: 10, width: 40, height: 30 } })
+    await nextTick()
+    const fitted = session.snapshot.core.document.layers[0] as RulerLayer
+    expect(transformedPoint(fitted.transform, fitted.payload.start)).toEqual({ x: 30, y: 21 })
+    expect(transformedPoint(fitted.transform, fitted.payload.end)).toEqual({ x: 70, y: 21 })
+    session.undo()
+    expect(session.snapshot.core.document.layers[0]).toEqual(moved)
+    session.redo()
+    expect(session.snapshot.core.document.layers[0]).toEqual(fitted)
+    session.dispose()
+    view.unmount()
+  })
+
   it('moves one ruler endpoint intrinsically with conservative bounds and exact undo/redo', async () => {
     const ruler = precisionLayerFixture('ruler') as RulerLayer
     const beforeDocument = { ...documentFixture(), layers: [ruler] }

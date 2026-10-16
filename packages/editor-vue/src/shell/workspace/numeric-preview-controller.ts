@@ -2,6 +2,8 @@ import {
   applyEditorCommand,
   rebaseRulerLayer,
   rotateLayerTransform,
+  constrainRulerTransform,
+  rulerCanvasBounds,
   type EditorCommand,
   type EditorDocumentV1,
 } from '@cute-screen/editor-renderer'
@@ -137,9 +139,12 @@ function layerCommands(
     return [{ type: 'updateLayer', before: layer, after: { ...layer, opacity: value / 100 } }]
   }
   if (target.id !== 'rotation') return []
-  const rotated = { ...layer, transform: rotateLayerTransform(layer, value) }
-  const after = rotated.kind === 'ruler'
-    ? rebaseRulerLayer(rotated, rotated.payload, document.canvas)
-    : rotated
+  const transform = rotateLayerTransform(layer, value)
+  const after = layer.kind === 'ruler'
+    ? rebaseRulerLayer({
+        ...layer,
+        transform: constrainRulerTransform(layer, transform, rulerCanvasBounds(document), document.canvas),
+      }, layer.payload, document.canvas)
+    : { ...layer, transform }
   return [{ type: 'updateLayer', before: layer, after }]
 }

@@ -97,6 +97,7 @@ export class QuickCaptureCommitController {
     const hosts = this.#ports.hosts.value
     const draft = this.#ports.draft.value
     if (!hosts || !draft) throw new Error('Rendered capture is not ready')
+    await hosts.waitForRender?.()
     return cropPng(hosts.scene, selection, hosts.scene.width / draft.width, hosts.scene.height / draft.height)
   }
 }

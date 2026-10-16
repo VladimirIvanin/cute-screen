@@ -88,12 +88,14 @@ function keydown(event: KeyboardEvent): void {
   buttons[next]?.focus()
 }
 watch(() => props.disabled, (disabled) => {
-  if (disabled) show(false)
+  if (disabled && shown.value) show(false)
 })
 watch(custom, (next) => {
   if (next) void nextTick(() => panel.value?.querySelector<HTMLInputElement>('input')?.focus({ preventScroll: true }))
 })
-defineExpose({ close: () => show(false) })
+defineExpose({ close: () => {
+  if (shown.value) show(false)
+} })
 function sample(): void {
   show(false)
   emit('eyedropper')
@@ -135,7 +137,7 @@ function outside(event: MouseEvent): void {
         ref="panel"
         class="cs-simple-color-panel cs-color-picker-popover"
         :class="{ 'is-embedded': embedded }"
-        role="dialog"
+        :role="embedded ? 'group' : 'dialog'"
         :aria-label="ariaLabel"
         @keydown="keydown"
         @pointerdown.stop

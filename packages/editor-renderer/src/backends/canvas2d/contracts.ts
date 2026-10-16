@@ -70,5 +70,5 @@ export interface Canvas2DRendererOptions {
   readonly now?: () => number
   readonly exportCanvas?: (width: number, height: number) => Canvas2DLike
   /** Mirrors browser unicode-range font selection in deterministic headless tests. */
-  readonly resolveFontFamily?: (text: string, style: RenderTextStyle) => string
+  readonly resolveFontFamily?: (text: string, style: RenderTextStyle) => string | readonly string[]
 }

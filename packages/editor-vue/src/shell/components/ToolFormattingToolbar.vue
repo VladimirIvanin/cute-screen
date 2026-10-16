@@ -57,7 +57,7 @@ const position = usePreviewPopover(
 const names = computed<Record<string, string>>(() => ({
   brush: text('Brush and width', 'Кисть и толщина'),
   appearance: text('Opacity and blending', 'Непрозрачность и наложение'),
-  smoothing: text('Smoothing', 'Сглаживание'),
+  smoothing: text('Correction', 'Коррекция'),
   shape: text('Aperture shape', 'Форма области'),
   dim: text('Dimming', 'Затемнение'),
   feather: text('Edge softness', 'Мягкость краёв'),
@@ -103,13 +103,13 @@ const presets = (id: string) => ({
 const unit = (id: string) => ['width', 'rulerThickness', 'rulerFontSize'].includes(id) ? 'px' : id === 'rulerAngle' ? '°' : '%'
 const brushes = computed(() => [
   {
-    id: 'pen', name: text('Pen', 'Перо'),
+    id: 'pen', name: text('Exact pen', 'Точное перо'), hint: text('Follows your hand exactly', 'Точно повторяет движение'),
   },
   {
-    id: 'pencil', name: text('Pencil', 'Карандаш'),
+    id: 'stabilized', name: text('Autocorrection', 'Автокоррекция'), hint: text('Steadies lines and curves', 'Убирает дрожание руки'),
   },
   {
-    id: 'brush', name: text('Brush', 'Кисть'),
+    id: 'brush', name: text('Expressive brush', 'Экспрессивная кисть'), hint: text('Pressure or simulated pressure', 'Переменная толщина'),
   },
 ])
 const shapes = computed(() => [
@@ -147,7 +147,7 @@ const blends = computed(() => [
 function summary(menu: string): string {
   const display = (id: string, suffix = '') => mixed(id) ? '—' : `${value(id)}${suffix}`
   if (menu === 'brush')
-    return `${mixed('brush') ? '—' : brushes.value.find((item) => item.id === value('brush'))?.name} · ${display('width', ' px')}`
+    return `${mixed('brush') ? '—' : brushes.value.find((item) => item.id === value('brush'))?.name ?? text('Legacy pencil', 'Карандаш (старый)')} · ${display('width', ' px')}`
   if (menu === 'appearance')
     return display('layerOpacity', '%')
   if (menu === 'smoothing')
@@ -214,27 +214,27 @@ function keydown(event: KeyboardEvent): void {
   event.stopPropagation()
   show(open.value, false)
 }
-function brushSegments(brush: string) {
+function brushPreview(brush: string) {
   const geometry = resolveFreehandGeometry({
-    brush, width: 5, smoothing: 0.5, points: [
-      {
-        x: 3, y: 17, pressure: 0.3,
-      },
-      {
-        x: 13, y: 6, pressure: 0.6,
-      },
-      {
-        x: 23, y: 17, pressure: 1,
-      },
-      {
-        x: 36, y: 6, pressure: 0.8,
-      },
-    ],
+    brush, width: 3.5, strokeVersion: 2, pressureMode: 'pen',
+    smoothing: brush === 'brush' ? .35 : .65,
+    points: Array.from({ length: 45 }, (_, index) => ({
+      x: 3 + index * .75, y: 12 + Math.sin(index / 6) * 5 + (index % 2 ? 1.8 : -1.8),
+      pressure: .15 + .85 * Math.sin(index / 44 * Math.PI),
+    })),
   }, true)
-  return geometry.points.slice(1).map((end, index) => ({
-    start: geometry.points[index]!, end, width: geometry.width * (geometry.points[index]!.pressure + end.pressure) / 2,
-  }))
+  return {
+    points: (geometry.outline.length ? geometry.outline : geometry.points).map((point) => `${point.x},${point.y}`).join(' '),
+    filled: geometry.outline.length > 0, width: geometry.width,
+  }
 }
+const brushPreviews = computed(() => Object.fromEntries(
+  brushes.value.map((brush) => [brush.id, brushPreview(brush.id)]),
+))
+const correctionHint = computed(() => text(
+  'Exact pen follows the pointer without correction.',
+  'Точное перо повторяет курсор без коррекции.',
+))
 watch([() => props.schema.icon, () => settings.value.activeApertureId], () => {
   open.value = undefined
 })
@@ -282,28 +282,35 @@ watch([() => props.schema.icon, () => settings.value.activeApertureId], () => {
         @keydown="keydown"
         @pointerdown.stop
       >
-        <div v-if="menu === 'brush'" class="cs-tool-settings-choices">
+        <div v-if="menu === 'brush'" class="cs-tool-settings-choices cs-brush-choices">
           <button
             v-for="brush in brushes"
             :key="brush.id"
             type="button"
             :disabled="blocked"
             :aria-label="brush.name"
+            :title="brush.hint"
             :aria-pressed="!mixed('brush') && value('brush') === brush.id"
             @click="change('brush', brush.id)"
           >
-            <svg viewBox="0 0 40 24" aria-hidden="true"><line
-              v-for="(segment, index) in brushSegments(brush.id)"
-              :key="index"
-              :x1="segment.start.x"
-              :y1="segment.start.y"
-              :x2="segment.end.x"
-              :y2="segment.end.y"
-              :stroke-width="segment.width"
-              stroke="currentColor"
-              stroke-linecap="round"
-            /></svg>
-            {{ brush.name }}
+            <svg viewBox="0 0 40 24" aria-hidden="true">
+              <polygon
+                v-if="brushPreviews[brush.id]?.filled"
+                :points="brushPreviews[brush.id]?.points"
+                fill="currentColor"
+              />
+              <polyline
+                v-else
+                :points="brushPreviews[brush.id]?.points"
+                :stroke-width="brushPreviews[brush.id]?.width"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <span>{{ brush.name }}</span>
+            <small>{{ brush.hint }}</small>
           </button>
         </div>
         <div v-if="menu === 'shape'" class="cs-tool-settings-choices">
@@ -362,6 +369,7 @@ watch([() => props.schema.icon, () => settings.value.activeApertureId], () => {
           </div>
           <small>{{ text('Hold Alt to snap while drawing or moving an endpoint. Changing the step keeps the current measurement.', 'Alt — привязка при рисовании и перемещении конца. Изменение шага сохраняет текущее измерение.') }}</small>
         </template>
+        <small v-if="menu === 'smoothing' && numeric('smoothing')?.disabled && value('brush') === 'pen'">{{ correctionHint }}</small>
         <NumericControl
           v-for="id in numericIds(menu)"
           :key="id"
@@ -374,7 +382,7 @@ watch([() => props.schema.icon, () => settings.value.activeApertureId], () => {
           :presets="presets(id)"
           :control-id="id"
           :mixed="mixed(id)"
-          :disabled="blocked"
+          :disabled="blocked || numeric(id)?.disabled"
           :locale="locale"
           slider
           stepper
@@ -472,9 +480,9 @@ watch([() => props.schema.icon, () => settings.value.activeApertureId], () => {
       :ref="element => { if (element) triggers.set(menu, element as HTMLButtonElement) }"
       type="button"
       class="cs-tool-settings-trigger"
-      :disabled="blocked && menu !== 'measure' || menu === 'shape' && !control('spotlightShape')"
+      :disabled="blocked && menu !== 'measure' || menu === 'shape' && !control('spotlightShape') || menu === 'smoothing' && numeric('smoothing')?.disabled"
       :aria-label="names[menu]"
-      :title="names[menu]"
+      :title="menu === 'smoothing' && value('brush') === 'pen' ? correctionHint : names[menu]"
       :aria-expanded="open === menu"
       aria-haspopup="dialog"
       @click="show(menu, open !== menu)"

@@ -1,5 +1,163 @@
 # Стратегия тестирования
 
+## Панель текста: curated fonts и palette (2026-10-16, ADR-061)
+
+Платформа: Ubuntu 24.04.5 LTS x86_64, Linux 6.8.0-142-generic, X11;
+Chrome 154.0.8037.57, native WebKitGTK 605.1.15, Node 22.23.1, pnpm 10.33.2.
+
+Команды и фактические результаты:
+
+- `pnpm format` — passed; `pnpm format:check` — passed после записи evidence.
+- `pnpm test --maxWorkers=2` — 106 files, 788/788 passed. Обычный полностью
+  параллельный запуск ловил 5-second timeout в unrelated mounted/perf tests;
+  повтор с двумя workers стабилен. Лог `artifacts/text-toolbar-2026-10-16/unit.log`.
+- `pnpm exec vitest run --project vue tests/unit/vue/text-context-toolbar.test.ts
+tests/unit/vue/text-font-picker.test.ts --project renderer
+packages/editor-renderer/src/canvas2d-text-paint.test.ts` — 15/15 passed.
+  Mixed/disabled controls, palette Apply/Cancel, load/error/retry, keyboard,
+  Unicode-safe sample, local face cache и focus return проверены.
+- `pnpm test:render` — 7 files, 24/24 passed; 4 новых goldens:
+  `tests/goldens/m01-renderer/text-fonts-{latin,cyrillic}-{canvas2d,canvaskit}.png`.
+  В каждом изображении все 12 families, regular и B/I. Preview/export
+  повторно декодируются и сравниваются. Visual QA обнаружил tofu вместо цифр
+  у Cyrillic в headless Canvas2D: resolver теперь передаёт ordered subset family
+  list. CanvasKit делит смешанный fragment по script. Оба набора PNG просмотрены.
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5185 pnpm test:e2e:browser --spec
+tests/e2e/specs/browser-v7-rich-text-toolbar.e2e.ts --spec
+tests/e2e/specs/browser-v7-rich-text-editing.e2e.ts --spec
+tests/e2e/specs/browser-text-fonts.e2e.ts` — 3 specs / 7 scenarios passed.
+  Проверены range formatting, one-command commit, undo, все 12 family через
+  меню, binary PNG decode и 12 combinations locale/theme/width. Дополнительный
+  повтор font spec — 2/2 passed: Enter/Home в меню и стабильный screenshot.
+  Для contenteditable используется native typing в production mount-focus;
+  WebDriver addValue мог кликнуть по перекрывающему popover после auto-size.
+  Артефакты: `artifacts/browser-e2e/text-toolbar-*.png`, `text-font-menu.png`.
+- `pnpm audit:licenses`,
+  `pnpm --filter @cute-screen/editor-vue exec node ../../scripts/check-js-licenses.mjs`
+  — passed. Точные Fontsource 5.3.0 OFL exceptions добавлены после проверки
+  metadata/licenses; Roboto Slab использует Apache-2.0. Copyright notices и полные
+  license texts поставляются в `apps/desktop/public/font-licenses.txt`.
+- `pnpm audit:security` — exit 0, high/critical отсутствуют; отчёт содержит
+  одну low severity запись. `pnpm check:rust` — passed (fmt и все clippy variants); `pnpm ipc:check` — passed.
+- `pnpm check` проходит lint/typecheck/format/docs, но architecture boundary
+  останавливается на ранее изменённом `packages/editor-core/src/styles.ts`:
+  complexity 23 при лимите 20. TextFontPicker boundary исправлен; оставшаяся
+  ошибка относится к параллельному изменению кистей и здесь не переписана.
+- `CUTE_SCREEN_E2E_SCENARIOS=v7-rich-text,quick-chrome pnpm test:e2e:tauri`
+  собрал свежий test binary; первый запуск конфликтовал с существующим activation
+  endpoint. Повтор с отдельным `XDG_RUNTIME_DIR=$(mktemp -d
+/tmp/cs-text-runtime.XXXXXX)` запустил WebKitGTK: panel mount/no-overflow прошли,
+  но scene click не создал contenteditable; Quick specs остановились на tool
+  configure/right-click/selection. Отдельный v7 повтор с native pointer actions
+  дал тот же missing-editor result. Native edit, fonts и Quick handoff остаются
+  непроверенными; успешный Chrome не подменяет native evidence.
+
+Viewport screenshots дополнительно осмотрены через интерактивный браузер.
+Меню ограничено 480 px по высоте, все text groups остаются целыми; экран и
+originals не меняются от открытия меню/наведения. Ожидание последнего font-ready
+frame добавлено в Copy/Quick PNG перед encoding. Windows/macOS/Wayland не запускались.
+
+## Применение кропа и его панель (2026-10-16)
+
+`REQ-TOL-013`, `REQ-EDT-005/006`, `REQ-UI-005`. Linux x86_64, Node 22.23.1,
+pnpm 10.33.2, Chrome 154.0.8037.57; native WebKitGTK 2.52.6 / wry 0.55.1,
+external tauri-driver 2.1.0. Логи и просмотренные скриншоты —
+`artifacts/crop-apply/`.
+
+- Red-first: `pnpm exec vitest run tests/unit/vue/m08-crop-interactions.test.ts`
+  воспроизвёл отсутствие `selectTool` после Enter (`vue-red.log`).
+- `pnpm test --maxWorkers=2 --testTimeout=15000` — 103 files / 750 tests,
+  exit 0 (`unit.log`). Проверены transient drag, единая command, переход в Select,
+  повторное открытие/reset/cancel, undo/redo и disabled nested controls.
+  Первые общие прогоны выявили старое ожидание активного Crop и таймауты 5 s
+  в несвязанных numeric/highlighter тестах; ожидание обновлено, timeout последнего
+  прогона явно увеличен для нагруженного общего workspace.
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5195 pnpm test:e2e:browser --spec tests/e2e/specs/browser-crop-apply.e2e.ts --spec tests/e2e/specs/browser-m08-1.e2e.ts --spec tests/e2e/specs/browser-m08-2.e2e.ts --spec tests/e2e/specs/browser-m08-3.e2e.ts --spec tests/e2e/specs/browser-crop-cursors.e2e.ts`
+  — 5 files / 7 scenarios, exit 0 (`browser.log`). Сразу после Apply/Enter
+  проверены Select, отсутствие crop shade и размеры видимого cropped viewport;
+  дополнительных Cancel/Select перед проверкой нет. Enter на Cancel не создаёт
+  command. Проверены annotations, non-origin crop, reset, cancel, undo/redo,
+  все восемь курсоров, Tab/focus-visible и RU/EN × light/dark × окна
+  1213×724 / 1024×700: четыре control heights равны 32 px, центры совпадают
+  с допуском 1 px, panel/controls внутри окна и выше ToolRail. Восемь
+  `crop-toolbar-*.png` и `crop-applied.png` просмотрены.
+  Ранние прогоны выявили ошибку test helper: document coordinates вычислялись
+  через dense preview backing size. Helper теперь использует document canvas
+  dimensions и ждёт стабильного layout. Старый base-resize сценарий задевал
+  transient formatting panel у нижнего угла; gesture перенесён на доступный
+  верхний угол без программной подготовки состояния.
+- `XDG_SESSION_ID=crop-apply-e2e PATH="$PWD/artifacts/spotlight-fix/tools/bin:$PWD/artifacts/spotlight-fix/tools/webkit/root/usr/bin:$PATH" CUTE_SCREEN_E2E_DRIVER_PROVIDER=external CUTE_SCREEN_E2E_SCENARIOS=m08-crop-first-open pnpm test:e2e:tauri`
+  — 1/1, exit 0 (`native.log`). Production fake Capture → Quick → Editor
+  открывает первый decoded 400×300 document; проверены Enter, Apply, Cancel,
+  Reset, Undo/Redo, non-origin viewport и отсутствие crop overlay.
+  Скриншот `native-applied-1024x700.png` просмотрен.
+  Embedded попытка не открыла driver session (`native-embedded-failed.log`);
+  external попытка в общей desktop session столкнулась с activation endpoint
+  запущенного приложения (`native-shared-session-failed.log`). Изоляция
+  `XDG_SESSION_ID` устранила конфликт без остановки пользовательского editor.
+- `pnpm check` — exit 0 (`check.log`): lint, typecheck, format/docs, 43 boundary
+  tests, IPC и Rust fmt/clippy. Существующие lint warnings и предупреждения
+  CanvasKit externalization / bundle size остаются.
+- `pnpm tauri build --debug --no-bundle` — exit 0 (`build-production.log`):
+  после native suite восстановлен обычный executable без fake-platform/test-harness.
+- Финальные `pnpm format`, `pnpm format:check`, `pnpm docs:check` — exit 0;
+  `format.log`, `format-check.log`, `docs.log`.
+
+Физический capture, Windows/WebView2 и macOS/WKWebView этим исправлением не
+перепроверены; native подтверждение относится к fake capture и реальному Linux
+WebView. Renderer/export contracts и document schema не менялись.
+
+## Линейка: границы холста и подгонка после crop (2026-10-16, ADR-059)
+
+Ubuntu 24.04.5 x86_64/X11, Node 22.23.1, pnpm 10.33.2.
+Логи — `artifacts/ruler-bounds/`.
+
+- Red-first `pnpm exec vitest run --project core packages/editor-core/src/layer-resize.test.ts`:
+  endpoint 900 вместо 400 (`resize-red.log`), после crop длина 300 вместо 80
+  (`crop-red.log`). Mounted-shell Escape regression сначала выполнял лишний
+  move commit (`escape-red.log`). Начальный импорт ещё отсутствующего helper
+  зафиксирован отдельно в `core-red.log`.
+- Focused core/Vue — 29/29 (`badge-green.log`), включая 1000 property cases
+  rotated/reflected non-origin crops вплоть до 1 px, locked ruler, точный
+  apply/revert и history, endpoint/cancel/keyboard. Property test поймал
+  floating-point отказ подгонки; исправление — `property-green.log`.
+- `pnpm test --maxWorkers=2` — 103 files / 750 tests (`unit-controlled.log`).
+  `pnpm test:render` — 5 files / 20 tests (`render.log`), goldens не менялись.
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5213 pnpm test:e2e:browser --spec tests/e2e/specs/browser-ruler-bounds.e2e.ts`
+  — Chrome 154.0.8037.57, 2/2 при 1280 и 1024 px (`browser-stable.log`).
+  Реальные pointer inputs, документ неизменен до release, move/endpoint clamp,
+  Escape, crop сокращает существующую линейку, один Undo/Redo восстанавливает
+  область и точную геометрию. Screenshots
+  `artifacts/browser-e2e/ruler-bounds-{1280,1024}-{moving,endpoint,crop-draft,cropped,redo}.png`
+  просмотрены; подпись после crop читаема внутри изображения.
+- `mkdir -p artifacts/ruler-bounds/runtime` и `chmod 700 artifacts/ruler-bounds/runtime`;
+  `XDG_RUNTIME_DIR="$PWD/artifacts/ruler-bounds/runtime" PATH="$PWD/artifacts/spotlight-fix/tools/bin:$PWD/artifacts/spotlight-fix/tools/webkit/root/usr/bin:$PATH" CUTE_SCREEN_E2E_SCENARIOS=ruler-bounds pnpm test:e2e:tauri`
+  — external tauri-driver 2.1.0, WebKitGTK 2.52.6 / wry 0.55.1, 1/1
+  (`native-observed.log`). Production fake Capture → Quick → Editor; те же
+  pointer/crop/history проверки. Pointer `isTrusted=true`, конечные client
+  coordinates записаны в лог. Native moving/endpoint/cropped screenshots
+  `artifacts/tauri-e2e/ruler-bounds-*.png` просмотрены.
+- `pnpm check` — exit 0 (`check-verified.log`): lint (60 warnings, 0 errors),
+  TypeScript, format/docs, boundaries, generated IPC, frontend и Rust fmt/clippy.
+
+Промежуточные неуспехи сохранены: `browser.log` — shadowed DOM identifier
+в test helper; `browser-debug.log` — обнаруженная production Escape regression;
+`browser-final.log` содержит HMR EditorWorkspace во время жеста. До учёта badge
+скриншот показывал обрезанную подпись после crop. `native.log` остановлен после
+ошибки activation socket занятого developer app; отдельный runtime решает
+изоляцию без остановки этого приложения. `native-isolated.log` — неуспешная
+попытка с y=289 вместо верхнего края; финальный повтор с observation pointer
+прошёл все исходные assertions. `unit-final.log` содержит renderer timeouts
+при параллельных сборках и промежуточный crop UI failure; controlled repeat
+прошёл 750/750. Первый `check-final.log` встретил параллельно редактируемый
+crop E2E typecheck; итоговый `check-verified.log` — passed.
+
+Native source fixture 400×300; physical capture, Wayland/mixed-DPI, Windows
+WebView2 и macOS WKWebView этим изменением не проверены. В canvas меньше badge
+ограничиваются endpoints, размер текста не меняется. Схема документа и IPC
+сохранены. Undo подтверждённого crop восстанавливает исходную геометрию;
+расширение рамки само по себе не восстанавливает ранее сокращённую длину.
+
 ## Security audit Vue и source-map-js (2026-10-16)
 
 Ubuntu 24.04.5 x86_64, Node 22.23.1, pnpm 10.33.2; baseline commit
@@ -3551,3 +3709,87 @@ Native tray и реальные DPI этими листами не подтве�
 не переносится на новую геометрию. Новый Windows/GNOME/KDE/macOS native tray,
 light/dark/Retina/HiDPI и packaged-app smoke остаются pending; platform support
 не расширен. Для отображения новых embedded assets нужен перезапуск новой сборки.
+
+## Различимые кисти (2026-10-16, ADR-060)
+
+`REQ-TOL-003`, `REQ-EDT-002/005/006/015`, `REQ-OUT-003`. Linux x86_64/X11,
+Node 22.23.1, pnpm 10.33.2, Chrome 154.0.8037.57; native wry 0.55.1 и
+external WebKitGTK driver из `artifacts/spotlight-fix/tools/`. Логи —
+`artifacts/brushes/`; PNG — `artifacts/browser-e2e/brushes-*` и
+`artifacts/tauri-e2e/brushes-*`.
+
+Исследование: прежний resolver различал три brush только множителями
+1/0.65/1.5 и рисовал pencil отдельными line nodes. Excalidraw использует
+[perfect-freehand](https://github.com/steveruizok/perfect-freehand), разделяющий
+streamline, smoothing и thinning. В core закреплён MIT `perfect-freehand@1.2.3`.
+
+- Red-first: `pnpm exec vitest run --project core packages/editor-core/src/brushes.test.ts`
+  — 5 failures / 1 pass до реализации (`core-red.log`).
+- Финальный core + decoded brush goldens: `pnpm exec vitest run --project core packages/editor-core/src/brushes.test.ts --project render-harness tests/harness/render/golden-brushes.test.ts`
+  — 13/13 (`ink-final.log`). Проверены RMS шума ≤50% при 65%, raw endpoints,
+  constant width, настоящее/имитируемое pressure, короткие штрихи, dots/arcs/corners,
+  прозрачные петли, bounds/resize/rotation/reflection, strict codec, clipboard,
+  legacy upgrade одной command и точный Undo/Redo. При 12 000 samples — один node.
+- Mounted Vue: `pnpm exec vitest run --project vue tests/unit/vue/brushes.test.ts`
+  — 6/6 (`vue-focused.log`). Empty coalesced fallback, frozen settings/pen source,
+  release endpoint без pressure=0, Escape/pointercancel, одна command, disabled
+  correction и отдельная память 80%/20% через production defaults pipeline.
+  Тридцать pointermove не вызывают render каждого Vue component на каждом событии.
+  Дополнительно `tool-formatting-toolbar.test.ts` прошёл в `brush-focused.log`.
+- `pnpm test:render` до параллельного расширения text fonts — 22/22; новый
+  `golden-brushes.test.ts` сравнивает Canvas2D/CanvasKit при 1×/2×. Decoded
+  preview/export совпадают; alpha собственного пересечения остаётся ~128/255.
+  Backend semantic comparison допускает rounding ≤2 levels, каждый backend
+  дополнительно сравнивается с собственным exact golden. Старые goldens не менялись.
+  4K/8K `tool-settings-large.test.ts` использует UI PNG и 12 000 samples;
+  decoded SHA-256 preview/export совпадает, scene содержит один pencil node.
+  Timings и hashes — `artifacts/tool-settings/4k.json` и `8k.json`; это software
+  correctness evidence, не GPU performance claim.
+- `pnpm test:perf` — 4/4 (`perf.log`), controlled software suite.
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5221 pnpm test:e2e:browser --spec tests/e2e/specs/browser-brushes.e2e.ts --spec tests/e2e/specs/browser-tool-settings.e2e.ts`
+  — 2/2 (`browser.log`). Три кисти, Undo/Redo, отмена, четыре compact controls,
+  RU/EN × light/dark при 1024 px; screenshots просмотрены. Начальный timeout
+  устранён ожиданием окончания закрытия popover в helper; отмена держит pointer
+  через `perform(true)`, иначе WebDriver сам отпускал кнопку до Escape.
+- `XDG_SESSION_ID=brushes-e2e PATH="$PWD/artifacts/spotlight-fix/tools/bin:$PWD/artifacts/spotlight-fix/tools/webkit/root/usr/bin:$PATH" CUTE_SCREEN_E2E_DRIVER_PROVIDER=external CUTE_SCREEN_E2E_SCENARIOS=brushes,brushes-reopen pnpm test:e2e:tauri`
+  — оба сценария passed (`native.log`). Чистый профиль, production fake Capture →
+  Quick → Editor, три кисти в обеих WebView, Undo/Redo/Cancel; отдельный запуск
+  восстановил шесть штрихов и expressive default. Перед вводом после handoff
+  helper ждёт enabled Pencil; ожидания одного стабильного canvas недостаточно.
+- `pnpm tauri build --debug --no-bundle` — exit 0 (`build-production.log`),
+  обычная production сборка без fake-platform/test-harness.
+- `pnpm audit:licenses` — exit 0 (`licenses.log`), MIT dependency разрешена;
+  `pnpm audit:security` — exit 0, один low advisory (`security.log`).
+
+Границы общих проверок в общем изменяемом workspace:
+
+- Первый `pnpm test --maxWorkers=2` после исправления ожиданий — 765/765.
+  Промежуточный прогон после параллельных text-font изменений: 783 passed,
+  1 failure в `text-context-toolbar.test.ts` (background focus), `unit.log`.
+  Финальный `pnpm test --maxWorkers=2` — 106 files / 788 tests, exit 0
+  (`unit-final.log`).
+- Последний `pnpm test:render` — 23 passed, 1 failure в кириллическом сценарии
+  `golden-text-fonts.test.ts`, `render.log`. Brush goldens прошли отдельно.
+- `pnpm format`, `pnpm check`, `pnpm format:check` запускались. Последний check
+  остановился на max-len в `TextFontPicker.vue`, `golden-runtime-test-kit.ts`
+  и `golden-text-fonts.test.ts`; эти параллельные изменения не исправлялись
+  в задаче кистей. Логи — `format.log`, `check.log`, `format-check.log`.
+  `ink-lint.log` содержит отдельный lint изменённых модулей кистей.
+
+Windows/WebView2, macOS/WKWebView и физический планшет не проверялись.
+
+Финальное уточнение: `browser-final.log` — 1/1 с обновлёнными миниатюрами,
+`native-final.log` — повтор обоих production сценариев с `isTrusted` именно
+canvas pointerdown, оба passed. `e2e-typecheck.log` — exit 0.
+`typecheck-final.log` останавливается только на `exact` в ByRoleOptions
+параллельного `text-context-toolbar.test.ts`; package/frontend build прошли.
+Последний `pnpm format` после обновления общего workspace оставил один max-len
+в `golden-text-fonts.test.ts`; прежние три строки уже исправлены параллельно.
+
+Финальный `pnpm format:check` — exit 0 (`format-check.log`), `pnpm docs:check` —
+exit 0 (`docs.log`), `git diff --check` — exit 0. Повтор общего `pnpm check`
+(`check-final.log`) остановился на структурных переносах и max-len в новом
+параллельном `browser-text-fonts.e2e.ts`. Повтор `pnpm test:render`
+(`render-final.log`) — 23/24, тот же кириллический text-font failure.
+Кисти во всех этих прогонах прошли; незавершённые проверки текстовой задачи
+не считаются доказательством неработоспособности кистей и не объявляются passed.

@@ -88,11 +88,13 @@ function selectedAfter(
   payload: JsonObject,
   automatic: import('@cute-screen/editor-renderer').HighlighterEffect = 'highlight',
 ): LayerNode {
+  const { brushSmoothing: _memories, ...documentPayload } = payload
+  void _memories
   let after = {
     ...selected,
     ...(id === 'layerOpacity' ? { opacity: payload.layerOpacity as number } : {}),
     ...(id === 'blendMode' ? { blendMode: payload.blendMode as BlendMode } : {}),
-    ...(id === 'layerOpacity' || id === 'blendMode' ? {} : { payload }),
+    ...(id === 'layerOpacity' || id === 'blendMode' ? {} : { payload: documentPayload }),
     ...(id === 'markerMode'
       ? {
           blendMode: resolveHighlighterBlend(isHighlighterMode(value) ? value : 'highlight', automatic),

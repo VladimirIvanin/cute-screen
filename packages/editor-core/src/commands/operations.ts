@@ -210,7 +210,14 @@ function applySetCrop(
   if (!jsonEquals(document.crop, command.before)) {
     throw new Error('crop changed before update')
   }
-  return replaceDocument(document, { crop: command.after })
+  const changes = command.rulerChanges ?? []
+  for (const change of changes) {
+    assertCurrentLayer(findLayer(document, change.before.id), change.before, 'ruler changed before crop')
+  }
+  return replaceDocument(document, {
+    crop: command.after,
+    layers: document.layers.map((layer) => changes.find((change) => change.before.id === layer.id)?.after ?? layer),
+  })
 }
 
 function applyBatch(
@@ -324,7 +331,14 @@ function revertSetCrop(
   if (!jsonEquals(document.crop, command.after)) {
     throw new Error('crop changed before revert')
   }
-  return replaceDocument(document, { crop: command.before })
+  const changes = command.rulerChanges ?? []
+  for (const change of changes) {
+    assertCurrentLayer(findLayer(document, change.after.id), change.after, 'ruler changed before crop revert')
+  }
+  return replaceDocument(document, {
+    crop: command.before,
+    layers: document.layers.map((layer) => changes.find((change) => change.after.id === layer.id)?.before ?? layer),
+  })
 }
 
 function revertBatch(

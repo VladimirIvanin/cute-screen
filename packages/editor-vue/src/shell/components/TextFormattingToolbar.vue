@@ -10,6 +10,8 @@ import {
   type CSSProperties,
 } from 'vue'
 import { UiIcon } from '../icon'
+import SimpleColorPicker from '../ui/SimpleColorPicker.vue'
+import TextFontPicker from '../ui/TextFontPicker.vue'
 import NumericControl from '../ui/NumericControl.vue'
 import { textFormattingLabel } from '../ui/text-formatting-labels'
 import { usePreviewPopover } from '../ui/use-preview-popover'
@@ -44,11 +46,10 @@ const textSizeOpen = ref(false)
 const textSizeTrigger = ref<HTMLButtonElement>()
 const textSizeRoot = ref<HTMLElement>()
 const textSizeDraft = ref('24')
-const textOverflowOpen = ref(false)
-const textOverflowTrigger = ref<HTMLButtonElement>()
-const textOverflowRoot = ref<HTMLElement>()
-const textBackgroundReturnTrigger = ref<HTMLButtonElement>()
-
+const toolbarRoot = ref<HTMLElement>()
+let toolbarObserver: ResizeObserver | undefined
+const colorPicker = ref<InstanceType<typeof SimpleColorPicker>>()
+const fontPicker = ref<InstanceType<typeof TextFontPicker>>()
 const unregisterBackground = numericPreview?.register(backgroundOwner, () => {
   if (textBackgroundOpen.value) closeTextBackground()
 })
@@ -58,7 +59,7 @@ const sizePosition = usePreviewPopover(
   () => textSizeRoot.value,
 )
 const backgroundPosition = usePreviewPopover(
-  () => textBackgroundOpen.value ? textBackgroundReturnTrigger.value : undefined,
+  () => textBackgroundOpen.value ? textBackgroundTrigger.value : undefined,
   () => textBackgroundRoot.value,
 )
 function numericPopoverStyle(position: PreviewPlacement | undefined): CSSProperties {
@@ -73,6 +74,17 @@ function numericPopoverStyle(position: PreviewPlacement | undefined): CSSPropert
 }
 
 const textLabel = (key: Parameters<typeof textFormattingLabel>[1]) => textFormattingLabel(props.pickerLocale, key)
+
+const formattingControls = computed(() => [
+  { id: 'textBold', key: 'bold', icon: 'bold', value: props.text.bold },
+  { id: 'textItalic', key: 'italic', icon: 'italic', value: props.text.italic },
+  { id: 'textStrikethrough', key: 'strike', icon: 'strikethrough', value: props.text.strikethrough },
+] as const)
+const alignments = [
+  { value: 'start', label: 'alignStart', icon: 'alignLeft' },
+  { value: 'center', label: 'alignCenter', icon: 'alignCenter' },
+  { value: 'end', label: 'alignEnd', icon: 'alignRight' },
+] as const
 
 function textValue<T>(
   value: T | null,
@@ -94,11 +106,14 @@ function textToggle(
 
 function openTextSize(): void {
   if (blocked.value) return
+  closeOtherPopovers('size')
   textSizeDraft.value = String(props.text.fontSize ?? 24)
   textSizeOpen.value = true
+  void nextTick(() => textSizeRoot.value?.querySelector<HTMLInputElement>('input')?.focus({ preventScroll: true }))
 }
 
 function closeTextSize(): void {
+  if (!textSizeOpen.value) return
   textSizeOpen.value = false
   void nextTick(() => textSizeTrigger.value?.focus({ preventScroll: true }))
 }
@@ -127,51 +142,35 @@ function validTextBackground(value: typeof textBackgroundDraft.value): boolean {
   )
 }
 
-function chooseOverflowList(): void {
-  emit('change', 'textList', props.text.listKind === 'bullet' ? 'none' : 'bullet')
-  closeTextOverflow()
+function closeOtherPopovers(except?: 'color' | 'font' | 'size' | 'background'): void {
+  if (except !== 'color') colorPicker.value?.close()
+  if (except !== 'font') fontPicker.value?.close()
+  if (except !== 'size' && textSizeOpen.value) closeTextSize()
+  if (except !== 'background' && textBackgroundOpen.value) closeTextBackground()
 }
-
-function chooseOverflowAlign(event: Event): void {
-  emit('change', 'textAlign', (event.target as HTMLSelectElement).value)
-  closeTextOverflow()
-}
-
-function openOverflowBackground(): void {
-  textOverflowOpen.value = false
-  openTextBackground(textOverflowTrigger.value)
-}
-
-function openTextBackground(returnTrigger = textBackgroundTrigger.value): void {
+function openDirectTextBackground(): void {
   if (blocked.value) return
-  textBackgroundReturnTrigger.value = returnTrigger
+  closeOtherPopovers('background')
   const current = props.text.background
   textBackgroundDraft.value = current ? { ...current } : { color: '#fff2a8', padding: 0, radius: 0 }
   backgroundInvalid.value = { padding: false, radius: false }
   textBackgroundOpen.value = true
-}
-
-function openDirectTextBackground(): void {
-  openTextBackground(textBackgroundTrigger.value)
+  void nextTick(() => {
+    const button = textBackgroundRoot.value?.querySelector<HTMLButtonElement>('button:not(:disabled)')
+    button?.focus({ preventScroll: true })
+  })
 }
 
 function closeTextBackground(): void {
+  if (!textBackgroundOpen.value) return
   numericPreview?.cancel(backgroundOwner)
   textBackgroundOpen.value = false
-  const returnTrigger = textBackgroundReturnTrigger.value
-  textBackgroundReturnTrigger.value = undefined
-  void nextTick(() => returnTrigger?.focus({ preventScroll: true }))
-}
-
-function closeTextOverflow(): void {
-  textOverflowOpen.value = false
-  void nextTick(() => textOverflowTrigger.value?.focus({ preventScroll: true }))
+  void nextTick(() => textBackgroundTrigger.value?.focus({ preventScroll: true }))
 }
 
 function closeOpenTextPopover(event: KeyboardEvent): void {
   if (textBackgroundOpen.value) closeTextBackground()
   else if (textSizeOpen.value) closeTextSize()
-  else if (textOverflowOpen.value) closeTextOverflow()
   else return
   event.preventDefault()
   event.stopPropagation()
@@ -201,7 +200,8 @@ function closeOnOutsidePointer(event: PointerEvent): void {
   if (
     textBackgroundOpen.value &&
     !textBackgroundTrigger.value?.contains(target) &&
-    !textBackgroundRoot.value?.contains(target)
+    !textBackgroundRoot.value?.contains(target) &&
+    !(target instanceof Element && target.closest('.cs-color-picker-popover'))
   ) {
     closeTextBackground()
   }
@@ -212,24 +212,25 @@ function closeOnOutsidePointer(event: PointerEvent): void {
   ) {
     closeTextSize()
   }
-  if (
-    textOverflowOpen.value &&
-    !textOverflowTrigger.value?.contains(target) &&
-    !textOverflowRoot.value?.contains(target)
-  ) {
-    closeTextOverflow()
-  }
+
 }
 
 watch(blocked, (disabled) => {
   if (disabled) {
     closeTextSize()
     closeTextBackground()
-    closeTextOverflow()
+    closeOtherPopovers()
   }
 })
-onMounted(() => document.addEventListener('pointerdown', closeOnOutsidePointer, true))
+onMounted(() => {
+  document.addEventListener('pointerdown', closeOnOutsidePointer, true)
+  if (typeof ResizeObserver !== 'undefined' && toolbarRoot.value) {
+    toolbarObserver = new ResizeObserver(() => document.dispatchEvent(new Event('cs-text-toolbar-resize')))
+    toolbarObserver.observe(toolbarRoot.value)
+  }
+})
 onBeforeUnmount(() => {
+  toolbarObserver?.disconnect()
   unregisterBackground?.()
   numericPreview?.cancel(backgroundOwner)
   document.removeEventListener('pointerdown', closeOnOutsidePointer, true)
@@ -238,174 +239,150 @@ onBeforeUnmount(() => {
 
 <template>
   <div
+    ref="toolbarRoot"
     class="cs-text-toolbar"
     :class="{ 'cs-text-floating-toolbar': variant === 'floating' }"
     role="group"
     :aria-label="title"
     @keydown.escape="closeOpenTextPopover"
   >
-    <label class="cs-text-toolbar-color" data-text-control="color">
-      <span class="sr-only">{{ textLabel('color') }}</span>
-      <input
-        type="color"
-        :value="text.color ?? '#000000'"
-        :aria-label="`${textLabel('color')}${textMixed(text.color) ? `: ${textLabel('mixed')}` : ''}`"
-        @change="emit('change', 'textColor', ($event.target as HTMLInputElement).value)"
+    <div class="cs-text-control-group" data-text-control="color">
+      <SimpleColorPicker
+        ref="colorPicker"
+        :model-value="text.color ?? '#000000'"
+        :mixed="textMixed(text.color)"
+        :ariaLabel="`${textLabel('color')}${textMixed(text.color) ? `: ${textLabel('mixed')}` : ''}`"
+        :locale="pickerLocale ?? 'en'"
+        :eyedropper="false"
+        :disabled="blocked"
+        @opened="closeOtherPopovers('color')"
+        @commit="emit('change', 'textColor', $event)"
       />
-    </label>
-    <select
-      data-text-control="font"
-      :value="text.fontFamily ?? ''"
-      :aria-label="`${textLabel('font')}${textMixed(text.fontFamily) ? `: ${textLabel('mixed')}` : ''}`"
-      @change="emit('change', 'textFont', ($event.target as HTMLSelectElement).value)"
-    >
-      <option value="" disabled>
-        {{ textLabel('mixed') }}
-      </option>
-      <option v-if="text.fontFamily && !text.fonts.includes(text.fontFamily)" :value="text.fontFamily">
-        {{ text.fontFamily }}
-      </option>
-      <option
-        v-for="font in text.fonts"
-        :key="font"
-        :value="font"
+    </div>
+    <div class="cs-text-control-group cs-text-type-group">
+      <TextFontPicker
+        ref="fontPicker"
+        data-text-control="font"
+        :model-value="text.fontFamily"
+        :preview-text="text.fontPreviewText"
+        :locale="pickerLocale"
+
+        :ariaLabel="`${textLabel('font')}${textMixed(text.fontFamily) ? `: ${textLabel('mixed')}` : ''}`"
+        :disabled="blocked"
+        @opened="closeOtherPopovers('font')"
+        @commit="emit('change', 'textFont', $event)"
+      />
+      <button
+        ref="textSizeTrigger"
+        data-text-control="size"
+        :disabled="blocked"
+        :aria-label="`${textLabel('size')}${textMixed(text.fontSize) ? `: ${textLabel('mixed')}` : ''}`"
+        :title="textLabel('size')"
+        :aria-expanded="textSizeOpen"
+        aria-haspopup="dialog"
+        @click="openTextSize"
       >
-        {{ font }}
-      </option>
-    </select>
-    <button
-      ref="textSizeTrigger"
-      data-text-control="size"
-      :disabled="blocked"
-      :aria-label="`${textLabel('size')}${textMixed(text.fontSize) ? `: ${textLabel('mixed')}` : ''}`"
-      :aria-expanded="textSizeOpen"
-      aria-haspopup="dialog"
-      @click="openTextSize"
-    >
-      {{ text.fontSize ?? '—' }}
-    </button>
-    <Teleport to=".cs-overlay-root" defer>
-      <section
-        v-if="textSizeOpen"
-        ref="textSizeRoot"
-        class="cs-text-size-popover cs-text-numeric-popover"
-        :style="numericPopoverStyle(sizePosition)"
-        role="dialog"
-        :aria-label="textLabel('size')"
-        @keydown.escape.prevent.stop="closeTextSize"
+        {{ text.fontSize ?? '—' }}
+      </button>
+      <Teleport to=".cs-overlay-root" defer>
+        <section
+          v-if="textSizeOpen"
+          ref="textSizeRoot"
+          class="cs-text-size-popover cs-text-numeric-popover"
+          :style="numericPopoverStyle(sizePosition)"
+          role="dialog"
+          :aria-label="textLabel('size')"
+          @keydown.escape.prevent.stop="closeTextSize"
+        >
+          <NumericControl
+            :label="pickerLocale === 'ru' ? 'Значение размера шрифта' : textLabel('size') + ' value'"
+            :compact-label="textLabel('size')"
+            :value="text.fontSize ?? 24"
+            :mixed="textMixed(text.fontSize)"
+            :min="8"
+            :max="256"
+            :step="1"
+            stepper
+            unit="px"
+            control-id="textFontSize"
+            :locale="pickerLocale"
+            :presets="[16, 24, 32, 48, 64]"
+            @preview="textSizeDraft = String($event)"
+            @commit="applyTextSize($event)"
+          />
+          <button type="button" @click="closeTextSize">
+            {{ textLabel('cancel') }}
+          </button>
+        </section>
+      </Teleport>
+    </div>
+    <div class="cs-text-control-group">
+      <button
+        v-for="control in formattingControls"
+        :key="control.id"
+        type="button"
+        :data-text-control="control.icon"
+        :aria-label="`${textLabel(control.key)}${textMixed(control.value) ? `: ${textLabel('mixed')}` : ''}`"
+        :title="textLabel(control.key)"
+        :aria-pressed="textMixed(control.value) ? 'mixed' : (control.value ?? false)"
+        :disabled="blocked"
+        @click="textToggle(control.id, control.value)"
       >
-        <NumericControl
-          :label="pickerLocale === 'ru' ? 'Значение размера шрифта' : textLabel('size') + ' value'"
-          :compact-label="textLabel('size')"
-          :value="text.fontSize ?? 24"
-          :mixed="textMixed(text.fontSize)"
-          :min="8"
-          :max="256"
-          :step="1"
-          stepper
-          unit="px"
-          control-id="textFontSize"
-          :locale="pickerLocale"
-          :presets="[16, 24, 32, 48, 64]"
-          @preview="textSizeDraft = String($event)"
-          @commit="applyTextSize($event)"
-        />
-        <button type="button" @click="closeTextSize">
-          {{ textLabel('cancel') }}
-        </button>
-      </section>
-    </Teleport>
-    <button
-      data-text-control="bold"
-      type="button"
-      :aria-label="`${textLabel('bold')}${textMixed(text.bold) ? `: ${textLabel('mixed')}` : ''}`"
-      :aria-pressed="textMixed(text.bold) ? 'mixed' : (text.bold ?? false)"
-      @click="textToggle('textBold', text.bold)"
-    >
-      B
-    </button>
-    <button
-      data-text-control="italic"
-      type="button"
-      :aria-label="`${textLabel('italic')}${textMixed(text.italic) ? `: ${textLabel('mixed')}` : ''}`"
-      :aria-pressed="textMixed(text.italic) ? 'mixed' : (text.italic ?? false)"
-      @click="textToggle('textItalic', text.italic)"
-    >
-      <i>I</i>
-    </button>
-    <button
-      data-text-control="strikethrough"
-      type="button"
-      :aria-label="`${textLabel('strike')}${textMixed(text.strikethrough) ? `: ${textLabel('mixed')}` : ''}`"
-      :aria-pressed="textMixed(text.strikethrough) ? 'mixed' : (text.strikethrough ?? false)"
-      @click="textToggle('textStrikethrough', text.strikethrough)"
-    >
-      <s>S</s>
-    </button>
-    <button
-      data-text-control="list"
-      class="cs-text-overflowable"
-      type="button"
-      :aria-label="textLabel('list')"
-      :aria-pressed="textMixed(text.listKind) ? 'mixed' : text.listKind === 'bullet'"
-      :disabled="text.disabled.includes('list')"
-      :title="text.disabled.includes('list') ? text.disabledReason : undefined"
-      @click="emit('change', 'textList', text.listKind === 'bullet' ? 'none' : 'bullet')"
-    >
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <circle
-          cx="5"
-          cy="6"
-          r="1.5"
-        />
-        <circle
-          cx="5"
-          cy="12"
-          r="1.5"
-        />
-        <circle
-          cx="5"
-          cy="18"
-          r="1.5"
-        />
-        <path d="M10 6h9M10 12h9M10 18h9" />
-      </svg>
-    </button>
-    <select
+        <UiIcon :name="control.icon" />
+      </button>
+    </div>
+    <div class="cs-text-control-group">
+      <button
+        data-text-control="list"
+        type="button"
+        :aria-label="textLabel('list')"
+        :aria-pressed="textMixed(text.listKind) ? 'mixed' : text.listKind === 'bullet'"
+        :disabled="blocked || text.disabled.includes('list')"
+        :title="text.disabled.includes('list') ? text.disabledReason : textLabel('list')"
+        @click="emit('change', 'textList', text.listKind === 'bullet' ? 'none' : 'bullet')"
+      >
+        <UiIcon name="list" />
+      </button>
+    </div>
+    <div
+      class="cs-text-control-group"
       data-text-control="alignment"
-      class="cs-text-overflowable"
+      role="group"
       :aria-label="textLabel('alignment')"
-      :value="text.alignment ?? ''"
-      @change="emit('change', 'textAlign', ($event.target as HTMLSelectElement).value)"
     >
-      <option value="" disabled>
-        {{ textLabel('mixed') }}
-      </option>
-      <option value="start">Start</option>
-      <option value="center">Center</option>
-      <option value="end">End</option>
-    </select>
-    <button
-      ref="textBackgroundTrigger"
-      data-text-control="background"
-      class="cs-text-overflowable"
-      type="button"
-      :aria-label="textLabel('background')"
-      :aria-expanded="textBackgroundOpen"
-      aria-haspopup="dialog"
-      @click="openDirectTextBackground"
-    >
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <rect
-          x="4"
-          y="4"
-          width="16"
-          height="16"
-          rx="3"
+      <button
+        v-for="align in alignments"
+        :key="align.value"
+        type="button"
+        :aria-label="textLabel(align.label)"
+        :title="textLabel(align.label)"
+        :aria-pressed="text.alignment === align.value"
+        :disabled="blocked"
+        @click="emit('change', 'textAlign', align.value)"
+      >
+        <UiIcon :name="align.icon" />
+      </button>
+    </div>
+    <div class="cs-text-control-group">
+      <button
+        ref="textBackgroundTrigger"
+        data-text-control="background"
+        type="button"
+        :aria-label="textLabel('background')"
+        :title="textLabel('background')"
+        :aria-expanded="textBackgroundOpen"
+        :class="{ 'has-background': text.background }"
+        :disabled="blocked"
+        aria-haspopup="dialog"
+        @click="openDirectTextBackground"
+      >
+        <UiIcon name="textBackground" /><span
+          v-if="text.background"
+          class="cs-text-background-indicator"
+          :style="{ backgroundColor: text.background.color }"
         />
-        <path d="M8 8h8v8H8z" />
-      </svg>
-    </button>
+      </button>
+    </div>
     <Teleport to=".cs-overlay-root" defer>
       <section
         v-if="textBackgroundOpen"
@@ -424,12 +401,19 @@ onBeforeUnmount(() => {
         >
           {{ textLabel('none') }}
         </button>
-        <label>{{ textLabel('color') }}
-          <input
-            v-model="textBackgroundDraft.color"
-            type="color"
-            :aria-label="textLabel('background') + ' ' + textLabel('color')"
-          /></label>
+        <div class="cs-text-background-color">
+          <span>{{ textLabel('color') }}</span>
+          <SimpleColorPicker
+            :model-value="textBackgroundDraft.color"
+            :ariaLabel="textLabel('background') + ' ' + textLabel('color')"
+            :locale="pickerLocale ?? 'en'"
+            :eyedropper="false"
+            :disabled="blocked"
+            embedded
+            @commit="textBackgroundDraft.color = $event"
+            @dismiss="closeTextBackground"
+          />
+        </div>
         <NumericControl
           v-for="key in ['padding', 'radius'] as const"
           :key="key"
@@ -460,54 +444,5 @@ onBeforeUnmount(() => {
         </button>
       </section>
     </Teleport>
-    <button
-      ref="textOverflowTrigger"
-      class="cs-text-overflow-trigger"
-      type="button"
-      :aria-label="pickerLocale === 'ru' ? 'Дополнительные настройки текста' : 'More text settings'"
-      :aria-expanded="textOverflowOpen"
-      aria-haspopup="dialog"
-      @click="textOverflowOpen = !textOverflowOpen"
-    >
-      <UiIcon name="more" />
-    </button>
-    <section
-      v-if="textOverflowOpen"
-      ref="textOverflowRoot"
-      class="cs-text-overflow-popover"
-      role="dialog"
-      :aria-label="pickerLocale === 'ru' ? 'Дополнительные настройки текста' : 'More text settings'"
-      @keydown.escape.prevent.stop="closeTextOverflow"
-    >
-      <button
-        type="button"
-        :aria-label="textLabel('list')"
-        :aria-pressed="textMixed(text.listKind) ? 'mixed' : text.listKind === 'bullet'"
-        :disabled="text.disabled.includes('list')"
-        :title="text.disabled.includes('list') ? text.disabledReason : undefined"
-        @click="chooseOverflowList"
-      >
-        {{ textLabel('list') }}
-      </button>
-      <select
-        :aria-label="textLabel('alignment')"
-        :value="text.alignment ?? ''"
-        @change="chooseOverflowAlign"
-      >
-        <option value="" disabled>
-          {{ textLabel('mixed') }}
-        </option>
-        <option value="start">Start</option>
-        <option value="center">Center</option>
-        <option value="end">End</option>
-      </select>
-      <button
-        type="button"
-        :aria-label="textLabel('background')"
-        @click="openOverflowBackground"
-      >
-        {{ textLabel('background') }}
-      </button>
-    </section>
   </div>
 </template>

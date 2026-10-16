@@ -1,3 +1,5 @@
+import { waitForStableCanvas } from '../canvas-ready'
+import { setNumericInput } from '../numeric-input'
 import {
   $,
   browser,
@@ -112,39 +114,27 @@ export async function waitForEditorFocus(): Promise<void> {
     browser.execute(() => document.activeElement?.getAttribute('contenteditable') === 'true'))
 }
 
-export async function setNativeColor(
+export async function setTextColor(
   label: string,
   value: string,
 ): Promise<void> {
-  await browser.execute(
-    ({ label, value }) => {
-      const input = [...document.querySelectorAll<HTMLInputElement>('input[type="color"]')].find(
-        (candidate) => candidate.getAttribute('aria-label') === label,
-      )
-      if (!input) throw new Error(`Missing colour input: ${label}`)
-      input.value = value
-      input.dispatchEvent(new Event('change', { bubbles: true }))
-    },
-    { label, value },
-  )
+  await $(`button[aria-label="${label}"]`).click()
+  await $('button[aria-label="Custom colour"]').click()
+  const input = $('.cs-color-hex input')
+  await setNumericInput(input, value)
+  await browser.keys('Enter')
 }
 
-export async function setNativeSelect(
-  label: string,
-  value: string,
-): Promise<void> {
-  await browser.execute(
-    ({ label, value }) => {
-      const select = [...document.querySelectorAll<HTMLSelectElement>('select')].find(
-        (candidate) => candidate.getAttribute('aria-label') === label,
-      )
-      if (!select) throw new Error(`Missing select: ${label}`)
-      select.focus()
-      select.value = value
-      select.dispatchEvent(new Event('change', { bubbles: true }))
-    },
-    { label, value },
-  )
+export async function setTextFont(family: string): Promise<void> {
+  await $('button[aria-label="Font family"]').click()
+  const option = $(`button[role="option"][aria-label="${family}"]`)
+  await browser.waitUntil(async () => option.isEnabled())
+  await option.click()
+}
+
+export async function setTextAlignment(value: 'start' | 'center' | 'end'): Promise<void> {
+  const label = { start: 'Align left', center: 'Align center', end: 'Align right' }[value]
+  await $(`button[aria-label="${label}"]`).click()
 }
 
 export async function applyBackground(input: {
@@ -153,24 +143,14 @@ export async function applyBackground(input: {
   readonly radius: number
 }): Promise<void> {
   await $('button[aria-label="Background"]').click()
-  await browser.execute((draft) => {
-    const root = document.querySelector<HTMLElement>('.cs-text-background-popover')
-    const color = root?.querySelector<HTMLInputElement>('input[type="color"]')
-    const numbers = root?.querySelectorAll<HTMLInputElement>('input[role="spinbutton"]')
-    if (
-      !root ||
-      !color ||
-      !numbers ||
-      numbers.length !== 2
-    ) throw new Error('Text background controls are missing')
-    color.value = draft.color
-    color.dispatchEvent(new Event('input', { bubbles: true }))
-    numbers[0]!.value = String(draft.padding)
-    numbers[0]!.dispatchEvent(new Event('input', { bubbles: true }))
-    numbers[1]!.value = String(draft.radius)
-    numbers[1]!.dispatchEvent(new Event('input', { bubbles: true }))
-  }, input)
-  await $('.cs-text-background-popover').$('button=Apply').click()
+  const panel = $('.cs-text-background-popover')
+  await panel.$('button[aria-label="Custom colour"]').click()
+  await setNumericInput(panel.$('.cs-color-hex input'), input.color)
+  await browser.keys('Enter')
+  const numbers = await panel.$$('input[role="spinbutton"]')
+  if (await numbers[0]!.isEnabled()) await setNumericInput(numbers[0]!, String(input.padding))
+  if (await numbers[1]!.isEnabled()) await setNumericInput(numbers[1]!, String(input.radius))
+  await panel.$('button=Apply').click()
 }
 
 export async function startTextAt(
@@ -178,6 +158,7 @@ export async function startTextAt(
   y: number,
 ) {
   await $('button[aria-label="Text"]').click()
+  await waitForStableCanvas()
   await $('.cs-canvas:not(.cs-canvas-overlay)').click({ x, y })
   const editor = $('[contenteditable="true"][aria-label="Text editor"]')
   await expect(editor).toExist()

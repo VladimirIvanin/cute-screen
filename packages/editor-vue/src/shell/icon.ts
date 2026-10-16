@@ -1,5 +1,14 @@
 import {
   IconBlendMode,
+  IconBold,
+  IconItalic,
+  IconStrikethrough,
+  IconList,
+  IconAlignLeft,
+  IconAlignCenter,
+  IconAlignRight,
+  IconBackground,
+
   IconArrowBackUp,
   IconArrowForwardUp,
   IconArrowUpRight,
@@ -49,6 +58,15 @@ import {
 /** The only product-chrome mapping from stable semantics to Tabler or project geometry. */
 const icons = {
   blendMode: IconBlendMode,
+  bold: IconBold,
+  italic: IconItalic,
+  strikethrough: IconStrikethrough,
+  list: IconList,
+  alignLeft: IconAlignLeft,
+  alignCenter: IconAlignCenter,
+  alignRight: IconAlignRight,
+  textBackground: IconBackground,
+
   arrow: IconArrowUpRight,
   camera: IconCamera,
   callout: IconStrokeDynamic,

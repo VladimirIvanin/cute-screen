@@ -1,3 +1,4 @@
+import { rebaseFreehandLayer } from './tools/freehand'
 import { isShapeKind } from './shapes'
 import type {
   ArrowCap,
@@ -66,10 +67,13 @@ export const DEFAULT_DRAWING_DEFAULTS: DrawingDefaults = Object.freeze({
     starInnerRatio: 0.45,
   }),
   pencil: Object.freeze({
-    brush: 'pen',
+    brush: 'stabilized',
+    strokeVersion: 2,
+    pressureMode: 'simulated',
+    brushSmoothing: Object.freeze({ stabilized: .65, brush: .35 }),
     width: 3,
     color: Object.freeze({ red: 0.898, green: 0.282, blue: 0.302, alpha: 1 }),
-    smoothing: 0.5,
+    smoothing: 0.65,
   }),
   marker: Object.freeze({
     width: 18,
@@ -191,7 +195,9 @@ function drawingStrokeWidth(
 ): number {
   if (input.tool === 'pencil' || input.tool === 'marker') {
     const values = input.tool === 'pencil' ? defaults.pencil : defaults.marker
-    return positiveWidth(values.width, input.tool === 'marker' ? 18 : 3) * (input.tool === 'pencil' && values.brush === 'brush' ? 1.5 : input.tool === 'pencil' && values.brush === 'pencil' ? 0.65 : 1)
+    const width = positiveWidth(values.width, input.tool === 'marker' ? 18 : 3)
+    if (input.tool !== 'pencil' || values.strokeVersion === 2) return width
+    return width * (values.brush === 'brush' ? 1.5 : values.brush === 'pencil' ? .65 : 1)
   }
   const values = input.tool === 'arrow' ? defaults.arrow : defaults.shape
   const strokeValue = values.stroke instanceof Object ? (values.stroke as JsonObject).width : undefined
@@ -308,11 +314,15 @@ function createFreehandDrawing(
   common: ReturnType<typeof commonDrawingLayer>,
 ): LayerNode {
   const values = input.tool === 'pencil' ? defaults.pencil : defaults.marker
-  return Object.freeze({
+  const { brushSmoothing: _memories, layerOpacity: _opacity, blendMode: _blend, ...style } = values
+  void _memories
+  void _opacity
+  void _blend
+  const layer = {
     ...common,
     kind: input.tool,
     payload: {
-      ...values,
+      ...style,
       points: samples.map((point) => ({
         x: point.x - geometry.x,
         y: point.y - geometry.y,
@@ -322,7 +332,8 @@ function createFreehandDrawing(
               : 0.5,
       })),
     },
-  }) as LayerNode
+  } as LayerNode
+  return Object.freeze(layer.kind === 'pencil' && layer.payload.strokeVersion === 2 ? rebaseFreehandLayer(layer) : layer)
 }
 
 /** Builds one current drawing layer; callers only commit it on pointer-up. */

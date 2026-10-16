@@ -1,3 +1,4 @@
+import { mount } from '@vue/test-utils'
 import {
   fireEvent,
   render,
@@ -222,6 +223,7 @@ describe('M08 crop interaction', () => {
 
     expect(emitted().documentCommand).toBeUndefined()
     await fireEvent.keyDown(window, { key: 'Enter' })
+    expect(emitted().selectTool).toEqual([['select']])
     expect(emitted().documentCommand).toEqual([
       [
         {
@@ -231,6 +233,37 @@ describe('M08 crop interaction', () => {
         },
       ],
     ])
+  })
+
+  it('applies through the exposed button port and cancels a reset without replacing the committed crop', async () => {
+    const crop = { x: 20, y: 10, width: 60, height: 40 }
+    const view = mount(CanvasViewport, {
+      props: {
+        documentState: { kind: 'ready', title: 'M08', dimensions: '120 × 80' },
+        activeTool: 'crop',
+        canvas: { width: 120, height: 80 },
+        document: documentFixture(crop),
+        zoom: 100,
+        fitMode: false,
+        t: (key: string) => key,
+      } as never,
+    })
+    view.vm.setCropPresetValue('1:1')
+    view.vm.applyCropDraft()
+    expect(view.emitted('documentCommand')).toEqual([[{
+      type: 'setCrop', before: crop, after: { x: 30, y: 10, width: 40, height: 40 },
+    }]])
+    expect(view.emitted('selectTool')).toEqual([['select']])
+    const committed = { x: 30, y: 10, width: 40, height: 40 }
+    await view.setProps({ activeTool: 'select', document: documentFixture(committed) })
+    expect(view.find('.cs-canvas-surface').attributes('style')).toContain('width: 40px')
+    await view.setProps({ activeTool: 'crop' })
+    view.vm.resetCropDraft()
+    view.vm.cancelCropDraft()
+    expect(view.emitted('documentCommand')).toHaveLength(1)
+    await view.setProps({ activeTool: 'select' })
+    expect(view.find('.cs-canvas-surface').attributes('style')).toContain('width: 40px')
+    view.unmount()
   })
 
   it('reopens the committed crop, nudges it, resets it and cancels without a command', async () => {

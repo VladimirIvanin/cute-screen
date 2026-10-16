@@ -1,3 +1,4 @@
+import { expectCommittedCrop } from '../crop-result'
 import {
   $,
   browser,
@@ -30,7 +31,7 @@ describe('M08 crop and precision acceptance in browser mode', () => {
       width: 300,
       height: 300,
     })
-    await $('button[aria-label="Select"]').click()
+    await expectCommittedCrop(300, 300)
     const croppedSurface = await browser.execute(() => {
       const scene = document.querySelector<HTMLCanvasElement>('.cs-canvas:not(.cs-canvas-overlay)')
       const surface = document.querySelector<HTMLElement>('.cs-canvas-surface')
