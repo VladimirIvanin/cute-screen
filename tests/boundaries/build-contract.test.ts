@@ -14,6 +14,19 @@ interface PackageManifest {
 }
 
 describe('Tauri build boundary', () => {
+  it('aligns direct Cargo builds with the macOS bundle deployment baseline', async () => {
+    const root = process.cwd()
+    const config = JSON.parse(await readFile(path.join(root, 'src-tauri', 'tauri.conf.json'), 'utf8')) as {
+      bundle: { macOS: { minimumSystemVersion: string } }
+    }
+    const cargoConfig = await readFile(path.join(root, '.cargo', 'config.toml'), 'utf8')
+    const deploymentTarget = cargoConfig.match(/^MACOSX_DEPLOYMENT_TARGET\s*=\s*"([\d.]+)"\s*$/m)?.[1]
+
+    expect(cargoConfig).toMatch(/^\[env\]$/m)
+    expect(deploymentTarget).toBe('12.0')
+    expect(deploymentTarget).toBe(config.bundle.macOS.minimumSystemVersion)
+  })
+
   it('keeps shipped chrome CSS parseable by the oldest target WebView', async () => {
     const cssSources = await Promise.all(
       [

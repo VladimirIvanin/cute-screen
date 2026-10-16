@@ -5,6 +5,7 @@ import {
   rm,
   writeFile,
 } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import {
   describe,
@@ -15,7 +16,7 @@ import { cacheDownloadedEdgeDriver } from '../../scripts/tauri-driver-cache.mjs'
 
 describe('Windows native driver cache', () => {
   it('preserves a completed download for the next isolated WDIO process', async () => {
-    const root = await mkdtemp(path.resolve('artifacts/driver-cache-contract-'))
+    const root = await mkdtemp(path.join(tmpdir(), 'cute-screen-driver-cache-contract-'))
     try {
       const downloads = path.join(root, 'runtime', 'msedgedriver')
       const completed = path.join(downloads, '155-0123456789abcdef')

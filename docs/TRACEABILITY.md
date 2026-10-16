@@ -1,5 +1,22 @@
 # Трассируемость требований
 
+## Deployment target прямых Cargo-сборок macOS (2026-10-16)
+
+`REQ-REL-002`, `REQ-CAP-015`: прямые `cargo test`/`cargo check` используют
+macOS 12.0 из ADR-038, как и Tauri bundle. `.cargo/config.toml` задаёт
+`MACOSX_DEPLOYMENT_TARGET`, чтобы cc-rs не выбирал версию host SDK 15.5
+и не отклонял legacy CoreGraphics bridge. Boundary regression сверяет baseline
+с `bundle.macOS.minimumSystemVersion`. Native Intel/ARM compile и capture
+smoke требуют macOS; локальный Linux boundary test их не заменяет.
+
+## Boundary gate из чистого checkout (2026-10-16)
+
+`REQ-REL-001/002/003`: `tauri-driver-cache.test.ts` должен проверять сохранение
+завершённой загрузки без предварительного создания `artifacts`. Временный
+каталог создаётся в системном temp и удаляется в `finally`. Проверка:
+изолированный запуск теста без `artifacts`, затем `pnpm test:boundaries`.
+Фактические команды и результаты — TESTING.md.
+
 ## Единое числовое поле (2026-10-16)
 
 `REQ-UI-001/002/003/004/006/007`, `REQ-EDT-015/016`: общий NumericControl

@@ -1,5 +1,15 @@
 # CI-сборки и проверка версии через GitHub
 
+## Deployment target macOS
+
+Baseline macOS 12.0 из ADR-038 задан и в `bundle.macOS.minimumSystemVersion`,
+и в `.cargo/config.toml` через `MACOSX_DEPLOYMENT_TARGET`. Cargo-конфигурация
+нужна для прямых `cargo test`/`cargo check` в CI: они не читают Tauri bundle
+settings, а cc-rs без target может выбрать macOS 15.5 и отклонить
+`CGWindowListCreateImage` как obsoleted. Явное значение переменной окружения
+сохраняет приоритет над default Cargo. Это настройка сборки; она не подтверждает
+runtime capture на новых macOS и не реализует ScreenCaptureKit routing из ADR-038.
+
 ## Локальная real-WebView проверка Windows
 
 `pnpm install --frozen-lockfile` применяет зафиксированные patches native-core

@@ -1,5 +1,13 @@
 # Платформенная матрица
 
+## Прямые Cargo-сборки macOS (2026-10-16)
+
+`.cargo/config.toml` задаёт baseline 12.0 для прямых Cargo-команд, согласованный
+с Tauri bundle и ADR-038. Boundary regression проверяет совпадение настроек.
+Ошибка cc-rs при host target 15.5 исправлена конфигурацией; Intel/ARM native
+compile с Xcode 16.4 и runtime capture здесь не проверены: текущий host — Linux.
+Поддержка ScreenCaptureKit этим исправлением не подтверждается.
+
 ## Плотность подписи линейки (2026-10-16, ADR-058)
 
 Windows x64 / Chrome 155.0.8059.79: native browser pointer, DPR 1/2,

@@ -1,0 +1,4 @@
+[env]
+# Direct Cargo commands must share the Tauri bundle's macOS 12.0 baseline.
+# Otherwise cc-rs can target the host OS and reject legacy CoreGraphics APIs on 15+.
+MACOSX_DEPLOYMENT_TARGET = "12.0"
