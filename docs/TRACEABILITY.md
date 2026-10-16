@@ -1,5 +1,16 @@
 # Трассируемость требований
 
+## Security audit зависимостей Vue (2026-10-16)
+
+`REQ-REL-001/002/003/005`: production dependency graph должен проходить
+`pnpm audit:security` без high/critical advisories. Для GHSA-g2v6-rqmx-r4w6
+Vue и compiler-sfc обновляются согласованно до 3.5.42 во всех workspace manifests;
+для GHSA-68fv-2mgg-jv7q lockfile фиксирует source-map-js 1.2.2.
+Проверка: frozen-lockfile install, security/license audit, `pnpm check`,
+`pnpm test` и renderer goldens — passed на Linux x86_64: unit 733/733,
+render 20/20, boundaries 43/43; high/critical отсутствуют. Оставшаяся low KaTeX
+и фактические команды/логи — TESTING.md.
+
 ## Фонарь: создание и перемещение в Quick/editor (2026-10-16)
 
 `REQ-TOL-009`, `REQ-EDT-005/006`, `REQ-OUT-003`: затемнение и прозрачная

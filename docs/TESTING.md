@@ -1,5 +1,37 @@
 # Стратегия тестирования
 
+## Security audit Vue и source-map-js (2026-10-16)
+
+Ubuntu 24.04.5 x86_64, Node 22.23.1, pnpm 10.33.2; baseline commit
+`de5e7d0d9de558f71442425bdf83b1d00b0867c1`, логи —
+`artifacts/security-deps-20261016/`.
+
+До обновления `pnpm audit:security` воспроизвёл exit 1: две high и одна low.
+Vue и compiler-sfc обновлены с 3.5.41 до 3.5.42 во всех workspace manifests,
+source-map-js — с 1.2.1 до 1.2.2 во всех lockfile paths. Advisories:
+[Vue SSR XSS](https://github.com/advisories/GHSA-g2v6-rqmx-r4w6) и
+[source-map-js DoS](https://github.com/advisories/GHSA-68fv-2mgg-jv7q).
+Команды обновления: `pnpm update -r vue@3.5.42 @vue/compiler-sfc@3.5.42`,
+затем `pnpm update -r source-map-js --depth Infinity`.
+
+- `pnpm install --frozen-lockfile` — exit 0 (`install-frozen.log`).
+- `pnpm audit:security` — exit 0: high/critical отсутствуют (`audit.log`).
+  `pnpm audit --prod --json` — exit 1 из-за оставшейся low в KaTeX 0.16.22,
+  GHSA-238p-pmpm-9mq7 (`audit.json`). Порог CI high сохранён.
+- `pnpm audit:licenses` — exit 0 (`licenses.log`).
+- `pnpm test` — 101 files / 733 tests passed (`unit.log`).
+- `pnpm test:render` — 5 files / 20 tests passed, goldens не менялись (`render.log`).
+- `pnpm check` — exit 0 (`check.log`): lint (60 warnings, 0 errors),
+  TypeScript/package builds, format/docs, boundaries 43/43, generated IPC,
+  frontend build, Rust fmt и все clippy configurations. Сохранились
+  предупреждения CanvasKit browser externalization и bundle >500 kB.
+- `pnpm format` и `pnpm format:check` — exit 0 (`format-final.log`,
+  `format-check-final.log`); финальный `pnpm audit:security` — exit 0
+  (`audit-final.log`).
+
+Native capture, platform support и acceptance статусы этим dependency update
+не переобъявляются проверенными; real-WebView и packaged build smoke не выполнялись.
+
 ## Фонарь: устаревшие dist и live preview (2026-10-16)
 
 Ubuntu 24.04.5 x86_64, Node 22.23.1, pnpm 10.33.2; evidence:
