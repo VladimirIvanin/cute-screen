@@ -367,3 +367,17 @@ describe('intrinsic layer resize', () => {
     expect(resizedCensor.payload.effect).toBe(censor.payload.effect)
   })
 })
+
+it('uses supplied rich-text height metrics for width resize and undo', () => {
+  const before = createTextLayer({ id: '019c1f62-058e-7000-8000-000000000009', text: 'Широкий текст', origin: { x: 10, y: 20 } })!
+  const after = resizeLayerGeometry(before, 'e', { x: 90, y: 20 }, {
+    textHeight: (content, width) => {
+      expect(content.text).toBe(before.payload.content.text)
+      expect(width).toBe(80)
+      return 150
+    },
+  })
+  expect(after.localBounds).toEqual({ x: 0, y: 0, width: 80, height: 150 })
+  const command = { type: 'updateLayer' as const, before, after }
+  expect(revertEditorCommand(applyEditorCommand(document([before]), command), command).layers).toEqual([before])
+})

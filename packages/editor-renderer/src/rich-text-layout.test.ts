@@ -185,3 +185,29 @@ describe('renderer-neutral rich text layout', () => {
     expect(shallowInk.lines[0]?.baseline).toBe(38.5)
   })
 })
+
+it('measures shaped fragments rather than summing isolated character widths', () => {
+  const node = textNode({
+    text: 'AVAV', width: 17,
+    runs: [{ ...textNode().runs[0]!, end: 4 }],
+    paragraphs: [{ start: 0, end: 4, alignment: 'end', listKind: 'none' }],
+  })
+  const shaped = (text: string) => text.length * 10 - (text.match(/AV/gu)?.length ?? 0) * 4
+  const layout = layoutRichText(node, shaped)
+  expect(layout.lines.map((line) => line.text)).toEqual(['AV', 'AV'])
+  expect(layout.lines[0]?.width).toBe(16)
+  expect(layout.lines[0]?.x).toBe(11)
+  expect(layout.lines[0]?.fragments[0]?.width).toBe(16)
+})
+
+it('emergency wraps whole graphemes, preserving UTF-16 source offsets', () => {
+  const text = 'и\u0306👩‍💻и\u0306👩‍💻'
+  const node = textNode({
+    text, width: 10,
+    runs: [{ ...textNode().runs[0]!, end: text.length }],
+    paragraphs: [{ start: 0, end: text.length, alignment: 'start', listKind: 'none' }],
+  })
+  const layout = layoutRichText(node, (value) => [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(value)].length * 10)
+  expect(layout.lines.map((line) => line.text)).toEqual(['и\u0306', '👩‍💻', 'и\u0306', '👩‍💻'])
+  expect(layout.lines.map((line) => [line.start, line.end])).toEqual([[0, 2], [2, 7], [7, 9], [9, 14]])
+})

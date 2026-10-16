@@ -1,3 +1,4 @@
+import { measuredTextCommand } from '../../text-layout'
 import {
   computed,
   ref,
@@ -66,7 +67,7 @@ export function createSelectionActions(context: SelectionContext) {
       context.error.value = text('No compatible style changes', 'Нет совместимых изменений стиля')
       return
     }
-    execute([command])
+    execute([measuredTextCommand(command)])
     if (layers.every((layer) => layer.kind === layers[0]?.kind) && layers[0])
       context.rememberedStyles.value = {
         ...context.rememberedStyles.value,

@@ -22,6 +22,8 @@ export type BoundsResizeHandle = (typeof BOUNDS_RESIZE_HANDLES)[number]
 export type IntrinsicResizeHandle = BoundsResizeHandle | 'start' | 'end'
 export type LayerResizeCapability = 'imageTransform' | 'bounds' | 'points' | 'textWidth' | 'loupe' | 'ruler' | 'semantic' | 'none'
 export interface ResizeLayerGeometryOptions {
+  /** Host font metrics; remains DOM-free and is never persisted. */
+  readonly textHeight?: (content: RichTextContent, width: number) => number
   readonly rulerBounds?: Rect
   readonly snapAngleIncrementDegrees?: number | undefined
   readonly preserveAspect?: boolean
@@ -283,11 +285,15 @@ function resizeText(
     readonly kind: 'text'
   }>,
   requested: Rect,
+  options: ResizeLayerGeometryOptions,
 ): LayerNode {
+  const height = options.textHeight?.(layer.payload.content, requested.width) ??
+    estimatedTextHeight(layer.payload.content, requested.width)
+  if (!Number.isFinite(height) || height <= 0) throw new RangeError('text height must be positive and finite')
   const bounds = Object.freeze({
     ...requested,
     y: layer.localBounds.y,
-    height: estimatedTextHeight(layer.payload.content, requested.width),
+    height,
   })
   return Object.freeze({
     ...layer,
@@ -424,7 +430,7 @@ export function resizeLayerGeometry(
   const local = localPoint(layer, point)
   const requested = resizedBounds(layer.localBounds, handle, local, options)
   if (layer.kind === 'text')
-    return resizeText(layer, requested)
+    return resizeText(layer, requested, options)
   if (layer.kind === 'emoji') {
     return Object.freeze({
       ...layer,

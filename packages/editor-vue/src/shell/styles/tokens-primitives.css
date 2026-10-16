@@ -413,8 +413,14 @@ button:focus-visible {
   background: transparent;
   caret-color: currentColor;
   white-space: pre-wrap;
-  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
   font-family: Roboto, ui-sans-serif, system-ui, sans-serif;
+}
+/* The renderer supplies soft line boundaries; browser-specific word breakers
+   must not choose different lines from the exported document. */
+.cs-text-editor--measured {
+  white-space: pre;
+  overflow-wrap: normal;
 }
 .cs-text-editor [data-rich-text-paragraph] {
   position: relative;

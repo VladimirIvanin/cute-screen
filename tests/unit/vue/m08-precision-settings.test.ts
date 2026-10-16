@@ -57,12 +57,10 @@ describe('M08 shell lifecycle and contextual settings', () => {
 
     await fireEvent.click(screen.getByRole('button', { name: 'Hide data' }))
     const toolbar = view.container.querySelector('.cs-context-toolbar') as HTMLElement
-    expect(within(toolbar).getByText('Effect')).toBeInTheDocument()
-    expect(within(toolbar).getByText('Region')).toBeInTheDocument()
-    const effect = within(toolbar).getByRole('combobox', { name: 'Effect' })
-    await fireEvent.click(effect)
-    for (const option of ['Pixelate', 'Blur', 'Solid']) {
-      expect(await screen.findByRole('option', { name: option })).toBeInTheDocument()
+    expect(within(toolbar).getByRole('group', { name: 'Effect' })).toBeInTheDocument()
+    expect(within(toolbar).getByRole('button', { name: 'Region shape' })).toBeInTheDocument()
+    for (const option of ['Pixelate', 'Blur', 'Solid fill']) {
+      expect(within(toolbar).getByRole('button', { name: option })).toBeInTheDocument()
     }
     await fireEvent.pointerDown(document.body)
     await fireEvent.click(screen.getByRole('button', { name: 'Show layers' }))
@@ -92,7 +90,7 @@ describe('M08 shell lifecycle and contextual settings', () => {
   })
 
   it.each(([
-    ['censor', 'Hide data', 'Effect', 'Blur'],
+    ['censor', 'Hide data', 'Blur', 'Blur'],
     ['spotlight', 'Spotlight', 'Shape', 'Diamond'],
     ['ruler', 'Ruler', 'Thickness', ''],
     ['loupe', 'Loupe', 'Shape', 'Rectangle'],
@@ -125,7 +123,7 @@ describe('M08 shell lifecycle and contextual settings', () => {
       expect(useEditorShellStore(pinia).selectedLayerIds).toEqual([layer.id])
       execute.mockClear()
 
-      const role = kind === 'loupe' ? 'button' : kind === 'ruler' ? 'slider' : 'combobox'
+      const role = kind === 'loupe' || kind === 'censor' ? 'button' : kind === 'ruler' ? 'slider' : 'combobox'
       await within(view.container.querySelector('.cs-selection-floating-toolbar') as HTMLElement).findByRole(role, {
         name: controlLabel,
       })
@@ -159,7 +157,7 @@ describe('M08 shell lifecycle and contextual settings', () => {
       await fireEvent.keyDown(probe, { key: 'ArrowRight' })
       await fireEvent.keyDown(probe, { key: 'Enter' })
       await fireEvent.click(probe)
-      if (kind === 'loupe') expect(probe).toBeDisabled()
+      if (kind === 'loupe' || kind === 'censor') expect(probe).toBeDisabled()
       else expect(probe).toHaveAttribute('tabindex', '-1')
       expect(execute).not.toHaveBeenCalled()
       expect(session.snapshot.core.document).toEqual(before)
@@ -175,9 +173,12 @@ describe('M08 shell lifecycle and contextual settings', () => {
         expect(defaultControl).toHaveAttribute('aria-valuenow', '2')
       } else if (kind === 'loupe') {
         expect(defaultControl).toHaveAttribute('title', 'Shape: Circle')
+      } else if (kind === 'censor') {
+        expect(defaultControl).toHaveAttribute('aria-pressed', 'false')
+        expect(within(toolbar).getByRole('button', { name: 'Pixelate' })).toHaveAttribute('aria-pressed', 'true')
       } else {
         expect(defaultControl).toHaveTextContent(
-          kind === 'censor' ? 'Pixelate' : kind === 'spotlight' ? 'Rectangle' : 'Circle',
+          kind === 'spotlight' ? 'Rectangle' : 'Circle',
         )
       }
 
@@ -195,7 +196,7 @@ describe('M08 shell lifecycle and contextual settings', () => {
         await fireEvent.keyUp(enabledControl, { key: 'ArrowRight' })
       } else {
         await fireEvent.click(enabledControl)
-        await fireEvent.click(await screen.findByRole(kind === 'loupe' ? 'button' : 'option', { name: optionLabel }))
+        if (kind !== 'censor') await fireEvent.click(await screen.findByRole(kind === 'loupe' ? 'button' : 'option', { name: optionLabel }))
       }
       expect(execute).toHaveBeenCalledTimes(1)
       expect(session.snapshot.core.document.layers[0]).toMatchObject(
@@ -230,8 +231,7 @@ describe('M08 shell lifecycle and contextual settings', () => {
     })
     const execute = vi.spyOn(session, 'execute')
     await fireEvent.click(screen.getByRole('button', { name: 'Hide data' }))
-    await fireEvent.click(screen.getByRole('combobox', { name: 'Effect' }))
-    await fireEvent.click(await screen.findByRole('option', { name: 'Blur' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Blur' }))
     expect(execute).not.toHaveBeenCalled()
 
     const scene = screen.getByLabelText('Scene canvas') as HTMLCanvasElement

@@ -19,7 +19,7 @@ export function layoutRichText(
   const width = node.wrap === 'fixedWidth' ? Math.min(node.width, node.fixedWidth ?? node.width) : node.width
   const pending = buildPendingLines(node, measure, width)
   const metrics = buildLineMetrics(node, pending)
-  const lines = pending.map((line, index) => layoutPendingLine(node, line, index, metrics))
+  const lines = pending.map((line, index) => layoutPendingLine(node, line, index, metrics, measure))
   return Object.freeze({
     width,
     height: metrics.totalHeight,

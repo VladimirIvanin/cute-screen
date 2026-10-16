@@ -89,6 +89,12 @@ const scenarios = [
     fakeCapture: true,
   },
   {
+    id: 'censor-toolbar',
+    spec: 'tests/e2e/specs/tauri-censor-toolbar.e2e.ts',
+    harnessQuery: '?m04=1&m08=1',
+    fakeCapture: true,
+  },
+  {
     id: 'shape-defaults-placement',
     spec: 'tests/e2e/specs/tauri-shape-defaults-placement.e2e.ts',
     harnessQuery: '?m04=1&m08=1',

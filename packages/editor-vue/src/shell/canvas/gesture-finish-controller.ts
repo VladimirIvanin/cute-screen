@@ -1,3 +1,4 @@
+import { measuredTextHeight } from '../../text-layout'
 import {
   applyCropSession,
   createDrawingLayer,
@@ -258,6 +259,7 @@ function commitIntrinsicResize(
   }
   try {
     const after = resizeLayerGeometry(gesture.initial, gesture.handle, gesture.current, {
+      textHeight: measuredTextHeight,
       preserveAspect: gesture.preserveAspect,
       snapAngleIncrementDegrees: gesture.snapAngleIncrementDegrees,
       fromCenter: gesture.centerResize,

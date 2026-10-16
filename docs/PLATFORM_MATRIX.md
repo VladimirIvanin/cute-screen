@@ -1,5 +1,25 @@
 # Платформенная матрица
 
+## Геометрия текста и переносы (2026-10-16, ADR-062)
+
+Ubuntu 24.04.5 LTS x86_64/X11, Linux 6.8.0-142, Chrome 154.0.8037.57:
+новый capped input, unbroken Cyrillic, 12 loaded font faces, style geometry,
+manual width >480 px, reflow/undo и reopen проверяются production browser
+flows. Background popup — 640/1024/1440; toolbar — обе темы/RU/EN; большой
+canvas — 2560×1440. Сохранены screenshots и decoded PNG renderer goldens.
+
+Real Tauri/WebKitGTK 605.1.15 с embedded driver: toolbar mount прошёл, native
+canvas gesture не создал contenteditable. `tauri-driver` и `WebKitWebDriver`
+отсутствуют в PATH; native editing не подтверждено. Windows/macOS/Wayland для
+этого follow-up не запускались. Фактические результаты — TESTING.md.
+
+## Курсор номерных меток (2026-10-16)
+
+`REQ-TOL-006`: Linux x86_64 / Chrome 154.0.8037.57 — browser E2E 1/1 passed
+для выбора, hover, временного pan и возврата crosshair. Shared canvas logic
+используется также в Quick; native WebView, Windows/macOS и Wayland этим
+прогоном не подтверждены. Команды и ограничения — TESTING.md.
+
 ## Панель текста и 12 fonts (2026-10-16, ADR-061)
 
 Ubuntu 24.04.5 x86_64/X11, Chrome 154.0.8037.57: RU/EN × dark/light ×
@@ -695,3 +715,13 @@ WebKitGTK 2.52.6: три кисти, pointer creation, Cancel/Undo/Redo и setti
 подтверждены browser screenshots. Стили pen pressure/simulated покрыты core и
 renderer; физический графический планшет не проверялся. Windows/WebView2 и
 macOS/WKWebView в этом изменении не запускались; новых supported claims нет.
+
+## Панель скрытия данных (2026-10-16)
+
+Linux x86_64 / Chrome 154: RU/EN × light/dark × DPR 1/2 при 1024×700 и
+1440×900; presets, numeric cancel/commit, solid colour и undo/redo.
+WebKitGTK 605.1.15: production Capture → Quick → Editor, настройки и возврат
+в Select — 1/1 с embedded driver и fake capture. External provider не создал
+сессию до test body. Native pointer-жесты, физический capture, WebView2/WKWebView
+этим UI-прогоном не подтверждаются. Document v7, IPC и capture capabilities
+не меняются. Evidence и команды — TESTING.md, `artifacts/censor-toolbar/`.

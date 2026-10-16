@@ -9,7 +9,6 @@ import {
   m08VersionToken,
   recentColourHex,
   openM08,
-  chooseOption,
   drawPrecisionTool,
 } from './browser-m08-test-kit'
 
@@ -28,16 +27,14 @@ describe('M08 crop and precision acceptance in browser mode', () => {
     await row.$('button[aria-label="Lock layer"]').click()
     await browser.waitUntil(async () => (await m08Snapshot()).document.layers.at(-1)?.locked === true)
 
-    const effect = $('[role="combobox"][aria-label="Effect"]')
-    const blockSize = $('[role="slider"][aria-label="Block size"]')
-    await expect(effect).toHaveAttribute('aria-disabled', 'true')
-    await expect(blockSize).toHaveAttribute('aria-disabled', 'true')
+    const effect = $('.cs-censor-toolbar button[aria-label="Blur"]')
+    const blockSize = $('.cs-censor-toolbar button[aria-label="Pixel size"]')
+    await expect(effect).toBeDisabled()
+    await expect(blockSize).toBeDisabled()
     const before = await m08Snapshot()
     const versionBefore = await m08VersionToken()
     const disabledFocusState = await browser.execute(() => {
-      const target = [...document.querySelectorAll<HTMLElement>('[role="combobox"]')].find(
-        (element) => element.getAttribute('aria-label') === 'Effect',
-      )
+      const target = document.querySelector<HTMLButtonElement>('.cs-censor-toolbar button[aria-label="Blur"]')
       if (!target) throw new Error('Effect control is missing')
       target.focus()
       target.dispatchEvent(
@@ -57,23 +54,24 @@ describe('M08 crop and precision acceptance in browser mode', () => {
       target.click()
       return {
         focused: document.activeElement === target,
-        tabIndex: target.getAttribute('tabindex'),
+        disabled: target.disabled,
       }
     })
-    expect(disabledFocusState.tabIndex).toBe('-1')
+    expect(disabledFocusState.disabled).toBe(true)
+    expect(disabledFocusState.focused).toBe(false)
     expect(await m08VersionToken()).toBe(versionBefore)
     expect((await m08Snapshot()).document).toEqual(before.document)
     expect(await recentColourHex()).toBeUndefined()
 
     await $(`[data-layer-id="${baseId}"] .cs-layer-select`).click()
     await $('button[aria-label="Hide data"]').click({ button: 'right' })
-    await expect(effect).toHaveText('Pixelate')
+    await expect($('.cs-censor-toolbar button[aria-label="Pixelate"]')).toHaveAttribute('aria-pressed', 'true')
     await browser.keys('Escape')
     await row.$('.cs-layer-select').click()
     await row.$('button[aria-label="Unlock layer"]').click()
     await browser.waitUntil(async () => (await m08Snapshot()).document.layers.at(-1)?.locked === false)
     const versionAfterUnlock = await m08VersionToken()
-    await chooseOption('Effect', 'Blur')
+    await effect.click()
     await browser.waitUntil(
       async () =>
         (await m08Snapshot()).document.layers.at(-1)?.payload.effect &&

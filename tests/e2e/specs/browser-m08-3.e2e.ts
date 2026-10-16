@@ -18,14 +18,14 @@ describe('M08 crop and precision acceptance in browser mode', () => {
     const tools = {
       en: [
         ['Crop', ['Preset', 'Reset', 'Apply', 'Cancel']],
-        ['Hide data', ['Region', 'Effect', 'Block size']],
+        ['Hide data', ['Region shape', 'Effect', 'Pixel size']],
         ['Spotlight', ['Aperture shape', 'Dimming', 'Edge softness', 'Apertures']],
         ['Ruler', ['Colour', 'Thickness', 'Label and units', 'Measurement and snapping']],
         ['Loupe', ['Zoom', 'Size', 'Shape', 'Border']],
       ],
       ru: [
         ['Обрезка', ['Пропорции', 'Сбросить', 'Применить', 'Отмена']],
-        ['Скрыть данные', ['Область', 'Эффект', 'Размер блока']],
+        ['Скрыть данные', ['Форма области', 'Эффект', 'Размер пикселей']],
         ['Фонарь', ['Форма области', 'Затемнение', 'Мягкость краёв', 'Области']],
         ['Линейка', ['Цвет', 'Толщина', 'Подпись и единицы', 'Измерение и привязка']],
         ['Лупа', ['Увеличение', 'Размер', 'Форма', 'Обводка']],
@@ -45,7 +45,7 @@ describe('M08 crop and precision acceptance in browser mode', () => {
           else if (await localizedMore.isExisting()) await localizedMore.click()
           const layout = await browser.execute((expectedLabels) => {
             const toolbar = document.querySelector<HTMLElement>('.cs-context-toolbar')
-            const controls = document.querySelector<HTMLElement>('.cs-tool-formatting-toolbar, .cs-context-controls')
+            const controls = document.querySelector<HTMLElement>('.cs-tool-formatting-toolbar, .cs-censor-toolbar, .cs-context-controls')
             if (!toolbar || !controls) throw new Error('M08 toolbar is missing')
             const toolbarBounds = toolbar.getBoundingClientRect()
             const text = toolbar.textContent ?? ''

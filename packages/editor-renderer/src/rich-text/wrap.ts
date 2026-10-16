@@ -20,7 +20,8 @@ export function styledCodePoints(
   const glyphs: StyledCodePoint[] = []
   let offset = start
   let runIndex = node.runs.findIndex((run) => run.end > start)
-  for (const text of node.text.slice(start, end)) {
+  const segments = new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(node.text.slice(start, end))
+  for (const { segment: text } of segments) {
     while (runIndex >= 0 && offset >= node.runs[runIndex]!.end) runIndex += 1
     const style = node.runs[runIndex]
     if (!style || offset < style.start) throw new RangeError(`No rich-text run covers UTF-16 offset ${offset}`)
@@ -54,8 +55,22 @@ export function styledCodePoints(
   return glyphs
 }
 
-export function glyphWidth(glyphs: readonly StyledCodePoint[]): number {
-  return glyphs.reduce((total, glyph) => total + glyph.width, 0)
+export function glyphWidth(
+  glyphs: readonly StyledCodePoint[],
+  measure?: RichTextMeasure,
+): number {
+  if (!measure) return glyphs.reduce((total, glyph) => total + glyph.width, 0)
+  let width = 0
+  let start = 0
+  while (start < glyphs.length) {
+    let end = start + 1
+    while (end < glyphs.length && sameStyle(glyphs[start]!.style, glyphs[end]!.style)) end += 1
+    const text = glyphs.slice(start, end).map((glyph) => glyph.text).join('')
+    const result = measure(text, glyphs[start]!.style)
+    width += typeof result === 'number' ? result : result.width
+    start = end
+  }
+  return width
 }
 
 export function trimTrailingWhitespace(glyphs: readonly StyledCodePoint[]): readonly StyledCodePoint[] {
@@ -74,10 +89,10 @@ export function wrapParagraph(
   glyphs: readonly StyledCodePoint[],
   maximumWidth: number,
   wrap: boolean,
+  measure?: RichTextMeasure,
 ): readonly (readonly StyledCodePoint[])[] {
   const lines: (readonly StyledCodePoint[])[] = []
   let pending: StyledCodePoint[] = []
-  let pendingWidth = 0
   let endedWithNewline = false
 
   const commit = (line: readonly StyledCodePoint[]): void => {
@@ -88,7 +103,6 @@ export function wrapParagraph(
     if (glyph.newline) {
       commit(pending)
       pending = []
-      pendingWidth = 0
       endedWithNewline = true
       continue
     }
@@ -96,10 +110,9 @@ export function wrapParagraph(
     if (
       !wrap ||
       pending.length === 0 ||
-      pendingWidth + glyph.width <= maximumWidth
+      glyphWidth([...pending, glyph], measure) <= maximumWidth
     ) {
       pending.push(glyph)
-      pendingWidth += glyph.width
       continue
     }
 
@@ -113,21 +126,17 @@ export function wrapParagraph(
     if (breakIndex >= 0) {
       commit(pending.slice(0, breakIndex))
       pending = [...trimLeadingWhitespace(pending.slice(breakIndex + 1))]
-      pendingWidth = glyphWidth(pending)
     } else {
       commit(pending)
       pending = []
-      pendingWidth = 0
     }
 
-    if (pending.length > 0 && pendingWidth + glyph.width > maximumWidth) {
+    if (pending.length > 0 && glyphWidth([...pending, glyph], measure) > maximumWidth) {
       commit(pending)
       pending = []
-      pendingWidth = 0
     }
     if (!glyph.whitespace || pending.length > 0) {
       pending.push(glyph)
-      pendingWidth += glyph.width
     }
   }
   if (

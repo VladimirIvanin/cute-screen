@@ -1,3 +1,8 @@
+import {
+  INITIAL_TEXT_MAX_WIDTH,
+  measuredTextLayer,
+} from '../../text-layout'
+import { loadTextFontFamily } from '../../text-fonts'
 import type {
   Ref,
   ShallowRef,
@@ -111,6 +116,7 @@ async function pasteNativeClipboard(context: ContentControllerContext): Promise<
     }
     if (!snapshot.text) return
     const defaults = context.textDefaults.value
+    await loadTextFontFamily(defaults.fontFamily)
     const layer = createTextLayer({
       id: crypto.randomUUID(),
       text: snapshot.text,
@@ -125,7 +131,7 @@ async function pasteNativeClipboard(context: ContentControllerContext): Promise<
       color: defaults.color,
       background: defaults.background,
     })
-    if (layer) context.addLayer(layer)
+    if (layer) context.addLayer(measuredTextLayer(layer, INITIAL_TEXT_MAX_WIDTH))
   } catch (error) {
     console.warn('cute-screen native clipboard paste failed', error)
   }

@@ -1,3 +1,4 @@
+import { measuredTextLayer } from '../../../text-layout'
 import type {
   Ref,
   ShallowRef,
@@ -179,14 +180,14 @@ function updatedTextLayer(
   background: TextBackground | null | undefined,
 ): TextLayer {
   if (layer.kind === 'text') {
-    return {
+    return measuredTextLayer({
       ...layer,
       payload: {
         ...layer.payload,
         content,
         ...(background === undefined ? {} : { background }),
       },
-    }
+    })
   }
   if (layer.kind === 'callout') {
     return {

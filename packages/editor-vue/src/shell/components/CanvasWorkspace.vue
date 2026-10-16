@@ -114,7 +114,11 @@ defineExpose({
                   ? 'crosshair'
                   : activeTool === 'hand'
                     ? 'grab'
-                    : !sampling && (activeTool === 'pencil' || activeTool === 'marker')
+                    : !sampling && (
+                      activeTool === 'pencil' ||
+                      activeTool === 'marker' ||
+                      activeTool === 'numberedMarker'
+                    )
                       ? 'crosshair'
                       : undefined,
             }"

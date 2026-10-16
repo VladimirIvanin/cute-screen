@@ -16,6 +16,7 @@ import {
 
 beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    measureText: (text: string) => ({ width: Array.from(text).length * 14.4 }),
     arc: vi.fn(),
     beginPath: vi.fn(),
     clearRect: vi.fn(),
@@ -94,7 +95,7 @@ describe('M05 CanvasViewport transforms', () => {
     await fireEvent.paste(editor, {
       clipboardData: { getData: () => 'Plain\ntext' },
     })
-    await fireEvent.blur(editor)
+    editor.blur()
     await vi.waitFor(() => expect(emitted().documentCommand).toHaveLength(1))
   })
 
@@ -336,4 +337,18 @@ describe('M05 CanvasViewport transforms', () => {
     expect(context.translate).toHaveBeenCalledWith(390, 195)
     expect(context.translate).not.toHaveBeenCalledWith(770, 380)
   })
+})
+
+it('keeps the draft when editor focus returns before the deferred blur commit', async () => {
+  const { getByLabelText, scene, emitted } = mountViewport('text')
+  await fireEvent.pointerDown(scene, { pointerId: 1, clientX: 30, clientY: 40 })
+  await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 30, clientY: 40 })
+  const editor = getByLabelText('Text editor') as HTMLDivElement
+  editor.textContent = 'Return to typing'
+  await fireEvent.input(editor)
+  editor.blur()
+  editor.focus()
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  expect(getByLabelText('Text editor')).toBe(editor)
+  expect(emitted().documentCommand).toBeUndefined()
 })

@@ -68,6 +68,11 @@ function createFontResolver(
   }
 }
 
+function scriptChunks(text: string): readonly string[] {
+  return requiresCyrillicCoverage(text)
+    ? text.match(/[\u0400-\u052f]+|[^\u0400-\u052f]+/gu) ?? [] : [text]
+}
+
 function drawTextLayout(
   canvasKit: CanvasKitApi,
   canvas: CanvasKitCanvas,
@@ -77,15 +82,22 @@ function drawTextLayout(
   fontForStyle: (style: RenderTextStyle, text: string) => CanvasKitFont,
 ): void {
   const layout = layoutRichText(node, (text, style) => {
-    const font = fontForStyle(style, text)
-    const ink = canvasKitInkBounds(font, text, style.fontSize)
-    const line = canvasKitLineMetrics(font, style.fontSize)
+    const metrics = scriptChunks(text).map((chunk) => {
+      const font = fontForStyle(style, chunk)
+      const ink = canvasKitInkBounds(font, chunk, style.fontSize)
+      const line = canvasKitLineMetrics(font, style.fontSize)
+      return {
+        width: canvasKitTextWidth(font, chunk, style.fontSize),
+        ascent: Math.max(0, -ink.top), descent: Math.max(0, ink.bottom),
+        lineAscent: line.ascent, lineDescent: line.descent,
+      }
+    })
     return {
-      width: canvasKitTextWidth(font, text, style.fontSize),
-      ascent: Math.max(0, -ink.top),
-      descent: Math.max(0, ink.bottom),
-      lineAscent: line.ascent,
-      lineDescent: line.descent,
+      width: metrics.reduce((sum, chunk) => sum + chunk.width, 0),
+      ascent: Math.max(0, ...metrics.map((chunk) => chunk.ascent)),
+      descent: Math.max(0, ...metrics.map((chunk) => chunk.descent)),
+      lineAscent: Math.max(0, ...metrics.map((chunk) => chunk.lineAscent)),
+      lineDescent: Math.max(0, ...metrics.map((chunk) => chunk.lineDescent)),
     }
   })
   for (const line of layout.lines) {
@@ -107,13 +119,12 @@ function drawTextLayout(
       fill.setBlendMode(blendMode(canvasKit, node.blendMode))
       // Fontsource script subsets are separate typefaces. A merged layout
       // fragment can contain both scripts (including Latin digits and spaces).
-      const chunks = requiresCyrillicCoverage(fragment.text)
-        ? fragment.text.match(/[\u0400-\u052f]+|[^\u0400-\u052f]+/gu) ?? [] : [fragment.text]
+      const chunks = scriptChunks(fragment.text)
       let x = fragment.x
       for (const chunk of chunks) {
         const font = fontForStyle(fragment, chunk)
         canvas.drawText!(chunk, x, fragment.baseline, fill, font)
-        for (const point of chunk) x += canvasKitTextWidth(font, point, fragment.fontSize)
+        x += canvasKitTextWidth(font, chunk, fragment.fontSize)
       }
     }
     for (const strike of line.strikes) {

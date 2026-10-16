@@ -215,7 +215,7 @@ export function createCanvasWorkspaceState() {
     editingText: ref<
       | {
         readonly origin: CanvasPoint
-        readonly width: number
+        width: number
         readonly fixedWidth: boolean
         readonly id: string
         readonly controller: RichTextEditorController

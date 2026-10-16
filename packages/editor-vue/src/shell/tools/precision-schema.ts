@@ -80,7 +80,7 @@ function censorSchema(
       {
         kind: 'select',
         id: 'censorRegion',
-        label: precisionText('Region', 'Область'),
+        label: precisionText('Region shape', 'Форма области'),
         value: layer?.payload.region.kind ?? defaults.censor.region,
         disabled: controlsDisabled,
         options: [
@@ -90,7 +90,7 @@ function censorSchema(
           },
           {
             value: 'freeform',
-            label: precisionText('Freeform', 'Произвольная'),
+            label: precisionText('Freeform outline', 'Свободный контур'),
           },
         ],
       },
@@ -103,14 +103,14 @@ function censorSchema(
         options: [
           {
             value: 'pixelate',
-            label: precisionText('Pixelate', 'Пикселизация'),
+            label: precisionText('Pixelate', 'Мозаика'),
           },
           {
             value: 'blur', label: precisionText('Blur', 'Размытие'),
           },
           {
             value: 'solid',
-            label: precisionText('Solid', 'Сплошной цвет'),
+            label: precisionText('Solid fill', 'Заливка'),
           },
         ],
       },
@@ -119,7 +119,7 @@ function censorSchema(
             {
               kind: 'range' as const,
               id: 'censorBlockSize',
-              label: precisionText('Block size', 'Размер блока'),
+              label: precisionText('Pixel size', 'Размер пикселей'),
               value: selectedEffect?.mode === 'pixelate'
                 ? (selectedEffect.blockSize ?? defaults.censor.blockSize)
                 : defaults.censor.blockSize,
@@ -146,7 +146,7 @@ function censorSchema(
                 {
                   kind: 'color' as const,
                   id: 'censorSolidColor',
-                  label: precisionText('Solid color', 'Сплошной цвет'),
+                  label: precisionText('Colour', 'Цвет'),
                   value: hexColor(selectedSolidColor),
                   disabled: controlsDisabled,
                   eyedropper: Boolean(activeDocument.value) && !controlsDisabled,

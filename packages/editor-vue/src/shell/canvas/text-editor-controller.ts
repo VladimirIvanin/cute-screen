@@ -25,6 +25,16 @@ import type {
   CanvasViewportProps,
   CanvasViewportEmit,
 } from './contracts'
+import {
+  INITIAL_TEXT_MAX_WIDTH,
+  layoutTextContent,
+  measuredTextLayer,
+} from '../../text-layout'
+import {
+  isBundledTextFont,
+  loadTextFont,
+  loadTextFontFamily,
+} from '../../text-fonts'
 import { isFloatingToolbarTarget } from './floating-toolbar-controller'
 import {
   DEFAULT_TEXT_TOOL,
@@ -92,7 +102,7 @@ export class TextEditorController {
     editingText.value = {
       id: input.existing?.id ?? crypto.randomUUID(),
       origin: input.origin,
-      width: input.width ?? bounds?.width ?? this.#defaultWidth(),
+      width: input.width ?? bounds?.width ?? defaults.fontSize,
       fixedWidth,
       controller: markRaw(
         new RichTextEditorController(
@@ -114,6 +124,11 @@ export class TextEditorController {
       ...(input.calloutStroke === undefined ? {} : { calloutStroke: input.calloutStroke }),
     }
     this.#context.emitEditing()
+    const editing = editingText.value
+    const families = new Set([defaults.fontFamily, ...(existingContent?.spans.map((span) => span.fontFamily) ?? [])])
+    void Promise.all([...families].map(loadTextFontFamily)).then(() => {
+      if (editingText.value === editing && !editing.controller.composing) this.renderProjection()
+    }).catch((error: unknown) => this.#fontError(error))
     void nextTick(() => this.#focus())
   }
 
@@ -133,12 +148,24 @@ export class TextEditorController {
     const editing = editingText.value
     if (!editor || !editing) return
     // Restoring the DOM range may focus contenteditable in Chromium/WebView2.
-    // Keep the rich-text bookmark and return focus to the numeric control immediately.
-    const numericFocus = document.activeElement instanceof HTMLElement &&
-      document.activeElement.closest('.cs-numeric-control') ? document.activeElement : undefined
-    renderRichTextProjection(editor, editing.controller.state, (props.zoom ?? 100) / 100)
+    // Keep the rich-text bookmark and restore the active toolbar control immediately.
+    const toolbarFocus = document.activeElement instanceof HTMLElement &&
+      isFloatingToolbarTarget(document.activeElement) ? document.activeElement : undefined
+    const state = editing.controller.state
+    const layout = editing.kind === 'text'
+      ? layoutTextContent(
+          state.content,
+          editing.existing || editing.fixedWidth ? Infinity : INITIAL_TEXT_MAX_WIDTH,
+          state.typingStyle.fontSize,
+        )
+      : undefined
+    if (layout) editing.width = layout.width
+    renderRichTextProjection(editor, state, (props.zoom ?? 100) / 100, layout)
+    // Update synchronously before restoring the caret to avoid scroll-into-view
+    // against the previous, wider DOM box.
+    editor.style.width = `${editing.width * ((props.zoom ?? 100) / 100)}px`
     restoreRichTextDomSelection(editor, editing.controller.state.selection)
-    numericFocus?.focus({ preventScroll: true })
+    toolbarFocus?.focus({ preventScroll: true })
     void nextTick(this.#context.updateToolbarLayout)
   }
 
@@ -195,10 +222,13 @@ export class TextEditorController {
   }
 
   blur(event: FocusEvent): void {
+    const editing = this.#context.editingText.value
+    const editor = this.#context.textEditor.value
     const movedIntoToolbar = this.#toolbarPointerDown || isFloatingToolbarTarget(event.relatedTarget)
     window.setTimeout(() => {
-      if (!this.#context.editingText.value) return
+      if (this.#context.editingText.value !== editing) return
       const active = document.activeElement
+      if (active === editor || editor?.contains(active)) return
       if (movedIntoToolbar || isFloatingToolbarTarget(active)) return
       this.commit()
     }, 0)
@@ -215,6 +245,7 @@ export class TextEditorController {
     const { editingText, floatingToolbarLayout, props, emit } = this.#context
     const editing = editingText.value
     if (!editing || editing.controller.composing) return
+    if (this.#waitForFonts(editing)) return
     editingText.value = undefined
     floatingToolbarLayout.value = undefined
     this.#context.emitEditing()
@@ -335,7 +366,7 @@ export class TextEditorController {
   }
 
   #defaultWidth(): number {
-    return Math.max(160, this.#context.props.canvas?.width ? this.#context.props.canvas.width / 3 : 160)
+    return INITIAL_TEXT_MAX_WIDTH
   }
 
   #initialContent(
@@ -418,11 +449,29 @@ export class TextEditorController {
       background: editing.background,
     })
     if (!draft) return null
-    return {
+    return measuredTextLayer({
       ...draft,
       ...(existing ? { id: existing.id, transform: existing.transform } : {}),
       payload: { ...draft.payload, content },
-    }
+    }, !existing && !editing.fixedWidth ? INITIAL_TEXT_MAX_WIDTH : Infinity)
+  }
+
+  #waitForFonts(editing: NonNullable<WorkspaceState['editingText']['value']>): boolean {
+    if (!document.fonts?.check) return false
+    const missing = [editing.controller.state.typingStyle, ...editing.controller.state.content.spans]
+      .filter((style) => isBundledTextFont(style.fontFamily) && !document.fonts.check(
+        `${style.italic ? 'italic' : 'normal'} ${style.weight} 20px "${style.fontFamily}"`, 'Aa Яя 123',
+      ))
+    if (!missing.length) return false
+    void Promise.all(missing.map((style) => loadTextFont(style.fontFamily, style.weight, style.italic)))
+      .then(() => {
+        if (this.#context.editingText.value === editing) this.commit()
+      }).catch((error: unknown) => this.#fontError(error))
+    return true
+  }
+
+  #fontError(error: unknown): void {
+    this.#context.emit('toolError', error instanceof Error ? error.message : 'Could not load the text font')
   }
 
   #createCallout(

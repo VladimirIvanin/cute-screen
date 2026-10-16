@@ -1,5 +1,25 @@
 # Стратегия тестирования
 
+## Курсор номерных меток (2026-10-16)
+
+`REQ-TOL-006`, `REQ-UI-005`: Linux x86_64, Chrome 154.0.8037.57,
+Node 22.23.1, pnpm 10.33.2. Команда
+`CUTE_SCREEN_BROWSER_E2E_PORT=5198 pnpm test:e2e:browser --spec tests/e2e/specs/browser-creation-cursors.e2e.ts`
+— 1/1 passed. Через production mount и pointer input проверены немедленный
+crosshair, hover над объектами, middle-pan и возврат креста для Pencil,
+Highlighter и Numbered marker; Hand/Select сохраняют свои курсоры.
+`pnpm format`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck` — exit 0
+(lint содержит существующие warnings). Логи — `artifacts/numbered-cursor/`.
+Screenshot `artifacts/browser-e2e/creation-cursors-numbered-marker-cursor.png`
+просмотрен: инструмент активен, панели видимы. Browser screenshot не содержит
+системный pointer; cursor проверен computed style. Интерактивная проверка
+выбора Numbered marker также вернула `crosshair`.
+
+Полный `browser-highlighter.e2e.ts` после успешной cursor matrix упал на
+preview/committed checksum Highlighter (`verifyHighlighter`, sceneChecksum);
+его успех не заявляется. Native WebView и другие платформы не запускались.
+Архитектурное решение и persisted document не менялись, новый ADR не требуется.
+
 ## Панель текста: curated fonts и palette (2026-10-16, ADR-061)
 
 Платформа: Ubuntu 24.04.5 LTS x86_64, Linux 6.8.0-142-generic, X11;
@@ -3793,3 +3813,129 @@ exit 0 (`docs.log`), `git diff --check` — exit 0. Повтор общего `p
 (`render-final.log`) — 23/24, тот же кириллический text-font failure.
 Кисти во всех этих прогонах прошли; незавершённые проверки текстовой задачи
 не считаются доказательством неработоспособности кистей и не объявляются passed.
+
+## Панель «Скрыть данные» (2026-10-16)
+
+`REQ-TOL-008`, `REQ-EDT-008/015/016/017`, `REQ-UI-006`. Linux x86_64,
+Node 22.23.1, pnpm 10.33.2; Chrome 154.0.8037.57; WebKitGTK 605.1.15.
+
+QA inventory: три видимых эффекта и их selected/mixed states; две формы с
+пояснениями; visual presets, нестандартное значение, точный ввод и slider;
+цвет/палитра/eyedropper routing; переключение меню, Escape и возврат фокуса;
+locked/read-only/empty/loading; defaults/configure/selection; atomic group
+update, draft cancel, undo/redo; доступность Select и Quick → Editor.
+Off-happy-path: mixed effects без параметра; отмена незавершённого ввода
+без изменения defaults/history; переход locked во время открытого меню.
+Функциональные checks — censor-toolbar Vue, существующие M08 и browser/native
+сценарии. Visual checks — полные подписи/миниатюры, отсутствие clipping и
+доступность controls в RU/EN × light/dark × DPR 1/2 × 1024×700/1440×900.
+
+Evidence: `artifacts/censor-toolbar/`, включая browser toolbar/preset screenshots
+и `native-quick.png`, `native-editor.png`. Начальный общий запуск unit/render
+совпадал с другими CPU-heavy jobs и дал timeouts; rich-text golden менялся в
+параллельной задаче. Повтор с ограниченным числом workers: `pnpm test --maxWorkers=2`
+— 108 files / 802 tests passed; `pnpm test:render --maxWorkers=1` — 7 files /
+24 tests passed, включая decoded precision PNG на 1×/2×.
+
+`CUTE_SCREEN_BROWSER_E2E_PORT=5203 pnpm test:e2e:browser --spec tests/e2e/specs/browser-m08-3.e2e.ts --spec tests/e2e/specs/browser-m08-5.e2e.ts`
+— 2/2.
+`CUTE_SCREEN_BROWSER_E2E_PORT=5205 pnpm test:e2e:browser --spec tests/e2e/specs/browser-censor-toolbar.e2e.ts`
+— финальные 5/5: вся visual matrix плюс lifecycle, Tab → Enter на пресете,
+точный ввод, cancel, undo/redo, solid colour и configure → Select. Скриншоты
+светлой/тёмной темы и native surfaces просмотрены; в тёмной теме исправлен
+контраст текста активного пресета.
+
+Focused Vue: четыре затронутых файла — 20/20; после исправления Enter и
+focus — `pnpm exec vitest run --project vue tests/unit/vue/censor-toolbar.test.ts --maxWorkers=1`
+8/8. Enter на preset обрабатывается локально до числового commit-handler,
+повторная native activation подавляется. UI icon boundary расширен ровно на
+два компонента параметрических previews, аналогично существующим previews
+стрелок/фигур; общие UI icons продолжают проходить через UiIcon.
+Финальные `pnpm format`, `pnpm format:check` и общий `pnpm check` — exit 0.
+Последний включает lint/typecheck, docs/format/boundaries, IPC и Rust fmt/clippy;
+исходные unrelated lint warnings остаются warnings, новых lint errors нет.
+
+`CUTE_SCREEN_E2E_SCENARIOS=censor-toolbar CUTE_SCREEN_E2E_DRIVER_PROVIDER=embedded pnpm test:e2e:tauri`
+— WebKitGTK 1/1, production Capture → Quick → Editor, preset/region menus и
+возврат в Select. Финальный повтор без override:
+`CUTE_SCREEN_E2E_SCENARIOS=censor-toolbar pnpm test:e2e:tauri` — exit 0, 1/1. Встроенный driver проверяет реальные WebViews с DOM input;
+это не доказательство физических PointerEvent-жестов. Попытка external provider
+не создала WebDriver session (`No browserName ... nor hostname or port found`),
+до test body. Сценарий использует штатный platform default: embedded на Linux,
+external на Windows. Физический capture и Windows/macOS этим прогоном не подтверждаются.
+
+Для controlled numeric inputs browser-сценарий использует существующий
+`setNumericInput` (Ctrl+A → typing). WebDriver clearElement/setValue вызывал
+промежуточный сброс поля и дописывал цифры к старому значению; это не использовалось
+как доказательство обычного пользовательского ввода.
+
+## Text sizing, wrapping and focus repair (2026-10-16, ADR-062)
+
+Platform: Ubuntu 24.04.5 LTS, x86_64, X11; Linux 6.8.0-142-generic;
+Node 22.23.1, pnpm 10.33.2; Chrome 154.0.8037.57. Research articles and upstream
+issues are linked in [TEXT_LAYOUT_RESEARCH.md](TEXT_LAYOUT_RESEARCH.md).
+No third-party editor implementation was copied. Concurrent Censor toolbar and
+numbered-marker cursor changes in the working tree were preserved.
+
+Red-first evidence in `artifacts/text-layout/`:
+
+- `red-renderer.log`: two failures exposed isolated-character width sums and
+  splitting combining/ZWJ graphemes.
+- `red-core.log`: resize ignored supplied real-font text-height metrics.
+- `red-focus.log`: deferred blur committed a draft after focus had returned.
+- `red-faces.log`: opening a non-Roboto document did not preload its B/I faces.
+
+The repair uses the shared renderer line layout for DOM soft breaks, real
+browser-font bounds on creation/style/clipboard paste and resize, an initial
+480 document-px cap, and unrestricted subsequent manual width. Soft breaks keep
+source whitespace and UTF-16 offsets. Existing autoSize mode is preserved.
+Cyrillic/Latin CanvasKit measurement now resolves the same subset chunks used
+for drawing. `styles.ts` was split into focused helpers; architecture budgets
+were not increased. The only updated golden is `rich-text-v7-canvas2d.png`:
+whole-fragment kerning changes subpixel alignment. Before/after PNGs were viewed
+(`rich-text-before.png`, `rich-text-after.png`); CanvasKit golden is unchanged.
+
+Verification commands and artifacts:
+
+- `pnpm format` — `format-final.log`; `pnpm check` — `check-final.log`, including
+  formatting, typecheck, architecture, IPC, Rust format and Clippy configurations.
+- `pnpm test --maxWorkers=2` — `unit-final.log`, 805/805. The final family-preload
+  regression also passed in `fonts-final.log` (12/12 focused tests).
+- `pnpm test:render --maxWorkers=1` — `render-final.log`, 24/24, including all
+  12 real Fontsource faces, Latin/Cyrillic, B/I and decoded Canvas2D/CanvasKit PNG.
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5185 pnpm test:e2e:browser --spec tests/e2e/specs/browser-text-layout.e2e.ts --spec tests/e2e/specs/browser-text-fonts.e2e.ts --spec tests/e2e/specs/browser-v7-rich-text-editing.e2e.ts --spec tests/e2e/specs/browser-v7-rich-text-toolbar.e2e.ts --spec tests/e2e/specs/browser-m08-2.e2e.ts`
+  — `browser-final.log`, 5/5 files, 12/12 scenarios. Covers long unbroken
+  Cyrillic, measured widths for all fonts, soft-line reopen, range formatting,
+  IME/paste, mixed container semantics, crop/width reflow, undo/redo, and
+  RU/EN × light/dark × 640/1024/1440 toolbar geometry. The new layout spec also
+  uses a 2560×1440 canvas and stretches beyond the initial 480 px.
+- Screenshots reviewed: `artifacts/browser-e2e/text-long-word.png`,
+  `text-manual-width.png`, `text-background-fit-{640,1024,1440}.png` and the
+  existing twelve theme/locale/width text-toolbar screenshots. Inline toolbar
+  now uses viewport bounds instead of shrinking to the width of a tiny image.
+- `pnpm audit:licenses` — `licenses.log`, permissive policy passed for 21
+  production packages. `pnpm audit:security` — `security.log`, exit 0 at the
+  configured high threshold; one low advisory remains. No dependencies changed.
+
+After the final document-family B/I preload change, the new four layout scenarios
+passed again (`browser-fonts-final.log`). The twelve-family roundtrip hit the
+30-second Mocha deadline while unit/typecheck/Clippy ran concurrently, without
+an assertion failure. An isolated stable-command rerun of
+`browser-text-fonts.e2e.ts` passed 2/2 in 18.6 seconds
+(`browser-fonts-isolated.log`). `pnpm check` completed successfully, including
+all 43 boundary tests; the final unit run passed 805/805. Existing lint warnings,
+jsdom canvas-not-implemented notices and bundle-size warnings remain diagnostic.
+
+Initial browser attempts captured a deferred-blur regression and toolbar width
+being constrained by a 100 px crop. They also saw HMR resets while concurrent
+workspace changes rewrote CanvasWorkspace; those attempts were not counted as
+passing evidence. Synthetic unit blur events were replaced with actual DOM
+`blur()` so focus state matches production.
+
+`XDG_RUNTIME_DIR=$PWD/artifacts/text-layout/runtime XDG_SESSION_ID=cutescreen-text-layout CUTE_SCREEN_E2E_SCENARIOS=v7-rich-text pnpm test:e2e:tauri`
+ran the actual Tauri test build with isolated runtime/activation state
+(`tauri.log`). WebKitGTK reported 605.1.15: toolbar mounted and did not scroll,
+but the embedded driver's canvas gesture did not create contenteditable (0/1).
+`tauri-driver` and `WebKitWebDriver` were absent from PATH. This is not native
+text-editing acceptance. Windows, macOS, Wayland, physical capture and cross-DPI
+runtime smoke were not run for this follow-up.

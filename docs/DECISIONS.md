@@ -1198,3 +1198,31 @@ IPC, EditorCommand и общий inline commit сохраняются.
 **Проверяемое основание:** component/browser проверки selection, keyboard,
 responsive geometry и undo; локальные реальные faces и decoded PNG, отдельно
 фиксируемые результаты real WebView и обеих renderer-веток в TESTING.md.
+
+## ADR-062 — Измеряемая геометрия текста и ограниченный ввод
+
+**Статус:** accepted; уточняет sizing/wrapping REQ-TOL-005, дополняет ADR-061.
+
+**Контекст:** DOM начинался с трети ширины canvas, persisted bounds считались
+как length × size × 0.6, а renderer измерял реальный font. Рамка расходилась
+с glyphs, длинное слово растягивало строку. Источники и UX-основание —
+[research](TEXT_LAYOUT_RESEARCH.md).
+
+**Решение:** новый point text растёт от одного em до 480 document px, затем
+переносится. Ручной width resize сохраняет fixedWidth и может превысить cap.
+Короткий текст сохраняет autoSize, перенесённый — существующий fixedWidth v7.
+Действующие autoSize документы не получают новый cap при открытии. Browser
+Canvas2D измеряет реальные загруженные faces; общая renderer layout определяет
+bounds и soft line boundaries для inline projection, commit, style и resize.
+Переносы сохраняют исходную строку, UTF-16 bookmarks и целые graphemes.
+Ширина фрагмента измеряется целиком, с kerning. Сохранение и undo используют
+прежние EditorCommand; schema/IPC не меняются. Text, callout и numbered marker
+сохраняют разные container semantics. Popup использует shrinkable grid tracks,
+box sizing и перенос controls вместо горизонтального скролла. Inline toolbar
+ограничивается viewport, независимо от ширины снимка. Перед измерением доступны
+все B/I faces используемой гарнитуры; stale blur не подтверждает активный draft.
+
+**Проверяемое основание:** red-first renderer/core contracts, component
+selection/source roundtrip, production browser input с long Cyrillic/Latin,
+12 faces, resize/style/undo, decoded export и отсутствие popup overflow.
+Фактические команды, platform и ограничения фиксируются в TESTING.md.

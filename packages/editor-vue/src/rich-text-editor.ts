@@ -10,7 +10,6 @@ import {
   setRichTextSelection,
   type RichTextContent,
   type RichTextEditingState,
-  type RichTextParagraph,
   type RichTextParagraphStyle,
   type RichTextSelection,
   type RichTextSpanStyle,
@@ -143,66 +142,7 @@ export class RichTextEditorController {
   }
 }
 
-function cssColor(color: RichTextSpanStyle['color']): string {
-  return `rgba(${Math.round(color.red * 255)}, ${Math.round(color.green * 255)}, ${Math.round(color.blue * 255)}, ${color.alpha})`
-}
-
-function paragraphContentEnd(
-  text: string,
-  paragraph: RichTextParagraph,
-): number {
-  return paragraph.end > paragraph.start && text[paragraph.end - 1] === '\n' ? paragraph.end - 1 : paragraph.end
-}
-
-/** Rebuilds the transient DOM projection without persisting any HTML. */
-export function renderRichTextProjection(
-  editor: HTMLDivElement,
-  state: RichTextEditingState,
-  scale = 1,
-): void {
-  const fragment = document.createDocumentFragment()
-  const paragraphs =
-    state.content.paragraphs.length === 0
-      ? [
-          {
-            start: 0,
-            end: 0,
-            alignment: state.paragraphStyle.alignment,
-            listKind: state.paragraphStyle.listKind,
-          } as const,
-        ]
-      : state.content.paragraphs
-
-  for (const paragraph of paragraphs) {
-    const block = document.createElement('div')
-    block.dataset.richTextParagraph = ''
-    block.dataset.start = String(paragraph.start)
-    block.dataset.end = String(paragraph.end)
-    block.dataset.listKind = paragraph.listKind
-    block.style.textAlign = paragraph.alignment
-    const contentEnd = paragraphContentEnd(state.content.text, paragraph)
-    for (const span of state.content.spans) {
-      const start = Math.max(span.start, paragraph.start)
-      const end = Math.min(span.end, contentEnd)
-      if (end <= start) continue
-      const element = document.createElement('span')
-      element.dataset.richTextSpan = ''
-      element.dataset.start = String(start)
-      element.dataset.end = String(end)
-      element.style.fontFamily = span.fontFamily
-      element.style.fontSize = `${span.fontSize * scale}px`
-      element.style.fontWeight = String(span.weight)
-      element.style.fontStyle = span.italic ? 'italic' : 'normal'
-      element.style.textDecoration = span.strikethrough ? 'line-through' : 'none'
-      element.style.color = cssColor(span.color)
-      element.textContent = state.content.text.slice(start, end)
-      block.append(element)
-    }
-    if (!block.textContent) block.append(document.createElement('br'))
-    fragment.append(block)
-  }
-  editor.replaceChildren(fragment)
-}
+export { renderRichTextProjection } from './rich-text-projection'
 
 /** Reads only text nodes and logical block boundaries; markup is discarded. */
 export function readRichTextProjection(editor: HTMLDivElement): string {

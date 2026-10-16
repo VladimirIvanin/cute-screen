@@ -83,14 +83,23 @@ function updateTextLayout(context: FloatingToolbarContext): void {
     return
   }
   const editorRect = editor.getBoundingClientRect()
-  const surfaceRect = surface.getBoundingClientRect()
-  context.floatingToolbarLayout.value = clampedLayout(
-    surface,
-    toolbarHost,
-    editorRect.left - surfaceRect.left + editorRect.width / 2,
-    editorRect.top - surfaceRect.top,
-    editorRect.bottom - surfaceRect.top,
-  )
+  const view = context.scrollContainer.value?.getBoundingClientRect()
+  const root = editor.closest('.cs-editor-shell')
+  const header = root?.querySelector('.cs-topbar')?.getBoundingClientRect()
+  const dock = root?.querySelector('.cs-bottom-chrome')?.getBoundingClientRect()
+  const width = toolbarHost?.offsetWidth ?? 320
+  const height = toolbarHost?.offsetHeight ?? 44
+  const minTop = Math.max((view?.top ?? 0) + 8, header?.height ? header.bottom + 8 : 0)
+  const bottom = Math.min(view?.bottom ?? window.innerHeight, dock?.height ? dock.top - 8 : Infinity)
+  const minLeft = (view?.left ?? 0) + width / 2 + 8
+  const maxLeft = Math.max(minLeft, (view?.right ?? window.innerWidth) - width / 2 - 8)
+  const above = editorRect.top - height - 10
+  const placement = above >= minTop ? 'above' : 'below'
+  context.floatingToolbarLayout.value = Object.freeze({
+    left: Math.max(minLeft, Math.min(maxLeft, editorRect.left + editorRect.width / 2)),
+    top: Math.max(minTop, Math.min(bottom - height - 8, placement === 'above' ? above : editorRect.bottom + 10)),
+    placement,
+  })
 }
 
 function arrowLayoutFor(

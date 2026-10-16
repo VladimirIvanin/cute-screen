@@ -171,6 +171,50 @@ function styledContent(
   }
 }
 
+function rebaseStyledLayer(
+  next: LayerNode,
+  previous: LayerNode,
+  canvas?: { readonly width: number; readonly height: number },
+): LayerNode {
+  if (next.kind === 'pencil' || next.kind === 'marker') next = rebaseFreehandLayer(next)
+  if (next.kind === 'arrow' && JSON.stringify(next.payload) !== JSON.stringify(previous.payload))
+    next = rebaseArrowLayer(next, next.payload)
+  if (next.kind === 'callout' && JSON.stringify(next.payload) !== JSON.stringify(previous.payload))
+    next = rebaseCalloutLayer(next, next.payload)
+  if (next.kind === 'ruler' && JSON.stringify(next.payload) !== JSON.stringify(previous.payload)) {
+    if (!canvas) throw new Error('Ruler style changes require the document canvas')
+    next = rebaseRulerLayer(next, next.payload, canvas)
+  }
+  return next
+}
+
+function updateLoupeSource(
+  next: LayerNode,
+  layer: LayerNode,
+): LayerNode {
+  if (
+    next.kind === 'loupe' &&
+    layer.kind === 'loupe' &&
+    next.payload.zoom !== layer.payload.zoom
+  ) {
+    const region = next.payload.sourceRegion
+    const size = next.payload.lens.size / next.payload.zoom
+    next = {
+      ...next,
+      payload: {
+        ...next.payload,
+        sourceRegion: {
+          x: region.x + (region.width - size) / 2,
+          y: region.y + (region.height - size) / 2,
+          width: size,
+          height: size,
+        },
+      },
+    }
+  }
+  return next
+}
+
 export function applyLayerStyle<T extends LayerNode>(
   layer: T,
   style: LayerStyle,
@@ -194,36 +238,7 @@ export function applyLayerStyle<T extends LayerNode>(
         ['opacity', 'blendMode', 'shadows'].filter((key) => key in style).map((key) => [key, clone(style[key])]),
       ),
     }
-  if (
-    next.kind === 'loupe' &&
-    layer.kind === 'loupe' &&
-    next.payload.zoom !== layer.payload.zoom
-  ) {
-    const region = next.payload.sourceRegion
-    const size = next.payload.lens.size / next.payload.zoom
-    next = {
-      ...next,
-      payload: {
-        ...next.payload,
-        sourceRegion: {
-          x: region.x + (region.width - size) / 2,
-          y: region.y + (region.height - size) / 2,
-          width: size,
-          height: size,
-        },
-      },
-    }
-  }
-  if (next.kind === 'pencil' || next.kind === 'marker') next = rebaseFreehandLayer(next)
-  if (next.kind === 'arrow' && JSON.stringify(next.payload) !== JSON.stringify(layer.payload))
-    next = rebaseArrowLayer(next, next.payload)
-  if (next.kind === 'callout' && JSON.stringify(next.payload) !== JSON.stringify(layer.payload))
-    next = rebaseCalloutLayer(next, next.payload)
-  if (next.kind === 'ruler' && JSON.stringify(next.payload) !== JSON.stringify(layer.payload)) {
-    if (!canvas) throw new Error('Ruler style changes require the document canvas')
-    next = rebaseRulerLayer(next, next.payload, canvas)
-  }
-  return next as T
+  return rebaseStyledLayer(updateLoupeSource(next, layer), layer, canvas) as T
 }
 /** Locked groups are all-or-nothing, and no-ops never enter history. */
 export function styleCommand(

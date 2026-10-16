@@ -133,6 +133,9 @@
 }
 .cs-text-background-popover {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  box-sizing: border-box;
+  overflow-y: auto;
   gap: 12px;
   width: 320px;
   max-width: calc(100vw - 16px);
@@ -145,6 +148,8 @@
 }
 .cs-text-background-color {
   display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
 }
 .cs-text-font-popover {
@@ -223,7 +228,9 @@
   .cs-text-toolbar {
     max-width: min(360px, calc(100vw - 32px));
   }
-  .cs-text-floating-toolbar-host,
+  .cs-text-floating-toolbar-host {
+    max-width: calc(100vw - 16px);
+  }
   .cs-context-toolbar--text {
     max-width: calc(100% - 16px);
   }
@@ -634,4 +641,29 @@
 }
 .cs-context-toolbar--text > .cs-context-controls:empty {
   display: none;
+}
+
+.cs-text-background-popover .cs-simple-color-panel.is-embedded {
+  width: 100%;
+  min-width: 0;
+  overflow: visible;
+}
+.cs-text-background-popover .cs-simple-color-palette {
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.cs-text-background-popover .cs-simple-color-grid {
+  width: 100%;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+}
+.cs-text-background-popover .cs-simple-color-swatch {
+  max-width: 100%;
+}
+.cs-text-background-popover .cs-simple-color-custom-area {
+  flex-basis: 100%;
+  border: 0;
+  padding: 0;
+}
+.cs-text-background-popover .cs-numeric-control > .n-slider {
+  flex-basis: auto;
 }

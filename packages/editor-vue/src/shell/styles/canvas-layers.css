@@ -390,10 +390,11 @@
   stroke-width: 1.8;
 }
 .cs-text-floating-toolbar-host {
-  position: absolute;
+  position: fixed;
+  width: max-content;
   z-index: 4;
   pointer-events: auto;
-  max-width: calc(100% - 8px);
+  max-width: calc(100vw - 16px);
 }
 .cs-text-floating-toolbar {
   padding: 4px 8px;

@@ -22,13 +22,12 @@ async function sceneChecksum(): Promise<number> {
   })
 }
 
-export async function verifyHighlighter(
+export async function verifyCreationCursors(
   directory: string,
   prefix: string,
-  requireAutomatic = false,
 ): Promise<void> {
   const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
-  for (const label of ['Pencil', 'Highlighter']) {
+  for (const label of ['Pencil', 'Highlighter', 'Numbered marker']) {
     await $(`button[aria-label="${label}"]`).click()
     await expect(scene).toHaveStyle({ cursor: 'crosshair' })
     await browser.action('pointer').move({ origin: scene }).perform()
@@ -38,6 +37,7 @@ export async function verifyHighlighter(
     await browser.action('pointer').up({ button: 'middle' }).perform()
     await expect(scene).toHaveStyle({ cursor: 'crosshair' })
   }
+  await browser.saveScreenshot(path.resolve(directory, `${prefix}-numbered-marker-cursor.png`))
   if (!(await $('.cs-quick-actions').isExisting())) {
     await $('button[aria-label="Hand"]').click()
     await expect(scene).toHaveStyle({ cursor: 'grab' })
@@ -45,6 +45,15 @@ export async function verifyHighlighter(
   await $('button[aria-label="Select"]').click()
   await browser.action('pointer').move({ origin: scene, x: 1, y: 1 }).perform()
   expect((await scene.getCSSProperty('cursor')).value).not.toBe('crosshair')
+}
+
+export async function verifyHighlighter(
+  directory: string,
+  prefix: string,
+  requireAutomatic = false,
+): Promise<void> {
+  await verifyCreationCursors(directory, prefix)
+  const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
   await $('button[aria-label="Highlighter"]').click()
   await expect($('button[aria-label="Highlighter"] .cs-icon-marker')).toExist()
   const toolbar = $('.cs-highlighter-toolbar')

@@ -167,7 +167,8 @@ export class PointerGeometryController {
     if (
       props.quickSelectionMode ||
       props.activeTool === 'pencil' ||
-      props.activeTool === 'marker'
+      props.activeTool === 'marker' ||
+      props.activeTool === 'numberedMarker'
     ) {
       this.setCursor('crosshair')
       return

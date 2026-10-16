@@ -1,5 +1,18 @@
 # Трассируемость требований
 
+## Text sizing and wrapping follow-up (2026-10-16, ADR-062)
+
+REQ-TOL-005 / REQ-EDT-005: this entry was added before implementation.
+Implemented compact point-text input growing up to 480 document px, emergency
+grapheme wrapping, real-font bounds on commit/style/clipboard paste/width resize,
+soft wraps preserving source text and range, and a background popup without
+horizontal overflow. Inline toolbar uses viewport bounds; returning focus cancels
+stale blur commits. Red-first core/renderer/focus/font-loading regressions,
+component tests, decoded PNG and browser undo/reopen/large-canvas flows are
+recorded in TESTING.md. Schema v7 and one-command editing/resize semantics stay.
+Real Tauri embedded driver mounted toolbar but could not create the editor;
+Windows/macOS/Wayland are not newly verified.
+
 ## Панель текста и встроенные шрифты (2026-10-16)
 
 `REQ-TOL-005/006/007`, `REQ-EDT-005/008/016`, `REQ-UI-001/005/006/007`:
@@ -236,6 +249,11 @@ Hover использует тот же hit testing, что начало жест
 Фактические результаты фиксируются в TESTING.md.
 
 ## Курсор штриховых инструментов (2026-10-15)
+
+Расширение 2026-10-16, `REQ-TOL-006`: нумерованные точки используют тот же
+`crosshair` сразу при активации и при движении над холстом/объектами; временный
+pan сохраняет `grabbing` с возвратом креста. Общий `highlighter-toolbar.ts`
+проверяет выбор, hover и pan также для numbered marker.
 
 `REQ-TOL-003/004`, `REQ-UI-005`: Pencil и Highlighter показывают `crosshair`
 сразу при выборе и при наведении на холст, включая существующие объекты и
@@ -1108,3 +1126,21 @@ production Quick → Editor pointer flows и 4K/8K 12 000 samples. Фактич�
 `golden-brushes.test.ts`, `browser-brushes.e2e.ts`, `tauri-brushes.e2e.ts` и
 `tauri-brushes-reopen.e2e.ts`. Существующая large fixture проверяет один render
 node для 12 000 samples. Общие проверки и сторонние текущие failures — TESTING.md.
+
+## Censor toolbar UX · 2026-10-16
+
+`REQ-TOL-008`, `REQ-EDT-008/015/016/017`, `REQ-UI-006`: replace clipped
+region/effect selects and the permanently expanded slider with a shared compact
+censor toolbar. Three labelled effect thumbnails remain visible; region and
+effect-specific settings open anchored menus. Pixelate presets 6/12/24 and blur
+presets 4/12/24 supplement exact numeric input. Defaults, configure, selection,
+mixed values, locking, draft cancellation and atomic undo/redo retain the existing
+command pipeline. Document v7, renderer, IPC and initial defaults are unchanged.
+
+Evidence: focused Vue 20/20, followed by final preset Enter/focus regressions
+8/8; full unit suite 802/802 and decoded render harness 24/24. Final browser
+5/5 covers RU/EN × light/dark × DPR 1/2 at 1024×700 and 1440×900, plus actual
+creation/settings/cancel/undo/redo/configure. Existing M08 browser 2/2.
+WebKitGTK production Quick → Editor menus/Select: 1/1 with embedded DOM input;
+physical pointer gestures and Windows/macOS remain unverified by this run.
+Screenshots and logs: `artifacts/censor-toolbar/`; commands in TESTING.md.

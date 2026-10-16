@@ -96,8 +96,7 @@ describe('M08 shell lifecycle and contextual settings', () => {
     await selectLayerFromPanel(view, { activateSelect: false })
     const layerButton = view.container.querySelector('.cs-layer-select') as HTMLButtonElement
     expect(layerButton.closest('.cs-layer-row')).toHaveAttribute('aria-selected', 'true')
-    await fireEvent.click(screen.getByRole('combobox', { name: 'Effect' }))
-    await fireEvent.click(await screen.findByRole('option', { name: 'Blur' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Blur' }))
 
     expect(session.snapshot.core.document.layers[0]).toMatchObject({
       kind: 'censor',
@@ -376,7 +375,7 @@ describe('M08 shell lifecycle and contextual settings', () => {
     })
     const toolbar = view.container.querySelector('.cs-context-toolbar') as HTMLElement
     const english = [
-      ['Hide data', ['Region', 'Effect']],
+      ['Hide data', ['Region shape', 'Pixelate', 'Blur', 'Solid fill', 'Pixel size']],
       ['Spotlight', ['Shape', 'Dim color', 'Dim opacity', 'Feather']],
       ['Ruler', ['Colour', 'Thickness', 'Label size', 'Unit', 'Snapping', 'Angle step']],
       ['Loupe', ['Zoom', 'Size', 'Shape', 'Border']],
@@ -388,15 +387,15 @@ describe('M08 shell lifecycle and contextual settings', () => {
       if (tool === 'Spotlight' || tool === 'Ruler') {
         const names = tool === 'Spotlight' ? ['Aperture shape', 'Dimming', 'Edge softness', 'Apertures'] : ['Colour', 'Thickness', 'Label and units', 'Measurement and snapping']
         for (const name of names) expect(within(toolbar).getByRole('button', { name })).toBeInTheDocument()
-      } else if (tool === 'Loupe') {
+      } else if (tool === 'Loupe' || tool === 'Hide data') {
         for (const name of labels) expect(within(toolbar).getByRole('button', { name })).toBeInTheDocument()
-      } else for (const label of labels) expect(within(toolbar).getByText(label)).toBeInTheDocument()
+      }
     }
 
     useEditorShellStore(pinia).setLocale('ru')
     await fireEvent.click(await screen.findByRole('button', { name: 'Скрыть данные' }))
-    expect(within(toolbar).getByText('Область')).toBeInTheDocument()
-    expect(within(toolbar).getByText('Эффект')).toBeInTheDocument()
+    expect(within(toolbar).getByRole('button', { name: 'Форма области' })).toBeInTheDocument()
+    expect(within(toolbar).getByRole('group', { name: 'Эффект' })).toBeInTheDocument()
 
     await fireEvent.click(await screen.findByRole('button', { name: 'Линейка' }))
     for (const name of ['Цвет', 'Толщина', 'Подпись и единицы', 'Измерение и привязка']) expect(within(toolbar).getByRole('button', { name })).toBeInTheDocument()

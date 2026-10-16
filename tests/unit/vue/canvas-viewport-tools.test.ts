@@ -15,6 +15,7 @@ import { CanvasGeometryController } from '../../../packages/editor-vue/src/shell
 
 beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    measureText: (text: string) => ({ width: Array.from(text).length * 14.4 }),
     arc: vi.fn(),
     beginPath: vi.fn(),
     clearRect: vi.fn(),

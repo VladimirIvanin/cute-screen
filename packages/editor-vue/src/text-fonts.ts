@@ -65,11 +65,11 @@ export async function loadTextFontFamily(family: string): Promise<void> {
 }
 
 export async function loadDocumentTextFonts(document: EditorDocumentV1): Promise<void> {
-  const requests: Promise<void>[] = [loadTextFontFamily('Roboto')]
+  const families = new Set(['Roboto'])
   for (const layer of document.layers) {
     const content = layer.kind === 'text' || layer.kind === 'callout'
       ? layer.payload.content : layer.kind === 'numberedMarker' ? layer.payload.label : undefined
-    for (const span of content?.spans ?? []) requests.push(loadTextFont(span.fontFamily, span.weight, span.italic))
+    for (const span of content?.spans ?? []) families.add(span.fontFamily)
   }
-  await Promise.all(requests)
+  await Promise.all([...families].map(loadTextFontFamily))
 }

@@ -222,6 +222,10 @@ helper `crop-cursors.ts` проверяет все восемь точек и ц
 
 ## Курсор карандаша и выделителя (2026-10-15)
 
+Расширение 2026-10-16, `REQ-TOL-006`: выбрать Numbered marker — крест
+появляется сразу, сохраняется при движении над существующими объектами и
+возвращается после временного панорамирования средней кнопкой.
+
 `REQ-TOL-003/004`, `REQ-UI-005`: в editor и Quick Capture выбрать Pencil,
 затем Highlighter. На холсте сразу появляется `crosshair` и сохраняется при
 наведении на существующие объекты и во время штриха. При удержании средней
@@ -1012,3 +1016,38 @@ trusted pointer input, отмену, Undo/Redo; отдельный native launch
 4K/8K fixtures и 12 000 samples подтверждают decoded preview/export parity;
 software timing не является GPU frame-budget evidence. Фактические результаты
 и ограничения общих проверок — TESTING.md.
+
+## Text sizing/wrapping follow-up (2026-10-16, ADR-062)
+
+- New point text starts at one em; short Latin/Cyrillic text follows actual
+  bundled-face metrics, up to 480 document px. A long unbroken word wraps.
+- DOM soft lines and persisted/exported lines agree; wrapping does not insert
+  newlines in source or split combining/ZWJ graphemes. Range formatting and copy
+  retain UTF-16 offsets through soft breaks.
+- A capped commit uses v7 fixedWidth. Side handles may make it wider or narrower;
+  height reflows from real metrics without scaling fonts. Style edits update
+  bounds in the same undo step. Existing autoSize keeps its sizing mode.
+- Background popup fits at 640/1024/1440; colour, custom colour, padding/radius,
+  Apply and Cancel remain reachable without horizontal scrolling.
+- Execute core/renderer/component/browser/real-Tauri checks. Record actual
+  platform, decoded PNG and screenshots, including unavailable checks in
+  TESTING.md; Linux browser evidence does not establish Windows/macOS support.
+
+## Панель скрытия данных: UX (2026-10-16)
+
+`REQ-TOL-008`, `REQ-EDT-008/015/016/017`:
+
+1. Открыть изображение, выбрать «Скрыть данные»: видны три подписанных эффекта,
+   отдельная форма и текущий параметр; нет обрезанных select и постоянного slider.
+2. Выбрать форму, эффект, visual preset и произвольное число; нарисовать область.
+   После создания активен Select, настройки — в единственной панели у объекта.
+3. Изменить параметр, отменить draft через Escape, подтвердить другой параметр.
+   Undo/redo откатывают завершённые правки по одной, исходная geometry сохраняется.
+4. Проверить mixed selection, locked/read-only, ПКМ configure и ближайший Escape.
+5. RU/EN, light/dark, DPR 1/2, 1024×700 и 1440×900: все подписи и меню помещаются;
+   эффекты остаются видимыми. Enter/Space активируют кнопки, фокус возвращается.
+6. В Quick открыть и закрыть настройки, нажать Select, затем Editor одним кликом.
+
+Browser и WebKitGTK evidence: `artifacts/censor-toolbar/`; команды и пределы
+проверки — TESTING.md. Native embedded pass проверяет DOM input в production
+WebViews; Windows/macOS и физические pointer-жесты остаются отдельной проверкой.

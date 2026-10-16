@@ -66,6 +66,7 @@ function editorDocument(layer?: LayerNode): EditorDocument {
 
 beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    measureText: (text: string) => ({ width: Array.from(text).length * 14.4 }),
     clearRect: vi.fn(),
     setTransform: vi.fn(),
     drawImage: vi.fn(),
@@ -239,7 +240,7 @@ describe('v7 rich-text component editing', () => {
     await fireEvent.paste(editor, {
       clipboardData: { getData: () => 'x' },
     })
-    await fireEvent.blur(editor)
+    editor.blur()
     await vi.waitFor(() => expect(rendered.emitted().documentCommand).toHaveLength(1))
 
     const command = firstCommand(rendered.emitted)
@@ -400,7 +401,7 @@ describe('v7 rich-text component editing', () => {
 
     await fireEvent.compositionEnd(editor)
     expect(rendered.emitted().documentCommand).toBeUndefined()
-    await fireEvent.blur(editor)
+    editor.blur()
     await vi.waitFor(() => expect(rendered.emitted().documentCommand).toHaveLength(1))
     const command = firstCommand(rendered.emitted)
     expect(command?.layer?.kind).toBe('text')
@@ -422,7 +423,7 @@ describe('v7 rich-text component editing', () => {
 
     await fireEvent.keyDown(editor, { key: 'Enter' })
     await fireEvent.keyDown(editor, { key: 'Enter' })
-    await fireEvent.blur(editor)
+    editor.blur()
     await vi.waitFor(() => expect(rendered.emitted().documentCommand).toHaveLength(1))
 
     const command = firstCommand(rendered.emitted)
@@ -459,7 +460,7 @@ describe('v7 rich-text component editing', () => {
         getData: (type: string) => (type === 'text/plain' ? 'plain\r\n<b>text</b>' : '<b>ignored</b>'),
       },
     })
-    await fireEvent.blur(editor)
+    editor.blur()
     await vi.waitFor(() => expect(rendered.emitted().documentCommand).toHaveLength(1))
     const command = firstCommand(rendered.emitted)
     if (command?.after?.kind !== 'text') throw new Error('expected text update')
@@ -508,7 +509,7 @@ describe('v7 rich-text component editing', () => {
       await fireEvent.paste(editor, {
         clipboardData: { getData: () => 'new' },
       })
-      await fireEvent.blur(editor)
+      editor.blur()
       await vi.waitFor(() => expect(rendered.emitted().documentCommand).toHaveLength(1))
 
       expect(firstCommand(rendered.emitted)).toMatchObject({

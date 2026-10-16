@@ -38,7 +38,7 @@ export function buildPendingLines(
     const listIndent = paragraph.listKind === 'bullet' ? paragraphFontSize * 1.1 : 0
     const contentX = node.x + listIndent
     const contentWidth = Math.max(1, layoutWidth - listIndent)
-    const wrapped = wrapParagraph(glyphs, contentWidth, node.wrap === 'fixedWidth')
+    const wrapped = wrapParagraph(glyphs, contentWidth, node.wrap === 'fixedWidth', measure)
     for (const [paragraphLineIndex, line] of wrapped.entries()) {
       pending.push({
         glyphs: line,
@@ -129,34 +129,28 @@ function lineFragments(
   line: PendingLine,
   x: number,
   baseline: number,
+  measure: RichTextMeasure,
 ): readonly RichTextLayoutFragment[] {
   const fragments: RichTextLayoutFragment[] = []
   let cursor = x
-  for (const glyph of line.glyphs) {
-    const previous = fragments[fragments.length - 1]
-    if (
-      previous &&
-      previous.end === glyph.start &&
-      sameStyle(previous, glyph.style)
-    ) {
-      fragments[fragments.length - 1] = {
-        ...previous,
-        text: previous.text + glyph.text,
-        end: glyph.end,
-        width: previous.width + glyph.width,
-      }
-    } else {
-      fragments.push({
-        ...glyph.style,
-        text: glyph.text,
-        start: glyph.start,
-        end: glyph.end,
-        x: cursor,
-        baseline,
-        width: glyph.width,
-      })
-    }
-    cursor += glyph.width
+  let index = 0
+  while (index < line.glyphs.length) {
+    const first = line.glyphs[index]!
+    let end = index + 1
+    while (end < line.glyphs.length && sameStyle(first.style, line.glyphs[end]!.style)) end += 1
+    const glyphs = line.glyphs.slice(index, end)
+    const width = glyphWidth(glyphs, measure)
+    fragments.push({
+      ...first.style,
+      text: glyphs.map((glyph) => glyph.text).join(''),
+      start: first.start,
+      end: glyphs.at(-1)!.end,
+      x: cursor,
+      baseline,
+      width,
+    })
+    cursor += width
+    index = end
   }
   return fragments
 }
@@ -166,13 +160,14 @@ export function layoutPendingLine(
   line: PendingLine,
   index: number,
   metrics: LineMetrics,
+  measure: RichTextMeasure,
 ): RichTextLayoutLine {
   const height = metrics.heights[index]!
-  const width = glyphWidth(line.glyphs)
+  const width = glyphWidth(line.glyphs, measure)
   const x = lineX(line, width)
   const top = metrics.tops[index]! + metrics.verticalShift
   const baseline = top + metrics.baselineOffsets[index]!
-  const fragments = lineFragments(line, x, baseline)
+  const fragments = lineFragments(line, x, baseline, measure)
   const strikes = fragments
     .filter((fragment) => fragment.strikethrough && fragment.width > 0)
     .map((fragment) => ({

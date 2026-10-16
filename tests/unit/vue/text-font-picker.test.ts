@@ -1,3 +1,5 @@
+import { createTextLayer } from '@cute-screen/editor-core'
+import { document as documentFixture } from './canvas-viewport-test-kit'
 import {
   fireEvent,
   render,
@@ -75,4 +77,20 @@ describe('curated text font menu', () => {
       else Reflect.deleteProperty(document, 'fonts')
     }
   })
+
+  it('preloads B/I faces for document families before synchronous style geometry changes', async () => {
+    const load = vi.fn().mockResolvedValue([{}])
+    const original = Object.getOwnPropertyDescriptor(document, 'fonts')
+    Object.defineProperty(document, 'fonts', { configurable: true, value: { load } })
+    try {
+      const layer = createTextLayer({ id: 'text', text: 'Шрифт', origin: { x: 0, y: 0 }, fontFamily: 'Lora' })!
+      await fonts.loadDocumentTextFonts({ ...documentFixture, layers: [layer] })
+      for (const descriptor of ['normal 400', 'normal 700', 'italic 400', 'italic 700'])
+        expect(load).toHaveBeenCalledWith(`${descriptor} 20px "Lora"`, 'Aa Яя 123')
+    } finally {
+      if (original) Object.defineProperty(document, 'fonts', original)
+      else Reflect.deleteProperty(document, 'fonts')
+    }
+  })
+
 })

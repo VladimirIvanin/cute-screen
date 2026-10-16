@@ -56,15 +56,15 @@ it.each(['spotlight', 'censor'] as const)('switches the selection toolbar from l
   const execute = vi.spyOn(session, 'execute')
   for (const [x, y, layer, name] of [
     [85, 40, loupe, 'Zoom'],
-    [35, 20, spotlight, kind === 'spotlight' ? 'Dimming' : 'Effect'],
+    [35, 20, spotlight, kind === 'spotlight' ? 'Dimming' : 'Blur'],
     [85, 40, loupe, 'Zoom'],
-    [35, 20, spotlight, kind === 'spotlight' ? 'Dimming' : 'Effect'],
+    [35, 20, spotlight, kind === 'spotlight' ? 'Dimming' : 'Blur'],
   ] as const) {
     await fireEvent.pointerDown(scene, { pointerId: 1, button: 0, clientX: x, clientY: y })
     await fireEvent.pointerUp(scene, { pointerId: 1, button: 0, clientX: x, clientY: y })
     expect(store.selectedLayerIds).toEqual([layer.id])
     const toolbar = view.container.querySelector('.cs-selection-floating-toolbar') as HTMLElement
-    expect(within(toolbar).getByRole(name === 'Effect' ? 'combobox' : 'button', { name })).toBeInTheDocument()
+    expect(within(toolbar).getByRole('button', { name })).toBeInTheDocument()
     expect(within(toolbar).queryByRole('button', { name: name === 'Zoom' ? 'Dimming' : 'Zoom' })).toBeNull()
   }
   expect(execute).not.toHaveBeenCalled()

@@ -1,3 +1,4 @@
+import { measuredTextHeight } from '../../text-layout'
 import {
   BOUNDS_RESIZE_HANDLES,
   createDocumentRenderScene,
@@ -233,6 +234,7 @@ export class CanvasGeometryController {
     if (!layer) return undefined
     if (gesture.kind === 'intrinsicResize') {
       return resizeLayerGeometry(layer, gesture.handle, gesture.current, {
+        textHeight: measuredTextHeight,
         preserveAspect: gesture.preserveAspect,
         snapAngleIncrementDegrees: gesture.snapAngleIncrementDegrees,
         fromCenter: gesture.centerResize,

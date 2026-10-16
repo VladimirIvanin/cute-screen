@@ -1,5 +1,24 @@
 # Архитектура Cute Screen
 
+## Измерение текста и transient projection (ADR-062)
+
+`editor-renderer/rich-text` вычисляет soft lines по целым graphemes и измеряет
+полные styled fragments, учитывая kerning. DOM-free layout остаётся общим для
+Canvas2D и CanvasKit. CanvasKit измеряет mixed Latin/Cyrillic через те же
+Fontsource subset chunks, которыми рисует текст; отсутствие face не скрывается.
+
+`editor-vue/text-layout.ts` предоставляет browser font metrics для inline
+projection, commit, clipboard/style paste и width resize. Core принимает
+необязательный `textHeight` callback при intrinsic resize, не зависит от DOM
+и сохраняет сериализуемые commands. Новый point text ограничен 480 document px;
+wrapped commit использует существующий v7 fixedWidth. Прежний autoSize не
+ограничивается при открытии. BR в DOM projection обозначают только soft lines;
+source text и UTF-16 selection offsets не получают новых символов.
+
+Inline toolbar размещается относительно viewport и избегает header/bottom dock,
+а не ограничивается шириной снимка. Возврат фокуса в editor отменяет deferred
+blur commit; callback старого editing session не может подтвердить новый draft.
+
 ## Ограничения линейки и crop (ADR-059)
 
 `ruler-constraints.ts` в DOM-free core ограничивает world endpoints текущим
@@ -39,6 +58,18 @@ renderer origin и schema v7 не меняются: старые докумен�
 используют одно правило. Это сохраняет порядок composite-below и составную
 маску фонаря, не передавая precision nodes в `drawNodes2D`, который не может
 отрисовать их без ordered surface. Pointer click не меняет документ/history.
+
+## Панель скрытия данных
+
+`CensorFormattingToolbar` подключён через общий `ContextToolbar` для privacy
+и переиспользует существующие censor controls/events в defaults, configure,
+selection и Quick. Три эффекта видны сразу; region и параметр раскрываются
+через `usePreviewPopover`. `NumericControl` обслуживает визуальные preset slots,
+точный ввод и transient preview; `SimpleColorPicker` — цвет заливки.
+`CensorEffectPreview` рисует только демонстрационный фрагмент средствами SVG,
+без чтения снимка. Command history, mixed projection, preferences, document v7,
+renderer и IPC не меняются. Компоновка следует ADR-048/053/054 и не требует
+замены принятого ADR.
 
 ## Компактная панель лупы
 
