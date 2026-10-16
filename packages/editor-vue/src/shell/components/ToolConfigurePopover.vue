@@ -12,7 +12,10 @@ import {
   type PreviewPlacement,
 } from '../ui/preview-placement'
 
-const props = defineProps<{ anchor: HTMLElement }>()
+import { provideTransientSurface } from '../ui/transient-surface'
+const surfaceOwner = provideTransientSurface()
+
+const props = defineProps<{ anchor: HTMLElement; label: string }>()
 const host = ref<HTMLElement>()
 const layout = ref({ left: '0px', top: '0px', transform: 'none' })
 let previous: PreviewPlacement | undefined
@@ -69,7 +72,11 @@ onBeforeUnmount(() => {
 
 <template>
   <div
+    id="cs-tool-defaults"
     ref="host"
+    role="dialog"
+    :aria-label="label"
+    :data-cs-surface="surfaceOwner"
     class="cs-tool-configure-popover-host"
     :style="layout"
   >

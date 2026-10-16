@@ -70,6 +70,7 @@ export async function verifyShapeDefaultsPlacement(
   await expect(defaults.$('[data-shape-control="appearance"]')).toBeFocused()
   await expect(defaults).toBeDisplayed()
   await browser.keys('Escape')
-  await expect($('.cs-selection-preview-host')).toHaveAttribute('data-preview-bounds', /.+/u)
+  await expect($('.cs-selection-floating-toolbar')).not.toExist()
+  await expect($('.cs-selection-preview-host')).not.toHaveAttribute('data-preview-bounds')
   expect(await shapeDocument()).toEqual(before)
 }

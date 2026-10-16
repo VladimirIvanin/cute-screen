@@ -153,13 +153,12 @@ export async function verifyShapeDefaults(): Promise<void> {
   await expect(defaults).toBeDisplayed()
   await defaults.$('[data-shape-control="stroke"]').click()
   await waitForShapeAnimation()
-  const defaultsPreviewVisible = await browser.execute(() => {
-    const marker = document.querySelector<HTMLElement>('[data-preview-bounds]')!
-    const [left = 0, top = 0, width = 0, height = 0] = marker.dataset.previewBounds!.split(',').map(Number)
+  await expect($('.cs-selection-floating-toolbar')).not.toExist()
+  const defaultsFit = await browser.execute(() => {
     const panel = document.querySelector('.cs-shape-popover')!.getBoundingClientRect()
-    return panel.right <= left || panel.left >= left + width || panel.bottom <= top || panel.top >= top + height
+    return panel.left >= 0 && panel.top >= 0 && panel.right <= innerWidth && panel.bottom <= innerHeight
   })
-  expect(defaultsPreviewVisible).toBe(true)
+  expect(defaultsFit).toBe(true)
   await $('.cs-shape-popover').$('button[aria-label="2 px"]').click()
   await browser.keys('Escape')
   await expect($('.cs-shape-popover')).not.toExist()

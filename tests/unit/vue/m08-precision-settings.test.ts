@@ -39,7 +39,7 @@ afterEach(() => {
 })
 
 describe('M08 shell lifecycle and contextual settings', () => {
-  it('keeps creation defaults below and selects completed precision objects', async () => {
+  it('opens creation defaults on configure and selects completed precision objects', async () => {
     const session = new DocumentSessionController({
       document: documentFixture(),
       revision: 1,
@@ -55,7 +55,7 @@ describe('M08 shell lifecycle and contextual settings', () => {
       global: { plugins: [createEditorShellPinia()] },
     })
 
-    await fireEvent.click(screen.getByRole('button', { name: 'Hide data' }))
+    await fireEvent.contextMenu(screen.getByRole('button', { name: 'Hide data' }))
     const toolbar = view.container.querySelector('.cs-context-toolbar') as HTMLElement
     expect(within(toolbar).getByRole('group', { name: 'Effect' })).toBeInTheDocument()
     expect(within(toolbar).getByRole('button', { name: 'Region shape' })).toBeInTheDocument()
@@ -164,8 +164,8 @@ describe('M08 shell lifecycle and contextual settings', () => {
       expect(window.localStorage.getItem('cute-screen.drawing-tool-preferences.v1')).toBeNull()
 
       useEditorShellStore(pinia).clearLayerSelection()
-      await fireEvent.click(screen.getByRole('button', { name: toolLabel }))
-      toolbar = view.container.querySelector('.cs-bottom-chrome-center .cs-context-toolbar') as HTMLElement
+      await fireEvent.contextMenu(screen.getByRole('button', { name: toolLabel }))
+      toolbar = view.container.querySelector('.cs-tool-configure-popover-host .cs-context-toolbar') as HTMLElement
       const defaultControl = await within(toolbar).findByRole(role, {
         name: controlLabel,
       })
@@ -230,7 +230,7 @@ describe('M08 shell lifecycle and contextual settings', () => {
       global: { plugins: [createEditorShellPinia()] },
     })
     const execute = vi.spyOn(session, 'execute')
-    await fireEvent.click(screen.getByRole('button', { name: 'Hide data' }))
+    await fireEvent.contextMenu(screen.getByRole('button', { name: 'Hide data' }))
     await fireEvent.click(screen.getByRole('button', { name: 'Blur' }))
     expect(execute).not.toHaveBeenCalled()
 
@@ -279,8 +279,9 @@ describe('M08 shell lifecycle and contextual settings', () => {
       global: { plugins: [pinia] },
     })
     const store = useEditorShellStore(pinia)
+    store.selectTool('select')
     store.selectLayer(layer.id)
-    store.selectTool('ruler')
+    await vi.waitFor(() => expect(view.container.querySelector('.cs-selection-floating-toolbar')).not.toBeNull())
     const execute = vi.spyOn(session, 'execute')
     const toolbar = view.container.querySelector('.cs-context-toolbar') as HTMLElement
     const thickness = await within(toolbar).findByRole('button', { name: 'Thickness' })

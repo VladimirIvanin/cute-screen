@@ -42,6 +42,7 @@ const exposed: CanvasViewportExpose = {
   cancelCropDraft: () => workspace.value?.cancelCropDraft(),
   resetCropDraft: () => workspace.value?.resetCropDraft(),
   setCropPresetValue: (preset: CropPreset) => workspace.value?.setCropPresetValue(preset),
+  finishTextEditing: (continuation) => workspace.value?.finishTextEditing(continuation),
   refitCanvas: () => workspace.value?.refitCanvas(),
 }
 defineExpose(exposed)
@@ -56,6 +57,7 @@ defineExpose(exposed)
     @hosts-ready="emit('hostsReady', $event)"
     @context-menu="emit('contextMenu', $event)"
     @frame-ready="emit('frameReady', $event)"
+    @clear-selection="emit('clearSelection')"
     @select-layer="forwardSelectLayer"
     @move-layer="forwardMoveLayer"
     @transform-layer="forwardTransformLayer"

@@ -38,10 +38,10 @@ const sample = computed(() => {
 })
 const legacy = computed(() => props.modelValue && !isBundledTextFont(props.modelValue) ? props.modelValue : undefined)
 
-function close(): void {
+function close(restoreFocus = true): void {
   if (!shown.value) return
   shown.value = false
-  void nextTick(() => trigger.value?.focus({ preventScroll: true }))
+  if (restoreFocus) void nextTick(() => trigger.value?.focus({ preventScroll: true }))
 }
 async function load(family: string): Promise<void> {
   if (status.value[family] === 'ready') return
@@ -129,7 +129,7 @@ defineExpose({ close })
       :show-arrow="false"
       raw
       to=".cs-overlay-root"
-      @clickoutside="close"
+      @clickoutside="close(false)"
     >
       <section
         ref="panel"

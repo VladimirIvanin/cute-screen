@@ -189,10 +189,7 @@ function outside(event: PointerEvent): void {
   if (!open.value || !(event.target instanceof Node)) return
   if (host.value?.contains(event.target) || panel.value?.contains(event.target)) return
   if (event.target instanceof Element && event.target.closest('.n-base-select-menu, .n-tooltip')) return
-  const canvasGesture = event.target instanceof HTMLCanvasElement
-  const previous = open.value
-  if (canvasGesture) open.value = undefined
-  else show(previous, false)
+  open.value = undefined
 }
 function sample(id: string): void {
   open.value = undefined

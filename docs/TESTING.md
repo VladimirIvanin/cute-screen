@@ -3939,3 +3939,59 @@ but the embedded driver's canvas gesture did not create contenteditable (0/1).
 `tauri-driver` and `WebKitWebDriver` were absent from PATH. This is not native
 text-editing acceptance. Windows, macOS, Wayland, physical capture and cross-DPI
 runtime smoke were not run for this follow-up.
+
+## Жизненный цикл инструментов и панелей (2026-10-16, ADR-063)
+
+Платформа: Linux x86_64, Node 22.23.1, pnpm 10.33.2, Chrome 154.0.8037.57.
+Evidence directory: `artifacts/tool-lifecycle/`.
+
+Из production mount + creation gestures проверяются пустой canvas/background,
+одиночный/мультивыбор, modifiers/pan/zoom, defaults только по configure,
+повторный вызов, hotkey со сфокусированной кнопки defaults, owner-aware teleport,
+последовательный Escape и внешний focus. Inline text проверяет click destination,
+IME, deferred fonts, последний navigation intent, смену документа и отмену
+existing/new text; чистые UI-переходы не создают command/history.
+Defaults и selection используют прежние preferences и one-command style pipeline.
+
+Команды и результаты:
+
+- `pnpm format` — `format.log`; `pnpm format:check` — `format-check.log`.
+- `pnpm check` — `check-final.log`, passed: lint/typecheck/format/docs,
+  architecture boundaries 43/43, IPC check, Rust format и четыре Clippy configs.
+- `pnpm test --maxWorkers=1` — `unit-final.log`, passed: 109/109 файлов, 831/831 тестов.
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5186 pnpm test:e2e:browser --spec tests/e2e/specs/browser-tool-lifecycle.e2e.ts --spec tests/e2e/specs/browser-tool-ux.e2e.ts --spec tests/e2e/specs/browser-tool-settings.e2e.ts --spec tests/e2e/specs/browser-censor-toolbar.e2e.ts --spec tests/e2e/specs/browser-v7-rich-text-toolbar.e2e.ts --spec tests/e2e/specs/browser-shape-toolbar.e2e.ts`
+  — `browser-all.log`, 6/6 файлов, 20/20 сценариев. Включает реальные browser
+  pointer/keyboard, creation, toolbar geometry, RU/EN × light/dark, censor DPR 1/2,
+  mixed/container semantics и history. Старые проверки входа в defaults переведены
+  на ПКМ; проверки сохранения выделения при configure заменены очисткой selection
+  при неизменном документе. Arrow geometry берётся из document dimensions,
+  не из renderer backing pixels; inset сравнивается с subpixel tolerance.
+- Screenshots просмотрены: `browser-selected.png`, `browser-deselected.png`,
+  `browser-text-switch.png`. На пустом canvas отсутствуют selection frame,
+  selection toolbar и нижний defaults chrome; ToolRail остаётся доступным.
+
+Red-first: `red.log` — 10/11 новых сценариев воспроизводили прежнее поведение.
+`cancel-existing-red.log` отдельно воспроизвёл потерю выбора при отмене текста,
+открытого через Text tool; исправлено сохранением existing ID при cancel.
+После focus changes проверка background outside dismissal обновлена: Escape
+возвращает focus, outside pointer сохраняет focus цели клика. Промежуточный
+параллельный unit-прогон получил один 5 s timeout в content-image test во время
+native build; проверки не ослаблялись, финальный прогон выполняется с одним worker.
+Предупреждения jsdom canvas, существующие ESLint warnings и bundle size не скрыты.
+
+### Настоящий Tauri: неподтверждённая acceptance
+
+`XDG_RUNTIME_DIR=$PWD/artifacts/tool-lifecycle/runtime XDG_SESSION_ID=cutescreen-tool-lifecycle CUTE_SCREEN_E2E_SCENARIOS=tool-lifecycle pnpm test:e2e:tauri`
+— `tauri-final.log`. Стабильная команда собрала debug fake-platform/test-harness
+Tauri и открыла production Capture → Quick на WebKitGTK 605.1.15. Два сценария
+остановились на configure: embedded driver не открыл его ни по Shift+F10 со
+сфокусированной кнопки, ни по ПКМ (0/2). Переход к Editor и native creation
+в этом прогоне не подтверждены. `tauri-driver` и `WebKitWebDriver` отсутствуют
+в PATH. Не установлено, является ли это ограничением driver или native input
+регрессией; требуется внешний driver либо ручная проверка. Ошибка не заменена
+инъекцией selection/document state. Первый native attempt — `tauri.log`.
+
+Нативные failure screenshots сохранены стандартным runner в
+`artifacts/tauri-e2e/`; retained appData path записан в логе. Windows/macOS,
+Wayland, physical capture и mixed-DPI native input не запускались.
+Document v7, binary image transport и IPC не менялись; новых зависимостей нет.

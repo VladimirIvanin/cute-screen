@@ -1051,3 +1051,23 @@ software timing не является GPU frame-budget evidence. Фактиче�
 Browser и WebKitGTK evidence: `artifacts/censor-toolbar/`; команды и пределы
 проверки — TESTING.md. Native embedded pass проверяет DOM input в production
 WebViews; Windows/macOS и физические pointer-жесты остаются отдельной проверкой.
+
+## Жизненный цикл инструментов и панелей (2026-10-16, ADR-063)
+
+`REQ-EDT-002/003/008/015/016/018`, `REQ-UI-003/006/007`:
+
+- Создать аннотацию production pointer-жестом; пустой canvas и фон рабочей
+  области снимают рамку и панель без изменения документа/history.
+- ПКМ, Shift+F10 и ContextMenu открывают defaults у кнопки; повторная ПКМ
+  сохраняет панель. ЛКМ/hotkey, включая тот же tool, закрывает прежнюю панель
+  и sampling. Creation activation очищает прежний выбор.
+- Вложенные palette/select/number controls не считаются внешним кликом.
+  Escape закрывает один уровень с возвратом фокуса; outside click сохраняет
+  назначение и фокус, слои/zoom/history сохраняют выделение.
+- Текст подтверждается один раз до нового выбора/режима, включая IME/fonts;
+  Escape нового draft не создаёт history. Crop Apply/Cancel остаются видимыми.
+- Без выделения и открытых defaults нет нижней панели обычного инструмента.
+  В полном Editor flip canvas доступен через More actions и undo/redo;
+  empty/loading/read-only/pending блокируют эти команды. В Quick их нет.
+- Запустить mounted-shell, browser и production real-Tauri проверки. Платформу,
+  screenshots и ограничения native driver фиксировать в TESTING.md.

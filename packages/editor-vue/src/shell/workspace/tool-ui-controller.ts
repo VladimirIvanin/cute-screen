@@ -8,6 +8,7 @@ import {
   type DrawingToolPreferencesV2,
 } from '@cute-screen/editor-renderer'
 import type { ResolvedEditorShellProps } from '../contracts'
+import { ownsSurfaceTarget } from '../ui/transient-surface'
 import { parseHexColor } from '../tools/effects/color'
 
 interface ToolConfigureState {
@@ -17,6 +18,7 @@ interface ToolConfigureState {
 
 export interface ToolUiControllerContext {
   readonly props: ResolvedEditorShellProps
+  readonly finishTextEditing: (continuation: () => void) => void
   readonly store: { selectTool(id: string): void }
   readonly locale: Ref<'en' | 'ru'>
   readonly drawingPreferences: ShallowRef<DrawingToolPreferencesV2>
@@ -100,11 +102,14 @@ async function onColorSample(
   }
 }
 
-function closeToolConfigure(context: ToolUiControllerContext): void {
+function closeToolConfigure(
+  context: ToolUiControllerContext,
+  restoreFocus = false,
+): void {
   const anchor = context.toolConfigure.value?.anchor
   context.toolConfigure.value = undefined
   context.toolConfigureLayout.value = undefined
-  anchor?.focus({ preventScroll: true })
+  if (restoreFocus && anchor?.isConnected) anchor.focus({ preventScroll: true })
 }
 
 function onToolConfigureOutsidePointer(
@@ -115,19 +120,26 @@ function onToolConfigureOutsidePointer(
   if (!configure) return
   const target = event.target
   if (!(target instanceof Node)) return
-  if (
-    configure.anchor.contains(target) ||
-    (target instanceof Element &&
-      target.closest(
-        '.cs-tool-configure-popover-host, .cs-arrow-toolbar-popover, .cs-overlay-root, .n-popover, .n-base-select-menu, .cs-color-picker-popover',
-      ))
-  ) {
-    return
-  }
+  const host = document.getElementById('cs-tool-defaults')
+  if (configure.anchor.contains(target) || ownsSurfaceTarget(host?.dataset.csSurface, target)) return
   closeToolConfigure(context)
 }
 
 export function createToolUiController(context: ToolUiControllerContext) {
+  function activate(
+    toolId: string,
+    continuation?: () => void,
+  ): void {
+    context.finishTextEditing(() => {
+      closeToolConfigure(context)
+      context.toolError.value = undefined
+      context.samplingControl.value = undefined
+      context.eyedropperColor.value = undefined
+      context.eyedropperFeedback.value = undefined
+      context.store.selectTool(toolId)
+      continuation?.()
+    })
+  }
   let samplingDefaultsTool: string | undefined
   return {
     onToolConfigureKeydown: (event: KeyboardEvent) => {
@@ -136,18 +148,17 @@ export function createToolUiController(context: ToolUiControllerContext) {
         !context.toolConfigure.value ||
         event.defaultPrevented
       ) return
-      const nestedOpen = document.querySelector(
-        '.cs-tool-configure-popover-host [aria-haspopup="dialog"][aria-expanded="true"], .cs-tool-configure-popover-host [role="combobox"][aria-expanded="true"]',
-      )
+      const host = document.getElementById('cs-tool-defaults')
+      const target = event.target
       if (
-        nestedOpen &&
-        event.target instanceof Element &&
-        event.target.closest('[role="dialog"], [role="listbox"]')
-      )
-        return
+        target instanceof Element &&
+        ownsSurfaceTarget(host?.dataset.csSurface, target) &&
+        (target.closest('[role="dialog"], [role="listbox"]') !== host ||
+          target.closest('input, textarea, [role="combobox"], [role="slider"]'))
+      ) return
       event.preventDefault()
       event.stopImmediatePropagation()
-      closeToolConfigure(context)
+      closeToolConfigure(context, true)
     },
     onColorChange: (id: string, value: string) => onColorChange(context, id, value),
     startEyedropper: (id: string) => {
@@ -174,43 +185,45 @@ export function createToolUiController(context: ToolUiControllerContext) {
     },
     onToolConfigureOutsidePointer: (event: PointerEvent) => onToolConfigureOutsidePointer(context, event),
     openToolConfigure: (toolId: string, anchor: HTMLElement) => {
-      context.store.selectTool(toolId)
-      if (
-        ![
-          'arrow',
-          'shape',
-          'pencil',
-          'marker',
-          'text',
-          'callout',
-          'numberedMarker',
-          'censor',
-          'spotlight',
-          'ruler',
-          'loupe',
-          'crop',
-        ].includes(toolId)
-      ) {
-        closeToolConfigure(context)
-        return
-      }
-      const rect = anchor.getBoundingClientRect()
-      context.toolConfigure.value = { toolId, anchor }
-      context.toolConfigureLayout.value = {
-        left: Math.max(
-          Math.min(340, window.innerWidth / 2),
-          Math.min(window.innerWidth - Math.min(340, window.innerWidth / 2), rect.left + rect.width / 2),
-        ),
-        top: rect.top,
-      }
-      void nextTick(() =>
-        document
-          .querySelector<HTMLElement>(
-            '.cs-tool-configure-popover-host button:not(:disabled), .cs-tool-configure-popover-host select',
-          )
-          ?.focus({ preventScroll: true }))
+      if (context.toolConfigure.value?.toolId === toolId && context.toolConfigure.value.anchor === anchor) return
+      activate(toolId, () => {
+        if (
+          ![
+            'arrow',
+            'shape',
+            'pencil',
+            'marker',
+            'text',
+            'callout',
+            'numberedMarker',
+            'censor',
+            'spotlight',
+            'ruler',
+            'loupe',
+            'crop',
+          ].includes(toolId)
+        ) {
+          closeToolConfigure(context)
+          return
+        }
+        const rect = anchor.getBoundingClientRect()
+        context.toolConfigure.value = { toolId, anchor }
+        context.toolConfigureLayout.value = {
+          left: Math.max(
+            Math.min(340, window.innerWidth / 2),
+            Math.min(window.innerWidth - Math.min(340, window.innerWidth / 2), rect.left + rect.width / 2),
+          ),
+          top: rect.top,
+        }
+        void nextTick(() =>
+          document
+            .querySelector<HTMLElement>(
+              '.cs-tool-configure-popover-host button:not(:disabled), .cs-tool-configure-popover-host select',
+            )
+            ?.focus({ preventScroll: true }))
+      })
     },
-    closeToolConfigure: () => closeToolConfigure(context),
+    closeToolConfigure: () => closeToolConfigure(context, true),
     onToolConfigureChange: (id: string, value: string) => {
       context.configureDefaultsTool.value = context.toolConfigure.value?.toolId
       try {
@@ -219,13 +232,6 @@ export function createToolUiController(context: ToolUiControllerContext) {
         context.configureDefaultsTool.value = undefined
       }
     },
-    selectTool: (id: string) => {
-      context.toolError.value = undefined
-      context.store.selectTool(id)
-      if (id === 'eyedropper') {
-        context.eyedropperColor.value = undefined
-        context.eyedropperFeedback.value = undefined
-      }
-    },
+    selectTool: (id: string) => activate(id),
   }
 }

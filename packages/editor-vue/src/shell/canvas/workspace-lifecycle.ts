@@ -94,11 +94,17 @@ export function registerRenderLifecycle(context: RenderLifecycleContext): void {
     scrollHost?.removeEventListener('scroll', context.invalidateOverlay)
     resizeObserver?.disconnect()
     if (resizeFrame !== undefined) cancelAnimationFrame(resizeFrame)
+    context.editingText.value = undefined
     context.renderer.dispose()
   })
 }
 
 function registerDocumentWatches(context: RenderLifecycleContext): void {
+  watch(() => context.props.document?.id, () => {
+    context.cancelGesture()
+    context.editingText.value = undefined
+    context.emit('textEditing', undefined)
+  }, { flush: 'sync' })
   watch(
     () => context.props.document,
     () => {

@@ -114,6 +114,15 @@ function onTextCancelled(): void {
     <div class="cs-editor-shell" :class="{ 'is-quick-mode': props.quickMode }">
       <TopBar
         v-if="!props.quickMode"
+        :can-edit-canvas="
+          Boolean(
+            activeDocument &&
+              props.documentSession &&
+              !props.readOnlyDocument &&
+              store.documentHistory.saveState !== 'readOnly' &&
+              store.actionState.status !== 'pending'
+          )
+        "
         :locale="store.locale"
         :theme="store.preferences.theme"
         :can-copy-or-export="store.canCopyOrExport"
@@ -127,6 +136,7 @@ function onTextCancelled(): void {
         :capture-unavailable-reason="props.captureUnavailableReason ?? translate('captureUnavailable')"
         :open-image-available="props.openImageAvailable"
         :t="translate"
+        @canvas-action="onContextAction"
         @action="store.runAction"
         @undo="undoDocument"
         @redo="redoDocument"
@@ -164,6 +174,8 @@ function onTextCancelled(): void {
       <div class="cs-workbench">
         <div v-if="props.quickMode && !props.quickSelectionMode" class="cs-quick-toolrail-group">
           <ToolRail
+            :configured-tool-id="toolConfigure?.toolId"
+            :configure-hint="translate('toolConfigureHint')"
             :tools="tools"
             :active-tool-id="store.activeToolId"
             :t="translate"
@@ -215,6 +227,8 @@ function onTextCancelled(): void {
               @eyedropper="startEyedropper"
             />
             <ToolRail
+              :configured-tool-id="toolConfigure?.toolId"
+              :configure-hint="translate('toolConfigureHint')"
               :tools="tools"
               :active-tool-id="store.activeToolId"
               :t="translate"
@@ -269,6 +283,7 @@ function onTextCancelled(): void {
           @quick-frame-change="emit('quickFrameChange', $event)"
           @quick-selection-complete="emit('quickSelectionComplete', $event)"
           @context-menu="openCanvasMenu"
+          @clear-selection="store.clearLayerSelection()"
           @select-layer="selectLayer"
           @move-layer="moveLayer"
           @transform-layer="transformLayer"
@@ -281,7 +296,7 @@ function onTextCancelled(): void {
           @arrow-toolbar-change="onContextChange"
           @request-image-import="importContentImage"
           @open-image="store.runAction('openImage')"
-          @select-tool="store.selectTool"
+          @select-tool="selectTool"
           @color-sample="onColorSample"
           @color-sample-error="onColorSampleError"
           @color-sample-cancel="onColorSampleCancel"
@@ -345,7 +360,9 @@ function onTextCancelled(): void {
       <div class="cs-overlay-root" aria-live="polite">
         <ToolConfigurePopover
           v-if="toolConfigureSchema && toolConfigure"
+          :key="toolConfigure.toolId"
           :anchor="toolConfigure.anchor"
+          :label="translate('toolSettings')"
           @keydown.esc.prevent.stop="closeToolConfigure"
           @pointerdown.stop
         >

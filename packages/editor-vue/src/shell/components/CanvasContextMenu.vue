@@ -19,16 +19,16 @@ const root = ref<HTMLElement>()
 const viewportWidth = () => window.innerWidth
 const viewportHeight = () => window.innerHeight
 let previousFocus: HTMLElement | undefined
-function close(): void {
+function close(restoreFocus = true): void {
   emit('close')
-  previousFocus?.focus({ preventScroll: true })
+  if (restoreFocus && previousFocus?.isConnected) previousFocus.focus({ preventScroll: true })
 }
 function outside(event: PointerEvent): void {
   if (
     props.request &&
     event.target instanceof Node &&
     !root.value?.contains(event.target)
-  ) close()
+  ) close(false)
 }
 function keydown(event: KeyboardEvent): void {
   if (event.key === 'Escape' || event.key === 'Tab') {

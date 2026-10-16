@@ -326,6 +326,7 @@ export const translationKeys = [
   'darkTheme',
   'tools',
   'toolSettings',
+  'toolConfigureHint',
   'canvasActions',
   'flipHorizontal',
   'flipVertical',

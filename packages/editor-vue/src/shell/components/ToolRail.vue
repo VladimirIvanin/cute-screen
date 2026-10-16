@@ -8,6 +8,8 @@ import UiSeparator from '../ui/UiSeparator.vue'
 import type { ToolDescriptor } from '../types'
 
 defineProps<{
+  configuredToolId?: string | undefined
+  configureHint?: string | undefined
   tools: readonly ToolDescriptor[]
   activeToolId?: string | undefined
   t: (key: ToolDescriptor['labelKey'] | 'tools') => string
@@ -16,6 +18,10 @@ const emit = defineEmits<{
   select: [id: string]
   configure: [id: string, anchor: HTMLElement]
 }>()
+
+function configurable(id: string): boolean {
+  return !['select', 'hand', 'image', 'eyedropper'].includes(id)
+}
 
 const toolGroups = ['canvas', 'annotate', 'more'] as const
 
@@ -67,7 +73,7 @@ function onToolKeydown(
           :key="tool.id"
           placement="top"
           :delay="400"
-          :disabled="Boolean(tool.disabled)"
+          :disabled="Boolean(tool.disabled || configuredToolId)"
         >
           <template #trigger>
             <NButton
@@ -76,6 +82,9 @@ function onToolKeydown(
               class="cs-tool-button"
               :class="{ 'is-active': activeToolId === tool.id }"
               :disabled="Boolean(tool.disabled)"
+              :aria-haspopup="configurable(tool.id) ? 'dialog' : undefined"
+              :aria-expanded="configurable(tool.id) ? configuredToolId === tool.id : undefined"
+              :aria-controls="configuredToolId === tool.id ? 'cs-tool-defaults' : undefined"
               :aria-pressed="activeToolId === tool.id"
               :aria-label="t(tool.labelKey)"
               :title="tool.disabled ? toolTitle(tool, t) : undefined"
@@ -86,7 +95,7 @@ function onToolKeydown(
               <UiIcon :name="tool.icon" />
             </NButton>
           </template>
-          {{ toolTitle(tool, t) }}
+          {{ toolTitle(tool, t) }}{{ configurable(tool.id) && configureHint ? ` · ${configureHint}` : '' }}
         </NTooltip>
       </div>
     </template>

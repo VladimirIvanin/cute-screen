@@ -115,8 +115,10 @@ describe('v7 text contextual toolbar', () => {
     const padding = rendered.getByRole('spinbutton', { name: 'Padding' }) as HTMLInputElement
     await fireEvent.update(padding, '257')
     expect(within(backgroundDialog).getByRole('button', { name: 'Apply' })).toBeDisabled()
-    await fireEvent.pointerDown(document.body)
-    await waitFor(() => expect(background).toHaveFocus())
+    size.focus()
+    await fireEvent.pointerDown(size)
+    await waitFor(() => expect(rendered.queryByRole('dialog')).toBeNull())
+    expect(size).toHaveFocus()
   })
 
   it('keeps all groups visible with RU names and real alignment buttons', async () => {

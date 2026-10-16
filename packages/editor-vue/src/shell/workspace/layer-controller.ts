@@ -14,6 +14,7 @@ import {
 import type { ResolvedEditorShellProps } from '../contracts'
 
 export interface LayerControllerContext {
+  readonly finishTextEditing: (continuation: () => void) => void
   readonly prepareLayer?: (layer: LayerNode) => LayerNode
   readonly props: ResolvedEditorShellProps
   readonly activeDocument: Ref<EditorDocumentV1 | undefined>
@@ -246,8 +247,10 @@ export function createLayerController(context: LayerControllerContext) {
       reorderLayerTo(context, id, targetId, place),
     moveLayer: (id: string, deltaX: number, deltaY: number) => moveLayer(context, id, deltaX, deltaY),
     selectLayer: (id: string, toggle = false, range = false) => {
-      context.store.selectTool('select')
-      context.store.selectLayer(id, toggle, range)
+      context.finishTextEditing(() => {
+        context.store.selectTool('select')
+        context.store.selectLayer(id, toggle, range)
+      })
     },
     transformLayer: (id: string, transform: Transform2D) => transformLayer(context, id, transform),
     updateLayerPayload: (id: string, payload: JsonObject) => updateLayerPayload(context, id, payload),

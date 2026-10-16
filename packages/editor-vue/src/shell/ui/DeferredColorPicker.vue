@@ -22,6 +22,9 @@ import {
 } from '@cute-screen/editor-renderer'
 import { UiIcon } from '../icon'
 
+import { useTransientSurface } from './transient-surface'
+const surfaceOwner = useTransientSurface()
+
 const props = withDefaults(
   defineProps<{
     modelValue: string
@@ -110,7 +113,10 @@ function commit(value = draft.value): void {
   emit('commit', draft.value)
 }
 
-function onShown(next: boolean): void {
+function onShown(
+  next: boolean,
+  restoreFocus = false,
+): void {
   if (next && props.disabled) {
     shown.value = false
     return
@@ -121,7 +127,7 @@ function onShown(next: boolean): void {
     void nextTick(() => hexInput.value?.focus({ preventScroll: true }))
   } else {
     resetDraft()
-    void nextTick(() => trigger.value?.$el?.focus({ preventScroll: true }))
+    if (restoreFocus) void nextTick(() => trigger.value?.$el?.focus({ preventScroll: true }))
   }
 }
 
@@ -131,7 +137,7 @@ function close(): void {
     emit('dismiss')
     return
   }
-  onShown(false)
+  onShown(false, true)
 }
 
 function choose(value: string): void {
@@ -254,6 +260,7 @@ function requestEyedropper(): void {
         </template>
         <section
           ref="popover"
+          :data-cs-surface="surfaceOwner"
           class="cs-color-popover"
           :class="{ 'cs-color-popover--embedded': embedded }"
           :role="embedded ? 'group' : 'dialog'"

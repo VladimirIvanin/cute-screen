@@ -179,87 +179,6 @@ function imageSchema(
     ],
   }
 }
-function documentSchema(context: ContextSchemaContext): ContextToolbarSchema | undefined {
-  if (context.quickMode.value || !context.activeDocument.value)
-    return undefined
-  return {
-    icon: 'select',
-    title: context.translate('canvasActions'),
-    hint: context.translate('canvasViewport'),
-    controls: [
-      {
-        kind: 'action',
-        id: 'flipHorizontal',
-        label: context.translate('flipHorizontal'),
-      },
-      {
-        kind: 'action',
-        id: 'flipVertical',
-        label: context.translate('flipVertical'),
-      },
-    ],
-  }
-}
-function precisionSchema(
-  context: ContextSchemaContext,
-  tool: string,
-): ContextToolbarSchema | undefined {
-  const selected = tool === 'select' ? context.selectedPrecisionLayer() : undefined
-  const precisionTool = tool === 'censor' || tool === 'spotlight' || tool === 'ruler' || tool === 'loupe'
-    ? tool
-    : tool === 'select'
-      ? selected?.kind
-      : undefined
-  return precisionTool ? context.precisionToolSchema(precisionTool, selected) : undefined
-}
-function drawingSchema(
-  context: ContextSchemaContext,
-  tool: string,
-): ContextToolbarSchema | undefined {
-  if (context.isDrawingTool(tool)) {
-    if (tool === 'arrow')
-      return undefined
-    return context.drawingControl(tool, context.drawingDefaults.value[tool], true)
-  }
-  const selected = tool === 'select' ? context.selectedDrawingLayer() : undefined
-  if (!selected || !context.isDrawingTool(selected.kind))
-    return undefined
-  return selected.kind === 'arrow' ? undefined : context.drawingControl(selected.kind, selected.payload)
-}
-function contextSchemaFor(context: ContextSchemaContext): ContextToolbarSchema | undefined {
-  const tool = context.activeToolId.value ?? 'select'
-  if (tool === 'crop')
-    return cropSchema(context)
-  if (tool === 'select')
-    return context.store.selectedLayerIds.length ? undefined : documentSchema(context)
-  const precision = precisionSchema(context, tool)
-  if (precision)
-    return precision
-  const selected = tool === 'select' ? selectedLayer(context) : undefined
-  const text = context.buildTextContextSchema(selected, tool)
-  if (text) {
-    return context.textDraft.value
-      ? {
-          icon: text.icon,
-          title: text.title,
-          hint: text.hint,
-          controls: text.controls,
-        } : text
-  }
-  if (tool === 'numberedMarker')
-    return numberedMarkerSchema(context)
-  const drawing = drawingSchema(context, tool)
-  if (drawing)
-    return drawing
-  if (
-    tool === 'select' &&
-    selected?.kind === 'image' &&
-    selected.payload.role === 'content'
-  ) {
-    return imageSchema(context, selected)
-  }
-  return documentSchema(context)
-}
 function schemaForLayer(
   context: ContextSchemaContext,
   layer: LayerNode,
@@ -439,7 +358,7 @@ export function createContextSchema(context: ContextSchemaContext) {
     } : text
   })
   return {
-    contextSchema: computed(() => (context.toolConfigure.value ? undefined : contextSchemaFor(context))),
+    contextSchema: computed(() => (!context.toolConfigure.value && context.activeToolId.value === 'crop' ? cropSchema(context) : undefined)),
     floatingArrowToolbarSchema,
     selectionSchema,
     toolConfigureSchema,

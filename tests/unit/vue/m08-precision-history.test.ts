@@ -373,7 +373,7 @@ describe('M08 shell lifecycle and contextual settings', () => {
       props: { documentSession: markRaw(session) },
       global: { plugins: [pinia] },
     })
-    const toolbar = view.container.querySelector('.cs-context-toolbar') as HTMLElement
+    let toolbar: HTMLElement
     const english = [
       ['Hide data', ['Region shape', 'Pixelate', 'Blur', 'Solid fill', 'Pixel size']],
       ['Spotlight', ['Shape', 'Dim color', 'Dim opacity', 'Feather']],
@@ -381,7 +381,8 @@ describe('M08 shell lifecycle and contextual settings', () => {
       ['Loupe', ['Zoom', 'Size', 'Shape', 'Border']],
     ] as const
     for (const [tool, labels] of english) {
-      await fireEvent.click(screen.getByRole('button', { name: tool }))
+      await fireEvent.contextMenu(screen.getByRole('button', { name: tool }))
+      toolbar = view.container.querySelector('.cs-tool-configure-popover-host .cs-context-toolbar') as HTMLElement
       const more = within(toolbar).queryByRole('button', { name: /More|Ещё/ })
       if (more) await fireEvent.click(more)
       if (tool === 'Spotlight' || tool === 'Ruler') {
@@ -393,11 +394,13 @@ describe('M08 shell lifecycle and contextual settings', () => {
     }
 
     useEditorShellStore(pinia).setLocale('ru')
-    await fireEvent.click(await screen.findByRole('button', { name: 'Скрыть данные' }))
+    await fireEvent.contextMenu(await screen.findByRole('button', { name: 'Скрыть данные' }))
+    toolbar = view.container.querySelector('.cs-tool-configure-popover-host .cs-context-toolbar') as HTMLElement
     expect(within(toolbar).getByRole('button', { name: 'Форма области' })).toBeInTheDocument()
     expect(within(toolbar).getByRole('group', { name: 'Эффект' })).toBeInTheDocument()
 
-    await fireEvent.click(await screen.findByRole('button', { name: 'Линейка' }))
+    await fireEvent.contextMenu(await screen.findByRole('button', { name: 'Линейка' }))
+    toolbar = view.container.querySelector('.cs-tool-configure-popover-host .cs-context-toolbar') as HTMLElement
     for (const name of ['Цвет', 'Толщина', 'Подпись и единицы', 'Измерение и привязка']) expect(within(toolbar).getByRole('button', { name })).toBeInTheDocument()
     await fireEvent.click(await screen.findByRole('button', { name: 'Показать слои' }))
     expect(view.container.querySelector('.cs-layers-panel')).not.toHaveTextContent(/Размер подписи|Шаг угла|Привязка/u)

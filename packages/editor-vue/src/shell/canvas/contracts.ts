@@ -117,6 +117,7 @@ export type CanvasViewportEmits = {
   contextMenu: [request: { clientX: number; clientY: number; layerId?: string }]
   hostsReady: [hosts: CanvasViewportHosts]
   frameReady: [documentId: string]
+  clearSelection: []
   selectLayer: [id: string, toggle: boolean]
   moveLayer: [id: string, deltaX: number, deltaY: number]
   transformLayer: [id: string, transform: Transform2D]
@@ -159,6 +160,7 @@ export interface CanvasViewportExpose {
   cancelCropDraft(): void
   resetCropDraft(): void
   setCropPresetValue(preset: import('@cute-screen/editor-renderer').CropPreset): void
+  finishTextEditing(continuation: () => void): void
   refitCanvas(): void
 }
 
@@ -229,6 +231,7 @@ export const canvasViewportRuntimeEmits = [
   'contextMenu',
   'hostsReady',
   'frameReady',
+  'clearSelection',
   'selectLayer',
   'moveLayer',
   'transformLayer',

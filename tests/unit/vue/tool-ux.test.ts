@@ -146,7 +146,7 @@ describe('consistent tool UX through the mounted shell', () => {
     app.session.undo()
     expect(app.session.snapshot.core.document.layers.map((layer) => 'blendMode' in layer ? layer.blendMode : null)).toEqual(['multiply', 'screen'])
     app.session.redo()
-    await fireEvent.click(screen.getByRole('button', { name: 'Highlighter' }))
+    await fireEvent.contextMenu(screen.getByRole('button', { name: 'Highlighter' }))
     await fireEvent.click(screen.getByRole('button', { name: 'Effect' }))
     await fireEvent.click(await screen.findByRole('button', { name: 'Auto' }))
     await draw(app.scene)
@@ -453,11 +453,11 @@ describe('consistent tool UX through the mounted shell', () => {
       kind: 'text',
       payload: { content: { text: 'Hello 😀', spans: [{ fontSize: 32 }] } },
     })
-    await fireEvent.click(rail.getByRole('button', { name: 'Callout' }))
+    await fireEvent.contextMenu(rail.getByRole('button', { name: 'Callout' }))
     expect(fontSize()).toHaveTextContent('24')
-    await fireEvent.click(rail.getByRole('button', { name: 'Numbered marker' }))
+    await fireEvent.contextMenu(rail.getByRole('button', { name: 'Numbered marker' }))
     expect(fontSize()).toHaveTextContent('16')
-    await fireEvent.click(rail.getByRole('button', { name: 'Text' }))
+    await fireEvent.contextMenu(rail.getByRole('button', { name: 'Text' }))
     expect(fontSize()).toHaveTextContent('32')
     await draw(app.scene, 95)
     const cancelled = screen.getByRole('textbox', { name: 'Text editor' })

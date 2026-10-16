@@ -53,7 +53,7 @@ describe('Quick Capture context toolbar', () => {
 
   it('retains tool settings and selected-arrow formatting without fallback actions', async () => {
     const { view, session, store } = renderDocument(true)
-    await fireEvent.click(screen.getByRole('button', { name: 'Pencil' }))
+    await fireEvent.contextMenu(screen.getByRole('button', { name: 'Pencil' }))
     expect(view.container.querySelector('.cs-context-toolbar')).toBeInTheDocument()
     await fireEvent.click(screen.getByRole('button', { name: 'Select' }))
     store.selectLayer(session.snapshot.core.document.layers[0]!.id)
@@ -74,7 +74,8 @@ describe('Quick Capture context toolbar', () => {
     const { view, session } = renderDocument(false)
     await fireEvent.click(screen.getByRole('button', { name: 'Select' }))
     const before = session.snapshot.core.document
-    await fireEvent.click(screen.getByRole('button', { name: `Flip ${axis}` }))
+    await fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
+    await fireEvent.click(screen.getByRole('menuitem', { name: `Flip ${axis}` }))
     const flipped = session.snapshot.core.document
     expect(flipped.layers).not.toEqual(before.layers)
     await fireEvent.click(screen.getByRole('button', { name: 'Undo' }))

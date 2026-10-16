@@ -725,3 +725,16 @@ WebKitGTK 605.1.15: production Capture → Quick → Editor, настройки 
 сессию до test body. Native pointer-жесты, физический capture, WebView2/WKWebView
 этим UI-прогоном не подтверждаются. Document v7, IPC и capture capabilities
 не меняются. Evidence и команды — TESTING.md, `artifacts/censor-toolbar/`.
+
+## Жизненный цикл инструментов и панелей (2026-10-16, ADR-063)
+
+Linux x86_64 / Chrome 154.0.8037.57: browser suite — 6/6 файлов, 20/20
+сценариев; native browser pointer/keyboard, selection/defaults/inline text,
+RU/EN, light/dark и DPR 1/2 подтверждены соответствующими сценариями.
+Настоящий Tauri / WebKitGTK 605.1.15 собран и открыл production Capture → Quick,
+но embedded driver не открыл configure ни через ПКМ, ни через Shift+F10
+(0/2 сценариев). `tauri-driver` и `WebKitWebDriver` отсутствуют в PATH;
+native lifecycle acceptance остаётся pending. Это не подтверждает причину
+неудачи на уровне продукта и не заменяет проверку внешним driver/manual input.
+Windows/WebView2, macOS/WKWebView, Wayland и physical capture для этого изменения
+не запускались; новые supported claims не добавлены. Команды и artifacts — TESTING.md.

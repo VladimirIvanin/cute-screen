@@ -396,7 +396,12 @@ function createControllers(
       workspace.toolError.value = message
     },
   })
+  const finishTextEditing = (continuation: () => void) => {
+    if (workspace.canvasViewport.value) workspace.canvasViewport.value.finishTextEditing(continuation)
+    else continuation()
+  }
   const toolUi = createToolUiController({
+    finishTextEditing,
     props,
     store,
     locale: schemas.state.locale,
@@ -414,6 +419,7 @@ function createControllers(
     saveDrawingPreferences: context.saveDrawingPreferences,
   })
   const layers = createLayerController({
+    finishTextEditing,
     props,
     activeDocument: workspace.activeDocument,
     store,

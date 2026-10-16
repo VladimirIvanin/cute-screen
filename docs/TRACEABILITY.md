@@ -1,5 +1,19 @@
 # Трассируемость требований
 
+## Жизненный цикл инструментов и панелей (2026-10-16, ADR-063)
+
+`REQ-EDT-002/003/008/015/016/018`, `REQ-UI-003/006/007`: запись добавлена до
+реализации. Пустой canvas/background снимает выделение; создание очищает прежний
+выбор; defaults доступны только по ПКМ/Shift+F10/ContextMenu. Один переход
+синхронизирует tool, selection, sampling и принадлежащие поверхности, включая
+teleport. Escape закрывает ближайший уровень; внешний клик сохраняет назначение
+и фокус. Inline commit предшествует выбору/переключению с учётом IME и fonts.
+Crop сохраняет Apply/Cancel; общие flip commands переносятся в More actions.
+Проверки: mounted-shell regressions, browser native input, production Tauri
+Capture → Quick → Editor. Реализовано; browser 20/20 и полный `pnpm check`
+прошли. Native embedded configure не открылся (0/2), acceptance pending;
+фактические команды и результаты — TESTING.md.
+
 ## Text sizing and wrapping follow-up (2026-10-16, ADR-062)
 
 REQ-TOL-005 / REQ-EDT-005: this entry was added before implementation.

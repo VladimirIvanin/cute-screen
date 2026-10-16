@@ -69,6 +69,12 @@ const scenarios = [
     fakeCapture: true,
   },
   {
+    id: 'tool-lifecycle',
+    spec: 'tests/e2e/specs/tauri-tool-lifecycle.e2e.ts',
+    harnessQuery: '?m04=1&m08=1',
+    fakeCapture: true,
+  },
+  {
     id: 'tool-settings',
     spec: 'tests/e2e/specs/tauri-tool-settings.e2e.ts',
     harnessQuery: '?m04=1&m08=1',

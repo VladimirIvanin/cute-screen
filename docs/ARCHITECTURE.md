@@ -311,6 +311,26 @@ JSON как bytes/base64.
 - Rust выполняет атомарную запись и при необходимости JPEG/WebP encoding.
 - После записи файл декодируется обратно в release/E2E suite для проверки размера и формата.
 
+## Переходы инструментов и transient surfaces (ADR-063)
+
+Store `selectTool` очищает выбор при включении creation tools, а общий
+workspace lifecycle обрабатывает каждую активацию (включая повторную), закрывая
+configure и sampling. UI controller завершает inline text до нового режима;
+layer selection использует тот же барьер. `finishTextEditing(continuation)`
+дожидается IME/font readiness и выполняет последний переход один раз.
+Canvas сообщает `clearSelection` после пустого hit; фон рабочей области имеет
+собственный pointer handler, не затрагивающий chrome и pan.
+
+Defaults открываются только по ПКМ/Shift+F10/ContextMenu на кнопке. Снизу
+остаётся Crop; selection и inline toolbar сохраняют свои hosts. Flip canvas
+доступен в More actions TopBar через typed `canvasAction` и `canEditCanvas`.
+`provideTransientSurface` задаёт owner для host и teleported children;
+`usePreviewPopover`, colour pickers и UiSelect передают `data-cs-surface`.
+Общий overlay root не является внутренней областью каждого поповера.
+Outside dismissal не возвращает фокус; Escape закрывает ближайший уровень.
+Новые UI-переходы не создают EditorCommand; подтверждённые правки используют
+прежний command/history pipeline, scene graph остаётся вне глубокой Vue reactivity.
+
 ## Vue UI
 
 Основные компоненты:

@@ -10,6 +10,8 @@ import {
   type PreviewPlacement,
 } from './preview-placement'
 
+import { useTransientSurface } from './transient-surface'
+
 /** Only observes layout; scene gestures remain outside Vue's render loop.
  * Consumers use an external trigger and NPopover x/y + overlap + top-start.
  * In manual mode Naive UI omits its trigger slot; bottom-start translates the panel upward.
@@ -18,6 +20,7 @@ export function usePreviewPopover(
   anchor: () => HTMLElement | undefined,
   panel: () => HTMLElement | undefined,
 ) {
+  const surfaceOwner = useTransientSurface()
   const position = shallowRef<PreviewPlacement>()
   let observer: ResizeObserver | undefined
   let frame: number | undefined
@@ -25,6 +28,7 @@ export function usePreviewPopover(
     frame = undefined
     const trigger = anchor(), content = panel()
     if (!trigger || !content) return
+    if (surfaceOwner) content.dataset.csSurface = surfaceOwner
     const { view, obstacles } = previewEnvironment(trigger, content)
     content.style.maxWidth = `${Math.max(1, view.width - 16)}px`
     content.style.maxHeight = `${Math.max(1, view.height - 16)}px`
@@ -42,6 +46,7 @@ export function usePreviewPopover(
       // measured coordinates until the next opening supplies a new placement.
       return
     }
+    if (surfaceOwner) content.dataset.csSurface = surfaceOwner
     if (typeof ResizeObserver !== 'undefined') {
       observer = new ResizeObserver(schedule)
       observer.observe(trigger)

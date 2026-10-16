@@ -169,6 +169,7 @@ function summary(menu: string): string {
 function show(
   menu: string,
   shown: boolean,
+  restoreFocus = true,
 ): void {
   if (
     shown &&
@@ -186,7 +187,7 @@ function show(
       panel.value?.querySelector<HTMLElement>('[aria-pressed="true"], input:not(:disabled), button:not(:disabled)')?.focus({
         preventScroll: true,
       })
-    else
+    else if (restoreFocus)
       triggers.get(menu)?.focus({
         preventScroll: true,
       })
@@ -270,8 +271,8 @@ watch([() => props.schema.icon, () => settings.value.activeApertureId], () => {
       :show-arrow="false"
       raw
       to=".cs-overlay-root"
-      @update:show="show(menu, $event)"
-      @clickoutside="show(menu, false)"
+      @update:show="show(menu, $event, false)"
+      @clickoutside="show(menu, false, false)"
     >
       <div
         v-if="open === menu"

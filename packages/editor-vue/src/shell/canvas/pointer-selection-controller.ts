@@ -165,7 +165,16 @@ function selectHitLayer(
   const index = hits.length === 0 ? 0 : shouldCycle ? ((previous?.index ?? 0) + 1) % hits.length : 0
   context.setCycle({ key, at: now, index })
   const hit = hits[index] ?? hitTestDocument(document, point)
-  if (!hit) return
+  if (!hit) {
+    if (
+      !event.shiftKey &&
+      !event.metaKey &&
+      !event.ctrlKey &&
+      !event.altKey
+    ) context.emit('clearSelection')
+    context.invalidateOverlay()
+    return
+  }
   context.emit('selectLayer', hit.nodeId, event.metaKey || event.ctrlKey)
   context.scene.value!.setPointerCapture(event.pointerId)
   context.setGesture({

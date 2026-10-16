@@ -194,10 +194,16 @@ export function useWorkspaceLifecycle(context: WorkspaceLifecycleContext) {
     if (name !== 'selectTool') return
     // Observe the intent, including reselecting the same tool via a shortcut.
     // Watching activeToolId alone misses those explicit cancellations.
+    context.workspace.toolConfigure.value = undefined
+    context.workspace.toolConfigureLayout.value = undefined
     context.workspace.samplingControl.value = undefined
     context.workspace.eyedropperColor.value = undefined
     context.workspace.eyedropperFeedback.value = undefined
   })
+  watch([() => context.workspace.activeDocument.value?.id, () => context.store.selectedLayerIds.join(',')], () => {
+    context.workspace.toolConfigure.value = undefined
+    context.workspace.toolConfigureLayout.value = undefined
+  }, { flush: 'sync' })
   onBeforeUnmount(stopToolSampling)
   const onMediaChange = (event: MediaQueryListEvent) => context.store.setSystemDark(event.matches)
   registerResourceWatches(context)

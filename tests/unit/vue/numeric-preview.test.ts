@@ -65,6 +65,7 @@ describe('display-only numeric preview', () => {
     expect(app.display()).toBeUndefined()
     expect(app.session.snapshot.core.document).toEqual(original)
     const controller = createLayerController({
+      finishTextEditing: (continuation) => continuation(),
       props: { documentSession: app.session } as Parameters<typeof createLayerController>[0]['props'],
       activeDocument: shallowRef(original),
       store: { selectedLayerIds: [app.layer.id], selectTool: vi.fn(), selectLayer: vi.fn() },

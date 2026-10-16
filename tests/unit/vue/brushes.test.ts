@@ -106,7 +106,7 @@ describe('ink input and settings', () => {
       correlationId: () => 'ink-defaults', debounceMs: 60000 })
     const view = render(EditorShell, { props: { documentSession: markRaw(session) },
       global: { plugins: [createEditorShellPinia()] } })
-    await fireEvent.click(screen.getByRole('button', { name: 'Pencil' }))
+    await fireEvent.contextMenu(screen.getByRole('button', { name: 'Pencil' }))
     async function correction(value: string): Promise<void> {
       await fireEvent.click(screen.getByRole('button', { name: 'Correction' }))
       const input = await screen.findByRole('spinbutton', { name: 'Correction' })

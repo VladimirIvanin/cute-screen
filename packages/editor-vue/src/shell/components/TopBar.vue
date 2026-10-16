@@ -21,6 +21,7 @@ const props = withDefaults(
     locale: SupportedLocale
     theme: ThemePreference
     canCopyOrExport: boolean
+    canEditCanvas?: boolean
     canUndo?: boolean
     canRedo?: boolean
     saveState?: DocumentSaveState | undefined
@@ -44,6 +45,7 @@ const props = withDefaults(
 )
 const emit = defineEmits<{
   action: [name: 'capture' | 'captureWindow' | 'openImage' | 'copy' | 'export']
+  canvasAction: [name: 'flipHorizontal' | 'flipVertical']
   undo: []
   redo: []
   retrySave: []
@@ -232,6 +234,16 @@ function selectLocale(value: SupportedLocale): void {
           </NButton>
         </template>
         <div class="cs-menu" role="menu">
+          <NButton
+            v-for="action in ['flipHorizontal', 'flipVertical'] as const"
+            :key="action"
+            role="menuitem"
+            text
+            :disabled="!canEditCanvas"
+            @click="menuOpen = false; emit('canvasAction', action)"
+          >
+            {{ t(action) }}
+          </NButton>
           <p>{{ t('theme') }}</p>
           <NButton
             v-for="value in ['system', 'light', 'dark'] as const"

@@ -10,6 +10,10 @@ import {
   type SelectOption,
 } from 'naive-ui'
 
+import { useTransientSurface } from './transient-surface'
+const surfaceOwner = useTransientSurface()
+const menuProps = { class: 'cs-owned-select-menu', 'data-cs-surface': surfaceOwner }
+
 const props = defineProps<{
   modelValue: string | number
   options: readonly SelectOption[]
@@ -55,6 +59,7 @@ watch(
     @click="scheduleOptionLabels"
   >
     <NSelect
+      :menu-props="menuProps"
       :value="modelValue"
       :size="size ?? 'small'"
       :options="[...options]"

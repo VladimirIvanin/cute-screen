@@ -170,6 +170,8 @@ export class CanvasWorkspaceController {
         ) return
         handlePointerDown(this.#pointerDown, event)
       },
+      finishTextEditing: (continuation: () => void) => this.#textEditor.finishEditing(continuation),
+      onBackgroundPointerDown: (event: PointerEvent) => this.#backgroundPointerDown(event),
       onPointerMove: (event: PointerEvent) => {
         if (!this.#spotlight.pointerMove(event)) handlePointerMove(this.#pointerMove, event)
       },
@@ -209,6 +211,30 @@ export class CanvasWorkspaceController {
       setCropPresetValue: this.setCropPreset,
       refitCanvas: () => this.#viewport.fit(),
     }
+  }
+
+  #backgroundPointerDown(event: PointerEvent): void {
+    const target = event.target
+    const background = target === this.#state.scrollContainer.value ||
+      target instanceof HTMLElement && (target.classList.contains('cs-canvas-stage') || target.classList.contains('cs-canvas-surface'))
+    if (!background) return
+    if (
+      event.button !== 0 ||
+      event.shiftKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey ||
+      this.#spacePressed ||
+      this.#gesture ||
+      this.#props.sampling ||
+      this.#props.quickSelectionMode ||
+      this.#props.activeTool === 'hand' ||
+      this.#props.activeTool === 'crop'
+    ) return
+    this.#textEditor.finishEditing(() => {
+      this.#emit('clearSelection')
+      this.#state.scene.value?.focus({ preventScroll: true })
+    })
   }
 
   readonly applyCrop = (): void => {

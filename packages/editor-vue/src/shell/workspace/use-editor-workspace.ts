@@ -103,7 +103,15 @@ function createWorkspaceCore(props: ResolvedEditorShellProps) {
     redo: session.redoDocument,
     fit: () => store.enableFit(),
   })
+  const stopMenuTransitions = store.$onAction(({ name }) => {
+    if (name === 'selectTool' || name === 'clearLayerSelection') selectionActions.canvasMenu.value = undefined
+  })
+  onBeforeUnmount(stopMenuTransitions)
+  watch(() => workspace.activeDocument.value?.id, () => {
+    selectionActions.canvasMenu.value = undefined
+  })
   const { onKeydown } = createKeyboardController({
+    selectTool: bindings.selectTool,
     props,
     activeDocument: workspace.activeDocument,
     tools: bindings.tools,

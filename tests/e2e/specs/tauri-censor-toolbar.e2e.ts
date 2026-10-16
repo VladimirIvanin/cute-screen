@@ -9,7 +9,7 @@ import {
 const evidence = path.resolve('artifacts/censor-toolbar')
 
 async function verifyToolbar(surface: string): Promise<void> {
-  await $('button[aria-label="Hide data"]').click()
+  await $('button[aria-label="Hide data"]').click({ button: 'right' })
   await expect($('.cs-censor-toolbar')).toBeDisplayed()
   for (const effect of ['Pixelate', 'Blur', 'Solid fill']) {
     await expect($(`.cs-censor-effect[aria-label="${effect}"]`)).toBeDisplayed()

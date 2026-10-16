@@ -13,6 +13,9 @@ import type {
 import type { ContextToolbarSchema } from '../types'
 import ContextToolbar from './ContextToolbar.vue'
 
+import { provideTransientSurface } from '../ui/transient-surface'
+const surfaceOwner = provideTransientSurface()
+
 const props = defineProps<{
   schema?: ContextToolbarSchema | undefined
   document?: EditorDocumentV1 | undefined
@@ -184,6 +187,7 @@ onBeforeUnmount(() => {
 <template>
   <div
     ref="host"
+    :data-cs-surface="surfaceOwner"
     class="cs-selection-preview-host"
     :class="{
       'cs-selection-floating-toolbar': Boolean(schema),
@@ -200,6 +204,7 @@ onBeforeUnmount(() => {
     @pointerdown.stop
   >
     <ContextToolbar
+      :key="selectedIds.join(',')"
       :schema="schema"
       :label="schema?.title ?? ''"
       :picker-locale="locale"

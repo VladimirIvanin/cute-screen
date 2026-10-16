@@ -2,6 +2,7 @@ import type { ShellStoreState } from './store-state'
 
 export function createSelectionActions(state: ShellStoreState) {
   function selectTool(id: string): void {
+    if (!['select', 'hand', 'eyedropper'].includes(id)) clearLayerSelection()
     state.activeToolId.value = id
   }
   function selectLayer(

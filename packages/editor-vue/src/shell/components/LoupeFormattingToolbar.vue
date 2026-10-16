@@ -63,13 +63,14 @@ function numeric(menu: Menu) {
 function show(
   menu: Menu,
   shown: boolean,
+  restoreFocus = true,
 ): void {
   if (shown && disabled.value) return
   if (!shown && open.value !== menu) return
   open.value = shown ? menu : undefined
   void nextTick(() => {
     if (shown) panel.value?.querySelector<HTMLElement>('[aria-pressed="true"], input:not(:disabled), button:not(:disabled)')?.focus({ preventScroll: true })
-    else triggers.get(menu)?.focus({ preventScroll: true })
+    else if (restoreFocus) triggers.get(menu)?.focus({ preventScroll: true })
   })
 }
 function change(
@@ -143,7 +144,7 @@ watch(disabled, (blocked) => {
       :show-arrow="false"
       raw
       to=".cs-overlay-root"
-      @clickoutside="show(menu, false)"
+      @clickoutside="show(menu, false, false)"
     >
       <div
         v-if="open === menu"

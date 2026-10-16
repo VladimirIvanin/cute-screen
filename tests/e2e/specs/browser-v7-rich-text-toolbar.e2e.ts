@@ -150,7 +150,7 @@ describe('Document v7 rich text in browser mode', () => {
       ['Callout', 'Callout'],
       ['Numbered marker', 'Numbered marker'],
     ] as const) {
-      await $(`button[aria-label="${tool}"]`).click()
+      await $(`button[aria-label="${tool}"]`).click({ button: 'right' })
       await expect($('.cs-text-toolbar')).toHaveAttribute('aria-label', title)
     }
 
@@ -193,7 +193,7 @@ describe('Document v7 rich text in browser mode', () => {
     await openHarness()
     const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
 
-    await $('button[aria-label="Callout"]').click()
+    await $('button[aria-label="Callout"]').click({ button: 'right' })
     await applyBackground({ color: '#ffcc66', padding: 10, radius: 14 })
     await browser
       .action('pointer')
@@ -213,7 +213,7 @@ describe('Document v7 rich text in browser mode', () => {
     expect(layer?.payload).toHaveProperty('target')
     expect(layer?.payload).toHaveProperty('label')
 
-    await $('button[aria-label="Numbered marker"]').click()
+    await $('button[aria-label="Numbered marker"]').click({ button: 'right' })
     await expect($('button[aria-label="Bullet list"]')).toBeDisabled()
     await $('button[aria-label="Background"]').click()
     await expect($('.cs-text-background-popover').$('button=None')).toBeDisabled()

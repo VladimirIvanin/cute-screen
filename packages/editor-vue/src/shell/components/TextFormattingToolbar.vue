@@ -112,10 +112,10 @@ function openTextSize(): void {
   void nextTick(() => textSizeRoot.value?.querySelector<HTMLInputElement>('input')?.focus({ preventScroll: true }))
 }
 
-function closeTextSize(): void {
+function closeTextSize(restoreFocus = true): void {
   if (!textSizeOpen.value) return
   textSizeOpen.value = false
-  void nextTick(() => textSizeTrigger.value?.focus({ preventScroll: true }))
+  if (restoreFocus) void nextTick(() => textSizeTrigger.value?.focus({ preventScroll: true }))
 }
 
 function applyTextSize(value = Number(textSizeDraft.value)): void {
@@ -161,11 +161,11 @@ function openDirectTextBackground(): void {
   })
 }
 
-function closeTextBackground(): void {
+function closeTextBackground(restoreFocus = true): void {
   if (!textBackgroundOpen.value) return
   numericPreview?.cancel(backgroundOwner)
   textBackgroundOpen.value = false
-  void nextTick(() => textBackgroundTrigger.value?.focus({ preventScroll: true }))
+  if (restoreFocus) void nextTick(() => textBackgroundTrigger.value?.focus({ preventScroll: true }))
 }
 
 function closeOpenTextPopover(event: KeyboardEvent): void {
@@ -203,14 +203,14 @@ function closeOnOutsidePointer(event: PointerEvent): void {
     !textBackgroundRoot.value?.contains(target) &&
     !(target instanceof Element && target.closest('.cs-color-picker-popover'))
   ) {
-    closeTextBackground()
+    closeTextBackground(false)
   }
   if (
     textSizeOpen.value &&
     !textSizeTrigger.value?.contains(target) &&
     !textSizeRoot.value?.contains(target)
   ) {
-    closeTextSize()
+    closeTextSize(false)
   }
 
 }
@@ -292,7 +292,7 @@ onBeforeUnmount(() => {
           :style="numericPopoverStyle(sizePosition)"
           role="dialog"
           :aria-label="textLabel('size')"
-          @keydown.escape.prevent.stop="closeTextSize"
+          @keydown.escape.prevent.stop="closeTextSize()"
         >
           <NumericControl
             :label="pickerLocale === 'ru' ? 'Значение размера шрифта' : textLabel('size') + ' value'"
@@ -310,7 +310,7 @@ onBeforeUnmount(() => {
             @preview="textSizeDraft = String($event)"
             @commit="applyTextSize($event)"
           />
-          <button type="button" @click="closeTextSize">
+          <button type="button" @click="closeTextSize()">
             {{ textLabel('cancel') }}
           </button>
         </section>
@@ -391,7 +391,7 @@ onBeforeUnmount(() => {
         :style="numericPopoverStyle(backgroundPosition)"
         role="dialog"
         :aria-label="textLabel('background')"
-        @keydown.escape.prevent.stop="closeTextBackground"
+        @keydown.escape.prevent.stop="closeTextBackground()"
       >
         <button
           type="button"
@@ -411,7 +411,7 @@ onBeforeUnmount(() => {
             :disabled="blocked"
             embedded
             @commit="textBackgroundDraft.color = $event"
-            @dismiss="closeTextBackground"
+            @dismiss="closeTextBackground()"
           />
         </div>
         <NumericControl
@@ -439,7 +439,7 @@ onBeforeUnmount(() => {
         >
           {{ textLabel('apply') }}
         </button>
-        <button type="button" @click="closeTextBackground">
+        <button type="button" @click="closeTextBackground()">
           {{ textLabel('cancel') }}
         </button>
       </section>

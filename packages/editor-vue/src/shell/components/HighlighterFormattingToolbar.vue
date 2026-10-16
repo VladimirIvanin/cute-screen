@@ -12,6 +12,9 @@ import { UiIcon } from '../icon'
 import SimpleColorPicker from '../ui/SimpleColorPicker.vue'
 import ShapeNumericControl from './ShapeNumericControl.vue'
 
+import { useTransientSurface } from '../ui/transient-surface'
+const surfaceOwner = useTransientSurface()
+
 const props = defineProps<{ schema: ContextToolbarSchema; locale: 'en' | 'ru'; recentColors: readonly SrgbColor[] }>()
 const emit = defineEmits<{ change: [id: string, value: string]; eyedropper: [id: string] }>()
 type Menu = 'width' | 'layerOpacity' | 'markerMode'
@@ -46,13 +49,14 @@ const labels = computed(() => ({ width: text('Width', 'Толщина'), layerOp
 function show(
   menu: Menu,
   shown: boolean,
+  restoreFocus = true,
 ): void {
   if (!shown && open.value !== menu) return
   if (shown) colorPicker.value?.close()
   open.value = shown ? menu : undefined
   void nextTick(() => {
     if (shown) panel.value?.querySelector<HTMLElement>('[aria-pressed="true"], input, button:not(:disabled)')?.focus({ preventScroll: true })
-    else triggers.get(menu)?.focus({ preventScroll: true })
+    else if (restoreFocus) triggers.get(menu)?.focus({ preventScroll: true })
   })
 }
 function change(
@@ -101,7 +105,7 @@ watch(disabled, (blocked) => {
       :show-arrow="false"
       raw
       to=".cs-overlay-root"
-      @update:show="show(menu, $event)"
+      @update:show="show(menu, $event, false)"
     >
       <template #trigger>
         <button
@@ -131,6 +135,7 @@ watch(disabled, (blocked) => {
       <div
         :ref="(element) => { if (open === menu) panel = element as HTMLElement }"
         class="cs-highlighter-popover"
+        :data-cs-surface="surfaceOwner"
         role="dialog"
         :aria-label="labels[menu]"
         @keydown="keydown"

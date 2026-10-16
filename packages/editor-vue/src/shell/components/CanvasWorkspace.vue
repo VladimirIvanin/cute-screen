@@ -10,6 +10,9 @@ import {
 } from '../canvas/contracts'
 import { useCanvasWorkspace } from '../canvas/use-canvas-workspace'
 
+import { provideTransientSurface } from '../ui/transient-surface'
+const textSurfaceOwner = provideTransientSurface()
+
 const props = defineProps(canvasViewportRuntimeProps)
 const emit = defineEmits(canvasViewportRuntimeEmits) as CanvasViewportEmit
 const {
@@ -19,6 +22,8 @@ const {
   scene,
   isPanning,
   onPointerDown,
+  onBackgroundPointerDown,
+  finishTextEditing,
   onPointerMove,
   finishGesture,
   cancelGesture,
@@ -81,6 +86,7 @@ defineExpose({
   resetCropDraft,
   setCropPresetValue,
   refitCanvas,
+  finishTextEditing,
 })
 </script>
 
@@ -90,7 +96,11 @@ defineExpose({
     class="cs-viewport"
     :aria-label="t('canvasViewport')"
   >
-    <div ref="scrollContainer" class="cs-canvas-scroll">
+    <div
+      ref="scrollContainer"
+      class="cs-canvas-scroll"
+      @pointerdown="onBackgroundPointerDown"
+    >
       <div class="cs-canvas-stage">
         <div
           class="cs-canvas-surface"
@@ -147,6 +157,7 @@ defineExpose({
             v-if="editingText && textToolbarSchema"
             ref="textFloatingToolbar"
             class="cs-text-floating-toolbar-host"
+            :data-cs-surface="textSurfaceOwner"
             :style="
               floatingToolbarLayout
                 ? {

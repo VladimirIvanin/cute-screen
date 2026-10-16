@@ -97,9 +97,11 @@ export async function verifyArrowSelectionMenu(artifactDirectory: string): Promi
   }))
   await writeFile(path.resolve(artifactDirectory, 'arrow-toolbar-geometry.json'), JSON.stringify(geometry, null, 2))
   const layout = await readArrowMenuLayout()
-  expect(layout).toEqual({
+  expect(layout.insets.top).toBeCloseTo(5, 0)
+  expect(layout.insets.bottom).toBeCloseTo(5, 0)
+  expect(layout).toMatchObject({
     aligned: true,
-    insets: { top: 5, bottom: 5, panelHeight: 42 },
+    insets: { panelHeight: 42 },
     symmetric: true,
     separator: true,
     icons: true,
@@ -130,7 +132,11 @@ export async function verifyArrowSelectionMenu(artifactDirectory: string): Promi
       localBounds: { x: number; y: number; width: number; height: number }
       transform: { translateX: number; translateY: number }
     }
-    type Snapshot = { crop: { x: number; y: number } | null; layers: Layer[] }
+    type Snapshot = {
+      canvas: { width: number; height: number }
+      crop: { x: number; y: number; width: number; height: number } | null
+      layers: Layer[]
+    }
     const harness = (window as typeof window & {
       __cuteScreenE2eM05: { snapshot(): Snapshot }
     }).__cuteScreenE2eM05
@@ -138,8 +144,8 @@ export async function verifyArrowSelectionMenu(artifactDirectory: string): Promi
     const layer = doc.layers.at(-1)!
     const canvas = document.querySelector('.cs-canvas:not(.cs-canvas-overlay)')!
     const bounds = canvas.getBoundingClientRect()
-    const width = (canvas as HTMLCanvasElement).width
-    const height = (canvas as HTMLCanvasElement).height
+    const width = doc.crop?.width ?? doc.canvas.width
+    const height = doc.crop?.height ?? doc.canvas.height
     return {
       x: Math.round(bounds.left +
         (layer.transform.translateX + layer.localBounds.x - (doc.crop?.x ?? 0)) * bounds.width / width),

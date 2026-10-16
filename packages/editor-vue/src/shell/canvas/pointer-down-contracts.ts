@@ -38,7 +38,7 @@ export interface PointerDownContext {
   readonly setGesture: (gesture: NonNullable<CanvasGesture>) => void
   readonly clearRulerGuide: () => void
   readonly canvasPoint: (event: PointerEvent) => CanvasPoint | undefined
-  readonly commitText: () => void
+  readonly finishTextEditing: (continuation: () => void) => void
   readonly samplingCursor: Ref<CanvasPoint | undefined>
   readonly hideEyedropper: () => void
   readonly scheduleEyedropper: (point: CanvasPoint, client: { clientX: number; clientY: number }) => void

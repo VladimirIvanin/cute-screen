@@ -46,7 +46,7 @@ describe('censor formatting toolbar', () => {
         for (const locale of ['en', 'ru'] as const) {
           for (const theme of ['light', 'dark'] as const) {
             await setShellPreferences(locale, theme)
-            await $(`button[aria-label="${locale === 'ru' ? 'Скрыть данные' : 'Hide data'}"]`).click()
+            await $(`button[aria-label="${locale === 'ru' ? 'Скрыть данные' : 'Hide data'}"]`).click({ button: 'right' })
             const toolbar = $('.cs-censor-toolbar')
             expect((await toolbar.$$('.cs-censor-effect')).length).toBe(3)
             await assertFits()

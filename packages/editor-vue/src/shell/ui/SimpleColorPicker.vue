@@ -42,13 +42,16 @@ const colors = computed(() => props.palette === 'highlighter' ? highlighter : dr
 const names = computed(() => props.palette === 'highlighter'
   ? [text('Yellow', 'Жёлтый'), text('Orange', 'Оранжевый'), text('Pink', 'Розовый'), text('Violet', 'Фиолетовый'), text('Blue', 'Голубой'), text('Teal', 'Бирюзовый'), text('Green', 'Зелёный'), text('Grey', 'Серый')]
   : [text('Black', 'Чёрный'), text('Grey', 'Серый'), text('Red', 'Красный'), text('Orange', 'Оранжевый'), text('Yellow', 'Жёлтый'), text('Green', 'Зелёный'), text('Teal', 'Бирюзовый'), text('Blue', 'Голубой'), text('Violet', 'Фиолетовый'), text('Pink', 'Розовый'), text('White', 'Белый'), text('Light grey', 'Светло-серый'), text('Light red', 'Светло-красный'), text('Light orange', 'Светло-оранжевый'), text('Light yellow', 'Светло-жёлтый'), text('Light green', 'Светло-зелёный'), text('Light teal', 'Светло-бирюзовый'), text('Light blue', 'Светло-голубой'), text('Light violet', 'Светло-фиолетовый'), text('Light pink', 'Светло-розовый')])
-function show(next: boolean): void {
+function show(
+  next: boolean,
+  restoreFocus = true,
+): void {
   shown.value = next
   custom.value = false
   if (next) emit('opened')
   void nextTick(() => {
     if (next) panel.value?.querySelector<HTMLElement>('[aria-pressed="true"], button:not(:disabled)')?.focus({ preventScroll: true })
-    else trigger.value?.focus({ preventScroll: true })
+    else if (restoreFocus) trigger.value?.focus({ preventScroll: true })
   })
 }
 function choose(color: string): void {
@@ -102,7 +105,7 @@ function sample(): void {
 }
 function outside(event: MouseEvent): void {
   if (event.target instanceof Node && trigger.value?.contains(event.target)) return
-  show(false)
+  show(false, false)
 }
 </script>
 
@@ -130,7 +133,7 @@ function outside(event: MouseEvent): void {
     <component
       :is="embedded ? 'div' : NPopover"
       v-bind="embedded ? {} : { show: shown, disabled, trigger: 'manual', placement: 'top-start', x: popoverPosition?.left ?? 0, y: popoverPosition?.top ?? 0, overlap: true, flip: false, showArrow: false, raw: true, to: '.cs-overlay-root' }"
-      @update:show="show"
+      @update:show="show($event, false)"
       @clickoutside="outside"
     >
       <div

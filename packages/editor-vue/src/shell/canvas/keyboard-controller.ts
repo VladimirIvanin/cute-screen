@@ -62,8 +62,8 @@ export class KeyboardController {
       if (
         this.#context.gesture() ||
         this.#context.editingText.value ||
-        (this.#context.props.activeTool &&
-          this.#context.props.activeTool !== 'select')
+        this.#context.props.activeTool &&
+        this.#context.props.activeTool !== 'select'
       )
         event.preventDefault()
       this.#handleEscape()
@@ -207,29 +207,13 @@ export class KeyboardController {
     this.#context.invalidateOverlay()
   }
   #handleEscape(): void {
-    const { props, editingText } = this.#context
+    const { editingText } = this.#context
     if (editingText.value) {
       this.#context.cancelText()
       return
     }
-    const gesture = this.#context.gesture()
-    if (gesture && gesture.kind !== 'precision') {
-      this.#context.cancelGesture()
-      return
-    }
-    if (
-      props.activeTool === 'arrow' ||
-      props.activeTool === 'shape' ||
-      props.activeTool === 'pencil' ||
-      props.activeTool === 'marker' ||
-      props.activeTool === 'censor' ||
-      props.activeTool === 'spotlight' ||
-      props.activeTool === 'ruler' ||
-      props.activeTool === 'loupe'
-    ) {
-      this.#context.cancelGesture()
-      this.#context.emit('selectTool', 'select')
-    }
+    if (this.#context.gesture()) this.#context.cancelGesture()
+    else if (this.#context.props.activeTool && this.#context.props.activeTool !== 'select') this.#context.emit('selectTool', 'select')
   }
 }
 function samplingMove(event: KeyboardEvent): readonly [

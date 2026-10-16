@@ -38,9 +38,27 @@ function handleEditingText(
 ): boolean {
   const editing = context.editingText.value
   if (!editing) return false
-  if (event.button === 0 && !editing.controller.composing) {
+  if (event.button === 0) {
     event.preventDefault()
-    context.commitText()
+    context.finishTextEditing(() => {
+      const point = context.canvasPoint(event)
+      if (
+        !point ||
+        !context.scene.value ||
+        !context.props.document
+      ) return
+      context.scene.value.focus({ preventScroll: true })
+      // The click finishes editing and selects its destination; it never creates
+      // a second text object or grabs a handle of the just-committed object.
+      const hit = hitTestDocument(context.props.document, point)
+      if (hit) context.emit('selectLayer', hit.nodeId, event.metaKey || event.ctrlKey)
+      else if (
+        !event.shiftKey &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey
+      ) context.emit('clearSelection')
+    })
   }
   return true
 }

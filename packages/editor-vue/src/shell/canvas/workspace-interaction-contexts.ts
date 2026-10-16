@@ -78,7 +78,7 @@ export function createPointerDownContext(ports: WorkspaceInteractionPorts): Poin
     setGesture: ports.setGesture,
     clearRulerGuide: () => ports.setRulerGuide(undefined),
     canvasPoint: ports.canvasPoint,
-    commitText: () => ports.textEditor.commit(),
+    finishTextEditing: (continuation) => ports.textEditor.finishEditing(continuation),
     samplingCursor: eyedropper.cursor,
     hideEyedropper: () => eyedropper.hide(),
     scheduleEyedropper: (point, client) => eyedropper.schedule(point, client),

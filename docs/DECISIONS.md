@@ -928,7 +928,7 @@ review и GNOME tray smoke описаны в `TESTING.md`.
 
 ## ADR-048 — Жизненный цикл инструментов и стили у выделения
 
-**Статус:** accepted; supersedes ADR-034.
+**Статус:** superseded by [ADR-063](#adr-063-согласованные-переходы-инструментов-и-панелей); supersedes ADR-034.
 
 **Контекст:** единое sticky-поведение вынуждало вручную выходить из стрелки и
 фигур, ПКМ настраивала только arrow, а параметры экземпляра и defaults смешивались.
@@ -1027,7 +1027,7 @@ Canvas2D/CanvasKit highlighter goldens; browser/native WebView production-flow
 
 ## ADR-052 — Настройки с самой кнопки инструмента
 
-**Статус:** accepted; дополняет ADR-048.
+**Статус:** superseded by [ADR-063](#adr-063-согласованные-переходы-инструментов-и-панелей); дополняет ADR-048.
 
 **Контекст:** отдельная кнопка `⌄` появляется в конце группы при выборе
 инструмента, дублирует вход в defaults и меняет ширину нижней панели.
@@ -1226,3 +1226,27 @@ box sizing и перенос controls вместо горизонтальног�
 selection/source roundtrip, production browser input с long Cyrillic/Latin,
 12 faces, resize/style/undo, decoded export и отсутствие popup overflow.
 Фактические команды, platform и ограничения фиксируются в TESTING.md.
+
+## ADR-063 — Согласованные переходы инструментов и панелей
+
+**Статус:** accepted; supersedes ADR-048 и ADR-052.
+
+**Контекст:** пользователь подтвердил defaults только через ПКМ и снятие выбора
+при creation activation. Пустой hit ранее оставлял selection, а hotkey менял tool
+без закрытия прежнего configure. FigJam/Excalidraw служат UX-ориентирами.
+
+**Решение:** общий переход для buttons/hotkeys/configure/layer selection/create;
+defaults только ПКМ/Shift+F10/ContextMenu с самой кнопки. Пустой canvas/background
+очищает selection. Панели принадлежат owner, включая teleport; Escape закрывает
+один уровень с focus return, outside click не поглощается и не крадёт фокус.
+Inline commit завершается перед новым режимом/выбором с учётом IME/fonts.
+Crop сохраняет Apply/Cancel; flip canvas переносится в More actions.
+Creation policies, compatible/mixed selection toolbar, style clipboard,
+раздельные persistent defaults и их независимость от undo/redo из ADR-048
+сохраняются. Снизу ToolRail; Layers остаётся управлением слоями. Quick не
+получает общие canvas actions. Document v7 и IPC неизменны.
+
+**Проверяемое основание:** воспроизведение пустого hit/background и Arrow → P
+при открытом configure; mounted-shell regressions, browser pointer/keyboard и
+production Tauri Capture → Quick → Editor. Команды, artifacts и ограничения
+платформ записываются в TESTING.md.

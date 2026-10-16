@@ -10,6 +10,7 @@ import type { ResolvedEditorShellProps } from '../contracts'
 import type { ToolDescriptor } from '../types'
 
 export interface KeyboardControllerContext {
+  readonly selectTool: (id: string) => void
   readonly selectionActions?: Pick<
     ReturnType<typeof import('./selection-actions-controller').createSelectionActions>,
     'copyStyle' | 'pasteStyle' | 'duplicateSelection' | 'deleteSelection' | 'reorderSelection'
@@ -43,7 +44,7 @@ function isEditingTarget(target: EventTarget | null): boolean {
     (target instanceof HTMLElement &&
       (target.isContentEditable ||
         Boolean(
-          target.closest('button:disabled, input, textarea, select, [role="slider"], [role="combobox"], [role="menu"], [role="dialog"]'),
+          target.closest('button:disabled, input, textarea, select, [role="slider"], [role="combobox"], [role="menu"], [role="dialog"]:not(#cs-tool-defaults)'),
         )))
   )
 }
@@ -64,7 +65,7 @@ function handleToolShortcut(
   )
   if (!tool) return false
   event.preventDefault()
-  context.store.selectTool(tool.id)
+  context.selectTool(tool.id)
   return true
 }
 
@@ -217,6 +218,26 @@ function handleDelete(
   return true
 }
 
+function handleEscape(
+  context: KeyboardControllerContext,
+  event: KeyboardEvent,
+): void {
+  if (event.key === 'Escape') {
+    if (context.store.activeToolId !== 'select') {
+      event.preventDefault()
+      event.stopPropagation()
+      context.selectTool('select')
+      return
+    }
+    if (context.store.selectedLayerIds.length) {
+      event.preventDefault()
+      event.stopPropagation()
+      context.store.clearLayerSelection()
+    }
+    context.store.clearFeedback()
+  }
+}
+
 export function createKeyboardController(context: KeyboardControllerContext) {
   function onKeydown(event: KeyboardEvent): void {
     if (event.defaultPrevented) return
@@ -243,17 +264,7 @@ export function createKeyboardController(context: KeyboardControllerContext) {
     if (handleReorder(context, event)) return
     if (handleArrowMove(context, event)) return
     if (handleDelete(context, event)) return
-    if (event.key === 'Escape') {
-      if (context.store.activeToolId !== 'select') {
-        event.preventDefault()
-        event.stopPropagation()
-        context.store.selectTool('select')
-        return
-      }
-      context.store.clearFeedback()
-      context.store.setLayersOpen(false)
-      context.store.clearLayerSelection()
-    }
+    handleEscape(context, event)
   }
   return { onKeydown }
 }

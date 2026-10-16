@@ -31,10 +31,9 @@ import {
   measuredTextLayer,
 } from '../../text-layout'
 import {
-  isBundledTextFont,
-  loadTextFont,
   loadTextFontFamily,
 } from '../../text-fonts'
+import { waitForTextFonts } from './text-font-commit'
 import { isFloatingToolbarTarget } from './floating-toolbar-controller'
 import {
   DEFAULT_TEXT_TOOL,
@@ -84,12 +83,14 @@ export interface TextEditorContext {
 export class TextEditorController {
   readonly #context: TextEditorContext
   #toolbarPointerDown = false
+  #afterCommit: (() => void) | undefined
 
   constructor(context: TextEditorContext) {
     this.#context = context
   }
 
   start(input: TextEditorStartInput): void {
+    this.#afterCommit = undefined
     const { props, editingText } = this.#context
     const bounds = input.existing ? this.#context.layerBounds(input.existing) : undefined
     const defaults = copyTextStyle(props.textDefaults ?? DEFAULT_TEXT_TOOL)
@@ -191,6 +192,7 @@ export class TextEditorController {
     editing.controller.compositionEnd(this.#readText(), readRichTextDomSelection(editor))
     this.renderProjection()
     this.#context.emitEditing()
+    if (this.#afterCommit) this.commit()
   }
 
   paste(event: ClipboardEvent): void {
@@ -241,7 +243,25 @@ export class TextEditorController {
     }, 0)
   }
 
+  finishEditing(continuation: () => void): void {
+    if (!this.#context.editingText.value) {
+      continuation()
+      return
+    }
+    this.#afterCommit = continuation
+    this.commit()
+  }
+
   commit(): void {
+    this.#commitContent()
+    if (!this.#context.editingText.value) {
+      const continuation = this.#afterCommit
+      this.#afterCommit = undefined
+      continuation?.()
+    }
+  }
+
+  #commitContent(): void {
     const { editingText, floatingToolbarLayout, props, emit } = this.#context
     const editing = editingText.value
     if (!editing || editing.controller.composing) return
@@ -266,13 +286,17 @@ export class TextEditorController {
   }
 
   cancel(): void {
+    const existing = this.#context.editingText.value?.existing
+    this.#afterCommit = undefined
     this.#context.editingText.value = undefined
     this.#context.floatingToolbarLayout.value = undefined
     this.#context.emitEditing()
     this.#context.emit('textEditingCancelled', 'escape')
+    if (existing) this.#context.emit('selectLayer', existing.id, false)
   }
 
   keydown(event: KeyboardEvent): void {
+    if (event.isComposing || this.#context.editingText.value?.controller.composing) return
     if (event.key === 'Escape') {
       event.preventDefault()
       event.stopPropagation()
@@ -457,17 +481,9 @@ export class TextEditorController {
   }
 
   #waitForFonts(editing: NonNullable<WorkspaceState['editingText']['value']>): boolean {
-    if (!document.fonts?.check) return false
-    const missing = [editing.controller.state.typingStyle, ...editing.controller.state.content.spans]
-      .filter((style) => isBundledTextFont(style.fontFamily) && !document.fonts.check(
-        `${style.italic ? 'italic' : 'normal'} ${style.weight} 20px "${style.fontFamily}"`, 'Aa Яя 123',
-      ))
-    if (!missing.length) return false
-    void Promise.all(missing.map((style) => loadTextFont(style.fontFamily, style.weight, style.italic)))
-      .then(() => {
-        if (this.#context.editingText.value === editing) this.commit()
-      }).catch((error: unknown) => this.#fontError(error))
-    return true
+    return waitForTextFonts(editing.controller, () => {
+      if (this.#context.editingText.value === editing) this.commit()
+    }, (error) => this.#fontError(error))
   }
 
   #fontError(error: unknown): void {

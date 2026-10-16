@@ -52,12 +52,13 @@ function setPopoverRoot(
 function onPopoverShown(
   id: string,
   shown: boolean,
+  restoreFocus = true,
 ): void {
   openPopover.value = shown ? { [id]: true } : { ...openPopover.value, [id]: false }
   if (shown)
     void nextTick(() =>
       popoverRoots.value[id]?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true }))
-  if (!shown) {
+  if (!shown && restoreFocus) {
     void nextTick(() => triggers.value[id]?.focus({ preventScroll: true }))
   }
 }
@@ -106,7 +107,7 @@ function closeOnOutsidePointer(event: PointerEvent): void {
     if (triggers.value[id]?.contains(target) || popoverRoots.value[id]?.contains(target)) {
       continue
     }
-    closePopover(id)
+    onPopoverShown(id, false, false)
   }
 }
 
@@ -191,7 +192,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOnOutside
           :show-arrow="false"
           raw
           to=".cs-overlay-root"
-          @update:show="onPopoverShown(control.id, $event)"
+          @update:show="onPopoverShown(control.id, $event, false)"
         >
           <section
             :ref="(element) => setPopoverRoot(control.id, element as HTMLElement | null)"
@@ -303,7 +304,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOnOutside
           :show-arrow="false"
           raw
           to=".cs-overlay-root"
-          @update:show="onPopoverShown(control.id, $event)"
+          @update:show="onPopoverShown(control.id, $event, false)"
         >
           <section
             :ref="(element) => setPopoverRoot(control.id, element as HTMLElement | null)"
@@ -368,7 +369,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOnOutside
           :show-arrow="false"
           raw
           to=".cs-overlay-root"
-          @update:show="onPopoverShown(control.id, $event)"
+          @update:show="onPopoverShown(control.id, $event, false)"
         >
           <section
             :ref="(element) => setPopoverRoot(control.id, element as HTMLElement | null)"
