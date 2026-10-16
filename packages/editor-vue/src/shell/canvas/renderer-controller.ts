@@ -17,6 +17,7 @@ import type {
 import type { CanvasViewportEmit } from './contracts'
 import type { createCanvasWorkspaceState } from './workspace-state'
 import { HighlighterPreview } from './highlighter-preview'
+import { requiresScenePreview } from './scene-document-controller'
 
 type EditingText = ReturnType<typeof createCanvasWorkspaceState>['editingText']
 type RenderNode = ReturnType<typeof createDocumentRenderScene>['nodes'][number]
@@ -225,7 +226,7 @@ export class CanvasRendererController {
   }
 
   invalidateGesturePreview(): void {
-    if (['loupe', 'marker'].includes(this.context.previewLayer()?.kind ?? '')) {
+    if (requiresScenePreview(this.context.previewLayer())) {
       this.renderCommittedSceneForGesture()
     } else {
       this.context.invalidateOverlay()

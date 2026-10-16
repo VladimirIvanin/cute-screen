@@ -305,7 +305,7 @@ describe('M08 shell lifecycle and contextual settings', () => {
       ['Hide data', ['Region', 'Effect']],
       ['Spotlight', ['Shape', 'Dim color', 'Dim opacity', 'Feather']],
       ['Ruler', ['Colour', 'Thickness', 'Label size', 'Unit', 'Snapping', 'Angle step']],
-      ['Loupe', ['Zoom', 'Size', 'Shape', 'Border color', 'Border width', 'Shadow']],
+      ['Loupe', ['Zoom', 'Size', 'Shape', 'Border']],
     ] as const
     for (const [tool, labels] of english) {
       await fireEvent.click(screen.getByRole('button', { name: tool }))
@@ -314,6 +314,8 @@ describe('M08 shell lifecycle and contextual settings', () => {
       if (tool === 'Spotlight' || tool === 'Ruler') {
         const names = tool === 'Spotlight' ? ['Aperture shape', 'Dimming', 'Edge softness', 'Apertures'] : ['Colour', 'Thickness', 'Label and units', 'Measurement and snapping']
         for (const name of names) expect(within(toolbar).getByRole('button', { name })).toBeInTheDocument()
+      } else if (tool === 'Loupe') {
+        for (const name of labels) expect(within(toolbar).getByRole('button', { name })).toBeInTheDocument()
       } else for (const label of labels) expect(within(toolbar).getByText(label)).toBeInTheDocument()
     }
 

@@ -1,5 +1,35 @@
 # Трассируемость требований
 
+## Переключение панели между объектами (2026-10-16)
+
+`REQ-EDT-016`, `REQ-TOL-009/011`: после выбора лупы и последующего выбора
+фонаря на canvas панель должна сразу показывать настройки текущего выделения;
+изменения применяются только к нему. Повторный выбор, вложенные меню и
+числовой draft не должны сохранять настройки предыдущего объекта.
+Mounted-shell 2/2 и browser regression пройдены; исходный browser повторил
+`spotlight rendering requires an ordered Canvas2D surface`. Исправление
+сохраняет ordered precision preview в scene. Полные результаты — TESTING.md.
+
+## Компактные настройки лупы (2026-10-16)
+
+`REQ-TOL-011`, `REQ-EDT-015/016`, `REQ-UI-001/003/004/006/007`:
+общая панель лупы в selection, defaults и Quick использует четыре компактных
+trigger: увеличение, размер, форма, обводка. Вложенные панели сохраняют zoom,
+size, circle/rectangle, цвет/толщину рамки и тень; числовые draft/preview,
+Escape, focus return, mixed и locked/read-only используют существующие контракты.
+Document, renderer и команды не меняются. Windows x64: unit 709/709,
+Chrome 2/2 и WebView2 production Capture → Quick → Editor 1/1 пройдены.
+Evidence: `artifacts/loupe-settings/`, фактические команды — TESTING.md.
+
+## Иконка «Показать слои» (2026-10-16)
+
+`REQ-EDT-008/009`, `REQ-UI-001/006`: семантическая иконка `layers` использует
+Tabler `stack-2` через общий `UiIcon`. Проверка: существующие SVG-контракты
+`ui-icon.test.ts` и взаимодействия `layers-panel.test.ts`.
+Windows x64 / PowerShell: `pnpm test --project vue tests/unit/vue/ui-icon.test.ts tests/unit/vue/layers-panel.test.ts`
+— 75/75 passed; `pnpm format` и `pnpm format:check` — passed.
+Логи: `artifacts/layers-stack-2-{tests,format,format-check}.log`.
+
 ## Карандаш, составной фонарь и измерения (2026-10-16)
 
 `REQ-TOL-003/009/010`, `REQ-EDT-002/015/016/017`, `REQ-UI-001/003/004/006/007`:
@@ -882,6 +912,18 @@ dimension badge remains 28 CSS px high.
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | `REQ-CAP-012/013` | Regression: 400×300 preview растянут до 1440×1080 CSS px; пунктир/handles/badge должны растеризоваться в display resolution × DPR и сохранять CSS размеры. Vue controller/pixel tests при zoom >1, <1 и DPR 1/2; real-WebKitGTK screenshot сравнивается с приложенным blurred кадром. Scene pixels, crop commands, hit coordinates и export остаются в document space. | implemented; pixel/controller regressions 14/14, full unit 522/522, check passed; real WebKitGTK 3/3 and before/after screenshots in TESTING.md |
 
+## Loupe icon B1 · 2026-10-16
+
+`REQ-EDT-008`, `REQ-TOL-011`: adopt the user-selected B1 metaphor: a segmented
+source-region frame with a circular magnifier and handle. Keep the `loupe`
+semantic name, accessible labels and tool behaviour. Use one canonical geometry
+for shell and gallery. Validate existing SVG contracts, 16/18/20/24/32 px at
+DPR 1/2 in both themes, disabled/active/focus, RU/EN, and native Quick → Editor.
+Evidence: `artifacts/custom-icons/loupe-adopted/`. SVG 70/70 and browser 2/2
+passed on Windows/Chrome 155; both native attempts stop before loupe selection
+on pencil stroke creation in Quick. Native handoff remains pending; TESTING.md
+records the commands and screenshots.
+
 ## Spotlight icon concepts · 2026-10-16
 
 `REQ-EDT-008`, `REQ-TOL-009`: compare three dev-only icon proposals (hand torch,
@@ -915,3 +957,26 @@ full test 709/709, format, format:check and check. WebKit remains unverified.
 redaction bar and blurred fragment. Review at 18 px beside the adopted spotlight
 and Tabler in both themes. Keep production `privacy` mapping until selection.
 Evidence: `artifacts/custom-icons/censor-proposals/`.
+
+The first three proposals were rejected as effects without a clear concealment
+meaning; current privacy/censor also resembles spotlight. Compare three new
+dev-only metaphors: crossed eye, redacted document and locked data. Include the
+current censor and adopted spotlight at 18 px for direct comparison.
+Evidence: `artifacts/custom-icons/censor-concealment/`.
+
+Next dev-only round: six concepts for confidential data/password concealment,
+using the user's eye/lock, masked symbols, stop-field and document/eye references.
+Compare at 18 px, both themes and DPR 1/2; production privacy stays unchanged.
+Evidence: `artifacts/custom-icons/censor-secrets/`.
+
+Approved selection after screenshot-editor research: a coherent monochrome
+checkerboard replaces `privacy` behind UiIcon. The original 4×4 vector grid
+represents general censoring, not passwords or access control. Validate full SVG
+catalog, 18 px beside spotlight, RU/EN × light/dark, disabled/focus and native
+Capture → Quick → Editor. Evidence: `artifacts/custom-icons/censor-adopted/`.
+User refinement: preserve the checkerboard but add inherited-currentColor
+halftones through per-cell fill-opacity. Validate finite opacity in (0, 1],
+both themes and disabled opacity; the root SVG contract is unchanged.
+The initial three-tone version lacked contrast at toolbar size. Final refinement:
+coarser 3×3 checkerboard, full-opacity dark cells and 15% light cells, with grid
+edges aligned to whole device pixels at the actual 18 CSS px size (DPR 1/2).

@@ -16,6 +16,7 @@ import type {
   CanvasGesture,
   ResizeHandle,
 } from './workspace-state'
+import { requiresScenePreview } from './scene-document-controller'
 
 export interface LayerBounds {
   readonly x: number
@@ -248,7 +249,7 @@ export class CanvasGeometryController {
     const layer = this.gesturePreviewLayer()
     if (
       !layer ||
-      layer.kind === 'loupe' ||
+      requiresScenePreview(layer) ||
       !this.#context.props.document
     ) {
       return []

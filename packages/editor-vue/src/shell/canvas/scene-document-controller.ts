@@ -5,6 +5,10 @@ import type {
 import type { CanvasViewportProps } from './contracts'
 import type { CanvasGesture } from './workspace-state'
 
+export function requiresScenePreview(layer: LayerNode | undefined): boolean {
+  return Boolean(layer && ['censor', 'spotlight', 'loupe', 'marker'].includes(layer.kind))
+}
+
 export interface SceneDocumentContext {
   readonly props: CanvasViewportProps
   readonly gesture: () => CanvasGesture
@@ -36,7 +40,7 @@ export class SceneDocumentController {
       }
     }
     const preview = this.#context.previewLayer()
-    if (preview?.kind === 'loupe' || preview?.kind === 'marker') {
+    if (preview && requiresScenePreview(preview)) {
       return {
         ...document,
         layers: document.layers.map((layer) => (layer.id === preview.id ? preview : layer)),

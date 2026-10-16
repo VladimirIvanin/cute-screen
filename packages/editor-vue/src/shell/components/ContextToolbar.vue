@@ -12,6 +12,7 @@ import UiSelect from '../ui/UiSelect.vue'
 import TextFormattingToolbar from './TextFormattingToolbar.vue'
 import ArrowFormattingToolbar from './ArrowFormattingToolbar.vue'
 import ShapeFormattingToolbar from './ShapeFormattingToolbar.vue'
+import LoupeFormattingToolbar from './LoupeFormattingToolbar.vue'
 import ToolFormattingToolbar from './ToolFormattingToolbar.vue'
 import HighlighterFormattingToolbar from './HighlighterFormattingToolbar.vue'
 import {
@@ -72,7 +73,7 @@ const emit = defineEmits<{
       />
     </template>
     <span
-      v-else-if="schema.icon !== 'arrow' && !schema.shape && !schema.highlighter && !schema.toolSettings"
+      v-else-if="!['arrow', 'loupe'].includes(schema.icon) && !schema.shape && !schema.highlighter && !schema.toolSettings"
       class="cs-context-icon"
       :class="`cs-context-icon--${schema.icon}`"
     ><UiIcon :name="schema.icon"/></span>
@@ -81,6 +82,14 @@ const emit = defineEmits<{
       variant="floating"
       :controls="schema.controls"
       :picker-locale="pickerLocale ?? 'en'"
+      :recent-colors="recentColors ?? []"
+      @change="(id, value) => emit('change', id, value)"
+      @eyedropper="emit('eyedropper', $event)"
+    />
+    <LoupeFormattingToolbar
+      v-else-if="schema.icon === 'loupe'"
+      :schema="schema"
+      :locale="pickerLocale ?? 'en'"
       :recent-colors="recentColors ?? []"
       @change="(id, value) => emit('change', id, value)"
       @eyedropper="emit('eyedropper', $event)"

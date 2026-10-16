@@ -236,7 +236,9 @@ Cute Screen — полноценный local-first редактор снимко
   factual endpoints и пересчитывают conservative bounds, сохраняя thickness,
   ticks и badge font size.
 - `REQ-TOL-011` — loupe: zoom, размер, circle/rectangle, border color/width и
-  shadow. Линза оформлена как callout: connector цвета рамки ведёт от линзы к
+  shadow. Настройки используют компактную строку из четырёх controls:
+  увеличение, размер, форма и обводка; цвет/толщина рамки и тень раскрываются
+  в панели обводки. Линза оформлена как callout: connector цвета рамки ведёт от линзы к
   центру source region и одинаково попадает в preview/export. Для выбранной
   лупы точка source и компактные zoom/size chips отображаются только в
   transient overlay и не попадают в документ или export. Corner handles

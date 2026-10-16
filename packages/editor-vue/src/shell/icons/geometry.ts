@@ -1,6 +1,13 @@
-/** Monochrome geometry, including solid liquid/rubber parts; theme and sizing belong to UiIcon. */
+interface IconPathAttributes {
+  readonly d: string
+  readonly fill?: 'currentColor'
+  readonly stroke?: 'none'
+  readonly 'fill-opacity'?: number
+}
+
+/** Monochrome geometry with optional halftones; theme and sizing belong to UiIcon. */
 export type IconPrimitive =
-  | readonly ['path', { readonly d: string; readonly fill?: 'currentColor'; readonly stroke?: 'none' }]
+  | readonly ['path', IconPathAttributes]
   | readonly ['circle', { readonly cx: number; readonly cy: number; readonly r: number }]
   | readonly ['rect', { readonly x: number; readonly y: number; readonly width: number; readonly height: number; readonly rx?: number }]
   | readonly ['line', { readonly x1: number; readonly y1: number; readonly x2: number; readonly y2: number }]
@@ -15,6 +22,13 @@ export const markerGeometry = [
   ['path', { d: 'M9 9V5l6-3v7' }],
   ['path', { d: 'M7 13v-2a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2' }],
   ['path', { d: 'M4 21v-6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v6' }],
+] as const satisfies IconGeometry
+
+// User-selected B1: a segmented source region behind a magnifier, drawn locally.
+export const loupeGeometry = [
+  ['path', { d: 'M3 6V4a1 1 0 0 1 1-1h2m4 0h2m4 0h2a1 1 0 0 1 1 1v2M3 10v2m0 4v2a1 1 0 0 0 1 1h2' }],
+  ['circle', { cx: 14.5, cy: 14.5, r: 5.5 }],
+  ['path', { d: 'm18.4 18.4 3.1 3.1' }],
 ] as const satisfies IconGeometry
 
 // A diagonal pencil with a sharp graphite tip and a separate eraser band.
@@ -51,4 +65,23 @@ export const spotlightGeometry = [
   ['path', { d: 'M2.5 7.5L7.5 2.5M2.5 14.5L6 11M8 9L14.5 2.5M2.5 21.5L9 15' }],
   ['path', { d: 'M15 9L21.5 2.5M9.5 21.5L16 15M18 13L21.5 9.5M16.5 21.5L21.5 16.5' }],
   ['rect', { x: 6, y: 9, width: 12, height: 6, rx: 0.75 }],
+] as const satisfies IconGeometry
+
+// Coherent checkerboard region for general concealment. Original geometry;
+// research references inform the metaphor, no third-party asset is embedded.
+export const privacyGeometry = [
+  ['path', {
+    d: 'M4 4h5.333333v5.333333H4ZM14.666667 4H20v5.333333h-5.333333Z' +
+      'M9.333333 9.333333h5.333334v5.333334H9.333333Z' +
+      'M4 14.666667h5.333333V20H4ZM14.666667 14.666667H20V20h-5.333333Z',
+    fill: 'currentColor',
+    stroke: 'none',
+  }],
+  ['path', {
+    d: 'M9.333333 4h5.333334v5.333333H9.333333ZM4 9.333333h5.333333v5.333334H4Z' +
+      'M14.666667 9.333333H20v5.333334h-5.333333ZM9.333333 14.666667h5.333334V20H9.333333Z',
+    fill: 'currentColor',
+    stroke: 'none',
+    'fill-opacity': 0.15,
+  }],
 ] as const satisfies IconGeometry

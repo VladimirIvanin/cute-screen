@@ -14,7 +14,7 @@ const union = types.match(/export type IconName\s*=\s*((?:\|\s*'[^']+'\s*)+)/u)?
 if (!union) throw new Error('IconName declaration is missing')
 const names = [...union.matchAll(/\| '([A-Za-z]+)'/gu)].map((match) => match[1] as IconName)
 
-const customNames = new Set<IconName>(['marker', 'pencil', 'eyedropper', 'spotlight'])
+const customNames = new Set<IconName>(['marker', 'pencil', 'eyedropper', 'spotlight', 'privacy', 'loupe'])
 
 describe('semantic Tabler and project icons', () => {
   it.each(names)('preserves caller class and style for %s', (name) => {
@@ -46,10 +46,16 @@ describe('semantic Tabler and project icons', () => {
     for (const element of svg?.querySelectorAll('*') ?? []) {
       expect(['path', 'circle', 'rect', 'line', 'polyline', 'polygon', 'ellipse']).toContain(element.tagName)
       for (const attribute of element.attributes) {
-        expect(['d', 'cx', 'cy', 'r', 'x', 'y', 'width', 'height', 'rx', 'ry', 'x1', 'y1', 'x2', 'y2', 'points', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin']).toContain(attribute.name)
+        expect(['d', 'cx', 'cy', 'r', 'x', 'y', 'width', 'height', 'rx', 'ry', 'x1', 'y1', 'x2', 'y2', 'points', 'fill', 'fill-opacity', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin']).toContain(attribute.name)
         expect(attribute.value).not.toMatch(/url\(|https?:|data:|javascript:/iu)
         if (attribute.name === 'fill' || attribute.name === 'stroke') {
           expect(['none', 'currentColor']).toContain(attribute.value)
+        }
+        if (attribute.name === 'fill-opacity') {
+          expect(element).toHaveAttribute('fill', 'currentColor')
+          expect(Number.isFinite(Number(attribute.value))).toBe(true)
+          expect(Number(attribute.value)).toBeGreaterThan(0)
+          expect(Number(attribute.value)).toBeLessThanOrEqual(1)
         }
       }
       if (element.hasAttribute('d')) expect(element.getAttribute('d')).not.toBe('')

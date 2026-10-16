@@ -25,6 +25,7 @@ describe('custom icons beside Tabler', () => {
       await browser.setViewport({ width: 1280, height: 1400, devicePixelRatio: dpr })
       expect(await browser.execute(() => devicePixelRatio)).toBe(dpr)
       await browser.saveScreenshot(path.join(evidence, `gallery-dpr-${dpr}.png`))
+      await $('.loupe-preview').saveScreenshot(path.join(evidence, `loupe-dpr-${dpr}.png`))
       await $('.censor-proposals').saveScreenshot(path.join(evidence, `censor-options-dpr-${dpr}.png`))
     }
     await browser.setViewport({ width: 1280, height: 800, devicePixelRatio: 1 })
@@ -43,7 +44,9 @@ describe('custom icons beside Tabler', () => {
     await writeFile(path.join(evidence, 'gallery.json'), JSON.stringify(geometry, null, 2))
     const rasters = await browser.execute(async () => {
       const results = []
-      for (const name of ['marker', 'pencil', 'eyedropper', 'spotlight', 'mosaic', 'redaction', 'blur']) {
+      for (const name of [
+        'marker', 'pencil', 'eyedropper', 'spotlight', 'privacy', 'loupe',
+      ]) {
         for (const size of [16, 18, 20, 24, 32]) {
           for (const dpr of [1, 2]) {
             const source = document.querySelector(
@@ -103,6 +106,11 @@ describe('custom icons beside Tabler', () => {
     await browser.keys('Tab')
     await expect($('button[aria-label="light marker hover"]')).toBeFocused()
     await expect($('button[aria-label="light marker disabled"]')).toBeDisabled()
+    await $('button[aria-label="light loupe rest"]').click()
+    await browser.keys('Tab')
+    await expect($('button[aria-label="light loupe hover"]')).toBeFocused()
+    await expect($('button[aria-label="light loupe disabled"]')).toBeDisabled()
+    await browser.saveScreenshot(path.join(evidence, 'loupe-keyboard-focus.png'))
   })
 
   it('keeps the rail readable in RU/EN, light/dark and disabled states', async () => {
@@ -112,6 +120,8 @@ describe('custom icons beside Tabler', () => {
     await browser.url('/')
     await expect($('button[aria-label="Eyedropper"]')).toBeDisabled()
     await expect($('button[aria-label="Spotlight"]')).toBeDisabled()
+    await expect($('button[aria-label="Hide data"]')).toBeDisabled()
+    await expect($('button[aria-label="Loupe"]')).toBeDisabled()
     await browser.saveScreenshot(path.join(evidence, 'empty-disabled.png'))
     await openM08()
     for (const locale of ['en', 'ru'] as const) {
@@ -124,6 +134,14 @@ describe('custom icons beside Tabler', () => {
         await spotlight.click()
         await expect(spotlight).toHaveAttribute('aria-pressed', 'true')
         await expect(spotlight.$('svg')).toHaveElementClass('cs-icon-spotlight')
+        const censor = $(`button[aria-label="${locale === 'ru' ? 'Скрыть данные' : 'Hide data'}"]`)
+        await censor.click()
+        await expect(censor).toHaveAttribute('aria-pressed', 'true')
+        await expect(censor.$('svg')).toHaveElementClass('cs-icon-privacy')
+        await browser.keys('l')
+        const loupe = $(`button[aria-label="${locale === 'ru' ? 'Лупа' : 'Loupe'}"]`)
+        await expect(loupe).toHaveAttribute('aria-pressed', 'true')
+        await expect(loupe.$('svg')).toHaveElementClass('cs-icon-loupe')
         await browser.saveScreenshot(path.join(evidence, `editor-${locale}-${theme}.png`))
       }
     }

@@ -134,3 +134,52 @@
   width: 12px;
   height: 12px;
 }
+
+.cs-loupe-toolbar .cs-loupe-shape-preview {
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  margin: 2px;
+  border: 1.8px solid currentColor;
+}
+.cs-loupe-shape-preview.is-circle {
+  border-radius: 50%;
+}
+.cs-loupe-border-preview {
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  border: 2px solid;
+  border-radius: 50%;
+  background: var(--surface-sunken);
+  box-shadow: 0 0 0 1px var(--border);
+}
+.cs-loupe-border-preview.is-mixed {
+  border-style: dashed;
+}
+.cs-loupe-popover {
+  display: grid;
+  gap: 12px;
+}
+.cs-loupe-choice {
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.cs-loupe-choice[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--surface-raised);
+}
+.cs-loupe-choice:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.cs-loupe-choice:disabled {
+  opacity: 0.45;
+  cursor: default;
+}

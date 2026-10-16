@@ -125,7 +125,8 @@ describe('M08 shell lifecycle and contextual settings', () => {
       expect(useEditorShellStore(pinia).selectedLayerIds).toEqual([layer.id])
       execute.mockClear()
 
-      await screen.findByRole(kind === 'ruler' ? 'slider' : 'combobox', {
+      const role = kind === 'loupe' ? 'button' : kind === 'ruler' ? 'slider' : 'combobox'
+      await within(view.container.querySelector('.cs-selection-floating-toolbar') as HTMLElement).findByRole(role, {
         name: controlLabel,
       })
       let toolbar = view.container.querySelector('.cs-selection-floating-toolbar .cs-context-toolbar') as HTMLElement
@@ -150,7 +151,7 @@ describe('M08 shell lifecycle and contextual settings', () => {
         expect(slider).toHaveAttribute('aria-disabled', 'true')
       }
 
-      const probe = within(toolbar).getByRole(kind === 'ruler' ? 'slider' : 'combobox', {
+      const probe = within(toolbar).getByRole(role, {
         name: controlLabel,
       }) as HTMLElement
       const before = structuredClone(session.snapshot.core.document)
@@ -158,7 +159,8 @@ describe('M08 shell lifecycle and contextual settings', () => {
       await fireEvent.keyDown(probe, { key: 'ArrowRight' })
       await fireEvent.keyDown(probe, { key: 'Enter' })
       await fireEvent.click(probe)
-      expect(probe).toHaveAttribute('tabindex', '-1')
+      if (kind === 'loupe') expect(probe).toBeDisabled()
+      else expect(probe).toHaveAttribute('tabindex', '-1')
       expect(execute).not.toHaveBeenCalled()
       expect(session.snapshot.core.document).toEqual(before)
       expect(window.localStorage.getItem('cute-screen.drawing-tool-preferences.v1')).toBeNull()
@@ -166,11 +168,13 @@ describe('M08 shell lifecycle and contextual settings', () => {
       useEditorShellStore(pinia).clearLayerSelection()
       await fireEvent.click(screen.getByRole('button', { name: toolLabel }))
       toolbar = view.container.querySelector('.cs-bottom-chrome-center .cs-context-toolbar') as HTMLElement
-      const defaultControl = await within(toolbar).findByRole(kind === 'ruler' ? 'slider' : 'combobox', {
+      const defaultControl = await within(toolbar).findByRole(role, {
         name: controlLabel,
       })
       if (kind === 'ruler') {
         expect(defaultControl).toHaveAttribute('aria-valuenow', '2')
+      } else if (kind === 'loupe') {
+        expect(defaultControl).toHaveAttribute('title', 'Shape: Circle')
       } else {
         expect(defaultControl).toHaveTextContent(
           kind === 'censor' ? 'Pixelate' : kind === 'spotlight' ? 'Rectangle' : 'Circle',
@@ -182,7 +186,7 @@ describe('M08 shell lifecycle and contextual settings', () => {
       await fireEvent.click(screen.getByRole('button', { name: 'Unlock layer' }))
       execute.mockClear()
       toolbar = view.container.querySelector('.cs-selection-floating-toolbar .cs-context-toolbar') as HTMLElement
-      const enabledControl = await within(toolbar).findByRole(kind === 'ruler' ? 'slider' : 'combobox', {
+      const enabledControl = await within(toolbar).findByRole(role, {
         name: controlLabel,
       })
       if (kind === 'ruler') {
@@ -191,7 +195,7 @@ describe('M08 shell lifecycle and contextual settings', () => {
         await fireEvent.keyUp(enabledControl, { key: 'ArrowRight' })
       } else {
         await fireEvent.click(enabledControl)
-        await fireEvent.click(await screen.findByRole('option', { name: optionLabel }))
+        await fireEvent.click(await screen.findByRole(kind === 'loupe' ? 'button' : 'option', { name: optionLabel }))
       }
       expect(execute).toHaveBeenCalledTimes(1)
       expect(session.snapshot.core.document.layers[0]).toMatchObject(

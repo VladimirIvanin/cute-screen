@@ -1,5 +1,24 @@
 # Архитектура Cute Screen
 
+## Предпросмотр ordered effects при выделении
+
+`requiresScenePreview` объединяет loupe, censor, spotlight и marker.
+При move/resize/rotate их временная проекция заменяет исходный слой на прежнем
+месте в scene; overlay содержит только selection chrome. Geometry и renderer
+используют одно правило. Это сохраняет порядок composite-below и составную
+маску фонаря, не передавая precision nodes в `drawNodes2D`, который не может
+отрисовать их без ordered surface. Pointer click не меняет документ/history.
+
+## Компактная панель лупы
+
+`LoupeFormattingToolbar` подключён через общий `ContextToolbar` в selection,
+creation defaults, configure и Quick. Четыре trigger раскрывают zoom, size,
+shape и border; последнее меню содержит цвет/толщину рамки и shadow.
+Компонент использует существующие NumericControl, SimpleColorPicker,
+usePreviewPopover и effect/command pipeline. Миниатюра circle/rectangle — CSS-контур.
+Document v7, renderer и IPC сохраняются; отдельный ADR не требуется:
+компоновка следует существующим ADR-048/053/054.
+
 ## Брендовый знак (ADR-057)
 
 `scripts/generate-brand-assets.mjs` хранит общую геометрию монитора с кошачьими
@@ -30,6 +49,9 @@ Dev entry `apps/desktop/icons-preview.html` показывает тот же `Ui
 Принятый `spotlight` — прямоугольное окно на равномерной диагональной штриховке;
 линии подходят встык к контуру. Его геометрия, как у остальных собственных
 иконок, находится в `shell/icons/geometry.ts` и переиспользуется в dev preview.
+`privacy` использует шахматную сетку 3×3 с заполненными клетками `currentColor`;
+светлые клетки задаются локальной `fill-opacity` 0.15. Root-контракт не меняется,
+цвет по-прежнему наследуется от кнопки, включая active/disabled состояния.
 
 ## Выделитель (ADR-051)
 

@@ -1,5 +1,164 @@
 # Стратегия тестирования
 
+## Переключение панели лупа ↔ фонарь (2026-10-16)
+
+Windows x64, Node 22.23.1, pnpm 10.33.2. Evidence/logs:
+`artifacts/selection-toolbar-switch/`; screenshots сохраняются shared helper
+в `artifacts/browser-e2e/loupe-settings-selected-*.png` и
+`artifacts/tauri-e2e/loupe-settings-{quick,editor}-selected-*.png`.
+
+Red-first: mounted-shell pointer clicks меняют selected IDs на фонарь, но
+панель остаётся Loupe. Ошибка `spotlight rendering requires an ordered Canvas2D surface`
+прерывает Vue update; browser повторяет ту же ошибку в настоящем Canvas2D
+(`red.log`, `browser-red.log`). Precision preview ошибочно шёл через overlay.
+После исправления `pnpm test tests/unit/vue/selection-toolbar-switch.test.ts`
+— exit 0, 2/2 (`green.log`): повторные лупа ↔ фонарь и лупа ↔ цензура,
+правильная панель и отсутствие команд на click.
+
+Shared E2E создаёт оба объекта через UI, дважды переключает выделение,
+меняет dim до 80% только у фонаря и возвращается к лупе. Просмотрен browser
+`loupe-settings-selected-spotlight.png`: выделен фонарь, видны его controls.
+Первый green browser прошёл переключения, но упёрся в 30 s wrapper timeout
+при расширенной layout matrix: timeout перенесён с тела callback на сам Mocha test,
+чтобы WebdriverIO прочитал его до запуска. Product timeouts не менялись.
+Итоговые результаты:
+
+- `pnpm test` — exit 0, 98 files / 711 tests (`test.log`).
+- `pnpm check` — exit 0 (`check.log`): lint/types/format/docs, 40/40 boundaries,
+  IPC, frontend build, Rust fmt/clippy. После этого только перенос import
+  наверх файла и корректировка Mocha timeout в двух E2E specs.
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5195 pnpm test:e2e:browser --spec tests/e2e/specs/browser-loupe-settings.e2e.ts`
+  — exit 0, 1/1 (`browser-final.log`), Chrome 155.0.8059.79.
+- `CARGO_TARGET_DIR=D:/cutescreen/target/shape-catalog-native CARGO_BUILD_JOBS=4 CUTE_SCREEN_E2E_SCENARIOS=loupe-settings pnpm test:e2e:tauri`
+  (env заданы PowerShell) — первый запуск exit 1 до нового regression:
+  исходный drag лупы не создал слой (`native.log`, `native-first-failure.png`).
+  Панель defaults корректна; повтор (`native-retry.log`) дал тот же результат.
+  После ожидания закрытия configure/leave animations и stable canvas создание
+  прошло, но клик теста за краем маленькой линзы не выбирал её (`native-final.log`).
+  Координата исправлена на центр создания. Финальный запуск — exit 0, 1/1
+  (`native-verified.log`), WebView2 155.0.4283.45, external tauri-driver 2.1.0:
+  production fake Capture → Quick → Editor, повторное переключение выделения
+  и изменение dim только у фонаря в обоих окнах. Contextmenu/keydown trusted.
+  Просмотрены Quick и editor `selected-spotlight.png`: панель соответствует
+  рамке фонаря, лупа остаётся на canvas. Это fake-platform, не physical capture.
+- `pnpm exec tsc --noEmit -p tests/e2e/tsconfig.json` — exit 0 (`e2e-types.log`).
+- `pnpm format`, `pnpm format:check` — exit 0 (`format.log`, `format-check.log`).
+
+WebKitGTK/WKWebView и physical capture не проверены.
+
+## Компактные настройки лупы (2026-10-16)
+
+Windows x64, PowerShell, Node 22.23.1, pnpm 10.33.2;
+Chrome 155.0.8059.79, WebView2 155.0.4283.45, external tauri-driver 2.1.0.
+Evidence/logs: `artifacts/loupe-settings/`; screenshots:
+`artifacts/browser-e2e/loupe-*` и `artifacts/tauri-e2e/loupe-settings-*`.
+
+- `pnpm test` — 708/709; оставшийся тест ожидал прежние постоянные подписи.
+  После адаптации `pnpm test tests/unit/vue/m08-precision-history.test.ts tests/unit/vue/m08-precision-settings.test.ts`
+  — exit 0, 9/9; `unit-final.log`. Locked/unlock сохраняет disabled,
+  отсутствие history/default leakage и один command после unlock.
+  Итоговый полный `pnpm test` — exit 0, 97 files / 709 tests (`test-final.log`).
+- `pnpm check` сначала выявил inline SVG вне разрешённых icon boundaries:
+  миниатюра формы заменена CSS-контуром. Повтор — exit 0 (`check-final.log`),
+  до последнего изменения CSS палитры; 40/40 boundaries, lint/types/format/docs,
+  IPC, build и Rust fmt/clippy.
+  Итоговый повтор с финальной палитрой — exit 0 (`check-verified.log`).
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5195 pnpm test:e2e:browser --spec tests/e2e/specs/browser-loupe-settings.e2e.ts`
+  — exit 0, 1/1 (`browser-final.log`); defaults, создание, numeric cancel,
+  focus, size/shape/border/shadow и Undo/Redo, 1024/1280 × RU/EN × light/dark.
+  Просмотр снимка выявил horizontal overflow в border palette; общий button
+  style заменён оформлением shape popover. Финальный тест дополнительно
+  проверяет `scrollWidth <= clientWidth`: exit 0, 2/2 вместе с
+  `browser-m08-3.e2e.ts` (`browser-verified.log`). Просмотрен
+  `loupe-1024-ru-dark-loupeBorderWidth.png`: все цвета и numeric entry видимы,
+  popup остаётся рядом с toolbar, результат лупы виден на canvas.
+- `$env:CARGO_TARGET_DIR='D:/cutescreen/target/shape-catalog-native'; $env:CARGO_BUILD_JOBS='4'; $env:CUTE_SCREEN_E2E_SCENARIOS='loupe-settings'; pnpm test:e2e:tauri`
+  — exit 0, 1/1 (`native.log`), production Capture → Quick → Editor.
+  Настройки defaults, рисование, cancel, shape/border/shadow и Undo/Redo
+  проверены в обоих окнах, contextmenu/keydown имеют `isTrusted=true`.
+  Capture использует fake-platform, профиль изолирован. Повтор после финального
+  CSS — exit 0, 1/1 (`native-final.log`); просмотрены native Quick border и
+  editor compact screenshots: палитра помещается, линза и connector видимы.
+- `pnpm format`, `pnpm format:check` — exit 0
+  (`format-final.log`, `format-check-final.log`).
+
+Исходные browser failures относились к лишнему Escape и неверному WebDriver
+selector в новом тесте; исправлены без изменения production keyboard handling.
+WebKitGTK/WKWebView, physical capture и mixed-DPI не проверены.
+
+## Принятая иконка лупы B1 (2026-10-16, ADR-055)
+
+Пользователь выбрал B1: пунктирная рамка области, круглая линза и ручка.
+Каноническая `loupeGeometry` используется через прежнее имя `UiIcon` в shell
+и dev gallery; остальные кнопки zoom, доступные имена и команды сохранены.
+Геометрия нарисована локально по пользовательскому визуальному референсу;
+сторонние SVG не копировались. Новое архитектурное решение не требуется.
+
+Windows x64, PowerShell, Node 22.23.1, pnpm 10.33.2,
+Chrome 155.0.8059.79. Evidence: `artifacts/custom-icons/loupe-adopted/`;
+логи — `artifacts/custom-icons/loupe-*.log`.
+
+- До замены: `CUTE_SCREEN_BROWSER_E2E_PORT=5199`,
+  `CUTE_SCREEN_ICON_EVIDENCE=loupe-before`,
+  `pnpm test:e2e:browser --spec tests/e2e/specs/browser-custom-icons.e2e.ts`
+  — exit 0, 2/2; предыдущий production screenshot сохранён в `loupe-before/`.
+- `pnpm format` — exit 0; `pnpm test tests/unit/vue/ui-icon.test.ts`
+  — exit 0, 70/70: существующий полный SVG-контракт и fallthrough.
+- Та же browser-команда с `CUTE_SCREEN_ICON_EVIDENCE=loupe-adopted` — exit 0,
+  2/2: gallery, DPR 1/2, обе темы, raster decode без clipping при
+  16/18/20/24/32 px, keyboard focus и disabled; выбор L в editor RU/EN.
+  Просмотрены `loupe-dpr-1.png` и `editor-ru-dark.png`: выбранный рисунок
+  сохраняется в 18 px и согласован по толщине с соседними иконками.
+- `$env:CARGO_TARGET_DIR='D:/cutescreen/target/shape-catalog-native'; $env:CARGO_BUILD_JOBS='4'; $env:CUTE_SCREEN_E2E_SCENARIOS='custom-icons'; $env:CUTE_SCREEN_ICON_EVIDENCE='loupe-adopted'; pnpm test:e2e:tauri`
+  — exit 1; изолированный повтор без изменения source/assertions также exit 1.
+  Обе свежие сборки запускаются в WebView2 155.0.4283.45 через external
+  tauri-driver 2.1.0 (версия из `cargo install --list`; `--version` драйвер
+  не поддерживает). Оба запуска останавливаются на `pencil stroke did not commit`
+  в Quick до выбора лупы и handoff. Логи `loupe-native.log`,
+  `loupe-native-recheck.log`; просмотрен и сохранён `native-first-failure.png`.
+  Dedicated native выбор лупы/Quick → Editor остаётся pending; browser pass
+  не подменяет этот gate. Production pencil/controller в этой правке не менялись.
+- Итоговые format/check: pending.
+
+Browser не подтверждает WebView2, WebKitGTK/WKWebView или физический capture.
+
+## Принятая иконка «Скрыть данные»: шахматная мозаика (2026-10-16)
+
+По выбору пользователя `privacy` использует собственную геометрию вместо
+Tabler ScanEye. После просмотра screenshot-editor references и двух уточнений
+принята крупная сетка 3×3: пять клеток `currentColor` 100%, четыре — 15% через
+`fill-opacity`. Все клетки заполнены; root сохраняет fill none и stroke 1.8.
+Предыдущая 4×4 сетка с уровнями 30/65/100% отвергнута как малоконтрастная.
+Это визуальная замена в рамках ADR-055: API, tool commands и document не меняются.
+
+Windows x64, Node 22.23.1, pnpm 10.33.2, Chrome 155.0.8059.79.
+Evidence: `artifacts/custom-icons/censor-adopted/`; команды и версии runtime —
+в соседних `censor-adopted-*.log`. Снимок замечания пользователя сохранён как
+`low-contrast-user-feedback.png`.
+
+- Финальный SVG catalog: 70/70, включая классы, attrs, currentColor и конечную
+  числовую `fill-opacity` в (0, 1].
+- Browser `pnpm test:e2e:browser --spec tests/e2e/specs/browser-custom-icons.e2e.ts`
+  с `CUTE_SCREEN_BROWSER_E2E_PORT=5198`, `CUTE_SCREEN_ICON_EVIDENCE=censor-adopted`
+  — 2/2: DPR 1/2, обе темы, выбор Hide data/Скрыть данные, disabled пустого editor,
+  keyboard focus и отсутствие clipping при 16/18/20/24/32 px. Финальный DPR 1
+  render просмотрен; клетки заметно крупнее и контрастнее начального варианта.
+- Общие `pnpm test` (97 files / 709 tests) и `pnpm check` — exit 0 при
+  подключении мозаики, до последней коррекции контраста. После коррекции:
+  SVG 70/70, browser 2/2, `pnpm format`, `pnpm format:check` — exit 0.
+- `python -X utf8 .../skill-creator/scripts/quick_validate.py .agents/skills/cutescreen-icons`
+  — valid. Системная cp1251 без `-X utf8` не декодирует русскоязычный skill.
+- `$env:CARGO_TARGET_DIR='D:/cutescreen/target/shape-catalog-native'; $env:CARGO_BUILD_JOBS='4'; $env:CUTE_SCREEN_E2E_SCENARIOS='custom-icons'; $env:CUTE_SCREEN_ICON_EVIDENCE='censor-adopted'; pnpm test:e2e:tauri`
+  — exit 1, WebView2 155.0.4283.45. Первый запуск остановился на pencil stroke
+  в Quick (`censor-adopted-native-first.log`). Изолированный повтор прошёл
+  drawing/sampling/history и выбор цензуры с новой SVG, но перед handoff настройки
+  цензуры перекрыли Select: fieldset top 8 px, click point (677,85),
+  `element click intercepted` (`censor-adopted-native.log`). Failure screenshot
+  просмотрен и сохранён в evidence. Это отдельный Quick layout defect;
+  полный native handoff для финальной мозаики остаётся pending.
+
+WebView2 не подтверждает WebKitGTK/WKWebView и физический capture.
+
 ## Принятая иконка фонаря «Встык» (2026-10-16, ADR-055)
 
 Пользователь выбрал чистое прямоугольное окно на равномерной штриховке 45°,

@@ -9,10 +9,11 @@ import {
 } from '../../../../packages/editor-vue/src/shell/icons/geometry'
 import '../../../../packages/editor-vue/src/shell/shell.css'
 import { spotlightCandidates } from './spotlight-candidates'
-import { censorCandidates } from './censor-candidates'
+import { censorCandidates } from './censor-selected'
 
 const sizes = [16, 18, 20, 24, 32] as const
 const names = [
+  'loupe',
   'marker',
   'pencil',
   'eyedropper',
@@ -37,8 +38,48 @@ const eyedroppers = [
   <main class="icon-workbench">
     <h1>Cute Screen · Icon workbench</h1>
     <p>Live UiIcon · 24-unit grid · currentColor · stroke 1.8 · round caps and joins</p>
+    <section class="loupe-preview">
+      <h2>Лупа · принятый B1: область и увеличение</h2>
+      <div class="icon-themes">
+        <section
+          v-for="theme in ['light', 'dark']"
+          :key="theme"
+          :data-theme="theme"
+          class="icon-theme"
+        >
+          <div class="icon-row icon-heading">
+            <span>{{ theme }}</span>
+            <span v-for="size in sizes" :key="size">{{ size }} px</span>
+          </div>
+          <div class="icon-row">
+            <span>B1</span>
+            <span
+              v-for="size in sizes"
+              :key="size"
+              class="icon-cell"
+            >
+              <UiIcon name="loupe" :style="{ width: `${size}px`, height: `${size}px` }" />
+            </span>
+          </div>
+          <div class="icon-states">
+            <button
+              v-for="state in states"
+              :key="state"
+              :class="['icon-state', `is-${state}`]"
+              :aria-label="`${theme} loupe ${state}`"
+              :aria-pressed="state === 'active'"
+              :disabled="state === 'disabled'"
+            >
+              <UiIcon name="loupe" />
+            </button>
+            <span>18 px</span>
+          </div>
+          <p class="icon-legend">rest · hover · active · disabled · focus</p>
+        </section>
+      </div>
+    </section>
     <section class="censor-proposals">
-      <h2>Цензура · три концепции</h2>
+      <h2>Скрыть данные · шахматная мозаика</h2>
       <div class="icon-themes icon-candidates">
         <section
           v-for="theme in ['light', 'dark']"
@@ -71,6 +112,11 @@ const eyedroppers = [
                 :style="{ width: `${size}px`, height: `${size}px` }"
               />
             </span>
+          </div>
+          <div class="censor-neighbors">
+            <span>Сейчас <UiIcon name="privacy" /></span>
+            <span>Фонарь <UiIcon name="spotlight" /></span>
+            <span>18 px</span>
           </div>
         </section>
       </div>
@@ -178,7 +224,7 @@ const eyedroppers = [
         </div>
         <h3>18 px · button states</h3>
         <div
-          v-for="name in names.slice(0, 3)"
+          v-for="name in names.filter((name) => name !== 'loupe').slice(0, 3)"
           :key="name"
           class="icon-states"
         >
@@ -206,6 +252,9 @@ body { margin: 0; background: #e9e9ec; color: #202124; font: 14px/1.5 system-ui,
 .icon-workbench { max-width: 1160px; margin: auto; padding: 24px; }
 .icon-workbench h1 { font-size: 24px; margin: 0; }
 .spotlight-descriptions { display: grid; gap: 4px; }
+.censor-neighbors { display: flex; align-items: center; gap: 24px; margin-top: 16px; font-size: 12px; }
+.censor-neighbors span { display: inline-flex; align-items: center; gap: 8px; }
+.censor-neighbors svg { width: 18px; height: 18px; }
 .icon-workbench details { margin: 20px 0; }
 .icon-workbench summary { cursor: pointer; margin-bottom: 12px; }
 .icon-themes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }

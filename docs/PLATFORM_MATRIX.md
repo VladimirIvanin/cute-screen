@@ -1,5 +1,23 @@
 # Платформенная матрица
 
+## Переключение панели лупа ↔ фонарь (2026-10-16)
+
+Windows x64: Chrome 155.0.8059.79 и WebView2 155.0.4283.45 подтверждают
+повторный выбор лупы/фонаря кликами на canvas и изменение только текущего
+объекта. Native production fake Capture → Quick → Editor — 1/1, external
+tauri-driver 2.1.0; скриншоты обоих окон просмотрены. Ошибка ordered preview
+устранена также для censor. Unit: 711/711. Команды и initial failures — TESTING.md.
+WebKitGTK/WKWebView и physical capture не проверены.
+
+## Компактные настройки лупы (2026-10-16)
+
+Windows x64: Chrome 155.0.8059.79 — создание лупы и compact settings;
+WebView2 155.0.4283.45 — production fake Capture → Quick → Editor,
+zoom/size defaults, numeric cancel, shape, border, shadow и Undo/Redo.
+External tauri-driver 2.1.0, trusted contextmenu/keydown.
+Финальная палитра без overflow проверена в Chrome и WebView2; см. TESTING.md.
+WebKitGTK/WKWebView, physical capture и mixed-DPI этим срезом не проверены.
+
 ## Pencil / Spotlight / Ruler (2026-10-16, ADR-056)
 
 Windows x64: Chrome 155.0.8059.79 проверяет компактные настройки при 1024/1280 px,
@@ -15,6 +33,19 @@ Capture здесь fake-platform; физических платформенны�
 WebKitGTK/WKWebView и физический mixed-DPI pending. Подробности — TESTING.md.
 
 ## Проектные UI-иконки (2026-10-16, ADR-055)
+
+Лупа B1: Windows x64 / Chrome 155.0.8059.79 — SVG 70/70 и browser 2/2,
+16–32 px при DPR 1/2, обе темы, RU/EN, disabled/focus и выбор инструмента.
+Два запуска WebView2 155.0.4283.45 остановились на создании pencil stroke
+в Quick до выбора лупы; dedicated native handoff остаётся pending.
+Evidence: `artifacts/custom-icons/loupe-adopted/`, команды — TESTING.md.
+Linux/WebKitGTK и macOS/WKWebView не проверены; capture guarantees не меняются.
+
+Шахматная `privacy` 3×3 с полутонами 15/100%: Chrome 155.0.8059.79 —
+2/2 (DPR 1/2, RU/EN, обе темы). WebView2 155.0.4283.45 подтвердил её
+отображение и выбор в Quick; полный dedicated handoff остановился на перекрытии
+Select панелью настроек цензуры. Native final остаётся pending; TESTING.md
+содержит команды и evidence `artifacts/custom-icons/censor-adopted/`.
 
 Принятый фонарь «Встык»: Chrome 155.0.8059.79 — gallery и shell 2/2,
 WebView2 155.0.4283.45 — dedicated Capture → Quick → Editor 1/1 после

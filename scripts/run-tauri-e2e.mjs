@@ -21,6 +21,12 @@ const embeddedWebDriverPort = Number.parseInt(process.env.TAURI_WEBDRIVER_PORT ?
 
 const scenarios = [
   {
+    id: 'loupe-settings',
+    spec: 'tests/e2e/specs/tauri-loupe-settings.e2e.ts',
+    harnessQuery: '?m04=1&m08=1',
+    fakeCapture: true,
+  },
+  {
     id: 'tool-settings',
     spec: 'tests/e2e/specs/tauri-tool-settings.e2e.ts',
     harnessQuery: '?m04=1&m08=1',
