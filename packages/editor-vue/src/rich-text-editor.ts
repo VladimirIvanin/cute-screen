@@ -49,6 +49,11 @@ export class RichTextEditorController {
     return this.#state
   }
 
+  restoreState(state: RichTextEditingState): void {
+    this.#state = state
+    this.#revision += 1
+  }
+
   get composing(): boolean {
     return this.#composing
   }

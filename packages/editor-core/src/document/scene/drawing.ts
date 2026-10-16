@@ -1,3 +1,4 @@
+import { resolveFreehandGeometry } from '../../tools/freehand'
 import {
   shapeGeometry,
   mapShapePath,
@@ -15,7 +16,6 @@ import {
   color,
   fill,
   lineNode,
-  localPoint,
   stroke,
 } from './shared'
 
@@ -144,28 +144,11 @@ export function shapeNodes(layer: ShapeLayer): readonly RenderNode[] {
 
 export function freehandNodes(layer: PencilLayer | MarkerLayer): readonly RenderNode[] {
   const payload = layer.payload
-  const points = Array.isArray(payload.points)
-    ? payload.points.map((point) => {
-        const sample = point as Record<string, unknown>
-        return {
-          ...localPoint(sample, { x: 0, y: 0 }),
-          pressure:
-            typeof sample.pressure === 'number' && Number.isFinite(sample.pressure)
-              ? Math.max(0, Math.min(1, sample.pressure))
-              : 0.5,
-        }
-      })
-    : []
-  const baseWidth = typeof payload.width === 'number' ? payload.width : 1
-  const brushScale =
-    layer.kind === 'pencil' && payload.brush === 'pencil'
-      ? 0.65
-      : layer.kind === 'pencil' && payload.brush === 'brush'
-        ? 1.5
-        : 1
+  const geometry = resolveFreehandGeometry(payload, layer.kind === 'pencil')
+  const points = geometry.points
   const style = {
     color: color(payload.color),
-    width: baseWidth * brushScale,
+    width: geometry.width,
     cap: 'round' as const,
     join: 'round' as const,
   }

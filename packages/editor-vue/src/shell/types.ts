@@ -66,6 +66,7 @@ export type ContextControl = (
   }
   | {
     readonly kind: 'range'
+    readonly numeric?: import('./ui/numeric-presentation').NumericPresentation
     readonly id: string
     readonly label: string
     readonly value: number
@@ -123,6 +124,15 @@ export type ContextControl = (
 export type ShapeFill = import('@cute-screen/editor-renderer').FillPaint
 
 export interface ContextToolbarSchema {
+  readonly toolSettings?: Readonly<{
+    kind: 'pencil' | 'spotlight' | 'ruler'
+    apertures?: readonly Readonly<{ id: string; shape: string }>[]
+    activeApertureId?: string | undefined
+    editing?: boolean
+    adding?: boolean | undefined
+    measurement?: Readonly<{ length: string; angle: string }> | undefined
+  }>
+
   readonly highlighter?: import('./workspace/highlighter-background').HighlighterAnalysis
   /** Present only when all targets are shapes; null fill denotes mixed paint. */
   readonly shape?: Readonly<{

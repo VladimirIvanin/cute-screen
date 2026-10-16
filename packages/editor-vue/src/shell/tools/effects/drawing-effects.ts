@@ -4,6 +4,7 @@ import type {
 } from 'vue'
 import {
   rebaseArrowLayer,
+  rebaseFreehandLayer,
   rememberDrawingColor,
   resolveHighlighterBlend,
   isHighlighterMode,
@@ -105,6 +106,7 @@ function selectedAfter(
   ) {
     after = rebaseArrowLayer(selected, payload as typeof selected.payload)
   }
+  if (after.kind === 'pencil' || after.kind === 'marker') after = rebaseFreehandLayer(after)
   return after
 }
 
@@ -178,5 +180,5 @@ export function createDrawingEffects(context: DrawingEffectsContext) {
     context.savePreferences(preferences)
     return true
   }
-  return { applyDrawingChange }
+  return { resolveChange: (id: string, value: string) => resolveDrawingEffect(context, id, value), applyDrawingChange }
 }

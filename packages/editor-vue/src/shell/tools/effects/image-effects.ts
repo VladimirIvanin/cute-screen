@@ -114,5 +114,5 @@ export function createImageEffects(context: ImageEffectsContext) {
     }
     return true
   }
-  return { applyImageChange }
+  return { resolveChange: (id: string, value: string) => resolveImageEffect(context, id, value), applyImageChange }
 }

@@ -35,70 +35,71 @@ export function spotlightPath(
   canvasKit: CanvasKitApi,
   node: RenderSpotlightNode,
 ): CanvasKitPath {
-  const aperture = node.aperture
   const builder = new canvasKit.PathBuilder()
-  if (aperture.shape === 'ellipse') {
-    if (builder.addOval) {
-      builder.addOval(canvasKit.XYWHRect(aperture.x, aperture.y, aperture.width, aperture.height))
+  for (const aperture of node.apertures) {
+    if (aperture.shape === 'ellipse') {
+      if (builder.addOval) {
+        builder.addOval(canvasKit.XYWHRect(aperture.x, aperture.y, aperture.width, aperture.height))
+      } else {
+        const centerX = aperture.x + aperture.width / 2
+        const centerY = aperture.y + aperture.height / 2
+        const radiusX = aperture.width / 2
+        const radiusY = aperture.height / 2
+        const kappa = 0.552_284_75
+        builder.moveTo(centerX + radiusX, centerY)
+        builder.cubicTo(
+          centerX + radiusX,
+          centerY + radiusY * kappa,
+          centerX + radiusX * kappa,
+          centerY + radiusY,
+          centerX,
+          centerY + radiusY,
+        )
+        builder.cubicTo(
+          centerX - radiusX * kappa,
+          centerY + radiusY,
+          centerX - radiusX,
+          centerY + radiusY * kappa,
+          centerX - radiusX,
+          centerY,
+        )
+        builder.cubicTo(
+          centerX - radiusX,
+          centerY - radiusY * kappa,
+          centerX - radiusX * kappa,
+          centerY - radiusY,
+          centerX,
+          centerY - radiusY,
+        )
+        builder.cubicTo(
+          centerX + radiusX * kappa,
+          centerY - radiusY,
+          centerX + radiusX,
+          centerY - radiusY * kappa,
+          centerX + radiusX,
+          centerY,
+        )
+        builder.close()
+      }
     } else {
-      const centerX = aperture.x + aperture.width / 2
-      const centerY = aperture.y + aperture.height / 2
-      const radiusX = aperture.width / 2
-      const radiusY = aperture.height / 2
-      const kappa = 0.552_284_75
-      builder.moveTo(centerX + radiusX, centerY)
-      builder.cubicTo(
-        centerX + radiusX,
-        centerY + radiusY * kappa,
-        centerX + radiusX * kappa,
-        centerY + radiusY,
-        centerX,
-        centerY + radiusY,
-      )
-      builder.cubicTo(
-        centerX - radiusX * kappa,
-        centerY + radiusY,
-        centerX - radiusX,
-        centerY + radiusY * kappa,
-        centerX - radiusX,
-        centerY,
-      )
-      builder.cubicTo(
-        centerX - radiusX,
-        centerY - radiusY * kappa,
-        centerX - radiusX * kappa,
-        centerY - radiusY,
-        centerX,
-        centerY - radiusY,
-      )
-      builder.cubicTo(
-        centerX + radiusX * kappa,
-        centerY - radiusY,
-        centerX + radiusX,
-        centerY - radiusY * kappa,
-        centerX + radiusX,
-        centerY,
-      )
+      const points =
+        aperture.shape === 'diamond'
+          ? [
+              [aperture.x + aperture.width / 2, aperture.y],
+              [aperture.x + aperture.width, aperture.y + aperture.height / 2],
+              [aperture.x + aperture.width / 2, aperture.y + aperture.height],
+              [aperture.x, aperture.y + aperture.height / 2],
+            ]
+          : [
+              [aperture.x, aperture.y],
+              [aperture.x + aperture.width, aperture.y],
+              [aperture.x + aperture.width, aperture.y + aperture.height],
+              [aperture.x, aperture.y + aperture.height],
+            ]
+      builder.moveTo(points[0]![0]!, points[0]![1]!)
+      for (const point of points.slice(1)) builder.lineTo(point[0]!, point[1]!)
       builder.close()
     }
-  } else {
-    const points =
-      aperture.shape === 'diamond'
-        ? [
-            [aperture.x + aperture.width / 2, aperture.y],
-            [aperture.x + aperture.width, aperture.y + aperture.height / 2],
-            [aperture.x + aperture.width / 2, aperture.y + aperture.height],
-            [aperture.x, aperture.y + aperture.height / 2],
-          ]
-        : [
-            [aperture.x, aperture.y],
-            [aperture.x + aperture.width, aperture.y],
-            [aperture.x + aperture.width, aperture.y + aperture.height],
-            [aperture.x, aperture.y + aperture.height],
-          ]
-    builder.moveTo(points[0]![0]!, points[0]![1]!)
-    for (const point of points.slice(1)) builder.lineTo(point[0]!, point[1]!)
-    builder.close()
   }
   const path = builder.detach()
   builder.delete()

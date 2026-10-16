@@ -41,6 +41,8 @@ const {
   openToolConfigure,
   closeToolConfigure,
   activeDocument,
+  displayDocument,
+  spotlightEditing,
   canvasMenu,
   canvasMenuItems,
   canvasMenuAction,
@@ -234,10 +236,14 @@ function onTextCancelled(): void {
           :image="props.sourceImage"
           :texture-images="textureImages"
           :image-layer="baseImageLayer"
-          :document="activeDocument"
+          :document="displayDocument"
           :selected-layer-id="store.selectedLayerId"
           :selected-layer-ids="store.selectedLayerIds"
           :active-tool="store.activeToolId ?? 'select'"
+          :spotlight-editing="spotlightEditing"
+          :read-only="props.readOnlyDocument"
+          @spotlight-editing-change="spotlightEditing = $event"
+          @spotlight-remove="onContextAction('spotlightRemove')"
           :sampling="Boolean(samplingControl || store.activeToolId === 'eyedropper')"
           :sampling-blocked="!sceneTexturesReady"
           :drawing-defaults="drawingDefaults"
@@ -345,6 +351,7 @@ function onTextCancelled(): void {
         >
           <ContextToolbar
             :schema="toolConfigureSchema"
+            :defaults-tool="toolConfigure.toolId"
             :label="translate('toolSettings')"
             :recent-colors="drawingPreferences.recentColors"
             :picker-locale="state.locale.value"

@@ -236,6 +236,7 @@ function commitIntrinsicResize(
   try {
     const after = resizeLayerGeometry(gesture.initial, gesture.handle, gesture.current, {
       preserveAspect: gesture.preserveAspect,
+      snapAngleIncrementDegrees: gesture.snapAngleIncrementDegrees,
       fromCenter: gesture.centerResize,
       ...(context.props.document ? { canvas: context.props.document.canvas } : {}),
     })
@@ -353,6 +354,7 @@ function startCreatedText(
 
 function requiresCommittedRestore(gesture: CanvasGesture): boolean {
   return (
+    gesture?.kind === 'precision' && gesture.tool === 'spotlight' ||
     gesture?.kind === 'move' ||
     gesture?.kind === 'resize' ||
     gesture?.kind === 'intrinsicResize' ||

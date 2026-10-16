@@ -73,7 +73,7 @@ describe('M06 drawing tools in browser mode', () => {
     await browser.execute(() => {
       const color = document.querySelector<HTMLInputElement>('input[aria-label="Background Text color"]')
       const inputs = [
-        ...document.querySelectorAll<HTMLInputElement>('.cs-text-background-popover input[type="number"]'),
+        ...document.querySelectorAll<HTMLInputElement>('.cs-text-background-popover input[role="spinbutton"]'),
       ]
       if (!color || inputs.length !== 2) throw new Error('Text background controls are missing')
       color.value = '#fff2a8'

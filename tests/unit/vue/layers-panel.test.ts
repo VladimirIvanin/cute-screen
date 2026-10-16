@@ -201,7 +201,7 @@ describe('M05 LayersPanel reorder', () => {
     expect(rendered.container.querySelector('.cs-layer-properties')).toBeNull()
     expect(await rendered.findByRole('slider', { name: 'opacity' })).toBeInTheDocument()
     const rotationInput = rendered.container.querySelector(
-      '.cs-layers-controls .cs-ui-number-input input',
+      '.cs-layers-control--rotation input',
     ) as HTMLInputElement
     expect(rotationInput).not.toBeNull()
     await fireEvent.update(rotationInput, '45')

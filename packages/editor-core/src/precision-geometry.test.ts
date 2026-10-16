@@ -68,13 +68,18 @@ describe('M08 geometry, hit testing and renderer-neutral scene', () => {
     expect(createDocumentRenderScene(document).nodes).toEqual([
       expect.objectContaining({
         kind: 'spotlight',
-        aperture: {
+        bounds: {
+          x: 140,
+          y: 40,
+          width: 120,
+          height: 80,
+        }, apertures: [{
           shape: 'ellipse',
           x: 140,
           y: 40,
           width: 120,
           height: 80,
-        },
+        }],
         dimOpacity: 0.7,
         feather: 'soft',
       }),

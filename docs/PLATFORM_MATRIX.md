@@ -1,5 +1,94 @@
 # Платформенная матрица
 
+## Pencil / Spotlight / Ruler (2026-10-16, ADR-056)
+
+Windows x64: Chrome 155.0.8059.79 проверяет компактные настройки при 1024/1280 px,
+RU/EN и light/dark. WebView2 155.0.4283.45 через external tauri-driver 2.1.0
+прошёл production Capture → Quick с non-origin crop → Editor: области фонаря,
+настройки кисти, clipboard и Alt endpoints. Pointer/keyboard события trusted.
+Capture здесь fake-platform; физических платформенных гарантий этот тест не даёт.
+Отдельный запуск восстанавливает документ с составными фонарями и defaults.
+Все 22 native scenarios имеют успешное выполнение с изолированными повторами;
+общий прогон во время параллельного native runner не считается единым pass.
+Оба software renderer backend проверяются decoded PNG при 1×/2×; отдельный
+4K/8K harness подтверждает preview/export pixels больших документов.
+WebKitGTK/WKWebView и физический mixed-DPI pending. Подробности — TESTING.md.
+
+## Проектные UI-иконки (2026-10-16, ADR-055)
+
+Принятый фонарь «Встык»: Chrome 155.0.8059.79 — gallery и shell 2/2,
+WebView2 155.0.4283.45 — dedicated Capture → Quick → Editor 1/1 после
+подключения геометрии. Evidence: `artifacts/custom-icons/spotlight-adopted/`.
+WebKitGTK/WKWebView для этой иконки не проверены.
+
+Windows x64: Chrome 155.0.8059.79 проверяет реальные `UiIcon`, две темы,
+16/18/20/24/32 CSS px при DPR 1/2, отсутствие выхода stroke за viewBox,
+RU/EN и disabled/focus. WebView2 155.0.4283.45 проверяет dedicated production
+Capture → Quick → Editor с fake-platform capture: пипетку, оба штриха,
+native keyboard/focus и undo/redo, затем editor RU/EN × light/dark.
+Этот native pass выполнен до финальной визуальной правки по референсам;
+повтор окончательного варианта блокируется текущими TS errors параллельного
+spotlight/core среза на build stage. Финальный browser/raster pass выполнен.
+Начальные preferences прогретого Quick не проверяются как live-синхронизация
+с main; это не новый контракт иконок. Физический mixed-DPI и Linux/macOS/WebKit
+runtime не проверены. App/tray assets, capture capabilities и release targets
+не меняются. Дополнительные проверки и ограничения — TESTING.md.
+
+## Числовые controls и preview (2026-10-16, ADR-054)
+
+Windows NT 10.0.19045 x64: Chrome 155.0.8059.79 проверяет shell controls,
+RU/EN, light/dark, 1024 px и inline text; WebView2 155.0.4283.45 проверяет
+production Capture → Quick → Editor с fake capture, native pointer/keyboard
+и non-origin crop (первый прогон 4 spec files / 9 tests). Preview меняет пиксели до commit,
+сохраняя committed document; отмена и undo/redo проверены. 4K decoded RGBA
+preview/commit/export совпадают в CanvasKit render harness. Software perf suite
+прошёл, но это не аппаратная GPU гарантия. Логи и команды — TESTING.md.
+
+В дополненном native прогоне есть failures общей Quick suite (sampling/tool
+switch и создание стрелки), а также отдельный сбой driver port. Inline text
+background повторно прошёл 1/1. Повтор shape-only остановлен до runtime из-за
+параллельного обновления shared frontend dist; ограничения и логи — TESTING.md.
+
+После завершения параллельных сборок shape-only WebView2 повтор прошёл 1/1:
+production Quick → Editor, live opacity и история, defaults и 31 форма.
+`tauri-shape-isolated.log`; отдельный inline background повтор — 1/1 passed.
+
+Linux/macOS/WebKit runtime этого изменения не проверен и остаётся pending.
+Schema v7, IPC, Rust, capture backends и навигационный zoom не меняются.
+
+## Вложенные настройки после выделения сноски (2026-10-16, ADR-053)
+
+Windows x64 / Chrome 155 воспроизводит удалённое меню Shape defaults и
+подтверждает привязку к trigger после исправления. Исходный shared regression
+создаёт сноску через настоящий pointer/keyboard input и проверяет переключение
+меню, Escape/focus и неизменность документа. Полная проверка текущего workspace
+ограничена параллельными UI-изменениями; отдельный worktree проверяет только
+исправление placement. Команды, результаты WebView2 и артефакты — TESTING.md.
+Изолированный Windows WebView2 155.0.4283.45 прошёл production fake Capture →
+Quick → Editor с измерением привязки меню, Escape/focus и сохранности документа;
+дополнительно прошли native shape catalogue и Arrow scenarios (3 tests).
+Physical capture, Linux/WebKitGTK и macOS/WKWebView этим Windows-срезом не
+подтверждаются; capture capabilities и release guarantees сохраняются.
+
+## Компоновка палитры и custom swatch (2026-10-15)
+
+Windows x64 / Chrome 155.0.8059.79: 9 browser tests проверили два полных ряда
+цветов, отдельный custom action, интервалы 10/23 px, RU/EN и light/dark.
+WebView2 155.0.4283.45: highlighter 1/1, arrow 2/2 и отдельный shape replay
+1/1 подтвердили palette selection/defaults, embedded stroke/fill в Quick/editor,
+focus/history и закрытие без скачка. Capture использует fake-platform;
+Linux/WebKitGTK, macOS/WKWebView и physical capture остаются отдельными gates.
+Команды, первоначальные сбои test mount/input и artifacts — TESTING.md.
+
+## Закрытие цветовой палитры (2026-10-15)
+
+Windows 10 x64: Chrome 155.0.8059.79 подтвердил выбор цвета и закрытие палитры
+выделенной стрелки; WebView2 155.0.4283.45 проверил preset/custom commit,
+Escape и click outside в Quick Capture и editor через production fake capture.
+Покадровый замер показывает смещение 0 px при исчезновении. Команды и
+ограничения — TESTING.md. Linux/WebKitGTK, macOS/WKWebView и physical capture
+не проверялись; platform capabilities не меняются.
+
 ## Курсоры crop handles (2026-10-15)
 
 Windows x64 / Chrome 155.0.8059.79 и WebView2 155.0.4283.45: все восемь
@@ -448,6 +537,11 @@ coverage, но остаются без runtime support claim. Полный сп�
   а не доказательством поддержки Wayland hotkey.
 
 ## Знак системного трея (2026-10-15)
+
+Обновление геометрии 2026-10-16, ADR-057: монитор с ушами, двумя прищурами и
+подставкой. Новый знак требует отдельного native smoke на каждой платформе;
+прежнее GNOME evidence не распространяется автоматически на новый artwork.
+Повторное декодирование и размерный PNG review — только asset evidence.
 
 Windows и Linux используют отдельный прозрачный двухтонный знак; светлый
 знак виден на тёмной панели, тёмный контур — на светлой. macOS использует

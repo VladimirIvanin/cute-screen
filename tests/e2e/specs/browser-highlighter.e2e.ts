@@ -24,6 +24,10 @@ describe('highlighter and simple palettes', () => {
         await waitForShapeAnimation()
         await browser.saveScreenshot(path.resolve('artifacts/browser-e2e', `highlighter-${locale}-${theme}.png`))
         await browser.keys('Escape')
+        await $('.cs-highlighter-toolbar .cs-simple-color-trigger').click()
+        await waitForShapeAnimation()
+        await browser.saveScreenshot(path.resolve('artifacts/browser-e2e', `palette-${locale}-${theme}.png`))
+        await browser.keys('Escape')
       }
     }
   })

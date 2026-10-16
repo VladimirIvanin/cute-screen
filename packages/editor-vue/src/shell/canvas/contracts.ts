@@ -43,6 +43,8 @@ export interface TextToolbarSnapshot {
 }
 
 export interface TextFormattingPatch {
+  readonly preview?: boolean
+  readonly cancelPreview?: boolean
   readonly revision: number
   readonly span?: Partial<RichTextSpanStyle>
   readonly paragraph?: Partial<RichTextParagraphStyle>
@@ -65,6 +67,8 @@ export type CanvasTranslationKey =
   | 'retry'
 
 export interface CanvasViewportProps {
+  spotlightEditing?: SpotlightEditing | undefined
+  readOnly?: boolean | undefined
   highlighterEffect?: import('@cute-screen/editor-renderer').HighlighterEffect | undefined
   documentState: ShellDocumentState
   canvas?: { readonly width: number; readonly height: number } | undefined
@@ -107,6 +111,8 @@ export interface CanvasViewportProps {
 }
 
 export type CanvasViewportEmits = {
+  spotlightEditingChange: [value: SpotlightEditing | undefined]
+  spotlightRemove: []
   contextMenu: [request: { clientX: number; clientY: number; layerId?: string }]
   hostsReady: [hosts: CanvasViewportHosts]
   frameReady: [documentId: string]
@@ -156,6 +162,8 @@ export interface CanvasViewportExpose {
 }
 
 export const canvasViewportRuntimeProps = {
+  spotlightEditing: Object as PropType<SpotlightEditing | undefined>,
+  readOnly: Boolean,
   highlighterEffect: String as PropType<CanvasViewportProps['highlighterEffect']>,
   documentState: {
     type: Object as PropType<CanvasViewportProps['documentState']>,
@@ -215,6 +223,8 @@ export const canvasViewportRuntimeProps = {
 } as const
 
 export const canvasViewportRuntimeEmits = [
+  'spotlightEditingChange',
+  'spotlightRemove',
   'contextMenu',
   'hostsReady',
   'frameReady',
@@ -241,6 +251,12 @@ export const canvasViewportRuntimeEmits = [
   'quickFrameChange',
   'quickSelectionComplete',
 ] as string[]
+
+export interface SpotlightEditing {
+  readonly layerId: string
+  readonly apertureId: string
+  readonly adding?: boolean | undefined
+}
 
 export type CanvasPoint = {
   readonly x: number

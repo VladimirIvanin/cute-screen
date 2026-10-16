@@ -73,6 +73,9 @@
   display: block;
   margin-bottom: 12px;
 }
+.cs-shape-popover--paint {
+  width: 366px;
+}
 .cs-shape-grid,
 .cs-shape-presets {
   display: flex;

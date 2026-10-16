@@ -72,7 +72,7 @@ describe('M08 manual precision tools', () => {
     } else if (kind === 'spotlight') {
       expect(layer).toMatchObject({
         payload: {
-          shape: 'ellipse',
+          apertures: [{ shape: 'ellipse' }],
           dimOpacity: 0.65,
           feather: 'soft',
         },

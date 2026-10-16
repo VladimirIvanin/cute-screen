@@ -191,7 +191,7 @@ function drawingStrokeWidth(
 ): number {
   if (input.tool === 'pencil' || input.tool === 'marker') {
     const values = input.tool === 'pencil' ? defaults.pencil : defaults.marker
-    return positiveWidth(values.width, input.tool === 'marker' ? 18 : 3)
+    return positiveWidth(values.width, input.tool === 'marker' ? 18 : 3) * (input.tool === 'pencil' && values.brush === 'brush' ? 1.5 : input.tool === 'pencil' && values.brush === 'pencil' ? 0.65 : 1)
   }
   const values = input.tool === 'arrow' ? defaults.arrow : defaults.shape
   const strokeValue = values.stroke instanceof Object ? (values.stroke as JsonObject).width : undefined
@@ -313,16 +313,14 @@ function createFreehandDrawing(
     kind: input.tool,
     payload: {
       ...values,
-      points: simplifySampledPoints(
-        samples.map((point) => ({
-          x: point.x - geometry.x,
-          y: point.y - geometry.y,
-          pressure:
+      points: samples.map((point) => ({
+        x: point.x - geometry.x,
+        y: point.y - geometry.y,
+        pressure:
             typeof point.pressure === 'number' && Number.isFinite(point.pressure)
               ? Math.max(0, Math.min(1, point.pressure))
               : 0.5,
-        })),
-      ),
+      })),
     },
   }) as LayerNode
 }

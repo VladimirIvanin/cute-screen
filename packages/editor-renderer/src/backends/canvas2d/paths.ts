@@ -48,26 +48,28 @@ export function spotlightAperturePath(
   context: Context2D,
   node: RenderSpotlightNode,
 ): void {
-  const aperture = node.aperture
   context.beginPath()
-  if (aperture.shape === 'rectangle') {
-    context.rect(aperture.x, aperture.y, aperture.width, aperture.height)
-  } else if (aperture.shape === 'ellipse') {
-    context.ellipse(
-      aperture.x + aperture.width / 2,
-      aperture.y + aperture.height / 2,
-      aperture.width / 2,
-      aperture.height / 2,
-      0,
-      0,
-      Math.PI * 2,
-    )
-  } else {
-    context.moveTo(aperture.x + aperture.width / 2, aperture.y)
-    context.lineTo(aperture.x + aperture.width, aperture.y + aperture.height / 2)
-    context.lineTo(aperture.x + aperture.width / 2, aperture.y + aperture.height)
-    context.lineTo(aperture.x, aperture.y + aperture.height / 2)
-    context.closePath()
+  for (const aperture of node.apertures) {
+    context.moveTo(aperture.x + aperture.width, aperture.y + aperture.height / 2)
+    if (aperture.shape === 'rectangle') {
+      context.rect(aperture.x, aperture.y, aperture.width, aperture.height)
+    } else if (aperture.shape === 'ellipse') {
+      context.ellipse(
+        aperture.x + aperture.width / 2,
+        aperture.y + aperture.height / 2,
+        aperture.width / 2,
+        aperture.height / 2,
+        0,
+        0,
+        Math.PI * 2,
+      )
+    } else {
+      context.moveTo(aperture.x + aperture.width / 2, aperture.y)
+      context.lineTo(aperture.x + aperture.width, aperture.y + aperture.height / 2)
+      context.lineTo(aperture.x + aperture.width / 2, aperture.y + aperture.height)
+      context.lineTo(aperture.x, aperture.y + aperture.height / 2)
+      context.closePath()
+    }
   }
 }
 

@@ -38,7 +38,8 @@ export function usePreviewPopover(
   watch([anchor, panel], ([trigger, content]) => {
     observer?.disconnect()
     if (!trigger || !content) {
-      position.value = undefined
+      // NPopover still renders during its leave transition. Keep its last
+      // measured coordinates until the next opening supplies a new placement.
       return
     }
     if (typeof ResizeObserver !== 'undefined') {

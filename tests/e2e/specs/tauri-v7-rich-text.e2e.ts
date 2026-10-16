@@ -3,6 +3,8 @@ import {
   browser,
   expect,
 } from '@wdio/globals'
+import path from 'node:path'
+import { setNumericInput } from '../numeric-input'
 
 type HarnessSnapshot = {
   readonly schemaVersion: number
@@ -72,14 +74,43 @@ describe('Document v7 rich text in a real Tauri webview', () => {
     await $('button[aria-label="Bold"]').click()
     await browser.waitUntil(() =>
       browser.execute(() => document.activeElement?.getAttribute('contenteditable') === 'true'))
+    const openBackground = async () => {
+      const trigger = $('button[aria-label="Background"]')
+      if (await trigger.isDisplayed()) await trigger.click()
+      else {
+        await $('button[aria-label="More text settings"]').click()
+        await $('.cs-text-overflow-popover').$('button=Background').click()
+      }
+    }
+    await openBackground()
+    await setNumericInput($('.cs-text-background-popover input[aria-label="Padding"]'), '12')
+    await setNumericInput($('.cs-text-background-popover input[aria-label="Radius"]'), '8')
+    await browser.waitUntil(() => browser.execute(() => {
+      const editor = document.querySelector('.cs-text-editor')!
+      const background = getComputedStyle(editor, '::before')
+      const scale = Number(document.querySelector('.cs-zoom-controls')?.getAttribute('data-zoom') ?? 100) / 100
+      return Math.abs(Number.parseFloat(background.left) + 12 * scale) < 0.02 &&
+        Math.abs(Number.parseFloat(background.borderRadius) - 8 * scale) < 0.02
+    }))
     expect(await token()).toBe(0)
+    await browser.saveScreenshot(path.resolve('artifacts/tauri-e2e/numeric-text-background-preview.png'))
+    await $('.cs-text-background-popover').$('button=Cancel').click()
+    await browser.waitUntil(() => browser.execute(() =>
+      getComputedStyle(document.querySelector('.cs-text-editor')!, '::before').backgroundColor === 'rgba(0, 0, 0, 0)'))
+    await openBackground()
+    await expect($('.cs-text-background-popover input[aria-label="Padding"]')).toHaveValue('0')
+    await setNumericInput($('.cs-text-background-popover input[aria-label="Padding"]'), '12')
+    await setNumericInput($('.cs-text-background-popover input[aria-label="Radius"]'), '8')
+    await $('.cs-text-background-popover').$('button=Apply').click()
+    expect(await token()).toBe(0)
+    await editor.click()
     await browser.keys(['Control', 'Enter'])
     await browser.waitUntil(async () => (await snapshot()).layers.length === 5)
     expect(await token()).toBe(1)
     const layer = (await snapshot()).layers.at(-1)
     expect(layer).toMatchObject({
       kind: 'text',
-      payload: { content: { text: 'Привет WebView2' } },
+      payload: { content: { text: 'Привет WebView2' }, background: { padding: 12, radius: 8 } },
     })
     expect(layer).not.toHaveProperty('opacity')
     expect(layer).not.toHaveProperty('blendMode')

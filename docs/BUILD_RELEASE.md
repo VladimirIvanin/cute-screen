@@ -16,6 +16,12 @@
 без фильтра. Production build не включает WDIO plugins/test permissions.
 Linux/macOS гарантии этим запуском не подтверждаются. Evidence — TESTING.md.
 
+Сценарии с одинаковым `persistenceGroup` используют один выделенный app-data/
+WebView2 profile до завершения всей группы; остальные получают отдельные
+профили. Native input проверяется последовательно: одновременно запущенные
+runner из разных задач могут вмешиваться в ввод. Зафиксированный пример и
+изолированные повторы — `artifacts/tool-settings/concurrent-runners.log` и TESTING.md.
+
 Test-harness использует отдельный identifier с hash абсолютного E2E profile,
 чтобы single-instance dispatch не подключался к resident developer app. CLI
 того же профиля сохраняет тот же identifier. Интерактивная physical проверка
@@ -216,7 +222,10 @@ Network error не перезаписывает последний успешн�
 `pnpm icons:generate` воспроизводит SVG логотипа/редактора/favicon, отдельные
 tray/template PNG и все bundle icons (PNG/ICO/ICNS) из единой геометрии в
 `scripts/generate-brand-assets.mjs`. Команда использует существующие
-`@napi-rs/canvas` и Tauri CLI; новые зависимости не требуются. Generated assets
+`@napi-rs/canvas` и Tauri CLI; новые зависимости не требуются. `logo-mark.svg`
+сохраняет выбранный монитор с ушами, прищурами и подставкой без фоновой плитки.
+CLI запускается через текущий Node, без платформозависимого запуска pnpm shim.
+Generated assets
 хранятся в Git и не генерируются при каждом запуске приложения. После изменения
 проверить декодированные PNG и системный tray; app tile нельзя подставлять
 вместо tray asset.

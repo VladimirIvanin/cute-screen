@@ -140,10 +140,23 @@ export function parseSpotlightPayload(
   field: string,
 ): SpotlightLayerPayload {
   const input = readJsonObject(value, field)
-  assertOnlyFields(input, ['shape', 'dimColor', 'dimOpacity', 'feather'], field)
-  if (!SPOTLIGHT_SHAPES.includes(input.shape as (typeof SPOTLIGHT_SHAPES)[number])) {
-    throw new Error(`${field}.shape is invalid`)
-  }
+  assertOnlyFields(input, ['apertures', 'dimColor', 'dimOpacity', 'feather'], field)
+  if (
+    !Array.isArray(input.apertures) ||
+    !input.apertures.length ||
+    input.apertures.length > 64
+  ) throw new Error(`${field}.apertures requires 1…64 items`)
+  const apertures = input.apertures.map((raw, index) => {
+    const aperture = readJsonObject(raw, `${field}.apertures[${index}]`)
+    assertOnlyFields(aperture, ['id', 'shape', 'bounds'], field)
+    if (
+      typeof aperture.id !== 'string' ||
+      !aperture.id ||
+      !SPOTLIGHT_SHAPES.includes(aperture.shape as (typeof SPOTLIGHT_SHAPES)[number])
+    ) throw new Error(`${field}.apertures[${index}] is invalid`)
+    return Object.freeze({ id: aperture.id, shape: aperture.shape as SpotlightLayerPayload['apertures'][number]['shape'], bounds: parseStrictRect(aperture.bounds, `${field}.apertures[${index}].bounds`) })
+  })
+  if (new Set(apertures.map((item) => item.id)).size !== apertures.length) throw new Error(`${field}.apertures IDs must be unique`)
   if (
     input.feather !== null &&
     !SPOTLIGHT_FEATHER_PRESETS.includes(input.feather as (typeof SPOTLIGHT_FEATHER_PRESETS)[number])
@@ -151,7 +164,7 @@ export function parseSpotlightPayload(
     throw new Error(`${field}.feather is invalid`)
   }
   return Object.freeze({
-    shape: input.shape as SpotlightLayerPayload['shape'],
+    apertures: Object.freeze(apertures),
     dimColor: parseSrgbColor(input.dimColor, `${field}.dimColor`) as unknown as SrgbColor,
     dimOpacity: parseUnitInterval(input.dimOpacity, `${field}.dimOpacity`),
     feather: input.feather as SpotlightLayerPayload['feather'],
@@ -180,7 +193,7 @@ export function parseRulerPayload(
     throw new Error(`${field} endpoints must be distinct`)
   }
   const increment = readFiniteNumber(input.snapAngleIncrementDegrees, `${field}.snapAngleIncrementDegrees`)
-  if (increment <= 0 || increment > 90) {
+  if (increment < 1 || increment > 90) {
     throw new Error(`${field}.snapAngleIncrementDegrees is invalid`)
   }
   const thickness = readFiniteNumber(input.thickness, `${field}.thickness`)

@@ -13,6 +13,7 @@ import SimpleColorPicker from '../ui/SimpleColorPicker.vue'
 import { UiIcon } from '../icon'
 import ArrowStylePreview from './ArrowStylePreview.vue'
 import UiSeparator from '../ui/UiSeparator.vue'
+import NumericControl from '../ui/NumericControl.vue'
 
 defineProps<{
   controls: readonly ContextControl[]
@@ -242,39 +243,28 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOnOutside
                 }}</span>
               </button>
             </div>
-            <div
-              class="cs-arrow-toolbar-options"
-              role="group"
-              aria-label="Width presets"
+            <NumericControl
+              :label="pickerLocale === 'ru' ? 'Толщина' : 'Thickness'"
+              :locale="pickerLocale"
+              control-id="width"
+              :value="control.width"
+              :min="0.01"
+              :step="0.01"
+              unit="px"
+              :presets="[2, 4, 6, 8, 10]"
+              :disabled="control.disabled"
+              @commit="emit('change', 'width', String($event))"
             >
-              <span v-if="![2, 4, 6, 8, 10].includes(control.width)" class="cs-arrow-legacy-width">
-                {{ control.width }} px
-              </span>
-              <button
-                v-for="width in [2, 4, 6, 8, 10]"
-                :key="width"
-                type="button"
-                :aria-label="`${width} px`"
-                :aria-pressed="control.width === width"
-                :disabled="control.disabled ?? false"
-                @click="choose('width', String(width))"
-              >
-                <svg
-                  viewBox="0 0 24 22"
-                  aria-hidden="true"
-                  focusable="false"
-                >
-                  <path
-                    d="M3 11h18"
-                    fill="none"
-                    stroke="currentColor"
-                    :stroke-width="width"
-                    stroke-linecap="round"
-                  />
-                </svg>
-                <span>{{ width }} px</span>
-              </button>
-            </div>
+              <template #preset="preset">
+                <svg viewBox="0 0 24 16" aria-hidden="true"><path
+                  d="M3 8h18"
+                  stroke="currentColor"
+                  :stroke-width="preset.value"
+                  stroke-linecap="round"
+                /></svg>
+                <span>{{ preset.value }}</span>
+              </template>
+            </NumericControl>
           </section>
         </NPopover>
       </div>

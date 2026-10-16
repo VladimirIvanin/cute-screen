@@ -40,7 +40,7 @@ describe('M08 precision-tool document contracts', () => {
     expect(LOUPE_SHAPES).toEqual(['circle', 'rectangle'])
     expectTypeOf<CensorLayer['payload']>().toEqualTypeOf<CensorLayerPayload>()
     expectTypeOf<keyof CensorLayerPayload>().toEqualTypeOf<'region' | 'effect' | 'sampleSource'>()
-    expectTypeOf<keyof SpotlightLayerPayload>().toEqualTypeOf<'shape' | 'dimColor' | 'dimOpacity' | 'feather'>()
+    expectTypeOf<keyof SpotlightLayerPayload>().toEqualTypeOf<'apertures' | 'dimColor' | 'dimOpacity' | 'feather'>()
     expectTypeOf<keyof RulerLayerPayload>().toEqualTypeOf<
       'start' | 'end' | 'unit' | 'percentBasis' | 'snapAngleIncrementDegrees' | 'color' | 'thickness' | 'fontSize'
     >()
@@ -80,7 +80,7 @@ describe('M08 precision-tool document contracts', () => {
       sampleSource: 'compositeBelow',
     })
     expect(spotlight.payload).toEqual({
-      shape: 'rectangle',
+      apertures: [{ id: `${IDS.spotlight}:aperture`, shape: 'rectangle', bounds: { x: 0, y: 0, width: 100, height: 70 } }],
       dimColor: { red: 0, green: 0, blue: 0, alpha: 1 },
       dimOpacity: 0.65,
       feather: null,

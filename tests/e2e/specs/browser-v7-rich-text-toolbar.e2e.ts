@@ -238,7 +238,7 @@ describe('Document v7 rich text in browser mode', () => {
     await expect($('button[aria-label="Bullet list"]')).toBeDisabled()
     await $('button[aria-label="Background"]').click()
     await expect($('.cs-text-background-popover').$('button=None')).toBeDisabled()
-    const disabledNumbers = await $$('.cs-text-background-popover input[type="number"]:disabled')
+    const disabledNumbers = await $$('.cs-text-background-popover input[role="spinbutton"]:disabled')
     expect(disabledNumbers).toHaveLength(2)
     await browser.keys('Escape')
     await scene.click({ x: 42, y: 20 })

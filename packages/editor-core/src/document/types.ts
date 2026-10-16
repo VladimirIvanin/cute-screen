@@ -382,11 +382,17 @@ export const SPOTLIGHT_FEATHER_PRESETS = ['soft', 'strong'] as const
 export type SpotlightFeatherPreset = (typeof SPOTLIGHT_FEATHER_PRESETS)[number]
 
 export type SpotlightLayerPayload = Readonly<{
-  readonly shape: SpotlightShape
+  readonly apertures: readonly SpotlightAperture[]
   readonly dimColor: SrgbColor
   readonly dimOpacity: number
   /** `null` means a hard aperture edge. */
   readonly feather: SpotlightFeatherPreset | null
+}>
+
+export type SpotlightAperture = Readonly<{
+  readonly id: string
+  readonly shape: SpotlightShape
+  readonly bounds: Readonly<{ x: number; y: number; width: number; height: number }>
 }>
 
 export const RULER_UNITS = ['pixels', 'percent'] as const

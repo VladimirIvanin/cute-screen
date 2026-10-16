@@ -163,13 +163,18 @@ describe('M08 Canvas2D precision renderer/export', () => {
         {
           kind: 'spotlight',
           id: 'spotlight',
-          aperture: {
+          bounds: {
+            x: 12,
+            y: 8,
+            width: 32,
+            height: 24,
+          }, apertures: [{
             shape: 'ellipse',
             x: 12,
             y: 8,
             width: 32,
             height: 24,
-          },
+          }],
           dimColor: { red: 0, green: 0, blue: 0, alpha: 1 },
           dimOpacity: 0.6,
           feather: 'soft',

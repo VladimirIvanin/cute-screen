@@ -157,12 +157,11 @@ function movePrecision(
   point: CanvasPoint,
   gesture: Extract<NonNullable<CanvasGesture>, { readonly kind: 'precision' }>,
 ): void {
-  const defaults = context.props.precisionDefaults ?? DEFAULT_PRECISION_TOOLS
+  const defaults = gesture.precisionDefaults ?? context.props.precisionDefaults ?? DEFAULT_PRECISION_TOOLS
   let current = point
   context.setRulerGuide(undefined)
   if (
     gesture.tool === 'ruler' &&
-    defaults.ruler.snap &&
     (event.altKey ||
       gesture.guidesHeld)
   ) {
@@ -178,10 +177,12 @@ function movePrecision(
   context.setGesture({
     ...gesture,
     current,
+    rawCurrent: point,
     guidesHeld: event.altKey,
     points: shouldAppend ? [...gesture.points, point] : gesture.points,
   })
-  context.invalidateOverlay()
+  if (gesture.tool === 'spotlight') context.renderCommittedScene()
+  else context.invalidateOverlay()
 }
 
 function moveLayer(
@@ -221,6 +222,7 @@ function moveTransform(
   } else if (gesture.kind === 'intrinsicResize') {
     context.setGesture({
       ...gesture,
+      snapAngleIncrementDegrees: gesture.initial.kind === 'ruler' && event.altKey ? gesture.initial.payload.snapAngleIncrementDegrees : undefined,
       current: point,
       preserveAspect: event.shiftKey || gesture.initial.kind === 'emoji' || gesture.initial.kind === 'loupe',
       centerResize: gesture.handle === 'start' || gesture.handle === 'end' ? false : event.altKey,

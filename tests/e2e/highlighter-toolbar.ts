@@ -10,6 +10,7 @@ import {
   waitForShapeAnimation,
 } from './shape-toolbar'
 import { waitForStableCanvas } from './canvas-ready'
+import { verifyPaletteDismissal } from './palette-dismissal'
 
 async function sceneChecksum(): Promise<number> {
   return browser.execute(() => {
@@ -45,7 +46,7 @@ export async function verifyHighlighter(
   await browser.action('pointer').move({ origin: scene, x: 1, y: 1 }).perform()
   expect((await scene.getCSSProperty('cursor')).value).not.toBe('crosshair')
   await $('button[aria-label="Highlighter"]').click()
-  await expect($('button[aria-label="Highlighter"] .tabler-icon-highlight')).toExist()
+  await expect($('button[aria-label="Highlighter"] .cs-icon-marker')).toExist()
   const toolbar = $('.cs-highlighter-toolbar')
   await expect(toolbar).toBeDisplayed()
   await browser.waitUntil(async () => !(await toolbar.getText()).includes('analysing'))
@@ -55,7 +56,17 @@ export async function verifyHighlighter(
   await toolbar.$('button[aria-label="Colour"]').click()
   await waitForShapeAnimation()
   await expect($('.cs-simple-color-panel input')).not.toExist()
-  await $('.cs-simple-color-panel button[aria-label="Green"]').click()
+  await verifyPaletteDismissal(directory, `${prefix}-preset`, () =>
+    $('.cs-simple-color-panel button[aria-label="Green"]').click())
+  await expect(toolbar.$('button[aria-label="Colour"]')).toBeFocused()
+  await toolbar.$('button[aria-label="Colour"]').click()
+  await waitForShapeAnimation()
+  await verifyPaletteDismissal(directory, `${prefix}-escape`, () => browser.keys('Escape'))
+  await expect(toolbar.$('button[aria-label="Colour"]')).toBeFocused()
+  await toolbar.$('button[aria-label="Colour"]').click()
+  await waitForShapeAnimation()
+  await verifyPaletteDismissal(directory, `${prefix}-outside`, () => toolbar.$('button[aria-label="Width"]').click())
+  await browser.keys('Escape')
   await waitForStableCanvas()
   const initial = (await shapeDocument()).layers.length
   const points = await browser.execute(() => {
@@ -93,9 +104,10 @@ export async function verifyHighlighter(
   await expect(configure).toBeDisplayed()
   await configure.$('button[aria-label="Colour"]').click()
   await $('.cs-simple-color-panel button[aria-label="Custom colour"]').click()
+  await waitForShapeAnimation()
   const hex = $('input[aria-label="HEX colour code"]')
   await hex.setValue('#336699')
-  await browser.keys('Enter')
+  await verifyPaletteDismissal(directory, `${prefix}-custom`, () => browser.keys('Enter'))
   await configure.$('button[aria-label="Effect"]').click()
   await $('.cs-highlighter-mode[aria-label="Auto"]').click()
   await configure.$('button[aria-label="Effect"]').click()

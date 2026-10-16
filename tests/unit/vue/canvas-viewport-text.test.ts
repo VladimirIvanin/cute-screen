@@ -124,8 +124,8 @@ describe('M05 CanvasViewport transforms', () => {
     await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 30, clientY: 40 })
 
     const editor = getByLabelText('Text editor') as HTMLDivElement
-    expect(editor.style.backgroundColor).toBe('rgb(255, 204, 51)')
-    expect(editor.style.borderRadius).toBe('4px')
+    expect(editor.style.getPropertyValue('--text-background-color')).toBe('rgba(255, 204, 51, 1)')
+    expect(editor.style.getPropertyValue('--text-background-radius')).toBe('4px')
   })
 
   it('uses the horizontal drag span as a fixed text width before opening the editor', async () => {

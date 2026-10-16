@@ -15,7 +15,7 @@ function checkedNumber(
 ): number {
   const unit = ['red', 'green', 'blue', 'alpha', 'dimOpacity'].includes(key)
   const minimum = unit || ['radius', 'padding', 'borderWidth'].includes(key) ? 0 : 1
-  const maximum = unit ? 1 : key === 'fontSize' ? 256 : 2048
+  const maximum = unit ? 1 : key === 'fontSize' ? 256 : key === 'snapAngleIncrementDegrees' ? 90 : 2048
   if (
     typeof value !== 'number' ||
     !Number.isFinite(value) ||

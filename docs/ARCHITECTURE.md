@@ -1,5 +1,36 @@
 # Архитектура Cute Screen
 
+## Брендовый знак (ADR-057)
+
+`scripts/generate-brand-assets.mjs` хранит общую геометрию монитора с кошачьими
+ушами, прищурами и подставкой; производные SVG/PNG/ICO/ICNS создаются до запуска
+приложения. Корневой `logo-mark.svg` — прозрачный самостоятельный знак,
+`logo.svg`/editor/favicon/bundle — app tile. Embedded tray отделён от app tile;
+Windows/Linux получают двухтонную форму, macOS — alpha template с прозрачными
+глазами. Document/renderer/IPC и scene graph в этом изменении не участвуют.
+
+## Pencil / Spotlight / Ruler (ADR-056)
+
+DOM-free freehand geometry resolver обслуживает scene и hit testing, сохраняет
+sampled pressure/endpoints и применяет smoothing только к pencil. Spotlight payload
+содержит непустой массив локальных apertures с IDs; transform принадлежит всему слою.
+Renderer композитит общую маску объединения, не последовательные затемнения.
+Transient выбор области и numeric draft не сериализуются и не меняют history.
+Ruler measurements используют canvas coordinates, clipboard bridge и общий numeric adapter.
+
+## UI-иконки (ADR-055)
+
+`shell/icon.ts` связывает стабильный `IconName` с явными Tabler imports и
+проектными иконками. `shell/icons/` хранит типизированную геометрию допустимых
+SVG-примитивов и один Vue renderer. Геометрия не попадает в editor-core,
+document или IPC. `UiIcon` сохраняет class/style fallthrough, currentColor,
+контур 1.8 и декоративную семантику. Потребители не выбирают библиотеку напрямую.
+Dev entry `apps/desktop/icons-preview.html` показывает тот же `UiIcon` с
+реальными theme tokens; production main не импортирует preview.
+Принятый `spotlight` — прямоугольное окно на равномерной диагональной штриховке;
+линии подходят встык к контуру. Его геометрия, как у остальных собственных
+иконок, находится в `shell/icons/geometry.ts` и переиспользуется в dev preview.
+
 ## Выделитель (ADR-051)
 
 DOM-free highlighter resolver и brightness classifier принадлежат editor-core.
@@ -429,3 +460,19 @@ document v7, renderer contracts и IPC не меняются.
 `editor-core/shapes` хранит нормализованную геометрию и стабильные идентификаторы каталога: 30 shape kinds и rectangle preset с radius. Curved/compound shape компилируется в один `RenderVectorNode` с outline, detail paths и open-contour flag. Stroke-only braces не имеют fill hit area. Hit testing адаптивно аппроксимирует cubic curves; миниатюры используют те же команды. Canvas2D использует scratch composition, CanvasKit — saveLayer, чтобы opacity/blend применялись один раз ко всей фигуре.
 
 `preview-placement` сравнивает верхние, нижние и боковые кандидаты относительно trigger и препятствий. Selection host публикует компактные CSS bounds объекта; popup adapter использует реальный viewport, размеры панели и занятый chrome. Layout observers и resize/scroll notifications не переносят scene или pointermove в Vue state. Defaults, shape, arrow и simple colour popovers сохраняют Naive UI и общий overlay root.
+
+ADR-053 ограничивает зазор между trigger и вложенной панелью 16 CSS px при
+доступном trigger. Preview-placement комбинирует горизонтальные и вертикальные
+границы преград и минимизирует перекрытие среди близких позиций; заполненный
+canvas не отрывает submenu от родительских controls.
+
+### Numeric draft projection (ADR-054)
+
+Числовые controls используют общий NumericControl и NumericPresetGroup.
+Shell-owned NumericPreviewController объединяет updates через requestAnimationFrame,
+разрешает команды теми же чистыми effect resolvers и передаёт renderer временную
+shallow-проекцию. Committed activeDocument остаётся источником истории,
+сохранения и export. Defaults поповера не изменяют выделенный объект.
+Inline text preview сохраняет полный RichTextEditingState и background до первого
+preview; normal formatting/cancel восстанавливает baseline перед применением.
+Внешние shell props, schema v7, IPC и масштаб холста сохраняются.

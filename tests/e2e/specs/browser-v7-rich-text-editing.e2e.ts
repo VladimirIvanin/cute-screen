@@ -1,3 +1,4 @@
+import { setNumericInput } from '../numeric-input'
 import {
   $,
   browser,
@@ -40,16 +41,17 @@ describe('Document v7 rich text in browser mode', () => {
     await waitForEditorFocus()
     await $('button[data-text-control="size"]').click()
     await $('.cs-text-size-popover').$('button=32').click()
+    await browser.keys('Escape')
     await waitForEditorFocus()
     await $('button[data-text-control="size"]').click()
     const sizePopover = $('.cs-text-size-popover')
-    const sizeInput = sizePopover.$('input[type="number"]')
-    const applySize = sizePopover.$('button=Apply')
-    await sizeInput.setValue('257')
-    await expect(applySize).toBeDisabled()
-    await sizeInput.setValue('37')
-    await expect(applySize).toBeEnabled()
-    await applySize.click()
+    const sizeInput = sizePopover.$('input[role="spinbutton"]')
+    await setNumericInput(sizeInput, '257')
+    await expect(sizeInput).toHaveAttribute('aria-invalid', 'true')
+    await setNumericInput(sizeInput, '37')
+    await expect(sizeInput).toHaveAttribute('aria-invalid', 'false')
+    await browser.keys('Enter')
+    await browser.keys('Escape')
     await waitForEditorFocus()
     await setNativeSelect('Text alignment', 'center')
     await waitForEditorFocus()

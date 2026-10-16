@@ -76,7 +76,7 @@ function keydown(event: KeyboardEvent): void {
   const buttons = Array.from(panel.value?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [])
   const index = buttons.indexOf(event.target as HTMLButtonElement)
   if (index < 0) return
-  const columns = props.palette === 'highlighter' ? 9 : 10
+  const columns = props.palette === 'highlighter' ? 8 : 10
   const moves: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -columns, ArrowDown: columns }
   if (
     !(event.key in moves) &&
@@ -163,33 +163,44 @@ function outside(event: MouseEvent): void {
         </template>
         <div
           v-else
-          class="cs-simple-color-grid"
+          class="cs-simple-color-palette"
           :class="{ 'is-highlighter': palette === 'highlighter' }"
           role="group"
           :aria-label="ariaLabel"
         >
-          <button
-            v-for="(color, index) in colors"
-            :key="color"
-            class="cs-simple-color-swatch"
-            type="button"
-            :style="{ backgroundColor: color }"
-            :disabled="disabled"
-            :aria-label="names[index]"
-            :title="names[index]"
-            :aria-pressed="!mixed && modelValue.toUpperCase() === color"
-            @click="choose(color)"
-          />
-          <button
-            ref="customTrigger"
-            class="cs-simple-color-swatch cs-simple-color-custom"
-            type="button"
-            :disabled="disabled"
-            :aria-label="text('Custom colour', 'Свой цвет')"
-            :title="text('Custom colour', 'Свой цвет')"
-            :aria-pressed="!mixed && !colors.includes(modelValue.toUpperCase())"
-            @click="custom = true"
-          />
+          <div class="cs-simple-color-grid">
+            <button
+              v-for="(color, index) in colors"
+              :key="color"
+              class="cs-simple-color-swatch"
+              type="button"
+              :disabled="disabled"
+              :aria-label="names[index]"
+              :title="names[index]"
+              :aria-pressed="!mixed && modelValue.toUpperCase() === color"
+              @click="choose(color)"
+            >
+              <span
+                class="cs-simple-color-dot"
+                :style="{ backgroundColor: color }"
+                aria-hidden="true"
+              />
+            </button>
+          </div>
+          <div class="cs-simple-color-custom-area">
+            <button
+              ref="customTrigger"
+              class="cs-simple-color-swatch cs-simple-color-custom"
+              type="button"
+              :disabled="disabled"
+              :aria-label="text('Custom colour', 'Свой цвет')"
+              :title="text('Custom colour', 'Свой цвет')"
+              :aria-pressed="!mixed && !colors.includes(modelValue.toUpperCase())"
+              @click="custom = true"
+            >
+              <span class="cs-simple-color-dot" aria-hidden="true" />
+            </button>
+          </div>
         </div>
       </div>
     </component>

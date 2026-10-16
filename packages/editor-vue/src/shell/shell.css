@@ -5,3 +5,6 @@
 @import './styles/quick-responsive.css';
 @import './styles/shape-toolbar.css';
 @import './styles/highlighter-toolbar.css';
+@import './styles/numeric-controls.css';
+
+@import './styles/tool-formatting-toolbar.css';

@@ -76,13 +76,14 @@ export function freezeCensorNode(node: RenderCensorNode): RenderCensorNode {
 }
 
 export function freezeSpotlightNode(node: RenderSpotlightNode): RenderSpotlightNode {
-  if (!['rectangle', 'ellipse', 'diamond'].includes(node.aperture.shape)) {
-    throw new RangeError(`${node.id}.aperture.shape is invalid`)
+  if (!node.apertures.length || node.apertures.length > 64) throw new RangeError('spotlight requires 1…64 apertures')
+  for (const aperture of [...node.apertures, { ...node.bounds, shape: 'rectangle' }]) {
+    if (!['rectangle', 'ellipse', 'diamond'].includes(aperture.shape)) throw new RangeError('invalid spotlight shape')
+    assertFinite(aperture.x, 'spotlight aperture x')
+    assertFinite(aperture.y, 'spotlight aperture y')
+    assertPositive(aperture.width, 'spotlight aperture width')
+    assertPositive(aperture.height, 'spotlight aperture height')
   }
-  assertFinite(node.aperture.x, `${node.id}.aperture.x`)
-  assertFinite(node.aperture.y, `${node.id}.aperture.y`)
-  assertPositive(node.aperture.width, `${node.id}.aperture.width`)
-  assertPositive(node.aperture.height, `${node.id}.aperture.height`)
   if (
     !Number.isFinite(node.dimOpacity) ||
     node.dimOpacity < 0 ||
@@ -99,7 +100,8 @@ export function freezeSpotlightNode(node: RenderSpotlightNode): RenderSpotlightN
   }
   return Object.freeze({
     ...node,
-    aperture: Object.freeze({ ...node.aperture }),
+    bounds: Object.freeze({ ...node.bounds }),
+    apertures: Object.freeze(node.apertures.map((item) => Object.freeze({ ...item }))),
     dimColor: freezeColor(node.dimColor),
   })
 }

@@ -248,6 +248,13 @@ export async function overlayStats(): Promise<{
     const context = overlay.getContext('2d')
     if (!context) throw new Error('Interaction overlay context is missing')
     const data = context.getImageData(0, 0, overlay.width, overlay.height).data
+    // The overlay follows viewport zoom; assertions use document coordinates.
+    const state = window as typeof window & {
+      __cuteScreenE2eM08?: { snapshot(): { document: { canvas: { width: number; height: number } } } }
+    }
+    const canvas = state.__cuteScreenE2eM08?.snapshot()?.document.canvas
+    const scaleX = (canvas?.width ?? overlay.width) / overlay.width
+    const scaleY = (canvas?.height ?? overlay.height) / overlay.height
     const rows = new Array<number>(overlay.height).fill(0)
     const columns = new Array<number>(overlay.width).fill(0)
     let dimPixels = 0
@@ -296,7 +303,12 @@ export async function overlayStats(): Promise<{
     return {
       dimPixels,
       whitePixels,
-      ...(maxX >= 0 ? { whiteBounds: { minX, maxX, minY, maxY } } : {}),
+      ...(maxX >= 0 ? {
+        whiteBounds: {
+          minX: minX * scaleX, maxX: maxX * scaleX,
+          minY: minY * scaleY, maxY: maxY * scaleY,
+        },
+      } : {}),
       maxWarmRow: Math.max(0, ...rows),
       maxWarmColumn: Math.max(0, ...columns),
     }

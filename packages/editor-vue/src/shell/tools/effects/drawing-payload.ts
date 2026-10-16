@@ -17,6 +17,7 @@ export type DrawingControlId =
   | 'startCap'
   | 'endCap'
   | 'strokeStyle'
+  | 'smoothing'
   | 'brush'
   | 'markerMode'
   | 'layerOpacity'
@@ -36,6 +37,7 @@ const DRAWING_CONTROL_IDS = new Set<DrawingControlId>([
   'startCap',
   'endCap',
   'strokeStyle',
+  'smoothing',
   'brush',
   'markerMode',
   'layerOpacity',
@@ -147,6 +149,10 @@ function specializedPayload(
   tool: DrawingTool,
   current: JsonObject,
 ): JsonObject | undefined {
+  if (id === 'smoothing') {
+    const smoothing = Number(value) / 100
+    return tool === 'pencil' && Number.isFinite(smoothing) && smoothing >= 0 && smoothing <= 1 ? { ...current, smoothing } : undefined
+  }
   if (id === 'brush') {
     return tool === 'pencil' && ['pen', 'pencil', 'brush'].includes(value) ? { ...current, brush: value } : undefined
   }
@@ -299,7 +305,11 @@ export function resolveDrawingPayload(
   ) {
     return arrowStylePayload(id, value, tool, current)
   }
-  if (id === 'brush' || id === 'markerMode') {
+  if (
+    id === 'brush' ||
+    id === 'markerMode' ||
+    id === 'smoothing'
+  ) {
     return specializedPayload(id, value, tool, current)
   }
   if (id === 'fillKind') return fillKindPayload(value, tool, current)

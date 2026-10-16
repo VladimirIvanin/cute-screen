@@ -18,6 +18,7 @@
     "build:frontend": "vite build --config apps/desktop/vite.config.ts",
     "tauri": "tauri",
     "icons:generate": "node scripts/generate-brand-assets.mjs",
+    "icons:preview": "vite --config apps/desktop/vite.config.ts",
     "check": "pnpm lint && pnpm typecheck && pnpm format:check && pnpm docs:check && pnpm test:boundaries && pnpm ipc:check && pnpm check:rust",
     "ipc:codegen": "cargo run --quiet --bin desktop-ipc-codegen",
     "ipc:check": "cargo run --quiet --bin desktop-ipc-codegen -- --check",

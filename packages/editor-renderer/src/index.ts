@@ -259,3 +259,15 @@ export {
   parseToolSettingsPreferences,
   type ToolSettingsPreferencesV3,
 } from '@cute-screen/editor-core'
+
+export {
+  resolveFreehandGeometry,
+  rebaseFreehandLayer,
+  addSpotlightAperture,
+  updateSpotlightAperture,
+  removeSpotlightAperture,
+  spotlightWithApertures,
+  spotlightApertureAt,
+  measureRuler,
+  type SpotlightAperture,
+} from '@cute-screen/editor-core'

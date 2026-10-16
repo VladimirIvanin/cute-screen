@@ -7,8 +7,7 @@ import { NButton } from 'naive-ui'
 
 import { UiIcon } from '../icon'
 import type { LayerSummary } from '../types'
-import DeferredNumberInput from '../ui/DeferredNumberInput.vue'
-import DeferredSlider from '../ui/DeferredSlider.vue'
+import NumericControl from '../ui/NumericControl.vue'
 
 const props = defineProps<{
   layers: readonly LayerSummary[]
@@ -207,30 +206,37 @@ const emit = defineEmits<{
     </header>
     <div v-if="layers.length > 0" class="cs-layers-controls">
       <template v-if="selectedLayer">
-        <label class="cs-layers-control cs-layers-control--opacity">
-          <span class="cs-layers-control-label">{{ t('opacity') }}</span>
-          <DeferredSlider
+        <div class="cs-layers-control cs-layers-control--opacity">
+          <NumericControl
+            :label="t('opacity')"
             :min="0"
             :max="100"
-            :model-value="Math.round(selectedLayer.opacity * 100)"
+            :value="Math.round(selectedLayer.opacity * 100)"
             :step="1"
-            v-bind="{ ariaLabel: t('opacity') }"
+            unit="%"
+            slider
+            control-id="layerOpacity"
+            :layer-id="selectedLayer.id"
             :disabled="controlsDisabled || !selectedLayer.opacityEditable"
             @commit="emit('opacity', selectedLayer.id, Number($event) / 100)"
           />
-        </label>
-        <label class="cs-layers-control cs-layers-control--rotation">
-          <span class="cs-layers-control-label">{{ t('rotation') }}</span>
-          <DeferredNumberInput
+        </div>
+        <div class="cs-layers-control cs-layers-control--rotation">
+          <NumericControl
+            :label="t('rotation')"
             :min="-360"
             :max="360"
             :step="1"
-            :model-value="Math.round(selectedLayer.rotation)"
-            v-bind="{ ariaLabel: t('rotation') }"
+            :value="Math.round(selectedLayer.rotation)"
+            unit="°"
+            stepper
+            :presets="[0, 90, 180, 270]"
+            control-id="rotation"
+            :layer-id="selectedLayer.id"
             :disabled="controlsDisabled"
             @commit="emit('rotation', selectedLayer.id, Number($event))"
           />
-        </label>
+        </div>
       </template>
       <p v-else class="cs-layers-controls-hint">
         {{ t('layersNoSelection') }}

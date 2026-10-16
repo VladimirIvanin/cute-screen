@@ -1,5 +1,23 @@
 # Журнал архитектурных решений
 
+## ADR-056 — Сглаживание карандаша и составной фонарь
+
+**Статус:** accepted; дополняет ADR-048 и общий numeric preview contract.
+
+Карандаш хранит исходные sampled points и smoothing 0…1. Общий DOM-free resolver
+смешивает внутренние точки с окном весов 1/2/3/2/1, сохраняя endpoints и pressure;
+scene, preview и hit testing используют один путь. Настройки фиксируются на pointerdown.
+Фонарь хранит массив областей со стабильными IDs, индивидуальными shape/bounds и
+общим dim/feather style. Renderer затемняет кадр один раз через маску объединения;
+пересечения и мягкие края не образуют внутренних швов. Геометрия областей не входит
+в style clipboard. Линейка показывает измерение и копирование в transient UI,
+Alt включает привязку при создании и редактировании endpoints.
+
+Schema v7 расширяется без миграций старых файлов по явному решению пользователя.
+**Проверяемое основание:** red-first core geometry/codec tests, renderer decoded pixel
+tests и production browser/native editor/Quick. Результаты записываются в TESTING.md;
+Windows evidence не распространяется на WebKitGTK/WKWebView.
+
 Статусы: `proposed`, `accepted`, `superseded`, `rejected`. Accepted ADR не переписывается без нового решения, которое явно его заменяет.
 
 ## ADR-001 — Tauri 2 + Vue 3 + Rust
@@ -764,7 +782,7 @@ architecture budget gate. Перенос теста или source-text assertion
 
 ## ADR-043 — Tabler Icons и контекстные панели Quick Capture
 
-**Статус:** accepted
+**Статус:** superseded by [ADR-055](#adr-055-собственные-ui-иконки-рядом-с-tabler).
 
 **Контекст:** первый этап постепенного упрощения интерфейса убирает canvas flip
 из Quick Capture и требует единой MIT-библиотеки иконок. Основная лицензия
@@ -851,7 +869,7 @@ runtime и команды зафиксированы в `TESTING.md`.
 
 ## ADR-047 — Сплошной силуэт кота
 
-**Статус:** accepted
+**Статус:** superseded — [ADR-057](#adr-057-монитор-с-кошачьими-прищурами)
 
 **Контекст:** отсылка к screenshot не требуется; рамка из ADR-046 усложняет знак.
 
@@ -978,3 +996,119 @@ ContextMenu. Defaults, selection, nested controls и Escape сохраняютс
 и native quick-chrome проверяют открытие настроек и создание объектов.
 Screenshots подтверждают отсутствие отдельной стрелки; результаты и пределы
 platform evidence записываются в TESTING.md.
+
+## ADR-053 — Связность кнопки и вложенной панели настроек
+
+**Статус:** accepted; дополняет ADR-048 и ADR-052.
+
+**Контекст:** после выделения большой сноски ПКМ по Shape открывает defaults,
+но вложенное «Наложение» может оказаться в 231 px от своей кнопки: минимизация
+перекрытия preview выбирает удалённую позицию на другом краю canvas.
+
+**Решение:** общий preview-placement сначала рассматривает позиции с зазором
+между прямоугольниками trigger и панели не более 16 CSS px. Среди них сохраняются
+минимизация перекрытия объекта/chrome, устойчивость стороны и близость центров.
+Позиции сочетают горизонтальный обход одной преграды с вертикальным обходом
+другой, чтобы находить свободные углы рядом с trigger. При заполненном preview
+панель минимизирует перекрытие поблизости. Если trigger вне доступного viewport
+и близкая позиция невозможна, остаётся viewport-clamped fallback. Canvas и
+selection не перемещаются ради настроек; document/command contracts сохраняются.
+
+**Проверяемое основание:** red-first browser regression создаёт сноску обычным
+pointer input, выделяет её после commit и открывает Shape через trusted ПКМ.
+Измеряется реальный зазор для «Наложение → Обводка → Наложение», Escape/focus
+и неизменность документа. Геометрические tests проверяют свободный угол и
+заполненное окружение; shared E2E проходит Quick/editor в WebView2.
+Команды, результаты и ограничения фиксируются в TESTING.md.
+
+## ADR-054 — Общие числовые параметры и отменяемый предпросмотр
+
+**Статус:** accepted; дополняет ADR-030 и ADR-048.
+
+**Контекст:** числовые поля фигур не дают быстро подбирать результат на глаз;
+разные панели используют несовместимые поля, слайдеры и разрозненные пресеты.
+Пользователь выбрал обновление параметров всего редактора, компактные группы
+готовых значений и живой предпросмотр. Масштаб холста явно исключён.
+
+**Основание выбора (исследование 2026-10-15):**
+[Adobe Spectrum](https://spectrum.adobe.com/page/slider/) объединяет слайдер
+и редактируемое значение для визуального и точного выбора;
+[NN/g о слайдерах](https://www.nngroup.com/articles/gui-slider-controls/)
+описывает трудности точного выбора одним слайдером;
+[NN/g о steppers](https://www.nngroup.com/articles/input-steppers/)
+рекомендует крупные горизонтальные кнопки для небольших дискретных изменений.
+[WAI-ARIA](https://www.w3.org/WAI/ARIA/apg/patterns/slider/)
+задаёт keyboard/semantics. Это экспертное обоснование, не сравнительное
+пользовательское исследование Cute Screen.
+
+**Решение:** общий Naive UI adapter сочетает слайдер с точным полем,
+горизонтальные −/+ и NButtonGroup пресетов. Единицы отображаются отдельно;
+проценты не меняют persisted ratios. Input использует NInput с семантикой
+spinbutton: это позволяет хранить пустой/некорректный draft и принимать запятую
+без неявного clamp/coercion браузерного number input.
+
+Preview собирает те же EditorCommand через чистые resolvers и применяет
+applyEditorCommand к временной проекции. Проекция хранится в shallowRef и
+обновляется не чаще animation frame. Session, autosave и preferences до commit
+не меняются. В inline text сохраняется полный rich-text state и background;
+каждый preview строится от исходного state, отмена восстанавливает диапазон,
+смешанные spans, paragraphs и typing style. Общая граница text commit сохраняется.
+Числовой draft отменяется при смене контекста; владельцы защищают друг друга от
+запоздалого cancel. Завершённый gesture даёт одну команду/batch, удержание
+клавиши объединяется до keyup. Панели с Apply/Cancel сохраняют общий draft.
+
+**Проверяемое основание:** adapter/controller tests, mounted inline-text flow,
+trusted browser/native drag с пиксельным сравнением до/после pointerup,
+undo/redo/cancel и production Capture → Quick → Editor. Фактические команды,
+артефакты и платформенные ограничения — TESTING.md. Schema v7, IPC и Rust
+не меняются. Форматирование существующих accepted ADR сохраняется.
+
+## ADR-055 — Собственные UI-иконки рядом с Tabler
+
+**Статус:** accepted; supersedes ADR-043.
+
+**Контекст:** установленные Tabler Highlight и Pencil используют почти один
+диагональный контур; ColorPicker имеет сходный стержень. При 18 CSS px инструменты
+плохо различаются. Требуются собственные метафоры без смены библиотеки интерфейса.
+
+**Решение:** typed `UiIcon` остаётся единственной точкой выбора UI-иконок.
+Явные Tabler imports дополняются собственными marker/pencil/eyedropper.
+Геометрия — типизированные SVG-примитивы в `shell/icons/`, общий Vue renderer
+строит один SVG через `h()`: viewBox 24×24, currentColor, fill none, stroke 1.8,
+round caps/joins, декоративные aria-hidden/focusable. Внешние ресурсы, text,
+scripts, filters и HTML injection исключены. Caller class/style сохраняются.
+Фактические размеры задаёт прежний CSS. Геометрия одна для shell, tests и dev
+gallery; отдельный HTML preview entry не включается в production main.
+
+Сохраняются решения ADR-043 по Quick Capture: canvas flip скрыт, fallback canvas
+actions отсутствуют, toolbar без schema не создаёт DOM. В полном editor flip
+и история сохраняются. Callout/Numbered Marker различимы; геометрические previews
+параметров имеют собственную геометрию. App/tray assets и курсоры — отдельные
+контракты. Document schema, renderer, originals и platform backends не меняются.
+
+**Проверяемое основание:** runtime SVG-контракт всего каталога, source boundary,
+gallery 16/18/20/24/32 CSS px и raster review при DPR 1/2, shell RU/EN × light/dark,
+production Capture → Quick → Editor с native input, sampling и undo/redo.
+Фактические команды, screenshots, ограничения и platform evidence — TESTING.md.
+
+## ADR-057 — Монитор с кошачьими прищурами
+
+**Статус:** accepted; supersedes ADR-047.
+
+**Контекст:** пользователь выбрал вариант монитора с кошачьими ушами, подставкой
+и двумя изогнутыми прищурами вместо прямоугольного просвета экрана. Прищуры
+прочитаны пользователем как глаза; выбранный знак принят для проекта 2026-10-16.
+
+**Решение:** общий источник хранит внешний силуэт монитора и крупный вырез
+прищуров. App/editor/favicon/bundle: белый знак на тёмной плитке. Отдельный
+`logo-mark.svg`: чёрный знак на прозрачном фоне. Windows/Linux tray: белый знак,
+тёмный внешний контур и тёмные прищуры; контур рисуется под белой формой и не
+сужает глаза или подставку. macOS template сохраняет настоящую прозрачность глаз.
+Все SVG/PNG/ICO/ICNS генерируются через `pnpm icons:generate`; generated assets
+не правятся отдельно. Новые зависимости и изменения platform backends не нужны.
+
+**Проверяемое основание:** red-first Rust tests повторно декодируют embedded
+PNG и проверяют оба прищура, stem/foot, прозрачность фона/template и двухтонный
+tray. Размерный review 16/20/24/32 px и повторное декодирование bundle icons —
+asset evidence; runtime tray light/dark/HiDPI на каждой ОС проверяется отдельно.
+Фактические результаты и ограничения фиксируются в `TESTING.md`.

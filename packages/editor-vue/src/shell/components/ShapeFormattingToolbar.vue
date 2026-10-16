@@ -276,7 +276,7 @@ onBeforeUnmount(() => {
           v-if="open === menu"
           :ref="(element) => { panel = element as HTMLElement | undefined }"
           class="cs-shape-popover"
-          :class="{ 'cs-shape-popover--geometry': menu === 'geometry' }"
+          :class="{ 'cs-shape-popover--geometry': menu === 'geometry', 'cs-shape-popover--paint': menu === 'fill' || menu === 'stroke' }"
           role="dialog"
           :aria-label="labels[menu]"
           @keydown="keydown"
@@ -314,6 +314,10 @@ onBeforeUnmount(() => {
               <ShapeNumericControl
                 v-if="shape === 'rectangle'"
                 :label="text('Corner radius', 'Скругление')"
+                control-id="cornerRadius"
+                :locale="locale"
+                slider
+                unit="px"
                 :value="Number(value('cornerRadius'))"
                 :mixed="mixed('cornerRadius')"
                 :min="0"
@@ -326,6 +330,9 @@ onBeforeUnmount(() => {
                 <ShapeNumericControl
                   :label="text('Star points', 'Количество лучей')"
                   :compact-label="text('Points', 'Лучи')"
+                  control-id="starPoints"
+                  :locale="locale"
+                  stepper
                   :value="Number(value('starPoints'))"
                   :mixed="mixed('starPoints')"
                   :min="3"
@@ -337,6 +344,11 @@ onBeforeUnmount(() => {
                 <ShapeNumericControl
                   :label="text('Inner radius', 'Внутренний радиус')"
                   :compact-label="text('Inner radius', 'Внутр. радиус')"
+                  control-id="starInnerRatio"
+                  :locale="locale"
+                  slider
+                  unit="%"
+                  :display-scale="100"
                   :value="Number(value('starInnerRatio'))"
                   :mixed="mixed('starInnerRatio')"
                   :min="0.1"
@@ -383,6 +395,10 @@ onBeforeUnmount(() => {
             <ShapeNumericControl
               v-if="schema.shape?.fillOpacityEditable !== false && fill?.kind !== 'none'"
               :label="text('Fill opacity', 'Непрозрачность заливки')"
+              control-id="fillOpacity"
+              :locale="locale"
+              slider
+              unit="%"
               :value="Number(value('fillOpacity'))"
               :mixed="mixed('fillOpacity')"
               :min="0"
@@ -412,6 +428,11 @@ onBeforeUnmount(() => {
           <template v-if="menu === 'stroke'">
             <ShapeNumericControl
               :label="text('Thickness', 'Толщина')"
+              control-id="width"
+              :locale="locale"
+              slider
+              unit="px"
+              :presets="[1, 2, 4, 8, 16]"
               :value="Number(value('width'))"
               :mixed="mixed('width')"
               :min="1"
@@ -420,22 +441,6 @@ onBeforeUnmount(() => {
               :disabled="disabled"
               @commit="change('width', String($event))"
             />
-            <div
-              class="cs-shape-presets"
-              role="group"
-              :aria-label="text('Thickness presets', 'Готовая толщина')"
-            >
-              <button
-                v-for="width in [1, 2, 4, 8, 16]"
-                :key="width"
-                type="button"
-                :disabled="disabled"
-                :aria-pressed="!mixed('width') && Number(value('width')) === width"
-                @click="change('width', String(width))"
-              >
-                {{ width }} px
-              </button>
-            </div>
             <SimpleColorPicker
               :model-value="value('color')"
               :mixed="mixed('color')"
@@ -453,6 +458,10 @@ onBeforeUnmount(() => {
           <template v-if="menu === 'appearance'">
             <ShapeNumericControl
               :label="text('Opacity', 'Непрозрачность')"
+              control-id="layerOpacity"
+              :locale="locale"
+              slider
+              unit="%"
               :value="Number(value('layerOpacity'))"
               :mixed="mixed('layerOpacity')"
               :min="0"

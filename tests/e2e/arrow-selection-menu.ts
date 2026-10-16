@@ -5,6 +5,9 @@ import {
 } from '@wdio/globals'
 import path from 'node:path'
 import { writeFile } from 'node:fs/promises'
+import { verifyPaletteDismissal } from './palette-dismissal'
+import { waitForShapeAnimation } from './shape-toolbar'
+import { waitForStableCanvas } from './canvas-ready'
 
 function readArrowMenuLayout() {
   return browser.execute(() => {
@@ -45,7 +48,9 @@ function readArrowMenuLayout() {
 
 /** Observe production selection after a real creation gesture, without seeding it. */
 export async function verifyArrowSelectionMenu(artifactDirectory: string): Promise<void> {
+  await expect($('.cs-canvas-ready')).toExist()
   await $('button[aria-label="Arrow"]').click()
+  await waitForStableCanvas()
   const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
   await browser.action('pointer')
     .move({ origin: scene, x: -90, y: -60 })
@@ -56,6 +61,17 @@ export async function verifyArrowSelectionMenu(artifactDirectory: string): Promi
   await expect($('button[aria-label="Select"]')).toHaveAttribute('aria-pressed', 'true')
   const toolbar = $('.cs-selection-floating-toolbar')
   await toolbar.waitForDisplayed()
+  const colour = toolbar.$('.cs-simple-color-trigger')
+  await colour.click()
+  await waitForShapeAnimation()
+  await verifyPaletteDismissal(artifactDirectory, 'arrow-preset', () =>
+    $('.cs-simple-color-panel .cs-simple-color-swatch[aria-pressed="false"]:not(.cs-simple-color-custom)').click())
+  await expect(colour).toBeFocused()
+  await $('button[aria-label="Undo"]').click()
+  await colour.click()
+  await waitForShapeAnimation()
+  await verifyPaletteDismissal(artifactDirectory, 'arrow-escape', () => browser.keys('Escape'))
+  await expect(colour).toBeFocused()
   await toolbar.$('[data-control="endCap"] button').click()
   const menu = $('.cs-arrow-toolbar-popover[aria-label="Head"]')
   await menu.waitForDisplayed()

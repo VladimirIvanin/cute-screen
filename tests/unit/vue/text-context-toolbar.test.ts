@@ -48,10 +48,10 @@ describe('v7 text contextual toolbar', () => {
     expect(rendered.getByLabelText('Bullet list')).toBeDisabled()
     expect(rendered.getByLabelText('Bullet list')).toHaveAttribute('title', schema.text.disabledReason)
     await fireEvent.click(rendered.getByLabelText('Background'))
-    expect(rendered.getByRole('button', { name: 'None' })).toBeDisabled()
+    expect(await rendered.findByRole('button', { name: 'None' })).toBeDisabled()
     for (const name of ['Padding', 'Radius']) {
-      expect(rendered.getByLabelText(name)).toBeDisabled()
-      expect(rendered.getByLabelText(name)).toHaveAttribute('title', schema.text.disabledReason)
+      expect(rendered.getByRole('spinbutton', { name })).toBeDisabled()
+      expect(rendered.getByRole('spinbutton', { name })).toHaveAttribute('title', schema.text.disabledReason)
     }
   })
 
@@ -96,20 +96,21 @@ describe('v7 text contextual toolbar', () => {
     expect(rendered.emitted().change).toContainEqual(['textFont', 'Georgia'])
     const size = rendered.getByLabelText('Font size')
     await fireEvent.click(size)
-    const arbitrary = rendered.getByLabelText('Font size value') as HTMLInputElement
+    const arbitrary = await rendered.findByRole('spinbutton', { name: 'Font size value' }) as HTMLInputElement
     await fireEvent.update(arbitrary, '257')
     expect(rendered.emitted().change).not.toContainEqual(['textFontSize', '257'])
-    expect(rendered.getByRole('button', { name: 'Apply' })).toBeDisabled()
+    expect(arbitrary).toHaveAttribute('aria-invalid', 'true')
     await fireEvent.update(arbitrary, '32')
-    await fireEvent.click(rendered.getByRole('button', { name: 'Apply' }))
+    await fireEvent.keyDown(arbitrary, { key: 'Enter' })
+    await fireEvent.keyDown(arbitrary, { key: 'Escape' })
     expect(rendered.emitted().change).toContainEqual(['textFontSize', '32'])
     const background = rendered.getByLabelText('Background')
     await fireEvent.click(background)
-    await fireEvent.keyDown(rendered.getByRole('dialog'), { key: 'Escape' })
+    await fireEvent.keyDown(await rendered.findByRole('dialog'), { key: 'Escape' })
     expect(background).toHaveFocus()
     await fireEvent.click(background)
-    const backgroundDialog = rendered.getByRole('dialog')
-    const padding = rendered.getByLabelText('Padding') as HTMLInputElement
+    const backgroundDialog = await rendered.findByRole('dialog')
+    const padding = rendered.getByRole('spinbutton', { name: 'Padding' }) as HTMLInputElement
     await fireEvent.update(padding, '257')
     expect(within(backgroundDialog).getByRole('button', { name: 'Apply' })).toBeDisabled()
     await fireEvent.pointerDown(document.body)
@@ -130,7 +131,7 @@ describe('v7 text contextual toolbar', () => {
       name: 'Дополнительные настройки текста',
     })
     await fireEvent.click(within(overflowDialog).getByRole('button', { name: 'Фон' }))
-    await fireEvent.keyDown(rendered.getByRole('dialog'), { key: 'Escape' })
+    await fireEvent.keyDown(await rendered.findByRole('dialog'), { key: 'Escape' })
     expect(overflow).toHaveFocus()
 
     await fireEvent.click(overflow)

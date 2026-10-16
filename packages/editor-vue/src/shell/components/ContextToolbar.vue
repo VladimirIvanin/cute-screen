@@ -2,16 +2,22 @@
 import { NButton } from 'naive-ui'
 import { UiIcon } from '../icon'
 import type { ContextToolbarSchema } from '../types'
+import { numericPresentation } from '../ui/numeric-presentation'
 import type { SrgbColor } from '@cute-screen/editor-renderer'
 import DeferredColorPicker from '../ui/DeferredColorPicker.vue'
 import SimpleColorPicker from '../ui/SimpleColorPicker.vue'
-import DeferredSlider from '../ui/DeferredSlider.vue'
+import NumericControl from '../ui/NumericControl.vue'
+import { numericDefaultsKey } from '../ui/numeric-preview'
 import UiSelect from '../ui/UiSelect.vue'
 import TextFormattingToolbar from './TextFormattingToolbar.vue'
 import ArrowFormattingToolbar from './ArrowFormattingToolbar.vue'
 import ShapeFormattingToolbar from './ShapeFormattingToolbar.vue'
+import ToolFormattingToolbar from './ToolFormattingToolbar.vue'
 import HighlighterFormattingToolbar from './HighlighterFormattingToolbar.vue'
-import { ref } from 'vue'
+import {
+  ref,
+  provide,
+} from 'vue'
 const expanded = ref(false)
 function controlsFor(schema: ContextToolbarSchema) {
   const order = schema.icon === 'ruler' ? ['rulerColor', 'rulerThickness', 'rulerFontSize', 'rulerUnit'] : []
@@ -23,12 +29,14 @@ function controlsFor(schema: ContextToolbarSchema) {
     : schema.controls
   return expanded.value ? controls : controls.slice(0, 4)
 }
-defineProps<{
+const props = defineProps<{
+  defaultsTool?: string
   schema?: ContextToolbarSchema | undefined
   label: string
   recentColors?: readonly SrgbColor[]
   pickerLocale?: 'en' | 'ru'
 }>()
+provide(numericDefaultsKey, () => props.defaultsTool)
 const emit = defineEmits<{
   action: [id: string]
   change: [id: string, value: string]
@@ -39,7 +47,7 @@ const emit = defineEmits<{
 <template>
   <fieldset
     v-if="schema"
-    :disabled="schema.disabled ?? false"
+    :disabled="schema.toolSettings ? false : schema.disabled ?? false"
     :title="schema.disabledReason"
     class="cs-context-toolbar"
     :class="{
@@ -56,6 +64,7 @@ const emit = defineEmits<{
     <template v-if="schema.text">
       <TextFormattingToolbar
         :text="schema.text"
+        :disabled="schema.disabled"
         :title="schema.title"
         :picker-locale="pickerLocale ?? 'en'"
         variant="bottom"
@@ -63,7 +72,7 @@ const emit = defineEmits<{
       />
     </template>
     <span
-      v-else-if="schema.icon !== 'arrow' && !schema.shape && !schema.highlighter"
+      v-else-if="schema.icon !== 'arrow' && !schema.shape && !schema.highlighter && !schema.toolSettings"
       class="cs-context-icon"
       :class="`cs-context-icon--${schema.icon}`"
     ><UiIcon :name="schema.icon"/></span>
@@ -74,6 +83,15 @@ const emit = defineEmits<{
       :picker-locale="pickerLocale ?? 'en'"
       :recent-colors="recentColors ?? []"
       @change="(id, value) => emit('change', id, value)"
+      @eyedropper="emit('eyedropper', $event)"
+    />
+    <ToolFormattingToolbar
+      v-else-if="schema.toolSettings"
+      :schema="schema"
+      :locale="pickerLocale ?? 'en'"
+      :recent-colors="recentColors ?? []"
+      @change="(id, value) => emit('change', id, value)"
+      @action="emit('action', $event)"
       @eyedropper="emit('eyedropper', $event)"
     />
     <HighlighterFormattingToolbar
@@ -129,18 +147,21 @@ const emit = defineEmits<{
             @eyedropper="emit('eyedropper', control.id)"
           />
         </label>
-        <label v-else-if="control.kind === 'range'" class="cs-context-control">
-          <span>{{ control.label }}{{ control.mixed ? ' · —' : '' }}</span>
-          <DeferredSlider
-            :model-value="control.value"
-            :min="control.min"
-            :max="control.max"
-            :step="control.step"
-            :disabled="control.disabled ?? false"
-            v-bind="{ ariaLabel: control.label }"
-            @commit="emit('change', control.id, String($event))"
-          />
-        </label>
+        <NumericControl
+          v-else-if="control.kind === 'range'"
+          class="cs-context-control"
+          :label="control.label"
+          :value="control.value"
+          :min="control.min"
+          :max="control.max"
+          :step="control.step"
+          :mixed="control.mixed"
+          :disabled="schema.disabled || control.disabled"
+          :control-id="control.id"
+          :locale="pickerLocale"
+          v-bind="numericPresentation(control)"
+          @commit="emit('change', control.id, String($event))"
+        />
         <label v-else-if="control.kind === 'select'" class="cs-context-control">
           <span>{{ control.label }}{{ control.mixed ? ' · —' : '' }}</span>
           <UiSelect

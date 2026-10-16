@@ -351,3 +351,17 @@ export {
   parseToolSettingsPreferences,
   type ToolSettingsPreferencesV3,
 } from './tool-preferences'
+
+export {
+  resolveFreehandGeometry,
+  rebaseFreehandLayer,
+} from './tools/freehand'
+export {
+  addSpotlightAperture,
+  updateSpotlightAperture,
+  removeSpotlightAperture,
+  spotlightWithApertures,
+  spotlightApertureAt,
+} from './tools/precision/spotlight'
+
+export type { SpotlightAperture } from './document/types'

@@ -162,9 +162,11 @@ describe('M08 shell lifecycle and contextual settings', () => {
     })
     await selectLayerFromPanel(view, { activateSelect: false })
 
+    await fireEvent.click(screen.getByRole('button', { name: 'Thickness' }))
     const thickness = await screen.findByRole('slider', { name: 'Thickness' })
     thickness.focus()
     await fireEvent.keyDown(thickness, { key: 'ArrowRight' })
+    await fireEvent.keyUp(thickness, { key: 'ArrowRight' })
     expect(session.snapshot.core.document.layers[0]).toMatchObject({
       kind: 'ruler',
       payload: {
@@ -309,9 +311,10 @@ describe('M08 shell lifecycle and contextual settings', () => {
       await fireEvent.click(screen.getByRole('button', { name: tool }))
       const more = within(toolbar).queryByRole('button', { name: /More|Ещё/ })
       if (more) await fireEvent.click(more)
-      for (const label of labels) {
-        expect(within(toolbar).getByText(label)).toBeInTheDocument()
-      }
+      if (tool === 'Spotlight' || tool === 'Ruler') {
+        const names = tool === 'Spotlight' ? ['Aperture shape', 'Dimming', 'Edge softness', 'Apertures'] : ['Colour', 'Thickness', 'Label and units', 'Measurement and snapping']
+        for (const name of names) expect(within(toolbar).getByRole('button', { name })).toBeInTheDocument()
+      } else for (const label of labels) expect(within(toolbar).getByText(label)).toBeInTheDocument()
     }
 
     useEditorShellStore(pinia).setLocale('ru')
@@ -320,9 +323,7 @@ describe('M08 shell lifecycle and contextual settings', () => {
     expect(within(toolbar).getByText('Эффект')).toBeInTheDocument()
 
     await fireEvent.click(await screen.findByRole('button', { name: 'Линейка' }))
-    for (const label of ['Цвет', 'Толщина', 'Размер подписи', 'Единицы', 'Привязка', 'Шаг угла']) {
-      expect(within(toolbar).getByText(label)).toBeInTheDocument()
-    }
+    for (const name of ['Цвет', 'Толщина', 'Подпись и единицы', 'Измерение и привязка']) expect(within(toolbar).getByRole('button', { name })).toBeInTheDocument()
     await fireEvent.click(await screen.findByRole('button', { name: 'Показать слои' }))
     expect(view.container.querySelector('.cs-layers-panel')).not.toHaveTextContent(/Размер подписи|Шаг угла|Привязка/u)
 

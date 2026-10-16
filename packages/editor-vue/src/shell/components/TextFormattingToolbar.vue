@@ -1,11 +1,23 @@
 <script setup lang="ts">
 import {
   nextTick,
+  computed,
+  watch,
+  inject,
   onBeforeUnmount,
   onMounted,
   ref,
+  type CSSProperties,
 } from 'vue'
 import { UiIcon } from '../icon'
+import NumericControl from '../ui/NumericControl.vue'
+import { textFormattingLabel } from '../ui/text-formatting-labels'
+import { usePreviewPopover } from '../ui/use-preview-popover'
+import type { PreviewPlacement } from '../ui/preview-placement'
+import {
+  numericDefaultsKey,
+  numericPreviewKey,
+} from '../ui/numeric-preview'
 import type { ContextToolbarSchema } from '../types'
 
 const props = defineProps<{
@@ -13,11 +25,17 @@ const props = defineProps<{
   title: string
   pickerLocale?: 'en' | 'ru'
   variant?: 'bottom' | 'floating'
+  disabled?: boolean | undefined
 }>()
 const emit = defineEmits<{
   change: [id: string, value: string]
 }>()
 
+const numericPreview = inject(numericPreviewKey, undefined)
+const blocked = computed(() => Boolean(props.disabled || numericPreview?.isBlocked?.()))
+const numericDefaultsTool = inject(numericDefaultsKey, () => undefined)
+const backgroundOwner = Symbol('text-background')
+const backgroundInvalid = ref({ padding: false, radius: false })
 const textBackgroundOpen = ref(false)
 const textBackgroundTrigger = ref<HTMLButtonElement>()
 const textBackgroundRoot = ref<HTMLElement>()
@@ -31,62 +49,30 @@ const textOverflowTrigger = ref<HTMLButtonElement>()
 const textOverflowRoot = ref<HTMLElement>()
 const textBackgroundReturnTrigger = ref<HTMLButtonElement>()
 
-function textLabel(
-  key:
-    | 'color'
-    | 'font'
-    | 'size'
-    | 'bold'
-    | 'italic'
-    | 'strike'
-    | 'list'
-    | 'alignment'
-    | 'background'
-    | 'none'
-    | 'padding'
-    | 'radius'
-    | 'apply'
-    | 'cancel'
-    | 'mixed',
-): string {
-  const ru = props.pickerLocale === 'ru'
-  const labels = ru
-    ? {
-        color: 'Цвет текста',
-        font: 'Шрифт',
-        size: 'Размер шрифта',
-        bold: 'Полужирный',
-        italic: 'Курсив',
-        strike: 'Зачёркнутый',
-        list: 'Маркированный список',
-        alignment: 'Выравнивание текста',
-        background: 'Фон',
-        none: 'Нет',
-        padding: 'Отступ',
-        radius: 'Скругление',
-        apply: 'Применить',
-        cancel: 'Отмена',
-        mixed: 'смешанное',
-      }
-    : {
-        color: 'Text color',
-        font: 'Font family',
-        size: 'Font size',
-        bold: 'Bold',
-        italic: 'Italic',
-        strike: 'Strikethrough',
-        list: 'Bullet list',
-        alignment: 'Text alignment',
-        background: 'Background',
-        none: 'None',
-        padding: 'Padding',
-        radius: 'Radius',
-        apply: 'Apply',
-        cancel: 'Cancel',
-        mixed: 'mixed',
-      }
-  return labels[key]
+const unregisterBackground = numericPreview?.register(backgroundOwner, () => {
+  if (textBackgroundOpen.value) closeTextBackground()
+})
+
+const sizePosition = usePreviewPopover(
+  () => textSizeOpen.value ? textSizeTrigger.value : undefined,
+  () => textSizeRoot.value,
+)
+const backgroundPosition = usePreviewPopover(
+  () => textBackgroundOpen.value ? textBackgroundReturnTrigger.value : undefined,
+  () => textBackgroundRoot.value,
+)
+function numericPopoverStyle(position: PreviewPlacement | undefined): CSSProperties {
+  return {
+    position: 'fixed',
+    left: `${position?.left ?? 0}px`,
+    top: `${position?.top ?? 0}px`,
+    bottom: 'auto',
+    transform: 'none',
+    visibility: position ? 'visible' : 'hidden',
+  }
 }
+
+const textLabel = (key: Parameters<typeof textFormattingLabel>[1]) => textFormattingLabel(props.pickerLocale, key)
 
 function textValue<T>(
   value: T | null,
@@ -107,6 +93,7 @@ function textToggle(
 }
 
 function openTextSize(): void {
+  if (blocked.value) return
   textSizeDraft.value = String(props.text.fontSize ?? 24)
   textSizeOpen.value = true
 }
@@ -117,13 +104,14 @@ function closeTextSize(): void {
 }
 
 function applyTextSize(value = Number(textSizeDraft.value)): void {
+  if (blocked.value) return
   if (
     !Number.isInteger(value) ||
     value < 8 ||
     value > 256
   ) return
   emit('change', 'textFontSize', String(value))
-  closeTextSize()
+  textSizeDraft.value = String(value)
 }
 
 function validTextBackground(value: typeof textBackgroundDraft.value): boolean {
@@ -155,9 +143,11 @@ function openOverflowBackground(): void {
 }
 
 function openTextBackground(returnTrigger = textBackgroundTrigger.value): void {
+  if (blocked.value) return
   textBackgroundReturnTrigger.value = returnTrigger
   const current = props.text.background
   textBackgroundDraft.value = current ? { ...current } : { color: '#fff2a8', padding: 0, radius: 0 }
+  backgroundInvalid.value = { padding: false, radius: false }
   textBackgroundOpen.value = true
 }
 
@@ -166,6 +156,7 @@ function openDirectTextBackground(): void {
 }
 
 function closeTextBackground(): void {
+  numericPreview?.cancel(backgroundOwner)
   textBackgroundOpen.value = false
   const returnTrigger = textBackgroundReturnTrigger.value
   textBackgroundReturnTrigger.value = undefined
@@ -187,9 +178,21 @@ function closeOpenTextPopover(event: KeyboardEvent): void {
 }
 
 function commitTextBackground(value: typeof textBackgroundDraft.value | null): void {
+  if (blocked.value) return
   if (value && !validTextBackground(value)) return
+  numericPreview?.cancel(backgroundOwner)
   emit('change', 'textBackground', JSON.stringify(value))
   closeTextBackground()
+}
+
+function previewTextBackground(
+  key: 'padding' | 'radius',
+  value: number,
+): void {
+  textBackgroundDraft.value = { ...textBackgroundDraft.value, [key]: value }
+  if (validTextBackground(textBackgroundDraft.value)) numericPreview?.preview(backgroundOwner, {
+    id: 'textBackground', defaultsTool: numericDefaultsTool(),
+  }, JSON.stringify(textBackgroundDraft.value))
 }
 
 function closeOnOutsidePointer(event: PointerEvent): void {
@@ -218,8 +221,19 @@ function closeOnOutsidePointer(event: PointerEvent): void {
   }
 }
 
+watch(blocked, (disabled) => {
+  if (disabled) {
+    closeTextSize()
+    closeTextBackground()
+    closeTextOverflow()
+  }
+})
 onMounted(() => document.addEventListener('pointerdown', closeOnOutsidePointer, true))
-onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOnOutsidePointer, true))
+onBeforeUnmount(() => {
+  unregisterBackground?.()
+  numericPreview?.cancel(backgroundOwner)
+  document.removeEventListener('pointerdown', closeOnOutsidePointer, true)
+})
 </script>
 
 <template>
@@ -262,6 +276,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOnOutside
     <button
       ref="textSizeTrigger"
       data-text-control="size"
+      :disabled="blocked"
       :aria-label="`${textLabel('size')}${textMixed(text.fontSize) ? `: ${textLabel('mixed')}` : ''}`"
       :aria-expanded="textSizeOpen"
       aria-haspopup="dialog"
@@ -269,42 +284,37 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOnOutside
     >
       {{ text.fontSize ?? '—' }}
     </button>
-    <section
-      v-if="textSizeOpen"
-      ref="textSizeRoot"
-      class="cs-text-size-popover"
-      role="dialog"
-      :aria-label="textLabel('size')"
-      @keydown.escape.prevent.stop="closeTextSize"
-    >
-      <button
-        v-for="size in [16, 24, 32, 48, 64]"
-        :key="size"
-        type="button"
-        :aria-pressed="text.fontSize === size"
-        @click="applyTextSize(size)"
+    <Teleport to=".cs-overlay-root" defer>
+      <section
+        v-if="textSizeOpen"
+        ref="textSizeRoot"
+        class="cs-text-size-popover cs-text-numeric-popover"
+        :style="numericPopoverStyle(sizePosition)"
+        role="dialog"
+        :aria-label="textLabel('size')"
+        @keydown.escape.prevent.stop="closeTextSize"
       >
-        {{ size }}
-      </button>
-      <label>{{ textLabel('size') }}
-        <input
-          v-model="textSizeDraft"
-          type="number"
-          min="8"
-          max="256"
-          :aria-label="textLabel('size') + ' value'"
-        /></label>
-      <button
-        type="button"
-        :disabled="!Number.isInteger(Number(textSizeDraft)) || Number(textSizeDraft) < 8 || Number(textSizeDraft) > 256"
-        @click="applyTextSize()"
-      >
-        {{ textLabel('apply') }}
-      </button>
-      <button type="button" @click="closeTextSize">
-        {{ textLabel('cancel') }}
-      </button>
-    </section>
+        <NumericControl
+          :label="pickerLocale === 'ru' ? 'Значение размера шрифта' : textLabel('size') + ' value'"
+          :compact-label="textLabel('size')"
+          :value="text.fontSize ?? 24"
+          :mixed="textMixed(text.fontSize)"
+          :min="8"
+          :max="256"
+          :step="1"
+          stepper
+          unit="px"
+          control-id="textFontSize"
+          :locale="pickerLocale"
+          :presets="[16, 24, 32, 48, 64]"
+          @preview="textSizeDraft = String($event)"
+          @commit="applyTextSize($event)"
+        />
+        <button type="button" @click="closeTextSize">
+          {{ textLabel('cancel') }}
+        </button>
+      </section>
+    </Teleport>
     <button
       data-text-control="bold"
       type="button"
@@ -396,57 +406,60 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOnOutside
         <path d="M8 8h8v8H8z" />
       </svg>
     </button>
-    <section
-      v-if="textBackgroundOpen"
-      ref="textBackgroundRoot"
-      class="cs-text-background-popover"
-      role="dialog"
-      :aria-label="textLabel('background')"
-      @keydown.escape.prevent.stop="closeTextBackground"
-    >
-      <button
-        type="button"
-        :disabled="text.disabled.includes('none')"
-        :title="text.disabled.includes('none') ? text.disabledReason : undefined"
-        @click="commitTextBackground(null)"
+    <Teleport to=".cs-overlay-root" defer>
+      <section
+        v-if="textBackgroundOpen"
+        ref="textBackgroundRoot"
+        class="cs-text-background-popover cs-text-numeric-popover"
+        :style="numericPopoverStyle(backgroundPosition)"
+        role="dialog"
+        :aria-label="textLabel('background')"
+        @keydown.escape.prevent.stop="closeTextBackground"
       >
-        {{ textLabel('none') }}
-      </button>
-      <label>{{ textLabel('color') }}
-        <input
-          v-model="textBackgroundDraft.color"
-          type="color"
-          :aria-label="textLabel('background') + ' ' + textLabel('color')"
-        /></label>
-      <label>{{ textLabel('padding') }}
-        <input
-          v-model.number="textBackgroundDraft.padding"
-          type="number"
-          min="0"
-          max="256"
-          :disabled="text.disabled.includes('padding')"
-          :title="text.disabled.includes('padding') ? text.disabledReason : undefined"
-        /></label>
-      <label>{{ textLabel('radius') }}
-        <input
-          v-model.number="textBackgroundDraft.radius"
-          type="number"
-          min="0"
-          max="256"
-          :disabled="text.disabled.includes('radius')"
-          :title="text.disabled.includes('radius') ? text.disabledReason : undefined"
-        /></label>
-      <button
-        type="button"
-        :disabled="!validTextBackground(textBackgroundDraft)"
-        @click="commitTextBackground(textBackgroundDraft)"
-      >
-        {{ textLabel('apply') }}
-      </button>
-      <button type="button" @click="closeTextBackground">
-        {{ textLabel('cancel') }}
-      </button>
-    </section>
+        <button
+          type="button"
+          :disabled="text.disabled.includes('none')"
+          :title="text.disabled.includes('none') ? text.disabledReason : undefined"
+          @click="commitTextBackground(null)"
+        >
+          {{ textLabel('none') }}
+        </button>
+        <label>{{ textLabel('color') }}
+          <input
+            v-model="textBackgroundDraft.color"
+            type="color"
+            :aria-label="textLabel('background') + ' ' + textLabel('color')"
+          /></label>
+        <NumericControl
+          v-for="key in ['padding', 'radius'] as const"
+          :key="key"
+          :label="textLabel(key)"
+          :value="textBackgroundDraft[key]"
+          :min="0"
+          :max="256"
+          :step="1"
+          slider
+          unit="px"
+          :locale="pickerLocale"
+          :disabled="text.disabled.includes(key)"
+          :disabled-reason="text.disabledReason"
+          @invalid="backgroundInvalid[key] = $event"
+          @preview="previewTextBackground(key, $event)"
+          @commit="previewTextBackground(key, $event)"
+          @cancel="numericPreview?.cancel(backgroundOwner)"
+        />
+        <button
+          type="button"
+          :disabled="!validTextBackground(textBackgroundDraft) || backgroundInvalid.padding || backgroundInvalid.radius"
+          @click="commitTextBackground(textBackgroundDraft)"
+        >
+          {{ textLabel('apply') }}
+        </button>
+        <button type="button" @click="closeTextBackground">
+          {{ textLabel('cancel') }}
+        </button>
+      </section>
+    </Teleport>
     <button
       ref="textOverflowTrigger"
       class="cs-text-overflow-trigger"

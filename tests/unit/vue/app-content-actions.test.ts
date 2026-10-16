@@ -252,14 +252,17 @@ describe('M02 editor shell', () => {
     for (let index = 0; index < 12; index += 1) {
       await fireEvent.keyDown(radius, { key: 'ArrowRight' })
     }
+    await fireEvent.keyUp(radius, { key: 'ArrowRight' })
     borderWidth.focus()
     for (let index = 0; index < 3; index += 1) {
       await fireEvent.keyDown(borderWidth, { key: 'ArrowRight' })
     }
+    await fireEvent.keyUp(borderWidth, { key: 'ArrowRight' })
     opacity.focus()
     for (let index = 0; index < 8; index += 1) {
       await fireEvent.keyDown(opacity, { key: 'ArrowLeft' })
     }
+    await fireEvent.keyUp(opacity, { key: 'ArrowLeft' })
 
     expect(session.snapshot.core.document.layers[0]).toMatchObject({
       kind: 'image',

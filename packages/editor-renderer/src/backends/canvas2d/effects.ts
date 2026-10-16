@@ -185,36 +185,69 @@ export function drawSpotlight2D(
   scale: number,
   factory: (width: number, height: number) => Canvas2DLike,
 ): void {
-  const below = copyCanvas(factory, canvas)
+  // Build the union coverage first; erasing the shared dim surface avoids
+  // darkening overlapping apertures or drawing internal feather seams.
+  const dim = factory(canvas.width, canvas.height)
+  const dimContext = dim.getContext('2d')
+  const mask = factory(canvas.width, canvas.height)
+  const maskContext = mask.getContext('2d')
+  if (!dimContext || !maskContext) throw new Error('Spotlight mask context unavailable')
+  dimContext.fillStyle = cssColor(node.dimColor)
+  dimContext.globalAlpha = node.opacity * node.dimOpacity
+  dimContext.fillRect(0, 0, dim.width, dim.height)
+  const matrix = context.getTransform()
+  maskContext.setTransform(matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f)
+  const centerX = node.bounds.x + node.bounds.width / 2
+  const centerY = node.bounds.y + node.bounds.height / 2
+  withTransform(maskContext, { ...node, opacity: 1, blendMode: 'normal' }, centerX, centerY, () => {
+    spotlightAperturePath(maskContext, node)
+    maskContext.fillStyle = '#ffffff'
+    maskContext.fill()
+  })
+  dimContext.globalAlpha = 1
+  dimContext.globalCompositeOperation = 'destination-out'
+  const feather = spotlightFeatherWidth(node.feather) * scale
+  if (feather > 0) {
+    // Read only the transformed union bounds plus the blur support. The alpha
+    // blur is independent of CSS filters and remains usable in older WebKit.
+    const radians = node.rotation * Math.PI / 180
+    const originX = node.transformOriginX ?? centerX
+    const originY = node.transformOriginY ?? centerY
+    const corners = [[node.bounds.x,
+      node.bounds.y],
+    [node.bounds.x + node.bounds.width,
+      node.bounds.y],
+    [node.bounds.x,
+      node.bounds.y + node.bounds.height],
+    [node.bounds.x + node.bounds.width,
+      node.bounds.y + node.bounds.height]].map(([x,
+      y]) => {
+      const dx = (x! - originX) * (node.scaleX ?? 1)
+      const dy = (y! - originY) * (node.scaleY ?? 1)
+      const worldX = originX + dx * Math.cos(radians) - dy * Math.sin(radians)
+      const worldY = originY + dx * Math.sin(radians) + dy * Math.cos(radians)
+      return { x: matrix.a * worldX + matrix.c * worldY + matrix.e,
+        y: matrix.b * worldX + matrix.d * worldY + matrix.f }
+    })
+    const radius = Math.max(1, Math.ceil(feather / 2))
+    const x = Math.max(0, Math.floor(Math.min(...corners.map((point) => point.x)) - radius))
+    const y = Math.max(0, Math.floor(Math.min(...corners.map((point) => point.y)) - radius))
+    const right = Math.min(mask.width, Math.ceil(Math.max(...corners.map((point) => point.x)) + radius))
+    const bottom = Math.min(mask.height, Math.ceil(Math.max(...corners.map((point) => point.y)) + radius))
+    if (right > x && bottom > y) {
+      maskContext.setTransform(1, 0, 0, 1, 0, 0)
+      const image = maskContext.getImageData(x, y, right - x, bottom - y)
+      blurSpotlightAlpha(image, radius)
+      maskContext.putImageData(image, x, y)
+    }
+  }
+  dimContext.drawImage(mask as unknown as CanvasImageSource, 0, 0)
   context.save()
-  context.globalAlpha = node.opacity * node.dimOpacity
+  context.setTransform(1, 0, 0, 1, 0, 0)
+  context.globalAlpha = 1
   context.globalCompositeOperation = cssBlendMode(node.blendMode)
-  context.fillStyle = cssColor(node.dimColor)
-  context.fillRect(0, 0, scene.width, scene.height)
+  context.drawImage(dim as unknown as CanvasImageSource, 0, 0)
   context.restore()
-
-  const centerX = node.aperture.x + node.aperture.width / 2
-  const centerY = node.aperture.y + node.aperture.height / 2
-  withTransform(context, node, centerX, centerY, () => {
-    spotlightAperturePath(context, node)
-    context.clip()
-    context.setTransform(1, 0, 0, 1, 0, 0)
-    context.globalAlpha = 1
-    context.globalCompositeOperation = 'copy'
-    context.drawImage(below as unknown as CanvasImageSource, 0, 0)
-  })
-
-  const feather = spotlightFeatherWidth(node.feather)
-  if (feather === 0) return
-  withTransform(context, node, centerX, centerY, () => {
-    spotlightAperturePath(context, node)
-    context.globalAlpha = node.opacity * node.dimOpacity * 0.42
-    context.strokeStyle = cssColor(node.dimColor)
-    context.lineWidth = feather * 0.72
-    context.shadowColor = cssColor({ ...node.dimColor, alpha: 0.75 })
-    context.shadowBlur = feather * scale
-    context.stroke()
-  })
 }
 
 export function drawRuler2D(
@@ -385,4 +418,38 @@ export function drawLoupe2D(
       context.stroke()
     }
   })
+}
+
+/** Separable alpha-only box blur, with one byte of scratch per mask pixel. */
+function blurSpotlightAlpha(
+  image: ImageData,
+  radius: number,
+): void {
+  const { width, height, data } = image
+  const horizontal = new Uint8ClampedArray(width * height)
+  const window = radius * 2 + 1
+  for (let y = 0; y < height; y++) {
+    let sum = 0
+    for (let offset = -radius; offset <= radius; offset++) sum += data[(y * width + Math.max(0,
+      Math.min(width - 1,
+        offset))) * 4 + 3]!
+    for (let x = 0; x < width; x++) {
+      horizontal[y * width + x] = sum / window
+      sum += data[(y * width + Math.min(width - 1,
+        x + radius + 1)) * 4 + 3]! - data[(y * width + Math.max(0,
+        x - radius)) * 4 + 3]!
+    }
+  }
+  for (let x = 0; x < width; x++) {
+    let sum = 0
+    for (let offset = -radius; offset <= radius; offset++) sum += horizontal[Math.max(0,
+      Math.min(height - 1,
+        offset)) * width + x]!
+    for (let y = 0; y < height; y++) {
+      data[(y * width + x) * 4 + 3] = sum / window
+      sum += horizontal[Math.min(height - 1,
+        y + radius + 1) * width + x]! - horizontal[Math.max(0,
+        y - radius) * width + x]!
+    }
+  }
 }

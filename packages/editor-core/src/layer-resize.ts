@@ -12,16 +12,16 @@ import {
   transformToMatrix,
 } from './geometry'
 import { assertValidLoupeSourceRegion } from './tools/precision/shared'
-import { rebaseRulerLayer } from './tools/precision/ruler'
-
+import {
+  rebaseRulerLayer,
+  snapRulerEndpoint,
+} from './tools/precision/ruler'
 export const BOUNDS_RESIZE_HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as const
-
 export type BoundsResizeHandle = (typeof BOUNDS_RESIZE_HANDLES)[number]
 export type IntrinsicResizeHandle = BoundsResizeHandle | 'start' | 'end'
-export type LayerResizeCapability =
-  'imageTransform' | 'bounds' | 'points' | 'textWidth' | 'loupe' | 'ruler' | 'semantic' | 'none'
-
+export type LayerResizeCapability = 'imageTransform' | 'bounds' | 'points' | 'textWidth' | 'loupe' | 'ruler' | 'semantic' | 'none'
 export interface ResizeLayerGeometryOptions {
+  readonly snapAngleIncrementDegrees?: number | undefined
   readonly preserveAspect?: boolean
   readonly fromCenter?: boolean
   readonly canvas?: Readonly<{
@@ -29,9 +29,7 @@ export interface ResizeLayerGeometryOptions {
     readonly height: number
   }>
 }
-
 const MINIMUM_SIZE = 1
-
 export function layerResizeCapability(layer: LayerNode): LayerResizeCapability {
   switch (layer.kind) {
     case 'image':
@@ -57,7 +55,6 @@ export function layerResizeCapability(layer: LayerNode): LayerResizeCapability {
       return 'none'
   }
 }
-
 export function layerIntrinsicResizeHandles(layer: LayerNode): readonly IntrinsicResizeHandle[] {
   switch (layerResizeCapability(layer)) {
     case 'bounds':
@@ -74,11 +71,9 @@ export function layerIntrinsicResizeHandles(layer: LayerNode): readonly Intrinsi
       return []
   }
 }
-
 function unitScale(value: number): boolean {
   return Math.abs(value) === 1
 }
-
 export function assertLayerEditableScale(layer: LayerNode): void {
   if (
     layer.kind !== 'image' &&
@@ -88,7 +83,6 @@ export function assertLayerEditableScale(layer: LayerNode): void {
     throw new Error(`non-image layer ${layer.id} cannot use non-unit transform scale`)
   }
 }
-
 export function normalizeEditableLayerScale(layer: LayerNode): LayerNode {
   if (
     layer.kind === 'image' ||
@@ -106,7 +100,6 @@ export function normalizeEditableLayerScale(layer: LayerNode): LayerNode {
     }),
   }) as LayerNode
 }
-
 export function normalizeEditableDocumentScales(document: EditorDocumentV1): EditorDocumentV1 {
   let changed = false
   const layers = document.layers.map((layer) => {
@@ -114,30 +107,28 @@ export function normalizeEditableDocumentScales(document: EditorDocumentV1): Edi
     changed ||= normalized !== layer
     return normalized
   })
-  return changed ? Object.freeze({ ...document, layers: Object.freeze(layers) }) : document
+  return changed ? Object.freeze({
+    ...document, layers: Object.freeze(layers),
+  }) : document
 }
-
 function localPoint(
   layer: LayerNode,
   point: Point,
 ): Point {
   return transformPoint(invertMatrix(transformToMatrix(layer.transform)), point)
 }
-
 function clampLower(
   value: number,
   upper: number,
 ): number {
   return Math.min(value, upper - MINIMUM_SIZE)
 }
-
 function clampUpper(
   value: number,
   lower: number,
 ): number {
   return Math.max(value, lower + MINIMUM_SIZE)
 }
-
 function resizedBounds(
   bounds: Rect,
   handle: BoundsResizeHandle,
@@ -156,7 +147,6 @@ function resizedBounds(
   const changesRight = handle.includes('e')
   const changesTop = handle.includes('n')
   const changesBottom = handle.includes('s')
-
   if (options.fromCenter) {
     if (changesLeft || changesRight) {
       const halfWidth = Math.max(MINIMUM_SIZE / 2, Math.abs(point.x - centre.x))
@@ -169,12 +159,15 @@ function resizedBounds(
       bottom = centre.y + halfHeight
     }
   } else {
-    if (changesLeft) left = clampLower(point.x, right)
-    if (changesRight) right = clampUpper(point.x, left)
-    if (changesTop) top = clampLower(point.y, bottom)
-    if (changesBottom) bottom = clampUpper(point.y, top)
+    if (changesLeft)
+      left = clampLower(point.x, right)
+    if (changesRight)
+      right = clampUpper(point.x, left)
+    if (changesTop)
+      top = clampLower(point.y, bottom)
+    if (changesBottom)
+      bottom = clampUpper(point.y, top)
   }
-
   if (
     options.preserveAspect &&
     (changesLeft ||
@@ -193,13 +186,16 @@ function resizedBounds(
       top = centre.y - height / 2
       bottom = centre.y + height / 2
     } else {
-      if (changesLeft) left = bounds.x + bounds.width - width
-      else right = bounds.x + width
-      if (changesTop) top = bounds.y + bounds.height - height
-      else bottom = bounds.y + height
+      if (changesLeft)
+        left = bounds.x + bounds.width - width
+      else
+        right = bounds.x + width
+      if (changesTop)
+        top = bounds.y + bounds.height - height
+      else
+        bottom = bounds.y + height
     }
   }
-
   return Object.freeze({
     x: left,
     y: top,
@@ -207,7 +203,6 @@ function resizedBounds(
     height: Math.max(MINIMUM_SIZE, bottom - top),
   })
 }
-
 function squareBounds(
   original: Rect,
   resized: Rect,
@@ -236,7 +231,6 @@ function squareBounds(
     height: side,
   })
 }
-
 function mapPoint(
   point: Point,
   before: Rect,
@@ -247,7 +241,6 @@ function mapPoint(
     y: after.y + ((point.y - before.y) / before.height) * after.height,
   })
 }
-
 function estimatedTextHeight(
   content: RichTextContent,
   width: number,
@@ -259,22 +252,35 @@ function estimatedTextHeight(
     .reduce((total, line) => total + Math.max(1, Math.ceil((line.length * characterWidth) / width)), 0)
   return Math.max(fontSize * 1.25, lines * fontSize * 1.25)
 }
-
 function resizeRuler(
-  layer: Extract<LayerNode, { readonly kind: 'ruler' }>,
+  layer: Extract<LayerNode, {
+    readonly kind: 'ruler'
+  }>,
   handle: 'start' | 'end',
   point: Point,
   options: ResizeLayerGeometryOptions,
 ): LayerNode {
-  if (!options.canvas) throw new Error('ruler resize requires canvas dimensions')
-  const next = localPoint(layer, point)
+  if (!options.canvas)
+    throw new Error('ruler resize requires canvas dimensions')
   const other = handle === 'start' ? layer.payload.end : layer.payload.start
-  if (next.x === other.x && next.y === other.y) return layer
-  return rebaseRulerLayer(layer, Object.freeze({ ...layer.payload, [handle]: next }), options.canvas)
+  const candidate = options.snapAngleIncrementDegrees
+    ? snapRulerEndpoint(
+      transformPoint(transformToMatrix(layer.transform), other),
+      point,
+      options.snapAngleIncrementDegrees,
+    ).end
+    : point
+  const next = localPoint(layer, candidate)
+  if (next.x === other.x && next.y === other.y)
+    return layer
+  return rebaseRulerLayer(layer, Object.freeze({
+    ...layer.payload, [handle]: next,
+  }), options.canvas)
 }
-
 function resizeText(
-  layer: Extract<LayerNode, { readonly kind: 'text' }>,
+  layer: Extract<LayerNode, {
+    readonly kind: 'text'
+  }>,
   requested: Rect,
 ): LayerNode {
   const bounds = Object.freeze({
@@ -295,14 +301,16 @@ function resizeText(
     }),
   })
 }
-
 function resizeLoupe(
-  layer: Extract<LayerNode, { readonly kind: 'loupe' }>,
+  layer: Extract<LayerNode, {
+    readonly kind: 'loupe'
+  }>,
   requested: Rect,
   handle: BoundsResizeHandle,
   options: ResizeLayerGeometryOptions,
 ): LayerNode {
-  if (!options.canvas) throw new Error('loupe resize requires canvas dimensions')
+  if (!options.canvas)
+    throw new Error('loupe resize requires canvas dimensions')
   const source = layer.payload.sourceRegion
   const sourceCentre = {
     x: source.x + source.width / 2,
@@ -321,7 +329,7 @@ function resizeLoupe(
     handle,
     options.fromCenter === true,
     Math.max(16, (minimumSourceHalfSize * 2 + 1e-6) * layer.payload.zoom),
-    2_048,
+    2048,
   )
   const sourceSize = bounds.width / layer.payload.zoom
   const sourceRegion = Object.freeze({
@@ -337,52 +345,54 @@ function resizeLoupe(
     payload: Object.freeze({
       ...layer.payload,
       sourceRegion,
-      lens: Object.freeze({ ...layer.payload.lens, size: bounds.width }),
+      lens: Object.freeze({
+        ...layer.payload.lens, size: bounds.width,
+      }),
     }),
   })
 }
-
 function resizePointLayer(
-  layer: Extract<LayerNode, { readonly kind: 'pencil' | 'marker' }>,
+  layer: Extract<LayerNode, {
+    readonly kind: 'pencil' | 'marker'
+  }>,
   requested: Rect,
 ): LayerNode {
-  const points = (layer.payload.points as unknown as readonly (Point & Readonly<{ readonly pressure: number }>)[]).map(
-    (sample) =>
-      Object.freeze({
-        ...mapPoint(sample, layer.localBounds, requested),
-        pressure: sample.pressure,
-      }),
-  )
+  const points = (layer.payload.points as unknown as readonly (Point & Readonly<{
+    readonly pressure: number
+  }>)[]).map((sample) => Object.freeze({
+    ...mapPoint(sample, layer.localBounds, requested),
+    pressure: sample.pressure,
+  }))
   return Object.freeze({
     ...layer,
     localBounds: requested,
-    payload: Object.freeze({ ...layer.payload, points: Object.freeze(points) }),
+    payload: Object.freeze({
+      ...layer.payload, points: Object.freeze(points),
+    }),
   }) as LayerNode
 }
-
 function resizeFreeformCensor(
-  layer: Extract<LayerNode, { readonly kind: 'censor' }>,
+  layer: Extract<LayerNode, {
+    readonly kind: 'censor'
+  }>,
   requested: Rect,
 ): LayerNode {
-  const points =
-    layer.payload.region.kind === 'freeform'
-      ? layer.payload.region.points.map(
-          (sample) =>
-            Object.freeze({
-              ...mapPoint(sample, layer.localBounds, requested),
-            }) as Point & JsonObject,
-        )
-      : []
+  const points = layer.payload.region.kind === 'freeform'
+    ? layer.payload.region.points.map((sample) => Object.freeze({
+        ...mapPoint(sample, layer.localBounds, requested),
+      }) as Point & JsonObject)
+    : []
   return Object.freeze({
     ...layer,
     localBounds: requested,
     payload: Object.freeze({
       ...layer.payload,
-      region: Object.freeze({ kind: 'freeform' as const, points }),
+      region: Object.freeze({
+        kind: 'freeform' as const, points,
+      }),
     }),
   })
 }
-
 export function resizeLayerGeometry(
   layer: LayerNode,
   handle: IntrinsicResizeHandle,
@@ -390,7 +400,8 @@ export function resizeLayerGeometry(
   options: ResizeLayerGeometryOptions = {},
 ): LayerNode {
   assertLayerEditableScale(layer)
-  if (layer.locked) throw new Error(`layer ${layer.id} is locked`)
+  if (layer.locked)
+    throw new Error(`layer ${layer.id} is locked`)
   const capability = layerResizeCapability(layer)
   if (capability === 'ruler') {
     if (
@@ -408,32 +419,40 @@ export function resizeLayerGeometry(
   if (!layerIntrinsicResizeHandles(layer).includes(handle)) {
     throw new Error(`${layer.kind} does not support ${handle} intrinsic resize`)
   }
-
   const local = localPoint(layer, point)
   const requested = resizedBounds(layer.localBounds, handle, local, options)
-
-  if (layer.kind === 'text') return resizeText(layer, requested)
-
+  if (layer.kind === 'text')
+    return resizeText(layer, requested)
   if (layer.kind === 'emoji') {
     return Object.freeze({
       ...layer,
       localBounds: squareBounds(layer.localBounds, requested, handle, options.fromCenter === true),
     })
   }
-
-  if (layer.kind === 'loupe') return resizeLoupe(layer, requested, handle, options)
-
-  if (layer.kind === 'pencil' || layer.kind === 'marker') return resizePointLayer(layer, requested)
-
-  if (layer.kind === 'censor' && layer.payload.region.kind === 'freeform') return resizeFreeformCensor(layer, requested)
-
-  if (
-    layer.kind === 'shape' ||
-    layer.kind === 'spotlight' ||
-    layer.kind === 'censor'
-  ) {
-    return Object.freeze({ ...layer, localBounds: requested }) as LayerNode
+  if (layer.kind === 'loupe')
+    return resizeLoupe(layer, requested, handle, options)
+  if (layer.kind === 'pencil' || layer.kind === 'marker')
+    return resizePointLayer(layer, requested)
+  if (layer.kind === 'censor' && layer.payload.region.kind === 'freeform')
+    return resizeFreeformCensor(layer, requested)
+  if (layer.kind === 'spotlight') {
+    return {
+      ...layer, localBounds: requested, payload: {
+        ...layer.payload, apertures: layer.payload.apertures.map((aperture) => ({
+          ...aperture, bounds: {
+            ...mapPoint(aperture.bounds, layer.localBounds, requested),
+            width: aperture.bounds.width * requested.width / layer.localBounds.width,
+            height: aperture.bounds.height * requested.height / layer.localBounds.height,
+          },
+        })),
+      },
+    }
   }
-
+  if (layer.kind === 'shape' ||
+    layer.kind === 'censor') {
+    return Object.freeze({
+      ...layer, localBounds: requested,
+    }) as LayerNode
+  }
   throw new Error(`${layer.kind} does not support intrinsic bounds resize`)
 }

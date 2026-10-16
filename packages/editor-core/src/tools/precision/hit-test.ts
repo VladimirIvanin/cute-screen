@@ -7,6 +7,7 @@ import type {
 } from '../../document/types'
 import { pointInPolygon } from './polygon'
 import { rulerVisualGeometry } from './ruler'
+import { spotlightApertureAt } from './spotlight'
 import { RULER_HIT_PADDING } from './shared'
 
 function rulerTickHalfLength(thickness: number): number {
@@ -38,17 +39,7 @@ export function precisionLayerHitPart(
       : undefined
   }
   if (layer.kind === 'spotlight') {
-    const centerX = bounds.x + bounds.width / 2
-    const centerY = bounds.y + bounds.height / 2
-    const normalizedX = (point.x - centerX) / (bounds.width / 2)
-    const normalizedY = (point.y - centerY) / (bounds.height / 2)
-    const inside =
-      layer.payload.shape === 'rectangle'
-        ? true
-        : layer.payload.shape === 'ellipse'
-          ? normalizedX ** 2 + normalizedY ** 2 <= 1
-          : Math.abs(normalizedX) + Math.abs(normalizedY) <= 1
-    return inside ? 'fill' : undefined
+    return spotlightApertureAt(layer, point) ? 'fill' : undefined
   }
   if (layer.kind === 'ruler') {
     const start = layer.payload.start

@@ -4,6 +4,8 @@ import {
   expect,
 } from '@wdio/globals'
 import path from 'node:path'
+import { verifyShapeDefaultsPlacement } from '../shape-defaults-placement'
+import { verifyNumericOpacity } from '../numeric-controls'
 import {
   openDrawingHarness,
   setShellPreferences,
@@ -18,6 +20,11 @@ import {
 } from '../shape-toolbar'
 
 describe('compact shape toolbar', () => {
+  it('keeps nested shape defaults beside their trigger after selecting a callout', async () => {
+    await browser.setWindowSize(1024, 700)
+    await openDrawingHarness()
+    await verifyShapeDefaultsPlacement('artifacts/browser-e2e', 'callout-shape-defaults')
+  })
   it('edits every catalogue figure and preserves the object preview at 1024px', async () => {
     await browser.setWindowSize(1024, 700)
     await openDrawingHarness()
@@ -34,6 +41,7 @@ describe('compact shape toolbar', () => {
     await browser.setWindowSize(1024, 700)
     await openDrawingHarness()
     await verifyShapeToolbar('artifacts/browser-e2e', 'shape')
+    await verifyNumericOpacity('artifacts/browser-e2e', 'numeric-editor')
     const shape = (await shapeDocument()).layers.at(-1)!
     expect(shape).toMatchObject({ kind: 'shape', opacity: 0.75, blendMode: 'multiply', payload: { cornerRadius: 12, fill: { kind: 'solid', color: { red: 0.2, green: 0.4, blue: 0.6 } }, stroke: { width: 8 } } })
     for (const locale of ['en', 'ru'] as const) {

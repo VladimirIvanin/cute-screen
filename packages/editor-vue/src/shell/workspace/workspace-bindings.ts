@@ -53,6 +53,7 @@ function createSchemas(context: WorkspaceBindingsContext) {
     hasCanvas: computed(() => Boolean(workspace.activeDocument.value)),
   })
   const precision = createPrecisionSchema({
+    spotlightEditing: workspace.spotlightEditing,
     props,
     state,
     store,
@@ -167,6 +168,7 @@ function createEffects(
   const target = createSettingsTarget(context)
   const { settingsStore, settingsTool, selected, effectProps } = target
   const precision = createPrecisionEffects({
+    apertureId: () => workspace.spotlightEditing.value?.apertureId,
     props: effectProps,
     activeDocument: workspace.activeDocument,
     precisionDefaults: workspace.precisionDefaults,
@@ -221,7 +223,48 @@ function createEffects(
     applyImageChange: image.applyImageChange,
     applyDrawingChange: drawing.applyDrawingChange,
   })
-  return { precision, contextEffects: createSelectionSettingsChange(context, contextEffects, target) }
+  function numericCommands(
+    id: string,
+    value: string,
+  ): EditorCommand[] {
+    const layers =
+      workspace.activeDocument.value?.layers.filter((layer) => store.selectedLayerIds.includes(layer.id)) ?? []
+    if (context.props.readOnlyDocument || layers.some((layer) => layer.locked)) return []
+    const resolve = (key: string): EditorCommand | undefined => {
+      const textCommand = text.resolveChange(key, value)
+      if (textCommand) return textCommand
+      const effects = [
+        drawing.resolveChange(key, value),
+        precision.resolveChange(key, value),
+        image.resolveChange(key, value),
+      ]
+      for (const effect of effects) {
+        if (effect.kind === 'command') return effect.command
+      }
+      return undefined
+    }
+    if (!isSelectionStyleTarget(context, layers)) {
+      const command = resolve(id)
+      return command ? [command] : []
+    }
+    const commands: EditorCommand[] = []
+    try {
+      for (const layer of layers) {
+        workspace.settingsLayerId.value = layer.id
+        const command = resolve(id === 'width' && layer.kind === 'ruler' ? 'rulerThickness' : id)
+        if (command) commands.push(command)
+      }
+    } finally {
+      workspace.settingsLayerId.value = undefined
+    }
+    return commands
+  }
+  return {
+    precision,
+    numericCommands,
+    previewInline: text.previewInline,
+    contextEffects: createSelectionSettingsChange(context, contextEffects, target),
+  }
 }
 
 function createSelectionSettingsChange(
@@ -337,6 +380,12 @@ function createControllers(
 ) {
   const { props, store, workspace, translate } = context
   const actions = createContextActions({
+    spotlightEditing: workspace.spotlightEditing,
+    selectedLayerId: () => store.selectedLayerIds.length === 1 ? store.selectedLayerId : undefined,
+    locale: () => schemas.state.locale.value,
+    reportFeedback: (message) => {
+      workspace.eyedropperFeedback.value = message
+    },
     props,
     canvas: workspace.canvasViewport,
     cropPreset: workspace.cropPreset,
@@ -410,6 +459,8 @@ export function createWorkspaceBindings(context: WorkspaceBindingsContext) {
     floatingArrowToolbarSchema: schemas.contextSchema.floatingArrowToolbarSchema,
     toolConfigureArrowSchema: schemas.contextSchema.toolConfigureArrowSchema,
     onContextChange: effects.contextEffects.onContextChange,
+    numericCommands: effects.numericCommands,
+    previewInline: effects.previewInline,
     ...controllers.actions,
     ...controllers.toolUi,
     ...controllers.layers,

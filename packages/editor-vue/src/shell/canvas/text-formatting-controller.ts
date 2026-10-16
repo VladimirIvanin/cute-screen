@@ -6,6 +6,7 @@ import {
 import {
   richTextSelectionRange,
   type RichTextParagraphStyle,
+  type RichTextEditingState,
   type RichTextSpanStyle,
   type SrgbColor,
   type TextBackground,
@@ -118,11 +119,32 @@ export interface TextFormattingContext {
 }
 
 function registerFormattingWatches(context: TextFormattingContext): void {
+  let numericBefore: {
+    id: string
+    state: RichTextEditingState
+    background: TextBackground | null
+  } | undefined
   watch(
     () => context.props.textFormatting,
     (patch) => {
       const editing = context.editingText.value
       if (!editing || !patch) return
+      if (numericBefore && numericBefore.id !== editing.id) numericBefore = undefined
+      if (numericBefore) {
+        editing.controller.restoreState(numericBefore.state)
+        editing.background = numericBefore.background
+      }
+      if (patch.preview && !numericBefore) numericBefore = {
+        id: editing.id,
+        state: editing.controller.state,
+        background: editing.background,
+      }
+      if (!patch.preview) numericBefore = undefined
+      if (patch.cancelPreview) {
+        context.renderProjection()
+        emitTextEditing(context)
+        return
+      }
       if (patch.span) editing.controller.applySpanStyle(patch.span)
       if (patch.paragraph) {
         editing.controller.applyParagraphStyle(patch.paragraph)

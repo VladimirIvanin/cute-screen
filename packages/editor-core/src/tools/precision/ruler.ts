@@ -39,10 +39,10 @@ function rulerSnap(value: number | undefined): number {
   const snap = value ?? 15
   if (
     !Number.isFinite(snap) ||
-    snap <= 0 ||
+    snap < 1 ||
     snap > 90
   )
-    throw new RangeError('ruler snap angle increment must be between 0 and 90')
+    throw new RangeError('ruler snap angle increment must be between 1 and 90')
   return snap
 }
 

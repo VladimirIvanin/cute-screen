@@ -1,5 +1,78 @@
 # Трассируемость требований
 
+## Карандаш, составной фонарь и измерения (2026-10-16)
+
+`REQ-TOL-003/009/010`, `REQ-EDT-002/015/016/017`, `REQ-UI-001/003/004/006/007`:
+четыре компактных контрола для каждого инструмента; общий numeric preview adapter.
+Перед реализацией core требуются failing tests сглаживания, областей фонаря,
+codec и resize. Обязательны объединённая маска без внутренних швов, decoded exports,
+отмена и одна undo-команда, production editor/Quick, keyboard и clipboard failure.
+Реализовано в core, обоих renderer backend и общей editor/Quick панели.
+Core geometry/codec, mounted UI, renderer decoded exports, 4K/8K и dedicated
+Chrome/WebView2 flow пройдены; результаты и границы платформенного evidence —
+TESTING.md. Отдельный native launch подтверждает сохранённые документ/defaults.
+Покрыты все 23 browser specs и 22 native scenarios с успешными изолированными
+повторами сбоев общего прогона; эти повторы явно отделены в отчёте.
+
+## Иконка Shape (2026-10-16)
+
+`REQ-UI-001/006`: семантическая иконка `shape` использует Tabler `circle-square`
+через общий `UiIcon`. Проверка: существующий SVG-контракт `ui-icon.test.ts`.
+
+## Собственные UI-иконки рядом с Tabler (2026-10-16)
+
+`REQ-EDT-008`, `REQ-UI-001/003/006/007`: единый typed `UiIcon` сохраняет
+Tabler и добавляет проектные marker/pencil/eyedropper с различимыми силуэтами.
+Доказательство: полный SVG-контракт каталога, import boundary,
+dev-preview 16/18/20/24/32 px, raster review при DPR 1/2, RU/EN × light/dark,
+keyboard/focus/disabled и production Capture → Quick → Editor в WebView2.
+Реализовано: 70 SVG/attrs tests, browser gallery и dedicated WebView2 capture
+flow ранней редакции. Финальная native visual проверка pending из-за текущих
+build errors параллельного core среза. Проверки и артефакты — TESTING.md;
+WebKit evidence pending.
+
+## Числовые параметры и живой draft (2026-10-15)
+
+`REQ-EDT-008/009/015/016/017`, `REQ-TOL-001/002/003/004/005`,
+`REQ-UI-003/004/006/007`: числовые параметры используют общий адаптер,
+точный ввод, компактные группы пресетов и отменяемый предпросмотр.
+Preview не меняет document session, autosave или preferences; подтверждение
+создаёт одну команду, мультивыбор — один batch. Inline text сохраняет собственную
+границу подтверждения. Масштаб холста исключён из изменений. Реализованы общий
+Naive UI adapter, display-only RAF projection, синхронизация точного поля,
+слайдера и пресетов, отмена при смене контекста и блокировка read-only.
+Component/integration, browser и Windows WebView2 production flow проверены;
+4K render test сравнивает декодированные preview/commit/export. Фактические
+команды и границы доказательств — TESTING.md, ADR-054.
+
+## Вложенные настройки фигуры после выделения сноски (2026-10-16)
+
+`REQ-EDT-015/016`, `REQ-UI-003/006/007`: выделить сноску обычным canvas input,
+открыть defaults фигуры через ПКМ и меню «Наложение». Вложенная панель должна
+оставаться рядом с trigger, учитывать актуальную позицию родительской панели
+и доступный viewport, сохранять selection и документ. Проверка переключения
+меню и повторного открытия — browser и real WebView; evidence — TESTING.md.
+Исправление подтверждено isolated Windows WebView2 в Quick/editor: gap 8–14 px,
+Escape/focus и документ сохранены. Unit/component — 646/646, boundaries — 40/40;
+отдельный native scenario `shape-defaults-placement` — 1/1 passed.
+
+## Компоновка палитры и свой цвет (2026-10-15)
+
+`REQ-EDT-008/015/016`, `REQ-UI-001/003/006/007`: drawing palette содержит два
+полных ряда по десять цветов; custom action отделён сбоку. Увеличенный интервал
+оставляет свободное место вокруг selection/focus ring. Градиент рисуется только
+внутри отдельного круглого swatch, без цветных краёв кнопки и секторного круга.
+Проверить selection/defaults/embedded, keyboard, обе темы и закрытие без скачка
+через browser и real WebView; результаты — TESTING.md.
+
+## Закрытие палитры без скачка (2026-10-15)
+
+`REQ-EDT-008/015/016`, `REQ-UI-003/006/007`: manually positioned popover
+сохраняет последние координаты до конца leave transition. Выбор preset/custom
+цвета, Escape и click outside не переносят ещё видимую панель в начало editor.
+Browser и real-WebView regression записывают геометрию каждого animation frame
+при закрытии; результаты и ограничения — TESTING.md.
+
 ## Курсоры crop handles (2026-10-15)
 
 `REQ-TOL-013`, `REQ-UI-005`: восемь crop handles показывают соответствующие
@@ -179,7 +252,18 @@ Foundation harness не создаёт отдельного продуктово
 
 ## Читаемый знак приложения и трея (2026-10-15)
 
-До реализации уточнены `REQ-ACT-006` и `REQ-UI-013`: tray использует отдельный
+Обновление контракта до реализации (2026-10-16), `REQ-ACT-006`, `REQ-UI-013`,
+ADR-057: выбран монитор с кошачьими ушами, двумя крупными изогнутыми прищурами
+и подставкой. `logo.svg`/editor/favicon/bundle и отдельный прозрачный
+`logo-mark.svg` генерируются из общего источника. Windows/Linux tray сохраняет
+светлую форму, внешний тёмный контур и тёмные прищуры; macOS — alpha template
+с прозрачными прищурами. Требуемое evidence: red-first Rust decode/alpha/contrast
+tests для глаз и подставки, повторное декодирование PNG/ICO/ICNS, размерный review
+16/20/24/32 px и реальные platform smokes. Старый GNOME smoke ниже относится
+к предыдущей геометрии; для нового знака native runtime пока pending.
+
+Историческая запись для предыдущего знака (2026-10-15):
+до реализации уточнены `REQ-ACT-006` и `REQ-UI-013`: tray использует отдельный
 прозрачный знак без цветной плитки, с крупным силуэтом кота без рамок и мелких деталей. Windows
 и Linux получают светлый знак с тёмным контуром; macOS — alpha template с
 прозрачным фоном и системной окраской. Логотип редактора и bundle icons
@@ -797,3 +881,37 @@ dimension badge remains 28 CSS px high.
 | Требование        | Доказательство до реализации                                                                                                                                                                                                                                                                                                                                           | Статус                                                                                                                                          |
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | `REQ-CAP-012/013` | Regression: 400×300 preview растянут до 1440×1080 CSS px; пунктир/handles/badge должны растеризоваться в display resolution × DPR и сохранять CSS размеры. Vue controller/pixel tests при zoom >1, <1 и DPR 1/2; real-WebKitGTK screenshot сравнивается с приложенным blurred кадром. Scene pixels, crop commands, hit coordinates и export остаются в document space. | implemented; pixel/controller regressions 14/14, full unit 522/522, check passed; real WebKitGTK 3/3 and before/after screenshots in TESTING.md |
+
+## Spotlight icon concepts · 2026-10-16
+
+`REQ-EDT-008`, `REQ-TOL-009`: compare three dev-only icon proposals (hand torch,
+clear window in a dimmed area, light cone) at 18 px beside Tabler in both themes.
+The existing production `spotlight` mapping remains in use pending visual selection.
+Evidence: `artifacts/custom-icons/spotlight-proposals/`.
+
+Refinement from the user's sketch: a clear horizontal rectangle with diagonal
+hatching around it; compare sparse, balanced and dense hatching in the dev gallery
+at 18 px in both themes. Evidence: `artifacts/custom-icons/spotlight-hatching/`.
+
+The first hatch refinement was rejected: disconnected accents did not form a
+uniform background. The next dev comparison uses one continuous 45-degree lattice
+with constant spacing, with either a clear window or uninterrupted lines.
+Evidence: `artifacts/custom-icons/spotlight-uniform/`.
+
+User selected the clear-window concept and requested a second version with hatch
+lines meeting its outline. Compare the original clearance against zero clearance;
+both retain the same angle and spacing. Evidence: `artifacts/custom-icons/spotlight-joined/`.
+
+Approved adoption: `spotlight` now uses the joined hatch/window geometry through
+the existing `UiIcon` mapping. Validate the complete SVG catalog, production
+tool selection/disabled states in RU/EN and both themes, and native Quick→Editor.
+Evidence: `artifacts/custom-icons/spotlight-adopted/` and adjacent command logs.
+Passed on Windows: SVG catalog 70/70, browser 2/2, WebView2 custom-icons 1/1,
+full test 709/709, format, format:check and check. WebKit remains unverified.
+
+## Censor icon concepts · 2026-10-16
+
+`REQ-EDT-008`, `REQ-TOL-008`: dev-only comparison of pixel mosaic (user reference),
+redaction bar and blurred fragment. Review at 18 px beside the adopted spotlight
+and Tabler in both themes. Keep production `privacy` mapping until selection.
+Evidence: `artifacts/custom-icons/censor-proposals/`.

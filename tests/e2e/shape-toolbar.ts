@@ -5,6 +5,7 @@ import {
   expect,
 } from '@wdio/globals'
 import path from 'node:path'
+import { setNumericInput } from './numeric-input'
 import { waitForStableCanvas } from './canvas-ready'
 
 export async function waitForShapeAnimation(): Promise<void> {
@@ -22,6 +23,7 @@ export async function waitForShapeAnimation(): Promise<void> {
 }
 
 export async function drawShape(): Promise<void> {
+  await expect($('.cs-canvas-ready')).toExist()
   await $('button[aria-label="Shape"]').click()
   await waitForStableCanvas()
   const points = await browser.execute(() => {
@@ -69,7 +71,7 @@ export async function verifyShapeToolbar(
   await $('.cs-shape-fill-options').$('button=No fill').click()
   await browser.keys('Escape')
   await toolbar.$('[data-shape-control="stroke"]').click()
-  await $('.cs-shape-popover').$('button=8 px').click()
+  await $('.cs-shape-popover').$('button[aria-label="8 px"]').click()
   await browser.keys('Escape')
   expect(await toolbar.$('[data-shape-control="stroke"]').getAttribute('aria-label')).toMatch(/Stroke: .* · 8 px/u)
   await expect(toolbar.$('[data-shape-control="stroke"]')).toBeFocused()
@@ -77,10 +79,11 @@ export async function verifyShapeToolbar(
   expect(await $$('.cs-shape-grid button').length).toBe(31)
   await expect($('.cs-shape-popover input[aria-label="Star points"]')).not.toExist()
   const radius = $('.cs-shape-popover input[aria-label="Corner radius"]')
-  await radius.setValue('12')
+  await setNumericInput(radius, '12')
   await browser.keys('Enter')
   await browser.keys('Escape')
   await toolbar.$('[data-shape-control="fill"]').click()
+  await waitForShapeAnimation()
   await $('.cs-shape-popover button[aria-label="Custom colour"]').click()
   const hex = $('.cs-shape-popover input[aria-label="HEX colour code"]')
   await waitForShapeAnimation()
@@ -105,7 +108,7 @@ export async function verifyShapeToolbar(
   await $('button[aria-label="Redo"]').click()
   await expect(toolbar.$('[data-shape-control="fill"]')).toHaveAttribute('aria-label', 'Fill: Colour')
   await toolbar.$('[data-shape-control="appearance"]').click()
-  await $('.cs-shape-popover input[aria-label="Opacity"]').setValue('75')
+  await setNumericInput($('.cs-shape-popover input[aria-label="Opacity"]'), '75')
   await browser.keys('Enter')
   await $('.cs-shape-popover select').selectByAttribute('value', 'multiply')
   await browser.keys('Escape')
@@ -157,7 +160,7 @@ export async function verifyShapeDefaults(): Promise<void> {
     return panel.right <= left || panel.left >= left + width || panel.bottom <= top || panel.top >= top + height
   })
   expect(defaultsPreviewVisible).toBe(true)
-  await $('.cs-shape-popover').$('button=2 px').click()
+  await $('.cs-shape-popover').$('button[aria-label="2 px"]').click()
   await browser.keys('Escape')
   await expect($('.cs-shape-popover')).not.toExist()
   await expect(defaults).toBeDisplayed()
@@ -174,16 +177,21 @@ export async function verifyShapeCatalogue(
 ): Promise<void> {
   const geometry = $('.cs-selection-floating-toolbar [data-shape-control="geometry"]')
   await geometry.click()
+  await expect($('.cs-shape-grid')).toBeDisplayed()
   await waitForShapeAnimation()
   const entries = await browser.execute(() => [...document.querySelectorAll<HTMLElement>('[data-shape-id]')]
     .map((element) => element.dataset.shapeId!))
   expect(entries.length).toBe(31)
   for (const id of entries) {
-    if (!(await $('.cs-shape-grid').isExisting())) await geometry.click()
+    if (await geometry.getAttribute('aria-expanded') !== 'true') await geometry.click()
+    await expect($('.cs-shape-grid')).toBeDisplayed()
+    await waitForShapeAnimation()
     await $(`[data-shape-id="${id}"]`).click()
     await browser.waitUntil(async () => (await shapeDocument()).layers.at(-1)?.payload.shape ===
       (id === 'roundedRectangle' ? 'rectangle' : id), { timeoutMsg: `Shape ${id} was not committed` })
-    if (await $('.cs-shape-grid').isExisting()) await browser.keys('Escape')
+    if (await geometry.getAttribute('aria-expanded') === 'true') await browser.keys('Escape')
+    await expect(geometry).toHaveAttribute('aria-expanded', 'false')
+    await waitForShapeAnimation()
   }
   await $('.cs-selection-floating-toolbar [data-shape-control="stroke"]').click()
   await $('.cs-shape-popover button[aria-label="Blue"]').click()
@@ -205,7 +213,8 @@ export async function verifyShapeCatalogue(
       cells: cells.every((rect) => rect.width === 32 && rect.height === 32),
       icons: icons.every((rect) => rect.width === 20 && rect.height === 20),
       columns: cells.filter((rect) => Math.abs(rect.top - cells[0]!.top) < 1).length,
-      compactParameters: inputs.length === 2 && Math.abs(inputs[0]!.top - inputs[1]!.top) < 1,
+      compactParameters: inputs.length === 2 && inputs.every((rect) => rect.width <= 88 && rect.height <= 32) &&
+        menu.querySelector('.cs-shape-dimensions')!.getBoundingClientRect().height <= 120,
       heading: Boolean(menu.querySelector('.cs-shape-popover-title')),
       fits: bounds.left >= 0 && bounds.top >= 0 && bounds.right <= innerWidth && bounds.bottom <= innerHeight,
     }

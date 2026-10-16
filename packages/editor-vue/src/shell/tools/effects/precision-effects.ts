@@ -14,6 +14,7 @@ import { resolveRulerEffect } from './precision-ruler'
 import { resolveSpotlightEffect } from './precision-spotlight'
 
 export interface PrecisionEffectsContext {
+  readonly apertureId?: (() => string | undefined) | undefined
   readonly props: ResolvedEditorShellProps
   readonly activeDocument: Ref<EditorDocumentV1 | undefined>
   readonly precisionDefaults: ShallowRef<PrecisionToolDefaults>
@@ -51,6 +52,7 @@ function resolvePrecisionEffect(
   if (tool === 'spotlight') {
     return resolveSpotlightEffect(id, value, {
       ...common,
+      apertureId: context.apertureId?.(),
       selected: selected?.kind === 'spotlight' ? selected : undefined,
     })
   }
@@ -90,5 +92,9 @@ export function createPrecisionEffects(context: PrecisionEffectsContext) {
       (selected?.kind === tool && Boolean(selected.locked))
     )
   }
-  return { applyPrecisionChange, precisionChangeBlocked }
+  return {
+    resolveChange: (id: string, value: string) => resolvePrecisionEffect(context, id, value),
+    applyPrecisionChange,
+    precisionChangeBlocked,
+  }
 }

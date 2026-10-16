@@ -43,7 +43,7 @@ function isEditingTarget(target: EventTarget | null): boolean {
     (target instanceof HTMLElement &&
       (target.isContentEditable ||
         Boolean(
-          target.closest('input, textarea, select, [role="slider"], [role="combobox"], [role="menu"], [role="dialog"]'),
+          target.closest('button:disabled, input, textarea, select, [role="slider"], [role="combobox"], [role="menu"], [role="dialog"]'),
         )))
   )
 }

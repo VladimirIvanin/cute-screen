@@ -62,6 +62,7 @@ export type CanvasGesture =
     readonly centerResize: boolean
   }
   | {
+    readonly snapAngleIncrementDegrees?: number | undefined
     readonly kind: 'intrinsicResize'
     readonly id: string
     readonly handle: IntrinsicResizeHandle
@@ -123,6 +124,8 @@ export type CanvasGesture =
     readonly current: CanvasPoint
   }
   | {
+    readonly precisionDefaults?: PrecisionToolDefaults | undefined
+    readonly rawCurrent?: CanvasPoint | undefined
     readonly kind: 'precision'
     readonly tool: 'censor' | 'spotlight' | 'ruler' | 'loupe'
     readonly start: CanvasPoint

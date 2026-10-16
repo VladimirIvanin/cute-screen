@@ -226,6 +226,7 @@ export class CanvasGeometryController {
     if (gesture.kind === 'intrinsicResize') {
       return resizeLayerGeometry(layer, gesture.handle, gesture.current, {
         preserveAspect: gesture.preserveAspect,
+        snapAngleIncrementDegrees: gesture.snapAngleIncrementDegrees,
         fromCenter: gesture.centerResize,
         ...(this.#context.props.document === undefined ? {} : { canvas: this.#context.props.document.canvas }),
       })

@@ -94,6 +94,25 @@ async function draw(
   })
 }
 describe('consistent tool UX through the mounted shell', () => {
+  it('uses common properties for an arrow and pencil regardless of their order', async () => {
+    const arrow = arrowDocument().layers[0]!
+    const pencil = createDrawingLayer({
+      id: '019c1f62-058e-7000-8000-000000000099',
+      tool: 'pencil', start: { x: 10, y: 10 }, end: { x: 30, y: 30 },
+    })!
+    for (const layers of [[arrow, pencil], [pencil, arrow]]) {
+      const app = mount({ ...arrowDocument(), layers })
+      app.store.selectTool('select')
+      app.store.selectLayer(layers[0]!.id)
+      app.store.selectLayer(layers[1]!.id, true)
+      await nextTick()
+      const toolbar = app.view.container.querySelector('.cs-selection-floating-toolbar') as HTMLElement
+      expect(toolbar.querySelector('.cs-arrow-formatting-toolbar')).toBeNull()
+      expect(toolbar.querySelector('[data-tool-settings]')).toBeNull()
+      expect(toolbar.querySelector('input[aria-label="Width"]')).toBeInTheDocument()
+      app.close()
+    }
+  })
   it('does not reset source analysis on annotation, undo, crop or zoom changes', async () => {
     const reset = vi.spyOn(HighlighterBackgroundController.prototype, 'reset')
     const app = mount()
@@ -416,12 +435,16 @@ describe('consistent tool UX through the mounted shell', () => {
   })
   it('commits text once, keeps text/callout/number defaults independent and cancels drafts', async () => {
     const app = mount()
-    await fireEvent.click(screen.getByRole('button', { name: 'Text' }))
+    const rail = within(app.view.container.querySelector<HTMLElement>('.cs-toolrail')!)
+    const fontSize = () => within(app.view.container.querySelector<HTMLElement>('.cs-text-toolbar')!)
+      .getByRole('button', { name: 'Font size' })
+    await fireEvent.click(rail.getByRole('button', { name: 'Text' }))
     await draw(app.scene)
     const editor = screen.getByRole('textbox', { name: 'Text editor' })
     const toolbar = app.view.container.querySelector('.cs-text-floating-toolbar-host') as HTMLElement
     await fireEvent.click(within(toolbar).getByRole('button', { name: 'Font size' }))
-    await fireEvent.click(screen.getByRole('button', { name: '32' }))
+    const sizes = await screen.findByRole('dialog', { name: 'Font size' })
+    await fireEvent.click(within(sizes).getByRole('button', { name: '32 px' }))
     editor.textContent = 'Hello 😀'
     await fireEvent.input(editor)
     await fireEvent.keyDown(editor, { key: 'Enter', ctrlKey: true })
@@ -430,12 +453,12 @@ describe('consistent tool UX through the mounted shell', () => {
       kind: 'text',
       payload: { content: { text: 'Hello 😀', spans: [{ fontSize: 32 }] } },
     })
-    await fireEvent.click(screen.getByRole('button', { name: 'Callout' }))
-    expect(screen.getByRole('button', { name: 'Font size' })).toHaveTextContent('24')
-    await fireEvent.click(screen.getByRole('button', { name: 'Numbered marker' }))
-    expect(screen.getByRole('button', { name: 'Font size' })).toHaveTextContent('16')
-    await fireEvent.click(screen.getByRole('button', { name: 'Text' }))
-    expect(screen.getByRole('button', { name: 'Font size' })).toHaveTextContent('32')
+    await fireEvent.click(rail.getByRole('button', { name: 'Callout' }))
+    expect(fontSize()).toHaveTextContent('24')
+    await fireEvent.click(rail.getByRole('button', { name: 'Numbered marker' }))
+    expect(fontSize()).toHaveTextContent('16')
+    await fireEvent.click(rail.getByRole('button', { name: 'Text' }))
+    expect(fontSize()).toHaveTextContent('32')
     await draw(app.scene, 95)
     const cancelled = screen.getByRole('textbox', { name: 'Text editor' })
     cancelled.textContent = 'Cancelled'

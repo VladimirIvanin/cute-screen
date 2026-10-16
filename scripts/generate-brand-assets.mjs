@@ -10,7 +10,9 @@ import {
 } from '@napi-rs/canvas'
 
 // Original Cute Screen artwork, MIT. Keep the same bold geometry in every size.
-const cat = 'M5 5L12 11H20L27 5V23A4 4 0 0 1 23 27H9A4 4 0 0 1 5 23Z'
+const monitorCat = 'M4 4L11 9H21L28 4V22A2 2 0 0 1 26 24H18V27H23V29H9V27H14V24H6A2 2 0 0 1 4 22Z'
+const squintEyes = 'M8 14H11C11 18 14 19 16 15C18 19 21 18 21 14H24C24 21 19 23 16 19C13 23 8 21 8 14Z'
+const mark = `${monitorCat}${squintEyes}`
 const svg = (content, size = 32) =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 32 32">
   ${content}
@@ -18,11 +20,17 @@ const svg = (content, size = 32) =>
 `
 const app = svg(
   `<rect width="32" height="32" rx="7" fill="#231F26"/>
-  <path d="${cat}" fill="#FFFFFF"/>`,
+  <path d="${mark}" fill="#FFFFFF" fill-rule="evenodd"/>`,
   512,
 )
-const tray = svg(`<path d="${cat}" fill="#FFFFFF" stroke="#231F26" stroke-width="2" stroke-linejoin="round"/>`)
-const template = svg(`<path d="${cat}" fill="#000000"/>`)
+// Paint the silhouette over its stroke: the outline stays outside, preserving
+// the white two-pixel foot. Do not stroke the eyes and narrow their openings.
+const tray = svg(
+  `<path d="${monitorCat}" fill="none" stroke="#231F26" stroke-width="2" stroke-linejoin="round"/>
+  <path d="${mark}" fill="#FFFFFF" fill-rule="evenodd"/>
+  <path d="${squintEyes}" fill="#231F26"/>`,
+)
+const template = svg(`<path d="${mark}" fill="#000000" fill-rule="evenodd"/>`)
 const root = fileURLToPath(new URL('../', import.meta.url))
 const save = (path, content) => writeFile(new URL(path, new URL('../', import.meta.url)), content)
 
@@ -32,6 +40,7 @@ await mkdir(new URL('../apps/desktop/public/', import.meta.url), {
 })
 await Promise.all([
   save('logo.svg', app),
+  save('logo-mark.svg', template),
   save('src-tauri/icons/foundation.svg', app),
   save('src-tauri/icons/tray.svg', tray),
   save('src-tauri/icons/tray-template.svg', template),
@@ -48,7 +57,11 @@ for (const [name, source] of [
   await save(`src-tauri/icons/${name}.png`, canvas.toBuffer('image/png'))
 }
 
-const result = spawnSync('pnpm', ['tauri', 'icon', 'src-tauri/icons/foundation.svg'], {
+const result = spawnSync(process.execPath, [
+  fileURLToPath(import.meta.resolve('@tauri-apps/cli/tauri.js')),
+  'icon',
+  'src-tauri/icons/foundation.svg',
+], {
   cwd: root,
   stdio: 'inherit',
 })

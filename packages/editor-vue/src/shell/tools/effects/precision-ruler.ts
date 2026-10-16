@@ -36,7 +36,7 @@ function numericEffect(
       ? Number.isFinite(number) && number >= 1 && number <= 12
       : id === 'rulerFontSize'
         ? Number.isFinite(number) && number >= 10 && number <= 48
-        : Number.isFinite(number) && number > 0 && number <= 90
+        : Number.isFinite(number) && number >= 1 && number <= 90
   if (!valid) return HANDLED
   const ruler =
     id === 'rulerThickness'

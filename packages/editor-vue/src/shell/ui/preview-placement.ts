@@ -15,7 +15,18 @@ function overlap(
     Math.max(0, Math.min(a.top + a.height, b.top + b.height) - Math.max(a.top, b.top))
 }
 
-/** Select by covered area first, then stable side and proximity to the trigger. */
+function placementSide(
+  candidate: PreviewPlacement,
+  anchor: PreviewRect,
+): PreviewPlacement['side'] {
+  if (candidate.left + candidate.width <= anchor.left) return 'left'
+  if (candidate.left >= anchor.left + anchor.width) return 'right'
+  if (candidate.top + candidate.height <= anchor.top) return 'top'
+  if (candidate.top >= anchor.top + anchor.height) return 'bottom'
+  return candidate.side
+}
+
+/** Keep the panel tethered to its trigger, then minimize covered preview area. */
 export function previewPlacement(
   anchor: PreviewRect,
   size: { readonly width: number; readonly height: number },
@@ -27,12 +38,22 @@ export function previewPlacement(
   const width = Math.min(size.width, Math.max(1, viewport.width - gap * 2))
   const height = Math.min(size.height, Math.max(1, viewport.height - gap * 2))
   const candidates: PreviewPlacement[] = []
-  for (const reference of [anchor, ...obstacles]) {
-    const x = anchor.left + (anchor.width - width) / 2
-    const y = anchor.top + (anchor.height - height) / 2
-    candidates.push(
+  const references = [anchor, ...obstacles]
+  const xs = [anchor.left + (anchor.width - width) / 2]
+  const ys = [anchor.top + (anchor.height - height) / 2]
+  for (const reference of references) {
+    xs.push(reference.left - width - gap, reference.left + reference.width + gap)
+    ys.push(reference.top - height - gap, reference.top + reference.height + gap)
+  }
+  // A nested menu may need to clear the toolbar horizontally AND the object
+  // vertically. Testing only one axis at a time can miss that nearby free corner
+  // and send the menu to the opposite edge of the viewport.
+  for (const reference of references) {
+    for (const x of xs) candidates.push(
       { left: x, top: reference.top - height - gap, width, height, side: 'top' },
       { left: x, top: reference.top + reference.height + gap, width, height, side: 'bottom' },
+    )
+    for (const y of ys) candidates.push(
       { left: reference.left - width - gap, top: y, width, height, side: 'left' },
       { left: reference.left + reference.width + gap, top: y, width, height, side: 'right' },
     )
@@ -42,13 +63,23 @@ export function previewPlacement(
     left: clamp(candidate.left, viewport.left + gap, viewport.left + viewport.width - width - gap),
     top: clamp(candidate.top, viewport.top + gap, viewport.top + viewport.height - height - gap),
   }))
+  const separation = (candidate: PreviewPlacement) => Math.hypot(
+    Math.max(0, anchor.left - candidate.left - width, candidate.left - anchor.left - anchor.width),
+    Math.max(0, anchor.top - candidate.top - height, candidate.top - anchor.top - anchor.height),
+  )
+  // A free spot across the canvas is not a usable submenu placement. If the
+  // preview fills the nearby space, keep controls together and minimize overlap
+  // locally instead of detaching the menu from the button that opened it.
+  const tethered = fitted.filter((candidate) => separation(candidate) <= gap * 2)
+  const viable = (tethered.length ? tethered : fitted)
+    .map((candidate) => ({ ...candidate, side: placementSide(candidate, anchor) }))
   const cost = (candidate: PreviewPlacement) => {
     const covered = obstacles.reduce((sum, rect) => sum + overlap(candidate, rect), 0) + overlap(candidate, anchor)
     const distance = Math.hypot(candidate.left + width / 2 - anchor.left - anchor.width / 2,
       candidate.top + height / 2 - anchor.top - anchor.height / 2)
     return { covered, stable: previous && candidate.side !== previous.side ? 1 : 0, distance }
   }
-  return fitted.sort((a, b) => {
+  return viable.sort((a, b) => {
     const ca = cost(a), cb = cost(b)
     return ca.covered - cb.covered || ca.stable - cb.stable || ca.distance - cb.distance
   })[0]!
@@ -69,6 +100,16 @@ export function previewEnvironment(
       const [left = 0, top = 0, width = 0, height = 0] = values
       obstacles.push({ left: left - 6, top: top - 6, width: width + 12, height: height + 12 })
     }
+  })
+  root.querySelectorAll<HTMLElement>('.cs-text-editor, .cs-text-floating-toolbar-host').forEach((element) => {
+    const rect = element.getBoundingClientRect()
+    const padding = Number.parseFloat(getComputedStyle(element).getPropertyValue('--text-background-padding')) || 0
+    if (rect.width > 0 && rect.height > 0) obstacles.push({
+      left: rect.left - padding,
+      top: rect.top - padding,
+      width: rect.width + padding * 2,
+      height: rect.height + padding * 2,
+    })
   })
   root.querySelectorAll<HTMLElement>('.cs-layers-panel, .cs-tool-rail, .cs-toolrail, .cs-context-toolbar, .cs-tool-configure-popover-host').forEach((element) => {
     if (

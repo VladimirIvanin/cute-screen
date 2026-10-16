@@ -68,6 +68,7 @@ const DEFAULT_PRECISION_TOOLS: PrecisionToolDefaults = {
 
 export function createWorkspaceState() {
   return {
+    spotlightEditing: shallowRef<import('../canvas/contracts').SpotlightEditing>(),
     highlighterAnalysis: shallowRef<HighlighterAnalysis>({ status: 'loading', effect: 'highlight' }),
     canvasViewport: ref<CanvasViewportExpose>(),
     fallbackCopied: ref(false),
@@ -102,6 +103,7 @@ export function createWorkspaceState() {
     eyedropperColor: ref<string>(),
     toolError: ref<string>(),
     textureImages: ref<ReadonlyMap<string, HTMLImageElement>>(new Map()),
+    numericPreviewDocument: shallowRef<EditorDocumentV1>(),
     activeDocument: ref<EditorDocumentV1>(),
   }
 }

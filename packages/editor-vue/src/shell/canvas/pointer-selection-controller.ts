@@ -79,6 +79,7 @@ function beginIntrinsicResize(
   context.setCursor('crosshair')
   context.setGesture({
     kind: 'intrinsicResize',
+    snapAngleIncrementDegrees: selected.kind === 'ruler' && event.altKey ? selected.payload.snapAngleIncrementDegrees : undefined,
     id: selected.id,
     handle,
     start: point,

@@ -91,15 +91,15 @@ describe('arrow contextual toolbar', () => {
     expect(screen.queryByText('Text')).not.toBeInTheDocument()
   })
 
-  it('shows a legacy non-preset width without offering numeric input', async () => {
+  it('keeps a non-preset width in precise input alongside compact presets', async () => {
     render(ArrowFormattingToolbar, {
       props: { controls: arrowControls, variant: 'floating' },
     })
 
     await fireEvent.click(screen.getByRole('button', { name: 'Stroke: 3 px' }))
     const dialog = await screen.findByRole('dialog', { name: 'Stroke' })
-    expect(within(dialog).getByText('3 px')).toBeInTheDocument()
-    expect(within(dialog).queryByRole('spinbutton')).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('spinbutton', { name: 'Thickness' })).toHaveValue('3')
+    expect(within(dialog).getByRole('button', { name: '4 px' })).toHaveAttribute('aria-pressed', 'false')
     expect(within(dialog).queryByRole('textbox')).not.toBeInTheDocument()
   })
 

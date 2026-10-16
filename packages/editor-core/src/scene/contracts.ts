@@ -228,13 +228,14 @@ export interface RenderCensorNode extends RenderNodeBase {
 
 export interface RenderSpotlightNode extends RenderNodeBase {
   readonly kind: 'spotlight'
-  readonly aperture: Readonly<{
+  readonly bounds: Readonly<{ x: number; y: number; width: number; height: number }>
+  readonly apertures: readonly Readonly<{
     readonly shape: 'rectangle' | 'ellipse' | 'diamond'
     readonly x: number
     readonly y: number
     readonly width: number
     readonly height: number
-  }>
+  }>[]
   readonly dimColor: RgbaColor
   readonly dimOpacity: number
   readonly feather: 'soft' | 'strong' | null

@@ -330,6 +330,7 @@ function standardSchema(
     }
   }
   return {
+    ...(tool === 'pencil' ? { toolSettings: { kind: 'pencil' as const } } : {}),
     ...(tool === 'shape' ? { shape: {
       fill: state.values.fill as ShapeFill,
       fillSupported: !['braceLeft', 'braceRight'].includes(String(state.values.shape)),
@@ -343,6 +344,7 @@ function standardSchema(
       ...baseControls(context, tool, state),
       ...(tool === 'shape' ? shapeControls(context, state) : []),
       ...specializedControls(tool, state.values),
+      ...(tool === 'pencil' ? [{ kind: 'range' as const, id: 'smoothing', label: 'Smoothing', value: Number(state.values.smoothing ?? 0.5) * 100, min: 0, max: 100, step: 1, disabled: state.colorDisabled }] : []),
     ],
   }
 }

@@ -7,6 +7,7 @@ import {
   applyRichTextSpanStyle,
   rebaseCalloutLayer,
   type EditorDocumentV1,
+  type EditorCommand,
   type LayerNode,
   type RichTextParagraphStyle,
   type RichTextSpanStyle,
@@ -214,10 +215,10 @@ function updatedTextLayer(
   }
 }
 
-function updateWholeTextLayer(
+function wholeTextCommand(
   context: TextEffectsContext,
   change: TextChange,
-): void {
+): EditorCommand | undefined {
   const layer = selectedTextLayer(context)
   if (
     !layer ||
@@ -241,11 +242,11 @@ function updateWholeTextLayer(
     change.span,
   )
   const formatted = applyRichTextParagraphStyle(styled, change.paragraph)
-  context.props.documentSession.execute({
+  return {
     type: 'updateLayer',
     before: layer,
     after: updatedTextLayer(layer, formatted.content, change.background),
-  })
+  }
 }
 
 function changedCalloutStroke(
@@ -312,7 +313,7 @@ export function createTextEffects(context: TextEffectsContext) {
   ): boolean {
     const resolved = resolveTextChange(id, value, context.textDefaults.value)
     if (resolved.kind === 'unhandled') return false
-    if (resolved.kind === 'handled') return true
+    if (resolved.kind === 'handled' || context.props.readOnlyDocument) return true
     const change = resolved.change
     context.textDefaults.value = change.defaults
     if (context.textDraft.value) {
@@ -323,11 +324,27 @@ export function createTextEffects(context: TextEffectsContext) {
         ...(change.background === undefined ? {} : { background: change.background }),
       }
     } else {
-      updateWholeTextLayer(context, change)
+      const command = wholeTextCommand(context, change)
+      if (command) context.props.documentSession?.execute(command)
     }
     return true
   }
   return {
+    resolveChange: (id: string, value: string) => {
+      const resolved = resolveTextChange(id, value, context.textDefaults.value)
+      return resolved.kind === 'change' ? wholeTextCommand(context, resolved.change) : undefined
+    },
+    previewInline: (id: string, value: string): TextFormattingPatch | undefined => {
+      const resolved = resolveTextChange(id, value, context.textDefaults.value)
+      if (resolved.kind !== 'change') return undefined
+      return {
+        revision: ++revision,
+        preview: true,
+        span: resolved.change.span,
+        paragraph: resolved.change.paragraph,
+        ...(resolved.change.background === undefined ? {} : { background: resolved.change.background }),
+      }
+    },
     applyV7TextChange,
     applyCalloutStrokeChange: (id: string, value: string) => applyCalloutStrokeChange(context, id, value),
   }

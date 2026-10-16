@@ -19,9 +19,7 @@ import {
   type CanvasGesture,
   type createCanvasWorkspaceState,
 } from './workspace-state'
-
 type EditingText = ReturnType<typeof createCanvasWorkspaceState>['editingText']
-
 export interface KeyboardContext {
   readonly props: CanvasViewportProps
   readonly emit: CanvasViewportEmit
@@ -44,18 +42,18 @@ export interface KeyboardContext {
   readonly cancelGesture: () => void
   readonly invalidateOverlay: () => void
 }
-
 export class KeyboardController {
   readonly #context: KeyboardContext
-
   constructor(context: KeyboardContext) {
     this.#context = context
   }
-
   keydown(event: KeyboardEvent): void {
-    if (event.defaultPrevented || isEditableTarget(event.target)) return
-    if (this.#handleSampling(event)) return
-    if (this.#handleCrop(event)) return
+    if (event.defaultPrevented || isEditableTarget(event.target))
+      return
+    if (this.#handleSampling(event))
+      return
+    if (this.#handleCrop(event))
+      return
     this.#handleAltDown(event)
     if (event.code === 'Space' && !isEditableTarget(event.target)) {
       this.#context.setSpacePressed(true)
@@ -71,34 +69,47 @@ export class KeyboardController {
       this.#handleEscape()
     }
   }
-
   keyup(event: KeyboardEvent): void {
-    if (event.code === 'Space') this.#context.setSpacePressed(false)
+    if (event.code === 'Space')
+      this.#context.setSpacePressed(false)
     const gesture = this.#context.gesture()
+    if (
+      event.key === 'Alt' &&
+      gesture?.kind === 'intrinsicResize' &&
+      gesture.initial.kind === 'ruler'
+    ) {
+      this.#context.setGesture({
+        ...gesture, snapAngleIncrementDegrees: undefined,
+      })
+      this.#context.invalidateOverlay()
+    }
     if (event.key === 'Alt' && gesture?.kind === 'move') {
-      this.#context.setGesture({ ...gesture, guidesVisible: false })
+      this.#context.setGesture({
+        ...gesture, guidesVisible: false,
+      })
       this.#context.invalidateOverlay()
     }
     if (event.key === 'Alt' && gesture?.kind === 'precision') {
-      this.#context.setGesture({ ...gesture, guidesHeld: false })
+      this.#context.setGesture({
+        ...gesture, current: gesture.rawCurrent ?? gesture.current, guidesHeld: false,
+      })
       this.#context.setRulerGuide(undefined)
       this.#context.invalidateOverlay()
     }
   }
-
   blur(): void {
     this.#context.setSpacePressed(false)
     this.#context.setRulerGuide(undefined)
     this.#context.cancelGesture()
   }
-
   #handleSampling(event: KeyboardEvent): boolean {
     const { props, scene, outputBounds, samplingCursor } = this.#context
     if (
       !props.sampling ||
       !scene.value ||
       !props.canvas
-    ) return false
+    )
+      return false
     const bounds = outputBounds.value ?? {
       x: 0,
       y: 0,
@@ -123,7 +134,8 @@ export class KeyboardController {
       return true
     }
     const move = samplingMove(event)
-    if (!move) return false
+    if (!move)
+      return false
     event.preventDefault()
     const next = {
       x: Math.max(bounds.x, Math.min(bounds.x + bounds.width - 1, initial.x + move[0])),
@@ -134,12 +146,13 @@ export class KeyboardController {
     this.#context.invalidateOverlay()
     return true
   }
-
   #handleCrop(event: KeyboardEvent): boolean {
     const { props, crop } = this.#context
-    if (props.activeTool !== 'crop') return false
+    if (props.activeTool !== 'crop')
+      return false
     const session = crop.ensureSession()
-    if (!session) return false
+    if (!session)
+      return false
     const direction = cropDirection(event.key)
     if (direction) {
       event.preventDefault()
@@ -159,25 +172,40 @@ export class KeyboardController {
     }
     return false
   }
-
   #handleAltDown(event: KeyboardEvent): void {
     const gesture = this.#context.gesture()
     if (event.key === 'Alt' && gesture?.kind === 'move') {
-      this.#context.setGesture({ ...gesture, guidesVisible: true })
+      this.#context.setGesture({
+        ...gesture, guidesVisible: true,
+      })
       this.#context.invalidateOverlay()
     }
-    if (event.key !== 'Alt' || gesture?.kind !== 'precision') return
-    let next = { ...gesture, guidesHeld: true }
-    const defaults = this.#context.props.precisionDefaults ?? DEFAULT_PRECISION_TOOLS
-    if (gesture.tool === 'ruler' && defaults.ruler.snap) {
+    if (
+      event.key === 'Alt' &&
+      gesture?.kind === 'intrinsicResize' &&
+      gesture.initial.kind === 'ruler'
+    ) {
+      this.#context.setGesture({
+        ...gesture, snapAngleIncrementDegrees: gesture.initial.payload.snapAngleIncrementDegrees,
+      })
+      this.#context.invalidateOverlay()
+    }
+    if (event.key !== 'Alt' || gesture?.kind !== 'precision')
+      return
+    let next = {
+      ...gesture, guidesHeld: true,
+    }
+    const defaults = gesture.precisionDefaults ?? this.#context.props.precisionDefaults ?? DEFAULT_PRECISION_TOOLS
+    if (gesture.tool === 'ruler') {
       const snapped = snapRulerEndpoint(gesture.start, gesture.current, defaults.ruler.snapAngleIncrementDegrees)
-      next = { ...next, current: snapped.end }
+      next = {
+        ...next, current: snapped.end,
+      }
       this.#context.setRulerGuide(snapped.guide)
     }
     this.#context.setGesture(next)
     this.#context.invalidateOverlay()
   }
-
   #handleEscape(): void {
     const { props, editingText } = this.#context
     if (editingText.value) {
@@ -204,8 +232,10 @@ export class KeyboardController {
     }
   }
 }
-
-function samplingMove(event: KeyboardEvent): readonly [number, number] | undefined {
+function samplingMove(event: KeyboardEvent): readonly [
+  number,
+  number,
+] | undefined {
   const step = event.shiftKey ? 10 : 1
   return {
     ArrowLeft: [-step, 0] as const,
@@ -214,7 +244,6 @@ function samplingMove(event: KeyboardEvent): readonly [number, number] | undefin
     ArrowDown: [0, step] as const,
   }[event.key]
 }
-
 function cropDirection(key: string): 'left' | 'right' | 'up' | 'down' | undefined {
   return {
     ArrowLeft: 'left' as const,
@@ -223,13 +252,8 @@ function cropDirection(key: string): 'left' | 'right' | 'up' | 'down' | undefine
     ArrowDown: 'down' as const,
   }[key]
 }
-
 function isEditableTarget(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLInputElement ||
+  return (target instanceof HTMLInputElement ||
     target instanceof HTMLTextAreaElement ||
-    (target instanceof HTMLElement && (target.isContentEditable || Boolean(
-      target.closest('select, [role="slider"], [role="combobox"], [role="dialog"], [role="menu"]'),
-    )))
-  )
+    (target instanceof HTMLElement && (target.isContentEditable || Boolean(target.closest('select, [role="slider"], [role="combobox"], [role="dialog"], [role="menu"]')))))
 }

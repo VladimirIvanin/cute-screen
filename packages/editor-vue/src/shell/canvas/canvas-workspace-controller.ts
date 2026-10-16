@@ -1,3 +1,4 @@
+import { SpotlightEditingController } from './spotlight-editing-controller'
 import {
   applyCropSession,
   cancelCropSession,
@@ -67,6 +68,7 @@ export class CanvasWorkspaceController {
   readonly #emit: CanvasViewportEmit
   readonly #state = createCanvasWorkspaceState()
   readonly #viewport: ViewportController
+  readonly #spotlight: SpotlightEditingController
   readonly #geometry: CanvasGeometryController
   readonly #pointerGeometry: PointerGeometryController
   readonly #crop: CropController
@@ -129,6 +131,16 @@ export class CanvasWorkspaceController {
       moveLoupeSource: this.moveLoupeSource,
     })
     this.#overlay = this.#createOverlay()
+    this.#spotlight = new SpotlightEditingController({
+      invalidateOverlay: this.invalidateOverlay,
+      props, emit, canvas: () => this.#state.scene.value,
+      canvasPoint: this.canvasPoint, toLocal: this.toLocal,
+      resizeHandle: (layer, point) => this.#pointerGeometry.boundsResizeHandle(layer, point),
+      render: () => {
+        this.#renderer.renderCommittedSceneForGesture()
+        this.invalidateOverlay()
+      },
+    })
     this.#eyedropper = this.#createEyedropper()
     const ports = this.#interactionPorts()
     this.#pointerDown = createPointerDownContext(ports)
@@ -148,11 +160,29 @@ export class CanvasWorkspaceController {
       viewportOutputBounds: this.#viewport.outputBounds,
       scene: state.scene,
       isPanning: state.isPanning,
-      onPointerDown: (event: PointerEvent) => handlePointerDown(this.#pointerDown, event),
-      onPointerMove: (event: PointerEvent) => handlePointerMove(this.#pointerMove, event),
-      finishGesture: (event: PointerEvent) => finishCanvasGesture(this.#finish, event),
-      cancelGesture: (event?: PointerEvent) => cancelCanvasGesture(this.#finish, event),
-      onDoubleClick: (event: MouseEvent) => this.#textEditor.doubleClick(event),
+      onPointerDown: (event: PointerEvent) => {
+        if (
+          !this.#spacePressed &&
+          !this.#props.readOnly &&
+          (event.detail > 1 &&
+            this.#spotlight.doubleClick(event) ||
+            this.#spotlight.pointerDown(event))
+        ) return
+        handlePointerDown(this.#pointerDown, event)
+      },
+      onPointerMove: (event: PointerEvent) => {
+        if (!this.#spotlight.pointerMove(event)) handlePointerMove(this.#pointerMove, event)
+      },
+      finishGesture: (event: PointerEvent) => {
+        if (!this.#spotlight.pointerUp(event)) finishCanvasGesture(this.#finish, event)
+      },
+      cancelGesture: (event?: PointerEvent) => {
+        this.#spotlight.cancel()
+        cancelCanvasGesture(this.#finish, event)
+      },
+      onDoubleClick: (event: MouseEvent) => {
+        if (!this.#spotlight.doubleClick(event)) this.#textEditor.doubleClick(event)
+      },
       onWheel: (event: WheelEvent) => this.#viewport.wheel(event),
       editingText: state.editingText,
       textFloatingToolbar: state.textFloatingToolbar,
@@ -304,7 +334,11 @@ export class CanvasWorkspaceController {
       rendererError: state.rendererError,
       editingText: state.editingText,
       outputBounds: this.#viewport.outputBounds,
-      documentForScene: () => this.#sceneDocument.documentForScene(),
+      documentForScene: () => {
+        const document = this.#spotlight.documentForScene(this.#sceneDocument.documentForScene())
+        const draft = this.#gesture?.kind === 'precision' && this.#gesture.tool === 'spotlight' ? this.#draft.precisionLayer('__spotlight-draft__') : undefined
+        return document && draft ? { ...document, layers: [...document.layers, draft] } : document
+      },
       previewLayer: this.gesturePreviewLayer,
       invalidateOverlay: this.invalidateOverlay,
     })
@@ -318,8 +352,8 @@ export class CanvasWorkspaceController {
       renderer: this.#renderer,
       gesture: () => this.#gesture,
       previewNodes: () => this.#geometry.gesturePreviewNodes(),
-      previewLayer: this.gesturePreviewLayer,
-      selectedLayer: this.selectedLayer,
+      previewLayer: () => this.#spotlight?.selectionLayer() ?? this.gesturePreviewLayer(),
+      selectedLayer: () => this.#spotlight?.selectionLayer() ?? this.selectedLayer(),
       drawDrafts: (context) => {
         this.#draft.drawDrawing(context)
         this.#draft.drawCallout(context)

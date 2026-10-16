@@ -139,6 +139,7 @@ export interface CanvasKitApi {
   readonly PaintStyle: Readonly<{ Fill: unknown; Stroke: unknown }>
   readonly BlendMode: Readonly<{
     SrcOver: unknown
+    DstOut: unknown
     Src?: unknown
     Multiply: unknown
     Screen: unknown

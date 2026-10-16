@@ -197,13 +197,18 @@ export function precisionScene(): RenderSceneSnapshot {
     {
       kind: 'spotlight',
       id: 'precision-spotlight',
-      aperture: {
+      bounds: {
+        x: 18,
+        y: 78,
+        width: 76,
+        height: 54,
+      }, apertures: [{
         shape: 'ellipse',
         x: 18,
         y: 78,
         width: 76,
         height: 54,
-      },
+      }],
       dimColor: { red: 0.02, green: 0.04, blue: 0.08, alpha: 1 },
       dimOpacity: 0.28,
       feather: 'soft',

@@ -158,7 +158,7 @@ export class DraftController {
     const { props } = this.#context
     const gesture = this.#context.gesture()
     if (!gesture || gesture.kind !== 'precision') return undefined
-    const defaults = props.precisionDefaults ?? DEFAULT_PRECISION_TOOLS
+    const defaults = gesture.precisionDefaults ?? props.precisionDefaults ?? DEFAULT_PRECISION_TOOLS
     const bounds = rectFromPoints(gesture.start, gesture.current)
     if (gesture.tool === 'censor') {
       if (bounds.width < 1 || bounds.height < 1) return undefined
@@ -207,7 +207,7 @@ export class DraftController {
     const { props } = this.#context
     const gesture = this.#context.gesture()
     if (!gesture || gesture.kind !== 'precision') return
-    const defaults = props.precisionDefaults ?? DEFAULT_PRECISION_TOOLS
+    const defaults = gesture.precisionDefaults ?? props.precisionDefaults ?? DEFAULT_PRECISION_TOOLS
     const bounds = rectFromPoints(gesture.start, gesture.current)
     const scale = (props.zoom ?? 100) / 100
     context.save()

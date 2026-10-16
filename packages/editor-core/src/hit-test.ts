@@ -1,3 +1,4 @@
+import { resolveFreehandGeometry } from './tools/freehand'
 import {
   isShapeKind,
   shapeGeometry,
@@ -192,20 +193,6 @@ function hitLayer(
   })
 }
 
-function payloadPoint(
-  value: unknown,
-  fallback: Point,
-): Point {
-  if (!value || typeof value !== 'object') return fallback
-  const point = value as Record<string, unknown>
-  return typeof point.x === 'number' &&
-    Number.isFinite(point.x) &&
-    typeof point.y === 'number' &&
-    Number.isFinite(point.y)
-    ? { x: point.x, y: point.y }
-    : fallback
-}
-
 function payloadStrokeWidth(
   payload: JsonObject,
   fallback = 1,
@@ -319,16 +306,11 @@ function drawingHitPart(
     return capHit(arrow.startCap, arrow.start) || capHit(arrow.endCap, arrow.end) ? 'stroke' : undefined
   }
   if (layer.kind === 'pencil' || layer.kind === 'marker') {
-    const samples = Array.isArray(payload.points)
-      ? payload.points.map((sample) => payloadPoint(sample, { x: 0, y: 0 }))
-      : []
+    const geometry = resolveFreehandGeometry(payload, layer.kind === 'pencil')
+    const samples = geometry.points
     if (samples.length === 1)
-      return pointToSegmentDistance(point, samples[0]!, samples[0]!) <= strokeWidth / 2 ? 'stroke' : undefined
-    return samples
-      .slice(1)
-      .some((sample, index) => pointToSegmentDistance(point, samples[index]!, sample) <= strokeWidth / 2)
-      ? 'stroke'
-      : undefined
+      return pointToSegmentDistance(point, samples[0]!, samples[0]!) <= geometry.width * (layer.kind === 'pencil' ? samples[0]!.pressure : 1) / 2 ? 'stroke' : undefined
+    return samples.slice(1).some((sample, index) => pointToSegmentDistance(point, samples[index]!, sample) <= geometry.width * (layer.kind === 'pencil' ? (sample.pressure + samples[index]!.pressure) / 2 : 1) / 2) ? 'stroke' : undefined
   }
   // Pre-v3 in-memory fixtures and third-party callers may not have a drawing
   // payload yet. Keep the historical bounds hit until they pass the codec.

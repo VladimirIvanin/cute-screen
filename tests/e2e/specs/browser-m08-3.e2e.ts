@@ -19,15 +19,15 @@ describe('M08 crop and precision acceptance in browser mode', () => {
       en: [
         ['Crop', ['Preset', 'Reset', 'Apply', 'Cancel']],
         ['Hide data', ['Region', 'Effect', 'Block size']],
-        ['Spotlight', ['Shape', 'Dim color', 'Dim opacity', 'Feather']],
-        ['Ruler', ['Colour', 'Thickness', 'Label size', 'Unit', 'Snapping', 'Angle step']],
+        ['Spotlight', ['Aperture shape', 'Dimming', 'Edge softness', 'Apertures']],
+        ['Ruler', ['Colour', 'Thickness', 'Label and units', 'Measurement and snapping']],
         ['Loupe', ['Zoom', 'Size', 'Shape', 'Border color', 'Border width', 'Shadow']],
       ],
       ru: [
         ['Обрезка', ['Пропорции', 'Сбросить', 'Применить', 'Отмена']],
         ['Скрыть данные', ['Область', 'Эффект', 'Размер блока']],
-        ['Фонарь', ['Форма', 'Цвет затемнения', 'Непрозрачность затемнения', 'Растушёвка']],
-        ['Линейка', ['Цвет', 'Толщина', 'Размер подписи', 'Единицы', 'Привязка', 'Шаг угла']],
+        ['Фонарь', ['Форма области', 'Затемнение', 'Мягкость краёв', 'Области']],
+        ['Линейка', ['Цвет', 'Толщина', 'Подпись и единицы', 'Измерение и привязка']],
         ['Лупа', ['Увеличение', 'Размер', 'Форма', 'Цвет рамки', 'Толщина рамки', 'Тень']],
       ],
     } as const
@@ -45,12 +45,12 @@ describe('M08 crop and precision acceptance in browser mode', () => {
           else if (await localizedMore.isExisting()) await localizedMore.click()
           const layout = await browser.execute((expectedLabels) => {
             const toolbar = document.querySelector<HTMLElement>('.cs-context-toolbar')
-            const controls = document.querySelector<HTMLElement>('.cs-context-controls')
+            const controls = document.querySelector<HTMLElement>('.cs-tool-formatting-toolbar, .cs-context-controls')
             if (!toolbar || !controls) throw new Error('M08 toolbar is missing')
             const toolbarBounds = toolbar.getBoundingClientRect()
             const text = toolbar.textContent ?? ''
             return {
-              labelsVisible: expectedLabels.every((label) => text.includes(label)),
+              labelsVisible: expectedLabels.every((label) => text.includes(label) || [...toolbar.querySelectorAll('[aria-label]')].some((item) => item.getAttribute('aria-label') === label)),
               toolbarFits:
                 toolbarBounds.left >= 0 &&
                 toolbarBounds.right <= window.innerWidth &&

@@ -215,6 +215,7 @@ function beginPrecision(
   context.scene.value!.setPointerCapture(event.pointerId)
   context.setGesture({
     kind: 'precision',
+    precisionDefaults: context.props.precisionDefaults,
     tool,
     start: point,
     current: point,

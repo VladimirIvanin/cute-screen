@@ -21,6 +21,32 @@ const embeddedWebDriverPort = Number.parseInt(process.env.TAURI_WEBDRIVER_PORT ?
 
 const scenarios = [
   {
+    id: 'tool-settings',
+    spec: 'tests/e2e/specs/tauri-tool-settings.e2e.ts',
+    harnessQuery: '?m04=1&m08=1',
+    fakeCapture: true,
+    persistenceGroup: 'tool-settings',
+  },
+  {
+    id: 'tool-settings-reopen',
+    spec: 'tests/e2e/specs/tauri-tool-settings-reopen.e2e.ts',
+    harnessQuery: '?m04=1&m08=1',
+    fakeCapture: true,
+    persistenceGroup: 'tool-settings',
+  },
+  {
+    id: 'custom-icons',
+    spec: 'tests/e2e/specs/tauri-custom-icons.e2e.ts',
+    harnessQuery: '?m04=1&m08=1',
+    fakeCapture: true,
+  },
+  {
+    id: 'shape-defaults-placement',
+    spec: 'tests/e2e/specs/tauri-shape-defaults-placement.e2e.ts',
+    harnessQuery: '?m04=1&m08=1',
+    fakeCapture: true,
+  },
+  {
     id: 'highlighter',
     spec: 'tests/e2e/specs/tauri-highlighter.e2e.ts',
     harnessQuery: '?m04=1&m08=1',
@@ -230,7 +256,7 @@ const wdioCli = path.join(root, 'node_modules', '@wdio', 'cli', 'bin', 'wdio.js'
 
 const failedScenarios = []
 const retainedAppDataDirs = []
-let m03AppData
+const persistenceDirectories = new Map()
 
 try {
   if (run('pnpm', ['fixtures:generate:m01']) !== 0) {
@@ -274,10 +300,13 @@ try {
   console.info(`Pinned Tauri test binary: ${executable}`)
 
   for (const scenario of selectedScenarios) {
-    const appData =
-      scenario.persistenceGroup === 'm03'
-        ? (m03AppData ??= await mkdtemp(path.join(runtimeDirectory, 'cute-screen-e2e-m03-')))
-        : await mkdtemp(path.join(runtimeDirectory, `cute-screen-e2e-${scenario.id}-`))
+    const group = scenario.persistenceGroup
+    if (group && !persistenceDirectories.has(group)) {
+      persistenceDirectories.set(group, await mkdtemp(path.join(runtimeDirectory, `cute-screen-e2e-${group}-`)))
+    }
+    const appData = group
+      ? persistenceDirectories.get(group)
+      : await mkdtemp(path.join(runtimeDirectory, `cute-screen-e2e-${scenario.id}-`))
 
     await waitForPortFree(embeddedWebDriverPort)
 
@@ -307,7 +336,7 @@ try {
     )
     if (process.platform === 'win32') await cacheDownloadedEdgeDriver(path.join(runtimeDirectory, 'msedgedriver'), driverCache)
 
-    if (status === 0 && scenario.persistenceGroup !== 'm03') {
+    if (status === 0 && !group) {
       await rm(appData, { recursive: true, force: true, maxRetries: 10, retryDelay: 250 })
       continue
     }
@@ -322,11 +351,14 @@ try {
   throw error
 }
 
-if (m03AppData) {
-  if (failedScenarios.some((id) => id.startsWith('document-'))) {
-    retainedAppDataDirs.push(m03AppData)
+for (const [group, directory] of persistenceDirectories) {
+  const failed = selectedScenarios.some(
+    (scenario) => scenario.persistenceGroup === group && failedScenarios.includes(scenario.id),
+  )
+  if (failed) {
+    if (!retainedAppDataDirs.includes(directory)) retainedAppDataDirs.push(directory)
   } else {
-    await rm(m03AppData, { recursive: true, force: true, maxRetries: 10, retryDelay: 250 })
+    await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 250 })
   }
 }
 

@@ -206,10 +206,13 @@ defineExpose({
               fontStyle: editorTextStyle.italic ? 'italic' : 'normal',
               textDecoration: editorTextStyle.strikethrough ? 'line-through' : 'none',
               color: cssTextColor(editorTextStyle.color),
-              backgroundColor: cssTextBackground(editingText.background),
-              borderRadius: editingText.background
+              '--text-background-color': cssTextBackground(editingText.background) ?? 'transparent',
+              '--text-background-padding': editingText.background
+                ? `${editingText.background.padding * ((zoom ?? 100) / 100)}px`
+                : '0px',
+              '--text-background-radius': editingText.background
                 ? `${editingText.background.radius * ((zoom ?? 100) / 100)}px`
-                : undefined,
+                : '0px',
             }"
             :aria-label="
               editingText.kind === 'callout'

@@ -58,7 +58,7 @@ describe('editor-core dependency boundary', () => {
 })
 
 describe('M05 icon-system boundary', () => {
-  it('keeps Tabler imports behind UiIcon and allows only parameter-preview SVGs', async () => {
+  it('keeps Tabler/custom imports behind UiIcon and bounds SVG construction', async () => {
     const root = process.cwd()
     const sources = await fg('packages/editor-vue/src/**/*.{ts,vue}', {
       cwd: root,
@@ -66,6 +66,7 @@ describe('M05 icon-system boundary', () => {
     const parameterPreviews = new Set([
       'packages/editor-vue/src/shell/components/ArrowFormattingToolbar.vue',
       'packages/editor-vue/src/shell/components/ShapeFormattingToolbar.vue',
+      'packages/editor-vue/src/shell/components/ToolFormattingToolbar.vue',
       'packages/editor-vue/src/shell/components/HighlighterFormattingToolbar.vue',
       'packages/editor-vue/src/shell/components/ArrowStylePreview.vue',
       'packages/editor-vue/src/shell/components/TextFormattingToolbar.vue',
@@ -78,6 +79,20 @@ describe('M05 icon-system boundary', () => {
       }
       if (/['"](?:@lucide\/vue|lucide-vue-next)['"]/u.test(code)) {
         violations.push(`${source}: legacy Lucide import`)
+      }
+      const customRoot = path.resolve(root, 'packages/editor-vue/src/shell/icons') + path.sep
+      for (const match of code.matchAll(/from\s+['"]([^'"]+)['"]/gu)) {
+        const imported = path.resolve(path.dirname(path.join(root, source)), match[1] ?? '')
+        if (
+          imported.startsWith(customRoot) &&
+          !source.includes('/shell/icons/') &&
+          source !== 'packages/editor-vue/src/shell/icon.ts'
+        ) {
+          violations.push(`${source}: bypasses UiIcon with custom import`)
+        }
+      }
+      if (/\bh\(\s*['"]svg['"]/u.test(code) && source !== 'packages/editor-vue/src/shell/icons/create-custom-icon.ts') {
+        violations.push(`${source}: SVG construction outside icon renderer`)
       }
       if (
         source.includes('/shell/') &&
@@ -96,7 +111,7 @@ describe('M05 icon-system boundary', () => {
       readFile(path.join(root, 'packages/editor-vue/src/shell/types.ts'), 'utf8'),
       readFile(path.join(root, 'packages/editor-vue/src/shell/icon.ts'), 'utf8'),
     ])
-    const iconType = types.match(/export type IconName =([\s\S]*?)\n\nexport const/u)?.[1]
+    const iconType = types.match(/export type IconName\s*=\s*((?:\|\s*'[^']+'\s*)+)/u)?.[1]
     if (!iconType) throw new Error('IconName declaration is missing')
     const names = [...iconType.matchAll(/\| '([A-Za-z]+)'/gu)]
       .map((match) => match[1])

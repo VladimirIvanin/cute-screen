@@ -168,56 +168,43 @@ export function drawSpotlightCanvasKit(
   node: RenderSpotlightNode,
   scale: number,
 ): void {
-  surface.flush()
-  const below = surface.makeImageSnapshot()
   const path = spotlightPath(canvasKit, node)
   const paint = new canvasKit.Paint()
-  const centerX = node.aperture.x + node.aperture.width / 2
-  const centerY = node.aperture.y + node.aperture.height / 2
+  const group = new canvasKit.Paint()
+  const centerX = node.bounds.x + node.bounds.width / 2
+  const centerY = node.bounds.y + node.bounds.height / 2
   let featherFilter: CanvasKitMaskFilter | undefined
   try {
-    configurePaint(canvasKit, paint, node.dimColor, node.opacity * node.dimOpacity, 'fill')
-    paint.setBlendMode(blendMode(canvasKit, node.blendMode))
-    canvas.drawRect(canvasKit.XYWHRect(0, 0, scene.width, scene.height), paint)
-
-    withTransform(canvas, node, centerX, centerY, () => {
-      canvas.clipPath?.(path, canvasKit.ClipOp?.Intersect, true)
-      cancelNodeTransform(canvas, node, centerX, centerY)
+    group.setBlendMode(blendMode(canvasKit, node.blendMode))
+    canvas.saveLayer(group)
+    try {
+      configurePaint(canvasKit, paint, node.dimColor, node.opacity * node.dimOpacity, 'fill')
+      canvas.drawRect(canvasKit.XYWHRect(0, 0, scene.width, scene.height), paint)
       paint.setColorComponents(1, 1, 1, 1)
-      paint.setBlendMode(canvasKit.BlendMode.Src ?? canvasKit.BlendMode.SrcOver)
-      drawSnapshotCanvasKit(
-        canvasKit,
-        canvas,
-        below,
-        canvasKit.XYWHRect(0, 0, scene.width * scale, scene.height * scale),
-        canvasKit.XYWHRect(0, 0, scene.width, scene.height),
-        paint,
-      )
-    })
-
-    const feather = spotlightFeatherWidth(node.feather)
-    if (feather > 0) {
-      configurePaint(canvasKit, paint, node.dimColor, node.opacity * node.dimOpacity * 0.8, 'stroke', feather * 0.9)
-      paint.setBlendMode(blendMode(canvasKit, node.blendMode))
+      paint.setBlendMode(canvasKit.BlendMode.DstOut)
+      const feather = spotlightFeatherWidth(node.feather)
       if (
+        feather > 0 &&
         canvasKit.MaskFilter &&
         canvasKit.BlurStyle &&
         paint.setMaskFilter
       ) {
         featherFilter = canvasKit.MaskFilter.MakeBlur(canvasKit.BlurStyle.Normal, Math.max(0.5, feather / 2), true)
         paint.setMaskFilter(featherFilter)
-      }
-      withTransform(canvas, node, centerX, centerY, () => {
-        canvas.drawPath(path, paint)
-      })
+        withTransform(canvas, node, centerX, centerY, () => canvas.drawPath(path, paint))
+      } else withTransform(canvas, node, centerX, centerY, () => canvas.drawPath(path, paint))
+    } finally {
+      canvas.restore()
     }
   } finally {
     paint.setMaskFilter?.(null)
     featherFilter?.delete()
     paint.delete()
+    group.delete()
     path.delete()
-    below.delete()
   }
+  void surface
+  void scale
 }
 
 export function drawRulerCanvasKit(

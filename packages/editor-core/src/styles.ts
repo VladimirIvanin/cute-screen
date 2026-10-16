@@ -1,3 +1,4 @@
+import { rebaseFreehandLayer } from './tools/freehand'
 import type { EditorCommand } from './commands/types'
 import type {
   JsonObject,
@@ -207,6 +208,7 @@ export function applyLayerStyle<T extends LayerNode>(
       },
     }
   }
+  if (next.kind === 'pencil' || next.kind === 'marker') next = rebaseFreehandLayer(next)
   if (next.kind === 'arrow' && JSON.stringify(next.payload) !== JSON.stringify(layer.payload))
     next = rebaseArrowLayer(next, next.payload)
   if (next.kind === 'callout' && JSON.stringify(next.payload) !== JSON.stringify(layer.payload))

@@ -34,6 +34,15 @@ const positioned = ref(false)
 let layout: { left: number; top: number; placement: string } | undefined
 let observer: ResizeObserver | undefined
 let resizeFrame: number | undefined
+function toolbarBottomLimit(
+  root: Element | null | undefined,
+  view: DOMRect,
+): number {
+  const rail = root?.querySelector('.cs-toolrail')?.getBoundingClientRect()
+  return rail && rail.top > view.top + view.height / 2
+    ? Math.min(view.bottom, rail.top - 8)
+    : view.bottom
+}
 function scheduleResize(): void {
   if (resizeFrame !== undefined) return
   resizeFrame = requestAnimationFrame(() => {
@@ -106,9 +115,10 @@ function update(): void {
   const rightEdge = fitsBesidePanel ? safeRight : view.right
   const preferredTop = above >= view.top + 8 ? above : bottom + 10
   const panelBottom = !fitsBesidePanel && panel ? panel.bottom + 8 : view.top
+  const safeBottom = toolbarBottomLimit(root, view)
   const nextLayout = {
     left: Math.max(view.left + 8, Math.min(rightEdge - width - 8, (left + right - width) / 2)),
-    top: Math.max(view.top + 8, Math.min(view.bottom - height - 8, Math.max(preferredTop, panelBottom))),
+    top: Math.max(view.top + 8, Math.min(safeBottom - height - 8, Math.max(preferredTop, panelBottom))),
     placement: above >= view.top + 8 ? 'above' : 'below',
   }
   positioned.value = true

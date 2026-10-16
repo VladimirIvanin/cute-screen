@@ -13,6 +13,7 @@ import {
   ruRU,
 } from 'naive-ui'
 import { t } from '../i18n'
+import { useNumericPreview } from './use-numeric-preview'
 import { createBrowserDrawingToolPreferencesStorage } from '../preferences'
 import { useEditorShellStore } from '../store'
 import {
@@ -78,6 +79,10 @@ function createWorkspaceCore(props: ResolvedEditorShellProps) {
     translate,
     saveDrawingPreferences,
     rememberTextDefaults: memory.rememberTextDefaults,
+  })
+  useNumericPreview(workspace, props, store, bindings)
+  watch([() => store.activeToolId, () => store.selectedLayerIds.join(','), () => workspace.activeDocument.value?.id], () => {
+    workspace.spotlightEditing.value = undefined
   })
   const session = createSessionController({
     props,
@@ -188,6 +193,8 @@ function createWorkspaceViewModel(
     openToolConfigure: bindings.openToolConfigure,
     closeToolConfigure: bindings.closeToolConfigure,
     activeDocument: workspace.activeDocument,
+    spotlightEditing: workspace.spotlightEditing,
+    displayDocument: computed(() => workspace.numericPreviewDocument.value ?? workspace.activeDocument.value),
     contextSchema: bindings.contextSchema,
     selectionSchema: bindings.selectionSchema,
     toolConfigureSchema: bindings.toolConfigureSchema,

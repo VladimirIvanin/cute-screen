@@ -151,7 +151,7 @@ describe('editor document v7 codec', () => {
         ...shape,
         kind: 'spotlight',
         payload: {
-          shape: 'rectangle',
+          apertures: [{ id: 'aperture', shape: 'rectangle', bounds: { x: 0, y: 0, width: 100, height: 100 } }],
           dimColor: { red: 0, green: 0, blue: 0, alpha: 1 },
           dimOpacity: 0.65,
           feather: null,

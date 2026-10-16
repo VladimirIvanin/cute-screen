@@ -132,8 +132,13 @@ export class TextEditorController {
     const editor = textEditor.value
     const editing = editingText.value
     if (!editor || !editing) return
+    // Restoring the DOM range may focus contenteditable in Chromium/WebView2.
+    // Keep the rich-text bookmark and return focus to the numeric control immediately.
+    const numericFocus = document.activeElement instanceof HTMLElement &&
+      document.activeElement.closest('.cs-numeric-control') ? document.activeElement : undefined
     renderRichTextProjection(editor, editing.controller.state, (props.zoom ?? 100) / 100)
     restoreRichTextDomSelection(editor, editing.controller.state.selection)
+    numericFocus?.focus({ preventScroll: true })
     void nextTick(this.#context.updateToolbarLayout)
   }
 

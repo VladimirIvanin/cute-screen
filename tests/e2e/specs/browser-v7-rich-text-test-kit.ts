@@ -154,7 +154,7 @@ export async function applyBackground(input: {
   await browser.execute((draft) => {
     const root = document.querySelector<HTMLElement>('.cs-text-background-popover')
     const color = root?.querySelector<HTMLInputElement>('input[type="color"]')
-    const numbers = root?.querySelectorAll<HTMLInputElement>('input[type="number"]')
+    const numbers = root?.querySelectorAll<HTMLInputElement>('input[role="spinbutton"]')
     if (
       !root ||
       !color ||

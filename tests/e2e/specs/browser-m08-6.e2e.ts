@@ -30,6 +30,7 @@ describe('M08 crop and precision acceptance in browser mode', () => {
     await browser.waitUntil(async () => Boolean(await overlayAlphaBounds()))
     const initialFrame = await overlayAlphaBounds()
 
+    await $('button[aria-label="Label and units"]').click()
     await clickSliderProgress('Label size', 0.95, 'm08-ruler-font-size')
     await browser.waitUntil(async () => {
       const ruler = (await m08Snapshot()).document.layers.at(-1)
@@ -45,11 +46,14 @@ describe('M08 crop and precision acceptance in browser mode', () => {
       (fontFrame?.width ?? 0) > (initialFrame?.width ?? 0) || (fontFrame?.height ?? 0) > (initialFrame?.height ?? 0),
     ).toBe(true)
 
+    await browser.keys('Escape')
+    await $('button[aria-label="Thickness"]').click()
     await clickSliderProgress('Thickness', 0.95, 'm08-ruler-thickness')
     await browser.waitUntil(async () => {
       const ruler = (await m08Snapshot()).document.layers.at(-1)
       return Number(ruler?.payload.thickness) > 6
     })
+    await browser.keys('Escape')
     const afterThickness = (await m08Snapshot()).document.layers.at(-1)!
     expect(
       afterThickness.localBounds.width > afterFont.localBounds.width ||

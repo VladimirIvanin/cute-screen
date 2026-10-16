@@ -155,6 +155,11 @@ watch(disabled, (blocked) => {
         </template>
         <template v-else>
           <ShapeNumericControl
+            :control-id="menu"
+            :locale="locale"
+            slider
+            :unit="menu === 'width' ? 'px' : '%'"
+            :presets="menu === 'width' ? [8, 18, 32, 48] : [20, 35, 50, 75]"
             :label="labels[menu]"
             :value="Number(value(menu))"
             :mixed="mixed(menu)"
@@ -164,18 +169,6 @@ watch(disabled, (blocked) => {
             :disabled="disabled"
             @commit="change(menu, String($event))"
           />
-          <div class="cs-highlighter-presets">
-            <button
-              v-for="preset in menu === 'width' ? [8, 18, 32, 48] : [20, 35, 50, 75]"
-              :key="preset"
-              type="button"
-              :disabled="disabled"
-              :aria-pressed="!mixed(menu) && Number(value(menu)) === preset"
-              @click="change(menu, String(preset))"
-            >
-              {{ preset }}{{ menu === 'width' ? ' px' : '%' }}
-            </button>
-          </div>
         </template>
       </div>
     </NPopover>

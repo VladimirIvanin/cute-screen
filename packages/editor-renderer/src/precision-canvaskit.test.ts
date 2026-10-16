@@ -126,13 +126,18 @@ describe('M08 CanvasKit precision renderer/export', () => {
         {
           kind: 'spotlight',
           id: 'spotlight',
-          aperture: {
+          bounds: {
+            x: 28,
+            y: 6,
+            width: 36,
+            height: 36,
+          }, apertures: [{
             shape: 'diamond',
             x: 28,
             y: 6,
             width: 36,
             height: 36,
-          },
+          }],
           dimColor: { red: 0, green: 0, blue: 0, alpha: 1 },
           dimOpacity: 0.25,
           feather: null,

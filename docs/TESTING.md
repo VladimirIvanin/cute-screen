@@ -1,5 +1,475 @@
 # Стратегия тестирования
 
+## Принятая иконка фонаря «Встык» (2026-10-16, ADR-055)
+
+Пользователь выбрал чистое прямоугольное окно на равномерной штриховке 45°,
+без зазора между штрихами и контуром. `spotlight` переведён с Tabler Focus2
+на каноническую `spotlightGeometry`; dev preview использует ту же геометрию.
+API, доступное имя, CSS-размер и поведение инструмента сохранены.
+
+Windows x64, Node 22.23.1, pnpm 10.33.2, Chrome 155.0.8059.79.
+Evidence: `artifacts/custom-icons/spotlight-adopted/`; журналы команд —
+`artifacts/custom-icons/spotlight-adopted-*.log`.
+
+- `pnpm exec vitest run --project vue tests/unit/vue/ui-icon.test.ts` — 70/70.
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5198 CUTE_SCREEN_ICON_EVIDENCE=spotlight-adopted pnpm test:e2e:browser --spec tests/e2e/specs/browser-custom-icons.e2e.ts`
+  (переменные заданы PowerShell) — 2/2: реальный UiIcon, обе темы, DPR 1/2,
+  выбор фонаря в RU/EN, disabled пустого editor и keyboard focus.
+  Raster checks 16/18/20/24/32 px: stroke не обрезан, SVG не пуст.
+  Галерея и production editor screenshots сохранены; RU/dark screenshot просмотрен.
+- `pnpm test` — 97 files / 709 tests, exit 0.
+- `pnpm format`, `pnpm format:check` — exit 0.
+- `$env:CARGO_TARGET_DIR='D:/cutescreen/target/shape-catalog-native'; $env:CARGO_BUILD_JOBS='4'; $env:CUTE_SCREEN_E2E_SCENARIOS='custom-icons'; $env:CUTE_SCREEN_ICON_EVIDENCE='spotlight-adopted'; pnpm test:e2e:tauri`
+  — exit 0, 1/1, WebView2 155.0.4283.45. Production Capture → Quick → Editor:
+  выбор фонаря с новой SVG, рисование marker/pencil, пипетка, trusted keyboard,
+  undo/redo. Native Quick screenshot просмотрен; RU/EN × light/dark сохранены.
+  Захват использует fake-platform, профиль изолирован; stale binary не используется.
+- `pnpm check` — exit 0: lint (warnings без errors), typecheck, formatting,
+  Markdown links, boundaries 40/40, IPC, frontend build, Rust fmt/clippy.
+
+WebView2 не подтверждает WebKitGTK/WKWebView или физический захват.
+
+## Карандаш, составной фонарь и линейка (2026-10-16, ADR-056)
+
+Windows NT 10.0.19045 x64, Node 22.23.1, pnpm 10.33.2; Chrome
+155.0.8059.79 и WebView2 155.0.4283.45. Evidence root:
+`artifacts/tool-settings/`; browser/native screenshots находятся соответственно
+в `artifacts/browser-e2e/tool-settings-*` и `artifacts/tauri-e2e/tool-settings-*`.
+
+Core red-first: отсутствующий resolver/операции областей и непривязанный endpoint
+давали failing tests до реализации. `tool-settings-redesign.test.ts` проверяет
+веса сглаживания, 0/100%, короткие пути, pressure/endpoints, границы кисти,
+codec областей, добавление/изменение/удаление/resize и оба конца линейки.
+Дополнительные regression tests подтверждают одинаковый smoothed scene/hit path
+и диапазон углового шага 1…90° в factory/codec (`angle-red.log`, `angle-green.log`).
+Mounted-shell tests проверяют numeric cancel/focus, mixed, locked/read-only,
+history-neutral clipboard success/failure, одну команду и undo областей.
+Разнородное выделение arrow/pencil в обоих порядках покрыто регрессией:
+показываются общие свойства вместо панели первого слоя.
+
+- `pnpm test` — 97 files / 709 tests, exit 0 (`test-final.log`), включая
+  mixed-selection regression, rotated union и независимые слои фонаря.
+- `pnpm format`, `pnpm check` — exit 0 (`format-final.log`, `check-final.log`).
+  Check включает lint/typecheck, format/docs, 40 architecture tests, IPC drift
+  и четыре Rust/clippy конфигурации. Итоговый E2E typecheck после уточнения
+  test coordinates — exit 0 (`e2e-typecheck.log`).
+- `pnpm test:render` — 5 files / 20 tests, exit 0 (`render-final.log`).
+  Golden precision PNG обновлены намеренно: мягкость применяется к объединённой
+  маске. Canvas2D и CanvasKit сравнивают decoded pixels при 1×/2×, пересечения
+  и дублированные области не меняют coverage. Прежний golden сохранён как
+  `precision-before.png` для визуального сравнения.
+- `pnpm test:perf` — 4/4, exit 0 (`perf.log`);
+  `artifacts/perf/m01-renderer.json` содержит 30 warmups / 120 measurements.
+  Это software harness, не подтверждение GPU frame budget.
+- Дополнительно реальные UI fixtures 3840×2160 и 7680×4320: 12 000 sampled points,
+  шесть областей. SHA-256 decoded export совпадает с preview. `4k.json`/`8k.json`
+  содержат исходный hash, timing и pixel hash; это отдельное доказательство
+  корректности больших данных, не подмена контролируемого performance suite.
+- `$env:CUTE_SCREEN_BROWSER_E2E_PORT='5186'; pnpm test:e2e:browser --spec tests/e2e/specs/browser-tool-settings.e2e.ts`
+  — exit 0, 1/1 за 15.8 s (`browser-final.log`): создание трёх инструментов,
+  move/resize второй области, форма только выбранной области, удаление/undo,
+  clipboard failure, Alt для обоих endpoints, 1024/1280 × RU/EN × light/dark.
+  Browser m08-3 и m08-6 также прошли (`browser.log`). Первый длительный timeout
+  совпал с паузой машины; свежий независимый прогон воспроизведён успешно.
+- `$env:CARGO_TARGET_DIR='D:/cutescreen/target/shape-catalog-native'; $env:CARGO_BUILD_JOBS='4'; $env:CUTE_SCREEN_E2E_SCENARIOS='tool-settings'; pnpm test:e2e:tauri`
+  — exit 0, 1/1 за 13.2 s (`native.log`). Чистый профиль, настоящий production
+  Capture → Quick с non-origin crop → Editor, те же действия, native clipboard;
+  pointerdown/keydown имеют `isTrusted=true`. Capture использует fake-platform.
+
+Повтор с `CUTE_SCREEN_E2E_SCENARIOS='tool-settings,tool-settings-reopen'` —
+2 scenarios / 2 tests, exit 0 (`native-persistence.log`): после отдельного native
+launch создаются pencil с brush/6 px/smoothing 75% и spotlight с dim 80%; шаг
+линейки остаётся 30°. Runner разделяет изолированные persistence groups,
+не только прежний m03. Первоначальный повтор выявил ошибку настройки профилей
+runner; параллельные Chrome и WebView2 input также мешали жестам. Успешный
+повтор выполнен последовательно, с одним общим выделенным профилем двух launches.
+
+Первый общий browser suite: 21/23 files; два сбоя воспроизведены отдельно.
+Выявлено перекрытие ToolRail большой selection-панелью image: нижний предел
+панели теперь учитывает rail, `browser-regressions.log` подтверждает исправление.
+Crop assertion сравнивал pixels overlay при fit zoom с document coordinates:
+helper нормализует только geometry bounds, сами pixel counts остаются исходными.
+`browser-crop-final.log` — exit 0. Все 23 browser specs покрыты общим прогоном
+и успешными focused повторами двух исправленных сценариев; общий исходный
+`browser-suite.log` сохраняет exit 1, не выдаётся за единый зелёный прогон.
+
+`CUTE_SCREEN_E2E_SCENARIOS=''` + `pnpm test:e2e:tauri` выполнил всю unattended
+matrix: 22 scenarios, 16 passed / 6 failed (`native-suite.log`, exit 1).
+Во время него обнаружен второй `run-tauri-e2e.mjs` из параллельной задачи:
+`concurrent-runners.log` фиксирует PID/command/start time. Чужие процессы не
+останавливались. Новый тест также уточнён: coordinates в Quick рассчитываются
+из фактического crop, non-origin crop явно проверяется до рисования.
+После освобождения runner выполнен повтор
+`CUTE_SCREEN_E2E_SCENARIOS='tool-settings,tool-settings-reopen,shape-defaults-placement,quick-editor-handoff,shape-toolbar,arrow'`
+со стабильной `pnpm test:e2e:tauri`: **6 scenarios / 7 tests, exit 0**
+(`native-retry.log`). Таким образом, все 22 сценария имеют успешное выполнение,
+но не в одном общем прогоне. Новый reopen дополнительно читает сохранённый
+документ с двумя составными фонарями; writer дожидается завершения autosave.
+
+Начальные check выявили превышение complexity в projection группового toolbar
+и layout; heading/ограничение rail выделены в самостоятельные функции без
+ослабления architecture budgets. `boundaries-final.log` — 40/40, exit 0.
+WebKitGTK/WKWebView, physical capture и mixed-DPI в этом срезе не проверены.
+
+## Проектные UI-иконки рядом с Tabler (2026-10-16, ADR-055)
+
+Windows NT 10.0.19045 x64, PowerShell 7.6.5, Node 22.23.1, pnpm 10.33.2.
+Смысловые `marker/pencil/eyedropper` используют собственные SVG через тот же
+`UiIcon`; прочий каталог сохраняет Tabler. Геометрия, CSS-размеры и состояния
+проверяются отдельно от узнаваемости. Первый вертикальный вариант выделителя и
+пипетки отвергнут при review. Затем пользователь уточнил референсы выделителя:
+вертикальное скошенное перо вверх, короткая обойма и широкие округлые плечики,
+без внутренних штрихов и дополнительного следа. Карандаш сохраняет остриё,
+пипетка — выбранную пользователем наполненную диагональную трубку с округлой
+грушей, обоймой и круглым нижним концом. Локальные solid parts наследуют
+currentColor; root SVG сохраняет fill none и stroke 1.8.
+
+Evidence root: `artifacts/custom-icons/`.
+
+- Первый `pnpm format`, `pnpm format:check`, `pnpm check` — exit 0; логи `format.log`,
+  `format-check.log`, `check.log`. Check включает lint, typecheck, format/docs,
+  9 boundary files / 40 tests, IPC drift и четыре Rust clippy configurations.
+  Existing Vue lint warnings и CanvasKit build warnings сохраняются.
+  После финальной визуальной правки общий повтор `pnpm check` остановился на
+  47 lint errors в параллельно изменяемых `editor-core` freehand/spotlight,
+  codec и layer-resize; `check-final.log`. Последний `pnpm format` также не
+  завершился из-за max-len в новом `tool-settings-redesign.test.ts`;
+  `format-final.log`. Эти core-файлы не менялись в работе над иконками.
+- `pnpm test` — exit 0, 94 files / 693 tests; `test.log`.
+  После правки геометрии `pnpm test tests/unit/vue/ui-icon.test.ts` — exit 0,
+  70/70: SVG-контракт и class/style fallthrough всех 35 смысловых имён.
+  Лог — `unit-icons.log`.
+  Повтор всего `pnpm test` на новой общей рабочей копии — 90/95 files и 690/695
+  tests passed, пять failures и один unhandled error в spotlight/freehand
+  контракте; `test-final.log`. Проход первого полного прогона не заявляется
+  как success этой более поздней рабочей копии.
+  Последний `pnpm format:check` также завершился exit 1 на параллельных изменениях
+  `shell.css` и `styles/tool-formatting-toolbar.css`; `format-check-final.log`.
+- `$env:CUTE_SCREEN_BROWSER_E2E_PORT='5198'; pnpm test:e2e:browser --spec tests/e2e/specs/browser-custom-icons.e2e.ts`
+  — exit 0, 2/2, Chrome 155.0.8059.79; `browser-after.log`.
+  `after/gallery-dpr-{1,2}.png` просмотрены: реальные `UiIcon`, light/dark,
+  размеры 16/18/20/24/32 CSS px и состояния кнопок. `after/raster-checks.json`
+  содержит 30 повторных SVG decode/raster проверок в расширенном viewBox:
+  непустая геометрия, нет выхода обводки за исходную область. Это не автоматическое
+  доказательство семантики. `after/editor-{en,ru}-{light,dark}.png`,
+  `empty-disabled.png`, `gallery.json` фиксируют реальный shell, наследование
+  цвета и размеры; проверены настоящий Tab focus и disabled.
+- `$env:CARGO_TARGET_DIR='D:/cutescreen/target/shape-catalog-native'; $env:CARGO_BUILD_JOBS='4'; $env:CUTE_SCREEN_E2E_SCENARIOS='custom-icons,highlighter'; pnpm test:e2e:tauri`
+  — dedicated `custom-icons` passed 1/1 внутри WebView2 155.0.4283.45 через
+  external tauri-driver 2.1.0. Обычный Capture создаёт fake-platform Quick session,
+  затем Editor handoff: uppercase HEX #7F7F7F, два типа штрихов, повторное
+  создание, native keyboard (`isTrusted`), focus и undo/redo. Далее editor
+  переключается RU/EN × light/dark. `after/native-quick.png`, `native-editor.png`,
+  `native-editor-{en,ru}-{light,dark}.png` и `native-empty-disabled.png` просмотрены.
+  Общий запуск завершился exit 1: дополнительный highlighter scenario один раз
+  не дождался commit первого штриха после закрытия palette/numeric controls
+  (`highlighter-toolbar.ts`, ожидание layer count). Лог — `tauri-after.log`.
+  Повтор той же стабильной команды с `CUTE_SCREEN_E2E_SCENARIOS='highlighter'`
+  прошёл exit 0, 1/1, без изменения source или assertions:
+  `tauri-highlighter-recheck.log`. Проверены настройки, preview/commit,
+  native context menu, palette и история в Quick и editor. Первый сбой сохранён
+  как ограничение устойчивости combined suite, а не скрыт успешным повтором.
+  После утверждения финальной геометрии повтор с `CUTE_SCREEN_E2E_SCENARIOS='custom-icons'`
+  остановлен до старта runtime: `pnpm build` получил TS2322/2339/2344 в новых
+  spotlight apertures/Rect/JsonObject контрактах editor-core; `tauri-final.log`.
+  Stale binary не запускался. Поэтому native screenshots относятся к предыдущей
+  геометрической редакции, а final native visual pass остаётся pending.
+- Финальные отдельные проверки иконок: `pnpm test tests/unit/vue/ui-icon.test.ts`
+  — 70/70; targeted ESLint и ESLint-format — exit 0 (`lint-icons.log`,
+  `format-icons-check.log`), `pnpm docs:check` — exit 0 (`docs-final.log`).
+  Чтение union в тестах теперь не зависит от LF/CRLF и положения следующей
+  декларации. `pnpm test:boundaries` в поздней рабочей копии проверяет icon
+  boundary успешно, но общий gate останавливает complexity 23/20 в параллельно
+  изменённом `shell/tools/context-schema.ts`; `boundaries-final.log`.
+- `python C:/Users/Vladimir/.codex/skills/.system/skill-creator/scripts/quick_validate.py .agents/skills/cutescreen-icons`
+  с `PYTHONUTF8=1` — exit 0; `skill-validation.log`. Навык локальный, `.agents/`
+  gitignored. Инструкции связывают реальные source/tests/preview и источники
+  подходов; сторонние SVG и scripts не копировались.
+
+Исходные browser screenshots — `before/`, неудачный вертикальный вариант —
+`rejected-upright/`. До замены сохранены также native empty и первый рабочий
+Quick/editor flow. Диагностические прогоны до стабилизации теста встречали
+несогласованный locale прогретого Quick и конкурентную native session;
+`tauri-before-diagnostic.log` / `tauri-before.log`. Поэтому они не подтверждают
+полную native матрицу «до». Финальный dedicated тест проходит один production
+capture lifecycle, а RU/EN × light/dark переключает в editor. Live-синхронизация
+preferences уже прогретого Quick не заявляется как новое поведение.
+
+Production frontend build не содержит `icons-preview.html`, `icon-workbench`
+или текста gallery; основной HTML entry её не импортирует. App/tray icons,
+document/renderer contracts и binary image transport не изменялись. Physical
+mixed-DPI, Linux WebKitGTK и macOS WKWebView остаются pending для этого среза.
+
+## Иконка Shape circle-square (2026-10-16)
+
+Windows x64 / PowerShell: `pnpm test tests/unit/vue/ui-icon.test.ts` — 36/36,
+`pnpm format` — exit 0. Общий mapping `shape` использует `IconCircleSquare`
+из установленного Tabler. Browser и real-WebView визуальная проверка этой
+замены не проводилась.
+
+## Числовые параметры, пресеты и live preview (2026-10-16)
+
+Windows NT 10.0.19045 x64, PowerShell 7.6.5, Node 22.23.1, pnpm 10.33.2.
+Общий numeric adapter заменяет поля параметров редактора; navigation zoom
+не изменён. Исследование и контракт — ADR-054. Актуальная документация
+[Spectrum Slider](https://spectrum.adobe.com/web/rsp/components/slider)
+сохраняет editable value и mixed state; прежний `/page/slider/` при прямом
+запросе сейчас возвращает 404, но доступен в поисковом индексе.
+
+- `pnpm format`, `pnpm format:check`, `pnpm check` — результаты финального
+  прогона записаны в `artifacts/numeric-controls/format.log`, `format-check.log`
+  и `check-complete.log`.
+- `pnpm test` — 94 files, 659/659 tests. Adapter/controller и mounted shell
+  проверяют запятую/точку, ошибку диапазона/шага, mixed, disabled/read-only,
+  клавиатуру/Shift/Home/End, отмену и отсутствие повторных команд. Inline text
+  сохраняет rich-text state, диапазон и границу document commit. Лог — `test-final.log`.
+- `pnpm test:render` — 18/18, четыре файла. Новый 4K test использует каталог
+  31 фигуры, display projection мультивыбора и один batch. Декодированные RGBA
+  последнего preview, committed render и PNG export совпадают без различий;
+  undo возвращает исходный документ. Лог — `render-final.log`.
+- `pnpm test:perf` — 4/4. Это controlled CanvasKit/software trend suite,
+  не доказательство аппаратного GPU budget. Лог — `perf.log`, JSON отчёт —
+  `artifacts/perf/m01-renderer.json`.
+- Browser: Chrome 155.0.8059.79, отдельный Vite port 5197.
+  `CUTE_SCREEN_BROWSER_E2E_PORT=5197 pnpm test:e2e:browser` с `--spec` для
+  `browser-shape-toolbar`, `browser-highlighter`, `browser-tool-ux`,
+  `browser-v7-rich-text-editing`, `browser-v7-rich-text-toolbar`,
+  `browser-m06-content-tools` и `browser-m08-3` (`tests/e2e/specs/*.e2e.ts`).
+  Итоговый отдельный прогон — 7/7 spec files, 21/21 tests passed,
+  `browser-isolated.log`. Ранние повторы — `browser-final.log`,
+  `browser-shape-final.log`, `browser-text.log`, `browser-recheck.log`.
+  Trusted pointer удерживает opacity slider: пиксели меняются при неизменном
+  committed document, pointerup совпадает с последним preview, undo/redo и
+  Escape восстанавливают ожидаемое состояние. Проверяются RU/EN, light/dark,
+  1024 px, компактные группы и расположение панели. Inline size input сохраняет
+  focus/selection при каждом preview; фон текста использует общий Apply/Cancel.
+- Real Windows WebView2 155.0.4283.45, tauri-driver 2.1.0:
+  `CARGO_TARGET_DIR=target/shape-catalog-native`
+  `CUTE_SCREEN_E2E_SCENARIOS=shape-toolbar,highlighter,v7-rich-text,quick-chrome`
+  `pnpm test:e2e:tauri` — первый прогон 4/4 spec files, 9/9 tests (`tauri.log`).
+  Production Capture → Quick → Editor использует fake capture и обычный mount,
+  настоящий native pointer/keyboard, non-origin crop и отдельный test profile.
+  Изолированный Cargo target сохраняет запущенную пользовательскую debug app.
+  Screenshots: `artifacts/tauri-e2e/numeric-quick-opacity-preview.png`,
+  `numeric-editor-opacity-preview.png`, `quick-native-tool-settings.png`.
+
+Дополненный native прогон (`tauri-final.log`) не полностью зелёный:
+highlighter 1/1 и Quick 4/6 прошли, Quick sampling/tool-switch и создание
+стрелки дали failures. Shape scenario прервался на конфликте native driver
+port (`bind 0x2740`, затем `UND_ERR_SOCKET`). Отдельный повтор (`tauri-recheck.log`)
+прошёл numeric opacity в Quick/editor, затем выявил гонку ожидания каталога:
+DOM уходящего popover ещё существовал при `aria-expanded=false`.
+Helper теперь ожидает состояние trigger и видимую сетку. Inline background
+в том же повторе — 1/1 passed после исправления test focus перед Ctrl+Enter:
+padding/radius видимы с текущим zoom, Cancel полностью восстанавливает фон,
+Apply не меняет history, завершение текста даёт одну команду.
+Screenshot — `artifacts/tauri-e2e/numeric-text-background-preview.png`.
+Сбои общей Quick suite не переобъявляются прошедшими по первому запуску.
+Следующий shape-only запуск (`tauri-shape-final.log`) не достиг runtime:
+параллельная сборка обновила shared `apps/desktop/dist` во время Rust embedding
+(`failed to read asset ...src-BFMT04cO.css`). Runner отказался тестировать старый
+binary. В это время работал другой `tauri-custom-icons` WDIO; его процессы и
+изменения не останавливались и не откатывались. Изолированный Cargo target
+защищает binary, но не обеспечивает изоляцию общего frontend output.
+
+Финальный отдельный повтор после завершения параллельных сборок:
+`CARGO_TARGET_DIR=target/shape-catalog-native`
+`CUTE_SCREEN_E2E_SCENARIOS=shape-toolbar pnpm test:e2e:tauri` — 1/1 passed
+за 32.8 s (`tauri-shape-isolated.log`). Полный production Capture → Quick →
+Editor, opacity pixels/draft/history, defaults и каталог 31 формы прошли.
+Таким образом, numeric shape и inline background имеют финальное runtime
+evidence; два failures отдельной общей Quick suite остаются открытыми.
+
+Исправления найдены этими прогонами: numeric WebDriver input теперь использует
+native Ctrl+A/keys; preview rich text восстанавливает DOM selection и возвращает
+focus точному полю; текстовые popover измеряются общей placement системой и
+не уходят под нижнюю rail; повторный пресет не создаёт команду. После добавления
+новых файлов запущенный ранее Vite сохранял отрицательный resolve cache:
+перезапуск конфигурации восстановил HTTP 200 для `numeric-presentation.ts` и
+`ContextToolbar.vue` без изменения импортов.
+
+Inline background отрисовывается отдельной CSS поверхностью за текстом:
+padding расширяет только фон, сохраняя origin, DOM range и layout текста.
+Placement учитывает этот дополнительный отступ. Mounted test проверяет оба
+параметра, Cancel, повторное открытие с исходными значениями и общий Apply
+без document command до завершения text draft. Контекстная отмена сбрасывает
+также локальный invalid input, у которого ещё нет display projection.
+
+Linux/macOS/WebKit runtime для numeric-среза не запускался. Physical capture,
+native Save dialog и аппаратный GPU performance этим evidence не подтверждаются.
+Результаты предыдущих платформенных срезов на эти controls не переносятся.
+
+## Привязка вложенных настроек фигуры (2026-10-16, ADR-053)
+
+Windows x64 / PowerShell, Chrome 155.0.8059.79. Regression создаёт сноску через
+drag и ввод текста, затем открывает Shape через trusted ПКМ. До исправления
+«Наложение» было в 231.39 CSS px от trigger: `artifacts/shape-defaults-red.log`
+и `shape-defaults-unit-red.log`. После исправления зазор около 11.45 px;
+переключение appearance/stroke/appearance, Escape/focus и неизменность документа
+проходят. Реальные bounds и screenshots —
+`artifacts/browser-e2e/callout-shape-defaults-{0,1,2}-*-placement.{json,png}`.
+
+Команды в основном workspace:
+
+```powershell
+pnpm format
+pnpm exec vitest run --project vue tests/unit/vue/preview-placement.test.ts
+$env:CUTE_SCREEN_BROWSER_E2E_PORT='5194'
+pnpm test:e2e:browser --spec tests/e2e/specs/browser-shape-toolbar.e2e.ts --mochaOpts.grep 'nested shape defaults'
+pnpm check
+pnpm test --maxWorkers=2
+$env:CARGO_TARGET_DIR='D:\cutescreen\target\highlighter-e2e'
+$env:CARGO_BUILD_JOBS='4'
+$env:CUTE_SCREEN_E2E_SCENARIOS='shape-toolbar,arrow,highlighter'
+pnpm test:e2e:tauri
+```
+
+Focused geometry — 5/5 passed (`shape-defaults-focused.log`); browser regression
+passed (`shape-defaults-browser-first.log`, повторно в `shape-defaults-browser-regression.log`).
+Расширенный первый browser run: highlighter, m06-arrow-tools и tool-ux passed,
+catalogue failed из-за клика во время анимации. Shared catalogue helper теперь
+дожидается завершения animation перед следующим кликом.
+
+В workspace одновременно вносились другие UI-изменения: Vite фиксировал HMR
+EditorWorkspace/CanvasViewport/rich-text-editor во время повторных browser runs.
+Общая native-сборка остановилась до запуска WebView на TS2379 в новом
+NumericControl.vue (`unit`, `placeholder`, `max`); последующий typecheck также
+зафиксировал TS2375 в numeric-preview-controller.ts. Общий boundaries повтор
+отказал на длине use-editor-workspace.ts, а не на preview-placement.
+Эти прогоны не объявляются зелёными. Логи — `artifacts/shape-defaults-{tauri,
+typecheck-final,boundaries,browser-final,test-final}.log`. Для изолированной
+проверки создан временный worktree от `507521c5b84f027e385779ebbbc9d140beccc172`
+с изменением preview-placement и его shared regression helpers/specs.
+
+Изолированная проверка от указанного HEAD: `pnpm install --frozen-lockfile`,
+`pnpm format`, `pnpm test --maxWorkers=2` — 91 файл / 646 tests passed;
+`pnpm test:boundaries` — 9 файлов / 40 tests passed. SHA-256 проверяемых файлов
+сохранены в `artifacts/shape-defaults-isolated/source-hashes.json`.
+Implementation, geometry test, shared placement helper, новый native spec и
+scenario registry совпадают с main по SHA-256. Общий browser spec в main
+дополнительно содержит параллельный numeric test, которого нет в baseline.
+
+Для MSVC в worktree явно задан
+`RUSTUP_TOOLCHAIN=1.97.0-x86_64-pc-windows-msvc`: основной D:\cutescreen имеет
+directory override, а новый worktree первоначально выбрал GNU и отказал без
+dlltool. После выбора MSVC native `shape-toolbar,arrow` прошёл: 2 scenarios /
+3 tests, WebView2 155.0.4283.45. Production fake Capture → Quick → Editor
+включал новый callout/defaults regression, весь каталог и Arrow focus/history.
+Просмотрены обе native appearance PNG. Зазор — 7.89 px в Quick и 14.39 px
+в editor. Логи — `artifacts/shape-defaults-isolated/{tauri-final,test,boundaries}.log`,
+PNG/JSON — `artifacts/shape-defaults-isolated/tauri-e2e/callout-shape-*`.
+
+Отдельный повтор регрессии зарегистрирован как `shape-defaults-placement`:
+
+```powershell
+$env:RUSTUP_TOOLCHAIN='1.97.0-x86_64-pc-windows-msvc'
+$env:CARGO_TARGET_DIR='D:\cutescreen\target\shape-catalog-native'
+$env:CARGO_BUILD_JOBS='4'
+$env:CUTE_SCREEN_E2E_SCENARIOS='shape-defaults-placement'
+pnpm test:e2e:tauri
+```
+
+Отдельный native regression — 1/1 passed за 6 s; лог
+`artifacts/shape-defaults-isolated/tauri-regression.log`. Browser повтор в
+изолированном baseline сначала дал 8 passed / 1 failed: legacy paint test
+не нашёл HEX field после клика до завершения появления палитры. Helper теперь
+дожидается animation перед Custom colour; не относящиеся к placement изменения
+палитры и NumericControl в изолированную проверку не переносились.
+Универсальный shape-toolbar helper для старого baseline использует прежние
+подписи пресетов; main workspace параллельно обновляет их на aria-label.
+
+Итоговый focused browser replay — 2 files / 7 tests passed, Chrome 155:
+новый callout/defaults regression, весь каталог и пять tool-ux tests.
+Команда: `CUTE_SCREEN_BROWSER_E2E_PORT=5196 pnpm test:e2e:browser --spec
+'tests/e2e/specs/browser-{shape-toolbar,tool-ux}.e2e.ts' --mochaOpts.grep
+'nested shape defaults|every catalogue|consistent tool UX'` (переменная в
+PowerShell задавалась через `$env:`). Лог —
+`artifacts/shape-defaults-isolated/browser-regression-final.log`.
+В основном workspace `pnpm format`, `pnpm format:check`, `pnpm docs:check`
+и `git diff --check` прошли; логи — `shape-defaults-format-final.log`,
+`shape-defaults-format-check.log`, `shape-defaults-docs-check.log` в artifacts.
+Итоговый `pnpm check` в isolated worktree завершился с exit 0, включая lint,
+typecheck, format/docs/boundaries, IPC codegen и все четыре Rust clippy variants.
+Лог — `artifacts/shape-defaults-isolated/check-final.log`. Временный worktree
+после проверки архивируется; artifacts сохранены в основном workspace.
+
+## Компоновка палитры и custom swatch — Windows x64, 2026-10-15
+
+`REQ-EDT-008/015/016`, `REQ-UI-001/003/006/007`: drawing palette использует
+два полных ряда по десять образцов; highlighter — один ряд из восьми. Custom
+action отделён справа. Цветные круги 20 px находятся в hit areas 26 px;
+фактический промежуток между кругами 10 px, до custom — 23 px. Selection ring
+имеет свободное место. Плавные radial gradients рисуются только во внутреннем
+круге; фон самой кнопки прозрачен. Embedded shape stroke/fill popovers имеют
+ширину 366 px и сохраняют viewport constraints и preview placement.
+
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5186 pnpm test:e2e:browser --spec tests/e2e/specs/browser-highlighter.e2e.ts --spec tests/e2e/specs/browser-tool-ux.e2e.ts --spec tests/e2e/specs/browser-shape-toolbar.e2e.ts`
+  — exit 0, 3 files / 9 tests, Chrome 155.0.8059.79. Проверены actual grid rows,
+  расстояния и viewport fit, selection/defaults/embedded, Custom HEX,
+  keyboard/focus, Undo, закрытие без скачка и RU/EN × light/dark.
+  Лог — `artifacts/palette-layout-browser.log`; геометрия —
+  `artifacts/browser-e2e/{arrow,highlighter}-preset-palette-layout.json`.
+- `pnpm test tests/unit/vue/highlighter-toolbar.test.ts tests/unit/vue/shape-context-toolbar.test.ts tests/unit/vue/arrow-context-toolbar.test.ts tests/unit/vue/ui-controls.test.ts tests/unit/vue/tool-ux.test.ts`
+  — exit 0, 5 files / 56 tests; `artifacts/palette-layout-tests.log`.
+- `pnpm check` — exit 0, `artifacts/palette-layout-check.log`.
+- `CUTE_SCREEN_E2E_SCENARIOS=highlighter,arrow,shape-toolbar CARGO_TARGET_DIR=D:/cutescreen/target/highlighter-e2e CARGO_BUILD_JOBS=4 pnpm test:e2e:tauri`
+  — настоящий WebView2 155.0.4283.45: highlighter 1/1 и arrow 2/2 passed,
+  включая actual row/gap/fit measurements и закрытие без скачка. Shape scenario
+  остановился на первом gesture до проверки палитры;
+  `artifacts/palette-layout-tauri.log`.
+- Повтор `CUTE_SCREEN_E2E_SCENARIOS=shape-toolbar` с теми же Cargo env после
+  ожидания `.cs-canvas-ready` в общем draw helper — exit 0, 1/1 passed.
+  Production fake capture → Quick → Editor, embedded stroke/fill, Custom HEX,
+  defaults и каталог фигур; `artifacts/palette-layout-shape-tauri.log`.
+
+Просмотрены browser `arrow-preset-palette-open.png`, `palette-en-light.png`
+и `palette-en-dark.png`, native `arrow-preset-palette-open.png` и
+`highlighter-editor-preset-palette-open.png`. Полный unit suite 644/644 ранее проверил исправление
+leave transition; после изменения компоновки повторён затронутый component slice.
+Linux/WebKitGTK и macOS/WKWebView этим Windows evidence не подтверждаются.
+
+## Закрытие цветовой палитры — Windows x64, 2026-10-15
+
+`REQ-EDT-008/015/016`, `REQ-UI-003/006/007`: `usePreviewPopover` сохраняет
+последние измеренные координаты при закрытии. До исправления browser regression
+зафиксировал скачок на 419.27 CSS px к `(0, 0)` во время leave transition;
+`artifacts/palette-dismissal-red.{log,json}`. После исправления все записанные
+browser и Quick/editor WebView2 кадры показывают смещение 0 px.
+
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5186 pnpm test:e2e:browser --spec tests/e2e/specs/browser-highlighter.e2e.ts --spec tests/e2e/specs/browser-tool-ux.e2e.ts`
+  — exit 0, 2 files / 6 tests, Chrome 155.0.8059.79. Проверены selection palette
+  стрелки, preset/custom commit, Escape, click outside, focus и Undo.
+  Лог — `artifacts/palette-dismissal-browser.log`.
+- `CUTE_SCREEN_E2E_SCENARIOS=highlighter,arrow CARGO_TARGET_DIR=D:/cutescreen/target/highlighter-e2e CARGO_BUILD_JOBS=4 pnpm test:e2e:tauri`
+  — WebView2 155.0.4283.45, external tauri-driver. Highlighter 1/1 прошёл через
+  production fake capture → Quick → Editor; четыре способа закрытия проверены
+  в обоих окнах. Arrow в этом прогоне остановился до открытия палитры на первом
+  gesture. Лог — `artifacts/palette-dismissal-tauri-second.log`.
+- Повтор `CUTE_SCREEN_E2E_SCENARIOS=arrow` с теми же Cargo env — exit 0,
+  2/2 tests. Helper ждёт `.cs-canvas-ready` и стабильный Fit перед первым
+  gesture; затем проверены selection palette, preset/Escape, focus и Undo.
+  `artifacts/palette-dismissal-arrow-tauri.log`; native
+  `arrow-preset-palette-open.png` просмотрен, смещение при закрытии — 0 px.
+- `pnpm test` — exit 0, 91 files / 644 tests;
+  `artifacts/palette-dismissal-tests.log`.
+- `pnpm check` — exit 0, включая lint/types/format/docs/boundaries/IPC и Rust
+  fmt/clippy; `artifacts/palette-dismissal-check.log`.
+- После адаптации test callback повторно прошли `pnpm lint` и
+  `pnpm exec tsc --noEmit -p tests/e2e/tsconfig.json`; логи
+  `artifacts/palette-dismissal-{lint,e2e-types}.log`.
+
+`palette-dismissal.ts` начинает rAF-замер перед реальным input и сохраняет JSON
+для каждого закрытия: `artifacts/browser-e2e/*-palette-dismissal.json` и
+`artifacts/tauri-e2e/*-palette-dismissal.json`. Просмотрены browser
+`arrow-preset-palette-open.png` и native `highlighter-editor-preset-palette-open.png`.
+Первый native прогон выявил test-only `__name is not defined`: вложенную функцию
+заменили object method, который не требует внешнего transpiler helper при
+сериализации callback в WebView. Он не доказывает ошибку продукта;
+лог — `artifacts/palette-dismissal-tauri-first.log`.
+
+Linux/WebKitGTK, macOS/WKWebView и physical capture этим срезом не проверялись.
+ADR и platform capture capabilities сохраняются.
+
 ## Курсоры crop handles — Windows x64, 2026-10-15
 
 `REQ-TOL-013`, `REQ-UI-005`: hover и pointerdown используют общий crop hit testing;
@@ -2612,3 +3082,54 @@ deterministic raster/controller evidence; physical mixed-DPI replay остаёт
 pending. Полные browser failures предыдущего среза не переобъявляются зелёными
 и не перезапускались ради этого Quick-only fix. Native Save dialog и physical
 drag acceptance остаются открытыми, как указано выше.
+
+## Монитор с кошачьими прищурами — 2026-10-16
+
+`REQ-ACT-006`, `REQ-UI-013`, ADR-057. Windows 10 build 19045 x64;
+Node 22.23.1, Python 3.14.0 / Pillow 12.0.0, Rust 1.97.0.
+
+- До генерации `cargo test -p cute-screen-desktop --lib tray_icon::tests -- --nocapture`
+  упал 0/2: старый template имел alpha 255 вместо прозрачных глаз, а в новом
+  месте внешнего контура старый tray имел alpha 0 вместо тёмного цвета.
+- `pnpm icons:generate` — passed. Общая геометрия выбранного монитора с ушами,
+  двумя прищурами и подставкой обновила root logo, editor brand, favicon,
+  tray/template и PNG/ICO/ICNS. `logo-mark.svg` сохраняет самостоятельный SVG
+  без плитки. Запуск Tauri CLI через текущий Node работает на Windows без
+  попытки выполнить pnpm shim как native executable.
+- `cargo test --workspace` — passed: desktop 114, storage 20, binary/doc tests.
+  Новые контракты повторно декодируют настоящие embedded tray PNG, проверяют
+  оба глаза, белые stem/foot, внешний контур, template alpha и прозрачный фон.
+- `cargo fmt --all` — passed. Целевые ESLint и formatting checks генератора — passed.
+- `pnpm build:frontend` — passed; существующее предупреждение bundle >500 kB.
+  Production `brand-DJhADi5n.svg` содержит точную выбранную геометрию.
+- `python -X utf8 artifacts/branding/applied-logo-20261016/verify-generation.py`
+  — passed: 66 декодированных PNG/ICO/ICNS изображений/кадров, 61 generated file.
+  После повторного `pnpm icons:generate` decoded RGBA идентичны; SVG/PNG/ICO
+  побайтово воспроизводимы. ICNS container ordering Tauri CLI может различаться,
+  поэтому его сравнение выполнено по всем декодированным кадрам, не только bytes.
+  `logo.svg`, frontend brand, favicon и foundation равны; `logo-mark.svg`
+  совпадает по path с одобренным концептом. Отчёт: `verification.json` ниже.
+- `pnpm docs:check` — passed, относительные ссылки/anchors в 34 Markdown files.
+- `pnpm format` выполнен, но завершился ошибкой: 27 max-len ошибок в других
+  изменяемых файлах editor-core/editor-vue. Лог: `artifacts/branding/logo-apply-format.log`.
+- `pnpm check` остановился на lint: 365 errors / 60 warnings в текущем workspace;
+  полный check не объявляется пройденным. Лог: `artifacts/branding/logo-apply-check.log`.
+- `pnpm format:check` запускался; общий результат и оставшиеся ошибки сохраняются
+  в `artifacts/branding/logo-apply-format-check.log`. Проверки новых брендовых
+  исходников/документов выполняются отдельно, без заявления общего pass.
+
+Пакеты запускались через штатный pnpm 10.33.2 (cmd либо Node entry point из
+Corepack cache); это те же scripts package.json, без замены стабильных команд.
+
+Артефакты `artifacts/branding/applied-logo-20261016/`:
+`tray/` и `app/` — SVG/PNG в 16/18/20/22/24/32 при 100/125/150/200%, чёрный,
+белый и штатный варианты на трёх фонах; каждый PNG повторно декодирован.
+`tray/pixel-details.png` и app sheet просмотрены; прищуры и подставка сохранены.
+`tray/report.json` содержит 13 консервативных edge-contact warnings на некоторых
+маленьких размерах; они не являются автоматическим доказательством обрезки.
+Native tray и реальные DPI этими листами не подтверждены.
+`decoded-bundle-icons.json` и `verification.json` фиксируют размеры и SHA-256;
+`generate.log` — повторную генерацию. Исторический GNOME smoke старого кота
+не переносится на новую геометрию. Новый Windows/GNOME/KDE/macOS native tray,
+light/dark/Retina/HiDPI и packaged-app smoke остаются pending; platform support
+не расширен. Для отображения новых embedded assets нужен перезапуск новой сборки.
