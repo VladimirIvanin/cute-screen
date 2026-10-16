@@ -1,9 +1,9 @@
 import {
   $,
-  $$,
   browser,
   expect,
 } from '@wdio/globals'
+import path from 'node:path'
 import {
   snapshot,
   openHarness,
@@ -14,6 +14,63 @@ import {
 } from './browser-v7-rich-text-test-kit'
 
 describe('Document v7 rich text in browser mode', () => {
+  it('previews background palette colours without overflowing the dialog', async () => {
+    await browser.setWindowSize(1024, 700)
+    await openHarness()
+    const editor = await startTextAt(18, 18)
+    await editor.addValue('Palette preview')
+    const before = await snapshot()
+    const background = $('button[aria-label="Background"]')
+    const dialog = $('.cs-text-background-popover')
+
+    await background.click()
+    await dialog.$('button[aria-label="Blue"]').click()
+    await browser.waitUntil(() => browser.execute(() =>
+      getComputedStyle(document.querySelector('.cs-text-editor')!).getPropertyValue('--text-background-color') === 'rgba(61, 173, 255, 1)'))
+    expect(await snapshot()).toEqual(before)
+
+    await dialog.$('button[aria-label="Custom colour"]').click()
+    const palette = dialog.$('.cs-color-popover')
+    await expect(palette).toExist()
+    const layout = await browser.execute(() => {
+      const dialog = document.querySelector<HTMLElement>('.cs-text-background-popover')
+      const palette = dialog?.querySelector<HTMLElement>('.cs-color-popover')
+      if (!dialog || !palette) throw new Error('Embedded colour palette is unavailable')
+      const parent = dialog.getBoundingClientRect()
+      const child = palette.getBoundingClientRect()
+      const controls = [...palette.querySelectorAll<HTMLElement>('button, input')].map((element) => {
+        const rect = element.getBoundingClientRect()
+        return { left: rect.left, right: rect.right }
+      })
+      return {
+        child: { left: child.left, right: child.right },
+        controls,
+        parent: { left: parent.left, right: parent.right },
+        scrolls: dialog.scrollWidth > dialog.clientWidth || palette.scrollWidth > palette.clientWidth,
+      }
+    })
+    expect(layout.scrolls).toBe(false)
+    expect(layout.child.left).toBeGreaterThanOrEqual(layout.parent.left)
+    expect(layout.child.right).toBeLessThanOrEqual(layout.parent.right)
+    expect(layout.controls.every((control) =>
+      control.left >= layout.parent.left && control.right <= layout.parent.right)).toBe(true)
+
+    const hex = palette.$('input[aria-label="HEX colour code"]')
+    await hex.click()
+    await browser.keys(['Control', 'a'])
+    await browser.keys('#ff7556')
+    await browser.keys('Enter')
+    await browser.waitUntil(() => browser.execute(() =>
+      getComputedStyle(document.querySelector('.cs-text-editor')!).getPropertyValue('--text-background-color') === 'rgba(255, 117, 86, 1)'))
+    await browser.saveScreenshot(path.resolve('artifacts/browser-e2e/text-background-palette-preview.png'))
+    await browser.keys('Escape')
+    await expect(palette).not.toExist()
+    await expect(dialog).toExist()
+    await browser.keys('Escape')
+    await expect(dialog).not.toExist()
+    await expect(background).toBeFocused()
+  })
+
   it('hands text to the canvas without a vertical jump or duplicate projection', async () => {
     await browser.setWindowSize(1280, 720)
     await openHarness()
@@ -151,7 +208,7 @@ describe('Document v7 rich text in browser mode', () => {
       ['Numbered marker', 'Numbered marker'],
     ] as const) {
       await $(`button[aria-label="${tool}"]`).click({ button: 'right' })
-      await expect($('.cs-text-toolbar')).toHaveAttribute('aria-label', title)
+      await expect($(tool === 'Numbered marker' ? '.cs-numbered-marker-toolbar' : '.cs-text-toolbar')).toHaveAttribute('aria-label', title)
     }
 
     await $('button[aria-label="Text"]').click()
@@ -188,7 +245,7 @@ describe('Document v7 rich text in browser mode', () => {
     await expect($('button[aria-label="Фон"]')).toBeFocused()
   })
 
-  it('keeps Callout bubble and Numbered badge semantics with disabled container controls', async () => {
+  it('keeps Callout bubble and dedicated Numbered badge semantics', async () => {
     await browser.setWindowSize(1280, 720)
     await openHarness()
     const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
@@ -214,18 +271,17 @@ describe('Document v7 rich text in browser mode', () => {
     expect(layer?.payload).toHaveProperty('label')
 
     await $('button[aria-label="Numbered marker"]').click({ button: 'right' })
-    await expect($('button[aria-label="Bullet list"]')).toBeDisabled()
-    await $('button[aria-label="Background"]').click()
-    await expect($('.cs-text-background-popover').$('button=None')).toBeDisabled()
-    const disabledNumbers = await $$('.cs-text-background-popover input[role="spinbutton"]:disabled')
-    expect(disabledNumbers).toHaveLength(2)
-    await browser.keys('Escape')
+    await expect($('button[aria-label="Bullet list"]')).not.toExist()
+    await expect($('button[aria-label="Background"]')).not.toExist()
+    await expect($('button[aria-label="Badge color"]')).toBeDisplayed()
+    await $('button[aria-label="Numbered marker"]').click()
     await scene.click({ x: 42, y: 20 })
     await browser.waitUntil(async () => (await snapshot()).layers.length === 6)
     await $('button[aria-label="Show layers"]').click()
     await $('button[aria-label="Select"]').click()
     await $('.cs-layer-row .cs-layer-select').click()
-    await applyBackground({ color: '#cc3344', padding: 0, radius: 0 })
+    await $('button[aria-label="Badge color"]').click()
+    await $('[role="dialog"][aria-label="Badge color"] button[aria-label="Red"]').click()
     layer = (await snapshot()).layers.at(-1)
     expect(layer).toMatchObject({
       kind: 'numberedMarker',
@@ -233,9 +289,9 @@ describe('Document v7 rich text in browser mode', () => {
         badge: {
           shape: 'circle',
           color: {
-            red: 0.8,
-            green: 0.2,
-            blue: 0.26666666666666666,
+            red: 1,
+            green: 117 / 255,
+            blue: 86 / 255,
             alpha: 1,
           },
         },

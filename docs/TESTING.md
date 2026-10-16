@@ -1,5 +1,127 @@
 # Стратегия тестирования
 
+## Измеряемые подписи выносок (2026-10-17, ADR-065)
+
+Linux x86_64/X11, Node 22.23.1, pnpm 10.33.2, Chrome 154.0.8037.57.
+Core red-first regressions initially failed four assertions: supplied metrics,
+left placement, padded gap and missing width grip. Final geometry also checks
+world-coordinate preservation under rotation and measured spatial-index hits.
+
+- `pnpm test` — 110 files / 848 tests passed. The final controller extraction
+  was followed by 31/31 focused Vue tests and 43/43 architecture boundary tests.
+- `pnpm test:render` — 8 files / 26 tests passed. New callout tests round-trip
+  v7, decode Canvas2D/CanvasKit PNGs, inspect label pixels and verify exact
+  Canvas2D preview/export pixel identity. Existing goldens are unchanged.
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5231 pnpm test:e2e:browser --spec tests/e2e/specs/browser-callout-layout.e2e.ts --spec tests/e2e/specs/browser-callout-visual.e2e.ts --spec tests/e2e/specs/browser-text-layout.e2e.ts --spec tests/e2e/specs/browser-v7-rich-text-editing.e2e.ts --spec tests/e2e/specs/browser-v7-rich-text-toolbar.e2e.ts`
+  — 5 specs / 13 scenarios passed; exercises production drag creation on both sides, 480 px wrapping, stable
+  commit/reopen, 720 px manual width, direct grip resize, popup focus/Escape and
+  atomic undo/redo. Mixed font sizes retain the label's vertical center.
+  Visual evidence covers 1024 px × RU/EN × light/dark × 50/100/200% zoom.
+- `XDG_SESSION_ID=callout-layout-final PATH="$PWD/artifacts/spotlight-fix/tools/bin:$PWD/artifacts/spotlight-fix/tools/webkit/root/usr/bin:$PATH" CUTE_SCREEN_E2E_DRIVER_PROVIDER=external CUTE_SCREEN_E2E_SCENARIOS=callout-layout pnpm test:e2e:tauri`
+  — 1/1 passed in real Tauri/Wry/WebKitGTK with native creation, reopen,
+  numeric input, popup focus/Escape, grip resize and undo/redo. The first
+  shared-session attempt collided with the running application's activation
+  endpoint; an isolated embedded-driver attempt opened the app but did not
+  deliver the creation drag. The external driver passed without closing the
+  user's editor. Windows/macOS/Wayland were not run.
+
+The measured projection now supplies paragraph struts from the largest span and
+proportional line heights on child spans. Width popup input receives focus after
+its measured placement becomes visible. Browser text-layout's palette regression
+now opens tool defaults through the ADR-063 right-click entry point.
+Source changes preserve existing keyboard-shortcut work. Schema v7, IPC and
+original image storage are unchanged. Build commands must run sequentially because
+`build:packages` cleans shared outputs. Existing jsdom canvas warnings and
+CanvasKit externalization/bundle-size notices do not constitute test failures.
+
+Evidence is collected in `artifacts/callout-layout/`; browser and native PNGs
+were visually inspected, including 1024 px RU/dark/100%, EN/light/200%, and the
+selected left callout with its outer width grip.
+
+Final `pnpm check` passed (lint, typecheck, format/docs, 43 boundary tests,
+IPC generation check and all Rust fmt/clippy configurations). `pnpm tauri build
+--debug --no-bundle` passed and restored the production executable after native
+harness testing. Final `pnpm format`, `pnpm format:check` and `pnpm docs:check`
+are retained with the other logs.
+
+## Физические буквенные shortcuts редактора (2026-10-16, ADR-064)
+
+Ubuntu 24.04.5 LTS x86_64, Node 22.23.1, pnpm 10.33.2, Vitest 4.1.10:
+`pnpm vitest run --project vue tests/unit/vue/keyboard-shortcuts.test.ts tests/unit/vue/tool-ux.test.ts tests/unit/vue/app-content-actions.test.ts`
+— 3 files / 40 tests passed. Проверены `KeyZ` с русскими `я/Я`, Arabic `key`
+при `KeyV`, priority `code`, ASCII fallback при пустом/`Unidentified` code,
+Ctrl/Cmd history/open/duplicate/copy/cut/paste/style clipboard, editable target,
+IME и `defaultPrevented`. Mounted shell отдельно проверяет русский Undo/Redo,
+Duplicate, text cut и style clipboard.
+
+Chrome 154.0.8037.57 на Linux x86_64:
+`CUTE_SCREEN_BROWSER_E2E_PORT=5197 pnpm test:e2e:browser --spec tests/e2e/specs/browser-keyboard-shortcuts.e2e.ts`
+— 1/1 passed. Настоящий browser keyboard input создаёт Arrow, отменяет,
+возвращает и дублирует его. Нелатинский `key` при фиксированном `code` проверен
+изолированно в component/unit-среде: WebDriver не переключает системную раскладку
+без изменения пользовательской сессии. Real Tauri и системные RU/EN раскладки,
+Windows/WebView2, macOS/WKWebView и Wayland этим срезом не запускались; новых
+platform claims нет.
+
+## Диагностика Vitest workers (2026-10-16)
+
+`REQ-REL-001/002/003/005`. Платформа: Ubuntu 24.04.5 LTS x86_64,
+Linux 6.8.0-142-generic, Node 22.23.1, pnpm 10.33.2, Vitest 4.1.10;
+`os.availableParallelism()` = 16, 16 GiB RAM. Без явного предела Vitest
+этой версии запускает до 15 fork workers. jsdom, native Canvas2D и WASM
+используют память одновременно; V8 coverage увеличивает стоимость тестов.
+
+До изменения конфигурации:
+
+- `pnpm test` — 109 files / 831 tests passed, 28.49 s.
+- `pnpm test:coverage` — exit 1: 11 failed files, 17 test timeouts по 5000 ms;
+  98 files / 814 tests passed, 44.85 s. В том числе два случая
+  `highlighter-preview.test.ts`, но также mounted-shell tests в других файлах.
+- `pnpm test:coverage --maxWorkers=2` — exit 0: 109 files / 831 tests passed,
+  88.05 s, без unhandled errors и без увеличения timeout.
+
+В [CI run 38952953949](https://github.com/VladimirIvanin/cute-screen/actions/runs/38952953949/job/117148635896)
+публичные check annotations также фиксируют два timeout в
+`highlighter-preview.test.ts` при density 2. Это другой запуск, чем исходный
+фрагмент с `Worker exited unexpectedly`: локально аварийный выход процесса
+не воспроизведён. Stack Vitest не содержит exit signal/имя worker, поэтому
+OOM либо native crash по этому фрагменту не доказаны. Полные CI logs через
+REST требуют repository admin access (403); публичные annotations сохранены.
+
+Общий default `maxWorkers: 2` ограничивает нагрузку для всех Vitest projects;
+изоляция файлов, timeout и fail-on-unhandled-error сохраняются.
+Артефакты диагностики: `artifacts/vitest-worker/baseline.log`,
+`coverage-baseline.log`, `coverage-two-workers.log`, `github-annotations.json`.
+
+После изменения default, без CLI-override:
+
+- `pnpm test` — exit 0: 109 files / 831 tests passed, 67.84 s.
+- `pnpm test:coverage` — exit 0: 109 files / 831 tests passed, 84.47 s;
+  unhandled errors отсутствуют.
+- `pnpm test:render` — exit 0: 7 files / 24 tests passed, 7.24 s;
+  committed goldens не обновлялись.
+- `pnpm test:perf` — exit 0: 1 file / 4 tests passed, 69.47 s;
+  production-shaped 4K/500 и 8K/1000 CanvasKit redraws. Software trends не
+  подтверждают GPU/product performance budgets.
+- `pnpm test:boundaries` — exit 1: 9 files / 42 tests passed, один architecture
+  test failed: `packages/editor-vue/src/shell/workspace/keyboard-controller.ts:244`
+  имеет complexity 22 при лимите 20. Во время проверки в workspace параллельно
+  появились правки keyboard shortcuts; в изменении Vitest этот файл не
+  редактировался. Остальные boundary contracts прошли.
+- `pnpm format`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm docs:check` — exit 0;
+  lint содержит 63 warnings без errors.
+
+Логи финальных suites — `artifacts/vitest-worker/*-fixed.log`,
+статические проверки — `format.log`, `lint.log`, `typecheck.log`, `docs-check.log`
+в том же каталоге; финальная проверка форматирования — `format-check.log`.
+Unit/coverage/lint/typecheck завершились до появления параллельных keyboard
+правок и не подтверждают эти более поздние изменения. Новый CI run не запускался;
+эффект изменения на hosted runner пока не подтверждён. Более низкая параллельность увеличивает время
+локального прогона в обмен на ограничение одновременной нагрузки.
+
+Runtime продукта, document schema и платформенные capability не меняются;
+новый ADR и native E2E для этой настройки не требуются.
+
 ## Курсор номерных меток (2026-10-16)
 
 `REQ-TOL-006`, `REQ-UI-005`: Linux x86_64, Chrome 154.0.8037.57,
@@ -76,6 +198,37 @@ Viewport screenshots дополнительно осмотрены через и
 Меню ограничено 480 px по высоте, все text groups остаются целыми; экран и
 originals не меняются от открытия меню/наведения. Ожидание последнего font-ready
 frame добавлено в Copy/Quick PNG перед encoding. Windows/macOS/Wayland не запускались.
+
+## Live preview фона текста и встроенная палитра (2026-10-16)
+
+Ubuntu 24.04.5 LTS x86_64, Linux 6.8.0-142-generic, Chrome 154.0.8037.57,
+Node 22.23.1 и pnpm 10.33.2.
+
+- `pnpm exec vitest run --project vue tests/unit/vue/numeric-shell.test.ts
+tests/unit/vue/text-context-toolbar.test.ts tests/unit/vue/ui-controls.test.ts`
+  — 14/14 passed. Mounted editor подтверждает немедленный preview готового Blue
+  и пользовательского `#FF7556` при нулевых padding/radius, неизменность document
+  и defaults до Apply, Cancel и один undoable commit. RU nested palette возвращает
+  focus к «Свой цвет», затем к «Фон» по Escape.
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5187 pnpm test:e2e:browser --spec
+tests/e2e/specs/browser-v7-rich-text-toolbar.e2e.ts` — 1 spec / 4 scenarios
+  passed. При 1024×700 browser проверяет готовый и HEX preview, отсутствие history
+  до commit, границы embedded palette и всех её кнопок/inputs внутри text dialog,
+  Escape и возврат focus. Скриншот
+  `artifacts/browser-e2e/text-background-palette-preview.png` просмотрен: палитра
+  остаётся в ширине диалога; вертикальная прокрутка сохраняет доступ к нижним
+  секциям. Первый запуск на порту 5173 не стартовал, потому что порт уже был занят.
+- `CUTE_SCREEN_E2E_SCENARIOS=v7-rich-text pnpm test:e2e:tauri` собрал свежий
+  fake-platform/test-harness binary, но не открыл WebDriver session: на хосте нет
+  `tauri-driver` и `WebKitWebDriver`, соединение с `127.0.0.1:4445` отклонено.
+  Сценарий содержит те же native assertions и screenshot
+  `artifacts/tauri-e2e/text-background-palette-preview.png`, но runtime evidence
+  этим запуском не получено.
+- `pnpm format && pnpm format:check` и `pnpm docs:check` — passed. `pnpm check`
+  останавливается в lint на 32 ошибках indentation нового, несвязанного
+  `tests/unit/vue/keyboard-shortcuts.test.ts`; targeted ESLint затронутых файлов
+  проходит без errors. Отдельный `pnpm typecheck` собирает пакеты, затем
+  останавливается на TS2589 в том же новом keyboard-shortcuts test.
 
 ## Применение кропа и его панель (2026-10-16)
 
@@ -4032,3 +4185,72 @@ Driver provider и context input выводятся в лог. Новых packag
 Скриншоты и логи — `artifacts/tool-lifecycle/`; стандартные failure screenshots —
 `artifacts/tauri-e2e/`. Windows/macOS, Wayland, physical capture и mixed-DPI native
 input не запускались. Document v7, binary image transport и IPC не менялись.
+
+## Номерная метка и внешняя подпись — 2026-10-17 (ADR-066/067/068)
+
+Платформа: Ubuntu 24.04.5, Linux 6.8.0-142 x86_64 / X11, Intel i7-11700K.
+Browser: Chrome 154.0.8037.57. Native: настоящий Tauri/wry 0.55.1 / WebKitGTK,
+external driver; источник Capture — fake-platform, окна и production mount/handoff
+настоящие. Windows/macOS, Wayland, physical capture и mixed-DPI не запускались.
+Artifacts находятся в `artifacts/numbered-marker/`; прежние изменения Text,
+Callout и physical shortcuts сохранены.
+
+Уточнение пользователя заменило custom text внутри badge внешней подписью:
+номер всегда внутри, multiline caption справа с gap 8 px и вертикальным центром.
+Номер и caption перемещаются одним слоем; caption не увеличивает badge и не
+меняет sequence. Пустой commit/Remove label удаляют только подпись. Числовая
+подпись тоже допустима и не перенумеровывает объект. v7/IPC не расширены:
+первый paragraph существующего label содержит номер, следующие — caption.
+Открытие старых документов не создаёт EditorCommand и не меняет bounds.
+
+Команды и результаты из корня репозитория:
+
+- `pnpm check` — `check.log`, passed: lint/typecheck/format/docs,
+  boundaries 43/43, IPC, Rust format и четыре Clippy configurations.
+- `pnpm test --maxWorkers=1` — `unit.log`: 112/112 файлов, 863/863 теста.
+  Includes max+1, hidden/locked/duplicates, safe integers, manual next/reset,
+  cancellation without consumption, edit/undo/redo, mixed/read-only, separate
+  caption, renumber preserving caption and empty caption retaining the marker.
+- `pnpm test:render` — `render.log`: 9/9 файлов, 30/30 тестов. Все четыре формы,
+  1/10/100, font 16/48, multiline Cyrillic; white number pixels внутри safe rect,
+  black caption pixels внутри отдельной внешней области. Оба PNG backend
+  повторно декодированы; Canvas2D preview/export совпадают пиксельно.
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5186 pnpm test:e2e:browser --spec tests/e2e/specs/browser-numbered-marker.e2e.ts --spec tests/e2e/specs/browser-v7-rich-text-toolbar.e2e.ts`
+  — `browser.log`, 2/2 файлов, 10/10 сценариев. Marker harness 2560×1440;
+  production controls/pointer/keyboard, no state injection for marker creation.
+  Проверяет cancellation, manual 10→11, edit 100/undo, external caption/remove,
+  caption hit/drag together/undo, independent badge/label colours, nested font
+  menu and focus, overlay pixels после square/blue→diamond/red, cursor none,
+  pan/settings hiding, zoom 50/100/200, RU/EN × light/dark × 640/1024/1440.
+- Дополнительный прогон `CUTE_SCREEN_BROWSER_E2E_PORT=5186 pnpm test:e2e:browser --spec tests/e2e/specs/browser-numbered-marker.e2e.ts --spec tests/e2e/specs/browser-creation-cursors.e2e.ts --spec tests/e2e/specs/browser-v7-rich-text-toolbar.e2e.ts --spec tests/e2e/specs/browser-tool-lifecycle.e2e.ts`
+  — `browser-regressions.log`: marker 6/6, cursors 1/1 и lifecycle 2/2 прошли.
+  Старые rich-text assertions требовали общую панель и disabled padding у метки;
+  они обновлены под специализированную панель без этих controls и затем прошли
+  в финальном `browser.log` (4/4). Параметры и ожидания Text/Callout сохранены.
+- `XDG_RUNTIME_DIR="$PWD/artifacts/numbered-marker/runtime" XDG_SESSION_ID=cutescreen-numbered-marker PATH="$PWD/artifacts/spotlight-fix/tools/bin:$PWD/artifacts/spotlight-fix/tools/webkit/root/usr/bin:$PATH" CUTE_SCREEN_E2E_SCENARIOS=numbered-marker pnpm test:e2e:tauri`
+  — `tauri.log`: 1/1 scenario. Capture → Quick: создать 1, Next=2;
+  handoff Editor: Next=2, создать 2, изменить на 7, undo→2; добавить caption,
+  убедиться, что Number=2, undo убирает только caption. Test binary собран штатно.
+
+Red-first артефакты: `caption-red.log` (не было контракта отдельной подписи),
+`cancel-red.log` (pointerdown раньше уже добавлял слой при последующей отмене).
+Один промежуточный full unit run завершил 111 файлов и получил unexpected
+worker exit (`unit-worker-exit.log`); финальный полный прогон выполнен отдельно
+от browser/native build и прошёл без ослабления проверок. Первый native запуск
+без drivers в PATH не создал session (`tauri-no-drivers.log`); использованы уже
+имеющиеся локальные executables, повторный production WebView flow прошёл.
+
+Визуально просмотрены `caption-beside-number.png`, `external-caption.png`,
+`inline-label.png`, `native-editor.png`, `ru-light-1024.png`, `ru-dark-640.png`.
+Caption находится снаружи, toolbar не закрывает редактируемый текст, panel groups
+переносятся без horizontal overflow. В palette browser тестах выбор scoped к
+активному dialog: предыдущая palette может оставаться в DOM во время fade-out.
+Обычные jsdom Canvas warnings, существующие lint warnings и bundle-size warning
+не скрывались. Perf/заключительные format команды записаны ниже.
+
+- `pnpm test:perf` — `perf.log`, 4/4; 30 warmups + 120 measurements на scenario,
+  idleFrameCount=0. Отчёт скопирован в `perf.json`.
+  Software CanvasKit p95: 4K/500 — 174.81 ms, 8K/1000 — 339.47 ms.
+  Это trend/evidence harness, не подтверждение production GPU frame budget.
+- `pnpm format` — `format.log`; `pnpm format:check` — `format-check.log`.
+  Заключительный `pnpm check` — `check.log` (после записи verification docs).

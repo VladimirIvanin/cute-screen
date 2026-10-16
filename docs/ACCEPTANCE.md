@@ -1,5 +1,21 @@
 # Сквозная приёмка
 
+## Физические буквенные shortcuts редактора (2026-10-16, ADR-064)
+
+`REQ-EDT-003/005/006/016`:
+
+1. В editor создать или выбрать объект. На английской, русской и другой
+   нелатинской раскладке нажать физические Ctrl/Cmd+Z и Ctrl/Cmd+Shift+Z:
+   history отменяется и повторяется одинаково.
+2. На тех же раскладках проверить Ctrl/Cmd+O/D/C/X/V и Ctrl/Cmd+Alt+C/V.
+   Открытие, duplicate, clipboard и style clipboard реагируют по позиции
+   латинской клавиши, без добавления Ctrl+Y/Ctrl+S/Ctrl+A.
+3. В input, contenteditable и во время IME composition команды редактора не
+   перехватывают ввод. Уже обработанное событие не выполняется повторно.
+4. Browser E2E создаёт объект через видимый UI, затем выполняет Undo, Redo и
+   Duplicate native keyboard input. Real Tauri фиксирует отдельно платформу,
+   системную раскладку и trusted input; непроверенные WebViews не получают claim.
+
 ## Новая панель текста (2026-10-16, ADR-061)
 
 `REQ-TOL-005/006/007`, `REQ-EDT-005/008/016`, `REQ-UI-001/005/006/007`:
@@ -222,9 +238,9 @@ helper `crop-cursors.ts` проверяет все восемь точек и ц
 
 ## Курсор карандаша и выделителя (2026-10-15)
 
-Расширение 2026-10-16, `REQ-TOL-006`: выбрать Numbered marker — крест
-появляется сразу, сохраняется при движении над существующими объектами и
-возвращается после временного панорамирования средней кнопкой.
+Расширение `REQ-TOL-006`, обновлено 2026-10-17 (ADR-067): выбрать Numbered
+marker — полупрозрачная метка заменяет крест, сохраняется при движении над
+объектами и возвращается после временного pan средней кнопкой.
 
 `REQ-TOL-003/004`, `REQ-UI-005`: в editor и Quick Capture выбрать Pencil,
 затем Highlighter. На холсте сразу появляется `crosshair` и сохраняется при
@@ -1078,3 +1094,36 @@ WebDriver. Проверки наблюдают isTrusted, document focus и enab
 никакие события или document/selection state не инъецируются. Browser lifecycle
 повторяется после изменения общего input helper. Wayland и другие ОС этим
 follow-up не подтверждены; команды и диагностика — TESTING.md.
+
+## Выноска: измеренная подпись (2026-10-17, ADR-065)
+
+`REQ-TOL-007`, `REQ-TOL-005`, `REQ-EDT-016`: drag target→label opens an expanding
+inline label. Left endpoints place the whole padded block on the left; equal X uses
+the right. The marker gap is 6 document px, independent of text alignment.
+New labels wrap at 480 document px; the outer grip or numeric width can exceed
+that cap without scaling glyphs or moving endpoints. Auto, minimum-one-em validation,
+Escape/focus return, read-only blocking and one-command undo/redo are covered.
+Mixed span sizes use the same paragraph heights in projection and rendering.
+
+Linux browser and external-driver real WebKitGTK cover production creation,
+commit/reopen, 720 px width, direct grip resize, popup cancellation and undo/redo.
+Browser screenshots cover 1024 px, both themes, RU/EN and 50/100/200% zoom.
+The render harness decodes both backend exports and verifies Canvas2D preview/export
+pixel identity. Existing autoSize documents are measured without dirtying the document.
+Windows/macOS/Wayland were not run for this follow-up. See TESTING.md for commands.
+
+## Номерная метка (2026-10-17, ADR-066)
+
+- Через production controls создать 1/2/3, удалить 2, получить 4; undo/redo.
+- Задать повторяющийся следующий номер: предупреждение без запрета; после
+  успешного создания Auto, после смены инструмента override сохраняется.
+- Изменить номер, добавить multiline подпись справа, изменить номер с сохранением
+  подписи и убрать подпись; одна команда на commit, размер и центр badge не меняются.
+- Проверить все формы, крупный шрифт, 100 и кириллицу без обрезания и сдвига центра.
+- RU/EN, light/dark, 640/1024/1440, zoom 50/100/200: без horizontal overflow,
+  корректные focus/Escape/outside, locked/read-only, preview без selection.
+- Проверить экспорт повторным декодированием и реальный Capture → Quick → Editor.
+
+Дополнение ADR-067: предпросмотр заменяет курсор на canvas; сменить квадрат/синий
+на ромб/красный в defaults и вернуться в ту же точку — preview и созданная метка
+совпадают с новым стилем. Панели, pan и sampling скрывают preview.

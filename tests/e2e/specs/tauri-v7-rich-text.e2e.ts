@@ -86,6 +86,42 @@ describe('Document v7 rich text in a real Tauri webview', () => {
     await $('button[role="option"][aria-label="Lora"]').click()
     const openBackground = async () => $('button[aria-label="Background"]').click()
     await openBackground()
+    const backgroundDialog = $('.cs-text-background-popover')
+    await backgroundDialog.$('button[aria-label="Blue"]').click()
+    await browser.waitUntil(() => browser.execute(() =>
+      getComputedStyle(document.querySelector('.cs-text-editor')!).getPropertyValue('--text-background-color') === 'rgba(61, 173, 255, 1)'))
+    expect(await token()).toBe(0)
+    await backgroundDialog.$('button[aria-label="Custom colour"]').click()
+    const paletteLayout = await browser.execute(() => {
+      const dialog = document.querySelector<HTMLElement>('.cs-text-background-popover')
+      const palette = dialog?.querySelector<HTMLElement>('.cs-color-popover')
+      if (!dialog || !palette) throw new Error('Embedded colour palette is unavailable')
+      const parent = dialog.getBoundingClientRect()
+      const child = palette.getBoundingClientRect()
+      const controls = [...palette.querySelectorAll<HTMLElement>('button, input')].map((element) => {
+        const rect = element.getBoundingClientRect()
+        return { left: rect.left, right: rect.right }
+      })
+      return {
+        child: { left: child.left, right: child.right },
+        controls,
+        parent: { left: parent.left, right: parent.right },
+        scrolls: dialog.scrollWidth > dialog.clientWidth || palette.scrollWidth > palette.clientWidth,
+      }
+    })
+    expect(paletteLayout.scrolls).toBe(false)
+    expect(paletteLayout.child.left).toBeGreaterThanOrEqual(paletteLayout.parent.left)
+    expect(paletteLayout.child.right).toBeLessThanOrEqual(paletteLayout.parent.right)
+    expect(paletteLayout.controls.every((control) =>
+      control.left >= paletteLayout.parent.left && control.right <= paletteLayout.parent.right)).toBe(true)
+    const hex = backgroundDialog.$('input[aria-label="HEX colour code"]')
+    await hex.click()
+    await browser.keys(['Control', 'a'])
+    await browser.keys('#ff7556')
+    await browser.keys('Enter')
+    await browser.waitUntil(() => browser.execute(() =>
+      getComputedStyle(document.querySelector('.cs-text-editor')!).getPropertyValue('--text-background-color') === 'rgba(255, 117, 86, 1)'))
+    await browser.saveScreenshot(path.resolve('artifacts/tauri-e2e/text-background-palette-preview.png'))
     await setNumericInput($('.cs-text-background-popover input[aria-label="Padding"]'), '12')
     await setNumericInput($('.cs-text-background-popover input[aria-label="Radius"]'), '8')
     await browser.waitUntil(() => browser.execute(() => {

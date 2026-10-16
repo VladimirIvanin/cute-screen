@@ -131,7 +131,7 @@ export class CanvasRendererController {
         ? new Set([editing.id, `${editing.id}:background`])
         : editing.existing.kind === 'callout'
           ? new Set([`${editing.id}:text`, `${editing.id}:background`])
-          : new Set([`${editing.id}:label`])
+          : new Set([`${editing.id}:caption`])
     runtime.setScene(
       createRenderSceneSnapshot({
         width: documentScene.width,

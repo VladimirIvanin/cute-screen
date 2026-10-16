@@ -29,13 +29,13 @@ export async function verifyCreationCursors(
   const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
   for (const label of ['Pencil', 'Highlighter', 'Numbered marker']) {
     await $(`button[aria-label="${label}"]`).click()
-    await expect(scene).toHaveStyle({ cursor: 'crosshair' })
+    await expect(scene).toHaveStyle({ cursor: label === 'Numbered marker' ? 'none' : 'crosshair' })
     await browser.action('pointer').move({ origin: scene }).perform()
-    await expect(scene).toHaveStyle({ cursor: 'crosshair' })
+    await expect(scene).toHaveStyle({ cursor: label === 'Numbered marker' ? 'none' : 'crosshair' })
     await browser.action('pointer').move({ origin: scene }).down({ button: 'middle' }).perform(true)
     await expect(scene).toHaveStyle({ cursor: 'grabbing' })
     await browser.action('pointer').up({ button: 'middle' }).perform()
-    await expect(scene).toHaveStyle({ cursor: 'crosshair' })
+    await expect(scene).toHaveStyle({ cursor: label === 'Numbered marker' ? 'none' : 'crosshair' })
   }
   await browser.saveScreenshot(path.resolve(directory, `${prefix}-numbered-marker-cursor.png`))
   if (!(await $('.cs-quick-actions').isExisting())) {

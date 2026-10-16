@@ -75,6 +75,10 @@ function toolbarSnapshot(editing: NonNullable<EditingText['value']>) {
   const sameColor = (left: SrgbColor, right: SrgbColor) =>
     left.red === right.red && left.green === right.green && left.blue === right.blue && left.alpha === right.alpha
   return Object.freeze<TextToolbarSnapshot>({
+    ...(editing.kind === 'callout' ? { calloutWidth: {
+      mode: state.content.wrap, value: editing.width,
+      minimum: Math.max(state.typingStyle.fontSize, ...state.content.spans.map((span) => span.fontSize)),
+    } } : {}),
     fontPreviewText: range.start === range.end ? state.content.text : state.content.text.slice(range.start, range.end),
     fontFamily: common(
       spans.map((span) => span.fontFamily),
@@ -147,6 +151,18 @@ function registerFormattingWatches(context: TextFormattingContext): void {
         context.renderProjection()
         emitTextEditing(context)
         return
+      }
+      if (patch.calloutWidth !== undefined && editing.kind === 'callout') {
+        const state = editing.controller.state
+        const content = { ...state.content }
+        delete content.fixedWidth
+        const auto = patch.calloutWidth === 'auto'
+        editing.fixedWidth = !auto
+        editing.calloutAutoLimit = auto
+        const minimum = Math.max(state.typingStyle.fontSize, ...content.spans.map((span) => span.fontSize))
+        editing.controller.restoreState({ ...state, content: auto
+          ? { ...content, wrap: 'autoSize' }
+          : { ...content, wrap: 'fixedWidth', fixedWidth: Math.max(minimum, patch.calloutWidth as number) } })
       }
       if (patch.span) editing.controller.applySpanStyle(patch.span)
       if (patch.paragraph) {

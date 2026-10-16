@@ -1,3 +1,4 @@
+import { loadTextFontFamily } from '../../text-fonts'
 import {
   computed,
   nextTick,
@@ -17,6 +18,7 @@ import { useNumericPreview } from './use-numeric-preview'
 import { createBrowserDrawingToolPreferencesStorage } from '../preferences'
 import { useEditorShellStore } from '../store'
 import {
+  nextNumberedMarkerSequence,
   type DrawingToolPreferencesV2,
   type ImageLayer,
 } from '@cute-screen/editor-renderer'
@@ -72,6 +74,9 @@ function createWorkspaceCore(props: ResolvedEditorShellProps) {
   const saveDrawingPreferences = (value: DrawingToolPreferencesV2) =>
     createBrowserDrawingToolPreferencesStorage(environment.storage).save(value)
   const memory = useToolSettingsMemory(workspace, store, environment.storage)
+  watch(() => workspace.activeDocument.value?.id, () => {
+    workspace.markerNextOverride.value = undefined
+  }, { flush: 'sync' })
   const bindings = createWorkspaceBindings({
     props,
     store,
@@ -81,6 +86,12 @@ function createWorkspaceCore(props: ResolvedEditorShellProps) {
     rememberTextDefaults: memory.rememberTextDefaults,
   })
   useNumericPreview(workspace, props, store, bindings)
+  watch(() => [store.activeToolId, workspace.textDefaults.value.fontFamily], () => {
+    if (store.activeToolId !== 'numberedMarker') return
+    void loadTextFontFamily(workspace.textDefaults.value.fontFamily).catch((error: unknown) => {
+      workspace.toolError.value = error instanceof Error ? error.message : 'Could not load the marker font'
+    })
+  }, { immediate: true })
   watch([() => store.activeToolId, () => store.selectedLayerIds.join(','), () => workspace.activeDocument.value?.id], () => {
     workspace.spotlightEditing.value = undefined
   })
@@ -226,11 +237,26 @@ function createWorkspaceViewModel(
     floatingTextToolbarSchema: bindings.floatingTextToolbarSchema,
     floatingArrowToolbarSchema: bindings.floatingArrowToolbarSchema,
     markerShape: workspace.markerShape,
+    nextMarkerSequence: computed(() => workspace.markerNextOverride.value ??
+      nextNumberedMarkerSequence(workspace.activeDocument.value?.layers ?? [])),
+    markerPreviewBlocked: computed(() => Boolean(
+      workspace.toolConfigure.value || workspace.textDraft.value || core.store.actionState.status === 'pending',
+    )),
+    markerStyle: computed(() => {
+      const d = workspace.textDefaults.value
+      return { fontFamily: d.fontFamily, fontSize: d.fontSize, weight: d.weight, italic: d.italic,
+        strikethrough: d.strikethrough, alignment: d.alignment, listKind: 'none', textColor: { ...d.color },
+        badgeColor: { ...(d.background?.color ?? { red: 0, green: 0, blue: 0, alpha: 1 }) } }
+    }),
     selectLayer: bindings.selectLayer,
     moveLayer: bindings.moveLayer,
     transformLayer: bindings.transformLayer,
     updateLayerPayload: bindings.updateLayerPayload,
-    addLayer: bindings.addLayer,
+    addLayer: (layer: Parameters<typeof bindings.addLayer>[0], selectAfter?: boolean) => {
+      bindings.addLayer(layer, selectAfter)
+      if (layer.kind === 'numberedMarker' && workspace.activeDocument.value?.layers.some((entry) => entry.id === layer.id))
+        workspace.markerNextOverride.value = undefined
+    },
     executeDocumentCommand: bindings.executeDocumentCommand,
     setTextDraft: session.setTextDraft,
     importContentImage: bindings.importContentImage,

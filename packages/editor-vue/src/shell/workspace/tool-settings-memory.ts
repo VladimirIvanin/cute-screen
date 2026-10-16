@@ -38,8 +38,8 @@ export function useToolSettingsMemory(
       ...copy(standard),
       fontSize: 16,
       weight: 700,
-      alignment: 'center',
-      color: { red: 1, green: 1, blue: 1, alpha: 1 },
+      alignment: 'start',
+      color: { red: 0, green: 0, blue: 0, alpha: 1 },
     },
   }
   let backup: { kind: TextKind; defaults: TextToolDefaults } | undefined
@@ -102,6 +102,7 @@ export function useToolSettingsMemory(
     texts[layer.kind] = {
       ...base,
       ...patch,
+      ...(layer.kind === 'numberedMarker' ? { background: { color: layer.payload.badge.color, padding: 0, radius: 0 } } : {}),
       ...(paragraph ? { alignment: paragraph.alignment, listKind: paragraph.listKind } : {}),
     }
     if (kind.value === layer.kind) workspace.textDefaults.value = copy(texts[layer.kind])

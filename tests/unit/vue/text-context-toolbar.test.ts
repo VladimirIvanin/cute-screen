@@ -19,7 +19,7 @@ const schema = {
   hint: 'Text formatting',
   controls: [],
   text: {
-    kind: 'numberedMarker' as const,
+    kind: 'text' as const,
     color: '#101010',
     fontFamily: 'Roboto',
     fonts: ['Roboto', 'Arial', 'Georgia'],
@@ -133,6 +133,25 @@ describe('v7 text contextual toolbar', () => {
     expect(rendered.getByRole('button', { name: 'Фон' })).toHaveFocus()
   })
 
+  it('returns focus through the nested Russian background palette', async () => {
+    const rendered = render(TextFormattingToolbar, {
+      props: {
+        text: { ...schema.text, kind: 'text', disabled: [] },
+        title: 'Текст',
+        pickerLocale: 'ru',
+      },
+    })
+    const background = rendered.getByRole('button', { name: 'Фон' })
+    await fireEvent.click(background)
+    const dialog = await rendered.findByRole('dialog', { name: 'Фон' })
+    const custom = within(dialog).getByRole('button', { name: 'Свой цвет' })
+    await fireEvent.click(custom)
+    await fireEvent.keyDown(within(dialog).getByRole('textbox', { name: 'HEX-код цвета' }), { key: 'Escape' })
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Свой цвет' })).toHaveFocus())
+    await fireEvent.keyDown(dialog, { key: 'Escape' })
+    expect(background).toHaveFocus()
+  })
+
   it('commits a foreground swatch but keeps background swatches in the cancellable draft', async () => {
     const rendered = render(TextFormattingToolbar, { props: { text: { ...schema.text, kind: 'text', disabled: [] }, title: 'Text' } })
     await fireEvent.click(rendered.getByRole('button', { name: 'Text color' }))
@@ -168,5 +187,29 @@ describe('v7 text contextual toolbar', () => {
       [...rendered.container.querySelectorAll('[data-text-control]')].map((node) =>
         node.getAttribute('data-text-control')),
     ).toEqual(['color', 'font', 'size', 'bold', 'italic', 'strikethrough', 'list', 'alignment', 'background'])
+  })
+})
+
+describe('callout label width control', () => {
+  it('validates an em minimum, applies a width and cancels without another change', async () => {
+    const rendered = render(TextFormattingToolbar, { props: { title: 'Callout', pickerLocale: 'en',
+      text: { ...schema.text, kind: 'callout', calloutWidth: { mode: 'autoSize', value: 180, minimum: 24 } } } })
+    await fireEvent.click(rendered.getByRole('button', { name: 'Label width' }))
+    const dialog = await rendered.findByRole('dialog', { name: 'Label width' })
+    const input = within(dialog).getByRole('spinbutton')
+    await fireEvent.update(input, '10')
+    expect(within(dialog).getByRole('button', { name: 'Apply' })).toBeDisabled()
+    await fireEvent.update(input, '720')
+    await fireEvent.click(within(dialog).getByRole('button', { name: 'Apply' }))
+    expect(rendered.emitted().change).toEqual([['calloutTextWidth', '720']])
+    await fireEvent.click(rendered.getByRole('button', { name: 'Label width' }))
+    await rendered.findByRole('dialog')
+    await fireEvent.update(rendered.getByRole('spinbutton'), '800')
+    await fireEvent.keyDown(rendered.getByRole('dialog'), { key: 'Escape' })
+    expect(rendered.emitted().change).toHaveLength(1)
+    expect(rendered.queryByRole('dialog')).not.toBeInTheDocument()
+    await fireEvent.click(rendered.getByRole('button', { name: 'Label width' }))
+    await fireEvent.click(within(await rendered.findByRole('dialog')).getByRole('button', { name: 'Auto' }))
+    expect(rendered.emitted().change).toEqual([['calloutTextWidth', '720'], ['calloutTextWidth', 'auto']])
   })
 })

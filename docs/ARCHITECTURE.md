@@ -251,7 +251,16 @@ weight, italic и strikethrough; paragraph ranges — alignment
 background и Numbered Marker badge остаются разными container semantics и
 используют solid colors. Text background хранит также padding и radius.
 Callout payload хранит target/label points, elbow route, stroke и circle
-markers вместо bubble/tail. Новый text factory
+markers вместо bubble/tail.
+Callout geometry accepts a DOM-free `CalloutGeometryContext.measureText` callback.
+The renderer's measured facade supplies cached rich-text metrics for scene projection,
+spatial hit tests, selection handles and rebasing commands. The cache includes content,
+styles, wrap width and font-load state, and is invalidated by font-loading events.
+Derived geometry on open never changes document/history. The outer width grip edits
+v7 `content.wrap/fixedWidth`; endpoints remain fixed in world coordinates. Padded labels
+sit outside their endpoint, with a 6 px gap, and are vertically centered. Measured DOM
+paragraph struts use the paragraph's largest span; spans retain proportional line height
+so mixed font sizes cannot add browser-only leading. Новый text factory
 создаёт 24 px text. Presets, underline, letter spacing, line-height field,
 gradient/pattern/texture text fill, text outline, text shadows и text
 opacity/blend в v7 отсутствуют.
@@ -611,3 +620,22 @@ CanvasKit выбирает отдельный subset для script chunks сме
 Canvas2D resolver допускает список family для headless subset fallback;
 production WebView использует штатный unicode-range bundled CSS. Golden runtime
 регистрирует реальные файлы всех 12 гарнитур, включая Latin digits у Cyrillic text.
+
+## Номерная метка (ADR-066/067/068)
+
+DOM-free `numbered-marker` рассчитывает квадратную оболочку и безопасный text rect
+для circle/square/diamond/star, сохраняя локальный центр при любом transform.
+Renderer измеряет portable rich text; подготовка применяется до creation, style,
+number edit и style paste. Размер badge зависит только от номера. Rich-text label
+содержит строку номера и необязательные следующие строки внешней подписи;
+scene разделяет их на независимые text nodes внутри одного слоя. Caption rect
+расположен справа с зазором 8 px; union с badge используется в selection/hit-test.
+Inline DOM редактирует только caption и использует тот же measured rect. Открытие старого документа не меняет persisted bounds.
+
+`NumberedMarkerFormattingToolbar` используется в defaults/selection/inline;
+marker metadata в text schema описывает mode, mixed channels, sequence и warning.
+Одноразовый next override хранится в workspace отдельно от persistent styles.
+Pointerdown готовит слой без history; pointerup подтверждает один EditorCommand,
+pointercancel/Escape сохраняют override. Ghost pointer/cache/RAF принадлежат
+canvas controller и не создают Vue updates на каждом pointermove. Schema v7 и
+IPC не расширяются; max+1 не зависит от layer order/visibility/lock.

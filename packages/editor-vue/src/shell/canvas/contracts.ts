@@ -30,7 +30,14 @@ export interface TextToolDefaults {
   readonly background: TextBackground | null
 }
 
+export interface CalloutWidthSnapshot {
+  readonly mode: 'autoSize' | 'fixedWidth'
+  readonly value: number
+  readonly minimum: number
+}
+
 export interface TextToolbarSnapshot {
+  readonly calloutWidth?: CalloutWidthSnapshot
   readonly fontPreviewText?: string | undefined
   readonly fontFamily: string | null
   readonly fontSize: number | null
@@ -44,6 +51,7 @@ export interface TextToolbarSnapshot {
 }
 
 export interface TextFormattingPatch {
+  readonly calloutWidth?: number | 'auto'
   readonly preview?: boolean
   readonly cancelPreview?: boolean
   readonly revision: number
@@ -101,6 +109,8 @@ export interface CanvasViewportProps {
     }>
     | undefined
   arrowToolbarLocale?: 'en' | 'ru' | undefined
+  markerStyle?: import('@cute-screen/editor-renderer').LayerStyle | undefined
+  markerPreviewBlocked?: boolean | undefined
   nextMarkerSequence?: number | undefined
   markerShape?: 'circle' | 'square' | 'diamond' | 'star' | undefined
   openImageAvailable?: boolean | undefined
@@ -156,6 +166,7 @@ export type CanvasViewportEmit = <K extends keyof CanvasViewportEmits>(
 ) => void
 
 export interface CanvasViewportExpose {
+  editSelectedLabel(): void
   applyCropDraft(): void
   cancelCropDraft(): void
   resetCropDraft(): void
@@ -202,6 +213,8 @@ export const canvasViewportRuntimeProps = {
     type: String as PropType<CanvasViewportProps['arrowToolbarLocale']>,
     default: undefined,
   },
+  markerStyle: Object as PropType<CanvasViewportProps['markerStyle']>,
+  markerPreviewBlocked: Boolean,
   nextMarkerSequence: {
     type: Number as PropType<number | undefined>,
     default: undefined,

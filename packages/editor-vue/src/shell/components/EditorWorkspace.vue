@@ -3,7 +3,6 @@ import {
   NButton,
   NConfigProvider,
 } from 'naive-ui'
-import { nextNumberedMarkerSequence } from '@cute-screen/editor-renderer'
 import { UiIcon } from '../icon'
 import ActionFeedback from './ActionFeedback.vue'
 import SelectionFormattingToolbar from './SelectionFormattingToolbar.vue'
@@ -69,6 +68,9 @@ const {
   textFormatting,
   floatingTextToolbarSchema,
   markerShape,
+  markerStyle,
+  markerPreviewBlocked,
+  nextMarkerSequence,
   selectLayer,
   moveLayer,
   transformLayer,
@@ -269,7 +271,9 @@ function onTextCancelled(): void {
           :text-toolbar-locale="state.locale.value"
           :arrow-toolbar-schema="undefined"
           :arrow-toolbar-locale="state.locale.value"
-          :next-marker-sequence="activeDocument ? nextNumberedMarkerSequence(activeDocument.layers) : undefined"
+          :next-marker-sequence="nextMarkerSequence"
+          :marker-style="markerStyle"
+          :marker-preview-blocked="markerPreviewBlocked"
           :marker-shape="markerShape"
           :open-image-available="props.openImageAvailable"
           :zoom="store.zoom"

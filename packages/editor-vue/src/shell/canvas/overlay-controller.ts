@@ -142,6 +142,7 @@ export class CanvasOverlayController {
     layer: LayerNode,
     outputBounds: ViewportOutputBounds,
   ): void {
+    if (layer.kind === 'numberedMarker') return
     const half = 3 / ((this.#context.props.zoom ?? 100) / 100)
     context.fillStyle = '#fff'
     context.strokeStyle = '#0d99ff'
@@ -179,7 +180,11 @@ export class CanvasOverlayController {
         gesture?.kind === 'calloutHandle' && gesture.id === layer.id && gesture.handle === kind
           ? this.#context.toLocal(layer, gesture.current)
           : point
-      this.#drawRoundHandle(context, this.#context.transformPoint(layer.transform, local), half)
+      const world = this.#context.transformPoint(layer.transform, local)
+      if (kind === 'width') {
+        context.fillRect(world.x - half, world.y - half * 2, half * 2, half * 4)
+        context.strokeRect(world.x - half, world.y - half * 2, half * 2, half * 4)
+      } else this.#drawRoundHandle(context, world, half)
     }
   }
 

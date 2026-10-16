@@ -19,6 +19,7 @@ function styledSpan(
   element.style.fontFamily = style.fontFamily
   element.style.fontSize = `${hidden ? 0 : style.fontSize * scale}px`
   element.style.fontWeight = String(style.weight)
+  element.style.lineHeight = '1.25'
   element.style.fontStyle = style.italic ? 'italic' : 'normal'
   element.style.textDecoration = style.strikethrough ? 'line-through' : 'none'
   const color = style.color
@@ -49,6 +50,14 @@ export function renderRichTextProjection(
     const end = paragraph.end > paragraph.start && state.content.text[paragraph.end - 1] === '\n'
       ? paragraph.end - 1 : paragraph.end
     const lines = layout?.lines.filter((line) => line.start >= paragraph.start && line.start <= end) ?? []
+    if (lines.length) {
+      // Every line in a paragraph uses its largest span, matching renderer metrics.
+      // A caret's typing size must not change the paragraph's CSS strut or height.
+      const height = Math.max(...lines.map((line) => line.height)) * scale
+      block.style.fontSize = `${height / 1.25}px`
+      block.style.lineHeight = `${height}px`
+      block.style.minHeight = `${height}px`
+    }
     const breaks = lines.slice(1).map((line) => line.start)
     const hidden = lines.flatMap((line, index) => {
       const next = lines[index + 1]?.start ?? end

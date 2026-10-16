@@ -1,5 +1,7 @@
 import { measuredTextHeight } from '../../text-layout'
 import {
+  calloutGeometryBounds,
+  numberedMarkerGeometryBounds,
   BOUNDS_RESIZE_HANDLES,
   createDocumentRenderScene,
   resizeLayerGeometry,
@@ -43,7 +45,7 @@ export function transformCanvasPoint(
 }
 
 export function canvasLayerBounds(layer: LayerNode): LayerBounds {
-  return layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
+  return layer.kind === 'callout' ? calloutGeometryBounds(layer.payload) : layer.kind === 'numberedMarker' ? numberedMarkerGeometryBounds(layer) : layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
 }
 
 export interface CanvasGeometryContext {

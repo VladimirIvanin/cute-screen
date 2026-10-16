@@ -24,7 +24,9 @@ const {
   onPointerDown,
   onBackgroundPointerDown,
   finishTextEditing,
+  editSelectedLabel,
   onPointerMove,
+  onPointerLeave,
   finishGesture,
   cancelGesture,
   onDoubleClick,
@@ -87,6 +89,7 @@ defineExpose({
   setCropPresetValue,
   refitCanvas,
   finishTextEditing,
+  editSelectedLabel,
 })
 </script>
 
@@ -124,13 +127,14 @@ defineExpose({
                   ? 'crosshair'
                   : activeTool === 'hand'
                     ? 'grab'
-                    : !sampling && (
-                      activeTool === 'pencil' ||
-                      activeTool === 'marker' ||
-                      activeTool === 'numberedMarker'
-                    )
-                      ? 'crosshair'
-                      : undefined,
+                    : !sampling && activeTool === 'numberedMarker'
+                      ? markerPreviewBlocked || readOnly ? 'default' : 'none'
+                      : !sampling && (
+                        activeTool === 'pencil' ||
+                        activeTool === 'marker'
+                      )
+                        ? 'crosshair'
+                        : undefined,
             }"
             :aria-label="t('sceneCanvas')"
             :tabindex="
@@ -147,6 +151,7 @@ defineExpose({
             @pointerdown="onPointerDown"
             @contextmenu="onContextMenu"
             @pointermove="onPointerMove"
+            @pointerleave="onPointerLeave"
             @pointerup="finishGesture"
             @pointercancel="cancelGesture"
             @lostpointercapture="cancelGesture"
@@ -216,12 +221,16 @@ defineExpose({
               width: `${editingText.width * ((zoom ?? 100) / 100)}px`,
               fontSize: `${editorTextStyle.fontSize * ((zoom ?? 100) / 100)}px`,
               lineHeight: '1.25',
+              transformOrigin: 'top left',
+              transform: ['callout', 'numberedMarker'].includes(editingText.kind) && editingText.existing
+                ? `rotate(${editingText.existing.transform.rotation}deg) scale(${editingText.existing.transform.scaleX}, ${editingText.existing.transform.scaleY})`
+                : undefined,
               fontFamily: editorTextStyle.fontFamily,
               fontWeight: String(editorTextStyle.weight),
               fontStyle: editorTextStyle.italic ? 'italic' : 'normal',
               textDecoration: editorTextStyle.strikethrough ? 'line-through' : 'none',
               color: cssTextColor(editorTextStyle.color),
-              '--text-background-color': cssTextBackground(editingText.background) ?? 'transparent',
+              '--text-background-color': editingText.kind === 'numberedMarker' ? 'transparent' : cssTextBackground(editingText.background) ?? 'transparent',
               '--text-background-padding': editingText.background
                 ? `${editingText.background.padding * ((zoom ?? 100) / 100)}px`
                 : '0px',

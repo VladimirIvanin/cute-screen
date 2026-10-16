@@ -1,4 +1,8 @@
 import {
+  numberedMarkerGeometryBounds,
+  numberedMarkerCaptionBounds,
+} from './numbered-marker'
+import {
   resolveFreehandGeometry,
   freehandOutlineContains,
 } from './tools/freehand'
@@ -14,6 +18,8 @@ import {
   arrowPathPoints,
 } from './arrow-geometry'
 import {
+  type CalloutGeometryContext,
+  calloutGeometryBounds,
   calloutMarkerRadius,
   calloutPathPoints,
   calloutTextRect,
@@ -53,8 +59,13 @@ export class DocumentSpatialIndex {
   readonly #tree = new RBush<SpatialItem>()
   #itemsById = new Map<string, SpatialItem>()
   #document: EditorDocumentV1
+  readonly #context: CalloutGeometryContext
 
-  constructor(document: EditorDocumentV1) {
+  constructor(
+    document: EditorDocumentV1,
+    context: CalloutGeometryContext = {},
+  ) {
+    this.#context = context
     this.#document = document
     this.#insertAll(document)
   }
@@ -76,7 +87,7 @@ export class DocumentSpatialIndex {
         !layer.visible ||
         layer.locked
       ) continue
-      const item = spatialItem(layer)
+      const item = spatialItem(layer, this.#context)
       this.#tree.insert(item)
       this.#itemsById.set(id, item)
     }
@@ -97,21 +108,28 @@ export class DocumentSpatialIndex {
     for (let index = this.#document.layers.length - 1; index >= 0; index -= 1) {
       const layer = this.#document.layers[index]
       if (!layer || !candidateIds.has(layer.id)) continue
-      const hit = hitLayer(layer, canvasPoint, index, this.#document.canvas)
+      const hit = hitLayer(layer, canvasPoint, index, this.#document.canvas, this.#context)
       if (hit) hits.push(hit)
     }
     return Object.freeze(hits)
   }
 
   #insertAll(document: EditorDocumentV1): void {
-    const items = document.layers.filter((layer) => layer.visible && !layer.locked).map(spatialItem)
+    const items = document.layers
+      .filter((layer) => layer.visible && !layer.locked)
+      .map((layer) => spatialItem(layer, this.#context))
     this.#tree.load(items)
     this.#itemsById = new Map(items.map((item) => [item.layerId, item]))
   }
 }
 
-function spatialItem(layer: EditorDocumentV1['layers'][number]): SpatialItem {
-  const bounds = layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
+function spatialItem(
+  layer: EditorDocumentV1['layers'][number],
+  context: CalloutGeometryContext,
+): SpatialItem {
+  const bounds = layer.kind === 'callout'
+    ? calloutGeometryBounds(layer.payload, context)
+    : layer.kind === 'numberedMarker' ? numberedMarkerGeometryBounds(layer, context) : layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
   const matrix = transformToMatrix(layer.transform)
   const points = [
     transformPoint(matrix, { x: bounds.x, y: bounds.y }),
@@ -138,6 +156,7 @@ function spatialItem(layer: EditorDocumentV1['layers'][number]): SpatialItem {
 export function hitTestDocument(
   document: EditorDocumentV1,
   canvasPoint: Point,
+  context: CalloutGeometryContext = {},
 ): HitTestResult | undefined {
   for (let index = document.layers.length - 1; index >= 0; index -= 1) {
     const layer = document.layers[index]
@@ -146,7 +165,7 @@ export function hitTestDocument(
       !layer.visible ||
       layer.locked
     ) continue
-    const hit = hitLayer(layer, canvasPoint, index, document.canvas)
+    const hit = hitLayer(layer, canvasPoint, index, document.canvas, context)
     if (hit) return hit
   }
   return undefined
@@ -156,6 +175,7 @@ export function hitTestDocument(
 export function hitTestDocumentAll(
   document: EditorDocumentV1,
   canvasPoint: Point,
+  context: CalloutGeometryContext = {},
 ): readonly HitTestResult[] {
   const hits: HitTestResult[] = []
   for (let index = document.layers.length - 1; index >= 0; index -= 1) {
@@ -165,7 +185,7 @@ export function hitTestDocumentAll(
       !layer.visible ||
       layer.locked
     ) continue
-    const hit = hitLayer(layer, canvasPoint, index, document.canvas)
+    const hit = hitLayer(layer, canvasPoint, index, document.canvas, context)
     if (hit) hits.push(hit)
   }
   return Object.freeze(hits)
@@ -176,8 +196,11 @@ function hitLayer(
   canvasPoint: Point,
   zOrder: number,
   canvas: EditorDocumentV1['canvas'],
+  context: CalloutGeometryContext,
 ): HitTestResult | undefined {
-  const bounds = layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
+  const bounds = layer.kind === 'callout'
+    ? calloutGeometryBounds(layer.payload, context)
+    : layer.kind === 'numberedMarker' ? numberedMarkerGeometryBounds(layer, context) : layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
   const local = transformPoint(invertMatrix(transformToMatrix(layer.transform)), canvasPoint)
   if (
     local.x < bounds.x ||
@@ -186,7 +209,7 @@ function hitLayer(
     local.y > bounds.y + bounds.height
   )
     return undefined
-  const part = drawingHitPart(layer, local, canvas)
+  const part = drawingHitPart(layer, local, canvas, context)
   if (!part) return undefined
   return Object.freeze({
     nodeId: layer.id,
@@ -262,6 +285,7 @@ function drawingHitPart(
   layer: EditorDocumentV1['layers'][number],
   point: Point,
   canvas: EditorDocumentV1['canvas'],
+  context: CalloutGeometryContext,
 ): HitPart | undefined {
   if (layer.kind === 'image') return 'fill'
   if (
@@ -271,6 +295,9 @@ function drawingHitPart(
     layer.kind === 'loupe'
   ) {
     return precisionLayerHitPart(layer, point, canvas)
+  }
+  if (layer.kind === 'numberedMarker') {
+    return pointInRect(point, layer.localBounds) || pointInRect(point, numberedMarkerCaptionBounds(layer, context)) ? 'fill' : undefined
   }
   if (layer.kind === 'callout') {
     const callout = layer.payload
@@ -283,7 +310,7 @@ function drawingHitPart(
     const markerRadius = calloutMarkerRadius(strokeWidth)
     const markerHit = (anchor: Point) => Math.hypot(point.x - anchor.x, point.y - anchor.y) <= markerRadius
     if (markerHit(callout.target) || markerHit(callout.label)) return 'stroke'
-    const textRect = calloutTextRect(callout)
+    const textRect = calloutTextRect(callout, context)
     return pointInRect(point, textRect) ? 'fill' : undefined
   }
   if (

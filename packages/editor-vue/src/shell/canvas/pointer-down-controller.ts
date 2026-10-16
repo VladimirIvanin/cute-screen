@@ -1,7 +1,7 @@
 import {
   DEFAULT_DRAWING_DEFAULTS,
   calloutTextLayout,
-  createNumberedMarkerLayer,
+  createPreparedNumberedMarker,
   hitTestDocument,
   type LayerNode,
 } from '@cute-screen/editor-renderer'
@@ -251,15 +251,23 @@ function addNumberedMarker(
   point: CanvasPoint,
 ): void {
   event.preventDefault()
-  context.emit(
-    'addLayer',
-    createNumberedMarkerLayer({
+  if (!Number.isSafeInteger(context.props.nextMarkerSequence ?? 1)) {
+    context.emit('toolError', 'Choose a smaller marker number in tool settings.')
+    return
+  }
+  try {
+    const layer = createPreparedNumberedMarker({
       id: crypto.randomUUID(),
       sequence: context.props.nextMarkerSequence ?? 1,
       origin: point,
       shape: context.props.markerShape ?? 'circle',
-    }),
-  )
+      style: context.props.markerStyle,
+    })
+    context.scene.value?.setPointerCapture(event.pointerId)
+    context.setGesture({ kind: 'numberedMarker', layer })
+  } catch (error) {
+    context.emit('toolError', error instanceof Error ? error.message : 'Could not prepare the numbered marker')
+  }
 }
 
 function beginCallout(

@@ -9,10 +9,12 @@ import {
   ref,
   type CSSProperties,
 } from 'vue'
+import NumberedMarkerFormattingToolbar from './NumberedMarkerFormattingToolbar.vue'
 import { UiIcon } from '../icon'
 import SimpleColorPicker from '../ui/SimpleColorPicker.vue'
 import TextFontPicker from '../ui/TextFontPicker.vue'
 import NumericControl from '../ui/NumericControl.vue'
+import CalloutWidthControl from '../ui/CalloutWidthControl.vue'
 import { textFormattingLabel } from '../ui/text-formatting-labels'
 import { usePreviewPopover } from '../ui/use-preview-popover'
 import type { PreviewPlacement } from '../ui/preview-placement'
@@ -49,6 +51,7 @@ const textSizeDraft = ref('24')
 const toolbarRoot = ref<HTMLElement>()
 let toolbarObserver: ResizeObserver | undefined
 const colorPicker = ref<InstanceType<typeof SimpleColorPicker>>()
+const widthControl = ref<InstanceType<typeof CalloutWidthControl>>()
 const fontPicker = ref<InstanceType<typeof TextFontPicker>>()
 const unregisterBackground = numericPreview?.register(backgroundOwner, () => {
   if (textBackgroundOpen.value) closeTextBackground()
@@ -142,7 +145,8 @@ function validTextBackground(value: typeof textBackgroundDraft.value): boolean {
   )
 }
 
-function closeOtherPopovers(except?: 'color' | 'font' | 'size' | 'background'): void {
+function closeOtherPopovers(except?: 'color' | 'font' | 'size' | 'background' | 'width'): void {
+  if (except !== 'width') widthControl.value?.close()
   if (except !== 'color') colorPicker.value?.close()
   if (except !== 'font') fontPicker.value?.close()
   if (except !== 'size' && textSizeOpen.value) closeTextSize()
@@ -185,10 +189,9 @@ function commitTextBackground(value: typeof textBackgroundDraft.value | null): v
 }
 
 function previewTextBackground(
-  key: 'padding' | 'radius',
-  value: number,
+  patch: Partial<typeof textBackgroundDraft.value>,
 ): void {
-  textBackgroundDraft.value = { ...textBackgroundDraft.value, [key]: value }
+  textBackgroundDraft.value = { ...textBackgroundDraft.value, ...patch }
   if (validTextBackground(textBackgroundDraft.value)) numericPreview?.preview(backgroundOwner, {
     id: 'textBackground', defaultsTool: numericDefaultsTool(),
   }, JSON.stringify(textBackgroundDraft.value))
@@ -238,7 +241,16 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+  <NumberedMarkerFormattingToolbar
+    v-if="text.kind === 'numberedMarker'"
+    :text="text"
+    :recent-colors="text.marker?.recentColors"
+    :locale="pickerLocale ?? 'en'"
+    :disabled="blocked"
+    @change="(id, value) => emit('change', id, value)"
+  />
   <div
+    v-else
     ref="toolbarRoot"
     class="cs-text-toolbar"
     :class="{ 'cs-text-floating-toolbar': variant === 'floating' }"
@@ -246,6 +258,15 @@ onBeforeUnmount(() => {
     :aria-label="title"
     @keydown.escape="closeOpenTextPopover"
   >
+    <CalloutWidthControl
+      v-if="text.calloutWidth"
+      ref="widthControl"
+      :width="text.calloutWidth"
+      :locale="pickerLocale"
+      :disabled="blocked"
+      @opened="closeOtherPopovers('width')"
+      @change="emit('change', 'calloutTextWidth', $event)"
+    />
     <div class="cs-text-control-group" data-text-control="color">
       <SimpleColorPicker
         ref="colorPicker"
@@ -410,7 +431,7 @@ onBeforeUnmount(() => {
             :eyedropper="false"
             :disabled="blocked"
             embedded
-            @commit="textBackgroundDraft.color = $event"
+            @commit="previewTextBackground({ color: $event })"
             @dismiss="closeTextBackground()"
           />
         </div>
@@ -428,8 +449,8 @@ onBeforeUnmount(() => {
           :disabled="text.disabled.includes(key)"
           :disabled-reason="text.disabledReason"
           @invalid="backgroundInvalid[key] = $event"
-          @preview="previewTextBackground(key, $event)"
-          @commit="previewTextBackground(key, $event)"
+          @preview="previewTextBackground({ [key]: $event })"
+          @commit="previewTextBackground({ [key]: $event })"
           @cancel="numericPreview?.cancel(backgroundOwner)"
         />
         <button

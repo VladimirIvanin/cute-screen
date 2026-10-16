@@ -149,6 +149,17 @@ export interface ContextToolbarSchema {
   readonly controls: readonly ContextControl[]
   /** The v7 rich-text toolbar is a compact, shared control strip. */
   readonly text?: Readonly<{
+    readonly calloutWidth?: import('./canvas/contracts').CalloutWidthSnapshot | undefined
+    readonly marker?: Readonly<{
+      readonly recentColors: readonly import('@cute-screen/editor-renderer').SrgbColor[]
+      readonly mode: 'defaults' | 'selection' | 'inline' | 'multiple'
+      readonly sequence: number | null
+      readonly shape: 'circle' | 'square' | 'diamond' | 'star' | null
+      readonly badgeColor: string | null
+      readonly customLabel: boolean
+      readonly duplicate: boolean
+      readonly manual: boolean
+    }>
     readonly kind: 'text' | 'callout' | 'numberedMarker'
     readonly color: string | null
     readonly fontFamily: string | null

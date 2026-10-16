@@ -12,6 +12,7 @@ import type { createWorkspaceState } from './workspace-state'
 import type { createWorkspaceBindings } from './workspace-bindings'
 import type { ResolvedEditorShellProps } from '../contracts'
 import type { useEditorShellStore } from '../store'
+import { shortcutLetter } from '../../keyboard-shortcuts'
 
 export function useNumericPreview(
   workspace: ReturnType<typeof createWorkspaceState>,
@@ -49,9 +50,11 @@ export function useNumericPreview(
   }, { flush: 'sync' })
   const cancelNumericForShortcut = (event: KeyboardEvent) => {
     if (
+      !event.defaultPrevented &&
+      !event.isComposing &&
       (event.ctrlKey ||
         event.metaKey) &&
-        ['z', 'y', 's'].includes(event.key.toLowerCase())
+        ['z', 'y', 's'].includes(shortcutLetter(event) ?? '')
     ) numericPreview.cancel()
   }
   document.addEventListener('keydown', cancelNumericForShortcut, true)

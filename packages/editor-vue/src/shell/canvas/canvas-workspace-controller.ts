@@ -1,3 +1,12 @@
+import { textEditorBindings } from './text-editor-bindings'
+import {
+  useNumberedMarkerPreview,
+  type NumberedMarkerPreview,
+} from './numbered-marker-preview'
+import {
+  markerDocumentForScene,
+  editSelectedMarkerLabel,
+} from './numbered-marker-editing'
 import { SpotlightEditingController } from './spotlight-editing-controller'
 import {
   applyCropSession,
@@ -84,6 +93,7 @@ export class CanvasWorkspaceController {
   readonly #pointerDown: PointerDownContext
   readonly #pointerMove: PointerMoveContext
   readonly #finish: GestureFinishContext
+  readonly #markerPreview: NumberedMarkerPreview
   #gesture: CanvasGesture
   #rulerGuide: RulerAngleGuide | undefined
   #spacePressed = false
@@ -95,6 +105,11 @@ export class CanvasWorkspaceController {
   ) {
     this.#props = props
     this.#emit = emit
+    this.#markerPreview = useNumberedMarkerPreview(
+      props,
+      this.invalidateOverlay,
+      () => this.#spacePressed || Boolean(this.#gesture),
+    )
     this.#viewport = new ViewportController({
       props,
       emit,
@@ -170,9 +185,14 @@ export class CanvasWorkspaceController {
         ) return
         handlePointerDown(this.#pointerDown, event)
       },
+      editSelectedLabel: () => editSelectedMarkerLabel(this.#textEditor, this.selectedLayer()),
+      onPointerLeave: () => this.#markerPreview.clear(),
       finishTextEditing: (continuation: () => void) => this.#textEditor.finishEditing(continuation),
       onBackgroundPointerDown: (event: PointerEvent) => this.#backgroundPointerDown(event),
       onPointerMove: (event: PointerEvent) => {
+        const previewPoint = event.target === state.scene.value
+          ? this.canvasPoint(event) : undefined
+        this.#markerPreview.move(previewPoint)
         if (!this.#spotlight.pointerMove(event)) handlePointerMove(this.#pointerMove, event)
       },
       finishGesture: (event: PointerEvent) => {
@@ -195,7 +215,7 @@ export class CanvasWorkspaceController {
       editorTextStyle: this.#textFormatting.editorTextStyle,
       cssTextColor,
       cssTextBackground,
-      ...this.#textBindings(),
+      ...textEditorBindings(this.#textEditor),
       overlay: state.overlay,
       rendererError: state.rendererError,
       retryRender: () => void this.#renderer.drawDocument(),
@@ -348,6 +368,7 @@ export class CanvasWorkspaceController {
       resolveCalloutStroke: () => this.#draft.resolveCalloutStroke(),
       updateToolbarLayout: this.#toolbars.updateFloatingToolbarLayout,
       emitEditing: this.#textFormatting.emitTextEditing,
+      redrawMarker: () => void this.#renderer.drawDocument(),
       recordCycle: (cycle) => {
         this.#cycle = cycle
       },
@@ -367,7 +388,8 @@ export class CanvasWorkspaceController {
       documentForScene: () => {
         const document = this.#spotlight.documentForScene(this.#sceneDocument.documentForScene())
         const draft = this.#gesture?.kind === 'precision' && this.#gesture.tool === 'spotlight' ? this.#draft.precisionLayer('__spotlight-draft__') : undefined
-        return document && draft ? { ...document, layers: [...document.layers, draft] } : document
+        const result = document && draft ? { ...document, layers: [...document.layers, draft] } : document
+        return markerDocumentForScene(result, state.editingText.value)
       },
       previewLayer: this.gesturePreviewLayer,
       invalidateOverlay: this.invalidateOverlay,
@@ -385,6 +407,7 @@ export class CanvasWorkspaceController {
       previewLayer: () => this.#spotlight?.selectionLayer() ?? this.gesturePreviewLayer(),
       selectedLayer: () => this.#spotlight?.selectionLayer() ?? this.selectedLayer(),
       drawDrafts: (context) => {
+        this.#markerPreview.draw(context)
         this.#draft.drawDrawing(context)
         this.#draft.drawCallout(context)
         this.#draft.drawPrecision(context)
@@ -435,6 +458,8 @@ export class CanvasWorkspaceController {
       spacePressed: () => this.#spacePressed,
       setSpacePressed: (pressed) => {
         this.#spacePressed = pressed
+        this.#markerPreview.refresh()
+        if (this.#props.activeTool === 'numberedMarker') this.#pointerGeometry.setCursor(pressed ? 'grab' : 'none')
       },
       cycle: () => this.#cycle,
       setCycle: (cycle) => {
@@ -448,20 +473,6 @@ export class CanvasWorkspaceController {
       moveLoupeSource: this.moveLoupeSource,
       invalidateOverlay: this.invalidateOverlay,
       updateArrowToolbar: this.#toolbars.updateFloatingArrowToolbarLayout,
-    }
-  }
-
-  #textBindings() {
-    return {
-      onTextEditorCompositionStart: () => this.#textEditor.compositionStart(),
-      onTextEditorCompositionEnd: () => this.#textEditor.compositionEnd(),
-      onTextEditorBeforeInput: (event: InputEvent) => this.#textEditor.beforeInput(event),
-      onTextEditorInput: () => this.#textEditor.input(),
-      onTextEditorCopy: (event: ClipboardEvent) => this.#textEditor.copy(event),
-      onTextEditorCut: (event: ClipboardEvent) => this.#textEditor.cut(event),
-      onTextEditorPaste: (event: ClipboardEvent) => this.#textEditor.paste(event),
-      onTextEditorKeydown: (event: KeyboardEvent) => this.#textEditor.keydown(event),
-      onTextEditorBlur: (event: FocusEvent) => this.#textEditor.blur(event),
     }
   }
 

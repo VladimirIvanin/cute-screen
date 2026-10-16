@@ -20,7 +20,7 @@ export function createNumberedMarkerLayer(input: {
   readonly badgeColor?: SrgbColor
 }): NumberedMarkerLayer {
   assertFinitePoint(input.origin)
-  if (!Number.isInteger(input.sequence) || input.sequence <= 0) {
+  if (!Number.isSafeInteger(input.sequence) || input.sequence <= 0) {
     throw new Error('numbered marker sequence must be a positive integer')
   }
   const localBounds = { x: 0, y: 0, width: 32, height: 32 }
@@ -70,8 +70,9 @@ export function createNumberedMarkerLayer(input: {
 }
 
 export function nextNumberedMarkerSequence(layers: readonly LayerNode[]): number {
-  const used = new Set(layers.flatMap((layer) => (layer.kind === 'numberedMarker' ? [layer.payload.sequence] : [])))
-  let candidate = 1
-  while (used.has(candidate)) candidate += 1
-  return candidate
+  let maximum = 0
+  for (const layer of layers) {
+    if (layer.kind === 'numberedMarker') maximum = Math.max(maximum, layer.payload.sequence)
+  }
+  return maximum + 1
 }

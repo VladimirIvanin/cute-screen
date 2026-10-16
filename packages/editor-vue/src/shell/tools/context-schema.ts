@@ -108,25 +108,6 @@ function cropSchema(context: ContextSchemaContext): ContextToolbarSchema {
     ],
   }
 }
-function numberedMarkerSchema(context: ContextSchemaContext): ContextToolbarSchema {
-  return {
-    icon: 'numberedMarker',
-    title: context.translate('toolNumberedMarker'),
-    hint: context.translate('canvasViewport'),
-    controls: [
-      {
-        kind: 'select',
-        id: 'markerShape',
-        label: 'Shape',
-        value: context.markerShape.value,
-        options: ['circle', 'square', 'diamond', 'star'].map((shape) => ({
-          value: shape,
-          label: shape,
-        })),
-      },
-    ],
-  }
-}
 function imageSchema(
   context: ContextSchemaContext,
   layer: Extract<LayerNode, {
@@ -186,22 +167,7 @@ function schemaForLayer(
   if (['censor', 'spotlight', 'ruler', 'loupe'].includes(layer.kind))
     return context.precisionToolSchema(layer.kind as PrecisionTool, layer as PrecisionLayer)
   const text = context.buildTextContextSchema(layer, 'select')
-  if (text)
-    return layer.kind === 'numberedMarker'
-      ? {
-          ...text,
-          controls: [
-            {
-              kind: 'select' as const,
-              id: 'markerShape',
-              label: context.precisionText('Shape', 'Форма'),
-              value: layer.payload.badge.shape,
-              options: ['circle', 'square', 'diamond', 'star'].map((value) => ({
-                value, label: value,
-              })),
-            },
-          ],
-        } : text
+  if (text) return text
   if (context.isDrawingTool(layer.kind))
     return context.drawingControl(layer.kind, {
       ...layer.payload,
@@ -245,6 +211,27 @@ function selectionHeading(
     hint: homogeneous ? first.hint : context.precisionText('Common selection properties', 'Общие свойства выделения'),
     title: layers.length > 1 ? `${layers.length} ${context.precisionText('objects', 'объекта')}` : first.title,
   }
+}
+
+function markerSelectionProjection(
+  text: NonNullable<ContextToolbarSchema['text']>,
+  schemas: readonly (ContextToolbarSchema | undefined)[],
+  count: number,
+): NonNullable<ContextToolbarSchema['text']> {
+  if (text.marker && schemas.every((schema) => Boolean(schema?.text?.marker))) {
+    text = { ...text, marker: { ...text.marker,
+      mode: count > 1 ? 'multiple' : text.marker.mode,
+      shape: schemas.every((schema) => schema?.text?.marker?.shape === text?.marker?.shape)
+        ? text.marker.shape : null,
+      badgeColor: schemas.every((schema) => schema?.text?.marker?.badgeColor === text?.marker?.badgeColor)
+        ? text.marker.badgeColor : null,
+    } }
+  } else if (text.marker) {
+    const { marker: _marker, ...plain } = text
+    void _marker
+    text = { ...plain, kind: 'text' }
+  }
+  return text
 }
 
 function selectionSchemaFor(context: ContextSchemaContext): ContextToolbarSchema | undefined {
@@ -303,6 +290,7 @@ function selectionSchemaFor(context: ContextSchemaContext): ContextToolbarSchema
           [key]: null,
         })
     }
+    text = markerSelectionProjection(text, schemas, layers.length)
     if (disabled)
       text = {
         ...text,
@@ -353,9 +341,7 @@ export function createContextSchema(context: ContextSchemaContext) {
     if (tool === 'crop')
       return cropSchema(context)
     const text = context.buildTextContextSchema(undefined, tool, true)
-    return tool === 'numberedMarker' && text ? {
-      ...text, controls: numberedMarkerSchema(context).controls,
-    } : text
+    return text
   })
   return {
     contextSchema: computed(() => (!context.toolConfigure.value && context.activeToolId.value === 'crop' ? cropSchema(context) : undefined)),

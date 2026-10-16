@@ -24,7 +24,7 @@ import {
   type ImageLayer,
   type LayerNode,
 } from '@cute-screen/editor-renderer'
-import { calloutTextLayout } from '@cute-screen/editor-core'
+import { calloutTextLayout } from '@cute-screen/editor-renderer'
 
 const TEXT_DEFAULTS: TextToolDefaults = Object.freeze({
   fontFamily: 'Roboto',
@@ -67,6 +67,8 @@ function editorDocument(layer?: LayerNode): EditorDocument {
 beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
     measureText: (text: string) => ({ width: Array.from(text).length * 14.4 }),
+    save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(),
+    stroke: vi.fn(), arc: vi.fn(), fill: vi.fn(),
     clearRect: vi.fn(),
     setTransform: vi.fn(),
     drawImage: vi.fn(),
@@ -505,7 +507,7 @@ describe('v7 rich-text component editing', () => {
               })
       const rendered = await openExistingEditor(layer)
       const editor = rendered.getByRole('textbox') as HTMLDivElement
-      selectWithinFirstSpan(editor, 0, layer.kind === 'numberedMarker' ? 1 : 3)
+      if (layer.kind !== 'numberedMarker') selectWithinFirstSpan(editor, 0, 3)
       await fireEvent.paste(editor, {
         clipboardData: { getData: () => 'new' },
       })
@@ -560,4 +562,52 @@ describe('v7 rich-text component editing', () => {
       renderScene.mockRestore()
     }
   })
+})
+
+describe('measured callout editing', () => {
+  it.each([true, false])('grows a new label outside its endpoint and commits once (left=%s)', async (left) => {
+    const rendered = mount(undefined, 'callout')
+    await fireEvent.pointerDown(rendered.scene, { button: 0, pointerId: 1, clientX: 120, clientY: 60 })
+    await fireEvent.pointerMove(rendered.scene, { pointerId: 1, clientX: left ? 80 : 180, clientY: 100 })
+    await fireEvent.pointerUp(rendered.scene, { pointerId: 1, clientX: left ? 80 : 180, clientY: 100 })
+    const editor = await rendered.findByLabelText('Callout editor') as HTMLDivElement
+    await fireEvent.paste(editor, { clipboardData: { getData: () => 'Текст выноски' } })
+    const width = Number.parseFloat(editor.style.width)
+    expect(width).toBeGreaterThan(24)
+    const labelX = left ? 80 : 180
+    expect(left ? Number.parseFloat(editor.style.left) + width : Number.parseFloat(editor.style.left))
+      .toBeCloseTo(labelX + (left ? -11 : 11))
+    await fireEvent.keyDown(editor, { key: 'Enter', ctrlKey: true })
+    expect(rendered.emitted().documentCommand).toHaveLength(1)
+    const commands = rendered.emitted('documentCommand') as unknown[][]
+    const command = commands[0]![0] as { layer: LayerNode }
+    expect(command.layer.kind).toBe('callout')
+    if (command.layer.kind !== 'callout') throw new Error('expected callout')
+    const layout = calloutTextLayout(command.layer.payload)
+    expect(layout.text.width).toBeCloseTo(width)
+    expect(command.layer.transform.translateX + layout.text.x).toBeCloseTo(Number.parseFloat(editor.style.left))
+  })
+  it('remeasures long input, reopens on the label and applies width without emitting intermediate commands', async () => {
+    const layer = createCalloutLayer({ id: 'label', text: 'Текст', target: { x: 180, y: 40 }, label: { x: 160, y: 80 } })!
+    const rendered = await openExistingEditor(layer)
+    const editor = rendered.getByLabelText('Callout editor') as HTMLDivElement
+    const before = calloutTextLayout(layer.payload)
+    expect(Number.parseFloat(editor.style.left)).toBeCloseTo(layer.transform.translateX + before.text.x)
+    await rendered.rerender({ textFormatting: { revision: 1, calloutWidth: 720 } })
+    expect(Number.parseFloat(editor.style.width)).toBe(720)
+    expect(rendered.emitted().documentCommand).toBeUndefined()
+    await fireEvent.keyDown(editor, { key: 'Escape' })
+    expect(rendered.emitted().documentCommand).toBeUndefined()
+  })
+})
+
+it('does not open the callout editor in a read-only document', async () => {
+  const layer = createCalloutLayer({ id: 'readonly', text: 'Label', target: { x: 40, y: 40 }, label: { x: 80, y: 80 } })!
+  const rendered = mount(layer)
+  await rendered.rerender({ readOnly: true })
+  const rect = calloutTextLayout(layer.payload).text
+  await fireEvent.dblClick(rendered.scene, { clientX: layer.transform.translateX + rect.x + 2,
+    clientY: layer.transform.translateY + rect.y + 2 })
+  expect(rendered.queryByLabelText('Callout editor')).not.toBeInTheDocument()
+  expect(rendered.emitted().documentCommand).toBeUndefined()
 })

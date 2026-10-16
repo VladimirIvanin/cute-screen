@@ -31,9 +31,10 @@ function applyCropChange(
 
 function applyMarkerChange(
   context: ContextEffectsContext,
+  id: string,
   value: string,
 ): boolean {
-  if (context.activeToolId.value !== 'numberedMarker') return false
+  if (id !== 'markerShape' || context.activeToolId.value !== 'numberedMarker') return false
   if (['circle', 'square', 'diamond', 'star'].includes(value)) {
     context.markerShape.value = value as typeof context.markerShape.value
   }
@@ -50,7 +51,7 @@ export function createContextEffects(context: ContextEffectsContext) {
     if (applyCropChange(context, id, value)) return
     if (context.applyPrecisionChange(id, value)) return
     if (context.applyImageChange(id, value)) return
-    if (applyMarkerChange(context, value)) return
+    if (applyMarkerChange(context, id, value)) return
     context.applyDrawingChange(id, value)
   }
   return { onContextChange }

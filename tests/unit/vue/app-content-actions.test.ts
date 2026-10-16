@@ -184,7 +184,7 @@ describe('M02 editor shell', () => {
     })
 
     await selectLayerFromPanel(view, { activateSelect: false })
-    await fireEvent.keyDown(window, { key: 'x', ctrlKey: true })
+    await fireEvent.keyDown(window, { code: 'KeyX', key: 'ч', ctrlKey: true })
     await vi.waitFor(() => expect(writeClipboardText).toHaveBeenCalledWith('Copy me', expect.any(String)))
     expect(session.snapshot.core.document.layers).toEqual([])
 

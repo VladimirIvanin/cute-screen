@@ -1,14 +1,12 @@
 import {
   arrowSelectionHandles,
   BOUNDS_RESIZE_HANDLES,
-  calloutMarkerRadius,
   calloutSelectionHandles,
   hitTestDocument,
   layerIntrinsicResizeHandles,
   type ArrowHandleKind,
   type CalloutHandleKind,
   type LayerNode,
-  type StrokeStyle,
   type Transform2D,
 } from '@cute-screen/editor-renderer'
 import type {
@@ -37,18 +35,6 @@ export interface PointerGeometryContext {
   readonly worldHandlePositions: (layer: LayerNode) => Readonly<Record<ResizeHandle, CanvasPoint>>
   readonly transformPoint: (transform: Transform2D, point: CanvasPoint) => CanvasPoint
   readonly loupeSourceCenter: (layer: Extract<LayerNode, { readonly kind: 'loupe' }>) => CanvasPoint
-}
-
-export function calloutTextEditorOrigin(
-  label: CanvasPoint,
-  stroke: StrokeStyle,
-  fontSize: number,
-): CanvasPoint {
-  const markerRadius = calloutMarkerRadius(stroke.width)
-  return {
-    x: label.x + markerRadius + 6,
-    y: label.y - (fontSize * 1.25) / 2,
-  }
 }
 
 export class PointerGeometryController {
@@ -164,11 +150,11 @@ export class PointerGeometryController {
       this.setCursor(cropCursor)
       return
     }
+    if (this.#markerCursor()) return
     if (
       props.quickSelectionMode ||
       props.activeTool === 'pencil' ||
-      props.activeTool === 'marker' ||
-      props.activeTool === 'numberedMarker'
+      props.activeTool === 'marker'
     ) {
       this.setCursor('crosshair')
       return
@@ -191,7 +177,7 @@ export class PointerGeometryController {
       return
     }
     if (this.#isDirectHandle(layer, point)) {
-      this.setCursor('crosshair')
+      this.setCursor(this.calloutHandle(layer, point) === 'width' ? 'ew-resize' : 'crosshair')
       return
     }
     const resize = this.boundsResizeHandle(layer, point)
@@ -235,6 +221,17 @@ export class PointerGeometryController {
       const candidate = this.#context.transformPoint(layer.transform, local)
       return Math.hypot(candidate.x - point.x, candidate.y - point.y) <= this.#tolerance()
     })?.kind
+  }
+
+  #markerCursor(): boolean {
+    const { props } = this.#context
+    if (
+      props.activeTool !== 'numberedMarker' ||
+      props.sampling ||
+      props.quickSelectionMode
+    ) return false
+    this.setCursor(props.markerPreviewBlocked || props.readOnly ? 'default' : 'none')
+    return true
   }
 
   #isDirectHandle(

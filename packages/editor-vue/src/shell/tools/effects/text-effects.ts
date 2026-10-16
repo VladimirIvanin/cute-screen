@@ -1,9 +1,13 @@
-import { measuredTextLayer } from '../../../text-layout'
+import {
+  measuredTextLayer,
+  measuredCalloutLayer,
+} from '../../../text-layout'
 import type {
   Ref,
   ShallowRef,
 } from 'vue'
 import {
+  measuredNumberedMarkerLayer,
   applyRichTextParagraphStyle,
   applyRichTextSpanStyle,
   rebaseCalloutLayer,
@@ -190,16 +194,16 @@ function updatedTextLayer(
     })
   }
   if (layer.kind === 'callout') {
-    return {
+    return measuredCalloutLayer({
       ...layer,
       payload: {
         ...layer.payload,
         content,
-        ...(background === undefined ? {} : { background: background ?? layer.payload.background }),
+        ...(background === undefined ? {} : { background }),
       },
-    }
+    })
   }
-  return {
+  return measuredNumberedMarkerLayer({
     ...layer,
     payload: {
       ...layer.payload,
@@ -213,7 +217,7 @@ function updatedTextLayer(
             },
           }),
     },
-  }
+  })
 }
 
 function wholeTextCommand(
@@ -306,12 +310,47 @@ function applyCalloutStrokeChange(
   return true
 }
 
+function applyCalloutTextWidth(
+  context: TextEffectsContext,
+  id: string,
+  value: string,
+  revision: () => number,
+): boolean {
+  if (id !== 'calloutTextWidth') return false
+  if (context.props.readOnlyDocument) return true
+  const width = value === 'auto' ? 'auto' : Number(value)
+  if (
+    width !== 'auto' &&
+    (!Number.isFinite(width) ||
+      width <= 0)
+  ) return true
+  if (context.textDraft.value?.kind === 'callout') {
+    context.textFormatting.value = { revision: revision(), calloutWidth: width }
+    return true
+  }
+  const layer = selectedTextLayer(context)
+  if (
+    layer?.kind !== 'callout' ||
+    layer.locked ||
+    !context.props.documentSession
+  ) return true
+  const content = { ...layer.payload.content }
+  delete content.fixedWidth
+  const minimum = Math.max(1, ...content.spans.map((span) => span.fontSize))
+  const next = width === 'auto' ? { ...content, wrap: 'autoSize' as const }
+    : { ...content, wrap: 'fixedWidth' as const, fixedWidth: Math.max(minimum, width) }
+  const after = measuredCalloutLayer({ ...layer, payload: { ...layer.payload, content: next } }, width === 'auto' ? 480 : Infinity)
+  if (JSON.stringify(after) !== JSON.stringify(layer)) context.props.documentSession.execute({ type: 'updateLayer', before: layer, after })
+  return true
+}
+
 export function createTextEffects(context: TextEffectsContext) {
   let revision = 0
   function applyV7TextChange(
     id: string,
     value: string,
   ): boolean {
+    if (applyCalloutTextWidth(context, id, value, () => ++revision)) return true
     const resolved = resolveTextChange(id, value, context.textDefaults.value)
     if (resolved.kind === 'unhandled') return false
     if (resolved.kind === 'handled' || context.props.readOnlyDocument) return true

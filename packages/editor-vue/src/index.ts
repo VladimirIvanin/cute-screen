@@ -3,6 +3,8 @@ import type { EditorDocumentV1 } from '@cute-screen/editor-renderer'
 import './fonts'
 import './shell/shell.css'
 
+export { shortcutLetter } from './keyboard-shortcuts'
+
 export {
   Canvas2DRenderer,
   CanvasKitRenderer,

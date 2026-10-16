@@ -124,7 +124,7 @@ describe('measured text sizing and wrapping', () => {
   it('keeps the full background palette and numeric controls inside the popup', async () => {
     await openHarness()
     await $('.cs-zoom-value').click()
-    await $('button[aria-label="Text"]').click()
+    await $('button[aria-label="Text"]').click({ button: 'right' })
     for (const width of [640, 1024, 1440]) {
       await browser.setWindowSize(width, 800)
       await $('button[aria-label="Background"]').click()

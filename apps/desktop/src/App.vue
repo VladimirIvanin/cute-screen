@@ -13,6 +13,7 @@ import {
   describeError,
   loadImageWithBinaryFallback,
   parsePersistedDocument,
+  shortcutLetter,
   type CaptureProgressState,
   type CanvasViewportHosts,
   type FrameSummary,
@@ -286,8 +287,10 @@ async function pasteClipboardIntoEmptyDocument(): Promise<void> {
 
 function onWindowClipboardKeydown(event: KeyboardEvent): void {
   if (
+    event.defaultPrevented ||
+    event.isComposing ||
     !(event.metaKey || event.ctrlKey) ||
-    event.key.toLowerCase() !== 'v' ||
+    shortcutLetter(event) !== 'v' ||
     documentSession.value
   ) {
     return

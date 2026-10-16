@@ -70,6 +70,8 @@ describe('M05 icon-system boundary', () => {
       'packages/editor-vue/src/shell/components/HighlighterFormattingToolbar.vue',
       'packages/editor-vue/src/shell/components/ArrowStylePreview.vue',
       'packages/editor-vue/src/shell/components/TextFormattingToolbar.vue',
+      // Numbered marker miniatures preview the resulting badge geometry.
+      'packages/editor-vue/src/shell/components/NumberedMarkerFormattingToolbar.vue',
       // Censor SVGs illustrate effect results and region geometry, not UI icons.
       'packages/editor-vue/src/shell/components/CensorEffectPreview.vue',
       'packages/editor-vue/src/shell/components/CensorFormattingToolbar.vue',

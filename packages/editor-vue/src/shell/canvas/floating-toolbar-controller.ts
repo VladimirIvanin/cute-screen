@@ -14,7 +14,7 @@ import type {
 import type { FloatingToolbarLayout } from './workspace-state'
 
 const FLOATING_TOOLBAR_SELECTOR =
-  '.cs-context-toolbar, .cs-text-floating-toolbar, .cs-arrow-floating-toolbar, .cs-arrow-formatting-toolbar, .cs-text-size-popover, .cs-text-background-popover, .cs-text-font-popover, .cs-color-picker-popover, .cs-arrow-toolbar-popover'
+  '.cs-numbered-marker-toolbar, .cs-marker-popover, .cs-context-toolbar, .cs-text-floating-toolbar, .cs-arrow-floating-toolbar, .cs-arrow-formatting-toolbar, .cs-callout-width-popover, .cs-text-size-popover, .cs-text-background-popover, .cs-text-font-popover, .cs-color-picker-popover, .cs-arrow-toolbar-popover'
 
 export interface FloatingToolbarContext {
   readonly props: CanvasViewportProps

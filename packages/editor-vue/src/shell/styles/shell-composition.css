@@ -183,6 +183,12 @@
   background: var(--surface-raised);
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.28);
 }
+.cs-color-popover--embedded {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
 .cs-color-head {
   display: grid;
   grid-template-columns: 30px 1fr 28px;
@@ -315,6 +321,10 @@
   width: 34px;
   height: 34px;
   border: 1px solid var(--border);
+}
+.cs-color-eyedropper .n-button__content .cs-custom-icon {
+  width: 18px;
+  height: 18px;
 }
 .cs-color-error {
   margin: 6px 0 0;

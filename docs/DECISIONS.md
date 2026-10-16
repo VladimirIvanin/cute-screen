@@ -692,7 +692,7 @@ contenteditable selection и compact toolbar проверяются отдель
 
 ## ADR-032 — Callout leader line вместо speech bubble
 
-**Статус:** accepted; supersedes the callout container semantics portion of
+**Статус:** superseded in label placement/sizing by [ADR-065](#adr-065-измеряемая-подпись-выноски); remaining leader-line decision accepted; supersedes the callout container semantics portion of
 ADR-031
 
 **Контекст:** bubble/tail callout не соответствует technical annotation
@@ -1250,3 +1250,104 @@ Creation policies, compatible/mixed selection toolbar, style clipboard,
 при открытом configure; mounted-shell regressions, browser pointer/keyboard и
 production Tauri Capture → Quick → Editor. Команды, artifacts и ограничения
 платформ записываются в TESTING.md.
+
+## ADR-064 — Физические буквенные shortcuts редактора
+
+**Статус:** accepted; дополняет ADR-063.
+
+**Контекст:** `KeyboardEvent.key` содержит символ активной раскладки. Поэтому
+привязанные к букве команды, в том числе Undo, не работали после переключения
+с латиницы.
+
+**Решение:** буквенная команда получает латинскую букву из `KeyboardEvent.code`
+формата `KeyA`…`KeyZ`; это идентификатор физической позиции клавиши. Если `code`
+отсутствует либо равен `Unidentified`, используется прежний ASCII `key` fallback.
+Правило обслуживает существующие команды editor shell, инструментов, numeric
+preview и пустого desktop window. Editable controls и inline text сохраняют
+свою обработку, IME composition и `defaultPrevented` не вызывают команду.
+Новые shortcuts не добавляются; schema v7, IPC, Rust и EditorCommand не меняются.
+
+**Проверяемое основание:** unit/component регрессии русской и иной нелатинской
+раскладки, browser native input и real Tauri с системными раскладками. Команды,
+platform evidence и известные ограничения — в `TESTING.md`.
+
+## ADR-065 — Измеряемая подпись выноски
+
+**Статус:** accepted; supersedes ADR-032 in label placement/sizing only.
+
+**Контекст:** callout inline editor retained a one-em width and always opened to
+its label's right. Character-count bounds disagreed with glyph metrics and reopening.
+
+**Решение:** label.x < target.x places the entire padded label to its left;
+otherwise to its right, with a 6 document-pixel marker gap and vertical centering.
+A host-provided, cached rich-text measurement context supplies scene projection,
+hit-test, selection and command rebasing. Core remains DOM-free; derived metrics
+are not persisted. New labels grow up to 480 document px; an outer width handle
+and numeric width/Auto controls change existing v7 wrap/fixedWidth without scaling
+fonts or moving connector endpoints. Existing autoSize content retains its mode.
+Each committed gesture remains one EditorCommand.
+
+**Проверяемое основание:** core red-first placement/width tests, Vue editing and
+renderer regressions plus browser and real-WebView production drag-flow evidence
+are recorded in TESTING.md; missing platform runs are explicitly reported.
+
+## ADR-066 — Специализированная номерная метка
+
+**Статус:** superseded в части произвольной подписи решением ADR-068; остальные положения accepted.
+
+**Контекст:** текстовая панель скрывает форму и следующий номер; фиксированная
+рамка 32×32 обрезает длинные номера и подписи.
+
+**Решение:** специализированная компактная панель для numberedMarker с отдельными
+цветами badge/label и progressive disclosure текста. Автонумерация max+1;
+одноразовый override принадлежит документной сессии и не является preferences.
+Повторы допустимы с подсказкой. Измерение rich text и DOM-free shape geometry
+задают безопасную область, квадратную оболочку и неизменный центр. Старый v7
+документ при открытии не переразмечается; новые/изменённые метки проходят общий
+prepare до EditorCommand. Canvas preview хранит pointer вне Vue и рисуется RAF.
+Defaults, selection и inline используют существующее владение transient surfaces.
+Общая панель Text/Callout и остальные решения ADR-061 сохраняются.
+
+**Проверяемое основание:** воспроизведённая двухстрочная панель с overflow,
+red-first tests нумерации/геометрии, Vue и browser flows, decoded renderer и
+доступный native WebView; команды и ограничения записываются в TESTING.md.
+
+## ADR-067 — Предпросмотр номерной метки заменяет курсор
+
+**Статус:** accepted; дополняет ADR-066.
+
+**Контекст:** центрированный badge уже обозначает точку размещения. Дополнительный
+крест закрывает цифру; устаревший preview после defaults вводит в заблуждение.
+
+**Решение:** внутри canvas при активной номерной метке системный cursor скрыт.
+Preview получает актуальные sequence, shape и style; изменения настроек и загрузка
+шрифта инвалидируют измеренную геометрию. Pointer хранится в canvas controller,
+RAF обновляет overlay без Vue pointermove renders. Во время настроек preview скрыт;
+pan использует grab/grabbing, за пределами canvas остаётся системный курсор.
+
+**Проверяемое основание:** browser regression считывает pixels overlay до/после
+смены square/blue на diamond/red, проверяет форму, цвет, cursor и payload создания.
+Команды, screenshots и native ограничения — TESTING.md.
+
+## ADR-068 — Подпись номерной метки рядом с номером
+
+**Статус:** accepted; заменяет трактовку произвольной подписи в ADR-066.
+
+**Контекст:** пользователь уточнил назначение подписи: это текст рядом с номером,
+аналог текста выноски, чтобы не создавать и не выравнивать отдельный Text layer.
+
+**Решение:** sequence всегда рисуется внутри badge. Подпись расположена справа
+с зазором 8 document px и центрируется по вертикали; перенос ограничен 480 px.
+Номер, подпись и badge — один перемещаемый/удаляемый/undoable объект. Изменение
+подписи не увеличивает badge. Inline редактирует только подпись; номер доступен
+отдельным полем. Пустая подпись удаляет внешний текст.
+
+Document v7 и IPC сохраняются. Существующий rich-text label содержит первую
+строку номера и необязательные следующие строки подписи; projection разделяет
+их и сохраняет стили/ranges. Старые label, совпадающие с sequence, остаются без
+внешней подписи; старые произвольные label показываются рядом. Переразметки при
+открытии нет. Layout/hit-test/selection/export используют одну измеренную область.
+
+**Проверяемое основание:** red-first проверка независимости sequence и подписи,
+сохранения центра/размера badge и portable round-trip, browser edit/undo и
+декодирование PNG обоих backend; фактические результаты — TESTING.md.

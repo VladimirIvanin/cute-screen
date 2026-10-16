@@ -118,6 +118,7 @@ export {
 } from './drawing'
 export {
   calloutGeometryBounds,
+  type CalloutGeometryContext,
   calloutMarkerRadius,
   calloutPathPoints,
   calloutSelectionHandles,
@@ -375,3 +376,14 @@ export {
   constrainRulerMove,
   constrainRulerTransform,
 } from './ruler-constraints'
+
+export {
+  numberedMarkerLabelBounds,
+  numberedMarkerCaption,
+  numberedMarkerNumberContent,
+  setNumberedMarkerCaption,
+  numberedMarkerCaptionBounds,
+  numberedMarkerGeometryBounds,
+  rebaseNumberedMarkerLayer,
+  setNumberedMarkerSequence,
+} from './numbered-marker'

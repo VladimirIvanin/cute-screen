@@ -1,3 +1,4 @@
+import type { CalloutGeometryContext } from '../../callout-geometry'
 import type { RenderNode } from '../../scene/contracts'
 import { createRenderSceneSnapshot } from '../../scene/snapshot'
 import type {
@@ -24,6 +25,7 @@ function assertNever(value: never): never {
 function projectAnnotationLayer(
   layer: Exclude<LayerNode, { readonly kind: 'image' }>,
   document: EditorDocumentV1,
+  context: CalloutGeometryContext,
 ): readonly RenderNode[] {
   switch (layer.kind) {
     case 'arrow':
@@ -36,9 +38,9 @@ function projectAnnotationLayer(
     case 'text':
       return textNodes(layer)
     case 'numberedMarker':
-      return numberedMarkerNodes(layer)
+      return numberedMarkerNodes(layer, context)
     case 'callout':
-      return calloutNodes(layer)
+      return calloutNodes(layer, context)
     case 'censor':
     case 'spotlight':
     case 'ruler':
@@ -81,7 +83,10 @@ function imageNode(layer: Extract<LayerNode, { readonly kind: 'image' }>): Rende
 }
 
 /** Converts persisted nodes to renderer-neutral, ordered scene nodes. */
-export function createDocumentRenderScene(document: EditorDocumentV1) {
+export function createDocumentRenderScene(
+  document: EditorDocumentV1,
+  context: CalloutGeometryContext = {},
+) {
   const nodes: RenderNode[] = []
   for (const layer of document.layers) {
     if (layer.kind === 'image') {
@@ -89,7 +94,7 @@ export function createDocumentRenderScene(document: EditorDocumentV1) {
       continue
     }
     nodes.push(
-      ...projectAnnotationLayer(layer, document).map((node) => ({
+      ...projectAnnotationLayer(layer, document, context).map((node) => ({
         ...node,
         scaleX: layer.transform.scaleX,
         scaleY: layer.transform.scaleY,

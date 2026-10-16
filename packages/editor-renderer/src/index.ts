@@ -1,3 +1,17 @@
+export { measureRichTextContent } from './rich-text/measure-content'
+export {
+  calloutGeometryContext,
+  calloutGeometryBounds,
+  createDocumentRenderScene,
+  hitTestDocument,
+  hitTestDocumentAll,
+  DocumentSpatialIndex,
+  createCalloutLayer,
+  calloutSelectionHandles,
+  calloutTextLayout,
+  rebaseCalloutLayer,
+  updateCalloutHandle,
+} from './callout-layout'
 export {
   SHAPE_CATALOG,
   SHAPE_KINDS,
@@ -27,10 +41,6 @@ export {
   createEditorDocumentFromImage,
   materializeQuickCaptureDocument,
   createRenderSceneSnapshot,
-  createDocumentRenderScene,
-  hitTestDocument,
-  hitTestDocumentAll,
-  DocumentSpatialIndex,
   snapPoint,
   BOUNDS_RESIZE_HANDLES,
   assertLayerEditableScale,
@@ -88,7 +98,6 @@ export {
   createTextLayer,
   createTextCommitCommand,
   createNumberedMarkerLayer,
-  createCalloutLayer,
   createContentImageLayer,
   createDuplicateLayerCommand,
   nextNumberedMarkerSequence,
@@ -103,12 +112,9 @@ export {
   rebaseArrowLayer,
   calloutMarkerRadius,
   calloutPathPoints,
-  calloutSelectionHandles,
-  calloutTextLayout,
   defaultCalloutRoute,
-  rebaseCalloutLayer,
-  updateCalloutHandle,
   type CalloutHandleKind,
+  type CalloutGeometryContext,
   trimArrowBodyPoints,
   updateArrowHandle,
   type ArrowHandleKind,
@@ -281,3 +287,19 @@ export {
   constrainRulerMove,
   constrainRulerTransform,
 } from '@cute-screen/editor-core'
+
+export {
+  numberedMarkerLabelBounds,
+  numberedMarkerCaption,
+  numberedMarkerNumberContent,
+  setNumberedMarkerCaption,
+  rebaseNumberedMarkerLayer,
+  setNumberedMarkerSequence,
+} from '@cute-screen/editor-core'
+
+export {
+  measuredNumberedMarkerLayer,
+  numberedMarkerCaptionBounds,
+  numberedMarkerGeometryBounds,
+  createPreparedNumberedMarker,
+} from './numbered-marker-layout'

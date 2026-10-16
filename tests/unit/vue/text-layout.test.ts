@@ -80,3 +80,19 @@ describe('measured point text', () => {
   })
 
 })
+
+it('uses the largest span for the measured paragraph strut after a width change', () => {
+  const controller = new RichTextEditorController(layer('AA small text small text').payload.content)
+  controller.setSelection({ anchor: 0, focus: 2 })
+  controller.applySpanStyle({ fontSize: 48 })
+  const state = controller.state
+  const content = { ...state.content, wrap: 'fixedWidth' as const, fixedWidth: 60 }
+  const layout = layoutTextContent(content)
+  const editor = document.createElement('div')
+  renderRichTextProjection(editor, { ...state, content }, 1, layout)
+  const paragraph = editor.querySelector<HTMLElement>('[data-rich-text-paragraph]')!
+  expect(layout.lines.length).toBeGreaterThan(1)
+  expect(paragraph.style.fontSize).toBe('48px')
+  expect(paragraph.style.lineHeight).toBe('60px')
+  expect(paragraph.style.minHeight).toBe('60px')
+})

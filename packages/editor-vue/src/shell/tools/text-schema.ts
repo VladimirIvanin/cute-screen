@@ -1,9 +1,14 @@
+import {
+  numberedMarkerCaption,
+  measureRichTextContent,
+} from '@cute-screen/editor-renderer'
 import { TEXT_FONT_FAMILIES } from '../../text-fonts'
 import {
   computed,
   type Ref,
   type ShallowRef,
 } from 'vue'
+import { nextNumberedMarkerSequence } from '@cute-screen/editor-renderer'
 import type {
   EditorDocumentV1,
   LayerNode,
@@ -27,6 +32,9 @@ export interface TextDraft {
 }
 
 export interface TextSchemaContext {
+  readonly recentColors?: Ref<readonly SrgbColor[]>
+  readonly markerShape?: Ref<'circle' | 'square' | 'diamond' | 'star'>
+  readonly markerNextOverride?: Ref<number | undefined>
   readonly calloutStroke?: Ref<import('@cute-screen/editor-renderer').StrokeStyle>
   readonly props: ResolvedEditorShellProps
   readonly store: {
@@ -81,7 +89,9 @@ function sameColor(
 
 function contentFor(layer: TextLayer | undefined): RichTextContent | undefined {
   if (!layer) return undefined
-  return layer.kind === 'numberedMarker' ? layer.payload.label : layer.payload.content
+  if (layer.kind !== 'numberedMarker') return layer.payload.content
+  const caption = numberedMarkerCaption(layer)
+  return caption.text ? caption : layer.payload.label
 }
 
 function backgroundFor(
@@ -95,6 +105,41 @@ function backgroundFor(
     return { color: selected.payload.badge.color, padding: 0, radius: 0 }
   }
   return context.textDefaults.value.background
+}
+
+function markerMetadata(
+  context: TextSchemaContext,
+  selected: TextLayer | undefined,
+  background: ReturnType<typeof backgroundFor>,
+): NonNullable<NonNullable<ContextToolbarSchema['text']>['marker']> {
+  const snapshot = context.textDraft.value?.snapshot
+  const marker = selected?.kind === 'numberedMarker' ? selected : undefined
+  const sequence = marker?.payload.sequence ?? context.markerNextOverride?.value ??
+    nextNumberedMarkerSequence(context.activeDocument.value?.layers ?? [])
+  return {
+    recentColors: context.recentColors?.value ?? [],
+    mode: snapshot ? 'inline' as const : marker ? 'selection' as const : 'defaults' as const,
+    sequence,
+    shape: marker?.payload.badge.shape ?? context.markerShape?.value ?? 'circle',
+    badgeColor: background ? context.hexColor(background.color) : '#000000',
+    customLabel: Boolean(marker && numberedMarkerCaption(marker).text),
+    duplicate: Boolean(context.activeDocument.value?.layers.some((layer) =>
+      layer.kind === 'numberedMarker' && layer.id !== marker?.id && layer.payload.sequence === sequence)),
+    manual: context.markerNextOverride?.value !== undefined,
+  }
+}
+
+function calloutWidthSnapshot(
+  snapshot: TextToolbarSnapshot | undefined,
+  selected: TextLayer | undefined,
+) {
+  if (snapshot?.calloutWidth) return snapshot.calloutWidth
+  if (selected?.kind !== 'callout') return undefined
+  return {
+    mode: selected.payload.content.wrap,
+    value: measureRichTextContent(selected.payload.content).width,
+    minimum: Math.max(1, ...selected.payload.content.spans.map((span) => span.fontSize)),
+  }
 }
 
 function textToolbar(
@@ -114,6 +159,8 @@ function textToolbar(
   const background = snapshot ? snapshot.background : backgroundFor(context, selected)
   return {
     kind,
+    ...(kind === 'numberedMarker' ? { marker: markerMetadata(context, selected, background) } : {}),
+    calloutWidth: calloutWidthSnapshot(snapshot, selected),
     color: snapshot
       ? snapshot.color
         ? context.hexColor(snapshot.color)

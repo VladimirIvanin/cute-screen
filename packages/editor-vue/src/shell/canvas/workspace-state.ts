@@ -36,6 +36,7 @@ export type FloatingToolbarLayout = {
 export type ResizeHandle = BoundsResizeHandle
 
 export type CanvasGesture =
+  | { readonly kind: 'numberedMarker'; readonly layer: NumberedMarkerLayer }
   | {
     readonly kind: 'pan'
     readonly clientX: number
@@ -214,9 +215,10 @@ export function createCanvasWorkspaceState() {
     isPanning: ref(false),
     editingText: ref<
       | {
-        readonly origin: CanvasPoint
+        origin: CanvasPoint
         width: number
-        readonly fixedWidth: boolean
+        fixedWidth: boolean
+        calloutAutoLimit?: boolean
         readonly id: string
         readonly controller: RichTextEditorController
         background: TextBackground | null

@@ -62,6 +62,7 @@ function textStyle(
     'listKind',
     'background',
   ])
+  if (tool === 'numberedMarker' && 'badgeColor' in style) patch.background = { color: style.badgeColor!, padding: 0, radius: 0 }
   texts[tool] = {
     ...texts[tool],
     ...patch,

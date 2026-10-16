@@ -1,3 +1,8 @@
+import { numberedMarkerCaption } from '@cute-screen/editor-renderer'
+import {
+  editedNumberedMarker,
+  positionNumberedMarkerEditor,
+} from './numbered-marker-editing'
 import {
   markRaw,
   nextTick,
@@ -7,7 +12,6 @@ import {
   createTextCommitCommand,
   createTextLayer,
   hitTestDocumentAll,
-  rebaseCalloutLayer,
   type RichTextContent,
   type RichTextSpanStyle,
   type StrokeStyle,
@@ -29,11 +33,13 @@ import {
   INITIAL_TEXT_MAX_WIDTH,
   layoutTextContent,
   measuredTextLayer,
+  measuredCalloutLayer,
 } from '../../text-layout'
 import {
   loadTextFontFamily,
 } from '../../text-fonts'
 import { waitForTextFonts } from './text-font-commit'
+import { positionCalloutEditor } from './callout-editor-layout'
 import { isFloatingToolbarTarget } from './floating-toolbar-controller'
 import {
   DEFAULT_TEXT_TOOL,
@@ -62,6 +68,7 @@ export interface TextEditorStartInput {
 }
 
 export interface TextEditorContext {
+  readonly redrawMarker?: () => void
   readonly props: CanvasViewportProps
   readonly emit: CanvasViewportEmit
   readonly editingText: WorkspaceState['editingText']
@@ -92,13 +99,14 @@ export class TextEditorController {
   start(input: TextEditorStartInput): void {
     this.#afterCommit = undefined
     const { props, editingText } = this.#context
+    if (props.readOnly || input.existing?.locked) return
     const bounds = input.existing ? this.#context.layerBounds(input.existing) : undefined
     const defaults = copyTextStyle(props.textDefaults ?? DEFAULT_TEXT_TOOL)
     const fixedWidth =
       input.fixedWidth ??
-      (input.existing?.kind === 'text' ? input.existing.payload.content.wrap === 'fixedWidth' : false)
+      (input.existing && input.existing.kind !== 'numberedMarker' ? input.existing.payload.content.wrap === 'fixedWidth' : false)
     const existingContent =
-      input.existing?.kind === 'numberedMarker' ? input.existing.payload.label : input.existing?.payload.content
+      input.existing?.kind === 'numberedMarker' ? numberedMarkerCaption(input.existing) : input.existing?.payload.content
     const initialContent = this.#initialContent(existingContent, fixedWidth, input.width)
     editingText.value = {
       id: input.existing?.id ?? crypto.randomUUID(),
@@ -153,14 +161,18 @@ export class TextEditorController {
     const toolbarFocus = document.activeElement instanceof HTMLElement &&
       isFloatingToolbarTarget(document.activeElement) ? document.activeElement : undefined
     const state = editing.controller.state
-    const layout = editing.kind === 'text'
+    const layout = editing.kind === 'text' || editing.kind === 'callout' || editing.kind === 'numberedMarker'
       ? layoutTextContent(
           state.content,
-          editing.existing || editing.fixedWidth ? Infinity : INITIAL_TEXT_MAX_WIDTH,
+          (editing.existing && editing.kind !== 'numberedMarker' && !editing.calloutAutoLimit) || editing.fixedWidth ? Infinity : INITIAL_TEXT_MAX_WIDTH,
           state.typingStyle.fontSize,
         )
       : undefined
     if (layout) editing.width = layout.width
+    if (layout) positionCalloutEditor({ editing, layout, editor, zoom: props.zoom,
+      resolveStroke: this.#context.resolveCalloutStroke })
+    if (layout) positionNumberedMarkerEditor(editing, editor, props.zoom)
+    if (editing.existing?.kind === 'numberedMarker') this.#context.redrawMarker?.()
     renderRichTextProjection(editor, state, (props.zoom ?? 100) / 100, layout)
     // Update synchronously before restoring the caret to avoid scroll-into-view
     // against the previous, wider DOM box.
@@ -273,7 +285,7 @@ export class TextEditorController {
     const style = content.spans[0] ?? editing.controller.state.typingStyle
     const paragraph = content.paragraphs[0] ?? editing.controller.state.paragraphStyle
     const existing = editing.existing
-    if (content.text.length === 0) {
+    if (content.text.length === 0 && existing?.kind !== 'numberedMarker') {
       if (!existing) return
       const index = props.document?.layers.findIndex((layer) => layer.id === existing.id)
       if (index === undefined || index < 0) return
@@ -430,24 +442,11 @@ export class TextEditorController {
   ): EditableTextLayer | null {
     const existing = editing.existing
     const content = editing.controller.state.content
-    if (existing?.kind === 'numberedMarker') {
-      return {
-        ...existing,
-        payload: {
-          ...existing.payload,
-          label: content,
-          badge: editing.background
-            ? { ...existing.payload.badge, color: editing.background.color }
-            : existing.payload.badge,
-        },
-      }
-    }
+    if (existing?.kind === 'numberedMarker') return editedNumberedMarker(existing, content, editing.background)
     if (existing?.kind === 'callout') {
-      return rebaseCalloutLayer(existing, {
-        ...existing.payload,
-        content,
-        background: editing.background ?? existing.payload.background,
-      })
+      return measuredCalloutLayer({ ...existing, payload: {
+        ...existing.payload, content, background: editing.background,
+      } }, editing.calloutAutoLimit ? INITIAL_TEXT_MAX_WIDTH : Infinity)
     }
     if (editing.kind === 'callout') {
       return this.#createCallout(editing, style)
@@ -507,13 +506,8 @@ export class TextEditorController {
       stroke: editing.calloutStroke ?? this.#context.resolveCalloutStroke(),
     })
     return layer
-      ? {
-          ...layer,
-          payload: {
-            ...layer.payload,
-            content: editing.controller.state.content,
-          },
-        }
+      ? measuredCalloutLayer({ ...layer, payload: { ...layer.payload,
+          content: editing.controller.state.content } }, INITIAL_TEXT_MAX_WIDTH)
       : null
   }
 

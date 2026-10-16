@@ -8,6 +8,7 @@ import {
 } from '@cute-screen/editor-renderer'
 import type { ResolvedEditorShellProps } from '../contracts'
 import type { ToolDescriptor } from '../types'
+import { shortcutLetter } from '../../keyboard-shortcuts'
 
 export interface KeyboardControllerContext {
   readonly selectTool: (id: string) => void
@@ -59,7 +60,8 @@ function handleToolShortcut(
     event.altKey
   ) return false
   if (event.repeat || event.isComposing) return false
-  const shortcut = (event.code.startsWith('Key') ? event.code.slice(3) : event.key).toLowerCase()
+  const shortcut = shortcutLetter(event)
+  if (!shortcut) return false
   const tool = context.tools.value.find(
     (candidate) => !candidate.disabled && candidate.shortcut?.toLowerCase() === shortcut,
   )
@@ -143,6 +145,25 @@ function handleClipboard(
     event.preventDefault()
     void context.pasteNativeClipboard()
   }
+  return true
+}
+
+function handleStyleClipboard(
+  context: KeyboardControllerContext,
+  event: KeyboardEvent,
+): boolean {
+  if (
+    !(event.metaKey || event.ctrlKey) ||
+    !event.altKey ||
+    isEditingTarget(event.target)
+  ) {
+    return false
+  }
+  const key = shortcutLetter(event)
+  if (key !== 'c' && key !== 'v') return false
+  event.preventDefault()
+  if (key === 'c') context.selectionActions?.copyStyle()
+  else context.selectionActions?.pasteStyle()
   return true
 }
 
@@ -240,27 +261,14 @@ function handleEscape(
 
 export function createKeyboardController(context: KeyboardControllerContext) {
   function onKeydown(event: KeyboardEvent): void {
-    if (event.defaultPrevented) return
-    if (
-      (event.metaKey ||
-        event.ctrlKey) &&
-        event.altKey &&
-        !isEditingTarget(event.target)
-    ) {
-      const code = event.code || `Key${event.key.toUpperCase()}`
-      if (code === 'KeyC' || code === 'KeyV') {
-        event.preventDefault()
-        if (code === 'KeyC') context.selectionActions?.copyStyle()
-        else context.selectionActions?.pasteStyle()
-        return
-      }
-    }
+    if (event.defaultPrevented || event.isComposing) return
+    if (handleStyleClipboard(context, event)) return
     if (isEditingTarget(event.target)) return
-    const key = event.key.toLowerCase()
+    const key = shortcutLetter(event)
     if (handleToolShortcut(context, event)) return
-    if (handleOpenOrHistory(context, event, key)) return
-    if (handleDuplicate(context, event, key)) return
-    if (handleClipboard(context, event, key)) return
+    if (key && handleOpenOrHistory(context, event, key)) return
+    if (key && handleDuplicate(context, event, key)) return
+    if (key && handleClipboard(context, event, key)) return
     if (handleReorder(context, event)) return
     if (handleArrowMove(context, event)) return
     if (handleDelete(context, event)) return

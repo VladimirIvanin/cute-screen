@@ -433,10 +433,27 @@ describe('consistent tool UX through the mounted shell', () => {
     expect(screen.getByRole('menuitem', { name: 'Paste' })).toHaveAttribute('title', 'Clipboard is unavailable')
     app.close()
   })
+  it('uses physical Russian keys for mounted history and duplicate commands', async () => {
+    const app = mount(arrowDocument())
+    const layer = app.session.snapshot.core.document.layers[0]!
+    app.store.selectTool('select')
+    app.store.selectLayer(layer.id)
+    app.session.execute({ type: 'removeLayer', layer, index: 0 })
+
+    await fireEvent.keyDown(window, { code: 'KeyZ', key: 'я', ctrlKey: true })
+    expect(app.session.snapshot.core.document.layers).toHaveLength(1)
+    await fireEvent.keyDown(window, { code: 'KeyZ', key: 'Я', ctrlKey: true, shiftKey: true })
+    expect(app.session.snapshot.core.document.layers).toHaveLength(0)
+    await fireEvent.keyDown(window, { code: 'KeyZ', key: 'я', ctrlKey: true })
+    app.store.selectLayer(layer.id)
+    await fireEvent.keyDown(window, { code: 'KeyD', key: 'в', ctrlKey: true })
+    expect(app.session.snapshot.core.document.layers).toHaveLength(2)
+    app.close()
+  })
   it('commits text once, keeps text/callout/number defaults independent and cancels drafts', async () => {
     const app = mount()
     const rail = within(app.view.container.querySelector<HTMLElement>('.cs-toolrail')!)
-    const fontSize = () => within(app.view.container.querySelector<HTMLElement>('.cs-text-toolbar')!)
+    const fontSize = () => within(app.view.container.querySelector<HTMLElement>('.cs-text-toolbar, .cs-numbered-marker-toolbar')!)
       .getByRole('button', { name: 'Font size' })
     await fireEvent.click(rail.getByRole('button', { name: 'Text' }))
     await draw(app.scene)
@@ -472,7 +489,7 @@ describe('consistent tool UX through the mounted shell', () => {
     const source = mount(arrowDocument())
     source.store.selectTool('select')
     source.store.selectLayer(source.session.snapshot.core.document.layers[0]!.id)
-    await fireEvent.keyDown(window, { code: 'KeyC', key: 'c', ctrlKey: true, altKey: true })
+    await fireEvent.keyDown(window, { code: 'KeyC', key: 'с', ctrlKey: true, altKey: true })
     source.close()
     const doc = arrowDocument()
     const arrow = doc.layers[0]!
@@ -481,7 +498,7 @@ describe('consistent tool UX through the mounted shell', () => {
     const target = mount({ ...doc, layers: [recipient] })
     target.store.selectTool('select')
     target.store.selectLayer(recipient.id)
-    await fireEvent.keyDown(window, { code: 'KeyV', key: 'v', ctrlKey: true, altKey: true })
+    await fireEvent.keyDown(window, { code: 'KeyV', key: 'м', ctrlKey: true, altKey: true })
     expect(target.session.snapshot.core.document.layers[0]).toMatchObject({
       id: recipient.id,
       payload: { stroke: { width: 3 } },
@@ -490,7 +507,7 @@ describe('consistent tool UX through the mounted shell', () => {
     expect(target.session.snapshot.core.document.layers[0]).toMatchObject({ payload: { stroke: { width: 8 } } })
     target.session.execute({ type: 'updateLayer', before: recipient, after: { ...recipient, locked: true } })
     const before = target.session.snapshot.core.document
-    await fireEvent.keyDown(window, { code: 'KeyV', key: 'v', ctrlKey: true, altKey: true })
+    await fireEvent.keyDown(window, { code: 'KeyV', key: 'м', ctrlKey: true, altKey: true })
     expect(target.session.snapshot.core.document).toEqual(before)
     target.close()
   })

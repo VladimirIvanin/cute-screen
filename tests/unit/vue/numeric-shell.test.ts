@@ -90,7 +90,7 @@ describe('numeric parameters through the mounted editor', () => {
     session.dispose()
   })
 
-  it('previews both background parameters and rolls back or applies their shared inline draft', async () => {
+  it('previews background palette and numeric changes, then rolls back or applies their shared inline draft', async () => {
     const session = arrowSession({ ...arrowDocument(), layers: [] })
     const view = render(EditorShell, {
       props: { documentSession: markRaw(session) },
@@ -110,6 +110,13 @@ describe('numeric parameters through the mounted editor', () => {
     const background = toolbar.getByRole('button', { name: 'Background' })
     await fireEvent.click(background)
     let panel = within(await screen.findByRole('dialog', { name: 'Background' }))
+    await fireEvent.click(panel.getByRole('button', { name: 'Blue' }))
+    await waitFor(() => expect(editor.style.getPropertyValue('--text-background-color')).toBe('rgba(61, 173, 255, 1)'))
+    expect(session.snapshot).toEqual(before)
+    expect(localStorage.getItem(TOOL_SETTINGS_STORAGE_KEY)).toBe(preferences)
+    await fireEvent.click(panel.getByRole('button', { name: 'Custom colour' }))
+    await fireEvent.change(panel.getByRole('textbox', { name: 'HEX colour code' }), { target: { value: '#ff7556' } })
+    await waitFor(() => expect(editor.style.getPropertyValue('--text-background-color')).toBe('rgba(255, 117, 86, 1)'))
     await fireEvent.update(panel.getByRole('spinbutton', { name: 'Padding' }), '12')
     await fireEvent.update(panel.getByRole('spinbutton', { name: 'Radius' }), '8')
     await waitFor(() => expect(editor.style.getPropertyValue('--text-background-radius')).toBe('8px'))

@@ -1,4 +1,11 @@
 import {
+  numberedMarkerLabelBounds,
+  numberedMarkerNumberContent,
+  numberedMarkerCaption,
+  numberedMarkerCaptionBounds,
+} from '../../numbered-marker'
+import {
+  type CalloutGeometryContext,
   calloutMarkerRadius,
   calloutPathPoints,
   calloutTextLayout,
@@ -94,6 +101,7 @@ export function textNodes(layer: Extract<LayerNode, { readonly kind: 'text' }>):
 
 export function numberedMarkerNodes(
   layer: Extract<LayerNode, { readonly kind: 'numberedMarker' }>,
+  context: CalloutGeometryContext = {},
 ): readonly RenderNode[] {
   const bounds = layer.localBounds
   const x = layer.transform.translateX + bounds.x
@@ -148,19 +156,38 @@ export function numberedMarkerNodes(
                     }
                   }),
           }
+  const labelBounds = numberedMarkerLabelBounds(layer)
+  const number = numberedMarkerNumberContent(layer)
+  const badgeColor = payload.badge.color
+  const light = badgeColor.red * 0.299 + badgeColor.green * 0.587 + badgeColor.blue * 0.114 > 0.6
+  const numberColor = { red: light ? 0 : 1, green: light ? 0 : 1, blue: light ? 0 : 1, alpha: 1 }
+  const caption = numberedMarkerCaption(layer)
+  const captionBounds = numberedMarkerCaptionBounds(layer, context)
+  const captionNodes = caption.text ? [richTextNode(`${layer.id}:caption`, caption, {
+    ...captionBounds,
+    x: layer.transform.translateX + captionBounds.x,
+    y: layer.transform.translateY + captionBounds.y,
+  }, layer)] : []
   return [
     node,
     richTextNode(
       `${layer.id}:label`,
-      payload.label,
-      { x, y, width: bounds.width, height: bounds.height },
+      { ...number, spans: number.spans.map((span) => ({ ...span, color: numberColor })) },
+      { ...labelBounds,
+        x: layer.transform.translateX + labelBounds.x,
+        y: layer.transform.translateY + labelBounds.y,
+      },
       layer,
       'visualCenter',
     ),
+    ...captionNodes,
   ]
 }
 
-export function calloutNodes(layer: Extract<LayerNode, { readonly kind: 'callout' }>): readonly RenderNode[] {
+export function calloutNodes(
+  layer: Extract<LayerNode, { readonly kind: 'callout' }>,
+  context: CalloutGeometryContext = {},
+): readonly RenderNode[] {
   const payload = layer.payload
   if (
     payload.target === undefined ||
@@ -201,7 +228,7 @@ export function calloutNodes(layer: Extract<LayerNode, { readonly kind: 'callout
     radiusY: markerRadius,
     fill: markerFill,
   }
-  const layout = calloutTextLayout(payload)
+  const layout = calloutTextLayout(payload, context)
   const text = richTextNode(
     `${layer.id}:text`,
     payload.content,

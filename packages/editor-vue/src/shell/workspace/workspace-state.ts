@@ -93,6 +93,7 @@ export function createWorkspaceState() {
         >
       >
     >({}),
+    markerNextOverride: ref<number>(),
     markerShape: ref<'circle' | 'square' | 'diamond' | 'star'>('circle'),
     cropPreset: ref<CropPreset>('free'),
     precisionDefaults: shallowRef<PrecisionToolDefaults>(structuredClone(DEFAULT_PRECISION_TOOLS)),

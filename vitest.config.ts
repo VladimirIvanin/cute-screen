@@ -11,6 +11,8 @@ export default defineConfig({
     },
   },
   test: {
+    // Bound jsdom, native canvas and WASM memory even on hosts with many CPUs.
+    maxWorkers: 2,
     coverage: {
       provider: 'v8',
       reportsDirectory: 'coverage',

@@ -69,6 +69,13 @@ const scenarios = [
     fakeCapture: true,
   },
   {
+    id: 'numbered-marker',
+    spec: 'tests/e2e/specs/tauri-numbered-marker.e2e.ts',
+    harnessQuery: '?m04=1&m08=1',
+    fakeCapture: true,
+    driverProvider: 'external',
+  },
+  {
     id: 'tool-lifecycle',
     spec: 'tests/e2e/specs/tauri-tool-lifecycle.e2e.ts',
     harnessQuery: '?m04=1&m08=1',
@@ -146,6 +153,11 @@ const scenarios = [
     id: 'arrow',
     spec: 'tests/e2e/specs/tauri-arrow.e2e.ts',
     harnessQuery: '?m05=1',
+  },
+  {
+    id: 'callout-layout',
+    spec: 'tests/e2e/specs/tauri-callout-layout.e2e.ts',
+    harnessQuery: '?m05=1&m05viewport=1',
   },
   {
     id: 'v7-rich-text',

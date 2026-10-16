@@ -1,6 +1,8 @@
 export function textFormattingLabel(
   locale: 'en' | 'ru' | undefined,
   key:
+    | 'width'
+    | 'auto'
     | 'color'
     | 'font'
     | 'size'
@@ -23,6 +25,8 @@ export function textFormattingLabel(
   const ru = locale === 'ru'
   const labels = ru
     ? {
+        width: 'Ширина подписи',
+        auto: 'Авто',
         color: 'Цвет текста',
         font: 'Шрифт',
         size: 'Размер шрифта',
@@ -43,6 +47,8 @@ export function textFormattingLabel(
         mixed: 'смешанное',
       }
     : {
+        width: 'Label width',
+        auto: 'Auto',
         color: 'Text color',
         font: 'Font family',
         size: 'Font size',

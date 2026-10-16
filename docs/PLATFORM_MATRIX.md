@@ -1,5 +1,16 @@
 # Платформенная матрица
 
+## Подписи выносок (2026-10-17, ADR-065)
+
+Linux x86_64/X11: Chrome 154.0.8037.57 and real Tauri/WebKitGTK through the
+external driver verify drag creation, left/right placement, wrapping, reopen,
+numeric width, outer grip resize and undo/redo. Browser visual evidence covers
+1024 px × RU/EN × light/dark × 50/100/200% zoom; mixed-size paragraphs are centered.
+Canvas2D and CanvasKit exports are decoded by the render harness.
+Embedded WebKitGTK driver opened the app but did not deliver the creation drag;
+the successful native run uses isolated XDG_SESSION_ID and the external driver.
+Windows, macOS and Wayland remain unverified for this change. Schema/IPC are unchanged.
+
 ## Геометрия текста и переносы (2026-10-16, ADR-062)
 
 Ubuntu 24.04.5 LTS x86_64/X11, Linux 6.8.0-142, Chrome 154.0.8037.57:
@@ -741,3 +752,22 @@ trusted события. Runner выбирает этот режим для tool-
 contextmenu/PointerEvent и теряет modifier у F10.
 Windows/WebView2, macOS/WKWebView, Wayland и physical capture для этого изменения
 не запускались; новые supported claims не добавлены. Команды и artifacts — TESTING.md.
+
+## Физические буквенные shortcuts редактора (ADR-064)
+
+Chrome 154 на Linux x86_64 подтвердил browser keyboard flow: создание Arrow,
+Undo, Redo и Duplicate. Component/unit coverage сопоставляет русские и другие
+нелатинские `key` с физическими `KeyA`…`KeyZ`; это не заменяет системную
+раскладку real WebView. Linux/WebKitGTK с RU/EN system input, Windows/WebView2,
+macOS/WKWebView и Wayland пока не проверены и не получают новых supported claims.
+
+## Номерная метка и подпись (ADR-066/067/068, 2026-10-17)
+
+| Поверхность                               | Проверено                                                                                                                                 | Ограничение                                                               |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Linux x86_64 / X11, Chrome 154            | Manual next/max+1, external caption/drag/undo, colours/shape preview, cursor, nested menus, RU/EN light/dark, 640/1024/1440 и 50/100/200% | Browser harness 2560×1440; не заменяет capture backend acceptance         |
+| Linux / Tauri WebKitGTK / external driver | Production Capture → Quick → Editor, последовательность между WebViews, number edit/undo, caption add/undo                                | Capture source fake-platform; physical capture и mixed-DPI не запускались |
+| Canvas2D + CanvasKit                      | Повторно декодированные PNG: четыре формы, номер внутри, caption снаружи; Canvas2D preview/export pixel equality                          | Software renderer tests не подтверждают GPU budget                        |
+| Windows / macOS / Wayland                 | В этом срезе не запускались                                                                                                               | Новых supported claims нет                                                |
+
+Команды, red-first evidence, screenshots и промежуточные ограничения — TESTING.md.

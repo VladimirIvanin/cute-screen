@@ -97,7 +97,7 @@ describe('v7 content-layer core contracts', () => {
       })).toThrow(/padding/u)
   })
 
-  it('allocates the minimal free marker number and preserves badge semantics', () => {
+  it('allocates the next marker number and preserves badge semantics', () => {
     const one = createNumberedMarkerLayer({
       id: ids[0],
       sequence: 1,
@@ -109,7 +109,7 @@ describe('v7 content-layer core contracts', () => {
       origin: { x: 0, y: 0 },
       shape: 'diamond',
     })
-    expect(nextNumberedMarkerSequence([one, three])).toBe(2)
+    expect(nextNumberedMarkerSequence([one, three])).toBe(4)
     expect(three.payload.badge.shape).toBe('diamond')
     expect(three).not.toHaveProperty('opacity')
   })

@@ -21,10 +21,8 @@ import type {
   CanvasViewportProps,
 } from './contracts'
 import type { CropController } from './crop-controller'
-import { calloutTextEditorOrigin } from './pointer-geometry-controller'
 import type { TextEditorStartInput } from './text-editor-controller'
 import {
-  DEFAULT_TEXT_TOOL,
   type CanvasGesture,
   type ResizeHandle,
 } from './workspace-state'
@@ -329,14 +327,13 @@ function commitCreation(
   gesture: CanvasGesture,
   precisionLayer: LayerNode | undefined,
 ): void {
+  if (gesture?.kind === 'numberedMarker' && !context.props.readOnly) {
+    context.emit('addLayer', gesture.layer)
+  }
   if (gesture?.kind === 'calloutDraw' && moved(gesture)) {
     const stroke = context.resolveCalloutStroke()
     context.startText({
-      origin: calloutTextEditorOrigin(
-        gesture.current,
-        stroke,
-        context.props.textDefaults?.fontSize ?? DEFAULT_TEXT_TOOL.fontSize,
-      ),
+      origin: gesture.current,
       kind: 'callout',
       calloutDraft: { target: gesture.start, label: gesture.current },
       calloutStroke: stroke,

@@ -100,6 +100,13 @@ Artifacts считаются тестовыми/неофициальными с�
 - Linux fake-platform Tauri smoke;
 - compile checks Windows/macOS и ARM targets.
 
+Все Vitest projects наследуют `maxWorkers: 2` из `vitest.config.ts`.
+Это общий бюджет параллельных процессов для unit, coverage, renderer и perf
+gates: число CPU не учитывает память jsdom, native Canvas2D и CanvasKit.
+Файлы сохраняют изоляцию; unhandled errors по-прежнему проваливают gate.
+Для отдельного диагностического запуска число workers можно явно изменить
+через `--maxWorkers`; CI использует общий default без override.
+
 Linux jobs не используют `azure.archive.ubuntu.com` как первый apt-mirror:
 hosted Ubuntu runners могут зависнуть на нём на десятки минут и сжечь
 `timeout-minutes` ещё на `apt-get update`. Установка Tauri-зависимостей идёт
@@ -262,3 +269,22 @@ Generated assets
 ## Изолированная native E2E сборка
 
 `pnpm test:e2e:tauri` учитывает `CARGO_TARGET_DIR` при сборке и поиске executable; относительный путь нормализуется от корня workspace и передаётся Cargo как абсолютный. Это позволяет проверять UI без перезаписи занятого resident developer executable. Runner по-прежнему копирует успешно собранный test binary в собственный runtime directory перед запуском сценариев. Пример фактического прогона с отдельным target — TESTING.md, ADR-051.
+
+## Callout layout follow-up (2026-10-17, ADR-065)
+
+Callout measurements remain derived; schema v7, native IPC and original image
+storage do not change. Renderer re-exports provide measured geometry to browser
+preview, interaction and the canvas used by Copy/Save. The native acceptance runner
+adds `callout-layout` with a 2560×1440 document and production pointer creation.
+Use an isolated `XDG_SESSION_ID` and the external Linux driver as recorded in
+TESTING.md. Run builds sequentially: build:packages cleans shared outputs.
+
+## Проверка номерной метки (2026-10-17)
+
+`CUTE_SCREEN_E2E_SCENARIOS=numbered-marker pnpm test:e2e:tauri` запускает
+production Capture → Quick → Editor без подготовленного document state.
+Используется external driver; Linux требует `tauri-driver` и `WebKitWebDriver`.
+Первый запуск без drivers в PATH не создал native session. Повторный запуск
+с локальными drivers из artifacts/spotlight-fix/tools/ прошёл Capture → Quick →
+Editor, редактирование номера, отдельной подписи и undo в настоящем WebKitGTK.
+Точные PATH/XDG параметры и browser/renderer evidence — TESTING.md.

@@ -219,6 +219,9 @@ describe('M05 CanvasViewport transforms', () => {
       clientY: 40,
     })
 
+    expect(emitted().addLayer).toBeUndefined()
+    await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 30, clientY: 40 })
+
     const addLayer = emitted().addLayer as unknown as readonly [unknown][] | undefined
     const layer = (addLayer?.[0]?.[0] ?? null) as {
       readonly transform: {

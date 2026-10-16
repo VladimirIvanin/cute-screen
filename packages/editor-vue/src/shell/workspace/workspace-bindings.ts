@@ -1,3 +1,9 @@
+import { measuredNumberedMarkerLayer } from '@cute-screen/editor-renderer'
+import {
+  changeNumberedMarkerSetting,
+  markerColorChange,
+  markerShapeCommand,
+} from './numbered-marker-settings'
 import { computed } from 'vue'
 import {
   applyLayerStyle,
@@ -77,6 +83,9 @@ function createSchemas(context: WorkspaceBindingsContext) {
     activeDocument: workspace.activeDocument,
     textDefaults: workspace.textDefaults,
     calloutStroke: workspace.calloutStroke,
+    markerShape: workspace.markerShape,
+    markerNextOverride: workspace.markerNextOverride,
+    recentColors: computed(() => workspace.drawingPreferences.value.recentColors),
     textDraft: workspace.textDraft,
     translate,
     hexColor: precision.hexColor,
@@ -278,6 +287,10 @@ function createSelectionSettingsChange(
     id: string,
     value: string,
   ): void {
+    const colour = markerColorChange(context, id, value)
+    id = colour.id
+    value = colour.value
+    if (changeNumberedMarkerSetting(props, workspace, store, id, value)) return
     const layers =
       workspace.activeDocument.value?.layers.filter((layer) => store.selectedLayerIds.includes(layer.id)) ?? []
     if (!isSelectionStyleTarget(context, layers)) {
@@ -298,16 +311,8 @@ function createSelectionSettingsChange(
     try {
       for (const layer of layers) {
         workspace.settingsLayerId.value = layer.id
-        if (
-          id === 'markerShape' &&
-          layer.kind === 'numberedMarker' &&
-          ['circle', 'square', 'diamond', 'star'].includes(value)
-        )
-          commands.push({
-            type: 'updateLayer',
-            before: layer,
-            after: applyLayerStyle(layer, { badgeShape: value }),
-          })
+        const markerCommand = markerShapeCommand(layer, id, value)
+        if (markerCommand) commands.push(markerCommand)
         else contextEffects.onContextChange(id === 'width' && layer.kind === 'ruler' ? 'rulerThickness' : id, value)
       }
     } finally {
@@ -414,7 +419,7 @@ function createControllers(
     toolConfigureLayout: workspace.toolConfigureLayout,
     configureDefaultsTool: workspace.configureDefaultsTool,
     precisionChangeBlocked: effects.precision.precisionChangeBlocked,
-    onContextChange: effects.contextEffects.onContextChange,
+    onContextChange: (id, value) => id === 'markerSample' ? toolUi.startEyedropper(value) : effects.contextEffects.onContextChange(id, value),
     translate,
     saveDrawingPreferences: context.saveDrawingPreferences,
   })
@@ -425,6 +430,7 @@ function createControllers(
     store,
     prepareLayer: (layer) => {
       // Modern ink freezes every setting, including pressure source, at pointerdown.
+      if (layer.kind === 'numberedMarker') return measuredNumberedMarkerLayer(layer)
       if (layer.kind === 'pencil' && layer.payload.strokeVersion === 2) return layer
       const style = workspace.rememberedStyles.value[layer.kind]
       if (style && layer.kind === 'marker') {
@@ -466,7 +472,7 @@ export function createWorkspaceBindings(context: WorkspaceBindingsContext) {
     toolConfigureSchema: schemas.contextSchema.toolConfigureSchema,
     floatingArrowToolbarSchema: schemas.contextSchema.floatingArrowToolbarSchema,
     toolConfigureArrowSchema: schemas.contextSchema.toolConfigureArrowSchema,
-    onContextChange: effects.contextEffects.onContextChange,
+    onContextChange: (id: string, value: string) => id === 'markerSample' ? controllers.toolUi.startEyedropper(value) : effects.contextEffects.onContextChange(id, value),
     numericCommands: effects.numericCommands,
     previewInline: effects.previewInline,
     ...controllers.actions,
