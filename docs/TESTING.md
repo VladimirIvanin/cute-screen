@@ -1,5 +1,85 @@
 # Стратегия тестирования
 
+## Rust audit: zip и local path version (2026-10-17)
+
+Windows 10 x64 (10.0.19045), Rust/Cargo 1.97.0, cargo-deny 0.20.2.
+Исходный CI log блокировался на RUSTSEC-2026-0367/0368/0369 (`zip 6.0.0`)
+и `bans`; local path dependency без версии нарушала `wildcards = "deny"`.
+Storage обновлён до `zip =9.0.4`, неиспользуемая desktop-зависимость удалена,
+локальный storage dependency закреплён на `=0.0.0`. Policy не ослаблялась.
+
+Из-за занятого общего Cargo cache использованы отдельные переменные для
+проверочных команд (не глобальные настройки):
+
+```powershell
+$env:CARGO_HOME = "$PWD/artifacts/ci-zip-offline-home"
+$env:CARGO_TARGET_DIR = "$PWD/artifacts/ci-zip-target"
+```
+
+Registry archives скопированы из cache; четыре недостающих архива скачаны
+с static.crates.io и проверены по SHA-256 из Cargo.lock. Advisory DB получена
+обычным cargo-deny fetch до offline-прогона: commit `999ec89`, 2026-10-17.
+Остановлены только собственные ожидающие cache команды; resident app и
+чужие Rust-проверки не останавливались.
+
+- До обновления `cargo test -p cute-screen-storage --locked` — 30 passed,
+  включая recovery round-trip с production-shaped PNG 3840×2160;
+  `artifacts/ci-zip-storage-before.log`.
+- `cargo deny --offline --locked check` — exit 0: advisories/bans/licenses/sources
+  ok; `artifacts/ci-zip-deny-offline.log`. Duplicate warnings остаются
+  разрешёнными настройкой `multiple-versions = "warn"`.
+- После заполнения отдельного cache обычный `cargo deny check` — exit 0,
+  все четыре gates ok; `artifacts/ci-zip-deny-final.log`.
+- `cargo test --workspace --offline --locked` — 160 passed, 1 ignored
+  (существующий compositor runtime probe); recovery ZIP с новой версией
+  экспортирован и повторно импортирован с проверкой blob checksum.
+  Лог: `artifacts/ci-zip-workspace-offline.log`. Существующий warning об unused
+  `Duration` в shortcuts/operations.rs не относится к зависимости и сохранён.
+- `cargo clippy -p cute-screen-storage --all-targets --offline --locked -- -D warnings`
+  — exit 0; `artifacts/ci-zip-clippy.log`.
+- `cargo fmt --all --check`, `pnpm docs:check`, `git diff --check` — exit 0.
+- `pnpm format` и `pnpm format:check` — exit 0;
+  `artifacts/ci-zip-format.log`, `artifacts/ci-zip-format-check.log`.
+
+Hosted CI, Linux/macOS runtime и bundle install этим прогоном не подтверждаются.
+
+## Первый показ Windows Area (2026-10-17)
+
+Windows 10 build 19045 x64. Контракт проверен без визуального replay:
+первый кадр вспышки обычного окна длится один present и не фиксируется
+unit-тестом.
+
+- `cargo test -p cute-screen-desktop --lib windows_platform::tests::` —
+  21 passed, 1 ignored (`compositor_runtime_probe_reads_the_visible_desktop`).
+  Placement-флаги скрытого Quick окна не содержат `SWP_SHOWWINDOW` и
+  `SWP_ASYNCWINDOWPOS`; точка попадает в полный rect монитора под курсором.
+- `pnpm exec vitest run --project boundaries tests/boundaries/build-contract.test.ts` —
+  13/13 passed. Windows present коммитит bounds до `set_fullscreen` и `show`.
+- Локальный `pnpm run tauri dev` пересобрал `cute-screen-desktop` и запустил
+  `target/debug/cute-screen.exe`. В этом прогоне осталось прежнее
+  предупреждение `unused import: std::time::Duration` в
+  `services/shortcuts/operations.rs`.
+
+## Удаление повторных CI-проверок (2026-10-17)
+
+Windows 10 x64 (10.0.19045), Node 22.23.1, pnpm 10.33.2.
+Удалены повторные `pnpm test`, Rust format/Clippy и Linux x64 compile job:
+их проверки остаются соответственно в `pnpm test:coverage` и `pnpm check`.
+
+- `pnpm format` и `pnpm format:check` — exit 0; логи:
+  `artifacts/ci-cleanup-format.log`, `artifacts/ci-cleanup-format-check.log`.
+- `pnpm test:boundaries` — 10 files / 43 tests passed; лог:
+  `artifacts/ci-cleanup-boundaries.log`.
+- `pnpm docs:check` — проверены ссылки и anchors 37 Markdown files.
+- Python/PyYAML 6.0.3 разобрал оба workflow без ошибок. Сопоставление package
+  scripts подтвердило одинаковый набор проектов у `test` и `test:coverage`,
+  а `check:rust` сохраняет frontend build, format и четыре Clippy-вызова.
+- `git diff --check` — exit 0.
+
+Hosted CI не запускался локально. Пять оставшихся compile targets,
+Linux quality/runtime и все release guarantees требуют GitHub Actions;
+эта проверка YAML не подтверждает native runtime или сборку bundles.
+
 ## Пропорции указателя лупы (2026-10-17, ADR-079)
 
 Linux x86_64/X11, Node 22.23.1, pnpm 10.33.2. Логи —
@@ -5058,3 +5138,18 @@ WebDriver потерял соединение (`ECONNREFUSED`); delete зате�
 Полный native gate этого уточнения не пройден. Лог сохранён как
 `artifacts/history-ui-direct/native-isolated.log`; это ограничение проверки,
 а не доказательство native удаления. Итоговые browser 4/4 и format:check passed.
+
+## Полоса меню и first-run настройки (2026-10-17)
+
+ADR-080. Windows 10, Chrome через Vite e2e harness на `127.0.0.1:5174`.
+
+- `cargo test --manifest-path src-tauri/Cargo.toml --lib app_menu_is_not_an_in_window_title`:
+  1 passed. Меню приложения ставится только для macOS; Windows и Linux не
+  получают внутриоконную полосу «Cute Screen».
+- `pnpm exec vitest run --project vue tests/unit/vue/activation-settings.test.ts tests/unit/vue/settings-navigation.test.ts`:
+  2 files / 13 tests passed.
+- Browser `/?settings=general&settingsHarness=1&firstRun=1` при 820×560 и 640×560:
+  галочка автозапуска по центру строки, сноска об истории с тем же левым
+  отступом, что и заголовок (24 px и 16 px). Нативной полосы меню в браузере нет;
+  её отсутствие в окне Tauri проверяется перезапуском приложения. WebKit не
+  проверялся.

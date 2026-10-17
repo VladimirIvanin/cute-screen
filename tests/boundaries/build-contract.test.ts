@@ -210,7 +210,13 @@ describe('Tauri build boundary', () => {
     expect(windowsDismissSource).toBeDefined()
     expect(windowsDismissSource).not.toContain('set_fullscreen(false)')
     expect(hostSource).toMatch(
-      /fn quick_capture_present[\s\S]*target_os = "windows"[\s\S]*set_always_on_top\(true\)[\s\S]*set_fullscreen\(true\)/,
+      /fn present_windows_quick_capture[\s\S]*set_always_on_top\(true\)[\s\S]*commit_hidden_quick_capture_bounds\(window\)[\s\S]*set_fullscreen\(true\)[\s\S]*window\.show\(\)/,
+    )
+    expect(hostSource).toMatch(
+      /fn commit_hidden_quick_capture_bounds[\s\S]*place_hidden_quick_capture_on_pointer_monitor/,
+    )
+    expect(hostSource).toMatch(
+      /ensure_quick_capture_window\(app\)[\s\S]*prepare_quick_capture_bounds_before_capture\(app\)/,
     )
   })
 

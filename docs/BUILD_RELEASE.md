@@ -113,7 +113,7 @@ Artifacts считаются тестовыми/неофициальными с�
 
 ### `ci.yml`
 
-Запускается на pull request и branch push:
+Запускается на pull request и push в `main`:
 
 - Markdown links/docs consistency;
 - formatting, lint, TypeScript и Rust checks;
@@ -123,6 +123,13 @@ Artifacts считаются тестовыми/неофициальными с�
 - browser E2E;
 - Linux fake-platform Tauri smoke;
 - compile checks Windows/macOS и ARM targets.
+
+Linux x64 покрывается `quality-linux`: `pnpm check` собирает frontend и
+выполняет Rust format/Clippy во всех предусмотренных конфигурациях, затем
+запускаются Rust tests. Отдельный compile job для Linux x64 не требуется.
+Unit/property/component suites запускаются один раз через `pnpm test:coverage`;
+отдельный `pnpm test` дублировал бы те же проекты. Compile matrix содержит
+Linux ARM64, Windows x64/ARM64 и macOS Intel/ARM64. Остальные gates сохранены.
 
 Все Vitest projects наследуют `maxWorkers: 2` из `vitest.config.ts`.
 Это общий бюджет параллельных процессов для unit, coverage, renderer и perf
@@ -243,6 +250,13 @@ Network error не перезаписывает последний успешн�
 10. Downloaded file совпадает с опубликованным checksum.
 
 ## Supply chain без официальной подписи
+
+Rust audit использует строгий `bans.wildcards = "deny"`: локальные path
+dependencies также задают явную версию. Storage закрепляет `zip =9.0.4`
+с отключёнными default features и включённым deflate; неиспользуемая прямая
+desktop-зависимость удалена. Обновление устраняет CI advisories для `zip 6.0.0`
+без allowlist/ignore. Recovery bundle schema и способ импорта не меняются.
+Проверки и ограничения локального прогона — TESTING.md.
 
 - Lockfiles обязательны.
 - GitHub Actions pinned по full commit SHA.

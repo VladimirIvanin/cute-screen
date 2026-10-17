@@ -32,9 +32,10 @@ use windows_sys::Win32::{
     Graphics::Dwm::{DWMWA_TRANSITIONS_FORCEDISABLED, DwmFlush, DwmSetWindowAttribute},
     Graphics::Gdi::{
         BLACK_BRUSH, BeginPaint, CreatePen, CreateSolidBrush, DeleteObject, Ellipse, EndPaint,
-        FillRect, GetStockObject, InvalidateRect, LineTo, MoveToEx, PAINTSTRUCT, PS_DASH, PS_SOLID,
-        Rectangle, RoundRect, SelectObject, SetBkMode, SetTextColor, TRANSPARENT, TextOutW,
-        UpdateWindow, WHITE_BRUSH,
+        FillRect, GetMonitorInfoW, GetStockObject, InvalidateRect, LineTo,
+        MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromPoint, MoveToEx, PAINTSTRUCT, PS_DASH,
+        PS_SOLID, Rectangle, RoundRect, SelectObject, SetBkMode, SetTextColor, TRANSPARENT,
+        TextOutW, UpdateWindow, WHITE_BRUSH,
     },
     System::LibraryLoader::GetModuleHandleW,
     UI::HiDpi::{
@@ -48,10 +49,11 @@ use windows_sys::Win32::{
         GetSystemMetrics, GetWindowRect, IDC_CROSS, IsWindow, IsWindowVisible, LWA_ALPHA,
         LoadCursorW, MSG, PM_REMOVE, PeekMessageW, PostQuitMessage, RegisterClassW,
         SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SW_HIDE,
-        SW_SHOW, SW_SHOWNOACTIVATE, SetCursor, SetForegroundWindow, SetLayeredWindowAttributes,
-        ShowWindow, WA_INACTIVE, WM_ACTIVATE, WM_CLOSE, WM_DESTROY, WM_KEYDOWN, WM_LBUTTONDOWN,
-        WM_LBUTTONUP, WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_NCHITTEST, WM_PAINT, WM_SETCURSOR,
-        WNDCLASSW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+        SW_SHOW, SW_SHOWNOACTIVATE, SWP_NOACTIVATE, SWP_NOOWNERZORDER, SWP_NOZORDER, SetCursor,
+        SetForegroundWindow, SetLayeredWindowAttributes, SetWindowPos, ShowWindow, WA_INACTIVE,
+        WM_ACTIVATE, WM_CLOSE, WM_DESTROY, WM_KEYDOWN, WM_LBUTTONDOWN, WM_LBUTTONUP,
+        WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_NCHITTEST, WM_PAINT, WM_SETCURSOR, WNDCLASSW,
+        WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
         WindowFromPoint,
     },
 };
@@ -112,6 +114,111 @@ fn set_window_transitions_disabled(
         return Err(failure(correlation_id, "setCaptureWindowTransitions"));
     }
     Ok(())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct MonitorRect {
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+}
+
+/// Tao's first borderless fullscreen uses `SWP_ASYNCWINDOWPOS` and can map the
+/// restored 800×600 window before that deferred move lands. Placement for the
+/// still-hidden Quick surface must be synchronous and must not show it.
+const fn hidden_quick_capture_placement_flags() -> u32 {
+    SWP_NOACTIVATE | SWP_NOZORDER | SWP_NOOWNERZORDER
+}
+
+#[cfg(test)]
+fn monitor_rect_containing_point(monitors: &[MonitorRect], x: i32, y: i32) -> Option<MonitorRect> {
+    monitors.iter().copied().find(|monitor| {
+        x >= monitor.x
+            && y >= monitor.y
+            && x < monitor.x.saturating_add(monitor.width)
+            && y < monitor.y.saturating_add(monitor.height)
+    })
+}
+
+/// Moves the hidden Quick window onto the full physical monitor under the
+/// pointer. `SWP_SHOWWINDOW` and `SWP_ASYNCWINDOWPOS` are intentionally absent.
+pub(crate) fn place_hidden_quick_capture_on_pointer_monitor(window: HWND) -> Result<(), String> {
+    if unsafe { IsWindow(window) } == 0 {
+        return Err("quick capture window is invalid".to_owned());
+    }
+    set_window_transitions_disabled(window, true, "quick-capture-present")
+        .map_err(|error| error.to_string())?;
+    let placed = place_hidden_quick_capture_bounds(window);
+    if placed.is_err()
+        && let Err(restore) =
+            set_window_transitions_disabled(window, false, "quick-capture-present")
+    {
+        eprintln!("cute-screen quick capture transition restore: {restore}");
+    }
+    placed
+}
+
+pub(crate) fn restore_quick_capture_window_transitions(window: HWND) -> Result<(), String> {
+    set_window_transitions_disabled(window, false, "quick-capture-present")
+        .map_err(|error| error.to_string())
+}
+
+fn place_hidden_quick_capture_bounds(window: HWND) -> Result<(), String> {
+    let bounds = pointer_monitor_bounds().map_err(str::to_owned)?;
+    let placed = unsafe {
+        SetWindowPos(
+            window,
+            std::ptr::null_mut(),
+            bounds.x,
+            bounds.y,
+            bounds.width,
+            bounds.height,
+            hidden_quick_capture_placement_flags(),
+        )
+    };
+    if placed == 0 {
+        return Err("quick capture monitor placement failed".to_owned());
+    }
+    Ok(())
+}
+
+fn pointer_monitor_bounds() -> Result<MonitorRect, &'static str> {
+    let _dpi_awareness = ThreadDpiAwarenessGuard::enter()?;
+    let mut cursor = POINT::default();
+    if unsafe { GetPhysicalCursorPos(&mut cursor) } == 0 {
+        return Err("quickCaptureCursor");
+    }
+    let monitor = unsafe { MonitorFromPoint(cursor, MONITOR_DEFAULTTONEAREST) };
+    if monitor.is_null() {
+        return Err("quickCaptureMonitor");
+    }
+    let mut info = MONITORINFO {
+        cbSize: u32::try_from(std::mem::size_of::<MONITORINFO>())
+            .map_err(|_| "quickCaptureMonitorInfoSize")?,
+        ..MONITORINFO::default()
+    };
+    if unsafe { GetMonitorInfoW(monitor, &mut info) } == 0 {
+        return Err("quickCaptureMonitorInfo");
+    }
+    let width = info
+        .rcMonitor
+        .right
+        .checked_sub(info.rcMonitor.left)
+        .filter(|value| *value > 0)
+        .ok_or("quickCaptureMonitorWidth")?;
+    let height = info
+        .rcMonitor
+        .bottom
+        .checked_sub(info.rcMonitor.top)
+        .filter(|value| *value > 0)
+        .ok_or("quickCaptureMonitorHeight")?;
+    Ok(MonitorRect {
+        x: info.rcMonitor.left,
+        y: info.rcMonitor.top,
+        width,
+        height,
+    })
 }
 
 impl WindowsCompositorCaptureAdapter {
@@ -1642,6 +1749,51 @@ mod tests {
     fn pointer_only_dxgi_update_with_a_desktop_resource_does_not_wait_for_repaint() {
         assert!(!super::should_retry_dxgi_acquire(0, true));
         assert!(super::should_retry_dxgi_acquire(0, false));
+    }
+
+    #[test]
+    fn hidden_quick_capture_placement_stays_hidden_and_synchronous() {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{SWP_ASYNCWINDOWPOS, SWP_SHOWWINDOW};
+
+        let flags = super::hidden_quick_capture_placement_flags();
+
+        assert_eq!(flags & SWP_SHOWWINDOW, 0);
+        assert_eq!(flags & SWP_ASYNCWINDOWPOS, 0);
+        assert_ne!(flags & super::SWP_NOACTIVATE, 0);
+    }
+
+    #[test]
+    fn pointer_display_rect_is_the_full_monitor_under_the_cursor() {
+        let displays = [
+            super::MonitorRect {
+                x: 0,
+                y: 0,
+                width: 1920,
+                height: 1080,
+            },
+            super::MonitorRect {
+                x: 1920,
+                y: 0,
+                width: 2560,
+                height: 1440,
+            },
+        ];
+
+        let selected = super::monitor_rect_containing_point(&displays, 2000, 40);
+
+        assert_eq!(
+            selected,
+            Some(super::MonitorRect {
+                x: 1920,
+                y: 0,
+                width: 2560,
+                height: 1440,
+            })
+        );
+        assert_eq!(
+            super::monitor_rect_containing_point(&displays, -1, -1),
+            None
+        );
     }
 
     #[test]

@@ -913,8 +913,9 @@ remain pending.
     остаток интервала, а видимый editor становится `IsUnMapped` до snapshot.
     Первый drag на показанной Quick surface принимается без дополнительной
     подготовки; Escape возвращает typed `cancelled` и не материализует draft.
-13. На Windows проверить тот же single-surface lifecycle: до drag существует
-    один fullscreen `Cute Screen Quick Capture` HWND, первый physical drag не
+13. На Windows проверить тот же single-surface lifecycle: первый Area show не
+    проходит через восстановленное окно 800×600, до drag существует один
+    fullscreen `Cute Screen Quick Capture` HWND, первый physical drag не
     закрывает и не заменяет его, а после mouse-up те же scene/overlay canvas
     сохраняют frozen frame и рамку, добавляя tools/actions. Win32 Area selector
     не должен появляться; Window capture по-прежнему использует native selector.

@@ -1,5 +1,36 @@
 # Трассируемость требований
 
+## Исправление Rust dependency audit (2026-10-17)
+
+`REQ-QLT-005`, `REQ-REL-005`, ADR-016: запись до изменения зависимостей.
+CI блокируется advisories RUSTSEC-2026-0367/0368/0369 для `zip 6.0.0`.
+План: обновить используемый storage crate до точной исправленной версии
+`zip 9.0.4`, удалить неиспользуемую прямую desktop-зависимость, обновить
+Cargo.lock и проверить полный `cargo deny check` без advisory exceptions.
+Recovery bundle продолжает читать именованные entries и проверять checksum,
+не вызывает `ZipArchive::extract`. Контракты документа и originals не меняются.
+Для local path dependency storage требуется явная версия workspace: иначе
+`bans.wildcards = "deny"` считает отсутствующую версию wildcard. Проверить
+исправление точной версией, сохранив строгую policy без исключений.
+Доказательства: workspace Rust tests (160 passed, 1 ignored, включая recovery
+round-trip), storage Clippy, formatting и полный dependency audit passed на
+Windows 10 x64. Команды, advisory DB commit и логи — TESTING.md. Hosted CI
+и остальные платформы этим локальным прогоном не подтверждаются.
+
+## Удаление повторных CI-проверок (2026-10-17)
+
+`REQ-REL-001/002/003`, ADR-014/020: запись до изменения workflow.
+Linux x64 проверяется в `quality-linux` через `pnpm check` (сборка frontend,
+Rust format и все Clippy-конфигурации) и Rust tests. Отдельный compile job для
+того же target удаляется; Linux ARM64, Windows x64/ARM64 и macOS Intel/ARM64
+сохраняются. Unit/property/component suites выполняются один раз через
+`pnpm test:coverage`, использующий те же Vitest projects, что и `pnpm test`.
+Renderer, performance, browser/native E2E, audits и release-boundary остаются.
+Проверка: YAML parsing и сопоставление package scripts, `pnpm format`,
+`pnpm format:check`, `pnpm docs:check` и `pnpm test:boundaries` (43/43) passed;
+команды, платформа и логи — TESTING.md. Hosted matrix требует GitHub Actions.
+Это изменение организации CI, а не evidence готовности release artifacts.
+
 ## Пропорции указателя лупы (2026-10-17, ADR-079)
 
 `REQ-TOL-011`: запись до реализации. Общая производная геометрия задаёт толщину
@@ -662,6 +693,15 @@ present, дождаться `DwmFlush` и только затем читать f
 DOM также показал оставшийся `cs-loading`; component regression обязана доказать
 переход `DocumentSessionController` в `ready`, а Windows replay — отсутствие
 loading overlay и чёрного quick-окна после первого drag.
+
+Repair gate `REQ-CAP-010/013`, `REQ-UI-010` (2026-10-17, Windows first Area show):
+первый показ prewarmed Quick шёл через восстановленный размер Tao 800×600.
+`set_fullscreen` на Windows ставит bounds монитора через `SWP_ASYNCWINDOWPOS`,
+поэтому первый `show` отображал обычное окно и только затем selecting surface;
+повторный показ уже был fullscreen и вспышки не имел. Red-first контракт
+запрещает `SWP_SHOWWINDOW` и `SWP_ASYNCWINDOWPOS` у скрытого placement и
+требует commit монитора под курсором до `set_fullscreen`/`show`, включая Area
+preflight. Визуальный replay первого Area остаётся обязательным.
 
 Repair gate `REQ-CAP-010`, `REQ-UI-010` (2026-08-30, Windows editor handoff):
 живой dev replay после первого клика `Редактор` показал materialized document в
@@ -1369,6 +1409,13 @@ hover/focus и поведение инструментов сохраняютс�
 Статус: implemented; 29/29 component, 2/2 browser matrix и 1/1 real-WebView
 Capture → Quick → Editor passed. Геометрия и скриншоты проверены на Linux/X11;
 изоляция от параллельных правок и ограничения общих прогонов — TESTING.md.
+
+## Меню приложения не дублирует заголовок окна (2026-10-17, ADR-080)
+
+`REQ-ACT-008`: запись добавлена до реализации. Меню с названием программы
+остаётся только в системной строке macOS. Windows и Linux открывают настройки
+из трея и CLI и не показывают внутриоконную полосу. Проверка: контракт
+`installs_app_menu`; визуально first-run настройки на Windows.
 
 ## Навигация настроек и запись в строке (2026-10-17)
 

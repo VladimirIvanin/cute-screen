@@ -956,22 +956,85 @@ fn quick_capture_present(
         .get_webview_window("quick-capture")
         .ok_or_else(|| "quick capture window is unavailable".to_owned())?;
     #[cfg(target_os = "windows")]
-    window
-        .set_always_on_top(true)
-        .map_err(|error| error.to_string())?;
+    present_windows_quick_capture(&window)?;
     #[cfg(target_os = "macos")]
     {
         macos_platform::fit_quick_capture_to_pointer_screen(&window)?;
         macos_platform::set_quick_capture_presentation(&window, false)?;
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     window
         .set_fullscreen(true)
         .map_err(|error| error.to_string())?;
+    #[cfg(not(target_os = "windows"))]
     window.show().map_err(|error| error.to_string())?;
-    #[cfg(target_os = "windows")]
-    window.set_focus().map_err(|error| error.to_string())?;
     Ok(true)
+}
+
+fn prepare_quick_capture_bounds_before_capture<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        prepare_hidden_quick_capture_bounds(app)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = app;
+        Ok(())
+    }
+}
+
+/// The prewarmed Quick window is created at Tao's restored 800×600 size.
+/// Windows applies borderless fullscreen with `SWP_ASYNCWINDOWPOS`, so the
+/// first `show` maps that restored window before the monitor bounds arrive.
+/// Commit the pointer monitor synchronously while the window is still hidden.
+#[cfg(target_os = "windows")]
+fn present_windows_quick_capture<R: tauri::Runtime>(
+    window: &tauri::WebviewWindow<R>,
+) -> Result<(), String> {
+    window
+        .set_always_on_top(true)
+        .map_err(|error| error.to_string())?;
+    commit_hidden_quick_capture_bounds(window)?;
+    let presented = window
+        .set_fullscreen(true)
+        .map_err(|error| error.to_string())
+        .and_then(|()| window.show().map_err(|error| error.to_string()))
+        .and_then(|()| window.set_focus().map_err(|error| error.to_string()));
+    if let Err(error) = restore_hidden_quick_capture_transitions(window) {
+        eprintln!("cute-screen quick capture transition restore: {error}");
+    }
+    presented
+}
+
+#[cfg(target_os = "windows")]
+fn prepare_hidden_quick_capture_bounds<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+) -> Result<(), String> {
+    let window = app
+        .get_webview_window("quick-capture")
+        .ok_or_else(|| "quick capture window is unavailable".to_owned())?;
+    commit_hidden_quick_capture_bounds(&window)
+}
+
+#[cfg(target_os = "windows")]
+fn commit_hidden_quick_capture_bounds<R: tauri::Runtime>(
+    window: &tauri::WebviewWindow<R>,
+) -> Result<(), String> {
+    // `quick_capture_present` is a synchronous IPC command and runs on the UI
+    // thread. Queueing the placement back onto that thread and waiting would
+    // deadlock, so the Win32 call uses the HWND directly.
+    let hwnd = window.hwnd().map_err(|error| error.to_string())?;
+    windows_platform::place_hidden_quick_capture_on_pointer_monitor(hwnd.0)
+}
+
+#[cfg(target_os = "windows")]
+fn restore_hidden_quick_capture_transitions<R: tauri::Runtime>(
+    window: &tauri::WebviewWindow<R>,
+) -> Result<(), String> {
+    let hwnd = window.hwnd().map_err(|error| error.to_string())?;
+    windows_platform::restore_quick_capture_window_transitions(hwnd.0)
 }
 
 #[tauri::command]
@@ -2054,6 +2117,7 @@ async fn capture_with_preflight<R: tauri::Runtime>(
             area_quick_capture_supported(),
         )
         && let Err(error) = ensure_quick_capture_window(app)
+            .and_then(|()| prepare_quick_capture_bounds_before_capture(app))
     {
         eprintln!("cute-screen quick capture prewarm failed: {error}");
         let outcome = failed_capture(request.correlation_id);

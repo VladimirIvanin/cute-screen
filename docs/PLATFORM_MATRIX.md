@@ -560,7 +560,10 @@ UI получает `CaptureCapabilities` и не показывает непо�
   Window are direct snapshots. Area prepares duplication after the editor is
   hidden, registers/shows a transparent non-activating compositor pulse, waits
   for `DwmFlush`, then acquires one full frozen frame and opens the prewarmed
-  fullscreen Quick WebView directly in `selecting`; the first crop and later
+  fullscreen Quick WebView directly in `selecting`. The hidden window is moved
+  onto the pointer monitor with a synchronous non-activating `SetWindowPos`
+  before that first show, so Tao's deferred fullscreen cannot flash the
+  restored 800×600 window. The first crop and later
   annotation chrome share its mounted scene/overlay hosts. Window alone keeps
   the native selector, foreground
   restore, transparent compositor pulse, DWM flush and final acquire/crop. A

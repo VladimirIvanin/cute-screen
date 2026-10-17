@@ -459,7 +459,13 @@ Top-down BMP preview кладётся в owned memory transport, а draft пом
 class переиспользуется для pulse, а сам selector остаётся только для Window
 target. Prewarmed Quick WebView загружает frozen frame скрытой, затем один раз
 показывается в `selecting`; первый валидный drag и переход в `editing`
-обслуживают те же `CanvasViewport`, scene и overlay hosts.
+обслуживают те же `CanvasViewport`, scene и overlay hosts. Окно создаётся в
+восстановленном размере Tao (800×600). Первый Windows `set_fullscreen`
+ставит мониторные bounds через `SWP_ASYNCWINDOWPOS`, поэтому `show` успевал
+показать это обычное окно до интерфейса выделения. Перед fullscreen и `show`
+скрытое окно синхронно получает `rcMonitor` монитора под курсором, без
+`SWP_SHOWWINDOW` и без отложенного move; тот же commit выполняется в Area
+preflight, пока кадр ещё скрыт.
 
 Windows скрывает main на его оконном потоке через синхронный Win32 hide с
 временно отключённой через `DWMWA_TRANSITIONS_FORCEDISABLED` анимацией. Подтверждение приходит
@@ -691,7 +697,7 @@ Document v7, renderer geometry, native IPC и persistence не меняются.
 frontend настроек не нужен для работы глобальных сочетаний. Сохранение новой
 native комбинации выполняется между staging и освобождением старой регистрации.
 
-Отдельный singleton WebView `settings` открывается из CLI, native меню и трея.
+Отдельный singleton WebView `settings` открывается из CLI и трея. На macOS его также открывает системное меню приложения. Windows и Linux не рисуют внутриоконную полосу меню (ADR-080).
 Он использует activation-settings-adapter и generated IPC DTOs. Запись комбинации
 подавляет собственные глобальные действия; blur, закрытие, отмена и истечение
 lease возвращают обычную обработку. Все capture-вызовы используют существующий

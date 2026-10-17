@@ -65,23 +65,17 @@ jobs:
       - name: Install JavaScript dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Check frontend and documentation
+      - name: Check frontend, Rust and documentation
         run: pnpm check
 
       - name: Run unit and harness suites
         run: |
-          pnpm test
           pnpm test:coverage
           pnpm test:render
           pnpm test:perf
 
-      - name: Check Rust
+      - name: Run Rust tests
         run: |
-          cargo fmt --all --check
-          cargo clippy --workspace --all-targets -- -D warnings
-          cargo clippy --workspace --all-targets --features fake-platform,test-harness -- -D warnings
-          cargo clippy --workspace --all-targets --features x11-capture -- -D warnings
-          cargo clippy --workspace --lib --bins --all-features -- -D clippy::unwrap_used -D clippy::expect_used
           cargo test --workspace
           cargo test --workspace --features fake-platform
 
@@ -135,9 +129,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Linux x64
-            os: ubuntu-24.04
-            tauri_deps: true
           - name: Linux ARM64
             os: ubuntu-24.04-arm
             tauri_deps: true

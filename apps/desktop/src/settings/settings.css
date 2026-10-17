@@ -263,16 +263,21 @@
 }
 .cs-startup-choice {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 10px;
   margin: 12px 0;
   cursor: pointer;
 }
+.cs-settings-retention {
+  margin: 0;
+  padding: 8px var(--settings-content-padding) 16px;
+  color: var(--text-muted);
+}
 .cs-startup-choice input {
   width: 16px;
   height: 16px;
-  accent-color: var(--accent);
-  flex-shrink: 0;
+  margin: 0;
+  flex: 0 0 16px;
 }
 .cs-shortcut-command code {
   display: block;
@@ -353,11 +358,13 @@
 }
 .cs-startup-choice input::after {
   content: '';
+  box-sizing: content-box;
   width: 8px;
   height: 4px;
-  border-left: 2px solid var(--accent-contrast);
-  border-bottom: 2px solid var(--accent-contrast);
-  transform: rotate(-45deg);
+  border-style: solid;
+  border-color: var(--accent-contrast);
+  border-width: 0 0 2px 2px;
+  transform: translateY(-1px) rotate(-45deg);
   opacity: 0;
 }
 .cs-startup-choice input:checked {

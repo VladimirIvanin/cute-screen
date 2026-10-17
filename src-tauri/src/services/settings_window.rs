@@ -137,7 +137,17 @@ pub fn refresh_tray<R: Runtime>(app: &tauri::AppHandle<R>) {
 
 pub struct TrayShortcutItems<R: Runtime>(pub Vec<tauri::menu::MenuItem<R>>);
 
+/// The application menu belongs in the macOS system menu bar. On Windows and
+/// Linux the same menu is an in-window bar titled with the app name, directly
+/// under the native title of every window, including Settings.
+const fn installs_app_menu(is_macos: bool) -> bool {
+    is_macos
+}
+
 pub fn install_menu<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()> {
+    if !installs_app_menu(cfg!(target_os = "macos")) {
+        return Ok(());
+    }
     use tauri::menu::{Menu, MenuItem, Submenu};
     let settings = MenuItem::with_id(
         app,
@@ -171,5 +181,11 @@ mod navigation_tests {
             super::settings_query(true, false),
             "index.html?settings=shortcuts&firstRun=1"
         );
+    }
+
+    #[test]
+    fn app_menu_is_not_an_in_window_title() {
+        assert!(super::installs_app_menu(true));
+        assert!(!super::installs_app_menu(false));
     }
 }

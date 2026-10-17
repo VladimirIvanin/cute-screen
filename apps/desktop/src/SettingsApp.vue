@@ -173,7 +173,7 @@ useSettingsRuntime(bridge, state, cancelEditing)
           />
         </template>
       </div>
-      <p v-if="firstRun" class="cs-settings-muted">
+      <p v-if="firstRun" class="cs-settings-retention">
         {{ locale === 'ru'
           ? 'История временная: до 7 дней, 512 МиБ и 200 снимков. Старые снимки удаляются вместе с аннотациями. Защитите важные снимки от очистки или экспортируйте результат.'
           : 'History is temporary: up to 7 days, 512 MiB and 200 captures. Old captures and their annotations are deleted automatically. Protect important captures or export the result.' }}
