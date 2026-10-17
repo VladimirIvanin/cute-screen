@@ -15,7 +15,7 @@ export const strings = {
     conflictWith: 'Уже назначено действию', help: 'О проверке сочетаний',
     systemEdit: 'Изменить в системе…', systemContinue: 'Продолжить в системе',
     localHelp: 'Сочетания работают из других приложений. Изменения сохраняются на этом компьютере.',
-    notAssigned: 'Не назначено',
+    pendingShortcut: 'Новое сочетание',
 
     title: 'Настройки', subtitle: 'Нажмите «Назначить…» или «Изменить…», затем нажмите клавиши одновременно.',
     loading: 'Загружаем настройки…', retry: 'Повторить', edit: 'Изменить…', remove: 'Убрать сочетание', test: 'Проверить сочетание',
@@ -46,7 +46,7 @@ export const strings = {
     conflictWith: 'Already assigned to', help: 'About shortcut checks',
     systemEdit: 'Change in system…', systemContinue: 'Continue in system',
     localHelp: 'Shortcuts work from other applications. Changes stay on this computer.',
-    notAssigned: 'Unassigned',
+    pendingShortcut: 'New shortcut',
 
     title: 'Settings', subtitle: 'Choose Assign… or Change…, then press the keys together.',
     loading: 'Loading settings…', retry: 'Retry', edit: 'Change…', remove: 'Remove shortcut', test: 'Test shortcut', apply: 'Save', cancel: 'Cancel',

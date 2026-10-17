@@ -202,6 +202,37 @@ describe('shortcut actions and system-owned bindings', () => {
     await waitFor(async () => expect((await bridge.snapshot()).entries[0]?.trigger).toBeNull())
   })
 
+  it('shows the staged GNOME combination next to the previous binding until verification', async () => {
+    const bridge = createSettingsHarnessBridge()
+    await bridge.assign('capture-area', 'CTRL+SHIFT+2')
+    const original = bridge.snapshot
+    let pending = false
+    bridge.snapshot = async () => {
+      const snapshot = await original()
+      return { ...snapshot, backend: 'gnome', pendingAction: pending ? 'capture-area' : null }
+    }
+    bridge.assign = async () => {
+      pending = true
+      return bridge.snapshot()
+    }
+    bridge.cancel = async () => {
+      pending = false
+    }
+    const { container } = await mount(bridge)
+    await start('Change shortcut: Capture area')
+    await chord()
+    await screen.findByText('Available in registration check')
+    await fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    const row = within(container.querySelector('[data-action="capture-area"]') as HTMLElement)
+    await row.findByText(/Press the new shortcut within 60 seconds/)
+    expect(row.getByText('Ctrl+Shift+4', { selector: 'kbd' })).toBeTruthy()
+    expect(row.getByText('Ctrl+Shift+2', { selector: 'kbd' })).toBeTruthy()
+    await waitFor(() => expect(row.getByRole('button', { name: 'Cancel' }).hasAttribute('disabled')).toBe(false))
+    await fireEvent.click(row.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(row.queryByText(/Press the new shortcut/)).toBeNull())
+    expect((await original()).entries[0]?.trigger).toBe('CTRL+SHIFT+2')
+  })
+
   it('keeps verification timeout feedback in the tested action row', async () => {
     const bridge = createSettingsHarnessBridge()
     await bridge.assign('capture-area', 'CTRL+SHIFT+2')

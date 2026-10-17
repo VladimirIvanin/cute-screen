@@ -11,6 +11,7 @@ export function useSettings(bridge: ActivationSettingsBridge) {
   const recorder = useShortcutRecorder(bridge, snapshot)
   const testState = useShortcutTest(bridge, perform, load)
   const errorAction = ref<ShortcutAction>()
+  const pendingTrigger = ref('')
   const verificationExpired = ref<ShortcutAction>()
 
   async function cancel(): Promise<void> {
@@ -23,6 +24,7 @@ export function useSettings(bridge: ActivationSettingsBridge) {
     }
     await perform(async () => {
       await bridge.cancel()
+      pendingTrigger.value = ''
       await load()
     })
   }
@@ -51,6 +53,7 @@ export function useSettings(bridge: ActivationSettingsBridge) {
       await recorder.stopRecording()
       try {
         snapshot.value = await bridge.assign(action, value)
+        pendingTrigger.value = snapshot.value.pendingAction === action ? value ?? '' : ''
       } catch (cause) {
         await load()
         throw cause
@@ -63,12 +66,14 @@ export function useSettings(bridge: ActivationSettingsBridge) {
 
   async function test(action: ShortcutAction): Promise<void> {
     await cancel()
+    if (error.value) return
     errorAction.value = action
     await testState.test(action)
   }
 
   function tested(action: ShortcutAction): void {
     if (verificationExpired.value === action) verificationExpired.value = undefined
+    pendingTrigger.value = ''
     testState.tested(action)
   }
 
@@ -79,7 +84,7 @@ export function useSettings(bridge: ActivationSettingsBridge) {
 
   return {
     ...loader, ...recorder, ...testState,
-    errorAction, verificationExpired, edit, assign, cancel, test, tested, dispose,
+    errorAction, verificationExpired, pendingTrigger, edit, assign, cancel, test, tested, dispose,
   }
 }
 export type SettingsState = ReturnType<typeof useSettings>

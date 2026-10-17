@@ -4663,3 +4663,48 @@ DEB без test-harness; release/AppImage/NSIS/DMG builds и установка/
 не подменяются этим результатом. Визуально проверен Settings screenshot после
 исправления контраста native select; системный GTK appearance больше не
 перекрывает цвета элементов.
+
+## Навигация настроек и запись сочетаний в строке (2026-10-17, ADR-075)
+
+Среда: Ubuntu 24.04.5 x86_64, X11, Chrome 154.0.8037.57 и Tauri
+WebKitGTK 605.1.15. Логи этой работы — `artifacts/settings-ux/`.
+
+- Red-first: `cargo test -p cute-screen-desktop --lib settings_entry_points_select --no-default-features`
+  остановился на отсутствующем settings_query (`rust-red.log`); mounted
+  settings-navigation tests до реализации — 3 failures (`vue-red.log`).
+- `pnpm exec vitest run --project vue tests/unit/vue/activation-settings.test.ts tests/unit/vue/settings-navigation.test.ts tests/unit/vue/settings-recorder.test.ts`:
+  25/25. Проверяются production mount, immediate recorder, Esc/focus, Tab/blur,
+  delayed lease/probe, unchanged/duplicate bindings, ошибки probe/storage,
+  menu keyboard navigation, timeout и показ staged GNOME combination.
+- `pnpm test`: 118 файлов, 951 проверка, passed (`test.log`).
+- `cargo test --workspace`: passed (`cargo-test.log`), включая новый entry-point
+  contract и существующие transaction/GNOME ownership tests.
+- `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5234 pnpm test:e2e:browser --spec tests/e2e/specs/browser-activation-settings.e2e.ts`:
+  сценарии consent/assign/conflict/cancel/menu и RU/EN × light/dark ×
+  820×720/620×520. Размер browser chrome компенсируется, так что проверяются
+  именно размеры viewport. Screenshot names: `settings-inline-*`,
+  `settings-general.png`, `settings-actions.png`, `settings-candidate.png`.
+- Native entry: `settings_runtime_dir=$(mktemp -d /tmp/cs-settings-ux.XXXXXX)`
+  затем `XDG_RUNTIME_DIR="$settings_runtime_dir" TAURI_WEBDRIVER_PORT=4545 CUTE_SCREEN_CAPTURE_DEBUG=1 CUTE_SCREEN_E2E_SCENARIOS=activation-settings,activation-reopen,activation-capture pnpm test:e2e:tauri`.
+  Выделенный runtime изолирует activation socket от обычного экземпляра;
+  app-data остаётся изолированным штатным runner. Реальное DBusMenu выбирается
+  по PID, проверяет единственный пункт настроек и вызывает его через Event.
+
+Промежуточные ограничения отражены в `native-first.log` и
+`native-shared-runtime.log`: capture test кликал disabled footer до завершения
+сохранения; теперь он ждёт доступности кнопки. При параллельно открытом обычном
+экземпляре общий XDG_RUNTIME_DIR приводил к activation endpoint unavailable;
+выделенный временный runtime не требует закрытия пользовательского приложения.
+Browser и native input suites запускаются последовательно.
+
+Windows/macOS и GNOME/KDE Wayland runtime в этой работе не проверяются;
+mounted portal/manual/GNOME UI и Rust memory-backend tests не заменяют эти
+проверки. Автозапуск, login и установка не получают новых supported claims.
+
+Финальный native прогон с выделенным runtime: **3/3 spec, 5/5 сценариев**
+passed (`artifacts/settings-ux/native.log`). Frozen desktop 1920×1080;
+выбранная область 405×248 совпала с повторно декодированным PNG
+(`artifacts/tauri-e2e/activation-capture-decoded.json`, invocationSource hotkey,
+terminalOutcome captured). Просмотрены `settings-native-recording.png` и
+`settings-native-general.png`: recorder у выбранного действия, постоянная
+навигация и footer, General открывается из настоящего tray DBusMenu.

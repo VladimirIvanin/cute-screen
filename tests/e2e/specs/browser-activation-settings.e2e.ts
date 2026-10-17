@@ -43,6 +43,7 @@ describe('activation settings browser UI', () => {
     await beginRecording('capture-area')
     await browser.keys([Key.Control, Key.Shift, '2'])
     await expect($('p=Available in registration check')).toBeDisplayed()
+    await browser.saveScreenshot('artifacts/browser-e2e/settings-candidate.png')
     await $('button=Save').click()
     await expect($('[data-action="capture-area"] kbd')).toHaveText('Ctrl+Shift+2')
     await beginRecording('capture-area')
@@ -52,6 +53,7 @@ describe('activation settings browser UI', () => {
     await expect($('[data-action="capture-area"] kbd')).toHaveText('Ctrl+Shift+2')
     const more = $('button[aria-label="Actions: Capture area"]')
     await more.click()
+    await browser.saveScreenshot('artifacts/browser-e2e/settings-actions.png')
     await browser.keys(Key.ArrowDown)
     await expect($('[role="menuitem"]=Remove shortcut')).toBeFocused()
     await browser.keys(Key.Escape)
@@ -76,6 +78,11 @@ describe('activation settings browser UI', () => {
           await beginRecording('capture-window')
           await expect($('.cs-settings-sidebar nav')).toBeDisplayed()
           await assertFit()
+          expect(await browser.execute(() => {
+            const editor = document.querySelector('.cs-shortcut-inline-editor')!.getBoundingClientRect()
+            const panel = document.querySelector('.cs-settings-scroll')!.getBoundingClientRect()
+            return editor.top >= panel.top && editor.bottom <= panel.bottom
+          })).toBe(true)
           await browser.saveScreenshot(`artifacts/browser-e2e/settings-inline-${locale}-${theme}-${width}.png`)
           await browser.keys(Key.Escape)
           await expect($('[data-edit="capture-window"]')).toBeFocused()

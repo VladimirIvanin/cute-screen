@@ -863,3 +863,14 @@ Runtime evidence для изменения фиксируется в TESTING.md;
   Наличие адаптера и успешные unit tests не повышают статус этих гарантий.
 
 Команды, native capture/decode evidence и ограничения — TESTING.md.
+
+## Настройки: навигация и inline recorder (ADR-075)
+
+- Chrome 154 / Linux: browser UI matrix RU/EN, light/dark, 820×720 и 620×520;
+  проверяются overflow и видимость встроенного редактора. Это fixture bridge.
+- Ubuntu 24.04.5 / X11 / WebKitGTK 605.1.15: реальная запись, отмена/focus,
+  singleton CLI, настоящий пункт DBusMenu трея → Общие, физическая активация
+  скрытого редактора и восстановление после relaunch. Фактические результаты
+  финального native прогона и decoded capture — TESTING.md.
+- Windows/macOS/Wayland: новых runtime/support claims нет. Existing
+  platform-owned registration и first-run autostart contracts сохраняются.

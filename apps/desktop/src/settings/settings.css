@@ -1,6 +1,7 @@
 .cs-settings {
   --settings-sidebar-width: 180px;
   --settings-content-padding: 24px;
+  --settings-checkbox-radius: 4px;
   height: 100%;
   display: grid;
   grid-template-columns: var(--settings-sidebar-width) minmax(0, 1fr);
@@ -340,4 +341,37 @@
   width: 18px;
   height: 18px;
   transform: rotate(90deg);
+}
+
+.cs-startup-choice input {
+  appearance: none;
+  display: grid;
+  place-content: center;
+  border: 1px solid var(--text-muted);
+  border-radius: var(--settings-checkbox-radius);
+  background: var(--surface-raised);
+}
+.cs-startup-choice input::after {
+  content: '';
+  width: 8px;
+  height: 4px;
+  border-left: 2px solid var(--accent-contrast);
+  border-bottom: 2px solid var(--accent-contrast);
+  transform: rotate(-45deg);
+  opacity: 0;
+}
+.cs-startup-choice input:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.cs-startup-choice input:checked::after {
+  opacity: 1;
+}
+.cs-startup-choice input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+.cs-startup-choice input:disabled {
+  opacity: 0.5;
+  cursor: default;
 }

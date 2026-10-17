@@ -152,6 +152,7 @@ watch(() => editing.value && props.state.recording.value, async (active) => {
       class="cs-shortcut-feedback"
       role="status"
     >
+      <p v-if="state.pendingTrigger.value">{{ labels.pendingShortcut }}: <kbd>{{ displayTrigger(state.pendingTrigger.value, macos) }}</kbd></p>
       <p>{{ labels.pending }}</p><button :disabled="busy" @click="state.cancel">{{ labels.cancel }}</button>
     </div>
     <p
