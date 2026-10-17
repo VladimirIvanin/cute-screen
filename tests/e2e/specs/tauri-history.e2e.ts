@@ -107,8 +107,7 @@ describe('history through production capture and real storage', () => {
     await browser.saveScreenshot(path.resolve('artifacts/tauri-e2e/history-native.png'))
     const older = $('.cs-history-capture[aria-current="true"]')
     await expect(older).toBeDisplayed()
-    await $('[data-history-index="1"] + .cs-history-more').click()
-    await $('button=Protect from cleanup').click()
+    await $('[data-history-index="1"] ~ .cs-history-protect').click()
     if (process.platform === 'linux') await promisify(execFile)('xdotool', ['key', '--clearmodifiers', 'Escape'])
     else await browser.keys('Escape')
     await browser.waitUntil(() => browser.execute(() => document.activeElement === document.querySelector('.cs-history-trigger')), {

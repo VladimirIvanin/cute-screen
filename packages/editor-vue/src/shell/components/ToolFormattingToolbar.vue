@@ -21,6 +21,7 @@ import UiSeparator from '../ui/UiSeparator.vue'
 import RulerMeasurementSettings from './RulerMeasurementSettings.vue'
 import { useRulerMeasurement } from '../ui/ruler-measurement'
 import { usePreviewPopover } from '../ui/use-preview-popover'
+import { focusPopoverControl } from '../ui/focus-popover-control'
 const props = defineProps<{
   schema: ContextToolbarSchema
   locale: 'en' | 'ru'
@@ -186,9 +187,7 @@ function show(
   open.value = shown ? menu : undefined
   void nextTick(() => {
     if (shown)
-      panel.value?.querySelector<HTMLElement>('button[aria-pressed="true"]:not(:disabled), input:not(:disabled), button:not(:disabled)')?.focus({
-        preventScroll: true,
-      })
+      focusPopoverControl(panel.value)
     else if (restoreFocus)
       triggers.get(menu)?.focus({
         preventScroll: true,

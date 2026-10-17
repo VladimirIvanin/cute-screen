@@ -7,21 +7,26 @@ import {
   ref,
   shallowRef,
 } from 'vue'
-import { EditorPopover } from '@cute-screen/editor-vue'
+import {
+  EditorPopover,
+  describeError,
+  UiIcon,
+} from '@cute-screen/editor-vue'
 import type {
   CleanupPlan,
   HistoryCursor,
   RecentCapture,
   StorageReport,
 } from '../generated/desktop-ipc'
-import { describeError } from '@cute-screen/editor-vue'
 import {
   historyBytes,
   historyRequest,
+  previewHistoryClear,
   type HistoryBridge,
 } from './bridge'
 import { HistoryPreviews } from './previews'
 import HistoryThumbnail from './HistoryThumbnail.vue'
+import HistoryDeleteConfirmation from './HistoryDeleteConfirmation.vue'
 import './history.css'
 
 const props = defineProps<{
@@ -44,16 +49,21 @@ const items = shallowRef<readonly RecentCapture[]>([])
 const cursor = shallowRef<HistoryCursor | null>(null)
 const report = shallowRef<StorageReport>()
 const plan = shallowRef<CleanupPlan>()
+const columns = 2
+const rowHeight = 140
 const scrollTop = ref(0)
-let trigger: HTMLButtonElement | undefined
+const clearButton = ref<HTMLButtonElement>()
+const clearAll = ref(false)
+const notice = ref<string>()
+let deleteId: string | undefined
+const trigger = ref<HTMLButtonElement>()
 const list = ref<HTMLElement>()
-const menuId = ref<string>()
 const previewVersion = ref(0)
 const previews = new HistoryPreviews(props.bridge)
 const ru = computed(() => props.locale === 'ru')
-const startRow = computed(() => Math.max(0, Math.floor(scrollTop.value / 104) - 1))
-const visible = computed(() => items.value.slice(startRow.value * 3, (startRow.value + 6) * 3))
-const totalHeight = computed(() => Math.ceil(items.value.length / 3) * 104)
+const startRow = computed(() => Math.max(0, Math.floor(scrollTop.value / rowHeight) - 1))
+const visible = computed(() => items.value.slice(startRow.value * columns, (startRow.value + 5) * columns))
+const totalHeight = computed(() => Math.ceil(items.value.length / columns) * rowHeight)
 let requestId = 0
 let visibilityId = 0
 let disposed = false
@@ -84,9 +94,9 @@ async function show(
 ): Promise<void> {
   const visibility = ++visibilityId
   opened.value = value
-  menuId.value = undefined
   plan.value = undefined
   retryCapture.value = undefined
+  notice.value = undefined
   if (value) {
     scrollTop.value = 0
     loading.value = true
@@ -114,7 +124,7 @@ async function show(
       restoreFocus &&
       visibility === visibilityId &&
       !opened.value
-    ) trigger?.focus()
+    ) trigger.value?.focus()
   }
 }
 async function select(id: string): Promise<void> {
@@ -135,22 +145,33 @@ async function retry(): Promise<void> {
   else await refresh()
 }
 async function protect(item: RecentCapture): Promise<void> {
+  if (loading.value || props.busy) return
   const visibility = visibilityId
-  menuId.value = undefined
+  loading.value = true
+  error.value = undefined
   try {
     await props.bridge.request({ kind: 'protect', captureId: item.captureId, protected: !item.protected })
     if (visibility !== visibilityId || !opened.value) return
-    await refresh()
+    items.value = items.value.map((entry) => entry.captureId === item.captureId
+      ? { ...entry, protected: !item.protected }
+      : entry)
+    loading.value = false
     await nextTick()
     if (visibility !== visibilityId || !opened.value) return
     const buttons = [...(list.value?.querySelectorAll<HTMLButtonElement>('.cs-history-capture') ?? [])]
     buttons.find((button) => button.dataset.historyId === item.captureId)?.focus()
   } catch (cause) {
     error.value = describeError(cause, 'Unable to change protection')
+  } finally {
+    if (visibility === visibilityId) loading.value = false
   }
 }
 async function previewDelete(item: RecentCapture): Promise<void> {
-  menuId.value = undefined
+  if (loading.value || props.busy) return
+  const visibility = visibilityId
+  loading.value = true
+  clearAll.value = false
+  deleteId = item.captureId
   await previews.cancel()
   error.value = undefined
   try {
@@ -158,48 +179,101 @@ async function previewDelete(item: RecentCapture): Promise<void> {
       const next = items.value.find((entry) => entry.captureId !== item.captureId)
       if (!(await props.openCapture(next?.captureId ?? null))) return
     }
-    plan.value = (await historyRequest(props.bridge, { kind: 'preview', captureIds: [item.captureId], includeLegacy: false, clearCache: false }, 'plan')).plan
+    const result = await historyRequest(props.bridge, { kind: 'preview', captureIds: [item.captureId], includeLegacy: false, clearCache: false }, 'plan')
+    if (visibility !== visibilityId || !opened.value) return
+    plan.value = result.plan
+    loading.value = false
   } catch (cause) {
-    error.value = describeError(cause, 'Unable to prepare deletion')
+    if (visibility === visibilityId) error.value = describeError(cause, 'Unable to prepare deletion')
+  } finally {
+    if (visibility === visibilityId) loading.value = false
+  }
+}
+async function cancelDelete(): Promise<void> {
+  plan.value = undefined
+  await nextTick()
+  if (clearAll.value) clearButton.value?.focus()
+  else {
+    const buttons = [...(list.value?.querySelectorAll<HTMLButtonElement>('.cs-history-delete') ?? [])]
+    buttons.find((button) => button.dataset.historyDeleteId === deleteId)?.focus()
+  }
+}
+async function previewClear(): Promise<void> {
+  if (loading.value || props.busy) return
+  const visibility = visibilityId
+  loading.value = true
+  error.value = undefined
+  notice.value = undefined
+  clearAll.value = true
+  try {
+    await previews.cancel()
+    const reviewed = await previewHistoryClear(
+      props.bridge,
+      props.activeId,
+      () => visibility === visibilityId && opened.value,
+    )
+    if (!reviewed) return
+    plan.value = reviewed
+    loading.value = false
+  } catch (cause) {
+    if (visibility === visibilityId) error.value = describeError(cause, ru.value ? 'Не удалось подготовить очистку' : 'Unable to prepare cleanup')
+  } finally {
+    if (visibility === visibilityId) loading.value = false
   }
 }
 async function commitDelete(): Promise<void> {
-  if (!plan.value) return
+  if (
+    !plan.value ||
+    loading.value ||
+    props.busy
+  ) return
+  const visibility = visibilityId
   loading.value = true
+  error.value = undefined
   try {
-    await props.bridge.request({ kind: 'commit', token: plan.value.token })
+    const result = await historyRequest(props.bridge, { kind: 'commit', token: plan.value.token }, 'cleaned')
+    if (visibility !== visibilityId || !opened.value) return
     plan.value = undefined
+    report.value = result.report
+    notice.value = `${ru.value ? 'Удалено снимков:' : 'Captures deleted:'} ${result.removedCount}`
+    scrollTop.value = 0
   } catch (cause) {
+    if (visibility !== visibilityId) return
     plan.value = undefined
-    error.value = describeError(cause, 'Review deletion again')
+    error.value = describeError(cause, ru.value ? 'Подготовьте удаление повторно' : 'Review deletion again')
+    await nextTick()
+    clearButton.value?.focus()
     return
   } finally {
-    loading.value = false
+    if (visibility === visibilityId) loading.value = false
   }
+  if (visibility !== visibilityId || !opened.value) return
   await refresh()
+  await nextTick()
+  clearButton.value?.focus()
 }
 function onScroll(event: Event): void {
   const target = event.target as HTMLElement
   scrollTop.value = target.scrollTop
-  if (cursor.value && target.scrollHeight - target.scrollTop - target.clientHeight < 208) void refresh(true)
+  if (cursor.value && target.scrollHeight - target.scrollTop - target.clientHeight < rowHeight * 2) void refresh(true)
 }
 async function onKey(event: KeyboardEvent): Promise<void> {
   event.stopPropagation()
   if (event.key === 'Escape') {
     event.preventDefault()
     event.stopPropagation()
-    await show(false)
+    await escape()
     return
   }
-  const step = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: 3, ArrowUp: -3 }[event.key]
+  const step = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: columns, ArrowUp: -columns }[event.key]
   if (!step || !(event.target instanceof HTMLElement)) return
   const id = event.target.closest<HTMLElement>('[data-history-id]')?.dataset.historyId
   const index = items.value.findIndex((item) => item.captureId === id)
   if (index < 0) return
   event.preventDefault()
   const target = Math.min(items.value.length - 1, Math.max(0, index + step))
-  const row = Math.floor(target / 3)
-  if (list.value) list.value.scrollTop = Math.max(0, (row - 1) * 104)
+  const row = Math.floor(target / columns)
+  if (list.value) list.value.scrollTop = Math.max(0, (row - 1) * rowHeight)
   scrollTop.value = list.value?.scrollTop ?? 0
   await nextTick()
   list.value?.querySelector<HTMLElement>(`[data-history-index="${target}"]`)?.focus()
@@ -207,15 +281,16 @@ async function onKey(event: KeyboardEvent): Promise<void> {
 function date(item: RecentCapture): string {
   return new Intl.DateTimeFormat(props.locale, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(item.capturedAt)
 }
-function toggle(event: MouseEvent): void {
-  trigger = event.currentTarget as HTMLButtonElement
-  void show(!opened.value)
+async function escape(): Promise<void> {
+  if (loading.value && plan.value) return
+  if (plan.value) await cancelDelete()
+  else await show(false)
 }
 function onWindowKey(event: KeyboardEvent): void {
   if (!opened.value || event.key !== 'Escape') return
   event.preventDefault()
   event.stopPropagation()
-  void show(false)
+  void escape()
 }
 onMounted(() => window.addEventListener('keydown', onWindowKey, true))
 onBeforeUnmount(() => {
@@ -228,15 +303,16 @@ onBeforeUnmount(() => {
 <template>
   <EditorPopover
     :show="opened"
-    @clickoutside="show(false, false)"
+    @clickoutside="!plan && !loading && show(false, false)"
   >
     <template #trigger>
       <button
+        ref="trigger"
         class="cs-filmstrip cs-history-trigger"
         :aria-expanded="opened"
         aria-haspopup="dialog"
         :disabled="busy"
-        @click="toggle"
+        @click="!loading && !plan && show(!opened)"
       >
         <svg
           width="18"
@@ -258,10 +334,37 @@ onBeforeUnmount(() => {
     <section
       class="cs-history-popover"
       role="dialog"
+      :aria-busy="loading"
       :aria-label="ru ? 'История снимков' : 'Capture history'"
       @keydown="onKey"
     >
-      <header><strong>{{ ru ? 'История' : 'History' }}</strong><button :aria-label="ru ? 'Закрыть' : 'Close'" @click="show(false)">×</button></header>
+      <header>
+        <strong>{{ ru ? 'История' : 'History' }}</strong>
+        <div class="cs-history-header-actions">
+          <button
+            ref="clearButton"
+            class="cs-history-clear cs-history-danger"
+            :disabled="loading || busy || !items.length || !!plan"
+            @click="previewClear"
+          >
+            {{ ru ? 'Очистить…' : 'Clear history…' }}
+          </button>
+          <button
+            :disabled="loading"
+            :aria-label="ru ? 'Закрыть' : 'Close'"
+            @click="show(false)"
+          >
+            ×
+          </button>
+        </div>
+      </header>
+      <p
+        v-if="notice"
+        class="cs-history-notice"
+        role="status"
+      >
+        {{ notice }}
+      </p>
       <div
         v-if="error || maintenanceError"
         class="cs-history-message"
@@ -269,18 +372,16 @@ onBeforeUnmount(() => {
       >
         {{ error || maintenanceError }} <button @click="retry">{{ ru ? 'Повторить' : 'Retry' }}</button>
       </div>
-      <div v-if="plan" class="cs-history-message">
-        <p>{{ ru ? 'Удалить снимок и его аннотации?' : 'Delete capture and its annotations?' }}</p>
-        <p>{{ historyBytes(plan.reclaimableBytes, locale) }} · {{ ru ? 'Восстановление недоступно' : 'Cannot be undone' }}</p>
-        <button
-          :disabled="loading"
-          class="cs-history-danger"
-          @click="commitDelete"
-        >
-          {{ ru ? 'Удалить' : 'Delete' }}
-        </button>
-        <button :disabled="loading" @click="plan = undefined">{{ ru ? 'Отмена' : 'Cancel' }}</button>
-      </div>
+      <HistoryDeleteConfirmation
+        v-if="plan"
+        :plan="plan"
+        :locale="locale"
+        :clear-all="clearAll"
+        :loading="loading"
+        :busy="busy"
+        @cancel="cancelDelete"
+        @confirm="commitDelete"
+      />
       <div
         v-else
         ref="list"
@@ -296,7 +397,7 @@ onBeforeUnmount(() => {
           {{ loading ? (ru ? 'Загрузка…' : 'Loading…') : (ru ? 'Сделайте снимок — он появится здесь' : 'Take a capture to see it here') }}
         </p>
         <div class="cs-history-virtual" :style="{ height: `${totalHeight}px` }">
-          <div class="cs-history-grid" :style="{ transform: `translateY(${startRow * 104}px)` }">
+          <div class="cs-history-grid" :style="{ transform: `translateY(${startRow * rowHeight}px)` }">
             <div
               v-for="(item, index) in visible"
               :key="`${item.captureId}:${item.revision}:${previewVersion}`"
@@ -304,13 +405,13 @@ onBeforeUnmount(() => {
             >
               <button
                 :data-history-id="item.captureId"
-                :data-history-index="startRow * 3 + index"
+                :data-history-index="startRow * columns + index"
                 class="cs-history-capture"
                 :class="{ 'is-current': item.captureId === activeId }"
                 :aria-current="item.captureId === activeId ? 'true' : undefined"
                 :aria-label="`${date(item)}${item.protected ? (ru ? ', защищён' : ', protected') : ''}`"
                 :title="`${new Date(item.capturedAt).toLocaleString(locale)} · ${item.width} × ${item.height}`"
-                :disabled="busy"
+                :disabled="busy || loading"
                 @click="select(item.captureId)"
               >
                 <HistoryThumbnail
@@ -318,20 +419,29 @@ onBeforeUnmount(() => {
                   :previews="previews"
                   :unavailable="ru ? 'Миниатюра недоступна' : 'Preview unavailable'"
                 />
-                <small>{{ date(item) }} <span v-if="item.protected" aria-hidden="true">◆</span></small>
+                <small>{{ date(item) }}</small>
               </button>
               <button
-                class="cs-history-more"
-                :aria-label="ru ? 'Действия со снимком' : 'Capture actions'"
-                :aria-expanded="menuId === item.captureId"
-                @click="menuId = menuId === item.captureId ? undefined : item.captureId"
+                class="cs-history-delete cs-history-overlay-action"
+                :data-history-delete-id="item.captureId"
+                :aria-label="ru ? 'Удалить снимок' : 'Delete capture'"
+                :title="ru ? 'Удалить снимок…' : 'Delete capture…'"
+                :disabled="loading || busy"
+                @click="previewDelete(item)"
               >
-                ⋯
+                <UiIcon name="trash" />
               </button>
-              <div v-if="menuId === item.captureId" class="cs-history-card-menu">
-                <button @click="protect(item)">{{ item.protected ? (ru ? 'Снять защиту' : 'Remove protection') : (ru ? 'Защитить от автоочистки' : 'Protect from cleanup') }}</button>
-                <button @click="previewDelete(item)">{{ ru ? 'Удалить…' : 'Delete…' }}</button>
-              </div>
+              <button
+                class="cs-history-protect cs-history-overlay-action"
+                :class="{ 'is-protected': item.protected }"
+                :aria-pressed="item.protected"
+                :aria-label="item.protected ? (ru ? 'Снять защиту' : 'Remove protection') : (ru ? 'Защитить от очистки' : 'Protect from cleanup')"
+                :title="item.protected ? (ru ? 'Снять защиту' : 'Remove protection') : (ru ? 'Защитить от очистки' : 'Protect from cleanup')"
+                :disabled="loading || busy"
+                @click="protect(item)"
+              >
+                <UiIcon :name="item.protected ? 'lock' : 'unlock'" />
+              </button>
             </div>
           </div>
         </div>
@@ -347,7 +457,7 @@ onBeforeUnmount(() => {
       <footer>
         <span v-if="report" :class="{ 'cs-history-warning': report.overLimit }">{{ historyBytes(report.totalBytes, locale) }}
           <small>{{ ru ? `Временная история · до ${retentionDays} дн.` : `Temporary history · up to ${retentionDays} days` }}</small><small v-if="report.overLimit">{{ ru ? 'Лимит превышен: проверьте защищённые снимки' : 'Over limit: review protected captures' }}</small></span>
-        <button @click="bridge.settings().catch((cause: unknown) => { error = describeError(cause, 'Unable to open settings') })">{{ ru ? 'Хранение…' : 'Storage…' }}</button>
+        <button :disabled="loading || !!plan" @click="bridge.settings().catch((cause: unknown) => { error = describeError(cause, 'Unable to open settings') })">{{ ru ? 'Хранение…' : 'Storage…' }}</button>
       </footer>
     </section>
   </EditorPopover>

@@ -1,5 +1,15 @@
 # Платформенная матрица
 
+## Фокус пресетов (2026-10-17)
+
+Linux x86_64 / Chrome 154.0.8037.57: browser pointer/Enter reopen для
+4 px / 24 px, произвольное 5 px, Escape/focus и 1024 px fit прошли;
+RU/EN × light/dark screenshots просмотрены. Mounted Vue дополнительно
+покрывает mixed, лупу, карандаш, подсветку, выделитель и палитру.
+Native WebView, Windows/macOS и Wayland runtime в этом исправлении
+не запускались. Renderer, document commands и IPC не меняются.
+Команды и артефакты — TESTING.md, `artifacts/preset-focus/`.
+
 ## Понятные настройки линейки (2026-10-17, ADR-076)
 
 Linux x86_64/X11: Chrome 154.0.8037.57 — 2 browser scenarios passed,
@@ -915,3 +925,21 @@ Storage migration 4 и document schema v7 проверяются Rust tests. П�
 библиотека не подвергается автоудалению до consent preview. Windows/macOS/
 Wayland runtime для истории остаётся pending по ADR-020. Reference-hardware
 performance claims не добавлены; renderer cache budget не равен всему RSS.
+
+## История: крупные превью и очистка (2026-10-17, ADR-078)
+
+Linux x86_64 / Chrome 154.0.8037.57: browser history 4/4 passed, включая
+1000 записей, все страницы очистки, cancel/commit, защиту, неполную строку
+прокрутки и bounded menus. RU/EN × light/dark, 1024×700–1600×1000.
+Linux/X11 / WebKitGTK 605.1.15: production history → reopen → delete,
+3 native scenarios passed. Проверены защита, preview нулевого/непустого
+плана, отмена, удаление active и protected вручную и 200 переключений.
+Windows/macOS/Wayland runtime этого UI-среза не запускался. Schema, IPC и
+storage policy не менялись. Команды, screenshots и логи — TESTING.md.
+
+Уточнение UI истории: меню заменено прямой корзиной; белые SVG используют
+отдельную мягкую тёмную подложку вместо дополнительной обводки. Linux Chrome:
+4 browser сценария passed, screenshots просмотрены. Для этого уточнения
+native gate остаётся pending: обычный запуск столкнулся с activation endpoint
+работающего приложения, isolated повтор потерял WebDriver во время soak.
+Подробности и команды — TESTING.md; прежние 3/3 относятся к предыдущему срезу.

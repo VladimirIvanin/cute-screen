@@ -752,3 +752,12 @@ shared originals и images/textures других документов.
 возобновляется maintenance, включая deferred live blob resources. Preview
 имеет ограниченное время жизни и fingerprint; изменения истории требуют
 повторного review. Отчёт различает files, SQLite allocation и reusable bytes.
+
+История показывает две колонки с фиксированной высотой строки 140 CSS px;
+виртуализация и keyboard navigation используют ту же геометрию. Кнопки защиты
+и удаления доступны прямо на карточке; промежуточного меню нет. Корзина
+открывает существующее подтверждение, Cancel возвращает focus к той же корзине.
+Очистка в popover читает все cursor-страницы метаданных, исключает protected и
+active IDs и использует существующий preview/commit contract ADR-078. Preview
+явно подтверждает удаление старых снимков, но не меняет legacy auto-cleanup
+consent. Schema, IPC, storage policy и бинарный transport не меняются.

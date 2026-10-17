@@ -144,3 +144,5 @@ export { default as EditorPopover } from './shell/ui/EditorPopover.vue'
 
 export { renderHistoryThumbnail } from './history/thumbnail-render'
 export { loadDocumentTextFonts as loadHistoryDocumentFonts } from './text-fonts'
+
+export { UiIcon } from './shell/icon'

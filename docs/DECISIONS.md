@@ -1561,3 +1561,25 @@ resolver; browser и real Tauri pointer creation rectangle → freeform, эфф�
 **Проверяемое основание:** red-first Rust storage contracts, production session handoff tests, browser/native history flows, preview revision/censor tests и bounded-resource soak. Результаты и ограничения фиксируются в TESTING.md; наличие API не считается runtime evidence.
 
 Исследование ADR-078: [паттерны истории и ограничения ресурсов](HISTORY_RESEARCH.md).
+
+## ADR-079 — Пропорции указателя лупы
+
+**Статус:** accepted; дополняет REQ-TOL-011, не заменяет принятые ADR.
+
+**Контекст:** фиксированные 3 px линии и максимум 12 px наконечника теряются
+рядом с большой линзой и толстой рамкой, особенно при уменьшенном viewport.
+
+**Решение:** в document pixels толщина линии `t = clamp(0.65 × borderWidth, 3, 8)`;
+длина наконечника `L = min(lensSize / 2, clamp(max(0.05 × lensSize, 4 × t), 16, 32))`.
+Полуширина треугольника — `0.45 × L`. Border=0 сохраняет указатель с t=3.
+Линия заканчивается на 0.35 × L перед source center, наконечник указывает на
+source center. Цвет следует рамке; при source внутри линзы connector отсутствует.
+Оба backend используют общий расчёт после snapshot composite-below; viewport
+и export scale масштабируют геометрию. Нового контрола, schema и IPC нет;
+существующие документы получают новые производные пропорции при отрисовке.
+
+**Проверяемое основание:** при lensSize=512 и borderWidth=8 ожидаются t=5.2,
+L=25.6 вместо прежних 3/12. Геометрические и decoded-pixel проверки обоих
+backend, browser/native изменение размера и рамки, cancel и undo/redo;
+визуальная проверка 256/512 px на светлом/тёмном фоне и при уменьшении.
+Фактические команды, результаты и ограничения — TESTING.md.

@@ -7,6 +7,7 @@ import {
 } from 'vue'
 import { NPopover } from 'naive-ui'
 import { usePreviewPopover } from './use-preview-popover'
+import { focusPopoverControl } from './focus-popover-control'
 import type { SrgbColor } from '@cute-screen/editor-renderer'
 import DeferredColorPicker from './DeferredColorPicker.vue'
 import { UiIcon } from '../icon'
@@ -50,7 +51,7 @@ function show(
   custom.value = false
   if (next) emit('opened')
   void nextTick(() => {
-    if (next) panel.value?.querySelector<HTMLElement>('[aria-pressed="true"], button:not(:disabled)')?.focus({ preventScroll: true })
+    if (next) focusPopoverControl(panel.value)
     else if (restoreFocus) trigger.value?.focus({ preventScroll: true })
   })
 }

@@ -12,6 +12,7 @@ import { UiIcon } from '../icon'
 import SimpleColorPicker from '../ui/SimpleColorPicker.vue'
 import UiSeparator from '../ui/UiSeparator.vue'
 import ShapeNumericControl from './ShapeNumericControl.vue'
+import { focusPopoverControl } from '../ui/focus-popover-control'
 
 import { useTransientSurface } from '../ui/transient-surface'
 const surfaceOwner = useTransientSurface()
@@ -56,7 +57,7 @@ function show(
   if (shown) colorPicker.value?.close()
   open.value = shown ? menu : undefined
   void nextTick(() => {
-    if (shown) panel.value?.querySelector<HTMLElement>('[aria-pressed="true"], input, button:not(:disabled)')?.focus({ preventScroll: true })
+    if (shown) focusPopoverControl(panel.value)
     else if (restoreFocus) triggers.get(menu)?.focus({ preventScroll: true })
   })
 }

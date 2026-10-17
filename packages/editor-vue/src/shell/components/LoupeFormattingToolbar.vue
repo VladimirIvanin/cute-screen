@@ -12,6 +12,7 @@ import { UiIcon } from '../icon'
 import NumericControl from '../ui/NumericControl.vue'
 import SimpleColorPicker from '../ui/SimpleColorPicker.vue'
 import { usePreviewPopover } from '../ui/use-preview-popover'
+import { focusPopoverControl } from '../ui/focus-popover-control'
 
 const props = defineProps<{
   schema: ContextToolbarSchema
@@ -69,7 +70,7 @@ function show(
   if (!shown && open.value !== menu) return
   open.value = shown ? menu : undefined
   void nextTick(() => {
-    if (shown) panel.value?.querySelector<HTMLElement>('[aria-pressed="true"], input:not(:disabled), button:not(:disabled)')?.focus({ preventScroll: true })
+    if (shown) focusPopoverControl(panel.value)
     else if (restoreFocus) triggers.get(menu)?.focus({ preventScroll: true })
   })
 }

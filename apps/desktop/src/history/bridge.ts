@@ -1,4 +1,7 @@
 import type {
+  CleanupPlan,
+  HistoryCursor,
+  HistoryPage,
   HistoryRequest,
   HistoryResponse,
 } from '../generated/desktop-ipc'
@@ -23,4 +26,26 @@ export function historyBytes(
   locale: string,
 ): string {
   return new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(bytes / (1024 * 1024)) + (locale === 'ru' ? ' МиБ' : ' MiB')
+}
+
+/** Review all history pages without granting automatic cleanup consent for older captures. */
+export async function previewHistoryClear(
+  bridge: HistoryBridge,
+  activeId: string | undefined,
+  current: () => boolean,
+): Promise<CleanupPlan | undefined> {
+  const ids: string[] = []
+  let next: HistoryCursor | null = null
+  do {
+    const page: HistoryPage = (await historyRequest(bridge, { kind: 'list', cursor: next }, 'page')).page
+    if (!current()) return undefined
+    ids.push(...page.items
+      .filter((item) => !item.protected && item.captureId !== activeId)
+      .map((item) => item.captureId))
+    next = page.nextCursor
+  } while (next)
+  const result = await historyRequest(bridge, {
+    kind: 'preview', captureIds: ids, includeLegacy: false, clearCache: false,
+  }, 'plan')
+  return current() ? result.plan : undefined
 }

@@ -1,7 +1,11 @@
 :root {
   --cs-history-width: 360px;
-  --cs-history-height: 400px;
-  --cs-history-row: 104px;
+  --cs-history-height: 460px;
+  --cs-history-row: 140px;
+  --cs-history-preview-height: 104px;
+  --cs-history-icon-fill: #fff;
+  --cs-history-action-backdrop: rgb(0 0 0 / 58%);
+  --cs-history-action-blur: 5px;
 }
 .cs-bottom-chrome .cs-filmstrip.cs-history-trigger {
   display: inline-flex;
@@ -19,6 +23,8 @@
   cursor: pointer;
 }
 .cs-history-popover {
+  position: relative;
+  box-sizing: border-box;
   width: min(var(--cs-history-width), calc(100vw - 24px));
   max-height: min(var(--cs-history-height), calc(100vh - 88px));
   display: flex;
@@ -61,8 +67,26 @@
   gap: 8px;
   padding: 8px 12px;
 }
-.cs-history-popover header button {
+.cs-history-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cs-history-header-actions > button:last-child {
   width: 32px;
+}
+.cs-history-popover .cs-history-clear {
+  padding: 0 8px;
+}
+.cs-history-popover header,
+.cs-history-popover footer {
+  flex: none;
+}
+.cs-history-popover footer > span {
+  min-width: 0;
+}
+.cs-history-popover footer > button {
+  flex: none;
 }
 .cs-history-popover footer {
   border-top: 1px solid var(--border);
@@ -73,9 +97,10 @@
   font-size: 10px;
 }
 .cs-history-scroll {
-  overflow: auto;
-  min-height: 104px;
-  max-height: 292px;
+  overflow: hidden auto;
+  min-height: 0;
+  max-height: 352px;
+  scrollbar-gutter: stable;
   padding: 0 8px;
   overscroll-behavior: contain;
 }
@@ -86,7 +111,7 @@
   position: absolute;
   inset: 0 0 auto;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .cs-history-card {
   position: relative;
@@ -111,46 +136,72 @@
 }
 .cs-history-capture img {
   width: 100%;
-  height: 64px;
+  height: var(--cs-history-preview-height);
   object-fit: contain;
 }
 .cs-history-capture small {
   max-width: 100%;
   overflow: hidden;
   white-space: nowrap;
-  font-size: 9px;
+  font-size: 11px;
   padding-top: 4px;
 }
 .cs-history-placeholder {
   display: grid;
   place-items: center;
   width: 100%;
-  height: 64px;
+  height: var(--cs-history-preview-height);
   color: var(--text-muted);
 }
-.cs-history-popover .cs-history-more {
+.cs-history-popover .cs-history-overlay-action {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  min-width: 32px;
-  background: var(--surface-raised);
+  top: 8px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 2px;
+  background: transparent;
 }
-.cs-history-card-menu {
+.cs-history-delete {
+  right: 8px;
+}
+.cs-history-protect {
+  right: 40px;
+}
+.cs-history-overlay-action::before {
+  content: '';
   position: absolute;
-  top: 36px;
-  right: 4px;
-  z-index: 2;
-  min-width: 150px;
-  padding: 4px;
-  border: 1px solid var(--border);
+  inset: 3px;
   border-radius: var(--radius-sm);
-  background: var(--surface-raised);
-  box-shadow: var(--shadow-overlay);
+  background: var(--cs-history-action-backdrop);
+  filter: blur(var(--cs-history-action-blur));
+  pointer-events: none;
 }
-.cs-history-card-menu button {
-  display: block;
-  width: 100%;
-  text-align: left;
+.cs-history-overlay-action svg {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  color: var(--cs-history-icon-fill);
+}
+.cs-history-protect:not(.is-protected) {
+  opacity: 0;
+}
+.cs-history-card:hover .cs-history-protect,
+.cs-history-card:focus-within .cs-history-protect,
+.cs-history-protect:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .cs-history-protect:not(.is-protected) {
+    opacity: 1;
+  }
+}
+.cs-history-popover .cs-history-overlay-action:hover {
+  background: transparent;
+}
+.cs-history-overlay-action:hover svg {
+  transform: scale(1.08);
 }
 .cs-history-message {
   padding: 12px;
@@ -194,4 +245,23 @@
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
+}
+
+.cs-history-delete-confirm {
+  overflow: auto;
+  min-height: 0;
+}
+.cs-history-confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.cs-history-confirm-actions button {
+  padding: 4px 12px;
+}
+.cs-history-notice {
+  margin: 0;
+  padding: 0 12px 8px;
+  color: var(--text-muted);
 }

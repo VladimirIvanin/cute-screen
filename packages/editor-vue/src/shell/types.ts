@@ -295,6 +295,7 @@ export type IconName =
   | 'loupe'
   | 'marker'
   | 'more'
+  | 'trash'
   | 'numberedMarker'
   | 'pencil'
   | 'plus'

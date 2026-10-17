@@ -1,5 +1,44 @@
 # Стратегия тестирования
 
+## Однозначное выделение пресетов (2026-10-17)
+
+Linux x86_64, Node 22.23.1, pnpm 10.33.2; логи — `artifacts/preset-focus/`.
+
+- До исправления `pnpm exec vitest run --project vue tests/unit/vue/popover-control-focus.test.ts`
+  — 10 failed / 1 passed: первый пресет получал focus вместо выбранного
+  значения либо поля (`red.log`).
+- `pnpm exec vitest run --project vue tests/unit/vue/popover-control-focus.test.ts tests/unit/vue/tool-formatting-toolbar.test.ts tests/unit/vue/highlighter-toolbar.test.ts tests/unit/vue/ruler-toolbar.test.ts tests/unit/vue/numeric-control.test.ts`
+  — 5 файлов / 36 passed (`focused.log`). Открытие не создаёт change/commit;
+  проверены selected, custom/mixed, palette fallback и Escape focus return.
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5297 CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 pnpm test:e2e:browser --spec tests/e2e/specs/browser-preset-focus.e2e.ts`
+  — 1/1 passed (`browser-final.log`), Chrome 154.0.8037.57. Trusted ruler creation,
+  pointer/Enter reopen, 4 px / 24 px, custom 5 px, Escape, RU/EN × light/dark
+  при 1024 px на документе 2560×1440. Просмотрены
+  `artifacts/browser-e2e/preset-focus-ru-light-4.png`,
+  `preset-focus-ru-dark-24.png`: первый пресет без ложной подсветки, панели
+  внутри viewport. Первый browser прогон использовал detached WebDriver element
+  после remount; повторно найденный элемент проходит проверку фокуса.
+- `pnpm test` — 122 файла passed / 1 failed, 994 passed / 1 failed (`unit.log`):
+  существующий `highlighter-preview.test.ts` превысил 5000 ms на illuminate/DPR 2.
+  `pnpm exec vitest run --project vue tests/unit/vue/highlighter-preview.test.ts tests/unit/vue/popover-control-focus.test.ts`
+  — повтор 2 файла / 17 passed (`focused-final.log`).
+- Scoped ESLint изменённых исходников и тестов passed с двумя прежними ariaLabel
+  warnings (`scoped-lint.log`); `pnpm exec tsc --noEmit -p tests/e2e/tsconfig.json`
+  passed (`e2e-types.log`). Первичный `pnpm typecheck` обнаружил неверный test-only
+  toolSettings для loupe и параллельные history test types; fixture исправлена.
+  `pnpm exec vue-tsc --noEmit -p tests/tsconfig.json` passed (`test-types-final.log`).
+- `pnpm format` выполнен (`format-final.log`), `pnpm format:check` passed
+  (`format-check.log`). Первичный `pnpm check` остановился на параллельной
+  длинной строке `browser-history.e2e.ts` (`check.log`). Финальный повтор
+  прошёл lint, typecheck, format и docs, затем остановился на architecture
+  size budget параллельного `HistoryPopover.vue`: 556 > 500 строк
+  (`check-final.log`, boundaries 9 файлов / 42 checks passed, 1 failed).
+  IPC и Rust части общего gate после этой остановки не запускались.
+
+Native WebView, Windows/macOS и Wayland runtime не запускались. Renderer,
+document/history contracts и IPC не меняются; render/perf/Rust suites отдельно
+не запускались.
+
 ## Понятные настройки линейки (2026-10-17, ADR-076)
 
 Linux x86_64/X11, Node 22.23.1, pnpm 10.33.2. Логи — `artifacts/ruler-ux/`.
@@ -4894,3 +4933,79 @@ CanvasKit/WebKit, активный документ и переходы учит
 Исправлены поздний Fit поверх custom zoom (red/green) и возврат фокуса после
 Escape во время асинхронного изменения защиты. У history-soak отдельный
 таймаут 300 s; проверки и количество переключений не ослаблялись.
+
+## История: overflow, крупные карточки и очистка (2026-10-17)
+
+Среда: Linux x86_64, Chrome 154.0.8037.57. Контракт REQ-LIB-002/011/012/013,
+уточнение UI в рамках ADR-078 без изменения storage/IPC/schema.
+
+- `pnpm test --project vue tests/unit/vue/history-popover.test.ts tests/unit/vue/history-navigation.test.ts tests/unit/vue/history-document-loader.test.ts`:
+  3 files / 9 tests passed. Все cursor-страницы, active/protected исключения,
+  включение старых снимков в ручной preview, cancel без commit, focus на Cancel,
+  успешное удаление, пустой plan, повторный review после ошибки commit и
+  Escape при задержанном ответе защиты без возврата фокуса в скрытую карточку.
+- `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5198 pnpm test:e2e:browser --spec tests/e2e/specs/browser-history.e2e.ts`:
+  4/4 passed; browser harness 1000 записей; две колонки, крупное превью, bounded menu у
+  четырёх карточек, отсутствие горизонтального overflow, ArrowDown на два,
+  прямой замок, preview/Cancel/commit 997 снимков и сохранение трёх исключений.
+  RU/EN, light/dark, 1024×700, 1280×720, 1600×1000. Отдельная проверка
+  прокрутки на неполную строку исключает пустой низ виртуального списка.
+- Интерактивно открыты история, меню правой карточки и RU confirm в in-app
+  browser, проверены screenshot и возврат к карточкам по Cancel.
+- Скриншоты: `artifacts/browser-e2e/history-menu-{0,1,4,5}.png`,
+  `history-clear-confirm-ru.png`, `history-cleared-ru.png`,
+  `history-{light,dark}-*.png`; логи: `artifacts/history-ui/`.
+
+Native и полный gate фиксируются ниже по фактическому завершению; browser
+harness не доказывает native удаление файлов или platform capture.
+
+Нативная команда для UI-среза:
+`CUTE_SCREEN_E2E_SCENARIOS=history,history-reopen,history-delete pnpm test:e2e:tauri`.
+Linux/X11, WebKitGTK 605.1.15, isolated profile и fake-platform capture через
+настоящие Quick/Editor WebViews. Preview/Cancel нулевого и непустого плана,
+прямое снятие/возврат защиты, explicit delete active/protected и пустая история.
+Ранний прогон passed 3/3; повтор выявил гонку Escape во время protect (фокус
+не возвращался к trigger). Убрана блокировка Escape для pending protection;
+отдельный компонентный regression использует задержанный storage response.
+Подтверждённый commit остаётся защищён от закрытия до результата.
+
+Финальный повтор после исправления гонки: native 3/3 passed (history с
+20 warmup + 200 switches, reopen и delete); browser 4/4 passed;
+component/navigation/loader 3 files / 9 tests passed. `pnpm check` passed:
+lint (существующие warnings), typecheck, format:check, docs links,
+boundaries 10 files / 43 tests, IPC check и четыре Rust Clippy конфигурации.
+Логи финального состояния — `artifacts/history-ui/{unit,browser,native,check}.log`.
+Этот срез не заявляет отдельный `pnpm test:render`, полный `pnpm test`,
+release `pnpm tauri build` или Windows/macOS/Wayland runtime.
+
+## История: корзина вместо единственного пункта меню (2026-10-17)
+
+REQ-LIB-002/013, REQ-UI-006: прямая корзина рядом с замком открывает прежний
+preview/confirm; промежуточное меню и его позиционирование удалены. Cancel/Escape
+возвращают focus к той же корзине. Белые Tabler SVG не имеют дополнительной
+обводки или фильтра; контраст даёт отдельная мягкая тёмная подложка под значком.
+
+Linux x86_64 / Chrome 154.0.8037.57:
+
+- `pnpm test --project vue tests/unit/vue/history-popover.test.ts tests/unit/vue/ui-icon.test.ts`:
+  2 files / 92 tests passed.
+- `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5198 pnpm test:e2e:browser --spec tests/e2e/specs/browser-history.e2e.ts`:
+  4/4 passed; прямая корзина у четырёх карточек, Cancel/Escape/focus,
+  очистка всех страниц и protected/active exclusions, RU/EN × light/dark.
+- `pnpm check` passed. Последующее изменение подложки затрагивает только CSS;
+  browser suite повторён после него. Скриншоты просмотрены:
+  `artifacts/browser-e2e/history-direct-delete.png` и `history-dark-ru-1024.png`.
+- Native-команда `CUTE_SCREEN_E2E_SCENARIOS=history,history-reopen,history-delete pnpm test:e2e:tauri`
+  сначала остановилась до тестов: сервис не создал WebDriver session на
+  `127.0.0.1:4445`. Это не assertion failure и не успешная native проверка.
+
+Логи этого уточнения: `artifacts/history-ui-direct/`. Storage, IPC и schema
+не менялись. Windows/macOS/Wayland runtime не запускались.
+
+Повтор с отдельным activation scope:
+`XDG_SESSION_ID=cutescreen-history-ui-e2e CUTE_SCREEN_E2E_SCENARIOS=history,history-reopen,history-delete pnpm test:e2e:tauri`.
+Startup, history previews, protection/Escape и reopen прошли, но во время soak
+WebDriver потерял соединение (`ECONNREFUSED`); delete затем не показал карточку.
+Полный native gate этого уточнения не пройден. Лог сохранён как
+`artifacts/history-ui-direct/native-isolated.log`; это ограничение проверки,
+а не доказательство native удаления. Итоговые browser 4/4 и format:check passed.
