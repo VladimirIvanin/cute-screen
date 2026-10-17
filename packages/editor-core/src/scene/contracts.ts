@@ -1,3 +1,4 @@
+import type { RulerPercentBasis } from '../document/types'
 export interface RgbaColor {
   readonly red: number
   readonly green: number
@@ -250,7 +251,7 @@ export interface RenderRulerNode extends RenderNodeBase {
   readonly length: number
   readonly angleDegrees: number
   readonly percent: number
-  readonly percentBasis: 'canvasDiagonal'
+  readonly percentBasis: RulerPercentBasis
   readonly unit: 'pixels' | 'percent'
   readonly label: string
   readonly color: RgbaColor

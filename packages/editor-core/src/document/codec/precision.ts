@@ -5,6 +5,7 @@ import {
   RULER_FONT_SIZE_BOUNDS,
   RULER_THICKNESS_BOUNDS,
   RULER_UNITS,
+  RULER_PERCENT_BASES,
   SPOTLIGHT_FEATHER_PRESETS,
   SPOTLIGHT_SHAPES,
   type CensorLayerPayload,
@@ -184,7 +185,7 @@ export function parseRulerPayload(
   if (!RULER_UNITS.includes(input.unit as (typeof RULER_UNITS)[number])) {
     throw new Error(`${field}.unit is invalid`)
   }
-  if (input.percentBasis !== 'canvasDiagonal') {
+  if (!RULER_PERCENT_BASES.includes(input.percentBasis as RulerLayerPayload['percentBasis'])) {
     throw new Error(`${field}.percentBasis is invalid`)
   }
   const start = parseStrictPoint(input.start, `${field}.start`)
@@ -216,7 +217,7 @@ export function parseRulerPayload(
     start,
     end,
     unit: input.unit as RulerLayerPayload['unit'],
-    percentBasis: 'canvasDiagonal',
+    percentBasis: input.percentBasis as RulerLayerPayload['percentBasis'],
     snapAngleIncrementDegrees: increment,
     color: parseSrgbColor(input.color, `${field}.color`) as unknown as SrgbColor,
     thickness,

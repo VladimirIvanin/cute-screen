@@ -35,6 +35,7 @@ const value = (id: string) => {
   return item && 'value' in item ? String(item.value) : ''
 }
 const disabled = computed(() => Boolean(props.schema.disabled || props.schema.controls.some((item) => item.disabled)))
+const hasRegion = computed(() => Boolean(control('censorRegion')))
 const mode = computed(() => mixed('censorMode') ? undefined : value('censorMode'))
 const numeric = computed(() => {
   const item = control(mode.value === 'pixelate' ? 'censorBlockSize' : 'censorBlurStrength')
@@ -69,7 +70,12 @@ function show(
   shown: boolean,
   restoreFocus = true,
 ): void {
-  if (shown && disabled.value) return
+  if (
+    shown &&
+    (disabled.value ||
+      (menu === 'region' &&
+        !hasRegion.value))
+  ) return
   if (!shown && open.value !== menu) return
   open.value = shown ? menu : undefined
   void nextTick(() => {
@@ -122,6 +128,12 @@ function outside(
   if (event.target instanceof Node && triggers.get(menu)?.contains(event.target)) return
   show(menu, false)
 }
+watch(hasRegion, (available) => {
+  if (!available && open.value === 'region') {
+    show('region', false, false)
+    triggers.delete('region')
+  }
+})
 watch([disabled, mode], () => {
   if (
     open.value &&
@@ -139,6 +151,7 @@ watch([disabled, mode], () => {
     @keydown.enter.stop
   >
     <button
+      v-if="hasRegion"
       :ref="element => { if (element) triggers.set('region', element as HTMLButtonElement) }"
       type="button"
       class="cs-censor-trigger cs-censor-region"

@@ -158,8 +158,8 @@ export function createSessionController(context: SessionControllerContext) {
         syncLayerSummaries(context, context.activeDocument.value)
       }
     },
-    undoDocument: () => context.props.documentSession?.undo(),
-    redoDocument: () => context.props.documentSession?.redo(),
+    undoDocument: () => context.props.readOnlyDocument ? undefined : context.props.documentSession?.undo(),
+    redoDocument: () => context.props.readOnlyDocument ? undefined : context.props.documentSession?.redo(),
     retryDocumentSave: () => void context.props.documentSession?.retry(),
     exportDocumentRecovery: async () => {
       const outcome = await context.props.documentSession?.exportRecoveryBundle()

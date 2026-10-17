@@ -72,10 +72,13 @@ export class ImageResourceManager<T> {
     const entry = cached ?? (await this.#loadOnce(key))
     entry.references += 1
     entry.lastUsed = Date.now()
+    this.#evict()
+    let released = false
     return {
       value: entry.resource.value,
       release: () => {
-        if (entry.references === 0) return
+        if (released) return
+        released = true
         entry.references -= 1
         entry.lastUsed = Date.now()
         this.#evict()
@@ -113,7 +116,6 @@ export class ImageResourceManager<T> {
         this.#entries.set(serialized, entry)
         this.#bytes += resource.byteSize
         this.#pending.delete(serialized)
-        this.#evict()
         return entry
       })
       .catch((error: unknown) => {

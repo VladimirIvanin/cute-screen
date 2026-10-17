@@ -76,7 +76,9 @@ export const config: WebdriverIO.Config = {
   connectionRetryCount: 1,
   mochaOpts: {
     ui: 'bdd',
-    timeout: process.env.CUTE_SCREEN_REFERENCE_PASS ? 180_000 : 60_000,
+    timeout: process.env.CUTE_SCREEN_E2E_SCENARIO === 'history'
+      ? 300_000
+      : process.env.CUTE_SCREEN_REFERENCE_PASS ? 180_000 : 60_000,
   },
   beforeSuite: async () => {
     // Service setup is complete, and suite fixtures still see the main WebView.

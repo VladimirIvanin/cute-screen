@@ -36,7 +36,7 @@ export function createFlipCanvasCommand(
       },
     } as LayerNode
     if (reflected.kind === 'ruler') {
-      return rebaseRulerLayer(reflected, reflected.payload, document.canvas)
+      return rebaseRulerLayer(reflected, reflected.payload, document.crop ?? document.canvas)
     }
     if (reflected.kind !== 'loupe') return reflected
     const source = reflected.payload.sourceRegion

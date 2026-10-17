@@ -27,6 +27,72 @@ export type OpenDocument = {
   imageToken?: string
 }
 
+export type HistoryPolicy = { days: number; maxMib: number; maxCaptures: number }
+
+export type HistoryViewport = { zoom: number; mode: string; scrollLeft: number; scrollTop: number }
+
+export type HistoryCursor = { capturedAt: number; captureId: string }
+
+export type RecentCapture = {
+  captureId: string
+  documentId: string
+  capturedAt: number
+  revision: number
+  width: number
+  height: number
+  protected: boolean
+  legacyPending: boolean
+  hasThumbnail: boolean
+}
+
+export type HistoryPage = { items: Array<RecentCapture>; nextCursor: HistoryCursor | null }
+
+export type StorageReport = {
+  originalsBytes: number
+  documentsBytes: number
+  cacheBytes: number
+  databaseBytes: number
+  databaseReusableBytes: number
+  totalBytes: number
+  captureCount: number
+  protectedCount: number
+  legacyPendingCount: number
+  overLimit: boolean
+}
+
+export type CleanupPlan = {
+  token: string
+  captureIds: Array<string>
+  reclaimableBytes: number
+  clearCache: boolean
+  includeLegacy: boolean
+  legacyCount: number
+}
+
+export type HistoryRequest =
+  | { kind: 'list'; cursor: HistoryCursor | null }
+  | { kind: 'open'; captureId: string }
+  | { kind: 'activate'; captureId: string }
+  | { kind: 'release'; captureId: string }
+  | { kind: 'saveViewport'; captureId: string; viewport: HistoryViewport }
+  | { kind: 'protect'; captureId: string; protected: boolean }
+  | { kind: 'report' }
+  | { kind: 'policy' }
+  | { kind: 'setPolicy'; policy: HistoryPolicy }
+  | { kind: 'preview'; captureIds: Array<string> | null; includeLegacy: boolean; clearCache: boolean }
+  | { kind: 'commit'; token: string }
+  | { kind: 'maintain' }
+  | { kind: 'deactivate' }
+
+export type HistoryResponse =
+  | { kind: 'page'; page: HistoryPage }
+  | { kind: 'opened'; document: OpenDocument; viewport: HistoryViewport | null }
+  | { kind: 'report'; report: StorageReport }
+  | { kind: 'policy'; policy: HistoryPolicy }
+  | { kind: 'plan'; plan: CleanupPlan }
+  | { kind: 'cleaned'; freedBytes: number; removedCount: number; report: StorageReport }
+  | { kind: 'done' }
+
 export type CaptureOutcomeV2 = {
   version: 2
   correlationId: string

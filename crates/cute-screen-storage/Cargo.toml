@@ -22,6 +22,4 @@ ts-rs = "=12.0.1"
 tokio = { version = "=1.53.1", features = ["rt", "sync"] }
 uuid = { version = "=1.24.0", features = ["v7", "serde"] }
 zip = { version = "=6.0.0", default-features = false, features = ["deflate"] }
-
-[dev-dependencies]
 tempfile = "=3.27.0"

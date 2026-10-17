@@ -9,6 +9,10 @@ pub fn open_shortcuts<R: Runtime>(app: &tauri::AppHandle<R>) -> Result<(), Strin
     open_section(app, false, true)
 }
 
+pub fn open_history<R: Runtime>(app: &tauri::AppHandle<R>) -> Result<(), String> {
+    open_query(app, "index.html?settings=history")
+}
+
 fn settings_query(first_run: bool, shortcuts: bool) -> &'static str {
     if first_run {
         "index.html?settings=shortcuts&firstRun=1"
@@ -24,6 +28,10 @@ fn open_section<R: Runtime>(
     first_run: bool,
     shortcuts: bool,
 ) -> Result<(), String> {
+    open_query(app, settings_query(first_run, shortcuts))
+}
+
+fn open_query<R: Runtime>(app: &tauri::AppHandle<R>, query: &str) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("settings") {
         window
             .show()
@@ -32,7 +40,6 @@ fn open_section<R: Runtime>(
             .map_err(|error| error.to_string())?;
         return Ok(());
     }
-    let query = settings_query(first_run, shortcuts);
     let window = WebviewWindowBuilder::new(app, "settings", WebviewUrl::App(query.into()))
         .title("Cute Screen — Settings")
         .inner_size(820.0, 720.0)

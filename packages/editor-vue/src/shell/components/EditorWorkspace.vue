@@ -27,6 +27,7 @@ import {
 } from '../contracts'
 import { useEditorWorkspace } from '../workspace/use-editor-workspace'
 
+defineSlots<{ history(props: { locale: 'ru' | 'en' }): unknown }>()
 const props = defineProps(editorShellRuntimeProps)
 const emit = defineEmits(editorShellRuntimeEmits)
 const {
@@ -126,6 +127,20 @@ function onTextCancelled(): void {
   cancelTextDefaults()
   selectTool('select')
 }
+defineExpose({
+  prepareNavigation: () => new Promise<{ zoom: number; mode: 'fit' | 'custom' }>((resolve) => {
+    const finish = () => {
+      canvasViewport.value?.applyCropDraft()
+      resolve({ zoom: store.zoom, mode: store.zoomMode })
+    }
+    if (canvasViewport.value) canvasViewport.value.finishTextEditing(finish)
+    else finish()
+  }),
+  restoreZoom: (viewport: { zoom: number; mode: string }) => {
+    store.setZoom(viewport.zoom)
+    if (viewport.mode === 'fit') store.enableFit()
+  },
+})
 </script>
 
 <template>
@@ -150,9 +165,9 @@ function onTextCancelled(): void {
         "
         :locale="store.locale"
         :theme="store.preferences.theme"
-        :can-copy-or-export="store.canCopyOrExport"
-        :can-undo="store.documentHistory.canUndo"
-        :can-redo="store.documentHistory.canRedo"
+        :can-copy-or-export="store.canCopyOrExport && !props.readOnlyDocument"
+        :can-undo="store.documentHistory.canUndo && !props.readOnlyDocument"
+        :can-redo="store.documentHistory.canRedo && !props.readOnlyDocument"
         :save-state="store.documentHistory.saveState"
         :save-error="store.documentHistory.error"
         :pending="store.actionState.status === 'pending'"
@@ -266,12 +281,14 @@ function onTextCancelled(): void {
           </div>
         </div>
         <div v-else-if="!props.quickMode" class="cs-bottom-chrome">
-          <SeriesFilmstrip
-            :frames="store.frames"
-            :active-frame-id="store.activeFrameId"
-            :t="translate"
-            @select="store.selectFrame"
-          />
+          <slot name="history" :locale="state.locale.value">
+            <SeriesFilmstrip
+              :frames="store.frames"
+              :active-frame-id="store.activeFrameId"
+              :t="translate"
+              @select="store.selectFrame"
+            />
+          </slot>
           <div class="cs-bottom-chrome-center">
             <ContextToolbar
               v-if="creationSchema && !samplingControl"

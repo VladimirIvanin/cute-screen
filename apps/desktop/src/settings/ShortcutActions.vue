@@ -49,7 +49,7 @@ function onKey(event: KeyboardEvent): void {
     return
   }
   if (event.key === 'Tab') {
-    close()
+    close(true)
     return
   }
   if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
@@ -98,10 +98,17 @@ onBeforeUnmount(() => {
       :aria-label="`${labels.actions}: ${name}`"
       @keydown="onKey"
     >
-      <button role="menuitem" @click="select('test')">{{ labels.test }}</button>
+      <button
+        role="menuitem"
+        tabindex="-1"
+        @click="select('test')"
+      >
+        {{ labels.test }}
+      </button>
       <button
         v-if="!manual"
         role="menuitem"
+        tabindex="-1"
         @click="select('remove')"
       >
         {{ labels.remove }}

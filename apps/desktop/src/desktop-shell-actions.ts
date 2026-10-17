@@ -19,7 +19,8 @@ export interface DesktopShellActionPorts {
   readonly documentSession: ShallowRef<DocumentSessionController | undefined>
   readonly platformCapabilities: ShallowRef<PlatformCapabilities | undefined>
   readonly correlationId: () => string
-  readonly mountCapturedDocument: () => Promise<boolean>
+  readonly prepareDocumentChange?: () => Promise<void>
+  readonly mountCapturedDocument: (captureId?: string) => Promise<boolean>
 }
 
 export function createDesktopShellActions(ports: DesktopShellActionPorts): ShellActionAdapter | undefined {
@@ -36,6 +37,7 @@ async function runDesktopAction(
   reportProgress: ProgressReporter,
 ): Promise<string> {
   if (action === 'copy') return copyRenderedResult(ports, signal)
+  await ports.prepareDocumentChange?.()
   const flush = await ports.documentSession.value?.flush()
   if (flush?.kind === 'failed') throw new Error(flush.error)
   if (action === 'openImage') return openImage(ports, signal)
@@ -70,7 +72,7 @@ async function openImage(
   if (signal.aborted || outcome.kind === 'cancelled') {
     throw new ActionCancelledError('Open image cancelled')
   }
-  if (!(await ports.mountCapturedDocument())) {
+  if (!(await ports.mountCapturedDocument(outcome.document.captureId))) {
     throw new Error('Image was saved, but the editor could not open it')
   }
   return 'Image opened'
@@ -143,7 +145,7 @@ async function handleCaptureOutcome(
   outcome: CaptureOutcomeV2,
 ): Promise<string> {
   if (outcome.outcome === 'captured') {
-    if (!(await ports.mountCapturedDocument())) {
+    if (!(await ports.mountCapturedDocument(outcome.document?.captureId))) {
       throw new Error('Capture was saved, but the editor could not open it')
     }
     return 'Capture opened'

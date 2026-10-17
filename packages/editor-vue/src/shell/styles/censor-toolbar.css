@@ -59,6 +59,14 @@
   padding: 0 var(--cs-censor-gap);
   border-inline: 1px solid var(--border);
 }
+.cs-censor-effects:first-child {
+  padding-inline-start: 0;
+  border-inline-start: 0;
+}
+.cs-censor-effects:last-child {
+  padding-inline-end: 0;
+  border-inline-end: 0;
+}
 .cs-censor-effect {
   flex-direction: column;
   gap: 2px;

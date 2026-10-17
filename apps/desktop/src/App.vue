@@ -11,12 +11,9 @@ import {
   DocumentSessionCoordinator,
   EditorShell,
   describeError,
-  loadImageWithBinaryFallback,
-  parsePersistedDocument,
   shortcutLetter,
   type CaptureProgressState,
   type CanvasViewportHosts,
-  type FrameSummary,
   type EditorDocumentV1,
   type PlatformCapabilities,
   type ShellActionAdapter,
@@ -26,6 +23,12 @@ import {
   type ContentImageBridge,
   type ClipboardBridge,
 } from '@cute-screen/editor-vue'
+import HistoryPopover from './history/HistoryPopover.vue'
+import {
+  nativeHistory,
+} from './history/bridge'
+import { createHistoryDocumentLoader } from './history/document-loader'
+import { HistoryNavigation } from './history/navigation'
 import { runEditorStartup } from './editor-startup'
 import { EditorFirstFrameGate } from './editor-first-frame'
 import { readAppHarnessConfig } from './app-harness-config'
@@ -96,11 +99,19 @@ const testActions: ShellActionAdapter | undefined =
       }
     : undefined
 
+const shell = shallowRef<InstanceType<typeof EditorShell>>()
+const historyActiveCaptureId = shallowRef<string>()
+const historyBusy = shallowRef(false)
+const historyError = shallowRef<string>()
+const historyNavigation = new HistoryNavigation()
+let maintenanceTimer: ReturnType<typeof setTimeout> | undefined
+let periodicMaintenance: ReturnType<typeof setInterval> | undefined
+let disposedHistory = false
+let stopHistorySession: (() => void) | undefined
 const documentSession = shallowRef<DocumentSessionController>()
 const documentCoordinator = shallowRef<DocumentSessionCoordinator>()
 const platformCapabilities = shallowRef<PlatformCapabilities>()
 const captureProgress = shallowRef<CaptureProgressState>()
-const seriesFrames = shallowRef<readonly FrameSummary[]>([])
 const sourceImage = shallowRef<HTMLImageElement>()
 const textureBridge = shallowRef<TextureFillBridge>()
 const contentImageBridge = shallowRef<ContentImageBridge>()
@@ -122,6 +133,7 @@ const desktopActions: ShellActionAdapter | undefined =
         platformCapabilities,
         correlationId,
         mountCapturedDocument,
+        prepareDocumentChange: prepareHistory,
       })
 const editorFirstFrame = new EditorFirstFrameGate()
 let capturedDocumentMount: Promise<boolean> | undefined
@@ -153,6 +165,52 @@ function onCanvasViewportHostsReady(hosts: CanvasViewportHosts): void {
 
 function onEditorFrameReady(): void {
   editorFirstFrame.frameReady()
+  scheduleHistoryMaintenance()
+}
+
+function scheduleHistoryMaintenance(): void {
+  if (!('__TAURI_INTERNALS__' in window) || disposedHistory) return
+  clearTimeout(maintenanceTimer)
+  maintenanceTimer = setTimeout(() => {
+    if (historyBusy.value || disposedHistory) return
+    void nativeHistory.request({ kind: 'maintain' }).then(() => {
+      historyError.value = undefined
+    }).catch((error) => {
+      historyError.value = describeError(error, 'History cleanup failed')
+      console.warn('cute-screen history maintenance failed', error)
+    })
+  }, 1000)
+}
+
+async function prepareHistory(): Promise<void> {
+  const zoom = await shell.value?.prepareNavigation()
+  const flush = await documentSession.value?.flush()
+  if (flush?.kind === 'failed') throw new Error(flush.error)
+  const scroll = canvasViewportHosts.value?.scrollContainer
+  if (historyActiveCaptureId.value && zoom) {
+    await nativeHistory.request({ kind: 'saveViewport', captureId: historyActiveCaptureId.value, viewport: {
+      ...zoom, scrollLeft: scroll?.scrollLeft ?? 0, scrollTop: scroll?.scrollTop ?? 0,
+    } })
+  }
+}
+
+async function selectHistoryCapture(id: string | null): Promise<boolean> {
+  return historyNavigation.run(async (isCurrent) => {
+    await prepareHistory()
+    if (!isCurrent()) return false
+    historyBusy.value = true
+    try {
+      if (!id) {
+        await historyLoader.clear()
+        return true
+      }
+      const loaded = await historyLoader.load(id, isCurrent)
+      if (!loaded && isCurrent()) throw new Error(historyError.value ?? 'Unable to open capture')
+      return loaded
+    } finally {
+      historyBusy.value = false
+    }
+  })
 }
 
 async function refreshPlatformCapabilities(): Promise<void> {
@@ -177,100 +235,47 @@ async function loadSystemFonts(): Promise<void> {
   }
 }
 
-async function loadPersistedDocument(): Promise<boolean> {
+function onHistoryDocumentMounted(): void {
+  m08HarnessController.installFacade()
+  if (m03Harness) {
+    window.__cuteScreenE2eDocument = {
+      setCrop: () => {
+        const active = documentSession.value
+        if (!active) throw new Error('M03 session is not ready')
+        active.execute({
+          type: 'setCrop',
+          before: active.snapshot.core.document.crop,
+          after: { x: 0, y: 0, width: 120, height: 80 },
+        })
+      },
+      snapshot: () => {
+        const active = documentSession.value
+        return active
+          ? {
+              crop: active.snapshot.core.document.crop,
+              layers: active.snapshot.core.document.layers,
+              saveState: active.snapshot.saveState,
+            }
+          : undefined
+      },
+    }
+  }
+}
+
+const historyLoader = createHistoryDocumentLoader({
+  session: documentSession, coordinator: documentCoordinator, state: documentState, readOnly: readOnlyDocument,
+  source: sourceImage, activeId: historyActiveCaptureId, error: historyError, shell, hosts: canvasViewportHosts,
+  createCoordinator: createDocumentCoordinator, close: closeDocumentSession, mounted: onHistoryDocumentMounted,
+})
+
+async function loadPersistedDocument(captureId?: string): Promise<boolean> {
   if (
     import.meta.env.VITE_TEST_HARNESS === 'true' &&
       !m03Harness &&
       !m04CaptureHarness
   ) return true
-  documentState.value = { kind: 'loading' }
-  readOnlyDocument.value = false
-  try {
-    // Keep the native API out of browser-mode bundles: merely evaluating the
-    // Tauri bridge is not supported by all test WebViews.
-    const { tauriDesktopBridge } = await import('./desktop-bridge')
-    const record = await tauriDesktopBridge.repositoryOpenLast(correlationId())
-    if (!record) {
-      await closeDocumentSession()
-      documentState.value = { kind: 'empty' }
-      return false
-    }
-    const frames = await tauriDesktopBridge.repositoryListActiveSeriesFrames(correlationId())
-    seriesFrames.value = frames.map((frame, index) => ({
-      id: frame.captureId,
-      label: String(index + 1),
-      selected: frame.captureId === record.captureId,
-    }))
-    const parsed = parsePersistedDocument(record)
-    if (record.imageToken) {
-      await loadImageWithBinaryFallback({
-        token: record.imageToken,
-        correlationId: correlationId(),
-        bridge: tauriDesktopBridge,
-        createResource: async (image) => {
-          sourceImage.value = image
-          return image
-        },
-      })
-    } else {
-      sourceImage.value = undefined
-    }
-    if (parsed.kind !== 'editable') {
-      await closeDocumentSession()
-      readOnlyDocument.value = true
-      documentState.value = {
-        kind: 'ready',
-        title: `Document ${record.documentId.slice(0, 8)}`,
-        dimensions: 'Compatibility mode',
-      }
-      return true
-    }
-    const incoming = {
-      documentId: record.documentId,
-      document: parsed.document,
-      revision: record.revision,
-    }
-    const coordinator = documentCoordinator.value
-    if (coordinator) {
-      const handoff = await coordinator.handoff(incoming)
-      if (handoff.kind === 'failed') throw new Error(handoff.flush.error)
-    } else {
-      const created = createDocumentCoordinator(tauriDesktopBridge)
-      created.openInitial(incoming)
-      documentCoordinator.value = created
-    }
-    m08HarnessController.installFacade()
-    if (m03Harness) {
-      window.__cuteScreenE2eDocument = {
-        setCrop: () => {
-          const active = documentSession.value
-          if (!active) throw new Error('M03 session is not ready')
-          active.execute({
-            type: 'setCrop',
-            before: active.snapshot.core.document.crop,
-            after: { x: 0, y: 0, width: 120, height: 80 },
-          })
-        },
-        snapshot: () => {
-          const active = documentSession.value
-          return active
-            ? {
-                crop: active.snapshot.core.document.crop,
-                layers: active.snapshot.core.document.layers,
-                saveState: active.snapshot.saveState,
-              }
-            : undefined
-        },
-      }
-    }
-    return true
-  } catch (error) {
-    documentState.value = {
-      kind: 'error',
-      message: describeError(error, 'Unable to open the saved document.'),
-    }
-    return false
-  }
+  historyNavigation.cancel()
+  return historyLoader.load(captureId)
 }
 
 async function pasteClipboardIntoEmptyDocument(): Promise<void> {
@@ -279,7 +284,7 @@ async function pasteClipboardIntoEmptyDocument(): Promise<void> {
     const { tauriDesktopBridge } = await import('./desktop-bridge')
     const outcome = await tauriDesktopBridge.clipboardOpenImage(correlationId())
     if (outcome.kind !== 'opened') return
-    await mountCapturedDocument()
+    await mountCapturedDocument(outcome.document.captureId)
   } catch (error) {
     console.warn('cute-screen empty clipboard image paste failed', error)
   }
@@ -318,9 +323,9 @@ async function mountM05HarnessDocument(): Promise<void> {
 }
 
 /** Shares the native outcome event and the command response for one capture. */
-async function mountCapturedDocument(): Promise<boolean> {
+async function mountCapturedDocument(captureId?: string): Promise<boolean> {
   if (capturedDocumentMount) return capturedDocumentMount
-  const mount = loadPersistedDocument()
+  const mount = loadPersistedDocument(captureId)
   capturedDocumentMount = mount
   try {
     return await mount
@@ -349,7 +354,11 @@ function createDocumentCoordinator(
     },
     correlationId,
     onActiveSession: (session) => {
+      stopHistorySession?.()
       documentSession.value = session
+      stopHistorySession = session?.subscribe((snapshot) => {
+        if (snapshot.saveState === 'saved') scheduleHistoryMaintenance()
+      })
     },
   })
 }
@@ -364,8 +373,14 @@ async function closeDocumentSession(): Promise<void> {
 }
 
 async function flushBeforeLifecycleAction(): Promise<boolean> {
-  const outcome = await documentSession.value?.flush()
-  return outcome?.kind !== 'failed'
+  if (historyBusy.value) return false
+  try {
+    await prepareHistory()
+    return true
+  } catch (error) {
+    historyError.value = describeError(error, 'Unable to save the current document')
+    return false
+  }
 }
 
 async function installLifecycleGuards(): Promise<void> {
@@ -383,6 +398,7 @@ async function installLifecycleGuards(): Promise<void> {
 
 onMounted(() => {
   window.addEventListener('keydown', onWindowClipboardKeydown)
+  periodicMaintenance = setInterval(scheduleHistoryMaintenance, 3_600_000)
   void (async () => {
     if ('__TAURI_INTERNALS__' in window) {
       const { tauriDesktopBridge } = await import('./desktop-bridge')
@@ -411,10 +427,17 @@ onMounted(() => {
       refreshPlatformCapabilities,
       installLifecycleGuards,
     })
+    scheduleHistoryMaintenance()
   })()
 })
 
 onBeforeUnmount(() => {
+  disposedHistory = true
+  clearTimeout(maintenanceTimer)
+  clearInterval(periodicMaintenance)
+  stopHistorySession?.()
+  historyNavigation.cancel()
+  historyLoader.dispose()
   window.removeEventListener('keydown', onWindowClipboardKeydown)
   if ('__TAURI_INTERNALS__' in window) {
     void import('./desktop-bridge').then(({ tauriDesktopBridge }) =>
@@ -431,17 +454,17 @@ onBeforeUnmount(() => {
   <component :is="M05ReferencePerformance" v-if="m05ReferencePerfHarness && M05ReferencePerformance" />
   <EditorShell
     v-else
+    ref="shell"
     :fixture="fixture"
     :initial-document-state="initialDocumentState"
-    :read-only-document="readOnlyDocument"
+    :read-only-document="readOnlyDocument || historyBusy"
     :document-session="documentSession"
     :actions="desktopActions"
-    :capture-available="captureAvailable"
-    :capture-window-available="captureWindowAvailable"
-    :open-image-available="openImageAvailable"
+    :capture-available="captureAvailable && !historyBusy"
+    :capture-window-available="captureWindowAvailable && !historyBusy"
+    :open-image-available="openImageAvailable && !historyBusy"
     :capture-fallback-command="captureFallbackCommand"
     :capture-progress="captureProgress"
-    :frames="seriesFrames"
     :source-image="sourceImage"
     :texture-bridge="textureBridge"
     :content-image-bridge="contentImageBridge"
@@ -450,5 +473,19 @@ onBeforeUnmount(() => {
     @hosts-ready="onCanvasViewportHostsReady"
     @frame-ready="onEditorFrameReady"
     @retry-load="loadPersistedDocument"
-  />
+  >
+    <template v-if="openImageAvailable" #history="{ locale }">
+      <HistoryPopover
+        :bridge="nativeHistory"
+        :active-id="historyActiveCaptureId"
+        :locale="locale"
+        :open-capture="selectHistoryCapture"
+        :prepare="prepareHistory"
+        :cancel-navigation="() => historyNavigation.cancel()"
+        :maintenance-error="historyError"
+        :busy="historyBusy"
+        @retry-maintenance="scheduleHistoryMaintenance"
+      />
+    </template>
+  </EditorShell>
 </template>

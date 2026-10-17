@@ -20,6 +20,19 @@ await mkdir(runtimeDirectory, { recursive: true })
 const embeddedWebDriverPort = Number.parseInt(process.env.TAURI_WEBDRIVER_PORT ?? '4445', 10)
 
 const scenarios = [
+  { id: 'history', persistenceGroup: 'history', spec: 'tests/e2e/specs/tauri-history.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true },
+  { id: 'history-reopen', persistenceGroup: 'history', spec: 'tests/e2e/specs/tauri-history-reopen.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true },
+  { id: 'history-delete', persistenceGroup: 'history', spec: 'tests/e2e/specs/tauri-history-delete.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true },
+  {
+    id: 'ruler-toolbar', persistenceGroup: 'ruler-toolbar',
+    spec: 'tests/e2e/specs/tauri-ruler-toolbar.e2e.ts',
+    harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external',
+  },
+  {
+    id: 'ruler-toolbar-reopen', persistenceGroup: 'ruler-toolbar',
+    spec: 'tests/e2e/specs/tauri-ruler-toolbar-reopen.e2e.ts',
+    harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external',
+  },
   {
     id: 'ruler-shift',
     spec: 'tests/e2e/specs/tauri-ruler-shift.e2e.ts',
@@ -149,6 +162,8 @@ const scenarios = [
     spec: 'tests/e2e/specs/tauri-censor-toolbar.e2e.ts',
     harnessQuery: '?m04=1&m08=1',
     fakeCapture: true,
+    driverProvider: 'external',
+    contextInput: process.platform === 'linux' && process.env.XDG_SESSION_TYPE === 'x11' ? 'x11' : 'webdriver',
   },
   {
     id: 'shape-defaults-placement',

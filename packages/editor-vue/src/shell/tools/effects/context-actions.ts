@@ -1,5 +1,9 @@
 import { createPrecisionActions } from './precision-actions'
-import type { Ref } from 'vue'
+import {
+  watch,
+  onBeforeUnmount,
+  type Ref,
+} from 'vue'
 import {
   createFlipCanvasCommand,
   type CropPreset,
@@ -67,6 +71,16 @@ function importedShapePayload(
 export function createContextActions(context: ContextActionsContext) {
   const precisionActions = createPrecisionActions(context)
   let textureResolver: TextureResourceResolver | undefined
+  let documentId: string | undefined
+  let generation = 0
+  onBeforeUnmount(() => textureResolver?.clear())
+  watch(context.activeDocument, (document) => {
+    if (document) return
+    textureResolver?.clear()
+    context.textureImages.value = new Map()
+    documentId = undefined
+    generation += 1
+  }, { flush: 'sync' })
   function resolver(): TextureResourceResolver | undefined {
     if (!context.props.textureBridge)
       return undefined
@@ -102,9 +116,17 @@ export function createContextActions(context: ContextActionsContext) {
     const resources = resolver()
     if (!resources)
       return
+    if (documentId !== document.id) {
+      documentId = document.id
+      generation += 1
+      resources.clear()
+      context.textureImages.value = new Map()
+    }
+    const currentGeneration = generation
     const images = new Map(context.textureImages.value)
     for (const blobHash of documentTextureHashes(document)) {
       const resource = await resources.resolve(blobHash)
+      if (currentGeneration !== generation) return
       if (resource.kind === 'ready')
         images.set(blobHash, resource.image)
       else {

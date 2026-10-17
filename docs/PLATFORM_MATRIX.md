@@ -1,5 +1,15 @@
 # Платформенная матрица
 
+## Понятные настройки линейки (2026-10-17, ADR-076)
+
+Linux x86_64/X11: Chrome 154.0.8037.57 — 2 browser scenarios passed,
+2560×1440 document, четыре режима, crop/history и RU/EN × light/dark при 1024 px.
+Wry 0.55.1/WebKitGTK с external driver — production Capture → Quick → Editor
+и отдельный restart passed; unit/core/decoded renderer и existing perf gates
+прошли. Native fake source — 400×300; native большие изображения, physical capture,
+Windows/macOS и Wayland portal runtime не проверялись. Общий check в shared workspace
+имеет отдельные blockers из параллельной разработки history; результаты — TESTING.md.
+
 ## Shift для линейки (2026-10-17, ADR-074)
 
 Linux x86_64, Chrome 154.0.8037.57: обе Shift, key-only preview, endpoints,
@@ -874,3 +884,34 @@ Runtime evidence для изменения фиксируется в TESTING.md;
   финального native прогона и decoded capture — TESTING.md.
 - Windows/macOS/Wayland: новых runtime/support claims нет. Existing
   platform-owned registration и first-run autostart contracts сохраняются.
+
+## Форма скрытия данных до рисования (2026-10-17, ADR-077)
+
+Linux x86_64 / X11, Chrome 154.0.8037.57: 34 Vue checks и 9 browser scenarios
+passed. Обычный pointer input создаёт rectangle, затем freeform; selection
+не содержит переключателя формы, предыдущий объект и undo/redo сохраняются.
+RU/EN × light/dark, 1024 px и defaults matrix 1024/1440 px × DPR 1/2;
+PNG панелей RU light/dark просмотрены.
+
+Native Wry 0.55.1/WebKitGTK не подтверждает рисование в этом окружении:
+WebDriver Actions доставляет только MouseEvent, системный X11 ввод —
+mousedown/pointerup без pointerdown (trace сохранена). Regression явно pending
+при отсутствии pointerdown; UI/settings checks считаются отдельно. Изолированная
+сборка использует тот же censor source, без параллельных Rust history changes.
+Fake capture 400×300 не доказывает physical capture. Windows/macOS/Wayland
+для этой правки не проверялись. Команды, хеши и ограничения — TESTING.md,
+`artifacts/censor-toolbar/creation-only-*`.
+
+## Временная история · ADR-078 · 2026-10-17
+
+Ubuntu 24.04.5 / Linux x86_64 / X11: Chrome 154 проверяет popover/settings
+RU/EN, light/dark на 1600×1000, 1280×720 и 1024×700, virtualized каталог
+1000 записей и saved-result worker previews. Реальный Tauri/WebKitGTK 605.1.15
+использует production Capture → Quick → Editor, SQLite и binary IPC с
+4K fake backend; физический захват этим не подтверждается.
+Native restart/deletion и 200-switch RSS evidence фиксируются в TESTING.md.
+
+Storage migration 4 и document schema v7 проверяются Rust tests. Прежняя
+библиотека не подвергается автоудалению до consent preview. Windows/macOS/
+Wayland runtime для истории остаётся pending по ADR-020. Reference-hardware
+performance claims не добавлены; renderer cache budget не равен всему RSS.

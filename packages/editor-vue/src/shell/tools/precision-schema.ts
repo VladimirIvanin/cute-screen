@@ -77,23 +77,25 @@ function censorSchema(
     title: translate('toolPrivacy'),
     hint: precisionText('Drag to hide data manually', 'Потяните, чтобы скрыть данные вручную'),
     controls: [
-      {
-        kind: 'select',
-        id: 'censorRegion',
-        label: precisionText('Region shape', 'Форма области'),
-        value: layer?.payload.region.kind ?? defaults.censor.region,
-        disabled: controlsDisabled,
-        options: [
-          {
-            value: 'rectangle',
-            label: precisionText('Rectangle', 'Прямоугольник'),
-          },
-          {
-            value: 'freeform',
-            label: precisionText('Freeform outline', 'Свободный контур'),
-          },
-        ],
-      },
+      ...(layer ? [] : [
+        {
+          kind: 'select' as const,
+          id: 'censorRegion',
+          label: precisionText('Region shape', 'Форма области'),
+          value: defaults.censor.region,
+          disabled: controlsDisabled,
+          options: [
+            {
+              value: 'rectangle',
+              label: precisionText('Rectangle', 'Прямоугольник'),
+            },
+            {
+              value: 'freeform',
+              label: precisionText('Freeform outline', 'Свободный контур'),
+            },
+          ],
+        },
+      ]),
       {
         kind: 'select',
         id: 'censorMode',
@@ -248,10 +250,16 @@ function rulerSchema(
   const precisionText = (english: string, russian: string) => localizedText(context, english, russian)
   const layer = selected?.kind === 'ruler' ? selected : undefined
   const controlsDisabled = props.readOnlyDocument || !activeDocument.value || Boolean(layer?.locked)
+  const document = activeDocument.value
+  const area = document?.crop ?? document?.canvas
+  const measurement = layer && area ? measureRuler(layer, area) : undefined
   return {
     toolSettings: {
-      kind: 'ruler', measurement: layer && activeDocument.value ? {
-        length: measureRuler(layer, activeDocument.value.canvas).label, angle: `${measureRuler(layer, activeDocument.value.canvas).angleDegrees.toFixed(1)}°`,
+      kind: 'ruler',
+      measurementArea: area ? { width: area.width, height: area.height, cropped: Boolean(document?.crop) } : undefined,
+      measurement: measurement ? {
+        length: measurement.label,
+        angle: `${measurement.angleDegrees.toFixed(1)}°`,
       } : undefined,
     },
     icon: 'ruler',
@@ -299,6 +307,19 @@ function rulerSchema(
           {
             value: 'percent', label: precisionText('Percent', 'Проценты'),
           },
+        ],
+      },
+      {
+        kind: 'select',
+        id: 'rulerMeasurementMode',
+        label: precisionText('Measurement units', 'Единицы измерения'),
+        value: (layer?.payload.unit ?? defaults.ruler.unit) === 'pixels' ? 'pixels' : (layer?.payload.percentBasis ?? defaults.ruler.percentBasis),
+        disabled: controlsDisabled,
+        options: [
+          { value: 'pixels', label: precisionText('Pixels', 'Пиксели') },
+          { value: 'canvasWidth', label: precisionText('% of width', '% ширины') },
+          { value: 'canvasHeight', label: precisionText('% of height', '% высоты') },
+          { value: 'canvasDiagonal', label: precisionText('% of diagonal', '% диагонали') },
         ],
       },
       {

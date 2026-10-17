@@ -60,3 +60,43 @@ describe('M03 image resource manager', () => {
     ).toMatchObject({ variant: 'original' })
   })
 })
+
+describe('history resource ownership', () => {
+  it('never returns an evicted image when a live lease already exceeds the budget', async () => {
+    const disposed: string[] = []
+    const manager = new ImageResourceManager({
+      byteBudget: 100,
+      load: async (key) => ({
+        value: key.blobHash,
+        byteSize: 120,
+        dispose: () => {
+          disposed.push(key.blobHash)
+        },
+      }),
+    })
+    const key = { blobHash: 'a', variant: 'original' as const, colorProfile: 'srgb' }
+    const first = await manager.acquire(key)
+    const second = await manager.acquire({ ...key, blobHash: 'b' })
+    expect(disposed).toEqual([])
+    first.release()
+    expect(disposed).toEqual(['a'])
+    second.release()
+    expect(manager.bytesInUse).toBeLessThanOrEqual(100)
+  })
+  it('releases each lease only once', async () => {
+    const dispose = vi.fn()
+    const manager = new ImageResourceManager({
+      byteBudget: 100,
+      load: async () => ({ value: true, byteSize: 80, dispose }),
+    })
+    const key = { blobHash: 'a', variant: 'original' as const, colorProfile: 'srgb' }
+    const a = await manager.acquire(key)
+    const b = await manager.acquire(key)
+    a.release()
+    a.release()
+    const c = await manager.acquire({ ...key, blobHash: 'c' })
+    expect(dispose).not.toHaveBeenCalled()
+    b.release()
+    c.release()
+  })
+})

@@ -20,14 +20,16 @@ const harnessParams = new URLSearchParams(harnessSearch)
 const isM01Harness = import.meta.env.VITE_M01_HARNESS === 'true' && harnessParams.get('m01') === '1'
 
 const isQuickCapture = new URLSearchParams(window.location.search).get('quickCapture') === '1'
-const isSettings = ['shortcuts', 'general'].includes(new URLSearchParams(window.location.search).get('settings') ?? '')
-const Root = isM01Harness
-  ? (await import('./M01Harness.vue')).default
-  : isQuickCapture
-    ? (await import('./QuickCaptureApp.vue')).default
-    : isSettings
-      ? (await import('./SettingsApp.vue')).default
-      : (await import('./App.vue')).default
+const isSettings = ['shortcuts', 'general', 'history'].includes(new URLSearchParams(window.location.search).get('settings') ?? '')
+const Root = import.meta.env.VITE_TEST_HARNESS === 'true' && harnessParams.get('historyHarness') === '1'
+  ? (await import('./HistoryHarness.vue')).default
+  : isM01Harness
+    ? (await import('./M01Harness.vue')).default
+    : isQuickCapture
+      ? (await import('./QuickCaptureApp.vue')).default
+      : isSettings
+        ? (await import('./SettingsApp.vue')).default
+        : (await import('./App.vue')).default
 
 const rootProps = import.meta.env.VITE_TEST_HARNESS === 'true' && isSettings && harnessParams.get('settingsHarness') === '1'
   ? { bridge: (await import('./settings/browser-harness')).createSettingsHarnessBridge() }

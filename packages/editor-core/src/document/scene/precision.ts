@@ -76,7 +76,7 @@ export function precisionNodes(
     ]
   }
   if (layer.kind === 'ruler') {
-    const measurement = measureRuler(layer, document.canvas)
+    const measurement = measureRuler(layer, document.crop ?? document.canvas)
     return [
       {
         ...common,

@@ -129,6 +129,18 @@ function useMemoryPersistence(
       workspace.textDefaults.value = copy(texts[kind.value])
       workspace.calloutStroke.value = checked(workspace.calloutStroke.value, preferences.settings.callout?.stroke)
       workspace.precisionDefaults.value = checked(workspace.precisionDefaults.value, preferences.settings.precision)
+      const oldRuler = preferences.settings.precision?.ruler
+      if (
+        oldRuler &&
+        typeof oldRuler === 'object' &&
+        !Array.isArray(oldRuler) &&
+        !('percentBasis' in oldRuler)
+      ) {
+        workspace.precisionDefaults.value = {
+          ...workspace.precisionDefaults.value,
+          ruler: { ...workspace.precisionDefaults.value.ruler, percentBasis: 'canvasDiagonal' },
+        }
+      }
       const marker = preferences.settings.marker?.shape
       if (typeof marker === 'string' && ['circle', 'square', 'diamond', 'star'].includes(marker))
         workspace.markerShape.value = marker as typeof workspace.markerShape.value

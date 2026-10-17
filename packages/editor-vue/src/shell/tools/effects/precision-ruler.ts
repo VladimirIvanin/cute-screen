@@ -20,7 +20,11 @@ function result(
   after?: LayerNode,
 ): PrecisionSettingsEffect {
   if (state.selected && after?.kind === 'ruler') {
-    return updateLayerEffect(state.selected, rebaseRulerLayer(state.selected, after.payload, state.document.canvas))
+    return updateLayerEffect(state.selected, rebaseRulerLayer(
+      state.selected,
+      after.payload,
+      state.document.crop ?? state.document.canvas,
+    ))
   }
   return state.selected ? HANDLED : defaultsEffect(defaults)
 }
@@ -59,11 +63,30 @@ function numericEffect(
   return result(state, defaults, after)
 }
 
+function measurementModeEffect(
+  value: string,
+  state: State,
+): PrecisionSettingsEffect {
+  if (!['pixels', 'canvasWidth', 'canvasHeight', 'canvasDiagonal'].includes(value)) return HANDLED
+  const unit = value === 'pixels' ? 'pixels' as const : 'percent' as const
+  const percentBasis = value === 'pixels'
+    ? state.selected?.payload.percentBasis ?? state.defaults.ruler.percentBasis
+    : value as State['defaults']['ruler']['percentBasis']
+  const defaults: State['defaults'] = {
+    ...state.defaults, ruler: { ...state.defaults.ruler, unit, percentBasis },
+  }
+  const after = state.selected ? {
+    ...state.selected, payload: { ...state.selected.payload, unit, percentBasis },
+  } : undefined
+  return result(state, defaults, after)
+}
+
 export function resolveRulerEffect(
   id: string,
   value: string,
   state: State,
 ): PrecisionSettingsEffect {
+  if (id === 'rulerMeasurementMode') return measurementModeEffect(value, state)
   if (id === 'rulerColor') {
     const color = parseHexColor(value)
     if (!color) return HANDLED

@@ -11,6 +11,7 @@ import {
   m08VersionToken,
   openM08,
 } from './browser-m08-test-kit'
+import { verifyCensorCreationShape } from '../censor-creation-shape'
 import { setNumericInput } from '../numeric-input'
 import { setShellPreferences } from './browser-m06-test-kit'
 
@@ -64,6 +65,18 @@ describe('censor formatting toolbar', () => {
     }
   }
 
+  for (const locale of ['en', 'ru'] as const) {
+    for (const theme of ['light', 'dark'] as const) {
+      it(`chooses shapes only before pointer creation in ${locale}/${theme}`, async function () {
+        this.timeout(120000)
+        await browser.setViewport({ width: 1024, height: 700, devicePixelRatio: 1 })
+        await openM08()
+        await setShellPreferences(locale, theme)
+        await verifyCensorCreationShape(path.join(evidence, `creation-only-${locale}-${theme}`), locale)
+      })
+    }
+  }
+
   it('creates a region, edits presets/exact values/colour and preserves undo, cancel and Select reachability', async () => {
     await browser.setViewport({ width: 1024, height: 700, devicePixelRatio: 1 })
     await openM08()
@@ -113,7 +126,7 @@ describe('censor formatting toolbar', () => {
     })
     await browser.saveScreenshot(path.join(evidence, 'selected-solid.png'))
     await $('button[aria-label="Hide data"]').click({ button: 'right' })
-    await expect($('.cs-tool-configure-popover-host .cs-censor-toolbar')).toBeDisplayed()
+    await expect($('.cs-tool-defaults-toolbar .cs-censor-toolbar')).toBeDisplayed()
     await browser.keys('Escape')
     await $('button[aria-label="Select"]').click()
     await expect($('button[aria-label="Select"]')).toHaveAttribute('aria-pressed', 'true')

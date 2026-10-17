@@ -24,36 +24,15 @@ function regionEffect(
   value: string,
   state: State,
 ): PrecisionSettingsEffect {
-  if (value !== 'rectangle' && value !== 'freeform') return HANDLED
-  const defaults: State['defaults'] = {
+  if (
+    state.selected ||
+    (value !== 'rectangle' &&
+      value !== 'freeform')
+  ) return HANDLED
+  return defaultsEffect({
     ...state.defaults,
     censor: { ...state.defaults.censor, region: value },
-  }
-  const selected = state.selected
-  const after = selected
-    ? {
-        ...selected,
-        payload: {
-          ...selected.payload,
-          region:
-            value === 'rectangle'
-              ? { kind: 'rectangle' as const }
-              : {
-                  kind: 'freeform' as const,
-                  points: [
-                    { x: 0, y: 0 },
-                    { x: selected.localBounds.width, y: 0 },
-                    {
-                      x: selected.localBounds.width,
-                      y: selected.localBounds.height,
-                    },
-                    { x: 0, y: selected.localBounds.height },
-                  ],
-                },
-        },
-      }
-    : undefined
-  return result(state, defaults, after)
+  })
 }
 
 function modeEffect(

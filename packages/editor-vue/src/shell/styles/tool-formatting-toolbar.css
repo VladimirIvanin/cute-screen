@@ -130,7 +130,7 @@
   min-height: 0;
   padding: 5px;
 }
-.cs-tool-settings-trigger > svg {
+.cs-tool-settings-trigger > .cs-tool-settings-chevron {
   width: 12px;
   height: 12px;
 }
@@ -199,4 +199,44 @@
 .cs-brush-choices small {
   font-size: inherit;
   color: var(--text-muted);
+}
+
+.cs-tool-settings-trigger > .cs-tool-settings-semantic-icon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+.cs-tool-formatting-toolbar[data-tool-settings='ruler'] {
+  flex-wrap: nowrap;
+}
+.cs-tool-formatting-toolbar[data-tool-settings='ruler'] .cs-tool-settings-trigger {
+  flex: none;
+  max-width: none;
+}
+.cs-tool-formatting-toolbar[data-tool-settings='ruler'] .cs-tool-settings-trigger span {
+  overflow: visible;
+  text-overflow: clip;
+}
+.cs-ruler-modes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+.cs-ruler-reading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 8px;
+}
+.cs-ruler-reading > span {
+  color: var(--text-muted);
+}
+.cs-ruler-reading > output {
+  grid-column: 1;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.cs-ruler-reading > button {
+  grid-column: 2;
+  grid-row: 1 / 3;
 }

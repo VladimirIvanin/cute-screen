@@ -49,6 +49,7 @@ const DEFAULT_PRECISION_TOOLS: PrecisionToolDefaults = {
     feather: null,
   },
   ruler: {
+    percentBasis: 'canvasWidth',
     unit: 'pixels',
     snap: true,
     snapAngleIncrementDegrees: 15,
@@ -106,6 +107,6 @@ export function createWorkspaceState() {
     toolError: ref<string>(),
     textureImages: ref<ReadonlyMap<string, HTMLImageElement>>(new Map()),
     numericPreviewDocument: shallowRef<EditorDocumentV1>(),
-    activeDocument: ref<EditorDocumentV1>(),
+    activeDocument: shallowRef<EditorDocumentV1>(),
   }
 }

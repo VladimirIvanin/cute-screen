@@ -405,6 +405,8 @@ export type SpotlightAperture = Readonly<{
 
 export const RULER_UNITS = ['pixels', 'percent'] as const
 export type RulerUnit = (typeof RULER_UNITS)[number]
+export const RULER_PERCENT_BASES = ['canvasWidth', 'canvasHeight', 'canvasDiagonal'] as const
+export type RulerPercentBasis = (typeof RULER_PERCENT_BASES)[number]
 
 export const DEFAULT_RULER_COLOR: SrgbColor = Object.freeze({
   red: 227 / 255,
@@ -421,8 +423,8 @@ export type RulerLayerPayload = Readonly<{
   readonly start: Point & JsonObject
   readonly end: Point & JsonObject
   readonly unit: RulerUnit
-  /** Percent length is relative to hypot(canvas.width, canvas.height). */
-  readonly percentBasis: 'canvasDiagonal'
+  /** Percent vector length relative to the selected dimension of crop, or canvas without crop. */
+  readonly percentBasis: RulerPercentBasis
   readonly snapAngleIncrementDegrees: number
   readonly color: SrgbColor
   readonly thickness: number

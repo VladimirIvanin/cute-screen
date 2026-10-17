@@ -13,6 +13,12 @@ import {
 import { useSettings } from './settings/use-settings'
 import { useSettingsRuntime } from './settings/use-settings-runtime'
 import GeneralSettings from './settings/GeneralSettings.vue'
+import HistorySettings from './history/HistorySettings.vue'
+import { listenHistorySettings } from './platform/tauri/history-adapter'
+import {
+  onMounted,
+  onBeforeUnmount,
+} from 'vue'
 import ShortcutSettings from './settings/ShortcutSettings.vue'
 import StartupPreferences from './settings/StartupPreferences.vue'
 import './settings/settings.css'
@@ -31,7 +37,21 @@ const closeLabel = computed(() => {
   if (startupStep.value) return labels.value.cancel
   return snapshot.value?.setupCompleted ? labels.value.close : labels.value.finish
 })
-const section = ref(query.get('settings') === 'shortcuts' ? 'shortcuts' : 'general')
+const section = ref(query.get('settings') === 'history' ? 'history' : query.get('settings') === 'shortcuts' ? 'shortcuts' : 'general')
+let unlistenHistory: (() => void) | undefined
+let disposedHistory = false
+onMounted(async () => {
+  if (!('__TAURI_INTERNALS__' in window)) return
+  const cleanup = await listenHistorySettings(() => {
+    void navigate('history')
+  })
+  if (disposedHistory) cleanup()
+  else unlistenHistory = cleanup
+})
+onBeforeUnmount(() => {
+  disposedHistory = true
+  unlistenHistory?.()
+})
 
 async function confirmStartup(enabled: boolean): Promise<void> {
   errorAction.value = undefined
@@ -96,6 +116,13 @@ useSettingsRuntime(bridge, state, cancelEditing)
           {{ labels.general }}
         </button>
         <button
+          :aria-current="section === 'history' ? 'page' : undefined"
+          :disabled="busy || startupStep"
+          @click="navigate('history')"
+        >
+          {{ locale === 'ru' ? 'История и хранение' : 'History and storage' }}
+        </button>
+        <button
           :aria-current="section === 'shortcuts' ? 'page' : undefined"
           :disabled="busy || startupStep"
           @click="navigate('shortcuts')"
@@ -135,6 +162,7 @@ useSettingsRuntime(bridge, state, cancelEditing)
             @startup="confirmStartup"
             @system="startupSystem"
           />
+          <HistorySettings v-else-if="section === 'history'" :locale="locale" />
           <ShortcutSettings
             v-else
             :state="state"
@@ -145,6 +173,11 @@ useSettingsRuntime(bridge, state, cancelEditing)
           />
         </template>
       </div>
+      <p v-if="firstRun" class="cs-settings-muted">
+        {{ locale === 'ru'
+          ? 'История временная: до 7 дней, 512 МиБ и 200 снимков. Старые снимки удаляются вместе с аннотациями. Защитите важные снимки от очистки или экспортируйте результат.'
+          : 'History is temporary: up to 7 days, 512 MiB and 200 captures. Old captures and their annotations are deleted automatically. Protect important captures or export the result.' }}
+      </p>
       <footer v-if="snapshot" class="cs-settings-footer">
         <button :disabled="busy" @click="finish">{{ closeLabel }}</button>
       </footer>

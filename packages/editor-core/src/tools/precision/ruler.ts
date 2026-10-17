@@ -1,3 +1,4 @@
+import { RULER_PERCENT_BASES } from '../../document/types'
 import {
   invertMatrix,
   transformPoint,
@@ -10,6 +11,7 @@ import type {
   RulerLayer,
   RulerLayerPayload,
   RulerUnit,
+  RulerPercentBasis,
   SrgbColor,
 } from '../../document/types'
 import {
@@ -67,6 +69,7 @@ export function createRulerLayer(input: {
   readonly end: Point
   readonly canvas: Readonly<{ readonly width: number; readonly height: number }>
   readonly unit?: RulerUnit
+  readonly percentBasis?: RulerPercentBasis
   readonly snapAngleIncrementDegrees?: number
   readonly color?: SrgbColor
   readonly thickness?: number
@@ -78,6 +81,7 @@ export function createRulerLayer(input: {
     throw new RangeError('ruler endpoints must be distinct')
   }
   const unit = rulerUnit(input.unit)
+  if (!RULER_PERCENT_BASES.includes(input.percentBasis ?? 'canvasDiagonal')) throw new RangeError('ruler percent basis is invalid')
   const snapAngleIncrementDegrees = rulerSnap(input.snapAngleIncrementDegrees)
   const color = input.color ?? DEFAULT_RULER_COLOR
   assertUnitColor(color, 'ruler color')
@@ -96,7 +100,7 @@ export function createRulerLayer(input: {
     start: freezePoint(input.start),
     end: freezePoint(input.end),
     unit,
-    percentBasis: 'canvasDiagonal' as const,
+    percentBasis: input.percentBasis ?? 'canvasDiagonal',
     snapAngleIncrementDegrees,
     color: freezeColor(color),
     thickness,
@@ -148,11 +152,7 @@ export function rulerVisualGeometry(
   const worldEnd = transformPoint(matrix, payload.end)
   const worldLength = Math.hypot(worldEnd.x - worldStart.x, worldEnd.y - worldStart.y)
   if (worldLength <= 0) throw new RangeError('ruler endpoints must be distinct')
-  const diagonal = Math.hypot(canvas.width, canvas.height)
-  const label =
-    payload.unit === 'pixels'
-      ? `${formatMeasurement(worldLength, 0)} px`
-      : `${formatMeasurement((worldLength / diagonal) * 100, 2)}%`
+  const label = measureRuler({ ...layer, payload }, canvas).label
   const badge = rulerBadgeDimensions(label, payload.fontSize)
   const center = {
     x: (worldStart.x + worldEnd.x) / 2,
@@ -269,10 +269,11 @@ export interface RulerMeasurement {
   readonly length: number
   readonly angleDegrees: number
   readonly percent: number
-  readonly percentBasis: 'canvasDiagonal'
+  readonly percentBasis: RulerPercentBasis
   readonly label: string
 }
 
+/** Dimensions describe the visible crop, or the entire canvas when there is no crop. */
 export function measureRuler(
   layer: RulerLayer,
   canvas: Readonly<{ readonly width: number; readonly height: number }>,
@@ -292,12 +293,13 @@ export function measureRuler(
   const dy = end.y - start.y
   const length = Math.hypot(dx, dy)
   const angleDegrees = (Math.atan2(dy, dx) * 180) / Math.PI
-  const percent = (length / Math.hypot(canvas.width, canvas.height)) * 100
+  const denominator = layer.payload.percentBasis === 'canvasWidth' ? canvas.width : layer.payload.percentBasis === 'canvasHeight' ? canvas.height : Math.hypot(canvas.width, canvas.height)
+  const percent = (length / denominator) * 100
   return Object.freeze({
     length,
     angleDegrees,
     percent,
-    percentBasis: 'canvasDiagonal',
+    percentBasis: layer.payload.percentBasis,
     label: layer.payload.unit === 'pixels' ? `${formatMeasurement(length, 0)} px` : `${formatMeasurement(percent, 2)}%`,
   })
 }

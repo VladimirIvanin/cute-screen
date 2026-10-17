@@ -1,5 +1,17 @@
 # Трассируемость требований
 
+## Понятные настройки линейки (2026-10-17, ADR-076)
+
+`REQ-TOL-010`, `REQ-EDT-006/015/016/017`, `REQ-UI-006`: запись до реализации.
+Однострочная панель различает толщину, размер подписи и измерение пиктограммами;
+единицы и база процентов находятся в меню измерения и видны при закрытом меню.
+Базы: ширина, высота, диагональ crop либо canvas. Подпись на линии остаётся короткой.
+Единицы/база меняются атомарной командой; crop пересчитывает measurement и badge bounds
+включая locked/hidden rulers. План доказательств: red-first core/codec/history, Vue,
+decoded renderer, browser RU/EN × light/dark при 1024 px и production Tauri Quick → Editor.
+Статус: implemented; core/Vue, decoded renderer, browser и production Tauri
+с restart passed. Команды, screenshots и ограничения shared check — TESTING.md.
+
 ## Shift для линейки (2026-10-17)
 
 `REQ-TOL-010`, `REQ-EDT-005/006`: запись до реализации. Shift ограничивает
@@ -1341,3 +1353,28 @@ Capture → Quick → Editor passed. Геометрия и скриншоты п
 | REQ-ACT-002/011 | Cancel/blur/Tab/navigation и stale probe isolation               | Mounted delayed-bridge tests; real Tauri recorder/activation/reopen |
 
 Evidence и фактические ограничения добавляются в TESTING.md после прогонов.
+
+## Форма скрытия данных только до рисования · 2026-10-17
+
+`REQ-TOL-008`, `REQ-EDT-015/016`, `REQ-UI-006`, ADR-077: запись добавлена до реализации.
+Defaults/configure сохраняют выбор rectangle/freeform в Editor и Quick Capture.
+Selection schema не содержит censorRegion для одного объекта и группы; панель
+не показывает кнопку или подпись формы. Прямое событие censorRegion для готового
+объекта не меняет документ, историю и defaults. Эффекты и параметры сохраняют
+undo/redo и исходную геометрию. Доказательства: Vue censor-toolbar, browser/native
+censor-toolbar через pointer creation и production Capture → Quick → Editor;
+фактические результаты — TESTING.md, артефакты — `artifacts/censor-toolbar/`.
+
+## Компактная временная история (ADR-078)
+
+| Requirement | Contract/evidence                                                                      | Status                              |
+| ----------- | -------------------------------------------------------------------------------------- | ----------------------------------- |
+| REQ-LIB-010 | Recent history across series; production capture → edit → switch → restart             | implemented; evidence in TESTING.md |
+| REQ-LIB-011 | Cursor pages of 50, virtualized thumbnails, bounded caches and token lifecycle         | implemented; evidence in TESTING.md |
+| REQ-LIB-012 | 7 days / 512 MiB / 200 captures; protected and leased captures survive maintenance     | implemented; evidence in TESTING.md |
+| REQ-LIB-013 | Journalled cleanup, shared references, stale-plan rejection, legacy consent preview    | implemented; evidence in TESTING.md |
+| REQ-LIB-014 | Saved-result previews, revision invalidation, no originals in list payloads            | implemented; evidence in TESTING.md |
+| REQ-LIB-008 | Restore last successfully activated capture and per-capture viewport; fresh Undo stack | implemented; evidence in TESTING.md |
+
+Этот срез не завершает series/search/pin windows M09. Native evidence относится
+к Linux/X11; Windows/macOS/Wayland runtime pending (ADR-020).

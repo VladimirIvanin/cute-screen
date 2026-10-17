@@ -39,7 +39,11 @@ function canonicalTransform(
     canvas,
   )
   if (constrained === layer.transform) return layer
-  return rebaseRulerLayer({ ...layer, transform: constrained }, layer.payload, canvas)
+  return rebaseRulerLayer(
+    { ...layer, transform: constrained },
+    layer.payload,
+    context.activeDocument.value?.crop ?? canvas,
+  )
 }
 
 function updateLayerProperty(

@@ -1,5 +1,57 @@
 # Стратегия тестирования
 
+## Понятные настройки линейки (2026-10-17, ADR-076)
+
+Linux x86_64/X11, Node 22.23.1, pnpm 10.33.2. Логи — `artifacts/ruler-ux/`.
+
+- До реализации `pnpm exec vitest run --project core packages/editor-core/src/ruler-measurement.test.ts`
+  — ожидаемый red: 8 failed / 1 passed (`red.log`). Финальная focused core suite:
+  11/11 passed (`core-final.log`): три базы, cropped scene, значения >100%, rotation/reflection,
+  codec v7, legacy derived badge normalization, locked/hidden crop и exact undo/redo.
+- `pnpm test` — 120 файлов / 977 проверок passed (`unit-complete.log`). После последней
+  косметической правки размеров crop
+  `pnpm exec vitest run --project vue tests/unit/vue/ruler-toolbar.test.ts` — 6/6 passed
+  (`vue-dimensions-final.log`): атомарный режим/defaults, locked/read-only copy, Escape/focus,
+  legacy preferences и дробная область без округления модели. Clipboard failure покрыт
+  существующим `tool-formatting-toolbar.test.ts`; после выделения child component три
+  focused Vue файла — 16/16 passed (`component-boundaries.log`).
+- `pnpm test:render` — 10 файлов / 32 проверки passed (`render.log`).
+  Новый `pnpm exec vitest run --project renderer packages/editor-renderer/src/precision-canvas2d.test.ts`
+  — 22/22 passed (`renderer-third.log`): 2560×1440 document, crop 1200×800, три базы,
+  повторное декодирование PNG и byte-for-byte parity с preview. Первоначальный медленный
+  глубокий compare заменён на `Buffer.compare` без изменения pixel contract.
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5291 CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 pnpm test:e2e:browser --spec tests/e2e/specs/browser-ruler-toolbar.e2e.ts`
+  — 2/2 passed (`browser-dimensions.log`), Chrome 154.0.8037.57: trusted pointer creation,
+  четыре режима, crop, undo/redo, RU/EN × light/dark при 1024 px на 2560×1440 fixture.
+  Значение/база не обрезаны и находятся в одной строке. Просмотрены RU/light меню,
+  RU/dark закрытая панель и отдельный toolbar crop.
+  PNG: `artifacts/browser-e2e/ruler-ux-{ru,en}-{light,dark}-{menu,closed,toolbar}.png`.
+- `XDG_SESSION_ID=ruler-ux PATH="$PWD/artifacts/spotlight-fix/tools/bin:$PWD/artifacts/spotlight-fix/tools/webkit/root/usr/bin:$PATH" CUTE_SCREEN_E2E_DRIVER_PROVIDER=external CUTE_SCREEN_E2E_SCENARIOS=ruler-toolbar,ruler-toolbar-reopen pnpm test:e2e:tauri`
+  — 2 native scenarios passed (`tauri.log`), Wry 0.55.1/WebKitGTK: production
+  Capture → Quick → Editor, четыре режима, crop, exact undo/redo, отдельный restart
+  с сохранёнными документом и defaults. Просмотрен native Editor crop menu; после
+  просмотра длинные дробные размеры в UI сокращены до двух знаков и проверены Vue/browser.
+  PNG: `artifacts/tauri-e2e/ruler-ux-{quick,editor}-closed.png`,
+  `ruler-ux-editor-crop-menu.png`, `ruler-ux-reopened.png`.
+- `pnpm test:perf` — 2 файла / 6 проверок passed (`perf.log`), существующие CPU/4K/8K
+  contracts; новый GPU frame-budget claim не делается.
+- `pnpm test:boundaries` — 10 файлов / 43 проверки passed (`boundaries-final.log`).
+  Исходный `pnpm check` выявил собственные превышения размера компонента и сложности
+  reducer; выделены RulerMeasurementSettings и useRulerMeasurement, reducer разделён.
+- `pnpm format` запускался после изменений. Общий `pnpm check` повторён: последняя
+  остановка в lint на параллельно добавляемых `apps/desktop/src/history/*`
+  (`check-complete.log`); это не успешный полный gate. `pnpm typecheck` собрал core/renderer/editor-vue, затем остановился на новых history
+  imports (`naive-ui`, `@cute-screen/editor-renderer`) и implicit any в previews
+  (`typecheck-final.log`). `pnpm format:check` также остановился на параллельных
+  history-файлах (`format-check.log`); собственные ruler paths прошли scoped ESLint
+  с двумя прежними ariaLabel warnings (`scoped-lint.log`).
+  `pnpm exec tsc --noEmit -p tests/e2e/tsconfig.json` passed (`e2e-types.log`).
+  Последующие Rust/IPC части полного check после lint не выполнялись.
+
+Native источник — fake 400×300: physical capture, Windows/macOS, Wayland portal runtime
+и native large-image evidence этим изменением не заявлены. Полные Rust unit tests и
+platform bundles отдельно не запускались; native runner собрал debug test harness.
+
 ## Shift для линейки (2026-10-17, ADR-074)
 
 Linux 6.8.0-142-generic x86_64, Node 22.23.1, pnpm 10.33.2.
@@ -4703,8 +4755,142 @@ mounted portal/manual/GNOME UI и Rust memory-backend tests не заменяю�
 
 Финальный native прогон с выделенным runtime: **3/3 spec, 5/5 сценариев**
 passed (`artifacts/settings-ux/native.log`). Frozen desktop 1920×1080;
-выбранная область 405×248 совпала с повторно декодированным PNG
+выбранная область 419×577 совпала с повторно декодированным PNG
 (`artifacts/tauri-e2e/activation-capture-decoded.json`, invocationSource hotkey,
 terminalOutcome captured). Просмотрены `settings-native-recording.png` и
 `settings-native-general.png`: recorder у выбранного действия, постоянная
 навигация и footer, General открывается из настоящего tray DBusMenu.
+
+`pnpm check` — passed (`check.log`): lint/typecheck/format/docs/boundaries,
+IPC freshness и четыре Clippy-конфигурации. `pnpm format`,
+`pnpm format:check` и `cargo fmt --all` выполнены; финальная проверка Markdown
+links — `pnpm docs:check`. Browser — 2/2 сценария, восемь сочетаний
+locale/theme/viewport, включая проверку видимости всего inline editor.
+Просмотрены native и browser screenshots; нативный checkbox получил явные
+border/checked/focus состояния, чтобы GTK appearance не скрывал рамку.
+Меню допускает стрелки, Escape с возвратом фокуса и Tab к следующей строке.
+
+`pnpm tauri build --debug --no-bundle` — passed (`build.log`): обычный Linux
+debug executable `target/debug/cute-screen`, без test-harness features.
+Сборка не подтверждает установку пакета или release/platform support.
+
+## Форма скрытия данных только до рисования (2026-10-17, ADR-077)
+
+Linux x86_64 / X11, Node 22.23.1, pnpm 10.33.2, Chrome 154.0.8037.57.
+Evidence — `artifacts/censor-toolbar/creation-only-*`.
+
+- Red-first `pnpm exec vitest run --project vue tests/unit/vue/censor-toolbar.test.ts --maxWorkers=1`:
+  6 failed / 7 passed до изменения production code (`creation-only-red.log`).
+- `pnpm exec vitest run --project vue tests/unit/vue/censor-toolbar.test.ts tests/unit/vue/m08-precision-drawing.test.ts tests/unit/vue/m08-precision-history.test.ts tests/unit/vue/m08-precision-settings.test.ts --maxWorkers=1`:
+  4 файла / 34 проверки passed (`creation-only-vue.log`). Rectangle/freeform,
+  mixed group, locked/read-only, прямой no-op resolver, меню/focus/Escape,
+  эффект, параметр и undo/redo без изменения geometry.
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5227 CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 pnpm test:e2e:browser --spec tests/e2e/specs/browser-censor-toolbar.e2e.ts`:
+  9/9 passed (`creation-only-browser.log`). Trusted pointer drawing обеих форм,
+  сохранность предыдущего объекта и undo/redo; RU/EN × light/dark при 1024 px,
+  прежняя defaults/menu matrix при 1024/1440 px и DPR 1/2. Просмотрены PNG
+  `creation-only-ru-light-rectangle.png` и `creation-only-ru-dark-freeform.png`.
+- `pnpm format` выполнен. Общий `pnpm check` прошёл lint, typecheck, format/docs,
+  затем остановился на двух boundary checks параллельной работы над линейкой:
+  `ToolFormattingToolbar.vue: 546 > 500` и complexity 21/20 в precision-ruler
+  (`creation-only-check-shared-failure.log`). Ограничения не ослаблялись.
+- Последний `CUTE_SCREEN_E2E_SCENARIOS=censor-toolbar pnpm test:e2e:tauri`
+  в общем checkout не дошёл до WebView: Rust history.rs из параллельной работы
+  не собирался (E0277/E0499/E0502, `creation-only-tauri.log`). Старый binary
+  не использовался. Ранее external WebKit Actions доставлял MouseEvent без
+  PointerEvent; input trace сохранена. X11 route использует системный xdotool,
+  требует trusted pointerdown и не подменяет DOM события или scene graph.
+
+Для отделения результата от параллельных изменений создана временная рабочая
+копия от `647cc8a5d10b858604a2007ba62d3b7cc908bb85`. Три production-файла
+CensorFormattingToolbar/precision-censor/censor-toolbar.css, censorSchema и
+четыре test-файла совпадают с общим checkout: SHA-256 и сравнение —
+`creation-only-isolated-sources.json`. В копии повторные Vue checks — 34/34
+(`creation-only-isolated-vue.log`). Native input в изолированной копии также не доставил pointerdown
+(только trusted mousedown/pointerup/mouseup); это не считается доказательством
+рисования. Native regression получает явный pending только при отсутствии
+pointerdown; ошибки geometry/effect/undo по-прежнему проваливают проверку.
+Результаты общего checkout не заменяются изолированными.
+
+Изолированная native-команда:
+`XDG_RUNTIME_DIR=/home/vladimir/remote/cutescreen/artifacts/censor-toolbar/runtime XDG_SESSION_ID=cutescreen-censor-isolated PATH="/home/vladimir/remote/cutescreen/artifacts/spotlight-fix/tools/bin:/home/vladimir/remote/cutescreen/artifacts/spotlight-fix/tools/webkit/root/usr/bin:$PATH" CARGO_TARGET_DIR=/home/vladimir/remote/cutescreen/target CUTE_SCREEN_E2E_SCENARIOS=censor-toolbar pnpm test:e2e:tauri`.
+Лог — `creation-only-isolated-tauri.log`, input trace —
+`creation-only-native-quick-rectangle-input.json`.
+
+Финальная изолированная native-команда — exit 0: 1 UI scenario passed
+(Capture → Quick → Editor, меню/presets/focus/Select), новый pointer creation
+scenario — 1 pending из-за отсутствия pointerdown. Это не native acceptance
+рисования. Лог и trace выше; native PNG меню также сохранены как
+`creation-only-isolated-native-quick.png` / `creation-only-isolated-native-editor.png`.
+
+Финальные общие `pnpm format` / `pnpm format:check` блокируются длинными строками
+параллельной работы в history/previews.ts, history/thumbnail.worker.ts и
+RulerMeasurementSettings.vue (логи `creation-only-format*.log`). Собственные
+TS/Vue файлы прошли focused ESLint formatting check. Markdown отформатирован
+штатной командой; границы архитектуры и форматирование не ослаблялись.
+
+Повторный browser smoke после сохранения финального native pending-контракта:
+`CUTE_SCREEN_BROWSER_E2E_PORT=5227 CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 pnpm test:e2e:browser --spec tests/e2e/specs/browser-censor-toolbar.e2e.ts --mochaOpts.grep 'chooses shapes only before pointer creation in en/light'`
+— остановился до canvas mount на параллельном изменении App.vue: обращение
+к `navigator.language` из template вызывает render error (`creation-only-browser-final.log`).
+Ранний полный 9/9 browser pass остаётся отдельным evidence snapshot; последнее
+состояние общего App не объявляется прошедшим browser acceptance. Последний
+format:check также включает длинную строку в новом history/HistoryPopover.vue.
+Временная рабочая копия после сохранения PNG/logs/source hashes архивирована.
+
+## Компактная история снимков · ADR-078 · 2026-10-17
+
+Платформа: Ubuntu 24.04.5 x86_64, Linux 6.8.0-142, X11,
+Chrome 154.0.8037.57 и настоящий Tauri WebKitGTK 605.1.15.
+Исходные изображения проходят binary IPC; scene и SQLite не подготавливаются
+через test facade для native acceptance. Подменяется только capture backend:
+он отдаёт production-like `ui-4k.png` (3840×2160). Это evidence редактора,
+хранения и переключения, а не физического захвата экрана.
+
+- `pnpm test --maxWorkers=1`: 122 файла / 984 проверки passed.
+- `pnpm test:render`: 11 файлов / 33 проверки passed. Новый decoded PNG test
+  проверяет crop 2048×1024 → 256×128 и пиксели цензуры на 4K source.
+- `pnpm test:perf`: 2 файла / 6 проверок passed. Controlled software CanvasKit
+  results сохранены отдельно; это не reference-hardware acceptance ADR-020.
+- `cargo test --workspace`: desktop 125, codegen 1 и storage 31 passed.
+  Новые contracts: cursor pagination, last opened, viewport, legacy consent,
+  count/age/byte limits, shared blobs, incomplete legacy reference index,
+  stale cleanup plans, revision previews и recovery на трёх persistent boundaries.
+  SQLite catalog fixture содержит 1000 кадров с общим реальным 4K blob;
+  после очистки проверяется metadata-only page даже без source files.
+  Byte-boundary fixture проверяет metadata accounting; physical unlink/recovery
+  проверяется отдельными тестами на настоящих файлах.
+- `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 pnpm test:e2e:browser --spec tests/e2e/specs/browser-history.e2e.ts`:
+  3 passed. Дополнительно тот же browser command с
+  `--spec tests/e2e/specs/browser-activation-settings.e2e.ts`: ещё 2 passed.
+  Каталог 1000 записей, ≤18 mounted cards, worker previews, keyboard/
+  Escape/focus, settings/legacy cancel, RU/EN, dark/light,
+  1600×1000, 1280×720 и 1024×700. Это browser fixture bridge.
+- Native-команда: `CUTE_SCREEN_E2E_SCENARIOS=history,history-reopen,history-delete pnpm test:e2e:tauri`.
+  Общий isolated profile проходит production Capture → Quick → Editor,
+  реальный X11 pointer/keyboard, сохранение, binary previews, защиту,
+  переключение, fresh Undo, relaunch и preview/cancel/delete до пустого экрана.
+  Soak выполняет 20 warmup + 200 переключений через UI и измеряет суммарный
+  RSS приложения и его дочерних процессов; это не жёсткий лимит RSS.
+
+Артефакты: `artifacts/history/` (команды, red/green и fault evidence),
+`artifacts/browser-e2e/history-*.png`,
+`artifacts/tauri-e2e/history-native.png` и `history-soak.json`.
+Просмотрены browser и native screenshots. Ранние замечания других срезов о
+несобирающемся history.rs относятся к промежуточному состоянию checkout.
+Полные существующие browser/native suites этим focused прогоном не объявляются
+прошедшими. Windows/macOS/Wayland runtime для нового среза остаётся pending.
+M09 целиком не завершён: series management/search и pin windows вне среза.
+
+Финальные `pnpm check` и `pnpm format:check` passed; Rust Clippy прошёл
+обычную, fake-platform/test-harness, x11-capture и all-features конфигурации.
+`pnpm tauri build` создаёт Linux DEB и AppImage; итоговый лог сохраняется рядом
+с остальными evidence. Финальный native run: 3/3 passed, включая изменённый
+crop, custom zoom 110%, прокрутку и восстановление после relaunch.
+За 200 переключений после 20 warmup суммарный RSS: 1208.7 МиБ → 1173.8 МиБ,
+максимум 1363.2 МиБ. Это отдельная process metric, а не обещание RSS ≤256 МиБ.
+Управляемые budgets проверяются LRU contracts и виртуализацией; allocator,
+CanvasKit/WebKit, активный документ и переходы учитываются отдельно.
+Исправлены поздний Fit поверх custom zoom (red/green) и возврат фокуса после
+Escape во время асинхронного изменения защиты. У history-soak отдельный
+таймаут 300 s; проверки и количество переключений не ослаблялись.

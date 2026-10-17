@@ -108,7 +108,7 @@ export class DocumentSpatialIndex {
     for (let index = this.#document.layers.length - 1; index >= 0; index -= 1) {
       const layer = this.#document.layers[index]
       if (!layer || !candidateIds.has(layer.id)) continue
-      const hit = hitLayer(layer, canvasPoint, index, this.#document.canvas, this.#context)
+      const hit = hitLayer(layer, canvasPoint, index, this.#document.crop ?? this.#document.canvas, this.#context)
       if (hit) hits.push(hit)
     }
     return Object.freeze(hits)
@@ -165,7 +165,7 @@ export function hitTestDocument(
       !layer.visible ||
       layer.locked
     ) continue
-    const hit = hitLayer(layer, canvasPoint, index, document.canvas, context)
+    const hit = hitLayer(layer, canvasPoint, index, document.crop ?? document.canvas, context)
     if (hit) return hit
   }
   return undefined
@@ -185,7 +185,7 @@ export function hitTestDocumentAll(
       !layer.visible ||
       layer.locked
     ) continue
-    const hit = hitLayer(layer, canvasPoint, index, document.canvas, context)
+    const hit = hitLayer(layer, canvasPoint, index, document.crop ?? document.canvas, context)
     if (hit) hits.push(hit)
   }
   return Object.freeze(hits)

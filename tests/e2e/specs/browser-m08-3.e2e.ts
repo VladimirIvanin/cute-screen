@@ -20,14 +20,14 @@ describe('M08 crop and precision acceptance in browser mode', () => {
         ['Crop', ['Preset', 'Reset', 'Apply', 'Cancel']],
         ['Hide data', ['Region shape', 'Effect', 'Pixel size']],
         ['Spotlight', ['Aperture shape', 'Dimming', 'Edge softness', 'Apertures']],
-        ['Ruler', ['Colour', 'Thickness', 'Label and units', 'Measurement and snapping']],
+        ['Ruler', ['Colour', 'Thickness', 'Label size', 'Measurement and snapping']],
         ['Loupe', ['Zoom', 'Size', 'Shape', 'Border']],
       ],
       ru: [
         ['Обрезка', ['Пропорции', 'Сбросить', 'Применить', 'Отмена']],
         ['Скрыть данные', ['Форма области', 'Эффект', 'Размер пикселей']],
         ['Фонарь', ['Форма области', 'Затемнение', 'Мягкость краёв', 'Области']],
-        ['Линейка', ['Цвет', 'Толщина', 'Подпись и единицы', 'Измерение и привязка']],
+        ['Линейка', ['Цвет', 'Толщина линии', 'Размер подписи', 'Измерение и привязка']],
         ['Лупа', ['Увеличение', 'Размер', 'Форма', 'Обводка']],
       ],
     } as const

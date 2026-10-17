@@ -25,7 +25,7 @@ async function copyMeasurement(
   const document = context.activeDocument.value
   const layer = document?.layers.find((item) => item.id === context.selectedLayerId())
   if (layer?.kind !== 'ruler' || !document) return
-  const measurement = measureRuler(layer, document.canvas)
+  const measurement = measureRuler(layer, document.crop ?? document.canvas)
   const value = id === 'rulerCopyLength' ? measurement.label : `${measurement.angleDegrees.toFixed(1)}°`
   try {
     if (context.props.clipboardBridge?.writeClipboardText) {

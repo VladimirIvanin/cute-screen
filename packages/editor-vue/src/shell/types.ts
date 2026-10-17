@@ -131,6 +131,7 @@ export interface ContextToolbarSchema {
     editing?: boolean
     adding?: boolean | undefined
     measurement?: Readonly<{ length: string; angle: string }> | undefined
+    measurementArea?: Readonly<{ width: number; height: number; cropped: boolean }> | undefined
   }>
 
   readonly highlighter?: import('./workspace/highlighter-background').HighlighterAnalysis
@@ -196,6 +197,7 @@ export interface PrecisionToolDefaults {
     readonly feather: 'soft' | 'strong' | null
   }
   readonly ruler: {
+    readonly percentBasis: import('@cute-screen/editor-renderer').RulerPercentBasis
     readonly unit: 'pixels' | 'percent'
     readonly snap: boolean
     readonly snapAngleIncrementDegrees: number

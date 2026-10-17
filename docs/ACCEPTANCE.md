@@ -1,5 +1,19 @@
 # Сквозная приёмка
 
+## Понятные настройки линейки (2026-10-17, ADR-076)
+
+`REQ-TOL-010`, `REQ-EDT-006/015/016/017`, `REQ-UI-006`: в Editor и Quick
+панель остаётся одной строкой: цвет, пиктограмма толщины с px, Aa с px,
+прямой разделитель, пиктограмма линейки и результат с базой процентов.
+Размер текста не содержит единиц измерения. В меню измерения доступны Pixels,
+% ширины, % высоты и % диагонали, фактический crop/canvas с размерами,
+отдельные длина/угол с копированием и объяснение Shift/Alt. На линии и в PNG
+сохраняется короткая подпись без базы. Смена режима — один undo/redo;
+crop пересчитывает значение и badge geometry. Повторное открытие сохраняет
+режим; locked/read-only блокируют правки, копирование остаётся доступным.
+При 1024 px RU/EN × light/dark значение и база полностью видны без меню.
+Фактические результаты и ограничения — TESTING.md.
+
 ## Меню других действий (2026-10-17)
 
 `REQ-UI-001/002/003/004/006`: открыть меню TopBar в RU/EN и light/dark,
@@ -760,15 +774,20 @@ WebDriver server on port 4445 within 60 seconds, so neither clean-state decoded
 crop mount nor native system-clipboard readback reached its test body. Browser
 clipboard evidence is not substituted for that native result.
 
-## A09 — Серии и библиотека
+## A09 — История, серии и библиотека
 
-1. Создать несколько снимков в активной серии.
-2. Проверить filmstrip, rename и switching без сброса viewport.
-3. Перезапустить приложение и открыть последний кадр.
-4. Загрузить fixture с 1000 captures и измерить first-page latency.
-5. Проверить storage usage и cleanup preview.
-6. Удалить серию и проверить recoverable confirmation.
-7. Открыть pin window и проверить always-on-top.
+1. Через production Capture создать два кадра и аннотировать первый.
+2. Через кнопку истории открыть первый: восстановлены аннотации/crop/viewport, Undo начинается заново.
+3. Перезапустить приложение: выбран прежний старый кадр; protection сохранена.
+4. На fixture 1000 captures проверить первую страницу до полного scan и ≤18 DOM-карточек.
+5. Проверить срок/объём/count, soft-limit warning, active/protected/legacy exclusions.
+6. Очистить cache и подтвердить preview удаления активного и последнего кадров. Empty state оставляет Capture/Open image доступными.
+7. Проверить stale plan, shared blobs, interruption recovery и отсутствие stale/censor-leaking previews.
+8. Выполнить 200 переключений после прогрева и записать RSS/cache evidence.
+
+Команды, фактическая платформа и результаты — TESTING.md, раздел ADR-078.
+Series rename/search/size и pin windows остаются будущими частями M09;
+этот срез не подтверждает их runtime acceptance.
 
 ## A10 — Beautify, watermark и export
 
@@ -1231,3 +1250,16 @@ Cancel ничего не включает. Установить с обоими 
   recorder с кнопками прокручивается в видимую область; sidebar/footer постоянны.
 - Подтвердить native назначение, физическую активацию и relaunch отдельно от
   browser fixture. Команды, платформы и артефакты — TESTING.md.
+
+## Форма скрытия данных до рисования (2026-10-17, ADR-077)
+
+`REQ-TOL-008`, `REQ-EDT-015/016`, `REQ-UI-006`: в production Capture → Quick →
+Editor выбрать rectangle в настройках «Скрыть данные» и нарисовать область.
+У выделенного объекта видны эффекты и параметр без кнопки/подписи формы.
+Повторно активировать инструмент, выбрать freeform, нарисовать треугольный
+контур: первая область не меняется. У новой области и группы rectangle/freeform
+также нет переключателя; эффекты доступны, undo/redo сохраняет точки/геометрию.
+В defaults/configure доступны обе формы, Escape закрывает меню и возвращает
+focus; при смене schema открытое меню исчезает без focus удалённой кнопке.
+Проверить RU/EN, light/dark, 1024 px, locked/read-only. Результаты и ограничения
+фиксируются в TESTING.md и PLATFORM_MATRIX.md.

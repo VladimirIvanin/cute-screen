@@ -2,6 +2,13 @@
 mod e2e_paths;
 mod tray_icon;
 
+#[path = "services/history.rs"]
+pub mod history;
+use history::{
+    history_command, history_thumbnail, history_write_thumbnail, image_release,
+    settings_open_history,
+};
+
 use std::collections::{HashMap, VecDeque};
 use std::env;
 use std::fs;
@@ -2529,6 +2536,11 @@ pub fn run() {
         open_screen_recording_settings,
         get_e2e_harness_query,
         read_image_bytes,
+        history_command,
+        history_thumbnail,
+        history_write_thumbnail,
+        image_release,
+        settings_open_history,
         repository_open_last,
         repository_list_active_series_frames,
         repository_save_document,
@@ -2590,6 +2602,11 @@ pub fn run() {
         platform_capabilities,
         open_screen_recording_settings,
         read_image_bytes,
+        history_command,
+        history_thumbnail,
+        history_write_thumbnail,
+        image_release,
+        settings_open_history,
         repository_open_last,
         repository_list_active_series_frames,
         repository_save_document,

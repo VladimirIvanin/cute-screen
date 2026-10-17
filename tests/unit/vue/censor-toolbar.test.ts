@@ -14,6 +14,8 @@ import {
   vi,
 } from 'vitest'
 import { markRaw } from 'vue'
+import { createCensorLayer } from '@cute-screen/editor-renderer'
+import { resolveCensorEffect } from '../../../packages/editor-vue/src/shell/tools/effects/precision-censor'
 import {
   createEditorShellPinia,
   DocumentSessionController,
@@ -28,6 +30,7 @@ import {
   canvasContext,
   documentFixture,
   precisionLayerFixture,
+  precisionDefaults,
 } from './m08-precision-test-kit'
 
 beforeEach(() => {
@@ -45,7 +48,10 @@ function schema(mixed = false): ContextToolbarSchema {
     ],
   }
 }
-function mountSelection(layers = [precisionLayerFixture('censor')]) {
+function mountSelection(
+  layers = [precisionLayerFixture('censor')],
+  readOnlyDocument = false,
+) {
   const session = new DocumentSessionController({
     document: { ...documentFixture(), layers }, revision: 1,
     bridge: { saveDocument: async () => 2, exportRecoveryBundle: async () => ({ kind: 'saved' }) },
@@ -53,12 +59,91 @@ function mountSelection(layers = [precisionLayerFixture('censor')]) {
   })
   const pinia = createEditorShellPinia()
   const view = render(EditorShell, {
-    props: { documentSession: markRaw(session) }, global: { plugins: [pinia] },
+    props: { documentSession: markRaw(session), readOnlyDocument }, global: { plugins: [pinia] },
   })
   return { view, session, store: useEditorShellStore(pinia) }
 }
 
 describe('censor formatting toolbar', () => {
+  it('closes the shape menu when its control disappears without restoring detached focus', async () => {
+    const view = render(ContextToolbar, { props: { schema: schema(), label: 'Hide data' } })
+    const trigger = screen.getByRole('button', { name: 'Region shape' })
+    const focus = vi.spyOn(trigger, 'focus')
+    await fireEvent.click(trigger)
+    expect(await screen.findByRole('dialog', { name: 'Region shape' })).toBeInTheDocument()
+    await view.rerender({ schema: { ...schema(), controls: schema().controls.filter((item) => item.id !== 'censorRegion') } })
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Region shape' })).toBeNull())
+    expect(screen.queryByRole('button', { name: 'Region shape' })).toBeNull()
+    expect(focus).not.toHaveBeenCalled()
+  })
+
+  it.each(['rectangle', 'freeform'] as const)('keeps %s geometry while editing effects without a shape selector', async (kind) => {
+    const layer = createCensorLayer({
+      id: '019c1f62-058e-7000-8000-000000000831',
+      region: kind === 'rectangle'
+        ? { kind, bounds: { x: 10, y: 10, width: 50, height: 30 } }
+        : { kind, points: [{ x: 10, y: 10 }, { x: 60, y: 15 }, { x: 30, y: 40 }] },
+    })
+    const { view, session } = mountSelection([layer])
+    await selectLayerFromPanel(view)
+    expect(screen.queryByRole('button', { name: 'Region shape' })).toBeNull()
+    expect(view.container.querySelector('.cs-censor-region')).toBeNull()
+    const preferences = localStorage.getItem(TOOL_SETTINGS_STORAGE_KEY)
+    await fireEvent.click(screen.getByRole('button', { name: 'Blur' }))
+    expect(session.snapshot.core.document.layers[0]).toMatchObject({ payload: { region: layer.payload.region, effect: { mode: 'blur' } } })
+    expect(screen.getByRole('button', { name: 'Blur strength' })).toBeEnabled()
+    session.undo()
+    expect(session.snapshot.core.document.layers).toEqual([layer])
+    session.redo()
+    expect(session.snapshot.core.document.layers[0]).toMatchObject({ payload: { region: layer.payload.region, effect: { mode: 'blur' } } })
+    expect(JSON.parse(localStorage.getItem(TOOL_SETTINGS_STORAGE_KEY)!).settings.precision.censor.region)
+      .toBe(JSON.parse(preferences!).settings.precision.censor.region)
+    view.unmount()
+    session.dispose()
+  })
+
+  it.each(['rectangle', 'freeform'] as const)('ignores direct %s shape changes for an existing censor', (next) => {
+    const selected = createCensorLayer({
+      id: '019c1f62-058e-7000-8000-000000000831',
+      region: { kind: 'freeform', points: [{ x: 10, y: 10 }, { x: 60, y: 15 }, { x: 30, y: 40 }] },
+    })
+    const state = {
+      selected,
+      defaults: structuredClone(precisionDefaults),
+      document: { ...documentFixture(), layers: [selected] },
+    }
+    const before = structuredClone(state)
+    expect(resolveCensorEffect('censorRegion', next, state)).toEqual({ kind: 'handled' })
+    expect(state).toEqual(before)
+    expect(resolveCensorEffect('censorRegion', next, { ...state, selected: undefined })).toEqual({
+      kind: 'defaults', value: { ...state.defaults, censor: { ...state.defaults.censor, region: next } },
+    })
+  })
+
+  it.each(['locked', 'read-only'] as const)('keeps %s selection disabled without a shape selector or changes', async (state) => {
+    const { view, session } = mountSelection(
+      [precisionLayerFixture('censor', state === 'locked')],
+      state === 'read-only',
+    )
+    await selectLayerFromPanel(view)
+    const before = structuredClone(session.snapshot.core.document)
+    const execute = vi.spyOn(session, 'execute')
+    const preferences = localStorage.getItem(TOOL_SETTINGS_STORAGE_KEY)
+    expect(screen.queryByRole('button', { name: 'Region shape' })).toBeNull()
+    const effects = within(screen.getByRole('group', { name: 'Effect' }))
+    for (const button of effects.getAllByRole('button')) expect(button).toBeDisabled()
+    await fireEvent.click(effects.getByRole('button', { name: 'Blur' }))
+    const parameter = screen.getByRole('button', { name: 'Pixel size' })
+    expect(parameter).toBeDisabled()
+    await fireEvent.click(parameter)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(execute).not.toHaveBeenCalled()
+    expect(session.snapshot.core.document).toEqual(before)
+    expect(localStorage.getItem(TOOL_SETTINGS_STORAGE_KEY)).toBe(preferences)
+    view.unmount()
+    session.dispose()
+  })
+
   it('shows three effect buttons without selects or an expanded slider', async () => {
     const view = render(ContextToolbar, { props: { schema: schema(), label: 'Hide data' } })
     expect(screen.getByRole('button', { name: 'Pixelate' })).toHaveAttribute('aria-pressed', 'true')
@@ -157,13 +242,14 @@ describe('censor formatting toolbar', () => {
     if (first.kind !== 'censor') throw new Error('Expected censor fixture')
     const second = {
       ...first, id: '019c1f62-058e-7000-8000-000000000899',
-      payload: { ...first.payload, effect: { mode: 'blur' as const, strength: 24 } },
+      payload: { ...first.payload, region: { kind: 'freeform' as const, points: [{ x: 0, y: 0 }, { x: 50, y: 5 }, { x: 20, y: 30 }] }, effect: { mode: 'blur' as const, strength: 24 } },
     }
     const { view, session } = mountSelection([first, second])
     await selectLayerFromPanel(view)
     const rows = view.container.querySelectorAll<HTMLElement>('.cs-layer-select')
     rows[1]!.focus()
     await fireEvent.keyDown(rows[1]!, { key: 'Enter', ctrlKey: true })
+    expect(screen.queryByRole('button', { name: 'Region shape' })).toBeNull()
     const effects = within(screen.getByRole('group', { name: 'Effect' }))
     expect(effects.getAllByRole('button').every((item) => item.getAttribute('aria-pressed') === 'false')).toBe(true)
     expect(screen.queryByRole('button', { name: 'Pixel size' })).toBeNull()

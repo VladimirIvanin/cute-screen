@@ -386,7 +386,7 @@ describe('M08 shell lifecycle and contextual settings', () => {
       const more = within(toolbar).queryByRole('button', { name: /More|Ещё/ })
       if (more) await fireEvent.click(more)
       if (tool === 'Spotlight' || tool === 'Ruler') {
-        const names = tool === 'Spotlight' ? ['Rectangle', 'Ellipse', 'Diamond', 'Dimming', 'Edge softness'] : ['Colour', 'Thickness', 'Label and units', 'Measurement and snapping']
+        const names = tool === 'Spotlight' ? ['Rectangle', 'Ellipse', 'Diamond', 'Dimming', 'Edge softness'] : ['Colour', 'Thickness', 'Label size', 'Measurement and snapping']
         for (const name of names) expect(within(toolbar).getByRole('button', { name })).toBeInTheDocument()
       } else if (tool === 'Loupe' || tool === 'Hide data') {
         for (const name of labels) expect(within(toolbar).getByRole('button', { name })).toBeInTheDocument()
@@ -401,7 +401,7 @@ describe('M08 shell lifecycle and contextual settings', () => {
 
     await fireEvent.contextMenu(await screen.findByRole('button', { name: 'Линейка' }))
     toolbar = view.container.querySelector('.cs-tool-defaults-toolbar') as HTMLElement
-    for (const name of ['Цвет', 'Толщина', 'Подпись и единицы', 'Измерение и привязка']) expect(within(toolbar).getByRole('button', { name })).toBeInTheDocument()
+    for (const name of ['Цвет', 'Толщина линии', 'Размер подписи', 'Измерение и привязка']) expect(within(toolbar).getByRole('button', { name })).toBeInTheDocument()
     await fireEvent.click(await screen.findByRole('button', { name: 'Показать слои' }))
     expect(view.container.querySelector('.cs-layers-panel')).not.toHaveTextContent(/Размер подписи|Шаг угла|Привязка/u)
 

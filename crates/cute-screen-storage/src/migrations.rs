@@ -44,13 +44,19 @@ const MIGRATION_LIST: &[M<'static>] = &[
     M::up(LEGACY_MIGRATIONS[0].sql),
     M::up(LEGACY_MIGRATIONS[1].sql),
     M::up("DROP TABLE IF EXISTS schema_migrations;"),
+    M::up("ALTER TABLE captures ADD COLUMN history_protected INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE captures ADD COLUMN history_legacy_pending INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE captures ADD COLUMN viewport_json TEXT;
+        UPDATE captures SET history_legacy_pending=1;
+        CREATE TABLE history_thumbnails(document_id TEXT PRIMARY KEY REFERENCES documents(id), revision INTEGER NOT NULL, cache_name TEXT NOT NULL UNIQUE, byte_size INTEGER NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, updated_at INTEGER NOT NULL);
+        CREATE INDEX captures_history_cursor ON captures(captured_at DESC,id DESC) WHERE deleted_at IS NULL;"),
 ];
 const MIGRATIONS: Migrations<'static> = Migrations::from_slice(MIGRATION_LIST);
 
 pub(crate) fn migrate(connection: &mut Connection) -> Result<(), RepositoryError> {
     let user_version =
         connection.query_row("PRAGMA user_version", [], |row| row.get::<_, i64>(0))?;
-    let supported = 3;
+    let supported = 4;
     if user_version > supported {
         return Err(RepositoryError::UnsupportedDatabaseSchema {
             found: user_version,

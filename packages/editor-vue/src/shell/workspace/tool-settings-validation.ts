@@ -5,6 +5,7 @@ const enums: Record<string, readonly string[]> = {
   region: ['rectangle', 'freeform'],
   mode: ['pixelate', 'blur', 'solid'],
   unit: ['pixels', 'percent'],
+  percentBasis: ['canvasWidth', 'canvasHeight', 'canvasDiagonal'],
   feather: ['soft', 'strong'],
   style: ['solid', 'dashed', 'dotted'],
 }

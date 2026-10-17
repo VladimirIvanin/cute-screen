@@ -62,7 +62,11 @@ export function createSelectionActions(context: SelectionContext) {
   function pasteStyle(): void {
     if (blocked() || !styleClipboard.value) return
     const layers = selected()
-    const command = styleCommand(layers, styleClipboard.value, context.document.value?.canvas)
+    const command = styleCommand(
+      layers,
+      styleClipboard.value,
+      context.document.value?.crop ?? context.document.value?.canvas,
+    )
     if (!command) {
       context.error.value = text('No compatible style changes', 'Нет совместимых изменений стиля')
       return

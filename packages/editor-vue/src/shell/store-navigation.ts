@@ -45,7 +45,10 @@ export function createViewportActions(state: ShellStoreState) {
     rememberActiveFrame()
     state.activeFrameId.value = id
     const preserved = state.frameViewports.get(id)
-    if (!preserved) return
+    if (!preserved) {
+      state.zoomMode.value = 'fit'
+      return
+    }
     state.zoom.value = preserved.zoom
     state.zoomMode.value = preserved.mode
   }
@@ -61,6 +64,7 @@ export function createViewportActions(state: ShellStoreState) {
     setZoomState(value, 'custom')
   }
   function setFitZoom(value: number): void {
+    if (state.zoomMode.value !== 'fit') return
     setZoomState(value, 'fit')
   }
   function enableFit(): void {

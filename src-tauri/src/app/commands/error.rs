@@ -34,6 +34,7 @@ impl From<RepositoryError> for CommandErrorV1 {
             RepositoryError::WorkerBusy
                 | RepositoryError::WorkerStopped
                 | RepositoryError::RevisionConflict
+                | RepositoryError::HistoryConflict(_)
                 | RepositoryError::PermissionDenied
                 | RepositoryError::NoSpace
                 | RepositoryError::Io(_)
@@ -50,6 +51,7 @@ impl From<RepositoryError> for CommandErrorV1 {
             RepositoryError::InjectedFault { .. } => "injectedFault",
             RepositoryError::MissingBlob { .. } => "missingBlob",
             RepositoryError::RevisionConflict => "revisionConflict",
+            RepositoryError::HistoryConflict(_) => "historyConflict",
             RepositoryError::PermissionDenied => "permissionDenied",
             RepositoryError::NoSpace => "noSpace",
             RepositoryError::InvalidRecoveryBundle(_) => "invalidRecoveryBundle",

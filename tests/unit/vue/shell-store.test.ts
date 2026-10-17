@@ -11,6 +11,14 @@ import {
 } from '@cute-screen/editor-vue'
 
 describe('M04 capture action feedback', () => {
+  it('ignores a stale Fit result after restoring a custom history viewport', () => {
+    const store = useEditorShellStore(createEditorShellPinia())
+    store.setZoom(110)
+    store.setFitZoom(27)
+    expect(store.zoomMode).toBe('custom')
+    expect(store.zoom).toBe(110)
+  })
+
   it('keeps ordered multi-selection transient and clears it without document state', () => {
     const store = useEditorShellStore(createEditorShellPinia())
     store.selectLayer('bottom')

@@ -22,6 +22,7 @@ use zip::{ZipArchive, ZipWriter, write::SimpleFileOptions};
 
 use image::{ImageDecoder, codecs::jpeg::JpegDecoder, metadata::Orientation};
 
+pub mod history;
 mod migrations;
 use migrations::migrate;
 #[cfg(test)]
@@ -57,6 +58,8 @@ pub enum RepositoryError {
     MissingBlob { hash: String },
     #[error("stored document revision changed before save")]
     RevisionConflict,
+    #[error("history operation needs another review: {0}")]
+    HistoryConflict(String),
     #[error("storage permission was denied")]
     PermissionDenied,
     #[error("not enough storage space")]
@@ -141,6 +144,9 @@ impl CaptureMetadataV1 {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum StorageFaultPoint {
+    BeforeCleanupCommit,
+    AfterCleanupCommit,
+    CleanupFileRemoved,
     JournalPrepared,
     BlobWrittenAndSynced,
     MetadataTransactionStarted,
@@ -255,6 +261,10 @@ struct RecoveryBundleBlob {
 }
 
 struct StorageState {
+    library_root: PathBuf,
+    history_leases: BTreeSet<String>,
+    history_leased_blobs: BTreeSet<String>,
+    history_plans: std::collections::BTreeMap<String, history::PendingPlan>,
     blobs_root: PathBuf,
     resources_root: PathBuf,
     connection: Connection,
@@ -550,6 +560,10 @@ impl StorageState {
         connection.busy_timeout(std::time::Duration::from_secs(5))?;
         migrate(&mut connection)?;
         let mut state = Self {
+            library_root: root.to_path_buf(),
+            history_leases: BTreeSet::new(),
+            history_leased_blobs: BTreeSet::new(),
+            history_plans: std::collections::BTreeMap::new(),
             blobs_root,
             resources_root,
             connection,
@@ -642,10 +656,6 @@ impl StorageState {
             params![serde_json::to_string(&series_id).map_err(|error| RepositoryError::InvalidDocument(error.to_string()))?, request.captured_at],
         )?;
         transaction.execute(
-            "INSERT INTO settings (key, schema_version, value_json, updated_at) VALUES ('session.activeCaptureId', 1, ?1, ?2) ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at",
-            params![serde_json::to_string(&request.capture_id).map_err(|error| RepositoryError::InvalidDocument(error.to_string()))?, request.captured_at],
-        )?;
-        transaction.execute(
             "DELETE FROM recovery_journal WHERE operation_id = ?1",
             params![operation_id],
         )?;
@@ -679,15 +689,21 @@ impl StorageState {
     }
 
     fn open_last(&mut self) -> Result<Option<OpenDocument>, RepositoryError> {
-        let document = self.connection.query_row(
-            "SELECT d.id, d.capture_id, d.revision, d.content_json, c.original_blob_hash FROM documents d JOIN captures c ON c.id = d.capture_id WHERE c.deleted_at IS NULL ORDER BY c.captured_at DESC LIMIT 1",
-            [],
-            |row| Ok(OpenDocument { document_id: row.get(0)?, capture_id: row.get(1)?, revision: row.get(2)?, document_json: row.get(3)?, source_hash: row.get(4)?, image_token: None }),
+        let selected = self
+            .get_setting("session.activeCaptureId")?
+            .map(|value| {
+                serde_json::from_str::<String>(&value)
+                    .map_err(|e| RepositoryError::InvalidDocument(e.to_string()))
+            })
+            .transpose()?;
+        let id = self.connection.query_row(
+            "SELECT id FROM captures WHERE deleted_at IS NULL ORDER BY (id = ?1) DESC, captured_at DESC, id DESC LIMIT 1",
+            params![selected], |row| row.get::<_,String>(0),
         ).optional()?;
-        if let Some(open) = &document {
-            validate_document(&open.document_json)?;
-        }
-        Ok(document)
+        let Some(id) = id else { return Ok(None) };
+        let document = self.open_capture(&id)?;
+        self.history_leases.insert(id);
+        Ok(Some(document))
     }
 
     fn list_active_series_frames(&mut self) -> Result<Vec<SeriesFrame>, RepositoryError> {
@@ -1848,7 +1864,7 @@ mod tests {
         }
     }
 
-    fn request(document_id: &str, capture_id: &str) -> CreateCaptureRequest {
+    pub(super) fn request(document_id: &str, capture_id: &str) -> CreateCaptureRequest {
         let source_bytes = fixture_bytes();
         let hash = super::sha256_hex(&source_bytes);
         CreateCaptureRequest {
@@ -1886,7 +1902,7 @@ mod tests {
             fresh
                 .query_row("PRAGMA user_version", [], |row| row.get::<_, i64>(0))
                 .expect("user version"),
-            3
+            4
         );
         assert!(!super::legacy_migration_table_exists(&fresh).expect("legacy table probe"));
 
@@ -1939,7 +1955,7 @@ mod tests {
             connection
                 .query_row("PRAGMA user_version", [], |row| row.get::<_, i64>(0))
                 .expect("user version"),
-            3
+            4
         );
         assert!(!super::legacy_migration_table_exists(&connection).expect("legacy table probe"));
 
@@ -2451,3 +2467,6 @@ mod tests {
         ));
     }
 }
+
+#[cfg(test)]
+mod history_tests;

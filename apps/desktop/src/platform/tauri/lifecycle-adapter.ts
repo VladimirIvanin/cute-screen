@@ -13,7 +13,7 @@ export interface DesktopLifecyclePorts {
   readonly captureProgress: ShallowRef<CaptureProgressState | undefined>
   readonly firstFrame: EditorFirstFrameGate
   readonly flushBeforeAction: () => Promise<boolean>
-  readonly mountCapturedDocument: () => Promise<boolean>
+  readonly mountCapturedDocument: (captureId?: string) => Promise<boolean>
 }
 
 export async function installDesktopLifecycleGuards(ports: DesktopLifecyclePorts): Promise<Array<() => void>> {
@@ -86,7 +86,7 @@ async function handleCaptureOutcome(
   const waitsForEditorFrame = outcome.completion === 'editor' && documentId !== undefined
   const firstFrame = waitsForEditorFrame ? ports.firstFrame.waitForNextFrame() : undefined
   try {
-    mounted = await ports.mountCapturedDocument()
+    mounted = await ports.mountCapturedDocument(outcome.document?.captureId)
     if (mounted && firstFrame) await firstFrame
     if (!mounted && firstFrame) {
       ports.firstFrame.fail(new Error('editor document mount failed'))

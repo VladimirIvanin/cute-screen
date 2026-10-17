@@ -315,9 +315,10 @@ export class DraftController {
     if (start.x === end.x && start.y === end.y) return undefined
     return createRulerLayer({
       id,
-      canvas,
+      canvas: bounds,
       start,
       end,
+      percentBasis: defaults.ruler.percentBasis,
       unit: defaults.ruler.unit,
       snapAngleIncrementDegrees: defaults.ruler.snapAngleIncrementDegrees,
       color: defaults.ruler.color,

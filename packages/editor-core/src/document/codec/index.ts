@@ -9,7 +9,10 @@ import {
   type ParsedEditorDocument,
 } from '../types'
 import { assertValidLoupeSourceRegion } from '../../tools/precision/shared'
-import { rulerVisualBoundsAreConservative } from '../../tools/precision/ruler'
+import {
+  rebaseRulerLayer,
+  rulerVisualBoundsAreConservative,
+} from '../../tools/precision/ruler'
 import { parseLayer } from './layers'
 import {
   collectDocumentExtras,
@@ -73,7 +76,7 @@ function documentToJson(document: EditorDocument): JsonObject {
   }
 }
 
-function validateLayerRelationships(document: Pick<EditorDocument, 'source' | 'canvas' | 'layers'>): void {
+function validateLayerRelationships(document: Pick<EditorDocument, 'source' | 'canvas' | 'crop' | 'layers'>): void {
   const ids = new Set<string>()
   let baseCount = 0
   for (const layer of document.layers) {
@@ -88,7 +91,7 @@ function validateLayerRelationships(document: Pick<EditorDocument, 'source' | 'c
     if (layer.kind === 'loupe') {
       assertValidLoupeSourceRegion(layer.payload.sourceRegion, document.canvas)
     }
-    if (layer.kind === 'ruler' && !rulerVisualBoundsAreConservative(layer, document.canvas)) {
+    if (layer.kind === 'ruler' && !rulerVisualBoundsAreConservative(layer, document.crop ?? document.canvas)) {
       throw new Error(`layer ${layer.id} must use conservative localBounds containing its ruler line, ticks and badge`)
     }
   }
@@ -105,8 +108,7 @@ function parseCurrentDocument(object: Record<string, unknown>): EditorDocument {
   })
   if (!Array.isArray(object.layers)) throw new Error('layers must be an array')
   const source = parseSource(object.source)
-  const layers = Object.freeze(object.layers.map(parseLayer))
-  validateLayerRelationships({ source, canvas: canvasSize, layers })
+  const parsedLayers = object.layers.map(parseLayer)
   const crop = object.crop === null || object.crop === undefined ? null : parseRect(object.crop, 'crop')
   if (
     crop !== null &&
@@ -117,6 +119,19 @@ function parseCurrentDocument(object: Record<string, unknown>): EditorDocument {
   ) {
     throw new Error('crop must remain inside canvas')
   }
+  // Earlier v7 documents derived diagonal badges from the full canvas, even after crop.
+  // Accept those validated bounds, then refresh derived geometry before history is created.
+  const layers = Object.freeze(parsedLayers.map((layer) => {
+    if (
+      layer.kind !== 'ruler' ||
+      !crop ||
+      layer.payload.percentBasis !== 'canvasDiagonal' ||
+      rulerVisualBoundsAreConservative(layer, crop) ||
+      !rulerVisualBoundsAreConservative(layer, canvasSize)
+    ) return layer
+    return rebaseRulerLayer(layer, layer.payload, crop)
+  }))
+  validateLayerRelationships({ source, canvas: canvasSize, crop, layers })
   const extras = collectDocumentExtras(object)
   return Object.freeze({
     schemaVersion: EDITOR_DOCUMENT_SCHEMA_VERSION,

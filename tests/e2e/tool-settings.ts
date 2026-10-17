@@ -64,7 +64,7 @@ async function verifyRulerLabelSize(
   output: string,
   prefix: string,
 ): Promise<void> {
-  await $('button[aria-label="Label and units"]').click()
+  await $('button[aria-label="Label size"]').click()
   const labelSize = $('.cs-tool-settings-popover input[aria-label="Label size"]')
   await setNumericInput(labelSize, '16')
   await browser.keys('Enter')
@@ -75,7 +75,7 @@ async function verifyRulerLabelSize(
   await setNumericInput(labelSize, '24')
   await browser.keys('Escape')
   expect((await shapeDocument()).layers.at(-1)!.payload.fontSize).toBe(16)
-  await $('button[aria-label="Label and units"]').click()
+  await $('button[aria-label="Label size"]').click()
   await browser.saveScreenshot(path.resolve(output, `${prefix}-numeric-label.png`))
 }
 export async function verifyToolSettings(

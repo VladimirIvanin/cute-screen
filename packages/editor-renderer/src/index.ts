@@ -169,6 +169,7 @@ export {
   type SpotlightFeatherPreset,
   type SpotlightShape,
   type RulerUnit,
+  type RulerPercentBasis,
   DEFAULT_RICH_TEXT_PARAGRAPH_STYLE,
   DEFAULT_RICH_TEXT_SPAN_STYLE,
   applyRichTextParagraphStyle,

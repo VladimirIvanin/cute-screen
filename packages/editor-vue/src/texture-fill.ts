@@ -37,6 +37,7 @@ export type TextureResourceState =
 export class TextureResourceResolver {
   readonly #bridge: TextureFillBridge
   readonly #correlationId: () => string
+  #generation = 0
   #resources = new Map<string, TextureResourceState>()
 
   constructor(options: { readonly bridge: TextureFillBridge; readonly correlationId: () => string }) {
@@ -44,17 +45,25 @@ export class TextureResourceResolver {
     this.#correlationId = options.correlationId
   }
 
+  clear(): void {
+    this.#generation += 1
+    for (const resource of this.#resources.values()) if (resource.kind === 'ready') resource.image.src = ''
+    this.#resources.clear()
+  }
+
   get(blobHash: string): TextureResourceState | undefined {
     return this.#resources.get(blobHash)
   }
 
   async import(): Promise<TextureImportOutcome> {
+    const generation = this.#generation
     const outcome = await this.#bridge.importTexture(this.#correlationId())
-    if (outcome.kind === 'imported') await this.#load(outcome)
+    if (outcome.kind === 'imported') await this.#load(outcome, generation)
     return outcome
   }
 
   async resolve(blobHash: string): Promise<TextureResourceState> {
+    const generation = this.#generation
     const existing = this.#resources.get(blobHash)
     if (existing?.kind === 'ready') return existing
     try {
@@ -62,13 +71,13 @@ export class TextureResourceResolver {
       if (outcome.kind === 'cancelled') {
         throw new Error('Texture resolution was cancelled')
       }
-      return await this.#load(outcome)
+      return await this.#load(outcome, generation)
     } catch (error) {
       const missing: TextureResourceState = {
         kind: 'missing',
         error: error instanceof Error ? error.message : 'Texture is unavailable',
       }
-      this.#resources.set(blobHash, missing)
+      if (generation === this.#generation) this.#resources.set(blobHash, missing)
       return missing
     }
   }
@@ -77,7 +86,10 @@ export class TextureResourceResolver {
     this.#resources.delete(blobHash)
   }
 
-  async #load(outcome: Extract<TextureImportOutcome, { kind: 'imported' }>): Promise<TextureResourceState> {
+  async #load(
+    outcome: Extract<TextureImportOutcome, { kind: 'imported' }>,
+    generation = this.#generation,
+  ): Promise<TextureResourceState> {
     try {
       const loaded = await loadImageWithBinaryFallback({
         token: outcome.resourceToken,
@@ -85,6 +97,10 @@ export class TextureResourceResolver {
         bridge: this.#bridge,
         createResource: async (image) => image,
       })
+      if (generation !== this.#generation) {
+        loaded.resource.src = ''
+        throw new Error('Image belongs to an inactive document')
+      }
       const ready: TextureResourceState = {
         kind: 'ready',
         image: loaded.resource,
@@ -96,7 +112,7 @@ export class TextureResourceResolver {
         kind: 'missing',
         error: error instanceof Error ? error.message : 'Texture is unavailable',
       }
-      this.#resources.set(outcome.blobHash, missing)
+      if (generation === this.#generation) this.#resources.set(outcome.blobHash, missing)
       return missing
     }
   }

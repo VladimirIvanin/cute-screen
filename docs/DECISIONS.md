@@ -364,7 +364,7 @@ runtime pass не означает `supported` или `verified` для друг
 
 ## ADR-021 — Content-addressed blobs и bounded image resources
 
-**Статус:** accepted
+**Статус:** superseded в части автоматического maintenance по [ADR-078](#adr-078-компактная-временная-история); остальные storage/resource инварианты сохраняются.
 
 **Контекст:** M03 должен хранить originals и будущие image layers локально,
 не помещая bytes в document JSON или SQLite metadata. Полноразмерные bitmap
@@ -1508,3 +1508,56 @@ CLI `--section shortcuts` — сочетания; открытый singleton с�
 Vue tests, browser keyboard/menu/resize сценарии, real Tauri recorder,
 физическая активация и relaunch. Фактические результаты и ограничения —
 TESTING.md; источники UX — HOTKEYS_RESEARCH.md.
+
+## ADR-076 — Понятные параметры и база процентов линейки
+
+**Статус:** accepted; дополняет ADR-056/059/074.
+
+**Контекст:** три числа без видимых смысловых ориентиров плохо различимы;
+единицы измерения в меню размера текста выглядят как единицы шрифта.
+Единственная диагональная база всего canvas не описывает область Quick Capture.
+
+**Решение:** одна строка: цвет, пиктограмма толщины с px, Aa с размером в px,
+прямой разделитель, пиктограмма линейки с длиной и явной базой процентов.
+Четыре режима находятся в меню измерения: pixels, percent от ширины/высоты/диагонали
+crop либо canvas без crop. На линии и в экспорте остаётся короткая подпись.
+Все потребители используют один расчёт, включая bounds badge и hit testing.
+Изменение единиц/базы атомарно; изменение crop включает производную геометрию
+locked/hidden rulers в свою команду. Schema v7 расширяет существующий percentBasis;
+прежние диагональные значения сохраняются. Новая установка использует pixels
+и предпочитает canvasWidth; старые preferences без базы получают canvasDiagonal.
+
+**Проверяемое основание:** пользовательский сценарий с закрытыми меню, red-first
+core/codec/history, mounted Vue, decoded renderer и browser/native сценарии.
+Фактические результаты и платформенные ограничения фиксируются в TESTING.md.
+
+## ADR-077 — Форма скрытия данных выбирается до рисования
+
+**Статус:** accepted; дополняет ADR-069.
+
+**Контекст:** смена rectangle на freeform у готовой области создавала polygon
+из четырёх прежних углов: выбор менялся, видимого результата не было. Обратная
+смена могла потерять произвольный контур.
+
+**Решение:** censorRegion существует только в defaults/configure до рисования,
+включая Quick Capture. Selection одного или нескольких объектов показывает
+эффект и его параметры без выбора и подписи формы. Прямой вызов censorRegion
+для существующего слоя обрабатывается без изменения документа/history/defaults.
+Следующая область использует выбранный creation default. Формат v7, persisted
+points, public API, renderer и undoable effect updates сохраняются.
+
+**Проверяемое основание:** red-first Vue отсутствие selector для rectangle,
+freeform и группы, закрытие открытого меню при исчезновении control, no-op
+resolver; browser и real Tauri pointer creation rectangle → freeform, эффекты
+и undo/redo через production Capture → Quick → Editor. Фактические результаты
+и ограничения — TESTING.md.
+
+## ADR-078 — Компактная временная история
+
+**Статус:** accepted; supersedes maintenance scheduling portion of ADR-021.
+
+**Решение:** вместо номерного filmstrip — кнопка истории и bounded popover. Общая история использует SQLite cursor pagination и неизменяемые blobs. Defaults: 7 дней / 512 МиБ / 200 кадров. Защита и активные leases важнее лимитов. Старые данные требуют согласия на preview. Maintenance выполняется после первого отображения, materialization/save, изменения политики и не чаще раза в час для периодического запуска. Startup recovery лишь восстанавливает journal; полная orphan sweep при старте запрещена. Ручное удаление подтверждается до commit, Undo удаления отсутствует. Undo документа не переносится между сессиями кадров.
+
+**Проверяемое основание:** red-first Rust storage contracts, production session handoff tests, browser/native history flows, preview revision/censor tests и bounded-resource soak. Результаты и ограничения фиксируются в TESTING.md; наличие API не считается runtime evidence.
+
+Исследование ADR-078: [паттерны истории и ограничения ресурсов](HISTORY_RESEARCH.md).

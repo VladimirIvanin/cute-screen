@@ -1,5 +1,19 @@
 # Архитектура Cute Screen
 
+## Измерение линейки от видимой области (ADR-076)
+
+`RulerPercentBasis` в payload и renderer-neutral scene допускает canvasWidth,
+canvasHeight и canvasDiagonal. Размеры в DOM-free `measureRuler` и helpers
+badge/rebase описывают crop либо canvas; world endpoints не меняют систему
+координат. Один formatter создаёт короткую подпись для scene, preview/export,
+clipboard и conservative badge geometry. Vue добавляет локализованную базу
+только в UI. `rulerMeasurementMode` атомарно задаёт unit/percentBasis через
+существующую command boundary. Defaults сохраняют базу отдельно от style clipboard.
+`setCrop` включает необходимую подгонку bounds всех ruler в rulerChanges.
+Codec v7 принимает прежние диагональные документы; если старые full-canvas bounds
+недостаточны для crop badge, проверяет прежнюю геометрию и обновляет производные
+bounds до создания history, сохраняя world endpoints и payload semantics.
+
 ## Измерение текста и transient projection (ADR-062)
 
 `editor-renderer/rich-text` вычисляет soft lines по целым graphemes и измеряет
@@ -68,7 +82,11 @@ renderer origin и schema v7 не меняются: старые докумен�
 `CensorFormattingToolbar` подключён через общий `ContextToolbar` для privacy
 и переиспользует существующие censor controls/events в defaults, configure,
 selection и Quick. Три эффекта видны сразу; region и параметр раскрываются
-через `usePreviewPopover`. `NumericControl` обслуживает визуальные preset slots,
+через `usePreviewPopover`. По ADR-077 control `censorRegion` включается только
+в defaults/configure: selection schema не содержит его даже для группы.
+Панель скрывает кнопку и закрывает открытое меню при исчезновении control,
+не возвращая focus удалённой кнопке. Effect resolver игнорирует `censorRegion`
+для готового слоя без command/defaults update. `NumericControl` обслуживает визуальные preset slots,
 точный ввод и transient preview; `SimpleColorPicker` — цвет заливки.
 `CensorEffectPreview` рисует только демонстрационный фрагмент средствами SVG,
 без чтения снимка. Command history, mixed projection, preferences, document v7,
@@ -520,7 +538,7 @@ Backends не возвращают UI-строки. Они возвращают 
 
 ## Хранение и восстановление
 
-SQLite schema v3 содержит как минимум:
+SQLite schema v4 содержит как минимум:
 
 - `series`
 - `captures`
@@ -528,6 +546,7 @@ SQLite schema v3 содержит как минимум:
 - `blobs`
 - `settings`
 - `recovery_journal`
+- `history_thumbnails`
 
 Новые изменения схемы являются immutable entries `rusqlite_migration` и
 версионируются `PRAGMA user_version`. При `user_version = 0` legacy
@@ -695,3 +714,41 @@ ShortcutRow со встроенным recorder и доступным меню Sh
 useShortcutRecorder изолирует draft/probe по generation; useSettingsRuntime
 подключает реальные keyboard/blur/listener/polling и освобождает lease.
 Выбранный раздел не хранится в preferences и не меняет generated IPC.
+
+## Общая временная история (ADR-078)
+
+`history` — отдельный storage domain на существующем single-owner worker.
+`captures` содержит protection, legacy consent cohort и viewport JSON; документ
+v7 не меняется. `HistoryRequest`/`HistoryResponse` генерируются в IPC bindings.
+Список получает только summaries по cursor `(captured_at, id)`, по 50 записей.
+
+Desktop history loader подготавливает и декодирует входящий кадр, flush-ит
+исходящий документ и фиксирует active capture перед атомарной заменой session
+и source image. Latest-selection generation исключает устаревший mount.
+Viewport сохраняется перед capture, switch и close; Undo принадлежит одной
+сессии. Документы остаются вне глубокой реактивности Vue.
+
+Preview queue обрабатывает только запрошенные видимые карточки, одной задачей;
+OffscreenCanvas worker использует общий Canvas2D saved-scene renderer. При
+недоступном worker применяется тот же контракт на отдельном canvas. Crop и
+censor входят в результат; selection/overlay отсутствуют. Ключ содержит
+document ID, revision и renderer version. PNG передаётся бинарно с opaque
+transport token; frontend никогда не получает filesystem path из history API.
+
+Original decoded cache ограничен 256 МиБ, thumbnail decoded cache — 16 МиБ,
+thumbnail disk cache — 32 МиБ. Активные leases могут превысить бюджет; это не
+обещание ограничения RSS всего процесса. При смене документа освобождаются
+старые transport registrations и texture maps.
+
+Maintenance запускается после первого frame/empty startup, сохранения и смены
+политики, периодически раз в час. Defaults: 7 дней / 512 МиБ / 200 captures.
+Защита, активный документ и loading leases исключаются из автоудаления.
+Старые captures мигрируют с `history_legacy_pending=1`; согласие снимается
+только через подтверждённый preview. SQL references предотвращают удаление
+shared originals и images/textures других документов.
+
+Удаление metadata и `historyCleanup` journal фиксируются одной транзакцией;
+затем удаляются только проверенные owned paths. Незавершённый journal
+возобновляется maintenance, включая deferred live blob resources. Preview
+имеет ограниченное время жизни и fingerprint; изменения истории требуют
+повторного review. Отчёт различает files, SQLite allocation и reusable bytes.

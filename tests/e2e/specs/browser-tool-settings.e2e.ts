@@ -18,7 +18,7 @@ describe('pencil spotlight ruler compact settings', () => {
       await browser.setWindowSize(width, 800)
       for (const locale of ['en', 'ru'] as const) for (const theme of ['light', 'dark'] as const) {
         await setShellPreferences(locale, theme)
-        await $(`button[aria-label="${locale === 'ru' ? 'Подпись и единицы' : 'Label and units'}"]`).click()
+        await $(`button[aria-label="${locale === 'ru' ? 'Размер подписи' : 'Label size'}"]`).click()
         await expect($('.cs-tool-settings-popover')).toBeDisplayed()
         await browser.waitUntil(() => browser.execute(() => {
           const panel = document.querySelector('.cs-tool-settings-popover')!.getBoundingClientRect()

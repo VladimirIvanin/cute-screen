@@ -1,0 +1,197 @@
+:root {
+  --cs-history-width: 360px;
+  --cs-history-height: 400px;
+  --cs-history-row: 104px;
+}
+.cs-bottom-chrome .cs-filmstrip.cs-history-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 36px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  background: var(--chrome-96);
+  box-shadow: none;
+  cursor: pointer;
+}
+.cs-history-popover {
+  width: min(var(--cs-history-width), calc(100vw - 24px));
+  max-height: min(var(--cs-history-height), calc(100vh - 88px));
+  display: flex;
+  flex-direction: column;
+  color: var(--text);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-overlay);
+  font:
+    12px/1.4 system-ui,
+    sans-serif;
+}
+.cs-history-popover button {
+  min-height: 32px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+.cs-history-popover button:hover {
+  background: var(--surface-sunken);
+}
+.cs-history-popover button:focus-visible,
+.cs-history-trigger:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.cs-history-popover button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.cs-history-popover header,
+.cs-history-popover footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+}
+.cs-history-popover header button {
+  width: 32px;
+}
+.cs-history-popover footer {
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+}
+.cs-history-popover footer small {
+  display: block;
+  font-size: 10px;
+}
+.cs-history-scroll {
+  overflow: auto;
+  min-height: 104px;
+  max-height: 292px;
+  padding: 0 8px;
+  overscroll-behavior: contain;
+}
+.cs-history-virtual {
+  position: relative;
+}
+.cs-history-grid {
+  position: absolute;
+  inset: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.cs-history-card {
+  position: relative;
+  height: var(--cs-history-row);
+  padding: 4px;
+  box-sizing: border-box;
+  min-width: 0;
+}
+.cs-history-popover .cs-history-capture {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 4px;
+  border: 1px solid var(--border);
+  background: var(--surface-sunken);
+}
+.cs-history-popover .cs-history-capture.is-current {
+  border: 2px solid var(--accent);
+  padding: 3px;
+}
+.cs-history-capture img {
+  width: 100%;
+  height: 64px;
+  object-fit: contain;
+}
+.cs-history-capture small {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 9px;
+  padding-top: 4px;
+}
+.cs-history-placeholder {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 64px;
+  color: var(--text-muted);
+}
+.cs-history-popover .cs-history-more {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 32px;
+  background: var(--surface-raised);
+}
+.cs-history-card-menu {
+  position: absolute;
+  top: 36px;
+  right: 4px;
+  z-index: 2;
+  min-width: 150px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-overlay);
+}
+.cs-history-card-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+}
+.cs-history-message {
+  padding: 12px;
+}
+.cs-history-load {
+  width: 100%;
+}
+.cs-history-warning,
+.cs-history-popover .cs-history-danger {
+  color: var(--danger);
+}
+.cs-history-settings label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 16px 0;
+}
+.cs-history-settings select {
+  min-height: 32px;
+  color: var(--text);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.cs-history-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+.cs-history-settings dl {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+.cs-history-settings dd {
+  margin: 0;
+}
+.cs-history-confirm {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}

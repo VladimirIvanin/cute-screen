@@ -3,7 +3,12 @@ import {
   expect,
   it,
 } from 'vitest'
-import { createRenderSceneSnapshot } from '@cute-screen/editor-core'
+import {
+  createRenderSceneSnapshot,
+  createDocumentRenderScene,
+  createEditorDocumentFromImage,
+  createRulerLayer,
+} from '@cute-screen/editor-core'
 import {
   canvas2dPng,
   RULER_PINK,
@@ -25,6 +30,31 @@ import {
 } from './precision-rendering'
 
 describe('M08 Canvas2D precision renderer/export', () => {
+  it('renders crop-relative percent badges identically in preview and decoded export on a 2560px document', async () => {
+    const document = createEditorDocumentFromImage({
+      id: '019c1f62-058e-7000-8000-000000000000', baseLayerId: '019c1f62-058e-7000-8000-000000000001',
+      source: { blobHash: 'a'.repeat(64), format: 'png', mimeType: 'image/png', width: 2560, height: 1440,
+        orientationApplied: true, provenance: 'capture', color: { colorSpace: 'srgb', hasIccProfile: false } },
+      timestamp: '2026-10-17T00:00:00.000Z',
+    })
+    const crop = { x: 400, y: 200, width: 1200, height: 800 }
+    const results: Uint8ClampedArray[] = []
+    for (const [percentBasis, expected] of [['canvasWidth', '41.67%'], ['canvasHeight', '62.5%'], ['canvasDiagonal', '34.67%']] as const) {
+      const ruler = createRulerLayer({ id: '019c1f62-058e-7000-8000-000000000004', canvas: crop,
+        start: { x: 700, y: 600 }, end: { x: 1200, y: 600 }, unit: 'percent', percentBasis, fontSize: 32 })
+      const scene = createDocumentRenderScene({ ...document, crop, layers: [ruler] })
+      expect(scene.nodes[0]).toMatchObject({ kind: 'ruler', label: expected, percentBasis })
+      const preview = await decodedPixels(await canvas2dPng(scene, { preview: true }))
+      const exported = await decodedPixels(await canvas2dPng(scene))
+      expect([exported.width, exported.height]).toEqual([1200, 800])
+      expect(Buffer.compare(Buffer.from(exported.data), Buffer.from(preview.data))).toBe(0)
+      expect(exported.data.some((channel) => channel !== 0)).toBe(true)
+      results.push(exported.data)
+    }
+    expect(Buffer.compare(Buffer.from(results[0]!), Buffer.from(results[1]!))).not.toBe(0)
+    expect(Buffer.compare(Buffer.from(results[1]!), Buffer.from(results[2]!))).not.toBe(0)
+  })
+
   it('chooses an automatic contrasting badge and keeps reversed labels upright', () => {
     expect(rulerBadgePalette(RULER_PINK)).toEqual({
       background: { red: 1, green: 1, blue: 1, alpha: 0.96 },

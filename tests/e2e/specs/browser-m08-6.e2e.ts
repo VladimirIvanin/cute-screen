@@ -30,7 +30,7 @@ describe('M08 crop and precision acceptance in browser mode', () => {
     await browser.waitUntil(async () => Boolean(await overlayAlphaBounds()))
     const initialFrame = await overlayAlphaBounds()
 
-    await $('button[aria-label="Label and units"]').click()
+    await $('button[aria-label="Label size"]').click()
     await clickSliderProgress('Label size', 0.95, 'm08-ruler-font-size')
     await browser.waitUntil(async () => {
       const ruler = (await m08Snapshot()).document.layers.at(-1)

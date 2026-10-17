@@ -186,6 +186,7 @@ export const DEFAULT_PRECISION_TOOLS: PrecisionToolDefaults = Object.freeze({
     feather: 'soft',
   }),
   ruler: Object.freeze({
+    percentBasis: 'canvasWidth',
     unit: 'pixels',
     snap: true,
     snapAngleIncrementDegrees: 15,

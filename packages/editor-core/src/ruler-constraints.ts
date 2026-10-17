@@ -13,6 +13,7 @@ import {
 import {
   rebaseRulerLayer,
   rulerVisualGeometry,
+  rulerVisualBoundsAreConservative,
   snapRulerEndpoint,
 } from './tools/precision/ruler'
 
@@ -65,6 +66,7 @@ export function constrainRulerMove(
   bounds: Rect,
   canvas: EditorDocumentV1['canvas'] = bounds,
 ): Point {
+  canvas = bounds
   const rulers = layers.filter((layer): layer is RulerLayer => layer.kind === 'ruler')
   const endpoints = rulers.flatMap(worldEndpoints)
   if (!endpoints.length) return delta
@@ -134,5 +136,7 @@ export function fitRulerToBounds(
     }, canvas)
   }
   const transform = constrainRulerTransform(candidate, candidate.transform, bounds, canvas)
-  return transform === candidate.transform ? candidate : { ...candidate, transform }
+  candidate = transform === candidate.transform ? candidate : { ...candidate, transform }
+  if (candidate === layer && rulerVisualBoundsAreConservative(layer, bounds)) return layer
+  return rebaseRulerLayer(candidate, candidate.payload, bounds)
 }

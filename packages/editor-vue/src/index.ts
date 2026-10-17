@@ -7,6 +7,10 @@ export { shortcutLetter } from './keyboard-shortcuts'
 
 export {
   Canvas2DRenderer,
+  ImageResourceManager,
+  type ImageResourceLease,
+  createDocumentRenderScene,
+  parseEditorDocument,
   CanvasKitRenderer,
   createRenderSceneSnapshot,
   createEditorDocumentFromImage,
@@ -131,3 +135,12 @@ export type EditorVueBoundary = Readonly<{
 }>
 
 export type { EditorDocumentV1 }
+
+export {
+  createHistoryPreviewWorker,
+  type ThumbnailJob,
+} from './history/worker'
+export { default as EditorPopover } from './shell/ui/EditorPopover.vue'
+
+export { renderHistoryThumbnail } from './history/thumbnail-render'
+export { loadDocumentTextFonts as loadHistoryDocumentFonts } from './text-fonts'

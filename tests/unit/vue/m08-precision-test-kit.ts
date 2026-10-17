@@ -62,6 +62,7 @@ export const precisionDefaults = {
     feather: 'soft' as const,
   },
   ruler: {
+    percentBasis: 'canvasDiagonal',
     unit: 'percent' as const,
     snap: true,
     snapAngleIncrementDegrees: 15,

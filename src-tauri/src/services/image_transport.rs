@@ -75,6 +75,38 @@ pub struct ImageTransportService {
 }
 
 impl ImageTransportService {
+    /// Drops a token without deleting authoritative library content.
+    pub fn release_registration(&self, token: &str) -> Result<(), PlatformError> {
+        self.images
+            .write()
+            .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, "release"))?
+            .remove(token);
+        Ok(())
+    }
+
+    /// A document swap drops tokens owned by the previous session, including Undo-only images.
+    pub fn release_authoritative(&self) -> Result<(), PlatformError> {
+        self.images
+            .write()
+            .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, "release"))?
+            .retain(|_, image| !image.authoritative);
+        Ok(())
+    }
+
+    pub fn authoritative_hashes(
+        &self,
+    ) -> Result<std::collections::BTreeSet<String>, PlatformError> {
+        let images = self
+            .images
+            .read()
+            .map_err(|_| transport_error(PlatformErrorCode::CaptureFailed, "history"))?;
+        Ok(images
+            .values()
+            .filter(|image| image.authoritative)
+            .filter_map(|image| image.sha256.clone())
+            .collect())
+    }
+
     pub fn new(
         source_root: impl AsRef<Path>,
         stage_root: impl AsRef<Path>,

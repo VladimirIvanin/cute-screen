@@ -278,7 +278,7 @@ function resizeRuler(
     return layer
   return rebaseRulerLayer(layer, Object.freeze({
     ...layer.payload, [handle]: next,
-  }), options.canvas)
+  }), options.rulerBounds ?? options.canvas)
 }
 function resizeText(
   layer: Extract<LayerNode, {

@@ -105,7 +105,14 @@ function registerPropWatches(context: WorkspaceLifecycleContext): void {
   watch(
     () => context.props.documentSession,
     (session, _previous, onCleanup) => {
-      if (!session) return
+      if (!session) {
+        context.workspace.activeDocument.value = undefined
+        context.workspace.textureImages.value = new Map()
+        context.store.setLayers([])
+        context.store.clearLayerSelection()
+        context.store.setDocumentHistory({ canUndo: false, canRedo: false, saveState: 'saved' })
+        return
+      }
       onCleanup(session.subscribe(context.applyDocumentSnapshot))
     },
     { immediate: true },

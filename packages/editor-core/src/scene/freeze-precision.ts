@@ -1,3 +1,4 @@
+import { RULER_PERCENT_BASES } from '../document/types'
 import type {
   Point2D,
   RenderCensorEffect,
@@ -126,7 +127,7 @@ export function freezeRulerNode(node: RenderRulerNode): RenderRulerNode {
     throw new RangeError(`${node.id} ruler measurement is invalid`)
   }
   if (
-    node.percentBasis !== 'canvasDiagonal' ||
+    !RULER_PERCENT_BASES.includes(node.percentBasis) ||
     (node.unit !== 'pixels' &&
       node.unit !== 'percent')
   ) {

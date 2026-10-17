@@ -1,5 +1,15 @@
 # CI-сборки и проверка версии через GitHub
 
+## Проверка настроек линейки (ADR-076)
+
+`CUTE_SCREEN_E2E_SCENARIOS=ruler-toolbar,ruler-toolbar-reopen pnpm test:e2e:tauri`
+проверяет production Capture → Quick → Editor, режимы измерения, crop,
+undo/redo и отдельный запуск с сохранённым документом/defaults. Сценарии
+используют общую persistence group и external Linux driver, как ruler-shift.
+Расширены значения percentBasis существующей schema v7; native IPC не меняется.
+Старые документы с canvasDiagonal читаются, старые preferences без базы
+восстанавливают диагональ; новая установка использует pixels/canvasWidth.
+
 ## Очистка outputs editor-пакетов
 
 `pnpm build:packages` удаляет `packages/editor-core/dist` и
@@ -324,3 +334,25 @@ Settings показывает необходимость ремонта собс
 собирает test binary и проверяет Settings, relaunch и native capture. Для X11
 physical input требуется xdotool. `TAURI_WEBDRIVER_PORT` позволяет выбрать
 свободный embedded port, но keyboard/pointer suites следует выполнять последовательно.
+
+Для `CUTE_SCREEN_E2E_SCENARIOS=censor-toolbar pnpm test:e2e:tauri` выбран
+external provider: regression ADR-077 рисует rectangle/freeform настоящими
+PointerEvent в production Quick → Editor. В Linux нужны `tauri-driver` и
+`WebKitWebDriver` в PATH; embedded DOM MouseEvent не доказывает рисование.
+В X11 сценарий выбирает `contextInput=x11` и рисует системным указателем через
+`xdotool`: WebKitWebDriver Actions в этом окружении доставляет только MouseEvent.
+Сохранённая input trace обязана содержать trusted PointerEvent, без полифилла
+или искусственного создания слоя. Остальные платформы сохраняют WebDriver Actions.
+
+## История снимков (ADR-078)
+
+SQLite migration 4 добавляет protection/legacy consent/viewport и
+`history_thumbnails`; document schema остаётся v7. Старые сборки с поддержкой
+SQLite v3 не открывают библиотеку v4. Перенос originals и автоматический
+export не выполняются. Existing captures защищены от автоочистки до consent.
+
+Локальная native acceptance: `CUTE_SCREEN_E2E_SCENARIOS=history,history-reopen,history-delete pnpm test:e2e:tauri`. Сценарии используют общий isolated
+profile, production Capture → Quick → Editor и фактическое сохранение.
+На Linux без внешних drivers используется embedded WebView driver; размещение
+аннотации выполняется реальным X11 pointer input. Browser/native input suites
+запускаются последовательно.

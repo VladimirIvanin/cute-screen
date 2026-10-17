@@ -1118,6 +1118,29 @@ fn fake_capture_frame(
     transport: &ImageTransportService,
     correlation_id: &str,
 ) -> Result<CaptureResult, crate::platform::PlatformError> {
+    // History acceptance uses the same high-entropy 4K fixture as storage/render tests,
+    // rather than treating the tiny generic fake frame as memory evidence.
+    if std::env::var("CUTE_SCREEN_E2E_SCENARIO").is_ok_and(|value| value == "history") {
+        let bytes = std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../tests/fixtures/generated/ui-4k.png"),
+        )
+        .map_err(|_| {
+            crate::platform::PlatformError::new(PlatformErrorCode::CaptureFailed, correlation_id)
+        })?;
+        let token = format!("fake-{}", Uuid::now_v7().simple());
+        transport.import_owned_bytes(&token, &bytes, "image/png", 3840, 2160, correlation_id)?;
+        return Ok(CaptureResult {
+            image_token: token,
+            correlation_id: correlation_id.to_owned(),
+            width: 3840,
+            height: 2160,
+            geometry: None,
+            quick_frame_geometry: None,
+            quick_selection_pending: false,
+            cursor_included: None,
+        });
+    }
     const WIDTH: u32 = 400;
     const HEIGHT: u32 = 300;
     let mut bytes = Vec::new();

@@ -444,10 +444,14 @@ function createControllers(
         const { blendMode: _blend, highlighterMode: _mode, ...appearance } = style
         void _blend
         void _mode
-        return applyLayerStyle(layer, appearance, workspace.activeDocument.value?.canvas)
+        return applyLayerStyle(
+          layer,
+          appearance,
+          workspace.activeDocument.value?.crop ?? workspace.activeDocument.value?.canvas,
+        )
       }
       return style && !['text', 'callout'].includes(layer.kind)
-        ? applyLayerStyle(layer, style, workspace.activeDocument.value?.canvas)
+        ? applyLayerStyle(layer, style, workspace.activeDocument.value?.crop ?? workspace.activeDocument.value?.canvas)
         : layer
     },
   })

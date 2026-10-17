@@ -144,7 +144,7 @@ function layerCommands(
     ? rebaseRulerLayer({
         ...layer,
         transform: constrainRulerTransform(layer, transform, rulerCanvasBounds(document), document.canvas),
-      }, layer.payload, document.canvas)
+      }, layer.payload, document.crop ?? document.canvas)
     : { ...layer, transform }
   return [{ type: 'updateLayer', before: layer, after }]
 }

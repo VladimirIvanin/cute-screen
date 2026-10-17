@@ -17,6 +17,9 @@ import type {
 import { UiIcon } from '../icon'
 import SimpleColorPicker from '../ui/SimpleColorPicker.vue'
 import NumericControl from '../ui/NumericControl.vue'
+import UiSeparator from '../ui/UiSeparator.vue'
+import RulerMeasurementSettings from './RulerMeasurementSettings.vue'
+import { useRulerMeasurement } from '../ui/ruler-measurement'
 import { usePreviewPopover } from '../ui/use-preview-popover'
 const props = defineProps<{
   schema: ContextToolbarSchema
@@ -62,8 +65,8 @@ const names = computed<Record<string, string>>(() => ({
   dim: text('Dimming', 'Затемнение'),
   feather: text('Edge softness', 'Мягкость краёв'),
   regions: text('Apertures', 'Области'),
-  stroke: text('Thickness', 'Толщина'),
-  label: text('Label and units', 'Подпись и единицы'),
+  stroke: text('Thickness', 'Толщина линии'),
+  label: text('Label size', 'Размер подписи'),
   measure: text('Measurement and snapping', 'Измерение и привязка'),
 }))
 const menus = computed(() => kind.value === 'pencil' ? ['brush', 'appearance', 'smoothing'] : kind.value === 'spotlight' ? ['dim', 'feather', ...(settings.value.apertures ? ['regions'] : [])] : ['stroke', 'label', 'measure'])
@@ -144,6 +147,7 @@ const blends = computed(() => [
   ['softLight', text('Soft light', 'Мягкий свет')],
   ['hardLight', text('Hard light', 'Жёсткий свет')],
 ])
+const { length: rulerLength } = useRulerMeasurement(() => props.schema, () => props.locale)
 function summary(menu: string): string {
   const display = (id: string, suffix = '') => mixed(id) ? '—' : `${value(id)}${suffix}`
   if (menu === 'brush')
@@ -161,8 +165,8 @@ function summary(menu: string): string {
   if (menu === 'stroke')
     return display('rulerThickness', ' px')
   if (menu === 'label')
-    return `Aa ${display('rulerFontSize')} · ${mixed('rulerUnit') ? '—' : value('rulerUnit') === 'percent' ? '%' : 'px'}`
-  return settings.value.measurement?.length ?? 'Alt'
+    return `Aa ${display('rulerFontSize', ' px')}`
+  return rulerLength.value
 }
 function show(
   menu: string,
@@ -182,7 +186,7 @@ function show(
   open.value = shown ? menu : undefined
   void nextTick(() => {
     if (shown)
-      panel.value?.querySelector<HTMLElement>('[aria-pressed="true"], input:not(:disabled), button:not(:disabled)')?.focus({
+      panel.value?.querySelector<HTMLElement>('button[aria-pressed="true"]:not(:disabled), input:not(:disabled), button:not(:disabled)')?.focus({
         preventScroll: true,
       })
     else if (restoreFocus)
@@ -359,24 +363,14 @@ watch([() => props.schema.icon, () => settings.value.activeApertureId], () => {
           @commit="change('spotlightDimColor', $event)"
           @eyedropper="emit('eyedropper', 'spotlightDimColor')"
         />
-        <template v-if="menu === 'measure'">
-          <div v-if="settings.measurement" class="cs-tool-measurement">
-            <output>{{ settings.measurement.length }} · {{ settings.measurement.angle }}</output><button
-              type="button"
-              data-settings-action="rulerCopyLength"
-              @click="emit('action', 'rulerCopyLength')"
-            >
-              {{ text('Copy length', 'Скопировать длину') }}
-            </button><button
-              type="button"
-              data-settings-action="rulerCopyAngle"
-              @click="emit('action', 'rulerCopyAngle')"
-            >
-              {{ text('Copy angle', 'Скопировать угол') }}
-            </button>
-          </div>
-          <small>{{ text('Hold Alt to snap while drawing or moving an endpoint. Changing the step keeps the current measurement.', 'Alt — привязка при рисовании и перемещении конца. Изменение шага сохраняет текущее измерение.') }}</small>
-        </template>
+        <RulerMeasurementSettings
+          v-if="menu === 'measure'"
+          :schema="schema"
+          :locale="locale"
+          :disabled="blocked"
+          @change="change('rulerMeasurementMode', $event)"
+          @action="emit('action', $event)"
+        />
         <small v-if="menu === 'smoothing' && numeric('smoothing')?.disabled && value('brush') === 'pen'">{{ correctionHint }}</small>
         <NumericControl
           v-for="id in numericIds(menu)"
@@ -464,38 +458,41 @@ watch([() => props.schema.icon, () => settings.value.activeApertureId], () => {
           <p v-else>{{ text('Draw or select one spotlight to edit its apertures.', 'Нарисуйте или выберите один фонарь для редактирования областей.') }}</p>
           <small>{{ text('Double-click an aperture to edit it. Escape exits.', 'Двойной клик редактирует область. Escape завершает.') }}</small>
         </div>
-        <template v-if="menu === 'label'">
-          <div class="cs-tool-settings-choices">
-            <button
-              v-for="item in ['pixels', 'percent']"
-              :key="item"
-              type="button"
-              :disabled="blocked"
-              :aria-label="item === 'pixels' ? text('Pixels', 'Пиксели') : text('Percent', 'Проценты')"
-              :aria-pressed="!mixed('rulerUnit') && value('rulerUnit') === item"
-              @click="change('rulerUnit', item)"
-            >
-              {{ item === 'pixels' ? 'px' : '%' }}
-            </button>
-          </div>
-          <small>{{ text('Percent is relative to the diagonal of the entire canvas.', 'Проценты — от диагонали всего холста.') }}</small>
-        </template>
       </div>
     </NPopover>
-    <button
-      v-for="menu in menus"
-      :key="`trigger:${menu}`"
-      :ref="element => { if (element) triggers.set(menu, element as HTMLButtonElement) }"
-      type="button"
-      class="cs-tool-settings-trigger"
-      :disabled="blocked && menu !== 'measure' || menu === 'smoothing' && numeric('smoothing')?.disabled"
-      :aria-label="names[menu]"
-      :title="menu === 'smoothing' && value('brush') === 'pen' ? correctionHint : names[menu]"
-      :aria-expanded="open === menu"
-      aria-haspopup="dialog"
-      @click="show(menu, open !== menu)"
-    >
-      <span>{{ summary(menu) }}</span><UiIcon name="chevronDown"/>
-    </button>
+    <template v-for="menu in menus" :key="`trigger:${menu}`">
+      <UiSeparator v-if="kind === 'ruler' && menu === 'measure'" :length="21"/>
+      <button
+        :ref="element => { if (element) triggers.set(menu, element as HTMLButtonElement) }"
+        type="button"
+        class="cs-tool-settings-trigger"
+        :class="{ 'cs-ruler-measure-trigger': kind === 'ruler' && menu === 'measure' }"
+        :disabled="blocked && menu !== 'measure' || menu === 'smoothing' && numeric('smoothing')?.disabled"
+        :aria-label="names[menu]"
+        :title="menu === 'smoothing' && value('brush') === 'pen' ? correctionHint : names[menu]"
+        :aria-expanded="open === menu"
+        aria-haspopup="dialog"
+        @click="show(menu, open !== menu)"
+      >
+        <svg
+          v-if="kind === 'ruler' && menu === 'stroke'"
+          class="cs-tool-settings-semantic-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          aria-hidden="true"
+        >
+          <path d="M4 5H20" stroke-width="1"/>
+          <path d="M4 12H20" stroke-width="2"/>
+          <path d="M4 19H20" stroke-width="3"/>
+        </svg>
+        <UiIcon
+          v-if="kind === 'ruler' && menu === 'measure'"
+          class="cs-tool-settings-semantic-icon"
+          name="ruler"
+        />
+        <span>{{ summary(menu) }}</span><UiIcon class="cs-tool-settings-chevron" name="chevronDown"/>
+      </button>
+    </template>
   </div>
 </template>

@@ -15,7 +15,7 @@ use cute_screen_desktop::{
     shortcuts::{
         ShortcutAction, ShortcutBackendV1, ShortcutEntryV1, ShortcutSnapshotV1, ShortcutStatusV1,
     },
-    storage::OpenDocument,
+    storage::{OpenDocument, history::*},
 };
 use ts_rs::{Config, TS};
 
@@ -33,6 +33,15 @@ fn generated_bindings() -> String {
     output.push_str(&declaration::<CaptureCompletion>());
     output.push_str(&declaration::<CaptureTerminalOutcome>());
     output.push_str(&declaration::<OpenDocument>());
+    output.push_str(&declaration::<HistoryPolicy>());
+    output.push_str(&declaration::<HistoryViewport>());
+    output.push_str(&declaration::<HistoryCursor>());
+    output.push_str(&declaration::<RecentCapture>());
+    output.push_str(&declaration::<HistoryPage>());
+    output.push_str(&declaration::<StorageReport>());
+    output.push_str(&declaration::<CleanupPlan>());
+    output.push_str(&declaration::<HistoryRequest>());
+    output.push_str(&declaration::<HistoryResponse>());
     output.push_str(&declaration::<CaptureOutcomeV2>());
     output.push_str(&declaration::<QuickCaptureSelectionV1>());
     output.push_str(&declaration::<QuickCaptureDraftV1>());
