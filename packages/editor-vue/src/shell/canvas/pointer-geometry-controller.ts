@@ -1,13 +1,12 @@
 import {
-  arrowSelectionHandles,
-  BOUNDS_RESIZE_HANDLES,
-  calloutSelectionHandles,
-  hitTestDocument,
-  layerIntrinsicResizeHandles,
-  type ArrowHandleKind,
-  type CalloutHandleKind,
+  calloutGeometryContext,
+  DocumentSpatialIndex,
+  nearestSelectionHandle,
+  resolveSelectionTarget,
+  type SelectionHandle,
+  type SelectionTarget,
   type LayerNode,
-  type Transform2D,
+  type EditorDocumentV1,
 } from '@cute-screen/editor-renderer'
 import type {
   ComputedRef,
@@ -19,29 +18,34 @@ import type {
   ViewportOutputBounds,
 } from './contracts'
 import type { ResizeHandle } from './workspace-state'
+import { canvasSelectionHandles } from './selection-controls'
 
 export interface PointerGeometryContext {
   readonly props: CanvasViewportProps
   readonly scene: Ref<HTMLCanvasElement | undefined>
   readonly outputBounds: ComputedRef<ViewportOutputBounds | undefined>
   readonly selectedLayer: () => LayerNode | undefined
+  readonly calloutInsertMode?: () => boolean
   readonly cropCursor: (point: CanvasPoint) => string | undefined
-  readonly layerBounds: (layer: LayerNode) => {
-    x: number
-    y: number
-    width: number
-    height: number
-  }
-  readonly worldHandlePositions: (layer: LayerNode) => Readonly<Record<ResizeHandle, CanvasPoint>>
-  readonly transformPoint: (transform: Transform2D, point: CanvasPoint) => CanvasPoint
-  readonly loupeSourceCenter: (layer: Extract<LayerNode, { readonly kind: 'loupe' }>) => CanvasPoint
+
 }
 
 export class PointerGeometryController {
   readonly #context: PointerGeometryContext
+  #hitIndex: DocumentSpatialIndex | undefined
+  #indexedDocument: EditorDocumentV1 | undefined
+  hoverTarget: SelectionTarget = { kind: 'empty' }
 
   constructor(context: PointerGeometryContext) {
     this.#context = context
+  }
+
+  screenScale(): CanvasPoint {
+    const rect = this.#context.scene.value?.getBoundingClientRect()
+    const bounds = this.#context.outputBounds.value
+    const zoom = (this.#context.props.zoom ?? 100) / 100
+    return rect && bounds && rect.width > 0 && rect.height > 0
+      ? { x: rect.width / bounds.width, y: rect.height / bounds.height } : { x: zoom, y: zoom }
   }
 
   canvasPoint(event: {
@@ -62,71 +66,49 @@ export class PointerGeometryController {
     return {
       x: bounds.x + ((event.clientX - rect.left) * bounds.width) / rect.width,
       y: bounds.y + ((event.clientY - rect.top) * bounds.height) / rect.height,
-      pressure:
-        event.pointerType === 'pen' && typeof event.pressure === 'number' && Number.isFinite(event.pressure)
-          ? Math.max(0, Math.min(1, event.pressure))
-          : 0.5,
+      pressure: event.pointerType === 'pen' && typeof event.pressure === 'number' && Number.isFinite(event.pressure)
+        ? Math.max(0, Math.min(1, event.pressure)) : 0.5,
     }
+  }
+
+  handles(layer: LayerNode): readonly SelectionHandle[] {
+    return canvasSelectionHandles(layer, this.screenScale(), this.#context.outputBounds.value,
+      this.#context.calloutInsertMode?.())
+  }
+
+  resolveSelectionTarget(point: CanvasPoint): SelectionTarget {
+    const { props } = this.#context
+    if (!props.document) return { kind: 'empty' }
+    const ids = props.selectedLayerIds ?? (props.selectedLayerId ? [props.selectedLayerId] : [])
+    const selected = ids.length === 1 ? this.#context.selectedLayer() : undefined
+    return resolveSelectionTarget({ document: props.document, selectedIds: ids, point,
+      hitIndex: this.#indexFor(props.document),
+      screenScale: this.screenScale(), context: calloutGeometryContext(), readOnly: props.readOnly ?? false,
+      handles: selected && !props.readOnly ? this.handles(selected) : [] })
+  }
+
+  #indexFor(document: EditorDocumentV1): DocumentSpatialIndex {
+    if (!this.#hitIndex || !this.#indexedDocument) {
+      this.#hitIndex = new DocumentSpatialIndex(document)
+    } else if (this.#indexedDocument !== document) {
+      const previous = new Map(this.#indexedDocument.layers.map((layer) => [layer.id, layer]))
+      const changed = document.layers.filter((layer) => previous.get(layer.id) !== layer).map((layer) => layer.id)
+      const currentIds = new Set(document.layers.map((layer) => layer.id))
+      const removed = this.#indexedDocument.layers.filter((layer) => !currentIds.has(layer.id)).map((layer) => layer.id)
+      this.#hitIndex.update(document, [...changed, ...removed])
+    }
+    this.#indexedDocument = document
+    return this.#hitIndex
   }
 
   boundsResizeHandle(
     layer: LayerNode,
     point: CanvasPoint,
   ): ResizeHandle | undefined {
-    const handles =
-      layer.kind === 'image'
-        ? BOUNDS_RESIZE_HANDLES
-        : layerIntrinsicResizeHandles(layer).filter(
-            (handle): handle is ResizeHandle => handle !== 'start' && handle !== 'end',
-          )
-    const positions = this.#context.worldHandlePositions(layer)
-    const tolerance = this.#tolerance()
-    return handles.find((handle) => {
-      const position = positions[handle]
-      return Math.hypot(position.x - point.x, position.y - point.y) <= tolerance
-    })
+    const handle = nearestSelectionHandle(this.handles(layer).filter((item) => item.kind === 'resize'), point,
+      this.screenScale())
+    return handle?.kind === 'resize' ? handle.handle : undefined
   }
-
-  rotationCorner(
-    layer: LayerNode,
-    point: CanvasPoint,
-  ): ResizeHandle | undefined {
-    const positions = this.#context.worldHandlePositions(layer)
-    const bounds = this.#context.layerBounds(layer)
-    const center = this.#context.transformPoint(layer.transform, {
-      x: bounds.x + bounds.width / 2,
-      y: bounds.y + bounds.height / 2,
-    })
-    const corners = ['nw', 'ne', 'se', 'sw'] as const
-    const resizeCorners = new Set(
-      (layer.kind === 'image' ? BOUNDS_RESIZE_HANDLES : layerIntrinsicResizeHandles(layer)).filter((handle) =>
-        corners.includes(handle as never)),
-    )
-    const offset = 14 / this.#zoomScale()
-    return corners.find((handle) => {
-      const corner = positions[handle]
-      const length = Math.hypot(corner.x - center.x, corner.y - center.y) || 1
-      const target = resizeCorners.has(handle)
-        ? {
-            x: corner.x + ((corner.x - center.x) / length) * offset,
-            y: corner.y + ((corner.y - center.y) / length) * offset,
-          }
-        : corner
-      return Math.hypot(target.x - point.x, target.y - point.y) <= this.#tolerance()
-    })
-  }
-
-  intrinsicEndpoint(
-    layer: LayerNode,
-    point: CanvasPoint,
-  ): 'start' | 'end' | undefined {
-    if (layer.kind !== 'ruler') return undefined
-    return (['start', 'end'] as const).find((handle) => {
-      const candidate = this.#context.transformPoint(layer.transform, layer.payload[handle])
-      return Math.hypot(candidate.x - point.x, candidate.y - point.y) <= this.#tolerance()
-    })
-  }
-
   setCursor(
     cursor: string,
     rotate = false,
@@ -136,121 +118,61 @@ export class PointerGeometryController {
     canvas.classList.toggle('cs-canvas-rotate-cursor', rotate)
     canvas.style.cursor = cursor
   }
-
   resizeCursor(handle: ResizeHandle): string {
     if (handle === 'n' || handle === 's') return 'ns-resize'
     if (handle === 'e' || handle === 'w') return 'ew-resize'
     return handle === 'nw' || handle === 'se' ? 'nwse-resize' : 'nesw-resize'
   }
-
   updateHoverCursor(point: CanvasPoint): void {
-    const { props, scene } = this.#context
-    const cropCursor = props.quickSelectionMode ? undefined : this.#context.cropCursor(point)
-    if (cropCursor !== undefined) {
-      this.setCursor(cropCursor)
+    const { props } = this.#context
+    this.hoverTarget = { kind: 'empty' }
+    const crop = props.quickSelectionMode ? undefined : this.#context.cropCursor(point)
+    if (crop !== undefined) {
+      this.setCursor(crop)
       return
     }
-    if (this.#markerCursor()) return
+    if (
+      props.activeTool === 'numberedMarker' &&
+      !props.sampling &&
+      !props.quickSelectionMode
+    ) {
+      this.setCursor(props.markerPreviewBlocked || props.readOnly ? 'default' : 'none')
+      return
+    }
+    if (props.activeTool === 'hand' || props.activeTool === 'crop') return
     if (
       props.quickSelectionMode ||
-      props.activeTool === 'pencil' ||
-      props.activeTool === 'marker'
+      props.activeTool &&
+      props.activeTool !== 'select'
     ) {
       this.setCursor('crosshair')
       return
     }
-    if (
-      !scene.value ||
-      !props.document ||
-      props.activeTool === 'hand' ||
-      props.activeTool === 'crop'
-    ) {
-      return
-    }
-    const layer = this.#context.selectedLayer()
-    if (
-      !layer ||
-      layer.locked ||
-      !layer.visible
-    ) {
+    const target = this.resolveSelectionTarget(point)
+    this.hoverTarget = target
+    if (props.readOnly) {
       this.setCursor('')
       return
     }
-    if (this.#isDirectHandle(layer, point)) {
-      this.setCursor(this.calloutHandle(layer, point) === 'width' ? 'ew-resize' : 'crosshair')
+    if (target.kind === 'handle') {
+      const handle = target.target
+      if (handle.kind === 'rotate') {
+        this.setCursor('', true)
+        return
+      }
+      if (handle.kind === 'resize') {
+        this.setCursor(this.resizeCursor(handle.handle))
+        return
+      }
+      this.setCursor(directHandleCursor(handle))
       return
     }
-    const resize = this.boundsResizeHandle(layer, point)
-    if (resize) {
-      this.setCursor(this.resizeCursor(resize))
-      return
-    }
-    if (this.rotationCorner(layer, point)) {
-      this.setCursor('', true)
-      return
-    }
-    this.setCursor(hitTestDocument(props.document, point) ? 'move' : '')
+    this.setCursor(target.kind === 'empty' ? '' : 'move')
   }
+}
 
-  calloutHandle(
-    layer: LayerNode,
-    point: CanvasPoint,
-  ): CalloutHandleKind | undefined {
-    if (layer.kind !== 'callout') return undefined
-    return calloutSelectionHandles(layer).find(({ point: local }) => {
-      const candidate = this.#context.transformPoint(layer.transform, local)
-      return Math.hypot(candidate.x - point.x, candidate.y - point.y) <= this.#tolerance()
-    })?.kind
-  }
-
-  loupeSourceHandle(
-    layer: LayerNode,
-    point: CanvasPoint,
-  ): boolean {
-    if (layer.kind !== 'loupe') return false
-    const source = this.#context.loupeSourceCenter(layer)
-    return Math.hypot(source.x - point.x, source.y - point.y) <= this.#tolerance()
-  }
-
-  arrowHandle(
-    layer: LayerNode,
-    point: CanvasPoint,
-  ): ArrowHandleKind | undefined {
-    if (layer.kind !== 'arrow') return undefined
-    return arrowSelectionHandles(layer).find(({ point: local }) => {
-      const candidate = this.#context.transformPoint(layer.transform, local)
-      return Math.hypot(candidate.x - point.x, candidate.y - point.y) <= this.#tolerance()
-    })?.kind
-  }
-
-  #markerCursor(): boolean {
-    const { props } = this.#context
-    if (
-      props.activeTool !== 'numberedMarker' ||
-      props.sampling ||
-      props.quickSelectionMode
-    ) return false
-    this.setCursor(props.markerPreviewBlocked || props.readOnly ? 'default' : 'none')
-    return true
-  }
-
-  #isDirectHandle(
-    layer: LayerNode,
-    point: CanvasPoint,
-  ): boolean {
-    return Boolean(
-      this.calloutHandle(layer, point) ||
-      this.arrowHandle(layer, point) ||
-      this.intrinsicEndpoint(layer, point) ||
-      this.loupeSourceHandle(layer, point),
-    )
-  }
-
-  #zoomScale(): number {
-    return (this.#context.props.zoom ?? 100) / 100
-  }
-
-  #tolerance(): number {
-    return 9 / this.#zoomScale()
-  }
+function directHandleCursor(handle: SelectionHandle): string {
+  if (handle.kind !== 'callout') return 'crosshair'
+  if (handle.handle === 'width') return 'ew-resize'
+  return handle.handle === 'labelBody' ? 'move' : 'crosshair'
 }

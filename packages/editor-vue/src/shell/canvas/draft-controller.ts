@@ -1,6 +1,7 @@
 import {
-  calloutMarkerRadius,
-  calloutPathPoints,
+  createCalloutLayer,
+  rebaseCalloutLayer,
+  withCalloutBackground,
   createCensorLayer,
   createDocumentRenderScene,
   createDrawingLayer,
@@ -9,7 +10,6 @@ import {
   constrainRulerEndpoint,
   rulerCanvasBounds,
   createSpotlightLayer,
-  defaultCalloutRoute,
   drawNodes2D,
   type LayerNode,
   type RulerAngleGuide,
@@ -127,13 +127,13 @@ export class DraftController {
       const editing = editingText.value
       if (
         editing?.kind !== 'callout' ||
-        editing.existing ||
+        !editing.existing &&
         !editing.calloutDraft
       ) {
         return
       }
-      target = editing.calloutDraft.target
-      label = editing.calloutDraft.label
+      target = editing.existing?.kind === 'callout' ? editing.existing.payload.target : editing.calloutDraft!.target
+      label = editing.existing?.kind === 'callout' ? editing.existing.payload.label : editing.calloutDraft!.label
       stroke = editing.calloutStroke ?? stroke
     }
     if (
@@ -144,17 +144,14 @@ export class DraftController {
     ) {
       return
     }
-    const points = calloutPathPoints({
-      target,
-      label,
-      route: defaultCalloutRoute(target, label),
-      stroke,
-      content: { text: '', wrap: 'autoSize', spans: [], paragraphs: [] },
-      background: null,
-      targetMarker: 'circle',
-      labelMarker: 'circle',
-    })
-    this.#strokeCallout(context, points, stroke)
+    const defaults = this.#context.props.textDefaults
+    const editing = editingText.value
+    let layer = editing?.existing?.kind === 'callout' ? editing.existing : createCalloutLayer({ id: '__callout-preview__', text: editing?.controller.state.content.text || ' ', target, label, stroke,
+      ...(defaults?.calloutStyle === undefined ? {} : { style: defaults.calloutStyle }),
+    })!
+    if (editing?.kind === 'callout') layer = rebaseCalloutLayer(layer, { ...withCalloutBackground(layer.payload, editing.background), content: editing.controller.state.content })
+    const document = this.#context.props.document
+    if (document) drawNodes2D(context, createDocumentRenderScene({ ...document, layers: [layer] }).nodes.filter((node) => editing?.existing ? node.id.endsWith(':background') : !node.id.endsWith(':text')))
   }
 
   precisionLayer(id = '__precision-draft__'): LayerNode | undefined {
@@ -266,31 +263,6 @@ export class DraftController {
         break
     }
     context.rect(bounds.x, bounds.y, bounds.width, bounds.height)
-  }
-
-  #strokeCallout(
-    context: CanvasRenderingContext2D,
-    points: readonly CanvasPoint[],
-    stroke: StrokeStyle,
-  ): void {
-    const scale = 1 / ((this.#context.props.zoom ?? 100) / 100)
-    context.save()
-    context.strokeStyle = `rgba(${Math.round(stroke.color.red * 255)}, ${Math.round(stroke.color.green * 255)}, ${Math.round(stroke.color.blue * 255)}, ${stroke.color.alpha})`
-    context.lineWidth = stroke.width * scale
-    context.lineCap = 'round'
-    context.lineJoin = 'round'
-    context.beginPath()
-    context.moveTo(points[0]!.x, points[0]!.y)
-    for (const point of points.slice(1)) context.lineTo(point.x, point.y)
-    context.stroke()
-    context.fillStyle = context.strokeStyle
-    const radius = calloutMarkerRadius(stroke.width)
-    for (const point of [points[0]!, points[points.length - 1]!]) {
-      context.beginPath()
-      context.arc(point.x, point.y, radius, 0, Math.PI * 2)
-      context.fill()
-    }
-    context.restore()
   }
 
   #rulerLayer(

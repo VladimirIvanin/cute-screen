@@ -68,15 +68,17 @@ export function hitTestDocument(
   document: Parameters<typeof coreHit>[0],
   point: Parameters<typeof coreHit>[1],
   context = calloutGeometryContext(),
+  options?: import('@cute-screen/editor-core').HitTestOptions,
 ) {
-  return coreHit(document, point, context)
+  return coreHit(document, point, context, options)
 }
 export function hitTestDocumentAll(
   document: Parameters<typeof coreHits>[0],
   point: Parameters<typeof coreHits>[1],
   context = calloutGeometryContext(),
+  options?: import('@cute-screen/editor-core').HitTestOptions,
 ) {
-  return coreHits(document, point, context)
+  return coreHits(document, point, context, options)
 }
 export class DocumentSpatialIndex extends CoreSpatialIndex {
   constructor(

@@ -5,6 +5,7 @@ import type {
 } from './labels'
 import type { SettingsState } from './use-settings'
 import StartupPreferences from './StartupPreferences.vue'
+import ExportFilenameSettings from './ExportFilenameSettings.vue'
 
 defineProps<{ locale: SettingsLocale; labels: SettingsStrings; state: SettingsState }>()
 const emit = defineEmits<{ locale: [value: SettingsLocale]; startup: [enabled: boolean]; system: [] }>()
@@ -34,5 +35,6 @@ const emit = defineEmits<{ locale: [value: SettingsLocale]; startup: [enabled: b
       @change="emit('startup', $event)"
       @system="emit('system')"
     />
+    <ExportFilenameSettings :locale="locale" />
   </section>
 </template>

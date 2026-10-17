@@ -1,5 +1,55 @@
 # CI-сборки и проверка версии через GitHub
 
+## Проверка управляемых выносок (ADR-087)
+
+Browser: `pnpm test:e2e:browser --spec tests/e2e/specs/browser-callout-editing.e2e.ts --spec tests/e2e/specs/browser-callout-layout.e2e.ts --spec tests/e2e/specs/browser-callout-visual.e2e.ts`.
+PowerShell: `$env:CUTE_SCREEN_E2E_SCENARIOS='callout-editing,callout-editing-reopen'; pnpm test:e2e:tauri`.
+Native scenarios делят isolated profile и используют external driver:
+production fake capture → Quick/non-origin crop → Editor → отдельный запуск.
+При занятом executable задавать отдельный CARGO_TARGET_DIR; не останавливать
+чужой запущенный editor. IPC, Rust core и document schema version не меняются.
+
+## Проверка image toolbar и gesture preview (ADR-086)
+
+`pnpm test:e2e:browser --spec tests/e2e/specs/browser-image-editing.e2e.ts`
+проверяет G import, crop и все промежуточные кадры жестов в RU/EN, light/dark,
+1024/1600 px. PowerShell:
+`$env:CUTE_SCREEN_E2E_SCENARIOS='content-image-tool'; pnpm test:e2e:tauri` —
+тот же pixel contract после настоящего native import в Quick и Editor.
+Подготовка source/document выполняется production flow; новые IPC или features
+не требуются. На занятом target использовать отдельный CARGO_TARGET_DIR.
+
+## Проверка входа в хранение из истории
+
+PowerShell: `$env:CUTE_SCREEN_E2E_SCENARIOS='history-settings'; pnpm test:e2e:tauri`.
+Сценарий использует isolated profile, production empty-editor mount и external
+driver; проверяет загрузку History Settings, повторную активацию singleton,
+закрытие и открытие заново. Новых commands, permissions и зависимостей нет.
+
+## Проверка выбора и перемещения (ADR-085)
+
+Browser: `pnpm test:e2e:browser --spec tests/e2e/specs/browser-selection-interactions.e2e.ts`.
+PowerShell: `$env:CUTE_SCREEN_E2E_SCENARIOS='selection-interactions'; pnpm test:e2e:tauri`.
+Native сценарий использует отдельный профиль, fake-platform capture,
+production Quick → Editor и external provider для trusted pointer/keyboard.
+Это не доказательство physical capture. Новых IPC/features/dependencies нет.
+
+## Проверка входа в настройки из редактора (ADR-083)
+
+PowerShell: `$env:CUTE_SCREEN_E2E_SCENARIOS='editor-settings'; pnpm test:e2e:tauri`.
+Сценарий использует отдельный профиль, external driver и обычный empty-editor
+mount. Проверяются trusted keyboard, шестерёнка, native singleton Settings,
+сохранение раздела при повторной активации и открытие после закрытия окна.
+Новые native команды, permissions и зависимости сборки не добавляются.
+
+## Проверка вставки изображений (ADR-081)
+
+PowerShell: `$env:CUTE_SCREEN_E2E_SCENARIOS='content-image-tool,content-image-reopen,content-image-empty'; pnpm test:e2e:tauri`.
+Первые два сценария используют один изолированный persistence profile; empty
+получает отдельный. Native picker selection и OS drop подменяются только на
+входной границе test-harness, storage/serde/decode/commands остаются настоящими.
+Test-only команда и picker hook исключены из production Rust build.
+
 ## Проверка настроек линейки (ADR-076)
 
 `CUTE_SCREEN_E2E_SCENARIOS=ruler-toolbar,ruler-toolbar-reopen pnpm test:e2e:tauri`

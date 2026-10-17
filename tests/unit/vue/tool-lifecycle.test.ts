@@ -297,9 +297,9 @@ it.each(['empty', 'loading', 'readOnly'] as const)('disables canvas actions in %
     props: state === 'readOnly' ? { readOnlyDocument: true, initialDocumentState: { kind: 'ready', title: 'Read only', dimensions: '100 × 100' } } : { initialDocumentState: { kind: state } },
     global: { plugins: [createEditorShellPinia()] },
   })
-  await fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
-  expect(screen.getByRole('menuitem', { name: 'Flip horizontally' })).toBeDisabled()
-  expect(screen.getByRole('menuitem', { name: 'Flip vertically' })).toBeDisabled()
+  await fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+  expect(screen.getByRole('button', { name: 'Flip horizontally' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Flip vertically' })).toBeDisabled()
   view.unmount()
 })
 it('keeps the clicked chrome focus when dismissing a selection popover', async () => {

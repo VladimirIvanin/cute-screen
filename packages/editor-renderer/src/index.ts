@@ -110,7 +110,27 @@ export {
   arrowPathPoints,
   arrowSelectionHandles,
   rebaseArrowLayer,
+  DEFAULT_CALLOUT_FRAME,
+  DEFAULT_CALLOUT_STYLE,
+  defaultCalloutAttachment,
+  calloutRoutePreset,
+  calloutStyleForPayload,
+  calloutBackground,
+  calloutFrameBackground,
+  withCalloutBackground,
+  calloutEndpointSize,
+  addCalloutStep,
+  removeCalloutStep,
+  resetCalloutRoute,
+  type CalloutPayload,
+  type CalloutStyle,
+  type CalloutFrame,
+  type CalloutRoute,
+  type CalloutMarker,
+  type CalloutMarkerStyle,
+  type CalloutAttachment,
   calloutMarkerRadius,
+  calloutLabelContains,
   calloutPathPoints,
   defaultCalloutRoute,
   type CalloutHandleKind,
@@ -310,4 +330,32 @@ export {
   moveStroke,
   setStrokeStraight,
   type StrokeState,
+} from '@cute-screen/editor-core'
+export { imagePlacement } from '@cute-screen/editor-core'
+
+export {
+  LAYER_INTERACTION_POLICIES,
+  SELECTION_DRAG_THRESHOLD_CSS,
+  SMALL_SELECTION_SIZE_CSS,
+  resolveSelectionTarget,
+  selectionFrame,
+  nearestSelectionHandle,
+  layerHitBounds,
+  type SelectionTarget,
+  type SelectionFrame,
+  type SelectionHandle,
+  type LayerInteractionPolicy,
+  type HitTestOptions,
+} from '@cute-screen/editor-core'
+
+export { layerSelectionHandles } from '@cute-screen/editor-core'
+
+export {
+  transformPoint,
+  transformToMatrix,
+} from '@cute-screen/editor-core'
+
+export {
+  parseCalloutPayload,
+  parseCalloutStyle,
 } from '@cute-screen/editor-core'

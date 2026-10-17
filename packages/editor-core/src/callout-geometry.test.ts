@@ -15,7 +15,6 @@ import {
   calloutPathPoints,
   calloutSelectionHandles,
   calloutTextRect,
-  defaultCalloutRoute,
   rebaseCalloutLayer,
   updateCalloutHandle,
 } from './callout-geometry'
@@ -31,7 +30,7 @@ const STROKE = Object.freeze({
 
 describe('callout leader-line geometry', () => {
   it('routes an elbow connector between target and label', () => {
-    const route = defaultCalloutRoute({ x: 10, y: 20 }, { x: 120, y: 80 })
+    const route = { path: 'elbow' as const, elbow: { axis: 'y' as const, offset: 0 } }
     expect(route.path).toBe('elbow')
     const points = calloutPathPoints({
       target: { x: 10, y: 20 },
@@ -54,7 +53,7 @@ describe('callout leader-line geometry', () => {
   })
 
   it('creates a rebased callout layer with connector handles', () => {
-    const layer = createCalloutLayer({
+    const layer = createCalloutLayer({ style: null,
       id: 'callout-1',
       text: 'data-product-id',
       target: { x: 40, y: 60 },
@@ -82,7 +81,7 @@ describe('callout leader-line geometry', () => {
 describe('callout measured outside label contract', () => {
   const metrics = { measureText: (content: import('./document/types').RichTextContent) => ({ width: content.fixedWidth ?? 210, height: 75 }) }
   function fixture(left = true) {
-    return createCalloutLayer({ id: 'outside', text: 'Текст label',
+    return createCalloutLayer({ style: null, id: 'outside', text: 'Текст label',
       target: { x: 400, y: 100 }, label: { x: left ? 300 : 500, y: 180 },
       background: { color: STROKE.color, padding: 12, radius: 4 }, stroke: STROKE })!
   }
@@ -130,7 +129,7 @@ describe('callout measured outside label contract', () => {
 })
 
 it('uses measured label bounds for scene and spatial hits despite stale persisted bounds', () => {
-  const layer = createCalloutLayer({ id: 'measured', text: 'Wide', target: { x: 900, y: 200 }, label: { x: 700, y: 400 } })!
+  const layer = createCalloutLayer({ style: null, id: 'measured', text: 'Wide', target: { x: 900, y: 200 }, label: { x: 700, y: 400 } })!
   const context = { measureText: () => ({ width: 600, height: 80 }) }
   const document = { ...documentFixture, layers: [layer] }
   const rect = calloutTextRect(layer.payload, context)

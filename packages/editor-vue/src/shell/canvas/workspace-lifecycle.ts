@@ -57,6 +57,7 @@ export function registerRenderLifecycle(context: RenderLifecycleContext): void {
       scrollContainer.value
     ) {
       context.emit('hostsReady', {
+        exportPng: () => context.renderer.exportPng(),
         waitForRender: () => context.renderer.waitForRender(),
         scene: scene.value,
         overlay: overlay.value,
@@ -100,6 +101,7 @@ export function registerRenderLifecycle(context: RenderLifecycleContext): void {
 }
 
 function registerDocumentWatches(context: RenderLifecycleContext): void {
+  watch(() => context.props.readOnly, () => context.cancelGesture(), { flush: 'sync' })
   watch(() => context.props.document?.id, () => {
     context.cancelGesture()
     context.editingText.value = undefined
@@ -144,7 +146,8 @@ function registerDocumentWatches(context: RenderLifecycleContext): void {
     () => context.editingText.value?.existing?.id,
     () => void context.drawDocument(),
   )
-  watch(() => [context.props.selectedLayerId, context.props.selectedLayerIds], context.invalidateOverlay)
+  watch(() => [context.props.selectedLayerId, context.props.selectedLayerIds, context.props.textFormatting],
+    context.invalidateOverlay)
 }
 
 function registerViewportWatches(context: RenderLifecycleContext): void {
@@ -193,7 +196,6 @@ export interface InputLifecycleContext {
   readonly outputBounds: ComputedRef<ViewportOutputBounds | undefined>
   readonly samplingCursor: Ref<CanvasPoint | undefined>
   readonly eyedropper: EyedropperController
-  readonly initialSamplingCursor: () => CanvasPoint | undefined
   readonly scheduleEyedropper: (point: CanvasPoint) => void
   readonly hideEyedropper: () => void
   readonly setCursor: (cursor: string) => void
@@ -258,11 +260,10 @@ function registerSamplingWatches(context: InputLifecycleContext): void {
 }
 
 function initializeSampling(context: InputLifecycleContext): void {
-  const initial = context.initialSamplingCursor()
-  context.samplingCursor.value = initial
+  context.samplingCursor.value = undefined
+  context.hideEyedropper()
   context.invalidateOverlay()
   void nextTick(() => {
     context.scene.value?.focus({ preventScroll: true })
-    if (initial) context.scheduleEyedropper(initial)
   })
 }

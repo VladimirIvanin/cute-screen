@@ -45,7 +45,8 @@ export function transformCanvasPoint(
 }
 
 export function canvasLayerBounds(layer: LayerNode): LayerBounds {
-  return layer.kind === 'callout' ? calloutGeometryBounds(layer.payload) : layer.kind === 'numberedMarker' ? numberedMarkerGeometryBounds(layer) : layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
+  return layer.kind === 'callout' ? calloutGeometryBounds(layer.payload) : layer.kind === 'numberedMarker'
+    ? numberedMarkerGeometryBounds(layer) : layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
 }
 
 export interface CanvasGeometryContext {
@@ -157,7 +158,13 @@ export class CanvasGeometryController {
     ]
     this.#appendCropCandidates(candidates)
     for (const layer of document.layers) {
-      if (layer.id === excludingId || !layer.visible) continue
+      const gesture = this.#context.gesture()
+      if (
+        layer.id === excludingId ||
+        !layer.visible ||
+        gesture?.kind === 'move' &&
+        gesture.nodeIds?.includes(layer.id)
+      ) continue
       this.#appendLayerCandidates(candidates, layer)
     }
     return candidates
@@ -204,13 +211,19 @@ export class CanvasGeometryController {
       return layer.transform
     }
     if (gesture.kind === 'move') {
+      const dx = gesture.current.x - gesture.start.x
+      const dy = gesture.current.y - gesture.start.y
+      if (dx === 0 && dy === 0) return layer.transform
       return {
         ...layer.transform,
-        translateX: layer.transform.translateX + gesture.current.x - gesture.start.x,
-        translateY: layer.transform.translateY + gesture.current.y - gesture.start.y,
+        translateX: layer.transform.translateX + dx,
+        translateY: layer.transform.translateY + dy,
       }
     }
     if (gesture.kind === 'resize') {
+      // A handle is a CSS hit area, not an exact document point. Merely
+      // pressing it must keep the original pixels until the pointer moves.
+      if (gesture.current.x === gesture.start.x && gesture.current.y === gesture.start.y) return gesture.initial
       return this.resizeTransform(layer, gesture.handle, gesture.current, gesture.freeResize, gesture.centerResize)
     }
     if (gesture.kind === 'rotate') {
@@ -253,13 +266,17 @@ export class CanvasGeometryController {
     }
     if (gesture.kind === 'calloutHandle') {
       return layer.kind === 'callout'
-        ? updateCalloutHandle(layer, gesture.handle, this.toLocal(layer, gesture.current))
+        ? updateCalloutHandle(layer, gesture.handle, { x: this.toLocal(layer,
+            gesture.current).x - (gesture.offset?.x ?? 0), y: this.toLocal(layer,
+            gesture.current).y - (gesture.offset?.y ?? 0) })
         : undefined
     }
     return { ...layer, transform: this.previewTransform(layer) }
   }
 
   gesturePreviewNodes() {
+    const gesture = this.#context.gesture()
+    if (gesture?.kind === 'move' && (gesture.nodeIds?.length ?? 0) > 1) return []
     const layer = this.gesturePreviewLayer()
     if (
       !layer ||

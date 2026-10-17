@@ -193,6 +193,7 @@ pub async fn activation_setup_complete(app: tauri::AppHandle) -> CommandResult<(
 }
 
 #[tauri::command]
-pub fn open_activation_settings(app: tauri::AppHandle) -> CommandResult<()> {
+pub async fn open_activation_settings(app: tauri::AppHandle) -> CommandResult<()> {
+    // WebView2 window construction deadlocks inside synchronous IPC on Windows.
     crate::settings_window::open(&app, false).map_err(Into::into)
 }

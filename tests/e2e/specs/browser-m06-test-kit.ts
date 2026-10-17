@@ -1,3 +1,4 @@
+import { setEditorPreferences } from '../editor-settings'
 import {
   $,
   browser,
@@ -93,24 +94,7 @@ export async function setShellPreferences(
   locale: 'en' | 'ru',
   theme: 'light' | 'dark',
 ): Promise<void> {
-  const currentLocale = await browser.execute(() => document.documentElement.lang)
-  if (currentLocale !== locale) {
-    await $(`button[aria-label="${currentLocale === 'ru' ? 'Другие действия' : 'More actions'}"]`).click()
-    await $(`button=${locale === 'ru' ? 'RU' : 'EN'}`).click()
-  }
-  const currentTheme = await browser.execute(() => document.documentElement.dataset.theme)
-  if (currentTheme !== theme) {
-    await $(`button[aria-label="${locale === 'ru' ? 'Другие действия' : 'More actions'}"]`).click()
-    await $(
-      `button=${locale === 'ru' ? (theme === 'light' ? 'Светлая' : 'Тёмная') : theme === 'light' ? 'Light' : 'Dark'}`,
-    ).click()
-  }
-  await browser.waitUntil(
-    async () =>
-      (await browser.execute(() => document.documentElement.lang)) === locale &&
-      (await browser.execute(() => document.documentElement.dataset.theme)) === theme,
-  )
-  await expect($('.cs-menu')).not.toExist()
+  await setEditorPreferences(locale, theme)
   await browser.waitUntil(() => browser.execute(() => document.getAnimations().every((animation) =>
     animation.effect?.getTiming().iterations === Infinity || animation.playState !== 'running')))
 }

@@ -44,6 +44,8 @@ export {
   type TextureFillBridge,
   type TextureImportOutcome,
   type TextureResourceState,
+  type ImageDropEvent,
+  type ImageInsertionTarget,
 } from './texture-fill'
 
 export type {
@@ -97,6 +99,7 @@ export {
 export {
   ActionCancelledError,
   createEditorShellPinia,
+  TRANSIENT_ACTION_FEEDBACK_MS,
   useEditorShellStore,
 } from './shell/store'
 export {
@@ -105,6 +108,7 @@ export {
   t,
 } from './shell/i18n'
 export {
+  UI_PREFERENCES_STORAGE_KEY,
   createBrowserPreferencesStorage,
   defaultPreferences,
   parsePreferences,

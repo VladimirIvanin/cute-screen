@@ -1,3 +1,4 @@
+import { initialTextBackground } from './text-initial-background'
 import { numberedMarkerCaption } from '@cute-screen/editor-renderer'
 import {
   editedNumberedMarker,
@@ -14,8 +15,8 @@ import {
   hitTestDocumentAll,
   type RichTextContent,
   type RichTextSpanStyle,
+  withCalloutBackground,
   type StrokeStyle,
-  type TextBackground,
 } from '@cute-screen/editor-renderer'
 import {
   RichTextEditorController,
@@ -104,9 +105,11 @@ export class TextEditorController {
     const defaults = copyTextStyle(props.textDefaults ?? DEFAULT_TEXT_TOOL)
     const fixedWidth =
       input.fixedWidth ??
-      (input.existing && input.existing.kind !== 'numberedMarker' ? input.existing.payload.content.wrap === 'fixedWidth' : false)
+      (input.existing && input.existing.kind !== 'numberedMarker'
+        ? input.existing.payload.content.wrap === 'fixedWidth' : false)
     const existingContent =
-      input.existing?.kind === 'numberedMarker' ? numberedMarkerCaption(input.existing) : input.existing?.payload.content
+      input.existing?.kind === 'numberedMarker' ? numberedMarkerCaption(input.existing)
+        : input.existing?.payload.content
     const initialContent = this.#initialContent(existingContent, fixedWidth, input.width)
     editingText.value = {
       id: input.existing?.id ?? crypto.randomUUID(),
@@ -126,7 +129,7 @@ export class TextEditorController {
           },
         ),
       ),
-      background: this.#initialBackground(input.existing, defaults.background),
+      background: initialTextBackground(input.existing, defaults.background),
       kind: input.existing?.kind ?? input.kind ?? 'text',
       ...(input.existing === undefined ? {} : { existing: input.existing }),
       ...(input.calloutDraft === undefined ? {} : { calloutDraft: input.calloutDraft }),
@@ -164,12 +167,15 @@ export class TextEditorController {
     const layout = editing.kind === 'text' || editing.kind === 'callout' || editing.kind === 'numberedMarker'
       ? layoutTextContent(
           state.content,
-          (editing.existing && editing.kind !== 'numberedMarker' && !editing.calloutAutoLimit) || editing.fixedWidth ? Infinity : INITIAL_TEXT_MAX_WIDTH,
+          (editing.existing && editing.kind !== 'numberedMarker' && !editing.calloutAutoLimit)
+          || editing.fixedWidth ? Infinity : INITIAL_TEXT_MAX_WIDTH,
           state.typingStyle.fontSize,
         )
       : undefined
     if (layout) editing.width = layout.width
-    if (layout) positionCalloutEditor({ editing, layout, editor, zoom: props.zoom,
+    if (layout) positionCalloutEditor({
+      ...(props.textDefaults?.calloutStyle === undefined ? {} : { style: props.textDefaults.calloutStyle }),
+      editing, layout, editor, zoom: props.zoom,
       resolveStroke: this.#context.resolveCalloutStroke })
     if (layout) positionNumberedMarkerEditor(editing, editor, props.zoom)
     if (editing.existing?.kind === 'numberedMarker') this.#context.redrawMarker?.()
@@ -422,19 +428,6 @@ export class TextEditorController {
     )
   }
 
-  #initialBackground(
-    existing: EditableTextLayer | undefined,
-    fallback: TextBackground | null,
-  ) {
-    if (existing?.kind === 'text' || existing?.kind === 'callout') {
-      return existing.payload.background
-    }
-    if (existing?.kind === 'numberedMarker') {
-      return { color: existing.payload.badge.color, padding: 0, radius: 0 }
-    }
-    return fallback
-  }
-
   #committedLayer(
     editing: NonNullable<WorkspaceState['editingText']['value']>,
     style: RichTextSpanStyle,
@@ -445,7 +438,7 @@ export class TextEditorController {
     if (existing?.kind === 'numberedMarker') return editedNumberedMarker(existing, content, editing.background)
     if (existing?.kind === 'callout') {
       return measuredCalloutLayer({ ...existing, payload: {
-        ...existing.payload, content, background: editing.background,
+        ...withCalloutBackground(existing.payload, editing.background), content,
       } }, editing.calloutAutoLimit ? INITIAL_TEXT_MAX_WIDTH : Infinity)
     }
     if (editing.kind === 'callout') {
@@ -504,9 +497,11 @@ export class TextEditorController {
       color: style.color,
       background: editing.background,
       stroke: editing.calloutStroke ?? this.#context.resolveCalloutStroke(),
+      ...(this.#context.props.textDefaults?.calloutStyle === undefined ? {}
+        : { style: this.#context.props.textDefaults.calloutStyle }),
     })
     return layer
-      ? measuredCalloutLayer({ ...layer, payload: { ...layer.payload,
+      ? measuredCalloutLayer({ ...layer, payload: { ...withCalloutBackground(layer.payload, editing.background),
           content: editing.controller.state.content } }, INITIAL_TEXT_MAX_WIDTH)
       : null
   }

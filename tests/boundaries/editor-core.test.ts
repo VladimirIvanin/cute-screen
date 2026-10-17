@@ -69,6 +69,8 @@ describe('M05 icon-system boundary', () => {
       'packages/editor-vue/src/shell/components/ToolFormattingToolbar.vue',
       'packages/editor-vue/src/shell/components/HighlighterFormattingToolbar.vue',
       'packages/editor-vue/src/shell/components/ArrowStylePreview.vue',
+      // Callout miniatures use shared route geometry to preview the resulting leader.
+      'packages/editor-vue/src/shell/components/CalloutFormattingToolbar.vue',
       'packages/editor-vue/src/shell/components/TextFormattingToolbar.vue',
       // Numbered marker miniatures preview the resulting badge geometry.
       'packages/editor-vue/src/shell/components/NumberedMarkerFormattingToolbar.vue',

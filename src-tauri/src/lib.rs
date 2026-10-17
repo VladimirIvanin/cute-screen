@@ -2,6 +2,16 @@
 mod e2e_paths;
 mod tray_icon;
 
+#[path = "services/export_filename.rs"]
+pub mod export_filename;
+use export_filename::{export_filename_get, export_filename_preview, export_filename_save};
+
+#[path = "services/result_export.rs"]
+mod result_export;
+use result_export::{ResultExportService, result_cancel_png, result_choose_png, result_write_png};
+#[cfg(feature = "test-harness")]
+use result_export::{test_result_export, test_result_export_named};
+
 #[path = "services/history.rs"]
 pub mod history;
 use history::{
@@ -37,7 +47,7 @@ use platform::{
 };
 use serde::Serialize;
 use tauri::{
-    Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder,
+    Emitter, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
     utils::config::BackgroundThrottlingPolicy,
@@ -91,18 +101,29 @@ struct CaptureDiagnosticV1 {
     terminal_outcome: CaptureTerminalOutcome,
 }
 
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase", tag = "kind")]
-enum TextureImportOutcome {
-    Cancelled,
-    Imported {
-        blob_hash: String,
-        format: String,
-        mime_type: String,
-        width: u32,
-        height: u32,
-        resource_token: String,
-    },
+#[path = "services/image_import.rs"]
+pub mod image_import;
+use image_import::{DroppedImages, NativeImageDrop, TextureImportOutcome, read_image_file};
+
+#[cfg(test)]
+mod image_import_contract_tests {
+    #[test]
+    fn imported_image_serializes_the_frontend_contract() {
+        let result = super::TextureImportOutcome::Imported {
+            blob_hash: "b".repeat(64),
+            format: "png".into(),
+            mime_type: "image/png".into(),
+            width: 3840,
+            height: 2160,
+            resource_token: "opaque-token".into(),
+        };
+        let json = serde_json::to_value(result).expect("serialized image outcome");
+        assert_eq!(json["resourceToken"], "opaque-token");
+        assert_eq!(json["blobHash"], "b".repeat(64));
+        assert_eq!(json["mimeType"], "image/png");
+        assert_eq!(json["kind"], "imported");
+        assert!(json.get("resource_token").is_none());
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -264,6 +285,14 @@ enum QuickEditorHandoffStatus {
 async fn pick_file<R: tauri::Runtime>(
     dialog: FileDialogBuilder<R>,
 ) -> Result<Option<FilePath>, RepositoryError> {
+    #[cfg(feature = "test-harness")]
+    if let Some(selection) = image_import::TEST_PICKER
+        .lock()
+        .map_err(|e| RepositoryError::Io(e.to_string()))?
+        .take()
+    {
+        return Ok(selection.map(FilePath::Path));
+    }
     let (sender, receiver) = tokio::sync::oneshot::channel();
     dialog.pick_file(move |selection| {
         if sender.send(selection).is_err() {
@@ -332,6 +361,8 @@ pub mod image_transport;
 pub mod lifecycle;
 #[path = "services/settings_window.rs"]
 mod settings_window;
+#[cfg(feature = "test-harness")]
+use settings_window::test_tray_labels;
 #[path = "services/shortcuts/mod.rs"]
 pub mod shortcuts;
 use shortcuts::commands::*;
@@ -441,14 +472,12 @@ async fn repository_save_document(
 
 #[tauri::command]
 async fn repository_import_texture(
+    window: WebviewWindow,
     correlation_id: String,
     app: tauri::AppHandle,
     repository: State<'_, StorageHandle>,
     transport: State<'_, Arc<ImageTransportService>>,
 ) -> CommandResult<TextureImportOutcome> {
-    let window = app
-        .get_webview_window("main")
-        .ok_or_else(|| RepositoryError::Io("main window is unavailable".to_owned()))?;
     let dialog = app
         .dialog()
         .file()
@@ -461,7 +490,7 @@ async fn repository_import_texture(
     let path = source
         .into_path()
         .map_err(|error| RepositoryError::Io(error.to_string()))?;
-    let bytes = fs::read(path)?;
+    let bytes = read_image_file(&path)?;
     let metadata = storage::inspect_texture_bytes(&bytes)?;
     let stored = repository.import_blob(bytes, metadata).await?;
     let resource = repository.resolve_blob_source(stored.hash.clone()).await?;
@@ -482,14 +511,12 @@ async fn repository_import_texture(
 
 #[tauri::command]
 async fn repository_import_content_image(
+    window: WebviewWindow,
     correlation_id: String,
     app: tauri::AppHandle,
     repository: State<'_, StorageHandle>,
     transport: State<'_, Arc<ImageTransportService>>,
 ) -> CommandResult<TextureImportOutcome> {
-    let window = app
-        .get_webview_window("main")
-        .ok_or_else(|| RepositoryError::Io("main window is unavailable".to_owned()))?;
     let dialog = app
         .dialog()
         .file()
@@ -502,15 +529,32 @@ async fn repository_import_content_image(
     let path = source
         .into_path()
         .map_err(|error| RepositoryError::Io(error.to_string()))?;
-    let bytes = fs::read(path)?;
+    import_content_path(&path, &correlation_id, &repository, &transport).await
+}
+
+async fn import_content_path(
+    path: &std::path::Path,
+    correlation_id: &str,
+    repository: &StorageHandle,
+    transport: &ImageTransportService,
+) -> CommandResult<TextureImportOutcome> {
+    let bytes = read_image_file(path)?;
     let metadata = storage::inspect_content_image_bytes(&bytes)?;
-    let stored = repository.import_blob(bytes, metadata).await?;
-    let resource = repository.resolve_blob_source(stored.hash.clone()).await?;
+    let stored = repository.import_blob(bytes.clone(), metadata).await?;
+    // The immutable blob stays in the library. Path staging of that blob failed
+    // with "Native image staging failed" on Windows and Linux, so the session
+    // token keeps the same bytes in memory and uses the binary image channel.
     let resource_token = Uuid::now_v7().simple().to_string();
     transport
-        .register_authoritative_blob(resource_token.clone(), resource)
+        .import_owned_memory(
+            &resource_token,
+            bytes,
+            stored.metadata.mime_type.clone(),
+            stored.metadata.width,
+            stored.metadata.height,
+            correlation_id,
+        )
         .map_err(|error| RepositoryError::Io(error.to_string()))?;
-    let _ = correlation_id;
     Ok(TextureImportOutcome::Imported {
         blob_hash: stored.hash,
         format: stored.metadata.format,
@@ -519,6 +563,58 @@ async fn repository_import_content_image(
         height: stored.metadata.height,
         resource_token,
     })
+}
+
+#[tauri::command]
+async fn repository_import_dropped_image(
+    window: WebviewWindow,
+    token: String,
+    correlation_id: String,
+    drops: State<'_, DroppedImages>,
+    repository: State<'_, StorageHandle>,
+    transport: State<'_, Arc<ImageTransportService>>,
+) -> CommandResult<TextureImportOutcome> {
+    let path = drops.take(window.label(), &token)?;
+    import_content_path(&path, &correlation_id, &repository, &transport).await
+}
+
+#[tauri::command]
+fn repository_discard_dropped_image(
+    window: WebviewWindow,
+    token: String,
+    drops: State<'_, DroppedImages>,
+) -> CommandResult<()> {
+    Ok(drops.discard(window.label(), Some(&token))?)
+}
+
+#[tauri::command]
+fn repository_open_dropped_image(
+    window: WebviewWindow,
+    token: String,
+    drops: State<'_, DroppedImages>,
+    repository: State<'_, LibraryRepository>,
+    transport: State<'_, Arc<ImageTransportService>>,
+) -> CommandResult<OpenImageOutcome> {
+    if window.label() != "main" {
+        return Err(RepositoryError::PermissionDenied.into());
+    }
+    let path = drops.take(window.label(), &token)?;
+    let mut document = create_document_from_image(
+        &repository,
+        CreateDocumentFromImageRequest {
+            source_bytes: read_image_file(&path)?,
+            provenance: ImageProvenance::FileOpen,
+            series_id: None,
+            frame_metadata: CaptureMetadataV1::unknown(),
+            captured_at: chrono::Utc::now(),
+        },
+    )?;
+    let source = repository
+        .resolve_capture_source(document.capture_id.clone(), document.source_hash.clone())?;
+    let token = Uuid::now_v7().simple().to_string();
+    transport.register_authoritative(token.clone(), source)?;
+    document.image_token = Some(token);
+    Ok(OpenImageOutcome::Opened { document })
 }
 
 #[tauri::command]
@@ -614,14 +710,12 @@ fn clipboard_open_image(
 
 #[tauri::command]
 async fn repository_open_image(
+    window: WebviewWindow,
     correlation_id: String,
     app: tauri::AppHandle,
     repository: State<'_, LibraryRepository>,
     transport: State<'_, Arc<ImageTransportService>>,
 ) -> CommandResult<OpenImageOutcome> {
-    let window = app
-        .get_webview_window("main")
-        .ok_or_else(|| RepositoryError::Io("main window is unavailable".to_owned()))?;
     let dialog = app
         .dialog()
         .file()
@@ -634,7 +728,7 @@ async fn repository_open_image(
     let path = source
         .into_path()
         .map_err(|error| RepositoryError::Io(error.to_string()))?;
-    let source_bytes = fs::read(path)?;
+    let source_bytes = read_image_file(&path)?;
     let mut document = create_document_from_image(
         &repository,
         CreateDocumentFromImageRequest {
@@ -780,15 +874,22 @@ async fn settings_get(
 
 #[tauri::command]
 async fn settings_put(
+    app: tauri::AppHandle,
     _correlation_id: String,
     key: String,
     schema_version: u32,
     value_json: String,
     repository: State<'_, StorageHandle>,
 ) -> CommandResult<()> {
+    let ui_preferences = key == settings_window::UI_PREFERENCES_KEY;
     repository
-        .put_setting(key, schema_version, value_json)
+        .put_setting(key, schema_version, value_json.clone())
         .await?;
+    if ui_preferences {
+        settings_window::refresh_tray(&app);
+        app.emit("cute-screen:ui-preferences", value_json)
+            .map_err(|error| CommandErrorV1::internal(error.to_string(), "ui-preferences"))?;
+    }
     Ok(())
 }
 
@@ -988,7 +1089,7 @@ fn prepare_quick_capture_bounds_before_capture<R: tauri::Runtime>(
 /// The prewarmed Quick window is created at Tao's restored 800×600 size.
 /// Windows applies borderless fullscreen with `SWP_ASYNCWINDOWPOS`, so the
 /// first `show` maps that restored window before the monitor bounds arrive.
-/// Commit the pointer monitor synchronously while the window is still hidden.
+/// Keep it hidden until the WebView has rendered the final fullscreen geometry.
 #[cfg(target_os = "windows")]
 fn present_windows_quick_capture<R: tauri::Runtime>(
     window: &tauri::WebviewWindow<R>,
@@ -997,15 +1098,9 @@ fn present_windows_quick_capture<R: tauri::Runtime>(
         .set_always_on_top(true)
         .map_err(|error| error.to_string())?;
     commit_hidden_quick_capture_bounds(window)?;
-    let presented = window
+    window
         .set_fullscreen(true)
         .map_err(|error| error.to_string())
-        .and_then(|()| window.show().map_err(|error| error.to_string()))
-        .and_then(|()| window.set_focus().map_err(|error| error.to_string()));
-    if let Err(error) = restore_hidden_quick_capture_transitions(window) {
-        eprintln!("cute-screen quick capture transition restore: {error}");
-    }
-    presented
 }
 
 #[cfg(target_os = "windows")]
@@ -1053,6 +1148,14 @@ fn quick_capture_reveal(
     let window = app
         .get_webview_window("quick-capture")
         .ok_or_else(|| "quick capture window is unavailable".to_owned())?;
+    #[cfg(target_os = "windows")]
+    {
+        let shown = window.show().map_err(|error| error.to_string());
+        if let Err(error) = restore_hidden_quick_capture_transitions(&window) {
+            eprintln!("cute-screen quick capture transition restore: {error}");
+        }
+        shown?;
+    }
     #[cfg(target_os = "macos")]
     {
         macos_platform::set_quick_capture_presentation(&window, true)?;
@@ -1247,6 +1350,7 @@ fn quick_capture_prepare_png(
 #[tauri::command]
 async fn quick_capture_choose_save_png(
     app: tauri::AppHandle,
+    repository: State<'_, StorageHandle>,
     controller: State<'_, CaptureController>,
     service: State<'_, QuickSaveTargetService>,
 ) -> CommandResult<bool> {
@@ -1262,7 +1366,7 @@ async fn quick_capture_choose_save_png(
         .file()
         .set_parent(&window)
         .set_title("Save quick capture")
-        .set_file_name("cute-screen.png")
+        .set_file_name(export_filename::suggested_png_name(&repository).await?)
         .add_filter("PNG image", &["png"]);
     let Some(destination) = save_file(dialog).await? else {
         if let Ok(mut current) = service.target.lock() {
@@ -1452,6 +1556,63 @@ async fn hotkeys_bind_inner(
 #[tauri::command]
 fn get_e2e_harness_query() -> Option<String> {
     lifecycle::parse_e2e_harness_query(env::args_os())
+}
+
+/// Supplies the OS ingress boundary only; commands, storage, decode and history stay real.
+#[cfg(feature = "test-harness")]
+#[tauri::command]
+fn test_image_ingress(
+    window: WebviewWindow,
+    action: String,
+    fixture: String,
+    x: f64,
+    y: f64,
+    drops: State<'_, DroppedImages>,
+) -> CommandResult<()> {
+    if !matches!(
+        fixture.as_str(),
+        "ui-4k.png" | "alpha.png" | "corrupted.png"
+    ) {
+        return Err(RepositoryError::PermissionDenied.into());
+    }
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../tests/fixtures/generated")
+        .join(fixture);
+    match action.as_str() {
+        "picker" | "cancel" => {
+            *image_import::TEST_PICKER
+                .lock()
+                .map_err(|e| RepositoryError::Io(e.to_string()))? =
+                Some(if action == "cancel" { None } else { Some(path) });
+        }
+        "clipboard" => {
+            clipboard::write_native_png(&read_image_file(&path)?).map_err(RepositoryError::Io)?
+        }
+        "drop" | "multiple" => {
+            let paths = if action == "multiple" {
+                vec![path.clone(), path]
+            } else {
+                vec![path]
+            };
+            let token = drops.register(window.label(), &paths)?;
+            window
+                .emit_to(
+                    window.label(),
+                    "image-drop",
+                    NativeImageDrop {
+                        phase: "drop".into(),
+                        x,
+                        y,
+                        file_count: paths.len(),
+                        supported: true,
+                        token,
+                    },
+                )
+                .map_err(|e| RepositoryError::Io(e.to_string()))?;
+        }
+        _ => return Err(RepositoryError::PermissionDenied.into()),
+    }
+    Ok(())
 }
 
 #[cfg(feature = "test-harness")]
@@ -1776,7 +1937,11 @@ async fn hide_editor_for_native_capture<R: tauri::Runtime>(
                     .hwnd()
                     .map_err(|_| PlatformError::new(PlatformErrorCode::CaptureFailed, &correlation))
                     .and_then(|hwnd| {
-                        windows_platform::hide_window_for_capture(hwnd.0, &correlation)
+                        windows_platform::hide_window_for_capture(hwnd.0, &correlation, || {
+                            native_window.hide().map_err(|_| {
+                                PlatformError::new(PlatformErrorCode::CaptureFailed, &correlation)
+                            })
+                        })
                     });
                 let _ = sender.send(result);
             })
@@ -1817,37 +1982,24 @@ async fn hide_editor_for_native_capture<R: tauri::Runtime>(
 
 fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()> {
     let icon = tray_icon::load_icon(cfg!(target_os = "macos"))?;
-    let capture_area = MenuItem::with_id(app, "capture-area", "Capture Area", false, None::<&str>)?;
-    let capture_screen =
-        MenuItem::with_id(app, "capture-screen", "Capture Screen", false, None::<&str>)?;
-    let capture_window =
-        MenuItem::with_id(app, "capture-window", "Capture Window", false, None::<&str>)?;
-    let editor_label = if env::var("LANG")
-        .unwrap_or_default()
-        .to_lowercase()
-        .starts_with("ru")
-    {
-        "Открыть редактор"
-    } else {
-        "Open Editor"
+    let locale = settings_window::saved_locale(app);
+    let item = |id: &str, enabled: bool| {
+        MenuItem::with_id(
+            app,
+            id,
+            settings_window::tray_text(id, &locale, None),
+            enabled,
+            None::<&str>,
+        )
     };
-    let show = MenuItem::with_id(app, "show-editor", editor_label, true, None::<&str>)?;
-    let settings_label = if env::var("LANG").unwrap_or_default().starts_with("ru") {
-        "Настройки…"
-    } else {
-        "Settings…"
-    };
-    let settings = MenuItem::with_id(app, "settings", settings_label, true, None::<&str>)?;
-    let capture_active = MenuItem::with_id(
-        app,
-        "capture-active-window",
-        "Capture Active Window",
-        false,
-        None::<&str>,
-    )?;
-    let capture_repeat =
-        MenuItem::with_id(app, "capture-repeat", "Repeat Area", false, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+    let capture_area = item("capture-area", false)?;
+    let capture_screen = item("capture-screen", false)?;
+    let capture_window = item("capture-window", false)?;
+    let show = item("show-editor", true)?;
+    let settings = item("settings", true)?;
+    let capture_active = item("capture-active-window", false)?;
+    let capture_repeat = item("capture-repeat", false)?;
+    let quit = item("quit", true)?;
     let separator = PredefinedMenuItem::separator(app)?;
     let menu = Menu::with_items(
         app,
@@ -1906,6 +2058,17 @@ fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()
             _ => {}
         })
         .build(app)?;
+    #[cfg(feature = "test-harness")]
+    app.manage(settings_window::TrayStartupLabels(vec![
+        capture_area.text()?,
+        capture_screen.text()?,
+        capture_window.text()?,
+        capture_active.text()?,
+        capture_repeat.text()?,
+        show.text()?,
+        settings.text()?,
+        quit.text()?,
+    ]));
     app.manage(settings_window::TrayShortcutItems(vec![
         capture_area.clone(),
         capture_screen.clone(),
@@ -1913,6 +2076,8 @@ fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()
         capture_active.clone(),
         capture_repeat.clone(),
         show,
+        settings,
+        quit,
     ]));
     refresh_tray_capture_items(capture_area, capture_screen, capture_window);
     tauri::async_runtime::spawn(async move {
@@ -2430,6 +2595,61 @@ pub fn run() {
                 }
             },
         ))
+        .on_window_event(|window, event| {
+            if matches!(
+                event,
+                tauri::WindowEvent::Destroyed | tauri::WindowEvent::CloseRequested { .. }
+            ) && let Some(drops) = window.try_state::<DroppedImages>()
+                && let Err(error) = drops.discard(window.label(), None)
+            {
+                eprintln!("cute-screen drop cleanup: {error}");
+            }
+        })
+        .on_webview_event(|webview, event| {
+            if !matches!(webview.label(), "main" | "quick-capture") {
+                return;
+            }
+            let tauri::WebviewEvent::DragDrop(event) = event else {
+                return;
+            };
+            let (phase, x, y, paths) = match event {
+                tauri::DragDropEvent::Enter { paths, position } => {
+                    ("enter", position.x, position.y, Some(paths))
+                }
+                tauri::DragDropEvent::Drop { paths, position } => {
+                    ("drop", position.x, position.y, Some(paths))
+                }
+                tauri::DragDropEvent::Over { position } => ("over", position.x, position.y, None),
+                tauri::DragDropEvent::Leave => ("leave", 0.0, 0.0, None),
+                _ => return,
+            };
+            let token = if phase == "drop" {
+                match webview
+                    .state::<DroppedImages>()
+                    .register(webview.label(), paths.map_or(&[], Vec::as_slice))
+                {
+                    Ok(token) => token,
+                    Err(error) => {
+                        eprintln!("cute-screen drop registration: {error}");
+                        None
+                    }
+                }
+            } else {
+                None
+            };
+            let payload = NativeImageDrop {
+                phase: phase.into(),
+                x,
+                y,
+                file_count: paths.map_or(0, Vec::len),
+                supported: paths
+                    .is_some_and(|p| p.len() == 1 && image_import::supported_path(&p[0])),
+                token,
+            };
+            if let Err(error) = webview.emit_to(webview.label(), "image-drop", payload) {
+                eprintln!("cute-screen drop event: {error}");
+            }
+        })
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .on_menu_event(|app, event| {
@@ -2458,6 +2678,8 @@ pub fn run() {
             app.manage(CapturePreflightService::default());
             app.manage(QuickEditorMountService::default());
             app.manage(QuickSaveTargetService::default());
+            app.manage(ResultExportService::new(application_directories(app)?.0));
+            app.manage(DroppedImages::default());
             app.manage(CaptureDiagnosticsService::default());
 
             if should_prewarm_quick_capture_at_startup(
@@ -2578,6 +2800,12 @@ pub fn run() {
         quick_capture_cancel,
         quick_capture_copy_png,
         quick_capture_prepare_png,
+        export_filename_get,
+        export_filename_preview,
+        export_filename_save,
+        result_choose_png,
+        result_write_png,
+        result_cancel_png,
         quick_capture_choose_save_png,
         quick_capture_write_save_png,
         capture_diagnostics,
@@ -2610,6 +2838,9 @@ pub fn run() {
         repository_save_document,
         repository_import_texture,
         repository_import_content_image,
+        repository_import_dropped_image,
+        repository_discard_dropped_image,
+        repository_open_dropped_image,
         clipboard_read_snapshot,
         clipboard_write_text,
         clipboard_write_png,
@@ -2625,6 +2856,10 @@ pub fn run() {
         stage_image,
         test_portal_capture,
         test_portal_probe,
+        test_image_ingress,
+        test_result_export,
+        test_result_export_named,
+        test_tray_labels,
     ]);
 
     #[cfg(not(feature = "test-harness"))]
@@ -2645,6 +2880,12 @@ pub fn run() {
         quick_capture_cancel,
         quick_capture_copy_png,
         quick_capture_prepare_png,
+        export_filename_get,
+        export_filename_preview,
+        export_filename_save,
+        result_choose_png,
+        result_write_png,
+        result_cancel_png,
         quick_capture_choose_save_png,
         quick_capture_write_save_png,
         capture_diagnostics,
@@ -2676,6 +2917,9 @@ pub fn run() {
         repository_save_document,
         repository_import_texture,
         repository_import_content_image,
+        repository_import_dropped_image,
+        repository_discard_dropped_image,
+        repository_open_dropped_image,
         clipboard_read_snapshot,
         clipboard_write_text,
         clipboard_write_png,

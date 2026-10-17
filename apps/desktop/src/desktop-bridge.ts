@@ -1,4 +1,9 @@
 import { invoke } from '@tauri-apps/api/core'
+import { getCurrentWebview } from '@tauri-apps/api/webview'
+import type {
+  TextureImportOutcome,
+  NativeImageDrop,
+} from './generated/desktop-ipc'
 
 import type {
   ImageTransportBridge,
@@ -14,7 +19,6 @@ import type {
   ShortcutSpec,
   StagedImageMetadata,
   TextureFillBridge,
-  TextureImportOutcome,
 } from '@cute-screen/editor-vue'
 import type {
   CaptureOutcomeV2,
@@ -69,10 +73,14 @@ export interface DesktopBridge
   testPortalCapture?(correlationId: string): Promise<CaptureResult>
   repositoryOpenLast(correlationId: string): Promise<RepositoryOpenDocument | null>
   repositoryOpenImage(correlationId: string): Promise<OpenImageOutcome>
+  repositoryOpenDroppedImage(token: string): Promise<OpenImageOutcome>
   importContentImage(correlationId: string): Promise<TextureImportOutcome>
   readClipboardSnapshot(correlationId: string): Promise<NativeClipboardSnapshot>
   writeClipboardText(text: string, correlationId: string): Promise<void>
   writeClipboardPng(bytes: Uint8Array): Promise<void>
+  chooseResultPng(): Promise<string | null>
+  writeResultPng(ticket: string, bytes: Uint8Array): Promise<void>
+  cancelResultPng(ticket: string): Promise<void>
   listSystemFonts(correlationId: string): Promise<readonly SystemFontFace[]>
   clipboardOpenImage(correlationId: string): Promise<ClipboardOpenImageOutcome>
   repositoryListActiveSeriesFrames(correlationId: string): Promise<readonly RepositorySeriesFrame[]>
@@ -113,6 +121,14 @@ export type ClipboardOpenImageOutcome =
 export type RecoveryExportOutcome = { readonly kind: 'saved' } | { readonly kind: 'cancelled' }
 
 export const tauriDesktopBridge: DesktopBridge = {
+  releaseImage: (token) => invoke<void>('image_release', { token }),
+  discardDroppedImage: (token) => invoke<void>('repository_discard_dropped_image', { token }),
+  importDroppedImage: (token, correlationId) => invoke<TextureImportOutcome>('repository_import_dropped_image', { token, correlationId }),
+  repositoryOpenDroppedImage: (token) => invoke<OpenImageOutcome>('repository_open_dropped_image', { token }),
+  subscribeImageDrop: async (listener) => getCurrentWebview().listen<NativeImageDrop>('image-drop', ({ payload }) => {
+    const scale = window.devicePixelRatio || 1
+    listener({ ...payload, x: payload.x / scale, y: payload.y / scale })
+  }),
   ping: () => invoke<PingResponse>('ping'),
   stageImage: (token, correlationId) => invoke<StagedImageMetadata>('stage_image', { token, correlationId }),
   readImageBytes: (token, correlationId) => invoke<ArrayBuffer>('read_image_bytes', { token, correlationId }),
@@ -168,6 +184,11 @@ export const tauriDesktopBridge: DesktopBridge = {
     }),
   writeClipboardText: (text, correlationId) => invoke<void>('clipboard_write_text', { text, correlationId }),
   writeClipboardPng: (bytes) => invoke<void>('clipboard_write_png', bytes),
+  chooseResultPng: () => invoke<string | null>('result_choose_png'),
+  writeResultPng: (ticket, bytes) => invoke<void>('result_write_png', bytes, {
+    headers: { 'x-cute-screen-export': ticket },
+  }),
+  cancelResultPng: (ticket) => invoke<void>('result_cancel_png', { ticket }),
   listSystemFonts: (correlationId) => invoke<readonly SystemFontFace[]>('font_catalog_list', { correlationId }),
   clipboardOpenImage: (correlationId) =>
     invoke<ClipboardOpenImageOutcome>('clipboard_open_image', {

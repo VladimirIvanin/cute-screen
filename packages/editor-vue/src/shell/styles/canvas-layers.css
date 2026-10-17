@@ -459,3 +459,44 @@
 .cs-quick-settings-button {
   flex: none;
 }
+.cs-editor-shell.is-image-drop-target .cs-canvas-scroll {
+  outline: 2px solid var(--accent);
+  outline-offset: -4px;
+}
+
+.cs-tool-error.cs-image-feedback {
+  border-color: var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cs-selection-floating-toolbar {
+  display: flex;
+  align-items: center;
+}
+.cs-selection-move-grip {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  padding: 4px;
+  margin: 4px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  color: var(--text);
+  background: transparent;
+  cursor: grab;
+  touch-action: none;
+}
+.cs-selection-move-grip:hover {
+  background: var(--surface-hover);
+}
+.cs-selection-move-grip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.cs-selection-move-grip:active {
+  cursor: grabbing;
+}

@@ -34,6 +34,7 @@ interface SelectionContext {
   document: Ref<EditorDocumentV1 | undefined>
   error: Ref<string | undefined>
   rememberedStyles: Ref<Partial<Record<import('@cute-screen/editor-renderer').LayerNode['kind'], LayerStyle>>>
+  changeCallout?: (id: string, value: string) => void
   paste: () => Promise<void>
   undo: () => void
   redo: () => void
@@ -101,7 +102,8 @@ export function createSelectionActions(context: SelectionContext) {
   }
   function action(id: string): void {
     menu.value = undefined
-    actions[id]?.()
+    if (id.startsWith('callout')) context.changeCallout?.(id, '')
+    else actions[id]?.()
   }
   const items = computed(() => selectionMenuItems(context, menu.value))
 
@@ -241,6 +243,11 @@ function selectionMenuItems(
         : []),
     ]
   return [
+    ...(layers.length === 1 && layers[0]?.kind === 'callout' ? [
+      { id: 'calloutInsert', label: text('Add step', 'Добавить ступень'), disabled: disabled || layers[0].payload.route.path === 'straight', reason },
+      { id: 'calloutRemoveStep', label: text('Remove step', 'Удалить ступень'), disabled: disabled || layers[0].payload.route.path !== 'orthogonal', reason },
+      { id: 'calloutReset', label: text('Reset route', 'Сбросить маршрут'), disabled: disabled || layers[0].payload.route.path !== 'orthogonal', reason },
+    ] : []),
     {
       id: 'copyStyle',
       label: text('Copy style', 'Копировать стиль'),

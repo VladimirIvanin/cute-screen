@@ -1,3 +1,6 @@
+import { calloutFrameNodes } from './callout-frame'
+import { arrowCapNodes } from './arrow'
+import { arrowEndpointAngles } from '../../arrow-geometry'
 import {
   numberedMarkerLabelBounds,
   numberedMarkerNumberContent,
@@ -6,7 +9,7 @@ import {
 } from '../../numbered-marker'
 import {
   type CalloutGeometryContext,
-  calloutMarkerRadius,
+  calloutEndpointSize,
   calloutPathPoints,
   calloutTextLayout,
 } from '../../callout-geometry'
@@ -192,42 +195,22 @@ export function calloutNodes(
   if (
     payload.target === undefined ||
     payload.label === undefined ||
-    payload.route?.path !== 'elbow' ||
+    payload.route === undefined ||
     payload.stroke === undefined
   ) {
     return []
   }
-  const common = {
-    rotation: layer.transform.rotation,
-    opacity: 1,
-    visible: layer.visible,
-    blendMode: 'normal' as const,
-  }
   const strokeStyle = stroke(payload.stroke)
-  const markerRadius = calloutMarkerRadius(payload.stroke.width)
-  const markerFill = color(payload.stroke.color)
-  const pathPoints = calloutPathPoints(payload)
+  const pathPoints = calloutPathPoints(payload, context)
   const connector = pathNode(layer, `${layer.id}:connector`, pathPoints, strokeStyle)
-  const targetMarker: RenderNode = {
-    ...common,
-    id: `${layer.id}:target-marker`,
-    kind: 'ellipse',
-    centerX: layer.transform.translateX + payload.target.x,
-    centerY: layer.transform.translateY + payload.target.y,
-    radiusX: markerRadius,
-    radiusY: markerRadius,
-    fill: markerFill,
-  }
-  const labelMarker: RenderNode = {
-    ...common,
-    id: `${layer.id}:label-marker`,
-    kind: 'ellipse',
-    centerX: layer.transform.translateX + payload.label.x,
-    centerY: layer.transform.translateY + payload.label.y,
-    radiusX: markerRadius,
-    radiusY: markerRadius,
-    fill: markerFill,
-  }
+  const angles = arrowEndpointAngles(pathPoints)
+  const markers = (['target', 'label'] as const).flatMap((endpoint) => {
+    const endpointStyle = payload[`${endpoint}MarkerStyle`]
+    const style = endpointStyle?.color ? { ...strokeStyle, color: color(endpointStyle.color) } : strokeStyle
+    return arrowCapNodes(layer, `${layer.id}:${endpoint}-marker`, payload[endpoint],
+      endpoint === 'target' ? angles.start : angles.end, payload[`${endpoint}Marker`], style, undefined,
+      calloutEndpointSize(payload, endpoint))
+  })
   const layout = calloutTextLayout(payload, context)
   const text = richTextNode(
     `${layer.id}:text`,
@@ -240,36 +223,5 @@ export function calloutNodes(
     },
     layer,
   )
-  if (!layout.background) {
-    return [connector, targetMarker, labelMarker, text]
-  }
-  const background = layout.background
-  const bounds = calloutTextRectFromLayout(layout)
-  const backgroundNode: RenderNode = {
-    ...common,
-    id: `${layer.id}:background`,
-    kind: 'rect',
-    x: layer.transform.translateX + bounds.x,
-    y: layer.transform.translateY + bounds.y,
-    width: bounds.width,
-    height: bounds.height,
-    cornerRadius: Math.min(background.radius, bounds.width / 2, bounds.height / 2),
-    fill: color(background.color),
-  }
-  return [connector, targetMarker, labelMarker, backgroundNode, text]
-}
-
-function calloutTextRectFromLayout(layout: ReturnType<typeof calloutTextLayout>): {
-  readonly x: number
-  readonly y: number
-  readonly width: number
-  readonly height: number
-} {
-  const padding = layout.background?.padding ?? 0
-  return {
-    x: layout.text.x - padding,
-    y: layout.text.y - padding,
-    width: layout.text.width + padding * 2,
-    height: layout.text.height + padding * 2,
-  }
+  return [connector, ...calloutFrameNodes(layer, context), ...markers, text]
 }

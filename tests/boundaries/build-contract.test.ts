@@ -108,6 +108,24 @@ describe('Tauri build boundary', () => {
     expect(hostSource).not.toContain('.blocking_pick_file()')
     expect(hostSource).not.toContain('.blocking_save_file()')
     expect(hostSource).toContain('.set_parent(&window)')
+    for (const command of [
+      'repository_import_content_image',
+      'repository_import_texture',
+      'repository_open_image',
+    ]) {
+      const start = hostSource.indexOf(`async fn ${command}`)
+      const end = hostSource.indexOf('\nasync fn ', start + 1)
+      const body = hostSource.slice(start, end)
+      expect(body, command).toContain('window: WebviewWindow')
+      expect(body, command).not.toContain('get_webview_window("main")')
+    }
+    const contentImportStart = hostSource.indexOf('async fn repository_import_content_image')
+    const contentImport = hostSource.slice(
+      contentImportStart,
+      hostSource.indexOf('\n#[tauri::command]', contentImportStart + 1),
+    )
+    expect(contentImport).toContain('import_owned_memory(')
+    expect(contentImport).not.toContain('register_authoritative_blob(')
   })
 
   it('renders the X11 Window selector from canonical RGBA instead of a captured native image', async () => {
@@ -210,8 +228,12 @@ describe('Tauri build boundary', () => {
     expect(windowsDismissSource).toBeDefined()
     expect(windowsDismissSource).not.toContain('set_fullscreen(false)')
     expect(hostSource).toMatch(
-      /fn present_windows_quick_capture[\s\S]*set_always_on_top\(true\)[\s\S]*commit_hidden_quick_capture_bounds\(window\)[\s\S]*set_fullscreen\(true\)[\s\S]*window\.show\(\)/,
+      /fn present_windows_quick_capture[\s\S]*set_always_on_top\(true\)[\s\S]*commit_hidden_quick_capture_bounds\(window\)[\s\S]*set_fullscreen\(true\)/,
     )
+    const presentStart = hostSource.indexOf('fn present_windows_quick_capture')
+    const presentEnd = hostSource.indexOf('fn prepare_hidden_quick_capture_bounds', presentStart)
+    expect(hostSource.slice(presentStart, presentEnd)).not.toContain('window.show()')
+    expect(hostSource).toMatch(/fn quick_capture_reveal[\s\S]*target_os = "windows"[\s\S]*window\.show\(\)/)
     expect(hostSource).toMatch(
       /fn commit_hidden_quick_capture_bounds[\s\S]*place_hidden_quick_capture_on_pointer_monitor/,
     )

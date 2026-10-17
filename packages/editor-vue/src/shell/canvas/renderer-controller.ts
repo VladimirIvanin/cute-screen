@@ -34,6 +34,7 @@ export interface RendererControllerContext {
   readonly outputBounds: ComputedRef<ViewportOutputBounds | undefined>
   readonly documentForScene: () => EditorDocumentV1 | undefined
   readonly previewLayer: () => LayerNode | undefined
+  readonly gestureRequiresScenePreview?: () => boolean
   readonly invalidateOverlay: () => void
 }
 
@@ -192,6 +193,25 @@ export class CanvasRendererController {
     if (this.context.rendererError.value) throw new Error(this.context.rendererError.value)
   }
 
+  async exportPng(): Promise<Uint8Array> {
+    await this.waitForRender()
+    const document = this.context.props.document
+    const runtime = this.renderer
+    if (
+      !runtime ||
+      !document ||
+      !this.sceneReady
+    ) throw new Error('The rendered result is not ready')
+    // Crop editing and display density affect preview only. Export always uses
+    // committed document bounds and excludes transient text/gesture overlays.
+    runtime.setScene(createDocumentRenderScene(document))
+    try {
+      return await runtime.exportPng({ scale: 1 })
+    } finally {
+      if (this.renderer === runtime) this.setCommittedScene(runtime)
+    }
+  }
+
   private async drawFrame(): Promise<void> {
     const revision = ++this.revision
     const { scene, props, rendererError } = this.context
@@ -246,7 +266,7 @@ export class CanvasRendererController {
   }
 
   invalidateGesturePreview(): void {
-    if (requiresScenePreview(this.context.previewLayer())) {
+    if (requiresScenePreview(this.context.previewLayer()) || this.context.gestureRequiresScenePreview?.()) {
       this.renderCommittedSceneForGesture()
     } else {
       this.context.invalidateOverlay()

@@ -1,29 +1,25 @@
+import type { TextEffectsContext } from './text-effects-contracts'
+import { applyCalloutChange } from './callout-effects'
 import {
   measuredTextLayer,
   measuredCalloutLayer,
 } from '../../../text-layout'
-import type {
-  Ref,
-  ShallowRef,
-} from 'vue'
 import {
   measuredNumberedMarkerLayer,
   applyRichTextParagraphStyle,
   applyRichTextSpanStyle,
   rebaseCalloutLayer,
-  type EditorDocumentV1,
+  withCalloutBackground,
   type EditorCommand,
   type LayerNode,
   type RichTextParagraphStyle,
   type RichTextSpanStyle,
   type TextBackground,
 } from '@cute-screen/editor-renderer'
-import type { ResolvedEditorShellProps } from '../../contracts'
 import type {
   TextFormattingPatch,
   TextToolDefaults,
 } from '../../canvas/contracts'
-import type { TextDraft } from '../text-schema'
 import { parseHexColor } from './color'
 
 type TextLayer = Extract<LayerNode, { readonly kind: 'text' | 'callout' | 'numberedMarker' }>
@@ -46,19 +42,7 @@ type ResolvedTextChange =
   | { readonly kind: 'handled' }
   | { readonly kind: 'change'; readonly change: TextChange }
 
-export interface TextEffectsContext {
-  readonly calloutStroke?: Ref<import('@cute-screen/editor-renderer').StrokeStyle>
-  readonly configuringCallout?: () => boolean
-  readonly props: ResolvedEditorShellProps
-  readonly store: {
-    readonly selectedLayerIds: readonly string[]
-    readonly selectedLayerId: string | undefined
-  }
-  readonly activeDocument: Ref<EditorDocumentV1 | undefined>
-  readonly textDefaults: ShallowRef<TextToolDefaults>
-  readonly textFormatting: ShallowRef<TextFormattingPatch | undefined>
-  readonly textDraft: Ref<TextDraft | undefined>
-}
+export type { TextEffectsContext } from './text-effects-contracts'
 
 function selectedTextLayer(context: TextEffectsContext): TextLayer | undefined {
   if (context.store.selectedLayerIds.length !== 1) return undefined
@@ -197,9 +181,8 @@ function updatedTextLayer(
     return measuredCalloutLayer({
       ...layer,
       payload: {
-        ...layer.payload,
+        ...(background === undefined ? layer.payload : withCalloutBackground(layer.payload, background)),
         content,
-        ...(background === undefined ? {} : { background }),
       },
     })
   }
@@ -350,6 +333,7 @@ export function createTextEffects(context: TextEffectsContext) {
     id: string,
     value: string,
   ): boolean {
+    if (applyCalloutChange(context, id, value, () => ++revision)) return true
     if (applyCalloutTextWidth(context, id, value, () => ++revision)) return true
     const resolved = resolveTextChange(id, value, context.textDefaults.value)
     if (resolved.kind === 'unhandled') return false

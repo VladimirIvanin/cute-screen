@@ -1,4 +1,8 @@
 const enums: Record<string, readonly string[]> = {
+  route: ['straight', 'corner', 'elbow'],
+  kind: ['text', 'outline', 'card', 'capsule', 'accent'],
+  targetMarker: ['none', 'circle', 'ring', 'lineArrow', 'solidArrow'],
+  labelMarker: ['none', 'circle', 'ring', 'lineArrow', 'solidArrow'],
   alignment: ['start', 'center', 'end'],
   listKind: ['none', 'bullet'],
   shape: ['circle', 'square', 'diamond', 'star', 'rectangle', 'ellipse'],
@@ -45,6 +49,7 @@ export function checked<T>(
   key = '',
 ): T {
   if (typeof fallback === 'number') return checkedNumber(fallback, value, key) as T
+  if (key === 'calloutStyle' && value === null) return null as T
   if (key === 'feather' && value === null) return value as T
   if (typeof fallback === 'string') return checkedString(fallback, value, key) as T
   if (typeof fallback === 'boolean') return (typeof value === 'boolean' ? value : fallback) as T

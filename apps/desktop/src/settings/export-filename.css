@@ -1,0 +1,36 @@
+.cs-export-filename {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.cs-export-filename h3 {
+  margin: 0 0 12px;
+  font-size: 15px;
+}
+.cs-export-filename-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.cs-export-filename input {
+  min-width: 0;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--text);
+  font: inherit;
+}
+.cs-export-filename input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.cs-export-filename input[aria-invalid='true'] {
+  border-color: var(--accent);
+}
+.cs-export-filename-preview {
+  overflow-wrap: anywhere;
+  font-family: monospace;
+}

@@ -1,3 +1,4 @@
+import { CalloutRouteEditing } from './callout-route-editing'
 import { textEditorBindings } from './text-editor-bindings'
 import {
   useNumberedMarkerPreview,
@@ -41,6 +42,10 @@ import {
 import { KeyboardController } from './keyboard-controller'
 import { CanvasOverlayController } from './overlay-controller'
 import { handlePointerDown } from './pointer-down-controller'
+import {
+  createSelectionMoveStarter,
+  handleCanvasBackgroundPointerDown,
+} from './pointer-selection-controller'
 import { PointerGeometryController } from './pointer-geometry-controller'
 import { handlePointerMove } from './pointer-move-controller'
 import { CanvasRendererController } from './renderer-controller'
@@ -66,6 +71,7 @@ import {
   createKeyboardContext,
   createPointerDownContext,
   createPointerMoveContext,
+  createPointerLeaveHandler,
   type WorkspaceInteractionPorts,
 } from './workspace-interaction-contexts'
 import type { GestureFinishContext } from './gesture-finish-controller'
@@ -96,6 +102,8 @@ export class CanvasWorkspaceController {
   readonly #markerPreview: NumberedMarkerPreview
   #gesture: CanvasGesture
   #rulerGuide: RulerAngleGuide | undefined
+  readonly #calloutRouting: CalloutRouteEditing
+  readonly calloutInsertMode = (): boolean => this.#calloutRouting.active()
   #spacePressed = false
   #cycle: { readonly key: string; readonly at: number; readonly index: number } | undefined
 
@@ -103,6 +111,7 @@ export class CanvasWorkspaceController {
     props: CanvasViewportProps,
     emit: CanvasViewportEmit,
   ) {
+    this.#calloutRouting = new CalloutRouteEditing(props)
     this.#props = props
     this.#emit = emit
     this.#markerPreview = useNumberedMarkerPreview(
@@ -173,6 +182,7 @@ export class CanvasWorkspaceController {
       viewportRoot: state.viewportRoot,
       scrollContainer: state.scrollContainer,
       viewportOutputBounds: this.#viewport.outputBounds,
+      canvasPoint: this.canvasPoint,
       scene: state.scene,
       isPanning: state.isPanning,
       onPointerDown: (event: PointerEvent) => {
@@ -186,16 +196,22 @@ export class CanvasWorkspaceController {
         handlePointerDown(this.#pointerDown, event)
       },
       editSelectedLabel: () => editSelectedMarkerLabel(this.#textEditor, this.selectedLayer()),
-      onPointerLeave: () => this.#markerPreview.clear(),
+      onPointerLeave: createPointerLeaveHandler(this.#markerPreview, this.#eyedropper, () => {
+        this.#pointerGeometry.hoverTarget = { kind: 'empty' }
+        this.invalidateOverlay()
+      }),
       finishTextEditing: (continuation: () => void) => this.#textEditor.finishEditing(continuation),
-      onBackgroundPointerDown: (event: PointerEvent) => this.#backgroundPointerDown(event),
+      onBackgroundPointerDown: (event: PointerEvent) =>
+        handleCanvasBackgroundPointerDown(this.#pointerDown, Boolean(this.#gesture), event),
       onPointerMove: (event: PointerEvent) => {
         const previewPoint = event.target === state.scene.value
           ? this.canvasPoint(event) : undefined
         this.#markerPreview.move(previewPoint)
         if (!this.#spotlight.pointerMove(event)) handlePointerMove(this.#pointerMove, event)
+        if (!this.#gesture) this.invalidateOverlay()
       },
       finishGesture: (event: PointerEvent) => {
+        if (this.#gesture?.kind === 'calloutHandle') this.#calloutRouting.finish()
         if (!this.#spotlight.pointerUp(event)) finishCanvasGesture(this.#finish, event)
       },
       cancelGesture: (event?: PointerEvent) => {
@@ -230,31 +246,11 @@ export class CanvasWorkspaceController {
       resetCropDraft: this.resetCrop,
       setCropPresetValue: this.setCropPreset,
       refitCanvas: () => this.#viewport.fit(),
+      imageInsertionTarget: (point?: { readonly x: number; readonly y: number }) =>
+        this.#viewport.imageInsertionTarget(point),
+      startSelectionMove: createSelectionMoveStarter(this.#pointerDown),
+      focusCanvas: () => this.#state.scene.value?.focus({ preventScroll: true }),
     }
-  }
-
-  #backgroundPointerDown(event: PointerEvent): void {
-    const target = event.target
-    const background = target === this.#state.scrollContainer.value ||
-      target instanceof HTMLElement && (target.classList.contains('cs-canvas-stage') || target.classList.contains('cs-canvas-surface'))
-    if (!background) return
-    if (
-      event.button !== 0 ||
-      event.shiftKey ||
-      event.ctrlKey ||
-      event.metaKey ||
-      event.altKey ||
-      this.#spacePressed ||
-      this.#gesture ||
-      this.#props.sampling ||
-      this.#props.quickSelectionMode ||
-      this.#props.activeTool === 'hand' ||
-      this.#props.activeTool === 'crop'
-    ) return
-    this.#textEditor.finishEditing(() => {
-      this.#emit('clearSelection')
-      this.#state.scene.value?.focus({ preventScroll: true })
-    })
   }
 
   readonly applyCrop = (): void => {
@@ -289,6 +285,7 @@ export class CanvasWorkspaceController {
   }
 
   readonly cancelGesture = (): void => {
+    this.#calloutRouting.finish()
     cancelCanvasGesture(this.#finish)
   }
 
@@ -317,11 +314,9 @@ export class CanvasWorkspaceController {
       scene: this.#state.scene,
       outputBounds: this.#viewport.outputBounds,
       selectedLayer: this.selectedLayer,
+      calloutInsertMode: this.calloutInsertMode,
       cropCursor: (point) => this.#crop.cursorAtPoint(point),
-      layerBounds: this.layerBounds,
-      worldHandlePositions: (layer) => this.#geometry.worldBoundsHandlePositions(layer),
-      transformPoint: this.transformPoint,
-      loupeSourceCenter: (layer) => this.#geometry.loupeSourceCenter(layer),
+
     })
   }
 
@@ -387,11 +382,13 @@ export class CanvasWorkspaceController {
       outputBounds: this.#viewport.outputBounds,
       documentForScene: () => {
         const document = this.#spotlight.documentForScene(this.#sceneDocument.documentForScene())
-        const draft = this.#gesture?.kind === 'precision' && this.#gesture.tool === 'spotlight' ? this.#draft.precisionLayer('__spotlight-draft__') : undefined
+        const draft = this.#gesture?.kind === 'precision' && this.#gesture.tool === 'spotlight'
+          ? this.#draft.precisionLayer('__spotlight-draft__') : undefined
         const result = document && draft ? { ...document, layers: [...document.layers, draft] } : document
         return markerDocumentForScene(result, state.editingText.value)
       },
       previewLayer: this.gesturePreviewLayer,
+      gestureRequiresScenePreview: () => this.#gesture?.kind === 'move' && (this.#gesture.nodeIds?.length ?? 0) > 1,
       invalidateOverlay: this.invalidateOverlay,
     })
   }
@@ -399,6 +396,9 @@ export class CanvasWorkspaceController {
   #createOverlay(): CanvasOverlayController {
     return new CanvasOverlayController({
       props: this.#props,
+      calloutInsertMode: this.calloutInsertMode,
+      hoverTarget: () => this.#pointerGeometry.hoverTarget,
+      screenScale: () => this.#pointerGeometry.screenScale(),
       overlay: this.#state.overlay,
       outputBounds: this.#viewport.outputBounds,
       renderer: this.#renderer,
@@ -500,13 +500,14 @@ export class CanvasWorkspaceController {
       outputBounds: this.#viewport.outputBounds,
       samplingCursor: this.#eyedropper.cursor,
       eyedropper: this.#eyedropper,
-      initialSamplingCursor: () => this.#eyedropper.initialCursor(),
       scheduleEyedropper: (point) => this.#eyedropper.schedule(point),
       hideEyedropper: () => this.#eyedropper.hide(),
       setCursor: (cursor) => this.#pointerGeometry.setCursor(cursor),
       invalidateOverlay: this.invalidateOverlay,
       onStrokeKeydown: (event) => this.#keyboard.strokeKeydown(event),
-      onKeydown: (event) => this.#keyboard.keydown(event),
+      onKeydown: (event) => {
+        if (!this.#calloutRouting.keydown(event, this.cancelGesture)) this.#keyboard.keydown(event)
+      },
       onKeyup: (event) => this.#keyboard.keyup(event),
       onBlur: () => this.#keyboard.blur(),
       onDocumentPointerDown: (event) => this.#textEditor.documentPointerDown(event),

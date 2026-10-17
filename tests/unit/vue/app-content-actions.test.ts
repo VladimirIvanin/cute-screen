@@ -19,6 +19,7 @@ import {
   DocumentSessionController,
   parsePreferences,
   resolveSystemLocale,
+  useEditorShellStore,
 } from '@cute-screen/editor-vue'
 import {
   createContentImageLayer,
@@ -192,13 +193,13 @@ describe('M02 editor shell', () => {
     view.unmount()
   })
 
-  it('keeps content-image radius, border and opacity in the contextual toolbar', async () => {
+  it.each([2160, 3840])('supports full rounding and a thicker border on a 3840 × %i image', async (height) => {
     const image = createContentImageLayer({
       id: '019c1f62-058e-7000-8000-0000000000ac',
       blobHash: 'b'.repeat(64),
       format: 'png',
-      intrinsicWidth: 80,
-      intrinsicHeight: 60,
+      intrinsicWidth: 3840,
+      intrinsicHeight: height,
       origin: { x: 10, y: 12 },
     })
     const document: EditorDocumentV1 = {
@@ -233,31 +234,32 @@ describe('M02 editor shell', () => {
       correlationId: () => 'content-image-style',
       debounceMs: 60_000,
     })
+    const initialDocument = session.snapshot.core.document
     const view = render(EditorShell, {
       props: { documentSession: markRaw(session) },
       global: { plugins: [createEditorShellPinia()] },
     })
 
     await selectLayerFromPanel(view)
-    const radius = await screen.findByRole('slider', { name: 'Radius' })
-    const borderWidth = await screen.findByRole('slider', {
-      name: 'Border width',
-    })
     const toolbar = view.container.querySelector<HTMLElement>('.cs-context-toolbar')
     if (!toolbar) throw new Error('context toolbar should be rendered')
-    const opacity = await within(toolbar).findByRole('slider', {
-      name: 'Opacity',
-    })
+    await fireEvent.click(within(toolbar).getByRole('button', { name: 'Radius' }))
+    const radius = await screen.findByRole('slider', { name: 'Radius' })
+    expect(radius).toHaveAttribute('aria-valuemax', String(height / 2))
     radius.focus()
-    for (let index = 0; index < 12; index += 1) {
-      await fireEvent.keyDown(radius, { key: 'ArrowRight' })
-    }
-    await fireEvent.keyUp(radius, { key: 'ArrowRight' })
+    await fireEvent.keyDown(radius, { key: 'End' })
+    expect(session.snapshot.core.document.layers[0]).toEqual(image)
+    await fireEvent.keyUp(radius, { key: 'End' })
+    await fireEvent.click(within(toolbar).getByRole('button', { name: 'Border' }))
+    const borderWidth = await screen.findByRole('slider', { name: 'Border width' })
+    expect(borderWidth).toHaveAttribute('aria-valuemax', '32')
     borderWidth.focus()
-    for (let index = 0; index < 3; index += 1) {
-      await fireEvent.keyDown(borderWidth, { key: 'ArrowRight' })
-    }
-    await fireEvent.keyUp(borderWidth, { key: 'ArrowRight' })
+    await fireEvent.keyDown(borderWidth, { key: 'End' })
+    expect(session.snapshot.core.document.layers[0]).toMatchObject({ payload: { border: null } })
+    await fireEvent.keyUp(borderWidth, { key: 'End' })
+    await fireEvent.click(within(toolbar).getByRole('button', { name: 'Opacity' }))
+    const opacity = await within(await screen.findByRole('dialog', { name: 'Opacity' }))
+      .findByRole('slider', { name: 'Opacity' })
     opacity.focus()
     for (let index = 0; index < 8; index += 1) {
       await fireEvent.keyDown(opacity, { key: 'ArrowLeft' })
@@ -268,13 +270,28 @@ describe('M02 editor shell', () => {
       kind: 'image',
       opacity: 0.6,
       payload: {
-        radius: 12,
+        radius: height / 2,
         border: {
-          width: 3,
+          width: 32,
           color: { red: 0, green: 0, blue: 0, alpha: 1 },
         },
       },
     })
+
+    const committed = session.snapshot.core.document
+    session.undo()
+    expect(session.snapshot.core.document.layers[0]).toMatchObject({
+      opacity: 1,
+      payload: { radius: height / 2, border: { width: 32 } },
+    })
+    session.undo()
+    expect(session.snapshot.core.document.layers[0]).toMatchObject({ payload: { radius: height / 2, border: null } })
+    session.undo()
+    expect(session.snapshot.core.document).toEqual(initialDocument)
+    session.redo()
+    session.redo()
+    session.redo()
+    expect(session.snapshot.core.document).toEqual(committed)
 
     session.dispose()
     view.unmount()
@@ -314,6 +331,32 @@ describe('M02 editor shell', () => {
   })
 
   */
+  it('removes the open-image confirmation from the shell after 3 seconds', async () => {
+    vi.useFakeTimers()
+    const pinia = createEditorShellPinia()
+    try {
+      render(EditorShell, {
+        props: {
+          openImageAvailable: true,
+          actions: { run: async () => 'Image opened' },
+        },
+        global: { plugins: [pinia] },
+      })
+
+      const empty = screen.getByRole('region', { name: 'Capture your first screen' })
+      await fireEvent.click(within(empty).getByRole('button', { name: 'Open image…' }))
+      expect(screen.getByText('Image opened')).toBeInTheDocument()
+
+      await vi.advanceTimersByTimeAsync(2_999)
+      expect(screen.getByText('Image opened')).toBeInTheDocument()
+      await vi.advanceTimersByTimeAsync(1)
+      expect(screen.queryByText('Image opened')).not.toBeInTheDocument()
+    } finally {
+      useEditorShellStore(pinia).$dispose()
+      vi.useRealTimers()
+    }
+  })
+
   it('renders a native selector cancellation as terminal feedback, not an error', () => {
     render(ActionFeedback, {
       props: {
@@ -368,12 +411,12 @@ describe('M02 editor shell', () => {
   it('keeps familiar compact actions accessible and labels every icon control', async () => {
     renderApp()
     expect(screen.getByRole('button', { name: 'Capture' })).toBeEnabled()
-    expect(screen.getByRole('button', { name: 'More actions' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Zoom out' })).toBeInTheDocument()
 
-    await fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
-    expect(screen.getByRole('menuitemradio', { name: 'Dark' })).toBeInTheDocument()
-    expect(screen.getByRole('menuitemradio', { name: 'RU' })).toBeInTheDocument()
+    await fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    expect(screen.getByRole('radio', { name: 'Dark' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Русский' })).toBeInTheDocument()
   })
 
   it('uses the product locale fallback for corrupt preferences', () => {

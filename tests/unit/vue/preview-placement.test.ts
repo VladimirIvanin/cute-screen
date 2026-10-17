@@ -2,11 +2,39 @@ import {
   describe,
   expect,
   it,
+  vi,
 } from 'vitest'
-import { previewPlacement } from '../../../packages/editor-vue/src/shell/ui/preview-placement'
+import {
+  previewEnvironment,
+  previewPlacement,
+} from '../../../packages/editor-vue/src/shell/ui/preview-placement'
 
 const view = { left: 0, top: 0, width: 1024, height: 768 }
 describe('preview-preserving popovers', () => {
+  it('measures header chrome outside the workbench for nested settings', () => {
+    const shell = document.createElement('div')
+    shell.className = 'cs-editor-shell'
+    shell.innerHTML = '<header class="cs-topbar"></header><div class="cs-workbench"><div class="cs-viewport"></div><button></button><div class="panel"></div></div>'
+    document.body.append(shell)
+    const measure = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains('cs-topbar') ? new DOMRect(14, 12, 996, 42) : new DOMRect(0, 0, 1024, 768)
+    })
+    try {
+      const trigger = shell.querySelector('button')!
+      const panel = shell.querySelector<HTMLElement>('.panel')!
+      const environment = previewEnvironment(trigger, panel)
+      expect(environment.view).toEqual({ left: 0, top: 54, width: 1024, height: 714 })
+      expect(environment.obstacles).toContainEqual(new DOMRect(14, 12, 996, 42))
+      const result = previewPlacement({ left: 430, top: 68, width: 44, height: 36 },
+        { width: 250, height: 180 }, environment.view, environment.obstacles)
+      expect(result.top).toBeGreaterThanOrEqual(62)
+      shell.querySelector('header')!.remove()
+      expect(previewEnvironment(trigger, panel).view).toEqual(view)
+    } finally {
+      measure.mockRestore()
+      shell.remove()
+    }
+  })
   it('keeps a nested menu close when the selected callout and chrome fill the nearby space', () => {
     const anchor = { left: 346, top: 445, width: 98, height: 36 }
     const toolbar = { left: 154, top: 439, width: 296, height: 48 }

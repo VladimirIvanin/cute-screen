@@ -85,14 +85,25 @@ export function previewPlacement(
   })[0]!
 }
 
+/** The header is a sibling of the workbench and overlays the canvas viewport. */
+export function previewViewport(anchor: HTMLElement): PreviewRect {
+  const root = anchor.closest('.cs-editor-shell') ?? anchor.closest('.cs-workbench') ?? document.body
+  const viewport = root.querySelector('.cs-viewport')?.getBoundingClientRect()
+  const view = viewport && viewport.width > 0 && viewport.height > 0
+    ? viewport : { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight }
+  const header = root.querySelector<HTMLElement>('.cs-topbar')
+  const rect = header?.getBoundingClientRect()
+  const top = header && rect?.height && getComputedStyle(header).visibility !== 'hidden'
+    ? Math.max(view.top, rect.bottom) : view.top
+  return { left: view.left, top, width: view.width, height: Math.max(1, view.top + view.height - top) }
+}
+
 export function previewEnvironment(
   anchor: HTMLElement,
   panel: HTMLElement,
 ) {
-  const root = anchor.closest('.cs-workbench') ?? document.body
-  const viewport = root.querySelector('.cs-viewport')?.getBoundingClientRect()
-  const view = viewport && viewport.width > 0 && viewport.height > 0
-    ? viewport : { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight }
+  const root = anchor.closest('.cs-editor-shell') ?? anchor.closest('.cs-workbench') ?? document.body
+  const view = previewViewport(anchor)
   const obstacles: PreviewRect[] = []
   root.querySelectorAll<HTMLElement>('[data-preview-bounds]').forEach((element) => {
     const values = element.dataset.previewBounds?.split(',').map(Number)
@@ -111,7 +122,7 @@ export function previewEnvironment(
       height: rect.height + padding * 2,
     })
   })
-  root.querySelectorAll<HTMLElement>('.cs-layers-panel, .cs-tool-rail, .cs-toolrail, .cs-context-toolbar, .cs-tool-configure-popover-host').forEach((element) => {
+  root.querySelectorAll<HTMLElement>('.cs-topbar, .cs-layers-panel, .cs-tool-rail, .cs-toolrail, .cs-context-toolbar, .cs-tool-configure-popover-host, .cs-filmstrip, .cs-zoom-controls, .cs-quick-history, .cs-quick-settings-button').forEach((element) => {
     if (
       element === panel ||
       panel.contains(element) ||

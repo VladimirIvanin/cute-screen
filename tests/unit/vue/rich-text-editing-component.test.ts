@@ -27,6 +27,7 @@ import {
 import { calloutTextLayout } from '@cute-screen/editor-renderer'
 
 const TEXT_DEFAULTS: TextToolDefaults = Object.freeze({
+  calloutStyle: null,
   fontFamily: 'Roboto',
   fontSize: 24,
   weight: 400,
@@ -68,7 +69,14 @@ beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
     measureText: (text: string) => ({ width: Array.from(text).length * 14.4 }),
     save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(),
-    stroke: vi.fn(), arc: vi.fn(), fill: vi.fn(),
+    ellipse: vi.fn(),
+    stroke: vi.fn(),
+    arc: vi.fn(),
+    fill: vi.fn(),
+    quadraticCurveTo: vi.fn(),
+    closePath: vi.fn(),
+    rect: vi.fn(),
+    setLineDash: vi.fn(),
     clearRect: vi.fn(),
     setTransform: vi.fn(),
     drawImage: vi.fn(),
@@ -337,7 +345,7 @@ describe('v7 rich-text component editing', () => {
       const id = `019c1f62-058e-7000-8000-00000000020${kind.length}`
       const layer =
         kind === 'callout'
-          ? createCalloutLayer({
+          ? createCalloutLayer({ style: null,
             id,
             text: 'old',
             target: { x: 10, y: 60 },
@@ -494,7 +502,7 @@ describe('v7 rich-text component editing', () => {
         kind === 'text'
           ? createTextLayer({ id, text: 'old', origin: { x: 10, y: 10 } })!
           : kind === 'callout'
-            ? createCalloutLayer({
+            ? createCalloutLayer({ style: null,
               id,
               text: 'old',
               target: { x: 10, y: 60 },
@@ -588,7 +596,7 @@ describe('measured callout editing', () => {
     expect(command.layer.transform.translateX + layout.text.x).toBeCloseTo(Number.parseFloat(editor.style.left))
   })
   it('remeasures long input, reopens on the label and applies width without emitting intermediate commands', async () => {
-    const layer = createCalloutLayer({ id: 'label', text: 'Текст', target: { x: 180, y: 40 }, label: { x: 160, y: 80 } })!
+    const layer = createCalloutLayer({ style: null, id: 'label', text: 'Текст', target: { x: 180, y: 40 }, label: { x: 160, y: 80 } })!
     const rendered = await openExistingEditor(layer)
     const editor = rendered.getByLabelText('Callout editor') as HTMLDivElement
     const before = calloutTextLayout(layer.payload)
@@ -602,7 +610,7 @@ describe('measured callout editing', () => {
 })
 
 it('does not open the callout editor in a read-only document', async () => {
-  const layer = createCalloutLayer({ id: 'readonly', text: 'Label', target: { x: 40, y: 40 }, label: { x: 80, y: 80 } })!
+  const layer = createCalloutLayer({ style: null, id: 'readonly', text: 'Label', target: { x: 40, y: 40 }, label: { x: 80, y: 80 } })!
   const rendered = mount(layer)
   await rendered.rerender({ readOnly: true })
   const rect = calloutTextLayout(layer.payload).text

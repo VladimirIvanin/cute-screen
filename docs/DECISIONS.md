@@ -1,5 +1,196 @@
 # Журнал архитектурных решений
 
+## ADR-089 — Диапазоны оформления изображения
+
+**Статус:** accepted (2026-10-18); дополняет ADR-086.
+
+**Контекст:** предел скругления 128 локальных px не позволяет полностью
+скруглить вставленное 4K изображение. Диапазон рамки 0–16 px слишком узок.
+
+**Решение:** максимум скругления равен половине короткой стороны localBounds;
+максимум толщины рамки — 32 px. Это существующая геометрия rounded rectangle:
+квадрат достигает круга, прямоугольник — капсулы. Отдельная эллиптическая
+маска не вводится. Размеры остаются в локальных px, preview/commit и формат
+v7 сохраняются; schema toolbar и command validation принимают новые значения.
+
+**Проверяемое основание:** mounted EditorShell на 3840×2160 и 3840×3840,
+максимумы 1080/1920 и 32 px, preview без команды, по одному undo на параметр;
+production G browser smoke с видимым результатом. Команды — TESTING.md.
+
+## ADR-088 — Общий язык WebView и native tray
+
+**Статус:** accepted (2026-10-17); дополняет ADR-010/075/083 и REQ-UI-003.
+
+**Контекст:** General Settings держал язык в отдельном ref, tray capture/quit
+использовали английские строки, остальные пункты читали LANG. Shortcut refresh
+снова заменял перевод английским текстом.
+
+**Решение:** Settings использует существующий shell preference RU/EN; desktop
+adapter переносит browser preference в native settings и сериализует записи.
+Native preference event обновляет открытые WebViews без обратной записи.
+Tray creation и shortcut refresh используют одну таблицу переводов и сохранённую
+локаль; trigger и enabled state остаются независимыми от языка. Меню macOS
+использует тот же выбор. Document schema и оригиналы не меняются.
+
+**Проверяемое основание:** red-first Rust label regression и mounted Settings
+persistence; WebView2 Settings → RU/EN/RU → чтение actual MenuItem text,
+синхронизация editor и startup labels после нового процесса. Результаты — TESTING.md.
+
+## ADR-087 — Управляемая линия и оболочка выноски
+
+**Статус:** accepted; supersedes ADR-032 в части elbow-only/markers/container и
+ADR-065 в части автоматической стороны и отделения карточки от линии.
+
+**Решение:** новые Callout создаются как Г-линия, target circle, label none и
+скруглённая карточка. Маршрут выбирается независимо от наконечников/оболочки.
+Ручные маршруты сохраняют ортогональные точки, изменение сегмента — один command.
+Перенос подписи сохраняет target; сторона подключения закреплена и меняется явно.
+Core geometry обслуживает scene, bounds, hits, handles и измеренную подпись.
+Optional v7 fields расширяют контракт без миграции: отсутствие новых полей
+сохраняет прежнюю геометрию. Rich-text/IPC и immutable originals не меняются.
+
+**Проверяемое основание:** red-first route/codec/style tests, production creation,
+move/cancel/history и decoded render parity; команды и ограничения в TESTING.md.
+Г-образный default — гипотеза для screenshot workflow, основанная на
+[исследовании читаемости](https://arxiv.org/html/1509.00379), а не human-pass.
+
+## ADR-086 — Компактные настройки изображения и ordered gesture preview
+
+**Статус:** accepted (2026-10-17); дополняет ADR-051/053/054/081.
+
+**Контекст:** generic image toolbar растягивал три слайдера и палитру на две
+строки. Canvas gesture удалял image из scene, но lightweight overlay пропускает
+image nodes: простой click давал пропадание до pointerup, rotate скрывал картинку.
+
+**Решение:** ImageFormattingToolbar показывает три подписанные кнопки с текущими
+значениями: скругление, рамка, непрозрачность. Один popover; рамка объединяет
+NumericControl толщины и embedded SimpleColorPicker. Numeric preview, command
+collector, mixed/disabled и focus/cancel используют существующие контракты.
+Selection image любого размера использует общий preview-placement с protected
+bounds и handles; вложенные popover сохраняют tether к кнопке. Панель скрывается
+на время canvas gesture и возвращается у итогового выделения.
+
+Image входит в requiresScenePreview наравне с ordered effects. Временная geometry
+подставляется в исходный scene slot; renderer использует прежние decoded resources.
+Это относится к content и unlocked base image. Pointermove не изменяет Vue scene
+state или историю; commit/cancel используют прежний lifecycle. Document v7,
+публичные API, native IPC и immutable originals не меняются.
+
+**Проверяемое основание:** red-first Vue regression для base/content, component
+keyboard/draft/mixed/disabled tests; 4K decoded pixel equality между held gesture,
+commit и export с reflected scale, opacity, radius, border и верхним слоем;
+browser и real-WebView2 production G import с pixel checks на pointerdown,
+move/resize/rotate, cancel и undo/redo. Команды и фактический статус — TESTING.md.
+
+## ADR-085 — Политики захвата и перенос за выделение
+
+**Статус:** accepted (2026-10-17); дополняет ADR-048/069 и REQ-EDT-019.
+
+**Контекст:** перенос тонких стрелок и незалитых фигур требовал попадания
+в stroke; управляющие точки уже имели более широкую область. Пользователь
+выбрал перенос за пунктирную рамку после выделения, сохранив первичный выбор
+по геометрии с допуском и доступ к соседним объектам внутри рамки.
+
+**Решение:** исчерпывающий LayerInteractionPolicy по LayerKind в editor-core
+определяет первичный захват, CSS margin и перенос за рамку. Точные hit queries
+сохраняются; optional options включают допуск и measured screen scale.
+Spatial index расширяет query, narrow phase — bounds и геометрию. Один
+resolveSelectionTarget определяет hover/cursor и начало жеста; позиции
+ручек общие с overlay. Приоритет: handles → geometry → selected frame → margin.
+После pointerdown цель фиксирована; 4 CSS px отделяют перенос от щелчка.
+Мультивыбор имеет общую рамку и общий preview. Для маленьких выделений
+используется ручка в существующей transient-панели, без второго инспектора.
+Schema v7, IPC, creation policies и command/history boundary сохраняются.
+
+**Проверяемое основание:** red-first core regression, проверки mounted canvas,
+production browser creation при 25/100/400%, RU/EN и light/dark; отдельный
+external-driver WebView2 сценарий Capture → Quick с non-origin crop → Editor.
+Фактические команды, результаты и ограничения записываются в TESTING.md.
+
+## ADR-083 — Дроп настроек в редакторе
+
+**Статус:** accepted (2026-10-17); дополняет ADR-070/075/080.
+
+**Контекст:** Window capture стоял между Undo и Redo, а тема и язык были
+спрятаны в overflow вместе с отражениями. Входа в общие настройки из editor
+не было. Пользователь запросил убрать лишнюю кнопку и создать расширяемый дроп.
+
+**Решение:** удалить только кнопку Window capture из main editor. На месте
+overflow перед Export поставить шестерёнку, открывающую немодальную панель
+304 CSS px с viewport bounds и прокруткой. Сначала идут radio-переключатели
+темы и языка, затем отдельная группа undoable отражений и вход в Settings.
+Выбор темы/языка не закрывает панель; Escape возвращает фокус. Quick Capture
+сохраняет собственный chrome. Новые настройки добавляются в смысловые группы.
+
+EditorShell получает optional async `openSettings`; desktop передаёт
+существующий adapter `openActivationSettings`. Без adapter ссылка отключена
+с пояснением; pending исключает повтор, ошибка допускает retry. Успешный вызов
+закрывает дроп без перехвата фокуса native Settings. Существующий singleton
+сохраняет раздел при повторной активации. Native IPC и preferences schema
+не меняются; CLI/tray/hotkey Window capture сохраняются.
+
+**Проверяемое основание:** mounted Vue tests для live/persisted preferences,
+disabled/pending/error/retry/focus, browser matrix RU/EN × light/dark ×
+1024/1600 и short viewport; real-WebView сценарий `editor-settings` проверяет
+trusted keyboard, открытие из editor, singleton и сохранение раздела.
+Фактические результаты и ограничения фиксируются в TESTING.md.
+
+## ADR-082 — Согласованная видимость Windows capture
+
+**Статус:** accepted (2026-10-17); replaces ADR-049.
+
+**Контекст:** прямой Win32 SW_HIDE оставлял Tao VISIBLE=true. Последующий
+Tauri show не менял flags и не показывал main; это ломало Editor, tray и CLI.
+Первый fullscreen Quick показывался до resize/fit WebView: запись холодного
+запуска обнаружила видимый кадр 1901×1069 перед правильным 1920×1080.
+
+**Решение:** Windows hide выполняет Tauri hide на owning thread внутри
+временного DWMWA_TRANSITIONS_FORCEDISABLED. Проверка native visibility и
+DwmFlush по-прежнему предшествуют capture acknowledgement; transitions
+восстанавливаются и при ошибке callback. Windows Quick present готовит
+fullscreen скрытого окна; reveal показывает его после двух одинаковых
+измерений viewport/scene/bitmap. Selection использует собственное измерение,
+поскольку action chrome до первого drag отсутствует. Decode, renderer lifecycle,
+originals, IPC и EditorCommand не меняются.
+
+**Проверяемое основание:** red-first Rust framework-hide callback и Vue
+selection-layout regressions, physical DXGI cold capture и single-click
+Quick → Editor в dev WebView2, stable native capture-exclusion suite.
+Фактические команды, результаты и границы — TESTING.md.
+
+## ADR-081 — Немедленная вставка изображения в видимую область
+
+**Статус:** accepted (2026-10-17)
+
+**Контекст:** G возвращал Rust enum с snake_case полями вместо ожидаемых
+camelCase, и импорт останавливался до decode. Native E2E проверял только
+доступность кнопки. Bitmap paste обходил successful-create policy; размер и
+центр документа не учитывали zoom/pan и закрывающие холст панели.
+
+**Решение:** G — действие выбора одного файла с немедленной вставкой;
+дополнительного placement mode нет. Файл, bitmap и native drop используют
+один decode-before-command flow. Core вычисляет uniform scale до 80% измеренной
+видимой области без upscale; drop центрируется в точке отпускания и ограничивается
+видимой областью. Источник/документ v7 не меняются. Слой добавляется одним
+EditorCommand; Select/selection принадлежат существующей creation policy.
+Операция проверяет session identity/document ID и cancellation generation.
+
+Native drop выдаёт одноразовый token на канонизированный путь для конкретного
+WebView; JSON содержит метаданные, байты идут через binary transport.
+Размер файла ограничивается до чтения. DTO генерируется из Rust; тест serde
+проверяет фактические поля. Временные transport tokens и object URLs
+освобождаются после decode, decoded image остаётся доступным истории.
+
+**Основание UX:** [FigJam](https://help.figma.com/hc/en-us/articles/1500004290881-Place-images-video-and-GIFs-in-FigJam)
+использует центр viewport; [tldraw](https://tldraw.dev/sdk-features/external-content)
+объединяет источники external content. Выбор немедленной вставки и одного файла
+подтверждён пользователем. Код этих редакторов не переносился.
+
+**Проверяемое основание:** red-first serde regression, core fit/clamp tests,
+Vue decode/cancel/session/undo tests и browser/native ingress suites.
+Фактические платформенные результаты — TESTING.md. ADR-025 binary/decode
+boundary и ADR-048 creation policy сохраняются.
+
 ## ADR-072 — Прямой выбор формы фонаря
 
 **Статус:** accepted; дополняет ADR-056 и ADR-071.
@@ -752,7 +943,7 @@ contenteditable selection и compact toolbar проверяются отдель
 
 ## ADR-032 — Callout leader line вместо speech bubble
 
-**Статус:** superseded in label placement/sizing by [ADR-065](#adr-065-измеряемая-подпись-выноски); remaining leader-line decision accepted; supersedes the callout container semantics portion of
+**Статус:** superseded in route/markers/container by [ADR-087](#adr-087-управляемая-линия-и-оболочка-выноски), in label placement/sizing by [ADR-065](#adr-065-измеряемая-подпись-выноски); remaining leader-line decision accepted; supersedes the callout container semantics portion of
 ADR-031
 
 **Контекст:** bubble/tail callout не соответствует technical annotation
@@ -1016,7 +1207,7 @@ immutable originals, binary image transport и platform adapters сохраня�
 
 ## ADR-049 — Подтверждённое скрытие Windows editor до capture
 
-**Статус:** accepted.
+**Статус:** superseded by [ADR-082](#adr-082-согласованная-видимость-windows-capture).
 
 **Контекст:** успешный Tauri `hide()` из capture task означает постановку
 команды в оконную очередь. DWM может продолжать hide-animation, и её полупрозрачный
@@ -1333,7 +1524,7 @@ platform evidence и известные ограничения — в `TESTING.m
 
 ## ADR-065 — Измеряемая подпись выноски
 
-**Статус:** accepted; supersedes ADR-032 in label placement/sizing only.
+**Статус:** superseded in label side/attachment by [ADR-087](#adr-087-управляемая-линия-и-оболочка-выноски); remaining measurement/sizing accepted; supersedes ADR-032 in label placement/sizing only.
 
 **Контекст:** callout inline editor retained a one-em width and always opened to
 its label's right. Character-count bounds disagreed with glyph metrics and reopening.
@@ -1593,3 +1784,45 @@ L=25.6 вместо прежних 3/12. Геометрические и decoded
 backend, browser/native изменение размера и рамки, cancel и undo/redo;
 визуальная проверка 256/512 px на светлом/тёмном фоне и при уменьшении.
 Фактические команды, результаты и ограничения — TESTING.md.
+
+## ADR-083 — PNG export полного редактора
+
+**Статус:** accepted (2026-10-17); дополняет ADR-021.
+
+**Контекст:** native desktop action Export возвращал `export is not available yet`,
+хотя кнопка была доступна. Scene preview зависит от zoom/DPR, а при Crop показывает
+весь canvas, поэтому его bitmap нельзя использовать как итоговый файл.
+
+**Решение:** после подготовки inline edits и flush полный editor экспортирует
+committed scene через существующий renderer `exportPng({ scale: 1 })`. Native Save
+As выдаёт одноразовый opaque ticket; PNG идёт raw binary IPC с ticket в header.
+Rust пишет атомарно и проверяет PNG; canonical paths внутри app library запрещены.
+Отмена диалога и отмена до записи не создают output, ошибки допускают retry.
+Document schema, original blobs и undo history сохраняются. Этот срез даёт PNG 1×;
+JPEG/WebP и настройки качества/масштаба остаются отдельной частью REQ-OUT-003.
+
+**Проверяемое основание:** red-first desktop action воспроизводит сообщение со
+скриншота; Rust проверяет overwrite, декодированные RGBA и отказ для originals;
+реальный WebView проверяет production Open image, аннотацию, crop и отмену picker.
+Фактические результаты и границы — TESTING.md.
+
+## ADR-084 — Общий шаблон имени PNG
+
+**Статус:** accepted (2026-10-17); дополняет ADR-083.
+
+**Контекст:** пробелы в имени неудобны; дата в начале имени должна поддерживать
+хронологическую сортировку. Пользователь хочет менять формат в настройках.
+
+**Решение:** default `{date}_{time}_Скриншот` формирует
+`YYYY-MM-DD_HH-MM-SS_Скриншот.png` по локальным часам открытия Save As. В General
+Settings доступны draft, native preview, Save, Cancel и Reset. Обязательные
+подстановки `{date}` и `{time}` имеют фиксированные сортируемые ISO-компоненты;
+расширение .png добавляется автоматически. Rust запрещает whitespace, path
+separators, управляющие/запрещённые Windows символы, неизвестные tokens и слишком
+длинные имена. Settings key `export.filename.v1` хранится в существующей SQLite,
+без изменения schema. Невалидная/повреждённая запись даёт default; failed save
+не меняет прежний выбор. Оба Save As читают сохранённый шаблон заново.
+
+**Проверяемое основание:** red-first Rust формат/validation/reopen; Vue async
+preview/cancel/error/retry; real-WebView General Settings save → reopen → export
+с декодированием 4K output. Команды и платформенные границы — TESTING.md.

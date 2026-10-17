@@ -63,6 +63,12 @@ export {
   type StrokeStyle,
   type ArrowLayerPayload,
   type CalloutPayload,
+  type CalloutRoute,
+  type CalloutFrame,
+  type CalloutStyle,
+  type CalloutMarker,
+  type CalloutAttachment,
+  type CalloutMarkerStyle,
   type ShapeLayerPayload,
   type PencilLayerPayload,
   type StraightSegment,
@@ -120,9 +126,22 @@ export {
   type ShapeKind,
 } from './drawing'
 export {
+  DEFAULT_CALLOUT_FRAME,
+  DEFAULT_CALLOUT_STYLE,
+  defaultCalloutAttachment,
+  calloutRoutePreset,
+  calloutStyleForPayload,
+  calloutBackground,
+  calloutFrameBackground,
+  withCalloutBackground,
+  calloutEndpointSize,
+  addCalloutStep,
+  removeCalloutStep,
+  resetCalloutRoute,
   calloutGeometryBounds,
   type CalloutGeometryContext,
   calloutMarkerRadius,
+  calloutLabelContains,
   calloutPathPoints,
   calloutSelectionHandles,
   calloutTextLayout,
@@ -397,3 +416,30 @@ export {
   setStrokeStraight,
   type StrokeState,
 } from './tools/straight-stroke'
+export { imagePlacement } from './image-placement'
+
+export {
+  LAYER_INTERACTION_POLICIES,
+  SELECTION_DRAG_THRESHOLD_CSS,
+  SMALL_SELECTION_SIZE_CSS,
+  type LayerInteractionPolicy,
+} from './interaction-policy'
+export {
+  resolveSelectionTarget,
+  selectionFrame,
+  nearestSelectionHandle,
+  type SelectionHandle,
+  type SelectionFrame,
+  type SelectionTarget,
+} from './selection-target'
+export {
+  type HitTestOptions,
+  layerHitBounds,
+} from './hit-test'
+
+export { layerSelectionHandles } from './selection-handles'
+
+export {
+  parseCalloutPayload,
+  parseCalloutStyle,
+} from './document/codec/callout'

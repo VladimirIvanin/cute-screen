@@ -10,7 +10,10 @@ import type {
   RichTextContent,
 } from './document/types'
 import { rebaseArrowLayer } from './arrow-geometry'
-import { rebaseCalloutLayer } from './callout-geometry'
+import {
+  rebaseCalloutLayer,
+  calloutRoutePreset,
+} from './callout-geometry'
 import { rebaseRulerLayer } from './tools/precision/ruler'
 
 /** Semantic visual channels. Geometry and content are never style channels. */
@@ -47,6 +50,11 @@ const channels: Partial<Record<LayerNode['kind'], Readonly<Record<string, string
     width: 'stroke.width',
     strokeStyle: 'stroke.style',
     background: 'background',
+    calloutFrame: 'frame',
+    targetMarker: 'targetMarker',
+    labelMarker: 'labelMarker',
+    targetMarkerStyle: 'targetMarkerStyle',
+    labelMarkerStyle: 'labelMarkerStyle',
   },
   numberedMarker: { badgeColor: 'badge.color', badgeShape: 'badge.shape' },
   image: { imageBorder: 'border', radius: 'radius' },
@@ -90,6 +98,16 @@ export function creationPolicy(tool: string): 'repeat' | 'select' {
 }
 export function extractLayerStyle(layer: LayerNode): LayerStyle {
   const result: Record<string, JsonValue> = {}
+  if (layer.kind === 'callout') {
+    result.calloutRoute = calloutRoutePreset(layer.payload.route)
+    result.calloutFrame = clone(layer.payload.frame ?? {
+      kind: layer.payload.background ? 'card' : 'text',
+      fill: layer.payload.background?.color ?? { red: 1, green: 1, blue: 1, alpha: 1 },
+      border: null,
+      padding: layer.payload.background?.padding ?? 0,
+      radius: layer.payload.background?.radius ?? 0,
+    })
+  }
   for (const [key, path] of Object.entries(channels[layer.kind] ?? {})) {
     const value = readPath(layer.payload, path)
     if (value !== undefined) result[key] = clone(value)
@@ -224,10 +242,21 @@ export function applyLayerStyle<T extends LayerNode>(
   const source = layer.kind === 'pencil' && typeof style.brush === 'string'
     ? changePencilBrush(layer.payload, style.brush) : layer.payload
   const payload = clone(source) as MutableObject
+  if (layer.kind === 'callout' && ['straight', 'corner', 'elbow'].includes(String(style.calloutRoute))) {
+    const axis = Math.abs(layer.payload.label.x - layer.payload.target.x) >= Math.abs(layer.payload.label.y - layer.payload.target.y) ? 'y' : 'x'
+    payload.route = style.calloutRoute === 'straight' ? { path: 'straight' }
+      : style.calloutRoute === 'elbow' ? { path: 'elbow', elbow: { axis, offset: 0 } } : { path: 'corner', axis }
+  }
   delete payload.brushSmoothing
   for (const [key, path] of Object.entries(channels[layer.kind] ?? {})) {
     if (key in style) writePath(payload, path, key === 'brush' && style[key] === 'pencil' ? 'pen' : style[key]!)
   }
+  if (
+    layer.kind === 'callout' &&
+    'calloutFrame' in style &&
+    !layer.payload.attachment
+  )
+    payload.attachment = layer.payload.label.x < layer.payload.target.x ? 'right' : 'left'
   const content = contentFor(layer)
   if (content) payload[layer.kind === 'numberedMarker' ? 'label' : 'content'] = styledContent(content, style)
   let next = { ...layer, payload } as LayerNode

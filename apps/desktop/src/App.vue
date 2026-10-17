@@ -36,6 +36,8 @@ import { mountM05HarnessDocument as mountM05Harness } from './m05-harness'
 import { createDesktopShellActions } from './desktop-shell-actions'
 import { installDesktopLifecycleGuards } from './platform/tauri/lifecycle-adapter'
 import { M08HarnessController } from './m08-harness'
+import { openActivationSettings } from './platform/tauri/activation-settings-adapter'
+import { isTauri } from '@tauri-apps/api/core'
 
 declare global {
   interface Window {
@@ -148,12 +150,32 @@ const captureAvailable = computed(() =>
     : (platformCapabilities.value?.capture.available ?? false))
 const captureWindowAvailable = computed(() => platformCapabilities.value?.capture.windowTarget ?? false)
 const openImageAvailable = computed(() => '__TAURI_INTERNALS__' in window)
+const openSettings = isTauri() ? openActivationSettings : undefined
 const captureFallbackCommand = computed(() =>
   m04FallbackHarness
     ? "'/opt/Cute Screen/cute-screen' capture --mode area"
     : platformCapabilities.value?.cliFallback
       ? platformCapabilities.value.cliFallbackCommand
       : undefined)
+
+async function openDroppedImage(
+  token: string,
+  signal: AbortSignal,
+): Promise<void> {
+  if (
+    documentSession.value ||
+    readOnlyDocument.value ||
+    historyBusy.value
+  ) return
+  await prepareHistory()
+  if (signal.aborted || documentSession.value) return
+  const { tauriDesktopBridge } = await import('./desktop-bridge')
+  const outcome = await tauriDesktopBridge.repositoryOpenDroppedImage(token)
+  if (signal.aborted || documentSession.value) return
+  if (outcome.kind === 'opened' && !(await mountCapturedDocument(outcome.document.captureId))) {
+    throw new Error('Image was saved, but the editor could not open it')
+  }
+}
 
 function correlationId(): string {
   return `m03-${Date.now()}-${Math.random().toString(16).slice(2)}`
@@ -320,6 +342,13 @@ async function mountM05HarnessDocument(): Promise<void> {
     installClipboardBridge: () => m08HarnessController.installBrowserClipboardBridge(),
     installHarnessFacade: () => m08HarnessController.installFacade(),
   })
+  if (
+    import.meta.env.VITE_TEST_HARNESS === 'true' &&
+      harness.imageIngress
+  ) {
+    const { installImageIngressHarness } = await import('./image-ingress-harness')
+    lifecycleCleanup.push(installImageIngressHarness(contentImageBridge, clipboardBridge, documentSession))
+  }
 }
 
 /** Shares the native outcome event and the command response for one capture. */
@@ -400,7 +429,7 @@ onMounted(() => {
   window.addEventListener('keydown', onWindowClipboardKeydown)
   periodicMaintenance = setInterval(scheduleHistoryMaintenance, 3_600_000)
   void (async () => {
-    if ('__TAURI_INTERNALS__' in window) {
+    if ('__TAURI_INTERNALS__' in window && !harness.imageIngress) {
       const { tauriDesktopBridge } = await import('./desktop-bridge')
       textureBridge.value = tauriDesktopBridge
       contentImageBridge.value = tauriDesktopBridge
@@ -463,11 +492,13 @@ onBeforeUnmount(() => {
     :capture-available="captureAvailable && !historyBusy"
     :capture-window-available="captureWindowAvailable && !historyBusy"
     :open-image-available="openImageAvailable && !historyBusy"
+    :open-settings="openSettings"
     :capture-fallback-command="captureFallbackCommand"
     :capture-progress="captureProgress"
     :source-image="sourceImage"
     :texture-bridge="textureBridge"
     :content-image-bridge="contentImageBridge"
+    :open-dropped-image="openDroppedImage"
     :clipboard-bridge="clipboardBridge"
     :system-fonts="systemFonts"
     @hosts-ready="onCanvasViewportHostsReady"

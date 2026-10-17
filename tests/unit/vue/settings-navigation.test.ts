@@ -12,11 +12,12 @@ import {
   vi,
 } from 'vitest'
 import SettingsApp from '../../../apps/desktop/src/SettingsApp.vue'
+import { createEditorShellPinia } from '@cute-screen/editor-vue'
 import { createSettingsHarnessBridge } from '../../../apps/desktop/src/settings/browser-harness'
 
 async function openShortcuts() {
   const bridge = createSettingsHarnessBridge()
-  const view = render(SettingsApp, { props: { bridge } })
+  const view = render(SettingsApp, { props: { bridge }, global: { plugins: [createEditorShellPinia()] } })
   await fireEvent.click(await screen.findByRole('button', { name: 'Keyboard shortcuts' }))
   await screen.findByRole('button', { name: 'Assign shortcut: Capture area' })
   return { bridge, ...view }
@@ -24,7 +25,10 @@ async function openShortcuts() {
 
 describe('settings navigation and inline recorder', () => {
   it('starts on General and exposes both sections', async () => {
-    render(SettingsApp, { props: { bridge: createSettingsHarnessBridge() } })
+    render(SettingsApp, {
+      props: { bridge: createSettingsHarnessBridge() },
+      global: { plugins: [createEditorShellPinia()] },
+    })
     await screen.findByRole('heading', { name: 'General' })
     expect(screen.queryByText('Suggested for area capture')).toBeNull()
     await fireEvent.click(screen.getByRole('button', { name: 'Keyboard shortcuts' }))

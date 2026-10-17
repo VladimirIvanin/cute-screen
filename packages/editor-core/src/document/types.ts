@@ -283,9 +283,28 @@ export type CalloutRoute = Readonly<{
     readonly offset: number
   }> &
   JsonObject
-}>
+}> | Readonly<{ readonly path: 'straight' }>
+| Readonly<{ readonly path: 'corner'; readonly axis: 'x' | 'y' }>
+| Readonly<{ readonly path: 'orthogonal'; readonly points: readonly (Point & JsonObject)[]; readonly preset: 'corner' | 'elbow'; readonly axis: 'x' | 'y' }>
 
-export type CalloutMarker = 'circle'
+export type CalloutMarker = 'none' | 'circle' | 'ring' | 'lineArrow' | 'solidArrow'
+export type CalloutAttachment = 'left' | 'right' | 'top' | 'bottom'
+export type CalloutMarkerStyle = Readonly<{ readonly color?: SrgbColor; readonly size?: number }>
+export type CalloutFrame = Readonly<{
+  readonly kind: 'text' | 'outline' | 'card' | 'capsule' | 'accent'
+  readonly fill: SrgbColor
+  readonly border: StrokeStyle | null
+  readonly padding: number
+  readonly radius: number
+}>
+export type CalloutStyle = Readonly<{
+  readonly frame: CalloutFrame
+  readonly route: 'straight' | 'corner' | 'elbow'
+  readonly targetMarker: CalloutMarker
+  readonly labelMarker: CalloutMarker
+  readonly targetMarkerStyle?: CalloutMarkerStyle
+  readonly labelMarkerStyle?: CalloutMarkerStyle
+}>
 
 export type CalloutPayload = Readonly<{
   readonly content: RichTextContent
@@ -296,6 +315,10 @@ export type CalloutPayload = Readonly<{
   readonly stroke: StrokeStyle
   readonly targetMarker: CalloutMarker
   readonly labelMarker: CalloutMarker
+  readonly attachment?: CalloutAttachment
+  readonly frame?: CalloutFrame
+  readonly targetMarkerStyle?: CalloutMarkerStyle
+  readonly labelMarkerStyle?: CalloutMarkerStyle
 }>
 
 export interface EmojiAssetReference extends JsonObject {

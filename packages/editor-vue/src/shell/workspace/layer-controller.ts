@@ -163,14 +163,17 @@ function moveLayer(
   id: string,
   deltaX: number,
   deltaY: number,
+  nodeIds?: readonly string[],
 ): void {
-  const selected = new Set(context.store.selectedLayerIds)
+  const selected = new Set(nodeIds ?? context.store.selectedLayerIds)
   const layers = context.activeDocument.value?.layers.filter((layer) => selected.has(layer.id))
   if (
+    context.props.readOnlyDocument ||
     !layers?.length ||
+    layers.length !== selected.size ||
     !context.props.documentSession ||
     !selected.has(id) ||
-    layers.some((layer) => layer.locked)
+    layers.some((layer) => layer.locked || !layer.visible)
   ) {
     return
   }
@@ -249,7 +252,8 @@ export function createLayerController(context: LayerControllerContext) {
     onLayerRotation: (id: string, value: number) => updateLayerProperty(context, id, 'rotation', value),
     onLayerReorderTo: (id: string, targetId: string, place: 'before' | 'after') =>
       reorderLayerTo(context, id, targetId, place),
-    moveLayer: (id: string, deltaX: number, deltaY: number) => moveLayer(context, id, deltaX, deltaY),
+    moveLayer: (id: string, deltaX: number, deltaY: number, nodeIds?: readonly string[]) =>
+      moveLayer(context, id, deltaX, deltaY, nodeIds),
     selectLayer: (id: string, toggle = false, range = false) => {
       context.finishTextEditing(() => {
         context.store.selectTool('select')

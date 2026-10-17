@@ -5,11 +5,11 @@ import {
   expect,
 } from '@wdio/globals'
 import { Key } from 'webdriverio'
+import { verifyEyedropperPreviewActivation } from '../eyedropper-preview'
 import {
   readHarnessClipboard,
   recentColourHex,
   openM08,
-  setLocale,
   canvasPoint,
 } from './browser-m08-test-kit'
 
@@ -24,6 +24,8 @@ describe('M08 crop and precision acceptance in browser mode', () => {
     for (const alpha of [0, 128] as const) {
       await openM08({ alpha })
       await $('button[aria-label="Eyedropper"]').click()
+      await expect($('.cs-eyedropper-loupe')).not.toBeDisplayed()
+      await browser.keys('ArrowRight')
       await expect($('.cs-eyedropper-loupe')).toBeDisplayed()
       await expect($('.cs-eyedropper-loupe')).toHaveAttribute('data-state', 'unavailable')
       await browser.keys('Enter')
@@ -36,7 +38,7 @@ describe('M08 crop and precision acceptance in browser mode', () => {
     await openM08({ alpha: 255 })
     await $('button[aria-label="Zoom in"]').click()
     await expect($('.cs-zoom-controls')).not.toHaveAttribute('data-zoom', '100')
-    await $('button[aria-label="Eyedropper"]').click()
+    await verifyEyedropperPreviewActivation('artifacts/browser-e2e')
     await expect($('.cs-eyedropper-loupe')).toBeDisplayed()
     await expect($('.cs-eyedropper-loupe')).toHaveText(expect.stringContaining('#273D5A'))
     await expect($('.cs-eyedropper-loupe canvas')).toHaveAttribute('width', '9')
@@ -86,8 +88,14 @@ describe('M08 crop and precision acceptance in browser mode', () => {
 
     await browser.setWindowSize(1024, 700)
     await openM08({ alpha: 255 })
-    await setLocale('ru')
+    const settings = $('.cs-top-actions button[aria-haspopup="dialog"]')
+    await settings.click()
+    await $('.cs-settings-choices label:has(input[value="ru"])').click()
+    await settings.click()
+    await expect($('.cs-settings-popover')).not.toExist()
     await $('button[aria-label="Пипетка"]').click()
+    await expect($('.cs-eyedropper-loupe')).not.toBeDisplayed()
+    await browser.keys('ArrowRight')
     await expect($('.cs-eyedropper-loupe')).toHaveText(expect.stringContaining('Нажмите, чтобы выбрать'))
     await browser.saveScreenshot(path.resolve('artifacts/browser-e2e/m08-eyedropper-live-loupe-1024-ru.png'))
   })

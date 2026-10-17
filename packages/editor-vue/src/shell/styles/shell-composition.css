@@ -1,11 +1,19 @@
 .cs-top-actions {
   height: 42px;
-  gap: 3px;
+  gap: 6px;
   padding: 3px;
 }
 
 .cs-top-actions .n-button {
   --n-height: 34px;
+}
+
+.cs-top-actions .cs-button {
+  padding-inline: 12px;
+}
+
+.cs-top-actions .cs-button .n-button__content {
+  gap: 8px;
 }
 
 .cs-top-actions .cs-button-primary {

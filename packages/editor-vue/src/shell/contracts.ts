@@ -24,6 +24,7 @@ export interface EditorShellProps {
   captureWindowAvailable?: boolean
   captureUnavailableReason?: string | undefined
   openImageAvailable?: boolean
+  openSettings?: (() => Promise<void>) | undefined
   captureFallbackCommand?: string | undefined
   captureProgress?: CaptureProgressState | undefined
   frames?: readonly FrameSummary[] | undefined
@@ -31,6 +32,7 @@ export interface EditorShellProps {
   textureBridge?: TextureFillBridge | undefined
   contentImageBridge?: ContentImageBridge | undefined
   clipboardBridge?: ClipboardBridge | undefined
+  openDroppedImage?: ((token: string, signal: AbortSignal) => Promise<void>) | undefined
   systemFonts?: readonly SystemFontFace[] | undefined
   quickMode?: boolean
   quickSelectionMode?: boolean
@@ -76,6 +78,7 @@ export const editorShellRuntimeProps = {
     default: undefined,
   },
   openImageAvailable: { type: Boolean, default: false },
+  openSettings: Function as PropType<EditorShellProps['openSettings']>,
   captureFallbackCommand: {
     type: String as PropType<string | undefined>,
     default: undefined,
@@ -86,6 +89,7 @@ export const editorShellRuntimeProps = {
   textureBridge: Object as PropType<EditorShellProps['textureBridge']>,
   contentImageBridge: Object as PropType<EditorShellProps['contentImageBridge']>,
   clipboardBridge: Object as PropType<EditorShellProps['clipboardBridge']>,
+  openDroppedImage: Function as PropType<EditorShellProps['openDroppedImage']>,
   systemFonts: Array as PropType<EditorShellProps['systemFonts']>,
   quickMode: { type: Boolean, default: false },
   quickSelectionMode: { type: Boolean, default: false },

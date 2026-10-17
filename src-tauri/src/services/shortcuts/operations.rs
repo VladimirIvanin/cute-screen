@@ -4,6 +4,7 @@ use super::{
     host::{ShortcutService, apply_native},
     *,
 };
+#[cfg(target_os = "linux")]
 use std::time::Duration;
 #[cfg(target_os = "linux")]
 use std::{
@@ -304,7 +305,7 @@ impl ShortcutService {
         #[cfg(not(target_os = "linux"))]
         {
             let _ = (app, token);
-            return Err("No pending system shortcut verification".to_owned());
+            Err("No pending system shortcut verification".to_owned())
         }
         #[cfg(target_os = "linux")]
         {

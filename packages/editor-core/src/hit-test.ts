@@ -1,41 +1,29 @@
-import {
-  numberedMarkerGeometryBounds,
-  numberedMarkerCaptionBounds,
-} from './numbered-marker'
-import {
-  resolveFreehandGeometry,
-  freehandOutlineContains,
-} from './tools/freehand'
-import {
-  isShapeKind,
-  shapeGeometry,
-  flattenShapePath,
-} from './shapes'
 import RBush from 'rbush'
-
+import { numberedMarkerGeometryBounds } from './numbered-marker'
 import {
-  arrowCapSize,
-  arrowPathPoints,
-} from './arrow-geometry'
-import {
-  type CalloutGeometryContext,
   calloutGeometryBounds,
-  calloutMarkerRadius,
-  calloutPathPoints,
-  calloutTextRect,
+  type CalloutGeometryContext,
 } from './callout-geometry'
 import type {
-  ArrowLayerPayload,
   EditorDocumentV1,
-  JsonObject,
   Point,
+  Rect,
 } from './document/types'
 import {
   invertMatrix,
   transformPoint,
   transformToMatrix,
 } from './geometry'
-import { precisionLayerHitPart } from './tools/precision/hit-test'
+import { drawingHitPart } from './layer-hit-test'
+import { createStrokeHitMetric } from './hit-test-metric'
+import { LAYER_INTERACTION_POLICIES } from './interaction-policy'
+
+export interface HitTestOptions {
+  /** Additional CSS pixels around geometry. Omitted options retain exact legacy queries. */
+  readonly margin?: number
+  readonly screenScale?: Point
+  readonly useInteractionPolicy?: boolean
+}
 
 export type HitPart = 'fill' | 'handle' | 'stroke'
 
@@ -59,6 +47,7 @@ export class DocumentSpatialIndex {
   readonly #tree = new RBush<SpatialItem>()
   #itemsById = new Map<string, SpatialItem>()
   #document: EditorDocumentV1
+  #layers = new Map<string, { readonly layer: EditorDocumentV1['layers'][number]; readonly zOrder: number }>()
   readonly #context: CalloutGeometryContext
 
   constructor(
@@ -67,6 +56,7 @@ export class DocumentSpatialIndex {
   ) {
     this.#context = context
     this.#document = document
+    this.#syncLayers(document)
     this.#insertAll(document)
   }
 
@@ -75,13 +65,14 @@ export class DocumentSpatialIndex {
     changedLayerIds: readonly string[],
   ): void {
     this.#document = document
+    this.#syncLayers(document)
     for (const id of changedLayerIds) {
       const previous = this.#itemsById.get(id)
       if (previous) {
         this.#tree.remove(previous, (left, right) => left.layerId === right.layerId)
         this.#itemsById.delete(id)
       }
-      const layer = document.layers.find((candidate) => candidate.id === id)
+      const layer = this.#layers.get(id)?.layer
       if (
         !layer ||
         !layer.visible ||
@@ -93,25 +84,39 @@ export class DocumentSpatialIndex {
     }
   }
 
-  hitAll(canvasPoint: Point): readonly HitTestResult[] {
-    const candidateIds = new Set(
-      this.#tree
-        .search({
-          minX: canvasPoint.x,
-          minY: canvasPoint.y,
-          maxX: canvasPoint.x,
-          maxY: canvasPoint.y,
-        })
-        .map((item) => item.layerId),
-    )
+  hitAll(
+    canvasPoint: Point,
+    options: HitTestOptions = {},
+  ): readonly HitTestResult[] {
+    const scale = options.screenScale ?? { x: 1, y: 1 }
+    const policyMargin = Math.max(...Object.values(LAYER_INTERACTION_POLICIES).map((policy) => policy.marginCss))
+    const margin = options.margin ?? (options.useInteractionPolicy ? policyMargin : 0)
+    const candidates = this.#tree.search({
+      minX: canvasPoint.x - margin / scale.x,
+      minY: canvasPoint.y - margin / scale.y,
+      maxX: canvasPoint.x + margin / scale.x,
+      maxY: canvasPoint.y + margin / scale.y,
+    })
     const hits: HitTestResult[] = []
-    for (let index = this.#document.layers.length - 1; index >= 0; index -= 1) {
-      const layer = this.#document.layers[index]
-      if (!layer || !candidateIds.has(layer.id)) continue
-      const hit = hitLayer(layer, canvasPoint, index, this.#document.crop ?? this.#document.canvas, this.#context)
+    for (const candidate of candidates) {
+      const entry = this.#layers.get(candidate.layerId)
+      if (!entry) continue
+      const { layer, zOrder } = entry
+      const hit = hitLayer(
+        layer,
+        canvasPoint,
+        zOrder,
+        this.#document.crop ?? this.#document.canvas,
+        this.#context,
+        options,
+      )
       if (hit) hits.push(hit)
     }
-    return Object.freeze(hits)
+    return Object.freeze(hits.sort((left, right) => right.zOrder - left.zOrder))
+  }
+
+  #syncLayers(document: EditorDocumentV1): void {
+    this.#layers = new Map(document.layers.map((layer, zOrder) => [layer.id, { layer, zOrder }]))
   }
 
   #insertAll(document: EditorDocumentV1): void {
@@ -127,9 +132,7 @@ function spatialItem(
   layer: EditorDocumentV1['layers'][number],
   context: CalloutGeometryContext,
 ): SpatialItem {
-  const bounds = layer.kind === 'callout'
-    ? calloutGeometryBounds(layer.payload, context)
-    : layer.kind === 'numberedMarker' ? numberedMarkerGeometryBounds(layer, context) : layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
+  const bounds = layerHitBounds(layer, context)
   const matrix = transformToMatrix(layer.transform)
   const points = [
     transformPoint(matrix, { x: bounds.x, y: bounds.y }),
@@ -157,6 +160,7 @@ export function hitTestDocument(
   document: EditorDocumentV1,
   canvasPoint: Point,
   context: CalloutGeometryContext = {},
+  options: HitTestOptions = {},
 ): HitTestResult | undefined {
   for (let index = document.layers.length - 1; index >= 0; index -= 1) {
     const layer = document.layers[index]
@@ -165,7 +169,7 @@ export function hitTestDocument(
       !layer.visible ||
       layer.locked
     ) continue
-    const hit = hitLayer(layer, canvasPoint, index, document.crop ?? document.canvas, context)
+    const hit = hitLayer(layer, canvasPoint, index, document.crop ?? document.canvas, context, options)
     if (hit) return hit
   }
   return undefined
@@ -176,6 +180,7 @@ export function hitTestDocumentAll(
   document: EditorDocumentV1,
   canvasPoint: Point,
   context: CalloutGeometryContext = {},
+  options: HitTestOptions = {},
 ): readonly HitTestResult[] {
   const hits: HitTestResult[] = []
   for (let index = document.layers.length - 1; index >= 0; index -= 1) {
@@ -185,7 +190,7 @@ export function hitTestDocumentAll(
       !layer.visible ||
       layer.locked
     ) continue
-    const hit = hitLayer(layer, canvasPoint, index, document.crop ?? document.canvas, context)
+    const hit = hitLayer(layer, canvasPoint, index, document.crop ?? document.canvas, context, options)
     if (hit) hits.push(hit)
   }
   return Object.freeze(hits)
@@ -197,19 +202,27 @@ function hitLayer(
   zOrder: number,
   canvas: EditorDocumentV1['canvas'],
   context: CalloutGeometryContext,
+  options: HitTestOptions,
 ): HitTestResult | undefined {
-  const bounds = layer.kind === 'callout'
-    ? calloutGeometryBounds(layer.payload, context)
-    : layer.kind === 'numberedMarker' ? numberedMarkerGeometryBounds(layer, context) : layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
+  const bounds = layerHitBounds(layer, context)
+  const screenScale = options.screenScale ?? { x: 1, y: 1 }
+  const margin = options.margin ?? (options.useInteractionPolicy ? LAYER_INTERACTION_POLICIES[layer.kind].marginCss : 0)
+  const padding = margin /
+    (Math.min(screenScale.x, screenScale.y) *
+      Math.min(Math.abs(layer.transform.scaleX), Math.abs(layer.transform.scaleY)))
   const local = transformPoint(invertMatrix(transformToMatrix(layer.transform)), canvasPoint)
   if (
-    local.x < bounds.x ||
-    local.x > bounds.x + bounds.width ||
-    local.y < bounds.y ||
-    local.y > bounds.y + bounds.height
+    local.x < bounds.x - padding ||
+    local.x > bounds.x + bounds.width + padding ||
+    local.y < bounds.y - padding ||
+    local.y > bounds.y + bounds.height + padding
   )
     return undefined
-  const part = drawingHitPart(layer, local, canvas, context)
+  const precise = options.screenScale !== undefined ||
+    options.margin !== undefined || options.useInteractionPolicy === true
+  const boundsPolicy = options.useInteractionPolicy && LAYER_INTERACTION_POLICIES[layer.kind].primaryHit === 'bounds'
+  const part = boundsPolicy ? 'fill' : drawingHitPart(layer, local, canvas, context, padding, precise,
+    precise ? createStrokeHitMetric(layer.transform, screenScale, margin) : undefined)
   if (!part) return undefined
   return Object.freeze({
     nodeId: layer.id,
@@ -219,168 +232,10 @@ function hitLayer(
   })
 }
 
-function payloadStrokeWidth(
-  payload: JsonObject,
-  fallback = 1,
-): number {
-  const stroke = payload.stroke
-  if (
-    stroke &&
-    typeof stroke === 'object' &&
-    !Array.isArray(stroke)
-  ) {
-    const width = (stroke as Record<string, unknown>).width
-    if (
-      typeof width === 'number' &&
-      Number.isFinite(width) &&
-      width > 0
-    ) return width
-  }
-  const width = payload.width
-  return typeof width === 'number' && Number.isFinite(width) && width > 0 ? width : fallback
-}
-
-function pointInRect(
-  point: Point,
-  rect: {
-    readonly x: number
-    readonly y: number
-    readonly width: number
-    readonly height: number
-  },
-): boolean {
-  return point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y && point.y <= rect.y + rect.height
-}
-
-function pointToSegmentDistance(
-  point: Point,
-  start: Point,
-  end: Point,
-): number {
-  const dx = end.x - start.x
-  const dy = end.y - start.y
-  const lengthSquared = dx * dx + dy * dy
-  if (lengthSquared === 0) return Math.hypot(point.x - start.x, point.y - start.y)
-  const progress = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared))
-  return Math.hypot(point.x - (start.x + dx * progress), point.y - (start.y + dy * progress))
-}
-
-function pointInPolygon(
-  point: Point,
-  points: readonly Point[],
-): boolean {
-  let inside = false
-  for (let index = 0, previous = points.length - 1; index < points.length; previous = index++) {
-    const current = points[index]!
-    const before = points[previous]!
-    const intersects =
-      current.y > point.y !== before.y > point.y &&
-      point.x < ((before.x - current.x) * (point.y - current.y)) / (before.y - current.y) + current.x
-    if (intersects) inside = !inside
-  }
-  return inside
-}
-
-function drawingHitPart(
+export function layerHitBounds(
   layer: EditorDocumentV1['layers'][number],
-  point: Point,
-  canvas: EditorDocumentV1['canvas'],
-  context: CalloutGeometryContext,
-): HitPart | undefined {
-  if (layer.kind === 'image') return 'fill'
-  if (
-    layer.kind === 'censor' ||
-    layer.kind === 'spotlight' ||
-    layer.kind === 'ruler' ||
-    layer.kind === 'loupe'
-  ) {
-    return precisionLayerHitPart(layer, point, canvas)
-  }
-  if (layer.kind === 'numberedMarker') {
-    return pointInRect(point, layer.localBounds) || pointInRect(point, numberedMarkerCaptionBounds(layer, context)) ? 'fill' : undefined
-  }
-  if (layer.kind === 'callout') {
-    const callout = layer.payload
-    const samples = calloutPathPoints(callout)
-    const strokeWidth = callout.stroke.width
-    const bodyHit = samples
-      .slice(1)
-      .some((sample, index) => pointToSegmentDistance(point, samples[index]!, sample) <= strokeWidth / 2)
-    if (bodyHit) return 'stroke'
-    const markerRadius = calloutMarkerRadius(strokeWidth)
-    const markerHit = (anchor: Point) => Math.hypot(point.x - anchor.x, point.y - anchor.y) <= markerRadius
-    if (markerHit(callout.target) || markerHit(callout.label)) return 'stroke'
-    const textRect = calloutTextRect(callout, context)
-    return pointInRect(point, textRect) ? 'fill' : undefined
-  }
-  if (
-    layer.kind !== 'arrow' &&
-    layer.kind !== 'pencil' &&
-    layer.kind !== 'marker' &&
-    layer.kind !== 'shape'
-  ) {
-    return 'fill'
-  }
-  const payload = layer.payload
-  const bounds = layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
-  const strokeWidth = payloadStrokeWidth(payload)
-  if (layer.kind === 'arrow') {
-    const arrow = payload as unknown as ArrowLayerPayload
-    const samples = arrowPathPoints(arrow)
-    const bodyHit = samples
-      .slice(1)
-      .some((sample, index) => pointToSegmentDistance(point, samples[index]!, sample) <= strokeWidth / 2)
-    if (bodyHit) return 'stroke'
-    const capHit = (cap: ArrowLayerPayload['startCap'], anchor: Point) =>
-      cap !== 'none' && Math.hypot(point.x - anchor.x, point.y - anchor.y) <= arrowCapSize(cap, strokeWidth)
-    return capHit(arrow.startCap, arrow.start) || capHit(arrow.endCap, arrow.end) ? 'stroke' : undefined
-  }
-  if (layer.kind === 'pencil' || layer.kind === 'marker') {
-    const geometry = resolveFreehandGeometry(payload, layer.kind === 'pencil')
-    if (geometry.outline.length) return freehandOutlineContains(geometry.outline, point) ? 'stroke' : undefined
-    const samples = geometry.points
-    if (samples.length === 1)
-      return pointToSegmentDistance(point, samples[0]!, samples[0]!) <= geometry.width * (layer.kind === 'pencil' && !geometry.modern ? samples[0]!.pressure : 1) / 2 ? 'stroke' : undefined
-    return samples.slice(1).some((sample, index) => pointToSegmentDistance(point, samples[index]!, sample) <= geometry.width * (layer.kind === 'pencil' && !geometry.modern ? (sample.pressure + samples[index]!.pressure) / 2 : 1) / 2) ? 'stroke' : undefined
-  }
-  // Pre-v3 in-memory fixtures and third-party callers may not have a drawing
-  // payload yet. Keep the historical bounds hit until they pass the codec.
-  if (Object.keys(payload).length === 0) return 'fill'
-  const shape = payload.shape
-  const inset = strokeWidth / 2
-  const geometry = {
-    x: bounds.x + inset,
-    y: bounds.y + inset,
-    width: Math.max(1, bounds.width - inset * 2),
-    height: Math.max(1, bounds.height - inset * 2),
-  }
-  const centerX = geometry.x + geometry.width / 2
-  const centerY = geometry.y + geometry.height / 2
-  const hasFill =
-    payload.fill !== undefined &&
-    typeof payload.fill === 'object' &&
-    (payload.fill as Record<string, unknown>).kind !== 'none'
-  if (!isShapeKind(shape)) return undefined
-  if (shape === 'circle' || shape === 'oval') {
-    const radiusX = geometry.width / 2
-    const radiusY = geometry.height / 2
-    const distance = Math.hypot((point.x - centerX) / radiusX, (point.y - centerY) / radiusY)
-    if (hasFill && distance <= 1) return 'fill'
-    return Math.abs(distance - 1) <= strokeWidth / (2 * Math.min(radiusX, radiusY)) ? 'stroke' : undefined
-  }
-  const path = shapeGeometry(shape, geometry.width, geometry.height, {
-    cornerRadius: typeof payload.cornerRadius === 'number' ? payload.cornerRadius : 0,
-    starPoints: typeof payload.starPoints === 'number' ? payload.starPoints : 5,
-    starInnerRatio: typeof payload.starInnerRatio === 'number' ? payload.starInnerRatio : 0.45,
-  })
-  const local = { x: point.x - geometry.x, y: point.y - geometry.y }
-  const outline = flattenShapePath(path.outline)
-  if (
-    !path.open &&
-    hasFill &&
-    outline.some((contour) => pointInPolygon(local, contour))
-  ) return 'fill'
-  const contours = [...outline, ...flattenShapePath(path.details)]
-  return contours.some((contour) => contour.slice(1).some((end, i) =>
-    pointToSegmentDistance(local, contour[i]!, end) <= strokeWidth / 2)) ? 'stroke' : undefined
+  context: CalloutGeometryContext = {},
+): Rect {
+  return layer.kind === 'callout' ? calloutGeometryBounds(layer.payload, context)
+    : layer.kind === 'numberedMarker' ? numberedMarkerGeometryBounds(layer, context) : layer.localBounds
 }

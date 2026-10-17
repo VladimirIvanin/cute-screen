@@ -2,6 +2,7 @@ import {
   describe,
   expect,
   it,
+  vi,
 } from 'vitest'
 
 import {
@@ -229,5 +230,131 @@ describe('M04 capture action feedback', () => {
     expect(store.activeToolId).toBe('pencil')
     expect(store.zoom).toBe(175)
     expect(store.documentHistory.saveState).toBe('dirty')
+  })
+
+  it('hides a successful open-image confirmation after 3 seconds', async () => {
+    vi.useFakeTimers()
+    const store = useEditorShellStore(createEditorShellPinia())
+    try {
+      store.initialize({
+        preferences: { load: () => undefined, save: () => undefined },
+        languages: ['en'],
+        systemDark: () => false,
+        actions: { run: async () => 'Image opened' },
+      })
+
+      await store.runAction('openImage')
+      expect(store.actionState).toEqual({
+        status: 'success',
+        action: 'openImage',
+        message: 'Image opened',
+      })
+
+      await vi.advanceTimersByTimeAsync(2_999)
+      expect(store.actionState.status).toBe('success')
+      await vi.advanceTimersByTimeAsync(1)
+      expect(store.actionState).toEqual({ status: 'idle' })
+    } finally {
+      store.$dispose()
+      vi.useRealTimers()
+    }
+  })
+
+  it('hides a cancelled open-image notice after the same 3 seconds', async () => {
+    vi.useFakeTimers()
+    const store = useEditorShellStore(createEditorShellPinia())
+    try {
+      store.initialize({
+        preferences: { load: () => undefined, save: () => undefined },
+        languages: ['en'],
+        systemDark: () => false,
+        actions: {
+          run: async () => {
+            throw new ActionCancelledError('Open image cancelled')
+          },
+        },
+      })
+
+      await store.runAction('openImage')
+      expect(store.actionState.status).toBe('cancelled')
+      await vi.advanceTimersByTimeAsync(3_000)
+      expect(store.actionState).toEqual({ status: 'idle' })
+    } finally {
+      store.$dispose()
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps an error toast until the user dismisses it or starts another action', async () => {
+    vi.useFakeTimers()
+    const store = useEditorShellStore(createEditorShellPinia())
+    try {
+      store.initialize({
+        preferences: { load: () => undefined, save: () => undefined },
+        languages: ['en'],
+        systemDark: () => false,
+        actions: {
+          run: async () => {
+            throw new Error('storage failure')
+          },
+        },
+      })
+
+      await store.runAction('openImage')
+      await vi.advanceTimersByTimeAsync(3_000)
+      expect(store.actionState).toEqual({
+        status: 'error',
+        action: 'openImage',
+        message: 'storage failure',
+      })
+
+      store.clearFeedback()
+      expect(store.actionState).toEqual({ status: 'idle' })
+      await vi.advanceTimersByTimeAsync(3_000)
+      expect(store.actionState).toEqual({ status: 'idle' })
+    } finally {
+      store.$dispose()
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not let an earlier confirmation timer clear the next action', async () => {
+    vi.useFakeTimers()
+    const store = useEditorShellStore(createEditorShellPinia())
+    let releaseCapture: ((message: string) => void) | undefined
+    try {
+      store.initialize({
+        preferences: { load: () => undefined, save: () => undefined },
+        languages: ['en'],
+        systemDark: () => false,
+        actions: {
+          run: (action) => {
+            if (action === 'openImage') return Promise.resolve('Image opened')
+            return new Promise<string>((resolve) => {
+              releaseCapture = resolve
+            })
+          },
+        },
+      })
+
+      await store.runAction('openImage')
+      const capture = store.runAction('capture')
+      expect(store.actionState.status).toBe('pending')
+      await vi.advanceTimersByTimeAsync(3_000)
+      expect(store.actionState.status).toBe('pending')
+
+      releaseCapture?.('Capture opened')
+      await capture
+      expect(store.actionState).toEqual({
+        status: 'success',
+        action: 'capture',
+        message: 'Capture opened',
+      })
+      await vi.advanceTimersByTimeAsync(3_000)
+      expect(store.actionState).toEqual({ status: 'idle' })
+    } finally {
+      store.$dispose()
+      vi.useRealTimers()
+    }
   })
 })

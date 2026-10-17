@@ -5,7 +5,6 @@ import {
   calloutTextLayout,
   createPreparedNumberedMarker,
   hitTestDocument,
-  type LayerNode,
 } from '@cute-screen/editor-renderer'
 import type { CanvasPoint } from './contracts'
 import type { PointerDownContext } from './pointer-down-contracts'
@@ -29,7 +28,17 @@ export function handlePointerDown(
   if (handleQuickSelection(context, event, point)) return
   if (handleCrop(context, event, point)) return
   const selected = context.selectedLayer()
-  if (handleLoupeSource(context, event, point, selected)) return
+  if (context.props.readOnly) {
+    handleSelectionStart(context, event, point, selected)
+    return
+  }
+  if (context.props.activeTool === 'loupe' && selected?.kind === 'loupe') {
+    const target = context.resolveSelectionTarget(point)
+    if (target.kind === 'handle' && target.target.kind === 'loupeSource') {
+      handleSelectionStart(context, event, point, selected)
+      return
+    }
+  }
   if (handleCreationTool(context, event, point)) return
   handleSelectionStart(context, event, point, selected)
 }
@@ -151,33 +160,6 @@ function handleCrop(
     start: point,
     initial: session,
   })
-  return true
-}
-
-function handleLoupeSource(
-  context: PointerDownContext,
-  event: PointerEvent,
-  point: CanvasPoint,
-  selected: LayerNode | undefined,
-): boolean {
-  if (
-    selected?.kind !== 'loupe' ||
-    selected.locked ||
-    !context.loupeSourceHandle(selected, point)
-  ) {
-    return false
-  }
-  event.preventDefault()
-  context.scene.value!.setPointerCapture(event.pointerId)
-  context.setCursor('crosshair')
-  context.setGesture({
-    kind: 'loupeSource',
-    id: selected.id,
-    start: point,
-    current: point,
-    initial: selected,
-  })
-  context.renderCommittedScene()
   return true
 }
 

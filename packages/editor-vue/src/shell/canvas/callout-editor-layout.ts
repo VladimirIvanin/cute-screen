@@ -1,5 +1,6 @@
 import {
   calloutTextLayout,
+  withCalloutBackground,
   createCalloutLayer,
   type RichTextLayout,
   type StrokeStyle,
@@ -15,6 +16,7 @@ export function positionCalloutEditor(input: {
   readonly layout: RichTextLayout
   readonly editor: HTMLDivElement
   readonly zoom: number | undefined
+  readonly style?: import('@cute-screen/editor-renderer').CalloutStyle | null
   readonly resolveStroke: () => StrokeStyle
 }): void {
   const { editing, layout, editor, zoom, resolveStroke } = input
@@ -24,9 +26,10 @@ export function positionCalloutEditor(input: {
   const base = existing ?? createCalloutLayer({ id: editing.id, text: state.content.text || ' ',
     target: editing.calloutDraft!.target, label: editing.calloutDraft!.label,
     stroke: editing.calloutStroke ?? resolveStroke(),
+    ...(input.style === undefined ? {} : { style: input.style }),
   })!
-  const geometry = calloutTextLayout({ ...base.payload, content: state.content,
-    background: editing.background }, { measureText: () => layout })
+  const geometry = calloutTextLayout({ ...withCalloutBackground(base.payload, editing.background),
+    content: state.content }, { measureText: () => layout })
   const previous = editing.origin
   editing.origin = transformCanvasPoint(base.transform, geometry.text)
   const scale = (zoom ?? 100) / 100

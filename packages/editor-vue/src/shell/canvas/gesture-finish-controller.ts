@@ -175,11 +175,16 @@ function commitMovement(
   context: GestureFinishContext,
   gesture: CanvasGesture,
 ): void {
-  if (gesture?.kind !== 'move') return
+  if (
+    gesture?.kind !== 'move' ||
+    gesture.dragging === false ||
+    context.props.readOnly
+  ) return
   const deltaX = gesture.current.x - gesture.start.x
   const deltaY = gesture.current.y - gesture.start.y
   if (deltaX !== 0 || deltaY !== 0) {
-    context.emit('moveLayer', gesture.id, deltaX, deltaY)
+    if (gesture.nodeIds) context.emit('moveLayer', gesture.id, deltaX, deltaY, gesture.nodeIds)
+    else context.emit('moveLayer', gesture.id, deltaX, deltaY)
   }
 }
 
@@ -324,7 +329,9 @@ function commitLayerHandle(
     after = updateArrowHandle(layer, gesture.handle, context.toLocal(layer, gesture.current))
   }
   if (gesture.kind === 'calloutHandle' && layer?.kind === 'callout') {
-    after = updateCalloutHandle(layer, gesture.handle, context.toLocal(layer, gesture.current))
+    after = updateCalloutHandle(layer, gesture.handle, { x: context.toLocal(layer,
+      gesture.current).x - (gesture.offset?.x ?? 0), y: context.toLocal(layer,
+      gesture.current).y - (gesture.offset?.y ?? 0) })
   }
   if (gesture.kind === 'loupeSource') {
     after = context.moveLoupeSource(gesture.initial, gesture.current)

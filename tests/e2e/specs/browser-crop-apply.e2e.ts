@@ -1,3 +1,4 @@
+import { setEditorPreferences } from '../editor-settings'
 import path from 'node:path'
 import {
   $,
@@ -95,9 +96,7 @@ describe('Crop confirmation and toolbar', () => {
       for (const locale of ['en', 'ru'] as const) {
         await setLocale(locale)
         for (const theme of ['light', 'dark'] as const) {
-          await $(`button[aria-label="${locale === 'ru' ? 'Другие действия' : 'More actions'}"]`).click()
-          const themeLabel = locale === 'ru' ? (theme === 'dark' ? 'Тёмная' : 'Светлая') : (theme === 'dark' ? 'Dark' : 'Light')
-          await $(`button=${themeLabel}`).click()
+          await setEditorPreferences(locale, theme)
           await $(`button[aria-label="${locale === 'ru' ? 'Обрезка' : 'Crop'}"]`).click()
           const layout = await browser.execute(() => {
             const toolbar = document.querySelector<HTMLElement>('.cs-context-toolbar--crop')!

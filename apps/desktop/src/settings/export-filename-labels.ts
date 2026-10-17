@@ -1,0 +1,28 @@
+export const filenameLabels = {
+  ru: {
+    title: 'Имя PNG', pattern: 'Шаблон имени', save: 'Сохранить формат имени',
+    cancel: 'Отменить', reset: 'По умолчанию', saved: 'Формат имени сохранён',
+    loading: 'Загрузка формата имени…', checking: 'Проверка имени…', retry: 'Повторить',
+    unavailable: 'Формат имени настраивается в приложении Cute Screen.',
+    help: '{date} — дата ГГГГ-ММ-ДД, {time} — местное время ЧЧ-ММ-СС. Расширение .png добавляется автоматически.',
+    filenameLength: 'Шаблон пустой или слишком длинный.',
+    filenameWhitespace: 'Замените пробелы на дефисы или подчёркивания.',
+    filenameCharacters: 'Имя не должно содержать / \\ : * ? " < > | и управляющие символы.',
+    filenameTokens: 'Добавьте и {date}, и {time}, чтобы сохранять дату и время в имени.',
+    filenameUnknownToken: 'Поддерживаются только {date} и {time}.',
+    filenameExtension: 'Уберите .png из шаблона — расширение добавляется автоматически.',
+  },
+  en: {
+    title: 'PNG filename', pattern: 'Filename pattern', save: 'Save filename format',
+    cancel: 'Cancel', reset: 'Use default', saved: 'Filename format saved',
+    loading: 'Loading filename format…', checking: 'Checking filename…', retry: 'Retry',
+    unavailable: 'Filename format is available in the Cute Screen desktop app.',
+    help: '{date} is YYYY-MM-DD; {time} is local HH-MM-SS. The .png extension is added automatically.',
+    filenameLength: 'The pattern is empty or too long.',
+    filenameWhitespace: 'Replace spaces with hyphens or underscores.',
+    filenameCharacters: 'Names cannot contain / \\ : * ? " < > | or control characters.',
+    filenameTokens: 'Include both {date} and {time} to keep the date and time in filenames.',
+    filenameUnknownToken: 'Only {date} and {time} are supported.',
+    filenameExtension: 'Remove .png from the pattern; the extension is added automatically.',
+  },
+} as const

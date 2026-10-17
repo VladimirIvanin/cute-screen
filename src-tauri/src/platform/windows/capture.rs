@@ -48,8 +48,8 @@ use windows_sys::Win32::{
         GA_ROOT, GetAncestor, GetClientRect, GetForegroundWindow, GetPhysicalCursorPos,
         GetSystemMetrics, GetWindowRect, IDC_CROSS, IsWindow, IsWindowVisible, LWA_ALPHA,
         LoadCursorW, MSG, PM_REMOVE, PeekMessageW, PostQuitMessage, RegisterClassW,
-        SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SW_HIDE,
-        SW_SHOW, SW_SHOWNOACTIVATE, SWP_NOACTIVATE, SWP_NOOWNERZORDER, SWP_NOZORDER, SetCursor,
+        SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SW_SHOW,
+        SW_SHOWNOACTIVATE, SWP_NOACTIVATE, SWP_NOOWNERZORDER, SWP_NOZORDER, SetCursor,
         SetForegroundWindow, SetLayeredWindowAttributes, SetWindowPos, ShowWindow, WA_INACTIVE,
         WM_ACTIVATE, WM_CLOSE, WM_DESTROY, WM_KEYDOWN, WM_LBUTTONDOWN, WM_LBUTTONUP,
         WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_NCHITTEST, WM_PAINT, WM_SETCURSOR, WNDCLASSW,
@@ -78,17 +78,21 @@ pub struct WindowsCompositorCaptureAdapter;
 pub(crate) fn hide_window_for_capture(
     window: HWND,
     correlation_id: &str,
+    hide: impl FnOnce() -> Result<(), PlatformError>,
 ) -> Result<(), PlatformError> {
     if unsafe { IsWindow(window) } == 0 {
         return Err(failure(correlation_id, "invalidCaptureWindow"));
     }
     set_window_transitions_disabled(window, true, correlation_id)?;
-    unsafe { ShowWindow(window, SW_HIDE) };
-    let hidden = if unsafe { IsWindowVisible(window) } != 0 {
-        Err(failure(correlation_id, "captureWindowStillVisible"))
-    } else {
-        flush_desktop_composition(correlation_id)
-    };
+    // Use the framework's hide on the owning thread. A raw ShowWindow leaves
+    // Tao's VISIBLE flag set, so a subsequent Tauri show becomes a no-op.
+    let hidden = hide().and_then(|()| {
+        if unsafe { IsWindowVisible(window) } != 0 {
+            Err(failure(correlation_id, "captureWindowStillVisible"))
+        } else {
+            flush_desktop_composition(correlation_id)
+        }
+    });
     // Restore normal editor animations on both success and failure.
     let restored = set_window_transitions_disabled(window, false, correlation_id);
     hidden.and(restored)
@@ -1580,10 +1584,48 @@ mod tests {
 
     #[test]
     fn capture_window_hide_rejects_invalid_hwnd() {
-        let result = super::hide_window_for_capture(std::ptr::null_mut(), "invalid-window");
+        let result = super::hide_window_for_capture(std::ptr::null_mut(), "invalid-window", || {
+            panic!("invalid HWND must not invoke the framework hide")
+        });
         assert!(
             result.is_err(),
             "capture must not continue after a failed native hide"
+        );
+    }
+
+    #[test]
+    fn capture_window_hide_invokes_framework_visibility_update() {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{
+            CreateWindowExW, DestroyWindow, WS_POPUP,
+        };
+        let class: Vec<u16> = "STATIC\0".encode_utf16().collect();
+        let window = unsafe {
+            CreateWindowExW(
+                0,
+                class.as_ptr(),
+                std::ptr::null(),
+                WS_POPUP,
+                0,
+                0,
+                32,
+                32,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                std::ptr::null(),
+            )
+        };
+        assert!(!window.is_null());
+        let mut framework_hidden = false;
+        let result = super::hide_window_for_capture(window, "framework-hide", || {
+            framework_hidden = true;
+            Ok(())
+        });
+        unsafe { DestroyWindow(window) };
+        assert!(result.is_ok(), "{result:?}");
+        assert!(
+            framework_hidden,
+            "Tauri visibility must change along with Win32 visibility"
         );
     }
 

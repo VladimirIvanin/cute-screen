@@ -488,7 +488,7 @@
   .cs-history {
     display: none;
   }
-  .cs-button-quiet span {
+  .cs-button-quiet .n-button__content > span {
     display: none;
   }
   .cs-button-quiet {

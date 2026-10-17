@@ -9,6 +9,7 @@ import type {
   ViewportOutputBounds,
 } from './contracts'
 import type { ZoomAnchor } from './workspace-lifecycle'
+import { visibleImageTarget } from './image-insertion-target'
 
 export interface ViewportControllerContext {
   readonly props: CanvasViewportProps
@@ -37,6 +38,11 @@ export class ViewportController {
 
   readonly #context: ViewportControllerContext
   #pendingZoomAnchor: ZoomAnchor | undefined
+
+  imageInsertionTarget(point?: { readonly x: number; readonly y: number }) {
+    return visibleImageTarget(this.#context.scrollContainer.value, this.#context.scene.value,
+      this.outputBounds.value, this.#context.props.document?.crop ?? this.outputBounds.value, point)
+  }
 
   constructor(context: ViewportControllerContext) {
     this.#context = context

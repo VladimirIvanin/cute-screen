@@ -199,19 +199,6 @@ async function presentPreparedDraft(draftId: string): Promise<void> {
   try {
     await nextTick()
     if (draft.value?.draftId !== draftId) return
-    if (selectionPending.value) {
-      if (!(await tauriDesktopBridge.quickCapturePresent(draftId))) {
-        throw new Error('Quick capture draft is no longer active')
-      }
-      quickLayoutReady.value = true
-      await nextTick()
-      await nextLayoutFrame()
-      if (!(await tauriDesktopBridge.quickCaptureReveal(draftId))) {
-        throw new Error('Quick capture draft is no longer active')
-      }
-      presentedDraftId = draftId
-      return
-    }
     const presentation = await presentThenWaitForStableQuickCaptureLayout({
       present: () => tauriDesktopBridge.quickCapturePresent(draftId),
       reveal: async () => {
@@ -222,7 +209,7 @@ async function presentPreparedDraft(draftId: string): Promise<void> {
           throw new Error('Quick capture draft is no longer active')
         }
       },
-      measure: () => updateQuickLayout(),
+      measure: () => selectionPending.value ? layoutController.selectionLayout() : updateQuickLayout(),
       nextFrame: nextLayoutFrame,
     })
     if (draft.value?.draftId !== draftId) return
@@ -407,6 +394,7 @@ onBeforeUnmount(() => {
       :document-session="session"
       :source-image="sourceImage"
       :content-image-bridge="tauriDesktopBridge"
+      :clipboard-bridge="tauriDesktopBridge"
       @hosts-ready="onHostsReady"
       @frame-ready="onFrameReady"
       @quick-frame-change="onQuickFrameChange"

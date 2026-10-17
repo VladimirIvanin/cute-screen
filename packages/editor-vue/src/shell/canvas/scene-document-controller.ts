@@ -6,7 +6,9 @@ import type { CanvasViewportProps } from './contracts'
 import type { CanvasGesture } from './workspace-state'
 
 export function requiresScenePreview(layer: LayerNode | undefined): boolean {
-  return Boolean(layer && ['censor', 'spotlight', 'loupe', 'marker'].includes(layer.kind))
+  // Image nodes need decoded resources and their original ordered scene slot;
+  // the lightweight overlay intentionally does not render them.
+  return Boolean(layer && ['image', 'censor', 'spotlight', 'loupe', 'marker'].includes(layer.kind))
 }
 
 export interface SceneDocumentContext {
@@ -30,6 +32,18 @@ export class SceneDocumentController {
     const document = this.#context.props.document
     if (!document) return undefined
     const gesture = this.#context.gesture()
+    if (
+      gesture?.kind === 'move' &&
+      gesture.nodeIds &&
+      gesture.nodeIds.length > 1
+    ) {
+      return { ...document, layers: document.layers.map((layer) => gesture.nodeIds!.includes(layer.id) ? {
+        ...layer, transform: { ...layer.transform,
+          translateX: layer.transform.translateX + (gesture.current.x - gesture.start.x),
+          translateY: layer.transform.translateY + (gesture.current.y - gesture.start.y),
+        },
+      } : layer) }
+    }
     if (gesture?.kind === 'loupeSource') {
       return {
         ...document,

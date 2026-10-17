@@ -240,7 +240,7 @@ describe('v7 content-layer core contracts', () => {
         content: { text: 'Read this' },
         background: null,
         targetMarker: 'circle',
-        labelMarker: 'circle',
+        labelMarker: 'none',
       },
     })
     expect(callout).not.toHaveProperty('opacity')

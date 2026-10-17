@@ -118,22 +118,22 @@ function imageSchema(
   const border = layer.payload.border
   return {
     icon: 'image',
-    title: 'Image',
+    title: context.translate('toolImage'),
     hint: context.translate('canvasViewport'),
     controls: [
       {
         kind: 'range',
         id: 'imageRadius',
-        label: 'Radius',
+        label: context.precisionText('Radius', 'Скругление'),
         value: layer.payload.radius ?? 0,
         min: 0,
-        max: Math.min(128, (layer.localBounds?.width ?? 0) / 2, (layer.localBounds?.height ?? 0) / 2),
+        max: Math.min((layer.localBounds?.width ?? 0) / 2, (layer.localBounds?.height ?? 0) / 2),
         step: 1,
       },
       {
         kind: 'color',
         id: 'imageBorderColor',
-        label: 'Border',
+        label: context.precisionText('Border', 'Рамка'),
         value: context.hexColor(border?.color ?? {
           red: 0, green: 0, blue: 0, alpha: 1,
         }),
@@ -143,16 +143,16 @@ function imageSchema(
       {
         kind: 'range',
         id: 'imageBorderWidth',
-        label: 'Border width',
+        label: context.precisionText('Border width', 'Толщина рамки'),
         value: border?.width ?? 0,
         min: 0,
-        max: 16,
+        max: 32,
         step: 1,
       },
       {
         kind: 'range',
         id: 'imageOpacity',
-        label: 'Opacity',
+        label: context.precisionText('Opacity', 'Непрозрачность'),
         value: layer.opacity,
         min: 0,
         max: 1,
@@ -235,6 +235,21 @@ function markerSelectionProjection(
   return text
 }
 
+function calloutProjection(schemas: readonly (ContextToolbarSchema | undefined)[]): Partial<ContextToolbarSchema> {
+  const first = schemas[0]?.callout
+  if (!first || !schemas.every((schema) => schema?.callout)) return {}
+  const appearance = (payload: NonNullable<ContextToolbarSchema['callout']>) => JSON.stringify({
+    frame: payload.frame, background: payload.background, stroke: payload.stroke,
+    targetMarker: payload.targetMarker, labelMarker: payload.labelMarker,
+    targetMarkerStyle: payload.targetMarkerStyle, labelMarkerStyle: payload.labelMarkerStyle,
+    route: payload.route.path === 'orthogonal' ? payload.route.preset : payload.route.path,
+  })
+  return {
+    callout: first,
+    calloutMultiple: schemas.length > 1,
+    calloutMixed: schemas.some((schema) => appearance(schema!.callout!) !== appearance(first)),
+  }
+}
 function selectionSchemaFor(context: ContextSchemaContext): ContextToolbarSchema | undefined {
   if (
     context.activeToolId.value !== 'select' ||
@@ -269,7 +284,10 @@ function selectionSchemaFor(context: ContextSchemaContext): ContextToolbarSchema
   const common = commonLayerStyle(layers)
   if ('width' in common && !controls.some((control) => ['width', 'stroke'].includes(control.id))) {
     controls.push({
-      kind: 'range', id: 'width', label: context.precisionText('Width', 'Толщина'), value: typeof common.width === 'number' ? common.width : 1, min: 1, max: layers.some((layer) => layer.kind === 'ruler') ? 12 : 24, step: 1, disabled, mixed: common.width === null,
+      kind: 'range', id: 'width', label: context.precisionText('Width', 'Толщина'),
+      value: typeof common.width === 'number' ? common.width : 1, min: 1,
+      max: layers.some((layer) => layer.kind === 'ruler') ? 12 : 24, step: 1, disabled,
+      mixed: common.width === null,
     })
   }
   let text = first.text ? {
@@ -295,7 +313,8 @@ function selectionSchemaFor(context: ContextSchemaContext): ContextToolbarSchema
     if (disabled)
       text = {
         ...text,
-        disabledReason: context.precisionText('Unlock the entire selection to edit', 'Разблокируйте всё выделение для редактирования'),
+        disabledReason: context.precisionText('Unlock the entire selection to edit',
+          'Разблокируйте всё выделение для редактирования'),
       }
   } else
     text = undefined
@@ -304,9 +323,11 @@ function selectionSchemaFor(context: ContextSchemaContext): ContextToolbarSchema
     ...toolSettingsProjection(schemas, layers.length),
     ...highlighterProjection(schemas),
     ...shapeProjection(schemas),
+    ...calloutProjection(schemas),
     ...(disabled
       ? {
-          disabledReason: context.precisionText('Unlock the selection or open an editable document', 'Разблокируйте выделение или откройте редактируемый документ'),
+          disabledReason: context.precisionText('Unlock the selection or open an editable document',
+            'Разблокируйте выделение или откройте редактируемый документ'),
         } : {}),
     ...selectionHeading(context, layers, first),
     controls,
@@ -355,10 +376,12 @@ export function createContextSchema(context: ContextSchemaContext) {
   })
   return {
     creationSchema,
-    contextSchema: computed(() => (!context.toolConfigure.value && context.activeToolId.value === 'crop' ? cropSchema(context) : undefined)),
+    contextSchema: computed(() => (!context.toolConfigure.value && context.activeToolId.value === 'crop'
+      ? cropSchema(context) : undefined)),
     floatingArrowToolbarSchema,
     selectionSchema,
     toolConfigureSchema,
-    toolConfigureArrowSchema: computed(() => context.toolConfigure.value?.toolId === 'arrow' ? toolConfigureSchema.value : undefined),
+    toolConfigureArrowSchema: computed(() => context.toolConfigure.value?.toolId === 'arrow'
+      ? toolConfigureSchema.value : undefined),
   }
 }

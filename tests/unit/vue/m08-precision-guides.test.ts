@@ -32,6 +32,50 @@ afterEach(() => {
 })
 
 describe('M08 manual precision tools', () => {
+  it.each([false, true])('waits for a canvas target when sampling starts (mounted active: %s)', async (sampling) => {
+    const frames: FrameRequestCallback[] = []
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback)
+      return frames.length
+    })
+    const view = render(CanvasViewport, {
+      props: {
+        documentState: { kind: 'ready', title: 'M08', dimensions: '120 × 80' },
+        canvas: { width: 120, height: 80 },
+        document: documentFixture(),
+        sampling,
+        zoom: 100,
+        fitMode: false,
+        t: (key: string) => key,
+      } as never,
+    })
+    const scene = view.getByLabelText('sceneCanvas') as HTMLCanvasElement
+    prepareScene(scene)
+    await view.rerender({ sampling: true })
+    await nextTick()
+    frames.splice(0).forEach((callback) => callback(0))
+    const loupe = view.getByLabelText('eyedropperMagnifier')
+    expect(loupe).not.toBeVisible()
+    expect(view.emitted().colorSample).toBeUndefined()
+
+    await fireEvent.pointerMove(scene, { clientX: 30, clientY: 20 })
+    frames.splice(0).forEach((callback) => callback(16))
+    expect(loupe).toBeVisible()
+    await fireEvent.pointerLeave(scene)
+    expect(loupe).not.toBeVisible()
+    await view.rerender({ zoom: 150 })
+    frames.splice(0).forEach((callback) => callback(32))
+    expect(loupe).not.toBeVisible()
+
+    await fireEvent.keyDown(scene, { key: 'ArrowRight' })
+    frames.splice(0).forEach((callback) => callback(48))
+    expect(loupe).toBeVisible()
+    await view.rerender({ sampling: false })
+    await view.rerender({ sampling: true })
+    frames.splice(0).forEach((callback) => callback(64))
+    expect(loupe).not.toBeVisible()
+  })
+
   it('renders a frame-coalesced live 9 by 9 eyedropper loupe before confirmation', async () => {
     const frames: FrameRequestCallback[] = []
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {

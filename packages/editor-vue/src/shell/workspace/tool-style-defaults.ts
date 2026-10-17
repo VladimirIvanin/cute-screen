@@ -2,6 +2,9 @@ import type { Ref } from 'vue'
 import {
   changePencilBrush,
   normalizePencilDefaults,
+  DEFAULT_CALLOUT_STYLE,
+  calloutFrameBackground,
+  type CalloutFrame,
 } from '@cute-screen/editor-renderer'
 import type {
   JsonObject,
@@ -63,6 +66,12 @@ function textStyle(
     'background',
   ])
   if (tool === 'numberedMarker' && 'badgeColor' in style) patch.background = { color: style.badgeColor!, padding: 0, radius: 0 }
+  if (tool === 'callout') {
+    const base = texts.callout.calloutStyle ?? DEFAULT_CALLOUT_STYLE
+    patch.calloutStyle = { ...base, ...('calloutFrame' in style ? { frame: style.calloutFrame } : {}), ...('calloutRoute' in style ? { route: style.calloutRoute } : {}), ...pick(style, ['targetMarker', 'labelMarker', 'targetMarkerStyle', 'labelMarkerStyle']) } as unknown as JsonObject
+    if (style.calloutFrame)
+      patch.background = calloutFrameBackground(style.calloutFrame as CalloutFrame) as unknown as JsonObject
+  }
   texts[tool] = {
     ...texts[tool],
     ...patch,

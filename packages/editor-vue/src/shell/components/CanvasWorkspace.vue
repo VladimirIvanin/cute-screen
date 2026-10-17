@@ -16,9 +16,11 @@ const textSurfaceOwner = provideTransientSurface()
 const props = defineProps(canvasViewportRuntimeProps)
 const emit = defineEmits(canvasViewportRuntimeEmits) as CanvasViewportEmit
 const {
+  startSelectionMove,
   viewportRoot,
   scrollContainer,
   viewportOutputBounds,
+  canvasPoint,
   scene,
   isPanning,
   onPointerDown,
@@ -63,18 +65,14 @@ const {
   resetCropDraft,
   setCropPresetValue,
   refitCanvas,
+  imageInsertionTarget,
+  focusCanvas,
 } = useCanvasWorkspace(props, emit)
 function onContextMenu(event: MouseEvent): void {
   if (editingText.value || props.quickSelectionMode) return
   event.preventDefault()
-  const canvas = scene.value
-  if (!canvas || !props.document) return
-  const rect = canvas.getBoundingClientRect()
-  const scale = (props.zoom ?? 100) / 100
-  const point = {
-    x: (event.clientX - rect.left) / scale + (props.document.crop?.x ?? 0),
-    y: (event.clientY - rect.top) / scale + (props.document.crop?.y ?? 0),
-  }
+  const point = canvasPoint(event)
+  if (!point || !props.document) return
   const hit = hitTestDocument(props.document, point)
   emit('contextMenu', {
     clientX: event.clientX,
@@ -83,6 +81,9 @@ function onContextMenu(event: MouseEvent): void {
   })
 }
 defineExpose({
+  startSelectionMove,
+  imageInsertionTarget,
+  focusCanvas,
   applyCropDraft,
   cancelCropDraft,
   resetCropDraft,

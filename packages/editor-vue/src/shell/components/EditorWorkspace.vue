@@ -10,6 +10,7 @@ import {
 } from 'vue'
 import { UiIcon } from '../icon'
 import ActionFeedback from './ActionFeedback.vue'
+import ImageImportFeedback from './ImageImportFeedback.vue'
 import SelectionFormattingToolbar from './SelectionFormattingToolbar.vue'
 import CanvasViewport from './CanvasViewport.vue'
 import CanvasContextMenu from './CanvasContextMenu.vue'
@@ -93,6 +94,10 @@ const {
   onColorSampleError,
   onColorSampleCancel,
   toolError,
+  contentImageImporting,
+  imageFeedback,
+  imageDropActive,
+  cancelImageImport,
   updateLayerProperty,
   onLayerOpacity,
   onLayerRotation,
@@ -151,7 +156,7 @@ defineExpose({
     :theme-overrides="cuteScreenThemeOverrides"
     :abstract="false"
   >
-    <div class="cs-editor-shell" :class="{ 'is-quick-mode': props.quickMode }">
+    <div class="cs-editor-shell" :class="{ 'is-quick-mode': props.quickMode, 'is-image-drop-target': imageDropActive }">
       <TopBar
         v-if="!props.quickMode"
         :can-edit-canvas="
@@ -172,9 +177,9 @@ defineExpose({
         :save-error="store.documentHistory.error"
         :pending="store.actionState.status === 'pending'"
         :capture-available="props.captureAvailable"
-        :capture-window-available="props.captureWindowAvailable"
         :capture-unavailable-reason="props.captureUnavailableReason ?? translate('captureUnavailable')"
         :open-image-available="props.openImageAvailable"
+        :open-settings="props.openSettings"
         :t="translate"
         @canvas-action="onContextAction"
         @action="store.runAction"
@@ -393,6 +398,8 @@ defineExpose({
           @retry="emit('retryLoad')"
         />
         <SelectionFormattingToolbar
+          :move-enabled="store.activeToolId === 'select' && !props.readOnlyDocument && !floatingTextToolbarSchema"
+          @move-start="canvasViewport?.startSelectionMove($event)"
           :quick-mode="props.quickMode"
           :layers-open="store.layersOpen"
           :schema="selectionSchema"
@@ -480,13 +487,13 @@ defineExpose({
         />
         <span>{{ eyedropperFeedback }}</span>
       </p>
-      <p
-        v-if="toolError"
-        class="cs-tool-error"
-        role="alert"
-      >
-        {{ toolError }}
-      </p>
+      <ImageImportFeedback
+        :error="toolError"
+        :pending="contentImageImporting"
+        :message="imageFeedback"
+        :locale="state.locale.value"
+        @cancel="cancelImageImport"
+      />
     </div>
   </NConfigProvider>
 </template>

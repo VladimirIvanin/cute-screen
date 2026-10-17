@@ -1,7 +1,33 @@
+import {
+  calloutTextRect,
+  calloutMarkerRadius,
+  calloutEndpointSize,
+  type CalloutGeometryContext,
+} from './callout-label-geometry'
+export {
+  calloutTextRect,
+  calloutMarkerRadius,
+  calloutEndpointSize,
+  type CalloutGeometryContext,
+} from './callout-label-geometry'
+import {
+  calloutPathPoints,
+  manualRoute,
+  moveCalloutEndpoint,
+  moveCalloutSegment,
+} from './callout-route'
+export {
+  calloutPathPoints,
+  calloutRoutePreset,
+  calloutStyleForPayload,
+  defaultCalloutAttachment,
+  defaultCalloutRoute,
+} from './callout-route'
 import type {
   CalloutLayer,
   CalloutPayload,
-  CalloutRoute,
+  CalloutFrame,
+  CalloutStyle,
   JsonObject,
   Point,
   Rect,
@@ -9,86 +35,36 @@ import type {
   TextBackground,
 } from './document/types'
 
-const TEXT_LABEL_GAP = 6
-
-/** Supplied by a rendering host; core never depends on DOM or font loading. */
-export interface CalloutGeometryContext {
-  readonly measureText?: (content: RichTextContent) => Readonly<{ width: number; height: number }>
-}
-
 function point(value: Point): Point & JsonObject {
   return Object.freeze({ x: value.x, y: value.y })
 }
 
-export function calloutMarkerRadius(strokeWidth: number): number {
-  return Math.max(strokeWidth * 1.5, 5)
+export const DEFAULT_CALLOUT_FRAME: CalloutFrame = Object.freeze<CalloutFrame>({
+  kind: 'card', fill: { red: 1, green: 1, blue: 1, alpha: 1 },
+  border: { color: { red: 0.55, green: 0.55, blue: 0.55, alpha: 1 }, width: 1, style: 'solid', cap: 'round',
+    join: 'round' },
+  padding: 8, radius: 8,
+})
+export const DEFAULT_CALLOUT_STYLE: CalloutStyle = Object.freeze({
+  route: 'corner', frame: DEFAULT_CALLOUT_FRAME, targetMarker: 'circle', labelMarker: 'none',
+})
+export function calloutFrameBackground(frame: CalloutFrame): TextBackground | null {
+  if (!['card', 'capsule'].includes(frame.kind)) return null
+  return { color: frame.fill, padding: frame.padding, radius: frame.kind === 'capsule' ? 16384 : frame.radius }
 }
-
-/** Renderer-neutral points for every persisted callout elbow route. */
-export function calloutPathPoints(payload: CalloutPayload): readonly Point[] {
-  const target = point(payload.target)
-  const label = point(payload.label)
-  const elbow = payload.route.elbow
-  if (elbow.axis === 'x') {
-    const middleY = (target.y + label.y) / 2 + elbow.offset
-    return Object.freeze([target, point({ x: target.x, y: middleY }), point({ x: label.x, y: middleY }), label])
-  }
-  const middleX = (target.x + label.x) / 2 + elbow.offset
-  return Object.freeze([target, point({ x: middleX, y: target.y }), point({ x: middleX, y: label.y }), label])
+export function calloutBackground(payload: CalloutPayload): TextBackground | null {
+  return payload.frame ? calloutFrameBackground(payload.frame) : payload.background
 }
-
-export function defaultCalloutRoute(
-  target: Point,
-  label: Point,
-): CalloutRoute {
-  const dx = Math.abs(label.x - target.x)
-  const dy = Math.abs(label.y - target.y)
-  return Object.freeze({
-    path: 'elbow',
-    elbow: Object.freeze({
-      axis: dx >= dy ? ('y' as const) : ('x' as const),
-      offset: 0,
-    }),
-  })
-}
-
-function estimateTextSize(content: RichTextContent): Readonly<{
-  readonly width: number
-  readonly height: number
-  readonly fontSize: number
-}> {
-  const fontSize = content.spans.find((span) => span.fontSize > 0)?.fontSize ?? 24
-  const lines = content.text.length === 0 ? [''] : content.text.split('\n')
-  const naturalWidth = Math.max(fontSize, Math.max(...lines.map((line) => [...line].length)) * fontSize * 0.6)
-  const width = content.wrap === 'fixedWidth' ? content.fixedWidth ?? naturalWidth : naturalWidth
-  const lineCount = content.wrap === 'fixedWidth'
-    ? lines.reduce((count, line) => count + Math.max(1, Math.ceil([...line].length * fontSize * 0.6 / width)), 0)
-    : lines.length
-  return Object.freeze({
-    width,
-    height: lineCount * fontSize * 1.25,
-    fontSize,
-  })
-}
-
-export function calloutTextRect(
+export function withCalloutBackground(
   payload: CalloutPayload,
-  context: CalloutGeometryContext = {},
-): Rect & JsonObject {
-  const markerRadius = calloutMarkerRadius(payload.stroke.width)
-  const textSize = context.measureText?.(payload.content) ?? estimateTextSize(payload.content)
-  const background = payload.background
-  const padding = background?.padding ?? 0
-  const width = textSize.width + padding * 2
-  const height = textSize.height + padding * 2
-  return Object.freeze({
-    x: payload.label.x < payload.target.x
-      ? payload.label.x - markerRadius - TEXT_LABEL_GAP - width
-      : payload.label.x + markerRadius + TEXT_LABEL_GAP,
-    y: payload.label.y - height / 2,
-    width,
-    height,
-  })
+  background: TextBackground | null,
+): CalloutPayload {
+  if (!payload.frame) return { ...payload, background }
+  return { ...payload, frame: background
+    ? { ...payload.frame, kind: payload.frame.kind === 'capsule' ? 'capsule' : 'card', fill: background.color,
+        padding: background.padding, radius: payload.frame.kind === 'capsule' ? payload.frame.radius : background.radius }
+    : { ...payload.frame, kind: payload.frame.kind === 'outline' || payload.frame.kind === 'accent'
+        ? payload.frame.kind : 'text' } }
 }
 
 function unionBounds(parts: readonly Rect[]): Rect {
@@ -110,8 +86,10 @@ export function calloutGeometryBounds(
   payload: CalloutPayload,
   context: CalloutGeometryContext = {},
 ): Rect {
-  const points = calloutPathPoints(payload)
-  const markerRadius = calloutMarkerRadius(payload.stroke.width)
+  const points = calloutPathPoints(payload, context)
+  const markerRadius = payload.frame || payload.attachment
+    ? Math.max(calloutEndpointSize(payload, 'target'), calloutEndpointSize(payload, 'label'))
+    : calloutMarkerRadius(payload.stroke.width)
   const strokeInset = payload.stroke.width / 2
   const xs = points.flatMap((entry) => [entry.x - markerRadius - strokeInset, entry.x + markerRadius + strokeInset])
   const ys = points.flatMap((entry) => [entry.y - markerRadius - strokeInset, entry.y + markerRadius + strokeInset])
@@ -121,7 +99,10 @@ export function calloutGeometryBounds(
     width: Math.max(1, Math.max(...xs) - Math.min(...xs)),
     height: Math.max(1, Math.max(...ys) - Math.min(...ys)),
   })
-  return unionBounds([pathBounds, calloutTextRect(payload, context)])
+  const rect = calloutTextRect(payload, context)
+  const border = (payload.frame?.border?.width ?? 0) / 2
+  return unionBounds([pathBounds, { x: rect.x - border, y: rect.y - border, width: rect.width + border * 2,
+    height: rect.height + border * 2 }])
 }
 
 function shifted(
@@ -151,10 +132,8 @@ export function rebaseCalloutLayer(
     ...payload,
     target: shifted(payload.target, origin),
     label: shifted(payload.label, origin),
-    route: Object.freeze({
-      path: 'elbow',
-      elbow: Object.freeze({ ...payload.route.elbow }),
-    }),
+    route: payload.route.path === 'orthogonal' ? { ...payload.route,
+      points: payload.route.points.map((p) => shifted(p, origin)) } : payload.route,
   })
   return Object.freeze({
     ...layer,
@@ -173,101 +152,140 @@ export function rebaseCalloutLayer(
   })
 }
 
-export type CalloutHandleKind = 'target' | 'label' | 'elbow' | 'width'
-
-export interface CalloutSelectionHandle {
-  readonly kind: CalloutHandleKind
-  readonly point: Point
-}
-
+export type CalloutHandleKind = 'target' | 'label' | 'labelBody' | 'elbow' | 'width' | `segment:${number}` | `insert:${number}`
+export interface CalloutSelectionHandle { readonly kind: CalloutHandleKind; readonly point: Point }
 export function calloutSelectionHandles(
   layer: CalloutLayer,
   context: CalloutGeometryContext = {},
 ): readonly CalloutSelectionHandle[] {
   const handles: CalloutSelectionHandle[] = [
-    { kind: 'target', point: point(layer.payload.target) },
-    { kind: 'label', point: point(layer.payload.label) },
+    { kind: 'target', point: point(layer.payload.target) }, { kind: 'label', point: point(layer.payload.label) },
   ]
-  const points = calloutPathPoints(layer.payload)
-  handles.push({
-    kind: 'elbow',
-    point: point({
-      x: (points[1]!.x + points[2]!.x) / 2,
-      y: (points[1]!.y + points[2]!.y) / 2,
-    }),
-  })
+  const points = calloutPathPoints(layer.payload, context)
+  if (layer.payload.route.path === 'elbow' && !layer.payload.attachment) {
+    handles.push({ kind: 'elbow', point: point({ x: (points[1]!.x + points[2]!.x) / 2,
+      y: (points[1]!.y + points[2]!.y) / 2 }) })
+  } else if (layer.payload.route.path !== 'straight') {
+    points.slice(1).forEach((p, i) => handles.push({ kind: `segment:${i}`,
+      point: point({ x: (p.x + points[i]!.x) / 2, y: (p.y + points[i]!.y) / 2 }) }))
+  }
   const rect = calloutTextRect(layer.payload, context)
-  handles.push({ kind: 'width', point: point({
-    x: layer.payload.label.x < layer.payload.target.x ? rect.x : rect.x + rect.width,
-    y: layer.payload.label.y,
-  }) })
-  return Object.freeze(handles.map((handle) => Object.freeze(handle)))
+  const left = layer.payload.attachment === 'right' || !layer.payload.attachment
+    && layer.payload.label.x < layer.payload.target.x
+  handles.push({ kind: 'width', point: point({ x: left ? rect.x : rect.x + rect.width, y: rect.y + rect.height / 2 }) })
+  return handles
 }
-
+export function addCalloutStep(
+  layer: CalloutLayer,
+  segment = 0,
+  offset = 32,
+  context: CalloutGeometryContext = {},
+): CalloutLayer {
+  const points = calloutPathPoints(layer.payload, context).map((p) => ({ ...p }))
+  if (
+    points.length > 120 ||
+    points.length < 3 ||
+    offset === 0
+  ) return layer
+  const a = points[segment], b = points[segment + 1]
+  if (
+    !a ||
+    !b ||
+    a.x !== b.x &&
+    a.y !== b.y
+  ) return layer
+  if (a.x === b.x && a.y === b.y) return layer
+  const key = a.y === b.y ? 'y' : 'x'
+  const middle = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+  const shifted = { ...middle, [key]: middle[key] + offset }
+  if (segment + 1 < points.length - 1) {
+    b[key] += offset
+    points.splice(segment + 1, 0, middle, shifted)
+  } else {
+    a[key] += offset
+    points.splice(segment + 1, 0, shifted, middle)
+  }
+  return rebaseCalloutLayer(layer, { ...layer.payload, route: manualRoute(layer.payload, points) }, context)
+}
+export function removeCalloutStep(
+  layer: CalloutLayer,
+  context: CalloutGeometryContext = {},
+): CalloutLayer {
+  const points = calloutPathPoints(layer.payload, context).map((p) => ({ ...p }))
+  if (points.length < 5) return resetCalloutRoute(layer, context)
+  const index = points.length - 5
+  const a = points[index]!, p = points[index + 1]!, b = points[index + 3]!
+  if (a.y === p.y) b.y = a.y
+  else b.x = a.x
+  points.splice(index + 1, 2)
+  return rebaseCalloutLayer(layer, { ...layer.payload, route: manualRoute(layer.payload, points) }, context)
+}
+export function resetCalloutRoute(
+  layer: CalloutLayer,
+  context: CalloutGeometryContext = {},
+): CalloutLayer {
+  const route = layer.payload.route
+  if (route.path !== 'orthogonal') return layer
+  return rebaseCalloutLayer(layer, { ...layer.payload, route: route.preset === 'elbow'
+    ? { path: 'elbow', elbow: { axis: route.axis, offset: 0 } } : { path: 'corner', axis: route.axis } }, context)
+}
+function resizedCalloutContent(
+  current: CalloutPayload,
+  nextPoint: Point,
+  context: CalloutGeometryContext,
+): RichTextContent {
+  const fontSize = Math.max(1, ...current.content.spans.map((span) => span.fontSize))
+  const rect = calloutTextRect(current, context)
+  const left = current.attachment === 'right' || !current.attachment && current.label.x < current.target.x
+  const oldEdge = left ? rect.x : rect.x + rect.width
+  const oldWidth = rect.width - 2 * (current.frame?.kind === 'text' ? 0
+    : current.frame?.padding ?? current.background?.padding ?? 0)
+  const width = Math.max(fontSize, oldWidth + (nextPoint.x - oldEdge) * (left ? -1
+    : 1) * (current.attachment === 'top' || current.attachment === 'bottom' ? 2 : 1))
+  return { ...current.content, wrap: 'fixedWidth', fixedWidth: width }
+}
 export function updateCalloutHandle(
   layer: CalloutLayer,
   handle: CalloutHandleKind,
   nextPoint: Point,
   context: CalloutGeometryContext = {},
 ): CalloutLayer {
-  let payload: CalloutPayload
-  if (handle === 'width') {
-    const { payload: current } = layer
-    const fontSize = Math.max(1, ...current.content.spans.map((span) => span.fontSize))
-    const gap = calloutMarkerRadius(current.stroke.width) + TEXT_LABEL_GAP
-    const padding = current.background?.padding ?? 0
-    const outward = current.label.x < current.target.x ? -1 : 1
-    const width = Math.max(fontSize, (nextPoint.x - current.label.x) * outward - gap - padding * 2)
-    payload = { ...current, content: { ...current.content, wrap: 'fixedWidth', fixedWidth: width } }
-  } else if (handle === 'target' || handle === 'label') {
-    payload = { ...layer.payload, [handle]: point(nextPoint) }
-  } else {
-    const midpoint = {
-      x: (layer.payload.target.x + layer.payload.label.x) / 2,
-      y: (layer.payload.target.y + layer.payload.label.y) / 2,
-    }
-    payload = {
-      ...layer.payload,
-      route: {
-        path: 'elbow',
-        elbow: {
-          ...layer.payload.route.elbow,
-          offset: layer.payload.route.elbow.axis === 'x' ? nextPoint.y - midpoint.y : nextPoint.x - midpoint.x,
-        },
-      },
-    }
+  if (handle === 'labelBody') handle = 'label'
+  const current = layer.payload
+  let payload = current
+  if (handle === 'width') return rebaseCalloutLayer(layer, { ...current, content: resizedCalloutContent(current, nextPoint, context) }, context)
+  if (handle === 'target' || handle === 'label') return rebaseCalloutLayer(layer, moveCalloutEndpoint(current, handle, nextPoint), context)
+  if (handle === 'elbow' && current.route.path === 'elbow') {
+    const route = current.route
+    const midpoint = { x: (current.target.x + current.label.x) / 2, y: (current.target.y + current.label.y) / 2 }
+    const offset = route.elbow.axis === 'x' ? nextPoint.y - midpoint.y : nextPoint.x - midpoint.x
+    payload = { ...current, route: { ...route, elbow: { ...route.elbow, offset } } }
   }
+  if (handle.startsWith('insert:')) {
+    const index = Number(handle.split(':')[1])
+    const points = calloutPathPoints(current, context)
+    const a = points[index], b = points[index + 1]
+    if (a && b) return addCalloutStep(layer, index, a.y === b.y ? nextPoint.y - a.y : nextPoint.x - a.x, context)
+  }
+  if (handle.startsWith('segment:')) payload = { ...current, route: moveCalloutSegment(current, Number(handle.split(':')[1]), nextPoint, context) }
   return rebaseCalloutLayer(layer, payload, context)
 }
-
 export function calloutTextLayout(
   payload: CalloutPayload,
   context: CalloutGeometryContext = {},
-): Readonly<{
-  readonly text: Rect
-  readonly background: TextBackground | null
-}> {
-  const textRect = calloutTextRect(payload, context)
-  const background = payload.background
-  if (!background) {
-    const padding = 0
-    return Object.freeze({
-      text: Object.freeze({
-        x: textRect.x + padding,
-        y: textRect.y + padding,
-        width: Math.max(1, textRect.width - padding * 2),
-        height: Math.max(1, textRect.height - padding * 2),
-      }),
-      background: null,
-    })
-  }
-  return Object.freeze({
-    text: Object.freeze({
-      x: textRect.x + background.padding,
-      y: textRect.y + background.padding,
-      width: Math.max(1, textRect.width - background.padding * 2),
-      height: Math.max(1, textRect.height - background.padding * 2),
-    }),
-    background,
-  })
+): Readonly<{ readonly text: Rect; readonly background: TextBackground | null }> {
+  const rect = calloutTextRect(payload, context)
+  const padding = payload.frame?.kind === 'text' ? 0 : payload.frame?.padding ?? payload.background?.padding ?? 0
+  return { text: { x: rect.x + padding, y: rect.y + padding, width: Math.max(1, rect.width - padding * 2),
+    height: Math.max(1, rect.height - padding * 2) }, background: calloutBackground(payload) }
+}
+
+export function calloutLabelContains(
+  payload: CalloutPayload,
+  point: Point,
+  context: CalloutGeometryContext = {},
+): boolean {
+  if (!payload.attachment) return false
+  const rect = calloutTextRect(payload, context)
+  return point.x >= rect.x && point.y >= rect.y && point.x <= rect.x + rect.width && point.y <= rect.y + rect.height
 }

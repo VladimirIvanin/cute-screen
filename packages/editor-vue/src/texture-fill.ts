@@ -24,6 +24,23 @@ export interface TextureFillBridge extends ImageTransportBridge {
 /** Separate from texture selection: the result becomes a document image layer. */
 export interface ContentImageBridge extends ImageTransportBridge {
   importContentImage(correlationId: string): Promise<TextureImportOutcome>
+  importDroppedImage?(token: string, correlationId: string): Promise<TextureImportOutcome>
+  discardDroppedImage?(token: string): Promise<void>
+  subscribeImageDrop?(listener: (event: ImageDropEvent) => void): Promise<() => void>
+}
+
+export interface ImageDropEvent {
+  readonly phase: 'enter' | 'over' | 'leave' | 'drop'
+  readonly x: number
+  readonly y: number
+  readonly fileCount: number
+  readonly supported: boolean
+  readonly token: string | null
+}
+
+export interface ImageInsertionTarget {
+  readonly bounds: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }
+  readonly center?: { readonly x: number; readonly y: number }
 }
 
 export type TextureResourceState =

@@ -18,7 +18,10 @@ import {
 } from './store-state'
 
 export type { ShellStoreOptions } from './store-contracts'
-export { ActionCancelledError } from './store-actions'
+export {
+  ActionCancelledError,
+  TRANSIENT_ACTION_FEEDBACK_MS,
+} from './store-actions'
 
 export const useEditorShellStore = defineStore('cute-screen-editor-shell', () => {
   const state = createShellStoreState()

@@ -47,6 +47,9 @@ export type CanvasGesture =
   }
   | {
     readonly kind: 'move'
+    readonly nodeIds?: readonly string[]
+    readonly startClient?: CanvasPoint
+    readonly dragging?: boolean
     readonly id: string
     readonly start: CanvasPoint
     readonly current: CanvasPoint
@@ -91,6 +94,7 @@ export type CanvasGesture =
   }
   | {
     readonly kind: 'calloutHandle'
+    readonly offset?: CanvasPoint
     readonly id: string
     readonly handle: CalloutHandleKind
     readonly start: CanvasPoint

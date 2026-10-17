@@ -3,14 +3,12 @@ import {
   readJsonObject,
 } from '../json'
 import {
-  type CalloutPayload,
   type EmojiPayload,
   type ImageLayerPayload,
   type NumberedMarkerPayload,
   type SrgbColor,
 } from '../types'
 import {
-  parsePointPayload,
   parseSrgbColor,
   parseStroke,
 } from './paint'
@@ -21,14 +19,12 @@ import {
   isImageFormat,
   parseBoundedNonNegative,
   parseColor,
-  readFiniteNumber,
   readNonEmptyString,
   readPositiveNumber,
   readSha256,
 } from './primitives'
 import {
   parseRichTextContent,
-  parseTextBackground,
 } from './text'
 
 const MAX_IMAGE_RADIUS = 16_384
@@ -58,59 +54,7 @@ export function parseNumberedMarkerPayload(
   })
 }
 
-function parseCalloutRoute(
-  value: unknown,
-  field: string,
-): CalloutPayload['route'] {
-  const input = readJsonObject(value, field)
-  assertOnlyFields(input, ['path', 'elbow'], field)
-  if (input.path !== 'elbow') throw new Error(`${field}.path is invalid`)
-  const elbow = readJsonObject(input.elbow, `${field}.elbow`)
-  assertOnlyFields(elbow, ['axis', 'offset'], `${field}.elbow`)
-  if (elbow.axis !== 'x' && elbow.axis !== 'y') {
-    throw new Error(`${field}.elbow.axis is invalid`)
-  }
-  return Object.freeze({
-    path: 'elbow',
-    elbow: Object.freeze({
-      axis: elbow.axis,
-      offset: readFiniteNumber(elbow.offset, `${field}.elbow.offset`),
-    }),
-  }) as CalloutPayload['route']
-}
-
-function parseCalloutMarker(
-  value: unknown,
-  field: string,
-): CalloutPayload['targetMarker'] {
-  if (value !== 'circle') throw new Error(`${field} is invalid`)
-  return 'circle'
-}
-
-export function parseCalloutPayload(
-  value: unknown,
-  field: string,
-): CalloutPayload {
-  const input = readJsonObject(value, field)
-  if (Object.hasOwn(input, 'bubble') || Object.hasOwn(input, 'tailAnchor')) {
-    throw new Error(`${field} legacy callout bubble/tail fields are removed in v7`)
-  }
-  assertOnlyFields(
-    input,
-    ['content', 'background', 'target', 'label', 'route', 'stroke', 'targetMarker', 'labelMarker'],
-    field,
-  )
-  return Object.freeze({
-    content: parseRichTextContent(input.content, `${field}.content`),
-    background: input.background === null ? null : parseTextBackground(input.background, `${field}.background`),
-    target: parsePointPayload(input.target, `${field}.target`) as CalloutPayload['target'],
-    label: parsePointPayload(input.label, `${field}.label`) as CalloutPayload['label'],
-    route: parseCalloutRoute(input.route, `${field}.route`),
-    stroke: parseStroke(input.stroke, `${field}.stroke`) as CalloutPayload['stroke'],
-    targetMarker: parseCalloutMarker(input.targetMarker, `${field}.targetMarker`),
-    labelMarker: parseCalloutMarker(input.labelMarker, `${field}.labelMarker`),
-  })
-}
+export { parseCalloutPayload } from './callout'
 
 export function parseEmojiPayload(
   value: unknown,

@@ -1,0 +1,95 @@
+.cs-callout-toolbar {
+  flex-wrap: wrap;
+}
+.cs-callout-summary {
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+.cs-callout-popover {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 340px;
+  overflow: auto;
+}
+.cs-callout-popover--text {
+  width: max-content;
+}
+.cs-callout-choices,
+.cs-callout-marker-choices {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.cs-callout-choices button {
+  display: flex;
+  flex: 1 1 72px;
+  align-items: center;
+  flex-direction: column;
+  gap: 4px;
+}
+.cs-callout-choices svg {
+  width: 56px;
+  height: 32px;
+}
+.cs-callout-popover button {
+  min-height: 32px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-raised);
+  color: var(--text);
+  cursor: pointer;
+}
+.cs-callout-popover button[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.cs-callout-popover button:focus-visible,
+.cs-callout-popover summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.cs-callout-marker-choices button {
+  min-width: 36px;
+}
+.cs-callout-field,
+.cs-callout-endpoint {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cs-callout-endpoint + .cs-callout-endpoint {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.cs-callout-frame-preview {
+  padding: 3px 8px;
+}
+.cs-callout-frame-preview[data-frame='outline'] {
+  border: 1px solid currentColor;
+}
+.cs-callout-frame-preview[data-frame='card'],
+.cs-callout-frame-preview[data-frame='capsule'] {
+  border: 1px solid currentColor;
+  background: var(--accent-soft);
+  border-radius: 5px;
+}
+.cs-callout-frame-preview[data-frame='capsule'] {
+  border-radius: 20px;
+}
+.cs-callout-frame-preview[data-frame='accent'] {
+  border-left: 3px solid currentColor;
+}
+
+.cs-callout-frame-choices {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.cs-callout-frame-choices button {
+  padding-inline: 3px;
+  font-size: 12px;
+}

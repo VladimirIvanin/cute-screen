@@ -25,6 +25,38 @@ const base = {
 }
 
 describe('quick capture overlay layout', () => {
+  it('rejects the previous fitted scene after the fullscreen viewport has resized', () => {
+    const scene = document.createElement('canvas')
+    const width = window.innerWidth
+    const height = window.innerHeight
+    scene.getBoundingClientRect = () => new DOMRect(8, 4, width * 0.99, height * 0.99)
+    type Ports = ConstructorParameters<typeof QuickCaptureLayoutController>[0]
+    const controller = new QuickCaptureLayoutController({
+      hosts: shallowRef({ scene } as NonNullable<Ports['hosts']['value']>),
+      session: shallowRef({ snapshot: { core: { document: { canvas: { width, height } } } } } as NonNullable<Ports['session']['value']>),
+      currentCrop: ref({ x: 0, y: 0, width, height }),
+    })
+    expect(controller.selectionLayout()).toBeUndefined()
+    scene.getBoundingClientRect = () => new DOMRect(0, 0, width, height)
+    expect(controller.selectionLayout()).toBeDefined()
+  })
+  it('measures the selection scene without requiring the hidden action chrome', () => {
+    const scene = document.createElement('canvas')
+    scene.width = 1920
+    scene.height = 1080
+    scene.getBoundingClientRect = () => new DOMRect(0, 0, 1920, 1080)
+    const controller = new QuickCaptureLayoutController({
+      hosts: shallowRef({ scene } as NonNullable<ConstructorParameters<typeof QuickCaptureLayoutController>[0]['hosts']['value']>),
+      session: shallowRef(undefined),
+      currentCrop: ref({ x: 0, y: 0, width: 1920, height: 1080 }),
+    })
+    const first = controller.selectionLayout()
+    expect(first).toBeDefined()
+    scene.getBoundingClientRect = () => new DOMRect(8, 4, 1900, 1069)
+    expect(controller.selectionLayout()).not.toBe(first)
+    scene.getBoundingClientRect = () => new DOMRect(0, 0, 0, 0)
+    expect(controller.selectionLayout()).toBeUndefined()
+  })
   it('keeps configure and selection panels outside the bottom chrome measurements', () => {
     const root = document.createElement('div')
     root.className = 'cs-quick-capture'

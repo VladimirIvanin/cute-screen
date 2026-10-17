@@ -1,5 +1,6 @@
 import {
   ActionCancelledError,
+  describeError,
   type CanvasViewportHosts,
   type DocumentSessionController,
   type PlatformCapabilities,
@@ -40,11 +41,36 @@ async function runDesktopAction(
   await ports.prepareDocumentChange?.()
   const flush = await ports.documentSession.value?.flush()
   if (flush?.kind === 'failed') throw new Error(flush.error)
+  if (action === 'export') return exportRenderedResult(ports, signal)
   if (action === 'openImage') return openImage(ports, signal)
-  if (action !== 'capture' && action !== 'captureWindow') {
-    throw new Error(`${action} is not available yet`)
-  }
   return capture(ports, action, signal, reportProgress)
+}
+
+async function exportRenderedResult(
+  ports: DesktopShellActionPorts,
+  signal: AbortSignal,
+): Promise<string> {
+  const hosts = ports.canvasHosts.value
+  if (!hosts?.exportPng) throw new Error('The rendered result is not ready')
+  if (signal.aborted) throw new ActionCancelledError('Export cancelled')
+  const { tauriDesktopBridge } = await import('./desktop-bridge')
+  let ticket: string | null = null
+  try {
+    ticket = await tauriDesktopBridge.chooseResultPng()
+    if (!ticket) throw new ActionCancelledError('Export cancelled')
+    if (signal.aborted) throw new ActionCancelledError('Export cancelled')
+    const bytes = await hosts.exportPng()
+    if (signal.aborted) throw new ActionCancelledError('Export cancelled')
+    await tauriDesktopBridge.writeResultPng(ticket, bytes)
+    return 'PNG exported'
+  } catch (error) {
+    if (error instanceof ActionCancelledError) throw error
+    throw new Error(describeError(error, 'PNG export failed'), { cause: error })
+  } finally {
+    if (ticket) await tauriDesktopBridge.cancelResultPng(ticket).catch((error) => {
+      console.warn('cute-screen export destination cleanup failed', error)
+    })
+  }
 }
 
 async function copyRenderedResult(

@@ -1,3 +1,4 @@
+import { setEditorPreferences } from '../editor-settings'
 import {
   $,
   $$,
@@ -44,21 +45,7 @@ async function setPreferences(
   locale: 'en' | 'ru',
   theme: 'light' | 'dark',
 ): Promise<void> {
-  const currentLocale = await browser.execute(() => document.documentElement.lang)
-  if (currentLocale !== locale) {
-    await $(`button[aria-label="${currentLocale === 'ru' ? 'Другие действия' : 'More actions'}"]`).click()
-    await $(`button=${locale === 'ru' ? 'RU' : 'EN'}`).click()
-  }
-  if ((await browser.execute(() => document.documentElement.dataset.theme)) !== theme) {
-    await $(`button[aria-label="${locale === 'ru' ? 'Другие действия' : 'More actions'}"]`).click()
-    const label = locale === 'ru' ? (theme === 'light' ? 'Светлая' : 'Тёмная') : theme === 'light' ? 'Light' : 'Dark'
-    await $(`button=${label}`).click()
-  }
-  await browser.waitUntil(
-    async () =>
-      (await browser.execute(() => document.documentElement.lang)) === locale &&
-      (await browser.execute(() => document.documentElement.dataset.theme)) === theme,
-  )
+  await setEditorPreferences(locale, theme)
 }
 
 async function elbowHandlePoint(arrow: ArrowSnapshot['layers'][number]): Promise<Readonly<{ x: number; y: number }>> {

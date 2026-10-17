@@ -13,15 +13,17 @@ import {
   vi,
 } from 'vitest'
 import SettingsApp from '../../../apps/desktop/src/SettingsApp.vue'
+import { createEditorShellPinia } from '@cute-screen/editor-vue'
 import { createSettingsHarnessBridge } from '../../../apps/desktop/src/settings/browser-harness'
 import type { ActivationSettingsBridge } from '../../../apps/desktop/src/settings/contracts'
 
 beforeEach(() => {
+  window.localStorage.clear()
   window.history.replaceState(null, '', '/?settings=shortcuts')
 })
 
 async function mount(bridge = createSettingsHarnessBridge()) {
-  const view = render(SettingsApp, { props: { bridge } })
+  const view = render(SettingsApp, { props: { bridge }, global: { plugins: [createEditorShellPinia()] } })
   await screen.findByRole('heading', { name: 'Keyboard shortcuts' })
   return { bridge, ...view }
 }

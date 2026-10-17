@@ -251,30 +251,13 @@ describe('M02 editor shell', () => {
     expect(screen.getByRole('button', { name: 'capture' })).toHaveAttribute('title', 'Portal backend is unavailable')
   })
 
-  it('exposes window capture only when the native backend advertises it', async () => {
-    const hidden = render(TopBar, {
-      props: {
-        locale: 'en',
-        theme: 'system',
-        canCopyOrExport: false,
-        captureWindowAvailable: false,
-        t: (key) => key,
-      },
+  it('keeps window capture out of the editor even when the capability is available', () => {
+    render(EditorShell, {
+      props: { captureWindowAvailable: true },
+      global: { plugins: [createEditorShellPinia()] },
     })
-    expect(screen.queryByRole('button', { name: 'captureWindow' })).not.toBeInTheDocument()
-    hidden.unmount()
-
-    const available = render(TopBar, {
-      props: {
-        locale: 'en',
-        theme: 'system',
-        canCopyOrExport: false,
-        captureWindowAvailable: true,
-        t: (key) => key,
-      },
-    })
-    await fireEvent.click(screen.getByRole('button', { name: 'captureWindow' }))
-    expect(available.emitted('action')).toEqual([['captureWindow']])
+    expect(screen.queryByRole('button', { name: 'Capture window' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Capture' })).toBeEnabled()
   })
 
   it('routes Open image to the native action only when the desktop bridge is available', async () => {

@@ -1,5 +1,72 @@
 # Архитектура Cute Screen
 
+## Управляемые выноски (ADR-087)
+
+Callout остаётся одним LayerNode. `route` поддерживает straight, corner, elbow
+и orthogonal с внутренними точками, исходным preset и axis. `attachment`
+закрепляет сторону подписи; отсутствие attachment/frame сохраняет legacy v7
+placement без миграции. Optional frame хранит kind, solid fill, border,
+padding/radius; optional endpoint styles — независимые size/color.
+CalloutStyle/defaults/clipboard styles сохраняют только вид и route preset,
+никогда промежуточные точки, координаты или содержимое.
+
+DOM-free callout-route/callout-geometry обслуживают измеренный scene, handles,
+hit testing и rebasing. Наконечники используют общую Arrow/Callout проекцию.
+callout-label-geometry задаёт измеренные границы подписи. Если закреплённая
+сторона обращена от цели, callout-attachment-route перестраивает прилегающий
+участок снаружи подписи, сохраняя сторону и более ранние ручные точки.
+Это локальный подход к собственной подписи, а не обход соседних объектов.
+Transient insertion request проходит через существующий formatting adapter;
+до завершения pointer gesture history не меняется. Escape/lost capture отменяет
+gesture. Подпись имеет приоритет над свободной рамкой выделения и переносится
+с сохранением target. Scene graph не становится глубоко реактивным.
+
+## Изображение: панель и временная geometry (ADR-086)
+
+ImageFormattingToolbar использует existing image control IDs и общий NumericControl
+preview/commit service; цвет и толщина рамки находятся в одном popover. Host
+изображения любого размера и вложенная панель используют preview-placement.
+SceneDocumentController сохраняет временный image layer на исходном месте сцены;
+CanvasGeometryController не отдаёт его в lightweight overlay. CanvasRendererController
+обновляет ordered scene с существующими decoded resources на gesture invalidation.
+Scene graph не становится глубоко реактивным; history/schema/IPC не расширяются.
+
+## Политики взаимодействия с выделением (ADR-085)
+
+`interaction-policy` в editor-core исчерпывающе покрывает LayerKind.
+`resolveSelectionTarget` объединяет точный и расширенный hit-test, общую
+рамку и показанные handles; CSS scale передаётся из фактического canvas rect.
+Canvas adapter держит spatial index вне Vue и обновляет только изменённые
+или удалённые layers при новом immutable snapshot. На pointermove запрос
+работает по локальным кандидатам индекса, а не по всему документу.
+Точные вызовы без options сохраняют историческое поведение. Renderer
+пробрасывает hit options и измеренные text/callout metrics.
+
+`layerSelectionHandles` является источником позиций для overlay и pointer
+resolver. Hover/gesture — imperative transient state, без Vue scene graph.
+Move фиксирует IDs и начальную позицию; порог проверяется в CSS client pixels.
+Multi-selection preview двигает весь выбранный набор, commit передаёт
+зафиксированные IDs существующему command adapter. Маленькое выделение
+получает pointer-captured move grip в единственной selection-панели.
+
+## Windows capture visibility (ADR-082)
+
+Owning-thread hide вызывает Tauri hide внутри отключённых DWM transitions,
+затем проверяет HWND visibility и DwmFlush. Framework и native state остаются
+согласованы для следующего show. Windows Quick present готовит fullscreen
+скрытого окна; reveal показывает его после стабильных viewport/scene/bitmap
+и применения Fit. Selection gate не зависит от отсутствующих до drag панелей.
+
+## Вставка изображения (ADR-081)
+
+Shared content controller владеет transient операцией G/paste/drop и проверкой
+session identity после await. Canvas adapter измеряет viewport/crop/chrome и
+передаёт DOM-free placement helper только document-space bounds. Scene graph
+не становится реактивным; результат вставки проходит существующий addLayer
+и creation policy. Native drop выдаёт одноразовый window-bound file token,
+байты проходят ограниченный reader и binary image transport. Native DTO
+генерируется в desktop IPC; serde regression проверяет фактический JSON.
+
 ## Измерение линейки от видимой области (ADR-076)
 
 `RulerPercentBasis` в payload и renderer-neutral scene допускает canvasWidth,
@@ -282,8 +349,9 @@ weight, italic и strikethrough; paragraph ranges — alignment
 `start|center|end` и list kind `none|bullet`. Text background, Callout optional
 background и Numbered Marker badge остаются разными container semantics и
 используют solid colors. Text background хранит также padding и radius.
-Callout payload хранит target/label points, elbow route, stroke и circle
-markers вместо bubble/tail.
+Callout payload хранит target/label points, route, stroke и независимые markers;
+optional attachment/frame расширяют оболочку по ADR-087. Прежние elbow/circle
+payload сохраняют прежний вид вместо bubble/tail.
 Callout geometry accepts a DOM-free `CalloutGeometryContext.measureText` callback.
 The renderer's measured facade supplies cached rich-text metrics for scene projection,
 spatial hit tests, selection handles and rebasing commands. The cache includes content,
@@ -691,6 +759,17 @@ Document v7, renderer geometry, native IPC и persistence не меняются.
 
 ## Системная активация и отдельное окно настроек (ADR-070)
 
+ADR-083 добавляет вход из main editor: EditorShell принимает optional async
+`openSettings`, desktop использует существующий activation-settings-adapter.
+EditorSettingsPopover владеет только transient show/pending/error/focus;
+тема и язык используют прежние UiPreferences, отражения — EditorCommand.
+Новые IPC DTOs, native команды и поля документа не вводятся.
+
+`open_activation_settings` и вход истории `settings_open_history` исполняются
+как async IPC commands: синхронное
+создание WebView из UI-thread IPC на Windows блокирует WebView2. Существующий
+builder/singleton и ошибки сохраняются; задача освобождает UI event loop.
+
 `shortcuts::host::ShortcutService` хранит постоянные предпочтения в repository,
 а фактические регистрации, recorder lease, проверочные нажатия и portal session
 держит в памяти Rust. Восстановление запускается до обработки launch intent;
@@ -777,3 +856,34 @@ shared originals и images/textures других документов.
 active IDs и использует существующий preview/commit contract ADR-078. Preview
 явно подтверждает удаление старых снимков, но не меняет legacy auto-cleanup
 consent. Schema, IPC, storage policy и бинарный transport не меняются.
+
+## PNG export полного editor (ADR-083)
+
+`CanvasViewportHosts.exportPng` передаёт committed document в renderer, используя
+его decoded image resources, применённый crop и scale=1. Preview scale и transient
+слои не определяют output. Desktop action завершает edits перед запросом Save As.
+Native result-export service хранит выбранный путь за одноразовым ticket; frontend
+передаёт только ticket и raw PNG. Запись выполняется вне UI thread. После cancel,
+write или failure ticket удаляется; canonical destination не может быть внутри
+каталога библиотеки. JPEG/WebP и export settings пока не реализованы этим путём.
+
+PNG filename preferences (ADR-084): Rust export_filename владеет validation,
+local-clock formatting и SQLite key export.filename.v1. Generated DTO содержит
+pattern/defaultPattern/preview. General Settings хранит только transient draft;
+preview requests проверяют revision, Save атомарно обновляет единственное setting,
+Cancel не пишет. Editor и Quick получают suggested name при открытии диалога,
+поэтому сохранённый выбор действует сразу в обоих окнах без broadcast/cache.
+
+## Локаль native tray (ADR-088)
+
+Desktop сохраняет существующий UiPreferencesV1 под тем же ключом
+cute-screen.ui-preferences.v1 в SQLite settings. При первом подключении
+переносится browser preference или системная локаль WebView. Перед mount
+native preference восстанавливает browser storage. Main/Quick/Settings используют
+один shell store; Settings больше не держит независимый locale ref.
+Adapter сериализует записи, принимает native broadcast без обратной записи и
+не заменяет более новый локальный выбор ответом на предыдущий save. Ошибка
+сохранения видна в Settings; повторный выбор языка повторяет попытку.
+Tray creation и shortcut refresh берут locale из native repository и используют
+общие переводы всех восьми пунктов. Горячие клавиши и capability enabled flags
+не зависят от перевода. macOS Settings menu item использует ту же локаль.

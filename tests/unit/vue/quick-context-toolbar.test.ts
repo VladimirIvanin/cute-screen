@@ -77,8 +77,8 @@ describe('Quick Capture context toolbar', () => {
     const { view, session } = renderDocument(false)
     await fireEvent.click(screen.getByRole('button', { name: 'Select' }))
     const before = session.snapshot.core.document
-    await fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
-    await fireEvent.click(screen.getByRole('menuitem', { name: `Flip ${axis}` }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    await fireEvent.click(screen.getByRole('button', { name: `Flip ${axis}` }))
     const flipped = session.snapshot.core.document
     expect(flipped.layers).not.toEqual(before.layers)
     await fireEvent.click(screen.getByRole('button', { name: 'Undo' }))

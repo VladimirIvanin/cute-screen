@@ -52,8 +52,8 @@ function createSchemas(context: WorkspaceBindingsContext) {
   const hasInteractiveDocument = computed(() => props.documentSession !== undefined || props.fixture === 'ready')
   const { tools } = createToolCatalog({
     quickMode: props.quickMode,
-    readOnlyDocument: props.readOnlyDocument,
-    contentImageBridgeAvailable: Boolean(props.contentImageBridge),
+    readOnlyDocument: computed(() => props.readOnlyDocument),
+    contentImageBridgeAvailable: computed(() => Boolean(props.contentImageBridge)),
     contentImageImporting: workspace.contentImageImporting,
     hasInteractiveDocument,
     hasCanvas: computed(() => Boolean(workspace.activeDocument.value)),
@@ -405,6 +405,7 @@ function createControllers(
     if (workspace.canvasViewport.value) workspace.canvasViewport.value.finishTextEditing(continuation)
     else continuation()
   }
+  let requestContentImageImport = (): void => undefined
   const toolUi = createToolUiController({
     finishTextEditing,
     props,
@@ -423,6 +424,7 @@ function createControllers(
     onContextChange: (id, value) => id === 'markerSample' ? toolUi.startEyedropper(value) : effects.contextEffects.onContextChange(id, value),
     translate,
     saveDrawingPreferences: context.saveDrawingPreferences,
+    requestContentImageImport: () => requestContentImageImport(),
   })
   const layers = createLayerController({
     finishTextEditing,
@@ -457,6 +459,10 @@ function createControllers(
   })
   const content = createContentController({
     error: workspace.toolError,
+    feedback: workspace.imageFeedback,
+    locale: () => store.locale,
+    target: () => workspace.canvasViewport.value?.imageInsertionTarget(),
+    focus: () => workspace.canvasViewport.value?.focusCanvas(),
     props,
     activeDocument: workspace.activeDocument,
     contentImageImporting: workspace.contentImageImporting,
@@ -466,6 +472,10 @@ function createControllers(
     addLayer: layers.addLayer,
     rememberTextDefaults: context.rememberTextDefaults,
   })
+  requestContentImageImport = () => {
+    void content.importContentImage()
+  }
+
   return { actions, toolUi, layers, content }
 }
 

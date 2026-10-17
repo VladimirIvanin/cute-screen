@@ -31,6 +31,7 @@ import {
 } from './m08-precision-test-kit'
 import {
   createDrawingLayer,
+  createCalloutLayer,
   type EditorDocumentV1,
   type LayerNode,
 } from '@cute-screen/editor-renderer'
@@ -94,6 +95,17 @@ async function draw(
   })
 }
 describe('consistent tool UX through the mounted shell', () => {
+  it('targets callout context actions in Quick full-frame coordinates with a non-origin crop', async () => {
+    const callout = createCalloutLayer({ id: '019c1f62-058e-7000-8000-000000000099',
+      target: { x: 40, y: 50 }, label: { x: 80, y: 30 }, text: 'Label' }, {})!
+    const app = mount({ ...arrowDocument(), crop: { x: 20, y: 10, width: 70, height: 70 }, layers: [callout] }, true)
+    app.store.selectTool('select')
+    app.store.selectLayer(callout.id)
+    await nextTick()
+    await fireEvent.contextMenu(app.scene, { clientX: 48, clientY: 40 })
+    expect(screen.getByRole('menuitem', { name: 'Add step' })).toBeEnabled()
+    app.close()
+  })
   it('uses common properties for an arrow and pencil regardless of their order', async () => {
     const arrow = arrowDocument().layers[0]!
     const pencil = createDrawingLayer({
@@ -406,7 +418,7 @@ describe('consistent tool UX through the mounted shell', () => {
     app.store.selectLayer(first.id)
     app.store.selectLayer(app.session.snapshot.core.document.layers[1]!.id, true)
     const spy = vi.spyOn(app.session, 'execute')
-    await fireEvent.contextMenu(app.scene, { clientX: 40, clientY: 20 })
+    await fireEvent.contextMenu(app.scene, { clientX: 48, clientY: 16 })
     expect(app.store.selectedLayerIds).toHaveLength(2)
     await fireEvent.click(screen.getByRole('menuitem', { name: 'Duplicate' }))
     expect(app.session.snapshot.core.document.layers).toHaveLength(4)
@@ -421,7 +433,7 @@ describe('consistent tool UX through the mounted shell', () => {
     const app = mount(arrowDocument())
     app.store.selectTool('select')
     app.store.selectLayer(app.session.snapshot.core.document.layers[0]!.id)
-    await fireEvent.contextMenu(app.scene, { clientX: 40, clientY: 20 })
+    await fireEvent.contextMenu(app.scene, { clientX: 48, clientY: 16 })
     const forward = screen.getByRole('menuitem', { name: 'Bring forward' })
     expect(forward).toBeDisabled()
     expect(forward).toHaveAttribute('title', 'Already at the edge of the layer stack')
@@ -471,7 +483,7 @@ describe('consistent tool UX through the mounted shell', () => {
       payload: { content: { text: 'Hello 😀', spans: [{ fontSize: 32 }] } },
     })
     await fireEvent.contextMenu(rail.getByRole('button', { name: 'Callout' }))
-    expect(fontSize()).toHaveTextContent('24')
+    expect(app.view.container.querySelector('.cs-tool-configure-popover-host .cs-callout-toolbar')?.textContent).toContain('24')
     await fireEvent.contextMenu(rail.getByRole('button', { name: 'Numbered marker' }))
     expect(fontSize()).toHaveTextContent('16')
     await fireEvent.contextMenu(rail.getByRole('button', { name: 'Text' }))

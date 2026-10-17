@@ -29,12 +29,12 @@ function capNodeCommon(layer: LayerNode) {
   }
 }
 
-function arrowCapNodes(
+export function arrowCapNodes(
   layer: LayerNode,
   id: string,
   point: { readonly x: number; readonly y: number },
   angle: number,
-  cap: ArrowCap,
+  cap: ArrowCap | 'ring',
   style: ReturnType<typeof stroke>,
   bodyJoin?: { readonly x: number; readonly y: number },
   renderedSize?: number,
@@ -44,6 +44,7 @@ function arrowCapNodes(
     x: layer.transform.translateX + point.x,
     y: layer.transform.translateY + point.y,
   }
+  if (cap === 'circle' || cap === 'ring') return roundCapNodes(layer, id, anchor, cap, style, renderedSize)
   const size = renderedSize ?? arrowCapSize(cap, style.width)
   const behind =
     bodyJoin && (cap === 'solidArrow' || cap === 'triangle')
@@ -70,23 +71,6 @@ function arrowCapNodes(
   const right = {
     x: behind.x - perpendicular.x * size * 0.55,
     y: behind.y - perpendicular.y * size * 0.55,
-  }
-  if (cap === 'circle') {
-    return [
-      {
-        ...capNodeCommon(layer),
-        kind: 'ellipse' as const,
-        id,
-        centerX: anchor.x,
-        centerY: anchor.y,
-        radiusX: style.width,
-        radiusY: style.width,
-        fill: style.color,
-        stroke: style.color,
-        strokeWidth: Math.max(1, style.width / 2),
-        lineJoin: style.join,
-      },
-    ]
   }
   if (cap === 'solidArrow' || cap === 'triangle') {
     return [
@@ -179,4 +163,30 @@ export function arrowNodes(layer: ArrowLayer): readonly RenderNode[] {
       arrow.endCap === 'solidArrow' || arrow.endCap === 'triangle' ? capSizes.end : undefined,
     ),
   ]
+}
+
+function roundCapNodes(
+  layer: LayerNode,
+  id: string,
+  anchor: { x: number; y: number },
+  cap: 'circle' | 'ring',
+  style: ReturnType<typeof stroke>,
+  renderedSize?: number,
+): readonly RenderNode[] {
+  return [
+    {
+      ...capNodeCommon(layer),
+      kind: 'ellipse' as const,
+      id,
+      centerX: anchor.x,
+      centerY: anchor.y,
+      radiusX: renderedSize === undefined ? style.width : renderedSize / 2,
+      radiusY: renderedSize === undefined ? style.width : renderedSize / 2,
+      fill: cap === 'ring' ? TRANSPARENT : style.color,
+      stroke: style.color,
+      strokeWidth: renderedSize !== undefined && cap === 'circle' ? 0 : Math.max(1, style.width / 2),
+      lineJoin: style.join,
+    },
+  ]
+
 }

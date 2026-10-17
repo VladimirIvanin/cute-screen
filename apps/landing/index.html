@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Снимайте экран, добавляйте стрелки, пояснения и скрывайте данные. Cute Screen — локальный редактор скриншотов с открытым кодом."
+    />
+    <meta name="theme-color" content="#191a1e" />
+    <link rel="icon" href="assets/logo.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="assets/site.css" />
+    <link rel="alternate" hreflang="ru" href="https://vladimirivanin.github.io/cute-screen/" />
+    <link rel="alternate" hreflang="en" href="https://vladimirivanin.github.io/cute-screen/en/" />
+    <title>Cute Screen — Объясняйте наглядно</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#features">К инструментам</a>
+    <header class="site-header container">
+      <a class="brand" href="./" aria-label="Cute Screen — главная"
+        ><img src="assets/logo.svg" width="36" height="36" alt="" /><span>Cute Screen</span></a
+      >
+      <nav aria-label="Основная навигация">
+        <a href="#features">Инструменты</a>
+        <a href="https://github.com/VladimirIvanin/cute-screen">GitHub <span aria-hidden="true">↗</span></a>
+        <a class="locale-switch" href="en/" lang="en" hreflang="en">EN</a>
+      </nav>
+    </header>
+    <main>
+      <section class="hero container" aria-labelledby="page-title">
+        <div class="hero-copy">
+          <div>
+            <h1 id="page-title">Объясняйте<br /><span>наглядно.</span></h1>
+            <p class="lede">Снять, отметить, сохранить. Всё локально.</p>
+          </div>
+          <div class="hero-action">
+            <a class="button" href="https://github.com/VladimirIvanin/cute-screen"
+              >Смотреть на GitHub<span aria-hidden="true">↗</span></a
+            >
+            <p>Открытый код.</p>
+          </div>
+        </div>
+        <figure class="demo">
+          <div
+            class="demo-frame"
+            role="region"
+            tabindex="0"
+            aria-label="Снимок с пояснениями; при необходимости прокрутите по горизонтали"
+          >
+            <img
+              class="hero-screenshot"
+              src="assets/hero-admin.png"
+              width="1919"
+              height="943"
+              fetchpriority="high"
+              alt="Снимок вымышленной тёмной админки с пояснениями: номера, стрелка к кнопке нового проекта, рамки вокруг элементов, измерение ширины и увеличенный фрагмент команды."
+            />
+          </div>
+          <figcaption class="demo-caption">
+            <span class="demo-hint">Листайте снимок, чтобы увидеть все детали →</span>
+          </figcaption>
+        </figure>
+        <div class="toolbar-block">
+          <div
+            class="toolbar-scroll"
+            tabindex="0"
+            role="region"
+            aria-label="Настоящая панель инструментов; прокрутка по горизонтали"
+          >
+            <div class="toolbar-cutout">
+              <img
+                src="assets/toolrail.png"
+                width="595"
+                height="46"
+                alt="Настоящая нижняя панель инструментов Cute Screen: выделение, рука, обрезка, стрелки, фигуры, карандаш, выделитель, текст, номера, выноски, изображения, пипетка, скрытие данных, фонарь, линейка и лупа."
+              />
+            </div>
+          </div>
+          <p class="toolbar-caption">Всё нужное — в одной строке.</p>
+        </div>
+      </section>
+      <section id="features" class="features container" aria-labelledby="features-title">
+        <div class="section-heading">
+          <p class="eyebrow">ИНСТРУМЕНТЫ</p>
+          <h2 id="features-title">Покажите, что вы имеете в виду.</h2>
+          <p>От короткой пометки до подробной инструкции — прямо на снимке.</p>
+        </div>
+        <div class="tools-grid">
+          <article class="tool" data-tool="arrow">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="assets/icons/arrow.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Стрелки</h3>
+              <p>Укажите на нужную кнопку или свяжите части снимка прямой, дугой или ломаной.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="shape">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="assets/icons/shape.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Фигуры</h3>
+              <p>Обведите важный блок. Настройте форму, заливку и обводку.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="pencil">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="assets/icons/pencil.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Карандаш</h3>
+              <p>Обведите от руки, сделайте набросок или проведите ровную линию с Shift.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="marker">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="assets/icons/marker.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Выделитель</h3>
+              <p>Подсветите ключевые слова, сохранив текст читаемым.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="text">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="assets/icons/text.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Текст</h3>
+              <p>Добавьте пояснение. Выберите шрифт, размер, цвет и фон подписи.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="numberedMarker">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="assets/icons/numberedMarker.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Нумерация</h3>
+              <p>Разложите инструкцию на шаги. Номера продолжаются автоматически.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="callout">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="assets/icons/callout.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Выноска</h3>
+              <p>Соедините деталь с пояснением, расположенным рядом со снимком.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="privacy">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="assets/icons/privacy.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Скрытие данных</h3>
+              <p>Закройте выбранную область мозаикой, размытием или сплошной заливкой.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="spotlight">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="assets/icons/spotlight.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Фонарь</h3>
+              <p>Оставьте нужную область светлой, приглушив остальную часть снимка.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="loupe">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="assets/icons/loupe.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Лупа</h3>
+              <p>Увеличьте небольшой фрагмент, чтобы детали были видны с первого взгляда.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="ruler">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="assets/icons/ruler.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Линейка</h3>
+              <p>Покажите расстояние в пикселях или процентах и направление измерения.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="eyedropper">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="assets/icons/eyedropper.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Пипетка</h3>
+              <p>Возьмите цвет со снимка и используйте его в аннотациях.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="crop">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="assets/icons/crop.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Обрезка</h3>
+              <p>Оставьте в кадре только то, что относится к делу.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="image">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="assets/icons/image.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Изображения</h3>
+              <p>Добавьте ещё одну картинку и соберите несколько фрагментов в одну композицию.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="select">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="assets/icons/select.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Выделение</h3>
+              <p>Перемещайте объекты и меняйте их параметры после создания.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="hand">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="assets/icons/hand.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Рука</h3>
+              <p>Перемещайтесь по холсту, не сдвигая аннотации.</p>
+            </div>
+          </article>
+        </div>
+      </section>
+      <section class="local-note container" aria-label="Приватность">
+        <img class="tool-icon" src="assets/icons/check.svg" width="24" height="24" alt="" />
+        <p>Снимки остаются на вашем устройстве.<span>Без аккаунта и облачной обработки.</span></p>
+      </section>
+    </main>
+    <footer class="site-footer container">
+      <span>Снято. Понятно. Готово.</span>
+      <div><a href="https://github.com/VladimirIvanin/cute-screen">GitHub ↗</a><span>MIT License</span></div>
+    </footer>
+  </body>
+</html>

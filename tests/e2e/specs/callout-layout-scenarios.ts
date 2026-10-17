@@ -56,7 +56,7 @@ export async function exerciseCalloutLayout(artifacts: string): Promise<void> {
     await browser.keys('Текст выноски')
     const short = await editorRect()
     expect(short.width / short.scale).toBeGreaterThan(24)
-    expect(left ? short.left + short.width : short.left).toBeCloseTo(points.end.x + (left ? -11 : 11) * short.scale, 0)
+    expect(left ? short.left + short.width : short.left).toBeCloseTo(points.end.x + (left ? -8 : 8) * short.scale, 0)
     await browser.keys(' длинная подпись '.repeat(12))
     const long = await editorRect()
     expect(long.width / long.scale).toBeCloseTo(480, 0)
@@ -104,7 +104,7 @@ export async function exerciseCalloutLayout(artifacts: string): Promise<void> {
       const r = document.querySelector<HTMLElement>('.cs-canvas:not(.cs-canvas-overlay)')!.getBoundingClientRect()
       return { left: r.left, top: r.top, scale: r.width / 2560 }
     })
-    const x = scene.left + (handle.x + (left ? -731 : 731)) * scene.scale
+    const x = scene.left + (handle.x + (left ? -736 : 736)) * scene.scale
     const y = scene.top + handle.y * scene.scale
     await browser.action('pointer').move({ origin: 'viewport', x: Math.round(x), y: Math.round(y) }).down({ button: 'left' })
       .move({ origin: 'viewport', x: Math.round(x + (left ? 100 : -100)), y: Math.round(y), duration: 150 })

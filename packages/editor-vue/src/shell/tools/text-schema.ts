@@ -1,5 +1,7 @@
 import {
   numberedMarkerCaption,
+  calloutBackground,
+  createCalloutLayer,
   measureRichTextContent,
 } from '@cute-screen/editor-renderer'
 import { TEXT_FONT_FAMILIES } from '../../text-fonts'
@@ -99,7 +101,7 @@ function backgroundFor(
   selected: TextLayer | undefined,
 ) {
   if (selected?.kind === 'text' || selected?.kind === 'callout') {
-    return selected.payload.background
+    return selected.kind === 'callout' ? calloutBackground(selected.payload) : selected.payload.background
   }
   if (selected?.kind === 'numberedMarker') {
     return { color: selected.payload.badge.color, padding: 0, radius: 0 }
@@ -278,6 +280,14 @@ function buildTextContextSchema(
     icon: kind,
     title: titleFor(context, kind),
     hint: context.translate('canvasViewport'),
+    disabled: context.props.readOnlyDocument || Boolean(selected?.locked),
+    ...(kind === 'callout' ? { callout: selected?.kind === 'callout' ? selected.payload : createCalloutLayer({
+      id: '__callout-defaults__', text: 'Label', target: { x: 0, y: 0 }, label: { x: 120, y: 60 },
+      ...(context.textDefaults.value.calloutStyle === undefined ? {}
+        : { style: context.textDefaults.value.calloutStyle }),
+      background: context.textDefaults.value.background,
+      ...(context.calloutStroke ? { stroke: context.calloutStroke.value } : {}),
+    }, {})!.payload } : {}),
     controls: kind === 'callout' ? calloutControls(context, selected) : [],
     text: textToolbar(context, selected, kind),
   }

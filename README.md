@@ -70,3 +70,19 @@ editor-core <- editor-renderer <- editor-vue <- desktop shell
 ## CI status
 
 GitHub Actions validates Linux x64 runtime behavior and compile-checks Linux ARM64, Windows x64/ARM64, and macOS Intel/Apple Silicon. Successful compilation is not a platform-support claim; runtime support remains `planned` until the later capture and platform milestones provide real evidence.
+
+## Landing page
+
+The static landing page lives in `apps/landing`. Run `pnpm dev:landing` to preview it locally and
+`pnpm build:landing` to prepare the GitHub Pages artifact. After the first merge, open the repository
+**Settings → Pages**, select **GitHub Actions** as the publishing source, then run the **Deploy landing
+page** workflow or push a landing change to `main`. The default address is
+`https://VladimirIvanin.github.io/cute-screen/`.
+
+`pnpm test:e2e:landing` builds and checks the production preview on port 5176,
+including both languages at exact viewport widths of 375, 768, 1024 and 1440 px.
+The tool icons are static exports of the app's `UiIcon`; run `pnpm icons:landing`
+after updating their source. The supplied tool rail screenshot is preserved at
+595×46 px and clipped to its rounded boundary with CSS. The annotated admin
+screenshot in the hero is supplied by the user; it is hidden at widths up to
+760 px while the tool rail and feature descriptions remain visible.

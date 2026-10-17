@@ -12,6 +12,11 @@ import {
 } from './settings/labels'
 import { useSettings } from './settings/use-settings'
 import { useSettingsRuntime } from './settings/use-settings-runtime'
+import { uiPreferencesSyncError } from './platform/tauri/ui-preferences-adapter'
+import {
+  createBrowserPreferencesStorage,
+  useEditorShellStore,
+} from '@cute-screen/editor-vue'
 import GeneralSettings from './settings/GeneralSettings.vue'
 import HistorySettings from './history/HistorySettings.vue'
 import { listenHistorySettings } from './platform/tauri/history-adapter'
@@ -28,7 +33,13 @@ const scrollPanel = ref<HTMLElement>()
 const bridge = props.bridge ?? activationSettingsBridge
 const state = useSettings(bridge)
 const { snapshot, startup, error, busy, loading, errorAction } = state
-const locale = ref<SettingsLocale>(navigator.language.startsWith('ru') ? 'ru' : 'en')
+const shellStore = useEditorShellStore()
+shellStore.initialize({
+  languages: navigator.languages,
+  preferences: createBrowserPreferencesStorage(window.localStorage, navigator.languages),
+  systemDark: () => window.matchMedia('(prefers-color-scheme: dark)').matches,
+})
+const locale = computed<SettingsLocale>(() => shellStore.locale)
 const labels = computed(() => strings[locale.value])
 const query = new URLSearchParams(window.location.search)
 const firstRun = props.firstRun === true || query.get('firstRun') === '1'
@@ -133,6 +144,16 @@ useSettingsRuntime(bridge, state, cancelEditing)
     </aside>
     <div class="cs-settings-content">
       <div ref="scrollPanel" class="cs-settings-scroll">
+        <p
+          v-if="uiPreferencesSyncError"
+          role="alert"
+          class="cs-settings-error"
+        >
+          {{ locale === 'ru'
+            ? 'Не удалось сохранить настройки интерфейса. Выберите язык ещё раз.'
+            : 'Could not save interface preferences. Select the language again.' }}
+          {{ uiPreferencesSyncError }}
+        </p>
         <p v-if="loading" role="status">{{ labels.loading }}</p>
         <div
           v-if="(error && !errorAction) || snapshot?.error"
@@ -158,7 +179,7 @@ useSettingsRuntime(bridge, state, cancelEditing)
             :locale="locale"
             :labels="labels"
             :state="state"
-            @locale="locale = $event"
+            @locale="shellStore.setLocale($event)"
             @startup="confirmStartup"
             @system="startupSystem"
           />

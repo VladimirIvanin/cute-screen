@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Capture, annotate and conceal details with Cute Screen. A local screenshot editor with arrows, text, numbered steps and more."
+    />
+    <meta name="theme-color" content="#191a1e" />
+    <link rel="icon" href="../assets/logo.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../assets/site.css" />
+    <link rel="alternate" hreflang="ru" href="https://vladimirivanin.github.io/cute-screen/" />
+    <link rel="alternate" hreflang="en" href="https://vladimirivanin.github.io/cute-screen/en/" />
+    <title>Cute Screen — Explain it visually</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#features">Skip to tools</a>
+    <header class="site-header container">
+      <a class="brand" href="../" aria-label="Cute Screen — home"
+        ><img src="../assets/logo.svg" width="36" height="36" alt="" /><span>Cute Screen</span></a
+      >
+      <nav aria-label="Primary navigation">
+        <a href="#features">Tools</a>
+        <a href="https://github.com/VladimirIvanin/cute-screen">GitHub <span aria-hidden="true">↗</span></a>
+        <a class="locale-switch" href="../" lang="ru" hreflang="ru">RU</a>
+      </nav>
+    </header>
+    <main>
+      <section class="hero container" aria-labelledby="page-title">
+        <div class="hero-copy">
+          <div>
+            <h1 id="page-title">Explain it<br /><span>visually.</span></h1>
+            <p class="lede">Capture, annotate, save. Everything stays local.</p>
+          </div>
+          <div class="hero-action">
+            <a class="button" href="https://github.com/VladimirIvanin/cute-screen"
+              >View on GitHub<span aria-hidden="true">↗</span></a
+            >
+            <p>Open source.</p>
+          </div>
+        </div>
+        <figure class="demo">
+          <div
+            class="demo-frame"
+            role="region"
+            tabindex="0"
+            aria-label="Annotated screenshot; scroll horizontally to inspect the details"
+          >
+            <img
+              class="hero-screenshot"
+              src="../assets/hero-admin.png"
+              width="1919"
+              height="943"
+              fetchpriority="high"
+              alt="Annotated screenshot of a fictional dark project dashboard: numbered markers, an arrow to the new project button, frames around controls, a width measurement, and a magnified team detail."
+            />
+          </div>
+          <figcaption class="demo-caption">
+            <span class="demo-hint">Scroll to see every detail →</span>
+          </figcaption>
+        </figure>
+        <div class="toolbar-block">
+          <div class="toolbar-scroll" tabindex="0" role="region" aria-label="Actual tool rail; scroll horizontally">
+            <div class="toolbar-cutout">
+              <img
+                src="../assets/toolrail.png"
+                width="595"
+                height="46"
+                alt="The real Cute Screen bottom tool rail: selection, hand, crop, arrows, shapes, pencil, highlighter, text, numbers, callouts, images, eyedropper, concealment, spotlight, ruler and loupe."
+              />
+            </div>
+          </div>
+          <p class="toolbar-caption">Everything you need, in a single row.</p>
+        </div>
+      </section>
+      <section id="features" class="features container" aria-labelledby="features-title">
+        <div class="section-heading">
+          <p class="eyebrow">THE TOOLKIT</p>
+          <h2 id="features-title">Show what you mean.</h2>
+          <p>From a quick note to a step-by-step guide, right on your screenshot.</p>
+        </div>
+        <div class="tools-grid">
+          <article class="tool" data-tool="arrow">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="../assets/icons/arrow.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Arrows</h3>
+              <p>Point to a button or connect details with straight, curved or elbow arrows.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="shape">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="../assets/icons/shape.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Shapes</h3>
+              <p>Frame an important detail. Adjust its shape, fill and outline.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="pencil">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="../assets/icons/pencil.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Pencil</h3>
+              <p>Circle a detail, sketch freely or hold Shift for a straight segment.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="marker">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="../assets/icons/marker.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Highlighter</h3>
+              <p>Highlight key words while keeping the text readable.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="text">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="../assets/icons/text.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Text</h3>
+              <p>Add a caption. Choose its font, size, colour and background.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="numberedMarker">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="../assets/icons/numberedMarker.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Numbered steps</h3>
+              <p>Turn an explanation into a sequence with automatic numbering.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="callout">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="../assets/icons/callout.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Callouts</h3>
+              <p>Connect a detail to a caption placed beside it.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="privacy">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="../assets/icons/privacy.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Conceal data</h3>
+              <p>Cover a selected area with pixelation, blur or a solid fill.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="spotlight">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="../assets/icons/spotlight.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Spotlight</h3>
+              <p>Keep one area in focus by dimming the rest of the screenshot.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="loupe">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="../assets/icons/loupe.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Loupe</h3>
+              <p>Magnify a small area so its details are easy to see.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="ruler">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="../assets/icons/ruler.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Ruler</h3>
+              <p>Show a distance in pixels or percentages and its direction.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="eyedropper">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="../assets/icons/eyedropper.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Eyedropper</h3>
+              <p>Pick a colour from the screenshot for your annotations.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="crop">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="../assets/icons/crop.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Crop</h3>
+              <p>Keep only the part of the image that matters.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="image">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="../assets/icons/image.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Images</h3>
+              <p>Bring another image in and combine several pieces in one composition.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="select">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="../assets/icons/select.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Selection</h3>
+              <p>Move objects and adjust their properties after placing them.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="hand">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="../assets/icons/hand.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Hand</h3>
+              <p>Move around the canvas while your annotations stay in place.</p>
+            </div>
+          </article>
+        </div>
+      </section>
+      <section class="local-note container" aria-label="Privacy">
+        <img class="tool-icon" src="../assets/icons/check.svg" width="24" height="24" alt="" />
+        <p>Your screenshots stay on your device.<span>No account or cloud processing.</span></p>
+      </section>
+    </main>
+    <footer class="site-footer container">
+      <span>Captured. Explained. Done.</span>
+      <div><a href="https://github.com/VladimirIvanin/cute-screen">GitHub ↗</a><span>MIT License</span></div>
+    </footer>
+  </body>
+</html>

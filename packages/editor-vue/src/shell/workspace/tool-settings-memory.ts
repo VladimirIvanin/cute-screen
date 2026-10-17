@@ -7,6 +7,11 @@ import {
 } from 'vue'
 import {
   parseToolSettingsPreferences,
+  DEFAULT_CALLOUT_STYLE,
+  calloutBackground,
+  calloutFrameBackground,
+  calloutStyleForPayload,
+  parseCalloutStyle,
   type JsonObject,
   type LayerNode,
   type LayerStyle,
@@ -33,7 +38,9 @@ export function useToolSettingsMemory(
   const standard = copy(workspace.textDefaults.value)
   const texts: Record<TextKind, TextToolDefaults> = {
     text: standard,
-    callout: copy(standard),
+    callout: { ...copy(standard), color: { red: 0.125, green: 0.125, blue: 0.125, alpha: 1 },
+      background: { color: DEFAULT_CALLOUT_STYLE.frame.fill, padding: 8, radius: 8 },
+      calloutStyle: copy(DEFAULT_CALLOUT_STYLE) },
     numberedMarker: {
       ...copy(standard),
       fontSize: 16,
@@ -102,7 +109,12 @@ export function useToolSettingsMemory(
     texts[layer.kind] = {
       ...base,
       ...patch,
-      ...(layer.kind === 'numberedMarker' ? { background: { color: layer.payload.badge.color, padding: 0, radius: 0 } } : {}),
+      ...(layer.kind === 'callout' ? {
+        background: calloutBackground(layer.payload),
+        calloutStyle: calloutStyleForPayload(layer.payload),
+      } : {}),
+      ...(layer.kind === 'numberedMarker' ? { background: { color: layer.payload.badge.color, padding: 0,
+        radius: 0 } } : {}),
       ...(paragraph ? { alignment: paragraph.alignment, listKind: paragraph.listKind } : {}),
     }
     if (kind.value === layer.kind) workspace.textDefaults.value = copy(texts[layer.kind])
@@ -126,6 +138,14 @@ function useMemoryPersistence(
       const preferences = loadToolSettings(storage)
       for (const tool of ['text', 'callout', 'numberedMarker'] as const)
         texts[tool] = checked(texts[tool], preferences.settings[tool])
+      if (preferences.settings.callout
+        && !('calloutStyle' in preferences.settings.callout)) texts.callout = { ...texts.callout, calloutStyle: null, background: (preferences.settings.callout.background ?? null) as TextToolDefaults['background'] }
+      const storedCallout = preferences.settings.callout
+      if (storedCallout && 'calloutStyle' in storedCallout) {
+        const style = parseCalloutStyle(storedCallout.calloutStyle)
+        texts.callout = { ...texts.callout, calloutStyle: style,
+          ...(style ? { background: calloutFrameBackground(style.frame) } : {}) }
+      }
       workspace.textDefaults.value = copy(texts[kind.value])
       workspace.calloutStroke.value = checked(workspace.calloutStroke.value, preferences.settings.callout?.stroke)
       workspace.precisionDefaults.value = checked(workspace.precisionDefaults.value, preferences.settings.precision)

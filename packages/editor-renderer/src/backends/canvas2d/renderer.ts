@@ -156,6 +156,10 @@ export class Canvas2DRenderer implements Renderer {
   }
 
   async #blobBytes(canvas: Canvas2DLike): Promise<Uint8Array> {
+    if (canvas.convertToBlob) {
+      const blob = await canvas.convertToBlob({ type: 'image/png' })
+      return new Uint8Array(await blob.arrayBuffer())
+    }
     if (!canvas.toBlob) throw new Error('Canvas PNG encoding is unavailable')
     const blob = await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob!((value) => {

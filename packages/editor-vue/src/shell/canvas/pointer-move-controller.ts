@@ -3,6 +3,7 @@ import {
   updateRulerPointer,
 } from './ruler-modifiers'
 import {
+  SELECTION_DRAG_THRESHOLD_CSS,
   constrainRulerMove,
   moveStroke,
   rulerCanvasBounds,
@@ -190,6 +191,14 @@ function moveLayer(
   point: CanvasPoint,
   gesture: Extract<NonNullable<CanvasGesture>, { readonly kind: 'move' }>,
 ): void {
+  if (
+    gesture.startClient &&
+    !gesture.dragging &&
+    Math.hypot(
+      event.clientX - gesture.startClient.x,
+      event.clientY - gesture.startClient.y,
+    ) < SELECTION_DRAG_THRESHOLD_CSS
+  ) return
   const result = snapPoint(
     point,
     context.snapCandidates(gesture.id),
@@ -198,7 +207,7 @@ function moveLayer(
   )
   const document = context.props.document
   const delta = { x: result.x - gesture.start.x, y: result.y - gesture.start.y }
-  const selected = context.props.selectedLayerIds ?? [gesture.id]
+  const selected = gesture.nodeIds ?? context.props.selectedLayerIds ?? [gesture.id]
   const constrained = document
     ? constrainRulerMove(
         document.layers.filter((layer) => selected.includes(layer.id)),
@@ -211,6 +220,7 @@ function moveLayer(
   context.setGesture({
     ...gesture,
     current: { x: gesture.start.x + constrained.x, y: gesture.start.y + constrained.y },
+    dragging: true,
     guides: limited ? [] : result.guides,
     guidesVisible: event.altKey,
   })

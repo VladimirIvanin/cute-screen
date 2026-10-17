@@ -1,3 +1,4 @@
+import { DEFAULT_CALLOUT_STROKE } from '../canvas/workspace-state'
 import {
   ref,
   shallowRef,
@@ -78,7 +79,7 @@ export function createWorkspaceState() {
     drawingDefaults: ref<DrawingDefaults>(structuredClone(DEFAULT_DRAWING_DEFAULTS)),
     textDefaults: shallowRef<TextToolDefaults>({ ...DEFAULT_TEXT_TOOL }),
     calloutStroke: shallowRef<import('@cute-screen/editor-renderer').StrokeStyle>(
-      structuredClone(DEFAULT_DRAWING_DEFAULTS.arrow.stroke as import('@cute-screen/editor-renderer').StrokeStyle),
+      structuredClone(DEFAULT_CALLOUT_STROKE),
     ),
     textFormatting: shallowRef<TextFormattingPatch>(),
     textDraft: ref<TextDraft>(),
@@ -100,6 +101,8 @@ export function createWorkspaceState() {
     cropPreset: ref<CropPreset>('free'),
     precisionDefaults: shallowRef<PrecisionToolDefaults>(structuredClone(DEFAULT_PRECISION_TOOLS)),
     contentImageImporting: ref(false),
+    imageFeedback: ref<string>(),
+    imageDropActive: ref(false),
     drawingPreferences: shallowRef<DrawingToolPreferencesV2>(defaultDrawingToolPreferences()),
     samplingControl: ref<string>(),
     eyedropperFeedback: ref<string>(),

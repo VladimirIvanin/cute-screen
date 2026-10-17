@@ -1,4 +1,5 @@
 import {
+  IconArrowsMove,
   IconBlendMode,
   IconBold,
   IconItalic,
@@ -30,6 +31,7 @@ import {
   IconPlus,
   IconPointer2,
   IconRuler2,
+  IconSettings,
   IconSparkles,
   IconStack2,
   IconStrokeDynamic,
@@ -58,6 +60,7 @@ import {
 
 /** The only product-chrome mapping from stable semantics to Tabler or project geometry. */
 const icons = {
+  move: IconArrowsMove,
   blendMode: IconBlendMode,
   bold: IconBold,
   italic: IconItalic,
@@ -96,6 +99,7 @@ const icons = {
   redo: IconArrowForwardUp,
   ruler: IconRuler2,
   select: IconPointer2,
+  settings: IconSettings,
   shape: IconCircleSquare,
   spotlight: createCustomIcon('spotlight', spotlightGeometry),
   text: IconTypography,

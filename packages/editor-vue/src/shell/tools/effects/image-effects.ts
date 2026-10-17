@@ -56,7 +56,7 @@ function updatedImage(
     if (
       !Number.isFinite(width) ||
       width < 0 ||
-      width > 16
+      width > 32
     ) return undefined
     return {
       ...image,

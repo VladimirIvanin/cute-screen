@@ -1,0 +1,120 @@
+.cs-settings-popover {
+  box-sizing: border-box;
+  width: 304px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  color: var(--text);
+  box-shadow: var(--shadow-overlay);
+}
+
+.cs-settings-popover fieldset {
+  min-width: 0;
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+}
+
+.cs-settings-popover legend,
+.cs-settings-popover h3 {
+  margin: 0 0 6px;
+  padding: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.cs-settings-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.cs-settings-choices label {
+  position: relative;
+  flex: 1 1 auto;
+  cursor: pointer;
+}
+
+.cs-settings-choices input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.cs-settings-choices span {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+
+.cs-settings-choices label:hover span {
+  background: var(--surface-hover);
+}
+
+.cs-settings-choices input:checked + span {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.cs-settings-choices input:focus-visible + span {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.cs-settings-image-actions,
+.cs-settings-app-link {
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.cs-settings-app-link {
+  margin-top: 8px;
+}
+
+.cs-settings-popover .n-button {
+  display: flex;
+  width: 100%;
+  min-height: 32px;
+  height: auto;
+  justify-content: flex-start;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  text-align: left;
+}
+
+.cs-settings-popover .n-button:not(:disabled):hover {
+  background: var(--surface-hover);
+}
+
+.cs-settings-popover .n-button__content {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+
+.cs-settings-app-link p {
+  margin: 4px 8px 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.cs-settings-app-link .cs-settings-open-error {
+  color: var(--danger);
+}

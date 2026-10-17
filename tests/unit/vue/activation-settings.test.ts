@@ -11,12 +11,17 @@ import {
   vi,
 } from 'vitest'
 import SettingsApp from '../../../apps/desktop/src/SettingsApp.vue'
+import { createEditorShellPinia } from '@cute-screen/editor-vue'
 import { createSettingsHarnessBridge } from '../../../apps/desktop/src/settings/browser-harness'
 import { recordTrigger } from '../../../apps/desktop/src/settings/labels'
 
 function render(...args: Parameters<typeof renderComponent>) {
+  window.localStorage.clear()
   window.history.replaceState(null, '', '/?settings=shortcuts')
-  return renderComponent(...args)
+  return renderComponent(args[0], {
+    ...args[1],
+    global: { ...args[1]?.global, plugins: [createEditorShellPinia()] },
+  })
 }
 
 describe('activation settings production mount flow', () => {

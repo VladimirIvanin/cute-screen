@@ -30,7 +30,7 @@ export default defineConfig({
     host: '127.0.0.1',
     port: 5173,
     strictPort: true,
-    watch: {
+    watch: process.env.CUTE_SCREEN_E2E_DISABLE_WATCH === '1' ? null : {
       ignored: ['**/src-tauri/**'],
     },
   },

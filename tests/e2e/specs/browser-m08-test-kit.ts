@@ -1,3 +1,4 @@
+import { setEditorPreferences } from '../editor-settings'
 import {
   $,
   browser,
@@ -144,11 +145,7 @@ export async function openM08(
 }
 
 export async function setLocale(locale: 'en' | 'ru'): Promise<void> {
-  const current = await browser.execute(() => document.documentElement.lang)
-  if (current === locale) return
-  await $(`button[aria-label="${current === 'ru' ? 'Другие действия' : 'More actions'}"]`).click()
-  await $(`button=${locale === 'ru' ? 'RU' : 'EN'}`).click()
-  await browser.waitUntil(async () => (await browser.execute(() => document.documentElement.lang)) === locale)
+  await setEditorPreferences(locale)
 }
 
 export async function chooseOption(

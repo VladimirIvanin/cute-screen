@@ -3,6 +3,64 @@
   align-items: center;
   gap: 4px;
 }
+.cs-image-toolbar {
+  flex-wrap: wrap;
+  max-width: calc(100vw - 48px);
+}
+.cs-image-toolbar .cs-tool-settings-trigger {
+  flex: 0 0 auto;
+  max-width: none;
+  min-height: 34px;
+  font-size: 12px;
+}
+.cs-image-setting-value {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.cs-image-border-preview {
+  box-sizing: border-box;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  border: 2px solid;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px var(--border);
+}
+.cs-image-border-preview.is-mixed {
+  border-style: dashed;
+}
+.cs-image-border-preview.is-none {
+  border-color: var(--text-muted) !important;
+  background: linear-gradient(135deg, transparent 45%, var(--text-muted) 46% 54%, transparent 55%);
+}
+.cs-image-popover {
+  box-sizing: border-box;
+  display: grid;
+  gap: 12px;
+  width: 324px;
+  overscroll-behavior: contain;
+}
+.cs-image-popover .cs-simple-color-panel.is-embedded {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  overflow: visible;
+}
+.cs-image-popover .cs-simple-color-palette {
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.cs-image-popover .cs-simple-color-grid {
+  width: 100%;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+}
+.cs-image-popover .cs-simple-color-custom-area {
+  padding-left: 0;
+  border-left: 0;
+}
+.cs-image-popover > .cs-numeric-control {
+  margin-top: 0;
+}
 .cs-tool-settings-trigger {
   display: inline-flex;
   align-items: center;

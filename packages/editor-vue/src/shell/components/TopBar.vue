@@ -1,14 +1,11 @@
 <script setup lang="ts">
-import {
-  computed,
-  ref,
-} from 'vue'
+import { computed } from 'vue'
 import {
   NButton,
-  NPopover,
   NTooltip,
 } from 'naive-ui'
 import { UiIcon } from '../icon'
+import EditorSettingsPopover from './EditorSettingsPopover.vue'
 import brandUrl from '../assets/brand.svg?no-inline'
 import type {
   SupportedLocale,
@@ -28,9 +25,9 @@ const props = withDefaults(
     saveError?: string | undefined
     pending?: boolean
     captureAvailable?: boolean
-    captureWindowAvailable?: boolean
     captureUnavailableReason?: string | undefined
     openImageAvailable?: boolean
+    openSettings?: (() => Promise<void>) | undefined
     t: (key: Parameters<typeof import('../i18n').t>[1]) => string
   }>(),
   {
@@ -38,13 +35,13 @@ const props = withDefaults(
     saveError: undefined,
     pending: false,
     captureAvailable: true,
-    captureWindowAvailable: false,
     captureUnavailableReason: undefined,
     openImageAvailable: false,
+    openSettings: undefined,
   },
 )
 const emit = defineEmits<{
-  action: [name: 'capture' | 'captureWindow' | 'openImage' | 'copy' | 'export']
+  action: [name: 'capture' | 'openImage' | 'copy' | 'export']
   canvasAction: [name: 'flipHorizontal' | 'flipVertical']
   undo: []
   redo: []
@@ -53,21 +50,12 @@ const emit = defineEmits<{
   locale: [value: SupportedLocale]
   theme: [value: ThemePreference]
 }>()
-const menuOpen = ref(false)
 const disabled = computed(() => props.pending)
 const captureDisabled = computed(() => disabled.value || !props.captureAvailable)
 const captureTitle = computed(() =>
   props.captureAvailable ? props.t('capture') : (props.captureUnavailableReason ?? props.t('captureUnavailable')))
 const openImageTitle = computed(() =>
   props.openImageAvailable ? props.t('openImage') : props.t('openImageUnavailable'))
-function selectTheme(value: ThemePreference): void {
-  menuOpen.value = false
-  emit('theme', value)
-}
-function selectLocale(value: SupportedLocale): void {
-  menuOpen.value = false
-  emit('locale', value)
-}
 </script>
 
 <template>
@@ -103,21 +91,6 @@ function selectLocale(value: SupportedLocale): void {
           </NButton>
         </template>
         {{ t('undo') }}
-      </NTooltip>
-      <NTooltip v-if="captureWindowAvailable">
-        <template #trigger>
-          <NButton
-            secondary
-            class="cs-button cs-button-quiet"
-            :disabled="disabled"
-            :aria-label="t('captureWindow')"
-            :title="t('captureWindow')"
-            @click="emit('action', 'captureWindow')"
-          >
-            <UiIcon name="camera" /><span>{{ t('captureWindow') }}</span>
-          </NButton>
-        </template>
-        {{ t('captureWindow') }}
       </NTooltip>
       <NTooltip>
         <template #trigger>
@@ -213,66 +186,16 @@ function selectLocale(value: SupportedLocale): void {
         </template>
         {{ canCopyOrExport ? t('copy') : t('copyUnavailable') }}
       </NTooltip>
-      <NPopover
-        v-model:show="menuOpen"
-        trigger="click"
-        placement="bottom-end"
-        :show-arrow="false"
-        raw
-        to=".cs-overlay-root"
-      >
-        <template #trigger>
-          <NTooltip :disabled="menuOpen" :delay="400">
-            <template #trigger>
-              <NButton
-                quaternary
-                circle
-                class="cs-icon-button"
-                aria-haspopup="menu"
-                :aria-expanded="menuOpen"
-                :aria-label="t('moreActions')"
-              >
-                <UiIcon name="more" />
-              </NButton>
-            </template>
-            {{ t('moreActions') }}
-          </NTooltip>
-        </template>
-        <div class="cs-menu" role="menu">
-          <NButton
-            v-for="action in ['flipHorizontal', 'flipVertical'] as const"
-            :key="action"
-            role="menuitem"
-            text
-            :disabled="!canEditCanvas"
-            @click="menuOpen = false; emit('canvasAction', action)"
-          >
-            {{ t(action) }}
-          </NButton>
-          <p>{{ t('theme') }}</p>
-          <NButton
-            v-for="value in ['system', 'light', 'dark'] as const"
-            :key="value"
-            role="menuitemradio"
-            text
-            :aria-checked="theme === value"
-            @click="selectTheme(value)"
-          >
-            {{ t(value === 'system' ? 'systemTheme' : value === 'light' ? 'lightTheme' : 'darkTheme') }}
-          </NButton>
-          <p>{{ t('language') }}</p>
-          <NButton
-            v-for="value in ['ru', 'en'] as const"
-            :key="value"
-            role="menuitemradio"
-            text
-            :aria-checked="locale === value"
-            @click="selectLocale(value)"
-          >
-            {{ value.toUpperCase() }}
-          </NButton>
-        </div>
-      </NPopover>
+      <EditorSettingsPopover
+        :locale="locale"
+        :theme="theme"
+        :can-edit-canvas="canEditCanvas"
+        :open-settings="openSettings"
+        :t="t"
+        @canvas-action="emit('canvasAction', $event)"
+        @locale="emit('locale', $event)"
+        @theme="emit('theme', $event)"
+      />
       <NTooltip>
         <template #trigger>
           <NButton

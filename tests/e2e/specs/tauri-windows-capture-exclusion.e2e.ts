@@ -79,23 +79,48 @@ describe('Windows physical capture excludes the editor', () => {
         await writeFile(path.resolve('artifacts/tauri-e2e/windows-capture-exclusion-pixels.json'), JSON.stringify(evidence, null, 2))
         await browser.saveScreenshot(path.resolve(`artifacts/tauri-e2e/windows-capture-after-${attempt}.png`))
         for (const pixel of pixels) expect(pixel).toEqual([37, 71, 105, 255])
-        await browser.execute(() => {
-          document.querySelector<HTMLCanvasElement>('.cs-canvas:not(.cs-canvas-overlay)')?.focus()
-          window.addEventListener('keydown', (event) => {
-            document.documentElement.dataset.captureEscape = JSON.stringify({
-              key: event.key,
-              trusted: event.isTrusted,
-            })
-          }, { capture: true, once: true })
-        })
-        await browser.keys('Escape')
-        const escapeEvent = await browser.execute(() => document.documentElement.dataset.captureEscape)
-        expect(escapeEvent).toBe('{"key":"Escape","trusted":true}')
-        await writeFile(path.resolve('artifacts/tauri-e2e/windows-capture-escape.json'), JSON.stringify({ escapeEvent }))
-        await expect($('.cs-quick-capture.is-layout-ready')).not.toExist()
+        if (attempt === 2) {
+          await browser.action('pointer')
+            .move({ x: 180, y: 160 }).down()
+            .move({ x: 1000, y: 660, duration: 250 }).up().perform()
+          await expect($('.cs-quick-actions button:first-child')).toBeEnabled()
+          await $('.cs-quick-actions button:first-child').click()
+        } else {
+          await browser.execute(() => {
+            document.querySelector<HTMLCanvasElement>('.cs-canvas:not(.cs-canvas-overlay)')?.focus()
+            window.addEventListener('keydown', (event) => {
+              document.documentElement.dataset.captureEscape = JSON.stringify({
+                key: event.key,
+                trusted: event.isTrusted,
+              })
+            }, { capture: true, once: true })
+          })
+          await browser.keys('Escape')
+          const escapeEvent = await browser.execute(() => document.documentElement.dataset.captureEscape)
+          expect(escapeEvent).toBe('{"key":"Escape","trusted":true}')
+          await writeFile(path.resolve('artifacts/tauri-e2e/windows-capture-escape.json'), JSON.stringify({ escapeEvent }))
+          await expect($('.cs-quick-capture.is-layout-ready')).not.toExist()
+        }
+        // Observe before switching: selecting main with WebDriver can show it
+        // and conceal a broken production hide/show lifecycle.
+        await browser.waitUntil(() => browser.execute(async () => {
+          const invoke = (window as typeof window & {
+            __TAURI__: { core: { invoke<T>(command: string, args: Record<string, unknown>): Promise<T> } }
+          }).__TAURI__.core.invoke
+          return await invoke<boolean>('plugin:window|is_visible', { label: 'main' }) &&
+            !(await invoke<boolean>('plugin:window|is_visible', { label: 'quick-capture' }))
+        }), { timeoutMsg: 'Capture completion did not restore main before driver window selection' })
         await browser.tauri.switchWindow('main')
         await expect($('button[aria-label="Capture"]')).toBeEnabled()
         await browser.execute(() => document.getElementById('capture-exclusion-marker')?.remove())
+        if (attempt === 2) {
+          const painted = await browser.execute(() => {
+            const canvas = document.querySelector<HTMLCanvasElement>('.cs-canvas:not(.cs-canvas-overlay)')!
+            return [...canvas.getContext('2d')!.getImageData(canvas.width / 2, canvas.height / 2, 1, 1).data]
+          })
+          expect(painted).toEqual([37, 71, 105, 255])
+          await browser.saveScreenshot(path.resolve('artifacts/tauri-e2e/windows-physical-editor-handoff.png'))
+        }
       }
     } finally {
       background.kill()

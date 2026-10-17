@@ -20,6 +20,49 @@ await mkdir(runtimeDirectory, { recursive: true })
 const embeddedWebDriverPort = Number.parseInt(process.env.TAURI_WEBDRIVER_PORT ?? '4445', 10)
 
 const scenarios = [
+  { id: 'callout-editing', persistenceGroup: 'callout-editing', spec: 'tests/e2e/specs/tauri-callout-editing.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },
+  { id: 'callout-editing-reopen', persistenceGroup: 'callout-editing', spec: 'tests/e2e/specs/tauri-callout-editing-reopen.e2e.ts', harnessQuery: '?m04=1&m08=1', driverProvider: 'external' },
+  { id: 'tray-locale', persistenceGroup: 'tray-locale', spec: 'tests/e2e/specs/tauri-tray-locale.e2e.ts', harnessQuery: '?m04=1' },
+  { id: 'tray-locale-reopen', persistenceGroup: 'tray-locale', spec: 'tests/e2e/specs/tauri-tray-locale-reopen.e2e.ts', harnessQuery: '?m04=1' },
+  {
+    id: 'selection-toolbar-chrome',
+    spec: 'tests/e2e/specs/tauri-selection-toolbar-chrome.e2e.ts',
+    harnessQuery: '?m04=1&m08=1',
+    fakeCapture: true,
+    driverProvider: 'external',
+  },
+  {
+    id: 'history-settings',
+    spec: 'tests/e2e/specs/tauri-history-settings.e2e.ts',
+    harnessQuery: '?m04=1',
+    driverProvider: 'external',
+  },
+  {
+    id: 'selection-interactions',
+    spec: 'tests/e2e/specs/tauri-selection-interactions.e2e.ts',
+    harnessQuery: '?m04=1&m08=1',
+    fakeCapture: true,
+    driverProvider: 'external',
+  },
+  {
+    id: 'export-filename-settings',
+    spec: 'tests/e2e/specs/tauri-export-filename-settings.e2e.ts',
+    harnessQuery: '?m04=1&m08=1',
+    driverProvider: 'external',
+  },
+  {
+    id: 'editor-settings',
+    spec: 'tests/e2e/specs/tauri-editor-settings.e2e.ts',
+    harnessQuery: '?m04=1',
+    fakeCapture: true,
+    driverProvider: 'external',
+  },
+  {
+    id: 'result-export',
+    spec: 'tests/e2e/specs/tauri-result-export.e2e.ts',
+    harnessQuery: '?m04=1&m08=1',
+    driverProvider: 'external',
+  },
   { id: 'history', persistenceGroup: 'history', spec: 'tests/e2e/specs/tauri-history.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true },
   { id: 'history-reopen', persistenceGroup: 'history', spec: 'tests/e2e/specs/tauri-history-reopen.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true },
   { id: 'history-delete', persistenceGroup: 'history', spec: 'tests/e2e/specs/tauri-history-delete.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true },
@@ -230,6 +273,27 @@ const scenarios = [
     id: 'm05-viewport',
     spec: 'tests/e2e/specs/tauri-m05-viewport.e2e.ts',
     harnessQuery: '?m05=1&m05viewport=1',
+  },
+  {
+    id: 'content-image-tool',
+    spec: 'tests/e2e/specs/tauri-content-image-tool.e2e.ts',
+    harnessQuery: '?m04=1&m08=1',
+    fakeCapture: true,
+    driverProvider: 'external',
+    persistenceGroup: 'image-ingress',
+  },
+  {
+    id: 'content-image-reopen',
+    spec: 'tests/e2e/specs/tauri-content-image-reopen.e2e.ts',
+    harnessQuery: '?m04=1&m08=1',
+    driverProvider: 'external',
+    persistenceGroup: 'image-ingress',
+  },
+  {
+    id: 'content-image-empty',
+    spec: 'tests/e2e/specs/tauri-content-image-empty.e2e.ts',
+    harnessQuery: '?m04=1&m08=1',
+    driverProvider: 'external',
   },
   {
     id: 'document-write',

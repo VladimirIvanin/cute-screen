@@ -145,7 +145,7 @@ export async function applyBackground(input: {
   await $('button[aria-label="Background"]').click()
   const panel = $('.cs-text-background-popover')
   await panel.$('button[aria-label="Custom colour"]').click()
-  await setNumericInput(panel.$('.cs-color-hex input'), input.color)
+  await setNumericInput(panel.$('input[aria-label="HEX colour code"]'), input.color)
   await browser.keys('Enter')
   const numbers = await panel.$$('input[role="spinbutton"]')
   if (await numbers[0]!.isEnabled()) await setNumericInput(numbers[0]!, String(input.padding))

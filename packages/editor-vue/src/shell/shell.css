@@ -13,3 +13,6 @@
 @import './styles/censor-toolbar.css';
 
 @import './styles/numbered-marker-toolbar.css';
+@import './styles/editor-settings.css';
+
+@import './styles/tools-callout.css';

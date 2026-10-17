@@ -50,7 +50,7 @@ describe('measured callout preview and decoded export', () => {
         lineAscent: m.fontBoundingBoxAscent, lineDescent: m.fontBoundingBoxDescent }
     })
     const context = { measureText }
-    const base = createCalloutLayer({ id: '019c1f62-058e-7000-8000-000000000097',
+    const base = createCalloutLayer({ style: null, id: '019c1f62-058e-7000-8000-000000000097',
       text: 'Текст выноски для интерфейса\nLongUnbrokenLabel1234567890',
       target: { x: left ? 650 : 80, y: 60 }, label: { x: left ? 380 : 400, y: 300 },
       background: { color: { red: 1, green: 0.9, blue: 0.6, alpha: 1 }, padding: 12, radius: 8 } })!

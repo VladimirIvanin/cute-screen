@@ -14,6 +14,7 @@ import type { KeyboardContext } from './keyboard-controller'
 import type { PointerDownContext } from './pointer-down-contracts'
 import type { PointerGeometryController } from './pointer-geometry-controller'
 import type { PointerMoveContext } from './pointer-move-controller'
+import type { NumberedMarkerPreview } from './numbered-marker-preview'
 import type { CanvasRendererController } from './renderer-controller'
 import type { TextEditorController } from './text-editor-controller'
 import type {
@@ -62,6 +63,19 @@ export interface WorkspaceInteractionPorts {
   readonly updateArrowToolbar: () => void
 }
 
+export function createPointerLeaveHandler(
+  markerPreview: Pick<NumberedMarkerPreview, 'clear'>,
+  eyedropper: EyedropperController,
+  invalidateOverlay: () => void,
+): () => void {
+  return () => {
+    markerPreview.clear()
+    eyedropper.cursor.value = undefined
+    eyedropper.hide()
+    invalidateOverlay()
+  }
+}
+
 export function createPointerDownContext(ports: WorkspaceInteractionPorts): PointerDownContext {
   const { state, pointerGeometry, eyedropper } = ports
   return {
@@ -85,16 +99,12 @@ export function createPointerDownContext(ports: WorkspaceInteractionPorts): Poin
     sampleScene: (point) => eyedropper.sample(point),
     visibleCanvasCenter: () => eyedropper.visibleCanvasCenter(),
     selectedLayer: ports.selectedLayer,
-    loupeSourceHandle: (layer, point) => pointerGeometry.loupeSourceHandle(layer, point),
-    calloutHandle: (layer, point) => pointerGeometry.calloutHandle(layer, point),
-    arrowHandle: (layer, point) => pointerGeometry.arrowHandle(layer, point),
-    intrinsicEndpoint: (layer, point) => pointerGeometry.intrinsicEndpoint(layer, point),
-    resizeHandle: (layer, point) => pointerGeometry.boundsResizeHandle(layer, point),
-    rotationCorner: (layer, point) => pointerGeometry.rotationCorner(layer, point),
+    resolveSelectionTarget: (point) => pointerGeometry.resolveSelectionTarget(point),
     resizeCursor: (handle) => pointerGeometry.resizeCursor(handle),
     setCursor: (cursor, rotate) => pointerGeometry.setCursor(cursor, rotate),
     layerBounds: ports.layerBounds,
     transformPoint: ports.transformPoint,
+    toLocal: ports.toLocal,
     startText: (input) => ports.textEditor.start(input),
     invalidateOverlay: ports.invalidateOverlay,
     renderCommittedScene: () => rendererCommitted(ports.renderer),

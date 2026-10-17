@@ -24,6 +24,28 @@ export class QuickCaptureLayoutController {
     this.#ports = ports
   }
 
+  selectionLayout(): string | undefined {
+    const scene = this.#ports.hosts.value?.scene
+    const bounds = scene?.getBoundingClientRect()
+    if (
+      !scene ||
+      !bounds ||
+      bounds.width <= 0 ||
+      bounds.height <= 0
+    ) return undefined
+    const source = this.#ports.session.value?.snapshot.core.document.canvas
+    if (source) {
+      const fit = Math.min(window.innerWidth / source.width, window.innerHeight / source.height)
+      const scale = Math.round(fit * 100) / 100
+      // ResizeObserver schedules Fit on the following frame. Stable viewport
+      // dimensions alone can still describe the previous window's fitted scene.
+      if (Math.abs(bounds.width - source.width * scale) > 1 ||
+        Math.abs(bounds.height - source.height * scale) > 1) return undefined
+    }
+    return [window.innerWidth, window.innerHeight, bounds.x, bounds.y, bounds.width, bounds.height,
+      scene.width, scene.height].join(':')
+  }
+
   update(crop: QuickRect = this.#ports.currentCrop.value): string | undefined {
     const { hosts, session } = this.#ports
     if (

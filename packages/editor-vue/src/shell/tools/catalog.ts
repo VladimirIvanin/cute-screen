@@ -162,8 +162,8 @@ const QUICK_TOOL_IDS = new Set([
 
 export interface ToolCatalogContext {
   readonly quickMode: boolean
-  readonly readOnlyDocument: boolean
-  readonly contentImageBridgeAvailable: boolean
+  readonly readOnlyDocument: Ref<boolean>
+  readonly contentImageBridgeAvailable: Ref<boolean>
   readonly contentImageImporting: Ref<boolean>
   readonly hasInteractiveDocument: ComputedRef<boolean>
   readonly hasCanvas: ComputedRef<boolean>
@@ -177,16 +177,16 @@ function disabled(
     return !context.hasInteractiveDocument.value
   }
   if (entry.availability === 'editable') {
-    return !context.hasInteractiveDocument.value || context.readOnlyDocument
+    return !context.hasInteractiveDocument.value || context.readOnlyDocument.value
   }
   if (entry.availability === 'canvas') return !context.hasCanvas.value
   if (entry.availability === 'editableCanvas') {
-    return !context.hasCanvas.value || context.readOnlyDocument
+    return !context.hasCanvas.value || context.readOnlyDocument.value
   }
   return (
     !context.hasInteractiveDocument.value ||
-    context.readOnlyDocument ||
-    !context.contentImageBridgeAvailable ||
+    context.readOnlyDocument.value ||
+    !context.contentImageBridgeAvailable.value ||
     context.contentImageImporting.value
   )
 }
@@ -213,6 +213,12 @@ function availabilityReason(
   context: ToolCatalogContext,
 ): ToolDescriptor['disabledReasonKey'] {
   if (entry.disabledReasonKey) return entry.disabledReasonKey
+  if (entry.availability === 'contentImage') {
+    if (!context.hasInteractiveDocument.value) return undefined
+    if (context.readOnlyDocument.value) return 'readOnlyDocument'
+    if (!context.contentImageBridgeAvailable.value) return 'imageImportUnavailable'
+    return undefined
+  }
   if (entry.availability !== 'editableCanvas') return undefined
   return !context.hasCanvas.value ? 'toolNeedsCanvas' : 'readOnlyDocument'
 }

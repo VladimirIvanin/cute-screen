@@ -100,7 +100,8 @@ pub fn image_release(
 }
 
 #[tauri::command]
-pub fn settings_open_history(app: tauri::AppHandle) -> CommandResult<()> {
+pub async fn settings_open_history(app: tauri::AppHandle) -> CommandResult<()> {
+    // WebView2 window construction deadlocks inside synchronous IPC on Windows.
     crate::settings_window::open_history(&app)?;
     if let Some(window) = app.get_webview_window("settings") {
         use tauri::Emitter;
@@ -109,4 +110,19 @@ pub fn settings_open_history(app: tauri::AppHandle) -> CommandResult<()> {
             .map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn storage_settings_ipc_returns_a_future() {
+        fn require_async<F, Fut>(_: F)
+        where
+            F: FnOnce(tauri::AppHandle) -> Fut,
+            Fut: std::future::Future<Output = crate::CommandResult<()>>,
+        {
+        }
+
+        require_async(super::settings_open_history);
+    }
 }

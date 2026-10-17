@@ -1,6 +1,4 @@
 import type {
-  ArrowHandleKind,
-  CalloutHandleKind,
   LayerNode,
 } from '@cute-screen/editor-renderer'
 import type { Ref } from 'vue'
@@ -45,12 +43,7 @@ export interface PointerDownContext {
   readonly sampleScene: (point: CanvasPoint) => void
   readonly visibleCanvasCenter: () => CanvasPoint | undefined
   readonly selectedLayer: () => LayerNode | undefined
-  readonly loupeSourceHandle: (layer: LayerNode, point: CanvasPoint) => boolean
-  readonly calloutHandle: (layer: LayerNode, point: CanvasPoint) => CalloutHandleKind | undefined
-  readonly arrowHandle: (layer: LayerNode, point: CanvasPoint) => ArrowHandleKind | undefined
-  readonly intrinsicEndpoint: (layer: LayerNode, point: CanvasPoint) => 'start' | 'end' | undefined
-  readonly resizeHandle: (layer: LayerNode, point: CanvasPoint) => ResizeHandle | undefined
-  readonly rotationCorner: (layer: LayerNode, point: CanvasPoint) => ResizeHandle | undefined
+  readonly resolveSelectionTarget: (point: CanvasPoint) => import('@cute-screen/editor-renderer').SelectionTarget
   readonly resizeCursor: (handle: ResizeHandle) => string
   readonly setCursor: (cursor: string, rotate?: boolean) => void
   readonly layerBounds: (layer: LayerNode) => {
@@ -60,6 +53,7 @@ export interface PointerDownContext {
     height: number
   }
   readonly transformPoint: (transform: LayerNode['transform'], point: CanvasPoint) => CanvasPoint
+  readonly toLocal: (layer: LayerNode, point: CanvasPoint) => CanvasPoint
   readonly startText: (input: TextEditorStartInput) => void
   readonly invalidateOverlay: () => void
   readonly renderCommittedScene: () => void

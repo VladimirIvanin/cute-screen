@@ -27,7 +27,7 @@ describe('Callout mixed font metrics', () => {
     await $('button[aria-label="Callout"]').click()
     await waitForStableCanvas()
     await browser.action('pointer').move({ origin: 'viewport', x: 900, y: 500 }).down({ button: 'left' })
-      .move({ origin: 'viewport', x: 700, y: 300, duration: 150 }).up({ button: 'left' }).perform()
+      .move({ origin: 'viewport', x: 700, y: 400, duration: 150 }).up({ button: 'left' }).perform()
     const editor = $('[aria-label="Callout editor"]')
     await expect(editor).toExist()
     await browser.keys('AA small text small text small text')
@@ -44,7 +44,7 @@ describe('Callout mixed font metrics', () => {
       return { center: r.top + r.height / 2, breaks: editor.querySelectorAll('[data-rich-text-soft-break]').length }
     })
     expect(dimensions.breaks).toBeGreaterThan(1)
-    expect(dimensions.center).toBeCloseTo(300, 0)
+    expect(dimensions.center).toBeCloseTo(400, 0)
     await editor.click()
     await browser.keys('Escape')
   })

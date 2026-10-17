@@ -19,6 +19,7 @@ import type {
 } from '../types'
 
 export interface TextToolDefaults {
+  readonly calloutStyle?: import('@cute-screen/editor-renderer').CalloutStyle | null
   readonly fontFamily: string
   readonly fontSize: number
   readonly weight: RichTextSpanStyle['weight']
@@ -51,6 +52,7 @@ export interface TextToolbarSnapshot {
 }
 
 export interface TextFormattingPatch {
+  readonly calloutInsertStep?: string
   readonly calloutWidth?: number | 'auto'
   readonly preview?: boolean
   readonly cancelPreview?: boolean
@@ -129,7 +131,7 @@ export type CanvasViewportEmits = {
   frameReady: [documentId: string]
   clearSelection: []
   selectLayer: [id: string, toggle: boolean]
-  moveLayer: [id: string, deltaX: number, deltaY: number]
+  moveLayer: [id: string, deltaX: number, deltaY: number, nodeIds?: readonly string[]]
   transformLayer: [id: string, transform: Transform2D]
   updateLayerPayload: [id: string, payload: JsonObject]
   addLayer: [layer: LayerNode, selectAfter?: boolean]
@@ -166,6 +168,9 @@ export type CanvasViewportEmit = <K extends keyof CanvasViewportEmits>(
 ) => void
 
 export interface CanvasViewportExpose {
+  imageInsertionTarget(point?: { readonly x: number; readonly y: number }): import('../../texture-fill').ImageInsertionTarget | undefined
+  startSelectionMove(event: PointerEvent): void
+  focusCanvas(): void
   editSelectedLabel(): void
   applyCropDraft(): void
   cancelCropDraft(): void

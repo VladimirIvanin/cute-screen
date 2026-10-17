@@ -59,6 +59,7 @@ export interface Canvas2DLike {
   height: number
   getContext(type: '2d'): Context2D | null
   toBlob?: (callback: BlobCallback, type?: string) => void
+  convertToBlob?: (options?: ImageEncodeOptions) => Promise<Blob>
   encode?: (format: 'png') => Promise<Uint8Array>
 }
 

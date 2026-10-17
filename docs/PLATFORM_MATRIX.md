@@ -1,5 +1,97 @@
 # Платформенная матрица
 
+## Диапазоны изображения (2026-10-18, ADR-089)
+
+Windows x64: mounted Vue 4K square/landscape — passed; свежая сборка и
+real WebView2 155.0.4283.45 `content-image-tool` — 1/1 passed. Проверены
+максимальное скругление и рамка 32 px в Quick/Editor, G, preview/commit,
+cancel и undo/redo, PNG повторно декодирован. Chrome 155.0.8059.80:
+1024/1600 × RU/EN × light/dark — все 8 сочетаний passed.
+Команды и артефакты — TESTING.md.
+Linux/WebKitGTK и macOS/WKWebView для расширенных диапазонов не проверены.
+
+## Управляемые выноски (2026-10-18, ADR-087)
+
+Shared core/renderer/Vue путь: schema v7 extensions без миграции старых выносок.
+Windows x64: red-first geometry/codec и decoded Canvas2D/CanvasKit appearance
+проверены. Browser RU/EN × light/dark × 1024 px × zoom 50/100/200 проверен
+отдельно от WebView2. Финальные команды, повторные прогоны и ограничения —
+TESTING.md. Windows WebView2 155.0.4283.45 / external tauri-driver 2.1.0:
+свежая изолированная сборка и оба native сценария passed. Проверены Quick с
+non-origin crop, trusted keyboard/ПКМ, Editor handoff и отдельный запуск с
+восстановлением manual route/card/defaults. Linux/WebKitGTK, Wayland и
+macOS/WKWebView runtime pending;
+платформенные capture/hotkey гарантии этим изменением не расширяются.
+
+## Вход в хранение из истории (2026-10-17)
+
+Windows 10 x64 / WebView2 155.0.4283.45, external tauri-driver 2.1.0:
+native `history-settings` — 1/1 passed. Async `settings_open_history`
+освобождает UI thread при создании окна. Проверены загрузка History Settings,
+singleton/navigation, закрытие и повторное открытие, main keyboard/focus.
+Screenshot и команды — TESTING.md. Linux/WebKitGTK и macOS/WKWebView pending;
+native capture, IPC DTOs и storage policy не меняются.
+
+## Изображение: настройки и gesture preview (2026-10-17, ADR-086)
+
+Общий Vue/Canvas2D путь сохраняет image в ordered scene во время жеста.
+Windows x64: Vue regressions, software 4K render/decoded PNG, Chrome 155
+(1024/1600 × RU/EN × light/dark) и настоящий WebView2 155.0.4283.45 прошли.
+Native G import, held gesture, commit/cancel, undo/redo и Copy проверены в Quick
+и Editor на закреплённом binary успешной сборки этого изменения. Native pixels
+используют блоки 8×8 / 2⁄255 для resampling; document и decoded export — exact.
+Последующая сборка всего дерева блокируется параллельными callout props;
+команды, evidence и ограничения подробно записаны в TESTING.md. Linux/WebKitGTK,
+Wayland и macOS/WKWebView для этого изменения не проверены. Native capture,
+hotkey backend, IPC и document v7 не изменяются.
+
+## Выбор и перенос за рамку (2026-10-17, ADR-085)
+
+Общий DOM-free core и Vue canvas используют CSS hit margin и общий resolver.
+Windows Chrome 155.0.8059.80: 12/12 passed (RU/EN × light/dark × 25/100/400%).
+WebView2 155.0.4283.45 с external driver: 1/1 passed, production Capture →
+Quick non-origin crop → Editor, trusted pointer/keyboard. Native проверяет
+исходный fit-масштаб; полная native zoom/theme/locale matrix pending.
+Команды и логи — TESTING.md. Linux/WebKitGTK, Wayland и macOS/WKWebView для нового контракта
+pending; изменение не затрагивает native capture/hotkey backend.
+
+## Дроп настроек редактора (2026-10-17, ADR-083)
+
+Общий Vue chrome удаляет Window capture из main editor и открывает
+немодальные настройки темы/языка, отражения и существующее native Settings.
+Browser без native callback показывает disabled-пункт с объяснением.
+Проверки Windows Chrome/WebView2 и фактические результаты — TESTING.md.
+Windows 10 x64: Chrome 155.0.8059.80 — focused browser 10/10 и icons matrix
+1/1 passed; WebView2 155.0.4283.45 — 1/1 native passed с external driver.
+Синхронный Settings IPC воспроизвёл deadlock; async command устранил его.
+Linux/WebKitGTK, Wayland и macOS/WKWebView для этого изменения pending;
+capture backend и системные entrypoints не меняются.
+
+## Пипетка до входа на canvas (2026-10-17)
+
+`REQ-TOL-012`: общий Vue lifecycle не создаёт preview при активации;
+pointerleave скрывает карточку и очищает transient target. Keyboard nudging
+сохраняет начальную точку в видимой области. Проверки Windows Chromium/WebView2
+и фактические результаты перечислены в `TESTING.md`; Linux/macOS runtime
+для этого исправления не проверялись.
+
+## Windows capture visibility (2026-10-17, ADR-082)
+
+Windows 10 x64 / WebView2 155.0.4283.45: dev physical DXGI capture воспроизвёл
+холодный Fit jump и скрытый main после Editor; callback hide устранил
+рассинхронизацию Tauri/Win32. Окончательные native проверки и ограничения
+записаны в TESTING.md. Linux/macOS visibility routing не меняется;
+общий frontend selection gate требует отдельных platform re-smokes.
+
+## Вставка изображений (2026-10-17, ADR-081)
+
+Windows 10 x64: Chrome 155 browser 3/3 и WebView2 155.0.4283.45 external
+native 3/3 passed. G/import, bitmap clipboard, drop command, Quick → Editor,
+cancel/error, undo/redo, six-image persisted reopen и empty drop проверены.
+Picker selection и OS drop event заданы test-only adapter; физический chooser
+и перетаскивание из Проводника не подтверждены. Linux X11/Wayland и macOS
+по этому изменению не проверялись. Подробные команды/артефакты — TESTING.md.
+
 ## Пропорции указателя лупы (2026-10-17, ADR-079)
 
 Linux x86_64/X11: geometry и повторно декодированные Canvas2D/CanvasKit PNG,
@@ -958,3 +1050,49 @@ storage policy не менялись. Команды, screenshots и логи �
 native gate остаётся pending: обычный запуск столкнулся с activation endpoint
 работающего приложения, isolated повтор потерял WebDriver во время soak.
 Подробности и команды — TESTING.md; прежние 3/3 относятся к предыдущему срезу.
+
+## PNG export полного editor (2026-10-17, ADR-083)
+
+Windows x64 / WebView2 155.0.4283.45: production Open image → numbered marker →
+Export, cancel and cropped re-export passed 1/1 with external native input.
+3840×2160 and 2160×2160 outputs were decoded, compared pixel-for-pixel to the
+scene/cropped reference and visually inspected. The OS picker selection alone
+is substituted; manual system-dialog interaction remains unverified. Linux,
+macOS and ARM runtime remain pending. Renderer encoding now supports
+OffscreenCanvas.convertToBlob and HTMLCanvasElement.toBlob; headless renderer
+33/33 passed. Commands, general check limitation and artifacts — TESTING.md.
+
+## Шаблон имени PNG (ADR-084, 2026-10-17)
+
+Windows x64 / WebView2 155.0.4283.45: native General Settings draft/validation/
+Save/reopen и export с configured Unicode filename passed; named PNG повторно
+декодирован как 3840×2160. RU/EN layout просмотрен. Вместе с прежним crop/cancel
+проверены 2/2 native сценария. Date-first default и безопасные filename tokens
+общие для editor/Quick; Quick OS dialog, Linux/macOS runtime и ручной Save As
+заново не проверены. Артефакты и отдельные общие check blockers — TESTING.md.
+
+## Обход системных тулбаров настройками (2026-10-17)
+
+Windows x64 / Chrome 155.0.8059.80: 1024 px, RU/EN и обе темы — 4/4 browser
+regressions passed; selection toolbar и Stroke popover измерены после обычного
+создания стрелки, screenshots просмотрены. Vue 59/59 passed. Browser evidence
+не заменяет WebView2; native build/result и ограничения — TESTING.md.
+Linux/WebKitGTK, macOS/WKWebView и ARM runtime заново не проверялись.
+
+Native этого исправления: Windows x64 / WebView2 155.0.4283.45,
+external provider, `selection-toolbar-chrome` 1/1 passed. Production
+Capture → Quick → Editor и обычное рисование стрелки, bounds панели/Stroke,
+Escape/focus, без предсозданного document state. Fake-platform capture;
+оба native screenshots просмотрены. Другие ОС остаются pending.
+
+## Локаль native tray (ADR-088)
+
+Общая логика RU/EN применяется на Windows/Linux/macOS, включая shortcut refresh
+и macOS Settings menu item. Перевод не меняет capture capabilities и hotkeys.
+Локальные Windows/WebView2 результаты и команды — TESTING.md. Linux/macOS и
+визуальная проверка открытого системного popup остаются pending.
+
+Windows x64 / WebView2 155.0.4283.45 (2026-10-18): tray-locale и
+tray-locale-reopen — 2/2 passed, external driver, production Settings flow,
+actual MenuItem text и startup snapshot. Другие ОС и визуальный OS popup
+не проверены этим прогоном.

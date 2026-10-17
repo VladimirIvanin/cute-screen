@@ -25,13 +25,14 @@ describe('M02 editor shell', () => {
   it('localizes visible shell labels and action feedback without a restart', async () => {
     renderApp()
 
-    await fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
-    await fireEvent.click(screen.getByRole('menuitemradio', { name: 'RU' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    await fireEvent.click(screen.getByRole('radio', { name: 'Русский' }))
 
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Настройки' })).toBeInTheDocument()
     expect(screen.getByRole('complementary', { name: 'Инструменты' })).toBeInTheDocument()
     expect(screen.getByRole('main', { name: 'Область холста' })).toBeInTheDocument()
 
+    await fireEvent.keyDown(screen.getByRole('dialog', { name: 'Настройки' }), { key: 'Escape' })
     await fireEvent.click(screen.getByRole('button', { name: 'Снимок' }))
     expect(screen.getByRole('alert')).toHaveTextContent('Захват станет доступен после подключения native backend.')
   })

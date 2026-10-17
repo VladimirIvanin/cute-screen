@@ -1,3 +1,4 @@
+import type { StrokeHitMetric } from '../../hit-test-metric'
 import type {
   CensorLayer,
   LoupeLayer,
@@ -31,6 +32,9 @@ export function precisionLayerHitPart(
   layer: CensorLayer | SpotlightLayer | RulerLayer | LoupeLayer,
   point: Point,
   canvas?: Readonly<{ readonly width: number; readonly height: number }>,
+  padding = 0,
+  precise = false,
+  metric?: StrokeHitMetric,
 ): 'fill' | 'stroke' | undefined {
   const bounds = layer.localBounds
   if (layer.kind === 'censor') {
@@ -49,8 +53,9 @@ export function precisionLayerHitPart(
     const length = Math.hypot(dx, dy)
     const perpendicular = { x: -dy / length, y: dx / length }
     const tickHalf = rulerTickHalfLength(layer.payload.thickness)
-    const strokePadding = Math.max(RULER_HIT_PADDING, layer.payload.thickness / 2)
-    if (pointToSegmentDistance(point, start, end) <= strokePadding) {
+    const halfWidth = layer.payload.thickness / 2
+    const strokePadding = (precise ? halfWidth : Math.max(RULER_HIT_PADDING, halfWidth)) + padding
+    if (metric ? metric(point, start, end, halfWidth) : pointToSegmentDistance(point, start, end) <= strokePadding) {
       return 'stroke'
     }
     for (const endpoint of [start, end]) {
@@ -62,7 +67,9 @@ export function precisionLayerHitPart(
         x: endpoint.x + perpendicular.x * tickHalf,
         y: endpoint.y + perpendicular.y * tickHalf,
       }
-      if (pointToSegmentDistance(point, tickStart, tickEnd) <= strokePadding) {
+      const tickHit = metric ? metric(point, tickStart, tickEnd, halfWidth)
+        : pointToSegmentDistance(point, tickStart, tickEnd) <= strokePadding
+      if (tickHit) {
         return 'stroke'
       }
     }

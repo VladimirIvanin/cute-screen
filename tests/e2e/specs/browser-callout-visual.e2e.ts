@@ -1,3 +1,4 @@
+import { setEditorPreferences } from '../editor-settings'
 import {
   $,
   browser,
@@ -18,9 +19,7 @@ describe('Callout desktop layouts', () => {
     for (const locale of ['en', 'ru'] as const) {
       await setLocale(locale)
       for (const theme of ['light', 'dark'] as const) {
-        await $(`button[aria-label="${locale === 'ru' ? 'Другие действия' : 'More actions'}"]`).click()
-        const themeLabel = locale === 'ru' ? (theme === 'dark' ? 'Тёмная' : 'Светлая') : (theme === 'dark' ? 'Dark' : 'Light')
-        await $(`button=${themeLabel}`).click()
+        await setEditorPreferences(locale, theme)
         for (const zoom of [50, 100, 200]) {
           await $('.cs-zoom-value').click()
           const adjustment = zoom < 100 ? '.cs-zoom-controls button:first-child' : '.cs-zoom-controls button:last-child'

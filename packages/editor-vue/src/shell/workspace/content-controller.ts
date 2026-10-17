@@ -1,141 +1,7 @@
-import {
-  INITIAL_TEXT_MAX_WIDTH,
-  measuredTextLayer,
-} from '../../text-layout'
-import { loadTextFontFamily } from '../../text-fonts'
-import type {
-  Ref,
-  ShallowRef,
-} from 'vue'
-import {
-  createContentImageLayer,
-  createTextLayer,
-  type EditorCommand,
-  type EditorDocumentV1,
-} from '@cute-screen/editor-renderer'
-import { loadImageWithBinaryFallback } from '../../image-transport'
-import type { TextToolDefaults } from '../canvas/contracts'
-import type { ResolvedEditorShellProps } from '../contracts'
-
-export interface ContentControllerContext {
-  readonly error: Ref<string | undefined>
-  readonly props: ResolvedEditorShellProps
-  readonly activeDocument: Ref<EditorDocumentV1 | undefined>
-  readonly contentImageImporting: Ref<boolean>
-  readonly textureImages: Ref<ReadonlyMap<string, HTMLImageElement>>
-  readonly textDefaults: ShallowRef<TextToolDefaults>
-  readonly selectedLayerId: Ref<string | undefined>
-  readonly rememberTextDefaults: (layer: import('@cute-screen/editor-renderer').LayerNode) => void
-  readonly addLayer: (layer: import('@cute-screen/editor-renderer').LayerNode) => void
-}
-
-async function importContentImage(
-  context: ContentControllerContext,
-  origin: { readonly x: number; readonly y: number },
-): Promise<void> {
-  const bridge = context.props.contentImageBridge
-  if (
-    context.contentImageImporting.value ||
-    !bridge ||
-    !context.props.documentSession ||
-    context.props.readOnlyDocument
-  ) {
-    return
-  }
-  context.contentImageImporting.value = true
-  try {
-    const imported = await bridge.importContentImage(crypto.randomUUID())
-    if (imported.kind !== 'imported') return
-    const resource = await loadImageWithBinaryFallback({
-      token: imported.resourceToken,
-      correlationId: crypto.randomUUID(),
-      bridge,
-      createResource: async (image) => image,
-    })
-    context.textureImages.value = new Map(context.textureImages.value).set(imported.blobHash, resource.resource)
-    const layer = createContentImageLayer({
-      id: crypto.randomUUID(),
-      blobHash: imported.blobHash,
-      format: imported.format,
-      intrinsicWidth: imported.width,
-      intrinsicHeight: imported.height,
-      origin: {
-        x: origin.x - imported.width / 2,
-        y: origin.y - imported.height / 2,
-      },
-    })
-    context.addLayer(layer)
-  } catch (error) {
-    context.error.value = error instanceof Error ? error.message : String(error)
-  } finally {
-    context.contentImageImporting.value = false
-  }
-}
-
-async function pasteNativeClipboard(context: ContentControllerContext): Promise<void> {
-  const bridge = context.props.clipboardBridge
-  const document = context.activeDocument.value
-  if (
-    !bridge ||
-    !document ||
-    !context.props.documentSession ||
-    context.props.readOnlyDocument
-  ) {
-    return
-  }
-  try {
-    const snapshot = await bridge.readClipboardSnapshot(crypto.randomUUID())
-    const center = {
-      x: document.canvas.width / 2,
-      y: document.canvas.height / 2,
-    }
-    if (snapshot.bitmap) {
-      const bitmap = snapshot.bitmap
-      const loaded = await loadImageWithBinaryFallback({
-        token: bitmap.resourceToken,
-        correlationId: crypto.randomUUID(),
-        bridge,
-        createResource: async (image) => image,
-      })
-      context.textureImages.value = new Map(context.textureImages.value).set(bitmap.blobHash, loaded.resource)
-      context.props.documentSession.execute({
-        type: 'addLayer',
-        layer: createContentImageLayer({
-          id: crypto.randomUUID(),
-          blobHash: bitmap.blobHash,
-          format: bitmap.format,
-          intrinsicWidth: bitmap.width,
-          intrinsicHeight: bitmap.height,
-          origin: {
-            x: center.x - bitmap.width / 2,
-            y: center.y - bitmap.height / 2,
-          },
-        }),
-      })
-      return
-    }
-    if (!snapshot.text) return
-    const defaults = context.textDefaults.value
-    await loadTextFontFamily(defaults.fontFamily)
-    const layer = createTextLayer({
-      id: crypto.randomUUID(),
-      text: snapshot.text,
-      origin: center,
-      fontFamily: defaults.fontFamily,
-      fontSize: defaults.fontSize,
-      weight: defaults.weight,
-      italic: defaults.italic,
-      strikethrough: defaults.strikethrough,
-      alignment: defaults.alignment,
-      listKind: defaults.listKind,
-      color: defaults.color,
-      background: defaults.background,
-    })
-    if (layer) context.addLayer(measuredTextLayer(layer, INITIAL_TEXT_MAX_WIDTH))
-  } catch (error) {
-    console.warn('cute-screen native clipboard paste failed', error)
-  }
-}
+import type { EditorCommand } from '@cute-screen/editor-renderer'
+import type { ContentControllerContext } from './content-contracts'
+import { ImageInsertionController } from './image-insertion-controller'
+export type { ContentControllerContext } from './content-contracts'
 
 async function copySelectedTextLayer(
   context: ContentControllerContext,
@@ -171,9 +37,14 @@ async function copySelectedTextLayer(
 }
 
 export function createContentController(context: ContentControllerContext) {
+  const images = new ImageInsertionController(context)
   return {
-    importContentImage: (origin: { readonly x: number; readonly y: number }) => importContentImage(context, origin),
-    pasteNativeClipboard: () => pasteNativeClipboard(context),
+    importContentImage: (origin?: { readonly x: number; readonly y: number }) => images.import(origin),
+    importDroppedImage: (token: string, target: import('../../texture-fill').ImageInsertionTarget) => images.drop(token, target),
+    openDroppedDocument: (token: string) => images.openDocument(token),
+    pasteNativeClipboard: () => images.paste(),
+    cancelImageImport: () => images.cancel(),
+    dispose: () => images.dispose(),
     copySelectedTextLayer: (cut: boolean) => copySelectedTextLayer(context, cut),
     executeDocumentCommand: (command: unknown) => {
       if (!context.props.documentSession || context.props.readOnlyDocument) return

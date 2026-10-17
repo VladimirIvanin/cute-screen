@@ -1,3 +1,4 @@
+import { setEditorPreferences } from '../editor-settings'
 import {
   $,
   $$,
@@ -22,14 +23,7 @@ describe('curated text toolbar', () => {
       await browser.setWindowSize(width, 800)
       for (const locale of ['en', 'ru']) {
         for (const theme of ['dark', 'light']) {
-          const more = $('button[aria-label="More actions"], button[aria-label="Другие действия"]')
-          await more.click()
-          await $(`button=${locale.toUpperCase()}`).click()
-          await more.click()
-          const themeLabel = locale === 'ru'
-            ? theme === 'dark' ? 'Тёмная' : 'Светлая'
-            : theme === 'dark' ? 'Dark' : 'Light'
-          await $(`button=${themeLabel}`).click()
+          await setEditorPreferences(locale as 'en' | 'ru', theme as 'light' | 'dark')
           const geometry = await browser.execute(() => {
             const toolbar = document.querySelector<HTMLElement>('.cs-text-toolbar')!
             const groups = [...toolbar.querySelectorAll<HTMLElement>('.cs-text-control-group')]

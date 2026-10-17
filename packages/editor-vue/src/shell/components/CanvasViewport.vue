@@ -38,6 +38,9 @@ const forwardArrowToolbarChange = (...args: CanvasViewportEmits['arrowToolbarCha
   emit('arrowToolbarChange', ...args)
 
 const exposed: CanvasViewportExpose = {
+  startSelectionMove: (event) => workspace.value?.startSelectionMove(event),
+  imageInsertionTarget: (point) => workspace.value?.imageInsertionTarget(point),
+  focusCanvas: () => workspace.value?.focusCanvas(),
   editSelectedLabel: () => workspace.value?.editSelectedLabel(),
   applyCropDraft: () => workspace.value?.applyCropDraft(),
   cancelCropDraft: () => workspace.value?.cancelCropDraft(),

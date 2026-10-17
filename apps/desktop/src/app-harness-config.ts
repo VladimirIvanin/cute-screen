@@ -10,6 +10,7 @@ export interface AppHarnessConfig {
   readonly m08SourceNotReady: boolean
   readonly m08ClipboardError: boolean
   readonly m08SourceAlpha: number
+  readonly imageIngress?: boolean
 }
 
 export function readAppHarnessConfig(): AppHarnessConfig {
@@ -21,6 +22,7 @@ export function readAppHarnessConfig(): AppHarnessConfig {
   const alpha = query.get('m08alpha')
   return {
     fixture,
+    imageIngress: enabled && query.get('imageIngress') === '1',
     m03: enabled && query.get('m03') === '1',
     m04Capture: enabled && query.get('m04') === '1',
     m04Fallback: enabled && query.get('m04fallback') === '1',

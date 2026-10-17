@@ -15,6 +15,7 @@ import {
 } from 'naive-ui'
 import { t } from '../i18n'
 import { useNumericPreview } from './use-numeric-preview'
+import { useImageIngress } from './use-image-ingress'
 import { createBrowserDrawingToolPreferencesStorage } from '../preferences'
 import { useEditorShellStore } from '../store'
 import {
@@ -101,6 +102,7 @@ function createWorkspaceCore(props: ResolvedEditorShellProps) {
     rememberTextDefaults: memory.rememberTextDefaults,
   })
   useNumericPreview(workspace, props, store, bindings)
+  useImageIngress(props, workspace, bindings, () => store.locale)
   watch(() => [store.activeToolId, workspace.textDefaults.value.fontFamily], () => {
     if (store.activeToolId !== 'numberedMarker') return
     void loadTextFontFamily(workspace.textDefaults.value.fontFamily).catch((error: unknown) => {
@@ -125,6 +127,7 @@ function createWorkspaceCore(props: ResolvedEditorShellProps) {
     error: workspace.toolError,
     rememberedStyles: workspace.rememberedStyles,
     paste: bindings.pasteNativeClipboard,
+    changeCallout: bindings.onContextChange,
     undo: session.undoDocument,
     redo: session.redoDocument,
     fit: () => store.enableFit(),
@@ -276,6 +279,10 @@ function createWorkspaceViewModel(
     onColorSampleError: bindings.onColorSampleError,
     onColorSampleCancel: bindings.onColorSampleCancel,
     toolError: workspace.toolError,
+    contentImageImporting: workspace.contentImageImporting,
+    imageFeedback: workspace.imageFeedback,
+    imageDropActive: workspace.imageDropActive,
+    cancelImageImport: bindings.cancelImageImport,
     updateLayerProperty: bindings.updateLayerProperty,
     onLayerOpacity: bindings.onLayerOpacity,
     onLayerRotation: bindings.onLayerRotation,

@@ -1,3 +1,4 @@
+import { setEditorPreferences } from '../editor-settings'
 import {
   $,
   browser,
@@ -235,8 +236,7 @@ describe('Document v7 rich text in browser mode', () => {
     expect(layout).toEqual({ rows: 2, visible: true, toolbarScrolls: false, documentScrolls: false })
     await $('button[aria-label="Align center"]').click()
     await expect($('button[aria-label="Align center"]')).toHaveAttribute('aria-pressed', 'true')
-    await $('button[aria-label="More actions"]').click()
-    await $('button=RU').click()
+    await setEditorPreferences('ru')
     await $('button[aria-label="Размер шрифта"]').click()
     await browser.keys('Escape')
     await expect($('button[aria-label="Размер шрифта"]')).toBeFocused()
@@ -245,12 +245,13 @@ describe('Document v7 rich text in browser mode', () => {
     await expect($('button[aria-label="Фон"]')).toBeFocused()
   })
 
-  it('keeps Callout bubble and dedicated Numbered badge semantics', async () => {
+  it('keeps Callout card and dedicated Numbered badge semantics', async () => {
     await browser.setWindowSize(1280, 720)
     await openHarness()
     const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
 
     await $('button[aria-label="Callout"]').click({ button: 'right' })
+    await $('.cs-callout-toolbar button[aria-label="Text"]').click()
     await applyBackground({ color: '#ffcc66', padding: 10, radius: 14 })
     await browser
       .action('pointer')
@@ -265,7 +266,7 @@ describe('Document v7 rich text in browser mode', () => {
     let layer = (await snapshot()).layers.at(-1)
     expect(layer).toMatchObject({
       kind: 'callout',
-      payload: { background: { padding: 10, radius: 14 } },
+      payload: { frame: { kind: 'card', padding: 10, radius: 14 } },
     })
     expect(layer?.payload).toHaveProperty('target')
     expect(layer?.payload).toHaveProperty('label')

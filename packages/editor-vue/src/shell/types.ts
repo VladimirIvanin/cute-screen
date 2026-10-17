@@ -134,6 +134,9 @@ export interface ContextToolbarSchema {
     measurementArea?: Readonly<{ width: number; height: number; cropped: boolean }> | undefined
   }>
 
+  readonly calloutMultiple?: boolean
+  readonly calloutMixed?: boolean
+  readonly callout?: import('@cute-screen/editor-renderer').CalloutPayload
   readonly highlighter?: import('./workspace/highlighter-background').HighlighterAnalysis
   /** Present only when all targets are shapes; null fill denotes mixed paint. */
   readonly shape?: Readonly<{
@@ -216,6 +219,8 @@ export interface PrecisionToolDefaults {
 }
 
 export interface CanvasViewportHosts {
+  /** Encodes committed document pixels at 1×, independent of preview zoom/DPR. */
+  readonly exportPng?: () => Promise<Uint8Array>
   /** Resolves after the latest scene and local text fonts have been rendered. */
   readonly waitForRender?: () => Promise<void>
   readonly scene: HTMLCanvasElement
@@ -266,6 +271,7 @@ export interface ShellActionAdapter {
 }
 
 export type IconName =
+  | 'move'
   | 'bold'
   | 'italic'
   | 'strikethrough'
@@ -303,6 +309,7 @@ export type IconName =
   | 'redo'
   | 'ruler'
   | 'select'
+  | 'settings'
   | 'shape'
   | 'spotlight'
   | 'sparkles'
@@ -333,6 +340,13 @@ export const translationKeys = [
   'copy',
   'export',
   'moreActions',
+  'settings',
+  'appearance',
+  'imageActions',
+  'applicationSettings',
+  'settingsOpening',
+  'settingsOpenFailed',
+  'settingsUnavailable',
   'theme',
   'language',
   'systemTheme',
@@ -392,6 +406,7 @@ export const translationKeys = [
   'toolLoupe',
   'toolUnavailable',
   'toolNeedsCanvas',
+  'imageImportUnavailable',
   'eyedropperMagnifier',
   'eyedropperClickToSample',
   'eyedropperNoOpaqueColour',

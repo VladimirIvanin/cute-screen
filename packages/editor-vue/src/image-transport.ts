@@ -11,6 +11,7 @@ export interface StagedImageMetadata {
 export interface ImageTransportBridge {
   stageImage(token: string, correlationId: string): Promise<StagedImageMetadata>
   readImageBytes(token: string, correlationId: string): Promise<ArrayBuffer>
+  releaseImage?(token: string): Promise<void>
 }
 
 export interface ClipboardBitmapSnapshot {

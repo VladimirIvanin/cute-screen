@@ -38,6 +38,7 @@ export interface ToolUiControllerContext {
   readonly onContextChange: (id: string, value: string) => void
   readonly translate: (key: 'readOnlyDocument') => string
   readonly saveDrawingPreferences: (value: DrawingToolPreferencesV2) => void
+  readonly requestContentImageImport: () => void
 }
 
 function rememberColor(
@@ -153,7 +154,8 @@ function activateTool(
     context.samplingControl.value = undefined
     context.eyedropperColor.value = undefined
     context.eyedropperFeedback.value = undefined
-    context.store.selectTool(toolId)
+    if (toolId === 'image') context.requestContentImageImport()
+    else context.store.selectTool(toolId)
     if (transientFocus) void nextTick(() => restoreActivationFocus(previous, shell, toolId))
     continuation?.()
   })

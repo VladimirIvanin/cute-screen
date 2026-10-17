@@ -1,5 +1,12 @@
 import { createApp } from 'vue'
-import { createEditorShellPinia } from '@cute-screen/editor-vue'
+import {
+  createEditorShellPinia,
+  useEditorShellStore,
+} from '@cute-screen/editor-vue'
+import {
+  isDesktopRuntime,
+  reportUiPreferencesError,
+} from './platform/tauri/ui-preferences-adapter'
 
 import { resolveHarnessSearch } from './e2e-harness-query'
 import './styles.css'
@@ -17,6 +24,15 @@ if (
   window.history.replaceState(null, '', `${window.location.pathname}${harnessSearch}`)
 }
 const harnessParams = new URLSearchParams(harnessSearch)
+const pinia = createEditorShellPinia()
+if (isDesktopRuntime()) {
+  try {
+    const { installDesktopUiPreferences } = await import('./platform/tauri/ui-preferences-adapter')
+    await installDesktopUiPreferences(useEditorShellStore(pinia))
+  } catch (error) {
+    reportUiPreferencesError(error)
+  }
+}
 const isM01Harness = import.meta.env.VITE_M01_HARNESS === 'true' && harnessParams.get('m01') === '1'
 
 const isQuickCapture = new URLSearchParams(window.location.search).get('quickCapture') === '1'
@@ -34,4 +50,4 @@ const Root = import.meta.env.VITE_TEST_HARNESS === 'true' && harnessParams.get('
 const rootProps = import.meta.env.VITE_TEST_HARNESS === 'true' && isSettings && harnessParams.get('settingsHarness') === '1'
   ? { bridge: (await import('./settings/browser-harness')).createSettingsHarnessBridge() }
   : {}
-createApp(Root, rootProps).use(createEditorShellPinia()).mount('#app')
+createApp(Root, rootProps).use(pinia).mount('#app')

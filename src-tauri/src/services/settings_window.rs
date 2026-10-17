@@ -84,17 +84,10 @@ pub fn refresh_tray<R: Runtime>(app: &tauri::AppHandle<R>) {
     let Ok(preferences) = service.preferences() else {
         return;
     };
-    let labels = [
-        (ShortcutAction::CaptureArea, "Capture Area"),
-        (ShortcutAction::CaptureScreen, "Capture Screen"),
-        (ShortcutAction::CaptureWindow, "Capture Window"),
-        (ShortcutAction::CaptureActiveWindow, "Capture Active Window"),
-        (ShortcutAction::CaptureRepeat, "Repeat Area"),
-        (ShortcutAction::ShowEditor, "Open Editor"),
-    ];
+    let locale = saved_locale(app);
     // MenuItem handles are retained separately because TrayIcon has no menu getter.
     if let Some(items) = app.try_state::<TrayShortcutItems<R>>() {
-        for (action, label) in labels {
+        for action in ShortcutAction::ALL {
             if let Some(item) = items
                 .0
                 .iter()
@@ -123,19 +116,118 @@ pub fn refresh_tray<R: Runtime>(app: &tauri::AppHandle<R>) {
                         .and_then(|settings| settings.read(action))
                         .map(|(trigger, _)| trigger);
                 }
-                let text = display.as_ref().map_or_else(
-                    || label.to_owned(),
-                    |trigger| format!("{label}    {trigger}"),
-                );
+                let text = tray_text(action.id(), &locale, display.as_deref());
                 if let Err(error) = item.set_text(text) {
                     eprintln!("cute-screen tray shortcut label: {error}");
                 }
             }
         }
+        for item in items
+            .0
+            .iter()
+            .filter(|item| matches!(item.id().as_ref(), "settings" | "quit"))
+        {
+            if let Err(error) = item.set_text(tray_text(item.id().as_ref(), &locale, None)) {
+                eprintln!("cute-screen tray label: {error}");
+            }
+        }
+    }
+    if let Some(item) = app.try_state::<AppSettingsItem<R>>()
+        && let Err(error) = item.0.set_text(tray_text("settings", &locale, None))
+    {
+        eprintln!("cute-screen app settings label: {error}");
     }
 }
 
 pub struct TrayShortcutItems<R: Runtime>(pub Vec<tauri::menu::MenuItem<R>>);
+#[cfg(feature = "test-harness")]
+pub struct TrayStartupLabels(pub Vec<String>);
+
+#[cfg(feature = "test-harness")]
+#[tauri::command]
+pub fn test_tray_labels(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let items = app.state::<TrayShortcutItems<tauri::Wry>>();
+    let labels = items
+        .0
+        .iter()
+        .map(|item| {
+            Ok(serde_json::json!({
+                "id": item.id().as_ref(),
+                "text": item.text().map_err(|error| error.to_string())?,
+                "enabled": item.is_enabled().map_err(|error| error.to_string())?,
+            }))
+        })
+        .collect::<Result<Vec<serde_json::Value>, String>>()?;
+    Ok(serde_json::json!({ "items": labels, "startup": app.state::<TrayStartupLabels>().0 }))
+}
+
+struct AppSettingsItem<R: Runtime>(tauri::menu::MenuItem<R>);
+
+pub const UI_PREFERENCES_KEY: &str = "cute-screen.ui-preferences.v1";
+
+fn preference_locale(json: &str) -> Option<String> {
+    let value: serde_json::Value = serde_json::from_str(json).ok()?;
+    if value["schemaVersion"] != 1
+        || !matches!(value["theme"].as_str(), Some("system" | "light" | "dark"))
+    {
+        return None;
+    }
+    value["locale"]
+        .as_str()
+        .filter(|locale| matches!(*locale, "ru" | "en"))
+        .map(str::to_owned)
+}
+
+pub fn saved_locale<R: Runtime>(app: &tauri::AppHandle<R>) -> String {
+    let saved = app
+        .try_state::<crate::storage::LibraryRepository>()
+        .and_then(
+            |repository| match repository.get_setting(UI_PREFERENCES_KEY.into()) {
+                Ok(value) => value.and_then(|value| preference_locale(&value)),
+                Err(error) => {
+                    eprintln!("cute-screen native locale: {error}");
+                    None
+                }
+            },
+        );
+    saved.unwrap_or_else(|| {
+        if std::env::var("LANG")
+            .unwrap_or_default()
+            .to_lowercase()
+            .starts_with("ru")
+        {
+            "ru".into()
+        } else {
+            "en".into()
+        }
+    })
+}
+
+pub fn tray_text(id: &str, locale: &str, trigger: Option<&str>) -> String {
+    let label = match (locale == "ru", id) {
+        (true, "capture-area") => "Снимок области",
+        (true, "capture-screen") => "Снимок экрана",
+        (true, "capture-window") => "Снимок окна",
+        (true, "capture-active-window") => "Снимок активного окна",
+        (true, "capture-repeat") => "Повторить область",
+        (true, "show-editor") => "Открыть редактор",
+        (true, "settings") => "Настройки…",
+        (true, "quit") => "Выход",
+        (_, "capture-area") => "Capture Area",
+        (_, "capture-screen") => "Capture Screen",
+        (_, "capture-window") => "Capture Window",
+        (_, "capture-active-window") => "Capture Active Window",
+        (_, "capture-repeat") => "Repeat Area",
+        (_, "show-editor") => "Open Editor",
+        (_, "settings") => "Settings…",
+        (_, "quit") => "Quit",
+        _ => id,
+    };
+    trigger.map_or_else(
+        || label.to_owned(),
+        |trigger| format!("{label}    {trigger}"),
+    )
+}
 
 /// The application menu belongs in the macOS system menu bar. On Windows and
 /// Linux the same menu is an in-window bar titled with the app name, directly
@@ -152,21 +244,62 @@ pub fn install_menu<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()> 
     let settings = MenuItem::with_id(
         app,
         "app-settings",
-        if std::env::var("LANG").unwrap_or_default().starts_with("ru") {
-            "Настройки…"
-        } else {
-            "Settings…"
-        },
+        tray_text("settings", &saved_locale(app), None),
         true,
         Some("CmdOrCtrl+,"),
     )?;
     let submenu = Submenu::with_items(app, "Cute Screen", true, &[&settings])?;
     app.set_menu(Menu::with_items(app, &[&submenu])?)?;
+    app.manage(AppSettingsItem(settings));
     Ok(())
 }
 
 #[cfg(test)]
 mod navigation_tests {
+    #[test]
+    fn native_locale_uses_the_validated_shared_preference() {
+        assert_eq!(
+            super::preference_locale(r#"{"schemaVersion":1,"locale":"ru","theme":"dark"}"#)
+                .as_deref(),
+            Some("ru")
+        );
+        assert_eq!(
+            super::preference_locale(r#"{"schemaVersion":1,"locale":"en","theme":"system"}"#)
+                .as_deref(),
+            Some("en")
+        );
+        for invalid in [
+            "{",
+            r#"{"schemaVersion":2,"locale":"ru","theme":"dark"}"#,
+            r#"{"schemaVersion":1,"locale":"fr","theme":"dark"}"#,
+        ] {
+            assert_eq!(super::preference_locale(invalid), None);
+        }
+    }
+
+    #[test]
+    fn tray_localizes_every_item_and_preserves_shortcuts() {
+        let expected = [
+            ("capture-area", "Снимок области"),
+            ("capture-screen", "Снимок экрана"),
+            ("capture-window", "Снимок окна"),
+            ("capture-active-window", "Снимок активного окна"),
+            ("capture-repeat", "Повторить область"),
+            ("show-editor", "Открыть редактор"),
+            ("settings", "Настройки…"),
+            ("quit", "Выход"),
+        ];
+        for (id, label) in expected {
+            assert_eq!(super::tray_text(id, "ru", None), label);
+            assert_ne!(super::tray_text(id, "en", None), label);
+        }
+        assert_eq!(
+            super::tray_text("capture-area", "ru", Some("Ctrl+Shift+2")),
+            "Снимок области    Ctrl+Shift+2"
+        );
+        assert_eq!(super::tray_text("quit", "en", None), "Quit");
+    }
+
     #[test]
     fn settings_entry_points_select_the_requested_initial_section() {
         assert_eq!(

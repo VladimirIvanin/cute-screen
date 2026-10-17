@@ -1,9 +1,7 @@
 import {
-  arrowSelectionHandles,
-  BOUNDS_RESIZE_HANDLES,
-  calloutSelectionHandles,
+  selectionFrame,
+  calloutGeometryContext,
   drawNodes2D,
-  layerIntrinsicResizeHandles,
   type LayerNode,
   type Transform2D,
 } from '@cute-screen/editor-renderer'
@@ -22,6 +20,7 @@ import type {
   CanvasGesture,
   ResizeHandle,
 } from './workspace-state'
+import { canvasSelectionHandles } from './selection-controls'
 import { prepareDisplayOverlay } from './display-overlay-resolution'
 
 type PreviewNodes =
@@ -30,6 +29,9 @@ type PreviewNodes =
     : never
 
 export interface CanvasOverlayContext {
+  readonly calloutInsertMode?: () => boolean
+  readonly hoverTarget?: () => import('@cute-screen/editor-renderer').SelectionTarget
+  readonly screenScale?: () => CanvasPoint
   readonly props: CanvasViewportProps
   readonly overlay: Ref<HTMLCanvasElement | undefined>
   readonly outputBounds: ComputedRef<ViewportOutputBounds | undefined>
@@ -99,6 +101,7 @@ export class CanvasOverlayController {
         props.quickSelectionMode ||
         props.activeTool === 'crop')
     ) return
+    this.#drawHover(context)
     this.#drawSelection(context, bounds)
   }
 
@@ -106,23 +109,41 @@ export class CanvasOverlayController {
     context: CanvasRenderingContext2D,
     outputBounds: ViewportOutputBounds,
   ): void {
+    const activeGesture = this.#context.gesture?.()
+    const ids = activeGesture?.kind === 'move' ? activeGesture.nodeIds ?? [] : this.#context.props.selectedLayerIds ?? []
+    const document = this.#context.props.document
+    if (document && ids.length > 1) {
+      const frame = selectionFrame(document, ids, calloutGeometryContext())
+      if (!frame) return
+      const gesture = this.#context.gesture()
+      const moving = gesture?.kind === 'move' ? gesture : undefined
+      const layer = document.layers.find((item) => frame.nodeIds.includes(item.id))!
+      this.#drawSelectionFrame(context, { ...layer, localBounds: frame.bounds, transform: {
+        ...frame.transform,
+        translateX: frame.transform.translateX + (moving ? moving.current.x - moving.start.x : 0),
+        translateY: frame.transform.translateY + (moving ? moving.current.y - moving.start.y : 0),
+      } }, frame.bounds)
+      this.#drawGuides(context)
+      return
+    }
     const committed = this.#context.selectedLayer()
     const preview = this.#context.previewLayer()
     const layer = preview?.id === committed?.id ? preview : committed
     if (!layer?.visible) return
     this.#drawSelectionFrame(context, layer)
-    if (layer.locked) return
-    this.#drawResizeHandles(context, layer, outputBounds)
-    this.#drawKindHandles(context, layer)
+    if (layer.locked || this.#context.props.readOnly) return
+    this.#drawControls(context, layer, outputBounds)
+    if (layer.kind === 'loupe') this.#drawLoupeHandles(context, layer)
     this.#drawGuides(context)
   }
 
   #drawSelectionFrame(
     context: CanvasRenderingContext2D,
     layer: LayerNode,
+    bounds = this.#context.layerBounds(layer),
+    hover = false,
   ): void {
     const transform = layer.transform
-    const bounds = this.#context.layerBounds(layer)
     context.save()
     context.translate(transform.translateX, transform.translateY)
     context.rotate((transform.rotation * Math.PI) / 180)
@@ -130,86 +151,66 @@ export class CanvasOverlayController {
     const zoom = (this.#context.props.zoom ?? 100) / 100
     const scale = zoom * Math.max(Math.abs(transform.scaleX), Math.abs(transform.scaleY), 1)
     context.lineWidth = 1 / scale
-    context.strokeStyle = '#0d99ff'
-    context.setLineDash([4 / scale, 3 / scale])
+    context.strokeStyle = hover ? 'rgba(13, 153, 255, 0.55)' : '#0d99ff'
+    context.setLineDash(hover ? [] : [4 / scale, 3 / scale])
     context.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height)
     context.setLineDash([])
     context.restore()
   }
 
-  #drawResizeHandles(
+  #drawHover(context: CanvasRenderingContext2D): void {
+    if (!this.#context.hoverTarget || this.#context.gesture()) return
+    const target = this.#context.hoverTarget()
+    if (target?.kind === 'handle') {
+      const point = target.target.point
+      const zoom = (this.#context.props.zoom ?? 100) / 100
+      context.save()
+      context.fillStyle = 'rgba(13, 153, 255, 0.2)'
+      context.beginPath()
+      context.arc(point.x, point.y, target.target.radius / zoom, 0, Math.PI * 2)
+      context.fill()
+      context.restore()
+      return
+    }
+    if (target?.kind !== 'object') return
+    const layer = this.#context.props.document?.layers.find((item) => item.id === target.nodeId)
+    if (!layer || layer.id === this.#context.props.selectedLayerId) return
+    // Hover previews selection; it never becomes an additional pointer target.
+    this.#drawSelectionFrame(context, layer, this.#context.layerBounds(layer), true)
+  }
+
+  #drawControls(
     context: CanvasRenderingContext2D,
     layer: LayerNode,
     outputBounds: ViewportOutputBounds,
   ): void {
-    if (layer.kind === 'numberedMarker') return
-    const half = 3 / ((this.#context.props.zoom ?? 100) / 100)
+    const zoom = (this.#context.props.zoom ?? 100) / 100
+    const half = 3 / zoom
+    const scale = this.#context.screenScale?.() ?? { x: zoom, y: zoom }
+    const handles = canvasSelectionHandles(layer, scale, outputBounds, this.#context.calloutInsertMode?.())
     context.fillStyle = '#fff'
     context.strokeStyle = '#0d99ff'
-    context.lineWidth = 1 / ((this.#context.props.zoom ?? 100) / 100)
-    const intrinsic = layerIntrinsicResizeHandles(layer).filter(
-      (handle): handle is ResizeHandle => handle !== 'start' && handle !== 'end',
-    )
-    const resizeHandles = layer.kind === 'image' ? BOUNDS_RESIZE_HANDLES : intrinsic
-    const handles = resizeHandles.length > 0 ? resizeHandles : (['nw', 'ne', 'se', 'sw'] as const)
-    const positions = this.#context.worldHandlePositions(layer, layer.transform)
+    context.lineWidth = 1 / zoom
     for (const handle of handles) {
-      drawClampedHandleSquare(context, positions[handle], half, outputBounds)
-    }
-  }
-
-  #drawKindHandles(
-    context: CanvasRenderingContext2D,
-    layer: LayerNode,
-  ): void {
-    const half = 3 / ((this.#context.props.zoom ?? 100) / 100)
-    if (layer.kind === 'callout') this.#drawCalloutHandles(context, layer, half)
-    if (layer.kind === 'arrow') this.#drawArrowHandles(context, layer, half)
-    if (layer.kind === 'ruler') this.#drawRulerHandles(context, layer, half)
-    if (layer.kind === 'loupe') this.#drawLoupeHandles(context, layer)
-  }
-
-  #drawCalloutHandles(
-    context: CanvasRenderingContext2D,
-    layer: Extract<LayerNode, { readonly kind: 'callout' }>,
-    half: number,
-  ): void {
-    const gesture = this.#context.gesture()
-    for (const { kind, point } of calloutSelectionHandles(layer)) {
-      const local =
-        gesture?.kind === 'calloutHandle' && gesture.id === layer.id && gesture.handle === kind
-          ? this.#context.toLocal(layer, gesture.current)
-          : point
-      const world = this.#context.transformPoint(layer.transform, local)
-      if (kind === 'width') {
-        context.fillRect(world.x - half, world.y - half * 2, half * 2, half * 4)
-        context.strokeRect(world.x - half, world.y - half * 2, half * 2, half * 4)
-      } else this.#drawRoundHandle(context, world, half)
-    }
-  }
-
-  #drawArrowHandles(
-    context: CanvasRenderingContext2D,
-    layer: Extract<LayerNode, { readonly kind: 'arrow' }>,
-    half: number,
-  ): void {
-    const gesture = this.#context.gesture()
-    for (const { kind, point } of arrowSelectionHandles(layer)) {
-      const local =
-        gesture?.kind === 'arrowHandle' && gesture.id === layer.id && gesture.handle === kind
-          ? this.#context.toLocal(layer, gesture.current)
-          : point
-      this.#drawRoundHandle(context, this.#context.transformPoint(layer.transform, local), half)
-    }
-  }
-
-  #drawRulerHandles(
-    context: CanvasRenderingContext2D,
-    layer: Extract<LayerNode, { readonly kind: 'ruler' }>,
-    half: number,
-  ): void {
-    for (const point of [layer.payload.start, layer.payload.end]) {
-      this.#drawRoundHandle(context, this.#context.transformPoint(layer.transform, point), half)
+      if (handle.kind === 'loupeSource') continue
+      if (handle.kind === 'rotate') {
+        if (layer.kind !== 'numberedMarker' && !handles.some((item) => item.kind === 'resize'))
+          drawClampedHandleSquare(context, handle.point, half, outputBounds)
+        continue
+      }
+      if (handle.kind === 'resize') drawClampedHandleSquare(context, handle.point, half, outputBounds)
+      else if (handle.kind === 'callout' && handle.handle === 'width') {
+        context.fillRect(handle.point.x - half, handle.point.y - half * 2, half * 2, half * 4)
+        context.strokeRect(handle.point.x - half, handle.point.y - half * 2, half * 2, half * 4)
+      } else if (handle.kind === 'callout' && handle.handle.startsWith('insert:')) {
+        this.#drawRoundHandle(context, handle.point, half * 1.3)
+        context.beginPath()
+        context.moveTo(handle.point.x - half, handle.point.y)
+        context.lineTo(handle.point.x + half, handle.point.y)
+        context.moveTo(handle.point.x, handle.point.y - half)
+        context.lineTo(handle.point.x, handle.point.y + half)
+        context.stroke()
+      } else this.#drawRoundHandle(context, handle.point, half)
     }
   }
 
