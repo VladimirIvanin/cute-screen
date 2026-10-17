@@ -22,6 +22,13 @@ Browser и native input suites запускать последовательно
 не отменял активный browser gesture. Не запускать package-cleaning builds
 параллельно: native build и typecheck используют общие dist directories.
 
+Сценарий `CUTE_SCREEN_E2E_SCENARIOS=ruler-shift pnpm test:e2e:tauri`
+использует external provider для обеих Shift, key-only preview и endpoint
+resize в production Quick → Editor. Для browser input на общем desktop
+доступен opt-in `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1`: Chrome запускается с
+`--headless=new`, поэтому фокус другого приложения не отменяет drag-жесты.
+По умолчанию browser mode остаётся headed. Native focus проверяется отдельно.
+
 ## Deployment target macOS
 
 Baseline macOS 12.0 из ADR-038 задан и в `bundle.macOS.minimumSystemVersion`,

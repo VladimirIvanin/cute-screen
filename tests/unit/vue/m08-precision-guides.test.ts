@@ -256,7 +256,7 @@ describe('M08 manual precision tools', () => {
     expect(view.emitted().documentCommand).toBeUndefined()
   })
 
-  it('keeps the ruler angle guide overlay-only for the held shortcut lifetime', async () => {
+  it.each(['Alt', 'Shift'])('keeps the ruler %s guide overlay-only for the held shortcut lifetime', async (key) => {
     const { scene, emitted } = mountViewport('ruler')
     await fireEvent.pointerDown(scene, {
       pointerId: 23,
@@ -270,13 +270,13 @@ describe('M08 manual precision tools', () => {
     })
     vi.mocked(contextFixture.current.moveTo).mockClear()
 
-    await fireEvent.keyDown(window, { key: 'Alt' })
+    await fireEvent.keyDown(window, { key, shiftKey: key === 'Shift', altKey: key === 'Alt' })
     expect(vi.mocked(contextFixture.current.moveTo).mock.calls.filter(([x, y]) => x === 20 && y === 20)).toHaveLength(2)
     vi.mocked(contextFixture.current.moveTo).mockClear()
-    await fireEvent.keyUp(window, { key: 'Alt' })
+    await fireEvent.keyUp(window, { key })
     expect(vi.mocked(contextFixture.current.moveTo).mock.calls.filter(([x, y]) => x === 20 && y === 20)).toHaveLength(1)
 
-    await fireEvent.keyDown(window, { key: 'Alt' })
+    await fireEvent.keyDown(window, { key, shiftKey: key === 'Shift', altKey: key === 'Alt' })
     vi.mocked(contextFixture.current.moveTo).mockClear()
     await fireEvent(window, new Event('blur'))
     expect(vi.mocked(contextFixture.current.moveTo).mock.calls.filter(([x, y]) => x === 20 && y === 20)).toHaveLength(0)

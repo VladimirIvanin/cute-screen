@@ -376,6 +376,7 @@ export const translationKeys = [
   'toolShape',
   'toolPencil',
   'straightStrokeHint',
+  'rulerAngleHint',
   'toolMarker',
   'toolText',
   'toolNumberedMarker',

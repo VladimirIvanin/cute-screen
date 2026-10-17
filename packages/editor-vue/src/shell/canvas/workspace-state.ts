@@ -128,6 +128,7 @@ export type CanvasGesture =
   }
   | {
     readonly precisionDefaults?: PrecisionToolDefaults | undefined
+    readonly snapAngleIncrementDegrees?: number | undefined
     readonly rawCurrent?: CanvasPoint | undefined
     readonly kind: 'precision'
     readonly tool: 'censor' | 'spotlight' | 'ruler' | 'loupe'

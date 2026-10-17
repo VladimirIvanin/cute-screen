@@ -9,7 +9,7 @@ export function useShortcutTest(
 ) {
   const testing = ref<ShortcutAction>()
   const testPassed = ref<ShortcutAction>()
-  const testExpired = ref(false)
+  const testExpired = ref<ShortcutAction>()
   let timer: ReturnType<typeof setTimeout> | undefined
 
   async function test(action: ShortcutAction): Promise<void> {
@@ -17,11 +17,11 @@ export function useShortcutTest(
       await bridge.test(action)
       testPassed.value = undefined
       testing.value = action
-      testExpired.value = false
+      testExpired.value = undefined
       clearTimeout(timer)
       timer = setTimeout(() => {
         testing.value = undefined
-        testExpired.value = true
+        testExpired.value = action
       }, 30_000)
     })
   }
@@ -29,10 +29,17 @@ export function useShortcutTest(
   function tested(action: ShortcutAction): void {
     clearTimeout(timer)
     testing.value = undefined
-    testExpired.value = false
+    testExpired.value = undefined
     testPassed.value = action
     void refresh()
   }
 
-  return { testing, testPassed, testExpired, test, tested, dispose: () => clearTimeout(timer) }
+  function resetTest(): void {
+    clearTimeout(timer)
+    testing.value = undefined
+    testPassed.value = undefined
+    testExpired.value = undefined
+  }
+
+  return { testing, testPassed, testExpired, test, tested, resetTest, dispose: () => clearTimeout(timer) }
 }

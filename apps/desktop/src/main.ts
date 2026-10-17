@@ -20,7 +20,7 @@ const harnessParams = new URLSearchParams(harnessSearch)
 const isM01Harness = import.meta.env.VITE_M01_HARNESS === 'true' && harnessParams.get('m01') === '1'
 
 const isQuickCapture = new URLSearchParams(window.location.search).get('quickCapture') === '1'
-const isSettings = new URLSearchParams(window.location.search).get('settings') === 'shortcuts'
+const isSettings = ['shortcuts', 'general'].includes(new URLSearchParams(window.location.search).get('settings') ?? '')
 const Root = isM01Harness
   ? (await import('./M01Harness.vue')).default
   : isQuickCapture

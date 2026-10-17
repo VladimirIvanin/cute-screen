@@ -222,16 +222,21 @@ function selectLocale(value: SupportedLocale): void {
         to=".cs-overlay-root"
       >
         <template #trigger>
-          <NButton
-            quaternary
-            circle
-            class="cs-icon-button"
-            :aria-expanded="menuOpen"
-            :aria-label="t('moreActions')"
-            :title="t('moreActions')"
-          >
-            <UiIcon name="more" />
-          </NButton>
+          <NTooltip :disabled="menuOpen" :delay="400">
+            <template #trigger>
+              <NButton
+                quaternary
+                circle
+                class="cs-icon-button"
+                aria-haspopup="menu"
+                :aria-expanded="menuOpen"
+                :aria-label="t('moreActions')"
+              >
+                <UiIcon name="more" />
+              </NButton>
+            </template>
+            {{ t('moreActions') }}
+          </NTooltip>
         </template>
         <div class="cs-menu" role="menu">
           <NButton

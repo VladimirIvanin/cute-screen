@@ -1,5 +1,31 @@
 # Трассируемость требований
 
+## Shift для линейки (2026-10-17)
+
+`REQ-TOL-010`, `REQ-EDT-005/006`: запись до реализации. Shift ограничивает
+направление линейки шагом 45° при создании и изменении endpoints; Alt сохраняет
+настраиваемый шаг. Shift имеет приоритет. Key-only transitions пересчитывают
+preview из raw pointer, отпускная точка учитывается. Проверки: Vue input,
+browser DPR 1/2, production Quick → Editor в Tauri, undo/redo и cancel.
+Дополнение до исправления: native undo/redo к уже сохранённому состоянию
+оставлял ложный dirty badge. Red-first DocumentSession regression воспроизвёл
+ошибку; статус redo теперь берётся из `CommandManager.dirty`, как у undo.
+Native повтор со снятым save badge passed.
+Статус: implemented; Vue, browser DPR 1/2 × Fit/1:1 и настоящий
+Linux Tauri Quick → Editor passed. Команды, PNG и ограничения — TESTING.md,
+`artifacts/ruler-shift/`.
+
+## Меню других действий (2026-10-17)
+
+`REQ-UI-001/002/003/004/006`: запись добавлена до реализации. Ширина меню
+TopBar учитывает локализованные подписи и ограничена viewport; пункты не
+выходят за поверхность меню. Единственная подсказка триггера скрывается при
+открытии меню. Проверки: browser geometry и screenshots RU/EN, light/dark,
+1024 px и desktop, выбор темы/языка и disabled canvas actions.
+Статус: implemented; 4/4 focused browser scenarios (8 locale/theme/size
+combinations) и 11/11 component tests passed. Фактические команды и отдельные
+ошибки общего прогона — TESTING.md. Native WebView re-smoke pending.
+
 ## Прямые участки штрихов через Shift (2026-10-17)
 
 `REQ-TOL-003/004`, `REQ-EDT-006/016`: запись добавлена до реализации.
@@ -1305,3 +1331,13 @@ hover/focus и поведение инструментов сохраняютс�
 Статус: implemented; 29/29 component, 2/2 browser matrix и 1/1 real-WebView
 Capture → Quick → Editor passed. Геометрия и скриншоты проверены на Linux/X11;
 изоляция от параллельных правок и ограничения общих прогонов — TESTING.md.
+
+## Навигация настроек и запись в строке (2026-10-17)
+
+| Требование      | Изменение                                                        | Проверка                                                            |
+| --------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------- |
+| REQ-ACT-008     | Один tray item, Общие/Горячие клавиши слева, отдельный CLI route | Rust query contract; mounted navigation; browser/native singleton   |
+| REQ-ACT-009     | Запись с одного клика, inline draft/errors, меню троеточия       | Mounted component tests; browser keyboard/menu/size matrix          |
+| REQ-ACT-002/011 | Cancel/blur/Tab/navigation и stale probe isolation               | Mounted delayed-bridge tests; real Tauri recorder/activation/reopen |
+
+Evidence и фактические ограничения добавляются в TESTING.md после прогонов.

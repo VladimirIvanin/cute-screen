@@ -133,7 +133,7 @@ export class DocumentSessionController {
     const replayed = this.#manager.redo()
     this.#transient.reconcile(replayed.document)
     if (replayed.versionToken === before.versionToken) return this.#publish()
-    this.#state = 'dirty'
+    this.#state = replayed.dirty ? 'dirty' : 'saved'
     this.#scheduleSave()
     return this.#publish()
   }

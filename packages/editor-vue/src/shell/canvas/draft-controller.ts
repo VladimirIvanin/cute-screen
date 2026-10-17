@@ -311,7 +311,7 @@ export class DraftController {
       : { x: 0, y: 0, ...canvas }
     const start = constrainRulerEndpoint(gesture.start, gesture.start, bounds)
     const end = constrainRulerEndpoint(start, gesture.rawCurrent ?? gesture.current, bounds,
-      gesture.guidesHeld ? defaults.ruler.snapAngleIncrementDegrees : undefined)
+      gesture.snapAngleIncrementDegrees)
     if (start.x === end.x && start.y === end.y) return undefined
     return createRulerLayer({
       id,

@@ -1,3 +1,7 @@
+import {
+  rulerAngleStep,
+  updateRulerPointer,
+} from './ruler-modifiers'
 import { measuredTextHeight } from '../../text-layout'
 import {
   applyCropSession,
@@ -35,6 +39,7 @@ export interface GestureFinishContext {
   readonly isPanning: Ref<boolean>
   readonly crop: CropController
   readonly gesture: () => CanvasGesture
+  readonly setGesture: (gesture: NonNullable<CanvasGesture>) => void
   readonly clearGesture: () => void
   readonly clearRulerGuide: () => void
   readonly precisionLayer: (id: string) => LayerNode | undefined
@@ -79,6 +84,24 @@ export function finishCanvasGesture(
       const stroke = moveStroke(completed.stroke, point, event.shiftKey, true)
       completed = { ...completed, stroke, current: stroke.points.at(-1)!, points: stroke.points }
     }
+  }
+  const end = context.canvasPoint(event)
+  if (
+    end &&
+    completed?.kind === 'precision' &&
+    completed.tool === 'ruler'
+  ) {
+    completed = updateRulerPointer(completed, end, event,
+      context.props.precisionDefaults?.ruler.snapAngleIncrementDegrees).gesture
+    context.setGesture(completed)
+  }
+  if (
+    end &&
+    completed?.kind === 'intrinsicResize' &&
+    completed.initial.kind === 'ruler'
+  ) {
+    completed = { ...completed, current: end,
+      snapAngleIncrementDegrees: rulerAngleStep(event, completed.initial.payload.snapAngleIncrementDegrees) }
   }
   const precisionLayer = createCompletedPrecisionLayer(context, completed)
   clearTransientState(context, event)

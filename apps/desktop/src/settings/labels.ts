@@ -6,9 +6,20 @@ import type {
 
 export const strings = {
   ru: {
-    title: 'Горячие клавиши', subtitle: 'Захват из любого приложения. Настройки сохраняются на этом компьютере.',
-    loading: 'Загружаем настройки…', retry: 'Повторить', edit: 'Изменить', remove: 'Удалить', test: 'Проверить',
-    apply: 'Назначить', cancel: 'Отмена', record: 'Нажмите сочетание', recording: 'Нажмите сочетание · Esc — отмена',
+    general: 'Общие', shortcuts: 'Горячие клавиши', navigation: 'Разделы настроек', language: 'Язык',
+    generalHelp: 'Язык интерфейса и работа приложения в фоне.',
+    assign: 'Назначить…', assignName: 'Назначить сочетание', editName: 'Изменить сочетание',
+    actions: 'Действия', restart: 'Записать заново', escape: 'Esc — отменить',
+    invalid: 'Используйте Ctrl, Alt или Command с буквой, цифрой, F1–F11 или пробелом. Print Screen можно нажать отдельно.',
+    unchanged: 'Это сочетание уже назначено этому действию.',
+    conflictWith: 'Уже назначено действию', help: 'О проверке сочетаний',
+    systemEdit: 'Изменить в системе…', systemContinue: 'Продолжить в системе',
+    localHelp: 'Сочетания работают из других приложений. Изменения сохраняются на этом компьютере.',
+    notAssigned: 'Не назначено',
+
+    title: 'Настройки', subtitle: 'Нажмите «Назначить…» или «Изменить…», затем нажмите клавиши одновременно.',
+    loading: 'Загружаем настройки…', retry: 'Повторить', edit: 'Изменить…', remove: 'Убрать сочетание', test: 'Проверить сочетание',
+    apply: 'Сохранить', cancel: 'Отмена', record: 'Запись приостановлена', recording: 'Нажмите клавиши одновременно',
     recordHelp: 'Используйте Ctrl, Alt или Command. Fn, медиа-клавиши и F12 не поддерживаются.',
     system: 'Открыть настройки клавиатуры', portal: 'Сочетаниями управляет система. Изменение и удаление выполняются в системном окне.',
     manual: 'Автоматическое назначение недоступно. Добавьте сочетание в настройках клавиатуры и скопируйте команду ниже.',
@@ -26,9 +37,20 @@ export const strings = {
     unavailable: 'Этот вид захвата недоступен в текущей системе.', saving: 'Сохраняем…', close: 'Закрыть',
   },
   en: {
-    title: 'Keyboard shortcuts', subtitle: 'Capture from any application. Settings stay on this computer.',
-    loading: 'Loading settings…', retry: 'Retry', edit: 'Change', remove: 'Remove', test: 'Test', apply: 'Assign', cancel: 'Cancel',
-    record: 'Press a shortcut', recording: 'Press a shortcut · Esc to cancel',
+    general: 'General', shortcuts: 'Keyboard shortcuts', navigation: 'Settings sections', language: 'Language',
+    generalHelp: 'Interface language and background startup.',
+    assign: 'Assign…', assignName: 'Assign shortcut', editName: 'Change shortcut',
+    actions: 'Actions', restart: 'Record again', escape: 'Esc to cancel',
+    invalid: 'Use Ctrl, Alt or Command with a letter, number, F1–F11 or Space. Print Screen can be used on its own.',
+    unchanged: 'This shortcut is already assigned to this action.',
+    conflictWith: 'Already assigned to', help: 'About shortcut checks',
+    systemEdit: 'Change in system…', systemContinue: 'Continue in system',
+    localHelp: 'Shortcuts work from other applications. Changes stay on this computer.',
+    notAssigned: 'Unassigned',
+
+    title: 'Settings', subtitle: 'Choose Assign… or Change…, then press the keys together.',
+    loading: 'Loading settings…', retry: 'Retry', edit: 'Change…', remove: 'Remove shortcut', test: 'Test shortcut', apply: 'Save', cancel: 'Cancel',
+    record: 'Recording paused', recording: 'Press the keys together',
     recordHelp: 'Include Ctrl, Alt or Command. Fn, media keys and F12 are unsupported.',
     system: 'Open keyboard settings', portal: 'The system manages these shortcuts. Change or remove them in the system dialog.',
     manual: 'Automatic assignment is unavailable. Add a shortcut in system keyboard settings using the command below.',
@@ -53,7 +75,7 @@ const actionLabels: Record<ShortcutAction, [string, string]> = {
   'capture-repeat': ['Повторить область', 'Repeat area'], 'show-editor': ['Открыть редактор', 'Open editor'],
 }
 const statusLabels: Record<ShortcutStatusV1 | AutostartStateV1, [string, string]> = {
-  unassigned: ['Не назначено', 'Unassigned'], active: ['Работает', 'Active'], conflict: ['Конфликт', 'Conflict'],
+  unassigned: ['Не назначено', 'Unassigned'], active: ['Назначено', 'Assigned'], conflict: ['Конфликт', 'Conflict'],
   awaitingVerification: ['Ожидает проверки', 'Awaiting verification'], requiresApproval: ['Нужно разрешение в ОС', 'Requires system approval'],
   unavailable: ['Недоступно', 'Unavailable'], error: ['Ошибка', 'Error'], enabled: ['Включён', 'Enabled'],
   disabled: ['Выключен', 'Disabled'], unknown: ['Состояние ОС не подтверждено', 'System state unknown'], needsRepair: ['Нужно обновить путь', 'Path needs repair'],

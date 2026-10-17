@@ -1,6 +1,6 @@
 import {
   fireEvent,
-  render,
+  render as renderComponent,
   screen,
   waitFor,
 } from '@testing-library/vue'
@@ -13,6 +13,11 @@ import {
 import SettingsApp from '../../../apps/desktop/src/SettingsApp.vue'
 import { createSettingsHarnessBridge } from '../../../apps/desktop/src/settings/browser-harness'
 import { recordTrigger } from '../../../apps/desktop/src/settings/labels'
+
+function render(...args: Parameters<typeof renderComponent>) {
+  window.history.replaceState(null, '', '/?settings=shortcuts')
+  return renderComponent(...args)
+}
 
 describe('activation settings production mount flow', () => {
   it('offers system approval during setup without changing the startup choice', async () => {
@@ -34,7 +39,7 @@ describe('activation settings production mount flow', () => {
     render(SettingsApp, { props: { bridge } })
     await fireEvent.click(await screen.findByRole('button', { name: 'Ctrl+Shift+2' }))
     await screen.findByText('Available in registration check', { selector: 'p' })
-    await fireEvent.click(screen.getByRole('button', { name: 'Assign' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
     expect((await bridge.snapshot()).entries[0]?.trigger).toBeNull()
   })
@@ -57,7 +62,7 @@ describe('activation settings production mount flow', () => {
     const system = vi.spyOn(bridge, 'systemSettings')
     const assign = vi.spyOn(bridge, 'assign')
     render(SettingsApp, { props: { bridge } })
-    await fireEvent.click(await screen.findByRole('button', { name: 'Change: Capture area' }))
+    await fireEvent.click(await screen.findByRole('button', { name: 'Change in system…: Capture area' }))
     await waitFor(() => expect(system).toHaveBeenCalledOnce())
     expect(assign).not.toHaveBeenCalled()
   })
@@ -90,11 +95,11 @@ describe('activation settings production mount flow', () => {
     await bridge.assign('capture-area', 'CTRL+SHIFT+2')
     const assign = vi.spyOn(bridge, 'assign')
     render(SettingsApp, { props: { bridge, firstRun: true } })
-    await fireEvent.click(await screen.findByRole('button', { name: 'Change: Capture area' }))
-    await fireEvent.click(await screen.findByRole('button', { name: 'Ctrl+Shift+2' }))
+    await fireEvent.click(await screen.findByRole('button', { name: 'Change shortcut: Capture area' }))
+    await screen.findByText('Press the keys together')
     await fireEvent.keyDown(window, { key: '3', code: 'Digit3', ctrlKey: true, shiftKey: true })
     await screen.findByText('Already in use')
-    expect(screen.getByRole('button', { name: 'Assign' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: 'Save' }).hasAttribute('disabled')).toBe(true)
     expect(assign).not.toHaveBeenCalled()
     expect((await bridge.snapshot()).entries[0]?.trigger).toBe('CTRL+SHIFT+2')
   })
@@ -103,15 +108,16 @@ describe('activation settings production mount flow', () => {
     const bridge = createSettingsHarnessBridge()
     const recording = vi.spyOn(bridge, 'recording')
     render(SettingsApp, { props: { bridge } })
-    await fireEvent.click(await screen.findByRole('button', { name: 'Change: Capture area' }))
-    await fireEvent.click(await screen.findByRole('button', { name: 'Press a shortcut' }))
+    await fireEvent.click(await screen.findByRole('button', { name: 'Assign shortcut: Capture area' }))
+    await screen.findByText('Press the keys together')
     await fireEvent.keyDown(window, { key: '2', code: 'Digit2', ctrlKey: true, shiftKey: true })
     await screen.findByText('Available in registration check', { selector: 'p' })
-    await fireEvent.click(screen.getByRole('button', { name: 'Assign' }))
-    await waitFor(() => expect(screen.getByText('Active')).toBeTruthy())
+    await fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(screen.getByText('Assigned')).toBeTruthy())
     expect((await bridge.snapshot()).entries[0]?.trigger).toBe('CTRL+SHIFT+2')
-    await fireEvent.click(screen.getByRole('button', { name: 'Change: Capture area' }))
-    await fireEvent.click(await screen.findByRole('button', { name: 'Ctrl+Shift+2' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Change shortcut: Capture area' }).hasAttribute('disabled')).toBe(false))
+    await fireEvent.click(screen.getByRole('button', { name: 'Change shortcut: Capture area' }))
+    await screen.findByText('Press the keys together')
     await fireEvent.blur(window)
     await waitFor(() => expect(recording).toHaveBeenLastCalledWith(false))
   })
@@ -124,9 +130,9 @@ describe('activation settings production mount flow', () => {
     render(SettingsApp, { props: { bridge } })
     await fireEvent.click(await screen.findByRole('button', { name: 'Ctrl+Shift+2' }))
     await screen.findByText('Available in registration check', { selector: 'p' })
-    await fireEvent.click(screen.getByRole('button', { name: 'Assign' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect((await screen.findByRole('alert')).textContent).toContain('disk full')
-    expect(screen.getByRole('button', { name: 'Assign' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeTruthy()
   })
 })
 

@@ -4,6 +4,7 @@ import {
   expect,
 } from '@wdio/globals'
 import path from 'node:path'
+import { setShellPreferences } from './browser-m06-test-kit'
 
 describe('M02 editor shell in browser mode', () => {
   async function openShell(fixture: 'empty' | 'error' | 'loading' | 'ready'): Promise<void> {
@@ -198,6 +199,56 @@ describe('M02 editor shell in browser mode', () => {
     expect(placement.position).toBe('static')
     expect(placement.menuTop).toBeGreaterThanOrEqual(placement.triggerBottom)
   })
+
+  it('fits localized menu labels and hides the trigger tooltip while open', async () => {
+    await openShell('ready')
+    for (const width of [1024, 1600]) {
+      await browser.setWindowSize(width, 800)
+      for (const locale of ['ru', 'en'] as const) {
+        for (const theme of ['light', 'dark'] as const) {
+          await setShellPreferences(locale, theme)
+          const label = locale === 'ru' ? 'Другие действия' : 'More actions'
+          const trigger = $(`button[aria-label="${label}"]`)
+          await trigger.moveTo()
+          await browser.waitUntil(async () => (await $('.n-tooltip').isDisplayed()))
+          await trigger.click()
+          await expect(trigger).toHaveAttribute('aria-expanded', 'true')
+          await browser.waitUntil(async () => !(await $('.n-tooltip').isDisplayed()))
+
+          const geometry = await browser.execute((name) => {
+            const menu = document.querySelector('.cs-menu')!
+            const bounds = menu.getBoundingClientRect()
+            const trigger = document.querySelector(`button[aria-label="${name}"]`)!
+            return {
+              fitsViewport:
+                bounds.left >= 0 &&
+                bounds.right <= innerWidth &&
+                bounds.top >= 0 &&
+                bounds.bottom <= innerHeight,
+              nativeTooltip: trigger.hasAttribute('title'),
+              labelsFit: [...menu.querySelectorAll('button')].every((button) => {
+                const content = button.querySelector('.n-button__content')!
+                const range = document.createRange()
+                range.selectNodeContents(content)
+                const text = range.getBoundingClientRect()
+                const item = button.getBoundingClientRect()
+                return (
+                  text.left >= item.left &&
+                  text.right <= item.right &&
+                  text.top >= item.top &&
+                  text.bottom <= item.bottom
+                )
+              }),
+            }
+          }, label)
+          expect(geometry).toEqual({ fitsViewport: true, nativeTooltip: false, labelsFit: true })
+          await browser.saveScreenshot(path.resolve('artifacts/browser-e2e', `topbar-menu-${width}-${locale}-${theme}.png`))
+          await trigger.click()
+          await expect(trigger).toHaveAttribute('aria-expanded', 'false')
+        }
+      }
+    }
+  }).timeout(120000)
 
   it('renders loading and recoverable error states, and reaches capture first by keyboard', async () => {
     await browser.setWindowSize(1024, 700)

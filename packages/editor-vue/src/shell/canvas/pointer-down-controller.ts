@@ -1,3 +1,4 @@
+import { rulerAngleStep } from './ruler-modifiers'
 import {
   DEFAULT_DRAWING_DEFAULTS,
   beginStroke,
@@ -241,6 +242,10 @@ function beginPrecision(
     current: point,
     points: [point],
     guidesHeld: event.altKey,
+    snapAngleIncrementDegrees: rulerAngleStep(
+      event,
+      context.props.precisionDefaults?.ruler.snapAngleIncrementDegrees ?? 15,
+    ),
   })
   context.clearRulerGuide()
   context.invalidateOverlay()

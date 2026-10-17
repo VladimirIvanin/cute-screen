@@ -268,13 +268,19 @@
 .cs-overlay-root > * {
   pointer-events: auto;
 }
-.cs-menu {
-  width: 188px;
-}
 .cs-menu .n-button {
   display: flex;
   width: 100%;
+  height: auto;
+  min-height: 32px;
   justify-content: flex-start;
+  white-space: normal;
+}
+.cs-menu .n-button__content {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
 }
 
 @media (max-width: 1100px) {

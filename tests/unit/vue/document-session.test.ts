@@ -12,6 +12,7 @@ import {
 } from '@cute-screen/editor-vue'
 import {
   createDrawingLayer,
+  createRulerLayer,
   defaultDrawingToolPreferences,
   parseEditorDocument,
   parseDrawingToolPreferences,
@@ -40,6 +41,31 @@ const document: EditorDocumentV1 = {
 }
 
 describe('M03 document persistence session', () => {
+  it('shows saved when redo restores an already persisted ruler', async () => {
+    vi.useFakeTimers()
+    try {
+      const saveDocument = vi.fn(async () => 2)
+      const session = new DocumentSessionController({
+        document, revision: 1, correlationId: () => 'ruler-redo',
+        bridge: { saveDocument, exportRecoveryBundle: async () => ({ kind: 'saved' }) },
+      })
+      const ruler = createRulerLayer({ id: '019c1f62-058e-7000-8000-000000000089',
+        start: { x: 10, y: 10 }, end: { x: 60, y: 60 }, canvas: document.canvas })
+      session.execute({ type: 'addLayer', layer: ruler })
+      await session.flush()
+      session.undo()
+      expect(session.snapshot.saveState).toBe('dirty')
+      session.redo()
+      expect(session.snapshot.core.dirty).toBe(false)
+      expect(session.snapshot.saveState).toBe('saved')
+      await vi.advanceTimersByTimeAsync(500)
+      expect(saveDocument).toHaveBeenCalledTimes(1)
+      expect(session.snapshot.core.document.layers).toEqual([ruler])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('describes an unsupported native document schema without object stringification', () => {
     const message = describeError({ olderSchema: { schema_version: 4 } }, 'Unable to open the document.')
 

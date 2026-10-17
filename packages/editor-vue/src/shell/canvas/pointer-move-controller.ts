@@ -1,11 +1,14 @@
 import {
+  rulerAngleStep,
+  updateRulerPointer,
+} from './ruler-modifiers'
+import {
   constrainRulerMove,
   moveStroke,
   rulerCanvasBounds,
   moveCrop,
   resizeCrop,
   snapPoint,
-  snapRulerEndpoint,
   type RulerAngleGuide,
   type SnapCandidate,
 } from '@cute-screen/editor-renderer'
@@ -161,25 +164,18 @@ function movePrecision(
   gesture: Extract<NonNullable<CanvasGesture>, { readonly kind: 'precision' }>,
 ): void {
   const defaults = gesture.precisionDefaults ?? context.props.precisionDefaults ?? DEFAULT_PRECISION_TOOLS
-  let current = point
-  context.setRulerGuide(undefined)
-  if (
-    gesture.tool === 'ruler' &&
-    (event.altKey ||
-      gesture.guidesHeld)
-  ) {
-    const snapped = snapRulerEndpoint(gesture.start, point, defaults.ruler.snapAngleIncrementDegrees)
-    current = snapped.end
-    context.setRulerGuide(snapped.guide)
-  }
+  const ruler = gesture.tool === 'ruler'
+    ? updateRulerPointer(gesture, point, event, defaults.ruler.snapAngleIncrementDegrees)
+    : undefined
+  context.setRulerGuide(ruler?.guide)
   const previous = gesture.points[gesture.points.length - 1]
   const shouldAppend =
     gesture.tool === 'censor' &&
     defaults.censor.region === 'freeform' &&
     (!previous || Math.hypot(point.x - previous.x, point.y - previous.y) >= 0.5)
   context.setGesture({
-    ...gesture,
-    current,
+    ...(ruler?.gesture ?? gesture),
+    current: ruler?.gesture.current ?? point,
     rawCurrent: point,
     guidesHeld: event.altKey,
     points: shouldAppend ? [...gesture.points, point] : gesture.points,
@@ -237,7 +233,7 @@ function moveTransform(
   } else if (gesture.kind === 'intrinsicResize') {
     context.setGesture({
       ...gesture,
-      snapAngleIncrementDegrees: gesture.initial.kind === 'ruler' && event.altKey ? gesture.initial.payload.snapAngleIncrementDegrees : undefined,
+      snapAngleIncrementDegrees: gesture.initial.kind === 'ruler' ? rulerAngleStep(event, gesture.initial.payload.snapAngleIncrementDegrees) : undefined,
       current: point,
       preserveAspect: event.shiftKey || gesture.initial.kind === 'emoji' || gesture.initial.kind === 'loupe',
       centerResize: gesture.handle === 'start' || gesture.handle === 'end' ? false : event.altKey,

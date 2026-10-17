@@ -1,122 +1,85 @@
 import { ref } from 'vue'
 import type { ShortcutAction } from '../generated/desktop-ipc'
-import {
-  settingsError,
-  type ActivationSettingsBridge,
-} from './contracts'
+import { type ActivationSettingsBridge } from './contracts'
 import { useSettingsLoader } from './use-settings-loader'
 import { useShortcutTest } from './use-shortcut-test'
+import { useShortcutRecorder } from './use-shortcut-recorder'
 
 export function useSettings(bridge: ActivationSettingsBridge) {
-  const { snapshot, startup, error, busy, loading, load, perform } = useSettingsLoader(bridge)
-  const editing = ref<ShortcutAction>()
-  const recording = ref(false)
-  const trigger = ref('')
-  const probe = ref('')
+  const loader = useSettingsLoader(bridge)
+  const { snapshot, perform, load, error } = loader
+  const recorder = useShortcutRecorder(bridge, snapshot)
   const testState = useShortcutTest(bridge, perform, load)
-  const { testing, testPassed, testExpired, test, tested } = testState
+  const errorAction = ref<ShortcutAction>()
+  const verificationExpired = ref<ShortcutAction>()
 
-  async function stopRecording(): Promise<void> {
-    recording.value = false
-    try {
-      await bridge.recording(false)
-    } catch (cause) {
-      error.value = settingsError(cause)
+  async function cancel(): Promise<void> {
+    await recorder.cancelRecording()
+    testState.resetTest()
+    if (recorder.recordError.value) {
+      errorAction.value = undefined
+      error.value = recorder.recordError.value
+      return
     }
+    await perform(async () => {
+      await bridge.cancel()
+      await load()
+    })
   }
 
   async function edit(action: ShortcutAction): Promise<void> {
+    if (loader.busy.value) return
+    errorAction.value = action
+    error.value = ''
+    await cancel()
+    if (error.value) return
     if (snapshot.value?.backend === 'portal' && snapshot.value.canConfigure) {
       await perform(async () => {
         await bridge.systemSettings()
       })
       return
     }
-    await stopRecording()
-    editing.value = action
-    trigger.value = snapshot.value?.entries.find((entry) => entry.action === action)?.trigger ?? ''
-    probe.value = ''
-  }
-
-  async function startRecording(): Promise<void> {
-    error.value = ''
-    try {
-      await bridge.recording(true)
-      recording.value = true
-    } catch (cause) {
-      error.value = settingsError(cause)
-    }
-  }
-
-  async function setTrigger(value: string): Promise<void> {
-    trigger.value = value
-    await stopRecording()
-    probe.value = 'checking'
-    try {
-      const result = await bridge.probe(value)
-      if (trigger.value === value) probe.value = result
-    } catch (cause) {
-      if (trigger.value === value) {
-        probe.value = ''
-        error.value = settingsError(cause)
-      }
-    }
+    await recorder.edit(action)
   }
 
   async function assign(
     action: ShortcutAction,
     value: string | null,
   ): Promise<void> {
+    errorAction.value = action
     await perform(async () => {
-      await stopRecording()
+      await recorder.stopRecording()
       try {
         snapshot.value = await bridge.assign(action, value)
       } catch (cause) {
         await load()
         throw cause
       }
-      editing.value = undefined
-      testPassed.value = undefined
+      await recorder.cancelRecording()
+      testState.resetTest()
+      verificationExpired.value = undefined
     })
   }
 
-  async function cancel(): Promise<void> {
-    await stopRecording()
-    await perform(async () => {
-      await bridge.cancel()
-      editing.value = undefined
-      await load()
-    })
+  async function test(action: ShortcutAction): Promise<void> {
+    await cancel()
+    errorAction.value = action
+    await testState.test(action)
+  }
+
+  function tested(action: ShortcutAction): void {
+    if (verificationExpired.value === action) verificationExpired.value = undefined
+    testState.tested(action)
   }
 
   function dispose(): void {
     testState.dispose()
-    void stopRecording()
+    recorder.disposeRecorder()
   }
 
   return {
-    snapshot,
-    startup,
-    error,
-    busy,
-    loading,
-    editing,
-    recording,
-    trigger,
-    probe,
-    testing,
-    testPassed,
-    testExpired,
-    load,
-    perform,
-    edit,
-    startRecording,
-    stopRecording,
-    setTrigger,
-    assign,
-    cancel,
-    test,
-    tested,
-    dispose,
+    ...loader, ...recorder, ...testState,
+    errorAction, verificationExpired, edit, assign, cancel, test, tested, dispose,
   }
 }
+export type SettingsState = ReturnType<typeof useSettings>

@@ -2,191 +2,81 @@
 import {
   computed,
   nextTick,
-  onBeforeUnmount,
-  onMounted,
   ref,
-  shallowRef,
 } from 'vue'
 import { activationSettingsBridge } from './platform/tauri/activation-settings-adapter'
-import type { ShortcutAction } from './generated/desktop-ipc'
+import { type ActivationSettingsBridge } from './settings/contracts'
 import {
-  settingsError,
-  type ActivationSettingsBridge,
-} from './settings/contracts'
-import {
-  actionLabel,
-  displayTrigger,
-  recordTrigger,
   strings,
   type SettingsLocale,
 } from './settings/labels'
 import { useSettings } from './settings/use-settings'
-import ShortcutRow from './settings/ShortcutRow.vue'
+import { useSettingsRuntime } from './settings/use-settings-runtime'
+import GeneralSettings from './settings/GeneralSettings.vue'
+import ShortcutSettings from './settings/ShortcutSettings.vue'
 import StartupPreferences from './settings/StartupPreferences.vue'
 import './settings/settings.css'
 
 const props = defineProps<{ bridge?: ActivationSettingsBridge; firstRun?: boolean }>()
+const scrollPanel = ref<HTMLElement>()
 const bridge = props.bridge ?? activationSettingsBridge
 const state = useSettings(bridge)
-const {
-  snapshot,
-  startup,
-  error,
-  busy,
-  loading,
-  editing,
-  recording,
-  trigger,
-  probe,
-  testing,
-  testPassed,
-  testExpired,
-} = state
+const { snapshot, startup, error, busy, loading, errorAction } = state
 const locale = ref<SettingsLocale>(navigator.language.startsWith('ru') ? 'ru' : 'en')
 const labels = computed(() => strings[locale.value])
-const firstRun = props.firstRun === true || new URLSearchParams(window.location.search).get('firstRun') === '1'
+const query = new URLSearchParams(window.location.search)
+const firstRun = props.firstRun === true || query.get('firstRun') === '1'
 const startupStep = computed(() => firstRun && snapshot.value?.autostartChoice === null)
-const macos = computed(() => snapshot.value?.platform === 'macos')
-const recorder = ref<HTMLButtonElement>()
-const copied = ref(false)
-const verificationExpired = ref(false)
-const suggestions = shallowRef<Record<string, string>>({})
-let unlisten: (() => void) | undefined
-let polling: ReturnType<typeof setInterval> | undefined
-let disposed = false
-
-async function checkSuggestions(): Promise<void> {
-  if (!snapshot.value || snapshot.value.backend === 'manual') return
-  for (const value of snapshot.value.suggested) {
-    try {
-      const result = await bridge.probe(value)
-      if (disposed) return
-      suggestions.value = { ...suggestions.value, [value]: result }
-    } catch (cause) {
-      suggestions.value = { ...suggestions.value, [value]: 'unknown' }
-      console.warn('Shortcut suggestion check failed', settingsError(cause))
-    }
-  }
-}
+const closeLabel = computed(() => {
+  if (startupStep.value) return labels.value.cancel
+  return snapshot.value?.setupCompleted ? labels.value.close : labels.value.finish
+})
+const section = ref(query.get('settings') === 'shortcuts' ? 'shortcuts' : 'general')
 
 async function confirmStartup(enabled: boolean): Promise<void> {
+  errorAction.value = undefined
   await state.perform(async () => {
     startup.value = await bridge.setAutostart(enabled)
     snapshot.value = await bridge.snapshot()
+    if (firstRun) section.value = 'shortcuts'
   })
 }
 
 async function finish(): Promise<void> {
+  errorAction.value = undefined
+  await state.cancel()
+  if (error.value) return
   await state.perform(async () => {
-    await bridge.cancel()
     if (!snapshot.value?.setupCompleted) await bridge.completeSetup()
     await bridge.close()
   })
 }
 
-async function suggest(value: string): Promise<void> {
-  await editAction('capture-area')
-  await state.setTrigger(value)
-  await nextTick()
-  recorder.value?.focus()
-}
-
-async function editAction(action: ShortcutAction): Promise<void> {
-  await state.edit(action)
-  await nextTick()
-  recorder.value?.focus()
-  recorder.value?.scrollIntoView?.({ block: 'nearest' })
-}
-
 async function cancelEditing(): Promise<void> {
-  const action = editing.value ?? snapshot.value?.pendingAction
+  const action = state.editing.value ?? snapshot.value?.pendingAction
   await state.cancel()
-  if (action) document.querySelector<HTMLButtonElement>(`[data-action="${action}"] button`)?.focus()
+  await nextTick()
+  if (action) document.querySelector<HTMLButtonElement>(`[data-edit="${action}"]`)?.focus()
 }
 
-function onKey(event: KeyboardEvent): void {
-  if (
-    event.key === 'Escape' &&
-    (recording.value ||
-      editing.value)
-  ) {
-    event.preventDefault()
-    event.stopImmediatePropagation()
-    void cancelEditing()
-    return
-  }
-  if (!recording.value) return
-  if (event.key === 'Tab') {
-    void state.stopRecording()
-    return
-  }
-  event.preventDefault()
-  event.stopImmediatePropagation()
-  const value = recordTrigger(event)
-  if (value) void state.setTrigger(value)
+async function navigate(value: string): Promise<void> {
+  if (section.value === value || busy.value) return
+  await state.cancel()
+  if (error.value) return
+  errorAction.value = undefined
+  section.value = value
+  await nextTick()
+  scrollPanel.value?.scrollTo?.(0, 0)
 }
 
-function onBlur(): void {
-  void state.stopRecording()
-}
-
-async function poll(): Promise<void> {
-  if (disposed || busy.value) return
-  if (recording.value) {
-    try {
-      await bridge.recording(true)
-    } catch (cause) {
-      error.value = settingsError(cause)
-    }
-    return
-  }
-  const wasPending = snapshot.value?.pendingAction
-  await state.load()
-  if (
-    wasPending &&
-    !snapshot.value?.pendingAction &&
-    testPassed.value !== wasPending
-  ) verificationExpired.value = true
-}
-
-async function copyCommand(): Promise<void> {
-  const command = snapshot.value?.entries.find((entry) => entry.action === 'capture-area')?.command
-  if (!command) return
+async function startupSystem(): Promise<void> {
+  errorAction.value = undefined
   await state.perform(async () => {
-    await navigator.clipboard.writeText(command)
-    copied.value = true
+    await bridge.autostartSystemSettings()
   })
 }
 
-onMounted(async () => {
-  await state.load()
-  if (disposed) return
-  void checkSuggestions()
-  try {
-    const cleanup = await bridge.listen(state.tested, (value) => {
-      if (recording.value) void state.setTrigger(value)
-    })
-    if (disposed) cleanup()
-    else unlisten = cleanup
-  } catch (cause) {
-    error.value = settingsError(cause)
-  }
-  if (disposed) return
-  polling = setInterval(() => {
-    void poll()
-  }, 5000)
-  window.addEventListener('keydown', onKey, true)
-  window.addEventListener('blur', onBlur)
-})
-
-onBeforeUnmount(() => {
-  disposed = true
-  clearInterval(polling)
-  unlisten?.()
-  window.removeEventListener('keydown', onKey, true)
-  window.removeEventListener('blur', onBlur)
-  state.dispose()
-})
+useSettingsRuntime(bridge, state, cancelEditing)
 </script>
 
 <template>
@@ -195,132 +85,69 @@ onBeforeUnmount(() => {
     :lang="locale"
     :aria-busy="loading || busy"
   >
-    <header class="cs-settings-header">
-      <div><p class="cs-settings-eyebrow">Cute Screen</p><h1>{{ labels.title }}</h1></div>
-      <select v-model="locale" aria-label="Language / Язык"><option value="ru">Русский</option><option value="en">English</option></select>
-    </header>
-    <p class="cs-settings-muted">{{ labels.subtitle }}</p>
-    <p v-if="loading" role="status">{{ labels.loading }}</p>
-    <div
-      v-if="error || snapshot?.error"
-      class="cs-settings-error"
-      role="alert"
-    >
-      {{ error || snapshot?.error }}
-      <button v-if="!snapshot" @click="state.load">{{ labels.retry }}</button>
-    </div>
-    <template v-if="snapshot">
-      <StartupPreferences
-        v-if="startupStep"
-        :first-run="true"
-        :state="startup"
-        :busy="busy"
-        :locale="locale"
-        :labels="labels"
-        @confirm="confirmStartup"
-        @system="state.perform(async () => { await bridge.autostartSystemSettings() })"
-      />
-      <template v-else>
-        <section
-          v-if="!snapshot.entries.find((entry) => entry.action === 'capture-area')?.display && snapshot.backend !== 'manual'"
-          class="cs-shortcut-suggestions"
-          :aria-label="labels.suggested"
+    <aside class="cs-settings-sidebar">
+      <header><p class="cs-settings-eyebrow">Cute Screen</p><h1>{{ labels.title }}</h1></header>
+      <nav :aria-label="labels.navigation">
+        <button
+          :aria-current="section === 'general' ? 'page' : undefined"
+          :disabled="busy || startupStep"
+          @click="navigate('general')"
         >
-          <strong>{{ labels.suggested }}</strong>
-          <div class="cs-settings-row-actions">
-            <div
-              v-for="value in snapshot.suggested"
-              :key="value"
-              class="cs-suggestion-choice"
-            >
-              <button :disabled="busy || suggestions[value] === 'occupied' || suggestions[value] === 'assigned'" @click="suggest(value)">{{ displayTrigger(value, macos) }}</button>
-              <span class="cs-settings-muted">{{ labels[(suggestions[value] ?? 'checking') as 'available' | 'occupied' | 'unknown' | 'assigned' | 'checking'] }}</span>
-            </div>
-          </div>
-        </section>
-        <div v-if="snapshot.backend === 'portal' || snapshot.backend === 'manual'" class="cs-settings-notice">
-          <p>{{ snapshot.backend === 'portal' ? labels.portal : labels.manual }}</p>
-          <button :disabled="busy || (snapshot.backend === 'portal' && !snapshot.canConfigure)" @click="state.perform(async () => { await bridge.systemSettings() })">{{ labels.system }}</button>
-          <button
-            v-if="snapshot.backend === 'manual'"
-            :disabled="busy"
-            @click="copyCommand"
-          >
-            {{ copied ? labels.copied : labels.copy }}
-          </button>
+          {{ labels.general }}
+        </button>
+        <button
+          :aria-current="section === 'shortcuts' ? 'page' : undefined"
+          :disabled="busy || startupStep"
+          @click="navigate('shortcuts')"
+        >
+          {{ labels.shortcuts }}
+        </button>
+      </nav>
+    </aside>
+    <div class="cs-settings-content">
+      <div ref="scrollPanel" class="cs-settings-scroll">
+        <p v-if="loading" role="status">{{ labels.loading }}</p>
+        <div
+          v-if="(error && !errorAction) || snapshot?.error"
+          class="cs-settings-error"
+          role="alert"
+        >
+          {{ (error && !errorAction) ? error : snapshot?.error }}
+          <button v-if="!snapshot" @click="state.load">{{ labels.retry }}</button>
         </div>
-        <section class="cs-shortcut-list" :aria-label="labels.title">
-          <ShortcutRow
-            v-for="entry in snapshot.entries"
-            :key="entry.action"
-            :entry="entry"
+        <template v-if="snapshot">
+          <StartupPreferences
+            v-if="startupStep"
+            :first-run="true"
+            :state="startup"
+            :busy="busy"
             :locale="locale"
             :labels="labels"
-            :busy="busy"
-            :manual="snapshot.backend === 'manual'"
-            :macos="macos"
-            @edit="editAction(entry.action)"
-            @remove="state.assign(entry.action, null)"
-            @test="state.test(entry.action)"
+            @confirm="confirmStartup"
+            @system="startupSystem"
           />
-        </section>
-        <section
-          v-if="editing"
-          class="cs-shortcut-recorder"
-          :aria-label="actionLabel(editing, locale)"
-        >
-          <h2>{{ actionLabel(editing, locale) }}</h2>
-          <button
-            ref="recorder"
-            class="cs-record-shortcut"
-            :class="{ 'is-recording': recording }"
-            :disabled="busy"
-            @click="state.startRecording"
-          >
-            {{ recording ? labels.recording : trigger ? displayTrigger(trigger, macos) : labels.record }}
-          </button>
-          <p class="cs-settings-muted">{{ labels.recordHelp }}</p>
-          <p v-if="probe" role="status">{{ labels[probe as 'available' | 'occupied' | 'unknown' | 'assigned' | 'checking'] ?? probe }}</p>
-          <p v-if="trigger.includes('PRINT')" class="cs-settings-notice">{{ labels.print }}</p>
-          <div class="cs-settings-row-actions">
-            <button
-              class="cs-settings-primary"
-              :disabled="busy || recording || !trigger || probe === 'occupied' || probe === 'checking'"
-              @click="state.assign(editing, trigger)"
-            >
-              {{ busy ? labels.saving : labels.apply }}
-            </button>
-            <button :disabled="busy" @click="cancelEditing">{{ labels.cancel }}</button>
-          </div>
-        </section>
-        <div
-          v-if="snapshot.pendingAction"
-          class="cs-settings-notice"
-          role="status"
-        >
-          <p>{{ labels.pending }}</p><button :disabled="busy" @click="state.cancel">{{ labels.cancel }}</button>
-        </div>
-        <p
-          v-if="testing"
-          role="status"
-          class="cs-settings-notice"
-        >
-          {{ labels.testing }}
-        </p>
-        <p v-if="testPassed" role="status">{{ labels.tested }}: {{ actionLabel(testPassed, locale) }}</p>
-        <p v-if="verificationExpired || testExpired" role="status">{{ labels.timeout }}</p>
-        <p class="cs-settings-muted cs-settings-footnote">{{ labels.disclaimer }}</p>
-        <StartupPreferences
-          :first-run="false"
-          :state="startup"
-          :busy="busy"
-          :locale="locale"
-          :labels="labels"
-          @change="confirmStartup"
-          @system="state.perform(async () => { await bridge.autostartSystemSettings() })"
-        />
-      </template>
-      <footer class="cs-settings-footer"><button :disabled="busy" @click="finish">{{ startupStep ? labels.cancel : !snapshot.setupCompleted ? labels.finish : labels.close }}</button></footer>
-    </template>
+          <GeneralSettings
+            v-else-if="section === 'general'"
+            :locale="locale"
+            :labels="labels"
+            :state="state"
+            @locale="locale = $event"
+            @startup="confirmStartup"
+            @system="startupSystem"
+          />
+          <ShortcutSettings
+            v-else
+            :state="state"
+            :bridge="bridge"
+            :locale="locale"
+            :labels="labels"
+            @cancel="cancelEditing"
+          />
+        </template>
+      </div>
+      <footer v-if="snapshot" class="cs-settings-footer">
+        <button :disabled="busy" @click="finish">{{ closeLabel }}</button>
+      </footer>
+    </div>
   </main>
 </template>

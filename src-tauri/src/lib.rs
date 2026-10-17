@@ -1762,14 +1762,12 @@ fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()
         "Open Editor"
     };
     let show = MenuItem::with_id(app, "show-editor", editor_label, true, None::<&str>)?;
-    let settings = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
-    let shortcuts_item = MenuItem::with_id(
-        app,
-        "shortcut-settings",
-        "Assign keyboard shortcuts…",
-        true,
-        None::<&str>,
-    )?;
+    let settings_label = if env::var("LANG").unwrap_or_default().starts_with("ru") {
+        "Настройки…"
+    } else {
+        "Settings…"
+    };
+    let settings = MenuItem::with_id(app, "settings", settings_label, true, None::<&str>)?;
     let capture_active = MenuItem::with_id(
         app,
         "capture-active-window",
@@ -1791,7 +1789,6 @@ fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()
             &capture_repeat,
             &separator,
             &show,
-            &shortcuts_item,
             &settings,
             &quit,
         ],
@@ -1829,7 +1826,7 @@ fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()
                 capture_request_for_tray(capture::CaptureAction::Repeat),
                 false,
             ),
-            "settings" | "shortcut-settings" => {
+            "settings" => {
                 if let Err(error) = settings_window::open(app, false) {
                     eprintln!("cute-screen tray settings: {error}");
                 }
@@ -2188,7 +2185,7 @@ fn handle_launch<R: tauri::Runtime>(app: &tauri::AppHandle<R>, intent: LaunchInt
             }
         }
         LaunchIntentV1::Settings => {
-            if let Err(error) = settings_window::open(app, false) {
+            if let Err(error) = settings_window::open_shortcuts(app) {
                 eprintln!("cute-screen settings: {error}");
             }
         }

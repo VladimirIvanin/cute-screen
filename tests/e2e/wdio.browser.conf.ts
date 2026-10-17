@@ -69,7 +69,11 @@ export const config: WebdriverIO.Config = {
         // Chrome 138+ disables the software WebGL fallback unless this is
         // explicit. Browser mode intentionally exercises CanvasKit/WebGL,
         // while the application runtime retains its Canvas2D fallback.
-        args: ['--enable-unsafe-swiftshader'],
+        args: [
+          '--enable-unsafe-swiftshader',
+          // Isolate trusted input from focus changes on a shared desktop.
+          ...(process.env.CUTE_SCREEN_BROWSER_E2E_HEADLESS === '1' ? ['--headless=new'] : []),
+        ],
       },
     },
   ],

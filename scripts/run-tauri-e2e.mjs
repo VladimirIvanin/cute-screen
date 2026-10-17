@@ -21,6 +21,13 @@ const embeddedWebDriverPort = Number.parseInt(process.env.TAURI_WEBDRIVER_PORT ?
 
 const scenarios = [
   {
+    id: 'ruler-shift',
+    spec: 'tests/e2e/specs/tauri-ruler-shift.e2e.ts',
+    harnessQuery: '?m04=1&m08=1',
+    fakeCapture: true,
+    driverProvider: 'external',
+  },
+  {
     id: 'straight-strokes',
     persistenceGroup: 'straight-strokes',
     spec: 'tests/e2e/specs/tauri-straight-strokes.e2e.ts',

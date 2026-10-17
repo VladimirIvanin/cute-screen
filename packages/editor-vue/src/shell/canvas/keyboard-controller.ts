@@ -1,7 +1,10 @@
 import {
+  rulerAngleStep,
+  updateRulerPointer,
+} from './ruler-modifiers'
+import {
   nudgeCrop,
   setStrokeStraight,
-  snapRulerEndpoint,
   type RulerAngleGuide,
 } from '@cute-screen/editor-renderer'
 import type {
@@ -53,8 +56,12 @@ export class KeyboardController {
     const gesture = this.#context.gesture()
     if (
       event.key === 'Escape' &&
-      gesture?.kind === 'draw' &&
-      gesture.stroke
+      (gesture?.kind === 'draw' &&
+        gesture.stroke ||
+        gesture?.kind === 'precision' &&
+        gesture.tool === 'ruler' ||
+        gesture?.kind === 'intrinsicResize' &&
+        gesture.initial.kind === 'ruler')
     ) this.keydown(event)
   }
   keydown(event: KeyboardEvent): void {
@@ -64,6 +71,7 @@ export class KeyboardController {
       return
     if (this.#handleCrop(event))
       return
+    this.#handleRulerModifier(event, true)
     this.#handleShift(event, true)
     this.#handleAltDown(event)
     if (event.code === 'Space' && !isEditableTarget(event.target)) {
@@ -81,27 +89,22 @@ export class KeyboardController {
     }
   }
   keyup(event: KeyboardEvent): void {
+    this.#handleRulerModifier(event, event.key === 'Shift' ? event.shiftKey : event.altKey)
     this.#handleShift(event, event.shiftKey)
     if (event.code === 'Space')
       this.#context.setSpacePressed(false)
     const gesture = this.#context.gesture()
-    if (
-      event.key === 'Alt' &&
-      gesture?.kind === 'intrinsicResize' &&
-      gesture.initial.kind === 'ruler'
-    ) {
-      this.#context.setGesture({
-        ...gesture, snapAngleIncrementDegrees: undefined,
-      })
-      this.#context.invalidateOverlay()
-    }
     if (event.key === 'Alt' && gesture?.kind === 'move') {
       this.#context.setGesture({
         ...gesture, guidesVisible: false,
       })
       this.#context.invalidateOverlay()
     }
-    if (event.key === 'Alt' && gesture?.kind === 'precision') {
+    if (
+      event.key === 'Alt' &&
+      gesture?.kind === 'precision' &&
+      gesture.tool !== 'ruler'
+    ) {
       this.#context.setGesture({
         ...gesture, current: gesture.rawCurrent ?? gesture.current, guidesHeld: false,
       })
@@ -205,29 +208,34 @@ export class KeyboardController {
     }
     if (
       event.key === 'Alt' &&
-      gesture?.kind === 'intrinsicResize' &&
-      gesture.initial.kind === 'ruler'
+      gesture?.kind === 'precision' &&
+      gesture.tool !== 'ruler'
     ) {
-      this.#context.setGesture({
-        ...gesture, snapAngleIncrementDegrees: gesture.initial.payload.snapAngleIncrementDegrees,
-      })
+      this.#context.setGesture({ ...gesture, guidesHeld: true })
       this.#context.invalidateOverlay()
     }
-    if (event.key !== 'Alt' || gesture?.kind !== 'precision')
-      return
-    let next = {
-      ...gesture, guidesHeld: true,
+  }
+  #handleRulerModifier(
+    event: KeyboardEvent,
+    pressed: boolean,
+  ): void {
+    if (event.key !== 'Shift' && event.key !== 'Alt') return
+    const modifiers = { shiftKey: event.key === 'Shift' ? pressed : event.shiftKey,
+      altKey: event.key === 'Alt' ? pressed : event.altKey }
+    const gesture = this.#context.gesture()
+    if (gesture?.kind === 'intrinsicResize' && gesture.initial.kind === 'ruler') {
+      this.#context.setGesture({ ...gesture,
+        snapAngleIncrementDegrees: rulerAngleStep(modifiers, gesture.initial.payload.snapAngleIncrementDegrees) })
+      this.#context.invalidateOverlay()
     }
-    const defaults = gesture.precisionDefaults ?? this.#context.props.precisionDefaults ?? DEFAULT_PRECISION_TOOLS
-    if (gesture.tool === 'ruler') {
-      const snapped = snapRulerEndpoint(gesture.start, gesture.current, defaults.ruler.snapAngleIncrementDegrees)
-      next = {
-        ...next, current: snapped.end,
-      }
-      this.#context.setRulerGuide(snapped.guide)
+    if (gesture?.kind === 'precision' && gesture.tool === 'ruler') {
+      const configured = this.#context.props.precisionDefaults?.ruler.snapAngleIncrementDegrees ??
+        DEFAULT_PRECISION_TOOLS.ruler.snapAngleIncrementDegrees
+      const next = updateRulerPointer(gesture, gesture.rawCurrent ?? gesture.current, modifiers, configured)
+      this.#context.setGesture(next.gesture)
+      this.#context.setRulerGuide(next.guide)
+      this.#context.invalidateOverlay()
     }
-    this.#context.setGesture(next)
-    this.#context.invalidateOverlay()
   }
   #handleEscape(): void {
     const { editingText } = this.#context

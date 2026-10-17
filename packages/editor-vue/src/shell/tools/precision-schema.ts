@@ -256,7 +256,7 @@ function rulerSchema(
     },
     icon: 'ruler',
     title: translate('toolRuler'),
-    hint: precisionText('Hold Alt for angle guides', 'Удерживайте Alt для угловых направляющих'),
+    hint: precisionText('Shift: 45° steps · Alt: configured angle step', 'Shift: шаг 45° · Alt: настраиваемый шаг угла'),
     controls: [
       {
         kind: 'color',

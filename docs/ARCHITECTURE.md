@@ -19,7 +19,7 @@ Inline toolbar размещается относительно viewport и из�
 а не ограничивается шириной снимка. Возврат фокуса в editor отменяет deferred
 blur commit; callback старого editing session не может подтвердить новый draft.
 
-## Ограничения линейки и crop (ADR-059)
+## Ограничения линейки и crop (ADR-059/074)
 
 `ruler-constraints.ts` в DOM-free core ограничивает world endpoints текущим
 crop/canvas. Shared move delta применяется ко всей selection; resize и rotation
@@ -31,6 +31,10 @@ Move/crop дополнительно удерживают badge внутри п�
 его percent layout использует исходные canvas dimensions.
 Batch без crop не требует дополнительного проигрывания команд. Vue не хранит
 реактивный scene graph; persisted schema и IPC не расширяются.
+Transient ruler modifier resolver в canvas-controller выбирает Shift 45°
+перед Alt configured step и пересчитывает направление из raw pointer.
+Pointermove, key-only transitions и pointerup используют одинаковую привязку;
+core ограничивает snapped ray краем canvas в preview и commit.
 
 ## Актуальность модулей editor в desktop build
 
@@ -682,3 +686,12 @@ Shift events, не создавая reactive document updates. Preview и commit
 Canvas-controller перехватывает Escape активного stroke в window capture phase,
 раньше terminal Close Quick; target/focus и порядок mount parent/child на это
 не влияют. Вне stroke и при initial Area selection поведение Escape прежнее.
+
+## Навигация Settings (ADR-075)
+
+SettingsApp владеет разделом general/shortcuts и существующим lifecycle окна.
+GeneralSettings показывает язык и автозапуск; ShortcutSettings содержит список
+ShortcutRow со встроенным recorder и доступным меню ShortcutActions.
+useShortcutRecorder изолирует draft/probe по generation; useSettingsRuntime
+подключает реальные keyboard/blur/listener/polling и освобождает lease.
+Выбранный раздел не хранится в preferences и не меняет generated IPC.

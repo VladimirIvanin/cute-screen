@@ -1,5 +1,22 @@
 # Платформенная матрица
 
+## Shift для линейки (2026-10-17, ADR-074)
+
+Linux x86_64, Chrome 154.0.8037.57: обе Shift, key-only preview, endpoints,
+undo/redo и Escape, DPR 1/2 × Fit/1:1 на 2560×1440 browser document;
+RU/EN tooltip. Wry 0.55.1/WebKitGTK с external WebKitWebDriver: production
+Capture → Quick → Editor, те же input/preview/history/cancel проверки.
+Native fake source — 400×300; physical capture и native large images не
+проверялись. Windows/macOS и Wayland portal runtime остаются отдельными gates.
+Команды, логи и снимки — TESTING.md, `artifacts/ruler-shift/`.
+
+## Меню TopBar (2026-10-17)
+
+Linux x86_64 / Chrome 154: RU/EN × light/dark × окна 1024/1600 px прошли
+browser geometry/tooltip regression; просмотрены RU/light и RU/dark screenshots.
+Активные команды дополнительно просмотрены в in-app Chromium с `m05` harness.
+Это browser evidence; native WebView и Windows/macOS re-smoke pending.
+
 ## Прямые участки штрихов (2026-10-17, ADR-073)
 
 Linux x86_64: Chrome 154.0.8037.57 проверяет три pencil brushes и marker через

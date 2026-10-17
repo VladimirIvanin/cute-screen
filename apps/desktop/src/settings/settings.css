@@ -1,30 +1,37 @@
 .cs-settings {
+  --settings-sidebar-width: 180px;
+  --settings-content-padding: 24px;
   height: 100%;
-  overflow-y: auto;
-  padding: 24px 32px;
+  display: grid;
+  grid-template-columns: var(--settings-sidebar-width) minmax(0, 1fr);
   color: var(--text);
   background: var(--surface);
   font-size: 13px;
-  line-height: 1.45;
+  line-height: 1.5;
 }
-.cs-settings-header,
-.cs-settings-row-actions,
-.cs-settings-footer {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.cs-settings * {
+  box-sizing: border-box;
 }
-.cs-settings-header {
-  justify-content: space-between;
+.cs-settings-sidebar {
+  padding: 24px 12px;
+  border-right: 1px solid var(--border);
+  background: var(--surface-raised);
+}
+.cs-settings-sidebar header {
+  padding: 0 12px 24px;
 }
 .cs-settings h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 650;
 }
 .cs-settings h2 {
   margin: 0 0 8px;
   font-size: 15px;
+}
+.cs-settings h2.cs-settings-section-title {
+  font-size: 22px;
+  font-weight: 650;
 }
 .cs-settings-eyebrow {
   margin: 0 0 4px;
@@ -34,13 +41,9 @@
 .cs-settings-muted {
   color: var(--text-muted);
 }
-.cs-suggestion-choice {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+.cs-settings-sidebar nav {
+  display: grid;
   gap: 4px;
-  max-width: 200px;
-  font-size: 12px;
 }
 .cs-settings button,
 .cs-settings select {
@@ -52,6 +55,64 @@
   background: var(--surface-raised);
   cursor: pointer;
   font: inherit;
+}
+.cs-settings button:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+.cs-settings button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.cs-settings :is(button, select, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+.cs-settings-sidebar nav button {
+  text-align: left;
+  border-color: transparent;
+  background: transparent;
+  padding: 10px 12px;
+}
+.cs-settings-sidebar nav button[aria-current='page'],
+.cs-settings-sidebar nav button[aria-current='page']:hover:not(:disabled) {
+  color: var(--accent);
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+.cs-settings-content {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.cs-settings-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--settings-content-padding);
+  flex: 1;
+  scrollbar-gutter: stable;
+}
+.cs-settings-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px var(--settings-content-padding);
+  border-top: 1px solid var(--border);
+  background: var(--surface-raised);
+}
+.cs-settings-row-actions,
+.cs-shortcut-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.cs-settings .cs-settings-primary {
+  color: var(--accent-contrast);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.cs-settings .cs-settings-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
 }
 .cs-settings select {
   appearance: none;
@@ -65,33 +126,30 @@
   background-size: 4px 4px;
   background-repeat: no-repeat;
 }
-.cs-settings button:hover:not(:disabled) {
-  background: var(--surface-hover);
+.cs-settings-language {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 0;
+  margin-bottom: 16px;
 }
-.cs-settings button:disabled {
-  cursor: default;
-  opacity: 0.5;
-}
-.cs-settings .cs-settings-primary {
-  color: var(--accent-contrast);
-  background: var(--accent);
-  border-color: var(--accent);
-}
-.cs-settings .cs-settings-primary:hover:not(:disabled) {
-  background: var(--accent-hover);
+.cs-settings-language label {
+  font-weight: 600;
 }
 .cs-shortcut-list {
-  margin-top: 16px;
+  margin-top: 20px;
 }
 .cs-shortcut-row {
   display: grid;
-  grid-template-columns: minmax(150px, 1fr) auto auto;
+  grid-template-columns: minmax(100px, 1fr) auto;
   gap: 12px;
   align-items: center;
-  padding: 12px 0;
+  padding: 16px 0;
   border-bottom: 1px solid var(--border);
 }
 .cs-shortcut-description {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -102,49 +160,101 @@
 .cs-shortcut-description span {
   font-size: 12px;
 }
+.cs-shortcut-controls {
+  justify-content: flex-end;
+}
 .cs-settings kbd {
   padding: 4px 7px;
   border: 1px solid var(--border);
+  border-bottom-width: 2px;
   border-radius: var(--radius-sm);
   font: inherit;
-  white-space: nowrap;
+  font-weight: 500;
+  white-space: normal;
+  overflow-wrap: anywhere;
   background: var(--surface-raised);
+}
+.cs-shortcut-empty {
+  font-size: 12px;
 }
 .cs-settings-error {
   color: var(--danger);
   overflow-wrap: anywhere;
 }
 .cs-settings-notice,
-.cs-shortcut-recorder,
 .cs-shortcut-suggestions {
   margin: 16px 0;
-  padding: 16px;
+  padding: 12px;
   background: var(--surface-raised);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
 }
 .cs-shortcut-suggestions {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.cs-shortcut-suggestions > strong {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
 }
 .cs-settings-notice p {
   margin-top: 0;
 }
-.cs-settings .cs-record-shortcut {
+.cs-shortcut-inline-editor {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.cs-shortcut-inline-editor > p {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 12px;
+}
+.cs-record-shortcut {
   min-height: 48px;
-  min-width: 260px;
-  font-size: 16px;
+  min-width: 180px;
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--surface-raised);
+}
+.cs-record-shortcut > strong {
+  font-size: 14px;
+  font-weight: 500;
+}
+.cs-record-shortcut > span {
+  font-size: 12px;
+}
+.cs-record-shortcut kbd {
+  align-self: flex-start;
 }
 .cs-settings .is-recording {
   border-color: var(--accent);
   background: var(--accent-soft);
 }
+.cs-shortcut-feedback,
+.cs-shortcut-command {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.cs-shortcut-feedback p {
+  margin: 0 0 8px;
+}
 .cs-settings-footnote {
   font-size: 12px;
-  margin: 16px 0 24px;
+  margin: 20px 0 8px;
+}
+.cs-settings summary {
+  cursor: pointer;
 }
 .cs-startup-preferences {
   padding-top: 20px;
@@ -161,13 +271,7 @@
   width: 16px;
   height: 16px;
   accent-color: var(--accent);
-}
-.cs-settings-footer {
-  justify-content: flex-end;
-  padding: 20px 0 0;
-}
-.cs-shortcut-command {
-  grid-column: 1 / -1;
+  flex-shrink: 0;
 }
 .cs-shortcut-command code {
   display: block;
@@ -175,19 +279,65 @@
   margin-top: 8px;
   user-select: all;
 }
+.cs-shortcut-actions {
+  position: relative;
+}
+.cs-settings .cs-shortcut-more {
+  width: 36px;
+  min-height: 36px;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cs-shortcut-menu {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 200px;
+  padding: 4px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-overlay);
+}
+.cs-settings .cs-shortcut-menu button {
+  display: block;
+  width: 100%;
+  border-color: transparent;
+  text-align: left;
+}
 @media (max-width: 720px) {
   .cs-settings {
-    padding: 20px;
+    --settings-sidebar-width: 152px;
+    --settings-content-padding: 16px;
+  }
+  .cs-settings-sidebar {
+    padding-inline: 8px;
+  }
+  .cs-settings-sidebar header {
+    padding-inline: 8px;
+  }
+  .cs-settings-sidebar nav button {
+    padding-inline: 8px;
   }
   .cs-shortcut-row {
-    grid-template-columns: minmax(140px, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
   }
-  .cs-shortcut-row > .cs-settings-row-actions {
-    grid-column: 1 / -1;
+  .cs-shortcut-controls {
+    justify-content: flex-start;
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .cs-settings * {
     transition: none;
   }
+}
+
+.cs-shortcut-more svg {
+  width: 18px;
+  height: 18px;
+  transform: rotate(90deg);
 }

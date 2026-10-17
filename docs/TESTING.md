@@ -1,5 +1,114 @@
 # Стратегия тестирования
 
+## Shift для линейки (2026-10-17, ADR-074)
+
+Linux 6.8.0-142-generic x86_64, Node 22.23.1, pnpm 10.33.2.
+Логи — `artifacts/ruler-shift/`.
+
+- До реализации `pnpm exec vitest run --project vue tests/unit/vue/ruler-shift.test.ts`
+  — ожидаемый red: 6 failed / 2 passed (`red.log`). Core geometry не менялась.
+- `pnpm test` — исходный полный прогон: 116 файлов / 935 проверок passed (`unit.log`). Новый input
+  contract проверяет восемь направлений, нулевой жест, crop edge, обе Shift,
+  Shift/Alt priority и configured step, key-only preview, оба endpoints,
+  финальную pointerup-точку и Escape/blur/pointercancel. Существующие history
+  tests проверяют exact undo/redo. После исправления только TS casts новая
+  focused suite `pnpm exec vitest run --project vue tests/unit/vue/ruler-shift.test.ts tests/unit/vue/m08-precision-guides.test.ts tests/unit/vue/m08-precision-history.test.ts`
+  повторена: 3 файла / 34 проверки passed (`focused-final.log`).
+- `pnpm test:render` — 10 файлов / 32 проверки passed (`render.log`), включая
+  существующие decoded ruler pixels/export и большие 4K/8K fixtures.
+  Renderer и persisted geometry contract не менялись.
+- `pnpm test:boundaries` — 10 файлов / 43 проверки passed (`boundaries.log`).
+- `pnpm check` — исходный полный прогон passed: lint (68 прежних warnings, 0 errors), typecheck,
+  format/docs, architecture boundaries, IPC и все Rust fmt/clippy profiles
+  (`check.log`). `pnpm format` запускался после изменений; финальная
+  `pnpm format:check` прошла (`format-check.log`).
+- `pnpm test:perf` — 2 файла / 6 проверок passed (`perf.log`); существующие
+  software CPU/4K/8K contracts, без нового GPU frame-budget claim.
+- Расширенный native повтор прошёл input/history, но обнаружил ложный dirty
+  badge после redo к сохранённой версии (`tauri-save-red.log`). SQLite revision 4
+  содержала все четыре ruler; геометрия сохранена. Red-first regression
+  `pnpm exec vitest run --project vue tests/unit/vue/document-session.test.ts`
+  воспроизвёл `core.dirty: false` при `saveState: dirty` (`save-red.log`).
+  `DocumentSession.redo` теперь использует `replayed.dirty`, как undo,
+  и не запрашивает повторную запись уже сохранённой версии.
+  `pnpm exec vitest run --project vue tests/unit/vue/document-session.test.ts tests/unit/vue/ruler-shift.test.ts`
+  — 2 файла / 32 проверки passed (`save-green.log`); повтор native после
+  исправления прошёл, включая исчезновение save badge (`tauri-final.log`).
+- Промежуточный повтор общего `pnpm check` после исправления session остановился на
+  параллельных изменениях Settings: обязательный prop `ShortcutRow.state`
+  ещё не передавался из `SettingsApp.vue` (`check-settings-intermediate.log`). Промежуточный
+  `pnpm test` — 115 файлов / 931 проверка passed, 2 файла / 8 проверок failed
+  в `activation-settings.test.ts` и `settings-navigation.test.ts`
+  (`unit-settings-intermediate.log`). Эти файлы и Settings менялись параллельно в общей
+  рабочей копии; изменения линейки/session в failed suites не участвуют.
+  Поздний `pnpm check` снова остановился на текущих Settings/recorder:
+  unused `props`, mutation `state` prop и форматирование новых tests
+  (`check-settings-lint-intermediate.log`, 29 errors / 68 warnings на момент запуска).
+  Последний полный `pnpm test` после обновления Settings прошёл:
+  118 файлов / 948 проверок (`unit-final.log`). Последний общий check
+  прошёл lint и package build, затем остановился на исчезнувшем
+  `@cute-screen/editor-renderer` и производных implicit-any в старом
+  `tauri-quick-editor-handoff.e2e.ts` (`check-final.log`). Во время сбоя
+  наблюдался второй параллельный `build:packages`/typecheck, обновлявший общий
+  `dist`; это не подтверждает новый type defect. После восстановления outputs
+  `pnpm exec tsc --noEmit -p tests/e2e/tsconfig.json` прошёл
+  (`e2e-typecheck-final.log`). Финальный общий `pnpm check` не объявляется
+  полностью зелёным; первоначальный полный green сохранён в `check.log`.
+  Форматирование файлов функции отдельно проверено командой
+  `pnpm exec eslint --config eslint.format.config.js packages/editor-vue/src tests/e2e/ruler-shift.ts tests/e2e/specs/browser-ruler-shift.e2e.ts tests/e2e/specs/tauri-ruler-shift.e2e.ts tests/e2e/wdio.browser.conf.ts scripts/run-tauri-e2e.mjs tests/unit/vue/ruler-shift.test.ts tests/unit/vue/document-session.test.ts tests/unit/vue/m08-precision-guides.test.ts`
+  — passed (`format-feature.log`).
+- `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5281 pnpm test:e2e:browser --spec tests/e2e/specs/browser-ruler-shift.e2e.ts`
+  — Chrome 154.0.8037.57: 5 scenarios passed (`browser-final.log`), обе Shift,
+  key-only preview по изменению overlay pixels без pointermove, endpoints,
+  undo/redo, Escape draft и tooltip RU/EN; endpoint resize явно выбирает Select
+  и сохраняет ID, число слоёв и неподвижный конец. DPR 1/2 × Fit/1:1 на документе
+  2560×1440. PNG — `artifacts/browser-e2e/ruler-shift-*.png`.
+  Первый headed run прошёл без дополнительного cancel assert (`browser.log`);
+  расширенный headed повтор прерывался внешним window blur (input trace в
+  `browser-debug.log`). Итоговый headless run изолирует focus на общем desktop;
+  production blur cancellation остаётся включённой.
+- `XDG_SESSION_ID=ruler-shift PATH="$PWD/artifacts/spotlight-fix/tools/bin:$PWD/artifacts/spotlight-fix/tools/webkit/root/usr/bin:$PATH" CUTE_SCREEN_E2E_DRIVER_PROVIDER=external CUTE_SCREEN_E2E_SCENARIOS=ruler-shift pnpm test:e2e:tauri`
+  — 1 scenario passed (`tauri-final.log`), Wry 0.55.1/WebKitGTK: production
+  Capture → Quick → Editor, обе Shift, key-only preview, endpoint resize,
+  undo/redo и Escape без закрытия Quick. PNG —
+  `artifacts/tauri-e2e/ruler-shift-{quick,editor}{,-45}.png`.
+  Просмотрены browser DPR2 Fit и native Quick 45°.
+- Native source — fake 400×300: physical capture, Windows/macOS,
+  Wayland portal runtime и native 4K/8K в этом изменении не запускались.
+
+## Меню других действий (2026-10-17)
+
+Linux x86_64, Chrome 154.0.8037.57, Node 22.23.1, pnpm 10.33.2.
+Логи: `artifacts/topbar-menu/`; screenshots:
+`artifacts/browser-e2e/topbar-menu-{1024,1600}-{ru,en}-{light,dark}.png`.
+
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5276 pnpm test:e2e:browser --spec tests/e2e/specs/browser-shell.e2e.ts --mochaOpts.grep 'fits localized|places the overflow|switches locale|capture, copy'`
+  — 4/4 passed. Новая проверка покрывает восемь комбинаций ширины окна,
+  локали и темы: реальные bounds текста внутри пунктов, bounds меню внутри
+  viewport, появление hover tooltip и его исчезновение при открытии меню,
+  отсутствие дублирующего native title, закрытие повторным кликом.
+  Смена языка/темы и доступность основных действий проверены существующими
+  сценариями. Просмотрены screenshots 1024/RU/light и 1600/RU/dark.
+- `pnpm test --project vue tests/unit/vue/app-arrow-actions.test.ts`
+  — 11/11 passed, включая disabled capture и routing действий TopBar.
+- В in-app Chromium дополнительно открыт `/?m05=1`: активные flip actions
+  полностью помещаются в светлое меню; смена темы не оставляет tooltip над ним.
+- Полный `browser-shell.e2e.ts` до добавления новой проверки дал 6 passed,
+  1 failed: ожидание `.cs-context-toolbar .cs-highlighter-toolbar` в первом
+  сценарии. Остальные сценарии, включая меню, прошли.
+- `pnpm check` прошёл lint и package build, затем остановился на TS7053
+  в параллельно добавленном `tests/unit/vue/ruler-shift.test.ts` (строки
+  27/44/55/68). Дальнейшие части общего gate этим запуском не подтверждены.
+- `pnpm format` и `pnpm format:check` выполнены; Prettier passed, ESLint
+  formatting остановился на параллельных изменениях
+  `canvas/keyboard-controller.ts` и `canvas/pointer-down-controller.ts`.
+  Отдельные lint и ESLint-format checks изменённых `TopBar.vue` и
+  `browser-shell.e2e.ts` прошли. `pnpm exec tsc --noEmit -p tests/e2e/tsconfig.json`,
+  `pnpm docs:check` и `git diff --check` passed.
+
+Это исправление CSS/tooltip существующего UI-контракта; renderer/core/IPC и
+принятые ADR не меняются. Native WebView и Windows/macOS здесь не проверялись.
+
 ## Прямые участки через Shift (2026-10-17, ADR-073)
 
 Linux x86_64, Chrome 154.0.8037.57, Node 22.23.1, pnpm 10.33.2.

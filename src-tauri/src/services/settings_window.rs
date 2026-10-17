@@ -2,6 +2,28 @@ use crate::shortcuts::{ShortcutAction, host::ShortcutService};
 use tauri::{Manager, Runtime, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
 pub fn open<R: Runtime>(app: &tauri::AppHandle<R>, first_run: bool) -> Result<(), String> {
+    open_section(app, first_run, false)
+}
+
+pub fn open_shortcuts<R: Runtime>(app: &tauri::AppHandle<R>) -> Result<(), String> {
+    open_section(app, false, true)
+}
+
+fn settings_query(first_run: bool, shortcuts: bool) -> &'static str {
+    if first_run {
+        "index.html?settings=shortcuts&firstRun=1"
+    } else if shortcuts {
+        "index.html?settings=shortcuts"
+    } else {
+        "index.html?settings=general"
+    }
+}
+
+fn open_section<R: Runtime>(
+    app: &tauri::AppHandle<R>,
+    first_run: bool,
+    shortcuts: bool,
+) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("settings") {
         window
             .show()
@@ -10,11 +32,7 @@ pub fn open<R: Runtime>(app: &tauri::AppHandle<R>, first_run: bool) -> Result<()
             .map_err(|error| error.to_string())?;
         return Ok(());
     }
-    let query = if first_run {
-        "index.html?settings=shortcuts&firstRun=1"
-    } else {
-        "index.html?settings=shortcuts"
-    };
+    let query = settings_query(first_run, shortcuts);
     let window = WebviewWindowBuilder::new(app, "settings", WebviewUrl::App(query.into()))
         .title("Cute Screen — Settings")
         .inner_size(820.0, 720.0)
@@ -117,11 +135,34 @@ pub fn install_menu<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()> 
     let settings = MenuItem::with_id(
         app,
         "app-settings",
-        "Keyboard shortcuts…",
+        if std::env::var("LANG").unwrap_or_default().starts_with("ru") {
+            "Настройки…"
+        } else {
+            "Settings…"
+        },
         true,
         Some("CmdOrCtrl+,"),
     )?;
     let submenu = Submenu::with_items(app, "Cute Screen", true, &[&settings])?;
     app.set_menu(Menu::with_items(app, &[&submenu])?)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod navigation_tests {
+    #[test]
+    fn settings_entry_points_select_the_requested_initial_section() {
+        assert_eq!(
+            super::settings_query(false, false),
+            "index.html?settings=general"
+        );
+        assert_eq!(
+            super::settings_query(false, true),
+            "index.html?settings=shortcuts"
+        );
+        assert_eq!(
+            super::settings_query(true, false),
+            "index.html?settings=shortcuts&firstRun=1"
+        );
+    }
 }

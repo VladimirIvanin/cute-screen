@@ -129,6 +129,7 @@ export function createGestureFinishContext(ports: WorkspaceInteractionPorts): Ge
     isPanning: ports.state.isPanning,
     crop: ports.crop,
     gesture: ports.gesture,
+    setGesture: (gesture) => ports.setGesture(gesture),
     clearGesture: () => ports.setGesture(undefined),
     clearRulerGuide: () => ports.setRulerGuide(undefined),
     precisionLayer: (id) => ports.draft.precisionLayer(id),
