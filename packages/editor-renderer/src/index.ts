@@ -303,3 +303,10 @@ export {
   numberedMarkerGeometryBounds,
   createPreparedNumberedMarker,
 } from './numbered-marker-layout'
+
+export {
+  beginStroke,
+  moveStroke,
+  setStrokeStraight,
+  type StrokeState,
+} from '@cute-screen/editor-core'

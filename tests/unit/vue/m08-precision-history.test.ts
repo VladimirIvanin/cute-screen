@@ -386,7 +386,7 @@ describe('M08 shell lifecycle and contextual settings', () => {
       const more = within(toolbar).queryByRole('button', { name: /More|Ещё/ })
       if (more) await fireEvent.click(more)
       if (tool === 'Spotlight' || tool === 'Ruler') {
-        const names = tool === 'Spotlight' ? ['Aperture shape', 'Dimming', 'Edge softness'] : ['Colour', 'Thickness', 'Label and units', 'Measurement and snapping']
+        const names = tool === 'Spotlight' ? ['Rectangle', 'Ellipse', 'Diamond', 'Dimming', 'Edge softness'] : ['Colour', 'Thickness', 'Label and units', 'Measurement and snapping']
         for (const name of names) expect(within(toolbar).getByRole('button', { name })).toBeInTheDocument()
       } else if (tool === 'Loupe' || tool === 'Hide data') {
         for (const name of labels) expect(within(toolbar).getByRole('button', { name })).toBeInTheDocument()

@@ -6,6 +6,7 @@ import {
 import path from 'node:path'
 import { verifyShapeDefaultsPlacement } from '../shape-defaults-placement'
 import { verifyNumericOpacity } from '../numeric-controls'
+import { verifyToolbarSeparators } from '../toolbar-separators'
 import {
   openDrawingHarness,
   setShellPreferences,
@@ -44,20 +45,24 @@ describe('compact shape toolbar', () => {
     await verifyNumericOpacity('artifacts/browser-e2e', 'numeric-editor')
     const shape = (await shapeDocument()).layers.at(-1)!
     expect(shape).toMatchObject({ kind: 'shape', opacity: 0.75, blendMode: 'multiply', payload: { cornerRadius: 12, fill: { kind: 'solid', color: { red: 0.2, green: 0.4, blue: 0.6 } }, stroke: { width: 8 } } })
-    for (const locale of ['en', 'ru'] as const) {
-      for (const theme of ['light', 'dark'] as const) {
-        await setShellPreferences(locale, theme)
-        await $('.cs-selection-floating-toolbar [data-shape-control="appearance"]').click()
-        await expect($('.cs-shape-popover select')).toHaveAttribute('aria-label', locale === 'ru' ? 'Режим наложения' : 'Blend mode')
-        const fits = await browser.execute(() => {
-          const rect = document.querySelector('.cs-shape-popover')!.getBoundingClientRect()
-          return rect.left >= 0 && rect.right <= innerWidth && rect.top >= 0 && rect.bottom <= innerHeight
-        })
-        expect(fits).toBe(true)
-        await waitForShapeAnimation()
-        await browser.saveScreenshot(path.resolve('artifacts/browser-e2e', `shape-${locale}-${theme}.png`))
-        await browser.keys('Escape')
+    for (const width of [1024, 1280]) {
+      await browser.setWindowSize(width, 800)
+      for (const locale of ['en', 'ru'] as const) {
+        for (const theme of ['light', 'dark'] as const) {
+          await setShellPreferences(locale, theme)
+          await $('.cs-selection-floating-toolbar [data-shape-control="appearance"]').click()
+          await expect($('.cs-shape-popover select')).toHaveAttribute('aria-label', locale === 'ru' ? 'Режим наложения' : 'Blend mode')
+          const fits = await browser.execute(() => {
+            const rect = document.querySelector('.cs-shape-popover')!.getBoundingClientRect()
+            return rect.left >= 0 && rect.right <= innerWidth && rect.top >= 0 && rect.bottom <= innerHeight
+          })
+          expect(fits).toBe(true)
+          await waitForShapeAnimation()
+          await verifyToolbarSeparators('.cs-selection-floating-toolbar .cs-shape-toolbar', 3)
+          await browser.saveScreenshot(path.resolve('artifacts/browser-e2e', `shape-${width}-${locale}-${theme}.png`))
+          await browser.keys('Escape')
+        }
       }
     }
-  })
+  }).timeout(120000)
 })

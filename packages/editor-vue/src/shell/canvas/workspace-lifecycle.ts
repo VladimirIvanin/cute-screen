@@ -198,6 +198,7 @@ export interface InputLifecycleContext {
   readonly hideEyedropper: () => void
   readonly setCursor: (cursor: string) => void
   readonly invalidateOverlay: () => void
+  readonly onStrokeKeydown: (event: KeyboardEvent) => void
   readonly onKeydown: (event: KeyboardEvent) => void
   readonly onKeyup: (event: KeyboardEvent) => void
   readonly onBlur: () => void
@@ -208,6 +209,7 @@ export interface InputLifecycleContext {
 export function registerInputLifecycle(context: InputLifecycleContext): void {
   registerSamplingWatches(context)
   onMounted(() => {
+    window.addEventListener('keydown', context.onStrokeKeydown, true)
     window.addEventListener('keydown', context.onKeydown)
     window.addEventListener('keyup', context.onKeyup)
     window.addEventListener('blur', context.onBlur)
@@ -217,6 +219,7 @@ export function registerInputLifecycle(context: InputLifecycleContext): void {
   })
   onBeforeUnmount(() => {
     context.hideEyedropper()
+    window.removeEventListener('keydown', context.onStrokeKeydown, true)
     window.removeEventListener('keydown', context.onKeydown)
     window.removeEventListener('keyup', context.onKeyup)
     window.removeEventListener('blur', context.onBlur)

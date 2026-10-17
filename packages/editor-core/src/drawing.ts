@@ -9,6 +9,7 @@ import type {
   Point,
   Rect,
   Transform2D,
+  StraightSegment,
 } from './document/types'
 import { rebaseArrowLayer } from './arrow-geometry'
 import {
@@ -34,6 +35,7 @@ interface DrawingLayerInput {
   readonly start: Point
   readonly end: Point
   readonly defaults?: DrawingDefaults | undefined
+  readonly straightSegments?: readonly StraightSegment[] | undefined
   readonly constrainAngle?: boolean
   readonly drawFromCenter?: boolean
   readonly points?: readonly (Point & Readonly<{ readonly pressure?: number }>)[]
@@ -323,6 +325,8 @@ function createFreehandDrawing(
     kind: input.tool,
     payload: {
       ...style,
+      ...(input.tool === 'pencil' && input.straightSegments?.length
+        ? { strokeVersion: 3, straightSegments: input.straightSegments } : {}),
       points: samples.map((point) => ({
         x: point.x - geometry.x,
         y: point.y - geometry.y,
@@ -333,7 +337,7 @@ function createFreehandDrawing(
       })),
     },
   } as LayerNode
-  return Object.freeze(layer.kind === 'pencil' && layer.payload.strokeVersion === 2 ? rebaseFreehandLayer(layer) : layer)
+  return Object.freeze(layer.kind === 'pencil' && (layer.payload.strokeVersion === 2 || layer.payload.strokeVersion === 3) ? rebaseFreehandLayer(layer) : layer)
 }
 
 /** Builds one current drawing layer; callers only commit it on pointer-up. */

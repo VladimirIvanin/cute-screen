@@ -432,7 +432,11 @@ function createControllers(
     prepareLayer: (layer) => {
       // Modern ink freezes every setting, including pressure source, at pointerdown.
       if (layer.kind === 'numberedMarker') return measuredNumberedMarkerLayer(layer)
-      if (layer.kind === 'pencil' && layer.payload.strokeVersion === 2) return layer
+      if (
+        layer.kind === 'pencil' &&
+        (layer.payload.strokeVersion === 2 ||
+          layer.payload.strokeVersion === 3)
+      ) return layer
       const style = workspace.rememberedStyles.value[layer.kind]
       if (style && layer.kind === 'marker') {
         // The gesture already resolved Auto for this source. A remembered resolved

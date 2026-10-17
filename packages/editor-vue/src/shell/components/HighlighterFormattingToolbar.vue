@@ -10,6 +10,7 @@ import type { ContextToolbarSchema } from '../types'
 import type { SrgbColor } from '@cute-screen/editor-renderer'
 import { UiIcon } from '../icon'
 import SimpleColorPicker from '../ui/SimpleColorPicker.vue'
+import UiSeparator from '../ui/UiSeparator.vue'
 import ShapeNumericControl from './ShapeNumericControl.vue'
 
 import { useTransientSurface } from '../ui/transient-surface'
@@ -96,86 +97,87 @@ watch(disabled, (blocked) => {
       @commit="change('color', $event)"
       @eyedropper="emit('eyedropper', 'color')"
     />
-    <NPopover
-      v-for="menu in ['width', 'layerOpacity', 'markerMode'] as const"
-      :key="menu"
-      :show="open === menu"
-      trigger="click"
-      placement="top"
-      :show-arrow="false"
-      raw
-      to=".cs-overlay-root"
-      @update:show="show(menu, $event, false)"
-    >
-      <template #trigger>
-        <button
-          :ref="(element) => { if (element) triggers.set(menu, element as HTMLButtonElement) }"
-          class="cs-highlighter-trigger"
-          type="button"
-          :disabled="disabled"
-          :aria-label="labels[menu]"
-          :title="labels[menu]"
-          :aria-expanded="open === menu"
-          aria-haspopup="dialog"
-        >
-          <svg
-            v-if="menu === 'width'"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          ><path
-            d="M5 17L19 7"
-            stroke="currentColor"
-            :stroke-width="Math.min(9, Math.max(2, Number(value(menu)) / 5))"
-            stroke-linecap="round"
-          /></svg>
-          <span v-else>{{ menu === 'markerMode' ? summary : mixed(menu) ? '—' : `${Math.round(Number(value(menu)))}%` }}</span>
-          <UiIcon name="chevronDown"/>
-        </button>
-      </template>
-      <div
-        :ref="(element) => { if (open === menu) panel = element as HTMLElement }"
-        class="cs-highlighter-popover"
-        :data-cs-surface="surfaceOwner"
-        role="dialog"
-        :aria-label="labels[menu]"
-        @keydown="keydown"
-        @pointerdown.stop
+    <template v-for="menu in ['width', 'layerOpacity', 'markerMode'] as const" :key="menu">
+      <UiSeparator v-if="menu !== 'width'" :length="21" />
+      <NPopover
+        :show="open === menu"
+        trigger="click"
+        placement="top"
+        :show-arrow="false"
+        raw
+        to=".cs-overlay-root"
+        @update:show="show(menu, $event, false)"
       >
-        <template v-if="menu === 'markerMode'">
+        <template #trigger>
           <button
-            v-for="mode in modes"
-            :key="mode.id"
+            :ref="(element) => { if (element) triggers.set(menu, element as HTMLButtonElement) }"
+            class="cs-highlighter-trigger"
             type="button"
-            class="cs-highlighter-mode"
             :disabled="disabled"
-            :aria-label="mode.name"
-            :aria-pressed="!mixed(menu) && value(menu) === mode.id"
-            @click="chooseMode(mode.id)"
+            :aria-label="labels[menu]"
+            :title="labels[menu]"
+            :aria-expanded="open === menu"
+            aria-haspopup="dialog"
           >
-            <span class="cs-highlighter-sample" :class="`is-${mode.id}`"><span :style="{ backgroundColor: value('color'), mixBlendMode: mode.sample === 'auto' ? 'multiply' : mode.sample as 'multiply' | 'screen' | 'normal', opacity: Number(value('layerOpacity')) / 100 }"/><b>Aa</b></span>
-            <span><strong>{{ mode.name }}</strong><small>{{ mode.hint }}</small></span>
-            <UiIcon v-if="!mixed(menu) && value(menu) === mode.id" name="check"/>
+            <svg
+              v-if="menu === 'width'"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            ><path
+              d="M5 17L19 7"
+              stroke="currentColor"
+              :stroke-width="Math.min(9, Math.max(2, Number(value(menu)) / 5))"
+              stroke-linecap="round"
+            /></svg>
+            <span v-else>{{ menu === 'markerMode' ? summary : mixed(menu) ? '—' : `${Math.round(Number(value(menu)))}%` }}</span>
+            <UiIcon name="chevronDown"/>
           </button>
-          <p v-if="schema.highlighter?.status === 'unavailable'" class="cs-highlighter-hint">{{ text('Automatic analysis unavailable. Using Highlight; choose any effect manually.', 'Автоподбор недоступен. Используем «Выделить»; режим можно выбрать вручную.') }}</p>
         </template>
-        <template v-else>
-          <ShapeNumericControl
-            :control-id="menu"
-            :locale="locale"
-            slider
-            :unit="menu === 'width' ? 'px' : '%'"
-            :presets="menu === 'width' ? [8, 18, 32, 48] : [20, 35, 50, 75]"
-            :label="labels[menu]"
-            :value="Number(value(menu))"
-            :mixed="mixed(menu)"
-            :min="menu === 'width' ? 1 : 0"
-            :max="menu === 'width' ? 96 : 100"
-            :step="1"
-            :disabled="disabled"
-            @commit="change(menu, String($event))"
-          />
-        </template>
-      </div>
-    </NPopover>
+        <div
+          :ref="(element) => { if (open === menu) panel = element as HTMLElement }"
+          class="cs-highlighter-popover"
+          :data-cs-surface="surfaceOwner"
+          role="dialog"
+          :aria-label="labels[menu]"
+          @keydown="keydown"
+          @pointerdown.stop
+        >
+          <template v-if="menu === 'markerMode'">
+            <button
+              v-for="mode in modes"
+              :key="mode.id"
+              type="button"
+              class="cs-highlighter-mode"
+              :disabled="disabled"
+              :aria-label="mode.name"
+              :aria-pressed="!mixed(menu) && value(menu) === mode.id"
+              @click="chooseMode(mode.id)"
+            >
+              <span class="cs-highlighter-sample" :class="`is-${mode.id}`"><span :style="{ backgroundColor: value('color'), mixBlendMode: mode.sample === 'auto' ? 'multiply' : mode.sample as 'multiply' | 'screen' | 'normal', opacity: Number(value('layerOpacity')) / 100 }"/><b>Aa</b></span>
+              <span><strong>{{ mode.name }}</strong><small>{{ mode.hint }}</small></span>
+              <UiIcon v-if="!mixed(menu) && value(menu) === mode.id" name="check"/>
+            </button>
+            <p v-if="schema.highlighter?.status === 'unavailable'" class="cs-highlighter-hint">{{ text('Automatic analysis unavailable. Using Highlight; choose any effect manually.', 'Автоподбор недоступен. Используем «Выделить»; режим можно выбрать вручную.') }}</p>
+          </template>
+          <template v-else>
+            <ShapeNumericControl
+              :control-id="menu"
+              :locale="locale"
+              slider
+              :unit="menu === 'width' ? 'px' : '%'"
+              :presets="menu === 'width' ? [8, 18, 32, 48] : [20, 35, 50, 75]"
+              :label="labels[menu]"
+              :value="Number(value(menu))"
+              :mixed="mixed(menu)"
+              :min="menu === 'width' ? 1 : 0"
+              :max="menu === 'width' ? 96 : 100"
+              :step="1"
+              :disabled="disabled"
+              @commit="change(menu, String($event))"
+            />
+          </template>
+        </div>
+      </NPopover>
+    </template>
   </div>
 </template>

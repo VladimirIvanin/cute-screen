@@ -1,5 +1,38 @@
 # Трассируемость требований
 
+## Прямые участки штрихов через Shift (2026-10-17)
+
+`REQ-TOL-003/004`, `REQ-EDT-006/016`: запись добавлена до реализации.
+Shift начинает прямой участок с шагом 45° от конца текущей траектории;
+отпускание сохраняет участок и продолжает свободный штрих без скачка.
+Контракт общий для marker и трёх pencil brushes, Editor и Quick Capture.
+Планируемые доказательства: red-first core/codec/geometry/history tests,
+Vue input/cancel, production browser и real-WebView, decoded renderer, 4K/8K perf.
+`REQ-CAP-012`: Escape активного штриха потребляется capture listener canvas-controller до window Close Quick Capture;
+regression воспроизводит ранний parent listener (`escape-red.log`).
+Статус: implemented. Core/Vue suite — 115 файлов / 913 проверок; renderer —
+32 проверки, включая decoded 4K/8K exports; perf — 6 проверок. Production
+browser matrix DPR 1/2 × Fit/1:1 и RU/EN tooltip, native Quick → Editor и
+reopen проверены. Фактические команды и границы evidence — TESTING.md.
+
+## Форма фонаря кнопками-иконками (2026-10-17)
+
+`REQ-TOL-009`, `REQ-EDT-015/016`, `REQ-UI-006`: запись добавлена до реализации.
+В defaults и панели выбранной области три прямые кнопки формы заменяют меню:
+rectangle/ellipse/diamond, с локализованными именами/подсказками, pressed,
+disabled и keyboard focus. Изменение выбранной области остаётся одной
+undoable command; отсутствующий shape control не показывает группу.
+Проверки: mounted toolbar/history, browser RU/EN × light/dark и Quick/Editor
+через real Tauri. Фактические результаты — TESTING.md.
+
+## Чёткие края фонаря по умолчанию (2026-10-17)
+
+`REQ-TOL-009`, `REQ-EDT-015`: запись добавлена до реализации. Новый workspace
+использует «Чётко» (`feather: null`) для фонаря в editor и Quick Capture.
+Явный выбор мягкости и стили существующих объектов сохраняются. Проверка:
+browser/native spotlight-preview создаёт слой pointer-жестом и проверяет
+`feather: null` и выбранное «Sharp» в панели; результаты — TESTING.md.
+
 ## Горячие клавиши и запуск при входе (2026-10-17)
 
 | Требование              | Вертикальный срез                                                           | Доказательство                                                                                         |
@@ -1259,3 +1292,16 @@ Quick Capture показывает автоматическую строку т�
 Статус: implemented; pnpm test — 113 файлов / 884 проверки, затем 48/48 focused regressions.
 Browser matrix на 2560×1440 документе и native creation-settings прошли;
 фактические команды, дополнительные проверки и ограничения — TESTING.md.
+
+## Прямые разделители тулбаров (2026-10-17)
+
+REQ-UI-001: запись добавлена до реализации. Панели фигур и выделителя используют
+существующий UiSeparator вместо боковых рамок скруглённых кнопок: 1×21 CSS px,
+вертикальное центрирование, border-radius: 0. Группировка, скругление кнопок,
+hover/focus и поведение инструментов сохраняются в Editor и Quick Capture.
+Остальные декоративные разделители проверяются на тот же дефект; прямые линии
+не требуют замены. Проверки: browser computed geometry, RU/EN, light/dark,
+1024 px и desktop screenshots, component regressions и pnpm check.
+Статус: implemented; 29/29 component, 2/2 browser matrix и 1/1 real-WebView
+Capture → Quick → Editor passed. Геометрия и скриншоты проверены на Linux/X11;
+изоляция от параллельных правок и ограничения общих прогонов — TESTING.md.

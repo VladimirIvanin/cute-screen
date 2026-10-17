@@ -64,6 +64,7 @@ export {
   type CalloutPayload,
   type ShapeLayerPayload,
   type PencilLayerPayload,
+  type StraightSegment,
   type MarkerLayerPayload,
   type EmojiLayer,
   type EmojiPayload,
@@ -387,3 +388,10 @@ export {
   rebaseNumberedMarkerLayer,
   setNumberedMarkerSequence,
 } from './numbered-marker'
+
+export {
+  beginStroke,
+  moveStroke,
+  setStrokeStraight,
+  type StrokeState,
+} from './tools/straight-stroke'

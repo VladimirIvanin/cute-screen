@@ -180,7 +180,7 @@ describe('compact tool settings', () => {
     })
     await selectLayerFromPanel(view)
     const toolbar = view.container.querySelector('.cs-selection-floating-toolbar') as HTMLElement
-    const label = kind === 'spotlight' ? 'Aperture shape' : 'Thickness'
+    const label = kind === 'spotlight' ? 'Diamond' : 'Thickness'
     expect(within(toolbar).getByRole('button', {
       name: label,
     })).toBeDisabled()
@@ -196,11 +196,7 @@ describe('compact tool settings', () => {
     await fireEvent.click(within(toolbar).getByRole('button', {
       name: label,
     }))
-    if (kind === 'spotlight')
-      await fireEvent.click(await screen.findByRole('button', {
-        name: 'Diamond',
-      }))
-    else {
+    if (kind !== 'spotlight') {
       const input = await screen.findByRole('spinbutton', {
         name: 'Thickness',
       })
@@ -269,9 +265,6 @@ describe('compact tool settings', () => {
     if (layer?.kind !== 'spotlight')
       throw new Error('spotlight expected')
     expect(layer.payload.apertures).toHaveLength(2)
-    await fireEvent.click(screen.getByRole('button', {
-      name: 'Aperture shape',
-    }))
     await fireEvent.click(await screen.findByRole('button', {
       name: 'Ellipse',
     }))

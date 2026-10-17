@@ -120,7 +120,7 @@ describe('distinct ink brushes', () => {
   it('round-trips new payload and rejects unknown versions or pressure modes', () => {
     const stroke = layer('stabilized')
     expect(parseSampledPayload(stroke.payload, 'pencil', false)).toEqual(stroke.payload)
-    expect(() => parseSampledPayload({ ...stroke.payload, strokeVersion: 3 }, 'pencil', false)).toThrow('strokeVersion')
+    expect(() => parseSampledPayload({ ...stroke.payload, strokeVersion: 4 }, 'pencil', false)).toThrow('strokeVersion')
     expect(() => parseSampledPayload({ ...stroke.payload, pressureMode: 'bad' }, 'pencil', false)).toThrow('pressureMode')
     const document = withLayers([stroke])
     expect(parseEditorDocument(serializeEditorDocument(document))).toMatchObject({ kind: 'editable', document })

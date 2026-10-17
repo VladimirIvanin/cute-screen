@@ -338,9 +338,15 @@ export interface ShapeLayerPayload extends JsonObject {
   readonly starInnerRatio: number
 }
 
+export interface StraightSegment extends JsonObject {
+  readonly start: number
+  readonly end: number
+}
+
 export interface PencilLayerPayload extends JsonObject {
   readonly points: readonly SampledPoint[]
-  readonly strokeVersion?: 2
+  readonly strokeVersion?: 2 | 3
+  readonly straightSegments?: readonly StraightSegment[]
   readonly pressureMode?: 'pen' | 'simulated'
   readonly brush: 'pen' | 'pencil' | 'stabilized' | 'brush'
   readonly width: number

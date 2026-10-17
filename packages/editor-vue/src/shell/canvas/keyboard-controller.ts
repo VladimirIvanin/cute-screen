@@ -1,5 +1,6 @@
 import {
   nudgeCrop,
+  setStrokeStraight,
   snapRulerEndpoint,
   type RulerAngleGuide,
 } from '@cute-screen/editor-renderer'
@@ -47,6 +48,15 @@ export class KeyboardController {
   constructor(context: KeyboardContext) {
     this.#context = context
   }
+  /** Capture stroke cancellation before Quick Capture's window Close. */
+  strokeKeydown(event: KeyboardEvent): void {
+    const gesture = this.#context.gesture()
+    if (
+      event.key === 'Escape' &&
+      gesture?.kind === 'draw' &&
+      gesture.stroke
+    ) this.keydown(event)
+  }
   keydown(event: KeyboardEvent): void {
     if (event.defaultPrevented || isEditableTarget(event.target))
       return
@@ -54,6 +64,7 @@ export class KeyboardController {
       return
     if (this.#handleCrop(event))
       return
+    this.#handleShift(event, true)
     this.#handleAltDown(event)
     if (event.code === 'Space' && !isEditableTarget(event.target)) {
       this.#context.setSpacePressed(true)
@@ -70,6 +81,7 @@ export class KeyboardController {
     }
   }
   keyup(event: KeyboardEvent): void {
+    this.#handleShift(event, event.shiftKey)
     if (event.code === 'Space')
       this.#context.setSpacePressed(false)
     const gesture = this.#context.gesture()
@@ -96,6 +108,17 @@ export class KeyboardController {
       this.#context.setRulerGuide(undefined)
       this.#context.invalidateOverlay()
     }
+  }
+  #handleShift(
+    event: KeyboardEvent,
+    pressed: boolean,
+  ): void {
+    if (event.key !== 'Shift') return
+    const gesture = this.#context.gesture()
+    if (gesture?.kind !== 'draw' || !gesture.stroke) return
+    const stroke = setStrokeStraight(gesture.stroke, pressed)
+    this.#context.setGesture({ ...gesture, stroke, points: stroke.points, current: stroke.points.at(-1)! })
+    this.#context.invalidateOverlay()
   }
   blur(): void {
     this.#context.setSpacePressed(false)

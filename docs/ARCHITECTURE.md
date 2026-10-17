@@ -670,3 +670,15 @@ single-instance CLI. Portal session handles не попадают в посто�
 Windows/macOS подключают Rust global-shortcut plugin через отдельный registry.
 Автозапуск имеет собственный OS adapter и возвращает фактическое состояние;
 checkbox first-run не является регистрацией до явного подтверждения.
+
+## Составной штрих (ADR-073)
+
+editor-core владеет transient StrokeState: points, straightSegments, raw cursor,
+offset и начало текущего прямого span. Canvas controllers передают pointer и
+Shift events, не создавая reactive document updates. Preview и commit получают
+одни points/ranges. Pencil v3 хранит индексы spans; общий resolver сглаживает
+свободные части отдельно и строит цельный expressive outline. Codec проверяет
+диапазоны; resize и style не удаляют их. Legacy и v2 geometry не меняются.
+Canvas-controller перехватывает Escape активного stroke в window capture phase,
+раньше terminal Close Quick; target/focus и порядок mount parent/child на это
+не влияют. Вне stroke и при initial Area selection поведение Escape прежнее.

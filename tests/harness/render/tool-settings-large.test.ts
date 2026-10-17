@@ -41,17 +41,26 @@ describe('tool settings on production-shaped captures', () => {
     const points = Array.from({ length: 12000 },
       (_, index) => ({
         x: width * .1 + index * width * .6 / 12000,
-        y: height * .4 + Math.sin(index / 90) * height * .05 + Math.sin(index * 1.4) * 3,
+        y: index >= 4000 && index <= 8000 ? height * .4
+          : height * .4 + Math.sin(index / 90) * height * .05 + Math.sin(index * 1.4) * 3,
         pressure: .3 + .7 * (index % 100) / 100,
       }))
     const pencil = createDrawingLayer({
       id: '019c1f62-058e-7000-8000-000000009003',
       tool: 'pencil', start: points[0]!, end: points.at(-1)!, points,
+      straightSegments: [{ start: 4000, end: 8000 }],
       defaults: {
         ...DEFAULT_DRAWING_DEFAULTS,
         pencil: { ...DEFAULT_DRAWING_DEFAULTS.pencil, brush: 'brush', width: 12, smoothing: .75 },
       },
     })!
+    const otherInk = ['pen', 'stabilized', 'marker'].map((brush, index) => createDrawingLayer({
+      id: `large-compound-${brush}`, tool: brush === 'marker' ? 'marker' : 'pencil',
+      start: points[0]!, end: points.at(-1)!,
+      points: points.map((p) => ({ ...p, y: p.y + (index + 1) * 100 })),
+      straightSegments: [{ start: 4000, end: 8000 }],
+      defaults: { ...DEFAULT_DRAWING_DEFAULTS, pencil: { ...DEFAULT_DRAWING_DEFAULTS.pencil, brush } },
+    })!)
     let spotlight = createSpotlightLayer({
       id: '019c1f62-058e-7000-8000-000000009004',
       bounds: { x: width * .1, y: height * .15, width: width * .25, height: height * .4 },
@@ -67,7 +76,9 @@ describe('tool settings on production-shaped captures', () => {
         },
       })
     }
-    const scene = createDocumentRenderScene({ ...document, layers: [...document.layers, spotlight, pencil] })
+    const scene = createDocumentRenderScene({
+      ...document, layers: [...document.layers, spotlight, pencil, ...otherInk],
+    })
     expect(scene.nodes.filter((node) => node.id.startsWith(pencil.id))).toHaveLength(1)
     const preview = createCanvas(width, height)
     const renderer = new Canvas2DRenderer({

@@ -1,5 +1,6 @@
 import {
   constrainRulerMove,
+  moveStroke,
   rulerCanvasBounds,
   moveCrop,
   resizeCrop,
@@ -256,28 +257,21 @@ function moveDrawing(
   point: CanvasPoint,
   gesture: Extract<NonNullable<CanvasGesture>, { readonly kind: 'draw' }>,
 ): void {
-  const samples: CanvasPoint[] = []
-  if (gesture.tool === 'pencil' || gesture.tool === 'marker') {
-    let previous = gesture.points[gesture.points.length - 1]
+  let stroke = gesture.stroke
+  if (stroke) {
     const coalesced = event.getCoalescedEvents?.()
     for (const sample of coalesced?.length ? coalesced : [event]) {
       const candidate = context.canvasPoint(sample)
-      if (
-        candidate &&
-        (!previous ||
-          Math.hypot(candidate.x - previous.x, candidate.y - previous.y) >= 0.5)
-      ) {
-        samples.push(candidate)
-        previous = candidate
-      }
+      if (candidate) stroke = moveStroke(stroke, candidate, event.shiftKey)
     }
   }
   context.setGesture({
     ...gesture,
-    current: point,
+    current: stroke?.points.at(-1) ?? point,
     constrainAngle: event.shiftKey,
     drawFromCenter: event.altKey,
-    points: samples.length > 0 ? [...gesture.points, ...samples] : gesture.points,
+    points: stroke?.points ?? gesture.points,
+    ...(stroke ? { stroke } : {}),
   })
   context.invalidateOverlay()
 }

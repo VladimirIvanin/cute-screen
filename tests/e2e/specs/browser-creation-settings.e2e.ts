@@ -29,7 +29,15 @@ describe('creation settings policy', () => {
           return panel.left >= 0 && panel.right <= innerWidth && panel.top >= 0 && panel.bottom <= rail.top
         })
         expect(fits).toBe(true)
-        if (id === 'pencil' || id === 'numberedMarker') {
+        if (id === 'spotlight') {
+          const softness = locale === 'ru' ? 'Мягкость краёв' : 'Edge softness'
+          await expect($(`.cs-tool-defaults-toolbar button[aria-label="${softness}"]`)).toHaveText(locale === 'ru' ? 'Чётко' : 'Sharp')
+        }
+        if (
+          id === 'pencil' ||
+          id === 'numberedMarker' ||
+          id === 'spotlight'
+        ) {
           await browser.saveScreenshot(`artifacts/browser-e2e/creation-settings-${id}-${locale}-${theme}.png`)
         }
       }

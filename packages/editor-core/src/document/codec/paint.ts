@@ -309,12 +309,44 @@ export function parseSampledPayload(
       ...(input.highlighterMode === undefined ? {} : { highlighterMode: input.highlighterMode }),
     }) as MarkerLayerPayload
   }
-  if (input.strokeVersion !== undefined && input.strokeVersion !== 2) throw new Error(`${field}.strokeVersion is invalid`)
-  if (input.strokeVersion === 2 && !['pen', 'simulated'].includes(String(input.pressureMode))) throw new Error(`${field}.pressureMode is invalid`)
-  const brushes = input.strokeVersion === 2 ? ['pen', 'stabilized', 'brush'] : ['pen', 'pencil', 'brush']
+  const modern = input.strokeVersion === 2 || input.strokeVersion === 3
+  if (input.strokeVersion !== undefined && !modern) throw new Error(`${field}.strokeVersion is invalid`)
+  if (modern && !['pen', 'simulated'].includes(String(input.pressureMode))) throw new Error(`${field}.pressureMode is invalid`)
+  const brushes = modern ? ['pen', 'stabilized', 'brush'] : ['pen', 'pencil', 'brush']
   if (!brushes.includes(String(input.brush))) throw new Error(`${field}.brush is invalid`)
   return Object.freeze({
     ...common, brush: input.brush,
-    ...(input.strokeVersion === 2 ? { strokeVersion: 2, pressureMode: input.pressureMode } : {}),
+    ...(modern ? { strokeVersion: input.strokeVersion, pressureMode: input.pressureMode } : {}),
+    ...(input.strokeVersion === 3
+      ? { straightSegments: parseStraightSegments(input.straightSegments, points.length, field) } : {}),
   }) as PencilLayerPayload
+}
+
+function parseStraightSegments(
+  value: unknown,
+  length: number,
+  field: string,
+) {
+  if (!Array.isArray(value) || value.length === 0) throw new Error(`${field}.straightSegments must not be empty`)
+  let previousEnd = 0
+  return Object.freeze(value.map((value, index) => {
+    const range = readJsonObject(value, `${field}.straightSegments[${index}]`)
+    const start = range.start
+    const end = range.end
+    if (
+      typeof start !== 'number' ||
+      typeof end !== 'number' ||
+      !Number.isInteger(start) ||
+      !Number.isInteger(end)
+      ||
+      start < previousEnd ||
+      start < 0 ||
+      end <= start ||
+      end >= length
+    ) {
+      throw new Error(`${field}.straightSegments[${index}] is invalid`)
+    }
+    previousEnd = end
+    return Object.freeze({ start, end })
+  }))
 }

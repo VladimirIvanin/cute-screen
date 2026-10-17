@@ -11,6 +11,7 @@ import {
 } from './shape-toolbar'
 import { waitForStableCanvas } from './canvas-ready'
 import { verifyPaletteDismissal } from './palette-dismissal'
+import { verifyToolbarSeparators } from './toolbar-separators'
 
 async function sceneChecksum(): Promise<number> {
   return browser.execute(() => {
@@ -58,6 +59,7 @@ export async function verifyHighlighter(
   await expect($('button[aria-label="Highlighter"] .cs-icon-marker')).toExist()
   const toolbar = $('.cs-highlighter-toolbar')
   await expect(toolbar).toBeDisplayed()
+  await verifyToolbarSeparators('.cs-highlighter-toolbar', 2)
   await browser.waitUntil(async () => !(await toolbar.getText()).includes('analysing'))
   await toolbar.$('button[aria-label="Effect"]').click()
   if (requireAutomatic) await expect($('.cs-highlighter-hint')).not.toExist()
@@ -111,6 +113,7 @@ export async function verifyHighlighter(
   expect(await $('html').getAttribute('data-highlighter-context-trusted')).toBe('true')
   const configure = $(':is(.cs-tool-configure-popover-host, .cs-tool-defaults-toolbar:not([aria-hidden="true"]))')
   await expect(configure).toBeDisplayed()
+  await verifyToolbarSeparators('.cs-highlighter-toolbar', 2)
   await configure.$('button[aria-label="Colour"]').click()
   await $('.cs-simple-color-panel button[aria-label="Custom colour"]').click()
   await waitForShapeAnimation()

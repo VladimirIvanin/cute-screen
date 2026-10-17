@@ -377,7 +377,7 @@ function resizePointLayer(
       ...layer.payload, points: Object.freeze(points),
     }),
   }) as typeof layer
-  return layer.kind === 'pencil' && layer.payload.strokeVersion === 2 ? rebaseFreehandLayer(resized) : resized
+  return layer.kind === 'pencil' && (layer.payload.strokeVersion === 2 || layer.payload.strokeVersion === 3) ? rebaseFreehandLayer(resized) : resized
 }
 function resizeFreeformCensor(
   layer: Extract<LayerNode, {

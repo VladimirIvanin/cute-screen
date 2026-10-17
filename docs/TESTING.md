@@ -1,5 +1,179 @@
 # Стратегия тестирования
 
+## Прямые участки через Shift (2026-10-17, ADR-073)
+
+Linux x86_64, Chrome 154.0.8037.57, Node 22.23.1, pnpm 10.33.2.
+Логи и decoded PNG: `artifacts/straight-strokes/`.
+
+- До реализации `pnpm test --project core packages/editor-core/src/straight-stroke.test.ts`
+  дал ожидаемый red: новый DOM-free модуль отсутствовал (`red.log`).
+- `pnpm test` — 115 файлов / 913 проверок passed (`unit-all.log`).
+  Focused core/brushes/Vue input — 4 файла / 42 проверки passed, включая
+  coalesced samples, отпускную точку, отмену, две одновременно зажатые Shift,
+  codec/style/resize/history и восемь направлений (`focused-final.log`).
+- `pnpm test:render` — 10 файлов / 32 проверки passed (`render.log`).
+  Новый decoded contract проверяет три pencil brushes и marker при scale 1/2,
+  цельный alpha на стыках и Canvas2D preview/export equality. CanvasKit
+  проходит существующий semantic tolerance. PNG `ink-{1,2}-{canvas2d,canvaskit}.png`
+  сохранены; просмотрен `ink-2-canvas2d.png`. Production-like UI fixtures 3840×2160 и 7680×4320 содержат
+  12000 samples на каждый из четырёх штрихов и шесть spotlight apertures;
+  экспорт повторно декодирован и сравнен по полному pixel checksum.
+  Метрики и SHA-256 исходников — `render-4k.json`, `render-8k.json`.
+- `pnpm test:perf` — 2 файла / 6 проверок passed (`perf.log`).
+  Новый CPU contract обрабатывает 12000 raw samples при 4K/8K;
+  input и geometry timings для трёх кистей записаны в `perf-{3840,7680}.json`.
+  Это CPU/software evidence; новый GPU frame-budget claim не делается.
+- `pnpm check` прошёл: lint (68 существующих warnings, 0 errors), typecheck,
+  format/docs, 43 architecture checks, IPC и все Rust fmt/clippy configurations
+  (`check.log`). Повтор `pnpm test:boundaries` — 43/43 (`boundaries-final.log`).
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5274 pnpm test:e2e:browser --spec tests/e2e/specs/browser-straight-strokes.e2e.ts --spec tests/e2e/specs/browser-brushes.e2e.ts`
+  — 2 specs / 6 scenarios passed (`browser-final.log`). Trusted pointer/key
+  input проверяет marker и три pencil brushes, Shift до старта и посреди
+  gesture, обе Shift, undo/redo, Escape constrained draft, DPR 1/2 × Fit/1:1
+  на 2560×1440 document и RU/EN tooltip при 1024 px. Existing brush settings,
+  freehand creation и cancel также passed. PNG `straight-strokes-{1,2}-{fit,actual}.png`
+  находятся в `artifacts/browser-e2e/`.
+- `XDG_SESSION_ID=straight-strokes PATH="$PWD/artifacts/spotlight-fix/tools/bin:$PWD/artifacts/spotlight-fix/tools/webkit/root/usr/bin:$PATH" CUTE_SCREEN_E2E_DRIVER_PROVIDER=external CUTE_SCREEN_E2E_SCENARIOS=straight-strokes,straight-strokes-reopen pnpm test:e2e:tauri`
+  — 2 сценария / 2 проверки passed (`tauri.log`), Wry 0.55.1/WebKitGTK с
+  external WebKitWebDriver. Production Capture → Quick → Editor: marker и все
+  три кисти, обе Shift, undo/redo, Escape во время constrained stroke без
+  закрытия Quick, затем restart и восстановление шести pencil v3 и двух marker.
+  Native fake source — 400×300; physical capture и native 4K/8K не проверялись.
+  Просмотрены `artifacts/tauri-e2e/straight-strokes-quick.png` и
+  `straight-strokes-reopened.png`; settings открываются видимой кнопкой при
+  свёрнутой автоматической строке, cancel не оставляет draft в документе.
+  Windows/macOS/Wayland portal runtime остаются отдельными gates.
+- Native constrained Escape выявил более ранний window Close listener Quick:
+  `escape-red.log` воспроизводит закрытие draft вместо отмены штриха. Capture-phase
+  canvas-controller handling теперь потребляет Escape только активного pencil/marker draw.
+  `pnpm test --project vue tests/unit/vue/straight-strokes.test.ts tests/unit/vue/quick-capture-warmup.test.ts`
+  — 14/14 passed (`escape-green.log`); `escape-window-red.log` фиксирует regression при
+  window-targeted input. Отмена начального Area selection сохранена.
+
+Первый native build столкнулся с очисткой `editor-core/dist` другим build
+(`tauri-build-conflict.log`); последующие package builds запускались последовательно.
+Крошечная старая m05 fixture 160×120 с crop 100×80 при Fit × DPR 2 превышает
+существующий лимит renderer scale 16. Shift matrix использует существующую
+2560×1440 viewport fixture. Параллельный native launch прерывал browser gesture
+через штатный blur/cancel; итоговые native/browser прогоны разделены.
+
+## Прямые разделители тулбаров (2026-10-17)
+
+`REQ-UI-001`: Shape и Highlighter используют UiSeparator вместо боковых рамок
+скруглённых кнопок. Browser/WebView checks измеряют линии после применения CSS:
+1×21 CSS px, radius 0, центрирование, отсутствие боковой рамки кнопки,
+декоративность без focus/pointer target и отсутствие выхода панели за viewport.
+Проверены остальные toolbar borders: Text groups, Censor effects, Crop и custom
+colour area уже прямые; ToolRail и Arrow уже используют общий компонент.
+
+Платформа: Linux x64/X11, Chrome 154.0.8037.57. Логи и копии скриншотов:
+`artifacts/toolbar-separators/`.
+
+- `pnpm exec vitest run --project vue tests/unit/vue/shape-context-toolbar.test.ts tests/unit/vue/highlighter-toolbar.test.ts tests/unit/vue/arrow-context-toolbar.test.ts tests/unit/vue/quick-context-toolbar.test.ts`
+  — 4 файла, 29/29 passed (`components.log`).
+- `pnpm check` — exit 0 до параллельных правок straight-stroke: lint, typecheck,
+  format, docs, boundaries, IPC и Rust checks (`check.log`).
+- Финальный `pnpm check` в общем workspace — exit 1 (`check-final.log`):
+  lint, typecheck, format и docs passed, boundaries 41/43. Новые параллельные
+  правки карандаша добавили цикл freehand → constrained-freehand → freehand
+  и complexity 21/20 в freehand и drawing-schema. IPC/Rust в этом повторе
+  не запускались после остановки gate; production-файлы разделителей не менялись.
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5184 pnpm test:e2e:browser --spec tests/e2e/specs/browser-shape-toolbar.e2e.ts --spec tests/e2e/specs/browser-highlighter.e2e.ts --mochaOpts.grep 'edits paint|keeps straight separators'`
+  — 2/2 passed (`browser-stable.log`), RU/EN × light/dark × окна 1024/1280 px.
+  Проверены selection toolbar фигур, defaults выделителя, открытие панелей,
+  возврат focus по Escape, палитра, сохранение undo/redo в сценарии фигур.
+- `XDG_SESSION_ID=toolbar-separators-isolated CARGO_TARGET_DIR=/home/vladimir/remote/cutescreen/target PATH="/home/vladimir/remote/cutescreen/artifacts/spotlight-fix/tools/bin:/home/vladimir/remote/cutescreen/artifacts/spotlight-fix/tools/webkit/root/usr/bin:$PATH" CUTE_SCREEN_E2E_DRIVER_PROVIDER=external CUTE_SCREEN_E2E_SCENARIOS=toolbar-separators pnpm test:e2e:tauri`
+  — 1/1 passed (`tauri-geometry.log`), из той же копии. Настоящий wry 0.55.1
+  WebView: production fake Capture → Quick → материализованный Editor,
+  Shape и Highlighter, включая явную кнопку Settings при скрытых defaults.
+  Четыре просмотренных скриншота — `native/separators-{quick,editor}-{shape,highlighter}.png`.
+  Windows/macOS этим прогоном не подтверждены.
+
+Browser matrix выполнена в `/tmp/cutescreen-toolbar-separators-qa`: копия
+исходников с изменениями этой задачи и исходными незакоммиченными изменениями.
+Поздние параллельные правки карандаша исключены только из копии, поскольку Vite
+перезагрузил основной runner посреди проверки. Зависимости подключены ссылками;
+только в копии server.fs.allow разрешает workspace и общий dependency root для
+fonts. Основные исходники и конфигурация Vite этим не изменены. SHA-256 четырёх
+изменённых production-файлов — `source-sha256.txt`; они совпадают с копией.
+
+Просмотрены полные desktop/minimum-size screenshots и crops всех восьми
+сочетаний каждой панели. Нет скобок, перекосов или обрезанных toolbar controls;
+радиусы кнопок и читаемость линий сохранены. Матрица —
+`browser/{shape,highlighter,palette}-{1024,1280}-{en,ru}-{light,dark}.png`;
+контактные листы — `shape-review.png`, `highlighter-review.png`.
+
+Полные исходные E2E запускались отдельно и не объявляются зелёными:
+`browser.log` содержит сбои создания/повторного создания фигур и выноски,
+preview checksum выделителя; `tauri.log` — release средней кнопки в cursor
+scenario и WebKit color-input normalization `#369` вместо `#336699`.
+Повтор в основном workspace (`browser-geometry.log`) прерван hot reload от
+параллельной правки. Первый запуск копии потребовал workspace dependency links
+и Vite fs.allow (`browser-isolated*.log`); после настройки matrix прошла.
+
+Первый `pnpm format` прошёл (`format.log`); повтор застал новую строку 132
+символа в параллельно изменённом core codec (`format-final.log`). После следующих
+параллельных правок общий `pnpm format` снова прошёл (`format-after-docs.log`). Scoped lint
+и formatter checks изменённых здесь JS/TS/Vue проходят (`scoped-lint.log`,
+`scoped-format.log`); E2E typecheck — `e2e-types.log`.
+Итоговые `pnpm format` и `pnpm format:check` проходят (`format-complete.log`,
+`format-check.log`).
+
+## Кнопки формы фонаря (2026-10-17, ADR-072)
+
+Linux x86_64/X11, Chrome 154.0.8037.57, Node 22.23.1, pnpm 10.33.2.
+Логи — `artifacts/spotlight-shapes/`.
+
+- `pnpm test --project vue tests/unit/vue/tool-formatting-toolbar.test.ts tests/unit/vue/m08-precision-history.test.ts`
+  — 2 файла / 11 проверок passed: прямое изменение формы активной области,
+  независимость областей, locked/unlock, одна command и undo.
+- `pnpm test` — 113 файлов / 886 проверок passed (`unit-all.log`).
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5259 pnpm test:e2e:browser --spec tests/e2e/specs/browser-spotlight-preview.e2e.ts`
+  — 2/2 passed. Defaults на 2560×1440 document при окне 1024×800:
+  RU/EN × light/dark, три icon buttons, один pressed, локализованные title,
+  Tab/Space и минимум 36×36 CSS px без overflow. Pointer creation и изменение
+  формы выбранного слоя проверяют payload, undo/redo, move и cancel.
+  Просмотрены `artifacts/browser-e2e/spotlight-shapes-ru-{light,dark}.png`:
+  selected/focus видны, группа помещается над ToolRail без обрезки.
+- `pnpm build:packages`, `pnpm lint`, `pnpm typecheck` — passed;
+  lint — 68 существующих warnings, 0 errors.
+- `XDG_SESSION_ID=spotlight-shape-buttons PATH="$PWD/artifacts/spotlight-fix/tools/bin:$PWD/artifacts/spotlight-fix/tools/webkit/root/usr/bin:$PATH" CUTE_SCREEN_E2E_DRIVER_PROVIDER=external CUTE_SCREEN_E2E_SCENARIOS=spotlight-preview pnpm test:e2e:tauri`
+  — 1/1 passed, Wry 0.55.1/WebKitGTK. Production Capture → Quick → Editor:
+  создание фонаря, прямой Rectangle → Ellipse, точный undo/redo и прежний
+  preview/move/cancel contract в обеих поверхностях. Просмотрен
+  `artifacts/tauri-e2e/spotlight-editor-shapes.png`; native source — fake 400×300.
+- `pnpm format`, `pnpm format:check`, `pnpm docs:check` — passed.
+  Renderer/core/Rust не менялись; renderer goldens, perf, полный `pnpm check`
+  и release bundles для этого UI-среза не запускались.
+
+## Чёткие края фонаря по умолчанию (2026-10-17, ADR-071)
+
+Linux x86_64/X11, Chrome 154.0.8037.57, Node 22.23.1, pnpm 10.33.2.
+Артефакты и логи: `artifacts/spotlight-default/`.
+
+- `pnpm format`, `pnpm build:packages`, `pnpm lint`, `pnpm typecheck` — passed;
+  lint содержит 68 существующих warnings, без errors.
+- `pnpm test` — 113 файлов / 886 проверок passed (`unit.log`).
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5257 pnpm test:e2e:browser --spec tests/e2e/specs/browser-creation-settings.e2e.ts --spec tests/e2e/specs/browser-spotlight-preview.e2e.ts`
+  — spotlight-preview passed: pointer creation создаёт `feather: null`, панель
+  показывает Sharp; preview/move/undo/redo/cancel также прошли. Общий
+  creation-settings остановился на существующей проверке `.n-tooltip` Text.
+  Повтор только creation-settings на порту 5258 дал ту же ошибку;
+  полного RU/EN × light/dark pass для этого сценария нет.
+- Просмотрены `artifacts/browser-e2e/creation-settings-spotlight-en-light.png`
+  и `creation-settings-spotlight-ru-light.png`: панель показывает Sharp/Чётко,
+  controls помещаются над ToolRail. Английская dark-проверка также прошла;
+  до русской dark-комбинации общий сценарий не дошёл.
+- `XDG_SESSION_ID=spotlight-default-edges PATH="$PWD/artifacts/spotlight-fix/tools/bin:$PWD/artifacts/spotlight-fix/tools/webkit/root/usr/bin:$PATH" CUTE_SCREEN_E2E_DRIVER_PROVIDER=external CUTE_SCREEN_E2E_SCENARIOS=spotlight-preview pnpm test:e2e:tauri`
+  — 1/1 passed в Wry 0.55.1/WebKitGTK: production Capture → Quick → Editor,
+  новый слой в обеих поверхностях имеет `feather: null`, панель — Sharp,
+  gesture preview, move, undo/redo и cancel проходят. Fake capture — 400×300;
+  этот прогон подтверждает native UI, а не physical capture или large-image parity.
+  Лог — `tauri.log`, screenshots — `artifacts/tauri-e2e/spotlight-*.png`.
+- `pnpm docs:check`, `pnpm format:check` — passed. Rust/renderer код не менялся;
+  `pnpm check`, `pnpm test:render`, `pnpm test:perf`, `cargo test --workspace`
+  и release build для этого изменения не запускались.
+
 ## Контекстные настройки инструментов (2026-10-17, ADR-069)
 
 Linux x86_64/X11, Node 22.23.1, pnpm 10.33.2, Chrome 154.0.8037.57,

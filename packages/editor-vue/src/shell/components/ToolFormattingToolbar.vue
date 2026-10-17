@@ -66,7 +66,7 @@ const names = computed<Record<string, string>>(() => ({
   label: text('Label and units', 'Подпись и единицы'),
   measure: text('Measurement and snapping', 'Измерение и привязка'),
 }))
-const menus = computed(() => kind.value === 'pencil' ? ['brush', 'appearance', 'smoothing'] : kind.value === 'spotlight' ? ['shape', 'dim', 'feather', ...(settings.value.apertures ? ['regions'] : [])] : ['stroke', 'label', 'measure'])
+const menus = computed(() => kind.value === 'pencil' ? ['brush', 'appearance', 'smoothing'] : kind.value === 'spotlight' ? ['dim', 'feather', ...(settings.value.apertures ? ['regions'] : [])] : ['stroke', 'label', 'measure'])
 const labels = computed<Record<string, string>>(() => ({
   width: text('Width', 'Толщина'),
   layerOpacity: text('Opacity', 'Непрозрачность'),
@@ -152,8 +152,6 @@ function summary(menu: string): string {
     return display('layerOpacity', '%')
   if (menu === 'smoothing')
     return display('smoothing', '%')
-  if (menu === 'shape')
-    return mixed('spotlightShape') ? '—' : shapes.value.find((item) => item.id === value('spotlightShape'))?.name ?? ''
   if (menu === 'dim')
     return display('spotlightDimOpacity', '%')
   if (menu === 'feather')
@@ -258,6 +256,41 @@ watch([() => props.schema.icon, () => settings.value.activeApertureId], () => {
       @commit="change(colorId, $event)"
       @eyedropper="emit('eyedropper', colorId)"
     />
+    <div
+      v-if="kind === 'spotlight' && control('spotlightShape')"
+      class="cs-tool-shapes"
+      role="group"
+      :aria-label="names.shape"
+    >
+      <button
+        v-for="shape in shapes"
+        :key="shape.id"
+        type="button"
+        :disabled="blocked || control('spotlightShape')?.disabled"
+        :aria-label="shape.name"
+        :title="shape.name"
+        :aria-pressed="!mixed('spotlightShape') && value('spotlightShape') === shape.id"
+        @click="choose('spotlightShape', shape.id)"
+      >
+        <svg viewBox="0 0 32 24" aria-hidden="true">
+          <rect
+            v-if="shape.id === 'rectangle'"
+            x="3"
+            y="4"
+            width="26"
+            height="16"
+          />
+          <ellipse
+            v-else-if="shape.id === 'ellipse'"
+            cx="16"
+            cy="12"
+            rx="13"
+            ry="8"
+          />
+          <path v-else d="M16 2L30 12L16 22L2 12Z"/>
+        </svg>
+      </button>
+    </div>
     <NPopover
       v-for="menu in menus"
       :key="menu"
@@ -312,32 +345,6 @@ watch([() => props.schema.icon, () => settings.value.activeApertureId], () => {
             </svg>
             <span>{{ brush.name }}</span>
             <small>{{ brush.hint }}</small>
-          </button>
-        </div>
-        <div v-if="menu === 'shape'" class="cs-tool-settings-choices">
-          <button
-            v-for="shape in shapes"
-            :key="shape.id"
-            type="button"
-            :disabled="blocked"
-            :aria-label="shape.name"
-            :aria-pressed="!mixed('spotlightShape') && value('spotlightShape') === shape.id"
-            @click="choose('spotlightShape', shape.id)"
-          >
-            <svg viewBox="0 0 32 24" aria-hidden="true"><rect
-              v-if="shape.id === 'rectangle'"
-              x="3"
-              y="4"
-              width="26"
-              height="16"
-            /><ellipse
-              v-else-if="shape.id === 'ellipse'"
-              cx="16"
-              cy="12"
-              rx="13"
-              ry="8"
-            /><path v-else d="M16 2L30 12L16 22L2 12Z"/></svg>
-            {{ shape.name }}
           </button>
         </div>
         <SimpleColorPicker
@@ -481,7 +488,7 @@ watch([() => props.schema.icon, () => settings.value.activeApertureId], () => {
       :ref="element => { if (element) triggers.set(menu, element as HTMLButtonElement) }"
       type="button"
       class="cs-tool-settings-trigger"
-      :disabled="blocked && menu !== 'measure' || menu === 'shape' && !control('spotlightShape') || menu === 'smoothing' && numeric('smoothing')?.disabled"
+      :disabled="blocked && menu !== 'measure' || menu === 'smoothing' && numeric('smoothing')?.disabled"
       :aria-label="names[menu]"
       :title="menu === 'smoothing' && value('brush') === 'pen' ? correctionHint : names[menu]"
       :aria-expanded="open === menu"

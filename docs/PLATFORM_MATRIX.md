@@ -1,5 +1,48 @@
 # Платформенная матрица
 
+## Прямые участки штрихов (2026-10-17, ADR-073)
+
+Linux x86_64: Chrome 154.0.8037.57 проверяет три pencil brushes и marker через
+trusted input на документе 2560×1440, DPR 1/2 × Fit/1:1, ShiftLeft/ShiftRight,
+undo/redo, Escape constrained draft и RU/EN tooltip при 1024 px. Tauri/Wry 0.55.1 с external
+WebKitWebDriver подтверждает production Capture → Quick → Editor, Escape без
+закрытия Quick во время штриха и восстановление
+шести pencil v3 и двух marker после restart. Native источник — fake 400×300:
+это input/persistence evidence, а не physical capture или native large-image gate.
+Decoded Canvas2D exports и CanvasKit parity, 4K/8K fixtures с 12000 samples
+на каждый из четырёх штрихов и CPU perf подтверждены отдельно headless suite.
+Windows/macOS и Wayland portal runtime в этом изменении не запускались.
+Команды, логи и PNG — TESTING.md, `artifacts/straight-strokes/`.
+
+## Разделители Shape/Highlighter (2026-10-17)
+
+Linux x86_64/X11: Chrome 154.0.8037.57 — 2/2 browser matrix passed;
+wry 0.55.1, external tauri-driver — 1/1 Capture → Quick → Editor passed.
+Проверены 1×21 CSS px, radius 0 и центрирование. Все четыре production-файла
+совпадают с проверенной изолированной копией; подробности — TESTING.md,
+`artifacts/toolbar-separators/`. Windows/macOS visual re-smoke не выполнялся.
+
+## Кнопки формы фонаря (2026-10-17, ADR-072)
+
+Linux x86_64/X11: Chrome 154.0.8037.57 — browser 2/2 passed: RU/EN ×
+light/dark при 1024 px, pointer/keyboard shape selection и undo/redo.
+Native Wry 0.55.1/WebKitGTK с external driver — production Capture → Quick →
+Editor 1/1 passed для прямых icon buttons и shape/history contract.
+Browser использует 2560×1440 document для layout; native — fake source 400×300,
+без claim physical capture. Скриншоты RU light/dark и native editor просмотрены.
+Windows/macOS/Wayland для изменения не проверялись. Evidence — TESTING.md.
+
+## Чёткие края фонаря по умолчанию (2026-10-17, ADR-071)
+
+Linux x86_64/X11, Chrome 154.0.8037.57: создание фонаря с `feather: null`
+и Sharp в панели подтверждено browser spotlight-preview. Defaults Sharp/Чётко
+просмотрены в EN/RU light; EN dark assertion также прошёл. Полная матрица
+creation-settings прервана существующей ошибкой Text tooltip.
+Real Tauri/Wry 0.55.1/WebKitGTK, external driver: production Capture → Quick →
+Editor — 1/1 passed для default, preview, move, undo/redo и cancel;
+fake source 400×300 не доказывает physical capture. Windows, macOS и Wayland
+для этого изменения не проверялись. Команды и артефакты — TESTING.md.
+
 ## Подписи выносок (2026-10-17, ADR-065)
 
 Linux x86_64/X11: Chrome 154.0.8037.57 and real Tauri/WebKitGTK through the

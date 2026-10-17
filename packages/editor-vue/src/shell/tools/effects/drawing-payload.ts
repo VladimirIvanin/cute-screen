@@ -158,12 +158,14 @@ function specializedPayload(
       smoothing < 0 ||
       smoothing > 1 ||
       current.brush === 'pen' &&
-      current.strokeVersion === 2
+      (current.strokeVersion === 2 ||
+        current.strokeVersion === 3)
     ) return undefined
     const memories = current.brushSmoothing as JsonObject | undefined
     return {
       ...current, smoothing,
-      ...(current.strokeVersion === 2 ? { brushSmoothing: { ...memories, [String(current.brush)]: smoothing } } : {}),
+      ...((current.strokeVersion === 2 || current.strokeVersion === 3)
+        ? { brushSmoothing: { ...memories, [String(current.brush)]: smoothing } } : {}),
     }
   }
   if (id === 'brush') {

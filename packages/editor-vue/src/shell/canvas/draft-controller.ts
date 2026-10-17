@@ -99,6 +99,7 @@ export class DraftController {
       constrainAngle: gesture.constrainAngle,
       drawFromCenter: gesture.drawFromCenter,
       points: gesture.points,
+      straightSegments: gesture.stroke?.straightSegments,
     })
   }
 

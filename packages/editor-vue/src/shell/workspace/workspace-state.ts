@@ -46,7 +46,7 @@ const DEFAULT_PRECISION_TOOLS: PrecisionToolDefaults = {
     shape: 'rectangle',
     dimColor: { red: 0, green: 0, blue: 0, alpha: 1 },
     dimOpacity: 0.65,
-    feather: 'soft',
+    feather: null,
   },
   ruler: {
     unit: 'pixels',

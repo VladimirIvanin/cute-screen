@@ -1,6 +1,7 @@
 import { measuredTextHeight } from '../../text-layout'
 import {
   applyCropSession,
+  moveStroke,
   createDrawingLayer,
   resizeLayerGeometry,
   rotateLayerTransform,
@@ -71,14 +72,12 @@ export function finishCanvasGesture(
   ) {
     const end = context.canvasPoint(event)
     const previous = completed.points.at(-1)
-    if (end) {
+    if (end && completed.stroke) {
       const point = {
         ...end, pressure: end.pressure && end.pressure > 0 ? end.pressure : previous?.pressure ?? .5,
       }
-      const samePosition = previous && previous.x === point.x && previous.y === point.y
-      completed = {
-        ...completed, current: point, points: samePosition ? completed.points : [...completed.points, point],
-      }
+      const stroke = moveStroke(completed.stroke, point, event.shiftKey, true)
+      completed = { ...completed, stroke, current: stroke.points.at(-1)!, points: stroke.points }
     }
   }
   const precisionLayer = createCompletedPrecisionLayer(context, completed)
@@ -351,6 +350,7 @@ function commitCreation(
       constrainAngle: gesture.constrainAngle,
       drawFromCenter: gesture.drawFromCenter,
       points: gesture.points,
+      straightSegments: gesture.stroke?.straightSegments,
     })
     if (layer) context.emit('addLayer', layer)
   }

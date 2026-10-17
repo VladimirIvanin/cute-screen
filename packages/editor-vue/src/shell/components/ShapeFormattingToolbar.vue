@@ -23,6 +23,7 @@ import type {
 } from '../types'
 import { UiIcon } from '../icon'
 import SimpleColorPicker from '../ui/SimpleColorPicker.vue'
+import UiSeparator from '../ui/UiSeparator.vue'
 import ShapeNumericControl from './ShapeNumericControl.vue'
 
 const props = defineProps<{
@@ -212,6 +213,7 @@ onBeforeUnmount(() => {
 <template>
   <div ref="host" class="cs-shape-toolbar">
     <template v-for="menu in menus" :key="menu">
+      <UiSeparator v-if="menu !== 'geometry'" :length="21" />
       <button
         :ref="(element) => { if (element) triggers.set(menu, element as HTMLButtonElement) }"
         class="cs-shape-toolbar-trigger"

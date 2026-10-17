@@ -21,6 +21,22 @@ const embeddedWebDriverPort = Number.parseInt(process.env.TAURI_WEBDRIVER_PORT ?
 
 const scenarios = [
   {
+    id: 'straight-strokes',
+    persistenceGroup: 'straight-strokes',
+    spec: 'tests/e2e/specs/tauri-straight-strokes.e2e.ts',
+    harnessQuery: '?m04=1&m08=1',
+    fakeCapture: true,
+    driverProvider: 'external',
+  },
+  {
+    id: 'straight-strokes-reopen',
+    persistenceGroup: 'straight-strokes',
+    spec: 'tests/e2e/specs/tauri-straight-strokes-reopen.e2e.ts',
+    harnessQuery: '?m04=1&m08=1',
+    fakeCapture: true,
+    driverProvider: 'external',
+  },
+  {
     id: 'activation-capture',
     spec: 'tests/e2e/specs/tauri-activation-capture.e2e.ts',
     harnessQuery: '?m04=1',
@@ -138,6 +154,13 @@ const scenarios = [
     spec: 'tests/e2e/specs/tauri-highlighter.e2e.ts',
     harnessQuery: '?m04=1&m08=1',
     fakeCapture: true,
+  },
+  {
+    id: 'toolbar-separators',
+    spec: 'tests/e2e/specs/tauri-toolbar-separators.e2e.ts',
+    harnessQuery: '?m04=1&m08=1',
+    fakeCapture: true,
+    driverProvider: 'external',
   },
   {
     id: 'quick-editor-handoff',

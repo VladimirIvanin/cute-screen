@@ -24,9 +24,6 @@
   font-size: 12px;
   cursor: pointer;
 }
-.cs-highlighter-trigger + .cs-highlighter-trigger {
-  border-left: 1px solid var(--border);
-}
 .cs-highlighter-trigger:hover:not(:disabled),
 .cs-simple-color-trigger:hover:not(:disabled) {
   background: var(--surface-raised);

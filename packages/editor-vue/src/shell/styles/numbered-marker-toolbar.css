@@ -8,7 +8,8 @@
   max-width: 100%;
   color: var(--text);
 }
-.cs-marker-control-group {
+.cs-marker-control-group,
+.cs-tool-shapes {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -16,6 +17,7 @@
   padding-inline: 4px;
 }
 .cs-marker-control-group > button,
+.cs-tool-shapes > button,
 .cs-marker-number-label input {
   display: inline-flex;
   align-items: center;
@@ -30,20 +32,24 @@
   color: var(--text);
   font: inherit;
 }
-.cs-marker-control-group > button:hover:not(:disabled) {
+.cs-marker-control-group > button:hover:not(:disabled),
+.cs-tool-shapes > button:hover:not(:disabled) {
   background: var(--surface-sunken);
 }
-.cs-marker-control-group > button[aria-pressed='true'] {
+.cs-marker-control-group > button[aria-pressed='true'],
+.cs-tool-shapes > button[aria-pressed='true'] {
   border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--accent);
 }
 .cs-marker-control-group > button:focus-visible,
+.cs-tool-shapes > button:focus-visible,
 .cs-marker-number-label input:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
-.cs-marker-control-group > button:disabled {
+.cs-marker-control-group > button:disabled,
+.cs-tool-shapes > button:disabled {
   opacity: 0.45;
   cursor: default;
 }
@@ -73,10 +79,12 @@
   color: var(--text-muted);
   font-size: 11px;
 }
-.cs-marker-shapes > button {
+.cs-marker-shapes > button,
+.cs-tool-shapes > button {
   padding: 2px;
 }
-.cs-marker-shapes svg {
+.cs-marker-shapes svg,
+.cs-tool-shapes svg {
   width: 28px;
   height: 28px;
   fill: none;

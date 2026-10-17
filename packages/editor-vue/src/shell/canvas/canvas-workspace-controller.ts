@@ -505,6 +505,7 @@ export class CanvasWorkspaceController {
       hideEyedropper: () => this.#eyedropper.hide(),
       setCursor: (cursor) => this.#pointerGeometry.setCursor(cursor),
       invalidateOverlay: this.invalidateOverlay,
+      onStrokeKeydown: (event) => this.#keyboard.strokeKeydown(event),
       onKeydown: (event) => this.#keyboard.keydown(event),
       onKeyup: (event) => this.#keyboard.keyup(event),
       onBlur: () => this.#keyboard.blur(),

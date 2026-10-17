@@ -7,6 +7,7 @@ import {
 import path from 'node:path'
 import { setNumericInput } from './numeric-input'
 import { waitForStableCanvas } from './canvas-ready'
+import { verifyToolbarSeparators } from './toolbar-separators'
 
 export async function waitForShapeAnimation(): Promise<void> {
   await browser.waitUntil(() => browser.execute(() => {
@@ -66,6 +67,7 @@ export async function verifyShapeToolbar(
 ): Promise<void> {
   await drawShape()
   const toolbar = $('.cs-selection-floating-toolbar .cs-shape-toolbar')
+  await verifyToolbarSeparators('.cs-selection-floating-toolbar .cs-shape-toolbar', 3)
   expect(await toolbar.$$('[data-shape-control]').length).toBe(4)
   await toolbar.$('[data-shape-control="fill"]').click()
   await $('.cs-shape-fill-options').$('button=No fill').click()

@@ -16,6 +16,7 @@ import {
   type RulerAngleGuide,
   type SnapCandidate,
   type StrokeStyle,
+  type StrokeState,
   type TextBackground,
   type TextLayer,
   type Transform2D,
@@ -113,6 +114,7 @@ export type CanvasGesture =
     readonly highlighterEffect?: import('@cute-screen/editor-renderer').HighlighterEffect | undefined
     readonly drawingDefaults?: import('@cute-screen/editor-renderer').DrawingDefaults | undefined
     readonly tool: DrawingTool
+    readonly stroke?: StrokeState | undefined
     readonly start: CanvasPoint
     readonly current: CanvasPoint
     readonly constrainAngle: boolean

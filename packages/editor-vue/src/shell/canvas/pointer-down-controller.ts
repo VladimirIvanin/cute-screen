@@ -1,5 +1,6 @@
 import {
   DEFAULT_DRAWING_DEFAULTS,
+  beginStroke,
   calloutTextLayout,
   createPreparedNumberedMarker,
   hitTestDocument,
@@ -345,6 +346,7 @@ function beginDrawing(
     constrainAngle: event.shiftKey,
     drawFromCenter: event.altKey,
     points: [point],
+    ...(tool === 'pencil' || tool === 'marker' ? { stroke: beginStroke(point, event.shiftKey) } : {}),
   })
   context.invalidateOverlay()
 }

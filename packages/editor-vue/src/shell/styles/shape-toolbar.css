@@ -25,9 +25,6 @@
   font: inherit;
   font-size: 12px;
 }
-.cs-shape-toolbar-trigger + .cs-shape-toolbar-trigger {
-  border-left: 1px solid var(--border);
-}
 .cs-shape-toolbar-trigger > svg {
   width: 24px;
   height: 24px;

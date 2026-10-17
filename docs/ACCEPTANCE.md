@@ -1,5 +1,29 @@
 # Сквозная приёмка
 
+## Прямые разделители тулбаров (2026-10-17)
+
+`REQ-UI-001`: активировать Shape/Highlighter, открыть настройки и выделить
+фигуру. Разделители — прямые центрированные линии 1×21 CSS px; углы кнопок
+остаются скруглёнными. Browser RU/EN × light/dark × 1024/1280 и настоящий
+Linux/X11 WebView Capture → Quick → Editor прошли. Геометрия, скриншоты и
+ограничения остальных E2E — TESTING.md, `artifacts/toolbar-separators/`.
+
+## Кнопки формы фонаря (2026-10-17, ADR-072)
+
+`REQ-TOL-009`, `REQ-EDT-015/016`, `REQ-UI-006`: выбрать фонарь — в панели
+сразу доступны иконки rectangle/ellipse/diamond без меню. Click и Tab/Space
+меняют выбранную форму; подсказки и accessible names локализованы.
+На 1024 px RU/EN × light/dark группа помещается над ToolRail. После создания
+форма выбранной области меняется одной undoable command; locked/read-only
+блокирует кнопки. Повторить в Quick Capture и editor. Результаты — TESTING.md.
+
+## Чёткие края фонаря по умолчанию (2026-10-17, ADR-071)
+
+`REQ-TOL-009`, `REQ-EDT-015`: в новом workspace выбрать фонарь. Панель
+показывает «Чётко»/«Sharp» в RU/EN; созданный drag-жестом слой имеет
+`feather: null`. Повторить в Quick Capture и editor. Явно выбранные мягкие
+края и существующие слои сохраняют настройки. Результаты — TESTING.md.
+
 ## Физические буквенные shortcuts редактора (2026-10-16, ADR-064)
 
 `REQ-EDT-003/005/006/016`:
@@ -1156,3 +1180,17 @@ Cancel ничего не включает. Установить с обоими 
 Локально подтверждены browser UI, Rust/Gio контракты и X11 resident shortcuts.
 Полная Windows/macOS/Wayland и logout/login матрица остаётся pending до
 перечисленных реальных проверок. Фактические команды и артефакты — TESTING.md.
+
+## Прямые участки штрихов (ADR-073)
+
+`REQ-TOL-003/004`, `REQ-EDT-006/016`: в Editor и Quick выбрать выделитель и
+каждую pencil brush. Начать с Shift, провести горизонталь, вертикаль и диагональ;
+направление кратно 45°, длина сохраняется. Начать свободно, нажать Shift,
+изменить направление, отпустить Shift и продолжить без скачка. Повторить Shift
+несколько раз и обеими клавишами. До pointerup history не меняется; весь gesture
+отменяется одним Undo и восстанавливается Redo. Escape, blur и pointercancel
+не сохраняют draft. Tooltip RU/EN объясняет Shift. При correction 0/65/100%
+прямой span остаётся прямым; pressure expressive brush и alpha на стыках
+не теряются. Resize, смена кисти, save/reopen, zoom/DPR и decoded export
+сохраняют диапазоны. Old/v2 strokes остаются прежними. Фактическое evidence
+и непроверенные платформы — TESTING.md и PLATFORM_MATRIX.md.

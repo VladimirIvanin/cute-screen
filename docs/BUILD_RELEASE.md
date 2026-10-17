@@ -15,6 +15,13 @@ WebKitGTK `WebKitWebDriver` в PATH. Встроенный драйвер 1.3.0 �
 MouseEvent и не подтверждает PointerEvent-жесты canvas. Другие сценарии сохраняют
 прежний provider; `CUTE_SCREEN_E2E_DRIVER_PROVIDER` задаёт явный override.
 
+Для Shift drawing добавлены сценарии `straight-strokes,straight-strokes-reopen`
+с общим persistenceGroup и external provider. Они проверяют production
+Capture → Quick → Editor и повторный запуск сохранённого документа.
+Browser и native input suites запускать последовательно, чтобы native focus
+не отменял активный browser gesture. Не запускать package-cleaning builds
+параллельно: native build и typecheck используют общие dist directories.
+
 ## Deployment target macOS
 
 Baseline macOS 12.0 из ADR-038 задан и в `bundle.macOS.minimumSystemVersion`,

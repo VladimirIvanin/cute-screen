@@ -1,3 +1,4 @@
+import { constrainedFreehand } from './constrained-freehand'
 import {
   getStroke,
   getStrokePoints,
@@ -7,6 +8,7 @@ import type {
   Point,
   PencilLayer,
   MarkerLayer,
+  SampledPoint,
 } from '../document/types'
 
 export function rebaseFreehandLayer<T extends PencilLayer | MarkerLayer>(layer: T): T {
@@ -26,8 +28,18 @@ export function rebaseFreehandLayer<T extends PencilLayer | MarkerLayer>(layer: 
   }
   return { ...layer, localBounds: { x, y, width: right - x, height: bottom - y } }
 }
-export interface FreehandSample extends Point {
-  readonly pressure: number
+export type FreehandSample = SampledPoint
+
+function freehandSamples(payload: JsonObject): readonly FreehandSample[] {
+  const source = Array.isArray(payload.points) ? payload.points : []
+  return source.map((value) => {
+    const point = value as Record<string, unknown>
+    return {
+      x: typeof point.x === 'number' ? point.x : 0,
+      y: typeof point.y === 'number' ? point.y : 0,
+      pressure: typeof point.pressure === 'number' ? Math.max(0, Math.min(1, point.pressure)) : .5,
+    }
+  })
 }
 /** One geometry contract for scene, hit testing, previews and brush thumbnails. */
 export function resolveFreehandGeometry(
@@ -39,16 +51,9 @@ export function resolveFreehandGeometry(
   outline: readonly Point[]
   modern: boolean
 }> {
-  const source = Array.isArray(payload.points) ? payload.points : []
-  const samples = source.map((value) => {
-    const point = value as Record<string, unknown>
-    return {
-      x: typeof point.x === 'number' ? point.x : 0,
-      y: typeof point.y === 'number' ? point.y : 0,
-      pressure: typeof point.pressure === 'number' ? Math.max(0, Math.min(1, point.pressure)) : 0.5,
-    }
-  })
+  const samples = freehandSamples(payload)
   const width = typeof payload.width === 'number' ? payload.width : 1
+  if (pencil && payload.strokeVersion === 3) return constrainedFreehand(payload, samples, width)
   if (pencil && payload.strokeVersion === 2) {
     const strength = typeof payload.smoothing === 'number' ? payload.smoothing : .65
     if (
@@ -168,7 +173,7 @@ export function changePencilBrush(
   const memories = { ...previous.brushSmoothing as JsonObject }
   if (current.brush === 'stabilized' || current.brush === 'brush') memories[current.brush] = previous.smoothing!
   return {
-    ...previous, brush: brush === 'pencil' ? 'pen' : brush,
+    ...previous, strokeVersion: current.strokeVersion === 3 ? 3 : 2, brush: brush === 'pencil' ? 'pen' : brush,
     pressureMode: current.pressureMode === 'pen' ? 'pen' : 'simulated',
     smoothing: brush === 'pen' || brush === 'pencil' ? 0 : memories[brush]!, brushSmoothing: memories,
   }

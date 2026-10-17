@@ -1,5 +1,33 @@
 # Журнал архитектурных решений
 
+## ADR-072 — Прямой выбор формы фонаря
+
+**Статус:** accepted; дополняет ADR-056 и ADR-071.
+
+**Решение:** по запросу пользователя меню формы заменено тремя icon buttons
+в defaults и панели выбранной области. Размер и состояния совпадают с группой
+форм номерной метки: 36 px, accent selected, focus ring, disabled, локализованные
+имена и подсказки. При отсутствии shape control группа скрыта.
+Schema и command routing остаются прежними; редактируется активная область.
+
+**Проверяемое основание:** mounted-shell locked/unlock/undo и независимое
+редактирование областей; browser 1024 px RU/EN × light/dark с keyboard input;
+общий browser/native pointer scenario с shape change → undo/redo.
+Фактические результаты и ограничения — TESTING.md.
+
+## ADR-071 — Чёткие края фонаря по умолчанию
+
+**Статус:** accepted; дополняет ADR-056.
+
+**Решение:** по запросу пользователя новый workspace в editor и Quick Capture
+начинает с `spotlight.feather: null` («Чётко»). Явно выбранная мягкость,
+сохранённые настройки и слои продолжают использовать свои значения.
+Schema, renderer и IPC не меняются.
+
+**Проверяемое основание:** browser creation-settings проверяет «Чётко»/«Sharp»
+в defaults RU/EN; общий browser/native spotlight-preview проверяет payload
+созданного pointer-жестом слоя. Фактические результаты — TESTING.md.
+
 ## ADR-070 — Системные сочетания и явный выбор запуска при входе
 
 **Статус:** accepted; дополняет ADR-008 и ADR-010.
@@ -1192,7 +1220,7 @@ asset evidence; runtime tray light/dark/HiDPI на каждой ОС прове�
 
 ## ADR-060 — Различимые кисти и цельный контур
 
-**Статус:** accepted; supersedes карандашную часть ADR-056.
+**Статус:** superseded в части формата составных штрихов и сглаживания их прямых участков — ADR-073; supersedes карандашную часть ADR-056.
 
 Точное перо сохраняет траекторию и постоянную толщину. Автокоррекция использует
 стабилизацию perfect-freehand, экспрессивная кисть — переменный pressure outline.
@@ -1410,3 +1438,30 @@ Document v7, IPC и публичные API остаются прежними.
 геометрические проверки внешнего размещения и fallback при полном crop,
 browser/native pointer creation после outside-dismiss. Фактические команды,
 платформы, снимки и ограничения фиксируются в TESTING.md.
+
+## ADR-073 — Прямые участки карандаша и выделителя через Shift
+
+**Статус:** accepted; supersedes соответствующую часть ADR-060.
+
+Shift начинает прямой участок от конца траектории с ближайшим направлением,
+кратным 45°, и сохраняет длину вектора. Отпускание фиксирует участок, а offset
+между его концом и raw cursor сохраняется до конца жеста. Предыдущие участки
+не перерисовываются. Состояние DOM-free, transient, общее для двух инструментов;
+keydown/keyup и pointerup используют тот же контракт, что coalesced pointermove.
+Escape активного pencil/marker stroke обрабатывается canvas-controller в capture
+phase до window Close
+Quick Capture; отмена начального выбора и Escape вне штриха сохраняются.
+
+Marker сохраняет рассчитанные points. Pencil с прямыми диапазонами использует
+`strokeVersion: 3`, `straightSegments: [{start, end}]` с включительными индексами
+samples. Диапазоны упорядочены, не перекрываются (общий endpoint допустим),
+непусты и находятся внутри points. Свободные spans сглаживаются отдельно;
+прямые сохраняют ось и anchors. Expressive brush строит один pressure outline
+по объединённой оси. Schema v7 и IPC остаются прежними; обычный pencil сохраняет
+версию 2, прежняя геометрия не меняется. Старые приложения не поддерживают
+версию 3 и отклоняют её существующей проверкой неизвестного strokeVersion.
+
+**Проверяемое основание:** red-first core contracts для восьми направлений,
+смешанных участков, pressure и offset; codec/style/resize/history round-trip,
+Vue coalesced/key-only/cancel, decoded export parity и native production flow.
+Фактические результаты и платформенные ограничения записываются в TESTING.md.
