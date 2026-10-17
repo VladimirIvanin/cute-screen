@@ -9,6 +9,7 @@ import {
 } from './shape-toolbar'
 import { waitForStableCanvas } from './canvas-ready'
 import { setNumericInput } from './numeric-input'
+import { verifyLoupePointer } from './loupe-pointer'
 
 export async function verifyLoupeSettings(output: string): Promise<void> {
   await waitForStableCanvas()
@@ -31,6 +32,7 @@ export async function verifyLoupeSettings(output: string): Promise<void> {
   await browser.keys('Escape')
   if (await $('.cs-tool-configure-popover-host').isExisting()) await browser.keys('Escape')
   await $('.cs-tool-configure-popover-host').waitForExist({ reverse: true })
+  await expect($('.cs-toolrail button[aria-label="Loupe"]')).toHaveAttribute('aria-pressed', 'true')
   await waitForShapeAnimation()
   await waitForStableCanvas()
   const count = (await shapeDocument()).layers.length
@@ -56,10 +58,15 @@ export async function verifyLoupeSettings(output: string): Promise<void> {
     .down({ button: 'left' })
     .move({ origin: 'viewport', x: Math.round(c.x + c.w * .6), y: Math.round(c.y + c.h * .5), duration: 180 })
     .up({ button: 'left' }).perform()
-  await browser.waitUntil(async () => (await shapeDocument()).layers.length === count + 1)
+  try {
+    await browser.waitUntil(async () => (await shapeDocument()).layers.length === count + 1)
+  } catch (cause) {
+    await loupeCreationFailure(c, cause)
+  }
   await expect($('.cs-selection-floating-toolbar .cs-loupe-toolbar')).toBeDisplayed()
   const loupe = async () => (await shapeDocument()).layers.at(-1)!
   expect((await loupe()).payload.zoom).toBe(4)
+  await verifyLoupePointer(output)
   await $('[data-loupe-control="loupeZoom"]').click()
   await setNumericInput($('[role="dialog"] input[aria-label="Zoom"]'), '12')
   await browser.keys('Escape')
@@ -119,4 +126,20 @@ export async function verifyLoupeSettings(output: string): Promise<void> {
     .move({ origin: 'viewport', x: Math.round(c.x + c.w * .6), y: Math.round(c.y + c.h * .5) })
     .down({ button: 'left' }).up({ button: 'left' }).perform()
   await expect($('.cs-selection-floating-toolbar .cs-loupe-toolbar')).toBeDisplayed()
+}
+
+async function loupeCreationFailure(
+  coordinates: { x: number; y: number; w: number; h: number },
+  cause: unknown,
+): Promise<never> {
+  const diagnostics = await browser.execute(({ x, y, w, h }) => ({
+    coordinates: { x, y, w, h },
+    canvas: document.querySelector('.cs-canvas:not(.cs-canvas-overlay)')?.getBoundingClientRect().toJSON(),
+    viewport: { width: innerWidth, height: innerHeight },
+    startTarget: document.elementFromPoint(x + w * .25, y + h * .45)?.outerHTML.slice(0, 300),
+    endTarget: document.elementFromPoint(x + w * .6, y + h * .5)?.outerHTML.slice(0, 300),
+    tool: document.querySelector('.cs-toolrail [aria-pressed="true"]')?.getAttribute('aria-label'),
+    feedback: document.body.innerText,
+  }), coordinates)
+  throw new Error(`Loupe creation failed: ${JSON.stringify(diagnostics)}`, { cause })
 }

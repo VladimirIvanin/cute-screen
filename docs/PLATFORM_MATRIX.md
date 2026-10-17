@@ -1,5 +1,17 @@
 # Платформенная матрица
 
+## Пропорции указателя лупы (2026-10-17, ADR-079)
+
+Linux x86_64/X11: geometry и повторно декодированные Canvas2D/CanvasKit PNG,
+circle/rectangle, 1×/2× export и visual light/dark × 50%/100% passed.
+Chrome 154.0.8037.57 — browser creation/size 256/512/border 8/0,
+preview cancel и undo/redo passed на 2560×1440 harness; screenshots просмотрены.
+Tauri/Wry 0.55.1 с external driver собран и запущен дважды, но Quick drag
+не создал лупу до проверок новых пропорций (source 400×300, active Loupe,
+start hit-test `.cs-canvas-stage`). Native новый контракт остаётся pending;
+это не physical capture evidence. Windows/macOS/Wayland не проверялись.
+Команды, результаты и артефакты — TESTING.md, `artifacts/loupe-pointer/`.
+
 ## Фокус пресетов (2026-10-17)
 
 Linux x86_64 / Chrome 154.0.8037.57: browser pointer/Enter reopen для

@@ -342,7 +342,7 @@ export function drawLoupe2D(
     context.globalCompositeOperation = cssBlendMode(node.blendMode)
     context.strokeStyle = cssColor(node.border.color)
     context.fillStyle = cssColor(node.border.color)
-    context.lineWidth = 3
+    context.lineWidth = connector.lineWidth
     context.lineCap = 'round'
     context.lineJoin = 'round'
     context.shadowColor = 'rgba(0, 0, 0, 0.3)'

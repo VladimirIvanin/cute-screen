@@ -1,5 +1,54 @@
 # Стратегия тестирования
 
+## Пропорции указателя лупы (2026-10-17, ADR-079)
+
+Linux x86_64/X11, Node 22.23.1, pnpm 10.33.2. Логи —
+`artifacts/loupe-pointer/`; browser PNG — `artifacts/browser-e2e/loupe-settings-pointer-*`;
+визуальная матрица — `artifacts/loupe-pointer/visual/`.
+
+- До renderer changes `pnpm exec vitest run --project renderer packages/editor-renderer/src/loupe-connector.test.ts`
+  — 81 failed / 2 passed (`red.log`): прежние 3 px / 8–12 px не соответствуют
+  новому контракту. После реализации focused geometry/Canvas2D/CanvasKit —
+  118/118 passed (`renderer.log`).
+- После добавления light/dark × 50%/100% та же dedicated suite — 91/91 passed
+  (`renderer-final.log`). Geometry покрывает 16/64/256/512/2048 px;
+  повторно декодированные 1600×1000 PNG покрывают circle/rectangle,
+  64/512 px, border 0/3/8/64 и export 1×/2×. Проверены толщина shaft,
+  enlarged head, preview/export parity, source внутри линзы и snapshot-before-connector.
+  Отдельные 256/512 px PNG на светлом/тёмном фоне просмотрены при 50%.
+- `pnpm test` — 125 файлов / 1084 проверки passed (`unit.log`), до добавления
+  восьми дополнительных visual cases; финальная dedicated suite выше включает их.
+- `pnpm test:render` первоначально обнаружил два ожидаемых mismatch M08
+  (`render.log`). `pnpm test:render:update -t 'matches cropped M08 precision goldens'`
+  обновил только четыре precision PNG; все четыре просмотрены.
+  Повторный `pnpm test:render` — 11 файлов / 33 проверки passed (`render-final.log`).
+- `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5196 pnpm test:e2e:browser --spec tests/e2e/specs/browser-loupe-settings.e2e.ts`
+  — Chrome 154.0.8037.57, 1/1 passed (`browser.log`, повтор `browser-final.log`): trusted creation, size
+  256/512, border 8/0, numeric preview Escape и undo/redo size/border,
+  прежняя RU/EN × light/dark × 1024/1280 matrix. Просмотрены pointer 256/512 PNG.
+  Первая попытка на cropped 160×120 fixture не могла принять 512 px
+  (`browser-small-fixture.log`); spec переведён на существующий 2560×1440 harness.
+- `pnpm check` — exit 0 (`check.log`): lint с существующими warnings,
+  typecheck, format, docs, boundaries, IPC и четыре Rust clippy configuration.
+  `pnpm format` выполнен (`format.log`, `format-last.log`),
+  `pnpm format:check` — exit 0 (`format-check.log`). После добавления native
+  диагностики повторный check обнаружил лимит функции 124/120 строк
+  (`check-boundary-failure.log`); диагностика выделена в отдельный helper.
+  Финальный `pnpm check` — exit 0 (`check-final.log`), включая исправленный
+  architecture gate. Отдельная повторная architecture suite — 7/7 passed
+  (`boundaries-final.log`).
+
+- `XDG_SESSION_ID=loupe-pointer PATH="$PWD/artifacts/spotlight-fix/tools/bin:$PWD/artifacts/spotlight-fix/tools/webkit/root/usr/bin:$PATH" CUTE_SCREEN_E2E_DRIVER_PROVIDER=external CUTE_SCREEN_E2E_SCENARIOS=loupe-settings pnpm test:e2e:tauri`
+  — build successful, Wry 0.55.1 / WebKitGTK, external tauri-driver; 0/1,
+  первоначальный drag не создал слой в Quick, до нового pointer helper
+  (`native.log`, сохранённый `native-first-failure.png`). Повтор с
+  `XDG_SESSION_ID=loupe-pointer-recheck` и явной проверкой active Loupe также
+  остановился до создания (`native-recheck.log`): start hit-test вернул
+  `.cs-canvas-stage`, end — canvas; active tool Loupe, fake source 400×300,
+  viewport 1920×1054. Это не pass нового native size/border/cancel/undo контракта.
+  Browser evidence не заменяет native. Physical capture, Windows/macOS и Wayland
+  для этого изменения не проверялись.
+
 ## Однозначное выделение пресетов (2026-10-17)
 
 Linux x86_64, Node 22.23.1, pnpm 10.33.2; логи — `artifacts/preset-focus/`.

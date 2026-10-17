@@ -6,9 +6,12 @@
 линии по рамке (65%, 3–8 px) и увеличенный наконечник по размеру линзы/линии
 (5% / четыре толщины, 16–32 px, не больше половины линзы). При border=0
 указатель сохраняется. Schema v7 и IPC не меняются. План доказательств:
-geometry regressions, повторно декодированные Canvas2D/CanvasKit PNG для
-circle/rectangle, размеров 16/64/256/512/2048 и рамок 0/3/8/64, export 1×/2×;
+geometry regressions размеров 16/64/256/512/2048; повторно декодированные
+Canvas2D/CanvasKit PNG для circle/rectangle, размеров 64/512 и рамок 0/3/8/64,
+export 1×/2×; visual matrix 256/512 × light/dark × 50%/100%;
 browser и production Tauri Quick → Editor, preview cancel, undo/redo и screenshots.
+Статус: implemented; geometry/decoded PNG, visual matrix и browser passed.
+Native дважды остановился до создания лупы в Quick и остаётся pending.
 Результаты и ограничения фиксируются в TESTING.md.
 
 ## Однозначное выделение пресетов (2026-10-17)

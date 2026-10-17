@@ -30,7 +30,7 @@ function drawConnector(
 ): void {
   const connector = loupeConnectorGeometry(node)
   if (!connector) return
-  configurePaint(canvasKit, paint, node.border.color, node.opacity, 'stroke', 3)
+  configurePaint(canvasKit, paint, node.border.color, node.opacity, 'stroke', connector.lineWidth)
   paint.setBlendMode(blendMode(canvasKit, node.blendMode))
   paint.setStrokeCap(canvasKit.StrokeCap.Round)
   paint.setStrokeJoin(canvasKit.StrokeJoin.Round)

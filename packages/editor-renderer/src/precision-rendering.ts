@@ -13,6 +13,7 @@ export interface PixelRect {
 }
 
 export interface LoupeConnectorGeometry {
+  readonly lineWidth: number
   readonly source: Readonly<{ readonly x: number; readonly y: number }>
   readonly lensCenter: Readonly<{ readonly x: number; readonly y: number }>
   readonly lineEnd: Readonly<{ readonly x: number; readonly y: number }>
@@ -40,7 +41,8 @@ export function loupeConnectorGeometry(node: RenderLoupeNode): LoupeConnectorGeo
 
   const direction = { x: dx / distance, y: dy / distance }
   const perpendicular = { x: -direction.y, y: direction.x }
-  const arrowLength = Math.max(8, Math.min(12, node.lens.size * 0.12))
+  const lineWidth = Math.max(3, Math.min(8, node.border.width * 0.65))
+  const arrowLength = Math.min(radius, Math.max(16, Math.min(32, Math.max(node.lens.size * 0.05, lineWidth * 4))))
   const arrowHalfWidth = arrowLength * 0.45
   const lineEnd = {
     x: source.x - direction.x * (arrowLength * 0.35),
@@ -51,6 +53,7 @@ export function loupeConnectorGeometry(node: RenderLoupeNode): LoupeConnectorGeo
     y: source.y - direction.y * arrowLength,
   }
   return Object.freeze({
+    lineWidth,
     source: Object.freeze(source),
     lensCenter: Object.freeze(lensCenter),
     lineEnd: Object.freeze(lineEnd),

@@ -12,7 +12,7 @@ import { verifyLoupeSettings } from '../loupe-settings'
 describe('compact loupe settings', () => {
   it('creates and edits a loupe with compact controls and visible preview', async () => {
     await browser.setWindowSize(1280, 900)
-    await openDrawingHarness()
+    await openDrawingHarness(true)
     await verifyLoupeSettings('artifacts/browser-e2e/loupe-settings')
     for (const width of [1024, 1280]) {
       await browser.setWindowSize(width, 800)

@@ -103,6 +103,16 @@ usePreviewPopover и effect/command pipeline. Миниатюра circle/rectangl
 Document v7, renderer и IPC сохраняются; отдельный ADR не требуется:
 компоновка следует существующим ADR-048/053/054.
 
+## Производный указатель лупы (ADR-079)
+
+`editor-renderer/precision-rendering.ts` вычисляет lineWidth и вершины
+треугольного наконечника в document pixels по border.width и lens.size.
+Canvas2D и CanvasKit используют один результат в ordered preview/export.
+Snapshot composite-below создаётся до connector; выбранная source handle
+остаётся transient overlay. Рамка 0 не скрывает указатель. Новых полей
+persisted v7, IPC или Vue state нет; существующие size/border commands
+автоматически меняют производные пропорции с прежними cancel/undo/redo.
+
 ## Брендовый знак (ADR-057)
 
 `scripts/generate-brand-assets.mjs` хранит общую геометрию монитора с кошачьими
