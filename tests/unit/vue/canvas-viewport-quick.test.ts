@@ -309,4 +309,51 @@ describe('M05 CanvasViewport transforms', () => {
     unmount()
     vi.unstubAllGlobals()
   })
+
+  it('floors fit zoom so the canvas stays inside the padded viewport', async () => {
+    let notify: (() => void) | undefined
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: () => void) {
+          notify = callback
+        }
+        observe(): void {}
+        disconnect(): void {}
+      },
+    )
+    const wideDocument: EditorDocumentV1 = {
+      ...document,
+      canvas: {
+        width: 1920,
+        height: 1080,
+      },
+    }
+    const { container, emitted, unmount } = mountViewport('select', wideDocument)
+    const scroll = container.querySelector('.cs-canvas-scroll') as HTMLDivElement
+    Object.defineProperties(scroll, {
+      clientWidth: {
+        configurable: true,
+        value: 1010,
+      },
+      clientHeight: {
+        configurable: true,
+        value: 4000,
+      },
+    })
+    vi.spyOn(window, 'getComputedStyle').mockReturnValue({
+      paddingTop: '0px',
+      paddingRight: '0px',
+      paddingBottom: '0px',
+      paddingLeft: '0px',
+    } as CSSStyleDeclaration)
+
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    const fitsBeforeResize = emitted().fitZoom?.length ?? 0
+    notify?.()
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    expect(emitted().fitZoom?.slice(fitsBeforeResize)).toEqual([[52]])
+    unmount()
+    vi.unstubAllGlobals()
+  })
 })

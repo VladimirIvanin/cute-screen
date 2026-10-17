@@ -68,8 +68,16 @@ export class ViewportController {
       Number.parseFloat(style.paddingBottom || '0')
     if (availableWidth <= 0 || availableHeight <= 0) return
     const scale = Math.min(availableWidth / bounds.width, availableHeight / bounds.height)
-    const nextZoom = Math.round(scale * 100)
-    if (nextZoom === props.zoom) return
+    // Round down: an integer percent that rounds up is wider than the
+    // padded viewport and shows a scrollbar after capture opens in the editor.
+    let nextZoom = Math.floor(scale * 100)
+    if (
+      (bounds.width * nextZoom) / 100 > availableWidth ||
+      (bounds.height * nextZoom) / 100 > availableHeight
+    ) {
+      nextZoom -= 1
+    }
+    if (nextZoom < 1 || nextZoom === props.zoom) return
     emit('fitZoom', nextZoom)
   }
 
