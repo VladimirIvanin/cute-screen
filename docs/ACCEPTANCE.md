@@ -1138,3 +1138,21 @@ Windows/macOS/Wayland were not run for this follow-up. See TESTING.md for comman
 - Evidence: browser-creation-settings, tool-lifecycle, brushes; native scenario
   creation-settings через production Capture → Quick → Editor.
   Результаты и платформенные ограничения записываются в TESTING.md.
+
+## Глобальные сочетания и запуск при входе (ADR-070)
+
+REQ-ACT-007…012 реализуются через отдельный Settings и Rust-owned registrations.
+Проверить через реальный UI: назначить область/редактор, отменить recorder,
+получить конфликт без потери старого назначения, скрыть приложение и вызвать
+физическое сочетание. После перезапуска вызвать его до открытия Settings.
+Для захвата завершить selection → Editor и повторно декодировать оригинал;
+размеры декодированного файла должны совпасть с подтверждённой областью.
+
+Автозапуск: checkbox заранее включён, но ОС не меняется до подтверждения;
+Cancel ничего не включает. Установить с обоими вариантами, обновить и повторно
+войти в систему. Проверить фактический фоновой запуск и single-instance;
+системное отключение не должно автоматически отменяться приложением.
+
+Локально подтверждены browser UI, Rust/Gio контракты и X11 resident shortcuts.
+Полная Windows/macOS/Wayland и logout/login матрица остаётся pending до
+перечисленных реальных проверок. Фактические команды и артефакты — TESTING.md.

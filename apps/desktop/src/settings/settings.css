@@ -53,6 +53,18 @@
   cursor: pointer;
   font: inherit;
 }
+.cs-settings select {
+  appearance: none;
+  padding-inline-end: 28px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) 50%,
+    calc(100% - 10px) 50%;
+  background-size: 4px 4px;
+  background-repeat: no-repeat;
+}
 .cs-settings button:hover:not(:disabled) {
   background: var(--surface-hover);
 }

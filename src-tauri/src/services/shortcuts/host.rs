@@ -115,6 +115,13 @@ impl ShortcutService {
         app: &tauri::AppHandle<R>,
     ) -> Result<ShortcutSnapshotV1, String> {
         self.expire_pending()?;
+        #[cfg(target_os = "linux")]
+        if self.backend()? == ShortcutBackendV1::Gnome
+            && let Err(error) = super::gnome::GnomeSettings::open()
+        {
+            *self.backend.lock().map_err(|error| error.to_string())? = ShortcutBackendV1::Manual;
+            *self.error.lock().map_err(|error| error.to_string())? = Some(error);
+        }
         let preferences = self.preferences()?;
         let capabilities = tauri::async_runtime::block_on(crate::platform_capabilities(
             "shortcut-settings".to_owned(),

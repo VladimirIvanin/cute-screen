@@ -218,6 +218,7 @@ onBeforeUnmount(() => {
         :locale="locale"
         :labels="labels"
         @confirm="confirmStartup"
+        @system="state.perform(async () => { await bridge.autostartSystemSettings() })"
       />
       <template v-else>
         <section

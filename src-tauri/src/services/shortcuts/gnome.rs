@@ -68,11 +68,20 @@ impl GnomeSettings {
         if !main.is_writable("custom-keybindings") {
             return Err("Custom shortcuts are locked by system policy".to_owned());
         }
-        Ok(Self {
+        let settings = Self {
             main,
             custom: schema(CUSTOM)?,
             backend: None,
-        })
+        };
+        for action in ShortcutAction::ALL {
+            let entry = settings.entry(&Self::owned_path(action));
+            for key in ["name", "binding", "command"] {
+                if !entry.is_writable(key) {
+                    return Err(format!("GSettings key {key} is locked by system policy"));
+                }
+            }
+        }
+        Ok(settings)
     }
 
     pub fn available() -> bool {

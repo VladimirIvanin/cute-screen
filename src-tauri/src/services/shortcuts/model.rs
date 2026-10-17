@@ -165,7 +165,7 @@ pub fn normalize_trigger(value: &str, macos: bool) -> Result<String, String> {
     if !modifiers[0] && !modifiers[1] && !modifiers[3] && !print {
         return Err("Include Ctrl, Alt or Command".to_owned());
     }
-    if !macos && modifiers[3] {
+    if cfg!(target_os = "windows") && !macos && modifiers[3] {
         return Err("Windows/Super combinations are reserved for the system".to_owned());
     }
     let mut parts: Vec<&str> = ["CTRL", "ALT", "SHIFT", "SUPER"]

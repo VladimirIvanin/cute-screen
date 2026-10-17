@@ -15,6 +15,17 @@ import { createSettingsHarnessBridge } from '../../../apps/desktop/src/settings/
 import { recordTrigger } from '../../../apps/desktop/src/settings/labels'
 
 describe('activation settings production mount flow', () => {
+  it('offers system approval during setup without changing the startup choice', async () => {
+    const bridge = createSettingsHarnessBridge()
+    bridge.autostart = async () => ({ state: 'requiresApproval', message: null })
+    const system = vi.spyOn(bridge, 'autostartSystemSettings')
+    const setAutostart = vi.spyOn(bridge, 'setAutostart')
+    render(SettingsApp, { props: { bridge, firstRun: true } })
+    await fireEvent.click(await screen.findByRole('button', { name: 'System startup settings' }))
+    await waitFor(() => expect(system).toHaveBeenCalledOnce())
+    expect(setAutostart).not.toHaveBeenCalled()
+  })
+
   it('keeps a cancelled system binding request distinct from an error', async () => {
     const bridge = createSettingsHarnessBridge()
     bridge.assign = async () => {

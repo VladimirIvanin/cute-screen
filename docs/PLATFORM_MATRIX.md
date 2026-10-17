@@ -777,3 +777,29 @@ macOS/WKWebView и Wayland пока не проверены и не получа
 Политика показа defaults и свободной области Quick Capture общая для всех ОС.
 Runtime evidence для изменения фиксируется в TESTING.md; Linux/WebKitGTK smoke
 не подтверждает Windows/WebView2, macOS или Wayland capture.
+
+## Глобальные сочетания и автозапуск (2026-10-17, ADR-070)
+
+- Ubuntu 24.04.5 / X11, Linux x86_64: настоящий WebKitGTK 605.1.15 подтверждает
+  CLI → отдельный Settings, назначение recorder, открытие скрытого редактора
+  физическим сочетанием и восстановление регистрации после relaunch без Settings.
+  Захват: frozen 1920×1080 → selection 980×551 → совпадающий decoded PNG.
+  Debug DEB собран локально; установка и login acceptance остаются pending.
+  На host включены Num Lock и RU layout; Caps Lock/AltGr/удержание во всех ОС
+  требуют отдельной физической матрицы.
+- Chrome 154: browser first-run consent, конфликт, отмена и удаление. Это UI
+  evidence с fixture bridge, без утверждения о native регистрации или login.
+- GNOME custom-keybindings: Gio memory-backend tests подтверждают ownership,
+  сохранность чужих записей, staging/cancel, cleanup и чтение внешних изменений.
+  Ubuntu 22.04/24.04 Wayland, policy locks и GNOME/KDE portal runtime остаются pending.
+- Windows 10/11: RegisterHotKey и per-user Run реализованы; NSIS hooks проверены
+  отдельной компиляцией makensis 3.09 с `-WX`. Это проверка синтаксиса хуков,
+  не запуск полного NSIS installer. Cross-check MSVC остановился до проверки
+  приложения: в Linux окружении отсутствует SDK `lib.exe` для bundled SQLite.
+- macOS 12/13+, Intel/Apple Silicon: Carbon, LaunchAgent и SMAppService реализованы,
+  но компиляция Apple SDK и runtime matrix здесь недоступны и остаются pending.
+- Для всех ОС реальный logout/login, установка с обоими вариантами checkbox,
+  upgrade preservation и отключение автозапуска средствами ОС остаются pending.
+  Наличие адаптера и успешные unit tests не повышают статус этих гарантий.
+
+Команды, native capture/decode evidence и ограничения — TESTING.md.

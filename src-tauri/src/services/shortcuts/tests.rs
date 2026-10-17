@@ -94,3 +94,12 @@ fn duplicate_combination_is_rejected_before_os_mutation() {
     );
     assert!(result.is_err());
 }
+
+#[cfg(target_os = "linux")]
+#[test]
+fn linux_super_combinations_are_available_for_native_and_gnome_backends() {
+    assert_eq!(
+        normalize_trigger("Super+Control+Digit2", false).unwrap(),
+        "CTRL+SUPER+2"
+    );
+}

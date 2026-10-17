@@ -116,6 +116,7 @@ pub fn desktop_exec(executable: &str, arguments: &[&str]) -> String {
                     '%' => escaped.push_str("%%"),
                     '\n' => escaped.push_str("\\n"),
                     '\r' => escaped.push_str("\\r"),
+                    '\t' => escaped.push_str("\\t"),
                     _ => escaped.push(character),
                 }
             }
@@ -125,11 +126,20 @@ pub fn desktop_exec(executable: &str, arguments: &[&str]) -> String {
         .join(" ")
 }
 
+fn desktop_string(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace(' ', "\\s")
+        .replace('\t', "\\t")
+        .replace('\n', "\\n")
+        .replace('\r', "\\r")
+}
+
 pub fn desktop_entry(executable: &str) -> String {
     format!(
         "[Desktop Entry]\nType=Application\nName=Cute Screen\nExec={}\nTryExec={}\nTerminal=false\nStartupNotify=false\n",
         desktop_exec(executable, &["--background"]),
-        executable.replace('\\', "\\\\").replace('\n', "\\n")
+        desktop_string(executable)
     )
 }
 

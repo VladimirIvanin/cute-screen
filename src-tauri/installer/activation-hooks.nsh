@@ -56,7 +56,7 @@ FunctionEnd
     ${EndIf}
   ${EndIf}
   ${If} $CsStartupChoice = 1
-    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "io.github.vladimirivanin.cute-screen" '$"$INSTDIR\${MAINBINARYNAME}.exe$" --background'
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "io.github.vladimirivanin.cute-screen" '"$INSTDIR\${MAINBINARYNAME}.exe" --background'
   ${ElseIf} $CsStartupConfirmed = 1
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "io.github.vladimirivanin.cute-screen"
   ${EndIf}

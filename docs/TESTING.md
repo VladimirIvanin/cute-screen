@@ -4314,3 +4314,69 @@ Caption находится снаружи, toolbar не закрывает ре�
   Это trend/evidence harness, не подтверждение production GPU frame budget.
 - `pnpm format` — `format.log`; `pnpm format:check` — `format-check.log`.
   Заключительный `pnpm check` — `check.log` (после записи verification docs).
+
+## Глобальные сочетания и автозапуск (2026-10-17, ADR-070)
+
+Host: Ubuntu 24.04.5 LTS, x86_64, X11; настоящий Tauri / WebKitGTK 605.1.15,
+Chrome 154. Num Lock включён, активна RU layout. Результаты и логи собраны в
+`artifacts/activation-settings/`; UI screenshots — `activation-settings.png`
+и `activation-settings-native.png` в browser/tauri-e2e artifacts.
+
+- `pnpm test`: 113 файлов, 886 проверок. Включены 10 Settings tests: consent
+  default/confirm/cancel, installer choice, recorder/blur/IME/AltGr/repeat,
+  сохранение старого назначения и persistence error, loading/retry,
+  portal configuration, ожидаемая отмена и переход к system approval в первом
+  запуске без преждевременного изменения выбора автозапуска. Red regression:
+  `activation-approval-red.log`.
+- `cargo test --workspace`: 124 desktop, 1 IPC codegen и 21 storage test.
+  Shortcut tests проверяют staged replacement, conflict, дубли и persistence
+  rollback; Gio memory-backend — foreign paths, staging/cancel, restart cleanup
+  и external changes. Desktop Exec, TryExec, Windows quoting и moved path
+  проверяются отдельно. `activation-path-red.log` фиксирует падение до
+  исправления TryExec escaping; `activation-path-green.log` — успешный повтор.
+  Отдельный red/green regression сохраняет Super chords для Linux: Windows-only
+  запрет системных Win-комбинаций не распространяется на X11/GNOME.
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5197 pnpm test:e2e:browser --spec tests/e2e/specs/browser-activation-settings.e2e.ts`:
+  first-run checkbox, отказ, recorder, conflict/cancel/remove и отсутствие overflow.
+  Используется явный `settingsHarness=1`, это UI fixture bridge.
+- `TAURI_WEBDRIVER_PORT=4545 CUTE_SCREEN_CAPTURE_DEBUG=1 CUTE_SCREEN_E2E_SCENARIOS=activation-settings,activation-reopen,activation-capture pnpm test:e2e:tauri`:
+  финальный прогон: 3/3 файлов, 4/4 сценариев; отдельный singleton Settings
+  через repeated CLI, назначение из recorder,
+  physical X11 activation из скрытого Editor и relaunch до открытия Settings.
+  `activation-capture` не включает fake-capture flag: реальный frozen desktop
+  не меньше 1280×720, физический drag → Editor, `Image.decode()` оригинала
+  через binary IPC. Размер декодированного PNG совпадает с подтверждённой областью;
+  JSON evidence содержит только размеры/диагностику, без image bytes/base64.
+  Локальный frozen frame — 1920×1080, выбранная область и decoded PNG — 980×551.
+  После скрытия Editor тест ждёт native unmap перед системным нажатием.
+- `pnpm check`, `pnpm format`, `pnpm format:check`, `cargo fmt --all`:
+  финальные логи сохраняются рядом с evidence. Check включает четыре Clippy
+  configurations, IPC freshness, lint/typecheck/docs/boundaries/format.
+- `NSISDIR=/tmp/cutescreen-nsis-validation/root/usr/share/nsis /tmp/cutescreen-nsis-validation/root/usr/bin/makensis -WX -V3 /tmp/cutescreen-nsis-validation/activation-hook-smoke.nsi`:
+  hooks компилируются без warnings в standalone syntax harness. NSIS 3.09
+  распакован из Ubuntu packages в `/tmp`, система не устанавливалась/не менялась.
+  Полный NSIS installer на Windows этим не проверен.
+
+Промежуточные native failures отражены в диагностических логах: test config
+не разрешал закрытие Settings, обращение WebDriver к уже закрытому окну,
+раннее отображение prewarmed Quick и input до native focus/окончательного resize.
+Проверка теперь выбирает живой main context, ждёт frozen frame/layout и native
+focus, использует X11 geometry. Падение с произвольным минимальным размером crop
+заменено точным сравнением подтверждённой области и повторно декодированного PNG;
+минимальный размер настоящего frozen desktop проверяется независимо.
+
+Pending: Ubuntu 22.04/24.04 Wayland/GSettings, GNOME 48+/KDE portal configure,
+permission revocation/restart; Windows 10/11 full installer/runtime и system
+startup disable; macOS 12/13+ обеих архитектур; физическая RU/EN/AltGr/Caps/hold
+матрица на всех ОС; реальный logout/login, upgrade и оба consent choices.
+MSVC cross-check в Linux не прошёл инфраструктурно: bundled SQLite требует
+отсутствующий `lib.exe`; Apple SDK в окружении отсутствует. Наличие кода,
+serializer/memory tests и NSIS syntax harness не заменяет эти доказательства.
+
+Локальная пакетная сборка: `pnpm tauri build --debug --bundles deb` — passed,
+`target/debug/bundle/deb/Cute Screen_0.0.0_amd64.deb`; `dpkg-deb --field`
+подтвердил package cute-screen, version 0.0.0, architecture amd64. Это debug
+DEB без test-harness; release/AppImage/NSIS/DMG builds и установка/login acceptance
+не подменяются этим результатом. Визуально проверен Settings screenshot после
+исправления контраста native select; системный GTK appearance больше не
+перекрывает цвета элементов.

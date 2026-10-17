@@ -649,3 +649,24 @@ useQuickChromeLayout наблюдает размеры chrome и фиксиру�
 время canvas gesture; layout updates не передают pointermove в Vue state.
 Numeric drafts и пипетка сохраняют defaults target независимо от показа панели.
 Document v7, renderer geometry, native IPC и persistence не меняются.
+
+## Системная активация и отдельное окно настроек (ADR-070)
+
+`shortcuts::host::ShortcutService` хранит постоянные предпочтения в repository,
+а фактические регистрации, recorder lease, проверочные нажатия и portal session
+держит в памяти Rust. Восстановление запускается до обработки launch intent;
+frontend настроек не нужен для работы глобальных сочетаний. Сохранение новой
+native комбинации выполняется между staging и освобождением старой регистрации.
+
+Отдельный singleton WebView `settings` открывается из CLI, native меню и трея.
+Он использует activation-settings-adapter и generated IPC DTOs. Запись комбинации
+подавляет собственные глобальные действия; blur, закрытие, отмена и истечение
+lease возвращают обычную обработку. Все capture-вызовы используют существующий
+dispatcher и preflight; перед native capture скрываются Editor и Settings.
+
+Linux выбирает X11, portal либо GNOME по session/runtime probe. GNOME хранит
+только собственные custom-keybinding paths, временный token подтверждается через
+single-instance CLI. Portal session handles не попадают в постоянные настройки.
+Windows/macOS подключают Rust global-shortcut plugin через отдельный registry.
+Автозапуск имеет собственный OS adapter и возвращает фактическое состояние;
+checkbox first-run не является регистрацией до явного подтверждения.

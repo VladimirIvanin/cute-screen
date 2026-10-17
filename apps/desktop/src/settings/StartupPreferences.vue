@@ -38,7 +38,7 @@ function change(event: Event): void {
       <span>{{ labels.startupLabel }}</span>
     </label>
     <p
-      v-if="!firstRun && state"
+      v-if="state && (!firstRun || state.state === 'requiresApproval')"
       role="status"
       class="cs-settings-muted"
     >
@@ -54,7 +54,7 @@ function change(event: Event): void {
       {{ busy ? labels.saving : labels.continue }}
     </button>
     <button
-      v-else
+      v-if="!firstRun || state?.state === 'requiresApproval'"
       :disabled="busy"
       @click="emit('system')"
     >

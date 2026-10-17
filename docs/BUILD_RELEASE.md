@@ -288,3 +288,25 @@ production Capture → Quick → Editor без подготовленного do
 с локальными drivers из artifacts/spotlight-fix/tools/ прошёл Capture → Quick →
 Editor, редактирование номера, отдельной подписи и undo в настоящем WebKitGTK.
 Точные PATH/XDG параметры и browser/renderer evidence — TESTING.md.
+
+## Установка и системная активация (ADR-070)
+
+Windows NSIS использует `installer/activation-hooks.nsh`, current-user install
+и общий с приложением Run value `io.github.vladimirivanin.cute-screen`:
+`"<absolute executable>" --background`. Custom checkbox заранее включён,
+изменение сохраняется только при подтверждённой установке; silent/passive upgrade
+сохраняет существующий выбор. StartupApproved приложение/установщик не записывают.
+Синтаксис hooks отдельно проверен makensis 3.09; полный Windows bundle и запуск
+установщика требуют Windows SDK и интерактивного Windows host.
+
+DEB/AppImage/DMG сохраняют прежние форматы; вопрос перенесён в первый обычный
+GUI launch. Capture CLI и `--background` не открывают мастер. Для AppImage
+autostart и GNOME command используют внешний APPIMAGE path; после перемещения
+Settings показывает необходимость ремонта собственной записи. Для macOS 13+
+используется SMAppService.mainApp, для 12 — сериализованный LaunchAgent plist;
+из `/Volumes/` регистрация запрещена с предложением переноса в Applications.
+
+`CUTE_SCREEN_E2E_SCENARIOS=activation-settings,activation-reopen,activation-capture pnpm test:e2e:tauri`
+собирает test binary и проверяет Settings, relaunch и native capture. Для X11
+physical input требуется xdotool. `TAURI_WEBDRIVER_PORT` позволяет выбрать
+свободный embedded port, но keyboard/pointer suites следует выполнять последовательно.
