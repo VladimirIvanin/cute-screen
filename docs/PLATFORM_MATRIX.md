@@ -7,7 +7,13 @@ SHA256 `115b5752949e83f42494eb2344d902eedc7549dbac5171dfb6124c41ba7a161f`
 воспроизводит видимый Quick без native focus; Esc остаётся в чужом окне.
 Ранний WebDriver pass ниже не доказывает background activation, поскольку
 switchWindow сам активирует окно. Исправление использует свежий GDK X11 server
-timestamp и синхронный accept-focus. Результаты новых smoke и пакета — TESTING.md.
+timestamp и синхронный accept-focus. Native Tauri 2/2 и три background CLI
+попытки на извлечённом из нового Jammy DEB release ELF прошли. Новый ELF
+SHA256 `69da0181798d6f4373a04dbe01687b4a1c73c0bd8837c68ac9484f448b141a81`.
+После установки и перезапуска `/usr/bin/cute-screen` (PID 124925) тот же smoke
+прошёл 3/3, SHA256 файла и resident процесса совпадает. Во всех случаях Quick
+сам получил native focus до ввода, Escape вернул cancelled, окно скрылось.
+Команды и JSON — TESTING.md.
 Windows, macOS и Wayland этим изменением не объявляются проверенными.
 
 ## Escape до первого выделения Area (2026-10-18)

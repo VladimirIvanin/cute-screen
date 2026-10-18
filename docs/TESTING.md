@@ -15,8 +15,47 @@ Ubuntu 24.04.5 / GNOME X11 / WebKitGTK 2.52.6. Установленный `/usr/
 до ввода Esc на native focus assertion; cleanup активирует Quick только
 после failure. Лог `artifacts/installed-area-escape-red.log`, снимок JSON
 `artifacts/installed-area-escape-red.json`. Новый regression не использует
-WebDriver для выбора Quick. Результаты исправления, сборки и проверки пакета
-фиксируются после завершения.
+WebDriver для выбора Quick.
+
+- `CUTE_SCREEN_E2E_SCENARIOS=area-escape pnpm test:e2e:tauri`: fresh debug
+  build, 2/2 passed. Добавленный background CLI smoke выполняется до любого
+  WebDriver switch в Quick; native focus и три typed cancelled проверены.
+  `artifacts/installed-area-escape-tauri.log`.
+- `pnpm test tests/unit/vue/quick-capture tests/unit/vue/canvas-viewport-quick.test.ts tests/unit/vue/straight-strokes.test.ts`:
+  78/78 passed. `artifacts/installed-area-escape-unit.log`.
+- `cargo test --workspace --lib`: desktop 146/146, storage 31/31 passed.
+  `artifacts/installed-area-escape-rust.log`. Нового core/IPC контракта нет;
+  red-first доказательство native presentation — installed focus smoke выше.
+- `pnpm build:linux:ubuntu22`: passed, свежие DEB/AppImage, ELF ABI и оба
+  package CLI gates. `artifacts/installed-area-escape-package.log`.
+- Извлечённый из нового DEB release ELF запущен с `--background`;
+  `CUTE_SCREEN_AREA_ESCAPE_BINARY=/home/vladimir/remote/cutescreen/artifacts/installed-area-escape-deb/usr/bin/cute-screen pnpm smoke:installed:area-escape`:
+  3/3 passed, включая начальное выделение с зажатой primary button. SHA256
+  файла и resident process равны
+  `69da0181798d6f4373a04dbe01687b4a1c73c0bd8837c68ac9484f448b141a81`.
+  Это package payload smoke, не проверка `/usr/bin` после установки.
+  `artifacts/installed-area-escape-deb-smoke.log`,
+  `artifacts/installed-area-escape-deb.json`.
+
+- Исправленный DEB установлен через `pkexec /usr/bin/dpkg -i` из
+  `artifacts/ubuntu22/Cute Screen_0.1.0_amd64.deb`; exit 0,
+  `artifacts/installed-area-escape-install.log`. Resident перезапущен точно
+  как `/usr/bin/cute-screen --background` (PID 124925).
+- `pnpm smoke:installed:area-escape` без override: 3/3 passed на `/usr/bin`.
+  SHA256 установленного файла и `/proc/124925/exe` совпадает с новым DEB ELF
+  выше. Во всех попытках _NET_ACTIVE_WINDOW совпал с Quick XID 83886083 до
+  любых тестовых focus/click по Quick; Esc дал typed cancelled (CLI exit 130),
+  окно скрыто. Фоновый resident оставлен запущенным.
+  `artifacts/installed-area-escape-installed-smoke.log`,
+  `artifacts/installed-area-escape.json`.
+- `pnpm check` — exit 0: lint/typecheck/format/docs, boundaries 45/45, IPC
+  codegen check, frontend build, Rust fmt и четыре Clippy конфигурации.
+  `artifacts/installed-area-escape-check.log`. Финальные `pnpm format`,
+  `pnpm format:check` и `git diff --check` фиксируются delivery-логами
+  `artifacts/installed-area-escape-format.log` и
+  `artifacts/installed-area-escape-format-check.log`.
+
+Windows/macOS и Wayland runtime не запускались.
 
 ## Escape до первого выделения Area (2026-10-18)
 
