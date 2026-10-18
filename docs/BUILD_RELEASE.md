@@ -32,6 +32,12 @@ workflow_call и проверяет тот же SHA. Его ошибка бло�
 разделены. Linux native E2E устанавливает tauri-driver 2.1.0 и использует
 WebKitWebDriver под Xvfb/X11; тестовые features не попадают в установщики.
 
+Текущий dry run подтвердил все семь пакетов, четыре clean DEB install и
+Intel replay, но выявил блокирующие browser/native WebView assertions.
+Поэтому release-complete/draft пока не считаются принятыми. Фактические
+результаты и ссылки на jobs приведены в `docs/TESTING.md`; публикация до
+зелёного общего CI и A14 недопустима.
+
 Installer assets называются `cute-screen-<version>-<os>-<arch>.<extension>`.
 Рядом находятся SHA256SUMS, manifest.json, CycloneDX 1.6 SBOM, npm/Cargo/font
 license report, copyright bundled Linux libraries, package verification и

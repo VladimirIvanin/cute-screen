@@ -44,6 +44,43 @@ Manual A14, Gatekeeper/TCC, macOS 12, Windows 11 download/Smart App Control,
 FUSE/Wayland, physical capture, upgrade/login/uninstall остаются pending до
 отдельного evidence. Tag и draft никогда не считаются опубликованной версией.
 
+### Полный dry run и блокирующие runtime проверки
+
+[Release run 39117382934](https://github.com/VladimirIvanin/cute-screen/actions/runs/39117382934)
+проверял PR head `7ab3f1a` через merge SHA
+`efad45ad3b199cf85e7b5a1a2253d925a1fc7090` во всех jobs:
+
+- Все пять package jobs passed: семь установщиков, production features,
+  архитектура, CLI и embedded frontend/fonts/WASM; Linux glibc ≤2.35.
+- Четыре clean DEB install jobs passed: x64/ARM64, Ubuntu 22.04/24.04.
+- Тот же ad-hoc universal DMG прошёл Intel replay; первичная ARM64 проверка
+  включает codesign, обе Mach-O slices и deployment target 12.0.
+- Reports, пять compile checks и весь Linux core quality job passed:
+  check, coverage/unit/render/perf, оба Rust test режима, controlled X11,
+  dependency audits и production release boundary.
+- [Browser job](https://github.com/VladimirIvanin/cute-screen/actions/runs/39117382934/job/117645934774):
+  38 spec files passed / 13 failed из 51, Chrome 155.0.8059.39 на Ubuntu 24.04.
+  Есть устаревшие ожидания text/callout/numbered-marker toolbars, отсутствующий
+  `artifacts/highlighter` в изолированной VM и highlighter preview hash mismatch.
+- [Native WebView job](https://github.com/VladimirIvanin/cute-screen/actions/runs/39117382934/job/117645934775):
+  59 scenario launches, 26 passed / 33 failed, WebKitGTK / Wry 0.55.1.
+  Backend startup прошёл; ошибки дошли до UI assertions. Выявлены ограничения
+  embedded input, закрытый window handle при возврате из Settings, разбор
+  XFCE StatusNotifier ID и EXIF PNG decode 64×32 вместо display 32×64.
+- Assemble и draft были skipped из-за обязательных E2E gates. Полный
+  release-complete artifact и создание GitHub draft этим запуском не доказаны.
+
+Следующий срез исправляет только общие причины в CI infrastructure:
+создание highlighter evidence directory, external Linux WebDriver и оба
+формата StatusNotifier registration (`owner@/path`, `owner/path`). Его
+успешный native/browser rerun ещё требуется; эти изменения не превращают
+оставшиеся UI/WebView assertions в passed. Runtime E2E gate не ослаблен.
+
+На Windows x64 финальные `pnpm check` (включая format:check и 55 boundaries)
+и `cargo test --workspace --features ipc-codegen -j 1` passed; Rust: 174 passed /
+1 ignored. Предыдущий check один раз превысил исходный 5 s timeout architecture
+test на занятом desktop; повтор полного check без изменения timeout прошёл.
+
 ## Диапазоны оформления изображения (2026-10-18, ADR-089)
 
 Windows x64, Node 22.23.1, pnpm 10.33.2. Radius больше не ограничен 128 px:

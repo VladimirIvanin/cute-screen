@@ -31,6 +31,9 @@ registered = call(
 )[0]
 for item in registered:
     owner, _, path = item.partition("@")
+    if not path:
+        owner, separator, suffix = item.partition("/")
+        path = f"/{suffix}" if separator else "/StatusNotifierItem"
     pid = call(
         "org.freedesktop.DBus",
         "/org/freedesktop/DBus",

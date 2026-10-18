@@ -97,6 +97,7 @@ jobs:
         run: |
           pnpm build:packages
           pnpm fixtures:generate:m01
+          mkdir -p artifacts/highlighter
       - name: Run browser E2E
         env:
           CUTE_SCREEN_BROWSER_E2E_HEADLESS: '1'
@@ -125,13 +126,18 @@ jobs:
           cargo install tauri-driver --version '=2.1.0' --locked
           bash scripts/ci-install-linux-tauri-deps.sh xdotool xfwm4 xfce4-panel python3-gi dbus-x11
       - name: Run real Tauri E2E
+        env:
+          CUTE_SCREEN_E2E_DRIVER_PROVIDER: external
         run: xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' dbus-run-session -- env XDG_SESSION_TYPE=x11 bash scripts/ci-tauri-x11-session.sh
       - name: Upload native WebView evidence
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: tauri-e2e-${{ github.run_id }}
-          path: artifacts/tauri-e2e
+          path: |
+            artifacts/tauri-e2e
+            !artifacts/tauri-e2e/runtime/cute-screen-e2e-binary-*/**
+            !artifacts/tauri-e2e/driver-cache/**
           if-no-files-found: warn
           retention-days: 14
 
