@@ -40,6 +40,7 @@ export async function inspectExecutable(
     if (bytes.includes(Buffer.from(marker))) throw new Error(`Test-only marker in packaged executable: ${marker}`)
   }
   const info = JSON.parse(launch(['--release-info']))
+  await writeJson(path.join(root, 'artifacts/release/diagnostics', `${id}-resources.json`), info)
   validateResources(info, version, frontend)
   const reportedVersion = launch(['--version'])
   if (reportedVersion !== `cute-screen ${version}`) throw new Error(`Incorrect CLI version: ${reportedVersion}`)
@@ -164,12 +165,14 @@ export async function verifyPackage(
   const frontend = await inventory(path.join(root, 'apps/desktop/dist'))
   const output = path.join(root, 'artifacts/release', id)
   await mkdir(output, { recursive: true })
+  await writeJson(path.join(output, 'frontend-inventory.json'), frontend)
   const files = await walk(path.resolve(bundleDirectory))
   const report = { id, target: target.target, version, commit: run('git', ['rev-parse', 'HEAD']),
     host: { platform: process.platform, arch: process.arch, os: run(process.platform === 'win32' ? 'cmd.exe' : 'uname',
       process.platform === 'win32' ? ['/d', '/c', 'ver'] : ['-a']) },
     tools: { node: process.version, pnpm: run('pnpm', ['--version']), rust: run('rustc', ['--version']) },
     checks: {}, manualAcceptance: 'pending' }
+  if (id === 'macos-universal') report.tools.xcode = run('xcodebuild', ['-version'])
   const tree = run('cargo', ['tree', '--locked', '--package', 'cute-screen-desktop', '--edges', 'normal',
     '--target', target.target === 'universal-apple-darwin' ? 'aarch64-apple-darwin' : target.target,
     '--features', 'custom-protocol'], { maxBuffer: 16 * 1024 * 1024 })
@@ -177,13 +180,13 @@ export async function verifyPackage(
   for (const extension of target.extensions) {
     const candidates = files.filter((file) => file.endsWith(`.${extension}`))
     if (candidates.length !== 1) throw new Error(`Expected one ${extension} in ${bundleDirectory}, found ${candidates.length}`)
+    await copyFile(candidates[0], path.join(output, `cute-screen-${version}-${id}.${extension}`))
     const temporary = await mkdtemp(path.join(tmpdir(), 'cute-screen-release-'))
     try {
       const file = candidates[0]
       if (id.startsWith('linux-')) report.checks[extension] = await linuxPackage(file, extension, temporary, id, version, frontend)
       else if (id.startsWith('macos-')) report.checks[extension] = await macPackage(file, temporary, id, version, frontend)
       else report.checks[extension] = await windowsPackage(file, temporary, id, version, frontend)
-      await copyFile(file, path.join(output, `cute-screen-${version}-${id}.${extension}`))
     } finally {
       await rm(temporary, { recursive: true, force: true })
     }

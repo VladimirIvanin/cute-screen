@@ -89,7 +89,7 @@ jobs:
           target: ${{ matrix.target }}
       - name: Build production packages with locked dependencies
         shell: bash
-        run: pnpm tauri build --ci --target "$RELEASE_TARGET" --bundles "$RELEASE_BUNDLES" --config src-tauri/tauri.release.conf.json -- --locked
+        run: pnpm tauri build --ci --features custom-protocol --target "$RELEASE_TARGET" --bundles "$RELEASE_BUNDLES" --config src-tauri/tauri.release.conf.json -- --locked
       - name: Verify actual packaged executables and resources
         shell: bash
         run: |

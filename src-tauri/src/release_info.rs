@@ -49,7 +49,9 @@ pub fn print(context: &tauri::Context<tauri::Wry>) -> Result<(), String> {
     let report = ReleaseInfo {
         version: env!("CARGO_PKG_VERSION"),
         app_version: context.package_info().version.to_string(),
-        custom_protocol: cfg!(feature = "custom-protocol"),
+        // Tauri CLI may enable tauri/custom-protocol directly rather than our forwarding feature.
+        // The build-script dev cfg reflects the actual linked Tauri dependency mode.
+        custom_protocol: !cfg!(dev),
         fake_platform: cfg!(feature = "fake-platform"),
         test_harness: cfg!(feature = "test-harness"),
         platform_smoke: cfg!(feature = "platform-smoke"),
