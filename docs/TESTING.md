@@ -1,5 +1,27 @@
 # Стратегия тестирования
 
+## Версия 0.1.1 (2026-10-18)
+
+Ubuntu 24.04.5 x86_64. Метаданные версии и команда `pnpm version:bump`.
+
+- `node scripts/release-assets.mjs version . v0.1.1` — passed: package.json,
+  Tauri config и Cargo workspace согласованы.
+- `cargo metadata --format-version 1 --no-deps --locked --offline` — passed:
+  desktop и storage имеют версию 0.1.1, lockfile принят без изменений.
+- `pnpm version:bump 0.1.1` — passed на текущем checkout без изменения версии.
+  CLI на временной копии пяти production metadata files обновил 0.1.1 → 0.1.2;
+  release guard подтвердил результат. `production-metadata-smoke.json` в каталоге ниже.
+- `pnpm exec vitest run --project boundaries tests/boundaries/bump-version.test.ts --coverage --coverage.include=scripts/bump-version.mjs --coverage.reportsDirectory=artifacts/version-0.1.1/coverage`
+  — 17/17 passed, statements/lines 100%, branches 96.15%.
+  Проверены CLI, повторное обновление, no-op, ошибки аргументов и рассогласованные
+  файлы без записи, сохранение внешних зависимостей и приватных JS-пакетов.
+- `pnpm test:boundaries` — 12 files / 78 tests passed.
+- `pnpm exec vue-tsc --noEmit -p tests/tsconfig.json`, `pnpm lint`, `pnpm format`,
+  `pnpm format:check`, `pnpm docs:check`, `git diff --check` — passed.
+
+Логи и Cargo metadata: `artifacts/version-0.1.1/`. Сборка установщиков и
+runtime E2E для этого изменения не запускались.
+
 ## Разделение CI и короткий E2E smoke (2026-10-18, ADR-112)
 
 Ubuntu 24.04.5 x64 / GNOME X11, Node 22.23.1, pnpm 10.33.2.

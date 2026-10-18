@@ -1,5 +1,20 @@
 # CI-сборки и проверка версии через GitHub
 
+## Обновление версии приложения
+
+```sh
+pnpm version:bump 0.1.2
+```
+
+Указать стабильную версию `MAJOR.MINOR.PATCH` без префикса `v`.
+Команда обновляет package.json, src-tauri/tauri.conf.json, Cargo workspace,
+точную локальную storage dependency и два workspace package entries в Cargo.lock.
+До записи проверяются формат новой версии и согласованность исходных файлов.
+Приватные JS-пакеты сохраняют отдельную версию 0.0.0; внешние зависимости и
+pnpm-lock.yaml не меняются. Команда не создаёт commit, tag или Release.
+После обновления выполнить `pnpm format` и `pnpm format:check`; release guard:
+`node scripts/release-assets.mjs version . v0.1.2`.
+
 ## Проверка Esc на установленном пакете (ADR-106)
 
 `pnpm smoke:installed:area-escape` проверяет `/usr/bin/cute-screen` через

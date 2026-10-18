@@ -1,6 +1,6 @@
 {
   "name": "cute-screen",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -11,6 +11,7 @@
   },
   "scripts": {
     "preinstall": "node scripts/verify-toolchain.mjs",
+    "version:bump": "node scripts/bump-version.mjs",
     "dev": "vite --config apps/desktop/vite.config.ts",
     "dev:landing": "vite --config apps/landing/vite.config.ts",
     "dev:e2e:browser": "vite --mode e2e --config apps/desktop/vite.config.ts",
