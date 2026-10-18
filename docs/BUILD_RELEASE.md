@@ -3,7 +3,7 @@
 ## Обновление версии приложения
 
 ```sh
-pnpm version:bump 0.1.3
+pnpm version:bump 0.1.4
 ```
 
 Указать стабильную версию `MAJOR.MINOR.PATCH` без префикса `v`.
@@ -13,7 +13,7 @@ pnpm version:bump 0.1.3
 Приватные JS-пакеты сохраняют отдельную версию 0.0.0; внешние зависимости и
 pnpm-lock.yaml не меняются. Команда не создаёт commit, tag или Release.
 После обновления выполнить `pnpm format` и `pnpm format:check`; release guard:
-`node scripts/release-assets.mjs version . v0.1.3`.
+`node scripts/release-assets.mjs version . v0.1.4`.
 
 ## Проверка Esc на установленном пакете (ADR-106)
 

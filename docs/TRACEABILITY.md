@@ -1,5 +1,12 @@
 # Трассируемость требований
 
+## Версия 0.1.4 (2026-10-18)
+
+`REQ-REL-001/002/003/005`: штатной командой `pnpm version:bump 0.1.4`
+синхронизировать package.json, Tauri config, Cargo workspace, локальную storage
+dependency и Cargo.lock. Проверить release version guard для `v0.1.4`, Cargo
+metadata с `--locked --offline`, boundary tests и форматирование.
+
 ## Диапазон диагностического patch Vitest (2026-10-18)
 
 `REQ-REL-001/002/003/005`: выбирать диагностический patch по диапазону
