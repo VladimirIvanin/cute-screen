@@ -16,6 +16,11 @@ Physical capture, Gatekeeper/TCC, Smart App Control, Wayland, upgrade/login
 `REQ-REL-004` остаётся вне реализации: tag не доказывает публикацию binaries.
 Фактические команды и ограничения будут записаны в TESTING.md.
 
+Same-SHA gate выявил исходные architecture violations: прямой Tauri import
+в App.vue и depth/function-size в image-editing E2E helper. Для `REQ-REL-005`
+исправляются facade routing и декомпозиция helper без изменения UI, pixel
+tolerance или удаления assertions. Red evidence — GitHub run 39113801896.
+
 ## Расширенные диапазоны изображения (2026-10-18, до реализации)
 
 `REQ-TOL-015`, `REQ-EDT-005/006`, `REQ-UI-006/007`: убрать UI-предел

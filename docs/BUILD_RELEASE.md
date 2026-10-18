@@ -62,7 +62,10 @@ embedded ресурсов; сверяются все bundled fonts/WASM/licenses
 - macOS: Xcode 16.4, `MACOSX_DEPLOYMENT_TARGET=12.0`, Tauri minimum 12.0,
   universal Mach-O и ad-hoc `signingIdentity: "-"` до создания DMG.
   Codesign, embedded metadata и запуск проверяются из конечного DMG на ARM64
-  и Intel. macOS 12.0 runtime не считается проверенным запуском на 15.
+  и Intel. Objective-C availability helpers линкуются с compiler-rt из выбранного
+  Xcode: Rust `-nodefaultlibs` не добавляет этот архив автоматически. Runtime
+  отражён в SBOM/license report; Xcode version — в package verification.
+  macOS 12.0 runtime не считается проверенным запуском на 15.
   Ad-hoc не заменяет Developer ID/notarization: для доверенной загрузки
   использовать системный Privacy & Security → Open Anyway, если ОС разрешает.
   Не отключать Gatekeeper/SIP глобально. Screen Recording/TCC, отказ и
@@ -419,7 +422,7 @@ desktop-зависимость удалена. Обновление устран
 
 ## Явные ограничения
 
-- GitHub Actions retention может удалить старые artifacts; version tag останется, но это не обещание долгосрочной загрузки binary.
+- GitHub Actions retention может удалить CI artifacts; assets опубликованного GitHub Release от этого retention не зависят. Tag сам по себе не гарантирует binaries при failed workflow или неопубликованном draft.
 - Для private repository без пользовательского GitHub token version check не поддерживается. План рассчитан на публичный repository.
 - Unsigned Windows/macOS artifacts неизбежно могут вызывать OS warnings.
 - Если в будущем потребуется официальный подписанный канал или auto-update, он проектируется отдельным ADR, а не добавляется скрыто в этот workflow.

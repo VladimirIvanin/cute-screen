@@ -37,7 +37,7 @@ import { createDesktopShellActions } from './desktop-shell-actions'
 import { installDesktopLifecycleGuards } from './platform/tauri/lifecycle-adapter'
 import { M08HarnessController } from './m08-harness'
 import { openActivationSettings } from './platform/tauri/activation-settings-adapter'
-import { isTauri } from '@tauri-apps/api/core'
+import { isTauri } from './platform/tauri/runtime-adapter'
 
 declare global {
   interface Window {

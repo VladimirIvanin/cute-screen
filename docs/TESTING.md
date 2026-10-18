@@ -8,7 +8,7 @@ Windows x64, Node 22.23.1, pnpm 10.33.2, Rust 1.97.0 MSVC.
 
 - `pnpm release:check` — passed (0.0.0; номер первого выпуска не выбирался).
 - `pnpm exec vitest run --project boundaries tests/boundaries/release-contracts.test.ts`
-  — 7/7 passed: metadata/lock roundtrip, invalid versions, PE/universal/glibc,
+  — 8/8 passed: metadata/lock roundtrip, invalid versions, PE/universal/glibc,
   missing/altered embedded resources, incomplete/corrupt installers, published guard.
 - `pnpm build` — passed; исходные CanvasKit browser externalization и >500 kB
   chunk warnings сохранены. Это frontend build, не platform package acceptance.
@@ -19,9 +19,26 @@ src-tauri/src/release_info.rs --emit=metadata -o artifacts/release-red.rmeta`
   — expected E0425 до реализации `asset_summary`. Первый Cargo run выбрал
   установленный GNU toolchain и остановился на отсутствующем dlltool; локальные
   последующие команды явно используют RUSTUP_TOOLCHAIN 1.97.0 MSVC и VS DevShell.
-- Полный Cargo/check, SBOM и GitHub package matrix проверяются далее; наличие
-  workflow и helper tests не означает их успех. Первый SBOM/Cargo parallel run
-  прерван при нехватке RAM на общем desktop; это не положительный результат.
+- `pnpm test:boundaries` — 51/51 passed после минимального исправления исходных
+  facade/complexity нарушений App.vue и image-editing helper; assertions,
+  pixel tolerance и architecture budgets не ослаблялись.
+- `pnpm test --maxWorkers=1` — 140 files / 1203 tests passed; 463.41 s на
+  занятом Windows desktop. Обычные jsdom canvas warnings не скрывались.
+- `pnpm fixtures:generate:m01`, затем `cargo test --workspace -j 1` в MSVC
+  DevShell — desktop 143 passed / 1 ignored, codegen 1 passed, storage 30 passed,
+  doc tests passed. Без fixture generation первый storage run ожидаемо не нашёл
+  production-shaped PNG; повтор с настоящими семью fixtures прошёл.
+- `pnpm format`, `pnpm format:check` — passed. Финальные check/render/perf и
+  package matrix фиксируются в логах и [PR #3](https://github.com/VladimirIvanin/cute-screen/pull/3).
+- GitHub Release run `39112802370`: preflight/reports и пять native compile
+  checks passed. Скачанный `release-reports` artifact: CycloneDX 1.6, 1613
+  components (1025 npm, 580 Cargo плюс workspace). Полная упаковка выявила
+  ложное определение Tauri mode и macOS unresolved `__isPlatformVersionAtLeast`:
+  следующий срез использует Tauri build cfg, явный custom-protocol и Xcode
+  compiler-rt. Это red integration evidence, а не успешный package acceptance.
+- Первый local SBOM/Cargo parallel run был прерван при нехватке RAM; это не
+  положительный результат. Final same-SHA Actions manifest, logs и artifacts
+  проверяются через PR #3; repo entry не заменяет результаты workflow.
 
 Manual A14, Gatekeeper/TCC, macOS 12, Windows 11 download/Smart App Control,
 FUSE/Wayland, physical capture, upgrade/login/uninstall остаются pending до

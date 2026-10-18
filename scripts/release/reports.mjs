@@ -23,6 +23,11 @@ main(async () => {
     cargo: JSON.parse(run('cargo', ['metadata', '--locked', '--format-version', '1'], { maxBuffer: 32 * 1024 * 1024 }))
       .packages.map(({ name, version, license, source }) => ({ name, version, license, source })),
     assets: await readFile(path.join(root, 'apps/desktop/public/font-licenses.txt'), 'utf8'),
+    nativeCompilerRuntime: {
+      target: 'macos-universal', name: 'Apple Clang compiler-rt (Darwin)', toolchain: 'Xcode 16.4',
+      license: 'Apache-2.0 WITH LLVM-exception',
+      source: 'https://github.com/llvm/llvm-project/blob/main/compiler-rt/LICENSE.TXT',
+    },
     scope: 'Source dependency inventory; platform packagedFiles and native copyright reports describe bundled runtime files.',
   })
   run('pnpm', ['--dir', 'tools/release-sbom', 'exec', 'cdxgen', '-t', 'js', '-t', 'rust', '-r',
@@ -35,6 +40,13 @@ main(async () => {
       throw new Error(`SBOM is missing ${ecosystem} dependencies`)
     }
   }
+  bom.components.push({
+    type: 'library', name: 'Apple Clang compiler-rt (Darwin)', version: 'Xcode-16.4', scope: 'required',
+    'bom-ref': 'cute-screen:native:compiler-rt:darwin',
+    licenses: [{ expression: 'Apache-2.0 WITH LLVM-exception' }],
+    properties: [{ name: 'cute-screen:target', value: 'macos-universal' }],
+    externalReferences: [{ type: 'license', url: 'https://github.com/llvm/llvm-project/blob/main/compiler-rt/LICENSE.TXT' }],
+  })
   // Deterministic metadata makes identical-SHA retries comparable; no false binary reproducibility claim.
   const commit = run('git', ['rev-parse', 'HEAD'])
   const uuid = `${commit.slice(0, 8)}-${commit.slice(8, 12)}-5${commit.slice(13, 16)}-8${commit.slice(17, 20)}-${commit.slice(20, 32)}`

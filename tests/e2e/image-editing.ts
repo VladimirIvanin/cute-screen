@@ -48,21 +48,24 @@ async function samePixels(
     ) return false
     const width = Number(expected.split(':')[0]), height = Number(expected.split(':')[1])
     if (expected.split(':').slice(0, 2).join(':') !== actual.split(':').slice(0, 2).join(':')) return false
+    const blockDifference = (x: number, y: number): number => {
+      const sums = [0, 0, 0, 0]
+      let samples = 0
+      for (let dy = y; dy < Math.min(y + 8, height); dy++) {
+        for (let dx = x; dx < Math.min(x + 8, width); dx++) {
+          samples++
+          const index = (dy * width + dx) * 4
+          for (let channel = 0; channel < 4; channel++) {
+            sums[channel]! += before[index + channel]! - after[index + channel]!
+          }
+        }
+      }
+      return Math.max(...sums.map((sum) => Math.abs(sum) / samples))
+    }
     let maximum = 0
     for (let y = 0; y < height; y += 8) {
       for (let x = 0; x < width; x += 8) {
-        const sums = [0, 0, 0, 0]
-        let samples = 0
-        for (let dy = y; dy < Math.min(y + 8, height); dy++) {
-          for (let dx = x; dx < Math.min(x + 8, width); dx++) {
-            samples++
-            const index = (dy * width + dx) * 4
-            for (let channel = 0; channel < 4; channel++) {
-              sums[channel]! += before[index + channel]! - after[index + channel]!
-            }
-          }
-        }
-        for (const sum of sums) maximum = Math.max(maximum, Math.abs(sum) / samples)
+        maximum = Math.max(maximum, blockDifference(x, y))
       }
     }
     return maximum <= 2
@@ -191,6 +194,17 @@ export async function verifyImageEditing(output: string): Promise<void> {
   await up()
   await browser.waitUntil(async () => samePixels(initial, await pixels()))
   expect((await selectionDocument()).layers).toEqual(original.layers)
+  await verifyImageFormatting(image, output)
+  await browser.keys(['Control', 'z'])
+  await browser.keys(['Control', 'z'])
+  await browser.waitUntil(async () => samePixels(initial, await pixels()))
+  expect((await selectionDocument()).layers).toEqual(original.layers)
+}
+
+async function verifyImageFormatting(
+  image: ImageLayer,
+  output: string,
+): Promise<void> {
   const radius = $('[data-image-control="imageRadius"]')
   const radiusValue = Math.min(image.localBounds!.width, image.localBounds!.height) / 2
   await radius.click()
@@ -226,8 +240,4 @@ export async function verifyImageEditing(output: string): Promise<void> {
   })).toBe(true)
   await browser.saveScreenshot(`${output}-border-settings.png`)
   await browser.keys('Escape')
-  await browser.keys(['Control', 'z'])
-  await browser.keys(['Control', 'z'])
-  await browser.waitUntil(async () => samePixels(initial, await pixels()))
-  expect((await selectionDocument()).layers).toEqual(original.layers)
 }
