@@ -1,5 +1,19 @@
 # Трассируемость требований
 
+## Захват после закрытия меню трея (2026-10-18, до реализации)
+
+`REQ-CAP-001/002/005/006/012/014`: команды захвата из трея дают системному
+меню 200 мс на закрытие перед обращением к backend. Пауза использует штатный
+отменяемый delay и блокировку параллельного capture; hotkey, CLI и UI не
+получают дополнительной задержки. Проверки: red-first Rust для всех пяти
+tray actions и отмены до backend, реальное меню GNOME X11 → Area/Screen
+с повторным декодированием frozen/original PNG. Платформенные ограничения
+и фактические результаты фиксируются в TESTING.md.
+
+Результат: Rust workspace и pnpm check passed. Native GNOME X11 tray click
+проверил 40 250 decoded background pixels в Area frozen frame и Screen
+original. Area materialization и остальные платформы этим не подтверждены.
+
 ## Native focus Area из фонового процесса (2026-10-18, до реализации)
 
 `REQ-CAP-009/011/012/014`: видимый Quick selector после CLI/tray/hotkey должен

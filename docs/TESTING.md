@@ -1,5 +1,43 @@
 # Стратегия тестирования
 
+## Захват без меню трея (2026-10-18, ADR-107)
+
+Ubuntu 24.04.5 x64 / GNOME X11, 1920×1080 / WebKitGTK 2.52.6.
+Evidence: `artifacts/tray-menu-capture/`.
+
+- До реализации `cargo test -p cute-screen-desktop --lib tray_menu_delay_can_be_cancelled_before_the_backend_starts`
+  — expected failure: Selecting вместо Delay (`red.log`).
+- `cargo test --workspace` — passed: desktop 148, activation integration 1,
+  storage 31, doc tests (`rust.log`). Два новых контракта проверяют 200 мс
+  для всех пяти tray actions и отмену до backend без draft/document.
+- `pnpm tauri build --debug --no-bundle --features test-harness --config src-tauri/tauri.test.conf.json`
+  — passed (`native-build.log`). Fake capture не включён; приложение запущено
+  с `--background`, отдельными CUTE_SCREEN_E2E_APP_DATA и XDG_RUNTIME_DIR,
+  чтобы не менять установленный resident. SHA256 running ELF —
+  `native-evidence.json`. После smoke временные app и xmessage закрыты.
+- Native smoke: xmessage 800×700+1080+40, фон #245b92; настоящий GNOME tray
+  открывается `xdotool mousemove --sync 1508 15 click 1`, затем native click
+  Area (1480,62). До вызова открытое меню перекрывает sample 1420,100,175×230.
+  После вызова production Quick показывает frozen desktop без меню;
+  `inspect-frozen.py` читает кадр через binary IPC в реальном WebView,
+  декодирует createImageBitmap и считает sample pixels. Все 40 250 равны
+  [36,91,145,255] (`frozen-pixels.json`). Изображение через JSON не передаётся.
+- После закрытия Quick настоящий tray → Screen (1480,98) сохраняет original
+  1920×1080. Повторный PIL decode исходного PNG даёт те же 40 250 фоновых
+  пикселей без меню (`screen-original.png`, `screen-decoded.json`).
+  Снимки `menu-open.png` и `quick-frozen.png` просмотрены: меню сначала видно,
+  в frozen frame его нет. Попытка materialize Area после нескольких тестовых
+  gestures дала crop 1×1; она не считается доказательством Area original.
+- `pnpm check` — passed (`check.log`): lint/typecheck/format/docs,
+  boundaries 45/45, IPC drift, frontend build, Rust fmt и четыре Clippy
+  конфигурации. `cargo fmt --all`, `pnpm format`, `pnpm format:check`
+  — passed (`format.log`, `format-check.log`). `git diff --check` — passed.
+
+Проверены реальный menu click, Area frozen pixels и Screen original.
+Repeat/Window/Active Window, Windows/macOS/Wayland и нестандартная длительность
+анимации других shells в этом smoke не проверялись. Пауза 200 мс является
+ограниченным запасом на закрытие меню. Установленный пакет не обновлялся.
+
 ## Installed Area focus regression (2026-10-18, ADR-106)
 
 Ubuntu 24.04.5 / GNOME X11 / WebKitGTK 2.52.6. Установленный `/usr/bin/cute-screen`

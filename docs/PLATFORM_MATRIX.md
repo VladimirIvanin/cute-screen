@@ -1,5 +1,16 @@
 # Платформенная матрица
 
+## Закрытие меню трея перед захватом (2026-10-18, ADR-107)
+
+Все tray capture requests используют штатный отменяемый delay 200 мс;
+hotkey/CLI/UI не получают добавочной паузы. Ubuntu 24.04.5 / GNOME X11 /
+WebKitGTK 2.52.6: реальный menu click → Area frozen frame и Screen original
+1920×1080 прошли pixel decode, по 40 250 пикселей фона под прежним меню.
+Rust проверяет все пять tray actions и cancel до backend; pnpm check passed.
+Команды, screenshots и границы Area materialization — TESTING.md.
+Windows/macOS/Wayland, Repeat/Window/Active Window и другие shell animations
+runtime не проверены; 200 мс не объявляются универсальной гарантией анимаций.
+
 ## Фокус установленного Quick Capture (2026-10-18, ADR-106)
 
 Ubuntu 24.04.5 / GNOME X11 / WebKitGTK 2.52.6: установленный Jammy DEB с ELF

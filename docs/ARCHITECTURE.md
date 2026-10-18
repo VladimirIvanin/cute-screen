@@ -1,5 +1,12 @@
 # Архитектура Cute Screen
 
+## Закрытие меню трея перед захватом (ADR-107)
+
+Только capture_request_for_tray задаёт 200 мс delay. После preflight/hide
+CaptureController захватывает single-flight и асинхронно ждёт с поддержкой
+cancel до вызова backend. Hotkey, CLI и UI используют прежние requests.
+Новых таймеров в Vue, блокирующего UI sleep или изменений image transport нет.
+
 ## Native focus фонового Quick Capture (ADR-106)
 
 После mapped warmup Linux reveal устанавливает GTK accept-focus синхронно.

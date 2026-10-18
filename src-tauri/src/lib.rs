@@ -90,6 +90,8 @@ mod windows_platform;
 
 const CAPTURE_PREFLIGHT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 const CAPTURE_DIAGNOSTIC_CAPACITY: usize = 64;
+// Native tray callbacks can arrive before the compositor finishes dismissing the menu.
+const TRAY_MENU_DISMISS_DELAY_MS: u32 = 200;
 
 type CommandResult<T> = Result<T, CommandErrorV1>;
 
@@ -2117,7 +2119,7 @@ fn capture_request_for_tray(action: capture::CaptureAction) -> CaptureRequestV1 
     CaptureRequestV1 {
         correlation_id: Uuid::now_v7().to_string(),
         action,
-        delay_ms: 0,
+        delay_ms: TRAY_MENU_DISMISS_DELAY_MS,
         cursor: false,
         series_id: None,
         invocation_source: CaptureInvocationSource::Tray,
@@ -2988,6 +2990,56 @@ mod tests {
                 protocol_version: 1,
             }
         );
+    }
+
+    #[test]
+    fn tray_capture_waits_briefly_for_the_native_menu_to_close() {
+        use crate::capture::{CaptureAction, CaptureInvocationSource};
+
+        for action in [
+            CaptureAction::Area,
+            CaptureAction::Screen,
+            CaptureAction::Window,
+            CaptureAction::ActiveWindow,
+            CaptureAction::Repeat,
+        ] {
+            let request = super::capture_request_for_tray(action);
+            assert_eq!(request.action, action);
+            assert_eq!(request.invocation_source, CaptureInvocationSource::Tray);
+            assert_eq!(request.delay_ms, 200);
+        }
+    }
+
+    #[test]
+    fn tray_menu_delay_can_be_cancelled_before_the_backend_starts() {
+        use crate::capture::{CaptureAction, CaptureProgressState, CaptureTerminalOutcome};
+
+        let directory = tempfile::tempdir().expect("temporary library");
+        let repository = super::LibraryRepository::initialize(directory.path(), directory.path())
+            .expect("repository");
+        let transport = super::Arc::new(
+            super::ImageTransportService::new(
+                directory.path().join("transport"),
+                directory.path().join("stage"),
+            )
+            .expect("transport"),
+        );
+        let controller = super::CaptureController::new(repository.clone(), transport);
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .expect("runtime");
+        let outcome = runtime.block_on(controller.capture_with_progress(
+            super::capture_request_for_tray(CaptureAction::Area),
+            |state| {
+                assert_eq!(state, CaptureProgressState::Delay);
+                assert!(controller.cancel());
+            },
+        ));
+
+        assert_eq!(outcome.outcome, CaptureTerminalOutcome::Cancelled);
+        assert!(controller.active_quick_draft().is_none());
+        assert!(repository.open_last().expect("open last").is_none());
     }
 
     #[test]
