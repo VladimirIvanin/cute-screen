@@ -1,1 +1,4 @@
-export function cacheDownloadedEdgeDriver(downloads: string, cache: string): Promise<void>
+export function cacheDownloadedEdgeDriver(
+  downloads: string,
+  cache: string,
+): Promise<void>

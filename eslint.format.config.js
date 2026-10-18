@@ -19,7 +19,7 @@ export default [
   },
   ...vue.configs['flat/base'],
   {
-    files: ['**/*.{js,mjs,ts,vue}'],
+    files: ['**/*.{js,mjs,ts,mts,vue}'],
     plugins: { '@stylistic': stylistic, readability },
     rules: {
       '@stylistic/array-bracket-spacing': ['error', 'never'],
@@ -81,7 +81,7 @@ export default [
     },
   },
   {
-    files: ['**/*.ts'],
+    files: ['**/*.{ts,mts}'],
     languageOptions: { parser: tseslint.parser },
   },
   {

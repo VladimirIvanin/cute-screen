@@ -612,6 +612,12 @@ Cute Screen — полноценный local-first редактор снимко
 - `REQ-REL-003` — GitHub Actions собирает unsigned Windows x64/ARM64 NSIS installers.
 - `REQ-REL-004` — приложение вручную либо по явной opt-in настройке сравнивает текущую SemVer с тегами `vX.Y.Z` публичного GitHub-репозитория; оно не скачивает и не устанавливает обновления.
 - `REQ-REL-005` — versioned CI artifacts сопровождаются checksums, SBOM и license report, но не объявляются официальным релизом.
+- `REQ-REL-006` — публикация GitHub Release с тегом `vMAJOR.MINOR.PATCH`
+  автоматически прикрепляет пакеты всей build matrix после успешного CI того
+  же commit; ручной запуск допускает существующий тег. Версии package/Tauri/Cargo
+  обязаны совпадать с тегом. Релиз содержит ссылки на пакеты, SHA-256, SBOM,
+  license reports и предупреждение о неофициальных unsigned сборках.
+  Повторный запуск не заменяет отличающиеся опубликованные файлы.
 
 ## Публичный лендинг
 

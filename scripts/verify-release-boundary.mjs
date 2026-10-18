@@ -9,7 +9,7 @@ import process from 'node:process'
 
 import fg from 'fast-glob'
 
-const root = process.cwd()
+const root = path.resolve(process.argv[2] ?? process.cwd())
 const forbidden = [
   'tauri-plugin-wdio',
   'tauri-plugin-wdio-webdriver',
@@ -21,7 +21,12 @@ function capture(
   command,
   args,
 ) {
-  const result = spawnSync(command, args, {
+  const executable = command === 'pnpm' ? process.execPath : command
+  const commandArgs = command === 'pnpm' ? [process.env.npm_execpath, ...args] : args
+  if (command === 'pnpm' && !process.env.npm_execpath) {
+    throw new Error('Run the release boundary through pnpm verify:release-boundary.')
+  }
+  const result = spawnSync(executable, commandArgs, {
     cwd: root,
     encoding: 'utf8',
     env: process.env,

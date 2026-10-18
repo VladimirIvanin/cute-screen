@@ -229,7 +229,8 @@ Windows запускается через `CUTE_SCREEN_E2E_SCENARIOS=windows-cap
 
 ## Принцип
 
-Проект не создаёт официальный канал релизов. Нет code signing, notarization, GitHub Releases, Tauri updater или автоматической установки обновлений.
+Проект публикует неофициальные unsigned пакеты в GitHub Releases (ADR-111).
+Нет code signing, notarization, Tauri updater или автоматической установки обновлений.
 
 GitHub Actions выполняет две независимые функции:
 
@@ -311,20 +312,48 @@ Provisioning и runbook: [REFERENCE_PERF_RUNNER.md](REFERENCE_PERF_RUNNER.md).
 
 - Artifacts могут иметь короткий retention и не считаются versioned builds.
 
-### `build-artifacts.yml`
+### `release.yml` — Release assets
 
-Trigger: manual dispatch либо tag `v*`.
+Trigger: GitHub Release `published` либо manual dispatch с существующим тегом.
+После попадания workflow в `main` для уже существующего `v0.1.0` открыть
+Actions → Release assets → Run workflow, выбрать `main`, указать `tag: v0.1.0`.
+Тег пересоздавать не нужно. Новые версии: синхронизировать package.json,
+Cargo workspace/Cargo.lock и tauri.conf.json, создать tag и опубликовать Release.
+Сам push тега не запускает публикацию пакетов.
 
-1. Проверить SemVer tag и совпадение embedded version.
-2. Выполнить обязательные test gates для того же commit SHA.
-3. Собрать каждый target на native runner.
-4. Проверить architecture и обязательные bundled resources.
-5. Выполнить install/launch/fake-capture/export smoke.
-6. Сформировать SHA-256 checksums, SBOM и license report.
-7. Загрузить файлы как GitHub Actions artifacts с именем `cute-screen-<version>-<os>-<arch>`.
-8. Сохранить test reports и предупреждение `UNSIGNED / UNOFFICIAL BUILD`.
+1. Проверить строгий tag `vMAJOR.MINOR.PATCH`, совпадение package/Tauri/Cargo
+   version и зафиксировать SHA tagged source.
+2. Вызвать весь `ci.yml` для этого SHA, включая quality и compile matrix.
+3. Повторно использовать проверенные Linux x64/ARM64 CI DEB/AppImage без
+   повторной сборки; собрать Windows native x64/ARM64 NSIS и macOS universal DMG.
+4. На macOS проверить обе архитектуры через lipo, CLI и целостность DMG;
+   Windows выполняет CLI smoke. Полный install/capture/export acceptance
+   остаётся отдельным пунктом A14; наличие пакета его не подтверждает.
+5. Подготовить platform manifest, CycloneDX 1.6 inventory и license report.
+   Inventory включает npm production graph, Cargo resolved packages, в том
+   числе build dependencies/all targets, и bundled Noto Emoji; OS libraries
+   исключены. Font license texts включаются в license report.
+6. Только после всех пяти package jobs publisher проверяет комплектность,
+   SHA-256 и неизменность tag; формирует общий SHA256SUMS и прикрепляет файлы.
+   Каждый загруженный файл скачивается обратно и сверяется по SHA-256.
+7. Описание получает секцию Downloads со ссылками и `UNSIGNED / UNOFFICIAL BUILD`.
+   Пользовательский текст, сторонние assets и статус существующего Release
+   сохраняются. Для отсутствующего Release manual run создаёт draft, затем
+   публикует его только после успешной проверки всех загруженных файлов.
 
-Workflow не создаёт GitHub Release и не прикладывает updater manifests.
+Файлы: `cute-screen-<version>-<os>-<arch>.<ext>`; macOS —
+`cute-screen-<version>-macos-universal.dmg`, общий для Intel и Apple Silicon.
+Только job `publish` получает `contents: write`; PAT и signing secrets не нужны.
+Обычные PR/main CI не создают и не меняют Release.
+
+При transient upload error повторить только failed publish job, чтобы использовать
+тот же набор artifacts. Идентичный файл пропускается; отличие опубликованного
+одноимённого файла блокирует весь preflight без перезаписи — нужен новый patch tag.
+Для существующего опубликованного Release загрузка нескольких assets не атомарна:
+после ошибки часть файлов может быть уже видна; повтор publish job завершает набор.
+При включённой release immutability создавать draft ручным запуском workflow
+до публикации: к уже immutable Release добавить файлы нельзя.
+Workflow не прикладывает updater manifests.
 
 ## Контракт проверки версии
 
@@ -442,7 +471,8 @@ desktop-зависимость удалена. Обновление устран
 
 ## Явные ограничения
 
-- GitHub Actions retention может удалить старые artifacts; version tag останется, но это не обещание долгосрочной загрузки binary.
+- GitHub Actions retention может удалить CI artifacts; опубликованные Release assets
+  хранятся отдельно и не зависят от retention конкретного Actions run.
 - Для private repository без пользовательского GitHub token version check не поддерживается. План рассчитан на публичный repository.
 - Unsigned Windows/macOS artifacts неизбежно могут вызывать OS warnings.
 - Если в будущем потребуется официальный подписанный канал или auto-update, он проектируется отдельным ADR, а не добавляется скрыто в этот workflow.

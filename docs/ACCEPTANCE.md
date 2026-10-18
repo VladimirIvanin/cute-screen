@@ -1191,7 +1191,20 @@ remain pending.
 
 ## A14 — CI-сборки и проверка версии
 
-Для Linux x64/ARM64, Windows x64/ARM64 и macOS Intel/Apple Silicon скачать versioned artifact из GitHub Actions, проверить checksum/архитектуру, выполнить install/launch → capture → edit → export → relaunch → uninstall. На Windows/macOS ожидаемые предупреждения unsigned build документированы.
+Для Linux x64/ARM64, Windows x64/ARM64 и macOS Intel/Apple Silicon скачать
+versioned package из GitHub Release, проверить checksum/архитектуру, выполнить
+install/launch → capture → edit → export → relaunch → uninstall. На Windows/macOS
+ожидаемые предупреждения unsigned build документированы. macOS получает один
+universal DMG для обеих архитектур.
+
+`REQ-REL-006`, ADR-111: опубликовать Release со строгим version tag либо вручную
+запустить Release assets с существующим тегом. Дождаться полного CI и пяти
+package jobs; проверить семь installers/packages, пять SBOM/license reports,
+SHA256SUMS и Downloads с рабочими ссылками. Повторный publish job с теми же
+artifacts пропускает идентичные файлы. Ошибка любого job, несовпадение версий,
+перемещение tag, неполная матрица, повреждение файла и конфликт asset должны
+блокировать публикацию. Hosted end-to-end прогон этого workflow пока не выполнен;
+локальные boundary/API tests не заменяют installer/runtime acceptance.
 
 ## A15 — Area quick capture
 

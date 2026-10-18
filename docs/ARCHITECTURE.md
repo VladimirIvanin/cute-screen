@@ -1,5 +1,17 @@
 # Архитектура Cute Screen
 
+## Публикация установщиков (ADR-111)
+
+`release.yml` фиксирует SHA version tag и вызывает reusable `ci.yml` с этим SHA.
+После полного CI Linux packages берутся из artifacts того же workflow run;
+Windows/macOS package jobs собирают соответствующий tagged source. Release
+tooling отдельно checkout-ится из workflow commit, чтобы ручной запуск мог
+добавить assets к более старому тегу без изменения его исходников.
+`release-assets.mjs` подготавливает platform manifests, SBOM и license report;
+`publish-release.mjs` проверяет комплектность, SHA-256 и актуальность tag,
+прикрепляет файлы, повторно скачивает их и обновляет управляемую секцию Downloads.
+Write token существует только в publisher; package jobs имеют read-only token.
+
 ## Метаданные версии в Settings (ADR-108)
 
 AppVersion владеет только transient loading/error состоянием и читает

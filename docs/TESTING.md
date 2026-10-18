@@ -1,5 +1,34 @@
 # Стратегия тестирования
 
+## Публикация Release assets (2026-10-18, ADR-111)
+
+Ubuntu 24.04.5 x64, Node 22.23.1, pnpm 10.33.2. GitHub API заменён recording
+stub только в publisher contract tests; реальные Release/assets не изменялись.
+
+- `pnpm exec vitest run --project boundaries tests/boundaries/release-assets.test.ts --coverage --coverage.include=scripts/release-assets.mjs --coverage.include=scripts/publish-release.mjs --coverage.reportsDirectory=artifacts/release-validation/coverage`
+  — 15/15 passed; statements 92.85%, branches 85.59%, lines 94.18%.
+  Проверены strict tag и все три версии, пять platform manifests, один universal
+  DMG, inventories, corruption, stale/extra files, moved tag, immutable release,
+  API error, draft/retry, conflict preflight, повторное скачивание и skip
+  идентичных файлов. Лог: `artifacts/release-validation/coverage.log`.
+- `node scripts/release-assets.mjs version . v0.1.0` — passed на реальных
+  package/Tauri/Cargo metadata checkout.
+- `artifacts/release-validation/actionlint -config-file artifacts/release-validation/actionlint.yaml`
+  — passed для всех workflows, actionlint 1.7.12; архив проверен по опубликованному
+  SHA-256. Config перечисляет существующие custom self-hosted labels
+  `cutescreen-reference` и `rtx-2070-super`. Лог: `artifacts/release-validation/actionlint.log`.
+- `pnpm format` — passed; `.mts` declarations теперь форматируются ESLint,
+  как TypeScript, без противоречащего схлопывания Prettier.
+- `pnpm check` — passed: lint, TypeScript, formatting, docs links, boundary
+  61/61, IPC bindings, Rust fmt и все Clippy configurations. Лог:
+  `artifacts/release-validation/check.log`.
+
+Hosted matrix, Windows/macOS installers и полная публикация через настоящий
+GitHub API этим локальным прогоном не проверены. `pnpm test:render`,
+`pnpm test:e2e:browser`, `pnpm test:e2e:tauri`, `pnpm test:perf`,
+`pnpm tauri build` и отдельный `cargo test --workspace` в этом workflow-only
+изменении не запускались; release workflow сохраняет прежние обязательные CI gates.
+
 ## Версия в настройках (2026-10-18, ADR-108)
 
 Ubuntu 24.04.5 x64 / GNOME X11; Chrome 154.0.8037.57 и WebKitGTK 2.52.6.

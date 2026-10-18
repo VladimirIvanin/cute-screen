@@ -1,1 +1,4 @@
-export function isAllowedProductionLicense(packageKey: string, license: string): boolean
+export function isAllowedProductionLicense(
+  packageKey: string,
+  license: string,
+): boolean

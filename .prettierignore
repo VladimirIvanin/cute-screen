@@ -14,5 +14,6 @@ prototype-html
 **/*.js
 **/*.mjs
 **/*.ts
+**/*.mts
 **/*.vue
 !apps/desktop/src/generated/desktop-ipc.ts

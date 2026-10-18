@@ -1,5 +1,37 @@
 # Журнал архитектурных решений
 
+## ADR-111 — Автоматические пакеты в GitHub Releases
+
+**Статус:** accepted (2026-10-18); supersedes ADR-018 в способе распространения.
+Проверка версий приложения по tags, отсутствие updater и code signing сохраняются.
+
+**Контекст:** GitHub Release `v0.1.0` содержит только автоматически созданные
+архивы исходников; Actions artifacts не появляются в нём автоматически.
+Владелец продукта запросил автоматическое прикрепление установщиков.
+
+**Решение:** `release.yml` запускается на `release: published` и вручную для
+существующего строгого version tag. Сначала проверяются embedded версии и
+фиксируется commit SHA; reusable `ci.yml` проверяет именно этот SHA.
+Linux использует уже проверенные CI DEB/AppImage; Windows собирает native
+x64/ARM64 NSIS; macOS собирает один universal DMG с обеими Mach-O архитектурами.
+Package jobs формируют CycloneDX dependency inventory, license report и
+manifest с SHA-256. Publisher требует все пять platform manifests, заново
+проверяет хеши и неизменность tag, затем прикрепляет файлы и ссылки.
+Только publisher получает `contents: write`. Обычные CI и PR не публикуют файлы.
+
+При ручном запуске новый Release сначала создаётся draft и публикуется только
+после повторного скачивания и проверки всех загруженных файлов. Существующие
+описание, draft/prerelease status и сторонние assets сохраняются; обновляется
+только генерируемая секция Downloads. Отличающийся одноимённый asset блокирует
+публикацию без перезаписи. Существующий immutable Release требует новой версии.
+
+**Проверяемое основание:** boundary tests version mismatch, комплектности,
+corruption и publisher API flow; actionlint всего workflow graph. Hosted
+build/installer и физический capture/export acceptance остаются отдельными
+проверками; их отсутствие явно описано в Downloads и platform matrix.
+Сборки остаются unsigned/unofficial; SBOM inventory включает Cargo build
+dependencies и все resolved targets, но не системные библиотеки ОС.
+
 ## ADR-110 — На macOS доступны только Область и Экран
 
 **Статус:** accepted (2026-10-18); отзывает Window-часть ADR-038/091 для macOS.
@@ -793,7 +825,7 @@ rotation, transient preview/cancel и отсутствие non-image transform s
 
 ## ADR-018 — Неофициальные CI-сборки и GitHub version check
 
-**Статус:** accepted
+**Статус:** superseded в способе распространения by [ADR-111](#adr-111-автоматические-пакеты-в-github-releases); остальные решения сохраняются.
 
 **Решение:** проект не создаёт официальный подписанный канал дистрибуции, не выполняет code signing/notarization и не использует Tauri updater. GitHub Actions собирает versioned unsigned artifacts для всей платформенной матрицы. Приложение сравнивает встроенную SemVer с публичными GitHub tags `vX.Y.Z` и только сообщает о более новой версии.
 

@@ -1,0 +1,195 @@
+name: Release assets
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag (for example v0.1.0)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-assets-${{ inputs.tag || github.event.release.tag_name }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: 22.23.1
+  PNPM_VERSION: 10.33.2
+  RUST_VERSION: 1.97.0
+
+jobs:
+  version:
+    name: Resolve and validate version tag
+    runs-on: ubuntu-22.04
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      sha: ${{ steps.version.outputs.sha }}
+    steps:
+      - name: Checkout release tooling
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.workflow_sha }}
+
+      - name: Checkout tagged source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: refs/tags/${{ inputs.tag || github.event.release.tag_name }}
+          path: release-source
+
+      - name: Install Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Validate embedded versions
+        id: version
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.event.release.tag_name }}
+        run: |
+          node scripts/release-assets.mjs version release-source "$RELEASE_TAG"
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git -C release-source rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  checks:
+    name: Check tagged source
+    needs: version
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ needs.version.outputs.sha }}
+
+  packages:
+    name: Package ${{ matrix.platform }}
+    needs: [version, checks]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x64
+            os: ubuntu-22.04
+            ci_artifact: linux-x64-ubuntu22
+          - platform: linux-arm64
+            os: ubuntu-22.04-arm
+            ci_artifact: linux-arm64-ubuntu22
+          - platform: windows-x64
+            os: windows-2025
+          - platform: windows-arm64
+            os: windows-11-arm
+          - platform: macos-universal
+            os: macos-15
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout tagged source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+
+      # Use current tooling without changing the tagged application sources.
+      - name: Checkout release tooling
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .release-tools
+
+      - name: Install Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Activate pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@${PNPM_VERSION} --activate
+
+      - name: Install Rust
+        run: |
+          rustup toolchain install "${RUST_VERSION}" --profile minimal
+          rustup default "${RUST_VERSION}"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download checked Linux packages
+        if: runner.os == 'Linux'
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          name: ${{ matrix.ci_artifact }}-${{ needs.version.outputs.sha }}
+          path: target/release/bundle
+
+      - name: Verify production excludes test drivers
+        if: runner.os != 'Linux'
+        run: pnpm --dir .release-tools run verify:release-boundary "$GITHUB_WORKSPACE"
+
+      - name: Build Windows NSIS installer
+        if: runner.os == 'Windows'
+        run: |
+          pnpm tauri build --bundles nsis -- --locked
+          target/release/cute-screen.exe --help
+
+      - name: Build macOS universal DMG
+        if: runner.os == 'macOS'
+        run: |
+          rustup target add x86_64-apple-darwin aarch64-apple-darwin
+          pnpm tauri build --target universal-apple-darwin --bundles dmg -- --locked
+          lipo -verify_arch x86_64 arm64 "target/universal-apple-darwin/release/bundle/macos/Cute Screen.app/Contents/MacOS/cute-screen"
+          target/universal-apple-darwin/release/cute-screen --help
+          hdiutil verify target/universal-apple-darwin/release/bundle/dmg/*.dmg
+
+      - name: Collect dependency inventory
+        run: |
+          mkdir -p artifacts/release-metadata
+          cargo metadata --locked --format-version 1 > artifacts/release-metadata/cargo.json
+          pnpm licenses list --prod --json > artifacts/release-metadata/npm.json
+
+      - name: Prepare versioned assets and checksums
+        env:
+          RELEASE_TAG: ${{ needs.version.outputs.tag }}
+          RELEASE_PLATFORM: ${{ matrix.platform }}
+          RELEASE_SHA: ${{ needs.version.outputs.sha }}
+        run: node .release-tools/scripts/release-assets.mjs package . "$RELEASE_TAG" "$RELEASE_PLATFORM" "$RELEASE_SHA"
+
+      - name: Upload release assets
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: release-${{ matrix.platform }}
+          path: artifacts/release-assets/*
+          if-no-files-found: error
+
+  publish:
+    name: Attach packages to GitHub Release
+    needs: [version, packages]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout release tooling
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.workflow_sha }}
+
+      - name: Install Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Download all release assets
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          pattern: release-*
+          path: artifacts/release-assets
+          merge-multiple: true
+
+      - name: Verify and publish assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.version.outputs.tag }}
+          RELEASE_SHA: ${{ needs.version.outputs.sha }}
+        run: node scripts/publish-release.mjs
