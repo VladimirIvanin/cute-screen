@@ -40,6 +40,10 @@ describe('icons through production Capture → Quick → Editor', () => {
         await setShellPreferences(locale, theme)
         const label = locale === 'ru' ? 'Выделитель' : 'Highlighter'
         await expect($(`button[aria-label="${label}"] svg`)).toBeDisplayed()
+        const callout = $(`button[aria-label="${locale === 'ru' ? 'Выноска' : 'Callout'}"]`)
+        await callout.click()
+        await expect(callout).toHaveAttribute('aria-pressed', 'true')
+        await expect(callout.$('svg')).toHaveElementClass('cs-icon-callout')
         await browser.saveScreenshot(path.join(evidence, `native-editor-${locale}-${theme}.png`))
       }
     }

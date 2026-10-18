@@ -7,6 +7,7 @@ import type {
 import NumericControl from '../ui/NumericControl.vue'
 import SimpleColorPicker from '../ui/SimpleColorPicker.vue'
 import { parseHexColor } from '../tools/effects/color'
+import CalloutMarkerPreview from './CalloutMarkerPreview.vue'
 
 const props = defineProps<{ payload: CalloutPayload; locale: 'en' | 'ru'; disabled: boolean; mixed: boolean }>()
 const emit = defineEmits<{ change: [id: string, value: string] }>()
@@ -17,7 +18,7 @@ const markers = computed(() => [
   { value: 'ring', label: text('Ring', 'Кольцо') },
   { value: 'lineArrow', label: text('Open arrow', 'Открытая стрелка') },
   { value: 'solidArrow', label: text('Filled arrow', 'Заполненная стрелка') },
-])
+] as const)
 const hex = (color: { red: number; green: number; blue: number }) =>
   '#' + [color.red, color.green, color.blue].map((v) => Math.round(v * 255).toString(16).padStart(2, '0')).join('')
 function style(
@@ -54,35 +55,7 @@ function color(
         :disabled="disabled"
         @click="emit('change', endpoint === 'target' ? 'calloutTargetMarker' : 'calloutLabelMarker', marker.value)"
       >
-        <svg
-          viewBox="0 0 40 24"
-          aria-hidden="true"
-          focusable="false"
-        >
-          <g
-            :transform="endpoint === 'target' ? 'translate(40 0) scale(-1 1)' : undefined"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path :d="marker.value === 'none' ? 'M4 12h30' : 'M4 12h24'"/>
-            <circle
-              v-if="marker.value === 'circle' || marker.value === 'ring'"
-              cx="29"
-              cy="12"
-              r="4"
-              :fill="marker.value === 'circle' ? 'currentColor' : 'var(--surface-raised)'"
-            />
-            <path v-if="marker.value === 'lineArrow'" d="m25 6 9 6-9 6"/>
-            <path
-              v-if="marker.value === 'solidArrow'"
-              d="m24 6 10 6-10 6z"
-              fill="currentColor"
-            />
-          </g>
-        </svg>
+        <CalloutMarkerPreview :marker="marker.value" :start="endpoint === 'target'"/>
       </button>
     </div>
     <div v-if="payload[`${endpoint}Marker`] !== 'none'" class="cs-callout-endpoint-properties">

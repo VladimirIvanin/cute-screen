@@ -39,7 +39,7 @@ export async function finishAreaQuickCaptureInEditor(): Promise<void> {
   expect(overlayResolution.width).toBe(overlayResolution.expectedWidth)
   expect(overlayResolution.height).toBe(overlayResolution.expectedHeight)
   await expect($('button[aria-label="Numbered marker"] .tabler-icon-circle-number-1')).toExist()
-  await expect($('button[aria-label="Callout"] .tabler-icon-stroke-dynamic')).toExist()
+  await expect($('button[aria-label="Callout"] .cs-icon-callout')).toExist()
   await $('button[aria-label="Pencil"]').click()
   await expect($('.cs-quick-defaults')).toExist()
   if (!(await $('.cs-quick-defaults').isDisplayed())) {

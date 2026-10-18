@@ -17,6 +17,13 @@ export type IconPrimitive =
 export type IconGeometry = readonly IconPrimitive[]
 
 // Original Cute Screen drawings, MIT. Compare as a family at 18 CSS px.
+// User-selected 01: a caption card linked to a target by a stepped leader.
+export const calloutGeometry = [
+  ['rect', { x: 8, y: 3, width: 13, height: 10, rx: 2 }],
+  ['path', { d: 'M11.5 8h6M9 13v6H5.5' }],
+  ['circle', { cx: 4, cy: 19, r: 1.5 }],
+] as const satisfies IconGeometry
+
 // User reference: upright chisel nib pointing up, a short collar and broad rounded shoulders.
 export const markerGeometry = [
   ['path', { d: 'M9 9V5l6-3v7' }],

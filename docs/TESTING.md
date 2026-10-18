@@ -1,5 +1,28 @@
 # Стратегия тестирования
 
+## Выноска: принятая карточка с точкой (2026-10-18, ADR-055)
+
+`REQ-EDT-008`, `REQ-TOL-007`: пользователь выбрал вариант 01. Общий `UiIcon`
+теперь использует `calloutGeometry`; gallery и landing получают тот же рисунок.
+Доступное имя, shortcut O и поведение инструмента сохранены. Windows x64,
+PowerShell, Node 22.23.1, pnpm 10.33.2, Chrome 155.0.8059.80.
+
+- `pnpm icons:landing` — exit 0, обновлён только callout SVG.
+- `pnpm test tests/unit/vue/ui-icon.test.ts tests/unit/vue/quick-context-toolbar.test.ts`
+  — 2 files / 110 tests passed; `artifacts/custom-icons/callout-adopted-unit.log`.
+- `$env:CUTE_SCREEN_BROWSER_E2E_PORT='5198'; $env:CUTE_SCREEN_BROWSER_E2E_HEADLESS='1'; $env:CUTE_SCREEN_E2E_DISABLE_WATCH='1'; $env:CUTE_SCREEN_ICON_EVIDENCE='callout-adopted'; pnpm test:e2e:browser --spec tests/e2e/specs/browser-custom-icons.e2e.ts`
+  — 2/2 passed; `artifacts/custom-icons/callout-adopted-browser-final.log`.
+  Первый запуск выявил устаревший shortcut L для лупы; helper исправлен на Z
+  в соответствии с текущим product mapping. Финальный прогон проверяет Callout
+  по O, RU/EN × light/dark, disabled пустого editor, keyboard focus, SVG raster
+  16/18/20/24/32 px и DPR 1/2 без clipping.
+- Просмотрены `artifacts/custom-icons/callout-adopted/callout-family-dpr-1.png`,
+  `callout-family-dpr-2.png` и `editor-ru-dark.png`: карточка и связь различимы
+  при 18 px, вес согласован с соседними Tabler, active/focus/disabled читаемы.
+
+Native WebView и итоговые общие проверки записываются ниже после завершения.
+WebKitGTK/WKWebView и физический захват для этой замены не проверялись.
+
 ## Компактная ширина выноски (2026-10-18, ADR-103)
 
 Windows 10 x64 / PowerShell, Node 22.23.1, pnpm 10.33.2.

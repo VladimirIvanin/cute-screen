@@ -15,6 +15,32 @@ const payload = createCalloutLayer({ id: 'label', text: 'Label', target: { x: 0,
 const schema = { icon: 'callout' as const, title: 'Callout', hint: 'Callout settings', controls: [], callout: payload }
 
 describe('compact callout toolbar', () => {
+  it('keeps names and full values in localized tooltips while triggers show previews and short numbers', async () => {
+    const view = render(ContextToolbar, { props: { schema, label: 'Callout', pickerLocale: 'ru' } })
+    const toolbar = view.container.querySelector('.cs-callout-toolbar')!
+    expect(toolbar.textContent?.trim()).toBe(`${payload.stroke.width} px—`)
+    const route = view.getByRole('button', { name: 'Маршрут' })
+    expect(route).toHaveAttribute('title', 'Маршрут: Ступенчатая')
+    expect(view.getByRole('button', { name: 'Наконечники' })).toHaveAttribute('title', expect.stringContaining(' / '))
+    expect(view.getByRole('button', { name: 'Подпись' })).toHaveAttribute('title', 'Подпись: Карточка')
+    await view.rerender({ schema: { ...schema, callout: { ...payload, route: { path: 'straight' } } } })
+    expect(route).toHaveAttribute('title', 'Маршрут: Линия')
+    expect(route).toHaveAttribute('aria-description', 'Линия')
+    await fireEvent.click(route)
+    expect(await view.findByRole('dialog', { name: 'Маршрут' })).toBeVisible()
+    await fireEvent.keyDown(view.getByRole('dialog', { name: 'Маршрут' }), { key: 'Escape' })
+    expect(route).toHaveFocus()
+  })
+  it('does not present the first selection value as shared when settings are mixed', () => {
+    const view = render(ContextToolbar, {
+      props: { schema: { ...schema, calloutMixed: true }, label: 'Callout', pickerLocale: 'en' },
+    })
+    for (const button of view.container.querySelectorAll('.cs-callout-toolbar > button')) {
+      expect(button.textContent?.trim()).toBe('—')
+      expect(button).toHaveAttribute('title', expect.stringContaining(': —'))
+      expect(button).toHaveAttribute('aria-description', '—')
+    }
+  })
   it('exposes five groups, changes the route and enters segment insertion without a document mutation', async () => {
     const view = render(ContextToolbar, { props: { schema, label: 'Callout', pickerLocale: 'en' } })
     expect(view.container.querySelectorAll('.cs-callout-toolbar > button')).toHaveLength(5)

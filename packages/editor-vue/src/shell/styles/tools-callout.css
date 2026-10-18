@@ -2,11 +2,25 @@
   flex-wrap: wrap;
 }
 .cs-callout-summary {
-  max-width: 110px;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.cs-callout-toolbar > .cs-tool-settings-trigger {
+  flex: 0 0 auto;
+}
+.cs-callout-route-preview {
+  width: 32px;
+  height: 24px;
+  flex: none;
+}
+.cs-callout-markers-preview {
+  display: inline-flex;
+  align-items: center;
+}
+.cs-callout-markers-preview svg {
+  width: 30px;
+  height: 24px;
 }
 .cs-callout-popover {
   display: flex;

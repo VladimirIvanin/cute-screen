@@ -11,7 +11,10 @@ import {
   DEFAULT_CALLOUT_FRAME,
   type CalloutFrame,
 } from '@cute-screen/editor-renderer'
-import type { ContextToolbarSchema } from '../types'
+import type {
+  ContextToolbarSchema,
+  IconName,
+} from '../types'
 import { UiIcon } from '../icon'
 import NumericControl from '../ui/NumericControl.vue'
 import SimpleColorPicker from '../ui/SimpleColorPicker.vue'
@@ -26,12 +29,17 @@ import { parseHexColor } from '../tools/effects/color'
 import TextFormattingToolbar from './TextFormattingToolbar.vue'
 import CalloutRouteSettings from './CalloutRouteSettings.vue'
 import CalloutEndpointSettings from './CalloutEndpointSettings.vue'
+import CalloutMarkerPreview from './CalloutMarkerPreview.vue'
+import ArrowStylePreview from './ArrowStylePreview.vue'
 
 const props = defineProps<{ schema: ContextToolbarSchema; locale: 'en' | 'ru' }>()
 const emit = defineEmits<{ change: [id: string, value: string] }>()
 const surfaceOwner = useTransientSurface() ?? provideTransientSurface()
 type Menu = 'route' | 'markers' | 'line' | 'frame' | 'text'
 const menus: readonly Menu[] = ['route', 'markers', 'line', 'frame', 'text']
+const icons: Record<Menu, IconName> = {
+  route: 'callout', markers: 'arrow', line: 'line', frame: 'textBackground', text: 'text',
+}
 const open = ref<Menu>()
 const panel = ref<HTMLElement>()
 const triggers = new Map<Menu, HTMLButtonElement>()
@@ -53,6 +61,8 @@ const routes = computed(() => [
   { value: 'corner', label: text('Stepped', 'Ступенчатая') },
 ])
 const routeCategory = computed(() => calloutRoutePreset(payload.value.route) === 'straight' ? 'straight' : 'corner')
+const routePreview = computed(() => payload.value.route.path === 'quadratic' ? 'curve'
+  : routeCategory.value === 'straight' ? 'straight' : 'elbow')
 const frames = computed(() => [
   { value: 'text', label: text('Plain text', 'Текст') },
   { value: 'outline', label: text('Outline', 'Рамка') },
@@ -81,6 +91,7 @@ const hex = (color: { red: number; green: number; blue: number }) =>
 function summary(menu: Menu): string {
   if (props.schema.calloutMixed) return '—'
   if (menu === 'route') {
+    if (payload.value.route.path === 'quadratic') return text('Curve', 'Кривая')
     return routes.value.find((r) => r.value === routeCategory.value)?.label ?? ''
   }
   if (menu === 'frame') return frames.value.find((r) => r.value === frame.value.kind)?.label ?? ''
@@ -156,14 +167,29 @@ watch(() => props.schema.disabled, (disabled) => {
       class="cs-tool-settings-trigger"
       :disabled="schema.disabled ?? false"
       :aria-label="labels[menu]"
+      :aria-description="summary(menu)"
       :title="`${labels[menu]}: ${summary(menu)}`"
       :aria-expanded="open === menu"
       aria-haspopup="dialog"
       @click="show(menu, open !== menu)"
       @keydown="keydown"
     >
+      <template v-if="schema.calloutMixed">
+        <UiIcon :name="icons[menu]"/>
+        <span class="cs-callout-summary">—</span>
+      </template>
+      <ArrowStylePreview
+        v-else-if="menu === 'route'"
+        class="cs-callout-route-preview"
+        kind="path"
+        :value="routePreview"
+      />
+      <span v-else-if="menu === 'markers'" class="cs-callout-markers-preview">
+        <CalloutMarkerPreview :marker="payload.targetMarker" start/>
+        <CalloutMarkerPreview :marker="payload.labelMarker"/>
+      </span>
       <svg
-        v-if="menu === 'line'"
+        v-else-if="menu === 'line'"
         class="cs-callout-stroke-preview"
         viewBox="0 0 36 18"
         aria-hidden="true"
@@ -178,7 +204,9 @@ watch(() => props.schema.disabled, (disabled) => {
           :stroke-dasharray="payload.stroke.style === 'dashed' ? '7 4' : payload.stroke.style === 'dotted' ? '1 4' : undefined"
         />
       </svg>
-      <span>{{ labels[menu] }}</span><span class="cs-callout-summary">{{ summary(menu) }}</span><UiIcon name="chevronDown" class="cs-tool-settings-chevron"/>
+      <UiIcon v-else :name="menu === 'frame' ? 'textBackground' : 'text'"/>
+      <span v-if="!schema.calloutMixed && (menu === 'line' || menu === 'text')" class="cs-callout-summary">{{ summary(menu) }}</span>
+      <UiIcon name="chevronDown" class="cs-tool-settings-chevron"/>
     </button>
     <NPopover
       :show="Boolean(open)"

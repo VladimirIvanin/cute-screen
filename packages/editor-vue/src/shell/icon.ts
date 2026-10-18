@@ -41,7 +41,6 @@ import {
   IconSettings,
   IconSparkles,
   IconStack2,
-  IconStrokeDynamic,
   IconTypography,
   IconTrash,
   IconX,
@@ -57,6 +56,7 @@ import {
 import type { IconName } from './types'
 import { createCustomIcon } from './icons/create-custom-icon'
 import {
+  calloutGeometry,
   eyedropperGeometry,
   loupeGeometry,
   markerGeometry,
@@ -87,7 +87,7 @@ const icons = {
 
   arrow: IconArrowUpRight,
   camera: IconCamera,
-  callout: IconStrokeDynamic,
+  callout: createCustomIcon('callout', calloutGeometry),
   check: IconCheck,
   close: IconX,
   chevronDown: IconChevronDown,

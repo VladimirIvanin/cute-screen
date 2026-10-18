@@ -53,8 +53,25 @@ describe('Callout desktop layouts', () => {
           await browser.saveScreenshot(path.resolve(`artifacts/browser-e2e/callout-${locale}-${theme}-${zoom}.png`))
           await browser.keys('Escape')
           await editor.click()
-          await browser.keys('Escape')
+          await browser.keys(['Control', 'Enter'])
           await expect(editor).not.toExist()
+          const toolbar = $('.cs-callout-toolbar')
+          await expect(toolbar).toBeDisplayed()
+          const compact = await browser.execute(() => {
+            const toolbar = document.querySelector<HTMLElement>('.cs-callout-toolbar')!
+            const r = toolbar.getBoundingClientRect()
+            const buttons = [...toolbar.querySelectorAll('button')].map((button) => button.getBoundingClientRect())
+            return r.width < 420 && r.left >= 0 && r.right <= window.innerWidth &&
+              buttons.length === 5 && buttons.every((button) => Math.abs(button.top - buttons[0]!.top) < 1)
+          })
+          expect(compact).toBe(true)
+          await browser.saveScreenshot(path.resolve(`artifacts/browser-e2e/callout-icons-${locale}-${theme}-${zoom}.png`))
+          await toolbar.$('button').click()
+          await expect($('.cs-callout-popover')).toBeDisplayed()
+          await browser.saveScreenshot(path.resolve(`artifacts/browser-e2e/callout-route-${locale}-${theme}-${zoom}.png`))
+          await browser.keys('Escape')
+          await expect(toolbar.$('button')).toBeFocused()
+          await browser.keys('Escape')
         }
       }
     }

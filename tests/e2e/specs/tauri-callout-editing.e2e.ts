@@ -48,6 +48,16 @@ describe('callout through production capture and native persistence', () => {
     await browser.waitUntil(async () => ((await selectionDocument()).crop?.x ?? 0) > 0)
     expect((await selectionDocument()).crop?.x).toBeGreaterThan(0)
     await exerciseCalloutEditing('artifacts/tauri-e2e', true)
+    await expect($('.cs-callout-toolbar')).toBeDisplayed()
+    const compact = await browser.execute(() => {
+      const toolbar = document.querySelector<HTMLElement>('.cs-callout-toolbar')!
+      const bounds = toolbar.getBoundingClientRect()
+      const buttons = [...toolbar.querySelectorAll('button')].map((button) => button.getBoundingClientRect())
+      return bounds.width < 420 && buttons.length === 5 &&
+        buttons.every((button) => Math.abs(button.top - buttons[0]!.top) < 1)
+    })
+    expect(compact).toBe(true)
+    await browser.saveScreenshot('artifacts/tauri-e2e/callout-compact-quick.png')
     await $('.cs-quick-actions button:first-child').click()
     await browser.tauri.switchWindow('main')
     await browser.waitUntil(async () => (await selectionDocument()).layers.some((layer) => layer.kind === 'callout'))

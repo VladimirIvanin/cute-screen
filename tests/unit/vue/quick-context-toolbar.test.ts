@@ -89,11 +89,11 @@ describe('Quick Capture context toolbar', () => {
     for (const [label, icon] of [
       ['Select', 'pointer-2'],
       ['Text', 'typography'],
-      ['Callout', 'stroke-dynamic'],
       ['Numbered marker', 'circle-number-1'],
     ] as const) {
       expect(within(rail).getByRole('button', { name: label }).querySelector(`svg.tabler-icon-${icon}`)).toBeTruthy()
     }
+    expect(within(rail).getByRole('button', { name: 'Callout' }).querySelector('svg.cs-icon-callout')).toBeTruthy()
     view.unmount()
     session.dispose()
   })

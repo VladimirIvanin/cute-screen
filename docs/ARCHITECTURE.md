@@ -275,6 +275,9 @@ document или IPC. `UiIcon` сохраняет class/style fallthrough, curren
 контур 1.8 и декоративную семантику. Потребители не выбирают библиотеку напрямую.
 Dev entry `apps/desktop/icons-preview.html` показывает тот же `UiIcon` с
 реальными theme tokens; production main не импортирует preview.
+Принятый `callout` — карточка с подписью, ступенчатой линией и точкой цели;
+`calloutGeometry` из `shell/icons/geometry.ts` используется общим `UiIcon`
+в editor, Quick Capture, gallery и при генерации SVG лендинга.
 Принятый `spotlight` — прямоугольное окно на равномерной диагональной штриховке;
 линии подходят встык к контуру. Его геометрия, как у остальных собственных
 иконок, находится в `shell/icons/geometry.ts` и переиспользуется в dev preview.

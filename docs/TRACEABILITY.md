@@ -1,5 +1,27 @@
 # Трассируемость требований
 
+## Иконка выноски: карточка и точка (2026-10-18)
+
+`REQ-EDT-008`, `REQ-TOL-007`, ADR-055: пользователь выбрал вариант 01.
+Общий `UiIcon` показывает карточку с подписью, ступенчатую связь и точку цели
+вместо Tabler `stroke-dynamic`. Каноническая геометрия хранится в `shell/icons/`;
+gallery и landing используют тот же источник. Accessible names, shortcut O,
+состояния кнопок и поведение инструмента сохраняются. Evidence: SVG-контракт,
+Vue toolbar assertions, boundary checks, gallery 16/18/20/24/32 при DPR 1/2,
+RU/EN × light/dark и production Capture → Quick → Editor. Фактические команды
+и ограничения — TESTING.md.
+
+## Иконки настроек выноски (2026-10-18, до реализации)
+
+`REQ-TOL-007`, `REQ-EDT-016`, `REQ-UI-001/003/006`: пять групп selection/defaults
+выноски показывают маршрут, оба наконечника и штрих графически, оформление
+подписи и текст — существующими UiIcon. Названия групп и длинные значения
+переносятся в локализованные подсказки; толщина и размер шрифта остаются
+короткими числами. Mixed не показывает значение первого объекта как общее.
+Сохраняются accessible names, disabled, единственный popover, Escape и возврат
+фокуса. Проверки: Vue regression и browser production drag → commit → selection,
+RU/EN, обе темы, 1024 px и zoom 50/100/200%; фактические результаты — TESTING.md.
+
 ## Миниатюра автоматического положения выноски (2026-10-18, до реализации)
 
 `REQ-TOL-007`, `REQ-UI-001/006`: кнопка «Авто» в положении подписи показывает
@@ -942,9 +964,9 @@ Regression — mounted Quick Capture с consuming child и native Escape/retry.
 Для `REQ-EDT-008` инструмент Marker использует Tabler `brush` через общий
 `UiIcon` в editor и Quick Capture; SVG проверяется в `ui-icon.test.ts`.
 
-Для `REQ-EDT-008` инструмент Callout использует Tabler `stroke-dynamic` через
-общий `UiIcon` в editor и Quick Capture; native SVG assertion в
-`tests/e2e/quick-capture.ts` использует новое обозначение.
+Для `REQ-EDT-008` инструмент Callout использует собственную карточку с подписью,
+ступенчатой связью и точкой цели через общий `UiIcon` в editor и Quick Capture;
+native SVG assertion в `tests/e2e/quick-capture.ts` проверяет `cs-icon-callout`.
 
 Для `REQ-EDT-008` инструмент Select использует Tabler `pointer-2` через общий
 `UiIcon` в editor и Quick Capture. Проверка — существующий runtime SVG assertion

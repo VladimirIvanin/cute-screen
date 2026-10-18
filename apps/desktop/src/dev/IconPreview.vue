@@ -13,6 +13,7 @@ import { censorCandidates } from './censor-selected'
 
 const sizes = [16, 18, 20, 24, 32] as const
 const names = [
+  'callout',
   'loupe',
   'marker',
   'pencil',
@@ -224,7 +225,7 @@ const eyedroppers = [
         </div>
         <h3>18 px · button states</h3>
         <div
-          v-for="name in names.filter((name) => name !== 'loupe').slice(0, 3)"
+          v-for="name in ['callout', 'marker', 'pencil', 'eyedropper'] as const"
           :key="name"
           class="icon-states"
         >
