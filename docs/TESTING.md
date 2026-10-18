@@ -25,6 +25,12 @@ Ubuntu 24.04.5 x64 / GNOME X11; Chrome 154.0.8037.57 и WebKitGTK 2.52.6.
   native metadata, повторный CLI вход, singleton, tray settings и физический
   X11 shortcut. Финальный `artifacts/tauri-e2e/settings-native-general.png`
   просмотрен: Version 0.1.0 видна под названием приложения.
+- `pnpm check` — passed: lint (существующие warnings), typecheck, formatting,
+  docs links, boundaries 45/45, IPC drift, frontend build, Rust fmt и четыре
+  Clippy конфигурации; `artifacts/settings-version-check.log`.
+  `pnpm format`, `pnpm format:check`, `pnpm docs:check` и `git diff --check`
+  — passed; финальные логи `artifacts/settings-version-format-final.log`,
+  `artifacts/settings-version-format-check.log` и `artifacts/settings-version-docs.log`.
 
 Проверка обновлений по сети не входит в этот срез. Windows/macOS runtime
 не запускались. Установленный пакет не обновлялся.
