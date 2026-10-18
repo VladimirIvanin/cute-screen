@@ -147,11 +147,52 @@ API_AVAILABLE(macos(12.3))
 @end
 
 API_AVAILABLE(macos(12.3))
+static int32_t CuteWindowCaptureFrame(SCContentFilter *filter, SCStreamConfiguration *config,
+                                      CuteWindowImageState *state, const void *context,
+                                      CuteWindowCancellationProbe probe) {
+#if CUTE_SDK_HAS_SCK_14
+  if (@available(macOS 14.0, *)) {
+    [SCScreenshotManager captureImageWithFilter:filter configuration:config
+        completionHandler:^(CGImageRef image, NSError *error) {
+      if (error != nil) NSLog(@"Cute Screen window screenshot: %@", error);
+      CuteWindowFinish(state, image, error != nil || image == NULL ? 3 : 0);
+    }];
+    CuteWindowWait(state, context, probe, NO);
+    return 0;
+  }
+#endif
+  CuteSingleWindowFrame *output = [[CuteSingleWindowFrame alloc] init];
+  output.state = state;
+  SCStream *stream = [[SCStream alloc] initWithFilter:filter configuration:config delegate:output];
+  NSError *error = nil;
+  dispatch_queue_t queue = dispatch_queue_create("cute-screen.window-frame", DISPATCH_QUEUE_SERIAL);
+  if (![stream addStreamOutput:output type:SCStreamOutputTypeScreen sampleHandlerQueue:queue error:&error]) {
+    NSLog(@"Cute Screen window output: %@", error);
+    return 3;
+  }
+  [stream startCaptureWithCompletionHandler:^(NSError *error) {
+    if (error != nil) { NSLog(@"Cute Screen window start: %@", error); CuteWindowFinish(state, NULL, 3); }
+  }];
+  CuteWindowWait(state, context, probe, NO);
+  CuteWindowImageState *stopped = [[CuteWindowImageState alloc] init];
+  [stream stopCaptureWithCompletionHandler:^(NSError *error) {
+    if (error != nil) NSLog(@"Cute Screen window stop: %@", error);
+    CuteWindowFinish(stopped, NULL, 0);
+  }];
+  CuteWindowWait(stopped, NULL, NULL, NO);
+  if (![stream removeStreamOutput:output type:SCStreamOutputTypeScreen error:&error]) {
+    NSLog(@"Cute Screen window output cleanup: %@", error);
+  }
+  return 0;
+}
+
+API_AVAILABLE(macos(12.3))
 static int32_t CuteWindowFromFilter(SCContentFilter *filter, CGSize points, CGFloat scale,
                                     const char *path, const void *context,
                                     CuteWindowCancellationProbe probe, uint32_t *width,
                                     uint32_t *height) {
   SCStreamConfiguration *config = [[SCStreamConfiguration alloc] init];
+#if CUTE_SDK_HAS_SCK_14
   if (@available(macOS 14.0, *)) {
     points = filter.contentRect.size;
     scale = filter.pointPixelScale;
@@ -160,6 +201,7 @@ static int32_t CuteWindowFromFilter(SCContentFilter *filter, CGSize points, CGFl
       [config setValue:@NO forKey:@"shouldBeOpaque"];
     }
   }
+#endif
   if (points.width <= 0 || points.height <= 0 || scale <= 0) return 4;
   config.width = (size_t)ceil(points.width * scale);
   config.height = (size_t)ceil(points.height * scale);
@@ -170,37 +212,8 @@ static int32_t CuteWindowFromFilter(SCContentFilter *filter, CGSize points, CGFl
     [config setValue:@NO forKey:@"includeChildWindows"];
   }
   CuteWindowImageState *state = [[CuteWindowImageState alloc] init];
-  if (@available(macOS 14.0, *)) {
-    [SCScreenshotManager captureImageWithFilter:filter configuration:config
-        completionHandler:^(CGImageRef image, NSError *error) {
-      if (error != nil) NSLog(@"Cute Screen window screenshot: %@", error);
-      CuteWindowFinish(state, image, error != nil || image == NULL ? 3 : 0);
-    }];
-    CuteWindowWait(state, context, probe, NO);
-  } else {
-    CuteSingleWindowFrame *output = [[CuteSingleWindowFrame alloc] init];
-    output.state = state;
-    SCStream *stream = [[SCStream alloc] initWithFilter:filter configuration:config delegate:output];
-    NSError *error = nil;
-    dispatch_queue_t queue = dispatch_queue_create("cute-screen.window-frame", DISPATCH_QUEUE_SERIAL);
-    if (![stream addStreamOutput:output type:SCStreamOutputTypeScreen sampleHandlerQueue:queue error:&error]) {
-      NSLog(@"Cute Screen window output: %@", error);
-      return 3;
-    }
-    [stream startCaptureWithCompletionHandler:^(NSError *error) {
-      if (error != nil) { NSLog(@"Cute Screen window start: %@", error); CuteWindowFinish(state, NULL, 3); }
-    }];
-    CuteWindowWait(state, context, probe, NO);
-    CuteWindowImageState *stopped = [[CuteWindowImageState alloc] init];
-    [stream stopCaptureWithCompletionHandler:^(NSError *error) {
-      if (error != nil) NSLog(@"Cute Screen window stop: %@", error);
-      CuteWindowFinish(stopped, NULL, 0);
-    }];
-    CuteWindowWait(stopped, NULL, NULL, NO);
-    if (![stream removeStreamOutput:output type:SCStreamOutputTypeScreen error:&error]) {
-      NSLog(@"Cute Screen window output cleanup: %@", error);
-    }
-  }
+  int32_t started = CuteWindowCaptureFrame(filter, config, state, context, probe);
+  if (started != 0) return started;
   if (CuteWindowCancelled(context, probe)) return 1;
   return CuteWindowWrite(state, path, width, height);
 }
@@ -247,6 +260,7 @@ int32_t CuteCaptureIsolatedWindow(CGWindowID windowID, pid_t owner, const char *
   return CuteWindowWrite(state, path, width, height);
 }
 
+#if CUTE_SDK_HAS_SCK_14
 API_AVAILABLE(macos(14.0))
 @interface CuteSystemWindowPicker : NSObject <SCContentSharingPickerObserver>
 @property(nonatomic, strong) CuteWindowImageState *state;
@@ -270,12 +284,21 @@ API_AVAILABLE(macos(14.0))
   CuteWindowFinish(self.state, NULL, 3);
 }
 @end
+#endif
+
+bool cute_macos_system_window_picker_available(void) {
+#if CUTE_SDK_HAS_SCK_14
+  if (@available(macOS 14.0, *)) return NSClassFromString(@"SCContentSharingPicker") != nil;
+#endif
+  return false;
+}
 
 int32_t CuteCaptureSystemWindow(const char *path, const void *context,
                                CuteWindowCancellationProbe probe, uint32_t *width,
                                uint32_t *height) {
+#if CUTE_SDK_HAS_SCK_14
   if (@available(macOS 14.0, *)) {
-    if (NSClassFromString(@"SCContentSharingPicker") == nil) return 3;
+    if (!cute_macos_system_window_picker_available()) return 3;
     __block int32_t result = 3;
     void (^run)(void) = ^{
       CuteSystemWindowPicker *observer = [[CuteSystemWindowPicker alloc] init];
@@ -298,11 +321,22 @@ int32_t CuteCaptureSystemWindow(const char *path, const void *context,
     if (NSThread.isMainThread) run(); else dispatch_sync(dispatch_get_main_queue(), run);
     return result;
   }
+#else
+  (void)path;
+  (void)context;
+  (void)probe;
+  (void)width;
+  (void)height;
+#endif
   return 3;
 }
 
 int32_t cute_macos_window_pixel_backend(void) {
+#if CUTE_SDK_HAS_SCK_14
   if (@available(macOS 14.0, *)) return 2;
+#endif
   if (@available(macOS 12.3, *)) return 1;
   return 0;
 }
+
+int32_t cute_macos_build_sdk_version(void) { return CUTE_SCREEN_MACOS_SDK; }

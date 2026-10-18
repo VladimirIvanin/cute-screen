@@ -53,4 +53,26 @@ describe('production Tauri capability boundary', () => {
     expect(permissionIdentifiers).not.toContain('core:window:allow-close')
     expect(defaultCapability.windows).not.toContain('quick-capture')
   })
+
+  it('lets every webview read notification state for the plugin init script', async () => {
+    const root = process.cwd()
+    const names = ['default', 'quick-capture', 'settings']
+    const capabilities = await Promise.all(names.map(async (name) => JSON.parse(
+      await readFile(path.join(root, `src-tauri/capabilities/${name}.json`), 'utf8'),
+    ) as TauriCapability))
+    const identifiers = (capability: TauriCapability) => capability.permissions?.map((permission) =>
+      typeof permission === 'string' ? permission : permission.identifier) ?? []
+    const readsState = (capability: TauriCapability) => identifiers(capability).some((identifier) =>
+      identifier === 'notification:default' || identifier === 'notification:allow-is-permission-granted')
+
+    for (const window of ['main', 'quick-capture', 'settings']) {
+      const capability = capabilities.find((candidate) => candidate.windows?.includes(window))
+      expect(capability, window).toBeDefined()
+      expect(capability && readsState(capability), window).toBe(true)
+    }
+    const settings = identifiers(capabilities[2] as TauriCapability)
+    expect(settings).not.toContain('notification:default')
+    expect(settings).not.toContain('notification:allow-notify')
+    expect(settings).not.toContain('notification:allow-request-permission')
+  })
 })

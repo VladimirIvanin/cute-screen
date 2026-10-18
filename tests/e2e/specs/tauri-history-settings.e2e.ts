@@ -20,6 +20,20 @@ async function openStorage(): Promise<void> {
   await expect($('.cs-history-settings select')).toBeEnabled()
   await expect($('.cs-history-settings dl')).toBeDisplayed()
   expect((await browser.tauri.listWindows()).filter((label) => label === 'settings')).toHaveLength(1)
+  await expectNotificationStateReadable()
+}
+
+async function expectNotificationStateReadable(): Promise<void> {
+  const outcome = await browser.execute(async () => {
+    type Native = { __TAURI__: { core: { invoke(command: string): Promise<unknown> } } }
+    try {
+      await (window as unknown as Native).__TAURI__.core.invoke('plugin:notification|is_permission_granted')
+      return 'resolved'
+    } catch (error) {
+      return String(error)
+    }
+  })
+  expect(outcome).toBe('resolved')
 }
 
 async function closeSettings(): Promise<void> {

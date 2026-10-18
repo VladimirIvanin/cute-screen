@@ -233,6 +233,15 @@ jobs:
             target/release/bundle/appimage/*.AppImage
           if-no-files-found: error
 
+      - name: Syntax-check macOS legacy SDK branch
+        if: runner.os == 'macOS'
+        working-directory: src-tauri
+        run: |
+          for source in src/macos_window_capture.m src/macos_capture_bridge.m; do
+            cc -fsyntax-only -fobjc-arc -Wall -Wextra -Wno-deprecated-declarations \
+              -mmacosx-version-min=12.0 -DCUTE_SCREEN_MACOS_SDK=130000 "$source"
+          done
+
       - name: Upload compile logs on failure
         if: failure()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6

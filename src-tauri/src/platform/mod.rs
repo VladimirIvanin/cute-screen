@@ -180,9 +180,9 @@ impl PlatformCapabilities {
                     || windows_dxgi
                     || macos_screen
                     || (portal_v3 && probe.available_targets & 1 != 0),
+                // macOS offers only Area and Screen (ADR-110).
                 window_target: x11
                     || windows_dxgi
-                    || macos_screen
                     || (portal_v3 && probe.available_targets & 2 != 0),
                 active_window_target: x11
                     || windows_dxgi
@@ -209,10 +209,15 @@ pub enum MacosWindowPickerKind {
     SystemContentSharing,
 }
 
-/// ADR-038 version routing. The actual pixel backend may still fall back to
-/// CoreGraphics when ScreenCaptureKit is unavailable at compile or runtime.
-pub const fn macos_capture_pixel_backend(major: u32, minor: u32) -> MacosCapturePixelBackend {
-    if major >= 14 {
+/// ADR-038/104 routing: macOS 14 APIs require both the running OS and the
+/// build SDK. The actual pixel backend may still fall back to CoreGraphics
+/// when ScreenCaptureKit is unavailable at runtime.
+pub const fn macos_capture_pixel_backend(
+    major: u32,
+    minor: u32,
+    sdk_major: u32,
+) -> MacosCapturePixelBackend {
+    if major >= 14 && sdk_major >= 14 {
         MacosCapturePixelBackend::ScreenCaptureKitScreenshot
     } else if major > 12 || (major == 12 && minor >= 3) {
         MacosCapturePixelBackend::ScreenCaptureKitStream
@@ -221,8 +226,12 @@ pub const fn macos_capture_pixel_backend(major: u32, minor: u32) -> MacosCapture
     }
 }
 
-pub const fn macos_window_picker_kind(major: u32, _minor: u32) -> MacosWindowPickerKind {
-    if major >= 14 {
+pub const fn macos_window_picker_kind(
+    major: u32,
+    _minor: u32,
+    sdk_major: u32,
+) -> MacosWindowPickerKind {
+    if major >= 14 && sdk_major >= 14 {
         MacosWindowPickerKind::SystemContentSharing
     } else {
         MacosWindowPickerKind::NativeOverlay
@@ -490,7 +499,7 @@ mod tests {
     }
 
     #[test]
-    fn macos_adapter_advertises_area_screen_and_window_targets() {
+    fn macos_adapter_advertises_only_area_and_screen_targets() {
         let capabilities = PlatformCapabilities::for_session(
             "macos-screen".to_owned(),
             SessionKind::Macos,
@@ -505,7 +514,7 @@ mod tests {
         );
         assert!(capabilities.capture.monitor_target);
         assert!(capabilities.capture.interactive_selector);
-        assert!(capabilities.capture.window_target);
+        assert!(!capabilities.capture.window_target);
         assert!(!capabilities.capture.active_window_target);
         assert!(!capabilities.capture.cursor);
     }
@@ -532,27 +541,47 @@ mod tests {
     #[test]
     fn macos_pixel_backend_follows_adr_038_version_routing() {
         assert_eq!(
-            macos_capture_pixel_backend(12, 0),
+            macos_capture_pixel_backend(12, 0, 15),
             MacosCapturePixelBackend::CoreGraphicsLegacy
         );
         assert_eq!(
-            macos_capture_pixel_backend(12, 2),
+            macos_capture_pixel_backend(12, 2, 15),
             MacosCapturePixelBackend::CoreGraphicsLegacy
         );
         assert_eq!(
-            macos_capture_pixel_backend(12, 3),
+            macos_capture_pixel_backend(12, 3, 15),
             MacosCapturePixelBackend::ScreenCaptureKitStream
         );
         assert_eq!(
-            macos_capture_pixel_backend(13, 6),
+            macos_capture_pixel_backend(13, 6, 15),
             MacosCapturePixelBackend::ScreenCaptureKitStream
         );
         assert_eq!(
-            macos_capture_pixel_backend(14, 0),
+            macos_capture_pixel_backend(14, 0, 15),
             MacosCapturePixelBackend::ScreenCaptureKitScreenshot
         );
         assert_eq!(
-            macos_capture_pixel_backend(15, 6),
+            macos_capture_pixel_backend(15, 6, 15),
+            MacosCapturePixelBackend::ScreenCaptureKitScreenshot
+        );
+    }
+
+    #[test]
+    fn macos_pixel_backend_never_exceeds_the_build_sdk() {
+        assert_eq!(
+            macos_capture_pixel_backend(14, 0, 13),
+            MacosCapturePixelBackend::ScreenCaptureKitStream
+        );
+        assert_eq!(
+            macos_capture_pixel_backend(15, 6, 13),
+            MacosCapturePixelBackend::ScreenCaptureKitStream
+        );
+        assert_eq!(
+            macos_capture_pixel_backend(12, 1, 13),
+            MacosCapturePixelBackend::CoreGraphicsLegacy
+        );
+        assert_eq!(
+            macos_capture_pixel_backend(14, 0, 14),
             MacosCapturePixelBackend::ScreenCaptureKitScreenshot
         );
     }
@@ -560,15 +589,31 @@ mod tests {
     #[test]
     fn macos_window_picker_uses_system_ui_only_from_sonoma() {
         assert_eq!(
-            macos_window_picker_kind(12, 7),
+            macos_window_picker_kind(12, 7, 15),
             MacosWindowPickerKind::NativeOverlay
         );
         assert_eq!(
-            macos_window_picker_kind(13, 0),
+            macos_window_picker_kind(13, 0, 15),
             MacosWindowPickerKind::NativeOverlay
         );
         assert_eq!(
-            macos_window_picker_kind(14, 0),
+            macos_window_picker_kind(14, 0, 15),
+            MacosWindowPickerKind::SystemContentSharing
+        );
+    }
+
+    #[test]
+    fn macos_window_picker_falls_back_to_overlay_without_sonoma_sdk() {
+        assert_eq!(
+            macos_window_picker_kind(14, 0, 13),
+            MacosWindowPickerKind::NativeOverlay
+        );
+        assert_eq!(
+            macos_window_picker_kind(15, 6, 13),
+            MacosWindowPickerKind::NativeOverlay
+        );
+        assert_eq!(
+            macos_window_picker_kind(14, 0, 14),
             MacosWindowPickerKind::SystemContentSharing
         );
     }

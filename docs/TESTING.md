@@ -7646,3 +7646,37 @@ gesture-finish-controller, drawing-payload и image-editing; landing files в
 списке отсутствуют. Лог: `artifacts/landing-refresh/check.log`.
 IPC/Rust gates после этого fail-fast шага не выполнялись; native/core/IPC
 контракты и renderer geometry этим изменением не меняются.
+
+## macOS Screen без следа редактора и зависшего preflight (2026-10-18)
+
+Платформа: macOS 12.7.6 x64, CLT SDK 13.1, WKWebView Safari 17.6, один Retina
+дисплей 1440×900 pt (2880×1800 px), `pnpm tauri dev` (debug).
+
+До исправления:
+
+- CLI `target/debug/cute-screen capture --mode screen --json` при скрытом
+  Editor трижды вернул `failed`; dev log:
+  `capture preflight rejected (...): Err(Elapsed(()))`. С видимым Editor тот же
+  вызов — `captured`.
+- Захват, начатый при скрытом Editor и продолженный после `cute-screen show`,
+  сохранил PNG с видимым окном Cute Screen поверх Cursor: async Tauri `hide()`
+  не дожидался `orderOut`.
+- Декодированные оригиналы имели 3016×1886 и 3104×1974 px при экране
+  2880×1800: `CGRectNull` охватывал окна за краями дисплея, поля белые.
+
+Red-first: `capture_preflight_skips_a_suspended_macos_editor` (E0432 до
+реализации), `screen_bounds_cover_exactly_the_displays` (E0061/E0599). После:
+`cargo test -p cute-screen-desktop --lib` — 155 passed.
+
+Native replay после пересборки: два CLI Screen подряд (первый при скрытом
+Editor, второй при показанном после первого) — оба `captured`, без preflight
+timeout. `sips` decode обоих оригиналов: 2880×1800; просмотренный downscale
+совпадает с эталонным `screencapture -x` (Cursor), окна Cute Screen нет.
+Каждый CLI-вызов занимал около 24 с, PNG появлялся в конце: debug-профиль без
+оптимизации зависимостей; release-замер не выполнялся.
+
+Также: `cargo fmt --all`, `pnpm format`, `pnpm format:check`, `git diff --check`,
+`vue-tsc -p apps/desktop`, `pnpm docs:check`, eslint изменённых TS/MJS,
+vitest `window-capture-recovery` и `tauri-capabilities` (5 passed),
+`cc -fsyntax-only -DCUTE_SCREEN_MACOS_SDK=130000` обоих `.m` — exit 0.
+Не выполнялись: `pnpm test:e2e:tauri` на macOS и release build.

@@ -5,6 +5,7 @@
 #import "macos_window_capture.h"
 #include <stdbool.h>
 #include <stddef.h>
+#include <unistd.h>
 
 typedef struct {
   int32_t status;
@@ -143,6 +144,48 @@ void cute_quick_capture_set_presentation(void *windowPointer, bool revealed) {
   } else {
     dispatch_sync(dispatch_get_main_queue(), apply);
   }
+}
+
+static BOOL CuteWindowIsOnscreen(CGWindowID windowNumber) {
+  NSArray<NSDictionary *> *info =
+      CFBridgingRelease(CGWindowListCopyWindowInfo(kCGWindowListOptionIncludingWindow, windowNumber));
+  for (NSDictionary *window in info) {
+    if ([window[(id)kCGWindowNumber] unsignedIntValue] == windowNumber) {
+      return [window[(id)kCGWindowIsOnscreen] boolValue];
+    }
+  }
+  return NO;
+}
+
+bool cute_hide_window_for_capture(void *windowPointer, int32_t timeoutMs) {
+  if (windowPointer == NULL) {
+    return false;
+  }
+  __block CGWindowID windowNumber = kCGNullWindowID;
+  void (^apply)(void) = ^{
+    NSWindow *window = (__bridge NSWindow *)windowPointer;
+    if (window.windowNumber > 0) {
+      windowNumber = (CGWindowID)window.windowNumber;
+    }
+    [window orderOut:nil];
+  };
+  if (NSThread.isMainThread) {
+    apply();
+  } else {
+    dispatch_sync(dispatch_get_main_queue(), apply);
+  }
+  if (windowNumber == kCGNullWindowID) {
+    return true;
+  }
+  // orderOut returns before WindowServer stops compositing the window; a
+  // CoreGraphics snapshot taken earlier still contains it.
+  for (int32_t waited = 0; waited <= timeoutMs; waited += 5) {
+    if (!CuteWindowIsOnscreen(windowNumber)) {
+      return true;
+    }
+    usleep(5000);
+  }
+  return false;
 }
 
 bool cute_quick_capture_fit_pointer_screen(void *windowPointer) {
@@ -872,7 +915,7 @@ int32_t cute_capture_area(const char *outputPath, const void *cancelContext,
 
 int32_t cute_capture_window(const char *outputPath, const void *cancelContext,
                             CuteCancellationProbe cancelProbe, CuteCaptureSelection *result) {
-  if (@available(macOS 14.0, *)) {
+  if (cute_macos_system_window_picker_available()) {
     if (outputPath == NULL || result == NULL) return 3;
     memset(result, 0, sizeof(*result));
     int32_t status = CuteCaptureSystemWindow(outputPath, cancelContext, cancelProbe,

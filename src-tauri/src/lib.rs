@@ -48,7 +48,7 @@ use platform::{
 use serde::Serialize;
 use tauri::{
     Emitter, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
-    menu::{Menu, MenuItem, PredefinedMenuItem},
+    menu::{IsMenuItem, Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
     utils::config::BackgroundThrottlingPolicy,
     webview::Color,
@@ -1890,6 +1890,17 @@ fn should_hide_editor_for_native_capture(_visible: Option<bool>) -> bool {
     true
 }
 
+/// A hidden or minimized WKWebView is suspended on macOS 12–13 and cannot
+/// acknowledge the preflight. Closing the editor already flushed it, and the
+/// captured-document mount flushes again before replacing the document.
+fn request_capture_preflight(
+    suspends_hidden_webview: bool,
+    visible: Option<bool>,
+    minimized: Option<bool>,
+) -> bool {
+    !suspends_hidden_webview || (visible != Some(false) && minimized != Some(true))
+}
+
 #[cfg(all(target_os = "linux", feature = "x11-capture"))]
 fn should_wait_for_native_x11_unmap(source: &CaptureInvocationSource) -> bool {
     *source != CaptureInvocationSource::Ui
@@ -1915,9 +1926,17 @@ async fn hide_editor_for_native_capture<R: tauri::Runtime>(
     // Settings is a separate application surface. A shortcut invoked while it is
     // open must remove it before freezing desktop pixels, just like the editor.
     if let Some(settings) = app.get_webview_window("settings") {
-        settings
-            .hide()
-            .map_err(|_| PlatformError::new(PlatformErrorCode::CaptureFailed, correlation_id))?;
+        #[cfg(target_os = "macos")]
+        let hidden = macos_platform::hide_window_for_capture(&settings);
+        #[cfg(not(target_os = "macos"))]
+        let hidden = settings.hide().map_err(|error| error.to_string());
+        if let Err(error) = hidden {
+            eprintln!("cute-screen settings hide failed ({correlation_id}): {error}");
+            return Err(PlatformError::new(
+                PlatformErrorCode::CaptureFailed,
+                correlation_id,
+            ));
+        }
     }
     #[cfg(all(target_os = "linux", feature = "x11-capture"))]
     if x11_platform::X11CaptureAdapter.current_process_windows_unmapped(correlation_id)? {
@@ -1962,7 +1981,18 @@ async fn hide_editor_for_native_capture<R: tauri::Runtime>(
             ));
         }
     }
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "macos")]
+    if let Err(error) = macos_platform::hide_window_for_capture(&window) {
+        eprintln!("cute-screen native editor hide failed ({correlation_id}): {error}");
+        window
+            .show()
+            .map_err(|_| PlatformError::new(PlatformErrorCode::CaptureFailed, correlation_id))?;
+        return Err(PlatformError::new(
+            PlatformErrorCode::CaptureFailed,
+            correlation_id,
+        ));
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     window
         .hide()
         .map_err(|_| PlatformError::new(PlatformErrorCode::CaptureFailed, correlation_id))?;
@@ -2005,20 +2035,28 @@ fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()
     let capture_repeat = item("capture-repeat", false)?;
     let quit = item("quit", true)?;
     let separator = PredefinedMenuItem::separator(app)?;
-    let menu = Menu::with_items(
-        app,
-        &[
-            &capture_area,
-            &capture_screen,
-            &capture_window,
-            &capture_active,
-            &capture_repeat,
-            &separator,
-            &show,
-            &settings,
-            &quit,
-        ],
-    )?;
+    let listed: Vec<MenuItem<R>> = [
+        &capture_area,
+        &capture_screen,
+        &capture_window,
+        &capture_active,
+        &capture_repeat,
+        &show,
+        &settings,
+        &quit,
+    ]
+    .into_iter()
+    .filter(|item| tray_lists_item(item.id().as_ref()))
+    .cloned()
+    .collect();
+    let mut entries: Vec<&dyn IsMenuItem<R>> = Vec::with_capacity(listed.len() + 1);
+    for item in &listed {
+        if item.id().as_ref() == "show-editor" {
+            entries.push(&separator);
+        }
+        entries.push(item);
+    }
+    let menu = Menu::with_items(app, &entries)?;
 
     TrayIconBuilder::with_id("main-tray")
         .icon(icon)
@@ -2063,26 +2101,13 @@ fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()
         })
         .build(app)?;
     #[cfg(feature = "test-harness")]
-    app.manage(settings_window::TrayStartupLabels(vec![
-        capture_area.text()?,
-        capture_screen.text()?,
-        capture_window.text()?,
-        capture_active.text()?,
-        capture_repeat.text()?,
-        show.text()?,
-        settings.text()?,
-        quit.text()?,
-    ]));
-    app.manage(settings_window::TrayShortcutItems(vec![
-        capture_area.clone(),
-        capture_screen.clone(),
-        capture_window.clone(),
-        capture_active.clone(),
-        capture_repeat.clone(),
-        show,
-        settings,
-        quit,
-    ]));
+    app.manage(settings_window::TrayStartupLabels(
+        listed
+            .iter()
+            .map(MenuItem::text)
+            .collect::<tauri::Result<_>>()?,
+    ));
+    app.manage(settings_window::TrayShortcutItems(listed));
     refresh_tray_capture_items(capture_area, capture_screen, capture_window);
     tauri::async_runtime::spawn(async move {
         let capabilities = platform_capabilities("tray-extra-actions".to_owned()).await;
@@ -2097,6 +2122,11 @@ fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()
         }
     });
     Ok(())
+}
+
+/// macOS offers only Area and Screen capture (ADR-110).
+fn tray_lists_item(id: &str) -> bool {
+    !(cfg!(target_os = "macos") && id == "capture-window")
 }
 
 /// Tray items begin disabled: the portal version/advertised targets are not
@@ -2313,7 +2343,18 @@ async fn capture_with_preflight<R: tauri::Runtime>(
         return outcome;
     }
     let preflight = app.state::<CapturePreflightService>();
-    let Some(approval) = preflight.begin(&request.correlation_id) else {
+    let editor = app.get_webview_window("main");
+    let reaches_editor = request_capture_preflight(
+        cfg!(target_os = "macos"),
+        editor.as_ref().and_then(|window| window.is_visible().ok()),
+        editor
+            .as_ref()
+            .and_then(|window| window.is_minimized().ok()),
+    );
+    let approval = reaches_editor
+        .then(|| preflight.begin(&request.correlation_id))
+        .flatten();
+    let Some(approval) = approval else {
         let hid_editor = match hide_editor_for_native_capture(
             app,
             &request.correlation_id,
@@ -3164,6 +3205,17 @@ mod tests {
         assert!(super::should_hide_editor_for_native_capture(Some(false)));
     }
 
+    #[test]
+    fn capture_preflight_skips_a_suspended_macos_editor() {
+        use super::request_capture_preflight as preflight;
+
+        assert!(preflight(true, Some(true), Some(false)));
+        assert!(!preflight(true, Some(false), Some(false)));
+        assert!(!preflight(true, Some(true), Some(true)));
+        assert!(preflight(true, None, None));
+        assert!(preflight(false, Some(false), Some(true)));
+    }
+
     #[cfg(all(target_os = "linux", feature = "x11-capture"))]
     #[test]
     fn non_ui_ingress_waits_for_the_x11_editor_to_finish_unmapping() {
@@ -3238,7 +3290,7 @@ mod tests {
             crate::capture::CaptureAction::Area,
             &capabilities
         ));
-        assert!(super::capture_action_supported(
+        assert!(!super::capture_action_supported(
             crate::capture::CaptureAction::Window,
             &capabilities
         ));
@@ -3254,6 +3306,17 @@ mod tests {
             crate::capture::CaptureAction::Repeat,
             &capabilities
         ));
+    }
+
+    #[test]
+    fn tray_lists_window_capture_everywhere_except_macos() {
+        assert_eq!(
+            super::tray_lists_item("capture-window"),
+            !cfg!(target_os = "macos")
+        );
+        for id in ["capture-area", "capture-screen", "show-editor", "quit"] {
+            assert!(super::tray_lists_item(id), "{id}");
+        }
     }
 
     #[test]
