@@ -1,5 +1,15 @@
 # Архитектура Cute Screen
 
+## Независимые проверки CI (ADR-112)
+
+`ci.yml` задаёт matrix семи Linux tasks; reusable `ci-linux.yml` содержит общий
+setup и исполняет только шаги выбранной task. Jobs не зависят друг от друга;
+fail-fast выключен. Browser/native E2E по умолчанию ограничены smoke;
+manual `full_e2e` включает прежние полные suites. Артефакт Linux x64 сохраняет
+имя `linux-x64-ubuntu22-<sha>`, поэтому release publisher использует его без
+изменения контракта. Reusable `checks` завершается успешно только после всех
+tasks и compile matrix; независимая сборка не обходит release gates.
+
 ## Публикация установщиков (ADR-111)
 
 `release.yml` фиксирует SHA version tag и вызывает reusable `ci.yml` с этим SHA.
@@ -831,6 +841,12 @@ Preferences хранят отдельные значения коррекции;
 источник давления на pointerdown. Финальный sample берёт координаты pointerup,
 сохраняя последнее активное pressure при нулевом отпускном значении.
 Vue не владеет samples/контуром; обновления preview идут через renderer lifecycle.
+
+ADR-113: stabilized v2/v3 после perfect-freehand скругляет свободные стыки
+квадратичными кривыми с адаптивной аппроксимацией (0,1 document px).
+Общий helper возвращает centerline для единственной path node; endpoints и
+Shift anchors закреплены. 0% и pen возвращают исходные samples. Render,
+hit testing, bounds и экспорт используют тот же результат без Vue state.
 
 ## Панель текста и локальные fonts (ADR-061)
 

@@ -1,5 +1,16 @@
 # Платформенная матрица
 
+## CI smoke и локальная полная приёмка (2026-10-18, ADR-112)
+
+Linux hosted CI: семь независимых jobs, browser headless smoke и два native
+сценария под Xvfb с external tauri-driver. Это не полный Linux desktop/portal
+runtime pass и не подтверждение Windows/macOS runtime. Полные E2E остаются
+локальными либо manual opt-in; существующая compile/release matrix сохранена.
+Новый hosted workflow пока не запускался; локальные результаты — TESTING.md.
+Ubuntu 24.04.5 / GNOME X11: финальные browser smoke 3/3 и native smoke 2/2
+passed с external driver; подтверждены production capture mount и 4K/cropped
+PNG decode. Локально Xvfb отсутствует, hosted Xvfb pass не заявляется.
+
 ## Release assets (2026-10-18, ADR-111)
 
 Build matrix: Ubuntu 22.04 x64/ARM64 DEB/AppImage; Windows native x64/ARM64
@@ -1374,3 +1385,14 @@ dispatch с recording executable вместо браузера; не являе�
 загрузки сайта, physical capture или работы Windows/macOS. Linux/X11
 WebKitGTK 2.52.6: external native scenario 1/1 passed, click/Enter из обоих
 окон, четыре точных URL и отказ для трёх посторонних URL. Результаты — TESTING.md.
+
+## Плавная автокоррекция (2026-10-18, ADR-113)
+
+Ubuntu 24.04.5 x64: Chrome 154.0.8037.57, trusted pointer creation в production
+Vue shell на документе 2560×1440 — плавные петли при 65%, точное перо для
+сравнения. Browser regression также проверяет Undo/Redo/Cancel и Shift при
+DPR 1/2 × Fit/1:1. Headless Canvas2D/CanvasKit: decoded preview/export и
+goldens дуг/петель/S-кривых; 12 000 samples на 4K/8K остаются конечными.
+Общий DOM-free core применяется на всех ОС, native adapters не менялись.
+Новый native Tauri/WebKitGTK/WebView2/macOS прогон не выполнялся; browser и
+headless evidence не считаются новым native platform pass. Команды — TESTING.md.

@@ -275,12 +275,39 @@ Artifacts считаются тестовыми/неофициальными с�
 - Linux fake-platform Tauri smoke;
 - compile checks Windows/macOS и ARM targets.
 
-Linux x64 покрывается `quality-linux`: `pnpm check` собирает frontend и
-выполняет Rust format/Clippy во всех предусмотренных конфигурациях, затем
-запускаются Rust tests. Отдельный compile job для Linux x64 не требуется.
-Unit/property/component suites запускаются один раз через `pnpm test:coverage`;
-отдельный `pnpm test` дублировал бы те же проекты. Compile matrix содержит
-Linux ARM64, Windows x64/ARM64 и macOS Intel/ARM64. Остальные gates сохранены.
+ADR-112: Linux выполняется семью независимыми jobs через reusable
+`ci-linux.yml`, с `fail-fast: false` и одинаковым source SHA:
+
+| Task     | Проверки                                                               |
+| -------- | ---------------------------------------------------------------------- |
+| quality  | `pnpm check`: lint, types, format, docs, boundaries, IPC и Rust Clippy |
+| tests    | unit/component coverage, renderer goldens, controlled performance      |
+| rust     | workspace tests с/без fake-platform и controlled X11 smoke             |
+| audit    | JavaScript license/security и Rust cargo-deny                          |
+| browser  | короткий E2E smoke; полный suite по manual opt-in                      |
+| tauri    | короткий native E2E smoke; полный suite по manual opt-in               |
+| packages | production boundary, Jammy DEB/AppImage, ABI и extracted package smoke |
+
+Browser smoke: `browser-keyboard-shortcuts.e2e.ts` и
+`browser-activation-settings.e2e.ts` (три tests), с headless Chrome.
+Native smoke: `m04-clean-profile-capture,result-export` через внешний
+tauri-driver 2.1.0/WebKitWebDriver под Xvfb. UI persistence/reopen и подробное
+форматирование остаются в полном наборе; Rust/storage tests сохраняются в CI.
+Автоматический browser smoke ограничен 10 минутами, native smoke — 20 минутами
+вместе со свежей harness-сборкой; превышение завершает соответствующий job ошибкой.
+Подробные toolbar/theme/gesture regressions выполняются локально. Для полного
+прогона в Actions: CI → Run workflow → `full_e2e: true`; тот же флаг доступен
+в manual Release assets. Локальные `pnpm test:e2e:browser` и
+`pnpm test:e2e:tauri` без фильтров по-прежнему запускают полный набор.
+Обычный smoke push не отменяет manual full run.
+
+Отдельный compile job для Linux x64 не требуется. Unit suites запускаются
+один раз через `pnpm test:coverage`; compile matrix Linux ARM64,
+Windows x64/ARM64 и macOS Intel/ARM64 сохранена. Browser failure больше не
+мешает получить package artifact; публикация Release всё равно ждёт всех jobs.
+Отчёты сохраняются отдельно как `linux-<task>-evidence-<run>-<attempt>`.
+Task build caches не зависят от результата browser E2E; driver binaries также
+кэшируются. Production и test-harness outputs остаются в разных jobs.
 
 Все Vitest projects наследуют `maxWorkers: 2` из `vitest.config.ts`.
 Это общий бюджет параллельных процессов для unit, coverage, renderer и perf
@@ -323,7 +350,8 @@ Cargo workspace/Cargo.lock и tauri.conf.json, создать tag и опубл�
 
 1. Проверить строгий tag `vMAJOR.MINOR.PATCH`, совпадение package/Tauri/Cargo
    version и зафиксировать SHA tagged source.
-2. Вызвать весь `ci.yml` для этого SHA, включая quality и compile matrix.
+2. Вызвать весь `ci.yml` для этого SHA, включая quality, E2E smoke и compile
+   matrix. Manual `full_e2e: true` включает полные E2E suites вместо smoke.
 3. Повторно использовать проверенные Linux x64/ARM64 CI DEB/AppImage без
    повторной сборки; собрать Windows native x64/ARM64 NSIS и macOS universal DMG.
 4. На macOS проверить обе архитектуры через lipo, CLI и целостность DMG;

@@ -7,6 +7,18 @@ on:
         description: Exact commit to check before publishing release assets
         required: true
         type: string
+      full_e2e:
+        description: Run the complete browser and Tauri E2E suites
+        required: false
+        type: boolean
+        default: false
+  workflow_dispatch:
+    inputs:
+      full_e2e:
+        description: Run complete E2E suites instead of smoke
+        required: false
+        type: boolean
+        default: false
   pull_request:
   push:
     branches: [main]
@@ -15,7 +27,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ inputs.ref || github.ref }}
+  group: ci-${{ github.workflow }}-${{ inputs.ref || github.ref }}-${{ inputs.full_e2e && 'full' || 'smoke' }}
   cancel-in-progress: true
 
 env:
@@ -25,128 +37,31 @@ env:
   CARGO_DENY_VERSION: 0.20.2
 
 jobs:
-  quality-linux:
-    name: Linux quality and runtime smoke
-    runs-on: ubuntu-22.04
-    timeout-minutes: 90
-    steps:
-      - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          ref: ${{ inputs.ref || github.sha }}
-
-      - name: Install Node
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Activate pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@${PNPM_VERSION} --activate
-
-      - name: Install Rust
-        run: |
-          rustup toolchain install "${RUST_VERSION}" --profile minimal --component clippy,rustfmt
-          rustup default "${RUST_VERSION}"
-
-      - name: Install Tauri system dependencies
-        run: |
-          bash scripts/ci-install-linux-tauri-deps.sh \
-            build-essential curl file libayatana-appindicator3-dev librsvg2-dev \
-            libssl-dev libwebkit2gtk-4.1-dev libxdo-dev webkit2gtk-driver wget xdg-utils xvfb
-
-      - name: Resolve pnpm store
-        id: pnpm-store
-        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
-
-      - name: Cache pnpm and Cargo
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
-        with:
-          path: |
-            ${{ steps.pnpm-store.outputs.path }}
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: m00-jammy-${{ runner.os }}-${{ runner.arch }}-node-${{ env.NODE_VERSION }}-rust-${{ env.RUST_VERSION }}-${{ hashFiles('pnpm-lock.yaml', 'Cargo.lock') }}
-
-      - name: Install JavaScript dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Check frontend, Rust and documentation
-        run: pnpm check
-
-      - name: Run unit and harness suites
-        run: |
-          pnpm test:coverage
-          pnpm test:render
-          pnpm test:perf
-
-      - name: Run Rust tests
-        run: |
-          cargo test --workspace
-          cargo test --workspace --features fake-platform
-
-      - name: Run controlled X11 renderer boundary smoke
-        run: xvfb-run --auto-servernum env XDG_SESSION_TYPE=x11 pnpm smoke:m01:x11
-
-      - name: Audit JavaScript dependencies
-        run: |
-          pnpm audit:licenses
-          pnpm audit:security
-
-      - name: Audit Rust dependencies
-        run: |
-          cargo install cargo-deny --version "=${CARGO_DENY_VERSION}" --locked
-          cargo deny check
-
-      - name: Run browser E2E
-        run: pnpm test:e2e:browser
-
-      - name: Run real Tauri E2E
-        run: xvfb-run --auto-servernum pnpm test:e2e:tauri
-
-      - name: Verify production excludes test drivers
-        run: pnpm verify:release-boundary
-
-      - name: Build Ubuntu 22.04 packages and verify ABI
-        run: |
-          pnpm tauri build --bundles deb,appimage -- --locked
-          pnpm check:linux:compat
-          target/release/cute-screen --help
-          node scripts/check-m04-deb.mjs
-          APPIMAGE_EXTRACT_AND_RUN=1 node scripts/check-m04-appimage.mjs
-
-      - name: Upload Linux x64 packages
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        with:
-          name: linux-x64-ubuntu22-${{ inputs.ref || github.sha }}
-          path: |
-            target/release/bundle/deb/*.deb
-            target/release/bundle/appimage/*.AppImage
-          if-no-files-found: error
-
-      - name: Upload M01 trend and smoke evidence
-        if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        with:
-          name: m01-linux-evidence-${{ github.run_id }}
-          path: |
-            artifacts/perf/m01-renderer.json
-            artifacts/m01/x11-controlled.json
-          if-no-files-found: warn
-          retention-days: 30
-
-      - name: Upload failure artifacts
-        if: failure()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        with:
-          name: m00-linux-failure-${{ github.run_id }}
-          path: |
-            artifacts
-            coverage
-          if-no-files-found: ignore
-          retention-days: 14
+  linux:
+    name: Linux ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - task: quality
+            name: quality checks
+          - task: tests
+            name: unit, renderer and performance
+          - task: rust
+            name: Rust tests and X11 smoke
+          - task: audit
+            name: dependency audits
+          - task: browser
+            name: browser E2E
+          - task: tauri
+            name: Tauri E2E
+          - task: packages
+            name: packages and ABI
+    uses: ./.github/workflows/ci-linux.yml
+    with:
+      ref: ${{ inputs.ref || github.sha }}
+      task: ${{ matrix.task }}
+      full_e2e: ${{ inputs.full_e2e || false }}
 
   compile:
     name: Compile ${{ matrix.name }}

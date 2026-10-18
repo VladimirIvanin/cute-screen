@@ -1,5 +1,29 @@
 # Трассируемость требований
 
+## Независимые CI jobs и короткий E2E smoke (2026-10-18, до реализации)
+
+`REQ-REL-001/002/003/005/006`, ADR-014/020: разделить Linux quality/runtime
+job на независимые quality, unit/render/perf, Rust/X11, audits, browser E2E,
+Tauri E2E и packaging. Все gates сохраняются перед публикацией Release;
+package artifacts появляются независимо от E2E. По запросу владельца обычный
+CI выполняет только browser/native smoke; полный E2E suite остаётся локальным
+и доступным через manual workflow_dispatch. Smoke покрывает создание объекта,
+undo/redo, Settings, production capture mount и PNG export.
+Проверки: actionlint reusable workflow graph, фактический smoke запуск,
+стабильные formatting/docs/boundary gates. Hosted длительности не обещаются.
+
+`REQ-LIB-002`: clean-profile smoke использует кнопку History вместо удалённой
+постоянной ленты кадров и проверяет размер сохранённого документа через native
+API, а не размер viewport canvas после zoom. Подробные M03 persistence/reopen
+UI tests остаются в full suite; их устаревшие popover selectors требуют
+отдельного обновления. Обязательные Rust/storage integration tests сохраняются.
+
+Результат: browser smoke 3/3 passed (9 s), native smoke 2/2 passed (26 s и 3 s
+после сборки) на Ubuntu 24.04.5 x64 / GNOME X11, Chrome 154 и WebKitGTK 2.52.6.
+Boundary 61/61, E2E types, lint и actionlint passed. Полный набор E2E не
+объявляется успешным; новый hosted граф требует отдельного Actions run.
+Команды, исходные failure logs и финальный smoke — TESTING.md.
+
 ## Пакеты в GitHub Releases (2026-10-18, до реализации)
 
 `REQ-REL-001/002/003/005/006`: опубликованный GitHub Release с тегом
@@ -2171,3 +2195,20 @@ JS и no-JS — по 4 tests passed. Native Open image и capture панели �
 в WebView2 155. По уточнению пользователя итоговый asset заменён предоставленным
 скриншотом 598×41 без изменения pixels; наружный фон скрыт CSS clipping 12 px.
 Команды и ограничения общих gates — TESTING.md.
+
+## Плавные дуги автокоррекции (2026-10-18)
+
+`REQ-TOL-003`, `REQ-EDT-002/005/006`, `REQ-OUT-003`: до реализации уточнён
+контракт — stabilized v2/v3 скругляет стыки стабилизированных samples
+квадратичными кривыми с ограниченной ошибкой аппроксимации. На редкой дуге
+при 65% нет поворотов между соседними render segments более 0,18 rad.
+Начало/конец, исходные samples, постоянная толщина, точное перо, 0% и Shift
+anchors сохраняются. Red-first core tests; затем decoded render parity,
+production browser pointer/undo/cancel, visual review и 12 000 samples.
+Фактические команды и платформенные ограничения фиксируются в TESTING.md.
+
+ADR-113 evidence: red-first 2/2 новых core contracts failed до реализации;
+после реализации 1372 unit/component checks, 6 decoded render checks,
+7 browser regressions и отдельный loop pointer test passed. Плавные 65% дуги,
+точные endpoints/Shift и 0% подтверждены; CPU correctness 12 000 samples passed.
+Native acceptance для нового сглаживания отдельно не заявляется; TESTING.md.

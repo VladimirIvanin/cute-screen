@@ -15,15 +15,22 @@ describe('M04 clean-profile capture', () => {
 
     await expect($('button[aria-label="Copy"]')).toBeEnabled()
     await expect($('button[aria-label="Export"]')).toBeEnabled()
-    await expect($('nav[aria-label="Series frames"]')).toBeDisplayed()
+    await expect($('.cs-history-trigger')).toBeDisplayed()
+    await expect($('nav[aria-label="Series frames"]')).not.toExist()
     const scene = $('[aria-label="Scene canvas"]')
     await expect(scene).toExist()
-    expect(
-      await browser.execute(() => {
-        const canvas = document.querySelector('[aria-label="Scene canvas"]') as HTMLCanvasElement | null
-        return canvas ? [canvas.width, canvas.height] : undefined
-      }),
-    ).toEqual([400, 300])
+    // Canvas backing dimensions follow zoom/DPR; verify the persisted capture dimensions.
+    const persistedCanvas = await browser.execute(async () => {
+      const native = window as unknown as {
+        __TAURI__: { core: { invoke<T>(command: string, args: unknown): Promise<T> } }
+      }
+      const stored = await native.__TAURI__.core.invoke<{ documentJson: string } | null>('repository_open_last', {
+        correlationId: 'clean-profile-capture-smoke',
+      })
+      if (!stored) throw new Error('Capture was not persisted through the production request flow')
+      return (JSON.parse(stored.documentJson) as { canvas: { width: number; height: number } }).canvas
+    })
+    expect(persistedCanvas).toEqual({ width: 400, height: 300 })
 
     const zoomBefore = await $('.cs-zoom-controls').getAttribute('data-zoom')
     await browser.setWindowSize(1600, 1000)

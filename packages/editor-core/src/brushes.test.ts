@@ -71,6 +71,34 @@ describe('distinct ink brushes', () => {
     expect(input).toEqual(before)
     expect(resolveFreehandGeometry({ ...input, smoothing: 0 }, true).points).toEqual(points)
   })
+  it.each([2, 3])('rounds sparse arcs instead of joining stabilized v%i samples with visible corners', (strokeVersion) => {
+    const arc = Array.from({ length: 9 }, (_, i) => ({
+      x: 120 + Math.cos(i * Math.PI / 8) * 90,
+      y: 120 + Math.sin(i * Math.PI / 8) * 90, pressure: .2 + i * .08,
+    }))
+    const input = { ...payload('stabilized'), strokeVersion, points: arc, straightSegments: [] }
+    const before = structuredClone(input)
+    const geometry = resolveFreehandGeometry(input, true)
+    let maximumTurn = 0
+    for (let i = 1; i < geometry.points.length - 1; i++) {
+      const a = geometry.points[i - 1]!
+      const b = geometry.points[i]!
+      const c = geometry.points[i + 1]!
+      const ax = b.x - a.x
+      const ay = b.y - a.y
+      const bx = c.x - b.x
+      const by = c.y - b.y
+      if (Math.hypot(ax, ay) < 1e-8 || Math.hypot(bx, by) < 1e-8) continue
+      maximumTurn = Math.max(maximumTurn, Math.abs(Math.atan2(ax * by - ay * bx, ax * bx + ay * by)))
+    }
+    expect(maximumTurn).toBeLessThan(.18)
+    expect(geometry.points[0]).toEqual(arc[0])
+    expect(geometry.points.at(-1)).toEqual(arc.at(-1))
+    expect(geometry.width).toBe(8)
+    expect(input).toEqual(before)
+    expect(resolveFreehandGeometry({ ...input, smoothing: 0 }, true).points).toEqual(arc)
+    expect(resolveFreehandGeometry({ ...input, brush: 'pen' }, true).points).toEqual(arc)
+  })
   it('renders each new stroke in one node, including 12000 points', () => {
     for (const brush of ['pen', 'stabilized', 'brush']) {
       const stroke = layer(brush)

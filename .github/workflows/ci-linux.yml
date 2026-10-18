@@ -1,0 +1,216 @@
+name: Linux CI task
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        required: true
+        type: string
+      task:
+        required: true
+        type: string
+      full_e2e:
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: 22.23.1
+  PNPM_VERSION: 10.33.2
+  RUST_VERSION: 1.97.0
+  CARGO_DENY_VERSION: 0.20.2
+  TAURI_DRIVER_VERSION: 2.1.0
+
+jobs:
+  check:
+    name: ${{ inputs.task }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Install Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Activate pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@${PNPM_VERSION} --activate
+
+      - name: Install Rust
+        if: inputs.task != 'tests' && inputs.task != 'browser'
+        run: |
+          rustup toolchain install "${RUST_VERSION}" --profile minimal --component clippy,rustfmt
+          rustup default "${RUST_VERSION}"
+
+      - name: Install Tauri and X11 system dependencies
+        if: inputs.task == 'quality' || inputs.task == 'rust' || inputs.task == 'tauri' || inputs.task == 'packages'
+        run: |
+          bash scripts/ci-install-linux-tauri-deps.sh \
+            build-essential curl file libayatana-appindicator3-dev librsvg2-dev \
+            libssl-dev libwebkit2gtk-4.1-dev libxdo-dev webkit2gtk-driver wget xdg-utils xvfb
+
+      - name: Resolve pnpm store
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache JavaScript dependencies
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ci-pnpm-jammy-${{ runner.arch }}-node-${{ env.NODE_VERSION }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Cache task build outputs
+        if: inputs.task != 'tests' && inputs.task != 'browser'
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            target
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cache/cute-screen-ci
+          key: ci-target-jammy-${{ inputs.task }}-${{ runner.arch }}-rust-${{ env.RUST_VERSION }}-deny-${{ env.CARGO_DENY_VERSION }}-driver-${{ env.TAURI_DRIVER_VERSION }}-${{ hashFiles('Cargo.lock') }}-${{ inputs.ref }}
+          restore-keys: |
+            ci-target-jammy-${{ inputs.task }}-${{ runner.arch }}-rust-${{ env.RUST_VERSION }}-deny-${{ env.CARGO_DENY_VERSION }}-driver-${{ env.TAURI_DRIVER_VERSION }}-${{ hashFiles('Cargo.lock') }}-
+
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check frontend, Rust and documentation
+        if: inputs.task == 'quality'
+        run: pnpm check
+
+      - name: Build editor packages for isolated JS suites
+        if: inputs.task == 'tests' || inputs.task == 'browser'
+        run: pnpm build:packages
+
+      - name: Run unit and component tests
+        if: inputs.task == 'tests'
+        run: pnpm test:coverage
+
+      - name: Run renderer goldens
+        if: inputs.task == 'tests'
+        run: pnpm test:render
+
+      - name: Run controlled performance suite
+        if: inputs.task == 'tests'
+        run: pnpm test:perf
+
+      - name: Build frontend for direct Cargo tests
+        if: inputs.task == 'rust'
+        run: pnpm build
+
+      - name: Run Rust tests
+        if: inputs.task == 'rust'
+        run: |
+          cargo test --workspace
+          cargo test --workspace --features fake-platform
+
+      - name: Run controlled X11 renderer boundary smoke
+        if: inputs.task == 'rust'
+        run: xvfb-run --auto-servernum env XDG_SESSION_TYPE=x11 pnpm smoke:m01:x11
+
+      - name: Audit JavaScript dependencies
+        if: inputs.task == 'audit'
+        run: |
+          pnpm audit:licenses
+          pnpm audit:security
+
+      - name: Install pinned Rust audit tool
+        if: inputs.task == 'audit'
+        run: |
+          ci_deny_root="$HOME/.cache/cute-screen-ci/cargo-deny/${CARGO_DENY_VERSION}"
+          if [[ ! -x "$ci_deny_root/bin/cargo-deny" ]]; then
+            cargo install cargo-deny --version "=${CARGO_DENY_VERSION}" --locked --root "$ci_deny_root"
+          fi
+          echo "$ci_deny_root/bin" >> "$GITHUB_PATH"
+
+      - name: Audit Rust dependencies
+        if: inputs.task == 'audit'
+        run: cargo deny check
+
+      - name: Browser E2E smoke (annotation, undo/redo, Settings)
+        if: inputs.task == 'browser' && !inputs.full_e2e
+        timeout-minutes: 10
+        env:
+          CUTE_SCREEN_BROWSER_E2E_HEADLESS: '1'
+        run: |
+          pnpm test:e2e:browser \
+            --spec tests/e2e/specs/browser-keyboard-shortcuts.e2e.ts \
+            --spec tests/e2e/specs/browser-activation-settings.e2e.ts
+
+      - name: Complete browser E2E suite (manual opt-in)
+        if: inputs.task == 'browser' && inputs.full_e2e
+        timeout-minutes: 50
+        env:
+          CUTE_SCREEN_BROWSER_E2E_HEADLESS: '1'
+        run: pnpm test:e2e:browser
+
+      - name: Install native Tauri driver
+        if: inputs.task == 'tauri'
+        run: |
+          ci_driver_root="$HOME/.cache/cute-screen-ci/tauri-driver/${TAURI_DRIVER_VERSION}"
+          if [[ ! -x "$ci_driver_root/bin/tauri-driver" ]]; then
+            cargo install tauri-driver --version "=${TAURI_DRIVER_VERSION}" --locked --root "$ci_driver_root"
+          fi
+          echo "$ci_driver_root/bin" >> "$GITHUB_PATH"
+
+      - name: Tauri E2E smoke (capture and PNG export)
+        if: inputs.task == 'tauri' && !inputs.full_e2e
+        timeout-minutes: 20
+        env:
+          XDG_SESSION_TYPE: x11
+          CUTE_SCREEN_E2E_DRIVER_PROVIDER: external
+          CUTE_SCREEN_E2E_SCENARIOS: m04-clean-profile-capture,result-export
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" pnpm test:e2e:tauri
+
+      - name: Complete Tauri E2E suite (manual opt-in)
+        if: inputs.task == 'tauri' && inputs.full_e2e
+        timeout-minutes: 50
+        env:
+          XDG_SESSION_TYPE: x11
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" pnpm test:e2e:tauri
+
+      - name: Verify production excludes test drivers
+        if: inputs.task == 'packages'
+        run: pnpm verify:release-boundary
+
+      - name: Build Ubuntu 22.04 packages and verify ABI
+        if: inputs.task == 'packages'
+        run: |
+          pnpm tauri build --bundles deb,appimage -- --locked
+          pnpm check:linux:compat
+          target/release/cute-screen --help
+          node scripts/check-m04-deb.mjs
+          APPIMAGE_EXTRACT_AND_RUN=1 node scripts/check-m04-appimage.mjs
+
+      - name: Upload Linux x64 packages
+        if: inputs.task == 'packages'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: linux-x64-ubuntu22-${{ inputs.ref }}
+          path: |
+            target/release/bundle/deb/*.deb
+            target/release/bundle/appimage/*.AppImage
+          if-no-files-found: error
+
+      - name: Upload test reports and failure evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: linux-${{ inputs.task }}-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            artifacts
+            coverage
+            !artifacts/tauri-e2e/runtime/**
+            !artifacts/tauri-e2e/driver-cache/**
+          if-no-files-found: ignore
+          retention-days: 14

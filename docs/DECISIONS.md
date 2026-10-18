@@ -1,5 +1,41 @@
 # Журнал архитектурных решений
 
+## ADR-112 — Независимые CI jobs и E2E smoke по умолчанию
+
+**Статус:** accepted (2026-10-18); дополняет ADR-014/020/111.
+
+**Контекст:** job `Linux quality and runtime smoke` объединяет все проверки
+последовательно. Run 39133239285 потратил 41m44s на browser E2E и упал после
+1h03m20s; Tauri E2E и пакеты были skipped. Run 39138163099 отменён новым push
+на том же шаге. Владелец просит сократить CI E2E, так как полный набор выполняется
+локально, и разделить независимые проверки.
+
+**Решение:** `ci.yml` запускает семь Linux jobs через reusable `ci-linux.yml`:
+quality, unit/render/perf, Rust/X11, audits, browser, Tauri и packages.
+`fail-fast: false` сохраняет результаты остальных jobs после отдельной ошибки.
+Каждая job получает тот же SHA; кэши build outputs разделены по task и версии
+toolchain. Linux package artifact создаётся независимо от E2E, но Release
+по-прежнему ждёт успешного завершения всего CI и compile matrix.
+
+По умолчанию browser smoke запускает keyboard shortcuts и activation settings;
+native smoke — clean-profile capture и result export.
+Это короткая защита mount, commands/undo, Settings и PNG decode,
+а не полная runtime acceptance. Browser CI работает headless; native smoke
+использует внешний tauri-driver/WebKitWebDriver под Xvfb. Отчёты и screenshots
+сохраняются отдельным artifact каждой job, включая failed/cancelled состояния.
+Подробные persistence/reopen и tool-formatting UI regressions остаются в полном
+наборе; Rust/storage integration tests по-прежнему обязательны в обычном CI.
+
+Полные browser/Tauri suites сохраняются без изменения локальных команд и
+запускаются в Actions через `full_e2e: true` у manual CI или Release assets.
+Full и smoke имеют разные concurrency groups, поэтому обычный push не отменяет
+ручной full run. Полная platform/release acceptance из ADR-020 остаётся отдельной.
+
+**Проверяемое основание:** public job metadata двух runs, actionlint всего
+reusable workflow graph, локальные smoke-команды и стабильные quality checks.
+Фактические результаты — TESTING.md; ускорение hosted runner измеряется
+только после нового Actions run.
+
 ## ADR-111 — Автоматические пакеты в GitHub Releases
 
 **Статус:** accepted (2026-10-18); supersedes ADR-018 в способе распространения.
@@ -1727,6 +1763,7 @@ asset evidence; runtime tray light/dark/HiDPI на каждой ОС прове�
 
 **Статус:** superseded в части формата составных штрихов и сглаживания их прямых участков — ADR-073;
 в части выбора трёх кистей и сохранения экспрессивных штрихов — ADR-094;
+в части соединения stabilized samples прямыми — ADR-113;
 supersedes карандашную часть ADR-056.
 
 Точное перо сохраняет траекторию и постоянную толщину. Автокоррекция использует
@@ -2268,3 +2305,28 @@ production Capture → Quick → Editor, click/Enter атрибуции, выз�
 отказ для постороннего HTTPS URL, file URL и вложенного пути. OS boundary
 в тесте записывает аргументы вместо запуска браузера. Результаты — TESTING.md;
 Windows/macOS runtime требуют отдельного подтверждения.
+
+## ADR-113 — Плавная траектория автокоррекции
+
+**Статус:** accepted; supersedes соединение stabilized samples прямыми из ADR-060.
+
+**Контекст:** perfect-freehand стабилизирует samples, но прежняя centerline
+соединяет их прямыми. На редких дугах остаются видимые стыки (red-first:
+максимальный поворот 0,387 rad), несмотря на выполненный RMS-контракт.
+Визуальный ориентир пользователя — плавные дуги и петли Excalidraw.
+
+**Решение:** после существующей стабилизации свободные участки stabilized v2/v3
+скругляются квадратичными кривыми. Доля скругления растёт с коррекцией до
+середин соседних отрезков. Адаптивное подразделение ограничивает ошибку хорды
+0,1 document px; ограниченная глубина защищает от неограниченной работы.
+Полученная centerline остаётся одной path node постоянной толщины и общей для
+preview/export/hit/bounds/миниатюр. Начало/конец свободного участка закреплены;
+Shift ranges копируются без скругления. 0%, точное перо, legacy без версии,
+marker и старый pressure outline не меняются. Исходные samples и document/IPC
+schema сохраняются, новые зависимости не добавляются.
+
+**Проверяемое основание:** red-first дуги v2/v3 при 65% с поворотом соседних
+render segments <0,18 rad, сохранением endpoints/pressure/samples/width;
+существующие RMS, Shift, codec/history и 12 000 samples. Декодированные
+Canvas2D/CanvasKit PNG показывают различие точного пера и плавной centerline
+на одинаковых петлях и S-кривых; команды и платформы — TESTING.md.

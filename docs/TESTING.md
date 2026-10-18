@@ -1,5 +1,51 @@
 # Стратегия тестирования
 
+## Разделение CI и короткий E2E smoke (2026-10-18, ADR-112)
+
+Ubuntu 24.04.5 x64 / GNOME X11, Node 22.23.1, pnpm 10.33.2.
+
+- Public Jobs API для runs 39133239285/39138163099: первый job failed после
+  1h03m20s, из них browser E2E 41m44s; второй cancelled новым push на browser
+  E2E. Metadata: `artifacts/ci-split/job-117692565494.json` и
+  `job-117706857262.json`. Полные старые browser logs требуют GitHub login;
+  конкретный assertion старого падения не установлен по public metadata.
+- `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5297 pnpm test:e2e:browser --spec tests/e2e/specs/browser-keyboard-shortcuts.e2e.ts --spec tests/e2e/specs/browser-activation-settings.e2e.ts`
+  — 2 files / 3 tests passed за 9 секунд локально, Chrome 154.0.8037.57.
+  Создание, undo/redo/duplicate и Settings. Лог: `artifacts/ci-split/browser-smoke.log`.
+- Native smoke использует external tauri-driver 2.1.0 и WebKitWebDriver 2.52.6
+  из `artifacts/spotlight-fix/tools/bin` и `tools/webkit/root/usr/bin` в PATH.
+  `xvfb-run` локально отсутствует; запуск выполняется в настоящей GNOME X11
+  session, а не выдаётся за hosted Xvfb pass.
+- Первый `CUTE_SCREEN_E2E_DRIVER_PROVIDER=external CUTE_SCREEN_E2E_SCENARIOS=m04-clean-profile-capture,document-write,document-reopen,result-export pnpm test:e2e:tauri`
+  — export passed с повторным decode 4K/cropped PNG; три других сценария
+  показали устаревшие popover/filmstrip selectors и зависимый reopen после
+  незавершённой записи. Дополнительная попытка M03 выявила ошибку создания
+  cylinder в старом UI-тесте; эти подробные сценарии оставлены без изменений
+  в full suite для отдельного разбора, их pass не заявляется. Логи:
+  `artifacts/ci-split/tauri-smoke.log`, `tauri-smoke-retry.log`,
+  `tauri-smoke-contract.log`.
+- Clean-profile capture обновлён: History вместо filmstrip, размер документа
+  читается через `repository_open_last`, размер viewport canvas не выдаётся за
+  исходные 400×300. После изменения этот сценарий passed через production
+  Capture → Quick → Editor в `tauri-smoke-contract.log`.
+- Финальный `CUTE_SCREEN_E2E_DRIVER_PROVIDER=external CUTE_SCREEN_E2E_SCENARIOS=m04-clean-profile-capture,result-export pnpm test:e2e:tauri`
+  с `XDG_SESSION_TYPE=x11`, `XDG_SESSION_ID=cutescreen-ci-final-smoke` и PATH
+  выше — 2/2 files/tests passed; `artifacts/ci-split/tauri-final-smoke.log`.
+  После свежей harness-сборки: export 26 s, capture 3 s локально.
+- `pnpm test:boundaries` — 61/61 passed; `artifacts/ci-split/boundaries.log`.
+- `pnpm exec tsc --noEmit -p tests/e2e/tsconfig.json`, `pnpm lint` — passed;
+  lint содержит существующие warnings. Логи: `e2e-types.log`, `lint.log`
+  в `artifacts/ci-split`.
+- `artifacts/release-validation/actionlint -config-file artifacts/release-validation/actionlint.yaml`
+  — passed для всех workflows, включая nested reusable calls и boolean input
+  `full_e2e`; `artifacts/ci-split/actionlint.log`. Custom runner labels описаны
+  в config; actionlint 1.7.12 проверен по SHA-256 при предыдущем изменении.
+
+Новый hosted run и полные E2E suites в этом срезе не запускались.
+В изменении CI не менялись unit/render/perf и Rust/application code; для workflow/tests
+проверены smoke, E2E types, lint и boundary gates вместо повторной полной
+runtime/platform acceptance. Полный `pnpm check` в этом срезе не запускался.
+
 ## Публикация Release assets (2026-10-18, ADR-111)
 
 Ubuntu 24.04.5 x64, Node 22.23.1, pnpm 10.33.2. GitHub API заменён recording
@@ -7709,3 +7755,48 @@ timeout. `sips` decode обоих оригиналов: 2880×1800; просмо
 vitest `window-capture-recovery` и `tauri-capabilities` (5 passed),
 `cc -fsyntax-only -DCUTE_SCREEN_MACOS_SDK=130000` обоих `.m` — exit 0.
 Не выполнялись: `pnpm test:e2e:tauri` на macOS и release build.
+
+## Плавная автокоррекция (2026-10-18, ADR-113)
+
+Ubuntu 24.04.5 x64, Node 22.23.1, pnpm 10.33.2; Chrome 154.0.8037.57.
+Логи — `artifacts/brush-smoothing/`.
+
+- Red-first `pnpm test packages/editor-core/src/brushes.test.ts`: 2 новых
+  проверки v2/v3 failed (0,387 rad > 0,18), остальные 11 passed; `red.log`.
+- `pnpm test`: 153 files / 1372 tests passed; `unit-all.log`. Существующие
+  jsdom canvas warnings не превратились в failures.
+- После выделения modern resolver:
+  `pnpm test packages/editor-core/src/brushes.test.ts packages/editor-core/src/straight-stroke.test.ts packages/editor-core/src/brush-migration.test.ts packages/editor-core/src/tool-settings-redesign.test.ts tests/unit/vue/brushes.test.ts`
+  — 55/55 passed; `unit-final.log`. Endpoints/pressure, 0%, pen, RMS,
+  samples immutability, Shift, migration, history и mounted settings.
+- `CUTE_SCREEN_UPDATE_GOLDENS=1 pnpm test:render tests/harness/render/golden-brushes.test.ts`
+  обновляет только brush goldens и добавляет rounded-ink; `render-update.log`.
+  Затем `pnpm test:render tests/harness/render/golden-brushes.test.ts tests/harness/render/straight-strokes.test.ts`
+  — 6/6 passed без update; `render.log`. PNG повторно декодированы;
+  Canvas2D preview/export идентичны, CanvasKit в semantic tolerance.
+  Visual review: `tests/goldens/m01-renderer/rounded-ink-canvas2d.png` —
+  одинаковые samples, слева pen, справа stabilized, 3 px / 65%.
+- `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5298 pnpm test:e2e:browser --spec tests/e2e/specs/browser-brushes.e2e.ts --spec tests/e2e/specs/browser-straight-strokes.e2e.ts`
+  — 2 files / 7 tests passed; `browser.log`. Trusted pointer, Undo/Redo/Cancel,
+  Shift, DPR 1/2 × Fit/1:1, compact RU/EN × light/dark.
+- Дополнительный loop test сначала прерван Vite reload во время выделения
+  helper (`browser-loops.log`). Повтор без изменения исходников:
+  `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5298 pnpm test:e2e:browser --spec tests/e2e/specs/browser-brushes.e2e.ts`
+  — 3/3 passed; `browser-final.log`. Production pointer создаёт две петли
+  на 2560×1440, 6 px; screenshot `artifacts/browser-e2e/rounded-loops-2560.png`
+  просмотрен при 1280×900: плавные стыки справа, canvas и controls не обрезаны.
+- `pnpm test:perf tests/harness/perf/straight-strokes.test.ts` — 2/2 passed;
+  `perf.log`, timings в `artifacts/straight-strokes/perf-{3840,7680}.json`.
+  12 000 input samples, stabilized geometry 17,81/7,55 ms. Это CPU correctness
+  evidence при локальном прогоне, не контролируемый GPU frame budget.
+- Первый `pnpm check` выявил complexity 21/20 в resolver (`check.log`);
+  modern v2 вынесен в helper без ослабления boundary gate.
+
+Native `pnpm test:e2e:tauri`, `pnpm tauri build` и отдельный
+`cargo test --workspace` в этом TS geometry срезе не запускались.
+
+Финальный `pnpm check` — passed: lint, TypeScript, format, docs links,
+61 boundary checks, IPC codegen check, production frontend build, Rust fmt
+и все Clippy configurations; `artifacts/brush-smoothing/check-final.log`.
+`pnpm format` и `pnpm format:check` повторены после записи evidence;
+логи `format-evidence.log` и `format-check.log` в той же директории.

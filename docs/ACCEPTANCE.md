@@ -1191,6 +1191,12 @@ remain pending.
 
 ## A14 — CI-сборки и проверка версии
 
+ADR-112: обычный CI выполняет короткий browser/native E2E smoke. Для полной
+приёмки ниже запустить полные локальные suites либо manual CI с `full_e2e: true`.
+Проверить, что failure отдельной task не отменяет остальные jobs и создание
+package artifact, но блокирует Release publisher; отдельные reports доступны
+после ошибки. Новый Actions run должен подтвердить hosted граф и длительности.
+
 Для Linux x64/ARM64, Windows x64/ARM64 и macOS Intel/Apple Silicon скачать
 versioned package из GitHub Release, проверить checksum/архитектуру, выполнить
 install/launch → capture → edit → export → relaunch → uninstall. На Windows/macOS
@@ -1761,3 +1767,13 @@ Noto Emoji. Клик и Enter на ссылке передают точный up
 ручными/runtime проверками. Linux/X11 WebKitGTK 2.52.6, external driver:
 1/1 passed, четыре URL dispatch и три отказа; оба screenshots просмотрены.
 Фактические результаты — TESTING.md.
+
+## Плавные дуги автокоррекции (2026-10-18, ADR-113)
+
+`REQ-TOL-003`: на одинаковой редкой траектории сравнить точное перо и
+автокоррекцию 65% — у второй петля и S-кривая без углов на стыках.
+Повторить тонким штрихом, затем с 0%, коротким штрихом/точкой и Shift
+посередине: начало/конец совпадают с жестом, прямой участок не искривляется.
+Undo/Redo возвращают тот же штрих; Escape отменяет активный жест.
+Preview и повторно декодированный экспорт совпадают. Core/render/browser
+результаты и ограничения native проверки — TESTING.md и PLATFORM_MATRIX.md.

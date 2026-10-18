@@ -1,4 +1,5 @@
 import { constrainedFreehand } from './constrained-freehand'
+import { stabilizedFreehand } from './stabilized-freehand'
 import {
   getStroke,
   getStrokePoints,
@@ -41,43 +42,56 @@ function freehandSamples(payload: JsonObject): readonly FreehandSample[] {
     }
   })
 }
-/** One geometry contract for scene, hit testing, previews and brush thumbnails. */
-export function resolveFreehandGeometry(
-  payload: JsonObject,
-  pencil: boolean,
-): Readonly<{
+type FreehandGeometry = Readonly<{
   points: readonly FreehandSample[]
   width: number
   outline: readonly Point[]
   modern: boolean
-}> {
+}>
+
+function modernFreehand(
+  payload: JsonObject,
+  samples: readonly FreehandSample[],
+  width: number,
+): FreehandGeometry {
+  const strength = typeof payload.smoothing === 'number' ? payload.smoothing : .65
+  if (payload.brush === 'stabilized') {
+    return { points: stabilizedFreehand(samples, width, strength), width, outline: [], modern: true }
+  }
+  if (
+    payload.brush === 'pen' ||
+    samples.length <= 1 &&
+    payload.brush !== 'brush'
+  ) {
+    return { points: samples, width, outline: [], modern: true }
+  }
+  const input = samples.map((point) => [point.x, point.y, point.pressure])
+  const options = {
+    size: width, streamline: strength, smoothing: .6,
+    thinning: payload.brush === 'brush' ? .65 : 0,
+    simulatePressure: payload.pressureMode !== 'pen', last: true,
+  }
+  const points = strength === 0 ? samples : getStrokePoints(input, options).map((point, index, result) => ({
+    x: point.point[0], y: point.point[1],
+    pressure: index === 0 ? samples[0]!.pressure
+      : index === result.length - 1 ? samples.at(-1)!.pressure : point.pressure,
+  }))
+  return {
+    points, width, modern: true,
+    outline: payload.brush === 'brush' ? getStroke(input, options).map(([x, y]) => ({ x: x!, y: y! })) : [],
+  }
+}
+
+/** One geometry contract for scene, hit testing, previews and brush thumbnails. */
+export function resolveFreehandGeometry(
+  payload: JsonObject,
+  pencil: boolean,
+): FreehandGeometry {
   const samples = freehandSamples(payload)
   const width = typeof payload.width === 'number' ? payload.width : 1
   if (pencil && payload.strokeVersion === 3) return constrainedFreehand(payload, samples, width)
   if (pencil && payload.strokeVersion === 2) {
-    const strength = typeof payload.smoothing === 'number' ? payload.smoothing : .65
-    if (
-      payload.brush === 'pen' ||
-      samples.length <= 1 &&
-      payload.brush !== 'brush'
-    ) {
-      return { points: samples, width, outline: [], modern: true }
-    }
-    const input = samples.map((point) => [point.x, point.y, point.pressure])
-    const options = {
-      size: width, streamline: strength, smoothing: .6,
-      thinning: payload.brush === 'brush' ? .65 : 0,
-      simulatePressure: payload.pressureMode !== 'pen', last: true,
-    }
-    const points = strength === 0 ? samples : getStrokePoints(input, options).map((point, index, result) => ({
-      x: point.point[0], y: point.point[1],
-      pressure: index === 0 ? samples[0]!.pressure
-        : index === result.length - 1 ? samples.at(-1)!.pressure : point.pressure,
-    }))
-    return {
-      points, width, modern: true,
-      outline: payload.brush === 'brush' ? getStroke(input, options).map(([x, y]) => ({ x: x!, y: y! })) : [],
-    }
+    return modernFreehand(payload, samples, width)
   }
   const strength = pencil && typeof payload.smoothing === 'number' ? Math.max(0, Math.min(1, payload.smoothing)) : 0
   const points = strength === 0 ? samples : samples.map((sample, index) => {

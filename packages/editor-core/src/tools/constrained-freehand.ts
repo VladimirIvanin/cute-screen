@@ -3,6 +3,7 @@ import {
   getStrokeOutlinePoints,
   type StrokePoint,
 } from 'perfect-freehand'
+import { stabilizedFreehand } from './stabilized-freehand'
 import type {
   JsonObject,
   StraightSegment,
@@ -20,12 +21,13 @@ export function constrainedFreehand(
   const strength = typeof payload.smoothing === 'number' ? payload.smoothing : .65
   const appendFree = (start: number, end: number) => {
     const source = samples.slice(start, end + 1)
-    const resolved = payload.brush === 'pen' || strength === 0 || source.length <= 1 ? source
-      : getStrokePoints(source.map((p) => [p.x, p.y, p.pressure]), {
-          size: width, streamline: strength, smoothing: .6, last: true,
-        }).map((p, index, all) => ({ x: p.point[0], y: p.point[1],
-          pressure: index === 0 ? source[0]!.pressure
-            : index === all.length - 1 ? source.at(-1)!.pressure : p.pressure }))
+    const resolved = payload.brush === 'stabilized' ? [...stabilizedFreehand(source, width, strength)]
+      : payload.brush === 'pen' || strength === 0 || source.length <= 1 ? source
+        : getStrokePoints(source.map((p) => [p.x, p.y, p.pressure]), {
+            size: width, streamline: strength, smoothing: .6, last: true,
+          }).map((p, index, all) => ({ x: p.point[0], y: p.point[1],
+            pressure: index === 0 ? source[0]!.pressure
+              : index === all.length - 1 ? source.at(-1)!.pressure : p.pressure }))
     // Both boundaries are shared anchors. A short stabilized span may have fewer samples.
     if (resolved.length) {
       resolved[0] = source[0]!

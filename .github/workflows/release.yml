@@ -9,6 +9,11 @@ on:
         description: Existing version tag (for example v0.1.0)
         required: true
         type: string
+      full_e2e:
+        description: Run complete E2E suites instead of smoke
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -61,6 +66,7 @@ jobs:
     uses: ./.github/workflows/ci.yml
     with:
       ref: ${{ needs.version.outputs.sha }}
+      full_e2e: ${{ inputs.full_e2e || false }}
 
   packages:
     name: Package ${{ matrix.platform }}

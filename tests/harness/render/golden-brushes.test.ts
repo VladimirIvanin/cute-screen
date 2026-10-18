@@ -31,6 +31,45 @@ import { baseDocument } from '../../../packages/editor-core/src/precision-tools.
 
 beforeAll(prepareGoldenRuntime)
 describe('distinct brush decoded render parity', () => {
+  it('rounds sparse loops and S curves at constant width in preview and decoded export', async () => {
+    const layers: PencilLayer[] = []
+    for (const [column, brush] of ['pen', 'stabilized'].entries()) {
+      const trajectories = [
+        Array.from({ length: 20 }, (_, i) => {
+          const angle = i / 19 * Math.PI * 2.1
+          const radius = 25 + i * 3.4
+          return { x: 170 + column * 400 + Math.cos(angle) * radius,
+            y: 130 + Math.sin(angle) * radius, pressure: .5 }
+        }),
+        Array.from({ length: 25 }, (_, i) => ({
+          x: 40 + column * 400 + i * 13,
+          y: 320 + Math.sin(i / 24 * Math.PI * 2) * 65 + (i % 2 ? 2 : -2), pressure: .5,
+        })),
+      ]
+      for (const [row, points] of trajectories.entries()) {
+        layers.push(createDrawingLayer({ id: `rounded-${column}-${row}`, tool: 'pencil',
+          start: points[0]!, end: points.at(-1)!, points,
+          defaults: { ...DEFAULT_DRAWING_DEFAULTS, pencil: { ...DEFAULT_DRAWING_DEFAULTS.pencil,
+            brush, width: 3, smoothing: .65, color: { red: .12, green: .12, blue: .12, alpha: 1 } } },
+        }) as PencilLayer)
+      }
+    }
+    const ink = createDocumentRenderScene({ ...baseDocument(), canvas: { width: 800, height: 430 }, layers })
+    const scene = { ...ink, nodes: [{ kind: 'rect' as const, id: 'paper', x: 0, y: 0,
+      width: 800, height: 430, rotation: 0, opacity: 1, visible: true,
+      fill: { red: 1, green: 1, blue: 1, alpha: 1 } }, ...ink.nodes] }
+    const fallback = await canvas2dPngs(scene, 1)
+    const skia = renderHeadlessCanvasKitPng(canvasKit, scene)
+    await assertGolden('rounded-ink-canvas2d', fallback.exported)
+    await assertGolden('rounded-ink-canvaskit', skia)
+    expect(compareRgba(await rgba(fallback.preview), await rgba(fallback.exported)))
+      .toEqual({ changedChannels: 0, maximumDelta: 0 })
+    const decoded = await rgba(fallback.exported)
+    const skiaDecoded = await rgba(skia)
+    const significantChannels = skiaDecoded.reduce((sum, channel, index) =>
+      sum + (Math.abs(channel - decoded[index]!) > 2 ? 1 : 0), 0)
+    expect(significantChannels / decoded.length).toBeLessThanOrEqual(semanticParityTolerance.maximumChangedChannelRatio)
+  })
   it('exports migrated 4K ink with the same decoded pixels as stabilized preview in both backends', async () => {
     const points = Array.from({ length: 1200 }, (_, i) => ({
       x: 100 + i * 2.8, y: 900 + Math.sin(i / 20) * 300 + i % 2 * 5, pressure: .2 + i % 9 / 12,
