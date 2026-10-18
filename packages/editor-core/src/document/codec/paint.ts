@@ -219,6 +219,14 @@ export function parseArrowPayload(
   }
   const startCap = parseCap(input.startCap, 'startCap')
   const endCap = parseCap(input.endCap, 'endCap')
+  if (
+    input.annotationTool !== undefined &&
+    (input.annotationTool !== 'line' ||
+      input.path !== 'straight' ||
+      startCap !== 'none' ||
+      endCap !== 'none')
+  )
+    throw new Error(`${field}.annotationTool is invalid`)
   if (input.path === 'quadratic' && input.bend === undefined)
     throw new Error(`${field}.bend is required for a quadratic path`)
   if (input.path === 'elbow' && input.elbow === undefined)
@@ -236,6 +244,7 @@ export function parseArrowPayload(
         })()
       : undefined
   return Object.freeze({
+    ...(input.annotationTool === 'line' ? { annotationTool: 'line' as const } : {}),
     path: input.path,
     start: parsePointPayload(input.start, `${field}.start`) as ArrowLayerPayload['start'],
     end: parsePointPayload(input.end, `${field}.end`) as ArrowLayerPayload['end'],

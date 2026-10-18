@@ -1,5 +1,160 @@
 # Трассируемость требований
 
+## Общая тема окна настроек (2026-10-18)
+
+`REQ-UI-001/002`, `REQ-ACT-008`: до реализации зафиксирован repair gate.
+Settings применяет сохранённую тему общего shell store при production mount,
+обновляет её по broadcast из редактора и при изменении системной темы в режиме
+system. Все разделы, controls и scrollbar используют общие semantic tokens.
+Проверки: mounted Settings, повторное открытие и live light/dark в настоящем
+WebView2 через существующий сценарий `editor-settings`.
+Результат: component 8/8, real WebView2 2/2 passed; команды и screenshots
+записаны в TESTING.md.
+
+## Подпись открытия изображения (2026-10-18, до реализации)
+
+`REQ-UI-001/003/006`: «Открыть изображение» / «Open image» показываются
+без многоточия в кнопке, tooltip и accessible name; общий перевод сохраняет
+ту же подпись в пустом холсте. Существующие selectors обновляются под подпись.
+Фактические проверки — TESTING.md.
+
+## Прямые углы рамки изображения при радиусе 0 (2026-10-18, до реализации)
+
+`REQ-TOL-015`, `REQ-EDT-005/006/016`: скругление изображения определяется
+только radius; при 0 внешний контур рамки имеет прямые углы независимо от
+сохранённого border.join. Общая scene-проекция использует miter для рамки,
+не меняя persisted payload. Red-first core regression и повторно декодированные
+Canvas2D/CanvasKit PNG проверяют четыре внешних угла с рамкой 26/32 px,
+нулевой/положительный radius и preview/export parity на 4K изображении.
+Production G import, возврат radius к 0 и undo/redo проверяются отдельно
+в browser и real WebView. Результаты и ограничения — TESTING.md.
+
+Результат: 9 focused core/renderer tests passed; production browser — все
+8 сочетаний 1024/1600 × RU/EN × light/dark, включая corner pixels и undo/redo.
+Real WebView2 pending: свежая сборка прошла, два запуска остановлены
+занятым driver port и затем bind/closed-window startup failure до image assertions.
+Общие gates имеют отдельные ошибки — TESTING.md.
+
+## Эмоджи Noto 2D (до реализации, 2026-10-18)
+
+REQ-TOL-014: палитра сохраняет высоту и положение при смене категории,
+поиске и пустой выдаче; browser-emoji проверяет геометрию во всех этих состояниях.
+
+REQ-TOL-014, REQ-EDT-002/003/006/015/018: инструмент E в Editor и Quick,
+100 bundled Noto 2D SVG, 13 быстрых отметок (включая огонь и молнию), категории,
+поиск RU/EN, 12 недавних, defaults 64 px (16–256), размещение центром кликом,
+отменяемый preview без pointermove-реактивности и одна EditorCommand до Select.
+Замена/размер экземпляра не меняют defaults; scene/export/reopen используют
+versioned static reference без системных glyphs. Доказательства: failing core
+контракты, asset decode/render, Vue и browser/real-WebView production flow.
+Статус: implementation pending; артефакты и фактические проверки ниже после реализации.
+
+## Линия (до реализации, 2026-10-18)
+
+REQ-TOL-017, REQ-EDT-002/003/015/016/017: отдельная прямая линия (L), лупа (Z),
+серийное создание, привязка 5°/8°, Shift 45°, отдельные defaults и semantic
+annotationTool в arrow payload v7. Red-first core tests, decoded renderer,
+production browser и real WebView Quick → Editor → reopen обязательны.
+Результат: core/Vue 88/88, decoded 4K renderer 1/1, browser 2/2,
+performance 6/6 и real WebView2 line,line-reopen 2/2 passed. Проверены series,
+endpoint edits, clipboard pixels и восстановление шести линий/defaults.
+Фактические команды, screenshots и ограничения — TESTING.md.
+Уточнение UI по отзыву пользователя: icon-only toggle magnet/magnet-off,
+название в tooltip/aria-label; постоянная текстовая инструкция рядом скрыта.
+
+## Свёрнутый режим выделителя (2026-10-18)
+
+`REQ-TOL-004`, `REQ-EDT-015/016`, `REQ-UI-003/006`: кнопка режима показывает
+образец текущего цвета и интенсивности с подписью «Темнее / Светлее / Окрасить»;
+Авто показывает resolved effect, loading/mixed — нейтральный образец.
+Единый sample используется в trigger и меню; подписи пунктов меню сохраняются.
+Запись добавлена до реализации. Vue: 51/51 passed; browser: RU/EN × light/dark
+на 1024/1280 px; native: 2/2 tests passed, те же языки/темы в Editor и Quick,
+trusted input и decoded screenshots образцов. Browser drawing checksum и общие
+check/format gates оцениваются отдельно; команды и ограничения — TESTING.md.
+
+## Отступ действия на пустом холсте (2026-10-18)
+
+`REQ-UI-001/006`: запись до реализации. Кнопка открытия изображения отделена
+от описания пустого холста отступом 16 px; большая иконка состояния 32×32
+не меняет размер иконки внутри кнопки (18×18). Проверки и ограничения — TESTING.md.
+
+## Подписи кнопок и закрытие истории (2026-10-18, до реализации)
+
+`REQ-UI-001/006`, `REQ-LIB-013`: кнопки истории «Очистить»/«Хранение» и
+«Настройки приложения» в дропе редактора показываются без многоточий в RU/EN,
+включая accessible names. Подтверждение очистки и loading/error/disabled
+сохраняются; progress-сообщения остаются с многоточиями. Крестик истории —
+существующий UiIcon close 18×18 CSS px в кнопке 32×32, с focus-visible и
+возвратом фокуса. Доказательства: существующие Vue regressions, browser
+RU/EN × light/dark на 1024 px и native history-settings/editor-settings.
+Фактические команды, screenshots и ограничения — TESTING.md.
+
+Результат: Vue 12/12, все 8 выбранных browser cases passed с учётом rerun
+expanded matrix. Scoped lint и E2E types — exit 0. Native запуск блокируется
+TS2883 в текущем ShapeGradientEditor.vue; WebView2 evidence pending. Общие
+format/check имеют ошибки вне правки. Подробные команды и логи — TESTING.md.
+
+## Заливка и пунктир фигур (2026-10-18)
+
+REQ-TOL-002, ADR-092: три образца заливки, редактор 2–8 точек линейного
+градиента, solid/dashed/dotted для всех фигур в defaults/selection/group,
+Editor/Quick. Red-first scene tests, Vue tests, decoded Canvas2D/CanvasKit
+export parity и browser/real WebView evidence обязательны. Schema v7 сохраняется;
+старые radial paints читаются без конвертации. Реализовано: 74 целевых tests,
+46 renderer tests, browser locale/theme/zoom matrix и 2/2 real WebView2 scenarios
+passed. Общий check/unit gate имеет отдельные ограничения; результаты — TESTING.md.
+
+## Выбор окна без перекрытий (2026-10-18, ADR-091)
+
+`REQ-CAP-003/008/010/015`: red-first native selection state tests закрепляют
+initial hover, topmost identity, same-target click, Tab/Shift+Tab, empty Enter,
+cancel и invalidated target. Windows Window требует WGC вместо desktop crop;
+X11 — named Composite pixmap; macOS — single-window CoreGraphics/SCStream/
+SCScreenshotManager с системным picker на 14+; Wayland — advertised portal v3
+Window target. Native IDs не покидают Rust/Objective-C. Physical smokes обязаны
+повторно декодировать PNG большого перекрытого окна и исключить pixels соседа
+и selector; fake capture и browser tests не доказывают capture backend.
+Запись добавлена до реализации. Реализованы native selectors и pixel backends,
+typed recovery и отдельная Window capability. Windows 10/WebView2: физические
+Escape/retry, click, Tab/Shift+Tab/Enter, EN/dark и RU/light прошли; PNG
+1386×893 повторно декодирован и содержит скрытые контрольные pixels.
+Rust workspace и focused Vue tests passed. Команды, артефакты, ограничения
+общих gates и оставшаяся платформенная матрица — TESTING.md.
+
+## Два режима карандаша и краткие подсказки (до реализации, 2026-10-18)
+
+`REQ-TOL-003/004/010`, `REQ-EDT-002/006/015/016`, `REQ-UI-006`:
+доступны только точное перо и автокоррекция. Сохранённый default экспрессивной
+кисти заменяется автокоррекцией; её старые штрихи при открытии editable session
+преобразуются одной undoable command, включая hidden/locked. Samples, spans,
+appearance и transforms сохраняются; localBounds пересчитываются общей геометрией.
+Read-only документы не мигрируют. Tooltip RU/EN больше не объясняют Shift/45°;
+модификаторы и числовые поля угла продолжают работать. План доказательств:
+red-first core/preferences, mounted session/save/undo, renderer decode,
+production browser и Windows WebView2 Quick → Editor → reopen.
+
+Статус: implemented (ADR-094). Финальные migration/preferences/session — 33/33,
+renderer — 3/3; browser drawing и Shift matrix passed, follow-up preferences/
+RU/EN tooltip — 3/3 passed. Свежая native сборка блокируется сторонним TS2883 в
+ShapeGradientEditor.vue; runtime evidence pending. Команды и ограничения — TESTING.md.
+
+## Выноска: линия, подпись и адресное удаление ступени (до реализации, ADR-090)
+
+`REQ-TOL-007`, `REQ-TOL-005`, `REQ-EDT-002/005/006/016/017`, `REQ-UI-006/007`:
+пустой commit сохраняет connector без оформления подписи; две категории маршрута
+«Линия»/«Ступенчатая», bend handle, auto и четыре явные стороны, направленный акцент.
+Alt-click внутренней ручки удаляет указанную ступень с preview и одним undo;
+Escape/lost capture/release Alt/drag отменяют удаление. Контур и поле ширины относятся
+только к тексту. Наконечники — SVG, размер/цвет видимы без disclosure.
+Red-first core: empty/bounds/hits, quadratic/rebase/codec, auto/accent, indexed removal.
+Vue/browser/real WebView2: production creation, width, modifier cancellation, history,
+Quick non-origin crop, Editor handoff/reopen. Decoded Canvas2D/CanvasKit export.
+Старые v7 routes/explicit attachment сохраняются. Результаты и ограничения — TESTING.md.
+Фактические доказательства: 76 focused core/Vue, 46 render, 4 browser specs / 5 tests,
+2 real WebView2 scenarios с trusted input и отдельным process reopen — passed.
+Общие check/unit ограничения и платформы без прогона зафиксированы в TESTING.md.
+
 ## Расширенные диапазоны изображения (2026-10-18, до реализации)
 
 `REQ-TOL-015`, `REQ-EDT-005/006`, `REQ-UI-006/007`: убрать UI-предел
@@ -28,7 +183,7 @@ context/menu 33/33; browser 4+1 cases и native Quick/handoff/reopen 2/2 passed.
 
 ## Открытие хранения из истории (2026-10-17, до реализации)
 
-`REQ-LIB-002/012`, `REQ-UI-006/008`: «Хранение…» открывает singleton Settings
+`REQ-LIB-002/012`, `REQ-UI-006/008`: «Хранение» открывает singleton Settings
 на разделе истории без блокировки native event loop. Окно показывает controls,
 закрывается и открывается повторно; существующее окно переключается на историю.
 Rust regression фиксирует async IPC boundary; отдельный `history-settings`
@@ -802,6 +957,24 @@ Foundation harness не создаёт отдельного продуктово
 Автоформатирование редактора и обязательная
 проверка для агентов описаны в `../AGENTS.md` и `TESTING.md`.
 
+## Живой взгляд логотипа (2026-10-18, ADR-093)
+
+До реализации уточнены `REQ-UI-013`, `REQ-WEB-001/002` и `REQ-QLT-003`:
+генерируемый inline SVG в TopBar и RU/EN шапках, один DOM-only контроллер,
+После пользовательского review темп замедлен до 1500 ms приветствия,
+300 ms сглаживания слежения и 500 ms возврата (контракт уточнён до правки).
+Прищуры ограничены
+±1,5/±0,8 units; touch/reduced motion статичны, blur/hidden/unmount освобождают
+animation frame и listeners. Требуемое evidence: controller lifecycle tests,
+production landing/browser hover и no-JS navigation, real-WebView pointer input,
+размерный review. Native icons и document pipeline не меняются.
+Implemented: 22 unit/regression tests, landing RU/EN и browser editor hover,
+no-JS navigation и размерный review прошли на Windows/Chrome. Native build
+сначала блокировался сторонним типом градиента и Windows CLI shim; после их
+исправления финальный runtime-прогон свежего binary прошёл в WebView2 155 /
+external driver, EN × light/dark с trusted pointer input. WebKit/Linux runtime
+pending. Команды, transient startup failure и артефакты — TESTING.md.
+
 ## Читаемый знак приложения и трея (2026-10-15)
 
 Обновление контракта до реализации (2026-10-16), `REQ-ACT-006`, `REQ-UI-013`,
@@ -974,7 +1147,7 @@ WebKitGTK/X11 smoke.
 | REQ-TOL-011 | `precision-tools.test.ts`: strict v7 separate source/destination schema, bounded zoom/size/border/shadow, circle/rectangle hit geometry, composite-below scene descriptor and command history; focused renderer/Vue/browser suites cover clipped transparent sampling, flip behavior, conservative bounds, loupe-only transient auto-selection and source/lens drag that keeps the entire loupe (connector, lens and source marker) in the ordered transient scene                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | decoded Canvas2D/CanvasKit lens sampling plus seeded Chrome creation/context-toolbar coverage, including locked-selection disabled/no-history/no-default-leak behavior                                                                                                                                                                                                                                                                     | in_progress; core/codec, renderer/export and focused Vue/browser evidence passed on Windows x64 (2026-08-15), including the loupe/ruler and locked/read-only control repairs. Real Tauri/WebView2 remains blocked on port 4445                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | REQ-TOL-012 | `color-picker.test.ts`: HEX/RGB/HSV/palette/suggestions; Vue/browser eyedropper tests accept only composited pixels with alpha `255`, reject alpha `0` and `128` recoverably before clipboard/recent/swatch mutation, and retain zoom/crop mapping plus transient-overlay exclusion                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | seeded Chrome sampling interaction coverage; native clipboard readback and real WebView/GPU readback require real Tauri                                                                                                                                                                                                                                                                                                                    | in_progress; focused Vue and seeded Chrome interaction evidence covers alpha `0`/`128` rejection, alpha `255` acceptance, mapping, overlay exclusion and recoverable states. Native clipboard/readback remains blocked before the Tauri test body on port 4445                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | REQ-TOL-013 | M03 codec fixtures plus `crop-session.test.ts`: deterministic presets, canvas-bounded resize/move/nudge, reset/reopen, immutable cancel and one-command apply; renderer and Vue tests cover cropped output bounds, coordinate translation and overlay behavior; `overlay-handle-bounds.test.ts` clamps crop/selection handles inside the visible overlay bitmap on full-canvas sessions                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | `browser-m08-crop-precision.e2e.ts` under the `?m05=1` App harness provides seeded interaction coverage only; a clean production decoded-source mount and real Tauri/WebView remain required                                                                                                                                                                                                                                               | in_progress; editor-core, renderer/export, Vue and seeded Chrome interaction evidence passed on Windows x64 (2026-08-15). The browser harness is not production mount evidence; clean decoded-source mount remains pending and real Tauri is blocked before the test body on port 4445                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| REQ-TOL-014 | `content-tools.test.ts`: grapheme and versioned emoji asset reference round-trip; emoji renderer goldens                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | `emoji-picker.e2e`: RU/EN search, keyboard grid and recent items                                                                                                                                                                                                                                                                                                                                                                           | in_progress; Linux 6.8.0-137-generic x86_64/X11: `pnpm test` passed 134 tests (2026-08-10), covering typed portable emoji factory; approved bundled assets, picker and renderer evidence pending                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| REQ-TOL-014 | `content-tools.test.ts`: grapheme and versioned emoji asset reference round-trip; emoji renderer goldens                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | `browser-emoji.e2e.ts`, `tauri-emoji.e2e.ts`, `tauri-emoji-reopen.e2e.ts`: RU/EN search, keyboard grid and recent items                                                                                                                                                                                                                                                                                                                    | in_progress; Linux 6.8.0-137-generic x86_64/X11: `pnpm test` passed 134 tests (2026-08-10), covering typed portable emoji factory; Windows 2026-10-18: Noto 2D pack, picker, scene/export implemented; core/Vue/render/browser evidence in TESTING.md; Windows WebView2 emoji + reopen passed, decoded export and fixed picker geometry verified; Linux/macOS runtime pending                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | REQ-TOL-015 | `storage.rs`: encoded byte/dimension limits, strict static-SVG validation, immutable content blobs and error fixtures; Canvas Image-tool center/import routing; `tool-catalog.test.ts` and `content-image-import.test.ts` for reactive Image-tool availability and command-backed import; renderer/core rounded-image regressions                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | `image-import-suite`, `tauri-content-image-tool.e2e.ts` and local-dialog/paste real-Tauri flows                                                                                                                                                                                                                                                                                                                                            | in_progress; Linux 6.8.0-137-generic x86_64/X11: content images now expose radius, border and opacity only in the contextual toolbar; the update is command-backed, and Canvas2D/CanvasKit clip and stroke the same renderer node. Core/component/headless renderer coverage proves the new contract. Existing static SVG acceptance/executable rejection and native PNG/JPEG/WebP/SVG content-image command wiring pass. `cargo test --workspace` passed 78 and `pnpm test` passed 154 (2026-08-11). Windows 10 x64 2026-10-17: Image enablement follows a late `contentImageBridge`; import/open dialogs parent the invoking webview; focused Vue/boundary checks passed and `cargo test -p cute-screen-desktop --lib` passed 129. `tauri-content-image-tool.e2e.ts` was not launched while the dev binary was running. The same dialog then failed on Windows and Linux with "Native image staging failed"; the content-image session token is now memory-backed while the library blob stays immutable. EXIF normalization, Linux dialog runtime and a full real-dialog pass remain pending |
 | REQ-TOL-016 | `capture.rs`: atomic `CreateDocumentFromImage` transaction with locked base layer/provenance; `clipboard.rs` bitmap ingress reuses it for empty-state paste                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | `open-image-document.e2e` and `bitmap-paste-routing.e2e` in clean-profile real Tauri                                                                                                                                                                                                                                                                                                                                                       | in_progress; Linux 6.8.0-137-generic x86_64/X11: `cargo test --workspace` passed 76 tests and `pnpm check` passed (2026-08-10); native Open Image and empty-state `Mod+V` command are wired. Real system-clipboard/clean-profile E2E remains pending                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | REQ-LIB-001 | M03 repository transaction/fault-recovery and immutable-original tests                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | clean profile persisted capture, Tauri `m04-clean-profile-capture`                                                                                                                                                                                                                                                                                                                                                                         | implemented; clean-profile Tauri capture creates and opens the committed document without a seeded frontend state                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
@@ -1737,3 +1910,17 @@ RU/EN/RU, all eight native MenuItem texts, editor sync, Settings reopen и
 process restart startup labels — 2/2 native scenarios passed. 37 уникальных
 Vue tests, Rust workspace 173 passed / 1 ignored, Clippy passed. Общие
 сторонние lint/typecheck/format/boundary blockers — TESTING.md.
+
+## Компактные Quick actions и сохранение в историю (2026-10-18)
+
+`REQ-CAP-010/011/012/014`, `REQ-LIB-002`, `REQ-UI-001/003/004`, ADR-096:
+пять icon-only кнопок, RU/EN hover/focus, terminal completion history, clean
+original и editable annotations. Commit failure оставляет draft; dismiss retry
+не создаёт дубликат. Portal note обходит crop, action buttons и нижние tools;
+подсказки кнопок раскрываются в свободную половину viewport.
+
+Implemented: red-first Rust completion/rollback/retry; 153 focused Vue/icon tests,
+19 layout tests после tooltip-side regression; Windows 10 x64 real WebView2
+production Quick → history → restart на high-entropy 3840×2160 fixture. Чистый
+crop 3074×1730 совпал по SHA-256 decoded RGBA; exported PNG содержит annotations.
+Фактические команды, artifacts и незатронутые ошибки общего прогона — TESTING.md.

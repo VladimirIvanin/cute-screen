@@ -7,6 +7,7 @@ import {
 
 import {
   computeQuickCaptureLayout,
+  placeQuickCaptureNote,
   presentThenWaitForStableQuickCaptureLayout,
   waitForStableQuickCaptureLayout,
 } from '../../../apps/desktop/src/quick-capture-layout'
@@ -15,6 +16,17 @@ import {
   ref,
   shallowRef,
 } from 'vue'
+
+it('keeps the portal note off the compact History action and the crop', () => {
+  const position = placeQuickCaptureNote(
+    { width: 1920, height: 1080 },
+    { width: 240, height: 54 },
+    { left: 1692, top: 538, width: 46, height: 215 },
+    { left: 760, top: 154, width: 685, height: 46 },
+    { left: 523, top: 211, width: 1153, height: 865 },
+  )
+  expect(position).toEqual({ left: 8, top: 8 })
+})
 
 const base = {
   viewport: { width: 1440, height: 900 },
@@ -80,6 +92,11 @@ describe('quick capture overlay layout', () => {
       controller.update()
       expect(popup.style.top).toBe('')
       expect(popup.style.transform).toBe('')
+      const actions = root.querySelector<HTMLElement>('.cs-quick-actions')!
+      controller.update({ x: .1, y: .1, width: .1, height: .1 })
+      expect(actions.dataset.tooltipSide).toBe('right')
+      controller.update({ x: .7, y: .1, width: .1, height: .1 })
+      expect(actions.dataset.tooltipSide).toBe('left')
     } finally {
       root.remove()
     }

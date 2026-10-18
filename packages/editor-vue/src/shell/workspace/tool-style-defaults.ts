@@ -21,13 +21,18 @@ function drawingStyle(
   tool: string,
   style: LayerStyle,
 ): void {
-  if (!['arrow', 'shape', 'pencil', 'marker'].includes(tool)) return
-  const id = tool as 'arrow' | 'shape' | 'pencil' | 'marker'
+  if (!['arrow', 'line', 'shape', 'pencil', 'marker'].includes(tool)) return
+  if (tool === 'pencil' && style.brush === 'brush') style = { ...style, brush: 'stabilized' }
+  const id = tool as 'arrow' | 'line' | 'shape' | 'pencil' | 'marker'
   const existing = workspace.drawingDefaults.value[id]
   const payload = { ...(id === 'pencil' && typeof style.brush === 'string'
     ? changePencilBrush(existing, style.brush === 'pencil' ? 'pen' : style.brush)
     : existing) }
-  if (id === 'arrow' || id === 'shape') {
+  if (
+    id === 'arrow' ||
+    id === 'line' ||
+    id === 'shape'
+  ) {
     const stroke = { ...(payload.stroke as JsonObject), ...pick(style, ['color', 'width']) }
     if ('strokeStyle' in style) stroke.style = style.strokeStyle!
     payload.stroke = stroke

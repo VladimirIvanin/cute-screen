@@ -39,7 +39,7 @@ describe('PNG export through the production editor', () => {
     this.timeout(180000)
     await browser.setWindowSize(1280, 900)
     await nativeImageIngress('picker')
-    await $('button[aria-label="Open image…"]').click()
+    await $('button[aria-label="Open image"]').click()
     await $('button[aria-label="Export"]').waitForEnabled()
     await waitForStableCanvas()
     const initial = await rulerDocument()

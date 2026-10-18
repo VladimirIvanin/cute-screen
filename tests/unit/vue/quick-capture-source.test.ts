@@ -27,7 +27,7 @@ afterEach(() => {
 })
 
 describe('Quick immutable source versus rendered output', () => {
-  it.each((['editor', 'copied', 'saved'] as const).flatMap((completion) => [1, 2].map((scale) => ({ completion, scale }))))('persists clean crop pixels for $completion at preview density $scale and keeps output ink separate', async ({ completion, scale }) => {
+  it.each((['editor', 'copied', 'saved', 'history'] as const).flatMap((completion) => [1, 2].map((scale) => ({ completion, scale }))))('persists clean crop pixels for $completion at preview density $scale and keeps output ink separate', async ({ completion, scale }) => {
     vi.stubGlobal('crypto', webcrypto)
     const frozen = createCanvas(100, 100)
     const frozenContext = frozen.getContext('2d')

@@ -3,6 +3,8 @@ use std::{collections::BTreeMap, future::Future};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+pub(crate) mod window_selection;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum PlatformErrorCode {
@@ -108,6 +110,15 @@ pub struct PortalCapabilityProbe {
 }
 
 impl PlatformCapabilities {
+    #[cfg(any(test, target_os = "windows"))]
+    pub(crate) fn apply_windows_targets(&mut self, desktop: bool, window: bool) {
+        self.capture.available = desktop || window;
+        self.capture.monitor_target = desktop;
+        self.capture.active_window_target = desktop;
+        self.capture.interactive_selector = desktop;
+        self.capture.window_target = window;
+    }
+
     pub fn for_session(
         correlation_id: String,
         session: SessionKind,
@@ -346,6 +357,24 @@ mod tests {
         PlatformError, PlatformErrorCode, SessionKind, macos_capture_pixel_backend,
         macos_window_picker_kind, select_capture_backend,
     };
+
+    #[test]
+    fn windows_window_capability_is_independent_of_desktop_duplication() {
+        for (desktop, window) in [(false, true), (true, false), (true, true), (false, false)] {
+            let mut capabilities = PlatformCapabilities::for_session(
+                "window-probe".into(),
+                SessionKind::Windows,
+                None,
+                Some(desktop || window),
+            );
+            capabilities.apply_windows_targets(desktop, window);
+            assert_eq!(capabilities.capture.available, desktop || window);
+            assert_eq!(capabilities.capture.window_target, window);
+            assert_eq!(capabilities.capture.monitor_target, desktop);
+            assert_eq!(capabilities.capture.interactive_selector, desktop);
+            assert_eq!(capabilities.capture.active_window_target, desktop);
+        }
+    }
 
     #[test]
     fn platform_error_codes_are_stable_camel_case_values() {

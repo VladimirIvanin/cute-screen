@@ -22,6 +22,10 @@ import type {
 } from './workspace-state'
 import { canvasSelectionHandles } from './selection-controls'
 import { prepareDisplayOverlay } from './display-overlay-resolution'
+import {
+  drawCalloutTextFrame,
+  drawCalloutRemovalPreview,
+} from './callout-overlay'
 
 type PreviewNodes =
   ReturnType<CanvasRendererController['renderOverlay']> extends boolean
@@ -30,6 +34,7 @@ type PreviewNodes =
 
 export interface CanvasOverlayContext {
   readonly calloutInsertMode?: () => boolean
+  readonly calloutRemoveMode?: () => boolean
   readonly hoverTarget?: () => import('@cute-screen/editor-renderer').SelectionTarget
   readonly screenScale?: () => CanvasPoint
   readonly props: CanvasViewportProps
@@ -133,6 +138,12 @@ export class CanvasOverlayController {
     this.#drawSelectionFrame(context, layer)
     if (layer.locked || this.#context.props.readOnly) return
     this.#drawControls(context, layer, outputBounds)
+    if (layer.kind === 'callout') {
+      const zoom = (this.#context.props.zoom ?? 100) / 100
+      drawCalloutTextFrame(context, layer, zoom)
+      drawCalloutRemovalPreview(context, layer, this.#context.hoverTarget?.(), activeGesture,
+        this.#context.calloutRemoveMode?.() ?? false, zoom)
+    }
     if (layer.kind === 'loupe') this.#drawLoupeHandles(context, layer)
     this.#drawGuides(context)
   }

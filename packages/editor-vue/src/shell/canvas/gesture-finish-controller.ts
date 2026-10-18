@@ -1,3 +1,4 @@
+import { updateLineGesture } from './line-gesture'
 import {
   rulerAngleStep,
   updateRulerPointer,
@@ -12,6 +13,9 @@ import {
   rulerCanvasBounds,
   updateArrowHandle,
   updateCalloutHandle,
+  removeCalloutStepAt,
+  calloutGeometryContext,
+  SELECTION_DRAG_THRESHOLD_CSS,
   type LayerNode,
   type StrokeStyle,
   type Transform2D,
@@ -88,6 +92,22 @@ export function finishCanvasGesture(
   const end = context.canvasPoint(event)
   if (
     end &&
+    (completed?.kind === 'draw' &&
+      completed.tool === 'line' ||
+      completed?.kind === 'arrowHandle')
+  ) {
+    completed = updateLineGesture(completed, end, event.shiftKey, event.altKey, context.props)
+    if (
+      completed.kind === 'draw' &&
+      completed.startClient &&
+      Math.hypot(event.clientX - completed.startClient.x, event.clientY - completed.startClient.y) < 4
+    ) {
+      cancelCanvasGesture(context, event)
+      return
+    }
+  }
+  if (
+    end &&
     completed?.kind === 'precision' &&
     completed.tool === 'ruler'
   ) {
@@ -105,6 +125,7 @@ export function finishCanvasGesture(
   }
   const precisionLayer = createCompletedPrecisionLayer(context, completed)
   clearTransientState(context, event)
+  commitCalloutRemoval(context, completed, event)
   commitMovement(context, completed)
   commitCrop(context, completed)
   commitQuickSelection(context, completed)
@@ -319,7 +340,9 @@ function commitLayerHandle(
     (gesture.kind !== 'arrowHandle' &&
       gesture.kind !== 'calloutHandle' &&
       gesture.kind !== 'loupeSource') ||
-      !moved(gesture)
+      !moved(gesture) ||
+      gesture.kind === 'calloutHandle' &&
+      gesture.removal
   ) {
     return
   }
@@ -345,6 +368,29 @@ function commitLayerHandle(
       after,
     })
   }
+}
+
+function commitCalloutRemoval(
+  context: GestureFinishContext,
+  gesture: CanvasGesture,
+  event: PointerEvent,
+): void {
+  if (
+    gesture?.kind !== 'calloutHandle' ||
+    !gesture.removal ||
+    gesture.removal.cancelled ||
+    !event.altKey
+  ) return
+  if (Math.hypot(event.clientX - gesture.removal.clientStart.x,
+    event.clientY - gesture.removal.clientStart.y) >= SELECTION_DRAG_THRESHOLD_CSS) return
+  const layer = context.props.document?.layers.find((candidate) => candidate.id === gesture.id)
+  if (
+    context.props.readOnly ||
+    layer?.kind !== 'callout' ||
+    layer.locked
+  ) return
+  const after = removeCalloutStepAt(layer, gesture.removal.segment, calloutGeometryContext())
+  if (after !== layer) context.emit('documentCommand', { type: 'updateLayer', before: layer, after })
 }
 
 function moved(gesture: Extract<NonNullable<CanvasGesture>, { readonly start: CanvasPoint }>): boolean {

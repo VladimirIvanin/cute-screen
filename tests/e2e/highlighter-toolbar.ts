@@ -6,12 +6,75 @@ import {
 import path from 'node:path'
 import { writeFile } from 'node:fs/promises'
 import {
+  createCanvas,
+  loadImage,
+} from '@napi-rs/canvas'
+import {
   shapeDocument,
   waitForShapeAnimation,
 } from './shape-toolbar'
 import { waitForStableCanvas } from './canvas-ready'
 import { verifyPaletteDismissal } from './palette-dismissal'
 import { verifyToolbarSeparators } from './toolbar-separators'
+
+export const highlighterToolbarSelector = '.cs-highlighter-toolbar:not([aria-hidden="true"] *)'
+
+export async function verifyCollapsedHighlighterEffects(
+  directory: string,
+  prefix: string,
+  locale: 'en' | 'ru' = 'en',
+): Promise<void> {
+  await browser.execute(() => {
+    document.addEventListener('pointerdown', (event) => {
+      document.documentElement.dataset.highlighterSampleTrusted = String(event.isTrusted)
+    }, { once: true, capture: true })
+  })
+  if (await $('.cs-quick-settings-button').isDisplayed() && !(await $(highlighterToolbarSelector).isDisplayed())) {
+    await $('.cs-quick-settings-button').click()
+  }
+  const trigger = $(highlighterToolbarSelector).$('button[aria-label="' + (locale === 'ru' ? 'Режим' : 'Effect') + '"]')
+  const modes = [
+    ['highlight', locale === 'ru' ? 'Выделить' : 'Highlight', locale === 'ru' ? 'Темнее' : 'Darker'],
+    ['illuminate', locale === 'ru' ? 'Подсветить' : 'Illuminate', locale === 'ru' ? 'Светлее' : 'Lighter'],
+    ['veil', locale === 'ru' ? 'Окрасить' : 'Tint', locale === 'ru' ? 'Окрасить' : 'Tint'],
+  ] as const
+  for (const [effect, option, label] of modes) {
+    await trigger.click()
+    await $('.cs-highlighter-mode[aria-label="' + option + '"]').click()
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    await expect(trigger).toHaveText(expect.stringContaining(label))
+    const sample = trigger.$('.cs-highlighter-sample')
+    await expect(sample).toHaveAttribute('aria-hidden', 'true')
+    expect(await sample.getSize()).toEqual({ width: 36, height: 24 })
+    expect((await trigger.getSize()).height).toBe(36)
+    await waitForShapeAnimation()
+    const png = await sample.saveScreenshot(path.resolve(directory, `${prefix}-${effect}-sample.png`))
+    const decoded = await loadImage(png)
+    const canvas = createCanvas(decoded.width, decoded.height)
+    const context = canvas.getContext('2d')
+    context.drawImage(decoded, 0, 0)
+    const original = context.getImageData(Math.round(decoded.width / 36), Math.floor(decoded.height / 2), 1, 1).data
+    const stroke = context.getImageData(Math.round(decoded.width * 5 / 36), Math.floor(decoded.height / 2), 1, 1).data
+    const brightness = (pixel: Uint8ClampedArray) => pixel[0]! + pixel[1]! + pixel[2]!
+    if (effect === 'highlight') expect(brightness(stroke)).toBeLessThan(brightness(original))
+    if (effect === 'illuminate') expect(brightness(stroke)).toBeGreaterThan(brightness(original))
+    const fits = await browser.execute(() => {
+      const toolbar = [...document.querySelectorAll('.cs-highlighter-toolbar')].find((element) => !element.closest('[aria-hidden="true"]'))!
+      const rect = toolbar.getBoundingClientRect()
+      return rect.left >= 0 && rect.right <= innerWidth && rect.top >= 0 && rect.bottom <= innerHeight
+        && [...toolbar.querySelectorAll('button')].every((button) => button.scrollWidth <= button.clientWidth)
+    })
+    expect(fits).toBe(true)
+    await browser.saveScreenshot(path.resolve(directory, `${prefix}-${effect}-collapsed.png`))
+  }
+  await trigger.click()
+  const auto = $('.cs-highlighter-mode[aria-label="' + (locale === 'ru' ? 'Авто' : 'Auto') + '"]')
+  const autoEffect = ((await auto.$('.cs-highlighter-sample').getAttribute('class')) ?? '').match(/is-(highlight|illuminate|veil)/u)?.[1]
+  await auto.click()
+  await expect(trigger).toHaveText(expect.stringContaining(locale === 'ru' ? 'Авто ·' : 'Auto ·'))
+  await expect(trigger.$('.cs-highlighter-sample')).toHaveElementClass(`is-${autoEffect}`)
+  await expect($('html')).toHaveAttribute('data-highlighter-sample-trusted', 'true')
+}
 
 async function sceneChecksum(): Promise<number> {
   return browser.execute(() => {
@@ -57,10 +120,14 @@ export async function verifyHighlighter(
   const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
   await $('button[aria-label="Highlighter"]').click()
   await expect($('button[aria-label="Highlighter"] .cs-icon-marker')).toExist()
-  const toolbar = $('.cs-highlighter-toolbar')
+  if (await $('.cs-quick-settings-button').isDisplayed() && !(await $(highlighterToolbarSelector).isDisplayed())) {
+    await $('.cs-quick-settings-button').click()
+  }
+  const toolbar = $(highlighterToolbarSelector)
   await expect(toolbar).toBeDisplayed()
-  await verifyToolbarSeparators('.cs-highlighter-toolbar', 2)
+  await verifyToolbarSeparators(highlighterToolbarSelector, 2)
   await browser.waitUntil(async () => !(await toolbar.getText()).includes('analysing'))
+  await verifyCollapsedHighlighterEffects(directory, prefix)
   await toolbar.$('button[aria-label="Effect"]').click()
   if (requireAutomatic) await expect($('.cs-highlighter-hint')).not.toExist()
   await $('.cs-highlighter-mode[aria-label="Illuminate"]').click()
@@ -88,13 +155,18 @@ export async function verifyHighlighter(
       endX: Math.round(rect.left + rect.width * 0.65),
     }
   })
-  await browser.action('pointer').move({ origin: 'viewport', x: points.x, y: points.y }).down({ button: 'left' }).move({ origin: 'viewport', x: points.endX, y: points.y, duration: 160 }).perform(true)
+  await browser.action('pointer', { id: 'highlighter-stroke' }).move({ origin: 'viewport', x: points.x, y: points.y }).down({ button: 'left' }).move({ origin: 'viewport', x: points.endX, y: points.y, duration: 160 }).perform(true)
   await expect(scene).toHaveStyle({ cursor: 'crosshair' })
+  // Native input may finish before the queued preview RAF under build/test load.
+  await browser.executeAsync((done) => requestAnimationFrame(() => requestAnimationFrame(() => done())))
+  await scene.saveScreenshot(path.resolve(directory, `${prefix}-stroke-preview.png`))
   const preview = await sceneChecksum()
-  await browser.action('pointer').up({ button: 'left' }).perform()
+  // Reuse the held source: a new pointer starts at (0, 0) with no pressed buttons.
+  await browser.action('pointer', { id: 'highlighter-stroke' }).up({ button: 'left' }).perform()
   await browser.waitUntil(async () => (await shapeDocument()).layers.length === initial + 1)
   await waitForStableCanvas()
   await expect(scene).toHaveStyle({ cursor: 'crosshair' })
+  await scene.saveScreenshot(path.resolve(directory, `${prefix}-stroke-committed.png`))
   expect(await sceneChecksum()).toBe(preview)
   await writeFile(path.resolve(directory, `${prefix}-document.json`), JSON.stringify(await shapeDocument(), null, 2))
   expect((await shapeDocument()).layers.at(-1)).toMatchObject({ kind: 'marker', blendMode: 'screen', opacity: 0.35, payload: { highlighterMode: 'illuminate', width: 18 } })

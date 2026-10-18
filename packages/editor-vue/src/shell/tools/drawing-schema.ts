@@ -1,3 +1,4 @@
+import { annotationTool } from '@cute-screen/editor-renderer'
 import { SHAPE_CATALOG } from '@cute-screen/editor-renderer'
 import type { Ref } from 'vue'
 import {
@@ -17,7 +18,7 @@ import type {
   ShapeFill,
 } from '../types'
 
-type DrawingTool = 'arrow' | 'shape' | 'pencil' | 'marker'
+type DrawingTool = 'arrow' | 'line' | 'shape' | 'pencil' | 'marker'
 export type DrawingLayerNode = Extract<LayerNode, { readonly kind: DrawingTool }>
 
 export interface DrawingSchemaContext {
@@ -43,7 +44,7 @@ interface DrawingValues {
 }
 
 export function isDrawingTool(value: string | undefined): value is DrawingTool {
-  return value === 'arrow' || value === 'shape' || value === 'pencil' || value === 'marker'
+  return value === 'arrow' || value === 'line' || value === 'shape' || value === 'pencil' || value === 'marker'
 }
 
 function selectedDrawingLayer(context: DrawingSchemaContext): DrawingLayerNode | undefined {
@@ -62,10 +63,11 @@ function resolveValues(
   return {
     values,
     selected,
-    colorDisabled: context.props.readOnlyDocument || (selected?.kind === tool && selected.locked),
+    colorDisabled: context.props.readOnlyDocument
+      || Boolean(selected && annotationTool(selected) === tool && selected.locked),
     stroke,
-    color: tool === 'arrow' || tool === 'shape' ? stroke?.color : values.color,
-    width: tool === 'arrow' || tool === 'shape' ? stroke?.width : values.width,
+    color: tool === 'arrow' || tool === 'line' || tool === 'shape' ? stroke?.color : values.color,
+    width: tool === 'arrow' || tool === 'line' || tool === 'shape' ? stroke?.width : values.width,
   }
 }
 
@@ -147,7 +149,7 @@ function arrowSchema(
 
 function baseControls(
   context: DrawingSchemaContext,
-  tool: Exclude<DrawingTool, 'arrow'>,
+  tool: Exclude<DrawingTool, 'arrow' | 'line'>,
   state: DrawingValues,
 ): ContextToolbarSchema['controls'] {
   const selected = state.selected?.kind === tool ? state.selected : undefined
@@ -211,6 +213,11 @@ function shapeControls(
   const fill = values.fill && typeof values.fill === 'object' ? (values.fill as Record<string, unknown>) : undefined
   const controls: ContextToolbarSchema['controls'] = [
     {
+      kind: 'select', id: 'strokeStyle', label: 'Stroke style',
+      value: String((values.stroke as Record<string, unknown> | undefined)?.style ?? 'solid'),
+      options: ['solid', 'dashed', 'dotted'].map((value) => ({ value, label: value })),
+    },
+    {
       kind: 'select',
       id: 'shapeKind',
       label: 'Shape',
@@ -256,7 +263,6 @@ function shapeControls(
         { value: 'none', label: 'None' },
         { value: 'solid', label: 'Solid' },
         { value: 'linearGradient', label: 'Linear gradient' },
-        { value: 'radialGradient', label: 'Radial gradient' },
       ],
     },
     {
@@ -285,7 +291,7 @@ function shapeControls(
 }
 
 function specializedControls(
-  tool: Exclude<DrawingTool, 'arrow'>,
+  tool: Exclude<DrawingTool, 'arrow' | 'line'>,
   values: JsonObject,
 ): ContextToolbarSchema['controls'] {
   if (tool === 'pencil') {
@@ -295,7 +301,7 @@ function specializedControls(
         id: 'brush',
         label: 'Brush',
         value: typeof values.brush === 'string' ? values.brush : 'pen',
-        options: ['pen', 'stabilized', 'brush'].map((value) => ({
+        options: ['pen', 'stabilized'].map((value) => ({
           value,
           label: value,
         })),
@@ -307,7 +313,7 @@ function specializedControls(
 
 function standardSchema(
   context: DrawingSchemaContext,
-  tool: Exclude<DrawingTool, 'arrow'>,
+  tool: Exclude<DrawingTool, 'arrow' | 'line'>,
   state: DrawingValues,
 ): ContextToolbarSchema {
   if (tool === 'marker') {
@@ -363,6 +369,13 @@ function drawingControl(
         selected: undefined,
       }
     : resolved
+  if (tool === 'line') {
+    const arrow = arrowSchema(context, state)
+    return { ...arrow, icon: 'line', title: context.translate('toolLine'), hint: context.translate('lineHint'),
+      controls: arrow.controls.filter((control) => control.id === 'color' || control.id === 'stroke').map((control) => ({ ...control, ...(control.kind === 'arrowStroke' ? { allStyles: true } : {}) })),
+      ...(defaultsOnly ? { lineAlignment: { enabled: values.autoAlignAxes !== false, label: context.translate('lineAlignment'), disabled: state.colorDisabled } } : {}),
+    }
+  }
   return tool === 'arrow' ? arrowSchema(context, state) : standardSchema(context, tool, state)
 }
 

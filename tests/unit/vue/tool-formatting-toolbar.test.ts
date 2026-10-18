@@ -102,13 +102,13 @@ describe('compact tool settings', () => {
       name: 'Кисть и толщина',
     })
     await fireEvent.click(within(panel).getByRole('button', {
-      name: 'Экспрессивная кисть',
+      name: 'Автокоррекция',
     }))
-    expect(view.emitted('change')).toEqual([['brush', 'brush']])
+    expect(view.emitted('change')).toEqual([['brush', 'stabilized']])
     await view.rerender({
       schema: {
         ...pencil, controls: pencil.controls.map((item) => item.id === 'brush' ? {
-          ...item, value: 'brush',
+          ...item, value: 'stabilized',
         } : item),
       },
     })

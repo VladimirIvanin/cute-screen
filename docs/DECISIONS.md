@@ -1,5 +1,156 @@
 # Журнал архитектурных решений
 
+## ADR-097 — Радиус изображения определяет углы рамки
+
+**Статус:** accepted (2026-10-18); дополняет ADR-086/089.
+
+**Контекст:** сохранённый border.join=round скруглял внешний контур толстой
+рамки даже при показанном radius=0. Значение панели не соответствовало pixels.
+
+**Решение:** общая image scene-проекция всегда задаёт miter join; положительный
+radius продолжает строить rounded path, нулевой — прямоугольный. Это устраняет
+независимое скругление обводки в обоих backend и экспорте. Persisted v7 payload,
+команды, undo/redo и originals сохраняются без миграции.
+
+**Проверяемое основание:** red-first core tests для round/bevel/miter и
+decoded Canvas2D/CanvasKit PNG с 4K source, рамками 26/32 px и radius 0/80;
+четыре внешних угла и preview/export parity. Production UI evidence и
+фактические ограничения — TESTING.md.
+
+## ADR-095 — Образец эффекта в кнопке выделителя
+
+**Статус:** accepted (2026-10-18); дополняет ADR-051, не заменяя его.
+
+Свёрнутая кнопка режима показывает образец 36×24 px и подпись результата
+«Темнее / Светлее / Окрасить». Названия и пояснения внутри меню сохраняются.
+Общий Vue sample накладывает текущий цвет/интенсивность поверх демонстрационных
+фона и текста через multiply/screen/normal, оставляя края исходного фона.
+Авто показывает resolved effect из существующей schema; pending и mixed
+не изображают выдуманное значение. Доступное имя Effect/Режим сохраняется,
+описание и tooltip объясняют результат и fallback. Высота trigger — 36 px.
+Schema документа, IPC, renderer и команды не меняются.
+
+**Проверяемое основание:** component tests состояний, реактивного цвета и
+интенсивности, доступного описания и focus; shared browser/WebView2 scenario
+выбирает режимы реальным вводом и декодирует screenshot образца, проверяя
+направление изменения яркости. Команды, результаты и платформенные пределы — TESTING.md.
+
+## ADR-093 — Живой взгляд в блоках бренда
+
+**Статус:** accepted (2026-10-18); дополняет ADR-057.
+
+Наведение на весь блок бренда в editor и RU/EN landing запускает короткий
+взгляд влево/вправо, затем прищуры следуют за курсором; уход возвращает знак
+в исходное состояние. Единственный источник геометрии остаётся brand generator:
+он создаёт Vue-компонент и inline SVG-фрагменты HTML с отдельной группой глаз.
+Тёмные прищуры накладываются на белый силуэт; меняется только transform группы.
+Tray/favicon/bundle и исходная геометрия ADR-057 остаются статичными.
+
+Общий DOM-only контроллер не импортирует Vue, Tauri или document code.
+На pointermove меняется цель, rAF работает только пока движение не завершено.
+Touch/reduced motion отключают эффект; blur, hidden и unmount его останавливают.
+Inline SVG и все ссылки лендинга доступны без JS. Новых focus stops нет.
+
+**Проверяемое основание:** контролируемые временные тесты последовательности,
+limits, settle/cancel/dispose; настоящее browser/WebView наведение; размеры
+30/31/36 px, обе локали/темы, no-JS navigation и независимый landing bundle.
+Фактические результаты и платформенные ограничения фиксируются в TESTING.md.
+
+## ADR-094 — Два режима карандаша и краткие подсказки
+
+**Статус:** accepted (2026-10-18); supersedes выбор трёх кистей и сохранение
+экспрессивных штрихов без преобразования из ADR-060. Уточняет краткие tooltip ADR-069.
+
+**Контекст:** пользователь отказался от экспрессивной кисти и выбрал замену
+старых экспрессивных штрихов автокоррекцией. Пояснения Shift/45° удаляются из UI.
+
+**Решение:** доступны pen/stabilized. Старые brush payload остаются читаемыми
+для undo и read-only. Editable DocumentSession после создания CommandManager
+выполняет одну `migrateExpressiveBrushes`, если есть brush strokes. Команда
+проверяет before/after, атомарно преобразует hidden/locked, не открывая обход
+lock для обычных updateLayer. Samples, spans, appearance и transforms сохраняются;
+strokeVersion становится 2 либо остаётся 3, pressureMode сохраняется (legacy:
+simulated). Коррекция сохраняется, невалидная получает 65%; localBounds
+пересчитываются resolver-ом. Undo восстанавливает исходный вид; повторный open
+сохранённого преобразованного документа не создаёт команду. Обычные dirty/save/error/
+retry действуют и для миграции. Read-only путь не создаёт editable session.
+
+Preferences brush → stabilized с памятью stabilized либо 65%. Выбор brush
+недоступен в UI/actions; остаётся внутренняя геометрия для старых данных и undo.
+Tooltip инструментов содержит имя и shortcut без Shift/45°; пояснения modifiers
+в настройках линейки убраны. Поля угла и жесты Shift/Alt не меняются.
+Schema v7, original blobs, IPC и алгоритмы двух доступных кистей не меняются.
+
+**Проверяемое основание:** red-first migration/preferences; legacy/v2/v3,
+hidden/locked, before validation, сохранность данных и один undo/redo;
+session save/retry/reopen; decoded 4K Canvas2D preview/export и CanvasKit;
+production browser и native Quick → Editor → reopen. Результаты — TESTING.md.
+
+## ADR-092 — Образцы заливки, редактор градиента и пунктир фигур
+
+**Статус:** accepted
+
+**Контекст:** текстовые варианты заливки не показывают результат; созданный
+градиент нельзя настроить. Базовые scene nodes теряют stroke dash.
+
+**Решение:** три образца none/solid/linear, 2–8 редактируемых gradient stops,
+угол и разворот, три образца stroke. Radial остаётся в codec/render существующих
+документов. Shape dotted использует нулевой dash и round cap, остальные
+инструменты сохраняют прежний контракт. Временный drag редактирует локальную
+полосу, commit создаёт одну EditorCommand; multi-selection — batch.
+
+**Проверяемое основание:** red-first scene propagation tests и decoded
+Canvas2D/CanvasKit stroke/gradient comparisons, затем production mounted browser
+и real WebView сценарии с undo/redo и defaults. Фактические результаты — TESTING.md.
+
+**Последствия:** schema v7 не меняется; ADR-023 о paint model сохраняется.
+
+## ADR-091 — Выбор native identity и изолированный снимок окна
+
+**Статус:** accepted (2026-10-18); заменяет Window-часть ADR-029 и уточняет
+Window-часть ADR-028/038. Area, Screen и Active Window сохраняют прежние решения.
+
+**Контекст:** Windows использовал selector области и определял WindowFromPoint
+после его уничтожения. Все desktop-crop пути включали перекрывающие приложения.
+
+**Решение:** Window selector сохраняет identity кандидата до подтверждения,
+подсвечивает его до первого движения, поддерживает same-target click, Enter,
+Tab/Shift+Tab и Escape. Desktop/dock, minimized, hidden и свои окна исключены.
+Pixels читаются у выбранного окна: WGC CreateForWindow, XComposite named pixmap,
+CoreGraphics single-window на macOS 12.0–12.2, SCStream на 12.3–13,
+SCScreenshotManager на 14+. На macOS 14+ picker системный; Wayland использует
+только advertised Screenshot portal v3 Window. Desktop crop не является fallback.
+Недоступный изолированный backend даёт typed outcome, а не неверный снимок.
+Результат Window сразу материализуется через существующий document mount-flow.
+
+**Проверяемое основание:** red-first selection/identity tests и physical smoke
+большого частично перекрытого окна с повторным PNG decode и проверкой скрытых
+pixels, размеров, отсутствия selector/соседних окон. Pending runtime-платформы
+не объявляются проверенными; фактические команды и evidence — TESTING.md.
+
+## ADR-090 — Выноска без подписи, изгиб и адресное удаление ступени
+
+**Статус:** accepted (2026-10-18); supersedes ADR-087 в части каталога маршрутов,
+default attachment и взаимодействия с подписью/удалением ступеней.
+
+**Контекст:** дублирующие ортогональные presets, невидимые границы текста и
+символьные markers усложняют настройку; удаление последней ступени не позволяет
+выбрать нужный участок. Пустой commit ошибочно удаляет целую выноску.
+
+**Решение:** две UI категории «Линия»/«Ступенчатая»; optional v7 quadratic route
+с bend и attachment auto. Старые routes и explicit стороны читаются без миграции.
+Auto размещает подпись горизонтально, explicit стороны остаются закреплёнными.
+Accent противоположен tangent у target. Пустой rich text сохраняет connector и
+оформление в payload, но не рисует/не захватывает область подписи.
+Alt-click внутренней ручки локально удаляет два поворота с immutable endpoints,
+preview не пишет историю; pointerup подтверждает один EditorCommand. Escape,
+lost capture, release Alt и превышение drag threshold отменяют. Нижняя панель,
+transient formatting, immutable originals и native IPC сохраняют прежние контракты.
+
+**Проверяемое основание:** red-first 11 core failures, затем green contracts
+для empty/auto/quadratic/rebase/codec/accent/indexed removal. Production browser,
+real WebView2, decoded exports и ограничения записываются в TESTING.md.
+
 ## ADR-089 — Диапазоны оформления изображения
 
 **Статус:** accepted (2026-10-18); дополняет ADR-086.
@@ -38,7 +189,9 @@ persistence; WebView2 Settings → RU/EN/RU → чтение actual MenuItem tex
 
 ## ADR-087 — Управляемая линия и оболочка выноски
 
-**Статус:** accepted; supersedes ADR-032 в части elbow-only/markers/container и
+**Статус:** superseded в части UI routes/default attachment/пустой подписи/удаления
+ступеней by [ADR-090](#adr-090-выноска-без-подписи-изгиб-и-адресное-удаление-ступени);
+remaining geometry/markers/container accepted; supersedes ADR-032 в части elbow-only/markers/container и
 ADR-065 в части автоматической стороны и отделения карточки от линии.
 
 **Решение:** новые Callout создаются как Г-линия, target circle, label none и
@@ -723,7 +876,7 @@ failure. Area и Window по-прежнему являются crop одного
 
 ## ADR-028 — X11 capture выбирает фактически видимый drawable
 
-**Статус:** accepted
+**Статус:** accepted для Screen/Area/Active Window; Window superseded by ADR-091
 
 **Контекст:** при активном X11 compositing manager дочерние окна root могут быть
 redirected в off-screen storage, а итоговый desktop рисуется в Composite Overlay
@@ -746,7 +899,7 @@ typed capture failure. Существующие non-composited X11 smoke ост�
 
 ## ADR-029 — Windows interactive capture freezes on confirmation
 
-**Статус:** superseded для Area by ADR-040; Window behavior remains accepted
+**Статус:** superseded для Area by ADR-040; для Window by ADR-091
 
 **Контекст:** ADR-027 исправил источник pixels, но сохранил неверный момент
 заморозки: DXGI frame создавался до selector. Если пользователь открывал Area,
@@ -988,7 +1141,7 @@ ADR-020 отложен, пока нет машины владельца.
 
 ## ADR-038 — Native macOS Area/Window selector и versioned capture routing
 
-**Статус:** accepted
+**Статус:** accepted для Area/baseline; Window superseded by ADR-091
 
 **Контекст:** ADR-037 фиксирует первый Screen-only срез и не определяет
 Area/Window selector, минимальную версию macOS или маршрутизацию между
@@ -1411,7 +1564,9 @@ asset evidence; runtime tray light/dark/HiDPI на каждой ОС прове�
 
 ## ADR-060 — Различимые кисти и цельный контур
 
-**Статус:** superseded в части формата составных штрихов и сглаживания их прямых участков — ADR-073; supersedes карандашную часть ADR-056.
+**Статус:** superseded в части формата составных штрихов и сглаживания их прямых участков — ADR-073;
+в части выбора трёх кистей и сохранения экспрессивных штрихов — ADR-094;
+supersedes карандашную часть ADR-056.
 
 Точное перо сохраняет траекторию и постоянную толщину. Автокоррекция использует
 стабилизацию perfect-freehand, экспрессивная кисть — переменный pressure outline.
@@ -1826,3 +1981,67 @@ separators, управляющие/запрещённые Windows символы
 **Проверяемое основание:** red-first Rust формат/validation/reopen; Vue async
 preview/cancel/error/retry; real-WebView General Settings save → reopen → export
 с декодированием 4K output. Команды и платформенные границы — TESTING.md.
+
+## ADR-100 — Самостоятельная линия на общей геометрии стрелки
+
+**Статус:** accepted; дополняет ADR-069, ADR-064 и creation policy ADR-048.
+
+**Контекст:** пользователь может не знать о прямых штрихах карандаша. Для быстрых
+подчёркиваний нужен заметный инструмент без настроек наконечников и траектории.
+
+**Решение:** Line (L), Loupe (Z), repeat policy. Общий annotationTool resolver
+разделяет UI, defaults, layer labels и style inheritance. Persisted kind остаётся
+arrow, optional annotationTool: line разрешён только для straight/none/none;
+codec сохраняет признак, legacy arrows не переопределяются. Document v7 и IPC
+сохраняются. В preferences drawing.defaults.line хранятся отдельные stroke и
+UI-only autoAlignAxes; последний не является каналом стиля и не попадает в слой.
+Transient resolver привязывает к оси при <=5°, удерживает до >8°; Shift 45°
+имеет приоритет. Endpoint editing выполняет projection в world coordinates.
+Создание/правка — одна команда; preview и final pointerup используют один resolver.
+
+**Проверяемое основание:** red-first line.test.ts, mounted line-tool.test.ts,
+decoded 4K Canvas2D/CanvasKit, browser native input и real WebView Quick → Editor
+→ reopen. Команды и фактические границы платформ записываются в TESTING.md.
+UX-источники: [Figma](https://help.figma.com/hc/en-us/articles/360040450133-Shape-tools),
+[Greenshot](https://getgreenshot.org/help/#drawing-shapes),
+[Krita](https://docs.krita.org/en/reference_manual/tools/line.html).
+
+## ADR-096 — Компактные Quick actions и завершение в историю
+
+**Статус:** accepted (2026-10-18); дополняет ADR-041 и ADR-055.
+
+**Контекст:** текстовые Quick actions занимают лишнюю ширину; нужен выход
+с сохранением снимка без clipboard, файла или открытия editor.
+
+**Решение:** вертикальные UiIcon-кнопки 36×36, icons 20×20, RU/EN hover/focus
+подсказки и aria-label. History добавляется в CaptureCompletion существующего
+commit IPC. Перед commit завершаются inline text/crop; clean original и editable
+слои сохраняются атомарно. Quick закрывается после commit, без editor handoff.
+Failure допускает retry; после durable commit повторный History только dismiss.
+Схема хранения и binary transport сохраняются.
+
+**Проверяемое основание:** red-first Rust completion/rollback, Vue pending/retry,
+X11 restoration regression и Windows real-WebView Quick → history → restart
+с декодированием изображения и проверкой слоёв; результаты — TESTING.md.
+
+## ADR-101 — Встроенные эмоджи Noto 2D
+
+**Статус:** accepted (2026-10-18); дополняет ADR-025 и ADR-069.
+
+**Решение:** 100 статических Noto 2D SVG из закреплённого upstream commit,
+Apache 2.0 и NOTICE поставляются вместе с приложением. XML declarations/DOCTYPE
+удалены, namespace entities раскрыты; художественная графика не меняется.
+Документ v7 сохраняет существующий EmojiLayer и versioned reference
+`notoEmoji/noto-2d-v1/assetId`, а не шрифт, DOM или bytes. Default 64 px,
+13 быстрых отметок, палитра RU/EN и локальные 12 recent items. Emoji —
+однократный инструмент E с последующим Select. Instance changes не пишут defaults.
+
+Общий resolver декодирует SVG до создания слоя и при открытии; ошибки не
+подменяются системным glyph. Scene использует image nodes, включая gesture preview
+и export. Для history worker SVG сначала преобразуется в PNG Blob в WebView:
+createImageBitmap(SVG) не является переносимой гарантией. Оригинальные screenshot
+blobs и native IPC не изменяются. Новая версия документа не требуется.
+
+**Проверяемое основание:** red-first emoji core contracts; checksum и pixel decode
+всех 100 SVG; экспорт с повторным декодированием; production browser и Tauri
+scenarios emoji/emoji-reopen. Фактические результаты и ограничения — TESTING.md.

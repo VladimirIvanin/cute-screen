@@ -1,6 +1,7 @@
 import {
   render,
   fireEvent,
+  within,
 } from '@testing-library/vue'
 import {
   describe,
@@ -18,8 +19,14 @@ describe('compact callout toolbar', () => {
     const view = render(ContextToolbar, { props: { schema, label: 'Callout', pickerLocale: 'en' } })
     expect(view.container.querySelectorAll('.cs-callout-toolbar > button')).toHaveLength(5)
     await fireEvent.click(view.getByRole('button', { name: 'Route' }))
-    await fireEvent.click(await view.findByRole('button', { name: 'Straight' }))
+    const routePanel = within(await view.findByRole('dialog', { name: 'Route' }))
+    await fireEvent.click(routePanel.getByRole('button', { name: 'Line' }))
     expect(view.emitted().change).toContainEqual(['calloutRoute', 'straight'])
+    expect(view.queryByRole('combobox')).not.toBeInTheDocument()
+    await fireEvent.click(view.getByRole('button', { name: 'Left' }))
+    expect(view.emitted().change).toContainEqual(['calloutAttachment', 'right'])
+    await fireEvent.click(view.getByRole('button', { name: 'Auto' }))
+    expect(view.emitted().change).toContainEqual(['calloutAttachment', 'auto'])
     await fireEvent.click(view.getByRole('button', { name: 'Add step' }))
     expect(view.emitted().change).toContainEqual(['calloutInsert', ''])
     expect(view.queryByRole('dialog', { name: 'Route' })).not.toBeInTheDocument()
@@ -37,5 +44,14 @@ describe('compact callout toolbar', () => {
   it('blocks every group in locked/read-only state', () => {
     const view = render(ContextToolbar, { props: { schema: { ...schema, disabled: true }, label: 'Callout', pickerLocale: 'ru' } })
     for (const button of view.container.querySelectorAll('.cs-callout-toolbar > button')) expect(button).toBeDisabled()
+  })
+  it('renders endpoint SVGs and exposes size/color without a disclosure', async () => {
+    const view = render(ContextToolbar, { props: { schema, label: 'Callout', pickerLocale: 'en' } })
+    await fireEvent.click(view.getByRole('button', { name: 'Endpoints' }))
+    const panel = await view.findByRole('dialog', { name: 'Endpoints' })
+    expect(panel.querySelectorAll('.cs-callout-marker-choices svg')).toHaveLength(10)
+    expect(panel.querySelector('details')).toBeNull()
+    expect(view.getByRole('spinbutton', { name: 'Size' })).toBeVisible()
+    expect(view.getByRole('button', { name: 'Marker color' })).toBeVisible()
   })
 })

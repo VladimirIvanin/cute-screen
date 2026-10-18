@@ -1,5 +1,6 @@
 import {
   ImageResourceManager,
+  emojiThumbnailImages,
   renderHistoryThumbnail,
   loadHistoryDocumentFonts,
   parseEditorDocument,
@@ -155,6 +156,7 @@ export class HistoryPreviews {
       }
       if (generation !== this.#generation) throw new DOMException('Cancelled', 'AbortError')
       const job: ThumbnailJob = { document: parsed.document, images, fonts: previewFonts(parsed.document) }
+      job.images.push(...await emojiThumbnailImages(parsed.document))
       let bytes: Uint8Array
       try {
         bytes = await this.#renderWorker(job)

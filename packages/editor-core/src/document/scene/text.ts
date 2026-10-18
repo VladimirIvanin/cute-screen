@@ -1,6 +1,5 @@
 import { calloutFrameNodes } from './callout-frame'
 import { arrowCapNodes } from './arrow'
-import { arrowEndpointAngles } from '../../arrow-geometry'
 import {
   numberedMarkerLabelBounds,
   numberedMarkerNumberContent,
@@ -11,7 +10,9 @@ import {
   type CalloutGeometryContext,
   calloutEndpointSize,
   calloutPathPoints,
+  calloutEndpointAngles,
   calloutTextLayout,
+  calloutHasLabel,
 } from '../../callout-geometry'
 import type { RenderNode } from '../../scene/contracts'
 import type {
@@ -203,7 +204,7 @@ export function calloutNodes(
   const strokeStyle = stroke(payload.stroke)
   const pathPoints = calloutPathPoints(payload, context)
   const connector = pathNode(layer, `${layer.id}:connector`, pathPoints, strokeStyle)
-  const angles = arrowEndpointAngles(pathPoints)
+  const angles = calloutEndpointAngles(payload, context)
   const markers = (['target', 'label'] as const).flatMap((endpoint) => {
     const endpointStyle = payload[`${endpoint}MarkerStyle`]
     const style = endpointStyle?.color ? { ...strokeStyle, color: color(endpointStyle.color) } : strokeStyle
@@ -212,6 +213,7 @@ export function calloutNodes(
       calloutEndpointSize(payload, endpoint))
   })
   const layout = calloutTextLayout(payload, context)
+  if (!calloutHasLabel(payload)) return [connector, ...markers]
   const text = richTextNode(
     `${layer.id}:text`,
     payload.content,

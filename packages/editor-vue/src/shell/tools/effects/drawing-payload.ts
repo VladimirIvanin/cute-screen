@@ -3,11 +3,18 @@ import {
   isShapeKind,
   isHighlighterMode,
   type JsonObject,
+  type FillPaint,
+  type SrgbColor,
 } from '@cute-screen/editor-renderer'
 import { parseHexColor } from './color'
+import {
+  newLinearGradient,
+  parseLinearGradient,
+} from '../../ui/shape-gradient'
 
-export type DrawingTool = 'arrow' | 'shape' | 'pencil' | 'marker'
+export type DrawingTool = 'arrow' | 'line' | 'shape' | 'pencil' | 'marker'
 export type DrawingControlId =
+  | 'autoAlignAxes'
   | 'color'
   | 'width'
   | 'cornerRadius'
@@ -26,8 +33,10 @@ export type DrawingControlId =
   | 'fillKind'
   | 'fillColor'
   | 'fillOpacity'
+  | 'fillGradient'
 
 const DRAWING_CONTROL_IDS = new Set<DrawingControlId>([
+  'autoAlignAxes',
   'color',
   'width',
   'cornerRadius',
@@ -46,6 +55,7 @@ const DRAWING_CONTROL_IDS = new Set<DrawingControlId>([
   'fillKind',
   'fillColor',
   'fillOpacity',
+  'fillGradient',
 ])
 
 export function isDrawingControlId(value: string): value is DrawingControlId {
@@ -57,6 +67,7 @@ function layerPayload(
   value: string,
   current: JsonObject,
 ): JsonObject | undefined {
+  if (id === 'autoAlignAxes') return value === 'true' || value === 'false' ? { ...current, autoAlignAxes: value === 'true' } : undefined
   if (id === 'layerOpacity') {
     const opacity = Number(value) / 100
     return Number.isFinite(opacity) && opacity >= 0 && opacity <= 1 ? { ...current, layerOpacity: opacity } : undefined
@@ -122,7 +133,7 @@ function arrowStylePayload(
   tool: DrawingTool,
   current: JsonObject,
 ): JsonObject | undefined {
-  if (tool !== 'arrow') return undefined
+  if (tool !== 'arrow' && !((tool === 'shape' || tool === 'line') && id === 'strokeStyle')) return undefined
   if (id === 'startCap' || id === 'endCap') {
     const caps = ['none', 'lineArrow', 'solidArrow', 'triangle', 'circle', 'diamond']
     return caps.includes(value) ? { ...current, [id]: value } : undefined
@@ -169,7 +180,7 @@ function specializedPayload(
     }
   }
   if (id === 'brush') {
-    return tool === 'pencil' && ['pen', 'stabilized', 'brush'].includes(value) ? changePencilBrush(current, value) : undefined
+    return tool === 'pencil' && ['pen', 'stabilized'].includes(value) ? changePencilBrush(current, value) : undefined
   }
   if (id !== 'markerMode') return undefined
   if (tool !== 'marker' || !isHighlighterMode(value)) return undefined
@@ -184,10 +195,16 @@ function fillKindPayload(
   tool: DrawingTool,
   current: JsonObject,
 ): JsonObject | undefined {
-  if (tool !== 'shape' || !['none', 'solid', 'linearGradient', 'radialGradient'].includes(value)) {
+  if (
+    tool !== 'shape' ||
+    !['none', 'solid', 'linearGradient'].includes(value) ||
+    ['braceLeft', 'braceRight'].includes(String(current.shape))
+  ) {
     return undefined
   }
-  const candidate = (current.stroke as Record<string, unknown> | undefined)?.color
+  const previous = current.fill as FillPaint | undefined
+  if (previous?.kind === value) return current
+  const candidate = previous?.kind === 'solid' ? previous.color : (current.stroke as Record<string, unknown> | undefined)?.color
   const color: JsonObject =
     candidate && typeof candidate === 'object'
       ? (candidate as JsonObject)
@@ -196,31 +213,8 @@ function fillKindPayload(
   if (value === 'solid') {
     return { ...current, fill: { kind: 'solid', color, opacity: 1 } }
   }
-  const stops = [
-    { position: 0, color },
-    { position: 1, color: { red: 1, green: 1, blue: 1, alpha: 0 } },
-  ]
-  return value === 'linearGradient'
-    ? {
-        ...current,
-        fill: {
-          kind: value,
-          start: { x: 0, y: 0 },
-          end: { x: 1, y: 1 },
-          opacity: 1,
-          stops,
-        },
-      }
-    : {
-        ...current,
-        fill: {
-          kind: value,
-          center: { x: 0.5, y: 0.5 },
-          radius: 0.5,
-          opacity: 1,
-          stops,
-        },
-      }
+  const fill = newLinearGradient(previous ?? null, color as SrgbColor)
+  return { ...current, fill: { ...fill, start: { ...fill.start }, end: { ...fill.end } } }
 }
 
 function fillOpacityPayload(
@@ -264,7 +258,7 @@ function dimensionPayload(
     return tool === 'shape' && number > 0 && number < 1 ? { ...current, starInnerRatio: number } : undefined
   }
   if (id !== 'width' || number <= 0) return undefined
-  return tool === 'arrow' || tool === 'shape'
+  return tool === 'arrow' || tool === 'line' || tool === 'shape'
     ? {
         ...current,
         stroke: {
@@ -282,7 +276,7 @@ function colorPayload(
 ): JsonObject | undefined {
   const color = parseHexColor(value)
   if (!color) return undefined
-  return tool === 'arrow' || tool === 'shape'
+  return tool === 'arrow' || tool === 'line' || tool === 'shape'
     ? {
         ...current,
         stroke: { ...(current.stroke as Record<string, unknown>), color },
@@ -308,7 +302,11 @@ export function resolveDrawingPayload(
   tool: DrawingTool,
   current: JsonObject,
 ): JsonObject | undefined {
-  if (id === 'layerOpacity' || id === 'blendMode') {
+  if (
+    id === 'autoAlignAxes' ||
+    id === 'layerOpacity' ||
+    id === 'blendMode'
+  ) {
     return layerPayload(id, value, current)
   }
   if (id === 'shapeKind') return shapeKindPayload(value, tool, current)
@@ -328,6 +326,11 @@ export function resolveDrawingPayload(
     return specializedPayload(id, value, tool, current)
   }
   if (id === 'fillKind') return fillKindPayload(value, tool, current)
+  if (id === 'fillGradient') {
+    if (tool !== 'shape' || ['braceLeft', 'braceRight'].includes(String(current.shape))) return undefined
+    const fill = parseLinearGradient(value)
+    return fill ? { ...current, fill: { ...fill, start: { ...fill.start }, end: { ...fill.end } } } : undefined
+  }
   if (id === 'fillColor') return fillColorPayload(value, tool, current)
   if (id === 'fillOpacity') return fillOpacityPayload(value, tool, current)
   if (

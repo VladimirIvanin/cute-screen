@@ -51,6 +51,9 @@ export const config: WebdriverIO.Config = {
         autoDownloadEdgeDriver: true,
         autoInstallTauriDriver: process.platform === 'win32',
         driverProvider,
+        ...(process.env.CUTE_SCREEN_E2E_DRIVER_PORT ? {
+          tauriDriverPort: Number.parseInt(process.env.CUTE_SCREEN_E2E_DRIVER_PORT, 10),
+        } : {}),
         appArgs: harnessQuery ? [`--e2e-harness-query=${harnessQuery}`] : [],
         env: {
           CUTE_SCREEN_E2E_SCENARIO: scenarioId,

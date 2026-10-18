@@ -1,6 +1,8 @@
 /** Automatic defaults describe the next gesture; text is formatted after placement. */
 const AUTOMATIC_DEFAULTS_TOOLS = new Set([
+  'emoji',
   'arrow',
+  'line',
   'shape',
   'pencil',
   'marker',

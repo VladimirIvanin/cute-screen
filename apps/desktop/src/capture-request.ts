@@ -10,6 +10,7 @@ interface NativeCaptureDispatchOptions<T> {
   readonly mainWindow: MainWindowCaptureAdapter
   readonly waitForMainWindowUnmap: () => Promise<void>
   readonly capture: () => Promise<T>
+  readonly shouldRestore?: (result: T) => boolean
 }
 
 /**
@@ -23,6 +24,7 @@ export async function dispatchNativeCapture<T>({
   mainWindow,
   waitForMainWindowUnmap,
   capture,
+  shouldRestore,
 }: NativeCaptureDispatchOptions<T>): Promise<T> {
   if (session === 'macos') return capture()
   if (session !== 'x11') return capture()
@@ -33,6 +35,7 @@ export async function dispatchNativeCapture<T>({
       await waitForMainWindowUnmap()
     },
     capture,
+    shouldRestore,
   )
 }
 
@@ -40,6 +43,7 @@ async function runHiddenNativeCapture<T>(
   mainWindow: MainWindowCaptureAdapter,
   prepare: () => Promise<void>,
   capture: () => Promise<T>,
+  shouldRestore: (result: T) => boolean = () => true,
 ): Promise<T> {
   try {
     await prepare()
@@ -54,6 +58,7 @@ async function runHiddenNativeCapture<T>(
     return await restoreMainWindow(mainWindow, error)
   }
 
+  if (!shouldRestore(result)) return result
   try {
     await mainWindow.show()
   } catch (restoreError) {

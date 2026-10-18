@@ -103,13 +103,13 @@ export async function verifyToolSettings(
   await enterNumber('[role="dialog"] input[aria-label="Correction"]', '75')
   await browser.keys('Escape')
   await $('button[aria-label="Brush and width"]').click()
-  await $('[role="dialog"] button[aria-label="Expressive brush"]').click()
+  await $('[role="dialog"] button[aria-label="Exact pen"]').click()
   await enterNumber('[role="dialog"] input[aria-label="Width"]', '6')
   await browser.keys('Escape')
   await drag(c.x + c.w * .12, c.y + c.h * .45, c.x + c.w * .3, c.y + c.h * .5)
   await browser.waitUntil(async () => (await shapeDocument()).layers.length === count + 2)
   expect((await shapeDocument()).layers.at(-1)!.payload).toMatchObject({
-    brush: 'brush', width: 6, smoothing: .35,
+    brush: 'pen', width: 6, smoothing: 0,
   })
   await tool('Spotlight')
   await drag(c.x + c.w * .32, c.y + c.h * .22, c.x + c.w * .5, c.y + c.h * .42)

@@ -1,5 +1,118 @@
 # Сквозная приёмка
 
+## Общая тема окна настроек (2026-10-18)
+
+`REQ-UI-001/002`, `REQ-ACT-008`: Windows 10 x64 / WebView2 155.0.4283.45,
+external driver — 2/2 tests passed. Production editor → Settings показывает
+dark tokens для фона, текста, sidebar, footer, кнопок и scrollbar; открытое
+окно обновляется dark → light → dark и сохраняет dark после закрытия/открытия.
+Снимки: `artifacts/settings-theme-webview/settings-general-dark.png`,
+`artifacts/settings-theme-webview/settings-shortcuts-live-light.png`.
+Component tests 8/8 passed, включая system media change и cleanup.
+Linux/WebKitGTK и macOS/WKWebView runtime для этой правки pending.
+
+## Нулевое скругление изображения (ADR-097)
+
+REQ-TOL-015: импортировать через G изображение 4K, задать рамку 26 и 32 px.
+При radius 0 все четыре внешних угла прямые; положительный radius скругляет
+изображение, возврат к 0 восстанавливает прямые углы. Undo/redo возвращает
+точные значения и pixels. Проверить в Editor/Quick и повторно декодированном
+экспорте; старый border.join=round не добавляет скругления. Фактический статус — TESTING.md.
+
+## Линия (ADR-100)
+
+REQ-TOL-017: выбрать L, сделать несколько ровных подчёркиваний без Shift,
+выключить привязку, нарисовать диагональ, проверить Shift 45° и Alt от центра.
+V и щелчок открывают два конца и цвет/обводку. Проверить mixed/locked/read-only,
+короткий жест, Escape/blur/pointercancel, один undo/redo, Z для лупы.
+Quick с non-origin crop → Editor → reopen сохраняет lines/defaults; экспорт
+повторно декодируется. RU/EN × light/dark × 1024 px × zoom 50/100/200%.
+
+## Выбор окна без перекрытий (2026-10-18, ADR-091)
+
+`REQ-CAP-003/008/010/015`: запустить Window из tray/hotkey/CLI. До движения
+указателя видны рамка кандидата и подсказка выбора окна. Проверить empty click,
+Enter, Tab/Shift+Tab, перенос primary pointer на другое окно, Escape и повтор.
+Окно под частичным перекрытием снимается целиком: в повторно декодированном PNG
+есть скрытые контрольные pixels, нет соседнего приложения и capture chrome.
+Нативный original открывается обычным document mount без Quick. Закрытие окна,
+недоступный backend и permission denial дают recovery; Area запускается только
+явной кнопкой. DPI/несколько мониторов и платформы без runtime evidence pending.
+Windows 10/WebView2: production mount, initial hover, Escape/retry, click,
+Tab/Shift+Tab/Enter и EN/dark + RU/light прошли; decoded 1386×893 PNG сохранил
+pixels за перекрывающим окном. Остальные пункты матрицы выше pending.
+Фактические команды и результаты — TESTING.md.
+
+## Заливка и пунктир фигур (2026-10-18, ADR-092)
+
+REQ-TOL-002: none/solid/linear представлены образцами. Проверить 2–8 точек,
+цвет/позицию/alpha, общую opacity, угол и разворот, Escape при перетаскивании,
+disabled/mixed, групповую batch-команду и undo/redo. Старый radial документ
+сохраняет отображение; новый выбор radial отсутствует. Все фигуры поддерживают
+solid/dashed/round dotted. Canvas2D/CanvasKit exports повторно декодируются.
+Windows browser RU/EN × light/dark × 1024/1280 и реальные Quick → Editor →
+reopen проверяются отдельно; команды, результаты и ограничения — TESTING.md.
+
+## Живой взгляд бренда (ADR-093)
+
+`REQ-UI-013`, `REQ-WEB-001/002`, `REQ-QLT-003`: в RU/EN шапках сайта и
+редактора навести на значок, дождаться взгляда влево/вправо и перейти на
+название: глаза следуют, приветствие не повторяется. Уход во время любого
+этапа возвращает прищуры; повторный вход снова приветствует. Touch и reduced
+motion статичны. Переключение reduced motion, blur и hidden отменяют движение.
+Неподвижный курсор и idle не держат rAF; unmount освобождает ресурсы.
+Проверить знак 30 px в editor light/dark, 36/31 px на landing, без новых focus
+stops и изменения ссылок; при отключённом JS работают знак, языки и якорь.
+Доказательства browser и настоящего WebView фиксируются отдельно в TESTING.md.
+
+## Подписи кнопок и закрытие истории (2026-10-18)
+
+`REQ-UI-001/003/006`: «Открыть изображение» / «Open image» в верхней
+панели и пустом холсте показываются без многоточия; tooltip и accessible
+name верхней кнопки используют ту же подпись.
+
+`REQ-UI-001/006`, `REQ-LIB-013`: на 1024 px в RU/EN × light/dark открыть
+историю и дроп настроек. «Очистить»/«Хранение»/«Настройки приложения»
+видны полностью без многоточий; accessible names совпадают с подписями.
+Крестик — UiIcon close 18×18 px в кнопке 32×32 px, центрирован и имеет
+видимый клавиатурный фокус. Закрыть крестиком и Escape: фокус на trigger.
+Очистка по-прежнему требует подтверждения, cancel не удаляет снимки;
+pending/disabled/error и многоточия progress-сообщений сохраняются.
+Проверки: Vue/browser и Windows WebView2 history-settings/editor-settings;
+команды, screenshots и фактические ограничения — TESTING.md.
+
+## Два режима карандаша и краткие подсказки (ADR-094)
+
+В defaults, selection и group pencil доступны только точное перо и автокоррекция.
+Exact pen отключает коррекцию; возврат к автокоррекции восстанавливает её значение.
+Старый default brush выбирает автокоррекцию с её памятью либо 65%.
+Открыть legacy/v2/v3 expressive strokes, включая hidden/locked: все заменяются
+автокоррекцией одной отменяемой командой, без изменения samples/spans/appearance/
+transforms. Проверить undo/redo, save failure/retry и reopen без повторной миграции.
+Read-only сохраняет прежний документ. Preview/export повторно декодировать на 4K.
+В RU/EN tooltip инструментов только имя/shortcut, без Shift/45°; настройки линейки
+не содержат этих пояснений. Shift/Alt и функциональные поля угла работают.
+Проверить Quick → Editor → reopen, обе темы и 1024 px. Исторический контракт
+трёх кистей ADR-060 ниже заменён этим решением; платформы — PLATFORM_MATRIX.md.
+
+## Доработка выноски (ADR-090)
+
+Создать выноску и подтвердить пустой ввод: линия сохранена, оформление скрыто.
+Двойной клик по линии → ввести текст → удалить текст → undo/redo восстанавливают
+подпись и оформление. Escape нового ввода не создаёт объект.
+В маршруте только Line/Stepped; bend handle изгибает Line, Straighten возвращает
+прямую с прежними endpoints. Auto и четыре кнопки позиционируют подпись; accent
+зеркалится по target tangent. Контур ширины охватывает только текст и не экспортируется.
+Добавить три ступени и Alt-click удалить среднюю: минус/preview до commit,
+endpoints неподвижны, один undo возвращает маршрут. Проверить Escape, lost capture,
+release Alt, превышение drag threshold и минимальный маршрут. Без Alt — обычный drag.
+Endpoint SVG, size/color без disclosure, штрих в trigger и текстовый width/Auto
+проверяются через production Editor/Quick, locked/read-only/mixed и RU/EN.
+Исторические проверки ADR-087 ниже читаются с поправками ADR-090.
+Windows: focused 76/76, render 46/46, Chrome 4 specs / 5 tests и WebView2 2/2
+с production Quick/Editor/reopen пройдены; команды и ограничения — [TESTING.md](TESTING.md).
+WebKit/macOS этим прогоном не подтверждены.
+
 ## Диапазоны изображения (2026-10-18, ADR-089)
 
 Через G вставить 4K изображение. Скругление довести до максимума:
@@ -41,7 +154,7 @@ PNG export повторно декодировать. Фактическая п�
 
 ## Хранение из истории (2026-10-17)
 
-`REQ-LIB-002/012`, `REQ-UI-006/008`: открыть историю → «Хранение…».
+`REQ-LIB-002/012`, `REQ-UI-006/008`: открыть историю → «Хранение».
 Settings показывает раздел истории, доступные лимиты и отчёт об объёме.
 Перейти в General, повторить вход из истории: используется то же окно,
 раздел снова History. Закрыть кнопкой окна настроек, открыть и закрыть повторно;
@@ -78,7 +191,7 @@ Windows результат: Chrome matrix 12/12 и WebView2 1/1 passed. Native �
 
 В main editor отсутствует «Снимок окна» даже при доступной capability; Undo
 и Redo соседние. Шестерёнка перед Export открывает тему, язык, отражения и
-«Настройки приложения…». RU/EN и light/dark сохраняются после reload; выбор
+«Настройки приложения». RU/EN и light/dark сохраняются после reload; выбор
 оставляет панель открытой. Отражения закрывают дроп и поддерживают Undo/Redo.
 В empty/loading/read-only отражения disabled, настройки оформления доступны.
 В браузере native Settings disabled с объяснением; pending исключает повтор,
@@ -174,7 +287,8 @@ Focused browser evidence: 4/4 passed, восемь визуальных комб
 модификаторами: Shift имеет приоритет, после его отпускания остаётся Alt.
 Повторить для каждого endpoint, включая край canvas; другой конец фиксирован.
 Undo/redo меняет весь жест одним шагом; Escape/blur/pointercancel отменяют draft.
-Tooltip RU/EN сообщает шаг 45°. Результаты и ограничения — TESTING.md.
+Tooltip RU/EN содержит имя и shortcut без пояснений Shift/45° (ADR-094).
+Результаты и ограничения — TESTING.md.
 
 ## Прямые разделители тулбаров (2026-10-17)
 
@@ -461,6 +575,12 @@ tool-ux и quick-chrome; платформа, результаты и screenshots
 ## Выделитель и простые палитры
 
 `REQ-TOL-004`, `REQ-EDT-008/015/016/017`, ADR-051:
+
+- Свёрнутый режим: образец 36×24 px и «Темнее / Светлее / Окрасить» показывают
+  результат без открытия меню. Авто показывает resolved effect; pending и mixed
+  имеют нейтральный образец. Текущие цвет/интенсивность совпадают с меню.
+  Проверить tooltip/доступное описание, RU/EN, обе темы, 1024 px, Quick/Editor;
+  decoded screenshot должен подтверждать затемнение светлого и осветление тёмного фона.
 
 - Светлый документ с чёрным текстом: «Выделить» сохраняет чёрные пиксели.
 - Тёмный терминал с белым текстом: «Подсветить» сохраняет белые пиксели.
@@ -1371,7 +1491,7 @@ Cancel ничего не включает. Установить с обоими 
 изменить направление, отпустить Shift и продолжить без скачка. Повторить Shift
 несколько раз и обеими клавишами. До pointerup history не меняется; весь gesture
 отменяется одним Undo и восстанавливается Redo. Escape, blur и pointercancel
-не сохраняют draft. Tooltip RU/EN объясняет Shift. При correction 0/65/100%
+не сохраняют draft. Tooltip RU/EN не объясняет Shift (ADR-094). При correction 0/65/100%
 прямой span остаётся прямым; pressure expressive brush и alpha на стыках
 не теряются. Resize, смена кисти, save/reopen, zoom/DPR и decoded export
 сохраняют диапазоны. Old/v2 strokes остаются прежними. Фактическое evidence
@@ -1415,7 +1535,7 @@ focus; при смене schema открытое меню исчезает бе�
 - REQ-LIB-012/013: замок рядом с корзиной переключает защиту; защищённый замок
   виден постоянно, остальные доступны при hover/focus. Прозрачные кнопки 32 px,
   крупные белые SVG на мягкой тёмной подложке читаются на светлом и тёмном снимке.
-- «Очистить…» учитывает все страницы, включая старые снимки; preview показывает
+- «Очистить» учитывает все страницы, включая старые снимки; preview показывает
   число и объём и объясняет сохранение protected/active. Focus на «Отмена»,
   Tab ограничен подтверждением, Escape отменяет без commit и возвращает focus.
 - Подтверждение удаляет только reviewed IDs; пустой plan запрещает commit.
@@ -1489,3 +1609,28 @@ ADR-088 native acceptance: 2026-10-18 Windows x64 / WebView2 155.0.4283.45,
 external provider — 2/2 passed. Проверены все восемь native item texts,
 RU/EN/RU, editor sync, Settings reopen и initial tray после process restart.
 Screenshot Settings просмотрен; открытый OS popup визуально остаётся pending.
+
+### Эмоджи Noto 2D — REQ-TOL-014 (2026-10-18)
+
+Проверить E → быстрые 🔥/⚡ → pointer ghost → click → Select; заменить glyph,
+изменить размер, move/rotate/corner resize, undo/redo. Повторное E восстанавливает
+creation defaults, не параметры экземпляра. Палитра: 100 SVG, пять категорий,
+поиск RU/EN, 12 недавних, пустой результат и два уровня Escape/focus. Проверить
+1024 px, обе темы, non-origin crop в Quick, loading/read-only/error/cancel.
+Native emoji + emoji-reopen должны материализовать Quick, открыть Editor,
+сохранить и восстановить оба слоя после отдельного запуска. Windows WebView2
+155.0.4283.45: оба сценария прошли, PNG повторно декодирован и совпал по RGBA
+SHA-256 с preview 1:1. Геометрия палитры одинакова для 100/20/1/0 результатов.
+Лог: artifacts/emoji-tauri-complete.log. Linux/macOS runtime pending.
+
+## Компактные Quick actions и история (ADR-096)
+
+Production Area → non-origin crop → pencil → inline Text → History. Проверить
+пять доступных icon-only кнопок 36×36, SVG 20×20, панель 46 px и разделитель Close.
+Hover/focus дают RU/EN подсказки; Enter на кнопке активирует её, Enter на canvas
+копирует, Escape отменяет несохранённый draft. Пока pending, повторный ввод запрещён.
+History завершает inline text/crop и закрывает Quick после commit без main, picker
+или clipboard write. Ошибка persistence оставляет draft; dismiss retry не создаёт
+дубликат. Позже открыть единственную запись истории и перезапустить приложение:
+слои остаются редактируемыми, PNG результата содержит ink, original декодируется
+чистым. Windows WebView2 evidence и ограничения — TESTING.md.

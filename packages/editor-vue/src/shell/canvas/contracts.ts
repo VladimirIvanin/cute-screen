@@ -78,6 +78,12 @@ export type CanvasTranslationKey =
   | 'retry'
 
 export interface CanvasViewportProps {
+  emojiDefaults?: {
+    readonly assetId: string
+    readonly size: number
+    readonly image: HTMLImageElement | undefined
+    readonly blocked: boolean
+  } | undefined
   spotlightEditing?: SpotlightEditing | undefined
   readOnly?: boolean | undefined
   highlighterEffect?: import('@cute-screen/editor-renderer').HighlighterEffect | undefined
@@ -124,6 +130,7 @@ export interface CanvasViewportProps {
 }
 
 export type CanvasViewportEmits = {
+  emojiPlace: [point: { x: number; y: number }]
   spotlightEditingChange: [value: SpotlightEditing | undefined]
   spotlightRemove: []
   contextMenu: [request: { clientX: number; clientY: number; layerId?: string }]
@@ -181,6 +188,7 @@ export interface CanvasViewportExpose {
 }
 
 export const canvasViewportRuntimeProps = {
+  emojiDefaults: Object as PropType<CanvasViewportProps['emojiDefaults']>,
   spotlightEditing: Object as PropType<SpotlightEditing | undefined>,
   readOnly: Boolean,
   highlighterEffect: String as PropType<CanvasViewportProps['highlighterEffect']>,
@@ -244,6 +252,7 @@ export const canvasViewportRuntimeProps = {
 } as const
 
 export const canvasViewportRuntimeEmits = [
+  'emojiPlace',
   'spotlightEditingChange',
   'spotlightRemove',
   'contextMenu',

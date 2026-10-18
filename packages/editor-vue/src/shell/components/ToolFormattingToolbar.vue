@@ -112,9 +112,6 @@ const brushes = computed(() => [
   {
     id: 'stabilized', name: text('Autocorrection', 'Автокоррекция'), hint: text('Steadies lines and curves', 'Убирает дрожание руки'),
   },
-  {
-    id: 'brush', name: text('Expressive brush', 'Экспрессивная кисть'), hint: text('Pressure or simulated pressure', 'Переменная толщина'),
-  },
 ])
 const shapes = computed(() => [
   {
@@ -219,7 +216,7 @@ function keydown(event: KeyboardEvent): void {
 function brushPreview(brush: string) {
   const geometry = resolveFreehandGeometry({
     brush, width: 3.5, strokeVersion: 2, pressureMode: 'pen',
-    smoothing: brush === 'brush' ? .35 : .65,
+    smoothing: .65,
     points: Array.from({ length: 45 }, (_, index) => ({
       x: 3 + index * .75, y: 12 + Math.sin(index / 6) * 5 + (index % 2 ? 1.8 : -1.8),
       pressure: .15 + .85 * Math.sin(index / 44 * Math.PI),

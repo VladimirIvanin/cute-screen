@@ -2,6 +2,7 @@
 #import <CoreGraphics/CoreGraphics.h>
 #import <ImageIO/ImageIO.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
+#import "macos_window_capture.h"
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -242,6 +243,8 @@ CuteRect cute_selector_view_rect_for_window_bounds(CuteRect window_bounds,
 @property(nonatomic) BOOL accepted;
 @property(nonatomic) BOOL cancelled;
 @property(nonatomic, copy) NSArray<CuteCaptureView *> *views;
+@property(nonatomic, strong) NSDictionary *windowCandidate;
+@property(nonatomic, strong) NSDictionary *pressedWindow;
 - (void)selectionDidChange;
 @end
 
@@ -281,7 +284,27 @@ CuteRect cute_selector_view_rect_for_window_bounds(CuteRect window_bounds,
 }
 
 - (void)resetCursorRects {
-  [self addCursorRect:self.bounds cursor:NSCursor.crosshairCursor];
+  if (self.mode == CuteCaptureModeWindow) {
+    NSImage *image = [[NSImage alloc] initWithSize:NSMakeSize(32, 32)];
+    [image lockFocus];
+    NSBezierPath *arrow = [NSBezierPath bezierPath];
+    [arrow moveToPoint:NSMakePoint(2, 30)];
+    [arrow lineToPoint:NSMakePoint(2, 10)];
+    [arrow lineToPoint:NSMakePoint(7, 15)];
+    [arrow lineToPoint:NSMakePoint(12, 10)];
+    [arrow lineToPoint:NSMakePoint(15, 13)];
+    [arrow closePath];
+    [NSColor.blackColor setFill]; [arrow fill];
+    [NSColor.whiteColor setStroke]; [arrow stroke];
+    NSBezierPath *camera = [NSBezierPath bezierPathWithRoundedRect:NSMakeRect(13, 2, 17, 12) xRadius:2 yRadius:2];
+    [NSColor.blackColor setFill]; [camera fill];
+    [NSColor.whiteColor setStroke]; [camera stroke];
+    [[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(19, 5, 6, 6)] stroke];
+    [image unlockFocus];
+    [self addCursorRect:self.bounds cursor:[[NSCursor alloc] initWithImage:image hotSpot:NSMakePoint(2, 2)]];
+  } else {
+    [self addCursorRect:self.bounds cursor:NSCursor.crosshairCursor];
+  }
 }
 
 - (void)setFrozenImage:(CGImageRef)frozenImage {
@@ -328,11 +351,37 @@ CuteRect cute_selector_view_rect_for_window_bounds(CuteRect window_bounds,
     [NSGraphicsContext restoreGraphicsState];
 
     NSBezierPath *outline = [NSBezierPath bezierPathWithRect:NSInsetRect(self.selection, 0.5, 0.5)];
-    outline.lineWidth = 2.0;
-    CGFloat dash[] = {7.0, 4.0};
-    [outline setLineDash:dash count:2 phase:0.0];
+    if (self.mode == CuteCaptureModeWindow) {
+      outline.lineWidth = 4.0;
+      [NSColor.blackColor setStroke];
+      [outline stroke];
+      outline.lineWidth = 1.5;
+    } else {
+      outline.lineWidth = 2.0;
+      CGFloat dash[] = {7.0, 4.0};
+      [outline setLineDash:dash count:2 phase:0.0];
+    }
     [NSColor.whiteColor setStroke];
     [outline stroke];
+  }
+  if (self.mode == CuteCaptureModeWindow) {
+    NSPoint global = NSEvent.mouseLocation;
+    NSPoint local = [self convertPoint:[self.window convertPointFromScreen:global] fromView:nil];
+    if (NSPointInRect(local, self.bounds)) {
+      BOOL ru = CuteWindowSelectorRussian();
+      NSDictionary *candidate = self.session.windowCandidate;
+      NSString *name = candidate[(id)kCGWindowName];
+      if (name.length == 0) name = candidate[(id)kCGWindowOwnerName];
+      NSString *detail = candidate != nil ? [NSString stringWithFormat:@"%@ · %.0f × %.0f", name ?: @"Window", NSWidth(self.selection) * self.window.backingScaleFactor, NSHeight(self.selection) * self.window.backingScaleFactor] : (ru ? @"Наведите на окно" : @"Point to a window");
+      NSString *text = [NSString stringWithFormat:@"%@\n%@\n%@", ru ? @"Выберите окно" : @"Choose a window", detail, ru ? @"Клик / Enter — снять · Tab — окно · Esc — отмена" : @"Click / Enter to capture · Tab to switch · Esc to cancel"];
+      CGFloat width = MIN(430, NSWidth(self.bounds) - 16);
+      CGFloat x = MAX(8, MIN(local.x + 20, NSWidth(self.bounds) - width - 8));
+      CGFloat y = local.y + 24 + 80 < NSHeight(self.bounds) ? local.y + 24 : MAX(8, local.y - 96);
+      NSRect card = NSMakeRect(x, y, width, 80);
+      [[NSColor colorWithWhite:0.14 alpha:1] setFill];
+      [[NSBezierPath bezierPathWithRoundedRect:card xRadius:8 yRadius:8] fill];
+      [text drawInRect:NSInsetRect(card, 12, 8) withAttributes:@{NSFontAttributeName:[NSFont systemFontOfSize:12], NSForegroundColorAttributeName:NSColor.whiteColor}];
+    }
   }
 }
 
@@ -356,7 +405,7 @@ CuteRect cute_selector_view_rect_for_window_bounds(CuteRect window_bounds,
 }
 
 - (void)updateWindowSelection:(NSPoint)local {
-  self.selection = NSZeroRect;
+  self.session.windowCandidate = nil;
   CuteRect localPoint = CuteRectMake(local.x, local.y, 0.0, 0.0);
   for (NSDictionary *window in self.windows) {
     CGRect bounds = CGRectZero;
@@ -369,11 +418,22 @@ CuteRect cute_selector_view_rect_for_window_bounds(CuteRect window_bounds,
     if (localPoint.x >= viewRect.x && localPoint.y >= viewRect.y &&
         localPoint.x <= viewRect.x + viewRect.width &&
         localPoint.y <= viewRect.y + viewRect.height) {
-      self.selection = NSMakeRect(viewRect.x, viewRect.y, viewRect.width, viewRect.height);
+      self.session.windowCandidate = window;
       break;
     }
   }
-  [self setNeedsDisplay:YES];
+  [self refreshWindowSelection];
+}
+
+- (void)refreshWindowSelection {
+  CGRect bounds = CGRectZero;
+  NSDictionary *window = self.session.windowCandidate;
+  BOOL valid = window != nil && CGRectMakeWithDictionaryRepresentation((__bridge CFDictionaryRef)window[(id)kCGWindowBounds], &bounds);
+  for (CuteCaptureView *view in self.session.views) {
+    CuteRect rect = cute_selector_view_rect_for_window_bounds(CuteRectFromCGRect(bounds), view.screenFrame, view.mainScreenFrame);
+    view.selection = valid ? NSMakeRect(rect.x, rect.y, rect.width, rect.height) : NSZeroRect;
+    [view setNeedsDisplay:YES];
+  }
 }
 
 - (void)mouseMoved:(NSEvent *)event {
@@ -387,9 +447,7 @@ CuteRect cute_selector_view_rect_for_window_bounds(CuteRect window_bounds,
   NSPoint point = [self localPointForEvent:event];
   if (self.mode == CuteCaptureModeWindow) {
     [self updateWindowSelection:point];
-    if (!NSIsEmptyRect(self.selection)) {
-      [self finish:YES];
-    }
+    self.session.pressedWindow = self.session.windowCandidate;
     return;
   }
   self.session.dragging = YES;
@@ -412,6 +470,14 @@ CuteRect cute_selector_view_rect_for_window_bounds(CuteRect window_bounds,
 }
 
 - (void)mouseUp:(NSEvent *)event {
+  if (self.mode == CuteCaptureModeWindow) {
+    NSDictionary *pressed = self.session.pressedWindow;
+    [self updateWindowSelection:[self localPointForEvent:event]];
+    NSDictionary *current = self.session.windowCandidate;
+    self.session.pressedWindow = nil;
+    if (pressed != nil && current != nil && [pressed[(id)kCGWindowNumber] isEqual:current[(id)kCGWindowNumber]] && [pressed[(id)kCGWindowOwnerPID] isEqual:current[(id)kCGWindowOwnerPID]]) [self finish:YES];
+    return;
+  }
   if (!self.session.dragging || self.mode != CuteCaptureModeArea) {
     return;
   }
@@ -427,6 +493,23 @@ CuteRect cute_selector_view_rect_for_window_bounds(CuteRect window_bounds,
   if (event.keyCode == 53) {
     [self finish:NO];
     return;
+  }
+  if (self.mode == CuteCaptureModeWindow) {
+    if (event.keyCode == 36 || event.keyCode == 76) {
+      if (self.session.windowCandidate != nil) [self finish:YES];
+      return;
+    }
+    if (event.keyCode == 48) {
+      NSUInteger count = self.windows.count;
+      if (count == 0) return;
+      NSUInteger index = [self.windows indexOfObject:self.session.windowCandidate];
+      BOOL reverse = (event.modifierFlags & NSEventModifierFlagShift) != 0;
+      index = index == NSNotFound ? (reverse ? count - 1 : 0) : (index + count + (reverse ? -1 : 1)) % count;
+      self.session.windowCandidate = self.windows[index];
+      self.session.pressedWindow = nil;
+      [self refreshWindowSelection];
+      return;
+    }
   }
   [super keyDown:event];
 }
@@ -594,6 +677,8 @@ static int32_t CuteRunSelectionInner(CuteCaptureMode mode, const char *outputPat
   __block CGFloat selectedViewWidth = 1.0;
   __block CGFloat selectedViewHeight = 1.0;
   __block CGRect selectedPixels = CGRectNull;
+  __block CGWindowID selectedWindowID = 0;
+  __block pid_t selectedOwner = 0;
   void (^runSelection)(void) = ^{
     [NSApplication sharedApplication];
     NSArray<NSScreen *> *screens = NSScreen.screens;
@@ -626,6 +711,15 @@ static int32_t CuteRunSelectionInner(CuteCaptureMode mode, const char *outputPat
     for (CuteCaptureView *view in views) {
       view.session = session;
     }
+    if (mode == CuteCaptureModeWindow) {
+      NSPoint global = NSEvent.mouseLocation;
+      for (CuteCaptureView *view in views) {
+        if (NSPointInRect(global, view.window.frame)) {
+          [view updateWindowSelection:[view convertPoint:[view.window convertPointFromScreen:global] fromView:nil]];
+          break;
+        }
+      }
+    }
     for (NSUInteger index = 0; index < overlayWindows.count; index++) {
       NSWindow *window = overlayWindows[index];
       CuteCaptureView *view = views[index];
@@ -657,6 +751,8 @@ static int32_t CuteRunSelectionInner(CuteCaptureMode mode, const char *outputPat
           selectedImageRect = view.imageRect;
           selectedViewWidth = MAX(NSWidth(view.bounds), 1.0);
           selectedViewHeight = MAX(NSHeight(view.bounds), 1.0);
+          selectedWindowID = [session.windowCandidate[(id)kCGWindowNumber] unsignedIntValue];
+          selectedOwner = [session.windowCandidate[(id)kCGWindowOwnerPID] intValue];
           break;
         }
       }
@@ -698,6 +794,18 @@ static int32_t CuteRunSelectionInner(CuteCaptureMode mode, const char *outputPat
   }
   CGImageRelease(virtualFrozen);
 
+  if (mode == CuteCaptureModeWindow) {
+    if (selectedFrozen != NULL) CGImageRelease(selectedFrozen);
+    if (cancelled) { result->status = 1; return 1; }
+    if (selectedWindowID == 0) { result->status = 4; return 4; }
+    int32_t status = CuteCaptureIsolatedWindow(selectedWindowID, selectedOwner, outputPath,
+        cancelContext, cancelProbe, &result->width, &result->height);
+    result->status = status;
+    result->frame_width = result->width;
+    result->frame_height = result->height;
+    return status;
+  }
+
   if (cancelled || NSIsEmptyRect(selected)) {
     cute_selector_complete_handoff();
     if (selectedFrozen != NULL) {
@@ -729,19 +837,7 @@ static int32_t CuteRunSelectionInner(CuteCaptureMode mode, const char *outputPat
   }
 
   CGImageRef output = selectedFrozen;
-  if (mode == CuteCaptureModeWindow) {
-    output = CGImageCreateWithImageInRect(selectedFrozen, clamped);
-    if (output == NULL) {
-      cute_selector_complete_handoff();
-      CGImageRelease(selectedFrozen);
-      result->status = 3;
-      return 3;
-    }
-  }
   BOOL written = CuteWritePng(output, [NSString stringWithUTF8String:outputPath]);
-  if (mode == CuteCaptureModeWindow) {
-    CGImageRelease(output);
-  }
   if (!written) {
     cute_selector_complete_handoff();
     CGImageRelease(selectedFrozen);
@@ -776,6 +872,16 @@ int32_t cute_capture_area(const char *outputPath, const void *cancelContext,
 
 int32_t cute_capture_window(const char *outputPath, const void *cancelContext,
                             CuteCancellationProbe cancelProbe, CuteCaptureSelection *result) {
+  if (@available(macOS 14.0, *)) {
+    if (outputPath == NULL || result == NULL) return 3;
+    memset(result, 0, sizeof(*result));
+    int32_t status = CuteCaptureSystemWindow(outputPath, cancelContext, cancelProbe,
+        &result->width, &result->height);
+    result->status = status;
+    result->frame_width = result->width;
+    result->frame_height = result->height;
+    return status;
+  }
   return CuteRunSelection(CuteCaptureModeWindow, outputPath, cancelContext, cancelProbe, result);
 }
 

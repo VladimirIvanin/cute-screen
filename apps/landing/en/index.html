@@ -10,6 +10,7 @@
     <meta name="theme-color" content="#191a1e" />
     <link rel="icon" href="../assets/logo.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="../assets/site.css" />
+    <script type="module" src="../assets/brand-eyes.ts"></script>
     <link rel="alternate" hreflang="ru" href="https://vladimirivanin.github.io/cute-screen/" />
     <link rel="alternate" hreflang="en" href="https://vladimirivanin.github.io/cute-screen/en/" />
     <title>Cute Screen — Explain it visually</title>
@@ -18,7 +19,26 @@
     <a class="skip-link" href="#features">Skip to tools</a>
     <header class="site-header container">
       <a class="brand" href="../" aria-label="Cute Screen — home"
-        ><img src="../assets/logo.svg" width="36" height="36" alt="" /><span>Cute Screen</span></a
+        ><!-- brand-mark:start -->
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="36"
+          height="36"
+          viewBox="0 0 32 32"
+          data-brand-mark
+          aria-hidden="true"
+          focusable="false"
+        >
+          <rect width="32" height="32" rx="7" fill="#231F26" />
+          <path d="M4 4L11 9H21L28 4V22A2 2 0 0 1 26 24H18V27H23V29H9V27H14V24H6A2 2 0 0 1 4 22Z" fill="#FFFFFF" />
+          <g data-brand-eyes>
+            <path
+              d="M8 14H11C11 18 14 19 16 15C18 19 21 18 21 14H24C24 21 19 23 16 19C13 23 8 21 8 14Z"
+              fill="#231F26"
+            />
+          </g>
+        </svg>
+        <!-- brand-mark:end --><span>Cute Screen</span></a
       >
       <nav aria-label="Primary navigation">
         <a href="#features">Tools</a>
@@ -88,6 +108,18 @@
             <div>
               <h3>Arrows</h3>
               <p>Point to a button or connect details with straight, curved or elbow arrows.</p>
+            </div>
+          </article>
+          <article class="tool" data-tool="line">
+            <span class="tool-icon-wrap"
+              ><img class="tool-icon" src="../assets/icons/line.svg" width="24" height="24" alt=""
+            /></span>
+            <div>
+              <h3>Lines</h3>
+              <p>
+                Underline important details with a straight line. Alignment helps without Shift; color and width are
+                remembered.
+              </p>
             </div>
           </article>
           <article class="tool" data-tool="shape">

@@ -18,10 +18,11 @@ import {
   type HighlighterEffect,
 } from './highlighter'
 
-export type DrawingTool = 'arrow' | 'shape' | 'pencil' | 'marker'
+export type DrawingTool = 'arrow' | 'line' | 'shape' | 'pencil' | 'marker'
 export type { ShapeKind } from './shapes'
 
 export interface DrawingDefaults {
+  readonly line: JsonObject
   readonly arrow: JsonObject
   readonly shape: JsonObject
   readonly pencil: JsonObject
@@ -42,6 +43,13 @@ interface DrawingLayerInput {
 }
 
 export const DEFAULT_DRAWING_DEFAULTS: DrawingDefaults = Object.freeze({
+  line: Object.freeze({
+    autoAlignAxes: true,
+    stroke: Object.freeze({
+      color: Object.freeze({ red: 0.898, green: 0.282, blue: 0.302, alpha: 1 }),
+      width: 3, style: 'solid', cap: 'round', join: 'round',
+    }),
+  }),
   arrow: Object.freeze({
     path: 'straight',
     stroke: Object.freeze({
@@ -72,7 +80,7 @@ export const DEFAULT_DRAWING_DEFAULTS: DrawingDefaults = Object.freeze({
     brush: 'stabilized',
     strokeVersion: 2,
     pressureMode: 'simulated',
-    brushSmoothing: Object.freeze({ stabilized: .65, brush: .35 }),
+    brushSmoothing: Object.freeze({ stabilized: .65 }),
     width: 3,
     color: Object.freeze({ red: 0.898, green: 0.282, blue: 0.302, alpha: 1 }),
     smoothing: 0.65,
@@ -181,7 +189,7 @@ function drawingEnd(
   input: DrawingLayerInput,
   shape: string,
 ): Point {
-  if (input.tool === 'arrow') return constrainedEnd(input.start, input.end, input.constrainAngle === true)
+  if (input.tool === 'arrow' || input.tool === 'line') return constrainedEnd(input.start, input.end, input.constrainAngle === true)
   if (
     input.tool === 'shape' &&
     (input.constrainAngle === true ||
@@ -201,7 +209,7 @@ function drawingStrokeWidth(
     if (input.tool !== 'pencil' || values.strokeVersion === 2) return width
     return width * (values.brush === 'brush' ? 1.5 : values.brush === 'pencil' ? .65 : 1)
   }
-  const values = input.tool === 'arrow' ? defaults.arrow : defaults.shape
+  const values = input.tool === 'line' ? defaults.line : input.tool === 'arrow' ? defaults.arrow : defaults.shape
   const strokeValue = values.stroke instanceof Object ? (values.stroke as JsonObject).width : undefined
   return positiveWidth(strokeValue, 3)
 }
@@ -213,7 +221,7 @@ function drawingGeometry(
   strokeWidth: number,
 ): Rect {
   if (input.tool === 'pencil' || input.tool === 'marker') return pointsBounds(samples, strokeWidth / 2)
-  if (input.tool === 'arrow') return bounds({ x: 0, y: 0 }, { x: 0, y: 0 })
+  if (input.tool === 'arrow' || input.tool === 'line') return bounds({ x: 0, y: 0 }, { x: 0, y: 0 })
   if (input.drawFromCenter)
     return bounds({ x: input.start.x * 2 - end.x, y: input.start.y * 2 - end.y }, end, 1, strokeWidth / 2)
   return bounds(input.start, end, 1, strokeWidth / 2)
@@ -360,7 +368,24 @@ export function createDrawingLayer(input: DrawingLayerInput): LayerNode | undefi
   const strokeWidth = drawingStrokeWidth(input, defaults)
   const geometry = drawingGeometry(input, end, samples, strokeWidth)
   const common = commonDrawingLayer(input, defaults, geometry)
-  if (input.tool === 'arrow') return createArrowDrawing(input, defaults, end, common)
+  if (input.tool === 'arrow' || input.tool === 'line') {
+    const centeredStart = input.drawFromCenter
+      ? { x: input.start.x * 2 - end.x, y: input.start.y * 2 - end.y } : input.start
+    if (input.tool === 'line') {
+      const { autoAlignAxes: _align, ...style } = defaults.line
+      void _align
+      return createArrowDrawing(
+        { ...input, start: centeredStart },
+        {
+          ...defaults,
+          arrow: { ...style, annotationTool: 'line', path: 'straight', startCap: 'none', endCap: 'none' },
+        },
+        end,
+        common,
+      )
+    }
+    return createArrowDrawing(input, defaults, end, common)
+  }
   if (input.tool === 'shape') {
     const square = shape === 'circle'
     const side = Math.max(geometry.width, geometry.height)

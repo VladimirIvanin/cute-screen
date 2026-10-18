@@ -1,0 +1,17 @@
+#import <AppKit/AppKit.h>
+#import <CoreGraphics/CoreGraphics.h>
+#include <stdbool.h>
+
+typedef bool (*CuteWindowCancellationProbe)(const void *context);
+
+// Returns 0 success, 1 cancel, 2 permission denied, 3 capture failure,
+// 4 target invalidated. No caller-owned pointer is retained after return.
+int32_t CuteCaptureIsolatedWindow(CGWindowID windowID, pid_t owner, const char *path,
+                                 const void *context, CuteWindowCancellationProbe probe,
+                                 uint32_t *width, uint32_t *height);
+int32_t CuteCaptureSystemWindow(const char *path, const void *context,
+                               CuteWindowCancellationProbe probe, uint32_t *width,
+                               uint32_t *height);
+int32_t cute_macos_window_pixel_backend(void);
+void cute_window_selector_set_locale(bool russian);
+bool CuteWindowSelectorRussian(void);

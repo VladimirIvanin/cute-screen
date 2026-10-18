@@ -150,6 +150,11 @@ function defaults(
   const input = value as Record<string, unknown>
   const fallback = cloneDefaults(DEFAULT_DRAWING_DEFAULTS)
   return {
+    line: isJsonObject(input.line) && normalizedStroke(input.line.stroke) ? {
+      stroke: normalizedStroke(input.line.stroke)!,
+      autoAlignAxes: typeof input.line.autoAlignAxes === 'boolean' ? input.line.autoAlignAxes : true,
+      ...(typeof input.line.layerOpacity === 'number' && input.line.layerOpacity >= 0 && input.line.layerOpacity <= 1 ? { layerOpacity: input.line.layerOpacity } : {}),
+    } : fallback.line,
     arrow: normalizedArrow(input.arrow, schemaVersion, fallback.arrow),
     shape: isJsonObject(input.shape) ? input.shape : fallback.shape,
     pencil: isJsonObject(input.pencil)

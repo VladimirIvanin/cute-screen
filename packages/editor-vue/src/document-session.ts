@@ -1,5 +1,6 @@
 import {
   CommandManager,
+  createExpressiveBrushMigrationCommand,
   normalizeEditableDocumentScales,
   parseEditorDocument,
   serializeEditorDocument,
@@ -96,6 +97,8 @@ export class DocumentSessionController {
     this.#correlationId = options.correlationId
     if (options.onChange) this.#listeners.add(options.onChange)
     this.#debounceMs = options.debounceMs ?? 500
+    const migration = createExpressiveBrushMigrationCommand(this.#manager.snapshot.document)
+    if (migration) this.execute(migration)
   }
 
   get snapshot(): DocumentSessionSnapshot {

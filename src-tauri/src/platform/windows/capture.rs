@@ -1,7 +1,7 @@
 use std::{
     ptr::null,
     sync::{
-        Arc, Mutex, OnceLock,
+        Arc, OnceLock,
         atomic::{AtomicBool, Ordering},
     },
     time::{Duration, Instant},
@@ -28,33 +28,24 @@ use windows::{
     core::Interface,
 };
 use windows_sys::Win32::{
-    Foundation::{GetLastError, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM},
+    Foundation::{GetLastError, HWND, POINT, RECT},
     Graphics::Dwm::{DWMWA_TRANSITIONS_FORCEDISABLED, DwmFlush, DwmSetWindowAttribute},
     Graphics::Gdi::{
-        BLACK_BRUSH, BeginPaint, CreatePen, CreateSolidBrush, DeleteObject, Ellipse, EndPaint,
-        FillRect, GetMonitorInfoW, GetStockObject, InvalidateRect, LineTo,
-        MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromPoint, MoveToEx, PAINTSTRUCT, PS_DASH,
-        PS_SOLID, Rectangle, RoundRect, SelectObject, SetBkMode, SetTextColor, TRANSPARENT,
-        TextOutW, UpdateWindow, WHITE_BRUSH,
+        BLACK_BRUSH, GetMonitorInfoW, GetStockObject, MONITOR_DEFAULTTONEAREST, MONITORINFO,
+        MonitorFromPoint, UpdateWindow,
     },
     System::LibraryLoader::GetModuleHandleW,
     UI::HiDpi::{
         DPI_AWARENESS_CONTEXT, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
         SetThreadDpiAwarenessContext,
     },
-    UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture, SetFocus},
     UI::WindowsAndMessaging::{
-        CS_HREDRAW, CS_VREDRAW, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
-        GA_ROOT, GetAncestor, GetClientRect, GetForegroundWindow, GetPhysicalCursorPos,
-        GetSystemMetrics, GetWindowRect, IDC_CROSS, IsWindow, IsWindowVisible, LWA_ALPHA,
-        LoadCursorW, MSG, PM_REMOVE, PeekMessageW, PostQuitMessage, RegisterClassW,
-        SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SW_SHOW,
-        SW_SHOWNOACTIVATE, SWP_NOACTIVATE, SWP_NOOWNERZORDER, SWP_NOZORDER, SetCursor,
-        SetForegroundWindow, SetLayeredWindowAttributes, SetWindowPos, ShowWindow, WA_INACTIVE,
-        WM_ACTIVATE, WM_CLOSE, WM_DESTROY, WM_KEYDOWN, WM_LBUTTONDOWN, WM_LBUTTONUP,
-        WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_NCHITTEST, WM_PAINT, WM_SETCURSOR, WNDCLASSW,
-        WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
-        WindowFromPoint,
+        CreateWindowExW, DefWindowProcW, DestroyWindow, GA_ROOT, GetAncestor, GetForegroundWindow,
+        GetPhysicalCursorPos, GetSystemMetrics, GetWindowRect, IsWindow, IsWindowVisible,
+        LWA_ALPHA, RegisterClassW, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN,
+        SM_YVIRTUALSCREEN, SW_SHOWNOACTIVATE, SWP_NOACTIVATE, SWP_NOOWNERZORDER, SWP_NOZORDER,
+        SetLayeredWindowAttributes, SetWindowPos, ShowWindow, WNDCLASSW, WS_EX_LAYERED,
+        WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
     },
 };
 
@@ -62,6 +53,12 @@ use crate::{
     image_transport::ImageTransportService,
     platform::{CaptureGeometry, CaptureResult, CaptureTarget, PlatformError, PlatformErrorCode},
 };
+
+mod window;
+
+pub(crate) fn window_capture_available() -> bool {
+    window::available()
+}
 
 /// Direct Windows desktop capture using DWM's composited DXGI outputs.
 ///
@@ -261,16 +258,12 @@ impl WindowsCompositorCaptureAdapter {
                 (source_geometry.clone(), frame)
             }
             CaptureExecutionOrder::SelectThenFrame => {
-                let prepared = prepare_compositor_capture(&source_geometry, correlation_id)?;
-                let geometry =
-                    selected_window_geometry(&source_geometry, correlation_id, &cancel_signal)?;
-                let _pulse = CompositorPulse::show(&source_geometry, correlation_id)?;
-                flush_desktop_composition(correlation_id)?;
-                let frame_started = Instant::now();
-                let outputs = capture_prepared_compositor_outputs(&prepared, correlation_id)?;
-                let frame = compose_compositor_outputs(&source_geometry, &outputs, correlation_id)?;
-                log_capture_timing(correlation_id, "compositor-after-selection", frame_started);
-                (geometry, frame)
+                return window::capture(
+                    &source_geometry,
+                    correlation_id,
+                    &transport,
+                    &cancel_signal,
+                );
             }
             CaptureExecutionOrder::FrameThenResolve => {
                 let frame_started = Instant::now();
@@ -426,40 +419,7 @@ impl Drop for ThreadDpiAwarenessGuard {
     }
 }
 
-#[derive(Clone, Copy, Default)]
-struct SelectionState {
-    origin: POINT,
-    start: Option<POINT>,
-    end: Option<POINT>,
-    cursor: Option<POINT>,
-    cancelled: bool,
-    restore_foreground: isize,
-}
-
-static SELECTOR_STATE: Mutex<SelectionState> = Mutex::new(SelectionState {
-    origin: POINT { x: 0, y: 0 },
-    start: None,
-    end: None,
-    cursor: None,
-    cancelled: false,
-    restore_foreground: 0,
-});
 static SELECTOR_CLASS_REGISTERED: OnceLock<bool> = OnceLock::new();
-const SELECTOR_CLIENT_HIT: LRESULT = 1;
-const SELECTOR_DIM_ALPHA: u8 = 128;
-
-fn selected_window_geometry(
-    source: &CaptureGeometry,
-    correlation_id: &str,
-    cancel_signal: &AtomicBool,
-) -> Result<CaptureGeometry, PlatformError> {
-    let selection = select_on_virtual_desktop(source, correlation_id, cancel_signal)?;
-    let point = selection
-        .end
-        .ok_or_else(|| PlatformError::new(PlatformErrorCode::Cancelled, correlation_id))?;
-    let window = unsafe { WindowFromPoint(point) };
-    window_geometry(source, window, correlation_id)
-}
 
 fn active_window_geometry(
     source: &CaptureGeometry,
@@ -569,137 +529,6 @@ fn crop_bgra(
     Ok(output)
 }
 
-fn select_on_virtual_desktop(
-    source: &CaptureGeometry,
-    correlation_id: &str,
-    cancel_signal: &AtomicBool,
-) -> Result<SelectionState, PlatformError> {
-    if !*SELECTOR_CLASS_REGISTERED.get_or_init(register_selector_class) {
-        return Err(last_error(correlation_id, "registerSelectorClass"));
-    }
-    let width =
-        i32::try_from(source.width).map_err(|_| failure(correlation_id, "selectorWidth"))?;
-    let height =
-        i32::try_from(source.height).map_err(|_| failure(correlation_id, "selectorHeight"))?;
-    let class_name = selector_class_name();
-    {
-        let mut state = SELECTOR_STATE
-            .lock()
-            .map_err(|_| failure(correlation_id, "selectorState"))?;
-        let mut cursor = POINT::default();
-        let cursor = (unsafe { GetPhysicalCursorPos(&mut cursor) } != 0).then_some(cursor);
-        *state = SelectionState {
-            origin: POINT {
-                x: source.x,
-                y: source.y,
-            },
-            cursor,
-            restore_foreground: unsafe { GetForegroundWindow() } as isize,
-            ..SelectionState::default()
-        };
-    }
-    let window = unsafe {
-        CreateWindowExW(
-            WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED,
-            class_name.as_ptr(),
-            null(),
-            WS_POPUP,
-            source.x,
-            source.y,
-            width,
-            height,
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
-            GetModuleHandleW(null()),
-            null(),
-        )
-    };
-    if window.is_null() {
-        return Err(last_error(correlation_id, "createSelectorWindow"));
-    }
-    let (layer_color, layer_alpha, layer_flags) = selector_layered_attributes();
-    let layered =
-        unsafe { SetLayeredWindowAttributes(window, layer_color, layer_alpha, layer_flags) };
-    if layered == 0 {
-        let error = last_error(correlation_id, "showSelectorWindow");
-        unsafe { DestroyWindow(window) };
-        return Err(error);
-    }
-    unsafe {
-        ShowWindow(window, SW_SHOW);
-        // Layered popup windows do not always receive an initial full-client
-        // paint before the first pointer message. Force the complete dim/chrome
-        // frame so the first hint is never partially stale.
-        InvalidateRect(window, null(), 1);
-        UpdateWindow(window);
-        let cursor = LoadCursorW(std::ptr::null_mut(), selector_cursor_resource());
-        if !cursor.is_null() {
-            SetCursor(cursor);
-        }
-    }
-
-    unsafe {
-        SetForegroundWindow(window);
-        SetFocus(window);
-        SetCapture(window);
-    }
-    loop {
-        if selector_cancel_requested(cancel_signal) {
-            if let Ok(mut state) = SELECTOR_STATE.lock() {
-                state.cancelled = true;
-            }
-            break;
-        }
-        let mut message = MSG::default();
-        if unsafe { PeekMessageW(&mut message, std::ptr::null_mut(), 0, 0, PM_REMOVE) } == 0 {
-            std::thread::sleep(Duration::from_millis(16));
-            continue;
-        }
-        if message.message == windows_sys::Win32::UI::WindowsAndMessaging::WM_QUIT {
-            break;
-        }
-        unsafe { DispatchMessageW(&message) };
-    }
-    let selection = *SELECTOR_STATE
-        .lock()
-        .map_err(|_| failure(correlation_id, "selectorState"))?;
-    unsafe {
-        ReleaseCapture();
-        DestroyWindow(window);
-    }
-    if selection.cancelled || selection.start.is_none() || selection.end.is_none() {
-        return Err(PlatformError::new(
-            PlatformErrorCode::Cancelled,
-            correlation_id,
-        ));
-    }
-    restore_foreground_after_selector(selection.restore_foreground, correlation_id)?;
-    Ok(selection)
-}
-
-fn restore_foreground_after_selector(
-    restore_foreground: isize,
-    correlation_id: &str,
-) -> Result<(), PlatformError> {
-    let debug = std::env::var_os("CUTE_SCREEN_CAPTURE_DEBUG").is_some();
-    let restore = restore_foreground as HWND;
-    if !restore.is_null()
-        && unsafe { IsWindow(restore) } != 0
-        && unsafe { GetForegroundWindow() } != restore
-        && unsafe { SetForegroundWindow(restore) } == 0
-        && debug
-    {
-        // Windows may reject foreground activation even though the selector
-        // was the current foreground window. The selector has already been
-        // destroyed, so this cannot leak into the captured pixels and is not
-        // a valid reason to discard the user's completed selection.
-        eprintln!(
-            "cute-screen selector warning: foreground restore was rejected ({correlation_id})"
-        );
-    }
-    Ok(())
-}
-
 fn flush_desktop_composition(correlation_id: &str) -> Result<(), PlatformError> {
     if unsafe { DwmFlush() } < 0 {
         return Err(failure(correlation_id, "flushDesktopComposition"));
@@ -761,23 +590,11 @@ const fn compositor_pulse_policy() -> (u32, u8) {
     )
 }
 
-fn foreground_restore_candidate(
-    activation: usize,
-    previous: isize,
-    selector: isize,
-) -> Option<isize> {
-    (activation != WA_INACTIVE as usize && previous != 0 && previous != selector)
-        .then_some(previous)
-}
-
 fn register_selector_class() -> bool {
     let class_name = selector_class_name();
-    let cursor = unsafe { LoadCursorW(std::ptr::null_mut(), IDC_CROSS) };
     let class = WNDCLASSW {
-        style: CS_HREDRAW | CS_VREDRAW,
-        lpfnWndProc: Some(selector_window_proc),
+        lpfnWndProc: Some(DefWindowProcW),
         hInstance: unsafe { GetModuleHandleW(null()) },
-        hCursor: cursor,
         hbrBackground: unsafe { GetStockObject(BLACK_BRUSH).cast() },
         lpszClassName: class_name.as_ptr(),
         ..WNDCLASSW::default()
@@ -786,358 +603,10 @@ fn register_selector_class() -> bool {
 }
 
 fn selector_class_name() -> Vec<u16> {
-    "CuteScreenCaptureSelector"
+    "CuteScreenCompositorPulse"
         .encode_utf16()
         .chain(std::iter::once(0))
         .collect()
-}
-
-unsafe extern "system" fn selector_window_proc(
-    window: HWND,
-    message: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
-    match message {
-        WM_NCHITTEST => selector_hit_test(),
-        WM_SETCURSOR => {
-            let cursor = unsafe { LoadCursorW(std::ptr::null_mut(), selector_cursor_resource()) };
-            if !cursor.is_null() {
-                unsafe { SetCursor(cursor) };
-            }
-            1
-        }
-        WM_MOUSEACTIVATE => {
-            let foreground = unsafe { GetForegroundWindow() };
-            if !foreground.is_null()
-                && foreground != window
-                && let Ok(mut state) = SELECTOR_STATE.lock()
-            {
-                state.restore_foreground = foreground as isize;
-            }
-            unsafe { DefWindowProcW(window, message, wparam, lparam) }
-        }
-        WM_ACTIVATE => {
-            if let Some(previous) =
-                foreground_restore_candidate(wparam & 0xffff, lparam, window as isize)
-                && let Ok(mut state) = SELECTOR_STATE.lock()
-            {
-                state.restore_foreground = previous;
-            }
-            unsafe { DefWindowProcW(window, message, wparam, lparam) }
-        }
-        WM_LBUTTONDOWN => {
-            if let Ok(mut state) = SELECTOR_STATE.lock() {
-                state.start = Some(selector_point(lparam, state.origin));
-                state.end = state.start;
-            }
-            repaint_selector(window);
-            0
-        }
-        WM_MOUSEMOVE => {
-            let mut old_hint = None;
-            let mut new_hint = None;
-            let mut hint_changed = false;
-            let mut selecting = false;
-            let mut client = RECT::default();
-            unsafe { GetClientRect(window, &mut client) };
-            if let Ok(mut state) = SELECTOR_STATE.lock() {
-                let point = selector_point(lparam, state.origin);
-                if state.start.is_some() {
-                    state.end = Some(point);
-                    selecting = true;
-                } else {
-                    hint_changed = update_hint_cursor_transition(
-                        &client,
-                        &mut state,
-                        point,
-                        &mut old_hint,
-                        &mut new_hint,
-                    );
-                }
-            }
-            if selecting {
-                repaint_selector(window);
-            } else if hint_changed {
-                repaint_hint_transition(window, old_hint, new_hint);
-            }
-            0
-        }
-        WM_LBUTTONUP => {
-            let mut selection_started = false;
-            if let Ok(mut state) = SELECTOR_STATE.lock()
-                && state.start.is_some()
-            {
-                state.end = Some(selector_point(lparam, state.origin));
-                selection_started = true;
-            }
-            if selection_started {
-                post_selector_quit(message, wparam, true);
-            }
-            0
-        }
-        WM_KEYDOWN if wparam == 0x1b => {
-            if let Ok(mut state) = SELECTOR_STATE.lock() {
-                state.cancelled = true;
-            }
-            post_selector_quit(message, wparam, false);
-            0
-        }
-        WM_CLOSE => {
-            if let Ok(mut state) = SELECTOR_STATE.lock() {
-                state.cancelled = true;
-            }
-            post_selector_quit(message, wparam, false);
-            0
-        }
-        WM_DESTROY => 0,
-        WM_PAINT => {
-            paint_selector(window);
-            0
-        }
-        _ => unsafe { DefWindowProcW(window, message, wparam, lparam) },
-    }
-}
-
-fn post_selector_quit(message: u32, wparam: WPARAM, selection_started: bool) {
-    if selector_posts_quit(message, wparam, selection_started) {
-        unsafe { PostQuitMessage(0) };
-    }
-}
-
-fn selector_posts_quit(message: u32, wparam: WPARAM, selection_started: bool) -> bool {
-    (message == WM_LBUTTONUP && selection_started)
-        || message == WM_CLOSE
-        || (message == WM_KEYDOWN && wparam == 0x1b)
-}
-
-fn selector_hit_test() -> LRESULT {
-    SELECTOR_CLIENT_HIT
-}
-
-fn selector_cursor_resource() -> windows_sys::core::PCWSTR {
-    IDC_CROSS
-}
-
-fn selector_dimension_label(width: u32, height: u32) -> String {
-    format!("{width} x {height}")
-}
-
-const fn selector_border_background_mode() -> i32 {
-    TRANSPARENT.cast_signed()
-}
-
-fn repaint_selector(window: HWND) {
-    unsafe {
-        InvalidateRect(window, null(), 1);
-        UpdateWindow(window);
-    }
-}
-
-fn repaint_hint_transition(window: HWND, old_hint: Option<RECT>, new_hint: Option<RECT>) {
-    unsafe {
-        if let Some(old_hint) = old_hint {
-            InvalidateRect(window, &old_hint, 1);
-        }
-        if let Some(new_hint) = new_hint {
-            InvalidateRect(window, &new_hint, 1);
-        }
-        UpdateWindow(window);
-    }
-}
-
-fn paint_selector(window: HWND) {
-    let mut paint = PAINTSTRUCT::default();
-    let dc = unsafe { BeginPaint(window, &mut paint) };
-    if dc.is_null() {
-        return;
-    }
-    let mut client = RECT::default();
-    unsafe {
-        GetClientRect(window, &mut client);
-        FillRect(dc, &client, GetStockObject(BLACK_BRUSH).cast());
-        // PS_DASH uses the DC background mode for the spaces between strokes.
-        // The opaque default paints those spaces white too, making the native
-        // drag frame look solid until Canvas2D replaces it after selection.
-        SetBkMode(dc, selector_border_background_mode());
-    }
-    let state = SELECTOR_STATE.lock().ok().map(|state| *state);
-    if let Some(state) = state
-        && let Some((start, end)) = state.start.zip(state.end)
-    {
-        let origin = state.origin;
-        let mut rect = RECT {
-            left: start.x.min(end.x) - origin.x,
-            top: start.y.min(end.y) - origin.y,
-            right: start.x.max(end.x) - origin.x,
-            bottom: start.y.max(end.y) - origin.y,
-        };
-        if rect.right == rect.left {
-            rect.right += 1;
-        }
-        if rect.bottom == rect.top {
-            rect.bottom += 1;
-        }
-        let pen = unsafe { CreatePen(PS_DASH, 1, 0x00ff_ffff) };
-        let previous = unsafe { SelectObject(dc, pen.cast()) };
-        unsafe {
-            MoveToEx(dc, rect.left, rect.top, std::ptr::null_mut());
-            LineTo(dc, rect.right, rect.top);
-            LineTo(dc, rect.right, rect.bottom);
-            LineTo(dc, rect.left, rect.bottom);
-            LineTo(dc, rect.left, rect.top);
-            SelectObject(dc, previous);
-            DeleteObject(pen.cast());
-        }
-        let width = (rect.right - rect.left).unsigned_abs();
-        let height = (rect.bottom - rect.top).unsigned_abs();
-        let label = selector_dimension_label(width, height);
-        let label_w = 18 + i32::try_from(label.encode_utf16().count()).unwrap_or(12) * 8;
-        let label_top = (rect.top - 34).max(8);
-        let label_rect = RECT {
-            left: rect.left.max(8),
-            top: label_top,
-            right: rect.left.max(8) + label_w,
-            bottom: label_top + 28,
-        };
-        let brush = unsafe { CreateSolidBrush(0x0020_2020) };
-        let text: Vec<u16> = label.encode_utf16().collect();
-        unsafe {
-            let previous_brush = SelectObject(dc, brush.cast());
-            RoundRect(
-                dc,
-                label_rect.left,
-                label_rect.top,
-                label_rect.right,
-                label_rect.bottom,
-                12,
-                12,
-            );
-            SetBkMode(dc, TRANSPARENT.cast_signed());
-            SetTextColor(dc, 0x00ff_ffff);
-            TextOutW(
-                dc,
-                label_rect.left + 9,
-                label_rect.top + 6,
-                text.as_ptr(),
-                i32::try_from(text.len()).unwrap_or(0),
-            );
-            SelectObject(dc, previous_brush);
-            DeleteObject(brush.cast());
-        }
-    } else if let Some(state) = state
-        && state.cursor.is_some()
-    {
-        let Some(card) = selector_hint_bounds(&client, &state) else {
-            unsafe { EndPaint(window, &paint) };
-            return;
-        };
-        let text: Vec<u16> = "Выделите область".encode_utf16().collect();
-        unsafe {
-            let previous_brush = SelectObject(dc, GetStockObject(WHITE_BRUSH));
-            let hint_pen = CreatePen(PS_SOLID, 1, 0x0018_1818);
-            let previous_pen = SelectObject(dc, hint_pen.cast());
-            RoundRect(dc, card.left, card.top, card.right, card.bottom, 16, 16);
-            SetBkMode(dc, TRANSPARENT.cast_signed());
-            SetTextColor(dc, 0x0018_1818);
-            TextOutW(
-                dc,
-                card.left + 14,
-                card.top + 15,
-                text.as_ptr(),
-                i32::try_from(text.len()).unwrap_or(0),
-            );
-            // Small camera glyph, drawn natively so selector chrome has no
-            // font/icon asset dependency.
-            Rectangle(
-                dc,
-                card.left + 184,
-                card.top + 14,
-                card.left + 214,
-                card.top + 37,
-            );
-            Rectangle(
-                dc,
-                card.left + 192,
-                card.top + 10,
-                card.left + 205,
-                card.top + 15,
-            );
-            Ellipse(
-                dc,
-                card.left + 193,
-                card.top + 19,
-                card.left + 205,
-                card.top + 31,
-            );
-            SelectObject(dc, previous_pen);
-            SelectObject(dc, previous_brush);
-            DeleteObject(hint_pen.cast());
-        }
-    }
-    unsafe { EndPaint(window, &paint) };
-}
-
-fn selector_hint_bounds(client: &RECT, state: &SelectionState) -> Option<RECT> {
-    let cursor = state.cursor?;
-    let width = 226;
-    let height = 48;
-    let cursor_x = cursor.x - state.origin.x;
-    let cursor_y = cursor.y - state.origin.y;
-    let left = (cursor_x + 18).clamp(8, (client.right - width - 8).max(8));
-    let top = (cursor_y + 22).clamp(8, (client.bottom - height - 8).max(8));
-    Some(RECT {
-        left,
-        top,
-        right: left + width,
-        bottom: top + height,
-    })
-}
-
-fn selector_layered_attributes() -> (u32, u8, u32) {
-    (0, SELECTOR_DIM_ALPHA, LWA_ALPHA)
-}
-
-fn update_hint_cursor(state: &mut SelectionState, pointer: POINT) -> bool {
-    let changed = state
-        .cursor
-        .is_none_or(|cursor| cursor.x != pointer.x || cursor.y != pointer.y);
-    if changed {
-        state.cursor = Some(pointer);
-    }
-    changed
-}
-
-fn update_hint_cursor_transition(
-    client: &RECT,
-    state: &mut SelectionState,
-    pointer: POINT,
-    old_hint: &mut Option<RECT>,
-    new_hint: &mut Option<RECT>,
-) -> bool {
-    *old_hint = selector_hint_bounds(client, state);
-    let changed = update_hint_cursor(state, pointer);
-    *new_hint = selector_hint_bounds(client, state);
-    changed
-}
-
-fn selector_cancel_requested(cancel_signal: &AtomicBool) -> bool {
-    cancel_signal.load(Ordering::Acquire)
-}
-
-fn selector_point(lparam: LPARAM, origin: POINT) -> POINT {
-    let point = selector_client_point(lparam);
-    POINT {
-        x: origin.x + point.x,
-        y: origin.y + point.y,
-    }
-}
-
-fn selector_client_point(lparam: LPARAM) -> POINT {
-    let bytes = lparam.to_le_bytes();
-    let x = i32::from(i16::from_le_bytes([bytes[0], bytes[1]]));
-    let y = i32::from(i16::from_le_bytes([bytes[2], bytes[3]]));
-    POINT { x, y }
 }
 
 fn virtual_screen_geometry() -> Result<CaptureGeometry, &'static str> {
@@ -1564,8 +1033,8 @@ fn last_error(correlation_id: &str, stage: &'static str) -> PlatformError {
 mod tests {
     use super::{
         CaptureExecutionOrder, CompositorOutputFrame, capture_execution_order,
-        compose_compositor_outputs, crop_bgra, encode_bgra_png, foreground_restore_candidate,
-        intersect_rect, uses_mounted_quick_selection,
+        compose_compositor_outputs, crop_bgra, encode_bgra_png, intersect_rect,
+        uses_mounted_quick_selection,
     };
     use crate::platform::CaptureGeometry;
 
@@ -1679,93 +1148,6 @@ mod tests {
     }
 
     #[test]
-    fn selector_cleanup_does_not_enqueue_another_quit_for_the_next_capture() {
-        assert!(!super::selector_posts_quit(super::WM_DESTROY, 0, false));
-        assert!(!super::selector_posts_quit(super::WM_LBUTTONUP, 0, false));
-        assert!(super::selector_posts_quit(super::WM_LBUTTONUP, 0, true));
-        assert!(super::selector_posts_quit(super::WM_KEYDOWN, 0x1b, false));
-        assert!(!super::selector_posts_quit(super::WM_KEYDOWN, 0x0d, false));
-    }
-
-    #[test]
-    fn pre_drag_hint_does_not_reserve_a_cancel_button() {
-        let client = super::RECT {
-            left: 0,
-            top: 0,
-            right: 1920,
-            bottom: 1080,
-        };
-        let state = super::SelectionState {
-            cursor: Some(super::POINT { x: 200, y: 200 }),
-            ..super::SelectionState::default()
-        };
-        let hint = super::selector_hint_bounds(&client, &state).expect("hint bounds");
-
-        assert_eq!(hint.right - hint.left, 226);
-    }
-
-    #[test]
-    fn selector_uses_crosshair_for_the_whole_native_gesture() {
-        assert_eq!(super::selector_cursor_resource(), super::IDC_CROSS);
-    }
-
-    #[test]
-    fn selector_dimension_label_uses_only_stock_font_safe_ascii() {
-        let label = super::selector_dimension_label(377, 513);
-
-        assert_eq!(label, "377 x 513");
-        assert!(label.is_ascii());
-    }
-
-    #[test]
-    fn selector_dash_gaps_are_transparent_during_the_native_drag() {
-        assert_eq!(
-            super::selector_border_background_mode(),
-            super::TRANSPARENT.cast_signed()
-        );
-    }
-
-    #[test]
-    fn selector_layer_dims_the_desktop_without_a_color_key() {
-        let (color, alpha, flags) = super::selector_layered_attributes();
-
-        assert_eq!(color, 0);
-        assert!(alpha > 0 && alpha < 255);
-        assert_eq!(
-            flags,
-            windows_sys::Win32::UI::WindowsAndMessaging::LWA_ALPHA
-        );
-    }
-
-    #[test]
-    fn pre_drag_hint_tracks_each_pointer_move() {
-        let mut state = super::SelectionState {
-            cursor: Some(super::POINT { x: 40, y: 50 }),
-            ..super::SelectionState::default()
-        };
-
-        assert!(super::update_hint_cursor(
-            &mut state,
-            super::POINT { x: 140, y: 150 },
-        ));
-        let cursor = state.cursor.expect("updated cursor");
-        assert_eq!((cursor.x, cursor.y), (140, 150));
-    }
-
-    #[test]
-    fn transparent_selector_keeps_client_pointer_input() {
-        assert_eq!(super::selector_hit_test(), super::SELECTOR_CLIENT_HIT);
-    }
-
-    #[test]
-    fn selector_observes_the_shared_controller_cancel_signal() {
-        let signal = std::sync::atomic::AtomicBool::new(false);
-        assert!(!super::selector_cancel_requested(&signal));
-        signal.store(true, std::sync::atomic::Ordering::Release);
-        assert!(super::selector_cancel_requested(&signal));
-    }
-
-    #[test]
     fn area_uses_the_mounted_quick_surface_while_window_keeps_native_selection() {
         assert_eq!(
             capture_execution_order(crate::platform::CaptureTarget::Area),
@@ -1845,13 +1227,6 @@ mod tests {
         assert_ne!(extended_style & super::WS_EX_NOACTIVATE, 0);
         assert_ne!(extended_style & super::WS_EX_LAYERED, 0);
         assert_eq!(alpha, 0);
-    }
-
-    #[test]
-    fn selector_restores_the_window_that_was_active_before_its_latest_activation() {
-        assert_eq!(foreground_restore_candidate(1, 42, 7), Some(42));
-        assert_eq!(foreground_restore_candidate(0, 42, 7), None);
-        assert_eq!(foreground_restore_candidate(1, 7, 7), None);
     }
 
     #[test]

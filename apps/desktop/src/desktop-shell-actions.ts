@@ -127,6 +127,7 @@ async function capture(
     const captureAction = resolveCaptureAction(capabilities, action)
     const outcome = await dispatchNativeCapture({
       session: capabilities.session,
+      shouldRestore: (result) => result.completion !== 'history',
       mainWindow: await currentDesktopWindow(),
       waitForMainWindowUnmap: () => tauriDesktopBridge.captureWaitForEditorUnmap(ports.correlationId()),
       capture: () =>
@@ -174,7 +175,7 @@ async function handleCaptureOutcome(
     if (!(await ports.mountCapturedDocument(outcome.document?.captureId))) {
       throw new Error('Capture was saved, but the editor could not open it')
     }
-    return 'Capture opened'
+    return outcome.completion === 'history' ? 'Saved to history' : 'Capture opened'
   }
   if (outcome.outcome === 'cancelled') {
     throw new ActionCancelledError('Capture cancelled')

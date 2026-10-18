@@ -331,6 +331,47 @@ describe('consistent tool UX through the mounted shell', () => {
     input.remove()
     app.close()
   })
+  it('applies one common gradient and dotted stroke to mixed shapes with batch undo/redo', async () => {
+    const context = canvasContext()
+    context.createLinearGradient = vi.fn(() => ({ addColorStop: vi.fn() }) as unknown as CanvasGradient)
+    vi.mocked(HTMLCanvasElement.prototype.getContext).mockReturnValue(context)
+    const first = createDrawingLayer({ id: '019c1f62-058e-7000-8000-000000000010', tool: 'shape',
+      start: { x: 10, y: 10 }, end: { x: 30, y: 30 } })!
+    if (first.kind !== 'shape') throw new Error('expected shape')
+    const second = { ...first, id: '019c1f62-058e-7000-8000-000000000011',
+      payload: { ...first.payload, fill: { kind: 'solid', opacity: 0.4, color: { red: 0, green: 0, blue: 1, alpha: 1 } } } }
+    const app = mount({ ...arrowDocument(), layers: [first, second] })
+    app.store.selectTool('select')
+    app.store.selectLayer(first.id)
+    app.store.selectLayer(second.id, true)
+    await nextTick()
+    const spy = vi.spyOn(app.session, 'execute')
+    const toolbar = app.view.container.querySelector('.cs-selection-floating-toolbar') as HTMLElement
+    await fireEvent.click(await within(toolbar).findByRole('button', { name: 'Fill: —' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Linear gradient' }))
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(spy.mock.calls[0]![0].type).toBe('batch')
+    const after = app.session.snapshot.core.document.layers.map((layer) => shapePayload(layer).fill)
+    expect(after[0]).toEqual(after[1])
+    app.session.undo()
+    expect(app.session.snapshot.core.document.layers.map((layer) => shapePayload(layer).fill))
+      .toEqual([first.payload.fill, second.payload.fill])
+    app.session.redo()
+    expect(app.session.snapshot.core.document.layers.map((layer) => shapePayload(layer).fill)).toEqual(after)
+    await nextTick()
+    await fireEvent.click(await within(toolbar).findByRole('button', { name: /Stroke:/ }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Dotted' }))
+    expect(spy.mock.calls.at(-1)![0].type).toBe('batch')
+    for (const layer of app.session.snapshot.core.document.layers) expect(shapePayload(layer).stroke).toMatchObject({ style: 'dotted' })
+    app.close()
+    const reopened = mount()
+    await fireEvent.click(screen.getByRole('button', { name: 'Shape' }))
+    await draw(reopened.scene)
+    const created = shapePayload(reopened.session.snapshot.core.document.layers.at(-1)!)
+    expect(created.fill).toEqual(after[0])
+    expect(created.stroke).toMatchObject({ style: 'dotted' })
+    reopened.close()
+  })
   it('applies one mixed-selection property as one command and remembers it after remount', async () => {
     const first = createDrawingLayer({
       id: '019c1f62-058e-7000-8000-000000000010',

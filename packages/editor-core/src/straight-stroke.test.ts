@@ -91,7 +91,7 @@ describe('compound freehand and straight strokes', () => {
     expect(parseSampledPayload(layer.payload, 'pencil', false)).toEqual(layer.payload)
     const document = withLayers([layer])
     expect(parseEditorDocument(serializeEditorDocument(document))).toMatchObject({ kind: 'editable', document })
-    const styled = applyLayerStyle(layer, { brush: 'brush', smoothing: 1 })
+    const styled = applyLayerStyle(layer, { brush: 'stabilized', smoothing: 1 })
     expect(styled.payload.strokeVersion).toBe(3)
     expect(styled.payload.straightSegments).toEqual(layer.payload.straightSegments)
     const resized = resizeLayerGeometry(styled, 'se', { x: 90, y: 90 }) as PencilLayer

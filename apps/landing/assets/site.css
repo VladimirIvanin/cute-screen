@@ -82,7 +82,9 @@ img {
   font-weight: 650;
   letter-spacing: -0.6px;
 }
-.brand img {
+.brand svg {
+  display: block;
+  flex: none;
   border-radius: 9px;
 }
 .site-header nav {
@@ -370,7 +372,7 @@ h1 span {
     gap: 9px;
     font-size: 20px;
   }
-  .brand img {
+  .brand svg {
     width: 31px;
     height: 31px;
   }

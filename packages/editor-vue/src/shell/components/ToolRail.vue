@@ -13,7 +13,7 @@ defineProps<{
   configureHint?: string | undefined
   tools: readonly ToolDescriptor[]
   activeToolId?: string | undefined
-  t: (key: ToolDescriptor['labelKey'] | 'tools' | 'straightStrokeHint' | 'rulerAngleHint') => string
+  t: (key: ToolDescriptor['labelKey'] | 'tools') => string
 }>()
 const emit = defineEmits<{
   select: [id: string]
@@ -28,14 +28,12 @@ const toolGroups = ['canvas', 'annotate', 'more'] as const
 
 function toolTitle(
   tool: ToolDescriptor,
-  translate: (key: ToolDescriptor['labelKey'] | 'tools' | 'straightStrokeHint' | 'rulerAngleHint') => string,
+  translate: (key: ToolDescriptor['labelKey'] | 'tools') => string,
 ): string {
   if (tool.disabled && tool.disabledReasonKey) {
     return translate(tool.disabledReasonKey)
   }
-  const title = tool.shortcut ? `${translate(tool.labelKey)} (${tool.shortcut})` : translate(tool.labelKey)
-  if (tool.id === 'ruler') return `${title} · ${translate('rulerAngleHint')}`
-  return tool.id === 'pencil' || tool.id === 'marker' ? `${title} · ${translate('straightStrokeHint')}` : title
+  return tool.shortcut ? `${translate(tool.labelKey)} (${tool.shortcut})` : translate(tool.labelKey)
 }
 
 function onConfigure(

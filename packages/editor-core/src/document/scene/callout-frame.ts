@@ -1,8 +1,13 @@
-import type { CalloutLayer } from '../types'
+import type {
+  CalloutLayer,
+  Rect,
+} from '../types'
 import type { RenderNode } from '../../scene/contracts'
 import {
   calloutTextRect,
   calloutTextLayout,
+  calloutHasLabel,
+  calloutAccentSide,
   type CalloutGeometryContext,
 } from '../../callout-geometry'
 import {
@@ -14,6 +19,7 @@ export function calloutFrameNodes(
   context: CalloutGeometryContext,
 ): readonly RenderNode[] {
   const payload = layer.payload
+  if (!calloutHasLabel(payload)) return []
   const layout = calloutTextLayout(payload, context)
   const common = { rotation: layer.transform.rotation, opacity: 1, visible: layer.visible, blendMode: 'normal' as const }
   const bounds = calloutTextRect(payload, context)
@@ -32,11 +38,26 @@ export function calloutFrameNodes(
     ...(borderStyle ? { stroke: borderStyle.color, strokeWidth: borderStyle.width, lineJoin: borderStyle.join,
       lineCap: borderStyle.cap } : {}),
   }] : []
-  if (frame?.kind === 'accent') backgroundNodes.push({
-    ...common, id: `${layer.id}:background`, kind: 'rect',
-    x: layer.transform.translateX + bounds.x, y: layer.transform.translateY + bounds.y,
-    width: Math.max(2, frame.border?.width ?? 3), height: bounds.height,
-    fill: color(frame.border?.color ?? payload.stroke.color),
-  })
+  if (frame?.kind === 'accent') {
+    backgroundNodes.push(accentNode(layer, bounds, context))
+  }
   return backgroundNodes
+}
+
+function accentNode(
+  layer: CalloutLayer,
+  bounds: Rect,
+  context: CalloutGeometryContext,
+): RenderNode {
+  const side = calloutAccentSide(layer.payload, context)
+  const vertical = side === 'left' || side === 'right'
+  const width = Math.max(2, layer.payload.frame?.border?.width ?? 3)
+  return {
+    rotation: layer.transform.rotation, opacity: 1, visible: layer.visible, blendMode: 'normal',
+    id: `${layer.id}:background`, kind: 'rect',
+    x: layer.transform.translateX + bounds.x + (side === 'right' ? bounds.width - width : 0),
+    y: layer.transform.translateY + bounds.y + (side === 'bottom' ? bounds.height - width : 0),
+    width: vertical ? width : bounds.width, height: vertical ? bounds.height : width,
+    fill: color(layer.payload.frame?.border?.color ?? layer.payload.stroke.color),
+  }
 }

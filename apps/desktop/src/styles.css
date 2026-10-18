@@ -49,21 +49,26 @@ body,
   top: 50%;
   transform: translateY(-50%);
   display: grid;
-  gap: 8px;
-  padding: 8px;
-  border-radius: 12px;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--chrome-94);
   box-shadow: var(--shadow-overlay);
   z-index: 30;
 }
 .cs-quick-actions button {
-  min-width: 92px;
-  padding: 9px 12px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 8px;
+  box-sizing: border-box;
   border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--text);
-  background: var(--surface-hover);
+  background: transparent;
   cursor: pointer;
 }
 .cs-quick-actions button:hover:not(:disabled) {
@@ -94,6 +99,7 @@ body,
   z-index: 31;
 }
 .cs-quick-portal-limit {
+  pointer-events: none;
   position: fixed;
   right: 18px;
   top: calc(50% + 128px);
@@ -106,4 +112,52 @@ body,
   box-shadow: 0 6px 20px #0003;
   font-size: 12px;
   z-index: 30;
+}
+
+.cs-quick-actions button svg {
+  width: 20px;
+  height: 20px;
+}
+.cs-quick-actions button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.cs-quick-action-separator {
+  height: 1px;
+  margin: 2px 4px;
+  background: var(--border);
+}
+.cs-quick-action-tooltip {
+  position: absolute;
+  right: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%);
+  width: max-content;
+  max-width: min(220px, calc(100vw - 80px));
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: var(--shadow-overlay);
+  font-size: 12px;
+  line-height: 1.4;
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+  transition:
+    opacity 0.1s,
+    visibility 0.1s;
+}
+.cs-quick-actions[data-tooltip-side='right'] .cs-quick-action-tooltip {
+  right: auto;
+  left: calc(100% + 12px);
+}
+.cs-quick-actions button:hover:not(:disabled) .cs-quick-action-tooltip,
+.cs-quick-actions button:focus-visible .cs-quick-action-tooltip {
+  visibility: visible;
+  opacity: 1;
+}
+.cs-quick-actions button:hover:not(:focus-visible) .cs-quick-action-tooltip {
+  transition-delay: 0.4s;
 }

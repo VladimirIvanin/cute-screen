@@ -239,6 +239,8 @@ function createWorkspaceViewModel(
     startEyedropper: bindings.startEyedropper,
     canvasViewport: workspace.canvasViewport,
     textureImages: workspace.textureImages,
+    emojiDefaults: bindings.emojiDefaults,
+    placeEmoji: bindings.placeEmoji,
     baseImageLayer: core.baseImageLayer,
     sceneTexturesReady: core.sceneTexturesReady,
     highlighterAnalysis: workspace.highlighterAnalysis,

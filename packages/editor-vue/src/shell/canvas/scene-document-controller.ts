@@ -8,7 +8,7 @@ import type { CanvasGesture } from './workspace-state'
 export function requiresScenePreview(layer: LayerNode | undefined): boolean {
   // Image nodes need decoded resources and their original ordered scene slot;
   // the lightweight overlay intentionally does not render them.
-  return Boolean(layer && ['image', 'censor', 'spotlight', 'loupe', 'marker'].includes(layer.kind))
+  return Boolean(layer && ['emoji', 'image', 'censor', 'spotlight', 'loupe', 'marker'].includes(layer.kind))
 }
 
 export interface SceneDocumentContext {
@@ -71,6 +71,7 @@ export class SceneDocumentController {
 
 function transientLayerId(gesture: CanvasGesture): string | undefined {
   if (!gesture || !('id' in gesture)) return undefined
+  if (gesture.kind === 'calloutHandle' && gesture.removal) return undefined
   return gesture.kind === 'move' ||
     gesture.kind === 'resize' ||
     gesture.kind === 'intrinsicResize' ||

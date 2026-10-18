@@ -72,8 +72,17 @@
   align-items: center;
   gap: 8px;
 }
-.cs-history-header-actions > button:last-child {
+.cs-history-popover .cs-history-close {
+  display: grid;
+  place-items: center;
+  flex: 0 0 32px;
   width: 32px;
+  height: 32px;
+  padding: 0;
+}
+.cs-history-close svg {
+  width: 18px;
+  height: 18px;
 }
 .cs-history-popover .cs-history-clear {
   padding: 0 8px;

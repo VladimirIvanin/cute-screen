@@ -1,5 +1,119 @@
 # Платформенная матрица
 
+## Общая тема окна настроек (2026-10-18)
+
+Windows 10 x64, WebView2 155.0.4283.45 / external tauri-driver:
+2/2 tests passed. Настоящий Settings WebView использует общий saved/live theme,
+общие semantic tokens и dark native controls/scrollbar. Повторное открытие
+проверено через production editor entry; system media change покрыт component
+tests, без заявления о native OS toggle. Linux/WebKitGTK и macOS/WKWebView
+для этой правки не запускались. Команды и ограничения — TESTING.md.
+
+## Углы рамки изображения (2026-10-18, ADR-097)
+
+Windows x64: shared core и decoded software Canvas2D/CanvasKit tests прошли
+для 4K source, рамок 26/32 px, radius 0/80 и четырёх внешних углов.
+Browser и real WebView2 результаты — TESTING.md. Linux/WebKitGTK и
+macOS/WKWebView для этой правки не запускались; platform capture не меняется.
+Chrome 155.0.8059.80: 1024/1600 × RU/EN × light/dark — все 8 сочетаний passed,
+включая четыре внешних угла и undo/redo после production G import.
+WebView2 155.0.4283.45: fresh build passed, runtime pending; первый запуск
+остановлен занятым 4445, второй — bind 10048 / closed WebView до image assertions.
+
+## Свёрнутый режим выделителя (2026-10-18, ADR-095)
+
+Windows 10 x64, Chrome 155.0.8059.80: RU/EN × light/dark × 1024/1280,
+sample 36×24 px, текущий цвет/интенсивность и направление изменения яркости
+проверены через decoded screenshot. Vue — 51/51 passed. WebView2 155.0.4283.45,
+external driver: 2/2 tests passed, production Capture → Quick → Editor,
+RU/EN × light/dark, штатный fallback Settings в Quick, trusted input и
+точный native stroke preview/commit checksum. Browser drawing checksum остаётся
+отдельным failed gate; общий check/format не считается целевым UI evidence.
+Команды, логи и ограничения — TESTING.md. WKWebView/WebKitGTK runtime pending;
+гарантии физического захвата не расширяются.
+
+## Линия (2026-10-18, ADR-100)
+
+Windows 10 x64: core/Vue 88/88, decoded 4K screenshot Canvas2D/CanvasKit 1/1,
+controlled perf 6/6. Chrome 155.0.8059.80: 2/2 browser scenarios, trusted pointer,
+RU/EN × light/dark × 1024 px, zoom 50/100/200%. WebView2 155.0.4283.45:
+2/2 line,line-reopen passed на свежей сборке, non-origin Quick → Editor,
+endpoint/style edits, decoded clipboard и восстановление шести линий/defaults.
+Просмотрены screenshots controls + результата. Команды, диагностика и общие
+check/typecheck ограничения — TESTING.md. Linux/WebKitGTK и macOS/WKWebView
+runtime pending; native capture/hotkey гарантии этим UI изменением не расширяются.
+
+## Заливка и пунктир фигур (2026-10-18, ADR-092)
+
+Shared core/renderer/Vue: schema v7, radial compatibility, 2–8 linear stops,
+solid/dashed/round dotted. Windows x64: 74 целевых tests и 46 renderer tests
+passed; decoded Canvas2D/CanvasKit PNG просмотрены. Chrome 155.0.8059.80:
+RU/EN × light/dark × 1024/1280, zoom 50/100/200 и четыре прежних shape-toolbar
+сценария passed. Real WebView2 155.0.4283.45: 2/2 native scenarios passed,
+trusted input, non-origin Quick → Editor, decoded clipboard и восстановление
+фигур/defaults после relaunch. Команды и ограничения — TESTING.md.
+Linux/WebKitGTK и macOS/WKWebView для этой панели
+не проверены; platform capture/hotkey гарантии не расширяются.
+
+## Изолированный снимок окна (2026-10-18, ADR-091)
+
+Windows 10 Home 19045 x64 / WebView2 155.0.4283.45: WGC CreateForWindow,
+initial hover, Escape/retry, click и Tab/Shift+Tab/Enter проверены на реальном
+перекрытом окне, EN/dark и RU/light. Сохранённый PNG 1386×893 повторно
+декодирован: скрытые pixels target сохранены, перекрывающее окно и selector
+отсутствуют. Window capability независима от DXGI. Rust workspace и Vue recovery
+tests прошли; команды/артефакты — TESTING.md. Windows 11, tray/hotkey/CLI,
+Alt+Tab, close/resize, DPI 125/150/200% и multi-monitor runtime pending.
+X11: named Composite pixmap и отдельная capability; без compositor Window
+недоступен, screen/area не меняются. Linux runtime pending.
+macOS 12.0–12.2: CoreGraphics single-window; 12.3–13: SCStream one-shot;
+14+: system picker + SCScreenshotManager. Intel/Apple Silicon compile/runtime
+pending на владельцах macOS; Windows build не доказывает Objective-C путь.
+Wayland: только advertised Screenshot v3 Window; GNOME/KDE runtime pending.
+
+## Два режима карандаша и краткие подсказки (2026-10-18, ADR-094)
+
+Windows x64: migration/preferences/session — 33/33 final tests passed;
+decoded renderer — 3/3 passed, включая 4K и оба backend. Chrome 155.0.8059.80:
+две кисти, Shift drawing/ruler DPR 1/2 × Fit/1:1 и RU/EN × light/dark 1024 px
+проверены. Follow-up preferences/tooltip — 3/3 passed после исправления двух
+дефектов подготовки/assertions тестов. Windows WebView2: финальная свежая
+сборка остановлена TS2883 в параллельной правке ShapeGradientEditor.vue;
+native Quick → Editor → reopen и migration runtime pending. Команды и логи — TESTING.md.
+Linux/WebKitGTK и macOS/WKWebView не проверены; capture/hotkey гарантии не меняются.
+
+## Подписи кнопок и крестик истории (2026-10-18)
+
+Windows x64 / Chrome 155.0.8059.80: Vue 12/12 и все 8 выбранных browser cases
+passed с учётом повторного прогона expanded matrix. RU/EN × light/dark на
+1024 px: подписи без многоточий, close 18×18 в кнопке 32×32, click/Escape/focus.
+Native history-settings/editor-settings не запущены: свежую сборку блокирует
+TS2883 в текущем ShapeGradientEditor.vue. WebView2 для этой правки pending,
+Linux/WebKitGTK и macOS/WKWebView не проверялись. Команды и логи — TESTING.md.
+
+## Пасхалка бренда (2026-10-18, ADR-093)
+
+Hover-анимация inline SVG относится к chrome editor и RU/EN landing.
+Mouse включает эффект; touch/reduced motion сохраняют статичный знак.
+Windows WebView2, Chromium и отдельно WebKit/WKWebView требуют runtime evidence;
+наличие SVG и controller unit tests не подтверждает платформенную поддержку.
+Windows/Chrome 155: landing RU/EN, no-JS navigation и editor RU/EN × light/dark
+прошли. Windows WebView2 155.0.4283.45 / external driver: финальный runtime-прогон
+свежего binary прошёл в EN × light/dark с trusted pointer input. Первые native
+build/startup failures и точная команда повторного запуска записаны отдельно.
+Linux/WebKit/WKWebView не проверялись.
+Фактические команды и ограничения — TESTING.md.
+
+## Доработка выноски (2026-10-18, ADR-090)
+
+Windows x64: red-first core и focused Vue — 76 passed; decoded Canvas2D/CanvasKit
+на 2560×1440 — passed (`pnpm test:render`, 46/46). Production Chrome 155.0.8059.80:
+4 specs / 5 tests passed, включая Alt deletion/cancel, curve, empty caption,
+width и 1024 px × RU/EN × обе темы × zoom 50/100/200.
+Real WebView2 155.0.4283.45: Quick с non-origin crop → Editor → новый процесс,
+2/2 passed после Alt isolation; команды, артефакты и общие ограничения — TESTING.md.
+WebKitGTK/WKWebView/Wayland pending.
+
 ## Диапазоны изображения (2026-10-18, ADR-089)
 
 Windows x64: mounted Vue 4K square/landscape — passed; свежая сборка и
@@ -1096,3 +1210,25 @@ Windows x64 / WebView2 155.0.4283.45 (2026-10-18): tray-locale и
 tray-locale-reopen — 2/2 passed, external driver, production Settings flow,
 actual MenuItem text и startup snapshot. Другие ОС и визуальный OS popup
 не проверены этим прогоном.
+
+### Emoji — целевые платформы (2026-10-18)
+
+Общий versioned Noto 2D pack для Windows/WebView2, Linux WebKitGTK и macOS
+WKWebView; glyph не зависит от шрифта ОС. SVG decoding и history PNG worker
+нужно подтверждать на каждом runtime. Windows browser evidence не закрывает
+real-WebView и не считается Linux/macOS pass. Windows WebView2 155.0.4283.45:
+emoji и emoji-reopen прошли с external native input, Quick non-origin crop,
+Editor handoff, постоянной геометрией палитры, restart и decoded PNG export
+1:1 (RGBA SHA-256). Capture в этом прогоне fake-platform 400×300;
+browser production mount использует document 2560×1440. Linux/macOS runtime
+pending. Результаты и артефакты — TESTING.md.
+
+## Компактные Quick actions и история (2026-10-18, ADR-096)
+
+Windows 10 19045 x64 / WebView2 155: production Quick → history → restart прошёл
+на high-entropy 3840×2160 fake capture; non-origin 3074×1730 original проверен
+по decoded RGBA SHA-256, PNG export 1× повторно декодирован с annotations.
+Main остаётся скрытым после History; кнопки 36×36 и panel 46 px проверены в WebView.
+X11 no-restore покрыт dispatcher unit regression. Physical capture, реальный
+portal, Linux/WebKitGTK и macOS/WKWebView этой правкой не проверялись.
+Команды и ограничения общего workspace — TESTING.md.

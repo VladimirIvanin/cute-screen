@@ -186,6 +186,7 @@ export class CanvasWorkspaceController {
       scene: state.scene,
       isPanning: state.isPanning,
       onPointerDown: (event: PointerEvent) => {
+        this.#calloutRouting.altPressed = event.altKey
         if (
           !this.#spacePressed &&
           !this.#props.readOnly &&
@@ -204,6 +205,7 @@ export class CanvasWorkspaceController {
       onBackgroundPointerDown: (event: PointerEvent) =>
         handleCanvasBackgroundPointerDown(this.#pointerDown, Boolean(this.#gesture), event),
       onPointerMove: (event: PointerEvent) => {
+        this.#calloutRouting.altPressed = event.altKey
         const previewPoint = event.target === state.scene.value
           ? this.canvasPoint(event) : undefined
         this.#markerPreview.move(previewPoint)
@@ -361,6 +363,7 @@ export class CanvasWorkspaceController {
       layerBounds: this.layerBounds,
       canvasPoint: this.canvasPoint,
       resolveCalloutStroke: () => this.#draft.resolveCalloutStroke(),
+      screenScale: () => this.#pointerGeometry.screenScale(),
       updateToolbarLayout: this.#toolbars.updateFloatingToolbarLayout,
       emitEditing: this.#textFormatting.emitTextEditing,
       redrawMarker: () => void this.#renderer.drawDocument(),
@@ -398,6 +401,7 @@ export class CanvasWorkspaceController {
       props: this.#props,
       calloutInsertMode: this.calloutInsertMode,
       hoverTarget: () => this.#pointerGeometry.hoverTarget,
+      calloutRemoveMode: () => this.#calloutRouting.altPressed,
       screenScale: () => this.#pointerGeometry.screenScale(),
       overlay: this.#state.overlay,
       outputBounds: this.#viewport.outputBounds,
@@ -505,11 +509,7 @@ export class CanvasWorkspaceController {
       setCursor: (cursor) => this.#pointerGeometry.setCursor(cursor),
       invalidateOverlay: this.invalidateOverlay,
       onStrokeKeydown: (event) => this.#keyboard.strokeKeydown(event),
-      onKeydown: (event) => {
-        if (!this.#calloutRouting.keydown(event, this.cancelGesture)) this.#keyboard.keydown(event)
-      },
-      onKeyup: (event) => this.#keyboard.keyup(event),
-      onBlur: () => this.#keyboard.blur(),
+      ...this.#calloutRouting.inputHandlers(this.#keyboard, this.cancelGesture, this.invalidateOverlay),
       onDocumentPointerDown: (event) => this.#textEditor.documentPointerDown(event),
       onDocumentSelectionChange: () => this.#textEditor.documentSelectionChange(),
     })

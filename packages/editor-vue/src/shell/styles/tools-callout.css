@@ -13,10 +13,72 @@
   flex-direction: column;
   gap: 8px;
   width: 340px;
+  max-width: calc(100vw - 24px);
   overflow: auto;
 }
 .cs-callout-popover--text {
   width: max-content;
+}
+.cs-callout-stroke-preview {
+  width: 36px;
+  height: 18px;
+  flex: none;
+}
+.cs-callout-sides {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+}
+.cs-callout-sides button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  padding-inline: 3px;
+  font-size: 12px;
+}
+.cs-callout-sides svg {
+  width: 40px;
+  height: 28px;
+}
+.cs-callout-marker-choices button {
+  flex: 1;
+}
+.cs-callout-marker-choices svg {
+  display: block;
+  width: 40px;
+  height: 24px;
+}
+.cs-callout-endpoint-properties,
+.cs-callout-line-properties {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cs-callout-endpoint-properties .cs-numeric-control,
+.cs-callout-line-properties .cs-numeric-control {
+  flex: 1;
+  min-width: 0;
+}
+.cs-callout-line-choices svg {
+  height: 20px;
+}
+.cs-callout-width-control {
+  gap: 6px;
+}
+.cs-callout-width-control .cs-numeric-control {
+  gap: 6px;
+}
+.cs-callout-width-control .cs-numeric-entry {
+  width: 88px;
+}
+.cs-text-editor[aria-label='Callout editor'] {
+  outline: 1px solid #0d99ff;
+  outline-offset: 1px;
+}
+.cs-text-editor[data-callout-empty='true']::before {
+  display: none;
 }
 .cs-callout-choices,
 .cs-callout-marker-choices {

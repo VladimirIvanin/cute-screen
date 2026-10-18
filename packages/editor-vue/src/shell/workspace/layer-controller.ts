@@ -1,3 +1,4 @@
+import { annotationTool } from '@cute-screen/editor-renderer'
 import type { Ref } from 'vue'
 import {
   creationPolicy,
@@ -236,7 +237,7 @@ function addLayer(
   if (!context.props.documentSession || context.props.readOnlyDocument) return
   layer = context.prepareLayer?.(layer) ?? layer
   context.props.documentSession.execute({ type: 'addLayer', layer })
-  if (creationPolicy(layer.kind) === 'select') {
+  if (creationPolicy(annotationTool(layer)) === 'select') {
     context.store.selectTool('select')
     context.store.selectLayer(layer.id)
   }

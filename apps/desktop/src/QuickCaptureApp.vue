@@ -13,11 +13,13 @@ import {
   DocumentSessionController,
   EditorShell,
   loadImageWithBinaryFallback,
+  useEditorShellStore,
   type CanvasViewportHosts,
   type QuickCaptureDraftV1,
   type ShellDocumentState,
 } from '@cute-screen/editor-vue'
 import { tauriDesktopBridge } from './desktop-bridge'
+import QuickCaptureActions from './QuickCaptureActions.vue'
 import {
   cancelQuickCaptureAction,
   normalizeQuickCaptureSelection,
@@ -34,6 +36,8 @@ import { QuickCaptureActionController } from './quick-capture-action-controller'
 import { listenQuickCaptureAvailable } from './platform/tauri/quick-capture-events'
 import { installQuickCaptureTestFacade } from './quick-capture-test-facade'
 
+const editorShell = ref<InstanceType<typeof EditorShell>>()
+const shell = useEditorShellStore()
 const draft = shallowRef<QuickCaptureDraftV1>()
 const session = shallowRef<DocumentSessionController>()
 if (import.meta.env.VITE_TEST_HARNESS === 'true') {
@@ -49,26 +53,15 @@ const error = ref<string>()
 const quickLayoutReady = ref(false)
 const coordinator = useQuickCaptureCoordinator(tauriDesktopBridge)
 const selectionPending = computed(() => coordinator.phase.value === 'selecting')
-const russian = navigator.language.toLowerCase().startsWith('ru')
-const labels = russian
+const labels = computed(() => shell.locale === 'ru'
   ? {
-      actions: 'Действия со снимком',
-      editor: 'Редактор',
-      copy: 'Копировать',
-      save: 'Сохранить PNG',
-      close: 'Закрыть',
       selectArea: 'Выделите область',
       portalLimit: 'Область можно уменьшать только внутри фрагмента портала',
     }
   : {
-      actions: 'Quick capture actions',
-      editor: 'Editor',
-      copy: 'Copy',
-      save: 'Save PNG',
-      close: 'Close',
       selectArea: 'Select an area',
       portalLimit: 'The frame can only be reduced inside the portal fragment',
-    }
+    })
 const currentCrop = ref({ x: 0, y: 0, width: 0, height: 0 })
 const layoutController = new QuickCaptureLayoutController({
   hosts,
@@ -95,6 +88,7 @@ const actionController = new QuickCaptureActionController({
   coordinator,
   commit: commitController,
   dismissWindow,
+  prepareDocumentChange: () => editorShell.value?.prepareNavigation() ?? Promise.resolve(),
 })
 let unsubscribeSession: (() => void) | undefined
 let unsubscribeQuickCaptureAvailable: (() => void) | undefined
@@ -356,6 +350,7 @@ async function initializeQuickCaptureWindow(): Promise<void> {
 const copy = () => actionController.copy()
 const save = () => actionController.save()
 const openEditor = () => actionController.openEditor()
+const saveToHistory = () => actionController.saveToHistory()
 const cancel = () => actionController.cancel()
 const onKeydown = (event: KeyboardEvent) => actionController.keydown(event)
 
@@ -388,6 +383,7 @@ onBeforeUnmount(() => {
     @keydown.capture="onSelectingKeydown"
   >
     <EditorShell
+      ref="editorShell"
       quick-mode
       :quick-selection-mode="selectionPending"
       :initial-document-state="documentState"
@@ -414,40 +410,16 @@ onBeforeUnmount(() => {
     >
       {{ labels.selectArea }}
     </p>
-    <nav
+    <QuickCaptureActions
       v-if="draft && !selectionPending"
-      class="cs-quick-actions"
-      :aria-label="labels.actions"
-    >
-      <button
-        type="button"
-        :disabled="pending"
-        @click="openEditor"
-      >
-        {{ labels.editor }}
-      </button>
-      <button
-        type="button"
-        :disabled="pending"
-        @click="copy"
-      >
-        {{ labels.copy }}
-      </button>
-      <button
-        type="button"
-        :disabled="pending"
-        @click="save"
-      >
-        {{ labels.save }}
-      </button>
-      <button
-        type="button"
-        :disabled="pending"
-        @click="cancel"
-      >
-        {{ labels.close }}
-      </button>
-    </nav>
+      :locale="shell.locale"
+      :pending="pending"
+      @editor="openEditor"
+      @copy="copy"
+      @save="save"
+      @history="saveToHistory"
+      @close="cancel"
+    />
     <p
       v-if="draft && !selectionPending && !draft.canExpandSelection"
       class="cs-quick-portal-limit"

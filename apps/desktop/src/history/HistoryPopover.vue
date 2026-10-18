@@ -347,14 +347,15 @@ onBeforeUnmount(() => {
             :disabled="loading || busy || !items.length || !!plan"
             @click="previewClear"
           >
-            {{ ru ? 'Очистить…' : 'Clear history…' }}
+            {{ ru ? 'Очистить' : 'Clear history' }}
           </button>
           <button
+            class="cs-history-close"
             :disabled="loading"
             :aria-label="ru ? 'Закрыть' : 'Close'"
             @click="show(false)"
           >
-            ×
+            <UiIcon name="close" />
           </button>
         </div>
       </header>
@@ -457,7 +458,7 @@ onBeforeUnmount(() => {
       <footer>
         <span v-if="report" :class="{ 'cs-history-warning': report.overLimit }">{{ historyBytes(report.totalBytes, locale) }}
           <small>{{ ru ? `Временная история · до ${retentionDays} дн.` : `Temporary history · up to ${retentionDays} days` }}</small><small v-if="report.overLimit">{{ ru ? 'Лимит превышен: проверьте защищённые снимки' : 'Over limit: review protected captures' }}</small></span>
-        <button :disabled="loading || !!plan" @click="bridge.settings().catch((cause: unknown) => { error = describeError(cause, 'Unable to open settings') })">{{ ru ? 'Хранение…' : 'Storage…' }}</button>
+        <button :disabled="loading || !!plan" @click="bridge.settings().catch((cause: unknown) => { error = describeError(cause, 'Unable to open settings') })">{{ ru ? 'Хранение' : 'Storage' }}</button>
       </footer>
     </section>
   </EditorPopover>

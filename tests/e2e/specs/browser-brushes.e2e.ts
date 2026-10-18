@@ -1,5 +1,6 @@
 import {
   $,
+  $$,
   browser,
   expect,
 } from '@wdio/globals'
@@ -10,7 +11,27 @@ import {
 import { verifyBrushes } from '../brushes'
 
 describe('distinct brush drawing', () => {
-  it('draws three brushes, undoes and cancels, with accessible compact settings', async () => {
+  it('restores expressive preferences as autocorrection through production mount', async () => {
+    await openDrawingHarness()
+    await browser.execute(() => {
+      localStorage.removeItem('cute-screen.tool-settings.v3')
+      localStorage.setItem('cute-screen.drawing-tool-preferences.v1', JSON.stringify({
+        schemaVersion: 2, defaults: { pencil: { brush: 'brush', width: 12, smoothing: .2,
+          brushSmoothing: { brush: .2, stabilized: .8 } } },
+      }))
+    })
+    await browser.refresh()
+    await $('.cs-toolrail button[aria-label="Pencil"]').click()
+    await $('button[aria-label="Brush and width"]').click()
+    await expect($('.cs-brush-choices button[aria-label="Autocorrection"]')).toHaveAttribute('aria-pressed', 'true')
+    expect(await $$('.cs-brush-choices button').length).toBe(2)
+    await expect($('.cs-brush-choices button[aria-label="Expressive brush"]')).not.toExist()
+    await browser.keys('Escape')
+    await $('button[aria-label="Correction"]').click()
+    await expect($('input[aria-label="Correction"]')).toHaveValue('80')
+    await browser.keys('Escape')
+  })
+  it('draws two brushes, undoes and cancels, with accessible compact settings', async () => {
     await browser.setWindowSize(1280, 900)
     await openDrawingHarness()
     await verifyBrushes('artifacts/browser-e2e', 'brushes')

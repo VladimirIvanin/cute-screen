@@ -1,3 +1,5 @@
+export * from './emoji'
+export * from './emoji-catalog'
 export {
   SHAPE_CATALOG,
   SHAPE_KINDS,
@@ -60,6 +62,7 @@ export {
   type SrgbColor,
   type ShadowStyle,
   type FillPaint,
+  type GradientStop,
   type StrokeStyle,
   type ArrowLayerPayload,
   type CalloutPayload,
@@ -137,6 +140,11 @@ export {
   calloutEndpointSize,
   addCalloutStep,
   removeCalloutStep,
+  removeCalloutStepAt,
+  canRemoveCalloutStep,
+  calloutHasLabel,
+  resolvedCalloutAttachment,
+  calloutAccentSide,
   resetCalloutRoute,
   calloutGeometryBounds,
   type CalloutGeometryContext,
@@ -297,6 +305,7 @@ export {
   type SnapCandidate,
   type SnapResult,
 } from './snap'
+export { createExpressiveBrushMigrationCommand } from './commands/brush-migration'
 export {
   applyEditorCommand,
   CommandManager,
@@ -443,3 +452,10 @@ export {
   parseCalloutPayload,
   parseCalloutStyle,
 } from './document/codec/callout'
+
+export {
+  annotationTool,
+  resolveLineEndpoint,
+  type AnnotationTool,
+  type LineAxis,
+} from './line'

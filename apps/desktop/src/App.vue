@@ -24,6 +24,7 @@ import {
   type ClipboardBridge,
 } from '@cute-screen/editor-vue'
 import HistoryPopover from './history/HistoryPopover.vue'
+import WindowCaptureRecovery from './WindowCaptureRecovery.vue'
 import {
   nativeHistory,
 } from './history/bridge'
@@ -37,7 +38,6 @@ import { createDesktopShellActions } from './desktop-shell-actions'
 import { installDesktopLifecycleGuards } from './platform/tauri/lifecycle-adapter'
 import { M08HarnessController } from './m08-harness'
 import { openActivationSettings } from './platform/tauri/activation-settings-adapter'
-import { isTauri } from '@tauri-apps/api/core'
 
 declare global {
   interface Window {
@@ -147,10 +147,11 @@ const lifecycleCleanup: Array<() => void> = []
 const captureAvailable = computed(() =>
   import.meta.env.VITE_TEST_HARNESS === 'true' || !('__TAURI_INTERNALS__' in window)
     ? true
-    : (platformCapabilities.value?.capture.available ?? false))
+    : (platformCapabilities.value?.capture.interactiveSelector ?? false) ||
+      (platformCapabilities.value?.capture.monitorTarget ?? false))
 const captureWindowAvailable = computed(() => platformCapabilities.value?.capture.windowTarget ?? false)
 const openImageAvailable = computed(() => '__TAURI_INTERNALS__' in window)
-const openSettings = isTauri() ? openActivationSettings : undefined
+const openSettings = openImageAvailable.value ? openActivationSettings : undefined
 const captureFallbackCommand = computed(() =>
   m04FallbackHarness
     ? "'/opt/Cute Screen/cute-screen' capture --mode area"
@@ -519,4 +520,5 @@ onBeforeUnmount(() => {
       />
     </template>
   </EditorShell>
+  <WindowCaptureRecovery v-if="openImageAvailable" :session="platformCapabilities?.session ?? 'unknown'" />
 </template>

@@ -12,14 +12,14 @@ describe('brush document after native relaunch', () => {
     await waitForStableCanvas()
     const document = await shapeDocument()
     const strokes = document.layers.filter((layer) => layer.kind === 'pencil')
-    expect(strokes).toHaveLength(6)
+    expect(strokes).toHaveLength(4)
     expect(strokes.map((stroke) => stroke.payload.brush)).toEqual([
-      'pen', 'stabilized', 'brush', 'pen', 'stabilized', 'brush',
+      'pen', 'stabilized', 'pen', 'stabilized',
     ])
     for (const stroke of strokes) expect(stroke.payload).toMatchObject({ strokeVersion: 2, pressureMode: 'simulated' })
     await $('button[aria-label="Pencil"]').click()
     await $('button[aria-label="Brush and width"]').click()
-    await expect($('.cs-brush-choices button[aria-label="Expressive brush"]')).toHaveAttribute('aria-pressed', 'true')
+    await expect($('.cs-brush-choices button[aria-label="Autocorrection"]')).toHaveAttribute('aria-pressed', 'true')
     await browser.saveScreenshot('artifacts/tauri-e2e/brushes-reopened.png')
   })
 })

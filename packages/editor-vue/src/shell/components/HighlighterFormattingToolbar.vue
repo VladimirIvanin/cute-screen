@@ -3,6 +3,7 @@ import {
   computed,
   nextTick,
   ref,
+  useId,
   watch,
 } from 'vue'
 import { NPopover } from 'naive-ui'
@@ -10,6 +11,7 @@ import type { ContextToolbarSchema } from '../types'
 import type { SrgbColor } from '@cute-screen/editor-renderer'
 import { UiIcon } from '../icon'
 import SimpleColorPicker from '../ui/SimpleColorPicker.vue'
+import HighlighterSample from '../ui/HighlighterSample.vue'
 import UiSeparator from '../ui/UiSeparator.vue'
 import ShapeNumericControl from './ShapeNumericControl.vue'
 import { focusPopoverControl } from '../ui/focus-popover-control'
@@ -32,20 +34,45 @@ const value = (id: string) => {
   return item && 'value' in item ? String(item.value) : ''
 }
 const disabled = computed(() => Boolean(props.schema.disabled || control('color')?.disabled))
+const descriptionId = `cs-highlighter-effect-${useId()}`
+const sampleMixed = computed(() => mixed('color') || mixed('layerOpacity'))
+const legacy = computed(() => !['auto', 'highlight', 'illuminate', 'veil'].includes(value('markerMode')))
+const analysing = computed(() => value('markerMode') === 'auto' && props.schema.highlighter?.status === 'loading')
+const effect = computed(() => {
+  const mode = value('markerMode')
+  return mode === 'illuminate' || mode === 'veil' || mode === 'highlight'
+    ? mode : props.schema.highlighter?.effect ?? 'highlight'
+})
 const modes = computed(() => [
-  { id: 'auto', name: text('Auto', 'Авто'), hint: text('Choose for this screenshot', 'Подобрать по всему скриншоту'), sample: 'auto' },
-  { id: 'highlight', name: text('Highlight', 'Выделить'), hint: text('Dark text on a light background', 'Тёмный текст на светлом фоне'), sample: 'multiply' },
-  { id: 'illuminate', name: text('Illuminate', 'Подсветить'), hint: text('Light text on a dark background', 'Светлый текст на тёмном фоне'), sample: 'screen' },
-  { id: 'veil', name: text('Tint', 'Окрасить'), hint: text('Apply translucent colour over the image and text', 'Нанести полупрозрачный цвет поверх изображения и текста'), sample: 'normal' },
-])
+  { id: 'auto', name: text('Auto', 'Авто'), hint: text('Choose for this screenshot', 'Подобрать по всему скриншоту') },
+  { id: 'highlight', name: text('Highlight', 'Выделить'), hint: text('Dark text on a light background', 'Тёмный текст на светлом фоне') },
+  { id: 'illuminate', name: text('Illuminate', 'Подсветить'), hint: text('Light text on a dark background', 'Светлый текст на тёмном фоне') },
+  { id: 'veil', name: text('Tint', 'Окрасить'), hint: text('Apply translucent colour over the image and text', 'Нанести полупрозрачный цвет поверх изображения и текста') },
+] as const)
 const summary = computed(() => {
   if (mixed('markerMode')) return '—'
   const mode = value('markerMode')
-  if (mode !== 'auto') return modes.value.find((item) => item.id === mode)?.name ?? text('Saved effect', 'Сохранённый эффект')
-  const analysis = props.schema.highlighter
-  const suffix = analysis?.status === 'loading' ? text('analysing', 'определяем фон')
-    : modes.value.find((item) => item.id === (analysis?.effect ?? 'highlight'))?.name
-  return `${text('Auto', 'Авто')} · ${suffix}`
+  const name = { highlight: text('Darker', 'Темнее'), illuminate: text('Lighter', 'Светлее'), veil: text('Tint', 'Окрасить') }[effect.value]
+  if (mode !== 'auto') return modes.value.some((item) => item.id === mode) ? name : text('Saved effect', 'Сохранённый эффект')
+  return `${text('Auto', 'Авто')} · ${analysing.value ? text('analysing', 'определяем фон') : name}`
+})
+const unavailableHint = computed(() => text(
+  'Automatic analysis unavailable. Using Highlight; choose any effect manually.',
+  'Автоподбор недоступен. Используем «Выделить»; режим можно выбрать вручную.',
+))
+const description = computed(() => {
+  if (mixed('markerMode')) return text('Multiple effects selected', 'Выбраны разные режимы наложения')
+  if (legacy.value) return text('Saved effect. Choose a mode to change it.', 'Сохранённый эффект. Выберите режим, чтобы изменить его.')
+  if (analysing.value) return text('Auto: analysing the screenshot background', 'Авто: определяем фон скриншота')
+  const hint = {
+    highlight: text('Darkens a light background, preserving dark text.', 'Затемняет светлый фон, сохраняя тёмный текст.'),
+    illuminate: text('Lightens a dark background, preserving light text.', 'Осветляет тёмный фон, сохраняя светлый текст.'),
+    veil: text('Apply translucent colour over the image and text.', 'Нанести полупрозрачный цвет поверх изображения и текста.'),
+  }[effect.value]
+  const fallback = value('markerMode') === 'auto' && props.schema.highlighter?.status === 'unavailable'
+    ? ` ${unavailableHint.value}` : ''
+  const mixedHint = sampleMixed.value ? text(' Colour or intensity varies across the selection.', ' Цвет или интенсивность различаются у выбранных объектов.') : ''
+  return `${summary.value}. ${hint}${fallback}${mixedHint}`
 })
 const labels = computed(() => ({ width: text('Width', 'Толщина'), layerOpacity: text('Intensity', 'Интенсивность'), markerMode: text('Effect', 'Режим') }))
 function show(
@@ -116,7 +143,8 @@ watch(disabled, (blocked) => {
             type="button"
             :disabled="disabled"
             :aria-label="labels[menu]"
-            :title="labels[menu]"
+            :title="menu === 'markerMode' ? description : labels[menu]"
+            :aria-describedby="menu === 'markerMode' ? descriptionId : undefined"
             :aria-expanded="open === menu"
             aria-haspopup="dialog"
           >
@@ -130,7 +158,17 @@ watch(disabled, (blocked) => {
               :stroke-width="Math.min(9, Math.max(2, Number(value(menu)) / 5))"
               stroke-linecap="round"
             /></svg>
-            <span v-else>{{ menu === 'markerMode' ? summary : mixed(menu) ? '—' : `${Math.round(Number(value(menu)))}%` }}</span>
+            <template v-else-if="menu === 'markerMode'">
+              <HighlighterSample
+                :effect="effect"
+                :color="value('color')"
+                :intensity="Number(value('layerOpacity'))"
+                :neutral="mixed('markerMode') || sampleMixed || analysing || legacy"
+                compact
+              />
+              <span>{{ summary }}</span>
+            </template>
+            <span v-else>{{ mixed(menu) ? '—' : `${Math.round(Number(value(menu)))}%` }}</span>
             <UiIcon name="chevronDown"/>
           </button>
         </template>
@@ -154,11 +192,16 @@ watch(disabled, (blocked) => {
               :aria-pressed="!mixed(menu) && value(menu) === mode.id"
               @click="chooseMode(mode.id)"
             >
-              <span class="cs-highlighter-sample" :class="`is-${mode.id}`"><span :style="{ backgroundColor: value('color'), mixBlendMode: mode.sample === 'auto' ? 'multiply' : mode.sample as 'multiply' | 'screen' | 'normal', opacity: Number(value('layerOpacity')) / 100 }"/><b>Aa</b></span>
+              <HighlighterSample
+                :effect="mode.id === 'auto' ? schema.highlighter?.effect ?? 'highlight' : mode.id"
+                :color="value('color')"
+                :intensity="Number(value('layerOpacity'))"
+                :neutral="sampleMixed || (mode.id === 'auto' && schema.highlighter?.status === 'loading')"
+              />
               <span><strong>{{ mode.name }}</strong><small>{{ mode.hint }}</small></span>
               <UiIcon v-if="!mixed(menu) && value(menu) === mode.id" name="check"/>
             </button>
-            <p v-if="schema.highlighter?.status === 'unavailable'" class="cs-highlighter-hint">{{ text('Automatic analysis unavailable. Using Highlight; choose any effect manually.', 'Автоподбор недоступен. Используем «Выделить»; режим можно выбрать вручную.') }}</p>
+            <p v-if="schema.highlighter?.status === 'unavailable'" class="cs-highlighter-hint">{{ unavailableHint }}</p>
           </template>
           <template v-else>
             <ShapeNumericControl
@@ -180,5 +223,6 @@ watch(disabled, (blocked) => {
         </div>
       </NPopover>
     </template>
+    <span :id="descriptionId" hidden>{{ description }}</span>
   </div>
 </template>

@@ -3,6 +3,7 @@ import {
   computed,
   nextTick,
   ref,
+  watch,
 } from 'vue'
 import { activationSettingsBridge } from './platform/tauri/activation-settings-adapter'
 import { type ActivationSettingsBridge } from './settings/contracts'
@@ -34,11 +35,21 @@ const bridge = props.bridge ?? activationSettingsBridge
 const state = useSettings(bridge)
 const { snapshot, startup, error, busy, loading, errorAction } = state
 const shellStore = useEditorShellStore()
+const themeMedia = window.matchMedia('(prefers-color-scheme: dark)')
 shellStore.initialize({
   languages: navigator.languages,
   preferences: createBrowserPreferencesStorage(window.localStorage, navigator.languages),
-  systemDark: () => window.matchMedia('(prefers-color-scheme: dark)').matches,
+  systemDark: () => themeMedia.matches,
 })
+watch(
+  () => [shellStore.resolvedTheme, shellStore.locale] as const,
+  ([theme, language]) => {
+    document.documentElement.dataset.theme = theme
+    document.documentElement.lang = language
+  },
+  { immediate: true },
+)
+const onSystemThemeChange = (event: MediaQueryListEvent) => shellStore.setSystemDark(event.matches)
 const locale = computed<SettingsLocale>(() => shellStore.locale)
 const labels = computed(() => strings[locale.value])
 const query = new URLSearchParams(window.location.search)
@@ -52,6 +63,7 @@ const section = ref(query.get('settings') === 'history' ? 'history' : query.get(
 let unlistenHistory: (() => void) | undefined
 let disposedHistory = false
 onMounted(async () => {
+  themeMedia.addEventListener('change', onSystemThemeChange)
   if (!('__TAURI_INTERNALS__' in window)) return
   const cleanup = await listenHistorySettings(() => {
     void navigate('history')
@@ -60,6 +72,7 @@ onMounted(async () => {
   else unlistenHistory = cleanup
 })
 onBeforeUnmount(() => {
+  themeMedia.removeEventListener('change', onSystemThemeChange)
   disposedHistory = true
   unlistenHistory?.()
 })

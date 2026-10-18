@@ -1,3 +1,7 @@
+import {
+  annotationTool,
+  findEmoji,
+} from '@cute-screen/editor-renderer'
 import type { Ref } from 'vue'
 import type { EditorDocumentV1 } from '@cute-screen/editor-renderer'
 import type { DocumentSessionSnapshot } from '../../document-session'
@@ -12,7 +16,7 @@ export interface SessionControllerContext {
   readonly store: ShellStore
   readonly activeDocument: Ref<EditorDocumentV1 | undefined>
   readonly textDraft: Ref<TextDraft | undefined>
-  readonly translate: (key: 'readyLoadError' | 'baseImage') => string
+  readonly translate: (key: 'readyLoadError' | 'baseImage' | 'toolLine') => string
   readonly resolveDocumentTextures: (document: EditorDocumentV1) => Promise<void>
 }
 
@@ -104,12 +108,15 @@ function syncLayerSummaries(
     ...[...document.layers].reverse().map((layer) => ({
       id: layer.id,
       icon:
-        layer.kind === 'text' || layer.kind === 'callout' || layer.kind === 'numberedMarker'
+        layer.kind === 'text' || layer.kind === 'callout' || layer.kind === 'numberedMarker' || layer.kind === 'emoji'
           ? layer.kind
-          : layer.kind === 'image'
+          : annotationTool(layer) === 'line' ? ('line' as const) : layer.kind === 'image'
             ? ('image' as const)
             : ('shape' as const),
-      name: layer.kind === 'image' && layer.payload.role === 'base' ? context.translate('baseImage') : layer.kind,
+      name: layer.kind === 'emoji'
+        ? findEmoji(layer.payload.asset.assetId)?.[context.store.locale] ?? layer.payload.grapheme
+        : layer.kind === 'image' && layer.payload.role === 'base' ? context.translate('baseImage')
+          : annotationTool(layer) === 'line' ? context.translate('toolLine') : layer.kind,
       visible: layer.visible,
       locked: layer.locked,
       opacity: 'opacity' in layer ? layer.opacity : 1,

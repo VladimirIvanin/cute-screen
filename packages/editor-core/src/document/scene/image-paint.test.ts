@@ -76,8 +76,32 @@ describe('document render scene: images and paints', () => {
       cornerRadius: 18,
       stroke: { red: 0.2, green: 0.6, blue: 1, alpha: 1 },
       strokeWidth: 3,
-      lineJoin: 'round',
+      lineJoin: 'miter',
     })
+  })
+
+  it.each(['round', 'bevel', 'miter'] as const)('keeps zero-radius image borders square with persisted %s joins', (join) => {
+    const base = document.layers[0]
+    if (!base || base.kind !== 'image') throw new Error('expected image layer')
+    const image = {
+      ...base,
+      payload: {
+        ...base.payload,
+        radius: 0,
+        border: {
+          color: { red: 1, green: 0.4, blue: 0.3, alpha: 1 },
+          width: 26,
+          style: 'solid' as const,
+          cap: 'round' as const,
+          join,
+        },
+      },
+    }
+    const before = JSON.stringify(image)
+    const scene = createDocumentRenderScene({ ...document, layers: [image] })
+    expect(scene.nodes[0]).toMatchObject({ kind: 'image', strokeWidth: 26, lineJoin: 'miter' })
+    expect(scene.nodes[0]).not.toHaveProperty('cornerRadius')
+    expect(JSON.stringify(image)).toBe(before)
   })
 
   it('compiles normalized gradient geometry into renderer-neutral canvas coordinates', () => {

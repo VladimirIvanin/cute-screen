@@ -12,6 +12,7 @@ import {
 } from '@cute-screen/editor-vue'
 import {
   createDrawingLayer,
+  DEFAULT_DRAWING_DEFAULTS,
   createRulerLayer,
   defaultDrawingToolPreferences,
   parseEditorDocument,
@@ -41,6 +42,62 @@ const document: EditorDocumentV1 = {
 }
 
 describe('M03 document persistence session', () => {
+  function expressiveDocument(): EditorDocumentV1 {
+    const layer = createDrawingLayer({
+      id: '019c1f62-058e-7000-8000-000000000091', tool: 'pencil',
+      start: { x: 10, y: 20 }, end: { x: 70, y: 40 },
+      defaults: { ...DEFAULT_DRAWING_DEFAULTS, pencil: { ...DEFAULT_DRAWING_DEFAULTS.pencil, brush: 'brush' } },
+    })!
+    return { ...document, layers: [{ ...layer, locked: true, visible: false }] }
+  }
+
+  it('opens expressive ink as one undoable migration, saves it and reopens without another migration', async () => {
+    const original = expressiveDocument()
+    const saveDocument = vi.fn(async (record: { readonly documentJson: string; readonly revision: number }) => {
+      return record.revision + 1
+    })
+    const bridge = { saveDocument, exportRecoveryBundle: async () => ({ kind: 'saved' as const }) }
+    const session = new DocumentSessionController({ document: original, revision: 1, bridge,
+      correlationId: () => 'brush-migration', debounceMs: 60000 })
+    expect(session.snapshot).toMatchObject({ saveState: 'dirty', core: { canUndo: true,
+      document: { layers: [{ locked: true, visible: false, payload: { brush: 'stabilized' } }] } } })
+    expect(session.undo()).toMatchObject({ saveState: 'saved', core: { document: original, canUndo: false } })
+    session.redo()
+    const migrated = session.snapshot.core.document
+    await expect(session.flush()).resolves.toEqual({ kind: 'saved' })
+    expect(saveDocument).toHaveBeenCalledTimes(1)
+    expect(parseEditorDocument(saveDocument.mock.calls[0]![0].documentJson)).toMatchObject({
+      kind: 'editable', document: migrated,
+    })
+    const coordinator = new DocumentSessionCoordinator({ bridge, correlationId: () => 'handoff', onActiveSession: () => {} })
+    coordinator.openInitial({ documentId: migrated.id, document: migrated, revision: 2 })
+    expect(coordinator.active!.snapshot).toMatchObject({ saveState: 'saved', core: { canUndo: false } })
+    await coordinator.handoff({ documentId: migrated.id, document: migrated, revision: 2 })
+    expect(coordinator.active!.snapshot.core.canUndo).toBe(false)
+    coordinator.dispose()
+    session.dispose()
+  })
+
+  it('keeps migration dirty on save failure and retries normally', async () => {
+    const saveDocument = vi.fn().mockRejectedValueOnce(new Error('disk full')).mockResolvedValueOnce(2)
+    const session = new DocumentSessionController({ document: expressiveDocument(), revision: 1,
+      bridge: { saveDocument, exportRecoveryBundle: async () => ({ kind: 'cancelled' }) },
+      correlationId: () => 'brush-migration-error', debounceMs: 60000 })
+    await expect(session.flush()).resolves.toMatchObject({ kind: 'failed', error: 'disk full' })
+    expect(session.snapshot).toMatchObject({ saveState: 'error', core: { dirty: true } })
+    await expect(session.retry()).resolves.toEqual({ kind: 'saved' })
+    expect(session.snapshot).toMatchObject({ saveState: 'saved', core: { dirty: false } })
+    session.dispose()
+  })
+
+  it('keeps legacy ink unchanged when parsing editable and future read-only documents', () => {
+    const original = expressiveDocument()
+    expect(parseEditorDocument(serializeEditorDocument(original))).toMatchObject({ kind: 'editable', document: original })
+    const future = { ...original, schemaVersion: 999 }
+    expect(parseEditorDocument(JSON.stringify(future)).kind).toBe('readOnly')
+    expect(original.layers[0]).toMatchObject({ kind: 'pencil', payload: { brush: 'brush' } })
+  })
+
   it('shows saved when redo restores an already persisted ruler', async () => {
     vi.useFakeTimers()
     try {

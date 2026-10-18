@@ -118,6 +118,39 @@ function clamp(
   return Math.max(minimum, Math.min(maximum, value))
 }
 
+/** A passive portal note must avoid the action buttons, tools and captured pixels. */
+export function placeQuickCaptureNote(
+  viewport: ClientSize,
+  note: ClientSize,
+  actions: ClientRect,
+  tools: ClientRect,
+  crop: ClientRect,
+): { left: number; top: number } {
+  const margin = 8
+  const gap = 12
+  const right = viewport.width - note.width - margin
+  const bottom = viewport.height - note.height - margin
+  const candidates = [
+    { left: actions.left, top: actions.top + actions.height + gap },
+    { left: actions.left + actions.width - note.width, top: actions.top + actions.height + gap },
+    { left: actions.left, top: actions.top - note.height - gap },
+    { left: actions.left + actions.width - note.width, top: actions.top - note.height - gap },
+    { left: margin, top: margin },
+    { left: right, top: margin },
+    { left: margin, top: bottom },
+    { left: right, top: bottom },
+  ].map((point) => ({
+    left: clamp(point.left, margin, Math.max(margin, right)),
+    top: clamp(point.top, margin, Math.max(margin, bottom)),
+  }))
+  const overlap = (point: { left: number; top: number }, rect: ClientRect) =>
+    Math.max(0, Math.min(point.left + note.width, rect.left + rect.width) - Math.max(point.left, rect.left)) *
+    Math.max(0, Math.min(point.top + note.height, rect.top + rect.height) - Math.max(point.top, rect.top))
+  const score = (point: { left: number; top: number }) =>
+    (overlap(point, actions) + overlap(point, tools)) * viewport.width * viewport.height + overlap(point, crop)
+  return candidates.reduce((best, point) => score(point) < score(best) ? point : best)
+}
+
 export function computeQuickCaptureLayout(input: QuickCaptureLayoutInput): QuickCaptureLayout {
   const margin = input.margin ?? 8
   const gap = input.gap ?? 12

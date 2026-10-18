@@ -1,12 +1,18 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import {
+  computed,
+  onMounted,
+  onUnmounted,
+  ref,
+} from 'vue'
 import {
   NButton,
   NTooltip,
 } from 'naive-ui'
 import { UiIcon } from '../icon'
 import EditorSettingsPopover from './EditorSettingsPopover.vue'
-import brandUrl from '../assets/brand.svg?no-inline'
+import BrandMark from '../assets/BrandMark.vue'
+import { attachBrandEyes } from '../brand/brand-eyes'
 import type {
   SupportedLocale,
   ThemePreference,
@@ -51,6 +57,12 @@ const emit = defineEmits<{
   theme: [value: ThemePreference]
 }>()
 const disabled = computed(() => props.pending)
+const brand = ref<HTMLElement>()
+let disposeBrand: (() => void) | undefined
+onMounted(() => {
+  if (brand.value) disposeBrand = attachBrandEyes(brand.value)
+})
+onUnmounted(() => disposeBrand?.())
 const captureDisabled = computed(() => disabled.value || !props.captureAvailable)
 const captureTitle = computed(() =>
   props.captureAvailable ? props.t('capture') : (props.captureUnavailableReason ?? props.t('captureUnavailable')))
@@ -60,14 +72,13 @@ const openImageTitle = computed(() =>
 
 <template>
   <header class="cs-topbar">
-    <div class="cs-brand" :aria-label="t('appName')">
+    <div
+      ref="brand"
+      class="cs-brand"
+      :aria-label="t('appName')"
+    >
       <span class="cs-brand-mark" aria-hidden="true">
-        <img
-          :src="brandUrl"
-          alt=""
-          width="30"
-          height="30"
-        />
+        <BrandMark />
       </span>
       <strong>Cute Screen</strong>
     </div>

@@ -1,6 +1,7 @@
-import type {
-  CanvasViewportHosts,
-  QuickCaptureDraftV1,
+import {
+  describeError,
+  type CanvasViewportHosts,
+  type QuickCaptureDraftV1,
 } from '@cute-screen/editor-vue'
 import type {
   Ref,
@@ -22,6 +23,7 @@ export interface QuickCaptureActionPorts {
   readonly selectionPending: Ref<boolean>
   readonly coordinator: Coordinator
   readonly commit: QuickCaptureCommitController
+  readonly prepareDocumentChange: () => Promise<unknown>
   readonly dismissWindow: () => Promise<void>
 }
 
@@ -67,6 +69,17 @@ export class QuickCaptureActionController {
     })
   }
 
+  async saveToHistory(): Promise<void> {
+    if (!this.#ports.hosts.value) return
+    await this.#run(async () => {
+      if (!this.#ports.materialized.value) {
+        await this.#ports.prepareDocumentChange()
+        await this.#ports.commit.commit('history')
+      }
+      await this.#ports.dismissWindow()
+    })
+  }
+
   async cancel(): Promise<void> {
     if (this.#ports.pending.value) return
     const { pending, error, draft, coordinator } = this.#ports
@@ -79,7 +92,7 @@ export class QuickCaptureActionController {
         closeWindow: this.#ports.dismissWindow,
       })
     } catch (cause) {
-      error.value = cause instanceof Error ? cause.message : String(cause)
+      error.value = describeError(cause, 'Quick capture could not be closed')
     } finally {
       pending.value = false
     }
@@ -88,6 +101,11 @@ export class QuickCaptureActionController {
   keydown(event: KeyboardEvent): void {
     if (event.defaultPrevented || this.#ports.pending.value) return
     if (isEditableTarget(event.target)) return
+    if (
+      event.key === 'Enter' &&
+      event.target instanceof Element &&
+      event.target.closest('.cs-quick-actions button')
+    ) return
     if (event.key === 'Enter' && !event.repeat) {
       if (this.#ports.selectionPending.value) return
       event.preventDefault()
@@ -99,14 +117,15 @@ export class QuickCaptureActionController {
   }
 
   async #run(action: () => Promise<void>): Promise<void> {
-    const { pending, error, commit } = this.#ports
+    const { pending, error, commit, selectionPending } = this.#ports
+    if (pending.value || selectionPending.value) return
     pending.value = true
     error.value = undefined
     try {
       await action()
     } catch (cause) {
       await commit.detectMaterializedAfterError()
-      error.value = cause instanceof Error ? cause.message : String(cause)
+      error.value = describeError(cause, 'Quick capture action failed')
     } finally {
       pending.value = false
     }

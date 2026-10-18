@@ -1,4 +1,5 @@
 import { loadDocumentTextFonts } from '../../text-fonts'
+import { loadEmojiResource } from '../../emoji/resources'
 import type {
   ComputedRef,
   Ref,
@@ -154,6 +155,12 @@ export class CanvasRendererController {
       ...(layer && props.image ? ([[layer.payload.blobHash, props.image]] as const) : []),
       ...(props.textureImages ?? new Map()),
     ])
+    const emojiIds = new Set(createDocumentRenderScene(props.document!).nodes
+      .filter((node) => node.kind === 'image' && node.resourceId.startsWith('emoji:'))
+      .map((node) => (node as Extract<RenderNode, { kind: 'image' }>).resourceId))
+    const emojiImages = await Promise.all([...emojiIds].map(async (id) => [id, await loadEmojiResource(id)] as const))
+    if (!this.mounted || revision !== this.revision) return false
+    for (const [id, image] of emojiImages) inputs.set(id, image)
     for (const [id, image] of inputs) {
       const key = `${id}:${image.currentSrc || image.src}`
       if (this.resources.get(id)?.key === key) continue

@@ -114,13 +114,21 @@ export function freezePaint(
   return Object.freeze({ ...paint, stops: Object.freeze(stops) })
 }
 
-export function validateStrokeStyle(node: RenderLineNode | RenderPathNode | RenderVectorNode): void {
+export function validateStrokeStyle(node: Extract<RenderNode, { kind: 'rect' | 'ellipse' | 'polygon' }> | RenderLineNode | RenderPathNode | RenderVectorNode): void {
   if (node.lineCap && !['butt', 'round', 'square'].includes(node.lineCap))
     throw new RangeError(`${node.id}.lineCap is invalid`)
   if (node.lineJoin && !['miter', 'round', 'bevel'].includes(node.lineJoin))
     throw new RangeError(`${node.id}.lineJoin is invalid`)
   if (node.dash) {
-    if (node.dash.length === 0 || node.dash.some((value) => !Number.isFinite(value) || value <= 0)) {
+    const roundDots = ['rect', 'ellipse', 'polygon', 'vector'].includes(node.kind) && node.lineCap === 'round'
+    if (
+      node.dash.length === 0 ||
+      !node.dash.some((value) => value > 0) ||
+      node.dash.some((value, index) =>
+        !Number.isFinite(value) ||
+        value < 0 ||
+        value === 0 && (!roundDots || index % 2 !== 0))
+    ) {
       throw new RangeError(`${node.id}.dash is invalid`)
     }
   }

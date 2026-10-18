@@ -16,6 +16,7 @@ import UiSeparator from '../ui/UiSeparator.vue'
 import NumericControl from '../ui/NumericControl.vue'
 
 defineProps<{
+  lineAlignment?: { readonly enabled: boolean; readonly label: string; readonly disabled?: boolean } | undefined
   controls: readonly ContextControl[]
   recentColors?: readonly SrgbColor[]
   pickerLocale?: 'en' | 'ru'
@@ -86,7 +87,7 @@ function choose(
 function arrowStrokeStyles(
   control: Extract<ContextControl, { readonly kind: 'arrowStroke' }>,
 ): readonly ('solid' | 'dashed' | 'dotted')[] {
-  return control.style === 'dotted' ? (['solid', 'dashed', 'dotted'] as const) : (['solid', 'dashed'] as const)
+  return control.allStyles || control.style === 'dotted' ? (['solid', 'dashed', 'dotted'] as const) : (['solid', 'dashed'] as const)
 }
 
 function popoverKeydown(
@@ -156,7 +157,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOnOutside
           class="cs-arrow-toolbar-trigger"
           type="button"
           :disabled="control.disabled ?? false"
-          :aria-label="`${control.label}: ${control.width} px`"
+          :aria-label="`${control.label}: ${control.widthMixed ? '—' : `${control.width} px`}`"
           :title="control.label"
           :aria-expanded="openPopover[control.id] ?? false"
           aria-haspopup="dialog"
@@ -178,7 +179,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOnOutside
               "
             />
           </svg>
-          <span class="sr-only">{{ control.width }} px</span>
+          <span class="sr-only">{{ control.widthMixed ? '—' : `${control.width} px` }}</span>
           <UiIcon name="chevronDown" class="cs-arrow-toolbar-chevron"/>
         </button>
         <NPopover
@@ -217,7 +218,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOnOutside
                       ? control.dashedLabel
                       : control.dottedLabel
                 "
-                :aria-pressed="control.style === style"
+                :aria-pressed="!control.styleMixed && control.style === style"
                 :disabled="control.disabled ?? false"
                 @click="choose('strokeStyle', style)"
               >
@@ -249,6 +250,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOnOutside
               :locale="pickerLocale"
               control-id="width"
               :value="control.width"
+              :mixed="control.widthMixed ?? false"
               :min="0.01"
               :step="0.01"
               unit="px"
@@ -400,5 +402,18 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOnOutside
         </NPopover>
       </div>
     </template>
+    <button
+      v-if="lineAlignment"
+      class="cs-arrow-toolbar-trigger cs-line-alignment"
+      type="button"
+      :disabled="lineAlignment.disabled"
+      data-control="autoAlignAxes"
+      :aria-label="lineAlignment.label"
+      :title="lineAlignment.label"
+      :aria-pressed="lineAlignment.enabled"
+      @click="emit('change', 'autoAlignAxes', String(!lineAlignment.enabled))"
+    >
+      <UiIcon :name="lineAlignment.enabled ? 'magnet' : 'magnetOff'" />
+    </button>
   </div>
 </template>

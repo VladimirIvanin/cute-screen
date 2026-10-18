@@ -91,7 +91,7 @@ export function createWorkspaceState() {
     rememberedStyles: shallowRef<
       Partial<
         Record<
-          import('@cute-screen/editor-renderer').LayerNode['kind'],
+          import('@cute-screen/editor-renderer').AnnotationTool,
           import('@cute-screen/editor-renderer').LayerStyle
         >
       >

@@ -8,18 +8,20 @@ import type {
 } from './document/types'
 import {
   calloutTextRect,
+  calloutHasLabel,
+  resolvedCalloutAttachment,
   type CalloutGeometryContext,
 } from './callout-label-geometry'
+import {
+  arrowPathPoints,
+  arrowEndpointAngles,
+} from './arrow-geometry'
 import { calloutAttachmentRoute } from './callout-attachment-route'
 function point(value: Point): Point & JsonObject {
   return Object.freeze({ x: value.x, y: value.y })
 }
-export function defaultCalloutAttachment(
-  target: Point,
-  label: Point,
-): CalloutAttachment {
-  if (Math.abs(label.x - target.x) + 1e-6 >= Math.abs(label.y - target.y)) return label.x >= target.x ? 'left' : 'right'
-  return label.y >= target.y ? 'top' : 'bottom'
+export function defaultCalloutAttachment(): CalloutAttachment {
+  return 'auto'
 }
 export function calloutStyleForPayload(payload: CalloutPayload): CalloutStyle | null {
   if (!payload.frame) return null
@@ -33,7 +35,7 @@ export function calloutStyleForPayload(payload: CalloutPayload): CalloutStyle | 
   }
 }
 export function calloutRoutePreset(route: CalloutRoute): CalloutStyle['route'] {
-  return route.path === 'orthogonal' ? route.preset : route.path
+  return route.path === 'quadratic' ? 'straight' : route.path === 'orthogonal' ? route.preset : route.path
 }
 /** Remove zero-length and collinear internal segments without moving endpoints. */
 export function normalizeCalloutPoints(points: readonly Point[]): readonly (Point & JsonObject)[] {
@@ -64,6 +66,8 @@ function baseCalloutPathPoints(payload: CalloutPayload): readonly Point[] {
   const label = point(payload.label)
   const route = payload.route
   if (route.path === 'straight') return [target, label]
+  if (route.path === 'quadratic') return arrowPathPoints({ start: target, end: label, path: 'quadratic',
+    bend: route.bend, startCap: 'none', endCap: 'none', stroke: payload.stroke })
   if (route.path === 'orthogonal') return [target, ...route.points, label]
   if (route.path === 'corner') return normalizeCalloutPoints([target,
     route.axis === 'x' ? { x: label.x, y: target.y } : { x: target.x, y: label.y }, label])
@@ -80,9 +84,31 @@ export function calloutPathPoints(
   context: CalloutGeometryContext = {},
 ): readonly Point[] {
   const points = baseCalloutPathPoints(payload)
-  if (!payload.attachment) return points
-  return normalizeCalloutPoints(calloutAttachmentRoute(points, payload.attachment,
+  const attachment = resolvedCalloutAttachment(payload)
+  if (
+    !attachment ||
+    !calloutHasLabel(payload) ||
+    payload.route.path === 'straight' ||
+    payload.route.path === 'quadratic'
+  ) return points
+  return normalizeCalloutPoints(calloutAttachmentRoute(points, attachment,
     calloutTextRect(payload, context), Math.max(12, payload.stroke.width * 2)))
+}
+
+/** Quadratic endpoint directions use exact tangents; collapsed derivatives use the path fallback. */
+export function calloutEndpointAngles(
+  payload: CalloutPayload,
+  context: CalloutGeometryContext = {},
+) {
+  const fallback = arrowEndpointAngles(calloutPathPoints(payload, context))
+  if (payload.route.path !== 'quadratic') return fallback
+  const bend = payload.route.bend
+  return {
+    start: bend.x === payload.target.x && bend.y === payload.target.y ? fallback.start
+      : Math.atan2(payload.target.y - bend.y, payload.target.x - bend.x),
+    end: bend.x === payload.label.x && bend.y === payload.label.y ? fallback.end
+      : Math.atan2(payload.label.y - bend.y, payload.label.x - bend.x),
+  }
 }
 export function defaultCalloutRoute(
   target: Point,
@@ -95,7 +121,7 @@ export function manualRoute(
   points: readonly Point[],
 ): CalloutRoute {
   const route = payload.route
-  const axis = route.path === 'elbow' ? route.elbow.axis : route.path === 'straight' ? 'y' : route.axis
+  const axis = route.path === 'elbow' ? route.elbow.axis : route.path === 'straight' || route.path === 'quadratic' ? 'y' : route.axis
   return { path: 'orthogonal', preset: calloutRoutePreset(route) === 'elbow' ? 'elbow' : 'corner', axis,
     points: normalizeCalloutPoints(points).slice(1, -1) }
 }

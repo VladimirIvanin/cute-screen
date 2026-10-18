@@ -123,15 +123,11 @@ export function configureStrokePaint(
   configurePaint(canvasKit, paint, color, node.opacity, 'stroke', width)
   paint.setBlendMode(blendMode(canvasKit, node.blendMode))
   paint.setStrokeCap(
-    (node.kind === 'line' ||
-      node.kind === 'path' ||
-      node.kind === 'vector') && node.lineCap === 'round'
+    node.lineCap === 'round'
       ? canvasKit.StrokeCap.Round
-      : (node.kind === 'line' ||
-        node.kind === 'path' ||
-        node.kind === 'vector') && node.lineCap === 'square'
-          ? canvasKit.StrokeCap.Square
-          : canvasKit.StrokeCap.Butt,
+      : node.lineCap === 'square'
+        ? canvasKit.StrokeCap.Square
+        : canvasKit.StrokeCap.Butt,
   )
   paint.setStrokeJoin(
     node.lineJoin === 'round'
@@ -140,12 +136,7 @@ export function configureStrokePaint(
         ? canvasKit.StrokeJoin.Bevel
         : canvasKit.StrokeJoin.Miter,
   )
-  if (
-    (node.kind === 'line' ||
-      node.kind === 'path' ||
-      node.kind === 'vector') &&
-      node.dash
-  ) {
+  if (node.dash) {
     const effect = canvasKit.PathEffect.MakeDash([...node.dash])
     paint.setPathEffect(effect)
     return effect

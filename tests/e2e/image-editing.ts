@@ -226,6 +226,60 @@ export async function verifyImageEditing(output: string): Promise<void> {
   })).toBe(true)
   await browser.saveScreenshot(`${output}-border-settings.png`)
   await browser.keys('Escape')
+  await radius.click()
+  const zeroInput = $('.cs-image-popover input[role="spinbutton"]')
+  await zeroInput.click()
+  await browser.keys(['Control', 'a'])
+  await browser.keys('0')
+  await browser.keys('Enter')
+  await browser.waitUntil(async () => {
+    const layer = (await selectionDocument()).layers.find((item) => item.id === image.id)
+    return layer?.kind === 'image' && layer.payload.radius === 0
+  })
+  await browser.keys('Escape')
+  await waitForStableCanvas()
+  const square = await settledPixels()
+  const squareImage = (await selectionDocument()).layers.find((item) => item.id === image.id) as ImageLayer
+  const corners = await browser.execute((layer) => {
+    const canvas = document.querySelector<HTMLCanvasElement>('.cs-canvas:not(.cs-canvas-overlay)')!
+    const state = window as unknown as {
+      __cuteScreenE2eQuick?: { snapshot(): EditorDocumentV1 }
+      __cuteScreenE2eM05?: { snapshot(): EditorDocumentV1 }
+      __cuteScreenE2eM08?: { snapshot(): { document: EditorDocumentV1 } }
+    }
+    const doc = state.__cuteScreenE2eQuick?.snapshot()
+      ?? state.__cuteScreenE2eM08?.snapshot().document
+      ?? state.__cuteScreenE2eM05!.snapshot()
+    const out = document.querySelector('.cs-quick-actions') ? { x: 0, y: 0, ...doc.canvas }
+      : doc.crop ?? { x: 0, y: 0, ...doc.canvas }
+    const t = layer.transform, b = layer.localBounds!, half = layer.payload.border!.width / 2
+    const context = canvas.getContext('2d')!
+    const result: number[][] = []
+    for (const x of [b.x - half, b.x + b.width + half]) {
+      for (const y of [b.y - half, b.y + b.height + half]) {
+        const px = (t.translateX + x * t.scaleX - out.x) * canvas.width / out.width
+        const py = (t.translateY + y * t.scaleY - out.y) * canvas.height / out.height
+        const insetX = x < b.x ? 1 : -2, insetY = y < b.y ? 1 : -2
+        result.push([...context.getImageData(Math.floor(px + insetX), Math.floor(py + insetY), 1, 1).data])
+      }
+    }
+    return result
+  }, squareImage)
+  const color = squareImage.payload.border!.color
+  for (const corner of corners) {
+    for (const [index, channel] of [color.red, color.green, color.blue, color.alpha].entries()) {
+      expect(Math.abs(corner[index]! - Math.round(channel * 255))).toBeLessThanOrEqual(1)
+    }
+  }
+  await browser.saveScreenshot(`${output}-radius-zero.png`)
+  await browser.keys(['Control', 'z'])
+  await browser.waitUntil(async () => {
+    const layer = (await selectionDocument()).layers.find((item) => item.id === image.id)
+    return layer?.kind === 'image' && layer.payload.radius === radiusValue
+  })
+  await browser.keys(['Control', 'Shift', 'z'])
+  await browser.waitUntil(async () => samePixels(square, await pixels()))
+  await browser.keys(['Control', 'z'])
   await browser.keys(['Control', 'z'])
   await browser.keys(['Control', 'z'])
   await browser.waitUntil(async () => samePixels(initial, await pixels()))

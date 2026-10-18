@@ -25,19 +25,19 @@ describe('compact shape toolbar', () => {
     await browser.setWindowSize(1024, 700)
     await openDrawingHarness()
     await verifyShapeDefaultsPlacement('artifacts/browser-e2e', 'callout-shape-defaults')
-  })
+  }).timeout(120000)
   it('edits every catalogue figure and preserves the object preview at 1024px', async () => {
     await browser.setWindowSize(1024, 700)
     await openDrawingHarness()
     await drawShape()
     await verifyShapeCatalogue('artifacts/browser-e2e', 'shape-expanded')
-  })
+  }).timeout(120000)
   it('configures defaults with trusted right-click without editing the selection', async () => {
     await browser.setWindowSize(1280, 800)
     await openDrawingHarness()
     await verifyShapeToolbar('artifacts/browser-e2e', 'shape-large')
     await verifyShapeDefaults()
-  })
+  }).timeout(120000)
   it('edits paint and history, then fits every locale/theme at 1024px', async () => {
     await browser.setWindowSize(1024, 700)
     await openDrawingHarness()

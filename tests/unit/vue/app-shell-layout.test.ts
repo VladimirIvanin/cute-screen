@@ -69,6 +69,7 @@ describe('M02 editor shell', () => {
     expect(labels).toEqual([
       'Select',
       'Arrow',
+      'Line',
       'Shape',
       'Pencil',
       'Highlighter',
@@ -76,6 +77,7 @@ describe('M02 editor shell', () => {
       'Numbered marker',
       'Callout',
       'Image',
+      'Emoji',
       'Eyedropper',
       'Hide data',
       'Spotlight',

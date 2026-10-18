@@ -1,3 +1,4 @@
+import { updateLineGesture } from './line-gesture'
 import {
   rulerAngleStep,
   updateRulerPointer,
@@ -106,13 +107,35 @@ export function handlePointerMove(
       break
     case 'arrowHandle':
     case 'calloutHandle':
-      context.setGesture({ ...gesture, current: point })
-      context.invalidateOverlay()
+      moveDirectHandle(context, event, point, gesture)
       break
     case 'text':
       context.setGesture({ ...gesture, current: point })
       break
   }
+}
+
+function moveDirectHandle(
+  context: PointerMoveContext,
+  event: PointerEvent,
+  point: CanvasPoint,
+  gesture: Extract<NonNullable<CanvasGesture>, { kind: 'arrowHandle' | 'calloutHandle' }>,
+): void {
+  if (gesture.kind === 'arrowHandle') {
+    context.setGesture(updateLineGesture(
+      { ...gesture, current: point },
+      point,
+      event.shiftKey,
+      event.altKey,
+      context.props,
+    ))
+  } else if (gesture.kind === 'calloutHandle' && gesture.removal) {
+    const distance = Math.hypot(event.clientX - gesture.removal.clientStart.x,
+      event.clientY - gesture.removal.clientStart.y)
+    context.setGesture({ ...gesture, current: point, removal: { ...gesture.removal,
+      cancelled: gesture.removal.cancelled || !event.altKey || distance >= SELECTION_DRAG_THRESHOLD_CSS } })
+  } else context.setGesture({ ...gesture, current: point })
+  context.invalidateOverlay()
 }
 
 function movePan(
@@ -263,6 +286,11 @@ function moveDrawing(
   point: CanvasPoint,
   gesture: Extract<NonNullable<CanvasGesture>, { readonly kind: 'draw' }>,
 ): void {
+  if (gesture.tool === 'line') {
+    context.setGesture(updateLineGesture(gesture, point, event.shiftKey, event.altKey, context.props))
+    context.invalidateOverlay()
+    return
+  }
   let stroke = gesture.stroke
   if (stroke) {
     const coalesced = event.getCoalescedEvents?.()

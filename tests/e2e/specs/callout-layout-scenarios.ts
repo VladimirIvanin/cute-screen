@@ -75,17 +75,15 @@ export async function exerciseCalloutLayout(artifacts: string): Promise<void> {
     expect(reopened.left).toBeCloseTo(long.left, 0)
     expect(reopened.top).toBeCloseTo(long.top, 0)
     expect(reopened.height).toBeCloseTo(long.height, 0)
-    await $('button[aria-label="Label width"]').click()
-    let panel = $('.cs-callout-width-popover')
-    await expect(panel).toBeDisplayed()
-    await expect(panel.$('input')).toBeFocused()
+    const widthInput = $('.cs-callout-width-control input')
+    await widthInput.click()
+    await expect(widthInput).toBeFocused()
+    await setNumericInput(widthInput, '800')
     await browser.keys('Escape')
     await expect(editor).toExist()
-    await $('button[aria-label="Label width"]').click()
-    panel = $('.cs-callout-width-popover')
-    await expect(panel).toBeDisplayed()
-    await setNumericInput(panel.$('input'), '720')
-    await panel.$('button=Apply').click()
+    expect((await editorRect()).width / long.scale).toBeCloseTo(480, 0)
+    await setNumericInput(widthInput, '720')
+    await browser.keys('Enter')
     expect((await editorRect()).width / long.scale).toBeCloseTo(720, 0)
     expect(await versionToken()).toBe(token + 1)
     await editor.click()
@@ -104,7 +102,7 @@ export async function exerciseCalloutLayout(artifacts: string): Promise<void> {
       const r = document.querySelector<HTMLElement>('.cs-canvas:not(.cs-canvas-overlay)')!.getBoundingClientRect()
       return { left: r.left, top: r.top, scale: r.width / 2560 }
     })
-    const x = scene.left + (handle.x + (left ? -736 : 736)) * scene.scale
+    const x = scene.left + (handle.x + (left ? -728 : 728)) * scene.scale
     const y = scene.top + handle.y * scene.scale
     await browser.action('pointer').move({ origin: 'viewport', x: Math.round(x), y: Math.round(y) }).down({ button: 'left' })
       .move({ origin: 'viewport', x: Math.round(x + (left ? 100 : -100)), y: Math.round(y), duration: 150 })

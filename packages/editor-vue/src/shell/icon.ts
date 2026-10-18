@@ -1,5 +1,12 @@
 import {
+  IconMoodSmile,
+  IconEdit,
+  IconHistory,
+  IconLine,
+  IconMagnet,
+  IconMagnetOff,
   IconArrowsMove,
+  IconArrowsHorizontal,
   IconBlendMode,
   IconBold,
   IconItalic,
@@ -60,6 +67,13 @@ import {
 
 /** The only product-chrome mapping from stable semantics to Tabler or project geometry. */
 const icons = {
+  edit: IconEdit,
+  history: IconHistory,
+  emoji: IconMoodSmile,
+  line: IconLine,
+  magnet: IconMagnet,
+  magnetOff: IconMagnetOff,
+  reverseGradient: IconArrowsHorizontal,
   move: IconArrowsMove,
   blendMode: IconBlendMode,
   bold: IconBold,

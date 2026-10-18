@@ -37,7 +37,7 @@ const orthogonal = (points: readonly { x: number; y: number }[]) => points.slice
 describe('editable callouts', () => {
   it('chooses the same side for a diagonal gesture despite viewport rounding', () => {
     const layer = createCalloutLayer({ id, text: 'Diagonal', target: { x: 0, y: 0 }, label: { x: 200, y: 200.00000000001 } })!
-    expect(layer.payload.attachment).toBe('left')
+    expect(layer.payload.attachment).toBe('auto')
     expect(layer.payload.route).toEqual({ path: 'corner', axis: 'y' })
   })
   it('preserves old v7 geometry and omitted fields through the production codec', () => {
@@ -64,12 +64,13 @@ describe('editable callouts', () => {
   it('creates a corner route and an attached card without a label dot', () => {
     const layer = fixture()
     expect(layer.payload).toMatchObject({ route: { path: 'corner' }, targetMarker: 'circle',
-      labelMarker: 'none', frame: { kind: 'card', padding: 8, radius: 8 }, attachment: 'left' })
+      labelMarker: 'none', frame: { kind: 'card', padding: 8, radius: 8 }, attachment: 'auto' })
     expect(calloutPathPoints(layer.payload)).toHaveLength(3)
     expect(calloutTextRect(layer.payload).x).toBe(layer.payload.label.x)
   })
   it('moves the label across its target without flipping the attachment or moving the target', () => {
-    const layer = fixture()
+    const initial = fixture()
+    const layer = { ...initial, payload: { ...initial.payload, attachment: 'left' as const } }
     const after = updateCalloutHandle(layer, 'label', { x: layer.payload.target.x - 300, y: layer.payload.label.y })
     expect(after.payload.attachment).toBe('left')
     expect(world(after, 'target')).toEqual(world(layer, 'target'))
@@ -77,7 +78,7 @@ describe('editable callouts', () => {
   })
   it('keeps the terminal line outside a plain label after crossing the target', () => {
     const layer = fixture()
-    const plain = { ...layer, payload: { ...layer.payload, frame: { ...layer.payload.frame!, kind: 'text' as const } } }
+    const plain = { ...layer, payload: { ...layer.payload, attachment: 'left' as const, frame: { ...layer.payload.frame!, kind: 'text' as const } } }
     const after = updateCalloutHandle(plain, 'label', { x: plain.payload.target.x - 100, y: plain.payload.label.y })
     const points = calloutPathPoints(after.payload)
     expect(points.at(-2)!.x).toBeLessThanOrEqual(after.payload.label.x)

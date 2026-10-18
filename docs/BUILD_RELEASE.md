@@ -1,5 +1,53 @@
 # CI-сборки и проверка версии через GitHub
 
+## Проверка линии (ADR-100)
+
+Новые line/line-reopen сценарии используют штатный tauri runner и общий
+выделенный persistenceGroup. Native input запускается последовательно. Свежая
+сборка обязательна; browser pass не заменяет real WebView. IPC и document v7
+не меняются. Фактические команды и артефакты — TESTING.md.
+
+## Изолированный снимок окна (ADR-091)
+
+PowerShell: `$env:CUTE_SCREEN_E2E_SCENARIOS='window-capture'; pnpm test:e2e:tauri`.
+Сценарий требует интерактивный Windows desktop и external provider, запрещает
+fake pixels и использует отдельный профиль. Реальные WinForms окна 1400×1000
+и 700×480 создают частичное перекрытие; native SendInput подтверждает/отменяет
+selector; production mount и PNG decode выполняются внутри WebView2.
+Артефакты: `artifacts/tauri-e2e/window-selector-*.png`, `window-editor-*.png`,
+`window-capture-decoded.json`. Не запускать параллельные package-cleaning builds.
+Для занятого обычного target проверен отдельный
+`CARGO_TARGET_DIR=D:/cutescreen/artifacts/window-capture-target` и
+`CUTE_SCREEN_FRONTEND_DIST=D:/cutescreen/artifacts/window-capture-frontend`.
+Runner записывает временный Tauri config с относительным frontendDist;
+`CUTE_SCREEN_E2E_DRIVER_PORT=5660` позволяет избежать занятого default 4444.
+Сценарий проверяет EN/dark и RU/light, использует script timeout 45 s,
+не взаимодействует с selector другого executable и не останавливает пользовательский editor.
+
+Windows добавляет WinRT/WGC features существующего MIT windows crate;
+Screen/Area остаются DXGI. macOS weak-links ScreenCaptureKit, deployment baseline
+12.0 сохраняется, CoreImage/CoreMedia/CoreVideo используются для одного frame.
+X11 использует существующий x11rb Composite. Новых GPL-зависимостей нет.
+
+## Два режима карандаша (ADR-094)
+
+`pnpm test:e2e:browser --spec tests/e2e/specs/browser-brushes.e2e.ts --spec tests/e2e/specs/browser-straight-strokes.e2e.ts --spec tests/e2e/specs/browser-ruler-shift.e2e.ts`.
+Windows PowerShell: `$env:CUTE_SCREEN_E2E_SCENARIOS='brushes,brushes-reopen,straight-strokes,straight-strokes-reopen,ruler-shift'; pnpm test:e2e:tauri`.
+Native runner использует isolated profiles и свежую сборку, pin-ит binary
+перед запуском и проверяет Quick → Editor → отдельный reopen через external driver.
+Не перестраивать packages/frontend во время browser run; при параллельной работе
+Vite polling с большим интервалом исключает HMR от чужой записи файлов.
+Новых schema/IPC/features/dependencies нет; migration/save/undo покрыты отдельно.
+
+## Доработка выноски (ADR-090)
+
+`pnpm test:e2e:browser --spec tests/e2e/specs/browser-callout-editing.e2e.ts --spec tests/e2e/specs/browser-callout-empty.e2e.ts --spec tests/e2e/specs/browser-callout-layout.e2e.ts --spec tests/e2e/specs/browser-callout-visual.e2e.ts --mochaOpts.timeout=180000`
+проверяет новые route/empty/width и Alt gestures. Расширенный editing scenario имеет
+300 s limit. Native: `$env:CUTE_SCREEN_E2E_SCENARIOS='callout-editing,callout-editing-reopen'; pnpm test:e2e:tauri`.
+На занятом пользовательским editor target использовать отдельный CARGO_TARGET_DIR.
+Сценарии делят только выделенный persistence profile. v7 codec расширяется quadratic
+и auto attachment без миграции прежних документов; native IPC остаётся прежним.
+
 ## Проверка управляемых выносок (ADR-087)
 
 Browser: `pnpm test:e2e:browser --spec tests/e2e/specs/browser-callout-editing.e2e.ts --spec tests/e2e/specs/browser-callout-layout.e2e.ts --spec tests/e2e/specs/browser-callout-visual.e2e.ts`.
@@ -343,12 +391,22 @@ desktop-зависимость удалена. Обновление устран
 
 ## Перегенерация иконок
 
+ADR-093: та же `pnpm icons:generate` обновляет generated `BrandMark.vue`,
+inline SVG между `brand-mark:start/end` в обеих landing HTML и landing favicon.
+Фрагменты не редактируются вручную. Статические платформенные assets сохраняют
+прежнюю геометрию. `pnpm build:landing` собирает только небольшой DOM-модуль
+пасхалки; Vue и desktop entry в него не импортируются. Landing TypeScript
+проверяется общей `pnpm typecheck`. Без JS знак и навигация остаются доступны.
+
 `pnpm icons:generate` воспроизводит SVG логотипа/редактора/favicon, отдельные
 tray/template PNG и все bundle icons (PNG/ICO/ICNS) из единой геометрии в
 `scripts/generate-brand-assets.mjs`. Команда использует существующие
 `@napi-rs/canvas` и Tauri CLI; новые зависимости не требуются. `logo-mark.svg`
 сохраняет выбранный монитор с ушами, прищурами и подставкой без фоновой плитки.
 CLI запускается через текущий Node, без платформозависимого запуска pnpm shim.
+Команда `pnpm tauri` также вызывает CLI через Node напрямую, сохраняя все
+аргументы: Windows `.cmd` shim не должен повторно интерпретировать завершённую
+сборку и возвращать ошибку после успешного линкования.
 Generated assets
 хранятся в Git и не генерируются при каждом запуске приложения. После изменения
 проверить декодированные PNG и системный tray; app tile нельзя подставлять
@@ -420,3 +478,21 @@ profile, production Capture → Quick → Editor и фактическое со�
 На Linux без внешних drivers используется embedded WebView driver; размещение
 аннотации выполняется реальным X11 pointer input. Browser/native input suites
 запускаются последовательно.
+
+### Bundled emoji resources (2026-10-18)
+
+100 Noto 2D SVG, Apache-2.0.txt, LICENSE, NOTICE и manifest находятся в
+packages/editor-vue/src/emoji/assets. Источник и upstream commit закреплены в
+emoji-catalog.ts; scripts/vendor-noto-emoji.mjs воспроизводит выборку и XML
+normalization. SHA-256 проверяются render suite. Vite URL imports используют
+no-inline, поэтому asset-файлы и notices входят в frontend build. Сетевой доступ
+для штатного picker/render/export не нужен.
+
+## Проверка компактных Quick actions (ADR-096)
+
+PowerShell: `$env:CUTE_SCREEN_E2E_SCENARIOS='quick-history,quick-history-reopen,quick-chrome'; pnpm test:e2e:tauri`.
+Первые два сценария делят только isolated persistence profile; используют
+external tauri-driver/EdgeDriver, production Quick mount, native input и decode
+original/result. При занятом target задать отдельный CARGO_TARGET_DIR.
+`pnpm ipc:codegen` обновляет additive CaptureCompletion history; schema хранения,
+permissions, зависимости и платформенные capture backends не меняются.

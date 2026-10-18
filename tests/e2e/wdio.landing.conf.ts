@@ -64,6 +64,9 @@ export const config: WebdriverIO.Config = {
       browserName: 'tauri',
       'goog:chromeOptions': {
         args: [...(process.env.CUTE_SCREEN_BROWSER_E2E_HEADLESS === '1' ? ['--headless=new'] : [])],
+        ...(process.env.CUTE_SCREEN_LANDING_NO_JS === '1' ? {
+          prefs: { 'profile.managed_default_content_settings.javascript': 2 },
+        } : {}),
       },
     },
   ],

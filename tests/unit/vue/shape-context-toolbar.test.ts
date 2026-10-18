@@ -39,6 +39,35 @@ function mount(
   return render(ContextToolbar, { props: { schema: value, label: 'Shape', pickerLocale: locale } })
 }
 describe('compact shape formatting', () => {
+  it('shows three visual fill choices, preserves radial display and edits stroke styles', async () => {
+    const view = mount(schema('rectangle', { kind: 'radialGradient', center: { x: 0.5, y: 0.5 }, radius: 0.5,
+      opacity: 0.6, stops: [
+        { position: 0, color: { red: 1, green: 0, blue: 0, alpha: 1 } },
+        { position: 1, color: { red: 0, green: 0, blue: 1, alpha: 0 } },
+      ],
+    }))
+    const trigger = screen.getByRole('button', { name: 'Fill: Radial gradient' })
+    await fireEvent.click(trigger)
+    const options = screen.getByRole('group', { name: 'Fill type' })
+    expect(within(options).getAllByRole('button')).toHaveLength(3)
+    expect(within(options).queryByRole('button', { name: 'Radial gradient' })).toBeNull()
+    await fireEvent.click(within(options).getByRole('button', { name: 'Linear gradient' }))
+    const change = view.emitted('change')[0] as [string, string]
+    expect(change[0]).toBe('fillGradient')
+    expect(JSON.parse(change[1])).toMatchObject({ kind: 'linearGradient', opacity: 0.6 })
+    await fireEvent.keyDown(options, { key: 'Escape' })
+    expect(trigger).toHaveFocus()
+    await fireEvent.click(screen.getByRole('button', { name: /Stroke:/ }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Dotted' }))
+    expect(view.emitted('change').at(-1)).toEqual(['strokeStyle', 'dotted'])
+  })
+  it('requires an explicit fill choice before editing mixed gradients', async () => {
+    mount({ ...schema(), shape: { fill: null, fillColorEditable: false } })
+    await fireEvent.click(screen.getByRole('button', { name: 'Fill: —' }))
+    expect(screen.getByText('Mixed fills. Choose a fill type.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Custom colour' })).toBeNull()
+    expect(screen.queryByRole('slider', { name: /Gradient stop/ })).toBeNull()
+  })
   it('uses one command value for the rounded preset and preserves paint', () => {
     const current = { shape: 'star', fill: { kind: 'none' }, stroke: { width: 7 }, starPoints: 9 }
     const rounded = resolveDrawingPayload('shapeKind', 'roundedRectangle', 'shape', current)!

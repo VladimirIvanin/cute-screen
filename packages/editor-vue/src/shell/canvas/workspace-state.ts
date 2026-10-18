@@ -86,6 +86,8 @@ export type CanvasGesture =
     readonly currentAngle: number
   }
   | {
+    readonly lineAxis?: import('@cute-screen/editor-renderer').LineAxis | undefined
+    readonly rawCurrent?: CanvasPoint | undefined
     readonly kind: 'arrowHandle'
     readonly id: string
     readonly handle: ArrowHandleKind
@@ -94,6 +96,7 @@ export type CanvasGesture =
   }
   | {
     readonly kind: 'calloutHandle'
+    readonly removal?: { readonly segment: number; readonly cancelled: boolean; readonly clientStart: CanvasPoint }
     readonly offset?: CanvasPoint
     readonly id: string
     readonly handle: CalloutHandleKind
@@ -114,6 +117,9 @@ export type CanvasGesture =
     readonly constrainAngle: boolean
   }
   | {
+    readonly lineAxis?: import('@cute-screen/editor-renderer').LineAxis | undefined
+    readonly rawCurrent?: CanvasPoint | undefined
+    readonly startClient?: CanvasPoint | undefined
     readonly kind: 'draw'
     readonly highlighterEffect?: import('@cute-screen/editor-renderer').HighlighterEffect | undefined
     readonly drawingDefaults?: import('@cute-screen/editor-renderer').DrawingDefaults | undefined

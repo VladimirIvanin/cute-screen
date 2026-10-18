@@ -3,6 +3,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/vue'
 import {
   defineComponent,
@@ -44,8 +45,8 @@ describe('history cleanup confirmation', () => {
   it('reviews every page, preserves active/protected, and cancels without mutation', async () => {
     const { bridge, view, openCapture } = mountHistory()
     await fireEvent.click(screen.getByRole('button', { name: 'History' }))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Clear history…' })).toBeEnabled())
-    await fireEvent.click(screen.getByRole('button', { name: 'Clear history…' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Clear history' })).toBeEnabled())
+    await fireEvent.click(screen.getByRole('button', { name: 'Clear history' }))
     const confirmation = await screen.findByRole('alertdialog')
     expect(confirmation).toHaveTextContent('Captures and annotations to delete: 998.')
     expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus()
@@ -60,7 +61,7 @@ describe('history cleanup confirmation', () => {
     expect(preview.captureIds).not.toContain('capture-1')
     await fireEvent.keyDown(window, { key: 'Escape' })
     await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
-    expect(screen.getByRole('button', { name: 'Clear history…' })).toHaveFocus()
+    expect(screen.getByRole('button', { name: 'Clear history' })).toHaveFocus()
     expect(calls.some((request) => request.kind === 'commit')).toBe(false)
     expect(openCapture).not.toHaveBeenCalled()
     view.unmount()
@@ -79,7 +80,7 @@ describe('history cleanup confirmation', () => {
     }
     const trigger = screen.getByRole('button', { name: 'History' })
     await fireEvent.click(trigger)
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Clear history…' })).toBeEnabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Clear history' })).toBeEnabled())
     await fireEvent.click(screen.getAllByRole('button', { name: 'Protect from cleanup' })[0]!)
     await fireEvent.keyDown(window, { key: 'Escape' })
     await waitFor(() => expect(trigger).toHaveFocus())
@@ -93,30 +94,30 @@ describe('history cleanup confirmation', () => {
   it('commits reviewed deletion and disables an empty cleanup plan', async () => {
     const { view } = mountHistory()
     await fireEvent.click(screen.getByRole('button', { name: 'History' }))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Clear history…' })).toBeEnabled())
-    await fireEvent.click(screen.getByRole('button', { name: 'Clear history…' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Clear history' })).toBeEnabled())
+    await fireEvent.click(screen.getByRole('button', { name: 'Clear history' }))
     await screen.findByRole('alertdialog')
-    await fireEvent.click(screen.getByRole('button', { name: /^Clear history$/u }))
+    await fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Clear history' }))
     await screen.findByText('Captures deleted: 998')
     await waitFor(() => expect(view.container.querySelectorAll('.cs-history-card')).toHaveLength(2))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Clear history…' })).toBeEnabled())
-    await fireEvent.click(screen.getByRole('button', { name: 'Clear history…' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Clear history' })).toBeEnabled())
+    await fireEvent.click(screen.getByRole('button', { name: 'Clear history' }))
     await screen.findByRole('alertdialog')
-    expect(screen.getByRole('button', { name: /^Clear history$/u })).toBeDisabled()
+    expect(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Clear history' })).toBeDisabled()
     view.unmount()
   })
 
   it('requires a new review after commit failure and keeps captures visible', async () => {
     const { bridge, view } = mountHistory(true)
     await fireEvent.click(screen.getByRole('button', { name: 'History' }))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Clear history…' })).toBeEnabled())
-    await fireEvent.click(screen.getByRole('button', { name: 'Clear history…' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Clear history' })).toBeEnabled())
+    await fireEvent.click(screen.getByRole('button', { name: 'Clear history' }))
     await screen.findByRole('alertdialog')
-    await fireEvent.click(screen.getByRole('button', { name: /^Clear history$/u }))
+    await fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Clear history' }))
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Preview expired'))
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
     expect(view.container.querySelectorAll('.cs-history-card')).toHaveLength(10)
-    await fireEvent.click(screen.getByRole('button', { name: 'Clear history…' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Clear history' }))
     await screen.findByRole('alertdialog')
     expect(vi.mocked(bridge.request).mock.calls.filter(([request]) => request.kind === 'preview')).toHaveLength(2)
     view.unmount()

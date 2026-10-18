@@ -3,6 +3,7 @@ import type {
   LayerNode,
   Rect,
   RulerLayer,
+  PencilLayer,
 } from '../document/types'
 
 export interface IdGenerator {
@@ -10,6 +11,10 @@ export interface IdGenerator {
 }
 
 export type EditorCommand =
+  | Readonly<{
+    type: 'migrateExpressiveBrushes'
+    changes: readonly Readonly<{ before: PencilLayer; after: PencilLayer }>[]
+  }>
   | Readonly<{ type: 'addLayer'; layer: LayerNode }>
   | Readonly<{ type: 'removeLayer'; layer: LayerNode; index: number }>
   | Readonly<{ type: 'updateLayer'; before: LayerNode; after: LayerNode }>

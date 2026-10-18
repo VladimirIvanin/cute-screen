@@ -39,6 +39,24 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks())
 
 describe('ink input and settings', () => {
+  it.each(['legacy', 'unified'])('restores expressive defaults from %s preferences using autocorrection memory', async (storage) => {
+    const drawing = { schemaVersion: 2, defaults: { pencil: { brush: 'brush', width: 12, smoothing: .2,
+      brushSmoothing: { brush: .2, stabilized: .8 } } } }
+    localStorage.setItem(storage === 'legacy' ? 'cute-screen.drawing-tool-preferences.v1' : 'cute-screen.tool-settings.v3',
+      JSON.stringify(storage === 'legacy' ? drawing : { schemaVersion: 3, drawing,
+        settings: { styles: { pencil: { brush: 'brush', width: 12, smoothing: .2 } } } }))
+    const session = new DocumentSessionController({ document: documentFixture(), revision: 1,
+      bridge: { saveDocument: async () => 2, exportRecoveryBundle: async () => ({ kind: 'saved' }) },
+      correlationId: () => 'retired-defaults' })
+    const view = render(EditorShell, { props: { documentSession: markRaw(session) },
+      global: { plugins: [createEditorShellPinia()] } })
+    await fireEvent.contextMenu(screen.getByRole('button', { name: 'Pencil' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Correction' }))
+    expect(await screen.findByRole('spinbutton', { name: 'Correction' })).toHaveValue('80')
+    expect(session.snapshot.core.canUndo).toBe(false)
+    view.unmount()
+    session.dispose()
+  })
   it('collects empty-coalesced fallback, freezes pressure mode and adds the release endpoint', async () => {
     const view = render(CanvasViewport, { props: {
       documentState: { kind: 'ready', title: 'Ink', dimensions: '120 × 80' },
@@ -121,15 +139,14 @@ describe('ink input and settings', () => {
       await fireEvent.keyDown(panel, { key: 'Escape' })
     }
     await correction('80')
-    await brush('Expressive brush')
-    await correction('20')
+    await brush('Exact pen')
+    expect(screen.getByRole('button', { name: 'Correction' })).toBeDisabled()
     await brush('Autocorrection')
     await fireEvent.click(screen.getByRole('button', { name: 'Correction' }))
     expect(await screen.findByRole('spinbutton', { name: 'Correction' })).toHaveValue('80')
     await fireEvent.keyDown(screen.getByRole('dialog', { name: 'Correction' }), { key: 'Escape' })
-    await brush('Expressive brush')
-    await fireEvent.click(screen.getByRole('button', { name: 'Correction' }))
-    expect(await screen.findByRole('spinbutton', { name: 'Correction' })).toHaveValue('20')
+    await brush('Exact pen')
+    expect(screen.getByRole('button', { name: 'Correction' })).toBeDisabled()
     expect(session.snapshot.core.document.layers).toHaveLength(0)
     session.dispose()
     view.unmount()
@@ -146,7 +163,8 @@ describe('ink input and settings', () => {
     const execute = vi.spyOn(session, 'execute')
     await fireEvent.click(screen.getByRole('button', { name: 'Brush and width' }))
     const panel = await screen.findByRole('dialog', { name: 'Brush and width' })
-    expect(panel.querySelectorAll('.cs-brush-choices button')).toHaveLength(3)
+    expect(panel.querySelectorAll('.cs-brush-choices button')).toHaveLength(2)
+    expect(within(panel).queryByRole('button', { name: 'Expressive brush' })).toBeNull()
     await fireEvent.click(within(panel).getByRole('button', { name: 'Exact pen' }))
     expect(execute).toHaveBeenCalledTimes(1)
     expect(session.snapshot.core.document.layers[0]!.payload).toMatchObject({ brush: 'pen', strokeVersion: 2 })

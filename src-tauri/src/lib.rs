@@ -923,7 +923,11 @@ async fn platform_capabilities(correlation_id: String) -> PlatformCapabilities {
     #[cfg(all(target_os = "linux", feature = "x11-capture"))]
     let native_adapter_available = x11_platform::X11CaptureAdapter.available();
     #[cfg(target_os = "windows")]
-    let native_adapter_available = windows_platform::WindowsCompositorCaptureAdapter.available();
+    let windows_desktop_available = windows_platform::WindowsCompositorCaptureAdapter.available();
+    #[cfg(target_os = "windows")]
+    let windows_window_available = windows_platform::window_capture_available();
+    #[cfg(target_os = "windows")]
+    let native_adapter_available = windows_desktop_available || windows_window_available;
     #[cfg(target_os = "macos")]
     let native_adapter_available = macos_platform::MacosScreenCaptureAdapter.available();
     #[cfg(not(any(
@@ -938,6 +942,10 @@ async fn platform_capabilities(correlation_id: String) -> PlatformCapabilities {
         portal,
         Some(native_adapter_available),
     );
+    #[cfg(target_os = "windows")]
+    {
+        capabilities.apply_windows_targets(windows_desktop_available, windows_window_available);
+    }
     #[cfg(all(target_os = "linux", feature = "x11-capture"))]
     if session == SessionKind::X11 {
         let adapter = x11_platform::X11CaptureAdapter;
@@ -2159,7 +2167,22 @@ fn hotkey_capture_callback<R: tauri::Runtime>(
 fn publish_capture_outcome<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
     outcome: &CaptureOutcomeV2,
+    action: capture::CaptureAction,
 ) {
+    if action == capture::CaptureAction::Window {
+        if let Err(error) = app.emit("cute-screen:window-capture-outcome", outcome) {
+            eprintln!("cute-screen window outcome event: {error}");
+        }
+        if matches!(
+            outcome.outcome,
+            CaptureTerminalOutcome::Failed
+                | CaptureTerminalOutcome::InvalidTarget
+                | CaptureTerminalOutcome::Unavailable
+                | CaptureTerminalOutcome::PermissionDenied
+        ) {
+            show_editor(app);
+        }
+    }
     if let Some(diagnostics) = app.try_state::<CaptureDiagnosticsService>() {
         diagnostics.finish(outcome);
     }
@@ -2167,7 +2190,9 @@ fn publish_capture_outcome<R: tauri::Runtime>(
         && outcome.completion == Some(CaptureCompletion::Editor)
     {
         show_editor(app);
-    } else if outcome.outcome == CaptureTerminalOutcome::Failed {
+    } else if outcome.outcome == CaptureTerminalOutcome::Failed
+        && action != capture::CaptureAction::Window
+    {
         let app = app.clone();
         tauri::async_runtime::spawn_blocking(move || {
             if let Err(error) = app
@@ -2251,6 +2276,8 @@ async fn capture_with_preflight<R: tauri::Runtime>(
     controller: &CaptureController,
     request: CaptureRequestV1,
 ) -> CaptureOutcomeV2 {
+    let action = request.action;
+    platform::window_selection::set_locale(&settings_window::saved_locale(app));
     if request.invocation_source == CaptureInvocationSource::Cli {
         let action = match request.action {
             capture::CaptureAction::Area => shortcuts::ShortcutAction::CaptureArea,
@@ -2272,7 +2299,7 @@ async fn capture_with_preflight<R: tauri::Runtime>(
     let capabilities = platform_capabilities(request.correlation_id.clone()).await;
     if !capture_action_supported(request.action, &capabilities) {
         let outcome = terminal_capture(request.correlation_id, CaptureTerminalOutcome::Unavailable);
-        publish_capture_outcome(app, &outcome);
+        publish_capture_outcome(app, &outcome, action);
         return outcome;
     }
     if request.action == capture::CaptureAction::Area
@@ -2286,7 +2313,7 @@ async fn capture_with_preflight<R: tauri::Runtime>(
     {
         eprintln!("cute-screen quick capture prewarm failed: {error}");
         let outcome = failed_capture(request.correlation_id);
-        publish_capture_outcome(app, &outcome);
+        publish_capture_outcome(app, &outcome, action);
         return outcome;
     }
     let preflight = app.state::<CapturePreflightService>();
@@ -2302,7 +2329,7 @@ async fn capture_with_preflight<R: tauri::Runtime>(
             Err(error) => {
                 eprintln!("cute-screen background capture hide: {error:?}");
                 let outcome = failed_capture(request.correlation_id);
-                publish_capture_outcome(app, &outcome);
+                publish_capture_outcome(app, &outcome, action);
                 return outcome;
             }
         };
@@ -2315,7 +2342,7 @@ async fn capture_with_preflight<R: tauri::Runtime>(
                 publish_capture_progress(&progress_app, &progress_correlation_id, state);
             })
             .await;
-        publish_capture_outcome(app, &outcome);
+        publish_capture_outcome(app, &outcome, action);
         if outcome.outcome != CaptureTerminalOutcome::Captured && restore_editor {
             show_editor(app);
         }
@@ -2331,7 +2358,7 @@ async fn capture_with_preflight<R: tauri::Runtime>(
     {
         preflight.remove(&request.correlation_id);
         let outcome = failed_capture(request.correlation_id);
-        publish_capture_outcome(app, &outcome);
+        publish_capture_outcome(app, &outcome, action);
         return outcome;
     }
 
@@ -2344,7 +2371,7 @@ async fn capture_with_preflight<R: tauri::Runtime>(
             request.correlation_id
         );
         let outcome = failed_capture(request.correlation_id);
-        publish_capture_outcome(app, &outcome);
+        publish_capture_outcome(app, &outcome, action);
         return outcome;
     }
 
@@ -2360,7 +2387,7 @@ async fn capture_with_preflight<R: tauri::Runtime>(
         Err(error) => {
             eprintln!("cute-screen capture hide: {error:?}");
             let outcome = failed_capture(request.correlation_id);
-            publish_capture_outcome(app, &outcome);
+            publish_capture_outcome(app, &outcome, action);
             return outcome;
         }
     };
@@ -2372,7 +2399,7 @@ async fn capture_with_preflight<R: tauri::Runtime>(
             publish_capture_progress(&progress_app, &progress_correlation_id, state);
         })
         .await;
-    publish_capture_outcome(app, &outcome);
+    publish_capture_outcome(app, &outcome, action);
     if outcome.outcome != CaptureTerminalOutcome::Captured && restore_editor {
         show_editor(app);
     }

@@ -15,6 +15,7 @@ import ArrowFormattingToolbar from './ArrowFormattingToolbar.vue'
 import ShapeFormattingToolbar from './ShapeFormattingToolbar.vue'
 import LoupeFormattingToolbar from './LoupeFormattingToolbar.vue'
 import ImageFormattingToolbar from './ImageFormattingToolbar.vue'
+import EmojiFormattingToolbar from './EmojiFormattingToolbar.vue'
 import CensorFormattingToolbar from './CensorFormattingToolbar.vue'
 import ToolFormattingToolbar from './ToolFormattingToolbar.vue'
 import HighlighterFormattingToolbar from './HighlighterFormattingToolbar.vue'
@@ -63,7 +64,7 @@ const emit = defineEmits<{
     :class="{
       'cs-context-toolbar--crop': schema.icon === 'crop',
       'cs-context-toolbar--text': schema.text,
-      'cs-context-toolbar--arrow': schema.icon === 'arrow',
+      'cs-context-toolbar--arrow': ['arrow', 'line'].includes(schema.icon),
       'cs-context-toolbar--shape': Boolean(schema.shape),
       'cs-context-toolbar--highlighter': Boolean(schema.highlighter),
       'cs-context-toolbar--precision': ['crop', 'privacy', 'spotlight', 'ruler', 'loupe'].includes(schema.icon),
@@ -83,20 +84,27 @@ const emit = defineEmits<{
       />
     </template>
     <span
-      v-else-if="!['arrow', 'loupe', 'privacy', 'image'].includes(schema.icon) && !schema.shape && !schema.highlighter && !schema.toolSettings"
+      v-else-if="!['emoji', 'arrow', 'line', 'loupe', 'privacy', 'image'].includes(schema.icon) && !schema.shape && !schema.highlighter && !schema.toolSettings"
       class="cs-context-icon"
       :class="`cs-context-icon--${schema.icon}`"
     ><UiIcon :name="schema.icon"/></span>
+    <EmojiFormattingToolbar
+      v-if="schema.emoji"
+      :schema="schema"
+      :locale="pickerLocale ?? 'en'"
+      @change="(id, value) => emit('change', id, value)"
+    />
     <CalloutFormattingToolbar
-      v-if="schema.callout"
+      v-else-if="schema.callout"
       :schema="schema"
       :locale="pickerLocale ?? 'en'"
       @change="(id, value) => emit('change', id, value)"
     />
     <ArrowFormattingToolbar
-      v-else-if="schema.icon === 'arrow'"
+      v-else-if="['arrow', 'line'].includes(schema.icon)"
       variant="floating"
       :controls="schema.controls"
+      :line-alignment="schema.lineAlignment"
       :picker-locale="pickerLocale ?? 'en'"
       :recent-colors="recentColors ?? []"
       @change="(id, value) => emit('change', id, value)"

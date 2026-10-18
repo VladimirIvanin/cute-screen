@@ -5,6 +5,8 @@ import {
 } from '@wdio/globals'
 import { exerciseCalloutEditing } from '../callout-editing'
 import { selectionDocument } from '../selection-interactions'
+import { waitForStableCanvas } from '../canvas-ready'
+import { writeFile } from 'node:fs/promises'
 
 describe('callout through production capture and native persistence', () => {
   it('edits a callout in Quick and keeps it after the Editor handoff', async () => {
@@ -15,15 +17,34 @@ describe('callout through production capture and native persistence', () => {
     await browser.tauri.switchWindow('quick-capture')
     await expect($('.cs-quick-actions button:first-child')).toBeEnabled()
     await $('button[aria-label="Select"]').click()
+    await waitForStableCanvas()
+    await browser.execute(async () => {
+      const native = window as unknown as {
+        __TAURI__: { core: { invoke(command: string, args: unknown): Promise<void> } }
+      }
+      await native.__TAURI__.core.invoke('plugin:window|set_focus', { label: 'quick-capture' })
+    })
+    await browser.execute(() => {
+      const state = window as typeof window & { __calloutCropInput?: unknown[] }
+      state.__calloutCropInput = []
+      for (const type of ['pointerdown', 'pointerup']) document.addEventListener(type, (event) => {
+        const pointer = event as PointerEvent
+        state.__calloutCropInput!.push({ type, x: pointer.clientX, y: pointer.clientY,
+          trusted: event.isTrusted, target: (event.target as Element)?.className })
+      }, true)
+    })
     const canvas = $('.cs-canvas:not(.cs-canvas-overlay)')
     const size = await canvas.getSize()
     const origin = await canvas.getLocation()
     await browser.action('pointer')
-      .move({ origin: 'viewport', x: Math.round(origin.x + 5), y: Math.round(origin.y + 5) })
+      // The west handle stays clear of the native window's top resize border.
+      .move({ origin: 'viewport', x: Math.round(origin.x + 1), y: Math.round(origin.y + size.height / 2) })
       .down({ button: 'left' })
       .move({ origin: 'pointer', x: Math.round(size.width * .12),
-        y: Math.round(size.height * .12), duration: 200 })
+        y: 0, duration: 200 })
       .up({ button: 'left' }).perform()
+    await writeFile('artifacts/tauri-e2e/callout-crop-input.json', JSON.stringify(await browser.execute(() =>
+      (window as typeof window & { __calloutCropInput?: unknown[] }).__calloutCropInput), null, 2))
     await browser.waitUntil(async () => ((await selectionDocument()).crop?.x ?? 0) > 0)
     expect((await selectionDocument()).crop?.x).toBeGreaterThan(0)
     await exerciseCalloutEditing('artifacts/tauri-e2e', true)
@@ -33,5 +54,5 @@ describe('callout through production capture and native persistence', () => {
     const callout = (await selectionDocument()).layers.find((layer) => layer.kind === 'callout')!
     expect(callout.payload).toMatchObject({ targetMarker: 'ring', labelMarker: 'none', frame: { kind: 'card' }, route: { path: 'orthogonal' } })
     await browser.saveScreenshot('artifacts/tauri-e2e/callout-editor-handoff.png')
-  }).timeout(180_000)
+  }).timeout(300_000)
 })

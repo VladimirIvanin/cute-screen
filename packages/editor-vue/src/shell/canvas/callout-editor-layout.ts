@@ -22,14 +22,16 @@ export function positionCalloutEditor(input: {
   const { editing, layout, editor, zoom, resolveStroke } = input
   if (editing.kind !== 'callout') return
   const state = editing.controller.state
+  const empty = state.content.text.trim().length === 0
+  editor.dataset.calloutEmpty = String(empty)
   const existing = editing.existing?.kind === 'callout' ? editing.existing : undefined
-  const base = existing ?? createCalloutLayer({ id: editing.id, text: state.content.text || ' ',
+  const base = existing ?? createCalloutLayer({ id: editing.id, text: state.content.text,
     target: editing.calloutDraft!.target, label: editing.calloutDraft!.label,
     stroke: editing.calloutStroke ?? resolveStroke(),
     ...(input.style === undefined ? {} : { style: input.style }),
   })!
   const geometry = calloutTextLayout({ ...withCalloutBackground(base.payload, editing.background),
-    content: state.content }, { measureText: () => layout })
+    content: { ...state.content, text: empty ? '\u200b' : state.content.text } }, { measureText: () => layout })
   const previous = editing.origin
   editing.origin = transformCanvasPoint(base.transform, geometry.text)
   const scale = (zoom ?? 100) / 100

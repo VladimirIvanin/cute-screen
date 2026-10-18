@@ -32,6 +32,11 @@ export function handlePointerDown(
     handleSelectionStart(context, event, point, selected)
     return
   }
+  if (context.props.activeTool === 'emoji') {
+    event.preventDefault()
+    if (!context.props.emojiDefaults?.blocked) context.emit('emojiPlace', point)
+    return
+  }
   if (context.props.activeTool === 'loupe' && selected?.kind === 'loupe') {
     const target = context.resolveSelectionTarget(point)
     if (target.kind === 'handle' && target.target.kind === 'loupeSource') {
@@ -198,6 +203,7 @@ function handleCreationTool(
   }
   if (
     tool === 'arrow' ||
+    tool === 'line' ||
     tool === 'shape' ||
     tool === 'pencil' ||
     tool === 'marker'
@@ -316,12 +322,13 @@ function beginDrawing(
   context: PointerDownContext,
   event: PointerEvent,
   point: CanvasPoint,
-  tool: 'arrow' | 'shape' | 'pencil' | 'marker',
+  tool: 'arrow' | 'line' | 'shape' | 'pencil' | 'marker',
 ): void {
   event.preventDefault()
   context.scene.value!.setPointerCapture(event.pointerId)
   context.setGesture({
     kind: 'draw',
+    ...(tool === 'line' ? { startClient: { x: event.clientX, y: event.clientY } } : {}),
     highlighterEffect: context.props.highlighterEffect,
     drawingDefaults: tool === 'pencil' ? {
       ...(context.props.drawingDefaults ?? DEFAULT_DRAWING_DEFAULTS),

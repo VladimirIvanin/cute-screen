@@ -8,6 +8,7 @@ import type {
 } from 'vue'
 import {
   computeQuickCaptureLayout,
+  placeQuickCaptureNote,
   type QuickRect,
 } from './quick-capture-layout'
 
@@ -88,6 +89,19 @@ export class QuickCaptureLayoutController {
     positionActions(actions, layout.actions)
     positionTools(tools, context, layout.tools, visibleContextHeight,
       visibleContextHeight ? verticalGap : 0, visibleWidth)
+    const note = quickRoot?.querySelector<HTMLElement>('.cs-quick-portal-limit')
+    if (note) {
+      const position = placeQuickCaptureNote(
+        { width: window.innerWidth, height: window.innerHeight },
+        { width: note.offsetWidth, height: note.offsetHeight },
+        { ...layout.actions, width: actions.offsetWidth, height: actions.offsetHeight },
+        { ...layout.tools, width: visibleWidth, height: tools.offsetHeight + visibleContextHeight + verticalGap },
+        layout.crop,
+      )
+      note.style.left = `${Math.round(position.left)}px`
+      note.style.top = `${Math.round(position.top)}px`
+      note.style.right = 'auto'
+    }
     return layoutKey(bounds, source, crop, actions, groupWidth, groupHeight)
   }
 
@@ -132,6 +146,7 @@ function positionActions(
   element.style.top = `${Math.round(position.top)}px`
   element.style.transform = 'none'
   element.dataset.placement = position.side
+  element.dataset.tooltipSide = position.left + element.offsetWidth / 2 < window.innerWidth / 2 ? 'right' : 'left'
 }
 
 function positionTools(

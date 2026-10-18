@@ -116,6 +116,7 @@ pub enum CaptureCompletion {
     Copied,
     Saved,
     Editor,
+    History,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -1120,7 +1121,9 @@ fn fake_capture_frame(
 ) -> Result<CaptureResult, crate::platform::PlatformError> {
     // History acceptance uses the same high-entropy 4K fixture as storage/render tests,
     // rather than treating the tiny generic fake frame as memory evidence.
-    if std::env::var("CUTE_SCREEN_E2E_SCENARIO").is_ok_and(|value| value == "history") {
+    if std::env::var("CUTE_SCREEN_E2E_SCENARIO")
+        .is_ok_and(|value| matches!(value.as_str(), "history" | "quick-history"))
+    {
         let bytes = std::fs::read(
             std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
                 .join("../tests/fixtures/generated/ui-4k.png"),
@@ -1174,8 +1177,14 @@ fn fake_capture_frame(
     })
 }
 
-fn capture_backend_metadata_name() -> &'static str {
-    if cfg!(target_os = "windows") {
+fn capture_backend_metadata_name(action: CaptureAction) -> &'static str {
+    #[cfg(target_os = "macos")]
+    if action == CaptureAction::Window {
+        return crate::macos_platform::window_pixel_backend_name();
+    }
+    if cfg!(target_os = "windows") && action == CaptureAction::Window {
+        "windowsGraphicsCapture"
+    } else if cfg!(target_os = "windows") {
         "windowsDxgi"
     } else if cfg!(target_os = "macos") {
         "macosScreenCapture"
@@ -1183,7 +1192,11 @@ fn capture_backend_metadata_name() -> &'static str {
         && std::env::var("XDG_SESSION_TYPE")
             .is_ok_and(|session| session.eq_ignore_ascii_case("x11"))
     {
-        "x11"
+        if action == CaptureAction::Window {
+            "x11Composite"
+        } else {
+            "x11"
+        }
     } else {
         "waylandPortal"
     }
@@ -1196,7 +1209,7 @@ fn capture_metadata(
 ) -> CaptureMetadataV1 {
     CaptureMetadataV1 {
         schema_version: 1,
-        backend: capture_backend_metadata_name().to_owned(),
+        backend: capture_backend_metadata_name(request.action).to_owned(),
         target: request.action.metadata_name().to_owned(),
         geometry: geometry.map(|value| serde_json::json!(value)),
         monitor_snapshot: None,
@@ -1598,7 +1611,10 @@ mod tests {
     #[cfg(target_os = "macos")]
     #[test]
     fn macos_capture_metadata_names_the_native_backend() {
-        assert_eq!(super::capture_backend_metadata_name(), "macosScreenCapture");
+        assert_eq!(
+            super::capture_backend_metadata_name(CaptureAction::Screen),
+            "macosScreenCapture"
+        );
     }
 
     #[test]
@@ -1917,87 +1933,120 @@ mod tests {
 
     #[test]
     fn quick_commit_persists_the_frontend_document_and_reports_completion() {
-        let directory = tempfile::tempdir().expect("temporary library");
-        let repository =
-            LibraryRepository::initialize(directory.path(), directory.path()).expect("repository");
-        let transport = Arc::new(
-            ImageTransportService::new(
-                directory.path().join("transport"),
-                directory.path().join("stage"),
-            )
-            .expect("transport"),
-        );
-        transport
-            .import_owned_bytes(
-                "quick-commit-owned",
-                &png_1x1(),
-                "image/png",
-                1,
-                1,
-                "quick-commit",
-            )
-            .expect("owned capture staging");
-        let controller = CaptureController::new(repository.clone(), transport);
-        let request = CaptureRequestV1 {
-            correlation_id: "quick-commit".to_owned(),
-            action: CaptureAction::Area,
-            delay_ms: 0,
-            cursor: false,
-            series_id: None,
-            invocation_source: CaptureInvocationSource::Ui,
-        };
-        let draft = controller
-            .stage_quick_frame(
-                &request,
-                CaptureResult {
-                    image_token: "quick-commit-owned".to_owned(),
-                    correlation_id: "quick-commit".to_owned(),
-                    width: 1,
-                    height: 1,
-                    geometry: None,
-                    quick_frame_geometry: None,
-                    quick_selection_pending: false,
-                    cursor_included: None,
-                },
-            )
-            .expect("quick draft");
-        let metadata = BlobMetadata {
-            format: "png".to_owned(),
-            mime_type: "image/png".to_owned(),
-            width: 1,
-            height: 1,
-            color_metadata: serde_json::json!({
-                "colorSpace": "srgb",
-                "hasIccProfile": false,
-            }),
-        };
-        let document_id = "019d0000-0000-7000-8000-000000000010";
-        let document_json = super::initial_document_json(
-            document_id,
-            &format!("{:x}", sha2::Sha256::digest(png_1x1())),
-            &metadata,
-            ImageProvenance::Capture,
-            "2026-08-22T00:00:00.000Z".to_owned(),
-        );
+        for completion in [
+            super::CaptureCompletion::Editor,
+            super::CaptureCompletion::History,
+        ] {
+            let directory = tempfile::tempdir().expect("temporary library");
+            let repository = LibraryRepository::initialize(directory.path(), directory.path())
+                .expect("repository");
+            let transport = Arc::new(
+                ImageTransportService::new(
+                    directory.path().join("transport"),
+                    directory.path().join("stage"),
+                )
+                .expect("transport"),
+            );
+            transport
+                .import_owned_bytes(
+                    "quick-commit-owned",
+                    &png_1x1(),
+                    "image/png",
+                    1,
+                    1,
+                    "quick-commit",
+                )
+                .expect("owned capture staging");
+            let controller = CaptureController::new(repository.clone(), transport);
+            let request = CaptureRequestV1 {
+                correlation_id: "quick-commit".to_owned(),
+                action: CaptureAction::Area,
+                delay_ms: 0,
+                cursor: false,
+                series_id: None,
+                invocation_source: CaptureInvocationSource::Ui,
+            };
+            let draft = controller
+                .stage_quick_frame(
+                    &request,
+                    CaptureResult {
+                        image_token: "quick-commit-owned".to_owned(),
+                        correlation_id: "quick-commit".to_owned(),
+                        width: 1,
+                        height: 1,
+                        geometry: None,
+                        quick_frame_geometry: None,
+                        quick_selection_pending: false,
+                        cursor_included: None,
+                    },
+                )
+                .expect("quick draft");
+            let metadata = BlobMetadata {
+                format: "png".to_owned(),
+                mime_type: "image/png".to_owned(),
+                width: 1,
+                height: 1,
+                color_metadata: serde_json::json!({
+                    "colorSpace": "srgb",
+                    "hasIccProfile": false,
+                }),
+            };
+            let document_id = "019d0000-0000-7000-8000-000000000010";
+            let document_json = super::initial_document_json(
+                document_id,
+                &format!("{:x}", sha2::Sha256::digest(png_1x1())),
+                &metadata,
+                ImageProvenance::Capture,
+                "2026-08-22T00:00:00.000Z".to_owned(),
+            );
 
-        let outcome = controller
-            .commit_quick_draft(
+            let failure = controller.commit_quick_draft(
                 &draft.draft_id,
-                document_json,
-                super::CaptureCompletion::Editor,
+                "{}".to_owned(),
+                completion,
                 draft.selection,
-            )
-            .expect("quick commit");
-        assert_eq!(outcome.version, 2);
-        assert_eq!(outcome.completion, Some(super::CaptureCompletion::Editor));
-        assert_eq!(
-            outcome
-                .document
-                .as_ref()
-                .map(|value| value.document_id.as_str()),
-            Some(document_id)
-        );
-        assert!(repository.open_last().expect("open last").is_some());
+            );
+            assert!(failure.is_err());
+            assert!(controller.active_quick_draft().is_some());
+            assert!(
+                repository
+                    .open_last()
+                    .expect("no partial capture")
+                    .is_none()
+            );
+            let outcome = controller
+                .commit_quick_draft(&draft.draft_id, document_json, completion, draft.selection)
+                .expect("quick commit");
+            assert_eq!(outcome.version, 2);
+            assert_eq!(outcome.completion, Some(completion));
+            assert_eq!(
+                outcome
+                    .document
+                    .as_ref()
+                    .map(|value| value.document_id.as_str()),
+                Some(document_id)
+            );
+            assert!(repository.open_last().expect("open last").is_some());
+            assert!(controller.active_quick_draft().is_none());
+            assert!(
+                controller
+                    .commit_quick_draft(
+                        &draft.draft_id,
+                        "{}".to_owned(),
+                        completion,
+                        draft.selection
+                    )
+                    .is_err()
+            );
+            assert_eq!(
+                serde_json::to_value(completion).expect("completion JSON"),
+                if completion == super::CaptureCompletion::History {
+                    "history"
+                } else {
+                    "editor"
+                }
+            );
+        }
     }
 
     #[test]

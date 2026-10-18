@@ -12,6 +12,7 @@ import type {
   TextBackground,
   CalloutStyle,
   CalloutAttachment,
+  RichTextContent,
 } from '../../document/types'
 import {
   DEFAULT_TEXT_FONT_FAMILY,
@@ -43,39 +44,14 @@ export function createCalloutLayer(input: {
   readonly style?: CalloutStyle | null
   readonly attachment?: CalloutAttachment
 }): CalloutLayer | null {
-  if (input.text.length === 0) return null
   assertFinitePoint(input.target)
   assertFinitePoint(input.label)
   const fontFamily = input.fontFamily ?? DEFAULT_TEXT_FONT_FAMILY
   if (fontFamily.length === 0) throw new Error('callout font family is required')
-  const fontSize = DEFAULT_TEXT_FONT_SIZE
   const stroke = input.stroke ?? DEFAULT_CALLOUT_STROKE
   const route = input.route ?? (input.style === null ? { path: 'elbow' as const, elbow: { axis: Math.abs(input.label.x - input.target.x) >= Math.abs(input.label.y - input.target.y) ? 'y' as const : 'x' as const, offset: 0 } } : defaultCalloutRoute(input.target, input.label))
   const style = input.style === null ? undefined : input.style ?? DEFAULT_CALLOUT_STYLE
-  const content = {
-    text: input.text,
-    wrap: 'autoSize' as const,
-    spans: [
-      {
-        start: 0,
-        end: input.text.length,
-        fontFamily,
-        fontSize,
-        color: solidColor(input.color),
-        weight: 400 as const,
-        italic: false,
-        strikethrough: false,
-      },
-    ],
-    paragraphs: [
-      {
-        start: 0,
-        end: input.text.length,
-        alignment: 'start' as const,
-        listKind: 'none' as const,
-      },
-    ],
-  }
+  const content = calloutRichText(input.text, fontFamily, input.color)
   const payload = Object.freeze({
     content,
     background: input.background ?? null,
@@ -87,7 +63,7 @@ export function createCalloutLayer(input: {
     labelMarker: style?.labelMarker ?? 'circle',
     ...(style ? {
       frame: style.frame,
-      attachment: input.attachment ?? defaultCalloutAttachment(input.target, input.label),
+      attachment: input.attachment ?? defaultCalloutAttachment(),
       ...(style.targetMarkerStyle ? { targetMarkerStyle: style.targetMarkerStyle } : {}),
       ...(style.labelMarkerStyle ? { labelMarkerStyle: style.labelMarkerStyle } : {}),
       route: input.route ?? (style.route === 'straight' ? { path: 'straight' as const }
@@ -106,4 +82,15 @@ export function createCalloutLayer(input: {
   return rebaseCalloutLayer(seed, payload)
 }
 
-/** Emoji stays portable by storing its grapheme and an approved static asset ID. */
+function calloutRichText(
+  text: string,
+  fontFamily: string,
+  color: SrgbColor | undefined,
+): RichTextContent {
+  return {
+    text, wrap: 'autoSize',
+    spans: text.length === 0 ? [] : [{ start: 0, end: text.length, fontFamily, fontSize: DEFAULT_TEXT_FONT_SIZE,
+      color: solidColor(color), weight: 400, italic: false, strikethrough: false }],
+    paragraphs: text.length === 0 ? [] : [{ start: 0, end: text.length, alignment: 'start', listKind: 'none' }],
+  }
+}

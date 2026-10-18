@@ -77,6 +77,8 @@ export interface RenderVectorNode extends RenderNodeBase {
 }
 
 export interface RenderRectNode extends RenderNodeBase {
+  readonly dash?: readonly number[]
+  readonly lineCap?: RenderLineCap
   readonly kind: 'rect'
   readonly x: number
   readonly y: number
@@ -90,6 +92,8 @@ export interface RenderRectNode extends RenderNodeBase {
 }
 
 export interface RenderEllipseNode extends RenderNodeBase {
+  readonly dash?: readonly number[]
+  readonly lineCap?: RenderLineCap
   readonly kind: 'ellipse'
   readonly centerX: number
   readonly centerY: number
@@ -130,6 +134,8 @@ export interface RenderPathNode extends RenderNodeBase {
 }
 
 export interface RenderPolygonNode extends RenderNodeBase {
+  readonly dash?: readonly number[]
+  readonly lineCap?: RenderLineCap
   readonly kind: 'polygon'
   readonly points: readonly Readonly<{
     readonly x: number

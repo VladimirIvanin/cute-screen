@@ -7,6 +7,27 @@ import type {
 import { assertLayerEditableScale } from '../layer-resize'
 import { rebaseRulerLayer } from '../tools/precision/ruler'
 import type { EditorCommand } from './types'
+import { migrateExpressiveBrush } from './brush-migration'
+
+function migrateBrushes(
+  document: EditorDocumentV1,
+  command: Extract<EditorCommand, { type: 'migrateExpressiveBrushes' }>,
+  reverting = false,
+): EditorDocumentV1 {
+  const replacements = new Map<string, LayerNode>()
+  if (!command.changes.length) throw new Error('brush migration must not be empty')
+  for (const { before, after } of command.changes) {
+    if (
+      before.kind !== 'pencil' ||
+      before.payload.brush !== 'brush' ||
+      replacements.has(before.id) ||
+      !jsonEquals(after, migrateExpressiveBrush(before))
+    ) throw new Error('invalid brush migration')
+    assertCurrentLayer(findLayer(document, before.id), reverting ? after : before, 'brush migration source changed')
+    replacements.set(before.id, reverting ? before : after)
+  }
+  return replaceDocument(document, { layers: document.layers.map((layer) => replacements.get(layer.id) ?? layer) })
+}
 
 function assertNever(value: never): never {
   throw new Error(`unsupported editor command: ${String(value)}`)
@@ -246,6 +267,8 @@ export function applyEditorCommand(
   command: EditorCommand,
 ): EditorDocumentV1 {
   switch (command.type) {
+    case 'migrateExpressiveBrushes':
+      return migrateBrushes(document, command)
     case 'addLayer':
       return applyAddLayer(document, command)
     case 'removeLayer':
@@ -366,6 +389,8 @@ export function revertEditorCommand(
   command: EditorCommand,
 ): EditorDocumentV1 {
   switch (command.type) {
+    case 'migrateExpressiveBrushes':
+      return migrateBrushes(document, command, true)
     case 'addLayer':
       return revertAddLayer(document, command)
     case 'removeLayer':

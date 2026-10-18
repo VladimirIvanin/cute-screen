@@ -1,7 +1,6 @@
 import {
   $,
   browser,
-  expect,
 } from '@wdio/globals'
 import {
   openDrawingHarness,
@@ -9,6 +8,7 @@ import {
 } from './browser-m06-test-kit'
 import { verifyStraightStrokes } from '../straight-strokes'
 import { waitForStableCanvas } from '../canvas-ready'
+import { expectToolTooltip } from '../tool-tooltip'
 
 describe('Shift straight drawing', () => {
   for (const dpr of [1, 2]) {
@@ -22,15 +22,16 @@ describe('Shift straight drawing', () => {
       })
     }
   }
-  it('explains Shift in localized tooltips at 1024px', async () => {
+  it('keeps localized tooltips concise at 1024px', async () => {
     await browser.setViewport({ width: 1024, height: 800, devicePixelRatio: 1 })
     await openDrawingHarness(true)
     for (const locale of ['en', 'ru'] as const) {
       await setShellPreferences(locale, locale === 'ru' ? 'dark' : 'light')
       for (const tool of ['pencil', 'marker']) {
         await $(`.cs-toolrail button[data-tool-id="${tool}"]`).moveTo()
-        await expect($('.n-tooltip')).toHaveText(expect.stringContaining(locale === 'ru'
-          ? 'Shift — прямой участок, шаг 45°' : 'Shift — straight segment, 45° steps'))
+        await expectToolTooltip(tool === 'pencil'
+          ? locale === 'ru' ? 'Карандаш (P)' : 'Pencil (P)'
+          : locale === 'ru' ? 'Выделитель (M)' : 'Highlighter (M)')
         await $('.cs-brand').moveTo()
       }
     }

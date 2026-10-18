@@ -8,7 +8,10 @@ import {
   openDrawingHarness,
   setShellPreferences,
 } from './browser-m06-test-kit'
-import { verifyHighlighter } from '../highlighter-toolbar'
+import {
+  verifyCollapsedHighlighterEffects,
+  verifyHighlighter,
+} from '../highlighter-toolbar'
 import { waitForShapeAnimation } from '../shape-toolbar'
 import { verifyToolbarSeparators } from '../toolbar-separators'
 
@@ -26,6 +29,7 @@ describe('highlighter and simple palettes', () => {
       for (const locale of ['en', 'ru'] as const) {
         for (const theme of ['light', 'dark'] as const) {
           await setShellPreferences(locale, theme)
+          await verifyCollapsedHighlighterEffects('artifacts/browser-e2e', `highlighter-${width}-${locale}-${theme}`, locale)
           await $('.cs-highlighter-toolbar button[aria-label="' + (locale === 'ru' ? 'Режим' : 'Effect') + '"]').click()
           await expect($('.cs-highlighter-mode[aria-label="' + (locale === 'ru' ? 'Подсветить' : 'Illuminate') + '"]')).toBeDisplayed()
           await waitForShapeAnimation()
@@ -39,5 +43,5 @@ describe('highlighter and simple palettes', () => {
         }
       }
     }
-  }).timeout(120000)
+  }).timeout(300000)
 })

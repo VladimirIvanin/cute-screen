@@ -31,10 +31,10 @@ describe('Callout desktop layouts', () => {
           const editor = $('[aria-label="Callout editor"]')
           await expect(editor).toExist()
           await browser.keys(locale === 'ru' ? 'Подпись' : 'Label')
-          await $(`button[aria-label="${locale === 'ru' ? 'Ширина подписи' : 'Label width'}"]`).click()
-          await expect($('.cs-callout-width-popover')).toBeDisplayed()
+          await $('.cs-callout-width-control input').click()
+          await expect($('.cs-callout-width-control')).toBeDisplayed()
           const layout = await browser.execute(() => {
-            const panel = document.querySelector<HTMLElement>('.cs-callout-width-popover')!.getBoundingClientRect()
+            const panel = document.querySelector<HTMLElement>('.cs-callout-width-control')!.getBoundingClientRect()
             const toolbar = document.querySelector<HTMLElement>('.cs-text-floating-toolbar-host')!.getBoundingClientRect()
             return [panel, toolbar].every((r) => (
               r.left >= 0 &&

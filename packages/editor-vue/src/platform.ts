@@ -88,7 +88,7 @@ export interface CaptureRequestV1 {
   readonly invocationSource: CaptureInvocationSource
 }
 
-export type CaptureCompletion = 'copied' | 'saved' | 'editor'
+export type CaptureCompletion = 'copied' | 'saved' | 'editor' | 'history'
 
 export interface CaptureOutcomeV2 {
   readonly version: 2

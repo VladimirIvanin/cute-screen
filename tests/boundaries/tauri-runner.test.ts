@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import {
   mkdtemp,
+  mkdir,
   readFile,
   rm,
   writeFile,
@@ -24,6 +25,13 @@ describe('Tauri E2E build failure boundary', () => {
       : `#!/bin/sh\nprintf '%s\\n' "$*" >> "$CUTE_SCREEN_RUNNER_LOG"\n${failure === 'build' ? '[ "$1" = "fixtures:generate:m01" ] && exit 0\n' : ''}exit 42\n`
     try {
       await writeFile(path.join(directory, command), script, { mode: 0o700 })
+      const cliDirectory = path.join(directory, 'node_modules', '@tauri-apps', 'cli')
+      await mkdir(cliDirectory, { recursive: true })
+      await writeFile(path.join(cliDirectory, 'tauri.js'), [
+        "const { appendFileSync } = require('node:fs')",
+        "appendFileSync(process.env.CUTE_SCREEN_RUNNER_LOG, 'tauri ' + process.argv.slice(2).join(' ') + '\\n')",
+        'process.exit(42)',
+      ].join('\n'))
       const result = spawnSync(process.execPath, [path.resolve('scripts/run-tauri-e2e.mjs')], {
         cwd: directory,
         env: {
@@ -40,6 +48,7 @@ describe('Tauri E2E build failure boundary', () => {
       const calls = (await readFile(log, 'utf8')).trim().split(/\r?\n/u)
       expect(calls).toHaveLength(failure === 'build' ? 2 : 1)
       expect(calls[0]).toBe('fixtures:generate:m01')
+      if (failure === 'build') expect(calls[1]).toContain('tauri build --debug --no-bundle')
     } finally {
       await rm(directory, { recursive: true, force: true })
     }

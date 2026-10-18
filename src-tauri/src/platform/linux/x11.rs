@@ -31,6 +31,7 @@ use x11rb::{
     rust_connection::RustConnection,
 };
 
+use crate::platform::window_selection::{Candidate, Rect, Selection};
 use crate::{
     image_transport::ImageTransportService,
     platform::{
@@ -752,13 +753,13 @@ impl X11CaptureAdapter {
     /// Window targets require EWMH inventory properties. Do not advertise a
     /// selector merely because root pixel capture happens to be available.
     pub fn target_capabilities(&self) -> X11TargetCapabilities {
-        let Ok((connection, _)) = x11rb::connect(None) else {
+        let Ok((connection, screen_number)) = x11rb::connect(None) else {
             return X11TargetCapabilities {
                 window_selector: false,
                 active_window: false,
             };
         };
-        let window_selector = ewmh_atoms_available(
+        let inventory = ewmh_atoms_available(
             &connection,
             &[
                 b"_NET_CLIENT_LIST_STACKING".as_slice(),
@@ -766,7 +767,7 @@ impl X11CaptureAdapter {
                 b"WM_STATE".as_slice(),
             ],
         );
-        let active_window = window_selector
+        let active_window = inventory
             && ewmh_atoms_available(
                 &connection,
                 &[
@@ -774,6 +775,21 @@ impl X11CaptureAdapter {
                     b"_NET_FRAME_EXTENTS".as_slice(),
                 ],
             );
+        let compositor = connection
+            .intern_atom(true, format!("_NET_WM_CM_S{screen_number}").as_bytes())
+            .ok()
+            .and_then(|reply| reply.reply().ok())
+            .filter(|reply| reply.atom != NONE)
+            .and_then(|reply| connection.get_selection_owner(reply.atom).ok())
+            .and_then(|reply| reply.reply().ok())
+            .is_some_and(|reply| reply.owner != NONE);
+        let window_selector = inventory
+            && compositor
+            && connection
+                .composite_query_version(0, 2)
+                .ok()
+                .and_then(|reply| reply.reply().ok())
+                .is_some_and(|version| version.major_version > 0 || version.minor_version >= 2);
         X11TargetCapabilities {
             window_selector,
             active_window,
@@ -1007,12 +1023,6 @@ impl X11CaptureAdapter {
             .ok_or_else(|| gate_error(correlation_id, "screen"))?;
         let monitors = randr_monitor_layout(&connection, screen.root, correlation_id)?;
         let candidates = selectable_windows(&connection, screen.root, correlation_id)?;
-        if candidates.is_empty() {
-            return Err(PlatformError::new(
-                PlatformErrorCode::InvalidTarget,
-                correlation_id,
-            ));
-        }
         let root_frame = capture_root_frame(
             &connection,
             screen_number,
@@ -1020,7 +1030,7 @@ impl X11CaptureAdapter {
             correlation_id,
             cursor,
         )?;
-        let bounds = select_frozen_window(
+        let selected = select_frozen_window(
             &connection,
             screen.root,
             screen.root_depth,
@@ -1030,6 +1040,18 @@ impl X11CaptureAdapter {
             cancel_signal,
             correlation_id,
         )?;
+        let current = selectable_windows(&connection, screen.root, correlation_id)?
+            .into_iter()
+            .find(|item| item.window == selected.window && item.owner == selected.owner)
+            .ok_or_else(|| PlatformError::new(PlatformErrorCode::InvalidTarget, correlation_id))?;
+        let frame =
+            capture_composite_window(&connection, screen.root, current.window, correlation_id)?;
+        let bounds = (
+            current.bounds.0,
+            current.bounds.1,
+            frame.width,
+            frame.height,
+        );
         let capture_geometry = capture_geometry_with_layout(
             bounds,
             root_frame.width,
@@ -1037,7 +1059,6 @@ impl X11CaptureAdapter {
             &monitors,
             correlation_id,
         )?;
-        let frame = crop_root_frame(root_frame, bounds, correlation_id)?;
         let mut result = import_rgba_frame(transport, correlation_id, frame)?;
         result.geometry = Some(capture_geometry);
         Ok(result)
@@ -1309,6 +1330,102 @@ struct NativeRootFrame {
     visual_id: u32,
 }
 
+fn capture_composite_window<C: Connection>(
+    connection: &C,
+    root: u32,
+    client: u32,
+    id: &str,
+) -> Result<RgbaFrame, PlatformError> {
+    // Read the redirected WM frame (including its client) without desktop
+    // siblings. Never redirect/unredirect windows owned by the compositor.
+    let mut window = client;
+    for _ in 0..64 {
+        let tree = connection
+            .query_tree(window)
+            .map_err(|_| gate_error(id, "windowTree"))?
+            .reply()
+            .map_err(|_| PlatformError::new(PlatformErrorCode::InvalidTarget, id))?;
+        if tree.parent == root {
+            break;
+        }
+        if tree.parent == 0 || tree.parent == window {
+            return Err(gate_error(id, "windowFrameUnavailable"));
+        }
+        window = tree.parent;
+    }
+    let attributes = connection
+        .get_window_attributes(window)
+        .map_err(|_| gate_error(id, "windowAttributes"))?
+        .reply()
+        .map_err(|_| PlatformError::new(PlatformErrorCode::InvalidTarget, id))?;
+    let pixmap = connection
+        .generate_id()
+        .map_err(|_| gate_error(id, "windowPixmapId"))?;
+    connection
+        .composite_name_window_pixmap(window, pixmap)
+        .map_err(|_| gate_error(id, "windowPixmapUnavailable"))?
+        .check()
+        .map_err(|_| gate_error(id, "windowPixmapUnavailable"))?;
+    let result = (|| {
+        let geometry = connection
+            .get_geometry(pixmap)
+            .map_err(|_| gate_error(id, "windowPixmapGeometry"))?
+            .reply()
+            .map_err(|_| gate_error(id, "windowPixmapGeometry"))?;
+        if geometry.width == 0 || geometry.height == 0 {
+            return Err(PlatformError::new(PlatformErrorCode::InvalidTarget, id));
+        }
+        let (image, _) = Image::get(connection, pixmap, 0, 0, geometry.width, geometry.height)
+            .map_err(|_| gate_error(id, "windowPixmapRead"))?;
+        let mut rgba = decode_rgba(connection, attributes.visual, &image, id)?;
+        if geometry.depth == 32 {
+            let visual = connection
+                .setup()
+                .roots
+                .iter()
+                .flat_map(|screen| &screen.allowed_depths)
+                .flat_map(|depth| &depth.visuals)
+                .find(|visual| visual.visual_id == attributes.visual)
+                .ok_or_else(|| gate_error(id, "windowVisual"))?;
+            let alpha_mask = !(visual.red_mask | visual.green_mask | visual.blue_mask);
+            if alpha_mask.count_ones() == 8 {
+                for y in 0..geometry.height {
+                    for x in 0..geometry.width {
+                        let alpha = u8::try_from(
+                            (image.get_pixel(x, y) & alpha_mask) >> alpha_mask.trailing_zeros(),
+                        )
+                        .unwrap_or(0);
+                        let offset =
+                            (usize::from(y) * usize::from(geometry.width) + usize::from(x)) * 4;
+                        rgba[offset + 3] = alpha;
+                        for channel in &mut rgba[offset..offset + 3] {
+                            *channel = if alpha == 0 {
+                                0
+                            } else {
+                                u8::try_from(
+                                    (u32::from(*channel) * 255 + u32::from(alpha) / 2)
+                                        / u32::from(alpha),
+                                )
+                                .unwrap_or(255)
+                            };
+                        }
+                    }
+                }
+            }
+        }
+        Ok(RgbaFrame {
+            width: geometry.width,
+            height: geometry.height,
+            rgba,
+            cursor_included: false,
+        })
+    })();
+    if let Err(error) = connection.free_pixmap(pixmap) {
+        eprintln!("cute-screen X11 pixmap cleanup: {error}");
+    }
+    result
+}
+
 fn capture_native_root_frame<C: Connection>(
     connection: &C,
     screen_number: usize,
@@ -1513,6 +1630,7 @@ fn composite_xfixes_cursor<C: Connection>(
 #[derive(Debug, Clone, Copy)]
 struct WindowCandidate {
     window: u32,
+    owner: u32,
     bounds: (i32, i32, u16, u16),
     rectangle: Rectangle,
 }
@@ -1555,13 +1673,16 @@ fn select_frozen_window<C: Connection>(
     candidates: &[WindowCandidate],
     cancel_signal: &AtomicBool,
     correlation_id: &str,
-) -> Result<(i32, i32, u16, u16), PlatformError> {
+) -> Result<WindowCandidate, PlatformError> {
     let overlay = connection
         .generate_id()
         .map_err(|_| gate_error(correlation_id, "overlayId"))?;
     let frozen_pixmap = connection
         .generate_id()
         .map_err(|_| gate_error(correlation_id, "overlayFrozenPixmapId"))?;
+    let original_pixmap = connection
+        .generate_id()
+        .map_err(|_| gate_error(correlation_id, "overlayOriginalPixmapId"))?;
     let background_gc = connection
         .generate_id()
         .map_err(|_| gate_error(correlation_id, "overlayBackgroundGcId"))?;
@@ -1575,6 +1696,9 @@ fn select_frozen_window<C: Connection>(
     connection
         .create_pixmap(root_depth, frozen_pixmap, root, frame.width, frame.height)
         .map_err(|_| gate_error(correlation_id, "overlayFrozenPixmap"))?;
+    connection
+        .create_pixmap(root_depth, original_pixmap, root, frame.width, frame.height)
+        .map_err(|_| gate_error(correlation_id, "overlayOriginalPixmap"))?;
     let window_aux = CreateWindowAux::new()
         .background_pixmap(frozen_pixmap)
         .override_redirect(1)
@@ -1636,7 +1760,7 @@ fn select_frozen_window<C: Connection>(
     connection
         .set_dashes(selection_gc, 0, &[7, 5])
         .map_err(|_| gate_error(correlation_id, "overlaySelectionDash"))?;
-    let selection = (|| -> Result<(i32, i32, u16, u16), PlatformError> {
+    let selection = (|| -> Result<WindowCandidate, PlatformError> {
         // Secure input before uploading the already captured native frame. The
         // selector stays unmapped until its backing pixmap is complete, so the
         // first visible surface is already interactive and fully initialized.
@@ -1674,23 +1798,25 @@ fn select_frozen_window<C: Connection>(
             }
             return Err(PlatformError::new(PlatformErrorCode::Busy, correlation_id));
         }
-        let upload_started = Instant::now();
-        let frozen =
-            encode_selector_image(connection, root_visual, root_depth, frame, correlation_id)?;
-        for cookie in frozen
-            .put(connection, frozen_pixmap, background_gc, 0, 0)
-            .map_err(|_| gate_error(correlation_id, "overlayFrozenFrame"))?
-        {
-            cookie
-                .check()
-                .map_err(|_| gate_error(correlation_id, "overlayFrozenFrame"))?;
-        }
-        if std::env::var_os("CUTE_SCREEN_CAPTURE_DEBUG").is_some() {
-            eprintln!(
-                "cute-screen x11 selector frame uploaded from RGBA in {} ms",
-                upload_started.elapsed().as_millis()
-            );
-        }
+        upload_window_preview(
+            connection,
+            original_pixmap,
+            background_gc,
+            root_visual,
+            root_depth,
+            frame,
+            correlation_id,
+        )?;
+        let dimmed = dim_window_preview(frame);
+        upload_window_preview(
+            connection,
+            frozen_pixmap,
+            background_gc,
+            root_visual,
+            root_depth,
+            &dimmed,
+            correlation_id,
+        )?;
         connection
             .map_window(overlay)
             .map_err(|_| gate_error(correlation_id, "overlayMap"))?;
@@ -1703,6 +1829,8 @@ fn select_frozen_window<C: Connection>(
                 overlay,
                 selection_underlay_gc,
                 foreground_gc: selection_gc,
+                original_pixmap,
+                background_gc,
                 width: frame.width,
                 height: frame.height,
             },
@@ -1718,6 +1846,9 @@ fn select_frozen_window<C: Connection>(
     let _ = connection.free_gc(background_gc);
     let _ = connection.destroy_window(overlay);
     let _ = connection.free_pixmap(frozen_pixmap);
+    if let Err(error) = connection.free_pixmap(original_pixmap) {
+        eprintln!("cute-screen X11 selector cleanup: {error}");
+    }
     let _ = connection.flush();
     selection
 }
@@ -1727,6 +1858,8 @@ struct SelectorCanvas {
     overlay: u32,
     selection_underlay_gc: u32,
     foreground_gc: u32,
+    original_pixmap: u32,
+    background_gc: u32,
     width: u16,
     height: u16,
 }
@@ -1753,22 +1886,170 @@ const fn selection_stroke_plan() -> [SelectionStroke; 2] {
     ]
 }
 
+fn initial_window_selection<C: Connection>(
+    connection: &C,
+    candidates: &[WindowCandidate],
+    point: (i16, i16),
+    correlation_id: &str,
+) -> Selection {
+    let items = candidates
+        .iter()
+        .map(|item| Candidate {
+            id: u64::from(item.window),
+            owner: item.owner,
+            bounds: Rect {
+                x: item.bounds.0,
+                y: item.bounds.1,
+                width: u32::from(item.bounds.2),
+                height: u32::from(item.bounds.3),
+            },
+            title: window_title(connection, item.window, correlation_id),
+        })
+        .collect();
+    Selection::new(items, (i32::from(point.0), i32::from(point.1)))
+}
+
+fn dim_window_preview(frame: &RgbaFrame) -> RgbaFrame {
+    let mut dimmed = RgbaFrame {
+        width: frame.width,
+        height: frame.height,
+        rgba: frame.rgba.clone(),
+        cursor_included: false,
+    };
+    for pixel in dimmed.rgba.chunks_exact_mut(4) {
+        for channel in &mut pixel[..3] {
+            *channel = u8::try_from(u16::from(*channel) * 7 / 10).unwrap_or(0);
+        }
+    }
+    dimmed
+}
+
+fn upload_window_preview<C: Connection>(
+    connection: &C,
+    pixmap: u32,
+    gc: u32,
+    visual: u32,
+    depth: u8,
+    frame: &RgbaFrame,
+    id: &str,
+) -> Result<(), PlatformError> {
+    let image = encode_selector_image(connection, visual, depth, frame, id)?;
+    for cookie in image
+        .put(connection, pixmap, gc, 0, 0)
+        .map_err(|_| gate_error(id, "selectorFrameUpload"))?
+    {
+        cookie
+            .check()
+            .map_err(|_| gate_error(id, "selectorFrameUpload"))?;
+    }
+    Ok(())
+}
+
 fn window_interaction_loop<C: Connection>(
     connection: &C,
     canvas: SelectorCanvas,
     candidates: &[WindowCandidate],
     cancel_signal: &AtomicBool,
     correlation_id: &str,
-) -> Result<(i32, i32, u16, u16), PlatformError> {
-    let deadline = Instant::now() + Duration::from_secs(60);
-    let mut window_current = None;
+) -> Result<WindowCandidate, PlatformError> {
+    let pointer = connection
+        .query_pointer(canvas.overlay)
+        .map_err(|_| gate_error(correlation_id, "selectorInitialPointer"))?
+        .reply()
+        .map_err(|_| gate_error(correlation_id, "selectorInitialPointer"))?;
+    let mut selection = initial_window_selection(
+        connection,
+        candidates,
+        (pointer.root_x, pointer.root_y),
+        correlation_id,
+    );
+    let mut point = (pointer.root_x, pointer.root_y);
+    let setup = connection.setup();
+    let mapping = connection
+        .get_keyboard_mapping(setup.min_keycode, setup.max_keycode - setup.min_keycode + 1)
+        .map_err(|_| gate_error(correlation_id, "selectorKeymap"))?
+        .reply()
+        .map_err(|_| gate_error(correlation_id, "selectorKeymap"))?;
+    let font = connection
+        .generate_id()
+        .map_err(|_| gate_error(correlation_id, "selectorFontId"))?;
+    connection
+        .open_font(
+            font,
+            b"-misc-fixed-medium-r-normal--13-*-*-*-*-*-iso10646-1",
+        )
+        .map_err(|_| gate_error(correlation_id, "selectorFont"))?
+        .check()
+        .map_err(|_| gate_error(correlation_id, "selectorUnicodeFontUnavailable"))?;
+    let gc = connection
+        .generate_id()
+        .map_err(|_| gate_error(correlation_id, "selectorHintGc"))?;
+    connection
+        .create_gc(
+            gc,
+            canvas.overlay,
+            &CreateGCAux::new()
+                .font(font)
+                .foreground(0x00ff_ffff)
+                .background(0x0024_2424),
+        )
+        .map_err(|_| gate_error(correlation_id, "selectorHintGc"))?;
+    let cursor = create_window_cursor(connection, canvas.overlay, correlation_id)?;
+    connection
+        .change_active_pointer_grab(
+            cursor,
+            CURRENT_TIME,
+            EventMask::BUTTON_PRESS | EventMask::BUTTON_RELEASE | EventMask::POINTER_MOTION,
+        )
+        .map_err(|_| gate_error(correlation_id, "selectorCursor"))?;
     let mut rendered = None;
-    while Instant::now() < deadline {
+    let mut redraw = true;
+    let result = (|| loop {
         if cancel_signal.load(Ordering::Acquire) {
+            selection.cancel();
             return Err(PlatformError::new(
                 PlatformErrorCode::Cancelled,
                 correlation_id,
             ));
+        }
+        if redraw {
+            connection
+                .clear_area(false, canvas.overlay, 0, 0, 0, 0)
+                .map_err(|_| gate_error(correlation_id, "selectorClear"))?;
+            rendered = None;
+            let current = selection.current().and_then(|item| {
+                candidates
+                    .iter()
+                    .find(|candidate| u64::from(candidate.window) == item.id)
+            });
+            if let Some(current) = current {
+                let rect = current.rectangle;
+                connection
+                    .copy_area(
+                        canvas.original_pixmap,
+                        canvas.overlay,
+                        canvas.background_gc,
+                        rect.x,
+                        rect.y,
+                        rect.x,
+                        rect.y,
+                        rect.width,
+                        rect.height,
+                    )
+                    .map_err(|_| gate_error(correlation_id, "selectorUndimWindow"))?;
+            }
+            redraw_rectangle(
+                connection,
+                canvas,
+                &mut rendered,
+                current.map(|item| item.rectangle),
+                correlation_id,
+            )?;
+            draw_window_hint(connection, canvas, gc, &selection, point, correlation_id)?;
+            connection
+                .flush()
+                .map_err(|_| gate_error(correlation_id, "selectorPresent"))?;
+            redraw = false;
         }
         let Some(event) = connection
             .poll_for_event()
@@ -1777,48 +2058,46 @@ fn window_interaction_loop<C: Connection>(
             thread::sleep(Duration::from_millis(8));
             continue;
         };
-        match event {
+        let confirmed = match event {
             Event::MotionNotify(event) => {
-                let selected = window_at(candidates, event.event_x, event.event_y);
-                redraw_rectangle(
-                    connection,
-                    canvas,
-                    &mut rendered,
-                    selected.map(|candidate| candidate.rectangle),
-                    correlation_id,
-                )?;
-                window_current = selected;
+                point = (event.root_x, event.root_y);
+                selection.hover((i32::from(point.0), i32::from(point.1)));
+                redraw = true;
+                None
             }
             Event::ButtonPress(event) if event.detail == u8::from(ButtonIndex::M1) => {
-                let selected = window_at(candidates, event.event_x, event.event_y);
-                redraw_rectangle(
-                    connection,
-                    canvas,
-                    &mut rendered,
-                    selected.map(|candidate| candidate.rectangle),
-                    correlation_id,
-                )?;
-                window_current = selected;
+                point = (event.root_x, event.root_y);
+                selection.hover((i32::from(point.0), i32::from(point.1)));
+                selection.press();
+                None
             }
             Event::ButtonRelease(event) if event.detail == u8::from(ButtonIndex::M1) => {
-                return window_at(candidates, event.event_x, event.event_y)
-                    .map(|candidate| candidate.bounds)
-                    .ok_or_else(|| {
-                        PlatformError::new(PlatformErrorCode::Cancelled, correlation_id)
-                    });
+                point = (event.root_x, event.root_y);
+                selection.hover((i32::from(point.0), i32::from(point.1)));
+                selection.release()
             }
-            Event::KeyPress(event) if event.detail == 9 => {
-                return Err(PlatformError::new(
-                    PlatformErrorCode::Cancelled,
-                    correlation_id,
-                ));
-            }
-            Event::KeyPress(event) if event.detail == 36 => {
-                return window_current
-                    .map(|candidate| candidate.bounds)
-                    .ok_or_else(|| {
-                        PlatformError::new(PlatformErrorCode::Cancelled, correlation_id)
-                    });
+            Event::KeyPress(event) => {
+                let index = usize::from(event.detail.saturating_sub(setup.min_keycode))
+                    * usize::from(mapping.keysyms_per_keycode);
+                match mapping.keysyms.get(index).copied().unwrap_or(0) {
+                    0xff1b => {
+                        return Err(PlatformError::new(
+                            PlatformErrorCode::Cancelled,
+                            correlation_id,
+                        ));
+                    }
+                    0xff09 | 0xfe20 => {
+                        selection.cycle(
+                            event
+                                .state
+                                .contains(x11rb::protocol::xproto::ModMask::SHIFT),
+                        );
+                        redraw = true;
+                        None
+                    }
+                    0xff0d | 0xff8d => selection.confirm(),
+                    _ => None,
+                }
             }
             Event::FocusOut(_) => {
                 return Err(PlatformError::new(
@@ -1826,13 +2105,241 @@ fn window_interaction_loop<C: Connection>(
                     correlation_id,
                 ));
             }
-            _ => {}
+            _ => None,
+        };
+        if let Some(selected) = confirmed {
+            return candidates
+                .iter()
+                .find(|item| u64::from(item.window) == selected.id && item.owner == selected.owner)
+                .copied()
+                .ok_or_else(|| {
+                    PlatformError::new(PlatformErrorCode::InvalidTarget, correlation_id)
+                });
+        }
+    })();
+    for cleanup in [
+        connection.free_cursor(cursor),
+        connection.free_gc(gc),
+        connection.close_font(font),
+    ] {
+        if let Err(error) = cleanup {
+            eprintln!("cute-screen X11 selector cleanup: {error}");
         }
     }
-    Err(PlatformError::new(
-        PlatformErrorCode::Cancelled,
-        correlation_id,
-    ))
+    result
+}
+
+fn window_title<C: Connection>(connection: &C, window: u32, id: &str) -> String {
+    let title = intern_atom(connection, b"_NET_WM_NAME", id)
+        .ok()
+        .and_then(|atom| {
+            connection
+                .get_property(false, window, atom, AtomEnum::ANY, 0, 256)
+                .ok()
+        })
+        .and_then(|reply| reply.reply().ok())
+        .map(|reply| {
+            String::from_utf8_lossy(&reply.value)
+                .chars()
+                .take(64)
+                .collect::<String>()
+        });
+    title
+        .filter(|title| !title.is_empty())
+        .unwrap_or_else(|| format!("Window {window}"))
+}
+
+fn create_window_cursor<C: Connection>(
+    connection: &C,
+    root: u32,
+    id: &str,
+) -> Result<u32, PlatformError> {
+    let source = connection
+        .generate_id()
+        .map_err(|_| gate_error(id, "cursorSource"))?;
+    let mask = connection
+        .generate_id()
+        .map_err(|_| gate_error(id, "cursorMask"))?;
+    let gc = connection
+        .generate_id()
+        .map_err(|_| gate_error(id, "cursorGc"))?;
+    let cursor = connection
+        .generate_id()
+        .map_err(|_| gate_error(id, "cursorId"))?;
+    let result = (|| {
+        for pixmap in [source, mask] {
+            connection
+                .create_pixmap(1, pixmap, root, 32, 32)
+                .map_err(|_| gate_error(id, "cursorPixmap"))?;
+        }
+        connection
+            .create_gc(gc, source, &CreateGCAux::new().foreground(0))
+            .map_err(|_| gate_error(id, "cursorGc"))?;
+        let clear = Rectangle {
+            x: 0,
+            y: 0,
+            width: 32,
+            height: 32,
+        };
+        for pixmap in [source, mask] {
+            connection
+                .poly_fill_rectangle(pixmap, gc, &[clear])
+                .map_err(|_| gate_error(id, "cursorClear"))?;
+        }
+        connection
+            .change_gc(
+                gc,
+                &x11rb::protocol::xproto::ChangeGCAux::new().foreground(1),
+            )
+            .map_err(|_| gate_error(id, "cursorInk"))?;
+        let mut shape = Vec::new();
+        let mut ink = Vec::new();
+        for y in 0..32i16 {
+            for x in 0..32i16 {
+                let arrow = (2..=20).contains(&y) && x >= 2 && x <= 2 + (y - 2) / 2;
+                let camera = (13..=29).contains(&x) && (17..=28).contains(&y)
+                    || (17..=23).contains(&x) && (14..=17).contains(&y);
+                if arrow || camera {
+                    let pixel = Rectangle {
+                        x,
+                        y,
+                        width: 1,
+                        height: 1,
+                    };
+                    shape.push(pixel);
+                    if !(arrow && (x == 2 || x == 2 + (y - 2) / 2 || y == 20)
+                        || camera
+                            && (x == 13
+                                || x == 29
+                                || y == 17
+                                || y == 28
+                                || (19..=23).contains(&x) && (20..=24).contains(&y)))
+                    {
+                        ink.push(pixel);
+                    }
+                }
+            }
+        }
+        connection
+            .poly_fill_rectangle(mask, gc, &shape)
+            .map_err(|_| gate_error(id, "cursorMask"))?;
+        connection
+            .poly_fill_rectangle(source, gc, &ink)
+            .map_err(|_| gate_error(id, "cursorSource"))?;
+        connection
+            .create_cursor(cursor, source, mask, 0, 0, 0, 65535, 65535, 65535, 2, 2)
+            .map_err(|_| gate_error(id, "cursorCreate"))?
+            .check()
+            .map_err(|_| gate_error(id, "cursorCreate"))?;
+        Ok(cursor)
+    })();
+    for cleanup in [
+        connection.free_gc(gc),
+        connection.free_pixmap(source),
+        connection.free_pixmap(mask),
+    ] {
+        if let Err(error) = cleanup {
+            eprintln!("cute-screen X11 cursor cleanup: {error}");
+        }
+    }
+    result
+}
+
+fn draw_window_hint<C: Connection>(
+    connection: &C,
+    canvas: SelectorCanvas,
+    gc: u32,
+    selection: &Selection,
+    point: (i16, i16),
+    id: &str,
+) -> Result<(), PlatformError> {
+    let root = connection
+        .get_geometry(canvas.overlay)
+        .map_err(|_| gate_error(id, "hintRoot"))?
+        .reply()
+        .map_err(|_| gate_error(id, "hintRoot"))?
+        .root;
+    let monitors = connection
+        .randr_get_monitors(root, true)
+        .ok()
+        .and_then(|reply| reply.reply().ok());
+    let monitor = monitors.as_ref().and_then(|reply| {
+        reply.monitors.iter().find(|monitor| {
+            i32::from(point.0) >= i32::from(monitor.x)
+                && i32::from(point.1) >= i32::from(monitor.y)
+                && i32::from(point.0) < i32::from(monitor.x) + i32::from(monitor.width)
+                && i32::from(point.1) < i32::from(monitor.y) + i32::from(monitor.height)
+        })
+    });
+    let (mx, my, mw, mh) = monitor.map_or(
+        (0, 0, i32::from(canvas.width), i32::from(canvas.height)),
+        |monitor| {
+            (
+                i32::from(monitor.x),
+                i32::from(monitor.y),
+                i32::from(monitor.width),
+                i32::from(monitor.height),
+            )
+        },
+    );
+    let width = 450.min(mw - 16).max(1);
+    let x = (i32::from(point.0) + 20)
+        .min(mx + mw - width - 8)
+        .max(mx + 8);
+    let y = if i32::from(point.1) + 112 < my + mh {
+        i32::from(point.1) + 24
+    } else {
+        i32::from(point.1) - 102
+    }
+    .max(my + 8);
+    connection
+        .change_gc(
+            gc,
+            &x11rb::protocol::xproto::ChangeGCAux::new().foreground(0x0024_2424),
+        )
+        .map_err(|_| gate_error(id, "hintBackground"))?;
+    connection
+        .poly_fill_rectangle(
+            canvas.overlay,
+            gc,
+            &[Rectangle {
+                x: i16::try_from(x).unwrap_or(0),
+                y: i16::try_from(y).unwrap_or(0),
+                width: u16::try_from(width).unwrap_or(1),
+                height: 82,
+            }],
+        )
+        .map_err(|_| gate_error(id, "hintBackground"))?;
+    connection
+        .change_gc(
+            gc,
+            &x11rb::protocol::xproto::ChangeGCAux::new().foreground(0x00ff_ffff),
+        )
+        .map_err(|_| gate_error(id, "hintForeground"))?;
+    let lines = selection.hint();
+    for (row, line) in lines.iter().enumerate() {
+        let text: Vec<x11rb::protocol::xproto::Char2b> = line
+            .chars()
+            .take(usize::try_from((width - 16) / 7).unwrap_or(1))
+            .map(|ch| {
+                let value = u16::try_from(u32::from(ch)).unwrap_or(0xfffd).to_be_bytes();
+                x11rb::protocol::xproto::Char2b {
+                    byte1: value[0],
+                    byte2: value[1],
+                }
+            })
+            .collect();
+        connection
+            .image_text16(
+                canvas.overlay,
+                gc,
+                i16::try_from(x + 8).unwrap_or(0),
+                i16::try_from(y + 20 + i32::try_from(row).unwrap_or(0) * 24).unwrap_or(0),
+                &text,
+            )
+            .map_err(|_| gate_error(id, "windowHint"))?;
+    }
+    Ok(())
 }
 
 fn draw_selection_frame<C: Connection>(
@@ -2025,6 +2532,7 @@ fn selectable_windows<C: Connection>(
         {
             candidates.push(WindowCandidate {
                 window,
+                owner: window_process_id(connection, window, window_pid).unwrap_or(0),
                 bounds,
                 rectangle,
             });
@@ -2216,6 +2724,7 @@ fn overlay_rectangle(bounds: (i32, i32, u16, u16)) -> Option<Rectangle> {
     })
 }
 
+#[cfg(test)]
 fn window_at(candidates: &[WindowCandidate], x: i16, y: i16) -> Option<WindowCandidate> {
     let x = i32::from(x);
     let y = i32::from(y);
@@ -3199,6 +3708,7 @@ mod tests {
         let candidates = [
             WindowCandidate {
                 window: 7,
+                owner: 10,
                 bounds: (0, 0, 200, 200),
                 rectangle: Rectangle {
                     x: 0,
@@ -3209,6 +3719,7 @@ mod tests {
             },
             WindowCandidate {
                 window: 8,
+                owner: 11,
                 bounds: (50, 50, 100, 100),
                 rectangle: Rectangle {
                     x: 50,

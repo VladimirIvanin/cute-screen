@@ -5,6 +5,7 @@ import {
   mkdtemp,
   mkdir,
   rm,
+  writeFile,
 } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
@@ -20,6 +21,27 @@ await mkdir(runtimeDirectory, { recursive: true })
 const embeddedWebDriverPort = Number.parseInt(process.env.TAURI_WEBDRIVER_PORT ?? '4445', 10)
 
 const scenarios = [
+  { id: 'emoji', persistenceGroup: 'emoji', spec: 'tests/e2e/specs/tauri-emoji.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },
+  { id: 'emoji-reopen', persistenceGroup: 'emoji', spec: 'tests/e2e/specs/tauri-emoji-reopen.e2e.ts', harnessQuery: '?m04=1&m08=1', driverProvider: 'external' },
+  { id: 'quick-history', persistenceGroup: 'quick-history', spec: 'tests/e2e/specs/tauri-quick-history.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },
+  { id: 'quick-history-reopen', persistenceGroup: 'quick-history', spec: 'tests/e2e/specs/tauri-quick-history-reopen.e2e.ts', harnessQuery: '?m04=1&m08=1', driverProvider: 'external' },
+  { id: 'line', persistenceGroup: 'line', spec: 'tests/e2e/specs/tauri-line.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },
+  { id: 'line-reopen', persistenceGroup: 'line', spec: 'tests/e2e/specs/tauri-line-reopen.e2e.ts', harnessQuery: '?m04=1&m08=1', driverProvider: 'external' },
+  {
+    id: 'window-capture',
+    spec: 'tests/e2e/specs/tauri-window-capture.e2e.ts',
+    harnessQuery: '?m04=1',
+    interactiveWindows: true,
+    driverProvider: 'external',
+  },
+  { id: 'shape-paint', persistenceGroup: 'shape-paint', spec: 'tests/e2e/specs/tauri-shape-paint.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },
+  { id: 'shape-paint-reopen', persistenceGroup: 'shape-paint', spec: 'tests/e2e/specs/tauri-shape-paint-reopen.e2e.ts', harnessQuery: '?m04=1&m08=1', driverProvider: 'external' },
+  {
+    id: 'brand-eyes',
+    spec: 'tests/e2e/specs/tauri-brand-eyes.e2e.ts',
+    harnessQuery: '?m04=1',
+    driverProvider: 'external',
+  },
   { id: 'callout-editing', persistenceGroup: 'callout-editing', spec: 'tests/e2e/specs/tauri-callout-editing.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },
   { id: 'callout-editing-reopen', persistenceGroup: 'callout-editing', spec: 'tests/e2e/specs/tauri-callout-editing-reopen.e2e.ts', harnessQuery: '?m04=1&m08=1', driverProvider: 'external' },
   { id: 'tray-locale', persistenceGroup: 'tray-locale', spec: 'tests/e2e/specs/tauri-tray-locale.e2e.ts', harnessQuery: '?m04=1' },
@@ -411,7 +433,7 @@ function run(
     cwd: root,
     env: { ...process.env, ...extraEnv },
     stdio: 'inherit',
-    shell: process.platform === 'win32',
+    shell: process.platform === 'win32' && command !== process.execPath,
   })
   if (result.error) throw result.error
   return result.status ?? 1
@@ -469,10 +491,23 @@ try {
   if (run('pnpm', ['fixtures:generate:m01']) !== 0) {
     throw new Error('Tauri E2E fixture generation failed; application will not be launched')
   }
+  let frontendOverride
+  if (process.env.CUTE_SCREEN_FRONTEND_DIST) {
+    const directory = await mkdtemp(path.join(runtimeDirectory, 'frontend-config-'))
+    frontendOverride = path.join(directory, 'tauri.frontend.json')
+    await writeFile(frontendOverride, JSON.stringify({
+      build: {
+        frontendDist: path.relative(
+          path.join(root, 'src-tauri'),
+          path.resolve(root, process.env.CUTE_SCREEN_FRONTEND_DIST),
+        ).replaceAll(path.sep, '/'),
+      },
+    }))
+  }
   const buildStatus = run(
-    'pnpm',
+    process.execPath,
     [
-      'tauri',
+      path.join(root, 'node_modules', '@tauri-apps', 'cli', 'tauri.js'),
       'build',
       '--debug',
       '--no-bundle',
@@ -480,6 +515,7 @@ try {
       'fake-platform,test-harness',
       '--config',
       'src-tauri/tauri.test.conf.json',
+      ...(frontendOverride ? ['--config', frontendOverride] : []),
     ],
     {
       VITE_TEST_HARNESS: 'true',

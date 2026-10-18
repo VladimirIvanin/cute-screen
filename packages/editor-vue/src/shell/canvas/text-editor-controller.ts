@@ -69,6 +69,7 @@ export interface TextEditorStartInput {
 }
 
 export interface TextEditorContext {
+  readonly screenScale?: () => CanvasPoint
   readonly redrawMarker?: () => void
   readonly props: CanvasViewportProps
   readonly emit: CanvasViewportEmit
@@ -291,7 +292,11 @@ export class TextEditorController {
     const style = content.spans[0] ?? editing.controller.state.typingStyle
     const paragraph = content.paragraphs[0] ?? editing.controller.state.paragraphStyle
     const existing = editing.existing
-    if (content.text.length === 0 && existing?.kind !== 'numberedMarker') {
+    if (
+      content.text.length === 0 &&
+      editing.kind !== 'callout' &&
+      existing?.kind !== 'numberedMarker'
+    ) {
       if (!existing) return
       const index = props.document?.layers.findIndex((layer) => layer.id === existing.id)
       if (index === undefined || index < 0) return
@@ -362,7 +367,9 @@ export class TextEditorController {
     const { props, emit } = this.#context
     const point = this.#context.canvasPoint(event)
     if (!point || !props.document) return
-    const hits = hitTestDocumentAll(props.document, point)
+    const scale = (props.zoom ?? 100) / 100
+    const hits = hitTestDocumentAll(props.document, point, undefined, { useInteractionPolicy: true,
+      screenScale: this.#context.screenScale?.() ?? { x: scale, y: scale } })
     const text = props.document.layers.find(
       (layer) =>
         layer.id === hits[0]?.nodeId &&

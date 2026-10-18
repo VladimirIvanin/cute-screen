@@ -105,9 +105,113 @@
 }
 .cs-shape-fill-options {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 6px;
   margin-bottom: 12px;
+}
+.cs-shape-fill-options button,
+.cs-shape-stroke-options button {
+  display: grid;
+  place-items: center;
+  min-height: 36px;
+}
+.cs-shape-fill-options button[aria-pressed='true'],
+.cs-shape-stroke-options button[aria-pressed='true'] {
+  border-color: var(--accent);
+}
+.cs-shape-fill-sample {
+  width: 25px;
+  height: 22px;
+  border: 1px solid var(--text-muted);
+  border-radius: 3px;
+}
+.cs-shape-fill-sample.is-none {
+  background: linear-gradient(135deg, transparent 47%, var(--text) 48% 52%, transparent 53%);
+}
+.cs-shape-fill-sample.is-solid {
+  background: var(--text);
+}
+.cs-shape-fill-sample.is-linearGradient {
+  background: linear-gradient(135deg, var(--text), transparent);
+}
+.cs-shape-stroke-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.cs-shape-stroke-options button,
+.cs-gradient-action {
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+}
+.cs-shape-stroke-options svg {
+  width: 48px;
+  height: 24px;
+}
+.cs-gradient-action {
+  display: grid;
+  place-items: center;
+  min-width: 32px;
+  min-height: 32px;
+}
+.cs-gradient-action svg {
+  width: 18px;
+  height: 18px;
+}
+.cs-gradient-track-wrap {
+  padding: 8px 12px 16px;
+  background: var(--surface);
+  border-radius: 6px;
+}
+.cs-gradient-track {
+  position: relative;
+  height: 26px;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px var(--border);
+  cursor: copy;
+}
+.cs-gradient-track-wrap {
+  background-image: conic-gradient(var(--border) 25%, transparent 0 50%, var(--border) 0 75%, transparent 0);
+  background-size: 10px 10px;
+}
+.cs-shape-popover .cs-gradient-stop {
+  position: absolute;
+  top: 12px;
+  width: 24px;
+  height: 32px;
+  padding: 7px 5px;
+  border: 0;
+  background: transparent;
+  transform: translateX(-50%);
+  touch-action: none;
+  cursor: ew-resize;
+}
+.cs-gradient-stop span {
+  display: block;
+  width: 12px;
+  height: 16px;
+  border: 1px solid var(--text-muted);
+  border-radius: 3px;
+  background: var(--stop-color);
+  box-shadow: 0 0 0 2px var(--surface-raised);
+  pointer-events: none;
+}
+.cs-gradient-stop.is-selected span {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 2px var(--surface-raised),
+    0 0 0 3px var(--accent);
+}
+.cs-gradient-stop-details,
+.cs-gradient-direction {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 8px 0;
 }
 .cs-shape-toolbar-trigger:hover:not(:disabled),
 .cs-shape-toolbar-trigger[aria-expanded='true'],

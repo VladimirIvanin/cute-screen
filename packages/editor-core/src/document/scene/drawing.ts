@@ -10,6 +10,7 @@ import type {
   MarkerLayer,
   PencilLayer,
   ShapeLayer,
+  StrokeStyle,
 } from '../types'
 import {
   bounds,
@@ -45,6 +46,13 @@ export function shapeNodes(layer: ShapeLayer): readonly RenderNode[] {
   const localBounds = bounds(layer)
   const shape = isShapeKind(payload.shape) ? payload.shape : 'rectangle'
   const strokeStyle = stroke(payload.stroke)
+  const strokeInput = payload.stroke as StrokeStyle | undefined
+  const shapeStroke = {
+    lineCap: strokeInput?.style === 'dotted' ? 'round' as const : strokeStyle.cap,
+    ...(strokeInput?.style === 'dotted'
+      ? { dash: [0, strokeStyle.width * 2] }
+      : strokeStyle.dash ? { dash: strokeStyle.dash } : {}),
+  }
   // localBounds includes the stroke. Shapes themselves use the inner geometry
   // so draft, committed scene and export keep the same drag extents.
   const inset = strokeStyle.width / 2
@@ -72,14 +80,15 @@ export function shapeNodes(layer: ShapeLayer): readonly RenderNode[] {
       outline: mapShapePath(path.outline, 1, 1, x, y), details: mapShapePath(path.details, 1, 1, x, y),
       open: path.open, rotation: layer.transform.rotation, opacity: layer.opacity, visible: layer.visible,
       blendMode: layer.blendMode ?? 'normal', fill: fillColor, stroke: strokeStyle.color,
-      strokeWidth: strokeStyle.width, lineJoin: strokeStyle.join, lineCap: strokeStyle.cap,
-      ...(strokeStyle.dash ? { dash: strokeStyle.dash } : {}),
+      strokeWidth: strokeStyle.width, lineJoin: strokeStyle.join,
+      ...shapeStroke,
     }]
   }
   if (shape === 'circle' || shape === 'oval') {
     return [
       {
         kind: 'ellipse',
+        ...shapeStroke,
         id: layer.id,
         centerX: layer.transform.translateX + geometry.x + geometry.width / 2,
         centerY: layer.transform.translateY + geometry.y + geometry.height / 2,
@@ -104,6 +113,7 @@ export function shapeNodes(layer: ShapeLayer): readonly RenderNode[] {
     return [
       {
         kind: 'rect',
+        ...shapeStroke,
         id: layer.id,
         x: layer.transform.translateX + geometry.x,
         y: layer.transform.translateY + geometry.y,
@@ -125,6 +135,7 @@ export function shapeNodes(layer: ShapeLayer): readonly RenderNode[] {
   return [
     {
       kind: 'polygon' as const,
+      ...shapeStroke,
       id: layer.id,
       points: corners.map((point) => ({
         x: layer.transform.translateX + point.x,

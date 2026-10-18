@@ -25,6 +25,9 @@ import { UiIcon } from '../icon'
 import SimpleColorPicker from '../ui/SimpleColorPicker.vue'
 import UiSeparator from '../ui/UiSeparator.vue'
 import ShapeNumericControl from './ShapeNumericControl.vue'
+import ShapeGradientEditor from './ShapeGradientEditor.vue'
+import { newLinearGradient } from '../ui/shape-gradient'
+import { parseHexColor } from '../tools/effects/color'
 
 const props = defineProps<{
   schema: ContextToolbarSchema
@@ -104,6 +107,20 @@ const fillNames = computed(() => ({
   pattern: text('Pattern', 'Узор'),
   imageTexture: text('Texture', 'Текстура'),
 }))
+const strokeNames = computed(() => ({
+  solid: text('Solid', 'Сплошная'),
+  dashed: text('Dashed', 'Штрихи'),
+  dotted: text('Dotted', 'Точки'),
+}))
+function chooseFill(kind: 'none' | 'solid' | 'linearGradient'): void {
+  if (fill.value?.kind === kind) return
+  if (kind !== 'linearGradient') {
+    change('fillKind', kind)
+    return
+  }
+  const fallback = !mixed('color') && parseHexColor(value('color')) || { red: 0.35, green: 0.85, blue: 0.8, alpha: 1 }
+  change('fillGradient', JSON.stringify(newLinearGradient(fill.value, fallback)))
+}
 const blendNames = computed(() => ({
   normal: text('Normal', 'Обычный'),
   multiply: text('Multiply', 'Умножение'),
@@ -253,6 +270,7 @@ onBeforeUnmount(() => {
           d="M3 12h26"
           :stroke="mixed('color') ? 'currentColor' : value('color')"
           :stroke-width="Math.min(Number(value('width')), 8)"
+          :stroke-dasharray="mixed('strokeStyle') ? '2 3' : value('strokeStyle') === 'dashed' ? '8 5' : value('strokeStyle') === 'dotted' ? '0 7' : undefined"
           stroke-linecap="round"
         /></svg>
         <template v-else><UiIcon name="blendMode"/><span>{{ mixed('layerOpacity') ? '—' : value('layerOpacity') }}%</span></template>
@@ -364,21 +382,40 @@ onBeforeUnmount(() => {
               class="cs-shape-fill-options"
               role="group"
               :aria-label="text('Fill type', 'Тип заливки')"
+              @keydown="gridKeydown"
             >
               <button
-                v-for="kind in ['none', 'solid', 'linearGradient', 'radialGradient'] as const"
+                v-for="kind in ['none', 'solid', 'linearGradient'] as const"
                 :key="kind"
                 type="button"
                 :aria-pressed="fill?.kind === kind"
                 :disabled="disabled"
-                @click="change('fillKind', kind)"
+                :data-fill-kind="kind"
+                :title="fillNames[kind]"
+                :aria-label="fillNames[kind]"
+                @click="chooseFill(kind)"
               >
-                {{ fillNames[kind] }}
+                <span
+                  class="cs-shape-fill-sample"
+                  :class="`is-${kind}`"
+                  aria-hidden="true"
+                />
               </button>
             </div>
             <p v-if="fill?.kind === 'pattern' || fill?.kind === 'imageTexture'" class="cs-shape-current-fill">{{ fillNames[fill.kind] }}</p>
+            <p v-if="!fill" class="cs-shape-current-fill">{{ text('Mixed fills. Choose a fill type.', 'Разные заливки. Выберите тип заливки.') }}</p>
+            <p v-if="fill?.kind === 'radialGradient'" class="cs-shape-current-fill">{{ fillNames.radialGradient }}</p>
+            <ShapeGradientEditor
+              v-if="fill?.kind === 'linearGradient'"
+              :fill="fill"
+              :disabled="disabled"
+              :locale="locale"
+              :recent-colors="recentColors"
+              @commit="change('fillGradient', JSON.stringify($event))"
+              @dismiss="show(menu, false)"
+            />
             <SimpleColorPicker
-              v-if="schema.shape?.fillColorEditable !== false"
+              v-if="fill && ['none', 'solid'].includes(fill.kind) && schema.shape?.fillColorEditable !== false"
               :model-value="value('fillColor')"
               :mixed="mixed('fillColor')"
               v-bind="{ ariaLabel: text('Fill colour', 'Цвет заливки') }"
@@ -425,6 +462,33 @@ onBeforeUnmount(() => {
             </button>
           </template>
           <template v-if="menu === 'stroke'">
+            <div
+              class="cs-shape-stroke-options"
+              role="group"
+              :aria-label="text('Stroke style', 'Стиль обводки')"
+              @keydown="gridKeydown"
+            >
+              <button
+                v-for="style in ['solid', 'dashed', 'dotted'] as const"
+                :key="style"
+                type="button"
+                :aria-label="strokeNames[style]"
+                :title="strokeNames[style]"
+                :data-stroke-style="style"
+                :aria-pressed="!mixed('strokeStyle') && (value('strokeStyle') || 'solid') === style"
+                :disabled="disabled"
+                @click="change('strokeStyle', style)"
+              >
+                <svg viewBox="0 0 48 24" aria-hidden="true"><path
+                  d="M4 12h40"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="3"
+                  :stroke-dasharray="style === 'dashed' ? '9 6' : style === 'dotted' ? '0 6' : undefined"
+                  :stroke-linecap="style === 'dotted' ? 'round' : 'butt'"
+                /></svg>
+              </button>
+            </div>
             <ShapeNumericControl
               :label="text('Thickness', 'Толщина')"
               control-id="width"

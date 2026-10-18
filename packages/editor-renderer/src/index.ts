@@ -1,5 +1,21 @@
 export { measureRichTextContent } from './rich-text/measure-content'
 export {
+  createPlacedEmoji,
+  replaceEmoji,
+  resizeEmoji,
+  emojiResourceId,
+  emojiReference,
+  EMOJI_CATALOG,
+  EMOJI_CATEGORIES,
+  EMOJI_PACK_VERSION,
+  NOTO_EMOJI_COMMIT,
+  QUICK_EMOJI_IDS,
+  emojiAssetId,
+  findEmoji,
+  searchEmoji,
+  type EmojiEntry,
+} from '@cute-screen/editor-core'
+export {
   calloutGeometryContext,
   calloutGeometryBounds,
   createDocumentRenderScene,
@@ -37,6 +53,7 @@ export {
   applyEditorCommand,
   CommandManager,
   createFlipCanvasCommand,
+  createExpressiveBrushMigrationCommand,
   rotateLayerTransform,
   createEditorDocumentFromImage,
   materializeQuickCaptureDocument,
@@ -70,6 +87,7 @@ export {
   type SrgbColor,
   type StrokeStyle,
   type FillPaint,
+  type GradientStop,
   type BlendMode,
   type LayerNode,
   type RenderImageNode,
@@ -121,6 +139,11 @@ export {
   calloutEndpointSize,
   addCalloutStep,
   removeCalloutStep,
+  removeCalloutStepAt,
+  canRemoveCalloutStep,
+  calloutHasLabel,
+  resolvedCalloutAttachment,
+  calloutAccentSide,
   resetCalloutRoute,
   type CalloutPayload,
   type CalloutStyle,
@@ -358,4 +381,11 @@ export {
 export {
   parseCalloutPayload,
   parseCalloutStyle,
+} from '@cute-screen/editor-core'
+
+export {
+  annotationTool,
+  resolveLineEndpoint,
+  type AnnotationTool,
+  type LineAxis,
 } from '@cute-screen/editor-core'

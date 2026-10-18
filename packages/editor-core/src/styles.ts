@@ -1,3 +1,4 @@
+import { annotationTool } from './line'
 import {
   rebaseFreehandLayer,
   changePencilBrush,
@@ -94,7 +95,7 @@ function writePath(
   (object as MutableObject)[keys[keys.length - 1]!] = clone(value)
 }
 export function creationPolicy(tool: string): 'repeat' | 'select' {
-  return ['numberedMarker', 'pencil', 'marker'].includes(tool) ? 'repeat' : 'select'
+  return ['line', 'numberedMarker', 'pencil', 'marker'].includes(tool) ? 'repeat' : 'select'
 }
 export function extractLayerStyle(layer: LayerNode): LayerStyle {
   const result: Record<string, JsonValue> = {}
@@ -110,6 +111,11 @@ export function extractLayerStyle(layer: LayerNode): LayerStyle {
   }
   for (const [key, path] of Object.entries(channels[layer.kind] ?? {})) {
     const value = readPath(layer.payload, path)
+    if (
+      annotationTool(layer) === 'line' &&
+      (key === 'startCap' ||
+        key === 'endCap')
+    ) continue
     if (value !== undefined) result[key] = clone(value)
   }
   if ('opacity' in layer) {
@@ -249,6 +255,11 @@ export function applyLayerStyle<T extends LayerNode>(
   }
   delete payload.brushSmoothing
   for (const [key, path] of Object.entries(channels[layer.kind] ?? {})) {
+    if (
+      annotationTool(layer) === 'line' &&
+      (key === 'startCap' ||
+        key === 'endCap')
+    ) continue
     if (key in style) writePath(payload, path, key === 'brush' && style[key] === 'pencil' ? 'pen' : style[key]!)
   }
   if (
@@ -275,6 +286,7 @@ export function styleCommand(
   style: LayerStyle,
   canvas?: { readonly width: number; readonly height: number },
 ): EditorCommand | null {
+  if (style.brush === 'brush') return null
   if (!layers.length || layers.some((layer) => layer.locked)) return null
   const commands: EditorCommand[] = layers.flatMap((before) => {
     const after = applyLayerStyle(before, style, canvas)

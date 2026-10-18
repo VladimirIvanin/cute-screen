@@ -70,7 +70,7 @@ export async function verifyShapeToolbar(
   await verifyToolbarSeparators('.cs-selection-floating-toolbar .cs-shape-toolbar', 3)
   expect(await toolbar.$$('[data-shape-control]').length).toBe(4)
   await toolbar.$('[data-shape-control="fill"]').click()
-  await $('.cs-shape-fill-options').$('button=No fill').click()
+  await $('.cs-shape-fill-options [data-fill-kind="none"]').click()
   await browser.keys('Escape')
   await toolbar.$('[data-shape-control="stroke"]').click()
   await $('.cs-shape-popover').$('button[aria-label="8 px"]').click()

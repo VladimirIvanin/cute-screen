@@ -25,7 +25,7 @@ export function textFormattingLabel(
   const ru = locale === 'ru'
   const labels = ru
     ? {
-        width: 'Ширина подписи',
+        width: 'Ширина текста',
         auto: 'Авто',
         color: 'Цвет текста',
         font: 'Шрифт',
@@ -47,7 +47,7 @@ export function textFormattingLabel(
         mixed: 'смешанное',
       }
     : {
-        width: 'Label width',
+        width: 'Text width',
         auto: 'Auto',
         color: 'Text color',
         font: 'Font family',

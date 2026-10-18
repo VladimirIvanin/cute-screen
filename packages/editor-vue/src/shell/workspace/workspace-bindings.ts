@@ -1,3 +1,6 @@
+import { annotationTool } from '@cute-screen/editor-renderer'
+import { createEmojiController } from './emoji-controller'
+import type { EmojiContext } from './emoji-state'
 import { measuredNumberedMarkerLayer } from '@cute-screen/editor-renderer'
 import {
   changeNumberedMarkerSetting,
@@ -15,8 +18,6 @@ import {
 } from '@cute-screen/editor-renderer'
 import { storeToRefs } from 'pinia'
 import type { DrawingToolPreferencesV2 } from '@cute-screen/editor-renderer'
-import type { ResolvedEditorShellProps } from '../contracts'
-import type { useEditorShellStore } from '../store'
 import { createContextActions } from '../tools/effects/context-actions'
 import { createContextEffects } from '../tools/effects/context-effects'
 import { createDrawingEffects } from '../tools/effects/drawing-effects'
@@ -31,17 +32,11 @@ import { createTextSchema } from '../tools/text-schema'
 import { createContentController } from './content-controller'
 import { createLayerController } from './layer-controller'
 import { createToolUiController } from './tool-ui-controller'
-import type { createWorkspaceState } from './workspace-state'
 
-type ShellStore = ReturnType<typeof useEditorShellStore>
-type WorkspaceState = ReturnType<typeof createWorkspaceState>
 type Translate = (key: Parameters<typeof import('../i18n').t>[1]) => string
 
-export interface WorkspaceBindingsContext {
+export interface WorkspaceBindingsContext extends EmojiContext {
   readonly rememberTextDefaults: (layer: LayerNode) => void
-  readonly props: ResolvedEditorShellProps
-  readonly store: ShellStore
-  readonly workspace: WorkspaceState
   readonly translate: Translate
   readonly saveDrawingPreferences: (value: DrawingToolPreferencesV2) => void
 }
@@ -299,7 +294,7 @@ function createSelectionSettingsChange(
         !workspace.textDraft.value &&
         tool &&
         tool !== 'select' &&
-        workspace.rememberedStyles.value[tool as LayerNode['kind']]
+        workspace.rememberedStyles.value[tool as import('@cute-screen/editor-renderer').AnnotationTool]
       ) workspace.rememberedStyles.value = { ...workspace.rememberedStyles.value, [tool]: {} }
       contextEffects.onContextChange(id, value)
       return
@@ -325,8 +320,8 @@ function createSelectionSettingsChange(
     )
     if (!changed.length) return
     props.documentSession?.execute(changed.length === 1 ? changed[0]! : { type: 'batch', commands: changed })
-    if (layers.every((layer) => layer.kind === layers[0]!.kind)) {
-      workspace.configureDefaultsTool.value = layers[0]!.kind
+    if (layers.every((layer) => annotationTool(layer) === annotationTool(layers[0]!))) {
+      workspace.configureDefaultsTool.value = annotationTool(layers[0]!)
       try {
         contextEffects.onContextChange(id, value)
       } finally {
@@ -341,8 +336,8 @@ function createSelectionSettingsChange(
         )
         workspace.rememberedStyles.value = {
           ...workspace.rememberedStyles.value,
-          [command.after.kind]: {
-            ...workspace.rememberedStyles.value[command.after.kind],
+          [annotationTool(command.after)]: {
+            ...workspace.rememberedStyles.value[annotationTool(command.after)],
             ...patch,
           },
         }
@@ -439,7 +434,7 @@ function createControllers(
         (layer.payload.strokeVersion === 2 ||
           layer.payload.strokeVersion === 3)
       ) return layer
-      const style = workspace.rememberedStyles.value[layer.kind]
+      const style = workspace.rememberedStyles.value[annotationTool(layer)]
       if (style && layer.kind === 'marker') {
         // The gesture already resolved Auto for this source. A remembered resolved
         // blend from another screenshot must never replace that frozen decision.
@@ -483,13 +478,14 @@ export function createWorkspaceBindings(context: WorkspaceBindingsContext) {
   const schemas = createSchemas(context)
   const effects = createEffects(context, schemas)
   const controllers = createControllers(context, schemas, effects)
+  const emoji = createEmojiController(context, controllers.layers.addLayer)
   return {
     tools: schemas.tools,
     floatingTextToolbarSchema: schemas.text.floatingTextToolbarSchema,
     contextSchema: schemas.contextSchema.contextSchema,
-    selectionSchema: schemas.contextSchema.selectionSchema,
-    creationSchema: schemas.contextSchema.creationSchema,
-    toolConfigureSchema: schemas.contextSchema.toolConfigureSchema,
+    selectionSchema: computed(() => emoji.selectionSchema.value ?? schemas.contextSchema.selectionSchema.value),
+    creationSchema: computed(() => emoji.creationSchema.value ?? schemas.contextSchema.creationSchema.value),
+    toolConfigureSchema: computed(() => emoji.configureSchema.value ?? schemas.contextSchema.toolConfigureSchema.value),
     floatingArrowToolbarSchema: schemas.contextSchema.floatingArrowToolbarSchema,
     toolConfigureArrowSchema: schemas.contextSchema.toolConfigureArrowSchema,
     onContextChange: (id: string, value: string) => id === 'markerSample' ? controllers.toolUi.startEyedropper(value) : effects.contextEffects.onContextChange(id, value),
@@ -499,5 +495,16 @@ export function createWorkspaceBindings(context: WorkspaceBindingsContext) {
     ...controllers.toolUi,
     ...controllers.layers,
     ...controllers.content,
+    emojiDefaults: emoji.emojiDefaults,
+    placeEmoji: emoji.placeEmoji,
+    onColorChange: (id: string, value: string) => {
+      if (!emoji.change(id, value)) controllers.toolUi.onColorChange(id, value)
+    },
+    onCreationChange: (id: string, value: string) => {
+      if (!emoji.change(id, value, true)) controllers.toolUi.onCreationChange(id, value)
+    },
+    onToolConfigureChange: (id: string, value: string) => {
+      if (!emoji.change(id, value, true)) controllers.toolUi.onToolConfigureChange(id, value)
+    },
   }
 }

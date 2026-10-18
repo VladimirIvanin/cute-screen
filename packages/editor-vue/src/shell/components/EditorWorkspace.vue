@@ -66,6 +66,8 @@ const {
   startEyedropper,
   canvasViewport,
   textureImages,
+  emojiDefaults,
+  placeEmoji,
   baseImageLayer,
   sceneTexturesReady,
   highlighterAnalysis,
@@ -339,6 +341,8 @@ defineExpose({
           :canvas="activeDocument?.canvas"
           :image="props.sourceImage"
           :texture-images="textureImages"
+          :emoji-defaults="emojiDefaults"
+          @emoji-place="placeEmoji"
           :image-layer="baseImageLayer"
           :document="displayDocument"
           :selected-layer-id="store.selectedLayerId"

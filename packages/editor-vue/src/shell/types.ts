@@ -87,6 +87,9 @@ export type ContextControl = (
     }>[]
   }
   | {
+    readonly allStyles?: boolean
+    readonly widthMixed?: boolean
+    readonly styleMixed?: boolean
     readonly kind: 'arrowStroke'
     readonly id: 'stroke'
     readonly label: string
@@ -124,6 +127,7 @@ export type ContextControl = (
 export type ShapeFill = import('@cute-screen/editor-renderer').FillPaint
 
 export interface ContextToolbarSchema {
+  readonly lineAlignment?: { readonly enabled: boolean; readonly label: string; readonly disabled?: boolean }
   readonly toolSettings?: Readonly<{
     kind: 'pencil' | 'spotlight' | 'ruler'
     apertures?: readonly Readonly<{ id: string; shape: string }>[]
@@ -151,6 +155,14 @@ export interface ContextToolbarSchema {
   readonly title: string
   readonly hint: string
   readonly controls: readonly ContextControl[]
+  readonly emoji?: Readonly<{
+    assetId: string
+    size: number
+    recentIds: readonly string[]
+    selection: boolean
+    pending: boolean
+    error: string | undefined
+  }>
   /** The v7 rich-text toolbar is a compact, shared control strip. */
   readonly text?: Readonly<{
     readonly calloutWidth?: import('./canvas/contracts').CalloutWidthSnapshot | undefined
@@ -271,6 +283,10 @@ export interface ShellActionAdapter {
 }
 
 export type IconName =
+  | 'edit'
+  | 'history'
+  | 'emoji'
+  | 'reverseGradient'
   | 'move'
   | 'bold'
   | 'italic'
@@ -282,6 +298,9 @@ export type IconName =
   | 'textBackground'
 
   | 'blendMode'
+  | 'line'
+  | 'magnet'
+  | 'magnetOff'
   | 'arrow'
   | 'camera'
   | 'callout'
@@ -389,16 +408,18 @@ export const translationKeys = [
   'toolSelect',
   'toolHand',
   'toolCrop',
+  'toolLine',
+  'lineHint',
+  'lineAlignment',
   'toolArrow',
   'toolShape',
   'toolPencil',
-  'straightStrokeHint',
-  'rulerAngleHint',
   'toolMarker',
   'toolText',
   'toolNumberedMarker',
   'toolCallout',
   'toolImage',
+  'toolEmoji',
   'toolEyedropper',
   'toolPrivacy',
   'toolSpotlight',

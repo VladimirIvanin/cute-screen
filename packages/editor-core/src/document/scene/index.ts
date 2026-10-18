@@ -1,4 +1,5 @@
 import type { CalloutGeometryContext } from '../../callout-geometry'
+import { emojiResourceId } from '../../emoji'
 import type { RenderNode } from '../../scene/contracts'
 import { createRenderSceneSnapshot } from '../../scene/snapshot'
 import type {
@@ -47,7 +48,11 @@ function projectAnnotationLayer(
     case 'loupe':
       return precisionNodes(layer, document)
     case 'emoji':
-      return []
+      return [{ id: layer.id, kind: 'image', resourceId: emojiResourceId(layer.payload.asset),
+        x: layer.transform.translateX, y: layer.transform.translateY,
+        width: layer.localBounds!.width, height: layer.localBounds!.height,
+        scaleX: 1, scaleY: 1, rotation: layer.transform.rotation, opacity: layer.opacity,
+        visible: layer.visible, blendMode: layer.blendMode }]
     default:
       return assertNever(layer)
   }
@@ -76,7 +81,8 @@ function imageNode(layer: Extract<LayerNode, { readonly kind: 'image' }>): Rende
       ? {
           stroke: imageBorder.color,
           strokeWidth: imageBorder.width,
-          lineJoin: imageBorder.join,
+          // Image radius owns corner geometry; stroke joins must not add rounding.
+          lineJoin: 'miter',
         }
       : {}),
   }

@@ -23,6 +23,7 @@
   font: inherit;
   font-size: 12px;
   cursor: pointer;
+  white-space: nowrap;
 }
 .cs-highlighter-trigger:hover:not(:disabled),
 .cs-simple-color-trigger:hover:not(:disabled) {
@@ -205,11 +206,30 @@
 .cs-highlighter-sample.is-veil {
   background: linear-gradient(40deg, #425b83, #dfb998, #7e9682);
 }
-.cs-highlighter-sample > span {
+.cs-highlighter-sample-stroke {
   position: absolute;
   z-index: 1;
   inset: 6px 4px;
   border-radius: 3px;
+}
+.cs-highlighter-sample b {
+  font-size: 12px;
+  line-height: 1;
+}
+.cs-highlighter-sample.is-compact {
+  width: 36px;
+  height: 24px;
+  border-radius: 4px;
+}
+.cs-highlighter-sample.is-compact b {
+  font-size: 10px;
+}
+.cs-highlighter-sample.is-compact .cs-highlighter-sample-stroke {
+  inset: 4px 3px;
+}
+.cs-highlighter-sample.is-neutral {
+  color: #757c87;
+  background: #dce0e6;
 }
 .cs-highlighter-presets {
   display: flex;

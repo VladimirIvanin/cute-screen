@@ -1,6 +1,6 @@
+import { mount } from './rich-text-component-test-kit'
 import {
   fireEvent,
-  render,
 } from '@testing-library/vue'
 import {
   beforeEach,
@@ -10,65 +10,24 @@ import {
   vi,
 } from 'vitest'
 
-import CanvasViewport, {
-  type TextFormattingPatch,
-  type TextToolDefaults,
-} from '../../../packages/editor-vue/src/shell/components/CanvasViewport.vue'
+import type { TextFormattingPatch } from '../../../packages/editor-vue/src/shell/components/CanvasViewport.vue'
 import type { RenderSceneSnapshot } from '@cute-screen/editor-core'
 import {
   Canvas2DRenderer,
   createCalloutLayer,
+  addCalloutStep,
+  calloutSelectionHandles,
   createNumberedMarkerLayer,
   createTextLayer,
-  type EditorDocument,
-  type ImageLayer,
   type LayerNode,
 } from '@cute-screen/editor-renderer'
 import { calloutTextLayout } from '@cute-screen/editor-renderer'
-
-const TEXT_DEFAULTS: TextToolDefaults = Object.freeze({
-  calloutStyle: null,
-  fontFamily: 'Roboto',
-  fontSize: 24,
-  weight: 400,
-  italic: false,
-  strikethrough: false,
-  alignment: 'start',
-  listKind: 'none',
-  color: { red: 0, green: 0, blue: 0, alpha: 1 },
-  background: null,
-})
-
-function editorDocument(layer?: LayerNode): EditorDocument {
-  return {
-    schemaVersion: 7,
-    id: '019c1f62-058e-7000-8000-000000000000',
-    source: {
-      blobHash: 'a'.repeat(64),
-      format: 'png',
-      mimeType: 'image/png',
-      width: 240,
-      height: 160,
-      orientationApplied: true,
-      provenance: 'capture',
-      color: { colorSpace: 'srgb', hasIccProfile: false },
-    },
-    canvas: { width: 240, height: 160 },
-    crop: null,
-    layers: layer ? [layer] : [],
-    presentation: {
-      beautify: { enabled: false },
-      watermark: { enabled: false },
-    },
-    createdAt: '2026-08-14T00:00:00.000Z',
-    updatedAt: '2026-08-14T00:00:00.000Z',
-  }
-}
 
 beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
     measureText: (text: string) => ({ width: Array.from(text).length * 14.4 }),
     save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(),
+    translate: vi.fn(), rotate: vi.fn(), scale: vi.fn(), strokeRect: vi.fn(), fillRect: vi.fn(),
     ellipse: vi.fn(),
     stroke: vi.fn(),
     arc: vi.fn(),
@@ -82,83 +41,6 @@ beforeEach(() => {
     drawImage: vi.fn(),
   } as unknown as CanvasRenderingContext2D)
 })
-
-function mount(
-  layer?: LayerNode,
-  activeTool = 'select',
-  renderPersistedScene = false,
-) {
-  const imageLayer: ImageLayer = {
-    id: '019c1f62-058e-7000-8000-000000000001',
-    kind: 'image',
-    localBounds: { x: 0, y: 0, width: 240, height: 160 },
-    transform: {
-      translateX: 0,
-      translateY: 0,
-      rotation: 0,
-      scaleX: 1,
-      scaleY: 1,
-    },
-    opacity: 1,
-    blendMode: 'normal',
-    shadows: [],
-    visible: true,
-    locked: true,
-    payload: {
-      blobHash: 'a'.repeat(64),
-      intrinsicWidth: 240,
-      intrinsicHeight: 160,
-      format: 'png',
-      orientationApplied: true,
-      color: { colorSpace: 'srgb', hasIccProfile: false },
-      role: 'base',
-      border: null,
-      radius: 0,
-      crop: null,
-      mask: null,
-    },
-  }
-  const document = editorDocument(layer)
-  const renderDocument = renderPersistedScene
-    ? { ...document, layers: layer ? [imageLayer, layer] : [imageLayer] }
-    : document
-  const image = new Image()
-  if (renderPersistedScene) {
-    Object.defineProperties(image, {
-      naturalWidth: { configurable: true, value: 240 },
-      naturalHeight: { configurable: true, value: 160 },
-    })
-    image.src = 'data:image/png;base64,'
-  }
-  const rendered = render(CanvasViewport, {
-    props: {
-      documentState: { kind: 'ready', title: 'Text', dimensions: '240 × 160' },
-      canvas: renderDocument.canvas,
-      document: renderDocument,
-      ...(renderPersistedScene ? { image, imageLayer } : {}),
-      activeTool,
-      textDefaults: TEXT_DEFAULTS,
-      zoom: 100,
-      fitMode: true,
-      t: (key) => key,
-    },
-  })
-  const scene = rendered.getByLabelText('sceneCanvas') as HTMLCanvasElement
-  vi.spyOn(scene, 'getBoundingClientRect').mockReturnValue({
-    x: 0,
-    y: 0,
-    width: 240,
-    height: 160,
-    top: 0,
-    right: 240,
-    bottom: 160,
-    left: 0,
-    toJSON: () => ({}),
-  })
-  scene.setPointerCapture = vi.fn()
-  scene.hasPointerCapture = vi.fn(() => false)
-  return { ...rendered, scene }
-}
 
 async function openExistingEditor(layer: LayerNode): Promise<ReturnType<typeof mount>> {
   const rendered = mount(layer)
@@ -201,6 +83,47 @@ function firstCommand(emitted: (event?: string) => Record<string, unknown[][]>) 
 }
 
 describe('v7 rich-text component editing', () => {
+  it('opens an empty callout from the visible line hit margin', async () => {
+    const layer = createCalloutLayer({ id: 'empty-edit', text: '', target: { x: 20, y: 120 }, label: { x: 150, y: 40 } })!
+    const rendered = mount(layer)
+    await fireEvent.dblClick(rendered.scene, { clientX: 24, clientY: 90 })
+    await expect(rendered.findByRole('textbox')).resolves.toBeVisible()
+    await fireEvent.keyDown(rendered.getByRole('textbox'), { key: 'Escape' })
+    expect(rendered.emitted().documentCommand).toBeUndefined()
+  })
+  it.each(['pointercancel', 'lostpointercapture'])('cancels Alt step deletion on %s', async (type) => {
+    const layer = addCalloutStep(createCalloutLayer({ id: 'cancel-step', text: 'Caption',
+      target: { x: 20, y: 120 }, label: { x: 150, y: 40 } })!, 0, 25)
+    const rendered = mount(layer)
+    await rendered.rerender({ selectedLayerId: layer.id, selectedLayerIds: [layer.id] })
+    const handle = calloutSelectionHandles(layer).find((item) => item.kind === 'segment:1')!
+    const point = { clientX: layer.transform.translateX + handle.point.x,
+      clientY: layer.transform.translateY + handle.point.y, button: 0, pointerId: 1, altKey: true }
+    await fireEvent.pointerDown(rendered.scene, point)
+    await fireEvent(rendered.scene, new MouseEvent(type, { ...point, bubbles: true }))
+    await fireEvent.pointerUp(rendered.scene, point)
+    expect(rendered.emitted().documentCommand).toBeUndefined()
+  })
+  it('commits a new callout without text and keeps an existing one after deleting its caption', async () => {
+    const created = mount(undefined, 'callout')
+    await fireEvent.pointerDown(created.scene, { clientX: 20, clientY: 100, button: 0, pointerId: 1 })
+    await fireEvent.pointerMove(created.scene, { clientX: 140, clientY: 40, pointerId: 1 })
+    await fireEvent.pointerUp(created.scene, { clientX: 140, clientY: 40, pointerId: 1 })
+    const editor = await created.findByRole('textbox')
+    await fireEvent.keyDown(editor, { key: 'Enter', ctrlKey: true })
+    await vi.waitFor(() => expect(created.emitted().documentCommand).toHaveLength(1))
+    expect(firstCommand(created.emitted)?.layer).toMatchObject({ kind: 'callout', payload: { content: { text: '', spans: [], paragraphs: [] } } })
+    created.unmount()
+
+    const layer = createCalloutLayer({ id: 'caption', text: 'old', target: { x: 20, y: 100 }, label: { x: 140, y: 40 } })!
+    const existing = await openExistingEditor(layer)
+    const editing = existing.getByRole('textbox') as HTMLDivElement
+    selectWithinFirstSpan(editing, 0, 3)
+    await fireEvent.cut(editing, { clipboardData: { clearData: vi.fn(), setData: vi.fn() } })
+    await fireEvent.keyDown(editing, { key: 'Enter', ctrlKey: true })
+    await vi.waitFor(() => expect(existing.emitted().documentCommand).toHaveLength(1))
+    expect(firstCommand(existing.emitted)?.after).toMatchObject({ kind: 'callout', payload: { content: { text: '' }, frame: layer.payload.frame } })
+  })
   it('formats the selected emoji range and explicitly commits one update command', async () => {
     const layer = createTextLayer({
       id: '019c1f62-058e-7000-8000-000000000101',

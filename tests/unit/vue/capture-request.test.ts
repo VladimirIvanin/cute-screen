@@ -8,6 +8,18 @@ import {
 import { dispatchNativeCapture } from '../../../apps/desktop/src/capture-request'
 
 describe('native capture dispatch', () => {
+  it('keeps the X11 editor hidden after saving to history', async () => {
+    const show = vi.fn()
+    const outcome = { completion: 'history' }
+    await expect(dispatchNativeCapture({
+      session: 'x11',
+      mainWindow: { hide: vi.fn(), show },
+      waitForMainWindowUnmap: vi.fn(),
+      capture: async () => outcome,
+      shouldRestore: (result) => result.completion !== 'history',
+    })).resolves.toBe(outcome)
+    expect(show).not.toHaveBeenCalled()
+  })
   it('awaits hiding the X11 editor before it dispatches capture', async () => {
     let releaseHide: (() => void) | undefined
     const hide = vi.fn(

@@ -1,10 +1,22 @@
 import type {
   CalloutPayload,
+  CalloutAttachment,
   JsonObject,
   Rect,
   RichTextContent,
 } from './document/types'
 const TEXT_LABEL_GAP = 6
+
+export function calloutHasLabel(payload: CalloutPayload): boolean {
+  return payload.content.text.trim().length > 0
+}
+
+/** Persisted explicit sides are attachment sides, opposite the text-position buttons. */
+export function resolvedCalloutAttachment(payload: CalloutPayload): Exclude<CalloutAttachment, 'auto'> | undefined {
+  return payload.attachment === 'auto'
+    ? payload.label.x >= payload.target.x ? 'left' : 'right'
+    : payload.attachment
+}
 
 /** Supplied by a rendering host; core never depends on DOM or font loading. */
 export interface CalloutGeometryContext {
@@ -38,14 +50,16 @@ export function calloutTextRect(
   payload: CalloutPayload,
   context: CalloutGeometryContext = {},
 ): Rect & JsonObject {
+  if (!calloutHasLabel(payload)) return Object.freeze({ ...payload.label, width: 0, height: 0 })
   const marker = payload.labelMarker === 'none' ? 0 : calloutEndpointSize(payload, 'label') / 2
   const textSize = context.measureText?.(payload.content) ?? estimateTextSize(payload.content)
   const padding = payload.frame?.kind === 'text' ? 0 : payload.frame?.padding ?? payload.background?.padding ?? 0
   const width = textSize.width + padding * 2
   const height = textSize.height + padding * 2
-  if (payload.attachment) {
+  const attachment = resolvedCalloutAttachment(payload)
+  if (attachment) {
     const gap = payload.frame?.kind === 'text' ? marker + TEXT_LABEL_GAP : 0
-    const side = payload.attachment
+    const side = attachment
     return Object.freeze({
       x: side === 'left' ? payload.label.x + gap : side === 'right' ? payload.label.x - width - gap
         : payload.label.x - width / 2,

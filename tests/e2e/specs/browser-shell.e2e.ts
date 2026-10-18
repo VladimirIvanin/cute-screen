@@ -188,7 +188,7 @@ describe('M02 editor shell in browser mode', () => {
     const trigger = $('button[aria-label="Settings"]')
     await trigger.click()
     await expect($('.cs-settings-popover')).toExist()
-    await expect($('button[aria-label="Application settings…"]')).toBeDisabled()
+    await expect($('button[aria-label="Application settings"]')).toBeDisabled()
 
     const placement = await browser.execute(() => {
       const menu = document.querySelector('.cs-settings-popover')
@@ -223,6 +223,8 @@ describe('M02 editor shell in browser mode', () => {
           await trigger.click()
           await expect(trigger).toHaveAttribute('aria-expanded', 'true')
           await browser.waitUntil(async () => !(await $('.n-tooltip').isDisplayed()))
+          const settingsLabel = locale === 'ru' ? 'Настройки приложения' : 'Application settings'
+          await expect($(`.cs-settings-popover button[aria-label="${settingsLabel}"]`)).toHaveText(settingsLabel)
 
           const geometry = await browser.execute((name) => {
             const menu = document.querySelector('.cs-settings-popover')!

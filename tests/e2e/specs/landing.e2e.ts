@@ -1,4 +1,8 @@
-import { mkdir } from 'node:fs/promises'
+import {
+  mkdir,
+  readFile,
+  readdir,
+} from 'node:fs/promises'
 import path from 'node:path'
 
 import {
@@ -6,6 +10,7 @@ import {
   browser,
   expect,
 } from '@wdio/globals'
+import { verifyBrandEyes } from '../brand-eyes'
 
 const output = path.resolve('artifacts/landing-e2e')
 
@@ -60,9 +65,9 @@ describe('static landing production preview', () => {
           screenshotSize: [1919, 943],
           imageScrollable: width > 760 && width <= 1050,
           brandedMain: false,
-          tools: 16,
+          tools: 17,
           iconsLoaded: true,
-          scripts: 0,
+          scripts: 1,
         })
         await browser.saveScreenshot(path.join(output, `hero-shot-${locale}-${width}.png`), { fullPage: true })
       }
@@ -106,4 +111,42 @@ describe('static landing production preview', () => {
     })
     expect(image).toEqual({ clip: 'inset(0px round 16px)', width: 595, height: 46 })
   })
+
+  it('animates the inline brand in RU/EN using a small independent bundle', async function () {
+    if (process.env.CUTE_SCREEN_LANDING_NO_JS === '1') this.skip()
+    const assets = 'apps/landing/dist/assets'
+    const scripts = (await readdir(assets)).filter((file) => file.endsWith('.js'))
+    expect(scripts).toHaveLength(1)
+    const source = await readFile(path.join(assets, scripts[0]!), 'utf8')
+    expect(source.length).toBeLessThan(12_000)
+    expect(source).not.toMatch(/__TAURI__|__VUE__|createApp|EditorCommand/u)
+    for (const locale of ['ru', 'en'] as const) {
+      await openPage(locale, 1440)
+      await verifyBrandEyes('.brand', path.join(output, `brand-${locale}.png`))
+      expect(await $('.brand svg').getSize('width')).toBe(36)
+      await $('.brand').click()
+      await expect($('html')).toHaveAttribute('lang', 'ru')
+    }
+  })
+
+  it('keeps the inline logo and navigation working without JavaScript', async function () {
+    if (process.env.CUTE_SCREEN_LANDING_NO_JS !== '1') this.skip()
+    await openPage('en', 375)
+    await expect($('.brand svg')).toBeDisplayed()
+    expect(await $('.brand svg').getSize('width')).toBe(31)
+    await $('.brand').moveTo()
+    await browser.pause(650)
+    expect(await $('[data-brand-eyes]').getAttribute('transform')).toBeNull()
+    await browser.keys('Tab')
+    await expect($('.skip-link')).toBeFocused()
+    await browser.keys('Tab')
+    await expect($('.brand')).toBeFocused()
+    await browser.keys('Enter')
+    await expect($('html')).toHaveAttribute('lang', 'ru')
+    await $('.locale-switch').click()
+    await expect($('html')).toHaveAttribute('lang', 'en')
+    await browser.setViewport({ width: 1440, height: 950, devicePixelRatio: 1 })
+    await $('nav a[href="#features"]').click()
+    expect(await browser.execute(() => location.hash)).toBe('#features')
+  }).timeout(120000)
 })

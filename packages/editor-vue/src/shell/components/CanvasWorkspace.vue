@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { hitTestDocument } from '@cute-screen/editor-renderer'
+import {
+  hitTestDocument,
+  createPlacedEmoji,
+} from '@cute-screen/editor-renderer'
+import {
+  ref,
+  watch,
+} from 'vue'
 import { UiIcon } from '../icon'
 import TextFormattingToolbar from './TextFormattingToolbar.vue'
 import ArrowFormattingToolbar from './ArrowFormattingToolbar.vue'
@@ -9,6 +16,7 @@ import {
   canvasViewportRuntimeProps,
 } from '../canvas/contracts'
 import { useCanvasWorkspace } from '../canvas/use-canvas-workspace'
+import { emojiContainsPoint } from '../workspace/emoji-state'
 
 import { provideTransientSurface } from '../ui/transient-surface'
 const textSurfaceOwner = provideTransientSurface()
@@ -68,6 +76,54 @@ const {
   imageInsertionTarget,
   focusCanvas,
 } = useCanvasWorkspace(props, emit)
+const emojiGhost = ref<HTMLImageElement>()
+function hideEmojiGhost(): void {
+  if (emojiGhost.value) emojiGhost.value.style.display = 'none'
+}
+function movePointer(event: PointerEvent): void {
+  onPointerMove(event)
+  const defaults = props.emojiDefaults
+  const point = canvasPoint(event)
+  const bounds = viewportOutputBounds.value
+  const image = emojiGhost.value
+  if (
+    !defaults?.image ||
+    !point ||
+    !bounds ||
+    !image ||
+    defaults.blocked ||
+    props.readOnly ||
+    props.sampling ||
+    isPanning.value ||
+    props.activeTool !== 'emoji'
+  ) {
+    hideEmojiGhost()
+    return
+  }
+  if (!emojiContainsPoint(bounds, point)) {
+    hideEmojiGhost()
+    return
+  }
+  const placementBounds = imageInsertionTarget()?.bounds ?? props.document?.crop ?? bounds
+  if (!emojiContainsPoint(placementBounds, point)) {
+    hideEmojiGhost()
+    return
+  }
+  const layer = createPlacedEmoji('__emoji-preview__', defaults.assetId, point, defaults.size, placementBounds)
+  const zoom = (props.zoom ?? 100) / 100
+  image.style.display = 'block'
+  image.style.left = `${(layer.transform.translateX - bounds.x) * zoom}px`
+  image.style.top = `${(layer.transform.translateY - bounds.y) * zoom}px`
+  image.style.width = `${layer.localBounds!.width * zoom}px`
+  image.style.height = `${layer.localBounds!.height * zoom}px`
+}
+function leavePointer(): void {
+  hideEmojiGhost()
+  onPointerLeave()
+}
+watch(() => [
+  props.activeTool, props.emojiDefaults, props.document?.id, props.readOnly, props.sampling, props.zoom,
+], hideEmojiGhost)
 function onContextMenu(event: MouseEvent): void {
   if (editingText.value || props.quickSelectionMode) return
   event.preventDefault()
@@ -131,6 +187,7 @@ defineExpose({
                     : !sampling && activeTool === 'numberedMarker'
                       ? markerPreviewBlocked || readOnly ? 'default' : 'none'
                       : !sampling && (
+                        activeTool === 'line' ||
                         activeTool === 'pencil' ||
                         activeTool === 'marker'
                       )
@@ -142,6 +199,7 @@ defineExpose({
               sampling ||
                 quickSelectionMode ||
                 activeTool === 'crop' ||
+                activeTool === 'emoji' ||
                 activeTool === 'censor' ||
                 activeTool === 'spotlight' ||
                 activeTool === 'ruler' ||
@@ -151,14 +209,24 @@ defineExpose({
             "
             @pointerdown="onPointerDown"
             @contextmenu="onContextMenu"
-            @pointermove="onPointerMove"
-            @pointerleave="onPointerLeave"
+            @pointermove="movePointer"
+            @pointerleave="leavePointer"
             @pointerup="finishGesture"
             @pointercancel="cancelGesture"
             @lostpointercapture="cancelGesture"
             @dblclick="onDoubleClick"
             @wheel="onWheel"
           ></canvas>
+          <img
+            v-if="activeTool === 'emoji' && emojiDefaults?.image && !readOnly"
+            ref="emojiGhost"
+            class="cs-emoji-ghost"
+            :src="emojiDefaults.image.src"
+            alt=""
+            aria-hidden="true"
+            draggable="false"
+            style="display: none; position: absolute; pointer-events: none; opacity: .55; z-index: 2"
+          />
           <div
             v-if="editingText && textToolbarSchema"
             ref="textFloatingToolbar"

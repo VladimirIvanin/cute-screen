@@ -22,7 +22,7 @@ describe('native tray follows the Settings language', () => {
   it('switches all native menu labels RU/EN, synchronizes the editor and persists Russian', async () => {
     await expect($('.cs-editor-shell')).toExist()
     await $('button[aria-label="Settings"]').click()
-    await $('button[aria-label="Application settings…"]').click()
+    await $('button[aria-label="Application settings"]').click()
     await browser.waitUntil(async () => (await browser.tauri.listWindows()).includes('settings'))
     await browser.tauri.switchWindow('settings')
     const russian = ['Снимок области', 'Снимок экрана', 'Снимок окна', 'Снимок активного окна', 'Повторить область', 'Открыть редактор', 'Настройки…', 'Выход']
@@ -47,7 +47,7 @@ describe('native tray follows the Settings language', () => {
     await browser.tauri.switchWindow('main')
     await expect($('button[aria-label="Настройки"]')).toExist()
     await $('button[aria-label="Настройки"]').click()
-    await $('button[aria-label="Настройки приложения…"]').click()
+    await $('button[aria-label="Настройки приложения"]').click()
     await browser.waitUntil(async () => (await browser.tauri.listWindows()).includes('settings'))
     await browser.tauri.switchWindow('settings')
     await expect($('#settings-language')).toHaveValue('ru')

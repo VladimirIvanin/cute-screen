@@ -12,7 +12,7 @@ describe('history cleanup through the real webview', () => {
     await expect($('[data-history-index="0"]')).toBeDisplayed()
     await $('.cs-history-clear').click()
     await expect($('[role="alertdialog"]')).toHaveText(expect.stringContaining('Captures and annotations to delete: 0.'))
-    await expect($('button=Clear history')).toBeDisabled()
+    await expect($('[role="alertdialog"]').$('button=Clear history')).toBeDisabled()
     await expect($('.cs-history-cancel')).toBeFocused()
     await $('.cs-history-cancel').click()
     await expect($$('.cs-history-card')).toBeElementsArrayOfSize(2)

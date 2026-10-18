@@ -2,22 +2,28 @@ import {
   calloutTextRect,
   calloutMarkerRadius,
   calloutEndpointSize,
+  calloutHasLabel,
+  resolvedCalloutAttachment,
   type CalloutGeometryContext,
 } from './callout-label-geometry'
 export {
   calloutTextRect,
   calloutMarkerRadius,
   calloutEndpointSize,
+  calloutHasLabel,
+  resolvedCalloutAttachment,
   type CalloutGeometryContext,
 } from './callout-label-geometry'
 import {
   calloutPathPoints,
+  calloutEndpointAngles,
   manualRoute,
   moveCalloutEndpoint,
   moveCalloutSegment,
 } from './callout-route'
 export {
   calloutPathPoints,
+  calloutEndpointAngles,
   calloutRoutePreset,
   calloutStyleForPayload,
   defaultCalloutAttachment,
@@ -99,6 +105,7 @@ export function calloutGeometryBounds(
     width: Math.max(1, Math.max(...xs) - Math.min(...xs)),
     height: Math.max(1, Math.max(...ys) - Math.min(...ys)),
   })
+  if (!calloutHasLabel(payload)) return pathBounds
   const rect = calloutTextRect(payload, context)
   const border = (payload.frame?.border?.width ?? 0) / 2
   return unionBounds([pathBounds, { x: rect.x - border, y: rect.y - border, width: rect.width + border * 2,
@@ -133,7 +140,8 @@ export function rebaseCalloutLayer(
     target: shifted(payload.target, origin),
     label: shifted(payload.label, origin),
     route: payload.route.path === 'orthogonal' ? { ...payload.route,
-      points: payload.route.points.map((p) => shifted(p, origin)) } : payload.route,
+      points: payload.route.points.map((p) => shifted(p, origin)) }
+      : payload.route.path === 'quadratic' ? { ...payload.route, bend: shifted(payload.route.bend, origin) } : payload.route,
   })
   return Object.freeze({
     ...layer,
@@ -152,7 +160,7 @@ export function rebaseCalloutLayer(
   })
 }
 
-export type CalloutHandleKind = 'target' | 'label' | 'labelBody' | 'elbow' | 'width' | `segment:${number}` | `insert:${number}`
+export type CalloutHandleKind = 'target' | 'label' | 'labelBody' | 'elbow' | 'bend' | 'width' | `segment:${number}` | `insert:${number}`
 export interface CalloutSelectionHandle { readonly kind: CalloutHandleKind; readonly point: Point }
 export function calloutSelectionHandles(
   layer: CalloutLayer,
@@ -162,15 +170,20 @@ export function calloutSelectionHandles(
     { kind: 'target', point: point(layer.payload.target) }, { kind: 'label', point: point(layer.payload.label) },
   ]
   const points = calloutPathPoints(layer.payload, context)
-  if (layer.payload.route.path === 'elbow' && !layer.payload.attachment) {
+  if (layer.payload.route.path === 'straight' || layer.payload.route.path === 'quadratic') {
+    handles.push({ kind: 'bend', point: layer.payload.route.path === 'quadratic' ? layer.payload.route.bend
+      : point({ x: (layer.payload.target.x + layer.payload.label.x) / 2,
+          y: (layer.payload.target.y + layer.payload.label.y) / 2 }) })
+  } else if (layer.payload.route.path === 'elbow' && !layer.payload.attachment) {
     handles.push({ kind: 'elbow', point: point({ x: (points[1]!.x + points[2]!.x) / 2,
       y: (points[1]!.y + points[2]!.y) / 2 }) })
-  } else if (layer.payload.route.path !== 'straight') {
+  } else {
     points.slice(1).forEach((p, i) => handles.push({ kind: `segment:${i}`,
       point: point({ x: (p.x + points[i]!.x) / 2, y: (p.y + points[i]!.y) / 2 }) }))
   }
-  const rect = calloutTextRect(layer.payload, context)
-  const left = layer.payload.attachment === 'right' || !layer.payload.attachment
+  if (!calloutHasLabel(layer.payload)) return handles
+  const rect = calloutTextLayout(layer.payload, context).text
+  const left = resolvedCalloutAttachment(layer.payload) === 'right' || !layer.payload.attachment
     && layer.payload.label.x < layer.payload.target.x
   handles.push({ kind: 'width', point: point({ x: left ? rect.x : rect.x + rect.width, y: rect.y + rect.height / 2 }) })
   return handles
@@ -181,6 +194,7 @@ export function addCalloutStep(
   offset = 32,
   context: CalloutGeometryContext = {},
 ): CalloutLayer {
+  if (layer.payload.route.path === 'straight' || layer.payload.route.path === 'quadratic') return layer
   const points = calloutPathPoints(layer.payload, context).map((p) => ({ ...p }))
   if (
     points.length > 120 ||
@@ -211,14 +225,48 @@ export function removeCalloutStep(
   layer: CalloutLayer,
   context: CalloutGeometryContext = {},
 ): CalloutLayer {
+  const points = calloutPathPoints(layer.payload, context)
+  return removeCalloutStepAt(layer, points.length - 4, context)
+}
+
+export function canRemoveCalloutStep(
+  payload: CalloutPayload,
+  segment: number,
+  context: CalloutGeometryContext = {},
+): boolean {
+  if (payload.route.path !== 'orthogonal' || payload.route.points.length < 3) return false
+  const points = calloutPathPoints(payload, context)
+  return Number.isInteger(segment) && points.length >= 5 && segment > 0 && segment < points.length - 2
+}
+
+/** Collapse the selected inner segment locally, preserving both endpoints. */
+export function removeCalloutStepAt(
+  layer: CalloutLayer,
+  segment: number,
+  context: CalloutGeometryContext = {},
+): CalloutLayer {
+  if (!canRemoveCalloutStep(layer.payload, segment, context)) return layer
   const points = calloutPathPoints(layer.payload, context).map((p) => ({ ...p }))
-  if (points.length < 5) return resetCalloutRoute(layer, context)
-  const index = points.length - 5
-  const a = points[index]!, p = points[index + 1]!, b = points[index + 3]!
+  // The final inner segment uses the same operation backwards, so neither endpoint moves.
+  const reversed = segment === points.length - 3
+  if (reversed) points.reverse()
+  const index = reversed ? 1 : segment
+  const a = points[index - 1]!, p = points[index]!, b = points[index + 2]!
   if (a.y === p.y) b.y = a.y
   else b.x = a.x
-  points.splice(index + 1, 2)
+  points.splice(index, 2)
+  if (reversed) points.reverse()
   return rebaseCalloutLayer(layer, { ...layer.payload, route: manualRoute(layer.payload, points) }, context)
+}
+
+export function calloutAccentSide(
+  payload: CalloutPayload,
+  context: CalloutGeometryContext = {},
+): 'left' | 'right' | 'top' | 'bottom' {
+  const angle = calloutEndpointAngles(payload, context).start
+  const dx = -Math.cos(angle), dy = -Math.sin(angle)
+  if (Math.abs(dx) + 1e-6 >= Math.abs(dy)) return dx >= 0 ? 'right' : 'left'
+  return dy >= 0 ? 'bottom' : 'top'
 }
 export function resetCalloutRoute(
   layer: CalloutLayer,
@@ -235,13 +283,13 @@ function resizedCalloutContent(
   context: CalloutGeometryContext,
 ): RichTextContent {
   const fontSize = Math.max(1, ...current.content.spans.map((span) => span.fontSize))
-  const rect = calloutTextRect(current, context)
-  const left = current.attachment === 'right' || !current.attachment && current.label.x < current.target.x
+  const rect = calloutTextLayout(current, context).text
+  const attachment = resolvedCalloutAttachment(current)
+  const left = attachment === 'right' || !attachment && current.label.x < current.target.x
   const oldEdge = left ? rect.x : rect.x + rect.width
-  const oldWidth = rect.width - 2 * (current.frame?.kind === 'text' ? 0
-    : current.frame?.padding ?? current.background?.padding ?? 0)
+  const oldWidth = rect.width
   const width = Math.max(fontSize, oldWidth + (nextPoint.x - oldEdge) * (left ? -1
-    : 1) * (current.attachment === 'top' || current.attachment === 'bottom' ? 2 : 1))
+    : 1) * (attachment === 'top' || attachment === 'bottom' ? 2 : 1))
   return { ...current.content, wrap: 'fixedWidth', fixedWidth: width }
 }
 export function updateCalloutHandle(
@@ -253,6 +301,12 @@ export function updateCalloutHandle(
   if (handle === 'labelBody') handle = 'label'
   const current = layer.payload
   let payload = current
+  if (
+    handle === 'bend' &&
+    (current.route.path === 'straight' ||
+      current.route.path === 'quadratic')
+  )
+    return rebaseCalloutLayer(layer, { ...current, route: { path: 'quadratic', bend: point(nextPoint) } }, context)
   if (handle === 'width') return rebaseCalloutLayer(layer, { ...current, content: resizedCalloutContent(current, nextPoint, context) }, context)
   if (handle === 'target' || handle === 'label') return rebaseCalloutLayer(layer, moveCalloutEndpoint(current, handle, nextPoint), context)
   if (handle === 'elbow' && current.route.path === 'elbow') {
@@ -285,7 +339,7 @@ export function calloutLabelContains(
   point: Point,
   context: CalloutGeometryContext = {},
 ): boolean {
-  if (!payload.attachment) return false
+  if (!payload.attachment || !calloutHasLabel(payload)) return false
   const rect = calloutTextRect(payload, context)
   return point.x >= rect.x && point.y >= rect.y && point.x <= rect.x + rect.width && point.y <= rect.y + rect.height
 }

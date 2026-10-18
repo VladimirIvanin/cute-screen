@@ -11,6 +11,7 @@ import type {
 import { tauriDesktopBridge } from './desktop-bridge'
 import { normalizeQuickCaptureSelection } from './quick-capture-actions'
 import type { QuickRect } from './quick-capture-layout'
+import type { CaptureCompletion } from './generated/desktop-ipc'
 import type { useQuickCaptureCoordinator } from './use-quick-capture-coordinator'
 
 type Coordinator = ReturnType<typeof useQuickCaptureCoordinator>
@@ -46,7 +47,7 @@ export class QuickCaptureCommitController {
   }
 
   async commit(
-    completion: 'copied' | 'saved' | 'editor',
+    completion: CaptureCompletion,
     selection: QuickRect = this.physicalSelection(),
   ): Promise<void> {
     const { draft, session, coordinator, materialized } = this.#ports

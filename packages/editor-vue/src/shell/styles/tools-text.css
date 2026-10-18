@@ -711,3 +711,16 @@
 .cs-callout-width-popover button:disabled {
   opacity: 0.45;
 }
+
+.cs-line-alignment {
+  width: 32px;
+}
+.cs-line-alignment[aria-pressed='true'] {
+  color: var(--text);
+  border-color: var(--accent-border-55);
+  background: var(--accent-soft);
+}
+.cs-line-alignment svg {
+  width: 20px;
+  height: 20px;
+}

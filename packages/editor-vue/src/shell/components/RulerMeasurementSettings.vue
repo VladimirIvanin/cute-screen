@@ -64,5 +64,4 @@ const { modes, mode, length, localized, settings } = useRulerMeasurement(() => p
       </button>
     </div>
   </div>
-  <small>{{ text('Shift: 45° steps. Alt: configured angle step while drawing or moving an endpoint. Changing the step keeps the current measurement.', 'Shift — шаг 45°. Alt — настраиваемый шаг при рисовании и перемещении конца. Изменение шага сохраняет текущее измерение.') }}</small>
 </template>

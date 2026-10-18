@@ -8,6 +8,9 @@ import {
   createDrawingLayer,
   createDocumentRenderScene,
   DEFAULT_DRAWING_DEFAULTS,
+  CommandManager,
+  createExpressiveBrushMigrationCommand,
+  rebaseFreehandLayer,
   type PencilLayer,
 } from '@cute-screen/editor-core'
 import { renderHeadlessCanvasKitPng } from '@cute-screen/editor-renderer'
@@ -28,6 +31,33 @@ import { baseDocument } from '../../../packages/editor-core/src/precision-tools.
 
 beforeAll(prepareGoldenRuntime)
 describe('distinct brush decoded render parity', () => {
+  it('exports migrated 4K ink with the same decoded pixels as stabilized preview in both backends', async () => {
+    const points = Array.from({ length: 1200 }, (_, i) => ({
+      x: 100 + i * 2.8, y: 900 + Math.sin(i / 20) * 300 + i % 2 * 5, pressure: .2 + i % 9 / 12,
+    }))
+    const stroke = createDrawingLayer({ id: '019c1f62-058e-7000-8000-000000000091', tool: 'pencil',
+      start: points[0]!, end: points.at(-1)!, points,
+      defaults: { ...DEFAULT_DRAWING_DEFAULTS, pencil: { ...DEFAULT_DRAWING_DEFAULTS.pencil,
+        brush: 'brush', width: 20, smoothing: .35, layerOpacity: .5 } },
+    }) as PencilLayer
+    const input = { ...baseDocument(), canvas: { width: 3840, height: 2160 }, layers: [stroke] }
+    const manager = new CommandManager(input)
+    const migrated = manager.execute(createExpressiveBrushMigrationCommand(manager.snapshot.document)!).document
+    const expected = { ...input, layers: [rebaseFreehandLayer({ ...stroke,
+      payload: { ...stroke.payload, brush: 'stabilized' },
+    })] }
+    const scene = createDocumentRenderScene(migrated)
+    const fallback = await canvas2dPngs(scene, 1)
+    const pixels = await rgba(fallback.exported)
+    expect(pixels.some((value, index) => index % 4 === 3 && value > 0)).toBe(true)
+    expect(compareRgba(await rgba(fallback.preview), pixels)).toEqual({ changedChannels: 0, maximumDelta: 0 })
+    const expectedScene = createDocumentRenderScene(expected)
+    expect(compareRgba(await rgba((await canvas2dPngs(expectedScene, 1)).exported), pixels))
+      .toEqual({ changedChannels: 0, maximumDelta: 0 })
+    expect(compareRgba(await rgba(renderHeadlessCanvasKitPng(canvasKit, scene)),
+      await rgba(renderHeadlessCanvasKitPng(canvasKit, expectedScene))))
+      .toEqual({ changedChannels: 0, maximumDelta: 0 })
+  })
   it.each([1, 2] as const)('renders all brushes and legacy ink with single-pass alpha at scale %i', async (scale) => {
     const layers: PencilLayer[] = []
     for (const [index, brush] of ['pen', 'stabilized', 'brush', 'pencil'].entries()) {

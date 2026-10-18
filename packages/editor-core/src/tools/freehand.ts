@@ -152,15 +152,15 @@ function unitInterval(
 /** Preferences-only normalization; persisted legacy documents never use this. */
 export function normalizePencilDefaults(value: JsonObject): JsonObject {
   const brush = value.brush === 'pencil' ? 'pen'
-    : ['pen', 'brush', 'stabilized'].includes(String(value.brush)) ? String(value.brush) : 'stabilized'
+    : value.brush === 'pen' ? 'pen' : 'stabilized'
   const memories = value.brushSmoothing && typeof value.brushSmoothing === 'object'
     && !Array.isArray(value.brushSmoothing) ? value.brushSmoothing as JsonObject : {}
-  const smoothing = unitInterval(value.smoothing, brush === 'brush' ? .35 : .65)
+  const smoothing = value.brush === 'brush'
+    ? unitInterval(memories.stabilized, .65) : unitInterval(value.smoothing, .65)
   return {
     ...value, brush, strokeVersion: 2, pressureMode: 'simulated', smoothing,
     brushSmoothing: {
       stabilized: unitInterval(memories.stabilized, brush === 'stabilized' ? smoothing : .65),
-      brush: unitInterval(memories.brush, brush === 'brush' ? smoothing : .35),
     },
   }
 }
@@ -169,9 +169,10 @@ export function changePencilBrush(
   current: JsonObject,
   brush: string,
 ): JsonObject {
+  if (!['pen', 'pencil', 'stabilized'].includes(brush)) throw new RangeError('unsupported pencil brush')
   const previous = normalizePencilDefaults(current)
   const memories = { ...previous.brushSmoothing as JsonObject }
-  if (current.brush === 'stabilized' || current.brush === 'brush') memories[current.brush] = previous.smoothing!
+  if (current.brush === 'stabilized') memories.stabilized = previous.smoothing!
   return {
     ...previous, strokeVersion: current.strokeVersion === 3 ? 3 : 2, brush: brush === 'pencil' ? 'pen' : brush,
     pressureMode: current.pressureMode === 'pen' ? 'pen' : 'simulated',

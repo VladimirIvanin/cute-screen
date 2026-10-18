@@ -1,3 +1,4 @@
+import { annotationTool } from '@cute-screen/editor-renderer'
 import type {
   Ref,
   ShallowRef,
@@ -60,7 +61,7 @@ function targetFor(context: DrawingEffectsContext): DrawingTarget | undefined {
   const selected = context.configureDefaultsTool.value
     ? undefined
     : context.isDrawingTool(activeTool)
-      ? candidate?.kind === activeTool
+      ? candidate && annotationTool(candidate) === activeTool
         ? candidate
         : undefined
       : activeTool === 'select'
@@ -70,8 +71,8 @@ function targetFor(context: DrawingEffectsContext): DrawingTarget | undefined {
     context.configureDefaultsTool.value ??
     (context.isDrawingTool(activeTool)
       ? activeTool
-      : selected && context.isDrawingTool(selected.kind)
-        ? selected.kind
+      : selected && context.isDrawingTool(annotationTool(selected))
+        ? annotationTool(selected)
         : undefined)
   if (!tool || !context.isDrawingTool(tool)) return undefined
   return {
@@ -122,6 +123,8 @@ function resolveDrawingEffect(
   if (!target) return { kind: 'unhandled' }
   const payload = resolveDrawingPayload(id, value, target.tool, target.current)
   if (!payload) return { kind: 'handled' }
+  if (id === 'autoAlignAxes' && target.tool !== 'line') return { kind: 'handled' }
+  if (id === 'autoAlignAxes' && target.selected) return { kind: 'handled' }
   if (target.selected) {
     if (!context.props.documentSession || target.selected.locked) {
       return { kind: 'handled' }
@@ -149,7 +152,7 @@ function colorFrom(
   payload: JsonObject,
 ): SrgbColor | undefined {
   const candidate =
-    tool === 'arrow' || tool === 'shape'
+    tool === 'arrow' || tool === 'line' || tool === 'shape'
       ? (payload.stroke as Record<string, unknown> | undefined)?.color
       : payload.color
   return candidate && typeof candidate === 'object' ? (candidate as SrgbColor) : undefined

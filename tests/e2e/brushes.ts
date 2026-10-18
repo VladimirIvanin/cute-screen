@@ -25,7 +25,7 @@ export async function verifyBrushes(
   })
   const initial = (await shapeDocument()).layers.length
   for (const [row, entry] of [
-    ['Exact pen', 'pen'], ['Autocorrection', 'stabilized'], ['Expressive brush', 'brush'],
+    ['Exact pen', 'pen'], ['Autocorrection', 'stabilized'],
   ].entries()) {
     await $('button[aria-label="Brush and width"]').click()
     await $(`.cs-brush-choices button[aria-label="${entry[0]}"]`).click()
@@ -54,9 +54,9 @@ export async function verifyBrushes(
   expect(await $('html').getAttribute('data-brush-pointer-trusted')).toBe('true')
   await browser.saveScreenshot(path.resolve(directory, `${prefix}-strokes.png`))
   await $('button[aria-label="Undo"]').click()
-  await browser.waitUntil(async () => (await shapeDocument()).layers.length === initial + 2)
+  await browser.waitUntil(async () => (await shapeDocument()).layers.length === initial + 1)
   await $('button[aria-label="Redo"]').click()
-  await browser.waitUntil(async () => (await shapeDocument()).layers.length === initial + 3)
+  await browser.waitUntil(async () => (await shapeDocument()).layers.length === initial + 2)
   const beforeCancel = await shapeDocument()
   const x = Math.round(bounds.x + bounds.width * .2)
   const y = Math.round(bounds.y + bounds.height * .8)

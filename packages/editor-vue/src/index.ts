@@ -5,6 +5,7 @@ import './shell/shell.css'
 
 export { shortcutLetter } from './keyboard-shortcuts'
 
+export { emojiThumbnailImages } from './emoji/resources'
 export {
   Canvas2DRenderer,
   ImageResourceManager,

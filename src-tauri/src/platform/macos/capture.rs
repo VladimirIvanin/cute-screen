@@ -45,6 +45,8 @@ unsafe extern "C" {
         result: *mut NativeCaptureSelection,
     ) -> c_int;
     fn cute_macos_pixel_backend() -> c_int;
+    fn cute_macos_window_pixel_backend() -> c_int;
+    fn cute_window_selector_set_locale(russian: bool);
     fn cute_quick_capture_set_presentation(window: *mut std::ffi::c_void, revealed: bool);
     fn cute_quick_capture_fit_pointer_screen(window: *mut std::ffi::c_void) -> bool;
     fn cute_selector_complete_handoff();
@@ -154,6 +156,15 @@ fn native_pixel_backend_name() -> &'static str {
     }
 }
 
+pub(crate) fn window_pixel_backend_name() -> &'static str {
+    // SAFETY: this function reports the runtime-available single-window route.
+    match unsafe { cute_macos_window_pixel_backend() } {
+        2 => "screenCaptureKitScreenshot",
+        1 => "screenCaptureKitStream",
+        _ => "coreGraphicsWindow",
+    }
+}
+
 impl MacosScreenCaptureAdapter {
     pub fn available(&self) -> bool {
         CGDisplay::active_display_count().is_ok_and(|count| count > 0)
@@ -182,6 +193,8 @@ impl MacosScreenCaptureAdapter {
             ));
         }
         require_screen_recording(correlation_id)?;
+        // SAFETY: native locale is an atomic flag; no caller data is retained.
+        unsafe { cute_window_selector_set_locale(crate::platform::window_selection::russian()) };
         if matches!(target, CaptureTarget::Area | CaptureTarget::Window) {
             return capture_interactive_target(target, correlation_id, &transport, &cancel_signal);
         }
@@ -256,6 +269,12 @@ fn capture_interactive_target(
         2 => {
             return Err(PlatformError::new(
                 PlatformErrorCode::PermissionDenied,
+                correlation_id,
+            ));
+        }
+        4 => {
+            return Err(PlatformError::new(
+                PlatformErrorCode::InvalidTarget,
                 correlation_id,
             ));
         }

@@ -138,7 +138,7 @@ describe('distinct ink brushes', () => {
     expect(after.layers[0]).toMatchObject({ payload: { strokeVersion: 2 } })
     expect(manager.undo().document).toEqual(before)
     expect(manager.redo().document).toEqual(after)
-    expect(applyLayerStyle(layer('pen'), { brush: 'brush' }).payload.pressureMode).toBe('pen')
+    expect(applyLayerStyle(layer('pen'), { brush: 'stabilized' }).payload.pressureMode).toBe('pen')
   })
   it('bounds contain the actual outline after resize and rotation/reflection hit testing', () => {
     const stroke = layer('brush')
@@ -158,14 +158,14 @@ describe('distinct ink brushes', () => {
       brush: 'pencil', width: 7, smoothing: .4, layerOpacity: .6,
     } } })
     expect(preferences.defaults.pencil).toMatchObject({ brush: 'pen', width: 7, layerOpacity: .6, strokeVersion: 2 })
-    let value = changePencilBrush({ ...DEFAULT_DRAWING_DEFAULTS.pencil, smoothing: .8 }, 'brush')
-    expect(value.smoothing).toBe(.35)
-    value = changePencilBrush({ ...value, smoothing: .2 }, 'stabilized')
+    let value = changePencilBrush({ ...DEFAULT_DRAWING_DEFAULTS.pencil, smoothing: .8 }, 'pen')
+    expect(value.smoothing).toBe(0)
+    value = changePencilBrush(value, 'stabilized')
     expect(value.smoothing).toBe(.8)
-    expect(changePencilBrush(value, 'brush').smoothing).toBe(.2)
+    expect(() => changePencilBrush(value, 'brush')).toThrow('unsupported pencil brush')
     const reopened = parseDrawingToolPreferences({
       ...preferences, defaults: { ...preferences.defaults, pencil: value },
     })
-    expect(changePencilBrush(reopened.defaults.pencil, 'brush').smoothing).toBe(.2)
+    expect(reopened.defaults.pencil.smoothing).toBe(.8)
   })
 })

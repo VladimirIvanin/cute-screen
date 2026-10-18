@@ -11,7 +11,7 @@ import { renderToString } from 'vue/server-renderer'
 const root = fileURLToPath(new URL('../', import.meta.url))
 const output = new URL('../apps/landing/assets/icons/', import.meta.url)
 const names = [
-  'select', 'hand', 'crop', 'arrow', 'shape', 'pencil', 'marker', 'text',
+  'select', 'hand', 'crop', 'arrow', 'line', 'shape', 'pencil', 'marker', 'text',
   'numberedMarker', 'callout', 'image', 'eyedropper', 'privacy', 'spotlight',
   'ruler', 'loupe', 'check',
 ]

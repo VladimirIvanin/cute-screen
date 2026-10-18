@@ -13,7 +13,7 @@ export function useQuickChromeLayout(controller: QuickCaptureLayoutController) {
   const observed = new WeakSet<Element>()
 
   function update(crop?: QuickRect): string | undefined {
-    for (const element of document.querySelectorAll('.cs-quick-actions, .cs-quick-toolrail-group, .cs-tool-defaults-toolbar')) {
+    for (const element of document.querySelectorAll('.cs-quick-actions, .cs-quick-toolrail-group, .cs-tool-defaults-toolbar, .cs-quick-portal-limit')) {
       if (observed.has(element)) continue
       observed.add(element)
       observer?.observe(element)

@@ -38,7 +38,7 @@ describe('M06 drawing tools in browser mode', () => {
     const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
     await $('button[aria-label="Shape"]').click()
     await $('[data-shape-control="fill"]').click()
-    await $('.cs-shape-fill-options').$('button=Linear gradient').click()
+    await $('.cs-shape-fill-options [data-fill-kind="linearGradient"]').click()
     await browser.keys('Escape')
     await browser
       .action('pointer')

@@ -2,6 +2,8 @@ import { rulerAngleStep } from './ruler-modifiers'
 import {
   type LayerNode,
   calloutLabelContains,
+  canRemoveCalloutStep,
+  calloutGeometryContext,
 } from '@cute-screen/editor-renderer'
 import type { CanvasPoint } from './contracts'
 import type { PointerDownContext } from './pointer-down-contracts'
@@ -64,11 +66,15 @@ function beginDirectHandle(
 ): boolean {
   const callout = target.kind === 'callout' ? target.handle : undefined
   if (selected.kind === 'callout' && callout) {
+    const segment = callout.startsWith('segment:') ? Number(callout.split(':')[1]) : -1
+    const removing = event.altKey && canRemoveCalloutStep(selected.payload, segment, calloutGeometryContext())
     const local = context.toLocal(selected, point)
     const anchor = callout === 'labelBody' || callout === 'label' ? selected.payload.label : callout === 'target' ? selected.payload.target : local
     context.scene.value!.setPointerCapture(event.pointerId)
     context.setGesture({
       kind: 'calloutHandle',
+      ...(removing ? { removal: { segment, cancelled: false,
+        clientStart: { x: event.clientX, y: event.clientY } } } : {}),
       id: selected.id,
       handle: callout,
       offset: { x: local.x - anchor.x, y: local.y - anchor.y },

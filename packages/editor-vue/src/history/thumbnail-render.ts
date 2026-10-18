@@ -3,6 +3,7 @@ import {
   createDocumentRenderScene,
   type EditorDocumentV1,
 } from '@cute-screen/editor-renderer'
+import { documentEmojiImages } from '../emoji/resources'
 
 /** Same saved-scene contract as the editor; overlays and selection never enter previews. */
 export async function renderHistoryThumbnail(
@@ -14,7 +15,8 @@ export async function renderHistoryThumbnail(
   const renderer = new Canvas2DRenderer()
   try {
     await renderer.initialize({ scene: canvas, overlay, dpr: 1, correlationId: 'history-preview' })
-    for (const [id, image] of images) {
+    const resources = new Map([...images, ...await documentEmojiImages(document, images)])
+    for (const [id, image] of resources) {
       const width = 'naturalWidth' in image ? image.naturalWidth : image.width
       const height = 'naturalHeight' in image ? image.naturalHeight : image.height
       await renderer.createImageResource({ id, width, height, source: image })

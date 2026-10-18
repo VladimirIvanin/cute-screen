@@ -165,7 +165,7 @@ function useMemoryPersistence(
       if (typeof marker === 'string' && ['circle', 'square', 'diamond', 'star'].includes(marker))
         workspace.markerShape.value = marker as typeof workspace.markerShape.value
       workspace.rememberedStyles.value = (preferences.settings.styles ?? {}) as Partial<
-        Record<LayerNode['kind'], LayerStyle>
+        Record<import('@cute-screen/editor-renderer').AnnotationTool, LayerStyle>
       >
     } catch (error) {
       console.warn('Tool settings could not be restored', error)

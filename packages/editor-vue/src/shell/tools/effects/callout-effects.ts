@@ -25,7 +25,7 @@ function patchedFrame(
   const border = !frame.border && (patch.kind === 'outline' || patch.kind === 'accent')
     ? { ...DEFAULT_CALLOUT_FRAME.border!, width: patch.kind === 'accent' ? 3 : 1 } : frame.border
   return { ...current, frame: { ...frame, border, ...patch },
-    attachment: current.attachment ?? defaultCalloutAttachment(current.target, current.label) }
+    attachment: current.attachment ?? defaultCalloutAttachment() }
 }
 function changedPayload(
   layer: CalloutLayer,
@@ -39,7 +39,7 @@ function changedPayload(
   if (id === 'calloutAddStep') return addCalloutStep(layer, Number(value), 32, context)
   let payload: CalloutPayload = current
   const route = current.route
-  const axis = route.path === 'elbow' ? route.elbow.axis : route.path === 'straight' ? 'y' : route.axis
+  const axis = routeAxis(route)
   if (id === 'calloutRoute') payload = { ...current, route: value === 'straight' ? { path: 'straight' }
     : value === 'elbow' ? { path: 'elbow', elbow: { axis, offset: 0 } } : { path: 'corner', axis } }
   if (id === 'calloutFlip') payload = { ...current, route: { path: 'corner', axis: axis === 'x' ? 'y' : 'x' } }
@@ -54,6 +54,11 @@ function changedPayload(
     payload = { ...current, [key]: Object.keys(patch).length ? { ...current[key], ...patch } : {} }
   }
   return rebaseCalloutLayer(layer, parseCalloutPayload(payload, 'callout'), context)
+}
+function routeAxis(route: CalloutPayload['route']): 'x' | 'y' {
+  if (route.path === 'elbow') return route.elbow.axis
+  if (route.path === 'straight' || route.path === 'quadratic') return 'y'
+  return route.axis
 }
 export function calloutStyleFromPayload(payload: CalloutPayload): CalloutStyle {
   return { frame: payload.frame ?? { ...DEFAULT_CALLOUT_FRAME, kind: payload.background ? 'card' : 'text',

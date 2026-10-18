@@ -36,7 +36,7 @@ export type CaptureRequestV1 = {
   invocationSource: CaptureInvocationSource
 }
 
-export type CaptureCompletion = 'copied' | 'saved' | 'editor'
+export type CaptureCompletion = 'copied' | 'saved' | 'editor' | 'history'
 
 export type CaptureTerminalOutcome =
   'captured' | 'cancelled' | 'busy' | 'permissionDenied' | 'unavailable' | 'invalidTarget' | 'failed'

@@ -45,6 +45,10 @@ const TOOL_CATALOG: readonly ToolCatalogEntry[] = [
     availability: 'interactive',
   },
   {
+    id: 'line',
+    group: 'annotate', icon: 'line', labelKey: 'toolLine', shortcut: 'L', availability: 'editableCanvas',
+  },
+  {
     id: 'shape',
     group: 'annotate',
     icon: 'shape',
@@ -101,6 +105,14 @@ const TOOL_CATALOG: readonly ToolCatalogEntry[] = [
     availability: 'contentImage',
   },
   {
+    id: 'emoji',
+    group: 'annotate',
+    icon: 'emoji',
+    labelKey: 'toolEmoji',
+    shortcut: 'E',
+    availability: 'editableCanvas',
+  },
+  {
     id: 'eyedropper',
     group: 'more',
     icon: 'eyedropper',
@@ -138,7 +150,7 @@ const TOOL_CATALOG: readonly ToolCatalogEntry[] = [
     group: 'more',
     icon: 'loupe',
     labelKey: 'toolLoupe',
-    shortcut: 'L',
+    shortcut: 'Z',
     availability: 'editableCanvas',
   },
 ]
@@ -146,6 +158,7 @@ const TOOL_CATALOG: readonly ToolCatalogEntry[] = [
 const QUICK_TOOL_IDS = new Set([
   'select',
   'arrow',
+  'line',
   'shape',
   'pencil',
   'marker',
@@ -153,6 +166,7 @@ const QUICK_TOOL_IDS = new Set([
   'numberedMarker',
   'callout',
   'image',
+  'emoji',
   'eyedropper',
   'censor',
   'spotlight',

@@ -344,7 +344,7 @@ describe('M02 editor shell', () => {
       })
 
       const empty = screen.getByRole('region', { name: 'Capture your first screen' })
-      await fireEvent.click(within(empty).getByRole('button', { name: 'Open image…' }))
+      await fireEvent.click(within(empty).getByRole('button', { name: 'Open image' }))
       expect(screen.getByText('Image opened')).toBeInTheDocument()
 
       await vi.advanceTimersByTimeAsync(2_999)

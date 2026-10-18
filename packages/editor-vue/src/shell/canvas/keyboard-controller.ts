@@ -1,3 +1,4 @@
+import { updateLineGesture } from './line-gesture'
 import {
   rulerAngleStep,
   updateRulerPointer,
@@ -56,12 +57,15 @@ export class KeyboardController {
     const gesture = this.#context.gesture()
     if (
       event.key === 'Escape' &&
-      (gesture?.kind === 'draw' &&
-        gesture.stroke ||
-        gesture?.kind === 'precision' &&
-        gesture.tool === 'ruler' ||
-        gesture?.kind === 'intrinsicResize' &&
-        gesture.initial.kind === 'ruler')
+      (gesture?.kind === 'calloutHandle' ||
+        gesture?.kind === 'draw' &&
+        (gesture.stroke ||
+          gesture.tool === 'line') ||
+          gesture?.kind === 'arrowHandle' ||
+          gesture?.kind === 'precision' &&
+          gesture.tool === 'ruler' ||
+          gesture?.kind === 'intrinsicResize' &&
+          gesture.initial.kind === 'ruler')
     ) this.keydown(event)
   }
   keydown(event: KeyboardEvent): void {
@@ -71,6 +75,7 @@ export class KeyboardController {
       return
     if (this.#handleCrop(event))
       return
+    this.#handleLineModifier(event)
     this.#handleRulerModifier(event, true)
     this.#handleShift(event, true)
     this.#handleAltDown(event)
@@ -89,11 +94,20 @@ export class KeyboardController {
     }
   }
   keyup(event: KeyboardEvent): void {
+    this.#handleLineModifier(event)
     this.#handleRulerModifier(event, event.key === 'Shift' ? event.shiftKey : event.altKey)
     this.#handleShift(event, event.shiftKey)
     if (event.code === 'Space')
       this.#context.setSpacePressed(false)
     const gesture = this.#context.gesture()
+    if (
+      event.key === 'Alt' &&
+      gesture?.kind === 'calloutHandle' &&
+      gesture.removal
+    ) {
+      this.#context.setGesture({ ...gesture, removal: { ...gesture.removal, cancelled: true } })
+      this.#context.invalidateOverlay()
+    }
     if (event.key === 'Alt' && gesture?.kind === 'move') {
       this.#context.setGesture({
         ...gesture, guidesVisible: false,
@@ -111,6 +125,20 @@ export class KeyboardController {
       this.#context.setRulerGuide(undefined)
       this.#context.invalidateOverlay()
     }
+  }
+  #handleLineModifier(event: KeyboardEvent): void {
+    if (event.key !== 'Shift' && event.key !== 'Alt') return
+    const gesture = this.#context.gesture()
+    if (gesture?.kind !== 'draw' && gesture?.kind !== 'arrowHandle') return
+    if (gesture.kind === 'draw' && gesture.tool !== 'line') return
+    this.#context.setGesture(updateLineGesture(
+      gesture,
+      gesture.rawCurrent ?? gesture.current,
+      event.shiftKey,
+      event.altKey,
+      this.#context.props,
+    ))
+    this.#context.invalidateOverlay()
   }
   #handleShift(
     event: KeyboardEvent,

@@ -33,6 +33,10 @@ function parseRoute(
   field: string,
 ): CalloutRoute {
   const input = readJsonObject(value, field)
+  if (input.path === 'quadratic') {
+    assertOnlyFields(input, ['path', 'bend'], field)
+    return { path: 'quadratic', bend: parsePointPayload(input.bend, `${field}.bend`) as CalloutPayload['target'] }
+  }
   if (input.path === 'straight') {
     assertOnlyFields(input, ['path'], field)
     return { path: 'straight' }
@@ -104,7 +108,7 @@ export function parseCalloutPayload(
     'tailAnchor')) throw new Error(`${field} legacy callout bubble/tail fields are removed in v7`)
   assertOnlyFields(input, ['content', 'background', 'target', 'label', 'route', 'stroke', 'targetMarker',
     'labelMarker', 'attachment', 'frame', 'targetMarkerStyle', 'labelMarkerStyle'], field)
-  if (input.attachment !== undefined && !['left', 'right', 'top',
+  if (input.attachment !== undefined && !['auto', 'left', 'right', 'top',
     'bottom'].includes(String(input.attachment))) throw new Error(`${field}.attachment invalid`)
   const target = parsePointPayload(input.target, `${field}.target`) as CalloutPayload['target']
   const label = parsePointPayload(input.label, `${field}.label`) as CalloutPayload['label']

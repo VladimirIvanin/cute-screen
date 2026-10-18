@@ -1,5 +1,8 @@
 import { showsCreationDefaults } from './settings-policy'
-import { commonLayerStyle } from '@cute-screen/editor-renderer'
+import {
+  annotationTool,
+  commonLayerStyle,
+} from '@cute-screen/editor-renderer'
 import {
   computed,
   type Ref,
@@ -15,7 +18,7 @@ import type { ContextToolbarSchema } from '../types'
 import type { TextDraft } from './text-schema'
 import type { DrawingLayerNode } from './drawing-schema'
 import type { PrecisionTool } from './precision-schema'
-type DrawingTool = 'arrow' | 'shape' | 'pencil' | 'marker'
+type DrawingTool = 'arrow' | 'line' | 'shape' | 'pencil' | 'marker'
 type PrecisionLayer = Extract<LayerNode, {
   readonly kind: PrecisionTool
 }>
@@ -169,8 +172,8 @@ function schemaForLayer(
     return context.precisionToolSchema(layer.kind as PrecisionTool, layer as PrecisionLayer)
   const text = context.buildTextContextSchema(layer, 'select')
   if (text) return text
-  if (context.isDrawingTool(layer.kind))
-    return context.drawingControl(layer.kind, {
+  if (context.isDrawingTool(annotationTool(layer)))
+    return context.drawingControl(annotationTool(layer) as DrawingTool, {
       ...layer.payload,
       layerOpacity: 'opacity' in layer ? layer.opacity : 1,
       blendMode: 'blendMode' in layer ? layer.blendMode : 'normal',
@@ -206,7 +209,7 @@ function selectionHeading(
   layers: readonly LayerNode[],
   first: ContextToolbarSchema,
 ): Pick<ContextToolbarSchema, 'icon' | 'hint' | 'title'> {
-  const homogeneous = layers.every((layer) => layer.kind === layers[0]?.kind)
+  const homogeneous = layers.every((layer) => annotationTool(layer) === annotationTool(layers[0]!))
   return {
     icon: homogeneous ? first.icon : 'select',
     hint: homogeneous ? first.hint : context.precisionText('Common selection properties', 'Общие свойства выделения'),
@@ -279,6 +282,16 @@ function selectionSchemaFor(context: ContextSchemaContext): ContextToolbarSchema
         ...control,
         disabled: disabled || Boolean(control.disabled),
         mixed,
+        ...(control.kind === 'arrowStroke' ? {
+          widthMixed: schemas.some((schema) => {
+            const other = schema?.controls.find((candidate) => candidate.id === control.id)
+            return other?.kind === 'arrowStroke' && other.width !== control.width
+          }),
+          styleMixed: schemas.some((schema) => {
+            const other = schema?.controls.find((candidate) => candidate.id === control.id)
+            return other?.kind === 'arrowStroke' && other.style !== control.style
+          }),
+        } : {}),
       }
     })
   const common = commonLayerStyle(layers)
@@ -344,7 +357,7 @@ export function createContextSchema(context: ContextSchemaContext) {
     const layer = selectedLayer(context)
     if (layer?.kind !== 'arrow')
       return undefined
-    const schema = context.drawingControl('arrow', layer.payload)
+    const schema = context.drawingControl(annotationTool(layer) as DrawingTool, layer.payload)
     return {
       controls: schema.controls, title: schema.title,
     }

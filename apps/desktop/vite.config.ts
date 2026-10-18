@@ -23,7 +23,7 @@ export default defineConfig({
   root,
   build: {
     emptyOutDir: true,
-    outDir: 'dist',
+    outDir: process.env.CUTE_SCREEN_FRONTEND_DIST ?? 'dist',
   },
   clearScreen: false,
   server: {

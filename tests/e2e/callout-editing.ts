@@ -1,4 +1,5 @@
 import { selectionDocument } from './selection-interactions'
+import { exerciseCalloutRevision } from './callout-revision'
 import {
   $,
   browser,
@@ -12,6 +13,7 @@ import {
 } from './specs/browser-v7-rich-text-test-kit'
 
 type Point = { x: number; y: number }
+type CalloutInputTrust = { keydown: boolean[]; contextmenu: boolean[]; pointer: boolean[] }
 type Payload = {
   target: Point
   label: Point
@@ -69,10 +71,12 @@ export async function exerciseCalloutEditing(
 ): Promise<void> {
   if (!native) await browser.setWindowSize(1440, 900)
   if (native) await browser.execute(() => {
-    const state = window as typeof window & { __calloutInputTrust?: { keydown: boolean[]; contextmenu: boolean[] } }
-    state.__calloutInputTrust = { keydown: [], contextmenu: [] }
+    const state = window as typeof window & { __calloutInputTrust?: CalloutInputTrust }
+    state.__calloutInputTrust = { keydown: [], contextmenu: [], pointer: [] }
     document.addEventListener('keydown', (event) => state.__calloutInputTrust!.keydown.push(event.isTrusted), true)
     document.addEventListener('contextmenu', (event) => state.__calloutInputTrust!.contextmenu.push(event.isTrusted), true)
+    document.addEventListener('pointerdown', (event) => state.__calloutInputTrust!.pointer.push(event.isTrusted), true)
+    document.addEventListener('pointerup', (event) => state.__calloutInputTrust!.pointer.push(event.isTrusted), true)
   })
   await $('button[aria-label="Callout"]').click()
   await waitForStableCanvas()
@@ -141,6 +145,7 @@ export async function exerciseCalloutEditing(
   await browser.keys('Escape')
   await browser.waitUntil(async () => !await $('.cs-callout-popover').isExisting())
   await browser.saveScreenshot(path.resolve(artifacts, 'callout-card.png'))
+  await exerciseCalloutRevision(artifacts, { last, screen, world, drag })
   if (native) {
     await browser.action('pointer').move({ origin: 'viewport', x: Math.round(target.x), y: Math.round(target.y) })
       .down({ button: 'right' }).up({ button: 'right' }).perform()
@@ -148,13 +153,14 @@ export async function exerciseCalloutEditing(
     await browser.keys('Escape')
     const trust = await browser.execute(() => {
       const state = window as typeof window & {
-        __calloutInputTrust: { keydown: boolean[]; contextmenu: boolean[] }
+        __calloutInputTrust: CalloutInputTrust
       }
       return state.__calloutInputTrust
     })
     expect(trust.keydown.length).toBeGreaterThan(0)
     expect(trust.contextmenu.length).toBeGreaterThan(0)
-    expect([...trust.keydown, ...trust.contextmenu].every(Boolean)).toBe(true)
+    expect(trust.pointer.length).toBeGreaterThan(0)
+    expect([...trust.keydown, ...trust.contextmenu, ...trust.pointer].every(Boolean)).toBe(true)
     await writeFile(path.resolve(artifacts, 'callout-input-trust.json'), JSON.stringify(trust, null, 2))
   }
 }

@@ -284,11 +284,12 @@ export type CalloutRoute = Readonly<{
   }> &
   JsonObject
 }> | Readonly<{ readonly path: 'straight' }>
+| Readonly<{ readonly path: 'quadratic'; readonly bend: Point & JsonObject }>
 | Readonly<{ readonly path: 'corner'; readonly axis: 'x' | 'y' }>
 | Readonly<{ readonly path: 'orthogonal'; readonly points: readonly (Point & JsonObject)[]; readonly preset: 'corner' | 'elbow'; readonly axis: 'x' | 'y' }>
 
 export type CalloutMarker = 'none' | 'circle' | 'ring' | 'lineArrow' | 'solidArrow'
-export type CalloutAttachment = 'left' | 'right' | 'top' | 'bottom'
+export type CalloutAttachment = 'auto' | 'left' | 'right' | 'top' | 'bottom'
 export type CalloutMarkerStyle = Readonly<{ readonly color?: SrgbColor; readonly size?: number }>
 export type CalloutFrame = Readonly<{
   readonly kind: 'text' | 'outline' | 'card' | 'capsule' | 'accent'
@@ -333,6 +334,8 @@ export interface EmojiPayload extends JsonObject {
 }
 
 export interface ArrowLayerPayload extends JsonObject {
+  readonly annotationTool?: 'line'
+
   readonly path: 'straight' | 'quadratic' | 'elbow'
   readonly start: Point & JsonObject
   readonly end: Point & JsonObject

@@ -1,5 +1,58 @@
 # Архитектура Cute Screen
 
+## Углы рамки изображения (ADR-097)
+
+Image scene-проекция использует miter join независимо от persisted border.join.
+Только radius определяет форму углов: 0 сохраняет прямой внешний контур рамки,
+положительный radius строит общий rounded path. Canvas2D/CanvasKit и экспорт
+получают один RenderImageNode; schema v7 и command lifecycle не меняются.
+
+## Линия (ADR-100)
+
+Line — UI tool с отдельными drawing defaults и repeat policy. Persisted arrow
+payload v7 содержит optional annotationTool: line; общий resolver определяет
+панели, названия слоёв, style channels и defaults. Renderer/hit testing/bounds
+переиспользуют arrow geometry без caps. autoAlignAxes остаётся UI preference;
+transient lineAxis/rawCurrent не принадлежат реактивному документу Vue.
+
+## Изолированный Window capture (ADR-091)
+
+Window имеет отдельный native selection lifecycle. Windows/X11 сохраняют
+native identity и owner в Rust, AppKit 12–13 — CGWindowID/PID, системный picker
+macOS 14+ — opaque SCContentFilter. Эти значения не пересекают IPC. Общая
+Rust selection state задаёт initial hover, front-to-back hit test, same-target
+press/release, Enter и Tab/Shift+Tab; пустой выбор остаётся открытым.
+
+Windows получает один WGC frame, X11 читает named pixmap WM-frame, macOS
+использует single-window CoreGraphics/SCStream/SCScreenshotManager по runtime
+availability. Desktop preview selector не является источником Window original.
+Wayland запрашивает только advertised portal v3 Window; fallback к Area явный.
+Capture metadata отражает источник Window pixels. Existing binary transport,
+immutable original и прямой document mount сохраняются; Quick draft не создаётся.
+Native failure возвращает типизированный outcome, поднимает существующий editor
+и показывает RU/EN recovery с повторным выбором и явным переходом к области.
+
+## Заливка и обводка фигур (ADR-092)
+
+Shape UI предлагает none/solid/linear без удаления radial из schema v7.
+Линейная заливка изменяется атомарным внутренним `fillGradient`: полный
+проверенный paint с 2–8 точками, нормализованными start/end и opacity.
+Индекс выбранной точки и drag draft принадлежат панели; отпускание создаёт одну
+EditorCommand, смешанное выделение использует существующий batch routing.
+Базовые rect/ellipse/polygon scene nodes передают dash и lineCap наравне с vector.
+Круглые shape dots имеют `[0, width * 2]` и round cap; arrow/path семантика прежняя.
+
+## Выноска: единая геометрия и transient editing (ADR-090)
+
+CalloutRoute дополнен quadratic/bend, attachment — auto; optional поля v7 и старые
+routes читаются без миграции. UI сводит routes к line/stepped; style extraction
+копирует только preset, без bend/waypoints. Core определяет label visibility,
+resolved attachment, tangent/accent, bounds/handles и адресное удаление ступени.
+Empty rich text имеет пустые spans/paragraphs; скрытая подпись не участвует в сцене,
+hit testing и bounds. Редактор пустой подписи использует временную измеренную область.
+Alt deletion хранится в pointer gesture, preview/minus рисуются overlay без Vue
+scene updates; один updateLayer возникает только на допустимом pointerup.
+
 ## Управляемые выноски (ADR-087)
 
 Callout остаётся одним LayerNode. `route` поддерживает straight, corner, elbow
@@ -181,6 +234,13 @@ persisted v7, IPC или Vue state нет; существующие size/border 
 автоматически меняют производные пропорции с прежними cancel/undo/redo.
 
 ## Брендовый знак (ADR-057)
+
+Дополнение ADR-093: generator также создаёт `BrandMark.vue` и inline SVG
+в RU/EN HTML. DOM-only `attachBrandEyes(host): dispose` используется TopBar
+через mount/unmount и отдельным landing entry. События меняют цель взгляда,
+rAF обновляет только transform группы прищуров и останавливается после settle.
+Scene graph, Vue render cycle и постоянный idle loop в движении не участвуют.
+Blur/hidden/pagehide/reduced motion сбрасывают взгляд; dispose удаляет listeners.
 
 `scripts/generate-brand-assets.mjs` хранит общую геометрию монитора с кошачьими
 ушами, прищурами и подставкой; производные SVG/PNG/ICO/ICNS создаются до запуска
@@ -695,7 +755,14 @@ Inline text preview сохраняет полный RichTextEditingState и back
 preview; normal formatting/cancel восстанавливает baseline перед применением.
 Внешние shell props, schema v7, IPC и масштаб холста сохраняются.
 
-## Различимые кисти (ADR-060)
+## Карандаш и совместимость старых кистей (ADR-060/094)
+
+Доступны pen/stabilized. Preferences brush нормализуются в stabilized с памятью
+автокоррекции либо 65%. DocumentSession при открытии editable документа выполняет
+одну `migrateExpressiveBrushes`: hidden/locked включены, snapshots проверяются,
+samples/spans/appearance/transforms сохраняются, bounds пересчитываются.
+Миграция участвует в undo/redo, dirty и автосохранении; read-only путь не меняется.
+Описанная ниже pressure geometry сохраняется для чтения старых payload и undo.
 
 Новый pencil сохраняет `strokeVersion: 2`, исходные samples и `pressureMode`.
 DOM-free resolver возвращает centerline постоянного пера/автокоррекции либо
@@ -881,9 +948,32 @@ cute-screen.ui-preferences.v1 в SQLite settings. При первом подкл
 переносится browser preference или системная локаль WebView. Перед mount
 native preference восстанавливает browser storage. Main/Quick/Settings используют
 один shell store; Settings больше не держит независимый locale ref.
+Settings при setup сразу отражает resolvedTheme и locale в корневых HTML
+атрибутах, затем наблюдает общий store и системный prefers-color-scheme;
+media listener освобождается при unmount. Цвета всех разделов и native controls
+берутся из существующих semantic tokens, как в editor.
 Adapter сериализует записи, принимает native broadcast без обратной записи и
 не заменяет более новый локальный выбор ответом на предыдущий save. Ошибка
 сохранения видна в Settings; повторный выбор языка повторяет попытку.
 Tray creation и shortcut refresh берут locale из native repository и используют
 общие переводы всех восьми пунктов. Горячие клавиши и capability enabled flags
 не зависят от перевода. macOS Settings menu item использует ту же локаль.
+
+### Встроенные эмоджи (ADR-101)
+
+EmojiLayer проецируется в image node с resource ID из collection/version/assetId.
+Каталог DOM-free; загрузчик bundled Noto 2D находится в editor-vue и разделяется
+между canvas, экспортом и history. Pointer ghost обновляет DOM style без Vue
+реактивности pointermove. SVG resources загружаются локальными file URLs и кешируются;
+в IPC/JSON идут только ссылки. History worker получает предварительно отрисованные
+PNG blobs. Неизвестная версия пака — явная ошибка ресурса.
+
+## Quick actions и History completion (ADR-096)
+
+QuickCaptureActions — presentation-only вертикальная панель пяти UiIcon-кнопок.
+QuickCaptureActionController завершает inline text/crop через prepareNavigation
+перед History, затем использует общий QuickCaptureCommitController. CaptureCompletion
+расширен history; Rust commit сохраняет clean crop и editable document атомарно.
+Materialized flag защищает dismiss retry от дубликатов; pending блокирует конкуренцию.
+Только editor completion запускает native mount handshake. X11 UI dispatcher
+не восстанавливает main для history. Обычная фоновая загрузка capture сохраняется.

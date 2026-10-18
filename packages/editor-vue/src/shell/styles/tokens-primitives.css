@@ -122,12 +122,11 @@ button:focus-visible {
   height: 30px;
   place-items: center;
 }
-.cs-brand-mark img {
+.cs-brand-mark svg {
   display: block;
   width: 100%;
   height: 100%;
 }
-.cs-brand svg,
 .cs-icon-button svg,
 .cs-button svg,
 .cs-tool-button svg,
@@ -415,7 +414,7 @@ button:focus-visible {
   color: var(--text-muted);
   text-align: center;
 }
-.cs-empty-state svg {
+.cs-empty-state > svg {
   width: 32px;
   height: 32px;
   color: var(--accent);
@@ -428,4 +427,7 @@ button:focus-visible {
 .cs-empty-state p {
   margin: 0;
   line-height: 1.5;
+}
+.cs-empty-state > .cs-button {
+  margin-top: 16px;
 }

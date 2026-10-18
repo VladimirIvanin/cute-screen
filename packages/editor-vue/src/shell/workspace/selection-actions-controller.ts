@@ -1,3 +1,4 @@
+import { annotationTool } from '@cute-screen/editor-renderer'
 import { measuredTextCommand } from '../../text-layout'
 import {
   computed,
@@ -8,6 +9,7 @@ import {
   createDuplicateLayerCommand,
   extractLayerStyle,
   styleCommand,
+  canRemoveCalloutStep,
   type EditorCommand,
   type EditorDocumentV1,
   type LayerStyle,
@@ -33,7 +35,7 @@ interface SelectionContext {
   store: ReturnType<typeof useEditorShellStore>
   document: Ref<EditorDocumentV1 | undefined>
   error: Ref<string | undefined>
-  rememberedStyles: Ref<Partial<Record<import('@cute-screen/editor-renderer').LayerNode['kind'], LayerStyle>>>
+  rememberedStyles: Ref<Partial<Record<import('@cute-screen/editor-renderer').AnnotationTool, LayerStyle>>>
   changeCallout?: (id: string, value: string) => void
   paste: () => Promise<void>
   undo: () => void
@@ -73,11 +75,11 @@ export function createSelectionActions(context: SelectionContext) {
       return
     }
     execute([measuredTextCommand(command)])
-    if (layers.every((layer) => layer.kind === layers[0]?.kind) && layers[0])
+    if (layers.every((layer) => annotationTool(layer) === annotationTool(layers[0]!)) && layers[0])
       context.rememberedStyles.value = {
         ...context.rememberedStyles.value,
-        [layers[0].kind]: {
-          ...context.rememberedStyles.value[layers[0].kind],
+        [annotationTool(layers[0])]: {
+          ...context.rememberedStyles.value[annotationTool(layers[0])],
           ...styleClipboard.value,
         },
       }
@@ -244,8 +246,8 @@ function selectionMenuItems(
     ]
   return [
     ...(layers.length === 1 && layers[0]?.kind === 'callout' ? [
-      { id: 'calloutInsert', label: text('Add step', 'Добавить ступень'), disabled: disabled || layers[0].payload.route.path === 'straight', reason },
-      { id: 'calloutRemoveStep', label: text('Remove step', 'Удалить ступень'), disabled: disabled || layers[0].payload.route.path !== 'orthogonal', reason },
+      { id: 'calloutInsert', label: text('Add step', 'Добавить ступень'), disabled: disabled || ['straight', 'quadratic'].includes(layers[0].payload.route.path), reason },
+      { id: 'calloutRemoveStep', label: text('Remove last step', 'Удалить последнюю ступень'), disabled: disabled || !canRemoveCalloutStep(layers[0].payload, 1), reason },
       { id: 'calloutReset', label: text('Reset route', 'Сбросить маршрут'), disabled: disabled || layers[0].payload.route.path !== 'orthogonal', reason },
     ] : []),
     {

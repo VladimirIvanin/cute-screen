@@ -265,6 +265,7 @@ export class CanvasGeometryController {
         : undefined
     }
     if (gesture.kind === 'calloutHandle') {
+      if (gesture.removal) return undefined
       return layer.kind === 'callout'
         ? updateCalloutHandle(layer, gesture.handle, { x: this.toLocal(layer,
             gesture.current).x - (gesture.offset?.x ?? 0), y: this.toLocal(layer,

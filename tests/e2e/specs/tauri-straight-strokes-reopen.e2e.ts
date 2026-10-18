@@ -12,9 +12,9 @@ describe('constrained ink after restart', () => {
     await waitForStableCanvas()
     const layers = (await shapeDocument()).layers
     const pencils = layers.filter((layer) => layer.kind === 'pencil')
-    expect(pencils).toHaveLength(6)
+    expect(pencils).toHaveLength(4)
     expect(layers.filter((layer) => layer.kind === 'marker')).toHaveLength(2)
-    expect(pencils.map((layer) => layer.payload.brush)).toEqual(['pen', 'stabilized', 'brush', 'pen', 'stabilized', 'brush'])
+    expect(pencils.map((layer) => layer.payload.brush)).toEqual(['pen', 'stabilized', 'pen', 'stabilized'])
     for (const layer of pencils) {
       expect(layer.payload.strokeVersion).toBe(3)
       expect(layer.payload.straightSegments).toHaveLength(1)

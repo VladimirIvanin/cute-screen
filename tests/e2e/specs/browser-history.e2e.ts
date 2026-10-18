@@ -105,6 +105,9 @@ describe('compact recent history', () => {
       { width: 1600, height: 1000, locale: 'en', theme: 'dark' },
       { width: 1280, height: 720, locale: 'en', theme: 'light' },
       { width: 1024, height: 700, locale: 'ru', theme: 'dark' },
+      { width: 1024, height: 700, locale: 'ru', theme: 'light' },
+      { width: 1024, height: 700, locale: 'en', theme: 'dark' },
+      { width: 1024, height: 700, locale: 'en', theme: 'light' },
     ] as const
     for (const scenario of cases) {
       await browser.setWindowSize(scenario.width, scenario.height)
@@ -112,6 +115,21 @@ describe('compact recent history', () => {
       await setShellPreferences(scenario.locale, scenario.theme)
       await $('.cs-history-trigger').click()
       await expect($('.cs-history-capture img')).toBeDisplayed()
+      await expect($('.cs-history-clear')).toHaveText(scenario.locale === 'ru' ? 'Очистить' : 'Clear history')
+      await expect($('.cs-history-popover footer button')).toHaveText(scenario.locale === 'ru' ? 'Хранение' : 'Storage')
+      const close = await browser.execute(() => {
+        const button = document.querySelector('.cs-history-close')!.getBoundingClientRect()
+        const icon = document.querySelector('.cs-history-close svg')!.getBoundingClientRect()
+        return {
+          width: button.width,
+          height: button.height,
+          iconWidth: icon.width,
+          iconHeight: icon.height,
+          centered: Math.abs(icon.left + icon.width / 2 - button.left - button.width / 2) < 1 &&
+            Math.abs(icon.top + icon.height / 2 - button.top - button.height / 2) < 1,
+        }
+      })
+      expect(close).toEqual({ width: 32, height: 32, iconWidth: 18, iconHeight: 18, centered: true })
       const bounds = await browser.execute(() => {
         const rect = document.querySelector('.cs-history-popover')!.getBoundingClientRect()
         return {
@@ -126,13 +144,18 @@ describe('compact recent history', () => {
       expect(bounds.left).toBeGreaterThanOrEqual(0)
       expect(bounds.top).toBeGreaterThanOrEqual(0)
       expect(bounds.right).toBeLessThanOrEqual(scenario.width)
+      expect(bounds.bottom).toBeLessThanOrEqual(scenario.height)
       expect(bounds.width).toBeLessThanOrEqual(360)
       expect(bounds.height).toBeLessThanOrEqual(460)
       const file = `history-${scenario.theme}-${scenario.locale}-${scenario.width}.png`
       await browser.saveScreenshot(path.resolve('artifacts/browser-e2e', file))
+      await $('.cs-history-close').click()
+      await expect($('.cs-history-trigger')).toBeFocused()
+      await expect($('.cs-history-popover')).not.toBeDisplayed()
+      await $('.cs-history-trigger').click()
       await browser.keys('Escape')
       await expect($('.cs-history-trigger')).toBeFocused()
     }
-  })
+  }).timeout(120000)
 
 })

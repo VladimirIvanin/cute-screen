@@ -18,7 +18,7 @@ export async function verifyStraightStrokes(
 ): Promise<void> {
   const initial = (await shapeDocument()).layers.length
   let cancelOrigin = { x: 0, y: 0 }
-  for (const [index, brush] of ['marker', 'pen', 'stabilized', 'brush'].entries()) {
+  for (const [index, brush] of ['marker', 'pen', 'stabilized'].entries()) {
     const label = brush === 'marker' ? 'Highlighter' : 'Pencil'
     await $(`.cs-toolrail button[aria-label="${label}"]`).click()
     if (brush !== 'marker') {
@@ -27,7 +27,7 @@ export async function verifyStraightStrokes(
       if (collapsed) await quickSettings.click()
       const settingsHost = collapsed ? '.cs-tool-configure-popover-host' : '.cs-tool-defaults-toolbar'
       await $(`${settingsHost} button[aria-label="Brush and width"]`).click()
-      const name = brush === 'pen' ? 'Exact pen' : brush === 'stabilized' ? 'Autocorrection' : 'Expressive brush'
+      const name = brush === 'pen' ? 'Exact pen' : 'Autocorrection'
       await $(`.cs-brush-choices button[aria-label="${name}"]`).click()
       await browser.keys('Escape')
       if (collapsed) await browser.keys('Escape')
@@ -96,7 +96,7 @@ export async function verifyStraightStrokes(
   }
   const before = await shapeDocument()
   await $('button[aria-label="Undo"]').click()
-  await browser.waitUntil(async () => (await shapeDocument()).layers.length === initial + 3)
+  await browser.waitUntil(async () => (await shapeDocument()).layers.length === initial + 2)
   await $('button[aria-label="Redo"]').click()
   expect(await shapeDocument()).toEqual(before)
   await browser.performActions([

@@ -264,7 +264,7 @@ function rulerSchema(
     },
     icon: 'ruler',
     title: translate('toolRuler'),
-    hint: precisionText('Shift: 45° steps · Alt: configured angle step', 'Shift: шаг 45° · Alt: настраиваемый шаг угла'),
+    hint: '',
     controls: [
       {
         kind: 'color',

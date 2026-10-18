@@ -14,7 +14,7 @@ import { waitForStableCanvas } from '../canvas-ready'
 
 async function openSettings(): Promise<void> {
   await $('button[aria-label="Settings"], button[aria-label="Настройки"]').click()
-  await $('button[aria-label="Application settings…"], button[aria-label="Настройки приложения…"]').click()
+  await $('button[aria-label="Application settings"], button[aria-label="Настройки приложения"]').click()
   await browser.waitUntil(async () => (await browser.tauri.listWindows()).includes('settings'))
   await browser.tauri.switchWindow('settings')
   await $('#settings-language').selectByAttribute('value', 'en')
@@ -27,7 +27,7 @@ describe('persisted PNG filename settings', () => {
     this.timeout(180000)
     await browser.setWindowSize(1024, 700)
     await nativeImageIngress('picker')
-    await $('button[aria-label="Open image…"]').click()
+    await $('button[aria-label="Open image"]').click()
     await $('button[aria-label="Export"]').waitForEnabled()
     await waitForStableCanvas()
     await openSettings()

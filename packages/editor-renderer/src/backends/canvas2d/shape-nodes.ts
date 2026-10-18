@@ -18,6 +18,8 @@ function configureStroke(
   context.strokeStyle = cssColor(node.stroke!)
   context.lineWidth = node.strokeWidth ?? 1
   context.lineJoin = node.lineJoin ?? 'miter'
+  context.lineCap = node.lineCap ?? 'butt'
+  context.setLineDash(node.dash ? [...node.dash] : [])
 }
 
 export function drawRectNode2D(
@@ -49,6 +51,7 @@ export function drawEllipseNode2D(
   withTransform(context, node, node.centerX, node.centerY, () => {
     context.beginPath()
     context.ellipse(node.centerX, node.centerY, node.radiusX, node.radiusY, 0, 0, Math.PI * 2)
+    context.closePath()
     context.fillStyle = paintStyle(context, node.fill, resources)
     context.fill()
     if (!node.stroke || (node.strokeWidth ?? 0) <= 0) return

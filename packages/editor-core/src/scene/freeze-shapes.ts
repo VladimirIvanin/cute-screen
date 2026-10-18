@@ -44,6 +44,7 @@ export function freezeVectorNode(node: RenderVectorNode): RenderVectorNode {
 }
 
 export function freezeRectNode(node: RenderRectNode): RenderRectNode {
+  validateStrokeStyle(node)
   assertFinite(node.x, `${node.id}.x`)
   assertFinite(node.y, `${node.id}.y`)
   assertPositive(node.width, `${node.id}.width`)
@@ -61,10 +62,12 @@ export function freezeRectNode(node: RenderRectNode): RenderRectNode {
     ...node,
     fill: freezePaint(node.fill, `${node.id}.fill`),
     ...(node.stroke === undefined ? {} : { stroke: freezeColor(node.stroke) }),
+    ...(node.dash ? { dash: Object.freeze([...node.dash]) } : {}),
   })
 }
 
 export function freezeEllipseNode(node: RenderEllipseNode): RenderEllipseNode {
+  validateStrokeStyle(node)
   assertFinite(node.centerX, `${node.id}.centerX`)
   assertFinite(node.centerY, `${node.id}.centerY`)
   assertPositive(node.radiusX, `${node.id}.radiusX`)
@@ -76,6 +79,7 @@ export function freezeEllipseNode(node: RenderEllipseNode): RenderEllipseNode {
     ...node,
     fill: freezePaint(node.fill, `${node.id}.fill`),
     ...(node.stroke === undefined ? {} : { stroke: freezeColor(node.stroke) }),
+    ...(node.dash ? { dash: Object.freeze([...node.dash]) } : {}),
   })
 }
 
@@ -106,6 +110,7 @@ export function freezePathNode(node: RenderPathNode): RenderPathNode {
 }
 
 export function freezePolygonNode(node: RenderPolygonNode): RenderPolygonNode {
+  validateStrokeStyle(node)
   if (node.points.length < 3) throw new RangeError(`${node.id}.points must contain at least 3 entries`)
   if (node.strokeWidth !== undefined) assertNonNegative(node.strokeWidth, `${node.id}.strokeWidth`)
   const points = node.points.map((point, index) => {
@@ -118,6 +123,7 @@ export function freezePolygonNode(node: RenderPolygonNode): RenderPolygonNode {
     points: Object.freeze(points),
     fill: freezePaint(node.fill, `${node.id}.fill`),
     ...(node.stroke === undefined ? {} : { stroke: freezeColor(node.stroke) }),
+    ...(node.dash ? { dash: Object.freeze([...node.dash]) } : {}),
   })
 }
 
