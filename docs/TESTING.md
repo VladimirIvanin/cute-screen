@@ -1,5 +1,26 @@
 # Стратегия тестирования
 
+## Диагностический patch для Vitest 4.x (2026-10-18)
+
+Ubuntu 24.04.5 x86_64, Node 22.23.1, pnpm 10.33.2. Селектор patch изменён
+на `vitest@4`, файл переименован в `patches/vitest-worker-diagnostics.patch`.
+Содержимое и SHA-256 patch сохранены; зависимость остаётся Vitest 4.1.10.
+
+- `pnpm install --lockfile-only --no-frozen-lockfile --offline`, затем
+  `pnpm install --frozen-lockfile --offline` — passed.
+- `pnpm test:boundaries` — 13 files / 81 tests passed, включая настоящие
+  native exit 23 и SIGKILL и сохранение ненулевого exit у runner.
+- В отдельной копии package manifests/lockfile/patches имя compiled chunk
+  намеренно заменено на отсутствующее. После штатного обновления lockfile
+  `pnpm install --frozen-lockfile --offline --ignore-scripts` завершился
+  ошибкой `ERR_PNPM_PATCH_FAILED`. Диапазон 4 не отключает проверку применимости.
+
+Логи: `artifacts/vitest-patch-range/` — `lockfile.log`, `install.log`,
+`boundaries.log`, `incompatible-lockfile.log`, `incompatible-install.log`;
+форматирование и docs checks — `format.log`, `format-check.log`, `docs-check.log`.
+Другие версии 4.x не проверялись: смена hashed chunk может потребовать
+адаптации patch. Production behavior и зависимости приложения не меняются.
+
 ## Версия 0.1.3 (2026-10-18)
 
 Ubuntu 24.04.5 x86_64, Node 22.23.1, pnpm 10.33.2.

@@ -15,9 +15,9 @@ patchedDependencies:
   '@wdio/tauri-service@1.3.0':
     hash: e25f62efc765304c93c68c85ac261383b3b0a1a5cf8d1f1e60a155a0be82faf6
     path: patches/@wdio__tauri-service@1.3.0.patch
-  vitest@4.1.10:
+  vitest@4:
     hash: 47c7704fb72f5715207ad27309918e89ce79765ca48913f19f8c1a8937f0e35c
-    path: patches/vitest@4.1.10.patch
+    path: patches/vitest-worker-diagnostics.patch
 
 importers:
 
