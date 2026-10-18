@@ -25,6 +25,13 @@ zeroes, installer-compatible диапазон компонентов 0..65535, �
 workflow_call и проверяет тот же SHA. Его ошибка блокирует полный комплект
 и draft; успешный compile не заменяет quality gate.
 
+В reusable CI core/coverage/render/perf/Rust, browser E2E и real Tauri E2E
+выполняются на отдельных Ubuntu 24.04 VM одного SHA. Все jobs обязательны;
+разделение устраняет общий 60-минутный лимит последовательного прогона.
+Кэши core tests, browser tests, fake-platform/test-harness и production
+разделены. Linux native E2E устанавливает tauri-driver 2.1.0 и использует
+WebKitWebDriver под Xvfb/X11; тестовые features не попадают в установщики.
+
 Installer assets называются `cute-screen-<version>-<os>-<arch>.<extension>`.
 Рядом находятся SHA256SUMS, manifest.json, CycloneDX 1.6 SBOM, npm/Cargo/font
 license report, copyright bundled Linux libraries, package verification и

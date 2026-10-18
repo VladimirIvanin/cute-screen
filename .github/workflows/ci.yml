@@ -28,43 +28,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
-      - name: Install Node
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      - uses: ./.github/actions/ci-linux-setup
         with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Activate pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@${PNPM_VERSION} --activate
-
-      - name: Install Rust
-        run: |
-          rustup toolchain install "${RUST_VERSION}" --profile minimal --component clippy,rustfmt
-          rustup default "${RUST_VERSION}"
-
-      - name: Install Tauri system dependencies
-        run: |
-          bash scripts/ci-install-linux-tauri-deps.sh \
-            build-essential curl file libayatana-appindicator3-dev librsvg2-dev \
-            libssl-dev libwebkit2gtk-4.1-dev libxdo-dev webkit2gtk-driver wget xvfb
-
-      - name: Resolve pnpm store
-        id: pnpm-store
-        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
-
-      - name: Cache pnpm and Cargo
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
-        with:
-          path: |
-            ${{ steps.pnpm-store.outputs.path }}
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: m00-${{ runner.os }}-${{ runner.arch }}-node-${{ env.NODE_VERSION }}-rust-${{ env.RUST_VERSION }}-${{ hashFiles('pnpm-lock.yaml', 'Cargo.lock') }}
-
-      - name: Install JavaScript dependencies
-        run: pnpm install --frozen-lockfile
+          cache-scope: core-tests
 
       - name: Check frontend, Rust and documentation
         run: pnpm check
@@ -93,12 +59,6 @@ jobs:
           cargo install cargo-deny --version "=${CARGO_DENY_VERSION}" --locked
           cargo deny check
 
-      - name: Run browser E2E
-        run: pnpm test:e2e:browser
-
-      - name: Run real Tauri E2E
-        run: xvfb-run --auto-servernum pnpm test:e2e:tauri
-
       - name: Verify production excludes test drivers
         run: pnpm verify:release-boundary
 
@@ -122,6 +82,57 @@ jobs:
             artifacts
             coverage
           if-no-files-found: ignore
+          retention-days: 14
+
+  browser-e2e:
+    name: Browser E2E
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: ./.github/actions/ci-linux-setup
+        with:
+          cache-scope: browser-tests
+      - name: Build packages and fixtures
+        run: |
+          pnpm build:packages
+          pnpm fixtures:generate:m01
+      - name: Run browser E2E
+        env:
+          CUTE_SCREEN_BROWSER_E2E_HEADLESS: '1'
+          CUTE_SCREEN_E2E_DISABLE_WATCH: '1'
+        run: pnpm test:e2e:browser
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: browser-e2e-${{ github.run_id }}
+          path: artifacts/browser-e2e
+          if-no-files-found: warn
+          retention-days: 14
+
+  tauri-e2e:
+    name: Real Tauri WebView E2E
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: ./.github/actions/ci-linux-setup
+        with:
+          cache-scope: fake-platform-test-harness
+      - name: Install pinned external WebDriver
+        run: |
+          cargo install tauri-driver --version '=2.1.0' --locked
+          bash scripts/ci-install-linux-tauri-deps.sh xdotool xfwm4 xfce4-panel python3-gi dbus-x11
+      - name: Run real Tauri E2E
+        run: xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' dbus-run-session -- env XDG_SESSION_TYPE=x11 bash scripts/ci-tauri-x11-session.sh
+      - name: Upload native WebView evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: tauri-e2e-${{ github.run_id }}
+          path: artifacts/tauri-e2e
+          if-no-files-found: warn
           retention-days: 14
 
   compile:

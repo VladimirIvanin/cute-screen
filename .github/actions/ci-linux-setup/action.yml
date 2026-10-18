@@ -1,0 +1,51 @@
+name: Linux CI environment
+description: Install the pinned test toolchain and native WebView dependencies
+inputs:
+  cache-scope:
+    description: Keep production, core tests and WebView harness builds separate
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Install Node
+      uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: Activate pnpm
+      shell: bash
+      run: |
+        corepack enable
+        corepack prepare pnpm@${PNPM_VERSION} --activate
+
+    - name: Install Rust
+      shell: bash
+      run: |
+        rustup toolchain install "${RUST_VERSION}" --profile minimal --component clippy,rustfmt
+        rustup default "${RUST_VERSION}"
+
+    - name: Install Tauri system dependencies
+      shell: bash
+      run: |
+        bash scripts/ci-install-linux-tauri-deps.sh \
+          build-essential curl file libayatana-appindicator3-dev librsvg2-dev \
+          libssl-dev libwebkit2gtk-4.1-dev libxdo-dev webkit2gtk-driver wget xvfb
+
+    - name: Resolve pnpm store
+      id: pnpm-store
+      shell: bash
+      run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+    - name: Cache pnpm and Cargo
+      uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+      with:
+        path: |
+          ${{ steps.pnpm-store.outputs.path }}
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: m00-${{ inputs.cache-scope }}-ubuntu-24.04-${{ runner.os }}-${{ runner.arch }}-node-${{ env.NODE_VERSION }}-rust-${{ env.RUST_VERSION }}-${{ hashFiles('pnpm-lock.yaml', 'Cargo.lock') }}
+
+    - name: Install JavaScript dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile
