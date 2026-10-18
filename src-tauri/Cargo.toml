@@ -33,6 +33,8 @@ required-features = ["platform-smoke"]
 [[bin]]
 name = "desktop-ipc-codegen"
 path = "src/bin/desktop-ipc-codegen.rs"
+# Tauri bundles every enabled [[bin]] into the app; keep the dev tool out.
+required-features = ["ipc-codegen"]
 
 [build-dependencies]
 tauri-build = { version = "=2.6.3", features = [] }
@@ -98,6 +100,7 @@ rusqlite = { version = "=0.40.2", features = ["bundled"] }
 default = ["x11-capture"]
 custom-protocol = ["tauri/custom-protocol"]
 fake-platform = []
+ipc-codegen = []
 platform-smoke = []
 x11-capture = ["dep:x11rb"]
 test-harness = [
