@@ -94,6 +94,16 @@ export function checkGlibc(output) {
   return versions.map((parts) => parts.join('.'))
 }
 
+export function checkMacMinimum(output) {
+  const minima = [...output.matchAll(
+    /cmd (?:LC_BUILD_VERSION|LC_VERSION_MIN_MACOSX)[\s\S]*?\n\s*(?:minos|version) (\d+\.\d+(?:\.\d+)?)/gu,
+  )].map((match) => match[1])
+  if (minima.length !== 2 || minima.some((minimum) => !/^12\.0(?:\.0)?$/u.test(minimum))) {
+    throw new Error(`Every universal slice must target macOS 12.0: ${minima.join(', ')}`)
+  }
+  return minima
+}
+
 export function validateResources(
   info,
   version,

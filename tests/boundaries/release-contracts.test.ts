@@ -7,6 +7,7 @@ import {
   assertArchitecture,
   assertDraftUpdate,
   checkGlibc,
+  checkMacMinimum,
   packageNames,
   sha256,
   stableVersion,
@@ -84,6 +85,15 @@ describe('release inputs and final artifact contracts', () => {
     expect(checkGlibc('Name: GLIBC_2.17\nName: GLIBC_2.35')).toEqual(['2.17', '2.35'])
     expect(() => checkGlibc('Name: GLIBC_2.36')).toThrow('baseline')
     expect(() => checkGlibc('Name: GLIBC_ABI_DT_RELR')).toThrow('ABI')
+  })
+
+  it('checks both modern and legacy Mach-O deployment commands, ignoring dylib version numbers', () => {
+    const headers = 'cmd LC_BUILD_VERSION\ncmdsize 32\nplatform 1\nminos 12.0\nsdk 15.5\n'
+      + 'cmd LC_LOAD_DYLIB\ncurrent version 999.0\n'
+      + 'cmd LC_VERSION_MIN_MACOSX\ncmdsize 16\nversion 12.0\nsdk 15.5\n'
+    expect(checkMacMinimum(headers)).toEqual(['12.0', '12.0'])
+    expect(() => checkMacMinimum(headers.replace('version 12.0', 'version 13.0'))).toThrow('Every universal slice')
+    expect(() => checkMacMinimum('cmd LC_BUILD_VERSION\nminos 12.0')).toThrow('Every universal slice')
   })
 
   it('rejects missing or altered embedded resources and test-feature builds', () => {

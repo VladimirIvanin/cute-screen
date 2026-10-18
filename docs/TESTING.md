@@ -15,7 +15,7 @@ Windows x64, Node 22.23.1, pnpm 10.33.2, Rust 1.97.0 MSVC.
 - `actionlint 1.7.12 .github/workflows/release.yml .github/workflows/ci.yml`
   — passed; binary из upstream Release проверен по SHA-256 checksums.
 - Red-first resource contract: `rustc +1.97.0-x86_64-pc-windows-msvc --test
-  src-tauri/src/release_info.rs --emit=metadata -o artifacts/release-red.rmeta`
+src-tauri/src/release_info.rs --emit=metadata -o artifacts/release-red.rmeta`
   — expected E0425 до реализации `asset_summary`. Первый Cargo run выбрал
   установленный GNU toolchain и остановился на отсутствующем dlltool; локальные
   последующие команды явно используют RUSTUP_TOOLCHAIN 1.97.0 MSVC и VS DevShell.

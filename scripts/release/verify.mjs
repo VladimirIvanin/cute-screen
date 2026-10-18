@@ -11,6 +11,7 @@ import process from 'node:process'
 import {
   assertArchitecture,
   checkGlibc,
+  checkMacMinimum,
   forbidden,
   targets,
   validateResources,
@@ -122,12 +123,7 @@ async function macPackage(
     const minimum = run('/usr/libexec/PlistBuddy', ['-c', 'Print :LSMinimumSystemVersion', path.join(app, 'Contents/Info.plist')])
     if (minimum !== '12.0') throw new Error(`DMG minimum macOS differs from 12.0: ${minimum}`)
     const headers = run('otool', ['-arch', 'all', '-l', executable])
-    const minima = [...headers.matchAll(/(?:minos|version) (\d+\.\d+(?:\.\d+)?)/gu)].map((match) => match[1])
-    // LC_BUILD_VERSION uses minos; LC_VERSION_MIN_MACOSX uses version.
-    if (!headers.includes('minos 12.0') && !headers.includes('version 12.0')) throw new Error('Mach-O lacks macOS 12.0 deployment target')
-    for (const match of headers.matchAll(/minos (\d+\.\d+(?:\.\d+)?)/gu)) {
-      if (!/^12\.0(?:\.0)?$/u.test(match[1])) throw new Error(`Mach-O slice minimum differs from 12.0: ${match[1]}`)
-    }
+    const minima = checkMacMinimum(headers)
     return { ...await inspectExecutable(executable, (args) => run(executable, args), id, version, frontend),
       codesign: 'verified ad-hoc', signature, minimum, minima, hostArchitecture: process.arch,
       packagedFiles: await inventory(app) }

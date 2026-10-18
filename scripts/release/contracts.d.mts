@@ -31,6 +31,7 @@ export function sha256(bytes: Buffer): string
 export function architectures(bytes: Buffer): string[]
 export function assertArchitecture(bytes: Buffer, id: string): string[]
 export function checkGlibc(output: string): string[]
+export function checkMacMinimum(output: string): string[]
 export function validateResources(info: ResourceInfo, version: string, frontend: ReleaseAsset[]): void
 export function validateManifest(manifest: PackageManifest, files: Map<string, Buffer>): void
 export function assertDraftUpdate(
