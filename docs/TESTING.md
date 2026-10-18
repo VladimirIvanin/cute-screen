@@ -1,5 +1,46 @@
 # Стратегия тестирования
 
+## Наблюдаемость Vitest worker crash (2026-10-18)
+
+Исходный [Release job](https://github.com/VladimirIvanin/cute-screen/actions/runs/39144900736/job/117726702110)
+на commit `0c194cf` завершился с 152/153 files, 1368/1372 tests и
+`Worker exited unexpectedly`. Присланный расширенный log обрывается до итогового
+отчёта. Среди renderer suites отсутствует `tool-settings-rendering.test.ts`
+с четырьмя tests; это кандидат, а не доказанная причина аварии. Exit signal,
+OOM и native stack в доступных логах отсутствуют.
+
+Ubuntu 24.04.5 x86_64, Node 22.23.1, pnpm 10.33.2, Vitest 4.1.10:
+
+- До patch: `pnpm test:coverage --reporter=verbose --reporter=json --outputFile=artifacts/coverage-worker-0.1.2/results.json`
+  — 153 files / 1372 tests passed, 138.00 s, без unhandled errors.
+- `pnpm exec vitest run --coverage --project renderer packages/editor-renderer/src/tool-settings-rendering.test.ts --reporter=verbose`
+  — 12 последовательных прогонов по 4/4 passed; исходный crash не повторился.
+- В локальном `cute-screen-ubuntu22-build:local`, Ubuntu 22.04, с теми же
+  Node/pnpm выполнен тот же focused coverage с отдельным reportsDirectory:
+  4/4 passed. Это container-проверка, а не новый hosted CI pass.
+- Red: новый `vitest-worker-diagnostics.test.ts` запускает настоящий fork;
+  исходный Vitest теряет signal/assigned file при SIGKILL. Green после pnpm
+  patch: `pnpm test:boundaries` — 13 files / 81 tests passed. Native exit 23
+  обходит Vitest process.exit guard через `process.reallyExit`; SIGKILL case
+  выполняется только на Unix. Обе аварии сохраняют exit 1 у внешнего runner;
+  обычные success/assertion failure не получают ложную worker error.
+- `pnpm install --frozen-lockfile --offline` — passed; lockfile фиксирует
+  patch hash, версии зависимостей не меняются.
+- После patch в том же Ubuntu 22.04 container:
+  `pnpm test:coverage --coverage.reportsDirectory=artifacts/coverage-worker-0.1.2/jammy-full-coverage`
+  — 153 files / 1372 tests passed, 134.90 s, без unhandled errors.
+- `pnpm lint` — passed с 85 warnings вне этой правки; `pnpm typecheck`,
+  `pnpm format`, `pnpm format:check`, `pnpm docs:check` и `git diff --check`
+  — passed на Ubuntu 24.04.5. Native builds, Rust, render/perf harnesses и E2E
+  в этом диагностическом срезе не запускались.
+
+Артефакты: `artifacts/coverage-worker-0.1.2/` — `baseline.log`, `results.json`,
+`spotlight/run-*.log`, `jammy-spotlight.log`, `diagnostic-red.log`,
+`diagnostic-green.log`, `install.log`, `jammy-full.log`, `lint.log`,
+`typecheck.log`, `format.log`, `format-check.log`, `docs-check.log`.
+Patch устраняет потерю диагностики;
+первопричина исходного CI crash остаётся неустановленной.
+
 ## Версия 0.1.2 (2026-10-18)
 
 Ubuntu 24.04.5 x86_64, Node 22.23.1, pnpm 10.33.2.

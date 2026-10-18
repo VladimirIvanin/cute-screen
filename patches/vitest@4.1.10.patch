@@ -1,0 +1,31 @@
+diff --git a/dist/chunks/cli-api.BK8pd4xc.js b/dist/chunks/cli-api.BK8pd4xc.js
+index 1fbd189a39af6fbc5dac2d572ce1e414e52afdfa..9ab3442e33fda6aafa80cab51c3e0fd1d41f5dd1 100644
+--- a/dist/chunks/cli-api.BK8pd4xc.js
++++ b/dist/chunks/cli-api.BK8pd4xc.js
+@@ -2799,6 +2799,7 @@ class PoolRunner {
+ 	poolId = void 0;
+ 	project;
+ 	environment;
++	_lastTestFiles = [];
+ 	_state = RunnerState.IDLE;
+ 	_operationLock = null;
+ 	_terminatePromise = createDefer();
+@@ -2874,6 +2875,7 @@ class PoolRunner {
+ 		return span;
+ 	}
+ 	request(method, context) {
++		this._lastTestFiles = context.files.map((file) => file.filepath);
+ 		this._otel?.files.push(...context.files.map((f) => f.filepath));
+ 		return this.postMessage({
+ 			__vitest_worker_request__: true,
+@@ -3019,8 +3021,8 @@ class PoolRunner {
+ 			this._eventEmitter.emit("error", error);
+ 		}
+ 	};
+-	emitUnexpectedExit = () => {
+-		const error = /* @__PURE__ */ new Error("Worker exited unexpectedly");
++	emitUnexpectedExit = (code, signal) => {
++		const error = new Error(`Worker exited unexpectedly (code: ${code ?? "none"}, signal: ${signal ?? "none"}, project: ${this.project.name || "default"}, state: ${this._state}). Test files: ${this._lastTestFiles.join(", ") || "(not assigned)"}`);
+ 		this._state = RunnerState.STOPPED;
+ 		this._eventEmitter.emit("error", error);
+ 	};

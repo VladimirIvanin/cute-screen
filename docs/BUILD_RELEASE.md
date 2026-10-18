@@ -344,6 +344,13 @@ gates: число CPU не учитывает память jsdom, native Canvas2
 Для отдельного диагностического запуска число workers можно явно изменить
 через `--maxWorkers`; CI использует общий default без override.
 
+Vitest 4.1.10 использует закреплённый pnpm patch
+`patches/vitest@4.1.10.patch`: аварийный выход worker сообщает project,
+последние назначенные test files, exit code и signal. Patch меняет только
+сообщение ошибки; авария по-прежнему завершает gate с ненулевым кодом.
+`pnpm test:boundaries` проверяет настоящий native exit и, на Unix, SIGKILL,
+а также успешный тест и обычный assertion failure.
+
 Linux jobs не используют `azure.archive.ubuntu.com` как первый apt-mirror:
 hosted Ubuntu runners могут зависнуть на нём на десятки минут и сжечь
 `timeout-minutes` ещё на `apt-get update`. Установка Tauri-зависимостей идёт
