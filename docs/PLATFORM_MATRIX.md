@@ -23,8 +23,8 @@ PNG decode. Локально Xvfb отсутствует, hosted Xvfb pass не 
 ## Release assets (2026-10-18, ADR-111)
 
 Build matrix: Ubuntu 22.04 x64/ARM64 DEB/AppImage; Windows native x64/ARM64
-unsigned NSIS; macOS 15 Apple Silicon собирает universal DMG и проверяет
-`lipo -verify_arch x86_64 arm64`. Один DMG поддерживает Intel и Apple Silicon;
+unsigned NSIS; macOS 15 Apple Silicon собирает universal DMG (`--bundles app,dmg`)
+и проверяет `lipo <Mach-O> -verify_arch x86_64 arm64`. Один DMG поддерживает Intel и Apple Silicon;
 это не отдельная Intel runtime acceptance. Linux packages сохраняют CI ABI
 и extracted-package CLI gates. Windows выполняет executable CLI smoke;
 macOS — CLI и DMG image verification. Полный install/capture/export, macOS Intel

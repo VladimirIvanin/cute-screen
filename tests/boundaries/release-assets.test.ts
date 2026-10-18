@@ -144,6 +144,21 @@ it('requires repository identity and credentials before contacting GitHub', asyn
   expect(github.calls).toEqual([])
 })
 
+it('keeps the macOS app bundle and passes the Mach-O path before lipo -verify_arch in release.yml', async () => {
+  const workflow = await readFile(
+    path.join(process.cwd(), '.github', 'workflows', 'release.yml'),
+    'utf8',
+  )
+
+  expect(workflow).toContain(
+    'pnpm tauri build --target universal-apple-darwin --bundles app,dmg -- --locked',
+  )
+  expect(workflow).toContain(
+    'lipo "target/universal-apple-darwin/release/bundle/macos/Cute Screen.app/Contents/MacOS/cute-screen" -verify_arch x86_64 arm64',
+  )
+  expect(workflow).not.toMatch(/lipo\s+-verify_arch\b/u)
+})
+
 function githubStub({
   exists = true,
   conflict = false,

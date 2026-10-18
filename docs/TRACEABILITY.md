@@ -1,5 +1,17 @@
 # Трассируемость требований
 
+## Проверка архитектур universal DMG в release workflow (2026-10-18)
+
+`REQ-REL-002`, `REQ-REL-006`: шаг `Build macOS universal DMG` в
+`.github/workflows/release.yml` должен сохранять `.app` bundle (`--bundles app,dmg`)
+и передавать путь к Mach-O бинарнику первым позиционным аргументом `lipo` перед
+вариантной командой `-verify_arch x86_64 arm64`. При `--bundles dmg` Tauri
+удаляет промежуточный `Cute Screen.app` после `bundle_dmg.sh`, а при постановке
+пути после `-verify_arch x86_64 arm64` утилита `lipo` интерпретирует путь как
+третий флаг архитектуры и завершается с кодом 1. Реализовано; boundary
+`release-assets.test.ts` (16/16) и `pnpm test:boundaries` (82/82) passed.
+Команды и результаты — TESTING.md.
+
 ## Версия 0.1.4 (2026-10-18)
 
 `REQ-REL-001/002/003/005`: штатной командой `pnpm version:bump 0.1.4`

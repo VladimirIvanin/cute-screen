@@ -8,7 +8,7 @@
 и `target/debug/cute-screen --help`. Отдельно выполнить штатный
 `pnpm verify:release-boundary` и universal DMG build из release workflow.
 Не должно быть undefined `__isPlatformVersionAtLeast`; обе архитектуры DMG
-должны пройти существующий `lipo -verify_arch`. Native smoke и проверка
+должны пройти `lipo <input_file> -verify_arch x86_64 arm64`. Native smoke и проверка
 Screen Recording остаются отдельными gates. Исправленный macOS run pending;
 локальный Linux pass не закрывает эту приёмку.
 

@@ -144,8 +144,8 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           rustup target add x86_64-apple-darwin aarch64-apple-darwin
-          pnpm tauri build --target universal-apple-darwin --bundles dmg -- --locked
-          lipo -verify_arch x86_64 arm64 "target/universal-apple-darwin/release/bundle/macos/Cute Screen.app/Contents/MacOS/cute-screen"
+          pnpm tauri build --target universal-apple-darwin --bundles app,dmg -- --locked
+          lipo "target/universal-apple-darwin/release/bundle/macos/Cute Screen.app/Contents/MacOS/cute-screen" -verify_arch x86_64 arm64
           target/universal-apple-darwin/release/cute-screen --help
           hdiutil verify target/universal-apple-darwin/release/bundle/dmg/*.dmg
 

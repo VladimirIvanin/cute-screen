@@ -1,5 +1,34 @@
 # Стратегия тестирования
 
+## Проверка `lipo` и сохранения `.app` в macOS release workflow (2026-10-18)
+
+Red evidence: лог `Package macos-universal` на commit `f12695f` (`v0.1.4`):
+
+- `pnpm tauri build --target universal-apple-darwin --bundles dmg -- --locked`
+  успешно собрал universal Mach-O и DMG, после чего удалил промежуточный
+  `target/universal-apple-darwin/release/bundle/macos/Cute Screen.app`
+  (`Cleaning .../Cute Screen.app`);
+- следующая строка
+  `lipo -verify_arch x86_64 arm64 "target/universal-apple-darwin/release/bundle/macos/Cute Screen.app/Contents/MacOS/cute-screen"`
+  упала с `unknown architecture specification flag: ... in specifying -verify_arch operation`,
+  так как `lipo <input_file> -verify_arch <arch_type> ...` считает все аргументы
+  после `-verify_arch` именами архитектур.
+
+Исправление в `.github/workflows/release.yml`:
+
+- сборка использует `--bundles app,dmg`, чтобы `Cute Screen.app` не удалялся
+  после `bundle_dmg.sh` (`prepareReleaseAssets` для `macos-universal` по-прежнему
+  собирает только `.dmg`);
+- вызов исправлен на
+  `lipo "target/universal-apple-darwin/release/bundle/macos/Cute Screen.app/Contents/MacOS/cute-screen" -verify_arch x86_64 arm64`.
+
+Локальная проверка (macOS 12.7.6 x86_64, Darwin 21.6.0, Node 22.23.1, pnpm 10.33.2):
+
+- Red/Green: `pnpm exec vitest run --project boundaries tests/boundaries/release-assets.test.ts`
+  — 16/16 passed;
+- `pnpm test:boundaries` — 13 files / 82 tests passed;
+- `pnpm format`, `pnpm format:check`, `pnpm docs:check` и `git diff --check` — passed.
+
 ## Версия 0.1.4 (2026-10-18)
 
 Ubuntu 24.04.5 x86_64, Node 22.23.1, pnpm 10.33.2.
