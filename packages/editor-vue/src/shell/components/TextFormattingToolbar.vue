@@ -52,6 +52,7 @@ const toolbarRoot = ref<HTMLElement>()
 let toolbarObserver: ResizeObserver | undefined
 const colorPicker = ref<InstanceType<typeof SimpleColorPicker>>()
 const fontPicker = ref<InstanceType<typeof TextFontPicker>>()
+const widthPicker = ref<InstanceType<typeof CalloutWidthControl>>()
 const unregisterBackground = numericPreview?.register(backgroundOwner, () => {
   if (textBackgroundOpen.value) closeTextBackground()
 })
@@ -145,6 +146,7 @@ function validTextBackground(value: typeof textBackgroundDraft.value): boolean {
 }
 
 function closeOtherPopovers(except?: 'color' | 'font' | 'size' | 'background' | 'width'): void {
+  if (except !== 'width') widthPicker.value?.close(false)
   if (except !== 'color') colorPicker.value?.close()
   if (except !== 'font') fontPicker.value?.close()
   if (except !== 'size' && textSizeOpen.value) closeTextSize()
@@ -258,6 +260,7 @@ onBeforeUnmount(() => {
   >
     <CalloutWidthControl
       v-if="text.calloutWidth"
+      ref="widthPicker"
       :width="text.calloutWidth"
       :locale="pickerLocale"
       :disabled="blocked"

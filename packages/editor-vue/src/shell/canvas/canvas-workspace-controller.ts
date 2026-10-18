@@ -454,7 +454,15 @@ export class CanvasWorkspaceController {
       textEditor: this.#textEditor,
       gesture: () => this.#gesture,
       setGesture: (gesture) => {
+        const wasChangingFrame = this.#gesture?.kind === 'crop' || this.#gesture?.kind === 'quickSelect'
+        const changingFrame = gesture?.kind === 'crop' || gesture?.kind === 'quickSelect'
         this.#gesture = gesture
+        if (this.#props.quickFrameMode && wasChangingFrame !== changingFrame) {
+          this.#state.scene.value?.dispatchEvent(new CustomEvent('cs-quick-frame-gesture', {
+            bubbles: true,
+            detail: changingFrame,
+          }))
+        }
       },
       setRulerGuide: (guide) => {
         this.#rulerGuide = guide

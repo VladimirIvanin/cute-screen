@@ -10,6 +10,7 @@ export function useQuickChromeLayout(controller: QuickCaptureLayoutController) {
   let observer: ResizeObserver | undefined
   let frame: number | undefined
   let canvasGesture = false
+  let frameRoot: HTMLElement | undefined
   const observed = new WeakSet<Element>()
 
   function update(crop?: QuickRect): string | undefined {
@@ -35,21 +36,35 @@ export function useQuickChromeLayout(controller: QuickCaptureLayoutController) {
     canvasGesture = false
     schedule()
   }
+  function frameGesture(event: Event): void {
+    if (!(event.target instanceof Element)) return
+    const root = event.target.closest<HTMLElement>('.cs-quick-capture')
+    if (!root) return
+    const active = (event as CustomEvent<boolean>).detail
+    root.classList.toggle('is-changing-frame', active)
+    frameRoot = active ? root : undefined
+    if (!active) finish()
+  }
   onMounted(() => {
     if (typeof ResizeObserver !== 'undefined') observer = new ResizeObserver(schedule)
     document.addEventListener('cs-preview-layout', schedule)
     document.addEventListener('pointerdown', start, true)
+    document.addEventListener('cs-quick-frame-gesture', frameGesture)
     window.addEventListener('pointerup', finish)
     window.addEventListener('pointercancel', finish)
+    window.addEventListener('blur', finish)
     window.addEventListener('resize', schedule)
   })
   onBeforeUnmount(() => {
     observer?.disconnect()
     if (frame !== undefined) cancelAnimationFrame(frame)
+    frameRoot?.classList.remove('is-changing-frame')
     document.removeEventListener('cs-preview-layout', schedule)
     document.removeEventListener('pointerdown', start, true)
+    document.removeEventListener('cs-quick-frame-gesture', frameGesture)
     window.removeEventListener('pointerup', finish)
     window.removeEventListener('pointercancel', finish)
+    window.removeEventListener('blur', finish)
     window.removeEventListener('resize', schedule)
   })
   return update

@@ -1679,7 +1679,7 @@ platform evidence и известные ограничения — в `TESTING.m
 
 ## ADR-065 — Измеряемая подпись выноски
 
-**Статус:** superseded in label side/attachment by [ADR-087](#adr-087-управляемая-линия-и-оболочка-выноски); remaining measurement/sizing accepted; supersedes ADR-032 in label placement/sizing only.
+**Статус:** superseded in label side/attachment by [ADR-087](#adr-087-управляемая-линия-и-оболочка-выноски), in width control presentation by [ADR-103](#adr-103-ширина-подписи-выноски-в-выпадающей-панели); remaining measurement/sizing accepted; supersedes ADR-032 in label placement/sizing only.
 
 **Контекст:** callout inline editor retained a one-em width and always opened to
 its label's right. Character-count bounds disagreed with glyph metrics and reopening.
@@ -2024,6 +2024,26 @@ Failure допускает retry; после durable commit повторный H
 X11 restoration regression и Windows real-WebView Quick → history → restart
 с декодированием изображения и проверкой слоёв; результаты — TESTING.md.
 
+## ADR-102 — Скрытие chrome во время изменения Quick-рамки
+
+**Статус:** accepted (2026-10-18); дополняет ADR-069 и ADR-096.
+
+**Контекст:** замороженные позиции тулбаров при resize узкой области оставляли
+панели поверх изображения и мешали оценить границы снимка.
+
+**Решение:** canvas controller сообщает DOM-событием только начало и конец
+Quick frame gesture (initial selection/move/resize). Quick chrome становится
+невидимым до pointerup либо отмены; mounted controls сохраняют размеры для
+layout. После жеста размещение пересчитывается у committed crop. Escape
+активного Quick resize перехватывается до terminal Close. Аннотации и Crop
+полного редактора сохраняют прежнюю видимость. Pointermove не создаёт новых
+реактивных UI updates; EditorCommand, undo/redo, document и IPC не меняются.
+
+**Проверяемое основание:** mounted resize проверяет pointerup/pointercancel,
+Escape/blur и отсутствие сигнала при рисовании. Real WebView Capture → Quick
+проверяет hidden chrome при удерживаемом native pointer, возврат панелей,
+undo/redo и Escape без закрытия Quick. Результаты — TESTING.md.
+
 ## ADR-101 — Встроенные эмоджи Noto 2D
 
 **Статус:** accepted (2026-10-18); дополняет ADR-025 и ADR-069.
@@ -2045,3 +2065,22 @@ blobs и native IPC не изменяются. Новая версия доку�
 **Проверяемое основание:** red-first emoji core contracts; checksum и pixel decode
 всех 100 SVG; экспорт с повторным декодированием; production browser и Tauri
 scenarios emoji/emoji-reopen. Фактические результаты и ограничения — TESTING.md.
+
+## ADR-103 — Ширина подписи выноски в выпадающей панели
+
+**Статус:** accepted; supersedes width control presentation in ADR-065.
+
+**Контекст:** числовое поле и отдельное «Авто» перегружают inline-панель,
+нарушают единый ряд controls и не объясняют автоматический режим.
+
+**Решение:** одна кнопка «Ширина» с текущим режимом и chevron открывает
+компактный dropdown. «По содержимому» объясняет автоматический рост и перенос;
+ниже доступна ручная ширина в px. Новый текст сохраняет auto-size. Dropdown
+использует общий preview-placement и transient owner; Escape отменяет draft,
+закрывает только этот уровень и возвращает focus. Read-only закрывает панель.
+Sizing, schema, EditorCommand, inline commit и undo/redo не меняются.
+
+**Проверяемое основание:** регрессия Vue проверяет hidden numeric field,
+режимы, минимум, cancel/focus, взаимное закрытие и disabled. Browser drag-flow
+проверяет RU/EN, обе темы, 1024 px и zoom с видимой подписью и dropdown.
+Фактические результаты и ограничения WebView — TESTING.md.

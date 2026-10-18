@@ -1,5 +1,24 @@
 # Платформенная матрица
 
+## Компактная ширина выноски (2026-10-18, ADR-103)
+
+Windows 10 x64: Vue 14/14 passed; Chrome 155.0.8059.80 — все 12 сочетаний
+RU/EN × light/dark × zoom 50/100/200 при 1024 px, dropdown не пересекает
+inline text. WebView2 155.0.4283.45 / external tauri-driver — production
+Capture → non-origin Quick → Callout width/manual/cancel/auto → Editor,
+1/1 passed на окончательной сборке. PNG просмотрены. Команды и ограничения
+общих architecture gates — TESTING.md. Linux/WebKitGTK и macOS/WKWebView
+runtime pending; native physical capture гарантии не расширяются.
+
+## Chrome при изменении Quick-рамки (2026-10-18, ADR-102)
+
+Windows 10 x64 / WebView2 155.0.4283.45: 7/7 Quick chrome scenarios passed
+через external driver и свежую сборку. Held native resize скрывает панели,
+release/Escape возвращают их, undo/redo сохраняет crop. Mounted Vue 42/42
+включает pointercancel/blur. Скриншоты просмотрены; команды — TESTING.md.
+Fake capture проверяет UI lifecycle; physical capture гарантии не расширяются.
+Linux/WebKitGTK, macOS/WKWebView и отдельный browser mode не запускались.
+
 ## Общая тема окна настроек (2026-10-18)
 
 Windows 10 x64, WebView2 155.0.4283.45 / external tauri-driver:

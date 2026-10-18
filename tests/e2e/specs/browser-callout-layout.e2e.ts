@@ -35,7 +35,8 @@ describe('Callout mixed font metrics', () => {
     await $('button[aria-label="Font size"]').click()
     await $('.cs-text-size-popover').$('button=48').click()
     await browser.keys('Escape')
-    await setNumericInput($('.cs-callout-width-control input'), '110')
+    await $('.cs-callout-width-control > button').click()
+    await setNumericInput($('.cs-callout-width-popover input'), '110')
     await browser.keys('Enter')
     const dimensions = await browser.execute(() => {
       const editor = document.querySelector<HTMLElement>('[aria-label="Callout editor"]')!
@@ -44,6 +45,7 @@ describe('Callout mixed font metrics', () => {
     })
     expect(dimensions.breaks).toBeGreaterThan(1)
     expect(dimensions.center).toBeCloseTo(400, 0)
+    await browser.keys('Escape')
     await editor.click()
     await browser.keys('Escape')
   })

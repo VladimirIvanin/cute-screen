@@ -1,5 +1,127 @@
 # Стратегия тестирования
 
+## Компактная ширина выноски (2026-10-18, ADR-103)
+
+Windows 10 x64 / PowerShell, Node 22.23.1, pnpm 10.33.2.
+
+- `pnpm test tests/unit/vue/text-context-toolbar.test.ts tests/unit/vue/callout-toolbar.test.ts`:
+  14/14 passed. Hidden numeric field, минимум, commit/cancel, focus return,
+  auto/manual, взаимоисключение popover и read-only:
+  `artifacts/callout-width-unit-final.log`.
+- `$env:CUTE_SCREEN_BROWSER_E2E_PORT='5194'; $env:CUTE_SCREEN_BROWSER_E2E_HEADLESS='1'; $env:CUTE_SCREEN_E2E_DISABLE_WATCH='1'; pnpm test:e2e:browser --spec tests/e2e/specs/browser-callout-visual.e2e.ts`:
+  Chrome 155.0.8059.80, 1/1 passed, все 12 сочетаний RU/EN × light/dark ×
+  50/100/200%, окно 1024×700. Проверены bounds toolbar/dropdown и отсутствие
+  перекрытия inline текста. PNG `artifacts/browser-e2e/callout-ru-light-200.png`
+  просмотрен: dropdown над toolbar, текст полностью виден.
+  Лог: `artifacts/callout-width-browser-visual-final.log`.
+- `pnpm test:e2e:browser --spec tests/e2e/specs/browser-callout-visual.e2e.ts --spec tests/e2e/specs/browser-callout-editing.e2e.ts`
+  с портом 5193: editing 1/1 passed, включая width 300, отмену 720,
+  auto-size, route/card и undo/redo; visual первоначально обнаружил overlap
+  при 200%. Пояснение/отступы сокращены, финальная матрица выше прошла.
+  Повтор visual сначала завершился на WDIO timeout: timeout вынесен
+  из тела теста в `.timeout(180_000)`. Логи: `artifacts/callout-width-browser.log`,
+  `artifacts/callout-width-browser-visual.log`.
+- `$env:CUTE_SCREEN_BROWSER_E2E_PORT='5194'; $env:CUTE_SCREEN_BROWSER_E2E_HEADLESS='1'; pnpm test:e2e:browser --spec tests/e2e/specs/browser-callout-layout.e2e.ts`:
+  2/2 passed: подписи по обе стороны target, soft wrapping, reopen, ширина
+  720 px, undo/redo и mixed font metrics. Лог: `artifacts/callout-width-browser-layout.log`.
+- `pnpm lint` passed (0 errors / 85 existing warnings), `pnpm typecheck`
+  passed; после выделения E2E helper отдельно `pnpm exec tsc --noEmit -p tests/e2e/tsconfig.json`
+  passed. Логи: `artifacts/callout-width-lint.log`, `callout-width-types.log`,
+  `callout-width-e2e-types-final.log`. `pnpm docs:check` passed.
+- `pnpm test:boundaries`: 42 passed / 2 failed на существующих ограничениях
+  размера/сложности canvas-workspace-controller, ShapeFormattingToolbar,
+  styles, gesture-finish, drawing-payload и image-editing. Новый width helper
+  вынесен отдельно, затронутые width-файлы не входят в итоговые violations:
+  `artifacts/callout-width-boundaries-final.log`.
+
+Native: `$env:CUTE_SCREEN_E2E_SCENARIOS='callout-editing'; $env:CUTE_SCREEN_E2E_DRIVER_PORT='5694'; $env:TAURI_WEBDRIVER_PORT='5695'; $env:CARGO_TARGET_DIR='D:/cutescreen/artifacts/callout-target'; $env:CUTE_SCREEN_FRONTEND_DIST='D:/cutescreen/artifacts/callout-width-frontend'; pnpm test:e2e:tauri`.
+Первый WebView2 155.0.4283.45 / external tauri-driver прогон passed 1/1:
+production Capture → non-origin Quick → drag Callout → width/manual/cancel/auto
+→ Editor handoff; trusted pointer/keyboard/contextmenu проверены существующим
+сценарием (`artifacts/callout-width-native.log`). После финального compact hint
+сборка passed, но перенос test helper совпал с загрузкой spec и дал duplicate
+editorRect; helper исправлен, E2E tsc passed. Повтор на том же свежем pinned
+binary: `artifacts/callout-width-native-runtime.ps1` — 1/1 passed, с отдельными
+app data/UDF и сохранённым полным env. Логи: `artifacts/callout-width-native-final.log`,
+`artifacts/callout-width-native-verified.log`; runtime evidence —
+`artifacts/callout-width-webview/`, screenshot — `artifacts/tauri-e2e/callout-width-auto.png`.
+Итоговый native PNG просмотрен: выровненная строка controls, компактный dropdown
+и подпись выноски видны одновременно.
+Linux/WebKitGTK и macOS/WKWebView для этой правки не запускались. Capture
+fake-platform проверяет UI lifecycle, физический захват не заявляется.
+`pnpm format` и `pnpm format:check` после изменений: логи
+`artifacts/callout-width-format-complete.log` и `artifacts/callout-width-format-check-complete.log`.
+
+## Миниатюра «Авто» у выноски (2026-10-18)
+
+Windows x64 / PowerShell. Изменён только геометрический preview attachment
+в `CalloutRouteSettings.vue`: карточка, соединитель с точкой и отдельная
+контурная искра вместо двух стрелок. Размер preview остаётся 40×28 CSS px;
+контракт общих 24×24 UiIcon и галерея не меняются.
+
+- `pnpm test tests/unit/vue/callout-toolbar.test.ts tests/unit/vue/ui-icon.test.ts`:
+  110/110 passed, exit 0, `artifacts/callout-auto-icon/unit.log`.
+- `pnpm exec eslint packages/editor-vue/src/shell/components/CalloutRouteSettings.vue`:
+  exit 0.
+- `pnpm exec vitest run --project boundaries tests/boundaries/editor-core.test.ts`:
+  5/5 passed, exit 0, `artifacts/callout-auto-icon/icon-boundary.log`.
+- `pnpm test:boundaries`: exit 1, общие architecture/formatting timeout и шесть
+  существующих нарушений размера/сложности в других файлах;
+  `artifacts/callout-auto-icon/boundaries.log`.
+- `pnpm format` и `pnpm format:check`: exit 0;
+  `artifacts/callout-auto-icon/format.log` и `format-check.log`.
+- `pnpm check`: lint, typecheck, format и docs прошли; exit 1 на общей
+  architecture boundary (file-size ratchet и перечисленные выше нарушения
+  сложности), `artifacts/callout-auto-icon/check.log`. Rust-этап не выполнялся.
+
+Визуальная проверка: `pnpm icons:preview --mode e2e --port 5218 --strictPort`,
+IAB, 1280×720, `/?m05=1` → Callout → ПКМ → Route. Просмотрены исходная
+миниатюра `artifacts/callout-auto-icon/before.png`, итоговая EN/dark
+`after-dark.png`, RU/light `after-light-ru.png`, RU/dark `after-dark-ru.png`
+и настоящий keyboard focus `after-focus.png`. Искра отделена от карточки,
+штрихи не обрезаны, соседние фиксированные стороны различимы. Left → Auto
+сохраняет выбранное состояние; Tab/Shift+Tab показывает focus outline.
+Тестовый документ монтируется штатным browser harness, выноска заранее
+не создавалась; проверялся popover defaults. Browser engine version не снята.
+Native Capture → Quick → Editor, 1024 px, DPR 2 и WebKit/WKWebView для этой
+локальной правки не запускались и остаются pending.
+
+## Chrome во время изменения Quick-рамки (2026-10-18, ADR-102)
+
+Windows 10 x64, PowerShell, Node 22.23.1, pnpm 10.33.2.
+`pnpm test tests/unit/vue/canvas-viewport-quick.test.ts tests/unit/vue/quick-capture-layout.test.ts tests/unit/vue/quick-context-toolbar.test.ts tests/unit/vue/quick-capture-warmup.test.ts`:
+42/42 passed (`artifacts/quick-frame-unit-final.log`). Resize start/end,
+pointercancel/Escape/blur, no annotation/full-editor signal и initial selection
+mount покрыты. `pnpm lint` — 0 errors / 85 warnings
+(`artifacts/quick-frame-lint.log`); app vue-tsc и E2E tsc passed
+(`artifacts/quick-frame-app-types.log`, `artifacts/quick-frame-e2e-types.log`).
+
+Native команда: `CUTE_SCREEN_E2E_SCENARIOS=quick-chrome`,
+`CARGO_TARGET_DIR=D:/cutescreen/target/highlighter-e2e`,
+`CUTE_SCREEN_FRONTEND_DIST=D:/cutescreen/artifacts/quick-frame-frontend`,
+`CUTE_SCREEN_E2E_DRIVER_PORT=5784`, `TAURI_WEBDRIVER_PORT=5785`,
+`pnpm test:e2e:tauri`: 7/7 passed на WebView2 155.0.4283.45 / external
+tauri-driver, fresh pinned binary. Лог `artifacts/quick-frame-native-final.log`.
+Production Capture → Quick, trusted pointer, held resize до узкой области,
+hidden Actions/ToolRail/defaults, release, одна Undo/Redo, Escape без закрытия,
+прежние palette/settings/selection/Copy и Quick → Editor прошли.
+Просмотрены `artifacts/tauri-e2e/quick-frame-during-resize.png` и
+`artifacts/tauri-e2e/quick-frame-after-resize.png`: рамка и badge видны в обоих,
+chrome отсутствует при удержании и возвращается после него.
+Первый run (`artifacts/quick-frame-native.log`) имел 6/7 passed: новый тест
+автоматически release-ил pointer перед assertion; исправлен на `perform(true)`.
+Это fake-platform UI evidence, не physical capture; отдельный browser run,
+Linux/WebKitGTK и macOS/WKWebView для этой правки не запускались.
+`pnpm format` passed (`artifacts/quick-frame-format.log`), docs links passed
+(`artifacts/quick-frame-docs.log`). `pnpm check` остановился на параллельно
+изменённом `tests/e2e/specs/browser-callout-visual.e2e.ts:46` (max-len 136/120),
+до typecheck/format/Rust stages: `artifacts/quick-frame-check.log`.
+Финальные `pnpm format` и `pnpm format:check` passed
+(`artifacts/quick-frame-format-final.log`, `artifacts/quick-frame-format-check.log`).
+`pnpm exec vue-tsc --noEmit -p tests/tsconfig.json` и scoped ESLint пяти
+затронутых TS-файлов passed (`artifacts/quick-frame-test-types.log`,
+`artifacts/quick-frame-scoped-lint.log`).
+
 ## Общая тема окна настроек (2026-10-18)
 
 Windows 10 x64, PowerShell, Node 22.23.1, pnpm 10.33.2.

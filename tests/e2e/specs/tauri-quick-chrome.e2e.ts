@@ -23,6 +23,65 @@ async function startCapture(): Promise<void> {
 }
 
 describe('Quick Capture chrome in a real Tauri webview', () => {
+  it('hides chrome only while resizing the capture frame and restores it on release or Escape', async () => {
+    await startCapture()
+    await $('button[aria-label="Pencil"]').click()
+    const frame = async () => browser.execute(() => {
+      const state = window as typeof window & { __cuteScreenE2eQuick?: { snapshot(): {
+        crop: { x: number; y: number; width: number; height: number }
+        canvas: { width: number; height: number }
+      } } }
+      const doc = state.__cuteScreenE2eQuick!.snapshot()
+      const scene = document.querySelector<HTMLCanvasElement>('.cs-canvas:not(.cs-canvas-overlay)')!
+      const rect = scene.getBoundingClientRect()
+      return {
+        crop: doc.crop,
+        x: Math.round(rect.left + doc.crop.x * rect.width / doc.canvas.width),
+        y: Math.round(rect.top + doc.crop.y * rect.height / doc.canvas.height),
+        width: doc.crop.width * rect.width / doc.canvas.width,
+        height: doc.crop.height * rect.height / doc.canvas.height,
+      }
+    })
+    const before = await frame()
+    await browser.execute(() => {
+      document.querySelector('.cs-canvas:not(.cs-canvas-overlay)')!.addEventListener('pointerdown', (event) => {
+        document.documentElement.dataset.e2eFrameTrusted = String(event.isTrusted)
+      }, { once: true })
+    })
+    await browser.action('pointer')
+      .move({ origin: 'viewport', x: before.x + 2, y: before.y + 2 })
+      .down({ button: 'left' })
+      .move({ origin: 'viewport', x: Math.round(before.x + before.width - 180),
+        y: Math.round(before.y + Math.max(40, before.height - 440)), duration: 150 }).perform(true)
+    expect(await $('html').getAttribute('data-e2e-frame-trusted')).toBe('true')
+    await expect($('.cs-quick-actions')).not.toBeDisplayed()
+    await expect($('.cs-quick-toolrail-group')).not.toBeDisplayed()
+    await expect($('.cs-quick-defaults')).not.toBeDisplayed()
+    expect((await frame()).crop).toEqual(before.crop)
+    await browser.saveScreenshot(path.resolve('artifacts/tauri-e2e/quick-frame-during-resize.png'))
+    await browser.action('pointer').up({ button: 'left' }).perform()
+    await expect($('.cs-quick-actions')).toBeDisplayed()
+    await expect($('.cs-quick-toolrail-group')).toBeDisplayed()
+    const resized = await frame()
+    expect(resized.crop).not.toEqual(before.crop)
+    await browser.saveScreenshot(path.resolve('artifacts/tauri-e2e/quick-frame-after-resize.png'))
+    await $('button[aria-label="Undo"]').click()
+    expect((await frame()).crop).toEqual(before.crop)
+    await $('button[aria-label="Redo"]').click()
+    expect((await frame()).crop).toEqual(resized.crop)
+    await browser.action('pointer')
+      .move({ origin: 'viewport', x: resized.x, y: resized.y })
+      .down({ button: 'left' })
+      .move({ origin: 'pointer', x: -30, y: -20, duration: 100 }).perform(true)
+    await expect($('.cs-quick-actions')).not.toBeDisplayed()
+    await browser.keys('Escape')
+    await browser.action('pointer').up({ button: 'left' }).perform()
+    await expect($('.cs-quick-actions')).toBeDisplayed()
+    await expect($('.cs-quick-toolrail-group')).toBeDisplayed()
+    expect((await frame()).crop).toEqual(resized.crop)
+    await $('.cs-quick-actions button:last-child').click()
+  })
+
   it('cancels palette sampling when another tool action is chosen', async () => {
     await startCapture()
     await verifyEyedropperToolSwitch('quick-capture', 'artifacts/tauri-e2e/eyedropper-switch-quick.png')

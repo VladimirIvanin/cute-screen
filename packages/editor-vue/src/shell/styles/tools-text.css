@@ -672,24 +672,41 @@
   width: auto;
   min-width: 56px;
   padding-inline: 6px;
+  gap: 6px;
   font-variant-numeric: tabular-nums;
 }
 .cs-callout-width-popover {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  width: 260px;
-  padding: 12px;
+  z-index: 60;
+  display: grid;
+  gap: 6px;
+  width: 280px;
+  box-sizing: border-box;
+  overflow: auto;
+  padding: 8px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface-raised);
   color: var(--text);
   box-shadow: var(--shadow-overlay);
 }
-.cs-callout-width-popover > label {
-  display: grid;
-  width: 100%;
-  gap: 8px;
+.cs-callout-width-summary,
+.cs-callout-width-popover p {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.cs-callout-width-popover p {
+  margin: 0;
+  line-height: 1.5;
+}
+.cs-callout-width-popover .cs-numeric-control {
+  justify-content: space-between;
+}
+.cs-callout-width-popover .cs-numeric-entry {
+  width: 96px;
+}
+.cs-callout-width-popover > button[aria-pressed='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
 }
 .cs-callout-width-popover input,
 .cs-callout-width-popover button {

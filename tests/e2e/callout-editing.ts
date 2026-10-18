@@ -8,6 +8,7 @@ import {
 import path from 'node:path'
 import { writeFile } from 'node:fs/promises'
 import { waitForStableCanvas } from './canvas-ready'
+import { setNumericInput } from './numeric-input'
 import {
   versionToken,
 } from './specs/browser-v7-rich-text-test-kit'
@@ -65,6 +66,32 @@ function world(
   const p = (layer.payload as unknown as Payload)[key]
   return { x: layer.transform.translateX + p.x, y: layer.transform.translateY + p.y }
 }
+async function exerciseCalloutWidth(artifacts: string): Promise<void> {
+  const editor = $('[aria-label="Callout editor"]')
+  const widthTrigger = $('.cs-callout-width-control > button')
+  await expect(widthTrigger).toHaveText(expect.stringContaining('Fit text'))
+  await expect($('.cs-callout-width-popover')).not.toExist()
+  await widthTrigger.click()
+  const widthPanel = $('.cs-callout-width-popover')
+  await expect(widthPanel).toBeDisplayed()
+  await expect(widthPanel.$('button')).toHaveAttribute('aria-pressed', 'true')
+  await browser.saveScreenshot(path.resolve(artifacts, 'callout-width-auto.png'))
+  const widthInput = widthPanel.$('input')
+  await setNumericInput(widthInput, '300')
+  await browser.keys('Enter')
+  await expect(widthTrigger).toHaveText(expect.stringContaining('300 px'))
+  await setNumericInput(widthInput, '720')
+  await browser.keys('Escape')
+  await expect(widthPanel).not.toExist()
+  await expect(editor).toBeDisplayed()
+  await expect(widthTrigger).toBeFocused()
+  await expect(widthTrigger).toHaveText(expect.stringContaining('300 px'))
+  await widthTrigger.click()
+  await widthPanel.$('button').click()
+  await expect(widthTrigger).toHaveText(expect.stringContaining('Fit text'))
+  await browser.keys('Escape')
+  await editor.click()
+}
 export async function exerciseCalloutEditing(
   artifacts: string,
   native = false,
@@ -88,6 +115,7 @@ export async function exerciseCalloutEditing(
   const editor = $('[aria-label="Callout editor"]')
   await expect(editor).toBeDisplayed()
   await browser.keys('Product title\nПояснение')
+  await exerciseCalloutWidth(artifacts)
   const editorRect = await browser.execute(() => {
     const r = document.querySelector<HTMLElement>('[aria-label="Callout editor"]')!.getBoundingClientRect()
     return { x: r.x, y: r.y, width: r.width, height: r.height }

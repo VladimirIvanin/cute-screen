@@ -347,7 +347,10 @@ Cute Screen — полноценный local-first редактор снимко
   справа; её фон отстоит от marker на 6 document px, центр по Y совпадает с label.
   Новый текст растёт по метрикам шрифта до 480 document px и затем переносится.
   Внешний width handle и числовое поле меняют только wrap width (минимум один em),
-  «Авто» восстанавливает автоматический размер. Ручная ширина может превышать 480.
+  В inline-панели ширина открывается одной кнопкой с текущим режимом.
+  Числовое поле находится в dropdown; «По содержимому» восстанавливает
+  автоматический размер с пояснением роста до 480 px и переноса строк.
+  Новая подпись использует auto-size. Ручная ширина может превышать 480.
   Inline editing, hit-test, bounds, preview и export используют общие измерения.
   Speech-bubble tail не входит.
 - `REQ-TOL-008` — manual censor: pixelate, blur и solid fill; без
@@ -545,6 +548,9 @@ Cute Screen — полноценный local-first редактор снимко
   пунктирную crop-рамку и dimension badge; состояние редактирования добавляет
   annotation toolbar у нижней стороны рамки и action bar Editor/Copy/Save/Close
   справа. Панели меняют сторону при collision, остаются keyboard-accessible и
+  скрываются на время выбора, перемещения и изменения размера области.
+  После отпускания указателя или отмены жеста панели возвращаются у актуальной
+  рамки; рамка и dimension badge остаются видимыми во время жеста. Панели
   не содержат OCR, AI/cloud, print, Pin, layers, beautify или watermark. После
   первого drag переход выполняется только изменением UI state существующей
   WebView; повторные show/hide/focus, native selector handoff и второй renderer

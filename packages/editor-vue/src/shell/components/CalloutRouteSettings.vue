@@ -16,7 +16,7 @@ const routes = computed(() => [
   { value: 'corner', label: text('Stepped', 'Ступенчатая') },
 ])
 const sides = computed(() => [
-  { value: 'auto', label: text('Auto', 'Авто'), x: 19, y: 10 },
+  { value: 'auto', label: text('Auto', 'Авто'), x: 12, y: 10 },
   { value: 'right', label: text('Left', 'Слева'), x: 2, y: 10 },
   { value: 'left', label: text('Right', 'Справа'), x: 24, y: 10 },
   { value: 'bottom', label: text('Top', 'Сверху'), x: 13, y: 2 },
@@ -115,13 +115,13 @@ function preview(value: string): string {
           focusable="false"
         >
           <path
-            d="M4 14h16"
+            :d="side.value === 'auto' ? 'M4 14h8' : 'M4 14h16'"
             fill="none"
             stroke="currentColor"
             stroke-width="1.8"
           />
           <circle
-            cx="20"
+            :cx="side.value === 'auto' ? 4 : 20"
             cy="14"
             r="2"
             fill="currentColor"
@@ -138,10 +138,12 @@ function preview(value: string): string {
           />
           <path
             v-if="side.value === 'auto'"
-            d="m9 5-4 3 4 3m22 6 4 3-4 3"
+            d="m30 3 1.2 3.8L35 8l-3.8 1.2L30 13l-1.2-3.8L25 8l3.8-1.2Z"
             fill="none"
             stroke="currentColor"
             stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
           />
         </svg>
         <span>{{ side.label }}</span>

@@ -28,6 +28,16 @@ body,
 .cs-quick-capture.is-selecting .cs-quick-history {
   display: none;
 }
+/* Keep mounted chrome measurable while the pointer owns the capture frame. */
+.cs-quick-capture.is-changing-frame .cs-quick-actions,
+.cs-quick-capture.is-changing-frame .cs-quick-toolrail-group,
+.cs-quick-capture.is-changing-frame .cs-context-toolbar,
+.cs-quick-capture.is-changing-frame .cs-selection-floating-toolbar,
+.cs-quick-capture.is-changing-frame .cs-tool-configure-popover-host,
+.cs-quick-capture.is-changing-frame .cs-quick-portal-limit {
+  visibility: hidden;
+  pointer-events: none;
+}
 .cs-quick-selection-hint {
   position: fixed;
   top: 24px;

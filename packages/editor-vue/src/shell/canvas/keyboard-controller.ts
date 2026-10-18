@@ -52,12 +52,14 @@ export class KeyboardController {
   constructor(context: KeyboardContext) {
     this.#context = context
   }
-  /** Capture stroke cancellation before Quick Capture's window Close. */
+  /** Capture gesture cancellation before Quick Capture's window Close. */
   strokeKeydown(event: KeyboardEvent): void {
     const gesture = this.#context.gesture()
     if (
       event.key === 'Escape' &&
-      (gesture?.kind === 'calloutHandle' ||
+      (gesture?.kind === 'crop' &&
+        this.#context.props.quickFrameMode ||
+        gesture?.kind === 'calloutHandle' ||
         gesture?.kind === 'draw' &&
         (gesture.stroke ||
           gesture.tool === 'line') ||

@@ -1,4 +1,8 @@
-import { fireEvent } from '@testing-library/vue'
+import {
+  fireEvent,
+  render,
+} from '@testing-library/vue'
+import { defineComponent } from 'vue'
 import {
   beforeEach,
   describe,
@@ -7,6 +11,8 @@ import {
   vi,
 } from 'vitest'
 import type { EditorDocumentV1 } from '@cute-screen/editor-renderer'
+import { useQuickChromeLayout } from '../../../apps/desktop/src/use-quick-chrome-layout'
+import type { QuickCaptureLayoutController } from '../../../apps/desktop/src/quick-capture-layout-controller'
 import {
   document,
   mountViewport,
@@ -39,6 +45,57 @@ beforeEach(() => {
 })
 
 describe('M05 CanvasViewport transforms', () => {
+  it.each(['pointerup', 'pointercancel', 'Escape', 'blur'])('restores Quick chrome after frame resize ends with %s', async (ending) => {
+    const update = vi.fn()
+    const chrome = render(defineComponent({
+      setup() {
+        useQuickChromeLayout({ update } as unknown as QuickCaptureLayoutController)
+      },
+      template: '<main class="cs-quick-capture" />',
+    }))
+    const root = chrome.container.querySelector('main')!
+    const crop = { x: 10, y: 10, width: 60, height: 60 }
+    const view = mountViewport('select', { ...document, crop }, '', undefined, false, undefined, undefined, true)
+    root.append(view.container)
+    const transitions: boolean[] = []
+    view.scene.addEventListener('cs-quick-frame-gesture', (event) => transitions.push((event as CustomEvent<boolean>).detail))
+    try {
+      await fireEvent.pointerDown(view.scene, { pointerId: 7, button: 0, clientX: 70, clientY: 70 })
+      expect(root).toHaveClass('is-changing-frame')
+      for (const clientX of [75, 80]) {
+        await fireEvent.pointerMove(view.scene, { pointerId: 7, clientX, clientY: 75 })
+        expect(root).toHaveClass('is-changing-frame')
+      }
+      expect(transitions).toEqual([true])
+      if (ending === 'Escape') await fireEvent.keyDown(view.scene, { key: 'Escape' })
+      else if (ending === 'blur') await fireEvent(window, new Event('blur'))
+      else await fireEvent(view.scene, new PointerEvent(ending, {
+        bubbles: true, pointerId: 7, clientX: 80, clientY: 75,
+      }))
+      expect(root).not.toHaveClass('is-changing-frame')
+      expect(transitions).toEqual([true, false])
+      if (ending === 'pointerup') expect(view.emitted().documentCommand).toHaveLength(1)
+      else expect(view.emitted().documentCommand).toBeUndefined()
+      await vi.waitFor(() => expect(update).toHaveBeenCalled())
+    } finally {
+      view.unmount()
+      chrome.unmount()
+    }
+  })
+
+  it('does not signal frame changes for annotation drawing or full-editor Crop', async () => {
+    for (const quick of [true, false]) {
+      const view = mountViewport(quick ? 'pencil' : 'crop', document, '', undefined, false, undefined, undefined, quick)
+      const transition = vi.fn()
+      view.scene.addEventListener('cs-quick-frame-gesture', transition)
+      await fireEvent.pointerDown(view.scene, { pointerId: 7, button: 0, clientX: 50, clientY: 50 })
+      await fireEvent.pointerMove(view.scene, { pointerId: 7, clientX: 60, clientY: 60 })
+      await fireEvent.pointerUp(view.scene, { pointerId: 7, clientX: 60, clientY: 60 })
+      expect(transition).not.toHaveBeenCalled()
+      view.unmount()
+    }
+  })
+
   it('keeps the Quick overlay at display resolution across document redraws', async () => {
     vi.stubGlobal('devicePixelRatio', 2)
     const view = mountViewport('select', document, '', undefined, false, undefined, undefined, true)

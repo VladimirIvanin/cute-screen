@@ -10,8 +10,7 @@ import { openHarness } from './browser-v7-rich-text-test-kit'
 import { setLocale } from './browser-m08-test-kit'
 
 describe('Callout desktop layouts', () => {
-  it('keeps editing and width controls reachable at 1024 px in RU/EN, both themes and three zooms', async function () {
-    this.timeout(120_000)
+  it('keeps editing and width controls reachable at 1024 px in RU/EN, both themes and three zooms', async () => {
     await browser.setWindowSize(1024, 700)
     await openHarness()
     await browser.url('/?m05=1&m05viewport=1')
@@ -31,17 +30,24 @@ describe('Callout desktop layouts', () => {
           const editor = $('[aria-label="Callout editor"]')
           await expect(editor).toExist()
           await browser.keys(locale === 'ru' ? 'Подпись' : 'Label')
-          await $('.cs-callout-width-control input').click()
-          await expect($('.cs-callout-width-control')).toBeDisplayed()
+          await expect($('.cs-callout-width-control input')).not.toExist()
+          await $('.cs-callout-width-control > button').click()
+          await expect($('.cs-callout-width-popover')).toBeDisplayed()
           const layout = await browser.execute(() => {
-            const panel = document.querySelector<HTMLElement>('.cs-callout-width-control')!.getBoundingClientRect()
+            const panel = document.querySelector<HTMLElement>('.cs-callout-width-popover')!.getBoundingClientRect()
             const toolbar = document.querySelector<HTMLElement>('.cs-text-floating-toolbar-host')!.getBoundingClientRect()
+            const editor = document.querySelector<HTMLElement>('[aria-label="Callout editor"]')!.getBoundingClientRect()
             return [panel, toolbar].every((r) => (
               r.left >= 0 &&
               r.top >= 0 &&
               r.right <= window.innerWidth &&
               r.bottom <= window.innerHeight
-            ))
+            )) && (
+              panel.right <= editor.left ||
+              panel.left >= editor.right ||
+              panel.bottom <= editor.top ||
+              panel.top >= editor.bottom
+            )
           })
           expect(layout).toBe(true)
           await browser.saveScreenshot(path.resolve(`artifacts/browser-e2e/callout-${locale}-${theme}-${zoom}.png`))
@@ -52,5 +58,5 @@ describe('Callout desktop layouts', () => {
         }
       }
     }
-  })
+  }).timeout(180_000)
 })

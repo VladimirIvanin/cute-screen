@@ -1,5 +1,13 @@
 # Архитектура Cute Screen
 
+## Ширина подписи выноски (ADR-103)
+
+CalloutWidthControl владеет только transient dropdown: общий preview-placement
+размещает его относительно кнопки и защищаемой подписи, Teleport сохраняет
+surface owner. TextFormattingToolbar закрывает соседние popover. NumericControl
+сохраняет cancel/minimum/focus; прежний calloutTextWidth adapter обслуживает
+inline draft и EditorCommand. Default auto-size, scene graph и схема не меняются.
+
 ## Углы рамки изображения (ADR-097)
 
 Image scene-проекция использует miter join независимо от persisted border.join.
@@ -812,6 +820,11 @@ canvas controller и не создают Vue updates на каждом pointermo
 IPC не расширяются; max+1 не зависит от layer order/visibility/lock.
 
 ## Настройки до создания (ADR-069)
+
+ADR-102: canvas gesture boundary отправляет bubbling `cs-quick-frame-gesture`
+только при смене active frame gesture. `useQuickChromeLayout` скрывает chrome
+через transient class на Quick root и пересчитывает layout по завершении.
+Панели остаются mounted и измеряемыми. Pointermove не проходит через Vue state.
 
 Внутренняя settings-policy определяет инструменты с автоматической строкой
 defaults. Строка использует существующие ContextToolbar schemas и defaults

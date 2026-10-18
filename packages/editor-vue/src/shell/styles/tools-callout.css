@@ -64,15 +64,6 @@
 .cs-callout-line-choices svg {
   height: 20px;
 }
-.cs-callout-width-control {
-  gap: 6px;
-}
-.cs-callout-width-control .cs-numeric-control {
-  gap: 6px;
-}
-.cs-callout-width-control .cs-numeric-entry {
-  width: 88px;
-}
 .cs-text-editor[aria-label='Callout editor'] {
   outline: 1px solid #0d99ff;
   outline-offset: 1px;
