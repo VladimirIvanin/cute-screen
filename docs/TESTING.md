@@ -1,5 +1,32 @@
 # Стратегия тестирования
 
+## Иконки настроек выноски (2026-10-18)
+
+Windows x64 / PowerShell, Node 22.23.1, pnpm 10.33.2. Панель использует
+существующие UiIcon и ArrowStylePreview; CalloutMarkerPreview разделяется
+между trigger и выбором наконечников. Document/core/IPC не меняются.
+
+- `pnpm test tests/unit/vue/callout-toolbar.test.ts tests/unit/vue/text-context-toolbar.test.ts`:
+  16/16 passed, `artifacts/callout-compact-unit.log`. Подсказки RU, смена значения,
+  mixed, disabled, настройки, Escape и возврат focus.
+- `$env:CUTE_SCREEN_BROWSER_E2E_PORT='5224'; $env:CUTE_SCREEN_BROWSER_E2E_HEADLESS='1'; $env:CUTE_SCREEN_E2E_DISABLE_WATCH='1'; pnpm test:e2e:browser --spec tests/e2e/specs/browser-callout-visual.e2e.ts --spec tests/e2e/specs/browser-callout-editing.e2e.ts`:
+  Chrome 155.0.8059.80, 2/2 passed. Production drag → inline → Ctrl+Enter →
+  selection показывает пять кнопок в одном ряду шириной менее 420 px во всех
+  12 сочетаниях RU/EN × light/dark × 50/100/200% при окне 1024×700.
+  Открытие Route, Escape/focus, прежние width controls, изменения наконечников,
+  геометрии и оболочки, cancel/undo/redo прошли. Лог:
+  `artifacts/callout-compact-browser.log`. Просмотрены
+  `artifacts/browser-e2e/callout-icons-en-dark-50.png`,
+  `callout-icons-ru-dark-200.png` и `callout-route-ru-light-100.png`.
+- Прямые `pnpm exec vue-tsc --noEmit -p apps/desktop/tsconfig.json`,
+  `pnpm exec vue-tsc --noEmit -p tests/tsconfig.json` и
+  `pnpm exec tsc --noEmit -p tests/e2e/tsconfig.json`: exit 0,
+  `artifacts/callout-compact-types.log`. Scoped ESLint изменённых компонентов
+  и тестов exit 0. `pnpm format`: exit 0, `artifacts/callout-compact-format.log`.
+
+Native и общий gate фиксируются после окончания прогона. Linux/WebKitGTK
+и macOS/WKWebView для этой правки не запускались.
+
 ## Выноска: принятая карточка с точкой (2026-10-18, ADR-055)
 
 `REQ-EDT-008`, `REQ-TOL-007`: пользователь выбрал вариант 01. Общий `UiIcon`
@@ -20,7 +47,22 @@ PowerShell, Node 22.23.1, pnpm 10.33.2, Chrome 155.0.8059.80.
   `callout-family-dpr-2.png` и `editor-ru-dark.png`: карточка и связь различимы
   при 18 px, вес согласован с соседними Tabler, active/focus/disabled читаемы.
 
-Native WebView и итоговые общие проверки записываются ниже после завершения.
+- `$env:CARGO_TARGET_DIR='D:/cutescreen/target/shape-catalog-native'; $env:CARGO_BUILD_JOBS='4'; $env:CUTE_SCREEN_E2E_SCENARIOS='custom-icons'; $env:CUTE_SCREEN_ICON_EVIDENCE='callout-adopted'; $env:CUTE_SCREEN_E2E_DRIVER_PORT='5662'; pnpm test:e2e:tauri`
+  — exit 0, 1/1 passed, свежая debug-сборка и pinned test binary,
+  WebView2 155.0.4283.45 / external driver. Production Capture → Quick → Editor:
+  новая иконка, выбор по O, RU/EN × light/dark, trusted keyboard, pencil/marker,
+  sampling и undo/redo. `artifacts/custom-icons/callout-adopted-tauri.log`;
+  просмотрены `native-quick.png` и `native-editor-ru-dark.png` в evidence folder.
+  Fake capture и изолированный профиль не подтверждают physical capture.
+- `pnpm lint` — exit 0, warnings без errors. `pnpm format`, `pnpm format:check`
+  — exit 0; журналы `artifacts/custom-icons/callout-adopted-format-final.log`,
+  `callout-adopted-format-check.log` и `callout-adopted-lint.log`.
+- `pnpm test:boundaries` — exit 1, 41 passed / 3 failed. Файлы вне этой замены:
+  новый параллельный `CalloutMarkerPreview.vue` требует SVG boundary allowlist;
+  size ratchets в canvas-workspace-controller/ShapeFormattingToolbar и
+  complexity/depth в styles/gesture-finish-controller/drawing-payload/image-editing.
+  Журнал: `artifacts/custom-icons/callout-adopted-boundaries.log`.
+
 WebKitGTK/WKWebView и физический захват для этой замены не проверялись.
 
 ## Компактная ширина выноски (2026-10-18, ADR-103)

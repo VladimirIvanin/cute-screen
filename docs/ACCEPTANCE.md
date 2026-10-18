@@ -1,5 +1,14 @@
 # Сквозная приёмка
 
+## Иконка выноски: карточка и точка (2026-10-18)
+
+`REQ-EDT-008`, ADR-055: выбранный вариант 01 используется общим `UiIcon`.
+Windows x64 / Chrome 155: gallery 16/18/20/24/32 px при DPR 1/2, focus/disabled
+и RU/EN × light/dark passed. WebView2 155.0.4283.45: production Capture → Quick
+→ Editor, выбор выноски по O и кликом, история и sampling — 1/1 passed.
+Native Quick и RU/dark editor screenshots просмотрены; команды и ограничения
+общих проверок — TESTING.md. WebKitGTK/WKWebView runtime pending.
+
 ## Иконки настроек выноски (2026-10-18)
 
 `REQ-TOL-007`, `REQ-EDT-016`, `REQ-UI-001/003/006`: создать выноску обычным

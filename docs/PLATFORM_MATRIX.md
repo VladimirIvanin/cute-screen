@@ -1,5 +1,13 @@
 # Платформенная матрица
 
+## Иконка выноски: карточка и точка (2026-10-18)
+
+Windows x64: Vue 110/110, Chrome 155.0.8059.80 2/2 и WebView2 155.0.4283.45
+external driver 1/1 passed. Production Capture → Quick → Editor использует
+единую `calloutGeometry`; RU/EN × light/dark и размеры 16–32 px просмотрены.
+Команды, screenshots и ограничения общих gates — TESTING.md.
+Linux/WebKitGTK и macOS/WKWebView для этой замены pending.
+
 ## Компактная ширина выноски (2026-10-18, ADR-103)
 
 Windows 10 x64: Vue 14/14 passed; Chrome 155.0.8059.80 — все 12 сочетаний
