@@ -1,5 +1,29 @@
 # Журнал архитектурных решений
 
+## ADR-106 — Native focus Quick Capture при фоновом X11-захвате
+
+**Статус:** accepted (2026-10-18); дополняет ADR-039/041 и REQ-CAP-012.
+
+**Контекст:** установленный DEB показывает selector с DEMANDS_ATTENTION,
+оставляя keyboard focus в чужом приложении. Esc не попадает в WebView.
+Tao `set_focus` асинхронно вызывает GTK `present_with_time(CURRENT_TIME)`;
+prewarmed tray window может иметь устаревшее user time. WebDriver
+`switchWindow` самостоятельно активирует окно и скрывает этот дефект.
+
+**Решение:** Linux reveal выполняет accept-focus и opacity синхронно на GTK
+thread. Для фактического GDK X11 window получает свежий server timestamp,
+обновляет user time и выполняет `present_with_time(timestamp)` на том же
+окне. Другие GDK backends используют GTK present, системный XDG selector
+не меняется. gdkx11 0.18.2 уже присутствует в dependency graph GTK/Wry;
+добавляется прямое MIT dependency без нового native backend или unsafe кода.
+
+**Проверяемое основание:** native CLI smoke из постороннего активного окна
+сравнивает _NET_ACTIVE_WINDOW с Quick XID до ввода и до WebDriver switch.
+Первый и повторный Escape, а также Escape во время начального drag должны
+давать typed cancelled. Старый установленный ELF воспроизводимо проваливает
+focus assertion; ручная активация выполняется исключительно при cleanup.
+Фактические SHA256, команды и результаты — TESTING.md.
+
 ## ADR-104 — Ubuntu 22.04 как база распространяемых Linux-сборок
 
 **Статус:** accepted (2026-10-18); уточняет REQ-REL-001.

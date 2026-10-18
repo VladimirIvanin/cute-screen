@@ -1,5 +1,18 @@
 # CI-сборки и проверка версии через GitHub
 
+## Проверка Esc на установленном пакете (ADR-106)
+
+`pnpm smoke:installed:area-escape` проверяет `/usr/bin/cute-screen` через
+штатный CLI в настоящей X11 session. Перед каждым из трёх capture активирует
+отдельное xmessage window; Quick не активируется тестом до assertions.
+Проверяются _NET_ACTIVE_WINDOW, Esc без клика, Esc с удерживаемым первым drag,
+повторное открытие и typed cancelled. JSON содержит путь и SHA256 проверяемого
+ELF: `artifacts/installed-area-escape.json`. Xmessage/xdotool необходимы.
+`CUTE_SCREEN_AREA_ESCAPE_BINARY` позволяет проверить извлечённый package ELF;
+такой результат помечен его путём и не считается проверкой `/usr/bin`.
+После установки нужно полностью перезапустить resident process и сравнить
+`sha256sum /usr/bin/cute-screen /proc/<pid>/exe`.
+
 ## Linux: совместимость с Ubuntu 22.04 (ADR-104)
 
 Распространяемые x64/ARM64 DEB и AppImage собираются на Ubuntu 22.04

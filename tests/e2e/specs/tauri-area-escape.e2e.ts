@@ -74,4 +74,20 @@ describe('Area Escape before selection in the real WebView', () => {
       expect((await quickState()).persisted).toBeNull()
     }
   })
+  it('receives native focus from a background CLI capture before any driver window switch', async function () {
+    if (process.platform !== 'linux' || process.env.XDG_SESSION_TYPE !== 'x11') {
+      this.skip()
+      return
+    }
+    const executable = process.env.CUTE_SCREEN_WDIO_APP_BINARY
+    if (!executable) throw new Error('Missing test-harness binary')
+    await browser.execute(async () => {
+      await window.__cuteScreenE2eWindow?.hide()
+    })
+    await execute('pnpm', ['smoke:installed:area-escape'], {
+      env: { ...process.env, CUTE_SCREEN_AREA_ESCAPE_BINARY: executable },
+    })
+    await execute(executable, ['show'])
+  })
+
 })

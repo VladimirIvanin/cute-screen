@@ -857,6 +857,7 @@ dependencies = [
  "core-graphics",
  "cute-screen-storage",
  "futures-util",
+ "gdkx11",
  "gtk",
  "image",
  "plist",

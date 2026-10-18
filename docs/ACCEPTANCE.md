@@ -1,5 +1,15 @@
 # Сквозная приёмка
 
+## Фоновый Area и системный focus (2026-10-18, ADR-106)
+
+`REQ-CAP-009/011/012/014`: foreground принадлежит чужому окну, Cute Screen
+работает в tray. Запустить installed CLI Area. До любого click/выделения
+и WebDriver switchWindow активным должен стать Quick XID. Esc закрывает его
+и возвращает typed cancelled. Повторить с удерживаемым первым drag и ещё раз
+без drag. `pnpm smoke:installed:area-escape` проверяет installed ELF; путь,
+SHA256, native XID и результаты находятся в JSON. Предыдущий WebDriver
+UI-прогон с switchWindow подтверждал DOM cancellation, но не этот контракт.
+
 ## Escape до первого выделения Area (2026-10-18)
 
 `REQ-CAP-011/012/014`: открыть Area штатной кнопкой Capture и, не нажимая

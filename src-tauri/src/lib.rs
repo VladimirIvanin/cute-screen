@@ -369,6 +369,9 @@ use shortcuts::commands::*;
 #[cfg(target_os = "linux")]
 #[path = "platform/linux/portal.rs"]
 pub mod linux_platform;
+#[cfg(target_os = "linux")]
+#[path = "platform/linux/quick_presentation.rs"]
+mod linux_quick_presentation;
 pub mod platform;
 pub use cute_screen_storage as storage;
 pub mod app;
@@ -1170,17 +1173,8 @@ fn quick_capture_reveal(
         macos_platform::complete_selector_handoff();
     }
     #[cfg(target_os = "linux")]
-    {
-        use gtk::prelude::WidgetExt;
-
-        window
-            .gtk_window()
-            .map_err(|error| error.to_string())?
-            .set_opacity(1.0);
-        window
-            .set_focusable(true)
-            .map_err(|error| error.to_string())?;
-    }
+    linux_quick_presentation::reveal(&window)?;
+    #[cfg(not(target_os = "linux"))]
     window.set_focus().map_err(|error| error.to_string())?;
     Ok(true)
 }

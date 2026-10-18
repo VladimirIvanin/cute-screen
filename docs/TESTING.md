@@ -1,5 +1,23 @@
 # Стратегия тестирования
 
+## Installed Area focus regression (2026-10-18, ADR-106)
+
+Ubuntu 24.04.5 / GNOME X11 / WebKitGTK 2.52.6. Установленный `/usr/bin/cute-screen`
+и resident `/proc/106340/exe` имеют одинаковый SHA256
+`115b5752949e83f42494eb2344d902eedc7549dbac5171dfb6124c41ba7a161f`.
+До правки `cute-screen capture --mode area --json` показывает Quick XID
+83886884 с DEMANDS_ATTENTION, пока _NET_ACTIVE_WINDOW принадлежит Codex.
+`xdotool key Escape` не отменяет захват. После отдельного windowactivate Quick
+тот же Escape возвращает typed cancelled. Первоначальный UI/WebDriver pass
+не подтверждал этот сценарий: switchWindow сам давал отсутствующий focus.
+
+`pnpm smoke:installed:area-escape` на installed ELF воспроизводимо падает
+до ввода Esc на native focus assertion; cleanup активирует Quick только
+после failure. Лог `artifacts/installed-area-escape-red.log`, снимок JSON
+`artifacts/installed-area-escape-red.json`. Новый regression не использует
+WebDriver для выбора Quick. Результаты исправления, сборки и проверки пакета
+фиксируются после завершения.
+
 ## Escape до первого выделения Area (2026-10-18)
 
 Ubuntu 24.04.5 x64 / X11, WebKitGTK 2.52.6, Node 22.23.1 / pnpm 10.33.2.

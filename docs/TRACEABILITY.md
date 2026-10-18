@@ -1,5 +1,16 @@
 # Трассируемость требований
 
+## Native focus Area из фонового процесса (2026-10-18, до реализации)
+
+`REQ-CAP-009/011/012/014`: видимый Quick selector после CLI/tray/hotkey должен
+получать системный focus без клика. Escape до выделения отменяет захват при
+активном постороннем приложении до вызова и при повторном захвате. Проверка
+установленного DEB воспроизвела Quick с DEMANDS_ATTENTION и focus в Codex;
+WebDriver switchWindow скрывал дефект. Новый smoke использует только native
+CLI/X11 input, не активирует Quick до assertions и проверяет typed cancelled.
+Изменение native presentation проверяется failing smoke до реализации;
+результаты и SHA256 установленного/проверенного ELF — TESTING.md.
+
 ## Escape до первого выделения Area (2026-10-18, до реализации)
 
 `REQ-CAP-011/012/014`: первый Escape после открытия Area отменяет draft и

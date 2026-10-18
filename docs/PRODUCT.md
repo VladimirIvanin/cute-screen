@@ -79,6 +79,8 @@ Cute Screen — полноценный local-first редактор снимко
   undoable `setCrop` command. Аннотации остаются привязаны к physical pixels
   frozen frame и только clip-ятся рамкой. До первого drag та же Quick WebView
   показывает непрозрачную подсказку «Выделите область», crosshair и затемнение;
+  при запуске из tray/hotkey/CLI получает native keyboard focus до любого клика,
+  чтобы Escape отменял capture даже при ранее активном чужом приложении;
   во время drag — пунктирную рамку и читаемый размер. Escape отменяет временный
   draft; во время активного pencil/marker stroke первый Escape отменяет только
   незавершённый штрих, оставляя Quick Capture открытым. Отпускание primary pointer после валидного первого drag только меняет

@@ -1,5 +1,15 @@
 # Платформенная матрица
 
+## Фокус установленного Quick Capture (2026-10-18, ADR-106)
+
+Ubuntu 24.04.5 / GNOME X11 / WebKitGTK 2.52.6: установленный Jammy DEB с ELF
+SHA256 `115b5752949e83f42494eb2344d902eedc7549dbac5171dfb6124c41ba7a161f`
+воспроизводит видимый Quick без native focus; Esc остаётся в чужом окне.
+Ранний WebDriver pass ниже не доказывает background activation, поскольку
+switchWindow сам активирует окно. Исправление использует свежий GDK X11 server
+timestamp и синхронный accept-focus. Результаты новых smoke и пакета — TESTING.md.
+Windows, macOS и Wayland этим изменением не объявляются проверенными.
+
 ## Escape до первого выделения Area (2026-10-18)
 
 Общий Vue handler начальной отмены больше не зависит от DOM focus внутри

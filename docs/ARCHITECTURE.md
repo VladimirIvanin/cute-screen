@@ -1,5 +1,15 @@
 # Архитектура Cute Screen
 
+## Native focus фонового Quick Capture (ADR-106)
+
+После mapped warmup Linux reveal устанавливает GTK accept-focus синхронно.
+Для GDK X11 получает текущий server timestamp, обновляет user time и вызывает
+present_with_time на уже существующем Quick window. CURRENT_TIME из очереди
+Tao недостаточен для prewarmed окна с устаревшим user time в Mutter. Окно,
+renderer и frozen frame не пересоздаются. Wayland остаётся на системном
+portal selector; GDK Wayland presentation использует обычный GTK present.
+Native focus доказывается до WebDriver switchWindow и любого click по Quick.
+
 ## Внешняя атрибуция эмоджи (ADR-105)
 
 Tauri host регистрирует opener plugin; его initialization script обрабатывает

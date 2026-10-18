@@ -46,6 +46,7 @@
     "test:e2e:browser": "wdio run tests/e2e/wdio.browser.conf.ts",
     "test:e2e:landing": "pnpm build:landing && wdio run tests/e2e/wdio.landing.conf.ts",
     "test:e2e:tauri": "node scripts/run-tauri-e2e.mjs",
+    "smoke:installed:area-escape": "node scripts/check-installed-area-escape.mjs",
     "smoke:m01:x11": "cargo run --features platform-smoke,x11-capture --bin m01-platform-smoke -- x11-controlled --output artifacts/m01/x11-controlled.json",
     "smoke:m01:portal:probe": "cargo run --features platform-smoke --bin m01-platform-smoke -- portal-probe --output artifacts/m01/portal-probe.json",
     "smoke:m01:portal:screenshot": "cargo run --features platform-smoke --bin m01-platform-smoke -- portal-screenshot --output artifacts/m01/portal-screenshot.json",
