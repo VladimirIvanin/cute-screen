@@ -1,5 +1,16 @@
 # Стратегия тестирования
 
+## Версия 0.1.2 (2026-10-18)
+
+Ubuntu 24.04.5 x86_64, Node 22.23.1, pnpm 10.33.2.
+`pnpm version:bump 0.1.2` обновил пять файлов метаданных;
+`node scripts/release-assets.mjs version . v0.1.2` и
+`cargo metadata --locked --offline --no-deps --format-version 1` — passed.
+`pnpm test:boundaries` — 12 files / 78 tests passed.
+`pnpm format`, `pnpm format:check`, `pnpm docs:check` и `git diff --check` — passed.
+Логи и Cargo metadata: `artifacts/version-0.1.2/`.
+Изменены только версия и документация; runtime/build suites не запускались.
+
 ## macOS availability runtime link (2026-10-18)
 
 Red evidence: пользовательский лог release run 39142547248,

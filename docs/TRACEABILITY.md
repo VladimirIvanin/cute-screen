@@ -1,5 +1,14 @@
 # Трассируемость требований
 
+## Версия 0.1.2 (2026-10-18)
+
+`REQ-REL-001/002/003/005`: штатной командой `pnpm version:bump 0.1.2`
+синхронизировать package.json, Tauri config, Cargo workspace, локальную storage
+dependency и Cargo.lock. Проверить release version guard для `v0.1.2`, Cargo
+metadata с `--locked --offline`, boundary tests и форматирование.
+Реализовано; release guard, Cargo metadata, boundary 78/78 и formatting/docs
+checks passed. Фактические команды и артефакты — TESTING.md.
+
 ## Clang runtime в macOS linker (2026-10-18)
 
 `REQ-REL-002`, `REQ-CAP-015`: native bridges с `@available` должны линковаться
