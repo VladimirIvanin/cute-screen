@@ -1,5 +1,31 @@
 # Стратегия тестирования
 
+## Пользовательский README и GitHub-шапка (2026-10-18)
+
+`REQ-UI-013`, `REQ-ACT-006`, ADR-057. Windows x64, Node 22.23.1 / pnpm 10.33.2.
+Изменены только документация, presentation assets и отдельный генератор шапок;
+контракты core, Vue UI, Rust и платформ не менялись.
+
+- `pnpm artwork:github` — passed: сохранённые PNG повторно декодированы,
+  README 1280×480 / 41 456 bytes, Social preview 1280×640 / 43 000 bytes.
+  Логотип загружается из существующего SVG; supplied toolbar 598×41 сохранён
+  byte-for-byte и обрезается только clip-маской при композиции для удаления
+  прямоугольных углов исходного screenshot.
+- `pnpm format`, `pnpm format:check`, `pnpm docs:check`,
+  `pnpm exec eslint scripts/generate-github-artwork.mjs`, `git diff --check` —
+  результаты в `artifacts/readme-verification.log`, форматирование —
+  `artifacts/readme-format.log`. Полные runtime suites не запускались:
+  приложение не изменялось.
+- GitHub Markdown API отрендерил обе версии README. Локальный browser preview
+  с приближёнными GitHub light/dark styles проверен в восьми сочетаниях
+  EN/RU × light/dark × 375/1280 px. Оба изображения загружены во всех вариантах,
+  шапка целиком помещается, горизонтального overflow страницы нет.
+  Screenshots: `artifacts/readme-{en,ru}-{light,dark}-{375,1280}.png`;
+  DOM metrics: `artifacts/readme-browser-qa.json`. PNG шапок просмотрены отдельно.
+  Это проверка GFM и локального представления, а не опубликованной GitHub страницы.
+- About description/topics и Social preview подготовлены для ручной настройки
+  согласно уточнению пользователя; внешние настройки не менялись.
+
 ## Vite dev/E2E optimize-deps cache (2026-10-18)
 
 Windows x64: запрос пользователя к `localhost:5173` с прежним hash Tauri core

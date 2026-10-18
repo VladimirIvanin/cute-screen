@@ -21,6 +21,7 @@
     "tauri": "node node_modules/@tauri-apps/cli/tauri.js",
     "icons:generate": "node scripts/generate-brand-assets.mjs",
     "icons:landing": "node scripts/generate-landing-icons.mjs",
+    "artwork:github": "node scripts/generate-github-artwork.mjs",
     "icons:preview": "vite --config apps/desktop/vite.config.ts",
     "check": "pnpm lint && pnpm typecheck && pnpm format:check && pnpm docs:check && pnpm test:boundaries && pnpm ipc:check && pnpm check:rust",
     "ipc:codegen": "cargo run --quiet --bin desktop-ipc-codegen",

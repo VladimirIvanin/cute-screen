@@ -1,88 +1,75 @@
+[![Cute Screen — cat-shaped monitor logo above the screenshot annotation toolbar](docs/assets/github/readme-header.png)](docs/assets/github/readme-header.png)
+
+<p align="center">
+  <strong>English</strong> · <a href="README.ru.md" lang="ru">Русский</a><br />
+  <a href="https://vladimirivanin.github.io/cute-screen/en/">Website</a> ·
+  <a href="#get-started">Get started</a> ·
+  <a href="https://github.com/VladimirIvanin/cute-screen/issues">Report an issue</a>
+</p>
+
 # Cute Screen
 
-Cute Screen is a local-first screenshot capture and annotation application being built with Tauri 2, Vue 3, and Rust. The repository is currently at **M00 / foundation**: workspace boundaries, deterministic test seams, and CI are available, while capture, editor, renderer, and library product features are intentionally not implemented.
+**A local-first screenshot capture and annotation editor.** Capture your screen or open an image, add clear visual
+explanations, and copy or save the result. Your screenshots and editable documents stay on your device. No account needed.
 
-The product contract lives in [`docs/PRODUCT.md`](docs/PRODUCT.md), accepted architecture decisions in [`docs/DECISIONS.md`](docs/DECISIONS.md), and the foundation verification strategy in [`docs/TESTING.md`](docs/TESTING.md) and [CI workflow](.github/workflows/ci.yml).
+Made for bug reports, tutorials, design feedback, and everyday explanations.
 
-## Toolchain
+> **In development.** The editor and capture workflows are implemented, but platform validation is still in progress.
+> There are no published GitHub Releases or signed installers. To try Cute Screen today, run it from source.
 
-- Node `22.23.1`
-- pnpm `10.33.2`, activated through Corepack
-- Rust `1.97.0`, selected by `rust-toolchain.toml`
+## What you can do
 
-Install the exact JavaScript dependencies from a clean checkout:
+| Task                       | Tools                                                            |
+| -------------------------- | ---------------------------------------------------------------- |
+| Point out a detail         | Arrows, lines, shapes, freehand pencil, and highlighter          |
+| Explain a sequence         | Text, callouts, and numbered markers                             |
+| Hide sensitive details     | Manual pixelation or solid cover                                 |
+| Make small details visible | Spotlight, loupe, and ruler                                      |
+| Prepare an image           | Crop, insert additional images, and arrange annotations          |
+| Keep working               | Undo/redo and local screenshot history with editable annotations |
+| Share the result           | Copy the rendered image to the clipboard or save a PNG           |
 
-```bash
-corepack enable
-corepack prepare pnpm@10.33.2 --activate
-pnpm install --frozen-lockfile
-```
+## See an example
 
-The install fails early with an actionable message when Node or pnpm does not match the pinned contract.
+[![Annotated example showing numbered steps, an arrow, highlighted controls, a width measurement, and a magnified detail](apps/landing/assets/hero-admin.png)](apps/landing/assets/hero-admin.png)
 
-## Tauri prerequisites
+An example annotation on a fictional admin interface. Open the image to inspect the details, or visit the
+[website](https://vladimirivanin.github.io/cute-screen/en/) for a tour of the tools.
 
-Follow the [official Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for the current operating system, then run:
+## Get started
 
-```bash
-pnpm run doctor
-```
+Start with the [source setup guide](docs/DEVELOPMENT.md#run-the-desktop-app). Once the desktop app is running:
 
-On Ubuntu 24.04 the required development packages include GTK 3, WebKitGTK 4.1, JavaScriptCoreGTK 4.1, libsoup 3, OpenSSL, libayatana-appindicator, librsvg, and build tools. Browser E2E additionally requires Chrome; real Linux Tauri E2E runs through the embedded WDIO WebDriver provider and needs a display or `xvfb-run`.
+1. **Capture or open.** Capture an area, screen, or window using the tray menu or a configured shortcut, or open an image
+   in the editor. Available capture modes depend on your operating system.
+2. **Annotate.** Use the bottom toolbar to add arrows, labels, numbers, and other annotations. Select an object to adjust
+   its appearance; undo and redo let you revise your work.
+3. **Copy or save.** Copy the result to the clipboard or save a PNG. The original capture remains unchanged.
 
-Windows development requires the Microsoft C++ Build Tools and WebView2. macOS development requires Xcode Command Line Tools.
+Area capture opens Quick Capture, where you can annotate before copying or saving, or continue in the full editor.
 
-## Stable commands
+## Platforms and current limits
 
-Format sources with `pnpm format` and verify them with `pnpm format:check`.
-`pnpm check` includes the formatting gate. ESLint Stylistic formats JS/TS/Vue;
-Prettier handles CSS, JSON, YAML, Markdown and HTML. VS Code recommends both
-extensions and uses the matching formatter on save. Width is 120; named imports,
-function declarations and interface base lists wrap by structure, while short
-calls stay compact. Format Rust with `cargo fmt --all`.
+Cute Screen targets **Linux, Windows, and macOS**, with Linux first in the development priorities. Available modes and
+runtime verification differ between systems; a successful CI compilation does not mean every feature is verified.
 
-```text
-pnpm check
-pnpm test
-pnpm test:coverage
-pnpm test:render
-pnpm test:e2e:browser
-pnpm test:e2e:tauri
-pnpm test:perf
-pnpm tauri build
-cargo test --workspace
-cargo test --workspace --features fake-platform
-cargo clippy --workspace --all-targets -- -D warnings
-```
+| Platform        | What to expect                                                                                                                    |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Linux / X11     | Native capture and global shortcuts; compositor and display configuration affect verification.                                    |
+| Linux / Wayland | System capture picker through XDG portals. Shortcuts use the GlobalShortcuts portal when available, with CLI setup as a fallback. |
+| Windows         | Native capture and global shortcuts. ARM64 and mixed-DPI/multi-monitor coverage still have pending checks.                        |
+| macOS           | Screen recording permission is required. Capture and shortcut coverage is still being validated on Intel and Apple Silicon.       |
 
-`test:render` and `test:perf` currently exercise only their deterministic harness helpers. Passing them is not evidence that a renderer exists or that a performance budget has been reached.
+See the [platform matrix](docs/PLATFORM_MATRIX.md) for the current evidence and limitations. There is no official signed
+distribution or automatic update installation; see [build and distribution details](docs/BUILD_RELEASE.md).
 
-The browser E2E suite starts and stops Vite automatically. The Tauri suite builds a separate binary with `fake-platform,test-harness`, creates temporary app data, exercises a typed Rust IPC round-trip in a real webview, and closes the process. A normal `pnpm tauri build` enables neither test feature.
+## Help and feedback
 
-## Workspace boundaries
+[Open an issue](https://github.com/VladimirIvanin/cute-screen/issues) with your OS, app version or commit, steps to reproduce,
+and what you expected. Include an example image only if it is safe to share.
 
-```text
-editor-core <- editor-renderer <- editor-vue <- desktop shell
-```
+## For developers
 
-`editor-core` is compiled without DOM types and cannot import Vue, Tauri, the renderer, or Vue adapters. The fake-platform scenario and fixture manifests contain metadata and paths only; image bytes are never placed in JSON or base64.
-
-## CI status
-
-GitHub Actions validates Linux x64 runtime behavior and compile-checks Linux ARM64, Windows x64/ARM64, and macOS Intel/Apple Silicon. Successful compilation is not a platform-support claim; runtime support remains `planned` until the later capture and platform milestones provide real evidence.
-
-## Landing page
-
-The static landing page lives in `apps/landing`. Run `pnpm dev:landing` to preview it locally and
-`pnpm build:landing` to prepare the GitHub Pages artifact. After the first merge, open the repository
-**Settings → Pages**, select **GitHub Actions** as the publishing source, then run the **Deploy landing
-page** workflow or push a landing change to `main`. The default address is
-`https://VladimirIvanin.github.io/cute-screen/`.
-
-`pnpm test:e2e:landing` builds and checks the production preview on port 5176,
-including both languages at exact viewport widths of 375, 768, 1024 and 1440 px.
-The tool icons are static exports of the app's `UiIcon`; run `pnpm icons:landing`
-after updating their source. The supplied tool rail screenshot is preserved at
-595×46 px and clipped to its rounded boundary with CSS. The annotated admin
-screenshot in the hero is supplied by the user; it is hidden at widths up to
-760 px while the tool rail and feature descriptions remain visible.
+Read the [development guide](docs/DEVELOPMENT.md) for setup, commands, architecture, and landing-page maintenance.
+The [product contract](docs/PRODUCT.md), [architecture](docs/ARCHITECTURE.md), and [testing guide](docs/TESTING.md) describe
+the implementation and its acceptance requirements.
