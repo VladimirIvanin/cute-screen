@@ -1,5 +1,15 @@
 # Платформенная матрица
 
+## Версия в Settings (2026-10-18, ADR-108)
+
+Общий Vue UI показывает package version через Tauri getVersion; settings
+window имеет core:app:allow-version. Ubuntu 24.04.5 x64 / GNOME X11 /
+WebKitGTK 2.52.6: native metadata assertion прошёл, видна Version 0.1.0.
+Полный activation-settings native regression после ожидания save — 3/3 passed.
+Chrome 154: 2/2 browser scenarios, RU/EN × light/dark и 820×720/620×520;
+screenshots просмотрены. Полные результаты — TESTING.md.
+Windows/macOS runtime в этом срезе не проверялись.
+
 ## Закрытие меню трея перед захватом (2026-10-18, ADR-107)
 
 Все tray capture requests используют штатный отменяемый delay 200 мс;

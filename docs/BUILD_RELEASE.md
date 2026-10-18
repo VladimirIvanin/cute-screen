@@ -319,6 +319,12 @@ Workflow не создаёт GitHub Release и не прикладывает upd
 
 ### Источники
 
+ADR-108: текущий номер уже показывается в Settings sidebar через Tauri
+getVersion с отдельным core:app:allow-version для settings window.
+Browser preview получает номер из tauri.conf.json при Vite build;
+номер вручную в Vue не задаётся. Это отображение локальных метаданных,
+независимое от запланированного GitHub version check ниже.
+
 - Current version: Tauri package/app metadata, получаемая через typed native adapter.
 - Repository: compile-time `owner/repo`, задаваемый CI variable `CUTE_SCREEN_GITHUB_REPOSITORY`.
 - Remote versions: публичный GitHub REST endpoint `GET /repos/{owner}/{repo}/tags?per_page=100`.

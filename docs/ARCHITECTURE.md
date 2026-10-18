@@ -1,5 +1,13 @@
 # Архитектура Cute Screen
 
+## Метаданные версии в Settings (ADR-108)
+
+AppVersion владеет только transient loading/error состоянием и читает
+версию через app-version-adapter. Desktop получает package metadata Tauri;
+browser preview использует Vite define из tauri.conf.json. Компонент
+находится в общей боковой панели вне загрузки и навигации Settings.
+Настройки, scene graph и IPC schema не меняются.
+
 ## Закрытие меню трея перед захватом (ADR-107)
 
 Только capture_request_for_tray задаёт 200 мс delay. После preflight/hide

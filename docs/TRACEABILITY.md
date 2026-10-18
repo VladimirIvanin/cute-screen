@@ -10,6 +10,11 @@
 между разделами и совпадение native metadata. Проверка новых версий по сети
 остаётся отдельным planned контрактом.
 
+Результат: unit 6/6, browser 2/2 passed; RU/EN × light/dark и compact layout
+проверены по screenshots. Native metadata assertion прошёл в Settings
+WebView; полный activation-settings native regression — 3/3 passed.
+Команды и результаты проверок — TESTING.md.
+
 ## Захват после закрытия меню трея (2026-10-18, до реализации)
 
 `REQ-CAP-001/002/005/006/012/014`: команды захвата из трея дают системному

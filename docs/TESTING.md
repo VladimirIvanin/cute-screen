@@ -1,5 +1,34 @@
 # Стратегия тестирования
 
+## Версия в настройках (2026-10-18, ADR-108)
+
+Ubuntu 24.04.5 x64 / GNOME X11; Chrome 154.0.8037.57 и WebKitGTK 2.52.6.
+
+- `pnpm test tests/unit/vue/app-version.test.ts tests/unit/vue/settings-navigation.test.ts`
+  — 6/6 passed; `artifacts/settings-version-unit.log`. Native pending response,
+  prerelease/build suffix, RU/EN, error → Retry и browser fallback без IPC.
+- `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5296 pnpm test:e2e:browser --spec tests/e2e/specs/browser-activation-settings.e2e.ts`
+  — 2/2 passed; `artifacts/settings-version-browser.log`. Версия совпадает с
+  tauri.conf.json в RU/EN × light/dark, 820×720 и 620×520, после перехода
+  между General и Shortcuts. Просмотрены
+  `artifacts/browser-e2e/settings-inline-ru-light-620.png` и
+  `settings-inline-en-dark-820.png`: версия видима без обрезки.
+- `CUTE_SCREEN_E2E_SCENARIOS=activation-settings XDG_SESSION_ID=cutescreen-settings-version pnpm test:e2e:tauri`
+  — metadata assertion прошёл в настоящем Settings WebView; весь сценарий
+  2/3 из-за повторного перехода в General до завершения save. Screenshot
+  `artifacts/tauri-e2e/failure-opens-a-singleton-settings-window-through-CLI-and-assigns-through-the-real-recorder.png`
+  просмотрен: Version 0.1.0 видна. Helper теперь ждёт enabled navigation и
+  показ language select. Исходный лог: `artifacts/settings-version-native.log`.
+- Повтор с `XDG_SESSION_ID=cutescreen-settings-version-retry` и той же
+  `CUTE_SCREEN_E2E_SCENARIOS=activation-settings pnpm test:e2e:tauri`
+  — 3/3 passed; `artifacts/settings-version-native-retry.log`. Проверены
+  native metadata, повторный CLI вход, singleton, tray settings и физический
+  X11 shortcut. Финальный `artifacts/tauri-e2e/settings-native-general.png`
+  просмотрен: Version 0.1.0 видна под названием приложения.
+
+Проверка обновлений по сети не входит в этот срез. Windows/macOS runtime
+не запускались. Установленный пакет не обновлялся.
+
 ## Захват без меню трея (2026-10-18, ADR-107)
 
 Ubuntu 24.04.5 x64 / GNOME X11, 1920×1080 / WebKitGTK 2.52.6.

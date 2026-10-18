@@ -1337,6 +1337,12 @@ parsing. The physical replay was inspected in
 `/tmp/cutescreen-selector-lucide-camera-2026-08-28.png`; Escape returned typed
 `cancelled`.
 
+Текущая версия (REQ-UI-015, ADR-108): открыть Settings → General;
+под Cute Screen видна «Версия <номер>» / «Version <number>» из метаданных
+запущенного приложения. Проверить RU/EN, обе темы, 820×720 и 620×520;
+переключить разделы и выделить номер для копирования. При ошибке чтения
+доступен повтор; настройки остаются рабочими. Фактический evidence — TESTING.md.
+
 Отдельно проверить GitHub version check:
 
 1. При равном/старом теге приложение показывает, что текущая версия актуальна.
