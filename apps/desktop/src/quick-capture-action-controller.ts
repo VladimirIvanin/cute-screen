@@ -110,7 +110,11 @@ export class QuickCaptureActionController {
       if (this.#ports.selectionPending.value) return
       event.preventDefault()
       void this.copy()
-    } else if (event.key === 'Escape' && !event.repeat) {
+    } else if (
+      event.key === 'Escape' &&
+      (!event.repeat ||
+        this.#ports.selectionPending.value)
+    ) {
       event.preventDefault()
       void this.cancel()
     }

@@ -1,5 +1,181 @@
 # Стратегия тестирования
 
+## Escape до первого выделения Area (2026-10-18)
+
+Ubuntu 24.04.5 x64 / X11, WebKitGTK 2.52.6, Node 22.23.1 / pnpm 10.33.2.
+Существующий контракт `REQ-CAP-011/012/014` восстановлен без изменений core,
+Rust/IPC и accepted ADR. Initial Escape обрабатывается window capture listener,
+зарегистрированным до mount canvas; editing gesture cancellation сохраняется.
+
+- До исправления mounted production EditorShell с фокусом вне shell пропускал
+  Escape: 1 failed / 5 passed. `artifacts/area-escape-unit-red.log`.
+- `pnpm test tests/unit/vue/quick-capture tests/unit/vue/canvas-viewport-quick.test.ts tests/unit/vue/straight-strokes.test.ts`:
+  78/78 passed. Проверены body/canvas/первый drag, cancel/retry, Quick actions,
+  crop gestures и отмена незавершённых штрихов. `artifacts/area-escape-unit.log`.
+- Native regression подтвердил Escape с repeat=true после hide/reopen Quick:
+  событие было trusted, initial capture оставался Selecting. Диагностика до
+  исправления repeat guard: `artifacts/area-escape-native-repeat-red.json`.
+  Отдельный failing test guard — `artifacts/area-escape-repeat-red.log`.
+  В selecting repeat разрешён, в editing остаётся подавленным.
+- `CUTE_SCREEN_E2E_SCENARIOS=area-escape pnpm test:e2e:tauri`: fresh debug
+  build и 1/1 passed в Tauri/Wry WebKitGTK, physical X11 capture 1920×1080.
+  Без `.focus()` или клика по canvas первый trusted Escape закрывает selector;
+  повторный capture → удерживаемый drag 200,200→700,500 → trusted Escape с
+  repeat=true также удаляет draft. В обоих случаях Quick hidden, main visible,
+  `repository_open_last` возвращает null. `artifacts/area-escape-tauri.log`,
+  `artifacts/tauri-e2e/area-escape.json`; просмотрены screenshots
+  `area-escape-initial.png` и `area-escape-drag.png` в том же каталоге.
+- `pnpm check` — exit 0: lint/typecheck/format/docs, boundaries 45/45, IPC
+  codegen drift check, frontend build, Rust fmt и все четыре Clippy конфигурации.
+  `artifacts/area-escape-check.log`.
+- `pnpm format`, `pnpm format:check` и `git diff --check` — passed.
+  Логи: `artifacts/area-escape-format.log`,
+  `artifacts/area-escape-format-check.log`.
+
+Browser mode, Windows/WebView2, macOS/WKWebView и Wayland portal для этой правки
+не запускались. Windows physical exclusion E2E больше не назначает DOM focus
+перед Escape; его результат требует отдельного Windows runner.
+
+## Исправление TypeScript architecture ratchets (2026-10-18)
+
+Ubuntu 24.04.5 LTS x86_64, Linux 6.8.0-147-generic, Node 22.23.1,
+pnpm 10.33.2. Поведенчески нейтральный рефакторинг по ADR-042:
+preview helpers панели фигур вынесены в отдельный UI-модуль; eyedropper
+сам предоставляет UI bindings; callout style и завершение штриха выделены
+в функции; gradient payload отделён от dispatch; image E2E разбит на этапы
+с прежними assertions и pixel tolerances. Бюджеты и exceptions не менялись.
+
+Исходный `pnpm test:boundaries` воспроизвёл два падения из отчёта (семь
+нарушений размеров/complexity/depth), а также независимый build-contract
+failure: строковая capability reference перед inline test-harness. Тест
+теперь выбирает test-harness по identifier и сохраняет проверки hide/show.
+
+- `pnpm test:boundaries` — 10 files, 45/45 passed.
+- `pnpm typecheck` — passed, включая package build и E2E TypeScript.
+- `pnpm lint` — exit 0, 85 warnings, 0 errors.
+- `pnpm test:render` — 18 files, 51/51 passed, goldens не обновлялись.
+- Первый `pnpm test` — 151/152 files passed, 1362 passed / 1 failed. Единственное
+  падение — `quick-capture-warmup.test.ts`, который вместе с QuickCaptureApp
+  менялся параллельно вне этого рефакторинга. Повторный scoped запуск
+  `pnpm test --project vue tests/unit/vue/quick-capture-warmup.test.ts` —
+  5 passed / 1 failed: Escape из body не вызвал cancel. Затронутые этим
+  рефакторингом core/renderer/Vue tests прошли. После обновления параллельной
+  правки итоговый `pnpm test` — **152 files, 1365/1365 passed**;
+  `artifacts/architecture-ratchets/unit-final.log`.
+- `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5191 pnpm test:e2e:browser --spec tests/e2e/specs/browser-image-editing.e2e.ts`
+  — Chrome 154.0.8037.57, 1/1 passed: восемь сочетаний 1024/1600 px × RU/EN ×
+  light/dark, импорт 3840×2160, move/resize/rotate, Escape, undo/redo,
+  numeric formatting и четыре прямых border corners. Screenshots и JUnit —
+  `artifacts/browser-e2e/`; исходные assertions и допуски сохранены.
+- `pnpm format`, `pnpm format:check`, `pnpm docs:check` — passed.
+
+Логи: `artifacts/architecture-ratchets/`. Browser evidence не расширяет
+платформенные гарантии; real Tauri и другие ОС этим рефакторингом не проверялись.
+
+## Ссылка атрибуции Noto Emoji (2026-10-18, ADR-105)
+
+Ubuntu 24.04.5 LTS x86_64/X11, Linux 6.8.0-147-generic, WebKitGTK 2.52.6,
+Node 22.23.1, pnpm 10.33.2. Native host подключает scoped opener; Enter ссылки
+не всплывает в Quick shortcut Copy. Document/core/desktop IPC не меняются.
+
+- `pnpm test:boundaries tests/boundaries/tauri-capabilities.test.ts`: 2/2 passed;
+  точный URL и оба окна, общая capability в production и native harness.
+  До реализации новый контракт падал на отсутствующей capability.
+- `pnpm test tests/unit/vue/emoji-tool.test.ts`: 6/6 passed. Новая регрессия
+  сначала падала на всплытии Enter к window, затем проверила сохранение default
+  activation, focus и отсутствие изменения документа.
+- `pnpm exec tsc --noEmit -p tests/e2e/tsconfig.json`: passed.
+- `pnpm lint`: passed, 85 существующих warnings; scoped ESLint также passed.
+- `cargo fmt --all --check`: passed. Новые Rust зависимости MIT/Apache-2.0;
+  open/is-docker/is-wsl — MIT. Lockfile изменяет только новый dependency graph.
+
+`PATH="$PWD/artifacts/noto-driver/bin:$PWD/artifacts/noto-driver/webkit/usr/bin:$PATH" CUTE_SCREEN_E2E_SCENARIOS=emoji-link pnpm test:e2e:tauri`:
+1/1 passed, свежий test-harness binary, external tauri-driver 2.1.0 и
+WebKitWebDriver 2.52.6. Production empty mount → Capture → Quick → выбор области →
+Emoji picker → Editor handoff. Click и Enter из обоих окон имеют isTrusted=true;
+recording xdg-open получил четыре точных URL. Чужой HTTPS URL, file URL и
+вложенный upstream path отвергнуты без OS dispatch. Палитра остаётся открытой;
+Enter больше не вызывает Quick Copy. Для стабильного native input сценарий
+ждёт window focus и окончания анимации палитры.
+
+Просмотрены artifacts/tauri-e2e/quick-noto-link.png (1920×1080) и
+editor-noto-link.png (1280×800), включая видимый focus ring ссылки. Полный лог:
+artifacts/noto-link-tauri.log; OS boundary: artifacts/tauri-e2e/emoji-link-dispatch.log.
+Ранее embedded driver выявил Quick Enter/Copy conflict; итоговый pass получен
+external driver после исправления propagation. Capture fake-platform 400×300;
+это проверка UI/URL dispatch, не physical capture и не загрузка страницы браузером.
+Windows/WebView2, macOS/WKWebView и Wayland этой правкой не проверялись.
+Драйверы загружены локально в ignored artifacts/noto-driver, системные пакеты
+и настройки браузера пользователя не менялись.
+
+`pnpm check`: exit 0 — lint, полный typecheck, format:check, docs:check,
+45/45 boundary tests, generated IPC check, Rust fmt и все четыре Clippy
+конфигурации прошли. Rust этап ожидал Cargo lock параллельной сборки.
+`pnpm format` выполнен; финальное форматирование и отдельный format:check
+сохранены в artifacts/noto-link-format.log и artifacts/noto-link-format-check.log.
+Логи unit, capabilities, scoped lint/types и общей проверки:
+artifacts/noto-link-unit.log, noto-link-boundaries.log, noto-link-lint.log,
+noto-link-types.log, noto-link-check.log. Renderer goldens, browser E2E,
+performance suite и cargo test --workspace не запускались: artwork, scene,
+commands, export и Rust core не менялись.
+
+## Ubuntu 22.04 baseline (2026-10-18, ADR-104)
+
+Host: Ubuntu 24.04.5 x64; проверяемая среда: Docker Ubuntu 22.04.5 x64,
+glibc `2.35-0ubuntu3.14`, GTK `3.24.33-1ubuntu2.2`, WebKitGTK
+`2.50.4-0ubuntu0.22.04.1` из Jammy updates. Новых Rust/core контрактов нет.
+
+- Старый `target/release/cute-screen` от 2026-10-17: в Jammy с установленными
+  GTK/WebKit `--help` падает на `GLIBC_2.39 not found`.
+  `artifacts/compat-ubuntu22/jammy-runtime.log`.
+- `pnpm check:linux:compat` — ожидаемый exit 1 на старом ELF; weak imports
+  pidfd_spawnp/pidfd_getpid также требуют GLIBC_2.39.
+  `artifacts/compat-ubuntu22/old-binary-gate.log`.
+  `pnpm check:linux:compat /bin/true` — exit 0, maximum GLIBC_2.34.
+- Дополнительный API diagnostic в настоящем Jammy WebKitGTK/Xvfb:
+  `DISPLAY=:99 XAUTHORITY=/tmp/xvfb-run.Hegn7V/Xauthority WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1 python3 -u /audit/webkit-api-probe.py`.
+  `structuredClone`, `crypto.randomUUID`, `Intl.Segmenter`, ResizeObserver,
+  inert, CSS :has, PNG Canvas.toBlob/createImageBitmap и module worker с
+  OffscreenCanvas 2D/convertToBlob, FontFace/self.fonts — passed.
+  Script/result: `artifacts/compat-ubuntu22/webkit-api-probe.py`,
+  `artifacts/compat-ubuntu22/webkit-api-result.log`. Это focused API diagnostic
+  с отключённой sandbox в root container, не production editor acceptance.
+- `pnpm format` — exit 0. Первый `pnpm check`: lint, typecheck, format и docs checks
+  прошли; boundaries — 42 passed / 2 failed на существующих file-size/complexity
+  violations (ShapeFormattingToolbar, canvas-workspace-controller, styles,
+  gesture-finish-controller, drawing-payload, image-editing). Rust portion после
+  boundaries не запускалась. `artifacts/compat-ubuntu22/check.log`. Эти ratchets
+  затем исправлены параллельной работой; её результаты — в разделе выше.
+
+- `pnpm build:linux:ubuntu22` — exit 0 на окончательном Docker image.
+  Первый прогон собрал release/DEB, но AppImage остановился на отсутствующем
+  `/usr/bin/xdg-open`; добавлен `xdg-utils` в image, CI и DEB dependencies.
+  Первый/финальный логи: `artifacts/compat-ubuntu22/build-first.log`,
+  `artifacts/compat-ubuntu22/build.log`. Cargo/JS outputs отдельные; перед Rust
+  build переиспользован только cache исходных crates, не host target.
+- `pnpm check:linux:compat artifacts/ubuntu22-work/target/release/cute-screen`
+  — passed, maximum GLIBC_2.34; прежнее требование GLIBC_2.39 отсутствует.
+  DEB metadata требует libc6 >= 2.35, WebKitGTK 4.1 >= 2.40 и xdg-utils.
+  Штатные `check-m04-deb.mjs` и `check-m04-appimage.mjs` — passed в Jammy.
+- В отдельном Jammy container:
+  `apt-get install --reinstall -y /tmp/cute-screen-final.deb && /usr/bin/cute-screen --help`
+  — exit 0; зависимости устанавливаются через apt.
+  `APPIMAGE_EXTRACT_AND_RUN=1 /tmp/CuteScreen.AppImage --help` — exit 0.
+  Логи: `artifacts/compat-ubuntu22/deb-install-final.log`,
+  `artifacts/compat-ubuntu22/appimage-jammy.log`. FUSE mount не проверялся.
+- Финальный установленный DEB: обычный user uid 1000, Xvfb/X11, session D-Bus,
+  штатная WebKit sandbox (без disable flag),
+  `dbus-run-session -- timeout 12s /usr/bin/cute-screen show`.
+  Окно `Cute Screen — Settings` 820×720 и WebKitWebProcess появились; процесс
+  оставался запущенным до ожидаемого timeout exit 124. Это startup smoke,
+  не visual/interaction acceptance. Логи: `artifacts/compat-ubuntu22/gui-launch-final.log`,
+  `artifacts/compat-ubuntu22/gui-windows-final.log`. В минимальном container
+  отсутствует accessibility bus (AT-SPI warning).
+- Готовые `Cute Screen_0.1.0_amd64.deb` и `.AppImage` находятся в
+  `artifacts/ubuntu22/`; `sha256sum -c SHA256SUMS` — оба OK.
+
+ARM64 и physical GNOME/Wayland capture/clipboard не проверены.
+
 ## Пользовательский README и GitHub-шапка (2026-10-18)
 
 `REQ-UI-013`, `REQ-ACT-006`, ADR-057. Windows x64, Node 22.23.1 / pnpm 10.33.2.

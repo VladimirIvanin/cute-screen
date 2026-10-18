@@ -1,5 +1,13 @@
 # Архитектура Cute Screen
 
+## Внешняя атрибуция эмоджи (ADR-105)
+
+Tauri host регистрирует opener plugin; его initialization script обрабатывает
+обычные ссылки target=_blank, включая активацию клавиатурой. Отдельная
+capability emoji-attribution связывает точный upstream URL с main и
+quick-capture. Компонент палитры не импортирует native API. Production и
+native E2E используют одну capability; браузерный preview использует href.
+
 ## Ширина подписи выноски (ADR-103)
 
 CalloutWidthControl владеет только transient dropdown: общий preview-placement

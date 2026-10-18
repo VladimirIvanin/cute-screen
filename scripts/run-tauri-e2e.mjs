@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process'
 import net from 'node:net'
 import {
   copyFile,
+  chmod,
   mkdtemp,
   mkdir,
   rm,
@@ -21,7 +22,9 @@ await mkdir(runtimeDirectory, { recursive: true })
 const embeddedWebDriverPort = Number.parseInt(process.env.TAURI_WEBDRIVER_PORT ?? '4445', 10)
 
 const scenarios = [
+  { id: 'area-escape', spec: 'tests/e2e/specs/tauri-area-escape.e2e.ts', harnessQuery: '?m04=1' },
   { id: 'landing-assets', spec: 'tests/e2e/specs/tauri-landing-assets.e2e.ts', harnessQuery: '?m04=1&m08=1', driverProvider: 'external' },
+  { id: 'emoji-link', spec: 'tests/e2e/specs/tauri-emoji-link.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },
   { id: 'emoji', persistenceGroup: 'emoji', spec: 'tests/e2e/specs/tauri-emoji.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },
   { id: 'emoji-reopen', persistenceGroup: 'emoji', spec: 'tests/e2e/specs/tauri-emoji-reopen.e2e.ts', harnessQuery: '?m04=1&m08=1', driverProvider: 'external' },
   { id: 'quick-history', persistenceGroup: 'quick-history', spec: 'tests/e2e/specs/tauri-quick-history.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },
@@ -567,6 +570,18 @@ try {
         TMP: runtimeDirectory,
         PATH: `${driverCache}${path.delimiter}${process.env.PATH ?? ''}`,
       } : {}),
+    }
+    if (scenario.id === 'emoji-link' && process.platform === 'linux') {
+      // Observe the real plugin's OS dispatch without opening browser tabs in CI.
+      const openerDirectory = path.join(appData, 'browser-dispatch')
+      await mkdir(openerDirectory, { recursive: true })
+      const dispatchLog = path.join(artifacts, 'emoji-link-dispatch.log')
+      await writeFile(dispatchLog, '')
+      const opener = path.join(openerDirectory, 'xdg-open')
+      await writeFile(opener, '#!/bin/sh\nprintf \'%s\\n\' "$1" >> "$CUTE_SCREEN_E2E_BROWSER_DISPATCH_LOG"\n')
+      await chmod(opener, 0o755)
+      scenarioEnv.PATH = `${openerDirectory}${path.delimiter}${process.env.PATH ?? ''}`
+      scenarioEnv.CUTE_SCREEN_E2E_BROWSER_DISPATCH_LOG = dispatchLog
     }
     if (scenario.harnessQuery) {
       scenarioEnv.CUTE_SCREEN_E2E_HARNESS_QUERY = scenario.harnessQuery

@@ -87,6 +87,22 @@ describe('history terminal action', () => {
     expect(ports.error.value).toBe('Library disk is full')
   })
 
+  it('cancels initial selection even when a reused WebView reports Escape as repeated', async () => {
+    const { controller, ports, dismissWindow } = setup()
+    ports.selectionPending.value = true
+    const event = new KeyboardEvent('keydown', { key: 'Escape', repeat: true, cancelable: true })
+    controller.keydown(event)
+    await vi.waitFor(() => expect(dismissWindow).toHaveBeenCalledOnce())
+    expect(event.defaultPrevented).toBe(true)
+    expect(ports.coordinator.cancel).toHaveBeenCalledWith('draft')
+  })
+
+  it('ignores repeated Escape in editing so a held key cannot close after cancelling a stroke', () => {
+    const { controller, dismissWindow } = setup()
+    controller.keydown(new KeyboardEvent('keydown', { key: 'Escape', repeat: true }))
+    expect(dismissWindow).not.toHaveBeenCalled()
+  })
+
   it('lets a focused action button handle Enter and keeps canvas Enter as Copy', () => {
     const { controller } = setup()
     const copy = vi.spyOn(controller, 'copy').mockResolvedValue(undefined)

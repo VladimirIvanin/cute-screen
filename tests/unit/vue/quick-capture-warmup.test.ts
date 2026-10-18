@@ -105,6 +105,30 @@ describe('GTK quick capture mapped warmup', () => {
     await vi.waitFor(() => expect(mocks.dismiss).toHaveBeenCalledOnce())
   })
 
+  it.each(['body', 'canvas', 'drag'])('cancels initial selection from %s with the real shell', async (target) => {
+    const view = render(QuickCaptureApp, {
+      global: { plugins: [createEditorShellPinia()] },
+    })
+    await vi.waitFor(() => expect(mocks.loadImage).toHaveBeenCalledOnce())
+    await vi.waitFor(() => expect(view.container.querySelector('.cs-loading')).toBeNull())
+    const scene = view.getByLabelText('Scene canvas') as HTMLCanvasElement
+    if (target === 'body') {
+      // Native reveal can leave focus outside the shell even after the hidden
+      // canvas attempted to focus during mount.
+      scene.blur()
+      expect(document.activeElement).toBe(document.body)
+    } else if (target === 'drag') {
+      scene.getBoundingClientRect = () => ({ left: 0, top: 0, width: 1280, height: 720 }) as DOMRect
+      scene.setPointerCapture = vi.fn()
+      await fireEvent.pointerDown(scene, { pointerId: 7, button: 0, clientX: 100, clientY: 100 })
+      await fireEvent.pointerMove(scene, { pointerId: 7, clientX: 600, clientY: 400 })
+      expect(view.container.querySelector('.cs-quick-capture')).toHaveClass('is-changing-frame')
+    }
+    await fireEvent.keyDown(target === 'body' ? document.body : scene, { key: 'Escape' })
+    await vi.waitFor(() => expect(mocks.cancel).toHaveBeenCalledWith('draft-gtk'))
+    expect(mocks.dismiss).toHaveBeenCalledOnce()
+  })
+
   it('overlaps mapped warmup with frozen-frame decode', async () => {
     render(QuickCaptureApp, {
       global: {

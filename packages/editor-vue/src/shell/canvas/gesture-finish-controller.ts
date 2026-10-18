@@ -73,22 +73,7 @@ export function finishCanvasGesture(
   context: GestureFinishContext,
   event: PointerEvent,
 ): void {
-  let completed = context.gesture()
-  if (
-    completed?.kind === 'draw' &&
-    (completed.tool === 'pencil' ||
-      completed.tool === 'marker')
-  ) {
-    const end = context.canvasPoint(event)
-    const previous = completed.points.at(-1)
-    if (end && completed.stroke) {
-      const point = {
-        ...end, pressure: end.pressure && end.pressure > 0 ? end.pressure : previous?.pressure ?? .5,
-      }
-      const stroke = moveStroke(completed.stroke, point, event.shiftKey, true)
-      completed = { ...completed, stroke, current: stroke.points.at(-1)!, points: stroke.points }
-    }
-  }
+  let completed = finishStroke(context.gesture(), context, event)
   const end = context.canvasPoint(event)
   if (
     end &&
@@ -136,6 +121,29 @@ export function finishCanvasGesture(
   const hoverPoint = context.canvasPoint(event)
   if (hoverPoint) context.updateHoverCursor(hoverPoint)
   if (requiresCommittedRestore(completed)) scheduleCommittedRestore(context)
+}
+
+function finishStroke(
+  completed: CanvasGesture,
+  context: GestureFinishContext,
+  event: PointerEvent,
+): CanvasGesture {
+  if (
+    completed?.kind === 'draw' &&
+    (completed.tool === 'pencil' ||
+      completed.tool === 'marker')
+  ) {
+    const end = context.canvasPoint(event)
+    const previous = completed.points.at(-1)
+    if (end && completed.stroke) {
+      const point = {
+        ...end, pressure: end.pressure && end.pressure > 0 ? end.pressure : previous?.pressure ?? .5,
+      }
+      const stroke = moveStroke(completed.stroke, point, event.shiftKey, true)
+      completed = { ...completed, stroke, current: stroke.points.at(-1)!, points: stroke.points }
+    }
+  }
+  return completed
 }
 
 export function cancelCanvasGesture(

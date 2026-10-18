@@ -48,21 +48,27 @@ async function samePixels(
     ) return false
     const width = Number(expected.split(':')[0]), height = Number(expected.split(':')[1])
     if (expected.split(':').slice(0, 2).join(':') !== actual.split(':').slice(0, 2).join(':')) return false
+    function blockDifference(
+      x: number,
+      y: number,
+    ): number {
+      const sums = [0, 0, 0, 0]
+      let samples = 0
+      for (let dy = y; dy < Math.min(y + 8, height); dy++) {
+        for (let dx = x; dx < Math.min(x + 8, width); dx++) {
+          samples++
+          const index = (dy * width + dx) * 4
+          for (let channel = 0; channel < 4; channel++) {
+            sums[channel]! += before![index + channel]! - after![index + channel]!
+          }
+        }
+      }
+      return Math.max(...sums.map((sum) => Math.abs(sum) / samples))
+    }
     let maximum = 0
     for (let y = 0; y < height; y += 8) {
       for (let x = 0; x < width; x += 8) {
-        const sums = [0, 0, 0, 0]
-        let samples = 0
-        for (let dy = y; dy < Math.min(y + 8, height); dy++) {
-          for (let dx = x; dx < Math.min(x + 8, width); dx++) {
-            samples++
-            const index = (dy * width + dx) * 4
-            for (let channel = 0; channel < 4; channel++) {
-              sums[channel]! += before[index + channel]! - after[index + channel]!
-            }
-          }
-        }
-        for (const sum of sums) maximum = Math.max(maximum, Math.abs(sum) / samples)
+        maximum = Math.max(maximum, blockDifference(x, y))
       }
     }
     return maximum <= 2
@@ -108,6 +114,74 @@ async function up(): Promise<void> {
   await browser.action('pointer').up({ button: 'left' }).perform()
 }
 
+type ImageGestureKind = 'move' | 'resize' | 'rotate'
+
+async function verifyImageGesture(
+  kind: ImageGestureKind,
+  image: ImageLayer,
+  original: EditorDocumentV1,
+  output: string,
+): Promise<void> {
+  // Separate gestures from the preceding click/undo sequence. Double-click
+  // cycling is intentional and is covered by the selection interaction suite.
+  await browser.pause(1100)
+  await waitForStableCanvas()
+  const points = await geometry(image, await selectionDocument())
+  // Native resource handoff after Quick → Editor may finish between gestures.
+  // Compare each press against its immediately preceding rendered frame.
+  const initial = await settledPixels()
+  // Keep the next press outside the platform double-click rectangle: a real
+  // double click intentionally cycles through overlapping layers.
+  const start = kind === 'move' ? {
+    x: points.center.x + Math.min(30, (points.corner.x - points.center.x) * .2), y: points.center.y,
+  } : kind === 'resize' ? points.corner : points.rotation
+  const end = kind === 'rotate' ? {
+    x: points.center.x + (start.x - points.center.x) * .94 - (start.y - points.center.y) * .342,
+    y: points.center.y + (start.x - points.center.x) * .342 + (start.y - points.center.y) * .94,
+  } : { x: start.x - 24, y: start.y + 12 }
+  await down(start)
+  const pressed = await pixels()
+  if (!await samePixels(initial, pressed)) {
+    const difference = await browser.execute(({ initial, pressed }) => {
+      const frames = (window as unknown as { __imagePixelFrames: Map<string, Uint8ClampedArray> }).__imagePixelFrames
+      const before = frames.get(initial)!, after = frames.get(pressed)!
+      let channels = 0, maximum = 0
+      for (let index = 0; index < before.length; index++) {
+        const delta = Math.abs(before[index]! - after[index]!)
+        if (delta) channels++
+        maximum = Math.max(maximum, delta)
+      }
+      return { channels, maximum }
+    }, { initial, pressed })
+    throw new Error(`${kind} changed pixels at pointerdown; difference=${JSON.stringify(difference)}`)
+  }
+  await browser.action('pointer').move({ origin: 'viewport', x: Math.round(end.x), y: Math.round(end.y), duration: 150 }).perform(true)
+  const held = await pixels()
+  if (await samePixels(initial, held)) {
+    const cursor = await $('.cs-canvas:not(.cs-canvas-overlay)').getCSSProperty('cursor')
+    await browser.saveScreenshot(`${output}-${kind}-unchanged.png`)
+    await up()
+    const after = (await selectionDocument()).layers.at(-1)?.transform
+    throw new Error([
+      `${kind} did not update preview pixels`, `cursor=${cursor.value}`, `after=${JSON.stringify(after)}`,
+    ].join('; '))
+  }
+  expect((await selectionDocument()).layers).toEqual(original.layers)
+  await browser.saveScreenshot(`${output}-${kind}-held.png`)
+  await up()
+  await browser.waitUntil(async () => samePixels(held, await pixels()), { timeoutMsg: `${kind} pixels changed at pointerup` })
+  const changed = (await selectionDocument()).layers
+  expect(changed).not.toEqual(original.layers)
+  await browser.keys(['Control', 'z'])
+  await browser.waitUntil(async () => samePixels(initial, await pixels()))
+  expect((await selectionDocument()).layers).toEqual(original.layers)
+  await browser.keys(['Control', 'Shift', 'z'])
+  await browser.waitUntil(async () => samePixels(held, await pixels()))
+  expect((await selectionDocument()).layers).toEqual(changed)
+  await browser.keys(['Control', 'z'])
+  await browser.waitUntil(async () => samePixels(initial, await pixels()))
+}
+
 /** Called immediately after production G import, before adding any other image. */
 export async function verifyImageEditing(output: string): Promise<void> {
   const original = await selectionDocument()
@@ -122,66 +196,18 @@ export async function verifyImageEditing(output: string): Promise<void> {
   await up()
   expect((await selectionDocument()).layers).toEqual(original.layers)
   for (const kind of ['move', 'resize', 'rotate'] as const) {
-    // Separate gestures from the preceding click/undo sequence. Double-click
-    // cycling is intentional and is covered by the selection interaction suite.
-    await browser.pause(1100)
-    await waitForStableCanvas()
-    const points = await geometry(image, await selectionDocument())
-    // Native resource handoff after Quick → Editor may finish between gestures.
-    // Compare each press against its immediately preceding rendered frame.
-    initial = await settledPixels()
-    // Keep the next press outside the platform double-click rectangle: a real
-    // double click intentionally cycles through overlapping layers.
-    const start = kind === 'move' ? {
-      x: points.center.x + Math.min(30, (points.corner.x - points.center.x) * .2), y: points.center.y,
-    } : kind === 'resize' ? points.corner : points.rotation
-    const end = kind === 'rotate' ? {
-      x: points.center.x + (start.x - points.center.x) * .94 - (start.y - points.center.y) * .342,
-      y: points.center.y + (start.x - points.center.x) * .342 + (start.y - points.center.y) * .94,
-    } : { x: start.x - 24, y: start.y + 12 }
-    await down(start)
-    const pressed = await pixels()
-    if (!await samePixels(initial, pressed)) {
-      const difference = await browser.execute(({ initial, pressed }) => {
-        const frames = (window as unknown as { __imagePixelFrames: Map<string, Uint8ClampedArray> }).__imagePixelFrames
-        const before = frames.get(initial)!, after = frames.get(pressed)!
-        let channels = 0, maximum = 0
-        for (let index = 0; index < before.length; index++) {
-          const delta = Math.abs(before[index]! - after[index]!)
-          if (delta) channels++
-          maximum = Math.max(maximum, delta)
-        }
-        return { channels, maximum }
-      }, { initial, pressed })
-      throw new Error(`${kind} changed pixels at pointerdown; difference=${JSON.stringify(difference)}`)
-    }
-    await browser.action('pointer').move({ origin: 'viewport', x: Math.round(end.x), y: Math.round(end.y), duration: 150 }).perform(true)
-    const held = await pixels()
-    if (await samePixels(initial, held)) {
-      const cursor = await $('.cs-canvas:not(.cs-canvas-overlay)').getCSSProperty('cursor')
-      await browser.saveScreenshot(`${output}-${kind}-unchanged.png`)
-      await up()
-      const after = (await selectionDocument()).layers.at(-1)?.transform
-      throw new Error([
-        `${kind} did not update preview pixels`, `cursor=${cursor.value}`, `after=${JSON.stringify(after)}`,
-      ].join('; '))
-    }
-    expect((await selectionDocument()).layers).toEqual(original.layers)
-    await browser.saveScreenshot(`${output}-${kind}-held.png`)
-    await up()
-    await browser.waitUntil(async () => samePixels(held, await pixels()), { timeoutMsg: `${kind} pixels changed at pointerup` })
-    const changed = (await selectionDocument()).layers
-    expect(changed).not.toEqual(original.layers)
-    await browser.keys(['Control', 'z'])
-    await browser.waitUntil(async () => samePixels(initial, await pixels()))
-    expect((await selectionDocument()).layers).toEqual(original.layers)
-    await browser.keys(['Control', 'Shift', 'z'])
-    await browser.waitUntil(async () => samePixels(held, await pixels()))
-    expect((await selectionDocument()).layers).toEqual(changed)
-    await browser.keys(['Control', 'z'])
-    await browser.waitUntil(async () => samePixels(initial, await pixels()))
+    await verifyImageGesture(kind, image, original, output)
   }
   initial = await settledPixels()
+  await verifyRotationCancellation(image, original, initial)
+  await verifyImageFormatting(image, original, initial, output)
+}
+
+async function verifyRotationCancellation(
+  image: ImageLayer,
+  original: EditorDocumentV1,
+  initial: string,
+): Promise<void> {
   const cancelPoints = await geometry(image, await selectionDocument())
   await down(cancelPoints.rotation)
   await browser.action('pointer').move({ origin: 'viewport', x: Math.round(cancelPoints.rotation.x - 32),
@@ -191,6 +217,14 @@ export async function verifyImageEditing(output: string): Promise<void> {
   await up()
   await browser.waitUntil(async () => samePixels(initial, await pixels()))
   expect((await selectionDocument()).layers).toEqual(original.layers)
+}
+
+async function verifyImageFormatting(
+  image: ImageLayer,
+  original: EditorDocumentV1,
+  initial: string,
+  output: string,
+): Promise<void> {
   const radius = $('[data-image-control="imageRadius"]')
   const radiusValue = Math.min(image.localBounds!.width, image.localBounds!.height) / 2
   await radius.click()
@@ -240,6 +274,23 @@ export async function verifyImageEditing(output: string): Promise<void> {
   await waitForStableCanvas()
   const square = await settledPixels()
   const squareImage = (await selectionDocument()).layers.find((item) => item.id === image.id) as ImageLayer
+  await verifySquareBorderCorners(squareImage)
+  await browser.saveScreenshot(`${output}-radius-zero.png`)
+  await browser.keys(['Control', 'z'])
+  await browser.waitUntil(async () => {
+    const layer = (await selectionDocument()).layers.find((item) => item.id === image.id)
+    return layer?.kind === 'image' && layer.payload.radius === radiusValue
+  })
+  await browser.keys(['Control', 'Shift', 'z'])
+  await browser.waitUntil(async () => samePixels(square, await pixels()))
+  await browser.keys(['Control', 'z'])
+  await browser.keys(['Control', 'z'])
+  await browser.keys(['Control', 'z'])
+  await browser.waitUntil(async () => samePixels(initial, await pixels()))
+  expect((await selectionDocument()).layers).toEqual(original.layers)
+}
+
+async function verifySquareBorderCorners(squareImage: ImageLayer): Promise<void> {
   const corners = await browser.execute((layer) => {
     const canvas = document.querySelector<HTMLCanvasElement>('.cs-canvas:not(.cs-canvas-overlay)')!
     const state = window as unknown as {
@@ -271,17 +322,4 @@ export async function verifyImageEditing(output: string): Promise<void> {
       expect(Math.abs(corner[index]! - Math.round(channel * 255))).toBeLessThanOrEqual(1)
     }
   }
-  await browser.saveScreenshot(`${output}-radius-zero.png`)
-  await browser.keys(['Control', 'z'])
-  await browser.waitUntil(async () => {
-    const layer = (await selectionDocument()).layers.find((item) => item.id === image.id)
-    return layer?.kind === 'image' && layer.payload.radius === radiusValue
-  })
-  await browser.keys(['Control', 'Shift', 'z'])
-  await browser.waitUntil(async () => samePixels(square, await pixels()))
-  await browser.keys(['Control', 'z'])
-  await browser.keys(['Control', 'z'])
-  await browser.keys(['Control', 'z'])
-  await browser.waitUntil(async () => samePixels(initial, await pixels()))
-  expect((await selectionDocument()).layers).toEqual(original.layers)
 }

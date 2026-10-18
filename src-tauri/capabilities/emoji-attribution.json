@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "emoji-attribution",
+  "description": "Open the Noto Emoji attribution in the system browser from editor windows.",
+  "windows": ["main", "quick-capture"],
+  "permissions": [
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        {
+          "url": "https://github.com/googlefonts/noto-emoji"
+        }
+      ]
+    }
+  ]
+}

@@ -97,9 +97,10 @@ describe('Tauri build boundary', () => {
 
     expect(capability.permissions).toEqual(expect.arrayContaining(['core:window:allow-hide', 'core:window:allow-show']))
     const testConfig = JSON.parse(await readFile(path.join(process.cwd(), 'src-tauri', 'tauri.test.conf.json'), 'utf8')) as {
-      app: { security: { capabilities: Array<{ permissions: string[] }> } }
+      app: { security: { capabilities: Array<string | { identifier: string; permissions: string[] }> } }
     }
-    expect(testConfig.app.security.capabilities[0]?.permissions).toEqual(expect.arrayContaining(['core:window:allow-hide', 'core:window:allow-show']))
+    const harness = testConfig.app.security.capabilities.find((entry) => typeof entry !== 'string' && entry.identifier === 'test-harness')
+    expect(typeof harness === 'object' ? harness.permissions : undefined).toEqual(expect.arrayContaining(['core:window:allow-hide', 'core:window:allow-show']))
   })
 
   it('keeps native file dialogs asynchronous and parented', async () => {

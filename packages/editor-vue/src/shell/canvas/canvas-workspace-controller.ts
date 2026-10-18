@@ -26,10 +26,7 @@ import type {
 import type { CanvasViewportEmit } from './contracts'
 import { CropController } from './crop-controller'
 import { DraftController } from './draft-controller'
-import {
-  EyedropperController,
-  EYEDROPPER_GRID_SIZE,
-} from './eyedropper-controller'
+import { EyedropperController } from './eyedropper-controller'
 import {
   cancelCanvasGesture,
   finishCanvasGesture,
@@ -237,12 +234,7 @@ export class CanvasWorkspaceController {
       overlay: state.overlay,
       rendererError: state.rendererError,
       retryRender: () => void this.#renderer.drawDocument(),
-      eyedropperLoupe: this.#eyedropper.loupe,
-      eyedropperPreview: this.#eyedropper.preview,
-      EYEDROPPER_GRID_SIZE,
-      eyedropperSwatch: this.#eyedropper.swatch,
-      eyedropperHex: this.#eyedropper.hex,
-      eyedropperHint: this.#eyedropper.hint,
+      ...this.#eyedropper.bindings(),
       applyCropDraft: this.applyCrop,
       cancelCropDraft: this.cancelCrop,
       resetCropDraft: this.resetCrop,

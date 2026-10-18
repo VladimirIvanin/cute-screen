@@ -2679,6 +2679,7 @@ pub fn run() {
         })
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_opener::init())
         .on_menu_event(|app, event| {
             if event.id.as_ref() == "app-settings"
                 && let Err(error) = settings_window::open(app, false)

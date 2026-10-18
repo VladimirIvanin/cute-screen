@@ -1,5 +1,33 @@
 # CI-сборки и проверка версии через GitHub
 
+## Linux: совместимость с Ubuntu 22.04 (ADR-104)
+
+Распространяемые x64/ARM64 DEB и AppImage собираются на Ubuntu 22.04
+(glibc 2.35). Используются обновления Jammy и `libwebkit2gtk-4.1` версии
+не ниже 2.40. Сборка на Ubuntu 24.04 может добавить GLIBC_2.39 даже через
+weak imports; копирование в AppImage этого не исправляет.
+
+На Linux с работающим Docker:
+
+```sh
+pnpm build:linux:ubuntu22
+```
+
+Команда собирает pinned Node/pnpm/Rust image из `scripts/ubuntu22.Dockerfile`,
+копирует исходники в `artifacts/ubuntu22-work`, устанавливает отдельные JS/Rust
+dependencies и запускает штатный `pnpm tauri build --bundles deb,appimage`.
+Host `node_modules` и `target` не используются. Архитектура нативная:
+x64 host выпускает x64, ARM64 host — ARM64; эмуляция не включается.
+Готовые пакеты и SHA256SUMS появляются в `artifacts/ubuntu22` после успешных
+ABI/DEB/AppImage CLI gates. AppImage smoke использует extract-and-run без FUSE.
+
+`pnpm check:linux:compat` проверяет `target/release/cute-screen` через readelf;
+другой путь передаётся как аргумент. Для локальной сборки на Ubuntu 24.04
+ожидается отказ, если ELF требует более новую glibc. Linux CI использует
+`ubuntu-22.04` / `ubuntu-22.04-arm`, независимые caches и тот же ABI gate
+перед upload. Минимальные libc6/WebKit dependencies и xdg-utils указаны в DEB metadata.
+Статус runtime проверок и ограничения X11/Wayland — PLATFORM_MATRIX.md.
+
 ## Проверка линии (ADR-100)
 
 Новые line/line-reopen сценарии используют штатный tauri runner и общий
@@ -188,13 +216,13 @@ Artifacts считаются тестовыми/неофициальными с�
 
 ## Матрица artifacts
 
-| ОС      | Target                                         | Runner                  | CI artifact               |
-| ------- | ---------------------------------------------- | ----------------------- | ------------------------- |
-| Linux   | `x86_64-unknown-linux-gnu`                     | conservative Ubuntu x64 | `.deb`, `.AppImage`       |
-| Linux   | `aarch64-unknown-linux-gnu`                    | native Ubuntu ARM64     | `.deb`, `.AppImage`       |
-| macOS   | `x86_64-apple-darwin` + `aarch64-apple-darwin` | native Apple Silicon    | unsigned universal `.dmg` |
-| Windows | `x86_64-pc-windows-msvc`                       | Windows x64             | unsigned NSIS `.exe`      |
-| Windows | `aarch64-pc-windows-msvc`                      | Windows ARM64           | unsigned NSIS `.exe`      |
+| ОС      | Target                                         | Runner               | CI artifact               |
+| ------- | ---------------------------------------------- | -------------------- | ------------------------- |
+| Linux   | `x86_64-unknown-linux-gnu`                     | Ubuntu 22.04 x64     | `.deb`, `.AppImage`       |
+| Linux   | `aarch64-unknown-linux-gnu`                    | Ubuntu 22.04 ARM64   | `.deb`, `.AppImage`       |
+| macOS   | `x86_64-apple-darwin` + `aarch64-apple-darwin` | native Apple Silicon | unsigned universal `.dmg` |
+| Windows | `x86_64-pc-windows-msvc`                       | Windows x64          | unsigned NSIS `.exe`      |
+| Windows | `aarch64-pc-windows-msvc`                      | Windows ARM64        | unsigned NSIS `.exe`      |
 
 Если hosted ARM runner недоступен, workflow использует узко помеченный self-hosted native runner. Cross-compilation может проверить compile, но не заменяет native install/launch smoke.
 
@@ -496,3 +524,17 @@ external tauri-driver/EdgeDriver, production Quick mount, native input и decode
 original/result. При занятом target задать отдельный CARGO_TARGET_DIR.
 `pnpm ipc:codegen` обновляет additive CaptureCompletion history; schema хранения,
 permissions, зависимости и платформенные capture backends не меняются.
+
+## Ссылка атрибуции Noto Emoji (ADR-105)
+
+Native host добавляет tauri-plugin-opener 2.5.3 (MIT/Apache-2.0) и закреплённый
+Cargo.lock. JavaScript зависимости, desktop IPC и document schema не меняются.
+`CUTE_SCREEN_E2E_SCENARIOS=emoji-link pnpm test:e2e:tauri` строит свежий binary
+и проверяет production Capture → Quick → Editor на Linux через external
+`tauri-driver` и соответствующий runtime `WebKitWebDriver`. Встроенный driver
+не заменяет проверку keyboard default actions. Runner подставляет
+recording xdg-open только для этого сценария; frontend/IPC/plugin остаются
+настоящими. Capability emoji-attribution одинакова для production и harness.
+Артефакты: artifacts/tauri-e2e/emoji-link-dispatch.log и *-noto-link.png.
+На Windows/macOS автоматический сценарий пока skipped; нужен ручной click/Enter
+с реальным системным браузером. Не считать этот skip платформенным pass.

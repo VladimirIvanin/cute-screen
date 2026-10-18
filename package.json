@@ -18,6 +18,8 @@
     "build:packages": "node scripts/clean-package-outputs.mjs && vue-tsc -b --force packages/editor-core packages/editor-renderer && pnpm --filter @cute-screen/editor-vue build",
     "build:frontend": "vite build --config apps/desktop/vite.config.ts",
     "build:landing": "vite build --config apps/landing/vite.config.ts",
+    "build:linux:ubuntu22": "bash scripts/build-linux-ubuntu22.sh",
+    "check:linux:compat": "bash scripts/check-linux-compat.sh",
     "tauri": "node node_modules/@tauri-apps/cli/tauri.js",
     "icons:generate": "node scripts/generate-brand-assets.mjs",
     "icons:landing": "node scripts/generate-landing-icons.mjs",

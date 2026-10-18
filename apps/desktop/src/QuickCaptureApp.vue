@@ -2,6 +2,7 @@
 import {
   computed,
   nextTick,
+  onBeforeMount,
   onBeforeUnmount,
   onMounted,
   ref,
@@ -358,12 +359,18 @@ function onSelectingKeydown(event: KeyboardEvent): void {
   if (selectionPending.value && event.key === 'Escape') actionController.keydown(event)
 }
 
+// Initial selection owns Escape even before focus enters the shell or a first
+// drag starts. Register before the canvas mounts its gesture capture listener.
+onBeforeMount(() => {
+  window.addEventListener('keydown', onSelectingKeydown, true)
+})
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
   void initializeQuickCaptureWindow().catch(recordPreparationError)
 })
 onBeforeUnmount(() => {
   loadRevision += 1
+  window.removeEventListener('keydown', onSelectingKeydown, true)
   window.removeEventListener('keydown', onKeydown)
   sceneElement?.removeEventListener('dblclick', onSceneDoubleClick)
   unsubscribeQuickCaptureAvailable?.()
@@ -380,7 +387,6 @@ onBeforeUnmount(() => {
       'is-selecting': selectionPending,
     }"
     data-testid="quick-capture-shell"
-    @keydown.capture="onSelectingKeydown"
   >
     <EditorShell
       ref="editorShell"

@@ -21,8 +21,8 @@ env:
 jobs:
   quality-linux:
     name: Linux quality and runtime smoke
-    runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -46,7 +46,7 @@ jobs:
         run: |
           bash scripts/ci-install-linux-tauri-deps.sh \
             build-essential curl file libayatana-appindicator3-dev librsvg2-dev \
-            libssl-dev libwebkit2gtk-4.1-dev libxdo-dev webkit2gtk-driver wget xvfb
+            libssl-dev libwebkit2gtk-4.1-dev libxdo-dev webkit2gtk-driver wget xdg-utils xvfb
 
       - name: Resolve pnpm store
         id: pnpm-store
@@ -60,7 +60,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: m00-${{ runner.os }}-${{ runner.arch }}-node-${{ env.NODE_VERSION }}-rust-${{ env.RUST_VERSION }}-${{ hashFiles('pnpm-lock.yaml', 'Cargo.lock') }}
+          key: m00-jammy-${{ runner.os }}-${{ runner.arch }}-node-${{ env.NODE_VERSION }}-rust-${{ env.RUST_VERSION }}-${{ hashFiles('pnpm-lock.yaml', 'Cargo.lock') }}
 
       - name: Install JavaScript dependencies
         run: pnpm install --frozen-lockfile
@@ -101,6 +101,23 @@ jobs:
       - name: Verify production excludes test drivers
         run: pnpm verify:release-boundary
 
+      - name: Build Ubuntu 22.04 packages and verify ABI
+        run: |
+          pnpm tauri build --bundles deb,appimage -- --locked
+          pnpm check:linux:compat
+          target/release/cute-screen --help
+          node scripts/check-m04-deb.mjs
+          APPIMAGE_EXTRACT_AND_RUN=1 node scripts/check-m04-appimage.mjs
+
+      - name: Upload Linux x64 packages
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: linux-x64-ubuntu22-${{ github.sha }}
+          path: |
+            target/release/bundle/deb/*.deb
+            target/release/bundle/appimage/*.AppImage
+          if-no-files-found: error
+
       - name: Upload M01 trend and smoke evidence
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -130,7 +147,7 @@ jobs:
       matrix:
         include:
           - name: Linux ARM64
-            os: ubuntu-24.04-arm
+            os: ubuntu-22.04-arm
             tauri_deps: true
           - name: Windows x64
             os: windows-2025
@@ -145,7 +162,7 @@ jobs:
             os: macos-15-intel
             tauri_deps: false
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -172,7 +189,7 @@ jobs:
         run: |
           bash scripts/ci-install-linux-tauri-deps.sh \
             build-essential curl file libayatana-appindicator3-dev librsvg2-dev \
-            libssl-dev libwebkit2gtk-4.1-dev libxdo-dev wget
+            libssl-dev libwebkit2gtk-4.1-dev libxdo-dev wget xdg-utils
 
       - name: Resolve pnpm store
         id: pnpm-store
@@ -196,6 +213,25 @@ jobs:
         run: |
           pnpm build
           cargo check --workspace --all-targets
+
+      - name: Build Ubuntu 22.04 ARM64 packages and verify ABI
+        if: matrix.tauri_deps
+        run: |
+          pnpm tauri build --bundles deb,appimage -- --locked
+          pnpm check:linux:compat
+          target/release/cute-screen --help
+          node scripts/check-m04-deb.mjs
+          APPIMAGE_EXTRACT_AND_RUN=1 node scripts/check-m04-appimage.mjs
+
+      - name: Upload Linux ARM64 packages
+        if: matrix.tauri_deps
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: linux-arm64-ubuntu22-${{ github.sha }}
+          path: |
+            target/release/bundle/deb/*.deb
+            target/release/bundle/appimage/*.AppImage
+          if-no-files-found: error
 
       - name: Upload compile logs on failure
         if: failure()

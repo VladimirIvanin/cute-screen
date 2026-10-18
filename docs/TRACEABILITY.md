@@ -1,5 +1,56 @@
 # Трассируемость требований
 
+## Escape до первого выделения Area (2026-10-18, до реализации)
+
+`REQ-CAP-011/012/014`: первый Escape после открытия Area отменяет draft и
+закрывает Quick Capture без клика/выделения, в том числе при фокусе на body
+и во время первого drag. Повторный Area доступен сразу после отмены; документ
+и original не создаются. В editing сохраняется приоритет отмены активного
+штриха над закрытием и защита от key repeat после отмены штриха. Начальная
+отмена срабатывает также при Escape с repeat=true после повторного открытия
+WebView. Проверки: mounted production EditorShell (body/canvas/drag),
+native X11 capture → trusted Escape без назначения focus → cancel → retry;
+команды, артефакты и ограничения — TESTING.md.
+
+## TypeScript architecture ratchets (2026-10-18, до реализации)
+
+`REQ-EDT-002/015/016`, `REQ-CAP-012`, `REQ-TOL-015`: рефакторинг применения
+стилей, финализации canvas gestures, preview панели фигур и image E2E сохраняет
+существующие команды, undo/redo, focus/cancel и сравнения пикселей. Размеры
+файлов, complexity и depth возвращаются в бюджеты ADR-042 без исключений
+и повышения лимитов. Build boundary находит test-harness capability по
+identifier среди строковых ссылок и inline capabilities. Проверки: исходно падающий `pnpm test:boundaries`,
+`pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check` и browser
+image-editing regression; фактические команды и результаты — TESTING.md. Итог:
+45/45 boundaries, 1365/1365 unit/component, 51/51 renderer goldens и browser
+image-editing (восемь сочетаний) passed; typecheck/lint/format также passed.
+
+## Ссылка Noto Emoji (2026-10-18, до реализации)
+
+`REQ-TOL-014`: ссылка атрибуции Noto Emoji в палитре открывает upstream
+репозиторий в системном браузере из Editor и Quick Capture, включая Enter
+при фокусе на ссылке. Native opener получает разрешение только на точный
+`https://github.com/googlefonts/noto-emoji`, без файлов и произвольных URL.
+Проверки: capability boundary и production mount → реальный WebView click/Enter
+→ OS browser dispatch; browser-only/unit evidence не заменяет native прогон.
+Linux/X11 WebKitGTK 2.52.6: native 1/1 passed, четыре dispatch по click/Enter
+из Quick/Editor; scoped capability 2/2 и Vue 6/6 passed. Артефакты — TESTING.md.
+
+## Ubuntu 22.04 как Linux build baseline (2026-10-18, ADR-104)
+
+`REQ-REL-001`: Linux x64/ARM64 пакеты собираются на Ubuntu 22.04 с glibc 2.35
+и обновлённым WebKitGTK 4.1. Изолированный local Docker build использует ту же
+базу, отдельные dependencies/target и проверяет ABI перед выдачей пакетов.
+CI отклоняет ELF с требованиями GLIBC выше 2.35; DEB объявляет минимальные
+runtime dependencies. Проверки: отрицательный gate на прежнем Ubuntu 24.04
+binary, новая release-сборка, DEB install/CLI и GUI launch в Jammy, AppImage
+extract-and-run. X11/Wayland capture, hotkeys и clipboard требуют отдельных
+runtime проверок и этим изменением не объявляются полностью подтверждёнными.
+
+Результат x64: новый release ELF требует максимум GLIBC_2.34, DEB install/CLI,
+AppImage extract-and-run и GUI startup с включённой sandbox в Jammy прошли;
+контрольные суммы обоих пакетов проверены. Команды и ограничения — TESTING.md.
+
 ## Пользовательский README и GitHub-шапка (2026-10-18)
 
 `REQ-UI-013`, `REQ-ACT-006`: пользовательская документация EN/RU использует

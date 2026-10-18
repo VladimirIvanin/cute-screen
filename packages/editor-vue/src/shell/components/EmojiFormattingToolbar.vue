@@ -282,6 +282,7 @@ watch(() => props.schema.disabled, (value) => {
             href="https://github.com/googlefonts/noto-emoji"
             target="_blank"
             rel="noreferrer"
+            @keydown.enter.stop
           >Noto Emoji</a> · Apache 2.0</small>
         </template>
       </div>

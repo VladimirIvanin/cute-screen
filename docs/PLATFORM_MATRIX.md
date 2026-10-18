@@ -1,5 +1,36 @@
 # Платформенная матрица
 
+## Escape до первого выделения Area (2026-10-18)
+
+Общий Vue handler начальной отмены больше не зависит от DOM focus внутри
+shell. Mounted tests body/canvas/первый drag и существующая stroke cancellation:
+78/78 passed на Ubuntu 24.04.5 x64. Physical X11 1920×1080 / WebKitGTK 2.52.6:
+1/1 native test passed — Escape без клика, повторный capture и Escape при
+удерживаемом первом drag. Оба отменённых draft удалены, Quick hidden,
+main visible, persisted document отсутствует. Повторный native Escape имел
+repeat=true; selecting принимает его, editing сохраняет защиту от повтора
+после отмены штриха. Команды, JSON и screenshots — TESTING.md. Windows exclusion regression лишён искусственного `.focus()` перед
+Escape; Windows/WebView2 и macOS для этой правки не запускались. Системный
+Wayland XDG selector сохраняет собственный cancel lifecycle.
+
+## Ubuntu 22.04 binary baseline (2026-10-18, ADR-104)
+
+Linux x64/ARM64 CI использует Ubuntu 22.04; package ABI gate запрещает
+GLIBC выше 2.35. Local Docker build изолирует dependencies и target от host.
+Jammy x64 / glibc 2.35 / WebKitGTK 2.50.4: прежний Ubuntu 24.04 ELF воспроизводимо
+не запускается (`GLIBC_2.39 not found`); отрицательный gate passed.
+Focused WebKitGTK API probe прошёл для canvas, module workers, OffscreenCanvas,
+fonts, structuredClone, randomUUID, Segmenter, inert и :has. Probe выполнялся
+в Xvfb/root container с отключённой WebKit sandbox; это не подтверждение
+production editor или физического захвата. Команды/логи — TESTING.md.
+Новая x64 release-сборка: maximum GLIBC_2.34, ABI gate passed; DEB установлен
+через apt, CLI DEB/AppImage extract-and-run прошли. Установленный DEB запустил
+Settings и WebKitWebProcess под обычным пользователем в Xvfb/X11 с включённой
+sandbox; это startup smoke без visual/interaction приёмки. Пакеты и SHA256SUMS —
+`artifacts/ubuntu22/`. ARM64, FUSE mount и physical capture/clipboard pending.
+Wayland Screenshot/GlobalShortcuts capabilities по-прежнему определяются
+portal version и backend; полная GNOME 42 приёмка этим ABI gate не закрывается.
+
 ## Иконки настроек выноски (2026-10-18)
 
 Windows x64: Vue 16/16 passed; Chrome 155.0.8059.80 2/2 passed, включая
@@ -1278,3 +1309,13 @@ WebView2 155.0.4283.45 / external driver: production Open image → editor,
 пользователем и сохранён без изменения pixels; внешние углы скрываются CSS.
 Изменения лендинга не расширяют платформенные capture гарантии; Safari,
 Linux/WebKitGTK и macOS/WKWebView для этой правки не проверялись.
+
+## Ссылка атрибуции Noto Emoji (ADR-105, 2026-10-18)
+
+Windows/WebView2, Linux/WebKitGTK и macOS/WKWebView используют общий native
+opener и точное разрешение URL для Editor/Quick. Browser preview продолжает
+использовать обычную ссылку. Native scenario emoji-link проверяет Linux OS
+dispatch с recording executable вместо браузера; не является доказательством
+загрузки сайта, physical capture или работы Windows/macOS. Linux/X11
+WebKitGTK 2.52.6: external native scenario 1/1 passed, click/Enter из обоих
+окон, четыре точных URL и отказ для трёх посторонних URL. Результаты — TESTING.md.

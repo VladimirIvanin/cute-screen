@@ -457,6 +457,8 @@ Cute Screen — полноценный local-first редактор снимко
   emoji сохраняет размер/transform. Instance changes не меняют creation defaults.
   Resources декодируются до commit; cancel/stale/error не создают слой. Unknown
   versioned reference даёт явную ошибку. Quick доступен после выбора области.
+  Ссылка Noto Emoji в палитре открывает upstream репозиторий в системном
+  браузере по клику и Enter из Editor и Quick Capture.
 - `REQ-TOL-015` — вставка PNG/JPEG/WebP/SVG как image layer. Image selection
   показывает компактные кнопки скругления, рамки и непрозрачности с текущими
   значениями; параметры раскрываются по одному, цвет и толщина рамки вместе.
@@ -596,6 +598,8 @@ Cute Screen — полноценный local-first редактор снимко
 - `REQ-QLT-004` — библиотека из 1000 кадров показывает первую страницу без полного synchronous probe.
 - `REQ-QLT-005` — crash/failed write не повреждает оригинал или последнее подтверждённое состояние.
 - `REQ-REL-001` — GitHub Actions собирает Linux x64/ARM64 deb и AppImage как неофициальные CI artifacts.
+  Минимальная база — Ubuntu 22.04 с glibc 2.35 и обновлённым WebKitGTK 4.1
+  (не ниже 2.40); сборки выполняются на этой базе и проходят проверку ELF ABI.
 - `REQ-REL-002` — GitHub Actions собирает unsigned macOS universal DMG для Intel и Apple Silicon.
 - `REQ-REL-003` — GitHub Actions собирает unsigned Windows x64/ARM64 NSIS installers.
 - `REQ-REL-004` — приложение вручную либо по явной opt-in настройке сравнивает текущую SemVer с тегами `vX.Y.Z` публичного GitHub-репозитория; оно не скачивает и не устанавливает обновления.

@@ -124,6 +124,29 @@ describe('mounted emoji tool', () => {
     app.unmount()
     app.session.dispose()
   })
+  it('keeps attribution Enter local without preventing native link activation', async () => {
+    const app = mount()
+    const globalKeydown = vi.fn()
+    window.addEventListener('keydown', globalKeydown)
+    try {
+      await fireEvent.click(screen.getByRole('button', { name: 'Emoji' }))
+      const trigger = screen.getByRole('button', { name: 'All emoji' })
+      await waitFor(() => expect(trigger).toBeEnabled())
+      await fireEvent.click(trigger)
+      const link = await screen.findByRole('link', { name: 'Noto Emoji' })
+      link.focus()
+      const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+      link.dispatchEvent(enter)
+      expect(enter.defaultPrevented).toBe(false)
+      expect(globalKeydown).not.toHaveBeenCalled()
+      expect(link).toHaveFocus()
+      expect(app.session.snapshot.core.document.layers).toHaveLength(0)
+    } finally {
+      window.removeEventListener('keydown', globalKeydown)
+      app.unmount()
+      app.session.dispose()
+    }
+  })
   it('disables creation in read-only and validates persisted defaults', async () => {
     const app = mount(false, true)
     expect(screen.getByRole('button', { name: 'Emoji' })).toBeDisabled()

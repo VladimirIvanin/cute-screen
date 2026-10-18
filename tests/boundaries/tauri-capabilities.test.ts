@@ -13,6 +13,20 @@ interface TauriCapability {
 }
 
 describe('production Tauri capability boundary', () => {
+  it('allows the emoji attribution URL only in editor windows and the native harness', async () => {
+    const root = process.cwd()
+    const capability = JSON.parse(await readFile(path.join(root, 'src-tauri/capabilities/emoji-attribution.json'), 'utf8'))
+    expect(capability.windows).toEqual(['main', 'quick-capture'])
+    expect(capability.permissions).toEqual([{
+      identifier: 'opener:allow-open-url',
+      allow: [{ url: 'https://github.com/googlefonts/noto-emoji' }],
+    }])
+    for (const file of ['tauri.conf.json', 'tauri.test.conf.json']) {
+      const config = JSON.parse(await readFile(path.join(root, 'src-tauri', file), 'utf8'))
+      expect(config.app.security.capabilities).toContain('emoji-attribution')
+    }
+  })
+
   it('keeps quick-capture lifecycle authority behind native commands', async () => {
     const root = process.cwd()
     const [configSource, capabilitySource, defaultCapabilitySource] = await Promise.all([

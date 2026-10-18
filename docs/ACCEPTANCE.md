@@ -1,5 +1,28 @@
 # Сквозная приёмка
 
+## Escape до первого выделения Area (2026-10-18)
+
+`REQ-CAP-011/012/014`: открыть Area штатной кнопкой Capture и, не нажимая
+на canvas и не назначая ему focus тестом, нажать Escape. Draft удалён, Quick
+скрыт, main восстановлен, repository не получил документ. Повторить захват,
+начать первый drag, удерживать primary pointer и нажать Escape: отменяется весь
+ещё не подтверждённый capture. После отмены доступен новый захват. В editing
+первый Escape во время pencil/marker stroke по-прежнему отменяет только штрих.
+Native X11 сценарий: `CUTE_SCREEN_E2E_SCENARIOS=area-escape pnpm test:e2e:tauri`;
+Ubuntu 24.04.5 / physical X11 / WebKitGTK 2.52.6 — 1/1 passed, включая
+repeat=true после hide/reopen. Артефакты и ограничения — TESTING.md. Windows physical exclusion
+сценарий также больше не назначает DOM focus перед Escape.
+
+## Ubuntu 22.04: бинарная совместимость (ADR-104)
+
+`REQ-REL-001`: прежний ELF с GLIBC_2.39 должен провалить
+`pnpm check:linux:compat`. Собрать `pnpm build:linux:ubuntu22`, проверить ABI
+нового ELF и DEB dependencies. В Ubuntu 22.04 с актуальными Jammy updates
+установить DEB, выполнить CLI `--help` и открыть GUI через настоящий WebKitGTK.
+Повторить AppImage extract-and-run. Отдельно проверить X11/Wayland capture,
+горячие клавиши и clipboard; ELF/CLI smoke не заменяет эти проверки.
+Для ARM64 требуется native runner. Команды и фактический статус — TESTING.md.
+
 ## Иконка выноски: карточка и точка (2026-10-18)
 
 `REQ-EDT-008`, ADR-055: выбранный вариант 01 используется общим `UiIcon`.
@@ -1686,3 +1709,15 @@ RU/EN показывают одинаковые 18 карточек с акту�
 CSS clipping удаляет наружный фон скруглений. Большой hero не изменён.
 Chrome/JS/no-JS и native capture evidence — TESTING.md; новые desktop runtime
 или платформенные гарантии этим изменением не заявляются.
+
+## Ссылка Noto Emoji (ADR-105)
+
+`REQ-TOL-014`: Capture → Quick → выбор области → Emoji → Все эмоджи →
+Noto Emoji. Клик и Enter на ссылке передают точный upstream URL системному
+браузеру. Повторить после перехода в Editor; палитра и документ сохраняются.
+Проверить отказ native opener для стороннего HTTPS, file URL и вложенного
+пути. Автоматизированный Linux scenario emoji-link записывает OS dispatch;
+реальное отображение сайта в браузере и Windows/macOS остаются отдельными
+ручными/runtime проверками. Linux/X11 WebKitGTK 2.52.6, external driver:
+1/1 passed, четыре URL dispatch и три отказа; оба screenshots просмотрены.
+Фактические результаты — TESTING.md.

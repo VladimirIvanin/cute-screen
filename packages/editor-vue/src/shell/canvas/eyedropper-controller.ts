@@ -67,6 +67,17 @@ export class EyedropperController {
     this.#ports = ports
   }
 
+  bindings() {
+    return {
+      eyedropperLoupe: this.loupe,
+      eyedropperPreview: this.preview,
+      EYEDROPPER_GRID_SIZE,
+      eyedropperSwatch: this.swatch,
+      eyedropperHex: this.hex,
+      eyedropperHint: this.hint,
+    }
+  }
+
   #scenePixel(point: CanvasPoint): Readonly<{ x: number; y: number }> | undefined {
     const canvas = this.#ports.scene.value
     const bounds = this.#ports.outputBounds.value

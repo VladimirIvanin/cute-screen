@@ -1,5 +1,27 @@
 # Журнал архитектурных решений
 
+## ADR-104 — Ubuntu 22.04 как база распространяемых Linux-сборок
+
+**Статус:** accepted (2026-10-18); уточняет REQ-REL-001.
+
+**Контекст:** существующий release ELF, собранный на Ubuntu 24.04, требует
+GLIBC_2.39. В Ubuntu 22.04.5 с glibc 2.35 его `--help` завершается ошибкой
+загрузчика даже при установленных GTK/WebKit runtime libraries.
+
+**Решение:** Linux x64 и ARM64 собираются нативно на Ubuntu 22.04; local
+packaging использует Docker с такой же базой и отдельными Cargo/JS outputs.
+Проверка фактических ELF version requirements запрещает GLIBC выше 2.35,
+включая weak imports. DEB явно требует libc6 >= 2.35 и WebKitGTK 4.1 >= 2.40;
+системный WebKitGTK должен получать обновления Jammy. AppImage также собирается
+на Jammy: упаковка сама по себе не устраняет glibc ABI requirements.
+Существующий reference-perf runner Ubuntu 24.04 из ADR-024 сохраняется;
+его локальные бинарники не являются распространяемыми Jammy artifacts.
+
+**Проверяемое основание:** отрицательный ABI gate на прежнем ELF, новая сборка
+через `pnpm build:linux:ubuntu22`, положительный ABI gate и запуск пакетов в
+Jammy. Фактические результаты — TESTING.md. Физический захват, Wayland portals,
+clipboard и ARM64 runtime требуют собственных платформенных доказательств.
+
 ## ADR-097 — Радиус изображения определяет углы рамки
 
 **Статус:** accepted (2026-10-18); дополняет ADR-086/089.
@@ -2084,3 +2106,26 @@ Sizing, schema, EditorCommand, inline commit и undo/redo не меняются.
 режимы, минимум, cancel/focus, взаимное закрытие и disabled. Browser drag-flow
 проверяет RU/EN, обе темы, 1024 px и zoom с видимой подписью и dropdown.
 Фактические результаты и ограничения WebView — TESTING.md.
+
+## ADR-105 — Открытие атрибуции Noto Emoji системным браузером
+
+**Статус:** accepted (2026-10-18); дополняет ADR-101.
+
+**Контекст:** обычная ссылка с target=_blank в Tauri WebView не передавала
+URL системному браузеру; нажатие атрибуции оставалось без результата.
+
+**Решение:** native host подключает MIT/Apache-2.0 tauri-plugin-opener 2.5.3,
+совместимый с закреплённым Tauri 2.11.5. Его штатный initialization script
+обрабатывает активацию существующей ссылки. Capability emoji-attribution
+разрешает main и quick-capture только open-url для точного upstream URL,
+без default permission set, открытия файлов и произвольных URL. Renderer
+остаётся независимым от Tauri; browser preview сохраняет обычную ссылку.
+Enter на атрибуции не всплывает в глобальный Quick shortcut Copy, но
+сохраняет default activation ссылки.
+Новый EditorCommand и изменение документа не нужны.
+
+**Проверяемое основание:** capability regression и реальный Linux WebView:
+production Capture → Quick → Editor, click/Enter атрибуции, вызов OS opener,
+отказ для постороннего HTTPS URL, file URL и вложенного пути. OS boundary
+в тесте записывает аргументы вместо запуска браузера. Результаты — TESTING.md;
+Windows/macOS runtime требуют отдельного подтверждения.

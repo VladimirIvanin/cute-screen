@@ -87,7 +87,6 @@ describe('Windows physical capture excludes the editor', () => {
           await $('.cs-quick-actions button:first-child').click()
         } else {
           await browser.execute(() => {
-            document.querySelector<HTMLCanvasElement>('.cs-canvas:not(.cs-canvas-overlay)')?.focus()
             window.addEventListener('keydown', (event) => {
               document.documentElement.dataset.captureEscape = JSON.stringify({
                 key: event.key,

@@ -296,6 +296,16 @@ function fillColorPayload(
   return { ...current, fill: { kind: 'solid', color, opacity: typeof fill?.opacity === 'number' ? fill.opacity : 1 } }
 }
 
+function fillGradientPayload(
+  value: string,
+  tool: DrawingTool,
+  current: JsonObject,
+): JsonObject | undefined {
+  if (tool !== 'shape' || ['braceLeft', 'braceRight'].includes(String(current.shape))) return undefined
+  const fill = parseLinearGradient(value)
+  return fill ? { ...current, fill: { ...fill, start: { ...fill.start }, end: { ...fill.end } } } : undefined
+}
+
 export function resolveDrawingPayload(
   id: DrawingControlId,
   value: string,
@@ -326,11 +336,7 @@ export function resolveDrawingPayload(
     return specializedPayload(id, value, tool, current)
   }
   if (id === 'fillKind') return fillKindPayload(value, tool, current)
-  if (id === 'fillGradient') {
-    if (tool !== 'shape' || ['braceLeft', 'braceRight'].includes(String(current.shape))) return undefined
-    const fill = parseLinearGradient(value)
-    return fill ? { ...current, fill: { ...fill, start: { ...fill.start }, end: { ...fill.end } } } : undefined
-  }
+  if (id === 'fillGradient') return fillGradientPayload(value, tool, current)
   if (id === 'fillColor') return fillColorPayload(value, tool, current)
   if (id === 'fillOpacity') return fillOpacityPayload(value, tool, current)
   if (

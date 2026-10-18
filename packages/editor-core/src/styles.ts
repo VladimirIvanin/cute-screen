@@ -239,6 +239,24 @@ function updateLoupeSource(
   return next
 }
 
+function applyCalloutStyle(
+  layer: LayerNode,
+  style: LayerStyle,
+  payload: MutableObject,
+): void {
+  if (layer.kind === 'callout' && ['straight', 'corner', 'elbow'].includes(String(style.calloutRoute))) {
+    const axis = Math.abs(layer.payload.label.x - layer.payload.target.x) >= Math.abs(layer.payload.label.y - layer.payload.target.y) ? 'y' : 'x'
+    payload.route = style.calloutRoute === 'straight' ? { path: 'straight' }
+      : style.calloutRoute === 'elbow' ? { path: 'elbow', elbow: { axis, offset: 0 } } : { path: 'corner', axis }
+  }
+  if (
+    layer.kind === 'callout' &&
+    'calloutFrame' in style &&
+    !layer.payload.attachment
+  )
+    payload.attachment = layer.payload.label.x < layer.payload.target.x ? 'right' : 'left'
+}
+
 export function applyLayerStyle<T extends LayerNode>(
   layer: T,
   style: LayerStyle,
@@ -248,11 +266,7 @@ export function applyLayerStyle<T extends LayerNode>(
   const source = layer.kind === 'pencil' && typeof style.brush === 'string'
     ? changePencilBrush(layer.payload, style.brush) : layer.payload
   const payload = clone(source) as MutableObject
-  if (layer.kind === 'callout' && ['straight', 'corner', 'elbow'].includes(String(style.calloutRoute))) {
-    const axis = Math.abs(layer.payload.label.x - layer.payload.target.x) >= Math.abs(layer.payload.label.y - layer.payload.target.y) ? 'y' : 'x'
-    payload.route = style.calloutRoute === 'straight' ? { path: 'straight' }
-      : style.calloutRoute === 'elbow' ? { path: 'elbow', elbow: { axis, offset: 0 } } : { path: 'corner', axis }
-  }
+  applyCalloutStyle(layer, style, payload)
   delete payload.brushSmoothing
   for (const [key, path] of Object.entries(channels[layer.kind] ?? {})) {
     if (
@@ -262,12 +276,6 @@ export function applyLayerStyle<T extends LayerNode>(
     ) continue
     if (key in style) writePath(payload, path, key === 'brush' && style[key] === 'pencil' ? 'pen' : style[key]!)
   }
-  if (
-    layer.kind === 'callout' &&
-    'calloutFrame' in style &&
-    !layer.payload.attachment
-  )
-    payload.attachment = layer.payload.label.x < layer.payload.target.x ? 'right' : 'left'
   const content = contentFor(layer)
   if (content) payload[layer.kind === 'numberedMarker' ? 'label' : 'content'] = styledContent(content, style)
   let next = { ...layer, payload } as LayerNode

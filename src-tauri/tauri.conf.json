@@ -12,7 +12,7 @@
   "app": {
     "withGlobalTauri": false,
     "security": {
-      "capabilities": ["default", "quick-capture", "settings"],
+      "capabilities": ["default", "quick-capture", "settings", "emoji-attribution"],
       "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; img-src 'self' asset: http://asset.localhost blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost asset: http://asset.localhost blob:",
       "assetProtocol": {
         "enable": true,
@@ -36,6 +36,11 @@
   "bundle": {
     "active": true,
     "targets": ["deb", "appimage"],
+    "linux": {
+      "deb": {
+        "depends": ["libc6 (>= 2.35)", "libwebkit2gtk-4.1-0 (>= 2.40)", "xdg-utils"]
+      }
+    },
     "windows": {
       "nsis": {
         "installMode": "currentUser",
