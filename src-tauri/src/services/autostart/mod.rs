@@ -83,21 +83,23 @@ pub fn installer_choice() -> Option<bool> {
 }
 
 pub fn open_settings() -> Result<(), String> {
-    #[cfg(target_os = "linux")]
-    let result = std::process::Command::new("gnome-session-properties")
-        .spawn()
-        .map(|_| ());
-    #[cfg(target_os = "windows")]
-    let result = std::process::Command::new("cmd")
-        .args(["/C", "start", "", "ms-settings:startupapps"])
-        .spawn()
-        .map(|_| ());
     #[cfg(target_os = "macos")]
     {
-        return macos::open_settings();
+        macos::open_settings()
     }
     #[cfg(not(target_os = "macos"))]
-    result.map_err(|error| error.to_string())
+    {
+        #[cfg(target_os = "linux")]
+        let result = std::process::Command::new("gnome-session-properties")
+            .spawn()
+            .map(|_| ());
+        #[cfg(target_os = "windows")]
+        let result = std::process::Command::new("cmd")
+            .args(["/C", "start", "", "ms-settings:startupapps"])
+            .spawn()
+            .map(|_| ());
+        result.map_err(|error| error.to_string())
+    }
 }
 
 /// Desktop Entry has its own escaping layers, distinct from shell/GNOME argv.
