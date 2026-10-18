@@ -1,5 +1,14 @@
 # Платформенная матрица
 
+## Иконки настроек выноски (2026-10-18)
+
+Windows x64: Vue 16/16 passed; Chrome 155.0.8059.80 2/2 passed, включая
+12 сочетаний RU/EN × light/dark × zoom 50/100/200 при 1024 px. Пять кнопок
+остаются в одном ряду; screenshots просмотрены. Свежая WebView2-сборка прошла,
+но оба native прогона остановились до проверки toolbar на ранних pointer
+gestures (Callout create / Quick resize); native layout/handoff не подтверждены.
+Linux/WebKitGTK и macOS/WKWebView pending. Команды и логи — TESTING.md.
+
 ## Иконка выноски: карточка и точка (2026-10-18)
 
 Windows x64: Vue 110/110, Chrome 155.0.8059.80 2/2 и WebView2 155.0.4283.45

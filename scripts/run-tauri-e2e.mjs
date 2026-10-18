@@ -21,6 +21,7 @@ await mkdir(runtimeDirectory, { recursive: true })
 const embeddedWebDriverPort = Number.parseInt(process.env.TAURI_WEBDRIVER_PORT ?? '4445', 10)
 
 const scenarios = [
+  { id: 'landing-assets', spec: 'tests/e2e/specs/tauri-landing-assets.e2e.ts', harnessQuery: '?m04=1&m08=1', driverProvider: 'external' },
   { id: 'emoji', persistenceGroup: 'emoji', spec: 'tests/e2e/specs/tauri-emoji.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },
   { id: 'emoji-reopen', persistenceGroup: 'emoji', spec: 'tests/e2e/specs/tauri-emoji-reopen.e2e.ts', harnessQuery: '?m04=1&m08=1', driverProvider: 'external' },
   { id: 'quick-history', persistenceGroup: 'quick-history', spec: 'tests/e2e/specs/tauri-quick-history.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },

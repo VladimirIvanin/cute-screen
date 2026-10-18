@@ -12,7 +12,7 @@ const root = fileURLToPath(new URL('../', import.meta.url))
 const output = new URL('../apps/landing/assets/icons/', import.meta.url)
 const names = [
   'select', 'hand', 'crop', 'arrow', 'line', 'shape', 'pencil', 'marker', 'text',
-  'numberedMarker', 'callout', 'image', 'eyedropper', 'privacy', 'spotlight',
+  'numberedMarker', 'callout', 'image', 'emoji', 'eyedropper', 'privacy', 'spotlight',
   'ruler', 'loupe', 'check',
 ]
 const server = await createServer({

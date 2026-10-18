@@ -13,6 +13,10 @@ import {
 import { verifyBrandEyes } from '../brand-eyes'
 
 const output = path.resolve('artifacts/landing-e2e')
+const expectedTools = [
+  'arrow', 'line', 'shape', 'pencil', 'marker', 'text', 'numberedMarker', 'callout',
+  'privacy', 'spotlight', 'loupe', 'ruler', 'eyedropper', 'crop', 'image', 'emoji', 'select', 'hand',
+]
 
 async function openPage(
   locale: 'ru' | 'en',
@@ -30,7 +34,7 @@ describe('static landing production preview', () => {
     await mkdir(output, { recursive: true })
   })
 
-  it('shows the supplied screenshot and all project icons in both locales at exact viewport widths', async () => {
+  it('shows the demo screenshot and all eighteen project tools in both locales at exact viewport widths', async () => {
     for (const locale of ['ru', 'en'] as const) {
       for (const width of [375, 760, 768, 1024, 1440]) {
         await openPage(locale, width)
@@ -49,11 +53,19 @@ describe('static landing production preview', () => {
             screenshotSize: [screenshot.naturalWidth, screenshot.naturalHeight],
             imageScrollable: frame.scrollWidth > frame.clientWidth,
             brandedMain: document.querySelector('main')!.innerText.includes('Cute Screen'),
-            tools: tools.length,
+            tools: tools.map((tool) => tool.getAttribute('data-tool')),
             iconsLoaded: tools.every((tool) => {
               const icon = tool.querySelector('img')
-              return icon instanceof HTMLImageElement && icon.complete && icon.naturalWidth > 0
+              if (
+                !(icon instanceof HTMLImageElement) ||
+                !icon.complete ||
+                !icon.naturalWidth
+              ) return false
+              const filename = new URL(icon.src).pathname.split('/').at(-1)!
+              const name = tool.getAttribute('data-tool')
+              return filename === `${name}.svg` || (filename.startsWith(`${name}-`) && filename.endsWith('.svg'))
             }),
+            descriptionsPresent: tools.every((tool) => Boolean(tool.querySelector('p')?.textContent?.trim())),
             scripts: document.scripts.length,
           }
         })
@@ -65,10 +77,13 @@ describe('static landing production preview', () => {
           screenshotSize: [1919, 943],
           imageScrollable: width > 760 && width <= 1050,
           brandedMain: false,
-          tools: 17,
+          tools: expectedTools,
           iconsLoaded: true,
+          descriptionsPresent: true,
           scripts: 1,
         })
+        await expect($('[data-tool="emoji"] h3')).toHaveText(locale === 'ru' ? 'Эмодзи' : 'Emoji')
+        await expect($('[data-tool="emoji"] p')).toHaveText(expect.stringContaining('100'))
         await browser.saveScreenshot(path.join(output, `hero-shot-${locale}-${width}.png`), { fullPage: true })
       }
     }
@@ -92,7 +107,7 @@ describe('static landing production preview', () => {
     )).toBe(0)
   })
 
-  it('hides the hero screenshot and clips the supplied tool rail corners on mobile', async () => {
+  it('hides the hero screenshot and clips the captured tool rail corners on mobile', async () => {
     await openPage('ru', 375)
     expect(await $('.demo').isDisplayed()).toBe(false)
     const toolbar = $('.toolbar-scroll')
@@ -109,7 +124,7 @@ describe('static landing production preview', () => {
         height: img.naturalHeight,
       }
     })
-    expect(image).toEqual({ clip: 'inset(0px round 16px)', width: 595, height: 46 })
+    expect(image).toEqual({ clip: 'inset(0px round 16px)', width: 665, height: 46 })
   })
 
   it('animates the inline brand in RU/EN using a small independent bundle', async function () {

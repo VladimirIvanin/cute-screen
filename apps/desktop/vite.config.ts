@@ -4,8 +4,12 @@ import vue from '@vitejs/plugin-vue'
 import { defineConfig } from 'vite'
 
 const root = fileURLToPath(new URL('.', import.meta.url))
+const browserE2ePort = process.env.CUTE_SCREEN_BROWSER_E2E_PORT ?? '5173'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  cacheDir: mode === 'e2e'
+    ? fileURLToPath(new URL(`../../node_modules/.vite/cutescreen-e2e-${browserE2ePort}`, import.meta.url))
+    : undefined,
   plugins: [vue()],
   resolve: {
     alias: {
@@ -39,4 +43,4 @@ export default defineConfig({
     port: 4173,
     strictPort: true,
   },
-})
+}))

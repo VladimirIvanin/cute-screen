@@ -1,5 +1,27 @@
 # Стратегия тестирования
 
+## Vite dev/E2E optimize-deps cache (2026-10-18)
+
+Windows x64: запрос пользователя к `localhost:5173` с прежним hash Tauri core
+воспроизвёл HTTP 504 Outdated Optimize Dep. E2E теперь использует собственный
+cacheDir на порт. Существующий dev-сервер автоматически перечитал config.
+Во время browser run на 5226 импорт из `src/desktop-bridge.ts` на 5173 сохранил
+hash `c182b150` и HTTP 200; E2E писал в `.vite/cutescreen-e2e-5226`.
+Наблюдение через `Invoke-WebRequest`: `artifacts/vite-cache-isolation.json`.
+Уже открытая страница со старым import hash может потребовать reload.
+
+`$env:CUTE_SCREEN_BROWSER_E2E_PORT='5226'; $env:CUTE_SCREEN_BROWSER_E2E_HEADLESS='1'; $env:CUTE_SCREEN_E2E_DISABLE_WATCH='1'; pnpm test:e2e:browser --spec tests/e2e/specs/browser-callout-visual.e2e.ts`:
+Chrome 155.0.8059.80, 1/1 passed, прежняя матрица 12 сочетаний прошла с отдельным
+кешем; `artifacts/callout-compact-cache-browser.log`. Scoped ESLint Vite config
+passed. Финальное форматирование и проверка:
+`artifacts/callout-compact-format-delivery.log`,
+`artifacts/callout-compact-format-check-delivery.log`.
+`pnpm format` exit 0; последний общий format:check exit 1 только на двух
+параллельно изменяемых landing HTML (`apps/landing/index.html` и
+`apps/landing/en/index.html`). `pnpm docs:check` passed, 38 документов.
+Scoped форматирование затронутых Vite/callout/test/CSS/Markdown файлов:
+`artifacts/callout-compact-format-scoped.log`.
+
 ## Иконки настроек выноски (2026-10-18)
 
 Windows x64 / PowerShell, Node 22.23.1, pnpm 10.33.2. Панель использует
@@ -24,8 +46,31 @@ Windows x64 / PowerShell, Node 22.23.1, pnpm 10.33.2. Панель исполь�
   `artifacts/callout-compact-types.log`. Scoped ESLint изменённых компонентов
   и тестов exit 0. `pnpm format`: exit 0, `artifacts/callout-compact-format.log`.
 
-Native и общий gate фиксируются после окончания прогона. Linux/WebKitGTK
-и macOS/WKWebView для этой правки не запускались.
+`pnpm test:boundaries`: 42 passed / 2 failed,
+`artifacts/callout-compact-boundaries-final.log`. Перенесено точечное разрешение
+геометрического SVG из CalloutEndpointSettings в общий CalloutMarkerPreview;
+icon-system boundary прошёл. Остаются прежние file-size/complexity violations
+в ShapeFormattingToolbar, canvas-workspace-controller, styles,
+gesture-finish-controller, drawing-payload и image-editing.
+
+Native: `$env:CUTE_SCREEN_E2E_SCENARIOS='callout-editing'; $env:CUTE_SCREEN_E2E_DRIVER_PORT='5804'; $env:TAURI_WEBDRIVER_PORT='5805'; $env:CARGO_TARGET_DIR='D:/cutescreen/artifacts/callout-target'; $env:CUTE_SCREEN_FRONTEND_DIST='D:/cutescreen/artifacts/callout-compact-frontend'; pnpm test:e2e:tauri`.
+Свежая сборка passed, WebView2 155.0.4283.45 / external driver запустился,
+но сценарий упал до новой проверки toolbar: Callout editor не появился после
+drag. Лог: `artifacts/callout-compact-native.log`; failure PNG просмотрен.
+Повтор `& ./artifacts/callout-compact-native-runtime.ps1` использовал тот же
+свежий pinned binary и отдельные app data/UDF, полный env сохранён в скрипте.
+Лог: `artifacts/callout-compact-native-retry.log`; timeout на предшествующем
+resize Quick crop (`crop.x > 0`). Поэтому native layout/handoff для этой правки
+не подтверждены. Это fake capture, не проверка physical capture.
+
+Первый `pnpm check` прошёл lint (0 errors / 85 warnings), но остановился на
+отсутствующих generated renderer declarations во время typecheck;
+`artifacts/callout-compact-check.log`. Повтор `pnpm check` прошёл lint, полную
+сборку/typecheck, format:check и docs:check, затем остановился на тех же двух
+architecture boundary checks (42 passed / 2 failed), без затронутых callout
+файлов в violations; `artifacts/callout-compact-check-final.log`.
+`pnpm format` passed, `artifacts/callout-compact-format-final.log`.
+Linux/WebKitGTK и macOS/WKWebView для этой правки не запускались.
 
 ## Выноска: принятая карточка с точкой (2026-10-18, ADR-055)
 
@@ -62,6 +107,10 @@ PowerShell, Node 22.23.1, pnpm 10.33.2, Chrome 155.0.8059.80.
   size ratchets в canvas-workspace-controller/ShapeFormattingToolbar и
   complexity/depth в styles/gesture-finish-controller/drawing-payload/image-editing.
   Журнал: `artifacts/custom-icons/callout-adopted-boundaries.log`.
+- `pnpm check` — exit 1 на тех же трёх boundary gates вне файлов замены
+  иконки; lint, typecheck, format:check и docs:check passed до этого шага.
+  `artifacts/custom-icons/callout-adopted-check.log`. Последующие IPC/Rust gates
+  этой командой не запускались.
 
 WebKitGTK/WKWebView и физический захват для этой замены не проверялись.
 
