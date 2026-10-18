@@ -195,6 +195,14 @@ resize в production Quick → Editor. Для browser input на общем desk
 
 ## Deployment target macOS
 
+Native bridges используют `@available`, которому нужен Clang builtins runtime.
+`build.rs` передаёт `-fapple-link-rtlib` драйверу Clang: это сохраняет runtime
+при Rust `-nodefaultlibs`, без жёстко заданного пути Xcode или архитектуры.
+Без него release link может падать с undefined `__isPlatformVersionAtLeast`.
+Compile matrix дополнительно линкует binary без test features и запускает
+`--help` на Intel/ARM64; `cargo check` сам по себе линковку не проверяет.
+Release gate по-прежнему собирает и проверяет release binary.
+
 Baseline macOS 12.0 из ADR-038 задан и в `bundle.macOS.minimumSystemVersion`,
 и в `.cargo/config.toml` через `MACOSX_DEPLOYMENT_TARGET`. Cargo-конфигурация
 нужна для прямых `cargo test`/`cargo check` в CI: они не читают Tauri bundle

@@ -1,5 +1,17 @@
 # Сквозная приёмка
 
+## Линковка macOS availability checks (2026-10-18)
+
+`REQ-REL-002`, `REQ-CAP-015`: на macOS Intel и Apple Silicon выполнить
+`pnpm build`, затем
+`cargo build --locked --package cute-screen-desktop --bin cute-screen --no-default-features`
+и `target/debug/cute-screen --help`. Отдельно выполнить штатный
+`pnpm verify:release-boundary` и universal DMG build из release workflow.
+Не должно быть undefined `__isPlatformVersionAtLeast`; обе архитектуры DMG
+должны пройти существующий `lipo -verify_arch`. Native smoke и проверка
+Screen Recording остаются отдельными gates. Исправленный macOS run pending;
+локальный Linux pass не закрывает эту приёмку.
+
 ## Меню трея не попадает в захват (2026-10-18, ADR-107)
 
 `REQ-CAP-001/002/005/006/012/014`: открыть настоящее системное меню трея,

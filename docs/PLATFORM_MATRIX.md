@@ -1,5 +1,14 @@
 # Платформенная матрица
 
+## macOS Clang availability runtime (2026-10-18)
+
+Release run 39142547248 / job 117722198522 упал при arm64 link с undefined
+`__isPlatformVersionAtLeast`, до создания DMG. `build.rs` теперь запрашивает
+Clang builtins runtime при `-nodefaultlibs`. CI Intel/ARM64 дополнен реальной
+линковкой и CLI `--help`. Baseline 12.0 и SDK gate 14+ сохраняются.
+Linux boundary/Rust checks не подтверждают native macOS link: исправленный
+macOS run, universal DMG и capture runtime остаются pending.
+
 ## CI smoke и локальная полная приёмка (2026-10-18, ADR-112)
 
 Linux hosted CI: семь независимых jobs, browser headless smoke и два native

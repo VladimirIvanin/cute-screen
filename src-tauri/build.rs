@@ -12,6 +12,8 @@ fn main() {
         println!("cargo:rustc-link-lib=framework=AppKit");
         println!("cargo:rustc-link-lib=framework=CoreGraphics");
         println!("cargo:rustc-link-arg=-Wl,-weak_framework,ScreenCaptureKit");
+        // Rust uses -nodefaultlibs; @available still needs Clang's availability builtins.
+        println!("cargo:rustc-link-arg=-fapple-link-rtlib");
         println!("cargo:rustc-link-lib=framework=CoreMedia");
         println!("cargo:rustc-link-lib=framework=CoreVideo");
         println!("cargo:rustc-link-lib=framework=CoreImage");

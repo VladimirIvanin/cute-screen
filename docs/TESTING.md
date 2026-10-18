@@ -1,5 +1,33 @@
 # Стратегия тестирования
 
+## macOS availability runtime link (2026-10-18)
+
+Red evidence: пользовательский лог release run 39142547248,
+job 117722198522 (`Package macos-universal`): arm64 release link завершился
+undefined `__isPlatformVersionAtLeast` в `macos_window_capture.o` при
+`-nodefaultlibs`. Это ошибка линковки, а не найденный test-only driver.
+
+Исправление: macOS build script передаёт Clang `-fapple-link-rtlib`.
+[Clang reference](https://clang.llvm.org/docs/ClangCommandLineReference.html#cmdoption-clang-fapple-link-rtlib)
+определяет его как принудительное подключение builtins runtime;
+[Darwin driver](https://clang.llvm.org/doxygen/Darwin_8cpp_source.html)
+обрабатывает этот флаг и при `-nodefaultlibs`. Compile matrix теперь
+выполняет настоящий production-feature `cargo build` и CLI `--help`
+на macOS ARM64/Intel до release packaging.
+
+Локальная платформа: Ubuntu 24.04.5 x86_64, Rust 1.97.0, Node 22.23.1,
+pnpm 10.33.2. `pnpm test:boundaries` — 12 files / 78 tests passed;
+`cargo test --workspace --locked` — 184 passed (desktop 152, IPC codegen 1,
+storage 31). `cargo fmt --all`, actionlint всех workflows и
+`pnpm docs:check` — passed.
+Итог остальных локальных проверок записан в
+`artifacts/macos-availability-link/validation.json`; docs log находится рядом.
+Native macOS `cargo build`, `pnpm verify:release-boundary` и
+`pnpm tauri build --target universal-apple-darwin --bundles dmg -- --locked`
+здесь недоступны: Linux host не содержит Xcode/macOS SDK. Исправленная
+линковка и DMG остаются pending до macOS CI; Linux тесты их не заменяют.
+Browser/render/perf suites не запускались: editor и frontend не менялись.
+
 ## Fixtures отдельного Rust CI job (2026-10-18)
 
 Ubuntu 24.04.5 x86_64, Rust 1.97.0, Node 22.23.1, pnpm 10.33.2.

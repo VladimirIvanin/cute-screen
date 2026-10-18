@@ -1,5 +1,18 @@
 # Трассируемость требований
 
+## Clang runtime в macOS linker (2026-10-18)
+
+`REQ-REL-002`, `REQ-CAP-015`: native bridges с `@available` должны линковаться
+при Rust `-nodefaultlibs` с baseline macOS 12.0. Build script явно просит
+Clang подключить builtins runtime через `-fapple-link-rtlib`; Xcode выбирает
+путь и архитектуру библиотеки. Compile matrix должна выполнять настоящий
+`cargo build` и CLI `--help` на macOS Intel/ARM64, поскольку `cargo check`
+не обнаруживает undefined `__isPlatformVersionAtLeast` на этапе линковки.
+Red evidence: release run 39142547248, job 117722198522, arm64 linker failure.
+Реализовано; Linux boundary 78/78, Rust workspace 184/184 и actionlint passed.
+Локальные Linux checks не заменяют macOS link/runtime evidence; новый macOS
+run pending. Команды и артефакты — TESTING.md.
+
 ## Fixtures независимого Rust CI (2026-10-18, до реализации)
 
 `REQ-REL-001/005`, ADR-014/112: Rust/X11 job самостоятельно генерирует M01
