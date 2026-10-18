@@ -6,6 +6,7 @@ import type {
 
 export const strings = {
   ru: {
+    version: 'Версия', versionUnavailable: 'Версия недоступна',
     general: 'Общие', shortcuts: 'Горячие клавиши', navigation: 'Разделы настроек', language: 'Язык',
     generalHelp: 'Язык интерфейса и работа приложения в фоне.',
     assign: 'Назначить…', assignName: 'Назначить сочетание', editName: 'Изменить сочетание',
@@ -37,6 +38,7 @@ export const strings = {
     unavailable: 'Этот вид захвата недоступен в текущей системе.', saving: 'Сохраняем…', close: 'Закрыть',
   },
   en: {
+    version: 'Version', versionUnavailable: 'Version unavailable',
     general: 'General', shortcuts: 'Keyboard shortcuts', navigation: 'Settings sections', language: 'Language',
     generalHelp: 'Interface language and background startup.',
     assign: 'Assign…', assignName: 'Assign shortcut', editName: 'Change shortcut',

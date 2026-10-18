@@ -6,8 +6,10 @@ import {
   expect,
 } from '@wdio/globals'
 import { Key } from 'webdriverio'
+import { readFileSync } from 'node:fs'
 
 const execute = promisify(execFile)
+const appVersion = (JSON.parse(readFileSync('src-tauri/tauri.conf.json', 'utf8')) as { version: string }).version
 
 async function openSettings(): Promise<void> {
   const executable = process.env.CUTE_SCREEN_WDIO_APP_BINARY
@@ -18,6 +20,7 @@ async function openSettings(): Promise<void> {
   await $('select[aria-label="Language / Язык"]').selectByAttribute('value', 'en')
   await $('.cs-settings-sidebar nav button:last-child').click()
   await expect($('.cs-shortcut-list')).toExist()
+  await expect($('.cs-settings-version')).toHaveText(`Version ${appVersion}`)
 }
 
 describe('native shortcut settings and resident activation', () => {

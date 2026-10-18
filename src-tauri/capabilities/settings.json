@@ -3,5 +3,5 @@
   "identifier": "settings",
   "description": "Settings window events and lifecycle; no image, clipboard, capture or notification plugin permissions.",
   "windows": ["settings"],
-  "permissions": ["core:event:default", "core:window:allow-close"]
+  "permissions": ["core:event:default", "core:window:allow-close", "core:app:allow-version"]
 }

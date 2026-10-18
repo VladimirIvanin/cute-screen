@@ -19,6 +19,7 @@ import {
   useEditorShellStore,
 } from '@cute-screen/editor-vue'
 import GeneralSettings from './settings/GeneralSettings.vue'
+import AppVersion from './settings/AppVersion.vue'
 import HistorySettings from './history/HistorySettings.vue'
 import { listenHistorySettings } from './platform/tauri/history-adapter'
 import {
@@ -130,7 +131,11 @@ useSettingsRuntime(bridge, state, cancelEditing)
     :aria-busy="loading || busy"
   >
     <aside class="cs-settings-sidebar">
-      <header><p class="cs-settings-eyebrow">Cute Screen</p><h1>{{ labels.title }}</h1></header>
+      <header>
+        <p class="cs-settings-eyebrow">Cute Screen</p>
+        <AppVersion :labels="labels" />
+        <h1>{{ labels.title }}</h1>
+      </header>
       <nav :aria-label="labels.navigation">
         <button
           :aria-current="section === 'general' ? 'page' : undefined"

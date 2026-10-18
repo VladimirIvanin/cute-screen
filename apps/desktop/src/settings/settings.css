@@ -42,6 +42,16 @@
 .cs-settings-muted {
   color: var(--text-muted);
 }
+.cs-settings-version {
+  margin-bottom: 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.cs-settings-version p {
+  margin: 0;
+}
 .cs-settings-sidebar nav {
   display: grid;
   gap: 4px;
