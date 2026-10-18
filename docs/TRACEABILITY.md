@@ -1,5 +1,14 @@
 # Трассируемость требований
 
+## Версия 0.1.5 (2026-10-18)
+
+`REQ-REL-001/002/003/005`: штатной командой `pnpm version:bump 0.1.5`
+синхронизировать package.json, Tauri config, Cargo workspace, локальную storage
+dependency и Cargo.lock. Проверить release version guard для `v0.1.5`, Cargo
+metadata с `--locked --offline`, boundary tests и форматирование.
+Реализовано; release guard, Cargo metadata и boundary 82/82 passed.
+Фактические команды и артефакты — TESTING.md.
+
 ## Проверка архитектур universal DMG в release workflow (2026-10-18)
 
 `REQ-REL-002`, `REQ-REL-006`: шаг `Build macOS universal DMG` в

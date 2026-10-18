@@ -1,5 +1,15 @@
 # Стратегия тестирования
 
+## Версия 0.1.5 (2026-10-18)
+
+macOS 12.7.6 x86_64 (Darwin 21.6.0), Node 22.23.1, pnpm 10.33.2.
+`pnpm version:bump 0.1.5` обновил пять файлов метаданных;
+`node scripts/release-assets.mjs version . v0.1.5` и
+`cargo metadata --locked --offline --no-deps --format-version 1` — passed.
+`pnpm test:boundaries --maxWorkers=1` — 13 files / 82 tests passed.
+`pnpm format`, `pnpm format:check`, `pnpm docs:check` и `git diff --check` — passed.
+Изменены только версия и документация; runtime/build suites не запускались.
+
 ## Проверка `lipo` и сохранения `.app` в macOS release workflow (2026-10-18)
 
 Red evidence: лог `Package macos-universal` на commit `f12695f` (`v0.1.4`):
