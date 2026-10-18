@@ -5,6 +5,7 @@ import {
 } from 'vitest'
 import {
   assertArchitecture,
+  assertNoDevelopmentBinaries,
   assertDraftUpdate,
   checkGlibc,
   checkMacMinimum,
@@ -30,6 +31,12 @@ import {
 } from '../../scripts/release/versions.mjs'
 
 describe('release inputs and final artifact contracts', () => {
+  it('rejects development binaries in actual package file inventories', () => {
+    for (const file of ['usr/bin/desktop-ipc-codegen', 'Contents/MacOS/m04-platform-smoke', 'bin/m01-platform-smoke.exe']) {
+      expect(() => assertNoDevelopmentBinaries([{ path: file }])).toThrow('leaked')
+    }
+    expect(() => assertNoDevelopmentBinaries([{ path: 'cute-screen.exe' }, { path: 'uninstall.exe' }])).not.toThrow()
+  })
   it('synchronizes the actual workspace metadata and pinned Cargo lock without bumping dependencies', async () => {
     const directory = await mkdtemp(path.join(tmpdir(), 'cute-screen-version-'))
     try {

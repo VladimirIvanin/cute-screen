@@ -13,7 +13,16 @@ export const forbidden = [
   'tauri-plugin-wdio-webdriver',
   'cute-screen:fake-platform',
   'cute-screen:test-harness',
+  'desktop-ipc-codegen',
 ]
+
+export function assertNoDevelopmentBinaries(files) {
+  for (const file of files) {
+    if (/(?:^|[/\\])(?:desktop-ipc-codegen|m01-platform-smoke|m04-platform-smoke)(?:\.exe)?$/u.test(file.path)) {
+      throw new Error(`Development executable leaked into package: ${file.path}`)
+    }
+  }
+}
 
 export function stableVersion(version) {
   if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/u.test(version)
@@ -114,6 +123,7 @@ export function validateResources(
     !info.customProtocol ||
     info.fakePlatform ||
     info.testHarness ||
+    info.ipcCodegen ||
     info.platformSmoke
   ) {
     throw new Error('Packaged binary is not a production build')

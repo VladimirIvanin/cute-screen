@@ -45,6 +45,10 @@ workflow сообщает ошибку и никогда не публикует
 
 Production build использует default features плюс Tauri custom-protocol,
 locked dependencies и явные `--bundles`. Test-only features не разрешаются.
+Служебный `desktop-ipc-codegen` требует отдельного `ipc-codegen` feature:
+`pnpm ipc:codegen` и `pnpm ipc:check` включают его автоматически, production
+packaging — никогда. Это исключает утечку helper в DEB/NSIS и ошибку universal
+bundler, который объединяет только основной executable.
 `pnpm release:verify <platform> <bundle-directory>` извлекает DEB/AppImage,
 устанавливает NSIS во временный каталог или монтирует DMG read-only.
 Hidden `--release-info` возвращает только metadata и хеши декодированных

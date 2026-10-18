@@ -25,6 +25,7 @@ struct ReleaseInfo {
     custom_protocol: bool,
     fake_platform: bool,
     test_harness: bool,
+    ipc_codegen: bool,
     platform_smoke: bool,
     assets: Vec<AssetSummary>,
 }
@@ -54,6 +55,7 @@ pub fn print(context: &tauri::Context<tauri::Wry>) -> Result<(), String> {
         custom_protocol: !cfg!(dev),
         fake_platform: cfg!(feature = "fake-platform"),
         test_harness: cfg!(feature = "test-harness"),
+        ipc_codegen: cfg!(feature = "ipc-codegen"),
         platform_smoke: cfg!(feature = "platform-smoke"),
         assets: summaries,
     };

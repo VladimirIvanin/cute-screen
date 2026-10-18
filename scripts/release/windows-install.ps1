@@ -13,7 +13,8 @@ if (-not $installPath.StartsWith($tempRoot, [System.StringComparison]::OrdinalIg
   throw 'The test installation must stay under the runner temporary directory'
 }
 if ($Uninstall) {
-  if ($installerPath -ne (Join-Path $installPath 'uninstall.exe')) {
+  $expectedUninstaller = (Resolve-Path -LiteralPath (Join-Path $installPath 'uninstall.exe')).Path
+  if ($installerPath -ne $expectedUninstaller) {
     throw 'Only the temporary test installation may be uninstalled'
   }
   $installerProcess = Start-Process -FilePath $installerPath -ArgumentList "/S _?=$Directory" -WindowStyle Hidden -Wait -PassThru

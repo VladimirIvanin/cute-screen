@@ -78,7 +78,7 @@ jobs:
       - name: Run Rust tests
         run: |
           cargo test --workspace
-          cargo test --workspace --features fake-platform
+          cargo test --workspace --features fake-platform,ipc-codegen
 
       - name: Run controlled X11 renderer boundary smoke
         run: xvfb-run --auto-servernum env XDG_SESSION_TYPE=x11 pnpm smoke:m01:x11

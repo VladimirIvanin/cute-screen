@@ -10,6 +10,7 @@ import path from 'node:path'
 import process from 'node:process'
 import {
   assertArchitecture,
+  assertNoDevelopmentBinaries,
   checkGlibc,
   checkMacMinimum,
   forbidden,
@@ -187,6 +188,7 @@ export async function verifyPackage(
       if (id.startsWith('linux-')) report.checks[extension] = await linuxPackage(file, extension, temporary, id, version, frontend)
       else if (id.startsWith('macos-')) report.checks[extension] = await macPackage(file, temporary, id, version, frontend)
       else report.checks[extension] = await windowsPackage(file, temporary, id, version, frontend)
+      assertNoDevelopmentBinaries(report.checks[extension].packagedFiles)
     } finally {
       await rm(temporary, { recursive: true, force: true })
     }

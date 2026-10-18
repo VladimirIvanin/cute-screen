@@ -12,6 +12,7 @@ export interface ResourceInfo {
   customProtocol: boolean
   fakePlatform: boolean
   testHarness: boolean
+  ipcCodegen?: boolean
   platformSmoke: boolean
   assets: ReleaseAsset[]
 }
@@ -24,6 +25,7 @@ export interface PackageManifest {
 
 export const targets: { id: string; target: string; extensions: string[] }[]
 export const forbidden: string[]
+export function assertNoDevelopmentBinaries(files: { path: string }[]): void
 export function stableVersion(version: string): string
 export function validateVersions(entries: Record<string, string | undefined>, tag?: string): string
 export function packageNames(version: string): string[]

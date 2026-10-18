@@ -33,6 +33,7 @@ required-features = ["platform-smoke"]
 [[bin]]
 name = "desktop-ipc-codegen"
 path = "src/bin/desktop-ipc-codegen.rs"
+required-features = ["ipc-codegen"]
 
 [build-dependencies]
 tauri-build = { version = "=2.6.3", features = [] }
@@ -97,6 +98,7 @@ default = ["x11-capture"]
 custom-protocol = ["tauri/custom-protocol"]
 fake-platform = []
 platform-smoke = []
+ipc-codegen = []
 x11-capture = ["dep:x11rb"]
 test-harness = [
   "dep:tauri-plugin-wdio",
