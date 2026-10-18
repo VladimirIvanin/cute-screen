@@ -8,6 +8,10 @@ fixtures перед `cargo test --workspace` с/без `fake-platform`. Подг
 на чистом снимке commit без generated PNG должен падать с missing fixture,
 после штатной `pnpm fixtures:generate:m01` — проходить; затем оба workspace suites.
 
+Результат: clean-snapshot red/green подтверждён; workspace 184 и fake-platform
+187 tests passed, boundary 78/78, actionlint, formatting и docs checks passed.
+Команды и артефакты — TESTING.md; новый hosted run ещё не выполнен.
+
 ## Версия 0.1.1 (2026-10-18, до реализации)
 
 `REQ-REL-001/002/003/005`: добавить `pnpm version:bump <MAJOR.MINOR.PATCH>`

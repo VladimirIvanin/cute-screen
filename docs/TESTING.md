@@ -18,9 +18,13 @@ Ubuntu 24.04.5 x86_64, Rust 1.97.0, Node 22.23.1, pnpm 10.33.2.
   Логи: `clean-generate.log`, `generated-fixture-green.log`.
 - `cargo test --workspace` — 184 passed: desktop 152, IPC codegen 1, storage 31;
   `rust-workspace.log`. Рабочий checkout уже содержал generated fixtures.
+- `cargo test --workspace --features fake-platform` — 187 passed: desktop 155,
+  IPC codegen 1, storage 31; `rust-fake-platform.log`.
 - `pnpm test:boundaries` — 12 files / 78 tests passed; `boundaries.log`.
 - `artifacts/release-validation/actionlint -config-file artifacts/release-validation/actionlint.yaml`
   — passed; `actionlint.log`.
+- `pnpm format`, `pnpm format:check`, `pnpm docs:check`, `git diff --check`
+  — passed; `format-final.log`, `format-check.log`, `docs-final.log`, `diff-check.log`.
 
 Логи: `artifacts/ci-rust-fixtures/`. Workflow теперь генерирует fixtures внутри
 Rust job перед обоими Cargo suites. Повторный hosted run и Xvfb smoke в этом
