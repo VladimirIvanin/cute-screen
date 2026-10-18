@@ -1,5 +1,14 @@
 # Трассируемость требований
 
+## Версия 0.1.3 (2026-10-18)
+
+`REQ-REL-001/002/003/005`: штатной командой `pnpm version:bump 0.1.3`
+синхронизировать package.json, Tauri config, Cargo workspace, локальную storage
+dependency и Cargo.lock. Проверить release version guard для `v0.1.3`, Cargo
+metadata с `--locked --offline`, boundary tests и форматирование.
+Реализовано; release guard, Cargo metadata, boundary 81/81 и formatting/docs
+checks passed. Фактические команды и артефакты — TESTING.md.
+
 ## Диагностика аварийного выхода Vitest (2026-10-18)
 
 `REQ-REL-001/002/003/005`: закреплённый patch Vitest 4.1.10 добавляет в ошибку

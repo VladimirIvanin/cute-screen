@@ -1,5 +1,16 @@
 # Стратегия тестирования
 
+## Версия 0.1.3 (2026-10-18)
+
+Ubuntu 24.04.5 x86_64, Node 22.23.1, pnpm 10.33.2.
+`pnpm version:bump 0.1.3` обновил пять файлов метаданных;
+`node scripts/release-assets.mjs version . v0.1.3` и
+`cargo metadata --locked --offline --no-deps --format-version 1` — passed.
+`pnpm test:boundaries` — 13 files / 81 tests passed.
+`pnpm format`, `pnpm format:check`, `pnpm docs:check` и `git diff --check` — passed.
+Логи и Cargo metadata: `artifacts/version-0.1.3/`.
+Изменены только версия и документация; runtime/build suites не запускались.
+
 ## Наблюдаемость Vitest worker crash (2026-10-18)
 
 Исходный [Release job](https://github.com/VladimirIvanin/cute-screen/actions/runs/39144900736/job/117726702110)
