@@ -6,6 +6,8 @@
 синхронизировать package.json, Tauri config, Cargo workspace, локальную storage
 dependency и Cargo.lock. Проверить release version guard для `v0.1.4`, Cargo
 metadata с `--locked --offline`, boundary tests и форматирование.
+Реализовано; release guard, Cargo metadata и boundary 81/81 passed.
+Фактические команды и артефакты — TESTING.md.
 
 ## Диапазон диагностического patch Vitest (2026-10-18)
 

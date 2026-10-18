@@ -1,5 +1,16 @@
 # Стратегия тестирования
 
+## Версия 0.1.4 (2026-10-18)
+
+Ubuntu 24.04.5 x86_64, Node 22.23.1, pnpm 10.33.2.
+`pnpm version:bump 0.1.4` обновил пять файлов метаданных;
+`node scripts/release-assets.mjs version . v0.1.4` и
+`cargo metadata --locked --offline --no-deps --format-version 1` — passed.
+`pnpm test:boundaries` — 13 files / 81 tests passed.
+`pnpm format`, `pnpm format:check`, `pnpm docs:check` и `git diff --check` — passed.
+Логи и Cargo metadata: `artifacts/version-0.1.4/`.
+Изменены только версия и документация; runtime/build suites не запускались.
+
 ## Диагностический patch для Vitest 4.x (2026-10-18)
 
 Ubuntu 24.04.5 x86_64, Node 22.23.1, pnpm 10.33.2. Селектор patch изменён
