@@ -1,5 +1,31 @@
 # Стратегия тестирования
 
+## Fixtures отдельного Rust CI job (2026-10-18)
+
+Ubuntu 24.04.5 x86_64, Rust 1.97.0, Node 22.23.1, pnpm 10.33.2.
+
+- Public Jobs API подтвердил failure шага `Run Rust tests` в job 117717391316,
+  run 39141737137, commit `fcbce59`. Metadata:
+  `artifacts/ci-rust-fixtures/job-117717391316.json`. Полный hosted log требует
+  авторизации; конкретный hosted assertion по public metadata недоступен.
+- Red: `git archive HEAD` на `fcbce59` распакован в отдельный временный каталог
+  без ignored generated fixtures. С общим `CARGO_TARGET_DIR` команда
+  `cargo test --manifest-path "$clean/Cargo.toml" -p cute-screen-storage creates_deduplicated_capture_and_persists_the_document`
+  завершилась exit 101: `production-shaped PNG fixture`, `NotFound` при чтении
+  `tests/fixtures/generated/ui-4k.png`. Лог: `missing-fixture-red.log` в каталоге ниже.
+- В том же clean snapshot выполнена штатная `pnpm fixtures:generate:m01`
+  (7 fixtures), после чего та же Cargo-команда прошла 1/1 без изменения Rust code.
+  Логи: `clean-generate.log`, `generated-fixture-green.log`.
+- `cargo test --workspace` — 184 passed: desktop 152, IPC codegen 1, storage 31;
+  `rust-workspace.log`. Рабочий checkout уже содержал generated fixtures.
+- `pnpm test:boundaries` — 12 files / 78 tests passed; `boundaries.log`.
+- `artifacts/release-validation/actionlint -config-file artifacts/release-validation/actionlint.yaml`
+  — passed; `actionlint.log`.
+
+Логи: `artifacts/ci-rust-fixtures/`. Workflow теперь генерирует fixtures внутри
+Rust job перед обоими Cargo suites. Повторный hosted run и Xvfb smoke в этом
+срезе не запускались; runtime/application code не менялся.
+
 ## Версия 0.1.1 (2026-10-18)
 
 Ubuntu 24.04.5 x86_64. Метаданные версии и команда `pnpm version:bump`.

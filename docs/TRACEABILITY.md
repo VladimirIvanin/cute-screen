@@ -1,5 +1,13 @@
 # Трассируемость требований
 
+## Fixtures независимого Rust CI (2026-10-18, до реализации)
+
+`REQ-REL-001/005`, ADR-014/112: Rust/X11 job самостоятельно генерирует M01
+fixtures перед `cargo test --workspace` с/без `fake-platform`. Подготовка
+не зависит от unit job, cache или файлов разработчика. Проверка: storage test
+на чистом снимке commit без generated PNG должен падать с missing fixture,
+после штатной `pnpm fixtures:generate:m01` — проходить; затем оба workspace suites.
+
 ## Версия 0.1.1 (2026-10-18, до реализации)
 
 `REQ-REL-001/002/003/005`: добавить `pnpm version:bump <MAJOR.MINOR.PATCH>`

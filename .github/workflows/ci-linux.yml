@@ -108,6 +108,10 @@ jobs:
         if: inputs.task == 'rust'
         run: pnpm build
 
+      - name: Generate fixtures for Rust tests
+        if: inputs.task == 'rust'
+        run: pnpm fixtures:generate:m01
+
       - name: Run Rust tests
         if: inputs.task == 'rust'
         run: |

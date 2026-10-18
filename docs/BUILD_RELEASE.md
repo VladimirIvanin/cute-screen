@@ -303,6 +303,11 @@ ADR-112: Linux выполняется семью независимыми jobs �
 | tauri    | короткий native E2E smoke; полный suite по manual opt-in               |
 | packages | production boundary, Jammy DEB/AppImage, ABI и extracted package smoke |
 
+Rust job перед прямыми Cargo tests отдельно выполняет
+`pnpm fixtures:generate:m01`: storage tests читают generated 4K PNG,
+которые не хранятся в Git и не появляются при `pnpm build`.
+Независимая unit job не подготавливает файлы для Rust runner.
+
 Browser smoke: `browser-keyboard-shortcuts.e2e.ts` и
 `browser-activation-settings.e2e.ts` (три tests), с headless Chrome.
 Native smoke: `m04-clean-profile-capture,result-export` через внешний
