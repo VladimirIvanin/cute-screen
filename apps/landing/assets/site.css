@@ -203,16 +203,16 @@ h1 span {
   scrollbar-color: #56505f transparent;
 }
 .toolbar-cutout {
-  width: 665px;
+  width: 598px;
   margin-inline: auto;
-  border-radius: 16px;
+  border-radius: 12px;
   overflow: hidden;
-  clip-path: inset(0 round 16px);
+  clip-path: inset(0 round 12px);
   box-shadow: 0 8px 24px #00000025;
 }
 .toolbar-cutout img {
-  width: 665px;
-  height: 46px;
+  width: 598px;
+  height: 41px;
 }
 .toolbar-caption {
   margin-top: 3px;

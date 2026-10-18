@@ -7273,3 +7273,44 @@ macOS/WKWebView и отдельная native RU/EN/light матрица оста
 на 4K + 6 quick-chrome regressions). `pnpm format` и отдельный `pnpm format:check`
 после реализации прошли; `cargo fmt --all` и повторный `cargo test --workspace`
 также exit 0 (172 passed, 1 ignored; `artifacts/quick-history-rust-final.log`).
+
+## Актуализация лендинга (2026-10-18)
+
+Windows 10 x64 / PowerShell, Node 22.23.1, pnpm 10.33.2. RU/EN: 18 карточек,
+актуальные описания, Emoji и общий экспорт UiIcon; hero screenshot сохранён.
+
+- `pnpm icons:landing`: exit 0, 19 SVG (18 инструментов и Check).
+- `$env:CUTE_SCREEN_E2E_SCENARIOS='landing-assets'; $env:CARGO_TARGET_DIR='D:/cutescreen/artifacts/callout-target'; $env:CUTE_SCREEN_FRONTEND_DIST='D:/cutescreen/artifacts/landing-refresh/frontend'; $env:TAURI_WEBDRIVER_PORT='4457'; pnpm test:e2e:tauri`:
+  fresh build + external driver / WebView2 155.0.4283.45, 1/1 passed. Штатный
+  Open image с 4K fixture создал editor document; все 18 кнопок доступны.
+  Снимок 665×46 повторно декодирован; просмотрены
+  `artifacts/landing-refresh/editor-toolrail.png` и `toolrail.png`.
+  Лог: `artifacts/landing-refresh/native.log`.
+- По последующему уточнению пользователя использован его готовый screenshot
+  `localhost_5173_editor_.png`, 598×41. SHA-256 источника и landing asset совпал:
+  `d3cdd7f50e047905130b8396e5cfd99fbd5076a624db80c7db360183396b07be`.
+  Изображение не перерисовано; CSS `inset(0 round 12px)` скрывает только наружные
+  углы. Иконки, active state и внутренний фон сохранены.
+- `$env:CUTE_SCREEN_BROWSER_E2E_HEADLESS='1'; $env:CUTE_SCREEN_LANDING_E2E_PORT='5321'; pnpm test:e2e:landing`:
+  Chrome 155.0.8059.80, 4 passed / 1 no-JS-only skipped, exit 0.
+  Лог: `artifacts/landing-refresh/landing-js.log`.
+- С теми же параметрами и `$env:CUTE_SCREEN_LANDING_NO_JS='1'; pnpm test:e2e:landing`:
+  4 passed / 1 JS-only skipped, exit 0;
+  `artifacts/landing-refresh/landing-no-js.log`.
+- Обе локали проверены на 375/760/768/1024/1440 px: все 18 карточек с корректными
+  SVG, без page overflow; mobile toolbar прокручивается клавиатурой, размер
+  asset 598×41, clip 12 px, language/skip links и focus работают без JS.
+  Просмотрены RU/EN 1440 и RU 375 screenshots в `artifacts/landing-refresh/js/`.
+- Первый расширенный icon assertion ошибочно ожидал исходные SVG paths:
+  исправлен для hash-named production assets, затем оба режима прошли полностью.
+  Общий typecheck обнаружил `cacheDir: undefined` в соседнем Vite изменении:
+  условное включение свойства сохраняет изоляцию caches и exact optional types.
+
+`pnpm format` — exit 0. Финальный `pnpm check` прошёл lint, полный typecheck,
+format:check и docs:check (38 Markdown files), затем остановился на прежних
+architecture budgets: boundaries 42 passed / 2 failed, exit 1.
+Нарушения относятся к размерам/сложности ShapeFormattingToolbar, styles,
+gesture-finish-controller, drawing-payload и image-editing; landing files в
+списке отсутствуют. Лог: `artifacts/landing-refresh/check.log`.
+IPC/Rust gates после этого fail-fast шага не выполнялись; native/core/IPC
+контракты и renderer geometry этим изменением не меняются.

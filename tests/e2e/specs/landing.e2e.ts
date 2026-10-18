@@ -124,7 +124,7 @@ describe('static landing production preview', () => {
         height: img.naturalHeight,
       }
     })
-    expect(image).toEqual({ clip: 'inset(0px round 16px)', width: 665, height: 46 })
+    expect(image).toEqual({ clip: 'inset(0px round 12px)', width: 598, height: 41 })
   })
 
   it('animates the inline brand in RU/EN using a small independent bundle', async function () {

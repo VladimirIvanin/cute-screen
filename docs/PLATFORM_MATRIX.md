@@ -1268,3 +1268,13 @@ Main остаётся скрытым после History; кнопки 36×36 и 
 X11 no-restore покрыт dispatcher unit regression. Physical capture, реальный
 portal, Linux/WebKitGTK и macOS/WKWebView этой правкой не проверялись.
 Команды и ограничения общего workspace — TESTING.md.
+
+## Лендинг RU/EN (2026-10-18)
+
+Windows 10 x64 / Chrome 155.0.8059.80: по 4 landing E2E passed с JS и без JS,
+пять ширин 375–1440 px, 18 инструментов, keyboard navigation и mobile scroll.
+WebView2 155.0.4283.45 / external driver: production Open image → editor,
+1/1 capture-проверка панели passed. Итоговый asset 598×41 предоставлен
+пользователем и сохранён без изменения pixels; внешние углы скрываются CSS.
+Изменения лендинга не расширяют платформенные capture гарантии; Safari,
+Linux/WebKitGTK и macOS/WKWebView для этой правки не проверялись.

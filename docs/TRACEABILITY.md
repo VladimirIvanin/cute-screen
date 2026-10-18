@@ -1996,4 +1996,8 @@ crop 3074×1730 совпал по SHA-256 decoded RGBA; exported PNG содер�
 mount state. Landing E2E проверяет одинаковый полный набор карточек, загрузку
 изображений, размеры и прокрутку панели, responsive layout, keyboard navigation
 и no-JS. Большой hero screenshot и поведение редактора сохраняются.
-Статус: planned; фактические результаты будут записаны после проверок.
+Статус: implemented; Windows x64 / Chrome 155: landing RU/EN на пяти ширинах,
+JS и no-JS — по 4 tests passed. Native Open image и capture панели — 1/1 passed
+в WebView2 155. По уточнению пользователя итоговый asset заменён предоставленным
+скриншотом 598×41 без изменения pixels; наружный фон скрыт CSS clipping 12 px.
+Команды и ограничения общих gates — TESTING.md.
