@@ -173,6 +173,10 @@ X11: named Composite pixmap и отдельная capability; без compositor 
 macOS 12.0–12.2: CoreGraphics single-window; 12.3–13: SCStream one-shot;
 14+: system picker + SCScreenshotManager. Intel/Apple Silicon compile/runtime
 pending на владельцах macOS; Windows build не доказывает Objective-C путь.
+ADR-109: маршрут 14+ требует SDK 14+ при сборке; с SDK 13.x Window на любой ОС
+идёт через AppKit selector и SCStream/CoreGraphics. Релиз требует SDK 14+.
+ADR-110: macOS не объявляет Window target — продукт на macOS предлагает только
+Area и Screen; описанные маршруты Window остаются кодом без пользовательского входа.
 Wayland: только advertised Screenshot v3 Window; GNOME/KDE runtime pending.
 
 ## Два режима карандаша и краткие подсказки (2026-10-18, ADR-094)
@@ -842,10 +846,13 @@ UI получает `CaptureCapabilities` и не показывает непо�
 - Screen Recording permission проверяется до Screen snapshot. Отказ —
   typed `permissionDenied`, без прозрачных окон и без overlay.
 - UI объясняет переход в System Settings (`Privacy_ScreenCapture`) и Retry.
+- ADR-110: на macOS доступны только Area и Screen; Window target не объявляется,
+  tray menu не содержит «Снимок окна».
 - Deployment baseline — macOS 12.0. Native AppKit selector обслуживает Area и
   Window. Intended pixel routing: legacy CoreGraphics fallback на 12.0–12.2,
   one-shot `SCStream` на 12.3–13, `SCScreenshotManager` и system window picker
-  на 14+; API availability проверяется во время выполнения.
+  на 14+; API availability проверяется во время выполнения, а маршрут 14+
+  дополнительно требует SDK 14+ при сборке (ADR-109).
 - Area использует frozen multi-display frame и quick-mode. Window создаёт
   direct document без quick-mode.
 - Локальный macOS 12.7.6 x64 startup smoke (2026-08-29) подтвердил только

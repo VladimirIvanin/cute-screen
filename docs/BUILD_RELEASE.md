@@ -188,6 +188,17 @@ settings, а cc-rs без target может выбрать macOS 15.5 и отк�
 сохраняет приоритет над default Cargo. Это настройка сборки; она не подтверждает
 runtime capture на новых macOS и не реализует ScreenCaptureKit routing из ADR-038.
 
+Deployment target и SDK — разные ограничения (ADR-109). На macOS 12 доступен
+максимум Xcode 14.2 / Command Line Tools с SDK 13.1; такая сборка годится для
+`pnpm tauri dev` и локальных тестов, но системный window picker и
+SCScreenshotManager в неё не компилируются, `build.rs` печатает предупреждение.
+Релиз собирается с SDK 14+ (Xcode 15+): `pnpm verify:release-boundary` на
+macOS завершается ошибкой при SDK ниже 14. SDK выбирается через `xcode-select`,
+`DEVELOPER_DIR` или `SDKROOT`; версию показывает `xcrun --show-sdk-version`.
+`tauri dev` запускает бинарник без `.app`: Info.plist не применяется,
+Screen Recording запрашивается для родительского terminal/IDE, а bundle id
+отсутствует, поэтому self-exclusion системного picker в dev не работает.
+
 ## Локальная real-WebView проверка Windows
 
 `pnpm install --frozen-lockfile` применяет зафиксированные patches native-core

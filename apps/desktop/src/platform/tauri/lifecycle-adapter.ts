@@ -86,7 +86,9 @@ async function handleCaptureOutcome(
   const waitsForEditorFrame = outcome.completion === 'editor' && documentId !== undefined
   const firstFrame = waitsForEditorFrame ? ports.firstFrame.waitForNextFrame() : undefined
   try {
-    mounted = await ports.mountCapturedDocument(outcome.document?.captureId)
+    // A capture from a suspended hidden editor skipped the native preflight.
+    mounted = await ports.flushBeforeAction() &&
+      await ports.mountCapturedDocument(outcome.document?.captureId)
     if (mounted && firstFrame) await firstFrame
     if (!mounted && firstFrame) {
       ports.firstFrame.fail(new Error('editor document mount failed'))

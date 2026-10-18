@@ -33,6 +33,22 @@ function capture(
   return result.stdout
 }
 
+const minimumMacosSdk = 14
+let macosSdk = null
+if (process.platform === 'darwin') {
+  macosSdk = capture('xcrun', [
+    '--sdk',
+    process.env.SDKROOT || 'macosx',
+    '--show-sdk-version',
+  ]).trim()
+  if (Number.parseInt(macosSdk, 10) < minimumMacosSdk) {
+    console.error(
+      `macOS SDK ${macosSdk} is below ${minimumMacosSdk}: release builds would compile out the system window picker and SCScreenshotManager (ADR-109). Select Xcode 15+ via DEVELOPER_DIR or xcode-select.`,
+    )
+    process.exit(1)
+  }
+}
+
 const tree = capture('cargo', [
   'tree',
   '--package',
@@ -73,6 +89,7 @@ for (const file of frontendFiles) {
 const report = {
   checkedAt: new Date().toISOString(),
   executable: path.relative(root, executable),
+  macosSdk,
   graphViolations,
   binaryViolations,
   configViolations,

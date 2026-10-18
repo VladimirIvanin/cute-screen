@@ -290,6 +290,52 @@ Escape/retry, click, Tab/Shift+Tab/Enter, EN/dark и RU/light прошли; PNG
 Rust workspace и focused Vue tests passed. Команды, артефакты, ограничения
 общих gates и оставшаяся платформенная матрица — TESTING.md.
 
+## Сборка macOS с SDK ниже 14 (2026-10-18, ADR-109, до реализации)
+
+`REQ-CAP-003/009`: `@available` проверяет только ОС при запуске, поэтому
+SCScreenshotManager, системный picker и свойства SCContentFilter из macOS 14
+дополнительно исключаются при компиляции с SDK ниже 14. Тогда Window на любой
+версии ОС использует AppKit selector и SCStream (12.3+) или CoreGraphics
+(12.0–12.2); маршруты сборки с SDK 14+ не меняются. Native capability
+`cute_macos_system_window_picker_available` — единственный критерий выбора
+picker. Red-first Rust contracts: routing с учётом SDK и запрет 14+ маршрута
+при SDK ниже 14. `build.rs` предупреждает о вырезанном маршруте,
+`pnpm verify:release-boundary` отказывает релизу с SDK ниже 14. Evidence:
+`pnpm tauri dev` и Window capture на macOS 12.7.6 с SDK 13.1, CI syntax check
+legacy-ветки на macos-15. Команды и ограничения — TESTING.md.
+
+## macOS: только Область и Экран (2026-10-18, ADR-110)
+
+`REQ-CAP-003/009`, `REQ-ACT-*`: macOS capability не объявляет Window target;
+gate отклоняет Window из tray/hotkey/CLI/UI, tray menu на macOS не содержит
+«Снимок окна». Red-first Rust contracts: `macos_adapter_advertises_only_area_
+and_screen_targets`, `capture_action_gate_follows_advertised_macos_capabilities`,
+`tray_lists_window_capture_everywhere_except_macos`. E2E tray-locale ожидает
+семь пунктов на macOS. Screen evidence: `pnpm smoke:m04:macos:screen` с
+повторным PNG decode. Команды и результаты — TESTING.md.
+
+## macOS: Screen без следа редактора и зависшего preflight (2026-10-18, до реализации)
+
+`REQ-CAP-001/002/010`: Tauri `hide()` с async-потока только ставит сообщение в
+event loop, поэтому CoreGraphics snapshot мог получить ещё видимый Editor.
+На macOS main и settings скрываются `orderOut` на главной очереди AppKit, затем
+capture ждёт, пока WindowServer перестанет считать окно on-screen; иначе захват
+отклоняется и окно возвращается. Скрытый или свёрнутый WKWebView на macOS 12–13
+приостановлен (`inactiveSchedulingPolicy` есть только с 14), поэтому
+preflight к нему не отправляется: закрытие уже прошло flush, а mount
+полученного документа сначала выполняет тот же flush и не заменяет документ при
+отказе. Red-first Rust contract: `capture_preflight_skips_a_suspended_macos_editor`.
+Native evidence: CLI Screen при видимом и скрытом Editor на macOS 12.7.6,
+повторный PNG decode без окна Cute Screen. Результаты — TESTING.md.
+
+## Окно настроек и notification init script (2026-10-18)
+
+`REQ-UI-*`: init script tauri-plugin-notification вызывает
+`is_permission_granted` в каждом webview на macOS/Linux; capability `settings`
+получает только это read-only разрешение. Boundary test требует его для main,
+quick-capture и settings и запрещает settings notify/request. Native evidence:
+`tauri-history-settings` вызывает команду внутри окна settings.
+
 ## Два режима карандаша и краткие подсказки (до реализации, 2026-10-18)
 
 `REQ-TOL-003/004/010`, `REQ-EDT-002/006/015/016`, `REQ-UI-006`:

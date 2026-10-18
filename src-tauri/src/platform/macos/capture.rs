@@ -46,10 +46,33 @@ unsafe extern "C" {
     ) -> c_int;
     fn cute_macos_pixel_backend() -> c_int;
     fn cute_macos_window_pixel_backend() -> c_int;
+    #[cfg(test)]
+    fn cute_macos_system_window_picker_available() -> bool;
+    #[cfg(test)]
+    fn cute_macos_build_sdk_version() -> c_int;
     fn cute_window_selector_set_locale(russian: bool);
     fn cute_quick_capture_set_presentation(window: *mut std::ffi::c_void, revealed: bool);
     fn cute_quick_capture_fit_pointer_screen(window: *mut std::ffi::c_void) -> bool;
+    fn cute_hide_window_for_capture(window: *mut std::ffi::c_void, timeout_ms: i32) -> bool;
     fn cute_selector_complete_handoff();
+}
+
+const CAPTURE_HIDE_TIMEOUT_MS: i32 = 1_000;
+
+/// Orders a window out and waits until WindowServer no longer composites it,
+/// so the following desktop snapshot cannot contain it.
+pub fn hide_window_for_capture<R: tauri::Runtime>(
+    window: &tauri::WebviewWindow<R>,
+) -> Result<(), String> {
+    let native = window.ns_window().map_err(|error| error.to_string())?;
+    // SAFETY: Tauri owns this NSWindow for the lifetime of `window`; the
+    // bridge calls orderOut synchronously on AppKit's main queue and only
+    // keeps the window number for the WindowServer probe.
+    if unsafe { cute_hide_window_for_capture(native, CAPTURE_HIDE_TIMEOUT_MS) } {
+        Ok(())
+    } else {
+        Err("window is still on screen after orderOut".to_owned())
+    }
 }
 
 pub fn complete_selector_handoff() {
@@ -422,11 +445,14 @@ fn capture_desktop_frame(
 ) -> Result<(Vec<u8>, CaptureGeometry), PlatformError> {
     let displays =
         CGDisplay::active_displays().map_err(|_| failure(correlation_id, "displayList"))?;
-    if displays.is_empty() {
-        return Err(failure(correlation_id, "noDisplays"));
-    }
+    let display_bounds: Vec<CGRect> = displays
+        .iter()
+        .map(|id| CGDisplay::new(*id).bounds())
+        .collect();
+    let bounds = desktop_capture_bounds(&display_bounds)
+        .ok_or_else(|| failure(correlation_id, "noDisplays"))?;
     let image = CGDisplay::screenshot(
-        desktop_capture_bounds(),
+        bounds,
         kCGWindowListOptionOnScreenOnly,
         kCGNullWindowID,
         kCGWindowImageBestResolution | kCGWindowImageShouldBeOpaque,
@@ -462,12 +488,24 @@ fn capture_desktop_frame(
     ))
 }
 
-fn desktop_capture_bounds() -> CGRect {
-    // CGRectNull: CoreGraphics treats this as “all displays”.
-    CGRect::new(
-        &CGPoint::new(f64::INFINITY, f64::INFINITY),
-        &CGSize::new(0.0, 0.0),
-    )
+/// CGRectNull would mean “the rectangle enclosing every window”, including
+/// parts outside the displays; Screen must be exactly the display union.
+fn desktop_capture_bounds(displays: &[CGRect]) -> Option<CGRect> {
+    let (first, rest) = displays.split_first()?;
+    let mut left = first.origin.x;
+    let mut top = first.origin.y;
+    let mut right = first.origin.x + first.size.width;
+    let mut bottom = first.origin.y + first.size.height;
+    for display in rest {
+        left = left.min(display.origin.x);
+        top = top.min(display.origin.y);
+        right = right.max(display.origin.x + display.size.width);
+        bottom = bottom.max(display.origin.y + display.size.height);
+    }
+    Some(CGRect::new(
+        &CGPoint::new(left, top),
+        &CGSize::new(right - left, bottom - top),
+    ))
 }
 
 fn layout_fingerprint(display_ids: &[u32]) -> String {
@@ -586,6 +624,40 @@ mod tests {
     }
 
     #[test]
+    fn screen_bounds_cover_exactly_the_displays() {
+        use core_graphics::geometry::{CGPoint, CGRect, CGSize};
+
+        let rect =
+            |x, y, width, height| CGRect::new(&CGPoint::new(x, y), &CGSize::new(width, height));
+        let union =
+            super::desktop_capture_bounds(&[rect(0.0, 0.0, 1440.0, 900.0)]).expect("single");
+        assert_eq!(
+            (
+                union.origin.x,
+                union.origin.y,
+                union.size.width,
+                union.size.height
+            ),
+            (0.0, 0.0, 1440.0, 900.0),
+        );
+        let union = super::desktop_capture_bounds(&[
+            rect(0.0, 0.0, 1440.0, 900.0),
+            rect(-1920.0, -180.0, 1920.0, 1080.0),
+        ])
+        .expect("pair");
+        assert_eq!(
+            (
+                union.origin.x,
+                union.origin.y,
+                union.size.width,
+                union.size.height
+            ),
+            (-1920.0, -180.0, 3360.0, 1080.0),
+        );
+        assert!(super::desktop_capture_bounds(&[]).is_none());
+    }
+
+    #[test]
     fn encodes_top_down_bgra_as_opaque_rgba_png() {
         let png = encode_bgra_png(&[5, 10, 250, 0], 1, 1, "macos-png").expect("PNG");
         let decoder = png::Decoder::new(std::io::Cursor::new(png));
@@ -671,6 +743,21 @@ mod tests {
             (0..=2).contains(&backend),
             "unexpected pixel backend {backend}"
         );
+    }
+
+    #[test]
+    fn native_window_routing_never_exceeds_the_build_sdk() {
+        let sdk = unsafe { super::cute_macos_build_sdk_version() };
+        let backend = unsafe { super::cute_macos_window_pixel_backend() };
+        let picker = unsafe { super::cute_macos_system_window_picker_available() };
+        assert!(sdk >= 120000, "unexpected macOS SDK {sdk}");
+        if sdk < 140000 {
+            assert_ne!(backend, 2, "SDK {sdk} cannot route to SCScreenshotManager");
+            assert!(!picker, "SDK {sdk} cannot present the system window picker");
+        }
+        if picker {
+            assert_eq!(backend, 2);
+        }
     }
 
     fn rect(x: f64, y: f64, width: f64, height: f64) -> CuteRect {

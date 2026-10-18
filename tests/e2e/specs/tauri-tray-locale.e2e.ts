@@ -6,6 +6,8 @@ import {
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
+import { russianTrayLabels } from '../tray-labels'
+
 export interface TrayLabels {
   items: { id: string; text: string; enabled: boolean }[]
   startup: string[]
@@ -25,7 +27,7 @@ describe('native tray follows the Settings language', () => {
     await $('button[aria-label="Application settings"]').click()
     await browser.waitUntil(async () => (await browser.tauri.listWindows()).includes('settings'))
     await browser.tauri.switchWindow('settings')
-    const russian = ['Снимок области', 'Снимок экрана', 'Снимок окна', 'Снимок активного окна', 'Повторить область', 'Открыть редактор', 'Настройки…', 'Выход']
+    const russian = russianTrayLabels
     const evidence: TrayLabels[] = []
     for (const locale of ['ru', 'en', 'ru']) {
       await $('#settings-language').selectByAttribute('value', locale)
@@ -34,11 +36,11 @@ describe('native tray follows the Settings language', () => {
         return labels.items.find((item) => item.id === 'quit')?.text === (locale === 'ru' ? 'Выход' : 'Quit')
       })
       const labels = await nativeTrayLabels()
-      expect(labels.items).toHaveLength(8)
+      expect(labels.items).toHaveLength(russian.length)
       if (locale === 'ru') labels.items.forEach((item, index) => expect(item.text.split('    ')[0]).toBe(russian[index]))
       else {
         expect(labels.items[0]?.text).toContain('Capture Area')
-        expect(labels.items[6]?.text).toBe('Settings…')
+        expect(labels.items.at(-2)?.text).toBe('Settings…')
       }
       evidence.push(labels)
     }

@@ -293,6 +293,7 @@
   display: block;
   overflow-wrap: anywhere;
   margin-top: 8px;
+  -webkit-user-select: all;
   user-select: all;
 }
 .cs-shortcut-actions {

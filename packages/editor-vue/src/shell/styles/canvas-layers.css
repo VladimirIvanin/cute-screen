@@ -97,6 +97,7 @@
   cursor: grabbing;
 }
 .cs-layer-row.is-dragging .cs-layer-select {
+  -webkit-user-select: none;
   user-select: none;
 }
 .cs-layer-row.is-locked {

@@ -1,5 +1,49 @@
 # Журнал архитектурных решений
 
+## ADR-110 — На macOS доступны только Область и Экран
+
+**Статус:** accepted (2026-10-18); отзывает Window-часть ADR-038/091 для macOS.
+Windows, X11 и Wayland сохраняют прежние Window-решения; ADR-109 остаётся
+ограничением сборки нативного кода, который продолжает компилироваться.
+
+**Контекст:** изолированный снимок окна на macOS зависит от трёх маршрутов
+(CoreGraphics, SCStream, SCScreenshotManager/системный picker), версии SDK и
+отдельного TCC-поведения; runtime ни одного из них не подтверждён. Владелец
+продукта решил выпускать macOS только с Area и Screen.
+
+**Решение:** macOS adapter не объявляет `window_target`. Capability gate поэтому
+отклоняет Window из tray, hotkey, CLI и UI; шорткат Window в Settings получает
+статус unsupported. Пункт «Снимок окна» не добавляется в macOS tray menu.
+Area/Screen, permission preflight и Objective-C код окна не меняются.
+
+**Проверяемое основание:** red-first Rust tests capability/gate и tray filter;
+tray-locale E2E ожидает меню без Window на macOS; `pnpm smoke:m04:macos:screen`
+на macOS 12.7.6 с повторным декодированием сохранённого оригинала.
+
+## ADR-109 — Маршрут macOS 14 зависит от SDK сборки
+
+**Статус:** accepted (2026-10-18); уточняет macOS-маршрутизацию ADR-038/091,
+не заменяя их.
+
+**Контекст:** `@available` проверяет ОС при запуске, но не SDK компиляции.
+SCScreenshotManager, SCContentSharingPicker и `contentRect`/`pointPixelScale`
+появились в SDK 14. На macOS 12 новее Xcode 14.2 (SDK 13.1) не ставится, и
+`pnpm tauri dev` не собирался вовсе. CI на macos-15 этого не замечал.
+
+**Решение:** код macOS 14 дополнительно исключается при компиляции с SDK ниже 14
+(`CUTE_SDK_HAS_SCK_14`). Такая сборка на любой ОС выбирает Window через AppKit
+selector и снимает SCStream (12.3+) или CoreGraphics (12.0–12.2). Сборка с SDK
+14+ сохраняет прежние маршруты. `cute_macos_system_window_picker_available`
+— единственный критерий системного picker; diagnostics backend следует ему.
+`build.rs` предупреждает о вырезанном маршруте; `pnpm verify:release-boundary`
+отказывает при SDK ниже 14, чтобы релиз не терял маршрут 14+ незаметно.
+Deployment baseline 12.0 и weak-link ScreenCaptureKit не меняются.
+
+**Проверяемое основание:** red-first Rust routing с учётом SDK и native contract
+«SDK ниже 14 не сообщает SCScreenshotManager/picker»; `pnpm tauri dev` и Window
+capture на macOS 12.7.6 с SDK 13.1; CI syntax check legacy-ветки с переопределённым
+SDK на macos-15. Сборку с SDK 14+ подтверждает CI compile; runtime 14+ pending.
+
 ## ADR-108 — Текущая версия в боковой панели настроек
 
 **Статус:** accepted (2026-10-18); дополняет ADR-018 и REQ-UI-015.
