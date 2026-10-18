@@ -13,6 +13,9 @@
   font-synthesis: none;
   --accent: #ff82b3;
   --muted: #a3a4ae;
+  --surface-raised: #ffffff04;
+  --border: #ffffff20;
+  --text: #f5f4f7;
 }
 * {
   box-sizing: border-box;
@@ -317,6 +320,80 @@ h1 span {
   display: flex;
   gap: 24px;
 }
+.hero-action .button img {
+  flex: none;
+  filter: brightness(0);
+}
+.all-downloads {
+  display: inline-block;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.downloads {
+  padding-block: 24px 64px;
+}
+.downloads-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+}
+.download-column {
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-raised);
+}
+.download-column h3 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 20px;
+  font-weight: 550;
+}
+.download-column ul {
+  display: grid;
+  gap: 8px;
+  margin: 24px 0 16px;
+  padding: 0;
+  list-style: none;
+}
+.download-column li a {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 14px;
+}
+.download-column li a:hover {
+  color: var(--accent);
+  background: var(--surface-raised);
+}
+.download-column p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.download-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  margin-top: 24px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.download-meta a {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
 @media (max-width: 1050px) {
   .container {
     width: calc(100% - 56px);
@@ -400,6 +477,7 @@ h1 span {
   }
   .hero-action {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 18px;
     padding: 0;
@@ -410,6 +488,17 @@ h1 span {
     font-size: 10px;
     max-width: 115px;
     line-height: 1.7;
+  }
+  .hero-action .all-downloads {
+    flex-basis: 100%;
+    margin-top: 0;
+  }
+  .downloads-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .download-column {
+    padding: 20px;
   }
   .button {
     gap: 17px;

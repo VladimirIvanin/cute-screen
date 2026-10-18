@@ -1,5 +1,14 @@
 # Платформенная матрица
 
+## Загрузки лендинга (ADR-113)
+
+Определение ОС в браузере — рекомендация: optional Client Hints, UA fallback,
+неизвестная архитектура x64. Это не подтверждение native install/capture/export.
+macOS universal; Linux DEB/AppImage x64/ARM64, Ubuntu 22.04+, Wayland portals;
+Windows unsigned EXE x64/ARM64. Ubuntu 24.04.5 / Chrome 154: RU/EN E2E с JS/no-JS passed, 375–1440 px;
+OS/CPU scenarios эмулированы до production mount. Safari/Firefox и hosted
+Pages не запускались. Browser/CI evidence и ограничения — TESTING.md.
+
 ## macOS Clang availability runtime (2026-10-18)
 
 Release run 39142547248 / job 117722198522 упал при arm64 link с undefined

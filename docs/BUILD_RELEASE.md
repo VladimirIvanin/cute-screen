@@ -1,5 +1,17 @@
 # CI-сборки и проверка версии через GitHub
 
+## Обновление загрузок лендинга (ADR-113)
+
+Pages запускается после успешного Release assets, на push main и вручную.
+Код берётся из main; каталог обновляется перед pnpm build:landing из максимального
+стабильного полного GitHub Release. Ошибка API или отсутствие полного набора
+останавливает deploy. Локальная `pnpm build:landing` работает со snapshot без сети.
+Для ручного обновления: `node scripts/landing-release.mjs apps/landing/assets/release.json`.
+Декларации `landing-release.d.mts` описывают каталог; Vite валидирует snapshot перед
+HTML transform. Лицензия локальных SVG включена в `public/os-icons-licenses.txt`
+и копируется в опубликованный сайт. Browser detection: `userAgentData.platform`,
+UA fallback; для Windows/Linux только hints `architecture` и `bitness`.
+
 ## Обновление версии приложения
 
 ```sh

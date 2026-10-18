@@ -1,5 +1,13 @@
 # Сквозная приёмка
 
+## Загрузки лендинга (ADR-113)
+
+REQ-WEB-005/006/007: RU/EN, семь точных установщиков, release/checksums, три
+колонки выше 760 px и вертикальный список до 760 px. Проверить Tab/Enter,
+hero-рекомендации x64/ARM64/universal, mobile/unknown/32-bit, отказ Client Hints,
+полный список и якорь без JS. CI не выбирает draft/prerelease/неполные версии;
+API failure не публикует сайт. Hosted workflow проверяется отдельным запуском.
+
 ## Линковка macOS availability checks (2026-10-18)
 
 `REQ-REL-002`, `REQ-CAP-015`: на macOS Intel и Apple Silicon выполнить

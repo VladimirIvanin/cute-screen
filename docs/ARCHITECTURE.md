@@ -1,5 +1,12 @@
 # Архитектура Cute Screen
 
+## Загрузки лендинга (ADR-113)
+
+Vite подставляет единый release snapshot в HTML обеих локалей; DOM-модуль
+меняет только hero-рекомендацию через Navigator/optional Client Hints. Полный
+список — обычные ссылки. CI получает актуальный каталог из GitHub API до build;
+локально используется snapshot v0.1.5. Desktop и IPC не затрагиваются.
+
 ## Независимые проверки CI (ADR-112)
 
 `ci.yml` задаёт matrix семи Linux tasks; reusable `ci-linux.yml` содержит общий

@@ -1,5 +1,18 @@
 # Трассируемость требований
 
+## Загрузки лендинга (2026-10-18, до реализации)
+
+`REQ-WEB-005/006/007`: рекомендация desktop-пакета, статический RU/EN каталог семи
+установщиков и обновление Pages после завершения Release assets. Доказательства:
+unit контракты распознавания и CI-каталога, production landing E2E с JS/no-JS,
+responsive screenshots и actionlint. Implemented; локальные unit/E2E и screenshots — TESTING.md; hosted deploy pending.
+
+| Требование  | Реализация                                             | Доказательства                                           | Статус                             |
+| ----------- | ------------------------------------------------------ | -------------------------------------------------------- | ---------------------------------- |
+| REQ-WEB-005 | Локальная рекомендация ОС/CPU и прямой hero download   | 25 contract tests; production E2E hints/UA/denied/32-bit | implemented                        |
+| REQ-WEB-006 | Статический каталог RU/EN, семь файлов, три OS-колонки | JS/no-JS E2E на пяти ширинах; просмотр screenshots       | implemented                        |
+| REQ-WEB-007 | Каталог из полного stable release; Pages workflow_run  | SemVer/API tests, live v0.1.5 lookup, actionlint         | implemented; hosted deploy pending |
+
 ## Установка pnpm в GitHub Actions (2026-10-18)
 
 `REQ-REL-001/002/003`: hosted CI не должен ставить pnpm через `corepack prepare`.

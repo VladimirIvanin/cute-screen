@@ -1,5 +1,49 @@
 # Стратегия тестирования
 
+## Загрузки лендинга (2026-10-18, ADR-113)
+
+Ubuntu 24.04.5 x86_64, Linux 6.8.0-147-generic, Node 22.23.1, pnpm 10.33.2,
+Chrome 154.0.8037.57. REQ-WEB-005/006/007: snapshot v0.1.5 содержит семь
+установщиков и SHA256SUMS; локальная сборка не требует сети. Проверки:
+
+- `pnpm check` — passed: lint, desktop/tests/landing typecheck, formatting,
+  docs links, 107 boundary tests, IPC generation check, Rust fmt и четыре Clippy profiles.
+- `pnpm format` и `pnpm format:check` — passed; `git diff --check` — passed.
+- `pnpm test:boundaries` — 14 files / 107 tests passed, включая 25 новых
+  сценария ОС/архитектуры, denied/missing hints, mobile/iPad/ChromeOS/32-bit,
+  SemVer, draft/prerelease/incomplete assets, API pagination/failure.
+- `pnpm exec vitest run --project boundaries tests/boundaries/landing-downloads.test.ts --coverage --coverage.include=scripts/landing-release.mjs --coverage.include=apps/landing/assets/download-platform.ts --coverage.include=apps/landing/downloads-html.ts --coverage.reportsDirectory=artifacts/landing-downloads/coverage`
+  — 25 passed; statements 92.72%, branches 95.57%, functions 100%.
+- `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 pnpm test:e2e:landing` — 6 passed,
+  1 intentional no-JS skip; RU/EN, пять ширин 375/760/768/1024/1440,
+  production recommendations x64/ARM64/universal, UA fallback без Client Hints, denial/unknown/32-bit,
+  seven exact URLs, icons, anchor and keyboard focus.
+- `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_LANDING_NO_JS=1 CUTE_SCREEN_LANDING_E2E_PORT=5177 pnpm test:e2e:landing`
+  — 5 passed, 2 intentional JS-only skips. Все ссылки работают без JS.
+- `node scripts/landing-release.mjs artifacts/landing-downloads/live-release.json`
+  — live GitHub API выбрал v0.1.5, 7 installers; build uses validated snapshot.
+- `artifacts/landing-downloads/actionlint .github/workflows/deploy-pages.yml`
+  — passed (actionlint 1.7.12).
+
+Логи: `artifacts/landing-downloads/`. Production preview просмотрен интерактивно:
+RU/EN desktop 1440×950, RU mobile 375×950, hero и download anchor, Linux links,
+release/checksums/footer. Screenshots `hero-ru-{desktop,mobile}.png`,
+`downloads-{ru,en}-desktop.png`, `downloads-ru-mobile.png`,
+`downloads-ru-mobile-bottom.png`, `downloads-en-mobile-no-js.png` находятся
+в том же каталоге. E2E screenshots разделены в `artifacts/landing-e2e/js/`
+и `artifacts/landing-e2e/no-js/`. Проверены читаемость, focus, иконки,
+отсутствие горизонтального overflow и доступность всех файлов на mobile.
+Дополнительный red/green regression: явно 32-битный UA вместе с denied/empty
+Client Hints сохраняет ссылку на список вместо x64; failing evidence:
+`artifacts/landing-downloads/explicit-32bit-red.log`, затем 25 tests passed.
+Первый прогон выявил неверный относительный SVG path RU из-за language-switch;
+исправлено определение локали по html lang, последующие E2E passed.
+
+Hosted Pages/workflow_run пока не запускался; GitHub deploy и native
+install/capture/export не подтверждаются этими browser-проверками.
+Safari/Firefox fallback покрыт входными данными в Chromium, отдельные браузеры
+не запускались. Подбор x64 при неизвестном CPU — явное продуктовое решение.
+
 ## Установка pnpm в GitHub Actions (2026-10-18)
 
 macOS 12.7.6 x86_64 (Darwin 21.6.0). Падение `Compile macOS Intel` на теге

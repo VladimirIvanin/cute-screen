@@ -1,11 +1,16 @@
 name: Deploy landing page
 
 on:
+  workflow_run:
+    workflows: [Release assets]
+    types: [completed]
   workflow_dispatch:
   push:
     branches: [main]
     paths:
       - apps/landing/**
+      - scripts/landing-release.mjs
+      - scripts/release-assets.mjs
       - .github/workflows/deploy-pages.yml
 
 permissions:
@@ -19,10 +24,13 @@ concurrency:
 
 jobs:
   build:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: main
 
       - name: Install Node
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
@@ -36,6 +44,11 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Resolve complete stable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/landing-release.mjs apps/landing/assets/release.json
 
       - name: Build landing page
         run: pnpm build:landing
