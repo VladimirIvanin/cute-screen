@@ -1,5 +1,21 @@
 # Трассируемость требований
 
+## Версионные сборки и draft Release (до реализации, 2026-10-18)
+
+`REQ-REL-001/002/003/005`, ADR-095: tag `vX.Y.Z` проверяет согласованность
+npm/Tauri/Cargo/lockfiles и принадлежность SHA истории main до сборки.
+Ubuntu 22.04 x64/ARM64 выпускают DEB/AppImage, Windows x64/ARM64 — NSIS,
+macOS — один ad-hoc universal DMG с повторной проверкой того же образа на Intel.
+Обязательны готовые package metadata/architecture/resources/version checks,
+release-boundary, glibc <=2.35, SHA-256, CycloneDX и license reports.
+Негативные helper tests покрывают неверные версии/архитектуры, отсутствующие
+ресурсы/файлы, повреждённые checksums и запрет изменения published Release.
+CI того же SHA блокирует draft при ошибке; manual/PR run сохраняет artifacts.
+Physical capture, Gatekeeper/TCC, Smart App Control, Wayland, upgrade/login
+проверяются отдельно по A14; наличие пакета не повышает platform support.
+`REQ-REL-004` остаётся вне реализации: tag не доказывает публикацию binaries.
+Фактические команды и ограничения будут записаны в TESTING.md.
+
 ## Расширенные диапазоны изображения (2026-10-18, до реализации)
 
 `REQ-TOL-015`, `REQ-EDT-005/006`, `REQ-UI-006/007`: убрать UI-предел

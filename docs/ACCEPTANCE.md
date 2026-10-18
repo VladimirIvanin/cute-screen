@@ -986,7 +986,25 @@ remain pending.
 
 ## A14 — CI-сборки и проверка версии
 
-Для Linux x64/ARM64, Windows x64/ARM64 и macOS Intel/Apple Silicon скачать versioned artifact из GitHub Actions, проверить checksum/архитектуру, выполнить install/launch → capture → edit → export → relaunch → uninstall. На Windows/macOS ожидаемые предупреждения unsigned build документированы.
+Для Linux x64/ARM64, Windows 11 x64/ARM64 и macOS Intel/Apple Silicon скачать
+versioned installer из draft Release (manual/PR — Actions artifact), сверить
+SHA256SUMS, architecture и commit в manifest. Выполнить install/launch →
+capture → edit → export с повторным декодированием PNG → relaunch → upgrade →
+uninstall. Tray, single-instance, autostart on/off и installer cancel;
+upgrade сохраняет выбор и library, uninstall не удаляет библиотеку без consent.
+
+Linux: 22.04/24.04, FUSE и extraction fallback, X11 и отдельно GNOME/KDE
+Wayland portals. macOS: один universal DMG на обеих архитектурах, downloaded
+quarantine/Gatekeeper, Screen Recording permission deny/retry, 12.0 и текущая
+ОС по доступности. Windows 11: браузерный Mark-of-the-Web, SmartScreen и
+Smart App Control, existing/missing WebView2 и ошибка без сети. Не обещать
+обход managed policy. Непроверенные клетки остаются pending.
+
+Manual/PR workflow не создаёт Release; malformed/mismatched tag отклоняется
+до сборки; failed same-SHA CI и неполный комплект не создают draft. Retry
+не изменяет published assets. Публиковать draft вручную только после фиксации
+результатов, не одновременно с работающим workflow. `REQ-REL-004` остаётся
+отдельным контрактом; наличие тега не доказывает доступность binaries.
 
 ## A15 — Area quick capture
 

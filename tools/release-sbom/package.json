@@ -1,0 +1,8 @@
+{
+  "name": "cute-screen-release-sbom-tool",
+  "private": true,
+  "packageManager": "pnpm@10.33.2",
+  "dependencies": {
+    "@cyclonedx/cdxgen": "12.8.6"
+  }
+}

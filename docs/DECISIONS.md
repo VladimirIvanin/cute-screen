@@ -1,5 +1,41 @@
 # Журнал архитектурных решений
 
+## ADR-095 — Версионные пакеты и draft GitHub Releases
+
+**Статус:** accepted (2026-10-18); supersedes ADR-018.
+
+**Контекст:** Actions artifacts имеют retention и требуют входа в GitHub.
+Нужны постоянные ссылки на семь установщиков без покупки сертификатов и без
+автоматической публикации непроверенной сборки.
+
+**Решение:** строгий tag `vX.Y.Z` запускает preflight версий/main ancestry,
+production packaging всей матрицы и CI того же SHA. Только полный проверенный
+комплект создаёт draft Release. Manual/PR runs создают только artifacts.
+Публикация выполняется человеком после A14. Published Release и assets
+не изменяются workflow; конфликтующие draft assets также не перезаписываются.
+Параллельная ручная публикация во время workflow запрещена runbook.
+
+Linux baseline — Ubuntu 22.04/glibc 2.35, ARM AppImage собирается нативно.
+macOS сохраняет 12.0 baseline, universal DMG получает ad-hoc подпись до
+упаковки; тот же DMG проверяется на Apple Silicon и Intel. Developer ID,
+notarization и Windows Authenticode не добавляются. Windows использует
+current-user NSIS и Evergreen WebView2 downloadBootstrapper.
+
+Hidden CLI `--release-info` сообщает версии, production feature flags и
+имена/размеры/SHA-256 декодированных embedded assets до инициализации окон,
+storage, capture и single-instance. Байты ресурсов не передаются через JSON.
+Это диагностика пакета, а не test-harness или сетевой API.
+
+**Проверяемое основание:** helper negative tests, Rust decoded resource hash
+test, package-derived ELF/PE/Mach-O/resource checks, два native запуска одного
+DMG, clean DEB installs 22.04/24.04, same-SHA CI и проверяемые checksums.
+Результаты и ограничения фиксируются в TESTING.md. Gatekeeper/TCC, Smart App
+Control, Wayland, login и physical capture остаются отдельной ручной приёмкой.
+
+**Границы:** Tauri updater, автоматическое скачивание/установка и `REQ-REL-004`
+в этом срезе не реализуются. Наличие tag не означает публикацию binaries.
+Подпись сертификатами позднее требует отдельного ADR.
+
 ## ADR-089 — Диапазоны оформления изображения
 
 **Статус:** accepted (2026-10-18); дополняет ADR-086.
@@ -511,7 +547,7 @@ rotation, transient preview/cancel и отсутствие non-image transform s
 
 ## ADR-018 — Неофициальные CI-сборки и GitHub version check
 
-**Статус:** accepted
+**Статус:** superseded by [ADR-095](#adr-095-версионные-пакеты-и-draft-github-releases)
 
 **Решение:** проект не создаёт официальный подписанный канал дистрибуции, не выполняет code signing/notarization и не использует Tauri updater. GitHub Actions собирает versioned unsigned artifacts для всей платформенной матрицы. Приложение сравнивает встроенную SemVer с публичными GitHub tags `vX.Y.Z` и только сообщает о более новой версии.
 

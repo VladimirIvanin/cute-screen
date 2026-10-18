@@ -1,5 +1,85 @@
 # CI-сборки и проверка версии через GitHub
 
+## Версионный выпуск (ADR-095)
+
+`release.yml` собирает семь установщиков: Linux x64/ARM64 DEB и AppImage,
+Windows x64/ARM64 NSIS и один macOS universal DMG. Pull request, затрагивающий
+release pipeline, запускает тот же dry run без публикации: это позволяет
+проверить новый workflow до его появления в default branch. Manual dispatch
+также создаёт только Actions artifacts. Tag push создаёт только **draft**.
+
+1. В чистом checkout выполнить `pnpm release:version 1.2.3` с выбранным номером.
+   Команда синхронизирует npm workspace, Tauri, Cargo, pinned path dependency
+   и собственные Cargo.lock entries. `workspace:*` ссылки pnpm не содержат
+   номера, поэтому pnpm-lock.yaml не переписывается ради повышения версии.
+2. Проверить `pnpm release:check v1.2.3`, закоммитить metadata и провести CI.
+3. После попадания commit в main создать и отправить новый tag `v1.2.3`.
+   Workflow не повышает версии, не создаёт tags и не исправляет их автоматически.
+4. Дождаться всех package/clean-install/Intel/quality gates и job draft.
+5. Скачать файлы из draft, сверить SHA256SUMS и провести A14. Опубликовать
+   вручную; не публиковать draft одновременно с работающим workflow.
+
+До tag сборки preflight проверяет строгую stable SemVer без suffix/leading
+zeroes, installer-compatible диапазон компонентов 0..65535, согласованность
+всей metadata и принадлежность SHA истории main. CI переиспользуется через
+workflow_call и проверяет тот же SHA. Его ошибка блокирует полный комплект
+и draft; успешный compile не заменяет quality gate.
+
+Installer assets называются `cute-screen-<version>-<os>-<arch>.<extension>`.
+Рядом находятся SHA256SUMS, manifest.json, CycloneDX 1.6 SBOM, npm/Cargo/font
+license report, copyright bundled Linux libraries, package verification и
+clean-install reports, README с ограничениями. Все файлы кроме SHA256SUMS
+покрываются checksums. SBOM — source dependency inventory; packagedFiles
+отдельно фиксирует имена, размеры и хеши файлов в каждом пакете.
+SBOM tool `@cyclonedx/cdxgen@12.8.6` имеет изолированный lockfile; build tooling
+не становится production dependency desktop-приложения.
+
+Draft имеет commit marker. При повторном запуске одинаковые assets пропускаются
+по GitHub SHA-256 digest, недостающие добавляются. Конфликтующие assets не
+перезаписываются: удалить незавершённый draft вручную и повторить workflow.
+Published Release не изменяется; для исправления опубликованных bytes нужен
+новый patch version/tag. Network failure может оставить неполный draft;
+workflow сообщает ошибку и никогда не публикует его автоматически.
+
+### Реальные пакеты и платформенные границы
+
+Production build использует default features плюс Tauri custom-protocol,
+locked dependencies и явные `--bundles`. Test-only features не разрешаются.
+`pnpm release:verify <platform> <bundle-directory>` извлекает DEB/AppImage,
+устанавливает NSIS во временный каталог или монтирует DMG read-only.
+Hidden `--release-info` возвращает только metadata и хеши декодированных
+embedded ресурсов; сверяются все bundled fonts/WASM/licenses с frontend.
+`pnpm verify:release-boundary --packaged <binary> <platform>` проверяет уже
+упакованный binary без пересборки; прежний default режима CI сохранён.
+
+- Linux: native Ubuntu 22.04 runners, ELF/GLIBC <=2.35 для приложения и
+  поставляемых библиотек; AppImage extraction fallback не требует FUSE.
+  DEB устанавливается с одними declared dependencies в чистых 22.04/24.04
+  контейнерах на обеих архитектурах. Обычный FUSE-запуск остаётся ручным.
+  AppRun/GTK GDK_BACKEND lines попадают в report: при принудительном X11
+  не обещать native Wayland. GNOME/KDE portals проверяются отдельно;
+  X11 hotkeys не доказывают GlobalShortcuts portal support.
+- macOS: Xcode 16.4, `MACOSX_DEPLOYMENT_TARGET=12.0`, Tauri minimum 12.0,
+  universal Mach-O и ad-hoc `signingIdentity: "-"` до создания DMG.
+  Codesign, embedded metadata и запуск проверяются из конечного DMG на ARM64
+  и Intel. macOS 12.0 runtime не считается проверенным запуском на 15.
+  Ad-hoc не заменяет Developer ID/notarization: для доверенной загрузки
+  использовать системный Privacy & Security → Open Anyway, если ОС разрешает.
+  Не отключать Gatekeeper/SIP глобально. Screen Recording/TCC, отказ и
+  повторное разрешение проверяются при ручной приёмке установленного app.
+- Windows: Windows Server 2025 x64 build не доказывает Windows 11 runtime.
+  NSIS wrapper может быть x86 для ARM64; PE проверяется у установленного app.
+  Сохраняются currentUser и autostart hooks. При отсутствии Evergreen WebView2
+  downloadBootstrapper требует сети; fixed runtime не поставляется.
+  SmartScreen может предупреждать, Smart App Control/managed policy может
+  блокировать unsigned app. Универсальный обход блокировки не обещается.
+  Проверять скачанный браузером installer с Mark-of-the-Web на Windows 11.
+
+Первый полный GitHub run, ручные platform gates и опубликованные artifacts
+фиксируются в TESTING.md; локальный helper test не заменяет эту проверку.
+Проверка новой версии внутри приложения остаётся отдельным `REQ-REL-004`.
+Tag может существовать при failed pipeline или ещё не опубликованном draft.
+
 ## Проверка управляемых выносок (ADR-087)
 
 Browser: `pnpm test:e2e:browser --spec tests/e2e/specs/browser-callout-editing.e2e.ts --spec tests/e2e/specs/browser-callout-layout.e2e.ts --spec tests/e2e/specs/browser-callout-visual.e2e.ts`.
@@ -129,11 +209,13 @@ Windows запускается через `CUTE_SCREEN_E2E_SCENARIOS=windows-cap
 
 ## Принцип
 
-Проект не создаёт официальный канал релизов. Нет code signing, notarization, GitHub Releases, Tauri updater или автоматической установки обновлений.
+Проект выпускает неофициальные unsigned/ad-hoc builds через draft GitHub Releases
+по ADR-095. Нет Developer ID/Authenticode, notarization, Tauri updater или
+автоматической установки обновлений.
 
 GitHub Actions выполняет две независимые функции:
 
-1. Создаёт проверенные versioned artifacts для Linux, Windows и macOS, включая ARM64.
+1. Создаёт проверенные versioned artifacts и draft Releases для Linux, Windows и macOS, включая ARM64.
 2. Хранит Git tags `vX.Y.Z`, с которыми приложение может сравнить свою текущую SemVer.
 
 Artifacts считаются тестовыми/неофициальными сборками. На macOS и Windows пользователь может увидеть Gatekeeper/SmartScreen warning, и это должно быть явно написано рядом с инструкцией скачивания.
@@ -211,9 +293,9 @@ Provisioning и runbook: [REFERENCE_PERF_RUNNER.md](REFERENCE_PERF_RUNNER.md).
 
 - Artifacts могут иметь короткий retention и не считаются versioned builds.
 
-### `build-artifacts.yml`
+### `release.yml`
 
-Trigger: manual dispatch либо tag `v*`.
+Trigger: manual dispatch, release-related PR либо tag `v*`.
 
 1. Проверить SemVer tag и совпадение embedded version.
 2. Выполнить обязательные test gates для того же commit SHA.
@@ -224,7 +306,8 @@ Trigger: manual dispatch либо tag `v*`.
 7. Загрузить файлы как GitHub Actions artifacts с именем `cute-screen-<version>-<os>-<arch>`.
 8. Сохранить test reports и предупреждение `UNSIGNED / UNOFFICIAL BUILD`.
 
-Workflow не создаёт GitHub Release и не прикладывает updater manifests.
+Только tag push создаёт draft GitHub Release. Публикация ручная; updater
+manifests отсутствуют. Подробный runbook и платформенные ограничения — выше.
 
 ## Контракт проверки версии
 
@@ -234,7 +317,7 @@ Workflow не создаёт GitHub Release и не прикладывает upd
 - Repository: compile-time `owner/repo`, задаваемый CI variable `CUTE_SCREEN_GITHUB_REPOSITORY`.
 - Remote versions: публичный GitHub REST endpoint `GET /repos/{owner}/{repo}/tags?per_page=100`.
 - При наличии `Link: rel=next` клиент следует максимум пяти страницам, чтобы ограничить запросы.
-- Ссылка пользователю ведёт на `https://github.com/{owner}/{repo}/tree/<tag>` и страницу Actions, а не на отсутствующий GitHub Release.
+- Этот будущий контракт `REQ-REL-004` не реализован релизным workflow; наличие тега не гарантирует опубликованный Release или доступные binaries.
 
 Если repository variable отсутствует или имеет invalid format, version check отображается как недоступный build capability и не делает сетевой запрос.
 

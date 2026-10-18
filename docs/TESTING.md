@@ -1,5 +1,32 @@
 # Стратегия тестирования
 
+## Release pipeline (2026-10-18, ADR-095)
+
+Изолированный checkout `D:/cutescreen-release-builds`, branch
+`codex/release-builds`, base SHA `aebdb2e2b1407362542b0ba7e080b9e64eb40187`.
+Windows x64, Node 22.23.1, pnpm 10.33.2, Rust 1.97.0 MSVC.
+
+- `pnpm release:check` — passed (0.0.0; номер первого выпуска не выбирался).
+- `pnpm exec vitest run --project boundaries tests/boundaries/release-contracts.test.ts`
+  — 7/7 passed: metadata/lock roundtrip, invalid versions, PE/universal/glibc,
+  missing/altered embedded resources, incomplete/corrupt installers, published guard.
+- `pnpm build` — passed; исходные CanvasKit browser externalization и >500 kB
+  chunk warnings сохранены. Это frontend build, не platform package acceptance.
+- `actionlint 1.7.12 .github/workflows/release.yml .github/workflows/ci.yml`
+  — passed; binary из upstream Release проверен по SHA-256 checksums.
+- Red-first resource contract: `rustc +1.97.0-x86_64-pc-windows-msvc --test
+  src-tauri/src/release_info.rs --emit=metadata -o artifacts/release-red.rmeta`
+  — expected E0425 до реализации `asset_summary`. Первый Cargo run выбрал
+  установленный GNU toolchain и остановился на отсутствующем dlltool; локальные
+  последующие команды явно используют RUSTUP_TOOLCHAIN 1.97.0 MSVC и VS DevShell.
+- Полный Cargo/check, SBOM и GitHub package matrix проверяются далее; наличие
+  workflow и helper tests не означает их успех. Первый SBOM/Cargo parallel run
+  прерван при нехватке RAM на общем desktop; это не положительный результат.
+
+Manual A14, Gatekeeper/TCC, macOS 12, Windows 11 download/Smart App Control,
+FUSE/Wayland, physical capture, upgrade/login/uninstall остаются pending до
+отдельного evidence. Tag и draft никогда не считаются опубликованной версией.
+
 ## Диапазоны оформления изображения (2026-10-18, ADR-089)
 
 Windows x64, Node 22.23.1, pnpm 10.33.2. Radius больше не ограничен 128 px:

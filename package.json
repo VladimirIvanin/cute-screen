@@ -63,6 +63,12 @@
     "smoke:m04:deb": "pnpm tauri build --bundles deb && node scripts/check-m04-deb.mjs",
     "smoke:m04:appimage": "pnpm tauri build --bundles appimage && node scripts/check-m04-appimage.mjs",
     "verify:release-boundary": "node scripts/verify-release-boundary.mjs",
+    "release:version": "node scripts/release/cli.mjs version",
+    "release:check": "node scripts/release/cli.mjs check",
+    "release:verify": "node scripts/release/cli.mjs verify",
+    "release:mac-intel": "node scripts/release/cli.mjs mac-intel",
+    "release:reports": "node scripts/release/reports.mjs",
+    "release:assemble": "node scripts/release/cli.mjs assemble",
     "licenses": "node scripts/check-js-licenses.mjs",
     "audit:licenses": "pnpm run licenses && pnpm licenses list --prod --long",
     "audit:security": "pnpm audit --prod --audit-level high"

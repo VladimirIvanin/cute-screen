@@ -1,5 +1,16 @@
 # Платформенная матрица
 
+## Release packaging (2026-10-18, ADR-095)
+
+Release workflow: Ubuntu 22.04 x64/ARM64 (DEB/AppImage, glibc <=2.35),
+Windows 2025 x64 и Windows 11 ARM64 (NSIS), macOS 15 ARM64 (universal DMG,
+Xcode 16.4, deployment 12.0, ad-hoc). Тот же DMG проверяется на macOS 15 Intel;
+clean DEB installs — Ubuntu 22.04/24.04 x64/ARM64. Сборка и CLI/resource
+checks не повышают capture/hotkey/UI runtime support до supported.
+Gatekeeper/TCC/macOS 12, Windows 11 x64/Smart App Control, Wayland GNOME/KDE,
+FUSE, login, upgrade и uninstall остаются ручными A14 gates. Конкретные
+результаты, SHA, platform versions и limitations — TESTING.md.
+
 ## Диапазоны изображения (2026-10-18, ADR-089)
 
 Windows x64: mounted Vue 4K square/landscape — passed; свежая сборка и

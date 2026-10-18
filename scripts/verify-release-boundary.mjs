@@ -8,14 +8,20 @@ import path from 'node:path'
 import process from 'node:process'
 
 import fg from 'fast-glob'
+import { forbidden } from './release/contracts.mjs'
+
+if (process.argv[2] === '--packaged') {
+  const { inspectExecutable } = await import('./release/verify.mjs')
+  const { inventory, run } = await import('./release/io.mjs')
+  const { checkVersions } = await import('./release/versions.mjs')
+  const executable = path.resolve(process.argv[3])
+  const report = await inspectExecutable(executable, (args) => run(executable, args), process.argv[4],
+    await checkVersions(), await inventory(path.join(process.cwd(), 'apps/desktop/dist')))
+  console.log(JSON.stringify(report, null, 2))
+  process.exit(0)
+}
 
 const root = process.cwd()
-const forbidden = [
-  'tauri-plugin-wdio',
-  'tauri-plugin-wdio-webdriver',
-  'cute-screen:fake-platform',
-  'cute-screen:test-harness',
-]
 
 function capture(
   command,

@@ -1,0 +1,239 @@
+name: Release
+
+on:
+  push:
+    tags: [v*]
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - .github/actions/release-setup/**
+      - scripts/release/**
+      - tools/release-sbom/**
+      - src-tauri/src/release_info.rs
+      - src-tauri/tauri.release.conf.json
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.inputs.outputs.version }}
+      commit: ${{ steps.inputs.outputs.commit }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22.23.1
+      - name: Validate release inputs before builds
+        id: inputs
+        run: node scripts/release/cli.mjs preflight
+
+  quality:
+    needs: preflight
+    uses: ./.github/workflows/ci.yml
+
+  package:
+    name: Package ${{ matrix.id }}
+    needs: preflight
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: linux-x64
+            os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            bundles: deb,appimage
+          - id: linux-arm64
+            os: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+            bundles: deb,appimage
+          - id: windows-x64
+            os: windows-2025
+            target: x86_64-pc-windows-msvc
+            bundles: nsis
+          - id: windows-arm64
+            os: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            bundles: nsis
+          - id: macos-universal
+            os: macos-15
+            target: universal-apple-darwin
+            bundles: dmg
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      RELEASE_ID: ${{ matrix.id }}
+      RELEASE_TARGET: ${{ matrix.target }}
+      RELEASE_BUNDLES: ${{ matrix.bundles }}
+      CARGO_BUILD_JOBS: '2'
+      MACOSX_DEPLOYMENT_TARGET: '12.0'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Select macOS SDK explicitly
+        if: runner.os == 'macOS'
+        run: |
+          test -d /Applications/Xcode_16.4.app/Contents/Developer
+          echo 'DEVELOPER_DIR=/Applications/Xcode_16.4.app/Contents/Developer' >> "$GITHUB_ENV"
+      - uses: ./.github/actions/release-setup
+        with:
+          image: ${{ matrix.os }}
+          target: ${{ matrix.target }}
+      - name: Build production packages with locked dependencies
+        shell: bash
+        run: pnpm tauri build --ci --target "$RELEASE_TARGET" --bundles "$RELEASE_BUNDLES" --config src-tauri/tauri.release.conf.json -- --locked
+      - name: Verify actual packaged executables and resources
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            xvfb-run --auto-servernum dbus-run-session -- pnpm release:verify "$RELEASE_ID" "target/$RELEASE_TARGET/release/bundle"
+          else
+            pnpm release:verify "$RELEASE_ID" "target/$RELEASE_TARGET/release/bundle"
+          fi
+      - name: Upload verified packages
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: release-package-${{ matrix.id }}
+          path: artifacts/release/${{ matrix.id }}/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Keep failure evidence
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: release-failure-${{ matrix.id }}
+          path: artifacts/release/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  macos-intel:
+    name: Verify the same universal DMG on Intel
+    needs: package
+    runs-on: macos-15-intel
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: ./.github/actions/release-setup
+        with:
+          image: macos-15-intel
+          target: x86_64-apple-darwin
+      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: release-package-macos-universal
+          path: incoming/macos
+      - run: pnpm release:mac-intel incoming/macos
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: release-intel
+          path: artifacts/release/macos-intel-verification.json
+          if-no-files-found: error
+
+  linux-install:
+    name: Clean DEB install ${{ matrix.id }} Ubuntu ${{ matrix.base }}
+    needs: package
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { id: linux-x64, os: ubuntu-22.04, base: '22.04' }
+          - { id: linux-x64, os: ubuntu-24.04, base: '24.04' }
+          - { id: linux-arm64, os: ubuntu-22.04-arm, base: '22.04' }
+          - { id: linux-arm64, os: ubuntu-24.04-arm, base: '24.04' }
+    env:
+      RELEASE_ID: ${{ matrix.id }}
+      UBUNTU_BASE: ${{ matrix.base }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22.23.1
+      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: release-package-${{ matrix.id }}
+          path: incoming/package
+      - name: Install using only the DEB declared dependencies
+        run: |
+          mkdir -p artifacts/clean-install
+          docker run --rm \
+            -v "$PWD/incoming/package:/packages:ro" \
+            -v "$PWD/scripts/release/linux-install-smoke.sh:/smoke.sh:ro" \
+            -v "$PWD/artifacts/clean-install:/evidence" \
+            "ubuntu:$UBUNTU_BASE" bash /smoke.sh
+          node scripts/release/linux-install-result.mjs "$RELEASE_ID" "$UBUNTU_BASE" incoming/package
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: release-install-${{ matrix.id }}-${{ matrix.base }}
+          path: artifacts/clean-install/
+          if-no-files-found: error
+
+  reports:
+    needs: preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: ./.github/actions/release-setup
+        with:
+          image: ubuntu-24.04
+          target: x86_64-unknown-linux-gnu
+      - name: Install isolated, locked SBOM tooling
+        run: pnpm --dir tools/release-sbom install --ignore-workspace --frozen-lockfile --ignore-scripts
+      - name: Generate source dependency and license reports
+        run: pnpm release:reports
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: release-reports
+          path: artifacts/release/reports/
+          if-no-files-found: error
+
+  assemble:
+    needs: [preflight, quality, package, macos-intel, linux-install, reports]
+    runs-on: ubuntu-24.04
+    env:
+      RELEASE_QUALITY_RESULT: ${{ needs.quality.result }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22.23.1
+      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          pattern: release-*
+          path: incoming
+      - run: node scripts/release/cli.mjs assemble incoming
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: cute-screen-${{ needs.preflight.outputs.version }}-complete
+          path: artifacts/release-complete/
+          if-no-files-found: error
+          retention-days: 30
+
+  draft:
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: [preflight, assemble]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22.23.1
+      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: cute-screen-${{ needs.preflight.outputs.version }}-complete
+          path: release-complete
+      - name: Create or complete the draft without overwriting assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/release/cli.mjs publish release-complete

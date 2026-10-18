@@ -518,11 +518,11 @@ Cute Screen — полноценный local-first редактор снимко
 - `REQ-QLT-003` — idle editor не поддерживает непрерывный animation loop.
 - `REQ-QLT-004` — библиотека из 1000 кадров показывает первую страницу без полного synchronous probe.
 - `REQ-QLT-005` — crash/failed write не повреждает оригинал или последнее подтверждённое состояние.
-- `REQ-REL-001` — GitHub Actions собирает Linux x64/ARM64 deb и AppImage как неофициальные CI artifacts.
-- `REQ-REL-002` — GitHub Actions собирает unsigned macOS universal DMG для Intel и Apple Silicon.
+- `REQ-REL-001` — GitHub Actions собирает Linux x64/ARM64 deb и AppImage на Ubuntu 22.04/glibc 2.35; готовые пакеты проверяются до draft Release.
+- `REQ-REL-002` — GitHub Actions собирает macOS universal DMG для Intel и Apple Silicon с ad-hoc подписью, без Developer ID/notarization; один образ проверяется на обеих архитектурах.
 - `REQ-REL-003` — GitHub Actions собирает unsigned Windows x64/ARM64 NSIS installers.
 - `REQ-REL-004` — приложение вручную либо по явной opt-in настройке сравнивает текущую SemVer с тегами `vX.Y.Z` публичного GitHub-репозитория; оно не скачивает и не устанавливает обновления.
-- `REQ-REL-005` — versioned CI artifacts сопровождаются checksums, SBOM и license report, но не объявляются официальным релизом.
+- `REQ-REL-005` — versioned artifacts сопровождаются checksums, SBOM и license report. Тег создаёт только draft GitHub Release после успешного CI того же SHA; публикация после ручной A14 приёмки. Manual/PR run не создаёт Release; published assets не перезаписываются.
 
 ## Публичный лендинг
 

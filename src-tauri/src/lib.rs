@@ -1,5 +1,6 @@
 #[cfg(any(test, feature = "test-harness"))]
 mod e2e_paths;
+mod release_info;
 mod tray_icon;
 
 #[path = "services/export_filename.rs"]
@@ -2542,6 +2543,15 @@ fn seed_m03_document(repository: &LibraryRepository) -> Result<(), RepositoryErr
     reason = "declarative Tauri builder lists managed state and stable IPC handlers"
 )]
 pub fn run() {
+    #[allow(unused_mut)]
+    let mut context = tauri::generate_context!();
+    if release_info::requested() {
+        if let Err(error) = release_info::print(&context) {
+            eprintln!("cute-screen release diagnostics failed: {error}");
+            std::process::exit(1);
+        }
+        return;
+    }
     #[cfg(feature = "test-harness")]
     if let Err(error) = tracing_subscriber::fmt()
         .with_ansi(false)
@@ -2935,8 +2945,6 @@ pub fn run() {
         stage_image
     ]);
 
-    #[allow(unused_mut)]
-    let mut context = tauri::generate_context!();
     #[cfg(feature = "test-harness")]
     if let Some(profile) = env::var_os("CUTE_SCREEN_E2E_APP_DATA") {
         context.config_mut().identifier = e2e_paths::profile_identifier(
