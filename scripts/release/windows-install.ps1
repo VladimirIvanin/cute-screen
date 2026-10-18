@@ -5,7 +5,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$installerPath = (Resolve-Path -LiteralPath $Installer).Path
+. (Join-Path $PSScriptRoot 'windows-path.ps1')
+$installerPath = Get-ReleaseCanonicalPath -LiteralPath $Installer
 if (-not $Directory) { throw 'An isolated installation directory is required' }
 $installPath = [System.IO.Path]::GetFullPath($Directory)
 $tempRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
@@ -13,7 +14,7 @@ if (-not $installPath.StartsWith($tempRoot, [System.StringComparison]::OrdinalIg
   throw 'The test installation must stay under the runner temporary directory'
 }
 if ($Uninstall) {
-  $expectedUninstaller = (Resolve-Path -LiteralPath (Join-Path $installPath 'uninstall.exe')).Path
+  $expectedUninstaller = Get-ReleaseCanonicalPath -LiteralPath (Join-Path $installPath 'uninstall.exe')
   if ($installerPath -ne $expectedUninstaller) {
     throw 'Only the temporary test installation may be uninstalled'
   }
