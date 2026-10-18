@@ -8,7 +8,8 @@ Cute Screen uses Tauri 2, Vue 3, and Rust. For an overview of the app, see the [
 Use the pinned toolchain:
 
 - Node `22.23.1` (also in `.node-version`).
-- pnpm `10.33.2`, activated through Corepack.
+- pnpm `10.33.2`, activated through Corepack. GitHub Actions installs the same version with
+  `pnpm/action-setup` instead of Corepack.
 - Rust `1.97.0`, selected by `rust-toolchain.toml`.
 
 Install the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for your OS. Windows needs Microsoft C++ Build

@@ -97,11 +97,10 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Activate pnpm
-        shell: bash
-        run: |
-          corepack enable
-          corepack prepare pnpm@${PNPM_VERSION} --activate
+      - name: Install pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
 
       - name: Install Rust
         shell: bash

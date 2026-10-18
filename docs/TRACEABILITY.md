@@ -1,5 +1,17 @@
 # Трассируемость требований
 
+## Установка pnpm в GitHub Actions (2026-10-18)
+
+`REQ-REL-001/002/003`: hosted CI не должен ставить pnpm через `corepack prepare`.
+Один запрос corepack к `registry.npmjs.org` не повторяется; на macOS Intel
+job `Compile macOS Intel` для `v0.1.5` упал на загрузке `pnpm-10.33.2.tgz`
+после `ENOTFOUND api.github.com`, до компиляции. В CI, Linux CI, release,
+Pages и reference-perf pnpm 10.33.2 ставит `pnpm/action-setup` v6.1.0:
+сначала `npm ci` по зафиксированному lockfile, затем `self-update`.
+Локальная активация остаётся через Corepack. `pnpm/setup` не используется:
+он требует pnpm 11+, а для v11 нет сборки Intel macOS. Hosted runner этим
+локальным изменением не подтверждается.
+
 ## Версия 0.1.5 (2026-10-18)
 
 `REQ-REL-001/002/003/005`: штатной командой `pnpm version:bump 0.1.5`

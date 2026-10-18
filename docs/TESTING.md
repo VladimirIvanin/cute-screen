@@ -1,5 +1,22 @@
 # Стратегия тестирования
 
+## Установка pnpm в GitHub Actions (2026-10-18)
+
+macOS 12.7.6 x86_64 (Darwin 21.6.0). Падение `Compile macOS Intel` на теге
+`v0.1.5`: `corepack prepare` один раз не скачал `pnpm-10.33.2.tgz` после
+`ENOTFOUND api.github.com`. Компиляция не начиналась.
+
+В workflow pnpm ставит `pnpm/action-setup` v6.1.0
+(`ea17c68df8912ef543352723c149a84f56e3d413`) после `actions/setup-node`.
+Отдельный тест сценария не добавлялся: это шаг hosted runner, а не контракт
+репозитория, который можно устойчиво проверить локально.
+
+`pnpm exec prettier --write` для изменённых workflow и docs, затем
+`pnpm exec prettier --check` по тем же файлам, `pnpm docs:check` и
+`git diff --check`. Hosted runner этим прогоном не подтверждается.
+Повторный запуск уже упавшего job `v0.1.5` читает workflow из тега и эту
+замену не подхватывает.
+
 ## Версия 0.1.5 (2026-10-18)
 
 macOS 12.7.6 x86_64 (Darwin 21.6.0), Node 22.23.1, pnpm 10.33.2.
