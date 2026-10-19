@@ -1,5 +1,40 @@
 # Стратегия тестирования
 
+## Регрессии тестов после смены defaults (2026-10-19, ADR-116)
+
+Windows 10 x64 / Chrome 155.0.8059.80, Node 22.23.1, pnpm 10.33.2.
+Начальный HEAD `befc429`; финальные проверки исходников — `819412b`.
+Изменены tests и четыре shape-catalogue PNG, production defaults сохранены.
+Ожидания сохранённых объектов 3 px оставлены; восстановление preferences
+проверяется выбором 6 px вместо начальных 8 px. Numeric rotation учитывает
+stroke 4 px, mixed-line undo возвращает 4/7 px. В production-parent selection
+сценарии снятие выделения идёт нажатием по фону: bounds стрелки 8 px покрывают
+малый fixture canvas. Browser defaults используют постоянную toolbar;
+один Escape закрывает вложенную панель и сохраняет активную стрелку.
+
+- Первый `pnpm test`: 153 files / 1376 tests, шесть failures в четырёх Vue
+  файлах; исправлены ожидания labels, mixed undo и пустой области.
+  Прогон начат до правок, более поздние файлы уже читали обновлённые tests.
+- `pnpm test:render`: до обновления goldens два ожидаемых failures каталога
+  фигур; после обновления — 18 files / 52 tests passed. Canvas2D/CanvasKit
+  PNG при scale 1/2 просмотрены; export повторно декодируется тестами.
+- `$env:CUTE_SCREEN_UPDATE_GOLDENS='1'; pnpm test:render tests/harness/render/golden-shapes.test.ts`
+  — 3 passed; обновлены только четыре PNG каталога фигур. Финальный обычный
+  `pnpm test:render` выполнялся без update-переменной.
+- `$env:CUTE_SCREEN_BROWSER_E2E_HEADLESS='1'; pnpm test:e2e:browser --spec tests/e2e/specs/browser-tool-lifecycle.e2e.ts --spec tests/e2e/specs/browser-tool-ux.e2e.ts --spec tests/e2e/specs/browser-m06-arrow-tools.e2e.ts --spec tests/e2e/specs/browser-line.e2e.ts`
+  — lifecycle 2/2, arrow tools 4/4, line 2/2 passed; tool UX изначально выявил
+  старый popover contract. После исправления отдельный запуск
+  `pnpm test:e2e:browser --spec tests/e2e/specs/browser-tool-ux.e2e.ts` — 5/5
+  passed. Всего 13 browser-сценариев passed, RU/EN, light/dark, layout,
+  native browser pointer/keyboard, preferences/reload и undo/redo.
+- `pnpm lint`: passed, прежние 85 warnings. `pnpm typecheck` и
+  `pnpm docs:check`: passed.
+
+Логи — `artifacts/defaults-test-regressions/`; browser screenshots/JUnit —
+`artifacts/browser-e2e/`, lifecycle PNG — `artifacts/tool-lifecycle/`.
+Native Tauri, Rust, capture backends и performance suite не запускались:
+production implementation не изменена, новых native/platform claims нет.
+
 ## Windows GUI, Area и версия 0.1.6 (2026-10-18–19, ADR-115)
 
 Windows 10 build 19045 x64, один экран 1920×1080 / DPR 1,
