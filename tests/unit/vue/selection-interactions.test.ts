@@ -66,8 +66,8 @@ describe('canvas selection targets', () => {
         await fireEvent.pointerMove(scene, move(-15, -10))
         await fireEvent.pointerUp(scene, down(-15, -10))
       } else {
-        await fireEvent.pointerDown(scene, down(95, 5))
-        await fireEvent.pointerUp(scene, down(95, 5))
+        // The thicker arrow's selection frame covers the small fixture canvas.
+        await fireEvent.pointerDown(view.container.querySelector('.cs-canvas-stage')!, down(95, 75))
         expect(store.selectedLayerIds).toEqual([])
         await fireEvent.pointerDown(scene, down(47, 43))
         await fireEvent.pointerMove(scene, move(62, 53))
