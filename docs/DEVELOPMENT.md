@@ -14,7 +14,10 @@ Use the pinned toolchain:
 
 Install the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for your OS. Windows needs Microsoft C++ Build
 Tools and WebView2; macOS needs Xcode Command Line Tools. On Ubuntu 24.04, development dependencies include GTK 3,
-WebKitGTK 4.1, JavaScriptCoreGTK 4.1, libsoup 3, OpenSSL, libayatana-appindicator, librsvg, and build tools.
+WebKitGTK 4.1, JavaScriptCoreGTK 4.1, libsoup 3, OpenSSL, libayatana-appindicator, librsvg, GStreamer core/app/video, and build tools.
+Wayland runtime also needs the PipeWire GStreamer source plugin (`gstreamer1.0-pipewire` on Ubuntu).
+Capture availability checks the actual ScreenCast Monitor/Hidden cursor support and raw pipeline elements.
+It does not substitute Screenshot requests that require confirmation for every image.
 
 From a clean checkout:
 

@@ -1,5 +1,27 @@
 # Архитектура Cute Screen
 
+## Wayland raw-frame capture (ADR-118/119)
+
+Area/Screen/Repeat используют XDG ScreenCast Monitor session. Разрешённая сессия
+разделяется между clones CaptureController; повторный capture не вызывает
+CreateSession/SelectSources/Start. Новый PipeWire consumer получает один raw
+RGBA кадр в его negotiated resolution и закрывается, разрешение остаётся до
+выхода/отзыва. Frame fitting/crop работают в пикселях выбранного монитора;
+desktop geometry не синтезируется. Межмониторное выделение не заявляется.
+Probe проверяет Monitor, Hidden cursor и создание pipewiresrc/videoconvert/appsink.
+Stride, размер и полнота кадра проверяются до staging: Area — memory-owned BMP,
+Screen — fast lossless PNG. Settings может заменить разрешённый монитор; cancel
+сохраняет прежнюю сессию. Pipeline videoscale
+и фиксированные уменьшенные caps отсутствуют. При ошибке нет Screenshot/X11 fallback.
+Linux entry использует native Wayland для preview, исключая inherited XWayland.
+
+Probe/capability handshake имеют короткий технический timeout. Screenshot
+request/response не имеет прикладного deadline выбора: в ashpd 0.13.13 уже
+`send().await` ожидает Response signal. `response()` извлекает готовый результат.
+Это сохраняется для Window/Active Window и первого ScreenCast Start: время
+ответа пользователя не ограничивается техническим handshake timeout.
+Причины и ограничения — [Linux capture](LINUX_CAPTURE_RESEARCH.md).
+
 ## Windows/macOS GUI lifecycle (ADR-115)
 
 Публичный capture CLI компилируется только для Linux. Windows/macOS не имеют
@@ -61,8 +83,8 @@ cancel до вызова backend. Hotkey, CLI и UI используют пре�
 Для GDK X11 получает текущий server timestamp, обновляет user time и вызывает
 present_with_time на уже существующем Quick window. CURRENT_TIME из очереди
 Tao недостаточен для prewarmed окна с устаревшим user time в Mutter. Окно,
-renderer и frozen frame не пересоздаются. Wayland остаётся на системном
-portal selector; GDK Wayland presentation использует обычный GTK present.
+renderer и frozen frame не пересоздаются. Wayland использует общий Quick
+lifecycle (ADR-118/119); GDK Wayland presentation использует обычный GTK present.
 Native focus доказывается до WebDriver switchWindow и любого click по Quick.
 
 ## Внешняя атрибуция эмоджи (ADR-105)
@@ -640,7 +662,9 @@ document-command boundary.
 уже в Quick surface. macOS создаёт draft после platform selector. Draft может
 ссылаться на frozen virtual desktop и physical selection bounds; на macOS это
 единый frozen multi-display frame native AppKit selector. Wayland draft
-содержит только portal fragment. Pixels доступны Vue только через scoped/binary
+содержит raw кадр выбранного монитора через memory-owned BMP с pending selection
+(ADR-118/119).
+Pixels доступны Vue только через scoped/binary
 transport token. Windows/macOS Window после native selection создаёт документ
 напрямую и quick-mode не открывает.
 
@@ -660,8 +684,9 @@ Quick WebView мапится fullscreen в фазе `selecting`; первый в
 draft и меняет только Vue state на `editing`. `EditorShell`, renderer, scene и
 overlay canvas, frozen image, dim layer и dash остаются теми же DOM/native
 объектами. Toolbar и actions добавляются вокруг существующего crop без
-show/hide/focus и без повторного layout-ready gate. Wayland сохраняет
-portal-owned system selector и не использует этот X11 маршрут.
+show/hide/focus и без повторного layout-ready gate. Wayland использует тот же
+Quick lifecycle после получения raw кадра через XDG ScreenCast (ADR-118/119),
+без вызовов X11 adapter.
 
 Windows Area использует тот же frontend lifecycle: после скрытия `main` backend
 подготавливает DXGI duplication, показывает прозрачный non-activating

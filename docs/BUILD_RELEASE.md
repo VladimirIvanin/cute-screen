@@ -1,5 +1,34 @@
 # CI-сборки и проверка версии через GitHub
 
+## Linux dev desktop (ADR-118)
+
+`pnpm build:linux:dev` собирает debug binary с embedded frontend в штатном
+Ubuntu 22.04 Docker image. Требуются Docker и установленные `pnpm install
+--frozen-lockfile` зависимости; host GTK/WebKit dev packages не нужны.
+Cargo cache и target сохраняются. Config `src-tauri/tauri.dev.conf.json` задаёт
+имя Cute Screen Dev и отдельный identifier: обычная библиотека и single-instance
+установленной версии не используются. Сборка не создаёт installer.
+
+Успешная сборка атомарно копирует debug executable в
+`artifacts/linux-dev/cute-screen-dev`: следующая обычная Cargo-сборка его
+не перезаписывает, старый dev-процесс может продолжать работать.
+`pnpm start:linux:dev` запускает этот файл; wrapper также
+отделяет Linux activation socket через session scope. Можно передать capture
+arguments, например `pnpm start:linux:dev capture --mode area`.
+Это debug build для
+локальной проверки, без Vite hot reload; стандартный `pnpm tauri dev` требует
+host dependencies из DEVELOPMENT.md.
+
+Wayland Area/Screen/Repeat требуют GStreamer core/app/video development libraries
+при сборке и pipewiresrc, videoconvert, appsink во время выполнения. Они добавлены
+в Ubuntu image и обе Linux CI install commands. DEB зависит от
+gstreamer1.0-pipewire и gstreamer1.0-plugins-base; AppImage plugin packaging
+должен отдельно проверяться на чистом host. Capabilities создают элементы
+pipeline и проверяют ScreenCast Monitor/Hidden cursor; отсутствие компонентов
+отключает путь, не подменяя его Screenshot с повторными подтверждениями.
+Rust wrappers GStreamer 0.25.3/app 0.25.2/video 0.25.4 закреплены в Cargo.lock
+(MIT/Apache-2.0), PipeWire plugin — системная MIT/X11 реализация.
+
 ## Windows GUI release и внутренний startup smoke (ADR-115)
 
 Windows/macOS не поставляют пользовательский capture CLI/help/version.

@@ -259,6 +259,8 @@ pub struct CaptureController {
     state: Arc<Mutex<CaptureState>>,
     cancel_signal: Arc<AtomicBool>,
     quick_draft: Arc<Mutex<QuickCaptureState>>,
+    #[cfg(target_os = "linux")]
+    screencast: Arc<crate::linux_screencast::ScreencastCaptureService>,
     #[cfg(all(target_os = "linux", feature = "x11-capture"))]
     last_x11_area: Arc<Mutex<Option<CaptureGeometry>>>,
 }
@@ -277,6 +279,8 @@ impl CaptureController {
             state: Arc::new(Mutex::new(CaptureState::default())),
             cancel_signal: Arc::new(AtomicBool::new(false)),
             quick_draft: Arc::new(Mutex::new(QuickCaptureState::default())),
+            #[cfg(target_os = "linux")]
+            screencast: Arc::new(crate::linux_screencast::ScreencastCaptureService::default()),
             #[cfg(all(target_os = "linux", feature = "x11-capture"))]
             last_x11_area: Arc::new(Mutex::new(None)),
         }
@@ -295,6 +299,27 @@ impl CaptureController {
             .and_then(|active| active.active_descriptor().cloned())
     }
 
+    #[cfg(target_os = "linux")]
+    pub async fn select_monitor(&self) -> Result<bool, crate::platform::PlatformError> {
+        let busy = self
+            .state
+            .lock()
+            .map_err(|_| {
+                crate::platform::PlatformError::new(
+                    PlatformErrorCode::CaptureFailed,
+                    "screen-selection",
+                )
+            })?
+            .active;
+        if busy {
+            return Err(crate::platform::PlatformError::new(
+                PlatformErrorCode::Busy,
+                "screen-selection",
+            ));
+        }
+        self.screencast.select_monitor().await
+    }
+
     pub fn stage_quick_frame(
         &self,
         request: &CaptureRequestV1,
@@ -309,7 +334,10 @@ impl CaptureController {
         frame: CaptureResult,
         terminal: Option<tokio::sync::oneshot::Sender<CaptureOutcomeV2>>,
     ) -> Result<QuickCaptureDraftV1, crate::platform::PlatformError> {
-        if request.action != CaptureAction::Area || frame.width == 0 || frame.height == 0 {
+        if !matches!(request.action, CaptureAction::Area | CaptureAction::Repeat)
+            || frame.width == 0
+            || frame.height == 0
+        {
             return Err(crate::platform::PlatformError::new(
                 PlatformErrorCode::InvalidTarget,
                 &request.correlation_id,
@@ -380,7 +408,7 @@ impl CaptureController {
             width: frame.width,
             height: frame.height,
             selection,
-            can_expand_selection,
+            can_expand_selection: can_expand_selection || frame.quick_selection_pending,
             selection_pending: frame.quick_selection_pending,
         };
         active
@@ -806,14 +834,24 @@ impl CaptureController {
             .as_str()
         {
             "wayland" => {
-                crate::linux_platform::AshpdPortalClient::with_transport(Arc::clone(
-                    &self.transport,
-                ))
-                .capture(CaptureRequest {
+                let capture = CaptureRequest {
                     correlation_id: request.correlation_id.clone(),
                     target: request.action.target(),
-                })
-                .await
+                };
+                if matches!(
+                    capture.target,
+                    crate::platform::CaptureTarget::Area | crate::platform::CaptureTarget::Monitor
+                ) {
+                    self.screencast
+                        .capture(capture, Arc::clone(&self.transport))
+                        .await
+                } else {
+                    crate::linux_platform::AshpdPortalClient::with_transport(Arc::clone(
+                        &self.transport,
+                    ))
+                    .capture(capture)
+                    .await
+                }
             }
             "x11" => {
                 #[cfg(feature = "x11-capture")]
@@ -893,7 +931,7 @@ impl CaptureController {
             ));
 
         match result {
-            Ok(frame) if request.action == CaptureAction::Area => {
+            Ok(frame) if request.action == CaptureAction::Area || frame.quick_selection_pending => {
                 self.wait_for_quick_frame(&request, frame, || {
                     progress(CaptureProgressState::QuickEditing);
                 })
@@ -2046,6 +2084,70 @@ mod tests {
                     "editor"
                 }
             );
+        }
+    }
+
+    #[test]
+    fn portal_desktop_draft_selects_in_png_coordinates_without_native_geometry() {
+        for action in [CaptureAction::Area, CaptureAction::Repeat] {
+            let directory = tempfile::tempdir().expect("temporary library");
+            let repository = LibraryRepository::initialize(directory.path(), directory.path())
+                .expect("repository");
+            let transport = Arc::new(
+                ImageTransportService::new(
+                    directory.path().join("transport"),
+                    directory.path().join("stage"),
+                )
+                .expect("transport"),
+            );
+            let frame = png_rgba(2560, 1440, [16, 32, 48, 255]);
+            transport
+                .import_owned_bytes("portal-desktop", &frame, "image/png", 2560, 1440, "portal")
+                .expect("full desktop staging");
+            let controller = CaptureController::new(repository, transport);
+            let request = CaptureRequestV1 {
+                correlation_id: "portal".to_owned(),
+                action,
+                delay_ms: 0,
+                cursor: false,
+                series_id: None,
+                invocation_source: CaptureInvocationSource::Ui,
+            };
+            let draft = controller
+                .stage_quick_frame(
+                    &request,
+                    CaptureResult {
+                        image_token: "portal-desktop".to_owned(),
+                        correlation_id: "portal".to_owned(),
+                        width: 2560,
+                        height: 1440,
+                        geometry: None,
+                        quick_frame_geometry: None,
+                        quick_selection_pending: true,
+                        cursor_included: None,
+                    },
+                )
+                .expect("desktop draft without compositor geometry");
+            assert!(draft.selection_pending);
+            assert!(draft.can_expand_selection);
+            assert!(
+                controller
+                    .confirm_quick_selection(
+                        &draft.draft_id,
+                        QuickCaptureSelectionV1 {
+                            x: 700,
+                            y: 400,
+                            width: 1200,
+                            height: 700,
+                        }
+                    )
+                    .expect("confirm PNG crop")
+            );
+            let confirmed = controller.active_quick_draft().expect("confirmed draft");
+            assert!(!confirmed.selection_pending);
+            assert_eq!(confirmed.selection.width, 1200);
+            assert!(controller.cancel_quick_draft(&draft.draft_id));
+            assert!(controller.active_quick_draft().is_none());
         }
     }
 

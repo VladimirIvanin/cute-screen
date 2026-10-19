@@ -112,6 +112,77 @@ artifacts 11,718 → 11,718 GiB. Рост — сохранённый build cache
 Рекурсивное удаление завершённых диагностических профилей отклонено
 автоматической проверкой разрешений (`blocked by policy`); эти профили оставлены.
 
+## Wayland ScreenCast и dev desktop (2026-10-19, ADR-118/119)
+
+Ubuntu 22.04.5 x64 / GNOME 42.9 / Wayland; portal 1.14.4, GNOME backend
+42.1, Screenshot v2, ScreenCast v4, pipewiresrc 0.3.48. Ветка
+`codex/fix-wayland-portal-timeout` перебазирована на `origin/main` (`fd23862`); rebase сохранил upstream тесты, goldens и evidence.
+Полный check выполнен перед последним rebase; между 819412b и fd23862 изменились
+только docs, production sources сборки совпадают.
+Node 22.23.1, pnpm 10.33.2, Rust 1.97.0. Host GTK development packages
+отсутствуют; Rust/check/native build выполняются в штатном Ubuntu 22.04 Docker
+с рабочим деревом `/source`, shared Cargo registry/target и UID 1000.
+
+Regression tests добавлены до реализации. Первый host запуск
+`cargo test --workspace screenshot_response --locked` остановился до tests
+на отсутствии GLib/GTK/WebKit development packages; наблюдаемый red test
+этим запуском не подтверждён. Системные development packages не устанавливались.
+
+До ADR-118 владелец проверил Screenshot-only dev: GNOME каждый раз просит
+доступ, preview размыт. После ScreenCast + native Wayland dev он выполнил
+повторный Area capture и подтвердил: «Повторного запроса нет, качество хорошее».
+`/proc/<pid>/environ` подтвердил GDK_BACKEND=wayland. Затем владелец сообщил
+задержку перед выделением на каждом capture. ADR-119 убирает PNG compression
+и disk staging до selection; в новой сборке владелец подтвердил: выделение заметно быстрее; Settings
+открывает выбор монитора, после отмены capture продолжает работать.
+
+Проверки до последнего native прогона:
+
+- `cargo test --workspace --locked` — итоговый прогон: 164 desktop + 1 main +
+  31 storage = 196 passed. После ребейза Rust sources не менялись. Отдельный `cargo test --package cute-screen-desktop --lib --locked`
+  — 164 passed: reselect cancel сохраняет сессию, reuse не авторизуется повторно,
+  GNOME stable binding переживает reopen/cleanup, native BMP 2560×1440 повторно
+  декодирован GdkPixbuf с сравнением каждого RGB pixel. PNG round-trip также
+  сравнивает все pixels, stride/truncation/overflow и capability gates проверены.
+- `pnpm test tests/unit/vue/capture-source-settings.test.ts tests/unit/vue/quick-capture-source.test.ts`
+  — 2 files / 11 passed: unsupported hidden, pending, cancel, busy и retry.
+- Ранее focused Quick source/coordinator/canvas/actions — 4 files / 32 passed;
+  `pnpm test:boundaries` — 16 files / 112 passed.
+- `pnpm check` для ADR-118 целиком passed, включая Clippy configurations.
+  Итоговый прогон после ADR-119 целиком passed: lint/typecheck/format/docs,
+  112 boundary checks, IPC codegen и четыре Clippy configurations. Clippy
+  сначала обнаружил signed casts в новом BMP regression test; заменены
+  проверяемыми conversions без изменения production поведения.
+  Лог: `artifacts/linux-dev/verification/check-verified.log`.
+- `pnpm build:linux:dev` после ADR-119 и ребейза — passed; executable
+  `artifacts/linux-dev/cute-screen-dev`, версия 0.1.6, `ldd` без missing libraries.
+  Dev identifier/library и activation socket отделены от установленной версии.
+
+На host обнаружена GNOME stable binding к `/usr/bin/cute-screen` 0.1.5;
+production preferences содержали Ctrl+Shift+2, dev preferences — пустые bindings.
+Удалена только проверенная managed binding с этим executable, backup:
+`artifacts/linux-dev/verification/removed-installed-shortcuts.json`.
+Пакет автоматически не удалён: по просьбе владельца pkexec отменён,
+предоставлена команда `sudo apt remove cute-screen`. Последующая проверка
+`dpkg-query` подтвердила отсутствие установленного пакета.
+GNOME capability теперь учитывает GSettings backend и не показывает ложный
+unavailable fallback. Повторное назначение в Dev подтверждено чтением GSettings и preferences;
+настоящий restart этого сочетания ещё pending.
+
+Новая dev-сборка запущена, PID 150850, GDK_BACKEND=wayland. Повторные реальные
+captures в этом процессе: authorization 0/5 ms, raw frame 52/169 ms, staging
+593/824 ms от начала backend. Это не end-to-end latency до видимого выделения.
+SHA-256 binary и ldd записаны в `dev-build.json` и `ldd-final.txt`; отсутствующих
+shared libraries нет. Владелец подтвердил ускорение и Settings cancel. После повторного назначения
+пользователь сообщил «вроде заработало»; прочитаны stable GNOME Capture Area
+Ctrl+Shift+2 с command на dev executable и такой же binding в SQLite preferences.
+Evidence: `gnome-binding-final.json`. Воспроизведение потери подтверждённого
+stable binding и настоящий restart пока не подтверждены.
+
+Логи — `artifacts/linux-dev/verification/`. KDE/wlroots, mixed-DPI,
+Windows/macOS runtime и AppImage на чистой системе этим прогоном не проверены.
+Unit/component checks не заменяют production WebView capture acceptance.
+
 ## Стартовая толщина линий (2026-10-18, ADR-116)
 
 Windows x64, HEAD `3304e55` с рабочими изменениями. До реализации новые

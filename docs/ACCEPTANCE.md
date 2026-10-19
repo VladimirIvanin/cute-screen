@@ -1,5 +1,33 @@
 # Сквозная приёмка
 
+## Wayland: одна авторизация и качественный кадр (2026-10-19, ADR-118)
+
+`REQ-CAP-001/006/009/010/012`: в настоящей GNOME/Wayland сессии запустить Area
+из приложения: первый capture открывает выбор монитора/разрешение ScreenCast,
+оставить его открытым минимум 5 секунд. Выбрать монитор и разрешить доступ.
+Второй capture в том же процессе не должен снова открывать системное окно.
+После отзыва доступа системным индикатором следующий capture сообщает ошибку;
+повторный явный запрос может открыть новую авторизацию, без скрытых повторов.
+До решения пользователя `Capture unavailable` не появляется, повторный захват
+не создаёт второй запрос. Разрешение открывает Quick Capture с полным
+кадром в selecting; drag переходит к аннотациям в том же WebView.
+Copy/Save/Editor сохраняют только выбранную область; экспорт повторно декодировать.
+Повторить с Escape до drag и отменой разрешения после паузы: без error toast
+и нового документа; следующий capture доступен. Repeat повторно открывает выбор.
+Проверить отсутствие main/settings в кадре, резкость мелкого текста и PNG
+в physical resolution выбранного монитора: fit в одной Quick surface,
+корректный pixel crop и расширение рамки. В другом масштабе монитора повторить
+проверку native Wayland preview; межмониторное выделение не заявляется.
+Отказ разрешения должен оставаться отдельным permissionDenied.
+Rust regression не заменяет эту проверку через production WebView.
+В General Settings проверить «Выбрать экран»: отмена сохраняет прежний монитор,
+успех переключает последующие captures, pending не создаёт второй запрос.
+Измерить повторный capture до выделения по dev timing, сравнить с PNG staging.
+Назначить hotkey в Dev, проверить срабатывание, перезапустить тот же executable:
+binding/command сохраняются, ложного unavailable banner нет.
+Статус native приёмки и ограничения — TESTING.md; причины удаления
+customization dialog — [исследование Linux](LINUX_CAPTURE_RESEARCH.md).
+
 ## Стартовая толщина линий (2026-10-18, ADR-116)
 
 `REQ-EDT-015/017`, `REQ-TOL-001/002/003/011`: в workspace без сохранённых
@@ -1295,8 +1323,10 @@ artifacts пропускает идентичные файлы. Ошибка л�
    и X11 Area должен использовать единственную fullscreen Quick surface без
    отдельного native Area selector. На macOS Area должен использовать native
    AppKit selector и единый frozen multi-display frame. На Wayland подтвердить
-   системный selector, fragment-only surface и disabled expansion.
-9. Screen, Window, Active Window и Repeat по-прежнему открывают полный editor.
+   один системный выбор ScreenCast Monitor и затем собственное Quick выделение
+   с расширением до границ выбранного монитора (ADR-118/119).
+9. Screen, Window и Active Window открывают полный editor. Repeat на Wayland
+   снова открывает Quick selection, остальные платформы сохраняют прежний flow.
 10. Для resident X11/Windows процесса измерить mouse-up → `IsViewable`
     interactive quick chrome; временный preview не должен синхронно сжимать
     full-desktop PNG или записывать transport-файл.

@@ -20,6 +20,7 @@ use ashpd::{
             Activated, BindShortcutsOptions, Deactivated, GlobalShortcuts, ListShortcutsOptions,
             NewShortcut,
         },
+        screencast::{CursorMode, Screencast, SourceType},
         screenshot::{AvailableTargets, Screenshot, ScreenshotProxy},
     },
 };
@@ -56,28 +57,56 @@ impl AshpdPortalClient {
         correlation_id: &str,
     ) -> Result<PortalCapabilityProbe, PlatformError> {
         let screenshot =
-            portal_handshake(ScreenshotProxy::new(), PORTAL_PROBE_TIMEOUT, correlation_id).await?;
-        let version = screenshot.version();
-        let available_targets = if version >= 3 {
-            portal_handshake(
-                screenshot.available_targets(),
-                PORTAL_PROBE_TIMEOUT,
-                correlation_id,
-            )
-            .await?
-            .bits()
-        } else {
-            0
-        };
+            portal_handshake(ScreenshotProxy::new(), PORTAL_PROBE_TIMEOUT, correlation_id)
+                .await
+                .ok();
+        let version = screenshot.as_ref().map_or(0, |proxy| proxy.version());
+        let available_targets =
+            if let Some(screenshot) = screenshot.filter(|proxy| proxy.version() >= 3) {
+                portal_handshake(
+                    screenshot.available_targets(),
+                    PORTAL_PROBE_TIMEOUT,
+                    correlation_id,
+                )
+                .await?
+                .bits()
+            } else {
+                0
+            };
         let global_shortcuts_available =
             portal_handshake(GlobalShortcuts::new(), PORTAL_PROBE_TIMEOUT, correlation_id)
                 .await
                 .is_ok_and(|proxy| proxy.version() > 0);
 
+        let screencast_monitor_available = if crate::linux_screencast::raw_capture_available() {
+            match portal_handshake(Screencast::new(), PORTAL_PROBE_TIMEOUT, correlation_id).await {
+                Ok(proxy) => {
+                    let sources = portal_handshake(
+                        proxy.available_source_types(),
+                        PORTAL_PROBE_TIMEOUT,
+                        correlation_id,
+                    )
+                    .await;
+                    let cursor = portal_handshake(
+                        proxy.available_cursor_modes(),
+                        PORTAL_PROBE_TIMEOUT,
+                        correlation_id,
+                    )
+                    .await;
+                    sources.is_ok_and(|sources| sources.contains(SourceType::Monitor))
+                        && cursor.is_ok_and(|cursor| cursor.contains(CursorMode::Hidden))
+                }
+                Err(_) => false,
+            }
+        } else {
+            false
+        };
+
         Ok(PortalCapabilityProbe {
             screenshot_version: version,
             available_targets,
             global_shortcuts_available,
+            screencast_monitor_available,
         })
     }
 
@@ -113,22 +142,18 @@ impl AshpdPortalClient {
         };
         let target = portal_target_for_request(version, advertised_targets, request.target)
             .map_err(|code| PlatformError::new(code, &request.correlation_id))?;
-        let mut screenshot = Screenshot::request().interactive(true).modal(true);
+        // Area is selected in Quick Capture from the full desktop PNG (ADR-117).
+        // `interactive` asks for an extra customization dialog, not permission.
+        let mut screenshot = Screenshot::request().interactive(false).modal(true);
         if let Some(target) = target {
             screenshot = screenshot.target(target);
         }
 
-        let portal_request = portal_handshake(
-            screenshot.send(),
-            PORTAL_HANDSHAKE_TIMEOUT,
+        let response = portal_screenshot_response(
+            async { screenshot.send().await?.response() },
             &request.correlation_id,
         )
         .await?;
-        // The user-facing selector deliberately has no technical timeout. Its
-        // request object stays alive until the portal answers or the app exits.
-        let response = portal_request
-            .response()
-            .map_err(|error| map_ashpd_error(error, &request.correlation_id))?;
         let source = validated_file_uri(response.uri().as_str(), &request.correlation_id)?;
         let file = File::open(&source).map_err(|_| {
             PlatformError::new(PlatformErrorCode::CaptureFailed, &request.correlation_id)
@@ -157,13 +182,13 @@ impl AshpdPortalClient {
             height,
             geometry: None,
             quick_frame_geometry: None,
-            quick_selection_pending: false,
+            quick_selection_pending: request.target == CaptureTarget::Area,
             cursor_included: None,
         })
     }
 }
 
-async fn portal_handshake<T>(
+pub(crate) async fn portal_handshake<T>(
     operation: impl Future<Output = Result<T, AshpdError>>,
     timeout: Duration,
     correlation_id: &str,
@@ -171,6 +196,17 @@ async fn portal_handshake<T>(
     tokio::time::timeout(timeout, operation)
         .await
         .map_err(|_| PlatformError::new(PlatformErrorCode::PortalUnavailable, correlation_id))?
+        .map_err(|error| map_ashpd_error(error, correlation_id))
+}
+
+async fn portal_screenshot_response<T>(
+    operation: impl Future<Output = Result<T, AshpdError>>,
+    correlation_id: &str,
+) -> Result<T, PlatformError> {
+    // ashpd's send() includes waiting for the user's Response signal. Bounding
+    // it as a handshake abandons a live permission dialog after two seconds.
+    operation
+        .await
         .map_err(|error| map_ashpd_error(error, correlation_id))
 }
 
@@ -188,7 +224,7 @@ fn portal_target_for_request(
             .ok_or(PlatformErrorCode::InvalidTarget);
     }
     let (target, target_bit) = match request {
-        CaptureTarget::Area => (AvailableTargets::Area, 4),
+        CaptureTarget::Area => (AvailableTargets::Screen, 1),
         CaptureTarget::Monitor => (AvailableTargets::Screen, 1),
         CaptureTarget::Window => (AvailableTargets::Window, 2),
         CaptureTarget::ActiveWindow => (AvailableTargets::ActiveWindow, 8),
@@ -561,7 +597,7 @@ pub fn validated_file_uri(uri: &str, correlation_id: &str) -> Result<PathBuf, Pl
         .map_err(|()| PlatformError::new(PlatformErrorCode::InvalidUri, correlation_id))
 }
 
-fn map_ashpd_error(error: AshpdError, correlation_id: &str) -> PlatformError {
+pub(crate) fn map_ashpd_error(error: AshpdError, correlation_id: &str) -> PlatformError {
     let code = match error {
         AshpdError::Response(ResponseError::Cancelled)
         | AshpdError::Portal(ashpd::PortalError::Cancelled(_)) => PlatformErrorCode::Cancelled,
@@ -643,7 +679,7 @@ mod tests {
     }
 
     #[test]
-    fn portal_v2_accepts_only_the_interactive_area_selector() {
+    fn portal_v2_accepts_full_desktop_for_our_area_selection() {
         assert_eq!(
             portal_target_for_request(2, 0, CaptureTarget::Area).expect("area"),
             None
@@ -657,8 +693,12 @@ mod tests {
     #[test]
     fn portal_v3_never_sends_an_unadvertised_target() {
         assert_eq!(
-            portal_target_for_request(3, 4, CaptureTarget::Area).expect("area target"),
-            Some(ashpd::desktop::screenshot::AvailableTargets::Area)
+            portal_target_for_request(3, 1, CaptureTarget::Area).expect("desktop for area"),
+            Some(ashpd::desktop::screenshot::AvailableTargets::Screen)
+        );
+        assert_eq!(
+            portal_target_for_request(3, 4, CaptureTarget::Area).unwrap_err(),
+            PlatformErrorCode::InvalidTarget
         );
         assert_eq!(
             portal_target_for_request(3, 4, CaptureTarget::ActiveWindow).unwrap_err(),
@@ -667,7 +707,7 @@ mod tests {
     }
 
     #[test]
-    fn portal_handshake_timeout_is_reported_without_timing_out_the_selector() {
+    fn portal_handshake_timeout_is_reported() {
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_time()
             .build()
@@ -681,5 +721,67 @@ mod tests {
             .expect_err("technical handshake must be bounded");
 
         assert_eq!(error.code, PlatformErrorCode::PortalUnavailable);
+    }
+
+    #[test]
+    fn screenshot_response_waits_past_the_handshake_deadline() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .expect("runtime");
+        let response = runtime.block_on(super::portal_screenshot_response(
+            async {
+                tokio::time::sleep(super::PORTAL_HANDSHAKE_TIMEOUT + Duration::from_millis(50))
+                    .await;
+                Ok("selected-image")
+            },
+            "slow-selection",
+        ));
+
+        assert_eq!(
+            response.expect("user selection has no deadline"),
+            "selected-image"
+        );
+    }
+
+    #[test]
+    fn delayed_screenshot_cancellation_is_not_capture_unavailable() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .expect("runtime");
+        let error = runtime
+            .block_on(super::portal_screenshot_response(
+                async {
+                    tokio::time::sleep(super::PORTAL_HANDSHAKE_TIMEOUT + Duration::from_millis(50))
+                        .await;
+                    Err::<(), _>(ashpd::Error::Response(
+                        ashpd::desktop::ResponseError::Cancelled,
+                    ))
+                },
+                "slow-cancel",
+            ))
+            .expect_err("cancelled selection");
+
+        assert_eq!(error.code, PlatformErrorCode::Cancelled);
+        assert_eq!(error.correlation_id, "slow-cancel");
+    }
+
+    #[test]
+    fn screenshot_permission_denial_remains_distinct() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .expect("runtime");
+        let error = runtime
+            .block_on(super::portal_screenshot_response(
+                std::future::ready(Err::<(), _>(ashpd::Error::Portal(
+                    ashpd::PortalError::NotAllowed("denied".to_owned()),
+                ))),
+                "denied-selection",
+            ))
+            .expect_err("permission denied");
+
+        assert_eq!(error.code, PlatformErrorCode::PermissionDenied);
     }
 }

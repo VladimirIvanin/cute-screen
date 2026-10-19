@@ -71,7 +71,10 @@ tempfile = "=3.27.0"
 tokio = { version = "=1.53.1", features = ["rt", "sync", "time"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-ashpd = { version = "=0.13.13", default-features = false, features = ["tokio", "screenshot", "global_shortcuts"] }
+ashpd = { version = "=0.13.13", default-features = false, features = ["tokio", "screenshot", "screencast", "global_shortcuts"] }
+gstreamer = "=0.25.3"
+gstreamer-app = "=0.25.2"
+gstreamer-video = "=0.25.4"
 gtk = "=0.18.2"
 gdkx11 = "=0.18.2"
 x11rb = { version = "=0.14.0", default-features = false, features = ["composite", "image", "randr", "xfixes", "xkb"], optional = true }

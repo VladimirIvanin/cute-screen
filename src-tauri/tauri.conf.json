@@ -38,7 +38,13 @@
     "targets": ["deb", "appimage"],
     "linux": {
       "deb": {
-        "depends": ["libc6 (>= 2.35)", "libwebkit2gtk-4.1-0 (>= 2.40)", "xdg-utils"]
+        "depends": [
+          "libc6 (>= 2.35)",
+          "libwebkit2gtk-4.1-0 (>= 2.40)",
+          "gstreamer1.0-pipewire",
+          "gstreamer1.0-plugins-base",
+          "xdg-utils"
+        ]
       }
     },
     "windows": {

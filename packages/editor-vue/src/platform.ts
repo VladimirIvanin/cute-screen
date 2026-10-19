@@ -12,7 +12,7 @@ export interface CaptureCapabilities {
 
 export interface HotkeyCapabilities {
   readonly available: boolean
-  readonly backend: 'globalShortcutsPortal' | 'native' | 'unavailable'
+  readonly backend: 'globalShortcutsPortal' | 'gnomeSettings' | 'native' | 'unavailable'
   readonly canListShortcuts: boolean
 }
 
@@ -46,6 +46,7 @@ export interface PortalCapabilityProbe {
   readonly screenshotVersion: number
   readonly availableTargets: number
   readonly globalShortcutsAvailable: boolean
+  readonly screencastMonitorAvailable?: boolean
 }
 
 export interface CaptureResult {

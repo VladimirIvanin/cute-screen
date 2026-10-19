@@ -3,6 +3,8 @@ use std::{collections::BTreeMap, future::Future};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+#[cfg(target_os = "linux")]
+pub(crate) mod preview;
 pub(crate) mod window_selection;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -77,6 +79,7 @@ pub struct CaptureCapabilities {
 #[serde(rename_all = "camelCase")]
 pub enum HotkeyBackendKind {
     GlobalShortcutsPortal,
+    GnomeSettings,
     Native,
     Unavailable,
 }
@@ -107,9 +110,20 @@ pub struct PortalCapabilityProbe {
     pub screenshot_version: u32,
     pub available_targets: u32,
     pub global_shortcuts_available: bool,
+    pub screencast_monitor_available: bool,
 }
 
 impl PlatformCapabilities {
+    #[cfg(any(test, target_os = "linux"))]
+    pub(crate) fn apply_gnome_hotkeys(&mut self) {
+        self.hotkeys = HotkeyCapabilities {
+            available: true,
+            backend: HotkeyBackendKind::GnomeSettings,
+            can_list_shortcuts: false,
+        };
+        self.cli_fallback = false;
+        self.cli_fallback_command = None;
+    }
     #[cfg(any(test, target_os = "windows"))]
     pub(crate) fn apply_windows_targets(&mut self, desktop: bool, window: bool) {
         self.capture.available = desktop || window;
@@ -125,22 +139,29 @@ impl PlatformCapabilities {
         portal: Option<PortalCapabilityProbe>,
         x11_gate_passed: Option<bool>,
     ) -> Self {
-        let portal_available = portal.is_some_and(|probe| probe.screenshot_version > 0);
+        let portal_available = portal.is_some_and(|probe| {
+            probe.screenshot_version > 0 || probe.screencast_monitor_available
+        });
         let native_adapter_available = x11_gate_passed.unwrap_or(false);
         let backend = select_capture_backend(session, portal_available, native_adapter_available);
         let probe = portal.unwrap_or(PortalCapabilityProbe {
             screenshot_version: 0,
             available_targets: 0,
             global_shortcuts_available: false,
+            screencast_monitor_available: false,
         });
-        let portal_v2 =
-            backend == CaptureBackendKind::WaylandPortal && probe.screenshot_version >= 2;
+        let portal_desktop =
+            backend == CaptureBackendKind::WaylandPortal && probe.screencast_monitor_available;
         let portal_v3 =
             backend == CaptureBackendKind::WaylandPortal && probe.screenshot_version >= 3;
         let x11 = backend == CaptureBackendKind::X11;
         let windows_dxgi = backend == CaptureBackendKind::WindowsDxgi;
         let macos_screen = backend == CaptureBackendKind::MacosScreenCapture;
-        let capture_available = backend != CaptureBackendKind::Unavailable;
+        let capture_available = if backend == CaptureBackendKind::WaylandPortal {
+            portal_desktop || (portal_v3 && probe.available_targets & 10 != 0)
+        } else {
+            backend != CaptureBackendKind::Unavailable
+        };
         let hotkeys = if (session == SessionKind::X11 && native_adapter_available)
             || matches!(session, SessionKind::Windows | SessionKind::Macos)
         {
@@ -173,13 +194,10 @@ impl PlatformCapabilities {
             capture: CaptureCapabilities {
                 available: capture_available,
                 backend,
-                // Native desktop adapters own a frozen-frame selector;
-                // Wayland's remains exclusively portal-driven.
-                interactive_selector: portal_v2 || x11 || windows_dxgi || macos_screen,
-                monitor_target: x11
-                    || windows_dxgi
-                    || macos_screen
-                    || (portal_v3 && probe.available_targets & 1 != 0),
+                // Wayland obtains its frozen PNG through the portal, then
+                // shares Quick Capture's selection lifecycle with native hosts.
+                interactive_selector: portal_desktop || x11 || windows_dxgi || macos_screen,
+                monitor_target: x11 || windows_dxgi || macos_screen || portal_desktop,
                 // macOS offers only Area and Screen (ADR-110).
                 window_target: x11
                     || windows_dxgi
@@ -453,12 +471,48 @@ mod tests {
                 screenshot_version: 2,
                 available_targets: 0,
                 global_shortcuts_available: false,
+                screencast_monitor_available: true,
             }),
             None,
         );
 
         assert!(capabilities.capture.available);
         assert!(capabilities.cli_fallback);
+    }
+
+    #[test]
+    fn verified_gnome_shortcuts_do_not_show_the_unavailable_fallback() {
+        let mut capabilities =
+            PlatformCapabilities::for_session("gnome".to_owned(), SessionKind::Wayland, None, None);
+        capabilities.cli_fallback_command = Some("cute-screen capture --mode area".to_owned());
+        capabilities.apply_gnome_hotkeys();
+        assert!(capabilities.hotkeys.available);
+        assert_eq!(
+            capabilities.hotkeys.backend,
+            super::HotkeyBackendKind::GnomeSettings
+        );
+        assert!(!capabilities.cli_fallback);
+        assert!(capabilities.cli_fallback_command.is_none());
+    }
+
+    #[test]
+    fn wayland_area_requires_a_verified_screencast_backend() {
+        for (targets, screencast) in [(1, true), (4, false), (2, false), (4, true)] {
+            let capabilities = PlatformCapabilities::for_session(
+                "portal-area".to_owned(),
+                SessionKind::Wayland,
+                Some(super::PortalCapabilityProbe {
+                    screenshot_version: 3,
+                    available_targets: targets,
+                    global_shortcuts_available: false,
+                    screencast_monitor_available: screencast,
+                }),
+                None,
+            );
+            assert_eq!(capabilities.capture.interactive_selector, screencast);
+            assert_eq!(capabilities.capture.monitor_target, screencast);
+            assert_eq!(capabilities.capture.available, screencast || targets == 2);
+        }
     }
 
     #[test]

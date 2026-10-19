@@ -111,4 +111,19 @@ fn restart_cleanup_removes_only_owned_pending_rows() {
         .unwrap();
     settings.cleanup_pending().unwrap();
     assert_eq!(settings.paths(), [stable]);
+
+    let reopened = GnomeSettings {
+        main: gio::Settings::new_full(
+            &settings.main.settings_schema().expect("schema"),
+            settings.backend.as_ref(),
+            None,
+        ),
+        custom: settings.custom.clone(),
+        backend: settings.backend.clone(),
+    };
+    reopened.cleanup_pending().expect("restart cleanup");
+    assert_eq!(
+        reopened.read(ShortcutAction::ShowEditor),
+        Some(("CTRL+SHIFT+2".to_owned(), "show".to_owned()))
+    );
 }

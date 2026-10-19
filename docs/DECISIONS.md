@@ -1,5 +1,105 @@
 # Журнал архитектурных решений
 
+## ADR-119 — Смена разрешённого экрана и прямой preview
+
+**Статус:** accepted (2026-10-19); дополняет ADR-118.
+
+**Основание:** владелец подтвердил одну авторизацию и чёткую картинку, но
+сообщил задержку перед каждым выделением и необходимость исправлять выбор
+монитора. Полный PNG compression/write не нужен для transient Area preview.
+
+**Решение:** General Settings показывает «Выбрать экран» только для доступного
+Wayland ScreenCast Monitor backend. Повторный выбор открывает новую системную
+авторизацию; успешный результат атомарно заменяет старую сессию и закрывает её.
+Отмена или ошибка сохраняет прежнюю сессию, concurrent capture/selection
+возвращает busy, повторное нажатие в pending отключено.
+Area получает несжатый memory-owned BMP по существующему бинарному transport,
+без PNG compression и дискового staging до выделения. Экспорт и оригинал
+сохраняют lossless PNG. Screen использует fast lossless PNG. Dev timing
+различает авторизацию, получение raw frame и staging; универсальный latency
+budget этим решением не объявляется. Native Wayland сохраняется.
+GNOME GSettings учитывается при вычислении hotkey capability; стабильные
+системные bindings переживают startup cleanup. Удалённые пользователем
+системные сочетания автоматически не восстанавливаются из preferences.
+
+**Проверка:** повторное декодирование полного BMP 2560×1440 с сравнением всех
+RGB pixels, cancellation/replacement tests, mounted Settings pending/cancel/
+busy/retry, GNOME binding reopen и повторный production capture. Фактические
+результаты и ограничения — TESTING.md.
+
+## ADR-118 — Проверяемый Wayland backend без повторных подтверждений
+
+**Статус:** accepted (2026-10-19); заменяет ADR-117.
+
+**Основание:** ручная проверка владельца на GNOME 42.9 / Screenshot portal
+1.14.4 / backend 42.1 показала обязательное подтверждение каждого готового
+снимка даже при interactive=false. Также dev-процесс наследовал
+GDK_BACKEND=x11 в Wayland-сессии, что допускает размытие через XWayland.
+Прежняя Screenshot-only архитектура не выполняет запрос владельца.
+
+**Решение:** Area/Screen/Repeat используют XDG ScreenCast Monitor session и
+PipeWire raw frame. Системный выбор монитора/разрешение выполняется один раз
+при открытии сессии; повторные снимки переиспользуют её до выхода приложения
+или отзыва доступа. Аудио, запись видео, постоянное сохранение кадров и
+screen recording UI не добавляются. Каждый capture создаёт короткий PipeWire
+consumer, получает один raw RGBA кадр и закрывает consumer; session остаётся.
+Собственное выделение использует тот же Quick lifecycle и пиксели выбранного
+монитора. Смена монитора требует новой системной авторизации; межмониторное
+выделение этой реализацией не обещается.
+
+Capabilities проверяют фактический ScreenCast Monitor, Hidden cursor и
+доступность pipewiresrc/videoconvert/appsink. Успех capture требует decoded
+raw frame с валидными размерами, stride и полными строками. Pipeline не
+использует videoscale, JPEG или фиксированное уменьшенное разрешение.
+Исходный PNG сохраняет все пиксели полученного кадра. При отзыве/ошибке сессия
+закрывается; следующий явный capture может запросить новую авторизацию.
+Автоматического fallback на Screenshot/X11 и скрытых повторов нет.
+
+Linux entry до GTK при Wayland-сессии переисполняет процесс с
+GDK_BACKEND=wayland, если унаследован другой backend; это исключает XWayland
+для preview. При недоступности native Wayland запуск не маскируется X11.
+Window/Active Window сохраняют advertised Screenshot v3 контракт.
+
+GStreamer Rust bindings — MIT/Apache-2.0; PipeWire source plugin — MIT/X11.
+Linux build/runtime dependencies закреплены в Cargo.lock, Docker, CI и DEB.
+AppImage требует отдельной проверки доступности plugin на чистой системе;
+его наличие не выводится из названия desktop.
+
+**Проверка:** capability matrix, повторная авторизация opener только один раз,
+stride/truncation/overflow и PNG round-trip, native Wayland startup selection,
+два production capture с единственной portal session и проверка preview.
+Фактическое evidence и ограничения — TESTING.md.
+
+## ADR-117 — Wayland Area без системного окна настройки
+
+**Статус:** superseded — заменён [ADR-118](DECISIONS.md).
+
+**Основание:** владелец запросил общий Quick Capture вместо дополнительного
+окна настройки screenshot. В GNOME/Wayland Screenshot v2 `interactive(true)`
+вызывает именно такое окно. В ashpd 0.13.13 `send()` ждёт пользовательский
+Response, поэтому прежний timeout 2 секунды ошибочно выдаёт unavailable.
+Проверяемые API и наблюдения — [исследование Linux](LINUX_CAPTURE_RESEARCH.md).
+
+**Решение:** Wayland Area и Repeat получают полный frozen PNG через XDG
+Screenshot с `interactive(false)`; v3 использует advertised Screen, v2 —
+неинтерактивный default desktop. До запроса скрываются собственные окна.
+Начальное выделение выполняет существующий Quick Capture; выбор и аннотации
+живут в одном WebView lifecycle. Без native geometry координаты относятся
+только к PNG: весь кадр вписывается в Quick surface, desktop coordinates
+и monitor IDs не выдумываются. Repeat на Wayland открывает новое выделение.
+Crop можно менять в пределах полного PNG; durable original создаётся только
+при terminal action. Capture другого окна по-прежнему требует advertised v3
+Window/ActiveWindow: desktop crop не подменяет Window.
+
+Системное разрешение не обходится и не имеет прикладного deadline; desktop
+может показать permission/picker по своему контракту. Неподдерживаемый target
+не запускает интерактивный customization fallback. X11 backend на Wayland
+не используется. ScreenCast/PipeWire не добавляются.
+
+**Проверка:** delayed response/cancel/denial, advertised targets, full-frame
+draft без compositor geometry, Quick selection/cancel, dev native build.
+GNOME/KDE/mixed-DPI runtime фиксируется отдельно в TESTING.md.
+
 ## ADR-116 — Стартовая толщина линий
 
 **Статус:** accepted (2026-10-18); дополняет ADR-048/100.
@@ -816,7 +916,7 @@ Windows evidence не распространяется на WebKitGTK/WKWebView.
 
 ## ADR-009 — Системный Wayland selector
 
-**Статус:** accepted
+**Статус:** superseded — заменён [ADR-117](DECISIONS.md).
 
 **Решение:** на Wayland используется selector desktop portal. Собственный ScreenCast/PipeWire overlay не входит в приложение.
 
