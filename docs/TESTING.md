@@ -17,7 +17,12 @@ Cargo cache. Node 22.23.1 / pnpm 10.33.2. Команды Rust запускают
 `artifacts/preview-cfg-fix/`.
 
 - `cargo check --workspace --all-targets --locked` — passed.
-- Остальные результаты локальных проверок фиксируются после завершения прогона.
+- `cargo test --workspace --locked` — 198 passed: desktop 166, main 1,
+  storage 31. Оба X11 BMP tests и full-resolution GTK decoder test прошли.
+- `cargo fmt --all`, `pnpm format`, `pnpm format:check`, `pnpm docs:check`
+  и `git diff --check` — passed.
+- `pnpm disk:usage`: target 21.734 → 21.895 GiB, artifacts 0.437 GiB.
+  Общий Cargo cache сохранён; отдельные targets не создавались.
 
 Windows/macOS hosts и toolchains здесь недоступны; повтор compile matrix CI
 остаётся необходимым подтверждением исходной Windows ошибки. Runtime capture,
