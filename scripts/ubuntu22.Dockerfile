@@ -35,7 +35,3 @@ RUN apt-get update && apt-get install --yes --no-install-recommends xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
-
-RUN apt-get update && apt-get install --yes --no-install-recommends \
-    libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-pipewire \
-    && rm -rf /var/lib/apt/lists/*

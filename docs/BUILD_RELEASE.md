@@ -30,15 +30,17 @@ arguments, например `pnpm start:linux:dev capture --mode area`.
 локальной проверки, без Vite hot reload; стандартный `pnpm tauri dev` требует
 host dependencies из DEVELOPMENT.md.
 
-Wayland Area/Screen/Repeat требуют GStreamer core/app/video development libraries
-при сборке и pipewiresrc, videoconvert, appsink во время выполнения. Они добавлены
-в Ubuntu image и обе Linux CI install commands. DEB зависит от
-gstreamer1.0-pipewire и gstreamer1.0-plugins-base; AppImage plugin packaging
-должен отдельно проверяться на чистом host. Capabilities создают элементы
-pipeline и проверяют ScreenCast Monitor/Hidden cursor; отсутствие компонентов
-отключает путь, не подменяя его Screenshot с повторными подтверждениями.
-Rust wrappers GStreamer 0.25.3/app 0.25.2/video 0.25.4 закреплены в Cargo.lock
-(MIT/Apache-2.0), PipeWire plugin — системная MIT/X11 реализация.
+Wayland Area/Screen/Repeat используют разовые Screenshot/helper пути ADR-121.
+GStreamer/PipeWire для захвата не требуются. WebKitGTK может иметь собственные
+multimedia dependencies; это не ScreenCast backend Cute Screen.
+Для GNOME ≤42 необязательная внешняя утилита gnome-screenshot устраняет
+подтверждение каждого кадра; для совместимых wlroots окружений возможен grim.
+Утилиты ищутся в PATH и ~/.local/bin, в bundle не включаются. Без helper
+остаётся Screenshot portal с системным UX. Современный GNOME сохраняет portal.
+Для проверки на данном host официальный Ubuntu пакет 41.0-2 установлен только
+в пользовательский ~/.local/share/cute-screen/tools, wrapper — ~/.local/bin;
+системные пакеты и их настройки не изменены. Для обычной установки рекомендуется
+пакетный менеджер дистрибутива. GPL helper не линкуется с MIT-продуктом.
 
 ## Windows GUI release и внутренний startup smoke (ADR-115)
 

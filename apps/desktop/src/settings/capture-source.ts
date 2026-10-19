@@ -1,4 +1,9 @@
+import type {
+  LinuxCaptureMethod,
+  LinuxCaptureMethods,
+} from '../generated/desktop-ipc'
+
 export interface CaptureSourceBridge {
-  available(): Promise<boolean>
-  select(): Promise<boolean>
+  snapshot(): Promise<LinuxCaptureMethods | null>
+  save(method: LinuxCaptureMethod): Promise<LinuxCaptureMethods>
 }

@@ -23,7 +23,7 @@ use crate::{
 };
 
 #[cfg(target_os = "linux")]
-use crate::platform::{CaptureRequest, PortalClient};
+use crate::platform::CaptureRequest;
 
 const CAPTURE_OUTCOME_VERSION: u8 = 2;
 
@@ -260,7 +260,7 @@ pub struct CaptureController {
     cancel_signal: Arc<AtomicBool>,
     quick_draft: Arc<Mutex<QuickCaptureState>>,
     #[cfg(target_os = "linux")]
-    screencast: Arc<crate::linux_screencast::ScreencastCaptureService>,
+    linux_capture: Arc<crate::linux_capture::LinuxCaptureService>,
     #[cfg(all(target_os = "linux", feature = "x11-capture"))]
     last_x11_area: Arc<Mutex<Option<CaptureGeometry>>>,
 }
@@ -273,6 +273,10 @@ struct CaptureState {
 
 impl CaptureController {
     pub fn new(repository: LibraryRepository, transport: Arc<ImageTransportService>) -> Self {
+        #[cfg(target_os = "linux")]
+        let linux_capture = Arc::new(crate::linux_capture::LinuxCaptureService::new(
+            repository.handle(),
+        ));
         Self {
             repository,
             transport,
@@ -280,7 +284,7 @@ impl CaptureController {
             cancel_signal: Arc::new(AtomicBool::new(false)),
             quick_draft: Arc::new(Mutex::new(QuickCaptureState::default())),
             #[cfg(target_os = "linux")]
-            screencast: Arc::new(crate::linux_screencast::ScreencastCaptureService::default()),
+            linux_capture,
             #[cfg(all(target_os = "linux", feature = "x11-capture"))]
             last_x11_area: Arc::new(Mutex::new(None)),
         }
@@ -300,24 +304,36 @@ impl CaptureController {
     }
 
     #[cfg(target_os = "linux")]
-    pub async fn select_monitor(&self) -> Result<bool, crate::platform::PlatformError> {
-        let busy = self
+    pub async fn capture_methods(
+        &self,
+    ) -> Result<crate::platform::capture_method::LinuxCaptureMethods, crate::platform::PlatformError>
+    {
+        self.linux_capture.methods().await
+    }
+
+    #[cfg(target_os = "linux")]
+    pub async fn set_capture_method(
+        &self,
+        method: crate::platform::capture_method::LinuxCaptureMethod,
+    ) -> Result<crate::platform::capture_method::LinuxCaptureMethods, crate::platform::PlatformError>
+    {
+        if self
             .state
             .lock()
             .map_err(|_| {
                 crate::platform::PlatformError::new(
                     PlatformErrorCode::CaptureFailed,
-                    "screen-selection",
+                    "capture-method",
                 )
             })?
-            .active;
-        if busy {
+            .active
+        {
             return Err(crate::platform::PlatformError::new(
                 PlatformErrorCode::Busy,
-                "screen-selection",
+                "capture-method",
             ));
         }
-        self.screencast.select_monitor().await
+        self.linux_capture.set_method(method).await
     }
 
     pub fn stage_quick_frame(
@@ -667,6 +683,7 @@ impl CaptureController {
             record.cursor_included,
             owned,
             document_json,
+            helper_pixel_backend(&record.descriptor.image_token),
         ) {
             Ok(document) => document,
             Err(error) => {
@@ -834,24 +851,16 @@ impl CaptureController {
             .as_str()
         {
             "wayland" => {
-                let capture = CaptureRequest {
-                    correlation_id: request.correlation_id.clone(),
-                    target: request.action.target(),
-                };
-                if matches!(
-                    capture.target,
-                    crate::platform::CaptureTarget::Area | crate::platform::CaptureTarget::Monitor
-                ) {
-                    self.screencast
-                        .capture(capture, Arc::clone(&self.transport))
-                        .await
-                } else {
-                    crate::linux_platform::AshpdPortalClient::with_transport(Arc::clone(
-                        &self.transport,
-                    ))
-                    .capture(capture)
+                self.linux_capture
+                    .capture(
+                        CaptureRequest {
+                            correlation_id: request.correlation_id.clone(),
+                            target: request.action.target(),
+                        },
+                        Arc::clone(&self.transport),
+                        Arc::clone(&self.cancel_signal),
+                    )
                     .await
-                }
             }
             "x11" => {
                 #[cfg(feature = "x11-capture")]
@@ -987,7 +996,13 @@ impl CaptureController {
                 );
             }
         };
-        match self.persist_owned(request, owned, geometry, cursor_included) {
+        match self.persist_owned(
+            request,
+            owned,
+            geometry,
+            cursor_included,
+            helper_pixel_backend(&frame.image_token),
+        ) {
             Ok(document) => {
                 let source = match self.repository.resolve_capture_source(
                     document.capture_id.clone(),
@@ -1036,6 +1051,7 @@ impl CaptureController {
         owned: OwnedImage,
         geometry: Option<CaptureGeometry>,
         cursor_included: Option<bool>,
+        pixel_backend: Option<&str>,
     ) -> Result<OpenDocument, RepositoryError> {
         let captured_at = Utc::now();
         create_document_from_image(
@@ -1044,7 +1060,7 @@ impl CaptureController {
                 source_bytes: owned.bytes,
                 provenance: ImageProvenance::Capture,
                 series_id: request.series_id.clone(),
-                frame_metadata: capture_metadata(request, geometry, cursor_included),
+                frame_metadata: capture_metadata(request, geometry, cursor_included, pixel_backend),
                 captured_at,
             },
         )
@@ -1057,6 +1073,7 @@ impl CaptureController {
         cursor_included: Option<bool>,
         owned: OwnedImage,
         document_json: String,
+        pixel_backend: Option<&str>,
     ) -> Result<OpenDocument, RepositoryError> {
         let source_metadata = inspect_content_image_bytes(&owned.bytes)?;
         if source_metadata.width != owned.width || source_metadata.height != owned.height {
@@ -1087,7 +1104,7 @@ impl CaptureController {
             document_json,
             source_bytes: owned.bytes,
             source_metadata,
-            capture_metadata: capture_metadata(request, geometry, cursor_included),
+            capture_metadata: capture_metadata(request, geometry, cursor_included, pixel_backend),
             captured_at: Utc::now().timestamp_millis(),
         })
     }
@@ -1240,14 +1257,27 @@ fn capture_backend_metadata_name(action: CaptureAction) -> &'static str {
     }
 }
 
+fn helper_pixel_backend(token: &str) -> Option<&'static str> {
+    if token.starts_with("gnome-screenshot-") {
+        Some("gnomeScreenshot")
+    } else if token.starts_with("grim-") {
+        Some("grim")
+    } else {
+        None
+    }
+}
+
 fn capture_metadata(
     request: &CaptureRequestV1,
     geometry: Option<CaptureGeometry>,
     cursor_included: Option<bool>,
+    pixel_backend: Option<&str>,
 ) -> CaptureMetadataV1 {
     CaptureMetadataV1 {
         schema_version: 1,
-        backend: capture_backend_metadata_name(request.action).to_owned(),
+        backend: pixel_backend
+            .unwrap_or_else(|| capture_backend_metadata_name(request.action))
+            .to_owned(),
         target: request.action.metadata_name().to_owned(),
         geometry: geometry.map(|value| serde_json::json!(value)),
         monitor_snapshot: None,
@@ -1636,7 +1666,7 @@ mod tests {
             invocation_source: CaptureInvocationSource::Ui,
         };
 
-        let metadata = super::capture_metadata(&request, None, None);
+        let metadata = super::capture_metadata(&request, None, None, None);
         assert_eq!(
             metadata.cursor,
             Some(serde_json::json!({
@@ -1733,6 +1763,7 @@ mod tests {
                 },
                 None,
                 None,
+                Some("gnomeScreenshot"),
             )
             .expect("capture persistence");
         let persisted = repository
@@ -1781,6 +1812,7 @@ mod tests {
                     width: 1,
                     height: 1,
                 },
+                None,
                 None,
                 None,
             )

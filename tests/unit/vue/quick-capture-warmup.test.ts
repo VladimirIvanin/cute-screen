@@ -156,4 +156,33 @@ describe('GTK quick capture mapped warmup', () => {
       kind: 'ready',
     })
   })
+  it('flushes the previous selection out of the reused shell before native warmup', async () => {
+    const first = await mocks.getActive()
+    mocks.getActive.mockResolvedValue({ ...first, selectionPending: false })
+    const view = render(QuickCaptureApp, {
+      global: {
+        plugins: [createEditorShellPinia()],
+        stubs: { EditorShell: defineComponent({
+          props: ['initialDocumentState', 'documentSession'],
+          template: '<div data-testid="painted-shell" :data-kind="initialDocumentState.kind" :data-document="documentSession?.snapshot.core.document.id" />',
+        }) },
+      },
+    })
+    await vi.waitFor(() => expect(view.getByTestId('painted-shell')).toHaveAttribute('data-kind', 'ready'))
+    const previousDocument = view.getByTestId('painted-shell').getAttribute('data-document')
+    expect(previousDocument).toBeTruthy()
+    const paintedAtWarmup: Array<{ kind: string | null; document: string | null }> = []
+    mocks.warmup.mockImplementation(async () => {
+      const element = view.getByTestId('painted-shell')
+      paintedAtWarmup.push({ kind: element.getAttribute('data-kind'), document: element.getAttribute('data-document') })
+      return true
+    })
+    mocks.getActive.mockResolvedValue({ ...first, draftId: 'second-draft', selectionPending: true })
+    const available = mocks.listen.mock.calls.find(([event]) => event === 'cute-screen:quick-capture-available')?.[1] as (() => void)
+    expect(available).toBeTypeOf('function')
+    available()
+    await vi.waitFor(() => expect(paintedAtWarmup).toHaveLength(1))
+    expect(paintedAtWarmup[0]).toEqual({ kind: 'loading', document: null })
+  })
+
 })

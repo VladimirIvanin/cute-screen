@@ -19,6 +19,9 @@ import {
   createDocumentRenderScene,
   searchEmoji,
   emojiAssetId,
+  resizeLayerGeometry,
+  transformPoint,
+  transformToMatrix,
 } from '@cute-screen/editor-core'
 import { Canvas2DRenderer } from '@cute-screen/editor-renderer'
 import {
@@ -79,4 +82,48 @@ describe('licensed Noto artwork through the renderer', () => {
       renderer.dispose()
     }
   })
+})
+
+describe('resized emoji pixels', () => {
+  for (const handle of ['sw', 'nw', 'ne', 'se'] as const) {
+    it(`paints and exports offset bounds after ${handle} resize with rotation/flip`, async () => {
+      const placed = createPlacedEmoji(IDS.censor, '1f525', { x: 350, y: 250 }, 64, { x: 0, y: 0, width: 800, height: 600 })
+      const before = { ...placed, transform: { ...placed.transform, rotation: 27, scaleX: -1 } }
+      const after = resizeLayerGeometry(before, handle, transformPoint(transformToMatrix(before.transform), {
+        x: handle.includes('w') ? -32 : 96, y: handle.includes('n') ? -32 : 96,
+      }), { preserveAspect: true })
+      const canvas = createCanvas(1, 1)
+      const renderer = new Canvas2DRenderer({ exportCanvas: (width, height) => createCanvas(width, height) as unknown as import('../../../packages/editor-renderer/src/backends/canvas2d/contracts').Canvas2DLike })
+      try {
+        await renderer.initialize({ scene: canvas as unknown as HTMLCanvasElement, overlay: createCanvas(1, 1) as unknown as HTMLCanvasElement, dpr: 1, correlationId: 'emoji-corner-export' })
+        const image = await loadImage(await readFile(new URL('emoji_u1f525.svg', assets)))
+        await renderer.createImageResource({
+          id: emojiResourceId(before.payload.asset),
+          width: image.width,
+          height: image.height,
+          source: image as unknown as HTMLImageElement })
+        renderer.setScene(createDocumentRenderScene({ ...baseDocument(), layers: [after] }))
+        renderer.render(['scene'])
+        const expected = createCanvas(800, 600)
+        const context = expected.getContext('2d')
+        context.translate(before.transform.translateX, before.transform.translateY)
+        context.rotate(27 * Math.PI / 180)
+        context.scale(-1, 1)
+        context.drawImage(image, handle.includes('w') ? -32 : 0, handle.includes('n') ? -32 : 0, 96, 96)
+        const reference = expected.getContext('2d').getImageData(0, 0, 800, 600).data
+        const pixels = canvas.getContext('2d').getImageData(0, 0, 800, 600).data
+        // Equivalent matrix compositions can differ by one antialiasing level.
+        const difference = pixels.reduce((sum, value, index) => sum + Math.abs(value - reference[index]!), 0)
+        expect(difference / pixels.length).toBeLessThan(0.01)
+        const exported = await loadImage(await renderer.exportPng())
+        expect([exported.width, exported.height]).toEqual([800, 600])
+        const decoded = createCanvas(800, 600)
+        decoded.getContext('2d').drawImage(exported, 0, 0)
+        const decodedPixels = decoded.getContext('2d').getImageData(0, 0, 800, 600).data
+        expect(Buffer.from(decodedPixels).equals(Buffer.from(pixels))).toBe(true)
+      } finally {
+        renderer.dispose()
+      }
+    })
+  }
 })

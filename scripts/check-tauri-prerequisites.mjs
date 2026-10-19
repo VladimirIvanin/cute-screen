@@ -16,7 +16,7 @@ if (process.platform === 'linux') {
   if (!commandWorks('pkg-config', ['--version'])) {
     missing.push('pkg-config')
   } else {
-    for (const dependency of ['gtk+-3.0', 'webkit2gtk-4.1', 'javascriptcoregtk-4.1', 'libsoup-3.0', 'gstreamer-1.0', 'gstreamer-app-1.0', 'gstreamer-video-1.0']) {
+    for (const dependency of ['gtk+-3.0', 'webkit2gtk-4.1', 'javascriptcoregtk-4.1', 'libsoup-3.0']) {
       if (!commandWorks('pkg-config', ['--exists', dependency])) missing.push(dependency)
     }
   }

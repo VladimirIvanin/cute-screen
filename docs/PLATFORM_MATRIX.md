@@ -1,5 +1,19 @@
 # Платформенная матрица
 
+## Wayland single-shot без трансляции (2026-10-20, ADR-121)
+
+ScreenCast/PipeWire capture удалён. Ubuntu 22.04.5 x64 / GNOME 42.9 /
+Wayland / gnome-screenshot 41.0-2: три внешних снимка и новый dev Screen capture
+прошли; все PNG 1920×1080 повторно декодированы. Native dev завершился captured;
+D-Bus trace содержит GNOME Screenshot и не содержит ScreenCast calls.
+Auto предпочитает helper только для ShellVersion ≤42; современные GNOME,
+включая Ubuntu 24, сохраняют Screenshot portal. KDE/wlroots/ARM64/mixed-DPI
+не проверены на этом host. Их маршруты проверяются capability contracts,
+но это не native evidence. Settings и повторный Quick reset проверены 19 component tests; real GNOME
+WebView: два Area, History PNG decode и preference reopen прошли. На обоих
+warmup document=null, ready=false, overlay=hidden; оба новых crop=null. Drag
+в тесте — DOM PointerEvents; физический input gate отдельно pending (TESTING.md).
+
 ## Единая иконка толщины линии (2026-10-19)
 
 `REQ-EDT-015/016`, `REQ-UI-001/003/006`: общий Vue `UiIcon.strokeWidth`
@@ -848,9 +862,9 @@ external tauri-driver 2.1.0 + подходящий EdgeDriver; embedded 1.3.0 DO
 | --------------- | -------------- | --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- | ------------------------- |
 | Linux X11       | x86_64         | `x11rb` visible drawable + target-visual frozen overlay; local compositor/quick runtime passed 2026-08-24 | Tauri/global-hotkey                                   | deb, AppImage             |
 | Linux X11       | aarch64        | `x11rb` visible drawable + собственный frozen overlay; compositor runtime re-smoke pending                | Tauri/global-hotkey                                   | deb, AppImage             |
-| GNOME Wayland   | x86_64/aarch64 | XDG ScreenCast/PipeWire Monitor; Screenshot v3 Window                                                     | XDG GlobalShortcuts, GNOME GSettings или CLI fallback | deb, AppImage             |
-| KDE Wayland     | x86_64/aarch64 | XDG ScreenCast/PipeWire при verified capability                                                           | XDG GlobalShortcuts или CLI fallback                  | deb, AppImage             |
-| wlroots Wayland | x86_64/aarch64 | Portal при наличии                                                                                        | Portal при наличии, иначе CLI fallback                | deb, AppImage             |
+| GNOME Wayland   | x86_64/aarch64 | Screenshot portal; GNOME ≤42: optional gnome-screenshot; v3 Window                                        | XDG GlobalShortcuts, GNOME GSettings или CLI fallback | deb, AppImage             |
+| KDE Wayland     | x86_64/aarch64 | XDG Screenshot portal                                                                                     | XDG GlobalShortcuts или CLI fallback                  | deb, AppImage             |
+| wlroots Wayland | x86_64/aarch64 | Screenshot portal; optional grim при совместимом compositor                                               | Portal при наличии, иначе CLI fallback                | deb, AppImage             |
 | Windows         | x86_64         | DXGI/D3D11 frozen Area Quick surface; single-HWND/pixel replay passed; cross-monitor smoke pending        | Tauri/global-hotkey                                   | NSIS exe                  |
 | Windows 11      | ARM64          | DXGI/D3D11 frozen Area Quick surface; native Window selector; runtime smoke pending                       | Tauri/global-hotkey                                   | NSIS exe                  |
 | macOS           | Intel          | Native AppKit Area/Window; CG 12.0–12.2, intended SCKit 12.3+ routing; runtime smoke pending              | later slice: Tauri/global-hotkey                      | universal DMG             |
@@ -864,8 +878,8 @@ API и webview. Release baseline не повышается без ADR и CI-до
 
 | Возможность      | X11                                            | Wayland portal                                         | Windows                                     | macOS                        |
 | ---------------- | ---------------------------------------------- | ------------------------------------------------------ | ------------------------------------------- | ---------------------------- |
-| Area             | One fullscreen Quick surface: select → edit    | Quick selection выбранного ScreenCast Monitor          | One fullscreen Quick surface: select → edit | AppKit; frozen quick-mode    |
-| Screen           | Root or Composite Overlay Window               | Разрешённый ScreenCast Monitor                         | DXGI virtual screen                         | Direct after permission      |
+| Area             | One fullscreen Quick surface: select → edit    | Quick selection полного single-shot PNG                | One fullscreen Quick surface: select → edit | AppKit; frozen quick-mode    |
+| Screen           | Root or Composite Overlay Window               | Полный single-shot desktop                             | DXGI virtual screen                         | Direct after permission      |
 | Window           | Direct/window list                             | Portal target/capability                               | Direct/window list                          | Native; direct document      |
 | Active window    | Window manager adapter                         | Portal when exposed, otherwise clear unavailable state | Native                                      | Not advertised (later slice) |
 | Repeat last area | Stored physical/image geometry with validation | Новое Quick выделение в разрешённом Monitor            | Stored geometry                             | Not advertised (later slice) |
@@ -875,9 +889,9 @@ API и webview. Release baseline не повышается без ADR и CI-до
 Area является единственной capture action, которая заканчивается в quick-mode.
 На X11/Windows/macOS quick surface сохраняет frozen desktop и physical
 selection coordinates; macOS Area использует единый frozen multi-display
-frame. Wayland использует raw frame выбранного ScreenCast Monitor и тот же
-Quick lifecycle; рамка может расширяться до границ выбранного монитора. Repeat
-на Wayland начинает новое выделение в той же разрешённой сессии. Screen, Window
+frame. Wayland использует полный разовый PNG desktop и тот же Quick lifecycle;
+рамка может расширяться до границ кадра. Repeat на Wayland получает новый PNG
+и начинает новое выделение без постоянной сессии. Screen, Window
 и Active Window продолжают direct-to-editor flow; Repeat остальных платформ
 сохраняет собственный контракт.
 
@@ -1479,3 +1493,14 @@ goldens дуг/петель/S-кривых; 12 000 samples на 4K/8K остаю
 Общий DOM-free core применяется на всех ОС, native adapters не менялись.
 Новый native Tauri/WebKitGTK/WebView2/macOS прогон не выполнялся; browser и
 headless evidence не считаются новым native platform pass. Команды — TESTING.md.
+
+## Ресайз за углы (2026-10-20)
+
+`REQ-TOL-014/015`, `REQ-EDT-005/006`: общая DOM-free проекция image/emoji
+преобразует локальное начало через полную матрицу слоя. Emoji size control
+сохраняет world centre после corner resize и отражений. Schema v7, IPC,
+capabilities и принятый контракт ADR-035 прежние. Проверка — Ubuntu 22.04.5
+x86_64 / headless Chrome 147.0.7727.101, core и Canvas2D pixel/export tests.
+Native WebKitGTK, Windows WebView2 и macOS WKWebView в этой задаче не
+запускались; browser results не считаются их платформенным pass.
+Подробные результаты — TESTING.md.

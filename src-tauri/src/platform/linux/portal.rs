@@ -1,8 +1,6 @@
 use std::{
     collections::BTreeSet,
-    fs::File,
     future::Future,
-    io::BufReader,
     path::PathBuf,
     sync::{
         Arc, Mutex,
@@ -20,7 +18,6 @@ use ashpd::{
             Activated, BindShortcutsOptions, Deactivated, GlobalShortcuts, ListShortcutsOptions,
             NewShortcut,
         },
-        screencast::{CursorMode, Screencast, SourceType},
         screenshot::{AvailableTargets, Screenshot, ScreenshotProxy},
     },
 };
@@ -78,35 +75,10 @@ impl AshpdPortalClient {
                 .await
                 .is_ok_and(|proxy| proxy.version() > 0);
 
-        let screencast_monitor_available = if crate::linux_screencast::raw_capture_available() {
-            match portal_handshake(Screencast::new(), PORTAL_PROBE_TIMEOUT, correlation_id).await {
-                Ok(proxy) => {
-                    let sources = portal_handshake(
-                        proxy.available_source_types(),
-                        PORTAL_PROBE_TIMEOUT,
-                        correlation_id,
-                    )
-                    .await;
-                    let cursor = portal_handshake(
-                        proxy.available_cursor_modes(),
-                        PORTAL_PROBE_TIMEOUT,
-                        correlation_id,
-                    )
-                    .await;
-                    sources.is_ok_and(|sources| sources.contains(SourceType::Monitor))
-                        && cursor.is_ok_and(|cursor| cursor.contains(CursorMode::Hidden))
-                }
-                Err(_) => false,
-            }
-        } else {
-            false
-        };
-
         Ok(PortalCapabilityProbe {
             screenshot_version: version,
             available_targets,
             global_shortcuts_available,
-            screencast_monitor_available,
         })
     }
 
@@ -155,14 +127,8 @@ impl AshpdPortalClient {
         )
         .await?;
         let source = validated_file_uri(response.uri().as_str(), &request.correlation_id)?;
-        let file = File::open(&source).map_err(|_| {
-            PlatformError::new(PlatformErrorCode::CaptureFailed, &request.correlation_id)
-        })?;
-        let decoder = png::Decoder::new(BufReader::new(file));
-        let reader = decoder.read_info().map_err(|_| {
-            PlatformError::new(PlatformErrorCode::CaptureFailed, &request.correlation_id)
-        })?;
-        let (width, height) = reader.info().size();
+        let (width, height) = crate::linux_capture::validate_png(&source)
+            .map_err(|code| PlatformError::new(code, &request.correlation_id))?;
         let digest = Sha256::digest(request.correlation_id.as_bytes());
         let token = format!("portal-{digest:x}");
         let token = &token[..39];
@@ -219,7 +185,7 @@ fn portal_target_for_request(
         return Err(PlatformErrorCode::PortalTooOld);
     }
     if version < 3 {
-        return (request == CaptureTarget::Area)
+        return matches!(request, CaptureTarget::Area | CaptureTarget::Monitor)
             .then_some(None)
             .ok_or(PlatformErrorCode::InvalidTarget);
     }

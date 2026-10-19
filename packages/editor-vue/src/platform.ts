@@ -1,4 +1,4 @@
-export type CaptureBackendKind = 'unavailable' | 'waylandPortal' | 'windowsDxgi' | 'x11' | 'macosScreenCapture'
+export type CaptureBackendKind = 'unavailable' | 'waylandPortal' | 'gnomeScreenshot' | 'grim' | 'windowsDxgi' | 'x11' | 'macosScreenCapture'
 
 export interface CaptureCapabilities {
   readonly available: boolean
@@ -46,7 +46,6 @@ export interface PortalCapabilityProbe {
   readonly screenshotVersion: number
   readonly availableTargets: number
   readonly globalShortcutsAvailable: boolean
-  readonly screencastMonitorAvailable?: boolean
 }
 
 export interface CaptureResult {

@@ -3,6 +3,8 @@ use std::{collections::BTreeMap, future::Future};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+pub mod capture_method;
+
 // X11 adapter tests also compile on Windows/macOS and use these pure-Rust helpers.
 #[cfg(any(test, target_os = "linux"))]
 pub(crate) mod preview;
@@ -59,6 +61,8 @@ pub enum SessionKind {
 pub enum CaptureBackendKind {
     Unavailable,
     WaylandPortal,
+    GnomeScreenshot,
+    Grim,
     WindowsDxgi,
     X11,
     MacosScreenCapture,
@@ -111,7 +115,6 @@ pub struct PortalCapabilityProbe {
     pub screenshot_version: u32,
     pub available_targets: u32,
     pub global_shortcuts_available: bool,
-    pub screencast_monitor_available: bool,
 }
 
 impl PlatformCapabilities {
@@ -140,19 +143,17 @@ impl PlatformCapabilities {
         portal: Option<PortalCapabilityProbe>,
         x11_gate_passed: Option<bool>,
     ) -> Self {
-        let portal_available = portal.is_some_and(|probe| {
-            probe.screenshot_version > 0 || probe.screencast_monitor_available
-        });
+        let portal_available = portal.is_some_and(|probe| probe.screenshot_version >= 2);
         let native_adapter_available = x11_gate_passed.unwrap_or(false);
         let backend = select_capture_backend(session, portal_available, native_adapter_available);
         let probe = portal.unwrap_or(PortalCapabilityProbe {
             screenshot_version: 0,
             available_targets: 0,
             global_shortcuts_available: false,
-            screencast_monitor_available: false,
         });
-        let portal_desktop =
-            backend == CaptureBackendKind::WaylandPortal && probe.screencast_monitor_available;
+        let portal_desktop = backend == CaptureBackendKind::WaylandPortal
+            && probe.screenshot_version >= 2
+            && (probe.screenshot_version < 3 || probe.available_targets & 1 != 0);
         let portal_v3 =
             backend == CaptureBackendKind::WaylandPortal && probe.screenshot_version >= 3;
         let x11 = backend == CaptureBackendKind::X11;
@@ -472,7 +473,6 @@ mod tests {
                 screenshot_version: 2,
                 available_targets: 0,
                 global_shortcuts_available: false,
-                screencast_monitor_available: true,
             }),
             None,
         );
@@ -497,8 +497,8 @@ mod tests {
     }
 
     #[test]
-    fn wayland_area_requires_a_verified_screencast_backend() {
-        for (targets, screencast) in [(1, true), (4, false), (2, false), (4, true)] {
+    fn wayland_area_requires_an_advertised_screenshot_target() {
+        for targets in [0, 1, 2, 4, 8, 15] {
             let capabilities = PlatformCapabilities::for_session(
                 "portal-area".to_owned(),
                 SessionKind::Wayland,
@@ -506,13 +506,12 @@ mod tests {
                     screenshot_version: 3,
                     available_targets: targets,
                     global_shortcuts_available: false,
-                    screencast_monitor_available: screencast,
                 }),
                 None,
             );
-            assert_eq!(capabilities.capture.interactive_selector, screencast);
-            assert_eq!(capabilities.capture.monitor_target, screencast);
-            assert_eq!(capabilities.capture.available, screencast || targets == 2);
+            assert_eq!(capabilities.capture.interactive_selector, targets & 1 != 0);
+            assert_eq!(capabilities.capture.monitor_target, targets & 1 != 0);
+            assert_eq!(capabilities.capture.available, targets & 11 != 0);
         }
     }
 

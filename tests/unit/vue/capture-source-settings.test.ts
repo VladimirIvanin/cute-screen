@@ -13,41 +13,66 @@ import {
   vi,
 } from 'vitest'
 import CaptureSourceSettings from '../../../apps/desktop/src/settings/CaptureSourceSettings.vue'
+import type { LinuxCaptureMethods } from '../../../apps/desktop/src/generated/desktop-ipc'
 
+const initial: LinuxCaptureMethods = { selected: 'auto', resolved: 'gnomeScreenshot', available: ['auto', 'portal', 'gnomeScreenshot'] }
 afterEach(cleanup)
 
-describe('Wayland capture display settings', () => {
-  it('does not offer selection for unsupported backends', async () => {
-    const bridge = { available: vi.fn().mockResolvedValue(false), select: vi.fn() }
-    render(CaptureSourceSettings, { props: { locale: 'ru', bridge } })
-    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument())
-    expect(screen.queryByRole('button', { name: 'Выбрать экран' })).not.toBeInTheDocument()
+describe('Wayland screenshot method settings', () => {
+  it('hides on other platforms and retries failed capability loading', async () => {
+    const snapshot = vi.fn().mockRejectedValueOnce(new Error('Connection lost')).mockResolvedValue(null)
+    render(CaptureSourceSettings, { props: { locale: 'en', bridge: { snapshot, save: vi.fn() } } })
+    await screen.findByRole('alert')
+    await fireEvent.click(screen.getByRole('button', { name: 'Check again' }))
+    await waitFor(() => expect(screen.queryByRole('region')).not.toBeInTheDocument())
   })
 
-  it('blocks duplicate requests and distinguishes cancellation from error', async () => {
-    let complete: (selected: boolean) => void = () => undefined
-    const bridge = { available: vi.fn().mockResolvedValue(true), select: vi.fn(() => new Promise<boolean>((resolve) => {
-      complete = resolve
-    })) }
+  it('reports the active method, disables unavailable helpers and cancels without saving', async () => {
+    const bridge = { snapshot: vi.fn().mockResolvedValue(initial), save: vi.fn() }
     render(CaptureSourceSettings, { props: { locale: 'ru', bridge } })
-    const button = await screen.findByRole('button', { name: 'Выбрать экран' })
-    await fireEvent.click(button)
-    expect(button).toBeDisabled()
-    expect(bridge.select).toHaveBeenCalledOnce()
-    complete(false)
-    await screen.findByText('Выбор отменён. Экран не изменён.')
+    const select = await screen.findByRole('combobox', { name: 'Способ захвата' })
+    select.focus()
+    expect(select).toHaveFocus()
+    expect(screen.getByRole('option', { name: /wlroots/u })).toBeDisabled()
+    expect(screen.queryByText(/ScreenCast/u)).not.toBeInTheDocument()
+    await fireEvent.update(select, 'portal')
+    await fireEvent.click(screen.getByRole('button', { name: 'Отменить изменение' }))
+    expect(select).toHaveValue('auto')
+    expect(bridge.save).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Применить' })).toBeDisabled()
+  })
+
+  it('blocks duplicate saves and preserves the draft after a busy error', async () => {
+    let reject: (error: unknown) => void = () => undefined
+    const save = vi.fn().mockImplementationOnce(() => new Promise((_resolve, rejectPromise) => {
+      reject = rejectPromise
+    }))
+      .mockResolvedValue({ ...initial, selected: 'portal', resolved: 'portal' })
+    render(CaptureSourceSettings, { props: { locale: 'en', bridge: { snapshot: vi.fn().mockResolvedValue(initial), save } } })
+    const select = await screen.findByRole('combobox', { name: 'Capture method' })
+    await fireEvent.update(select, 'portal')
+    await fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+    expect(select).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Saving…' })).toBeDisabled()
+    expect(save).toHaveBeenCalledOnce()
+    reject({ code: 'busy' })
+    await screen.findByText('Finish the current capture before changing the method.')
+    expect(select).toHaveValue('portal')
+    await fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+    await screen.findByText('Capture method saved.')
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-    expect(button).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled()
   })
 
-  it('keeps a retryable button and explains an active capture', async () => {
-    const bridge = { available: vi.fn().mockResolvedValue(true), select: vi.fn().mockRejectedValueOnce({ code: 'busy' }).mockResolvedValue(true) }
+  it('keeps an unavailable saved choice visible and permits recovery to automatic', async () => {
+    const bridge = { snapshot: vi.fn().mockResolvedValue({ ...initial, selected: 'grim', resolved: null }), save: vi.fn().mockResolvedValue(initial) }
     render(CaptureSourceSettings, { props: { locale: 'en', bridge } })
-    const button = await screen.findByRole('button', { name: 'Choose display' })
-    await fireEvent.click(button)
-    await screen.findByText('Finish the current capture before choosing a display.')
-    await fireEvent.click(button)
-    await screen.findByText('Capture display selected.')
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    const select = await screen.findByRole('combobox', { name: 'Capture method' })
+    expect(select).toHaveValue('grim')
+    await screen.findByText(/selected method is unavailable/u)
+    await fireEvent.update(select, 'auto')
+    await fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+    expect(bridge.save).toHaveBeenCalledWith('auto')
+    await screen.findByText('Capture method saved.')
   })
 })

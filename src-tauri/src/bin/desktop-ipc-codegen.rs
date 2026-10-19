@@ -7,6 +7,7 @@ use std::{
 
 use cute_screen_desktop::export_filename::ExportFilenameSettings;
 use cute_screen_desktop::image_import::{NativeImageDrop, TextureImportOutcome};
+use cute_screen_desktop::platform::capture_method::{LinuxCaptureMethod, LinuxCaptureMethods};
 use cute_screen_desktop::{
     app::commands::error::CommandErrorV1,
     autostart::{AutostartSnapshotV1, AutostartStateV1},
@@ -29,6 +30,8 @@ fn declaration<T: TS>() -> String {
 
 fn generated_bindings() -> String {
     let mut output = String::from(HEADER);
+    output.push_str(&declaration::<LinuxCaptureMethod>());
+    output.push_str(&declaration::<LinuxCaptureMethods>());
     output.push_str(&declaration::<ExportFilenameSettings>());
     output.push_str(&declaration::<TextureImportOutcome>());
     output.push_str(&declaration::<NativeImageDrop>());

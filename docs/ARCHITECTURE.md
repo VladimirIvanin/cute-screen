@@ -1,29 +1,27 @@
 # Архитектура Cute Screen
 
-## Wayland raw-frame capture (ADR-118/119/120)
+## Wayland single-shot routing (ADR-121)
 
-Area/Screen/Repeat используют XDG ScreenCast Monitor session. Разрешённая сессия
-разделяется между clones CaptureController; повторный capture не вызывает
-CreateSession/SelectSources/Start. Новый PipeWire consumer получает один raw
-RGBA кадр в его negotiated resolution и закрывается, разрешение остаётся до
-выхода/отзыва. Новая авторизация и успешный reselect ждут 350 мс после
-portal response до публикации сессии: consumer открывается после запаса на
-исчезновение permission dialog. Cached authorization, cancel и error не ждут.
-Frame fitting/crop работают в пикселях выбранного монитора;
-desktop geometry не синтезируется. Межмониторное выделение не заявляется.
-Probe проверяет Monitor, Hidden cursor и создание pipewiresrc/videoconvert/appsink.
-Stride, размер и полнота кадра проверяются до staging: Area — memory-owned BMP,
-Screen — fast lossless PNG. Settings может заменить разрешённый монитор; cancel
-сохраняет прежнюю сессию. Pipeline videoscale
-и фиксированные уменьшенные caps отсутствуют. При ошибке нет Screenshot/X11 fallback.
-Linux entry использует native Wayland для preview, исключая inherited XWayland.
+LinuxCaptureService выбирает отдельный Screenshot-запрос или внешний системный
+helper для Area/Screen/Repeat. Предпочтение хранится в storage. Auto сохраняет
+Screenshot portal v2+/advertised v3 Screen для современных GNOME, KDE и других
+portal-окружений. Только GNOME Shell ≤42 с установленным gnome-screenshot
+предпочитает helper; при отсутствии Screenshot доступен grim в известных
+wlroots-окружениях. Название окружения не доказывает runtime-поддержку протокола.
+Явный выбор не имеет скрытого fallback. Capabilities отражают выбранный путь;
+Window/Active Window остаются отдельными advertised Screenshot targets.
+Helpers имеют child guard, 10-секундный timeout, cancel flag, приватный staging
+и полное PNG декодирование. ScreenCast session и GStreamer capture dependencies
+отсутствуют. Native Wayland startup сохраняется.
 
-Probe/capability handshake имеют короткий технический timeout. Screenshot
-request/response не имеет прикладного deadline выбора: в ashpd 0.13.13 уже
-`send().await` ожидает Response signal. `response()` извлекает готовый результат.
-Это сохраняется для Window/Active Window и первого ScreenCast Start: время
-ответа пользователя не ограничивается техническим handshake timeout.
-Причины и ограничения — [Linux capture](LINUX_CAPTURE_RESEARCH.md).
+Screenshot request/response не имеет deadline выбора пользователя: в ashpd
+0.13.13 уже send().await ожидает Response signal. Timeout относится к probe.
+Перед mapped warmup переиспользованный Quick shell сбрасывает прежний документ
+и рамку, Vue применяет reset до показа native surface. EditorShell получает
+новый key только между drafts; переход selecting → editing остаётся в одном
+renderer lifecycle. Overlay скрыт до frame/layout ready; устаревший reveal
+не раскрывает и не закрывает новый draft.
+Причины, источники и ограничения — [исследование Linux](LINUX_CAPTURE_RESEARCH.md).
 
 ## Windows/macOS GUI lifecycle (ADR-115)
 
@@ -667,8 +665,8 @@ document-command boundary.
 уже в Quick surface. macOS создаёт draft после platform selector. Draft может
 ссылаться на frozen virtual desktop и physical selection bounds; на macOS это
 единый frozen multi-display frame native AppKit selector. Wayland draft
-содержит raw кадр выбранного монитора через memory-owned BMP с pending selection
-(ADR-118/119).
+содержит полный PNG desktop от Screenshot portal или внешнего helper с pending
+selection (ADR-121).
 Pixels доступны Vue только через scoped/binary
 transport token. Windows/macOS Window после native selection создаёт документ
 напрямую и quick-mode не открывает.
@@ -690,7 +688,7 @@ draft и меняет только Vue state на `editing`. `EditorShell`, rend
 overlay canvas, frozen image, dim layer и dash остаются теми же DOM/native
 объектами. Toolbar и actions добавляются вокруг существующего crop без
 show/hide/focus и без повторного layout-ready gate. Wayland использует тот же
-Quick lifecycle после получения raw кадра через XDG ScreenCast (ADR-118/119),
+Quick lifecycle после разового PNG через Screenshot/helper (ADR-121),
 без вызовов X11 adapter.
 
 Windows Area использует тот же frontend lifecycle: после скрытия `main` backend

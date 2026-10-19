@@ -44,13 +44,20 @@ Cute Screen — полноценный local-first редактор снимко
   не является fallback. Window сразу открывает документ, без Quick draft.
   Wayland и macOS 14+ используют системный picker с его собственным UX.
 - `REQ-CAP-004` — захват активного окна.
-- `REQ-CAP-016` — для Wayland ScreenCast backend в Settings доступна кнопка
-  «Выбрать экран». Она повторно открывает системный выбор монитора;
-  отмена сохраняет прежний экран. Во время захвата смена недоступна;
-  pending, focus, error и cancel различаются. Кнопка не показывается
-  для других backend-ов.
+- `REQ-CAP-016` — Wayland Settings позволяет выбрать способ разового захвата:
+  Auto, Screenshot portal, внешний gnome-screenshot или grim. Недоступные
+  способы отключены; loading, pending, error, cancel и keyboard focus различаются.
+  Выбор сохраняется и применяется к следующему снимку. Смена во время capture
+  недоступна. Streaming picker и постоянная трансляция не используются.
+- `REQ-CAP-017` — Auto сохраняет Screenshot portal на современных окружениях,
+  включая Ubuntu 24/GNOME. На GNOME Shell ≤42 с установленным gnome-screenshot
+  используется helper без подтверждения каждого снимка. В известных wlroots
+  окружениях без Screenshot может использоваться установленный grim.
+  Ошибка/отмена не переключает способ молча. Helpers не копируются и не линкуются
+  с продуктом; отсутствие утилиты объясняется в Settings. Захватывается полный
+  desktop, если backend не предоставляет отдельный монитор.
 - `REQ-CAP-005` — повтор последней области с корректировкой при изменении мониторов/DPI.
-  Wayland повторно получает кадр разрешённого монитора и открывает новое выделение в Quick Capture.
+  Wayland повторно получает разовый кадр desktop и открывает новое выделение в Quick Capture.
 - `REQ-CAP-006` — задержка перед захватом с отменой.
   Команды трея ждут 200 мс перед backend, чтобы закрывающееся системное меню
   не попало в кадр; hotkey, CLI и UI не получают этой дополнительной паузы.
@@ -59,15 +66,11 @@ Cute Screen — полноценный local-first редактор снимко
 - `REQ-CAP-009` — X11 Area использует fullscreen Quick Capture как единственную
   видимую capture surface: она сначала показывает frozen desktop в состоянии
   выбора области, а после подтверждения на той же WebView и в том же renderer
-  lifecycle открывает annotation chrome. Wayland получает raw frame разрешённого
-  монитора через XDG ScreenCast/PipeWire и использует тот же этап выделения
-  Quick Capture. Разрешение/выбор монитора выполняется при создании сессии;
-  последующие capture переиспользуют её, пока доступ не отозван.
-  После успешной новой авторизации backend ждёт 350 мс перед первым consumer,
-  чтобы permission dialog успел исчезнуть; cached capture не получает эту
-  паузу. Успешная смена монитора использует тот же порядок (ADR-120).
-  Capabilities требуют фактически доступный Monitor source и raw RGBA pipeline,
-  без fallback на Screenshot с подтверждением каждого кадра.
+  lifecycle открывает annotation chrome. Wayland получает разовый PNG через
+  выбранный способ ADR-121 и использует тот же Quick Capture selection lifecycle.
+  При переиспользовании Quick-окна старый документ и рамка убираются до native
+  warmup; новая рамка не наследует crop предыдущего capture. ScreenCast-сессии
+  не создаются. Системное разрешение определяется Screenshot backend.
   Временная рамка, размер и подсказка X11 восстанавливаются из frozen
   frame при каждом перемещении и не накапливают следы курсора или предыдущих
   состояний.
@@ -114,10 +117,10 @@ Cute Screen — полноценный local-first редактор снимко
 - `REQ-CAP-013` — Windows/X11/macOS Area quick-mode показывает frozen desktop
   в исходных physical coordinates. На Windows и X11 первый Area drag выполняется
   внутри той же fullscreen Quick surface, что затем показывает editor chrome;
-  отдельный native Area selector запрещён. Wayland вписывает полный кадр выбранного монитора
+  отдельный native Area selector запрещён. Wayland вписывает полный полученный кадр desktop
   в одну Quick surface; выбор и изменение рамки используют пиксели кадра без
   предположений о desktop geometry/mixed-DPI. Рамку можно расширять в пределах
-  кадра. Native Wayland preview не использует XWayland; raw кадр не уменьшается
+  кадра. Native Wayland preview не использует XWayland; полученное изображение не уменьшается
   backend-ом приложения. Межмониторное выделение этим путём не поддерживается.
 - `REQ-CAP-014` — один Area draft блокирует параллельный capture. Copy, Save PNG, History
   и Editor дают terminal `captured` с различимым completion; Close даёт

@@ -392,6 +392,11 @@ const scenarios = [
   },
 ]
 
+scenarios.push(
+  { id: 'wayland-single-shot', persistenceGroup: 'wayland-single-shot', spec: 'tests/e2e/specs/tauri-wayland-single-shot.e2e.ts', harnessQuery: '?m04=1', interactiveWayland: true },
+  { id: 'wayland-single-shot-reopen', persistenceGroup: 'wayland-single-shot', spec: 'tests/e2e/specs/tauri-wayland-single-shot-reopen.e2e.ts', harnessQuery: '?m04=1', interactiveWayland: true },
+)
+
 const requestedScenarioIds = new Set(
   (process.env.CUTE_SCREEN_E2E_SCENARIOS ?? '')
     .split(',')
@@ -400,7 +405,7 @@ const requestedScenarioIds = new Set(
 )
 const selectedScenarios =
   requestedScenarioIds.size === 0
-    ? scenarios.filter((scenario) => !scenario.interactiveWindows)
+    ? scenarios.filter((scenario) => !scenario.interactiveWindows && !scenario.interactiveWayland)
     : scenarios.filter(({ id }) => requestedScenarioIds.has(id))
 if (selectedScenarios.some((scenario) => scenario.interactiveWindows) && process.platform !== 'win32') {
   throw new Error('windows-capture-exclusion requires an interactive Windows desktop')

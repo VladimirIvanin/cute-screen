@@ -113,8 +113,7 @@ jobs:
         run: |
           bash scripts/ci-install-linux-tauri-deps.sh \
             build-essential curl file libayatana-appindicator3-dev librsvg2-dev \
-            libssl-dev libwebkit2gtk-4.1-dev libxdo-dev wget xdg-utils \
-            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-pipewire
+            libssl-dev libwebkit2gtk-4.1-dev libxdo-dev wget xdg-utils
 
       - name: Resolve pnpm store
         id: pnpm-store

@@ -1,5 +1,28 @@
 # Трассируемость требований
 
+## Разовые Wayland-снимки и выбор способа (2026-10-20, до реализации)
+
+`REQ-CAP-001/002/005/006/007/009/010/011/013/016/017`: по запросу владельца
+ScreenCast удаляется полностью, включая зависимости. Современный GNOME
+(Ubuntu 24), KDE и другие portal-окружения сохраняют Screenshot; GNOME ≤42
+при наличии gnome-screenshot использует внешний helper, wlroots без Screenshot
+может использовать установленный grim. Способ можно выбрать явно; Auto
+не оставляет трансляции. Отказ/отмена не запускают другой способ.
+Helper передаёт PNG файлом, без shell/base64, с полной проверкой декодирования,
+ограничением времени, отменой и cleanup. Требуются red-first Rust contracts,
+Settings loading/empty/disabled/focus/error/cancel, native GNOME повторные
+снимки и сохранённый выбор после reopen. KDE/wlroots отмечаются отдельно.
+`REQ-CAP-009/012/013`: проверить переиспользованное Quick-окно: старый документ,
+рамка и chrome убраны до native warmup; новый кадр раскрывается только после
+renderer-ready и устойчивого layout. Добавить повторный production mount test.
+
+ADR-121 evidence: 199 workspace Rust tests, 167 final desktop Rust tests,
+19 component tests, 112 boundary tests и pnpm check passed. Реальный GNOME
+Screen captured и полностью декодирован; D-Bus без ScreenCast calls. Два native
+Area и reopen прошли, PNG crop 863×486 декодирован, readonly warmup evidence:
+document=null, ready=false, overlay=hidden. DOM gesture scope и ограничения —
+TESTING.md; физический Wayland input и другие окружения отдельно pending.
+
 ## Единая иконка толщины линии (2026-10-19, до реализации)
 
 `REQ-EDT-015/016`, `REQ-UI-001/003/006`: контрол штриха у стрелки, линии,
@@ -2503,3 +2526,15 @@ ADR-113 evidence: red-first 2/2 новых core contracts failed до реали
 7 browser regressions и отдельный loop pointer test passed. Плавные 65% дуги,
 точные endpoints/Shift и 0% подтверждены; CPU correctness 12 000 samples passed.
 Native acceptance для нового сглаживания отдельно не заявляется; TESTING.md.
+
+## Ресайз за углы и совпадение изображения с рамкой (2026-10-19)
+
+`REQ-TOL-014/015`, `REQ-EDT-005/006`: запись до реализации. Воспроизвести
+ресайз emoji за нижний левый угол: рисунок должен следовать новой localBounds,
+противоположный угол остаётся неподвижен. Проверить все четыре угла, уменьшение,
+Alt, поворот и отражение, preview/commit/export, undo/redo и повторное изменение
+размера через панель. Проверить аналогичные пути shape, pencil/marker, text,
+censor, spotlight, loupe, ruler и image; добавить регрессии для найденных ошибок.
+Реализовано: image/emoji origin и panel centre исправлены; 49 focused core,
+6 render/export и 6 browser regressions passed. Ограничения общих прогонов
+и параллельных изменений — TESTING.md.

@@ -2,6 +2,10 @@ import {
   EMOJI_PACK_VERSION,
   findEmoji,
 } from './emoji-catalog'
+import {
+  transformPoint,
+  transformToMatrix,
+} from './geometry'
 import { createEmojiLayer } from './tools/content/media'
 import type {
   EmojiAssetReference,
@@ -55,10 +59,13 @@ export function resizeEmoji(
   ) throw new Error('Invalid emoji size')
   const bounds = layer.localBounds!
   const delta = (bounds.width - size) / 2
-  const angle = layer.transform.rotation * Math.PI / 180
+  const origin = transformPoint(transformToMatrix(layer.transform), {
+    x: bounds.x + delta,
+    y: bounds.y + delta,
+  })
   return { ...layer, localBounds: { x: 0, y: 0, width: size, height: size },
     transform: {
       ...layer.transform,
-      translateX: layer.transform.translateX + delta * (Math.cos(angle) - Math.sin(angle)),
-      translateY: layer.transform.translateY + delta * (Math.sin(angle) + Math.cos(angle)) } }
+      translateX: origin.x,
+      translateY: origin.y } }
 }

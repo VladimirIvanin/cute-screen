@@ -1,5 +1,9 @@
 import type { CalloutGeometryContext } from '../../callout-geometry'
 import { emojiResourceId } from '../../emoji'
+import {
+  transformPoint,
+  transformToMatrix,
+} from '../../geometry'
 import type { RenderNode } from '../../scene/contracts'
 import { createRenderSceneSnapshot } from '../../scene/snapshot'
 import type {
@@ -47,12 +51,14 @@ function projectAnnotationLayer(
     case 'ruler':
     case 'loupe':
       return precisionNodes(layer, document)
-    case 'emoji':
+    case 'emoji': {
+      const origin = transformPoint(transformToMatrix(layer.transform), layer.localBounds!)
       return [{ id: layer.id, kind: 'image', resourceId: emojiResourceId(layer.payload.asset),
-        x: layer.transform.translateX, y: layer.transform.translateY,
+        x: origin.x, y: origin.y,
         width: layer.localBounds!.width, height: layer.localBounds!.height,
         scaleX: 1, scaleY: 1, rotation: layer.transform.rotation, opacity: layer.opacity,
         visible: layer.visible, blendMode: layer.blendMode }]
+    }
     default:
       return assertNever(layer)
   }
@@ -60,14 +66,15 @@ function projectAnnotationLayer(
 
 function imageNode(layer: Extract<LayerNode, { readonly kind: 'image' }>): RenderNode {
   const bounds = layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
+  const origin = transformPoint(transformToMatrix(layer.transform), bounds)
   const imageBorder = layer.payload.border ? stroke(layer.payload.border) : undefined
   const imageRadius = Math.max(0, Math.min(layer.payload.radius ?? 0, bounds.width / 2, bounds.height / 2))
   return {
     id: layer.id,
     kind: 'image',
     resourceId: layer.payload.blobHash,
-    x: layer.transform.translateX + bounds.x,
-    y: layer.transform.translateY + bounds.y,
+    x: origin.x,
+    y: origin.y,
     width: bounds.width,
     height: bounds.height,
     scaleX: layer.transform.scaleX,

@@ -41,10 +41,9 @@ const editorShell = ref<InstanceType<typeof EditorShell>>()
 const shell = useEditorShellStore()
 const draft = shallowRef<QuickCaptureDraftV1>()
 const session = shallowRef<DocumentSessionController>()
-if (import.meta.env.VITE_TEST_HARNESS === 'true') {
-  const disposeFacade = installQuickCaptureTestFacade(() => session.value?.snapshot.core.document)
-  onBeforeUnmount(disposeFacade)
-}
+const testFacade = import.meta.env.VITE_TEST_HARNESS === 'true'
+  ? installQuickCaptureTestFacade(() => session.value?.snapshot.core.document) : undefined
+onBeforeUnmount(() => testFacade?.dispose())
 const sourceImage = shallowRef<HTMLImageElement>()
 const hosts = shallowRef<CanvasViewportHosts>()
 const documentState = ref<ShellDocumentState>({ kind: 'loading' })
@@ -197,9 +196,11 @@ async function presentPreparedDraft(draftId: string): Promise<void> {
     const presentation = await presentThenWaitForStableQuickCaptureLayout({
       present: () => tauriDesktopBridge.quickCapturePresent(draftId),
       reveal: async () => {
+        if (draft.value?.draftId !== draftId) return
         quickLayoutReady.value = true
         await nextTick()
         await nextLayoutFrame()
+        if (draft.value?.draftId !== draftId) return
         if (!(await tauriDesktopBridge.quickCaptureReveal(draftId))) {
           throw new Error('Quick capture draft is no longer active')
         }
@@ -224,6 +225,7 @@ async function terminateFailedPresentation(
   draftId: string,
   cause: unknown,
 ): Promise<void> {
+  if (draft.value?.draftId !== draftId) return
   console.warn('cute-screen quick capture presentation failed', cause)
   try {
     await cancelQuickCaptureAction({
@@ -255,6 +257,11 @@ async function loadDraft(): Promise<void> {
   resetDraftSession()
   draft.value = active
   coordinator.projectDraft(active)
+  // The native warmup maps the reused WebView. Commit the empty shell first,
+  // so its previous document, crop and overlay cannot be mapped for one frame.
+  await nextTick()
+  if (revision !== loadRevision || draft.value?.draftId !== active.draftId) return
+  testFacade?.recordWarmup()
   if (!(await tauriDesktopBridge.quickCaptureWarmup(active.draftId))) {
     throw new Error('Quick capture draft is no longer active')
   }
@@ -389,6 +396,7 @@ onBeforeUnmount(() => {
     data-testid="quick-capture-shell"
   >
     <EditorShell
+      :key="draft?.draftId ?? 'empty'"
       ref="editorShell"
       quick-mode
       :quick-selection-mode="selectionPending"

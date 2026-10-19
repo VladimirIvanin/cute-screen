@@ -4,7 +4,43 @@
 до `7856504`. Наблюдаемое окружение: Ubuntu 22.04.5 x64, GNOME, Wayland;
 Screenshot portal сообщает version 2.
 
-## Итог ручной проверки и новая стратегия
+## Разовые снимки вместо постоянной трансляции (2026-10-20, ADR-121)
+
+Пользователь отклонил постоянный GNOME-индикатор «Экран общедоступен» и уточнил,
+что Ubuntu 24 раньше работала хорошо. ScreenCast удаляется полностью. Общий
+Auto сохраняет Screenshot portal на современных desktop. GNOME ShellVersion
+≤42 с установленным gnome-screenshot получает отдельный helper-процесс;
+Screenshot без helper остаётся доступен с исходным системным подтверждением.
+В wlroots без Screenshot возможен установленный grim; явный выбор доступен
+в Settings. Необъявленный target, отмена и ошибка не запускают другой backend.
+
+Реальный Ubuntu 22.04.5 / GNOME 42.9 / Wayland: официальный пакет Ubuntu
+`gnome-screenshot 41.0-2` распакован для проверки без root, зависимости уже
+доступны. Три запуска `gnome-screenshot --file <private path>` завершились
+без запросов разрешения; 1920×1080 RGBA PNG полностью декодированы. Измерено
+1348, 1427, 1334 мс. Утилита использует GNOME Shell screenshot API и идентичность
+org.gnome.Screenshot, разрешённую GNOME Shell 42. Flash=true задан самой
+утилитой; отдельного CLI-флага отключения/настройки нет. Вспышка принята владельцем.
+Для новой dev-сборки helper установлен только в пользовательский каталог
+~/.local/share/cute-screen/tools; wrapper в ~/.local/bin. GPL binary/copyright
+находятся отдельно от исходников/bundle MIT-продукта. Системные пакеты не менялись.
+
+Источники:
+
+- [Flameshot Screenshot portal](https://github.com/flameshot-org/flameshot/blob/master/src/utils/screengrabber.cpp).
+- [Spectacle: ImagePlatformKWin](https://github.com/KDE/spectacle/blob/master/src/Platforms/ImagePlatformKWin.cpp).
+- [grim: compositor capture](https://github.com/emersion/grim/blob/master/main.c).
+- [GNOME screenshot 41 original distribution](https://download.gnome.org/sources/gnome-screenshot/41/).
+- [GNOME Shell 42 screenshot service](https://github.com/GNOME/gnome-shell/blob/gnome-42/js/ui/screenshot.js).
+- [Portal 1.16 release notes: permission store](https://github.com/flatpak/xdg-desktop-portal/blob/1.16.0/NEWS).
+- [GNOME 43 permission-aware screenshot backend](https://github.com/GNOME/xdg-desktop-portal-gnome/blob/gnome-43/src/screenshot.c).
+
+Постоянный индикатор был следствием lifetime сессии, а не чтения кадров в фоне.
+Restore tokens не решают проблему старого GNOME backend: frontend ScreenCast
+version=4 не доказывает поддержку persistence реализацией. В ADR-121 этот путь
+не используется вообще. Ни KWin API, ни grim не являются GNOME fallback.
+
+## Историческая стратегия ADR-118 (заменена ADR-121)
 
 Владелец подтвердил: неинтерактивный Screenshot на этом host всё равно каждый
 раз показывает «Дать доступ», а preview размыт. Установлены GNOME 42.9,

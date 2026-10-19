@@ -162,3 +162,14 @@ describe('document render scene: images and paints', () => {
     })
   })
 })
+
+it('transforms a nonzero image bounds origin before applying image rotation and reflection', () => {
+  const base = document.layers[0]!
+  const image = { ...base, localBounds: { x: -30, y: 20, width: 90, height: 60 },
+    transform: { translateX: 200, translateY: 150, rotation: 90, scaleX: -2, scaleY: 3 } }
+  const node = createDocumentRenderScene({ ...document, layers: [image] }).nodes[0]!
+  if (node.kind !== 'image') throw new Error('expected image node')
+  expect(node.x).toBeCloseTo(140)
+  expect(node.y).toBeCloseTo(210)
+  expect(node).toMatchObject({ width: 90, height: 60, rotation: 90, scaleX: -2, scaleY: 3 })
+})

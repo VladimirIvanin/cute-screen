@@ -1,5 +1,68 @@
 # Стратегия тестирования
 
+## Разовые Wayland-снимки, без sharing indicator (2026-10-20, ADR-121)
+
+Исходный HEAD 54ddab2, рабочая копия с изменениями. Ubuntu 22.04.5 x86_64 /
+GNOME 42.9 / Wayland, gnome-screenshot 41.0-2; Screenshot v2, portal 1.14.4.
+Rust 1.97.0 / Node 22.23.1 / pnpm 10.33.2 из штатного Ubuntu 22 image.
+Host Node 22.21.1 не подходит engine gate: для frontend проверок временно
+использовался Node 22.23.1 из image; системная версия не менялась.
+
+- Red-first `cargo test --workspace --locked platform::capture_method`: два
+  новых routing assertions failed до реализации. Полный `cargo test --workspace
+--locked`: 199 passed (167 desktop, 1 main, 31 storage). После финального
+  refactor `cargo test --package cute-screen-desktop --lib --locked`: 167 passed.
+- `pnpm test tests/unit/vue/capture-source-settings.test.ts tests/unit/vue/quick-capture-warmup.test.ts tests/unit/vue/quick-capture-coordinator.test.ts tests/unit/vue/quick-capture-actions.test.ts`:
+  19 passed. Новый repeated-mount regression сначала failed: в native warmup
+  попадал прежний ready document. После reset/nextTick/key/overlay guard — passed.
+- `pnpm check`: passed в стандартном Docker image; lint 88 baseline warnings,
+  typecheck, formatting, docs, 112 boundary tests, generated IPC и все четыре
+  Clippy feature gates. После test-only warmup recorder отдельно проверены
+  desktop Vue и E2E TypeScript, component suite и formatting.
+- `pnpm build:linux:dev`: свежая debug/no-bundle сборка, без ScreenCast/GStreamer
+  capture dependencies. Три standalone gnome-screenshot PNG полностью декодированы:
+  1920×1080 RGBA, 1348/1427/1334 мс. Helper установлен отдельно в пользовательский
+  каталог, официальный package checksum — helper-install.json; root install отсутствует.
+- Production dev CLI `capture --mode screen --json`: captured, exit 0.
+  Повторное декодирование сохранённого original — 1920×1080 RGBA. D-Bus monitor
+  содержит GNOME Screenshot и не содержит ScreenCast calls.
+- `CUTE_SCREEN_E2E_SCENARIOS=wayland-single-shot,wayland-single-shot-reopen pnpm test:e2e:tauri`:
+  оба сценария passed в real GNOME/Wayland WebKitGTK, embedded driver. Fake capture
+  выключен. Два PNG 1920×1080 получены настоящим helper; два разных production
+  drafts с crop=null. После History сохранённый crop 863×486 полностью декодирован
+  в WebView, все alpha=255. Повторный старт сохранил явный gnomeScreenshot выбор.
+  Read-only test facade перед каждым native warmup записал document=null,
+  ready=false, overlay=hidden. Визуально проверены первый и второй initial frames:
+  старой рамки нет. Выбранные screenshots и JSON — в evidence.
+
+Native тест использует DOM PointerEvents в настоящем WebView: embedded driver
+не доставил drag на Wayland surface. Только pointer capture для синтетического
+pointer на время gesture заменён no-op; production pointer handlers, EditorCommand,
+PNG source, storage и повторный mount не подменялись. Это не gate физического
+ввода мышью/keyboard activation. Rust/renderer/runtime frame assertions и
+визуальные screenshots имеют отдельный scope; KDE/wlroots/Ubuntu 24/ARM64/
+mixed-DPI на этом host не запускались. Auto для современного GNOME сохраняет
+Screenshot portal по unit contract, а не по native Ubuntu 24 evidence.
+
+Runtime container запускается с --network host, --security-opt apparmor=unconfined,
+реальными XDG_RUNTIME_DIR/Wayland/D-Bus и read-only helper/schema/libhandy.
+Workspace смонтирован и в /source (пути Cargo permission cache), и по тому же
+абсолютному host path, который используется как workdir: GNOME Shell пишет
+промежуточный PNG снаружи контейнера. CUTE_SCREEN_FRONTEND_DIST — абсолютный
+путь <workspace>/artifacts/capture-variants-2026-10-19/frontend. Контейнерная
+изоляция и путь /source без host alias ломали helper/permission cache; эти
+неуспешные прогоны диагностированы и заменены актуальным успешным комплектом.
+Первые локальные quality failures (max-len, ADR anchor, capture function size)
+исправлены; итоговый pnpm check passed. Отдельные Cargo targets не создавались.
+
+Evidence: artifacts/capture-variants-2026-10-19 — environment.json, check.log,
+rust-tests.log/rust-final.log, vue-red.log/vue-tests.log, native-e2e.log,
+wayland-single-shot.json, wayland-warmup.json, JUnit и выбранные PNG. Временный
+frontend и диагностированные test profiles удалены после проверки; полезный
+Cargo cache сохранён. Общий target вырос с 21.895 до 33.577 GiB после сборок и
+четырёх Clippy feature gates; artifacts — с 3.904 до 3.908 GiB. Размеры и cleanup —
+storage-before.json, storage-after.log и cleanup.json.
+
 ## Загрузки лендинга v0.1.6 (2026-10-19)
 
 `REQ-WEB-006/007`. Исходный HEAD `f81426b`, Windows 10 x64 (19045),
@@ -8514,3 +8577,81 @@ Native `pnpm test:e2e:tauri`, `pnpm tauri build` и отдельный
 и все Clippy configurations; `artifacts/brush-smoothing/check-final.log`.
 `pnpm format` и `pnpm format:check` повторены после записи evidence;
 логи `format-evidence.log` и `format-check.log` в той же директории.
+
+## Ресайз эмоджи за нижний левый угол (2026-10-20)
+
+`REQ-TOL-014/015`, `REQ-EDT-005/006`, ADR-035. Исходный HEAD `54ddab2`
+после `git fetch origin && git pull --ff-only`. Ubuntu 22.04.5 x86_64,
+Linux 6.8.0-138-generic, Node 22.23.1 из
+`/tmp/cute-screen-portal-research/node-v22.23.1-linux-x64/bin`, pnpm 10.33.2,
+headless Chrome/ChromeDriver 147.0.7727.101. Начальный shell Node 22.21.1
+был отвергнут engine check; последующие pnpm команды используют pinned Node.
+
+Причина: emoji image node игнорировал localBounds.x/y, которые меняются при
+ресайзе за левую/верхнюю сторону. Преобразуется полное локальное начало
+с rotation/reflection. Связанные исправления: size control сохраняет центр
+после такого ресайза; image projection корректно обрабатывает ненулевое
+локальное начало при rotation/scale. У shape, text, censor, spotlight и loupe
+проекции уже учитывают локальную геометрию; pencil/marker и ruler используют
+свои points/endpoints. Arrow/callout имеют semantic handles; numberedMarker
+не имеет generic resize. Persisted schema и EditorCommand не изменены.
+
+- Red-first: `pnpm test --project core packages/editor-core/src/emoji.test.ts`
+  — 26 failed / 11 passed; аналогичный focused image-paint run — 1 failed /
+  7 passed. После исправления и добавления четырёх Alt centre contracts оба
+  файла — 49 passed. Логи red-core, red-image, green-core.
+- `pnpm test:render tests/harness/render/emoji-assets.test.ts` — после исправления
+  6 passed: all 100 SVG decode, каждый угол, rotation/reflection, ожидаемые pixels
+  и повторное декодирование экспортированного PNG. В red-render три offset
+  cases провалились по pixels; четвёртый достиг 5 s test timeout при дорогом
+  сравнении typed arrays. Сравнение decoded buffers теперь использует
+  Buffer.equals, без изменения проверяемого равенства.
+- Browser env: `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1`,
+  `CUTE_SCREEN_BROWSER_E2E_PORT=5193`,
+  `NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt`.
+  `pnpm test:e2e:browser --spec tests/e2e/specs/browser-emoji-resize.e2e.ts --mochaOpts.timeout 120000`
+  — первоначальная regression sw failed по pixels во время preview (MAE 5.99
+  при допуске <1); после исправления четыре угла passed. Настоящий trusted
+  pointer, 2560×1440 документ, 100% viewport; preview transient, commit, exact
+  undo/redo и сравнение рисунка с независимо отрисованным SVG. Позднее сценарий
+  дополнен изменением размера через панель после corner resize.
+
+- `pnpm test` — 154 files, 1416 passed / 5 failed. Один failure — 5 s timeout
+  app-arrow-actions; `pnpm test tests/unit/vue/app-arrow-actions.test.ts --testTimeout 20000`
+  — 11 passed. Остальные четыре — параллельно изменяемые capture-source-settings
+  (`bridge.available is not a function`), вне resize-правки; общий pass не заявляется.
+- `pnpm test:render` — 18 files, 55 passed / один 5 s timeout 4K golden-brushes.
+  `pnpm test:render tests/harness/render/golden-brushes.test.ts --testTimeout 20000`
+  — 4 passed, включая decode parity двух backends. Assertions не ослаблялись;
+  timeout увеличен только аргументом повторного запуска на загруженном host.
+- `pnpm test:boundaries` — 110 passed / два 5 s timeout architecture scans;
+  `pnpm test:boundaries --testTimeout 20000` — 16 files / 112 passed.
+- `pnpm lint` — exit 0, 85 existing warnings. `pnpm docs:check` — passed.
+  `pnpm exec tsc --noEmit -p tests/e2e/tsconfig.json` — passed.
+- `pnpm typecheck` успешно собрал editor-core, editor-renderer и editor-vue,
+  затем заблокирован параллельной правкой CaptureSourceSettings/capture-source:
+  generated desktop-ipc ещё не экспортирует LinuxCaptureMethod/LinuxCaptureMethods.
+  Отдельный `pnpm exec vue-tsc --noEmit -p tests/tsconfig.json` показывает только
+  те же ошибки в settings и capture-source-settings.test, без resize diagnostics.
+  Общий typecheck pass не заявляется.
+
+- Финальный `pnpm test:e2e:browser --spec tests/e2e/specs/browser-emoji-resize.e2e.ts --mochaOpts.timeout 120000`
+  — **6 passed**, 1 min 41 s: четыре угла + изменение размера в панели,
+  отдельный production G-import 3840×2160 → SW resize с pixel preview/commit
+  parity и exact undo/redo, отдельный ruler endpoint resize с неподвижным
+  противоположным концом и сохранением style/history.
+- Дополнительный browser audit (`--spec browser-image-editing.e2e.ts`,
+  `browser-m08-2.e2e.ts`, `browser-m08-4.e2e.ts`, `browser-m08-6.e2e.ts`)
+  — 2 passed / 2 failed. Non-origin crop/text resize и precision cancel passed.
+  Восьмикомбинационный 4K image formatting suite достиг общего timeout 600 s;
+  ruler style suite остановился на thickness slider (строка 52), до ресайза.
+  Эти два широких сценария не считаются passed; короткие resize regressions
+  выше проходят отдельно, без изменения проверяемого production пути.
+- Финальные formatting и disk commands: см. логи artifacts/resize-corners.
+  Фокусные lint/type checks не подменяют упомянутые общие failures.
+  Native Tauri/WebKitGTK, WebView2, WKWebView, Rust, полный `pnpm check`,
+  release/package build и perf suite в этой DOM-free geometry правке не
+  запускались. Параллельные изменения Rust в том же workspace не относятся к ней.
+  Evidence: `artifacts/resize-corners/`; screenshots `emoji-resize-{sw,nw,ne,se}.png`
+  первоначально в artifacts/browser-e2e. Просмотрены sw и nw: рисунок внутри
+  рамки, selection toolbar над объектом.

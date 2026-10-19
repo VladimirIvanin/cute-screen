@@ -369,14 +369,14 @@ use settings_window::test_tray_labels;
 pub mod shortcuts;
 use shortcuts::commands::*;
 #[cfg(target_os = "linux")]
+#[path = "platform/linux/capture.rs"]
+pub mod linux_capture;
+#[cfg(target_os = "linux")]
 #[path = "platform/linux/portal.rs"]
 pub mod linux_platform;
 #[cfg(target_os = "linux")]
 #[path = "platform/linux/quick_presentation.rs"]
 mod linux_quick_presentation;
-#[cfg(target_os = "linux")]
-#[path = "platform/linux/screencast.rs"]
-mod linux_screencast;
 pub mod platform;
 pub use cute_screen_storage as storage;
 pub mod app;
@@ -902,7 +902,18 @@ async fn settings_put(
 }
 
 #[tauri::command]
-async fn platform_capabilities(correlation_id: String) -> PlatformCapabilities {
+async fn platform_capabilities(
+    correlation_id: String,
+    controller: State<'_, CaptureController>,
+) -> CommandResult<PlatformCapabilities> {
+    Ok(compute_platform_capabilities(correlation_id, &controller).await)
+}
+
+async fn compute_platform_capabilities(
+    correlation_id: String,
+    controller: &CaptureController,
+) -> PlatformCapabilities {
+    let _ = &controller;
     #[cfg(feature = "fake-platform")]
     if env::var_os("CUTE_SCREEN_E2E_FAKE_CAPTURE").is_some() {
         return PlatformCapabilities::for_session(
@@ -966,6 +977,18 @@ async fn platform_capabilities(correlation_id: String) -> PlatformCapabilities {
         let adapter = x11_platform::X11CaptureAdapter;
         capabilities.capture.cursor = adapter.cursor_available();
         apply_x11_target_capabilities(&mut capabilities, adapter.target_capabilities());
+    }
+    #[cfg(target_os = "linux")]
+    if session == SessionKind::Wayland {
+        match controller.capture_methods().await {
+            Ok(methods) => linux_capture::apply_capabilities(&mut capabilities, &methods),
+            Err(error) => {
+                eprintln!("cute-screen capture methods: {error}");
+                capabilities.capture.available = false;
+                capabilities.capture.interactive_selector = false;
+                capabilities.capture.monitor_target = false;
+            }
+        }
     }
     if capabilities.cli_fallback {
         capabilities.cli_fallback_command = lifecycle::current_cli_fallback_command();
@@ -1064,17 +1087,28 @@ fn quick_capture_warmup(
 }
 
 #[tauri::command]
-async fn capture_select_monitor(controller: State<'_, CaptureController>) -> CommandResult<bool> {
+async fn capture_methods(
+    controller: State<'_, CaptureController>,
+) -> CommandResult<Option<platform::capture_method::LinuxCaptureMethods>> {
+    let _ = &controller;
     #[cfg(target_os = "linux")]
     if current_session() == SessionKind::Wayland {
-        return Ok(controller.select_monitor().await?);
+        return Ok(Some(controller.capture_methods().await?));
     }
-    let _ = controller;
-    Err(PlatformError::new(
-        platform::PlatformErrorCode::InvalidTarget,
-        "screen-selection",
-    )
-    .into())
+    Ok(None)
+}
+
+#[tauri::command]
+async fn capture_set_method(
+    method: platform::capture_method::LinuxCaptureMethod,
+    controller: State<'_, CaptureController>,
+) -> CommandResult<platform::capture_method::LinuxCaptureMethods> {
+    let _ = (&method, &controller);
+    #[cfg(target_os = "linux")]
+    if current_session() == SessionKind::Wayland {
+        return Ok(controller.set_capture_method(method).await?);
+    }
+    Err(PlatformError::new(PlatformErrorCode::InvalidTarget, "capture-method").into())
 }
 
 #[tauri::command]
@@ -2154,9 +2188,11 @@ fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()
             .collect::<tauri::Result<_>>()?,
     ));
     app.manage(settings_window::TrayShortcutItems(listed));
-    refresh_tray_capture_items(capture_area, capture_screen, capture_window);
+    refresh_tray_capture_items(app, capture_area, capture_screen, capture_window);
+    let controller = app.state::<CaptureController>().inner().clone();
     tauri::async_runtime::spawn(async move {
-        let capabilities = platform_capabilities("tray-extra-actions".to_owned()).await;
+        let capabilities =
+            compute_platform_capabilities("tray-extra-actions".to_owned(), &controller).await;
         if let Err(error) = capture_active.set_enabled(capabilities.capture.active_window_target) {
             eprintln!("cute-screen tray active window: {error}");
         }
@@ -2179,12 +2215,15 @@ fn tray_lists_item(id: &str) -> bool {
 /// known until the asynchronous capability probe returns. This avoids a menu
 /// action that looks available but immediately fails in an unsupported session.
 fn refresh_tray_capture_items<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
     capture_area: MenuItem<R>,
     capture_screen: MenuItem<R>,
     capture_window: MenuItem<R>,
 ) {
+    let controller = app.state::<CaptureController>().inner().clone();
     tauri::async_runtime::spawn(async move {
-        let capabilities = platform_capabilities("tray-capabilities".to_owned()).await;
+        let capabilities =
+            compute_platform_capabilities("tray-capabilities".to_owned(), &controller).await;
         let _ = capture_area.set_enabled(capabilities.capture.interactive_selector);
         let _ = capture_screen.set_enabled(capabilities.capture.monitor_target);
         let _ = capture_window.set_enabled(capabilities.capture.window_target);
@@ -2368,7 +2407,8 @@ async fn capture_with_preflight<R: tauri::Runtime>(
         diagnostics.begin(&request);
     }
     publish_capture_progress(app, &request.correlation_id, CaptureProgressState::Probing);
-    let capabilities = platform_capabilities(request.correlation_id.clone()).await;
+    let capabilities =
+        compute_platform_capabilities(request.correlation_id.clone(), controller).await;
     if !capture_action_supported(request.action, &capabilities) {
         let outcome = terminal_capture(request.correlation_id, CaptureTerminalOutcome::Unavailable);
         publish_capture_outcome(app, &outcome, action);
@@ -2907,7 +2947,8 @@ pub fn run() {
         quick_capture_get_active,
         quick_capture_confirm_selection,
         quick_capture_warmup,
-        capture_select_monitor,
+        capture_methods,
+        capture_set_method,
         quick_capture_present,
         quick_capture_reveal,
         quick_capture_dismiss,
@@ -2988,7 +3029,8 @@ pub fn run() {
         quick_capture_get_active,
         quick_capture_confirm_selection,
         quick_capture_warmup,
-        capture_select_monitor,
+        capture_methods,
+        capture_set_method,
         quick_capture_present,
         quick_capture_reveal,
         quick_capture_dismiss,

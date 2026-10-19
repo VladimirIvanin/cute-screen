@@ -123,8 +123,9 @@ impl ShortcutService {
             *self.error.lock().map_err(|error| error.to_string())? = Some(error);
         }
         let preferences = self.preferences()?;
-        let capabilities = tauri::async_runtime::block_on(crate::platform_capabilities(
+        let capabilities = tauri::async_runtime::block_on(crate::compute_platform_capabilities(
             "shortcut-settings".to_owned(),
+            &app.state::<crate::CaptureController>(),
         ));
         let backend = self.backend()?;
         let entries = ShortcutAction::ALL
