@@ -51,11 +51,20 @@ capture/help/version; служебные startup/background/settings args сох
 в `target/e2e-isolated`. После dry-run очищены только пакеты с доказанным
 повреждением (1520 файлов / 594,8 MiB и 157 / 12,4 MiB). Затем инвентаризация
 нашла ещё 122 .rmeta с нулевым заголовком; очищены outputs соответствующих
-пакетов (3926 файлов / 1,4 GiB). Остальной cache сохранён.
+пакетов (3926 файлов / 1,4 GiB). Дополнительно восстановлены повреждённые
+PDB двух macro-пакетов (72 файла / 35,1 MiB) и percent-encoding
+(27 файлов / 933,2 KiB). Остальной cache сохранён.
 `pnpm install --frozen-lockfile` применил уже зафиксированный Vitest patch;
 после синхронизации полный boundary suite прошёл: 111 passed, один skipped.
-`pnpm check` также прошёл lint, typecheck, format:check и docs:check;
-IPC/Rust результат записывается после завершения восстановления cache.
+Итоговый `pnpm check` на 0.1.6 целиком passed: lint, typecheck,
+format:check, docs:check, boundaries, IPC и четыре Clippy-конфигурации.
+Лог — `artifacts/windows-audit/check-verified-0.1.6.log`.
+Повторный `cargo test --offline --workspace` на 0.1.6: 180 passed,
+один interactive ignored; `artifacts/windows-audit/rust-workspace-0.1.6.log`.
+`pnpm format`, `cargo fmt --all` и финальный `pnpm format:check` выполнены.
+Диск до/после тяжёлой проверки: target 17,223 → 24,445 GiB,
+artifacts 11,718 → 11,718 GiB. Рост — сохранённый build cache и NSIS output;
+`artifacts/windows-audit/disk-before-release.log` и `disk-completed.log`.
 Рекурсивное удаление завершённых диагностических профилей отклонено
 автоматической проверкой разрешений (`blocked by policy`); эти профили оставлены.
 
