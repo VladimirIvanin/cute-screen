@@ -1,3 +1,5 @@
+use crate::platform::preview::{encode_rgba_bmp, top_down_bmp_prefix};
+
 use std::{
     collections::BTreeSet,
     sync::mpsc::{self, Receiver, Sender},
@@ -2982,67 +2984,6 @@ fn import_quick_rgba_preview(
         );
     }
     Ok(result)
-}
-
-fn top_down_bmp_prefix(
-    width: u32,
-    height: u32,
-    pixel_length: usize,
-    correlation_id: &str,
-) -> Result<Vec<u8>, PlatformError> {
-    let bmp_width = i32::try_from(width).map_err(|_| gate_error(correlation_id, "bmpWidth"))?;
-    let bmp_height = i32::try_from(height).map_err(|_| gate_error(correlation_id, "bmpHeight"))?;
-    let pixel_length =
-        u32::try_from(pixel_length).map_err(|_| gate_error(correlation_id, "bmpPixelLength"))?;
-    let file_size = 54_u32
-        .checked_add(pixel_length)
-        .ok_or_else(|| gate_error(correlation_id, "bmpFileSize"))?;
-    let capacity =
-        usize::try_from(file_size).map_err(|_| gate_error(correlation_id, "bmpCapacity"))?;
-    let mut bmp = Vec::with_capacity(capacity);
-    bmp.extend_from_slice(b"BM");
-    bmp.extend_from_slice(&file_size.to_le_bytes());
-    bmp.extend_from_slice(&0_u32.to_le_bytes());
-    bmp.extend_from_slice(&54_u32.to_le_bytes());
-    bmp.extend_from_slice(&40_u32.to_le_bytes());
-    bmp.extend_from_slice(&bmp_width.to_le_bytes());
-    bmp.extend_from_slice(&bmp_height.saturating_neg().to_le_bytes());
-    bmp.extend_from_slice(&1_u16.to_le_bytes());
-    bmp.extend_from_slice(&32_u16.to_le_bytes());
-    bmp.extend_from_slice(&0_u32.to_le_bytes());
-    bmp.extend_from_slice(&pixel_length.to_le_bytes());
-    bmp.extend_from_slice(&0_i32.to_le_bytes());
-    bmp.extend_from_slice(&0_i32.to_le_bytes());
-    bmp.extend_from_slice(&0_u32.to_le_bytes());
-    bmp.extend_from_slice(&0_u32.to_le_bytes());
-    Ok(bmp)
-}
-
-fn encode_rgba_bmp(
-    rgba: &[u8],
-    width: u32,
-    height: u32,
-    correlation_id: &str,
-) -> Result<Vec<u8>, PlatformError> {
-    let expected_len = usize::try_from(width)
-        .ok()
-        .and_then(|width| {
-            usize::try_from(height)
-                .ok()
-                .and_then(|height| width.checked_mul(height))
-        })
-        .and_then(|pixels| pixels.checked_mul(4))
-        .ok_or_else(|| gate_error(correlation_id, "bmpPixelLength"))?;
-    if rgba.len() != expected_len {
-        return Err(gate_error(correlation_id, "bmpPixelLength"));
-    }
-    let mut bmp = top_down_bmp_prefix(width, height, rgba.len(), correlation_id)?;
-    bmp.extend_from_slice(rgba);
-    for pixel in bmp[54..].chunks_exact_mut(4) {
-        pixel.swap(0, 2);
-        pixel[3] = u8::MAX;
-    }
-    Ok(bmp)
 }
 
 fn is_standard_xrgb32(image: &Image<'_>, layout: PixelLayout) -> bool {

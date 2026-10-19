@@ -13,6 +13,24 @@ startup check в build gates. Нативные Windows 11/ARM64/HDR/mixed-DPI,
 Срабатывание PRO32 ID700022 относится к установщику 0.1.5; результат
 проверки 0.1.6 этим антивирусом неизвестен. Evidence — TESTING.md.
 
+## Wayland: сессия доступа и raw frame (2026-10-19, ADR-118)
+
+Ubuntu 22.04.5 x64 / GNOME 42.9 / Wayland: Screenshot v2, ScreenCast v4,
+AvailableSourceTypes=3, pipewiresrc 0.3.48. Владелец подтвердил, что прежний
+Screenshot путь каждый раз просит доступ, preview недостаточно чёткий;
+dev наследовал GDK_BACKEND=x11. Поэтому Area/Screen/Repeat переведены на
+переиспользуемую Monitor session и raw-RGBA PipeWire consumer, entry — на
+native Wayland. Наличие raw pipeline проверяется, frame не уменьшается.
+Выделение в пределах выбранного монитора, без синтеза desktop geometry.
+Владелец проверил два захвата новой сборкой: повторного запроса нет, качество
+хорошее. Сообщённая задержка перед выделением привела к memory-owned BMP
+preview (ADR-119). Владелец подтвердил заметное ускорение, открытие системного
+выбора и рабочий capture после отмены. После повторного назначения hotkey
+Ctrl+Shift+2 сохранён в GNOME и dev preferences; пользователь сообщил, что
+заработало. Настоящий restart и смена физического монитора ещё pending.
+Команды и результаты — TESTING.md.
+KDE/wlroots, X11, Windows/macOS и mixed-DPI этим изменением не проверены.
+
 ## Стартовая толщина линий (2026-10-18, ADR-116)
 
 Общие TypeScript/Vue defaults: arrow 8 px; line, shape, pencil и рамка лупы
@@ -808,17 +826,17 @@ external tauri-driver 2.1.0 + подходящий EdgeDriver; embedded 1.3.0 DO
 
 ## Поддерживаемые цели
 
-| Платформа       | Архитектура    | Захват                                                                                                    | Горячие клавиши                        | Неофициальный CI artifact |
-| --------------- | -------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------- |
-| Linux X11       | x86_64         | `x11rb` visible drawable + target-visual frozen overlay; local compositor/quick runtime passed 2026-08-24 | Tauri/global-hotkey                    | deb, AppImage             |
-| Linux X11       | aarch64        | `x11rb` visible drawable + собственный frozen overlay; compositor runtime re-smoke pending                | Tauri/global-hotkey                    | deb, AppImage             |
-| GNOME Wayland   | x86_64/aarch64 | XDG Screenshot portal                                                                                     | XDG GlobalShortcuts или CLI fallback   | deb, AppImage             |
-| KDE Wayland     | x86_64/aarch64 | XDG Screenshot portal                                                                                     | XDG GlobalShortcuts или CLI fallback   | deb, AppImage             |
-| wlroots Wayland | x86_64/aarch64 | Portal при наличии                                                                                        | Portal при наличии, иначе CLI fallback | deb, AppImage             |
-| Windows         | x86_64         | DXGI/D3D11 frozen Area Quick surface; single-HWND/pixel replay passed; cross-monitor smoke pending        | Tauri/global-hotkey                    | NSIS exe                  |
-| Windows 11      | ARM64          | DXGI/D3D11 frozen Area Quick surface; native Window selector; runtime smoke pending                       | Tauri/global-hotkey                    | NSIS exe                  |
-| macOS           | Intel          | Native AppKit Area/Window; CG 12.0–12.2, intended SCKit 12.3+ routing; runtime smoke pending              | later slice: Tauri/global-hotkey       | universal DMG             |
-| macOS           | Apple Silicon  | Same versioned native adapter as Intel; compile/CI until owner runtime                                    | later slice: Tauri/global-hotkey       | universal DMG             |
+| Платформа       | Архитектура    | Захват                                                                                                    | Горячие клавиши                                       | Неофициальный CI artifact |
+| --------------- | -------------- | --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- | ------------------------- |
+| Linux X11       | x86_64         | `x11rb` visible drawable + target-visual frozen overlay; local compositor/quick runtime passed 2026-08-24 | Tauri/global-hotkey                                   | deb, AppImage             |
+| Linux X11       | aarch64        | `x11rb` visible drawable + собственный frozen overlay; compositor runtime re-smoke pending                | Tauri/global-hotkey                                   | deb, AppImage             |
+| GNOME Wayland   | x86_64/aarch64 | XDG ScreenCast/PipeWire Monitor; Screenshot v3 Window                                                     | XDG GlobalShortcuts, GNOME GSettings или CLI fallback | deb, AppImage             |
+| KDE Wayland     | x86_64/aarch64 | XDG ScreenCast/PipeWire при verified capability                                                           | XDG GlobalShortcuts или CLI fallback                  | deb, AppImage             |
+| wlroots Wayland | x86_64/aarch64 | Portal при наличии                                                                                        | Portal при наличии, иначе CLI fallback                | deb, AppImage             |
+| Windows         | x86_64         | DXGI/D3D11 frozen Area Quick surface; single-HWND/pixel replay passed; cross-monitor smoke pending        | Tauri/global-hotkey                                   | NSIS exe                  |
+| Windows 11      | ARM64          | DXGI/D3D11 frozen Area Quick surface; native Window selector; runtime smoke pending                       | Tauri/global-hotkey                                   | NSIS exe                  |
+| macOS           | Intel          | Native AppKit Area/Window; CG 12.0–12.2, intended SCKit 12.3+ routing; runtime smoke pending              | later slice: Tauri/global-hotkey                      | universal DMG             |
+| macOS           | Apple Silicon  | Same versioned native adapter as Intel; compile/CI until owner runtime                                    | later slice: Tauri/global-hotkey                      | universal DMG             |
 
 macOS deployment baseline зафиксирован ADR-038 как 12.0. Остальные точные
 минимальные версии ОС фиксируются во время финальной runtime-проверки capture
@@ -828,21 +846,22 @@ API и webview. Release baseline не повышается без ADR и CI-до
 
 | Возможность      | X11                                            | Wayland portal                                         | Windows                                     | macOS                        |
 | ---------------- | ---------------------------------------------- | ------------------------------------------------------ | ------------------------------------------- | ---------------------------- |
-| Area             | One fullscreen Quick surface: select → edit    | System selector                                        | One fullscreen Quick surface: select → edit | AppKit; frozen quick-mode    |
-| Screen           | Root or Composite Overlay Window               | Portal target/capability                               | DXGI virtual screen                         | Direct after permission      |
+| Area             | One fullscreen Quick surface: select → edit    | Quick selection выбранного ScreenCast Monitor          | One fullscreen Quick surface: select → edit | AppKit; frozen quick-mode    |
+| Screen           | Root or Composite Overlay Window               | Разрешённый ScreenCast Monitor                         | DXGI virtual screen                         | Direct after permission      |
 | Window           | Direct/window list                             | Portal target/capability                               | Direct/window list                          | Native; direct document      |
 | Active window    | Window manager adapter                         | Portal when exposed, otherwise clear unavailable state | Native                                      | Not advertised (later slice) |
-| Repeat last area | Stored physical/image geometry with validation | New portal interaction if silent reuse is unavailable  | Stored geometry                             | Not advertised (later slice) |
+| Repeat last area | Stored physical/image geometry with validation | Новое Quick выделение в разрешённом Monitor            | Stored geometry                             | Not advertised (later slice) |
 | Delay            | App countdown before backend invocation        | App countdown before portal                            | App countdown                               | App countdown                |
 | Cursor           | Capability-dependent                           | Portal-dependent                                       | Backend option                              | Not advertised               |
 
 Area является единственной capture action, которая заканчивается в quick-mode.
 На X11/Windows/macOS quick surface сохраняет frozen desktop и physical
 selection coordinates; macOS Area использует единый frozen multi-display
-frame. Wayland сначала завершает системный XDG selector, затем показывает
-только возвращённый fragment на нейтральном фоне; рамку можно перемещать и
-уменьшать внутри fragment, но нельзя расширять за его границы. Screen, Window,
-Active Window и Repeat продолжают direct-to-editor flow.
+frame. Wayland использует raw frame выбранного ScreenCast Monitor и тот же
+Quick lifecycle; рамка может расширяться до границ выбранного монитора. Repeat
+на Wayland начинает новое выделение в той же разрешённой сессии. Screen, Window
+и Active Window продолжают direct-to-editor flow; Repeat остальных платформ
+сохраняет собственный контракт.
 
 UI получает `CaptureCapabilities` и не показывает неподдерживаемый режим как рабочий. Если функция временно недоступна, control disabled с объяснением и доступной альтернативой.
 

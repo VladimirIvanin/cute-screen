@@ -1,0 +1,19 @@
+{
+  "productName": "Cute Screen Dev",
+  "identifier": "io.github.vladimirivanin.cute-screen.dev",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Cute Screen Dev",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 640,
+        "decorations": true,
+        "resizable": true,
+        "visible": false
+      }
+    ]
+  }
+}

@@ -374,6 +374,9 @@ pub mod linux_platform;
 #[cfg(target_os = "linux")]
 #[path = "platform/linux/quick_presentation.rs"]
 mod linux_quick_presentation;
+#[cfg(target_os = "linux")]
+#[path = "platform/linux/screencast.rs"]
+mod linux_screencast;
 pub mod platform;
 pub use cute_screen_storage as storage;
 pub mod app;
@@ -947,6 +950,13 @@ async fn platform_capabilities(correlation_id: String) -> PlatformCapabilities {
         portal,
         Some(native_adapter_available),
     );
+    #[cfg(target_os = "linux")]
+    if session == SessionKind::Wayland
+        && !capabilities.hotkeys.available
+        && shortcuts::gnome::GnomeSettings::available()
+    {
+        capabilities.apply_gnome_hotkeys();
+    }
     #[cfg(target_os = "windows")]
     {
         capabilities.apply_windows_targets(windows_desktop_available, windows_window_available);
@@ -1051,6 +1061,20 @@ fn quick_capture_warmup(
     #[cfg(not(target_os = "linux"))]
     let _ = app;
     Ok(true)
+}
+
+#[tauri::command]
+async fn capture_select_monitor(controller: State<'_, CaptureController>) -> CommandResult<bool> {
+    #[cfg(target_os = "linux")]
+    if current_session() == SessionKind::Wayland {
+        return Ok(controller.select_monitor().await?);
+    }
+    let _ = controller;
+    Err(PlatformError::new(
+        platform::PlatformErrorCode::InvalidTarget,
+        "screen-selection",
+    )
+    .into())
 }
 
 #[tauri::command]
@@ -1923,7 +1947,8 @@ async fn hide_editor_for_native_capture<R: tauri::Runtime>(
     #[cfg(target_os = "macos")]
     let native_desktop_capture = true;
     #[cfg(not(any(target_os = "windows", target_os = "macos")))]
-    let native_desktop_capture = current_session() == SessionKind::X11;
+    let native_desktop_capture =
+        matches!(current_session(), SessionKind::X11 | SessionKind::Wayland);
     if !native_desktop_capture {
         return Ok(false);
     }
@@ -1943,14 +1968,20 @@ async fn hide_editor_for_native_capture<R: tauri::Runtime>(
         }
     }
     #[cfg(all(target_os = "linux", feature = "x11-capture"))]
-    if x11_platform::X11CaptureAdapter.current_process_windows_unmapped(correlation_id)? {
+    if current_session() == SessionKind::X11
+        && x11_platform::X11CaptureAdapter.current_process_windows_unmapped(correlation_id)?
+    {
         x11_platform::wait_for_recent_app_surface_settle();
         return Ok(false);
     }
     let Some(window) = app.get_webview_window("main") else {
+        #[cfg(target_os = "linux")]
+        settle_wayland_capture_surfaces().await;
         return Ok(false);
     };
     if !should_hide_editor_for_native_capture(window.is_visible().ok()) {
+        #[cfg(target_os = "linux")]
+        settle_wayland_capture_surfaces().await;
         return Ok(false);
     }
     #[cfg(target_os = "windows")]
@@ -2001,7 +2032,7 @@ async fn hide_editor_for_native_capture<R: tauri::Runtime>(
         .hide()
         .map_err(|_| PlatformError::new(PlatformErrorCode::CaptureFailed, correlation_id))?;
     #[cfg(all(target_os = "linux", feature = "x11-capture"))]
-    {
+    if current_session() == SessionKind::X11 {
         x11_platform::X11CaptureAdapter.round_trip_barrier(correlation_id)?;
         if should_wait_for_native_x11_unmap(invocation_source)
             && let Err(error) =
@@ -2015,7 +2046,18 @@ async fn hide_editor_for_native_capture<R: tauri::Runtime>(
     }
     #[cfg(not(all(target_os = "linux", feature = "x11-capture")))]
     let _ = invocation_source;
+    #[cfg(target_os = "linux")]
+    settle_wayland_capture_surfaces().await;
     Ok(true)
+}
+
+#[cfg(target_os = "linux")]
+async fn settle_wayland_capture_surfaces() {
+    if current_session() == SessionKind::Wayland {
+        // Wayland has no X11 unmap barrier. Allow the compositor to retire our
+        // hidden surfaces before asking the portal for the frozen desktop.
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    }
 }
 
 fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()> {
@@ -2865,6 +2907,7 @@ pub fn run() {
         quick_capture_get_active,
         quick_capture_confirm_selection,
         quick_capture_warmup,
+        capture_select_monitor,
         quick_capture_present,
         quick_capture_reveal,
         quick_capture_dismiss,
@@ -2945,6 +2988,7 @@ pub fn run() {
         quick_capture_get_active,
         quick_capture_confirm_selection,
         quick_capture_warmup,
+        capture_select_monitor,
         quick_capture_present,
         quick_capture_reveal,
         quick_capture_dismiss,

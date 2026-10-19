@@ -6,6 +6,7 @@ import type {
 import type { SettingsState } from './use-settings'
 import StartupPreferences from './StartupPreferences.vue'
 import ExportFilenameSettings from './ExportFilenameSettings.vue'
+import CaptureSourceSettings from './CaptureSourceSettings.vue'
 
 defineProps<{ locale: SettingsLocale; labels: SettingsStrings; state: SettingsState }>()
 const emit = defineEmits<{ locale: [value: SettingsLocale]; startup: [enabled: boolean]; system: [] }>()
@@ -36,5 +37,6 @@ const emit = defineEmits<{ locale: [value: SettingsLocale]; startup: [enabled: b
       @system="emit('system')"
     />
     <ExportFilenameSettings :locale="locale" />
+    <CaptureSourceSettings :locale="locale" />
   </section>
 </template>

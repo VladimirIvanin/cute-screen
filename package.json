@@ -22,6 +22,8 @@
     "build:frontend": "vite build --config apps/desktop/vite.config.ts",
     "build:landing": "vite build --config apps/landing/vite.config.ts",
     "build:linux:ubuntu22": "bash scripts/build-linux-ubuntu22.sh",
+    "build:linux:dev": "bash scripts/build-linux-dev.sh",
+    "start:linux:dev": "bash scripts/run-linux-dev.sh",
     "check:linux:compat": "bash scripts/check-linux-compat.sh",
     "tauri": "node node_modules/@tauri-apps/cli/tauri.js",
     "icons:generate": "node scripts/generate-brand-assets.mjs",
