@@ -1,14 +1,20 @@
 # Архитектура Cute Screen
 
-## Wayland single-shot routing (ADR-121)
+## Wayland single-shot routing (ADR-122)
 
 LinuxCaptureService выбирает отдельный Screenshot-запрос или внешний системный
-helper для Area/Screen/Repeat. Предпочтение хранится в storage. Auto сохраняет
+helper для Area/Screen/Repeat. GNOME Shell ≤42 в Auto использует встроенный
+Screenshot client с кратковременным legacy D-Bus именем, без replacement и
+очереди. Соединение закрывается до PNG import, включая cancel/error/timeout.
+Busy не вытесняет установленную утилиту. Предпочтение хранится в storage. Auto сохраняет
 Screenshot portal v2+/advertised v3 Screen для современных GNOME, KDE и других
-portal-окружений. Только GNOME Shell ≤42 с установленным gnome-screenshot
-предпочитает helper; при отсутствии Screenshot доступен grim в известных
+portal-окружений. В Auto техническая ошибка встроенного GNOME client может
+запустить установленный gnome-screenshot; отмена/PermissionDenied/Busy не
+запускают fallback. При отсутствии Screenshot доступен grim в известных
 wlroots-окружениях. Название окружения не доказывает runtime-поддержку протокола.
-Явный выбор не имеет скрытого fallback. Capabilities отражают выбранный путь;
+Явный выбор не имеет скрытого fallback. Wayland hide main/settings/Quick
+выполняется на GTK thread с display.sync; ожидается лишь оставшаяся часть fade недавно
+скрытой поверхности вместо безусловных 200 мс. Capabilities отражают выбранный путь;
 Window/Active Window остаются отдельными advertised Screenshot targets.
 Helpers имеют child guard, 10-секундный timeout, cancel flag, приватный staging
 и полное PNG декодирование. ScreenCast session и GStreamer capture dependencies

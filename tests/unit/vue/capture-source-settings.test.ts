@@ -15,7 +15,7 @@ import {
 import CaptureSourceSettings from '../../../apps/desktop/src/settings/CaptureSourceSettings.vue'
 import type { LinuxCaptureMethods } from '../../../apps/desktop/src/generated/desktop-ipc'
 
-const initial: LinuxCaptureMethods = { selected: 'auto', resolved: 'gnomeScreenshot', available: ['auto', 'portal', 'gnomeScreenshot'] }
+const initial: LinuxCaptureMethods = { selected: 'auto', resolved: 'gnomeShell', available: ['auto', 'portal', 'gnomeShell'] }
 afterEach(cleanup)
 
 describe('Wayland screenshot method settings', () => {
@@ -31,6 +31,8 @@ describe('Wayland screenshot method settings', () => {
     const bridge = { snapshot: vi.fn().mockResolvedValue(initial), save: vi.fn() }
     render(CaptureSourceSettings, { props: { locale: 'ru', bridge } })
     const select = await screen.findByRole('combobox', { name: 'Способ захвата' })
+    expect(screen.getByText(/Не требует установки/u)).toBeInTheDocument()
+    expect(screen.queryByText(/Нужна утилита gnome-screenshot/u)).not.toBeInTheDocument()
     select.focus()
     expect(select).toHaveFocus()
     expect(screen.getByRole('option', { name: /wlroots/u })).toBeDisabled()

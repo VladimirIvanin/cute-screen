@@ -1,5 +1,17 @@
 # Сквозная приёмка
 
+## GNOME 42 из коробки (2026-10-20, ADR-122)
+
+`REQ-CAP-001/002/006/009/016/017`: в GNOME 42 окружении без gnome-screenshot
+в PATH/HOME Auto разрешается во встроенный gnomeShell. Два последовательных
+Area, History, новый crop=null, reopen и полное PNG decode проходят. Перед
+capture main/settings/Quick скрыты; старой рамки нет. D-Bus Screenshot имеет
+flash=false; ScreenCast calls отсутствуют. Занятое legacy имя даёт Busy, его
+владелец не заменяется; после освобождения следующий захват работает.
+Отдельно проверить явный резервный gnomeScreenshot там, где утилита установлена.
+CLI и Settings сохраняют реальный backend в provenance. Современный GNOME
+по routing contract сохраняет portal; реальный Ubuntu 24 gate отдельно.
+
 ## Разовые Wayland-снимки и повторная рамка (2026-10-20, ADR-121)
 
 `REQ-CAP-001/002/005/006/009/010/011/012/013/016/017`: GNOME ≤42 с helper:

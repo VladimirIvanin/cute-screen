@@ -1,5 +1,63 @@
 # Стратегия тестирования
 
+## Встроенный GNOME Screenshot и исчезновение окна (2026-10-20, ADR-122)
+
+Исходный HEAD 2136b7b, рабочая копия с изменениями. Ubuntu 22.04.5 x86_64,
+GNOME 42.9 / Wayland, scale 1.25; Node 22.23.1 / pnpm 10.33.2 / Rust 1.97.0
+из штатного `cute-screen-ubuntu22-build:local`. Host Node 22.21.1 не менялся.
+
+- Red-first routing без установленного helper и UI-контракт встроенного метода
+  сначала failed; после реализации passed. `cargo test --package
+cute-screen-desktop --lib --locked`: 172 passed. Четыре относящихся Vue suite
+  (`capture-source-settings`, `quick-capture-warmup`, `quick-capture-coordinator`,
+  `quick-capture-actions`): 19 passed.
+- `pnpm check`: lint (88 baseline warnings), typecheck и format:check passed.
+  Docs gate выявил неверный ADR anchor; после исправления отдельно выполнены
+  `pnpm docs:check`, `pnpm test:boundaries` (112 passed), `pnpm ipc:check`,
+  `pnpm check:rust` (cargo fmt и четыре Clippy feature gates): passed.
+  Production frontend не содержит `__cuteScreenE2eQuick`, warmupAt/recordReveal.
+- `CUTE_SCREEN_E2E_SCENARIOS=wayland-single-shot,wayland-single-shot-reopen pnpm test:e2e:tauri`:
+  два passed без gnome-screenshot в PATH/HOME; затем два passed с явным
+  `CUTE_SCREEN_E2E_CAPTURE_METHOD=gnomeScreenshot`. Это свежий штатный debug
+  harness, реальный GNOME Screenshot и WebKitGTK, без fake capture.
+- Два разных Area drafts, crop=null при новом mount, reset перед warmup,
+  overlay hidden до reveal, Busy при параллельном запросе, сохранённый crop
+  863×486 полностью декодирован/opaque, выбранный метод сохранился при reopen.
+  DOM PointerEvents доставляются в реальные production handlers; физическая
+  мышь не является gate этих сценариев (подробности предыдущего раздела ниже).
+- Проверка исключения окна сначала failed: 69 317 пурпурных пикселей маркера
+  редактора попали в PNG через GNOME fade. GTK roundtrip этого не предотвращает.
+  После ожидания остатка 200 мс от фактического hide — 17 фоновых пикселей
+  на обоих снимках, и визуально чистый initial frame. Без недавнего hide пауза
+  равна нулю; отдельный tray delay сохранён.
+- Read-only timing facade: native debug click-to-reveal 1484/1131 мс,
+  external helper 2306/1868 мс. Отдельный backend-прототип дал 142–164 мс
+  (PNG decode + release 186–223 мс); это не время полного Quick UI.
+
+- `pnpm tauri build --no-bundle --config src-tauri/tauri.dev.conf.json -- --locked`
+  в штатном image: passed, оптимизированная сборка с dev identity без пакетов.
+  Свежий binary атомарно обновлён в artifacts/linux-dev и запущен штатным
+  `bash scripts/run-linux-dev.sh --background`.
+- Обычный production CLI `capture --mode screen --json`: при занятом
+  org.gnome.Screenshot — Busy / exit 75, владелец и число captures не изменились.
+  После освобождения — два captured / exit 0 за 714/1193 мс (весь CLI с
+  сохранением, не Area reveal). Сохранённый original повторно декодирован:
+  1920×1080 RGBA, alpha 255, backend=gnomeShell. Screenshot D-Bus trace содержит
+  false/false и ни одного ScreenCast call; после захвата legacy имя свободно.
+  Последний original визуально проверен: затухающего редактора нет.
+
+Runtime container использует реальные Wayland/D-Bus, workspace по одинаковому
+абсолютному пути host/container, `TMPDIR=<workspace>/artifacts/mutter-one-shot-2026-10-20/native-tmp`
+и отдельный frontendDist. Иначе GNOME вне контейнера пишет PNG в невидимый ему
+container /tmp; диагностированный первый failure сохранён, успешный gate
+проверяет правильное размещение.
+
+Evidence: `artifacts/mutter-one-shot-2026-10-20`: red/green PNG и pixel counts,
+native-no-helper.json, native-helper.json, warmup JSON, Rust/Vue logs,
+run-native-e2e.sh и run-native-helper-e2e.sh. Ubuntu 24, KDE, wlroots, ARM64,
+другие версии GNOME и mixed-DPI остаются native pending; сохранение portal
+на современных desktop подтверждено routing contracts.
+
 ## Разовые Wayland-снимки, без sharing indicator (2026-10-20, ADR-121)
 
 Исходный HEAD 54ddab2, рабочая копия с изменениями. Ubuntu 22.04.5 x86_64 /

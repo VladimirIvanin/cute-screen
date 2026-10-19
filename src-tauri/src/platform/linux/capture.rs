@@ -1,3 +1,5 @@
+#[path = "gnome_shell.rs"]
+mod gnome_shell;
 #[path = "helpers.rs"]
 mod helpers;
 
@@ -90,24 +92,34 @@ impl LinuxCaptureService {
                     .capture(request)
                     .await
             }
+            Some(LinuxCaptureMethod::GnomeShell) => {
+                let captured = gnome_shell::capture(
+                    request.clone(),
+                    Arc::clone(&transport),
+                    Arc::clone(&cancelled),
+                )
+                .await;
+                match captured {
+                    Err(error)
+                        if helper_fallback(snapshot.selected, error.code)
+                            && helpers::find_program("gnome-screenshot").is_some() =>
+                    {
+                        eprintln!(
+                            "cute-screen GNOME native capture failed; using installed screenshot helper: {error}"
+                        );
+                        capture_helper(
+                            LinuxCaptureMethod::GnomeScreenshot,
+                            request,
+                            transport,
+                            cancelled,
+                        )
+                        .await
+                    }
+                    result => result,
+                }
+            }
             Some(method @ (LinuxCaptureMethod::GnomeScreenshot | LinuxCaptureMethod::Grim)) => {
-                let name = if method == LinuxCaptureMethod::Grim {
-                    "grim"
-                } else {
-                    "gnome-screenshot"
-                };
-                let program = helpers::find_program(name).ok_or_else(|| {
-                    PlatformError::new(
-                        PlatformErrorCode::PortalUnavailable,
-                        &request.correlation_id,
-                    )
-                })?;
-                let id = request.correlation_id.clone();
-                tokio::task::spawn_blocking(move || {
-                    helpers::capture(method, &program, request, &transport, &cancelled)
-                })
-                .await
-                .map_err(|_| PlatformError::new(PlatformErrorCode::CaptureFailed, id))?
+                capture_helper(method, request, transport, cancelled).await
             }
             _ => Err(PlatformError::new(
                 PlatformErrorCode::PortalUnavailable,
@@ -115,6 +127,39 @@ impl LinuxCaptureService {
             )),
         }
     }
+}
+
+fn helper_fallback(selected: LinuxCaptureMethod, error: PlatformErrorCode) -> bool {
+    selected == LinuxCaptureMethod::Auto
+        && matches!(
+            error,
+            PlatformErrorCode::CaptureFailed | PlatformErrorCode::PortalUnavailable
+        )
+}
+
+async fn capture_helper(
+    method: LinuxCaptureMethod,
+    request: CaptureRequest,
+    transport: Arc<ImageTransportService>,
+    cancelled: Arc<AtomicBool>,
+) -> Result<CaptureResult, PlatformError> {
+    let name = if method == LinuxCaptureMethod::Grim {
+        "grim"
+    } else {
+        "gnome-screenshot"
+    };
+    let program = helpers::find_program(name).ok_or_else(|| {
+        PlatformError::new(
+            PlatformErrorCode::PortalUnavailable,
+            &request.correlation_id,
+        )
+    })?;
+    let id = request.correlation_id.clone();
+    tokio::task::spawn_blocking(move || {
+        helpers::capture(method, &program, request, &transport, &cancelled)
+    })
+    .await
+    .map_err(|_| PlatformError::new(PlatformErrorCode::CaptureFailed, id))?
 }
 
 fn desktop_matches(desktop: &str, choices: &[&str]) -> bool {
@@ -172,6 +217,7 @@ pub fn apply_capabilities(capabilities: &mut PlatformCapabilities, methods: &Lin
     capabilities.capture.interactive_selector = desktop;
     capabilities.capture.monitor_target = desktop;
     capabilities.capture.backend = match methods.resolved {
+        Some(LinuxCaptureMethod::GnomeShell) => CaptureBackendKind::GnomeShell,
         Some(LinuxCaptureMethod::GnomeScreenshot) => CaptureBackendKind::GnomeScreenshot,
         Some(LinuxCaptureMethod::Grim) => CaptureBackendKind::Grim,
         _ if capabilities.capture.available => CaptureBackendKind::WaylandPortal,
@@ -182,6 +228,29 @@ pub fn apply_capabilities(capabilities: &mut PlatformCapabilities, methods: &Lin
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn helper_fallback_is_only_for_auto_backend_failures() {
+        assert!(helper_fallback(
+            LinuxCaptureMethod::Auto,
+            PlatformErrorCode::CaptureFailed
+        ));
+        assert!(helper_fallback(
+            LinuxCaptureMethod::Auto,
+            PlatformErrorCode::PortalUnavailable
+        ));
+        for error in [
+            PlatformErrorCode::Cancelled,
+            PlatformErrorCode::Busy,
+            PlatformErrorCode::PermissionDenied,
+        ] {
+            assert!(!helper_fallback(LinuxCaptureMethod::Auto, error));
+        }
+        assert!(!helper_fallback(
+            LinuxCaptureMethod::GnomeShell,
+            PlatformErrorCode::CaptureFailed
+        ));
+    }
 
     #[test]
     fn helper_environment_detection_does_not_use_substrings_or_run_grim_on_gnome() {

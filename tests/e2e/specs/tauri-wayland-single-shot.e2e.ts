@@ -8,7 +8,9 @@ import type { LinuxCaptureMethods } from '../../../apps/desktop/src/generated/de
 
 type NativeWindow = Window & { __TAURI__: { core: { invoke<T>(command: string, args?: unknown): Promise<T> } } }
 type QuickSnapshot = { id: string; crop: unknown; canvas: { width: number; height: number } }
-type WarmupSample = { document: string | null; ready: boolean; overlay: string }
+type WarmupSample = { document: string | null; ready: boolean; overlay: string; warmupAt: number; revealedAt?: number }
+const captureMethod = process.env.CUTE_SCREEN_E2E_CAPTURE_METHOD === 'gnomeScreenshot' ? 'gnomeScreenshot' : 'gnomeShell'
+
 type ProbeWindow = Window & {
   __cuteScreenE2eQuick?: { snapshot(): QuickSnapshot | undefined; warmups(): WarmupSample[] }
 }
@@ -25,21 +27,36 @@ async function showMain(): Promise<void> {
 describe('Wayland single-shot capture on a real GNOME desktop', () => {
   it('captures twice without a streaming session and resets the previous Area frame', async () => {
     expect(process.env.XDG_SESSION_TYPE).toBe('wayland')
-    const methods = await browser.execute(async () => {
+    const methods = await browser.execute(async (method) => {
       const native = window as unknown as NativeWindow
       const before = await native.__TAURI__.core.invoke<LinuxCaptureMethods>('capture_methods')
-      await native.__TAURI__.core.invoke('capture_set_method', { method: 'gnomeScreenshot' })
+      await native.__TAURI__.core.invoke('capture_set_method', { method })
       return before
-    })
-    expect(methods.resolved).toBe('gnomeScreenshot')
+    }, captureMethod)
+    expect(methods.resolved).toBe('gnomeShell')
+    if (process.env.CUTE_SCREEN_E2E_NO_GNOME_HELPER === '1') {
+      expect(methods.available).not.toContain('gnomeScreenshot')
+    }
     const evidence = []
     for (let attempt = 0; attempt < 2; attempt++) {
       await showMain()
       await expect($('button[aria-label="Capture"]')).toBeEnabled()
+      await browser.execute(async () => {
+        let marker = document.querySelector<HTMLDivElement>('[data-capture-exclusion-marker]')
+        if (!marker) {
+          marker = document.createElement('div')
+          marker.dataset.captureExclusionMarker = '1'
+          marker.style.cssText = 'position:fixed;right:20px;top:90px;width:300px;height:220px;background:rgb(255,0,255);z-index:2147483647;pointer-events:none'
+          document.body.append(marker)
+        }
+        await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+      })
+      const captureStarted = Date.now()
       await $('button[aria-label="Capture"]').click()
       await browser.waitUntil(async () => (await browser.tauri.listWindows()).includes('quick-capture'))
       await browser.tauri.switchWindow('quick-capture')
       await expect($('.cs-quick-capture.is-selecting.is-layout-ready')).toBeDisplayed()
+      const captureElapsedMs = Date.now() - captureStarted
       const initial = await browser.execute(() => {
         const state = window as typeof window & { __cuteScreenE2eQuick?: { snapshot(): QuickSnapshot } }
         const document = state.__cuteScreenE2eQuick!.snapshot()
@@ -47,6 +64,23 @@ describe('Wayland single-shot capture on a real GNOME desktop', () => {
       })
       expect(initial.crop).toBeNull()
       expect(initial.canvas.width).toBeGreaterThanOrEqual(1280)
+      await browser.waitUntil(async () => browser.execute(() => Boolean(
+        (window as unknown as ProbeWindow).__cuteScreenE2eQuick?.warmups().at(-1)?.revealedAt,
+      )))
+      const timing = await browser.execute(() => (
+        (window as unknown as ProbeWindow).__cuteScreenE2eQuick!.warmups().at(-1)!
+      ))
+      const duplicate = await browser.execute(async () => {
+        const native = window as unknown as NativeWindow
+        return native.__TAURI__.core.invoke<{ outcome: string }>('capture_request', {
+          request: {
+            correlationId: 'parallel-native-capture', action: 'area', delayMs: 0,
+            cursor: false, invocationSource: 'hotkey',
+          },
+        })
+      })
+      expect(duplicate.outcome).toBe('busy')
+      await expect($('.cs-quick-capture.is-selecting.is-layout-ready')).toBeDisplayed()
       if (attempt === 1) {
         const warmup = await browser.execute(() => (window as unknown as ProbeWindow).__cuteScreenE2eQuick?.warmups())
         expect(warmup).toHaveLength(2)
@@ -56,6 +90,28 @@ describe('Wayland single-shot capture on a real GNOME desktop', () => {
         await writeFile('artifacts/tauri-e2e/wayland-warmup.json', JSON.stringify(warmup, null, 2))
       }
       await browser.saveScreenshot(`artifacts/tauri-e2e/wayland-area-${attempt + 1}-initial.png`)
+      const ghostPixels = await browser.execute(async () => {
+        const native = window as unknown as NativeWindow
+        const draft = await native.__TAURI__.core.invoke<{ imageToken: string; correlationId: string }>('quick_capture_get_active')
+        const bytes = await native.__TAURI__.core.invoke<ArrayBuffer>('read_image_bytes', {
+          token: draft.imageToken, correlationId: draft.correlationId,
+        })
+        const image = await createImageBitmap(new Blob([bytes], { type: 'image/png' }))
+        const canvas = document.createElement('canvas')
+        canvas.width = image.width
+        canvas.height = image.height
+        const context = canvas.getContext('2d')!
+        context.drawImage(image, 0, 0)
+        const pixels = context.getImageData(0, 0, image.width, image.height).data
+        let magenta = 0
+        for (let offset = 0; offset < pixels.length; offset += 4) {
+          if (pixels[offset]! > pixels[offset + 1]! + 25 && pixels[offset + 2]! > pixels[offset + 1]! + 25) magenta++
+        }
+        image.close()
+        return magenta
+      })
+      await writeFile('artifacts/tauri-e2e/wayland-exclusion.json', JSON.stringify({ attempt, ghostPixels }))
+      expect(ghostPixels).toBeLessThan(5000)
       // The embedded driver cannot drag a pointer into a native Wayland surface.
       // Use production DOM handlers; this is not evidence for OS pointer injection.
       await browser.execute(() => {
@@ -76,7 +132,8 @@ describe('Wayland single-shot capture on a real GNOME desktop', () => {
       })
       await expect($('.cs-quick-actions')).toBeDisplayed()
       await browser.saveScreenshot(`artifacts/tauri-e2e/wayland-area-${attempt + 1}-selected.png`)
-      evidence.push(initial)
+      evidence.push({ ...initial, captureElapsedMs, captureReadyMs: timing.revealedAt! - captureStarted,
+        backendAndWarmupMs: timing.warmupAt - captureStarted, method: captureMethod, ghostPixels })
       if (attempt === 0) {
         await $('button[aria-label="Save to history and close"]').click()
       } else {

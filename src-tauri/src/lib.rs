@@ -372,6 +372,9 @@ use shortcuts::commands::*;
 #[path = "platform/linux/capture.rs"]
 pub mod linux_capture;
 #[cfg(target_os = "linux")]
+#[path = "platform/linux/capture_surfaces.rs"]
+mod linux_capture_surfaces;
+#[cfg(target_os = "linux")]
 #[path = "platform/linux/portal.rs"]
 pub mod linux_platform;
 #[cfg(target_os = "linux")]
@@ -829,6 +832,8 @@ fn lifecycle_complete_main_window_close(app: tauri::AppHandle) {
     if should_hide {
         if let Some(window) = app.get_webview_window("main") {
             let _ = window.hide();
+            #[cfg(target_os = "linux")]
+            linux_capture_surfaces::note_hidden();
         }
     } else {
         app.exit(0);
@@ -1268,6 +1273,8 @@ fn dismiss_quick_capture_window<R: tauri::Runtime>(
     }
     #[cfg(all(target_os = "linux", feature = "x11-capture"))]
     x11_platform::note_app_surface_hidden();
+    #[cfg(target_os = "linux")]
+    linux_capture_surfaces::note_hidden();
     Ok(true)
 }
 
@@ -1976,6 +1983,10 @@ async fn hide_editor_for_native_capture<R: tauri::Runtime>(
     correlation_id: &str,
     invocation_source: &CaptureInvocationSource,
 ) -> Result<bool, PlatformError> {
+    #[cfg(target_os = "linux")]
+    if current_session() == SessionKind::Wayland {
+        return linux_capture_surfaces::hide(app, correlation_id).await;
+    }
     #[cfg(target_os = "windows")]
     let native_desktop_capture = true;
     #[cfg(target_os = "macos")]
@@ -2009,13 +2020,9 @@ async fn hide_editor_for_native_capture<R: tauri::Runtime>(
         return Ok(false);
     }
     let Some(window) = app.get_webview_window("main") else {
-        #[cfg(target_os = "linux")]
-        settle_wayland_capture_surfaces().await;
         return Ok(false);
     };
     if !should_hide_editor_for_native_capture(window.is_visible().ok()) {
-        #[cfg(target_os = "linux")]
-        settle_wayland_capture_surfaces().await;
         return Ok(false);
     }
     #[cfg(target_os = "windows")]
@@ -2080,18 +2087,7 @@ async fn hide_editor_for_native_capture<R: tauri::Runtime>(
     }
     #[cfg(not(all(target_os = "linux", feature = "x11-capture")))]
     let _ = invocation_source;
-    #[cfg(target_os = "linux")]
-    settle_wayland_capture_surfaces().await;
     Ok(true)
-}
-
-#[cfg(target_os = "linux")]
-async fn settle_wayland_capture_surfaces() {
-    if current_session() == SessionKind::Wayland {
-        // Wayland has no X11 unmap barrier. Allow the compositor to retire our
-        // hidden surfaces before asking the portal for the frozen desktop.
-        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-    }
 }
 
 fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()> {
@@ -2405,6 +2401,11 @@ async fn capture_with_preflight<R: tauri::Runtime>(
     }
     if let Some(diagnostics) = app.try_state::<CaptureDiagnosticsService>() {
         diagnostics.begin(&request);
+    }
+    if controller.active_quick_draft().is_some() {
+        let outcome = terminal_capture(request.correlation_id, CaptureTerminalOutcome::Busy);
+        publish_capture_outcome(app, &outcome, action);
+        return outcome;
     }
     publish_capture_progress(app, &request.correlation_id, CaptureProgressState::Probing);
     let capabilities =
@@ -2751,6 +2752,13 @@ pub fn run() {
             },
         ))
         .on_window_event(|window, event| {
+            #[cfg(target_os = "linux")]
+            if matches!(
+                event,
+                tauri::WindowEvent::Destroyed | tauri::WindowEvent::CloseRequested { .. }
+            ) {
+                linux_capture_surfaces::note_hidden();
+            }
             if matches!(
                 event,
                 tauri::WindowEvent::Destroyed | tauri::WindowEvent::CloseRequested { .. }

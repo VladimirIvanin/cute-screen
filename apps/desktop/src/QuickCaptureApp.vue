@@ -204,6 +204,7 @@ async function presentPreparedDraft(draftId: string): Promise<void> {
         if (!(await tauriDesktopBridge.quickCaptureReveal(draftId))) {
           throw new Error('Quick capture draft is no longer active')
         }
+        if (draft.value?.draftId === draftId) testFacade?.recordReveal()
       },
       measure: () => selectionPending.value ? layoutController.selectionLayout() : updateQuickLayout(),
       nextFrame: nextLayoutFrame,

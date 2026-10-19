@@ -683,7 +683,7 @@ impl CaptureController {
             record.cursor_included,
             owned,
             document_json,
-            helper_pixel_backend(&record.descriptor.image_token),
+            owned_pixel_backend(&record.descriptor.image_token),
         ) {
             Ok(document) => document,
             Err(error) => {
@@ -1001,7 +1001,7 @@ impl CaptureController {
             owned,
             geometry,
             cursor_included,
-            helper_pixel_backend(&frame.image_token),
+            owned_pixel_backend(&frame.image_token),
         ) {
             Ok(document) => {
                 let source = match self.repository.resolve_capture_source(
@@ -1257,7 +1257,10 @@ fn capture_backend_metadata_name(action: CaptureAction) -> &'static str {
     }
 }
 
-fn helper_pixel_backend(token: &str) -> Option<&'static str> {
+fn owned_pixel_backend(token: &str) -> Option<&'static str> {
+    if token.starts_with("gnome-shell-") {
+        return Some("gnomeShell");
+    }
     if token.starts_with("gnome-screenshot-") {
         Some("gnomeScreenshot")
     } else if token.starts_with("grim-") {

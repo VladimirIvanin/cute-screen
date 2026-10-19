@@ -30,13 +30,16 @@ arguments, например `pnpm start:linux:dev capture --mode area`.
 локальной проверки, без Vite hot reload; стандартный `pnpm tauri dev` требует
 host dependencies из DEVELOPMENT.md.
 
-Wayland Area/Screen/Repeat используют разовые Screenshot/helper пути ADR-121.
+Wayland Area/Screen/Repeat используют разовые Screenshot/helper пути ADR-122.
 GStreamer/PipeWire для захвата не требуются. WebKitGTK может иметь собственные
 multimedia dependencies; это не ScreenCast backend Cute Screen.
-Для GNOME ≤42 необязательная внешняя утилита gnome-screenshot устраняет
-подтверждение каждого кадра; для совместимых wlroots окружений возможен grim.
+Для GNOME ≤42 встроен Rust Screenshot client: отдельная утилита, Python и
+extension не нужны. Используются уже имеющиеся D-Bus/zbus и Shell API, новые
+системные зависимости не добавляются. Необязательная внешняя утилита
+gnome-screenshot сохраняется как явный метод и Auto fallback при техническом
+сбое встроенного пути; для совместимых wlroots окружений возможен grim.
 Утилиты ищутся в PATH и ~/.local/bin, в bundle не включаются. Без helper
-остаётся Screenshot portal с системным UX. Современный GNOME сохраняет portal.
+GNOME ≤42 сохраняет встроенный путь, другие окружения — Screenshot portal. Современный GNOME сохраняет portal.
 Для проверки на данном host официальный Ubuntu пакет 41.0-2 установлен только
 в пользовательский ~/.local/share/cute-screen/tools, wrapper — ~/.local/bin;
 системные пакеты и их настройки не изменены. Для обычной установки рекомендуется

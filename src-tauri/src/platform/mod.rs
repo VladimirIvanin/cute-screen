@@ -62,6 +62,7 @@ pub enum CaptureBackendKind {
     Unavailable,
     WaylandPortal,
     GnomeScreenshot,
+    GnomeShell,
     Grim,
     WindowsDxgi,
     X11,

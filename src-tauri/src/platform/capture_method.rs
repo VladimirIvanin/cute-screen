@@ -7,6 +7,7 @@ pub enum LinuxCaptureMethod {
     #[default]
     Auto,
     Portal,
+    GnomeShell,
     GnomeScreenshot,
     Grim,
 }
@@ -31,11 +32,12 @@ impl CaptureMethodsProbe {
     pub fn resolve(&self, method: LinuxCaptureMethod) -> Option<LinuxCaptureMethod> {
         use LinuxCaptureMethod as Method;
         match method {
-            Method::Auto if self.legacy_gnome && self.gnome => Some(Method::GnomeScreenshot),
+            Method::Auto if self.legacy_gnome => Some(Method::GnomeShell),
             Method::Auto if self.portal => Some(Method::Portal),
             Method::Auto if self.grim => Some(Method::Grim),
             Method::Auto if self.gnome => Some(Method::GnomeScreenshot),
             Method::Portal if self.portal => Some(method),
+            Method::GnomeShell if self.legacy_gnome => Some(method),
             Method::GnomeScreenshot if self.gnome => Some(method),
             Method::Grim if self.grim => Some(method),
             _ => None,
@@ -46,6 +48,7 @@ impl CaptureMethodsProbe {
         let available = [
             LinuxCaptureMethod::Auto,
             LinuxCaptureMethod::Portal,
+            LinuxCaptureMethod::GnomeShell,
             LinuxCaptureMethod::GnomeScreenshot,
             LinuxCaptureMethod::Grim,
         ]
@@ -65,17 +68,28 @@ mod tests {
     use super::{CaptureMethodsProbe, LinuxCaptureMethod as Method};
 
     #[test]
+    fn legacy_gnome_is_available_without_an_installed_screenshot_program() {
+        let probe = CaptureMethodsProbe {
+            legacy_gnome: true,
+            portal: true,
+            ..Default::default()
+        };
+        assert_eq!(probe.resolve(Method::Auto), Some(Method::GnomeShell));
+        assert_eq!(probe.resolve(Method::GnomeShell), Some(Method::GnomeShell));
+    }
+
+    #[test]
     fn legacy_gnome_uses_helper_and_other_desktops_keep_the_screenshot_portal() {
-        for (gnome, grim, portal, expected) in [
-            (true, true, true, Some(Method::GnomeScreenshot)),
+        for (legacy_gnome, grim, portal, expected) in [
+            (true, true, true, Some(Method::GnomeShell)),
             (false, true, true, Some(Method::Portal)),
             (false, true, false, Some(Method::Grim)),
             (false, false, true, Some(Method::Portal)),
             (false, false, false, None),
         ] {
             let probe = CaptureMethodsProbe {
-                legacy_gnome: true,
-                gnome,
+                legacy_gnome,
+                gnome: false,
                 grim,
                 portal,
             };

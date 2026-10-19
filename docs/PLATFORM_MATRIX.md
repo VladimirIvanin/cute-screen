@@ -1,5 +1,16 @@
 # Платформенная матрица
 
+## GNOME 42 без обязательного helper (2026-10-20, ADR-122)
+
+GNOME Shell ≤42: Auto выбирает встроенный Screenshot client, без внешней
+утилиты/extension, с flash=false. Legacy имя занимается только на время кадра;
+при занятом имени Busy без replacement/queue. gnome-screenshot остаётся
+опциональным fallback Auto при технической ошибке и отдельным явным методом.
+Современный/неизвестный GNOME, KDE сохраняют portal. Безусловные 200 мс заменены
+GTK hide/Wayland roundtrip и ожиданием только незавершённого fade недавно
+скрытой поверхности. Native evidence нового пути фиксируется в TESTING.md;
+другие сборки GNOME 42, ARM64 и mixed-DPI остаются отдельными gates.
+
 ## Wayland single-shot без трансляции (2026-10-20, ADR-121)
 
 ScreenCast/PipeWire capture удалён. Ubuntu 22.04.5 x64 / GNOME 42.9 /

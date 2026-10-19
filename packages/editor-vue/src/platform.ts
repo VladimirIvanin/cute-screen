@@ -1,4 +1,4 @@
-export type CaptureBackendKind = 'unavailable' | 'waylandPortal' | 'gnomeScreenshot' | 'grim' | 'windowsDxgi' | 'x11' | 'macosScreenCapture'
+export type CaptureBackendKind = 'unavailable' | 'waylandPortal' | 'gnomeScreenshot' | 'gnomeShell' | 'grim' | 'windowsDxgi' | 'x11' | 'macosScreenCapture'
 
 export interface CaptureCapabilities {
   readonly available: boolean

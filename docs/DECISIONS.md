@@ -1,8 +1,56 @@
 # Журнал архитектурных решений
 
+## ADR-122 — Встроенный Screenshot client для старого GNOME
+
+**Статус:** accepted (2026-10-20); заменяет ADR-121 в части GNOME routing.
+
+**Основание:** основной захват должен работать из коробки на GNOME 42,
+а gnome-screenshot сохраняется как необязательный fallback.
+Отдельный helper занимал 964–1427 мс. Прототип штатного Shell
+Screenshot API с legacy client name, flash=false и без внешней утилиты получил
+три PNG 1920×1080 за 142–164 мс; полное декодирование и освобождение имени —
+186–223 мс. Прямой Mutter ScreenCast хоть и быстрее, отклонён: установленный
+Shell показывает sharing indicator минимум пять секунд даже после Stop.
+
+**Решение:** Auto на подтверждённом GNOME Shell ≤42 выбирает встроенный Rust
+D-Bus client org.gnome.Shell.Screenshot. Для совместимости с allowlist этого
+Shell отдельное соединение на время кадра занимает legacy имя
+org.gnome.Screenshot с DoNotQueue: без ReplaceExisting/AllowReplacement,
+ожидания очереди и вытеснения установленной утилиты. Занятое имя — Busy.
+Это версионно ограниченный private compatibility API, не универсальная
+гарантия GNOME. Новые/неизвестные версии сохраняют Screenshot portal.
+
+Снимок получает flash=false/includeCursor=false и приватный путь. Успешный
+ответ должен указывать именно этот путь; полный PNG декодируется с прежними
+лимитами. Соединение закрывается до передачи снимка в Quick, в том числе при
+отмене/ошибке/timeout. Промежуточные файлы удаляются. Отдельный executable,
+Python, extension и новые системные библиотеки не нужны; GPL-код не копируется.
+Производственный код не использует ScreenCast или unsafe_mode.
+
+Метод gnomeShell доступен явно. В Auto техническая ошибка встроенного capture
+может использовать установленный gnome-screenshot; Cancelled, PermissionDenied
+и Busy не запускают fallback. Явно выбранные методы не переключаются молча.
+Старый gnomeScreenshot setting продолжает обозначать внешний резервный helper.
+Metadata различает gnomeShell, gnomeScreenshot и portal. Grim не меняется.
+
+Безусловная Wayland пауза заменяется GTK hide main/settings/Quick и
+GdkDisplay.sync на main thread. Native pixel regression выявил, что roundtrip
+не завершает fade актёра Mutter: 69317 пикселей контрольной метки попали в
+кадр. Поэтому после фактического unmap ждём только оставшуюся часть 200 мс
+защиты от fade (стандартный GNOME 42 destroy effect — 150 мс), включая недавнее
+закрытие Quick. Давно скрытое приложение не получает паузы. Отдельная задержка
+tray menu остаётся.
+Правила сброса старой рамки, immutable originals и binary transport сохраняются.
+
+**Проверка:** red-first routing без helper и текст Settings; Rust cancel/timeout,
+Busy/неверный PNG path/fallback policy; native Tauri два Area/reopen без
+установленной утилиты, decode сохранённого crop, native helper как отдельный
+резервный метод, D-Bus без ScreenCast и проверка занятого legacy имени.
+Команды, фактические результаты и пределы платформ — TESTING.md.
+
 ## ADR-121 — Разовые снимки по окружению, без ScreenCast
 
-**Статус:** accepted (2026-10-20); заменяет ADR-118/119/120 в части захвата.
+**Статус:** superseded — заменён [ADR-122](#adr-122-встроенный-screenshot-client-для-старого-gnome) (2026-10-20).
 
 **Основание:** владелец подтвердил постоянный индикатор «Экран общедоступен»
 после ADR-118 и поломку следующего захвата после системного отзыва доступа.

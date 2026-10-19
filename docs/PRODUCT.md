@@ -45,29 +45,34 @@ Cute Screen — полноценный local-first редактор снимко
   Wayland и macOS 14+ используют системный picker с его собственным UX.
 - `REQ-CAP-004` — захват активного окна.
 - `REQ-CAP-016` — Wayland Settings позволяет выбрать способ разового захвата:
-  Auto, Screenshot portal, внешний gnome-screenshot или grim. Недоступные
+  Auto, Screenshot portal, встроенный GNOME Screenshot, внешний gnome-screenshot или grim. Недоступные
   способы отключены; loading, pending, error, cancel и keyboard focus различаются.
   Выбор сохраняется и применяется к следующему снимку. Смена во время capture
   недоступна. Streaming picker и постоянная трансляция не используются.
 - `REQ-CAP-017` — Auto сохраняет Screenshot portal на современных окружениях,
-  включая Ubuntu 24/GNOME. На GNOME Shell ≤42 с установленным gnome-screenshot
-  используется helper без подтверждения каждого снимка. В известных wlroots
+  включая Ubuntu 24/GNOME. На GNOME Shell ≤42 используется встроенный
+  Screenshot D-Bus client без внешней утилиты, вспышки и подтверждения каждого
+  снимка (ADR-122). Установленный gnome-screenshot остаётся отдельным методом
+  и Auto fallback при техническом сбое встроенного пути. В известных wlroots
   окружениях без Screenshot может использоваться установленный grim.
-  Ошибка/отмена не переключает способ молча. Helpers не копируются и не линкуются
+  Отмена, PermissionDenied и Busy не запускают fallback; явный выбор не
+  переключается. Helpers не копируются и не линкуются
   с продуктом; отсутствие утилиты объясняется в Settings. Захватывается полный
   desktop, если backend не предоставляет отдельный монитор.
 - `REQ-CAP-005` — повтор последней области с корректировкой при изменении мониторов/DPI.
   Wayland повторно получает разовый кадр desktop и открывает новое выделение в Quick Capture.
 - `REQ-CAP-006` — задержка перед захватом с отменой.
   Команды трея ждут 200 мс перед backend, чтобы закрывающееся системное меню
-  не попало в кадр; hotkey, CLI и UI не получают этой дополнительной паузы.
+  не попало в кадр; hotkey, CLI и UI не получают этой дополнительной паузы. Если наша поверхность только что
+  скрылась, backend ждёт только оставшуюся часть 200 мс compositor fade;
+  давно скрытое приложение эту паузу не получает.
 - `REQ-CAP-007` — настройка включения курсора там, где это поддерживает backend.
 - `REQ-CAP-008` — multi-monitor и mixed-DPI без смещения итоговой области.
 - `REQ-CAP-009` — X11 Area использует fullscreen Quick Capture как единственную
   видимую capture surface: она сначала показывает frozen desktop в состоянии
   выбора области, а после подтверждения на той же WebView и в том же renderer
   lifecycle открывает annotation chrome. Wayland получает разовый PNG через
-  выбранный способ ADR-121 и использует тот же Quick Capture selection lifecycle.
+  выбранный способ ADR-122 и использует тот же Quick Capture selection lifecycle.
   При переиспользовании Quick-окна старый документ и рамка убираются до native
   warmup; новая рамка не наследует crop предыдущего capture. ScreenCast-сессии
   не создаются. Системное разрешение определяется Screenshot backend.

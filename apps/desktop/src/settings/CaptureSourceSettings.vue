@@ -34,9 +34,10 @@ const text = computed(() => props.locale === 'ru' ? {
   unavailable: ' — недоступно', active: 'Используется: ',
   help: 'Для Области, Экрана и Повтора. Снимки разовые: постоянная трансляция экрана не включается. Выбор окна использует системный диалог.',
   portal: 'Системное разрешение зависит от окружения. Современные версии GNOME запоминают разрешение; старые могут спрашивать каждый раз.',
-  gnome: 'Для GNOME. Нужна утилита gnome-screenshot. Возможны системная вспышка и небольшая задержка. Захватывается весь рабочий стол.',
+  shell: 'Встроенный захват для старых версий GNOME. Не требует установки утилит или расширений и не включает вспышку.',
+  gnome: 'Резервный способ для GNOME. Нужна утилита gnome-screenshot. Возможны системная вспышка и небольшая задержка. Захватывается весь рабочий стол.',
   grim: 'Для совместимых wlroots-композиторов. Нужна утилита grim и протокол screencopy. Захватывается весь рабочий стол.',
-  names: { auto: 'Автоматически', portal: 'Системный снимок (portal)', gnomeScreenshot: 'Совместимость с GNOME', grim: 'Совместимость с wlroots (grim)' },
+  names: { auto: 'Автоматически', portal: 'Системный снимок (portal)', gnomeShell: 'GNOME (встроенный)', gnomeScreenshot: 'GNOME (резервная утилита)', grim: 'Совместимость с wlroots (grim)' },
 } : {
   title: 'Screen capture', method: 'Capture method', checking: 'Checking capture methods…',
   save: 'Apply', saving: 'Saving…', cancel: 'Cancel change', retry: 'Check again',
@@ -45,15 +46,16 @@ const text = computed(() => props.locale === 'ru' ? {
   unavailable: ' — unavailable', active: 'Using: ',
   help: 'For Area, Screen and Repeat. Captures are individual screenshots; screen sharing stays off. Window selection uses the system dialog.',
   portal: 'System permission depends on your desktop. Modern GNOME versions remember permission; older versions may ask every time.',
-  gnome: 'For GNOME. Requires gnome-screenshot. A system flash and a short delay are possible. Captures the entire desktop.',
+  shell: 'Built-in capture for older GNOME versions. Requires no extra utility or extension and does not flash the screen.',
+  gnome: 'Fallback for GNOME. Requires gnome-screenshot. A system flash and a short delay are possible. Captures the entire desktop.',
   grim: 'For compatible wlroots compositors. Requires grim and the screencopy protocol. Captures the entire desktop.',
-  names: { auto: 'Automatic', portal: 'System screenshot (portal)', gnomeScreenshot: 'GNOME compatibility', grim: 'wlroots compatibility (grim)' },
+  names: { auto: 'Automatic', portal: 'System screenshot (portal)', gnomeShell: 'GNOME (built-in)', gnomeScreenshot: 'GNOME (fallback utility)', grim: 'wlroots compatibility (grim)' },
 })
-const methods: LinuxCaptureMethod[] = ['auto', 'portal', 'gnomeScreenshot', 'grim']
+const methods: LinuxCaptureMethod[] = ['auto', 'portal', 'gnomeShell', 'gnomeScreenshot', 'grim']
 const changed = computed(() => selected.value !== snapshot.value?.selected)
 const hint = computed(() => {
   const method = selected.value === 'auto' ? snapshot.value?.resolved : selected.value
-  return method === 'gnomeScreenshot' ? text.value.gnome : method === 'grim' ? text.value.grim : text.value.portal
+  return method === 'gnomeShell' ? text.value.shell : method === 'gnomeScreenshot' ? text.value.gnome : method === 'grim' ? text.value.grim : text.value.portal
 })
 
 async function load(): Promise<void> {
