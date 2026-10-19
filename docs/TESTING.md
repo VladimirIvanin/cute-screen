@@ -15,6 +15,8 @@ stroke 4 px, mixed-line undo возвращает 4/7 px. В production-parent s
 - Первый `pnpm test`: 153 files / 1376 tests, шесть failures в четырёх Vue
   файлах; исправлены ожидания labels, mixed undo и пустой области.
   Прогон начат до правок, более поздние файлы уже читали обновлённые tests.
+- Финальный `pnpm test`: 153 files / 1376 tests passed, 357,98 s;
+  `artifacts/defaults-test-regressions/test-final.log`.
 - `pnpm test:render`: до обновления goldens два ожидаемых failures каталога
   фигур; после обновления — 18 files / 52 tests passed. Canvas2D/CanvasKit
   PNG при scale 1/2 просмотрены; export повторно декодируется тестами.
@@ -29,6 +31,13 @@ stroke 4 px, mixed-line undo возвращает 4/7 px. В production-parent s
   native browser pointer/keyboard, preferences/reload и undo/redo.
 - `pnpm lint`: passed, прежние 85 warnings. `pnpm typecheck` и
   `pnpm docs:check`: passed.
+- `pnpm test:boundaries`: 111 passed / 1 skipped, 16 files.
+- `pnpm format` и `pnpm format:check`: passed.
+
+`pnpm disk:usage` во время финальных проверок и после них: target
+24,798 → 24,798 GiB, artifacts 11,719 → 11,719 GiB. Временных Chrome profiles
+после E2E нет. Промежуточные диагностические логи задачи удалены; полезные
+build caches сохранены. Inventory — `disk.log` и `disk-final.log` в каталоге задачи.
 
 Логи — `artifacts/defaults-test-regressions/`; browser screenshots/JUnit —
 `artifacts/browser-e2e/`, lifecycle PNG — `artifacts/tool-lifecycle/`.
