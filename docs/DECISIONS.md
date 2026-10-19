@@ -1,5 +1,32 @@
 # Журнал архитектурных решений
 
+## ADR-120 — Первый кадр после закрытия ScreenCast permission dialog
+
+**Статус:** accepted (2026-10-19); дополняет ADR-118/119.
+
+**Основание:** пользователь приложил первый снимок с ещё видимым системным
+диалогом «Доступ к экрану». Успешный ScreenCast Start сообщает готовность
+сессии/streams, но не завершение compositor animation. Текущий backend сразу
+подключает consumer и принимает первый кадр. UX lifecycle GNOME подтверждает
+отдельное скрытие диалога и анимацию
+([portal dialog](https://github.com/GNOME/xdg-desktop-portal-gnome/blob/gnome-42/src/screencastdialog.c),
+[GNOME Shell](https://github.com/GNOME/gnome-shell/blob/gnome-42/js/ui/windowManager.js));
+сторонний код не копируется и не линкуется.
+
+**Решение:** новая успешная авторизация становится доступна для capture через
+350 мс после ответа портала. Ожидание асинхронное, до открытия PipeWire remote
+и consumer. Оно применяется также к успешной замене монитора в Settings;
+повторные captures с cached authorization дополнительной паузы не получают.
+Cancel/error возвращаются сразу и сохраняют предыдущую сессию при reselect.
+Ожидание выбора пользователя остаётся без deadline; tray delay не меняется.
+350 мс — консервативный запас на закрытие, а не универсальное подтверждение
+состояния всех Wayland compositors или обещание общей capture latency.
+
+**Проверка:** failing Rust tests проверяют, что initial capture и успешная
+замена не используют сессию раньше 350 мс; cached/cancel/error готовы сразу.
+Новая native dev-сборка; первый и повторный capture, смена экрана и cancel
+проверяются отдельно в GNOME/Wayland. Фактические результаты — TESTING.md.
+
 ## ADR-119 — Смена разрешённого экрана и прямой preview
 
 **Статус:** accepted (2026-10-19); дополняет ADR-118.

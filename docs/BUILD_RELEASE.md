@@ -1,5 +1,16 @@
 # CI-сборки и проверка версии через GitHub
 
+## Linux CI: GStreamer и libunwind в Ubuntu 22.04
+
+Оба Linux workflow используют `scripts/ci-install-linux-tauri-deps.sh`.
+Installer явно запрашивает `libunwind-dev` в одной apt-транзакции с переданными
+пакетами: GStreamer требует этот пакет, а предустановленный в hosted Jammy
+LLVM `libunwind-14-dev` конфликтует с ним. Явный выбор позволяет apt заменить
+конфликтующие development packages без отдельного remove/autoremove,
+ручного unhold или смены Ubuntu baseline. Bounded network retries сохраняются.
+Воспроизведение и локальная проверка — TESTING.md; hosted ARM64 build требует
+отдельного CI pass.
+
 ## Linux dev desktop (ADR-118)
 
 `pnpm build:linux:dev` собирает debug binary с embedded frontend в штатном

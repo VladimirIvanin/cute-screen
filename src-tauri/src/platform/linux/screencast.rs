@@ -19,6 +19,7 @@ use crate::{
 };
 
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(2);
+const PORTAL_DIALOG_CLOSE_SETTLE: Duration = Duration::from_millis(350);
 const MAX_FRAME_BYTES: usize = 512 * 1024 * 1024;
 
 #[derive(Default)]
@@ -141,7 +142,7 @@ async fn reuse_authorization<'a, T>(
     id: &str,
 ) -> Result<&'a T, PlatformError> {
     if active.is_none() {
-        *active = Some(open.await?);
+        *active = Some(settled_authorization(open).await?);
     }
     active
         .as_ref()
@@ -152,8 +153,18 @@ async fn replace_authorization<T>(
     active: &mut Option<T>,
     open: impl Future<Output = Result<T, PlatformError>>,
 ) -> Result<Option<T>, PlatformError> {
-    let candidate = open.await?;
+    let candidate = settled_authorization(open).await?;
     Ok(active.replace(candidate))
+}
+
+async fn settled_authorization<T>(
+    open: impl Future<Output = Result<T, PlatformError>>,
+) -> Result<T, PlatformError> {
+    let authorized = open.await?;
+    // Portal success can arrive before the compositor has removed its consent
+    // dialog. Wait before exposing a new session to the first PipeWire consumer.
+    tokio::time::sleep(PORTAL_DIALOG_CLOSE_SETTLE).await;
+    Ok(authorized)
 }
 
 async fn close_authorization(active: &mut Option<AuthorizedMonitor>) {
@@ -397,6 +408,7 @@ mod tests {
     #[test]
     fn a_second_capture_reuses_the_authorized_session() {
         let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
             .build()
             .expect("runtime");
         runtime.block_on(async {
@@ -420,8 +432,93 @@ mod tests {
     }
 
     #[test]
+    fn first_capture_waits_for_consent_close_but_cached_capture_is_immediately_ready() {
+        use futures_util::FutureExt;
+
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .expect("runtime");
+        runtime.block_on(async {
+            let mut active = None;
+            let responded_at = std::cell::Cell::new(None);
+            let session = reuse_authorization(
+                &mut active,
+                async {
+                    responded_at.set(Some(std::time::Instant::now()));
+                    Ok(42)
+                },
+                "first",
+            )
+            .await
+            .expect("authorized screen");
+            assert_eq!(*session, 42);
+            assert!(
+                responded_at
+                    .get()
+                    .expect("portal response received")
+                    .elapsed()
+                    >= Duration::from_millis(350),
+                "the first consumer must wait for the consent dialog to leave the desktop"
+            );
+            let cached = reuse_authorization(
+                &mut active,
+                std::future::pending::<Result<i32, PlatformError>>(),
+                "cached",
+            )
+            .now_or_never()
+            .expect("cached authorization must not wait or reopen the portal")
+            .expect("cached screen");
+            assert_eq!(*cached, 42);
+        });
+    }
+
+    #[test]
+    fn screen_reselection_waits_after_success_but_cancellation_and_errors_are_immediate() {
+        use futures_util::FutureExt;
+
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .expect("runtime");
+        runtime.block_on(async {
+            let mut active = Some(42);
+            for code in [
+                PlatformErrorCode::Cancelled,
+                PlatformErrorCode::PermissionDenied,
+            ] {
+                let result = replace_authorization(&mut active, async {
+                    Err(PlatformError::new(code, "reselect"))
+                })
+                .now_or_never()
+                .expect("failed selection must not wait for compositor settling");
+                assert_eq!(result.expect_err("selection failed").code, code);
+                assert_eq!(active, Some(42));
+            }
+            let responded_at = std::cell::Cell::new(None);
+            let previous = replace_authorization(&mut active, async {
+                responded_at.set(Some(std::time::Instant::now()));
+                Ok(99)
+            })
+            .await
+            .expect("replacement screen");
+            assert_eq!(previous, Some(42));
+            assert_eq!(active, Some(99));
+            assert!(
+                responded_at
+                    .get()
+                    .expect("portal response received")
+                    .elapsed()
+                    >= Duration::from_millis(350),
+                "a successful monitor picker also needs time to disappear"
+            );
+        });
+    }
+
+    #[test]
     fn cancelled_screen_selection_keeps_the_previous_authorization() {
         let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
             .build()
             .expect("runtime");
         runtime.block_on(async {

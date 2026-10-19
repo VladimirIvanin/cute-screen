@@ -37,11 +37,14 @@ APT_OPTS=(
   -o Acquire::ftp::Timeout=20
 )
 
+# Jammy runners include LLVM libunwind-14-dev, which conflicts with Ubuntu's
+# libunwind-dev required by GStreamer. Select the Ubuntu package explicitly in
+# the same transaction so apt can replace the conflicting development packages.
 attempt=1
 while true; do
   if sudo DEBIAN_FRONTEND=noninteractive apt-get update "${APT_OPTS[@]}" &&
     sudo DEBIAN_FRONTEND=noninteractive apt-get install \
-      --yes --no-install-recommends "${APT_OPTS[@]}" "$@"; then
+      --yes --no-install-recommends "${APT_OPTS[@]}" libunwind-dev "$@"; then
     exit 0
   fi
   if ((attempt >= 3)); then

@@ -1,12 +1,15 @@
 # Архитектура Cute Screen
 
-## Wayland raw-frame capture (ADR-118/119)
+## Wayland raw-frame capture (ADR-118/119/120)
 
 Area/Screen/Repeat используют XDG ScreenCast Monitor session. Разрешённая сессия
 разделяется между clones CaptureController; повторный capture не вызывает
 CreateSession/SelectSources/Start. Новый PipeWire consumer получает один raw
 RGBA кадр в его negotiated resolution и закрывается, разрешение остаётся до
-выхода/отзыва. Frame fitting/crop работают в пикселях выбранного монитора;
+выхода/отзыва. Новая авторизация и успешный reselect ждут 350 мс после
+portal response до публикации сессии: consumer открывается после запаса на
+исчезновение permission dialog. Cached authorization, cancel и error не ждут.
+Frame fitting/crop работают в пикселях выбранного монитора;
 desktop geometry не синтезируется. Межмониторное выделение не заявляется.
 Probe проверяет Monitor, Hidden cursor и создание pipewiresrc/videoconvert/appsink.
 Stride, размер и полнота кадра проверяются до staging: Area — memory-owned BMP,

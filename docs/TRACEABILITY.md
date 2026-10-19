@@ -1,5 +1,26 @@
 # Трассируемость требований
 
+## Первый Wayland кадр без диалога разрешения (2026-10-19, до реализации)
+
+`REQ-CAP-001/002/006/009/016`: успешный ответ новой ScreenCast авторизации
+ещё не означает, что композитор убрал permission dialog. До первого PipeWire
+consumer выдержать 350 мс после успешного ответа. Пауза относится только
+к новой/заменённой авторизации; cached capture и cancel/error её не получают.
+Проверки: сначала failing Rust regression на initial/reselection ordering,
+затем cached/cancel/error tests, native dev build и ручной первый/повторный
+capture. Unit/build evidence не заменяет проверку исчезновения диалога в
+настоящем GNOME/Wayland; результаты — TESTING.md.
+
+## GStreamer dependencies в Jammy CI (2026-10-19)
+
+`REQ-REL-001/005`: общий Linux CI installer должен явно выбирать Ubuntu
+`libunwind-dev` вместе с Tauri/GStreamer dependencies, чтобы apt мог заменить
+конфликтующий LLVM development package на hosted runner. Runtime `libunwind8`
+сохраняется; Ubuntu 22.04 baseline и ARM64 matrix не меняются. Проверка:
+воспроизведение конфликта в одноразовом Jammy container, установка через
+исправленный script и повторный запуск. Native ARM64 hosted build остаётся
+отдельной проверкой; команды и ограничения — TESTING.md.
+
 ## Регрессии тестов стартовой толщины (2026-10-19)
 
 `REQ-EDT-015/017`, `REQ-TOL-001/002/003/011`, ADR-116: согласовать оставшиеся

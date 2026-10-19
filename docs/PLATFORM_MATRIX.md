@@ -1,5 +1,14 @@
 # Платформенная матрица
 
+## Wayland: закрытие первого permission dialog (2026-10-19, ADR-120)
+
+Пользовательский снимок на GNOME/Wayland показывает permission dialog в первом
+кадре. Backend добавляет 350 мс только после новой успешной авторизации или
+reselect; cached captures не замедляются. Rust regressions и dev build
+проверяются на Ubuntu 22.04 x64. Визуальная приёмка новой сборки с реальным
+системным диалогом остаётся pending до отдельного capture; KDE/wlroots,
+ARM64 и изменённая скорость compositor animations не проверены.
+
 ## Windows GUI и физические края Area (2026-10-19, ADR-115)
 
 Windows 10 build 19045 x64, WebView2 155.0.4283.62, один экран 1920×1080,

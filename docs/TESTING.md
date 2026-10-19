@@ -1,5 +1,51 @@
 # Стратегия тестирования
 
+## GStreamer/libunwind в Jammy CI (2026-10-19)
+
+`REQ-REL-001/005`. Исходный HEAD `1f1008c8322359bf79f691fcd8e36bab414dcbc1`.
+Host Linux x86_64; одноразовый Docker container
+`cute-screen-ubuntu22-build:local` (Ubuntu 22.04 x64).
+Node 22.23.1 из `/tmp/cute-screen-portal-research/node-v22.23.1-linux-x64/bin`,
+pnpm 10.33.2. Host Node 22.21.1 сначала отклонён engine check;
+затем команды выполнены с нужным Node в PATH.
+
+В контейнере выполнены `apt-get update -qq` и
+`apt-get install -y --no-install-recommends libc++-dev libc++abi-dev sudo`.
+Это устанавливает LLVM `libunwind-14-dev` 1:14.0.0-1ubuntu1.1.
+Исходный `apt-get -s install --no-install-recommends` с полным набором пакетов
+из ARM64 compile job воспроизводит ровно
+`libgstreamer1.0-dev : Depends: libunwind-dev` и exit 100.
+Затем readonly-mounted production script запущен командой:
+
+```sh
+bash /tmp/install-deps.sh \
+  build-essential curl file libayatana-appindicator3-dev librsvg2-dev \
+  libssl-dev libwebkit2gtk-4.1-dev libxdo-dev wget xdg-utils \
+  libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-pipewire
+```
+
+Исправленный installer завершился с exit 0 с первой попытки. Apt заменил
+`libunwind-14-dev`, удалив зависящие `libc++-dev`/`libc++-14-dev`;
+`libunwind8` сохранён. Установлены Ubuntu `libunwind-dev` 1.3.2-2build2.1,
+GStreamer core dev 1.20.3 и plugins-base dev 1.20.1.
+`pkg-config --modversion gstreamer-1.0 gstreamer-app-1.0 gstreamer-video-1.0`
+возвращает 1.20.3 / 1.20.1 / 1.20.1.
+Повторный `bash /tmp/install-deps.sh libgstreamer1.0-dev
+libgstreamer-plugins-base1.0-dev gstreamer1.0-pipewire` — exit 0,
+без установки/удаления пакетов. Контейнер удалён через `docker run --rm`.
+
+- `bash -n scripts/ci-install-linux-tauri-deps.sh`: passed.
+- `pnpm test:boundaries`: 16 files / 112 tests passed.
+- `pnpm docs:check`, `pnpm format`, `pnpm format:check`: passed.
+
+Логи — `artifacts/ci-jammy-libunwind/`. До/после: target 21.727 GiB,
+artifacts 0.437 GiB; Cargo cache и profiles не менялись. Нового target нет.
+Полный `pnpm check`, app build и UI/native suites не запускались:
+изменены только apt installer и документация. Hosted ARM64 build/runtime
+не проверены; нужен новый CI run. Ubuntu baseline, product behavior и ADR
+не меняются. Конфликт пакетов описан в
+[Ubuntu bug 1989124](https://lists.ubuntu.com/archives/ubuntu-openstack-bugs/2022-September/029754.html).
+
 ## Регрессии тестов после смены defaults (2026-10-19, ADR-116)
 
 Windows 10 x64 / Chrome 155.0.8059.80, Node 22.23.1, pnpm 10.33.2.
