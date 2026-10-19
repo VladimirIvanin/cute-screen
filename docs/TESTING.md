@@ -1,5 +1,58 @@
 # Стратегия тестирования
 
+## Windows GUI, Area и версия 0.1.6 (2026-10-18–19, ADR-115)
+
+Windows 10 build 19045 x64, один экран 1920×1080 / DPR 1,
+WebView2 и EdgeDriver 155.0.4283.62; Node 22.23.1, pnpm 10.33.2,
+Rust 1.97.0. Исходники вошли в `7856504`; следующие изменения уточняют evidence.
+Native сценарии запускались последовательно штатным `pnpm test:e2e:tauri`
+с `CARGO_TARGET_DIR=target/e2e-isolated`, external provider и свежим debug harness.
+
+До исправления физические нажатия на y=0/1 и в верхнем левом углу
+не доходили до WebView; y=8 работал. Над WebView оставалось
+`TAURI_DRAG_RESIZE_BORDERS`. EdgeDriver pointer actions обходили перехват,
+даже с isTrusted=true. Новая регрессия использует SetCursorPos/mouse_event
+и Escape через системный ввод; DOM служит только наблюдателем.
+
+| Проверка                                                                                                              | Результат / evidence                                                                                                                                                                                                        |
+| --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CUTE_SCREEN_E2E_SCENARIOS=windows-area-edges pnpm test:e2e:tauri`                                                    | Passed: четыре края, четыре угла, полный экран, Escape во время drag, повтор. `artifacts/windows-audit/edges-final.log`, `artifacts/tauri-e2e/windows-area-edges.json` и screenshots                                        |
+| Quick chrome                                                                                                          | 7/7 passed, `artifacts/windows-audit/e2e.log`                                                                                                                                                                               |
+| Quick Editor handoff                                                                                                  | Passed после исправления координат самой проверки; тот же log                                                                                                                                                               |
+| Windows capture exclusion                                                                                             | Passed после восстановления topmost фоновой fixture; `artifacts/windows-audit/e2e-retry.log`                                                                                                                                |
+| `cargo test --offline --workspace`                                                                                    | 180 passed, один interactive ignored; `artifacts/windows-audit/rust-workspace.log`                                                                                                                                          |
+| Boundary executable/version/release assets                                                                            | 35/35 passed; `artifacts/windows-audit/release-contracts.log`                                                                                                                                                               |
+| `pnpm version:bump 0.1.6`                                                                                             | package/Tauri/Cargo/Cargo.lock согласованы; release/tag/publish не выполнялись                                                                                                                                              |
+| `pnpm.cmd tauri build --bundles nsis -- --locked`                                                                     | Passed; `artifacts/windows-audit/release-0.1.6.log`                                                                                                                                                                         |
+| PE subsystem и `--startup-check`                                                                                      | Subsystem 2 / exit 0 у release и установленного executable                                                                                                                                                                  |
+| NSIS `/S /UPDATE`, затем `/S`                                                                                         | Exit 0; обычная установка восстановила старый пустой ярлык, который update mode намеренно сохраняет                                                                                                                         |
+| Установленный release: executable, Start Menu shortcut через ShellExecute, `--background`, foreground single-instance | Passed; отсутствие консоли проверено AttachConsole → ERROR_INVALID_HANDLE (6). Background не показывает основное окно; повторный запуск показывает окно того же PID. `artifacts/windows-audit/installed-startup-0.1.6.json` |
+
+Два прежних pixel failures были дефектами проверки: handoff сравнивал
+supersampled preview buffer с document coordinates, а WinForms fixture имела
+TopMost=true без WS_EX_TOPMOST. Исправлены преобразование координат и native
+topmost fixture; проверки пикселей/undo/redo сохранены.
+Установленный executable отличается от root build только тремя байтами
+штатного Tauri bundle marker `UNK` → `NSS`; остальное сравнивается побайтно.
+
+Installer `target/release/bundle/nsis/Cute Screen_0.1.6_x64-setup.exe`, SHA-256:
+`EA736A7B83A9F522D6B2088A60E07FE8B3ED4A6261469E192E6038EADF5906E1`.
+Подпись отсутствует. PRO32 ID700022 на старом установщике 0.1.5 подтверждён
+скриншотом пользователя; причина и результат проверки новой сборки неизвестны.
+Карантин/настройки антивируса не менялись, внешняя отправка не выполнялась.
+
+Windows 11, ARM64, несколько мониторов, mixed-DPI, HDR и RDP/смена дисплея
+остаются pending. macOS/Linux native runtime этим Windows-прогоном не закрыт.
+DXGI timeout → frame и Rotation 180° проверены unit-тестами, физические
+повороты монитора здесь не проверялись. Windows/macOS отвергают публичные
+capture/help/version; служебные startup/background/settings args сохранены.
+
+При проверке Rust после перезапуска среды обнаружены corrupt .rmeta (E0786)
+в `target/e2e-isolated`. После dry-run очищены только пакеты с доказанным
+повреждением (1520 файлов / 594,8 MiB и 157 / 12,4 MiB); общий cache сохранён.
+Рекурсивное удаление завершённых диагностических профилей отклонено
+автоматической проверкой разрешений (`blocked by policy`); эти профили оставлены.
+
 ## Стартовая толщина линий (2026-10-18, ADR-116)
 
 Windows x64, HEAD `3304e55` с рабочими изменениями. До реализации новые
