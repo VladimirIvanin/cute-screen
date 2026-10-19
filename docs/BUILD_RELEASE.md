@@ -296,7 +296,7 @@ Native bridges используют `@available`, которому нужен Cl
 при Rust `-nodefaultlibs`, без жёстко заданного пути Xcode или архитектуры.
 Без него release link может падать с undefined `__isPlatformVersionAtLeast`.
 Compile matrix дополнительно линкует binary без test features и запускает
-`--help` на Intel/ARM64; `cargo check` сам по себе линковку не проверяет.
+`--startup-check` на Intel/ARM64; `cargo check` сам по себе линковку не проверяет.
 Release gate по-прежнему собирает и проверяет release binary.
 
 Baseline macOS 12.0 из ADR-038 задан и в `bundle.macOS.minimumSystemVersion`,
@@ -488,8 +488,8 @@ Cargo workspace/Cargo.lock и tauri.conf.json, создать tag и опубл�
    matrix. Manual `full_e2e: true` включает полные E2E suites вместо smoke.
 3. Повторно использовать проверенные Linux x64/ARM64 CI DEB/AppImage без
    повторной сборки; собрать Windows native x64/ARM64 NSIS и macOS universal DMG.
-4. На macOS проверить обе архитектуры через lipo, CLI и целостность DMG;
-   Windows выполняет CLI smoke. Полный install/capture/export acceptance
+4. На macOS проверить обе архитектуры через lipo, внутренний startup check и целостность DMG;
+   Windows проверяет PE GUI subsystem и startup check. Полный install/capture/export acceptance
    остаётся отдельным пунктом A14; наличие пакета его не подтверждает.
 5. Подготовить platform manifest, CycloneDX 1.6 inventory и license report.
    Inventory включает npm production graph, Cargo resolved packages, в том
@@ -589,7 +589,7 @@ Network error не перезаписывает последний успешн�
 2. Binary architecture соответствует matrix.
 3. Версия binary совпадает с tag.
 4. Чистая установка/запуск либо documented portable launch.
-5. Tray, single-instance и CLI version/JSON.
+5. Tray и single-instance; Linux — CLI version/JSON, Windows/macOS — внутренний startup check.
 6. Fake capture → editor → export.
 7. Real platform capture/hotkey smoke на доступном runner.
 8. Повторный запуск сохраняет library/settings.

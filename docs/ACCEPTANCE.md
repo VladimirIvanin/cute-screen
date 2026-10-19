@@ -45,7 +45,7 @@ API failure не публикует сайт. Hosted workflow проверяет
 `REQ-REL-002`, `REQ-CAP-015`: на macOS Intel и Apple Silicon выполнить
 `pnpm build`, затем
 `cargo build --locked --package cute-screen-desktop --bin cute-screen --no-default-features`
-и `target/debug/cute-screen --help`. Отдельно выполнить штатный
+и `target/debug/cute-screen --startup-check`. Отдельно выполнить штатный
 `pnpm verify:release-boundary` и universal DMG build из release workflow.
 Не должно быть undefined `__isPlatformVersionAtLeast`; обе архитектуры DMG
 должны пройти `lipo <input_file> -verify_arch x86_64 arm64`. Native smoke и проверка

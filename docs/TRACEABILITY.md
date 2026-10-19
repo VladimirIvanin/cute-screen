@@ -40,7 +40,10 @@ Quick Capture принимает системную мышь на всех кр�
 окна поверх WebView. DXGI WAIT_TIMEOUT повторяется в пределах общего deadline;
 неподдерживаемый Rotation отклоняется явно, включая 180°. Evidence: red-first
 Rust/boundary tests, PE subsystem/startup gate и physical Windows edge regression.
-Проверка Windows 11/ARM64/HDR/mixed-DPI/RDP остаётся отдельной. Статус: planned.
+Реализовано: Windows 10 x64 — 11 физических edge/corner/cancel/retry случаев,
+Quick chrome 7/7, Editor handoff и capture exclusion passed; PE subsystem 2,
+startup check и NSIS 0.1.6 passed. Команды и ограничения — TESTING.md.
+Проверка Windows 11/ARM64/HDR/mixed-DPI/RDP остаётся отдельной.
 
 ## Загрузки лендинга (2026-10-18, до реализации)
 

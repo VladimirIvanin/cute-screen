@@ -1,5 +1,18 @@
 # Платформенная матрица
 
+## Windows GUI и физические края Area (2026-10-19, ADR-115)
+
+Windows 10 build 19045 x64, WebView2 155.0.4283.62, один экран 1920×1080,
+DPR 1: системный ввод с четырёх краёв и четырёх углов, полный экран,
+Escape во время drag и повторный захват прошли. Quick chrome 7/7,
+Editor handoff и capture exclusion также прошли. Release 0.1.6 имеет
+PE GUI subsystem 2; NSIS собран, silent install завершился с exit 0.
+Пользовательский CLI остаётся только на Linux; macOS использует внутренний
+startup check в build gates. Нативные Windows 11/ARM64/HDR/mixed-DPI,
+несколько мониторов, RDP и macOS этим прогоном не подтверждены.
+Срабатывание PRO32 ID700022 относится к установщику 0.1.5; результат
+проверки 0.1.6 этим антивирусом неизвестен. Evidence — TESTING.md.
+
 ## Стартовая толщина линий (2026-10-18, ADR-116)
 
 Общие TypeScript/Vue defaults: arrow 8 px; line, shape, pencil и рамка лупы
@@ -29,7 +42,7 @@ Pages не запускались. Browser/CI evidence и ограничения
 Release run 39142547248 / job 117722198522 упал при arm64 link с undefined
 `__isPlatformVersionAtLeast`, до создания DMG. `build.rs` теперь запрашивает
 Clang builtins runtime при `-nodefaultlibs`. CI Intel/ARM64 дополнен реальной
-линковкой и CLI `--help`. Baseline 12.0 и SDK gate 14+ сохраняются.
+линковкой и внутренним `--startup-check` (ADR-115). Baseline 12.0 и SDK gate 14+ сохраняются.
 Linux boundary/Rust checks не подтверждают native macOS link: исправленный
 macOS run, universal DMG и capture runtime остаются pending.
 
@@ -50,8 +63,8 @@ Build matrix: Ubuntu 22.04 x64/ARM64 DEB/AppImage; Windows native x64/ARM64
 unsigned NSIS; macOS 15 Apple Silicon собирает universal DMG (`--bundles app,dmg`)
 и проверяет `lipo <Mach-O> -verify_arch x86_64 arm64`. Один DMG поддерживает Intel и Apple Silicon;
 это не отдельная Intel runtime acceptance. Linux packages сохраняют CI ABI
-и extracted-package CLI gates. Windows выполняет executable CLI smoke;
-macOS — CLI и DMG image verification. Полный install/capture/export, macOS Intel
+и extracted-package CLI gates. Windows проверяет PE GUI subsystem/startup;
+macOS — внутренний startup check и DMG image verification. Полный install/capture/export, macOS Intel
 runtime и предупреждения после скачивания требуют отдельного native прогона.
 Локальные проверки скриптов/workflows на Linux не считаются hosted build pass.
 
