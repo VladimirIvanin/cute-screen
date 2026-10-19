@@ -341,8 +341,8 @@ runner из разных задач могут вмешиваться в вво�
 изолированные повторы — `artifacts/tool-settings/concurrent-runners.log` и TESTING.md.
 
 Test-harness использует отдельный identifier с hash абсолютного E2E profile,
-чтобы single-instance dispatch не подключался к resident developer app. CLI
-того же профиля сохраняет тот же identifier. Интерактивная physical проверка
+чтобы single-instance dispatch не подключался к resident developer app. Служебный
+запуск того же профиля сохраняет тот же identifier. Интерактивная physical проверка
 Windows запускается через `CUTE_SCREEN_E2E_SCENARIOS=windows-capture-exclusion`;
 обычный unattended suite её пропускает. Production identity не меняется.
 
@@ -696,7 +696,7 @@ Windows NSIS использует `installer/activation-hooks.nsh`, current-user
 установщика требуют Windows SDK и интерактивного Windows host.
 
 DEB/AppImage/DMG сохраняют прежние форматы; вопрос перенесён в первый обычный
-GUI launch. Capture CLI и `--background` не открывают мастер. Для AppImage
+GUI launch. Capture CLI на Linux и `--background` не открывают мастер. Для AppImage
 autostart и GNOME command используют внешний APPIMAGE path; после перемещения
 Settings показывает необходимость ремонта собственной записи. Для macOS 13+
 используется SMAppService.mainApp, для 12 — сериализованный LaunchAgent plist;
