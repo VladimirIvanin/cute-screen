@@ -17,6 +17,12 @@ linux_screencast::tests` — 5 passed / 2 expected failures: первый captur
   `rust-verified.log`.
 - `cargo clippy --package cute-screen-desktop --lib --tests --locked -- -D warnings`
   — passed. `cargo fmt --all` — выполнен.
+- `pnpm build:linux:dev` — passed. Обновлён
+  `artifacts/linux-dev/cute-screen-dev`; `--version` возвращает 0.1.6,
+  `ldd` не содержит missing libraries. SHA-256 — `dev-sha256.txt`.
+- `pnpm docs:check`, `pnpm format`, `pnpm format:check` — passed.
+- `pnpm disk:usage`: target 21.727 → 21.729 GiB, artifacts 0.437 GiB.
+  Полезный общий cache сохранён; отдельные targets/profiles не создавались.
 
 Docker invocation для Rust: `docker run --rm --user "$(id -u):$(id -g)"
 --env CARGO_HOME=/build/cargo --env CARGO_BUILD_JOBS=4
