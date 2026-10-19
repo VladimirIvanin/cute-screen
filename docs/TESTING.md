@@ -1,5 +1,36 @@
 # Стратегия тестирования
 
+## Закрытие первого Wayland permission dialog (2026-10-19, ADR-120)
+
+Ubuntu 22.04.5 x64 / GNOME Wayland; исходный HEAD `1f1008c`, реализация
+и тесты вошли в `4925c12` во время проверки. Rust 1.97.0 выполняется в штатном
+`cute-screen-ubuntu22-build:local`, с shared workspace `target/` и Cargo cache;
+host development libraries отсутствуют. Node 22.23.1 / pnpm 10.33.2.
+
+- До реализации: `cargo test --package cute-screen-desktop --lib --locked
+linux_screencast::tests` — 5 passed / 2 expected failures: первый capture
+  и reselect не ждали исчезновения диалога. `rust-before.log`.
+- После реализации: `cargo test --package cute-screen-desktop --lib --locked`
+  — 166 passed. Финальные regressions измеряют паузу от момента получения
+  успешного ответа, cached future готов сразу даже с pending opener,
+  cancel/permissionDenied тоже готовы сразу и сохраняют старую сессию.
+  `rust-verified.log`.
+- `cargo clippy --package cute-screen-desktop --lib --tests --locked -- -D warnings`
+  — passed. `cargo fmt --all` — выполнен.
+
+Docker invocation для Rust: `docker run --rm --user "$(id -u):$(id -g)"
+--env CARGO_HOME=/build/cargo --env CARGO_BUILD_JOBS=4
+--volume "$PWD:/source" --volume "$HOME/.cargo:/build/cargo" --workdir /source
+cute-screen-ubuntu22-build:local`, затем перечисленные cargo commands.
+Логи — `artifacts/wayland-consent-settle/`.
+
+Пауза 350 мс применяется после новой авторизации/смены монитора перед
+открытием PipeWire consumer. Unit tests проверяют порядок и отсутствие
+повторной паузы; это не визуальное подтверждение отсутствия permission dialog.
+Первый/повторный Area/Screen и немедленный capture после Settings reselect
+на настоящем desktop остаются pending; установленный процесс использует
+свою прежнюю сборку. KDE/wlroots/ARM64 этим прогоном не проверены.
+
 ## GStreamer/libunwind в Jammy CI (2026-10-19)
 
 `REQ-REL-001/005`. Исходный HEAD `1f1008c8322359bf79f691fcd8e36bab414dcbc1`.
