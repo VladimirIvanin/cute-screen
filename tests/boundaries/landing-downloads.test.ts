@@ -23,8 +23,8 @@ import {
 const snapshotPath = 'apps/landing/assets/release.json'
 const snapshot = JSON.parse(await readFile(snapshotPath, 'utf8'))
 
-function release(tag = 'v0.1.5') {
-  const catalog = JSON.parse(JSON.stringify(snapshot).replaceAll('0.1.5', tag.slice(1)))
+function release(tag = snapshot.tag) {
+  const catalog = JSON.parse(JSON.stringify(snapshot).replaceAll(snapshot.tag.slice(1), tag.slice(1)))
   return {
     tag_name: tag,
     draft: false,
@@ -130,7 +130,7 @@ describe('landing download recommendation', () => {
 })
 
 describe('landing release catalog', () => {
-  it('validates the offline v0.1.5 snapshot and renders all seven links in both locales', async () => {
+  it('validates the offline release snapshot and renders all seven links in both locales', async () => {
     expect(await readLandingCatalog(snapshotPath)).toEqual(snapshot)
     expect(createLandingCatalog(release())).toEqual(snapshot)
     expect(snapshot.files).toHaveLength(7)

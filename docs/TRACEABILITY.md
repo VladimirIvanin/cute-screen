@@ -156,16 +156,22 @@ startup check и NSIS 0.1.6 passed. Команды и ограничения —
 
 ## Загрузки лендинга (2026-10-18, до реализации)
 
+Уточнение `REQ-WEB-006/007` перед обновлением 2026-10-19: локальный snapshot
+должен содержать полный опубликованный v0.1.6; проверить семь ссылок RU/EN,
+локальную production-сборку и версию на GitHub Pages после успешного deploy.
+
 `REQ-WEB-005/006/007`: рекомендация desktop-пакета, статический RU/EN каталог семи
 установщиков и обновление Pages после завершения Release assets. Доказательства:
 unit контракты распознавания и CI-каталога, production landing E2E с JS/no-JS,
-responsive screenshots и actionlint. Implemented; локальные unit/E2E и screenshots — TESTING.md; hosted deploy pending.
+responsive screenshots и actionlint. Implemented; локальные unit/E2E и screenshots — TESTING.md.
+Hosted deploy v0.1.6 проверен 2026-10-19: run 39242048304 success,
+RU/EN содержат семь установщиков v0.1.6 и ссылки release/SHA256SUMS.
 
-| Требование  | Реализация                                             | Доказательства                                           | Статус                             |
-| ----------- | ------------------------------------------------------ | -------------------------------------------------------- | ---------------------------------- |
-| REQ-WEB-005 | Локальная рекомендация ОС/CPU и прямой hero download   | 25 contract tests; production E2E hints/UA/denied/32-bit | implemented                        |
-| REQ-WEB-006 | Статический каталог RU/EN, семь файлов, три OS-колонки | JS/no-JS E2E на пяти ширинах; просмотр screenshots       | implemented                        |
-| REQ-WEB-007 | Каталог из полного stable release; Pages workflow_run  | SemVer/API tests, live v0.1.5 lookup, actionlint         | implemented; hosted deploy pending |
+| Требование  | Реализация                                             | Доказательства                                           | Статус                              |
+| ----------- | ------------------------------------------------------ | -------------------------------------------------------- | ----------------------------------- |
+| REQ-WEB-005 | Локальная рекомендация ОС/CPU и прямой hero download   | 25 contract tests; production E2E hints/UA/denied/32-bit | implemented                         |
+| REQ-WEB-006 | Статический каталог RU/EN, семь файлов, три OS-колонки | JS/no-JS E2E на пяти ширинах; просмотр screenshots       | implemented                         |
+| REQ-WEB-007 | Каталог из полного stable release; Pages workflow_run  | SemVer/API tests, live v0.1.6 lookup, hosted RU/EN       | implemented; hosted deploy verified |
 
 ## Установка pnpm в GitHub Actions (2026-10-18)
 

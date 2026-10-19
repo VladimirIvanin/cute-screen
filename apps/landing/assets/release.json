@@ -1,49 +1,49 @@
 {
-  "tag": "v0.1.5",
-  "releaseUrl": "https://github.com/VladimirIvanin/cute-screen/releases/tag/v0.1.5",
-  "checksumsUrl": "https://github.com/VladimirIvanin/cute-screen/releases/download/v0.1.5/SHA256SUMS",
+  "tag": "v0.1.6",
+  "releaseUrl": "https://github.com/VladimirIvanin/cute-screen/releases/tag/v0.1.6",
+  "checksumsUrl": "https://github.com/VladimirIvanin/cute-screen/releases/download/v0.1.6/SHA256SUMS",
   "files": [
     {
       "platform": "linux-x64",
       "extension": "deb",
-      "name": "cute-screen-0.1.5-linux-x64.deb",
-      "url": "https://github.com/VladimirIvanin/cute-screen/releases/download/v0.1.5/cute-screen-0.1.5-linux-x64.deb"
+      "name": "cute-screen-0.1.6-linux-x64.deb",
+      "url": "https://github.com/VladimirIvanin/cute-screen/releases/download/v0.1.6/cute-screen-0.1.6-linux-x64.deb"
     },
     {
       "platform": "linux-x64",
       "extension": "AppImage",
-      "name": "cute-screen-0.1.5-linux-x64.AppImage",
-      "url": "https://github.com/VladimirIvanin/cute-screen/releases/download/v0.1.5/cute-screen-0.1.5-linux-x64.AppImage"
+      "name": "cute-screen-0.1.6-linux-x64.AppImage",
+      "url": "https://github.com/VladimirIvanin/cute-screen/releases/download/v0.1.6/cute-screen-0.1.6-linux-x64.AppImage"
     },
     {
       "platform": "linux-arm64",
       "extension": "deb",
-      "name": "cute-screen-0.1.5-linux-arm64.deb",
-      "url": "https://github.com/VladimirIvanin/cute-screen/releases/download/v0.1.5/cute-screen-0.1.5-linux-arm64.deb"
+      "name": "cute-screen-0.1.6-linux-arm64.deb",
+      "url": "https://github.com/VladimirIvanin/cute-screen/releases/download/v0.1.6/cute-screen-0.1.6-linux-arm64.deb"
     },
     {
       "platform": "linux-arm64",
       "extension": "AppImage",
-      "name": "cute-screen-0.1.5-linux-arm64.AppImage",
-      "url": "https://github.com/VladimirIvanin/cute-screen/releases/download/v0.1.5/cute-screen-0.1.5-linux-arm64.AppImage"
+      "name": "cute-screen-0.1.6-linux-arm64.AppImage",
+      "url": "https://github.com/VladimirIvanin/cute-screen/releases/download/v0.1.6/cute-screen-0.1.6-linux-arm64.AppImage"
     },
     {
       "platform": "windows-x64",
       "extension": "exe",
-      "name": "cute-screen-0.1.5-windows-x64.exe",
-      "url": "https://github.com/VladimirIvanin/cute-screen/releases/download/v0.1.5/cute-screen-0.1.5-windows-x64.exe"
+      "name": "cute-screen-0.1.6-windows-x64.exe",
+      "url": "https://github.com/VladimirIvanin/cute-screen/releases/download/v0.1.6/cute-screen-0.1.6-windows-x64.exe"
     },
     {
       "platform": "windows-arm64",
       "extension": "exe",
-      "name": "cute-screen-0.1.5-windows-arm64.exe",
-      "url": "https://github.com/VladimirIvanin/cute-screen/releases/download/v0.1.5/cute-screen-0.1.5-windows-arm64.exe"
+      "name": "cute-screen-0.1.6-windows-arm64.exe",
+      "url": "https://github.com/VladimirIvanin/cute-screen/releases/download/v0.1.6/cute-screen-0.1.6-windows-arm64.exe"
     },
     {
       "platform": "macos-universal",
       "extension": "dmg",
-      "name": "cute-screen-0.1.5-macos-universal.dmg",
-      "url": "https://github.com/VladimirIvanin/cute-screen/releases/download/v0.1.5/cute-screen-0.1.5-macos-universal.dmg"
+      "name": "cute-screen-0.1.6-macos-universal.dmg",
+      "url": "https://github.com/VladimirIvanin/cute-screen/releases/download/v0.1.6/cute-screen-0.1.6-macos-universal.dmg"
     }
   ]
 }

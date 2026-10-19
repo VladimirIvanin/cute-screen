@@ -1,5 +1,35 @@
 # Стратегия тестирования
 
+## Загрузки лендинга v0.1.6 (2026-10-19)
+
+`REQ-WEB-006/007`. Исходный HEAD `f81426b`, Windows 10 x64 (19045),
+Node 22.23.1, pnpm 10.33.2, Chrome 155.0.8059.80. `git pull --ff-only`
+подтвердил актуальный main. Локальный snapshot обновлён с v0.1.5 до v0.1.6;
+test fixture использует версию snapshot, чтобы следующее обновление не требовало
+ручной замены номера в helper.
+
+- `node scripts/landing-release.mjs apps/landing/assets/release.json` — passed,
+  live API выбрал полный stable v0.1.6, семь установщиков и SHA256SUMS.
+- `pnpm test:boundaries` — 16 files, 111 passed / 1 skipped.
+- `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_LANDING_E2E_PORT=5321 pnpm test:e2e:landing`
+  — build passed, 6 passed / 1 intentional no-JS skip.
+- Та же команда с `CUTE_SCREEN_LANDING_NO_JS=1` — build passed,
+  5 passed / 2 intentional JS-only skips. RU/EN, пять ширин 375–1440 px,
+  семь точных ссылок, keyboard focus и рекомендации ОС/архитектуры.
+- `pnpm exec eslint tests/boundaries/landing-downloads.test.ts` и
+  `pnpm exec tsc --noEmit -p apps/landing/tsconfig.json` — passed.
+- Hosted Pages run [39242048304](https://github.com/VladimirIvanin/cute-screen/actions/runs/39242048304)
+  уже завершился success для `f81426b`. Повторный HTTP GET RU и EN подтвердил
+  семь установщиков v0.1.6, release/checksums и отсутствие v0.1.5.
+  Повторная публикация не требовалась.
+
+Логи и hosted JSON — `artifacts/landing-v0.1.6/`; screenshots —
+`artifacts/landing-e2e/{js,no-js}/`. Просмотрены RU 1440 px и EN 375 px
+download screenshots: версия, колонки, текст и focus читаемы, overflow нет.
+`pnpm format`, `pnpm format:check`, `pnpm docs:check` и `git diff --check`
+— passed. Полный `pnpm check`, Rust и native WebView не запускались:
+изменены только snapshot, boundary fixture и документация.
+
 ## Единая иконка толщины линии (2026-10-19)
 
 Исходный HEAD `85aae8c`; Linux 6.8.0-138-generic x86_64, Node 22.23.1,
