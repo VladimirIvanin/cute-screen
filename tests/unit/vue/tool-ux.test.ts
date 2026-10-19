@@ -210,8 +210,8 @@ describe('consistent tool UX through the mounted shell', () => {
   it('restores defaults configured before any object was created from v3 preferences alone', async () => {
     const app = mount()
     await fireEvent.contextMenu(screen.getByRole('button', { name: 'Arrow' }))
-    await fireEvent.click(screen.getByRole('button', { name: 'Stroke: 3 px' }))
-    await fireEvent.click(screen.getByRole('button', { name: '8 px' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Stroke: 8 px' }))
+    await fireEvent.click(screen.getByRole('button', { name: '6 px' }))
     await nextTick()
     const preferences = localStorage.getItem(TOOL_SETTINGS_STORAGE_KEY)!
     app.close()
@@ -219,7 +219,7 @@ describe('consistent tool UX through the mounted shell', () => {
     localStorage.setItem(TOOL_SETTINGS_STORAGE_KEY, preferences)
     const reopened = mount()
     await fireEvent.contextMenu(screen.getByRole('button', { name: 'Arrow' }))
-    expect(screen.getByRole('button', { name: 'Stroke: 8 px' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Stroke: 6 px' })).toBeTruthy()
     reopened.close()
   })
   it('keeps the first selection drag alive when the initial tool is implicit Select', async () => {
@@ -303,7 +303,7 @@ describe('consistent tool UX through the mounted shell', () => {
     await fireEvent.contextMenu(screen.getByRole('button', { name: 'Arrow' }))
     expect(app.store.activeToolId).toBe('arrow')
     const host = app.view.container.querySelector('.cs-tool-defaults-toolbar') as HTMLElement
-    const stroke = within(host).getByRole('button', { name: 'Stroke: 3 px' })
+    const stroke = within(host).getByRole('button', { name: 'Stroke: 8 px' })
     await fireEvent.pointerDown(stroke.querySelector('path')!)
     expect(app.view.container.querySelector('.cs-tool-defaults-toolbar')).toBeTruthy()
     await fireEvent.click(stroke)

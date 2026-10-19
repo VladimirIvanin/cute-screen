@@ -27,6 +27,6 @@ describe('line after native restart', () => {
     await $('.cs-toolrail [data-tool-id="arrow"]').click()
     const arrowHost = await lineDefaultsHost()
     await $(`${arrowHost} [data-control="stroke"] button`).click()
-    await expect($('input[aria-label="Thickness"]')).toHaveValue('3')
+    await expect($('input[aria-label="Thickness"]')).toHaveValue('8')
   })
 })

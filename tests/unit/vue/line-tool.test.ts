@@ -181,7 +181,7 @@ it('inherits selected line styles only into line defaults and blocks locked/read
   await fireEvent.keyDown(window, { key: 'Escape' })
   await fireEvent.click(screen.getByRole('button', { name: 'Arrow' }))
   const arrowStroke = app.view.container.querySelector('.cs-tool-defaults-toolbar [data-control="stroke"] button')!
-  expect(arrowStroke).toHaveAttribute('aria-label', 'Stroke: 3 px')
+  expect(arrowStroke).toHaveAttribute('aria-label', 'Stroke: 8 px')
   await fireEvent.click(screen.getByRole('button', { name: 'Line' }))
   expect(app.view.container.querySelector('.cs-tool-defaults-toolbar [data-control="stroke"] button'))
     .toHaveAttribute('aria-label', 'Stroke: 7 px')
@@ -224,6 +224,6 @@ it('shows mixed line stroke values independently and changes the group with one 
   app.session.undo()
   expect(
     (app.session.snapshot.core.document.layers as ArrowLayer[]).map((layer) => layer.payload.stroke.width),
-  ).toEqual([3, 7])
+  ).toEqual([4, 7])
   app.close()
 })

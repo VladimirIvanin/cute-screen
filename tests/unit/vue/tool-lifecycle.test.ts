@@ -193,7 +193,7 @@ it('keeps teleported controls inside defaults and closes one Escape level at a t
   const app = mount(true)
   const arrow = screen.getByRole('button', { name: 'Arrow' })
   await fireEvent.contextMenu(arrow)
-  await fireEvent.click(screen.getByRole('button', { name: 'Stroke: 3 px' }))
+  await fireEvent.click(screen.getByRole('button', { name: 'Stroke: 8 px' }))
   const panel = screen.getByRole('dialog', { name: 'Stroke' })
   await fireEvent.pointerDown(within(panel).getByRole('button', { name: '6 px' }), { button: 0 })
   await fireEvent.click(within(panel).getByRole('button', { name: '6 px' }))
@@ -306,7 +306,7 @@ it('keeps the clicked chrome focus when dismissing a selection popover', async (
   const app = mount()
   await draw(app.scene, 'Arrow')
   const ids = [...app.store.selectedLayerIds]
-  const trigger = screen.getByRole('button', { name: 'Stroke: 3 px' })
+  const trigger = screen.getByRole('button', { name: 'Stroke: 8 px' })
   await fireEvent.click(trigger)
   const zoom = screen.getByRole('button', { name: 'Zoom in' })
   zoom.focus()

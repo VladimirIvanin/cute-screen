@@ -57,9 +57,9 @@ describe('display-only numeric preview', () => {
     app.controller.preview(owner, { id: 'rotation', layerId: app.layer.id }, '90')
     app.frame()
     const projected = app.display()!.layers[0]!
-    // The 3 px stroke adds 1.5 px on each side; world center is (40, 35).
-    expect(projected.transform.translateX).toBeCloseTo(66.5, 10)
-    expect(projected.transform.translateY).toBeCloseTo(3.5, 10)
+    // The 4 px stroke adds 2 px on each side; world center is (40, 35).
+    expect(projected.transform.translateX).toBeCloseTo(67, 10)
+    expect(projected.transform.translateY).toBeCloseTo(3, 10)
     expect(app.session.snapshot.core.canUndo).toBe(false)
     app.controller.cancel(owner)
     expect(app.display()).toBeUndefined()

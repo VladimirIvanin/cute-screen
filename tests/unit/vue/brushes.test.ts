@@ -78,7 +78,7 @@ describe('ink input and settings', () => {
     const additions = view.emitted().addLayer as unknown as readonly (readonly unknown[])[]
     const stroke = additions[0]![0] as PencilLayer
     const payload = stroke.payload as PencilLayerPayload
-    expect(stroke.payload).toMatchObject({ brush: 'stabilized', width: 3, pressureMode: 'pen' })
+    expect(stroke.payload).toMatchObject({ brush: 'stabilized', width: 4, pressureMode: 'pen' })
     expect(payload.points).toHaveLength(3)
     const last = payload.points.at(-1)!
     expect(last.pressure).toBeCloseTo(.8)

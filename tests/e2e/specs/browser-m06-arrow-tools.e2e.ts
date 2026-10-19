@@ -73,8 +73,8 @@ describe('M06 drawing tools in browser mode', () => {
           observableCount: 5,
           observableLabels:
             preference.locale === 'ru'
-              ? ['Цвет', 'Линия: 3 px', 'Хвост: Нет', 'Геометрия: Прямая', 'Наконечник: Заполненная стрелка']
-              : ['Color', 'Stroke: 3 px', 'Tail: None', 'Geometry: Straight', 'Head: Solid arrow'],
+              ? ['Цвет', 'Линия: 8 px', 'Хвост: Нет', 'Геометрия: Прямая', 'Наконечник: Заполненная стрелка']
+              : ['Color', 'Stroke: 8 px', 'Tail: None', 'Geometry: Straight', 'Head: Solid arrow'],
           controlsClientWidth: layout.controlsClientWidth,
           controlsScrollWidth: layout.controlsClientWidth,
           controlsFit: true,

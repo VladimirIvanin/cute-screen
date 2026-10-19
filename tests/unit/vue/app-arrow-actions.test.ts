@@ -40,9 +40,9 @@ describe('M02 editor shell', () => {
     })
 
     await fireEvent.click(screen.getByRole('button', { name: 'Arrow' }))
-    expect(screen.getByRole('button', { name: 'Stroke: 3 px' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Stroke: 8 px' })).toBeInTheDocument()
     await fireEvent.contextMenu(screen.getByRole('button', { name: 'Arrow' }))
-    await fireEvent.click(await screen.findByRole('button', { name: 'Stroke: 3 px' }))
+    await fireEvent.click(await screen.findByRole('button', { name: 'Stroke: 8 px' }))
     await fireEvent.click(await screen.findByRole('button', { name: '2 px' }))
 
     expect(screen.getByRole('button', { name: 'Arrow' })).toHaveAttribute('aria-pressed', 'true')
@@ -201,7 +201,7 @@ describe('M02 editor shell', () => {
       global: { plugins: [createEditorShellPinia()] },
     })
     await fireEvent.contextMenu(screen.getByRole('button', { name: 'Arrow' }))
-    expect(await screen.findByRole('button', { name: 'Stroke: 3 px' })).toBeDisabled()
+    expect(await screen.findByRole('button', { name: 'Stroke: 8 px' })).toBeDisabled()
     readOnlyView.unmount()
     readOnlySession.dispose()
   })

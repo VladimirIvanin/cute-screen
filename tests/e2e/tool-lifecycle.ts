@@ -27,7 +27,7 @@ export async function verifyToolLifecycle(
   await expect($('.cs-tool-configure-popover-host')).not.toExist()
   await expect($('.cs-tool-defaults-toolbar')).toBeDisplayed()
   await configureArrow()
-  await $('button[aria-label="Stroke: 3 px"]').click()
+  await $('button[aria-label="Stroke: 8 px"]').click()
   await $('.cs-arrow-toolbar-popover button[aria-label="6 px"]').click()
   await expect($('.cs-tool-defaults-toolbar')).toBeDisplayed()
   await browser.keys('Escape')
