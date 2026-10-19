@@ -1,5 +1,14 @@
 # Трассируемость требований
 
+## BMP preview в cross-platform Rust tests (2026-10-19)
+
+`REQ-REL-001/002/003`: `cargo check --workspace --all-targets` компилирует
+X11 adapter в `cfg(test)` на Windows/macOS. Его pure-Rust BMP helpers должны
+быть доступны в том же test build; GTK decoder regression остаётся Linux-only.
+Регрессия до исправления — приложенный Windows CI `E0432` при импорте
+`platform::preview` в `x11.rs`. Существующие X11 BMP tests и compile matrix
+проверяют контракт; локальные команды и ограничения — TESTING.md.
+
 ## Первый Wayland кадр без диалога разрешения (2026-10-19)
 
 `REQ-CAP-001/002/006/009/016`: успешный ответ новой ScreenCast авторизации

@@ -3,7 +3,8 @@ use std::{collections::BTreeMap, future::Future};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-#[cfg(target_os = "linux")]
+// X11 adapter tests also compile on Windows/macOS and use these pure-Rust helpers.
+#[cfg(any(test, target_os = "linux"))]
 pub(crate) mod preview;
 pub(crate) mod window_selection;
 

@@ -1,5 +1,28 @@
 # Стратегия тестирования
 
+## Cross-platform test build BMP preview (2026-10-19)
+
+`REQ-REL-001/002/003`. Исходный HEAD `2cc0336`.
+Приложенный Windows CI log до исправления: `E0432`, `x11.rs` не может
+импортировать `platform::preview`, скрытый Linux-only `cfg`.
+X11 adapter намеренно компилируется с `cfg(test)` на всех ОС; pure-Rust BMP
+helpers теперь имеют ту же доступность. GTK decoder test остаётся Linux-only.
+Существующие `area_quick_preview_uses_a_memory_owned_top_down_bmp` и
+`standard_xrgb32_encodes_directly_as_opaque_top_down_bmp` проверяют оба пути.
+
+Локальная проверка: Linux 6.8.0-138-generic x86_64, Ubuntu 22.04 Docker image
+`cute-screen-ubuntu22-build:local`, Rust 1.97.0, shared workspace `target/` и
+Cargo cache. Node 22.23.1 / pnpm 10.33.2. Команды Rust запускаются через
+тот же Docker invocation, что ниже в разделе ADR-120; логи находятся в
+`artifacts/preview-cfg-fix/`.
+
+- `cargo check --workspace --all-targets --locked` — passed.
+- Остальные результаты локальных проверок фиксируются после завершения прогона.
+
+Windows/macOS hosts и toolchains здесь недоступны; повтор compile matrix CI
+остаётся необходимым подтверждением исходной Windows ошибки. Runtime capture,
+платформенные capabilities и принятые ADR не меняются.
+
 ## Закрытие первого Wayland permission dialog (2026-10-19, ADR-120)
 
 Ubuntu 22.04.5 x64 / GNOME Wayland; исходный HEAD `1f1008c`, реализация
