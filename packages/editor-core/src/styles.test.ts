@@ -71,7 +71,7 @@ describe('tool UX style contract', () => {
   })
   it('exposes mixed values and disables an entire locked batch', () => {
     const first = arrow()
-    const second = applyLayerStyle({ ...arrow(), id: '019c1f62-058e-7000-8000-000000000011' }, { width: 8 })
+    const second = applyLayerStyle({ ...arrow(), id: '019c1f62-058e-7000-8000-000000000011' }, { width: 12 })
     expect(commonLayerStyle([first, second]).width).toBeNull()
     expect(styleCommand([first, { ...second, locked: true }], { width: 5 })).toBeNull()
     expect(styleCommand([first, second], { width: 5 })?.type).toBe('batch')

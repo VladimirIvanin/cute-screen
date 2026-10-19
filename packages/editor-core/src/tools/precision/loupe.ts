@@ -77,7 +77,7 @@ function loupeShape(value: 'circle' | 'rectangle' | undefined) {
 }
 
 function loupeBorderWidth(value: number | undefined): number {
-  const width = value ?? 3
+  const width = value ?? 4
   if (
     !Number.isFinite(width) ||
     width < 0 ||

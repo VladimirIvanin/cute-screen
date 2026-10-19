@@ -1,5 +1,37 @@
 # Сквозная приёмка
 
+## Стартовая толщина линий (2026-10-18, ADR-116)
+
+`REQ-EDT-015/017`, `REQ-TOL-001/002/003/011`: в workspace без сохранённых
+настроек стрелка создаётся с 8 px, линия, фигура, карандаш и рамка лупы —
+с 4 px. Панель показывает ту же толщину. Сохранённые пользовательские
+настройки и существующие объекты сохраняют свои значения; шрифты не меняются.
+Core/component evidence и ограничения native проверки — TESTING.md.
+
+## Windows GUI и края Area (ADR-115)
+
+REQ-ACT-005/006/007/008, REQ-REL-003, REQ-CAP-001/006/010/011/012:
+запустить установленный release через Проводник/ярлык и --background: отдельная
+консоль не появляется. Проверить single-instance, tray и GUI settings.
+Публичные capture/--json/--help/--version отвергаются на Windows/macOS; Linux CLI
+сохраняется. Build smoke использует внутренний --startup-check.
+Системной мышью начать Area с четырёх краёв/углов, закончить у противоположного
+края, отменить живой drag через Escape и повторить. EdgeDriver-only действия
+и isTrusted=true не доказывают отсутствие native перехвата у края.
+Повторить Quick chrome, физический захват без main и сохранение аннотаций после
+Editor handoff. Windows 11/ARM64/mixed-DPI/HDR/RDP требуют отдельных прогонов.
+
+## Гигиена локальных артефактов (ADR-114)
+
+`REQ-REL-001/002/003/005`: `pnpm disk:usage` различает основной target,
+изолированные сборки и test runtime. Dry-run cleanup перечисляет только
+известные temporary profiles/binary/config; screenshots/reports и failed appData
+сохраняются. Два worker не удаляют профили друг друга. После browser E2E
+не остаётся его Chrome profile; после native runner — его pin binary/config.
+Аварийный kill требует ручного cleanup. Полезные Cargo/incremental caches
+сохраняются, Cargo profiles не меняются. Проверка UI/runtime на каждой native
+платформе остаётся отдельной.
+
 ## Загрузки лендинга (ADR-113)
 
 REQ-WEB-005/006/007: RU/EN, семь точных установщиков, release/checksums, три

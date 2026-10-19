@@ -63,7 +63,7 @@ const DEFAULT_PRECISION_TOOLS: PrecisionToolDefaults = {
     size: 120,
     shape: 'circle',
     borderColor: { red: 1, green: 1, blue: 1, alpha: 1 },
-    borderWidth: 3,
+    borderWidth: 4,
     shadow: true,
   },
 }

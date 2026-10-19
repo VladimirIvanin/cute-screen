@@ -1,6 +1,6 @@
 {
   "name": "cute-screen",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -10,6 +10,8 @@
     "pnpm": "10.33.2"
   },
   "scripts": {
+    "disk:usage": "node scripts/workspace-storage.mjs report",
+    "clean:artifacts": "node scripts/workspace-storage.mjs clean",
     "preinstall": "node scripts/verify-toolchain.mjs",
     "version:bump": "node scripts/bump-version.mjs",
     "dev": "vite --config apps/desktop/vite.config.ts",

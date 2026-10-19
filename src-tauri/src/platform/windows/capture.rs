@@ -20,8 +20,10 @@ use windows::{
                 ID3D11Texture2D,
             },
             Dxgi::{
-                CreateDXGIFactory1, DXGI_ERROR_NOT_FOUND, DXGI_OUTDUPL_FRAME_INFO, IDXGIAdapter1,
-                IDXGIFactory1, IDXGIOutput1, IDXGIOutputDuplication, IDXGIResource,
+                Common::{DXGI_MODE_ROTATION, DXGI_MODE_ROTATION_IDENTITY},
+                CreateDXGIFactory1, DXGI_ERROR_NOT_FOUND, DXGI_ERROR_WAIT_TIMEOUT,
+                DXGI_OUTDUPL_FRAME_INFO, IDXGIAdapter1, IDXGIFactory1, IDXGIOutput1,
+                IDXGIOutputDuplication, IDXGIResource,
             },
         },
     },
@@ -712,6 +714,7 @@ fn prepare_adapter_outputs(
         if !description.AttachedToDesktop.as_bool() {
             continue;
         }
+        validate_output_rotation(description.Rotation, correlation_id)?;
         let rect = description.DesktopCoordinates;
         let geometry = intersect_rect(
             desktop,
@@ -773,6 +776,35 @@ fn create_d3d_device(
     ))
 }
 
+fn validate_output_rotation(
+    rotation: DXGI_MODE_ROTATION,
+    correlation_id: &str,
+) -> Result<(), PlatformError> {
+    if rotation != DXGI_MODE_ROTATION_IDENTITY {
+        return Err(failure(correlation_id, "rotatedDxgiOutputUnsupported"));
+    }
+    Ok(())
+}
+
+/// WAIT_TIMEOUT does not invalidate duplication and does not acquire a frame.
+/// Share the caller's deadline so pointer-only updates cannot restart the budget.
+fn acquire_dxgi_frame_with_retry<T>(
+    deadline: Instant,
+    mut acquire: impl FnMut(u32) -> windows::core::Result<T>,
+) -> windows::core::Result<T> {
+    loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return Err(windows::core::Error::from_hresult(DXGI_ERROR_WAIT_TIMEOUT));
+        }
+        let timeout = u32::try_from(remaining.as_millis().clamp(1, 250)).unwrap_or(250);
+        match acquire(timeout) {
+            Err(error) if error.code() == DXGI_ERROR_WAIT_TIMEOUT => continue,
+            result => return result,
+        }
+    }
+}
+
 fn capture_prepared_dxgi_output(
     prepared: &PreparedCompositorOutput,
     correlation_id: &str,
@@ -783,14 +815,16 @@ fn capture_prepared_dxgi_output(
         if remaining.is_zero() {
             return Err(failure(correlation_id, "dxgiDesktopFrameTimeout"));
         }
-        let timeout = u32::try_from(remaining.as_millis().min(250)).unwrap_or(250);
-        let mut frame_info = DXGI_OUTDUPL_FRAME_INFO::default();
-        let mut resource: Option<IDXGIResource> = None;
-        unsafe {
-            prepared
-                .duplication
-                .AcquireNextFrame(timeout, &mut frame_info, &mut resource)
-        }
+        let (frame_info, resource) = acquire_dxgi_frame_with_retry(deadline, |timeout| {
+            let mut frame_info = DXGI_OUTDUPL_FRAME_INFO::default();
+            let mut resource: Option<IDXGIResource> = None;
+            unsafe {
+                prepared
+                    .duplication
+                    .AcquireNextFrame(timeout, &mut frame_info, &mut resource)
+            }?;
+            Ok((frame_info, resource))
+        })
         .map_err(|error| compositor_failure(correlation_id, "acquireDxgiFrame", &error))?;
         if should_retry_dxgi_acquire(frame_info.LastPresentTime, resource.is_some()) {
             unsafe { prepared.duplication.ReleaseFrame() }.map_err(|error| {
@@ -1037,6 +1071,66 @@ mod tests {
         uses_mounted_quick_selection,
     };
     use crate::platform::CaptureGeometry;
+
+    #[test]
+    fn dxgi_wait_timeout_retries_until_a_frame_arrives() {
+        use windows::Win32::Graphics::Dxgi::DXGI_ERROR_WAIT_TIMEOUT;
+        let mut attempts = 0;
+        let frame = super::acquire_dxgi_frame_with_retry(
+            std::time::Instant::now() + std::time::Duration::from_secs(1),
+            |timeout| {
+                assert!(timeout > 0 && timeout <= 250);
+                attempts += 1;
+                if attempts == 1 {
+                    Err(windows::core::Error::from_hresult(DXGI_ERROR_WAIT_TIMEOUT))
+                } else {
+                    Ok("desktop frame")
+                }
+            },
+        )
+        .expect("a transient timeout must not fail the capture");
+        assert_eq!(frame, "desktop frame");
+        assert_eq!(attempts, 2);
+    }
+
+    #[test]
+    fn dxgi_wait_deadline_and_non_timeout_failures_are_bounded() {
+        use windows::Win32::Graphics::Dxgi::{DXGI_ERROR_ACCESS_LOST, DXGI_ERROR_WAIT_TIMEOUT};
+        let expired = super::acquire_dxgi_frame_with_retry::<()>(std::time::Instant::now(), |_| {
+            panic!("an expired deadline must not acquire another frame")
+        });
+        assert_eq!(expired.unwrap_err().code(), DXGI_ERROR_WAIT_TIMEOUT);
+        let mut attempts = 0;
+        let invalidated = super::acquire_dxgi_frame_with_retry::<()>(
+            std::time::Instant::now() + std::time::Duration::from_secs(1),
+            |_| {
+                attempts += 1;
+                Err(windows::core::Error::from_hresult(DXGI_ERROR_ACCESS_LOST))
+            },
+        );
+        assert_eq!(invalidated.unwrap_err().code(), DXGI_ERROR_ACCESS_LOST);
+        assert_eq!(attempts, 1);
+    }
+
+    #[test]
+    fn dxgi_rejects_all_rotated_outputs_including_same_size_180_degrees() {
+        use windows::Win32::Graphics::Dxgi::Common::{
+            DXGI_MODE_ROTATION_IDENTITY, DXGI_MODE_ROTATION_ROTATE90, DXGI_MODE_ROTATION_ROTATE180,
+            DXGI_MODE_ROTATION_ROTATE270,
+        };
+        assert!(super::validate_output_rotation(DXGI_MODE_ROTATION_IDENTITY, "rotation").is_ok());
+        for rotation in [
+            DXGI_MODE_ROTATION_ROTATE90,
+            DXGI_MODE_ROTATION_ROTATE180,
+            DXGI_MODE_ROTATION_ROTATE270,
+        ] {
+            let error = super::validate_output_rotation(rotation, "rotation").unwrap_err();
+            assert_eq!(
+                error.context.get("stage").map(String::as_str),
+                Some("rotatedDxgiOutputUnsupported")
+            );
+        }
+    }
 
     fn geometry(x: i32, y: i32, width: u32, height: u32) -> CaptureGeometry {
         CaptureGeometry {

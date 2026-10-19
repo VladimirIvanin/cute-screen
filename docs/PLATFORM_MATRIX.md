@@ -1,5 +1,20 @@
 # Платформенная матрица
 
+## Стартовая толщина линий (2026-10-18, ADR-116)
+
+Общие TypeScript/Vue defaults: arrow 8 px; line, shape, pencil и рамка лупы
+4 px. Native API, схема документа, preferences и платформенные гарантии
+не меняются. Core/component проверки выполняются на Windows x64;
+новая native runtime проверка Linux/macOS этим изменением не заявляется.
+
+## Локальная дисковая гигиена (2026-10-18, ADR-114)
+
+Cargo profiles и полезный build/incremental cache сохраняются.
+Cleanup Chrome profiles/pin binary/config не меняет native
+capture backend. Windows-аудит и фактическая проверка cleanup — TESTING.md.
+Linux/macOS cleanup отдельно не проверялся; размер/скорость их сборок
+не экстраполируются с Windows.
+
 ## Загрузки лендинга (ADR-113)
 
 Определение ОС в браузере — рекомендация: optional Client Hints, UA fallback,

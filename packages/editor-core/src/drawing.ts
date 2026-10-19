@@ -47,14 +47,14 @@ export const DEFAULT_DRAWING_DEFAULTS: DrawingDefaults = Object.freeze({
     autoAlignAxes: true,
     stroke: Object.freeze({
       color: Object.freeze({ red: 0.898, green: 0.282, blue: 0.302, alpha: 1 }),
-      width: 3, style: 'solid', cap: 'round', join: 'round',
+      width: 4, style: 'solid', cap: 'round', join: 'round',
     }),
   }),
   arrow: Object.freeze({
     path: 'straight',
     stroke: Object.freeze({
       color: Object.freeze({ red: 0.898, green: 0.282, blue: 0.302, alpha: 1 }),
-      width: 3,
+      width: 8,
       style: 'solid',
       cap: 'round',
       join: 'round',
@@ -67,7 +67,7 @@ export const DEFAULT_DRAWING_DEFAULTS: DrawingDefaults = Object.freeze({
     fill: Object.freeze({ kind: 'none' }),
     stroke: Object.freeze({
       color: Object.freeze({ red: 0.898, green: 0.282, blue: 0.302, alpha: 1 }),
-      width: 3,
+      width: 4,
       style: 'solid',
       cap: 'round',
       join: 'round',
@@ -81,7 +81,7 @@ export const DEFAULT_DRAWING_DEFAULTS: DrawingDefaults = Object.freeze({
     strokeVersion: 2,
     pressureMode: 'simulated',
     brushSmoothing: Object.freeze({ stabilized: .65 }),
-    width: 3,
+    width: 4,
     color: Object.freeze({ red: 0.898, green: 0.282, blue: 0.302, alpha: 1 }),
     smoothing: 0.65,
   }),
@@ -205,13 +205,13 @@ function drawingStrokeWidth(
 ): number {
   if (input.tool === 'pencil' || input.tool === 'marker') {
     const values = input.tool === 'pencil' ? defaults.pencil : defaults.marker
-    const width = positiveWidth(values.width, input.tool === 'marker' ? 18 : 3)
+    const width = positiveWidth(values.width, input.tool === 'marker' ? 18 : 4)
     if (input.tool !== 'pencil' || values.strokeVersion === 2) return width
     return width * (values.brush === 'brush' ? 1.5 : values.brush === 'pencil' ? .65 : 1)
   }
   const values = input.tool === 'line' ? defaults.line : input.tool === 'arrow' ? defaults.arrow : defaults.shape
   const strokeValue = values.stroke instanceof Object ? (values.stroke as JsonObject).width : undefined
-  return positiveWidth(strokeValue, 3)
+  return positiveWidth(strokeValue, input.tool === 'arrow' ? 8 : 4)
 }
 
 function drawingGeometry(

@@ -209,7 +209,7 @@ export const DEFAULT_PRECISION_TOOLS: PrecisionToolDefaults = Object.freeze({
     size: 120,
     shape: 'circle',
     borderColor: Object.freeze({ red: 1, green: 1, blue: 1, alpha: 1 }),
-    borderWidth: 3,
+    borderWidth: 4,
     shadow: true,
   }),
 })

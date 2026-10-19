@@ -1,5 +1,47 @@
 # Трассируемость требований
 
+## Версия 0.1.6 (2026-10-19)
+
+`REQ-REL-003/005`: по запросу владельца выполнен patch bump штатной командой
+`pnpm version:bump 0.1.6`; package.json, Tauri config, Cargo workspace,
+точная storage dependency и оба package entries Cargo.lock согласованы.
+В сборку входят Windows GUI subsystem, физические края Area и Linux-only
+пользовательский CLI (ADR-115). Новый GitHub release/публикация не выполнялись.
+
+
+## Стартовая толщина линий (2026-10-18, до реализации)
+
+`REQ-EDT-015/017`, `REQ-TOL-001/002/003/011`: стрелка по умолчанию 8 px;
+линия, фигура, карандаш и рамка лупы — 4 px вместо 3 px. Размеры шрифтов,
+сохранённые настройки пользователя и существующие объекты не изменяются.
+Доказательства: core factory regressions и относящиеся component tests;
+фактические команды и результаты — TESTING.md.
+
+## Локальные сборки и временные файлы (2026-10-18, до реализации)
+
+`REQ-REL-001/002/003/005`: ограничить накопление локальных outputs без изменения
+release matrix. Полезный Cargo/incremental cache и profiles сохраняются.
+Browser E2E удаляет собственный временный профиль
+после закрытия session; native runner освобождает pin бинарника и временный config
+в finally. Отчёты, failure screenshots и failed appData сохраняются отдельно.
+Доказательства: Windows inventory до/после очистки, boundary tests, browser smoke,
+typecheck, форматирование и docs links; native runtime/platform matrix не заменяются.
+Реализовано; локальные cleanup contracts и browser smoke passed, результаты
+и ограничения общих проверок — TESTING.md.
+
+## Windows: запуск и первый пиксель Area (2026-10-18, до реализации)
+
+`REQ-ACT-005/006/007/008`, `REQ-REL-003`, `REQ-CAP-001/006/010/011/012`: release
+запускается без новой консоли. По уточнению владельца Windows/macOS не требуют
+публичного CLI: capture/help/version отключены, подключения к родительской
+консоли нет; служебные аргументы
+автозапуска, настроек и автоматизированных проверок сохраняются.
+Quick Capture принимает системную мышь на всех краях и углах, без native resize
+окна поверх WebView. DXGI WAIT_TIMEOUT повторяется в пределах общего deadline;
+неподдерживаемый Rotation отклоняется явно, включая 180°. Evidence: red-first
+Rust/boundary tests, PE subsystem/startup gate и physical Windows edge regression.
+Проверка Windows 11/ARM64/HDR/mixed-DPI/RDP остаётся отдельной. Статус: planned.
+
 ## Загрузки лендинга (2026-10-18, до реализации)
 
 `REQ-WEB-005/006/007`: рекомендация desktop-пакета, статический RU/EN каталог семи

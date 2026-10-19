@@ -1,3 +1,6 @@
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
 use serde::Serialize;
 use std::path::PathBuf;
 use ts_rs::TS;
@@ -95,6 +98,7 @@ pub fn open_settings() -> Result<(), String> {
             .map(|_| ());
         #[cfg(target_os = "windows")]
         let result = std::process::Command::new("cmd")
+            .creation_flags(windows_sys::Win32::System::Threading::CREATE_NO_WINDOW)
             .args(["/C", "start", "", "ms-settings:startupapps"])
             .spawn()
             .map(|_| ());

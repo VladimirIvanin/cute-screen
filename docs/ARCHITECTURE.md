@@ -1,5 +1,16 @@
 # Архитектура Cute Screen
 
+## Windows/macOS GUI lifecycle (ADR-115)
+
+Публичный capture CLI компилируется только для Linux. Windows/macOS не имеют
+help/version flags и CLI fallback; внутренние launch intents остаются едиными
+для tray, автозапуска, settings и single-instance. Скрытый --startup-check
+проверяет запуск связанного binary без mount приложения. Windows release
+использует GUI subsystem, без создания/подключения консоли. Quick WebView
+создаётся non-resizable на Windows до установки native resize handler.
+DXGI использует общий deadline для повторных WAIT_TIMEOUT и проверяет Rotation
+до подготовки duplication. Ошибки не подменяются успешным неполным кадром.
+
 ## Загрузки лендинга (ADR-113)
 
 Vite подставляет единый release snapshot в HTML обеих локалей; DOM-модуль

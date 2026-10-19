@@ -44,7 +44,12 @@ async function focusWindow(label: string): Promise<void> {
 async function scenePixel(point: { x: number; y: number }): Promise<number[]> {
   return browser.execute(({ x, y }) => {
     const canvas = document.querySelector<HTMLCanvasElement>('.cs-canvas:not(.cs-canvas-overlay)')!
-    return [...canvas.getContext('2d')!.getImageData(x, y, 1, 1).data]
+    const doc = (window as typeof window & {
+      __cuteScreenE2eM08: { snapshot(): { document: EditorDocumentV1 } }
+    }).__cuteScreenE2eM08.snapshot().document
+    return [...canvas.getContext('2d')!.getImageData(
+      Math.floor(x * canvas.width / doc.canvas.width),
+      Math.floor(y * canvas.height / doc.canvas.height), 1, 1).data]
   }, point)
 }
 
@@ -94,11 +99,11 @@ describe('Quick → Editor with editable annotations', () => {
     await browser.waitUntil(async () =>
       (await browser.execute(() => document.querySelector('.cs-quick-size-a11y')?.textContent)) !== sizeBefore)
     const crop = await browser.execute(() => {
-      const source = document.querySelector<HTMLCanvasElement>('.cs-canvas:not(.cs-canvas-overlay)')!
-      const text = document.querySelector('.cs-quick-size-a11y')!.textContent!
-      const [width, height] = text.match(/\d+/gu)!.map(Number)
-      if (!width || !height) throw new Error('Missing crop dimensions')
-      return { x: source.width - width, y: source.height - height, width, height }
+      const doc = (window as typeof window & {
+        __cuteScreenE2eQuick: { snapshot(): EditorDocumentV1 }
+      }).__cuteScreenE2eQuick.snapshot()
+      if (!doc.crop) throw new Error('Quick crop was not committed')
+      return { ...doc.crop }
     })
     expect(crop.x).toBeGreaterThan(0)
     expect(crop.y).toBeGreaterThan(0)
@@ -117,6 +122,11 @@ describe('Quick → Editor with editable annotations', () => {
     await $('.cs-selection-floating-toolbar').waitForDisplayed()
     const ink = await browser.execute(() => {
       const source = document.querySelector<HTMLCanvasElement>('.cs-canvas:not(.cs-canvas-overlay)')!
+      const doc = (window as typeof window & {
+        __cuteScreenE2eQuick: { snapshot(): EditorDocumentV1 }
+      }).__cuteScreenE2eQuick.snapshot()
+      const scale = source.width / doc.canvas.width
+      const margin = Math.ceil(scale)
       const pixels = source.getContext('2d')!.getImageData(0, 0, source.width, source.height).data
       let sample: { x: number; y: number; rgba: number[] } | undefined
       for (let y = Math.floor(source.height / 2); y < source.height; y += 1) {
@@ -128,9 +138,17 @@ describe('Quick → Editor with editable annotations', () => {
             pixels[offset + 2]! < 130
           ) {
             const rgba = [...pixels.slice(offset, offset + 4)]
-            // Use opaque inner ink, not the first antialiased boundary pixel.
-            if (!sample || rgba[0]! - rgba[1]! > sample.rgba[0]! - sample.rgba[1]!) {
-              sample = { x, y, rgba }
+            // Preview buffers may be supersampled. Require a document-pixel
+            // interior around the sample before comparing with the editor.
+            const interior = [[x - margin, y], [x + margin, y], [x, y - margin], [x, y + margin]]
+              .every(([px, py]) => px! >= 0 && py! >= 0 && px! < source.width && py! < source.height &&
+                rgba.every((channel, index) => pixels[(py! * source.width + px!) * 4 + index] === channel))
+            if (
+              interior &&
+              (!sample ||
+                rgba[0]! - rgba[1]! > sample.rgba[0]! - sample.rgba[1]!)
+            ) {
+              sample = { x: x / scale, y: y / scale, rgba }
             }
           }
         }

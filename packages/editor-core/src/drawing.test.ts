@@ -15,6 +15,16 @@ import type { ArrowLayer } from './document/types'
 const id = '019c1f62-058e-7000-8000-000000000010'
 
 describe('M06 drawing factories', () => {
+  it.each([
+    ['arrow', 8],
+    ['line', 4],
+    ['shape', 4],
+    ['pencil', 4],
+  ] as const)('creates %s with a default line width of %s px', (tool, width) => {
+    const layer = createDrawingLayer({ id, tool, start: { x: 10, y: 10 }, end: { x: 110, y: 60 } })
+    expect(layer?.payload).toMatchObject(tool === 'pencil' ? { width } : { stroke: { width } })
+  })
+
   it('does not create a zero-length arrow', () => {
     expect(
       createDrawingLayer({

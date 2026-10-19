@@ -1,5 +1,89 @@
 # CI-сборки и проверка версии через GitHub
 
+## Windows GUI release и внутренний startup smoke (ADR-115)
+
+Windows/macOS не поставляют пользовательский capture CLI/help/version.
+Служебный --startup-check завершается до создания окон и проверяет link/startup.
+Windows release проверяется командой
+`node scripts/check-windows-executable.mjs target/release/cute-screen.exe`:
+фактический PE subsystem должен быть 2, startup exit code — 0.
+Проверка входит в release boundary и NSIS workflow для x64/ARM64.
+Debug Windows остаётся console subsystem. Native E2E проверяет свежий harness
+через test-only query вместе с --startup-check, не запуская stale binary.
+
+Системный Windows input: `CUTE_SCREEN_E2E_SCENARIOS=windows-area-edges pnpm test:e2e:tauri`
+(PowerShell: задать переменную через `$env:`). Сценарий использует отдельный
+профиль и Win32 mouse/key input; fake-platform pixels отключены. Native
+mouse/key операции запускать последовательно. Протокол и пределы — TESTING.md.
+
+## Дисковая гигиена локальной разработки (ADR-114)
+
+`pnpm disk:usage` показывает GiB по подкаталогам `target`, `artifacts`,
+`node_modules` и `.git`, не переходя по symlink/junction. Это логический размер
+файлов: hardlinks pnpm могут разделять физические блоки. При параллельной записи
+результат является снимком, а не точным измерением освобождённых блоков.
+
+Windows-аудит 2026-10-18: `target` 159,961 GiB, `artifacts` 91,941 GiB;
+главные причины — `target/debug/incremental` 51,676 GiB, повторные Rust target
+каталоги и 448 Chrome profiles (browser-e2e суммарно 42,058 GiB). Это build/runtime
+cache, а не размер исходного кода. Список очистки и фактические результаты — TESTING.md.
+
+Ежедневный цикл: `pnpm dev` / относящиеся browser tests для UI,
+`cargo check` / подходящие `cargo test` для Rust, `pnpm tauri dev` для native.
+Standalone native smoke: `pnpm tauri build --debug --no-bundle`.
+Пакетировать только для package/release проверки: например,
+`pnpm tauri build --bundles nsis` на Windows. `--no-bundle` исключает упаковку,
+но не Cargo cache. `--locked` удерживает lockfile, `--jobs` ограничивает
+параллелизм; эти параметры не очищают старые outputs.
+
+Workspace `target/` общий. Дополнительный target создаёт ещё один dependency
+cache; при необходимой изоляции использовать один `target/e2e-isolated`.
+Полезный cache этого isolated target также сохраняется. Исторические пути ниже
+описывают прежние прогоны и не являются шаблоном для новых папок под каждую задачу.
+Только для заведомо заброшенного target: остановить свои процессы; затем сначала:
+
+```sh
+cargo clean --target-dir target/e2e-isolated --dry-run
+pnpm clean:artifacts
+```
+
+После проверки списка и абсолютных путей убрать `--dry-run`, либо выполнить
+`pnpm clean:artifacts --apply`. Cargo очистит соответствующие caches; следующая
+сборка будет холодной. Не запускать clean при активной сборке или E2E.
+Не чистить отдельные случайные `.rlib`/`.fingerprint` в живом Cargo cache.
+
+`clean:artifacts` имеет фиксированный список родителей и имён: Chrome profiles
+в browser/landing E2E, pin-копии binary и frontend config в native runtime.
+Он проверяет реальные пути, отсутствие tracked artifacts и использования путей
+процессами. Он сохраняет JSON/JUnit/logs, screenshots, failed appData и driver-cache;
+не чистит Rust, пользовательскую библиотеку, fixtures или release evidence.
+Во время очистки не запускать новые тесты. После SIGKILL/сбоя worker выполнить
+cleanup вручную. Успешный browser session убирает свой профиль в `afterSession`;
+native build временные файлы убираются в `finally`, включая build/scenario errors.
+Failed appData хранится до окончания расследования, затем удаляется адресно.
+
+Полезный общий Cargo cache, включая `target/debug/incremental`, `deps`, `build`
+и release outputs, сохраняется: он ускоряет следующие сборки. Размер cache сам
+по себе не означает мусор. По уточнению владельца не отключаем incremental,
+не меняем dev/test/release profiles и не чистим общий target автоматически.
+`cargo clean` допустим для заброшенного отдельного target, при доказанной
+поломке cache или явном запросе владельца. Переключение flags/profiles создаёт
+дополнительные outputs. Параметры `debug` и `incremental` из Cargo Book полезны
+для осознанной настройки конкретного окружения, но не являются обязательным
+способом экономии места в этом проекте.
+
+`pnpm store prune` удаляет неиспользуемые пакеты общего pnpm store и не очищает
+Rust. Cargo global-cache GC также не заменяет очистку workspace build outputs.
+Не переносить мусор в произвольный внешний target только ради уменьшения этой
+папки: общий расход диска от этого не уменьшается.
+
+Первоисточники: [Cargo clean](https://doc.rust-lang.org/cargo/commands/cargo-clean.html),
+[Cargo profiles](https://doc.rust-lang.org/cargo/reference/profiles.html),
+[Cargo build cache](https://doc.rust-lang.org/cargo/reference/build-cache.html),
+[Tauri CLI](https://v2.tauri.app/reference/cli/),
+[WebdriverIO hooks](https://webdriver.io/docs/configuration#hooks),
+[pnpm store](https://pnpm.io/cli/store).
+
 ## Обновление загрузок лендинга (ADR-113)
 
 Pages запускается после успешного Release assets, на push main и вручную.

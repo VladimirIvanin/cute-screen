@@ -3,6 +3,7 @@ import { once } from 'node:events'
 import path from 'node:path'
 
 import { saveFailureScreenshot } from './failure-artifacts'
+import { browserProfileHooks } from './browser-profile'
 
 const outputDir = path.resolve('artifacts/browser-e2e')
 const browserE2ePort = process.env.CUTE_SCREEN_BROWSER_E2E_PORT ?? '5173'
@@ -46,6 +47,7 @@ async function startBrowserDevServer(): Promise<{
 }
 
 export const config: WebdriverIO.Config = {
+  ...browserProfileHooks(outputDir),
   runner: 'local',
   specs: ['./specs/browser-*.e2e.ts'],
   maxInstances: 1,

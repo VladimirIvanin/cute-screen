@@ -103,8 +103,8 @@ describe('selection interaction contract', () => {
   it('measures padding using the actual canvas scale on each axis', () => {
     const vertical = createDrawingLayer({ id: 'vertical', tool: 'arrow', start: { x: 100, y: 100 }, end: { x: 100, y: 500 } })!
     const options = { margin: 6, screenScale: { x: 4, y: 1 } }
-    expect(hitTestDocument(document([vertical]), { x: 103, y: 300 }, {}, options)?.nodeId).toBe('vertical')
-    expect(hitTestDocument(document([vertical]), { x: 103.1, y: 300 }, {}, options)).toBeUndefined()
+    expect(hitTestDocument(document([vertical]), { x: 105.5, y: 300 }, {}, options)?.nodeId).toBe('vertical')
+    expect(hitTestDocument(document([vertical]), { x: 105.6, y: 300 }, {}, options)).toBeUndefined()
   })
   it('requires an explicit policy for every persisted layer kind', () => {
     expect(Object.keys(LAYER_INTERACTION_POLICIES).sort()).toEqual([...LAYER_KINDS].sort())
@@ -116,7 +116,7 @@ describe('selection interaction contract', () => {
   it.each([0.25, 1, 4])('keeps the contour margin in CSS pixels at scale %s', (scale) => {
     const horizontal = createDrawingLayer({ id: 'line', tool: 'arrow', start: { x: 100, y: 100 }, end: { x: 500, y: 100 } })!
     const doc = document([horizontal])
-    const width = 3 / 2
+    const width = 8 / 2
     const point = { x: 300, y: 100 + width + 5.9 / scale }
     expect(hitTestDocument(doc, point)).toBeUndefined()
     const options = { margin: 6, screenScale: { x: scale, y: scale } }

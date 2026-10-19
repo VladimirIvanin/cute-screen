@@ -1769,6 +1769,7 @@ struct QuickCaptureWindowPolicy {
     focused: bool,
     fullscreen: bool,
     background_throttling_disabled: bool,
+    resizable: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1783,6 +1784,8 @@ const fn quick_capture_window_policy() -> QuickCaptureWindowPolicy {
         focused: false,
         fullscreen: false,
         background_throttling_disabled: true,
+        // A fullscreen Windows WebView must not get TAURI_DRAG_RESIZE_BORDERS.
+        resizable: !cfg!(target_os = "windows"),
     }
 }
 
@@ -1868,6 +1871,7 @@ fn ensure_quick_capture_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> 
     WebviewWindowBuilder::new(app, "quick-capture", url)
         .title("Cute Screen Quick Capture")
         .decorations(false)
+        .resizable(policy.resizable)
         .always_on_top(true)
         .skip_taskbar(true)
         .fullscreen(policy.fullscreen)
@@ -2464,6 +2468,7 @@ fn start_capture<R: tauri::Runtime>(
 
 fn handle_launch<R: tauri::Runtime>(app: &tauri::AppHandle<R>, intent: LaunchIntentV1) {
     match intent {
+        LaunchIntentV1::StartupCheck => {}
         LaunchIntentV1::ShowEditor => {
             if shortcuts::host::intercept_recording(app, shortcuts::ShortcutAction::ShowEditor)
                 || shortcuts::host::intercept_test(app, shortcuts::ShortcutAction::ShowEditor)
@@ -2623,6 +2628,10 @@ pub fn run() {
             std::process::exit(exit_code);
         }
     };
+
+    if matches!(launch_intent, LaunchIntentV1::StartupCheck) {
+        return;
+    }
 
     if let LaunchIntentV1::Capture(capture) = &launch_intent {
         let request = ActivationRequestV1 {
@@ -3196,6 +3205,7 @@ mod tests {
         assert!(!policy.focused);
         assert!(!policy.fullscreen);
         assert!(policy.background_throttling_disabled);
+        assert_eq!(policy.resizable, !cfg!(target_os = "windows"));
     }
 
     #[test]

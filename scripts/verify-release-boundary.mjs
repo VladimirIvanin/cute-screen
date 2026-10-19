@@ -8,6 +8,7 @@ import path from 'node:path'
 import process from 'node:process'
 
 import fg from 'fast-glob'
+import { checkWindowsExecutable } from './check-windows-executable.mjs'
 
 const root = path.resolve(process.argv[2] ?? process.cwd())
 const forbidden = [
@@ -73,6 +74,7 @@ const executable = path.join(
   'release',
   process.platform === 'win32' ? 'cute-screen.exe' : 'cute-screen',
 )
+const windowsExecutable = process.platform === 'win32' ? await checkWindowsExecutable(executable) : null
 const binary = await readFile(executable)
 const binaryViolations = forbidden.filter((entry) => binary.includes(Buffer.from(entry)))
 const config = await readFile(path.join(root, 'src-tauri', 'tauri.conf.json'), 'utf8')
@@ -95,6 +97,7 @@ const report = {
   checkedAt: new Date().toISOString(),
   executable: path.relative(root, executable),
   macosSdk,
+  windowsExecutable,
   graphViolations,
   binaryViolations,
   configViolations,

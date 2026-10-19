@@ -1,5 +1,71 @@
 # Журнал архитектурных решений
 
+## ADR-116 — Стартовая толщина линий
+
+**Статус:** accepted (2026-10-18); дополняет ADR-048/100.
+
+**Основание:** владелец запросил стрелку 8 px и замену стартовых 3 px на 4 px
+для линий, без изменения размеров шрифтов.
+
+**Решение:** arrow получает 8 px; line, shape, pencil и border лупы — 4 px.
+Core factories, workspace/canvas defaults и toolbar fallbacks согласованы.
+Сохранённые preferences и стили документов не мигрируют; остальные толщины
+и диапазоны ручного ввода сохраняются.
+
+**Проверка:** failing-first core factory tests, component regressions и
+форматирование; фактические результаты — TESTING.md.
+
+## ADR-115 — GUI-запуск Windows/macOS и системный ввод Area
+
+**Статус:** accepted (2026-10-18); заменяет ADR-010.
+
+**Основание:** владелец отказался от пользовательского CLI Windows/macOS.
+Windows release PE имел subsystem 3 и открывал консоль. На Windows 10 19045
+системная мышь на y=0/1 и (0,0) не доставляет pointerdown в Quick canvas:
+поверх WebView остаётся TAURI_DRAG_RESIZE_BORDERS. EdgeDriver при тех же
+координатах доставляет isTrusted=true и пропускает дефект.
+
+**Решение:** один binary сохраняет GUI/tray/single-instance. Публичные capture,
+JSON, help/version остаются Linux-only. Windows release имеет subsystem 2 без
+AttachConsole/AllocConsole; debug сохраняет диагностику. Внутренние background,
+show, settings, shortcuts verification и скрытый startup-check не требуют
+пользовательского CLI. Packaging/link smoke использует startup-check, E2E дополнительно
+требует test-only query. Quick Windows создаётся resizable(false) до WebView,
+не устанавливая resize handler. Shell helpers настроек используют CREATE_NO_WINDOW.
+
+DXGI WAIT_TIMEOUT повторяется до единого двухсекундного deadline; остальные
+ошибки остаются recoverable failures. Rotation проверяется явно до DuplicateOutput:
+неподдерживаемые повороты, включая 180°, отклоняются, не выдавая перевёрнутый кадр.
+Полная поддержка поворотов этим решением не добавляется.
+
+**Проверка:** Rust regression tests; PE parser и проверка реального release;
+Windows native-input Area edges/corners/cancel/retry; Quick chrome, decoded
+physical capture и Editor handoff. Доказательства и ограничения — TESTING.md.
+
+## ADR-114 — Ограничение локальных build/runtime артефактов
+
+**Статус:** accepted (2026-10-18); дополняет ADR-020/112, не меняет release matrix.
+
+**Контекст:** Windows workspace содержит около 252 GiB в target/artifacts.
+Из них 51,676 GiB — incremental Rust, около 42 GiB — browser E2E с 448
+оставшимися Chrome profiles; несколько отдельных Cargo targets дублируют deps.
+
+**Решение:** один основной Cargo target и только при необходимости один
+переиспользуемый isolated target. Полезный общий Cargo cache, включая incremental,
+сохраняется; dev/test/release profiles не меняются. Размер cache сам по себе
+не является причиной очистки. Cargo clean применяется к заброшенным отдельным
+targets, при доказанной поломке cache либо явном запросе владельца.
+Browser worker владеет собственным временным профилем и удаляет его после
+закрытия session; native runner освобождает pin binary/config в finally.
+Отчёты и failed appData отделены от временных build outputs. Ручной cleanup
+имеет dry-run и фиксированный список disposable каталогов; произвольные
+исходники/библиотека/fixtures/release evidence в него не входят.
+
+**Проверяемое основание:** inventory Windows до/после очистки, Cargo dry-run,
+тест изоляции двух browser workers и сохранения evidence, browser E2E smoke,
+форматирование. Фактические результаты и ограничения
+зафиксированы в TESTING.md. Правила агента — AGENTS.md; команды и источники — BUILD_RELEASE.md.
+
 ## ADR-113 — Статический каталог загрузок и рекомендация ОС
 
 **Статус:** accepted (2026-10-18); дополняет ADR-111 и REQ-WEB-005/006/007.
@@ -758,7 +824,7 @@ Windows evidence не распространяется на WebKitGTK/WKWebView.
 
 ## ADR-010 — Один бинарник с GUI/tray/CLI dispatch
 
-**Статус:** accepted
+**Статус:** superseded — заменён [ADR-115](DECISIONS.md).
 
 **Решение:** `cute-screen` без capture subcommand запускает обычный lifecycle; CLI разбирается через `clap`, использует single-instance forwarding и стабильный JSON/exit-code контракт.
 

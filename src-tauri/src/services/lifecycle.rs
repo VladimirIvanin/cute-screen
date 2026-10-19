@@ -1,9 +1,13 @@
 use std::path::Path;
 
-use clap::{Parser, Subcommand, ValueEnum};
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+use clap::ValueEnum;
+use clap::{Parser, Subcommand};
 use serde::Serialize;
 
-use crate::capture::{CaptureAction, CaptureInvocationSource, CaptureRequestV1};
+use crate::capture::CaptureRequestV1;
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+use crate::capture::{CaptureAction, CaptureInvocationSource};
 
 pub trait AutostartService {
     fn enabled(&self) -> Result<bool, String>;
@@ -29,6 +33,7 @@ impl AutostartService for MemoryAutostartService {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum LaunchIntentV1 {
+    StartupCheck,
     ShowEditor,
     Background,
     Settings,
@@ -47,9 +52,15 @@ pub struct CaptureLaunchV1 {
 #[command(
     name = "cute-screen",
     version,
-    about = "Local screenshot capture and annotation"
+    about = "Local screenshot capture and annotation",
+    disable_help_flag = cfg!(any(target_os = "windows", target_os = "macos")),
+    disable_version_flag = cfg!(any(target_os = "windows", target_os = "macos")),
+    disable_help_subcommand = cfg!(any(target_os = "windows", target_os = "macos"))
 )]
 struct Cli {
+    // Internal packaging/link smoke: exit before opening any application surface.
+    #[arg(long, hide = true)]
+    startup_check: bool,
     #[arg(long)]
     background: bool,
     #[cfg(feature = "test-harness")]
@@ -70,6 +81,7 @@ enum Command {
         #[command(subcommand)]
         command: ShortcutCommand,
     },
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     Capture(CaptureArgs),
 }
 
@@ -89,6 +101,7 @@ fn validate_verification_token(value: &str) -> Result<String, String> {
     }
 }
 
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 #[derive(Debug, clap::Args)]
 struct CaptureArgs {
     #[arg(long, value_enum)]
@@ -103,6 +116,7 @@ struct CaptureArgs {
     json: bool,
 }
 
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 #[derive(Debug, Clone, Copy, ValueEnum)]
 enum CaptureMode {
     Area,
@@ -113,6 +127,7 @@ enum CaptureMode {
     Repeat,
 }
 
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 impl From<CaptureMode> for CaptureAction {
     fn from(value: CaptureMode) -> Self {
         match value {
@@ -131,11 +146,15 @@ where
     T: Into<std::ffi::OsString> + Clone,
 {
     let cli = Cli::try_parse_from(args)?;
+    if cli.startup_check {
+        return Ok(LaunchIntentV1::StartupCheck);
+    }
     match cli.command {
         Some(Command::Settings { .. }) => Ok(LaunchIntentV1::Settings),
         Some(Command::Shortcuts {
             command: ShortcutCommand::Test { token },
         }) => Ok(LaunchIntentV1::VerifyShortcut { token }),
+        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
         Some(Command::Capture(capture)) => Ok(LaunchIntentV1::Capture(CaptureLaunchV1 {
             request: CaptureRequestV1 {
                 correlation_id: uuid::Uuid::now_v7().to_string(),
@@ -166,6 +185,12 @@ pub fn cli_fallback_command(current_exe: &Path, appimage: bool) -> String {
     }
 }
 
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+pub fn current_cli_fallback_command() -> Option<String> {
+    None
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 pub fn current_cli_fallback_command() -> Option<String> {
     let current_exe = crate::autostart::executable().ok()?;
     Some(cli_fallback_command(
@@ -246,7 +271,7 @@ mod tests {
     }
 
     use super::{
-        AutostartService, CaptureLaunchV1, LaunchIntentV1, LifecycleState, MemoryAutostartService,
+        AutostartService, LaunchIntentV1, LifecycleState, MemoryAutostartService,
         cli_fallback_command, parse_launch,
     };
 
@@ -266,9 +291,27 @@ mod tests {
         );
     }
 
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
+    #[test]
+    fn gui_platforms_reject_public_cli_but_keep_internal_startup_check() {
+        for args in [
+            vec!["cute-screen", "--help"],
+            vec!["cute-screen", "--version"],
+            vec!["cute-screen", "capture", "--mode", "screen", "--json"],
+        ] {
+            assert!(parse_launch(args).is_err());
+        }
+        assert_eq!(
+            parse_launch(["cute-screen", "--startup-check"]).unwrap(),
+            LaunchIntentV1::StartupCheck
+        );
+        assert!(super::current_cli_fallback_command().is_none());
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     #[test]
     fn parses_versioned_m04_capture_contract() {
-        let LaunchIntentV1::Capture(CaptureLaunchV1 { request, json }) = parse_launch([
+        let LaunchIntentV1::Capture(super::CaptureLaunchV1 { request, json }) = parse_launch([
             "cute-screen",
             "capture",
             "--mode",

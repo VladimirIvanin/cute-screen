@@ -1,3 +1,6 @@
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
 use super::{ShortcutAction, ShortcutSnapshotV1, host::ShortcutService};
 use crate::{CommandResult, app::commands::error::CommandErrorV1};
 use std::time::{Duration, Instant};
@@ -116,6 +119,7 @@ pub async fn shortcuts_system_settings(app: tauri::AppHandle) -> CommandResult<(
         {
             let _ = app;
             std::process::Command::new("cmd")
+                .creation_flags(windows_sys::Win32::System::Threading::CREATE_NO_WINDOW)
                 .args(["/C", "start", "", "ms-settings:easeofaccess-keyboard"])
                 .spawn()
                 .map(|_| ())

@@ -74,6 +74,7 @@ function resolveValues(
 function arrowSchema(
   context: DrawingSchemaContext,
   state: DrawingValues,
+  defaultWidth = 8,
 ): ContextToolbarSchema {
   const { activeDocument, hexColor, translate } = context
   const { color, colorDisabled, stroke, values, width } = state
@@ -106,7 +107,7 @@ function arrowSchema(
         kind: 'arrowStroke',
         id: 'stroke',
         label: translate('arrowStroke'),
-        width: typeof width === 'number' ? width : 3,
+        width: typeof width === 'number' ? width : defaultWidth,
         style: stroke?.style === 'solid' || stroke?.style === 'dotted' ? stroke.style : 'dashed',
         disabled: colorDisabled,
         solidLabel: translate('arrowSolid'),
@@ -166,7 +167,7 @@ function baseControls(
       kind: 'range',
       id: 'width',
       label: context.translate('width'),
-      value: typeof state.width === 'number' ? state.width : 3,
+      value: typeof state.width === 'number' ? state.width : tool === 'marker' ? 18 : 4,
       min: 1,
       max: tool === 'marker' ? 96 : 48,
       step: 1,
@@ -370,7 +371,7 @@ function drawingControl(
       }
     : resolved
   if (tool === 'line') {
-    const arrow = arrowSchema(context, state)
+    const arrow = arrowSchema(context, state, 4)
     return { ...arrow, icon: 'line', title: context.translate('toolLine'), hint: context.translate('lineHint'),
       controls: arrow.controls.filter((control) => control.id === 'color' || control.id === 'stroke').map((control) => ({ ...control, ...(control.kind === 'arrowStroke' ? { allStyles: true } : {}) })),
       ...(defaultsOnly ? { lineAlignment: { enabled: values.autoAlignAxes !== false, label: context.translate('lineAlignment'), disabled: state.colorDisabled } } : {}),

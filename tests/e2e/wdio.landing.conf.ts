@@ -3,6 +3,7 @@ import { once } from 'node:events'
 import path from 'node:path'
 
 import { saveFailureScreenshot } from './failure-artifacts'
+import { browserProfileHooks } from './browser-profile'
 
 const outputDir = path.resolve('artifacts/landing-e2e')
 const port = process.env.CUTE_SCREEN_LANDING_E2E_PORT ?? '5176'
@@ -43,6 +44,7 @@ async function startLandingServer(): Promise<{
 }
 
 export const config: WebdriverIO.Config = {
+  ...browserProfileHooks(outputDir),
   runner: 'local',
   specs: ['./specs/landing.e2e.ts'],
   maxInstances: 1,

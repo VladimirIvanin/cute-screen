@@ -138,11 +138,11 @@ jobs:
           pnpm build
           cargo check --workspace --all-targets
 
-      - name: Link macOS production binary and verify CLI startup
+      - name: Link macOS production binary and verify internal startup
         if: runner.os == 'macOS'
         run: |
           cargo build --locked --package cute-screen-desktop --bin cute-screen --no-default-features
-          target/debug/cute-screen --help
+          target/debug/cute-screen --startup-check
 
       - name: Build Ubuntu 22.04 ARM64 packages and verify ABI
         if: matrix.tauri_deps

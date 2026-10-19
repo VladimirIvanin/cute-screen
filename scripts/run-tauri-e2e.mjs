@@ -22,6 +22,13 @@ await mkdir(runtimeDirectory, { recursive: true })
 const embeddedWebDriverPort = Number.parseInt(process.env.TAURI_WEBDRIVER_PORT ?? '4445', 10)
 
 const scenarios = [
+  {
+    id: 'windows-area-edges',
+    spec: 'tests/e2e/specs/tauri-windows-area-edges.e2e.ts',
+    harnessQuery: '?m04=1&m08=1',
+    interactiveWindows: true,
+    driverProvider: 'external',
+  },
   { id: 'area-escape', spec: 'tests/e2e/specs/tauri-area-escape.e2e.ts', harnessQuery: '?m04=1' },
   { id: 'landing-assets', spec: 'tests/e2e/specs/tauri-landing-assets.e2e.ts', harnessQuery: '?m04=1&m08=1', driverProvider: 'external' },
   { id: 'emoji-link', spec: 'tests/e2e/specs/tauri-emoji-link.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },
@@ -490,6 +497,7 @@ const wdioCli = path.join(root, 'node_modules', '@wdio', 'cli', 'bin', 'wdio.js'
 const failedScenarios = []
 const retainedAppDataDirs = []
 const persistenceDirectories = new Map()
+const temporaryBuildDirectories = []
 
 try {
   if (run('pnpm', ['fixtures:generate:m01']) !== 0) {
@@ -498,6 +506,7 @@ try {
   let frontendOverride
   if (process.env.CUTE_SCREEN_FRONTEND_DIST) {
     const directory = await mkdtemp(path.join(runtimeDirectory, 'frontend-config-'))
+    temporaryBuildDirectories.push(directory)
     frontendOverride = path.join(directory, 'tauri.frontend.json')
     await writeFile(frontendOverride, JSON.stringify({
       build: {
@@ -535,9 +544,10 @@ try {
   // Other desktop tasks may rebuild target/debug while this suite is running.
   // Pin the successfully built harness before starting any driver or scenario.
   const binaryDirectory = await mkdtemp(path.join(runtimeDirectory, 'cute-screen-e2e-binary-'))
+  temporaryBuildDirectories.push(binaryDirectory)
   const executable = path.join(binaryDirectory, path.basename(builtExecutable))
   await copyFile(builtExecutable, executable)
-  const help = spawnSync(executable, ['--e2e-harness-query=?m04=1', '--help'], {
+  const help = spawnSync(executable, ['--e2e-harness-query=?m04=1', '--startup-check'], {
     encoding: 'utf8',
     windowsHide: true,
   })
@@ -613,6 +623,10 @@ try {
 } catch (error) {
   process.exitCode = 1
   throw error
+} finally {
+  for (const directory of temporaryBuildDirectories) {
+    await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 250 })
+  }
 }
 
 for (const [group, directory] of persistenceDirectories) {

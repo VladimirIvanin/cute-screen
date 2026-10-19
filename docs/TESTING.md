@@ -1,5 +1,91 @@
 # Стратегия тестирования
 
+## Стартовая толщина линий (2026-10-18, ADR-116)
+
+Windows x64, HEAD `3304e55` с рабочими изменениями. До реализации новые
+factory assertions дали ожидаемые failures: arrow/line/shape/pencil ещё 3 px,
+loupe border ещё 3 px. После изменения:
+
+- `pnpm test packages/editor-core/src` — 49 files, 441 tests passed.
+  Ожидания hit margin, mixed styles и fallback preferences обновлены под новые defaults.
+- `pnpm test packages/editor-core/src/drawing.test.ts packages/editor-core/src/precision-contracts.test.ts tests/unit/vue/canvas-viewport-tools.test.ts tests/unit/vue/arrow-context-toolbar.test.ts tests/unit/vue/shape-context-toolbar.test.ts tests/unit/vue/m08-precision-drawing.test.ts tests/unit/vue/m08-precision-settings.test.ts`
+  — 7 files, 73 tests passed.
+- `pnpm lint` — passed, 85 warnings вне изменённых файлов.
+- `pnpm docs:check` — passed.
+- `pnpm typecheck` — package/frontend checks прошли; tests/e2e остановился на
+  `tauri-windows-area-edges.e2e.ts:54`, TS2554 (Expected 1 arguments, but got 2).
+  Файл уже имел сторонние рабочие изменения до этой задачи; он не изменялся.
+- `pnpm format` и `pnpm format:check` — passed.
+
+Rust/native runtime не запускались: изменены только общие defaults и их tests;
+native capture/platform pass не заявляется.
+
+## Дисковая гигиена разработки (2026-10-18, ADR-114)
+
+Windows 10 Home x64 10.0.19045, Chrome 155.0.8059.80, Node 22.23.1,
+pnpm 10.33.2, Rust 1.97.0; HEAD `3304e55` с рабочими изменениями.
+Параллельно другая задача меняет Windows capture/startup и создаёт
+`target/e2e-isolated`; её исходники и активный target сохранены.
+
+Логический размер до/после (GiB, снимки при параллельной разработке):
+
+| Каталог                     | До      | После   |
+| --------------------------- | ------- | ------- |
+| target                      | 159,961 | 7,378   |
+| artifacts                   | 91,941  | 11,528  |
+| artifacts/browser-e2e       | 42,058  | 0,029   |
+| artifacts/tauri-e2e/runtime | 13,118  | около 7 |
+
+До уточнения владельца `cargo clean --profile dev --target-dir D:\cutescreen\target`
+после `--dry-run` удалил 69735 файлов / 103,7 GiB. В момент старта активная
+компиляция завершилась, установленное приложение из AppData оставлено запущенным.
+После уточнения общий полезный Cargo/incremental cache больше не очищается;
+эксперимент с dev profile полностью убран, `Cargo.toml` не имеет diff.
+Следующие сборки восстановят очищенный основной cache.
+
+Штатным `cargo clean --target-dir <проверенный абсолютный путь>` удалены восемь
+заброшенных отдельных targets: `target/{emoji-e2e,highlighter-e2e,quick-history-e2e,
+shape-catalog-native,tray-locale-e2e}` и
+`artifacts/{callout-target,ci-zip-target,window-capture-target}`.
+`pnpm clean:artifacts` затем `pnpm clean:artifacts --apply` удалили 622 временных
+каталога / 48,481 GiB: старые Chrome profiles, pin binary и frontend configs.
+Перед удалением проверены canonical paths, tracked files и активные процессы.
+После очистки dry-run: 0 каталогов / 0 GiB. Reports/screenshots, failed appData,
+driver-cache, release output, исходники, fixtures, `.git` и пользовательская
+библиотека сохранены. Free space D: вырос примерно с 28,9 до 224 GiB;
+около 195 GiB фактически освобождено, с поправкой на параллельные записи.
+Логические размеры учитывают hardlinks иначе, чем свободные блоки диска.
+
+Проверки:
+
+- `pnpm exec vitest run --project boundaries tests/boundaries/workspace-storage.test.ts`
+  — 3 passed: независимые worker profiles, сохранение failure evidence,
+  отказ от внешнего profile и отсутствие перехода по junction при измерении.
+- `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 pnpm test:e2e:browser --spec tests/e2e/specs/browser-foundation.e2e.ts`
+  — 1 passed; после закрытия session её Chrome profile отсутствует.
+- `cargo test --offline --locked --package cute-screen-storage` — 30 passed;
+  Cargo metadata с `--locked --offline --no-deps` и `cargo fmt --all --check` — passed.
+- `pnpm exec vue-tsc --noEmit -p tests/tsconfig.json` — passed.
+- `pnpm lint` — 0 errors, 85 warnings в существующем workspace;
+  ESLint по изменённым storage/E2E файлам — passed без warnings.
+- `node --check scripts/workspace-storage.mjs` и
+  `node --check scripts/run-tauri-e2e.mjs` — passed.
+- `pnpm format`, `pnpm format:check`, `pnpm docs:check`, `git diff --check` — passed.
+
+Общие проверки не полностью зелёные: `pnpm test:boundaries` дал 110 passed,
+1 skipped и 1 failed в `vitest-worker-diagnostics.test.ts`: worker-exit output
+не содержит ожидаемый `code: 23`. `pnpm exec tsc --noEmit -p tests/e2e/tsconfig.json`
+останавливается на параллельно добавленном `tauri-windows-area-edges.e2e.ts`
+(TS2554, вызов с двумя аргументами вместо одного). Эти файлы не исправлялись
+в рамках очистки. Полные `pnpm check`, native E2E, render/perf и platform builds
+в этой задаче не запускались. Native pin/config cleanup проверен синтаксически;
+новый real-WebView pass этим аудитом не заявляется.
+
+Артефакты: `artifacts/storage-clean-preview.log`, `storage-clean-applied.log`,
+`storage-after.tsv`, `storage-format.log`, `storage-format-check.log`,
+`storage-lint.log`, `storage-boundaries.log`, `storage-cargo-metadata.json`.
+Официальные рекомендации и команды — BUILD_RELEASE.md; обязательный процесс — AGENTS.md.
+
 ## Загрузки лендинга (2026-10-18, ADR-113)
 
 Ubuntu 24.04.5 x86_64, Linux 6.8.0-147-generic, Node 22.23.1, pnpm 10.33.2,

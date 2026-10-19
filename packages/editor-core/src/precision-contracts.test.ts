@@ -101,7 +101,7 @@ describe('M08 precision-tool document contracts', () => {
     expect(loupe.payload).toMatchObject({
       lens: { shape: 'circle', size: 80 },
       zoom: 2,
-      border: { color: { red: 1, green: 1, blue: 1, alpha: 1 }, width: 3 },
+      border: { color: { red: 1, green: 1, blue: 1, alpha: 1 }, width: 4 },
       sampleSource: 'compositeBelow',
     })
     for (const layer of [censor, spotlight, ruler, loupe]) {
