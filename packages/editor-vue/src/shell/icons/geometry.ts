@@ -3,6 +3,7 @@ interface IconPathAttributes {
   readonly fill?: 'currentColor'
   readonly stroke?: 'none'
   readonly 'fill-opacity'?: number
+  readonly 'stroke-width'?: number
 }
 
 /** Monochrome geometry with optional halftones; theme and sizing belong to UiIcon. */
@@ -17,6 +18,12 @@ export type IconPrimitive =
 export type IconGeometry = readonly IconPrimitive[]
 
 // Original Cute Screen drawings, MIT. Compare as a family at 18 CSS px.
+export const strokeWidthGeometry = [
+  ['path', { d: 'M4 5H20', 'stroke-width': 1 }],
+  ['path', { d: 'M4 12H20', 'stroke-width': 2 }],
+  ['path', { d: 'M4 19H20', 'stroke-width': 3 }],
+] as const satisfies IconGeometry
+
 // User-selected 01: a caption card linked to a target by a stepped leader.
 export const calloutGeometry = [
   ['rect', { x: 8, y: 3, width: 13, height: 10, rx: 2 }],

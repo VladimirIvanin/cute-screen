@@ -33,11 +33,6 @@
 .cs-callout-popover--text {
   width: max-content;
 }
-.cs-callout-stroke-preview {
-  width: 36px;
-  height: 18px;
-  flex: none;
-}
 .cs-callout-sides {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));

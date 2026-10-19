@@ -1,5 +1,34 @@
 # Стратегия тестирования
 
+## Единая иконка толщины линии (2026-10-19)
+
+Исходный HEAD `85aae8c`; Linux 6.8.0-138-generic x86_64, Node 22.23.1,
+pnpm 10.33.2, headless Chrome/ChromeDriver 147.0.7727.101. Общий `strokeWidth`
+заменяет одиночный штрих в controls стрелки/линии, фигуры и выноски;
+линейка использует тот же источник. Изменена только презентация controls.
+
+- `pnpm test` с фильтрами `tests/unit/vue/{ui-icon,arrow-context-toolbar,line-tool,shape-context-toolbar,callout-toolbar,ruler-toolbar,tool-formatting-toolbar}.test.ts`
+  — 7 files / 154 passed; focus, Escape, mixed, disabled и изменение значений.
+- `pnpm test:e2e:browser --spec tests/e2e/specs/browser-m06-arrow-tools.e2e.ts --spec tests/e2e/specs/browser-line.e2e.ts --spec tests/e2e/specs/browser-shape-toolbar.e2e.ts --spec tests/e2e/specs/browser-callout-visual.e2e.ts`
+  с `--mochaOpts.grep 'shows all five arrow controls|keeps settings and visible lines|edits paint and history|keeps editing and width controls'`
+  — линия, фигура и выноска passed; стрелка достигла default timeout 30 s.
+  Повтор только arrow spec с `--mochaOpts.grep 'shows all five arrow controls' --mochaOpts.timeout 120000`
+  — 1/1 passed. Итого четыре выбранных сценария прошли.
+  RU/EN × light/dark, 1024 px; линия/выноска также 50/100/200%.
+  Просмотрены screenshots стрелки, линии, фигуры и выноски.
+- Browser env: `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1`,
+  `CUTE_SCREEN_BROWSER_E2E_PORT=5193`,
+  `NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt`.
+  Первый запуск без системного CA bundle завершился до тестов с
+  `SELF_SIGNED_CERT_IN_CHAIN`; TLS verification не отключалась.
+- `pnpm lint` — exit 0, 85 warnings без errors; `pnpm typecheck` — passed.
+- `pnpm format`, `pnpm format:check`, `pnpm docs:check`, `git diff --check`
+  — passed. Логи, JUnit и выбранные screenshots — `artifacts/stroke-width-icon/`.
+
+Native WebView и полный `pnpm check` в этой UI-правке не запускались;
+Rust, IPC, scene graph и export не изменены. Отдельные Cargo targets не создавались;
+shared cache сохранён. Временные Chrome profiles удалены штатным afterSession.
+
 ## Cross-platform test build BMP preview (2026-10-19)
 
 `REQ-REL-001/002/003`. Исходный HEAD `2cc0336`.

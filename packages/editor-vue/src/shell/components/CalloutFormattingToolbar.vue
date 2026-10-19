@@ -38,7 +38,7 @@ const surfaceOwner = useTransientSurface() ?? provideTransientSurface()
 type Menu = 'route' | 'markers' | 'line' | 'frame' | 'text'
 const menus: readonly Menu[] = ['route', 'markers', 'line', 'frame', 'text']
 const icons: Record<Menu, IconName> = {
-  route: 'callout', markers: 'arrow', line: 'line', frame: 'textBackground', text: 'text',
+  route: 'callout', markers: 'arrow', line: 'strokeWidth', frame: 'textBackground', text: 'text',
 }
 const open = ref<Menu>()
 const panel = ref<HTMLElement>()
@@ -188,22 +188,11 @@ watch(() => props.schema.disabled, (disabled) => {
         <CalloutMarkerPreview :marker="payload.targetMarker" start/>
         <CalloutMarkerPreview :marker="payload.labelMarker"/>
       </span>
-      <svg
+      <UiIcon
         v-else-if="menu === 'line'"
-        class="cs-callout-stroke-preview"
-        viewBox="0 0 36 18"
-        aria-hidden="true"
-        focusable="false"
-      >
-        <path
-          d="M3 9h30"
-          fill="none"
-          stroke="currentColor"
-          :stroke-width="Math.min(payload.stroke.width, 7)"
-          stroke-linecap="round"
-          :stroke-dasharray="payload.stroke.style === 'dashed' ? '7 4' : payload.stroke.style === 'dotted' ? '1 4' : undefined"
-        />
-      </svg>
+        name="strokeWidth"
+        class="cs-tool-settings-semantic-icon"
+      />
       <UiIcon v-else :name="menu === 'frame' ? 'textBackground' : 'text'"/>
       <span v-if="!schema.calloutMixed && (menu === 'line' || menu === 'text')" class="cs-callout-summary">{{ summary(menu) }}</span>
       <UiIcon name="chevronDown" class="cs-tool-settings-chevron"/>

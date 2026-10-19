@@ -208,17 +208,11 @@ onBeforeUnmount(() => {
           :style="{ background: fillBackground(fill) }"
           aria-hidden="true"
         ><UiIcon v-if="fill?.kind === 'imageTexture'" name="image"/></span>
-        <svg
+        <UiIcon
           v-else-if="menu === 'stroke'"
-          viewBox="0 0 32 24"
-          aria-hidden="true"
-        ><path
-          d="M3 12h26"
-          :stroke="mixed('color') ? 'currentColor' : value('color')"
-          :stroke-width="Math.min(Number(value('width')), 8)"
-          :stroke-dasharray="mixed('strokeStyle') ? '2 3' : value('strokeStyle') === 'dashed' ? '8 5' : value('strokeStyle') === 'dotted' ? '0 7' : undefined"
-          stroke-linecap="round"
-        /></svg>
+          name="strokeWidth"
+          class="cs-shape-thickness-icon"
+        />
         <template v-else><UiIcon name="blendMode"/><span>{{ mixed('layerOpacity') ? '—' : value('layerOpacity') }}%</span></template>
         <UiIcon class="cs-shape-chevron" name="chevronDown"/>
       </button>

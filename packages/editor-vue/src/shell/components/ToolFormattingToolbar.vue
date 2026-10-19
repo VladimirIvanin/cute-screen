@@ -470,18 +470,11 @@ watch([() => props.schema.icon, () => settings.value.activeApertureId], () => {
         aria-haspopup="dialog"
         @click="show(menu, open !== menu)"
       >
-        <svg
+        <UiIcon
           v-if="kind === 'ruler' && menu === 'stroke'"
           class="cs-tool-settings-semantic-icon"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          aria-hidden="true"
-        >
-          <path d="M4 5H20" stroke-width="1"/>
-          <path d="M4 12H20" stroke-width="2"/>
-          <path d="M4 19H20" stroke-width="3"/>
-        </svg>
+          name="strokeWidth"
+        />
         <UiIcon
           v-if="kind === 'ruler' && menu === 'measure'"
           class="cs-tool-settings-semantic-icon"

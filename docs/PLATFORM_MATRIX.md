@@ -1,5 +1,14 @@
 # Платформенная матрица
 
+## Единая иконка толщины линии (2026-10-19)
+
+`REQ-EDT-015/016`, `REQ-UI-001/003/006`: общий Vue `UiIcon.strokeWidth`
+используется у стрелки, линии, фигуры, выноски и линейки. Linux x86_64 /
+Chrome 147: component suites и browser RU/EN × light/dark, 1024 px;
+линия и выноска также 50/100/200%. Native WebKitGTK, WebView2 и WKWebView
+в этой правке не запускались; платформенные capabilities прежние.
+Точные команды, результаты и screenshots — TESTING.md.
+
 ## Wayland: закрытие первого permission dialog (2026-10-19, ADR-120)
 
 Пользовательский снимок на GNOME/Wayland показывает permission dialog в первом

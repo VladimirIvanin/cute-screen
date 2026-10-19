@@ -163,22 +163,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOnOutside
           aria-haspopup="dialog"
           @keydown.enter.space="togglePopover($event, control.id)"
         >
-          <svg
-            viewBox="0 0 36 18"
-            aria-hidden="true"
-            focusable="false"
-          >
-            <path
-              d="M3 9h30"
-              fill="none"
-              stroke="currentColor"
-              :stroke-width="Math.min(control.width, 7)"
-              stroke-linecap="round"
-              :stroke-dasharray="
-                control.style === 'dashed' ? '7 4' : control.style === 'dotted' ? '1 4' : undefined
-              "
-            />
-          </svg>
+          <UiIcon name="strokeWidth" class="cs-arrow-toolbar-thickness-icon"/>
           <span class="sr-only">{{ control.widthMixed ? '—' : `${control.width} px` }}</span>
           <UiIcon name="chevronDown" class="cs-arrow-toolbar-chevron"/>
         </button>

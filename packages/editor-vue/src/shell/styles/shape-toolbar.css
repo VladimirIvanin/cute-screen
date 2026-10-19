@@ -33,6 +33,10 @@
   width: 12px;
   height: 12px;
 }
+.cs-shape-toolbar-trigger .cs-shape-thickness-icon {
+  width: 18px;
+  height: 18px;
+}
 .cs-shape-fill-swatch {
   display: grid;
   place-items: center;

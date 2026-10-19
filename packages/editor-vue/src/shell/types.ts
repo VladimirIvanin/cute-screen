@@ -299,6 +299,7 @@ export type IconName =
 
   | 'blendMode'
   | 'line'
+  | 'strokeWidth'
   | 'magnet'
   | 'magnetOff'
   | 'arrow'

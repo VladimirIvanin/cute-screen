@@ -289,6 +289,10 @@
   height: 12px;
   color: var(--text-muted);
 }
+.cs-arrow-toolbar-trigger .cs-arrow-toolbar-thickness-icon {
+  width: 18px;
+  height: 18px;
+}
 .cs-arrow-toolbar-trigger > .sr-only {
   position: absolute;
   width: 1px;

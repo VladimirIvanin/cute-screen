@@ -63,6 +63,7 @@ import {
   pencilGeometry,
   privacyGeometry,
   spotlightGeometry,
+  strokeWidthGeometry,
 } from './icons/geometry'
 
 /** The only product-chrome mapping from stable semantics to Tabler or project geometry. */
@@ -71,6 +72,7 @@ const icons = {
   history: IconHistory,
   emoji: IconMoodSmile,
   line: IconLine,
+  strokeWidth: createCustomIcon('strokeWidth', strokeWidthGeometry),
   magnet: IconMagnet,
   magnetOff: IconMagnetOff,
   reverseGradient: IconArrowsHorizontal,
