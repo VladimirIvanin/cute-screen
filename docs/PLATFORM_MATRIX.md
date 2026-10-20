@@ -1,5 +1,16 @@
 # Платформенная матрица
 
+## Магнит рамок (ADR-146, 2026-10-20)
+
+Windows x64: Chrome 155.0.8059.85 — general frame и gradient 2/2 passed;
+WebView2 155.0.4283.62 / external driver, fresh harness — frame-snap 1/1 passed.
+Native production Capture → Quick проверяет ненулевой crop, move/resize рамки
+и Undo; Editor — материализованный crop и UI-open 4K, held preview, Ctrl,
+Escape и exact Undo/Redo. Actual Fit scale учитывается независимо от requested
+zoom. Full unit 1600 passed; core/Vue дополнительно покрывают группы, отражения,
+aspect/Alt и no-op. Fake capture, DPR 1. WKWebView/WebKitGTK pending.
+Команды, JSON и screenshots — TESTING.md и `artifacts/frame-snap/`.
+
 ## Свободный контур с пересечениями (ADR-145, 2026-10-20)
 
 Windows x64: production Chrome 155.0.8059.85 и fresh WebView2 155.0.4283.62 /

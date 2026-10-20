@@ -1,5 +1,53 @@
 # Стратегия тестирования
 
+## Общий магнит рамки (2026-10-20, ADR-146)
+
+Windows x64 / PowerShell, Node 22.23.1, pnpm 10.33.2. Baseline `3665454`;
+реализация вошла в `35ace42`, `c41c3e1` и последующие рабочие изменения.
+Evidence — `artifacts/frame-snap/`.
+
+- Red-first `pnpm test packages/editor-core/src/frame-snap.test.ts` — missing
+  module до реализации. Core проверяет 6/14 CSS px при 50/100/200%, crop origin,
+  независимые оси, обход, aspect и Alt. Vue проверяет обычную фигуру, группу,
+  отражения, actual Fit scale, no-op/cancel, pointerup и Quick resize.
+- Финальный focused `pnpm test` для frame-snap, selection-interactions,
+  m08-precision-guides, canvas-viewport-transform, gradient-backdrop,
+  m08-crop-interactions и gradient-move-snap — 8 files / 68 passed.
+- Полный `pnpm test` — 178 files / 1600 passed. Ранний прогон обнаружил шесть
+  ожиданий старого pointerup/modifier контракта; модификаторы теперь присутствуют
+  и на отпускании. Alt guides и их lifecycle сохранены.
+- `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5195 pnpm test:e2e:browser --spec tests/e2e/specs/browser-frame-snap.e2e.ts --spec tests/e2e/specs/browser-gradient.e2e.ts`
+  — Chrome 155.0.8059.85, 2/2 passed. Обычная фигура на 2560×1440 при Fit,
+  held preview, resize до края, Ctrl, Escape, exact Undo/Redo; gradient regression.
+  Дополнительно browser-emoji-resize проверяет четыре угла emoji, decoded pixel
+  preview/commit parity, 4K image и ruler endpoint. Split actions используют один
+  именованный pointer device: новый device отправлял отпускание с позиции (0, 0).
+  Финальный отдельный `pnpm test:e2e:browser --spec tests/e2e/specs/browser-emoji-resize.e2e.ts`
+  с теми же headless/port параметрами — 1 file / 6 passed.
+- `CUTE_SCREEN_E2E_SCENARIOS=frame-snap CARGO_TARGET_DIR=D:/cutescreen/target/e2e-isolated NODE_OPTIONS=--dns-result-order=ipv4first pnpm test:e2e:tauri`
+  — fresh debug/no-bundle, external tauri-driver, WebView2 155.0.4283.62,
+  1/1 passed. Production Capture → Quick: crop с ненулевым origin, move с
+  удержанием, resize к полному canvas и Undo. После Editor handoff проверены
+  материализованный кадр 329×247 и UI-open 3840×2160, trusted move/resize,
+  Ctrl, Escape и Undo/Redo. Fit scale 0.28 и 2.46; JSON и screenshots сохранены.
+- `pnpm test:boundaries` — 16 files / 112 passed / 1 existing skip. Новые
+  функции укладываются в ограничения сложности/размера, зависимости ацикличны.
+- `pnpm check` — passed: lint/typecheck/format/docs, boundaries, IPC codegen,
+  frontend build, cargo fmt и все четыре clippy configurations. Rust source
+  не менялся. `pnpm format` и финальный `pnpm format:check` выполнены отдельно.
+
+Ранние native попытки попадали в занятые chrome участки рамки; финальная
+проверка использует свободную левую сторону и верхний левый resize handle,
+обычный native pointer input и видимые кнопки Undo. Browser input suites
+запускались последовательно; прогон, пересечённый с format/HMR, заменён.
+Схема, IPC, зависимости и immutable originals не меняются. WKWebView/WebKitGTK
+на этом host не запускались; Windows evidence не является WebKit-pass.
+
+Disk: target 51.594 → 51.854 GiB, существующий e2e-isolated cache сохранён.
+Автоматическая проверка отклонила удаление трёх завершённых диагностических
+appData и заменённых артефактов с причиной `blocked by policy`; они оставлены
+в artifacts. Успешный runner удалил собственные runtime profile и pinned binary.
+
 ## Отмена маркера и таймаут pixel-reference (2026-10-20)
 
 Windows 10 x64 / PowerShell, Node 22.23.1, pnpm 10.33.2. Исходный baseline
@@ -24,7 +72,11 @@ Windows 10 x64 / PowerShell, Node 22.23.1, pnpm 10.33.2. Исходный baseli
   после `frameReady`, проверки показа обеих направляющих и их скрытия при
   keyup/blur сохранены. Три затронутых файла вместе — 21/21 passed
   (`targeted.log`).
-- `pnpm format`, `pnpm format:check`, ESLint исходных двух изменённых тестов и
+- Финальный `pnpm test tests/unit/vue` — 97 files / 849 passed, 441.04 s
+  (`vue.log`). Общий core/renderer/fixtures/fake-platform повторно не запускался:
+  после первого общего прогона менялось только ожидание mount в Vue-тесте.
+- `pnpm format`, `pnpm format:check`, ESLint трёх изменённых тестов,
+  `pnpm docs:check` и
   `git diff --check` — passed.
 - `pnpm disk:usage` — target 51.595 GiB, artifacts 12.669 GiB,
   node_modules 0.781 GiB (`disk-usage.log`). Задача не создаёт native targets

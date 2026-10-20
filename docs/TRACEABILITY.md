@@ -20,7 +20,7 @@ Legacy-reference blur/pixelate сохраняет точное сравнени�
 Проверки: существующие Vue composition tests и browser appearance colors,
 визуальная проверка заголовка в светлой/тёмной теме RU/EN на Windows Chromium.
 
-## Общий магнит рамки — до реализации (2026-10-20)
+## Общий магнит рамки (2026-10-20)
 
 `REQ-EDT-005/006`, `REQ-CAP-012`, `REQ-TOL-018`: move рамки объекта/выделения
 и Crop/Quick привязывает собственные края к Crop/canvas (для Crop — canvas).
@@ -29,7 +29,13 @@ Legacy-reference blur/pixelate сохраняет точное сравнени�
 отключает магнит; preview/pointerup используют общий расчёт, cancel/no-op
 не создают history. Endpoint/semantic handles и повёрнутый resize сохраняют
 свой контракт. Проверки: red-first core, Vue pointer, production browser,
-native WebView и undo/redo; фактические результаты будут записаны в TESTING.md.
+native WebView и undo/redo; фактические результаты записаны в TESTING.md.
+
+Результат: core/Vue 68 passed, full unit 1600 passed; Chrome general frame +
+gradient 2/2 и fresh WebView2 Capture → Quick → Editor + UI-open 4K 1/1 passed.
+Quick crop имеет ненулевой origin, Editor handoff материализует выбранный кадр.
+Actual Fit scale используется вместо requested zoom; split WDIO actions имеют
+общий pointer ID. Evidence и ограничения платформ — TESTING.md, ADR-146.
 
 ## Свободный контур цензуры — до исправления (2026-10-20)
 

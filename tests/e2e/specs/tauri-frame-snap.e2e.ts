@@ -20,40 +20,41 @@ async function verifyQuickFrame(): Promise<void> {
     await pointer().move({ origin: 'viewport', ...last, duration: 120 }).perform(true)
   }
   const drag = async (fromX: number, fromY: number, toX: number, toY: number) => {
-    await move(fromX, fromY)
-    await pointer().down().perform(true)
-    await move(toX, toY)
-    await pointer().move({ origin: 'viewport', ...last }).up().perform(true)
+    await pointer().move({ origin: 'viewport', x: Math.round(fromX), y: Math.round(fromY) })
+      .down({ button: 'left' })
+      .move({ origin: 'viewport', x: Math.round(toX), y: Math.round(toY), duration: 120 })
+      .up({ button: 'left' }).perform()
+    await expect($('.cs-quick-actions')).toBeDisplayed()
+    await waitForStableCanvas()
   }
   await drag(rect.left + 2, rect.top + 2, rect.left + rect.width * .18, rect.top + rect.height * .18)
-  const inset = (await selectionDocument()).crop!
-  const eastY = rect.top + (inset.y + inset.height / 2) * scale
-  await drag(rect.right - 4, eastY, rect.left + rect.width * .82, eastY)
   const crop = (await selectionDocument()).crop!
   expect(crop.x).toBeGreaterThan(0)
   expect(crop.y).toBeGreaterThan(0)
-  expect(crop.x + crop.width).toBeLessThan(initial.canvas.width - 1)
-  const start = { x: rect.left + (crop.x + crop.width * .25) * scale, y: rect.top + crop.y * scale + 1 }
+  const start = { x: rect.left + crop.x * scale + 1,
+    y: rect.top + (crop.y + crop.height * .25) * scale }
   const target = { x: start.x - crop.x * scale, y: start.y - crop.y * scale }
-  await move(start.x, start.y)
-  await pointer().down().perform(true)
+  await pointer().move({ origin: 'viewport', x: Math.round(start.x), y: Math.round(start.y) })
+    .down({ button: 'left' }).perform(true)
   await move(target.x + 4, target.y + 4)
   await move(target.x + 11, target.y + 11)
   expect((await selectionDocument()).crop).toEqual(crop)
   await browser.saveScreenshot('artifacts/tauri-e2e/quick-frame-move-held.png')
-  await pointer().move({ origin: 'viewport', ...last }).up().perform(true)
+  await pointer().move({ origin: 'viewport', ...last }).up({ button: 'left' }).perform()
   const moved = (await selectionDocument()).crop!
   expect(moved.x).toBe(0)
   expect(moved.y).toBe(0)
   expect(moved.width).toBe(crop.width)
   expect(moved.height).toBe(crop.height)
-  await browser.keys(['Control', 'z'])
+  await $('button[aria-label="Undo"]').click()
   await browser.waitUntil(async () => JSON.stringify((await selectionDocument()).crop) === JSON.stringify(crop))
-  await drag(rect.left + (crop.x + crop.width) * scale, rect.top + (crop.y + crop.height / 2) * scale,
-    rect.right - 4, rect.top + (crop.y + crop.height / 2) * scale)
-  const resized = (await selectionDocument()).crop!
-  expect(resized.x + resized.width).toBe(initial.canvas.width)
-  await browser.keys(['Control', 'z'])
+  await drag(rect.left + crop.x * scale, rect.top + crop.y * scale, rect.left + 4, rect.top + 4)
+  const resized = (await selectionDocument()).crop ?? { x: 0, y: 0, ...initial.canvas }
+  expect(resized.x).toBe(0)
+  expect(resized.y).toBe(0)
+  expect(resized.width).toBe(initial.canvas.width)
+  expect(resized.height).toBe(initial.canvas.height)
+  await $('button[aria-label="Undo"]').click()
   await browser.waitUntil(async () => JSON.stringify((await selectionDocument()).crop) === JSON.stringify(crop))
   await writeFile('artifacts/tauri-e2e/quick-frame-snap.json', JSON.stringify({ crop, moved, resized, rect, scale }, null, 2))
 }
