@@ -310,6 +310,7 @@ export type IconName =
   | 'placement'
 
   | 'gradient'
+  | 'palette'
   | 'edit'
   | 'history'
   | 'emoji'

@@ -192,7 +192,7 @@ const openImageTitle = computed(() =>
         :aria-label="locale === 'ru' ? 'Оформление' : 'Appearance'"
         @click="emit('appearance')"
       >
-        <UiIcon name="gradient" /><span>{{ locale === 'ru' ? 'Оформление' : 'Appearance' }}</span>
+        <UiIcon name="palette" /><span>{{ locale === 'ru' ? 'Оформление' : 'Appearance' }}</span>
       </NButton>
       <NTooltip>
         <template #trigger>

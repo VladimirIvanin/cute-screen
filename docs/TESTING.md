@@ -1,5 +1,14 @@
 # Стратегия тестирования
 
+## Иконка оформления (2026-10-20)
+
+Windows x64, HEAD `9ec157d`, рабочая копия: кнопка «Оформление» использует
+Tabler `palette` через `UiIcon`.
+`pnpm test --project vue tests/unit/vue/ui-icon.test.ts`: 130/130 passed,
+включая новый знак (SVG, currentColor, accessibility и class/style fallthrough).
+`pnpm format`, `pnpm format:check` и `pnpm typecheck` прошли.
+Отдельная визуальная проверка в browser/native WebView не проводилась.
+
 ## Магнитное перемещение градиента (2026-10-20, ADR-131)
 
 Windows x64, HEAD `445cf1740ded724c14febe2d21704f6eec462e12`, общая рабочая копия
