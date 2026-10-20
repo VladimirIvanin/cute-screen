@@ -4,6 +4,7 @@ import {
   ref,
 } from 'vue'
 import { numericContextKey } from '../ui/numeric-preview'
+import { UiIcon } from '../icon'
 import {
   createComposition,
   type CompositionSettings,
@@ -44,10 +45,11 @@ function background(
     <header>
       <strong>{{ text('Оформление', 'Appearance') }}</strong><button type="button" @click="emit('layers')">{{ text('Слои', 'Layers') }}</button><button
         type="button"
+        class="cs-composition-close"
         :aria-label="text('Закрыть оформление', 'Close appearance')"
         @click="emit('close')"
       >
-        ×
+        <UiIcon name="close" />
       </button>
     </header>
     <div class="cs-composition-body">

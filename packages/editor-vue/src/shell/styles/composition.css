@@ -24,6 +24,19 @@
 .cs-composition-panel header strong {
   flex: 1;
 }
+.cs-composition-panel .cs-composition-close {
+  display: grid;
+  place-items: center;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+}
+.cs-composition-close svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
 .cs-composition-footer {
   flex-shrink: 0;
   padding: 6px 12px;

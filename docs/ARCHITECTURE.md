@@ -1,5 +1,14 @@
 # Архитектура Cute Screen
 
+## Магнит рамок (ADR-146)
+
+Core `frame-snap` оперирует world rectangles и CSS-допуском через zoom;
+не зависит от DOM и не меняет scene. Canvas `frame-gesture` объединяет bounds
+выделения и отображает отражённые resize handles. `crop-gesture` сохраняет
+уже существующие CropSession/preset/clamp. Только CanvasGesture хранит удержание.
+Move, resize и pointerup используют общие функции; глубокая Vue-реактивность
+scene graph и persisted constraints не добавляются. Команды и схема прежние.
+
 ## Freeform-цензура (ADR-145)
 
 Persisted points — неявно замкнутый путь с nonzero winding, общий для

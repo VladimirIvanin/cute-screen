@@ -1,10 +1,13 @@
 import {
-  isGradientLayer,
   gradientFrame,
   snapGradientPoint,
 } from '@cute-screen/editor-renderer'
 import { updateLineGesture } from './line-gesture'
-import { updateGradientMove } from './gradient-move-gesture'
+import {
+  updateFrameMove,
+  updateFrameResize,
+} from './frame-gesture'
+import { updateCropGesture } from './crop-gesture'
 import {
   rulerAngleStep,
   updateRulerPointer,
@@ -14,8 +17,6 @@ import {
   constrainRulerMove,
   moveStroke,
   rulerCanvasBounds,
-  moveCrop,
-  resizeCrop,
   snapPoint,
   type RulerAngleGuide,
   type SnapCandidate,
@@ -33,6 +34,7 @@ import {
 } from './workspace-state'
 
 export interface PointerMoveContext {
+  readonly screenScale: () => CanvasPoint
   readonly props: CanvasViewportProps
   readonly emit: CanvasViewportEmit
   readonly scrollContainer: Ref<HTMLDivElement | undefined>
@@ -83,7 +85,7 @@ export function handlePointerMove(
       moveQuickSelection(context, point, gesture)
       break
     case 'crop':
-      moveCropGesture(context, point, gesture)
+      moveCropGesture(context, event, point, gesture)
       break
     case 'precision':
       movePrecision(context, event, point, gesture)
@@ -174,15 +176,14 @@ function moveQuickSelection(
 
 function moveCropGesture(
   context: PointerMoveContext,
+  event: PointerEvent,
   point: CanvasPoint,
   gesture: Extract<NonNullable<CanvasGesture>, { readonly kind: 'crop' }>,
 ): void {
-  const delta = { x: point.x - gesture.start.x, y: point.y - gesture.start.y }
-  const session =
-    gesture.action === 'move' ? moveCrop(gesture.initial, delta) : resizeCrop(gesture.initial, gesture.handle!, delta)
-  context.crop.session = session
+  context.setGesture(updateCropGesture(gesture, point, context.props, context.crop,
+    !event.ctrlKey && !event.metaKey, context.screenScale().x))
   if (context.props.quickFrameMode) {
-    context.emit('quickFrameChange', { ...session.crop })
+    context.emit('quickFrameChange', { ...context.crop.session!.crop })
   }
   context.invalidateOverlay()
 }
@@ -228,7 +229,8 @@ function moveLayer(
       event.clientY - gesture.startClient.y,
     ) < SELECTION_DRAG_THRESHOLD_CSS
   ) return
-  const gradient = updateGradientMove(gesture, point, context.props, !event.ctrlKey && !event.metaKey)
+  const gradient = updateFrameMove({ ...gesture, guidesVisible: event.altKey }, point, context.props,
+    !event.ctrlKey && !event.metaKey, context.screenScale().x)
   if (gradient) {
     context.setGesture(gradient)
     context.invalidateGesturePreview()
@@ -269,24 +271,11 @@ function moveTransform(
   gesture: Extract<NonNullable<CanvasGesture>, { readonly kind: 'resize' | 'intrinsicResize' | 'rotate' }>,
 ): void {
   if (gesture.kind === 'resize') {
-    context.setGesture({
-      ...gesture,
-      current: point,
-      freeResize: event.shiftKey,
-      centerResize: event.altKey,
-    })
+    context.setGesture(updateFrameResize(gesture, point, context.props, event, context.screenScale().x))
   } else if (gesture.kind === 'intrinsicResize') {
-    if (
-      isGradientLayer(gesture.initial) &&
-      context.props.document &&
-      Math.abs(gesture.initial.transform.rotation % 360) < 1e-8
-    ) point = snapGradientPoint(point, gradientFrame(context.props.document), (context.props.zoom ?? 100) / 100)
     context.setGesture({
-      ...gesture,
+      ...updateFrameResize(gesture, point, context.props, event, context.screenScale().x),
       snapAngleIncrementDegrees: gesture.initial.kind === 'ruler' ? rulerAngleStep(event, gesture.initial.payload.snapAngleIncrementDegrees) : undefined,
-      current: point,
-      preserveAspect: event.shiftKey || gesture.initial.kind === 'emoji' || gesture.initial.kind === 'loupe',
-      centerResize: gesture.handle === 'start' || gesture.handle === 'end' ? false : event.altKey,
     })
   } else {
     const angle = Math.atan2(point.y - gesture.center.y, point.x - gesture.center.x)

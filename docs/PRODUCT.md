@@ -203,6 +203,13 @@ Cute Screen — полноценный local-first редактор снимко
   bounds/points resize противоположная сторона закреплена в world space;
   `Shift` сохраняет aspect ratio, `Alt` изменяет geometry от центра. Locked
   layer показывает selection frame без активных handles.
+  Перемещение общей рамки объекта/выделения привязывает её края к Crop/canvas:
+  вход 6 CSS px, независимое удержание осей до 14 CSS px. Bounds resize
+  неповёрнутого объекта привязывает изменяемые края с допуском 6 CSS px,
+  сохраняя пропорции, отражения и Alt. Ctrl/Cmd временно отключает магнит.
+  Crop и Quick-рамка используют те же move/resize пороги относительно canvas.
+  Endpoint/semantic handles сохраняют отдельные контракты. Preview и pointerup
+  используют один расчёт; Escape/cancel/no-op не меняют history (ADR-146).
 - `REQ-EDT-006` — все изменения документа undoable; redo очищается после новой ветки изменений.
 - `REQ-EDT-007` — guides появляются только при удержании назначенной клавиши.
 - `REQ-EDT-008` — основной `ToolRail` находится внизу по центру.

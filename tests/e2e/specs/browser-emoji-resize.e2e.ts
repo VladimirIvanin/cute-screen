@@ -8,6 +8,7 @@ import { openDrawingHarness } from './browser-m06-test-kit'
 import { selectionDocument } from '../selection-interactions'
 import { waitForStableCanvas } from '../canvas-ready'
 import { setNumericInput } from '../numeric-input'
+import { writeFile } from 'node:fs/promises'
 import {
   openM08,
   m08Snapshot,
@@ -108,6 +109,7 @@ describe('emoji corner resize through production pointer input', () => {
       await waitForStableCanvas()
       const after = (await selectionDocument()).layers.at(-1)!
       expect(after.transform).toEqual(before.transform)
+      await writeFile(`artifacts/frame-snap/emoji-${handle}.json`, JSON.stringify({ before, after, expected }, null, 2))
       expect(await paintedDifference(expected)).toBeLessThan(1)
       await browser.saveScreenshot(`artifacts/browser-e2e/emoji-resize-${handle}.png`)
       await $('button[aria-label="Undo"]').click()

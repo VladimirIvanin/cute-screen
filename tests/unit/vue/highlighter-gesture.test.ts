@@ -44,11 +44,14 @@ describe('composition marker gesture lifecycle', () => {
     await fireEvent.keyDown(scene, { key: 'Shift', shiftKey: true })
     expect(redraw).toHaveBeenCalledOnce()
     redraw.mockClear()
+    // Cancellation restores the settled scene rather than scheduling another interactive frame.
+    const restore = vi.spyOn(CanvasRendererController.prototype, 'drawDocument')
     if (cancel === 'Escape') await fireEvent.keyDown(scene, { key: 'Escape' })
     else if (cancel === 'blur') await fireEvent(window, new Event('blur'))
     else await fireEvent.pointerCancel(scene, { pointerId: 1 })
     await flushPromises()
-    expect(redraw).toHaveBeenCalledOnce()
+    expect(restore).toHaveBeenCalledOnce()
+    await restore.mock.results[0]!.value
     await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 80, clientY: 35 })
     expect(view.emitted('addLayer')).toBeUndefined()
     expect(document.layers).toEqual(original.layers)

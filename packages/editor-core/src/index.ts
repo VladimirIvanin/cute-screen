@@ -488,3 +488,8 @@ export {
   decodeClipboardLayersV3,
   type ClipboardLayersV3,
 } from './tools/content/clipboard-codec'
+export {
+  snapFrameMove,
+  snapFrameResizePoint,
+  type FrameMoveSnapState,
+} from './frame-snap'

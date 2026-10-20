@@ -1,5 +1,33 @@
 # Трассируемость требований
 
+## Регрессии отмены маркера и pixel-reference (2026-10-20)
+
+`REQ-TOL-003`, `REQ-EDT-006`, `REQ-TOL-008`, `REQ-OUT-001/009`:
+Vue lifecycle проверяет перерисовку preview при Shift и восстановление committed
+scene через `drawDocument` при Escape/blur/pointercancel без добавления слоя.
+Legacy-reference blur/pixelate сохраняет точное сравнение RGBA, размеры сцены,
+трансформации, перекрытия и плотности 1×/2×; только этот CPU-heavy тест получает
+таймаут 30 s вместо общего 5 s. Performance thresholds не меняются.
+
+## Крестик панели оформления — до исправления (2026-10-20)
+
+`REQ-UI-001/006`, ADR-055: кнопка закрытия «Оформления» использует общий
+`UiIcon.close` вместо шрифтового знака ×. SVG 16×16 расположен по центру
+кнопки 30×30; доступное имя RU/EN, закрытие и keyboard focus сохраняются.
+Проверки: существующие Vue composition tests и browser appearance colors,
+визуальная проверка заголовка в светлой/тёмной теме RU/EN на Windows Chromium.
+
+## Общий магнит рамки — до реализации (2026-10-20)
+
+`REQ-EDT-005/006`, `REQ-CAP-012`, `REQ-TOL-018`: move рамки объекта/выделения
+и Crop/Quick привязывает собственные края к Crop/canvas (для Crop — canvas).
+Вход 6 CSS px, независимое удержание осей до 14 CSS px. Bounds resize использует
+6 CSS px по фактическому краю с сохранением aspect/Alt и отражений. Ctrl/Cmd
+отключает магнит; preview/pointerup используют общий расчёт, cancel/no-op
+не создают history. Endpoint/semantic handles и повёрнутый resize сохраняют
+свой контракт. Проверки: red-first core, Vue pointer, production browser,
+native WebView и undo/redo; фактические результаты будут записаны в TESTING.md.
+
 ## Свободный контур цензуры — до исправления (2026-10-20)
 
 `REQ-TOL-008`, `REQ-EDT-006`, `REQ-OUT-001`: жест с самопересечением или

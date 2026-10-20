@@ -1,6 +1,11 @@
 import { updateLineGesture } from './line-gesture'
 import { finishGradientGeometry } from './gradient-gesture-finish'
 import {
+  updateFrameMove,
+  updateFrameResize,
+} from './frame-gesture'
+import { updateCropGesture } from './crop-gesture'
+import {
   rulerAngleStep,
   updateRulerPointer,
 } from './ruler-modifiers'
@@ -38,6 +43,7 @@ import {
 } from './workspace-state'
 
 export interface GestureFinishContext {
+  readonly screenScale: () => CanvasPoint
   readonly props: CanvasViewportProps
   readonly emit: CanvasViewportEmit
   readonly scene: Ref<HTMLCanvasElement | undefined>
@@ -109,7 +115,28 @@ export function finishCanvasGesture(
     completed = { ...completed, current: end,
       snapAngleIncrementDegrees: rulerAngleStep(event, completed.initial.payload.snapAngleIncrementDegrees) }
   }
-  completed = finishGradientGeometry(context.props, completed, end, event)
+  completed = finishGradientGeometry(context.props, completed, end)
+  if (
+    end &&
+    completed?.kind === 'move' &&
+    completed.dragging
+  ) {
+    completed = updateFrameMove(completed, end, context.props, !event.ctrlKey && !event.metaKey,
+      context.screenScale().x) ?? completed
+  }
+  if (
+    end &&
+    (completed?.kind === 'resize' ||
+      completed?.kind === 'intrinsicResize') &&
+      completed.handle !== 'start' &&
+      completed.handle !== 'end'
+  ) {
+    completed = updateFrameResize(completed, end, context.props, event, context.screenScale().x)
+  }
+  if (end && completed?.kind === 'crop') {
+    completed = updateCropGesture(completed, end, context.props, context.crop, !event.ctrlKey && !event.metaKey,
+      context.screenScale().x)
+  }
   const precisionLayer = createCompletedPrecisionLayer(context, completed)
   clearTransientState(context, event)
   commitCalloutRemoval(context, completed, event)

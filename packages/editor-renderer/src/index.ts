@@ -451,3 +451,8 @@ export { brandingNodes } from '@cute-screen/editor-core'
 export { compositionBlobHashes } from '@cute-screen/editor-core'
 
 export { parseComposition } from '@cute-screen/editor-core'
+export {
+  snapFrameMove,
+  snapFrameResizePoint,
+  type FrameMoveSnapState,
+} from '@cute-screen/editor-core'

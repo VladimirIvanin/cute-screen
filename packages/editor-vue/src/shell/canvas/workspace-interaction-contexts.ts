@@ -114,6 +114,7 @@ export function createPointerDownContext(ports: WorkspaceInteractionPorts): Poin
 
 export function createPointerMoveContext(ports: WorkspaceInteractionPorts): PointerMoveContext {
   return {
+    screenScale: () => ports.pointerGeometry.screenScale(),
     props: ports.props,
     emit: ports.emit,
     scrollContainer: ports.state.scrollContainer,
@@ -134,6 +135,7 @@ export function createPointerMoveContext(ports: WorkspaceInteractionPorts): Poin
 
 export function createGestureFinishContext(ports: WorkspaceInteractionPorts): GestureFinishContext {
   return {
+    screenScale: () => ports.pointerGeometry.screenScale(),
     props: ports.props,
     emit: ports.emit,
     scene: ports.state.scene,

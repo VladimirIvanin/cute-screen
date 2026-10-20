@@ -1,5 +1,22 @@
 # Стратегия тестирования
 
+## Крестик закрытия оформления (2026-10-20)
+
+Windows x64 / PowerShell, baseline `366545441b8f6ca70a7af34f8f22a29787a6b650`
+и рабочие изменения. Шрифтовой × заменён общим SVG `UiIcon.close`, 16×16,
+по центру кнопки 30×30; поведение закрытия не менялось.
+
+- `pnpm test tests/unit/vue/composition.test.ts` — 7/7 passed.
+- `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5198 pnpm test:e2e:browser --spec tests/e2e/specs/browser-appearance-colors.e2e.ts`
+  — 1/1 passed, Chrome 155.0.8059.85. Заголовок просмотрен на screenshots
+  `artifacts/browser-e2e/appearance-color-{ru,en}-{dark,light}.png`.
+- `pnpm exec eslint packages/editor-vue/src/shell/composition/CompositionPanel.vue`
+  и `git diff --check` — passed.
+- `pnpm format` запускался; ошибки max-len в параллельных изменениях
+  `canvas/frame-gesture.ts` и `tests/e2e/frame-snap.ts` вне этой правки.
+  `pnpm format:check`: Prettier passed, ESLint failed на тех же трёх max-len.
+- Native WebView, WKWebView и WebKitGTK для этой CSS/SVG-правки не запускались.
+
 ## Самопересечения свободного контура (ADR-145, 2026-10-20)
 
 Windows x64; baseline `3f1eedc41dc08818da4300e7d32066f8ab21dd54` + рабочие изменения.

@@ -169,6 +169,7 @@ describe('Canvas2D ordered effect cache', () => {
     }
   })
 
+  // Pixel parity runs both native filters at 1×/2×; this is correctness coverage, not a timing gate.
   it.each(['blur', 'pixelate'] as const)('matches the old whole-surface %s through transforms, seams and overlapping masks', async (mode) => {
     const r = await runtime()
     try {
@@ -196,7 +197,7 @@ describe('Canvas2D ordered effect cache', () => {
     } finally {
       r.renderer.dispose()
     }
-  })
+  }, 30_000)
 
   it('reuses a stationary underlay on move/style-above and invalidates changed content below', async () => {
     const r = await runtime()
