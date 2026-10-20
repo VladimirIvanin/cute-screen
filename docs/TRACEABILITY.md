@@ -1,5 +1,29 @@
 # Трассируемость требований
 
+## Магнитное перемещение градиента — до реализации (2026-10-20)
+
+`REQ-TOL-018`, `REQ-EDT-005/006`: при переносе одной градиентной подложки
+привязывать её собственные края к Crop/canvas, а не позицию курсора.
+Вход — 6 CSS px, удержание — до 14 CSS px; оси независимы для движения вдоль
+края и попадания в угол. Ctrl/Cmd отключает магнит и сбрасывает удержание.
+Только transient gesture state; размер/fill не меняются, pointerup выполняет
+одну команду, Escape/cancel/no-op не добавляют history. Поворот и multi-selection
+не получают нового магнита. Red-first core, Vue pointer flow, production browser
+создание → перенос → Undo/Redo; native/platform evidence фиксируется отдельно.
+Статус: implemented; 33 core/Vue, boundaries и browser passed; Windows WebView2
+gradient + reopen 2/2 passed с trusted input. Evidence — artifacts/gradient-magnet/.
+
+## Иконка градиента — до замены (2026-10-20)
+
+`REQ-TOL-018`, `REQ-UI-001`: выбранный пользователем вариант 01 — квадратная
+заливка с затуханием слева направо вместо круглого Tabler Gradienter.
+Смысловое имя `gradient`, размеры кнопки и поведение инструмента сохраняются;
+каноническая геометрия использует currentColor и восемь уровней fill-opacity.
+Проверка: общий SVG-контракт, границы пакетов, gallery light/dark × размеры
+16/18/20/24/32 × DPR 1/2 и production browser gradient flow.
+Статус: implemented; SVG 128/128, boundaries 112 passed/1 skipped,
+browser 3/3 passed. Результаты и ограничения — TESTING.md.
+
 ## Windows capture startup и ручное оформление — до исправления (2026-10-20)
 
 `REQ-CAP-001/002`, `REQ-UI-001`: Windows DXGI доступен при повторном IPC probe,

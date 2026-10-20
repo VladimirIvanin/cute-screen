@@ -43,6 +43,64 @@ export function snapGradientPoint(
     Math.abs(value - first) <= tolerance ? first : Math.abs(value - last) <= tolerance ? last : value
   return { x: snap(point.x, frame.x, frame.x + frame.width), y: snap(point.y, frame.y, frame.y + frame.height) }
 }
+
+/** Targets are gesture-relative translation deltas, never persisted layer constraints. */
+export interface GradientMoveSnapState {
+  readonly x?: number
+  readonly y?: number
+}
+
+export function snapGradientMove(
+  layer: LayerNode,
+  delta: Point,
+  frame: Rect,
+  options: {
+    readonly zoom?: number
+    readonly previous?: GradientMoveSnapState | undefined
+    readonly enabled?: boolean
+  } = {},
+): Readonly<{ delta: Point; state: GradientMoveSnapState }> {
+  const zoom = options.zoom ?? 1
+  if (
+    options.enabled === false ||
+    !Number.isFinite(zoom) ||
+    zoom <= 0 ||
+    !isGradientLayer(layer) ||
+    layer.locked ||
+    !layer.visible ||
+    !layer.localBounds ||
+    Math.abs(layer.transform.rotation % 360) > 1e-8
+  ) return { delta, state: {} }
+  const bounds = layer.localBounds
+  const transform = layer.transform
+  const left = transform.translateX + bounds.x * transform.scaleX + Math.min(0, bounds.width * transform.scaleX)
+  const top = transform.translateY + bounds.y * transform.scaleY + Math.min(0, bounds.height * transform.scaleY)
+  const axis = (value: number, targets: readonly number[], previous: number | undefined) => {
+    // Hysteresis lets the user slide along one edge into a corner without jitter.
+    if (
+      previous !== undefined &&
+      targets.includes(previous) &&
+      Math.abs(value - previous) <= 14 / zoom
+    ) return previous
+    return targets.filter((target) => Math.abs(value - target) <= 6 / zoom)
+      .sort((a, b) => Math.abs(value - a) - Math.abs(value - b))[0]
+  }
+  const x = axis(
+    delta.x,
+    [frame.x - left, frame.x + frame.width - left - Math.abs(bounds.width * transform.scaleX)],
+    options.previous?.x,
+  )
+  const y = axis(
+    delta.y,
+    [frame.y - top, frame.y + frame.height - top - Math.abs(bounds.height * transform.scaleY)],
+    options.previous?.y,
+  )
+  return {
+    delta: { x: x ?? delta.x, y: y ?? delta.y },
+    state: { ...(x === undefined ? {} : { x }), ...(y === undefined ? {} : { y }) },
+  }
+}
+
 export function fitGradientLayer(
   layer: ShapeLayer,
   frame: Rect,

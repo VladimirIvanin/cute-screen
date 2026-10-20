@@ -1,5 +1,15 @@
 # Платформенная матрица
 
+## Магнит краёв градиента (ADR-131, 2026-10-20)
+
+Windows x64: Chrome 155 browser flow passed; WebView2 155.0.4283.62 через external
+tauri-driver 2.1.0 — gradient + gradient-reopen 2/2 passed. Production Quick → Editor,
+создание подложки и перенос в угол, удержание/отрыв/Ctrl/Escape, Undo/Redo и relaunch.
+Native input trace: 20 pointer events / 13 keydown, все isTrusted. Fake capture
+не является доказательством физического захвата. Magnet использует CSS thresholds
+при browser fit ~38% и native zoom ~202%; core проверяет 50/100/200%.
+WebKitGTK и WKWebView остаются непроверенными для нового drag contract.
+
 ## Windows dev capture / нейтральная панель (2026-10-20)
 
 Windows 10 x64 19045: native IPC подключён, Windows DXGI fresh compositor probe

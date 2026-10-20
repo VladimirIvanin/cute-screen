@@ -17,6 +17,19 @@ export type IconPrimitive =
 
 export type IconGeometry = readonly IconPrimitive[]
 
+// User-selected 01: a square linear fill fading from left to right.
+export const gradientGeometry = [
+  ['path', { d: 'M4 4h2v16h-2Z', fill: 'currentColor', 'fill-opacity': 1, stroke: 'none' }],
+  ['path', { d: 'M6 4h2v16h-2Z', fill: 'currentColor', 'fill-opacity': 0.87, stroke: 'none' }],
+  ['path', { d: 'M8 4h2v16h-2Z', fill: 'currentColor', 'fill-opacity': 0.73, stroke: 'none' }],
+  ['path', { d: 'M10 4h2v16h-2Z', fill: 'currentColor', 'fill-opacity': 0.59, stroke: 'none' }],
+  ['path', { d: 'M12 4h2v16h-2Z', fill: 'currentColor', 'fill-opacity': 0.45, stroke: 'none' }],
+  ['path', { d: 'M14 4h2v16h-2Z', fill: 'currentColor', 'fill-opacity': 0.31, stroke: 'none' }],
+  ['path', { d: 'M16 4h2v16h-2Z', fill: 'currentColor', 'fill-opacity': 0.18, stroke: 'none' }],
+  ['path', { d: 'M18 4h2v16h-2Z', fill: 'currentColor', 'fill-opacity': 0.06, stroke: 'none' }],
+  ['rect', { x: 3, y: 3, width: 18, height: 18, rx: 2 }],
+] as const satisfies IconGeometry
+
 // Original Cute Screen drawings, MIT. Compare as a family at 18 CSS px.
 export const strokeWidthGeometry = [
   ['path', { d: 'M4 5H20', 'stroke-width': 1 }],

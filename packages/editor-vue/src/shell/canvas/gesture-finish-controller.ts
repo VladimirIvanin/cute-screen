@@ -1,9 +1,5 @@
-import {
-  isGradientLayer,
-  gradientFrame,
-  snapGradientPoint,
-} from '@cute-screen/editor-renderer'
 import { updateLineGesture } from './line-gesture'
+import { finishGradientGeometry } from './gradient-gesture-finish'
 import {
   rulerAngleStep,
   updateRulerPointer,
@@ -113,7 +109,7 @@ export function finishCanvasGesture(
     completed = { ...completed, current: end,
       snapAngleIncrementDegrees: rulerAngleStep(event, completed.initial.payload.snapAngleIncrementDegrees) }
   }
-  completed = finishGradientGeometry(context, completed, end)
+  completed = finishGradientGeometry(context.props, completed, end, event)
   const precisionLayer = createCompletedPrecisionLayer(context, completed)
   clearTransientState(context, event)
   commitCalloutRemoval(context, completed, event)
@@ -127,37 +123,6 @@ export function finishCanvasGesture(
   const hoverPoint = context.canvasPoint(event)
   if (hoverPoint) context.updateHoverCursor(hoverPoint)
   if (requiresCommittedRestore(completed)) scheduleCommittedRestore(context)
-}
-
-function finishGradientGeometry(
-  context: GestureFinishContext,
-  completed: CanvasGesture,
-  end: CanvasPoint | undefined,
-): CanvasGesture {
-  if (
-    end &&
-    completed?.kind === 'draw' &&
-    completed.tool === 'gradient' &&
-    context.props.document
-  ) {
-    completed = {
-      ...completed,
-      current: snapGradientPoint(end, gradientFrame(context.props.document), (context.props.zoom ?? 100) / 100),
-    }
-  }
-  if (
-    end &&
-    completed?.kind === 'intrinsicResize' &&
-    isGradientLayer(completed.initial) &&
-    context.props.document &&
-    Math.abs(completed.initial.transform.rotation % 360) < 1e-8
-  ) {
-    completed = {
-      ...completed,
-      current: snapGradientPoint(end, gradientFrame(context.props.document), (context.props.zoom ?? 100) / 100),
-    }
-  }
-  return completed
 }
 
 function finishStroke(

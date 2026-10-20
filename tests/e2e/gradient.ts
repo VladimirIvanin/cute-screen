@@ -1,4 +1,5 @@
 import { writeFile } from 'node:fs/promises'
+import { Key } from 'webdriverio'
 import {
   $,
   browser,
@@ -57,6 +58,113 @@ async function drag(
     .move({ origin: 'viewport', x: Math.round(end.x), y: Math.round(end.y), duration: 180 })
     .up({ button: 'left' }).perform()
 }
+
+async function verifyGradientMagnet(directory: string): Promise<void> {
+  const original = (await gradientDocument()).layers.at(-1)!
+  const snapshot = await gradientDocument()
+  const frame = snapshot.crop ?? { x: 0, y: 0, ...snapshot.canvas }
+  const rect = await canvasRect()
+  const scale = rect.width / frame.width
+  const center = (layer: typeof original) => ({
+    x: Math.round(rect.left + (layer.transform.translateX - frame.x + layer.localBounds.width / 2) * scale),
+    y: Math.round(rect.top + (layer.transform.translateY - frame.y + layer.localBounds.height / 2) * scale),
+  })
+  const move = async (x: number, y: number) => browser.action('pointer', { id: 'gradient-magnet-pointer' })
+    .move({ origin: 'viewport', x: Math.round(x), y: Math.round(y), duration: 100 }).perform(true)
+  const down = async (point: { x: number; y: number }) => browser.action('pointer', { id: 'gradient-magnet-pointer' })
+    .move({ origin: 'viewport', ...point }).down({ button: 'left' }).perform(true)
+  const up = async () => browser.action('pointer', { id: 'gradient-magnet-pointer' }).up({ button: 'left' }).perform(true)
+  const latest = async () => (await gradientDocument()).layers.at(-1)!
+  const undoTo = async (layer: typeof original) => {
+    await browser.keys(['Control', 'z'])
+    await browser.waitUntil(async () => JSON.stringify(await latest()) === JSON.stringify(layer))
+  }
+  await browser.execute(() => {
+    const events: { type: string; trusted: boolean; x?: number; y?: number; target?: string }[] = []
+    const controller = new AbortController()
+    const target = window as unknown as {
+      __gradientMagnetInput: { events: typeof events; controller: AbortController }
+    }
+    target.__gradientMagnetInput = { events, controller }
+    for (const type of ['pointerdown', 'pointermove', 'pointerup', 'keydown']) {
+      document.addEventListener(type, (event) => {
+        events.push({ type: event.type, trusted: event.isTrusted,
+          ...(event instanceof PointerEvent ? { x: event.clientX, y: event.clientY } : {}),
+          target: event.target instanceof Element ? String(event.target.className) : '' })
+      }, { signal: controller.signal })
+    }
+  })
+  try {
+    const start = center(original)
+    const corner = { x: start.x + (frame.x - original.transform.translateX) * scale,
+      y: start.y + (frame.y - original.transform.translateY) * scale }
+    await down(start)
+    await move(corner.x + 4, corner.y + 4)
+    await move(corner.x + 11, corner.y + 11)
+    expect(await latest()).toEqual(original) // Scene preview must not mutate the document.
+    await browser.saveScreenshot(`${directory}/gradient-magnet-held.png`)
+    await up()
+    const snapped = await latest()
+    const trace = await browser.execute(() => (window as unknown as {
+      __gradientMagnetInput: { events: unknown[] }
+    }).__gradientMagnetInput.events)
+    await writeFile(`${directory}/gradient-magnet-capture.json`, JSON.stringify({
+      original, snapped, frame, rect, scale, start, corner, trace,
+    }, null, 2))
+    expect(snapped.transform.translateX).toBeCloseTo(frame.x, 8)
+    expect(snapped.transform.translateY).toBeCloseTo(frame.y, 8)
+    expect(snapped.localBounds).toEqual(original.localBounds)
+    expect(snapped.payload).toEqual(original.payload)
+    await undoTo(original)
+    await browser.keys(['Control', 'Shift', 'z'])
+    await browser.waitUntil(async () => JSON.stringify(await latest()) === JSON.stringify(snapped))
+
+    const origin = center(snapped)
+    await down(origin)
+    await move(origin.x + 5, origin.y + 5)
+    await move(origin.x + 11, origin.y + 11)
+    await move(origin.x + 20, origin.y + 20)
+    await up()
+    const released = await latest()
+    expect((released.transform.translateX - frame.x) * scale).toBeCloseTo(20, 0)
+    expect((released.transform.translateY - frame.y) * scale).toBeCloseTo(20, 0)
+    await undoTo(snapped)
+
+    await down(origin)
+    await move(origin.x + 5, origin.y + 5)
+    await browser.action('key', { id: 'gradient-magnet-key' }).down(Key.Control).perform(true)
+    await move(origin.x + 9, origin.y + 9)
+    await up()
+    await browser.action('key', { id: 'gradient-magnet-key' }).up(Key.Control).perform(true)
+    const bypassed = await latest()
+    expect((bypassed.transform.translateX - frame.x) * scale).toBeCloseTo(9, 0)
+    expect((bypassed.transform.translateY - frame.y) * scale).toBeCloseTo(9, 0)
+    await undoTo(snapped)
+
+    await down(origin)
+    await move(origin.x + 5, origin.y + 5)
+    await browser.keys('Escape')
+    await up()
+    expect(await latest()).toEqual(snapped)
+    await undoTo(original) // Cancel added no history entry; one undo restores the initial placement.
+    const input = await browser.execute(() => {
+      const trace = (window as unknown as {
+        __gradientMagnetInput: { events: { type: string; trusted: boolean }[] }
+      }).__gradientMagnetInput
+      return trace.events
+    })
+    expect(input.some((event) => event.type === 'pointermove' && event.trusted)).toBe(true)
+    await writeFile(`${directory}/gradient-magnet.json`, JSON.stringify({ original, snapped, released, bypassed, input }, null, 2))
+  } finally {
+    await browser.releaseActions()
+    await browser.execute(() => {
+      const target = window as unknown as { __gradientMagnetInput?: { controller: AbortController } }
+      target.__gradientMagnetInput?.controller.abort()
+      delete target.__gradientMagnetInput
+    })
+  }
+}
+
 export async function verifyGradient(directory: string): Promise<void> {
   await tool('gradient')
   const rect = await canvasRect()
@@ -68,6 +176,7 @@ export async function verifyGradient(directory: string): Promise<void> {
   await expect(toolbar).toBeDisplayed()
   const initial = (await gradientDocument()).layers.at(-1)!
   expect(initial.payload).toMatchObject({ annotationTool: 'gradient', fill: { kind: 'linearGradient', start: { x: .5, y: 1 }, end: { x: .5, y: 0 } } })
+  await verifyGradientMagnet(directory)
   await toolbar.$('button[aria-label="Placement"]').click()
   await $('[data-gradient-placement="gradientFitWidth"]').click()
   await browser.keys('Escape')

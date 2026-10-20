@@ -84,6 +84,62 @@ const schema: ContextToolbarSchema = {
     { kind: 'action', id: 'gradientFitHeight', label: 'Full height' }],
 }
 describe('gradient backdrop interactions', () => {
+  function movingViewport() {
+    const layer = createDrawingLayer({ id: 'gradient', tool: 'gradient',
+      start: { x: 20, y: 20 }, end: { x: 60, y: 60 } }) as ShapeLayer
+    return mountViewport('select', { ...viewportDocument, layers: [layer] }, layer.id)
+  }
+
+  it('holds the layer edges at a corner during preview and commits the final held delta once', async () => {
+    const view = movingViewport()
+    await fireEvent.pointerDown(view.scene, { button: 0, pointerId: 1, clientX: 40, clientY: 40 })
+    await fireEvent.pointerMove(view.scene, { pointerId: 1, clientX: 25, clientY: 25 })
+    await fireEvent.pointerMove(view.scene, { pointerId: 1, clientX: 32, clientY: 32 })
+    expect(view.emitted('moveLayer')).toBeUndefined()
+    await fireEvent.pointerUp(view.scene, { pointerId: 1, clientX: 33, clientY: 33 })
+    expect(view.emitted('moveLayer')).toEqual([['gradient', -20, -20, ['gradient']]])
+    expect(view.emitted('documentCommand')).toBeUndefined()
+  })
+
+  it('releases at pointerup, cancels without a command and starts the next drag without a stale magnet', async () => {
+    const view = movingViewport()
+    await fireEvent.pointerDown(view.scene, { button: 0, pointerId: 1, clientX: 40, clientY: 40 })
+    await fireEvent.pointerMove(view.scene, { pointerId: 1, clientX: 25, clientY: 25 })
+    await fireEvent.pointerCancel(view.scene, { pointerId: 1 })
+    expect(view.emitted('moveLayer')).toBeUndefined()
+    await fireEvent.pointerDown(view.scene, { button: 0, pointerId: 2, clientX: 40, clientY: 40 })
+    await fireEvent.pointerMove(view.scene, { pointerId: 2, clientX: 32, clientY: 32 })
+    await fireEvent.pointerUp(view.scene, { pointerId: 2, clientX: 32, clientY: 32 })
+    expect(view.emitted('moveLayer')).toEqual([['gradient', -8, -8, ['gradient']]])
+    await fireEvent.pointerDown(view.scene, { button: 0, pointerId: 3, clientX: 40, clientY: 40 })
+    await fireEvent.pointerMove(view.scene, { pointerId: 3, clientX: 25, clientY: 25 })
+    await fireEvent.pointerUp(view.scene, { pointerId: 3, clientX: 35, clientY: 35 })
+    expect(view.emitted('moveLayer').at(-1)).toEqual(['gradient', -5, -5, ['gradient']])
+  })
+
+  it.each(['ctrlKey', 'metaKey'])('bypasses a captured edge with %s', async (modifier) => {
+    const view = movingViewport()
+    await fireEvent.pointerDown(view.scene, { button: 0, pointerId: 1, clientX: 40, clientY: 40 })
+    await fireEvent.pointerMove(view.scene, { pointerId: 1, clientX: 25, clientY: 25 })
+    await fireEvent.pointerMove(view.scene, { pointerId: 1, clientX: 32, clientY: 32, [modifier]: true })
+    await fireEvent.pointerUp(view.scene, { pointerId: 1, clientX: 32, clientY: 32, [modifier]: true })
+    expect(view.emitted('moveLayer')).toEqual([['gradient', -8, -8, ['gradient']]])
+  })
+
+  it('does not add movement for a click, a returned-to-origin drag or Escape', async () => {
+    const view = movingViewport()
+    await fireEvent.pointerDown(view.scene, { button: 0, pointerId: 1, clientX: 40, clientY: 40 })
+    await fireEvent.pointerUp(view.scene, { pointerId: 1, clientX: 40, clientY: 40 })
+    await fireEvent.pointerDown(view.scene, { button: 0, pointerId: 2, clientX: 40, clientY: 40 })
+    await fireEvent.pointerMove(view.scene, { pointerId: 2, clientX: 25, clientY: 25 })
+    await fireEvent.pointerUp(view.scene, { pointerId: 2, clientX: 40, clientY: 40 })
+    await fireEvent.pointerDown(view.scene, { button: 0, pointerId: 3, clientX: 40, clientY: 40 })
+    await fireEvent.pointerMove(view.scene, { pointerId: 3, clientX: 25, clientY: 25 })
+    await fireEvent.keyDown(window, { key: 'Escape' })
+    await fireEvent.pointerUp(view.scene, { pointerId: 3, clientX: 25, clientY: 25 })
+    expect(view.emitted('moveLayer')).toBeUndefined()
+  })
+
   it('creates a transient snapped draft and commits the release coordinates only once', async () => {
     const view = mountViewport('gradient', { ...viewportDocument, layers: [] }, '')
     await view.rerender({ drawingDefaults: DEFAULT_DRAWING_DEFAULTS })

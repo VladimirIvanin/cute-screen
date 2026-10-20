@@ -60,6 +60,13 @@ recovery journal. Физическое удаление возможно тол�
 
 ## Размещение градиентной подложки (ADR-128)
 
+ADR-131: перенос одной неповёрнутой подложки использует core snapGradientMove
+по её собственным границам и gradientFrame. Вход 6 CSS px, выход 14 CSS px;
+gesture-relative targets каждой оси хранятся в обычном поле gradientSnap.
+updateGradientMove переиспользуется pointermove и pointerup, Ctrl/Cmd очищает
+targets. Pointer draft не мутирует документ, commit использует прежний moveLayer.
+Новые constraints, persisted fields и Vue scene reactivity не вводятся.
+
 Панель использует компактные mode/fill/opacity; graphic placement — её transient
 popover через общий usePreviewPopover/surface owner. Две оси × четыре команды
 в общей metadata GRADIENT_PLACEMENTS. gradientSchema вычисляет disabled и active

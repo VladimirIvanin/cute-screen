@@ -4,6 +4,7 @@ import {
   snapGradientPoint,
 } from '@cute-screen/editor-renderer'
 import { updateLineGesture } from './line-gesture'
+import { updateGradientMove } from './gradient-move-gesture'
 import {
   rulerAngleStep,
   updateRulerPointer,
@@ -227,6 +228,12 @@ function moveLayer(
       event.clientY - gesture.startClient.y,
     ) < SELECTION_DRAG_THRESHOLD_CSS
   ) return
+  const gradient = updateGradientMove(gesture, point, context.props, !event.ctrlKey && !event.metaKey)
+  if (gradient) {
+    context.setGesture(gradient)
+    context.invalidateGesturePreview()
+    return
+  }
   const result = snapPoint(
     point,
     context.snapCandidates(gesture.id),

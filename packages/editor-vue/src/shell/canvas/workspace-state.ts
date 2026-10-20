@@ -10,6 +10,7 @@ import {
   type CropResizeHandle,
   type CropSession,
   type DrawingTool,
+  type GradientMoveSnapState,
   type IntrinsicResizeHandle,
   type LayerNode,
   type NumberedMarkerLayer,
@@ -47,6 +48,7 @@ export type CanvasGesture =
   }
   | {
     readonly kind: 'move'
+    readonly gradientSnap?: GradientMoveSnapState | undefined
     readonly nodeIds?: readonly string[]
     readonly startClient?: CanvasPoint
     readonly dragging?: boolean

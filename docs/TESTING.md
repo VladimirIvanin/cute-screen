@@ -1,5 +1,74 @@
 # Стратегия тестирования
 
+## Магнитное перемещение градиента (2026-10-20, ADR-131)
+
+Windows x64, HEAD `445cf1740ded724c14febe2d21704f6eec462e12`, общая рабочая копия
+с ранее выбранной иконкой градиента. Магнит относится к краям одной подложки,
+имеет capture 6 / release 14 CSS px и transient state без таймеров.
+
+- Red-first: `pnpm test --project core packages/editor-core/src/gradient-move-snap.test.ts`:
+  6 failed до реализации отсутствующей функции.
+- `pnpm test --project core --project vue packages/editor-core/src/gradient-move-snap.test.ts packages/editor-core/src/gradient.test.ts tests/unit/vue/gradient-backdrop.test.ts tests/unit/vue/canvas-viewport-transform.test.ts`:
+  4 files / 33 passed. Capture/hold/release по осям, zoom 0.5/1/2, Crop origin,
+  отражённые scales, guards, pointerup, Ctrl/Cmd, cancel/Escape, no-op и новый drag.
+  JSDOM сообщает отсутствие Canvas getContext; это проверка контрактов, не renderer evidence.
+- `CUTE_SCREEN_BROWSER_E2E_PORT=53195 CUTE_SCREEN_BROWSER_E2E_HEADLESS=1
+NODE_OPTIONS=--dns-result-order=ipv4first pnpm test:e2e:browser --spec tests/e2e/specs/browser-gradient.e2e.ts`:
+  Chrome 155.0.8059.85, 1/1 passed. Настоящие pointer/key events: создание подложки,
+  перенос в угол, удержание при смещении курсора на 11 CSS px, отрыв на 20 px,
+  Ctrl, Escape, одна undoable command, Redo и неизменные size/fill.
+  Просмотрен `artifacts/gradient-magnet/browser-held.png`; document/input trace —
+  `browser.json` и `browser-capture.json` в том же каталоге.
+- `browser-gradient-placement.e2e.ts` в первом общем browser-прогоне: 2/2 passed,
+  RU/EN × light/dark, 1024/640 px и прежние placement commands.
+  Первый новый assertion исправлен на float tolerance 1e-8 для delta arithmetic;
+  затем отдельный прогон выполнен после завершения package build.
+- `pnpm test:boundaries`: 112 passed / 1 skipped после выделения gradient finish
+  в отдельный модуль без повышения лимитов complexity/file size.
+- `pnpm lint`, `pnpm typecheck`, `pnpm exec tsc --noEmit -p tests/e2e/tsconfig.json`
+  прошли; lint сохраняет 54 предупреждения вне изменённых файлов.
+- Первый `pnpm test:e2e:tauri` не смог перезаписать занятый пользовательским
+  приложением `target/debug/cute-screen.exe`; старый binary не использовался.
+  Повтор с существующим `CARGO_TARGET_DIR=D:/cutescreen/target/e2e-isolated`,
+  `CUTE_SCREEN_E2E_SCENARIOS=gradient,gradient-reopen`,
+  `NODE_OPTIONS=--dns-result-order=ipv4first pnpm test:e2e:tauri` прошёл: 2/2.
+  Свежий debug/no-bundle harness, external tauri-driver 2.1.0, WebView2 155.0.4283.62.
+  Production Capture → Quick без Gradient → Editor → создание → перенос → reopen.
+  Трасса подтверждает 20 trusted pointer events и 13 trusted keydown, все события
+  настоящие. Capture использует fake-platform; это проверка взаимодействия WebView2.
+  Просмотрен `artifacts/gradient-magnet/native-held.png`; native.json содержит
+  before/snapped/released/bypassed и input trace, сохранены оба JUnit.
+- Исправлена native-only сериализация наблюдателя событий: именованный callback
+  попадал в WebDriver с недоступным esbuild helper __name. Observer теперь использует
+  анонимный listener и AbortController для cleanup; product code не подменяется.
+- Linux WebKitGTK и macOS WKWebView этим Windows прогоном не проверены.
+  Native beforeBuild проверил новые Vue/core modules; Rust/schema/IPC не менялись.
+
+## Иконка градиента: выбранный вариант 01 (2026-10-20)
+
+Windows x64, HEAD `445cf1740ded724c14febe2d21704f6eec462e12`, изменения не закоммичены.
+В `UiIcon gradient` подключён квадрат с затуханием слева направо; геометрия совпадает
+с выбранным прототипом. Поведение Gradient и доступность только в Editor сохранены.
+
+- `pnpm test --project vue tests/unit/vue/ui-icon.test.ts`: 128 passed.
+- `pnpm test:boundaries`: 112 passed, 1 skipped.
+- `pnpm icons:preview --port 53193 --strictPort`: gallery открыта в in-app browser.
+- PowerShell: `CUTE_SCREEN_BROWSER_E2E_PORT=53194`, `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1`,
+  `CUTE_SCREEN_ICON_EVIDENCE=gradient-01`, `NODE_OPTIONS=--dns-result-order=ipv4first`;
+  `pnpm test:e2e:browser --spec tests/e2e/specs/browser-custom-icons.e2e.ts --spec tests/e2e/specs/browser-gradient.e2e.ts`:
+  Chrome 155.0.8059.85, 2 specs / 3 tests passed. Проверены actual UiIcon в обеих темах,
+  размеры 16/18/20/24/32, DPR 1/2, отсутствие clipping при decode SVG и создание/редактирование
+  подложки через production input; RU/EN × light/dark, 1024 px.
+- Просмотрены `artifacts/custom-icons/gradient-01/gradient-family-dpr-{1,2}.png`
+  и `artifacts/browser-e2e/gradient-ru-dark.png`: знак различим при 18 px,
+  согласован с соседями; active и disabled сохраняют переход и контур.
+- `pnpm format`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm docs:check`
+  прошли; lint сообщает 54 предупреждения вне изменённых файлов.
+  Browser harness сообщает предупреждения об отсутствующем native image-drop/history bridge;
+  это браузерный прогон, а не native verification.
+- Native WebView, WebKit и сборки пакетов этим изменением не проверялись.
+  Новый SVG использует прежний контракт примитивов/currentColor; Rust не изменялся.
+
 ## Windows dev capture и ручное оформление (2026-10-20)
 
 Windows 10 Home x64 10.0.19045; baseline HEAD `06a59dbd557356c6a204f1aeeed380b8c3c36b9f`,

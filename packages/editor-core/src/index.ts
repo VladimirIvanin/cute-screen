@@ -468,6 +468,8 @@ export {
   gradientFrame,
   gradientPoints,
   snapGradientPoint,
+  snapGradientMove,
+  type GradientMoveSnapState,
   fitGradientLayer,
   placeGradientLayer,
   type GradientPlacement,
