@@ -99,12 +99,12 @@ describe('emoji corner resize through production pointer input', () => {
       const dy = handle.includes('n') ? -32 : 32
       const expected = { x: origin.x + (handle.includes('w') ? -32 : 0),
         y: origin.y + (handle.includes('n') ? -32 : 0), width: b.width + 32, height: b.height + 32 }
-      await browser.action('pointer').move({ origin: 'viewport', ...start }).down()
+      await browser.action('pointer', { id: 'emoji-resize-pointer' }).move({ origin: 'viewport', ...start }).down()
         .move({ origin: 'viewport', x: start.x + dx, y: start.y + dy, duration: 160 }).perform(true)
       await waitForStableCanvas()
       expect((await selectionDocument()).layers.at(-1)).toEqual(before)
       expect(await paintedDifference(expected)).toBeLessThan(1)
-      await browser.action('pointer').up().perform()
+      await browser.action('pointer', { id: 'emoji-resize-pointer' }).up().perform()
       await browser.waitUntil(async () => (await selectionDocument()).layers.at(-1)?.localBounds?.width !== b.width)
       await waitForStableCanvas()
       const after = (await selectionDocument()).layers.at(-1)!
@@ -182,13 +182,13 @@ describe('image resize regression on production-sized content', () => {
       return value >>> 0
     })
     const initial = await hash()
-    await browser.action('pointer').move({ origin: 'viewport', ...geometry }).down()
+    await browser.action('pointer', { id: 'image-resize-pointer' }).move({ origin: 'viewport', ...geometry }).down()
       .move({ origin: 'viewport', x: geometry.x + 24, y: geometry.y - 24, duration: 160 }).perform(true)
     await waitForStableCanvas()
     const preview = await hash()
     expect(preview).not.toBe(initial)
     expect((await selectionDocument()).layers.at(-1)).toEqual(before)
-    await browser.action('pointer').up().perform()
+    await browser.action('pointer', { id: 'image-resize-pointer' }).up().perform()
     await browser.waitUntil(async () =>
       (await selectionDocument()).layers.at(-1)!.transform.scaleX !== before.transform.scaleX,
     )

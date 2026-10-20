@@ -14,12 +14,16 @@ async function verifyQuickFrame(): Promise<void> {
   const rect = await browser.execute(() => document.querySelector('.cs-canvas:not(.cs-canvas-overlay)')!.getBoundingClientRect().toJSON())
   const scale = rect.width / initial.canvas.width
   const pointer = () => browser.action('pointer', { id: 'quick-frame-snap' })
-  const move = async (x: number, y: number) => pointer().move({ origin: 'viewport', x: Math.round(x), y: Math.round(y), duration: 120 }).perform(true)
+  let last = { x: 0, y: 0 }
+  const move = async (x: number, y: number) => {
+    last = { x: Math.round(x), y: Math.round(y) }
+    await pointer().move({ origin: 'viewport', ...last, duration: 120 }).perform(true)
+  }
   const drag = async (fromX: number, fromY: number, toX: number, toY: number) => {
     await move(fromX, fromY)
     await pointer().down().perform(true)
     await move(toX, toY)
-    await pointer().up().perform(true)
+    await pointer().move({ origin: 'viewport', ...last }).up().perform(true)
   }
   await drag(rect.left + 2, rect.top + 2, rect.left + rect.width * .18, rect.top + rect.height * .18)
   await drag(rect.right - 2, rect.bottom - 2, rect.left + rect.width * .82, rect.top + rect.height * .82)
@@ -34,7 +38,7 @@ async function verifyQuickFrame(): Promise<void> {
   await move(target.x + 11, target.y + 11)
   expect((await selectionDocument()).crop).toEqual(crop)
   await browser.saveScreenshot('artifacts/tauri-e2e/quick-frame-move-held.png')
-  await pointer().up().perform(true)
+  await pointer().move({ origin: 'viewport', ...last }).up().perform(true)
   const moved = (await selectionDocument()).crop!
   expect(moved.x).toBe(0)
   expect(moved.y).toBe(0)

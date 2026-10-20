@@ -63,28 +63,59 @@ export function snapFrameResizePoint(
   if (!Number.isFinite(zoom) || zoom <= 0) return point
   const changesX = handle.includes('w') || handle.includes('e')
   const changesY = handle.includes('n') || handle.includes('s')
-  const corner = { x: bounds.x + (handle.includes('w') ? 0 : bounds.width),
-    y: bounds.y + (handle.includes('n') ? 0 : bounds.height) }
-  const anchor = options.fromCenter
-    ? { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 }
-    : { x: bounds.x + (handle.includes('w') ? bounds.width : 0),
-        y: bounds.y + (handle.includes('n') ? bounds.height : 0) }
+  const corner = resizeCorner(bounds, handle)
+  const anchor = resizeAnchor(bounds, handle, options.fromCenter === true)
   const vector = { x: corner.x - anchor.x, y: corner.y - anchor.y }
-  const factorX = (point.x - anchor.x) / vector.x
-  const factorY = (point.y - anchor.y) / vector.y
   const aspect = options.preserveAspect && changesX && changesY
-  const factor = Math.abs(factorX - 1) >= Math.abs(factorY - 1) ? factorX : factorY
-  const predicted = aspect ? { x: anchor.x + vector.x * factor, y: anchor.y + vector.y * factor } : point
-  const x = changesX && (predicted.x - anchor.x) * vector.x > 0
-    ? nearestEdge(predicted.x, frame.x, frame.x + frame.width, 6 / zoom) : undefined
-  const y = changesY && (predicted.y - anchor.y) * vector.y > 0
-    ? nearestEdge(predicted.y, frame.y, frame.y + frame.height, 6 / zoom) : undefined
-  const validX = x !== undefined && (x - anchor.x) * vector.x > 0 ? x : undefined
-  const validY = y !== undefined && (y - anchor.y) * vector.y > 0 ? y : undefined
+  const predicted = aspect ? aspectPoint(point, anchor, vector) : point
+  const validX = resizeEdge(changesX, predicted.x, anchor.x, vector.x, frame.x, frame.x + frame.width, 6 / zoom)
+  const validY = resizeEdge(changesY, predicted.y, anchor.y, vector.y, frame.y, frame.y + frame.height, 6 / zoom)
   if (!aspect) return { x: validX ?? point.x, y: validY ?? point.y }
   if (validX === undefined && validY === undefined) return point
   const useX = validX !== undefined &&
     (validY === undefined || Math.abs(validX - predicted.x) <= Math.abs(validY - predicted.y))
   const snappedFactor = useX ? (validX! - anchor.x) / vector.x : (validY! - anchor.y) / vector.y
   return { x: anchor.x + vector.x * snappedFactor, y: anchor.y + vector.y * snappedFactor }
+}
+
+function resizeCorner(
+  bounds: Rect,
+  handle: BoundsResizeHandle,
+): Point {
+  return { x: bounds.x + (handle.includes('w') ? 0 : bounds.width),
+    y: bounds.y + (handle.includes('n') ? 0 : bounds.height) }
+}
+
+function resizeAnchor(
+  bounds: Rect,
+  handle: BoundsResizeHandle,
+  fromCenter: boolean,
+): Point {
+  return fromCenter ? { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 }
+    : { x: bounds.x + (handle.includes('w') ? bounds.width : 0),
+        y: bounds.y + (handle.includes('n') ? bounds.height : 0) }
+}
+
+function aspectPoint(
+  point: Point,
+  anchor: Point,
+  vector: Point,
+): Point {
+  const x = (point.x - anchor.x) / vector.x, y = (point.y - anchor.y) / vector.y
+  const factor = Math.abs(x - 1) >= Math.abs(y - 1) ? x : y
+  return { x: anchor.x + vector.x * factor, y: anchor.y + vector.y * factor }
+}
+
+function resizeEdge(
+  enabled: boolean,
+  value: number,
+  anchor: number,
+  vector: number,
+  first: number,
+  last: number,
+  tolerance: number,
+): number | undefined {
+  if (!enabled || (value - anchor) * vector <= 0) return undefined
+  const edge = nearestEdge(value, first, last, tolerance)
+  return edge !== undefined && (edge - anchor) * vector > 0 ? edge : undefined
 }

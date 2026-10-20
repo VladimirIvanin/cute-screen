@@ -93,6 +93,13 @@ describe('general frame magnets through canvas gestures', () => {
       { ...props, document: { ...document, layers: [shape, nearby] } }, true)!.current).toEqual(gesture.start)
   })
 
+  it('uses actual fit scale instead of the requested zoom for the magnetic tolerance', () => {
+    const gesture = { kind: 'move' as const, id: shape.id,
+      start: { x: 40, y: 40 }, current: { x: 40, y: 40 }, guides: [], guidesVisible: false }
+    expect(updateFrameMove(gesture, { x: 32, y: 32 }, props, true, .5)!.current)
+      .toEqual({ x: 22, y: 22 })
+  })
+
   it('uses the same crop move/resize magnet in Quick and commits one crop command', async () => {
     const cropped = { ...document, crop: { x: 20, y: 20, width: 40, height: 40 } }
     const view = mountViewport('select', cropped, '', undefined, false, undefined, undefined, true)

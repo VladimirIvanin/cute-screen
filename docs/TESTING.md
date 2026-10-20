@@ -1,5 +1,25 @@
 # Стратегия тестирования
 
+## Отмена маркера и таймаут pixel-reference (2026-10-20)
+
+Windows 10 x64 / PowerShell, Node 22.23.1, pnpm 10.33.2. Исходный baseline
+`366545441b8f6ca70a7af34f8f22a29787a6b650` с параллельными рабочими изменениями;
+во время проверки изменения вошли в `35ace42`. Evidence —
+`artifacts/unit-regressions-20261020/`.
+
+- До исправления `pnpm test tests/unit/vue/highlighter-gesture.test.ts packages/editor-renderer/src/effect-cache.test.ts`
+  — 3 failed / 8 passed. Все три отмены ожидали старый interactive redraw,
+  хотя production вызывает settled `drawDocument`. Локально pixel-reference
+  завершился в пределах общего таймаута; CI сообщил превышение 5 s.
+- После исправления та же команда — 2 files / 11 passed. Тест ждёт Promise
+  восстановления и сохраняет проверки Shift, отсутствия `addLayer` после
+  отмены и последующего pointerup, неизменности слоёв документа.
+- Только legacy-reference blur/pixelate получает 30 s: полное равенство RGBA,
+  исходный размер сцены, transforms/seams/overlaps и 1×/2× сохраняются.
+  Общий timeout, worker isolation и performance thresholds не меняются.
+- `pnpm format`, `pnpm format:check`, ESLint двух изменённых тестов и
+  `git diff --check` — passed.
+
 ## Крестик закрытия оформления (2026-10-20)
 
 Windows x64 / PowerShell, baseline `366545441b8f6ca70a7af34f8f22a29787a6b650`

@@ -17,14 +17,21 @@ export async function verifyFrameSnapping(directory: string): Promise<void> {
   await waitForStableCanvas()
   const doc = await selectionDocument()
   const frame = doc.crop ?? { x: 0, y: 0, ...doc.canvas }
-  const rect = await browser.execute(() => document.querySelector('.cs-canvas:not(.cs-canvas-overlay)')!.getBoundingClientRect().toJSON())
-  const scale = rect.width / frame.width
+  let rect = await browser.execute(() => document.querySelector('.cs-canvas:not(.cs-canvas-overlay)')!.getBoundingClientRect().toJSON())
+  let scale = rect.width / frame.width
   const client = (x: number, y: number) => ({ x: Math.round(rect.left + (x - frame.x) * scale),
     y: Math.round(rect.top + (y - frame.y) * scale) })
   const pointer = () => browser.action('pointer', { id: 'frame-snap-pointer' })
-  const move = async (point: { x: number; y: number }) => pointer().move({ origin: 'viewport', ...point, duration: 120 }).perform(true)
-  const down = async (point: { x: number; y: number }) => pointer().move({ origin: 'viewport', ...point }).down().perform(true)
-  const up = async () => pointer().up().perform(true)
+  let last = { x: 0, y: 0 }
+  const move = async (point: { x: number; y: number }) => {
+    last = point
+    await pointer().move({ origin: 'viewport', ...point, duration: 120 }).perform(true)
+  }
+  const down = async (point: { x: number; y: number }) => {
+    last = point
+    await pointer().move({ origin: 'viewport', ...point }).down().perform(true)
+  }
+  const up = async () => pointer().move({ origin: 'viewport', ...last }).up().perform(true)
   const latest = async () => (await selectionDocument()).layers.at(-1)!
   const undo = async (layer: LayerNode) => {
     await browser.keys([Key.Control, 'z'])
@@ -34,8 +41,15 @@ export async function verifyFrameSnapping(directory: string): Promise<void> {
     y: layer.transform.translateY + layer.localBounds!.y,
     width: layer.localBounds!.width, height: layer.localBounds!.height })
   await browser.execute(() => {
-    const state = window as typeof window & { __frameTrusted?: boolean[] }
+    const state = window as typeof window & { __frameTrusted?: boolean[]; __frameEvents?: unknown[] }
     state.__frameTrusted = []
+    state.__frameEvents = []
+    for (const type of ['pointermove', 'pointerup', 'pointerdown', 'pointercancel']) {
+      document.addEventListener(type, (event) => {
+        const pointer = event as PointerEvent
+        state.__frameEvents!.push({ type, x: pointer.clientX, y: pointer.clientY, buttons: pointer.buttons })
+      })
+    }
     document.querySelector('.cs-canvas:not(.cs-canvas-overlay)')!.addEventListener('pointerdown', (event) => {
       state.__frameTrusted!.push(event.isTrusted)
     })
@@ -48,6 +62,8 @@ export async function verifyFrameSnapping(directory: string): Promise<void> {
     await browser.waitUntil(async () => (await latest()).kind === 'shape' && (await latest()).id !== doc.layers.at(-1)?.id)
     await waitForStableCanvas()
     const original = await latest()
+    rect = await browser.execute(() => document.querySelector('.cs-canvas:not(.cs-canvas-overlay)')!.getBoundingClientRect().toJSON())
+    scale = rect.width / frame.width
     const b = bounds(original)
     const center = client(b.x + b.width / 2, b.y + b.height / 2)
     const corner = { x: center.x + (frame.x - b.x) * scale, y: center.y + (frame.y - b.y) * scale }
@@ -102,6 +118,8 @@ export async function verifyFrameSnapping(directory: string): Promise<void> {
     const evidence = { frame, scale, original, held, resized, bypassed, trusted }
     await writeFile(`${directory}/frame-snap.json`, JSON.stringify(evidence, null, 2))
   } finally {
+    const events = await browser.execute(() => (window as typeof window & { __frameEvents: unknown[] }).__frameEvents)
+    await writeFile(`${directory}/input.json`, JSON.stringify({ rect, scale, events }, null, 2))
     await browser.releaseActions()
   }
 }

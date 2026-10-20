@@ -213,7 +213,7 @@ describe('M05 CanvasViewport transforms', () => {
       shiftKey: true,
       altKey: true,
     })
-    await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 50, clientY: 40 })
+    await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 50, clientY: 40, shiftKey: true, altKey: true })
 
     const command = (emitted().documentCommand as unknown[][] | undefined)?.[0]?.[0] as
       { readonly after?: LayerNode } | undefined
@@ -340,7 +340,7 @@ describe('M05 CanvasViewport transforms', () => {
       clientY: 40,
       shiftKey: true,
     })
-    await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 50, clientY: 40 })
+    await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 50, clientY: 40, shiftKey: true })
 
     expect(emitted().transformLayer).toEqual([
       ['image-free-resize', expect.objectContaining({ scaleX: 2, scaleY: 1.5 })],

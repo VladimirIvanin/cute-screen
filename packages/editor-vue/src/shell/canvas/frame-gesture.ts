@@ -19,9 +19,33 @@ import type {
   CanvasViewportProps,
 } from './contracts'
 import type { CanvasGesture } from './workspace-state'
+import type { GestureFinishContext } from './gesture-finish-controller'
+import { updateCropGesture } from './crop-gesture'
 
 type MoveGesture = Extract<CanvasGesture, { readonly kind: 'move' }>
 type ResizeGesture = Extract<CanvasGesture, { readonly kind: 'resize' | 'intrinsicResize' }>
+
+export function finishFrameGeometry(
+  context: GestureFinishContext,
+  completed: CanvasGesture,
+  end: CanvasPoint | undefined,
+  event: PointerEvent,
+): CanvasGesture {
+  if (!end) return completed
+  if (completed?.kind === 'move' && completed.dragging) {
+    return updateFrameMove(completed, end, context.props, !event.ctrlKey && !event.metaKey,
+      context.screenScale().x) ?? completed
+  }
+  if ((completed?.kind === 'resize' || completed?.kind === 'intrinsicResize') &&
+    completed.handle !== 'start' && completed.handle !== 'end') {
+    return updateFrameResize(completed, end, context.props, event, context.screenScale().x)
+  }
+  if (completed?.kind === 'crop') {
+    return updateCropGesture(completed, end, context.props, context.crop, !event.ctrlKey && !event.metaKey,
+      context.screenScale().x)
+  }
+  return completed
+}
 
 export function updateFrameMove(
   gesture: MoveGesture,
@@ -49,7 +73,8 @@ export function updateFrameMove(
     gradientFrame(document), { zoom,
       enabled, previous: gesture.frameSnap })
   const candidates = new CanvasGeometryController({ props, gesture: () => gesture }).snapCandidates(gesture.id)
-    .filter((candidate) => !candidate.id.startsWith('canvas-') && !candidate.id.startsWith('crop-'))
+    .filter((candidate) => candidate.id.endsWith('-center') ||
+      (!candidate.id.startsWith('canvas-') && !candidate.id.startsWith('crop-')))
   const fallback = snapPoint(point, candidates, zoom,
     enabled && !layers.some(isGradientLayer))
   const proposed = { x: result.state.x === undefined ? fallback.x - gesture.start.x : result.delta.x,
