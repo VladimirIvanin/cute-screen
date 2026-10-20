@@ -16,6 +16,22 @@ import {
   readSha256,
 } from './primitives'
 
+function parseSketch(
+  input: Record<string, unknown>,
+  field: string,
+): { sketchSeed?: number; sketchVersion?: 1 } {
+  if (input.sketchSeed === undefined && input.sketchVersion === undefined) return {}
+  const seed = readFiniteNumber(input.sketchSeed, `${field}.sketchSeed`)
+  if (
+    !Number.isInteger(seed) ||
+    seed < 1 ||
+    seed > 4294967295 ||
+    input.sketchVersion !== 1
+  )
+    throw new Error(`${field} sketch metadata is invalid`)
+  return { sketchSeed: seed, sketchVersion: 1 }
+}
+
 export function parseUnitInterval(
   value: unknown,
   field: string,
@@ -202,6 +218,25 @@ function parseFill(
   }
 }
 
+function parseArrowAppearance(
+  input: Record<string, unknown>,
+  field: string,
+): ArrowLayerPayload['appearance'] {
+  if (
+    input.appearance !== undefined &&
+    input.appearance !== 'clean' &&
+    input.appearance !== 'handDrawn'
+  )
+    throw new Error(`${field}.appearance is invalid`)
+  if (
+    input.appearance === 'handDrawn' &&
+    (input.annotationTool === 'line' ||
+      input.sketchSeed === undefined)
+  )
+    throw new Error(`${field} hand-drawn arrow requires sketch metadata`)
+  return input.appearance as ArrowLayerPayload['appearance']
+}
+
 export function parseArrowPayload(
   value: unknown,
   field: string,
@@ -217,6 +252,7 @@ export function parseArrowPayload(
     if (ARROW_CAPS.includes(value as (typeof ARROW_CAPS)[number])) return value as (typeof ARROW_CAPS)[number]
     throw new Error(`${field}.${cap} is invalid`)
   }
+  const appearance = parseArrowAppearance(input, field)
   const startCap = parseCap(input.startCap, 'startCap')
   const endCap = parseCap(input.endCap, 'endCap')
   if (
@@ -244,6 +280,8 @@ export function parseArrowPayload(
         })()
       : undefined
   return Object.freeze({
+    ...parseSketch(input, field),
+    ...(appearance === undefined ? {} : { appearance }),
     ...(input.annotationTool === 'line' ? { annotationTool: 'line' as const } : {}),
     path: input.path,
     start: parsePointPayload(input.start, `${field}.start`) as ArrowLayerPayload['start'],
@@ -268,6 +306,12 @@ export function parseShapePayload(
   if (!isShapeKind(input.shape))
     throw new Error(`${field}.shape is invalid`)
   const fill = parseFill(input.fill, `${field}.fill`)
+  if (
+    ['circling', 'rectangularCircling'].includes(String(input.shape)) &&
+    (fill.kind !== 'none' ||
+      input.sketchSeed === undefined)
+  )
+    throw new Error(`${field} circling requires sketch metadata and no fill`)
   const cornerRadius = readFiniteNumber(input.cornerRadius, `${field}.cornerRadius`)
   const starPoints = readFiniteNumber(input.starPoints, `${field}.starPoints`)
   const starInnerRatio = parseUnitInterval(input.starInnerRatio, `${field}.starInnerRatio`)
@@ -279,6 +323,7 @@ export function parseShapePayload(
   )
     throw new Error(`${field} geometry is invalid`)
   return Object.freeze({
+    ...parseSketch(input, field),
     shape: input.shape as ShapeLayerPayload['shape'],
     fill: fill as ShapeLayerPayload['fill'],
     stroke: parseStroke(input.stroke, `${field}.stroke`) as ShapeLayerPayload['stroke'],

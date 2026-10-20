@@ -37,8 +37,8 @@ function layer(shape: string): ShapeLayer {
 
 describe('shared shape catalogue', () => {
   it('covers the complete palette with one rounded rectangle preset', () => {
-    expect(SHAPE_CATALOG).toHaveLength(31)
-    expect(new Set(SHAPE_CATALOG.map((entry) => entry.id)).size).toBe(31)
+    expect(SHAPE_CATALOG).toHaveLength(33)
+    expect(new Set(SHAPE_CATALOG.map((entry) => entry.id)).size).toBe(33)
     expect(SHAPE_CATALOG.find((entry) => entry.id === 'roundedRectangle')).toMatchObject({ shape: 'rectangle', cornerRadius: 12 })
   })
   it.each(['triangle', 'roundedDiamond', 'parallelogram', 'trapezoid', 'pentagon', 'hexagon', 'octagon',

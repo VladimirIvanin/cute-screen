@@ -425,7 +425,7 @@ function commitCreation(
   if (gesture?.kind === 'draw') {
     const defaults = gesture.drawingDefaults ?? context.props.drawingDefaults
     const layer = createDrawingLayer({
-      id: crypto.randomUUID(),
+      id: gesture.layerId,
       tool: gesture.tool,
       start: gesture.start,
       end: gesture.current,

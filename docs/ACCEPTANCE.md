@@ -1,5 +1,19 @@
 # Сквозная приёмка
 
+## Обводка и рукописные стрелки (ADR-123)
+
+`REQ-TOL-001/002`, `REQ-EDT-002/005/006/015/016/017`: выбрать овальную и прямоугольную обводки из
+палитры до рисования, протянуть область и проверить отсутствие заливки,
+Shift/Alt, selection, resize/rotate и undo/redo. Создать два объекта и сравнить
+вариации. Для стрелки выбрать рукописное оформление в настройках обводки,
+проверить три траектории, наконечники, пунктир, mixed/locked/read-only,
+перенос стиля и defaults. Переключение clean/handDrawn сохраняет seed.
+Draft и commit совпадают. Проверить Quick → Editor и reopen, декодированные
+экспорты 1×/2× обоих renderers и неизменяемый original. Доказательства
+фиксируются в TESTING.md. Linux browser, decoded renderer exports 1×/2× и
+real-WebView Quick → Editor/reopen passed; Windows/macOS и system capture
+для этого среза pending. Наличие controls само по себе не является acceptance.
+
 ## GNOME 42 из коробки (2026-10-20, ADR-122)
 
 `REQ-CAP-001/002/006/009/016/017`: в GNOME 42 окружении без gnome-screenshot

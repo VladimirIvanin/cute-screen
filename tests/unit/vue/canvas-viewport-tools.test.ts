@@ -169,8 +169,8 @@ describe('M05 CanvasViewport transforms', () => {
     vi.unstubAllGlobals()
   })
 
-  it('does not commit a cancelled drawing draft', async () => {
-    const { scene, emitted } = mountViewport('marker')
+  it.each(['marker', 'arrow', 'shape'] as const)('does not commit a cancelled %s drawing draft', async (tool) => {
+    const { scene, emitted } = mountViewport(tool)
     await fireEvent.pointerDown(scene, { pointerId: 1, clientX: 5, clientY: 5 })
     await fireEvent.pointerMove(scene, {
       pointerId: 1,

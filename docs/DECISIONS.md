@@ -1,5 +1,32 @@
 # Журнал архитектурных решений
 
+## ADR-123 — Обводка и воспроизводимые рукописные стрелки
+
+**Статус:** accepted (2026-10-20); дополняет ADR-069/092/100 и каталог фигур.
+
+**Основание:** нужен быстрый редактируемый акцент вокруг содержимого и
+индивидуальные стрелки с общим характером росчерка. Первые core-тесты до
+реализации failed на отсутствии circling и appearance style channel.
+Проверяемый контракт: одинаковые geometry/seed/version дают одинаковые paths,
+разные новые IDs дают разные seeds; codec roundtrip сохраняет scene.
+
+**Решение:** собственный DOM-free генератор низкочастотных отклонений с
+кубическими кривыми и постоянной толщиной. Circling/rectangularCircling — открытая овальная/прямоугольная
+петля с полным обходом и коротким нахлёстом смещённых свободных концов,
+вписанная вместе с control points в intrinsic bounds,
+без fill. Arrow appearance clean/handDrawn независимо от route/caps/dashes.
+Payload хранит sketchSeed и sketchVersion=1; arrow дополнительно appearance.
+ID выделяется один раз при pointerdown и используется в preview и commit.
+Metadata остаётся при смене оформления и duplicate, не входит в style clipboard
+или defaults. Legacy arrow получает seed при первой явной стилизации.
+
+Геометрия общая для обоих renderers и hit testing. Controls используют
+существующие defaults/selection hosts; линия не получает appearance.
+Schema v7 расширяется по действующему контракту каталога: старые документы
+сохраняют вид, старые сборки не обязаны понимать новый shape kind/оформление.
+Дополнительные runtime dependencies не требуются. Проверки и ограничения
+платформ фиксируются в TESTING.md и PLATFORM_MATRIX.md.
+
 ## ADR-122 — Встроенный Screenshot client для старого GNOME
 
 **Статус:** accepted (2026-10-20); заменяет ADR-121 в части GNOME routing.

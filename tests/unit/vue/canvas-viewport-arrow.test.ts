@@ -43,6 +43,19 @@ beforeEach(() => {
 })
 
 describe('M05 CanvasViewport transforms', () => {
+  it('allocates one drawing identity on pointerdown and retains it on commit', async () => {
+    const identity = vi.spyOn(crypto, 'randomUUID').mockReturnValue('019c1f62-058e-7000-8000-000000000099')
+    const { scene, emitted } = mountViewport('arrow')
+    await fireEvent.pointerDown(scene, { pointerId: 1, clientX: 40, clientY: 40, buttons: 1 })
+    expect(identity).toHaveBeenCalledTimes(1)
+    await fireEvent.pointerMove(scene, { pointerId: 1, clientX: 80, clientY: 70, buttons: 1 })
+    await fireEvent.pointerUp(scene, { pointerId: 1, clientX: 80, clientY: 70 })
+    const layer = (emitted().addLayer as unknown[][])[0]![0] as ArrowLayer
+    expect(layer.id).toBe('019c1f62-058e-7000-8000-000000000099')
+    expect(identity).toHaveBeenCalledTimes(1)
+    identity.mockRestore()
+  })
+
   it('returns to Select on Escape after an already-cancelled drawing draft', async () => {
     const { emitted } = mountViewport('shape')
     await fireEvent.keyDown(window, { key: 'Escape' })

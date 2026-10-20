@@ -81,7 +81,7 @@ function choose(
   value: string,
 ): void {
   emit('change', id, value)
-  closePopover(id === 'width' || id === 'strokeStyle' ? 'stroke' : id)
+  closePopover(id === 'width' || id === 'strokeStyle' || id === 'arrowAppearance' ? 'stroke' : id)
 }
 
 function arrowStrokeStyles(
@@ -187,6 +187,33 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOnOutside
             :aria-label="control.label"
             @keydown="popoverKeydown($event, control.id)"
           >
+            <div
+              v-if="control.appearance !== undefined && control.appearanceSupported !== false"
+              class="cs-arrow-toolbar-options"
+              role="group"
+              :aria-label="pickerLocale === 'ru' ? 'Характер линии' : 'Line appearance'"
+            >
+              <button
+                v-for="appearance in (['clean', 'handDrawn'] as const)"
+                :key="appearance"
+                type="button"
+                :aria-pressed="!control.appearanceMixed && control.appearance === appearance"
+                :disabled="control.disabled ?? false"
+                @click="choose('arrowAppearance', appearance)"
+              >
+                <svg viewBox="0 0 42 16" aria-hidden="true">
+                  <path
+                    :d="appearance === 'clean' ? 'M3 8H39' : 'M3 8C13 4 24 12 39 8'"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="3"
+                    stroke-linecap="round"
+                  />
+                </svg>
+                <span v-if="appearance === 'clean'">{{ pickerLocale === 'ru' ? 'Ровная' : 'Clean' }}</span>
+                <span v-else>{{ pickerLocale === 'ru' ? 'Рукописная' : 'Hand-drawn' }}</span>
+              </button>
+            </div>
             <div
               class="cs-arrow-toolbar-options"
               role="group"

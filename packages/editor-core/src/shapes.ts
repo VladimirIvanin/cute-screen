@@ -1,15 +1,18 @@
-type Point = Readonly<{ x: number; y: number }>
+import {
+  circlingPath,
+  rectangularCirclingPath,
+} from './sketch-geometry'
 
-export type ShapePathCommand =
-  | readonly ['M' | 'L', number, number]
-  | readonly ['C', number, number, number, number, number, number]
-  | readonly ['Z']
+import type { ShapePathCommand } from './shape-path-types'
+export type { ShapePathCommand } from './shape-path-types'
+
+type Point = Readonly<{ x: number; y: number }>
 
 export const SHAPE_KINDS = [
   'rectangle', 'circle', 'oval', 'diamond', 'star', 'roundedDiamond', 'triangle', 'parallelogram',
   'trapezoid', 'pentagon', 'hexagon', 'octagon', 'cross', 'arrowLeft', 'arrowRight', 'arrowBoth',
   'chevron', 'pentagonRight', 'speechBubble', 'cloud', 'braceLeft', 'braceRight', 'cylinder', 'cube',
-  'foldedDocument', 'ticket', 'shield', 'predefinedProcess', 'internalStorage', 'stackedCards',
+  'foldedDocument', 'ticket', 'shield', 'predefinedProcess', 'internalStorage', 'stackedCards', 'circling', 'rectangularCircling',
 ] as const
 export type ShapeKind = typeof SHAPE_KINDS[number]
 
@@ -53,6 +56,8 @@ export const SHAPE_CATALOG: readonly ShapePreset[] = Object.freeze([
   { id: 'chevron', shape: 'chevron', en: 'Chevron', ru: 'Шеврон' },
   { id: 'stackedCards', shape: 'stackedCards', en: 'Stacked cards', ru: 'Стопка карточек' },
   { id: 'cube', shape: 'cube', en: 'Cube', ru: 'Куб' },
+  { id: 'circling', shape: 'circling', en: 'Hand-drawn circle', ru: 'Овальная обводка' },
+  { id: 'rectangularCircling', shape: 'rectangularCircling', en: 'Hand-drawn rectangle', ru: 'Прямоугольная обводка' },
 ].map((entry) => Object.freeze(entry)) as ShapePreset[])
 
 export function isShapeKind(value: unknown): value is ShapeKind {
@@ -65,6 +70,8 @@ export interface ShapeGeometry {
   readonly open: boolean
 }
 interface Parameters {
+  readonly sketchSeed?: number
+  readonly sketchVersion?: 1
   readonly cornerRadius?: number
   readonly starPoints?: number
   readonly starInnerRatio?: number
@@ -158,6 +165,22 @@ const SIMPLE_OUTLINES: Partial<Record<ShapeKind, readonly ShapePathCommand[]>> =
   shield: polygon([[0, 0], [1, 0], [1, 0.65], [0.5, 1], [0, 0.65]]),
 }
 
+const SKETCH_OUTLINES: Partial<Record<ShapeKind, typeof circlingPath>> = {
+  circling: circlingPath,
+  rectangularCircling: rectangularCirclingPath,
+}
+
+function sketchShapeGeometry(
+  kind: ShapeKind,
+  width: number,
+  height: number,
+  parameters: Parameters,
+): ShapeGeometry | undefined {
+  const generate = SKETCH_OUTLINES[kind]
+  if (!generate) return undefined
+  return { outline: generate(width, height, parameters.sketchSeed ?? 1), details: [], open: true }
+}
+
 /** Geometry is normalized, except that rectangle radius is supplied in document units. */
 export function shapeGeometry(
   kind: ShapeKind,
@@ -165,6 +188,8 @@ export function shapeGeometry(
   height = 1,
   parameters: Parameters = {},
 ): ShapeGeometry {
+  const sketch = sketchShapeGeometry(kind, width, height, parameters)
+  if (sketch) return sketch
   const base = parameterizedOutline(kind, width, height, parameters) ?? SIMPLE_OUTLINES[kind]
   if (base) return { outline: mapShapePath(base, width, height), details: [], open: false }
   let outline: readonly ShapePathCommand[]

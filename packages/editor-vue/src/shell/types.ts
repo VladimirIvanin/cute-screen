@@ -87,6 +87,9 @@ export type ContextControl = (
     }>[]
   }
   | {
+    readonly appearance?: 'clean' | 'handDrawn'
+    readonly appearanceMixed?: boolean
+    readonly appearanceSupported?: boolean
     readonly allStyles?: boolean
     readonly widthMixed?: boolean
     readonly styleMixed?: boolean

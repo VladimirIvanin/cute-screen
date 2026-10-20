@@ -90,7 +90,7 @@ export class DraftController {
     if (!gesture || gesture.kind !== 'draw') return undefined
     const defaults = gesture.drawingDefaults ?? props.drawingDefaults
     return createDrawingLayer({
-      id: '__drawing-draft__',
+      id: gesture.layerId,
       tool: gesture.tool,
       start: gesture.start,
       end: gesture.current,

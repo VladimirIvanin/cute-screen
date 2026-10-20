@@ -1,5 +1,20 @@
 # Архитектура Cute Screen
 
+## Рукописные акценты (ADR-123)
+
+`sketch-geometry` вычисляет воспроизводимые кубические пути: circling/rectangularCircling —
+открытый овал/прямоугольник с полным обходом и нахлёстом смещённых концов, стрелка — ограниченные низкочастотные отклонения.
+Seed выводится из creation ID один раз и сохраняется как sketchSeed вместе с
+sketchVersion=1. Creation gesture использует один ID для draft/commit;
+перемещение, resize, duplicate и смена paint не меняют seed. Style clipboard
+переносит appearance, сохраняя seed получателя. Defaults не хранят seed.
+
+Arrow body учитывает trim наконечников; ломаная сохраняет свои углы,
+конечные точки и касательные остаются точными. Hand-drawn scene компилируется
+в vector nodes, hit testing использует те же paths. Обычная линия и clean
+стрелки сохраняют прежнюю геометрию. Circling входит в общий каталог как
+stroke-only фигура; заливка отключена и не создаёт hit area внутри петли.
+
 ## Wayland single-shot routing (ADR-122)
 
 LinuxCaptureService выбирает отдельный Screenshot-запрос или внешний системный

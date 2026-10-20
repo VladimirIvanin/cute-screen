@@ -328,6 +328,7 @@ function beginDrawing(
   context.scene.value!.setPointerCapture(event.pointerId)
   context.setGesture({
     kind: 'draw',
+    layerId: crypto.randomUUID(),
     ...(tool === 'line' ? { startClient: { x: event.clientX, y: event.clientY } } : {}),
     highlighterEffect: context.props.highlighterEffect,
     drawingDefaults: tool === 'pencil' ? {

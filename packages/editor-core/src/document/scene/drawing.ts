@@ -70,6 +70,7 @@ export function shapeNodes(layer: ShapeLayer): readonly RenderNode[] {
   if (!['rectangle', 'circle', 'oval', 'diamond', 'star'].includes(shape)) {
     const path = shapeGeometry(shape, geometry.width, geometry.height, {
       cornerRadius: typeof payload.cornerRadius === 'number' ? payload.cornerRadius : 0,
+      ...(typeof payload.sketchSeed === 'number' ? { sketchSeed: payload.sketchSeed } : {}),
       starPoints: typeof payload.starPoints === 'number' ? payload.starPoints : 5,
       starInnerRatio: typeof payload.starInnerRatio === 'number' ? payload.starInnerRatio : 0.45,
     })

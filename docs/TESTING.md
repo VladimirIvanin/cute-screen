@@ -1,5 +1,79 @@
 # Стратегия тестирования
 
+## Две незамкнутые обводки и рукописные стрелки (2026-10-20, ADR-123)
+
+Исходный HEAD `65f77b2`, рабочая копия с изменениями. Frontend: Linux x86_64,
+Node 22.23.1 / pnpm 10.33.2; native/check: штатный Docker image
+`cute-screen-ubuntu22-build:local`, Ubuntu 22.04 x86_64 / Rust 1.97.0,
+WebKitGTK 2.50.4, Xvfb. Системный Node 22.21.1 не менялся.
+
+- До реализации два core assertions failed: отсутствовали circling и appearance
+  style channel. После референса владельца red-first проверки полного обхода
+  и нахлёста дали 2 failed / 9 passed; отдельная проверка расстояния концов
+  прямоугольника также сначала failed. Финальный core suite: 12 passed.
+- `pnpm test --maxWorkers=1 --testTimeout=15000`: 155 files / 1435 passed.
+  После финального выделения shared path types и style helpers отдельно выполнены
+  `pnpm test packages/editor-core/src/hand-drawn.test.ts packages/editor-core/src/styles.test.ts
+packages/editor-core/src/drawing.test.ts packages/editor-core/src/drawing-preferences.test.ts
+tests/unit/vue/arrow-context-toolbar.test.ts tests/unit/vue/shape-context-toolbar.test.ts
+tests/unit/vue/canvas-viewport-arrow.test.ts tests/unit/vue/canvas-viewport-tools.test.ts`:
+  8 files / 80 passed. Дополнительный core контракт проверяет 72 сочетания:
+  длины 8/1800, толщины 1/24, три траектории, все наконечники, поворот 37°,
+  конечность координат, bounds и hit testing. Seed/codec/duplicate/resize/history,
+  перенос стиля и независимая линия также проверены. Pointer cancellation
+  проверен для marker/arrow/shape; resize стрелки использует её endpoint handle.
+- `pnpm test:render --maxWorkers=1 --testTimeout=15000`: 19 files / 58 passed.
+  Четыре catalogue goldens обновлены для 32 kinds / 33 presets, четыре новых
+  hand-drawn goldens покрывают Canvas2D/CanvasKit и decoded PNG 1×/2×.
+  Визуально осмотрены оба backend: полный контур, смещённые свободные концы,
+  без заливки и вырезанного сектора; дуги и управляемые углы стрелок сохранены.
+- `pnpm check` в штатном Docker image: passed, включая lint (88 baseline
+  warnings), typecheck, format:check, docs, 112 boundary tests, IPC codegen
+  и четыре Clippy feature gates. Архитектурный gate обнаружил цикл типов и
+  превышение complexity; исправлены выделением path primitives и helpers,
+  ratchets не ослаблялись.
+- Browser gate: `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 pnpm test:e2e:browser
+--spec tests/e2e/specs/browser-hand-drawn.e2e.ts --spec tests/e2e/specs/browser-shape-toolbar.e2e.ts`.
+  Chrome 147, Linux x86_64: hand-drawn 1/1 passed; catalogue 4/4 passed отдельным
+  повтором после исправления старого Undo-ожидания cube → rectangularCircling.
+  Проверяются создание
+  через палитру, defaults/selection, переключение стрелки, seed, undo/redo,
+  весь каталог и RU/EN × light/dark при 1024/1280 px.
+- `CUTE_SCREEN_E2E_SCENARIOS=hand-drawn,hand-drawn-reopen pnpm test:e2e:tauri`:
+  два passed на свежем debug/no-bundle harness, external tauri-driver 2.1.0 /
+  WebKitWebDriver. Реальные WebView handlers создают обе фигуры и стрелку
+  в Quick, включая кнопку defaults при компактной рамке. Quick → Editor,
+  сохранение payload/seed/version и remembered appearance после relaunch passed.
+  Capture pixels — fake-platform 400×300; это WebView evidence, не system capture.
+  Embedded driver не доставлял pointer events; обход production handlers не применялся.
+- Драйвер собран командой `cargo install tauri-driver --version 2.1.0 --locked
+--debug --target-dir /source/target --root /source/artifacts/tauri-e2e/driver-cache`;
+  сохранён полезный cache. Native run использует этот bin в PATH, Xvfb/D-Bus,
+  bind mount passwd/group и временный HOME uid 1000. Других target не создавали.
+- Дополнительный manual render gate на настоящем скриншоте интерфейса Chrome
+  1280×761: `TSX_TSCONFIG_PATH=artifacts/hand-drawn/review-tsconfig.json node
+--import ./node_modules/.pnpm/tsx@4.23.9/node_modules/tsx/dist/loader.mjs
+artifacts/hand-drawn/review-export.mts`. Скрипт использует production renderer
+  export routines с raster resource и сохраняет четыре PNG. Полный повторный
+  decode: 1280×761 / 2560×1522; исходный SHA-256 не изменился, Canvas2D preview
+  совпадает с export 1×. Между backend при пороге 32 отличаются 0% / 0.2852%
+  каналов на 1×/2×. Экспорты обоих backend визуально осмотрены.
+
+Первый полный прогон имел два timeout 5 s и старое ожидание последнего элемента
+палитры (исправлено). Следующий поймал V8 SIGTRAP в app-arrow-actions: 1432 passed,
+три не выполнены; этот запуск не считался pass. Финальные успешные команды выше
+не меняют assertions; увеличены timeout и ограничены workers.
+
+Evidence: `artifacts/hand-drawn` — итоговые logs, annotations.png, screenshot source,
+четыре decoded exports, screenshot-exports.json и cleanup.json;
+`artifacts/browser-e2e/hand-drawn.png`, `artifacts/tauri-e2e/hand-drawn-editor.png`,
+`hand-drawn-reopened.png` и два JUnit. Дисковый аудит — disk-at-resume.log / disk-after.log. Изначально target
+34.699 GiB / artifacts 4.052 GiB; после задачи target 39.763 GiB / artifacts
+4.083 GiB. Удалены семь диагностированных task-owned profiles (371 442 140 bytes);
+общий Cargo cache и driver-cache сохранены.
+Windows WebView2, macOS WKWebView и физический Wayland capture для этой функции
+остаются pending.
+
 ## Версия 0.1.7 (2026-10-20)
 
 Исходный HEAD b9e1c54, рабочая копия с bump. Ubuntu 22.04.5 LTS x86_64,

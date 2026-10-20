@@ -25,6 +25,7 @@ export type DrawingControlId =
   | 'startCap'
   | 'endCap'
   | 'strokeStyle'
+  | 'arrowAppearance'
   | 'smoothing'
   | 'brush'
   | 'markerMode'
@@ -47,6 +48,7 @@ const DRAWING_CONTROL_IDS = new Set<DrawingControlId>([
   'startCap',
   'endCap',
   'strokeStyle',
+  'arrowAppearance',
   'smoothing',
   'brush',
   'markerMode',
@@ -85,7 +87,7 @@ function shapeKindPayload(
   if (tool !== 'shape') return undefined
   if (value === 'roundedRectangle') return { ...current, shape: 'rectangle', cornerRadius: 12 }
   if (!isShapeKind(value)) return undefined
-  return { ...current, shape: value, ...(value === 'rectangle' ? { cornerRadius: 0 } : {}) }
+  return { ...current, shape: value, ...(['circling', 'rectangularCircling'].includes(String(value)) ? { fill: { kind: 'none' } } : {}), ...(value === 'rectangle' ? { cornerRadius: 0 } : {}) }
 }
 
 function arrowPathPayload(
@@ -306,6 +308,24 @@ function fillGradientPayload(
   return fill ? { ...current, fill: { ...fill, start: { ...fill.start }, end: { ...fill.end } } } : undefined
 }
 
+function arrowAppearancePayload(
+  value: string,
+  tool: DrawingTool,
+  current: JsonObject,
+): JsonObject | undefined {
+  return tool === 'arrow' && (value === 'clean' || value === 'handDrawn')
+    ? { ...current, appearance: value } : undefined
+}
+
+function blockedCirclingFill(
+  id: DrawingControlId,
+  tool: DrawingTool,
+  current: JsonObject,
+): boolean {
+  return tool === 'shape' && ['circling', 'rectangularCircling'].includes(String(current.shape)) &&
+    ['fillKind', 'fillColor', 'fillOpacity', 'fillGradient'].includes(id)
+}
+
 export function resolveDrawingPayload(
   id: DrawingControlId,
   value: string,
@@ -319,6 +339,8 @@ export function resolveDrawingPayload(
   ) {
     return layerPayload(id, value, current)
   }
+  if (id === 'arrowAppearance') return arrowAppearancePayload(value, tool, current)
+  if (blockedCirclingFill(id, tool, current)) return undefined
   if (id === 'shapeKind') return shapeKindPayload(value, tool, current)
   if (id === 'arrowPath') return arrowPathPayload(value, tool, current)
   if (
@@ -339,12 +361,7 @@ export function resolveDrawingPayload(
   if (id === 'fillGradient') return fillGradientPayload(value, tool, current)
   if (id === 'fillColor') return fillColorPayload(value, tool, current)
   if (id === 'fillOpacity') return fillOpacityPayload(value, tool, current)
-  if (
-    id === 'width' ||
-    id === 'cornerRadius' ||
-    id === 'starPoints' ||
-    id === 'starInnerRatio'
-  ) {
+  if (['width', 'cornerRadius', 'starPoints', 'starInnerRatio'].includes(id)) {
     return dimensionPayload(id, value, tool, current)
   }
   return colorPayload(value, tool, current)

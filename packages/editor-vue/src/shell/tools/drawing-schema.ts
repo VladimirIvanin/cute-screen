@@ -74,8 +74,9 @@ function resolveValues(
 function arrowSchema(
   context: DrawingSchemaContext,
   state: DrawingValues,
-  defaultWidth = 8,
+  tool: 'arrow' | 'line' = 'arrow',
 ): ContextToolbarSchema {
+  const defaultWidth = tool === 'line' ? 4 : 8
   const { activeDocument, hexColor, translate } = context
   const { color, colorDisabled, stroke, values, width } = state
   const capOptions = [
@@ -113,6 +114,7 @@ function arrowSchema(
         solidLabel: translate('arrowSolid'),
         dashedLabel: translate('arrowDashed'),
         dottedLabel: translate('arrowDotted'),
+        ...(tool === 'arrow' ? { appearance: values.appearance === 'handDrawn' ? 'handDrawn' as const : 'clean' as const } : {}),
       },
       {
         kind: 'arrowCap',
@@ -340,7 +342,7 @@ function standardSchema(
     ...(tool === 'pencil' ? { toolSettings: { kind: 'pencil' as const } } : {}),
     ...(tool === 'shape' ? { shape: {
       fill: state.values.fill as ShapeFill,
-      fillSupported: !['braceLeft', 'braceRight'].includes(String(state.values.shape)),
+      fillSupported: !['braceLeft', 'braceRight', 'circling', 'rectangularCircling'].includes(String(state.values.shape)),
       fillColorEditable: ['none', 'solid'].includes((state.values.fill as ShapeFill).kind),
       fillOpacityEditable: (state.values.fill as ShapeFill).kind !== 'none',
     } } : {}),
@@ -371,7 +373,7 @@ function drawingControl(
       }
     : resolved
   if (tool === 'line') {
-    const arrow = arrowSchema(context, state, 4)
+    const arrow = arrowSchema(context, state, 'line')
     return { ...arrow, icon: 'line', title: context.translate('toolLine'), hint: context.translate('lineHint'),
       controls: arrow.controls.filter((control) => control.id === 'color' || control.id === 'stroke').map((control) => ({ ...control, ...(control.kind === 'arrowStroke' ? { allStyles: true } : {}) })),
       ...(defaultsOnly ? { lineAlignment: { enabled: values.autoAlignAxes !== false, label: context.translate('lineAlignment'), disabled: state.colorDisabled } } : {}),

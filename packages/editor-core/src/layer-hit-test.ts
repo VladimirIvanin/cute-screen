@@ -1,3 +1,4 @@
+import { arrowNodes } from './document/scene/arrow'
 import {
   numberedMarkerCaptionBounds,
 } from './numbered-marker'
@@ -143,6 +144,21 @@ export function drawingHitPart(
   const strokeWidth = payloadStrokeWidth(payload)
   if (layer.kind === 'arrow') {
     const arrow = payload as unknown as ArrowLayerPayload
+    if (arrow.appearance === 'handDrawn' && arrow.annotationTool !== 'line') {
+      const nodes = arrowNodes({
+        ...layer, transform: { ...layer.transform, translateX: 0, translateY: 0, rotation: 0 },
+      })
+      for (const node of nodes) {
+        if (node.kind !== 'vector') continue
+        const contours = flattenShapePath(node.outline, 0.05)
+        const filled = !node.open && 'alpha' in node.fill && node.fill.alpha > 0
+        if (filled && contours.some((contour) => pointInPolygon(point, contour))) return 'fill'
+        const onStroke = contours.some((contour) => contour.slice(1).some((end, i) =>
+          strokeHit(contour[i]!, end, node.strokeWidth / 2)))
+        if (onStroke) return 'stroke'
+      }
+      return undefined
+    }
     const samples = arrowPathPoints(arrow)
     const bodyHit = samples
       .slice(1)
@@ -191,6 +207,7 @@ export function drawingHitPart(
     return Math.abs(distance - 1) <= (strokeWidth / 2 + padding) / Math.min(radiusX, radiusY) ? 'stroke' : undefined
   }
   const path = shapeGeometry(shape, geometry.width, geometry.height, {
+    ...(typeof payload.sketchSeed === 'number' ? { sketchSeed: payload.sketchSeed } : {}),
     cornerRadius: typeof payload.cornerRadius === 'number' ? payload.cornerRadius : 0,
     starPoints: typeof payload.starPoints === 'number' ? payload.starPoints : 5,
     starInnerRatio: typeof payload.starInnerRatio === 'number' ? payload.starInnerRatio : 0.45,

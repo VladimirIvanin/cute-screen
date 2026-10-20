@@ -1,3 +1,4 @@
+export { sketchSeed } from '@cute-screen/editor-core'
 export { measureRichTextContent } from './rich-text/measure-content'
 export {
   createPlacedEmoji,

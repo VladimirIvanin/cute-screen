@@ -1,5 +1,16 @@
 # Платформенная матрица
 
+## Рукописные акценты (ADR-123)
+
+Circling/rectangularCircling и hand-drawn arrow используют общий TypeScript core и vector paths
+Canvas2D/CanvasKit. Системных API и новых разрешений не добавлено. Общий codec
+v7 расширен двумя shape kinds и optional sketch metadata. Linux x86_64 /
+Chrome 147: browser controls; Ubuntu 22.04 / WebKitGTK 2.50.4, Xvfb / external
+tauri-driver 2.1.0: Quick → Editor и relaunch с сохранением seed/defaults passed.
+Capture pixels этого gate — fake-platform; 1×/2× export дополнительно проверен
+на настоящем скриншоте интерфейса. Подробности — TESTING.md. Windows, macOS
+и физический Wayland capture остаются pending.
+
 ## GNOME 42 без обязательного helper (2026-10-20, ADR-122)
 
 GNOME Shell ≤42: Auto выбирает встроенный Screenshot client, без внешней

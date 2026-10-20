@@ -41,7 +41,8 @@ function drawingStyle(
     payload,
     pick(
       style,
-      ['fill', 'cornerRadius', 'startCap', 'endCap'].filter((key) => key in payload),
+      [...['fill', 'cornerRadius', 'startCap', 'endCap'].filter((key) => key in payload),
+        ...(id === 'arrow' ? ['appearance'] : [])],
     ),
   )
   if ('opacity' in style) payload.layerOpacity = style.opacity!

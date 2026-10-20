@@ -168,4 +168,17 @@ describe('arrow contextual toolbar', () => {
     })
     for (const button of container.querySelectorAll('.cs-arrow-toolbar-trigger')) expect(button).toBeDisabled()
   })
+  it('chooses independent hand-drawn appearance, handles mixed values and restores focus', async () => {
+    const controls = arrowControls.map((control) => control.kind === 'arrowStroke'
+      ? { ...control, appearance: 'clean' as const, appearanceMixed: true } : control)
+    const view = render(ArrowFormattingToolbar, { props: { controls, pickerLocale: 'en' } })
+    const trigger = screen.getByRole('button', { name: /Stroke: 3 px/ })
+    await fireEvent.click(trigger)
+    const group = screen.getByRole('group', { name: 'Line appearance' })
+    expect(within(group).getByRole('button', { name: 'Clean' })).toHaveAttribute('aria-pressed', 'false')
+    await fireEvent.click(within(group).getByRole('button', { name: 'Hand-drawn' }))
+    expect(view.emitted('change').at(-1)).toEqual(['arrowAppearance', 'handDrawn'])
+    expect(trigger).toHaveFocus()
+  })
+
 })

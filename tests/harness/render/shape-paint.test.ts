@@ -30,7 +30,7 @@ beforeAll(prepareGoldenRuntime)
 describe('shape paint exported appearance', () => {
   it('round-trips and decodes the complete catalogue with three stroke styles and multi-stop gradients', async () => {
     const layers = ['solid', 'dashed', 'dotted'].flatMap((style, row) => SHAPE_CATALOG.map((entry, i) => createDrawingLayer({
-      id: `019c1f62-058e-7000-8000-${String(row * 31 + i + 1).padStart(12, '0')}`, tool: 'shape',
+      id: `019c1f62-058e-7000-8000-${String(row * SHAPE_CATALOG.length + i + 1).padStart(12, '0')}`, tool: 'shape',
       start: { x: i % 7 * 144 + 18, y: (Math.floor(i / 7) + row * 5) * 128 + 18 },
       end: { x: i % 7 * 144 + 124, y: (Math.floor(i / 7) + row * 5) * 128 + 104 },
       defaults: { ...DEFAULT_DRAWING_DEFAULTS, shape: {

@@ -283,6 +283,14 @@ function selectionSchemaFor(context: ContextSchemaContext): ContextToolbarSchema
         disabled: disabled || Boolean(control.disabled),
         mixed,
         ...(control.kind === 'arrowStroke' ? {
+          appearanceSupported: schemas.every((schema) => {
+            const other = schema?.controls.find((candidate) => candidate.id === control.id)
+            return other?.kind === 'arrowStroke' && other.appearance !== undefined
+          }),
+          appearanceMixed: schemas.some((schema) => {
+            const other = schema?.controls.find((candidate) => candidate.id === control.id)
+            return other?.kind === 'arrowStroke' && other.appearance !== control.appearance
+          }),
           widthMixed: schemas.some((schema) => {
             const other = schema?.controls.find((candidate) => candidate.id === control.id)
             return other?.kind === 'arrowStroke' && other.width !== control.width

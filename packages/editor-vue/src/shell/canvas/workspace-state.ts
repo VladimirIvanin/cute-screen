@@ -121,6 +121,7 @@ export type CanvasGesture =
     readonly rawCurrent?: CanvasPoint | undefined
     readonly startClient?: CanvasPoint | undefined
     readonly kind: 'draw'
+    readonly layerId: string
     readonly highlighterEffect?: import('@cute-screen/editor-renderer').HighlighterEffect | undefined
     readonly drawingDefaults?: import('@cute-screen/editor-renderer').DrawingDefaults | undefined
     readonly tool: DrawingTool

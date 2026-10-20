@@ -45,6 +45,8 @@ const scenarios = [
     interactiveWindows: true,
     driverProvider: 'external',
   },
+  { id: 'hand-drawn', persistenceGroup: 'hand-drawn', spec: 'tests/e2e/specs/tauri-hand-drawn.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },
+  { id: 'hand-drawn-reopen', persistenceGroup: 'hand-drawn', spec: 'tests/e2e/specs/tauri-hand-drawn-reopen.e2e.ts', harnessQuery: '?m04=1&m08=1', driverProvider: 'external' },
   { id: 'shape-paint', persistenceGroup: 'shape-paint', spec: 'tests/e2e/specs/tauri-shape-paint.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },
   { id: 'shape-paint-reopen', persistenceGroup: 'shape-paint', spec: 'tests/e2e/specs/tauri-shape-paint-reopen.e2e.ts', harnessQuery: '?m04=1&m08=1', driverProvider: 'external' },
   {

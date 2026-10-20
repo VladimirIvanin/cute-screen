@@ -4,6 +4,7 @@ import type {
   ShallowRef,
 } from 'vue'
 import {
+  sketchSeed,
   rebaseArrowLayer,
   rebaseFreehandLayer,
   rememberDrawingColor,
@@ -89,8 +90,11 @@ function selectedAfter(
   payload: JsonObject,
   automatic: import('@cute-screen/editor-renderer').HighlighterEffect = 'highlight',
 ): LayerNode {
-  const { brushSmoothing: _memories, ...documentPayload } = payload
+  const { brushSmoothing: _memories, ...unseededPayload } = payload
   void _memories
+  const documentPayload = (['circling', 'rectangularCircling'].includes(String(unseededPayload.shape)) || unseededPayload.appearance === 'handDrawn') && unseededPayload.sketchSeed === undefined
+    ? { ...unseededPayload, sketchSeed: sketchSeed(selected.id), sketchVersion: 1 }
+    : unseededPayload
   let after = {
     ...selected,
     ...(id === 'layerOpacity' ? { opacity: payload.layerOpacity as number } : {}),
@@ -107,7 +111,7 @@ function selectedAfter(
     id !== 'layerOpacity' &&
     id !== 'blendMode'
   ) {
-    after = rebaseArrowLayer(selected, payload as typeof selected.payload)
+    after = rebaseArrowLayer(selected, documentPayload as typeof selected.payload)
   }
   if (after.kind === 'pencil' || after.kind === 'marker') after = rebaseFreehandLayer(after)
   return after

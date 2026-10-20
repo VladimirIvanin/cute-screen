@@ -1,3 +1,4 @@
+export { sketchSeed } from './sketch-geometry'
 export * from './emoji'
 export * from './emoji-catalog'
 export {

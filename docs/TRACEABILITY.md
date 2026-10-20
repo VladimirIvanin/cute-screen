@@ -1,5 +1,17 @@
 # Трассируемость требований
 
+## Обводка и рукописные стрелки (2026-10-20)
+
+`REQ-TOL-001/002`, `REQ-EDT-002/005/006/015/016/017`: добавить открытые
+фигуры circling/rectangularCircling без заливки и независимое оформление clean/handDrawn стрелок.
+Seed и версия генератора сохраняются в документе; геометрия одинакова для
+preview, hit testing и export. Копирование стиля не переносит seed, duplicate
+сохраняет рисунок. Старые документы и отдельная линия сохраняют прежний вид.
+До реализации: red-first core contracts; далее codec/history/preferences,
+Canvas2D/CanvasKit decoded goldens 1×/2×, browser и real-WebView production
+creation/reopen. Статус: implemented; core/Vue, оба renderers, browser и Linux
+WebView Quick → Editor/reopen проверены; платформенные пределы — TESTING.md.
+
 ## Версия 0.1.7 (2026-10-20)
 
 `REQ-REL-001/002/003/005`: по запросу владельца выполнен patch bump штатной

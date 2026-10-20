@@ -1,4 +1,5 @@
 import { rebaseFreehandLayer } from './tools/freehand'
+import { sketchSeed } from './sketch-geometry'
 import { isShapeKind } from './shapes'
 import type {
   ArrowCap,
@@ -51,6 +52,7 @@ export const DEFAULT_DRAWING_DEFAULTS: DrawingDefaults = Object.freeze({
     }),
   }),
   arrow: Object.freeze({
+    appearance: 'clean',
     path: 'straight',
     stroke: Object.freeze({
       color: Object.freeze({ red: 0.898, green: 0.282, blue: 0.302, alpha: 1 }),
@@ -290,6 +292,11 @@ function createArrowDrawing(
   delete arrowStyle.start
   const payload: ArrowLayerPayload = {
     ...arrowStyle,
+    ...(input.tool === 'arrow' ? {
+      appearance: defaults.arrow.appearance === 'handDrawn' ? 'handDrawn' as const : 'clean' as const,
+      sketchSeed: sketchSeed(input.id),
+      sketchVersion: 1 as const,
+    } : {}),
     path,
     start: { x: input.start.x, y: input.start.y },
     end: { x: end.x, y: end.y },
@@ -393,7 +400,9 @@ export function createDrawingLayer(input: DrawingLayerInput): LayerNode | undefi
       ...common,
       localBounds: square ? { x: 0, y: 0, width: side, height: side } : common.localBounds,
       kind: 'shape' as const,
-      payload: { ...defaults.shape, shape },
+      payload: { ...defaults.shape, shape,
+        ...(['circling', 'rectangularCircling'].includes(String(shape)) ? { fill: { kind: 'none' }, sketchSeed: sketchSeed(input.id), sketchVersion: 1 } : {}),
+      },
     })
   }
   return createFreehandDrawing(input, defaults, samples, geometry, common)

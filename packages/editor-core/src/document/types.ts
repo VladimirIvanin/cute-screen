@@ -334,6 +334,9 @@ export interface EmojiPayload extends JsonObject {
 }
 
 export interface ArrowLayerPayload extends JsonObject {
+  readonly appearance?: 'clean' | 'handDrawn'
+  readonly sketchSeed?: number
+  readonly sketchVersion?: 1
   readonly annotationTool?: 'line'
 
   readonly path: 'straight' | 'quadratic' | 'elbow'
@@ -356,6 +359,8 @@ export const ARROW_CAPS = ['none', 'lineArrow', 'solidArrow', 'triangle', 'circl
 export type ArrowCap = (typeof ARROW_CAPS)[number]
 
 export interface ShapeLayerPayload extends JsonObject {
+  readonly sketchSeed?: number
+  readonly sketchVersion?: 1
   readonly shape: ShapeKind
   readonly fill: FillPaint & JsonObject
   readonly stroke: StrokeStyle

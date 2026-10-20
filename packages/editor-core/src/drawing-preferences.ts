@@ -126,8 +126,11 @@ function normalizedArrow(
   delete style.label
   delete style.start
   delete style.text
+  delete style.sketchSeed
+  delete style.sketchVersion
   return {
     ...style,
+    appearance: value.appearance === 'handDrawn' ? 'handDrawn' : 'clean',
     path,
     stroke,
     startCap: String(startCap),

@@ -1,3 +1,4 @@
+import { sketchSeed } from './sketch-geometry'
 import { annotationTool } from './line'
 import {
   rebaseFreehandLayer,
@@ -25,6 +26,7 @@ type MutableObject = Record<string, JsonValue>
 export type LayerStyle = Readonly<Record<string, JsonValue>>
 const channels: Partial<Record<LayerNode['kind'], Readonly<Record<string, string>>>> = {
   arrow: {
+    appearance: 'appearance',
     color: 'stroke.color',
     width: 'stroke.width',
     strokeStyle: 'stroke.style',
@@ -97,8 +99,20 @@ function writePath(
 export function creationPolicy(tool: string): 'repeat' | 'select' {
   return ['line', 'numberedMarker', 'pencil', 'marker'].includes(tool) ? 'repeat' : 'select'
 }
+function arrowAppearanceStyle(layer: LayerNode): LayerStyle {
+  return layer.kind === 'arrow' && annotationTool(layer) === 'arrow'
+    ? { appearance: layer.payload.appearance ?? 'clean' } : {}
+}
+
+function lineOnlyChannel(
+  layer: LayerNode,
+  key: string,
+): boolean {
+  return annotationTool(layer) === 'line' && ['startCap', 'endCap', 'appearance'].includes(key)
+}
+
 export function extractLayerStyle(layer: LayerNode): LayerStyle {
-  const result: Record<string, JsonValue> = {}
+  const result: Record<string, JsonValue> = { ...arrowAppearanceStyle(layer) }
   if (layer.kind === 'callout') {
     result.calloutRoute = calloutRoutePreset(layer.payload.route)
     result.calloutFrame = clone(layer.payload.frame ?? {
@@ -111,11 +125,7 @@ export function extractLayerStyle(layer: LayerNode): LayerStyle {
   }
   for (const [key, path] of Object.entries(channels[layer.kind] ?? {})) {
     const value = readPath(layer.payload, path)
-    if (
-      annotationTool(layer) === 'line' &&
-      (key === 'startCap' ||
-        key === 'endCap')
-    ) continue
+    if (lineOnlyChannel(layer, key)) continue
     if (value !== undefined) result[key] = clone(value)
   }
   if ('opacity' in layer) {
@@ -257,6 +267,21 @@ function applyCalloutStyle(
     payload.attachment = layer.payload.label.x < layer.payload.target.x ? 'right' : 'left'
 }
 
+function applySketchStyle(
+  layer: LayerNode,
+  payload: MutableObject,
+): void {
+  if (
+    annotationTool(layer) === 'arrow' &&
+    payload.appearance === 'handDrawn' &&
+    payload.sketchSeed === undefined
+  ) {
+    payload.sketchSeed = sketchSeed(layer.id)
+    payload.sketchVersion = 1
+  }
+  if (layer.kind === 'shape' && ['circling', 'rectangularCircling'].includes(String(payload.shape))) payload.fill = { kind: 'none' }
+}
+
 export function applyLayerStyle<T extends LayerNode>(
   layer: T,
   style: LayerStyle,
@@ -269,13 +294,15 @@ export function applyLayerStyle<T extends LayerNode>(
   applyCalloutStyle(layer, style, payload)
   delete payload.brushSmoothing
   for (const [key, path] of Object.entries(channels[layer.kind] ?? {})) {
+    if (lineOnlyChannel(layer, key)) continue
     if (
-      annotationTool(layer) === 'line' &&
-      (key === 'startCap' ||
-        key === 'endCap')
+      key === 'appearance' &&
+      style[key] === 'clean' &&
+      payload.appearance === undefined
     ) continue
     if (key in style) writePath(payload, path, key === 'brush' && style[key] === 'pencil' ? 'pen' : style[key]!)
   }
+  applySketchStyle(layer, payload)
   const content = contentFor(layer)
   if (content) payload[layer.kind === 'numberedMarker' ? 'label' : 'content'] = styledContent(content, style)
   let next = { ...layer, payload } as LayerNode

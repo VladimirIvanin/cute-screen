@@ -1,5 +1,16 @@
 # CI-сборки и проверка версии через GitHub
 
+## Рукописные акценты (ADR-123)
+
+Овальная и прямоугольная обводки и оформление стрелок входят в общий frontend;
+новых runtime/system dependencies нет. Schema v7 расширена каталогом фигур
+и optional sketch metadata. Старые документы сохраняют вид; документы с
+новыми фигурами или рукописными стрелками требуют актуальной сборки.
+Нативный persistence gate: `CUTE_SCREEN_E2E_SCENARIOS=hand-drawn,hand-drawn-reopen pnpm test:e2e:tauri`.
+Он собирает свежий debug/no-bundle harness, создаёт аннотации в Quick,
+передаёт их в Editor и проверяет payload/defaults после повторного запуска.
+Платформы и фактические результаты — TESTING.md и PLATFORM_MATRIX.md.
+
 ## Linux CI: GStreamer и libunwind в Ubuntu 22.04
 
 Оба Linux workflow используют `scripts/ci-install-linux-tauri-deps.sh`.

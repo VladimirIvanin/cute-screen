@@ -1,3 +1,8 @@
+import { sketchPath } from './sketch-geometry'
+import {
+  flattenShapePath,
+  type ShapePathCommand,
+} from './shapes'
 import type {
   ArrowCap,
   ArrowLayer,
@@ -81,18 +86,23 @@ export function arrowCapSize(
 }
 
 function arrowGeometryBounds(payload: ArrowLayerPayload): Rect {
-  const points = arrowPathPoints(payload)
+  const points = payload.appearance === 'handDrawn'
+    ? [...arrowPathPoints(payload), ...arrowBodyGeometry(payload).points]
+    : arrowPathPoints(payload)
   const inset = Math.max(
     payload.stroke.width / 2,
     arrowCapSize(payload.startCap, payload.stroke.width),
     arrowCapSize(payload.endCap, payload.stroke.width),
   )
+  // Hand-drawn caps include curved control points; retain their entire ink
+  // envelope at every orientation, including thin arrows without caps.
+  const padding = payload.appearance === 'handDrawn' ? inset * 1.5 + payload.stroke.width / 2 + 6 : inset
   const xs = points.map((entry) => entry.x)
   const ys = points.map((entry) => entry.y)
-  const minimumX = Math.min(...xs) - inset
-  const minimumY = Math.min(...ys) - inset
-  const maximumX = Math.max(...xs) + inset
-  const maximumY = Math.max(...ys) + inset
+  const minimumX = Math.min(...xs) - padding
+  const minimumY = Math.min(...ys) - padding
+  const maximumX = Math.max(...xs) + padding
+  const maximumY = Math.max(...ys) + padding
   return Object.freeze({
     x: minimumX,
     y: minimumY,
@@ -282,4 +292,17 @@ export function trimArrowBodyPoints(
   }
   body.push(at(bodyEnd))
   return Object.freeze(body)
+}
+
+/** Shared visible body, including cap trimming and hand-drawn curvature. */
+export function arrowBodyGeometry(payload: ArrowLayerPayload): Readonly<{
+  path: readonly ShapePathCommand[]
+  points: readonly Point[]
+}> {
+  const base = trimArrowBodyPoints(arrowPathPoints(payload), payload.startCap, payload.endCap, payload.stroke.width)
+  if (payload.annotationTool === 'line' || payload.appearance !== 'handDrawn') {
+    return { points: base, path: base.map((p, i): ShapePathCommand => [i ? 'L' : 'M', p.x, p.y]) }
+  }
+  const path = sketchPath(base, payload.sketchSeed ?? 1, payload.stroke.width, payload.path === 'elbow')
+  return { path, points: flattenShapePath(path, 0.05)[0] ?? [] }
 }

@@ -45,10 +45,12 @@ export async function drawShape(): Promise<void> {
 }
 
 export async function shapeDocument(): Promise<{
-  layers: { kind: string; payload: Record<string, unknown>; opacity: number; blendMode: string }[]
+  layers: { id: string; kind: string; payload: Record<string, unknown>; opacity: number; blendMode: string }[]
 }> {
   return browser.execute(() => {
-    type Document = { layers: { kind: string; payload: Record<string, unknown>; opacity: number; blendMode: string }[] }
+    type Document = {
+      layers: { id: string; kind: string; payload: Record<string, unknown>; opacity: number; blendMode: string }[]
+    }
     const state = window as typeof window & {
       __cuteScreenE2eM05?: { snapshot(): Document }
       __cuteScreenE2eQuick?: { snapshot(): Document }
@@ -78,7 +80,7 @@ export async function verifyShapeToolbar(
   expect(await toolbar.$('[data-shape-control="stroke"]').getAttribute('aria-label')).toMatch(/Stroke: .* · 8 px/u)
   await expect(toolbar.$('[data-shape-control="stroke"]')).toBeFocused()
   await toolbar.$('[data-shape-control="geometry"]').click()
-  expect(await $$('.cs-shape-grid button').length).toBe(31)
+  expect(await $$('.cs-shape-grid button').length).toBe(33)
   await expect($('.cs-shape-popover input[aria-label="Star points"]')).not.toExist()
   const radius = $('.cs-shape-popover input[aria-label="Corner radius"]')
   await setNumericInput(radius, '12')
@@ -180,7 +182,7 @@ export async function verifyShapeCatalogue(
   await waitForShapeAnimation()
   const entries = await browser.execute(() => [...document.querySelectorAll<HTMLElement>('[data-shape-id]')]
     .map((element) => element.dataset.shapeId!))
-  expect(entries.length).toBe(31)
+  expect(entries.length).toBe(33)
   for (const id of entries) {
     if (await geometry.getAttribute('aria-expanded') !== 'true') await geometry.click()
     await expect($('.cs-shape-grid')).toBeDisplayed()
@@ -224,7 +226,7 @@ export async function verifyShapeCatalogue(
   await browser.saveScreenshot(path.resolve(artifactDirectory, `${prefix}-catalogue.png`))
   await browser.keys('Escape')
   await $('button[aria-label="Undo"]').click()
-  expect((await shapeDocument()).layers.at(-1)!.payload.shape).toBe('cube')
+  expect((await shapeDocument()).layers.at(-1)!.payload.shape).toBe('rectangularCircling')
   await $('button[aria-label="Redo"]').click()
   expect((await shapeDocument()).layers.at(-1)!.payload.shape).toBe('star')
 }
