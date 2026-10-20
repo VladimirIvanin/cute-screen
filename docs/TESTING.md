@@ -1,5 +1,20 @@
 # Стратегия тестирования
 
+## Версия 0.1.7 (2026-10-20)
+
+Исходный HEAD b9e1c54, рабочая копия с bump. Ubuntu 22.04.5 LTS x86_64,
+штатный Docker image `cute-screen-ubuntu22-build:local`, Node 22.23.1,
+pnpm 10.33.2, Rust 1.97.0. Host Node 22.21.1 отклонён engine guard до
+изменения метаданных; команды ниже выполнены в контейнере с bind mount репозитория.
+
+- `pnpm version:bump 0.1.7` синхронизировал пять файлов метаданных.
+- `node scripts/release-assets.mjs version . v0.1.7` и
+  `cargo metadata --locked --offline --no-deps --format-version 1` — passed.
+- `pnpm test:boundaries --maxWorkers=1` — 16 files / 112 tests passed.
+- `pnpm format`, `pnpm format:check`, `pnpm docs:check` и `git diff --check` — passed.
+
+Изменены версия и документация; runtime/build suites не запускались.
+
 ## Встроенный GNOME Screenshot и исчезновение окна (2026-10-20, ADR-122)
 
 Исходный HEAD 2136b7b, рабочая копия с изменениями. Ubuntu 22.04.5 x86_64,

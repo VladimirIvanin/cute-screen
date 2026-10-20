@@ -1,5 +1,13 @@
 # Трассируемость требований
 
+## Версия 0.1.7 (2026-10-20)
+
+`REQ-REL-001/002/003/005`: по запросу владельца выполнен patch bump штатной
+командой `pnpm version:bump 0.1.7`: синхронизировать package.json, Tauri config,
+Cargo workspace, точную storage dependency и оба package entries Cargo.lock.
+Release version guard для `v0.1.7`, Cargo metadata с `--locked --offline`
+и boundary tests (112/112) passed. Фактические команды и результаты — TESTING.md.
+
 ## GNOME 42 без установленного helper (2026-10-20, до реализации)
 
 `REQ-CAP-001/002/006/009/016/017`: основной захват должен работать из коробки
