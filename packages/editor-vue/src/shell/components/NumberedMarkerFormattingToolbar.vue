@@ -4,7 +4,6 @@ import {
   inject,
   nextTick,
   ref,
-  watch,
 } from 'vue'
 import { NPopover } from 'naive-ui'
 import type { ContextToolbarSchema } from '../types'
@@ -13,6 +12,7 @@ import SimpleColorPicker from '../ui/SimpleColorPicker.vue'
 import TextFontPicker from '../ui/TextFontPicker.vue'
 import NumericControl from '../ui/NumericControl.vue'
 import { numericPreviewKey } from '../ui/numeric-preview'
+import { useNumericDraft } from '../ui/use-numeric-draft'
 import { usePreviewPopover } from '../ui/use-preview-popover'
 
 const props = withDefaults(defineProps<{
@@ -32,11 +32,31 @@ const sizeTrigger = ref<HTMLButtonElement>()
 const moreTrigger = ref<HTMLButtonElement>()
 const badgePicker = ref<InstanceType<typeof SimpleColorPicker>>()
 const labelPicker = ref<InstanceType<typeof SimpleColorPicker>>()
-const numberDraft = ref('')
-const numberInvalid = computed(() => !/^[0-9]+$/u.test(numberDraft.value) || !Number.isSafeInteger(Number(numberDraft.value)) || Number(numberDraft.value) < 1)
-watch(() => marker.value?.sequence, (value) => {
-  numberDraft.value = value === null || value === undefined ? '' : String(value)
-}, { immediate: true })
+const numberHost = ref<HTMLElement>()
+const numberOptions = {
+  get value() {
+    return marker.value?.sequence ?? 1
+  },
+  min: 1,
+  max: Number.MAX_SAFE_INTEGER,
+  step: 1,
+  get disabled() {
+    return blocked.value
+  },
+  get commitUnchanged() {
+    return marker.value?.mode === 'defaults' && !marker.value.manual
+  },
+  get controlId() {
+    return marker.value?.mode === 'defaults' ? 'markerNext' : 'markerSequence'
+  },
+}
+const { draft: numberDraft, invalid: numberInvalid, ariaValue: numberAriaValue, errorId: numberErrorId,
+  preview: previewNumber, keydown: numberKeydown, blur: numberBlur,
+  compositionstart, compositionend } = useNumericDraft(numberOptions, numberHost, {
+  preview: () => undefined,
+  cancel: () => undefined,
+  commit: (value) => change(numberOptions.controlId, String(value)),
+})
 const position = usePreviewPopover(() => open.value === 'size' ? sizeTrigger.value : open.value === 'more' ? moreTrigger.value : undefined, () => panel.value)
 const shapes = computed(() => [
   { id: 'circle', name: text('Circle', 'Круг') },
@@ -60,29 +80,9 @@ function change(
 ): void {
   if (!blocked.value) emit('change', id, value)
 }
-function commitNumber(): void {
-  if (numberInvalid.value) return
-  const id = marker.value?.mode === 'defaults' ? 'markerNext' : 'markerSequence'
-  if (
-    Number(numberDraft.value) !== marker.value?.sequence ||
-    id === 'markerNext' &&
-    !marker.value?.manual
-  ) change(id, numberDraft.value)
-}
 function outside(event: MouseEvent): void {
   if (event.target instanceof Element && event.target.closest('.cs-text-font-popover, .cs-color-picker-popover')) return
   close(false)
-}
-function stepNumber(event: KeyboardEvent): void {
-  if (!['ArrowUp', 'ArrowDown'].includes(event.key)) return
-  event.preventDefault()
-  event.stopPropagation()
-  const value = Number(numberDraft.value)
-  const next = value + (event.key === 'ArrowUp' ? 1 : -1)
-  if (Number.isSafeInteger(next) && next > 0) {
-    numberDraft.value = String(next)
-    commitNumber()
-  }
 }
 function close(restoreFocus = true): void {
   const previous = open.value
@@ -114,23 +114,25 @@ function show(menu: 'size' | 'more'): void {
       class="cs-marker-control-group cs-marker-number-group"
       data-marker-control="number"
     >
-      <label class="cs-marker-number-label">
+      <label ref="numberHost" class="cs-marker-number-label">
         <span>{{ marker?.mode === 'defaults' ? text('Next number', 'Следующий номер') : text('Number', 'Номер') }}</span>
         <input
-          v-model="numberDraft"
+          :value="numberDraft"
           type="text"
           inputmode="numeric"
           role="spinbutton"
           :aria-valuemin="1"
           :aria-valuemax="Number.MAX_SAFE_INTEGER"
-          :aria-valuenow="numberInvalid ? undefined : Number(numberDraft)"
+          :aria-valuenow="numberAriaValue"
+          :aria-describedby="numberInvalid ? numberErrorId : undefined"
           :aria-invalid="numberInvalid"
           :aria-label="marker?.mode === 'defaults' ? text('Next number', 'Следующий номер') : text('Number', 'Номер')"
           :disabled="blocked"
-          @change="commitNumber"
-          @keydown="stepNumber"
-          @keydown.enter.prevent.stop="commitNumber"
-          @keydown.escape.prevent.stop="numberDraft = String(marker?.sequence ?? 1)"
+          @input="previewNumber(($event.target as HTMLInputElement).value)"
+          @keydown="numberKeydown"
+          @blur="numberBlur"
+          @compositionstart="compositionstart"
+          @compositionend="compositionend"
         />
       </label>
       <button
@@ -150,7 +152,11 @@ function show(menu: 'size' | 'more'): void {
       >
         {{ text('Remove label', 'Убрать подпись') }}
       </button>
-      <small v-if="numberInvalid" role="alert">{{ text('Enter a positive whole number', 'Введите положительное целое число') }}</small>
+      <small
+        v-if="numberInvalid"
+        :id="numberErrorId"
+        role="alert"
+      >{{ text('Enter a positive whole number', 'Введите положительное целое число') }}</small>
       <small v-else-if="marker?.duplicate" role="status">{{ text('This number is already used', 'Этот номер уже используется') }}</small>
     </div>
     <div

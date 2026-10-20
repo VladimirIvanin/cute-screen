@@ -82,6 +82,8 @@ describe('M05 icon-system boundary', () => {
       // Censor SVGs illustrate effect results and region geometry, not UI icons.
       'packages/editor-vue/src/shell/components/CensorEffectPreview.vue',
       'packages/editor-vue/src/shell/components/CensorFormattingToolbar.vue',
+      // Frame miniatures preview the resulting window/browser/phone geometry.
+      'packages/editor-vue/src/shell/composition/CardFrame.vue',
     ])
     const violations: string[] = []
     for (const source of sources) {

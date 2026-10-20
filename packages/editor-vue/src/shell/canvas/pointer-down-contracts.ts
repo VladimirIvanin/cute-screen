@@ -56,5 +56,6 @@ export interface PointerDownContext {
   readonly toLocal: (layer: LayerNode, point: CanvasPoint) => CanvasPoint
   readonly startText: (input: TextEditorStartInput) => void
   readonly invalidateOverlay: () => void
+  readonly invalidateGesturePreview: () => void
   readonly renderCommittedScene: () => void
 }

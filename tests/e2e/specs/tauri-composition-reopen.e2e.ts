@@ -10,6 +10,7 @@ import {
   cardNative,
 } from '../publication-card'
 import { waitForStableCanvas } from '../canvas-ready'
+import { verifyBackgroundThumbnail } from '../background-thumbnail'
 
 describe('publication card after native restart', () => {
   it('restores frame, background bytes and independent reusable preset', async () => {
@@ -18,6 +19,7 @@ describe('publication card after native restart', () => {
     const saved = JSON.parse(await readFile('artifacts/tauri-e2e/composition-document.json', 'utf8')) as EditorDocumentV1
     expect((await cardDocument()).presentation.composition).toEqual(saved.presentation.composition)
     await $('button[aria-label="Appearance"]').click()
+    await verifyBackgroundThumbnail(64, 64, 'artifacts/tauri-e2e')
     await expect($('.cs-composition-panel').$('button*=Cute publication')).toExist()
     const materials = await cardNative<Array<{ kind: string }>>('materials_list')
     expect(materials.filter((item) => item.kind === 'preset')).toHaveLength(1)

@@ -78,6 +78,7 @@ export type CanvasTranslationKey =
   | 'retry'
 
 export interface CanvasViewportProps {
+  interactivePreview?: boolean | undefined
   compositionSpace?: 'content' | 'card' | undefined
   activateCompositionAt?: (event: MouseEvent, preserveSelection?: boolean) => void
   compositionDocument?: EditorDocumentV1 | undefined
@@ -194,6 +195,8 @@ export interface CanvasViewportExpose {
 }
 
 export const canvasViewportRuntimeProps = {
+  interactivePreview: Boolean,
+  exportDocument: Object as PropType<CanvasViewportProps['exportDocument']>,
   compositionSpace: String as PropType<CanvasViewportProps['compositionSpace']>,
   emojiDefaults: Object as PropType<CanvasViewportProps['emojiDefaults']>,
   spotlightEditing: Object as PropType<SpotlightEditing | undefined>,

@@ -96,6 +96,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', outside, true)
       :label="text('Opacity', 'Непрозрачность')"
       class="cs-gradient-opacity"
       compact-label="α"
+      control-id="layerOpacity"
       :title="text('Opacity', 'Непрозрачность')"
       :value="opacity.value"
       :mixed="opacity.mixed"
@@ -138,6 +139,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', outside, true)
         <p v-if="mixedFill">{{ text('Mixed gradients. Reset to edit together.', 'Разные градиенты. Сбросьте для общей правки.') }}</p>
         <ShapeGradientEditor
           v-else
+          control-id="fillGradient"
           :fill="fill"
           :disabled="disabled"
           :locale="locale"

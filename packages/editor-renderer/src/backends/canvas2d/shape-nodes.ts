@@ -1,12 +1,16 @@
 import type { RenderNode } from '@cute-screen/editor-core'
 import type { ImageResourceInput } from '../../types'
-import type { Context2D } from './contracts'
+import type {
+  Canvas2DLike,
+  Context2D,
+} from './contracts'
 import {
   cssColor,
   paintStyle,
   withTransform,
 } from './paint'
 import { roundedRectPath } from './paths'
+import { drawOuterShadows2D } from './outer-shadow'
 
 type Node<K extends RenderNode['kind']> = Extract<RenderNode, { kind: K }>
 type Resources = ReadonlyMap<string, ImageResourceInput['source']>
@@ -26,9 +30,11 @@ export function drawRectNode2D(
   context: Context2D,
   node: Node<'rect'>,
   resources: Resources,
+  newCanvas?: (width: number, height: number) => Canvas2DLike,
 ): void {
   const rounded = (node.cornerRadius ?? 0) > 0
   withTransform(context, node, node.x + node.width / 2, node.y + node.height / 2, () => {
+    drawOuterShadows2D(context, node, newCanvas)
     context.fillStyle = paintStyle(context, node.fill, resources)
     if (rounded) {
       roundedRectPath(context, node.x, node.y, node.width, node.height, node.cornerRadius ?? 0)

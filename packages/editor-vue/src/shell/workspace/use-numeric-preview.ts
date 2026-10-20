@@ -49,6 +49,9 @@ export function useNumericPreview(
     if (status === 'pending') numericPreview.cancel()
   }, { flush: 'sync' })
   const cancelNumericForShortcut = (event: KeyboardEvent) => {
+    // Native input undo/redo belongs to the text draft, not the document.
+    const editable = event.target instanceof Element && Boolean(event.target.closest('input, textarea, [contenteditable="true"]'))
+    if (editable && ['z', 'y'].includes(shortcutLetter(event) ?? '')) return
     if (
       !event.defaultPrevented &&
       !event.isComposing &&

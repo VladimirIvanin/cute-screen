@@ -30,7 +30,7 @@ export function drawNodes2D(
         drawVectorNode2D(context, node, resources, newCanvas)
         break
       case 'rect':
-        drawRectNode2D(context, node, resources)
+        drawRectNode2D(context, node, resources, newCanvas)
         break
       case 'ellipse':
         drawEllipseNode2D(context, node, resources)

@@ -44,6 +44,7 @@ export function freezeVectorNode(node: RenderVectorNode): RenderVectorNode {
 }
 
 export function freezeRectNode(node: RenderRectNode): RenderRectNode {
+  if (node.outerShadows && node.outerShadows.length > 8) throw new RangeError(`${node.id}.shadow layer limit`)
   validateStrokeStyle(node)
   assertFinite(node.x, `${node.id}.x`)
   assertFinite(node.y, `${node.id}.y`)
@@ -61,6 +62,14 @@ export function freezeRectNode(node: RenderRectNode): RenderRectNode {
   return Object.freeze({
     ...node,
     fill: freezePaint(node.fill, `${node.id}.fill`),
+    ...(node.outerShadows === undefined ? {} : { outerShadows: Object.freeze(node.outerShadows.map((shadow) => {
+      assertFinite(shadow.offsetX, `${node.id}.shadow.offsetX`)
+      assertFinite(shadow.offsetY, `${node.id}.shadow.offsetY`)
+      assertFinite(shadow.spread, `${node.id}.shadow.spread`)
+      assertNonNegative(shadow.blur, `${node.id}.shadow.blur`)
+      if (Math.abs(shadow.spread) > 512 || shadow.blur > 4096) throw new RangeError(`${node.id}.shadow exceeds its bounds`)
+      return Object.freeze({ ...shadow, color: freezeColor(shadow.color) })
+    })) }),
     ...(node.stroke === undefined ? {} : { stroke: freezeColor(node.stroke) }),
     ...(node.dash ? { dash: Object.freeze([...node.dash]) } : {}),
   })

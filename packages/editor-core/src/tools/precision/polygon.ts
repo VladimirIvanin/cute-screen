@@ -7,14 +7,13 @@ import {
   assertPoint,
 } from './shared'
 
-function polygonArea(points: readonly Point[]): number {
-  let twiceArea = 0
-  for (let index = 0; index < points.length; index += 1) {
-    const point = points[index]!
-    const next = points[(index + 1) % points.length]!
-    twiceArea += point.x * next.y - next.x * point.y
-  }
-  return twiceArea / 2
+/** Non-collinearity, not signed shoelace area: a figure-eight can have zero
+ * signed area while both lobes are visibly filled with the nonzero rule. */
+export function hasFreeformArea(points: readonly Point[]): boolean {
+  const first = points[0]
+  if (!first) return false
+  const next = points.find((point) => point.x !== first.x || point.y !== first.y)
+  return Boolean(next && points.some((point) => Math.abs(orientation(first, next, point)) > GEOMETRY_EPSILON))
 }
 
 function orientation(
@@ -45,31 +44,6 @@ function pointOnSegment(
   )
 }
 
-function segmentsIntersect(
-  a: Point,
-  b: Point,
-  c: Point,
-  d: Point,
-): boolean {
-  const abC = orientation(a, b, c)
-  const abD = orientation(a, b, d)
-  const cdA = orientation(c, d, a)
-  const cdB = orientation(c, d, b)
-  if (
-    ((abC > GEOMETRY_EPSILON &&
-      abD < -GEOMETRY_EPSILON) ||
-      (abC < -GEOMETRY_EPSILON &&
-        abD > GEOMETRY_EPSILON)) &&
-        ((cdA > GEOMETRY_EPSILON &&
-          cdB < -GEOMETRY_EPSILON) ||
-          (cdA < -GEOMETRY_EPSILON &&
-            cdB > GEOMETRY_EPSILON))
-  ) {
-    return true
-  }
-  return pointOnSegment(c, a, b) || pointOnSegment(d, a, b) || pointOnSegment(a, c, d) || pointOnSegment(b, c, d)
-}
-
 export function assertValidFreeformPolygon(
   points: readonly Point[],
   field = 'freeform polygon',
@@ -85,20 +59,8 @@ export function assertValidFreeformPolygon(
       throw new RangeError(`${field} has a zero-length edge`)
     }
   }
-  if (Math.abs(polygonArea(points)) <= GEOMETRY_EPSILON) {
-    throw new RangeError(`${field} must enclose a non-zero area`)
-  }
-  for (let first = 0; first < points.length; first += 1) {
-    const firstNext = (first + 1) % points.length
-    for (let second = first + 1; second < points.length; second += 1) {
-      const secondNext = (second + 1) % points.length
-      const adjacent =
-        first === second || firstNext === second || secondNext === first || (first === 0 && secondNext === 0)
-      if (adjacent) continue
-      if (segmentsIntersect(points[first]!, points[firstNext]!, points[second]!, points[secondNext]!)) {
-        throw new RangeError(`${field} must be a simple polygon`)
-      }
-    }
+  if (!hasFreeformArea(points)) {
+    throw new RangeError(`${field} must contain non-collinear points`)
   }
 }
 
@@ -121,21 +83,22 @@ export function pointInPolygon(
   point: Point,
   points: readonly Point[],
 ): boolean {
+  let winding = 0
   for (let index = 0; index < points.length; index += 1) {
-    if (pointOnSegment(point, points[index]!, points[(index + 1) % points.length]!)) {
-      return true
-    }
-  }
-  let inside = false
-  for (let index = 0, previous = points.length - 1; index < points.length; previous = index++) {
     const current = points[index]!
-    const before = points[previous]!
+    const next = points[(index + 1) % points.length]!
+    if (pointOnSegment(point, current, next)) return true
+    const side = orientation(current, next, point)
     if (
-      current.y > point.y !== before.y > point.y &&
-      point.x < ((before.x - current.x) * (point.y - current.y)) / (before.y - current.y) + current.x
-    ) {
-      inside = !inside
-    }
+      current.y <= point.y &&
+      next.y > point.y &&
+      side > GEOMETRY_EPSILON
+    ) winding++
+    else if (
+      current.y > point.y &&
+      next.y <= point.y &&
+      side < -GEOMETRY_EPSILON
+    ) winding--
   }
-  return inside
+  return winding !== 0
 }

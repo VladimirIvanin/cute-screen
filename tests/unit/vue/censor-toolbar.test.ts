@@ -219,6 +219,8 @@ describe('censor formatting toolbar', () => {
     expect(execute).not.toHaveBeenCalled()
     expect(localStorage.getItem(TOOL_SETTINGS_STORAGE_KEY)).toBe(preferences)
     await fireEvent.keyDown(input, { key: 'Escape' })
+    expect(input).toBeInTheDocument()
+    await fireEvent.keyDown(input, { key: 'Escape' })
     expect(trigger).toHaveFocus()
     expect(store.selectedLayerIds).toEqual([before.layers[0]!.id])
     expect(session.snapshot.core.document).toEqual(before)

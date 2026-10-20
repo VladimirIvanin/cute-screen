@@ -23,6 +23,7 @@ import {
   assertNodeBase,
   assertNonNegative,
   assertPositive,
+  freezeColor,
 } from './validation'
 
 function assertNever(value: never): never {
@@ -35,6 +36,7 @@ function freezeNode(node: RenderNode): RenderNode {
     case 'group':
       return Object.freeze({ ...node, scene: createRenderSceneSnapshot(node.scene),
         destination: Object.freeze({ ...node.destination }), clip: Object.freeze({ ...node.clip }),
+        ...(node.backdrop ? { backdrop: freezeColor(node.backdrop) } : {}),
         ...(node.outerClip ? { outerClip: Object.freeze({ ...node.outerClip,
           bounds: Object.freeze({ ...node.outerClip.bounds }) }) } : {}) })
     case 'freeform':

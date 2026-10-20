@@ -4,10 +4,8 @@ import {
   nextTick,
   onUpdated,
   inject,
-  onBeforeUnmount,
   onMounted,
   ref,
-  watch,
 } from 'vue'
 import {
   NButton,
@@ -15,11 +13,9 @@ import {
   NSlider,
 } from 'naive-ui'
 import NumericPresetGroup from './NumericPresetGroup.vue'
-import {
-  numericDefaultsKey,
-  numericPreviewKey,
-  numericLocaleKey,
-} from './numeric-preview'
+import { numericLocaleKey } from './numeric-preview'
+import { useNumericDraft } from './use-numeric-draft'
+import type { NumericCancelReason } from './numeric-draft-model'
 
 const props = withDefaults(defineProps<{
   label: string
@@ -38,218 +34,34 @@ const props = withDefaults(defineProps<{
   disabledReason?: string | undefined
   locale?: 'en' | 'ru' | undefined
   controlId?: string | undefined
+  previewValue?: ((value: number) => string) | undefined
   layerId?: string | undefined
 }>(), { displayScale: 1 })
 const emit = defineEmits<{
   commit: [value: number]
   preview: [value: number]
-  cancel: []
+  cancel: [reason?: NumericCancelReason]
   invalid: [value: boolean]
 }>()
-const service = inject(numericPreviewKey, undefined)
 const getLocale = inject(numericLocaleKey, () => 'en' as const)
 const localeValue = computed(() => props.locale ?? getLocale())
-const blocked = computed(() => Boolean(props.disabled || service?.isBlocked?.()))
-const defaultsTool = inject(numericDefaultsKey, () => undefined)
-const owner = Symbol('numeric-control')
-const unregister = service?.register?.(owner, () => {
-  cancelledPointer = pointer
-  reset()
-  emit('cancel')
-})
 const host = ref<HTMLElement>()
-const draft = ref('')
-const invalid = ref(false)
-let editing = false
-let pointer = false
-let cancelledPointer = false
-let lastCommitted = props.value
-const scale = computed(() => props.displayScale)
-const shownMin = computed(() => props.min * scale.value)
-const shownMax = computed(() => props.max === undefined ? undefined : props.max * scale.value)
-const shownStep = computed(() => props.step * scale.value)
-const shownValue = computed(() => parse() ?? props.value * scale.value)
-const presets = computed(() => props.presets?.map((value) => value * scale.value))
-
-function format(value: number): string {
-  return String(Number(value.toFixed(8)))
-}
-
-function reset(): void {
-  draft.value = props.mixed ? '' : format(props.value * scale.value)
-  invalid.value = false
-  emit('invalid', false)
-  editing = false
-  pointer = false
-  lastCommitted = props.value
-}
-
-function parse(): number | undefined {
-  const raw = draft.value.trim().replace(',', '.')
-  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(raw)) return undefined
-  const value = Number(raw)
-  const steps = (value - shownMin.value) / shownStep.value
-  if (
-    !Number.isFinite(value) ||
-    value < shownMin.value ||
-    (shownMax.value !== undefined &&
-      value > shownMax.value) ||
-      Math.abs(steps - Math.round(steps)) > 0.000001
-  ) return undefined
-  return value
-}
-
-function preview(next: string): void {
-  if (blocked.value) return
-  draft.value = next
-  editing = true
-  const value = parse()
-  invalid.value = value === undefined
-  emit('invalid', invalid.value)
-  if (value === undefined) {
-    service?.cancel(owner)
-    return
-  }
-  const actual = Number((value / scale.value).toFixed(10))
-  emit('preview', actual)
-  if (props.controlId) service?.preview(owner, {
-    id: props.controlId,
-    defaultsTool: defaultsTool(),
-    layerId: props.layerId,
-  }, String(actual))
-}
-
-function commit(): void {
-  if (blocked.value || !editing) return
-  const value = parse()
-  invalid.value = value === undefined
-  emit('invalid', invalid.value)
-  if (value === undefined) return
-  const actual = Number((value / scale.value).toFixed(10))
-  editing = false
-  pointer = false
-  service?.cancel(owner)
-  if (actual !== lastCommitted || props.mixed) {
-    lastCommitted = actual
-    emit('commit', actual)
-  }
-}
-
-function cancel(): void {
-  const pending = editing
-  service?.cancel(owner)
-  reset()
-  if (pending) emit('cancel')
-}
-
+const {
+  draft, invalid, editing, blocked, shownMin, shownMax, shownStep, shownValue, ariaValue, errorId,
+  preview, commit, increment, keydown, keyup, pointerdown, pointerup, sliderUpdate, blur,
+  compositionstart, compositionend, format,
+} = useNumericDraft(props, host, {
+  preview: (value) => emit('preview', value),
+  commit: (value) => emit('commit', value),
+  cancel: (reason) => emit('cancel', reason),
+  invalid: (value) => emit('invalid', value),
+})
+const presets = computed(() => props.presets?.map((value) => value * (props.displayScale ?? 1)))
 function choose(value: number): void {
   preview(format(value))
   commit()
 }
 
-function increment(
-  direction: number,
-  multiplier = 1,
-): void {
-  const current = parse() ?? props.value * scale.value
-  const moved = current + direction * shownStep.value * multiplier
-  const next = Math.max(shownMin.value, Math.min(shownMax.value ?? Infinity, moved))
-  preview(format(next))
-}
-
-function keydown(event: KeyboardEvent): void {
-  if (event.key === 'Escape') {
-    cancelledPointer = pointer
-    cancel()
-    return
-  }
-  if (blocked.value) return
-  const slider = event.target instanceof Element && Boolean(event.target.closest('.n-slider'))
-  const directions: Record<string, number> = { ArrowUp: 1, ArrowDown: -1, ArrowRight: 1, ArrowLeft: -1 }
-  if (
-    event.key in directions &&
-    (slider ||
-      event.key === 'ArrowUp' ||
-      event.key === 'ArrowDown')
-  ) {
-    event.preventDefault()
-    event.stopPropagation()
-    increment(directions[event.key]!, event.shiftKey ? 10 : 1)
-  } else if (
-    slider &&
-    (event.key === 'Home' ||
-      event.key === 'End')
-  ) {
-    event.preventDefault()
-    event.stopPropagation()
-    preview(format(event.key === 'Home' ? shownMin.value : shownMax.value ?? shownValue.value))
-  } else if (event.key === 'Enter') {
-    event.preventDefault()
-    event.stopPropagation()
-    commit()
-  }
-}
-
-function keyup(event: KeyboardEvent): void {
-  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) commit()
-}
-
-function pointerdown(event: PointerEvent): void {
-  if (blocked.value || event.button !== 0) return
-  if (event.target instanceof Element && event.target.closest('.n-slider')) {
-    cancelledPointer = false
-    pointer = true
-  }
-}
-
-function sliderUpdate(value: number): void {
-  if (!cancelledPointer) preview(format(value))
-}
-
-function pointerup(): void {
-  if (pointer && !cancelledPointer) queueMicrotask(commit)
-}
-
-function pointercancel(): void {
-  if (!pointer) return
-  cancelledPointer = true
-  cancel()
-}
-
-function globalEscape(event: KeyboardEvent): void {
-  if (event.key !== 'Escape' || !editing) return
-  cancelledPointer = pointer
-  cancel()
-}
-
-function outside(event: PointerEvent): void {
-  if (!editing || !(event.target instanceof Node)) return
-  const panel = host.value?.closest('[role="dialog"], fieldset, .cs-layers-controls') ?? host.value
-  if (!panel?.contains(event.target)) cancel()
-}
-
-function blur(event: FocusEvent): void {
-  if (pointer) return
-  // A text projection restores its range and returns focus synchronously.
-  // Only an actual focus departure completes numeric input.
-  queueMicrotask(() => {
-    if (!editing || document.activeElement === event.target) return
-    if (event.relatedTarget instanceof Node && host.value?.contains(event.relatedTarget)) return
-    const panel = host.value?.closest('[role="dialog"], fieldset, .cs-layers-controls') ?? host.value
-    if (
-      !event.relatedTarget ||
-      (event.relatedTarget instanceof Node &&
-        panel?.contains(event.relatedTarget))
-    ) commit()
-  })
-}
-
-watch(() => [props.value, props.mixed, props.displayScale] as const, () => {
-  if (!editing) reset()
-}, { immediate: true })
-watch(blocked, (disabled) => {
-  if (disabled) cancel()
-})
 function labelSlider(): void {
   const slider = host.value?.querySelector<HTMLElement>('[role="slider"]')
   slider?.setAttribute('aria-label', props.label)
@@ -259,20 +71,6 @@ function labelSlider(): void {
 onUpdated(labelSlider)
 onMounted(() => {
   void nextTick(() => nextTick(labelSlider))
-  document.addEventListener('keydown', globalEscape, true)
-  document.addEventListener('pointerdown', outside, true)
-  document.addEventListener('pointerup', pointerup)
-  document.addEventListener('pointercancel', pointercancel)
-  window.addEventListener('blur', cancel)
-})
-onBeforeUnmount(() => {
-  unregister?.()
-  document.removeEventListener('keydown', globalEscape, true)
-  service?.cancel(owner)
-  document.removeEventListener('pointerdown', outside, true)
-  document.removeEventListener('pointerup', pointerup)
-  document.removeEventListener('pointercancel', pointercancel)
-  window.removeEventListener('blur', cancel)
 })
 </script>
 
@@ -284,6 +82,8 @@ onBeforeUnmount(() => {
     @keydown.capture="keydown"
     @keyup="keyup"
     @pointerdown.capture="pointerdown"
+    @compositionstart="compositionstart"
+    @compositionend="compositionend"
   >
     <span class="cs-numeric-label">{{ compactLabel ?? label }}</span>
     <div class="cs-numeric-values">
@@ -317,20 +117,20 @@ onBeforeUnmount(() => {
           'aria-label': label,
           'aria-valuemin': shownMin,
           'aria-valuemax': shownMax,
-          'aria-valuenow': mixed && !editing ? undefined : shownValue,
+          'aria-valuenow': ariaValue,
+          'aria-describedby': invalid ? errorId : undefined,
           'aria-valuetext': mixed && !editing ? '—' : `${draft}${unit ?? ''}`,
           'aria-invalid': invalid,
         }"
         @update:value="preview"
         @blur="blur"
-        @wheel.stop
       >
         <template v-if="stepper" #prefix>
           <NButton
             class="cs-numeric-step"
             quaternary
             size="small"
-            :disabled="blocked || (!mixed && shownValue <= shownMin)"
+            :disabled="blocked || invalid || (mixed && !editing) || shownValue <= shownMin"
             :aria-label="`${label} −`"
             @click="increment(-1); commit()"
           >
@@ -344,7 +144,7 @@ onBeforeUnmount(() => {
             class="cs-numeric-step"
             quaternary
             size="small"
-            :disabled="blocked || (!mixed && shownMax !== undefined && shownValue >= shownMax)"
+            :disabled="blocked || invalid || (mixed && !editing) || (shownMax !== undefined && shownValue >= shownMax)"
             :aria-label="`${label} +`"
             @click="increment(1); commit()"
           >
@@ -367,6 +167,7 @@ onBeforeUnmount(() => {
     />
     <small
       v-if="invalid"
+      :id="errorId"
       class="cs-numeric-error"
       role="alert"
     >{{ shownMin }}–{{ shownMax ?? '∞' }} · {{ localeValue === 'ru' ? 'шаг' : 'step' }} {{ format(shownStep) }}</small>

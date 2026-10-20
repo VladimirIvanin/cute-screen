@@ -19,7 +19,6 @@ import {
   type CropPreset,
   type LayerNode,
   type RulerAngleGuide,
-  type Transform2D,
 } from '@cute-screen/editor-renderer'
 import type {
   CanvasPoint,
@@ -312,7 +311,7 @@ export class CanvasWorkspaceController {
   readonly selectedLayer = () => this.#geometry.selectedLayer()
   readonly gesturePreviewLayer = () => this.#gradient?.preview() ?? this.#geometry.gesturePreviewLayer()
   readonly layerBounds = (layer: LayerNode) => canvasLayerBounds(layer)
-  readonly transformPoint = (transform: Transform2D, point: CanvasPoint) => transformCanvasPoint(transform, point)
+  readonly transformPoint = transformCanvasPoint
   readonly toLocal = (layer: LayerNode, point: CanvasPoint) => this.#geometry.toLocal(layer, point)
   readonly moveLoupeSource = (layer: Extract<LayerNode, { readonly kind: 'loupe' }>, point: CanvasPoint) =>
     this.#geometry.moveLoupeSourceMarker(layer, point)
@@ -385,6 +384,7 @@ export class CanvasWorkspaceController {
       },
       previewLayer: this.gesturePreviewLayer,
       gestureRequiresScenePreview: () => this.#gesture?.kind === 'move' && (this.#gesture.nodeIds?.length ?? 0) > 1,
+      isInteracting: () => Boolean(this.#gesture || this.#props.interactivePreview),
       invalidateOverlay: this.invalidateOverlay,
     })
   }

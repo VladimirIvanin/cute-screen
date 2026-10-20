@@ -77,6 +77,8 @@ export interface RenderVectorNode extends RenderNodeBase {
 }
 
 export interface RenderRectNode extends RenderNodeBase {
+  /** Shadow-only paint outside the original rounded contour, including transparent fills. */
+  readonly outerShadows?: readonly RenderOuterShadow[]
   readonly dash?: readonly number[]
   readonly lineCap?: RenderLineCap
   readonly kind: 'rect'
@@ -89,6 +91,15 @@ export interface RenderRectNode extends RenderNodeBase {
   readonly stroke?: RgbaColor
   readonly strokeWidth?: number
   readonly lineJoin?: RenderLineJoin
+}
+
+export interface RenderOuterShadow {
+  readonly color: RgbaColor
+  readonly offsetX: number
+  readonly offsetY: number
+  readonly blur: number
+  /** Positive values expand the rounded caster; negative values contract it. */
+  readonly spread: number
 }
 
 export interface RenderEllipseNode extends RenderNodeBase {
@@ -309,6 +320,8 @@ export interface RenderGroupNode extends RenderNodeBase {
   readonly clip: RenderOutputBounds
   readonly cornerRadius: number
   readonly outerClip?: { readonly bounds: RenderOutputBounds; readonly cornerRadius: number }
+  /** Fill clip beneath the source before clipping and applying group opacity. */
+  readonly backdrop?: RgbaColor
   readonly blur: number
 }
 export interface RenderFreeformNode extends RenderNodeBase {

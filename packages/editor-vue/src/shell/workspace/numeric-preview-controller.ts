@@ -55,11 +55,7 @@ export class NumericPreviewController implements NumericPreviewService {
     }
   }
 
-  preview(
-    owner: symbol,
-    target: NumericPreviewTarget,
-    value: string,
-  ): void {
+  activate(owner: symbol): void {
     if (this.#context.readOnly()) return
     if (this.#owner !== owner) {
       const previous = this.#owner
@@ -70,6 +66,15 @@ export class NumericPreviewController implements NumericPreviewService {
       this.#owner = owner
       this.#base = this.#context.document()
     }
+  }
+
+  preview(
+    owner: symbol,
+    target: NumericPreviewTarget,
+    value: string,
+  ): void {
+    if (this.#context.readOnly()) return
+    this.activate(owner)
     this.#pending = { target, value }
     if (this.#frame !== undefined) return
     this.#frame = this.#context.requestFrame(() => {

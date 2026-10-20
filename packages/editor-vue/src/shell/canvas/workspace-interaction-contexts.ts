@@ -107,6 +107,7 @@ export function createPointerDownContext(ports: WorkspaceInteractionPorts): Poin
     toLocal: ports.toLocal,
     startText: (input) => ports.textEditor.start(input),
     invalidateOverlay: ports.invalidateOverlay,
+    invalidateGesturePreview: () => ports.renderer.invalidateGesturePreview(),
     renderCommittedScene: () => rendererCommitted(ports.renderer),
   }
 }
@@ -153,7 +154,7 @@ export function createGestureFinishContext(ports: WorkspaceInteractionPorts): Ge
     canvasPoint: ports.canvasPoint,
     updateHoverCursor: (point) => ports.pointerGeometry.updateHoverCursor(point),
     invalidateOverlay: ports.invalidateOverlay,
-    renderCommittedScene: () => rendererCommitted(ports.renderer),
+    renderCommittedScene: () => void ports.renderer.drawDocument(),
     updateArrowToolbar: ports.updateArrowToolbar,
   }
 }
@@ -185,6 +186,7 @@ export function createKeyboardContext(
     cancelText: () => ports.textEditor.cancel(),
     cancelGesture,
     invalidateOverlay: ports.invalidateOverlay,
+    invalidateGesturePreview: () => ports.renderer.invalidateGesturePreview(),
   }
 }
 

@@ -1,4 +1,5 @@
 import type { RenderNode } from '@cute-screen/editor-core'
+import { drawOuterShadowsCanvasKit } from './outer-shadow'
 import type {
   CanvasKitApi,
   CanvasKitCanvas,
@@ -65,6 +66,7 @@ export function drawRectNodeCanvasKit(
     const rounded = (node.cornerRadius ?? 0) > 0 ? roundedRectPath(canvasKit, node) : undefined
     try {
       withTransform(canvas, node, node.x + node.width / 2, node.y + node.height / 2, () => {
+        drawOuterShadowsCanvasKit(canvasKit, canvas, node)
         setShader(configureFillPaint(canvasKit, fill, node.fill, node.opacity, node.blendMode, resources))
         if (rounded) canvas.drawPath(rounded, fill)
         else canvas.drawRect(rect, fill)

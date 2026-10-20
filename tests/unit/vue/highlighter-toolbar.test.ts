@@ -53,6 +53,8 @@ describe('highlighter formatting', () => {
     const input = await screen.findByRole('spinbutton', { name: 'Толщина' })
     await fireEvent.input(input, { target: { value: '28' } })
     await fireEvent.keyDown(input, { key: 'Escape' })
+    expect(input).toBeInTheDocument()
+    await fireEvent.keyDown(input, { key: 'Escape' })
     expect(view.emitted('change') ?? []).toEqual([])
     expect(screen.getByRole('button', { name: 'Толщина' })).toHaveFocus()
   })

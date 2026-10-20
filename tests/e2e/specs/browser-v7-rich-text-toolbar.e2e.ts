@@ -1,4 +1,5 @@
 import { setEditorPreferences } from '../editor-settings'
+import { setNumericInput } from '../numeric-input'
 import {
   $,
   browser,
@@ -10,7 +11,6 @@ import {
   openHarness,
   waitForEditorFocus,
   setTextColor,
-  applyBackground,
   startTextAt,
 } from './browser-v7-rich-text-test-kit'
 
@@ -208,8 +208,12 @@ describe('Document v7 rich text in browser mode', () => {
       ['Callout', 'Callout'],
       ['Numbered marker', 'Numbered marker'],
     ] as const) {
-      await $(`button[aria-label="${tool}"]`).click({ button: 'right' })
-      await expect($(tool === 'Numbered marker' ? '.cs-numbered-marker-toolbar' : '.cs-text-toolbar')).toHaveAttribute('aria-label', title)
+      await $(`.cs-toolrail button[aria-label="${tool}"]`).click({ button: 'right' })
+      if (tool === 'Callout') await $('.cs-callout-toolbar button[aria-label="Text"]').click()
+      const formatting = $(tool === 'Numbered marker' ? '.cs-numbered-marker-toolbar' : '.cs-text-toolbar')
+      await expect(formatting).toBeDisplayed()
+      await expect(formatting).toHaveAttribute('aria-label', title)
+      if (tool === 'Callout') await browser.keys('Escape')
     }
 
     await $('button[aria-label="Text"]').click()
@@ -251,8 +255,15 @@ describe('Document v7 rich text in browser mode', () => {
     const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
 
     await $('button[aria-label="Callout"]').click({ button: 'right' })
-    await $('.cs-callout-toolbar button[aria-label="Text"]').click()
-    await applyBackground({ color: '#ffcc66', padding: 10, radius: 14 })
+    await $('.cs-callout-toolbar button[aria-label="Label"]').click()
+    const frame = $('.cs-callout-popover[aria-label="Label"]')
+    await expect(frame).toBeDisplayed()
+    await frame.$('button=Card').click()
+    for (const [name, value] of [['Padding', '10'], ['Radius', '14']]) {
+      await setNumericInput(frame.$(`input[aria-label="${name}"]`), value!)
+      await browser.keys('Enter')
+    }
+    await browser.keys('Escape')
     await browser
       .action('pointer')
       .move({ origin: scene, x: -24, y: -12, duration: 0 })

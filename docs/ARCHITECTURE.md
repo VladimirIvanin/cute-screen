@@ -1,5 +1,66 @@
 # Архитектура Cute Screen
 
+## Freeform-цензура (ADR-145)
+
+Persisted points — неявно замкнутый путь с nonzero winding, общий для
+Canvas2D, CanvasKit и core hit-test. Валидация проверяет конечность, лимит
+точек, ненулевые рёбра и неколлинеарность; самопересечения допустимы.
+Draft удаляет только соседние повторы и последнюю копию стартовой точки.
+Границы готового пути вычисляются по всем точкам, а не по start/end жеста.
+
+## Граница экрана рамки (ADR-144)
+
+RenderGroupNode.backdrop компонуется с source до clipping и group opacity.
+Промежуточный экран имеет целочисленный raster и один скопированный граничный
+texel снаружи clip; geometry/contain/cover не меняются. Округление source
+компенсируется transform и обратным размещением. Backdrop не попадает в blur.
+Canvas2D использует EffectFrame и LRU, CanvasKit освобождает snapshots/surfaces
+в finally и применяет outerClip. Цвет/размещение инвалидируют составной экран;
+radius/opacity переиспользуют его. Document schema/IPC остаются прежними.
+
+## Пиксельные эффекты Canvas2D (ADR-143)
+
+Scene paint — генератор ordered операций: sync renderer исполняет фильтры
+локально, prepareEffects — в одном worker с transferable Uint8ClampedArray.
+Невидимый staging canvas публикуется только после завершения актуальной
+подготовки. Renderer владеет LRU 128 MiB; ключи compositeBelow не зависят от
+изменений слоёв выше. Тайлы 512×512 хранят обработанную подложку отдельно от
+маски. Group source и blur кэшируются отдельно от clip/destination/opacity.
+EffectFrame закрепляет используемые LRU entries и владеет временными group
+sources >64 MiB: фон и content разделяют один native растр внутри paint, не
+вытесняя друг друга на 8K. Temporary group bytes и filter scratch измеряются
+отдельно; после completed/cancelled paint временное владение освобождается.
+Промежуточный Float64 buffer ограничен кольцом строк; вертикальный pre-roll
+сохраняет побайтное округление старого box blur. Worker не получает scene graph,
+DOM, JSON/base64 изображений или EditorCommand.
+
+Контроллер coalesce-ит pointer/numeric preview: один активный кадр и последний
+ожидающий, запуск через rAF. Commit/cancel/document switch отменяет подготовку.
+Interactive background downsample до 2048 px выполняется после native цензуры.
+Экспорт получает activeDocument отдельно от display projection и сериализуется
+с worker; финальные алгоритмы, original blobs и undo/redo не изменены.
+
+## Numeric keyboard lifecycle (ADR-133)
+
+`useNumericDraft` хранит строковый ввод и набор удерживаемых клавиш отдельно от
+committed props. Общая логика обслуживает NumericControl, CardNumber, номер
+метки и legacy number adapter. Только keyup начатого жеста завершает изменение;
+каретка и события кнопок не входят в этот путь. Capture-Escape отменяет активный
+draft и поглощается до обработчиков панели/Quick. Context invalidation и window
+blur очищают удерживаемые клавиши, чтобы поздний keyup не создал команду.
+
+`numeric-draft-model` отделяет parsing/state/действия от DOM lifecycle.
+Необязательный `previewValue` преобразует число в существующий атомарный style
+payload для frame/marker выноски. Причина cancel различает gesture, invalid
+и context: общий inline Apply/Cancel draft восстанавливает только поле при
+локальной отмене, но не возобновляет старую проекцию при смене документа.
+
+ShapeGradientEditor адаптирует числовые preview к атомарному fillGradient с тем же
+owner; локальный draft сохраняет выбранную точку при сортировке. Оформление
+пробрасывает preview/cancel по тем же immutable patches, что и commit; отдельная
+shallow-проекция объединяется через requestAnimationFrame. DocumentSession,
+autosave и preferences меняются только на существующей границе commit.
+
 ## Восстановление capture capabilities
 
 Desktop capability monitor публикует каждый ответ native probe, повторяет отрицательный
@@ -30,7 +91,13 @@ canvas/crop и координаты прежних слоёв сохраняют
 output bounds отдельно от canvas. Crop и flip работают с content.
 
 Порядок: background/bands → shadow/frame → clipped content group → card layers →
-anchored signature groups. Эффекты читают уже отрисованное содержимое своей
+anchored signature groups. ADR-134 задаёт три outerShadows у внешнего контура
+снимка/рамки: contact/key/ambient с разными blur/offset/alpha. Optional shadowOptions
+в composition v1 отделяет размер, мягкость, spread, X/Y и цвет от плотности shadow.
+CanvasKit использует MaskFilter, Canvas2D — bounded cache масок на renderer
+(2048 px по стороне; повторное использование при alpha edit, освобождение при
+геометрическом изменении и dispose). Внутренняя область контура исключена,
+чтобы прозрачность снимка не получала тёмную подложку. Эффекты читают уже отрисованное содержимое своей
 группы. Blurred content использует ту же сцену с censorship; перед уменьшением
 группа с censorship рассчитывается минимум в исходной плотности, чтобы
 антиалиасинг не возвращал исходные пиксели на границе. Opacity подписи применяется
@@ -51,6 +118,25 @@ Vue хранит shallow preview/settings; тяжёлые ресурсы и scen
 Для документа без composition UI использует нейтральное представление настроек:
 прозрачный фон, нулевые поля, radius и shadow. Это не scene preview и не persisted
 composition; первая явная правка проходит прежней setPresentation command.
+
+ADR-142 добавляет footer «Убрать оформление» вне scroll body. Controller удаляет
+optional composition одной setPresentation, сохраняя остальные presentation и
+layers; presence watch сбрасывает transient editing/selection/space. Отсутствие
+composition отключает кнопку по фактическому документу, не нейтральной UI-модели.
+Interaction projection исключает card layers без оформления; persisted layers
+не удаляются. Undo/Redo используют прежний session journal без нового состояния.
+
+ADR-132 объединяет фон и макет внутри CardLayout через background slot. Состояние
+раскрытия остаётся локальным DOM details; открытие/сворачивание не выполняет
+команд. Linked insets используют одно поле, unlink сохраняет стороны, повторное
+link выравнивает их по top. Shadow переиспользует общий NumericControl без нового
+controlId: preview/commit/cancel маршрутизируются через composition controller.
+Escape внутри shadow отменяет draft, сохраняя панель открытой.
+
+ADR-139: миниатюра фона читает текущий blobHash из CardBackground и готовый
+HTMLImageElement из workspace.textureImages через compositionImagesKey.
+Небольшой canvas рисует contain без повторного decode/IPC/URL. Loading/error
+не изменяют документ; смена ресурса очищает старые пиксели.
 
 SQLite migration 5 добавляет user_materials. В blob_references появляется независимый
 owner_kind=material; presets владеют собственным набором hashes. History/cache cleanup
@@ -510,6 +596,12 @@ legacy appearance не пересчитывается. Настройки жес
 HighlighterPreview сохраняет committed backdrop один раз, восстанавливает только
 повреждённую область и композитит непрерывный путь с теми же nodes, что export.
 Существующий marker при transform-preview композитится в порядке document layers.
+
+При включённом оформлении новый marker добавляется во временную сцену
+композиции. Начало штриха, pointermove и Shift используют общий gesture preview;
+отдельный HighlighterPreview в этом режиме отключён. Завершение и отмена жеста
+восстанавливают сцену после очистки transient state. Pointermove не изменяет
+документ и не запускает глубокую реактивность Vue; pointerup подтверждает одну команду.
 
 HighlighterBackgroundController запускается из frameReady один раз на source load.
 Worker сам читает immutable local asset или получает binary Blob structured clone,

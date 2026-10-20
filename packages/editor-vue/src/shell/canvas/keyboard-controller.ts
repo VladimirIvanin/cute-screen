@@ -46,6 +46,7 @@ export interface KeyboardContext {
   readonly cancelText: () => void
   readonly cancelGesture: () => void
   readonly invalidateOverlay: () => void
+  readonly invalidateGesturePreview: () => void
 }
 export class KeyboardController {
   readonly #context: KeyboardContext
@@ -151,7 +152,8 @@ export class KeyboardController {
     if (gesture?.kind !== 'draw' || !gesture.stroke) return
     const stroke = setStrokeStraight(gesture.stroke, pressed)
     this.#context.setGesture({ ...gesture, stroke, points: stroke.points, current: stroke.points.at(-1)! })
-    this.#context.invalidateOverlay()
+    if (gesture.tool === 'marker' && this.#context.props.compositionDocument) this.#context.invalidateGesturePreview()
+    else this.#context.invalidateOverlay()
   }
   blur(): void {
     this.#context.setSpacePressed(false)

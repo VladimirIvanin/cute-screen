@@ -60,6 +60,8 @@ function color(
     </div>
     <div v-if="payload[`${endpoint}Marker`] !== 'none'" class="cs-callout-endpoint-properties">
       <NumericControl
+        :control-id="endpoint === 'target' ? 'calloutTargetMarkerStyle' : 'calloutLabelMarkerStyle'"
+        :preview-value="(size) => JSON.stringify({ size })"
         :label="text('Size', 'Размер')"
         :value="payload[`${endpoint}MarkerStyle`]?.size ?? Math.max(10, payload.stroke.width * 3)"
         :min="2"

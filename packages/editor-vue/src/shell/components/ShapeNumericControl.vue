@@ -18,7 +18,7 @@ defineProps<{
   presets?: readonly number[] | undefined
   locale?: 'en' | 'ru' | undefined
 }>()
-const emit = defineEmits<{ commit: [value: number] }>()
+const emit = defineEmits<{ commit: [value: number]; preview: [value: number]; cancel: [] }>()
 </script>
 
 <template>
@@ -39,5 +39,7 @@ const emit = defineEmits<{ commit: [value: number] }>()
     :presets="presets"
     :locale="locale"
     @commit="emit('commit', $event)"
+    @preview="emit('preview', $event)"
+    @cancel="emit('cancel')"
   />
 </template>

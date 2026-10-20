@@ -11,7 +11,13 @@ import { UiIcon } from '../icon'
 import CardBrandingEditor from './CardBrandingEditor.vue'
 
 const props = defineProps<{ value: readonly CardBranding[]; locale: 'ru' | 'en'; disabled: boolean; selected?: string | undefined; canImport: boolean }>()
-const emit = defineEmits<{ change: [value: readonly CardBranding[]]; select: [id: string]; import: [] }>()
+const emit = defineEmits<{
+  change: [value: readonly CardBranding[]]
+  preview: [value: readonly CardBranding[]]
+  cancel: []
+  select: [id: string]
+  import: []
+}>()
 const text = (ru: string, en: string) => props.locale === 'ru' ? ru : en
 const active = computed(() => props.value.find((block) => block.id === props.selected) ?? props.value[0])
 const activeIndex = computed(() => props.value.findIndex((block) => block.id === active.value?.id))
@@ -29,8 +35,13 @@ function remove(): void {
   emit('change', remaining)
   if (next) emit('select', next.id)
 }
-function change(value: CardBranding): void {
-  emit('change', props.value.map((block) => block.id === value.id ? value : block))
+function change(
+  value: CardBranding,
+  preview = false,
+): void {
+  const next = props.value.map((block) => block.id === value.id ? value : block)
+  if (preview) emit('preview', next)
+  else emit('change', next)
 }
 </script>
 <template>
@@ -84,6 +95,8 @@ function change(value: CardBranding): void {
         :disabled="disabled"
         :can-import="canImport"
         @change="change"
+        @preview="change($event, true)"
+        @cancel="emit('cancel')"
         @import="emit('select', active.id); emit('import')"
       />
     </section>

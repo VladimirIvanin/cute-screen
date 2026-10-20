@@ -26,7 +26,7 @@ async function scrollToSection(title: string): Promise<void> {
     origin: await $('.cs-composition-body').getElement(),
     x: -140,
     y: 0,
-    deltaY: Math.round(bounds.top - bounds.bodyTop + 80),
+    deltaY: Math.round(bounds.top - bounds.bodyTop + 20),
     deltaX: 0,
     duration: 200,
   }).perform()
@@ -40,16 +40,15 @@ describe('appearance section headings', () => {
     await $('button[aria-label="Appearance"]').click()
     const panel = $('.cs-composition-panel')
     await panel.$('button=Padding').click()
-    await scrollToSection('Layout')
-    const layout = await sectionBounds('Layout')
+    await scrollToSection('Background & layout')
+    const layout = await sectionBounds('Background & layout')
     expect(layout.top).toBeGreaterThanOrEqual(layout.headerBottom)
     expect(layout.bottom).toBeLessThan(layout.end)
     await browser.saveScreenshot('artifacts/browser-e2e/composition-sticky-layout.png')
-    await scrollToSection('Background')
-    const background = await sectionBounds('Background')
-    expect((await sectionBounds('Layout')).bottom).toBeLessThanOrEqual(background.top)
-    expect(background.top).toBeGreaterThanOrEqual(background.headerBottom)
-    await panel.$('summary=Background').click()
-    await expect(panel.$('summary=Background').$('..')).not.toHaveAttribute('open')
+    await panel.$('summary=Background & layout').click()
+    await expect(panel.$('summary=Background & layout').$('..')).not.toHaveAttribute('open')
+    await panel.$('summary=Background & layout').click()
+    await scrollToSection('Background & layout')
+    expect((await sectionBounds('Background & layout')).top).toBeGreaterThanOrEqual(layout.headerBottom)
   }).timeout(120000)
 })

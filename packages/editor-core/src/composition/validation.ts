@@ -175,6 +175,14 @@ export function parseComposition(value: unknown): CompositionSettings {
   }
   number(input.radius, 'radius', 0, 4096)
   number(input.shadow, 'shadow', 0, 1)
+  if (input.shadowOptions !== undefined) {
+    const shadow = readJsonObject(input.shadowOptions, 'shadowOptions')
+    number(shadow.size, 'shadowOptions.size', 0.25, 4)
+    number(shadow.softness, 'shadowOptions.softness', 0.1, 2)
+    number(shadow.spread, 'shadowOptions.spread', -128, 256)
+    point(shadow.offset, 'shadowOptions.offset', -1024, 1024)
+    color(shadow.color, 'shadowOptions.color')
+  }
   if (!Array.isArray(input.branding) || input.branding.length > 64) throw new Error('composition branding is invalid')
   const blocks = input.branding.map(validateBranding)
   if (new Set(blocks.map((b) => b.id)).size !== blocks.length) throw new Error('composition duplicate branding id')

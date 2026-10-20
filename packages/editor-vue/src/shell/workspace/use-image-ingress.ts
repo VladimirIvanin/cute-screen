@@ -89,7 +89,10 @@ export function useImageIngress(
     })
   }, { immediate: true })
   const onEscape = (event: KeyboardEvent) => {
-    if (event.target instanceof Element && event.target.closest('[role="dialog"], [aria-haspopup="dialog"][aria-expanded="true"]')) return
+    if (event.target instanceof Element && event.target.closest([
+      'input', 'textarea', 'select', '[contenteditable]', '[role="slider"]',
+      '[role="dialog"]', '[aria-haspopup="dialog"][aria-expanded="true"]',
+    ].join(','))) return
     if (
       event.key !== 'Escape' ||
       (!workspace.contentImageImporting.value &&

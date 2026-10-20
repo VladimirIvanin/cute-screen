@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import type {} from './harness-globals'
 import {
   computed,
   defineAsyncComponent,
+  nextTick,
   onBeforeUnmount,
   onMounted,
   shallowRef,
@@ -14,7 +16,6 @@ import {
   shortcutLetter,
   type CaptureProgressState,
   type CanvasViewportHosts,
-  type EditorDocumentV1,
   type ShellActionAdapter,
   type ShellDocumentState,
   type TextureFillBridge,
@@ -38,38 +39,6 @@ import { createDesktopShellActions } from './desktop-shell-actions'
 import { installDesktopLifecycleGuards } from './platform/tauri/lifecycle-adapter'
 import { M08HarnessController } from './m08-harness'
 import { openActivationSettings } from './platform/tauri/activation-settings-adapter'
-
-declare global {
-  interface Window {
-    __cuteScreenE2eDocument?: {
-      setCrop(): void
-      snapshot():
-        | {
-          crop: unknown
-          layers: EditorDocumentV1['layers']
-          saveState: string
-        }
-        | undefined
-    }
-    __cuteScreenE2eM05?: {
-      snapshot(): EditorDocumentV1 | undefined
-      versionToken(): number | undefined
-    }
-    __cuteScreenE2eM08?: {
-      snapshot():
-        | {
-          document: EditorDocumentV1
-          decodedSource?: {
-            width: number
-            height: number
-          }
-          clipboardText?: string
-        }
-        | undefined
-      readClipboardText(): Promise<string | undefined>
-    }
-  }
-}
 
 const harness = readAppHarnessConfig()
 const fixture = harness.fixture
@@ -125,11 +94,18 @@ const contentImageBridge = shallowRef<ContentImageBridge>()
 const clipboardBridge = shallowRef<ClipboardBridge>()
 const systemFonts = shallowRef<readonly SystemFontFace[]>([])
 const canvasViewportHosts = shallowRef<CanvasViewportHosts>()
+async function waitForCanvasRender(): Promise<void> {
+  await nextTick()
+  const wait = canvasViewportHosts.value?.waitForRender
+  if (!wait) throw new Error('Canvas render host has not mounted')
+  await wait()
+}
 const m08HarnessController = new M08HarnessController(harness, {
   documentSession,
   sourceImage,
   clipboardBridge,
   correlationId,
+  waitForRender: waitForCanvasRender,
 })
 const desktopActions: ShellActionAdapter | undefined =
   import.meta.env.VITE_TEST_HARNESS === 'true' && !m04CaptureHarness
@@ -336,6 +312,7 @@ async function mountM05HarnessDocument(): Promise<void> {
     correlationId,
     installClipboardBridge: () => m08HarnessController.installBrowserClipboardBridge(),
     installHarnessFacade: () => m08HarnessController.installFacade(),
+    waitForRender: waitForCanvasRender,
   })
   if (
     import.meta.env.VITE_TEST_HARNESS === 'true' &&

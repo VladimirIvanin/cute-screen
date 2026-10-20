@@ -21,8 +21,6 @@ describe('visual background fills', () => {
     await $('button[aria-label="Appearance"]').click()
     const panel = $('.cs-composition-panel')
     await panel.$('button=Padding').click()
-    await panel.$('summary=Presets').click()
-    await panel.$('summary=Layout').click()
     const types = panel.$('.cs-card-fill-types')
     expect(await types.$$('button')).toHaveLength(7)
     for (const kind of ['transparent', 'solid', 'radial', 'freeform', 'image', 'blurred', 'linear']) {

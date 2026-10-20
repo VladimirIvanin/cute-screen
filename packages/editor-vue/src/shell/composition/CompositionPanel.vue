@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import {
+  provide,
+  ref,
+} from 'vue'
+import { numericContextKey } from '../ui/numeric-preview'
 import {
   createComposition,
   type CompositionSettings,
@@ -12,8 +16,9 @@ import CardBackground from './CardBackground.vue'
 import CardFrame from './CardFrame.vue'
 import CardBranding from './CardBranding.vue'
 import CardNumber from './CardNumber.vue'
-const props = defineProps<{ value?: CompositionSettings | undefined; locale: 'ru' | 'en'; disabled: boolean; materials: readonly MaterialRecord[]; pending: boolean; error: string; canImport: boolean; canSave: boolean; editing: boolean; target: 'background' | 'header' | 'footer'; selectedBrand?: string | undefined }>()
-const emit = defineEmits<{ change: [value: CompositionSettings]; preview: [value: CompositionSettings]; cancel: []; close: []; layers: []; edit: [target: 'background' | 'header' | 'footer']; import: [kind: 'background' | 'logo', target?: 'background' | 'header' | 'footer']; save: [kind: 'preset' | 'gradient', title: string]; remove: [id: string]; apply: [record: MaterialRecord]; retry: []; selectBrand: [id: string] }>()
+const props = defineProps<{ active?: boolean; applied?: boolean; value?: CompositionSettings | undefined; locale: 'ru' | 'en'; disabled: boolean; materials: readonly MaterialRecord[]; pending: boolean; error: string; canImport: boolean; canSave: boolean; editing: boolean; target: 'background' | 'header' | 'footer'; selectedBrand?: string | undefined }>()
+const emit = defineEmits<{ change: [value: CompositionSettings]; preview: [value: CompositionSettings]; cancel: []; reset: []; close: []; layers: []; edit: [target: 'background' | 'header' | 'footer']; import: [kind: 'background' | 'logo', target?: 'background' | 'header' | 'footer']; save: [kind: 'preset' | 'gradient', title: string]; remove: [id: string]; apply: [record: MaterialRecord]; retry: []; selectBrand: [id: string] }>()
+provide(numericContextKey, () => `${props.active !== false}:${props.applied}:${props.disabled}:${props.selectedBrand}:${props.target}:${props.editing}`)
 const title = ref(''), removeId = ref<string>()
 const text = (ru: string, en: string) => props.locale === 'ru' ? ru : en
 function start(kind: CompositionStart): void {
@@ -49,23 +54,104 @@ function background(
       <p v-if="disabled && !value">{{ text('Откройте изображение для оформления.', 'Open an image to start.') }}</p>
       <p v-if="pending" role="status">{{ text('Сохранение материала…', 'Saving material…') }}</p>
       <p v-if="error" role="alert">{{ error }} <button type="button" @click="emit('retry')">{{ text('Повторить', 'Retry') }}</button></p>
-      <details open>
-        <summary>{{ text('Пресеты', 'Presets') }}</summary>
-        <div class="cs-card-buttons">
-          <button
-            v-for="(label, kind) in { padding: text('Поля вокруг', 'Padding'), browser: text('Браузер', 'Browser'), phone: text('Телефон', 'Phone') }"
-            :key="kind"
-            type="button"
+      <div
+        class="cs-card-buttons cs-card-starters"
+        role="group"
+        :aria-label="text('Быстрые стили', 'Quick styles')"
+      >
+        <button
+          v-for="(label, kind) in { padding: text('Поля вокруг', 'Padding'), browser: text('Браузер', 'Browser'), phone: text('Телефон', 'Phone') }"
+          :key="kind"
+          type="button"
+          :disabled="disabled"
+          @click="start(kind)"
+        >
+          {{ label }}
+        </button>
+      </div>
+      <template v-if="value">
+        <details open>
+          <summary>{{ text('Фон и макет', 'Background & layout') }}</summary><CardLayout
+            :value="value"
+            :locale="locale"
             :disabled="disabled"
-            @click="start(kind)"
+            @change="emit('change', $event)"
+            @preview="emit('preview', $event)"
+            @cancel="emit('cancel')"
           >
-            {{ label }}
-          </button>
-        </div>
+            <template #background>
+              <CardBackground
+                :value="value.background"
+                :locale="locale"
+                :disabled="disabled"
+                :can-import="canImport"
+                :editing="editing && target === 'background'"
+                @change="background('background', $event)"
+                @preview="background('background', $event, true)"
+                @cancel="emit('cancel')"
+                @edit="emit('edit', 'background')"
+                @import="emit('import', 'background')"
+              />
+            </template>
+          </CardLayout>
+        </details>
+        <details>
+          <summary>{{ text('Рамка', 'Frame') }}</summary><CardFrame
+            :value="value.frame"
+            :locale="locale"
+            :disabled="disabled"
+            @change="emit('change', { ...value, frame: $event })"
+            @preview="emit('preview', { ...value, frame: $event })"
+            @cancel="emit('cancel')"
+          />
+        </details>
+        <details v-for="band in ['header', 'footer'] as const" :key="band">
+          <summary>{{ band === 'header' ? text('Верхняя полоса', 'Header strip') : text('Нижняя полоса', 'Footer strip') }}</summary>
+          <CardNumber
+            :label="text('Высота полосы', 'Strip height')"
+            :value="value[band].height"
+            :min="0"
+            :max="8192"
+            :disabled="disabled"
+            @change="emit('change', { ...value, [band]: { ...value[band], height: $event } })"
+            @preview="emit('preview', { ...value, [band]: { ...value[band], height: $event } })"
+            @cancel="emit('cancel')"
+          />
+          <CardBackground
+            :value="value[band].fill"
+            :locale="locale"
+            :disabled="disabled"
+            :can-import="canImport"
+            :editing="editing && target === band"
+            @change="background(band, $event)"
+            @preview="background(band, $event, true)"
+            @cancel="emit('cancel')"
+            @edit="emit('edit', band)"
+            @import="emit('import', 'background', band)"
+          />
+        </details>
+
+        <details>
+          <summary>{{ text('Подписи', 'Signatures') }}</summary><CardBranding
+            :value="value.branding"
+            :locale="locale"
+            :disabled="disabled"
+            :can-import="canImport"
+            :selected="selectedBrand"
+            @change="emit('change', { ...value, branding: $event })"
+            @preview="emit('preview', { ...value, branding: $event })"
+            @cancel="emit('cancel')"
+            @select="emit('selectBrand', $event)"
+            @import="emit('import', 'logo')"
+          />
+        </details>
+      </template>
+      <details>
+        <summary>{{ text('Пресеты', 'Presets') }}</summary>
         <template v-if="value">
           <label>{{ text('Название пресета', 'Preset name') }}<input
-            class="cs-card-input"
             v-model="title"
+            class="cs-card-input"
             :disabled="disabled"
             maxlength="128"
           /></label>
@@ -116,75 +202,17 @@ function background(
           <p>{{ text('Убрать из материалов? Документы сохранят свои ресурсы.', 'Remove from materials? Documents keep their resources.') }}</p><button type="button" @click="emit('remove', removeId!); removeId = undefined">{{ text('Удалить', 'Remove') }}</button><button type="button" @click="removeId = undefined">{{ text('Отмена', 'Cancel') }}</button>
         </div>
       </details>
-      <template v-if="value">
-        <details open>
-          <summary>{{ text('Макет', 'Layout') }}</summary><CardLayout
-            :value="value"
-            :locale="locale"
-            :disabled="disabled"
-            @change="emit('change', $event)"
-            @preview="emit('preview', $event)"
-            @cancel="emit('cancel')"
-          />
-        </details>
-        <details open>
-          <summary>{{ text('Фон', 'Background') }}</summary><CardBackground
-            :value="value.background"
-            :locale="locale"
-            :disabled="disabled"
-            :can-import="canImport"
-            :editing="editing && target === 'background'"
-            @change="background('background', $event)"
-            @preview="background('background', $event, true)"
-            @cancel="emit('cancel')"
-            @edit="emit('edit', 'background')"
-            @import="emit('import', 'background')"
-          />
-        </details>
-        <details v-for="band in ['header', 'footer'] as const" :key="band">
-          <summary>{{ band === 'header' ? text('Верхняя полоса', 'Header strip') : text('Нижняя полоса', 'Footer strip') }}</summary>
-          <CardNumber
-            :label="text('Высота полосы', 'Strip height')"
-            :value="value[band].height"
-            :min="0"
-            :max="8192"
-            :disabled="disabled"
-            @change="emit('change', { ...value, [band]: { ...value[band], height: $event } })"
-          />
-          <CardBackground
-            :value="value[band].fill"
-            :locale="locale"
-            :disabled="disabled"
-            :can-import="canImport"
-            :editing="editing && target === band"
-            @change="background(band, $event)"
-            @preview="background(band, $event, true)"
-            @cancel="emit('cancel')"
-            @edit="emit('edit', band)"
-            @import="emit('import', 'background', band)"
-          />
-        </details>
-        <details>
-          <summary>{{ text('Рамка', 'Frame') }}</summary><CardFrame
-            :value="value.frame"
-            :locale="locale"
-            :disabled="disabled"
-            @change="emit('change', { ...value, frame: $event })"
-          />
-        </details>
-        <details>
-          <summary>{{ text('Подписи', 'Signatures') }}</summary><CardBranding
-            :value="value.branding"
-            :locale="locale"
-            :disabled="disabled"
-            :can-import="canImport"
-            :selected="selectedBrand"
-            @change="emit('change', { ...value, branding: $event })"
-            @select="emit('selectBrand', $event)"
-            @import="emit('import', 'logo')"
-          />
-        </details>
-      </template>
     </div>
+    <footer class="cs-composition-footer">
+      <button
+        type="button"
+        data-composition-reset
+        :disabled="disabled || !applied"
+        :title="applied ? text('Вернуть оформление можно через отмену действия', 'Undo restores the appearance') : text('Оформление не применено', 'No appearance applied')"
+        @click="emit('reset')"
+      >
+        {{ text('Убрать оформление', 'Remove appearance') }}
+      </button>
+    </footer>
   </aside>
 </template>

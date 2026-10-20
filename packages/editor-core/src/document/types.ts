@@ -402,7 +402,7 @@ export type CensorRegion =
   | Readonly<{ readonly kind: 'rectangle' }>
   | Readonly<{
     readonly kind: 'freeform'
-    /** An implicitly closed, simple polygon in layer-local coordinates. */
+    /** Implicitly closed path in layer-local coordinates, using nonzero winding. */
     readonly points: readonly (Point & JsonObject)[]
   }>
 

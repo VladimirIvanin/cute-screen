@@ -61,8 +61,6 @@ describe('compact appearance gradient', () => {
     await $('button[aria-label="Appearance"]').click()
     const panel = $('.cs-composition-panel')
     await panel.$('button=Padding').click()
-    await panel.$('summary=Presets').click()
-    await panel.$('summary=Layout').click()
     await expectControlsFit()
     await panel.$('button=Edit on canvas').click()
     for (const degrees of [0, 45, 90, 180, 270, 359]) {

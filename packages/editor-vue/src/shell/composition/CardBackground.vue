@@ -5,6 +5,7 @@ import { UiIcon } from '../icon'
 import CardColor from './CardColor.vue'
 import CardNumber from './CardNumber.vue'
 import CardGradient from './CardGradient.vue'
+import CardImagePreview from './CardImagePreview.vue'
 const props = defineProps<{ value: CardBackground; locale: 'ru' | 'en'; disabled: boolean; editing: boolean; canImport: boolean }>()
 const emit = defineEmits<{
   change: [value: CardBackground]
@@ -56,8 +57,14 @@ const fills = computed(() => ({
     <CardColor
       v-if="value.kind === 'solid'"
       :value="value.color"
+      :locale="locale"
+      :disabled="disabled"
       :label="text('Цвет фона', 'Background color')"
+      :opacity-label="text('Непрозрачность фона %', 'Background opacity %')"
+      compact
       @change="emit('change', { ...value, color: $event })"
+      @preview="emit('preview', { ...value, color: $event })"
+      @cancel="emit('cancel')"
     />
     <CardGradient
       v-if="['linear', 'radial', 'freeform'].includes(value.kind)"
@@ -71,8 +78,21 @@ const fills = computed(() => ({
       @edit="emit('edit')"
     />
     <template v-if="value.kind === 'image' || value.kind === 'blurred'">
+      <div v-if="value.kind === 'image' && value.image" class="cs-card-image-source">
+        <CardImagePreview :image="value.image" :locale="locale" />
+        <div class="cs-card-image-info">
+          <span>{{ value.image.width }} × {{ value.image.height }} · {{ value.image.format.toUpperCase() }}</span>
+          <button
+            type="button"
+            :disabled="!canImport"
+            @click="emit('import')"
+          >
+            {{ text('Заменить картинку', 'Replace image') }}
+          </button>
+        </div>
+      </div>
       <button
-        v-if="value.kind === 'image'"
+        v-else-if="value.kind === 'image'"
         type="button"
         :disabled="!canImport"
         @click="emit('import')"
@@ -87,6 +107,8 @@ const fills = computed(() => ({
         :min="1"
         :max="1600"
         @change="emit('change', { ...value, scale: $event / 100 })"
+        @preview="emit('preview', { ...value, scale: $event / 100 })"
+        @cancel="emit('cancel')"
       />
       <CardNumber
         v-for="axis in ['x', 'y'] as const"
@@ -94,6 +116,8 @@ const fills = computed(() => ({
         :label="`${text('Фон', 'Background')} ${axis.toUpperCase()}`"
         :value="value.offset[axis]"
         @change="emit('change', { ...value, offset: { ...value.offset, [axis]: $event } })"
+        @preview="emit('preview', { ...value, offset: { ...value.offset, [axis]: $event } })"
+        @cancel="emit('cancel')"
       />
       <CardNumber
         v-if="value.kind === 'blurred'"
@@ -102,6 +126,8 @@ const fills = computed(() => ({
         :min="0"
         :max="128"
         @change="emit('change', { ...value, blur: $event })"
+        @preview="emit('preview', { ...value, blur: $event })"
+        @cancel="emit('cancel')"
       />
     </template>
   </fieldset>

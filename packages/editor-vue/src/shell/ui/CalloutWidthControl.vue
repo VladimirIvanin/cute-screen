@@ -117,6 +117,7 @@ defineExpose({ close })
         </button>
         <p :id="hintId">{{ text('Grows to 480 px, then wraps.', 'Растёт до 480 px, затем перенос строк.') }}</p>
         <NumericControl
+          control-id="calloutTextWidth"
           :label="label()"
           :value="Math.max(width.minimum, Math.round(width.value * 100) / 100)"
           :min="width.minimum"

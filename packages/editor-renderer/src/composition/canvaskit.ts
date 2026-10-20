@@ -9,6 +9,7 @@ import type {
   CanvasKitSurface,
 } from '../backends/canvaskit/contracts'
 import { freeformPixels } from './freeform'
+import { drawBackdropCanvasKit } from './canvaskit-backdrop'
 
 export function drawGroupCanvasKit(
   kit: CanvasKitApi,
@@ -33,6 +34,11 @@ export function drawGroupCanvasKit(
     render(surface, density)
     const image = surface.makeImageSnapshot()
     try {
+      if (node.outerClip) {
+        const b = node.outerClip.bounds
+        canvas.clipRRect?.(kit.RRectXY(kit.XYWHRect(b.x, b.y, b.width, b.height),
+          node.outerClip.cornerRadius, node.outerClip.cornerRadius), kit.ClipOp?.Intersect, true)
+      }
       const c = node.clip
       canvas.clipRRect?.(kit.RRectXY(kit.XYWHRect(c.x,
         c.y,
@@ -49,14 +55,21 @@ export function drawGroupCanvasKit(
         paint.setImageFilter?.(filter)
       }
       const b = node.scene.outputBounds, d = node.destination
+      const scaleX = node.backdrop ? Math.max(1, Math.round(source.width * density)) / source.width : density
+      const scaleY = node.backdrop ? Math.max(1, Math.round(source.height * density)) / source.height : density
+      const sourceRect = kit.XYWHRect(
+        (fullSource ? b.x : 0) * scaleX,
+        (fullSource ? b.y : 0) * scaleY,
+        b.width * scaleX,
+        b.height * scaleY,
+      )
+      if (node.backdrop) {
+        drawBackdropCanvasKit(kit, canvas, image, sourceRect, node, scale, paint)
+        return
+      }
       canvas.drawImageRect(
         image,
-        kit.XYWHRect(
-          (fullSource ? b.x : 0) * density,
-          (fullSource ? b.y : 0) * density,
-          b.width * density,
-          b.height * density,
-        ),
+        sourceRect,
         kit.XYWHRect(d.x, d.y, d.width, d.height),
         paint,
       )

@@ -10,6 +10,7 @@ export interface M08HarnessPorts {
   readonly sourceImage: ShallowRef<HTMLImageElement | undefined>
   readonly clipboardBridge: ShallowRef<ClipboardBridge | undefined>
   readonly correlationId: () => string
+  readonly waitForRender: () => Promise<void>
 }
 
 export class M08HarnessController {
@@ -28,6 +29,7 @@ export class M08HarnessController {
   installFacade(): void {
     if (!this.#config.m08) return
     window.__cuteScreenE2eM08 = {
+      waitForRender: () => this.#ports.waitForRender(),
       snapshot: () => {
         const document = this.#ports.documentSession.value?.snapshot.core.document
         if (!document) return undefined

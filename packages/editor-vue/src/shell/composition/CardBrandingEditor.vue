@@ -12,13 +12,15 @@ import { parseHexColor } from '../tools/effects/color'
 import CardNumber from './CardNumber.vue'
 
 const props = defineProps<{ value: CardBranding; locale: 'ru' | 'en'; disabled: boolean; canImport: boolean }>()
-const emit = defineEmits<{ change: [value: CardBranding]; import: [] }>()
+const emit = defineEmits<{ change: [value: CardBranding]; preview: [value: CardBranding]; cancel: []; import: [] }>()
 const text = (ru: string, en: string) => props.locale === 'ru' ? ru : en
 function patch<K extends keyof CardBranding>(
   key: K,
   value: CardBranding[K],
+  preview = false,
 ): void {
-  emit('change', { ...props.value, [key]: value })
+  if (preview) emit('preview', { ...props.value, [key]: value })
+  else emit('change', { ...props.value, [key]: value })
 }
 function changeText(template: string): void {
   emit('change', resolveBrandingYear({ ...props.value, template }, new Date().getFullYear()))
@@ -65,6 +67,8 @@ const anchors = computed(() => {
         :min="6"
         :max="512"
         @change="patch('fontSize', $event)"
+        @preview="patch('fontSize', $event, true)"
+        @cancel="emit('cancel')"
       />
     </div>
     <div
@@ -132,12 +136,16 @@ const anchors = computed(() => {
             :label="axis.toUpperCase()"
             :value="value.offset[axis]"
             @change="patch('offset', { ...value.offset, [axis]: $event })"
+            @preview="patch('offset', { ...value.offset, [axis]: $event }, true)"
+            @cancel="emit('cancel')"
           /><CardNumber
             :label="text('Отступ', 'Inset')"
             :value="value.padding"
             :min="0"
             :max="4096"
             @change="patch('padding', $event)"
+            @preview="patch('padding', $event, true)"
+            @cancel="emit('cancel')"
           />
         </div>
       </div>
@@ -150,6 +158,8 @@ const anchors = computed(() => {
         :min="0"
         :max="100"
         @change="patch('opacity', $event / 100)"
+        @preview="patch('opacity', $event / 100, true)"
+        @cancel="emit('cancel')"
       />
       <CardNumber
         :label="text('Текст %', 'Text %')"
@@ -157,6 +167,8 @@ const anchors = computed(() => {
         :min="0"
         :max="100"
         @change="patch('color', { ...value.color, alpha: $event / 100 })"
+        @preview="patch('color', { ...value.color, alpha: $event / 100 }, true)"
+        @cancel="emit('cancel')"
       />
       <label class="cs-brand-backplate-toggle"><input
         type="checkbox"
@@ -181,6 +193,8 @@ const anchors = computed(() => {
           :min="0"
           :max="100"
           @change="patch('backplate', { ...value.backplate!, alpha: $event / 100 })"
+          @preview="patch('backplate', { ...value.backplate!, alpha: $event / 100 }, true)"
+          @cancel="emit('cancel')"
         />
       </template>
     </section>
@@ -200,6 +214,8 @@ const anchors = computed(() => {
           :min="1"
           :max="4096"
           @change="patch('imageSize', $event)"
+          @preview="patch('imageSize', $event, true)"
+          @cancel="emit('cancel')"
         /><button type="button" @click="patch('image', null)">{{ text('Убрать логотип', 'Remove logo') }}</button>
       </template>
     </section>

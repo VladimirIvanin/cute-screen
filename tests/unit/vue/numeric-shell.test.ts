@@ -33,6 +33,35 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks())
 
 describe('numeric parameters through the mounted editor', () => {
+  it('gives a numeric draft Escape priority over background image-drop feedback', async () => {
+    const session = arrowSession(arrowDocument())
+    const view = render(EditorShell, {
+      props: { documentSession: markRaw(session), contentImageBridge: {
+        subscribeImageDrop: vi.fn().mockRejectedValue(new Error('Drop listener unavailable')),
+        releaseImage: vi.fn(async () => undefined),
+        readImageBytes: vi.fn(async () => new ArrayBuffer(0)),
+        stageImage: vi.fn(),
+        importContentImage: vi.fn(async () => ({ kind: 'cancelled' as const })),
+      } },
+      global: { plugins: [createEditorShellPinia()] },
+    })
+    try {
+      const feedback = await screen.findByText('File drop is unavailable. Use G to choose an image.')
+      await fireEvent.click(screen.getByRole('button', { name: 'Appearance' }))
+      const panel = screen.getByRole('complementary', { name: 'Appearance' })
+      const input = within(panel).getByRole('spinbutton', { name: 'All sides' })
+      const before = session.snapshot
+      await fireEvent.update(input, '24')
+      await fireEvent.keyDown(input, { key: 'Escape' })
+      expect(input).toHaveValue('0')
+      expect(panel).toBeVisible()
+      expect(feedback).toBeInTheDocument()
+      expect(session.snapshot).toEqual(before)
+    } finally {
+      view.unmount()
+      session.dispose()
+    }
+  })
   it('previews and cancels inline font size without leaking defaults, then commits the text once', async () => {
     const session = arrowSession({ ...arrowDocument(), layers: [] })
     const view = render(EditorShell, {
@@ -118,6 +147,7 @@ describe('numeric parameters through the mounted editor', () => {
     await fireEvent.change(panel.getByRole('textbox', { name: 'HEX colour code' }), { target: { value: '#ff7556' } })
     await waitFor(() => expect(editor.style.getPropertyValue('--text-background-color')).toBe('rgba(255, 117, 86, 1)'))
     await fireEvent.update(panel.getByRole('spinbutton', { name: 'Padding' }), '12')
+    await fireEvent.keyDown(panel.getByRole('spinbutton', { name: 'Padding' }), { key: 'Tab' })
     await fireEvent.update(panel.getByRole('spinbutton', { name: 'Radius' }), '8')
     await waitFor(() => expect(editor.style.getPropertyValue('--text-background-radius')).toBe('8px'))
     expect(editor.style.getPropertyValue('--text-background-padding')).toBe('12px')
@@ -129,7 +159,14 @@ describe('numeric parameters through the mounted editor', () => {
     panel = within(await screen.findByRole('dialog', { name: 'Background' }))
     expect(panel.getByRole('spinbutton', { name: 'Padding' })).toHaveValue('0')
     await fireEvent.update(panel.getByRole('spinbutton', { name: 'Padding' }), '12')
+    await fireEvent.keyDown(panel.getByRole('spinbutton', { name: 'Padding' }), { key: 'Tab' })
     await fireEvent.update(panel.getByRole('spinbutton', { name: 'Radius' }), '8')
+    await fireEvent.keyDown(panel.getByRole('spinbutton', { name: 'Radius' }), { key: 'Escape' })
+    expect(panel.getByRole('spinbutton', { name: 'Radius' })).toHaveValue('0')
+    expect(panel.getByRole('spinbutton', { name: 'Padding' })).toHaveValue('12')
+    await waitFor(() => expect(editor.style.getPropertyValue('--text-background-padding')).toBe('12px'))
+    await fireEvent.update(panel.getByRole('spinbutton', { name: 'Radius' }), '8')
+    await fireEvent.keyDown(panel.getByRole('spinbutton', { name: 'Radius' }), { key: 'Tab' })
     await fireEvent.click(panel.getByRole('button', { name: 'Apply' }))
     expect(session.snapshot).toEqual(before)
     await fireEvent.keyDown(editor, { key: 'Enter', ctrlKey: true })

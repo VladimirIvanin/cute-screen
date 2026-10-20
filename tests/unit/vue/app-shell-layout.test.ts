@@ -34,7 +34,8 @@ describe('M02 editor shell', () => {
 
     await fireEvent.keyDown(screen.getByRole('dialog', { name: 'Настройки' }), { key: 'Escape' })
     await fireEvent.click(screen.getByRole('button', { name: 'Снимок' }))
-    expect(screen.getByRole('alert')).toHaveTextContent('Захват станет доступен после подключения native backend.')
+    expect(screen.getByRole('alert')).toHaveTextContent('Захват экрана сейчас недоступен.')
+    expect(within(screen.getByRole('alert')).getByRole('button', { name: 'Повторить' })).toBeInTheDocument()
   })
 
   it('docks filmstrip, tool rail and zoom in one bottom chrome row', async () => {

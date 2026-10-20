@@ -11,6 +11,7 @@ import {
 import { waitForStableCanvas } from '../canvas-ready'
 import { waitForShapeAnimation } from '../shape-toolbar'
 import { setShellPreferences } from './browser-m06-test-kit'
+import { verifyCompositionHighlighterPreview } from '../highlighter-live-preview'
 
 describe('highlighter through production capture', () => {
   it('shows the collapsed effects in Quick and Editor in both languages and themes', async () => {
@@ -52,6 +53,11 @@ describe('highlighter through production capture', () => {
       }
     }
   }).timeout(300000)
+  it('previews composition strokes while held and restores Escape with trusted native input', async () => {
+    await setShellPreferences('en', 'dark')
+    await browser.setWindowSize(1280, 900)
+    await verifyCompositionHighlighterPreview('artifacts/tauri-e2e', 'highlighter-live-native')
+  }).timeout(120000)
   it('draws and configures the highlighter in Quick Capture and the editor', async () => {
     await setShellPreferences('en', 'dark')
     await $('button[aria-label="Capture"]').click()

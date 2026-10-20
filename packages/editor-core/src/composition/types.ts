@@ -84,6 +84,13 @@ export interface CardBranding {
   readonly padding: number
   readonly backplate: CardColor | null
 }
+export interface CardShadowOptions {
+  readonly size: number
+  readonly softness: number
+  readonly spread: number
+  readonly offset: CardPoint
+  readonly color: CardColor
+}
 export interface CompositionSettings {
   readonly version: 1
   readonly layout: CardLayout
@@ -93,6 +100,7 @@ export interface CompositionSettings {
   readonly frame: CardFrame
   readonly radius: number
   readonly shadow: number
+  readonly shadowOptions?: CardShadowOptions
   readonly branding: readonly CardBranding[]
 }
 export type CompositionStart = 'padding' | 'header' | 'footer' | 'bands' | 'browser' | 'phone'

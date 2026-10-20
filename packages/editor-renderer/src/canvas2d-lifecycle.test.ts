@@ -17,6 +17,41 @@ function asHtmlCanvas(canvas: unknown): HTMLCanvasElement {
 }
 
 describe('Canvas2D renderer lifecycle and vector nodes', () => {
+  it('reuses bounded shadow masks across opacity edits and releases them on resize and dispose', async () => {
+    const surfaces: Canvas2DLike[] = []
+    const renderer = new Canvas2DRenderer({ exportCanvas: (width, height) => {
+      const canvas = createCanvas(width, height) as unknown as Canvas2DLike
+      surfaces.push(canvas)
+      return canvas
+    } })
+    await renderer.initialize({ scene: asHtmlCanvas(createCanvas(1, 1)),
+      overlay: asHtmlCanvas(createCanvas(1, 1)),
+      dpr: 1, correlationId: 'shadow-cache' })
+    const update = (
+      alpha: number,
+      blur: number,
+    ) => renderer.setScene(createRenderSceneSnapshot({ width: 300, height: 200,
+      nodes: [{ id: 'shadow', kind: 'rect', x: 30, y: 30, width: 200, height: 100, cornerRadius: 10,
+        visible: true, opacity: 1, rotation: 0, fill: { red: 0, green: 0, blue: 0, alpha: 0 },
+        outerShadows: [{ offsetX: 0, offsetY: 8, blur, spread: 4, color: { red: 0, green: 0, blue: 0, alpha } }] }] }))
+    try {
+      update(0.3, 20)
+      renderer.render(['scene'])
+      expect(surfaces).toHaveLength(2)
+      renderer.render(['scene'])
+      update(0.8, 20)
+      renderer.render(['scene'])
+      expect(surfaces).toHaveLength(2)
+      update(0.8, 30)
+      renderer.render(['scene'])
+      expect(surfaces).toHaveLength(4)
+      expect(surfaces.slice(0, 2).every((canvas) => canvas.width === 1 && canvas.height === 1)).toBe(true)
+      expect(surfaces.every((canvas) => canvas.width <= 2048 && canvas.height <= 2048)).toBe(true)
+    } finally {
+      renderer.dispose()
+    }
+    expect(surfaces.every((canvas) => canvas.width === 1 && canvas.height === 1)).toBe(true)
+  })
   it('keeps the current texture when an older resource with the same id is disposed', async () => {
     const renderer = new Canvas2DRenderer()
     const scene = createCanvas(4, 4)

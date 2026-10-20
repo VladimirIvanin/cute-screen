@@ -205,6 +205,26 @@ describe('M08 manual precision tools', () => {
     })
   })
 
+  it.each(['solid', 'blur', 'pixelate'] as const)('closes a crossed freeform %s path without replacing it by a rectangle', async (mode) => {
+    const defaults = { ...precisionDefaults,
+      censor: { ...precisionDefaults.censor, region: 'freeform' as const, mode } }
+    const { scene, emitted } = mountViewportDocument('censor', documentFixture(), defaults)
+    const points = [{ x: 20, y: 20 }, { x: 100, y: 70 }, { x: 20, y: 70 },
+      { x: 100, y: 20 }, { x: 20, y: 20 }]
+    await fireEvent.pointerDown(scene, { pointerId: 21, clientX: 20, clientY: 20 })
+    for (const point of points.slice(1)) await fireEvent.pointerMove(scene, {
+      pointerId: 21, clientX: point.x, clientY: point.y,
+    })
+    await fireEvent.pointerUp(scene, { pointerId: 21, clientX: 20, clientY: 20 })
+    const additions = emitted().addLayer as unknown as readonly (readonly unknown[])[]
+    expect(additions).toHaveLength(1)
+    expect(additions[0]?.[0]).toMatchObject({ kind: 'censor', payload: {
+      effect: { mode }, region: { kind: 'freeform', points: [
+        { x: 0, y: 0 }, { x: 80, y: 50 }, { x: 0, y: 50 }, { x: 80, y: 0 },
+      ] },
+    } })
+  })
+
   it('reports a not-ready eyedropper scene and cancels sampling with a secondary pointer', async () => {
     const view = render(CanvasViewport, {
       props: {

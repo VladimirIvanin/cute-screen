@@ -208,6 +208,8 @@ describe('callout label width control', () => {
     expect(rendered.emitted().change).toEqual([['calloutTextWidth', '720']])
     await fireEvent.update(input, '800')
     await fireEvent.keyDown(input, { key: 'Escape' })
+    expect(input).toBeInTheDocument()
+    await fireEvent.keyDown(input, { key: 'Escape' })
     expect(rendered.emitted().change).toHaveLength(1)
     expect(rendered.queryByRole('dialog')).not.toBeInTheDocument()
     expect(trigger).toHaveFocus()

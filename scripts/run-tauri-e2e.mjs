@@ -22,6 +22,9 @@ await mkdir(runtimeDirectory, { recursive: true })
 const embeddedWebDriverPort = Number.parseInt(process.env.TAURI_WEBDRIVER_PORT ?? '4445', 10)
 
 const scenarios = [
+  { id: 'frame-seams', spec: 'tests/e2e/specs/tauri-frame-seams.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },
+  { id: 'blur-optimization', spec: 'tests/e2e/specs/tauri-blur-optimization.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },
+  { id: 'numeric-keyboard', spec: 'tests/e2e/specs/tauri-numeric-keyboard.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },
   { id: 'creative-fonts', persistenceGroup: 'creative-fonts', spec: 'tests/e2e/specs/tauri-creative-fonts.e2e.ts', harnessQuery: '?m04=1&m08=1', driverProvider: 'external' },
   { id: 'creative-fonts-reopen', persistenceGroup: 'creative-fonts', spec: 'tests/e2e/specs/tauri-creative-fonts-reopen.e2e.ts', harnessQuery: '?m04=1&m08=1', driverProvider: 'external' },
   { id: 'composition', persistenceGroup: 'composition', spec: 'tests/e2e/specs/tauri-composition.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },

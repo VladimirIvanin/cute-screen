@@ -3,6 +3,8 @@ import {
   rebaseCalloutLayer,
   withCalloutBackground,
   createCensorLayer,
+  hasFreeformArea,
+  pointsBounds,
   createDocumentRenderScene,
   createDrawingLayer,
   createLoupeLayer,
@@ -52,13 +54,17 @@ function freeformDraftPoints(
   start: CanvasPoint,
   end: CanvasPoint,
 ): readonly CanvasPoint[] {
-  if (points.length >= 3) {
-    const area = points.reduce((sum, point, index) => {
-      const next = points[(index + 1) % points.length]!
-      return sum + point.x * next.y - next.x * point.y
-    }, 0)
-    if (Math.abs(area) > 0.5) return points
-  }
+  const path = points.filter((point, index) => index === 0 ||
+    point.x !== points[index - 1]!.x || point.y !== points[index - 1]!.y)
+  const first = path[0]
+  const last = path.at(-1)
+  if (
+    first &&
+    last &&
+    first.x === last.x &&
+    first.y === last.y
+  ) path.pop()
+  if (hasFreeformArea(path)) return path
   const bounds = rectFromPoints(start, end)
   return [
     { x: bounds.x, y: bounds.y },
@@ -161,7 +167,10 @@ export class DraftController {
     const defaults = gesture.precisionDefaults ?? props.precisionDefaults ?? DEFAULT_PRECISION_TOOLS
     const bounds = rectFromPoints(gesture.start, gesture.current)
     if (gesture.tool === 'censor') {
-      if (bounds.width < 1 || bounds.height < 1) return undefined
+      const points = defaults.censor.region === 'freeform'
+        ? freeformDraftPoints(gesture.points, gesture.start, gesture.current) : undefined
+      const censorBounds = points ? pointsBounds(points) : bounds
+      if (censorBounds.width < 1 || censorBounds.height < 1) return undefined
       const effect =
         defaults.censor.mode === 'pixelate'
           ? ({
@@ -177,10 +186,10 @@ export class DraftController {
       return createCensorLayer({
         id,
         region:
-          defaults.censor.region === 'freeform'
+          points
             ? {
                 kind: 'freeform',
-                points: freeformDraftPoints(gesture.points, gesture.start, gesture.current),
+                points,
               }
             : { kind: 'rectangle', bounds },
         effect,

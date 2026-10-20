@@ -142,7 +142,15 @@ function borderColor(value: string): void {
   if (color && frame.value.border) setFrame({ border: { ...frame.value.border, color } })
 }
 function borderWidth(width: number): void {
-  setFrame({ border: width === 0 ? null : { ...DEFAULT_CALLOUT_FRAME.border!, ...frame.value.border, width } })
+  change('calloutFrame', borderPreview(width))
+}
+function framePreview(patch: Partial<CalloutFrame>): string {
+  return JSON.stringify({ ...frame.value, ...patch })
+}
+function borderPreview(width: number): string {
+  return framePreview({
+    border: width === 0 ? null : { ...DEFAULT_CALLOUT_FRAME.border!, ...frame.value.border, width },
+  })
 }
 function insert(): void {
   const canvas = triggers.get('route')?.closest('.cs-workbench')
@@ -268,6 +276,7 @@ watch(() => props.schema.disabled, (disabled) => {
           <div class="cs-callout-line-properties">
             <NumericControl
               :label="text('Thickness', 'Толщина')"
+              control-id="width"
               :value="payload.stroke.width"
               :min="1"
               :max="24"
@@ -316,6 +325,8 @@ watch(() => props.schema.disabled, (disabled) => {
             />
             <NumericControl
               :label="text('Padding', 'Отступ')"
+              control-id="calloutFrame"
+              :preview-value="(padding) => framePreview({ padding })"
               :value="frame.padding"
               :min="0"
               :max="256"
@@ -326,6 +337,8 @@ watch(() => props.schema.disabled, (disabled) => {
             />
             <NumericControl
               v-if="frame.kind !== 'capsule' && frame.kind !== 'accent'"
+              control-id="calloutFrame"
+              :preview-value="(radius) => framePreview({ radius })"
               :label="text('Radius', 'Скругление')"
               :value="frame.radius"
               :min="0"
@@ -337,6 +350,8 @@ watch(() => props.schema.disabled, (disabled) => {
             />
             <NumericControl
               :label="frame.kind === 'accent' ? text('Accent width', 'Толщина акцента') : text('Border width', 'Толщина рамки')"
+              control-id="calloutFrame"
+              :preview-value="borderPreview"
               :value="frame.border?.width ?? 0"
               :min="0"
               :max="24"

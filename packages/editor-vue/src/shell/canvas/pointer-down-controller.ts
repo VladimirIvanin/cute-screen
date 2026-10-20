@@ -366,5 +366,6 @@ function beginDrawing(
     points: [point],
     ...(tool === 'pencil' || tool === 'marker' ? { stroke: beginStroke(point, event.shiftKey) } : {}),
   })
-  context.invalidateOverlay()
+  if (tool === 'marker' && context.props.compositionDocument) context.invalidateGesturePreview()
+  else context.invalidateOverlay()
 }

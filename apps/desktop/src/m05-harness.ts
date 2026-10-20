@@ -11,6 +11,7 @@ export interface M05HarnessPorts {
   readonly correlationId: () => string
   readonly installClipboardBridge: () => void
   readonly installHarnessFacade: () => void
+  readonly waitForRender: () => Promise<void>
 }
 
 export async function mountM05HarnessDocument(
@@ -40,6 +41,7 @@ export async function mountM05HarnessDocument(
   window.__cuteScreenE2eM05 = {
     snapshot: () => ports.documentSession.value?.snapshot.core.document,
     versionToken: () => ports.documentSession.value?.snapshot.core.versionToken,
+    waitForRender: ports.waitForRender,
   }
   ports.installClipboardBridge()
   ports.installHarnessFacade()

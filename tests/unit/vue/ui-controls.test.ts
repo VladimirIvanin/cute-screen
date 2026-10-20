@@ -68,7 +68,7 @@ describe('Naive UI editor control adapters', () => {
         ariaLabel: 'Rotation',
       },
     })
-    expect(number.getByRole('textbox')).toBeInTheDocument()
+    expect(number.getByRole('spinbutton', { name: 'Rotation' })).toBeInTheDocument()
     expect(number.emitted('commit')).toBeUndefined()
 
     const color = render(DeferredColorPicker, {

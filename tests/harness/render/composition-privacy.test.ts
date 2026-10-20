@@ -20,7 +20,7 @@ import type { Canvas2DLike } from '../../../packages/editor-renderer/src/backend
 import { rgba } from './golden-assertion-test-kit'
 
 describe('composition privacy', () => {
-  it('samples censored content for blurred backgrounds and card loupes at export and thumbnail sizes', async () => {
+  it.each(['padding', 'phone', 'browser'] as const)('samples censored %s content for backgrounds and card loupes', async (startKind) => {
     const bytes = await readFile('tests/fixtures/generated/ui-4k.png')
     const image = await loadImage(bytes)
     const other = createCanvas(image.width, image.height)
@@ -34,7 +34,7 @@ describe('composition privacy', () => {
       baseLayerId: '019c1f62-058e-7000-8000-000000000001', timestamp: '2026-10-20T00:00:00Z',
       source: { blobHash: hash, format: 'png', mimeType: 'image/png', provenance: 'fileOpen', width: image.width, height: image.height,
         orientationApplied: true, color: { colorSpace: 'srgb', hasIccProfile: false } } })
-    const start = createComposition()
+    const start = createComposition(startKind)
     const composition = { ...start, layout: { ...start.layout, mode: 'fixed' as const, width: 640, height: 480 },
       background: { ...start.background, kind: 'blurred' as const, blur: 24 } }
     const censor = createCensorLayer({ id: 'censor', region: { kind: 'rectangle', bounds: { x: 0, y: 0, ...initial.canvas } },

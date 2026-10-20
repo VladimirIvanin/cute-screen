@@ -1,4 +1,8 @@
-export { sketchSeed } from '@cute-screen/editor-core'
+export {
+  sketchSeed,
+  hasFreeformArea,
+  pointsBounds,
+} from '@cute-screen/editor-core'
 export { measureRichTextContent } from './rich-text/measure-content'
 export {
   createPlacedEmoji,
@@ -291,6 +295,8 @@ export type {
   Renderer,
   RendererBackend,
   RenderExportOptions,
+  PrepareEffectsOptions,
+  EffectPreparationRenderer,
   RendererRuntimeState,
 } from './types'
 
@@ -414,6 +420,8 @@ export { prepareCompositionScene } from './composition/freeform'
 export {
   DEFAULT_PRESENTATION_SETTINGS,
   createComposition,
+  createCardShadowOptions,
+  type CardShadowOptions,
   compositionInteractionSpace,
   createCardBackground,
   createCardBranding,

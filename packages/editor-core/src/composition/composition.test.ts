@@ -4,6 +4,7 @@ import {
   it,
 } from 'vitest'
 import { documentFixture as sceneFixture } from '../document/scene/test-kit'
+import type { EditorDocument } from '../document/types'
 import {
   parseEditorDocument,
   serializeEditorDocument,
@@ -24,6 +25,76 @@ import {
 const documentFixture = { ...sceneFixture, layers: sceneFixture.layers.map((layer) => layer.kind === 'image' ? { ...layer, payload: { ...layer.payload, crop: null, mask: null, border: null, radius: 0 } } : layer) }
 
 describe('publication card contract', () => {
+  it('defaults new frames to dark while preserving saved light frames and presets', () => {
+    for (const start of ['padding', 'browser', 'phone', 'header', 'footer', 'bands'] as const) {
+      expect(createComposition(start).frame.theme).toBe('dark')
+    }
+    const base = createComposition('browser')
+    const light = { ...base, frame: { ...base.frame, theme: 'light' as const } }
+    const document = { ...documentFixture, presentation: { ...documentFixture.presentation, composition: light } }
+    const restored = parseEditorDocument(JSON.parse(serializeEditorDocument(document)))
+    if (restored.kind !== 'editable') throw new Error('editable')
+    expect(restored.document.presentation.composition?.frame.theme).toBe('light')
+    expect(compositionPreset(light).frame.theme).toBe('light')
+  })
+  it('persists independent shadow size, softness, spread, position and color with undo', () => {
+    const base = createComposition()
+    const options = { size: 4, softness: 1.5, spread: 24, offset: { x: -20, y: 30 },
+      color: { red: 0.2, green: 0.1, blue: 0.4, alpha: 1 } }
+    const document = { ...documentFixture, presentation: { ...documentFixture.presentation,
+      composition: { ...base, shadow: 0.8, shadowOptions: options } } }
+    const restored = parseEditorDocument(JSON.parse(serializeEditorDocument(document)))
+    if (restored.kind !== 'editable') throw new Error('editable')
+    expect(restored.document.presentation.composition).toMatchObject({ shadowOptions: options })
+    const shadowOf = (doc: EditorDocument) => {
+      const node = createDocumentRenderScene(doc).nodes.find((entry) => entry.id === 'card:shadow:0')
+      if (node?.kind !== 'rect') throw new Error('shadow')
+      return node.outerShadows!
+    }
+    const regular = shadowOf({ ...document,
+      presentation: { ...document.presentation, composition: { ...base, shadow: 0.8 } } })
+    const enlarged = shadowOf(restored.document)
+    expect(enlarged[2]!.blur).toBeCloseTo(regular[2]!.blur * 6)
+    expect(enlarged[2]!.offsetX).toBe(-20)
+    expect(enlarged[2]!.spread).toBeGreaterThan(0)
+    expect(enlarged[2]!.color.red).toBe(0.2)
+    expect(enlarged[2]!.color.alpha).toBe(regular[2]!.color.alpha)
+    const manager = new CommandManager(restored.document)
+    const before = manager.snapshot.document.presentation
+    manager.execute({ type: 'setPresentation', before, after: { ...before,
+      composition: { ...document.presentation.composition, shadowOptions: { ...options, size: 1 } } } })
+    manager.undo()
+    expect(manager.snapshot.document.presentation.composition).toMatchObject({ shadowOptions: { size: 4 } })
+    manager.redo()
+    expect(manager.snapshot.document.presentation.composition).toMatchObject({ shadowOptions: { size: 1 } })
+    for (const invalid of [{ size: 5 }, { softness: 0 }, { spread: 257 },
+      { offset: { x: NaN, y: 0 } }, { color: { ...options.color, red: 2 } }]) {
+      expect(() => parseEditorDocument({ ...document, presentation: { ...document.presentation,
+        composition: { ...base, shadowOptions: { ...options, ...invalid } } } })).toThrow()
+    }
+  })
+  it.each(['none', 'browser', 'phone'] as const)('uses three distinct outer shadow layers for %s', (kind) => {
+    const base = createComposition('padding')
+    const composition = { ...base, radius: 38, shadow: 0.83,
+      layout: { ...base.layout, scale: 0.99 }, frame: { ...base.frame, kind } }
+    const document = { ...documentFixture, presentation: { ...documentFixture.presentation, composition } }
+    const layout = resolveCompositionLayout(document)
+    const node = createDocumentRenderScene(document).nodes.find((entry) => entry.id === 'card:shadow:0')
+    if (node?.kind !== 'rect') throw new Error('shadow carrier')
+    expect(node.outerShadows).toHaveLength(3)
+    const [contact, key, ambient] = node.outerShadows!
+    expect(contact!.blur).toBeLessThan(key!.blur)
+    expect(key!.blur).toBeLessThan(ambient!.blur)
+    expect(contact!.offsetY).toBeLessThan(key!.offsetY)
+    expect(key!.offsetY).toBeLessThan(ambient!.offsetY)
+    expect(ambient!.color.alpha).toBeLessThan(contact!.color.alpha)
+    expect(node.x).toBe(layout.frame.x)
+    expect(node.y).toBe(layout.frame.y)
+    expect(node.width).toBe(layout.frame.width)
+    expect(node.height).toBe(layout.frame.height)
+    expect(Object.isFrozen(node.outerShadows)).toBe(true)
+    expect(Object.isFrozen(contact)).toBe(true)
+  })
   it('opens v7 without mutating its raw object and serializes edits as v8', () => {
     const raw = { ...structuredClone(documentFixture), schemaVersion: 7 }
     const before = JSON.stringify(raw)
@@ -126,9 +197,9 @@ describe('publication card contract', () => {
     const body = nodes.find((node) => node.id === 'card:frame')
     const shadow = nodes.find((node) => node.id === 'card:shadow:0')
     if (body?.kind !== 'rect' || shadow?.kind !== 'rect') throw new Error('phone body and shadow')
-    expect(shadow.cornerRadius).toBeCloseTo(body.cornerRadius! + 1)
-    expect(shadow.x).toBe(body.x - 1)
-    expect(shadow.y).toBe(body.y + 4)
+    expect(shadow.cornerRadius).toBeCloseTo(body.cornerRadius!)
+    expect(shadow.x).toBe(body.x)
+    expect(shadow.y).toBe(body.y)
   })
   it('rejects invalid freeform colors, canvas dimensions and missing band targets', () => {
     const composition = createComposition('padding')

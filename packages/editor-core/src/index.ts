@@ -211,6 +211,7 @@ export {
 } from './crop-session'
 export {
   assertValidFreeformPolygon,
+  hasFreeformArea,
   pointInPolygon,
   pointsBounds,
 } from './tools/precision/polygon'
@@ -348,6 +349,7 @@ export {
   type RenderRectNode,
   type RenderSceneInput,
   type RenderSceneSnapshot,
+  type RenderGroupNode,
   type RgbaColor,
 } from './scene/contracts'
 export {

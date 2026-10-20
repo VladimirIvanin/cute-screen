@@ -36,11 +36,12 @@ export function composeDocumentScene(
     ...backgroundNodes('card:background', bounds, settings.background, content),
     ...backgroundNodes('card:header', l.header, settings.header.fill, content),
     ...backgroundNodes('card:footer', l.footer, settings.footer.fill, content),
-    ...cardShadow(l.frame, frameRadius(settings, l), settings.shadow),
+    ...cardShadow(l.frame, frameRadius(settings, l), settings.shadow, settings.shadowOptions),
     ...frameNodes(settings, l),
     { ...visibleNode, id: 'card:content', kind: 'group', scene: content, destination: l.content,
       clip: l.screen, cornerRadius: settings.frame.kind === 'phone'
         ? Math.min(l.screen.width, l.screen.height) * 0.07 : windowChrome ? 0 : settings.radius,
+      ...(settings.frame.kind !== 'none' ? { backdrop: settings.frame.screenColor } : {}),
       ...(windowChrome
         ? { outerClip: { bounds: l.frame, cornerRadius: frameRadius(settings, l) } } : {}), blur: 0 },
     ...cardNodes,

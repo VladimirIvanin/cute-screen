@@ -45,6 +45,11 @@ export interface FrameProbe {
 
 export interface RenderExportOptions {
   readonly scale?: number
+  readonly signal?: AbortSignal
+}
+
+export interface PrepareEffectsOptions {
+  readonly signal?: AbortSignal
 }
 
 export interface Renderer {
@@ -56,6 +61,13 @@ export interface Renderer {
   render(reasons: readonly InvalidationReason[]): FrameMetric
   exportPng(options?: RenderExportOptions): Promise<Uint8Array>
   dispose(): void
+}
+
+/** Optional CPU effect preparation capability; GPU renderers keep their own path. */
+export interface EffectPreparationRenderer extends Renderer {
+  setRenderMode(mode: 'interactive' | 'settled'): void
+  prepareEffects(options?: PrepareEffectsOptions): Promise<void>
+  clearEffectCache(): void
 }
 
 export type RendererRuntimeState =

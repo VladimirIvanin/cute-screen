@@ -24,7 +24,21 @@
 .cs-composition-panel header strong {
   flex: 1;
 }
+.cs-composition-footer {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border-top: 1px solid var(--border);
+}
+.cs-composition-footer button {
+  width: 100%;
+  min-height: 32px;
+}
+.cs-composition-footer button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 .cs-composition-body {
+  flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
   padding: 0 12px 12px;
@@ -34,6 +48,8 @@
   padding: 8px 0;
 }
 .cs-composition-panel summary {
+  -webkit-user-select: none;
+  user-select: none;
   cursor: pointer;
   padding: 4px 0;
   font-weight: 600;
@@ -53,6 +69,42 @@
   padding: 6px 0;
   margin: 0;
   min-width: 0;
+}
+.cs-card-image-source {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0 10px;
+}
+.cs-card-image-preview {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: 0 0 80px;
+  width: 80px;
+  height: 60px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: conic-gradient(#8883 25%, transparent 0 50%, #8883 0 75%, transparent 0) 0 0 / 12px 12px;
+}
+.cs-card-image-preview canvas {
+  width: 80px;
+  height: 60px;
+}
+.cs-card-image-preview > span {
+  padding: 4px;
+  font-size: 10px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.cs-card-image-info {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--text-muted);
 }
 .cs-composition-panel label {
   display: flex;
@@ -300,4 +352,332 @@
 .cs-card-palettes button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
+}
+
+/* The main appearance group uses short paired fields; other card editors keep
+   their own control sizing. */
+.cs-card-starters {
+  margin: 12px 0 4px;
+}
+.cs-card-starters button {
+  flex: 1;
+  min-height: 32px;
+}
+.cs-card-layout-group {
+  border-top: 1px solid var(--border);
+  margin-top: 2px;
+  padding-top: 4px;
+}
+.cs-card-layout label {
+  margin: 4px 0;
+}
+.cs-card-linked-inset.cs-numeric-control {
+  width: 100%;
+  gap: 0 8px;
+  margin: 4px 0 0;
+}
+.cs-card-linked-inset > .n-slider {
+  min-height: 24px;
+}
+.cs-card-layout > .cs-card-layout-group:not(.cs-card-shadow) {
+  padding-top: 2px;
+}
+.cs-card-linked-inset .cs-numeric-entry.n-input {
+  width: 112px;
+}
+.cs-card-frame-types {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+  margin: 4px 0 8px;
+}
+.cs-composition-panel .cs-card-frame-option {
+  display: block;
+  position: relative;
+  margin: 0;
+  min-width: 0;
+  cursor: pointer;
+}
+.cs-card-frame-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  clip-path: inset(50%);
+  overflow: hidden;
+}
+.cs-card-frame-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 2px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 16px;
+}
+.cs-card-frame-choice svg {
+  width: 56px;
+  max-width: 100%;
+  height: 40px;
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-width: 1.25;
+}
+.cs-card-frame-choice .cs-card-frame-body {
+  fill: var(--surface-raised);
+}
+.cs-card-frame-choice .cs-card-frame-screen {
+  fill: var(--accent-soft);
+  stroke: none;
+}
+.cs-card-frame-choice .cs-card-frame-address {
+  fill: var(--text-muted);
+  stroke: none;
+  opacity: 0.5;
+}
+.cs-card-frame-choice.is-selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  font-weight: 600;
+}
+.cs-card-frame-option input:focus-visible + .cs-card-frame-choice {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.cs-card-frame-option input:disabled + .cs-card-frame-choice {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.cs-card-frame-option input:not(:disabled) + .cs-card-frame-choice:hover {
+  border-color: var(--accent);
+}
+.cs-card-row-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 26px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.cs-card-inset-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.cs-card-inset-units {
+  display: flex;
+  gap: 2px;
+  padding: 1px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-sunken);
+}
+.cs-card-inset-actions button {
+  min-height: 30px;
+}
+.cs-card-inset-actions .cs-card-inset-units button {
+  min-width: 26px;
+  min-height: 26px;
+  padding: 2px 4px;
+  border-color: transparent;
+  background: transparent;
+}
+.cs-card-inset-units button[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.cs-card-field-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 10px;
+}
+.cs-card-field-pair .cs-card-number {
+  gap: 4px;
+  flex-direction: column;
+  align-items: stretch;
+  margin: 4px 0;
+}
+.cs-card-layout .cs-card-input {
+  box-sizing: border-box;
+  min-height: 32px;
+}
+.cs-card-field-pair .cs-card-input {
+  width: 100%;
+}
+.cs-composition-panel .cs-card-position-details {
+  padding: 4px 0 0;
+  border: 0;
+}
+.cs-card-position-details summary {
+  font-size: 12px;
+  font-weight: 400;
+}
+.cs-card-position {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+.cs-card-position .cs-card-input {
+  width: 72px;
+}
+.cs-card-position .cs-card-alignment {
+  grid-template-columns: repeat(3, 30px);
+  gap: 2px;
+}
+.cs-card-position .cs-card-alignment button {
+  height: 30px;
+  padding: 0;
+}
+.cs-card-shadow-presets {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+  margin: 4px 0 3px;
+}
+.cs-card-shadow-presets button {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  min-width: 0;
+  padding: 3px;
+  font-size: 11px;
+}
+.cs-card-shadow-preview {
+  /* A fixed reference surface keeps black shadows visible in either UI theme. */
+  display: grid;
+  place-items: center;
+  height: 48px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #e2e5ec;
+}
+.cs-card-shadow-sample {
+  display: block;
+  box-sizing: border-box;
+  width: 32px;
+  height: 22px;
+  transform: translateY(-4px);
+  border-radius: 4px;
+  border: 1px solid #b5bbc6;
+  background: #ffffff;
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / calc(var(--shadow-strength) * 0.8)),
+    0 4px calc(8px * var(--shadow-size)) -1px rgb(0 0 0 / calc(var(--shadow-strength) * 0.7)),
+    0 7px calc(10px * var(--shadow-size)) -2px rgb(0 0 0 / calc(var(--shadow-strength) * 0.55));
+}
+.cs-card-shadow-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.cs-card-shadow-controls .cs-numeric-control {
+  align-content: start;
+}
+.cs-card-shadow-controls .cs-numeric-label {
+  flex: 1 1 auto;
+  font-size: 11px;
+}
+.cs-card-shadow-controls .cs-numeric-values {
+  flex: 0 0 64px;
+}
+.cs-card-shadow-controls .cs-numeric-entry.n-input {
+  flex: 1 1 auto;
+  width: 64px;
+}
+.cs-card-shadow .cs-numeric-control {
+  width: 100%;
+  margin-top: 4px;
+}
+.cs-card-shadow-hint {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.cs-card-layout :is(button, input, select, summary):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.cs-card-color-compact {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 74px;
+  align-items: center;
+  gap: 8px;
+}
+.cs-card-color {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px minmax(96px, 140px);
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+  font-size: 12px;
+}
+.cs-card-color .cs-simple-color-trigger {
+  box-sizing: border-box;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  padding: 0;
+  gap: 0;
+}
+.cs-card-color .cs-simple-color-trigger > svg {
+  display: none;
+}
+.cs-card-color .cs-simple-color-current {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+}
+.cs-card-color-compact .cs-card-color {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 6px;
+}
+.cs-card-color-compact .cs-card-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 32px;
+}
+.cs-card-color-compact .cs-card-color > span,
+.cs-card-color-compact .cs-card-number > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.cs-card-color-compact .cs-card-number {
+  position: relative;
+}
+.cs-card-color-compact .cs-card-number::after {
+  content: '%';
+  position: absolute;
+  right: 8px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.cs-card-color-compact input[type='number'] {
+  padding-right: 24px;
+  appearance: textfield;
+}
+.cs-card-color-compact input::-webkit-inner-spin-button {
+  appearance: none;
+}
+.cs-card-color-compact input[type='color'] {
+  width: 30px;
+  height: 30px;
+}
+
+.cs-composition-panel .cs-card-layout,
+.cs-card-layout > fieldset {
+  padding: 0;
 }

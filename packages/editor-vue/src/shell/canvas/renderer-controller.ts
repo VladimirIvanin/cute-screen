@@ -41,6 +41,7 @@ export interface RendererControllerContext {
   readonly documentForScene: () => EditorDocumentV1 | undefined
   readonly previewLayer: () => LayerNode | undefined
   readonly gestureRequiresScenePreview?: () => boolean
+  readonly isInteracting?: () => boolean
   readonly invalidateOverlay: () => void
 }
 
@@ -54,6 +55,12 @@ export class CanvasRendererController {
   private revision = 0
   private mounted = false
   private drawing: Promise<void> = Promise.resolve()
+  private frame: number | undefined
+  private finishFrame: (() => void) | undefined
+  private gestureDrawing: Promise<void> | undefined
+  private gesturePending = false
+  private documentId: string | undefined
+  private exporting: Promise<void> | undefined
   private resources = new Map<string, { readonly key: string; readonly resource: ImageResource }>()
 
   constructor(private readonly context: RendererControllerContext) {}
@@ -67,6 +74,7 @@ export class CanvasRendererController {
   }
 
   dispose(): void {
+    this.cancelScheduledFrame()
     this.preparation?.abort()
     this.highlighterPreview.invalidate()
     this.mounted = false
@@ -133,9 +141,12 @@ export class CanvasRendererController {
     return composition ? Math.max(0.01, Math.min(density, nativeDensity)) : nativeDensity
   }
 
-  private setCommittedScene(runtime: Canvas2DRenderer): void {
+  private setCommittedScene(
+    runtime: Canvas2DRenderer,
+    preparedDocument?: EditorDocumentV1,
+  ): void {
     const { props, editingText } = this.context
-    const document = mergeCompositionView(props.compositionDocument,
+    const document = preparedDocument ?? mergeCompositionView(props.compositionDocument,
       this.context.documentForScene(),
       props.compositionSpace)
     if (!document) return
@@ -207,6 +218,12 @@ export class CanvasRendererController {
   }
 
   drawDocument(): Promise<void> {
+    if (this.context.isInteracting?.() && this.sceneReady) {
+      this.renderCommittedSceneForGesture()
+      return this.drawing
+    }
+    this.gesturePending = false
+    this.cancelScheduledFrame()
     const drawing = this.drawFrame()
     this.drawing = drawing
     return drawing
@@ -226,6 +243,7 @@ export class CanvasRendererController {
     readonly onProgress?: (fraction: number) => void
   }): Promise<Uint8Array> {
     await this.waitForRender()
+    await this.exporting
     const document = this.context.props.exportDocument
       ?? this.context.props.compositionDocument
       ?? this.context.props.document
@@ -237,17 +255,31 @@ export class CanvasRendererController {
     ) throw new Error('The rendered result is not ready')
     // Crop editing and display density affect preview only. Export always uses
     // committed document bounds and excludes transient text/gesture overlays.
-    await prepareCompositionScene(createDocumentRenderScene(document), 1, options?.signal, options?.onProgress)
-    runtime.setScene(createDocumentRenderScene(document))
+    let unlock!: () => void
+    const exporting = new Promise<void>((resolve) => {
+      unlock = resolve
+    })
+    this.exporting = exporting
     try {
-      return await runtime.exportPng({ scale: 1 })
+      await prepareCompositionScene(createDocumentRenderScene(document), 1, options?.signal, options?.onProgress)
+      runtime.setScene(createDocumentRenderScene(document))
+      return await runtime.exportPng({ scale: 1, ...(options?.signal ? { signal: options.signal } : {}) })
     } finally {
       if (this.renderer === runtime) this.setCommittedScene(runtime)
+      if (this.exporting === exporting) this.exporting = undefined
+      unlock()
     }
   }
 
-  private async drawFrame(): Promise<void> {
+  private isCurrent(revision: number): boolean {
+    return this.mounted && revision === this.revision
+  }
+
+  private async drawFrame(announceReady = true): Promise<void> {
+    this.preparation?.abort()
     const revision = ++this.revision
+    await this.exporting
+    if (!this.mounted || revision !== this.revision) return
     const { scene, props, rendererError } = this.context
     const bounds = this.context.outputBounds.value
     if (
@@ -257,6 +289,8 @@ export class CanvasRendererController {
     ) return
     rendererError.value = undefined
     if (!props.document) {
+      this.renderer?.clearEffectCache()
+      this.sceneReady = false
       scene.value.width = Math.max(1, Math.round(bounds.width))
       scene.value.height = Math.max(1, Math.round(bounds.height))
       scene.value.getContext('2d')?.clearRect(0, 0, scene.value.width, scene.value.height)
@@ -269,19 +303,13 @@ export class CanvasRendererController {
       const runtime = await this.ensureRenderer()
       if (
         !runtime ||
-        !this.mounted ||
-        revision !== this.revision
+        !this.isCurrent(revision)
       ) return
-      if (!(await this.syncImageResources(runtime, revision))) return
-      await this.prepareScene(props)
-      if (!this.mounted || revision !== this.revision) return
-      this.setCommittedScene(runtime)
-      this.highlighterPreview.invalidate()
-      runtime.render(['scene'])
+      if (!(await this.prepareFrame(runtime, revision))) return
       readyDocumentId = props.document.id
     } catch (error) {
       if (
-        revision !== this.revision ||
+        !this.isCurrent(revision) ||
         isCancelled(error)
       ) return
       this.renderer?.dispose()
@@ -290,13 +318,34 @@ export class CanvasRendererController {
       this.resources = new Map()
       rendererError.value = error instanceof Error ? error.message : String(error)
     }
-    if (this.mounted && revision === this.revision) {
+    if (this.isCurrent(revision)) {
       this.context.invalidateOverlay()
-      if (readyDocumentId) this.context.emit('frameReady', readyDocumentId)
+      if (readyDocumentId && announceReady) this.context.emit('frameReady', readyDocumentId)
     }
   }
 
-  private async prepareScene(props: CanvasViewportProps): Promise<void> {
+  private async prepareFrame(
+    runtime: Canvas2DRenderer,
+    revision: number,
+  ): Promise<boolean> {
+    const { props } = this.context
+    if (!(await this.syncImageResources(runtime, revision))) return false
+    if (this.documentId !== props.document!.id) {
+      runtime.clearEffectCache()
+      this.documentId = props.document!.id
+    }
+    runtime.setRenderMode(this.context.isInteracting?.() ? 'interactive' : 'settled')
+    const preparedDocument = await this.prepareScene(props)
+    if (!this.mounted || revision !== this.revision) return false
+    this.setCommittedScene(runtime, preparedDocument)
+    await runtime.prepareEffects({ signal: this.preparation!.signal })
+    if (!this.mounted || revision !== this.revision) return false
+    this.highlighterPreview.invalidate()
+    runtime.render(['scene'])
+    return true
+  }
+
+  private async prepareScene(props: CanvasViewportProps): Promise<EditorDocumentV1> {
     const full = props.compositionDocument ?? props.document!
     if (compositionBlobHashes(full.presentation.composition).some((hash) => !this.resources.has(hash))) {
       throw new Error('Appearance image is unavailable. Restore the material or choose another image.')
@@ -313,14 +362,41 @@ export class CanvasRendererController {
       this.committedDensity(prepared),
       this.preparation.signal,
     )
+    return prepared
   }
 
   renderCommittedSceneForGesture(): void {
-    if (this.renderer && this.sceneReady) {
-      this.setCommittedScene(this.renderer)
-      this.renderer.render(['scene'])
+    if (!this.mounted || this.frame !== undefined) return
+    if (this.gestureDrawing) {
+      this.gesturePending = true
+      return
     }
+    this.drawing = new Promise<void>((resolve) => {
+      this.finishFrame = resolve
+      this.frame = requestAnimationFrame(() => {
+        this.frame = undefined
+        this.finishFrame = undefined
+        const drawing = this.drawFrame(false)
+        this.gestureDrawing = drawing
+        this.drawing = drawing
+        void drawing.finally(() => {
+          if (this.gestureDrawing === drawing) this.gestureDrawing = undefined
+          resolve()
+          if (this.gesturePending && this.mounted) {
+            this.gesturePending = false
+            this.renderCommittedSceneForGesture()
+          }
+        })
+      })
+    })
     if (this.mounted) this.context.invalidateOverlay()
+  }
+
+  private cancelScheduledFrame(): void {
+    if (this.frame !== undefined) cancelAnimationFrame(this.frame)
+    this.frame = undefined
+    this.finishFrame?.()
+    this.finishFrame = undefined
   }
 
   invalidateGesturePreview(): void {

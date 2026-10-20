@@ -73,6 +73,16 @@ export function installImageIngressHarness(
   const target = window as unknown as { __cuteScreenE2eImages?: unknown }
   target.__cuteScreenE2eImages = {
     choose,
+    chooseFixture: async (url: string) => {
+      const response = await fetch(url)
+      if (!response.ok) throw new Error(`Fixture fetch failed: ${response.status}`)
+      source = await response.blob()
+      const image = await createImageBitmap(source)
+      width = image.width
+      height = image.height
+      format = 'png'
+      image.close()
+    },
     drop: (x: number, y: number, count: number) => listener?.({ phase: 'drop', x, y, fileCount: count, supported: true, token: 'fixture-drop' }),
     crop: () => {
       const active = session.value!

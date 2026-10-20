@@ -1,5 +1,159 @@
 # Платформенная матрица
 
+## Свободный контур с пересечениями (ADR-145, 2026-10-20)
+
+Windows x64: production Chrome 155.0.8059.85 и fresh WebView2 155.0.4283.62 /
+external driver — crossed freeform create в solid/blur/pixelate, замыкание
+в стартовой точке и Undo/Redo passed. Native PNG повторно декодирован.
+Core/Vue 41 tests и decoded Canvas2D/CanvasKit 1×/2× passed. WKWebView/WebKitGTK
+не запускались. Evidence — TESTING.md и `artifacts/blur-optimization/`.
+
+## Стыки экрана рамки (ADR-144, 2026-10-20)
+
+Windows x64: Chrome 155.0.8059.85 — frame seams/types 2/2 passed.
+Fresh WebView2 155.0.4283.62 / external tauri-driver 2.1.0 — frame-seams,
+composition, composition-reopen 3/3 passed. В обеих ориентациях и темах
+white/black screen fill даёт нулевую разницу preview и decoded PNG opaque 4K.
+Contain сохраняет свободные поля; Undo/Redo и reopen проверены. Canvas2D/CanvasKit
+software decoded tests покрывают 0.63/1/1.25/2, alpha, opacity, outerClip и crop.
+WKWebView/WebKitGTK pending: Windows pass не является WebKit evidence.
+Capture fake, DPR 1. Артефакты — TESTING.md и `artifacts/frame-seams/`.
+
+## Кэш blur / отражение (ADR-143, 2026-10-20)
+
+Windows x64: Chrome 155.0.8059.85 и свежий WebView2 155.0.4283.62 /
+external tauri-driver 2.1.0 — по 1/1 passed. Production UI: 4K import,
+censor create/move/resize/strength, Escape, Undo/Redo, blurred background,
+перемещение обычной фигуры, оба flip и native decoded PNG export 4186×2506.
+Статическая цензура при движении верхнего слоя повторно не фильтруется.
+Pixel-reference и software 4K/500, 8K/1000 отдельно от UI; p95 публикаций
+Chrome 55–74 мс / WebView2 76–80 мс не подтверждает reference SLA 16,7/33,3 мс.
+WKWebView/WebKitGTK и точная input-to-photon latency pending. Capture fake;
+новых native dependencies/schema/IPC нет. Evidence — TESTING.md и
+`artifacts/blur-optimization/`.
+
+## Явное отключение оформления (ADR-142, 2026-10-20)
+
+Windows x64: Chrome 155.0.8059.85 composition/layout RU/EN × темы — 2/2 passed.
+Fresh WebView2 155.0.4283.62 / external driver composition + reopen — 2/2 passed:
+fixed footer, отмена draft, Tab/Enter, Undo/Redo, content drawing и decoded PNG
+3840×2160 без оформления; восстановленное оформление сохраняется при reopen.
+Component regressions — 25 passed. WebKitGTK/WKWebView не запускались; новых
+platform API нет, capture fake. Evidence — TESTING.md, `artifacts/remove-appearance/`.
+
+Заголовки оформления без text selection (2026-10-20): Windows x64 / Chrome
+155.0.8059.85, существующий composition-layout RU/EN × темы — 1/1 passed.
+CSS использует user-select и -webkit-user-select; native/WebKit отдельно для
+этой правки не запускались. Evidence — `artifacts/appearance-heading-selection/`.
+
+## Светлая площадка образцов теней (ADR-141, 2026-10-20)
+
+Windows x64 / Chrome 155.0.8059.85: production layout RU/EN × light/dark
+при 1024×768 — passed. Fresh WebView2 155.0.4283.62 / external driver:
+composition + reopen 2/2 passed. Четыре белые карточки 32×22; измерения пикселей
+под образцами 230/207/177/145 в обоих runtime, screenshots просмотрены.
+Component regressions — 6 passed. Новых platform API нет; значения пресетов
+и actual shadow renderer прежние. WebKitGTK/WKWebView pending, capture fake.
+Команды и evidence — TESTING.md и `artifacts/shadow-presets-preview/`.
+
+## Тёмная тема рамок по умолчанию (ADR-140, 2026-10-20)
+
+Windows x64 / Chrome 155.0.8059.85: production frame picker RU/EN × темы,
+default dark и Light/Undo/Redo — passed. Core/Vue 22 tests, render composition
+4 files / 6 tests: Canvas2D/CanvasKit 1×/2× — passed. Сохранённый light остаётся
+light в документе и пресете. Native WebView/WebKit отдельно для смены default
+не запускались; platform API не меняются. Evidence — TESTING.md и
+`artifacts/frame-dark-default/`.
+
+## Миниатюра фона (ADR-139, 2026-10-20)
+
+Windows x64: Chrome 155.0.8059.85 — fill controls RU/EN × темы passed.
+Fresh WebView2 155.0.4283.62 / external driver — composition + reopen 2/2 passed:
+UI-импорт 3840×2160, замена прозрачным PNG, Undo/Redo/cancel и восстановление
+после удаления материала из каталога. Preview 80×60, contain/alpha проверены
+измерениями пикселей, screenshots просмотрены. Component loading/error — passed.
+WebKitGTK/WKWebView не запускались; capture fake-platform. Evidence — TESTING.md
+и `artifacts/background-thumbnail/`.
+
+## Палитра оформления и пипетка (ADR-138, 2026-10-20)
+
+Windows x64: Chrome 155.0.8059.85 — palette и compact layout 2/2 passed,
+RU/EN × light/dark при 1024 px. Fresh WebView2 155.0.4283.62 / external driver —
+composition + reopen 2/2 passed: trusted input, custom HEX/alpha, Undo/Redo,
+Escape/focus и активация/отмена пипетки. Button 34×34, SVG 18×18, padding 0;
+смещение центров 0 px в обоих runtime. Screenshots просмотрены.
+Evidence — TESTING.md и `artifacts/appearance-colors/`.
+WebKitGTK/WKWebView не запускались; это не evidence физического захвата.
+
+## Клавиатура числовых полей (ADR-133, 2026-10-20)
+
+Windows x64: Chrome 155.0.8059.85 — numeric/appearance/shape 3/3,
+rich-text toolbar 4/4; RU/EN × light/dark, 1024 px, pixels до keyup,
+repeat/Shift, undo/redo, typed/invalid/caret/Tab/Escape/wheel.
+Fresh WebView2 155.0.4283.62 / external driver — production fake Capture →
+Quick shape opacity → Editor gradient opacity и оформление, 1/1 passed.
+Все записанные keydown trusted; native и browser screenshots просмотрены.
+Фактические команды и артефакты — TESTING.md и artifacts/numeric-keyboard.
+Это не physical capture evidence. Linux WebKitGTK и macOS WKWebView pending.
+
+## Ползунок связанных полей (ADR-136/137, 2026-10-20)
+
+Windows x64 browser и WebView2 evidence — TESTING.md и `artifacts/inset-slider/`.
+Range использует существующий NumericControl/Naive UI, без новых platform API.
+Chrome 155: 2/2 passed; WebView2 155.0.4283.62 composition + reopen: 2/2 passed.
+WebKitGTK/WKWebView для этой компоновки не запускались.
+
+## Живой выделитель с оформлением (2026-10-20)
+
+Windows 10 x64 / Chrome 155.0.8059.85: production controls на fixture 2560×1440,
+3 эффекта, live pixels до pointerup, Shift без движения, продолжение, один слой,
+Undo/Redo и Escape — browser regression 1/1 passed. Input trusted; сравнение
+пикселей области штриха точное. Component и decoded Canvas2D PNG — 26/26 passed,
+включая blur/pointercancel. Straight strokes browser — 5/5, native WebView2
+155.0.4283.62 — 1/1 passed в Quick и Editor. Native capture использует fake-platform;
+физический захват, WebKitGTK и WKWebView этим результатом не подтверждаются.
+Новый composition scenario в WebView2 также passed для трёх эффектов с trusted
+pointer/Shift/Escape и точными preview/commit/Undo/Redo pixels области штриха.
+Открытые ограничения общих smoke/gates перечислены в TESTING.md.
+
+## Визуальный выбор рамки (ADR-135, 2026-10-20)
+
+Windows x64 / Chrome 155: frame choices и layout passed; 1024 px RU/EN × themes.
+WebView2 155.0.4283.62: fresh composition + reopen 2/2 passed, два ArrowRight
+keydown trusted. Evidence в TESTING.md и `artifacts/frame-tiles/`.
+Native radio использует штатный клавиатурный ввод.
+WebKitGTK/WKWebView для нового выбора не запускались; Chromium их не заменяет.
+
+## Многослойная тень и размер (ADR-134, 2026-10-20)
+
+Windows x64: decoded Canvas2D/CanvasKit PNG 1×/2× на 4K source — 5 render
+tests passed, включая 400%, прозрачный центр и privacy. Chrome 155.0.8059.85:
+production 1024×768 RU/EN × light/dark, density/size/advanced/undo — passed.
+Shared-host Canvas2D software 4K/8K perf recorded; reference GPU SLA pending.
+Fresh WebView2 155.0.4283.62 / tauri-driver 2.1.0: composition + reopen 2/2
+passed; size 400%, trusted input, сохранение 250%, повторное декодирование PNG
+и native screenshot. Evidence — TESTING.md и native-layered.log.
+WebKitGTK/WKWebView не проверены для нового blur/control contract.
+
+## Непрерывная тень снимка — предыдущий этап до ADR-134 (2026-10-20)
+
+Windows x64: Canvas2D + CanvasKit decoded PNG 1×/2× на 4K source, scale 99%,
+radius 38 и shadow 83% — 5 render tests passed, включая goldens/privacy.
+Chrome 155: production controls и RU/EN × themes passed. Fresh WebView2
+155.0.4283.62 / tauri-driver 2.1.0: composition + reopen 2/2 passed;
+PNG 4186×2506 имеет red=63 вместо фона 87 на 1 px ниже снимка, без светлой щели.
+31 keydown и 15 pointerdown — все trusted. WebKitGTK/WKWebView pending.
+
+## Компактные фон и макет (ADR-132, 2026-10-20)
+
+Windows x64 / Chrome 155.0.8059.85: 5/5 browser scenarios passed, including
+inner viewport 1024×768, RU/EN × light/dark, common settings in one view,
+linked/independent insets, shadow slider/input/Escape/Undo/Redo, gradient and sticky.
+WebView2 155.0.4283.62 / external tauri-driver 2.1.0: freshly built composition +
+reopen 2/2 passed; shadow numeric lifecycle, materials, decoded PNG and clipboard
+bitmap. Fake capture remains distinct from physical capture. New layout has not
+been run on WebKitGTK or WKWebView. Commands/evidence are in TESTING.md.
+
 ## Магнит краёв градиента (ADR-131, 2026-10-20)
 
 Windows x64: Chrome 155 browser flow passed; WebView2 155.0.4283.62 через external

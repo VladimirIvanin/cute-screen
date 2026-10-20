@@ -2,9 +2,15 @@ import type {
   CardBackground,
   CardBranding,
   CardColor,
+  CardShadowOptions,
   CompositionSettings,
   CompositionStart,
 } from './types'
+
+export function createCardShadowOptions(): CardShadowOptions {
+  return { size: 1, softness: 1, spread: 0, offset: { x: 0, y: 0 },
+    color: { red: 0, green: 0, blue: 0, alpha: 1 } }
+}
 
 export const cardColor = (red: number,
   green: number,
@@ -41,7 +47,7 @@ export function createComposition(start: CompositionStart = 'padding'): Composit
     header: { height: start === 'header' || start === 'bands' ? 80 : 0, fill: createCardBackground('solid') },
     footer: { height: start === 'footer' || start === 'bands' ? 80 : 0, fill: createCardBackground('solid') },
     frame: { kind: start === 'phone' ? 'phone' : start === 'browser' ? 'browser' : 'none',
-      theme: 'light', title: '', url: '', orientation: 'portrait', fit: 'contain',
+      theme: 'dark', title: '', url: '', orientation: 'portrait', fit: 'contain',
       screenColor: cardColor(0.96, 0.96, 0.98), zoom: 1, offset: { x: 0, y: 0 } },
     radius: band ? 0 : 12, shadow: band ? 0 : 0.3, branding: [],
   }

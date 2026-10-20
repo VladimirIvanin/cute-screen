@@ -1,3 +1,11 @@
+import {
+  EffectCache,
+  EffectFrame,
+  effectKey,
+  finishSteps,
+  type PaintSteps,
+} from '../../effects/runtime'
+import { drawCensorTiles } from '../../effects/censor'
 import { groupNeedsFullSource } from '../../composition/group-scale'
 import {
   drawGroup2D,
@@ -33,6 +41,9 @@ type NewCanvas = (width: number, height: number) => Canvas2DLike
 type FontResolver = NonNullable<Canvas2DRendererOptions['resolveFontFamily']>
 
 interface SceneContext {
+  readonly cache: EffectCache
+  readonly frame: EffectFrame
+  prefix: string
   readonly working: Canvas2DLike
   readonly context: Context2D
   readonly scene: RenderSceneSnapshot
@@ -111,27 +122,37 @@ function drawImageNode(
   }
 }
 
-function drawOrderedNode(
+function* drawOrderedNode(
   context: SceneContext,
   node: RenderNode,
-): void {
+): PaintSteps {
   switch (node.kind) {
     case 'group':
-      drawGroup2D(context.context, node, context.scale, context.newCanvas, (canvas, scale) =>
-        drawScene2D(canvas,
+      yield* drawGroup2D(context.context, node, context.scale, context.newCanvas, (canvas, scale) =>
+        drawScene2DSteps(canvas,
           node.scene,
           scale,
           context.resources,
           context.resourceSources,
           context.newCanvas,
           context.resolveFontFamily,
-          !groupNeedsFullSource(node.scene)))
+          !groupNeedsFullSource(node.scene), context.cache, context.frame, Boolean(node.backdrop)),
+      context.cache, context.frame)
       return
     case 'freeform':
       drawFreeform2D(context.context, node, context.scale, context.newCanvas)
       return
     case 'censor':
-      drawCensor2D(context.context, context.working, node, context.scale, context.newCanvas)
+      if (node.effect.mode === 'solid') drawCensor2D(context.context, context.working, node, context.scale, context.newCanvas)
+      else yield* drawCensorTiles(
+        context.context,
+        context.working,
+        node,
+        context.scale,
+        context.newCanvas,
+        context.cache,
+        context.prefix,
+      )
       return
     case 'spotlight':
       drawSpotlight2D(context.context, context.working, context.scene, node, context.scale, context.newCanvas)
@@ -155,6 +176,8 @@ function copyOutput(
   working: Canvas2DLike,
   scene: RenderSceneSnapshot,
   scale: number,
+  sourceScaleX = scale,
+  sourceScaleY = scale,
 ): void {
   if (working === canvas) return
   const size = scaledOutputSize(scene.outputBounds, scale)
@@ -165,10 +188,10 @@ function copyOutput(
   output.clearRect(0, 0, canvas.width, canvas.height)
   output.drawImage(
     working as unknown as CanvasImageSource,
-    scene.outputBounds.x * scale,
-    scene.outputBounds.y * scale,
-    scene.outputBounds.width * scale,
-    scene.outputBounds.height * scale,
+    scene.outputBounds.x * sourceScaleX,
+    scene.outputBounds.y * sourceScaleY,
+    scene.outputBounds.width * sourceScaleX,
+    scene.outputBounds.height * sourceScaleY,
     0,
     0,
     size.width,
@@ -176,7 +199,7 @@ function copyOutput(
   )
 }
 
-export function drawScene2D(
+export function* drawScene2DSteps(
   canvas: Canvas2DLike,
   scene: RenderSceneSnapshot,
   scale: number,
@@ -185,7 +208,11 @@ export function drawScene2D(
   newCanvas: NewCanvas,
   resolveFontFamily: FontResolver,
   cropFirst = false,
-): void {
+  cache = new EffectCache(),
+  frame?: EffectFrame,
+  alignOutputEdges = false,
+): PaintSteps {
+  const paintFrame = frame ?? new EffectFrame(cache)
   const fullWidth = Math.max(1, Math.round((cropFirst ? scene.outputBounds.width : scene.width) * scale))
   const fullHeight = Math.max(1, Math.round((cropFirst ? scene.outputBounds.height : scene.height) * scale))
   const usesFullCanvas =
@@ -197,14 +224,21 @@ export function drawScene2D(
   working.width = fullWidth
   working.height = fullHeight
   const context = working.getContext('2d')!
+  // The destination mapping undoes this rounding, keeping content geometry intact.
+  const scaleX = alignOutputEdges ? fullWidth / (cropFirst ? scene.outputBounds.width : scene.width) : scale
+  const scaleY = alignOutputEdges ? fullHeight / (cropFirst ? scene.outputBounds.height : scene.height) : scale
   context.setTransform(1, 0, 0, 1, 0, 0)
   context.clearRect(0, 0, working.width, working.height)
   context.setTransform(
-    scale, 0, 0, scale,
-    cropFirst ? -scene.outputBounds.x * scale : 0,
-    cropFirst ? -scene.outputBounds.y * scale : 0,
+    scaleX, 0, 0, scaleY,
+    cropFirst ? -scene.outputBounds.x * scaleX : 0,
+    cropFirst ? -scene.outputBounds.y * scaleY : 0,
   )
   const sceneContext: SceneContext = {
+    frame: paintFrame,
+    cache, prefix: effectKey([
+      scene.width, scene.height, scene.outputBounds, scale, cropFirst, alignOutputEdges, cache.generation,
+    ]),
     working,
     context,
     scene,
@@ -214,12 +248,22 @@ export function drawScene2D(
     newCanvas,
     resolveFontFamily,
   }
-  for (const node of scene.nodes) {
-    if (node.visible && node.opacity !== 0) drawOrderedNode(sceneContext, node)
+  try {
+    for (const node of scene.nodes) {
+      if (!node.visible || node.opacity === 0) continue
+      yield* drawOrderedNode(sceneContext, node)
+      sceneContext.prefix = effectKey([sceneContext.prefix, node])
+    }
+    copyOutput(canvas, working, scene, scale, scaleX, scaleY)
+  } finally {
+    if (!frame) paintFrame.dispose()
+    if (working !== canvas) {
+      working.width = 1
+      working.height = 1
+    }
   }
-  copyOutput(canvas, working, scene, scale)
-  if (working !== canvas) {
-    working.width = 1
-    working.height = 1
-  }
+}
+
+export function drawScene2D(...args: Parameters<typeof drawScene2DSteps>): void {
+  finishSteps(drawScene2DSteps(...args))
 }

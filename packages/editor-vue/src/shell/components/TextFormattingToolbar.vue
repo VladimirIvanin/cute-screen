@@ -14,6 +14,7 @@ import { UiIcon } from '../icon'
 import SimpleColorPicker from '../ui/SimpleColorPicker.vue'
 import TextFontPicker from '../ui/TextFontPicker.vue'
 import NumericControl from '../ui/NumericControl.vue'
+import type { NumericCancelReason } from '../ui/numeric-draft-model'
 import CalloutWidthControl from '../ui/CalloutWidthControl.vue'
 import { textFormattingLabel } from '../ui/text-formatting-labels'
 import { usePreviewPopover } from '../ui/use-preview-popover'
@@ -190,11 +191,23 @@ function commitTextBackground(value: typeof textBackgroundDraft.value | null): v
 
 function previewTextBackground(
   patch: Partial<typeof textBackgroundDraft.value>,
+  confirm = true,
 ): void {
-  textBackgroundDraft.value = { ...textBackgroundDraft.value, ...patch }
-  if (validTextBackground(textBackgroundDraft.value)) numericPreview?.preview(backgroundOwner, {
+  const value = { ...textBackgroundDraft.value, ...patch }
+  if (confirm) textBackgroundDraft.value = value
+  if (validTextBackground(value)) numericPreview?.preview(backgroundOwner, {
     id: 'textBackground', defaultsTool: numericDefaultsTool(),
-  }, JSON.stringify(textBackgroundDraft.value))
+  }, JSON.stringify(value))
+}
+
+function cancelTextBackgroundNumber(reason?: NumericCancelReason): void {
+  numericPreview?.cancel(backgroundOwner)
+  if (
+    reason === 'context' ||
+    !textBackgroundOpen.value ||
+    blocked.value
+  ) return
+  previewTextBackground({})
 }
 
 function closeOnOutsidePointer(event: PointerEvent): void {
@@ -449,9 +462,9 @@ onBeforeUnmount(() => {
           :disabled="text.disabled.includes(key)"
           :disabled-reason="text.disabledReason"
           @invalid="backgroundInvalid[key] = $event"
-          @preview="previewTextBackground({ [key]: $event })"
+          @preview="previewTextBackground({ [key]: $event }, false)"
           @commit="previewTextBackground({ [key]: $event })"
-          @cancel="numericPreview?.cancel(backgroundOwner)"
+          @cancel="cancelTextBackgroundNumber"
         />
         <button
           type="button"

@@ -6,6 +6,7 @@ import {
   ref,
   shallowRef,
   watch,
+  type Ref,
 } from 'vue'
 import {
   createComposition,
@@ -15,8 +16,42 @@ import type { ResolvedEditorShellProps } from '../contracts'
 import type { createWorkspaceState } from '../workspace/workspace-state'
 import type { useEditorShellStore } from '../store'
 import { compositionEditingKey } from './editing'
+import { compositionImagesKey } from './image-preview'
 
 type Workspace = ReturnType<typeof createWorkspaceState>
+
+function finishSpaceChange(
+  props: ResolvedEditorShellProps,
+  workspace: Workspace,
+  store: ReturnType<typeof useEditorShellStore>,
+  current: Ref<'content' | 'card'>,
+  space: 'content' | 'card',
+): void {
+  workspace.canvasViewport.value?.finishTextEditing(() => {
+    current.value = space
+    props.documentSession?.setLayerSpace(space)
+    store.clearLayerSelection()
+  })
+}
+
+function removeComposition(
+  props: ResolvedEditorShellProps,
+  workspace: Workspace,
+  disabled: () => boolean,
+  cancel: () => void,
+): void {
+  const finish = () => {
+    const doc = workspace.activeDocument.value
+    if (!doc?.presentation.composition || disabled()) return
+    cancel()
+    const after = { ...doc.presentation }
+    delete after.composition
+    props.documentSession!.execute({ type: 'setPresentation', before: doc.presentation, after })
+  }
+  if (workspace.canvasViewport.value) workspace.canvasViewport.value.finishTextEditing(finish)
+  else finish()
+}
+
 function neutralComposition(): CompositionSettings {
   const neutral = createComposition()
   return {
@@ -28,15 +63,51 @@ function neutralComposition(): CompositionSettings {
   }
 }
 
+function useCompositionPreview(
+  workspace: Workspace,
+  disabled: () => boolean,
+) {
+  const compositionPreview = shallowRef<CompositionSettings>()
+  let previewFrame: number | undefined
+  let pendingPreview: CompositionSettings | undefined
+  let previewDocument: typeof workspace.activeDocument.value
+  function cancel(): void {
+    if (previewFrame !== undefined) cancelAnimationFrame(previewFrame)
+    previewFrame = undefined
+    pendingPreview = undefined
+    previewDocument = undefined
+    compositionPreview.value = undefined
+  }
+  function preview(value: CompositionSettings): void {
+    if (disabled()) return
+    pendingPreview = value
+    previewDocument = workspace.activeDocument.value
+    previewFrame ??= requestAnimationFrame(() => {
+      previewFrame = undefined
+      if (previewDocument === workspace.activeDocument.value && !disabled()) {
+        compositionPreview.value = pendingPreview
+      }
+      pendingPreview = undefined
+    })
+  }
+  watch(() => workspace.activeDocument.value, cancel, { flush: 'sync' })
+  watch(disabled, (blocked) => {
+    if (blocked) cancel()
+  }, { flush: 'sync' })
+  onBeforeUnmount(cancel)
+  return { compositionPreview, preview, cancel }
+}
+
 export function useComposition(
   props: ResolvedEditorShellProps,
   workspace: Workspace,
   store: ReturnType<typeof useEditorShellStore>,
 ) {
+  provide(compositionImagesKey, { images: workspace.textureImages, error: workspace.toolError })
   const compositionOpen = ref(false)
   const compositionSpace = ref<'content' | 'card'>('content')
-  const compositionPreview = shallowRef<CompositionSettings>()
   const neutralSettings = neutralComposition()
+  const applied = computed(() => Boolean(workspace.activeDocument.value?.presentation.composition))
   const settings = computed(() => {
     const document = workspace.activeDocument.value
     return document ? document.presentation.composition ?? neutralSettings : undefined
@@ -46,10 +117,8 @@ export function useComposition(
   const selectedBrand = ref<string>()
   const gradientTarget = ref<'background' | 'header' | 'footer'>('background')
   const disabled = computed(() => props.readOnlyDocument || !props.documentSession || pending.value || store.actionState.status === 'pending')
+  const { compositionPreview, preview, cancel } = useCompositionPreview(workspace, () => disabled.value)
   const t = (ru: string, en: string) => store.locale === 'ru' ? ru : en
-  function cancel(): void {
-    compositionPreview.value = undefined
-  }
   function commit(value: CompositionSettings): void {
     const doc = workspace.activeDocument.value
     if (!doc || disabled.value) return
@@ -58,23 +127,27 @@ export function useComposition(
     props.documentSession!.execute({ type: 'setPresentation', before: doc.presentation,
       after: { ...doc.presentation, composition: value } })
   }
-  function preview(value: CompositionSettings): void {
-    if (!disabled.value) compositionPreview.value = value
-  }
   const library = useCompositionMaterials({ props, workspace, settings, selectedBrand, disabled, commit, t, pending })
   const { materials, error, load, saveMaterial, removeMaterial, applyMaterial, importImage } = library
   function switchSpace(space: 'content' | 'card'): void {
-    workspace.canvasViewport.value?.finishTextEditing(() => {
-      compositionSpace.value = space
-      props.documentSession?.setLayerSpace(space)
-      store.clearLayerSelection()
-    })
+    finishSpaceChange(props, workspace, store, compositionSpace, space)
   }
   function activateSpace(space: 'content' | 'card'): void {
     compositionSpace.value = space
     props.documentSession?.setLayerSpace(space)
     store.clearLayerSelection()
   }
+  function remove(): void {
+    if (disabled.value || !applied.value) return
+    removeComposition(props, workspace, () => disabled.value, cancel)
+  }
+  watch(applied, (value) => {
+    if (value) return
+    cancel()
+    editing.value = false
+    selectedBrand.value = undefined
+    activateSpace('content')
+  }, { flush: 'sync' })
   function toggle(): void {
     store.setZoom(store.zoom)
     editing.value = false
@@ -99,7 +172,7 @@ export function useComposition(
       store.selectLayer(layer.id)
     }
     if (layer) {
-      compositionSpace.value = layer.space ?? 'content'
+      compositionSpace.value = applied.value ? layer.space ?? 'content' : 'content'
       props.documentSession?.setLayerSpace(compositionSpace.value)
     }
   })
@@ -111,9 +184,6 @@ export function useComposition(
   })
   watch(() => store.activeToolId, (tool) => {
     if (tool === 'crop') switchSpace('content')
-  })
-  onBeforeUnmount(() => {
-    cancel()
   })
   provide(compositionEditingKey,
     { settings,
@@ -129,12 +199,14 @@ export function useComposition(
     compositionSpace,
     compositionPreview,
     compositionSettings: settings,
+    compositionApplied: applied,
     compositionMaterials: materials,
 
     compositionPending: pending, compositionError: error, compositionDisabled: disabled,
     toggleComposition: toggle,
     activateCompositionSpace: activateSpace,
     commitComposition: commit,
+    removeComposition: remove,
     previewComposition: preview,
 
     cancelCompositionPreview: cancel, importCompositionImage: importImage, saveCompositionMaterial: saveMaterial,

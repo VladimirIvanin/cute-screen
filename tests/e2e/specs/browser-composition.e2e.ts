@@ -6,6 +6,7 @@ import {
 import { openDrawingHarness } from './browser-m06-test-kit'
 import { waitForStableCanvas } from '../canvas-ready'
 import { setEditorPreferences } from '../editor-settings'
+import { verifyRemoveAppearance } from '../remove-appearance'
 import type { EditorDocumentV1 } from '../../../packages/editor-core/src/document/types'
 async function snapshot(): Promise<EditorDocumentV1> {
   return browser.execute(() => {
@@ -29,17 +30,18 @@ describe('publication cards', () => {
     const original = (await snapshot()).layers
     await $('button[aria-label="Appearance"]').click()
     const panel = $('.cs-composition-panel')
+    await expect(panel.$('[data-composition-reset]')).toBeDisabled()
     await expect(panel).toBeDisplayed()
     expect((await snapshot()).presentation.composition).toBeUndefined()
-    await expect(panel.$('summary=Layout')).toBeDisplayed()
+    await expect(panel.$('summary=Background & layout')).toBeDisplayed()
     await expect(panel.$('[data-card-fill="transparent"]')).toHaveAttribute('aria-pressed', 'true')
-    await panel.$('label*=Top').$('input').setValue('6')
+    await panel.$('input[aria-label="All sides"]').setValue('6')
     await browser.keys('Tab')
     await browser.waitUntil(async () => (await snapshot()).presentation.composition?.layout.insets.top === 6)
     expect((await snapshot()).presentation.composition?.shadow).toBe(0)
     await $('button[aria-label="Undo"]').click()
     await browser.waitUntil(async () => (await snapshot()).presentation.composition === undefined)
-    await expect(panel.$('summary=Layout')).toBeDisplayed()
+    await expect(panel.$('summary=Background & layout')).toBeDisplayed()
     await panel.$('button=Browser').click()
     await browser.waitUntil(async () => (await snapshot()).presentation.composition?.frame.kind === 'browser')
     expect((await snapshot()).layers).toEqual(original)
@@ -90,12 +92,17 @@ describe('publication cards', () => {
       return moved.transform.translateY !== cardArrow.transform.translateY
     })
     expect((await snapshot()).layers.find((layer) => layer.id === cardArrow.id)!.space).toBe('card')
+    await verifyRemoveAppearance(snapshot, 'artifacts/browser-e2e')
     await browser.setWindowSize(1024, 768)
     for (const locale of ['ru', 'en'] as const) for (const theme of ['light', 'dark'] as const) {
       await setEditorPreferences(locale, theme)
       await browser.saveScreenshot(`artifacts/browser-e2e/composition-${locale}-${theme}.png`)
       const bounds = await panel.getSize()
       expect(bounds.width).toBe(320)
+      await expect(panel.$('[data-composition-reset]')).toHaveText(locale === 'ru' ? 'Убрать оформление' : 'Remove appearance')
+      const footer = await panel.$('.cs-composition-footer').getLocation()
+      const footerSize = await panel.$('.cs-composition-footer').getSize()
+      expect(footer.y + footerSize.height).toBeLessThanOrEqual(768)
     }
   }).timeout(120000)
 })

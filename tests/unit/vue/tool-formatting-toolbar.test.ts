@@ -128,6 +128,8 @@ describe('compact tool settings', () => {
       key: 'Escape',
     })
     expect(view.emitted('change')).toHaveLength(1)
+    expect(input).toBeInTheDocument()
+    await fireEvent.keyDown(input, { key: 'Escape' })
     expect(screen.getByRole('button', {
       name: 'Кисть и толщина',
     })).toHaveFocus()

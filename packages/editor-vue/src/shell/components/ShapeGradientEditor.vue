@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import {
   computed,
+  inject,
   nextTick,
   onBeforeUnmount,
   ref,
+  provide,
   watch,
 } from 'vue'
 import type {
@@ -25,9 +27,14 @@ import {
   type GradientStop,
 } from '../ui/shape-gradient'
 import { parseHexColor } from '../tools/effects/color'
+import {
+  numericDefaultsKey,
+  numericPreviewKey,
+} from '../ui/numeric-preview'
 
 const props = defineProps<{
   compact?: boolean
+  controlId?: string
   hideDirection?: boolean
   geometry?: { readonly width: number; readonly height: number } | undefined
   selectedIndex?: number
@@ -47,6 +54,27 @@ const text = (en: string, ru: string) => props.locale === 'ru' ? ru : en
 const host = ref<HTMLElement>()
 const track = ref<HTMLElement>()
 const selected = ref(props.selectedIndex ?? 0)
+const service = inject(numericPreviewKey, undefined)
+const defaultsTool = inject(numericDefaultsKey, () => undefined)
+let numericSelection: number | undefined
+provide(numericPreviewKey, {
+  isBlocked: () => props.disabled || Boolean(service?.isBlocked?.()),
+  activate: (owner) => service?.activate?.(owner),
+  register: (owner, invalidated) => service?.register?.(owner, invalidated) ?? (() => undefined),
+  cancel: (owner) => service?.cancel(owner),
+  preview: (owner, target, raw) => {
+    numericSelection ??= selected.value
+    const value = Number(raw)
+    if (target.id === 'stopPosition') updateStop({ position: value / 100 }, true)
+    if (target.id === 'stopOpacity') updateStop({ color: { ...stop.value.color, alpha: value / 100 } }, true)
+    if (target.id === 'gradientAngle') {
+      draft.value = angleFill(value)
+      emit('preview', draft.value)
+    }
+    if (props.controlId) service?.preview(owner,
+      { id: props.controlId, defaultsTool: defaultsTool() }, JSON.stringify(current.value))
+  },
+})
 watch(() => props.selectedIndex, (value) => {
   if (value !== undefined) selected.value = Math.max(0, Math.min(props.fill.stops.length - 1, value))
 })
@@ -61,14 +89,27 @@ const angle = computed(() => {
   const dy = (current.value.end.y - current.value.start.y) * props.geometry.height
   return (Math.round(Math.atan2(dy, dx) * 180 / Math.PI) + 360) % 360
 })
-function setAngle(value: number): void {
-  if (!props.geometry) return commit(angleGradient(current.value, value))
-  commit(rotateGradientFill(
+function angleFill(value: number): LinearFill {
+  if (!props.geometry) return angleGradient(current.value, value)
+  return rotateGradientFill(
     current.value as LinearGradientPaint,
     value - angle.value,
     props.geometry.width,
     props.geometry.height,
-  ))
+  )
+}
+function commitNumeric(): void {
+  const fill = current.value
+  numericSelection = undefined
+  draft.value = undefined
+  commit(fill)
+}
+function cancelNumeric(): void {
+  if (numericSelection === undefined) return
+  selected.value = numericSelection
+  numericSelection = undefined
+  draft.value = undefined
+  emit('cancel')
 }
 let dragging = false
 let dragTarget: HTMLElement | undefined
@@ -173,6 +214,7 @@ function move(event: PointerEvent): void {
   if (dragging && event.pointerId === pointerId) updateStop({ position: position(event) }, true)
 }
 function cancel(): void {
+  cancelNumeric()
   if (dragging) emit('cancel')
   dragging = false
   draft.value = undefined
@@ -274,6 +316,7 @@ function reverse(): void {
     </div>
     <div class="cs-gradient-stop-details">
       <ShapeNumericControl
+        control-id="stopPosition"
         :label="text('Stop position', 'Положение точки')"
         :compact-label="text('Position', 'Позиция')"
         :value="Math.round(stop.position * 100)"
@@ -283,7 +326,8 @@ function reverse(): void {
         unit="%"
         :disabled="disabled"
         :locale="locale"
-        @commit="updateStop({ position: $event / 100 })"
+        @commit="commitNumeric"
+        @cancel="cancelNumeric"
       />
       <button
         type="button"
@@ -319,6 +363,7 @@ function reverse(): void {
       @dismiss="emit('dismiss')"
     />
     <ShapeNumericControl
+      control-id="stopOpacity"
       :label="text('Stop opacity', 'Непрозрачность точки')"
       :value="Math.round(stop.color.alpha * 100)"
       :min="0"
@@ -328,11 +373,13 @@ function reverse(): void {
       slider
       :disabled="disabled"
       :locale="locale"
-      @commit="updateStop({ color: { ...stop.color, alpha: $event / 100 } })"
+      @commit="commitNumeric"
+      @cancel="cancelNumeric"
     />
     <div class="cs-gradient-direction">
       <ShapeNumericControl
         v-if="!hideDirection"
+        control-id="gradientAngle"
         :label="text('Angle', 'Угол')"
         :value="angle"
         :min="0"
@@ -341,7 +388,8 @@ function reverse(): void {
         unit="°"
         :disabled="disabled"
         :locale="locale"
-        @commit="setAngle"
+        @commit="commitNumeric"
+        @cancel="cancelNumeric"
       />
       <button
         type="button"

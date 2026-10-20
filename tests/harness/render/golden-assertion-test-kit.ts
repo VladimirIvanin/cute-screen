@@ -49,7 +49,12 @@ export async function assertGolden(
   const file = path.join(goldenRoot, `${name}.png`)
   if (process.env.CUTE_SCREEN_UPDATE_GOLDENS === '1') {
     await mkdir(goldenRoot, { recursive: true })
-    await writeFile(file, actual)
+    const previous = await readFile(file).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === 'ENOENT') return undefined
+      throw error
+    })
+    // Preserve untouched baselines and avoid reopening identical PNGs for writing.
+    if (!previous || !previous.equals(actual)) await writeFile(file, actual)
   }
   const expected = new Uint8Array(await readFile(file))
   expect(compareRgba(await rgba(actual), await rgba(expected))).toEqual({

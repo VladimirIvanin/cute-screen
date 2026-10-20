@@ -1,7 +1,6 @@
 import type { RenderNode } from '../scene/contracts'
 import type { CompositionLayout } from './layout'
 import type { CompositionSettings } from './types'
-import { createRenderSceneSnapshot } from '../scene/snapshot'
 import { cardColor } from './defaults'
 import {
   cardRect,
@@ -21,21 +20,6 @@ export function frameRadius(
   return settings.frame.kind === 'phone' ? edge * 0.1 : Math.min(settings.radius, edge / 2)
 }
 
-function screenNode(
-  settings: CompositionSettings,
-  layout: CompositionLayout,
-): RenderNode {
-  const { screen, frame } = layout
-  if (hasWindowChrome(settings.frame)) return {
-    ...visibleNode, id: 'card:screen', kind: 'group', destination: screen,
-    scene: createRenderSceneSnapshot({ width: screen.width, height: screen.height,
-      nodes: [cardRect('card:screen:fill', { x: 0, y: 0, width: screen.width, height: screen.height }, settings.frame.screenColor)] }),
-    clip: frame, cornerRadius: frameRadius(settings, layout), blur: 0,
-  }
-  return cardRect('card:screen', screen, settings.frame.screenColor,
-    settings.frame.kind === 'phone' ? Math.min(screen.width, screen.height) * 0.07 : 0)
-}
-
 export function frameNodes(
   settings: CompositionSettings,
   layout: CompositionLayout,
@@ -46,7 +30,6 @@ export function frameNodes(
   const nodes: RenderNode[] = [cardRect('card:frame', layout.frame,
     dark ? cardColor(0.08, 0.08, 0.1) : cardColor(0.94, 0.94, 0.96),
     frameRadius(settings, layout))]
-  nodes.push(screenNode(settings, layout))
   if (f.kind === 'phone') return nodes
   const titlebar = layout.screen.y - layout.frame.y
   const chromeScale = titlebar / 40

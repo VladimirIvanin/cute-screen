@@ -4,7 +4,7 @@ import { useEditorShellStore } from '../store'
 import type { useComposition } from './controller'
 const props = defineProps<{ controller: ReturnType<typeof useComposition>; canImport: boolean; canSave: boolean }>()
 const store = useEditorShellStore()
-const { compositionOpen, compositionSettings, compositionMaterials,
+const { compositionOpen, compositionSettings, compositionMaterials, compositionApplied, removeComposition,
   compositionPending, compositionError, compositionDisabled, toggleComposition,
   commitComposition, previewComposition, cancelCompositionPreview, importCompositionImage,
   saveCompositionMaterial, removeCompositionMaterial, applyCompositionMaterial, reloadCompositionMaterials,
@@ -18,7 +18,9 @@ function editGradient(target: 'background' | 'header' | 'footer'): void {
 <template>
   <CompositionPanel
     v-show="compositionOpen"
+    :active="compositionOpen"
     :value="compositionSettings"
+    :applied="compositionApplied"
     :locale="store.locale"
     :disabled="compositionDisabled"
     :materials="compositionMaterials"
@@ -30,6 +32,7 @@ function editGradient(target: 'background' | 'header' | 'footer'): void {
     :target="compositionGradientTarget"
     :selected-brand="compositionSelectedBrand"
     @change="commitComposition"
+    @reset="removeComposition"
     @preview="previewComposition"
     @cancel="cancelCompositionPreview"
     @close="compositionGradientEditing = false; toggleComposition()"

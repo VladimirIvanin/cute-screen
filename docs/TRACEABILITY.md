@@ -1,5 +1,246 @@
 # Трассируемость требований
 
+## Свободный контур цензуры — до исправления (2026-10-20)
+
+`REQ-TOL-008`, `REQ-EDT-006`, `REQ-OUT-001`: жест с самопересечением или
+повторным обходом не вызывает `must be a simple polygon`. Контур сохраняет
+порядок точек и nonzero winding, общий для preview, hit-test и обоих renderer.
+Старые простые/вогнутые контуры не меняются. Соседние дубликаты и повтор
+начальной точки при замыкании удаляются до команды; коллинеарный draft
+использует прежний прямоугольный preview. Проверки до реализации: core
+construction/codec/hit-test на bow-tie и двойном обходе, Vue pointer path;
+затем browser/WebView2 создание solid/blur/mosaic, Undo/Redo и decoded PNG.
+
+## Стыки экрана и рамки — до реализации (2026-10-20)
+
+`REQ-OUT-012/014`, `REQ-OUT-001/006`: цвет экрана и снимок компонуются до
+единственного скруглённого clip; светлая подложка не просвечивает по краю
+непрозрачного снимка. Свободные поля contain, alpha, cover, offset и внешний
+clip окна сохраняются. Внутренний RenderGroupNode получает immutable backdrop,
+без изменения schema/IPC. Red-first: scene contract, freeze/invalid color,
+decoded edge pixels обоих backend при дробной плотности и экспорте 1×/2×,
+opacity/alpha/letterbox, production browser и fresh Windows WebView2.
+WKWebView/WebKitGTK требуют отдельных runtime-проверок. Evidence — TESTING.md
+и `artifacts/frame-seams/`; исходные изображения не изменяются.
+
+Результат: core red 4/4, render red 5/5; затем core/composition/cache/Vue 35
+passed, decoded render 13 passed. Chrome frame-seams/types 2/2 и fresh WebView2
+frame-seams/composition/reopen 3/3 passed; white/black под opaque 4K не меняет
+ни одного канала preview/PNG. Contain, alpha, Undo/Redo, resource disposal и
+pixel budget сохранены. WKWebView/WebKitGTK pending; подробности — TESTING.md.
+
+## Кэш размытия — до реализации (2026-10-20)
+
+`REQ-TOL-008`, `REQ-OUT-001/009`, `REQ-QLT-001/002/003`: Canvas2D обрабатывает
+только необходимые участки compositeBelow, переиспользует обработанные подложки
+при move/resize маски и независимые группы оформления. Renderer владеет LRU
+128 MiB, worker и отменяемой подготовкой interactive/settled; экспорт использует
+точное committed-состояние. Финальные RGBA сохраняют прежние box blur/pixelate,
+порядок эффектов и native censorship до уменьшения. Проверки: legacy-reference
+RGBA, invalidation/resource replacement/dispose, worker cancel, production UI
+move/resize/strength/Undo/Redo/export, 4K/8K cold/warm timing и real WebView2.
+Результаты и ограничения записываются в TESTING.md; GPU SLA не выводится из Node.
+Фактически: Chrome и fresh Windows WebView2 по 1/1 passed, включая ordinary
+shape movement, оба flip/Undo/Redo и decoded native export. Legacy RGBA,
+worker cancel, LRU/lifetime, 4K/8K software perf passed; reference frame budget
+и точная input latency остаются неподтверждёнными. Evidence — TESTING.md.
+
+## Явное отключение оформления — до реализации (2026-10-20)
+
+`REQ-OUT-001`, `REQ-EDT-006`, `REQ-UI-004/006/007`: закрепить под прокручиваемой
+панелью действие «Убрать оформление». Одна setPresentation удаляет composition;
+Undo/Redo восстанавливают всё оформление. Исходный canvas/crop/content и card
+layers не меняются; скрытые card layers не участвуют в hit testing, новые
+аннотации без оформления создаются в content. Отмена draft предшествует удалению,
+градиент/подписи выходят из редактирования. Empty/read-only/pending отключают
+кнопку. Проверить production mount, draft → remove → Undo/Redo, keyboard/focus,
+RU/EN × темы и fixed footer после прокрутки при 1024 px; native export без
+оформления повторно декодировать, затем восстановить оформление и проверить reopen.
+Результат: red-first (кнопка отсутствует), затем 25 component tests, browser
+composition/layout 2/2 и fresh Windows WebView2 composition + reopen 2/2 passed.
+Проверены fixed footer, draft cancel, Tab/Enter, content drawing, Undo/Redo и
+decoded PNG 3840×2160 без оформления. Evidence — `artifacts/remove-appearance/`.
+
+## Заголовки оформления без выделения текста (2026-10-20)
+
+`REQ-UI-006/007`: запретить выделение текста всех summary в панели оформления,
+включая вложенные разделы. Раскрытие мышью и клавиатурой сохраняется; поля ввода
+остаются доступными для выделения и копирования. Изменение ограничено CSS.
+Проверка: Windows x64 / Chrome 155.0.8059.85,
+`CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5189 pnpm test:e2e:browser --spec tests/e2e/specs/browser-composition-layout.e2e.ts`
+— 1/1 passed, RU/EN × темы; `pnpm format` и `pnpm format:check` — exit 0.
+Логи — `artifacts/appearance-heading-selection/`.
+
+## Читаемые образцы теней на светлой площадке — до реализации (2026-10-20)
+
+`REQ-OUT-001`, `REQ-UI-006/007`: утверждён первый вариант сравнения — четыре
+пресета в ряд, белая карточка 32×22 на отдельной светлой нейтральной площадке.
+Подложка образца сохраняет контраст в обеих темах; selected/focus обозначаются
+снаружи, без окрашивания самой площадки. Различия тени в миниатюре усилены;
+значения пресетов, renderer/export, commands и Undo/Redo прежние. Основные
+controls доступны при 1024 px, advanced остаётся в прокрутке. Проверить реальные
+пиксели под образцами в RU/EN × темы и Windows WebView2.
+Результат: 6 component tests, browser layout RU/EN × light/dark и fresh Windows
+WebView2 composition + reopen 2/2 passed. Карточки 32×22; яркость под ними
+230/207/177/145, четыре уровня различаются в обоих runtime. Evidence —
+`artifacts/shadow-presets-preview/`; команды и границы — TESTING.md.
+
+## Тёмная тема рамок по умолчанию — до реализации (2026-10-20)
+
+`REQ-OUT-012/014`: новое оформление и starter styles используют frame.theme=dark.
+Тема приложения не влияет на default рамки. Сохранённые документы/пресеты с light
+читаются без подмены; ручной выбор темы и Undo/Redo сохраняются. До изменения core
+зафиксировать failing test defaults/roundtrip; проверить production UI и render.
+Результат: red-first light→dark воспроизведён; 22 core/Vue tests passed,
+browser frame choices с Light/Undo/Redo RU/EN × темы passed. Обновлены эталоны
+тёмных рамок; чистый render-прогон composition без update — 4 files / 6 passed,
+Canvas2D/CanvasKit 1×/2×. Evidence — `artifacts/frame-dark-default/`.
+
+## Явное название настроек тени (2026-10-20)
+
+`REQ-OUT-001`, `REQ-UI-006`: русское «Дополнительно» в блоке тени заменить
+на «Параметры тени», чтобы назначение было понятно без раскрытия. Layout,
+параметры, команды и английское «Advanced shadow» сохраняются.
+
+## Миниатюра выбранной картинки фона — до реализации (2026-10-20)
+
+`REQ-OUT-011`, `REQ-LIB-015`, `REQ-UI-006/007`: в режиме «Картинка» показать
+миниатюру выбранного фона с сохранением пропорций и прозрачности, размеры/формат
+и «Заменить картинку». Использовать уже декодированный scene texture по blobHash,
+без повторного IPC, JSON/base64 или нового URL lifecycle. Loading/error различимы;
+без картинки остаётся импорт. Замена/отмена/Undo/Redo и reopen сохраняют согласованность
+миниатюры с документом. Проверить UI-импорт и пиксели preview в Windows WebView2.
+Результат: 7 component tests passed; browser fills RU/EN × темы passed;
+fresh Windows WebView2 composition + reopen 2/2 passed. Импорт 4K, замена PNG,
+Undo/Redo, cancel и reopen после удаления catalogue rows проверены. Миниатюра
+80×60 без overflow; alpha центра 255/63–64 и прозрачный contain-margin 0.
+Evidence — `artifacts/background-thumbnail/`, ограничения — TESTING.md.
+
+## Общая палитра оформления и размер пипетки — до реализации (2026-10-20)
+
+`REQ-OUT-011/012/013`, `REQ-UI-006/007`: заменить native color input в цветах
+фона/полос, freeform-точек, подложки телефона и тени общей SimpleColorPicker,
+как у инструментов и подписей. Сохранить отдельные HEX/alpha и one-command undo.
+Палитра имеет стандартные оттенки, custom/hue/HEX/suggestions, Escape/focus и
+disabled. Пипетка инструментов: кнопка 34×34 без горизонтального padding,
+SVG 18×18 без flex shrink. В оформлении sampling выключен, как у подписей:
+не показывать кнопку без маршрута применения к параметрам композиции.
+Проверить production mount/Undo, компактность RU/EN × темы и реальную геометрию
+пипетки в палитре инструмента, включая Windows WebView2.
+Результат: 33 component tests, 2 browser scenarios и fresh Windows WebView2
+composition + reopen 2/2 passed. Custom HEX сохраняет alpha; Escape не принимает
+запоздалый blur-commit закрытого уровня. Обе измеренные кнопки 34×34, SVG 18×18,
+центры совпадают, padding 0; sampling activation/cancel проверены trusted input.
+Evidence — `artifacts/appearance-colors/`, подробности и ограничения — TESTING.md.
+
+## Ползунок связанных полей — до реализации (2026-10-20)
+
+Уточнение владельца после просмотра: разместить ползунок отдельной строкой
+на всю ширину, под подписью и числом. ADR-137 заменяет однострочный ADR-136.
+Geometry gate обновляется под две строки; общие настройки сохраняют компактность.
+
+`REQ-OUT-010`, `REQ-UI-006/016`: в режиме «Все стороны» общий NumericControl
+показывает ползунок и точное число в одной компактной строке. Ползунок меняет
+четыре поля одновременно, preview transient, один drag — одна команда.
+Escape/pointercancel отменяют preview; keyboard, %/px, undo/redo и read-only
+сохраняются. Диапазоны прежние: 0–200% / 0–8192 px. Раздельные поля не меняются.
+Проверка: production-session component, browser drag/keyboard и Windows WebView2.
+Финальная компоновка ADR-137: 21 component tests, 2 browser и 2 Windows native
+scenarios passed; drag остаётся transient, один Undo возвращает четыре стороны,
+Escape отменяет, %/px и точное число сохранены. Evidence — `artifacts/inset-slider/`.
+
+## Рамки сразу после фона и макета — до реализации (2026-10-20)
+
+`REQ-OUT-012`, `REQ-UI-006/007`: раздел «Рамка» следует непосредственно за
+«Фон и макет», перед верхней/нижней полосами. Тип рамки выбирается четырьмя
+визуальными radio-плитками с названиями: без рамки, окно, браузер, телефон.
+Видны форма и характер chrome; выбранный вариант, focus и disabled различимы.
+Tab/стрелки используют native radio semantics; один выбор — одна существующая
+setPresentation command с undo/redo. Смена типа сохраняет остальные настройки
+рамки и показывает только применимые поля. Schema/renderer не меняются.
+План: production-session component, browser RU/EN × themes/1024 и Windows WebView2.
+Результат: 5 component tests passed; Chrome visual-frame и layout сценарии
+прошли. Fresh Windows WebView2 composition + reopen 2/2 passed, две ArrowRight
+записи trusted, выбранный frame.kind сохраняется. Evidence — `artifacts/frame-tiles/`.
+
+## Живой штрих выделителя с оформлением (2026-10-20)
+
+`REQ-TOL-004`, `REQ-EDT-002/006`: marker обновляет видимые пиксели при удерживаемой
+кнопке мыши, включая композицию, и при переключении Shift без нового pointermove.
+Временный штрих не изменяет документ; pointerup создаёт одну undoable command.
+Escape, blur и pointercancel восстанавливают исходную сцену. Обычный Editor и
+Quick Capture сохраняют отдельный облегчённый blend preview. Evidence:
+browser red-first → green на 2560×1440 и общий сценарий с trusted input в
+настоящем WebView2 passed; пиксели до pointerup, продолжение, preview/commit
+parity, Escape и undo/redo. Component и decoded blend PNG — 26/26 passed,
+включая blur/pointercancel. Логи и открытые общие regressions — TESTING.md и
+`artifacts/highlighter-live/`.
+
+## Клавиатурный контракт числовых полей (2026-10-20)
+
+`REQ-UI-016`, `REQ-EDT-006/016/017`: единый числовой draft для стилей,
+градиентов, слоёв, оформления и номера метки. ↑/↓ и Shift меняют preview,
+один key gesture подтверждается на keyup; каретка не подтверждает ввод.
+Enter/Tab/обычный blur подтверждают корректное значение, ошибочный blur
+восстанавливает baseline; первый Escape отменяет только draft. Mixed/invalid
+не шагают, wheel прокручивает панель, IME и кнопки сохраняют своё поведение.
+Смена контекста/окна/блокировка отменяют gesture без запоздалого commit.
+План доказательств: component/mounted-shell regressions, trusted browser и
+Windows WebView2 с production creation, пиксельным preview, undo/redo.
+Реализовано по ADR-133: общий model/composable, atomic style preview,
+наследуемые wrappers, номер метки, оформление и общий inline draft.
+Windows component, trusted browser и fresh WebView2 проверки прошли;
+команды и ограничения — TESTING.md. Общий `pnpm check` passed;
+WebKitGTK/WKWebView pending.
+
+## Многослойная тень — до реализации (2026-10-20)
+
+Уточнение владельца: плотность и размер независимы. Размер 25–400%; в
+свёрнутом блоке мягкость 10–200%, расширение −128…256 px, X/Y −1024…1024 px
+и цвет. Отсутствующие shadowOptions используют прежние default-параметры;
+настройки сериализуются, валидируются и поддерживают preview/cancel/undo.
+Canvas2D хранит ограниченный cache масок на renderer и освобождает при dispose.
+
+`REQ-OUT-001/012/014`: по запросу владельца заменить равномерный тёмный ореол
+сочетанием контактной, направленной и рассеянной теней с разными blur/offset/alpha.
+Нативное размытие вместо ступенчатых силуэтов; внешний контур исключает тень
+внутри прозрачного снимка. Сила остаётся одним scalar и одной undo-командой.
+Параметры согласованы между Canvas2D/CanvasKit и масштабируются с размером карточки.
+Основание: Ahlin, Comeau и Fluent; ADR-134. Red-first scene contract, decoded
+1×/2× PNG, прозрачность внутри контура, browser/native и controlled perf evidence.
+Статус: implemented; core/Vue/lifecycle 28 passed, render 5 passed,
+browser layout 1 passed и software perf 2 passed. Fresh Windows native
+composition + reopen 2/2 passed; decoded red52/background87 при size400%.
+General check: фактический итог в TESTING.md и `artifacts/appearance-compact/`.
+
+## Непрерывная тень снимка (2026-10-20; контракт записан до исправления)
+
+`REQ-OUT-001/012/014`: при scale 99%, radius 38 и shadow 83% под нижним
+краем снимка не должно быть светлой полосы до начала тени. Тень соединяется
+с контуром снимка/корпуса, равномерно ослабевает наружу и совпадает в preview
+и PNG 1×/2× обоих renderer. Сначала failing core coverage и decoded render
+regression на production-like 4K image; затем минимальное исправление общей сцены.
+Статус: implemented; red 3 core + 2 renderer failures, green 18 core/Vue и
+5 render/decoded tests. Browser 99/38/83 и свежие Windows native composition +
+reopen 2/2 passed; exported red=63 вместо background=87 непосредственно под
+краем. Schema/IPC/renderer primitives не менялись. Evidence — TESTING.md.
+
+## Компактное оформление (2026-10-20; контракт записан до реализации)
+
+`REQ-OUT-001/009/010/011`, `REQ-UI-006/007`: объединить фон и макет в один
+раздел. Связанные поля редактируются одним числом; раздельные — сеткой 2×2,
+единицы и переключатель связи рядом. Размеры и параметры снимка группируются
+парами; положение раскрывается отдельно. По уточнению владельца единицы выбираются
+сегментным переключателем `% / px` с двумя видимыми вариантами и доступным
+активным состоянием вместо select. Стартовые стили доступны сразу,
+сохранение и библиотека пресетов свёрнуты. Тень: именованные образцы и общий
+NumericControl с точным процентом и slider; preview/cancel/одна undo-команда.
+Сохраняются все прежние параметры, schema и renderer. Проверка production mount,
+RU/EN × темы, 1024 px, keyboard/Escape/disabled, независимые поля и undo/redo.
+Статус: implemented; 12 component tests, 5 browser scenarios и Windows WebView2
+composition + reopen 2/2 passed. Команды и ограничения — TESTING.md,
+`artifacts/appearance-compact/`.
+
 ## Иконка оформления (2026-10-20)
 
 `REQ-UI-001/006`: кнопка «Оформление» в верхней панели использует Tabler

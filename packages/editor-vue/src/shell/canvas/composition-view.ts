@@ -30,7 +30,8 @@ export function compositionViewport(
   const scale = () => enabled() && !card() ? layout.value!.scale : 1
   const viewDocument = computed(() => {
     const doc = props.document
-    if (!doc?.presentation.composition) return doc
+    if (!doc) return doc
+    if (!doc.presentation.composition) return { ...doc, layers: doc.layers.filter((layer) => layer.space !== 'card') }
     const l = layout.value!
     return { ...doc, presentation: DEFAULT_PRESENTATION_SETTINGS,
       canvas: card() && enabled() ? { width: l.width, height: l.height } : doc.canvas,
@@ -49,7 +50,7 @@ export function compositionViewport(
     key,
   ) {
     if (key === 'document') return viewDocument.value
-    if (key === 'exportDocument') return props.document
+    if (key === 'exportDocument') return props.exportDocument ?? props.document
     if (key === 'compositionDocument') return enabled() ? props.document : undefined
     if (key === 'compositionBounds') return bounds()
     if (key === 'canvas') return viewDocument.value?.canvas ?? props.canvas

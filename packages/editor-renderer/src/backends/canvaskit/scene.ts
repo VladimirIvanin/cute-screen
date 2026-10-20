@@ -52,6 +52,7 @@ function drawOrderedNode(
           context.typefaces,
           scale,
           !groupNeedsFullSource(node.scene),
+          Boolean(node.backdrop),
         ))
       return
     case 'freeform':
@@ -85,12 +86,15 @@ export function drawScene(
   typefaces?: CanvasKitTypefaceStore,
   scale = 1,
   translateToOutput = false,
+  alignOutputEdges = false,
 ): void {
   const canvas = surface.getCanvas()
   canvas.clear(canvasKit.TRANSPARENT)
   canvas.save()
   try {
-    canvas.scale(scale, scale)
+    const bounds = translateToOutput ? scene.outputBounds : scene
+    canvas.scale(alignOutputEdges ? Math.max(1, Math.round(bounds.width * scale)) / bounds.width : scale,
+      alignOutputEdges ? Math.max(1, Math.round(bounds.height * scale)) / bounds.height : scale)
     if (translateToOutput) {
       canvas.translate(-scene.outputBounds.x, -scene.outputBounds.y)
     }

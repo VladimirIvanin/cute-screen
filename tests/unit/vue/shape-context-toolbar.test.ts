@@ -134,6 +134,8 @@ describe('compact shape formatting', () => {
     const radius = await screen.findByRole('spinbutton', { name: 'Corner radius' })
     await fireEvent.input(radius, { target: { value: '28' } })
     await fireEvent.keyDown(radius, { key: 'Escape' })
+    expect(radius).toBeInTheDocument()
+    await fireEvent.keyDown(radius, { key: 'Escape' })
     expect(view.emitted('change') ?? []).toEqual([])
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(trigger).toHaveFocus()

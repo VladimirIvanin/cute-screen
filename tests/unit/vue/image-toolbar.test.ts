@@ -54,6 +54,8 @@ describe('compact image formatting', () => {
     expect(view.emitted('change')).toEqual([['imageOpacity', '0.55']])
     await fireEvent.update(input, '80')
     await fireEvent.keyDown(input, { key: 'Escape' })
+    expect(input).toBeInTheDocument()
+    await fireEvent.keyDown(input, { key: 'Escape' })
     await waitFor(() => expect(trigger).toHaveFocus())
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
     expect(view.cancel).toHaveBeenCalled()

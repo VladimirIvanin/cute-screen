@@ -35,6 +35,24 @@ function mount(
   return { ...view, track, latest: () => (view.emitted('commit') as [LinearFill][]).at(-1)![0] }
 }
 describe('shape gradient controls', () => {
+  it('keeps a numeric stop selected across sorting and rolls back only its draft', async () => {
+    const original: LinearFill = { ...fill,
+      stops: [fill.stops[0]!, { position: 0.5, color: blue }, { position: 1, color: red }] }
+    const view = mount(original)
+    const input = screen.getByRole('spinbutton', { name: 'Stop position' })
+    await fireEvent.update(input, '75')
+    expect(screen.getByRole('spinbutton', { name: 'Stop opacity' })).toHaveValue('100')
+    expect(view.emitted('commit')).toBeUndefined()
+    expect(view.emitted('preview')?.at(-1)).toEqual([{ ...original, stops: [original.stops[1], { ...original.stops[0]!, position: 0.75 }, original.stops[2]] }])
+    await fireEvent.keyDown(input, { key: 'Escape' })
+    expect(input).toHaveValue('0')
+    await fireEvent.update(input, '50')
+    await fireEvent.keyDown(input, { key: 'Enter' })
+    expect(view.latest().stops).toEqual([
+      { ...original.stops[0]!, position: 0.5 }, original.stops[1], original.stops[2],
+    ])
+    expect(view.emitted('commit')).toHaveLength(1)
+  })
   it('keeps radial stops, alpha and opacity when converting; seeds a matching transparent colour', () => {
     expect(newLinearGradient({ kind: 'radialGradient', opacity: 0.7, center: { x: 0.5, y: 0.5 }, radius: 0.5, stops: fill.stops }, red)).toMatchObject({ stops: fill.stops, opacity: 0.7 })
     const seeded = newLinearGradient({ kind: 'solid', color: blue, opacity: 0.4 }, red)

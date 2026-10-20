@@ -1,5 +1,551 @@
 # Стратегия тестирования
 
+## Самопересечения свободного контура (ADR-145, 2026-10-20)
+
+Windows x64; baseline `3f1eedc41dc08818da4300e7d32066f8ab21dd54` + рабочие изменения.
+Evidence — `artifacts/blur-optimization/freeform-*`, `browser/freeform.*`,
+`native/freeform.*` и общие blur acceptance logs.
+
+- Red-first `pnpm test packages/editor-core/src/censor-freeform.test.ts`:
+  3 failed / 1 passed — нулевая signed area, запрет самопересечения и evenodd hit-test.
+- `pnpm test packages/editor-core/src/censor-freeform.test.ts packages/editor-core/src/precision-contracts.test.ts packages/editor-core/src/precision-geometry.test.ts tests/unit/vue/m08-precision-drawing.test.ts`
+  — 4 files / 41 passed. Construction/codec, double winding, crossed lobes,
+  strict invalid coordinates/zero edges; pointer closure точно в стартовой
+  позиции для solid/blur/pixelate сохраняет исходный crossed path.
+- `pnpm test:render tests/harness/render/censor-freeform.test.ts` — 2 passed:
+  Canvas2D и CanvasKit, decoded lobes/nonzero center/outside при 1×/2×.
+  Полный `pnpm test:render` после исправления — 28 files / 80 passed.
+- Общий blur browser scenario — Chrome 155.0.8059.85, 1/1 passed; дополнен
+  production созданием замкнутого crossed freeform в трёх режимах и Undo/Redo.
+- Общий fresh WebView2 155.0.4283.62 / tauri-driver 2.1.0 scenario — 1/1 passed:
+  те же freeform gestures, реальные effect modes зафиксированы в JSON,
+  затем штатный Export с повторным декодированием PNG. Screenshots просмотрены.
+- Финальные `pnpm format` и `pnpm check` — exit 0. Lint: 0 errors / 37 прежних
+  warnings; typecheck, format:check, docs links, 112 boundary tests (1 skipped),
+  IPC codegen check, frontend build, cargo fmt и все четыре clippy configurations
+  прошли. `git diff --check` — exit 0. Evidence — `check-final.log`.
+
+Новых полей schema/IPC нет, Canvas2D/CanvasKit fill rule уже был nonzero;
+hit-test теперь совпадает с ним. WKWebView/WebKitGTK отдельно не запускались.
+
+## Стыки экрана рамки (ADR-144, 2026-10-20)
+
+Windows x64 / PowerShell; baseline `3f1eedc41dc08818da4300e7d32066f8ab21dd54`
+с рабочими изменениями. Evidence — `artifacts/frame-seams/`.
+
+- До реализации: `pnpm test packages/editor-core/src/composition/frame-backdrop.test.ts`
+  — 4 failed; `pnpm test:render tests/harness/render/frame-seams.test.ts` — 5 failed.
+- `pnpm test packages/editor-renderer/src packages/editor-core/src/composition tests/unit/vue/composition.test.ts`
+  — 24 files / 229 passed. После добавления resource/cache contracts:
+  `pnpm test packages/editor-core/src/composition packages/editor-renderer/src/composition tests/unit/vue/composition.test.ts`
+  — 8 files / 35 passed, включая alpha gutter, cache invalidation/dispose и pixel budget.
+- `CUTE_SCREEN_UPDATE_GOLDENS=1 pnpm test:render tests/harness/render/composition.test.ts`
+  — 2 passed. Чистый прогон без update:
+  `pnpm test:render tests/harness/render/composition tests/harness/render/frame-seams.test.ts`
+  — 5 files / 13 passed. Телефон portrait/landscape, window/browser, обе темы,
+  плотности 0.63/1/1.25/2, 4K PNG, crop/privacy, alpha/opacity/outerClip.
+  Нормализация source rounding меняет sampling некоторых внутренних пикселей;
+  goldens обновлены, до/после просмотрены. Неизменённые PNG при update не переписываются.
+- `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5193 pnpm test:e2e:browser --spec tests/e2e/specs/browser-frame-seams.e2e.ts --spec tests/e2e/specs/browser-frame-types.e2e.ts`
+  — Chrome 155.0.8059.85, 2/2 passed. White/black screen fill: 0 changed channels
+  при cover; contain сохраняет свободные поля, Undo/Redo и keyboard picker работают.
+- `CUTE_SCREEN_E2E_SCENARIOS=frame-seams,composition,composition-reopen CARGO_TARGET_DIR=D:/cutescreen/target/e2e-isolated NODE_OPTIONS=--dns-result-order=ipv4first pnpm test:e2e:tauri`
+  — fresh debug/no-bundle harness, WebView2 155.0.4283.62, external tauri-driver
+  2.1.0, 3/3 passed. UI-import opaque 3840×2160; четыре пары white/black:
+  max RGBA difference 0 в preview и decoded PNG. Contain, export/copy,
+  материалы, Undo/Redo и reopen прошли. Capture fake, DPR 1; версии и pixel
+  reports записаны в JSON, native screenshots и export просмотрены.
+- WKWebView/WebKitGTK не доступны на этом Windows host и остаются pending.
+  Локальные software/perf measurements не подтверждают GPU SLA.
+
+`pnpm test:perf tests/harness/perf/composition.test.ts` — 2 passed (4K/500 и
+8K/1000); software/shared-host p95 17.0/835.3 ms — trend only, не GPU SLA.
+`pnpm check` — passed целиком: lint/typecheck/format/docs, boundaries (112 passed,
+1 existing skip), IPC, cargo fmt и все clippy variants. Усиленный повтор
+`frame-seams` — 1/1 passed: явный выбор locale через production settings и
+проверка нового mtime каждого PNG перед decode исключают чтение старого экспорта.
+Итог, форматирование и disk usage — в README артефакта. Собственные profiles/pinned
+harness удалены runner. Удаление диагностического профиля startup отклонено
+автопроверкой (blocked by policy); профиль сохранён и отмечен в README артефакта.
+
+## Кэш размытия и отражение холста (ADR-143, 2026-10-20)
+
+Windows x64, PowerShell, Node 22.23.1, pnpm 10.33.2; baseline
+`3f1eedc41dc08818da4300e7d32066f8ab21dd54` + рабочие изменения.
+Evidence — `artifacts/blur-optimization/` (команды, JSON, screenshots и PNG).
+
+- До реализации зафиксированы traceability и failing pixel/cache contracts.
+  Frozen legacy blur/pixelate сравнивается по decoded RGBA: прозрачность,
+  повороты/отрицательный scale, края, свободный контур, перекрытия и 1×/2×.
+  Flip regression использует настоящую команду отражения, non-origin crop,
+  warmed/fresh renderer и Undo/Redo.
+- `pnpm test` — 173 files / 1566 passed на промежуточной версии;
+  финальные targeted renderer/censor regressions — 6 files / 52 passed.
+- `pnpm test:render` — финально 27 files / 76 passed, включая blur/flip.
+- `pnpm test:perf` — 4 files / 10 passed. Software Canvas2D на общем host:
+  4K/500 и 8K/1000, 30 warmups / 120 samples. Старый/новый полный CPU kernel:
+  596,9/259,5 мс и 3488,7/1046,3 мс. Дополнительные typed buffers kernel:
+  285/1,76 MiB на 4K и 1139/3,52 MiB на 8K; canvas/input/cache отдельно.
+  Warm scene p95 19,7/53,6 мс; движущаяся фигура с blur background
+  102,2/319,1 мс. Повторная фильтрация статической цензуры — 0 пикселей;
+  retained cache <=128 MiB, temporary group bytes после кадра — 0.
+- `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5198 pnpm test:e2e:browser --spec tests/e2e/specs/browser-blur-optimization.e2e.ts`
+  — Chrome 155.0.8059.85, 1/1 passed. UI import реального 4K PNG, создание,
+  перемещение/resize/strength, Escape, Undo/Redo, idle canvas; обычная залитая
+  фигура перемещается при цензуре и blur background. После обоих отражений
+  transform именно фигуры меняется; сцена обновляется до pointerup.
+  На 50 trusted input events получено 38/41 публикация; p95 интервала
+  публикаций 73,6/54,8 мс (это не точная input-to-photon latency).
+- `CUTE_SCREEN_E2E_SCENARIOS=blur-optimization CARGO_TARGET_DIR=D:/cutescreen/target/e2e-isolated NODE_OPTIONS=--dns-result-order=ipv4first pnpm test:e2e:tauri`
+  — fresh debug/no-bundle, WebView2 155.0.4283.62 / tauri-driver 2.1.0,
+  1/1 passed. Production fake Capture → Quick → Editor → picker 3840×2160;
+  те же gestures/flip/history, затем штатный Export. PNG повторно декодирован:
+  4186×2506. На 50 trusted events получено 33/29 публикаций; p95 интервала
+  79,9/76,3 мс. Screenshots Chrome и WebView2 просмотрены; selected transform
+  подтверждает движение фигуры, а не изображения под ней.
+
+16,7/33,3 мс остаются продуктовыми бюджетами reference hardware. Эти software
+и shared-host замеры их не подтверждают; отдельное точное измерение задержки
+ввода и GPU reference run ещё необходимы. WKWebView/WebKitGTK не запускались.
+
+## Отключение оформления (ADR-142, 2026-10-20)
+
+Windows x64, PowerShell, Node 22.23.1, pnpm 10.33.2; baseline
+`3f1eedc41dc08818da4300e7d32066f8ab21dd54` + рабочие изменения.
+Evidence — `artifacts/remove-appearance/`.
+
+- `pnpm test tests/unit/vue/composition.test.ts` до реализации — 1 failed / 6
+  passed: отсутствует Remove appearance (`red.log`). После реализации
+  `pnpm test tests/unit/vue/composition.test.ts tests/unit/vue/numeric-control.test.ts tests/unit/vue/card-number.test.ts`
+  — 3 files / 25 passed. UI apply → draft → remove создаёт ровно одну команду,
+  Undo возвращает полный документ, Redo снимает оформление; empty/read-only
+  disabled, interaction projection исключает card layers, merge сохраняет их.
+- `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5189 pnpm test:e2e:browser --spec tests/e2e/specs/browser-composition.e2e.ts --spec tests/e2e/specs/browser-composition-layout.e2e.ts`
+  — Chrome 155.0.8059.85, 2/2 passed. Production frame/background/card arrow →
+  remove с активным numeric draft; committed layers/canvas/crop прежние.
+  Новая стрелка имеет content space; Undo/Redo полностью возвращают документ.
+  Footer неподвижен после wheel, scroll body заканчивается выше него, Tab/Enter
+  активирует кнопку. RU/EN × light/dark, width 1024; образцы теней остаются
+  видимыми, нижние numeric controls доступны через scroll. Screenshots просмотрены.
+- `CUTE_SCREEN_E2E_SCENARIOS=composition,composition-reopen CARGO_TARGET_DIR=D:/cutescreen/target/e2e-isolated NODE_OPTIONS=--dns-result-order=ipv4first pnpm test:e2e:tauri`
+  — fresh debug/no-bundle, WebView2 155.0.4283.62 / external driver, 2/2 passed.
+  Fake Capture → Quick → Editor, UI import 4K, remove/draft/Tab/Enter/content
+  arrow/Undo/Redo, decoded export без оформления 3840×2160. После Undo выполнены
+  обычные copy/export/save/reopen с фоном и preset; screenshots просмотрены.
+- `pnpm lint` — exit 0, 37 прежних warnings; `pnpm exec tsc --noEmit -p tests/e2e/tsconfig.json`
+  и `pnpm exec vue-tsc --noEmit -p tests/tsconfig.json` — exit 0.
+- `pnpm format` и `pnpm format:check` — exit 0.
+- `pnpm disk:usage`: target до задачи 44,865 GiB, существующий isolated cache
+  переиспользован; новый target не создавался.
+
+Новых core/schema/IPC нет. Полный `pnpm check` с Rust/IPC и WebKitGTK/WKWebView
+этой UI-задачей не запускались; native capture использует fake-platform.
+
+## Образцы теней на светлой площадке (ADR-141, 2026-10-20)
+
+Windows x64, PowerShell, Node 22.23.1, pnpm 10.33.2; baseline
+`3f1eedc41dc08818da4300e7d32066f8ab21dd54` + рабочие изменения.
+Evidence — `artifacts/shadow-presets-preview/`.
+
+- `pnpm test tests/unit/vue/composition.test.ts` — 6 passed.
+- `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5189 pnpm test:e2e:browser --spec tests/e2e/specs/browser-composition-layout.e2e.ts`
+  — Chrome 155.0.8059.85, 1/1 passed, RU/EN × light/dark, viewport 1024×768.
+  Основные controls помещаются без горизонтального overflow. Белые карточки
+  32×22, площадка высотой 48; измеренная средняя яркость RGB под карточкой
+  230,3 / 207 / 177 / 145,3. Между соседними образцами требуется разница >8.
+  Существующие выбор пресетов, параметры, Escape и Undo/Redo также passed.
+- `CUTE_SCREEN_E2E_SCENARIOS=composition,composition-reopen CARGO_TARGET_DIR=D:/cutescreen/target/e2e-isolated NODE_OPTIONS=--dns-result-order=ipv4first pnpm test:e2e:tauri`
+  — fresh debug/no-bundle, WebView2 155.0.4283.62 / external driver, 2/2 passed.
+  Production fake Capture → Quick → Editor; пиксели образцов совпадают с browser.
+  Export повторно декодирован; сохранение/перезапуск, фон и preset восстановлены.
+  Screenshots обоих runtime просмотрены. Первый диагностический запуск дошёл
+  до образцов, но остановился на последующем рисовании стрелки; удалена лишняя
+  scrollIntoView из измерительного helper, повторный полный прогон passed.
+- `pnpm lint` — exit 0 (37 прежних warnings); `pnpm exec tsc --noEmit -p tests/e2e/tsconfig.json`
+  и `pnpm exec vue-tsc --noEmit -p tests/tsconfig.json` — exit 0.
+- `pnpm disk:usage`: target 44,865 GiB; существующий cache переиспользован,
+  новый target не создавался.
+
+Изменены только миниатюры пресетов: реальный renderer/export и значения пресетов
+не менялись. WebKitGTK/WKWebView и физический захват этой проверкой не покрыты.
+
+## Тёмный default рамок (ADR-140, 2026-10-20)
+
+Windows x64, PowerShell, Node 22.23.1, pnpm 10.33.2, baseline
+`3f1eedc41dc08818da4300e7d32066f8ab21dd54` + рабочие изменения.
+Evidence — `artifacts/frame-dark-default/`.
+
+- `pnpm test packages/editor-core/src/composition/composition.test.ts` до реализации
+  — 1 failed / 15 passed: ожидался dark, получен light (`red.log`). После изменения
+  `pnpm test packages/editor-core/src/composition/composition.test.ts tests/unit/vue/composition.test.ts`
+  — 22 passed. Проверены все starter defaults, roundtrip сохранённой light и preset.
+- `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5189 pnpm test:e2e:browser --spec tests/e2e/specs/browser-frame-types.e2e.ts`
+  — Chrome 155.0.8059.85, 1/1 passed: default dark, Light/Undo/Redo, смена frame.kind,
+  RU/EN × light/dark при 1024 px.
+- `CUTE_SCREEN_UPDATE_GOLDENS=1 pnpm test:render tests/harness/render/composition.test.ts`
+  — обновлены эталоны рамок, 2/2 passed. После снятия update-переменной
+  `pnpm test:render tests/harness/render/composition` — 4 files / 6 tests passed.
+  Canvas2D/CanvasKit 1×/2×, decoded PNG/parity, исходник immutable;
+  browser/window/phone screenshots просмотрены.
+- `pnpm exec tsc --noEmit -p tests/e2e/tsconfig.json` — exit 0.
+
+Schema, native API и платформенные зависимости прежние. Native WebView и полный
+Rust check для изменения core default не запускались.
+
+## Миниатюра картинки фона (ADR-139, 2026-10-20)
+
+Windows x64, PowerShell, Node 22.23.1, pnpm 10.33.2; baseline
+`3f1eedc41dc08818da4300e7d32066f8ab21dd54` + рабочие изменения.
+Evidence — `artifacts/background-thumbnail/`.
+
+- `pnpm test tests/unit/vue/card-image-preview.test.ts tests/unit/vue/composition.test.ts`
+  — 2 files / 7 tests passed: contain geometry, очистка старой миниатюры при
+  ожидании замены, loading/error RU/EN и production composition regressions.
+- `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5189 pnpm test:e2e:browser --spec tests/e2e/specs/browser-composition-fill.e2e.ts`
+  — Chrome 155.0.8059.85, 1/1 passed: семь типов заливки, empty image,
+  keyboard/Undo/Redo и RU/EN × light/dark. Загруженный preview проверен native.
+- `CUTE_SCREEN_E2E_SCENARIOS=composition,composition-reopen CARGO_TARGET_DIR=D:/cutescreen/target/e2e-isolated NODE_OPTIONS=--dns-result-order=ipv4first pnpm test:e2e:tauri`
+  — fresh debug/no-bundle, WebView2 155.0.4283.62 / external driver, 2/2 passed.
+  Production fake Capture → Quick → Editor; UI-импорт фона 3840×2160 и замена
+  прозрачным PNG 64×64, Undo/Redo/cancel, save/relaunch после удаления catalogue
+  rows. Preview 80×60, no overflow; alpha центра 255 и 63–64, прозрачный contain-margin 0.
+  Оба screenshots просмотрены. Существующий export повторно декодирован.
+- `pnpm lint` — exit 0 (37 прежних warnings); `pnpm exec tsc --noEmit -p tests/e2e/tsconfig.json`
+  и `pnpm exec vue-tsc --noEmit -p tests/tsconfig.json` — exit 0.
+- `pnpm disk:usage`: target 44,865 GiB, до задачи 44,572 GiB; общий cache сохранён,
+  новый target не создавался.
+
+Новых native API нет. WebKitGTK/WKWebView, physical capture и полный Rust check
+этой UI-задачей не проверялись.
+
+## Общая палитра оформления (ADR-138, 2026-10-20)
+
+Windows x64, PowerShell, Node 22.23.1, pnpm 10.33.2, baseline
+`3f1eedc41dc08818da4300e7d32066f8ab21dd54` + рабочие изменения.
+Evidence: `artifacts/appearance-colors/`.
+
+- `pnpm test tests/unit/vue/composition.test.ts tests/unit/vue/branding.test.ts tests/unit/vue/highlighter-toolbar.test.ts tests/unit/vue/ui-controls.test.ts`
+  — 4 files / 33 tests passed. Production session: палитра фона, сохранение alpha,
+  одна команда, Undo, invalid HEX, Escape/focus и disabled.
+- `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5189 pnpm test:e2e:browser --spec tests/e2e/specs/browser-appearance-colors.e2e.ts`
+  и отдельный `--spec tests/e2e/specs/browser-composition-layout.e2e.ts` — оба passed,
+  Chrome 155.0.8059.85. RU/EN × light/dark при 1024 px, custom HEX/alpha, Undo/Redo,
+  invalid/cancel, геометрия, активация и отмена инструментальной пипетки.
+  Compact gate допускает 1 CSS px дробной границы scroll-area: измеренное превышение
+  0,297 px относится к нижнему border, controls полностью видимы на screenshot.
+- `CUTE_SCREEN_E2E_SCENARIOS=composition,composition-reopen CARGO_TARGET_DIR=D:/cutescreen/target/e2e-isolated NODE_OPTIONS=--dns-result-order=ipv4first pnpm test:e2e:tauri`
+  — fresh debug/no-bundle harness, WebView2 155.0.4283.62 / external driver,
+  2/2 passed. Production fake Capture → Quick → Editor, UI-импорт 3840×2160,
+  цвет/alpha/Undo/Redo, custom HEX, Escape/focus, sampling activation/cancel,
+  save/relaunch и decoded export. Все записанные pointer/keyboard/contextmenu
+  события trusted. Обе геометрии: button 34×34, SVG 18×18, dx/dy 0, padding 0.
+- `pnpm lint` — exit 0 (37 существующих warnings); `pnpm exec vue-tsc --noEmit -p tests/tsconfig.json`
+  и `pnpm exec tsc --noEmit -p tests/e2e/tsconfig.json` — exit 0.
+- `pnpm disk:usage`: target 44,572 GiB после, предыдущий замер 44,310 GiB;
+  общий cache сохранён, новый target не создавался.
+
+Browser/native screenshots просмотрены. Chromium не подтверждает WebKitGTK/WKWebView;
+эти платформы не запускались. Capture использует fake-platform. Полный Rust check
+для этого UI-изменения не запускался.
+
+## Клавиатурный lifecycle числовых полей (ADR-133, 2026-10-20)
+
+Windows x64, PowerShell, Node 22.23.1, pnpm 10.33.2, baseline
+`3f1eedc41dc08818da4300e7d32066f8ab21dd54` + рабочие изменения.
+Логи задачи: `artifacts/numeric-keyboard/`.
+
+- `pnpm test` — 169 files / 1543 tests passed (`unit-delivery.log`).
+- `pnpm test tests/unit/vue/numeric-control.test.ts tests/unit/vue/numeric-shell.test.ts tests/unit/vue/numeric-preview.test.ts tests/unit/vue/shape-gradient.test.ts tests/unit/vue/card-number.test.ts tests/unit/vue/numbered-marker.test.ts tests/unit/vue/composition.test.ts tests/unit/vue/text-context-toolbar.test.ts tests/unit/vue/editor-settings.test.ts tests/unit/vue/callout-toolbar.test.ts`
+  — после последнего подключения atomic preview 10 files / 74 tests passed
+  (`targeted-delivery.log`). Покрыты caret/Enter/Tab/blur, repeat/Shift, границы,
+  mixed/invalid, comma, малые дроби, safe integers, IME/window blur, смена
+  контекста, сортировка точек, номер метки и общий inline Apply/Cancel draft.
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5198 CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 pnpm test:e2e:browser --spec tests/e2e/specs/browser-numeric-keyboard.e2e.ts --spec tests/e2e/specs/browser-numeric-appearance.e2e.ts --spec tests/e2e/specs/browser-shape-toolbar.e2e.ts --mochaOpts.grep "edits paint|previews gradient|commits on release"`
+  — 3/3 passed (`browser-complete.log`), Chrome 155.0.8059.85. RU/EN ×
+  light/dark при 1024 px, live pixels до keyup без document mutation,
+  повтор и Shift с одним undo, точный redo, каретка/Tab/Escape, wheel,
+  оформление и production slider drag/preview/commit. Для окружения PowerShell
+  переменные заданы через `$env:`, без изменения конфигурации репозитория.
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5198 CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 pnpm test:e2e:browser --spec tests/e2e/specs/browser-v7-rich-text-toolbar.e2e.ts`
+  — 4/4 passed (`text-toolbar-complete.log`): текстовый background preview,
+  handoff, responsive toolbar, Callout frame и номерная метка. Старый сценарий
+  обновлён для существующих отдельных меню Text/Label выноски; её карточка
+  больше не настраивается через отключённый text-background control.
+- `CARGO_TARGET_DIR=D:/cutescreen/target/e2e-isolated CUTE_SCREEN_E2E_SCENARIOS=numeric-keyboard pnpm test:e2e:tauri`
+  — 1/1 passed (`native-complete.log`), freshly built debug/no-bundle harness,
+  WebView2 155.0.4283.62, external driver, WDIO Tauri service 1.3.0.
+  Production fake Capture → Quick → Editor: shape opacity в Quick, gradient
+  opacity и оформление в Editor. Повтор/Shift, preview pixels до keyup,
+  один undo/redo, invalid/caret/Tab/Escape проверены настоящим вводом.
+  `numeric-quick-input.json` и `numeric-editor-input.json`: все keydown trusted.
+  Просмотрены native Quick/Editor и browser screenshots с полем и объектом.
+  Общий debug executable занят development-приложением; переиспользован
+  предусмотренный AGENTS.md isolated cache, новый target не создавался.
+- `pnpm format` — passed (`format.log`). Общий `pnpm check` — passed
+  (`check-status.log`): lint/types/format/docs, boundaries 112 passed + 1 skipped,
+  IPC и четыре штатных Rust clippy профиля.
+
+Red-first evidence: `card-red.log`, `escape-priority-red.log`,
+`shared-draft-red.log`, `atomic-preview-red.log`. Помимо общих обработчиков
+исправлен window capture-Escape фоновой ошибки image drop: он больше не
+перехватывает Escape у editable controls. Numeric preview внутри Apply/Cancel
+не записывает неподтверждённое число в общий draft; отмена поля сохраняет
+остальные подтверждённые параметры панели и их preview. Context cancellation
+отличается от локальной отмены и не возобновляет старую проекцию.
+
+Дисковая гигиена: workspace target 44.857 → 44.863 GiB, task evidence около
+0.001 GiB. Полезные debug/isolated/release cache и зависимости сохранены.
+Автоматическая проверка разрешений отклонила удаление пяти собственных failed
+E2E profiles с причиной `blocked by policy`; они оставлены в runtime. Их точные
+имена и результаты — `artifacts/numeric-keyboard/summary.json`; успешные
+session profiles очищены штатным runner. Disk report — `disk-after.log`.
+
+Первый native `gradient` gate остановился на прежнем magnet assertion до
+числовых проверок (`native.log`); выделен независимый numeric-keyboard сценарий.
+При повторе были занятый порт 4445 и неоднозначный drag в угол перенесённой из
+Quick фигуры. Финальный сценарий создаёт градиент на свободном участке;
+старый magnet assertion не ослаблялся. WebKitGTK/WKWebView и physical capture
+для этого изменения не запускались.
+
+## Ползунок связанных полей (ADR-136/137, 2026-10-20)
+
+Windows x64, working copy; evidence — `artifacts/inset-slider/`.
+
+- `pnpm test tests/unit/vue/composition.test.ts tests/unit/vue/numeric-control.test.ts`:
+  21 passed. Production session проверяет transient keyboard preview четырёх
+  сторон, один commit и Undo; общий control покрывает drag/cancel/disabled.
+- HEADLESS=1, port5189,
+  `pnpm test:e2e:browser --spec tests/e2e/specs/browser-inset-slider.e2e.ts --spec tests/e2e/specs/browser-composition-layout.e2e.ts`:
+  итог — `browser.log`. Новый сценарий держит pointer до проверки committed
+  document, затем release/Undo/Redo/Escape, %/px и ArrowRight. RU/EN × themes
+  при 1024 px: control до 68 px, ползунок ≥250 px под числом,
+  horizontal overflow отсутствует; общий раздел <570 px.
+- `pnpm test:e2e:tauri`, composition + composition-reopen, fresh debug/no-bundle,
+  CARGO_TARGET_DIR=D:/cutescreen/target/e2e-isolated,
+  NODE_OPTIONS=--dns-result-order=ipv4first: тот же drag-flow в production
+  Windows WebView2. Фактический итог — `native.log`.
+- `pnpm format`, `pnpm format:check`, E2E typecheck и docs links — logs рядом.
+  Core/renderer/schema/IPC не менялись. WebKitGTK/WKWebView не запускались.
+  Финал: browser 2/2 passed (Chrome 155.0.8059.85), native composition + reopen
+  2/2 passed (WebView2 155.0.4283.62 / tauri-driver 2.1.0). Held-drag screenshot
+  просмотрен; native input trace — все события trusted. Format, format:check,
+  E2E/unit typecheck и docs links passed. Новых render/release/GPU claims нет.
+
+## Живой выделитель с оформлением (2026-10-20)
+
+Windows 10 x64 (19045), Node 22.23.1 / pnpm 10.33.2; baseline
+`3f1eedc41dc08818da4300e7d32066f8ab21dd54` с существующими локальными изменениями.
+Evidence: `artifacts/highlighter-live/`.
+
+- Red-first: `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1`, `CUTE_SCREEN_BROWSER_E2E_PORT=5193`,
+  `pnpm test:e2e:browser --spec tests/e2e/specs/browser-highlighter-live.e2e.ts`:
+  Tint не менял пиксели при удерживаемой кнопке, checksum 1522438899 до/после.
+- Тот же сценарий с `CUTE_SCREEN_E2E_DISABLE_WATCH=1`: Chrome 155.0.8059.85,
+  1/1 passed на fixture 2560×1440. Три эффекта, продолжение, Shift down/up,
+  отсутствие нового слоя до pointerup, exact checksum области штриха после
+  commit/Undo/Redo и Escape. События input — trusted. Область не включает
+  несвязанные фон/тень; tolerance не используется.
+- WebDriver sequence едина от down до up; RAF-наблюдатель читает пиксели и
+  число слоёв между движениями. Раздельные команды с модификатором теряют
+  capture даже на отдельном пустом canvas в ChromeDriver. Наблюдатель не
+  подменяет input; object method сериализуется без внешнего `__name`.
+- `pnpm test tests/unit/vue/highlighter-gesture.test.ts tests/unit/vue/highlighter-preview.test.ts tests/unit/vue/straight-strokes.test.ts tests/unit/vue/highlighter-background.test.ts`:
+  4 files / 26 passed. Component покрывает Escape/blur/pointercancel;
+  decoded Canvas2D PNG проверяет blend, повторный preview и восстановление backdrop.
+- Browser `browser-straight-strokes.e2e.ts`: 5/5 passed, DPR 1/2 × Fit/1:1.
+  Существующий `browser-highlighter.e2e.ts`: 1 passed / 1 failed;
+  preview checksum 2500640380, committed 3415657837 в обычном Editor.
+  В этом маршруте сохранён прежний HighlighterPreview.
+- `pnpm check`: lint/typecheck/format/docs passed; boundaries — 111 passed,
+  1 skipped, 1 failed. Четыре нарушения size/complexity относятся к параллельно
+  изменённым composition controller, numeric draft и numbered-marker settings.
+  IPC/Rust-часть общего gate этим запуском не достигнута.
+
+- Native: `CARGO_TARGET_DIR=D:/cutescreen/target/e2e-isolated`,
+  `CUTE_SCREEN_E2E_SCENARIOS=highlighter`, `CUTE_SCREEN_E2E_DRIVER_PORT=4464`,
+  `TAURI_WEBDRIVER_PORT=4465`, `pnpm test:e2e:tauri` — fresh debug/no-bundle,
+  external tauri-driver 2.1.0 + WebView2 155.0.4283.62. Новый composition scenario
+  passed для всех трёх эффектов с trusted pointer/Shift/Escape, transient layer
+  counts, exact content-band preview/commit/Undo/Redo pixels. Source — fake
+  opaque capture 400×300 через production Capture → Quick → Editor.
+  `highlighter-live-native.json` содержит наблюдения между движениями.
+- `CUTE_SCREEN_E2E_SCENARIOS=highlighter,straight-strokes pnpm test:e2e:tauri`
+  с тем же общим isolated target: straight-strokes 1/1 passed. Существующий
+  highlighter Quick smoke в начальном прогоне остановился на ожидании addLayer.
+  Финальный highlighter suite: 2 passed / 1 failed; новая composition-проверка
+  и UI matrix passed, старый Quick smoke ожидает numbered-marker cursor `none`,
+  но получает `move` до проверки штриха.
+  Browser/native UI matrix RU/EN × light/dark passed. Native instrumentation
+  `__name` исправлен object method; временная ошибка numeric draft и конфликт
+  параллельных native sessions потребовали повторить свежую сборку.
+
+## Визуальный выбор рамки (ADR-135, 2026-10-20)
+
+Windows x64; evidence — `artifacts/frame-tiles/`. Существующий working tree
+с незавершёнными параллельными изменениями сохраняется. Schema/renderer не менялись.
+
+- `pnpm test tests/unit/vue/composition.test.ts`: 5 passed (`unit.log`), включая
+  production session: порядок разделов, отсутствие команды при открытии,
+  один выбор — одна команда, title сохраняется, применимые поля, Undo/Redo,
+  native radio disabled при read-only.
+- `pnpm test:e2e:browser --spec tests/e2e/specs/browser-frame-types.e2e.ts`:
+  HEADLESS=1, port5189; keyboard ArrowRight, четыре типа, Undo/Redo и снимки
+  1024 px RU/EN × themes. Фактический итог — `browser.log`; предыдущая
+  layout regression прошла отдельно. Тест нажимает видимую плитку, не скрытый radio.
+- `pnpm test:e2e:tauri`: composition + composition-reopen, fresh debug/no-bundle,
+  CARGO_TARGET_DIR=D:/cutescreen/target/e2e-isolated,
+  NODE_OPTIONS=--dns-result-order=ipv4first. Native использует тот же UI flow,
+  сохраняет trusted ArrowRight events и документ; итог — `native.log`.
+  Результат: 2/2 passed, WebView2 155.0.4283.62, tauri-driver 2.1.0;
+  `native-input.json` содержит два trusted ArrowRight keydown. Native screenshot
+  просмотрен. Browser Chrome 155.0.8059.85: 1 passed, четыре RU/EN × theme
+  screenshot просмотрены. После native прогона только selected CSS дополнен
+  толщиной контура и жирностью; его финальная geometry проверяется browser-ом.
+- Formatting/typecheck и disk usage — одноимённые logs. WebKitGTK/WKWebView
+  не запускались; screenshots проверяются отдельно от наличия компонентов.
+
+## Многослойная тень и независимый размер (ADR-134, 2026-10-20)
+
+Windows x64, Node 22.23.1/pnpm 10.33.2; baseline
+`3f1eedc41dc08818da4300e7d32066f8ab21dd54`, working copy.
+Исследование и собственный рецепт: `docs/SHADOWS_RESEARCH.md`.
+Evidence: `artifacts/appearance-compact/`.
+
+- Red-first core: `pnpm test packages/editor-core/src/composition/composition.test.ts`:
+  новая проверка размера 400% сначала падала (blur 30 вместо 180);
+  `shadow-options-red.log`. Более ранний layered contract: 5 red failures.
+- `pnpm test tests/unit/vue/composition.test.ts packages/editor-core/src/composition/composition.test.ts packages/editor-renderer/src/canvas2d-lifecycle.test.ts`:
+  28 passed (`options-unit.log`). Codec/validation/defaults/undo, независимый размер,
+  preview/Escape, cache reuse при alpha edit, освобождение при resize/dispose.
+- `pnpm test:render tests/harness/render/composition.test.ts tests/harness/render/composition-shadow.test.ts tests/harness/render/composition-privacy.test.ts`:
+  5 passed (`layered-render-final.log`). PNG повторно декодируется: 4K source,
+  Canvas2D/CanvasKit 1×/2×, непрерывный профиль, прозрачный центр, хвост 400%,
+  исходный SHA неизменен. Обновлены composition goldens; tolerances не менялись.
+  Ранее обнаруженная Windows footer 2× разница: 8 channels, delta 1.
+- HEADLESS=1, CUTE_SCREEN_BROWSER_E2E_PORT=5189,
+  `pnpm test:e2e:browser --spec tests/e2e/specs/browser-composition-layout.e2e.ts`:
+  1 passed (`browser-layered.log`), Chrome 155.0.8059.85. Production mount,
+  inner viewport 1024×768, RU/EN × light/dark; main group <530 px, два ползунка
+  и collapsed advanced видны, horizontal overflow отсутствует. Trusted input:
+  density/size/undo/redo/Escape, spread, shift и reset.
+- `pnpm test:perf tests/harness/perf/composition.test.ts`: 2 passed,
+  30 warmups/120 measurements; 4K/500 annotations p95 105.3 ms,
+  8K/1000 p95 377.1 ms. Shared Windows Canvas2D software, trend only,
+  reference GPU budgets 16.7/33.3 ms остаются pending. JSON в
+  `artifacts/composition/perf-{3840,7680}.json`, log `layered-perf.log`.
+- Native: fresh `pnpm test:e2e:tauri` composition + composition-reopen,
+  CARGO_TARGET_DIR=D:/cutescreen/target/e2e-isolated,
+  NODE_OPTIONS=--dns-result-order=ipv4first: 2/2 passed, WebView2 155.0.4283.62,
+  external tauri-driver 2.1.0 (`native-layered.log`). Native PNG 4186×2506:
+  red=52 вместо background=87 непосредственно под снимком, размер 400%,
+  scale99/radius38/density83 (`native-shadow-pixel.json`). 43 keydown и 19
+  pointerdown — все trusted. Size draft/cancel/commit/undo/redo и сохранение
+  250% через restart подтверждены. `native-shadow.png` визуально проверен.
+  Первое повторение выявило неверный порядок Undo в новом test block;
+  блок исправлен, production command history не менялся.
+- General check, formatting и final disk usage: `check.log`, `format.log`,
+  `disk-final.log`. WebKitGTK/WKWebView и reference GPU runner не запускались;
+  fake capture в native не доказывает physical capture.
+  `pnpm check` прошёл lint/typecheck, но общий результат не green: параллельно
+  меняемые numeric helpers нарушали formatting, затем отдельный
+  `pnpm test:boundaries` показал четыре structure violations (controller.ts,
+  use-numeric-draft.ts, numbered-marker-settings.ts). Финальные format/check
+  прошли отдельно; 111 boundary tests passed, 1 failed, 1 skipped.
+  Точный список — `check-remaining.log`; IPC/Rust — `check-ipc-rust.log`.
+
+## Непрерывная тень снимка — предыдущий этап до ADR-134 (2026-10-20)
+
+Уточнение владельца при scale 99%, radius 38, shadow 83%: под снимком была
+светлая щель перед тенью. Общая сцена рисовала 12 прозрачных прямоугольников
+с обводками и offsetY=5; внутренний участок между снимком и первой обводкой
+не покрывался. Исправление: те же 12 контуров заполнены alpha strength/32,
+перекрытие непрерывно заполняет смещённый силуэт. Новых primitives, schema,
+IPC и dependencies нет; нулевой shadow остаётся пустым.
+
+Evidence: `artifacts/appearance-compact/`, Windows x64, тот же baseline.
+
+- `pnpm test packages/editor-core/src/composition/composition.test.ts`:
+  red — 3 failures (none/browser/phone), coverage непосредственно под корпусом 0.
+- `pnpm test:render tests/harness/render/composition-shadow.test.ts`:
+  red — 2 failures, decoded delta на 1 px под краем 0. `shadow-before.png`.
+- `pnpm test packages/editor-core/src/composition/composition.test.ts tests/unit/vue/composition.test.ts`:
+  green — 18/18 passed (`shadow-core-green.log`).
+- Decoded 4K input → 1600×1000 PNG, both backends at 1×/2×: connected shadow,
+  monotonic samples at 1/8/16 px, unchanged background at 32 px, input hash retained.
+  `shadow-render-green.log` — 2/2 passed. On/off Canvas2D and CanvasKit PNG retained;
+  corrected Canvas2D PNG visually inspected.
+- Composition goldens regenerated with
+  `$env:CUTE_SCREEN_UPDATE_GOLDENS='1'; pnpm test:render tests/harness/render/composition.test.ts`.
+  One existing footer Canvas2D 2× golden also differs by 8 channels ×1 on this
+  Windows raster runtime; recorded with the regenerated outputs. No tolerance raised.
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5189`, headless,
+  `pnpm test:e2e:browser --spec tests/e2e/specs/browser-composition-layout.e2e.ts`:
+  passed with actual scale 99%, radius 38 and shadow 83%, RU/EN × themes.
+- Native composition scenario now exports this exact combination and decodes
+  the pixel immediately below the body; `native-shadow.log` records the fresh run.
+  Screenshot and `appearance-shadow-pixel.json` are retained from the native output.
+  2/2 passed after correcting the Node-side helper import to the existing relative
+  layout module. Decoded native PNG 4186×2506: at (2093,2324), red=63 versus
+  unshadowed background=87. 31 keydown + 15 pointerdown recorded, all trusted.
+  Screenshot inspected. WebKitGTK/WKWebView are not covered by the Windows run.
+- Final `pnpm test:render tests/harness/render/composition.test.ts tests/harness/render/composition-shadow.test.ts tests/harness/render/composition-privacy.test.ts`:
+  3 files / 5 passed (`shadow-render-final.log`), including updated goldens and
+  censorship/blur privacy. No tolerance raised.
+
+Disk after the builds: target 44.857 GiB (debug 17.178 / isolated 23.997 /
+release 3.638); shared caches retained. Automatic approval review rejected cleanup
+of the resolved instrumentation-failure profile with reason `blocked by policy`;
+failed profiles remain diagnostic data, outside the compact evidence folder.
+
+## Компактные фон и макет (2026-10-20, ADR-132)
+
+Windows 10 x64; baseline `3f1eedc41dc08818da4300e7d32066f8ab21dd54`, changes
+uncommitted. Node 22.23.1 / pnpm 10.33.2. Evidence: `artifacts/appearance-compact/`.
+
+- `pnpm test tests/unit/vue/composition.test.ts tests/unit/vue/numeric-control.test.ts tests/unit/vue/branding.test.ts`:
+  3 files / 12 passed. Production session: neutral open, linked/independent insets,
+  one-command relink, shadow preview/Escape/commit/Undo/Redo. NumericControl covers
+  pointercancel; branding regression remains green.
+- PowerShell: `$env:CUTE_SCREEN_BROWSER_E2E_HEADLESS='1'` and
+  `$env:CUTE_SCREEN_BROWSER_E2E_PORT='5189'`, then
+  `pnpm test:e2e:browser --spec tests/e2e/specs/browser-composition-layout.e2e.ts --spec tests/e2e/specs/browser-composition-fill.e2e.ts --spec tests/e2e/specs/browser-composition-compact.e2e.ts --spec tests/e2e/specs/browser-composition-sticky.e2e.ts --spec tests/e2e/specs/browser-composition.e2e.ts`:
+  Chrome 155.0.8059.85, 5/5 passed. New layout scenario measures **inner viewport**
+  1024×768 (window adjusted for Chrome chrome), common solid settings under 530 px,
+  shadow bottom within scroll viewport, RU/EN × themes. Screenshot panel and canvas
+  inspected in RU/dark and EN/light. Existing suites keep their outer-window sizing.
+  Trusted keyboard edits slider, one Undo reverses its change; exact input remains
+  transient until commit, Escape keeps panel open, relink restores with Undo.
+- PowerShell: `$env:CUTE_SCREEN_E2E_SCENARIOS='composition,composition-reopen'`,
+  `$env:CARGO_TARGET_DIR='D:/cutescreen/target/e2e-isolated'`,
+  `$env:NODE_OPTIONS='--dns-result-order=ipv4first'`, then `pnpm test:e2e:tauri`:
+  fresh debug/no-bundle harness, external tauri-driver 2.1.0 / WebView2
+  155.0.4283.62, 2/2 passed. Native shadow draft/Escape/Enter/Undo/Redo,
+  material save from collapsed Presets, import/gradient drag, clipboard bitmap,
+  decoded exported PNG and persisted reopen. Native screenshot inspected.
+  Fake capture is not evidence of physical capture. WebKitGTK/WKWebView remain
+  unverified for this layout; renderer/schema/IPC were not changed.
+
+Earlier browser attempts caught a malformed test selector, browser-only image-drop
+feedback obscuring controls (fixed by the existing imageIngress harness), sticky
+assertions targeting the removed section, and an over-tall first layout. The final
+production geometry passes without hiding controls or rewriting document state.
+The initial `pnpm check` found an unsupported testing-library `exact` query option;
+removed it without changing the queried name. The full `pnpm check` then passed,
+including 112 boundary tests (1 skipped), IPC consistency and all Rust clippy gates.
+
+Owner follow-up: replaced inset unit select with visible `% / px` segments.
+Repeated the same 12 component tests and the browser layout scenario: passed,
+including keyboard selection, active state, Undo/Redo and RU/EN geometry. Native
+input observation uses explicit window.document because a test-local document
+variable otherwise becomes an inaccessible document2 closure in serialized code.
+
+Disk before native: target 43.935 GiB (debug 16.251 / e2e-isolated 24.003 /
+release 3.638). Reused e2e-isolated because the resident dev executable occupies
+target/debug. Cleanup preview identified this task's abandoned 0.047 GiB Chrome
+profile from the interrupted port-conflict attempt; `pnpm clean:artifacts --apply`
+removed it. Cargo caches and the resident application were retained. Target after
+native was 43.928 GiB (16.251 debug / 23.996 isolated); the final report is retained.
+
 ## Иконка оформления (2026-10-20)
 
 Windows x64, HEAD `9ec157d`, рабочая копия: кнопка «Оформление» использует

@@ -202,10 +202,10 @@ onBeforeUnmount(cancel)
       v-else-if="brandStyle"
       type="button"
       class="cs-card-brand-handle"
-      @keydown.delete.prevent.stop
-      @keydown.backspace.prevent.stop
       :aria-label="locale === 'ru' ? 'Переместить подпись' : 'Move signature'"
       :style="brandStyle"
+      @keydown.delete.prevent.stop
+      @keydown.backspace.prevent.stop
       @pointerdown="begin($event, 0, true)"
       @pointermove="move"
       @pointerup="finish"

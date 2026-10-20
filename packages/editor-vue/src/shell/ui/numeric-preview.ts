@@ -7,6 +7,7 @@ export interface NumericPreviewTarget {
 }
 
 export interface NumericPreviewService {
+  activate?(owner: symbol): void
   isBlocked(): boolean
   register(owner: symbol, invalidated: () => void): () => void
   preview(owner: symbol, target: NumericPreviewTarget, value: string): void
@@ -17,3 +18,4 @@ export const numericPreviewKey: InjectionKey<NumericPreviewService> = Symbol('nu
 export const numericDefaultsKey: InjectionKey<() => string | undefined> = Symbol('numeric-defaults')
 
 export const numericLocaleKey: InjectionKey<() => 'en' | 'ru'> = Symbol('numeric-locale')
+export const numericContextKey: InjectionKey<() => string> = Symbol('numeric-context')

@@ -6,6 +6,7 @@ import {
   changeNumberedMarkerSetting,
   markerColorChange,
   markerShapeCommand,
+  markerSequenceCommand,
 } from './numbered-marker-settings'
 import { computed } from 'vue'
 import {
@@ -235,6 +236,7 @@ function createEffects(
       workspace.activeDocument.value?.layers.filter((layer) => store.selectedLayerIds.includes(layer.id)) ?? []
     if (context.props.readOnlyDocument || layers.some((layer) => layer.locked)) return []
     const resolve = (key: string): EditorCommand | undefined => {
+      if (key === 'markerSequence' && layers.length === 1) return markerSequenceCommand(layers[0]!, Number(value))
       const textCommand = text.resolveChange(key, value)
       if (textCommand) return textCommand
       const effects = [

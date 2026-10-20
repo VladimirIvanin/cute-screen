@@ -15,6 +15,23 @@ import type { createWorkspaceState } from './workspace-state'
 import type { ResolvedEditorShellProps } from '../contracts'
 import type { useEditorShellStore } from '../store'
 
+function validMarkerSequence(value: number): boolean {
+  return Number.isSafeInteger(value) && value > 0
+}
+
+export function markerSequenceCommand(
+  layer: LayerNode,
+  sequence: number,
+): EditorCommand | undefined {
+  if (
+    layer.kind !== 'numberedMarker' ||
+    layer.locked ||
+    !validMarkerSequence(sequence)
+  ) return undefined
+  const after = measuredNumberedMarkerLayer(setNumberedMarkerSequence(layer, sequence))
+  return JSON.stringify(after) === JSON.stringify(layer) ? undefined : { type: 'updateLayer', before: layer, after }
+}
+
 export function changeNumberedMarkerSetting(
   props: ResolvedEditorShellProps,
   workspace: ReturnType<typeof createWorkspaceState>,
@@ -30,7 +47,7 @@ export function changeNumberedMarkerSetting(
   }
   const number = Number(value)
   if (id === 'markerNext') {
-    if (Number.isSafeInteger(number) && number > 0) workspace.markerNextOverride.value = number
+    if (validMarkerSequence(number)) workspace.markerNextOverride.value = number
     return true
   }
   if (
@@ -46,10 +63,14 @@ export function changeNumberedMarkerSetting(
   }
   const sequence = id === 'markerRemoveCaption' ? layer.payload.sequence : number
   if (
-    !Number.isSafeInteger(sequence) ||
-    sequence <= 0 ||
+    !validMarkerSequence(sequence) ||
     !props.documentSession
   ) return true
+  if (id === 'markerSequence') {
+    const command = markerSequenceCommand(layer, sequence)
+    if (command) props.documentSession.execute(command)
+    return true
+  }
   const after = measuredNumberedMarkerLayer(id === 'markerRemoveCaption'
     ? setNumberedMarkerCaption(layer, { text: '', wrap: 'autoSize', spans: [], paragraphs: [] })
     : setNumberedMarkerSequence(layer, sequence))

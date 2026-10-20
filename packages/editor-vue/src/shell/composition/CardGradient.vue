@@ -149,7 +149,7 @@ onBeforeUnmount(() => {
       :recent-colors="[]"
       @commit="changeStops($event)"
       @preview="changeStops($event, true)"
-      @cancel="emit('cancel')"
+      @cancel="cancel"
     />
     <template v-if="value.kind === 'radial'">
       <CardNumber
@@ -160,6 +160,8 @@ onBeforeUnmount(() => {
         :min="0"
         :max="100"
         @change="emit('change', { ...value, radial: { ...value.radial, center: { ...value.radial.center, [axis]: $event / 100 } } })"
+        @preview="emit('preview', { ...value, radial: { ...value.radial, center: { ...value.radial.center, [axis]: $event / 100 } } })"
+        @cancel="cancel"
       />
       <CardNumber
         :label="text('Радиус %', 'Radius %')"
@@ -167,6 +169,8 @@ onBeforeUnmount(() => {
         :min="1"
         :max="400"
         @change="emit('change', { ...value, radial: { ...value.radial, radius: $event / 100 } })"
+        @preview="emit('preview', { ...value, radial: { ...value.radial, radius: $event / 100 } })"
+        @cancel="cancel"
       />
     </template>
     <template v-if="value.kind === 'freeform'">
@@ -219,7 +223,11 @@ onBeforeUnmount(() => {
       <CardColor
         :label="text('Цвет точки', 'Point color')"
         :value="point.color"
+        :locale="locale"
+        :disabled="disabled"
         @change="patchPoint({ color: $event })"
+        @preview="patchPoint({ color: $event }, true)"
+        @cancel="cancel"
       />
       <CardNumber
         v-for="axis in ['x', 'y'] as const"
@@ -229,6 +237,8 @@ onBeforeUnmount(() => {
         :min="0"
         :max="100"
         @change="patchPoint({ [axis]: $event / 100 })"
+        @preview="patchPoint({ [axis]: $event / 100 }, true)"
+        @cancel="cancel"
       />
       <CardNumber
         :label="text('Влияние %', 'Spread %')"
@@ -236,6 +246,8 @@ onBeforeUnmount(() => {
         :min="1"
         :max="400"
         @change="patchPoint({ radius: $event / 100 })"
+        @preview="patchPoint({ radius: $event / 100 }, true)"
+        @cancel="cancel"
       />
     </template>
     <button

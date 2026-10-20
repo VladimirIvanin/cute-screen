@@ -1,5 +1,26 @@
 # CI-сборки и проверка версии через GitHub
 
+## Стыки экрана рамки (ADR-144)
+
+RenderGroupNode.backdrop — внутренний scene contract; persisted schema/IPC,
+native dependencies и поставляемые материалы прежние. Новых npm/assets нет.
+Gate: decoded Canvas2D/CanvasKit composition/seam tests, browser frame-seams/types,
+fresh Tauri `frame-seams,composition,composition-reopen`. На Windows использовать
+общий target либо существующий `target/e2e-isolated`, если основной executable
+занят; runner собирает свежий debug/no-bundle harness и удаляет pin/profiles.
+WKWebView/WebKitGTK требуют собственных платформенных запусков. Команды и
+результаты — TESTING.md и `artifacts/frame-seams/`.
+
+## Worker размытия (ADR-143)
+
+Vite поставляет `effects/filter.worker` вместе с frontend; эффект передаёт
+Uint8ClampedArray через transferable ArrayBuffer. Native dependencies, CSP,
+IPC и schema не расширяются. Финальный export не использует уменьшенный
+interactive background. Проверки — `pnpm check`, `pnpm test`, `pnpm test:render`,
+`pnpm test:perf` и `blur-optimization` browser/real-Tauri scenario. Использовать
+workspace target или существующий e2e-isolated при занятом основном executable;
+не создавать новый Cargo target/cache. Фактическое evidence — TESTING.md.
+
 ## Публикационная карточка (ADR-127)
 
 Новые документы создаются в schema v8; v7 читается без записи, v0–v6 unsupported,

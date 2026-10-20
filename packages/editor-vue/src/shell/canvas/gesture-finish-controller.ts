@@ -122,7 +122,7 @@ export function finishCanvasGesture(
   context.invalidateOverlay()
   const hoverPoint = context.canvasPoint(event)
   if (hoverPoint) context.updateHoverCursor(hoverPoint)
-  if (requiresCommittedRestore(completed)) scheduleCommittedRestore(context)
+  if (requiresCommittedRestore(completed, context.props)) scheduleCommittedRestore(context)
 }
 
 function finishStroke(
@@ -155,7 +155,7 @@ export function cancelCanvasGesture(
   const gesture = context.gesture()
   const cancelledCrop = gesture?.kind === 'crop' ? gesture.initial : undefined
   const cancelledQuickSelection = gesture?.kind === 'quickSelect'
-  const restoreCommittedScene = requiresCommittedRestore(gesture)
+  const restoreCommittedScene = requiresCommittedRestore(gesture, context.props)
   context.clearGesture()
   context.isPanning.value = false
   if (cancelledCrop) context.crop.session = cancelledCrop
@@ -463,7 +463,11 @@ function startCreatedText(
   })
 }
 
-function requiresCommittedRestore(gesture: CanvasGesture): boolean {
+function requiresCommittedRestore(
+  gesture: CanvasGesture,
+  props: CanvasViewportProps,
+): boolean {
+  if (gesture?.kind === 'draw' && gesture.tool === 'marker') return Boolean(props.compositionDocument)
   return (
     gesture?.kind === 'precision' && gesture.tool === 'spotlight' ||
     gesture?.kind === 'move' ||

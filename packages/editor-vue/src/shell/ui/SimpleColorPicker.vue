@@ -61,6 +61,12 @@ function choose(color: string): void {
   emit('commit', color)
   if (!props.embedded) show(false)
 }
+function chooseCustom(color: string): void {
+  // Returning to the quick palette blurs the HEX field. Its final change
+  // belongs to the dismissed custom editor and must not close this level.
+  if (!custom.value) return
+  choose(color)
+}
 function back(): void {
   custom.value = false
   void nextTick(() => customTrigger.value?.focus({ preventScroll: true }))
@@ -164,7 +170,7 @@ function outside(event: MouseEvent): void {
             :compact="compact"
             :locale="locale"
             embedded
-            @commit="choose"
+            @commit="chooseCustom"
             @dismiss="back"
             @eyedropper="sample"
           />

@@ -347,6 +347,7 @@ onBeforeUnmount(() => {
             <p v-if="fill?.kind === 'radialGradient'" class="cs-shape-current-fill">{{ fillNames.radialGradient }}</p>
             <ShapeGradientEditor
               v-if="fill?.kind === 'linearGradient'"
+              control-id="fillGradient"
               :fill="fill"
               :disabled="disabled"
               :locale="locale"

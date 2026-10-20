@@ -325,5 +325,6 @@ function moveDrawing(
     points: stroke?.points ?? gesture.points,
     ...(stroke ? { stroke } : {}),
   })
-  context.invalidateOverlay()
+  if (gesture.tool === 'marker' && context.props.compositionDocument) context.invalidateGesturePreview()
+  else context.invalidateOverlay()
 }
