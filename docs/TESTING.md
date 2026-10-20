@@ -17,8 +17,18 @@ Windows 10 x64 / PowerShell, Node 22.23.1, pnpm 10.33.2. Исходный baseli
 - Только legacy-reference blur/pixelate получает 30 s: полное равенство RGBA,
   исходный размер сцены, transforms/seams/overlaps и 1×/2× сохраняются.
   Общий timeout, worker isolation и performance thresholds не меняются.
-- `pnpm format`, `pnpm format:check`, ESLint двух изменённых тестов и
+- Первый полный `pnpm test` — 178 files, 1598 passed / 1 failed за 544 s
+  (`unit.log`). Исходные четыре падения устранены; оставшийся failure —
+  Alt-направляющие в `m08-precision-guides.test.ts`. Отдельный повтор этого
+  файла до дополнительной правки — 10/10 passed. Теперь жест начинается
+  после `frameReady`, проверки показа обеих направляющих и их скрытия при
+  keyup/blur сохранены. Три затронутых файла вместе — 21/21 passed
+  (`targeted.log`).
+- `pnpm format`, `pnpm format:check`, ESLint исходных двух изменённых тестов и
   `git diff --check` — passed.
+- `pnpm disk:usage` — target 51.595 GiB, artifacts 12.669 GiB,
+  node_modules 0.781 GiB (`disk-usage.log`). Задача не создаёт native targets
+  и profiles; общий build cache и artifacts других задач сохранены.
 
 ## Крестик закрытия оформления (2026-10-20)
 

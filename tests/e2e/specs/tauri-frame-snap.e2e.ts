@@ -26,10 +26,13 @@ async function verifyQuickFrame(): Promise<void> {
     await pointer().move({ origin: 'viewport', ...last }).up().perform(true)
   }
   await drag(rect.left + 2, rect.top + 2, rect.left + rect.width * .18, rect.top + rect.height * .18)
-  await drag(rect.right - 2, rect.bottom - 2, rect.left + rect.width * .82, rect.top + rect.height * .82)
+  const inset = (await selectionDocument()).crop!
+  const eastY = rect.top + (inset.y + inset.height / 2) * scale
+  await drag(rect.right - 4, eastY, rect.left + rect.width * .82, eastY)
   const crop = (await selectionDocument()).crop!
   expect(crop.x).toBeGreaterThan(0)
   expect(crop.y).toBeGreaterThan(0)
+  expect(crop.x + crop.width).toBeLessThan(initial.canvas.width - 1)
   const start = { x: rect.left + (crop.x + crop.width * .25) * scale, y: rect.top + crop.y * scale + 1 }
   const target = { x: start.x - crop.x * scale, y: start.y - crop.y * scale }
   await move(start.x, start.y)

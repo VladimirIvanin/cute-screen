@@ -1,6 +1,7 @@
 import {
   fireEvent,
   render,
+  waitFor,
 } from '@testing-library/vue'
 import { nextTick } from 'vue'
 import {
@@ -273,6 +274,7 @@ describe('M08 manual precision tools', () => {
     })
     const scene = view.getByLabelText('sceneCanvas') as HTMLCanvasElement
     prepareScene(scene)
+    await waitFor(() => expect(view.emitted('frameReady')).toBeDefined())
     await fireEvent.pointerDown(scene, {
       pointerId: 10,
       clientX: 20,

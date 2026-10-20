@@ -19,14 +19,20 @@ import type {
   CanvasViewportProps,
 } from './contracts'
 import type { CanvasGesture } from './workspace-state'
-import type { GestureFinishContext } from './gesture-finish-controller'
+import type { CropController } from './crop-controller'
 import { updateCropGesture } from './crop-gesture'
 
 type MoveGesture = Extract<CanvasGesture, { readonly kind: 'move' }>
 type ResizeGesture = Extract<CanvasGesture, { readonly kind: 'resize' | 'intrinsicResize' }>
 
+interface FrameFinishContext {
+  readonly props: CanvasViewportProps
+  readonly crop: CropController
+  readonly screenScale: () => CanvasPoint
+}
+
 export function finishFrameGeometry(
-  context: GestureFinishContext,
+  context: FrameFinishContext,
   completed: CanvasGesture,
   end: CanvasPoint | undefined,
   event: PointerEvent,
@@ -36,8 +42,12 @@ export function finishFrameGeometry(
     return updateFrameMove(completed, end, context.props, !event.ctrlKey && !event.metaKey,
       context.screenScale().x) ?? completed
   }
-  if ((completed?.kind === 'resize' || completed?.kind === 'intrinsicResize') &&
-    completed.handle !== 'start' && completed.handle !== 'end') {
+  if (
+    (completed?.kind === 'resize' ||
+      completed?.kind === 'intrinsicResize') &&
+      completed.handle !== 'start' &&
+      completed.handle !== 'end'
+  ) {
     return updateFrameResize(completed, end, context.props, event, context.screenScale().x)
   }
   if (completed?.kind === 'crop') {
