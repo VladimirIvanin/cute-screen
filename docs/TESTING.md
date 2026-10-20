@@ -1,5 +1,40 @@
 # Стратегия тестирования
 
+## Округление Canvas2D golden карточек (2026-10-20)
+
+Baseline `a472777`, Windows x64 / PowerShell и Ubuntu 22.04 x86_64 / WSL2,
+Node 22.23.1, pnpm 10.33.2, `@napi-rs/canvas` 1.0.2. Evidence —
+`artifacts/composition-golden/`. Linux использует те же исходники, fixtures,
+шрифты и lockfile; временные Linux Node/native bindings подключены через
+preload resolver без переустановки Windows node_modules.
+
+До исправления focused Linux `composition.test.ts` воспроизводит обе ошибки
+владельца: browser Canvas2D 16 каналов на 1× и 173 на 2×, maximumDelta=1
+(`linux-before.log`). Диагностический проход всех пяти карточек на обеих
+плотностях (`linux-diagnostic.log`, `differences.json`) показывает максимум
+28/187 изменённых RGB-каналов, delta=1, ноль изменений alpha; все десять
+CanvasKit PNG точные. Нативный Canvas2D даёт платформенные различия последнего
+разряда в масштабированном снимке и footer; геометрия не меняется. Linux browser
+PNG и committed golden визуально просмотрены.
+
+Только этот вызов Canvas2D `assertGolden` явно разрешает delta≤1 при доле
+изменённых каналов ≤0,00002 (0,002%); alpha сравнивается точно. Остальные
+вызовы используют нулевые допуски. Пять проверок harness отклоняют delta=2,
+превышение бюджета, изменение alpha и RGB-разницу без явного допуска.
+Production renderer и committed PNG не менялись. Проверки размера decoded PNG,
+исходного SHA-256, документа, точного Canvas2D preview/export и межbackend
+parity сохранены.
+
+- Focused `pnpm exec vitest run --project render-harness tests/harness/render/golden-assertion.test.ts tests/harness/render/composition.test.ts`
+  — Windows и Linux, по 2 files / 7 passed (`windows-focused.log`, `linux-focused.log`).
+- Полный `pnpm test:render` — Windows и Linux, по 29 files / 85 passed
+  (`windows-render.log`, `linux-render.log`).
+- `pnpm lint` — passed, 37 прежних Vue warnings; `pnpm exec vue-tsc --noEmit -p tests/tsconfig.json`
+  — passed (`lint.log`, `typecheck.log`).
+- `pnpm format`, `pnpm format:check`, `pnpm docs:check` — passed (соответствующие logs).
+  Browser/Tauri/Rust не запускались:
+  изменение затрагивает только headless test harness, без нового UI/native контракта.
+
 ## Общий магнит рамки (2026-10-20, ADR-146)
 
 Windows x64 / PowerShell, Node 22.23.1, pnpm 10.33.2. Baseline `3665454`;

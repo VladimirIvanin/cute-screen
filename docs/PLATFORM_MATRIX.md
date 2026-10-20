@@ -1,5 +1,16 @@
 # Платформенная матрица
 
+## Canvas2D golden карточек (2026-10-20)
+
+Headless Windows x64 и Ubuntu 22.04 x86_64 / WSL2, Node 22.23.1,
+native `@napi-rs/canvas` 1.0.2: focused decoded composition 1×/2× и
+assertion self-tests — по 7 passed. Linux точно воспроизводит CI-разницу
+16/173 RGB-каналов browser; максимальная разница по карточкам — 1/255,
+alpha совпадает. Scoped бюджет 0,002% с delta≤1 применяется только к этим
+Canvas2D goldens; CanvasKit остаётся точным. Полный `pnpm test:render` —
+по 29 files / 85 passed на Windows и Linux. Это software renderer evidence,
+без заявления о проверке WebView2/WKWebView/WebKitGTK. Подробности — TESTING.md.
+
 ## Магнит рамок (ADR-146, 2026-10-20)
 
 Windows x64: Chrome 155.0.8059.85 — general frame и gradient 2/2 passed;

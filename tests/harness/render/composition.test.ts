@@ -37,7 +37,10 @@ import {
   assertGolden,
   rgba,
 } from './golden-assertion-test-kit'
-import { compareRgba } from './golden'
+import {
+  compareRgba,
+  compositionCanvas2dTolerance,
+} from './golden'
 
 beforeAll(prepareGoldenRuntime)
 describe('publication cards on production-like content', () => {
@@ -83,7 +86,8 @@ describe('publication cards on production-like content', () => {
         for (const [backend, bytes] of [['canvas2d', fallback], ['canvaskit', native]] as const) {
           const decoded = await loadImage(bytes)
           expect([decoded.width, decoded.height]).toEqual([960 * scale, 720 * scale])
-          await assertGolden(`composition-${kind}-${backend}-${scale}`, bytes)
+          await assertGolden(`composition-${kind}-${backend}-${scale}`, bytes,
+            backend === 'canvas2d' ? compositionCanvas2dTolerance : undefined)
           await mkdir('artifacts/composition', { recursive: true })
           if (scale === 1) await writeFile(`artifacts/composition/${kind}-${backend}.png`, bytes)
         }

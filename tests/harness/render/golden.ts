@@ -3,6 +3,19 @@ export interface PixelDifference {
   readonly maximumDelta: number
 }
 
+export interface GoldenTolerance {
+  readonly maximumChangedChannelRatio: number
+  readonly maximumDelta: number
+}
+
+// Native Canvas2D on Linux/Windows rounds a few resampled RGB channels differently.
+// Measured on the 4K composition fixture: <=28 channels at 1x, <=187 at 2x, delta 1.
+// Keep both a sparse-change budget (0.002%) and a one-level cap; alpha stays exact.
+export const compositionCanvas2dTolerance: GoldenTolerance = {
+  maximumChangedChannelRatio: 0.00002,
+  maximumDelta: 1,
+}
+
 export const semanticParityTolerance = {
   // Skia and Cairo use different edge antialiasing kernels. Interior pixels
   // must agree; up to six percent of channels may differ at vector edges.

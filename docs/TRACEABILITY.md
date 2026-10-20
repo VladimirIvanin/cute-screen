@@ -1,5 +1,17 @@
 # Трассируемость требований
 
+## Переносимость golden карточек (2026-10-20)
+
+`REQ-OUT-001/003/006/012/014`: Linux воспроизводит CI-разницу Canvas2D
+16/173 каналов в browser 1×/2×; максимум по пяти карточкам — 28/187,
+только RGB и delta=1. Только эти Canvas2D goldens явно используют бюджет
+0,002% каналов и delta≤1; alpha, CanvasKit и остальные goldens точные.
+Сохраняются проверки размеров, исходника/документа и точного preview/export
+parity. `golden-assertion.test.ts` проверяет default exact и отклонение
+превышений обоих лимитов/изменений alpha; assertion указывает имя PNG.
+Эталоны и production renderer не менялись. Evidence — TESTING.md и
+`artifacts/composition-golden/`.
+
 ## Регрессии отмены маркера и pixel-reference (2026-10-20)
 
 `REQ-TOL-003`, `REQ-EDT-006`, `REQ-TOL-008`, `REQ-OUT-001/009`:
