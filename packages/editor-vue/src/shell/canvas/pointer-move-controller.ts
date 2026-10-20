@@ -1,3 +1,8 @@
+import {
+  isGradientLayer,
+  gradientFrame,
+  snapGradientPoint,
+} from '@cute-screen/editor-renderer'
 import { updateLineGesture } from './line-gesture'
 import {
   rulerAngleStep,
@@ -264,6 +269,11 @@ function moveTransform(
       centerResize: event.altKey,
     })
   } else if (gesture.kind === 'intrinsicResize') {
+    if (
+      isGradientLayer(gesture.initial) &&
+      context.props.document &&
+      Math.abs(gesture.initial.transform.rotation % 360) < 1e-8
+    ) point = snapGradientPoint(point, gradientFrame(context.props.document), (context.props.zoom ?? 100) / 100)
     context.setGesture({
       ...gesture,
       snapAngleIncrementDegrees: gesture.initial.kind === 'ruler' ? rulerAngleStep(event, gesture.initial.payload.snapAngleIncrementDegrees) : undefined,
@@ -291,6 +301,7 @@ function moveDrawing(
     context.invalidateOverlay()
     return
   }
+  if (gesture.tool === 'gradient' && context.props.document) point = snapGradientPoint(point, gradientFrame(context.props.document), (context.props.zoom ?? 100) / 100)
   let stroke = gesture.stroke
   if (stroke) {
     const coalesced = event.getCoalescedEvents?.()

@@ -1,8 +1,63 @@
 # Журнал архитектурных решений
 
+## ADR-126 — Gradient только в полном редакторе
+
+**Статус:** accepted (2026-10-20); дополняет ADR-124 ограничением availability.
+
+**Основание:** владелец явно ограничил инструмент полным Editor и исключил
+его из Quick Capture. Проверяемый контракт: в Quick rail нет Gradient;
+после штатного перехода в Editor кнопка доступна, подложка создаётся,
+редактируется и восстанавливается после relaunch вместе с defaults.
+
+**Решение:** Gradient исключён из каталога Quick tools; создание и настройка
+доступны в Editor. Core, codec, renderer и история остаются общими.
+Подложка использует Crop либо canvas текущего документа; исходная область
+Quick Capture становится кадром документа после перехода в Editor.
+Новый shortcut не назначается. Доказательства — TESTING.md.
+
+## ADR-125 — Рукописное оформление линии
+
+**Статус:** accepted (2026-10-20); заменяет исключение Line из ADR-123,
+остальные решения ADR-123 сохраняются.
+
+**Основание:** владелец запросил такой же характер отдельной линии.
+Четыре core contracts сначала failed: seed/кубические paths, codec/reopen,
+style transfer и независимые defaults. Повторное использование генератора
+стрелок сохраняет точные endpoints и общую геометрию preview/hit/export.
+
+**Решение:** Line остаётся straight arrow payload v7 с annotationTool=line
+и двумя none caps; optional appearance/sketchSeed/sketchVersion совпадают
+с контрактом стрелок. Стартовое оформление и legacy — clean. Defaults линии
+помнят appearance отдельно, без instance seed. Совместимые line/arrow styles
+передают appearance, сохраняя seed получателя; caps линии не передаются.
+Переключатель находится в существующем меню обводки defaults/selection,
+включая mixed/locked/read-only. Серийное создание, snapping и undo не меняются.
+Новый generator, renderer primitive, schema и dependencies не нужны.
+Фактические команды и платформенные ограничения — TESTING.md.
+
+## ADR-124 — Линейная градиентная подложка
+
+**Статус:** accepted (2026-10-20); дополняет ADR-023/092.
+
+**Решение:** Gradient — отдельный creation tool без shortcut, backed by rectangle
+shape с optional annotationTool=gradient и существующим linearGradient paint v7.
+Обычные shape не распознаются по внешнему виду. Две независимые geometry:
+область подложки и нормализованные start/end заливки. Defaults хранятся отдельно.
+Размер/Переход используют единственную transient-панель; canvas drafts не входят
+в Vue scene graph и commit создаёт одну EditorCommand. Fit по текущему кадру
+явный, при rotation disabled; snapping 6 CSS px только для gradient geometry.
+
+**Проверяемое основание:** red-first core/codec/command tests, production input
+browser flow, decoded Canvas2D/CanvasKit export 1×/2× и real-WebView reopen;
+фактические результаты и ограничения фиксируются в TESTING.md.
+
+**Последствия:** новая схема документа и новый renderer primitive не требуются.
+Старые документы неизменны; старые версии могут потерять metadata нового инструмента.
+
 ## ADR-123 — Обводка и воспроизводимые рукописные стрелки
 
-**Статус:** accepted (2026-10-20); дополняет ADR-069/092/100 и каталог фигур.
+**Статус:** superseded в части исключения Line — [ADR-125](#adr-125-рукописное-оформление-линии)
+(2026-10-20); остальные решения сохранены ADR-125.
 
 **Основание:** нужен быстрый редактируемый акцент вокруг содержимого и
 индивидуальные стрелки с общим характером росчерка. Первые core-тесты до

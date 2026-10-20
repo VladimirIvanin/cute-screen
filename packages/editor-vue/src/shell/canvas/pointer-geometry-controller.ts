@@ -21,6 +21,7 @@ import type { ResizeHandle } from './workspace-state'
 import { canvasSelectionHandles } from './selection-controls'
 
 export interface PointerGeometryContext {
+  readonly gradientEditing?: () => boolean
   readonly props: CanvasViewportProps
   readonly scene: Ref<HTMLCanvasElement | undefined>
   readonly outputBounds: ComputedRef<ViewportOutputBounds | undefined>
@@ -72,6 +73,11 @@ export class PointerGeometryController {
   }
 
   handles(layer: LayerNode): readonly SelectionHandle[] {
+    if (
+      this.#context.gradientEditing?.() &&
+      layer.kind === 'shape' &&
+      layer.payload.annotationTool === 'gradient'
+    ) return []
     return canvasSelectionHandles(layer, this.screenScale(), this.#context.outputBounds.value,
       this.#context.calloutInsertMode?.())
   }

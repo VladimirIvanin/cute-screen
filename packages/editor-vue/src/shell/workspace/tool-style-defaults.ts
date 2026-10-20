@@ -21,28 +21,24 @@ function drawingStyle(
   tool: string,
   style: LayerStyle,
 ): void {
-  if (!['arrow', 'line', 'shape', 'pencil', 'marker'].includes(tool)) return
+  if (!['arrow', 'line', 'shape', 'gradient', 'pencil', 'marker'].includes(tool)) return
   if (tool === 'pencil' && style.brush === 'brush') style = { ...style, brush: 'stabilized' }
-  const id = tool as 'arrow' | 'line' | 'shape' | 'pencil' | 'marker'
+  const id = tool as 'arrow' | 'line' | 'shape' | 'gradient' | 'pencil' | 'marker'
   const existing = workspace.drawingDefaults.value[id]
   const payload = { ...(id === 'pencil' && typeof style.brush === 'string'
     ? changePencilBrush(existing, style.brush === 'pencil' ? 'pen' : style.brush)
     : existing) }
-  if (
-    id === 'arrow' ||
-    id === 'line' ||
-    id === 'shape'
-  ) {
+  if (['arrow', 'line', 'shape', 'gradient'].includes(id)) {
     const stroke = { ...(payload.stroke as JsonObject), ...pick(style, ['color', 'width']) }
     if ('strokeStyle' in style) stroke.style = style.strokeStyle!
-    payload.stroke = stroke
+    payload.stroke = id === 'gradient' ? existing.stroke! : stroke
   } else Object.assign(payload, pick(style, ['color', 'width', 'brush', 'smoothing', ...(id === 'marker' ? ['highlighterMode'] : [])]))
   Object.assign(
     payload,
     pick(
       style,
       [...['fill', 'cornerRadius', 'startCap', 'endCap'].filter((key) => key in payload),
-        ...(id === 'arrow' ? ['appearance'] : [])],
+        ...(['arrow', 'line'].includes(id) ? ['appearance'] : [])],
     ),
   )
   if ('opacity' in style) payload.layerOpacity = style.opacity!

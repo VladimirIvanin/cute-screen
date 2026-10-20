@@ -141,7 +141,7 @@ function parseGradientStops(
   return Object.freeze(stops)
 }
 
-function parseFill(
+export function parseFill(
   value: unknown,
   field: string,
 ): JsonObject {
@@ -230,8 +230,7 @@ function parseArrowAppearance(
     throw new Error(`${field}.appearance is invalid`)
   if (
     input.appearance === 'handDrawn' &&
-    (input.annotationTool === 'line' ||
-      input.sketchSeed === undefined)
+    input.sketchSeed === undefined
   )
     throw new Error(`${field} hand-drawn arrow requires sketch metadata`)
   return input.appearance as ArrowLayerPayload['appearance']
@@ -312,6 +311,18 @@ export function parseShapePayload(
       input.sketchSeed === undefined)
   )
     throw new Error(`${field} circling requires sketch metadata and no fill`)
+  const gradientStroke = input.stroke as Record<string, unknown> | undefined
+  const gradientColor = gradientStroke?.color as Record<string, unknown> | undefined
+  if (
+    input.annotationTool !== undefined &&
+    (input.annotationTool !== 'gradient' ||
+      input.shape !== 'rectangle' ||
+      fill.kind !== 'linearGradient' ||
+      JSON.stringify(fill.start) === JSON.stringify(fill.end) ||
+      gradientStroke?.width !== 1 ||
+      gradientColor?.alpha !== 0)
+  )
+    throw new Error(`${field} gradient metadata is invalid`)
   const cornerRadius = readFiniteNumber(input.cornerRadius, `${field}.cornerRadius`)
   const starPoints = readFiniteNumber(input.starPoints, `${field}.starPoints`)
   const starInnerRatio = parseUnitInterval(input.starInnerRatio, `${field}.starInnerRatio`)
@@ -324,6 +335,7 @@ export function parseShapePayload(
     throw new Error(`${field} geometry is invalid`)
   return Object.freeze({
     ...parseSketch(input, field),
+    ...(input.annotationTool === 'gradient' ? { annotationTool: 'gradient' as const } : {}),
     shape: input.shape as ShapeLayerPayload['shape'],
     fill: fill as ShapeLayerPayload['fill'],
     stroke: parseStroke(input.stroke, `${field}.stroke`) as ShapeLayerPayload['stroke'],

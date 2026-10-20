@@ -37,7 +37,9 @@ import { updateLineGesture } from '../../../packages/editor-vue/src/shell/canvas
 
 beforeEach(() => {
   localStorage.clear()
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(canvasContext())
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    ...canvasContext(), bezierCurveTo: vi.fn(),
+  })
 })
 afterEach(() => vi.restoreAllMocks())
 
@@ -65,6 +67,32 @@ async function drag(
 }
 
 describe('line through the mounted editor', () => {
+  it('configures hand-drawn defaults and preserves the selected line seed through style history', async () => {
+    const app = mount()
+    await fireEvent.click(screen.getByRole('button', { name: 'Line' }))
+    const stroke = app.view.container.querySelector('.cs-tool-defaults-toolbar [data-control="stroke"] button')!
+    await fireEvent.click(stroke)
+    await fireEvent.click(await screen.findByRole('button', { name: 'Hand-drawn' }))
+    await drag(app.scene, 90, 60)
+    const line = app.session.snapshot.core.document.layers[0] as ArrowLayer
+    expect(line.payload.appearance).toBe('handDrawn')
+    expect(line.payload.sketchSeed).toBeGreaterThan(0)
+    app.store.selectTool('select')
+    app.store.selectLayer(line.id)
+    await nextTick()
+    await fireEvent.click(app.view.container.querySelector('.cs-selection-floating-toolbar [data-control="stroke"] button')!)
+    await fireEvent.click(await screen.findByRole('button', { name: 'Clean' }))
+    expect((app.session.snapshot.core.document.layers[0] as ArrowLayer).payload).toMatchObject({
+      appearance: 'clean', sketchSeed: line.payload.sketchSeed,
+    })
+    app.session.undo()
+    expect((app.session.snapshot.core.document.layers[0] as ArrowLayer).payload.appearance).toBe('handDrawn')
+    await fireEvent.click(screen.getByRole('button', { name: 'Arrow' }))
+    await fireEvent.click(app.view.container.querySelector('.cs-tool-defaults-toolbar [data-control="stroke"] button')!)
+    expect(await screen.findByRole('button', { name: 'Clean' })).toHaveAttribute('aria-pressed', 'true')
+    app.close()
+  })
+
   it('creates aligned lines in series with a single undo step per gesture', async () => {
     const app = mount()
     await fireEvent.click(screen.getByRole('button', { name: 'Line' }))
@@ -201,7 +229,8 @@ it('shows mixed line stroke values independently and changes the group with one 
   await drag(app.scene)
   await drag(app.scene, 65, 65)
   const [first, second] = app.session.snapshot.core.document.layers as ArrowLayer[]
-  const changed = { ...second!, payload: { ...second!.payload, stroke: { ...second!.payload.stroke, width: 7, style: 'dashed' as const } } }
+  const changed = { ...second!, payload: { ...second!.payload, appearance: 'handDrawn' as const,
+    stroke: { ...second!.payload.stroke, width: 7, style: 'dashed' as const } } }
   app.session.execute({ type: 'updateLayer', before: second!, after: changed })
   app.store.selectTool('select')
   app.store.selectLayer(first!.id)
@@ -212,6 +241,8 @@ it('shows mixed line stroke values independently and changes the group with one 
   const thickness = await screen.findByRole('spinbutton', { name: 'Thickness' })
   expect(thickness).toHaveValue('')
   for (const name of ['Solid', 'Dashed', 'Dotted'])
+    expect(screen.getByRole('button', { name })).toHaveAttribute('aria-pressed', 'false')
+  for (const name of ['Clean', 'Hand-drawn'])
     expect(screen.getByRole('button', { name })).toHaveAttribute('aria-pressed', 'false')
   await fireEvent.focus(thickness)
   await fireEvent.input(thickness, { target: { value: '5' } })
@@ -225,5 +256,17 @@ it('shows mixed line stroke values independently and changes the group with one 
   expect(
     (app.session.snapshot.core.document.layers as ArrowLayer[]).map((layer) => layer.payload.stroke.width),
   ).toEqual([4, 7])
+  await nextTick()
+  await fireEvent.click(screen.getByRole('button', { name: 'Hand-drawn' }))
+  expect(
+    (app.session.snapshot.core.document.layers as ArrowLayer[]).map((layer) => layer.payload.appearance),
+  ).toEqual(['handDrawn', 'handDrawn'])
+  expect(
+    (app.session.snapshot.core.document.layers as ArrowLayer[]).map((layer) => layer.payload.sketchSeed),
+  ).toEqual([first!.payload.sketchSeed, second!.payload.sketchSeed])
+  app.session.undo()
+  expect(
+    (app.session.snapshot.core.document.layers as ArrowLayer[]).map((layer) => layer.payload.appearance),
+  ).toEqual(['clean', 'handDrawn'])
   app.close()
 })

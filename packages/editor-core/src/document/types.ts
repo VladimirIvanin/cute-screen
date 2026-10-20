@@ -359,6 +359,7 @@ export const ARROW_CAPS = ['none', 'lineArrow', 'solidArrow', 'triangle', 'circl
 export type ArrowCap = (typeof ARROW_CAPS)[number]
 
 export interface ShapeLayerPayload extends JsonObject {
+  readonly annotationTool?: 'gradient'
   readonly sketchSeed?: number
   readonly sketchVersion?: 1
   readonly shape: ShapeKind

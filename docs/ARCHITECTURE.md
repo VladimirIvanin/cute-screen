@@ -1,5 +1,27 @@
 # Архитектура Cute Screen
 
+## Градиентная подложка (ADR-124/126)
+
+Gradient доступен в полном Editor; Quick tool catalog его исключает.
+Gradient создаёт shape rectangle с annotationTool=gradient, совместимой прозрачной
+обводкой (persisted width=1/alpha=0; renderer width=0) и существующей linearGradient заливкой. Codec v7 сохраняет optional
+identity; обычные gradient shapes не меняют семантику. Core предоставляет
+frame/snap/fit и world-space редактирование заливки с нормализованными start/end.
+Angle и rotate учитывают pixel aspect ratio подложки. Renderer использует полный
+rectangle без stroke inset. Mode/selected stop — UI state, pointer draft —
+обычные поля GradientEditingController; scene preview сохраняет ordered slot
+подложки и не создаёт history до pointerup. В режиме Переход bounds handles
+не рисуются и исключены из pointer targeting. Defaults независимы от Shape;
+подтверждённая правка fill/opacity запоминается, undo/redo preferences не меняют.
+
+## Рукописная линия (ADR-125)
+
+Line использует общий seeded arrow body и vector node без caps. Appearance
+доступен в общей stroke-панели, в style clipboard и отдельных defaults линии;
+codec v7 сохраняет metadata. Legacy clean проходит прежним path-node путём.
+Серийность и axis snapping работают с точной базовой геометрией, а hit testing
+получает тот же кубический контур, что preview/export обоих backend.
+
 ## Рукописные акценты (ADR-123)
 
 `sketch-geometry` вычисляет воспроизводимые кубические пути: circling/rectangularCircling —

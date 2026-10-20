@@ -141,10 +141,10 @@ export function drawingHitPart(
   }
   const payload = layer.payload
   const bounds = layer.localBounds ?? { x: 0, y: 0, width: 1, height: 1 }
-  const strokeWidth = payloadStrokeWidth(payload)
+  const strokeWidth = layer.kind === 'shape' && payload.annotationTool === 'gradient' ? 0 : payloadStrokeWidth(payload)
   if (layer.kind === 'arrow') {
     const arrow = payload as unknown as ArrowLayerPayload
-    if (arrow.appearance === 'handDrawn' && arrow.annotationTool !== 'line') {
+    if (arrow.appearance === 'handDrawn') {
       const nodes = arrowNodes({
         ...layer, transform: { ...layer.transform, translateX: 0, translateY: 0, rotation: 0 },
       })

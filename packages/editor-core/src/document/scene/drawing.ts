@@ -41,11 +41,16 @@ function polygonCorners(
   }))
 }
 
+function shapeLayerStroke(layer: ShapeLayer) {
+  const value = stroke(layer.payload.stroke)
+  return layer.payload.annotationTool === 'gradient' ? { ...value, width: 0 } : value
+}
+
 export function shapeNodes(layer: ShapeLayer): readonly RenderNode[] {
   const payload = layer.payload
   const localBounds = bounds(layer)
   const shape = isShapeKind(payload.shape) ? payload.shape : 'rectangle'
-  const strokeStyle = stroke(payload.stroke)
+  const strokeStyle = shapeLayerStroke(layer)
   const strokeInput = payload.stroke as StrokeStyle | undefined
   const shapeStroke = {
     lineCap: strokeInput?.style === 'dotted' ? 'round' as const : strokeStyle.cap,

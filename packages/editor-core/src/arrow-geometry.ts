@@ -300,7 +300,7 @@ export function arrowBodyGeometry(payload: ArrowLayerPayload): Readonly<{
   points: readonly Point[]
 }> {
   const base = trimArrowBodyPoints(arrowPathPoints(payload), payload.startCap, payload.endCap, payload.stroke.width)
-  if (payload.annotationTool === 'line' || payload.appearance !== 'handDrawn') {
+  if (payload.appearance !== 'handDrawn') {
     return { points: base, path: base.map((p, i): ShapePathCommand => [i ? 'L' : 'M', p.x, p.y]) }
   }
   const path = sketchPath(base, payload.sketchSeed ?? 1, payload.stroke.width, payload.path === 'elbow')

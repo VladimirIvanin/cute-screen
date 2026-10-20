@@ -33,6 +33,7 @@ type PreviewNodes =
     : never
 
 export interface CanvasOverlayContext {
+  readonly gradientDraw?: (context: CanvasRenderingContext2D) => boolean
   readonly calloutInsertMode?: () => boolean
   readonly calloutRemoveMode?: () => boolean
   readonly hoverTarget?: () => import('@cute-screen/editor-renderer').SelectionTarget
@@ -106,6 +107,7 @@ export class CanvasOverlayController {
         props.quickSelectionMode ||
         props.activeTool === 'crop')
     ) return
+    if (this.#context.gradientDraw?.(context)) return
     this.#drawHover(context)
     this.#drawSelection(context, bounds)
   }

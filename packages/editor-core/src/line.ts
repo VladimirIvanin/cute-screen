@@ -3,11 +3,12 @@ import type {
   Point,
 } from './document/types'
 
-export type AnnotationTool = LayerNode['kind'] | 'line'
+export type AnnotationTool = LayerNode['kind'] | 'line' | 'gradient'
 export type LineAxis = 'horizontal' | 'vertical'
 
 /** Persisted identity is explicit: legacy arrows without caps remain arrows. */
 export function annotationTool(layer: LayerNode): AnnotationTool {
+  if (layer.kind === 'shape' && layer.payload.annotationTool === 'gradient') return 'gradient'
   return layer.kind === 'arrow' && layer.payload.annotationTool === 'line' ? 'line' : layer.kind
 }
 

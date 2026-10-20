@@ -1,3 +1,7 @@
+import {
+  gradientFrame,
+  snapGradientPoint,
+} from '@cute-screen/editor-renderer'
 import { rulerAngleStep } from './ruler-modifiers'
 import {
   DEFAULT_DRAWING_DEFAULTS,
@@ -205,6 +209,7 @@ function handleCreationTool(
     tool === 'arrow' ||
     tool === 'line' ||
     tool === 'shape' ||
+    tool === 'gradient' ||
     tool === 'pencil' ||
     tool === 'marker'
   ) {
@@ -322,8 +327,9 @@ function beginDrawing(
   context: PointerDownContext,
   event: PointerEvent,
   point: CanvasPoint,
-  tool: 'arrow' | 'line' | 'shape' | 'pencil' | 'marker',
+  tool: 'arrow' | 'line' | 'shape' | 'gradient' | 'pencil' | 'marker',
 ): void {
+  if (tool === 'gradient' && context.props.document) point = snapGradientPoint(point, gradientFrame(context.props.document), (context.props.zoom ?? 100) / 100)
   event.preventDefault()
   context.scene.value!.setPointerCapture(event.pointerId)
   context.setGesture({

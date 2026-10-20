@@ -460,3 +460,16 @@ export {
   type AnnotationTool,
   type LineAxis,
 } from './line'
+
+export {
+  DEFAULT_GRADIENT_FILL,
+  DEFAULT_GRADIENT_DEFAULTS,
+  isGradientLayer,
+  gradientFrame,
+  gradientPoints,
+  snapGradientPoint,
+  fitGradientLayer,
+  updateGradientHandle,
+  rotateGradientFill,
+  type LinearGradientPaint,
+} from './gradient'

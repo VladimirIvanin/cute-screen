@@ -1,3 +1,4 @@
+import { DEFAULT_GRADIENT_DEFAULTS } from './gradient'
 import { rebaseFreehandLayer } from './tools/freehand'
 import { sketchSeed } from './sketch-geometry'
 import { isShapeKind } from './shapes'
@@ -19,10 +20,11 @@ import {
   type HighlighterEffect,
 } from './highlighter'
 
-export type DrawingTool = 'arrow' | 'line' | 'shape' | 'pencil' | 'marker'
+export type DrawingTool = 'arrow' | 'line' | 'shape' | 'gradient' | 'pencil' | 'marker'
 export type { ShapeKind } from './shapes'
 
 export interface DrawingDefaults {
+  readonly gradient: JsonObject
   readonly line: JsonObject
   readonly arrow: JsonObject
   readonly shape: JsonObject
@@ -44,7 +46,9 @@ interface DrawingLayerInput {
 }
 
 export const DEFAULT_DRAWING_DEFAULTS: DrawingDefaults = Object.freeze({
+  gradient: DEFAULT_GRADIENT_DEFAULTS,
   line: Object.freeze({
+    appearance: 'clean',
     autoAlignAxes: true,
     stroke: Object.freeze({
       color: Object.freeze({ red: 0.898, green: 0.282, blue: 0.302, alpha: 1 }),
@@ -292,11 +296,9 @@ function createArrowDrawing(
   delete arrowStyle.start
   const payload: ArrowLayerPayload = {
     ...arrowStyle,
-    ...(input.tool === 'arrow' ? {
-      appearance: defaults.arrow.appearance === 'handDrawn' ? 'handDrawn' as const : 'clean' as const,
-      sketchSeed: sketchSeed(input.id),
-      sketchVersion: 1 as const,
-    } : {}),
+    appearance: defaults.arrow.appearance === 'handDrawn' ? 'handDrawn' as const : 'clean' as const,
+    sketchSeed: sketchSeed(input.id),
+    sketchVersion: 1 as const,
     path,
     start: { x: input.start.x, y: input.start.y },
     end: { x: end.x, y: end.y },
@@ -372,7 +374,12 @@ export function createDrawingLayer(input: DrawingLayerInput): LayerNode | undefi
   const samples: readonly (Point & Readonly<{ readonly pressure?: number }>)[] = input.points?.length
     ? input.points
     : [input.start, end]
-  const strokeWidth = drawingStrokeWidth(input, defaults)
+  if (
+    input.tool === 'gradient' &&
+    (Math.abs(end.x - input.start.x) < 1 ||
+      Math.abs(end.y - input.start.y) < 1)
+  ) return undefined
+  const strokeWidth = input.tool === 'gradient' ? 0 : drawingStrokeWidth(input, defaults)
   const geometry = drawingGeometry(input, end, samples, strokeWidth)
   const common = commonDrawingLayer(input, defaults, geometry)
   if (input.tool === 'arrow' || input.tool === 'line') {
@@ -392,6 +399,15 @@ export function createDrawingLayer(input: DrawingLayerInput): LayerNode | undefi
       )
     }
     return createArrowDrawing(input, defaults, end, common)
+  }
+  if (input.tool === 'gradient') {
+    const { layerOpacity: _opacity, blendMode: _blend, ...payload } = {
+      ...DEFAULT_GRADIENT_DEFAULTS,
+      ...defaults.gradient,
+    }
+    void _opacity
+    void _blend
+    return Object.freeze({ ...common, kind: 'shape' as const, payload })
   }
   if (input.tool === 'shape') {
     const square = shape === 'circle'

@@ -1,3 +1,4 @@
+import { isGradientLayer } from '@cute-screen/editor-renderer'
 import type {
   EditorDocumentV1,
   LayerNode,
@@ -8,7 +9,7 @@ import type { CanvasGesture } from './workspace-state'
 export function requiresScenePreview(layer: LayerNode | undefined): boolean {
   // Image nodes need decoded resources and their original ordered scene slot;
   // the lightweight overlay intentionally does not render them.
-  return Boolean(layer && ['emoji', 'image', 'censor', 'spotlight', 'loupe', 'marker'].includes(layer.kind))
+  return Boolean(isGradientLayer(layer) || layer && ['emoji', 'image', 'censor', 'spotlight', 'loupe', 'marker'].includes(layer.kind))
 }
 
 export interface SceneDocumentContext {

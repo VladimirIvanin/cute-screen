@@ -57,6 +57,9 @@ const TOOL_CATALOG: readonly ToolCatalogEntry[] = [
     availability: 'interactive',
   },
   {
+    id: 'gradient', group: 'annotate', icon: 'gradient', labelKey: 'toolGradient', availability: 'editableCanvas',
+  },
+  {
     id: 'pencil',
     group: 'annotate',
     icon: 'pencil',

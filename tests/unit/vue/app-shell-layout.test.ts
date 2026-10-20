@@ -45,6 +45,7 @@ describe('M02 editor shell', () => {
     })
 
     const chrome = view.container.querySelector('.cs-bottom-chrome')
+    expect(screen.getByRole('button', { name: 'Gradient' })).toBeInTheDocument()
     expect(chrome).toBeTruthy()
     expect(chrome?.querySelector('.cs-bottom-chrome-center .cs-toolrail')).toBeTruthy()
     expect(chrome?.querySelector('.cs-zoom-controls')).toBeTruthy()
@@ -84,6 +85,7 @@ describe('M02 editor shell', () => {
       'Ruler',
       'Loupe',
     ])
+    expect(screen.queryByRole('button', { name: 'Gradient' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Crop' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Layers' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument()

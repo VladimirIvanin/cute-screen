@@ -18,7 +18,7 @@ import type { ContextToolbarSchema } from '../types'
 import type { TextDraft } from './text-schema'
 import type { DrawingLayerNode } from './drawing-schema'
 import type { PrecisionTool } from './precision-schema'
-type DrawingTool = 'arrow' | 'line' | 'shape' | 'pencil' | 'marker'
+type DrawingTool = 'arrow' | 'line' | 'shape' | 'gradient' | 'pencil' | 'marker'
 type PrecisionLayer = Extract<LayerNode, {
   readonly kind: PrecisionTool
 }>
@@ -182,7 +182,11 @@ function schemaForLayer(
 }
 function shapeProjection(schemas: readonly (ContextToolbarSchema | undefined)[]): Pick<ContextToolbarSchema, 'shape'> {
   const first = schemas[0]?.shape
-  if (!first || !schemas.every((schema) => schema?.shape))
+  if (
+    !first ||
+    !schemas.every((schema) => schema?.shape) ||
+    schemas.some((schema) => Boolean(schema?.gradient) !== Boolean(schemas[0]?.gradient))
+  )
     return {}
   return {
     shape: {
@@ -253,6 +257,15 @@ function calloutProjection(schemas: readonly (ContextToolbarSchema | undefined)[
     calloutMixed: schemas.some((schema) => appearance(schema!.callout!) !== appearance(first)),
   }
 }
+function gradientProjection(
+  schemas: readonly (ContextToolbarSchema | undefined)[],
+  count: number,
+): Pick<ContextToolbarSchema, 'gradient'> {
+  const first = schemas[0]?.gradient
+  return first && schemas.every((schema) => schema?.gradient)
+    ? { gradient: { ...first, single: count === 1 } } : {}
+}
+
 function selectionSchemaFor(context: ContextSchemaContext): ContextToolbarSchema | undefined {
   if (
     context.activeToolId.value !== 'select' ||
@@ -341,6 +354,7 @@ function selectionSchemaFor(context: ContextSchemaContext): ContextToolbarSchema
     text = undefined
   return {
     disabled,
+    ...gradientProjection(schemas, layers.length),
     ...toolSettingsProjection(schemas, layers.length),
     ...highlighterProjection(schemas),
     ...shapeProjection(schemas),

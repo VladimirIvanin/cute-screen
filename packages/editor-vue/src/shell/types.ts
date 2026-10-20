@@ -130,6 +130,7 @@ export type ContextControl = (
 export type ShapeFill = import('@cute-screen/editor-renderer').FillPaint
 
 export interface ContextToolbarSchema {
+  readonly gradient?: { readonly single: boolean; readonly width: number; readonly height: number }
   readonly lineAlignment?: { readonly enabled: boolean; readonly label: string; readonly disabled?: boolean }
   readonly toolSettings?: Readonly<{
     kind: 'pencil' | 'spotlight' | 'ruler'
@@ -286,6 +287,7 @@ export interface ShellActionAdapter {
 }
 
 export type IconName =
+  | 'gradient'
   | 'edit'
   | 'history'
   | 'emoji'
@@ -417,6 +419,10 @@ export const translationKeys = [
   'lineAlignment',
   'toolArrow',
   'toolShape',
+  'toolGradient',
+  'gradientFitWidth',
+  'gradientFitHeight',
+  'gradientResetRotation',
   'toolPencil',
   'toolMarker',
   'toolText',

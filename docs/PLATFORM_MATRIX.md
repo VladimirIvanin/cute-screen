@@ -1,5 +1,24 @@
 # Платформенная матрица
 
+## Градиентная подложка (ADR-124/126)
+
+`REQ-TOL-018`: общий TypeScript core/codec v7 и Canvas2D/CanvasKit; новых
+native API или разрешений нет. Linux x86_64: core/Vue и decoded renderer
+1×/2× прошли; Chrome 147 browser RU/EN × light/dark и real WebKitGTK 2.50.4
+Quick (Gradient отсутствует) → Editor (создание/настройка) → relaunch
+(fresh debug/no-bundle, external driver/Xvfb) passed.
+Capture pixels — fake-platform; физический capture этим gate не проверяется.
+Windows WebView2 и macOS WKWebView остаются pending до фактического прогона.
+
+## Рукописная линия (ADR-125)
+
+Общий TypeScript generator и существующие vector nodes Canvas2D/CanvasKit;
+новых platform API/permissions нет. Linux Chrome 147: 3 browser cases passed;
+Ubuntu 22.04 / WebKitGTK 2.50.4: Quick → Editor и relaunch passed.
+Decoded exports 1×/2× обоих backend проверены поверх настоящего screenshot.
+Команды и ограничения — TESTING.md. Windows WebView2, macOS WKWebView и физический
+Wayland capture требуют отдельного native evidence.
+
 ## Рукописные акценты (ADR-123)
 
 Circling/rectangularCircling и hand-drawn arrow используют общий TypeScript core и vector paths

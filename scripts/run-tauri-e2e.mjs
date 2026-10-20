@@ -22,6 +22,8 @@ await mkdir(runtimeDirectory, { recursive: true })
 const embeddedWebDriverPort = Number.parseInt(process.env.TAURI_WEBDRIVER_PORT ?? '4445', 10)
 
 const scenarios = [
+  { id: 'gradient', persistenceGroup: 'gradient', spec: 'tests/e2e/specs/tauri-gradient.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },
+  { id: 'gradient-reopen', persistenceGroup: 'gradient', spec: 'tests/e2e/specs/tauri-gradient-reopen.e2e.ts', harnessQuery: '?m04=1&m08=1', driverProvider: 'external' },
   {
     id: 'windows-area-edges',
     spec: 'tests/e2e/specs/tauri-windows-area-edges.e2e.ts',
@@ -47,6 +49,8 @@ const scenarios = [
   },
   { id: 'hand-drawn', persistenceGroup: 'hand-drawn', spec: 'tests/e2e/specs/tauri-hand-drawn.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },
   { id: 'hand-drawn-reopen', persistenceGroup: 'hand-drawn', spec: 'tests/e2e/specs/tauri-hand-drawn-reopen.e2e.ts', harnessQuery: '?m04=1&m08=1', driverProvider: 'external' },
+  { id: 'hand-drawn-line', persistenceGroup: 'hand-drawn-line', spec: 'tests/e2e/specs/tauri-hand-drawn-line.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },
+  { id: 'hand-drawn-line-reopen', persistenceGroup: 'hand-drawn-line', spec: 'tests/e2e/specs/tauri-hand-drawn-line-reopen.e2e.ts', harnessQuery: '?m04=1&m08=1', driverProvider: 'external' },
   { id: 'shape-paint', persistenceGroup: 'shape-paint', spec: 'tests/e2e/specs/tauri-shape-paint.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },
   { id: 'shape-paint-reopen', persistenceGroup: 'shape-paint', spec: 'tests/e2e/specs/tauri-shape-paint-reopen.e2e.ts', harnessQuery: '?m04=1&m08=1', driverProvider: 'external' },
   {

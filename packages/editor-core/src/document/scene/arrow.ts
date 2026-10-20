@@ -167,7 +167,7 @@ export function arrowNodes(layer: ArrowLayer): readonly RenderNode[] {
       arrow.endCap === 'solidArrow' || arrow.endCap === 'triangle' ? capSizes.end : undefined,
     ),
   ]
-  if (arrow.annotationTool === 'line' || arrow.appearance !== 'handDrawn') return nodes
+  if (arrow.appearance !== 'handDrawn') return nodes
   return nodes.map((node) => handDrawnNode(node, layer))
 }
 

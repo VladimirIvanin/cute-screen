@@ -12,6 +12,7 @@ import UiSelect from '../ui/UiSelect.vue'
 import TextFormattingToolbar from './TextFormattingToolbar.vue'
 import CalloutFormattingToolbar from './CalloutFormattingToolbar.vue'
 import ArrowFormattingToolbar from './ArrowFormattingToolbar.vue'
+import GradientFormattingToolbar from './GradientFormattingToolbar.vue'
 import ShapeFormattingToolbar from './ShapeFormattingToolbar.vue'
 import LoupeFormattingToolbar from './LoupeFormattingToolbar.vue'
 import ImageFormattingToolbar from './ImageFormattingToolbar.vue'
@@ -150,6 +151,14 @@ const emit = defineEmits<{
       :recent-colors="recentColors ?? []"
       @change="(id, value) => emit('change', id, value)"
       @eyedropper="emit('eyedropper', $event)"
+    />
+    <GradientFormattingToolbar
+      v-else-if="schema.icon === 'gradient'"
+      :schema="schema"
+      :locale="pickerLocale ?? 'en'"
+      :recent-colors="recentColors ?? []"
+      @change="(id, value) => emit('change', id, value)"
+      @action="emit('action', $event)"
     />
     <ShapeFormattingToolbar
       v-else-if="schema.shape"

@@ -1,4 +1,8 @@
 import {
+  rotateGradientFill,
+  DEFAULT_GRADIENT_FILL,
+} from '@cute-screen/editor-renderer'
+import {
   changePencilBrush,
   isShapeKind,
   isHighlighterMode,
@@ -12,8 +16,10 @@ import {
   parseLinearGradient,
 } from '../../ui/shape-gradient'
 
-export type DrawingTool = 'arrow' | 'line' | 'shape' | 'pencil' | 'marker'
+export type DrawingTool = 'arrow' | 'line' | 'shape' | 'gradient' | 'pencil' | 'marker'
 export type DrawingControlId =
+  | 'gradientRotate'
+  | 'gradientReset'
   | 'autoAlignAxes'
   | 'color'
   | 'width'
@@ -37,6 +43,7 @@ export type DrawingControlId =
   | 'fillGradient'
 
 const DRAWING_CONTROL_IDS = new Set<DrawingControlId>([
+  'gradientRotate', 'gradientReset',
   'autoAlignAxes',
   'color',
   'width',
@@ -303,7 +310,11 @@ function fillGradientPayload(
   tool: DrawingTool,
   current: JsonObject,
 ): JsonObject | undefined {
-  if (tool !== 'shape' || ['braceLeft', 'braceRight'].includes(String(current.shape))) return undefined
+  if (
+    (tool !== 'shape' &&
+      tool !== 'gradient') ||
+      ['braceLeft', 'braceRight'].includes(String(current.shape))
+  ) return undefined
   const fill = parseLinearGradient(value)
   return fill ? { ...current, fill: { ...fill, start: { ...fill.start }, end: { ...fill.end } } } : undefined
 }
@@ -313,7 +324,7 @@ function arrowAppearancePayload(
   tool: DrawingTool,
   current: JsonObject,
 ): JsonObject | undefined {
-  return tool === 'arrow' && (value === 'clean' || value === 'handDrawn')
+  return ['arrow', 'line'].includes(tool) && (value === 'clean' || value === 'handDrawn')
     ? { ...current, appearance: value } : undefined
 }
 
@@ -326,12 +337,27 @@ function blockedCirclingFill(
     ['fillKind', 'fillColor', 'fillOpacity', 'fillGradient'].includes(id)
 }
 
+function gradientPayload(
+  id: DrawingControlId,
+  tool: DrawingTool,
+  current: JsonObject,
+): JsonObject | undefined {
+  if (tool !== 'gradient') return undefined
+  if (id === 'gradientReset') return { ...current, fill: DEFAULT_GRADIENT_FILL, layerOpacity: 1 }
+  if (id === 'gradientRotate') {
+    const fill = current.fill as import('@cute-screen/editor-renderer').LinearGradientPaint
+    return { ...current, fill: rotateGradientFill(fill, 90) }
+  }
+  return undefined
+}
+
 export function resolveDrawingPayload(
   id: DrawingControlId,
   value: string,
   tool: DrawingTool,
   current: JsonObject,
 ): JsonObject | undefined {
+  if (['gradientReset', 'gradientRotate'].includes(id)) return gradientPayload(id, tool, current)
   if (
     id === 'autoAlignAxes' ||
     id === 'layerOpacity' ||

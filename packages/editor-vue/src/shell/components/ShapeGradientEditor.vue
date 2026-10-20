@@ -7,7 +7,9 @@ import {
 } from 'vue'
 import type {
   SrgbColor,
+  LinearGradientPaint,
 } from '@cute-screen/editor-renderer'
+import { rotateGradientFill } from '@cute-screen/editor-renderer'
 import { UiIcon } from '../icon'
 import SimpleColorPicker from '../ui/SimpleColorPicker.vue'
 import ShapeNumericControl from './ShapeNumericControl.vue'
@@ -24,20 +26,41 @@ import {
 import { parseHexColor } from '../tools/effects/color'
 
 const props = defineProps<{
+  geometry?: { readonly width: number; readonly height: number } | undefined
+  selectedIndex?: number
   fill: LinearFill
   disabled: boolean
   locale: 'ru' | 'en'
   recentColors: readonly SrgbColor[]
 }>()
-const emit = defineEmits<{ commit: [fill: LinearFill]; dismiss: [] }>()
+const emit = defineEmits<{ commit: [fill: LinearFill]; dismiss: []; select: [index: number] }>()
 const text = (en: string, ru: string) => props.locale === 'ru' ? ru : en
 const host = ref<HTMLElement>()
 const track = ref<HTMLElement>()
-const selected = ref(0)
+const selected = ref(props.selectedIndex ?? 0)
+watch(() => props.selectedIndex, (value) => {
+  if (value !== undefined) selected.value = Math.max(0, Math.min(props.fill.stops.length - 1, value))
+})
+watch(selected, (value) => emit('select', value))
 const draft = ref<LinearFill>()
 const current = computed(() => draft.value ?? props.fill)
 const stop = computed<GradientStop>(() => current.value.stops[selected.value] ?? current.value.stops[0]!)
 const hex = computed(() => '#' + [stop.value.color.red, stop.value.color.green, stop.value.color.blue].map((n) => Math.round(n * 255).toString(16).padStart(2, '0')).join(''))
+const angle = computed(() => {
+  if (!props.geometry) return gradientAngle(current.value)
+  const dx = (current.value.end.x - current.value.start.x) * props.geometry.width
+  const dy = (current.value.end.y - current.value.start.y) * props.geometry.height
+  return (Math.round(Math.atan2(dy, dx) * 180 / Math.PI) + 360) % 360
+})
+function setAngle(value: number): void {
+  if (!props.geometry) return commit(angleGradient(current.value, value))
+  commit(rotateGradientFill(
+    current.value as LinearGradientPaint,
+    value - angle.value,
+    props.geometry.width,
+    props.geometry.height,
+  ))
+}
 let dragging = false
 let dragTarget: HTMLElement | undefined
 let pointerId = 0
@@ -279,14 +302,14 @@ function reverse(): void {
     <div class="cs-gradient-direction">
       <ShapeNumericControl
         :label="text('Angle', 'Угол')"
-        :value="gradientAngle(current)"
+        :value="angle"
         :min="0"
         :max="359"
         :step="1"
         unit="°"
         :disabled="disabled"
         :locale="locale"
-        @commit="commit(angleGradient(current, $event))"
+        @commit="setAngle"
       />
       <button
         type="button"

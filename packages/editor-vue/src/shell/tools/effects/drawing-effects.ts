@@ -1,4 +1,8 @@
-import { annotationTool } from '@cute-screen/editor-renderer'
+import {
+  rotateGradientFill,
+  type LinearGradientPaint,
+  annotationTool,
+} from '@cute-screen/editor-renderer'
 import type {
   Ref,
   ShallowRef,
@@ -90,14 +94,27 @@ function selectedAfter(
   payload: JsonObject,
   automatic: import('@cute-screen/editor-renderer').HighlighterEffect = 'highlight',
 ): LayerNode {
-  const { brushSmoothing: _memories, ...unseededPayload } = payload
+  const { brushSmoothing: _memories, layerOpacity: _layerOpacity, blendMode: _blendMode, ...unseededPayload } = payload
+  void _layerOpacity
+  void _blendMode
   void _memories
-  const documentPayload = (['circling', 'rectangularCircling'].includes(String(unseededPayload.shape)) || unseededPayload.appearance === 'handDrawn') && unseededPayload.sketchSeed === undefined
+  let documentPayload = (['circling', 'rectangularCircling'].includes(String(unseededPayload.shape)) || unseededPayload.appearance === 'handDrawn') && unseededPayload.sketchSeed === undefined
     ? { ...unseededPayload, sketchSeed: sketchSeed(selected.id), sketchVersion: 1 }
     : unseededPayload
+  if (
+    id === 'gradientRotate' &&
+    selected.kind === 'shape' &&
+    annotationTool(selected) === 'gradient'
+  ) {
+    const bounds = selected.localBounds!
+    documentPayload = {
+      ...documentPayload,
+      fill: rotateGradientFill(selected.payload.fill as LinearGradientPaint, 90, bounds.width, bounds.height),
+    }
+  }
   let after = {
     ...selected,
-    ...(id === 'layerOpacity' ? { opacity: payload.layerOpacity as number } : {}),
+    ...(id === 'layerOpacity' || id === 'gradientReset' ? { opacity: payload.layerOpacity as number } : {}),
     ...(id === 'blendMode' ? { blendMode: payload.blendMode as BlendMode } : {}),
     ...(id === 'layerOpacity' || id === 'blendMode' ? {} : { payload: documentPayload }),
     ...(id === 'markerMode'

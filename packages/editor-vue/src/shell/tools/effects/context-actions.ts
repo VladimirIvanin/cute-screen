@@ -1,3 +1,8 @@
+import {
+  fitGradientLayer,
+  gradientFrame,
+  isGradientLayer,
+} from '@cute-screen/editor-renderer'
 import { createPrecisionActions } from './precision-actions'
 import {
   watch,
@@ -136,7 +141,22 @@ export function createContextActions(context: ContextActionsContext) {
     }
     context.textureImages.value = images
   }
+  function fitGradient(id: string): boolean {
+    if (!['gradientFitWidth', 'gradientFitHeight'].includes(id)) return false
+    const document = context.activeDocument.value
+    const layer = document?.layers.find((item) => item.id === context.selectedLayerId())
+    if (
+      !document ||
+      !isGradientLayer(layer) ||
+      context.props.readOnlyDocument ||
+      layer.locked
+    ) return true
+    const after = fitGradientLayer(layer, gradientFrame(document), id === 'gradientFitWidth' ? 'width' : 'height')
+    if (after !== layer) context.props.documentSession?.execute({ type: 'updateLayer', before: layer, after })
+    return true
+  }
   async function onContextAction(id: string): Promise<void> {
+    if (fitGradient(id)) return
     if (await precisionActions(id)) return
     if (id === 'cropReset') {
       context.cropPreset.value = 'free'

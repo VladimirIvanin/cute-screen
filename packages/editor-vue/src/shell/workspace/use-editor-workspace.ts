@@ -1,3 +1,4 @@
+import { provideGradientEditing } from '../ui/gradient-editing'
 import { loadTextFontFamily } from '../../text-fonts'
 import {
   computed,
@@ -304,6 +305,7 @@ function createWorkspaceViewModel(
 }
 
 export function useEditorWorkspace(props: ResolvedEditorShellProps) {
+  provideGradientEditing()
   const core = createWorkspaceCore(props)
   const ui = createWorkspaceUiActions(core)
   useWorkspaceLifecycle({

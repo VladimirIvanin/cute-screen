@@ -1,3 +1,7 @@
+import {
+  isGradientLayer,
+  extractLayerStyle,
+} from '@cute-screen/editor-renderer'
 import { checked } from './tool-settings-validation'
 import { syncRememberedToolStyles } from './tool-style-defaults'
 import {
@@ -86,6 +90,10 @@ export function useToolSettingsMemory(
     }
   }
   function rememberText(layer: LayerNode): void {
+    if (isGradientLayer(layer)) {
+      workspace.rememberedStyles.value = { ...workspace.rememberedStyles.value, gradient: extractLayerStyle(layer) }
+      return
+    }
     if (
       layer.kind !== 'text' &&
       layer.kind !== 'callout' &&

@@ -1,5 +1,31 @@
 # Сквозная приёмка
 
+## Градиентная подложка (ADR-124/126)
+
+`REQ-TOL-018`, `REQ-EDT-002/015/016/017`: в Quick Capture нет Gradient.
+Перейти в полный Editor, выбрать Gradient, протянуть область
+в обе стороны. Получить чёрный снизу → прозрачный сверху, без stroke, с Select.
+Проверить fit width/height по Crop/canvas, disabled при rotation, edge snap
+6 CSS px при 50/100/200%. В одной панели переключить Размер/Переход: bounds
+handles и gradient handles взаимно исключаются. Перенести конец, линию и stop,
+проверить Shift 45°, Escape/pointercancel/no-op и одну команду на жест.
+Проверить 2–8 stops, alpha/position/colour, reverse/rotate/reset и opacity;
+новый текст над подложкой, независимые Shape defaults, locked/read-only и mixed.
+Повторить RU/EN × light/dark при 1024 px; Quick → Editor → создание → relaunch должен
+сохранить identity, editable controls и defaults. Декодировать exports обоих
+backend при 1×/2× и визуально проверить снимок интерфейса. Факты — TESTING.md.
+
+## Рукописная линия (ADR-125)
+
+`REQ-TOL-017` (Line), `REQ-EDT-005/006/015/016/017`: выбрать оформление в defaults,
+создать две линии серией, проверить разные seeds и отсутствие наконечников.
+В Select переключить clean/handDrawn, выполнить undo/redo: seed сохраняется.
+Defaults стрелки независимы; mixed/locked/read-only используют общую панель.
+Проверить codec, style transfer, оба decoded exports 1×/2×, Quick → Editor
+и relaunch с теми же payload/defaults. Linux browser, оба renderer exports
+1×/2× и real-WebView Quick → Editor/relaunch passed. Windows/macOS pending;
+native gate использует fake capture pixels. Evidence — TESTING.md.
+
 ## Обводка и рукописные стрелки (ADR-123)
 
 `REQ-TOL-001/002`, `REQ-EDT-002/005/006/015/016/017`: выбрать овальную и прямоугольную обводки из

@@ -1,3 +1,4 @@
+import { GradientEditingController } from './gradient-editing-controller'
 import { CalloutRouteEditing } from './callout-route-editing'
 import { textEditorBindings } from './text-editor-bindings'
 import {
@@ -58,7 +59,7 @@ import {
   createCanvasWorkspaceState,
   type CanvasGesture,
 } from './workspace-state'
-import { createFloatingToolbarController } from './floating-toolbar-controller'
+import { createWorkspaceToolbars } from './workspace-toolbars'
 import {
   registerInputLifecycle,
   registerRenderLifecycle,
@@ -76,6 +77,7 @@ import type { PointerDownContext } from './pointer-down-contracts'
 import type { PointerMoveContext } from './pointer-move-controller'
 
 export class CanvasWorkspaceController {
+  readonly #gradient: GradientEditingController
   readonly #props: CanvasViewportProps
   readonly #emit: CanvasViewportEmit
   readonly #state = createCanvasWorkspaceState()
@@ -85,7 +87,7 @@ export class CanvasWorkspaceController {
   readonly #pointerGeometry: PointerGeometryController
   readonly #crop: CropController
   readonly #draft: DraftController
-  readonly #toolbars: ReturnType<typeof createFloatingToolbarController>
+  readonly #toolbars: ReturnType<typeof createWorkspaceToolbars>
   readonly #textFormatting: ReturnType<typeof createTextFormattingController>
   readonly #textEditor: TextEditorController
   readonly #renderer: CanvasRendererController
@@ -141,7 +143,13 @@ export class CanvasWorkspaceController {
       gesture: () => this.#gesture,
       rulerGuide: () => this.#rulerGuide,
     })
-    this.#toolbars = this.#createToolbars()
+    this.#toolbars = createWorkspaceToolbars(props, this.#state, {
+      outputBounds: this.#viewport.outputBounds,
+      selectedLayer: this.selectedLayer,
+      previewLayer: this.gesturePreviewLayer,
+      layerBounds: this.layerBounds,
+      transformPoint: this.transformPoint,
+    })
     this.#textFormatting = this.#createTextFormatting()
     this.#textEditor = this.#createTextEditor()
     this.#renderer = this.#createRenderer()
@@ -162,6 +170,11 @@ export class CanvasWorkspaceController {
         this.invalidateOverlay()
       },
     })
+    this.#gradient = new GradientEditingController({ props, emit, scene: () => this.#state.scene.value,
+      point: this.canvasPoint, render: () => {
+        this.#renderer.renderCommittedSceneForGesture()
+        this.invalidateOverlay()
+      }, invalidate: this.invalidateOverlay })
     this.#eyedropper = this.#createEyedropper()
     const ports = this.#interactionPorts()
     this.#pointerDown = createPointerDownContext(ports)
@@ -191,6 +204,7 @@ export class CanvasWorkspaceController {
             this.#spotlight.doubleClick(event) ||
             this.#spotlight.pointerDown(event))
         ) return
+        if (!this.#spacePressed && this.#gradient.pointerDown(event)) return
         handlePointerDown(this.#pointerDown, event)
       },
       editSelectedLabel: () => editSelectedMarkerLabel(this.#textEditor, this.selectedLayer()),
@@ -206,14 +220,17 @@ export class CanvasWorkspaceController {
         const previewPoint = event.target === state.scene.value
           ? this.canvasPoint(event) : undefined
         this.#markerPreview.move(previewPoint)
+        if (!this.#gesture && this.#gradient.pointerMove(event)) return
         if (!this.#spotlight.pointerMove(event)) handlePointerMove(this.#pointerMove, event)
         if (!this.#gesture) this.invalidateOverlay()
       },
       finishGesture: (event: PointerEvent) => {
+        if (this.#gradient.pointerUp(event)) return
         if (this.#gesture?.kind === 'calloutHandle') this.#calloutRouting.finish()
         if (!this.#spotlight.pointerUp(event)) finishCanvasGesture(this.#finish, event)
       },
       cancelGesture: (event?: PointerEvent) => {
+        this.#gradient.cancel()
         this.#spotlight.cancel()
         cancelCanvasGesture(this.#finish, event)
       },
@@ -279,6 +296,7 @@ export class CanvasWorkspaceController {
   }
 
   readonly cancelGesture = (): void => {
+    this.#gradient.cancel()
     this.#calloutRouting.finish()
     cancelCanvasGesture(this.#finish)
   }
@@ -291,7 +309,7 @@ export class CanvasWorkspaceController {
   }) => this.#pointerGeometry.canvasPoint(event)
 
   readonly selectedLayer = () => this.#geometry.selectedLayer()
-  readonly gesturePreviewLayer = () => this.#geometry.gesturePreviewLayer()
+  readonly gesturePreviewLayer = () => this.#gradient?.preview() ?? this.#geometry.gesturePreviewLayer()
   readonly layerBounds = (layer: LayerNode) => canvasLayerBounds(layer)
   readonly transformPoint = (transform: Transform2D, point: CanvasPoint) => transformCanvasPoint(transform, point)
   readonly toLocal = (layer: LayerNode, point: CanvasPoint) => this.#geometry.toLocal(layer, point)
@@ -304,6 +322,7 @@ export class CanvasWorkspaceController {
 
   #createPointerGeometry(): PointerGeometryController {
     return new PointerGeometryController({
+      gradientEditing: () => this.#gradient?.active() ?? false,
       props: this.#props,
       scene: this.#state.scene,
       outputBounds: this.#viewport.outputBounds,
@@ -311,25 +330,6 @@ export class CanvasWorkspaceController {
       calloutInsertMode: this.calloutInsertMode,
       cropCursor: (point) => this.#crop.cursorAtPoint(point),
 
-    })
-  }
-
-  #createToolbars() {
-    const state = this.#state
-    return createFloatingToolbarController({
-      props: this.#props,
-      textEditor: state.textEditor,
-      textFloatingToolbar: state.textFloatingToolbar,
-      arrowFloatingToolbar: state.arrowFloatingToolbar,
-      scrollContainer: state.scrollContainer,
-      floatingToolbarLayout: state.floatingToolbarLayout,
-      floatingArrowToolbarLayout: state.floatingArrowToolbarLayout,
-      editing: () => Boolean(state.editingText.value),
-      outputBounds: this.#viewport.outputBounds,
-      selectedLayer: this.selectedLayer,
-      previewLayer: this.gesturePreviewLayer,
-      layerBounds: this.layerBounds,
-      transformPoint: this.transformPoint,
     })
   }
 
@@ -390,6 +390,7 @@ export class CanvasWorkspaceController {
 
   #createOverlay(): CanvasOverlayController {
     return new CanvasOverlayController({
+      gradientDraw: (context) => this.#gradient?.draw(context) ?? false,
       props: this.#props,
       calloutInsertMode: this.calloutInsertMode,
       hoverTarget: () => this.#pointerGeometry.hoverTarget,

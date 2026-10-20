@@ -1,5 +1,17 @@
 # CI-сборки и проверка версии через GitHub
 
+## Градиентная подложка (ADR-124)
+
+Gradient использует optional shape metadata в v7 и прежний renderer; IPC и
+native dependencies не меняются. Старые документы читаются без миграции.
+Persisted stroke width=1/alpha=0 совместим с прежним positive-width codec;
+новый renderer рисует подложку без обводки. Старые сборки открывают её как
+обычный gradient rectangle и могут потерять специализированную identity
+при сохранении; их прежний stroke inset может дать небольшой край.
+Persistence gate: `CUTE_SCREEN_E2E_SCENARIOS=gradient,gradient-reopen pnpm test:e2e:tauri`.
+Штатная команда собирает свежий debug/no-bundle harness и сохраняет appData
+между двумя сценариями. UI/renderer evidence и платформы — TESTING.md.
+
 ## Рукописные акценты (ADR-123)
 
 Овальная и прямоугольная обводки и оформление стрелок входят в общий frontend;

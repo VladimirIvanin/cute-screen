@@ -1,5 +1,136 @@
 # Стратегия тестирования
 
+## Градиентная подложка (2026-10-20, ADR-124/126)
+
+`REQ-TOL-018`. Исходный HEAD `50ae833`, рабочее дерево с параллельной
+рукописной линией ADR-125. Host Linux x86_64, Node 22.23.1 / pnpm 10.33.2,
+Chrome 147. Native — штатный Ubuntu 22.04 Docker image, Rust 1.97.0,
+WebKitGTK 2.50.4 / external tauri-driver 2.1.0 / Xvfb / D-Bus.
+
+- Red-first `pnpm test packages/editor-core/src/gradient.test.ts`: сначала
+  отсутствовал модуль; rotation, strict codec и legacy positive-width stroke
+  contracts также сначала failed. Логи `artifacts/gradient/*-red.log`.
+- Финальный `pnpm test packages/editor-core/src/gradient.test.ts
+tests/unit/vue/gradient-backdrop.test.ts tests/unit/vue/shape-gradient.test.ts
+tests/unit/vue/app-shell-layout.test.ts --maxWorkers=1 --testTimeout=15000`:
+  4 files / 24 passed. Bottom-to-top defaults, stroke-free bounds, codec identity,
+  commands/undo/redo, frame fit, Shift в pixel space, независимые preferences,
+  preview/cancel/read-only, popup Escape/focus; Quick rail без Gradient и полный rail с ним.
+- `pnpm test:render tests/harness/render/gradient-backdrop.test.ts`: 2 passed,
+  Canvas2D/CanvasKit, crop и decoded alpha при 1×/2×, preview/export parity.
+  Финальный повтор с `CUTE_SCREEN_GRADIENT_SOURCE=artifacts/hand-drawn/screenshot-source.png`
+  прошёл 2/2 на настоящем снимке UI; composite PNG осмотрены. Источник не менялся.
+- `CUTE_SCREEN_BROWSER_E2E_PORT=53147 CUTE_SCREEN_BROWSER_E2E_HEADLESS=1
+pnpm test:e2e:browser --spec tests/e2e/specs/browser-gradient.e2e.ts`: 1 passed;
+  создание в Editor, fit, transition/stop, undo/redo, текст и RU/EN × light/dark
+  при 1024 px. Caption настроен белым через обычные controls. Скриншоты осмотрены.
+- `pnpm test:boundaries --maxWorkers=1 --testTimeout=15000`: 16 files / 112 passed.
+  Первые size/complexity failures исправлены выделением helpers без ослабления ratchets.
+- Полный `pnpm test --maxWorkers=1 --testTimeout=15000`: повтор 158 files /
+  1455 passed. После него уточнено Editor-only availability и добавлен legacy
+  stroke contract; финальные затронутые suites прошли 24/24 (см. выше).
+- Полный `pnpm test:render --maxWorkers=1 --testTimeout=15000`: 60 passed,
+  два тяжёлых catalogue tests превысили собственные 20/30 s при параллельной
+  нагрузке. После снижения нагрузки `pnpm test:render
+tests/harness/render/golden-shapes.test.ts tests/harness/render/shape-paint.test.ts
+--maxWorkers=1`: 2 files / 5 passed без смены goldens/таймаутов; все
+  62 renderer scenarios покрыты успешными проверками. Логи render-all/retry.
+- Финальный `CUTE_SCREEN_E2E_SCENARIOS=gradient,gradient-reopen
+TAURI_WEBDRIVER_PORT=4457 CUTE_SCREEN_E2E_DRIVER_PORT=4458 pnpm test:e2e:tauri`
+  в штатном Docker image с D-Bus/Xvfb: 2/2 passed. Свежий debug/no-bundle,
+  Quick без Gradient → Editor → создание/fit/transition/stops/history/text →
+  autosave → relaunch; identity, редактирование и defaults с тремя stops сохранены; после reopen
+  подложка выбрана на холсте, Full height изменяет область и undo её восстанавливает.
+  Лог `native-editor-only.log`, выбранные native screenshots и decoded document.
+  Предыдущий Quick-creation сценарий заменён после уточнения владельца;
+  его text-colour click interception не относится к финальному Editor-only flow.
+- `pnpm check` в том же Docker image: passed, включая lint/typecheck,
+  format/docs/boundaries, IPC generation guard, Rust fmt и четыре Clippy gates.
+  После усиления reopen-теста отдельно прошли `pnpm exec tsc --noEmit -p
+tests/e2e/tsconfig.json` и `pnpm exec eslint tests/e2e/specs/tauri-gradient-reopen.e2e.ts`.
+- `pnpm format` и `pnpm format:check`: passed. Изменения документации дополнительно
+  проверены `pnpm docs:check`. Логи — artifacts/gradient.
+- `pnpm dev --host 127.0.0.1 --port 53149 --strictPort`: HTTP 200, smoke остановлен.
+
+Артефакты — `artifacts/gradient/`; итог check/format и дисковая гигиена фиксируются
+в evidence.json. Capture pixels native harness — fake-platform; это WebView
+input evidence, не системный Screenshot gate. Windows WebView2, macOS WKWebView
+и физический Wayland input не проверялись.
+
+## Рукописная линия (2026-10-20, ADR-125)
+
+Исходный HEAD `50ae833`, рабочая копия с параллельной реализацией Gradient.
+Frontend: Linux x86_64, Node 22.23.1 / pnpm 10.33.2, Chrome 147. Native:
+штатный `cute-screen-ubuntu22-build:local`, Ubuntu 22.04 x86_64 / Rust 1.97.0,
+WebKitGTK 2.50.4, Xvfb/D-Bus и external tauri-driver 2.1.0.
+
+- Red-first `hand-drawn-line.test.ts`: 4 failed до реализации. Финальный
+  `pnpm test packages/editor-core/src/hand-drawn-line.test.ts
+packages/editor-core/src/hand-drawn.test.ts packages/editor-core/src/line.test.ts
+tests/unit/vue/line-tool.test.ts`: 4 files / 33 passed. Проверены seeded cubic
+  path, endpoints, hit testing, codec/reopen и legacy, style transfer без caps,
+  seed получателя, независимые defaults без instance metadata и UI undo.
+  После расширения mixed appearance assertions отдельно
+  `pnpm test tests/unit/vue/line-tool.test.ts`: 9 passed; одно undo для группы,
+  оба instance seeds сохранены.
+- Полный `pnpm test --maxWorkers=1 --testTimeout=15000`: 158 files /
+  1454 passed. Предыдущий незавершённый запуск получил SIGTERM без итогового
+  отчёта и не считался pass.
+- `pnpm test:render:update tests/harness/render/hand-drawn-line.test.ts`, затем
+  `pnpm test:render tests/harness/render/hand-drawn-line.test.ts
+tests/harness/render/hand-drawn.test.ts`: 4 passed. Четыре новых goldens для
+  solid/dashed/dotted, толщин 2/5/10, Canvas2D/CanvasKit и decoded PNG 1×/2×.
+  Preview совпадает с export 1×; backend delta при пороге 32 меньше 1% каналов.
+  `pnpm test:render tests/harness/render/line.test.ts`: 1 passed на 4K UI fixture.
+  Browser screenshot и новые goldens визуально осмотрены: одиночный плавный
+  штрих, неизменные endpoints и сохранённый пунктир.
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5187 CUTE_SCREEN_BROWSER_E2E_HEADLESS=1
+pnpm test:e2e:browser --spec tests/e2e/specs/browser-hand-drawn-line.e2e.ts
+--spec tests/e2e/specs/browser-line.e2e.ts`: 2 specs / 3 passed. Production
+  controls, серийное создание с разными seeds, переключение selection,
+  undo/redo и прежние theme/locale/zoom сценарии линии. Отдельный порт нужен,
+  поскольку обычный dev server занят другой задачей; первый конфликтный запуск
+  не считался pass.
+
+- `CUTE_SCREEN_E2E_SCENARIOS=hand-drawn-line,hand-drawn-line-reopen
+pnpm test:e2e:tauri`: оба сценария passed на свежем debug/no-bundle binary.
+  Real WebView input создаёт две линии в Quick; Quick → Editor сохраняет
+  полные слои, relaunch сохраняет seed/version и отдельные defaults линии.
+  Native gate использует fake-platform pixels 400×300; system capture не проверяет.
+- Дополнительно production renderers экспортировали линии поверх настоящего
+  browser screenshot 1280×761. Команда:
+  `TSX_TSCONFIG_PATH=artifacts/hand-drawn-line/review-tsconfig.json node
+--import ./node_modules/.pnpm/tsx@4.23.9/node_modules/tsx/dist/loader.mjs
+artifacts/hand-drawn-line/review-export.mts`. Четыре PNG повторно декодированы:
+  1280×761 / 2560×1522. Canvas2D preview = export 1×; backend delta при пороге
+  32: 0.0134% / 0.2224% каналов. SHA-256 original не изменился. Оба backend
+  визуально осмотрены.
+- `pnpm format`, `pnpm format:check` и `pnpm docs:check` passed. Финальный
+  `pnpm check` в штатном Docker image прошёл lint (88 baseline warnings)
+  и весь typecheck, включая E2E. Первый typecheck обнаружил неуточнённый тип
+  слоя в новом E2E helper; добавлен runtime guard ArrowLayer, повторный
+  `pnpm exec tsc --noEmit -p tests/e2e/tsconfig.json` passed.
+- `pnpm test:render --maxWorkers=1 --testTimeout=15000`: 61 passed, один
+  timeout 30 s в существующем catalogue test `shape-paint.test.ts`.
+  Отдельный повтор `pnpm test:render tests/harness/render/shape-paint.test.ts
+--maxWorkers=1` также превысил 30 s; assertions/goldens не менялись.
+  Финальный полный повтор: 60 passed / 2 timeout — тот же catalogue test
+  (30 s) и `golden-shapes.test.ts` scale 2 (20 s). Новые line goldens passed;
+  общий render gate не считается зелёным.
+- `pnpm test:boundaries --testTimeout=15000`: 110 passed / 2 failed.
+  В параллельной реализации Gradient превышены file size limits
+  EditorWorkspace/canvas-workspace-controller и complexity limits шести
+  функций. Новые файлы линии не нарушают ratchets; limits не ослаблялись.
+  Финальный `pnpm check` также завершился на этих двух boundary failures
+  после успешных lint/typecheck/format/docs; IPC/Rust gates не достигнуты.
+
+Evidence — `artifacts/hand-drawn-line/`. Новых target и зависимостей нет; системный Node и
+общие Cargo/driver caches этой задачей не очищались. `pnpm disk:usage`: общий target
+41.030 → 41.176 GiB после свежего native build; финальный shared-workspace
+аудит — 40.680 GiB. Успешные profiles/pinned binary убраны штатными runner hooks.
+Оставшийся Chrome profile первого прерванного запуска удалён после проверки
+отсутствия процесса с этим user-data-dir. Активные артефакты другой задачи не удалялись.
+
 ## Две незамкнутые обводки и рукописные стрелки (2026-10-20, ADR-123)
 
 Исходный HEAD `65f77b2`, рабочая копия с изменениями. Frontend: Linux x86_64,

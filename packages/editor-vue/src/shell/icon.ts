@@ -1,4 +1,5 @@
 import {
+  IconGradienter,
   IconMoodSmile,
   IconEdit,
   IconHistory,
@@ -117,6 +118,7 @@ const icons = {
   select: IconPointer2,
   settings: IconSettings,
   shape: IconCircleSquare,
+  gradient: IconGradienter,
   spotlight: createCustomIcon('spotlight', spotlightGeometry),
   text: IconTypography,
   undo: IconArrowBackUp,

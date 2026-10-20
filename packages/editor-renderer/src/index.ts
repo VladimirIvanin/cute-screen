@@ -390,3 +390,18 @@ export {
   type AnnotationTool,
   type LineAxis,
 } from '@cute-screen/editor-core'
+
+export {
+  DEFAULT_GRADIENT_FILL,
+  DEFAULT_GRADIENT_DEFAULTS,
+  isGradientLayer,
+  gradientFrame,
+  gradientPoints,
+  snapGradientPoint,
+  fitGradientLayer,
+  updateGradientHandle,
+  rotateGradientFill,
+  type LinearGradientPaint,
+  type ShapeLayer,
+  type Point,
+} from '@cute-screen/editor-core'

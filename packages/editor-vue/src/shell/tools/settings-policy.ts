@@ -4,6 +4,7 @@ const AUTOMATIC_DEFAULTS_TOOLS = new Set([
   'arrow',
   'line',
   'shape',
+  'gradient',
   'pencil',
   'marker',
   'numberedMarker',

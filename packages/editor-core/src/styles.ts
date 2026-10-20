@@ -100,7 +100,7 @@ export function creationPolicy(tool: string): 'repeat' | 'select' {
   return ['line', 'numberedMarker', 'pencil', 'marker'].includes(tool) ? 'repeat' : 'select'
 }
 function arrowAppearanceStyle(layer: LayerNode): LayerStyle {
-  return layer.kind === 'arrow' && annotationTool(layer) === 'arrow'
+  return layer.kind === 'arrow'
     ? { appearance: layer.payload.appearance ?? 'clean' } : {}
 }
 
@@ -108,7 +108,7 @@ function lineOnlyChannel(
   layer: LayerNode,
   key: string,
 ): boolean {
-  return annotationTool(layer) === 'line' && ['startCap', 'endCap', 'appearance'].includes(key)
+  return annotationTool(layer) === 'line' && ['startCap', 'endCap'].includes(key)
 }
 
 export function extractLayerStyle(layer: LayerNode): LayerStyle {
@@ -124,6 +124,7 @@ export function extractLayerStyle(layer: LayerNode): LayerStyle {
     })
   }
   for (const [key, path] of Object.entries(channels[layer.kind] ?? {})) {
+    if (annotationTool(layer) === 'gradient' && ['color', 'width', 'strokeStyle', 'cornerRadius'].includes(key)) continue
     const value = readPath(layer.payload, path)
     if (lineOnlyChannel(layer, key)) continue
     if (value !== undefined) result[key] = clone(value)
@@ -272,7 +273,7 @@ function applySketchStyle(
   payload: MutableObject,
 ): void {
   if (
-    annotationTool(layer) === 'arrow' &&
+    layer.kind === 'arrow' &&
     payload.appearance === 'handDrawn' &&
     payload.sketchSeed === undefined
   ) {
@@ -294,6 +295,7 @@ export function applyLayerStyle<T extends LayerNode>(
   applyCalloutStyle(layer, style, payload)
   delete payload.brushSmoothing
   for (const [key, path] of Object.entries(channels[layer.kind] ?? {})) {
+    if (annotationTool(layer) === 'gradient' && ['color', 'width', 'strokeStyle', 'cornerRadius'].includes(key)) continue
     if (lineOnlyChannel(layer, key)) continue
     if (
       key === 'appearance' &&
@@ -304,6 +306,11 @@ export function applyLayerStyle<T extends LayerNode>(
   }
   applySketchStyle(layer, payload)
   const content = contentFor(layer)
+  if (
+    layer.kind === 'shape' &&
+    annotationTool(layer) === 'gradient' &&
+    (payload.fill as JsonObject | undefined)?.kind !== 'linearGradient'
+  ) payload.fill = layer.payload.fill!
   if (content) payload[layer.kind === 'numberedMarker' ? 'label' : 'content'] = styledContent(content, style)
   let next = { ...layer, payload } as LayerNode
   if ('opacity' in next)

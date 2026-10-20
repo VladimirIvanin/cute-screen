@@ -1,3 +1,5 @@
+import { parseFill } from './document/codec/paint'
+import { DEFAULT_GRADIENT_DEFAULTS } from './gradient'
 import { normalizePencilDefaults } from './tools/freehand'
 import type {
   JsonObject,
@@ -139,6 +141,22 @@ function normalizedArrow(
   }
 }
 
+function gradientDefaults(value: unknown): JsonObject {
+  if (!isJsonObject(value)) return DEFAULT_GRADIENT_DEFAULTS
+  try {
+    const fill = parseFill(value.fill, 'gradient.fill')
+    if (fill.kind !== 'linearGradient' || JSON.stringify(fill.start) === JSON.stringify(fill.end)) {
+      return DEFAULT_GRADIENT_DEFAULTS
+    }
+    return { ...DEFAULT_GRADIENT_DEFAULTS, fill,
+      layerOpacity: typeof value.layerOpacity === 'number' && Number.isFinite(value.layerOpacity) && value.layerOpacity >= 0 && value.layerOpacity <= 1 ? value.layerOpacity : 1 }
+  } catch (error) {
+    // Invalid persisted preferences are recoverable; a document parse still reports errors.
+    if (error instanceof Error) return DEFAULT_GRADIENT_DEFAULTS
+    throw error
+  }
+}
+
 function defaults(
   value: unknown,
   schemaVersion: 1 | 2,
@@ -153,8 +171,10 @@ function defaults(
   const input = value as Record<string, unknown>
   const fallback = cloneDefaults(DEFAULT_DRAWING_DEFAULTS)
   return {
+    gradient: gradientDefaults(input.gradient),
     line: isJsonObject(input.line) && normalizedStroke(input.line.stroke) ? {
       stroke: normalizedStroke(input.line.stroke)!,
+      appearance: input.line.appearance === 'handDrawn' ? 'handDrawn' : 'clean',
       autoAlignAxes: typeof input.line.autoAlignAxes === 'boolean' ? input.line.autoAlignAxes : true,
       ...(typeof input.line.layerOpacity === 'number' && input.line.layerOpacity >= 0 && input.line.layerOpacity <= 1 ? { layerOpacity: input.line.layerOpacity } : {}),
     } : fallback.line,

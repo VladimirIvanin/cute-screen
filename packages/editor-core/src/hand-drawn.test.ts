@@ -181,9 +181,11 @@ describe('hand-drawn annotations', () => {
       expect(() => parseEditorDocument(value)).toThrow()
     }
   })
-  it('leaves the independent line tool clean and prevents arrow style transfer to lines', () => {
+  it('starts the independent line clean and transfers appearance without adding arrow caps', () => {
     const line = createDrawingLayer({ id: 'line', tool: 'line', start: { x: 0, y: 0 }, end: { x: 100, y: 50 } }) as ArrowLayer
-    expect(applyLayerStyle(line, extractLayerStyle(drawing('arrow'))).payload.appearance).toBeUndefined()
+    expect(applyLayerStyle(line, extractLayerStyle(drawing('arrow'))).payload).toMatchObject({
+      appearance: 'handDrawn', startCap: 'none', endCap: 'none',
+    })
     expect(createDocumentRenderScene({ ...documentFixture, layers: [line] }).nodes[0]!.kind).toBe('path')
   })
 
