@@ -1,5 +1,39 @@
 # Стратегия тестирования
 
+## Windows dev capture и ручное оформление (2026-10-20)
+
+Windows 10 Home x64 10.0.19045; baseline HEAD `06a59dbd557356c6a204f1aeeed380b8c3c36b9f`,
+изменения не закоммичены. Node 22.23.1 / pnpm 10.33.2; Chrome 155.0.8059.85,
+WebView2 155.0.4283.62, external tauri-driver. Evidence — `artifacts/dev-appearance/`.
+
+- До исправления Editor хранил отрицательные desktop targets, хотя повторный
+  native IPC возвращал Windows DXGI с доступными Area/Screen. Native backend был
+  подключён. Причина первого transient отказа не сохранилась в boolean probe API.
+- Red-first Vue: отсутствующий Layout до выбора пресета; затем
+  `pnpm exec vitest run --project vue tests/unit/vue/composition.test.ts
+tests/unit/vue/platform-capabilities.test.ts tests/unit/vue/app-startup.test.ts
+--maxWorkers=1`: 3 files / 9 passed. Покрыты neutral/no-edit opening, первая
+  ручная команда, Undo/Redo, bounded retry/error/coalescing/disposal.
+- `CUTE_SCREEN_BROWSER_E2E_PORT=53170 CUTE_SCREEN_BROWSER_E2E_HEADLESS=1
+NODE_OPTIONS=--dns-result-order=ipv4first pnpm test:e2e:browser --spec
+tests/e2e/specs/browser-composition.e2e.ts --logLevel debug`: 1/1 passed.
+  Production controls до пресета, Undo, RU/EN × light/dark при 1024 px.
+- Production dev WebView2: fault injection одного отрицательного ответа на
+  DesktopBridge boundary; последующий настоящий native IPC вернул targets и
+  включил Capture. JSON — `webview-recovery.json`; persisted mount state не подставлялся.
+- `cargo test --workspace compositor_runtime_probe_reads_the_visible_desktop --
+--ignored --nocapture`: 1 actual compositor test passed, другие tests filtered.
+- `CUTE_SCREEN_E2E_SCENARIOS=composition,composition-reopen,windows-capture-exclusion
+NODE_OPTIONS=--dns-result-order=ipv4first pnpm test:e2e:tauri`: свежий debug/no-bundle
+  harness, 3 scenarios / 3 tests passed. Native ручной inset до пресета и Undo,
+  native image/material import, Copy и повторно декодированный PNG, persisted reopen.
+  Отдельный physical Windows scenario без fake capture проверил hide/cancel/retry
+  и точные desktop pixels без editor. Composition fixture использует fake capture;
+  это не является доказательством physical capture само по себе.
+- `pnpm check` passed, включая Rust feature/clippy gates. `pnpm format` выполнен;
+  финальный format/docs gate фиксируется в том же evidence каталоге.
+- Другие платформы этим Windows прогоном не проверялись. Release/package не собирался.
+
 ## Жест масштабирования интерфейса (2026-10-20, ADR-130)
 
 Linux x86_64, HEAD `e50da83a869ed09778bd173e2de290c60a40c3d1`, общая рабочая

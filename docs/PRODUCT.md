@@ -577,6 +577,9 @@ Cute Screen — полноценный local-first редактор снимко
 - `REQ-OUT-009` — Editor-only кнопка «Оформление» перед Copy открывает dock справа;
   он делит место со слоями, резервирует viewport, не меняет pan/zoom/document при открытии.
   Quick Capture не монтирует эти controls. Ширина dock 320 px при окне 1024 px.
+  Макет, фон, рамка и подписи доступны сразу, без выбора пресета. Для документа
+  без composition панель показывает нейтральные значения; только явная правка
+  создаёт оформление одной undoable командой.
 - `REQ-OUT-010` — композиция: auto/fixed output, independent linked px/% insets,
   upper/lower bands, 9-point alignment, aspect presets, uniform content scale/offset.
 - `REQ-OUT-011` — transparent/solid/linear/radial/freeform/image/blurred-content

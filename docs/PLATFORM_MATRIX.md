@@ -1,5 +1,18 @@
 # Платформенная матрица
 
+## Windows dev capture / нейтральная панель (2026-10-20)
+
+Windows 10 x64 19045: native IPC подключён, Windows DXGI fresh compositor probe
+прошёл. Отрицательный desktop startup probe оставлял UI disabled при доступном
+повторном native ответе. Проверено восстановление production dev WebView2 после
+одного fault-injected отрицательного ответа: второй настоящий IPC возвращает
+desktop targets, кнопка включается. Это не подмена физических capture pixels.
+Chrome 155 / Windows: composition browser scenario passed, включая ручную правку
+до пресета, Undo, RU/EN × light/dark, 1024 px. Остальные ОС этим прогоном не проверены.
+WebView2 155.0.4283.62 / external tauri-driver: composition + reopen + physical
+windows-capture-exclusion — 3/3 passed; native Copy/decoded PNG и действительные
+desktop pixels проверены раздельными сценариями. Команды и evidence — TESTING.md.
+
 ## Жест масштабирования интерфейса (ADR-130, 2026-10-20)
 
 Общий frontend guard действует в entrypoint всех окон. Chrome/Linux browser:

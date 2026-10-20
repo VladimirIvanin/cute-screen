@@ -1,5 +1,23 @@
 # Трассируемость требований
 
+## Windows capture startup и ручное оформление — до исправления (2026-10-20)
+
+`REQ-CAP-001/002`, `REQ-UI-001`: Windows DXGI доступен при повторном IPC probe,
+но Editor сохраняет отрицательный стартовый результат. Повторять неудачный probe
+ограниченное число раз и при возврате фокуса, без параллельных запросов; отменять
+таймер и игнорировать поздний ответ после unmount. Подсказка disabled capture
+описывает недоступность захвата, а не отсутствие уже подключённого native backend.
+Проверка: recovery/error/dispose component contracts и physical Windows WebView2.
+
+`REQ-OUT-009/010/011`: параметры оформления доступны без стартового пресета.
+Показывать нейтральные значения (прозрачный фон, нулевые поля/radius/shadow),
+не создавая composition/undo при открытии панели. Первая ручная правка — одна
+setPresentation command; Undo возвращает исходный документ и сохраняет controls.
+Проверка: production session component, browser/native mount и Undo/Redo.
+Статус: implemented; Vue 9/9, browser 1/1, Windows WebView2 3/3 passed;
+реальный Windows capture и dev retry recovery проверены отдельно. `pnpm check` passed.
+Команды, платформа и артефакты — TESTING.md и `artifacts/dev-appearance/summary.md`.
+
 ## Жест масштабирования интерфейса — до реализации (2026-10-20)
 
 `REQ-UI-001`, `REQ-EDT-001`: pinch/модифицированный wheel над chrome не

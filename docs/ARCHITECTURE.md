@@ -1,5 +1,13 @@
 # Архитектура Cute Screen
 
+## Восстановление capture capabilities
+
+Desktop capability monitor публикует каждый ответ native probe, повторяет отрицательный
+результат или ошибку до трёх попыток с интервалом 1 s и обновляет состояние при focus.
+Focus listener устанавливается после обычного editor startup, сохраняя порядок загрузки
+persisted document. Запросы объединяются; scope disposal снимает listener/таймер и
+исключает публикацию поздних ответов. Windows DXGI и native capture pipeline не меняются.
+
 ## Масштаб интерфейса и canvas (ADR-130)
 
 `main.ts` устанавливает window-level non-passive capture listeners до первого
@@ -40,6 +48,9 @@ Vue хранит shallow preview/settings; тяжёлые ресурсы и scen
 определяется началом жеста на снимке или внешнем поле; выбор слоя синхронизирует
 пространство без ручного переключателя. Граница не меняет привязку активного жеста. Quick Capture
 не монтирует оформление. Открытие панели не выполняет document command.
+Для документа без composition UI использует нейтральное представление настроек:
+прозрачный фон, нулевые поля, radius и shadow. Это не scene preview и не persisted
+composition; первая явная правка проходит прежней setPresentation command.
 
 SQLite migration 5 добавляет user_materials. В blob_references появляется независимый
 owner_kind=material; presets владеют собственным набором hashes. History/cache cleanup

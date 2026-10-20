@@ -8,6 +8,7 @@ import {
   watch,
 } from 'vue'
 import {
+  createComposition,
   type CompositionSettings,
 } from '@cute-screen/editor-renderer'
 import type { ResolvedEditorShellProps } from '../contracts'
@@ -16,6 +17,17 @@ import type { useEditorShellStore } from '../store'
 import { compositionEditingKey } from './editing'
 
 type Workspace = ReturnType<typeof createWorkspaceState>
+function neutralComposition(): CompositionSettings {
+  const neutral = createComposition()
+  return {
+    ...neutral,
+    layout: { ...neutral.layout, insets: { ...neutral.layout.insets, top: 0, right: 0, bottom: 0, left: 0 } },
+    background: { ...neutral.background, kind: 'transparent' },
+    radius: 0,
+    shadow: 0,
+  }
+}
+
 export function useComposition(
   props: ResolvedEditorShellProps,
   workspace: Workspace,
@@ -24,7 +36,11 @@ export function useComposition(
   const compositionOpen = ref(false)
   const compositionSpace = ref<'content' | 'card'>('content')
   const compositionPreview = shallowRef<CompositionSettings>()
-  const settings = computed(() => workspace.activeDocument.value?.presentation.composition)
+  const neutralSettings = neutralComposition()
+  const settings = computed(() => {
+    const document = workspace.activeDocument.value
+    return document ? document.presentation.composition ?? neutralSettings : undefined
+  })
   const pending = ref(false)
   const editing = ref(false)
   const selectedBrand = ref<string>()
@@ -38,7 +54,7 @@ export function useComposition(
     const doc = workspace.activeDocument.value
     if (!doc || disabled.value) return
     cancel()
-    if (JSON.stringify(doc.presentation.composition) === JSON.stringify(value)) return
+    if (JSON.stringify(settings.value) === JSON.stringify(value)) return
     props.documentSession!.execute({ type: 'setPresentation', before: doc.presentation,
       after: { ...doc.presentation, composition: value } })
   }

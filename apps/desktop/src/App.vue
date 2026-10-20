@@ -15,7 +15,6 @@ import {
   type CaptureProgressState,
   type CanvasViewportHosts,
   type EditorDocumentV1,
-  type PlatformCapabilities,
   type ShellActionAdapter,
   type ShellDocumentState,
   type TextureFillBridge,
@@ -31,6 +30,7 @@ import {
 import { createHistoryDocumentLoader } from './history/document-loader'
 import { HistoryNavigation } from './history/navigation'
 import { runEditorStartup } from './editor-startup'
+import { useDesktopCapabilities } from './platform-capability-monitor'
 import { EditorFirstFrameGate } from './editor-first-frame'
 import { readAppHarnessConfig } from './app-harness-config'
 import { mountM05HarnessDocument as mountM05Harness } from './m05-harness'
@@ -112,7 +112,11 @@ let disposedHistory = false
 let stopHistorySession: (() => void) | undefined
 const documentSession = shallowRef<DocumentSessionController>()
 const documentCoordinator = shallowRef<DocumentSessionCoordinator>()
-const platformCapabilities = shallowRef<PlatformCapabilities>()
+const {
+  platformCapabilities,
+  refreshPlatformCapabilities,
+  listenForCapabilityChanges,
+} = useDesktopCapabilities(correlationId)
 const captureProgress = shallowRef<CaptureProgressState>()
 const sourceImage = shallowRef<HTMLImageElement>()
 const materialBridge = shallowRef<import('@cute-screen/editor-vue').MaterialBridge>()
@@ -235,17 +239,6 @@ async function selectHistoryCapture(id: string | null): Promise<boolean> {
       historyBusy.value = false
     }
   })
-}
-
-async function refreshPlatformCapabilities(): Promise<void> {
-  if (import.meta.env.VITE_TEST_HARNESS === 'true') return
-  if (!('__TAURI_INTERNALS__' in window)) return
-  try {
-    const { tauriDesktopBridge } = await import('./desktop-bridge')
-    platformCapabilities.value = await tauriDesktopBridge.platformCapabilities(correlationId())
-  } catch (error) {
-    console.warn('cute-screen platform capability probe failed', error)
-  }
 }
 
 async function loadSystemFonts(): Promise<void> {
@@ -459,6 +452,7 @@ onMounted(() => {
       refreshPlatformCapabilities,
       installLifecycleGuards,
     })
+    listenForCapabilityChanges()
     scheduleHistoryMaintenance()
   })()
 })
