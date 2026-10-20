@@ -20,6 +20,7 @@ import {
 } from '../ui/shape-gradient'
 import ShapeGradientEditor from './ShapeGradientEditor.vue'
 import ShapeNumericControl from './ShapeNumericControl.vue'
+import GradientPlacementControl from './GradientPlacementControl.vue'
 
 const props = defineProps<{ schema: ContextToolbarSchema; locale: 'en' | 'ru'; recentColors: readonly SrgbColor[] }>()
 const emit = defineEmits<{ change: [id: string, value: string]; action: [id: string] }>()
@@ -93,6 +94,9 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', outside, true)
     <ShapeNumericControl
       v-if="opacity?.kind === 'range'"
       :label="text('Opacity', 'Непрозрачность')"
+      class="cs-gradient-opacity"
+      compact-label="α"
+      :title="text('Opacity', 'Непрозрачность')"
       :value="opacity.value"
       :mixed="opacity.mixed"
       :min="0"
@@ -103,16 +107,13 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', outside, true)
       :locale="locale"
       @commit="emit('change', 'layerOpacity', String($event))"
     />
-    <button
-      v-for="action in actions"
-      :key="action.id"
-      type="button"
-      :disabled="disabled || action.disabled"
-      :title="action.disabled ? schema.gradient?.single === false ? text('Select one backdrop', 'Выберите одну подложку') : text('Reset rotation first', 'Сначала сбросьте поворот') : action.label"
-      @click="emit('action', action.id)"
-    >
-      {{ action.label }}
-    </button>
+    <GradientPlacementControl
+      v-if="actions.length"
+      :schema="schema"
+      :locale="locale"
+      :disabled="disabled"
+      @action="emit('action', $event)"
+    />
     <NPopover
       :show="open"
       trigger="manual"
@@ -176,35 +177,68 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', outside, true)
   align-items: center;
   gap: 6px;
 }
+.cs-gradient-toolbar {
+  flex-wrap: wrap;
+  max-width: min(100%, calc(100vw - 40px));
+}
+.cs-gradient-modes {
+  flex: 0 0 auto;
+}
+.cs-gradient-toolbar > *,
+.cs-gradient-modes > * {
+  flex-shrink: 0;
+}
 .cs-gradient-toolbar button {
-  background: var(--cs-surface, transparent);
+  background: var(--surface);
   color: inherit;
-  border: 1px solid var(--cs-border, #8885);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 6px 8px;
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 12px;
   cursor: pointer;
   white-space: nowrap;
 }
 .cs-gradient-toolbar button[aria-pressed="true"] {
-  background: #0d99ff22;
-  border-color: #0d99ff;
+  background: var(--accent-soft);
+  border-color: var(--accent);
 }
 .cs-gradient-toolbar button:disabled {
   opacity: .45;
   cursor: default;
 }
 .cs-gradient-toolbar button:focus-visible {
-  outline: 2px solid #0d99ff;
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 .cs-gradient-fill-trigger {
-  width: 44px;
+  width: 36px;
+  padding: 4px;
   background: repeating-conic-gradient(#999 0% 25%, #eee 0% 50%) 0 0 / 8px 8px !important;
 }
 .cs-gradient-fill-trigger span {
   display: block;
   width: 26px;
   height: 16px;
+}
+.cs-gradient-opacity {
+  width: auto;
+  margin: 0;
+  flex-wrap: nowrap;
+}
+.cs-gradient-opacity :deep(.cs-numeric-label) {
+  flex: 0 0 auto;
+  font-size: 14px;
+}
+.cs-gradient-opacity :deep(.cs-numeric-values) {
+  flex-wrap: nowrap;
+}
+.cs-gradient-opacity :deep(.cs-numeric-entry) {
+  width: 76px;
 }
 .cs-gradient-popover {
   width: min(330px, calc(100vw - 32px));

@@ -50,13 +50,14 @@ const MIGRATION_LIST: &[M<'static>] = &[
         UPDATE captures SET history_legacy_pending=1;
         CREATE TABLE history_thumbnails(document_id TEXT PRIMARY KEY REFERENCES documents(id), revision INTEGER NOT NULL, cache_name TEXT NOT NULL UNIQUE, byte_size INTEGER NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, updated_at INTEGER NOT NULL);
         CREATE INDEX captures_history_cursor ON captures(captured_at DESC,id DESC) WHERE deleted_at IS NULL;"),
+    M::up("CREATE TABLE user_materials(id TEXT PRIMARY KEY, title TEXT NOT NULL, kind TEXT NOT NULL, value_json TEXT NOT NULL, updated_at INTEGER NOT NULL);"),
 ];
 const MIGRATIONS: Migrations<'static> = Migrations::from_slice(MIGRATION_LIST);
 
 pub(crate) fn migrate(connection: &mut Connection) -> Result<(), RepositoryError> {
     let user_version =
         connection.query_row("PRAGMA user_version", [], |row| row.get::<_, i64>(0))?;
-    let supported = 4;
+    let supported = 5;
     if user_version > supported {
         return Err(RepositoryError::UnsupportedDatabaseSchema {
             found: user_version,

@@ -26,12 +26,18 @@ import {
   editorShellRuntimeEmits,
   editorShellRuntimeProps,
 } from '../contracts'
+import CaptureFallback from './CaptureFallback.vue'
+import CompositionDock from '../composition/CompositionDock.vue'
 import { useEditorWorkspace } from '../workspace/use-editor-workspace'
 
 defineSlots<{ history(props: { locale: 'ru' | 'en' }): unknown }>()
 const props = defineProps(editorShellRuntimeProps)
 const emit = defineEmits(editorShellRuntimeEmits)
 const {
+  compositionOpen,
+  compositionSpace,
+  compositionController,
+  toggleComposition,
   naiveTheme,
   naiveLocale,
   naiveDateLocale,
@@ -158,9 +164,10 @@ defineExpose({
     :theme-overrides="cuteScreenThemeOverrides"
     :abstract="false"
   >
-    <div class="cs-editor-shell" :class="{ 'is-quick-mode': props.quickMode, 'is-image-drop-target': imageDropActive }">
+    <div class="cs-editor-shell" :class="{ 'is-quick-mode': props.quickMode, 'is-image-drop-target': imageDropActive, 'has-composition-dock': compositionOpen || store.layersOpen && !props.quickMode }">
       <TopBar
         v-if="!props.quickMode"
+        :appearance-open="compositionOpen"
         :can-edit-canvas="
           Boolean(
             activeDocument &&
@@ -178,6 +185,7 @@ defineExpose({
         :save-state="store.documentHistory.saveState"
         :save-error="store.documentHistory.error"
         :pending="store.actionState.status === 'pending'"
+        @appearance="toggleComposition"
         :capture-available="props.captureAvailable"
         :capture-unavailable-reason="props.captureUnavailableReason ?? translate('captureUnavailable')"
         :open-image-available="props.openImageAvailable"
@@ -192,32 +200,14 @@ defineExpose({
         @locale="store.setLocale"
         @theme="store.setTheme"
       />
-      <div
+      <CaptureFallback
         v-if="props.captureFallbackCommand && fallbackVisible"
-        class="cs-capture-fallback"
-        role="status"
-        aria-live="polite"
-        data-placement="overlay"
-      >
-        <span>{{ translate('captureFallback') }}</span>
-        <code>{{ props.captureFallbackCommand }}</code>
-        <button
-          type="button"
-          :aria-label="translate('copyCaptureFallback')"
-          @click="copyCaptureFallback"
-        >
-          {{ fallbackCopied ? translate('captureFallbackCopied') : translate('copyCaptureFallback') }}
-        </button>
-        <button
-          class="cs-capture-fallback-dismiss"
-          type="button"
-          :aria-label="translate('dismissCaptureFallback')"
-          :title="translate('dismissCaptureFallback')"
-          @click="dismissCaptureFallback"
-        >
-          <UiIcon name="close" />
-        </button>
-      </div>
+        :command="props.captureFallbackCommand"
+        :copied="fallbackCopied"
+        :t="translate"
+        @copy="copyCaptureFallback"
+        @dismiss="dismissCaptureFallback"
+      />
       <div class="cs-workbench">
         <div
           v-if="props.quickMode && !props.quickSelectionMode && creationSchema && !toolConfigure"
@@ -342,18 +332,18 @@ defineExpose({
           :image="props.sourceImage"
           :texture-images="textureImages"
           :emoji-defaults="emojiDefaults"
-          @emoji-place="placeEmoji"
           :image-layer="baseImageLayer"
           :document="displayDocument"
+          :composition-space="compositionSpace"
+          @layer-space="compositionController.activateCompositionSpace"
           :selected-layer-id="store.selectedLayerId"
           :selected-layer-ids="store.selectedLayerIds"
           :active-tool="store.activeToolId ?? 'select'"
           :spotlight-editing="spotlightEditing"
           :read-only="props.readOnlyDocument"
-          @spotlight-editing-change="spotlightEditing = $event"
-          @spotlight-remove="onContextAction('spotlightRemove')"
           :sampling="Boolean(samplingControl || store.activeToolId === 'eyedropper')"
           :sampling-blocked="!sceneTexturesReady"
+          @emoji-place="placeEmoji"
           :drawing-defaults="drawingDefaults"
           :precision-defaults="precisionDefaults"
           :text-defaults="textDefaults"
@@ -361,7 +351,9 @@ defineExpose({
           :text-formatting="textFormatting"
           :text-toolbar-schema="floatingTextToolbarSchema"
           :text-toolbar-locale="state.locale.value"
+          @spotlight-editing-change="spotlightEditing = $event"
           :arrow-toolbar-schema="undefined"
+          @spotlight-remove="onContextAction('spotlightRemove')"
           :arrow-toolbar-locale="state.locale.value"
           :next-marker-sequence="nextMarkerSequence"
           :marker-style="markerStyle"
@@ -403,7 +395,6 @@ defineExpose({
         />
         <SelectionFormattingToolbar
           :move-enabled="store.activeToolId === 'select' && !props.readOnlyDocument && !floatingTextToolbarSchema"
-          @move-start="canvasViewport?.startSelectionMove($event)"
           :quick-mode="props.quickMode"
           :layers-open="store.layersOpen"
           :schema="selectionSchema"
@@ -412,12 +403,19 @@ defineExpose({
           :zoom="store.zoom"
           :locale="state.locale.value"
           :recent-colors="drawingPreferences.recentColors"
+          @move-start="canvasViewport?.startSelectionMove($event)"
           @change="onColorChange"
           @action="onContextAction"
           @eyedropper="startEyedropper"
         />
-        <LayersPanel
+        <CompositionDock
           v-if="!props.quickMode"
+          :controller="compositionController"
+          :can-import="Boolean(props.textureBridge && props.materialBridge)"
+          :can-save="Boolean(props.materialBridge)"
+        />
+        <LayersPanel
+          v-if="!props.quickMode && !compositionOpen"
           :layers="store.layers"
           :open="store.layersOpen"
           :selected-layer-id="store.selectedLayerId"

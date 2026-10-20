@@ -1,3 +1,4 @@
+import { layerSpaceDocument } from './layer-space'
 import {
   applyEditorCommand,
   rebaseRulerLayer,
@@ -139,6 +140,7 @@ function layerCommands(
     return [{ type: 'updateLayer', before: layer, after: { ...layer, opacity: value / 100 } }]
   }
   if (target.id !== 'rotation') return []
+  document = layerSpaceDocument(document, layer)
   const transform = rotateLayerTransform(layer, value)
   const after = layer.kind === 'ruler'
     ? rebaseRulerLayer({

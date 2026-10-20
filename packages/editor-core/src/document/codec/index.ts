@@ -1,3 +1,4 @@
+import { resolveCompositionLayout } from '../../composition/layout'
 import {
   freezeJsonObject,
   readJsonObject,
@@ -33,6 +34,7 @@ function documentToJson(document: EditorDocument): JsonObject {
       ...(layer.extras ?? {}),
       id: layer.id,
       kind: layer.kind,
+      ...(layer.space === 'card' ? { space: layer.space } : {}),
       transform: {
         translateX: layer.transform.translateX,
         translateY: layer.transform.translateY,
@@ -70,28 +72,34 @@ function documentToJson(document: EditorDocument): JsonObject {
     presentation: {
       beautify: { enabled: document.presentation.beautify.enabled },
       watermark: { enabled: document.presentation.watermark.enabled },
+      ...(document.presentation.composition ? {
+        composition: document.presentation.composition as unknown as JsonObject,
+      } : {}),
+
     },
     createdAt: document.createdAt,
     updatedAt: document.updatedAt,
   }
 }
 
-function validateLayerRelationships(document: Pick<EditorDocument, 'source' | 'canvas' | 'crop' | 'layers'>): void {
+function validateLayerRelationships(document: Pick<EditorDocument, 'source' | 'canvas' | 'crop' | 'layers' | 'presentation'>): void {
   const ids = new Set<string>()
+  const output = resolveCompositionLayout(document)
   let baseCount = 0
   for (const layer of document.layers) {
     if (ids.has(layer.id)) throw new Error(`duplicate layer id: ${layer.id}`)
     ids.add(layer.id)
     if (layer.kind === 'image' && layer.payload.role === 'base') {
+      if (layer.space === 'card') throw new Error('base layer belongs to content space')
       baseCount += 1
       if (layer.payload.blobHash !== document.source.blobHash) {
         throw new Error('base layer must reference source.blobHash')
       }
     }
     if (layer.kind === 'loupe') {
-      assertValidLoupeSourceRegion(layer.payload.sourceRegion, document.canvas)
+      assertValidLoupeSourceRegion(layer.payload.sourceRegion, layer.space === 'card' ? output : document.canvas)
     }
-    if (layer.kind === 'ruler' && !rulerVisualBoundsAreConservative(layer, document.crop ?? document.canvas)) {
+    if (layer.kind === 'ruler' && !rulerVisualBoundsAreConservative(layer, layer.space === 'card' ? output : document.crop ?? document.canvas)) {
       throw new Error(`layer ${layer.id} must use conservative localBounds containing its ruler line, ticks and badge`)
     }
   }
@@ -123,6 +131,7 @@ function parseCurrentDocument(object: Record<string, unknown>): EditorDocument {
   // Accept those validated bounds, then refresh derived geometry before history is created.
   const layers = Object.freeze(parsedLayers.map((layer) => {
     if (
+      layer.space === 'card' ||
       layer.kind !== 'ruler' ||
       !crop ||
       layer.payload.percentBasis !== 'canvasDiagonal' ||
@@ -131,7 +140,8 @@ function parseCurrentDocument(object: Record<string, unknown>): EditorDocument {
     ) return layer
     return rebaseRulerLayer(layer, layer.payload, crop)
   }))
-  validateLayerRelationships({ source, canvas: canvasSize, crop, layers })
+  const presentation = parsePresentation(object.presentation)
+  validateLayerRelationships({ source, canvas: canvasSize, crop, layers, presentation })
   const extras = collectDocumentExtras(object)
   return Object.freeze({
     schemaVersion: EDITOR_DOCUMENT_SCHEMA_VERSION,
@@ -140,7 +150,7 @@ function parseCurrentDocument(object: Record<string, unknown>): EditorDocument {
     canvas: canvasSize,
     crop,
     layers,
-    presentation: parsePresentation(object.presentation),
+    presentation,
     createdAt: readNonEmptyString(object.createdAt, 'createdAt'),
     updatedAt: readNonEmptyString(object.updatedAt, 'updatedAt'),
     ...(extras === undefined ? {} : { extras }),
@@ -162,7 +172,7 @@ export function parseEditorDocument(input: unknown): ParsedEditorDocument {
       reason: 'newerSchema',
     })
   }
-  if (schemaVersion < EDITOR_DOCUMENT_SCHEMA_VERSION) {
+  if (schemaVersion < 7) {
     return Object.freeze({
       kind: 'unsupported',
       schemaVersion,

@@ -23,6 +23,7 @@ const props = withDefaults(
   defineProps<{
     locale: SupportedLocale
     theme: ThemePreference
+    appearanceOpen?: boolean
     canCopyOrExport: boolean
     canEditCanvas?: boolean
     canUndo?: boolean
@@ -47,6 +48,7 @@ const props = withDefaults(
   },
 )
 const emit = defineEmits<{
+  appearance: []
   action: [name: 'capture' | 'openImage' | 'copy' | 'export']
   canvasAction: [name: 'flipHorizontal' | 'flipVertical']
   undo: []
@@ -182,6 +184,16 @@ const openImageTitle = computed(() =>
         </template>
         {{ openImageTitle }}
       </NTooltip>
+      <NButton
+        secondary
+        class="cs-button cs-appearance-button"
+        :disabled="disabled || !canEditCanvas"
+        :aria-expanded="Boolean(appearanceOpen)"
+        :aria-label="locale === 'ru' ? 'Оформление' : 'Appearance'"
+        @click="emit('appearance')"
+      >
+        <UiIcon name="gradient" /><span>{{ locale === 'ru' ? 'Оформление' : 'Appearance' }}</span>
+      </NButton>
       <NTooltip>
         <template #trigger>
           <NButton

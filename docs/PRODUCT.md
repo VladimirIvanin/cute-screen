@@ -163,6 +163,9 @@ Cute Screen — полноценный local-first редактор снимко
   с клавиатурным перемещением. Щелчок и отмена не создают history entry.
 
 - `REQ-EDT-001` — pan/zoom не сбрасываются при смене инструмента, свойств, undo или кадра. Fit берёт наибольший целый процент, при котором холст помещается в viewport с учётом padding и не получает полосу прокрутки.
+  Pinch и Ctrl/Cmd+wheel не масштабируют весь интерфейс Editor, Quick Capture
+  и Settings. Над canvas модифицированный wheel меняет только zoom холста;
+  обычная прокрутка панелей сохраняется.
 - `REQ-EDT-002` — line, numberedMarker, pencil и marker после создания сохраняют активный инструмент без выделения нового объекта. Arrow, shape, gradient, censor, spotlight, ruler, loupe, emoji и импорт image после успешного создания переключают в select и выделяют новый объект. Text/callout делают это после подтверждения ввода. Пустой/ошибочный/отменённый жест не запускает successful-create transition; отмена нового текста возвращает select без объекта. Редактирование существующего текста не считается созданием.
 - `REQ-EDT-003` — закрепления инструмента нет. Повторный вызов доступен физическими клавишами V/H/C/A/S/P/M/T/N/O/I/R/L/Z, B (censor), F (spotlight), G (image), E (emoji), независимо от раскладки, вне editable controls. Буквенные команды редактора Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, Ctrl/Cmd+O/D/C/X/V и Ctrl/Cmd+Alt+C/V также используют физические клавиши независимо от раскладки; `key` служит fallback только при отсутствующем либо `Unidentified` `code`.
 - `REQ-EDT-015` — defaults стрелки, линии, фигуры, градиента, карандаша, выделителя, номера,
@@ -344,7 +347,7 @@ Cute Screen — полноценный local-first редактор снимко
   common layer opacity/blend/shadows для text-bearing layers не сохраняются.
   Общая панель показывает цвет, шрифт/размер, B/I/зачёркивание, список,
   три кнопки выравнивания и фон; целые группы переносятся на узкой ширине.
-  12 встроенных Latin/Cyrillic гарнитур из ADR-061 доступны офлайн с образцами
+  20 встроенных Latin/Cyrillic гарнитур из ADR-061/131 доступны офлайн с образцами
   текста в меню; наведение не меняет документ. Системный каталог не расширяет
   список. Текущее внешнее family сохраняется с предупреждением.
   Боковые width handles переводят auto-size text в fixed-width либо меняют
@@ -541,6 +544,10 @@ Cute Screen — полноценный local-first редактор снимко
   Fit width/height использует текущий Crop либо canvas документа (после Quick — выбранную область), сохраняя
   вторую ось; при повороте команды disabled с пояснением. Creation/resize
   привязывается к краям кадра с допуском 6 CSS px независимо от zoom.
+  Компактная панель держит mode/fill/opacity без переносов внутри controls;
+  графический popover «Расположение» предоставляет края и центры по каждой оси,
+  fit width/height, доступные имена и подсказки. Выравнивание меняет только
+  одну координату и сохраняет размер; каждое действие разовое, с undo/redo.
   Resize сохраняет нормализованные точки перехода; Crop не перестраивает объект.
   Каждый завершённый жест — одна EditorCommand, cancel/no-op не меняет history.
   Радиальные градиенты, midpoint curves и presets вне первой версии.
@@ -566,6 +573,41 @@ Cute Screen — полноценный local-first редактор снимко
   structured error никогда не отображается как `[object Object]`.
 
 ## Оформление и вывод
+
+- `REQ-OUT-009` — Editor-only кнопка «Оформление» перед Copy открывает dock справа;
+  он делит место со слоями, резервирует viewport, не меняет pan/zoom/document при открытии.
+  Quick Capture не монтирует эти controls. Ширина dock 320 px при окне 1024 px.
+- `REQ-OUT-010` — композиция: auto/fixed output, independent linked px/% insets,
+  upper/lower bands, 9-point alignment, aspect presets, uniform content scale/offset.
+- `REQ-OUT-011` — transparent/solid/linear/radial/freeform/image/blurred-content
+  backgrounds; freeform 2–16 RGBA/spread points, linear/radial 2–8 stops.
+  Тип заливки выбирается семью кнопками с визуальными образцами/иконками,
+  выделением активного типа, его названием и доступными подписями.
+  Общий редактор градиента поддерживает compact для узкой панели: поля процентов
+  и угла читаемы целиком, палитра вместе со своим цветом помещается без горизонтального scroll.
+  Номера ручек градиента 1–16 центрированы внутри кружков и не обрезаются при повороте.
+  Gesture preview transient; один commit, keyboard, Escape/pointercancel.
+- `REQ-OUT-012` — neutral window/browser chrome с title/URL и phone portrait/landscape;
+  contain default, explicit cover/position without distortion. Original immutable.
+  В рамках окна и браузера снимок стыкуется с title bar без внутренних скруглений;
+  обрезка сохраняет внешний контур окна. Тень телефона повторяет контур корпуса
+  в обеих ориентациях и не образует прямоугольную подложку.
+- `REQ-OUT-013` — несколько anchored text/logo blocks: content/card/header/footer,
+  offsets, font/color/opacity/backplate. Year expands once, explicit refresh undoable.
+  Внешний раздел «Подписи» содержит плоский выбор блоков и один редактор без
+  вложенных expand: полноширинный текст, font/size, быстрая палитра и alignment;
+  размещение, видимость и логотип — отдельные статические группы.
+- `REQ-OUT-014` — именованные ручные style presets; новый документ без оформления.
+  Shared scene path covers preview/Copy/PNG/history; blur samples censored composite.
+- `REQ-EDT-020` — content/card spaces. Existing layers default to content and retain
+  their ownership. New object ownership follows the gesture start:
+  inside visible screenshot → content, outside → card. Selecting an existing object
+  routes to its space, including card objects over the screenshot. No manual mode
+  switch; dragging across boundaries preserves ownership. Scoped selection/reorder/effects;
+  Crop/flip target content. Starter presets: padding, browser, phone; bands remain manual.
+- `REQ-LIB-015` — backgrounds/logos/gradients/presets are durable user materials,
+  excluded from history/cache/7-day cleanup; own imported copy and blob references.
+  Catalog removal cannot break documents/presets. Cards retain normal history policy.
 
 - `REQ-OUT-001` — beautify поддерживает фон/градиент, padding, radius, shadow и позиционирование снимка.
 - `REQ-OUT-002` — watermark поддерживает text/image, угол или точную позицию, offsets, opacity и текущий год.

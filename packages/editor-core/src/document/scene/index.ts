@@ -1,3 +1,5 @@
+import { composeDocumentScene } from '../../composition/scene'
+import { resolveCompositionLayout } from '../../composition/layout'
 import type { CalloutGeometryContext } from '../../callout-geometry'
 import { emojiResourceId } from '../../emoji'
 import {
@@ -101,7 +103,23 @@ export function createDocumentRenderScene(
   context: CalloutGeometryContext = {},
 ) {
   const nodes: RenderNode[] = []
+  const cardNodes: RenderNode[] = []
+  const layout = resolveCompositionLayout(document)
   for (const layer of document.layers) {
+    if (layer.space === 'card') {
+      cardNodes.push(...(layer.kind === 'image' ? [imageNode(layer)] : projectAnnotationLayer(layer,
+        { ...document,
+          canvas: { width: layout.width,
+            height: layout.height },
+          crop: null },
+        context).map((node) => ({ ...node,
+
+        scaleX: layer.transform.scaleX,
+        scaleY: layer.transform.scaleY,
+        transformOriginX: layer.transform.translateX,
+        transformOriginY: layer.transform.translateY }))))
+      continue
+    }
     if (layer.kind === 'image') {
       nodes.push(imageNode(layer))
       continue
@@ -116,7 +134,7 @@ export function createDocumentRenderScene(
       })),
     )
   }
-  return createRenderSceneSnapshot({
+  const content = createRenderSceneSnapshot({
     width: document.canvas.width,
     height: document.canvas.height,
     outputBounds:
@@ -129,4 +147,5 @@ export function createDocumentRenderScene(
       }),
     nodes,
   })
+  return composeDocumentScene(document, content, cardNodes)
 }

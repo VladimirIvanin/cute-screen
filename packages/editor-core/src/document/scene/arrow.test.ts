@@ -11,7 +11,7 @@ describe('document render scene: arrows', () => {
   it('compiles independent arrow caps into the ordered render scene', () => {
     const scene = createDocumentRenderScene({
       ...document,
-      schemaVersion: 7,
+      schemaVersion: 8,
       layers: [
         {
           id: '019c1f62-058e-7000-8000-000000000003',
@@ -180,7 +180,7 @@ describe('document render scene: arrows', () => {
   it('preserves the complete transform for non-image render nodes', () => {
     const scene = createDocumentRenderScene({
       ...document,
-      schemaVersion: 7,
+      schemaVersion: 8,
       layers: [
         {
           id: '019c1f62-058e-7000-8000-000000000002',
@@ -228,7 +228,7 @@ describe('document render scene: arrows', () => {
   it('ends a thick arrow body at the base of its solid arrow cap', () => {
     const scene = createDocumentRenderScene({
       ...document,
-      schemaVersion: 7,
+      schemaVersion: 8,
       layers: [
         {
           id: '019c1f62-058e-7000-8000-000000000012',
@@ -284,7 +284,7 @@ describe('document render scene: arrows', () => {
     (endCap) => {
       const scene = createDocumentRenderScene({
         ...document,
-        schemaVersion: 7,
+        schemaVersion: 8,
         layers: [
           {
             id: '019c1f62-058e-7000-8000-000000000013',

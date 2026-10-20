@@ -176,7 +176,8 @@ function createSelectionMutations(
         !layer ||
         !neighbor ||
         !ids.has(layer.id) ||
-        ids.has(neighbor.id)
+        ids.has(neighbor.id) ||
+        (layer.space ?? 'content') !== (neighbor.space ?? 'content')
       ) continue
       commands.push({
         type: 'reorderLayer',
@@ -291,6 +292,7 @@ function canMoveSelection(
   const ids = new Set(context.store.selectedLayerIds)
   return layers.some((layer, index) => {
     const neighbor = layers[index + (direction === 'up' ? 1 : -1)]
-    return ids.has(layer.id) && neighbor !== undefined && !ids.has(neighbor.id)
+    return ids.has(layer.id) && neighbor !== undefined &&
+      (!ids.has(neighbor.id) || (layer.space ?? 'content') !== (neighbor.space ?? 'content'))
   })
 }

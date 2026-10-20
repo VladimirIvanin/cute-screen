@@ -21,7 +21,7 @@ const TEXT_DEFAULTS: TextToolDefaults = Object.freeze({
 
 function editorDocument(layer?: LayerNode): EditorDocument {
   return {
-    schemaVersion: 7,
+    schemaVersion: 8,
     id: '019c1f62-058e-7000-8000-000000000000',
     source: {
       blobHash: 'a'.repeat(64),

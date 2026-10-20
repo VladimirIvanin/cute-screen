@@ -10,17 +10,17 @@ import {
   stripTransientLayerFields,
 } from './shared'
 
-export const CLIPBOARD_LAYERS_MIME = 'application/x-cute-screen-layers+json;version=2' as const
+export const CLIPBOARD_LAYERS_MIME = 'application/x-cute-screen-layers+json;version=3' as const
 
 export interface ClipboardLayersV2 {
-  readonly version: 2
+  readonly version: 3
   readonly documentSchemaVersion: typeof EDITOR_DOCUMENT_SCHEMA_VERSION
   readonly layers: readonly LayerNode[]
 }
 
 export function encodeClipboardLayersV2(layers: readonly LayerNode[]): string {
   const payload: ClipboardLayersV2 = {
-    version: 2,
+    version: 3,
     documentSchemaVersion: EDITOR_DOCUMENT_SCHEMA_VERSION,
     layers: layers.map((layer) => contentImage(cloneLayer(layer))),
   }
@@ -34,13 +34,10 @@ export function decodeClipboardLayersV2(serialized: string): ClipboardLayersV2 {
   } catch {
     throw new Error('clipboard layer payload is not valid JSON')
   }
-  if (
-    !candidate ||
-    typeof candidate !== 'object' ||
-    (candidate as { version?: unknown }).version !== 2 ||
-    (candidate as { documentSchemaVersion?: unknown }).documentSchemaVersion !== EDITOR_DOCUMENT_SCHEMA_VERSION ||
-    !Array.isArray((candidate as { layers?: unknown }).layers)
-  ) {
+  const object = candidate as { version?: unknown; documentSchemaVersion?: unknown; layers?: unknown } | null
+  const supported = object && ((object.version === 2 && object.documentSchemaVersion === 7) ||
+    (object.version === 3 && object.documentSchemaVersion === EDITOR_DOCUMENT_SCHEMA_VERSION))
+  if (!supported || !Array.isArray(object.layers)) {
     throw new Error('clipboard layer payload has an unsupported version')
   }
   const layers = (candidate as { layers: unknown[] }).layers
@@ -80,8 +77,12 @@ export function decodeClipboardLayersV2(serialized: string): ClipboardLayersV2 {
     return contentImage(layer)
   })
   return Object.freeze({
-    version: 2,
+    version: 3,
     documentSchemaVersion: EDITOR_DOCUMENT_SCHEMA_VERSION,
     layers: Object.freeze(parsedLayers),
   })
 }
+
+export type ClipboardLayersV3 = ClipboardLayersV2
+export const encodeClipboardLayersV3 = encodeClipboardLayersV2
+export const decodeClipboardLayersV3 = decodeClipboardLayersV2

@@ -5,6 +5,7 @@ import {
 } from 'vitest'
 
 import type { RichTextContent } from '@cute-screen/editor-core'
+import { renderRichTextProjection } from '../../../packages/editor-vue/src/rich-text-projection'
 import { RichTextEditorController } from '../../../packages/editor-vue/src/rich-text-editor'
 
 const CONTENT: RichTextContent = Object.freeze({
@@ -33,6 +34,15 @@ const CONTENT: RichTextContent = Object.freeze({
 })
 
 describe('RichTextEditorController', () => {
+  it('quotes the pixel font in the DOM while preserving the portable document family', () => {
+    const content = { ...CONTENT, spans: CONTENT.spans.map((span) => ({ ...span, fontFamily: 'Press Start 2P' })) }
+    const controller = new RichTextEditorController(content)
+    const editor = document.createElement('div')
+    renderRichTextProjection(editor, controller.state)
+    expect(editor.querySelector<HTMLSpanElement>('[data-rich-text-span]')!.style.fontFamily).toBe('"Press Start 2P"')
+    expect(controller.state.content.spans[0]!.fontFamily).toBe('Press Start 2P')
+  })
+
   it('tracks a UTF-16-safe browser selection and formats only that range', () => {
     const controller = new RichTextEditorController(CONTENT)
     controller.setSelection({ anchor: 1, focus: 3 })

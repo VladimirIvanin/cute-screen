@@ -1,0 +1,303 @@
+.cs-composition-panel {
+  position: absolute;
+  z-index: 25;
+  top: 64px;
+  right: 14px;
+  bottom: 14px;
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--surface-raised);
+  color: var(--text);
+  box-shadow: var(--shadow-overlay);
+}
+.cs-composition-panel header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.cs-composition-panel header strong {
+  flex: 1;
+}
+.cs-composition-body {
+  min-height: 0;
+  overflow: auto;
+  padding: 0 12px 12px;
+}
+.cs-composition-panel details {
+  border-bottom: 1px solid var(--border);
+  padding: 8px 0;
+}
+.cs-composition-panel summary {
+  cursor: pointer;
+  padding: 4px 0;
+  font-weight: 600;
+}
+.cs-composition-body > details > summary {
+  margin: 0 -12px;
+  padding: 6px 12px;
+  background: var(--surface-raised);
+}
+.cs-composition-body > details[open] > summary {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.cs-composition-panel fieldset {
+  border: 0;
+  padding: 6px 0;
+  margin: 0;
+  min-width: 0;
+}
+.cs-composition-panel label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 7px 0;
+  font-size: 12px;
+}
+.cs-composition-panel .cs-card-input,
+.cs-composition-panel select,
+.cs-composition-panel textarea {
+  min-width: 0;
+  width: 140px;
+  color: var(--text);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px;
+  font: inherit;
+}
+.cs-composition-panel textarea {
+  min-height: 64px;
+}
+.cs-composition-panel input[type='color'] {
+  width: 36px;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.cs-composition-panel button {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.cs-composition-panel button:disabled,
+.cs-composition-panel fieldset:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.cs-composition-panel button[aria-pressed='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.cs-composition-panel p {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.cs-card-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 6px 0;
+}
+.cs-card-fill-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 7px 0;
+  font-size: 12px;
+}
+.cs-card-fill-heading span:last-child {
+  color: var(--text-muted);
+}
+.cs-card-fill-types {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.cs-composition-panel .cs-card-fill-types button {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 38px;
+  padding: 5px 2px;
+}
+.cs-card-fill-types button:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+.cs-card-fill-types button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.cs-card-fill-icon {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px rgb(127 127 127 / 25%);
+}
+.cs-card-fill-icon svg {
+  width: 20px;
+  height: 20px;
+}
+.cs-card-fill-icon.is-transparent {
+  background: conic-gradient(#a7a7ad 25%, #f3f3f6 0 50%, #a7a7ad 0 75%, #f3f3f6 0) 0 0 / 10px 10px;
+}
+.cs-card-fill-icon.is-solid {
+  background: #8c79df;
+}
+.cs-card-fill-icon.is-linear {
+  background: linear-gradient(135deg, #6456db, #efa5d3);
+}
+.cs-card-fill-icon.is-radial {
+  background: radial-gradient(circle at center, #f7c9e3, #6456db);
+}
+.cs-card-fill-icon.is-freeform {
+  background:
+    radial-gradient(at 0 100%, #65d8d1, transparent 70%), radial-gradient(at 100% 0, #f7c9e3, transparent 75%), #6456db;
+}
+.cs-card-fill-icon.is-blurred {
+  background: linear-gradient(140deg, #c4badf, #849eb1 45%, #becfc1);
+  color: #394957;
+}
+.cs-card-fill-icon.is-blurred svg {
+  filter: blur(1px);
+}
+.cs-card-alignment {
+  display: grid;
+  grid-template-columns: repeat(3, 28px);
+  gap: 3px;
+  margin: 8px 0;
+}
+.cs-card-material {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  margin: 4px 0;
+}
+.cs-card-mesh {
+  position: relative;
+  margin: 14px 8px;
+  width: calc(100% - 16px);
+  height: 160px;
+}
+.cs-card-mesh canvas {
+  width: 100%;
+  height: 100%;
+  border-radius: 7px;
+}
+.cs-card-mesh button {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  touch-action: none;
+  padding: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+}
+.has-composition-dock:not(.is-quick-mode) .cs-viewport {
+  right: 348px;
+}
+.has-composition-dock:not(.is-quick-mode) .cs-bottom-chrome {
+  right: 362px;
+}
+.has-composition-dock:not(.is-quick-mode) .cs-toolrail {
+  max-width: calc(100vw - 420px);
+}
+.cs-composition-handles {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+.cs-composition-handles.is-editing {
+  pointer-events: auto;
+  cursor: crosshair;
+}
+.cs-composition-handles button {
+  position: absolute;
+  border: 2px solid white;
+  box-shadow: 0 0 0 1px #222;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  width: 20px;
+  height: 20px;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  touch-action: none;
+}
+.cs-composition-handles .cs-card-gradient-handle,
+.cs-card-mesh .cs-card-gradient-handle {
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.cs-card-gradient-handle > span {
+  pointer-events: none;
+}
+.cs-card-gradient-handle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.cs-composition-handles .cs-card-brand-handle {
+  width: auto;
+  height: auto;
+  min-width: 30px;
+  border-radius: 4px;
+  transform: none;
+  background: transparent;
+  color: transparent;
+  border: 1px dashed var(--accent);
+}
+.cs-composition-handles .cs-card-title-hit {
+  transform: none;
+  border-radius: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  color: transparent;
+}
+.cs-card-title-editor {
+  position: absolute;
+  z-index: 6;
+  pointer-events: auto;
+  min-width: 100px;
+}
+
+.cs-card-palettes {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0;
+}
+.cs-card-palettes button {
+  width: 34px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+}
+.cs-card-palettes button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}

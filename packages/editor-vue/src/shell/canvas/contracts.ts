@@ -78,6 +78,11 @@ export type CanvasTranslationKey =
   | 'retry'
 
 export interface CanvasViewportProps {
+  compositionSpace?: 'content' | 'card' | undefined
+  activateCompositionAt?: (event: MouseEvent, preserveSelection?: boolean) => void
+  compositionDocument?: EditorDocumentV1 | undefined
+  exportDocument?: EditorDocumentV1 | undefined
+  compositionBounds?: ViewportOutputBounds | undefined
   emojiDefaults?: {
     readonly assetId: string
     readonly size: number
@@ -130,6 +135,7 @@ export interface CanvasViewportProps {
 }
 
 export type CanvasViewportEmits = {
+  layerSpace: [space: 'content' | 'card']
   emojiPlace: [point: { x: number; y: number }]
   spotlightEditingChange: [value: SpotlightEditing | undefined]
   spotlightRemove: []
@@ -188,6 +194,7 @@ export interface CanvasViewportExpose {
 }
 
 export const canvasViewportRuntimeProps = {
+  compositionSpace: String as PropType<CanvasViewportProps['compositionSpace']>,
   emojiDefaults: Object as PropType<CanvasViewportProps['emojiDefaults']>,
   spotlightEditing: Object as PropType<SpotlightEditing | undefined>,
   readOnly: Boolean,
@@ -252,6 +259,7 @@ export const canvasViewportRuntimeProps = {
 } as const
 
 export const canvasViewportRuntimeEmits = [
+  'layerSpace',
   'emojiPlace',
   'spotlightEditingChange',
   'spotlightRemove',

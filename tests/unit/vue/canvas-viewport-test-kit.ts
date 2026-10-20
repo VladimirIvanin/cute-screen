@@ -23,7 +23,7 @@ export const TEXT_TOOLBAR_SCHEMA = {
 }
 
 export const document: EditorDocumentV1 = {
-  schemaVersion: 7,
+  schemaVersion: 8,
   id: '019c1f62-058e-7000-8000-000000000000',
   source: {
     blobHash: 'a'.repeat(64),

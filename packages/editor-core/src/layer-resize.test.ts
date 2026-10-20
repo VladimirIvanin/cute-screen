@@ -35,7 +35,7 @@ const CANVAS = Object.freeze({ width: 400, height: 300 })
 
 function document(layers: readonly LayerNode[]): EditorDocumentV1 {
   return {
-    schemaVersion: 7,
+    schemaVersion: 8,
     id: DOCUMENT_ID,
     source: {
       blobHash: 'a'.repeat(64),

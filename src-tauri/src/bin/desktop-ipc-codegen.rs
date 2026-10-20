@@ -30,6 +30,9 @@ fn declaration<T: TS>() -> String {
 
 fn generated_bindings() -> String {
     let mut output = String::from(HEADER);
+    output.push_str(&declaration::<
+        cute_screen_desktop::storage::materials::MaterialRecord,
+    >());
     output.push_str(&declaration::<LinuxCaptureMethod>());
     output.push_str(&declaration::<LinuxCaptureMethods>());
     output.push_str(&declaration::<ExportFilenameSettings>());

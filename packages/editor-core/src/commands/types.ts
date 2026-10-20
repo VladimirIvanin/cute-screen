@@ -15,6 +15,7 @@ export type EditorCommand =
     type: 'migrateExpressiveBrushes'
     changes: readonly Readonly<{ before: PencilLayer; after: PencilLayer }>[]
   }>
+  | Readonly<{ type: 'setPresentation'; before: EditorDocumentV1['presentation']; after: EditorDocumentV1['presentation'] }>
   | Readonly<{ type: 'addLayer'; layer: LayerNode }>
   | Readonly<{ type: 'removeLayer'; layer: LayerNode; index: number }>
   | Readonly<{ type: 'updateLayer'; before: LayerNode; after: LayerNode }>

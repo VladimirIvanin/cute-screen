@@ -1,3 +1,4 @@
+import { mergeCompositionView } from './composition-view'
 import { loadDocumentTextFonts } from '../../text-fonts'
 import { loadEmojiResource } from '../../emoji/resources'
 import type {
@@ -5,8 +6,12 @@ import type {
   Ref,
 } from 'vue'
 import {
+  compositionBlobHashes,
   Canvas2DRenderer,
+  prepareCompositionScene,
+  resolveCompositionLayout,
   createDocumentRenderScene,
+  emojiResourceId,
   createRenderSceneSnapshot,
   type EditorDocumentV1,
   type ImageResource,
@@ -44,6 +49,7 @@ export class CanvasRendererController {
   private renderer: Canvas2DRenderer | undefined
   private overlayTarget: HTMLCanvasElement | undefined
   private initialization: Promise<Canvas2DRenderer | undefined> | undefined
+  private preparation: AbortController | undefined
   private sceneReady = false
   private revision = 0
   private mounted = false
@@ -61,6 +67,7 @@ export class CanvasRendererController {
   }
 
   dispose(): void {
+    this.preparation?.abort()
     this.highlighterPreview.invalidate()
     this.mounted = false
     this.revision += 1
@@ -114,11 +121,25 @@ export class CanvasRendererController {
     }
   }
 
+  private committedDensity(document: EditorDocumentV1): number {
+    const composition = document.presentation.composition ? resolveCompositionLayout(document) : undefined
+    const contentScale = this.context.props.compositionDocument && this.context.props.compositionSpace !== 'card'
+      ? composition?.scale ?? 1 : 1
+    const density = (this.context.props.zoom ?? 100) / 100 / contentScale * (window.devicePixelRatio || 1)
+    const nativeDensity = scenePreviewScale(composition ?? document.canvas,
+      (this.context.props.zoom ?? 100) / 100 / contentScale, window.devicePixelRatio || 1)
+    // Appearance can enlarge a 4K/8K source far beyond the visible viewport.
+    // Keep that preview at display density; export prepares its own full-size resources.
+    return composition ? Math.max(0.01, Math.min(density, nativeDensity)) : nativeDensity
+  }
+
   private setCommittedScene(runtime: Canvas2DRenderer): void {
     const { props, editingText } = this.context
-    const document = this.context.documentForScene()
+    const document = mergeCompositionView(props.compositionDocument,
+      this.context.documentForScene(),
+      props.compositionSpace)
     if (!document) return
-    runtime.setPreviewScale(scenePreviewScale(document.canvas, (props.zoom ?? 100) / 100, window.devicePixelRatio || 1))
+    runtime.setPreviewScale(this.committedDensity(document))
     const documentScene = createDocumentRenderScene(
       (props.activeTool === 'crop' || props.quickFrameMode) && document.crop ? { ...document, crop: null } : document,
     )
@@ -139,7 +160,7 @@ export class CanvasRendererController {
         width: documentScene.width,
         height: documentScene.height,
         outputBounds: documentScene.outputBounds,
-        nodes: documentScene.nodes.filter((candidate) => !hiddenNodeIds.has(candidate.id)),
+        nodes: hideEditingNodes(documentScene.nodes, hiddenNodeIds),
       }),
     )
     this.sceneReady = true
@@ -155,9 +176,9 @@ export class CanvasRendererController {
       ...(layer && props.image ? ([[layer.payload.blobHash, props.image]] as const) : []),
       ...(props.textureImages ?? new Map()),
     ])
-    const emojiIds = new Set(createDocumentRenderScene(props.document!).nodes
-      .filter((node) => node.kind === 'image' && node.resourceId.startsWith('emoji:'))
-      .map((node) => (node as Extract<RenderNode, { kind: 'image' }>).resourceId))
+    const emojiIds = new Set((props.compositionDocument ?? props.document)!.layers
+      .filter((layer) => layer.kind === 'emoji')
+      .map((layer) => emojiResourceId(layer.payload.asset)))
     const emojiImages = await Promise.all([...emojiIds].map(async (id) => [id, await loadEmojiResource(id)] as const))
     if (!this.mounted || revision !== this.revision) return false
     for (const [id, image] of emojiImages) inputs.set(id, image)
@@ -200,9 +221,14 @@ export class CanvasRendererController {
     if (this.context.rendererError.value) throw new Error(this.context.rendererError.value)
   }
 
-  async exportPng(): Promise<Uint8Array> {
+  async exportPng(options?: {
+    readonly signal?: AbortSignal
+    readonly onProgress?: (fraction: number) => void
+  }): Promise<Uint8Array> {
     await this.waitForRender()
-    const document = this.context.props.document
+    const document = this.context.props.exportDocument
+      ?? this.context.props.compositionDocument
+      ?? this.context.props.document
     const runtime = this.renderer
     if (
       !runtime ||
@@ -211,6 +237,7 @@ export class CanvasRendererController {
     ) throw new Error('The rendered result is not ready')
     // Crop editing and display density affect preview only. Export always uses
     // committed document bounds and excludes transient text/gesture overlays.
+    await prepareCompositionScene(createDocumentRenderScene(document), 1, options?.signal, options?.onProgress)
     runtime.setScene(createDocumentRenderScene(document))
     try {
       return await runtime.exportPng({ scale: 1 })
@@ -238,7 +265,7 @@ export class CanvasRendererController {
     }
     let readyDocumentId: string | undefined
     try {
-      await loadDocumentTextFonts(this.context.documentForScene() ?? props.document)
+      await loadDocumentTextFonts(props.compositionDocument ?? this.context.documentForScene() ?? props.document)
       const runtime = await this.ensureRenderer()
       if (
         !runtime ||
@@ -246,12 +273,17 @@ export class CanvasRendererController {
         revision !== this.revision
       ) return
       if (!(await this.syncImageResources(runtime, revision))) return
+      await this.prepareScene(props)
+      if (!this.mounted || revision !== this.revision) return
       this.setCommittedScene(runtime)
       this.highlighterPreview.invalidate()
       runtime.render(['scene'])
       readyDocumentId = props.document.id
     } catch (error) {
-      if (revision !== this.revision) return
+      if (
+        revision !== this.revision ||
+        isCancelled(error)
+      ) return
       this.renderer?.dispose()
       this.renderer = undefined
       this.sceneReady = false
@@ -264,6 +296,25 @@ export class CanvasRendererController {
     }
   }
 
+  private async prepareScene(props: CanvasViewportProps): Promise<void> {
+    const full = props.compositionDocument ?? props.document!
+    if (compositionBlobHashes(full.presentation.composition).some((hash) => !this.resources.has(hash))) {
+      throw new Error('Appearance image is unavailable. Restore the material or choose another image.')
+    }
+    this.preparation?.abort()
+    this.preparation = new AbortController()
+    const prepared = mergeCompositionView(
+      props.compositionDocument,
+      this.context.documentForScene(),
+      props.compositionSpace,
+    )!
+    await prepareCompositionScene(
+      createDocumentRenderScene(prepared),
+      this.committedDensity(prepared),
+      this.preparation.signal,
+    )
+  }
+
   renderCommittedSceneForGesture(): void {
     if (this.renderer && this.sceneReady) {
       this.setCommittedScene(this.renderer)
@@ -273,7 +324,11 @@ export class CanvasRendererController {
   }
 
   invalidateGesturePreview(): void {
-    if (requiresScenePreview(this.context.previewLayer()) || this.context.gestureRequiresScenePreview?.()) {
+    if (
+      this.context.props.compositionDocument ||
+      requiresScenePreview(this.context.previewLayer()) ||
+      this.context.gestureRequiresScenePreview?.()
+    ) {
       this.renderCommittedSceneForGesture()
     } else {
       this.context.invalidateOverlay()
@@ -282,12 +337,14 @@ export class CanvasRendererController {
 
   renderOverlay(nodes: readonly RenderNode[]): boolean {
     if (!this.renderer || !this.sceneReady) return false
+    if (this.context.props.compositionDocument) return true
     this.renderer.setOverlay(nodes)
     this.renderer.render(['overlay'])
     return true
   }
 
   renderHighlighterDraft(layer: LayerNode | undefined): void {
+    if (this.context.props.compositionDocument) return
     const scene = this.context.scene.value
     const bounds = this.context.outputBounds.value
     const document = this.context.props.document
@@ -304,4 +361,18 @@ export class CanvasRendererController {
       scenePreviewScale(document.canvas, (this.context.props.zoom ?? 100) / 100, window.devicePixelRatio || 1),
     )
   }
+}
+
+function hideEditingNodes(
+  nodes: readonly RenderNode[],
+  ids: ReadonlySet<string>,
+): readonly RenderNode[] {
+  return nodes.filter((node) => !ids.has(node.id)).map((node) => node.kind === 'group'
+    ? { ...node, scene: createRenderSceneSnapshot({
+        ...node.scene, nodes: hideEditingNodes(node.scene.nodes, ids),
+      }) } : node)
+}
+
+function isCancelled(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError'
 }

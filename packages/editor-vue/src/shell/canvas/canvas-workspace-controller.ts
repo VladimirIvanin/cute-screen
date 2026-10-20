@@ -1,3 +1,4 @@
+import { compositionDraftDocument } from './composition-view'
 import { GradientEditingController } from './gradient-editing-controller'
 import { CalloutRouteEditing } from './callout-route-editing'
 import { textEditorBindings } from './text-editor-bindings'
@@ -379,8 +380,8 @@ export class CanvasWorkspaceController {
         const document = this.#spotlight.documentForScene(this.#sceneDocument.documentForScene())
         const draft = this.#gesture?.kind === 'precision' && this.#gesture.tool === 'spotlight'
           ? this.#draft.precisionLayer('__spotlight-draft__') : undefined
-        const result = document && draft ? { ...document, layers: [...document.layers, draft] } : document
-        return markerDocumentForScene(result, state.editingText.value)
+        const draftDocument = compositionDraftDocument(document, this.#props, this.#draft.drawingLayer(), draft)
+        return markerDocumentForScene(draftDocument, state.editingText.value)
       },
       previewLayer: this.gesturePreviewLayer,
       gestureRequiresScenePreview: () => this.#gesture?.kind === 'move' && (this.#gesture.nodeIds?.length ?? 0) > 1,

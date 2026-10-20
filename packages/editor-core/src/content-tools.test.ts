@@ -146,8 +146,8 @@ describe('v7 content-layer core contracts', () => {
     })
 
     expect(JSON.parse(encoded)).toMatchObject({
-      version: 2,
-      documentSchemaVersion: 7,
+      version: 3,
+      documentSchemaVersion: 8,
     })
     expect(pasted[0]).toMatchObject({
       id: ids[2],

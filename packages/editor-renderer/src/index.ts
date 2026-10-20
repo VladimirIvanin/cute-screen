@@ -399,9 +399,45 @@ export {
   gradientPoints,
   snapGradientPoint,
   fitGradientLayer,
+  placeGradientLayer,
+  type GradientPlacement,
   updateGradientHandle,
   rotateGradientFill,
   type LinearGradientPaint,
   type ShapeLayer,
   type Point,
 } from '@cute-screen/editor-core'
+
+export { prepareCompositionScene } from './composition/freeform'
+export {
+  DEFAULT_PRESENTATION_SETTINGS,
+  createComposition,
+  compositionInteractionSpace,
+  createCardBackground,
+  createCardBranding,
+  cardColor,
+  compositionPreset,
+  resolveBrandingYear,
+  resolveCompositionLayout,
+  contentToCard,
+  cardToContent,
+  rasterizeFreeform,
+  type CompositionSettings,
+  type CompositionStart,
+  type CompositionLayout,
+  type CardBackground,
+  type CardBranding,
+  type CardFrame,
+  type CardLayout,
+  type CardColor,
+  type CardImage,
+  type CardPoint,
+  type CardStop,
+  type FreeformPoint,
+  type EditorDocumentV8,
+} from '@cute-screen/editor-core'
+
+export { brandingNodes } from '@cute-screen/editor-core'
+export { compositionBlobHashes } from '@cute-screen/editor-core'
+
+export { parseComposition } from '@cute-screen/editor-core'

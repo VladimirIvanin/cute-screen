@@ -1,5 +1,33 @@
 # CI-сборки и проверка версии через GitHub
 
+## Публикационная карточка (ADR-127)
+
+Новые документы создаются в schema v8; v7 читается без записи, v0–v6 unsupported,
+v9+ read-only. Downgrade старой сборки не должен сохранять v8 как v7. SQLite migration 5
+immutable; каталог user_materials и его blob references переживают очистку истории.
+Новый clipboard v3 принимает v2/schema7. IPC bindings генерируются штатным
+`pnpm ipc:codegen`; новые команды materials_list/put/remove не передают image bytes
+через JSON. Импорт использует прежний native binary/blob path.
+
+Freeform worker поставляется Vite вместе с renderer; нельзя заменять export-resolution
+расчёт уменьшенным preview. Встроенные палитры и векторные рамки созданы в проекте,
+не используют код/assets GPL-референсов. Новых native dependencies не добавлено.
+
+Gate: core/Vue, renderer PNG decode, browser composition, native
+`CUTE_SCREEN_E2E_SCENARIOS=composition,composition-reopen pnpm test:e2e:tauri`, Rust
+storage references/journal cleanup, performance и `pnpm check`. Linux проверяется
+свежим debug/no-bundle; Windows/macOS требуют собственных результатов. Общий Cargo
+cache сохраняется, отдельный target этой задачей не создаётся.
+
+## Панель градиента (ADR-128)
+
+Изменение frontend/core не добавляет IPC, системных разрешений или native
+зависимостей, не меняет persisted gradient metadata. В build используется
+существующий icon adapter и transient surface layout. Новый browser gate:
+`pnpm test:e2e:browser --spec tests/e2e/specs/browser-gradient-placement.e2e.ts`.
+Native regression использует прежние gradient/gradient-reopen сценарии со
+свежим штатным debug/no-bundle harness и новым placement popover.
+
 ## Градиентная подложка (ADR-124)
 
 Gradient использует optional shape metadata в v7 и прежний renderer; IPC и

@@ -71,6 +71,12 @@ const progressKey: Record<
       }}
     </span>
     <span v-else>{{ state.message }}</span>
+    <progress
+      v-if="state.status === 'pending' && state.progress !== undefined"
+      :value="state.progress"
+      max="1"
+    />
+    <span v-if="state.status === 'pending' && state.progress !== undefined">{{ Math.round(state.progress * 100) }}%</span>
     <NButton
       v-if="state.status === 'pending'"
       text

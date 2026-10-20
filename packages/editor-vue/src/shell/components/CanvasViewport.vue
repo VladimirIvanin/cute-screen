@@ -56,6 +56,7 @@ defineExpose(exposed)
   <CanvasWorkspace
     ref="workspace"
     v-bind="props"
+    @layer-space="emit('layerSpace', $event)"
     @emoji-place="emit('emojiPlace', $event)"
     @spotlight-editing-change="emit('spotlightEditingChange', $event)"
     @spotlight-remove="emit('spotlightRemove')"

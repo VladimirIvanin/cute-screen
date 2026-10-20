@@ -2,6 +2,7 @@
 import {
   computed,
   nextTick,
+  onBeforeUnmount,
   ref,
   watch,
 } from 'vue'
@@ -26,6 +27,8 @@ import {
 import { parseHexColor } from '../tools/effects/color'
 
 const props = defineProps<{
+  compact?: boolean
+  hideDirection?: boolean
   geometry?: { readonly width: number; readonly height: number } | undefined
   selectedIndex?: number
   fill: LinearFill
@@ -33,7 +36,13 @@ const props = defineProps<{
   locale: 'ru' | 'en'
   recentColors: readonly SrgbColor[]
 }>()
-const emit = defineEmits<{ commit: [fill: LinearFill]; dismiss: []; select: [index: number] }>()
+const emit = defineEmits<{
+  commit: [fill: LinearFill]
+  preview: [fill: LinearFill]
+  cancel: []
+  dismiss: []
+  select: [index: number]
+}>()
 const text = (en: string, ru: string) => props.locale === 'ru' ? ru : en
 const host = ref<HTMLElement>()
 const track = ref<HTMLElement>()
@@ -64,6 +73,20 @@ function setAngle(value: number): void {
 let dragging = false
 let dragTarget: HTMLElement | undefined
 let pointerId = 0
+let stopPointerClick = false
+function resetTrackPointer(): void {
+  stopPointerClick = false
+}
+function trackClick(event: MouseEvent): void {
+  if (stopPointerClick) {
+    stopPointerClick = false
+    event.preventDefault()
+    event.stopPropagation()
+    return
+  }
+  add(event)
+}
+onBeforeUnmount(cancel)
 watch(() => props.fill, () => {
   cancel()
   selected.value = Math.min(selected.value, props.fill.stops.length - 1)
@@ -85,8 +108,10 @@ function updateStop(
     .sort((a, b) => a.position - b.position)
   selected.value = stops.indexOf(replacement)
   const fill = { ...current.value, stops }
-  if (preview) draft.value = fill
-  else commit(fill)
+  if (preview) {
+    draft.value = fill
+    emit('preview', fill)
+  } else commit(fill)
 }
 function position(event: PointerEvent | MouseEvent): number {
   const rect = track.value!.getBoundingClientRect()
@@ -136,6 +161,7 @@ function begin(
   index: number,
 ): void {
   if (props.disabled || event.button !== 0) return
+  stopPointerClick = true
   selected.value = index
   dragging = true
   draft.value = props.fill
@@ -147,6 +173,7 @@ function move(event: PointerEvent): void {
   if (dragging && event.pointerId === pointerId) updateStop({ position: position(event) }, true)
 }
 function cancel(): void {
+  if (dragging) emit('cancel')
   dragging = false
   draft.value = undefined
   if (dragTarget?.hasPointerCapture?.(pointerId)) dragTarget.releasePointerCapture(pointerId)
@@ -205,6 +232,7 @@ function reverse(): void {
   <div
     ref="host"
     class="cs-shape-gradient-editor"
+    :class="{ 'is-compact': compact }"
     @keydown="keydown"
   >
     <div class="cs-gradient-track-wrap">
@@ -214,7 +242,8 @@ function reverse(): void {
         :style="{ backgroundImage: gradientStrip(current) }"
         role="group"
         :aria-label="text('Gradient stops; click to add', 'Точки градиента; нажмите для добавления')"
-        @click="add"
+        @pointerdown.capture="resetTrackPointer"
+        @click.capture="trackClick"
       >
         <button
           v-for="(entry, index) in current.stops"
@@ -236,6 +265,7 @@ function reverse(): void {
           @pointermove.stop="move"
           @pointerup.stop="finish"
           @pointercancel="cancel"
+          @lostpointercapture="cancel"
           @keydown="markerKey($event, index)"
         >
           <span />
@@ -283,6 +313,7 @@ function reverse(): void {
       :locale="locale"
       :disabled="disabled"
       :eyedropper="false"
+      :compact="compact"
       embedded
       @commit="changeColor"
       @dismiss="emit('dismiss')"
@@ -301,6 +332,7 @@ function reverse(): void {
     />
     <div class="cs-gradient-direction">
       <ShapeNumericControl
+        v-if="!hideDirection"
         :label="text('Angle', 'Угол')"
         :value="angle"
         :min="0"

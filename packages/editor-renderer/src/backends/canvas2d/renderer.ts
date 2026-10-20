@@ -119,8 +119,13 @@ export class Canvas2DRenderer implements Renderer {
     const size = scaledOutputSize(scene.outputBounds, scale)
     const target = this.#newCanvas(size.width, size.height)
     this.#drawScene(target, scene, scale)
-    if (target.encode) return target.encode('png')
-    return this.#blobBytes(target)
+    try {
+      if (target.encode) return await target.encode('png')
+      return await this.#blobBytes(target)
+    } finally {
+      target.width = 1
+      target.height = 1
+    }
   }
 
   dispose(): void {

@@ -53,7 +53,7 @@ export function createDuplicateLayerCommand(
 ): Extract<EditorCommand, { type: 'duplicateLayer' }> {
   const duplicated = pasteClipboardLayers(
     Object.freeze({
-      version: 2,
+      version: 3,
       documentSchemaVersion: EDITOR_DOCUMENT_SCHEMA_VERSION,
       layers: Object.freeze([source]),
     }),

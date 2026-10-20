@@ -45,7 +45,9 @@ export async function prepareGoldenRuntime(): Promise<void> {
     if (family === 'Roboto') continue
     const slug = family.toLowerCase().replaceAll(' ', '-')
     for (const subset of ['latin', 'cyrillic'] as const) {
-      const fontPath = `packages/editor-vue/node_modules/@fontsource/${slug}/files/${slug}-${subset}-400-normal.woff2`
+      const fontPath = family === 'Germanica'
+        ? 'packages/editor-vue/src/assets/fonts/germanica/Germanica.ttf'
+        : `packages/editor-vue/node_modules/@fontsource/${slug}/files/${slug}-${subset}-400-normal.woff2`
       const bytes = await readFile(path.resolve(fontPath))
       if (!GlobalFonts.register(bytes, `${family} ${subset}`)) throw new Error(`Could not register ${family} ${subset}`)
       canvasKitFonts = [...canvasKitFonts, {
@@ -373,7 +375,7 @@ export function persistedArrowScene(route: 'straight' | 'quadratic' | 'elbow'): 
     }
   }
   const document: EditorDocumentV1 = {
-    schemaVersion: 7,
+    schemaVersion: 8,
     id: '019c1f62-058e-7000-8000-000000000600',
     source: {
       blobHash: 'a'.repeat(64),

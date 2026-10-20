@@ -1,5 +1,7 @@
 import {
   selectionFrame,
+  contentToCard,
+  resolveCompositionLayout,
   calloutGeometryContext,
   transformPoint,
   transformToMatrix,
@@ -23,11 +25,14 @@ export function selectionPreviewBounds(
   if (!frame) return undefined
   const b = frame.bounds
   const matrix = transformToMatrix(frame.transform)
+  const layout = document.presentation.composition ? resolveCompositionLayout(document) : undefined
+  const cardSpace = document.layers.find((layer) => selectedIds.includes(layer.id))?.space === 'card'
   const points = [{ x: b.x, y: b.y }, { x: b.x + b.width, y: b.y },
     { x: b.x, y: b.y + b.height }, { x: b.x + b.width, y: b.y + b.height }]
-    .map((point) => transformPoint(matrix, point)).map((point) => ({
-      x: canvas.left + (point.x - (crop?.x ?? 0)) * canvas.width / output.width,
-      y: canvas.top + (point.y - (crop?.y ?? 0)) * canvas.height / output.height,
+    .map((point) => transformPoint(matrix, point))
+    .map((point) => layout && !cardSpace ? contentToCard(point, layout) : point).map((point) => ({
+      x: canvas.left + (point.x - (layout ? 0 : crop?.x ?? 0)) * canvas.width / (layout?.width ?? output.width),
+      y: canvas.top + (point.y - (layout ? 0 : crop?.y ?? 0)) * canvas.height / (layout?.height ?? output.height),
     }))
   const left = Math.min(...points.map((point) => point.x))
   const right = Math.max(...points.map((point) => point.x))

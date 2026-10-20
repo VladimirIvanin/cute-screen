@@ -113,10 +113,11 @@ function syncLayerSummaries(
           : annotationTool(layer) === 'gradient' ? ('gradient' as const) : annotationTool(layer) === 'line' ? ('line' as const) : layer.kind === 'image'
             ? ('image' as const)
             : ('shape' as const),
-      name: layer.kind === 'emoji'
+      space: layer.space ?? 'content',
+      name: compositionSpaceLabel(layer.space, Boolean(document.presentation.composition), context.store.locale) + (layer.kind === 'emoji'
         ? findEmoji(layer.payload.asset.assetId)?.[context.store.locale] ?? layer.payload.grapheme
         : layer.kind === 'image' && layer.payload.role === 'base' ? context.translate('baseImage')
-          : annotationTool(layer) === 'gradient' ? context.translate('toolGradient') : annotationTool(layer) === 'line' ? context.translate('toolLine') : layer.kind,
+          : annotationTool(layer) === 'gradient' ? context.translate('toolGradient') : annotationTool(layer) === 'line' ? context.translate('toolLine') : layer.kind),
       visible: layer.visible,
       locked: layer.locked,
       opacity: 'opacity' in layer ? layer.opacity : 1,
@@ -179,4 +180,14 @@ export function createSessionController(context: SessionControllerContext) {
       }
     },
   }
+}
+
+function compositionSpaceLabel(
+  space: 'content' | 'card' | undefined,
+  enabled: boolean,
+  locale: 'ru' | 'en',
+): string {
+  if (!enabled) return ''
+  if (space === 'card') return locale === 'ru' ? 'Карточка · ' : 'Card · '
+  return locale === 'ru' ? 'Снимок · ' : 'Screenshot · '
 }

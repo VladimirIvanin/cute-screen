@@ -97,11 +97,12 @@ export function createActionActions(
         : { status: 'pending', action },
     )
     try {
-      const message = await options.actions.run(
-        action,
-        actionController.signal,
-        captures ? (progress) => setCaptureProgress(state, progress) : undefined,
-      )
+      const report = (fraction: number) => {
+        if (state.actionState.value.status !== 'pending' || actionController.signal.aborted) return
+        state.actionState.value = { ...state.actionState.value, progress: Math.max(0, Math.min(1, fraction)) }
+      }
+      const message = await options.actions.run(action, actionController.signal,
+        captures ? (progress) => setCaptureProgress(state, progress) : undefined, report)
       publishFeedback({ status: 'success', action, message })
     } catch (error) {
       if (actionController.signal.aborted || error instanceof ActionCancelledError) {

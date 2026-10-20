@@ -91,7 +91,8 @@ describe('measured text sizing and wrapping', () => {
   it('uses the actual face width for every bundled font and remeasures selected styling', async () => {
     await openHarness()
     await $('.cs-zoom-value').click()
-    const sample = 'AV Текст Ширина'
+    // Keep the metric sample below the 480 px wrap cap even in wide pixel faces.
+    const sample = 'AV Ёж'
     const editor = await startTextAt(18, 18)
     await browser.keys(sample)
     await setEditorSelection(0, sample.length)
@@ -119,7 +120,7 @@ describe('measured text sizing and wrapping', () => {
     await browser.keys(['Control', 'z'])
     await browser.waitUntil(async () =>
       (await snapshot()).layers.at(-1)!.localBounds.width === before.localBounds.width)
-  })
+  }).timeout(90000)
 
   it('keeps the full background palette and numeric controls inside the popup', async () => {
     await openHarness()

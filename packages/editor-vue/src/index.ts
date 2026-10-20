@@ -151,3 +151,10 @@ export { renderHistoryThumbnail } from './history/thumbnail-render'
 export { loadDocumentTextFonts as loadHistoryDocumentFonts } from './text-fonts'
 
 export { UiIcon } from './shell/icon'
+
+export type {
+  MaterialBridge,
+  MaterialRecord,
+} from './materials'
+
+export { compositionBlobHashes } from '@cute-screen/editor-renderer'

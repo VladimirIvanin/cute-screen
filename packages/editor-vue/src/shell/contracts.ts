@@ -15,6 +15,7 @@ import type {
 } from './types'
 
 export interface EditorShellProps {
+  materialBridge?: import('../materials').MaterialBridge | undefined
   actions?: ShellActionAdapter | undefined
   documentSession?: DocumentSessionController | undefined
   fixture?: 'empty' | 'error' | 'loading' | 'ready'
@@ -63,6 +64,7 @@ export type EditorShellEmits = {
 export type EditorShellEmit = <K extends keyof EditorShellEmits>(event: K, ...args: EditorShellEmits[K]) => void
 
 export const editorShellRuntimeProps = {
+  materialBridge: Object as PropType<EditorShellProps['materialBridge']>,
   actions: Object as PropType<EditorShellProps['actions']>,
   documentSession: Object as PropType<EditorShellProps['documentSession']>,
   fixture: {

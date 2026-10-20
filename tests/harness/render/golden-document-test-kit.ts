@@ -42,7 +42,7 @@ export function curvedStartCapRepairScene(): RenderSceneSnapshot {
     },
   }
   const document: EditorDocumentV1 = {
-    schemaVersion: 7,
+    schemaVersion: 8,
     id: '019c1f62-058e-7000-8000-000000000614',
     source: {
       blobHash: 'b'.repeat(64),
@@ -90,7 +90,7 @@ export function curvedStartCapRepairScene(): RenderSceneSnapshot {
 
 export function persistedRichTextScene(): RenderSceneSnapshot {
   const document: EditorDocumentV1 = {
-    schemaVersion: 7,
+    schemaVersion: 8,
     id: '019c1f62-058e-7000-8000-000000000700',
     source: {
       blobHash: 'c'.repeat(64),

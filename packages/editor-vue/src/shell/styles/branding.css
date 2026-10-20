@@ -1,0 +1,134 @@
+.cs-branding .cs-brand-add,
+.cs-brand-heading button,
+.cs-brand-text-align button,
+.cs-brand-group > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+}
+.cs-branding svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.cs-brand-list {
+  display: grid;
+  gap: 4px;
+  max-height: 128px;
+  margin: 10px 0;
+  overflow: auto;
+}
+.cs-brand-list button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  text-align: left;
+}
+.cs-brand-list button span:first-child {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.cs-brand-list button span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cs-brand-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 8px;
+  font-size: 12px;
+}
+.cs-branding :is(button, input, textarea, select):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.cs-brand-editor .cs-brand-text,
+.cs-brand-editor .cs-brand-font {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+}
+.cs-brand-editor .cs-brand-text textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 64px;
+  resize: vertical;
+}
+.cs-brand-year {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 10px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.cs-brand-font-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 76px;
+  align-items: end;
+  gap: 8px;
+}
+.cs-brand-font-row .cs-card-number {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+}
+.cs-brand-editor .cs-brand-font select,
+.cs-brand-font-row .cs-card-number input {
+  box-sizing: border-box;
+  width: 100%;
+}
+.cs-brand-colour {
+  margin-top: 12px;
+  font-size: 12px;
+}
+.cs-brand-text-align {
+  display: flex;
+  gap: 4px;
+  margin: 4px 0 12px;
+}
+.cs-brand-text-align button {
+  flex: 1;
+}
+.cs-brand-group {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.cs-brand-group h4 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.cs-brand-position {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+}
+.cs-brand-position .cs-card-alignment {
+  margin: 0;
+}
+.cs-brand-position .cs-card-number input,
+.cs-brand-group > .cs-card-number input {
+  box-sizing: border-box;
+  width: 76px;
+}
+.cs-brand-editor .cs-brand-backplate-toggle {
+  justify-content: flex-start;
+  margin-top: 12px;
+}
+.cs-brand-backplate-colour {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+}

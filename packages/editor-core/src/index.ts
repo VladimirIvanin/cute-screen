@@ -469,7 +469,18 @@ export {
   gradientPoints,
   snapGradientPoint,
   fitGradientLayer,
+  placeGradientLayer,
+  type GradientPlacement,
   updateGradientHandle,
   rotateGradientFill,
   type LinearGradientPaint,
 } from './gradient'
+
+export * from './composition'
+export type { EditorDocumentV8 } from './document/types'
+
+export {
+  encodeClipboardLayersV3,
+  decodeClipboardLayersV3,
+  type ClipboardLayersV3,
+} from './tools/content/clipboard-codec'

@@ -72,7 +72,7 @@ function createM05Document(
 ): EditorDocumentV1 {
   const hash = 'f'.repeat(64)
   return {
-    schemaVersion: 7,
+    schemaVersion: 8,
     id: '019c1f62-058e-7000-8000-000000000005',
     source: {
       blobHash: hash,

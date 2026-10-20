@@ -13,7 +13,7 @@ export function renderApp() {
 
 export function arrowDocument(locked = false): EditorDocumentV1 {
   return {
-    schemaVersion: 7,
+    schemaVersion: 8,
     id: '019c1f62-058e-7000-8000-0000000000aa',
     source: {
       blobHash: 'a'.repeat(64),

@@ -27,7 +27,12 @@ export interface DesktopShellActionPorts {
 export function createDesktopShellActions(ports: DesktopShellActionPorts): ShellActionAdapter | undefined {
   if (!('__TAURI_INTERNALS__' in window)) return undefined
   return {
-    run: (action, signal, reportProgress) => runDesktopAction(ports, action, signal, reportProgress),
+    run: (action, signal, reportProgress, operationProgress) =>
+      runDesktopAction(ports,
+        action,
+        signal,
+        reportProgress,
+        operationProgress),
   }
 }
 
@@ -36,12 +41,16 @@ async function runDesktopAction(
   action: ShellAction,
   signal: AbortSignal,
   reportProgress: ProgressReporter,
+  operationProgress?: (fraction: number) => void,
 ): Promise<string> {
-  if (action === 'copy') return copyRenderedResult(ports, signal)
+  if (action === 'copy') {
+    await ports.prepareDocumentChange?.()
+    return copyRenderedResult(ports, signal, operationProgress)
+  }
   await ports.prepareDocumentChange?.()
   const flush = await ports.documentSession.value?.flush()
   if (flush?.kind === 'failed') throw new Error(flush.error)
-  if (action === 'export') return exportRenderedResult(ports, signal)
+  if (action === 'export') return exportRenderedResult(ports, signal, operationProgress)
   if (action === 'openImage') return openImage(ports, signal)
   return capture(ports, action, signal, reportProgress)
 }
@@ -49,6 +58,7 @@ async function runDesktopAction(
 async function exportRenderedResult(
   ports: DesktopShellActionPorts,
   signal: AbortSignal,
+  onProgress?: (fraction: number) => void,
 ): Promise<string> {
   const hosts = ports.canvasHosts.value
   if (!hosts?.exportPng) throw new Error('The rendered result is not ready')
@@ -59,12 +69,13 @@ async function exportRenderedResult(
     ticket = await tauriDesktopBridge.chooseResultPng()
     if (!ticket) throw new ActionCancelledError('Export cancelled')
     if (signal.aborted) throw new ActionCancelledError('Export cancelled')
-    const bytes = await hosts.exportPng()
+    const bytes = await hosts.exportPng({ signal, ...(onProgress ? { onProgress } : {}) })
     if (signal.aborted) throw new ActionCancelledError('Export cancelled')
     await tauriDesktopBridge.writeResultPng(ticket, bytes)
     return 'PNG exported'
   } catch (error) {
     if (error instanceof ActionCancelledError) throw error
+    if (signal.aborted) throw new ActionCancelledError('Export cancelled')
     throw new Error(describeError(error, 'PNG export failed'), { cause: error })
   } finally {
     if (ticket) await tauriDesktopBridge.cancelResultPng(ticket).catch((error) => {
@@ -76,15 +87,21 @@ async function exportRenderedResult(
 async function copyRenderedResult(
   ports: DesktopShellActionPorts,
   signal: AbortSignal,
+  onProgress?: (fraction: number) => void,
 ): Promise<string> {
   await ports.canvasHosts.value?.waitForRender?.()
   const scene = ports.canvasHosts.value?.scene
   if (!scene) throw new Error('The rendered result is not ready')
   if (signal.aborted) throw new ActionCancelledError('Copy cancelled')
   const { tauriDesktopBridge } = await import('./desktop-bridge')
-  await writeResultCanvasToClipboard(scene, {
-    writePng: tauriDesktopBridge.writeClipboardPng,
-  })
+  const exporter = ports.canvasHosts.value?.exportPng
+  if (exporter) {
+    const bytes = await exporter({ signal, ...(onProgress ? { onProgress } : {}) })
+    if (signal.aborted) throw new ActionCancelledError('Copy cancelled')
+    await tauriDesktopBridge.writeClipboardPng(bytes)
+  } else {
+    await writeResultCanvasToClipboard(scene, { writePng: tauriDesktopBridge.writeClipboardPng })
+  }
   if (signal.aborted) throw new ActionCancelledError('Copy cancelled')
   return 'Result copied'
 }

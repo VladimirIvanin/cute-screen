@@ -70,6 +70,8 @@ pub struct StorageReport {
     #[ts(type = "number")]
     pub cache_bytes: u64,
     #[ts(type = "number")]
+    pub materials_bytes: u64,
+    #[ts(type = "number")]
     pub database_bytes: u64,
     #[ts(type = "number")]
     pub database_reusable_bytes: u64,
@@ -172,10 +174,10 @@ pub(crate) struct PendingPlan {
     created_at: i64,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct CleanupJournal {
-    blobs: Vec<(String, String)>,
-    thumbnails: Vec<String>,
-    derivatives: Vec<(String, String)>,
+pub(super) struct CleanupJournal {
+    pub(super) blobs: Vec<(String, String)>,
+    pub(super) thumbnails: Vec<String>,
+    pub(super) derivatives: Vec<(String, String)>,
 }
 
 impl LibraryRepository {
@@ -431,7 +433,11 @@ impl StorageState {
                 .max(0)
                 .cast_unsigned())
         };
-        let originals_bytes = sum("SELECT coalesce(sum(byte_size),0) FROM blobs")?;
+        let materials_bytes = sum(
+            "SELECT coalesce(sum(b.byte_size),0) FROM blobs b WHERE EXISTS(SELECT 1 FROM blob_references r WHERE r.blob_hash=b.hash AND r.owner_kind='material')",
+        )?;
+        let originals_bytes =
+            sum("SELECT coalesce(sum(byte_size),0) FROM blobs")?.saturating_sub(materials_bytes);
         let documents_bytes =
             sum("SELECT coalesce(sum(length(CAST(content_json AS BLOB))),0) FROM documents")?;
         let cache_bytes = sum("SELECT coalesce(sum(byte_size),0) FROM history_thumbnails")?
@@ -447,10 +453,11 @@ impl StorageState {
             Ok(total + file_size(&self.library_root.join(name))?)
         })?;
         let (capture_count, protected_count, legacy_pending_count) = self.connection.query_row("SELECT count(*), coalesce(sum(history_protected),0), coalesce(sum(history_legacy_pending),0) FROM captures WHERE deleted_at IS NULL", [], |r| Ok((r.get::<_,u32>(0)?, r.get::<_,u32>(1)?, r.get::<_,u32>(2)?)))?;
-        let total_bytes = originals_bytes + cache_bytes + database_bytes;
+        let total_bytes = originals_bytes + materials_bytes + cache_bytes + database_bytes;
         let policy = self.history_policy()?;
         Ok(StorageReport {
             originals_bytes,
+            materials_bytes,
             documents_bytes,
             cache_bytes,
             database_bytes,
@@ -459,7 +466,8 @@ impl StorageState {
             capture_count,
             protected_count,
             legacy_pending_count,
-            over_limit: total_bytes > u64::from(policy.max_mib) * MIB
+            over_limit: total_bytes.saturating_sub(materials_bytes)
+                > u64::from(policy.max_mib) * MIB
                 || capture_count > policy.max_captures,
         })
     }
@@ -535,7 +543,11 @@ impl StorageState {
             }
             if at < cutoff
                 || remaining > policy.max_captures
-                || report.total_bytes.saturating_sub(reclaimed) > u64::from(policy.max_mib) * MIB
+                || report
+                    .total_bytes
+                    .saturating_sub(report.materials_bytes)
+                    .saturating_sub(reclaimed)
+                    > u64::from(policy.max_mib) * MIB
             {
                 for hash in hashes.get(&id).into_iter().flatten() {
                     if let Some(references) = owners.get_mut(hash) {

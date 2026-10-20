@@ -1,5 +1,87 @@
 # Трассируемость требований
 
+## Жест масштабирования интерфейса — до реализации (2026-10-20)
+
+`REQ-UI-001`, `REQ-EDT-001`: pinch/модифицированный wheel над chrome не
+масштабирует всю страницу Editor, Quick Capture и Settings. Над canvas сохраняется
+существующий zoom документа, обычная прокрутка панелей не блокируется.
+Общий entrypoint устанавливает non-passive обработчики до асинхронного mount.
+Проверка: trusted browser wheel над chrome/canvas, измерение viewport/DPR и
+размеров controls, scroll панели; gesture events WebKit — отдельный контракт.
+Статус: implemented; browser 2/2 и Vue 13/13 passed. Нативный pinch на
+физических трекпадах требует проверки на каждой платформе. Результаты — TESTING.md.
+
+## Панель и размещение градиента — до реализации (2026-10-20, ADR-128)
+
+`REQ-TOL-018`, `REQ-UI-001/006/007`, `REQ-EDT-005/006/016`: исправить
+перенос opacity/переполнение панели. Графический popover «Расположение»:
+левый/правый/верхний/нижний край, центры по осям, fit width/height по текущему
+Crop/canvas. Alignment сохраняет размер и вторую ось; fit сохраняет вторую ось
+и нормализованный переход. Разовые EditorCommand с no-op/undo/redo; guards
+locked/read-only/multi/rotation. Панель остаётся Editor-only. До реализации —
+failing core contract; затем component и production browser RU/EN × обе темы,
+узкие окна, focus/Escape/undo. Статус: implemented; core/Vue/renderer, browser и native/reopen passed; итог общих проверок — TESTING.md и artifacts/gradient-ux/evidence.json. Исследование — GRADIENT_CONTROLS_RESEARCH.md.
+
+## Публикационные карточки (2026-10-20, ADR-127)
+
+Уточнение владельца до изменения UX: убрать ручной content/card переключатель.
+При создании привязка определяется началом жеста, при выборе — объектом;
+во время жеста она не меняется. Убрать header/footer/bands из стартовых
+пресетов, сохранив ручные настройки полос и существующие документы. REQ-EDT-020,
+REQ-OUT-010/014; новое решение ADR-129, core red-first и production browser.
+
+До реализации: `REQ-OUT-001/002`, `REQ-OUT-009…014`, `REQ-EDT-020`, `REQ-LIB-015`.
+Добавить Editor-only dock, layout/frame/background/branding, linear/radial/freeform
+editor, content/card coordinate scopes, v7 → v8 compatibility и постоянный каталог
+материалов. Проверки: red-first core/Rust contracts; decoded Canvas2D/CanvasKit
+exports; browser production mount; native reopen/cleanup. Статус: implemented;
+core/Vue, decoded exports, Linux browser, Rust workspace и real WebKitGTK
+creation/drag/Copy/PNG/reopen passed. Windows/macOS и reference GPU pending;
+актуальный результат performance gates — TESTING.md.
+Материалы переживают cache/history/age cleanup, сами карточки не получают protection.
+REQ-OUT-004: native production Copy gate выявил потерю X11 clipboard ownership
+после возврата команды (bitmap=null без clipboard manager). До исправления —
+failed WebView test; удерживать arboard owner до завершения приложения.
+Замечания владельца о браузере и телефоне: red-first контракты исключают
+внутренний radius браузерного снимка и связывают shadow radius с корпусом телефона
+в portrait/landscape; обновлены и визуально проверены goldens обоих renderer.
+REQ-OUT-011 / REQ-TOL-018: до исправления dragging stops воспроизвести production
+pointer input в панели оформления. Проверить hit targets, плавный transient preview,
+неизменное число точек, один commit, Escape/cancel и отдельный click-to-add.
+Воспроизведены static-position handles в dock и click после drag, создающий stop;
+общий editor styles/click guard исправлены. Window/browser используют единое
+правило внешнего clipping; window core contract сначала failed.
+REQ-OUT-009: по уточнению владельца summary раскрытого раздела остаётся sticky
+под шапкой при внутренней прокрутке; ограничивается своим details, не перекрывает
+шапку и уступает место следующему разделу. Проверка production browser scroll/click.
+REQ-OUT-009/011, REQ-UI-006/007: до изменения заменить select типа заливки
+семью визуальными кнопками с образцами/иконками. Выбранный тип выделен,
+имеет видимое название; все кнопки подписаны для hover/accessibility, доступны
+с клавиатуры и учитывают disabled. Общий компонент используется также в полосах.
+Настройки каждого типа сохраняются, изменение проходит существующей undo-командой.
+Проверка: component states и production browser RU/EN, обе темы, 1024 px, undo.
+REQ-OUT-011, REQ-UI-006/007: до исправления воспроизвести обрезанные numeric
+values/суффиксы и горизонтальную прокрутку палитры в dock. Общий ShapeGradientEditor
+получает opt-in compact, передаваемый SimpleColorPicker; только CardGradient включает
+его. Палитра целиком в ширине dock, keyboard соответствует числу колонок; поля
+0–100% и 0–359° читаемы, custom HEX доступен. Стили native полей панели не должны
+переопределять внутренний input общего NumericControl. Сохранить штатный размер
+редактора фигур/градиентной подложки. Проверка: production geometry/input, RU/EN ×
+themes 1024 px, regression drag/undo, component keyboard.
+REQ-OUT-011 / REQ-UI-006: до исправления воспроизвести обрезку номеров
+on-canvas gradient handles при повороте. Общий класс нумерованных ручек
+(холст/миниатюра freeform) задаёт центрирование, нулевые padding, явный line-height
+и место для 1–16. Проверить text bounds при углах 0/45/90/180/270/359,
+двузначные номера, keyboard focus и прежний drag; compact numeric поля не сжимаются.
+REQ-OUT-013 / REQ-UI-006/007: до изменения переработать редактор подписей:
+один внешний expand, плоский список выбора при нескольких подписях и один редактор.
+Текст во всю ширину, font/size рядом, быстрая compact-палитра, icon alignment;
+размещение/видимость/логотип разделены статическими группами. Year refresh только
+для шаблона {year}. Сохранить все параметры, alpha, несколько блоков, логотип,
+подложку, disabled/import guards и существующие EditorCommand/undo/redo.
+Проверка production add/edit/color/select/delete/undo, RU/EN × themes 1024 px,
+keyboard и отсутствие вложенных details.
+
 ## Рукописная линия — запись до реализации (2026-10-20)
 
 `REQ-TOL-017` (Line), `REQ-TOL-001`, `REQ-EDT-005/006/015/016/017`:
@@ -2612,3 +2694,23 @@ censor, spotlight, loupe, ruler и image; добавить регрессии д
 Реализовано: image/emoji origin и panel centre исправлены; 49 focused core,
 6 render/export и 6 browser regressions passed. Ограничения общих прогонов
 и параллельных изменений — TESTING.md.
+
+## Креативные гарнитуры с кириллицей (2026-10-20, ADR-131)
+
+`REQ-TOL-005/006/007`: запись добавлена до реализации. Встроенный каталог
+расширяется с 12 до 20 семейств: Press Start 2P, Germanica, Rubik Dirt,
+Rubik Glitch, Unbounded, Russo One, Ruslan Display, Underdog. Существующий
+порядок сохраняется. Все файлы локальные, OFL-1.1, содержат русский алфавит
+с Ё/ё, латиницу и цифры. Germanica поставляется неизменённым TTF автора;
+семь остальных — закреплёнными Fontsource 5.3.0 assets.
+Проверки: component keyboard/loading/error/retry, glyph coverage реальных
+файлов, decoded Latin/Cyrillic Canvas2D/CanvasKit goldens, browser menu,
+wrap/B/I/undo/redo; production Tauri создание, сохранение, повторный запуск
+и повторное декодирование экспорта. Команды, платформа и фактический статус
+фиксируются в TESTING.md; результаты старого каталога не доказывают новый.
+
+Для `REQ-TOL-005` дополнительно: DOM projection, editor root и меню используют
+кавычки/escaping для CSS family; имя Press Start 2P с числовым словом не должно
+теряться при CSS parsing. Portable family остаётся исходной строкой. Regression
+сначала упал в двух component tests (`red-font-family-css.log`); browser measured
+width проверяет фактическое применение face, а не только сохранённую family.

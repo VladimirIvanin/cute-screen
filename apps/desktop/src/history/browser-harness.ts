@@ -18,7 +18,8 @@ export function createHistoryHarnessBridge(): HistoryBridge {
   }))
   const binary = new Map<string, Uint8Array>()
   let original: Promise<ArrayBuffer> | undefined
-  const report = (): StorageReport => ({ originalsBytes: 512 * 1024, documentsBytes: 1000, cacheBytes: 0,
+  const report = (): StorageReport => ({
+    originalsBytes: 512 * 1024, materialsBytes: 0, documentsBytes: 1000, cacheBytes: 0,
     databaseBytes: 8192, databaseReusableBytes: 0, totalBytes: 532480, captureCount: items.length,
     protectedCount: items.filter((item) => item.protected).length,
     legacyPendingCount: items.filter((item) => item.legacyPending).length,

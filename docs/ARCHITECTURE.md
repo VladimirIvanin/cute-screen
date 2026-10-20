@@ -1,5 +1,63 @@
 # Архитектура Cute Screen
 
+## Масштаб интерфейса и canvas (ADR-130)
+
+`main.ts` устанавливает window-level non-passive capture listeners до первого
+await, общие для Editor, Quick Capture и Settings. Ctrl/Meta+wheel отменяет только
+браузерный default, не propagation: CanvasWorkspace продолжает менять viewport
+через существующий controller. Обычная прокрутка не отменяется. WebKit gesture
+stream не получает browser magnification. AbortController снимает listeners при
+HMR; это window lifetime, вне Vue scene graph и EditorCommand history.
+
+## Публикационная карточка (ADR-127)
+
+Editable boundary — v8. v7 преобразуется в памяти в нейтральную v8; storage не
+перезаписывает raw JSON от чтения. Старые v0–v6 остаются unsupported, будущие
+версии — typed newer-schema. Clipboard v3/schema8 принимает legacy v2/schema7.
+
+`composition/` в editor-core содержит immutable settings, resolver размеров,
+преобразования content/card и построение renderer-neutral групп. Исходные
+canvas/crop и координаты прежних слоёв сохраняются. `LayerNode.space` отсутствует
+для legacy content; `card` явно задаёт свободный слой композиции. Layout решает
+output bounds отдельно от canvas. Crop и flip работают с content.
+
+Порядок: background/bands → shadow/frame → clipped content group → card layers →
+anchored signature groups. Эффекты читают уже отрисованное содержимое своей
+группы. Blurred content использует ту же сцену с censorship; перед уменьшением
+группа с censorship рассчитывается минимум в исходной плотности, чтобы
+антиалиасинг не возвращал исходные пиксели на границе. Opacity подписи применяется
+к изолированному блоку. Canvas2D и CanvasKit используют один scene/layout path;
+Copy и export работают с полным committed document, включая активный Crop preview.
+
+Freeform v1 — нормализованные Gaussian fields с premultiplied RGBA, 2–16 точек.
+Общий детерминированный resolver принимает полосы с глобальными координатами.
+Worker передаёт bounded row tiles с progress; AbortSignal завершает worker.
+Preview transient, один завершённый жест — один setPresentation command.
+Vue хранит shallow preview/settings; тяжёлые ресурсы и scene graph вне deep reactivity.
+
+Правая панель 320 px резервирует viewport и делит место со Layers. Разделы панели
+остаются смонтированными при переключении. По ADR-129 пространство нового объекта
+определяется началом жеста на снимке или внешнем поле; выбор слоя синхронизирует
+пространство без ручного переключателя. Граница не меняет привязку активного жеста. Quick Capture
+не монтирует оформление. Открытие панели не выполняет document command.
+
+SQLite migration 5 добавляет user_materials. В blob_references появляется независимый
+owner_kind=material; presets владеют собственным набором hashes. History/cache cleanup
+учитывает эти references, а удаление материала проводит кандидатов через существующий
+recovery journal. Физическое удаление возможно только без всех владельцев и leases.
+Материалы учитываются отдельно от history limit; preview/thumbnail остаются cache.
+
+## Размещение градиентной подложки (ADR-128)
+
+Панель использует компактные mode/fill/opacity; graphic placement — её transient
+popover через общий usePreviewPopover/surface owner. Две оси × четыре команды
+в общей metadata GRADIENT_PLACEMENTS. gradientSchema вычисляет disabled и active
+состояния без изменения документа. Core placeGradientLayer сохраняет fill,
+размер и вторую координату при alignment; fit переиспользует прежнюю геометрию.
+Контроллер actions выполняет одну updateLayer EditorCommand и пропускает no-op.
+Ctrl/Cmd+Z/Shift+Z работают на placement buttons; остальные dialog/input guards
+не меняются. Никаких новых persisted fields, renderer primitives или dependencies.
+
 ## Градиентная подложка (ADR-124/126)
 
 Gradient доступен в полном Editor; Quick tool catalog его исключает.
@@ -937,21 +995,24 @@ ADR-113: stabilized v2/v3 после perfect-freehand скругляет сво�
 Shift anchors закреплены. 0% и pen возвращают исходные samples. Render,
 hit testing, bounds и экспорт используют тот же результат без Vue state.
 
-## Панель текста и локальные fonts (ADR-061)
+## Панель текста и локальные fonts (ADR-061/131)
 
-UI-реестр содержит 12 bundled family с Latin/Cyrillic static faces 400/700 и
-доступными italic. TextFontPicker показывает 32 code points диапазона или текста;
+UI-реестр содержит 20 bundled family с локальными Latin/Cyrillic faces:
+Fontsource 5.3.0, доступные static 400/700 и italic; недоступные начертания
+синтезируются. Germanica поставляется полным неизменённым TTF автора с OFL,
+источником и SHA-256; headless runtime регистрирует его для обоих script keys. TextFontPicker показывает 32 code points диапазона или текста;
 loading/error/retry не изменяют document. FontFaceSet loader кеширует готовые
 faces, удаляет failed promise для retry и ждёт обе scripts. Перед scene frame
 загружаются используемые document faces. Опциональный CanvasViewportHosts.waitForRender
 позволяет Copy/Quick terminal actions дождаться последнего кадра и получить
-ошибку renderer вместо предыдущего изображения. Font preview text transient;
+ошибку renderer вместо предыдущего изображения. DOM и menu samples сериализуют family одним quoted CSS string, включая Press Start 2P;
+portable family сохраняется без CSS quoting. Font preview text transient;
 schema v7, IPC и inline one-command commit не меняются.
 
 CanvasKit выбирает отдельный subset для script chunks смешанного фрагмента.
 Canvas2D resolver допускает список family для headless subset fallback;
 production WebView использует штатный unicode-range bundled CSS. Golden runtime
-регистрирует реальные файлы всех 12 гарнитур, включая Latin digits у Cyrillic text.
+регистрирует реальные файлы всех 20 гарнитур, включая Latin digits у Cyrillic text.
 
 ## Номерная метка (ADR-066/067/068)
 

@@ -7,6 +7,8 @@ import {
   ref,
   watch,
 } from 'vue'
+import { fontFamilyCss } from '../../font-family-css'
+import CompositionHandles from '../composition/CompositionHandles.vue'
 import { UiIcon } from '../icon'
 import TextFormattingToolbar from './TextFormattingToolbar.vue'
 import ArrowFormattingToolbar from './ArrowFormattingToolbar.vue'
@@ -15,6 +17,7 @@ import {
   canvasViewportRuntimeEmits,
   canvasViewportRuntimeProps,
 } from '../canvas/contracts'
+import { compositionViewport } from '../canvas/composition-view'
 import { useCanvasWorkspace } from '../canvas/use-canvas-workspace'
 import { emojiContainsPoint } from '../workspace/emoji-state'
 
@@ -23,6 +26,7 @@ const textSurfaceOwner = provideTransientSurface()
 
 const props = defineProps(canvasViewportRuntimeProps)
 const emit = defineEmits(canvasViewportRuntimeEmits) as CanvasViewportEmit
+const compositionView = compositionViewport(props, emit)
 const {
   startSelectionMove,
   viewportRoot,
@@ -75,7 +79,7 @@ const {
   refitCanvas,
   imageInsertionTarget,
   focusCanvas,
-} = useCanvasWorkspace(props, emit)
+} = useCanvasWorkspace(compositionView.props, compositionView.emit)
 const emojiGhost = ref<HTMLImageElement>()
 function hideEmojiGhost(): void {
   if (emojiGhost.value) emojiGhost.value.style.display = 'none'
@@ -127,6 +131,7 @@ watch(() => [
 function onContextMenu(event: MouseEvent): void {
   if (editingText.value || props.quickSelectionMode) return
   event.preventDefault()
+  compositionView.props.activateCompositionAt?.(event)
   const point = canvasPoint(event)
   if (!point || !props.document) return
   const hit = hitTestDocument(props.document, point)
@@ -167,8 +172,8 @@ defineExpose({
           :style="
             viewportOutputBounds
               ? {
-                width: `${viewportOutputBounds.width * ((zoom ?? 100) / 100)}px`,
-                height: `${viewportOutputBounds.height * ((zoom ?? 100) / 100)}px`,
+                width: `${viewportOutputBounds.width * ((compositionView.props.zoom ?? 100) / 100)}px`,
+                height: `${viewportOutputBounds.height * ((compositionView.props.zoom ?? 100) / 100)}px`,
               }
               : undefined
           "
@@ -217,6 +222,11 @@ defineExpose({
             @dblclick="onDoubleClick"
             @wheel="onWheel"
           ></canvas>
+          <CompositionHandles
+            v-if="document?.presentation.composition && activeTool !== 'crop' && !quickFrameMode"
+            :document="document"
+            :locale="textToolbarLocale ?? 'en'"
+          />
           <img
             v-if="activeTool === 'emoji' && emojiDefaults?.image && !readOnly"
             ref="emojiGhost"
@@ -285,26 +295,26 @@ defineExpose({
             role="textbox"
             aria-multiline="true"
             :style="{
-              left: `${(editingText.origin.x - (viewportOutputBounds?.x ?? 0)) * ((zoom ?? 100) / 100)}px`,
-              top: `${(editingText.origin.y - (viewportOutputBounds?.y ?? 0)) * ((zoom ?? 100) / 100)}px`,
-              width: `${editingText.width * ((zoom ?? 100) / 100)}px`,
-              fontSize: `${editorTextStyle.fontSize * ((zoom ?? 100) / 100)}px`,
+              left: `${(editingText.origin.x - (viewportOutputBounds?.x ?? 0)) * ((compositionView.props.zoom ?? 100) / 100)}px`,
+              top: `${(editingText.origin.y - (viewportOutputBounds?.y ?? 0)) * ((compositionView.props.zoom ?? 100) / 100)}px`,
+              width: `${editingText.width * ((compositionView.props.zoom ?? 100) / 100)}px`,
+              fontSize: `${editorTextStyle.fontSize * ((compositionView.props.zoom ?? 100) / 100)}px`,
               lineHeight: '1.25',
               transformOrigin: 'top left',
               transform: ['callout', 'numberedMarker'].includes(editingText.kind) && editingText.existing
                 ? `rotate(${editingText.existing.transform.rotation}deg) scale(${editingText.existing.transform.scaleX}, ${editingText.existing.transform.scaleY})`
                 : undefined,
-              fontFamily: editorTextStyle.fontFamily,
+              fontFamily: fontFamilyCss(editorTextStyle.fontFamily),
               fontWeight: String(editorTextStyle.weight),
               fontStyle: editorTextStyle.italic ? 'italic' : 'normal',
               textDecoration: editorTextStyle.strikethrough ? 'line-through' : 'none',
               color: cssTextColor(editorTextStyle.color),
               '--text-background-color': editingText.kind === 'numberedMarker' ? 'transparent' : cssTextBackground(editingText.background) ?? 'transparent',
               '--text-background-padding': editingText.background
-                ? `${editingText.background.padding * ((zoom ?? 100) / 100)}px`
+                ? `${editingText.background.padding * ((compositionView.props.zoom ?? 100) / 100)}px`
                 : '0px',
               '--text-background-radius': editingText.background
-                ? `${editingText.background.radius * ((zoom ?? 100) / 100)}px`
+                ? `${editingText.background.radius * ((compositionView.props.zoom ?? 100) / 100)}px`
                 : '0px',
             }"
             :aria-label="

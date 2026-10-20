@@ -208,6 +208,9 @@ importers:
       '@fontsource/oswald':
         specifier: 5.3.0
         version: 5.3.0
+      '@fontsource/press-start-2p':
+        specifier: 5.3.0
+        version: 5.3.0
       '@fontsource/pt-mono':
         specifier: 5.3.0
         version: 5.3.0
@@ -221,6 +224,24 @@ importers:
         specifier: 5.3.0
         version: 5.3.0
       '@fontsource/rubik':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource/rubik-dirt':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource/rubik-glitch':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource/ruslan-display':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource/russo-one':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource/unbounded':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource/underdog':
         specifier: 5.3.0
         version: 5.3.0
       '@tabler/icons-vue':
@@ -564,6 +585,9 @@ packages:
   '@fontsource/oswald@5.3.0':
     resolution: {integrity: sha512-16r2aHActe0pH+9FLdk/74/YxXM7HpGak05kAzx3RvSToiJwGvyhv6GvckPz+YuZmvL1nxWbEop2jAXRcXYPRg==}
 
+  '@fontsource/press-start-2p@5.3.0':
+    resolution: {integrity: sha512-gxWFxdeDglPhEYSwEeooomcaFK8kSQYLQwVxfnOJeYRj2sPEHXjpVtFgEaYfqzOjuAJGrIcJOipu2KY5YkbyuQ==}
+
   '@fontsource/pt-mono@5.3.0':
     resolution: {integrity: sha512-AKXUTYCdv53jAJyzk3AEns6PdOvL3u+AD9Y4Ms6BFFRC7WCqYOvywujYT3gs00sMBIPs/J8iY7SQljk3wRfovw==}
 
@@ -576,8 +600,26 @@ packages:
   '@fontsource/roboto@5.3.0':
     resolution: {integrity: sha512-BapRJOWYP+LZ21zp+wBQjfpPYKRoxc4LspJ/RLuI+HSMBD5u/X4O+ESDrSvEqDSy0rAl7GwBJ+09mdc16cVQ1Q==}
 
+  '@fontsource/rubik-dirt@5.3.0':
+    resolution: {integrity: sha512-EinXO2ePd/Bcn4k+qwr6q6MC/XGoCRsWJGllkth8SU3GUtJbVLoEF1Y7bpKku1EpcBhR9LDdhW2kJCQb5CcD9Q==}
+
+  '@fontsource/rubik-glitch@5.3.0':
+    resolution: {integrity: sha512-TUe1qXVF+5IeMWU73HvfDdao9IssUK06hOHOdF8QKmPJj36pWGLVtdFWUgHGQQjytxpWitSHgmcJ7DkiWmTXQA==}
+
   '@fontsource/rubik@5.3.0':
     resolution: {integrity: sha512-Nks2mn7vlE1jZVHuVgoKU2Ejqjvd+GJzLRdraCjo1xc79oo7O6vJ8pcvSfmKPGX3/Ln7nt09XWFzPeu2jWf0xQ==}
+
+  '@fontsource/ruslan-display@5.3.0':
+    resolution: {integrity: sha512-D9h3y6zytztVCiqwpepI0rWL7rNvT9uCIfMj9YTKgSslTHc9uwy0B4M6jwf/2077Rancdvd5RADxDzywMeUq8g==}
+
+  '@fontsource/russo-one@5.3.0':
+    resolution: {integrity: sha512-loHnqTq6D+H2WQdOB2pnAeCHbbsGqobmxnxU79MNFKjPWV2TPXdc78dbbkOAcWuKWDEY+FNXZFZ1nhaQvCWNAw==}
+
+  '@fontsource/unbounded@5.3.0':
+    resolution: {integrity: sha512-pPD6hsTnjoQRr6pCsqMHbHBfauB4LZygCNQEUJHu+CO2wzDFHqELEFSG7sTwo5Z5Gr4q3OK0fIILOXBJDv6lcw==}
+
+  '@fontsource/underdog@5.3.0':
+    resolution: {integrity: sha512-V83JXz2Q5iayyBVgSeLTJ+POSpRoRneCkKWm0bmwMIvoGAlgsrMJs5baIFQnUWEycfncgUsc/edHSDb4Mqx4eQ==}
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -4354,6 +4396,8 @@ snapshots:
 
   '@fontsource/oswald@5.3.0': {}
 
+  '@fontsource/press-start-2p@5.3.0': {}
+
   '@fontsource/pt-mono@5.3.0': {}
 
   '@fontsource/pt-serif@5.3.0': {}
@@ -4362,7 +4406,19 @@ snapshots:
 
   '@fontsource/roboto@5.3.0': {}
 
+  '@fontsource/rubik-dirt@5.3.0': {}
+
+  '@fontsource/rubik-glitch@5.3.0': {}
+
   '@fontsource/rubik@5.3.0': {}
+
+  '@fontsource/ruslan-display@5.3.0': {}
+
+  '@fontsource/russo-one@5.3.0': {}
+
+  '@fontsource/unbounded@5.3.0': {}
+
+  '@fontsource/underdog@5.3.0': {}
 
   '@humanfs/core@0.19.2':
     dependencies:

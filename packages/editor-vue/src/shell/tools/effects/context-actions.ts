@@ -1,8 +1,10 @@
+import { compositionBlobHashes } from '@cute-screen/editor-renderer'
 import {
-  fitGradientLayer,
+  placeGradientLayer,
   gradientFrame,
   isGradientLayer,
 } from '@cute-screen/editor-renderer'
+import { GRADIENT_PLACEMENTS } from '../gradient-placement'
 import { createPrecisionActions } from './precision-actions'
 import {
   watch,
@@ -38,7 +40,7 @@ function textureBlobHash(fill: unknown): string | undefined {
   return candidate.kind === 'imageTexture' && typeof candidate.blobHash === 'string' ? candidate.blobHash : undefined
 }
 function documentTextureHashes(document: EditorDocumentV1): readonly string[] {
-  return document.layers.flatMap((layer) => {
+  return [...compositionBlobHashes(document.presentation.composition), ...document.layers.flatMap((layer) => {
     if (layer.kind === 'image' && layer.payload.role === 'content') {
       return [layer.payload.blobHash]
     }
@@ -46,7 +48,7 @@ function documentTextureHashes(document: EditorDocumentV1): readonly string[] {
       return []
     const blobHash = textureBlobHash(layer.payload.fill)
     return blobHash ? [blobHash] : []
-  })
+  })]
 }
 function importedShapePayload(
   current: JsonObject,
@@ -142,7 +144,8 @@ export function createContextActions(context: ContextActionsContext) {
     context.textureImages.value = images
   }
   function fitGradient(id: string): boolean {
-    if (!['gradientFitWidth', 'gradientFitHeight'].includes(id)) return false
+    const action = GRADIENT_PLACEMENTS.find((item) => item.id === id)
+    if (!action) return false
     const document = context.activeDocument.value
     const layer = document?.layers.find((item) => item.id === context.selectedLayerId())
     if (
@@ -151,7 +154,7 @@ export function createContextActions(context: ContextActionsContext) {
       context.props.readOnlyDocument ||
       layer.locked
     ) return true
-    const after = fitGradientLayer(layer, gradientFrame(document), id === 'gradientFitWidth' ? 'width' : 'height')
+    const after = placeGradientLayer(layer, gradientFrame(document), action.placement)
     if (after !== layer) context.props.documentSession?.execute({ type: 'updateLayer', before: layer, after })
     return true
   }

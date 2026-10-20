@@ -130,7 +130,7 @@ function assertPrecisionLayerShape(
 ): void {
   assertOnlyFields(
     input,
-    ['id', 'kind', 'transform', 'localBounds', 'opacity', 'visible', 'locked', 'blendMode', 'shadows', 'payload'],
+    ['id', 'space', 'kind', 'transform', 'localBounds', 'opacity', 'visible', 'locked', 'blendMode', 'shadows', 'payload'],
     field,
   )
   const transform = readJsonObject(input.transform, `${field}.transform`)
@@ -175,13 +175,16 @@ export function parseLayer(
     'blendMode',
     'shadows',
     'payload',
+    'space',
   ])
   const payload = parseLayerPayload(input.kind, input.payload, `${field}.payload`)
   const localBounds = precisionLayer
     ? parseStrictLayerRect(input.localBounds, `${field}.localBounds`)
     : parseRect(input.localBounds, `${field}.localBounds`)
   assertPrecisionPayloadBounds(input.kind, payload, localBounds, field)
+  if (input.space !== undefined && !['content', 'card'].includes(String(input.space))) throw new Error(`${field}.space is invalid`)
   const common = {
+    ...(input.space === 'card' ? { space: 'card' as const } : {}),
     id: readStableId(input.id, `${field}.id`),
     kind: input.kind,
     transform: parseTransform(input.transform, `${field}.transform`),

@@ -1,4 +1,12 @@
 import {
+  IconLayoutAlignLeft,
+  IconLayoutAlignCenter,
+  IconLayoutAlignRight,
+  IconLayoutAlignTop,
+  IconLayoutAlignMiddle,
+  IconLayoutAlignBottom,
+  IconArrowsVertical,
+  IconBorderOuter,
   IconGradienter,
   IconMoodSmile,
   IconEdit,
@@ -69,6 +77,15 @@ import {
 
 /** The only product-chrome mapping from stable semantics to Tabler or project geometry. */
 const icons = {
+  objectAlignLeft: IconLayoutAlignLeft,
+  objectAlignCenterX: IconLayoutAlignCenter,
+  objectAlignRight: IconLayoutAlignRight,
+  objectAlignTop: IconLayoutAlignTop,
+  objectAlignCenterY: IconLayoutAlignMiddle,
+  objectAlignBottom: IconLayoutAlignBottom,
+  stretchX: IconArrowsHorizontal,
+  stretchY: IconArrowsVertical,
+  placement: IconBorderOuter,
   edit: IconEdit,
   history: IconHistory,
   emoji: IconMoodSmile,

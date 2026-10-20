@@ -181,7 +181,7 @@
   background-image: conic-gradient(var(--border) 25%, transparent 0 50%, var(--border) 0 75%, transparent 0);
   background-size: 10px 10px;
 }
-.cs-shape-popover .cs-gradient-stop {
+.cs-shape-gradient-editor .cs-gradient-stop {
   position: absolute;
   top: 12px;
   width: 24px;
@@ -216,6 +216,27 @@
   justify-content: space-between;
   gap: 8px;
   margin: 8px 0;
+}
+.cs-shape-gradient-editor.is-compact {
+  min-width: 0;
+  width: 100%;
+}
+.cs-shape-gradient-editor.is-compact .cs-gradient-stop-details {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px 32px;
+}
+.cs-shape-gradient-editor.is-compact .cs-gradient-direction > .cs-numeric-control {
+  flex: 1;
+}
+.cs-shape-gradient-editor.is-compact .cs-gradient-stop-details > .cs-numeric-control,
+.cs-shape-gradient-editor.is-compact .cs-gradient-direction > .cs-numeric-control {
+  margin-top: 0;
+}
+.cs-shape-gradient-editor.is-compact .cs-numeric-label {
+  flex: 1 1 min-content;
+}
+.cs-shape-gradient-editor.is-compact .cs-gradient-action {
+  padding: 4px;
 }
 .cs-shape-toolbar-trigger:hover:not(:disabled),
 .cs-shape-toolbar-trigger[aria-expanded='true'],

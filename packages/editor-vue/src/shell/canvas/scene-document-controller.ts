@@ -55,7 +55,11 @@ export class SceneDocumentController {
       }
     }
     const preview = this.#context.previewLayer()
-    if (preview && requiresScenePreview(preview)) {
+    if (
+      preview &&
+      (requiresScenePreview(preview) ||
+        this.#context.props.compositionDocument)
+    ) {
       return {
         ...document,
         layers: document.layers.map((layer) => (layer.id === preview.id ? preview : layer)),

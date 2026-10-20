@@ -53,6 +53,8 @@ export function drawNodesCanvasKit(
       case 'image':
         // Image resources require ordered scene ownership.
         break
+      case 'group':
+      case 'freeform':
       case 'censor':
       case 'spotlight':
       case 'loupe':

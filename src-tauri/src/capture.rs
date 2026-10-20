@@ -1383,7 +1383,7 @@ fn initial_document_json(
         &source_hash[20..32],
     );
     serde_json::json!({
-        "schemaVersion": 7,
+        "schemaVersion": 8,
         "id": document_id,
         "source": {
             "blobHash": source_hash,
@@ -1596,7 +1596,7 @@ mod tests {
     }
 
     #[test]
-    fn initial_document_factory_creates_the_v7_locked_base_layer() {
+    fn initial_document_factory_creates_the_v8_locked_base_layer() {
         let metadata = BlobMetadata {
             format: "png".to_owned(),
             mime_type: "image/png".to_owned(),
@@ -1615,12 +1615,13 @@ mod tests {
             "2026-08-09T00:00:00.000Z".to_owned(),
         ))
         .expect("factory JSON");
-        let shared_fixture: serde_json::Value = serde_json::from_str(include_str!(
+        let mut shared_fixture: serde_json::Value = serde_json::from_str(include_str!(
             "../../packages/editor-core/src/document/fixtures/native-v7-document.json"
         ))
         .expect("shared native v7 fixture");
+        shared_fixture["schemaVersion"] = serde_json::json!(8);
         assert_eq!(actual, shared_fixture);
-        assert_eq!(actual["schemaVersion"], 7);
+        assert_eq!(actual["schemaVersion"], 8);
         assert_eq!(actual["layers"].as_array().map(Vec::len), Some(1));
         let base = &actual["layers"][0];
         assert_eq!(base["kind"], "image");
@@ -1776,7 +1777,7 @@ mod tests {
         let document_value: serde_json::Value =
             serde_json::from_str(&persisted.document_json).expect("initial document JSON");
         assert_eq!(persisted.document_id, document.document_id);
-        assert_eq!(document_value["schemaVersion"], 7);
+        assert_eq!(document_value["schemaVersion"], 8);
         assert_eq!(document_value["source"]["blobHash"], document.source_hash);
         assert_eq!(document_value["canvas"]["width"], 1);
     }

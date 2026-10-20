@@ -68,7 +68,9 @@ export async function verifyGradient(directory: string): Promise<void> {
   await expect(toolbar).toBeDisplayed()
   const initial = (await gradientDocument()).layers.at(-1)!
   expect(initial.payload).toMatchObject({ annotationTool: 'gradient', fill: { kind: 'linearGradient', start: { x: .5, y: 1 }, end: { x: .5, y: 0 } } })
-  await toolbar.$('button=Full width').click()
+  await toolbar.$('button[aria-label="Placement"]').click()
+  await $('[data-gradient-placement="gradientFitWidth"]').click()
+  await browser.keys('Escape')
   const document = await gradientDocument(), full = document.layers.at(-1)!
   const frame = document.crop ?? { x: 0, y: 0, ...document.canvas }
   expect(full.transform.translateX).toBe(frame.x)

@@ -40,10 +40,13 @@ export async function snapshot(): Promise<HarnessSnapshot> {
   })
 }
 
-export async function openDrawingHarness(viewportFixture = false): Promise<void> {
+export async function openDrawingHarness(
+  viewportFixture = false,
+  imageIngress = false,
+): Promise<void> {
   await browser.url('/')
   await browser.execute(() => window.localStorage.clear())
-  await browser.url(`/?m05=1${viewportFixture ? '&m05viewport=1' : ''}`)
+  await browser.url(`/?m05=1${viewportFixture ? '&m05viewport=1' : ''}${imageIngress ? '&imageIngress=1' : ''}`)
   await expect($('.cs-canvas-ready')).toExist()
   await browser.waitUntil(async () => (await snapshot()).layers.length === 4)
   await waitForStableCanvas()

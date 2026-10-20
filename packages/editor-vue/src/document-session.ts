@@ -1,3 +1,4 @@
+import { commandInSpace } from './command-space'
 import {
   CommandManager,
   createExpressiveBrushMigrationCommand,
@@ -83,6 +84,7 @@ export class DocumentSessionController {
   readonly #correlationId: () => string
   #listeners = new Set<(snapshot: DocumentSessionSnapshot) => void>()
   readonly #debounceMs: number
+  #layerSpace: 'content' | 'card' = 'content'
   #revision: number
   #state: DocumentSaveState = 'saved'
   #error: string | undefined
@@ -110,7 +112,12 @@ export class DocumentSessionController {
     }
   }
 
+  setLayerSpace(space: 'content' | 'card'): void {
+    this.#layerSpace = space
+  }
+
   execute(command: EditorCommand): DocumentSessionSnapshot {
+    command = commandInSpace(command, this.#layerSpace)
     const before = this.#manager.snapshot
     const committed = this.#manager.execute(command)
     this.#transient.reconcile(committed.document)

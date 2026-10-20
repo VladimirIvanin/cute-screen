@@ -25,7 +25,7 @@ export function transformedPoint(
 }
 
 export const documentFixture = (crop: EditorDocumentV1['crop'] = null): EditorDocumentV1 => ({
-  schemaVersion: 7,
+  schemaVersion: 8,
   id: '019c1f62-058e-7000-8000-000000000800',
   source: {
     blobHash: 'a'.repeat(64),

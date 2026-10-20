@@ -1,8 +1,35 @@
-use std::{borrow::Cow, io::Cursor};
+use std::{borrow::Cow, io::Cursor, sync::Mutex};
 
 use arboard::Clipboard;
 
 const MAX_CLIPBOARD_TEXT_BYTES: usize = 1_000_000;
+
+// X11 serves selection requests from the owner; dropping the last arboard
+// handle loses copied pixels on desktops without a clipboard manager.
+static OWNED_CLIPBOARD: Mutex<Option<Clipboard>> = Mutex::new(None);
+
+fn with_clipboard<T>(
+    operation: impl FnOnce(&mut Clipboard) -> Result<T, String>,
+) -> Result<T, String> {
+    let mut owner = OWNED_CLIPBOARD.lock().map_err(|error| error.to_string())?;
+    if owner.is_none() {
+        *owner = Some(Clipboard::new().map_err(|error| error.to_string())?);
+    }
+    operation(
+        owner
+            .as_mut()
+            .ok_or("native clipboard owner is unavailable")?,
+    )
+}
+
+pub fn release_native_clipboard() {
+    match OWNED_CLIPBOARD.lock() {
+        Ok(mut owner) => {
+            owner.take();
+        }
+        Err(error) => eprintln!("cute-screen clipboard shutdown: {error}"),
+    }
+}
 
 #[derive(Debug)]
 pub struct NativeClipboardBitmap {
@@ -19,24 +46,25 @@ pub struct NativeClipboardSnapshot {
 /// re-encoded as PNG natively so the webview receives only an opaque binary
 /// transport token, never raw pixels through JSON.
 pub fn read_native_snapshot() -> Result<NativeClipboardSnapshot, String> {
-    let mut clipboard = Clipboard::new().map_err(|error| error.to_string())?;
-    let bitmap = clipboard
-        .get_image()
-        .ok()
-        .map(|image| -> Result<NativeClipboardBitmap, String> {
-            let width = u32::try_from(image.width)
-                .map_err(|_| "clipboard image width exceeds native limit".to_owned())?;
-            let height = u32::try_from(image.height)
-                .map_err(|_| "clipboard image height exceeds native limit".to_owned())?;
-            let png_bytes = encode_rgba_png(width, height, image.bytes.as_ref())?;
-            Ok(NativeClipboardBitmap { png_bytes })
-        })
-        .transpose()?;
-    let text = clipboard
-        .get_text()
-        .ok()
-        .filter(|value| value.len() <= MAX_CLIPBOARD_TEXT_BYTES);
-    Ok(NativeClipboardSnapshot { bitmap, text })
+    with_clipboard(|clipboard| {
+        let bitmap = clipboard
+            .get_image()
+            .ok()
+            .map(|image| -> Result<NativeClipboardBitmap, String> {
+                let width = u32::try_from(image.width)
+                    .map_err(|_| "clipboard image width exceeds native limit".to_owned())?;
+                let height = u32::try_from(image.height)
+                    .map_err(|_| "clipboard image height exceeds native limit".to_owned())?;
+                let png_bytes = encode_rgba_png(width, height, image.bytes.as_ref())?;
+                Ok(NativeClipboardBitmap { png_bytes })
+            })
+            .transpose()?;
+        let text = clipboard
+            .get_text()
+            .ok()
+            .filter(|value| value.len() <= MAX_CLIPBOARD_TEXT_BYTES);
+        Ok(NativeClipboardSnapshot { bitmap, text })
+    })
 }
 
 /// Writes the interoperable plain-text fallback used for Text-layer copy/cut.
@@ -44,10 +72,11 @@ pub fn read_native_snapshot() -> Result<NativeClipboardSnapshot, String> {
 /// rather than silently degrading it into a JSON string here.
 pub fn write_native_text(text: &str) -> Result<(), String> {
     validate_native_text(text)?;
-    let mut clipboard = Clipboard::new().map_err(|error| error.to_string())?;
-    clipboard
-        .set_text(text.to_owned())
-        .map_err(|error| error.to_string())
+    with_clipboard(|clipboard| {
+        clipboard
+            .set_text(text.to_owned())
+            .map_err(|error| error.to_string())
+    })
 }
 
 /// Decodes a bounded PNG payload and writes native RGBA pixels to the system
@@ -72,14 +101,15 @@ pub fn write_native_png(bytes: &[u8]) -> Result<(), String> {
             .collect(),
         _ => return Err("clipboard PNG must decode to RGB or RGBA".to_owned()),
     };
-    let mut clipboard = Clipboard::new().map_err(|error| error.to_string())?;
-    clipboard
-        .set_image(arboard::ImageData {
-            width: info.width as usize,
-            height: info.height as usize,
-            bytes: Cow::Owned(rgba),
-        })
-        .map_err(|error| error.to_string())
+    with_clipboard(|clipboard| {
+        clipboard
+            .set_image(arboard::ImageData {
+                width: info.width as usize,
+                height: info.height as usize,
+                bytes: Cow::Owned(rgba),
+            })
+            .map_err(|error| error.to_string())
+    })
 }
 
 fn validate_native_text(text: &str) -> Result<(), String> {

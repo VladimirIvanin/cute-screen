@@ -23,6 +23,7 @@ use zip::{ZipArchive, ZipWriter, write::SimpleFileOptions};
 use image::{ImageDecoder, codecs::jpeg::JpegDecoder, metadata::Orientation};
 
 pub mod history;
+pub mod materials;
 mod migrations;
 use migrations::migrate;
 #[cfg(test)]
@@ -32,7 +33,7 @@ const MAX_ENCODED_BYTES: u64 = 512 * 1024 * 1024;
 const MAX_SVG_ENCODED_BYTES: usize = 10 * 1024 * 1024;
 const MAX_IMAGE_EDGE: u32 = 32_768;
 const MAX_IMAGE_PIXELS: u64 = 134_217_728;
-const EDITABLE_DOCUMENT_SCHEMA_VERSION: u32 = 7;
+const EDITABLE_DOCUMENT_SCHEMA_VERSION: u32 = 8;
 const RECOVERY_BUNDLE_VERSION: u32 = 1;
 
 #[derive(Debug, Error, Clone, Serialize)]
@@ -1267,7 +1268,7 @@ fn document_value(document_json: &str) -> Result<Value, RepositoryError> {
     if schema_version > EDITABLE_DOCUMENT_SCHEMA_VERSION {
         return Err(RepositoryError::NewerSchema { schema_version });
     }
-    if schema_version < EDITABLE_DOCUMENT_SCHEMA_VERSION {
+    if schema_version < 7 {
         return Err(RepositoryError::OlderSchema { schema_version });
     }
     if value.get("id").and_then(Value::as_str).is_none() {
@@ -1902,7 +1903,7 @@ mod tests {
             fresh
                 .query_row("PRAGMA user_version", [], |row| row.get::<_, i64>(0))
                 .expect("user version"),
-            4
+            5
         );
         assert!(!super::legacy_migration_table_exists(&fresh).expect("legacy table probe"));
 
@@ -1955,7 +1956,7 @@ mod tests {
             connection
                 .query_row("PRAGMA user_version", [], |row| row.get::<_, i64>(0))
                 .expect("user version"),
-            4
+            5
         );
         assert!(!super::legacy_migration_table_exists(&connection).expect("legacy table probe"));
 
@@ -2263,14 +2264,15 @@ mod tests {
     }
 
     #[test]
-    fn accepts_only_v7_for_editing_and_types_older_and_newer_schemas() {
-        let document = serde_json::json!({
-            "schemaVersion": 7,
-            "id": "doc-1",
-        })
-        .to_string();
-
-        assert!(super::validate_document(&document).is_ok());
+    fn accepts_v7_and_v8_for_editing_and_types_older_and_newer_schemas() {
+        for schema_version in [7, 8] {
+            let document = serde_json::json!({
+                "schemaVersion": schema_version,
+                "id": "doc-1",
+            })
+            .to_string();
+            assert!(super::validate_document(&document).is_ok());
+        }
 
         for schema_version in 0..=6 {
             let older = serde_json::json!({
@@ -2287,13 +2289,13 @@ mod tests {
         }
 
         let newer = serde_json::json!({
-            "schemaVersion": 8,
+            "schemaVersion": 9,
             "id": "doc-1",
         })
         .to_string();
         assert!(matches!(
             super::validate_document(&newer),
-            Err(RepositoryError::NewerSchema { schema_version: 8 })
+            Err(RepositoryError::NewerSchema { schema_version: 9 })
         ));
     }
 
@@ -2470,3 +2472,6 @@ mod tests {
 
 #[cfg(test)]
 mod history_tests;
+
+#[cfg(test)]
+mod material_tests;

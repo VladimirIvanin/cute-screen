@@ -9,6 +9,7 @@ import {
   DEFAULT_DRAWING_DEFAULTS,
 } from './drawing'
 import {
+  placeGradientLayer,
   rotateGradientFill,
   type LinearGradientPaint,
   fitGradientLayer,
@@ -77,6 +78,35 @@ describe('gradient backdrops', () => {
     gradientFrame(before),
     'width').transform.rotation).toBe(
       30)
+  })
+  it('places a backdrop against frame edges and centers without resizing or changing its transition', () => {
+    const before = layer()
+    const frame = { x: 7, y: 11, width: 400, height: 300 }
+    for (const [placement, axis, expected] of [
+      ['left', 'translateX', 7], ['centerX', 'translateX', 107], ['right', 'translateX', 207],
+      ['top', 'translateY', 11], ['centerY', 'translateY', 111], ['bottom', 'translateY', 211],
+    ] as const) {
+      const after = placeGradientLayer(before, frame, placement)
+      expect(after.transform[axis]).toBe(expected)
+      expect(after.transform[axis === 'translateX' ? 'translateY' : 'translateX']).toBe(
+        before.transform[axis === 'translateX' ? 'translateY' : 'translateX'])
+      expect(after.localBounds).toEqual(before.localBounds)
+      expect(after.payload).toBe(before.payload)
+      expect(placeGradientLayer(after, frame, placement)).toBe(after)
+      const document = { ...documentFixture, layers: [before] }
+      const command = { type: 'updateLayer' as const, before, after }
+      expect(revertEditorCommand(applyEditorCommand(document, command), command)).toEqual(document)
+    }
+    expect(placeGradientLayer(before, frame, 'width')).toEqual(fitGradientLayer(before, frame, 'width'))
+    expect(placeGradientLayer(before, frame, 'height')).toEqual(fitGradientLayer(before, frame, 'height'))
+    const reflected = { ...before, localBounds: { x: 30, y: 40, width: 200, height: 100 },
+      transform: { ...before.transform, scaleX: -1, scaleY: -1 } }
+    expect(placeGradientLayer(reflected, frame, 'right').transform.translateX).toBe(437)
+    expect(placeGradientLayer(reflected, frame, 'bottom').transform.translateY).toBe(351)
+    for (const blocked of [{ ...before, locked: true },
+      { ...before, transform: { ...before.transform, rotation: 45 } }]) {
+      expect(placeGradientLayer(blocked, frame, 'bottom')).toBe(blocked)
+    }
   })
   it('updates endpoints, snaps in physical space and translates the transition without changing bounds', () => {
     const before = layer()

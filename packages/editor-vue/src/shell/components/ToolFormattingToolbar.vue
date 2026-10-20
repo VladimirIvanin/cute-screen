@@ -245,7 +245,7 @@ watch([() => props.schema.icon, () => settings.value.activeApertureId], () => {
       v-if="kind !== 'spotlight'"
       ref="picker"
       :model-value="value(colorId)"
-      :ariaLabel="text('Colour', 'Цвет')"
+      v-bind="{ ariaLabel: text('Colour', 'Цвет') }"
       :mixed="mixed(colorId)"
       :disabled="blocked"
       :locale="locale"
@@ -350,7 +350,7 @@ watch([() => props.schema.icon, () => settings.value.activeApertureId], () => {
         <SimpleColorPicker
           v-if="menu === 'dim'"
           :model-value="value('spotlightDimColor')"
-          :ariaLabel="text('Dim colour', 'Цвет затемнения')"
+          v-bind="{ ariaLabel: text('Dim colour', 'Цвет затемнения') }"
           :mixed="mixed('spotlightDimColor')"
           :disabled="blocked"
           :locale="locale"

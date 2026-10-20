@@ -206,6 +206,12 @@ export interface CanvasKitApi {
   XYWHRect(x: number, y: number, width: number, height: number): Float32Array
   RRectXY(rect: Float32Array, radiusX: number, radiusY: number): Float32Array
   LTRBRect(left: number, top: number, right: number, bottom: number): Float32Array
+  readonly ColorType?: { readonly RGBA_8888: unknown }
+  readonly AlphaType?: { readonly Unpremul: unknown }
+  readonly ColorSpace?: { readonly SRGB: unknown }
+  MakeImage?(info: { width: number; height: number; alphaType: unknown; colorType: unknown; colorSpace: unknown },
+    pixels: Uint8ClampedArray,
+    rowBytes: number): CanvasKitImage | null
   MakeSurface(width: number, height: number): CanvasKitSurface | null
   MakeWebGLCanvasSurface(canvas: HTMLCanvasElement): CanvasKitSurface | null
   deleteContext(handle: number): void

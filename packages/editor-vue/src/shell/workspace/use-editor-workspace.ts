@@ -1,3 +1,5 @@
+import { compositionBlobHashes } from '@cute-screen/editor-renderer'
+import { useComposition } from '../composition/controller'
 import { provideGradientEditing } from '../ui/gradient-editing'
 import { loadTextFontFamily } from '../../text-fonts'
 import {
@@ -79,12 +81,15 @@ function createWorkspaceCore(props: ResolvedEditorShellProps) {
     const document = workspace.activeDocument.value
     if (!document) return false
     if (baseImageLayer.value && !props.sourceImage) return false
-    return document.layers.every(
-      (layer) =>
-        layer.kind !== 'image' ||
-        layer.payload.role !== 'content' ||
-        workspace.textureImages.value.has(layer.payload.blobHash),
-    )
+    const appearanceReady = compositionBlobHashes(document.presentation.composition)
+      .every((hash) => workspace.textureImages.value.has(hash))
+    return appearanceReady &&
+      document.layers.every(
+        (layer) =>
+          layer.kind !== 'image' ||
+          layer.payload.role !== 'content' ||
+          workspace.textureImages.value.has(layer.payload.blobHash),
+      )
   })
   const translate = (key: Parameters<typeof t>[1]) => t(state.locale.value, key)
   const environment = createWorkspaceEnvironment(props)
@@ -153,6 +158,7 @@ function createWorkspaceCore(props: ResolvedEditorShellProps) {
     store,
     state,
     workspace,
+    composition: useComposition(props, workspace, store),
     environment,
     bindings,
     session,
@@ -226,7 +232,14 @@ function createWorkspaceViewModel(
     closeToolConfigure: bindings.closeToolConfigure,
     activeDocument: workspace.activeDocument,
     spotlightEditing: workspace.spotlightEditing,
-    displayDocument: computed(() => workspace.numericPreviewDocument.value ?? workspace.activeDocument.value),
+    displayDocument: computed(() => {
+      const doc = workspace.numericPreviewDocument.value ?? workspace.activeDocument.value
+      return doc && core.composition.compositionPreview.value ? { ...doc,
+        presentation: { ...doc.presentation,
+          composition: core.composition.compositionPreview.value } } : doc
+    }),
+    ...core.composition,
+    compositionController: core.composition,
     contextSchema: bindings.contextSchema,
     creationSchema: bindings.creationSchema,
     toolActivationRevision: workspace.toolActivationRevision,

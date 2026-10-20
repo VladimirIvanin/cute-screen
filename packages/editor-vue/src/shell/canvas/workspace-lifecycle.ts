@@ -57,7 +57,7 @@ export function registerRenderLifecycle(context: RenderLifecycleContext): void {
       scrollContainer.value
     ) {
       context.emit('hostsReady', {
-        exportPng: () => context.renderer.exportPng(),
+        exportPng: (options) => context.renderer.exportPng(options),
         waitForRender: () => context.renderer.waitForRender(),
         scene: scene.value,
         overlay: overlay.value,

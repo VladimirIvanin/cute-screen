@@ -47,7 +47,7 @@ const shape: LayerNode = {
 }
 
 const document: EditorDocument = {
-  schemaVersion: 7,
+  schemaVersion: 8,
   id: '019c1f62-058e-7000-8000-000000000000',
   source: {
     blobHash: 'a'.repeat(64),
@@ -306,9 +306,9 @@ describe('editor document v7 codec', () => {
         reason: 'olderSchema',
       })
     }
-    expect(parseEditorDocument({ schemaVersion: 8 })).toMatchObject({
+    expect(parseEditorDocument({ schemaVersion: 9 })).toMatchObject({
       kind: 'readOnly',
-      schemaVersion: 8,
+      schemaVersion: 9,
       reason: 'newerSchema',
     })
   })

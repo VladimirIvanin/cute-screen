@@ -53,7 +53,7 @@ const layer: LayerNode = {
 }
 
 const document: EditorDocumentV1 = {
-  schemaVersion: 7,
+  schemaVersion: 8,
   id: '019c1f62-058e-7000-8000-000000000000',
   source: {
     blobHash: 'a'.repeat(64),
@@ -100,7 +100,7 @@ describe('M03 document core', () => {
       reason: 'olderSchema',
     })
 
-    const future = { ...v0, schemaVersion: 8 }
+    const future = { ...v0, schemaVersion: 9 }
     expect(parseEditorDocument(JSON.stringify(future))).toMatchObject({
       kind: 'readOnly',
       reason: 'newerSchema',

@@ -32,6 +32,15 @@ function assertNever(value: never): never {
 function freezeNode(node: RenderNode): RenderNode {
   assertNodeBase(node)
   switch (node.kind) {
+    case 'group':
+      return Object.freeze({ ...node, scene: createRenderSceneSnapshot(node.scene),
+        destination: Object.freeze({ ...node.destination }), clip: Object.freeze({ ...node.clip }),
+        ...(node.outerClip ? { outerClip: Object.freeze({ ...node.outerClip,
+          bounds: Object.freeze({ ...node.outerClip.bounds }) }) } : {}) })
+    case 'freeform':
+      return Object.freeze({ ...node,
+        points: Object.freeze(node.points.map((p) => Object.freeze({ ...p,
+          color: Object.freeze({ ...p.color }) }))) })
     case 'vector':
       return freezeVectorNode(node)
     case 'rect':

@@ -152,7 +152,6 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOnOutside
         data-control="stroke"
       >
         <button
-          @click="onPopoverShown(control.id, !(openPopover[control.id] ?? false))"
           :ref="(element) => setTrigger(control.id, element as HTMLButtonElement | null)"
           class="cs-arrow-toolbar-trigger"
           type="button"
@@ -161,6 +160,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOnOutside
           :title="control.label"
           :aria-expanded="openPopover[control.id] ?? false"
           aria-haspopup="dialog"
+          @click="onPopoverShown(control.id, !(openPopover[control.id] ?? false))"
           @keydown.enter.space="togglePopover($event, control.id)"
         >
           <UiIcon name="strokeWidth" class="cs-arrow-toolbar-thickness-icon"/>
@@ -289,7 +289,6 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOnOutside
         :data-control="control.id"
       >
         <button
-          @click="onPopoverShown(control.id, !(openPopover[control.id] ?? false))"
           :ref="(element) => setTrigger(control.id, element as HTMLButtonElement | null)"
           class="cs-arrow-toolbar-trigger"
           type="button"
@@ -298,6 +297,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOnOutside
           :title="control.label"
           :aria-expanded="openPopover[control.id] ?? false"
           aria-haspopup="dialog"
+          @click="onPopoverShown(control.id, !(openPopover[control.id] ?? false))"
           @keydown.enter.space="togglePopover($event, control.id)"
         >
           <ArrowStylePreview
@@ -358,7 +358,6 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOnOutside
         data-control="arrowPath"
       >
         <button
-          @click="onPopoverShown(control.id, !(openPopover[control.id] ?? false))"
           :ref="(element) => setTrigger(control.id, element as HTMLButtonElement | null)"
           class="cs-arrow-toolbar-trigger"
           type="button"
@@ -367,6 +366,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOnOutside
           :title="control.label"
           :aria-expanded="openPopover[control.id] ?? false"
           aria-haspopup="dialog"
+          @click="onPopoverShown(control.id, !(openPopover[control.id] ?? false))"
           @keydown.enter.space="togglePopover($event, control.id)"
         >
           <ArrowStylePreview kind="path" :value="control.value"/>

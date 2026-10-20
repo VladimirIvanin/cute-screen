@@ -103,7 +103,7 @@ function update(): void {
   const boundsChanged = host.value.dataset.previewBounds !== previewBounds
   host.value.dataset.previewBounds = previewBounds
   if (boundsChanged) document.dispatchEvent(new Event('cs-preview-layout'))
-  const panel = root?.querySelector('.cs-layers-panel')?.getBoundingClientRect()
+  const panel = root?.querySelector('.cs-layers-panel, .cs-composition-panel')?.getBoundingClientRect()
   const nextLayout = selectionToolbarPosition(
     bounds, { width: host.value.offsetWidth, height: host.value.offsetHeight }, view,
     toolbarBottomLimit(root, view), panel,

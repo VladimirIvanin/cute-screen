@@ -1,5 +1,83 @@
 # Журнал архитектурных решений
 
+## ADR-130 — Изоляция масштаба интерфейса от жестов трекпада
+
+**Статус:** accepted (2026-10-20); дополняет viewport-контракт REQ-EDT-001.
+
+**Контекст:** CanvasWorkspace отменяет браузерный default только над canvas;
+над chrome pinch/Ctrl+wheel может изменять масштаб всей страницы.
+
+**Решение:** общий desktop entrypoint до первого await устанавливает non-passive
+capture listeners wheel и WebKit gesturestart/gesturechange/gestureend. Wheel
+отменяется только с Ctrl/Meta, propagation сохраняется, поэтому canvas продолжает
+обрабатывать собственный zoom; немодифицированная прокрутка остаётся native.
+Обработчики живут с окном, HMR снимает их через AbortController.
+Tauri уже выключает browser zoom hotkeys по умолчанию; native настройки и
+системный DPI не меняются. Новых EditorCommand/persisted settings нет.
+
+**Проверяемое основание:** production browser mount, trusted modified wheel
+над chrome/canvas/Settings, неизменные viewport/DPR/control bounds и обычная
+прокрутка Settings. WebKit gesture cancellation проверяется отдельно синтетически;
+это не заменяет физический pinch в native WebViews. Результаты — TESTING.md.
+
+## ADR-129 — Автоматическая привязка объектов оформления
+
+**Статус:** accepted (2026-10-20); заменяет ручной переключатель пространств
+из продуктового контракта ADR-127. Документные content/card пространства сохраняются.
+
+**Основание:** владелец отверг обязательное переключение «На снимке / На карточке»
+и стартовые пресеты полос. Проверяемый контракт: объект, начатый на видимом снимке,
+связан с его пикселями; начатый на поле — с карточкой; один жест не меняет привязку.
+Существующий внешний объект выбирается поверх снимка и сохраняет свою привязку.
+
+**Решение:** определять пространство до начала жеста по месту нажатия; при выборе
+учитывать верхние слои карточки и активные selection handles. Crop/Hand/zoom
+сохраняют назначение. Кнопки выбора пространства удаляются. Header/footer/bands
+исключаются из стартовых пресетов; ручные полосы и сохранённые работы поддерживаются.
+Изменения schema/IPC не требуются. Проверка: core red→green, Vue и production browser.
+
+## ADR-128 — Компактная панель и графическое размещение подложки
+
+**Статус:** accepted (2026-10-20); дополняет ADR-124/126.
+
+**Основание:** screenshot владельца показывает двухстрочный opacity control и
+чрезмерно широкую панель. Официальные Figma/Affinity controls отделяют alignment
+по осям от изменения размера; источники — GRADIENT_CONTROLS_RESEARCH.md.
+Проверяемый контракт: RU/EN controls не перекрываются в узком окне; edge/center
+сохраняют размер и вторую координату, fit сохраняет вторую ось и fill;
+Escape возвращает focus, locked/read-only/rotation/multi не меняют документ.
+
+**Решение:** компактные mode/fill/opacity и один placement trigger. В popover
+две оси по четыре графические команды: три alignment и stretch. Это разовые
+EditorCommand по Crop/canvas; постоянные constraints и автоматический relayout
+не вводятся. Не меняются codec, renderer, defaults и Editor-only availability.
+
+## ADR-127 — Публикационная карточка и постоянные материалы
+
+**Статус:** accepted; supersedes ADR-031 schema/clipboard version boundary and
+extends ADR-022 coordinate model. Text restrictions and original provenance remain.
+Ручной выбор пространства: superseded by
+[ADR-129](#adr-129-автоматическая-привязка-объектов-оформления).
+
+**Основание:** v7 presentation parser rejects enabled beautify/watermark. Screenshot
+annotations must keep source-pixel coordinates while margins, chrome and output
+size change. Material ownership must survive history deletion and cache eviction.
+
+**Решение:** v8 adds composition and content/card layer space. v7 opens through a
+lossless in-memory normalizer; raw JSON remains unchanged until an actual command.
+v0–v6 unsupported; v9+ read-only. Content canvas/crop stay source-space, renderer
+composition groups own output clipping and uniform transforms. Scoped effects sample
+compositeBelow within their group. One scene pipeline covers editor/export/thumbnails.
+
+Permanent material/preset rows own immutable blob references independently of
+captures. Cleanup removes only unreferenced owned blobs and rebuildable derivatives.
+Presets apply manually and copy settings, not screenshot layers or window titles.
+Year expansion is frozen at apply; refresh is an explicit command.
+
+**Проверка:** red-first layout/codec/history and storage cleanup tests; decoded
+Canvas2D/CanvasKit output; production UI creation, reopen and age/cache cleanup.
+Platform claims require each real WebView, not just browser/unit evidence.
+
 ## ADR-126 — Gradient только в полном редакторе
 
 **Статус:** accepted (2026-10-20); дополняет ADR-124 ограничением availability.
@@ -1637,7 +1715,7 @@ pointermove path. Existing public shell props/emits and `ContextToolbarSchema`
 
 ## ADR-031 — Editable document v7 и переносимый минимальный text contract
 
-**Статус:** accepted; supersedes the older-schema migration portions of ADR-005
+**Статус:** superseded in editable schema/clipboard boundary by [ADR-127](#adr-127-публикационная-карточка-и-постоянные-материалы); remaining text contract accepted; supersedes the older-schema migration portions of ADR-005
 and ADR-022 and the text-contract portions of ADR-023, ADR-025 and ADR-026
 
 **Контекст:** paint/effect scope ADR-023 и ранний rich-text scope ADR-026
@@ -2171,7 +2249,8 @@ Canvas2D/CanvasKit export, production pointer flow и 12 000 samples на 4K/8K.
 
 ## ADR-061 — Панель текста и 12 переносимых гарнитур
 
-**Статус:** accepted; supersedes bundled-font baseline portion of ADR-025.
+**Статус:** accepted; supersedes bundled-font baseline portion of ADR-025;
+bundled catalogue superseded by ADR-131 (остальное решение сохраняется).
 
 **Контекст:** native color/font/alignment controls расходятся с остальными
 инструментами, системный каталог перегружен и не показывает внешний вид.
@@ -2719,3 +2798,26 @@ render segments <0,18 rad, сохранением endpoints/pressure/samples/wid
 существующие RMS, Shift, codec/history и 12 000 samples. Декодированные
 Canvas2D/CanvasKit PNG показывают различие точного пера и плавной centerline
 на одинаковых петлях и S-кривых; команды и платформы — TESTING.md.
+
+## ADR-131 — Восемь креативных гарнитур с кириллицей
+
+**Статус:** accepted (2026-10-20); supersedes состав каталога ADR-061.
+
+**Контекст:** 12 базовых семейств не покрывают пиксельные, готические, гранжевые,
+футуристичные и сказочные заголовки. Нужны свободная лицензия, кириллица и offline.
+
+**Решение:** сохранить прежние 12 семейств и добавить по порядку Press Start 2P,
+Germanica, Rubik Dirt, Rubik Glitch, Unbounded, Russo One, Ruslan Display, Underdog.
+Семь Fontsource пакетов закреплены на 5.3.0 с version-specific OFL-1.1 allowlist;
+подключены Latin/Cyrillic 400 normal, у Unbounded также 700 normal. Germanica —
+неизменённый полный TTF из архива Peter Wiegel, распространяемый по OFL-1.1;
+лицензия, источник и SHA-256 сохранены рядом с asset, лицензия включена в поставку.
+Общий FontFaceSet loader и synthesis недостающих B/I сохраняются. Меню содержит
+20 вариантов с прежними preview/loading/error/retry/keyboard semantics. Формат
+документа, IPC, EditorCommand и системный каталог не меняются.
+
+**Проверяемое основание:** каждый новый файл должен содержать русский алфавит
+с Ё/ё и латиницу без fallback; decoded Canvas2D/CanvasKit goldens покрывают
+20 семейств и B/I. Browser проверяет меню, measured geometry, переносы и
+undo/redo; native production-flow проверяет применение, сохранение, relaunch
+и повторное декодирование PNG. Фактические команды и платформы — TESTING.md.

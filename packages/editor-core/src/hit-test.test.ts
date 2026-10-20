@@ -49,7 +49,7 @@ function layer(
 }
 function document(layers: EditorDocumentV1['layers']): EditorDocumentV1 {
   return {
-    schemaVersion: 7,
+    schemaVersion: 8,
     id: '019c1f62-058e-7000-8000-000000000000',
     source,
     canvas: { width: 100, height: 100 },

@@ -21,6 +21,7 @@ const props = withDefaults(defineProps<{
   eyedropper?: boolean
   locale?: 'en' | 'ru'
   embedded?: boolean
+  compact?: boolean
   palette?: 'drawing' | 'highlighter'
 }>(), { recentColors: () => [], disabled: false, mixed: false, eyedropper: true, locale: 'en', embedded: false, palette: 'drawing' })
 const emit = defineEmits<{ commit: [value: string]; eyedropper: []; dismiss: []; opened: [] }>()
@@ -80,7 +81,7 @@ function keydown(event: KeyboardEvent): void {
   const buttons = Array.from(panel.value?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [])
   const index = buttons.indexOf(event.target as HTMLButtonElement)
   if (index < 0) return
-  const columns = props.palette === 'highlighter' ? 8 : 10
+  const columns = props.compact || props.palette === 'highlighter' ? 8 : 10
   const moves: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -columns, ArrowDown: columns }
   if (
     !(event.key in moves) &&
@@ -140,7 +141,7 @@ function outside(event: MouseEvent): void {
       <div
         ref="panel"
         class="cs-simple-color-panel cs-color-picker-popover"
-        :class="{ 'is-embedded': embedded }"
+        :class="{ 'is-embedded': embedded, 'is-compact': compact }"
         :role="embedded ? 'group' : 'dialog'"
         :aria-label="ariaLabel"
         @keydown="keydown"
@@ -160,6 +161,7 @@ function outside(event: MouseEvent): void {
             :recent-colors="recentColors"
             :disabled="disabled"
             :eyedropper="eyedropper"
+            :compact="compact"
             :locale="locale"
             embedded
             @commit="choose"

@@ -104,6 +104,7 @@ onMounted(load)
         <dt>{{ ru ? 'Всего' : 'Total' }}</dt><dd>{{ historyBytes(report.totalBytes, locale) }}</dd>
         <dt>{{ ru ? 'Оригиналы' : 'Originals' }}</dt><dd>{{ historyBytes(report.originalsBytes, locale) }}</dd>
         <dt>{{ ru ? 'Данные документов' : 'Document data' }}</dt><dd>{{ historyBytes(report.documentsBytes, locale) }}</dd>
+        <dt>{{ ru ? 'Материалы оформления' : 'Appearance materials' }}</dt><dd>{{ historyBytes(report.materialsBytes, locale) }}</dd>
         <dt>{{ ru ? 'Кэш' : 'Cache' }}</dt><dd>{{ historyBytes(report.cacheBytes, locale) }}</dd>
         <dt>{{ ru ? 'База данных, включая документы' : 'Database, including documents' }}</dt><dd>{{ historyBytes(report.databaseBytes, locale) }}</dd>
       </dl>

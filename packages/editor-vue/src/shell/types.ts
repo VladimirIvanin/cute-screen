@@ -29,6 +29,7 @@ export interface ToolDescriptor {
 }
 
 export interface LayerSummary {
+  readonly space?: 'content' | 'card'
   readonly id: string
   readonly icon: IconName
   readonly name: string
@@ -50,6 +51,7 @@ export interface FrameSummary {
 export type ContextControl = (
   | {
     readonly kind: 'action'
+    readonly disabledReason?: string
     readonly id: string
     readonly label: string
     readonly disabled?: boolean
@@ -130,7 +132,12 @@ export type ContextControl = (
 export type ShapeFill = import('@cute-screen/editor-renderer').FillPaint
 
 export interface ContextToolbarSchema {
-  readonly gradient?: { readonly single: boolean; readonly width: number; readonly height: number }
+  readonly gradient?: {
+    readonly single: boolean
+    readonly width: number
+    readonly height: number
+    readonly activeActions?: readonly string[]
+  }
   readonly lineAlignment?: { readonly enabled: boolean; readonly label: string; readonly disabled?: boolean }
   readonly toolSettings?: Readonly<{
     kind: 'pencil' | 'spotlight' | 'ruler'
@@ -236,7 +243,10 @@ export interface PrecisionToolDefaults {
 
 export interface CanvasViewportHosts {
   /** Encodes committed document pixels at 1×, independent of preview zoom/DPR. */
-  readonly exportPng?: () => Promise<Uint8Array>
+  readonly exportPng?: (options?: {
+    readonly signal?: AbortSignal
+    readonly onProgress?: (fraction: number) => void
+  }) => Promise<Uint8Array>
   /** Resolves after the latest scene and local text fonts have been rendered. */
   readonly waitForRender?: () => Promise<void>
   readonly scene: HTMLCanvasElement
@@ -252,6 +262,7 @@ export type AsyncActionState =
     readonly status: 'pending'
     readonly action: AsyncActionName
     readonly captureProgress?: CaptureProgressState
+    readonly progress?: number
   }
   | {
     readonly status: 'cancelled'
@@ -283,10 +294,21 @@ export interface ShellActionAdapter {
     action: AsyncActionName,
     signal: AbortSignal,
     reportCaptureProgress?: (state: CaptureProgressState) => void,
+    reportOperationProgress?: (fraction: number) => void,
   ): Promise<string>
 }
 
 export type IconName =
+  | 'objectAlignLeft'
+  | 'objectAlignCenterX'
+  | 'objectAlignRight'
+  | 'objectAlignTop'
+  | 'objectAlignCenterY'
+  | 'objectAlignBottom'
+  | 'stretchX'
+  | 'stretchY'
+  | 'placement'
+
   | 'gradient'
   | 'edit'
   | 'history'
@@ -420,6 +442,12 @@ export const translationKeys = [
   'toolArrow',
   'toolShape',
   'toolGradient',
+  'gradientAlignLeft',
+  'gradientAlignCenterX',
+  'gradientAlignRight',
+  'gradientAlignTop',
+  'gradientAlignCenterY',
+  'gradientAlignBottom',
   'gradientFitWidth',
   'gradientFitHeight',
   'gradientResetRotation',

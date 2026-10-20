@@ -51,7 +51,7 @@ describe('document render scene: images and paints', () => {
     if (!base || base.kind !== 'image') throw new Error('expected image layer')
     const scene = createDocumentRenderScene({
       ...document,
-      schemaVersion: 7,
+      schemaVersion: 8,
       layers: [
         {
           ...base,
@@ -107,7 +107,7 @@ describe('document render scene: images and paints', () => {
   it('compiles normalized gradient geometry into renderer-neutral canvas coordinates', () => {
     const scene = createDocumentRenderScene({
       ...document,
-      schemaVersion: 7,
+      schemaVersion: 8,
       layers: [
         {
           id: '019c1f62-058e-7000-8000-000000000002',

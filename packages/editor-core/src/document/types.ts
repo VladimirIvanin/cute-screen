@@ -1,7 +1,7 @@
 import type { ShapeKind } from '../shapes'
 
 /** v7 is the only editable persisted document schema. */
-export const EDITOR_DOCUMENT_SCHEMA_VERSION = 7 as const
+export const EDITOR_DOCUMENT_SCHEMA_VERSION = 8 as const
 
 export type JsonPrimitive = string | number | boolean | null
 export type JsonValue = JsonPrimitive | readonly JsonValue[] | JsonObject
@@ -151,6 +151,7 @@ export interface SourceImageRef {
 }
 
 export interface PresentationSettingsV1 {
+  readonly composition?: import('../composition/types').CompositionSettings
   readonly beautify: Readonly<{ enabled: false }>
   readonly watermark: Readonly<{ enabled: false }>
 }
@@ -180,6 +181,7 @@ export type LayerKind = (typeof LAYER_KINDS)[number]
 
 export interface LayerBase<K extends LayerKind, P extends JsonObject> {
   readonly id: string
+  readonly space?: 'content' | 'card'
   readonly kind: K
   readonly transform: Transform2D
   /** Bounds in the node's untransformed local coordinate system. */
@@ -518,7 +520,7 @@ export type LayerNode =
   | EmojiLayer
   | ImageLayer
 
-export interface EditorDocumentV7 {
+export interface EditorDocumentV8 {
   readonly schemaVersion: typeof EDITOR_DOCUMENT_SCHEMA_VERSION
   readonly id: string
   readonly source: SourceImageRef
@@ -533,7 +535,8 @@ export interface EditorDocumentV7 {
 }
 
 /** Current editable document contract. */
-export type EditorDocument = EditorDocumentV7
+export type EditorDocument = EditorDocumentV8
+export type EditorDocumentV7 = EditorDocumentV8
 
 /** @deprecated Historical names now alias the sole editable v7 contract. */
 export type EditorDocumentV1 = EditorDocumentV7

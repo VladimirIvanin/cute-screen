@@ -53,6 +53,8 @@ export function drawNodes2D(
       case 'image':
         // Resources are resolved by the renderer, keeping overlays independent.
         break
+      case 'group':
+      case 'freeform':
       case 'censor':
       case 'spotlight':
       case 'loupe':

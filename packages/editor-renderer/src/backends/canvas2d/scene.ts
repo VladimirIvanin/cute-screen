@@ -1,3 +1,8 @@
+import { groupNeedsFullSource } from '../../composition/group-scale'
+import {
+  drawGroup2D,
+  drawFreeform2D,
+} from '../../composition/canvas2d'
 import type {
   RenderNode,
   RenderSceneSnapshot,
@@ -111,6 +116,20 @@ function drawOrderedNode(
   node: RenderNode,
 ): void {
   switch (node.kind) {
+    case 'group':
+      drawGroup2D(context.context, node, context.scale, context.newCanvas, (canvas, scale) =>
+        drawScene2D(canvas,
+          node.scene,
+          scale,
+          context.resources,
+          context.resourceSources,
+          context.newCanvas,
+          context.resolveFontFamily,
+          !groupNeedsFullSource(node.scene)))
+      return
+    case 'freeform':
+      drawFreeform2D(context.context, node, context.scale, context.newCanvas)
+      return
     case 'censor':
       drawCensor2D(context.context, context.working, node, context.scale, context.newCanvas)
       return
@@ -165,21 +184,26 @@ export function drawScene2D(
   resourceSources: ReadonlyMap<string, ImageResourceInput['source']>,
   newCanvas: NewCanvas,
   resolveFontFamily: FontResolver,
+  cropFirst = false,
 ): void {
-  const fullWidth = Math.max(1, Math.round(scene.width * scale))
-  const fullHeight = Math.max(1, Math.round(scene.height * scale))
+  const fullWidth = Math.max(1, Math.round((cropFirst ? scene.outputBounds.width : scene.width) * scale))
+  const fullHeight = Math.max(1, Math.round((cropFirst ? scene.outputBounds.height : scene.height) * scale))
   const usesFullCanvas =
     scene.outputBounds.x === 0 &&
     scene.outputBounds.y === 0 &&
     scene.outputBounds.width === scene.width &&
     scene.outputBounds.height === scene.height
-  const working = usesFullCanvas ? canvas : newCanvas(fullWidth, fullHeight)
+  const working = usesFullCanvas || cropFirst ? canvas : newCanvas(fullWidth, fullHeight)
   working.width = fullWidth
   working.height = fullHeight
   const context = working.getContext('2d')!
   context.setTransform(1, 0, 0, 1, 0, 0)
   context.clearRect(0, 0, working.width, working.height)
-  context.setTransform(scale, 0, 0, scale, 0, 0)
+  context.setTransform(
+    scale, 0, 0, scale,
+    cropFirst ? -scene.outputBounds.x * scale : 0,
+    cropFirst ? -scene.outputBounds.y * scale : 0,
+  )
   const sceneContext: SceneContext = {
     working,
     context,
@@ -194,4 +218,8 @@ export function drawScene2D(
     if (node.visible && node.opacity !== 0) drawOrderedNode(sceneContext, node)
   }
   copyOutput(canvas, working, scene, scale)
+  if (working !== canvas) {
+    working.width = 1
+    working.height = 1
+  }
 }

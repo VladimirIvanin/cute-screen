@@ -1,3 +1,4 @@
+import { gradientSchema } from './gradient-schema'
 import { annotationTool } from '@cute-screen/editor-renderer'
 import { SHAPE_CATALOG } from '@cute-screen/editor-renderer'
 import type { Ref } from 'vue'
@@ -372,22 +373,15 @@ function drawingControl(
         selected: undefined,
       }
     : resolved
-  if (tool === 'gradient') {
-    const selected = defaultsOnly ? undefined : state.selected
-    const rotated = Boolean(selected && Math.abs(selected.transform.rotation % 360) > 1e-8)
-    return { gradient: { single: !defaultsOnly && context.store.selectedLayerIds.length === 1, width: selected?.localBounds?.width ?? 1, height: selected?.localBounds?.height ?? 1 }, icon: 'gradient', title: context.translate('toolGradient'), hint: context.translate('canvasViewport'),
-      shape: {
-        fill: values.fill as ShapeFill,
-        fillSupported: true,
-        fillColorEditable: false,
-        fillOpacityEditable: true,
-      },
-      controls: [
-        { kind: 'range', id: 'layerOpacity', label: context.translate('opacity'), value: selected?.opacity !== undefined ? selected.opacity * 100 : Number(values.layerOpacity ?? 1) * 100, min: 0, max: 100, step: 1, disabled: state.colorDisabled },
-        ...(!defaultsOnly ? ['Width', 'Height'].map((axis) => ({ kind: 'action' as const, id: `gradientFit${axis}`, label: context.translate(axis === 'Width' ? 'gradientFitWidth' : 'gradientFitHeight'), disabled: state.colorDisabled || rotated || context.store.selectedLayerIds.length !== 1,
-          ...(rotated ? { disabledReason: context.translate('gradientResetRotation') } : {}) })) : []),
-      ] }
-  }
+  if (tool === 'gradient') return gradientSchema({
+    document: context.activeDocument.value,
+    layer: defaultsOnly ? undefined : state.selected,
+    values,
+    disabled: state.colorDisabled,
+    defaultsOnly,
+    count: context.store.selectedLayerIds.length,
+    translate: context.translate,
+  })
   if (tool === 'line') {
     const arrow = arrowSchema(context, state, 'line')
     return { ...arrow, icon: 'line', title: context.translate('toolLine'), hint: context.translate('lineHint'),

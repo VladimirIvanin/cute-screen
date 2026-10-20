@@ -128,9 +128,9 @@ onBeforeUnmount(() => {
         {{ ru ? 'Выбрать окно снова' : 'Choose window again' }}
       </button>
       <button
+        ref="areaButton"
         type="button"
         :disabled="pending"
-        ref="areaButton"
         @click="retry('area')"
       >
         {{ ru ? 'Снять область' : 'Capture an area' }}

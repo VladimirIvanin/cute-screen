@@ -76,7 +76,7 @@ function editorDocument({
   readonly layers?: EditorDocument['layers']
 } = {}): EditorDocument {
   return {
-    schemaVersion: 7,
+    schemaVersion: 8,
     id: DOCUMENT_ID,
     source: {
       blobHash: 'a'.repeat(64),

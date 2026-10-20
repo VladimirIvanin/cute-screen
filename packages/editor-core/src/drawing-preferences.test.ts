@@ -29,7 +29,7 @@ function documentWithRecoveredArrow(preferences: ReturnType<typeof parseDrawingT
   })
   if (!arrow || arrow.kind !== 'arrow') throw new Error('expected arrow')
   return {
-    schemaVersion: 7,
+    schemaVersion: 8,
     id: documentId,
     source: {
       blobHash: 'a'.repeat(64),

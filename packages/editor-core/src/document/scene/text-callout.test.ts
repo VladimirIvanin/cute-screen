@@ -11,7 +11,7 @@ describe('document render scene: rich text and callouts', () => {
   it('compiles v7 runs and paragraph metadata into a renderer-neutral node', () => {
     const scene = createDocumentRenderScene({
       ...document,
-      schemaVersion: 7,
+      schemaVersion: 8,
       layers: [
         {
           id: '019c1f62-058e-7000-8000-000000000009',
@@ -93,7 +93,7 @@ describe('document render scene: rich text and callouts', () => {
   it('renders a text background through the shared rectangle paint primitive', () => {
     const scene = createDocumentRenderScene({
       ...document,
-      schemaVersion: 7,
+      schemaVersion: 8,
       layers: [
         {
           id: '019c1f62-058e-7000-8000-000000000019',
@@ -161,7 +161,7 @@ describe('document render scene: rich text and callouts', () => {
   it('compiles a numbered marker body and readable label from its stable sequence', () => {
     const scene = createDocumentRenderScene({
       ...document,
-      schemaVersion: 7,
+      schemaVersion: 8,
       layers: [
         {
           id: '019c1f62-058e-7000-8000-000000000010',
@@ -228,7 +228,7 @@ describe('document render scene: rich text and callouts', () => {
   it('keeps callout connector, markers and multiline text in one ordered scene object', () => {
     const scene = createDocumentRenderScene({
       ...document,
-      schemaVersion: 7,
+      schemaVersion: 8,
       layers: [
         {
           id: '019c1f62-058e-7000-8000-000000000011',

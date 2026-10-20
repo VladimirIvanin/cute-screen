@@ -11,6 +11,7 @@ import {
   isBundledTextFont,
   loadTextFontFamily,
 } from '../../text-fonts'
+import { fontFamilyCss } from '../../font-family-css'
 import { UiIcon } from '../icon'
 import { usePreviewPopover } from './use-preview-popover'
 
@@ -165,7 +166,7 @@ defineExpose({ close })
             <span
               v-if="status[family] === 'ready'"
               class="cs-text-font-sample"
-              :style="{ fontFamily: family }"
+              :style="{ fontFamily: fontFamilyCss(family) }"
             >{{ sample }}</span>
             <span v-else class="cs-text-font-status">{{ status[family] === 'error' ? text('Font unavailable', 'Шрифт недоступен') : text('Loading…', 'Загрузка…') }}</span>
           </button>

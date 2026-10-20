@@ -19,6 +19,7 @@ export function handlePointerDown(
   event: PointerEvent,
 ): void {
   if (handleEditingText(context, event)) return
+  activateComposition(context, event)
   const point = context.canvasPoint(event)
   if (
     !point ||
@@ -52,6 +53,21 @@ export function handlePointerDown(
   handleSelectionStart(context, event, point, selected)
 }
 
+function activateComposition(
+  context: PointerDownContext,
+  event: PointerEvent,
+): void {
+  if (
+    context.props.activateCompositionAt &&
+    !context.spacePressed() &&
+    event.button === 0
+  ) {
+    const initial = context.canvasPoint(event)
+    const target = initial ? context.resolveSelectionTarget(initial) : undefined
+    context.props.activateCompositionAt?.(event, target?.kind === 'handle' || target?.kind === 'selection')
+  }
+}
+
 function handleEditingText(
   context: PointerDownContext,
   event: PointerEvent,
@@ -61,6 +77,7 @@ function handleEditingText(
   if (event.button === 0) {
     event.preventDefault()
     context.finishTextEditing(() => {
+      context.props.activateCompositionAt?.(event)
       const point = context.canvasPoint(event)
       if (
         !point ||

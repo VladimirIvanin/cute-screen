@@ -4,6 +4,8 @@ import type { EditorDocumentV1 } from '@cute-screen/editor-renderer'
 export const TEXT_FONT_FAMILIES = [
   'Roboto', 'Manrope', 'Rubik', 'Comfortaa', 'Oswald', 'PT Serif',
   'Lora', 'Roboto Slab', 'JetBrains Mono', 'PT Mono', 'Caveat', 'Marck Script',
+  'Press Start 2P', 'Germanica', 'Rubik Dirt', 'Rubik Glitch',
+  'Unbounded', 'Russo One', 'Ruslan Display', 'Underdog',
 ] as const
 
 export function isBundledTextFont(family: string): boolean {
@@ -65,7 +67,7 @@ export async function loadTextFontFamily(family: string): Promise<void> {
 }
 
 export async function loadDocumentTextFonts(document: EditorDocumentV1): Promise<void> {
-  const families = new Set(['Roboto'])
+  const families = new Set(['Roboto', ...(document.presentation.composition?.branding.map((b) => b.fontFamily) ?? [])])
   for (const layer of document.layers) {
     const content = layer.kind === 'text' || layer.kind === 'callout'
       ? layer.payload.content : layer.kind === 'numberedMarker' ? layer.payload.label : undefined

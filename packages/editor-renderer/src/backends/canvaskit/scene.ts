@@ -1,3 +1,8 @@
+import { groupNeedsFullSource } from '../../composition/group-scale'
+import {
+  drawGroupCanvasKit,
+  drawFreeformCanvasKit,
+} from '../../composition/canvaskit'
 import type {
   RenderNode,
   RenderSceneSnapshot,
@@ -37,6 +42,21 @@ function drawOrderedNode(
   node: RenderNode,
 ): void {
   switch (node.kind) {
+    case 'group':
+      drawGroupCanvasKit(context.canvasKit, context.canvas, node, context.scale, (surface, scale) =>
+        drawScene(
+          context.canvasKit,
+          surface,
+          node.scene,
+          context.resources,
+          context.typefaces,
+          scale,
+          !groupNeedsFullSource(node.scene),
+        ))
+      return
+    case 'freeform':
+      drawFreeformCanvasKit(context.canvasKit, context.canvas, node, context.scale)
+      return
     case 'censor':
       drawCensorCanvasKit(context.canvasKit, context.surface, context.canvas, context.scene, node, context.scale)
       return

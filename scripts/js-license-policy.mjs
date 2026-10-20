@@ -14,6 +14,13 @@ const generallyAllowedLicenses = new Set([
 // Keep asset-license exceptions version-specific so dependency upgrades fail
 // closed until their bundled files and license metadata are audited again.
 const packageSpecificLicenses = new Map([
+  ['@fontsource/press-start-2p@5.3.0', new Set(['OFL-1.1'])],
+  ['@fontsource/rubik-dirt@5.3.0', new Set(['OFL-1.1'])],
+  ['@fontsource/rubik-glitch@5.3.0', new Set(['OFL-1.1'])],
+  ['@fontsource/unbounded@5.3.0', new Set(['OFL-1.1'])],
+  ['@fontsource/russo-one@5.3.0', new Set(['OFL-1.1'])],
+  ['@fontsource/ruslan-display@5.3.0', new Set(['OFL-1.1'])],
+  ['@fontsource/underdog@5.3.0', new Set(['OFL-1.1'])],
   ['@fontsource/roboto@5.3.0', new Set(['OFL-1.1'])],
   ['@fontsource/manrope@5.3.0', new Set(['OFL-1.1'])],
   ['@fontsource/rubik@5.3.0', new Set(['OFL-1.1'])],

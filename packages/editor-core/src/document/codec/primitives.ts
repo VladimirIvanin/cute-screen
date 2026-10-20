@@ -1,3 +1,4 @@
+import { parseComposition } from '../../composition/validation'
 import {
   collectExtras,
   readJsonObject,
@@ -217,7 +218,8 @@ export function parsePresentation(value: unknown): PresentationSettingsV1 {
   if (beautify.enabled !== false || watermark.enabled !== false) {
     throw new Error('presentation contains unsupported settings')
   }
-  return DEFAULT_PRESENTATION_SETTINGS
+  return input.composition === undefined ? DEFAULT_PRESENTATION_SETTINGS
+    : Object.freeze({ ...DEFAULT_PRESENTATION_SETTINGS, composition: parseComposition(input.composition) })
 }
 
 export function parseBoundedNonNegative(

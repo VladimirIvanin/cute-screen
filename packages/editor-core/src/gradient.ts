@@ -63,6 +63,34 @@ export function fitGradientLayer(
     transform: { ...layer.transform, [axis === 'width' ? 'translateX' : 'translateY']: translation } }
   return JSON.stringify(after) === JSON.stringify(layer) ? layer : Object.freeze(after)
 }
+export type GradientPlacement = 'left' | 'centerX' | 'right' | 'top' | 'centerY' | 'bottom' | 'width' | 'height'
+
+/** Alignment preserves the intrinsic area and fill; fit changes one intrinsic extent. */
+export function placeGradientLayer(
+  layer: ShapeLayer,
+  frame: Rect,
+  placement: GradientPlacement,
+): ShapeLayer {
+  if (placement === 'width' || placement === 'height') return fitGradientLayer(layer, frame, placement)
+  if (
+    !isGradientLayer(layer) ||
+    layer.locked ||
+    Math.abs(layer.transform.rotation % 360) > 1e-8
+  ) return layer
+  const horizontal = ['left', 'centerX', 'right'].includes(placement)
+  const bounds = layer.localBounds!
+  const scale = horizontal ? layer.transform.scaleX : layer.transform.scaleY
+  const extent = (horizontal ? bounds.width : bounds.height) * Math.abs(scale)
+  const frameExtent = horizontal ? frame.width : frame.height
+  const fraction = placement.startsWith('center') ? .5 : placement === 'right' || placement === 'bottom' ? 1 : 0
+  const origin = (horizontal ? frame.x : frame.y) + (frameExtent - extent) * fraction
+  const local = horizontal ? bounds.x : bounds.y
+  const offset = local * scale + Math.min(0, scale) * (horizontal ? bounds.width : bounds.height)
+  const field = horizontal ? 'translateX' : 'translateY'
+  const translation = origin - offset
+  if (Math.abs(translation - layer.transform[field]) < 1e-8) return layer
+  return Object.freeze({ ...layer, transform: { ...layer.transform, [field]: translation } })
+}
 export function gradientPoints(layer: ShapeLayer): Readonly<{ start: Point; end: Point }> {
   const fill = layer.payload.fill as LinearGradientPaint
   const bounds = layer.localBounds!

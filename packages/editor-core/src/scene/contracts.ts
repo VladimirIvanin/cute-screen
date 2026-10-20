@@ -302,7 +302,24 @@ export interface RenderOutputBounds {
   readonly height: number
 }
 
+export interface RenderGroupNode extends RenderNodeBase {
+  readonly kind: 'group'
+  readonly scene: RenderSceneSnapshot
+  readonly destination: RenderOutputBounds
+  readonly clip: RenderOutputBounds
+  readonly cornerRadius: number
+  readonly outerClip?: { readonly bounds: RenderOutputBounds; readonly cornerRadius: number }
+  readonly blur: number
+}
+export interface RenderFreeformNode extends RenderNodeBase {
+  readonly kind: 'freeform'
+  readonly bounds: RenderOutputBounds
+  readonly points: readonly import('../composition/types').FreeformPoint[]
+}
+
 export type RenderNode =
+  | RenderGroupNode
+  | RenderFreeformNode
   | RenderVectorNode
   | RenderRectNode
   | RenderEllipseNode

@@ -49,7 +49,7 @@ const baseLayer: LayerNode = {
 }
 
 const document: EditorDocumentV1 = {
-  schemaVersion: 7,
+  schemaVersion: 8,
   id: DOCUMENT_ID,
   source: {
     blobHash: 'a'.repeat(64),

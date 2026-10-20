@@ -11,7 +11,7 @@ describe('document render scene: drawing nodes', () => {
   it('compiles alternating inner and outer star points', () => {
     const scene = createDocumentRenderScene({
       ...document,
-      schemaVersion: 7,
+      schemaVersion: 8,
       layers: [
         {
           id: '019c1f62-058e-7000-8000-000000000004',
@@ -50,7 +50,7 @@ describe('document render scene: drawing nodes', () => {
   it('uses sampled pen pressure and renders a one-point marker as a dot', () => {
     const scene = createDocumentRenderScene({
       ...document,
-      schemaVersion: 7,
+      schemaVersion: 8,
       layers: [
         {
           id: '019c1f62-058e-7000-8000-000000000005',
@@ -99,7 +99,7 @@ describe('document render scene: drawing nodes', () => {
   it('compiles a multi-point marker into one contiguous round path', () => {
     const scene = createDocumentRenderScene({
       ...document,
-      schemaVersion: 7,
+      schemaVersion: 8,
       layers: [
         {
           id: '019c1f62-058e-7000-8000-000000000008',
@@ -142,7 +142,7 @@ describe('document render scene: drawing nodes', () => {
   it('keeps an image texture as a renderer resource reference', () => {
     const scene = createDocumentRenderScene({
       ...document,
-      schemaVersion: 7,
+      schemaVersion: 8,
       layers: [
         {
           id: '019c1f62-058e-7000-8000-000000000007',
@@ -199,7 +199,7 @@ describe('document render scene: drawing nodes', () => {
   it('clamps and compiles rectangle corner radius into the shared scene', () => {
     const scene = createDocumentRenderScene({
       ...document,
-      schemaVersion: 7,
+      schemaVersion: 8,
       layers: [
         {
           id: '019c1f62-058e-7000-8000-000000000008',

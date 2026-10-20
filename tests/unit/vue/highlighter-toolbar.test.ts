@@ -156,6 +156,16 @@ describe('collapsed highlighter effect', () => {
 })
 
 describe('two level colour palette', () => {
+  it('keeps every swatch and uses eight-column keyboard navigation in compact embeds', async () => {
+    render(SimpleColorPicker, { props: { modelValue: '#123456', ariaLabel: 'Colour', compact: true, embedded: true } })
+    const black = screen.getByRole('button', { name: 'Black' })
+    black.focus()
+    await fireEvent.keyDown(black, { key: 'ArrowDown' })
+    expect(screen.getByRole('button', { name: 'Violet' })).toHaveFocus()
+    expect(screen.getAllByRole('button')).toHaveLength(21)
+    await fireEvent.click(screen.getByRole('button', { name: 'Custom colour' }))
+    expect(await screen.findByRole('textbox', { name: 'HEX colour code' })).toBeInTheDocument()
+  })
   it.each(['drawing', 'highlighter'] as const)('uses only fixed %s swatches until Custom colour', async (palette) => {
     const view = render(SimpleColorPicker, { props: { modelValue: '#123456', ariaLabel: 'Colour', palette } })
     await fireEvent.click(screen.getByRole('button', { name: 'Colour' }))

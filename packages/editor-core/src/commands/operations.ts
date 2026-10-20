@@ -39,6 +39,7 @@ export function createFlipCanvasCommand(
   axis: 'horizontal' | 'vertical',
 ): Extract<EditorCommand, { type: 'flipCanvas' }> {
   const afterLayers = document.layers.map((layer) => {
+    if (layer.space === 'card') return layer
     const { transform } = layer
     const radians = (transform.rotation * Math.PI) / 180
     const scaleX = Math.hypot(transform.scaleX * Math.cos(radians), transform.scaleX * Math.sin(radians))
@@ -93,7 +94,7 @@ export function createFlipCanvasCommand(
 
 function replaceDocument(
   document: EditorDocumentV1,
-  next: Pick<EditorDocumentV1, 'layers'> | Pick<EditorDocumentV1, 'crop'>,
+  next: Partial<Pick<EditorDocumentV1, 'layers' | 'crop' | 'presentation'>>,
 ): EditorDocumentV1 {
   return normalizeEditorDocument({ ...document, ...next })
 }
@@ -269,6 +270,9 @@ export function applyEditorCommand(
   switch (command.type) {
     case 'migrateExpressiveBrushes':
       return migrateBrushes(document, command)
+    case 'setPresentation':
+      if (!jsonEquals(document.presentation, command.before)) throw new Error('presentation changed before command')
+      return replaceDocument(document, { presentation: command.after })
     case 'addLayer':
       return applyAddLayer(document, command)
     case 'removeLayer':
@@ -391,6 +395,9 @@ export function revertEditorCommand(
   switch (command.type) {
     case 'migrateExpressiveBrushes':
       return migrateBrushes(document, command, true)
+    case 'setPresentation':
+      if (!jsonEquals(document.presentation, command.after)) throw new Error('presentation changed before revert')
+      return replaceDocument(document, { presentation: command.before })
     case 'addLayer':
       return revertAddLayer(document, command)
     case 'removeLayer':

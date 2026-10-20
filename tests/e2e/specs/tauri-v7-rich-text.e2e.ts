@@ -82,7 +82,7 @@ describe('Document v7 rich text in a real Tauri webview', () => {
       browser.execute(() => document.activeElement?.getAttribute('contenteditable') === 'true'))
     await $('button[aria-label="Font family"]').click()
     await browser.waitUntil(async () => $('button[role="option"][aria-label="Lora"]').isEnabled())
-    await expect($$('button[role="option"]')).toBeElementsArrayOfSize(12)
+    await expect($$('button[role="option"]')).toBeElementsArrayOfSize(20)
     await $('button[role="option"][aria-label="Lora"]').click()
     const openBackground = async () => $('button[aria-label="Background"]').click()
     await openBackground()

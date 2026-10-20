@@ -9,7 +9,7 @@ import type { EditorDocumentV1 } from './document/types'
 import { TransientEditorStateController } from './transient'
 
 const document: EditorDocumentV1 = {
-  schemaVersion: 7,
+  schemaVersion: 8,
   id: '019c1f62-058e-7000-8000-000000000000',
   source: {
     blobHash: 'a'.repeat(64),

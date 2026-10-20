@@ -241,7 +241,7 @@ export class CanvasKitRenderer implements Renderer {
       scene.outputBounds.y === 0 &&
       scene.outputBounds.width === scene.width &&
       scene.outputBounds.height === scene.height
-    if (!fullOutput || scene.nodes.some((node) => ['censor', 'spotlight', 'loupe'].includes(node.kind))) {
+    if (!fullOutput || scene.nodes.some((node) => ['censor', 'spotlight', 'loupe', 'group', 'freeform'].includes(node.kind))) {
       return undefined
     }
     const recorder = new PictureRecorder()

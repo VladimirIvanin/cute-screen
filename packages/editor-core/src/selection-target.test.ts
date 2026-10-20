@@ -32,7 +32,7 @@ import {
 
 const arrow = createDrawingLayer({ id: 'arrow', tool: 'arrow', start: { x: 50, y: 50 }, end: { x: 250, y: 150 } })!
 function document(layers: readonly LayerNode[] = [arrow]): EditorDocumentV1 {
-  return { schemaVersion: 7, id: 'selection-test', canvas: { width: 1000, height: 700 }, crop: null,
+  return { schemaVersion: 8, id: 'selection-test', canvas: { width: 1000, height: 700 }, crop: null,
     source: { blobHash: 'a'.repeat(64), format: 'png', mimeType: 'image/png', width: 1000, height: 700,
       orientationApplied: true, color: { colorSpace: 'srgb', hasIccProfile: false } },
     layers, presentation: { beautify: { enabled: false }, watermark: { enabled: false } },

@@ -22,6 +22,10 @@ await mkdir(runtimeDirectory, { recursive: true })
 const embeddedWebDriverPort = Number.parseInt(process.env.TAURI_WEBDRIVER_PORT ?? '4445', 10)
 
 const scenarios = [
+  { id: 'creative-fonts', persistenceGroup: 'creative-fonts', spec: 'tests/e2e/specs/tauri-creative-fonts.e2e.ts', harnessQuery: '?m04=1&m08=1', driverProvider: 'external' },
+  { id: 'creative-fonts-reopen', persistenceGroup: 'creative-fonts', spec: 'tests/e2e/specs/tauri-creative-fonts-reopen.e2e.ts', harnessQuery: '?m04=1&m08=1', driverProvider: 'external' },
+  { id: 'composition', persistenceGroup: 'composition', spec: 'tests/e2e/specs/tauri-composition.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },
+  { id: 'composition-reopen', persistenceGroup: 'composition', spec: 'tests/e2e/specs/tauri-composition-reopen.e2e.ts', harnessQuery: '?m04=1&m08=1', driverProvider: 'external' },
   { id: 'gradient', persistenceGroup: 'gradient', spec: 'tests/e2e/specs/tauri-gradient.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },
   { id: 'gradient-reopen', persistenceGroup: 'gradient', spec: 'tests/e2e/specs/tauri-gradient-reopen.e2e.ts', harnessQuery: '?m04=1&m08=1', driverProvider: 'external' },
   {

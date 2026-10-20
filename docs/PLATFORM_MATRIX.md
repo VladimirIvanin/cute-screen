@@ -1,5 +1,45 @@
 # Платформенная матрица
 
+## Жест масштабирования интерфейса (ADR-130, 2026-10-20)
+
+Общий frontend guard действует в entrypoint всех окон. Chrome/Linux browser:
+trusted Ctrl+wheel над chrome/canvas/Settings, обычная прокрутка и synthetic
+WebKit gesture cancellation проверяются отдельным browser scenario.
+Физический pinch на Linux WebKitGTK, Windows WebView2 и macOS WKWebView — pending;
+browser result не считается native pass. Tauri/native DPI настройки не меняются.
+
+## Публикационные карточки (ADR-127, 2026-10-20)
+
+Общие TypeScript layout/codec и Canvas2D/CanvasKit; native SQLite migration 5 и
+materials_list/put/remove. Linux x86_64 Chrome 147: production controls, on-canvas
+freeform gesture, автоматическая привязка content/card и внешняя стрелка;
+1024 px RU/EN × themes passed.
+Выбор типа заливки семью визуальными кнопками: Chrome 147 / Linux 1024×768,
+RU/EN × light/dark, keyboard/Undo/Redo и gradient/sticky regressions passed
+(`fill-browser.log`). Native именно эта UI-замена отдельно не перепроверялась.
+Compact gradient controls/palette: Chrome 147/Linux, 1024×768, RU/EN × themes,
+числовой ввод/геометрия/keyboard/custom HEX passed (`compact-browser-final.log`),
+39 component tests passed. Native compact отдельно не проверялся.
+Редактор подписей без вложенных expand: Chrome 147/Linux, 1024×768 RU/EN ×
+themes, text/quick color/alpha/backplate/multiple/delete/Undo/Redo passed
+(`branding-browser.log`), component tests 5/5 + финальные 2/2 passed.
+Нативная проверка нового размещения controls остаётся pending.
+Decoded renderer exports 1×/2× passed. WebKitGTK: свежий debug/no-bundle harness,
+Quick → Editor, automatic card arrow, gradient drag/undo, durable import/preset,
+full Copy/decoded PNG и relaunch/restore — 2/2 scenarios passed (native.log).
+Windows WebView2 и macOS WKWebView остаются pending. Software performance timings
+не подтверждают reference GPU budgets; capture backend этой функцией не меняется.
+
+## Панель градиента и размещение (ADR-128, 2026-10-20)
+
+Общие Vue/CSS и TypeScript geometry commands; без новых native API/permissions
+и persisted fields. Linux Chrome 147: production creation и все восемь placement
+commands с undo/redo/no-op, RU/EN × light/dark при 640/1024 px passed.
+Core/Vue и оба renderer проверены; свежий WebKitGTK 2.50.4 gate прошёл
+Quick → Editor → placement/fit → save → relaunch → fit/undo.
+Windows WebView2, macOS WKWebView и физический capture не проверялись этой правкой.
+Фактические команды и evidence — TESTING.md.
+
 ## Градиентная подложка (ADR-124/126)
 
 `REQ-TOL-018`: общий TypeScript core/codec v7 и Canvas2D/CanvasKit; новых
@@ -1545,3 +1585,20 @@ x86_64 / headless Chrome 147.0.7727.101, core и Canvas2D pixel/export tests.
 Native WebKitGTK, Windows WebView2 и macOS WKWebView в этой задаче не
 запускались; browser results не считаются их платформенным pass.
 Подробные результаты — TESTING.md.
+
+## Креативные шрифты: 20 семейств (2026-10-20, ADR-131)
+
+Все восемь новых гарнитур поставляются локально под OFL-1.1. Germanica —
+неизменённый TTF автора; остальные — Fontsource 5.3.0 Latin/Cyrillic assets.
+Полный русский алфавит с Ё/ё проверяется по glyph IDs реальных файлов,
+Canvas2D/CanvasKit export повторно декодируется. Component и renderer evidence
+получены на Ubuntu 22.04.5 x86_64. Browser/native статус текущей рабочей копии
+и точные команды — TESTING.md. Windows/macOS runtime для этого расширения
+не запускались; Wayland capture этим изменением не затрагивается.
+
+Фактический результат расширения ADR-131: Chrome 147.0.7727.101 headless —
+2 specs / 6 tests passed; real Tauri WebKitGTK 2.50.4 / wry 0.55.1, external
+driver — 2 scenarios / 2 tests passed. Native Open image → восемь UI-created
+text layers → autosave → relaunch → повторный export 3840×2160 имеет тот же
+SHA-256 decoded RGBA. Desktop session — Wayland/XWayland; capture backend
+в этом сценарии не вызывался. Команды и selected screenshots — TESTING.md.

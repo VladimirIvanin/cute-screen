@@ -9,7 +9,11 @@ import {
 } from './platform/tauri/ui-preferences-adapter'
 
 import { resolveHarnessSearch } from './e2e-harness-query'
+import { installInterfaceZoomGuard } from './interface-zoom'
 import './styles.css'
+
+const disposeInterfaceZoomGuard = installInterfaceZoomGuard()
+import.meta.hot?.dispose(disposeInterfaceZoomGuard)
 
 if (import.meta.env.VITE_TEST_HARNESS === 'true') {
   await import('./test-harness')

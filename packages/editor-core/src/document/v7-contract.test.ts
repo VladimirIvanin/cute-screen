@@ -273,10 +273,10 @@ describe('document schema v7 contract', () => {
       expect(raw).toEqual(snapshot)
       expect(Object.isFrozen(raw)).toBe(false)
     }
-    expect(parseEditorDocument({ schemaVersion: 8, marker: 'future' })).toEqual({
+    expect(parseEditorDocument({ schemaVersion: 9, marker: 'future' })).toEqual({
       kind: 'readOnly',
-      schemaVersion: 8,
-      raw: { schemaVersion: 8, marker: 'future' },
+      schemaVersion: 9,
+      raw: { schemaVersion: 9, marker: 'future' },
       reason: 'newerSchema',
     })
   })
@@ -288,7 +288,7 @@ describe('document schema v7 contract', () => {
       source,
       timestamp: '2026-08-14T00:00:00.000Z',
     })
-    expect(created.schemaVersion).toBe(7)
+    expect(created.schemaVersion).toBe(8)
     expect(parseEditorDocument(serializeEditorDocument(created))).toEqual({
       kind: 'editable',
       document: created,
@@ -322,11 +322,11 @@ describe('document schema v7 contract', () => {
   })
 
   it('round-trips v7 text-bearing layers through clipboard v2', () => {
-    expect(CLIPBOARD_LAYERS_MIME).toBe('application/x-cute-screen-layers+json;version=2')
+    expect(CLIPBOARD_LAYERS_MIME).toBe('application/x-cute-screen-layers+json;version=3')
     const encoded = encodeClipboardLayersV2([textLayer() as unknown as LayerNode])
     expect(JSON.parse(encoded)).toMatchObject({
-      version: 2,
-      documentSchemaVersion: 7,
+      version: 3,
+      documentSchemaVersion: 8,
     })
     expect(decodeClipboardLayersV2(encoded).layers).toEqual([textLayer()])
     expect(() => decodeClipboardLayersV2(JSON.stringify({ version: 1, documentSchemaVersion: 6, layers: [] }))).toThrow(

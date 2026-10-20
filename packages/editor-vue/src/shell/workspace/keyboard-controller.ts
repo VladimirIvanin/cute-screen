@@ -263,8 +263,11 @@ export function createKeyboardController(context: KeyboardControllerContext) {
   function onKeydown(event: KeyboardEvent): void {
     if (event.defaultPrevented || event.isComposing) return
     if (handleStyleClipboard(context, event)) return
-    if (isEditingTarget(event.target)) return
     const key = shortcutLetter(event)
+    const placementHistory = key === 'z' && event.target instanceof HTMLElement &&
+      Boolean(event.target.closest('.cs-gradient-placement button:not(:disabled)'))
+    if (placementHistory && handleOpenOrHistory(context, event, key)) return
+    if (isEditingTarget(event.target)) return
     if (handleToolShortcut(context, event)) return
     if (key && handleOpenOrHistory(context, event, key)) return
     if (key && handleDuplicate(context, event, key)) return

@@ -1,5 +1,80 @@
 # Сквозная приёмка
 
+## Жест масштабирования интерфейса (ADR-130)
+
+В Editor, Quick Capture и Settings развести/свести два пальца над toolbar,
+панелями, пустым местом и открытым popover. Размеры controls и всей страницы
+должны сохраняться. Ctrl/Cmd+wheel над canvas продолжает менять только масштаб
+холста, обычная прокрутка Settings/слоёв сохраняется. Повторить после reload,
+при открытии нового окна и смене темы; системный DPI не блокируется.
+
+Browser regression проверяет trusted wheel cancellation, viewport/DPR/control
+sizes, zoom холста и Settings scroll. Синтетический WebKit gesture contract
+не доказывает физический pinch. Native Linux/Windows/macOS trackpad smoke pending.
+
+## Публикационная карточка (ADR-127)
+
+Проверить production mount → «Оформление» без изменения документа → ручной вариант.
+Новый capture и Quick → Editor не получают оформление автоматически. Панель справа
+резервирует место, переключается со слоями, сохраняет раскрытые разделы; Fit учитывает
+её ширину. 1024/1280 px, RU/EN, light/dark, focus/disabled/loading/error/cancel.
+Тип заливки выбирается семью визуальными кнопками; активен ровно один тип,
+названия доступны при наведении и screen reader. Tab/Enter выбирают тип;
+Undo/Redo возвращают выбор, параметры других типов сохраняются.
+В dock включён compact общего gradient editor: полностью видны 100% и 359°,
+число и единица не перекрываются, все 20 цветов и «Свой цвет» помещаются по ширине.
+ArrowDown следует восьми колонкам, свой HEX вводится и применяется; обычные
+popover редакторов фигур/подложки сохраняют прежний размер.
+Включить ручки на холсте, задать углы 0/45/90/180/270/359: цифры точек целиком
+помещаются и центрированы в кружках. Проверить номера до 16 и миниатюру freeform;
+размеры numeric input, keyboard focus и перетаскивание сохраняются.
+В «Подписях» нет вложенных details: один блок редактируется сразу, несколько
+выбираются плоским списком с сокращением длинных названий. Текст во всю ширину;
+font/size рядом, доступна быстрая палитра и кнопки text alignment. Смена цвета
+сохраняет alpha и остальные блоки. Проверить подложку, логотип/disabled import,
+выбор после удаления, Undo/Redo, {year} и 1024 px RU/EN × обе темы.
+
+На 4K снимке с аннотациями менять независимые поля, frame и положение: content-стрелки
+и censorship следуют пикселям. Создать card-стрелку от поля к снимку. Cross-space
+selection/reorder запрещены. Crop/flip относятся к content; экспорт при активном Crop
+включает всю карточку. Нижняя полоса с нулевыми прочими полями не перекрывает снимок.
+По ADR-129 переключателя пространств нет: начало на поле создаёт card-слой,
+на снимке — content-слой; перенос через границу сохраняет привязку. Card-слой
+выбирается и перемещается поверх снимка. Стартовые варианты: поля, браузер, телефон;
+три пресета полос отсутствуют, ручные настройки полос сохраняются.
+
+Browser: длинные RU/EN title+URL, тема, undo/redo/reopen. Phone: обе ориентации,
+contain/cover/offset без деформации и поворота снимка. Подписи: несколько text/logo
+blocks, четыре области, якоря/drag/font/opacity/backplate; {year} фиксируется при
+применении и меняется только явной командой.
+
+Градиенты: linear/radial 2–8 stops и reverse; freeform 2–16 points/spread/alpha,
+миниатюра всего фона и on-canvas controls. Один жест — один undo; Escape/pointercancel
+отменяют draft. Delete/стрелки в редакторе не редактируют document layers. Смена типа
+сохраняет предыдущие варианты; palette и собственные материалы применяются вручную.
+
+Импортировать фон/лого, сохранить preset, удалить внешний файл и очистить history/cache,
+смоделировать age >7 дней: материал доступен после relaunch. Удаление записи материала
+не ломает документ/preset; последний владелец освобождает blob через journal recovery.
+Материалы не защищают от удаления сам оформленный capture.
+
+Проверить декодированные PNG и clipboard bitmap: размеры/pixels, clipping,
+прозрачность, frame, обе реализации renderer, 1×/2×. Замена полностью закрытого
+censorship оригинала не должна менять blurred background, card loupe и thumbnail.
+Платформенная приёмка и reference GPU budgets фиксируются отдельно; pending не считается pass.
+
+## Компактная панель и графическое размещение (ADR-128)
+
+Создать Gradient в полном Editor. В RU/EN, dark/light и окнах 640/1024 px
+mode/fill/opacity/placement не пересекаются; opacity label/field на одной оси.
+Открыть «Расположение»: шесть иконок краёв/центров и две stretch-команды.
+Применить «Ширина → Снизу», затем проверить остальные края/центры. Меняется
+нужная ось, fill и независимая ось сохраняются. Повтор команды — no-op;
+Ctrl/Cmd+Z и redo работают, пока popup открыт. Arrow keys перемещают focus
+между кнопками, Escape закрывает popup и возвращает focus на trigger.
+Rotation/multi объясняют disabled состояние; locked/read-only блокируют команды.
+Настройки gradient stops не теряются при reopen. Scope остаётся Editor-only.
+
 ## Градиентная подложка (ADR-124/126)
 
 `REQ-TOL-018`, `REQ-EDT-002/015/016/017`: в Quick Capture нет Gradient.
@@ -1961,3 +2036,29 @@ Preview и повторно декодированный экспорт совп
 censor, spotlight, loupe и ruler используют собственную геометрию; arrow/callout
 имеют semantic handles, numberedMarker не имеет generic resize. Проверки
 и границы платформенного подтверждения — TESTING.md и PLATFORM_MATRIX.md.
+
+## Креативные шрифты (2026-10-20, ADR-131)
+
+`REQ-TOL-005/006/007`: каталог содержит 20 вариантов в прежнем меню. После
+исходных 12 идут Press Start 2P, Germanica, Rubik Dirt, Rubik Glitch, Unbounded,
+Russo One, Ruslan Display, Underdog. Все работают офлайн и распространяются
+по OFL-1.1 с сохранением copyright/license notices.
+
+- Component: 20 вариантов, Home/End/стрелки, явный commit, hover без изменений,
+  disabled/loading/error/retry и восстановление focus.
+- Assets/render: полный русский алфавит с Ё/ё, латиница и цифры в реальных
+  файлах без fallback; 20 строк regular/B/I в decoded Canvas2D/CanvasKit goldens.
+- Browser: production меню, смешанный текст, measured width и переносы,
+  B/I, undo/redo, PNG decode; RU/EN, обе темы, 640/1024/1440 px.
+- Native: новые text layers через UI на 4K original, все восемь family,
+  wrapping/B/I, undo/redo, autosave, relaunch и совпадение decoded export pixels.
+
+Фактические результаты и ограничения текущей рабочей копии — TESTING.md.
+Результаты старого набора из 12 шрифтов не являются native evidence нового.
+
+Результат ADR-131 на Ubuntu 22.04.5 x86_64: 18 component/license tests,
+4 профильных font/render tests, 6 browser tests и 2 native persistence/export
+сценария прошли. Оба native PNG декодированы, каждый текст меняет пиксели
+в собственных bounds, relaunch сохраняет полный decoded pixel hash.
+Общие проверки имеют отдельные timeout ограничения, зафиксированные
+в TESTING.md; Windows/macOS runtime не объявляются проверенными.

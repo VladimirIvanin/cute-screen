@@ -1,5 +1,223 @@
 # Стратегия тестирования
 
+## Жест масштабирования интерфейса (2026-10-20, ADR-130)
+
+Linux x86_64, HEAD `e50da83a869ed09778bd173e2de290c60a40c3d1`, общая рабочая
+копия с несвязанными изменениями. Node 22.23.1 / pnpm 10.33.2 / Chrome 147.
+Логи — `artifacts/interface-zoom/`.
+
+- Red-first `CUTE_SCREEN_E2E_DISABLE_WATCH=1 CUTE_SCREEN_BROWSER_E2E_PORT=53148
+CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 pnpm test:e2e:browser --spec
+tests/e2e/specs/browser-interface-zoom.e2e.ts`: оба trusted Ctrl+wheel над chrome
+  и Settings дошли без preventDefault (`cancelled:false`, browser-red.log).
+- После исправления та же команда с port 53149: 2/2 passed (browser-green.log).
+  Сохраняются viewport, DPR, visualViewport scale и размеры controls; wheel над
+  canvas меняет только editor zoom; обычный wheel прокручивает Settings.
+  Синтетические gesturestart/change/end отменены общим entrypoint.
+- Этот WebDriver Chrome не выполнял browser page zoom даже до исправления:
+  red доказывает отсутствие cancellation, а не физический pinch. Linux WebKitGTK,
+  Windows WebView2 и macOS WKWebView с настоящим трекпадом остаются pending.
+- `pnpm test tests/unit/vue/canvas-viewport-transform.test.ts
+tests/unit/vue/keyboard-shortcuts.test.ts --maxWorkers=1`: 2 files / 13 passed
+  (tests.log). Проверены прежние viewport transforms и keyboard shortcuts.
+- `pnpm typecheck`, targeted ESLint трёх файлов исправления и `pnpm docs:check`
+  passed. `pnpm format` выполнен; результат общего `pnpm format:check` — format-check.log.
+- Общий `pnpm lint` blocked сторонним unused `expect` в
+  `tests/e2e/specs/browser-composition-gradient.e2e.ts` (lint.log).
+  Rust/native/release сборки не запускались: изменение только в общем frontend.
+- `pnpm disk:usage`: общий Cargo target 45.537 GiB; полезный cache сохранён.
+  Собственные evidence занимают менее 0.1 MiB; временных profiles/targets нет.
+
+## Публикационные карточки (2026-10-20, ADR-127)
+
+HEAD `e50da83a869ed09778bd173e2de290c60a40c3d1`, общая рабочая копия с
+ADR-128. Linux x86_64; Node 22.23.1 / pnpm 10.33.2; Chrome 147.
+Native: Ubuntu 22.04 Docker `cute-screen-ubuntu22-build:local`, Rust 1.97.0,
+WebKitGTK 2.50.4, Xvfb/D-Bus и external tauri-driver. Один общий `target/`.
+
+- До реализации обновлены PRODUCT/TRACEABILITY и принят ADR-127.
+  Red-first core/Rust: schema/layout/material APIs отсутствовали; дополнительно
+  воспроизведены изоляция opacity подписи, отображение title/URL, abort до
+  запуска resolver, внутренний radius браузера и неверный shadow radius телефона.
+  Логи `artifacts/composition/*-red.log`; затем соответствующие контракты passed.
+- `pnpm test`: 161 files / 1487 tests passed (`tests-3.log`). Проверены
+  codec v8, нормализация v7, clipboard, EditorCommand/undo/redo, crop/flip/scopes,
+  нейтральное создание и production session панели. Поздние targeted проверки
+  года, геометрии и renderer allocation фиксируются отдельно в том же каталоге.
+- `cargo test --workspace` в указанном Docker: 172 desktop + 1 binary +
+  34 storage tests passed; doc-tests passed (`cargo-workspace-final.log`).
+  Durable material переживает expiry/history/cache/reopen; удаление записи
+  сохраняет preset/document owners, последний owner допускает физический cleanup.
+- `pnpm test:render`: 63/65 passed; legacy shape catalogue и 2× shapes превысили
+  wall-clock timeout при параллельной сборке. Штатный targeted повтор этих двух
+  файлов: 5/5 passed (`render-full.log`, `render-retry.log`), goldens не ослаблены.
+  Composition goldens 1×/2× Canvas2D/CanvasKit обновлялись отдельно;
+  браузер, телефон, footer/freeform и alpha сравниваются после PNG decode.
+  Privacy test сравнивает результат при полной замене цензурированного оригинала:
+  blur/card loupe/export/thumbnail одинаковы. Censor композится до downsampling.
+- `pnpm exec vitest run --project render-harness
+tests/harness/render/composition-crop.test.ts`: passed. Tiny 100×100 crop
+  исходной 8K сцены увеличен до 2160×2160; оба PNG декодированы, проверены
+  размеры и пиксели выбранной области. Выделение offscreen ограничено crop;
+  pixel-sampling effects сохраняют native-before-downsample обработку.
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5191 CUTE_SCREEN_BROWSER_E2E_HEADLESS=1
+pnpm test:e2e:browser --spec tests/e2e/specs/browser-composition.e2e.ts`:
+  1 spec passed (`browser-final.log`). Production mount, neutral → manual browser,
+  phone/freeform, handle gesture, card-space arrow; 1280/1024 px, RU/EN × themes.
+  После ADR-129: `browser-auto-space-3.log` — passed; без mode controls создание
+  на поле/снимке выбирает правильного владельца, card-стрелка перемещается поверх
+  снимка. Финальные core/Vue/renderer contracts: 6 files / 19 tests passed
+  (`auto-final-unit.log`); header/footer/bands отсутствуют среди starter buttons.
+- `pnpm test:perf tests/harness/perf/composition.test.ts`: 2/2 passed;
+  4K/500 и 8K/1000 source/layers, 30 warmups/120 samples, idle frames=0.
+  Software Canvas2D native-resolution p95 348.46/1791.01 ms; gradient resolver
+  105.68/153.08 ms. Это shared-host trend, reference GPU 16.7/33.3 ms pending.
+  Существующий 8K/1000 CanvasKit baseline дважды превысил 120 s suite timeout
+  при общей CPU нагрузке (`perf-baseline.log`, `perf-reference-retry.log`);
+  этот gate не объявляется passed и его бюджеты не изменены.
+- Отдельные регрессии по изображениям владельца: browser content не скругляется
+  у title bar, outer clip сохраняет нижние углы; screen fill также обрезается
+  внешним контуром. Phone shadow использует тот же radius, что корпус,
+  в portrait/landscape. Core red→green и обновлённые обоими renderer PNG
+  в `render-frame-final.log`; `browser-*.png` и `phone-*.png` осмотрены.
+
+- После замечаний владельца добавлены регрессии: `latest-regressions.log` —
+  20 core/Vue tests passed. Window/browser разделяют внешнее clipping;
+  `render-window-final.log` — decoded 1×/2× Canvas2D/CanvasKit passed.
+- Sticky summary разделов оформления: production wheel прокручивает «Макет»,
+  затем «Фон»; заголовки закрепляются под шапкой в пределах своего details,
+  закреплённый раздел сворачивается кликом. Chrome 147 / Linux, 1280×700:
+  `pnpm test:e2e:browser --spec tests/e2e/specs/browser-composition-sticky.e2e.ts`
+  — до изменения failed, после passed (`sticky-red.log`, `sticky-green.log`);
+  screenshot `artifacts/browser-e2e/composition-sticky-layout.png` осмотрен.
+  Native sticky отдельно не перепроверялся; изменение только CSS панели.
+- Визуальный выбор заливки: семь buttons с образцами, title/accessible name,
+  aria-pressed и видимым названием вместо select; общий CardBackground для фона
+  и полос. Production Chrome 147 / Linux, 1024×768, RU/EN × light/dark:
+  все семь типов, Tab/Enter, Undo/Redo; повторены gradient drag и sticky scroll.
+  `pnpm test:e2e:browser --spec tests/e2e/specs/browser-composition-fill.e2e.ts
+--spec tests/e2e/specs/browser-composition-gradient.e2e.ts
+--spec tests/e2e/specs/browser-composition-sticky.e2e.ts` — 3/3 passed
+  (`artifacts/composition/fill-browser.log`). Скриншоты `composition-fill-*.png`
+  находятся в `artifacts/browser-e2e/`. Native после этой UI-замены не запускался;
+  его сценарий обновлён на кнопки с data-card-fill.
+- Compact gradient editor в dock: `compact-red.log` воспроизвёл наложение
+  внутренних input на unit; стили native полей теперь ограничены cs-card-input.
+  ShapeGradientEditor/SimpleColorPicker имеют opt-in compact, CardGradient его
+  включает; палитра 8 колонок, 20 цветов + custom без горизонтального overflow.
+  `pnpm test tests/unit/vue/shape-gradient.test.ts
+tests/unit/vue/highlighter-toolbar.test.ts tests/unit/vue/numeric-control.test.ts
+tests/unit/vue/composition.test.ts` — 39/39 passed (`compact-component.log`).
+  `pnpm test:e2e:browser --spec tests/e2e/specs/browser-composition-compact.e2e.ts`
+  — passed (`compact-browser-final.log`): production mount, geometry всех полей,
+  ввод 55%, 100%, 359°, keyboard по 8 колонкам, custom HEX, RU/EN × themes,
+  1024×768, Chrome 147/Linux. Получены четыре composition-compact-*.png;
+  RU/dark визуально осмотрен.
+  Drag gradient отдельно passed (`compact-browser.log`); сам первый compact-run
+  в этом логе failed: WebDriver clearElement несовместим с controlled fields,
+  финальный использует штатный trusted select-all helper. Для OS boundary
+  включён существующий imageIngress harness; UI/document заранее не создаются.
+  Full pnpm typecheck/lint passed; после уточнения browser helper E2E tsc passed
+  (`compact-typecheck.log`, `compact-lint.log`, `compact-e2e-types.log`).
+  Native/Rust/render/perf для этой UI-правки не перезапускались.
+- Номера gradient handles: `point-labels-red.log` воспроизвёл выход text bounds
+  за кружок. Общий класс нумерованных ручек убирает padding, центрирует текст,
+  задаёт 24 px и 12 px/1 tabular numbers; используется на холсте и в freeform preview.
+  `pnpm test:e2e:browser --spec tests/e2e/specs/browser-composition-compact.e2e.ts
+--spec tests/e2e/specs/browser-composition-gradient.e2e.ts` — 2/2 passed
+  (`point-labels-browser.log`), Chrome 147/Linux, 1024×768: text bounds/центрирование
+  при углах 0/45/90/180/270/359, numeric bounds, номера 1–16, прежний drag/undo.
+  Screenshot `artifacts/browser-e2e/composition-point-labels.png` осмотрен:
+  16 читается на холсте и в миниатюре. E2E tsc passed (`point-labels-types.log`).
+  Native не повторялся для этой CSS/markup правки.
+- Новый редактор подписей: плоский список и один editor без nested details,
+  быстрые цвета сохраняют alpha, неактивные блоки не меняются; year refresh только
+  для шаблона. `pnpm test tests/unit/vue/branding.test.ts
+tests/unit/vue/composition.test.ts` — 5/5 passed (`branding-unit.log`), после
+  синхронизации активного блока повторены 2/2 (`branding-unit-final.log`).
+  `pnpm test:e2e:browser --spec tests/e2e/specs/browser-composition-branding.e2e.ts`
+  — production add/text/palette/alpha/backplate/select/delete/undo/redo, 1024×768,
+  RU/EN × themes passed (`branding-browser.log`). Финальный визуальный повтор —
+  `branding-browser-final.log`, captures composition-signature[s]-*.png.
+  Single-signature screenshot осмотрен: текст, font/size, палитра и alignment.
+  pnpm typecheck прошёл package/app/Vue tests, затем остановился на параллельно
+  изменявшемся browser-text-layout.e2e.ts:112 (TS2554); после исправления той
+  рабочей копии E2E tsc и landing tsc passed (`branding-typecheck.log`,
+  `branding-e2e-types.log`, `branding-landing-types.log`). Native не повторялся.
+- `browser-composition-gradient.e2e.ts`: до исправления handle имел position=static;
+  после shared styles и post-drag click guard — passed (`gradient-drag-green.log`).
+  Во время удержания pointer меняется preview, committed stops неизменны; release
+  сохраняет две точки и одну undo-команду. Unit red выявил второй commit от click,
+  retargeted на track; новый pointerdown снова разрешает обычное добавление.
+- Native production Quick → Editor → automatic card arrow → material/preset →
+  full Copy/decoded PNG → relaunch/restore: 2/2 passed (`native-before-gradient.log`).
+  После изменений gradient этот же gate повторён на свежем harness с общим
+  browser/WebView pointer helper; его итог — `native.log`.
+- Первый нативный Copy gate выявил bitmap=null на X11 без clipboard manager:
+  временный arboard handle терял ownership при возврате команды. Owner теперь
+  живёт до завершения event loop, native Copy/PNG подтверждены после исправления.
+  Reopen spec отдельно исправил неверный combined CSS/text selector.
+- Одновременные normal/native frontend builds однажды удалили asset во время
+  generate_context. Финальный native запуск использует штатный
+  `CUTE_SCREEN_FRONTEND_DIST=/source/artifacts/composition/frontend` и отдельный
+  временный frontend config; Cargo target остаётся общим. Копия frontend удаляется
+  после проверки. Binary всегда свежий и pin-ится штатным runner, stale binary не использован.
+
+Точный итог native/check/format и disk hygiene —
+`artifacts/composition/README.md`. Windows WebView2, macOS WKWebView и reference
+GPU runner остаются pending. Native fake capture не доказывает OS capture.
+
+## Панель и размещение градиента (2026-10-20, ADR-128)
+
+Исходный HEAD `e50da83`, общая рабочая копия с параллельной публикационной
+карточкой ADR-127. Host Linux x86_64, Node 22.23.1 / pnpm 10.33.2; Chrome 147.
+Native gate — штатный Ubuntu 22.04 Docker / WebKitGTK 2.50.4 / Rust 1.97.0,
+external tauri-driver, Xvfb/D-Bus. Источники UX — GRADIENT_CONTROLS_RESEARCH.md.
+
+- Red-first `pnpm test packages/editor-core/src/gradient.test.ts --maxWorkers=1`:
+  новый placeGradientLayer отсутствовал; затем 8/8 passed (core-red/core-green.log).
+- `pnpm test packages/editor-core/src/gradient.test.ts
+tests/unit/vue/gradient-backdrop.test.ts tests/unit/vue/shape-gradient.test.ts
+tests/unit/vue/keyboard-shortcuts.test.ts tests/unit/vue/app-shell-layout.test.ts
+--maxWorkers=1 --testTimeout=15000`: 5 files / 30 passed. Проверены bounds/fill,
+  reflection/local origin, guards, no-op/commands/history, popup focus/Escape,
+  arrow navigation, Ctrl/Cmd history из placement и прежний dialog guard.
+- `CUTE_SCREEN_E2E_DISABLE_WATCH=1 CUTE_SCREEN_BROWSER_E2E_PORT=53147
+CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 pnpm test:e2e:browser
+--spec tests/e2e/specs/browser-gradient-placement.e2e.ts`: 2/2 passed.
+  Все восемь действий с повтором/no-op/undo/redo; geometry и unchanged fill
+  проверены после production input. DOM rectangles подтверждают отсутствие
+  overlap/overflow и совпадение оси opacity label/field в RU/EN × две темы,
+  640/1024 px; screenshots осмотрены.
+- `pnpm test:e2e:browser --spec tests/e2e/specs/browser-gradient.e2e.ts` в общем
+  прогоне с новым spec: прежний creation/stops/text/RU/EN suite 1/1 passed.
+  Начальный placement spec нашёл реальный Ctrl+Z dialog guard, исправленный
+  узким history routing для placement buttons. Одновременный HMR другой задачи
+  прервал один mount; финальный прогон использовал штатный disable-watch flag.
+- `pnpm test:render tests/harness/render/gradient-backdrop.test.ts --maxWorkers=1`:
+  2/2 passed, decoded Canvas2D/CanvasKit crop/alpha/export при 1×/2× без смены goldens.
+- Архитектурные первые прогоны выявили нарушения в параллельном composition
+  code; локальные helpers/переносы исправляют их без ослабления ratchets.
+  Один последующий dependency scan превысил 15 s при общей нагрузке; повтор
+  `pnpm test:boundaries --maxWorkers=1 --testTimeout=30000`: 112/112 passed.
+- `CUTE_SCREEN_E2E_SCENARIOS=gradient,gradient-reopen TAURI_WEBDRIVER_PORT=4457
+CUTE_SCREEN_E2E_DRIVER_PORT=4458 pnpm test:e2e:tauri` в штатном Docker image:
+  2/2 passed на свежем debug/no-bundle. Quick → Editor, новый placement popup,
+  fit width/stops/text/history, save → relaunch → select restored gradient →
+  fit height → undo; independent defaults с тремя stops. Native build ждал
+  Cargo lock общей активной сборки; отдельные target/cache не создавались.
+- `pnpm exec tsc --noEmit -p tests/e2e/tsconfig.json`: passed. Исправлены
+  type-only import paths и shadow document в параллельных publication specs.
+- `pnpm check` запускался последовательно после native. Первые snapshots
+  поймали ещё изменявшийся код общей рабочей копии; окончательный результат
+  и фактический лог — artifacts/gradient-ux/evidence.json и check-final.log.
+- `pnpm format`, `pnpm format:check`, `pnpm docs:check`: финальные результаты
+  сохранены в том же evidence. Формат JS/TS/Vue не менялся через Prettier override.
+
+Актуальный итог, команды и disk hygiene — `artifacts/gradient-ux/evidence.json`.
+Выбранные screenshot и логи хранятся там же. Native capture pixels — fake-platform;
+этот gate проверяет WebView, не физический Screenshot backend. Windows/macOS pending.
+
 ## Градиентная подложка (2026-10-20, ADR-124/126)
 
 `REQ-TOL-018`. Исходный HEAD `50ae833`, рабочее дерево с параллельной
@@ -8933,3 +9151,111 @@ headless Chrome/ChromeDriver 147.0.7727.101. Начальный shell Node 22.21
   Evidence: `artifacts/resize-corners/`; screenshots `emoji-resize-{sw,nw,ne,se}.png`
   первоначально в artifacts/browser-e2e. Просмотрены sw и nw: рисунок внутри
   рамки, selection toolbar над объектом.
+
+## Восемь креативных гарнитур (2026-10-20, ADR-131)
+
+Платформа: Ubuntu 22.04.5 x86_64, desktop Wayland с XWayland, Chrome
+147.0.7727.101 (headless), WebKitGTK 2.50.4. Node 22.23.1 / pnpm 10.33.2;
+проверки используют установленный Node через
+`PATH=/home/ivaninvladimir/.nvm/versions/node/v22.23.1/bin:$PATH`.
+Baseline commit: `e50da83`, рабочая копия содержит параллельные изменения.
+Артефакты: `artifacts/creative-fonts/`; native screenshots/export —
+`artifacts/tauri-e2e/creative-fonts-*`.
+
+- До изменения каталога `pnpm exec vitest run --project vue
+tests/unit/vue/text-font-picker.test.ts` — red: ожидалось 20, получено 12
+  (`red-picker.log`). После реализации picker и license-policy — 8/8 passed
+  (`unit.log`).
+- `pnpm exec vitest run --project render-harness
+tests/harness/render/golden-text-fonts.test.ts` — 4/4 passed
+  (`fonts-final.log`): исходный SHA-256 Germanica, OFL notice, полный русский
+  алфавит с Ё/ё и Latin/digits по glyph IDs без fallback, decoded goldens
+  20 семейств в Canvas2D/CanvasKit regular и B/I. Четыре goldens обновлены
+  профильным запуском с `CUTE_SCREEN_UPDATE_GOLDENS=1`; изображения просмотрены.
+- `pnpm run licenses` — 28 production packages разрешены (`licenses.log`).
+  Команда `pnpm licenses` без `run` попадает во встроенную pnpm CLI,
+  поэтому для repository script использован явный `run`.
+- `pnpm test:render` — 63 passed / 4 timed out (`render.log`). Повтор
+  `pnpm exec vitest run --project render-harness
+tests/harness/render/shape-paint.test.ts tests/harness/render/numbered-marker.test.ts
+tests/harness/render/golden-brushes.test.ts --maxWorkers 1 --testTimeout 120000`
+  — 9 passed, один timeout (`render-retry.log`). У shape-paint собственный
+  предел 30000 ms, который CLI не заменяет; отдельный повтор также превысил
+  его (`shape-isolated.log`). Продуктовые goldens для шрифтов прошли.
+- `pnpm exec tsc --noEmit -p tests/e2e/tsconfig.json`, профильный ESLint и
+  `pnpm docs:check` прошли (`e2e-typecheck.log`, `lint-focused.log`, `docs-check.log`).
+- Выполнен `pnpm format`. Первая общая `pnpm format:check` застала 18 ошибок
+  структурных переносов в параллельно добавленных branding files; файлы
+  шрифтов прошли профильное форматирование. Финальный статус записан ниже.
+
+Первый browser запуск застал временно отсутствующий CardBranding.vue; первый
+`pnpm check` и native build остановились на двух ошибках ariaLabel в новом
+CardBrandingEditor.vue. Два вызова SimpleColorPicker исправлены через явный
+`v-bind` для ariaLabel. Одна повторная native-сборка пересеклась с очисткой
+package outputs другой сборкой и не разрешила editor-renderer в workers;
+повтор запущен после завершения очистки. Старый executable не использовался.
+
+Старые browser-сценарии уточнены для production-flow: responsive проверка
+сначала размещает текст; финальный font menu открывается на новом draft;
+короткий measured-width sample не достигает wrap cap у пиксельной гарнитуры.
+Длинный текст и реальные переносы остаются в отдельных layout/native проверках.
+
+Размер до: target 45.537 GiB (debug 43.217, release 2.320), artifacts
+4.095 GiB, node_modules 0.631 GiB. Использован общий target без отдельного
+Cargo home/target. Полезный cache и чужие активные приложения не удалялись.
+
+Финальные профильные результаты:
+
+- `pnpm exec vitest run --project vue tests/unit/vue/text-font-picker.test.ts
+tests/unit/vue/rich-text-editor.test.ts tests/unit/vue/text-layout.test.ts
+--project boundaries tests/boundaries/js-license-policy.test.ts` — 18/18 passed
+  (`unit-final.log`). До CSS исправления две regression проверки падали
+  (`red-font-family-css.log`): unquoted Press Start 2P отвергается CSS parser.
+  Общая функция сериализует family одним quoted CSS string для menu, root и
+  inline spans; исходное имя в документе не меняется. Новый branding select
+  также использует общий каталог вместо отдельного списка из 12 значений.
+- `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5187
+pnpm test:e2e:browser --spec tests/e2e/specs/browser-text-fonts.e2e.ts
+--spec tests/e2e/specs/browser-text-layout.e2e.ts --mochaOpts.timeout 90000`
+  — 2 specs / 6 tests passed (`browser-confirmed.log`): все 20 family,
+  B/I, keyboard, undo/redo, PNG decode, measured width, wrapping/reopen и
+  RU/EN × light/dark × 640/1024/1440. Метрики отдельно прошли после CSS fix
+  (`browser-metrics-final.log`); responsive отдельно — `browser-responsive.log`.
+
+Native export проверяет полноразмерный 3840×2160 PNG и наличие добавленных
+пикселей в bounds каждого из восьми текстов относительно неизменённой 4K
+fixture; повторный запуск обязан дать тот же SHA-256 decoded RGBA. Это не
+зависит от масштаба viewport и DPI. Образцы 48 px размещены в двух колонках
+без перекрытия точек создания: длинный пиксельный текст при 64 px иначе открывал
+редактирование прежнего объекта. Native selection использует trusted Ctrl+A
+в существующем contenteditable; browser-only bookmark helper с вложенным
+`__name` не сериализуется в WebKit.
+
+- `PATH=/home/ivaninvladimir/.nvm/versions/node/v22.23.1/bin:$PWD/artifacts/tauri-e2e/driver-cache/bin:$PWD/artifacts/creative-fonts/tools/usr/bin:$PATH
+XDG_SESSION_ID=cute-screen-creative-fonts
+CUTE_SCREEN_E2E_SCENARIOS=creative-fonts,creative-fonts-reopen
+pnpm test:e2e:tauri` — 2 scenarios / 2 tests passed (`tauri-complete.log`).
+  Штатный runner собрал свежий debug/no-bundle harness, pinned executable
+  и удалил успешную persistence group после relaunch. Native WebKitGTK/wry
+  0.55.1: восемь UI-created text layers, mixed Cyrillic/Latin, 48 px B/I,
+  wrapping, undo/redo, autosave, relaunch и идентичные decoded RGBA exports.
+  Временный WebKitWebDriver 2.50.4 извлечён из официального Ubuntu пакета
+  без системной установки; после проверки удалён вместе с диагностическими
+  appData неуспешных попыток. Browser-specific `__name` callback и
+  перекрывающиеся 64 px test samples исправлены только в сценарии.
+- Native screenshots `creative-fonts-editor.png`, `creative-fonts-reopened.png`
+  и два 4K export PNG просмотрены. `artifacts/creative-fonts/specimen.png`
+  показывает восемь regular faces с названиями; это иллюстрация, не замена E2E.
+- Финальный `pnpm check` прошёл lint, весь typecheck, format:check и docs:check,
+  затем остановился на timeout 5000 ms архитектурного ratchet test
+  (`check-final.log`: 112 passed / 1 timeout).
+  `pnpm exec vitest run --project boundaries --testTimeout 30000 --maxWorkers 1`
+  — 113/113 passed (`boundaries-final.log`). IPC/clippy tail общей команды
+  из-за ранней остановки не выполнялся; Rust исходники задачей не менялись.
+- Диск после сборок: target 45.583 GiB (debug 43.263, release 2.320),
+  прирост общего target около 47 MiB; полезный cache сохранён (`disk-after.log`).
+
+Ограничения общего workspace: полный `pnpm test:render` имеет timeout
+shape-paint вне шрифтовых тестов; `pnpm check` имеет описанный ratchet timeout.
+Профильные шрифты, browser и native проверки прошли. Windows/macOS для этого
+изменения не запускались. Схема документа и IPC этим расширением не менялись.

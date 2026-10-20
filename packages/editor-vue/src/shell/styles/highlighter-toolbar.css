@@ -108,6 +108,43 @@
   border-radius: 50%;
   cursor: pointer;
 }
+.cs-simple-color-panel .cs-simple-color-swatch {
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+}
+.cs-simple-color-panel.is-compact {
+  min-width: 0;
+  width: 100%;
+}
+.cs-simple-color-panel.is-compact:not(.is-embedded) {
+  width: 280px;
+}
+.cs-simple-color-panel.is-compact .cs-simple-color-grid {
+  flex: 1;
+  min-width: 0;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+}
+.cs-simple-color-panel.is-compact .cs-simple-color-grid > button {
+  width: 100%;
+  min-width: 0;
+}
+.cs-simple-color-panel.is-compact .cs-simple-color-custom-area {
+  flex-shrink: 0;
+}
+.cs-simple-color-panel.is-compact .cs-color-head {
+  display: none;
+}
+.cs-simple-color-panel.is-compact .cs-color-popover--embedded {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.cs-simple-color-panel.is-compact .cs-color-tile {
+  padding: 0;
+}
 .cs-simple-color-panel .cs-simple-color-swatch[aria-pressed] {
   background: transparent;
 }

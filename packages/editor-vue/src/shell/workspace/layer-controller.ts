@@ -1,3 +1,4 @@
+import { layerSpaceDocument } from './layer-space'
 import { annotationTool } from '@cute-screen/editor-renderer'
 import type { Ref } from 'vue'
 import {
@@ -31,19 +32,20 @@ function canonicalTransform(
   layer: LayerNode,
   transform: Transform2D,
 ): LayerNode {
-  const canvas = context.activeDocument.value?.canvas
+  const document = context.activeDocument.value && layerSpaceDocument(context.activeDocument.value, layer)
+  const canvas = document?.canvas
   if (layer.kind !== 'ruler' || !canvas) return { ...layer, transform }
   const constrained = constrainRulerTransform(
     layer,
     transform,
-    rulerCanvasBounds(context.activeDocument.value!),
+    rulerCanvasBounds(document!),
     canvas,
   )
   if (constrained === layer.transform) return layer
   return rebaseRulerLayer(
     { ...layer, transform: constrained },
     layer.payload,
-    context.activeDocument.value?.crop ?? canvas,
+    document?.crop ?? canvas,
   )
 }
 
@@ -106,7 +108,8 @@ function reorderLayer(
     fromIndex < 0 ||
     toIndex < 0 ||
     toIndex >= layers.length ||
-    layers[fromIndex]?.locked
+    layers[fromIndex]?.locked ||
+    (layers[fromIndex]?.space ?? 'content') !== (layers[toIndex]?.space ?? 'content')
   ) {
     return
   }
@@ -145,7 +148,8 @@ function reorderLayerTo(
     fromIndex < 0 ||
     targetIndex < 0 ||
     layers[fromIndex]?.locked ||
-    fromIndex === targetIndex
+    fromIndex === targetIndex ||
+    (layers[fromIndex]?.space ?? 'content') !== (layers[targetIndex]?.space ?? 'content')
   ) {
     return
   }
@@ -178,8 +182,9 @@ function moveLayer(
   ) {
     return
   }
+  const document = layerSpaceDocument(context.activeDocument.value!, layers[0]!)
   const delta = constrainRulerMove(layers, { x: deltaX, y: deltaY },
-    rulerCanvasBounds(context.activeDocument.value!), context.activeDocument.value!.canvas)
+    rulerCanvasBounds(document), document.canvas)
   if (delta.x === 0 && delta.y === 0) return
   const commands = layers.map((layer) => ({
     type: 'updateLayer' as const,

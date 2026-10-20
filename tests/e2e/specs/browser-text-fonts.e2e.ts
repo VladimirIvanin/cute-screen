@@ -18,7 +18,10 @@ import {
 describe('curated text toolbar', () => {
   it('keeps all groups visible in both themes/locales at desktop and narrow widths', async () => {
     await openHarness()
-    await $('button[aria-label="Text"]').click()
+    await startTextAt(18, 18)
+    await browser.keys('Образец Aa 123')
+    await browser.keys(['Control', 'Enter'])
+    await browser.waitUntil(async () => (await snapshot()).layers.length === 5)
     for (const width of [1440, 1024, 640]) {
       await browser.setWindowSize(width, 800)
       for (const locale of ['en', 'ru']) {
@@ -85,10 +88,17 @@ describe('curated text toolbar', () => {
       expect(result.equal).toBe(true)
       await browser.keys(['Control', 'z'])
       await browser.waitUntil(async () => (await snapshot()).layers.length === 4)
+      await browser.keys(['Control', 'Shift', 'z'])
+      await browser.waitUntil(async () => (await snapshot()).layers.length === 5)
+      expect((await snapshot()).layers.at(-1)!.payload.content).toEqual(content)
+      await browser.keys(['Control', 'z'])
+      await browser.waitUntil(async () => (await snapshot()).layers.length === 4)
     }
-    await $('button[aria-label="Text"]').click()
+    await startTextAt(18, 18)
+    await browser.keys('Образец Ёжик Aa 123')
+    await setEditorSelection(0, 'Образец Ёжик Aa 123'.length)
     await $('button[aria-label="Font family"]').click()
-    await expect($$('button[role="option"]')).toBeElementsArrayOfSize(12)
+    await expect($$('button[role="option"]')).toBeElementsArrayOfSize(20)
     await browser.keys('Home')
     await browser.keys('Enter')
     await expect($('button[aria-label="Font family"]')).toHaveText('Roboto')
@@ -96,5 +106,5 @@ describe('curated text toolbar', () => {
     await browser.waitUntil(() => browser.execute(() =>
       document.getAnimations().every((animation) => animation.playState !== 'running')))
     await browser.saveScreenshot(path.resolve('artifacts/browser-e2e/text-font-menu.png'))
-  })
+  }).timeout(180000)
 })

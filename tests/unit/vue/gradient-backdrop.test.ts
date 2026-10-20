@@ -30,6 +30,7 @@ import type {
   CanvasViewportEmit,
   CanvasViewportProps,
 } from '../../../packages/editor-vue/src/shell/canvas/contracts'
+import { gradientSchema } from '../../../packages/editor-vue/src/shell/tools/gradient-schema'
 import ContextToolbar from '../../../packages/editor-vue/src/shell/components/ContextToolbar.vue'
 import type { ContextToolbarSchema } from '../../../packages/editor-vue/src/shell/types'
 
@@ -147,6 +148,31 @@ describe('gradient backdrop interactions', () => {
     await view.rerender({ schema: { ...schema, disabled: true } })
     expect(trigger).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Transition' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Full width' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Placement' })).toBeDisabled()
   })
+  it('offers graphic frame placement, keeps the popup open for combinations and restores focus', async () => {
+    const value = gradientSchema({ document: viewportDocument, layer: gradient(),
+      values: gradient().payload, disabled: false, defaultsOnly: false, count: 1,
+      translate: (key) => key })
+    const view = render(ContextToolbar, { props: { schema: value, label: 'Gradient', pickerLocale: 'en' } })
+    const trigger = screen.getByRole('button', { name: 'Placement' })
+    await fireEvent.click(trigger)
+    expect(document.querySelectorAll('[data-gradient-placement]')).toHaveLength(8)
+    const first = screen.getByRole('button', { name: 'gradientAlignLeft' })
+    expect(first).toHaveFocus()
+    await fireEvent.keyDown(first, { key: 'ArrowDown' })
+    expect(screen.getByRole('button', { name: 'gradientAlignTop' })).toHaveFocus()
+    await fireEvent.click(screen.getByRole('button', { name: 'gradientAlignBottom' }))
+    expect(view.emitted('action').at(-1)).toEqual(['gradientAlignBottom'])
+    expect(screen.getByRole('dialog', { name: 'Placement' })).toBeInTheDocument()
+    await fireEvent.keyDown(screen.getByRole('dialog', { name: 'Placement' }), { key: 'Escape' })
+    expect(trigger).toHaveFocus()
+    const rotated = { ...gradient(), transform: { ...gradient().transform, rotation: 45 } }
+    await view.rerender({ schema: gradientSchema({ document: viewportDocument, layer: rotated,
+      values: rotated.payload, disabled: false, defaultsOnly: false, count: 1, translate: (key) => key }) })
+    await fireEvent.click(trigger)
+    expect(screen.getByRole('button', { name: 'gradientAlignBottom' })).toBeDisabled()
+    expect(screen.getByText('gradientResetRotation')).toBeInTheDocument()
+  })
+
 })

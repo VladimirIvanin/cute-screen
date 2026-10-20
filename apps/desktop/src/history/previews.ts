@@ -1,4 +1,5 @@
 import {
+  compositionBlobHashes,
   ImageResourceManager,
   emojiThumbnailImages,
   renderHistoryThumbnail,
@@ -139,7 +140,8 @@ export class HistoryPreviews {
       if (record.revision !== item.revision) throw new Error('Preview changed; reopen history')
       const parsed = parseEditorDocument(record.documentJson)
       if (parsed.kind !== 'editable') throw new Error('Document preview is unavailable')
-      const hashes = new Set<string>([record.sourceHash])
+      const hashes = new Set<string>([record.sourceHash,
+        ...compositionBlobHashes(parsed.document.presentation.composition)])
       for (const layer of parsed.document.layers) {
         if (layer.kind === 'image') hashes.add(layer.payload.blobHash)
         if (layer.kind === 'shape') {
@@ -233,7 +235,7 @@ export class HistoryPreviews {
 
 function previewFonts(documentModel: import('@cute-screen/editor-vue').EditorDocumentV1): ThumbnailJob['fonts'] {
   const fonts: ThumbnailJob['fonts'] = []
-  const families = new Set<string>()
+  const families = new Set<string>(['Roboto', ...(documentModel.presentation.composition?.branding.map((b) => b.fontFamily) ?? [])])
   for (const layer of documentModel.layers) {
     const content = layer.kind === 'text' || layer.kind === 'callout' ? layer.payload.content : layer.kind === 'numberedMarker' ? layer.payload.label : undefined
     for (const span of content?.spans ?? []) families.add(span.fontFamily)

@@ -1,3 +1,6 @@
+#[path = "services/materials.rs"]
+mod materials;
+use materials::{materials_list, materials_put, materials_remove};
 #[cfg(any(test, feature = "test-harness"))]
 mod e2e_paths;
 mod tray_icon;
@@ -2661,7 +2664,7 @@ fn seed_m03_document(repository: &LibraryRepository) -> Result<(), RepositoryErr
     let hash = format!("{:x}", Sha256::digest(&bytes));
     let document_id = "019c1f62-058e-7000-8000-000000000000";
     let document = serde_json::json!({
-        "schemaVersion": 7,
+        "schemaVersion": 8,
         "id": document_id,
         "source": { "blobHash": hash, "format": "png", "mimeType": "image/png", "width": 3840, "height": 2160, "orientationApplied": true, "provenance": "capture", "color": { "colorSpace": "srgb", "hasIccProfile": false } },
         "canvas": { "width": 3840, "height": 2160 }, "crop": null, "layers": [],
@@ -3002,6 +3005,9 @@ pub fn run() {
         repository_open_last,
         repository_list_active_series_frames,
         repository_save_document,
+        materials_list,
+        materials_put,
+        materials_remove,
         repository_import_texture,
         repository_import_content_image,
         repository_import_dropped_image,
@@ -3083,6 +3089,9 @@ pub fn run() {
         repository_open_last,
         repository_list_active_series_frames,
         repository_save_document,
+        materials_list,
+        materials_put,
+        materials_remove,
         repository_import_texture,
         repository_import_content_image,
         repository_import_dropped_image,
@@ -3112,7 +3121,9 @@ pub fn run() {
             std::path::Path::new(&profile),
         );
     }
-    if let Err(error) = builder.run(context) {
+    let outcome = builder.run(context);
+    clipboard::release_native_clipboard();
+    if let Err(error) = outcome {
         eprintln!("cute-screen startup failed: {error}");
         std::process::exit(1);
     }

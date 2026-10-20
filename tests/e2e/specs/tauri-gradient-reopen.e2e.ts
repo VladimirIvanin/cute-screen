@@ -31,7 +31,9 @@ describe('gradient after native relaunch', () => {
     const toolbar = $('.cs-selection-floating-toolbar .cs-gradient-toolbar')
     await expect(toolbar).toBeDisplayed()
     const current = async () => (await gradientDocument()).layers.find((layer) => layer.id === previous.id)!
-    await toolbar.$('button=Full height').click()
+    await toolbar.$('button[aria-label="Placement"]').click()
+    await $('[data-gradient-placement="gradientFitHeight"]').click()
+    await browser.keys('Escape')
     await browser.waitUntil(async () => (await current()).localBounds.height === frame.height)
     await browser.keys(['Control', 'z'])
     await browser.waitUntil(async () => (await current()).localBounds.height === previous.localBounds.height)

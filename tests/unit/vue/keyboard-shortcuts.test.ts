@@ -123,4 +123,22 @@ describe('physical letter shortcuts', () => {
 
     expect(app.undo).not.toHaveBeenCalled()
   })
+  it('allows document undo/redo from placement buttons while preserving the dialog guard elsewhere', () => {
+    const app = createContext()
+    const controller = createKeyboardController(app.context)
+    const popup = document.createElement('section')
+    popup.className = 'cs-gradient-placement'
+    popup.setAttribute('role', 'dialog')
+    const button = document.createElement('button')
+    popup.append(button)
+    button.addEventListener('keydown', (event) => controller.onKeydown(event))
+    button.dispatchEvent(keydown({ code: 'KeyZ', key: 'z', ctrlKey: true }))
+    button.dispatchEvent(keydown({ code: 'KeyZ', key: 'z', ctrlKey: true, shiftKey: true }))
+    expect(app.undo).toHaveBeenCalledTimes(1)
+    expect(app.redo).toHaveBeenCalledTimes(1)
+    popup.className = 'other-dialog'
+    button.dispatchEvent(keydown({ code: 'KeyZ', key: 'z', ctrlKey: true }))
+    expect(app.undo).toHaveBeenCalledTimes(1)
+  })
+
 })

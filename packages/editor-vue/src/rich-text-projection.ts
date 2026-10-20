@@ -1,3 +1,4 @@
+import { fontFamilyCss } from './font-family-css'
 import type {
   RichTextEditingState,
   RichTextLayout,
@@ -16,7 +17,7 @@ function styledSpan(
   element.dataset.richTextSpan = ''
   element.dataset.start = String(start)
   element.dataset.end = String(end)
-  element.style.fontFamily = style.fontFamily
+  element.style.fontFamily = fontFamilyCss(style.fontFamily)
   element.style.fontSize = `${hidden ? 0 : style.fontSize * scale}px`
   element.style.fontWeight = String(style.weight)
   element.style.lineHeight = '1.25'

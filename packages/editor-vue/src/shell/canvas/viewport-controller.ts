@@ -26,6 +26,7 @@ export class ViewportController {
     if (this.#context.props.activeTool === 'crop' || this.#context.props.quickFrameMode) {
       return { x: 0, y: 0, width: canvas.width, height: canvas.height }
     }
+    if (this.#context.props.compositionBounds) return this.#context.props.compositionBounds
     return (
       this.#context.props.document?.crop ?? {
         x: 0,

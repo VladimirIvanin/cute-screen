@@ -122,7 +122,7 @@ export function previewEnvironment(
       height: rect.height + padding * 2,
     })
   })
-  root.querySelectorAll<HTMLElement>('.cs-topbar, .cs-layers-panel, .cs-tool-rail, .cs-toolrail, .cs-context-toolbar, .cs-tool-configure-popover-host, .cs-filmstrip, .cs-zoom-controls, .cs-quick-history, .cs-quick-settings-button').forEach((element) => {
+  root.querySelectorAll<HTMLElement>('.cs-topbar, .cs-layers-panel, .cs-composition-panel, .cs-tool-rail, .cs-toolrail, .cs-context-toolbar, .cs-tool-configure-popover-host, .cs-filmstrip, .cs-zoom-controls, .cs-quick-history, .cs-quick-settings-button').forEach((element) => {
     if (
       element === panel ||
       panel.contains(element) ||

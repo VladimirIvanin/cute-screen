@@ -180,7 +180,7 @@ function prepareCropRulers(
   if (command.type !== 'setCrop' || jsonEquals(command.before, command.after)) return command
   const bounds = rulerCanvasBounds({ ...document, crop: command.after })
   const rulerChanges = document.layers.flatMap((layer) => {
-    if (layer.kind !== 'ruler') return []
+    if (layer.space === 'card' || layer.kind !== 'ruler') return []
     const after = fitRulerToBounds(layer, bounds, document.canvas)
     return jsonEquals(layer, after) ? [] : [{ before: layer, after }]
   })
