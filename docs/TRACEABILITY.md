@@ -13,6 +13,11 @@ Red-first sampler contracts проверяют counts, deadline, неверны�
 затем полный perf smoke, focused decoded render и стабильные frontend checks.
 Результаты и пределы доказательств записываются в TESTING.md.
 
+Результат: perf smoke 19/19 за 61.65 s, composition 8K 17.560 s; CLI trend
+sampler 9/9, renderer lifecycle 20/20, decoded 4K/8K/export 5/5, boundaries
+113/113 passed на Ubuntu 22.04.5 x86_64 / Node 22.23.1. RSS не используется
+как доказательство отсутствия утечки; reference GPU и native UI pending.
+
 ## Выбранные рукописные обводки — до реализации (2026-10-21)
 
 `REQ-TOL-002`, `REQ-EDT-002/005/006/016/017`: владелец выбрал овалы

@@ -1,5 +1,49 @@
 # Стратегия тестирования
 
+## Software perf без длинного CI sampling (2026-10-21, ADR-148)
+
+Baseline `0df49acaa184d4700bcd721323fd70b32bf565dc`, рабочая копия.
+Ubuntu 22.04.5 x86_64 / Linux 6.8.0-138, Ryzen 7 5700U, Node 22.23.1,
+pnpm 10.33.2; shared host, Canvas2D/CanvasKit software. Системный Node 22.21.1
+не проходит pinned engines; использован уже установленный NVM Node 22.23.1.
+Evidence — `artifacts/perf-harness-safety/`.
+
+- До реализации: `pnpm test:perf tests/harness/perf/composition.test.ts` оставался
+  в native redraw loop после 180 s; собственный worker остановлен SIGTERM
+  через 4m15s, 4K успел пройти, 8K не завершился. Это прерванный baseline,
+  не successful run и не новый Vitest timeout failure. `/usr/bin/time -v`:
+  max RSS 1 139 920 KiB, system CPU 176 s, около 57 млн minor page faults.
+  Это согласуется с allocation churn; монотонная утечка этим не доказана.
+- Red-first sampler: 8 failures (`sampling-red.log`): отсутствуют профиль,
+  deadline, native memory diagnostics и yield; неверные durations принимаются.
+  После добавлен также общий deadline warmup + measurements.
+- `pnpm test:perf --reporter=verbose`: 5 files / 19 passed, Vitest 61.65 s
+  (вся команда с fixtures 68.09 s). Composition 4K — 1.386 s, 8K — 17.560 s;
+  sampler 8K — 17.062 s, 2 warmups / 8 measurements. RSS после warmups
+  757 411 840 B, после measurements 758 108 160 B; sampled peak 804 978 688 B.
+  Это короткая диагностика, не подтверждение leak acceptance после 20 reopen.
+  Max RSS всей suite с legacy blur oracle — 1 942 524 KiB; сравнивать его
+  с composition-only baseline как одинаковую нагрузку нельзя.
+- `pnpm test:perf:trend tests/harness/perf/sampling.test.ts`: 9/9 passed;
+  проверено включение 30/120 через настоящий CLI mode. Полный тяжёлый trend
+  и designated reference GPU gate не запускались.
+- `pnpm test:render tests/harness/render/composition.test.ts
+tests/harness/render/composition-crop.test.ts tests/harness/render/tool-settings-large.test.ts
+--maxWorkers=1 --reporter=verbose`: 3 files / 5 passed. Повторно декодированы
+  PNG обоих backend при 1×/2×, production-like 4K/8K и enlarged tiny crop;
+  originals, goldens и production renderer не менялись.
+- `pnpm test packages/editor-renderer/src/effect-cache.test.ts
+packages/editor-renderer/src/effect-worker.test.ts packages/editor-renderer/src/canvas2d-lifecycle.test.ts`:
+  3 files / 20 passed. `pnpm test:boundaries`: 16 files / 113 passed.
+- `pnpm lint`: exit 0, 37 существующих Vue warnings; `pnpm typecheck`,
+  `pnpm docs:check`, `pnpm format`, `pnpm format:check` и `git diff --check`
+  пройдены. Полный `pnpm check` с Rust gates, browser/native UI и release build
+  не запускались: меняется только test harness/CI policy.
+
+Disk baseline: `pnpm disk:usage` — target 50.484 GiB, artifacts 4.104 GiB.
+Итоговый report — `disk-after.log`; общий Cargo cache и чужие artifacts сохранены.
+Новые targets/profiles/tools не создавались, заменённый успешный sampler log удалён.
+
 ## Выбранные обводки (2026-10-21, ADR-147)
 
 Baseline `6fae59d`, рабочая копия. Ubuntu 22.04.5 x86_64, установленный NVM Node 22.23.1 /

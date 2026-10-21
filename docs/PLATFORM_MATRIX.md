@@ -1,5 +1,18 @@
 # Платформенная матрица
 
+## Software perf smoke (ADR-148, 2026-10-21)
+
+Ubuntu 22.04.5 x86_64 / Ryzen 7 5700U / Node 22.23.1: `pnpm test:perf`
+19/19 passed, 61.65 s Vitest; composition 8K/1000 — 17.560 s при 2/8 sampling.
+RSS после warmups/measurements — 757.4/758.1 MB; это короткая диагностика,
+без утверждения об отсутствии утечек после 20 open/close. Legacy blur oracle
+по-прежнему требует до ~1.9 GiB RSS всей suite; perf-файлы идут последовательно.
+CLI trend sampler — 9/9, cache/worker/lifecycle — 20/20, decoded composition,
+4K/8K и tiny crop — 5/5 passed. Windows/macOS runtime, hosted CI timeout
+и reference GPU gate здесь не запускались. Новых native API/dependencies нет;
+платформенные GPU SLA не изменены. Evidence и команды — TESTING.md и
+`artifacts/perf-harness-safety/`.
+
 ## Выбранные обводки (ADR-147, 2026-10-21)
 
 Ubuntu 22.04.5 x86_64 / Node 22.23.1: 1609 core/component tests и 87 decoded
