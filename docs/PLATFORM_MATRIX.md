@@ -1314,7 +1314,11 @@ UI получает `CaptureCapabilities` и не показывает непо�
 - Windows backend uses DXGI Desktop Duplication plus a D3D11 CPU-readable
   staging texture for every attached output. It assembles one physical
   virtual-desktop frame under a per-monitor-v2 DPI context. Screen and Active
-  Window are direct snapshots. Area prepares duplication after the editor is
+  Window stay direct snapshots without a selector, but they use the same
+  composed acquire as Area: prepare duplication, show a transparent
+  non-activating compositor pulse, wait for `DwmFlush`, then read one frame.
+  An immediate DXGI frame is not the visible result while a borderless game
+  presents on another plane. Area prepares duplication after the editor is
   hidden, registers/shows a transparent non-activating compositor pulse, waits
   for `DwmFlush`, then acquires one full frozen frame and opens the prewarmed
   fullscreen Quick WebView directly in `selecting`. The hidden window is moved

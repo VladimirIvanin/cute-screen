@@ -66,8 +66,10 @@ pub(crate) fn window_capture_available() -> bool {
 ///
 /// Captures a composited virtual desktop into an application-owned BGRA buffer.
 /// Window capture resolves and destroys its selector before acquiring the
-/// immutable frame. Area capture acquires the full virtual desktop directly;
-/// the mounted Quick Capture surface owns selection and editing as one mode.
+/// immutable frame. Area, Screen and Active Window all read one composed
+/// virtual-desktop frame. A borderless game can present on an independent-flip
+/// plane, so the acquire waits until a transparent compositor pulse has forced
+/// that plane into the DWM image. Area then opens the mounted Quick surface.
 pub struct WindowsCompositorCaptureAdapter;
 
 /// Runs on the window's owning thread, before creating any capture session.
@@ -249,9 +251,10 @@ impl WindowsCompositorCaptureAdapter {
             ));
         }
         let (geometry, source_bgra) = match capture_execution_order(target) {
-            CaptureExecutionOrder::FrameForQuickSelection => {
+            order @ CaptureExecutionOrder::FrameForQuickSelection => {
                 let frame_started = Instant::now();
-                let frame = capture_fresh_compositor_frame(&source_geometry, correlation_id)?;
+                let frame =
+                    acquire_composed_desktop_frame(order, &source_geometry, correlation_id)?;
                 log_capture_timing(
                     correlation_id,
                     "compositor-for-quick-selection",
@@ -267,9 +270,10 @@ impl WindowsCompositorCaptureAdapter {
                     &cancel_signal,
                 );
             }
-            CaptureExecutionOrder::FrameThenResolve => {
+            order @ CaptureExecutionOrder::FrameThenResolve => {
                 let frame_started = Instant::now();
-                let frame = capture_compositor_frame(&source_geometry, correlation_id)?;
+                let frame =
+                    acquire_composed_desktop_frame(order, &source_geometry, correlation_id)?;
                 log_capture_timing(correlation_id, "compositor-before-selection", frame_started);
                 let geometry = match target {
                     CaptureTarget::Monitor => source_geometry.clone(),
@@ -379,12 +383,25 @@ const fn uses_mounted_quick_selection(target: CaptureTarget) -> bool {
     matches!(target, CaptureTarget::Area)
 }
 
-fn capture_compositor_frame(
+/// Immediate DXGI can return a non-empty black DWM plane while a borderless
+/// game is presenting on another plane. Area, Screen and Active Window must
+/// not treat that plane as the visible desktop.
+const fn composed_desktop_frame_required(order: CaptureExecutionOrder) -> bool {
+    matches!(
+        order,
+        CaptureExecutionOrder::FrameForQuickSelection | CaptureExecutionOrder::FrameThenResolve
+    )
+}
+
+fn acquire_composed_desktop_frame(
+    order: CaptureExecutionOrder,
     source: &CaptureGeometry,
     correlation_id: &str,
 ) -> Result<Vec<u8>, PlatformError> {
-    let outputs = capture_compositor_outputs(source, correlation_id)?;
-    compose_compositor_outputs(source, &outputs, correlation_id)
+    if !composed_desktop_frame_required(order) {
+        return Err(failure(correlation_id, "captureExecutionOrder"));
+    }
+    capture_fresh_compositor_frame(source, correlation_id)
 }
 
 fn capture_fresh_compositor_frame(
@@ -987,10 +1004,23 @@ fn encode_bgra_png(
         pixel.swap(0, 2);
         pixel[3] = u8::MAX;
     }
+    encode_rgba_png(&rgba, width, height, correlation_id)
+}
+
+fn encode_rgba_png(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    correlation_id: &str,
+) -> Result<Vec<u8>, PlatformError> {
     let mut png = Vec::new();
     let mut encoder = png::Encoder::new(&mut png, width, height);
     encoder.set_color(png::ColorType::Rgba);
     encoder.set_depth(png::BitDepth::Eight);
+    // Balanced uses zlib and an adaptive filter. On a 1920×1080 desktop that
+    // cost 1.6 s in a debug build while DXGI itself returned in 142 ms.
+    // Fastest keeps the pixels and uses the encoder's screenshot preset.
+    encoder.set_compression(png::Compression::Fastest);
     let mut writer = encoder
         .write_header()
         .map_err(|_| failure(correlation_id, "pngHeader"))?;
@@ -1260,6 +1290,15 @@ mod tests {
         ));
         assert!(!uses_mounted_quick_selection(
             crate::platform::CaptureTarget::Window
+        ));
+        assert!(super::composed_desktop_frame_required(
+            CaptureExecutionOrder::FrameForQuickSelection
+        ));
+        assert!(super::composed_desktop_frame_required(
+            CaptureExecutionOrder::FrameThenResolve
+        ));
+        assert!(!super::composed_desktop_frame_required(
+            CaptureExecutionOrder::SelectThenFrame
         ));
     }
 

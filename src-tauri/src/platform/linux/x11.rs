@@ -2910,6 +2910,7 @@ fn import_rgba_frame(
     );
     encoder.set_color(png::ColorType::Rgba);
     encoder.set_depth(png::BitDepth::Eight);
+    encoder.set_compression(png::Compression::Fastest);
     let mut writer = encoder
         .write_header()
         .map_err(|_| gate_error(correlation_id, "pngHeader"))?;

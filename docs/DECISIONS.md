@@ -1,5 +1,30 @@
 # Журнал архитектурных решений
 
+## ADR-150 — Windows Screen читает composed desktop frame
+
+**Статус:** accepted (2026-10-21); supersedes оставшийся direct-snapshot
+acquire Screen/Active Window из ADR-029. Selector по-прежнему нет.
+
+**Контекст:** Area уже готовил DXGI duplication, показывал прозрачный
+non-activating compositor pulse и ждал `DwmFlush`. Screen и Active Window
+брали первый кадр сразу после `DuplicateOutput`. На Windows 10 игра в
+borderless fullscreen презентует изображение на отдельной плоскости.
+Немедленный кадр при этом непустой, но чёрный: `LastPresentTime` уже
+ненулевой, поэтому повтор acquire его принимает.
+
+**Решение:** Screen и Active Window остаются прямыми снимками без selector
+и без Quick draft. Они получают тот же composed desktop frame, что и Area.
+Window по-прежнему читает выбранное окно через Windows Graphics Capture.
+Проверка доступности backend не показывает pulse.
+
+**Проверяемое основание:** red-first unit contract требует composed acquire
+для Area, Screen и Active Window и не требует его для Window. Живой probe
+на Windows 10 19045 до правки сравнил оба пути на видимом borderless окне
+Heroes of Might & Magic III HD Edition, 1920×1080. После правки production
+helper Screen на том же окне вернул изображение игры. Команды и доли чёрных
+пикселей записаны в TESTING.md. Linux и macOS этим ADR не меняются: там
+Area и Screen уже читают один и тот же источник кадра.
+
 ## ADR-149 — Ограниченное восстановление GTK paint main window
 
 **Статус:** accepted (2026-10-21); дополняет ADR-118.
@@ -2039,7 +2064,7 @@ typed capture failure. Существующие non-composited X11 smoke ост�
 
 ## ADR-029 — Windows interactive capture freezes on confirmation
 
-**Статус:** superseded для Area by ADR-040; для Window by ADR-091
+**Статус:** superseded для Area by ADR-040; для Window by ADR-091; прямой снимок Screen/Active Window без composed pulse superseded by ADR-150
 
 **Контекст:** ADR-027 исправил источник pixels, но сохранил неверный момент
 заморозки: DXGI frame создавался до selector. Если пользователь открывал Area,

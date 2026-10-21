@@ -1,5 +1,41 @@
 # Стратегия тестирования
 
+## Скорость PNG после захвата экрана (2026-10-21)
+
+Windows 10 build 19045, debug-сборка, один кадр 1920×1080.
+`cargo test -p cute-screen-desktop --lib desktop_capture_stage_timing -- --ignored --nocapture`
+до смены сжатия: DXGI composed acquire 142 мс; PNG `Balanced` 1553 мс и
+1 397 730 байт; `Fast` 951 мс; `Fastest` 329 мс и 1 996 170 байт; BMP 37 мс.
+Захват области уже отдаёт BMP, поэтому экран ждал сжатие, а не кадр.
+Capture PNG на Windows, X11 и macOS теперь использует `Compression::Fastest`.
+Временный probe удалён. Пиксели по-прежнему проверяет
+`encodes_top_down_bgra_as_opaque_rgba_png`.
+
+## Windows screen capture и borderless-игра (2026-10-21, ADR-150)
+
+Windows 10 build 19045, один монитор 1920×1080. Процесс `HOMM3 2.0.exe`,
+окно `Heroes of Might & Magic III - HD Edition`, HWND `0x4034e`,
+`WS_POPUP | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN`, `WS_EX_TOPMOST`,
+ровно bounds монитора. Cute Screen в этот момент был старым `target/debug`
+процессом и в захвате не участвовал: probe вызывал DXGI-функции библиотеки.
+
+До правки `cargo test -p cute-screen-desktop --lib homm3_compares_immediate_dxgi_with_composited_pulse -- --ignored --nocapture`:
+
+- немедленный путь Screen: 2 073 600 / 2 073 600 пикселей с каналами ниже 8,
+  центр `(0,0,0,0)`, файл `artifacts/homm3-capture-probe/immediate.png`;
+- путь Area с compositor pulse и `DwmFlush`: 1 820 / 2 073 600 таких пикселей
+  (0,1%), центр `(24,19,15,255)`, меню игры в `fresh.png`.
+
+После перевода Screen/Active Window на тот же acquire повторный probe:
+1 920 / 2 073 600 (0,1%), центр `(24,19,15,255)`, меню игры в
+`artifacts/homm3-capture-probe/screen-after-fix.png`. Игровой probe из
+исходников удалён. Постоянный контракт —
+`area_uses_the_mounted_quick_surface_while_window_keeps_native_selection`.
+
+Запущенный до правки `cute-screen.exe` эту библиотеку не подхватил.
+Linux X11, Wayland и macOS не прогонялись: у них Area и Screen уже берут
+один кадр, так что этот разрыв путей там не воспроизводится.
+
 ## Patch version 0.1.10 (2026-10-21)
 
 Baseline `2a3d9f9ecdff19e3d9575f796082ab34f64b90b7`, рабочая копия.

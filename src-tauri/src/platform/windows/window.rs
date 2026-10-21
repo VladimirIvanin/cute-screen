@@ -785,6 +785,7 @@ fn encode_window_png(
         let mut encoder = png::Encoder::new(&mut encoded, width, height);
         encoder.set_color(png::ColorType::Rgba);
         encoder.set_depth(png::BitDepth::Eight);
+        encoder.set_compression(png::Compression::Fastest);
         let mut writer = encoder
             .write_header()
             .map_err(|_| error(id, PlatformErrorCode::CaptureFailed, "windowPngHeader"))?;
