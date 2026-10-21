@@ -1,5 +1,13 @@
 # Трассируемость требований
 
+## Patch version 0.1.11 — до изменения metadata (2026-10-21)
+
+`REQ-REL-005/006`: штатный `pnpm version:bump 0.1.11` синхронизирует package,
+Tauri, Cargo workspace, точную storage dependency и Cargo.lock после ADR-150
+(composed desktop frame для Windows Screen/Active Window) и PNG
+`Compression::Fastest` на Windows, X11 и macOS. Проверки — version validator,
+существующие bump/release tests и форматирование. Результаты — TESTING.md.
+
 ## Patch version 0.1.10 — до изменения metadata (2026-10-21)
 
 `REQ-REL-005/006`: штатный `pnpm version:bump 0.1.10` синхронизирует package,
