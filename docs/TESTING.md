@@ -1,5 +1,24 @@
 # Стратегия тестирования
 
+## Patch version 0.1.11 (2026-10-21)
+
+Baseline `89d86ce5e878087d870ad9d901114f6d3961f73c`, рабочая копия.
+Windows 10 build 19045 / Node 22.23.1 / pnpm 10.33.2.
+
+- `pnpm version:bump 0.1.11`: package, Tauri, Cargo workspace, точная storage
+  dependency и две workspace entries в Cargo.lock синхронизированы.
+- `node scripts/release-assets.mjs version . v0.1.11`: passed.
+- `pnpm test:boundaries tests/boundaries/bump-version.test.ts tests/boundaries/release-assets.test.ts`:
+  2 файла, 33 tests passed.
+- `pnpm exec prettier --write` и `--check` для `docs/TESTING.md`,
+  `docs/TRACEABILITY.md`, `package.json` и `src-tauri/tauri.conf.json`,
+  затем `pnpm docs:check` и `git diff --check` по файлам бампа: passed.
+  Полный `pnpm format` не запускался: в рабочей копии уже есть незафиксированные
+  правки захвата.
+
+Изменена только версия и документация проверки. Native build и UI suites
+не повторялись; установленное приложение этим изменением не обновляется.
+
 ## Скорость PNG после захвата экрана (2026-10-21)
 
 Windows 10 build 19045, debug-сборка, один кадр 1920×1080.
