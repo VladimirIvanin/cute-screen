@@ -1,5 +1,20 @@
 # Стратегия тестирования
 
+## Patch version 0.1.12 (2026-10-21)
+
+Baseline `4f01f011eb126073775fb2234d42ecccb7d6059b`, рабочая копия.
+Windows 10 build 19045 / Node 22.23.1 / pnpm 10.33.2.
+
+- `pnpm version:bump 0.1.12`: package, Tauri, Cargo workspace, точная storage
+  dependency и две workspace entries в Cargo.lock синхронизированы.
+- `node scripts/release-assets.mjs version . v0.1.12`: passed.
+- `pnpm test:boundaries tests/boundaries/bump-version.test.ts tests/boundaries/release-assets.test.ts`:
+  2 файла, 33 tests passed.
+- `pnpm format`, `pnpm format:check`, `pnpm docs:check`, `git diff --check`: passed.
+
+Изменена только версия и документация проверки. Native build и UI suites
+не повторялись; установленное приложение этим изменением не обновляется.
+
 ## Patch version 0.1.11 (2026-10-21)
 
 Baseline `89d86ce5e878087d870ad9d901114f6d3961f73c`, рабочая копия.

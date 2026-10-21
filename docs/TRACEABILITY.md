@@ -1,5 +1,13 @@
 # Трассируемость требований
 
+## Patch version 0.1.12 — до изменения metadata (2026-10-21)
+
+`REQ-REL-005/006`: штатный `pnpm version:bump 0.1.12` синхронизирует package,
+Tauri, Cargo workspace, точную storage dependency и Cargo.lock после
+build-contract: Windows Screen/Active Window обязаны вызывать
+`acquire_composed_desktop_frame`. Проверки — version validator, существующие
+bump/release tests и форматирование. Результаты — TESTING.md.
+
 ## Patch version 0.1.11 — до изменения metadata (2026-10-21)
 
 `REQ-REL-005/006`: штатный `pnpm version:bump 0.1.11` синхронизирует package,
