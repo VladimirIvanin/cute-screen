@@ -592,6 +592,14 @@ hosted Ubuntu runners могут зависнуть на нём на десят�
 
 ### `reference-perf.yml`
 
+ADR-148: обычная Linux CI task вызывает `pnpm test:perf` последовательно
+с 2 warmups / 8 measurements для каждой software 4K/8K нагрузки. Sampler
+ограничен elapsed budget и отдаёт event loop; весь CI step имеет timeout
+5 минут на случай зависшего native вызова. Длинный software trend запускается
+явно через `pnpm test:perf:trend` (30/120) и не заменяет reference gate ниже.
+Оба режима сохраняют профиль/counts и memory diagnostics; RSS не является
+отдельным leak acceptance. Новые зависимости или native build не требуются.
+
 Manual-only workflow для trusted commits на self-hosted `cutescreen-reference`
 runner. Он не запускается для fork PR и не получает repository secrets. Перед
 M05 evidence проверяет pinned Linux/X11/GPU/WebKitGTK fingerprint и запускает

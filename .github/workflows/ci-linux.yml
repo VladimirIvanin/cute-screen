@@ -102,6 +102,7 @@ jobs:
 
       - name: Run controlled performance suite
         if: inputs.task == 'tests'
+        timeout-minutes: 5
         run: pnpm test:perf
 
       - name: Build frontend for direct Cargo tests

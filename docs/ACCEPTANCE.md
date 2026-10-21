@@ -1631,6 +1631,12 @@ remain pending.
 - Library 1000 captures не блокирует shell до полного scan.
 - 20 циклов document open/close не дают монотонной утечки.
 
+ADR-148: обычный software `pnpm test:perf` — ограниченный 2/8 smoke обеих
+4K/8K нагрузок с проверками cache lifetime; полный 30/120 software trend —
+`pnpm test:perf:trend`. Profile/counts/RSS сохраняются в JSON, shared-host
+quantiles не закрывают frame SLA выше. Для leak acceptance остаются реальные
+20 open/close циклов; короткий software sampling их не заменяет.
+
 ## A14 — CI-сборки и проверка версии
 
 ADR-112: обычный CI выполняет короткий browser/native E2E smoke. Для полной

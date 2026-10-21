@@ -42,16 +42,21 @@ describe('publication card performance evidence', () => {
     const scene = composeDocumentScene({ ...doc, presentation: { ...doc.presentation, composition: createComposition('browser') } },
       createRenderSceneSnapshot({ width, height, nodes }), [])
     const runtime = new Canvas2DRenderer({ exportCanvas: (w, h) => createCanvas(w, h) as unknown as Canvas2DLike })
-    await runtime.initialize({ scene: createCanvas(1, 1) as unknown as HTMLCanvasElement,
-      overlay: createCanvas(1, 1) as unknown as HTMLCanvasElement, dpr: 1, correlationId: 'composition-perf' })
-    await runtime.createImageResource({ id: hash, width, height, source: image as unknown as HTMLImageElement })
+    const canvas = createCanvas(1, 1)
+    const overlay = createCanvas(1, 1)
     try {
+      await runtime.initialize({ scene: canvas as unknown as HTMLCanvasElement,
+        overlay: overlay as unknown as HTMLCanvasElement, dpr: 1, correlationId: 'composition-perf' })
+      await runtime.createImageResource({ id: hash, width, height, source: image as unknown as HTMLImageElement })
       runtime.setScene(scene)
-      const report = measureScenario({ name: `composition-${width}-${count}`, fixtureSha256: hash, width, height,
-        nodeCount: count, runner: `${process.platform}/${process.arch} Canvas2D software; shared host; trend only` }, () => {
+      const report = await measureScenario({ name: `composition-${width}-${count}`, fixtureSha256: hash, width, height,
+        nodeCount: count, runner: `${process.platform}/${process.arch} Canvas2D software; shared host; no GPU SLA` }, () => {
         const start = performance.now()
         runtime.render(['scene'])
-        return performance.now() - start
+        const duration = performance.now() - start
+        expect(runtime.effectStats.bytes).toBeLessThanOrEqual(128 * 1024 * 1024)
+        expect(runtime.effectStats.temporaryGroupBytes).toBe(0)
+        return duration
       }, 0)
       const start = performance.now()
       const pixels = rasterizeFreeform(createComposition().background.freeform.points, 960, 540)
@@ -62,6 +67,13 @@ describe('publication card performance evidence', () => {
         referenceBudgetMs: count === 500 ? 16.7 : 33.3, referenceBudgetStatus: 'pending real reference GPU runner' }, null, 2))
     } finally {
       runtime.dispose()
+      canvas.width = 1
+      canvas.height = 1
+      overlay.width = 1
+      overlay.height = 1
+      expect(runtime.effectStats.bytes).toBe(0)
+      expect(runtime.effectStats.temporaryGroupBytes).toBe(0)
+      expect(runtime.effectStats.preparedBytes).toBe(0)
     }
   }, 180000)
 })

@@ -81,6 +81,8 @@ export default defineConfig({
         test: {
           name: 'perf-harness',
           environment: 'node',
+          fileParallelism: false,
+          maxWorkers: 1,
           include: ['tests/harness/perf/**/*.test.ts'],
         },
       },

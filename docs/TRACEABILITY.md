@@ -1,5 +1,18 @@
 # Трассируемость требований
 
+## Ограниченный software performance harness — до реализации (2026-10-21)
+
+`REQ-QLT-001/002/003`, `REQ-OUT-001`, `REQ-TOL-008`: обычный `pnpm test:perf`
+сохраняет production-like 4K/500 и 8K/1000, но использует короткий smoke sampling.
+Полные 30 warmups / 120 measurements доступны отдельной software trend-командой;
+reference GPU gate не меняется. Perf-файлы выполняются последовательно, sampler
+ограничивает elapsed time, отдаёт event loop между кадрами и записывает memory
+diagnostics. Canvas harness освобождает собственные surfaces в `finally`;
+проверки LRU/temporary ownership и blur invalidation остаются обязательными.
+Red-first sampler contracts проверяют counts, deadline, неверные durations и idle;
+затем полный perf smoke, focused decoded render и стабильные frontend checks.
+Результаты и пределы доказательств записываются в TESTING.md.
+
 ## Выбранные рукописные обводки — до реализации (2026-10-21)
 
 `REQ-TOL-002`, `REQ-EDT-002/005/006/016/017`: владелец выбрал овалы

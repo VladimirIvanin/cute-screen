@@ -1,5 +1,16 @@
 # Архитектура Cute Screen
 
+## Software performance harness (ADR-148)
+
+Harness не меняет production renderer: perf-файлы запускаются последовательно,
+а общий async sampler выполняет короткий 2/8 smoke либо явный 30/120 trend.
+Между измерениями он отдаёт event loop и проверяет общий elapsed budget.
+Отчёт содержит профиль, фактические counts и memory snapshots, включая RSS
+для native canvas/WASM, которые не отражаются полностью в V8 heap.
+Live LRU/temporary/prepared ownership проверяется отдельно; RSS не считается
+доказательством утечки. CanvasStack surfaces принадлежат harness и освобождаются
+им в `finally` вместе с renderer disposal. Reference GPU gate независим.
+
 ## Магнит рамок (ADR-146)
 
 Core `frame-snap` оперирует world rectangles и CSS-допуском через zoom;

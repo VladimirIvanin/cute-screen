@@ -1,5 +1,42 @@
 # Журнал архитектурных решений
 
+## ADR-148 — Ограниченный software perf smoke и отдельный trend
+
+**Статус:** accepted (2026-10-21); дополняет ADR-024.
+
+**Контекст:** CI publication-card 8K/1000 выполняет 150 полных software redraws
+и превышает 180 s timeout. Это сбор статистики без проверки GPU SLA или утечки.
+8K RGBA surface занимает около 127 MiB; большие group sources живут один paint
+по ADR-143 и создаются повторно. Параллельный blur benchmark дополнительно
+конкурирует за CPU/native memory. Синхронный sampler не отдаёт event loop;
+Vitest timeout сам по себе не останавливает цикл native вызовов.
+
+**Решение:** `pnpm test:perf` сохраняет обе production-like нагрузки 4K/500
+и 8K/1000 с 2 warmups / 8 measurements, помеченными `profile: smoke`.
+`pnpm test:perf:trend` явно включает 30/120 и `profile: trend`. Сокращённые
+quantiles — диагностические значения, не сопоставимый с прежними 120 samples
+p95 baseline и не product SLA. Full software trend также не закрывает GPU gate.
+
+Perf-файлы выполняются одним worker последовательно. Общий async sampler
+отдаёт event loop между кадрами, ограничивает весь warmup/sample цикл 30 s
+для smoke и 120 s для trend, проверяет конечные неотрицательные durations
+и записывает elapsed/RSS/heap/external/arrayBuffers до/после и sampled peak RSS.
+Budget failure содержит сценарий, фазу и RSS; незавершённый замер не выдаёт report.
+Лимит кооперативный: отдельный зависший native вызов не прерывается sampler;
+CI step имеет независимый timeout 5 минут.
+
+Обе Canvas2D нагрузки проверяют LRU ≤128 MiB и отсутствие temporary ownership
+между кадрами; renderer disposal и принадлежащие harness surfaces очищаются
+в `finally`. Legacy blur RGBA comparison использует views без двух дополнительных
+копий 8K buffers; его source surface освобождается до renderer benchmark.
+RSS служит диагностикой allocator/host pressure, а не самостоятельным leak gate.
+Reference GPU workflow, decoded render goldens и production renderer не меняются.
+
+**Проверяемое основание:** red-first sampler contracts воспроизводят прежние
+150 вызовов без yield/deadline и отсутствие memory/profile metadata. Оба CLI
+режима, полный perf smoke, decoded composition/crop и frontend checks описаны
+в TESTING.md; native runtime и dedicated reference GPU не проверяются этой задачей.
+
 ## ADR-147 — Выбранные рукописные обводки и документный цикл
 
 **Статус:** accepted (2026-10-21); supersedes ADR-123 в части геометрии

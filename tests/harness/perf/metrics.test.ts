@@ -24,6 +24,7 @@ import {
 import {
   measureScenario,
   percentile,
+  performanceSampling,
 } from './metrics'
 
 const require = createRequire(import.meta.url)
@@ -134,7 +135,7 @@ describe('performance metrics harness self-test', () => {
       if (!surface) throw new Error(`Could not create ${fixture.name} software surface`)
       try {
         const canvas = surface.getCanvas()
-        const report = measureScenario(
+        const report = await measureScenario(
           {
             name: fixture.name,
             fixtureSha256: fixtureSha256!,
@@ -155,8 +156,8 @@ describe('performance metrics harness self-test', () => {
         reports.push(report)
         await mkdir('artifacts/perf', { recursive: true })
         await writeFile('artifacts/perf/m01-renderer.json', `${JSON.stringify(reports, null, 2)}\n`)
-        expect(report.warmups).toBe(30)
-        expect(report.measurements).toBe(120)
+        expect(report.warmups).toBe(performanceSampling().warmups)
+        expect(report.measurements).toBe(performanceSampling().measurements)
         expect(report.idleFrameCount).toBe(0)
         expect(report.p50).toBeGreaterThan(0)
         expect(report.p95).toBeGreaterThanOrEqual(report.p50)
@@ -167,11 +168,11 @@ describe('performance metrics harness self-test', () => {
       } finally {
         surface.dispose()
       }
-    }, 120_000)
+    }, 180_000)
   }
 
-  it('always rejects an idle frame, independent of runner budgets', () => {
-    expect(() =>
+  it('always rejects an idle frame, independent of runner budgets', async () => {
+    await expect(
       measureScenario(
         {
           name: 'idle',
@@ -183,6 +184,6 @@ describe('performance metrics harness self-test', () => {
         },
         () => 0,
         1,
-      )).toThrow('Idle renderer scheduled 1 unexpected frames')
+      )).rejects.toThrow('Idle renderer scheduled 1 unexpected frames')
   })
 })

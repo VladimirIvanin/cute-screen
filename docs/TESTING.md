@@ -7077,7 +7077,21 @@ pixels не даёт статус `supported`.
 
 Trend benchmark запускается в PR, hard gate — на стабильном выделенном runner.
 
-M01 `pnpm test:perf` выполняет 30 warmups и 120 измеряемых полных software-CanvasKit redraws для 4K/500 и 8K/1000 и пишет `artifacts/perf/m01-renderer.json` с runner identity и fixture SHA. Это только trend: software/headless CanvasKit никогда не сравнивается с product budget. Любое ненулевое число idle frames остаётся hard failure везде.
+ADR-148: `pnpm test:perf` выполняет короткий software smoke: 2 warmups и
+8 measurements на 4K/500 и 8K/1000 для CanvasKit, composition и blur; каждый
+отчёт помечен `profile: smoke`. `pnpm test:perf:trend` явно включает прежние
+30 warmups / 120 measurements с `profile: trend`. Короткие quantiles нельзя
+сравнивать с прежним 120-sample baseline или product budget. CanvasKit пишет
+`artifacts/perf/m01-renderer.json`, composition и blur — собственные JSON с
+fixture SHA, runner, counts, elapsed и memory snapshots/RSS. Sampler отдаёт
+event loop между кадрами и ограничивает warmup + measurement цикл 30 s для
+smoke / 120 s для trend; perf-файлы идут последовательно. Budget failure
+содержит сценарий/фазу/RSS и не выдаёт частичный успешный report. Один native
+вызов не прерывается кооперативным budget; CI step ограничен 5 минутами.
+Ненулевые переданные idle frames остаются hard failure; синтетический ноль
+в CPU harness не доказывает idle production scheduler. Его проверяет reference
+и отдельные scheduler tests. RSS диагностический: bounded LRU и освобождение
+temporary/prepared surfaces проверяются отдельно.
 
 M05 `pnpm test:perf:reference` запускается только на designated self-hosted
 Ubuntu 24.04/X11 reference host (i7-11700K, RTX 2070 SUPER, NVIDIA 595.84,
