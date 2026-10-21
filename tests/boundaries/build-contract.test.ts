@@ -203,7 +203,12 @@ describe('Tauri build boundary', () => {
     expect(platformSource).toContain('quick_selection_pending: uses_mounted_quick_selection(target)')
     expect(platformSource).not.toContain('fn area_geometry(')
     expect(captureSource).not.toContain('select_on_virtual_desktop(')
-    expect(captureSource).toContain('capture_fresh_compositor_frame(&source_geometry, correlation_id)')
+    expect(captureSource).toContain(
+      'acquire_composed_desktop_frame(order, &source_geometry, correlation_id)',
+    )
+    expect(platformSource).toMatch(
+      /fn acquire_composed_desktop_frame[\s\S]*composed_desktop_frame_required\(order\)[\s\S]*capture_fresh_compositor_frame\(source, correlation_id\)/,
+    )
     expect(platformSource).toMatch(
       /fn capture_fresh_compositor_frame[\s\S]*prepare_compositor_capture\([\s\S]*CompositorPulse::show\([\s\S]*flush_desktop_composition\([\s\S]*capture_prepared_compositor_outputs\(/,
     )
