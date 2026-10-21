@@ -193,14 +193,21 @@ codec v7 сохраняет metadata. Legacy clean проходит прежни
 Серийность и axis snapping работают с точной базовой геометрией, а hit testing
 получает тот же кубический контур, что preview/export обоих backend.
 
-## Рукописные акценты (ADR-123)
+## Рукописные акценты (ADR-123/147)
 
-`sketch-geometry` вычисляет воспроизводимые кубические пути: circling/rectangularCircling —
-открытый овал/прямоугольник с полным обходом и нахлёстом смещённых концов, стрелка — ограниченные низкочастотные отклонения.
-Seed выводится из creation ID один раз и сохраняется как sketchSeed вместе с
-sketchVersion=1. Creation gesture использует один ID для draft/commit;
-перемещение, resize, duplicate и смена paint не меняют seed. Style clipboard
-переносит appearance, сохраняя seed получателя. Defaults не хранят seed.
+`circling-path` и `rectangular-circling-path` строят открытые кубические контуры
+выбранных вариантов: четыре овала и три прямоугольника. `circling-presets`
+выводит следующий независимый cursor из максимальной sketchSequence существующих
+фигур того же типа. Pointerdown фиксирует sequence для draft/commit; отмена и
+пустой жест ничего не меняют. Один addLayer EditorCommand сохраняет metadata
+sketchVersion=2/seed/sequence. Duplicate, reorder и перенос стиля не продвигают
+cursor; Undo/Redo, удаление последней фигуры и reopen следуют состоянию документа.
+Defaults не хранят metadata, при изменении вида выбранной фигуры seed пересчитывается
+для её sequence. Старые контуры заменены по запросу владельца без visual migration.
+
+`sketch-geometry` сохраняет общий seeded body стрелок/линий: ID выделяется при
+pointerdown, version=1 и seed переживают move/resize/duplicate/reopen и paint.
+Style clipboard переносит appearance с сохранением seed получателя.
 
 Arrow body учитывает trim наконечников; ломаная сохраняет свои углы,
 конечные точки и касательные остаются точными. Hand-drawn scene компилируется

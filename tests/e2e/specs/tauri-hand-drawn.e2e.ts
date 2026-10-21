@@ -3,7 +3,10 @@ import {
   browser,
   expect,
 } from '@wdio/globals'
-import { verifyHandDrawn } from '../hand-drawn'
+import {
+  verifyHandDrawn,
+  verifyCirclingSequence,
+} from '../hand-drawn'
 import { shapeDocument } from '../shape-toolbar'
 import { waitForStableCanvas } from '../canvas-ready'
 
@@ -21,12 +24,16 @@ describe('hand-drawn annotations through native capture', () => {
       await native.__TAURI__.core.invoke('plugin:window|set_focus', { label: 'quick-capture' })
     })
     await verifyHandDrawn('artifacts/tauri-e2e')
-    const before = (await shapeDocument()).layers.slice(-3).map((layer) => layer.payload)
+    await verifyCirclingSequence('artifacts/tauri-e2e')
+    const before = (await shapeDocument()).layers
+      .filter((layer) => layer.payload.sketchSeed).map((layer) => layer.payload)
     await $('.cs-quick-actions button:first-child').click()
     await browser.tauri.switchWindow('main')
     await expect($('.cs-canvas-ready')).toExist()
     await waitForStableCanvas()
-    expect((await shapeDocument()).layers.slice(-3).map((layer) => layer.payload)).toEqual(before)
+    const after = (await shapeDocument()).layers
+      .filter((layer) => layer.payload.sketchSeed).map((layer) => layer.payload)
+    expect(after).toEqual(before)
     await expect($('.cs-save-status')).not.toExist()
     await browser.saveScreenshot('artifacts/tauri-e2e/hand-drawn-editor.png')
   }).timeout(180000)

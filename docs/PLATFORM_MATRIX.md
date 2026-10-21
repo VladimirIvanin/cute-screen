@@ -1,5 +1,18 @@
 # Платформенная матрица
 
+## Выбранные обводки (ADR-147, 2026-10-21)
+
+Ubuntu 22.04.5 x86_64 / Node 22.23.1: 1609 core/component tests и 87 decoded
+renderer tests passed. Все 4 овала / 3 прямоугольника осмотрены в Canvas2D и
+CanvasKit, PNG 1x/2x поверх production-like ui-4k. Chrome 147.0.7727.101:
+hand-drawn 2/2 и shape-toolbar 4/4 passed (серии, Select, Undo/Redo, каталог,
+RU/EN × темы). Fresh Tauri debug/no-bundle /
+wry 0.55.1, WebKitGTK 2.50.4, external tauri-driver 2.1.0, Xvfb :98:
+Quick → Editor и reopen/продолжение циклов 2/2 passed. Capture fake 400x300;
+это WebView evidence, system capture не проверялся. Новых native API/IPC нет.
+Windows WebView2 / macOS WKWebView pending. Evidence — TESTING.md и
+`artifacts/circling-seeds/`.
+
 ## Canvas2D golden карточек (2026-10-20)
 
 Headless Windows x64 и Ubuntu 22.04 x86_64 / WSL2, Node 22.23.1,

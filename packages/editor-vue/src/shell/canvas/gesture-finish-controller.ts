@@ -431,6 +431,7 @@ function commitCreation(
     const defaults = gesture.drawingDefaults ?? context.props.drawingDefaults
     const layer = createDrawingLayer({
       id: gesture.layerId,
+      sketchSequence: gesture.sketchSequence,
       tool: gesture.tool,
       start: gesture.start,
       end: gesture.current,

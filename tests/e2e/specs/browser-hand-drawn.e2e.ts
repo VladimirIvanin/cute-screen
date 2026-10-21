@@ -3,7 +3,10 @@ import {
   expect,
 } from '@wdio/globals'
 import { openDrawingHarness } from './browser-m06-test-kit'
-import { verifyHandDrawn } from '../hand-drawn'
+import {
+  verifyHandDrawn,
+  verifyCirclingSequence,
+} from '../hand-drawn'
 import { shapeDocument } from '../shape-toolbar'
 
 describe('hand-drawn annotation tools', () => {
@@ -16,4 +19,9 @@ describe('hand-drawn annotation tools', () => {
     expect(annotations[1]!.payload.shape).toBe('circling')
     expect(annotations[2]!.payload.appearance).toBe('handDrawn')
   }).timeout(120000)
+  it('cycles the owner-selected oval and rectangle seeds through visible creation and exact Undo/Redo', async () => {
+    await browser.setWindowSize(1280, 900)
+    await openDrawingHarness(true)
+    await verifyCirclingSequence('artifacts/browser-e2e')
+  }).timeout(180000)
 })

@@ -1,5 +1,15 @@
 # CI-сборки и проверка версии через GitHub
 
+## Выбранные обводки (ADR-147)
+
+Новых dependencies, native API и IPC нет. Shape payload сохраняет version=2,
+seed и sequence в существующем JSON-контракте schema v8; старые сборки не
+обязаны читать новый metadata contract. Старые контуры version=1 читаются
+с заменённым генератором, визуальная совместимость снята владельцем.
+Gate: core/Vue/fixture, decoded Canvas2D/CanvasKit 1×/2×, browser hand-drawn,
+fresh `hand-drawn,hand-drawn-reopen` через штатный debug/no-bundle runner.
+Workspace target/cache сохраняются. Фактическое evidence — TESTING.md.
+
 ## Стыки экрана рамки (ADR-144)
 
 RenderGroupNode.backdrop — внутренний scene contract; persisted schema/IPC,

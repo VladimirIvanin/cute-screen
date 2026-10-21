@@ -363,7 +363,8 @@ export type ArrowCap = (typeof ARROW_CAPS)[number]
 export interface ShapeLayerPayload extends JsonObject {
   readonly annotationTool?: 'gradient'
   readonly sketchSeed?: number
-  readonly sketchVersion?: 1
+  readonly sketchVersion?: 1 | 2
+  readonly sketchSequence?: number
   readonly shape: ShapeKind
   readonly fill: FillPaint & JsonObject
   readonly stroke: StrokeStyle

@@ -1,5 +1,7 @@
 import {
   shapeGeometry,
+  circlingSketch,
+  isCirclingKind,
   shapePathSvg,
   mapShapePath,
   type ShapePreset,
@@ -12,7 +14,9 @@ export function thumbnail(entry: ShapePreset): string {
     entry.shape,
     24,
     entry.shape === 'oval' ? 16 : 24,
-    { cornerRadius: entry.cornerRadius ? 5 : 0 },
+    { cornerRadius: entry.cornerRadius ? 5 : 0,
+      ...(isCirclingKind(entry.shape) ? circlingSketch(entry.shape) : {}),
+    },
   )
   return shapePathSvg(mapShapePath([...geometry.outline, ...geometry.details], 1, 1, 4, entry.shape === 'oval' ? 8 : 4))
 }

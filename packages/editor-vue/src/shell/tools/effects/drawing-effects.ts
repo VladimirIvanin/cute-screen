@@ -9,6 +9,8 @@ import type {
 } from 'vue'
 import {
   sketchSeed,
+  circlingSketch,
+  isCirclingKind,
   rebaseArrowLayer,
   rebaseFreehandLayer,
   rememberDrawingColor,
@@ -87,6 +89,22 @@ function targetFor(context: DrawingEffectsContext): DrawingTarget | undefined {
   }
 }
 
+function shapeSketchPayload(
+  payload: JsonObject,
+  previous: JsonObject,
+): JsonObject {
+  if (isCirclingKind(payload.shape)) {
+    if (payload.shape === previous.shape && payload.sketchSeed !== undefined) return payload
+    const sequence = typeof payload.sketchSequence === 'number' ? payload.sketchSequence : 0
+    return { ...payload, ...circlingSketch(payload.shape, sequence) }
+  }
+  const { sketchSeed: _seed, sketchVersion: _version, sketchSequence: _sequence, ...clean } = payload
+  void _seed
+  void _version
+  void _sequence
+  return clean
+}
+
 function selectedAfter(
   selected: DrawingLayerNode,
   id: DrawingControlId,
@@ -98,9 +116,11 @@ function selectedAfter(
   void _layerOpacity
   void _blendMode
   void _memories
-  let documentPayload = (['circling', 'rectangularCircling'].includes(String(unseededPayload.shape)) || unseededPayload.appearance === 'handDrawn') && unseededPayload.sketchSeed === undefined
-    ? { ...unseededPayload, sketchSeed: sketchSeed(selected.id), sketchVersion: 1 }
-    : unseededPayload
+  let documentPayload = selected.kind === 'shape'
+    ? shapeSketchPayload(unseededPayload, selected.payload)
+    : unseededPayload.appearance === 'handDrawn' && unseededPayload.sketchSeed === undefined
+      ? { ...unseededPayload, sketchSeed: sketchSeed(selected.id), sketchVersion: 1 }
+      : unseededPayload
   if (
     id === 'gradientRotate' &&
     selected.kind === 'shape' &&

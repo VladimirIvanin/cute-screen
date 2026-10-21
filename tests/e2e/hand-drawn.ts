@@ -96,7 +96,7 @@ export async function verifyHandDrawn(directory: string): Promise<void> {
   await $('.cs-shape-popover').waitForDisplayed({ reverse: true })
   await closeDefaultsPopup()
   await draw('Shape', 0.16)
-  expect((await shapeDocument()).layers.at(-1)!.payload).toMatchObject({ shape: 'rectangularCircling', fill: { kind: 'none' }, sketchVersion: 1 })
+  expect((await shapeDocument()).layers.at(-1)!.payload).toMatchObject({ shape: 'rectangularCircling', fill: { kind: 'none' }, sketchVersion: 2 })
   await selectTool('Shape')
   const ovalHost = await drawingDefaultsHost()
   await $(`${ovalHost} [data-shape-control="geometry"]`).click()
@@ -106,7 +106,7 @@ export async function verifyHandDrawn(directory: string): Promise<void> {
   await closeDefaultsPopup()
   await draw('Shape', 0.4)
   const shape = (await shapeDocument()).layers.at(-1)!
-  expect(shape.payload).toMatchObject({ shape: 'circling', fill: { kind: 'none' }, sketchVersion: 1 })
+  expect(shape.payload).toMatchObject({ shape: 'circling', fill: { kind: 'none' }, sketchVersion: 2 })
   expect(Number(shape.payload.sketchSeed)).toBeGreaterThan(0)
   await expect($('.cs-selection-floating-toolbar [data-shape-control="fill"]')).toBeDisabled()
   await selectTool('Arrow')
@@ -124,4 +124,40 @@ export async function verifyHandDrawn(directory: string): Promise<void> {
   expect((await shapeDocument()).layers.at(-1)!.payload.sketchSeed).toBe(arrow.payload.sketchSeed)
   await browser.saveScreenshot(`${directory}/hand-drawn.png`)
   await writeFile(`${directory}/hand-drawn-document.json`, JSON.stringify(await shapeDocument(), null, 2))
+}
+
+export async function verifyCirclingSequence(directory: string): Promise<void> {
+  for (const [kind, seeds] of [
+    ['circling', [1021, 241, 16411, 97531]],
+    ['rectangularCircling', [683, 337, 127]],
+  ] as const) {
+    const previous = (await shapeDocument()).layers.filter((layer) => layer.payload.shape === kind)
+    const next = previous.reduce((maximum, layer) =>
+      Math.max(maximum, Number(layer.payload.sketchSequence ?? -1) + 1), 0)
+    await selectTool('Shape')
+    const host = await drawingDefaultsHost()
+    await $(`${host} [data-shape-control="geometry"]`).click()
+    await waitForShapeAnimation()
+    await $(`[data-shape-id="${kind}"]`).click()
+    await $('.cs-shape-popover').waitForDisplayed({ reverse: true })
+    await closeDefaultsPopup()
+    const count = (await shapeDocument()).layers.length
+    for (let index = 0; index <= seeds.length; index++) {
+      await draw('Shape', 0.12 + index * 0.13)
+      const layer = (await shapeDocument()).layers.at(-1)!
+      expect(layer.payload).toMatchObject({
+        shape: kind, sketchVersion: 2, sketchSequence: next + index,
+        sketchSeed: seeds[(next + index) % seeds.length],
+      })
+      await expect($('.cs-toolrail [data-tool-id="select"]')).toHaveAttribute('aria-pressed', 'true')
+    }
+    const beforeUndo = (await shapeDocument()).layers.at(-1)!
+    await key('undo')
+    await browser.waitUntil(async () => (await shapeDocument()).layers.length === count + seeds.length)
+    await key('redo')
+    await browser.waitUntil(async () => (await shapeDocument()).layers.length === count + seeds.length + 1)
+    expect((await shapeDocument()).layers.at(-1)!).toEqual(beforeUndo)
+  }
+  await writeFile(`${directory}/hand-drawn-document.json`, JSON.stringify(await shapeDocument(), null, 2))
+  await browser.saveScreenshot(`${directory}/circling-sequence.png`)
 }

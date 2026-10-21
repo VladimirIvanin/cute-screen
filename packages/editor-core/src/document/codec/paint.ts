@@ -1,3 +1,7 @@
+import {
+  circlingSketch,
+  isCirclingKind,
+} from '../../circling-presets'
 import { isShapeKind } from '../../shapes'
 import { isHighlighterMode } from '../../highlighter'
 import { readJsonObject } from '../json'
@@ -297,6 +301,22 @@ export function parseArrowPayload(
   })
 }
 
+function parseShapeSketch(
+  input: Record<string, unknown>,
+  field: string,
+): Pick<ShapeLayerPayload, 'sketchSeed' | 'sketchVersion' | 'sketchSequence'> {
+  if (input.sketchVersion !== 2) {
+    if (input.sketchSequence !== undefined) throw new Error(`${field} legacy sketch cannot have a sequence`)
+    return parseSketch(input, field)
+  }
+  if (!isCirclingKind(input.shape) || typeof input.sketchSequence !== 'number') {
+    throw new Error(`${field} circling sequence is missing or invalid`)
+  }
+  const expected = circlingSketch(input.shape, input.sketchSequence)
+  if (input.sketchSeed !== expected.sketchSeed) throw new Error(`${field} circling seed does not match sequence`)
+  return expected
+}
+
 export function parseShapePayload(
   value: unknown,
   field: string,
@@ -334,7 +354,7 @@ export function parseShapePayload(
   )
     throw new Error(`${field} geometry is invalid`)
   return Object.freeze({
-    ...parseSketch(input, field),
+    ...parseShapeSketch(input, field),
     ...(input.annotationTool === 'gradient' ? { annotationTool: 'gradient' as const } : {}),
     shape: input.shape as ShapeLayerPayload['shape'],
     fill: fill as ShapeLayerPayload['fill'],

@@ -1,4 +1,9 @@
 export {
+  circlingSketch,
+  isCirclingKind,
+  nextCirclingSequence,
+} from '@cute-screen/editor-core'
+export {
   sketchSeed,
   hasFreeformArea,
   pointsBounds,

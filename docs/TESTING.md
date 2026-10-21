@@ -1,5 +1,72 @@
 # Стратегия тестирования
 
+## Выбранные обводки (2026-10-21, ADR-147)
+
+Baseline `6fae59d`, рабочая копия. Ubuntu 22.04.5 x86_64, установленный NVM Node 22.23.1 /
+pnpm 10.33.2, Rust 1.97.0; Chrome 147.0.7727.101, WebKitGTK 2.50.4 / wry 0.55.1.
+Evidence — `artifacts/circling-seeds/` и штатные browser/tauri-e2e reports.
+
+- До реализации `pnpm test packages/editor-core/src/circling.test.ts`: 4 failed /
+  1 passed. Три контракта обнаружили старые seeds/version и 41 вместо 65 команд
+  прототипа; четвёртый failure был невалидным UUID новой fixture и исправлен.
+  Дополнительный red assertion референсного овала обнаружил слишком малый
+  вертикальный разнос концов; геометрия исправлена, порог не ослаблялся.
+- Fixture `tests/fixtures/circling-v2.json` извлечена из исходного прототипа,
+  production-код в её генерации не участвовал. Проверяются все координаты шести
+  выбранных контуров с точностью 1e-10; дополнительный овал — полный winding и
+  длинный верхний нахлёст. Core покрывает независимые циклы 4/3, codec/reopen,
+  duplicate/reorder/history, style identity, bounds при 1:1/2:1/10:1/1:10 и
+  stroke/interior hit testing. Vue pointer проверяет cancel/no-op/focus/read-only.
+- Финальный focused core/Vue: 4 files / 46 passed. Полный
+  `pnpm test --maxWorkers=1 --testTimeout=15000`: 179 files / 1609 passed.
+- `pnpm test:render:update tests/harness/render/circling-seeds.test.ts
+tests/harness/render/hand-drawn.test.ts tests/harness/render/golden-shapes.test.ts`:
+  3 files / 7 passed. Затем обычный
+  `pnpm test:render --maxWorkers=1 --testTimeout=15000`: 30 files / 87 passed.
+  Все семь контуров декодированы и визуально осмотрены в Canvas2D/CanvasKit;
+  PNG 1x/2x, совпадение preview/export 1x, screenshot composite поверх ui-4k.
+  Обновлены ожидаемые hand-drawn/catalogue goldens, добавлены четыре новых.
+- `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 pnpm test:e2e:browser
+--spec tests/e2e/specs/browser-hand-drawn.e2e.ts`: 2 passed. UI создаёт все
+  варианты плюс первый повтор каждого цикла, подтверждает Select после создания
+  и exact Undo/Redo. Harness m05 даёт interaction evidence, не clean capture.
+- `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 pnpm test:e2e:browser
+--spec tests/e2e/specs/browser-shape-toolbar.e2e.ts`: 4 passed, включая смену
+  всех видов выбранной фигуры, paint/history, trusted defaults и RU/EN × темы
+  при 1024px. Metadata circling очищается или пересчитывается при смене вида.
+- `DISPLAY=:98 CUTE_SCREEN_E2E_SCENARIOS=hand-drawn,hand-drawn-reopen
+dbus-run-session -- pnpm test:e2e:tauri`: 2 сценария passed. Runner каждый раз
+  собирает свежий debug/no-bundle harness в общем target. Trusted pointer создаёт
+  выбранные обводки в Quick, передаёт все annotation payload в Editor, после
+  relaunch сравнивает сохранённые seed/version/sequence и продолжает оба цикла.
+  Capture fake-platform 400x300; это реальный WebView, не доказательство system capture.
+  Использован cached tauri-driver 2.1.0; Xvfb :98 и временный WebKitWebDriver взяты
+  из штатного `cute-screen-ubuntu22-build:local`, app и Cargo выполнялись на host.
+- Первый native прогон ошибочно включал hash базового изображения в сравнение
+  Quick/Editor (handoff штатно материализует source); assertion исправлен на
+  все созданные аннотации. Финальный повтор прошёл и не использовал старый binary.
+- `pnpm test:boundaries --maxWorkers=1 --testTimeout=30000`: 16 files / 113 passed.
+  Под нагрузкой полного unit/native прогона стандартные AST scans с лимитом 5 s
+  давали timeout; assertions/архитектурные бюджеты не менялись. Найденное
+  complexity=21/20 устранено удалением ненужной передачи параметра в scene.
+
+Windows WebView2 и macOS WKWebView не запускались. Новых dependencies/IPC нет,
+прежняя геометрия обводок заменена по явному запросу владельца.
+
+Финальный `pnpm check` passed, включая lint (37 существующих warnings), полный
+TypeScript, format/docs, 113 boundaries, IPC codegen и четыре Rust Clippy gates.
+Повтор на свободном host прошёл штатный 5 s лимит AST scans без изменения tests
+или бюджетов. После записи evidence выполнены `pnpm format` и `pnpm format:check`.
+
+Дисковая гигиена: workspace target 45.583 → 50.484 GiB после свежего native build,
+IPC и четырёх Clippy feature gates; общий полезный Cargo cache сохранён.
+`pnpm clean:artifacts` dry-run: 0 directories. Известные task-owned временные
+артефакты удалены отдельно: failed fake appData после диагностики, временный
+WebKitWebDriver и его symlink, заменённые диагностические logs/screenshot —
+54 905 397 bytes. Xvfb container остановлен, runtime каталог пуст; cached
+tauri-driver сохранён. Команды и размеры — disk-after.log / cleanup.json,
+сводный результат — summary.json в `artifacts/circling-seeds/`.
+
 ## Округление Canvas2D golden карточек (2026-10-20)
 
 Baseline `a472777`, Windows x64 / PowerShell и Ubuntu 22.04 x86_64 / WSL2,

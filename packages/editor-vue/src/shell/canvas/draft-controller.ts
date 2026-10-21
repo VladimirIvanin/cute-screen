@@ -97,6 +97,7 @@ export class DraftController {
     const defaults = gesture.drawingDefaults ?? props.drawingDefaults
     return createDrawingLayer({
       id: gesture.layerId,
+      sketchSequence: gesture.sketchSequence,
       tool: gesture.tool,
       start: gesture.start,
       end: gesture.current,

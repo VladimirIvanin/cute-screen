@@ -5,6 +5,7 @@ import {
 import { rulerAngleStep } from './ruler-modifiers'
 import {
   DEFAULT_DRAWING_DEFAULTS,
+  nextCirclingSequence,
   beginStroke,
   calloutTextLayout,
   createPreparedNumberedMarker,
@@ -352,6 +353,10 @@ function beginDrawing(
   context.setGesture({
     kind: 'draw',
     layerId: crypto.randomUUID(),
+    ...(tool === 'shape' ? {
+      sketchSequence: nextCirclingSequence(context.props.document?.layers ?? [],
+        (context.props.drawingDefaults ?? DEFAULT_DRAWING_DEFAULTS).shape.shape),
+    } : {}),
     ...(tool === 'line' ? { startClient: { x: event.clientX, y: event.clientY } } : {}),
     highlighterEffect: context.props.highlighterEffect,
     drawingDefaults: tool === 'pencil' ? {

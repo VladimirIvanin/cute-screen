@@ -18,6 +18,8 @@ beforeEach(() => {
     measureText: (text: string) => ({ width: Array.from(text).length * 14.4 }),
     arc: vi.fn(),
     beginPath: vi.fn(),
+    bezierCurveTo: vi.fn(),
+    getTransform: vi.fn(() => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 })),
     clearRect: vi.fn(),
     closePath: vi.fn(),
     drawImage: vi.fn(),
@@ -41,6 +43,40 @@ beforeEach(() => {
 })
 
 describe('M05 CanvasViewport transforms', () => {
+  it('cycles each circling kind from committed gestures without consuming cancelled, empty or readonly gestures', async () => {
+    let current = { ...document, layers: [] as typeof document.layers }
+    const view = mountViewport('shape', current)
+    const expected = { circling: [1021, 241, 16411, 97531, 1021], rectangularCircling: [683, 337, 127, 683] }
+    let commits = 0
+    for (let index = 0; index < 5; index++) for (const kind of ['circling', 'rectangularCircling'] as const) {
+      if (index >= expected[kind].length) continue
+      const defaults = { ...DEFAULT_DRAWING_DEFAULTS, shape: { ...DEFAULT_DRAWING_DEFAULTS.shape, shape: kind } }
+      await view.rerender({ drawingDefaults: defaults, document: current })
+      await fireEvent.pointerDown(view.scene, { pointerId: 1, button: 0, clientX: 5, clientY: 45 })
+      await fireEvent.pointerMove(view.scene, { pointerId: 1, clientX: 75, clientY: 85 })
+      await fireEvent.pointerCancel(view.scene, { pointerId: 1 })
+      await fireEvent.pointerDown(view.scene, { pointerId: 2, button: 0, clientX: 5, clientY: 45 })
+      await fireEvent.pointerUp(view.scene, { pointerId: 2, clientX: 5, clientY: 45 })
+      expect((view.emitted('addLayer') ?? []).length).toBe(commits)
+      await fireEvent.pointerDown(view.scene, { pointerId: 3, button: 0, clientX: 5, clientY: 45 })
+      expect(view.scene.ownerDocument.activeElement).toBe(view.scene)
+      await fireEvent.pointerMove(view.scene, { pointerId: 3, clientX: 75, clientY: 85 })
+      expect((view.emitted('addLayer') ?? []).length).toBe(commits)
+      await fireEvent.pointerUp(view.scene, { pointerId: 3, clientX: 75, clientY: 85 })
+      const event = view.emitted('addLayer')![commits++] as unknown as [typeof document.layers[number]]
+      const layer = event[0]
+      expect(layer.payload).toMatchObject({
+        sketchSeed: expected[kind][index], sketchVersion: 2, sketchSequence: index,
+      })
+      current = { ...current, layers: [...current.layers, layer] }
+    }
+    await view.rerender({ document: current, readOnly: true })
+    await fireEvent.pointerDown(view.scene, { pointerId: 4, button: 0, clientX: 5, clientY: 45 })
+    await fireEvent.pointerMove(view.scene, { pointerId: 4, clientX: 75, clientY: 85 })
+    await fireEvent.pointerUp(view.scene, { pointerId: 4, clientX: 75, clientY: 85 })
+    expect(view.emitted('addLayer')).toHaveLength(commits)
+  })
+
   it('freezes automatic highlighter resolution at pointerdown while later strokes use the ready result', async () => {
     const view = mountViewport('marker')
     await view.rerender({ drawingDefaults: DEFAULT_DRAWING_DEFAULTS, highlighterEffect: 'highlight' })

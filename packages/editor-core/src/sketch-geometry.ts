@@ -89,49 +89,7 @@ export function sketchPath(
   ])
 }
 
-/** Full oval pen loop with separated overlapping ends, fitted to the intrinsic bounds. */
-export function circlingPath(
-  width: number,
-  height: number,
-  seed: number,
-): readonly ShapePathCommand[] {
-  const random = sketchRandom(seed)
-  const start = random() * Math.PI * 2
-  const phase = random() * Math.PI * 2
-  const overlap = 0.2 + random() * 0.18
-  const points = Array.from({ length: 41 }, (_, i) => {
-    const progress = i / 40
-    const angle = start + (Math.PI * 2 + overlap) * progress
-    const radius = 1 + 0.035 * Math.sin(angle * 3 + phase) + 0.02 * Math.cos(angle * 2 - phase)
-      + progress * 0.065
-    return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius }
-  })
-  return fitSketchPath(smoothSketchPath(points), width, height)
-}
-
-/** Full rectangular pen loop, with rounded turns and offset overlapping ends. */
-export function rectangularCirclingPath(
-  width: number,
-  height: number,
-  seed: number,
-): readonly ShapePathCommand[] {
-  const random = sketchRandom(seed)
-  const knots = [
-    [0.8, 0.015], [0.5, 0], [0.16, 0.015], [0.055, 0.02],
-    [0.015, 0.06], [0, 0.18], [0.01, 0.52], [0, 0.86],
-    [0.02, 0.96], [0.07, 0.99], [0.2, 1], [0.54, 0.985],
-    [0.86, 1], [0.96, 0.98], [0.99, 0.93], [1, 0.8],
-    [0.985, 0.48], [1, 0.17], [0.985, 0.03], [0.94, -0.015],
-    [0.86, -0.045], [0.72, -0.075],
-  ]
-  const points = knots.map(([x, y]) => ({
-    x: x! + (random() - 0.5) * 0.025,
-    y: y! + (random() - 0.5) * 0.025,
-  }))
-  return fitSketchPath(smoothSketchPath(points), width, height)
-}
-
-function fitSketchPath(
+export function fitSketchPath(
   path: readonly ShapePathCommand[],
   width: number,
   height: number,
@@ -145,8 +103,8 @@ function fitSketchPath(
   return path.map((command) => {
     if (command[0] === 'Z') return command
     const values = command.slice(1).map((value, i) => i % 2 === 0
-      ? ((value as number) - left) / (right - left) * width
-      : ((value as number) - top) / (bottom - top) * height)
+      ? ((value as number) - left) * (width / (right - left))
+      : ((value as number) - top) * (height / (bottom - top)))
     return command[0] === 'C' ? ['C', values[0]!, values[1]!, values[2]!, values[3]!, values[4]!, values[5]!] : [command[0], values[0]!, values[1]!]
   })
 }

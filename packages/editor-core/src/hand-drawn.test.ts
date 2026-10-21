@@ -51,7 +51,7 @@ function drawing(
   id = '019c1f62-058e-7000-8000-000000000004',
 ) {
   return createDrawingLayer({
-    id, tool, start: { x: 20, y: 30 }, end: { x: 300, y: 180 },
+    id, tool, sketchSequence: id.endsWith('005') ? 1 : 0, start: { x: 20, y: 30 }, end: { x: 300, y: 180 },
     defaults: { ...DEFAULT_DRAWING_DEFAULTS,
       shape: { ...DEFAULT_DRAWING_DEFAULTS.shape, shape: 'circling' },
       arrow: { ...DEFAULT_DRAWING_DEFAULTS.arrow, appearance: 'handDrawn' },
@@ -64,7 +64,7 @@ describe('hand-drawn annotations', () => {
     expect(SHAPE_CATALOG.some((entry) => entry.id === 'circling')).toBe(true)
     const first = drawing('shape') as ShapeLayer
     const second = drawing('shape', '019c1f62-058e-7000-8000-000000000005') as ShapeLayer
-    expect(first.payload.sketchVersion).toBe(1)
+    expect(first.payload.sketchVersion).toBe(2)
     expect(first.payload.sketchSeed).not.toBe(second.payload.sketchSeed)
     const geometry = shapeGeometry('circling', 280, 150, { sketchSeed: Number(first.payload.sketchSeed) })
     expect(geometry.open).toBe(true)
@@ -78,7 +78,7 @@ describe('hand-drawn annotations', () => {
       const delta = Math.atan2(p.y - 75, p.x - 140) - Math.atan2(previous.y - 75, previous.x - 140)
       return sum + Math.atan2(Math.sin(delta), Math.cos(delta))
     }, 0)
-    expect(turn).toBeGreaterThan(Math.PI * 2)
+    expect(Math.abs(turn)).toBeGreaterThan(Math.PI * 2)
 
     expect(geometry.outline.some((command) => command[0] === 'Z')).toBe(false)
     expect(geometry).toEqual(shapeGeometry('circling', 280, 150, { sketchSeed: Number(first.payload.sketchSeed) }))
@@ -174,7 +174,7 @@ describe('hand-drawn annotations', () => {
     }
   })
   it('rejects corrupt sketch metadata and forbids filled circling shapes', () => {
-    for (const patch of [{ sketchVersion: 2 }, { sketchSeed: 0 }, { sketchSeed: 1.5 }, { fill: { kind: 'solid' } }]) {
+    for (const patch of [{ sketchVersion: 3 }, { sketchSeed: 0 }, { sketchSeed: 1.5 }, { fill: { kind: 'solid' } }]) {
       const shape = drawing('shape') as ShapeLayer
       const value = JSON.parse(serializeEditorDocument({ ...documentFixture, layers: [shape] }))
       Object.assign(value.layers[0].payload, patch)
@@ -197,8 +197,8 @@ describe('hand-drawn annotations', () => {
     expect(geometry.open).toBe(true)
     const contour = flattenShapePath(geometry.outline)[0]!
     expect(contour.some((p) => p.x > 285 && p.y < 12)).toBe(true)
-    expect(contour.at(-1)!.x).toBeLessThan(contour[0]!.x)
-    expect(contour[0]!.y - contour.at(-1)!.y).toBeGreaterThan(8)
+    expect(Math.abs(contour.at(-1)!.x - contour[0]!.x)).toBeGreaterThan(20)
+    expect(Math.abs(contour[0]!.y - contour.at(-1)!.y)).toBeGreaterThan(2)
     expect(Math.hypot(contour[0]!.x - contour.at(-1)!.x, contour[0]!.y - contour.at(-1)!.y)).toBeGreaterThan(2)
     expect(hitTestDocument({ ...documentFixture, layers: [layer] }, { x: 150, y: 80 })).toBeUndefined()
     expect(layer.payload.fill).toMatchObject({ kind: 'none' })

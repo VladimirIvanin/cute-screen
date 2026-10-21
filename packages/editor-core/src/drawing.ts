@@ -1,6 +1,10 @@
 import { DEFAULT_GRADIENT_DEFAULTS } from './gradient'
 import { rebaseFreehandLayer } from './tools/freehand'
 import { sketchSeed } from './sketch-geometry'
+import {
+  circlingSketch,
+  isCirclingKind,
+} from './circling-presets'
 import { isShapeKind } from './shapes'
 import type {
   ArrowCap,
@@ -33,6 +37,7 @@ export interface DrawingDefaults {
 }
 
 interface DrawingLayerInput {
+  readonly sketchSequence?: number | undefined
   readonly highlighterEffect?: HighlighterEffect
   readonly id: string
   readonly tool: DrawingTool
@@ -417,7 +422,7 @@ export function createDrawingLayer(input: DrawingLayerInput): LayerNode | undefi
       localBounds: square ? { x: 0, y: 0, width: side, height: side } : common.localBounds,
       kind: 'shape' as const,
       payload: { ...defaults.shape, shape,
-        ...(['circling', 'rectangularCircling'].includes(String(shape)) ? { fill: { kind: 'none' }, sketchSeed: sketchSeed(input.id), sketchVersion: 1 } : {}),
+        ...(isCirclingKind(shape) ? { fill: { kind: 'none' }, ...circlingSketch(shape, input.sketchSequence) } : {}),
       },
     })
   }

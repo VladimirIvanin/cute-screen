@@ -1,7 +1,5 @@
-import {
-  circlingPath,
-  rectangularCirclingPath,
-} from './sketch-geometry'
+import { circlingPath } from './circling-path'
+import { rectangularCirclingPath } from './rectangular-circling-path'
 
 import type { ShapePathCommand } from './shape-path-types'
 export type { ShapePathCommand } from './shape-path-types'
@@ -71,7 +69,7 @@ export interface ShapeGeometry {
 }
 interface Parameters {
   readonly sketchSeed?: number
-  readonly sketchVersion?: 1
+  readonly sketchVersion?: 1 | 2
   readonly cornerRadius?: number
   readonly starPoints?: number
   readonly starInnerRatio?: number
