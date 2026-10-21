@@ -1,5 +1,23 @@
 # Стратегия тестирования
 
+## Release tag и bump 0.1.9 (2026-10-21)
+
+GitHub API и job logs подтвердили: Release run `39591853162` использует тег
+`v0.1.8` → `0df49ac`, до ADR-148. Новый workflow с timeout 5 минут исполняет
+старый source. CI run `39590240612` на `d2fdec4` прошёл: performance step
+11:18:25–11:18:47 UTC, 5 files / 19 passed. Evidence:
+[успешный CI job](https://github.com/VladimirIvanin/cute-screen/actions/runs/39590240612/job/119189545950),
+[проверка тега](https://github.com/VladimirIvanin/cute-screen/actions/runs/39591853162/job/119233955055).
+
+Ubuntu 22.04.5 x86_64 / Node 22.23.1 / pnpm 10.33.2: `pnpm version:bump 0.1.9`
+синхронизировал пять файлов metadata. `node scripts/release-assets.mjs version . v0.1.9`
+прошёл; `pnpm test:boundaries tests/boundaries/bump-version.test.ts
+tests/boundaries/release-assets.test.ts` — 2 files / 33 passed. `CI=true pnpm test:perf
+tests/harness/perf/sampling.test.ts --reporter=verbose` — 9/9 passed. Выполнены
+`pnpm format`, `pnpm format:check`, `pnpm docs:check`, `git diff --check`.
+Evidence — `artifacts/perf-ci-followup/`. Build/native suites для изменения
+только version metadata не запускались; commit/tag/Release не создавались.
+
 ## Software perf без длинного CI sampling (2026-10-21, ADR-148)
 
 Baseline `0df49acaa184d4700bcd721323fd70b32bf565dc`, рабочая копия.

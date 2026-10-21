@@ -1,5 +1,13 @@
 # Трассируемость требований
 
+## Patch version 0.1.9 — до изменения metadata (2026-10-21)
+
+`REQ-REL-005/006`: штатный `pnpm version:bump 0.1.9` синхронизирует package,
+Tauri, Cargo workspace, точную storage dependency и Cargo.lock. Новый тег
+должен ссылаться на commit с исправлением ADR-148: прежний `v0.1.8` указывает
+на `0df49ac`, до короткого perf sampling. Проверки — version validator,
+существующие bump/release tests и форматирование; публикация не выполняется.
+
 ## Ограниченный software performance harness — до реализации (2026-10-21)
 
 `REQ-QLT-001/002/003`, `REQ-OUT-001`, `REQ-TOL-008`: обычный `pnpm test:perf`
