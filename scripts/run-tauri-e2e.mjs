@@ -442,6 +442,7 @@ function isolatedAppDataEnvironment(directory) {
   if (process.platform === 'linux') {
     return {
       ...environment,
+      XDG_SESSION_ID: `cute-screen-e2e-${path.basename(directory)}`,
       XDG_CACHE_HOME: path.join(directory, 'cache'),
       XDG_CONFIG_HOME: path.join(directory, 'config'),
       XDG_DATA_HOME: path.join(directory, 'data'),

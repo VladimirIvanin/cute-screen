@@ -9,6 +9,9 @@ IPC, renderer backend или WEBKIT_DISABLE_* overrides. Проверки: Rust 
 Для локального GUI — `pnpm tauri build --debug --no-bundle` с отдельным dev
 identifier; release/package build для этого изменения не требуется.
 Общий target/cache сохраняется. Фактические platform/commands — TESTING.md.
+Linux E2E runner задаёт XDG_SESSION_ID по временному profile: installed GUI
+не занимает его activation socket, а второй launch в том же scenario использует
+тот же scope. Persistence group сохраняет scope до последнего reopen.
 
 ## Выбранные обводки (ADR-147)
 

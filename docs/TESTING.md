@@ -1,5 +1,60 @@
 # Стратегия тестирования
 
+## Linux native paint recovery (2026-10-21, ADR-149)
+
+Baseline `88179370cb1ac361e2aa4053ca6c496e71a8cceb`, рабочая копия.
+Paint recovery зафиксирован в `3767992895f26504ccdce6e9e4e0d4a5bffd6e0e`;
+native gate дополнительно включает рабочие изменения runner scope и readiness.
+Ubuntu 22.04.5 x86_64 / GNOME Shell 42.9 Wayland / AMD Lucienne, Mesa 23.2.1,
+GTK3 3.24.33 / WebKitGTK 2.50.4 / wry 0.55.1 / Rust 1.97.0 /
+NVM Node 22.23.1 / pnpm 10.33.2. Physical desktop 1920×1080 с fractional scale
+125%, WebView DPR 2. Evidence — `artifacts/linux-hover-black-2026-10-21/`.
+
+- Resident `/usr/bin/cute-screen` и установленный файл совпали по SHA256
+  `f9d73076d1ef471857920f672797ac62b1411b45360e2ac8e006e203f4e99c6c`.
+  WebKit/GPU overrides отсутствовали; GDK_BACKEND=wayland. GPU reset/crash
+  в проверенном журнале не найден. Это не исключает rendering failure.
+- ScreenshotWindow: 4 чёрных / 89 кадров, accessibility tree оставался живым.
+  Screenshot desktop: 0 / 58 у установленного процесса; дополнительная серия
+  дала 0 / 15. Пользователь подтвердил, что затем перестали мигать оба окна,
+  включая новый процесс с копией документа. Нельзя приравнивать window snapshot
+  к экранному compositor output или считать disappearance root-cause proof.
+- `cargo test --workspace --lib linux_window_paint -- --nocapture`:
+  до реализации 2 failed; после 2 passed. Event storm 2×1000 запросов не
+  отодвигает follow-up, hidden/cancel/remap не оставляет redraw loop.
+- Rust unit portions `cargo test --workspace`: 174 desktop + 1 main + 33 storage
+  passed. Первый общий запуск завершился ошибкой doctest E0463 при пересборке
+  зависимостей другим Cargo invocation; отдельный `cargo test --workspace --doc`
+  затем passed. Финальный повтор `cargo test --workspace` завершился exit 0:
+  208 unit tests и оба doctest targets; `rust-workspace.log`.
+- `cargo clippy --workspace --lib --features fake-platform,test-harness -- -D warnings`
+  passed. `pnpm lint`: exit 0, 37 прежних Vue warnings; `pnpm typecheck` passed.
+  `pnpm test:boundaries tests/boundaries/tauri-runner.test.ts`: 2 passed.
+- `GDK_BACKEND=wayland CARGO_BUILD_JOBS=4 CUTE_SCREEN_E2E_SCENARIOS=window-paint
+pnpm test:e2e:tauri`: fresh debug/no-bundle, external tauri-driver 2.1.0 /
+  WebKitWebDriver 2.50.4, реальная Wayland-сессия с GPU — 1/1 passed, 20.4 s.
+  Три цикла resize/maximize/native-title и HTML tooltip hover/hide → второй GUI
+  launch. 4K image ingress проходит production UI; 12 PNG повторно декодированы,
+  не являются чёрными, документ после каждого цикла равен исходному.
+  WebView snapshots не доказывают отсутствие редкого compositor flicker.
+- Первый native запуск упал до scenario: test GUI делил activation endpoint
+  с открытой установленной версией. Runner теперь задаёт XDG_SESSION_ID по
+  временному profile; повтор прошёл при продолжающем работать installed process.
+  Это отдельная воспроизводимая startup-ошибка, не доказанная причина hover bug.
+- Для native gate PATH дополнен task-local WebKitWebDriver из уже имеющегося
+  Ubuntu22 build image и `artifacts/tauri-e2e/driver-cache/bin`; TMPDIR —
+  `artifacts/linux-hover-black-2026-10-21/native-tmp`. Пакеты host не менялись.
+  Первый Docker build остановлен; окончательный native gate выполнен на host.
+- `pnpm tauri build --debug --no-bundle --config src-tauri/tauri.dev.conf.json`
+  passed; свежий standalone скопирован атомарно в обычный
+  `artifacts/linux-dev/cute-screen-dev`. Identifier/library/activation scope
+  отдельные; запуск — `pnpm start:linux:dev`. Release/package build не запускался.
+
+Стабильные UI/renderer/export алгоритмы не менялись, их полные browser/render/
+perf suites не повторялись. Windows/macOS и длительная ручная Wayland-проверка
+после холодного запуска остаются pending. Защитный native redraw не объявляется
+доказанным устранением исходного intermittent defect.
+
 ## Release tag и bump 0.1.9 (2026-10-21)
 
 GitHub API и job logs подтвердили: Release run `39591853162` использует тег

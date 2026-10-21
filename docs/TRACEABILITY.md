@@ -16,6 +16,15 @@ root-cause fix. До реализации: red-first bounded/coalescing/cancel c
 после — Rust checks, real WebView show/resize/hover smoke и ручной Wayland
 startup/reopen. Отсутствие повторения не считается доказательством устранения.
 
+Для native gate изолировать Linux activation scope по временному appData profile:
+запущенная установленная версия не должна занимать endpoint тестового GUI;
+второй GUI launch внутри scenario должен сохранять тот же scope.
+
+Результат: 208 Rust unit tests и doctests passed, clippy/typecheck/lint passed;
+fresh WebKitGTK Wayland window-paint 1/1, 12 decoded PNG и неизменённый документ.
+Standalone dev build готов. Исходный intermittent blackout не объявлен устранённым;
+точные команды и оставшиеся проверки — TESTING.md.
+
 ## Patch version 0.1.9 — до изменения metadata (2026-10-21)
 
 `REQ-REL-005/006`: штатный `pnpm version:bump 0.1.9` синхронизирует package,

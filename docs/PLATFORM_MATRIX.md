@@ -1,5 +1,20 @@
 # Платформенная матрица
 
+## GTK main paint recovery (ADR-149, 2026-10-21)
+
+Ubuntu 22.04.5 / GNOME 42.9 Wayland / AMD Lucienne / Mesa 23.2.1 /
+WebKitGTK 2.50.4: fresh native `window-paint` — 1/1 passed. Production UI-open
+4K, три цикла resize/maximize/hover/hide → second GUI launch, 12 decoded WebView
+PNG с видимым содержимым, документ неизменён. 208 Rust unit tests и отдельный
+doctest gate passed; scheduler red-first 2/2, clippy/typecheck/lint прошли.
+Standalone dev debug/no-bundle собран. Linux runner activation scope теперь
+изолирован по profile и не сталкивается с установленным приложением.
+
+Это lifecycle smoke, не доказательство отсутствия случайного desktop compositor
+blackout: исходный сбой исчез до изменения. Длительная ручная проверка после
+холодного запуска, X11, Windows и macOS pending. GPU и tooltips не отключаются.
+Точные команды, baseline и ограничения — TESTING.md.
+
 ## Software perf smoke (ADR-148, 2026-10-21)
 
 Ubuntu 22.04.5 x86_64 / Ryzen 7 5700U / Node 22.23.1: `pnpm test:perf`

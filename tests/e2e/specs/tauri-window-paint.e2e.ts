@@ -34,6 +34,7 @@ async function expectVisiblePixels(name: string): Promise<void> {
 describe('native window paint lifecycle', () => {
   it('keeps the 4K document visible through resize, maximize, hover and second-launch restore', async () => {
     await mkdir('artifacts/tauri-e2e', { recursive: true })
+    await expect($('button[aria-label="Open image"]')).toBeEnabled()
     await nativeImageIngress('picker', 'ui-4k.png')
     await $('button[aria-label="Open image"]').click()
     await browser.waitUntil(async () => (await cardDocument()).canvas.width === 3840)
