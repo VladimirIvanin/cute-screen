@@ -1,5 +1,16 @@
 # Архитектура Cute Screen
 
+## Восстановление GTK paint (ADR-149)
+
+`platform/linux/window_paint` обслуживает только native main window. Map,
+focus-in и новая allocation size объединяются в один двухкадровый цикл:
+первый frame clock пропускается, второй вызывает полный GTK `queue_draw`
+и снимает callback. Unmap отменяет ожидание; одинаковая allocation не запускает
+новый цикл. Обработчики живут вместе с GTK widget; callback id хранит weak ref.
+Vue, scene renderer, IPC и EditorCommand в этом восстановлении не участвуют.
+Это ограниченная защита display lifecycle; причина intermittent blackout
+из расследования 2026-10-21 не считается установленной.
+
 ## Software performance harness (ADR-148)
 
 Harness не меняет production renderer: perf-файлы запускаются последовательно,

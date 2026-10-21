@@ -1,5 +1,36 @@
 # Журнал архитектурных решений
 
+## ADR-149 — Ограниченное восстановление GTK paint main window
+
+**Статус:** accepted (2026-10-21); дополняет ADR-118.
+
+**Контекст:** установленная 0.1.9 на Ubuntu 22.04 / GNOME 42 Wayland /
+AMD Lucienne / WebKitGTK 2.50.4 периодически теряет видимую поверхность редактора
+при hover в развёрнутом окне. Системный заголовок и tooltip остаются. Исходный
+процесс и новый процесс с копией документа затем перестали воспроизводить сбой
+без изменения настроек. ScreenshotWindow дал 4 чёрных кадра из 89 при живом
+accessibility tree; Screenshot рабочего стола — 0 из 58. Эти методы нельзя
+считать одинаковым свидетельством экранного сбоя. Точный upstream defect
+и причинная связь с запуском, tooltip или backdrop-filter не установлены.
+
+**Решение:** main GTK window после map, возврата native focus и изменения размера
+получает один полный `queue_draw` на следующем frame clock после первого кадра.
+Повторные события в ожидании объединяются и не отодвигают redraw бесконечно.
+После redraw callback снимается; unmap отменяет его. Стабильное окно не имеет
+периодического redraw. Pointermove, документ, renderer lifecycle, undo/redo,
+hardware acceleration и tooltips не меняются. GTK callbacks устанавливаются
+однократно на UI thread до первого показа main; новые зависимости не нужны.
+
+Это защитное восстановление native paint по запросу владельца, а не доказанный
+root-cause fix. Глобальные переменные WEBKIT_DISABLE_* не устанавливаются:
+отключение GPU/DMABUF без подтверждённого A/B может дать другие артефакты.
+
+**Проверяемое основание:** red-first scheduler tests проверяют bounded redraw,
+event storm, hidden/cancel/remap. Штатный `window-paint` scenario открывает 4K
+через production image ingress, повторяет resize/maximize/native и HTML hover,
+hide → второй GUI launch, декодирует WebView PNG и сравнивает документ.
+Фактические результаты и ограничения compositor coverage — TESTING.md.
+
 ## ADR-148 — Ограниченный software perf smoke и отдельный trend
 
 **Статус:** accepted (2026-10-21); дополняет ADR-024.

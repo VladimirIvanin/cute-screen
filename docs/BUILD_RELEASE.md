@@ -1,5 +1,15 @@
 # CI-сборки и проверка версии через GitHub
 
+## GTK paint recovery (ADR-149)
+
+Новый Linux adapter использует существующий GTK3 и не добавляет dependencies,
+IPC, renderer backend или WEBKIT_DISABLE_* overrides. Проверки: Rust scheduler,
+`cargo test --workspace`, formatting/lint/typecheck и штатный
+`CUTE_SCREEN_E2E_SCENARIOS=window-paint pnpm test:e2e:tauri` со свежим harness.
+Для локального GUI — `pnpm tauri build --debug --no-bundle` с отдельным dev
+identifier; release/package build для этого изменения не требуется.
+Общий target/cache сохраняется. Фактические platform/commands — TESTING.md.
+
 ## Выбранные обводки (ADR-147)
 
 Новых dependencies, native API и IPC нет. Shape payload сохраняет version=2,

@@ -302,6 +302,13 @@ const scenarios = [
     harnessQuery: '?m02=ready',
   },
   {
+    id: 'window-paint',
+    spec: 'tests/e2e/specs/tauri-window-paint.e2e.ts',
+    harnessQuery: '?m04=1&m08=1',
+    fakeCapture: true,
+    driverProvider: 'external',
+  },
+  {
     id: 'arrow',
     spec: 'tests/e2e/specs/tauri-arrow.e2e.ts',
     harnessQuery: '?m05=1',

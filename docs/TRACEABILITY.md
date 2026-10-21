@@ -1,5 +1,21 @@
 # Трассируемость требований
 
+## Linux: восстановление native paint — до реализации (2026-10-21)
+
+`REQ-UI-001/006/008`, `REQ-EDT-001/006`: ограниченный GTK redraw после map,
+возврата native focus и изменения размера main window. Запросы объединяются;
+после первого frame clock разрешена одна полная перерисовка, затем callback
+снимается. Unmap отменяет незавершённый цикл. Документ, Vue scene graph,
+renderer lifecycle и hardware acceleration не перезапускаются.
+
+Исходный intermittent hover blackout на Ubuntu 22.04 / GNOME Wayland /
+WebKitGTK 2.50.4 перестал воспроизводиться без изменения настроек. Четыре
+чёрных ScreenshotWindow при живом accessibility tree не подтверждены
+Screenshot рабочего стола. Это защитное восстановление paint, а не доказанный
+root-cause fix. До реализации: red-first bounded/coalescing/cancel contracts;
+после — Rust checks, real WebView show/resize/hover smoke и ручной Wayland
+startup/reopen. Отсутствие повторения не считается доказательством устранения.
+
 ## Patch version 0.1.9 — до изменения metadata (2026-10-21)
 
 `REQ-REL-005/006`: штатный `pnpm version:bump 0.1.9` синхронизирует package,

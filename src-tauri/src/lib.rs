@@ -383,6 +383,9 @@ pub mod linux_platform;
 #[cfg(target_os = "linux")]
 #[path = "platform/linux/quick_presentation.rs"]
 mod linux_quick_presentation;
+#[cfg(target_os = "linux")]
+#[path = "platform/linux/window_paint.rs"]
+mod linux_window_paint;
 pub mod platform;
 pub use cute_screen_storage as storage;
 pub mod app;
@@ -2827,6 +2830,10 @@ pub fn run() {
             }
         })
         .setup(move |app| {
+            #[cfg(target_os = "linux")]
+            if let Some(window) = app.get_webview_window("main") {
+                linux_window_paint::install(&window.gtk_window()?);
+            }
             app.manage(Mutex::new(LifecycleState::default()));
             let repository = initialize_repository(app)?;
             #[cfg(feature = "test-harness")]
