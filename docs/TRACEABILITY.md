@@ -1,5 +1,12 @@
 # Трассируемость требований
 
+## Patch version 0.1.10 — до изменения metadata (2026-10-21)
+
+`REQ-REL-005/006`: штатный `pnpm version:bump 0.1.10` синхронизирует package,
+Tauri, Cargo workspace, точную storage dependency и Cargo.lock после Linux
+paint recovery и изоляции activation scope тестов. Проверки — version validator,
+существующие bump/release tests и форматирование. Результаты — TESTING.md.
+
 ## Linux: восстановление native paint — до реализации (2026-10-21)
 
 `REQ-UI-001/006/008`, `REQ-EDT-001/006`: ограниченный GTK redraw после map,

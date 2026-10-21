@@ -1,5 +1,20 @@
 # Стратегия тестирования
 
+## Patch version 0.1.10 (2026-10-21)
+
+Baseline `2a3d9f9ecdff19e3d9575f796082ab34f64b90b7`, рабочая копия.
+Ubuntu 22.04.5 x86_64 / Node 22.23.1 / pnpm 10.33.2.
+
+- `pnpm version:bump 0.1.10`: package, Tauri, Cargo workspace, точная storage
+  dependency и две workspace entries в Cargo.lock синхронизированы.
+- `node scripts/release-assets.mjs version . v0.1.10`: passed.
+- `pnpm test:boundaries tests/boundaries/bump-version.test.ts tests/boundaries/release-assets.test.ts`:
+  2 файла, 33 tests passed.
+- `pnpm format`, `pnpm format:check`, `pnpm docs:check`, `git diff --check`: passed.
+
+Изменена только версия и документация проверки. Native build и UI suites
+не повторялись; установленное приложение этим изменением не обновляется.
+
 ## Linux native paint recovery (2026-10-21, ADR-149)
 
 Baseline `88179370cb1ac361e2aa4053ca6c496e71a8cceb`, рабочая копия.
