@@ -1,5 +1,16 @@
 # Стратегия тестирования
 
+## Patch version 0.1.13 (2026-10-22)
+
+Ubuntu 22.04.5 x86_64, рабочая копия. `main` совпадает с `origin/main`
+`fdb144fd6e627f977ce5de9baabc7a2c876736e6` (0.1.12).
+
+- `pnpm version:bump 0.1.13`: `0.1.12 → 0.1.13` в package.json, Tauri config,
+  Cargo workspace, точной storage dependency и двух записях Cargo.lock.
+- `node scripts/release-assets.mjs version . v0.1.13`: passed.
+- `pnpm test:boundaries tests/boundaries/bump-version.test.ts tests/boundaries/release-assets.test.ts`:
+  2 файла, 33 tests passed.
+
 ## Patch version 0.1.12 (2026-10-21)
 
 Baseline `4f01f011eb126073775fb2234d42ecccb7d6059b`, рабочая копия.
@@ -69,6 +80,22 @@ Windows 10 build 19045, один монитор 1920×1080. Процесс `HOMM
 Запущенный до правки `cute-screen.exe` эту библиотеку не подхватил.
 Linux X11, Wayland и macOS не прогонялись: у них Area и Screen уже берут
 один кадр, так что этот разрыв путей там не воспроизводится.
+
+## Сохранение горячих клавиш GNOME (2026-10-22, ADR-151)
+
+Ubuntu 22.04.5 x86_64 / GNOME Shell 42.9 Wayland. Рабочая копия.
+
+- `cargo test -p cute-screen-desktop --lib shortcuts::gnome -- --test-threads=8`:
+  7 passed. Постоянная запись читается обратно, pending-путь не создаётся,
+  испорченный binding отвергается.
+- `cargo test -p cute-screen-desktop --lib shortcuts::tests -- --test-threads=8`:
+  6 passed.
+- `pnpm exec vitest run --project vue tests/unit/vue/settings-recorder.test.ts --maxWorkers=1`:
+  12 passed. «Сохранить» показывает новое сочетание без требования нажать его ещё раз.
+- `cargo build -p cute-screen-desktop --lib --offline`: finished, warnings нет.
+
+Проверка не запускала установленное приложение и не меняла пользовательские
+custom-keybindings. Физический grab GNOME после «Сохранить» не подтверждён.
 
 ## Patch version 0.1.10 (2026-10-21)
 

@@ -1,5 +1,22 @@
 # Трассируемость требований
 
+## Patch version 0.1.13 (2026-10-22)
+
+`REQ-REL-005/006`: после rebase на `origin/main` с 0.1.12 штатный
+`pnpm version:bump 0.1.13` синхронизирует package, Tauri, Cargo workspace,
+точную storage dependency и Cargo.lock. Проверки — version validator и
+существующие bump/release tests. Результаты — TESTING.md.
+
+## Сохранение горячих клавиш GNOME (2026-10-22)
+
+`REQ-ACT-002/009/010`, ADR-151: «Сохранить» на GNOME сразу записывает постоянную
+custom-keybinding и preferences. Повторное чтение binding/command подтверждает
+запись; несовпадение восстанавливает прежнее сочетание этого действия и
+показывает ошибку. Чужие пути сохраняются. Отдельное нажатие «Проверить
+сочетание» не требуется для сохранения. Rust install/confirm и mounted Settings
+passed. Команды — TESTING.md. Настоящий GNOME grab после сохранения этой
+проверкой не подтверждён.
+
 ## Patch version 0.1.12 — до изменения metadata (2026-10-21)
 
 `REQ-REL-005/006`: штатный `pnpm version:bump 0.1.12` синхронизирует package,

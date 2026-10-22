@@ -127,3 +127,43 @@ fn restart_cleanup_removes_only_owned_pending_rows() {
         Some(("CTRL+SHIFT+2".to_owned(), "show".to_owned()))
     );
 }
+
+#[test]
+fn install_commits_the_stable_binding_without_a_pending_row() {
+    let (settings, _directory) = isolated_settings();
+    let foreign = format!("{BASE}foreign/");
+    settings
+        .main
+        .set_strv("custom-keybindings", [&foreign])
+        .unwrap();
+    let command = "'/opt/Cute Screen' 'capture' '--mode' 'area'";
+    settings
+        .install(ShortcutAction::CaptureArea, "CTRL+SHIFT+3", command)
+        .unwrap();
+    assert_eq!(
+        settings.read(ShortcutAction::CaptureArea).unwrap(),
+        ("CTRL+SHIFT+3".to_owned(), command.to_owned())
+    );
+    assert!(settings.paths().contains(&foreign));
+    assert!(
+        settings
+            .paths()
+            .iter()
+            .all(|path| !path.contains("cute-screen-pending-"))
+    );
+}
+
+#[test]
+fn confirm_rejects_a_binding_the_system_did_not_keep() {
+    let (settings, _directory) = isolated_settings();
+    let path = GnomeSettings::owned_path(ShortcutAction::CaptureScreen);
+    settings.write(&path, "CTRL+SHIFT+2", "capture").unwrap();
+    settings
+        .entry(&path)
+        .set_string("binding", "<Control><Shift>9")
+        .unwrap();
+    let error = settings
+        .confirm(ShortcutAction::CaptureScreen, "CTRL+SHIFT+2", "capture")
+        .expect_err("changed binding");
+    assert!(error.contains("CTRL+SHIFT+9"), "{error}");
+}

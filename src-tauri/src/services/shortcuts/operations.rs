@@ -1,16 +1,13 @@
 #[cfg(target_os = "linux")]
-use super::host::{PendingBinding, command, command_for};
+use super::host::command_for;
 use super::{
     host::{ShortcutService, apply_native},
     *,
 };
 #[cfg(target_os = "linux")]
-use std::time::Duration;
+use std::sync::{Arc, atomic::Ordering};
 #[cfg(target_os = "linux")]
-use std::{
-    sync::{Arc, atomic::Ordering},
-    time::Instant,
-};
+use std::time::Duration;
 #[cfg(target_os = "linux")]
 use tauri::Emitter;
 use tauri::Runtime;
@@ -165,23 +162,14 @@ impl ShortcutService {
                     if let Some(conflict) = gnome.conflict(&trigger, action) {
                         return Err(format!("Combination is used by {conflict}"));
                     }
-                    let token = uuid::Uuid::now_v7().simple().to_string();
-                    let path = gnome.stage(
-                        &token,
-                        &trigger,
-                        &command(
-                            &crate::autostart::executable_text()?,
-                            &["shortcuts", "test", "--token", &token],
-                        ),
-                    )?;
-                    *self.pending.lock().map_err(|error| error.to_string())? =
-                        Some(PendingBinding {
-                            action,
-                            trigger,
-                            token,
-                            path,
-                            deadline: Instant::now() + Duration::from_secs(60),
-                        });
+                    let previous = gnome.read(action);
+                    let command = command_for(action)?;
+                    if let Err(error) = gnome.install(action, &trigger, &command) {
+                        return restore_gnome(&gnome, action, previous, error);
+                    }
+                    if let Err(error) = self.save(app, candidate) {
+                        return restore_gnome(&gnome, action, previous, error);
+                    }
                 } else {
                     let previous = gnome.read(action);
                     gnome.remove(&super::gnome::GnomeSettings::owned_path(action))?;
@@ -263,7 +251,7 @@ impl ShortcutService {
             {
                 "occupied"
             } else {
-                "unknown"
+                "available"
             }
             .to_owned()),
             _ => Ok("unknown".to_owned()),
@@ -357,5 +345,26 @@ impl ShortcutService {
             super::host::dispatch(&activation_app, &id)
         })));
         Ok(())
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn restore_gnome(
+    gnome: &super::gnome::GnomeSettings,
+    action: ShortcutAction,
+    previous: Option<(String, String)>,
+    error: String,
+) -> Result<(), String> {
+    let path = super::gnome::GnomeSettings::owned_path(action);
+    let rollback = if let Some((trigger, command)) = previous {
+        gnome.write(&path, &trigger, &command)
+    } else {
+        gnome.remove(&path)
+    };
+    match rollback {
+        Ok(()) => Err(error),
+        Err(rollback) => Err(format!(
+            "{error}; failed to restore the previous shortcut: {rollback}"
+        )),
     }
 }

@@ -1225,8 +1225,11 @@ lease возвращают обычную обработку. Все capture-в�
 dispatcher и preflight; перед native capture скрываются Editor и Settings.
 
 Linux выбирает X11, portal либо GNOME по session/runtime probe. GNOME хранит
-только собственные custom-keybinding paths, временный token подтверждается через
-single-instance CLI. Portal session handles не попадают в постоянные настройки.
+только собственные custom-keybinding paths. «Сохранить» сразу записывает
+постоянное сочетание и проверяет его повторным чтением; при расхождении
+восстанавливается прежняя запись этого действия. Отдельная проверка нажатием
+не сохраняет и не отменяет назначение. Старые временные token-записи удаляются
+при запуске. Portal session handles не попадают в постоянные настройки.
 Windows/macOS подключают Rust global-shortcut plugin через отдельный registry.
 Автозапуск имеет собственный OS adapter и возвращает фактическое состояние;
 checkbox first-run не является регистрацией до явного подтверждения.

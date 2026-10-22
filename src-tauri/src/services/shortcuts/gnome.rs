@@ -175,6 +175,10 @@ impl GnomeSettings {
             .and_then(|()| entry.set_string("binding", &accelerator(trigger)))
             .map_err(|error| error.to_string())?;
         entry.apply();
+        if entry.has_unapplied() {
+            entry.revert();
+            return Err("The system did not apply the shortcut".to_owned());
+        }
         self.main
             .set_strv(
                 "custom-keybindings",
@@ -183,6 +187,29 @@ impl GnomeSettings {
             .map_err(|error| error.to_string())?;
         gio::Settings::sync();
         Ok(())
+    }
+
+    pub fn install(
+        &self,
+        action: ShortcutAction,
+        trigger: &str,
+        command: &str,
+    ) -> Result<(), String> {
+        self.write(&Self::owned_path(action), trigger, command)?;
+        self.confirm(action, trigger, command)
+    }
+
+    pub fn confirm(
+        &self,
+        action: ShortcutAction,
+        trigger: &str,
+        command: &str,
+    ) -> Result<(), String> {
+        match self.read(action) {
+            Some((actual, stored)) if actual == trigger && stored == command => Ok(()),
+            Some((actual, _)) => Err(format!("The system stored {actual} instead of {trigger}")),
+            None => Err("The system did not store the shortcut".to_owned()),
+        }
     }
 
     pub fn remove(&self, path: &str) -> Result<(), String> {
@@ -203,6 +230,7 @@ impl GnomeSettings {
         Ok(())
     }
 
+    #[cfg(test)]
     pub fn stage(&self, token: &str, trigger: &str, command: &str) -> Result<String, String> {
         let path = format!("{BASE}cute-screen-pending-{token}/");
         self.write(&path, trigger, command)?;
