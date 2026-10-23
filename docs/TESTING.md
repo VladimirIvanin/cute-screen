@@ -1,5 +1,16 @@
 # Стратегия тестирования
 
+## Patch version 0.1.14 (2026-10-23)
+
+macOS 12.7.6 x86_64, рабочая копия. `main` совпадает с `origin/main`
+`1c2aad3` (0.1.13). Node 22.23.1 / pnpm 10.33.2.
+
+- `pnpm version:bump 0.1.14`: `0.1.13 → 0.1.14` в package.json, Tauri config,
+  Cargo workspace, точной storage dependency и двух записях Cargo.lock.
+- `node scripts/release-assets.mjs version . v0.1.14`: passed.
+- `pnpm test:boundaries tests/boundaries/bump-version.test.ts tests/boundaries/release-assets.test.ts`:
+  2 файла, 33 tests passed.
+
 ## Patch version 0.1.13 (2026-10-22)
 
 Ubuntu 22.04.5 x86_64, рабочая копия. `main` совпадает с `origin/main`

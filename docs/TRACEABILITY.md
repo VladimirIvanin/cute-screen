@@ -1,5 +1,11 @@
 # Трассируемость требований
 
+## Patch version 0.1.14 (2026-10-23)
+
+`REQ-REL-005/006`: штатный `pnpm version:bump 0.1.14` синхронизирует package,
+Tauri, Cargo workspace, точную storage dependency и Cargo.lock. Проверки —
+version validator и существующие bump/release tests. Результаты — TESTING.md.
+
 ## Patch version 0.1.13 (2026-10-22)
 
 `REQ-REL-005/006`: после rebase на `origin/main` с 0.1.12 штатный
