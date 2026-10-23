@@ -1,5 +1,19 @@
 # Трассируемость требований
 
+## Исправление Rust dependency audit: tokio (2026-10-23)
+
+`REQ-QLT-005`, `REQ-REL-005`, ADR-016. CI `cargo deny check` останавливается
+на `RUSTSEC-2026-0386`: конструкторы `AsyncFd` в `tokio 1.53.1` нарушают
+I/O safety. Прямые зависимости desktop и storage подняты с `=1.53.1` до
+точной исправленной `=1.53.3` (patched range advisory — `>=1.53.3`).
+Приложение использует features `rt`, `sync` и `time`.
+
+Повторный audit на актуальном индексе crates.io останавливается ещё и на
+yanked `clipboard-win 5.4.1` (`yanked = "deny"`). Это транзитивная
+Windows-зависимость `arboard 3.6.1` с требованием `^5.3.1`; lock обновлён до
+`5.4.3`. Policy без advisory exceptions. Контракты захвата, документа и
+originals сохраняются. Доказательства — TESTING.md.
+
 ## Patch version 0.1.14 (2026-10-23)
 
 `REQ-REL-005/006`: штатный `pnpm version:bump 0.1.14` синхронизирует package,

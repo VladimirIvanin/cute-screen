@@ -68,7 +68,7 @@ chrono = "=0.4.45"
 tempfile = "=3.27.0"
 # CapturePreflightService is shared by every desktop host, not only the Linux
 # portal implementation.
-tokio = { version = "=1.53.1", features = ["rt", "sync", "time"] }
+tokio = { version = "=1.53.3", features = ["rt", "sync", "time"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 ashpd = { version = "=0.13.13", default-features = false, features = ["tokio", "screenshot", "global_shortcuts"] }

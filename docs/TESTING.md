@@ -1,5 +1,29 @@
 # Стратегия тестирования
 
+## Rust audit: tokio и clipboard-win (2026-10-23)
+
+Ubuntu 22.04.5 LTS x86_64, Rust/Cargo 1.97.0, cargo-deny 0.20.2 — официальный
+musl-бинарник той же версии, что `CARGO_DENY_VERSION` в CI. Advisory DB
+`84d943a6deeb`, 2026-10-23, «Assigned RUSTSEC-2026-0386 to tokio».
+`git pull --ff-only` перемотал `main` с `4fe60ed` на `2a9efe4`.
+
+- `tokio` `=1.53.1` → `=1.53.3` в `src-tauri/Cargo.toml` и
+  `crates/cute-screen-storage/Cargo.toml`. SHA-256 crate
+  `ce3335fa71841cda333a58d7615b03901380ecf09d59b3296d21f8bbac0dde4e`
+  совпадает с `Cargo.lock`.
+- `clipboard-win` `5.4.1` → `5.4.3` в `Cargo.lock`. SHA-256
+  `052af7878466feccda12ba7a6a67d019d712f296809559b47c12c8cc196d3a9a`
+  совпадает с `Cargo.lock`.
+- `cargo check --workspace --locked` — exit 0, dev profile, 2 мин 38 с.
+- `cargo deny check` — exit 0: advisories, bans, licenses и sources ok.
+  Предупреждения о duplicate versions остаются разрешёнными настройкой
+  `multiple-versions = "warn"`.
+- `pnpm format`, `pnpm format:check`, `pnpm docs:check`, `git diff --check` и
+  `cargo fmt --all --check` — exit 0.
+
+`clipboard-win` на этой машине не компилировался: зависимость Windows-only.
+Hosted CI этим прогоном не подтверждается.
+
 ## Patch version 0.1.14 (2026-10-23)
 
 macOS 12.7.6 x86_64, рабочая копия. `main` совпадает с `origin/main`
