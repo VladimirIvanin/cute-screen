@@ -5,12 +5,13 @@ import type {
   AsyncActionName,
   AsyncActionState,
 } from '../types'
-defineProps<{
+const props = defineProps<{
   state: AsyncActionState
   t: (
     key:
       | 'cancel'
       | 'retry'
+      | 'reopen'
       | 'captureAction'
       | 'captureWindowAction'
       | 'openImageAction'
@@ -26,6 +27,9 @@ defineProps<{
   ) => string
 }>()
 const emit = defineEmits<{ cancel: []; retry: [] }>()
+function reopensApp(): boolean {
+  return props.state.status === 'error' && props.state.recovery === 'relaunch'
+}
 const actionKey: Record<
   AsyncActionName,
   'captureAction' | 'captureWindowAction' | 'openImageAction' | 'copyAction' | 'exportAction'
@@ -89,7 +93,7 @@ const progressKey: Record<
       text
       @click="emit('retry')"
     >
-      {{ t('retry') }}
+      {{ reopensApp() ? t('reopen') : t('retry') }}
     </NButton>
   </div>
 </template>

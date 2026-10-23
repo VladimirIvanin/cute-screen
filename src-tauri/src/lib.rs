@@ -1008,6 +1008,14 @@ async fn compute_platform_capabilities(
 }
 
 #[tauri::command]
+fn reopen_after_screen_recording(app: tauri::AppHandle) {
+    #[cfg(target_os = "macos")]
+    app.request_restart();
+    #[cfg(not(target_os = "macos"))]
+    let _ = app;
+}
+
+#[tauri::command]
 fn open_screen_recording_settings() -> CommandResult<()> {
     #[cfg(target_os = "macos")]
     {
@@ -3002,6 +3010,7 @@ pub fn run() {
         open_activation_settings,
         platform_capabilities,
         open_screen_recording_settings,
+        reopen_after_screen_recording,
         get_e2e_harness_query,
         read_image_bytes,
         history_command,
@@ -3087,6 +3096,7 @@ pub fn run() {
         open_activation_settings,
         platform_capabilities,
         open_screen_recording_settings,
+        reopen_after_screen_recording,
         read_image_bytes,
         history_command,
         history_thumbnail,

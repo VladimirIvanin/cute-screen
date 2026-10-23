@@ -9,7 +9,6 @@ use std::{
 };
 
 use core_graphics::{
-    access::ScreenCaptureAccess,
     display::CGDisplay,
     geometry::{CGPoint, CGRect, CGSize},
     window::{
@@ -32,6 +31,7 @@ use crate::{
 pub struct MacosScreenCaptureAdapter;
 
 unsafe extern "C" {
+    fn cute_screen_capture_access(request: bool) -> bool;
     fn cute_capture_area(
         output_path: *const c_char,
         cancel_context: *const std::ffi::c_void,
@@ -425,13 +425,14 @@ fn correlation_id_for_settings() -> &'static str {
     "macos-screen-recording-settings"
 }
 
+fn screen_recording_allowed(request: bool) -> bool {
+    // SAFETY: the bridge hops to AppKit's main queue and only calls the
+    // screen-capture access functions there. It retains no caller data.
+    unsafe { cute_screen_capture_access(request) }
+}
+
 fn require_screen_recording(correlation_id: &str) -> Result<(), PlatformError> {
-    let access = ScreenCaptureAccess;
-    if access.preflight() {
-        return Ok(());
-    }
-    let _ = access.request();
-    if access.preflight() {
+    if screen_recording_allowed(true) {
         return Ok(());
     }
     Err(PlatformError::new(
@@ -458,7 +459,7 @@ fn capture_desktop_frame(
         kCGWindowImageBestResolution | kCGWindowImageShouldBeOpaque,
     )
     .ok_or_else(|| {
-        if ScreenCaptureAccess.preflight() {
+        if screen_recording_allowed(false) {
             failure(correlation_id, "desktopSnapshot")
         } else {
             PlatformError::new(PlatformErrorCode::PermissionDenied, correlation_id)

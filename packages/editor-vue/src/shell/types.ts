@@ -278,6 +278,7 @@ export type AsyncActionState =
     readonly status: 'error'
     readonly action: AsyncActionName
     readonly message: string
+    readonly recovery?: 'relaunch'
   }
 
 export type DocumentSaveState = 'saved' | 'dirty' | 'saving' | 'error' | 'readOnly'
@@ -296,6 +297,7 @@ export interface ShellActionAdapter {
     reportCaptureProgress?: (state: CaptureProgressState) => void,
     reportOperationProgress?: (fraction: number) => void,
   ): Promise<string>
+  relaunch?(): Promise<void>
 }
 
 export type IconName =
@@ -497,6 +499,7 @@ export const translationKeys = [
   'selectedFrame',
   'cancel',
   'retry',
+  'reopen',
   'loadingEditor',
   'copyAction',
   'exportAction',

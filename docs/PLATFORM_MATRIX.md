@@ -1285,7 +1285,7 @@ UI получает `CaptureCapabilities` и не показывает непо�
 
 - Screen Recording permission проверяется до Screen snapshot. Отказ —
   typed `permissionDenied`, без прозрачных окон и без overlay.
-- UI объясняет переход в System Settings (`Privacy_ScreenCapture`) и Retry.
+- UI объясняет переход в System Settings (`Privacy_ScreenCapture`). Повтор этого отказа перезапускает приложение: разрешение записи экрана применяется к следующему процессу (ADR-152).
 - ADR-110: на macOS доступны только Area и Screen; Window target не объявляется,
   tray menu не содержит «Снимок окна».
 - Deployment baseline — macOS 12.0. Native AppKit selector обслуживает Area и

@@ -22,11 +22,14 @@ export class ActionCancelledError extends Error {
 function actionErrorMessage(
   error: unknown,
   locale: SupportedLocale,
-): string {
+): { readonly message: string; readonly recovery?: 'relaunch' } {
   if (error instanceof Error && error.message === 'permissionDenied') {
-    return t(locale, 'captureScreenRecordingDenied')
+    return {
+      message: t(locale, 'captureScreenRecordingDenied'),
+      recovery: 'relaunch',
+    }
   }
-  return error instanceof Error ? error.message : String(error)
+  return { message: error instanceof Error ? error.message : String(error) }
 }
 
 function unavailableMessage(
@@ -115,13 +118,34 @@ export function createActionActions(
         publishFeedback({
           status: 'error',
           action,
-          message: actionErrorMessage(error, locale.value),
+          ...actionErrorMessage(error, locale.value),
         })
       }
     } finally {
       if (controller === actionController) controller = undefined
     }
   }
+  async function retryAction(): Promise<void> {
+    const current = state.actionState.value
+    if (current.status !== 'error') return
+    if (current.recovery === 'relaunch') {
+      const relaunch = getOptions()?.actions?.relaunch
+      if (relaunch) {
+        try {
+          await relaunch()
+        } catch (error) {
+          publishFeedback({
+            status: 'error',
+            action: current.action,
+            message: error instanceof Error ? error.message : String(error),
+            recovery: 'relaunch',
+          })
+        }
+        return
+      }
+    }
+    await runAction(current.action)
+  }
   onScopeDispose(clearFeedbackTimer)
-  return { cancelAction, clearFeedback, runAction }
+  return { cancelAction, clearFeedback, retryAction, runAction }
 }

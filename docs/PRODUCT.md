@@ -141,9 +141,9 @@ Cute Screen — полноценный local-first редактор снимко
 - `REQ-CAP-014` — один Area draft блокирует параллельный capture. Copy, Save PNG, History
   и Editor дают terminal `captured` с различимым completion; Close даёт
   ожидаемый `cancelled` без скрытой очереди.
-- `REQ-CAP-015` — на macOS Screen Recording проверяется до захвата. Отказ даёт
+- `REQ-CAP-015` — на macOS Screen Recording проверяется до захвата на главной очереди AppKit. Отказ даёт
   `permissionDenied` без overlay и без зависших окон. UI объясняет переход в
-  System Settings и повторную попытку. Intel и Apple Silicon используют один
+  System Settings и что разрешение начинает действовать после полного перезапуска. Intel и Apple Silicon используют один
   adapter; capability не объявляется `supported` без runtime smoke.
 
 ## Запуск и горячие клавиши

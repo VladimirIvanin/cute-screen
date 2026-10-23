@@ -33,6 +33,28 @@ static bool CuteCancellationRequested(const void *context, CuteCancellationProbe
   return probe != NULL && probe(context);
 }
 
+static void CuteRunOnMain(void (^block)(void)) {
+  if (NSThread.isMainThread) {
+    block();
+  } else {
+    dispatch_sync(dispatch_get_main_queue(), block);
+  }
+}
+
+// CGRequestScreenCaptureAccess crashes or returns immediately when it is not
+// called on the main queue. A grant is applied to the next process, so the
+// caller restarts instead of capturing again in this one.
+bool cute_screen_capture_access(bool request) {
+  __block bool allowed = false;
+  CuteRunOnMain(^{
+    allowed = CGPreflightScreenCaptureAccess();
+    if (allowed || !request) return;
+    CGRequestScreenCaptureAccess();
+    allowed = CGPreflightScreenCaptureAccess();
+  });
+  return allowed;
+}
+
 typedef struct {
   double x;
   double y;

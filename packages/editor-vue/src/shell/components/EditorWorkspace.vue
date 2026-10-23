@@ -447,7 +447,7 @@ defineExpose({
         :state="store.actionState"
         :t="translate"
         @cancel="store.cancelAction"
-        @retry="store.runAction(store.actionState.status === 'error' ? store.actionState.action : 'capture')"
+        @retry="store.retryAction()"
       />
       <CanvasContextMenu
         :request="canvasMenu"

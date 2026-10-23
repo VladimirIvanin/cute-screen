@@ -33,6 +33,10 @@ export function createDesktopShellActions(ports: DesktopShellActionPorts): Shell
         signal,
         reportProgress,
         operationProgress),
+    relaunch: async () => {
+      const { tauriDesktopBridge } = await import('./desktop-bridge')
+      await tauriDesktopBridge.reopenAfterScreenRecording()
+    },
   }
 }
 

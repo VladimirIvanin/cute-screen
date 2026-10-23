@@ -155,8 +155,29 @@ describe('M04 capture action feedback', () => {
     expect(store.actionState).toEqual({
       status: 'error',
       action: 'capture',
-      message: 'Allow Screen Recording in System Settings, then retry Capture.',
+      message: 'Allow Screen Recording in System Settings, quit Cute Screen, and open it again.',
+      recovery: 'relaunch',
     })
+  })
+
+  it('reopens the app instead of capturing again after Screen Recording denial', async () => {
+    const store = useEditorShellStore(createEditorShellPinia())
+    const run = vi.fn(async () => {
+      throw new Error('permissionDenied')
+    })
+    const relaunch = vi.fn(async () => undefined)
+    store.initialize({
+      preferences: { load: () => undefined, save: () => undefined },
+      languages: ['en'],
+      systemDark: () => false,
+      actions: { run, relaunch },
+    })
+
+    await store.runAction('capture')
+    await store.retryAction()
+
+    expect(run).toHaveBeenCalledOnce()
+    expect(relaunch).toHaveBeenCalledOnce()
   })
 
   it('keeps Open image cancellation distinct from an error', async () => {
