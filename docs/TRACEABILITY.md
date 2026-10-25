@@ -1,5 +1,12 @@
 # Трассируемость требований
 
+## Бамп версии 0.1.15 (2026-10-25)
+
+`REQ-REL-005/006`: штатный `pnpm version:bump 0.1.15` синхронизирует package,
+Tauri config, Cargo workspace, точную storage dependency и Cargo.lock.
+Проверка: release version guard, тесты bump/release и форматирование.
+Поведение приложения и платформенные гарантии не меняются.
+
 ## Настройка панели быстрого режима (2026-10-25)
 
 `REQ-UI-017`, `REQ-EDT-003/008`, ADR-153: отдельный раздел Settings с двумя

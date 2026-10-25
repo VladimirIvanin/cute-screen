@@ -1,5 +1,16 @@
 # Стратегия тестирования
 
+## Бамп версии 0.1.15 (2026-10-25)
+
+Ubuntu 24.04.5 x86_64, baseline `1438e76`, рабочая копия.
+Node 22.23.1 / pnpm 10.33.2.
+
+- `pnpm version:bump 0.1.15`: `0.1.14 → 0.1.15` в пяти файлах метаданных.
+- `node scripts/release-assets.mjs version . v0.1.15`: passed.
+- `pnpm test:boundaries tests/boundaries/bump-version.test.ts tests/boundaries/release-assets.test.ts`:
+  2 файла, 33 tests passed.
+- `pnpm format` и `pnpm format:check`: passed.
+
 ## Разделители непустых групп ToolRail (2026-10-25)
 
 `REQ-EDT-008`, `REQ-UI-017`; та же Ubuntu 24.04.5 и baseline
