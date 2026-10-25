@@ -25,7 +25,7 @@ import { createDrawingEffects } from '../tools/effects/drawing-effects'
 import { createImageEffects } from '../tools/effects/image-effects'
 import { createPrecisionEffects } from '../tools/effects/precision-effects'
 import { createTextEffects } from '../tools/effects/text-effects'
-import { createToolCatalog } from '../tools/catalog'
+import { createWorkspaceToolCatalog } from './tool-catalog-bindings'
 import { createContextSchema } from '../tools/context-schema'
 import { createDrawingSchema } from '../tools/drawing-schema'
 import { createPrecisionSchema } from '../tools/precision-schema'
@@ -45,15 +45,7 @@ export interface WorkspaceBindingsContext extends EmojiContext {
 function createSchemas(context: WorkspaceBindingsContext) {
   const { props, store, workspace, translate } = context
   const state = storeToRefs(store)
-  const hasInteractiveDocument = computed(() => props.documentSession !== undefined || props.fixture === 'ready')
-  const { tools } = createToolCatalog({
-    quickMode: props.quickMode,
-    readOnlyDocument: computed(() => props.readOnlyDocument),
-    contentImageBridgeAvailable: computed(() => Boolean(props.contentImageBridge)),
-    contentImageImporting: workspace.contentImageImporting,
-    hasInteractiveDocument,
-    hasCanvas: computed(() => Boolean(workspace.activeDocument.value)),
-  })
+  const { tools } = createWorkspaceToolCatalog(context)
   const precision = createPrecisionSchema({
     spotlightEditing: workspace.spotlightEditing,
     props,

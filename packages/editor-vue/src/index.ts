@@ -158,3 +158,8 @@ export type {
 } from './materials'
 
 export { compositionBlobHashes } from '@cute-screen/editor-renderer'
+
+export {
+  quickToolCatalog,
+  orderQuickTools,
+} from './shell/tools/catalog'

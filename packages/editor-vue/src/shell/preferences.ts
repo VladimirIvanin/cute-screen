@@ -49,7 +49,20 @@ export function parsePreferences(
       isLocale((parsed as { locale?: unknown }).locale) &&
       isTheme((parsed as { theme?: unknown }).theme)
     ) {
-      return parsed as UiPreferencesV1
+      const preferences = parsed as UiPreferencesV1
+      const hidden: unknown = (parsed as { quickHiddenTools?: unknown }).quickHiddenTools
+      const order: unknown = (parsed as { quickToolOrder?: unknown }).quickToolOrder
+      const { quickHiddenTools: ignored, quickToolOrder: ignoredOrder, ...base } = preferences
+      void ignored
+      void ignoredOrder
+      const ids = (value: unknown): string[] => Array.isArray(value)
+        ? [...new Set(value.filter((id): id is string => typeof id === 'string' && !['select', 'hand', 'crop'].includes(id)))]
+        : []
+      return {
+        ...base,
+        ...(Array.isArray(hidden) ? { quickHiddenTools: ids(hidden) } : {}),
+        ...(Array.isArray(order) ? { quickToolOrder: ids(order) } : {}),
+      }
     }
   } catch (error) {
     void error

@@ -18,6 +18,7 @@ import {
   createBrowserPreferencesStorage,
   useEditorShellStore,
 } from '@cute-screen/editor-vue'
+import QuickToolsSettings from './settings/QuickToolsSettings.vue'
 import GeneralSettings from './settings/GeneralSettings.vue'
 import AppVersion from './settings/AppVersion.vue'
 import HistorySettings from './history/HistorySettings.vue'
@@ -60,7 +61,8 @@ const closeLabel = computed(() => {
   if (startupStep.value) return labels.value.cancel
   return snapshot.value?.setupCompleted ? labels.value.close : labels.value.finish
 })
-const section = ref(query.get('settings') === 'history' ? 'history' : query.get('settings') === 'shortcuts' ? 'shortcuts' : 'general')
+const requestedSection = query.get('settings') ?? 'general'
+const section = ref(['quick-tools', 'history', 'shortcuts'].includes(requestedSection) ? requestedSection : 'general')
 let unlistenHistory: (() => void) | undefined
 let disposedHistory = false
 onMounted(async () => {
@@ -145,6 +147,13 @@ useSettingsRuntime(bridge, state, cancelEditing)
           {{ labels.general }}
         </button>
         <button
+          :aria-current="section === 'quick-tools' ? 'page' : undefined"
+          :disabled="busy || startupStep"
+          @click="navigate('quick-tools')"
+        >
+          {{ locale === 'ru' ? 'Быстрый режим' : 'Quick mode' }}
+        </button>
+        <button
           :aria-current="section === 'history' ? 'page' : undefined"
           :disabled="busy || startupStep"
           @click="navigate('history')"
@@ -168,9 +177,12 @@ useSettingsRuntime(bridge, state, cancelEditing)
           class="cs-settings-error"
         >
           {{ locale === 'ru'
-            ? 'Не удалось сохранить настройки интерфейса. Выберите язык ещё раз.'
-            : 'Could not save interface preferences. Select the language again.' }}
+            ? 'Не удалось сохранить настройки интерфейса. Повторите сохранение.'
+            : 'Could not save interface preferences. Retry saving.' }}
           {{ uiPreferencesSyncError }}
+          <button @click="shellStore.preferences = { ...shellStore.preferences }">
+            {{ locale === 'ru' ? 'Повторить сохранение' : 'Retry saving' }}
+          </button>
         </p>
         <p v-if="loading" role="status">{{ labels.loading }}</p>
         <div
@@ -201,6 +213,7 @@ useSettingsRuntime(bridge, state, cancelEditing)
             @startup="confirmStartup"
             @system="startupSystem"
           />
+          <QuickToolsSettings v-else-if="section === 'quick-tools'" :locale="locale" />
           <HistorySettings v-else-if="section === 'history'" :locale="locale" />
           <ShortcutSettings
             v-else

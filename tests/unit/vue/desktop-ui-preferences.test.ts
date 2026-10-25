@@ -67,6 +67,25 @@ describe('native UI preference synchronization', () => {
     dispose()
   })
 
+  it('persists Quick visibility and synchronizes remote changes without changing other preferences', async () => {
+    native.get.mockResolvedValue(saved)
+    const store = useEditorShellStore(createEditorShellPinia())
+    const dispose = await installDesktopUiPreferences(store)
+    store.setQuickHiddenTools(['arrow', 'select'])
+    await vi.waitFor(() => expect(native.put).toHaveBeenCalledWith(
+      UI_PREFERENCES_STORAGE_KEY, 1,
+      JSON.stringify({ schemaVersion: 1, locale: 'ru', theme: 'dark', quickHiddenTools: ['arrow'] }),
+      expect.any(String),
+    ))
+    native.put.mockClear()
+    native.receive?.({ payload: JSON.stringify({ ...store.preferences, quickHiddenTools: ['line'] }) })
+    expect(store.preferences.quickHiddenTools).toEqual(['line'])
+    expect(store.locale).toBe('ru')
+    expect(store.preferences.theme).toBe('dark')
+    expect(native.put).not.toHaveBeenCalled()
+    dispose()
+  })
+
   it('keeps the latest local choice during queued writes and lets a failed save be retried', async () => {
     native.get.mockResolvedValue(saved)
     const store = useEditorShellStore(createEditorShellPinia())

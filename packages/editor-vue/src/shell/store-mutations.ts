@@ -20,7 +20,7 @@ export function createPreferenceActions(
     state.preferences.value = options.preferences.load() ?? defaultPreferences(options.languages)
     state.systemDark.value = options.systemDark()
   }
-  function updatePreferences(partial: Partial<Pick<(typeof state.preferences)['value'], 'locale' | 'theme'>>): void {
+  function updatePreferences(partial: Partial<Pick<(typeof state.preferences)['value'], 'locale' | 'theme' | 'quickHiddenTools' | 'quickToolOrder'>>): void {
     state.preferences.value = {
       ...state.preferences.value,
       ...partial,
@@ -30,6 +30,13 @@ export function createPreferenceActions(
   }
   return {
     initialize,
+    setQuickToolLayout: (quickHiddenTools: readonly string[], quickToolOrder: readonly string[]) => updatePreferences({
+      quickHiddenTools: [...new Set(quickHiddenTools.filter((id) => !['select', 'hand', 'crop'].includes(id)))],
+      quickToolOrder: [...new Set(quickToolOrder.filter((id) => !['select', 'hand', 'crop'].includes(id)))],
+    }),
+    setQuickHiddenTools: (ids: readonly string[]) => updatePreferences({
+      quickHiddenTools: [...new Set(ids.filter((id) => !['select', 'hand', 'crop'].includes(id)))],
+    }),
     setLocale: (locale: SupportedLocale) => updatePreferences({ locale }),
     setSystemDark: (value: boolean) => {
       state.systemDark.value = value

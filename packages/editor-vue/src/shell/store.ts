@@ -72,6 +72,8 @@ export const useEditorShellStore = defineStore('cute-screen-editor-shell', () =>
     setLayers: snapshots.setLayers,
     setLayersOpen: snapshots.setLayersOpen,
     setLocale: preferences.setLocale,
+    setQuickToolLayout: preferences.setQuickToolLayout,
+    setQuickHiddenTools: preferences.setQuickHiddenTools,
     setSystemDark: preferences.setSystemDark,
     setTheme: preferences.setTheme,
     setZoom: viewport.setZoom,

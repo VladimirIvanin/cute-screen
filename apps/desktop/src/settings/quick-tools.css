@@ -1,0 +1,78 @@
+.cs-quick-tools-zone {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  min-height: 112px;
+}
+.cs-quick-tools-zone.is-drop-target {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.cs-quick-tools-zone h3 {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.cs-quick-tools-zone h3 span {
+  margin-inline-start: 8px;
+  font-weight: 400;
+}
+.cs-quick-tools-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.cs-settings .cs-quick-tools-list button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.cs-settings .cs-quick-tools-list button:disabled {
+  opacity: 1;
+  color: var(--text-muted);
+  cursor: default;
+}
+.cs-quick-tools-list svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.cs-quick-tools-list small {
+  font-size: 11px;
+}
+.cs-settings .cs-quick-tools-list kbd {
+  padding: 0 4px;
+  font-size: 11px;
+}
+.cs-quick-tools-list .is-dragging {
+  opacity: 0.45;
+}
+.cs-quick-tools-announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.cs-quick-tools-ghost {
+  position: fixed;
+  z-index: 100;
+  pointer-events: none;
+  padding: 8px 12px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-overlay);
+}
+
+.cs-quick-tools-list .is-insertion-target {
+  box-shadow: -3px 0 0 var(--accent);
+}

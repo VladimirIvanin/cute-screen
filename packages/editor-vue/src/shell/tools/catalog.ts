@@ -158,26 +158,30 @@ const TOOL_CATALOG: readonly ToolCatalogEntry[] = [
   },
 ]
 
-const QUICK_TOOL_IDS = new Set([
-  'select',
-  'arrow',
-  'line',
-  'shape',
-  'pencil',
-  'marker',
-  'text',
-  'numberedMarker',
-  'callout',
-  'image',
-  'emoji',
-  'eyedropper',
-  'censor',
-  'spotlight',
-  'ruler',
-  'loupe',
-])
+/** Exclusions keep newly introduced Quick tools enabled by default. */
+export const quickToolCatalog: readonly ToolDescriptor[] = TOOL_CATALOG.filter(
+  (tool) => !['hand', 'crop', 'gradient'].includes(tool.id),
+).map(({ availability, ...tool }) => {
+  void availability
+  return tool
+})
+const QUICK_TOOL_IDS = new Set(quickToolCatalog.map((tool) => tool.id))
+
+export function orderQuickTools(
+  tools: readonly ToolDescriptor[],
+  order: readonly string[] = [],
+): readonly ToolDescriptor[] {
+  const rank = (id: string): number => {
+    if (id === 'select') return -1
+    const index = order.indexOf(id)
+    return index < 0 ? order.length : index
+  }
+  return [...tools].sort((a, b) => rank(a.id) - rank(b.id))
+}
 
 export interface ToolCatalogContext {
+  readonly quickToolOrder?: Readonly<Ref<readonly string[] | undefined>>
+  readonly quickHiddenTools?: Readonly<Ref<readonly string[] | undefined>>
   readonly quickMode: boolean
   readonly readOnlyDocument: Ref<boolean>
   readonly contentImageBridgeAvailable: Ref<boolean>
@@ -242,7 +246,11 @@ function availabilityReason(
 
 export function createToolCatalog(context: ToolCatalogContext) {
   const allTools = computed<readonly ToolDescriptor[]>(() => TOOL_CATALOG.map((entry) => resolveTool(entry, context)))
-  const tools = computed<readonly ToolDescriptor[]>(() =>
-    context.quickMode ? allTools.value.filter((tool) => QUICK_TOOL_IDS.has(tool.id)) : allTools.value)
+  const tools = computed<readonly ToolDescriptor[]>(() => {
+    if (!context.quickMode) return allTools.value
+    const hidden = context.quickHiddenTools?.value ?? []
+    return orderQuickTools(allTools.value.filter((tool) =>
+      QUICK_TOOL_IDS.has(tool.id) && (tool.id === 'select' || !hidden.includes(tool.id))), context.quickToolOrder?.value)
+  })
   return { tools }
 }

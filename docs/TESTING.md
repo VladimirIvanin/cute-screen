@@ -1,5 +1,60 @@
 # Стратегия тестирования
 
+## Разделители непустых групп ToolRail (2026-10-25)
+
+`REQ-EDT-008`, `REQ-UI-017`; та же Ubuntu 24.04.5 и baseline
+`aa5bebc357a889b482087a4b8bbba6b8158747fe`, рабочая копия.
+ToolRail сначала исключает пустые группы, затем рисует разделитель между
+оставшимися. Quick с одним Select не имеет разделителя; полный Editor
+сохраняет два разделителя. Порядок инструментов не меняется.
+
+- `pnpm exec vitest run --project vue tests/unit/vue/quick-tools-settings.test.ts tests/unit/vue/quick-context-toolbar.test.ts`:
+  2 files / 8 passed, 5.59 s. Проверка mounted Quick/Editor и скрытия всех
+  перемещаемых инструментов через preferences action.
+- `pnpm format`, `pnpm format:check`, `pnpm docs:check`, `git diff --check`: exit 0.
+
+Native/core/renderer не менялись; повторные native/build/render/perf suites
+не запускались. Дополнительные browser screenshots для этой условной
+отрисовки не снимались.
+
+## Панель быстрого режима: видимость и порядок (2026-10-25)
+
+Ubuntu 24.04.5 LTS x86_64 / Linux 6.8.0-147-generic / Node 22.23.1 /
+pnpm 10.33.2; baseline `aa5bebc357a889b482087a4b8bbba6b8158747fe`, рабочая копия.
+`REQ-UI-017`, ADR-153. До реализации добавлена трассируемость; core/Rust
+контракты не менялись.
+
+- `pnpm install --frozen-lockfile`: восстановлены 7 недостающих локальных
+  dependencies; lockfile не менялся. Первый focused запуск не стартовал из-за
+  отсутствовавшего `@fontsource/press-start-2p`.
+- `pnpm test`: 180 files / 1615 passed, 150.70 s. В jsdom остаются предупреждения
+  canvas getContext; renderer suite использует собственный native canvas.
+- `pnpm lint`: exit 0, 37 существующих warnings. `pnpm typecheck`: exit 0.
+- `pnpm test:boundaries`: 16 files / 113 passed. При первой проверке выявлен
+  лимит 500 строк workspace-bindings; catalog binding вынесен в отдельный модуль.
+- `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5184 pnpm test:e2e:browser --spec tests/e2e/specs/browser-quick-tools-settings.e2e.ts`:
+  Chrome 154.0.8037.57 / WebDriver, 1 passed, 9.9 s. Trusted drag вверх/вниз,
+  reorder активных и скрытых, Escape/outside cancel, reload, V, Enter/Space,
+  Alt + стрелки, все инструменты скрыты кроме V. RU/EN × light/dark, viewport
+  820×720; minimum 620×520 без горизонтального overflow. Четыре screenshots
+  осмотрены; сохранены в `artifacts/quick-tools-settings/`.
+- Existing regression: тот же browser command с двумя `--spec` для
+  `browser-quick-tools-settings.e2e.ts` и `browser-activation-settings.e2e.ts`:
+  2 files / 3 passed до добавления reorder; после reorder новый spec повторён.
+- `pnpm format`, `pnpm format:check`, `pnpm docs:check`, `git diff --check`: exit 0.
+
+Mounted Quick/Editor проверяет production preference mount, полный Editor
+catalog и пользовательский порядок Quick между группами annotate/more.
+Native preference adapter покрыт mock transport test, не runtime WebView.
+`pnpm test:e2e:tauri`, Rust tests, render/perf и release build не запускались:
+native/core/renderer контракты не менялись. Полный `pnpm check` не запускался,
+его relevant frontend/format/docs/boundaries gates выполнены отдельно.
+WebKitGTK/WebView2/WKWebView drag/relaunch остаются pending.
+
+`pnpm disk:usage`: target 129.441 GiB до/после, artifacts 61.320 → 61.321 GiB;
+новых targets нет. Общий cache сохранён, собственный диагностированный failure
+PNG удалён; итоговые screenshots и краткие logs занимают менее 0.5 MiB.
+
 ## Rust audit: tokio и clipboard-win (2026-10-23)
 
 Ubuntu 22.04.5 LTS x86_64, Rust/Cargo 1.97.0, cargo-deny 0.20.2 — официальный

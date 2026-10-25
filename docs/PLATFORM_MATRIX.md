@@ -1,5 +1,14 @@
 # Платформенная матрица
 
+## Настройка Quick toolbar (ADR-153, 2026-10-25)
+
+Изменение Vue UI и существующих UI preferences; native API и IPC schema
+не меняются. Ubuntu 24.04.5 / Chrome 154: 1615 unit/component tests, 113 boundaries и
+trusted browser drag/reorder/reload/keyboard passed; RU/EN × две темы,
+820×720 и minimum-width 620×520. Команды и ограничения — TESTING.md.
+Native drag-and-drop в WebKitGTK, WebView2 и WKWebView пока не проверен;
+keyboard/click transfer использует обычные кнопки. Editor сохраняет полный catalog.
+
 ## GTK main paint recovery (ADR-149, 2026-10-21)
 
 Ubuntu 22.04.5 / GNOME 42.9 Wayland / AMD Lucienne / Mesa 23.2.1 /

@@ -3,12 +3,14 @@ import {
   NButton,
   NTooltip,
 } from 'naive-ui'
+import { computed } from 'vue'
 import { UiIcon } from '../icon'
 import UiSeparator from '../ui/UiSeparator.vue'
 import { hasToolSettings } from '../tools/settings-policy'
 import type { ToolDescriptor } from '../types'
 
-defineProps<{
+const props = defineProps<{
+  ordered?: boolean
   configuredToolId?: string | undefined
   configureHint?: string | undefined
   tools: readonly ToolDescriptor[]
@@ -24,7 +26,12 @@ function configurable(id: string): boolean {
   return hasToolSettings(id)
 }
 
-const toolGroups = ['canvas', 'annotate', 'more'] as const
+const toolGroups = computed(() => {
+  const groups = props.ordered
+    ? [props.tools.filter((tool) => tool.id === 'select'), props.tools.filter((tool) => tool.id !== 'select')]
+    : (['canvas', 'annotate', 'more'] as const).map((group) => props.tools.filter((tool) => tool.group === group))
+  return groups.filter((group) => group.length > 0)
+})
 
 function toolTitle(
   tool: ToolDescriptor,
@@ -62,15 +69,15 @@ function onToolKeydown(
 
 <template>
   <aside class="cs-toolrail cs-toolrail--horizontal" :aria-label="t('tools')">
-    <template v-for="(group, groupIndex) in toolGroups" :key="group">
+    <template v-for="(group, groupIndex) in toolGroups" :key="groupIndex">
       <UiSeparator
-        v-if="groupIndex > 0 && tools.some((tool) => tool.group === group)"
+        v-if="groupIndex > 0"
         class="cs-tool-group-separator"
         :length="24"
       />
-      <div v-if="tools.some((tool) => tool.group === group)" class="cs-tool-group">
+      <div class="cs-tool-group">
         <NTooltip
-          v-for="tool in tools.filter((item) => item.group === group)"
+          v-for="tool in group"
           :key="tool.id"
           placement="top"
           :delay="400"

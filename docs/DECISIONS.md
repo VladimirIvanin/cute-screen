@@ -1,5 +1,25 @@
 # Журнал архитектурных решений
 
+## ADR-153 — Настраиваемая панель Quick Capture
+
+**Статус:** accepted (2026-10-25); дополняет ADR-043 и ADR-126.
+
+**Основание:** пользователь запросил две группы инструментов в Settings с
+переносом drag-and-drop, закреплённым Select и неизменным полным Editor.
+
+**Решение:** UI preferences v1 дополнены optional `quickHiddenTools` и `quickToolOrder`.
+Порядок сохраняется внутри групп; Quick rail следует активной группе, Select
+всегда первый. Alt + стрелки переставляют инструмент с клавиатуры. Читаются
+старые записи без миграции; видимость задаётся списком скрытых ID, включая
+неизвестные будущие ID. Новые доступные инструменты активны. Quick catalog исключает
+Hand, Crop и editor-only Gradient; полный catalog не фильтруется. Select нельзя
+скрыть даже повреждённой записью. Keyboard activation заменяет drag; Escape и
+вынос drag за зону не записывают изменения. Существующий native settings bridge
+синхронизирует WebViews; ошибка записи видима, повтор доступен.
+
+**Проверка:** mounted Settings, codec, production Quick/Editor mount и browser
+trusted drag/reload/keyboard; фактические результаты — TESTING.md.
+
 ## ADR-152 — Screen Recording проверяется на главной очереди и действует со следующего запуска
 
 **Статус:** accepted (2026-10-23); уточняет отказ `REQ-CAP-015`. Маршрут пикселей ADR-038 не меняется.

@@ -231,6 +231,7 @@ defineExpose({
         </div>
         <div v-if="props.quickMode && !props.quickSelectionMode" class="cs-quick-toolrail-group">
           <ToolRail
+            ordered
             :configured-tool-id="toolConfigure?.toolId"
             :tools="tools"
             :active-tool-id="store.activeToolId"

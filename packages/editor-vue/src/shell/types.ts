@@ -5,6 +5,8 @@ export type ResolvedTheme = Exclude<ThemePreference, 'system'>
 export interface UiPreferencesV1 {
   readonly schemaVersion: 1
   readonly locale: SupportedLocale
+  readonly quickHiddenTools?: readonly string[]
+  readonly quickToolOrder?: readonly string[]
   readonly theme: ThemePreference
 }
 

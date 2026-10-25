@@ -1,5 +1,18 @@
 # Архитектура Cute Screen
 
+## Панель Quick Capture (ADR-153)
+
+`quickHiddenTools` в UI preferences хранит исключения; `quickToolOrder` хранит
+порядок известных инструментов, новые дополняют его в конце. Quick rail
+показывает Select первым и затем пользовательский порядок, Editor сохраняет
+свои группы и порядок. Это не список разрешённых
+инструментов. Общий catalog предоставляет настройки и runtime rail; новые
+доступные инструменты активны. Hand/Crop/Gradient исключены из Quick policy,
+Select закреплён. `createWorkspaceToolCatalog` фильтрует только Quick и возвращает Select,
+если живое обновление скрыло текущий инструмент. Scene graph, commands и
+документ не меняются. Синхронизация между native WebViews использует имеющийся
+`cute-screen:ui-preferences` event и settings storage.
+
 ## Восстановление GTK paint (ADR-149)
 
 `platform/linux/window_paint` обслуживает только native main window. Map,
