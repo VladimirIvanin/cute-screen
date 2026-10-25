@@ -1,5 +1,12 @@
 # Платформенная матрица
 
+## Повторное получение MCP config (ADR-155)
+
+Linux/WebKitGTK: 7 native tests — Settings reopen, независимые ключи одного клиента,
+revoke и process restart с тем же config/key — passed. Unix 0700/0600 проверены Rust
+contract tests. Windows/macOS credential storage permissions и native runtime
+не проверены этим запуском. Новых зависимостей и package-path изменений нет.
+
 ## MCP companion (ADR-154)
 
 Транспорт локальный, без требований к shell, Node.js или Python. Для всех build
@@ -7,7 +14,7 @@ architectures пакет включает console companion; GUI subsystem Windo
 AppImage использует `--mcp-stdio`, macOS universal — universal sidecar.
 Платформенные возможности capture не расширяются MCP. Linux native и decoded PNG
 проверяются отдельным сценарием; Windows/macOS package/runtime и реальные
-клиентов требуют собственных smoke evidence и не следуют из Linux pass.
+клиенты требуют собственных smoke evidence и не следуют из Linux pass.
 
 Каталог 15 профилей: Linux/WebKitGTK — production Settings → генерация каждого
 JSON/TOML/YAML/stdio блока → real companion initialize/get_status через тестовый

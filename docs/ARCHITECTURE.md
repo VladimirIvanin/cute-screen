@@ -1,5 +1,14 @@
 # Архитектура Cute Screen
 
+## Повторное получение MCP-конфигурации (ADR-155)
+
+Settings-only `mcp_connection_configuration(id)` читает отдельный приватный файл
+ключа и генерирует config с актуальным executable path. SQLite содержит hash и
+optional legacy configuration-key hash; snapshot не возвращает секреты.
+Create добавляет grant, не заменяя записи того же клиента. Revoke удаляет только
+выбранный grant и файл. Первое получение legacy-конфига добавляет один recoverable
+key, сохраняя старый; повторные чтения ничего не ротируют.
+
 ## Локальный MCP (ADR-154)
 
 Отдельный `cute-screen-mcp` на rmcp общается с клиентом по stdio и с host по

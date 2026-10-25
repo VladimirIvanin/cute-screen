@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   computed,
+  nextTick,
   onBeforeUnmount,
   onMounted,
   ref,
@@ -8,6 +9,7 @@ import {
 import { describeError } from '@cute-screen/editor-vue'
 import type {
   AgentClient,
+  AgentConnection,
   AgentSettings,
   AgentSettingsBridge,
 } from '../agent/contracts'
@@ -21,12 +23,40 @@ const busy = ref(false)
 const error = ref('')
 const message = ref('')
 const config = ref('')
+const configId = ref<string>()
+const configField = ref<HTMLTextAreaElement>()
+const clientField = ref<HTMLSelectElement>()
 const client = ref<AgentClient>('codex')
 let disposed = false
 let timer: ReturnType<typeof setInterval> | undefined
 let messageTimer: ReturnType<typeof setTimeout> | undefined
 const ru = computed(() => props.locale === 'ru')
 const profile = computed(() => agentClientProfiles[client.value])
+const hasConnection = computed(() => state.value?.connections.some((entry) => entry.client === client.value))
+let failedAction: (() => Promise<void>) | undefined
+function connectionLabel(connection: AgentConnection): string {
+  const name = connection.client === 'generic' && ru.value ? 'Другой клиент / stdio'
+    : agentClientProfiles[connection.client]?.label ?? connection.client
+  return `${name} · ${connection.id.slice(0, 8)}`
+}
+function clearConfiguration(): void {
+  config.value = ''
+  configId.value = undefined
+}
+async function hideConfiguration(): Promise<void> {
+  clearConfiguration()
+  await nextTick()
+  clientField.value?.focus()
+}
+async function showConfiguration(
+  id: string,
+  value: string,
+): Promise<void> {
+  configId.value = id
+  config.value = value
+  await nextTick()
+  configField.value?.focus()
+}
 async function perform(action: () => Promise<void>): Promise<void> {
   if (busy.value || disposed) return
   busy.value = true
@@ -35,7 +65,9 @@ async function perform(action: () => Promise<void>): Promise<void> {
   clearTimeout(messageTimer)
   try {
     await action()
+    failedAction = undefined
   } catch (cause) {
+    failedAction = action
     if (!disposed) error.value = describeError(cause, ru.value ? 'Не удалось выполнить действие' : 'Action failed')
   } finally {
     busy.value = false
@@ -45,22 +77,34 @@ const load = () => perform(async () => {
   const next = await bridge.snapshot()
   if (!disposed) state.value = next
 })
+async function retry(): Promise<void> {
+  if (failedAction) await perform(failedAction)
+  else await load()
+}
 async function enable(enabled: boolean): Promise<void> {
   await perform(async () => {
     state.value = await bridge.configure(enabled)
-    if (!enabled) config.value = ''
+    if (!enabled) clearConfiguration()
   })
 }
 async function create(): Promise<void> {
   await perform(async () => {
     const result = await bridge.create(client.value)
     state.value = result.snapshot
-    config.value = result.config
+    await showConfiguration(result.id, result.config)
   })
 }
-async function copy(): Promise<void> {
+async function open(connection: AgentConnection): Promise<void> {
   await perform(async () => {
-    await bridge.copy(config.value)
+    const value = await bridge.configuration(connection.id)
+    client.value = connection.client
+    await showConfiguration(connection.id, value)
+  })
+}
+async function copy(id?: string): Promise<void> {
+  await perform(async () => {
+    const value = id ? await bridge.configuration(id) : config.value
+    await bridge.copy(value)
     message.value = ru.value ? 'Конфигурация скопирована' : 'Configuration copied'
     messageTimer = setTimeout(() => {
       message.value = ''
@@ -70,7 +114,7 @@ async function copy(): Promise<void> {
 async function revoke(id: string): Promise<void> {
   await perform(async () => {
     state.value = await bridge.revoke(id)
-    config.value = ''
+    if (configId.value === id) clearConfiguration()
   })
 }
 async function check(): Promise<void> {
@@ -121,7 +165,7 @@ onBeforeUnmount(() => {
       class="cs-settings-error"
       role="alert"
     >
-      {{ error }} <button :disabled="busy" @click="load">{{ ru ? 'Повторить' : 'Retry' }}</button>
+      {{ error }} <button :disabled="busy" @click="retry">{{ ru ? 'Повторить' : 'Retry' }}</button>
     </div>
     <template v-if="state">
       <label class="cs-agent-enable">
@@ -137,9 +181,10 @@ onBeforeUnmount(() => {
       <label for="mcp-client">{{ ru ? 'Клиент' : 'Client' }}</label>
       <select
         id="mcp-client"
+        ref="clientField"
         v-model="client"
         :disabled="busy"
-        @change="config = ''"
+        @change="clearConfiguration"
       >
         <option
           v-for="(entry, id) in agentClientProfiles"
@@ -153,38 +198,62 @@ onBeforeUnmount(() => {
       <p class="cs-settings-muted">{{ profile.destination }}</p>
       <p class="cs-settings-muted">{{ profile.help[locale] }}</p>
       <div class="cs-agent-buttons">
-        <button :disabled="busy || !state.enabled" @click="create">{{ ru ? 'Создать конфигурацию' : 'Create configuration' }}</button>
+        <button :disabled="busy || !state.enabled" @click="create">{{ hasConnection ? (ru ? 'Создать ещё ключ' : 'Create another key') : (ru ? 'Создать конфигурацию' : 'Create configuration') }}</button>
         <button :disabled="busy || !state.enabled" @click="check">{{ ru ? 'Проверить подключение' : 'Check connection' }}</button>
       </div>
-      <p class="cs-settings-muted">{{ ru ? 'Новая конфигурация заменяет прежний ключ этого клиента. Скопируйте блок в настройки агента и перезапустите подключение. Ключ показывается только сейчас; не публикуйте его.' : 'A new configuration replaces this client’s old key. Copy the block into your agent settings and restart its connection. The key is shown only now; keep it private.' }}</p>
+      <p class="cs-settings-muted">{{ ru ? 'Конфигурации можно открыть и скопировать из списка подключений, в том числе после перезапуска. Дополнительный ключ не меняет существующие подключения. Каждый ключ отзывается отдельно; не публикуйте конфигурацию.' : 'Open or copy configurations from the connections list, including after restart. An additional key keeps existing connections working. Revoke each key separately; keep configurations private.' }}</p>
       <template v-if="config">
         <label for="mcp-config">{{ ru ? 'Конфигурация подключения' : 'Connection configuration' }}</label>
         <textarea
           id="mcp-config"
+          ref="configField"
           :value="config"
           readonly
           rows="12"
           spellcheck="false"
         />
-        <button :disabled="busy" @click="copy">{{ ru ? 'Скопировать' : 'Copy' }}</button>
+        <div class="cs-agent-buttons">
+          <button :disabled="busy" @click="copy()">{{ ru ? 'Скопировать' : 'Copy' }}</button>
+          <button :disabled="busy" @click="hideConfiguration">{{ ru ? 'Скрыть конфигурацию' : 'Hide configuration' }}</button>
+        </div>
       </template>
       <p v-if="message" role="status">{{ message }}</p>
       <h3>{{ ru ? 'Подключения' : 'Connections' }}</h3>
       <p v-if="!state.connections.length" class="cs-settings-muted">{{ ru ? 'Подключений пока нет' : 'No connections yet' }}</p>
       <ul v-else class="cs-agent-connections">
-        <li v-for="connection in state.connections" :key="connection.id">
+        <li
+          v-for="connection in state.connections"
+          :key="connection.id"
+          :data-connection-id="connection.id"
+        >
           <div>
-            <strong>{{ connection.client === 'generic' && ru ? 'Другой клиент / stdio' : agentClientProfiles[connection.client]?.label ?? connection.client }}</strong>
+            <strong>{{ connectionLabel(connection) }}</strong>
             <p>{{ connection.connected ? (ru ? 'Недавно активен' : 'Recently active') : (ru ? 'Нет недавних запросов' : 'No recent requests') }}</p>
             <p v-if="connection.lastAction">{{ connection.lastAction }} · {{ new Date(connection.lastSeen!).toLocaleString(locale) }}</p>
           </div>
-          <button
-            :disabled="busy"
-            :aria-label="`${ru ? 'Отозвать' : 'Revoke'} ${connection.client}`"
-            @click="revoke(connection.id)"
-          >
-            {{ ru ? 'Отозвать' : 'Revoke' }}
-          </button>
+          <div class="cs-agent-connection-actions">
+            <button
+              :disabled="busy"
+              :aria-label="`${ru ? 'Открыть конфигурацию' : 'Open configuration'} ${connectionLabel(connection)}`"
+              @click="open(connection)"
+            >
+              {{ ru ? 'Открыть' : 'Open' }}
+            </button>
+            <button
+              :disabled="busy"
+              :aria-label="`${ru ? 'Скопировать конфигурацию' : 'Copy configuration'} ${connectionLabel(connection)}`"
+              @click="copy(connection.id)"
+            >
+              {{ ru ? 'Скопировать' : 'Copy' }}
+            </button>
+            <button
+              :disabled="busy"
+              :aria-label="`${ru ? 'Отозвать' : 'Revoke'} ${connectionLabel(connection)}`"
+              @click="revoke(connection.id)"
+            >
+              {{ ru ? 'Отозвать' : 'Revoke' }}
+            </button>
+          </div>
         </li>
       </ul>
     </template>
@@ -198,6 +267,7 @@ onBeforeUnmount(() => {
 .cs-agent-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .cs-agent-settings textarea { width: 100%; box-sizing: border-box; resize: vertical; padding: 12px; font-family: monospace; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); }
 .cs-agent-connections { list-style: none; padding: 0; margin: 0; }
-.cs-agent-connections li { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid var(--border); }
+.cs-agent-connections li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid var(--border); }
+.cs-agent-connection-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .cs-agent-settings :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
 </style>

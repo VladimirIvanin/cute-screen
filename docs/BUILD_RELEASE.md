@@ -1,5 +1,11 @@
 # CI-сборки и проверка версии через GitHub
 
+MCP-конфигурации повторно доступны после restart (ADR-155): `mcp-keys/` в app-data
+содержит секреты для копирования; SQLite хранит только hashes. Этот каталог нельзя
+копировать в reports/evidence вместе с диагностическим appData. Обновление приложения
+сохраняет app-data; отзыв удаляет соответствующий key file. Legacy grant получает
+дополнительный recoverable key при первом открытии, не отключая установленного агента.
+
 ## MCP companion (ADR-154)
 
 `pnpm tauri dev/build` — wrapper `scripts/tauri.mjs`: до Tauri собирает companion

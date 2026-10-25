@@ -10,6 +10,7 @@ fn service(root: &std::path::Path) -> McpService {
                 id: "client".into(),
                 client: "codex".into(),
                 key_hash: format!("{:x}", Sha256::digest(token.as_bytes())),
+                configuration_key_hash: None,
             }],
         }),
         activity: Mutex::new(HashMap::new()),
@@ -166,5 +167,110 @@ fn configuration_rejects_unknown_clients_instead_of_guessing_a_format() {
             "test-key"
         )
         .is_err()
+    );
+}
+
+#[test]
+fn credentials_survive_reopen_and_are_removed_on_revoke() {
+    let root = tempfile::tempdir().expect("root");
+    let id = uuid::Uuid::new_v4().to_string();
+    let token = "a".repeat(64);
+    assert_eq!(credentials::read(root.path(), &id).expect("missing"), None);
+    credentials::write(root.path(), &id, &token).expect("write");
+    assert_eq!(
+        credentials::read(root.path(), &id).expect("reopen"),
+        Some(token)
+    );
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(
+            std::fs::metadata(root.path().join("mcp-keys"))
+                .expect("dir")
+                .permissions()
+                .mode()
+                & 0o777,
+            0o700
+        );
+        assert_eq!(
+            std::fs::metadata(root.path().join("mcp-keys").join(&id))
+                .expect("file")
+                .permissions()
+                .mode()
+                & 0o777,
+            0o600
+        );
+    }
+    credentials::remove(root.path(), &id).expect("revoke");
+    assert_eq!(credentials::read(root.path(), &id).expect("removed"), None);
+    assert!(credentials::read(root.path(), "../outside").is_err());
+}
+
+#[test]
+fn legacy_configuration_key_preserves_the_installed_agent_and_revokes_both() {
+    let root = tempfile::tempdir().expect("root");
+    let service = service(root.path());
+    let legacy = "a".repeat(64);
+    let mut connection = settings::new_connection("codex", &legacy);
+    let (recovered, created) =
+        settings::configuration_credential(root.path(), &connection).expect("legacy recovery");
+    assert!(created);
+    credentials::write(root.path(), &connection.id, &recovered).expect("persist key");
+    connection.configuration_key_hash = Some(format!("{:x}", Sha256::digest(recovered.as_bytes())));
+    let (reopened, created_again) =
+        settings::configuration_credential(root.path(), &connection).expect("reopen");
+    assert!(!created_again);
+    assert_eq!(reopened, recovered);
+    let id = connection.id.clone();
+    let mut saved = service.settings.lock().expect("settings");
+    saved.enabled = true;
+    saved.connections = vec![connection];
+    let serialized = serde_json::to_string(&*saved).expect("serialize");
+    assert!(!serialized.contains(&recovered));
+    assert!(!serialized.contains(&legacy));
+    *saved = serde_json::from_str(&serialized).expect("restart");
+    drop(saved);
+    assert_eq!(service.authenticate(&legacy).expect("installed agent"), id);
+    assert_eq!(service.authenticate(&recovered).expect("config key"), id);
+    service
+        .settings
+        .lock()
+        .expect("settings")
+        .connections
+        .clear();
+    assert!(service.authenticate(&legacy).is_err());
+    assert!(service.authenticate(&recovered).is_err());
+}
+
+#[test]
+fn two_keys_for_the_same_client_are_independently_revocable() {
+    let root = tempfile::tempdir().expect("root");
+    let service = service(root.path());
+    let first = settings::new_connection("codex", &"a".repeat(64));
+    let second = settings::new_connection("codex", &"b".repeat(64));
+    assert_ne!(first.id, second.id);
+    let second_id = second.id.clone();
+    {
+        let mut saved = service.settings.lock().expect("settings");
+        saved.enabled = true;
+        saved.connections = vec![first, second];
+    }
+    assert!(service.authenticate(&"a".repeat(64)).is_ok());
+    assert_eq!(
+        service.authenticate(&"b".repeat(64)).expect("second"),
+        second_id
+    );
+    service
+        .settings
+        .lock()
+        .expect("settings")
+        .connections
+        .retain(|c| c.id == second_id);
+    assert!(service.authenticate(&"a".repeat(64)).is_err());
+    assert_eq!(
+        service
+            .authenticate(&"b".repeat(64))
+            .expect("second remains"),
+        second_id
     );
 }

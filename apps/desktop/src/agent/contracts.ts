@@ -11,7 +11,8 @@ export interface AgentSettings { enabled: boolean; connections: readonly AgentCo
 export interface AgentSettingsBridge {
   snapshot(): Promise<AgentSettings>
   configure(enabled: boolean): Promise<AgentSettings>
-  create(client: AgentClient): Promise<{ config: string; snapshot: AgentSettings }>
+  create(client: AgentClient): Promise<{ id: string; config: string; snapshot: AgentSettings }>
+  configuration(id: string): Promise<string>
   revoke(id: string): Promise<AgentSettings>
   check(): Promise<{ companion: boolean; editorReady: boolean; bridge: boolean }>
   copy(text: string): Promise<void>

@@ -6,6 +6,7 @@ export const agentSettingsBridge: AgentSettingsBridge = {
   snapshot: () => invoke('mcp_settings'),
   configure: (enabled) => invoke('mcp_configure', { enabled }),
   create: (client) => invoke('mcp_create_connection', { client }),
+  configuration: (id) => invoke('mcp_connection_configuration', { id }),
   revoke: (id) => invoke('mcp_revoke', { id }),
   check: () => invoke('mcp_check'),
   copy: (text) => invoke<void>('clipboard_write_text', { text, correlationId: 'mcp-config' }),

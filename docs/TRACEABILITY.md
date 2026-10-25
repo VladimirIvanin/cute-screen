@@ -2,14 +2,14 @@
 
 ## MCP для локальных агентов (2026-10-25, ADR-154)
 
-| Требование  | Реализация                                                                                    | Доказательство                                            |
-| ----------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| REQ-MCP-001 | Opt-in, кнопка агента, профили JSON/TOML/YAML и ручного stdio, инструкции для каждого клиента | Settings component, Rust config tests и native navigation |
-| REQ-MCP-002 | Stdio companion, authenticated loopback bridge, отзыв ключей                                  | Rust transport/auth tests и packaged smoke                |
-| REQ-MCP-003 | История, импорт и штатный capture с cancel/jobs                                               | Native production-flow E2E                                |
-| REQ-MCP-004 | Atomic EditorCommand batch, Undo/Redo и state token                                           | Core failing-first и session tests                        |
-| REQ-MCP-005 | Snapshot preview, binary IPC, ImageContent только на MCP boundary                             | Decode/render/native E2E                                  |
-| REQ-MCP-006 | Атомарный PNG export без перезаписи                                                           | Rust destination tests и decoded export                   |
+| Требование  | Реализация                                                                                                            | Доказательство                                             |
+| ----------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| REQ-MCP-001 | Opt-in, профили клиентов, повторное открытие/копирование без ротации, восстановление после restart и legacy migration | Settings component, Rust credentials tests и native reopen |
+| REQ-MCP-002 | Stdio companion, authenticated loopback bridge, отзыв ключей                                                          | Rust transport/auth tests и packaged smoke                 |
+| REQ-MCP-003 | История, импорт и штатный capture с cancel/jobs                                                                       | Native production-flow E2E                                 |
+| REQ-MCP-004 | Atomic EditorCommand batch, Undo/Redo и state token                                                                   | Core failing-first и session tests                         |
+| REQ-MCP-005 | Snapshot preview, binary IPC, ImageContent только на MCP boundary                                                     | Decode/render/native E2E                                   |
+| REQ-MCP-006 | Атомарный PNG export без перезаписи                                                                                   | Rust destination tests и decoded export                    |
 
 Результаты запусков фиксируются в TESTING.md; наличие строки не означает pass.
 

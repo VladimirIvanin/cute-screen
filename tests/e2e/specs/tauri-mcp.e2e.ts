@@ -33,6 +33,14 @@ function expectedState(snapshot: Record<string, unknown>) {
   return { documentId: document.id, expectedStateToken: snapshot.stateToken }
 }
 
+async function newestConnectionId(): Promise<string> {
+  const rows = $$('.cs-agent-connections li')
+  const count = await rows.length
+  const id = await rows[count - 1]!.getAttribute('data-connection-id')
+  if (!id) throw new Error('Connection row is missing its ID')
+  return id
+}
+
 describe('local MCP through the real editor WebView', () => {
   it('connects from Settings, imports 4K, edits atomically, previews, undoes and exports decoded PNG', async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), 'cute-screen-mcp-test-'))
@@ -107,7 +115,7 @@ describe('local MCP through the real editor WebView', () => {
       await browser.tauri.switchWindow('main')
       await browser.saveScreenshot(`${process.env.CUTE_SCREEN_WDIO_ARTIFACTS}/mcp-editor.png`)
       await browser.tauri.switchWindow('settings')
-      await $('.cs-agent-connections button').click()
+      await $('.cs-agent-connections button[aria-label^="Revoke "]').click()
       await expect($('#mcp-config')).not.toBeExisting()
       await browser.saveScreenshot(`${process.env.CUTE_SCREEN_WDIO_ARTIFACTS}/mcp-settings.png`)
       expect((await client.call('get_document')).isError).toBe(true)
@@ -187,10 +195,61 @@ describe('local MCP through the real editor WebView', () => {
       } finally {
         await client.close()
       }
-      await $(`button[aria-label="Revoke ${id}"]`).click()
+      const createdId = await newestConnectionId()
+      await $(`[data-connection-id="${createdId}"] button[aria-label^="Revoke "]`).click()
       await expect($('#mcp-config')).not.toBeExisting()
       if (id === 'continue') await browser.saveScreenshot(`${process.env.CUTE_SCREEN_WDIO_ARTIFACTS}/mcp-continue-profile.png`)
       if (id === 'vscode') await browser.saveScreenshot(`${process.env.CUTE_SCREEN_WDIO_ARTIFACTS}/mcp-vscode-profile.png`)
+    }
+  })
+
+  it('reopens configs, copies them and creates independent keys for the same client', async () => {
+    await browser.tauri.switchWindow('settings')
+    await selectMcpClient('opencode')
+    await $('.cs-agent-buttons button').click()
+    await expect($('#mcp-config')).toBeDisplayed()
+    const firstConfig = await $('#mcp-config').getValue()
+    const firstId = await newestConnectionId()
+    const first = new McpClient(parseMcpConfiguration(firstConfig))
+    let second: McpClient | undefined
+    try {
+      await first.initialize()
+      await $('.cs-settings-footer button').click()
+      await browser.tauri.switchWindow('main')
+      await browser.setWindowSize(1280, 800)
+      await expect($('.cs-agent-connect')).toBeDisplayed()
+      await $('.cs-agent-connect').click()
+      await browser.waitUntil(async () => (await browser.tauri.listWindows()).includes('settings'))
+      await browser.tauri.switchWindow('settings')
+      const firstRow = $(`[data-connection-id="${firstId}"]`)
+      await firstRow.$('button[aria-label^="Open configuration "]').click()
+      await expect($('#mcp-config')).toBeDisplayed()
+      const reopened = await $('#mcp-config').getValue()
+      expect(createHash('sha256').update(reopened).digest('hex')).toBe(createHash('sha256').update(firstConfig).digest('hex'))
+      await firstRow.$('button[aria-label^="Copy configuration "]').click()
+      await expect($('.cs-agent-settings p[role="status"]')).toHaveText('Configuration copied')
+      await expect($('.cs-agent-buttons button')).toHaveText('Create another key')
+      await $('.cs-agent-buttons button').click()
+      await expect($('.cs-agent-settings')).toHaveAttribute('aria-busy', 'false')
+      const secondConfig = await $('#mcp-config').getValue()
+      const secondId = await newestConnectionId()
+      expect(secondId).not.toBe(firstId)
+      second = new McpClient(parseMcpConfiguration(secondConfig))
+      await second.initialize()
+      expect((await first.data('get_status')).ready).toBe(true)
+      expect((await second.data('get_status')).ready).toBe(true)
+      await firstRow.$('button[aria-label^="Revoke "]').click()
+      await expect(firstRow).not.toBeExisting()
+      expect((await first.call('get_status')).isError).toBe(true)
+      expect((await second.data('get_status')).ready).toBe(true)
+      await writeFile(path.join(process.env.CUTE_SCREEN_WDIO_ARTIFACTS!, 'mcp-retained-connection.json'), JSON.stringify({
+        id: secondId, configHash: createHash('sha256').update(secondConfig).digest('hex'),
+      }))
+      await $('button=Hide configuration').click()
+      await browser.saveScreenshot(`${process.env.CUTE_SCREEN_WDIO_ARTIFACTS}/mcp-connection-actions.png`)
+    } finally {
+      await first.close()
+      await second?.close()
     }
   })
 

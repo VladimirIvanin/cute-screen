@@ -35,11 +35,11 @@ fn snapshot(service: &McpService) -> Result<Value, String> {
 fn persist(
     app: &tauri::AppHandle,
     service: &McpService,
-    update: impl FnOnce(&mut SavedSettings),
+    update: impl FnOnce(&mut SavedSettings) -> Result<(), String>,
 ) -> Result<(), String> {
     let mut current = service.settings.lock().map_err(|_| "settings lock")?;
     let mut next = current.clone();
-    update(&mut next);
+    update(&mut next)?;
     app.state::<crate::storage::LibraryRepository>()
         .put_setting(
             SETTING_KEY.into(),
@@ -67,7 +67,10 @@ pub fn mcp_configure(
     service: State<'_, Arc<McpService>>,
 ) -> Result<Value, String> {
     window_is(&window, "settings")?;
-    persist(&app, &service, |saved| saved.enabled = enabled)?;
+    persist(&app, &service, |saved| {
+        saved.enabled = enabled;
+        Ok(())
+    })?;
     snapshot(&service)
 }
 #[tauri::command]
@@ -79,13 +82,15 @@ pub fn mcp_revoke(
 ) -> Result<Value, String> {
     window_is(&window, "settings")?;
     persist(&app, &service, |saved| {
-        saved.connections.retain(|c| c.id != id)
+        saved.connections.retain(|c| c.id != id);
+        Ok(())
     })?;
     service
         .activity
         .lock()
         .map_err(|_| "activity lock")?
         .remove(&id);
+    credentials::remove(&service.library, &id)?;
     snapshot(&service)
 }
 
@@ -100,20 +105,96 @@ pub fn mcp_create_connection(
     if !CLIENTS.contains(&client.as_str()) {
         return Err("unknown client".into());
     }
-    let token = format!(
+    let token = new_token();
+    let connection = new_connection(&client, &token);
+    let config = configuration_for(&service, &connection, &token)?;
+    credentials::write(&service.library, &connection.id, &token)?;
+    if let Err(error) = persist(&app, &service, |saved| {
+        saved.connections.push(connection.clone());
+        Ok(())
+    }) {
+        credentials::remove(&service.library, &connection.id)?;
+        return Err(error);
+    }
+    Ok(json!({"id":connection.id,"config":config,"snapshot":snapshot(&service)?}))
+}
+
+fn new_token() -> String {
+    format!(
         "{}{}",
         uuid::Uuid::new_v4().simple(),
         uuid::Uuid::new_v4().simple()
-    );
-    let connection = Connection {
+    )
+}
+
+pub(super) fn new_connection(client: &str, token: &str) -> Connection {
+    Connection {
         id: uuid::Uuid::new_v4().to_string(),
-        client: client.clone(),
+        client: client.to_owned(),
         key_hash: format!("{:x}", Sha256::digest(token.as_bytes())),
-    };
-    persist(&app, &service, |saved| {
-        saved.connections.retain(|c| c.client != client);
-        saved.connections.push(connection.clone());
-    })?;
+        configuration_key_hash: None,
+    }
+}
+
+pub(super) fn configuration_credential(
+    root: &std::path::Path,
+    connection: &Connection,
+) -> Result<(String, bool), String> {
+    if let Some(token) = credentials::read(root, &connection.id)? {
+        let hash = format!("{:x}", Sha256::digest(token.as_bytes()));
+        if !connection.matches_key_hash(&hash) {
+            return Err("Saved MCP credential does not match this connection".into());
+        }
+        return Ok((token, false));
+    }
+    Ok((new_token(), true))
+}
+
+#[tauri::command]
+pub fn mcp_connection_configuration(
+    window: tauri::WebviewWindow,
+    app: tauri::AppHandle,
+    id: String,
+    service: State<'_, Arc<McpService>>,
+) -> Result<String, String> {
+    window_is(&window, "settings")?;
+    let connection = service
+        .settings
+        .lock()
+        .map_err(|_| "settings lock")?
+        .connections
+        .iter()
+        .find(|c| c.id == id)
+        .cloned()
+        .ok_or("Connection was revoked")?;
+    let (token, created) = configuration_credential(&service.library, &connection)?;
+    let config = configuration_for(&service, &connection, &token)?;
+    if !created {
+        return Ok(config);
+    }
+    // Legacy versions retained only a one-way hash. Add a recoverable key for
+    // this same grant, preserving the key already installed in the agent.
+    credentials::write(&service.library, &id, &token)?;
+    if let Err(error) = persist(&app, &service, |saved| {
+        let current = saved
+            .connections
+            .iter_mut()
+            .find(|c| c.id == id)
+            .ok_or("Connection was revoked")?;
+        current.configuration_key_hash = Some(format!("{:x}", Sha256::digest(token.as_bytes())));
+        Ok(())
+    }) {
+        credentials::remove(&service.library, &id)?;
+        return Err(error);
+    }
+    Ok(config)
+}
+
+fn configuration_for(
+    service: &McpService,
+    connection: &Connection,
+    token: &str,
+) -> Result<String, String> {
     let executable = std::env::current_exe().map_err(|e| e.to_string())?;
     let companion = executable.with_file_name(if cfg!(windows) {
         "cute-screen-mcp.exe"
@@ -136,8 +217,7 @@ pub fn mcp_create_connection(
         "--application".into(),
         application.to_string_lossy().into_owned(),
     ]);
-    let config = connection_configuration(&client, command, &args, &token)?;
-    Ok(json!({"id":connection.id,"config":config,"snapshot":snapshot(&service)?}))
+    connection_configuration(&connection.client, command, &args, token)
 }
 
 pub(super) fn connection_configuration(

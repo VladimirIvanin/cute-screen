@@ -1,5 +1,33 @@
 # Стратегия тестирования
 
+## Повторное копирование и несколько MCP-ключей (2026-10-25, ADR-155)
+
+Linux x86_64 / WebKitGTK 2.52.6, baseline `91d5997` + working tree.
+`cargo test --offline -p cute-screen-desktop --lib mcp::tests`: 10 passed;
+перед реализацией новый credentials/legacy contract дал compile failure.
+Проверены запись/чтение/удаление, Unix 0700/0600, запрет traversal, сохранение
+legacy key вместе с recovery key, сериализация без raw secrets и независимый revoke.
+`cargo test --offline --workspace`: 187 desktop + 1 main + 2 MCP framing +
+1 stdio integration + 33 storage passed.
+
+`pnpm exec vitest run --project vue tests/unit/vue/agent-settings.test.ts`:
+7 passed: remount/open/copy без create, несколько ключей одного клиента,
+revoke чужой строки сохраняет открытый config, MCP off сохраняет доступ к config,
+retry повторяет чтение/copy. `pnpm typecheck`, targeted ESLint и
+`pnpm exec tsc --noEmit -p tests/e2e/tsconfig.json`: passed.
+
+`CUTE_SCREEN_E2E_SCENARIOS=mcp,mcp-reopen CUTE_SCREEN_E2E_DRIVER_PROVIDER=embedded pnpm test:e2e:tauri`:
+5 + 2 passed. Fresh WebView/companion: Settings close/reopen возвращает прежний
+config; два OpenCode grants одновременно проходят stdio get_status; отзыв первого
+не ломает второй. После process restart открыт/скопирован тот же ID/config без
+нового create; совпадает SHA-256 полного config, агент успешно аутентифицируется.
+Предыдущие 4K import/edit/preview/Undo/export, capture/cancel и 15 profiles сохранены.
+Диагностический native failure: selector `p[role=status]` находил Version вместо
+copy status; исправлен scope на `.cs-agent-settings`. Скриншоты 820×720 dark
+просмотрены после скрытия config; raw keys/appData в evidence не копируются.
+Windows/macOS credential permissions и runtime не запускались.
+Evidence: `artifacts/mcp-config-reopen-2026-10-25/`.
+
 ## Каталог MCP-клиентов (2026-10-25)
 
 Linux x86_64 / WebKitGTK 2.52.6, baseline `c2a26cb` + working tree.

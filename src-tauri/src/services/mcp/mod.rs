@@ -1,4 +1,5 @@
 //! Opt-in local agent boundary. No command can evaluate JS or invoke arbitrary IPC.
+mod credentials;
 mod dispatch;
 pub mod settings;
 #[cfg(test)]
@@ -33,6 +34,8 @@ struct Connection {
     id: String,
     client: String,
     key_hash: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    configuration_key_hash: Option<String>,
 }
 struct PendingReply {
     owner: String,
@@ -103,9 +106,19 @@ impl McpService {
         settings
             .connections
             .iter()
-            .find(|c| constant_time_equal(c.key_hash.as_bytes(), hash.as_bytes()))
+            .find(|c| c.matches_key_hash(&hash))
             .map(|c| c.id.clone())
             .ok_or_else(|| "unauthorized: connection revoked or key invalid".into())
+    }
+}
+
+impl Connection {
+    fn matches_key_hash(&self, hash: &str) -> bool {
+        constant_time_equal(self.key_hash.as_bytes(), hash.as_bytes())
+            | self
+                .configuration_key_hash
+                .as_ref()
+                .is_some_and(|key| constant_time_equal(key.as_bytes(), hash.as_bytes()))
     }
 }
 
