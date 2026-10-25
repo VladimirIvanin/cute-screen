@@ -498,3 +498,7 @@ export {
   snapFrameResizePoint,
   type FrameMoveSnapState,
 } from './frame-snap'
+export {
+  createAgentEditCommand,
+  type AgentEdit,
+} from './agent-edits'

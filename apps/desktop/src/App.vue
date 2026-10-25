@@ -133,6 +133,10 @@ const captureAvailable = computed(() =>
 const captureWindowAvailable = computed(() => platformCapabilities.value?.capture.windowTarget ?? false)
 const openImageAvailable = computed(() => '__TAURI_INTERNALS__' in window)
 const openSettings = openImageAvailable.value ? openActivationSettings : undefined
+const connectAgent = openImageAvailable.value ? async () => {
+  const { openAgentSettings } = await import('./platform/tauri/agent-settings-adapter')
+  await openAgentSettings()
+} : undefined
 const captureFallbackCommand = computed(() =>
   m04FallbackHarness
     ? "'/opt/Cute Screen/cute-screen' capture --mode area"
@@ -429,6 +433,18 @@ onMounted(() => {
       refreshPlatformCapabilities,
       installLifecycleGuards,
     })
+    if ('__TAURI_INTERNALS__' in window) {
+      const { installAgentRuntime } = await import('./platform/tauri/agent-runtime')
+      lifecycleCleanup.push(await installAgentRuntime({
+        session: () => documentSession.value,
+        busy: () => Boolean(
+          historyBusy.value || readOnlyDocument.value || captureProgress.value || shell.value?.isAgentBusy(),
+        ),
+        open: (id) => selectHistoryCapture(id),
+        hosts: () => canvasViewportHosts.value,
+        capabilities: () => platformCapabilities.value,
+      }))
+    }
     listenForCapabilityChanges()
     scheduleHistoryMaintenance()
   })()
@@ -467,6 +483,7 @@ onBeforeUnmount(() => {
     :capture-window-available="captureWindowAvailable && !historyBusy"
     :open-image-available="openImageAvailable && !historyBusy"
     :open-settings="openSettings"
+    :connect-agent="connectAgent"
     :capture-fallback-command="captureFallbackCommand"
     :capture-progress="captureProgress"
     :source-image="sourceImage"

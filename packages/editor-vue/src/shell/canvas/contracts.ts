@@ -182,6 +182,7 @@ export type CanvasViewportEmit = <K extends keyof CanvasViewportEmits>(
 ) => void
 
 export interface CanvasViewportExpose {
+  isAgentBusy(): boolean
   imageInsertionTarget(point?: { readonly x: number; readonly y: number }): import('../../texture-fill').ImageInsertionTarget | undefined
   startSelectionMove(event: PointerEvent): void
   focusCanvas(): void

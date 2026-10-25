@@ -1,5 +1,27 @@
 # Журнал архитектурных решений
 
+## ADR-154 — Локальный MCP companion и команды редактора
+
+**Статус:** accepted (2026-10-25); заменяет ADR-011 в части внешнего MCP preview,
+дополняет ADR-115 отдельным console companion, не меняя GUI subsystem приложения.
+
+**Основание:** stdio принадлежит запущенному клиентом процессу; живой документ,
+EditorCommand и renderer принадлежат existing WebView. Прямое редактирование SQLite
+обходит Undo и конфликтует с autosave. Windows GUI binary не является stdio server.
+Стандартный MCP ImageContent требует base64; владелец явно согласовал исключение.
+
+**Решение:** Rust companion на rmcp → authenticated loopback binary bridge →
+typed main-WebView dispatcher → DocumentSessionController. Один видимый документ,
+atomic command batches, отдельный state epoch (Undo возвращает прежний core token),
+bounded request deduplication. Незавершённые пользовательские gestures не коммитятся.
+Внутренние изображения идут binary; только уменьшенный MCP preview кодируется base64
+в companion. История и originals остаются локальными; отправкой модели управляет клиент.
+Opt-in, отдельные отзываемые ключи клиентов, без JS eval/произвольного invoke.
+
+**Проверка:** failing-first core/transport tests, session conflict/Undo tests,
+production native flow и повторно decoded PNG; packaged/client/platform результаты
+фиксируются отдельно и не выводятся из unit pass.
+
 ## ADR-153 — Настраиваемая панель Quick Capture
 
 **Статус:** accepted (2026-10-25); дополняет ADR-043 и ADR-126.
@@ -1753,7 +1775,7 @@ Windows evidence не распространяется на WebKitGTK/WKWebView.
 
 ## ADR-011 — Бинарные изображения вне JSON IPC
 
-**Статус:** accepted
+**Статус:** superseded — заменён ADR-154; binary IPC сохраняется, добавлено только внешнее MCP preview.
 
 **Решение:** primary transport — scoped asset URL; fallback — binary IPC/Blob URL. Base64 запрещён. Долгие операции используют Channel API.
 

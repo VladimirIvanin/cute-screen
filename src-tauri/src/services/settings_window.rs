@@ -13,6 +13,13 @@ pub fn open_history<R: Runtime>(app: &tauri::AppHandle<R>) -> Result<(), String>
     open_query(app, "index.html?settings=history")
 }
 
+pub fn open_agents<R: Runtime>(app: &tauri::AppHandle<R>) -> Result<(), String> {
+    use tauri::Emitter;
+    open_query(app, "index.html?settings=agents")?;
+    app.emit_to("settings", "cute-screen:settings-section", "agents")
+        .map_err(|e| e.to_string())
+}
+
 fn settings_query(first_run: bool, shortcuts: bool) -> &'static str {
     if first_run {
         "index.html?settings=shortcuts&firstRun=1"

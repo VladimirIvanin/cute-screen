@@ -40,6 +40,7 @@ export const config: WebdriverIO.Config = {
   specs: ['./specs/tauri-*.e2e.ts'],
   maxInstances: 1,
   logLevel: 'info',
+  ...(scenarioId.startsWith('mcp') ? { maskingPatterns: '/[a-f0-9]{64}/g' } : {}),
   outputDir,
   services: [
     [

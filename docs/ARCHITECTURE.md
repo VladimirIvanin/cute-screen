@@ -1,5 +1,16 @@
 # Архитектура Cute Screen
 
+## Локальный MCP (ADR-154)
+
+Отдельный `cute-screen-mcp` на rmcp общается с клиентом по stdio и с host по
+framed binary loopback TCP. Opt-in и отдельные ключи клиентов проверяются до
+доступа к данным и перед исполнением queued WebView request. Main WebView владеет
+единственной видимой DocumentSession; typed edits используют core factories,
+atomic EditorCommand batch и общий renderer. Agent state epoch отличается от
+core undo token. Явный document space исключает зависимость от выбранной UI-зоны.
+Изображения остаются binary внутри; только уменьшенный MCP preview — ImageContent.
+Контракт и workflow: [MCP.md](MCP.md).
+
 ## Панель Quick Capture (ADR-153)
 
 `quickHiddenTools` в UI preferences хранит исключения; `quickToolOrder` хранит

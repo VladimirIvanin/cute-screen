@@ -29,6 +29,7 @@ import {
   IconArrowForwardUp,
   IconArrowUpRight,
   IconCamera,
+  IconRobot,
   IconCheck,
   IconChevronDown,
   IconCircleNumber1,
@@ -108,6 +109,7 @@ const icons = {
 
   arrow: IconArrowUpRight,
   camera: IconCamera,
+  agent: IconRobot,
   callout: createCustomIcon('callout', calloutGeometry),
   check: IconCheck,
   close: IconX,

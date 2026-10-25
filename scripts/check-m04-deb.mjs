@@ -2,7 +2,10 @@ import { execFileSync } from 'node:child_process'
 import {
   existsSync,
   readdirSync,
+  mkdtempSync,
+  rmSync,
 } from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
 
@@ -47,6 +50,14 @@ for (const forbidden of ['m01-platform-smoke', 'm04-platform-smoke']) {
   if (contents.includes(forbidden)) {
     throw new Error(`test-only executable leaked into deb artifact: ${forbidden}`)
   }
+}
+
+const extracted = mkdtempSync(path.join(tmpdir(), 'cute-screen-deb-mcp-'))
+try {
+  execFileSync('dpkg-deb', ['--extract', artifact, extracted])
+  execFileSync(path.join(extracted, 'usr/bin/cute-screen-mcp'), ['--self-check'], { timeout: 10000 })
+} finally {
+  rmSync(extracted, { recursive: true, force: true })
 }
 
 console.log(`M04 deb artifact verified: ${path.relative(root, artifact)}`)

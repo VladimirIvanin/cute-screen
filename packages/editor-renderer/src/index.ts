@@ -461,3 +461,9 @@ export {
   snapFrameResizePoint,
   type FrameMoveSnapState,
 } from '@cute-screen/editor-core'
+
+export {
+  createAgentEditCommand,
+  type AgentEdit,
+} from '@cute-screen/editor-core'
+export type { Rect } from '@cute-screen/editor-core'

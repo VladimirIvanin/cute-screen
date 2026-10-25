@@ -18,6 +18,8 @@ import {
   createBrowserPreferencesStorage,
   useEditorShellStore,
 } from '@cute-screen/editor-vue'
+import AgentSettings from './settings/AgentSettings.vue'
+import { listenAgentSettings } from './platform/tauri/agent-settings-adapter'
 import QuickToolsSettings from './settings/QuickToolsSettings.vue'
 import GeneralSettings from './settings/GeneralSettings.vue'
 import AppVersion from './settings/AppVersion.vue'
@@ -62,12 +64,18 @@ const closeLabel = computed(() => {
   return snapshot.value?.setupCompleted ? labels.value.close : labels.value.finish
 })
 const requestedSection = query.get('settings') ?? 'general'
-const section = ref(['quick-tools', 'history', 'shortcuts'].includes(requestedSection) ? requestedSection : 'general')
+const section = ref(['quick-tools', 'history', 'shortcuts', 'agents'].includes(requestedSection) ? requestedSection : 'general')
+let unlistenAgents: (() => void) | undefined
 let unlistenHistory: (() => void) | undefined
 let disposedHistory = false
 onMounted(async () => {
   themeMedia.addEventListener('change', onSystemThemeChange)
   if (!('__TAURI_INTERNALS__' in window)) return
+  const stopAgents = await listenAgentSettings(() => {
+    void navigate('agents')
+  })
+  if (disposedHistory) stopAgents()
+  else unlistenAgents = stopAgents
   const cleanup = await listenHistorySettings(() => {
     void navigate('history')
   })
@@ -78,6 +86,7 @@ onBeforeUnmount(() => {
   themeMedia.removeEventListener('change', onSystemThemeChange)
   disposedHistory = true
   unlistenHistory?.()
+  unlistenAgents?.()
 })
 
 async function confirmStartup(enabled: boolean): Promise<void> {
@@ -161,6 +170,13 @@ useSettingsRuntime(bridge, state, cancelEditing)
           {{ locale === 'ru' ? 'История и хранение' : 'History and storage' }}
         </button>
         <button
+          :aria-current="section === 'agents' ? 'page' : undefined"
+          :disabled="busy || startupStep"
+          @click="navigate('agents')"
+        >
+          {{ locale === 'ru' ? 'Агенты / MCP' : 'Agents / MCP' }}
+        </button>
+        <button
           :aria-current="section === 'shortcuts' ? 'page' : undefined"
           :disabled="busy || startupStep"
           @click="navigate('shortcuts')"
@@ -215,6 +231,7 @@ useSettingsRuntime(bridge, state, cancelEditing)
           />
           <QuickToolsSettings v-else-if="section === 'quick-tools'" :locale="locale" />
           <HistorySettings v-else-if="section === 'history'" :locale="locale" />
+          <AgentSettings v-else-if="section === 'agents'" :locale="locale" />
           <ShortcutSettings
             v-else
             :state="state"

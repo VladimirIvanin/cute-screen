@@ -22,6 +22,8 @@ await mkdir(runtimeDirectory, { recursive: true })
 const embeddedWebDriverPort = Number.parseInt(process.env.TAURI_WEBDRIVER_PORT ?? '4445', 10)
 
 const scenarios = [
+  { id: 'mcp', persistenceGroup: 'mcp', spec: 'tests/e2e/specs/tauri-mcp.e2e.ts', harnessQuery: '?m04=1', fakeCapture: true },
+  { id: 'mcp-reopen', persistenceGroup: 'mcp', spec: 'tests/e2e/specs/tauri-mcp-reopen.e2e.ts', harnessQuery: '?m04=1', fakeCapture: true },
   { id: 'frame-snap', spec: 'tests/e2e/specs/tauri-frame-snap.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },
   { id: 'frame-seams', spec: 'tests/e2e/specs/tauri-frame-seams.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },
   { id: 'blur-optimization', spec: 'tests/e2e/specs/tauri-blur-optimization.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },
@@ -547,7 +549,7 @@ try {
   const buildStatus = run(
     process.execPath,
     [
-      path.join(root, 'node_modules', '@tauri-apps', 'cli', 'tauri.js'),
+      path.join(root, 'scripts', 'tauri.mjs'),
       'build',
       '--debug',
       '--no-bundle',
@@ -574,6 +576,8 @@ try {
   temporaryBuildDirectories.push(binaryDirectory)
   const executable = path.join(binaryDirectory, path.basename(builtExecutable))
   await copyFile(builtExecutable, executable)
+  const companionName = process.platform === 'win32' ? 'cute-screen-mcp.exe' : 'cute-screen-mcp'
+  await copyFile(path.join(path.dirname(builtExecutable), companionName), path.join(binaryDirectory, companionName))
   const help = spawnSync(executable, ['--e2e-harness-query=?m04=1', '--startup-check'], {
     encoding: 'utf8',
     windowsHide: true,

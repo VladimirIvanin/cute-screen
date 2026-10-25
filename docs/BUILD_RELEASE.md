@@ -1,5 +1,17 @@
 # CI-сборки и проверка версии через GitHub
 
+## MCP companion (ADR-154)
+
+`pnpm tauri dev/build` — wrapper `scripts/tauri.mjs`: до Tauri собирает companion
+в общем Cargo target, создаёт architecture-suffixed externalBin и подключает
+`tauri.mcp.conf.json`. Без этого overlay прямые Cargo checks не требуют sidecar.
+Native E2E использует тот же wrapper и pin-ит оба freshly built executable.
+Companion наследует workspace version; version bump обновляет его lock entry и
+точную desktop dependency. rmcp 3.7.0 закреплён; license audit/SBOM включают crate.
+AppImage перенаправляет `--mcp-stdio` до GTK/Wayland initialization. Проверка release
+package обязана подтвердить запуск companion из установленного пакета на каждой ОС.
+Подробности: [MCP.md](MCP.md).
+
 ## GTK paint recovery (ADR-149)
 
 Новый Linux adapter использует существующий GTK3 и не добавляет dependencies,

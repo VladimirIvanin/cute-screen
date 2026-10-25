@@ -8,6 +8,7 @@ import {
   ref,
   watch,
 } from 'vue'
+import { createWorkspaceExposure } from '../workspace/exposure'
 import { UiIcon } from '../icon'
 import ActionFeedback from './ActionFeedback.vue'
 import ImageImportFeedback from './ImageImportFeedback.vue'
@@ -140,20 +141,7 @@ function onTextCancelled(): void {
   cancelTextDefaults()
   selectTool('select')
 }
-defineExpose({
-  prepareNavigation: () => new Promise<{ zoom: number; mode: 'fit' | 'custom' }>((resolve) => {
-    const finish = () => {
-      canvasViewport.value?.applyCropDraft()
-      resolve({ zoom: store.zoom, mode: store.zoomMode })
-    }
-    if (canvasViewport.value) canvasViewport.value.finishTextEditing(finish)
-    else finish()
-  }),
-  restoreZoom: (viewport: { zoom: number; mode: string }) => {
-    store.setZoom(viewport.zoom)
-    if (viewport.mode === 'fit') store.enableFit()
-  },
-})
+defineExpose(createWorkspaceExposure(canvasViewport, store, props))
 </script>
 
 <template>
@@ -189,6 +177,7 @@ defineExpose({
         :capture-unavailable-reason="props.captureUnavailableReason ?? translate('captureUnavailable')"
         :open-image-available="props.openImageAvailable"
         :open-settings="props.openSettings"
+        :connect-agent="props.connectAgent"
         :t="translate"
         @appearance="toggleComposition"
         @canvas-action="onContextAction"

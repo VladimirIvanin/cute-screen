@@ -28,6 +28,7 @@ const props = defineProps(canvasViewportRuntimeProps)
 const emit = defineEmits(canvasViewportRuntimeEmits) as CanvasViewportEmit
 const compositionView = compositionViewport(props, emit)
 const {
+  isAgentBusy,
   startSelectionMove,
   viewportRoot,
   scrollContainer,
@@ -142,6 +143,7 @@ function onContextMenu(event: MouseEvent): void {
   })
 }
 defineExpose({
+  isAgentBusy,
   startSelectionMove,
   imageInsertionTarget,
   focusCanvas,

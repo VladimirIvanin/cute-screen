@@ -267,6 +267,7 @@ pub struct CaptureController {
 
 #[derive(Debug, Default)]
 struct CaptureState {
+    correlation_id: Option<String>,
     active: bool,
     cancel_requested: bool,
 }
@@ -788,9 +789,11 @@ impl CaptureController {
     where
         F: Fn(CaptureProgressState),
     {
-        let Ok(operation) =
-            ActiveOperation::begin(Arc::clone(&self.state), Arc::clone(&self.cancel_signal))
-        else {
+        let Ok(operation) = ActiveOperation::begin(
+            Arc::clone(&self.state),
+            Arc::clone(&self.cancel_signal),
+            &request.correlation_id,
+        ) else {
             return terminal(&request.correlation_id, CaptureTerminalOutcome::Busy, None);
         };
 
@@ -966,13 +969,25 @@ impl CaptureController {
     /// Cancels an active pre-capture delay. Native/portal selectors retain
     /// their own cancellation mechanisms after the backend has been invoked.
     pub fn cancel(&self) -> bool {
+        self.cancel_matching(None)
+    }
+
+    /// A queued MCP cancellation must never cancel a user's different capture.
+    pub fn cancel_request(&self, correlation_id: &str) -> bool {
+        self.cancel_matching(Some(correlation_id))
+    }
+
+    fn cancel_matching(&self, expected: Option<&str>) -> bool {
         if let Some(draft) = self.active_quick_draft() {
+            if expected.is_some_and(|id| id != draft.correlation_id) {
+                return false;
+            }
             return self.cancel_quick_draft(&draft.draft_id);
         }
         let Ok(mut state) = self.state.lock() else {
             return false;
         };
-        if !state.active {
+        if !state.active || expected.is_some_and(|id| state.correlation_id.as_deref() != Some(id)) {
             return false;
         }
         state.cancel_requested = true;
@@ -1465,12 +1480,17 @@ struct ActiveOperation {
 }
 
 impl ActiveOperation {
-    fn begin(state: Arc<Mutex<CaptureState>>, cancel_signal: Arc<AtomicBool>) -> Result<Self, ()> {
+    fn begin(
+        state: Arc<Mutex<CaptureState>>,
+        cancel_signal: Arc<AtomicBool>,
+        correlation_id: &str,
+    ) -> Result<Self, ()> {
         {
             let mut state = state.lock().map_err(|_| ())?;
             if state.active {
                 return Err(());
             }
+            state.correlation_id = Some(correlation_id.into());
             state.active = true;
             state.cancel_requested = false;
             cancel_signal.store(false, Ordering::Release);
@@ -1489,6 +1509,7 @@ impl ActiveOperation {
 impl Drop for ActiveOperation {
     fn drop(&mut self) {
         if let Ok(mut state) = self.state.lock() {
+            state.correlation_id = None;
             state.active = false;
             state.cancel_requested = false;
         }
@@ -1565,11 +1586,14 @@ mod tests {
     fn second_operation_is_busy_until_the_first_is_dropped() {
         let state = Arc::new(Mutex::new(super::CaptureState::default()));
         let cancellation = Arc::new(AtomicBool::new(false));
-        let operation = ActiveOperation::begin(Arc::clone(&state), Arc::clone(&cancellation))
-            .expect("first operation");
-        assert!(ActiveOperation::begin(Arc::clone(&state), Arc::clone(&cancellation)).is_err());
+        let operation =
+            ActiveOperation::begin(Arc::clone(&state), Arc::clone(&cancellation), "test")
+                .expect("first operation");
+        assert!(
+            ActiveOperation::begin(Arc::clone(&state), Arc::clone(&cancellation), "test").is_err()
+        );
         drop(operation);
-        assert!(ActiveOperation::begin(state, cancellation).is_ok());
+        assert!(ActiveOperation::begin(state, cancellation, "test").is_ok());
     }
 
     #[test]
@@ -1687,6 +1711,30 @@ mod tests {
             super::capture_backend_metadata_name(CaptureAction::Screen),
             "macosScreenCapture"
         );
+    }
+
+    #[test]
+    fn scoped_cancel_never_cancels_another_capture() {
+        let root = tempfile::tempdir().expect("root");
+        let repository =
+            LibraryRepository::initialize(root.path(), root.path()).expect("repository");
+        let transport = Arc::new(
+            ImageTransportService::new(root.path().join("transport"), root.path().join("stage"))
+                .expect("transport"),
+        );
+        let controller = CaptureController::new(repository, transport);
+        let operation = ActiveOperation::begin(
+            Arc::clone(&controller.state),
+            Arc::clone(&controller.cancel_signal),
+            "owned",
+        )
+        .expect("operation");
+        assert!(!controller.cancel_request("another"));
+        assert!(!operation.is_cancelled());
+        assert!(controller.cancel_request("owned"));
+        assert!(operation.is_cancelled());
+        drop(operation);
+        assert!(!controller.cancel_request("owned"));
     }
 
     #[test]

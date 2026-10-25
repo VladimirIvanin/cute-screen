@@ -38,6 +38,7 @@ const forwardArrowToolbarChange = (...args: CanvasViewportEmits['arrowToolbarCha
   emit('arrowToolbarChange', ...args)
 
 const exposed: CanvasViewportExpose = {
+  isAgentBusy: () => workspace.value?.isAgentBusy() ?? false,
   startSelectionMove: (event) => workspace.value?.startSelectionMove(event),
   imageInsertionTarget: (point) => workspace.value?.imageInsertionTarget(point),
   focusCanvas: () => workspace.value?.focusCanvas(),

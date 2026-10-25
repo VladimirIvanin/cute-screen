@@ -22,6 +22,7 @@ const props = defineProps<{
   locale: SupportedLocale
   theme: ThemePreference
   canEditCanvas?: boolean
+  connectAgent?: (() => Promise<void>) | undefined
   openSettings?: (() => Promise<void>) | undefined
   t: (key: TranslationKey) => string
 }>()
@@ -60,12 +61,13 @@ function flip(action: 'flipHorizontal' | 'flipVertical'): void {
   close(true)
 }
 
-async function openApplicationSettings(): Promise<void> {
-  if (!props.openSettings || opening.value) return
+async function openApplicationSettings(agent = false): Promise<void> {
+  const action = agent ? props.connectAgent : props.openSettings
+  if (!action || opening.value) return
   opening.value = true
   error.value = undefined
   try {
-    await props.openSettings()
+    await action()
     close()
   } catch (cause) {
     const detail = describeError(cause, '')
@@ -157,12 +159,22 @@ async function openApplicationSettings(): Promise<void> {
       </section>
       <div class="cs-settings-app-link">
         <NButton
+          v-if="connectAgent"
+          text
+          class="cs-agent-overflow"
+          :disabled="opening"
+          @click="openApplicationSettings(true)"
+        >
+          <template #icon><UiIcon name="agent" /></template>
+          {{ locale === 'ru' ? 'Подключить агента' : 'Connect agent' }}
+        </NButton>
+        <NButton
           text
           :loading="opening"
           :disabled="!openSettings || opening"
           :aria-label="opening ? t('settingsOpening') : t('applicationSettings')"
           :aria-describedby="!openSettings ? `${id}-unavailable` : undefined"
-          @click="openApplicationSettings"
+          @click="openApplicationSettings(false)"
         >
           {{ opening ? t('settingsOpening') : t('applicationSettings') }}
         </NButton>

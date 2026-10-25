@@ -1,5 +1,88 @@
 # Стратегия тестирования
 
+## Каталог MCP-клиентов (2026-10-25)
+
+Linux x86_64 / WebKitGTK 2.52.6, baseline `c2a26cb` + working tree.
+Профилей 15: прежние 6, Claude Desktop, VS Code/Copilot, Gemini CLI, Windsurf/Cascade,
+Cline, Roo Code, Zed, Continue и ручной stdio. Официальные источники и форматы — MCP.md.
+
+- `cargo test --offline -p cute-screen-desktop --lib mcp::tests`: 7 passed.
+  Новые contracts сначала дали 3 failures, после реализации прошли: JSON roots,
+  YAML metadata/scalars, Unicode/Windows paths, args boundaries, unknown-client rejection.
+- `pnpm exec vitest run --project vue tests/unit/vue/agent-settings.test.ts`:
+  4 passed; все 15 профилей меняют формат/инструкцию, скрывают предыдущий config и
+  передают выбранный client в bridge; RU OpenCode и error/retry сохранены.
+- `pnpm typecheck`, targeted ESLint и
+  `cargo clippy --offline -p cute-screen-desktop --lib -- -D warnings`: passed.
+- `CUTE_SCREEN_E2E_SCENARIOS=mcp CUTE_SCREEN_E2E_DRIVER_PROVIDER=embedded pnpm test:e2e:tauri`:
+  4 passed, fresh GUI/companion. Каждый из 15 профилей сгенерирован через production
+  Settings, затем разобран тестовым клиентом и использован для stdio initialize →
+  get_status; ключ отозван. Также прошли 4K import/edit/preview/Undo/export, capture,
+  cancel и singleton narrow navigation. Profile screenshots просмотрены при 820×720
+  в dark theme; они сняты после отзыва ключа и скрытия config.
+
+Embedded WebDriver 1.3.0 реализует option click как `el.click()` и не меняет native
+select. После двух диагностических failures тест использует DOM input/change на
+реальном select, вызывая production Vue handler; external provider сохраняет штатный
+WebDriver selection. Это проверка конфигурационного flow в WebView, а не доказательство
+trusted OS keyboard interaction. Сессии в самих 14 клиентских приложениях и их моделях,
+Windows/macOS runtime не запускались. Новых зависимостей нет.
+Evidence: `artifacts/mcp-client-profiles-2026-10-25/`.
+
+## MCP для локальных агентов (2026-10-25, ADR-154)
+
+Baseline `c2a26cb6925602138b6bbf3442c50510cefb6837`, рабочая копия.
+Ubuntu 24.04.5 x86_64 / Linux 6.8.0-147 / WebKitGTK 2.52.6 /
+Node 22.23.1 / pnpm 10.33.2 / Rust 1.97.0. Evidence:
+`artifacts/mcp-2026-10-25/`; raw credentials и appData туда не копируются.
+
+- `pnpm check`: passed; lint, typecheck, formatting, docs, boundaries, generated schemas/IPC
+  и workspace Clippy. Существующие Vue lint warnings не объявляются новыми ошибками.
+- `pnpm test`: 183 файла, 1642 tests passed. Новые core/session tests проверяют
+  все семейства фабрик, atomic batch, crop→ruler update, Undo/Redo state epoch,
+  повтор requestId, busy, save failure и независимость от UI card space.
+- `pnpm test:render`: 30 файлов, 87 tests passed; Canvas2D/CanvasKit и decoded PNG.
+- `cargo test --workspace`: desktop 181 + main 1, storage 33, MCP framing 2 и
+  real stdio initialize/discovery 1 passed. Scoped cancellation сначала failed,
+  после исправления не отменяет capture с другим correlation ID.
+- `CUTE_SCREEN_E2E_SCENARIOS=mcp,mcp-reopen CUTE_SCREEN_E2E_DRIVER_PROVIDER=embedded pnpm test:e2e:tauri`:
+  реальный WebKitGTK, freshly built/pinned GUI и companion. MCP scenario 3 tests,
+  reopen 1 test passed. Конфиг получен из Settings; 4K import → текст/стрелка/crop →
+  dedup/conflict → preview → Undo/Redo → decoded export; overwrite rejected,
+  SHA-256 оригинала не изменился. Native jobs: delay cancellation и screen capture,
+  переключение истории, region preview; затем полный restart и production restore.
+  На 1024 px вход в overflow переключает уже открытые General Settings на Agents.
+  Снимки экрана проверены визуально. Capture backend здесь fake-platform;
+  физические XDG/GNOME/macOS/Windows capture не заявляются этим прогоном.
+- `pnpm test:e2e:browser --spec tests/e2e/specs/browser-activation-settings.e2e.ts`:
+  Chrome 154, 2 tests passed; обе локали, темы и размеры Settings.
+- `cargo check -p cute-screen-mcp --target x86_64-pc-windows-msvc`: passed;
+  это cross-check console companion, не Windows GUI/runtime/package pass.
+- `cargo deny check licenses`: licenses ok. rmcp 3.7.0 Apache-2.0 разрешён политикой.
+- `pnpm tauri build --debug --no-bundle`: production debug GUI и companion собраны.
+  `target/debug/cute-screen --startup-check`, `target/debug/cute-screen-mcp --self-check`
+  и `target/debug/cute-screen --mcp-stdio --self-check`: exit 0, без открытия GUI.
+- `pnpm mcp:schema:check`, `pnpm format`, `cargo fmt --all`, `git diff --check`:
+  выполнены. Schema generator использует repository Prettier config, а не defaults.
+
+Устранены найденные в native/tests сбои: преждевременный cancel_job, зависимость
+агентских координат от активной UI-зоны, несовпадение crop/ruler preflight с
+CommandManager. Test-driver masking скрывает ephemeral MCP keys; выбранные
+screenshots не показывают конфигурацию с ключом.
+
+**Не проверено:** установленные DEB/AppImage и Windows/macOS packages,
+macOS universal runtime, cold autostart через установленный пакет и реальные
+LLM-driven подключения всех пяти клиентов. Форматы пяти конфигураций проверены
+Rust-тестом, стандартный MCP — реальным stdio клиентом; это не заменяет client smoke.
+Release gates запускают packaged companion/self-check, включая AppImage dispatch
+и обе архитектуры macOS. Полный release build ради UI не выполнялся.
+
+Диск до задачи: target 131.738 GiB, artifacts 61.321 GiB. Промежуточно:
+target 142.208 GiB, artifacts 62.031 GiB. Общий Cargo cache сохранён; отдельный
+CARGO_HOME/target не создавался. Финально: target 147.420 GiB, artifacts 61.326 GiB. Удалены четыре собственных
+диагностированных inactive failed profiles (156802758 bytes) и заменённые failure
+screenshots; общий полезный cache и чужие artifacts сохранены.
+
 ## Бамп версии 0.1.15 (2026-10-25)
 
 Ubuntu 24.04.5 x86_64, baseline `1438e76`, рабочая копия.
@@ -10462,3 +10545,16 @@ pnpm test:e2e:tauri` — 2 scenarios / 2 tests passed (`tauri-complete.log`).
 shape-paint вне шрифтовых тестов; `pnpm check` имеет описанный ratchet timeout.
 Профильные шрифты, browser и native проверки прошли. Windows/macOS для этого
 изменения не запускались. Схема документа и IPC этим расширением не менялись.
+
+## OpenCode MCP profile — 2026-10-25
+
+Linux x86_64, baseline `c2a26cb` + working tree. Новый Rust contract test сначала
+упал (`type` = null), затем прошёл после добавления OpenCode JSON `mcp` profile.
+`cargo test --offline -p cute-screen-desktop --lib mcp::tests` — 5 passed;
+`pnpm exec vitest run --project vue tests/unit/vue/agent-settings.test.ts` — 3 passed.
+`pnpm exec vue-tsc --noEmit -p apps/desktop/tsconfig.json` и targeted ESLint — passed.
+Проверены command array, пути с пробелами/Unicode, environment, enabled и выбор
+OpenCode в RU settings. Формат сверён с официальной стабильной документацией
+<https://opencode.ai/docs/en/mcp-servers/>. Реальный OpenCode/runtime smoke и
+платформы Windows/macOS для этого профиля не запускались. Логи:
+`artifacts/opencode-2026-10-25/`.

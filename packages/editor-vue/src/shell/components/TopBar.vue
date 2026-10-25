@@ -9,6 +9,7 @@ import {
   NButton,
   NTooltip,
 } from 'naive-ui'
+import { describeError } from '../../document-session'
 import { UiIcon } from '../icon'
 import EditorSettingsPopover from './EditorSettingsPopover.vue'
 import BrandMark from '../assets/BrandMark.vue'
@@ -34,6 +35,7 @@ const props = withDefaults(
     captureAvailable?: boolean
     captureUnavailableReason?: string | undefined
     openImageAvailable?: boolean
+    connectAgent?: (() => Promise<void>) | undefined
     openSettings?: (() => Promise<void>) | undefined
     t: (key: Parameters<typeof import('../i18n').t>[1]) => string
   }>(),
@@ -70,6 +72,20 @@ const captureTitle = computed(() =>
   props.captureAvailable ? props.t('capture') : (props.captureUnavailableReason ?? props.t('captureUnavailable')))
 const openImageTitle = computed(() =>
   props.openImageAvailable ? props.t('openImage') : props.t('openImageUnavailable'))
+const agentError = ref('')
+const openingAgent = ref(false)
+async function openAgent(): Promise<void> {
+  if (openingAgent.value) return
+  openingAgent.value = true
+  agentError.value = ''
+  try {
+    await props.connectAgent?.()
+  } catch (error) {
+    agentError.value = describeError(error, props.t('settingsOpenFailed'))
+  } finally {
+    openingAgent.value = false
+  }
+}
 </script>
 
 <template>
@@ -209,11 +225,23 @@ const openImageTitle = computed(() =>
         </template>
         {{ canCopyOrExport ? t('copy') : t('copyUnavailable') }}
       </NTooltip>
+      <NButton
+        v-if="connectAgent"
+        secondary
+        class="cs-button cs-agent-connect"
+        :loading="openingAgent"
+        :disabled="pending || openingAgent"
+        @click="openAgent"
+      >
+        <UiIcon name="agent" /><span>{{ locale === 'ru' ? 'Подключить агента' : 'Connect agent' }}</span>
+      </NButton>
+      <span v-if="agentError" role="alert">{{ agentError }}</span>
       <EditorSettingsPopover
         :locale="locale"
         :theme="theme"
         :can-edit-canvas="canEditCanvas"
         :open-settings="openSettings"
+        :connect-agent="connectAgent"
         :t="t"
         @canvas-action="emit('canvasAction', $event)"
         @locale="emit('locale', $event)"

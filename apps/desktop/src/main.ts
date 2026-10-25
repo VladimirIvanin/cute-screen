@@ -40,7 +40,7 @@ if (isDesktopRuntime()) {
 const isM01Harness = import.meta.env.VITE_M01_HARNESS === 'true' && harnessParams.get('m01') === '1'
 
 const isQuickCapture = new URLSearchParams(window.location.search).get('quickCapture') === '1'
-const isSettings = ['shortcuts', 'general', 'history', 'quick-tools'].includes(new URLSearchParams(window.location.search).get('settings') ?? '')
+const isSettings = ['shortcuts', 'general', 'history', 'quick-tools', 'agents'].includes(new URLSearchParams(window.location.search).get('settings') ?? '')
 const Root = import.meta.env.VITE_TEST_HARNESS === 'true' && harnessParams.get('historyHarness') === '1'
   ? (await import('./HistoryHarness.vue')).default
   : isM01Harness

@@ -1,5 +1,7 @@
 #[path = "services/materials.rs"]
 mod materials;
+#[path = "services/mcp/mod.rs"]
+pub mod mcp;
 use materials::{materials_list, materials_put, materials_remove};
 #[cfg(any(test, feature = "test-harness"))]
 mod e2e_paths;
@@ -2335,6 +2337,9 @@ fn publish_capture_progress<R: tauri::Runtime>(
     correlation_id: &str,
     state: CaptureProgressState,
 ) {
+    if let Some(service) = app.try_state::<Arc<mcp::McpService>>() {
+        service.progress(correlation_id, state);
+    }
     if state == CaptureProgressState::QuickEditing {
         let preparation = ensure_quick_capture_window(app).and_then(|()| {
             app.get_webview_window("quick-capture")
@@ -2862,6 +2867,10 @@ pub fn run() {
             app.manage(QuickSaveTargetService::default());
             app.manage(ResultExportService::new(application_directories(app)?.0));
             app.manage(DroppedImages::default());
+            app.manage(mcp::McpService::start(
+                app.handle(),
+                application_directories(app)?.0,
+            )?);
             app.manage(CaptureDiagnosticsService::default());
 
             if should_prewarm_quick_capture_at_startup(
@@ -3018,6 +3027,16 @@ pub fn run() {
         history_write_thumbnail,
         image_release,
         settings_open_history,
+        mcp::settings_open_agents,
+        mcp::settings::mcp_settings,
+        mcp::settings::mcp_configure,
+        mcp::settings::mcp_create_connection,
+        mcp::settings::mcp_revoke,
+        mcp::settings::mcp_check,
+        mcp::mcp_editor_ready,
+        mcp::mcp_claim,
+        mcp::mcp_reply,
+        mcp::mcp_reply_bytes,
         repository_open_last,
         repository_list_active_series_frames,
         repository_save_document,
@@ -3103,6 +3122,16 @@ pub fn run() {
         history_write_thumbnail,
         image_release,
         settings_open_history,
+        mcp::settings_open_agents,
+        mcp::settings::mcp_settings,
+        mcp::settings::mcp_configure,
+        mcp::settings::mcp_create_connection,
+        mcp::settings::mcp_revoke,
+        mcp::settings::mcp_check,
+        mcp::mcp_editor_ready,
+        mcp::mcp_claim,
+        mcp::mcp_reply,
+        mcp::mcp_reply_bytes,
         repository_open_last,
         repository_list_active_series_frames,
         repository_save_document,
@@ -3138,7 +3167,15 @@ pub fn run() {
             std::path::Path::new(&profile),
         );
     }
-    let outcome = builder.run(context);
+    let outcome = builder.build(context).map(|application| {
+        application.run(|handle, event| {
+            if matches!(event, tauri::RunEvent::Exit)
+                && let Some(service) = handle.try_state::<Arc<mcp::McpService>>()
+            {
+                service.stop();
+            }
+        });
+    });
     clipboard::release_native_clipboard();
     if let Err(error) = outcome {
         eprintln!("cute-screen startup failed: {error}");

@@ -163,3 +163,14 @@ export {
   quickToolCatalog,
   orderQuickTools,
 } from './shell/tools/catalog'
+
+export {
+  createAgentEditCommand,
+  type AgentEdit,
+  type Rect,
+} from '@cute-screen/editor-renderer'
+export { resolveCompositionLayout } from '@cute-screen/editor-renderer'
+export {
+  searchEmoji,
+  emojiReference,
+} from '@cute-screen/editor-renderer'

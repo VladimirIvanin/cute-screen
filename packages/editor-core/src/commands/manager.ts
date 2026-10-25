@@ -164,7 +164,7 @@ export class CommandManager {
 }
 
 /** Record both geometries in the crop command, including locked/hidden rulers. */
-function prepareCropRulers(
+export function prepareCropRulers(
   document: EditorDocumentV1,
   command: EditorCommand,
 ): EditorCommand {

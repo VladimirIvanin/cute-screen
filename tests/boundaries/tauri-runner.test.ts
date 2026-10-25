@@ -32,6 +32,8 @@ describe('Tauri E2E build failure boundary', () => {
         "appendFileSync(process.env.CUTE_SCREEN_RUNNER_LOG, 'tauri ' + process.argv.slice(2).join(' ') + '\\n')",
         'process.exit(42)',
       ].join('\n'))
+      await mkdir(path.join(directory, 'scripts'), { recursive: true })
+      await writeFile(path.join(directory, 'scripts', 'tauri.mjs'), "import '../node_modules/@tauri-apps/cli/tauri.js'\n")
       const result = spawnSync(process.execPath, [path.resolve('scripts/run-tauri-e2e.mjs')], {
         cwd: directory,
         env: {

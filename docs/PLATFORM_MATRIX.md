@@ -1,5 +1,19 @@
 # Платформенная матрица
 
+## MCP companion (ADR-154)
+
+Транспорт локальный, без требований к shell, Node.js или Python. Для всех build
+architectures пакет включает console companion; GUI subsystem Windows сохраняется.
+AppImage использует `--mcp-stdio`, macOS universal — universal sidecar.
+Платформенные возможности capture не расширяются MCP. Linux native и decoded PNG
+проверяются отдельным сценарием; Windows/macOS package/runtime и реальные
+клиентов требуют собственных smoke evidence и не следуют из Linux pass.
+
+Каталог 15 профилей: Linux/WebKitGTK — production Settings → генерация каждого
+JSON/TOML/YAML/stdio блока → real companion initialize/get_status через тестовый
+stdio-клиент — passed (4 native scenarios, TESTING.md). Сами приложения клиентов,
+их модели и Windows/macOS runtime этим прогоном не покрыты.
+
 ## Настройка Quick toolbar (ADR-153, 2026-10-25)
 
 Изменение Vue UI и существующих UI preferences; native API и IPC schema

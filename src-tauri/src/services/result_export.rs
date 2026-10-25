@@ -118,7 +118,10 @@ pub async fn result_write_png(
     Ok(())
 }
 
-fn validate_destination(destination: &Path, library_root: &Path) -> Result<(), RepositoryError> {
+pub(crate) fn validate_destination(
+    destination: &Path,
+    library_root: &Path,
+) -> Result<(), RepositoryError> {
     let canonical = if destination.exists() {
         destination.canonicalize()?
     } else {
@@ -153,7 +156,7 @@ fn write_result_png(
     decode_png(&std::fs::read(destination)?)
 }
 
-fn decode_png(bytes: &[u8]) -> Result<(), RepositoryError> {
+pub(crate) fn decode_png(bytes: &[u8]) -> Result<(), RepositoryError> {
     let mut reader = png::Decoder::new(std::io::Cursor::new(bytes))
         .read_info()
         .map_err(|_| RepositoryError::InvalidImage)?;

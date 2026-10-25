@@ -1,5 +1,23 @@
 # Продуктовый контракт
 
+## Локальные агенты (ADR-154)
+
+- `REQ-MCP-001` — «Подключить агента» открывает singleton Settings → Агенты / MCP;
+  opt-in, RU/EN, конфигурации Codex/Claude Code/Claude Desktop/Cursor/ZCode/GigaCode/OpenCode,
+  VS Code/Copilot, Gemini CLI, Cline, Roo Code, Zed, Continue и Windsurf/Cascade;
+  универсальный stdio-профиль. Форматы JSON/TOML/YAML, место вставки и инструкция
+  соответствуют клиенту; copy, status и revoke. Конфиги автоматически не изменяются.
+- `REQ-MCP-002` — отдельный stdio companion использует authenticated loopback bridge;
+  ключ на клиента, ограниченные payload/timeouts, stdout только MCP, background autostart.
+- `REQ-MCP-003` — агент читает историю страницами, импортирует изображения,
+  открывает документ и запускает штатный capture с jobs/cancel и platform capabilities.
+- `REQ-MCP-004` — пакет типизированных правок атомарен, проходит EditorCommand,
+  отменяется одним Undo; stale state token и transient editing возвращают conflict/busy.
+- `REQ-MCP-005` — preview committed snapshot до 1536 px или заданной области;
+  binary IPC сохраняется. Только уменьшенный MCP ImageContent допускает base64.
+- `REQ-MCP-006` — PNG export атомарен, декодируется повторно, не заменяет
+  существующие файлы, originals и файлы библиотеки.
+
 ## Панель быстрого режима
 
 - `REQ-UI-017` — отдельный раздел настроек позволяет перетаскивать инструменты

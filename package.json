@@ -25,12 +25,12 @@
     "build:linux:dev": "bash scripts/build-linux-dev.sh",
     "start:linux:dev": "bash scripts/run-linux-dev.sh",
     "check:linux:compat": "bash scripts/check-linux-compat.sh",
-    "tauri": "node node_modules/@tauri-apps/cli/tauri.js",
+    "tauri": "node scripts/tauri.mjs",
     "icons:generate": "node scripts/generate-brand-assets.mjs",
     "icons:landing": "node scripts/generate-landing-icons.mjs",
     "artwork:github": "node scripts/generate-github-artwork.mjs",
     "icons:preview": "vite --config apps/desktop/vite.config.ts",
-    "check": "pnpm lint && pnpm typecheck && pnpm format:check && pnpm docs:check && pnpm test:boundaries && pnpm ipc:check && pnpm check:rust",
+    "check": "pnpm lint && pnpm typecheck && pnpm format:check && pnpm docs:check && pnpm test:boundaries && pnpm mcp:schema:check && pnpm ipc:check && pnpm check:rust",
     "ipc:codegen": "cargo run --quiet --features ipc-codegen --bin desktop-ipc-codegen",
     "ipc:check": "cargo run --quiet --features ipc-codegen --bin desktop-ipc-codegen -- --check",
     "check:rust": "pnpm build:frontend && cargo fmt --all --check && cargo clippy --workspace --all-targets --features ipc-codegen -- -D warnings && cargo clippy --workspace --all-targets --features fake-platform,test-harness -- -D warnings && cargo clippy --workspace --all-targets --features x11-capture -- -D warnings && cargo clippy --workspace --lib --bins --all-features -- -D clippy::unwrap_used -D clippy::expect_used",
@@ -75,7 +75,9 @@
     "verify:release-boundary": "node scripts/verify-release-boundary.mjs",
     "licenses": "node scripts/check-js-licenses.mjs",
     "audit:licenses": "pnpm run licenses && pnpm licenses list --prod --long",
-    "audit:security": "pnpm audit --prod --audit-level high"
+    "audit:security": "pnpm audit --prod --audit-level high",
+    "mcp:schema": "node scripts/generate-agent-schema.mjs",
+    "mcp:schema:check": "node scripts/generate-agent-schema.mjs --check"
   },
   "dependencies": {
     "@cute-screen/editor-vue": "workspace:*",

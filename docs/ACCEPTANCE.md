@@ -1,5 +1,18 @@
 # Сквозная приёмка
 
+## Локальный MCP (ADR-154)
+
+Через «Подключить агента» открыть Agents / MCP, включить подключения, скопировать
+конфиг и подключить stdio-клиент. Импортировать 4K PNG, добавить текст/стрелку/crop
+одним пакетом; проверить preview, token conflict, dedup, Undo/Redo, decoded export,
+отказ перезаписи и immutable original. Запустить capture job, отменить delayed
+capture и завершить screen capture. Вернуться к edited history record; перезапустить
+приложение и проверить production restore. Отозвать ключ и проверить отказ.
+Settings уже открыт на General: повторный вход переключает singleton на Agents.
+Проверить ширину 1024, keyboard/focus, RU/EN и обе темы. Все 15 профилей (JSON/TOML/YAML,
+ручной stdio), смена инструкции/формата, скрытие предыдущего секрета и
+packaged sidecar проверяются отдельно на доступных ОС; отсутствующий pass — pending.
+
 ## Настройка панели быстрого режима (REQ-UI-017, ADR-153)
 
 Открыть Settings → «Быстрый режим». Верхняя группа активна, нижняя скрыта;

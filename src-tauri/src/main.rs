@@ -1,6 +1,26 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 fn main() {
+    // AppImage's AppRun forwards arguments here. Dispatch before GTK/Wayland
+    // initialization so stdin/stdout remain the MCP client's pipes.
+    if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("--mcp-stdio")) {
+        let result = std::env::current_exe().and_then(|path| {
+            std::process::Command::new(path.with_file_name(if cfg!(windows) {
+                "cute-screen-mcp.exe"
+            } else {
+                "cute-screen-mcp"
+            }))
+            .args(std::env::args_os().skip(2))
+            .status()
+        });
+        match result {
+            Ok(status) => std::process::exit(status.code().unwrap_or(1)),
+            Err(_) => {
+                eprintln!("Cute Screen MCP companion unavailable");
+                std::process::exit(1);
+            }
+        }
+    }
     #[cfg(target_os = "linux")]
     prefer_native_wayland();
     cute_screen_desktop::run();

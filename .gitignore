@@ -35,3 +35,6 @@ tests/fixtures/generated/
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
+
+# Generated companion binaries prepared by pnpm tauri build/dev
+src-tauri/binaries/

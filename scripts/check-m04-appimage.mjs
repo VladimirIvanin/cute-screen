@@ -30,4 +30,10 @@ for (const expected of ['Usage: cute-screen', 'capture']) {
   }
 }
 
+execFileSync(artifact, ['--mcp-stdio', '--self-check'], {
+  cwd: root,
+  env: { ...process.env, APPIMAGE_EXTRACT_AND_RUN: '1' },
+  timeout: 30000,
+})
+
 console.log(`M04 AppImage artifact verified: ${path.relative(root, artifact)}`)

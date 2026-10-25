@@ -139,6 +139,7 @@ jobs:
         run: |
           pnpm tauri build --bundles nsis -- --locked
           node scripts/check-windows-executable.mjs target/release/cute-screen.exe
+          target/release/cute-screen-mcp.exe --self-check
 
       - name: Build macOS universal DMG
         if: runner.os == 'macOS'
@@ -146,6 +147,8 @@ jobs:
           rustup target add x86_64-apple-darwin aarch64-apple-darwin
           pnpm tauri build --target universal-apple-darwin --bundles app,dmg -- --locked
           lipo "target/universal-apple-darwin/release/bundle/macos/Cute Screen.app/Contents/MacOS/cute-screen" -verify_arch x86_64 arm64
+          lipo "target/universal-apple-darwin/release/bundle/macos/Cute Screen.app/Contents/MacOS/cute-screen-mcp" -verify_arch x86_64 arm64
+          "target/universal-apple-darwin/release/bundle/macos/Cute Screen.app/Contents/MacOS/cute-screen-mcp" --self-check
           target/universal-apple-darwin/release/cute-screen --startup-check
           hdiutil verify target/universal-apple-darwin/release/bundle/dmg/*.dmg
 

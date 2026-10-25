@@ -303,6 +303,7 @@ export interface ShellActionAdapter {
 }
 
 export type IconName =
+  | 'agent'
   | 'objectAlignLeft'
   | 'objectAlignCenterX'
   | 'objectAlignRight'

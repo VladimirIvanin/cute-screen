@@ -25,6 +25,7 @@ export interface EditorShellProps {
   captureWindowAvailable?: boolean
   captureUnavailableReason?: string | undefined
   openImageAvailable?: boolean
+  connectAgent?: (() => Promise<void>) | undefined
   openSettings?: (() => Promise<void>) | undefined
   captureFallbackCommand?: string | undefined
   captureProgress?: CaptureProgressState | undefined
@@ -80,6 +81,7 @@ export const editorShellRuntimeProps = {
     default: undefined,
   },
   openImageAvailable: { type: Boolean, default: false },
+  connectAgent: Function as PropType<EditorShellProps['connectAgent']>,
   openSettings: Function as PropType<EditorShellProps['openSettings']>,
   captureFallbackCommand: {
     type: String as PropType<string | undefined>,

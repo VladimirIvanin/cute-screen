@@ -1,0 +1,1369 @@
+{
+  "operation": { "$ref": "#/$defs/T0" },
+  "$defs": {
+    "T1": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "create" },
+        "tool": { "const": "drawing" },
+        "space": { "$ref": "#/$defs/T2" },
+        "input": { "$ref": "#/$defs/T3" }
+      },
+      "additionalProperties": false,
+      "required": ["type", "tool", "input"]
+    },
+    "T2": { "anyOf": [{ "const": "content" }, { "const": "card" }] },
+    "T3": {
+      "type": "object",
+      "properties": {
+        "sketchSequence": { "$ref": "#/$defs/T4" },
+        "highlighterEffect": { "$ref": "#/$defs/T5" },
+        "tool": { "$ref": "#/$defs/T6" },
+        "start": { "$ref": "#/$defs/T7" },
+        "end": { "$ref": "#/$defs/T7" },
+        "defaults": { "$ref": "#/$defs/T8" },
+        "straightSegments": { "$ref": "#/$defs/T13" },
+        "constrainAngle": { "type": "boolean" },
+        "drawFromCenter": { "type": "boolean" },
+        "points": { "$ref": "#/$defs/T16" }
+      },
+      "additionalProperties": false,
+      "required": ["tool", "start", "end"]
+    },
+    "T4": { "anyOf": [{ "type": "number" }] },
+    "T5": { "anyOf": [{ "const": "highlight" }, { "const": "illuminate" }, { "const": "veil" }] },
+    "T6": {
+      "anyOf": [
+        { "const": "arrow" },
+        { "const": "line" },
+        { "const": "shape" },
+        { "const": "gradient" },
+        { "const": "pencil" },
+        { "const": "marker" }
+      ]
+    },
+    "T7": {
+      "type": "object",
+      "properties": { "x": { "type": "number" }, "y": { "type": "number" } },
+      "additionalProperties": false,
+      "required": ["x", "y"]
+    },
+    "T9": {
+      "type": "object",
+      "properties": {
+        "gradient": { "$ref": "#/$defs/T10" },
+        "line": { "$ref": "#/$defs/T10" },
+        "arrow": { "$ref": "#/$defs/T10" },
+        "shape": { "$ref": "#/$defs/T10" },
+        "pencil": { "$ref": "#/$defs/T10" },
+        "marker": { "$ref": "#/$defs/T10" }
+      },
+      "additionalProperties": false,
+      "required": ["gradient", "line", "arrow", "shape", "pencil", "marker"]
+    },
+    "T10": { "type": "object", "properties": {}, "additionalProperties": { "$ref": "#/$defs/T11" } },
+    "T12": { "type": "array", "items": { "$ref": "#/$defs/T11" } },
+    "T11": {
+      "anyOf": [
+        { "type": "null" },
+        { "type": "string" },
+        { "type": "number" },
+        { "const": false },
+        { "const": true },
+        { "$ref": "#/$defs/T10" },
+        { "$ref": "#/$defs/T12" }
+      ]
+    },
+    "T8": { "anyOf": [{ "$ref": "#/$defs/T9" }] },
+    "T15": {
+      "type": "object",
+      "properties": { "start": { "type": "number" }, "end": { "type": "number" } },
+      "additionalProperties": { "$ref": "#/$defs/T11" },
+      "required": ["start", "end"]
+    },
+    "T14": { "type": "array", "items": { "$ref": "#/$defs/T15" } },
+    "T13": { "anyOf": [{ "$ref": "#/$defs/T14" }] },
+    "T17": {},
+    "T16": { "type": "array", "items": {} },
+    "T18": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "create" },
+        "tool": { "const": "text" },
+        "space": { "$ref": "#/$defs/T2" },
+        "input": { "$ref": "#/$defs/T19" }
+      },
+      "additionalProperties": false,
+      "required": ["type", "tool", "input"]
+    },
+    "T19": {
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "origin": { "$ref": "#/$defs/T7" },
+        "fontFamily": { "type": "string" },
+        "fontSize": { "type": "number" },
+        "weight": { "$ref": "#/$defs/T20" },
+        "italic": { "type": "boolean" },
+        "strikethrough": { "type": "boolean" },
+        "alignment": { "$ref": "#/$defs/T21" },
+        "listKind": { "$ref": "#/$defs/T22" },
+        "fixedWidth": { "type": "number" },
+        "color": { "$ref": "#/$defs/T23" },
+        "background": { "$ref": "#/$defs/T24" }
+      },
+      "additionalProperties": false,
+      "required": ["text", "origin"]
+    },
+    "T20": {
+      "anyOf": [
+        { "const": 100 },
+        { "const": 200 },
+        { "const": 300 },
+        { "const": 400 },
+        { "const": 500 },
+        { "const": 600 },
+        { "const": 700 },
+        { "const": 800 },
+        { "const": 900 }
+      ]
+    },
+    "T21": { "anyOf": [{ "const": "start" }, { "const": "end" }, { "const": "center" }] },
+    "T22": { "anyOf": [{ "const": "none" }, { "const": "bullet" }] },
+    "T23": {
+      "type": "object",
+      "properties": {
+        "red": { "type": "number" },
+        "green": { "type": "number" },
+        "blue": { "type": "number" },
+        "alpha": { "type": "number" }
+      },
+      "additionalProperties": { "$ref": "#/$defs/T11" },
+      "required": ["red", "green", "blue", "alpha"]
+    },
+    "T25": {
+      "type": "object",
+      "properties": {
+        "color": { "$ref": "#/$defs/T23" },
+        "padding": { "type": "number" },
+        "radius": { "type": "number" }
+      },
+      "additionalProperties": false,
+      "required": ["color", "padding", "radius"]
+    },
+    "T24": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/T25" }] },
+    "T26": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "create" },
+        "tool": { "const": "callout" },
+        "space": { "$ref": "#/$defs/T2" },
+        "input": { "$ref": "#/$defs/T27" }
+      },
+      "additionalProperties": false,
+      "required": ["type", "tool", "input"]
+    },
+    "T27": {
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "fontFamily": { "type": "string" },
+        "color": { "$ref": "#/$defs/T23" },
+        "background": { "$ref": "#/$defs/T24" },
+        "target": { "$ref": "#/$defs/T7" },
+        "label": { "$ref": "#/$defs/T7" },
+        "stroke": { "$ref": "#/$defs/T28" },
+        "route": { "$ref": "#/$defs/T32" },
+        "style": { "$ref": "#/$defs/T43" },
+        "attachment": { "$ref": "#/$defs/T51" }
+      },
+      "additionalProperties": false,
+      "required": ["text", "target", "label"]
+    },
+    "T28": {
+      "type": "object",
+      "properties": {
+        "color": { "$ref": "#/$defs/T23" },
+        "width": { "type": "number" },
+        "style": { "$ref": "#/$defs/T29" },
+        "cap": { "$ref": "#/$defs/T30" },
+        "join": { "$ref": "#/$defs/T31" }
+      },
+      "additionalProperties": { "$ref": "#/$defs/T11" },
+      "required": ["color", "width", "style", "cap", "join"]
+    },
+    "T29": { "anyOf": [{ "const": "solid" }, { "const": "dashed" }, { "const": "dotted" }] },
+    "T30": { "anyOf": [{ "const": "butt" }, { "const": "round" }, { "const": "square" }] },
+    "T31": { "anyOf": [{ "const": "round" }, { "const": "miter" }, { "const": "bevel" }] },
+    "T33": {
+      "type": "object",
+      "properties": { "path": { "const": "elbow" }, "elbow": {} },
+      "additionalProperties": false,
+      "required": ["path", "elbow"]
+    },
+    "T34": {},
+    "T35": {
+      "type": "object",
+      "properties": { "path": { "const": "straight" } },
+      "additionalProperties": false,
+      "required": ["path"]
+    },
+    "T36": {
+      "type": "object",
+      "properties": { "path": { "const": "quadratic" }, "bend": {} },
+      "additionalProperties": false,
+      "required": ["path", "bend"]
+    },
+    "T37": {},
+    "T38": {
+      "type": "object",
+      "properties": { "path": { "const": "corner" }, "axis": { "$ref": "#/$defs/T39" } },
+      "additionalProperties": false,
+      "required": ["path", "axis"]
+    },
+    "T39": { "anyOf": [{ "const": "x" }, { "const": "y" }] },
+    "T40": {
+      "type": "object",
+      "properties": {
+        "path": { "const": "orthogonal" },
+        "points": { "$ref": "#/$defs/T41" },
+        "preset": { "$ref": "#/$defs/T42" },
+        "axis": { "$ref": "#/$defs/T39" }
+      },
+      "additionalProperties": false,
+      "required": ["path", "points", "preset", "axis"]
+    },
+    "T41": { "type": "array", "items": { "$ref": "#/$defs/T37" } },
+    "T42": { "anyOf": [{ "const": "elbow" }, { "const": "corner" }] },
+    "T32": {
+      "anyOf": [
+        { "$ref": "#/$defs/T33" },
+        { "$ref": "#/$defs/T35" },
+        { "$ref": "#/$defs/T36" },
+        { "$ref": "#/$defs/T38" },
+        { "$ref": "#/$defs/T40" }
+      ]
+    },
+    "T44": {
+      "type": "object",
+      "properties": {
+        "frame": { "$ref": "#/$defs/T45" },
+        "route": { "$ref": "#/$defs/T48" },
+        "targetMarker": { "$ref": "#/$defs/T49" },
+        "labelMarker": { "$ref": "#/$defs/T49" },
+        "targetMarkerStyle": { "$ref": "#/$defs/T50" },
+        "labelMarkerStyle": { "$ref": "#/$defs/T50" }
+      },
+      "additionalProperties": false,
+      "required": ["frame", "route", "targetMarker", "labelMarker"]
+    },
+    "T45": {
+      "type": "object",
+      "properties": {
+        "kind": { "$ref": "#/$defs/T46" },
+        "fill": { "$ref": "#/$defs/T23" },
+        "border": { "$ref": "#/$defs/T47" },
+        "padding": { "type": "number" },
+        "radius": { "type": "number" }
+      },
+      "additionalProperties": false,
+      "required": ["kind", "fill", "border", "padding", "radius"]
+    },
+    "T46": {
+      "anyOf": [
+        { "const": "text" },
+        { "const": "card" },
+        { "const": "outline" },
+        { "const": "capsule" },
+        { "const": "accent" }
+      ]
+    },
+    "T47": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/T28" }] },
+    "T48": { "anyOf": [{ "const": "elbow" }, { "const": "straight" }, { "const": "corner" }] },
+    "T49": {
+      "anyOf": [
+        { "const": "none" },
+        { "const": "circle" },
+        { "const": "ring" },
+        { "const": "lineArrow" },
+        { "const": "solidArrow" }
+      ]
+    },
+    "T50": {
+      "type": "object",
+      "properties": { "color": { "$ref": "#/$defs/T23" }, "size": { "type": "number" } },
+      "additionalProperties": false
+    },
+    "T43": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/T44" }] },
+    "T51": {
+      "anyOf": [
+        { "const": "auto" },
+        { "const": "left" },
+        { "const": "right" },
+        { "const": "top" },
+        { "const": "bottom" }
+      ]
+    },
+    "T52": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "create" },
+        "tool": { "const": "numberedMarker" },
+        "space": { "$ref": "#/$defs/T2" },
+        "input": { "$ref": "#/$defs/T53" }
+      },
+      "additionalProperties": false,
+      "required": ["type", "tool", "input"]
+    },
+    "T53": {
+      "type": "object",
+      "properties": {
+        "shape": { "$ref": "#/$defs/T54" },
+        "origin": { "$ref": "#/$defs/T7" },
+        "sequence": { "type": "number" },
+        "badgeColor": { "$ref": "#/$defs/T23" }
+      },
+      "additionalProperties": false,
+      "required": ["origin", "sequence"]
+    },
+    "T54": { "anyOf": [{ "const": "square" }, { "const": "circle" }, { "const": "diamond" }, { "const": "star" }] },
+    "T55": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "create" },
+        "tool": { "const": "image" },
+        "space": { "$ref": "#/$defs/T2" },
+        "input": { "$ref": "#/$defs/T56" }
+      },
+      "additionalProperties": false,
+      "required": ["type", "tool", "input"]
+    },
+    "T56": {
+      "type": "object",
+      "properties": {
+        "origin": { "$ref": "#/$defs/T7" },
+        "blobHash": { "type": "string" },
+        "format": { "$ref": "#/$defs/T57" },
+        "intrinsicWidth": { "type": "number" },
+        "intrinsicHeight": { "type": "number" }
+      },
+      "additionalProperties": false,
+      "required": ["origin", "blobHash", "format", "intrinsicWidth", "intrinsicHeight"]
+    },
+    "T57": { "anyOf": [{ "const": "png" }, { "const": "jpeg" }, { "const": "webp" }, { "const": "svg" }] },
+    "T58": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "create" },
+        "tool": { "const": "emoji" },
+        "space": { "$ref": "#/$defs/T2" },
+        "input": { "$ref": "#/$defs/T59" }
+      },
+      "additionalProperties": false,
+      "required": ["type", "tool", "input"]
+    },
+    "T59": {
+      "type": "object",
+      "properties": {
+        "origin": { "$ref": "#/$defs/T7" },
+        "size": { "type": "number" },
+        "grapheme": { "type": "string" },
+        "asset": { "$ref": "#/$defs/T60" }
+      },
+      "additionalProperties": false,
+      "required": ["origin", "grapheme", "asset"]
+    },
+    "T60": {
+      "type": "object",
+      "properties": {
+        "collection": { "const": "notoEmoji" },
+        "version": { "type": "string" },
+        "assetId": { "type": "string" }
+      },
+      "additionalProperties": { "$ref": "#/$defs/T11" },
+      "required": ["collection", "version", "assetId"]
+    },
+    "T61": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "create" },
+        "tool": { "const": "censor" },
+        "space": { "$ref": "#/$defs/T2" },
+        "input": { "$ref": "#/$defs/T62" }
+      },
+      "additionalProperties": false,
+      "required": ["type", "tool", "input"]
+    },
+    "T62": {
+      "type": "object",
+      "properties": { "region": { "$ref": "#/$defs/T63" }, "effect": { "$ref": "#/$defs/T68" } },
+      "additionalProperties": false,
+      "required": ["region"]
+    },
+    "T64": {
+      "type": "object",
+      "properties": { "kind": { "const": "rectangle" }, "bounds": { "$ref": "#/$defs/T65" } },
+      "additionalProperties": false,
+      "required": ["kind", "bounds"]
+    },
+    "T65": {
+      "type": "object",
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "width": { "type": "number" },
+        "height": { "type": "number" }
+      },
+      "additionalProperties": false,
+      "required": ["x", "y", "width", "height"]
+    },
+    "T66": {
+      "type": "object",
+      "properties": { "kind": { "const": "freeform" }, "points": { "$ref": "#/$defs/T67" } },
+      "additionalProperties": false,
+      "required": ["kind", "points"]
+    },
+    "T67": { "type": "array", "items": { "$ref": "#/$defs/T7" } },
+    "T63": { "anyOf": [{ "$ref": "#/$defs/T64" }, { "$ref": "#/$defs/T66" }] },
+    "T69": {
+      "type": "object",
+      "properties": { "mode": { "const": "pixelate" }, "blockSize": { "type": "number" } },
+      "additionalProperties": false,
+      "required": ["mode", "blockSize"]
+    },
+    "T70": {
+      "type": "object",
+      "properties": { "mode": { "const": "blur" }, "strength": { "type": "number" } },
+      "additionalProperties": false,
+      "required": ["mode", "strength"]
+    },
+    "T71": {
+      "type": "object",
+      "properties": { "mode": { "const": "solid" }, "color": { "$ref": "#/$defs/T23" } },
+      "additionalProperties": false,
+      "required": ["mode", "color"]
+    },
+    "T68": { "anyOf": [{ "$ref": "#/$defs/T69" }, { "$ref": "#/$defs/T70" }, { "$ref": "#/$defs/T71" }] },
+    "T72": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "create" },
+        "tool": { "const": "spotlight" },
+        "space": { "$ref": "#/$defs/T2" },
+        "input": { "$ref": "#/$defs/T73" }
+      },
+      "additionalProperties": false,
+      "required": ["type", "tool", "input"]
+    },
+    "T73": {
+      "type": "object",
+      "properties": {
+        "shape": { "$ref": "#/$defs/T74" },
+        "bounds": { "$ref": "#/$defs/T65" },
+        "dimColor": { "$ref": "#/$defs/T23" },
+        "dimOpacity": { "type": "number" },
+        "feather": { "$ref": "#/$defs/T75" }
+      },
+      "additionalProperties": false,
+      "required": ["bounds"]
+    },
+    "T74": { "anyOf": [{ "const": "diamond" }, { "const": "rectangle" }, { "const": "ellipse" }] },
+    "T75": { "anyOf": [{ "type": "null" }, { "const": "soft" }, { "const": "strong" }] },
+    "T76": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "create" },
+        "tool": { "const": "ruler" },
+        "space": { "$ref": "#/$defs/T2" },
+        "input": { "$ref": "#/$defs/T77" }
+      },
+      "additionalProperties": false,
+      "required": ["type", "tool", "input"]
+    },
+    "T77": {
+      "type": "object",
+      "properties": {
+        "start": { "$ref": "#/$defs/T7" },
+        "end": { "$ref": "#/$defs/T7" },
+        "fontSize": { "type": "number" },
+        "color": { "$ref": "#/$defs/T23" },
+        "canvas": { "$ref": "#/$defs/T78" },
+        "unit": { "$ref": "#/$defs/T79" },
+        "percentBasis": { "$ref": "#/$defs/T80" },
+        "snapAngleIncrementDegrees": { "type": "number" },
+        "thickness": { "type": "number" }
+      },
+      "additionalProperties": false,
+      "required": ["start", "end", "canvas"]
+    },
+    "T78": {
+      "type": "object",
+      "properties": { "width": { "type": "number" }, "height": { "type": "number" } },
+      "additionalProperties": false,
+      "required": ["width", "height"]
+    },
+    "T79": { "anyOf": [{ "const": "pixels" }, { "const": "percent" }] },
+    "T80": { "anyOf": [{ "const": "canvasWidth" }, { "const": "canvasHeight" }, { "const": "canvasDiagonal" }] },
+    "T81": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "create" },
+        "tool": { "const": "loupe" },
+        "space": { "$ref": "#/$defs/T2" },
+        "input": { "$ref": "#/$defs/T82" }
+      },
+      "additionalProperties": false,
+      "required": ["type", "tool", "input"]
+    },
+    "T82": {
+      "type": "object",
+      "properties": {
+        "shape": { "$ref": "#/$defs/T83" },
+        "size": { "type": "number" },
+        "canvas": { "$ref": "#/$defs/T84" },
+        "sourceRegion": { "$ref": "#/$defs/T65" },
+        "destination": { "$ref": "#/$defs/T7" },
+        "zoom": { "type": "number" },
+        "borderColor": { "$ref": "#/$defs/T23" },
+        "borderWidth": { "type": "number" },
+        "shadow": { "$ref": "#/$defs/T85" }
+      },
+      "additionalProperties": false,
+      "required": ["canvas", "sourceRegion", "destination"]
+    },
+    "T83": { "anyOf": [{ "const": "circle" }, { "const": "rectangle" }] },
+    "T84": {
+      "type": "object",
+      "properties": { "width": { "type": "number" }, "height": { "type": "number" } },
+      "additionalProperties": false,
+      "required": ["width", "height"]
+    },
+    "T86": {
+      "type": "object",
+      "properties": {
+        "color": { "$ref": "#/$defs/T23" },
+        "offsetX": { "type": "number" },
+        "offsetY": { "type": "number" },
+        "blur": { "type": "number" }
+      },
+      "additionalProperties": { "$ref": "#/$defs/T11" },
+      "required": ["color", "offsetX", "offsetY", "blur"]
+    },
+    "T85": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/T86" }] },
+    "T87": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "update" },
+        "layerId": { "type": "string" },
+        "changes": { "$ref": "#/$defs/T88" }
+      },
+      "additionalProperties": false,
+      "required": ["type", "layerId", "changes"]
+    },
+    "T89": {
+      "type": "object",
+      "properties": {
+        "payload": { "$ref": "#/$defs/T90" },
+        "space": { "$ref": "#/$defs/T2" },
+        "transform": { "$ref": "#/$defs/T98" },
+        "localBounds": { "$ref": "#/$defs/T65" },
+        "visible": { "type": "boolean" },
+        "locked": { "type": "boolean" },
+        "extras": { "$ref": "#/$defs/T10" }
+      },
+      "additionalProperties": false
+    },
+    "T90": {
+      "type": "object",
+      "properties": { "content": { "$ref": "#/$defs/T91" }, "background": { "$ref": "#/$defs/T24" } },
+      "additionalProperties": false,
+      "required": ["content", "background"]
+    },
+    "T91": {
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "wrap": { "$ref": "#/$defs/T92" },
+        "fixedWidth": { "type": "number" },
+        "spans": { "$ref": "#/$defs/T93" },
+        "paragraphs": { "$ref": "#/$defs/T96" }
+      },
+      "additionalProperties": false,
+      "required": ["text", "wrap", "spans", "paragraphs"]
+    },
+    "T92": { "anyOf": [{ "const": "fixedWidth" }, { "const": "autoSize" }] },
+    "T94": {
+      "type": "object",
+      "properties": {
+        "start": { "type": "number" },
+        "end": { "type": "number" },
+        "fontFamily": { "type": "string" },
+        "fontSize": { "type": "number" },
+        "color": { "$ref": "#/$defs/T23" },
+        "weight": { "$ref": "#/$defs/T95" },
+        "italic": { "type": "boolean" },
+        "strikethrough": { "type": "boolean" }
+      },
+      "additionalProperties": false,
+      "required": ["start", "end", "fontFamily", "fontSize", "color", "weight", "italic", "strikethrough"]
+    },
+    "T95": {
+      "anyOf": [
+        { "const": 100 },
+        { "const": 200 },
+        { "const": 300 },
+        { "const": 400 },
+        { "const": 500 },
+        { "const": 600 },
+        { "const": 700 },
+        { "const": 800 },
+        { "const": 900 }
+      ]
+    },
+    "T93": { "type": "array", "items": { "$ref": "#/$defs/T94" } },
+    "T97": {
+      "type": "object",
+      "properties": {
+        "start": { "type": "number" },
+        "end": { "type": "number" },
+        "alignment": { "$ref": "#/$defs/T21" },
+        "listKind": { "$ref": "#/$defs/T22" }
+      },
+      "additionalProperties": false,
+      "required": ["start", "end", "alignment", "listKind"]
+    },
+    "T96": { "type": "array", "items": { "$ref": "#/$defs/T97" } },
+    "T98": {
+      "type": "object",
+      "properties": {
+        "translateX": { "type": "number" },
+        "translateY": { "type": "number" },
+        "rotation": { "type": "number" },
+        "scaleX": { "type": "number" },
+        "scaleY": { "type": "number" }
+      },
+      "additionalProperties": false,
+      "required": ["translateX", "translateY", "rotation", "scaleX", "scaleY"]
+    },
+    "T99": {
+      "type": "object",
+      "properties": {
+        "payload": { "$ref": "#/$defs/T100" },
+        "space": { "$ref": "#/$defs/T2" },
+        "transform": { "$ref": "#/$defs/T98" },
+        "localBounds": { "$ref": "#/$defs/T65" },
+        "visible": { "type": "boolean" },
+        "locked": { "type": "boolean" },
+        "extras": { "$ref": "#/$defs/T10" }
+      },
+      "additionalProperties": false
+    },
+    "T100": {
+      "type": "object",
+      "properties": {
+        "content": { "$ref": "#/$defs/T91" },
+        "background": { "$ref": "#/$defs/T24" },
+        "target": { "$ref": "#/$defs/T37" },
+        "label": { "$ref": "#/$defs/T37" },
+        "route": { "$ref": "#/$defs/T32" },
+        "stroke": { "$ref": "#/$defs/T28" },
+        "targetMarker": { "$ref": "#/$defs/T49" },
+        "labelMarker": { "$ref": "#/$defs/T49" },
+        "attachment": { "$ref": "#/$defs/T51" },
+        "frame": { "$ref": "#/$defs/T45" },
+        "targetMarkerStyle": { "$ref": "#/$defs/T50" },
+        "labelMarkerStyle": { "$ref": "#/$defs/T50" }
+      },
+      "additionalProperties": false,
+      "required": ["content", "background", "target", "label", "route", "stroke", "targetMarker", "labelMarker"]
+    },
+    "T101": {
+      "type": "object",
+      "properties": {
+        "payload": { "$ref": "#/$defs/T102" },
+        "space": { "$ref": "#/$defs/T2" },
+        "transform": { "$ref": "#/$defs/T98" },
+        "localBounds": { "$ref": "#/$defs/T65" },
+        "visible": { "type": "boolean" },
+        "locked": { "type": "boolean" },
+        "extras": { "$ref": "#/$defs/T10" }
+      },
+      "additionalProperties": false
+    },
+    "T102": {
+      "type": "object",
+      "properties": {
+        "sequence": { "type": "number" },
+        "label": { "$ref": "#/$defs/T91" },
+        "badge": { "$ref": "#/$defs/T103" }
+      },
+      "additionalProperties": false,
+      "required": ["sequence", "label", "badge"]
+    },
+    "T103": {
+      "type": "object",
+      "properties": { "shape": { "$ref": "#/$defs/T54" }, "color": { "$ref": "#/$defs/T23" } },
+      "additionalProperties": false,
+      "required": ["shape", "color"]
+    },
+    "T104": {
+      "type": "object",
+      "properties": {
+        "payload": { "$ref": "#/$defs/T105" },
+        "space": { "$ref": "#/$defs/T2" },
+        "transform": { "$ref": "#/$defs/T98" },
+        "localBounds": { "$ref": "#/$defs/T65" },
+        "visible": { "type": "boolean" },
+        "locked": { "type": "boolean" },
+        "extras": { "$ref": "#/$defs/T10" },
+        "opacity": { "type": "number" },
+        "blendMode": { "$ref": "#/$defs/T108" },
+        "shadows": { "$ref": "#/$defs/T109" }
+      },
+      "additionalProperties": false
+    },
+    "T105": {
+      "type": "object",
+      "properties": {
+        "blobHash": { "type": "string" },
+        "intrinsicWidth": { "type": "number" },
+        "intrinsicHeight": { "type": "number" },
+        "format": { "$ref": "#/$defs/T57" },
+        "orientationApplied": { "const": true },
+        "color": {},
+        "role": { "$ref": "#/$defs/T107" },
+        "border": { "$ref": "#/$defs/T47" },
+        "radius": { "type": "number" },
+        "crop": { "type": "null" },
+        "mask": { "type": "null" }
+      },
+      "additionalProperties": { "$ref": "#/$defs/T11" },
+      "required": ["blobHash", "intrinsicWidth", "intrinsicHeight", "format", "orientationApplied", "color", "role"]
+    },
+    "T106": {},
+    "T107": { "anyOf": [{ "const": "content" }, { "const": "base" }] },
+    "T108": {
+      "anyOf": [
+        { "const": "normal" },
+        { "const": "multiply" },
+        { "const": "screen" },
+        { "const": "overlay" },
+        { "const": "darken" },
+        { "const": "lighten" },
+        { "const": "softLight" },
+        { "const": "hardLight" }
+      ]
+    },
+    "T109": { "type": "array", "items": { "$ref": "#/$defs/T86" } },
+    "T110": {
+      "type": "object",
+      "properties": {
+        "payload": { "$ref": "#/$defs/T111" },
+        "space": { "$ref": "#/$defs/T2" },
+        "transform": { "$ref": "#/$defs/T98" },
+        "localBounds": { "$ref": "#/$defs/T65" },
+        "visible": { "type": "boolean" },
+        "locked": { "type": "boolean" },
+        "extras": { "$ref": "#/$defs/T10" },
+        "opacity": { "type": "number" },
+        "blendMode": { "$ref": "#/$defs/T108" },
+        "shadows": { "$ref": "#/$defs/T109" }
+      },
+      "additionalProperties": false
+    },
+    "T111": {
+      "type": "object",
+      "properties": { "grapheme": { "type": "string" }, "asset": { "$ref": "#/$defs/T60" } },
+      "additionalProperties": { "$ref": "#/$defs/T11" },
+      "required": ["grapheme", "asset"]
+    },
+    "T112": {
+      "type": "object",
+      "properties": {
+        "payload": { "$ref": "#/$defs/T113" },
+        "space": { "$ref": "#/$defs/T2" },
+        "transform": { "$ref": "#/$defs/T98" },
+        "localBounds": { "$ref": "#/$defs/T65" },
+        "visible": { "type": "boolean" },
+        "locked": { "type": "boolean" },
+        "extras": { "$ref": "#/$defs/T10" },
+        "opacity": { "type": "number" },
+        "blendMode": { "$ref": "#/$defs/T108" },
+        "shadows": { "$ref": "#/$defs/T109" }
+      },
+      "additionalProperties": false
+    },
+    "T113": {
+      "type": "object",
+      "properties": {
+        "region": { "$ref": "#/$defs/T114" },
+        "effect": { "$ref": "#/$defs/T117" },
+        "sampleSource": { "const": "compositeBelow" }
+      },
+      "additionalProperties": false,
+      "required": ["region", "effect", "sampleSource"]
+    },
+    "T115": {},
+    "T116": {},
+    "T114": { "anyOf": [{}, {}] },
+    "T118": {},
+    "T119": {},
+    "T120": {},
+    "T117": { "anyOf": [{}, {}, {}] },
+    "T121": {
+      "type": "object",
+      "properties": {
+        "payload": { "$ref": "#/$defs/T122" },
+        "space": { "$ref": "#/$defs/T2" },
+        "transform": { "$ref": "#/$defs/T98" },
+        "localBounds": { "$ref": "#/$defs/T65" },
+        "visible": { "type": "boolean" },
+        "locked": { "type": "boolean" },
+        "extras": { "$ref": "#/$defs/T10" },
+        "opacity": { "type": "number" },
+        "blendMode": { "$ref": "#/$defs/T108" },
+        "shadows": { "$ref": "#/$defs/T109" }
+      },
+      "additionalProperties": false
+    },
+    "T122": {
+      "type": "object",
+      "properties": {
+        "apertures": { "$ref": "#/$defs/T123" },
+        "dimColor": { "$ref": "#/$defs/T23" },
+        "dimOpacity": { "type": "number" },
+        "feather": { "$ref": "#/$defs/T75" }
+      },
+      "additionalProperties": false,
+      "required": ["apertures", "dimColor", "dimOpacity", "feather"]
+    },
+    "T124": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "shape": { "$ref": "#/$defs/T74" },
+        "bounds": { "$ref": "#/$defs/T125" }
+      },
+      "additionalProperties": false,
+      "required": ["id", "shape", "bounds"]
+    },
+    "T125": {
+      "type": "object",
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "width": { "type": "number" },
+        "height": { "type": "number" }
+      },
+      "additionalProperties": false,
+      "required": ["x", "y", "width", "height"]
+    },
+    "T123": { "type": "array", "items": { "$ref": "#/$defs/T124" } },
+    "T126": {
+      "type": "object",
+      "properties": {
+        "payload": { "$ref": "#/$defs/T127" },
+        "space": { "$ref": "#/$defs/T2" },
+        "transform": { "$ref": "#/$defs/T98" },
+        "localBounds": { "$ref": "#/$defs/T65" },
+        "visible": { "type": "boolean" },
+        "locked": { "type": "boolean" },
+        "extras": { "$ref": "#/$defs/T10" },
+        "opacity": { "type": "number" },
+        "blendMode": { "$ref": "#/$defs/T108" },
+        "shadows": { "$ref": "#/$defs/T109" }
+      },
+      "additionalProperties": false
+    },
+    "T127": {
+      "type": "object",
+      "properties": {
+        "start": { "$ref": "#/$defs/T37" },
+        "end": { "$ref": "#/$defs/T37" },
+        "unit": { "$ref": "#/$defs/T79" },
+        "percentBasis": { "$ref": "#/$defs/T80" },
+        "snapAngleIncrementDegrees": { "type": "number" },
+        "color": { "$ref": "#/$defs/T23" },
+        "thickness": { "type": "number" },
+        "fontSize": { "type": "number" }
+      },
+      "additionalProperties": false,
+      "required": [
+        "start",
+        "end",
+        "unit",
+        "percentBasis",
+        "snapAngleIncrementDegrees",
+        "color",
+        "thickness",
+        "fontSize"
+      ]
+    },
+    "T128": {
+      "type": "object",
+      "properties": {
+        "payload": { "$ref": "#/$defs/T129" },
+        "space": { "$ref": "#/$defs/T2" },
+        "transform": { "$ref": "#/$defs/T98" },
+        "localBounds": { "$ref": "#/$defs/T65" },
+        "visible": { "type": "boolean" },
+        "locked": { "type": "boolean" },
+        "extras": { "$ref": "#/$defs/T10" },
+        "opacity": { "type": "number" },
+        "blendMode": { "$ref": "#/$defs/T108" },
+        "shadows": { "$ref": "#/$defs/T109" }
+      },
+      "additionalProperties": false
+    },
+    "T129": {
+      "type": "object",
+      "properties": {
+        "sourceRegion": {},
+        "lens": { "$ref": "#/$defs/T131" },
+        "zoom": { "type": "number" },
+        "border": { "$ref": "#/$defs/T132" },
+        "shadow": { "$ref": "#/$defs/T85" },
+        "sampleSource": { "const": "compositeBelow" }
+      },
+      "additionalProperties": false,
+      "required": ["sourceRegion", "lens", "zoom", "border", "shadow", "sampleSource"]
+    },
+    "T130": {},
+    "T131": {
+      "type": "object",
+      "properties": { "shape": { "$ref": "#/$defs/T83" }, "size": { "type": "number" } },
+      "additionalProperties": { "$ref": "#/$defs/T11" },
+      "required": ["shape", "size"]
+    },
+    "T132": {
+      "type": "object",
+      "properties": { "color": { "$ref": "#/$defs/T23" }, "width": { "type": "number" } },
+      "additionalProperties": { "$ref": "#/$defs/T11" },
+      "required": ["color", "width"]
+    },
+    "T133": {
+      "type": "object",
+      "properties": {
+        "payload": { "$ref": "#/$defs/T134" },
+        "space": { "$ref": "#/$defs/T2" },
+        "transform": { "$ref": "#/$defs/T98" },
+        "localBounds": { "$ref": "#/$defs/T65" },
+        "visible": { "type": "boolean" },
+        "locked": { "type": "boolean" },
+        "extras": { "$ref": "#/$defs/T10" },
+        "opacity": { "type": "number" },
+        "blendMode": { "$ref": "#/$defs/T108" },
+        "shadows": { "$ref": "#/$defs/T109" }
+      },
+      "additionalProperties": false
+    },
+    "T134": {
+      "type": "object",
+      "properties": {
+        "appearance": { "$ref": "#/$defs/T135" },
+        "sketchSeed": { "type": "number" },
+        "sketchVersion": { "const": 1 },
+        "annotationTool": { "const": "line" },
+        "path": { "$ref": "#/$defs/T136" },
+        "start": { "$ref": "#/$defs/T37" },
+        "end": { "$ref": "#/$defs/T37" },
+        "bend": { "$ref": "#/$defs/T37" },
+        "elbow": {},
+        "stroke": { "$ref": "#/$defs/T28" },
+        "startCap": { "$ref": "#/$defs/T138" },
+        "endCap": { "$ref": "#/$defs/T138" }
+      },
+      "additionalProperties": { "$ref": "#/$defs/T11" },
+      "required": ["path", "start", "end", "stroke", "startCap", "endCap"]
+    },
+    "T135": { "anyOf": [{ "const": "clean" }, { "const": "handDrawn" }] },
+    "T136": { "anyOf": [{ "const": "elbow" }, { "const": "straight" }, { "const": "quadratic" }] },
+    "T137": {},
+    "T138": {
+      "anyOf": [
+        { "const": "none" },
+        { "const": "circle" },
+        { "const": "lineArrow" },
+        { "const": "solidArrow" },
+        { "const": "diamond" },
+        { "const": "triangle" }
+      ]
+    },
+    "T139": {
+      "type": "object",
+      "properties": {
+        "payload": { "$ref": "#/$defs/T10" },
+        "space": { "$ref": "#/$defs/T2" },
+        "transform": { "$ref": "#/$defs/T98" },
+        "localBounds": { "$ref": "#/$defs/T65" },
+        "visible": { "type": "boolean" },
+        "locked": { "type": "boolean" },
+        "extras": { "$ref": "#/$defs/T10" },
+        "opacity": { "type": "number" },
+        "blendMode": { "$ref": "#/$defs/T108" },
+        "shadows": { "$ref": "#/$defs/T109" }
+      },
+      "additionalProperties": false
+    },
+    "T140": {
+      "type": "object",
+      "properties": {
+        "payload": { "$ref": "#/$defs/T10" },
+        "space": { "$ref": "#/$defs/T2" },
+        "transform": { "$ref": "#/$defs/T98" },
+        "localBounds": { "$ref": "#/$defs/T65" },
+        "visible": { "type": "boolean" },
+        "locked": { "type": "boolean" },
+        "extras": { "$ref": "#/$defs/T10" },
+        "opacity": { "type": "number" },
+        "blendMode": { "$ref": "#/$defs/T108" },
+        "shadows": { "$ref": "#/$defs/T109" }
+      },
+      "additionalProperties": false
+    },
+    "T141": {
+      "type": "object",
+      "properties": {
+        "payload": { "$ref": "#/$defs/T10" },
+        "space": { "$ref": "#/$defs/T2" },
+        "transform": { "$ref": "#/$defs/T98" },
+        "localBounds": { "$ref": "#/$defs/T65" },
+        "visible": { "type": "boolean" },
+        "locked": { "type": "boolean" },
+        "extras": { "$ref": "#/$defs/T10" },
+        "opacity": { "type": "number" },
+        "blendMode": { "$ref": "#/$defs/T108" },
+        "shadows": { "$ref": "#/$defs/T109" }
+      },
+      "additionalProperties": false
+    },
+    "T88": {
+      "anyOf": [
+        { "$ref": "#/$defs/T89" },
+        { "$ref": "#/$defs/T99" },
+        { "$ref": "#/$defs/T101" },
+        { "$ref": "#/$defs/T104" },
+        { "$ref": "#/$defs/T110" },
+        { "$ref": "#/$defs/T112" },
+        { "$ref": "#/$defs/T121" },
+        { "$ref": "#/$defs/T126" },
+        { "$ref": "#/$defs/T128" },
+        { "$ref": "#/$defs/T133" },
+        { "$ref": "#/$defs/T139" },
+        { "$ref": "#/$defs/T140" },
+        { "$ref": "#/$defs/T141" }
+      ]
+    },
+    "T142": {
+      "type": "object",
+      "properties": { "type": { "const": "remove" }, "layerId": { "type": "string" } },
+      "additionalProperties": false,
+      "required": ["type", "layerId"]
+    },
+    "T143": {
+      "type": "object",
+      "properties": { "type": { "const": "duplicate" }, "layerId": { "type": "string" } },
+      "additionalProperties": false,
+      "required": ["type", "layerId"]
+    },
+    "T144": {
+      "type": "object",
+      "properties": { "type": { "const": "reorder" }, "layerId": { "type": "string" }, "index": { "type": "number" } },
+      "additionalProperties": false,
+      "required": ["type", "layerId", "index"]
+    },
+    "T145": {
+      "type": "object",
+      "properties": { "type": { "const": "crop" }, "bounds": { "$ref": "#/$defs/T146" } },
+      "additionalProperties": false,
+      "required": ["type", "bounds"]
+    },
+    "T146": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/T65" }] },
+    "T147": {
+      "type": "object",
+      "properties": { "type": { "const": "flip" }, "axis": { "$ref": "#/$defs/T148" } },
+      "additionalProperties": false,
+      "required": ["type", "axis"]
+    },
+    "T148": { "anyOf": [{ "const": "horizontal" }, { "const": "vertical" }] },
+    "T149": {
+      "type": "object",
+      "properties": { "type": { "const": "presentation" }, "value": { "$ref": "#/$defs/T150" } },
+      "additionalProperties": false,
+      "required": ["type", "value"]
+    },
+    "T150": {
+      "type": "object",
+      "properties": {
+        "composition": { "$ref": "#/$defs/T151" },
+        "beautify": { "$ref": "#/$defs/T180" },
+        "watermark": { "$ref": "#/$defs/T181" }
+      },
+      "additionalProperties": false,
+      "required": ["beautify", "watermark"]
+    },
+    "T151": {
+      "type": "object",
+      "properties": {
+        "version": { "const": 1 },
+        "layout": { "$ref": "#/$defs/T152" },
+        "background": { "$ref": "#/$defs/T157" },
+        "header": { "$ref": "#/$defs/T170" },
+        "footer": { "$ref": "#/$defs/T170" },
+        "frame": { "$ref": "#/$defs/T171" },
+        "radius": { "type": "number" },
+        "shadow": { "type": "number" },
+        "shadowOptions": { "$ref": "#/$defs/T175" },
+        "branding": { "$ref": "#/$defs/T176" }
+      },
+      "additionalProperties": false,
+      "required": ["version", "layout", "background", "header", "footer", "frame", "radius", "shadow", "branding"]
+    },
+    "T152": {
+      "type": "object",
+      "properties": {
+        "mode": { "$ref": "#/$defs/T153" },
+        "width": { "type": "number" },
+        "height": { "type": "number" },
+        "insets": { "$ref": "#/$defs/T154" },
+        "alignment": { "$ref": "#/$defs/T156" },
+        "scale": { "type": "number" },
+        "offset": { "$ref": "#/$defs/T156" }
+      },
+      "additionalProperties": false,
+      "required": ["mode", "width", "height", "insets", "alignment", "scale", "offset"]
+    },
+    "T153": { "anyOf": [{ "const": "auto" }, { "const": "fixed" }] },
+    "T154": {
+      "type": "object",
+      "properties": {
+        "top": { "type": "number" },
+        "right": { "type": "number" },
+        "bottom": { "type": "number" },
+        "left": { "type": "number" },
+        "unit": { "$ref": "#/$defs/T155" },
+        "linked": { "type": "boolean" }
+      },
+      "additionalProperties": false,
+      "required": ["top", "right", "bottom", "left", "unit", "linked"]
+    },
+    "T155": { "anyOf": [{ "const": "percent" }, { "const": "px" }] },
+    "T156": {
+      "type": "object",
+      "properties": { "x": { "type": "number" }, "y": { "type": "number" } },
+      "additionalProperties": false,
+      "required": ["x", "y"]
+    },
+    "T157": {
+      "type": "object",
+      "properties": {
+        "kind": { "$ref": "#/$defs/T158" },
+        "color": { "$ref": "#/$defs/T159" },
+        "linear": { "$ref": "#/$defs/T160" },
+        "radial": { "$ref": "#/$defs/T163" },
+        "freeform": { "$ref": "#/$defs/T164" },
+        "image": { "$ref": "#/$defs/T167" },
+        "fit": { "$ref": "#/$defs/T169" },
+        "scale": { "type": "number" },
+        "offset": { "$ref": "#/$defs/T156" },
+        "blur": { "type": "number" }
+      },
+      "additionalProperties": false,
+      "required": ["kind", "color", "linear", "radial", "freeform", "image", "fit", "scale", "offset", "blur"]
+    },
+    "T158": {
+      "anyOf": [
+        { "const": "image" },
+        { "const": "solid" },
+        { "const": "freeform" },
+        { "const": "transparent" },
+        { "const": "linear" },
+        { "const": "radial" },
+        { "const": "blurred" }
+      ]
+    },
+    "T159": {
+      "type": "object",
+      "properties": {
+        "red": { "type": "number" },
+        "green": { "type": "number" },
+        "blue": { "type": "number" },
+        "alpha": { "type": "number" }
+      },
+      "additionalProperties": false,
+      "required": ["red", "green", "blue", "alpha"]
+    },
+    "T160": {
+      "type": "object",
+      "properties": {
+        "stops": { "$ref": "#/$defs/T161" },
+        "start": { "$ref": "#/$defs/T156" },
+        "end": { "$ref": "#/$defs/T156" }
+      },
+      "additionalProperties": false,
+      "required": ["stops", "start", "end"]
+    },
+    "T162": {
+      "type": "object",
+      "properties": { "position": { "type": "number" }, "color": { "$ref": "#/$defs/T159" } },
+      "additionalProperties": false,
+      "required": ["position", "color"]
+    },
+    "T161": { "type": "array", "items": { "$ref": "#/$defs/T162" } },
+    "T163": {
+      "type": "object",
+      "properties": {
+        "stops": { "$ref": "#/$defs/T161" },
+        "center": { "$ref": "#/$defs/T156" },
+        "radius": { "type": "number" }
+      },
+      "additionalProperties": false,
+      "required": ["stops", "center", "radius"]
+    },
+    "T164": {
+      "type": "object",
+      "properties": { "version": { "const": 1 }, "points": { "$ref": "#/$defs/T165" } },
+      "additionalProperties": false,
+      "required": ["version", "points"]
+    },
+    "T166": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "color": { "$ref": "#/$defs/T159" },
+        "radius": { "type": "number" },
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      },
+      "additionalProperties": false,
+      "required": ["id", "color", "radius", "x", "y"]
+    },
+    "T165": { "type": "array", "items": { "$ref": "#/$defs/T166" } },
+    "T168": {
+      "type": "object",
+      "properties": {
+        "blobHash": { "type": "string" },
+        "width": { "type": "number" },
+        "height": { "type": "number" },
+        "format": { "$ref": "#/$defs/T57" }
+      },
+      "additionalProperties": false,
+      "required": ["blobHash", "width", "height", "format"]
+    },
+    "T167": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/T168" }] },
+    "T169": { "anyOf": [{ "const": "cover" }, { "const": "contain" }] },
+    "T170": {
+      "type": "object",
+      "properties": { "height": { "type": "number" }, "fill": { "$ref": "#/$defs/T157" } },
+      "additionalProperties": false,
+      "required": ["height", "fill"]
+    },
+    "T171": {
+      "type": "object",
+      "properties": {
+        "kind": { "$ref": "#/$defs/T172" },
+        "theme": { "$ref": "#/$defs/T173" },
+        "title": { "type": "string" },
+        "url": { "type": "string" },
+        "orientation": { "$ref": "#/$defs/T174" },
+        "fit": { "$ref": "#/$defs/T169" },
+        "screenColor": { "$ref": "#/$defs/T159" },
+        "zoom": { "type": "number" },
+        "offset": { "$ref": "#/$defs/T156" }
+      },
+      "additionalProperties": false,
+      "required": ["kind", "theme", "title", "url", "orientation", "fit", "screenColor", "zoom", "offset"]
+    },
+    "T172": { "anyOf": [{ "const": "none" }, { "const": "window" }, { "const": "browser" }, { "const": "phone" }] },
+    "T173": { "anyOf": [{ "const": "light" }, { "const": "dark" }] },
+    "T174": { "anyOf": [{ "const": "portrait" }, { "const": "landscape" }] },
+    "T175": {
+      "type": "object",
+      "properties": {
+        "size": { "type": "number" },
+        "softness": { "type": "number" },
+        "spread": { "type": "number" },
+        "offset": { "$ref": "#/$defs/T156" },
+        "color": { "$ref": "#/$defs/T159" }
+      },
+      "additionalProperties": false,
+      "required": ["size", "softness", "spread", "offset", "color"]
+    },
+    "T177": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "template": { "type": "string" },
+        "text": { "type": "string" },
+        "year": { "type": "number" },
+        "image": { "$ref": "#/$defs/T167" },
+        "imageSize": { "type": "number" },
+        "region": { "$ref": "#/$defs/T178" },
+        "alignment": { "$ref": "#/$defs/T156" },
+        "offset": { "$ref": "#/$defs/T156" },
+        "textAlignment": { "$ref": "#/$defs/T21" },
+        "fontFamily": { "type": "string" },
+        "fontSize": { "type": "number" },
+        "color": { "$ref": "#/$defs/T159" },
+        "opacity": { "type": "number" },
+        "padding": { "type": "number" },
+        "backplate": { "$ref": "#/$defs/T179" }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "template",
+        "text",
+        "year",
+        "image",
+        "imageSize",
+        "region",
+        "alignment",
+        "offset",
+        "textAlignment",
+        "fontFamily",
+        "fontSize",
+        "color",
+        "opacity",
+        "padding",
+        "backplate"
+      ]
+    },
+    "T178": { "anyOf": [{ "const": "content" }, { "const": "card" }, { "const": "header" }, { "const": "footer" }] },
+    "T179": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/T159" }] },
+    "T176": { "type": "array", "items": { "$ref": "#/$defs/T177" } },
+    "T180": {
+      "type": "object",
+      "properties": { "enabled": { "const": false } },
+      "additionalProperties": false,
+      "required": ["enabled"]
+    },
+    "T181": {
+      "type": "object",
+      "properties": { "enabled": { "const": false } },
+      "additionalProperties": false,
+      "required": ["enabled"]
+    },
+    "T0": {
+      "anyOf": [
+        { "$ref": "#/$defs/T1" },
+        { "$ref": "#/$defs/T18" },
+        { "$ref": "#/$defs/T26" },
+        { "$ref": "#/$defs/T52" },
+        { "$ref": "#/$defs/T55" },
+        { "$ref": "#/$defs/T58" },
+        { "$ref": "#/$defs/T61" },
+        { "$ref": "#/$defs/T72" },
+        { "$ref": "#/$defs/T76" },
+        { "$ref": "#/$defs/T81" },
+        { "$ref": "#/$defs/T87" },
+        { "$ref": "#/$defs/T142" },
+        { "$ref": "#/$defs/T143" },
+        { "$ref": "#/$defs/T144" },
+        { "$ref": "#/$defs/T145" },
+        { "$ref": "#/$defs/T147" },
+        { "$ref": "#/$defs/T149" }
+      ]
+    }
+  }
+}

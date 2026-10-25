@@ -48,10 +48,17 @@ export async function bumpVersion(
       return replaceVersion(source, /(\[workspace\.package\][^[]*?\nversion\s*=\s*")([^"]+)(")/gu, current, next, file)
     }
     if (file === 'src-tauri/Cargo.toml') {
-      return replaceVersion(source, /(^cute-screen-storage\s*=\s*\{\s*version\s*=\s*"=)([^"]+)(")/gmu, current, next, file)
+      let manifest = source
+      for (const name of ['cute-screen-storage', 'cute-screen-mcp']) {
+        if (name === 'cute-screen-mcp' && !source.includes('cute-screen-mcp =')) continue
+        const pattern = new RegExp(`(^${name}\\s*=\\s*\\{\\s*version\\s*=\\s*"=)([^"]+)(")`, 'gmu')
+        manifest = replaceVersion(manifest, pattern, current, next, file)
+      }
+      return manifest
     }
     let lockfile = source
-    for (const name of ['cute-screen-desktop', 'cute-screen-storage']) {
+    for (const name of ['cute-screen-desktop', 'cute-screen-storage', 'cute-screen-mcp']) {
+      if (name === 'cute-screen-mcp' && !source.includes('name = "cute-screen-mcp"')) continue
       const pattern = new RegExp(`(\\[\\[package\\]\\]\\r?\\nname = "${name}"\\r?\\nversion = ")([^"]+)(")`, 'gu')
       lockfile = replaceVersion(lockfile, pattern, current, next, file)
     }

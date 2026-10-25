@@ -116,8 +116,11 @@ export class DocumentSessionController {
     this.#layerSpace = space
   }
 
-  execute(command: EditorCommand): DocumentSessionSnapshot {
-    command = commandInSpace(command, this.#layerSpace)
+  execute(
+    command: EditorCommand,
+    options: { readonly space?: 'active' | 'document' } = {},
+  ): DocumentSessionSnapshot {
+    if (options.space !== 'document') command = commandInSpace(command, this.#layerSpace)
     const before = this.#manager.snapshot
     const committed = this.#manager.execute(command)
     this.#transient.reconcile(committed.document)

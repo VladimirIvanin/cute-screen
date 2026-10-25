@@ -27,7 +27,10 @@ import type {
 import type { CanvasViewportEmit } from './contracts'
 import { CropController } from './crop-controller'
 import { DraftController } from './draft-controller'
-import { EyedropperController } from './eyedropper-controller'
+import {
+  EyedropperController,
+  createWorkspaceEyedropper,
+} from './eyedropper-controller'
 import {
   cancelCanvasGesture,
   finishCanvasGesture,
@@ -175,7 +178,7 @@ export class CanvasWorkspaceController {
         this.#renderer.renderCommittedSceneForGesture()
         this.invalidateOverlay()
       }, invalidate: this.invalidateOverlay })
-    this.#eyedropper = this.#createEyedropper()
+    this.#eyedropper = createWorkspaceEyedropper(this.#props, this.#emit, this.#state, this.#viewport, this.canvasPoint)
     const ports = this.#interactionPorts()
     this.#pointerDown = createPointerDownContext(ports)
     this.#pointerMove = createPointerMoveContext(ports)
@@ -189,6 +192,10 @@ export class CanvasWorkspaceController {
   bindings() {
     const state = this.#state
     return {
+      isAgentBusy: () => Boolean(
+        this.#gesture || state.editingText.value || this.#crop.session ||
+        this.#props.interactivePreview || this.#calloutRouting.active(),
+      ),
       viewportRoot: state.viewportRoot,
       scrollContainer: state.scrollContainer,
       viewportOutputBounds: this.#viewport.outputBounds,
@@ -418,18 +425,6 @@ export class CanvasWorkspaceController {
       toLocal: this.toLocal,
       loupeSourceCenter: (layer) => this.#geometry.loupeSourceCenter(layer),
       moveLoupeSource: this.moveLoupeSource,
-    })
-  }
-
-  #createEyedropper(): EyedropperController {
-    return new EyedropperController({
-      props: this.#props,
-      emit: this.#emit,
-      scene: this.#state.scene,
-      viewportRoot: this.#state.viewportRoot,
-      scrollContainer: this.#state.scrollContainer,
-      outputBounds: this.#viewport.outputBounds,
-      canvasPoint: this.canvasPoint,
     })
   }
 

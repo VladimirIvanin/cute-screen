@@ -345,3 +345,17 @@ export class EyedropperController {
     )
   }
 }
+
+/** Shared workspace wiring keeps the interaction controller focused on gestures. */
+export function createWorkspaceEyedropper(
+  props: CanvasViewportProps,
+  emit: CanvasViewportEmit,
+  state: ReturnType<typeof import('./workspace-state').createCanvasWorkspaceState>,
+  viewport: { readonly outputBounds: EyedropperPorts['outputBounds'] },
+  canvasPoint: EyedropperPorts['canvasPoint'],
+): EyedropperController {
+  return new EyedropperController({
+    props, emit, scene: state.scene, viewportRoot: state.viewportRoot,
+    scrollContainer: state.scrollContainer, outputBounds: viewport.outputBounds, canvasPoint,
+  })
+}
