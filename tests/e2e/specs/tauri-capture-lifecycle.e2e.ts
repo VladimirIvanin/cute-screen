@@ -68,6 +68,9 @@ describe('capture lifecycle regressions from waytator issues', () => {
       const state = window as typeof window & { __beforeEllipse?: ImageData }
       state.__beforeEllipse = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height)
     })
+    await browser.execute(async () => {
+      await (window as unknown as NativeWindow).__TAURI__.core.invoke('plugin:window|set_focus', { label: 'main' })
+    })
     await drawShape()
     await $('.cs-selection-floating-toolbar [data-shape-control="geometry"]').click()
     await $('[data-shape-id="circle"]').click()
@@ -145,7 +148,14 @@ describe('capture lifecycle regressions from waytator issues', () => {
       busy.push({ source, ...result })
     }
     expect((await browser.tauri.listWindows()).filter((label) => label === 'quick-capture')).toHaveLength(1)
+    // Pixel/clipboard evidence is independent of the native activation gate.
+    await browser.execute(async () => {
+      await (window as unknown as NativeWindow).__TAURI__.core.invoke('plugin:window|set_focus',
+        { label: 'quick-capture' })
+    })
     await $('button[aria-label="Arrow"]').click()
+    await expect($('button[aria-label="Arrow"]')).toHaveAttribute('aria-pressed', 'true')
+    await waitForStableCanvas()
     const points = await browser.execute(() => {
       const state = window as typeof window & { __cuteScreenE2eQuick: { snapshot(): {
         crop: { x: number; y: number; width: number; height: number }

@@ -37,6 +37,20 @@ commits, конкретные tests/issues, наши существующие к
   отдельный Windows STA process читает системный bitmap, PNG декодируется заново:
   400×300, непрозрачный, содержит аннотацию. Скриншоты просмотрены.
 
+Финальная проверка: `pnpm check` passed полностью (включая 113 boundary tests,
+1 existing skipped case, IPC/schema и все configured Rust Clippy passes);
+`cargo clippy -p cute-screen-desktop --target x86_64-unknown-linux-gnu --all-targets -- -D warnings`
+в WSL passed. Native сценарии проверены отдельными прогонами:
+`CUTE_SCREEN_E2E_SCENARIOS=capture-lifecycle,quick-chrome pnpm test:e2e:tauri` —
+Quick chrome 7/7 passed в `native-validation.log`, общий exit 1 из-за одного capture failure;
+`CUTE_SCREEN_E2E_SCENARIOS=capture-lifecycle pnpm test:e2e:tauri` — финальный
+чистый прогон 2/2 passed, exit 0, `native-final-result.log`.
+Не объявляется единый успешный combined run по сумме разных запусков.
+Для drawing/chrome checks тест явно получает native focus; автоматическая
+активация до первого клика этим не доказывается. Sampling test рисует три объекта
+в разных местах и проверяет прирост layers: наложение жестов на прежнюю стрелку
+раньше могло проверять перемещение вместо создания фигуры.
+
 Диагностика native tests: geometry ID круга — `circle`; WebDriver element-click
 offset считается от центра. Text baseline снимается после выхода из inline edit,
 снятия выделения, fonts.ready и стабильных пикселей. Quick Escape без transient

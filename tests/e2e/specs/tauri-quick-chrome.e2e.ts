@@ -22,6 +22,13 @@ async function startCapture(): Promise<void> {
   await browser.waitUntil(async () => (await browser.tauri.listWindows()).includes('quick-capture'))
   await browser.tauri.switchWindow('quick-capture')
   await expect($('.cs-quick-actions button:first-child')).toBeEnabled()
+  // These cases test chrome/gestures; automatic activation has its own gate.
+  await browser.execute(async () => {
+    const core = (window as typeof window & {
+      __TAURI__: { core: { invoke(command: string, args: unknown): Promise<void> } }
+    }).__TAURI__.core
+    await core.invoke('plugin:window|set_focus', { label: 'quick-capture' })
+  })
 }
 
 describe('Quick Capture chrome in a real Tauri webview', () => {
