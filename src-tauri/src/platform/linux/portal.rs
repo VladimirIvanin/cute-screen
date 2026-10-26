@@ -18,7 +18,7 @@ use ashpd::{
             Activated, BindShortcutsOptions, Deactivated, GlobalShortcuts, ListShortcutsOptions,
             NewShortcut,
         },
-        screenshot::{AvailableTargets, Screenshot, ScreenshotProxy},
+        screenshot::{AvailableTargets, ScreenshotProxy},
     },
 };
 use futures_util::StreamExt;
@@ -87,6 +87,16 @@ impl AshpdPortalClient {
         request: CaptureRequest,
         transport: &ImageTransportService,
     ) -> Result<CaptureResult, PlatformError> {
+        self.capture_cancellable(request, transport, Arc::new(AtomicBool::new(false)))
+            .await
+    }
+
+    pub async fn capture_cancellable(
+        &self,
+        request: CaptureRequest,
+        transport: &ImageTransportService,
+        cancelled: Arc<AtomicBool>,
+    ) -> Result<CaptureResult, PlatformError> {
         let proxy = portal_handshake(
             ScreenshotProxy::new(),
             PORTAL_HANDSHAKE_TIMEOUT,
@@ -114,21 +124,31 @@ impl AshpdPortalClient {
         };
         let target = portal_target_for_request(version, advertised_targets, request.target)
             .map_err(|code| PlatformError::new(code, &request.correlation_id))?;
-        // Area is selected in Quick Capture from the full desktop PNG (ADR-117).
-        // `interactive` asks for an extra customization dialog, not permission.
-        let mut screenshot = Screenshot::request().interactive(false).modal(true);
-        if let Some(target) = target {
-            screenshot = screenshot.target(target);
-        }
-
-        let response = portal_screenshot_response(
-            async { screenshot.send().await?.response() },
+        let connection = proxy.connection().clone();
+        let uri = portal_screenshot_response(
+            cute_screen_portal::screenshot::capture(
+                &connection,
+                target.map(|target| target as u32),
+                Arc::clone(&cancelled),
+            ),
             &request.correlation_id,
         )
         .await?;
-        let source = validated_file_uri(response.uri().as_str(), &request.correlation_id)?;
+        if cancelled.load(Ordering::Acquire) {
+            return Err(PlatformError::new(
+                PlatformErrorCode::Cancelled,
+                request.correlation_id,
+            ));
+        }
+        let source = validated_file_uri(&uri, &request.correlation_id)?;
         let (width, height) = crate::linux_capture::validate_png(&source)
             .map_err(|code| PlatformError::new(code, &request.correlation_id))?;
+        if cancelled.load(Ordering::Acquire) {
+            return Err(PlatformError::new(
+                PlatformErrorCode::Cancelled,
+                request.correlation_id,
+            ));
+        }
         let digest = Sha256::digest(request.correlation_id.as_bytes());
         let token = format!("portal-{digest:x}");
         let token = &token[..39];
@@ -261,7 +281,7 @@ impl PortalHotkeyService {
         &self,
         shortcuts: Vec<ShortcutSpec>,
         correlation_id: &str,
-        on_activated: Arc<dyn Fn(String) + Send + Sync>,
+        on_activated: Arc<dyn Fn(cute_screen_portal::shortcuts::ShortcutActivation) + Send + Sync>,
     ) -> Result<Vec<ShortcutBindingResult>, PlatformError> {
         let mut session = PortalShortcutSession::create(correlation_id).await?;
         let bindings = session.bind_once(&shortcuts, correlation_id).await?;
@@ -315,7 +335,7 @@ async fn run_portal_hotkey_worker(
     shortcuts: Vec<ShortcutSpec>,
     correlation_id: String,
     stop: Arc<AtomicBool>,
-    on_activated: Arc<dyn Fn(String) + Send + Sync>,
+    on_activated: Arc<dyn Fn(cute_screen_portal::shortcuts::ShortcutActivation) + Send + Sync>,
 ) {
     loop {
         listen_for_activations(
@@ -358,8 +378,15 @@ async fn listen_for_activations(
     proxy: &GlobalShortcuts,
     portal_session: &Session<GlobalShortcuts>,
     stop: Arc<AtomicBool>,
-    on_activated: Arc<dyn Fn(String) + Send + Sync>,
+    on_activated: Arc<dyn Fn(cute_screen_portal::shortcuts::ShortcutActivation) + Send + Sync>,
 ) {
+    let path = match serde_json::to_value(portal_session) {
+        Ok(path) => path,
+        Err(error) => {
+            eprintln!("cute-screen portal session path: {error}");
+            return;
+        }
+    };
     let mut activated = match proxy.receive_activated().await {
         Ok(stream) => stream,
         Err(_) => {
@@ -377,8 +404,17 @@ async fn listen_for_activations(
     while !stop.load(Ordering::Acquire) {
         if let Ok(Some(event)) =
             tokio::time::timeout(Duration::from_millis(100), activated.next()).await
+            && path.as_str() == Some(event.session_handle().as_str())
         {
-            on_activated(event.shortcut_id().to_owned());
+            on_activated(cute_screen_portal::shortcuts::ShortcutActivation {
+                id: event.shortcut_id().to_owned(),
+                token: event
+                    .options()
+                    .get("activation_token")
+                    .and_then(|value| <&str>::try_from(value).ok())
+                    .filter(|token| !token.is_empty())
+                    .map(str::to_owned),
+            });
         }
         // Poll deactivation too, so portal signal queues are not allowed to
         // grow while the application is idle. The action is intentionally only

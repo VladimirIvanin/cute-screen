@@ -966,8 +966,8 @@ impl CaptureController {
         }
     }
 
-    /// Cancels an active pre-capture delay. Native/portal selectors retain
-    /// their own cancellation mechanisms after the backend has been invoked.
+    /// Cancels an active delay, Quick draft or cancellable native/portal request.
+    /// Screenshot cancellation also closes the system Request (ADR-156).
     pub fn cancel(&self) -> bool {
         self.cancel_matching(None)
     }

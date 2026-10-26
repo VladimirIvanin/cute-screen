@@ -407,6 +407,14 @@ pub fn apply_native<R: Runtime>(
 }
 
 pub fn dispatch<R: Runtime>(app: &tauri::AppHandle<R>, id: &str) {
+    dispatch_with_activation(app, id, None);
+}
+
+pub fn dispatch_with_activation<R: Runtime>(
+    app: &tauri::AppHandle<R>,
+    id: &str,
+    token: Option<String>,
+) {
     let Some(action) = ShortcutAction::ALL
         .into_iter()
         .find(|action| action.id() == id)
@@ -417,11 +425,11 @@ pub fn dispatch<R: Runtime>(app: &tauri::AppHandle<R>, id: &str) {
         return;
     }
     if action == ShortcutAction::ShowEditor {
-        crate::show_editor(app);
+        crate::show_editor_with_activation(app, token);
         return;
     }
     if let Some(capture) = crate::action_for_shortcut_id(id) {
-        crate::start_capture(
+        crate::start_capture_with_activation(
             app,
             crate::CaptureRequestV1 {
                 correlation_id: uuid::Uuid::now_v7().to_string(),
@@ -432,6 +440,7 @@ pub fn dispatch<R: Runtime>(app: &tauri::AppHandle<R>, id: &str) {
                 invocation_source: crate::CaptureInvocationSource::Hotkey,
             },
             false,
+            token,
         );
     }
 }

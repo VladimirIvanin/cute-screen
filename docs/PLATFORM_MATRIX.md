@@ -1,5 +1,23 @@
 # Платформенная матрица
 
+Windows/macOS research от 2026-10-26:
+[SCREENSHOT_PROJECTS_RESEARCH.md](SCREENSHOT_PROJECTS_RESEARCH.md). В приоритете
+native clipboard alpha/formats, focus-return/paste, frozen menus, mixed-DPI/Retina,
+lock/sleep hotkeys и TCC login/revoke/signed update. Эти пункты не помечаются
+поддержанными по результатам чужих unit tests. Windows capture-lifecycle 2/2
+проверяет production WebView flow с fake capture и отдельным OS clipboard reader;
+команды и границы доказательств — TESTING.md.
+
+## Portal lifecycle (2026-10-26, ADR-156)
+
+Linux transport проверяется на приватной D-Bus шине в WSL Ubuntu 22.04 с Rust
+1.97.0; обе стороны используют явный адрес, реальные desktop portals не вызываются.
+Это integration evidence протокола, а не новый supported claim для GNOME/KDE.
+Передача activation token до GTK/GDK present компилируется отдельно на Linux.
+GNOME/KDE keyboard focus/Escape, несколько мониторов и физический stylus остаются
+отдельными runtime gates. Windows native capture-lifecycle использует WebView2
+и fake capture; команды и фактические результаты фиксируются в TESTING.md.
+
 ## Повторное получение MCP config (ADR-155)
 
 Linux/WebKitGTK: 7 native tests — Settings reopen, независимые ключи одного клиента,

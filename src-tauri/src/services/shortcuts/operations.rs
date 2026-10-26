@@ -322,11 +322,11 @@ impl ShortcutService {
     ) -> Result<(), String> {
         let portal = tauri::async_runtime::block_on(async {
             if interactive {
-                super::portal::PortalSession::create(bindings, true).await
+                super::portal::create(bindings, true).await
             } else {
                 tokio::time::timeout(
                     Duration::from_secs(4),
-                    super::portal::PortalSession::create(bindings, false),
+                    super::portal::create(bindings, false),
                 )
                 .await
                 .map_err(|_| "Portal restoration timed out".to_owned())?
@@ -341,8 +341,8 @@ impl ShortcutService {
             old.stop.store(true, Ordering::Release);
         }
         let activation_app = app.clone();
-        tauri::async_runtime::spawn(portal.listen(Arc::new(move |id| {
-            super::host::dispatch(&activation_app, &id)
+        tauri::async_runtime::spawn(portal.listen(Arc::new(move |activation| {
+            super::host::dispatch_with_activation(&activation_app, &activation.id, activation.token)
         })));
         Ok(())
     }

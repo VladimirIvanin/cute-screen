@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/cute-screen-storage", "crates/cute-screen-mcp", "src-tauri"]
+members = ["crates/cute-screen-storage", "crates/cute-screen-mcp", "crates/cute-screen-portal", "src-tauri"]
 resolver = "2"
 
 [workspace.package]

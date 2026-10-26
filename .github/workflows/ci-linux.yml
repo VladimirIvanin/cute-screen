@@ -55,7 +55,7 @@ jobs:
         if: inputs.task == 'quality' || inputs.task == 'rust' || inputs.task == 'tauri' || inputs.task == 'packages'
         run: |
           bash scripts/ci-install-linux-tauri-deps.sh \
-            build-essential curl file libayatana-appindicator3-dev librsvg2-dev \
+            build-essential curl file dbus libayatana-appindicator3-dev librsvg2-dev \
             libssl-dev libwebkit2gtk-4.1-dev libxdo-dev webkit2gtk-driver wget xdg-utils xvfb
 
       - name: Resolve pnpm store

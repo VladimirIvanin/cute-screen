@@ -10,7 +10,7 @@ use crate::{
     linux_platform::AshpdPortalClient,
     platform::{
         CaptureBackendKind, CaptureRequest, CaptureResult, CaptureTarget, PlatformCapabilities,
-        PlatformError, PlatformErrorCode, PortalClient,
+        PlatformError, PlatformErrorCode,
         capture_method::{CaptureMethodsProbe, LinuxCaptureMethod, LinuxCaptureMethods},
     },
     storage::StorageHandle,
@@ -81,15 +81,15 @@ impl LinuxCaptureService {
             .try_lock()
             .map_err(|_| PlatformError::new(PlatformErrorCode::Busy, &request.correlation_id))?;
         if !matches!(request.target, CaptureTarget::Area | CaptureTarget::Monitor) {
-            return AshpdPortalClient::with_transport(transport)
-                .capture(request)
+            return AshpdPortalClient::default()
+                .capture_cancellable(request, &transport, cancelled)
                 .await;
         }
         let snapshot = self.methods().await?;
         match snapshot.resolved {
             Some(LinuxCaptureMethod::Portal) => {
-                AshpdPortalClient::with_transport(transport)
-                    .capture(request)
+                AshpdPortalClient::default()
+                    .capture_cancellable(request, &transport, cancelled)
                     .await
             }
             Some(LinuxCaptureMethod::GnomeShell) => {

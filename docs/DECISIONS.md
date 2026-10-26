@@ -1,5 +1,40 @@
 # Журнал архитектурных решений
 
+## ADR-156 — Отмена portal-запросов и адресная активация Wayland
+
+**Статус:** accepted (2026-10-26); дополняет ADR-070 и ADR-122.
+
+**Основание:** GlobalShortcuts терял activation_token, а Screenshot не получал
+cancel flag. Private-bus failing-first прогон выявляет потерю token, отсутствие
+Request.Close и смешение NotAllowed с transport error. ashpd 0.13.13 возвращает
+Request после Response; Close не вызывает Response.
+
+**Решение:** cute-screen-portal содержит общий для production и тестов transport
+без GTK/WebView. Screenshot подписывается на предсказуемый Request path до вызова,
+учитывает возвращённый handle, отличает method reply от ожидания человека,
+по cancel закрывает Request с ограниченным ожиданием и завершает локальный future.
+Потеря владельца D-Bus сервиса завершает ожидание. NotAllowed, Cancelled и failure
+остаются различимыми. После отмены снимок не передаётся на materialization.
+
+GlobalShortcuts подписывается до BindShortcuts и фильтрует session handle.
+Activation token принадлежит correlation ID одного действия, используется один
+раз и удаляется при terminal outcome/Busy/cancel. Recorder/test его не передают.
+Quick reveal или main presentation на GTK thread устанавливают GdkWaylandDisplay
+startup notification ID непосредственно перед present; GtkWindow startup-id
+используется только на X11. Переменные окружения и persistence не меняются.
+
+**Доказательство:** каждый integration test запускает собственный dbus-daemon,
+передаёт явный адрес обеим сторонам и завершает свой child. Проверяются early
+Response, cancel до send/до method reply/во время ожидания, отсутствие Response
+после Close, NotAllowed, service loss, чужая shortcut сессия, Closed и восстановление
+bindings после смены владельца. Настоящие GNOME/KDE focus/Escape, mixed-DPI и
+физический stylus требуют отдельных runtime результатов; WSLg их не заменяет.
+
+Источники: [XDG Request](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.Request.html),
+[GlobalShortcuts](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.GlobalShortcuts.html),
+[GDK Wayland startup ID](https://docs.gtk.org/gdk3-wayland/method.WaylandDisplay.set_startup_notification_id.html).
+Сторонний GPL-код не переносится. Команды и ограничения — TESTING.md.
+
 ## ADR-155 — Повторное получение MCP-конфигурации
 
 **Статус:** accepted (2026-10-25); дополняет ADR-154.

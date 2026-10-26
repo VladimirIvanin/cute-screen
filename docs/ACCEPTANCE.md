@@ -1,5 +1,25 @@
 # Сквозная приёмка
 
+## Portal lifecycle и регрессии waytator (2026-10-26, ADR-156)
+
+1. GNOME/KDE Wayland: из чужого приложения нажать зарегистрированный portal hotkey.
+   До первого клика Quick получает фокус, Escape закрывает его. Повторить ShowEditor,
+   Screen, Window, отмену, Busy и следующий запуск без token. Не добавлять тестовый
+   set_focus до проверки — это скроет дефект production presentation.
+2. В открытом Screenshot permission/picker отменить соответствующий MCP job:
+   системный диалог закрывается, job получает cancelled, новый capture доступен,
+   оригинал/документ не создаётся. Проверить ранний ответ и перезапуск portal.
+3. Native capture-lifecycle: второй capture через общий dispatcher возвращает Busy
+   и не меняет draft; Copy аннотированного Quick → закрытие → отдельный Windows STA
+   process читает PNG из OS clipboard. Повторно декодировать, сравнить crop dimensions,
+   opaque pixels и наличие аннотации. Fake capture не доказывает physical capture.
+4. Физические два монитора: сменить основной, отключить монитор и изменить DPI;
+   проверить Area/Screen/Repeat. Пером выбрать цвет и вложенный пункт меню, проверить
+   pointercancel/отпускание. Это отдельные pending hardware gates.
+5. Текст → круг: завершить текст, создать фигуру, zoom/resize, Undo/Redo и export;
+   не должно быть лишних сегментов и смещения transient overlays. Blur обновляется
+   при изменении нижних слоёв и после flip/undo.
+
 ## Локальный MCP (ADR-154)
 
 ADR-155: создать два ключа одного клиента и проверить оба stdio-подключения.

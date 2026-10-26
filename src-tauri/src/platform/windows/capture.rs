@@ -1025,7 +1025,7 @@ fn encode_rgba_png(
         .write_header()
         .map_err(|_| failure(correlation_id, "pngHeader"))?;
     writer
-        .write_image_data(&rgba)
+        .write_image_data(rgba)
         .map_err(|_| failure(correlation_id, "pngEncode"))?;
     drop(writer);
     Ok(png)

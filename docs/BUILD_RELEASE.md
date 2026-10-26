@@ -1,5 +1,15 @@
 # CI-сборки и проверка версии через GitHub
 
+## Portal transport (ADR-156)
+
+cute-screen-portal — workspace crate, используемый Linux desktop; private-bus
+тесты входят в cargo test --workspace на Linux и требуют dbus-daemon. Тест сам
+запускает/завершает приватный daemon и не использует DBUS_SESSION_BUS_ADDRESS
+пользователя. GTK wrapper gdkwayland 0.18.2 соответствует существующему GTK3/GDK3;
+новый capture protocol/ScreenCast backend не добавляется. Version bump обновляет
+точную path dependency и workspace lock entry нового crate. Общий target cache
+сохраняется; Linux target triple использует target/x86_64-unknown-linux-gnu.
+
 MCP-конфигурации повторно доступны после restart (ADR-155): `mcp-keys/` в app-data
 содержит секреты для копирования; SQLite хранит только hashes. Этот каталог нельзя
 копировать в reports/evidence вместе с диагностическим appData. Обновление приложения

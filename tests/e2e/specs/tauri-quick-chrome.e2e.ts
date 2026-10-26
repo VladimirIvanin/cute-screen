@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import path from 'node:path'
+import { writeFile } from 'node:fs/promises'
 import {
   $,
   browser,
@@ -8,6 +9,7 @@ import {
 } from '@wdio/globals'
 import { finishAreaQuickCaptureInEditor } from '../quick-capture'
 import { verifyEyedropperToolSwitch } from '../eyedropper-tool-switch'
+import { waitForStableCanvas } from '../canvas-ready'
 
 const executeFile = promisify(execFile)
 
@@ -26,6 +28,7 @@ describe('Quick Capture chrome in a real Tauri webview', () => {
   it('hides chrome only while resizing the capture frame and restores it on release or Escape', async () => {
     await startCapture()
     await $('button[aria-label="Pencil"]').click()
+    await waitForStableCanvas()
     const frame = async () => browser.execute(() => {
       const state = window as typeof window & { __cuteScreenE2eQuick?: { snapshot(): {
         crop: { x: number; y: number; width: number; height: number }
@@ -43,25 +46,45 @@ describe('Quick Capture chrome in a real Tauri webview', () => {
       }
     })
     const before = await frame()
+    const pointer = () => browser.action('pointer', { id: 'quick-frame-resize' })
+    const end = { x: Math.round(before.x + before.width - 180),
+      y: Math.round(before.y + Math.max(40, before.height - 440)) }
     await browser.execute(() => {
-      document.querySelector('.cs-canvas:not(.cs-canvas-overlay)')!.addEventListener('pointerdown', (event) => {
-        document.documentElement.dataset.e2eFrameTrusted = String(event.isTrusted)
-      }, { once: true })
+      const state = window as typeof window & {
+        __frameSamples: { trusted: boolean; hidden: boolean; crop: unknown }[]
+        __cuteScreenE2eQuick: { snapshot(): { crop: unknown } }
+      }
+      state.__frameSamples = []
+      const scene = document.querySelector('.cs-canvas:not(.cs-canvas-overlay)')!
+      scene.addEventListener('pointermove', (raw) => {
+        const event = raw as PointerEvent
+        if (!(event.buttons & 1)) return
+        requestAnimationFrame(() => {
+          state.__frameSamples.push({ trusted: event.isTrusted,
+            hidden: ['.cs-quick-actions', '.cs-quick-toolrail-group', '.cs-quick-defaults'].every((selector) => {
+              const element = document.querySelector(selector)
+              return !element || !element.checkVisibility({ visibilityProperty: true, opacityProperty: true })
+            }), crop: state.__cuteScreenE2eQuick.snapshot().crop })
+        })
+      })
     })
-    await browser.action('pointer')
+    await pointer()
       .move({ origin: 'viewport', x: before.x + 2, y: before.y + 2 })
       .down({ button: 'left' })
-      .move({ origin: 'viewport', x: Math.round(before.x + before.width - 180),
-        y: Math.round(before.y + Math.max(40, before.height - 440)), duration: 150 }).perform(true)
-    expect(await $('html').getAttribute('data-e2e-frame-trusted')).toBe('true')
-    await expect($('.cs-quick-actions')).not.toBeDisplayed()
-    await expect($('.cs-quick-toolrail-group')).not.toBeDisplayed()
-    await expect($('.cs-quick-defaults')).not.toBeDisplayed()
-    expect((await frame()).crop).toEqual(before.crop)
-    await browser.saveScreenshot(path.resolve('artifacts/tauri-e2e/quick-frame-during-resize.png'))
-    await browser.action('pointer').up({ button: 'left' }).perform()
+      .move({ origin: 'viewport', ...end, duration: 150 }).pause(300).up({ button: 'left' }).perform()
+    const samples = await browser.execute(() => {
+      const state = window as typeof window & {
+        __frameSamples: { trusted: boolean; hidden: boolean; crop: unknown }[]
+      }
+      return state.__frameSamples
+    })
+    expect(samples.length).toBeGreaterThan(0)
+    expect(samples.every((sample) => sample.trusted && sample.hidden)).toBe(true)
+    for (const sample of samples) expect(sample.crop).toEqual(before.crop)
     await expect($('.cs-quick-actions')).toBeDisplayed()
     await expect($('.cs-quick-toolrail-group')).toBeDisplayed()
+    await writeFile(path.resolve('artifacts/portal-lifecycle/frame-samples.json'), JSON.stringify(samples, null, 2))
+    await browser.waitUntil(async () => JSON.stringify((await frame()).crop) !== JSON.stringify(before.crop))
     const resized = await frame()
     expect(resized.crop).not.toEqual(before.crop)
     await browser.saveScreenshot(path.resolve('artifacts/tauri-e2e/quick-frame-after-resize.png'))
@@ -69,13 +92,15 @@ describe('Quick Capture chrome in a real Tauri webview', () => {
     expect((await frame()).crop).toEqual(before.crop)
     await $('button[aria-label="Redo"]').click()
     expect((await frame()).crop).toEqual(resized.crop)
-    await browser.action('pointer')
-      .move({ origin: 'viewport', x: resized.x, y: resized.y })
+    await waitForStableCanvas()
+    const restored = await frame()
+    await pointer()
+      .move({ origin: 'viewport', x: restored.x + 2, y: Math.round(restored.y + restored.height / 2) })
       .down({ button: 'left' })
-      .move({ origin: 'pointer', x: -30, y: -20, duration: 100 }).perform(true)
+      .move({ origin: 'pointer', x: 30, y: -20, duration: 100 }).perform(true)
     await expect($('.cs-quick-actions')).not.toBeDisplayed()
     await browser.keys('Escape')
-    await browser.action('pointer').up({ button: 'left' }).perform()
+    await pointer().up({ button: 'left' }).perform()
     await expect($('.cs-quick-actions')).toBeDisplayed()
     await expect($('.cs-quick-toolrail-group')).toBeDisplayed()
     expect((await frame()).crop).toEqual(resized.crop)
@@ -111,9 +136,7 @@ describe('Quick Capture chrome in a real Tauri webview', () => {
     await expect($('.cs-tool-configure-popover-host')).not.toExist()
     await expect($('.cs-quick-actions')).toBeDisplayed()
     await browser.keys('Escape')
-    await expect($('button[aria-label="Select"]')).toHaveAttribute('aria-pressed', 'true')
-    await expect($('.cs-quick-actions')).toBeDisplayed()
-    await $('.cs-quick-actions button:last-child').click()
+    await browser.waitUntil(async () => !(await $('.cs-quick-actions').isExisting()))
   })
   it('keeps tool settings, keyboard focus and the handoff to Editor', async () => {
     await startCapture()

@@ -1,5 +1,21 @@
 # Архитектура Cute Screen
 
+## Portal transport и активация (ADR-156)
+
+crates/cute-screen-portal отделяет D-Bus lifecycle от GTK и Tauri. Linux desktop
+вызывает тот же Screenshot transport и PortalSession, что private-bus tests.
+Screenshot cancellation доходит до Request.Close; локальное ожидание завершается
+без Response и при потере владельца сервиса. Deadline относится к method reply,
+а не к решению пользователя. GlobalShortcuts subscriptions создаются до BindShortcuts;
+Activated фильтруется по session handle, Closed/смена владельца отражаются как
+error для существующего ShortcutService maintain/reconnect.
+
+ActivationTokens хранит transient correlation ID → token с RAII lease. Только
+соответствующий Quick reveal или terminal-to-editor presentation забирает token.
+Cancelled/Busy и завершение future очищают остаток. GTK main thread передаёт
+token в GdkWaylandDisplay перед present; X11 сохраняет timestamp path.
+Ни persistence, ни generated IPC, ни переменные окружения не содержат token.
+
 ## Повторное получение MCP-конфигурации (ADR-155)
 
 Settings-only `mcp_connection_configuration(id)` читает отдельный приватный файл

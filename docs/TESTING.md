@@ -1,5 +1,55 @@
 # Стратегия тестирования
 
+## Portal lifecycle и screenshot research (2026-10-26, ADR-156)
+
+Baseline `8fe6c91` (main после fast-forward), рабочая копия. Windows x64 /
+WebView2 155.0.4283.62; Linux проверки — WSL Ubuntu 22.04 / Rust 1.97.0.
+[Исследование Windows/macOS](SCREENSHOT_PROJECTS_RESEARCH.md) фиксирует upstream
+commits, конкретные tests/issues, наши существующие контракты и pending проверки.
+Чужие программы локально не запускались, GPL/AGPL-код не переносился.
+
+- `cargo test --workspace` (Windows): 206 passed, 1 ignored. Новый portable
+  ActivationTokens проверяет single-use, correlation scope и RAII cleanup.
+- `cargo test -p cute-screen-portal --target x86_64-unknown-linux-gnu` (WSL):
+  2 unit + 9 integration passed. Каждый integration case запускает собственный
+  dbus-daemon, явно подключает обе стороны и завершает child. Пользовательская
+  session bus и DBUS_SESSION_BUS_ADDRESS не подменяются. Red-first evidence
+  сохранён до реализации; отдельный failing case выявил неверный mapping NotAllowed.
+  Проверены Response до method reply, cancel до send/до reply/во время ожидания,
+  Request.Close без Response, повторный capture, user cancel/error, permission
+  denial, service disconnect, activation во время Bind, token и чужая session,
+  Session.Closed, настоящий release/name reacquisition новым server connection.
+  Ожидание человека дольше технического handshake timeout также проходит.
+- `cargo clippy -p cute-screen-portal --target x86_64-unknown-linux-gnu --all-targets -- -D warnings`:
+  passed. `cargo deny check licenses` (Windows): passed, включая gdkwayland.
+- `pnpm test tests/unit/vue/quick-capture-actions.test.ts tests/unit/vue/quick-capture-action-controller.test.ts tests/unit/vue/brushes.test.ts tests/unit/vue/keyboard-shortcuts.test.ts tests/unit/vue/settings-locale.test.ts tests/unit/vue/window-capture-recovery.test.ts packages/editor-renderer/src/effect-cache.test.ts`:
+  7 files / 42 passed. Дополнительно ранее прошли 71 focused unit tests и render blur/flip case.
+- `CUTE_SCREEN_E2E_SCENARIOS=capture-lifecycle,blur-optimization,quick-chrome pnpm test:e2e:tauri`:
+  fresh harness, external tauri-driver/EdgeDriver, native input. Blur optimization
+  case прошёл: 4K source, live lower-layer changes, decoded export. Первый прогон
+  UI cases выявил ошибки test selector и координат; вся команда тогда не прошла.
+- `CUTE_SCREEN_E2E_SCENARIOS=capture-lifecycle,quick-chrome pnpm test:e2e:tauri`:
+  capture-lifecycle 2/2 passed. Production Capture → Quick → Editor → Text → Shape
+  → circle: после завершённой перерисовки текста изменяются только пиксели фигуры.
+  Второй capture через dispatcher с hotkey/tray/CLI/UI invocationSource получает
+  Busy и тот же draft ID; surface остаётся одна. Это проверка dispatcher, не
+  физического нажатия четырёх источников. Annotated Quick Copy закрывает surface;
+  отдельный Windows STA process читает системный bitmap, PNG декодируется заново:
+  400×300, непрозрачный, содержит аннотацию. Скриншоты просмотрены.
+
+Диагностика native tests: geometry ID круга — `circle`; WebDriver element-click
+offset считается от центра. Text baseline снимается после выхода из inline edit,
+снятия выделения, fonts.ready и стабильных пикселей. Quick Escape без transient
+panel по REQ-CAP-012 закрывает draft; старое ожидание Select исправлено.
+Split pointer commands в Windows WebView2 дали lostpointercapture до pointerup;
+release-путь проверяется непрерывным native action с read-only наблюдением chrome.
+
+Private D-Bus доказывает protocol lifecycle, WSL compilation — Linux API integration.
+Настоящие GNOME/KDE Wayland focus/Escape и закрытие реального portal dialog по MCP
+cancel, physical mixed-DPI monitors/stylus, macOS TCC/signing и WKWebView остаются
+pending в ACCEPTANCE/PLATFORM_MATRIX. Evidence: `artifacts/portal-lifecycle/`,
+native screenshots/JUnit — `artifacts/tauri-e2e/`.
+
 ## Повторное копирование и несколько MCP-ключей (2026-10-25, ADR-155)
 
 Linux x86_64 / WebKitGTK 2.52.6, baseline `91d5997` + working tree.

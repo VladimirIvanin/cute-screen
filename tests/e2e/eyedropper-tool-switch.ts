@@ -4,7 +4,10 @@ import {
   expect,
 } from '@wdio/globals'
 import path from 'node:path'
-import { waitForShapeAnimation } from './shape-toolbar'
+import {
+  shapeDocument,
+  waitForShapeAnimation,
+} from './shape-toolbar'
 import { waitForStableCanvas } from './canvas-ready'
 
 export async function verifyEyedropperToolSwitch(
@@ -12,7 +15,7 @@ export async function verifyEyedropperToolSwitch(
   screenshot: string,
 ): Promise<void> {
   const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
-  for (const method of ['click', 'keyboard', 'configure'] as const) {
+  for (const [index, method] of (['click', 'keyboard', 'configure'] as const).entries()) {
     await browser.execute(async (windowLabel) => {
       const core = (window as typeof window & {
         __TAURI__: { core: { invoke(command: string, args: Record<string, unknown>): Promise<void> } }
@@ -36,11 +39,19 @@ export async function verifyEyedropperToolSwitch(
     if (await $('.cs-tool-configure-popover-host').isExisting()) await browser.keys('Escape')
     await expect(chosen).toHaveAttribute('aria-pressed', 'true')
     await waitForStableCanvas()
+    const beforeCount = (await shapeDocument()).layers.length
+    const point = await browser.execute((index) => {
+      const rect = document.querySelector('.cs-canvas:not(.cs-canvas-overlay)')!.getBoundingClientRect()
+      return { x: Math.round(rect.left + rect.width / 2 - 60),
+        y: Math.round(rect.top + rect.height * (.25 + index * .25)) }
+    }, index)
     await browser.action('pointer')
-      .move({ origin: scene, x: -60, y: -35 })
+      .move({ origin: 'viewport', ...point })
       .down({ button: 'left' })
       .move({ origin: 'pointer', x: 120, y: 50, duration: 150 })
       .up({ button: 'left' }).perform()
+    await browser.waitUntil(async () => (await shapeDocument()).layers.length === beforeCount + 1,
+      { timeoutMsg: `The ${method} tool action did not create a new layer` })
     await expect($('button[aria-label="Select"]')).toHaveAttribute('aria-pressed', 'true')
     await $('.cs-selection-floating-toolbar').waitForDisplayed()
   }

@@ -1254,7 +1254,13 @@ fn quick_capture_reveal(
         macos_platform::complete_selector_handoff();
     }
     #[cfg(target_os = "linux")]
-    linux_quick_presentation::reveal(&window)?;
+    {
+        let token = active.as_ref().and_then(|draft| {
+            app.state::<cute_screen_portal::ActivationTokens>()
+                .take(&draft.correlation_id)
+        });
+        linux_quick_presentation::reveal(&window, token.as_deref())?;
+    }
     #[cfg(not(target_os = "linux"))]
     window.set_focus().map_err(|error| error.to_string())?;
     Ok(true)
@@ -1583,7 +1589,20 @@ async fn hotkeys_bind_inner(
                     .ok_or_else(|| {
                         PlatformError::new(PlatformErrorCode::ShortcutUnavailable, &correlation_id)
                     })?;
-                service.bind(shortcuts, &correlation_id, callback).await
+                let activation_app = app.clone();
+                service
+                    .bind(
+                        shortcuts,
+                        &correlation_id,
+                        Arc::new(move |activation| {
+                            shortcuts::host::dispatch_with_activation(
+                                &activation_app,
+                                &activation.id,
+                                activation.token,
+                            );
+                        }),
+                    )
+                    .await
             }
             SessionKind::X11 => {
                 #[cfg(feature = "x11-capture")]
@@ -1812,11 +1831,51 @@ fn application_directories<R: tauri::Runtime>(
 }
 
 fn show_editor<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+    show_editor_with_activation(app, None);
+}
+
+fn show_editor_with_activation<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    token: Option<String>,
+) {
     if let Some(window) = app.get_webview_window("main") {
+        #[cfg(target_os = "linux")]
+        if let Some(token) = token {
+            if let Err(error) = app.run_on_main_thread(move || {
+                use gtk::prelude::*;
+                match window.gtk_window() {
+                    Ok(native) => {
+                        native.show();
+                        native.deiconify();
+                        linux_quick_presentation::activate(&native, &token);
+                        native.present();
+                    }
+                    Err(error) => eprintln!("cute-screen editor activation: {error}"),
+                }
+            }) {
+                eprintln!("cute-screen editor activation dispatch: {error}");
+            }
+            return;
+        }
+        #[cfg(not(target_os = "linux"))]
+        let _ = token;
         let _ = window.show();
         let _ = window.unminimize();
         let _ = window.set_focus();
     }
+}
+
+fn show_editor_for_capture<R: tauri::Runtime>(app: &tauri::AppHandle<R>, correlation_id: &str) {
+    #[cfg(target_os = "linux")]
+    let token = app
+        .state::<cute_screen_portal::ActivationTokens>()
+        .take(correlation_id);
+    #[cfg(not(target_os = "linux"))]
+    let token = {
+        let _ = correlation_id;
+        None
+    };
+    show_editor_with_activation(app, token);
 }
 
 fn prepare_quick_capture_editor_handoff<R: tauri::Runtime>(
@@ -2303,7 +2362,7 @@ fn publish_capture_outcome<R: tauri::Runtime>(
                 | CaptureTerminalOutcome::Unavailable
                 | CaptureTerminalOutcome::PermissionDenied
         ) {
-            show_editor(app);
+            show_editor_for_capture(app, &outcome.correlation_id);
         }
     }
     if let Some(diagnostics) = app.try_state::<CaptureDiagnosticsService>() {
@@ -2312,7 +2371,7 @@ fn publish_capture_outcome<R: tauri::Runtime>(
     if outcome.outcome == CaptureTerminalOutcome::Captured
         && outcome.completion == Some(CaptureCompletion::Editor)
     {
-        show_editor(app);
+        show_editor_for_capture(app, &outcome.correlation_id);
     } else if outcome.outcome == CaptureTerminalOutcome::Failed
         && action != capture::CaptureAction::Window
     {
@@ -2554,9 +2613,24 @@ fn start_capture<R: tauri::Runtime>(
     request: CaptureRequestV1,
     cli_json: bool,
 ) {
+    start_capture_with_activation(app, request, cli_json, None);
+}
+
+fn start_capture_with_activation<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    request: CaptureRequestV1,
+    cli_json: bool,
+    token: Option<String>,
+) {
     let controller = app.state::<CaptureController>().inner().clone();
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
+        #[cfg(target_os = "linux")]
+        let _activation = app
+            .state::<cute_screen_portal::ActivationTokens>()
+            .begin(request.correlation_id.clone(), token);
+        #[cfg(not(target_os = "linux"))]
+        let _ = token;
         let outcome = capture_with_preflight(&app, &controller, request).await;
         if cli_json {
             let reply = activation_reply(&outcome.correlation_id, outcome.outcome);
@@ -2862,6 +2936,8 @@ pub fn run() {
             app.manage(shortcuts::native::NativeRegistry::default());
             app.manage(transport);
             app.manage(controller.clone());
+            #[cfg(target_os = "linux")]
+            app.manage(cute_screen_portal::ActivationTokens::default());
             app.manage(CapturePreflightService::default());
             app.manage(QuickEditorMountService::default());
             app.manage(QuickSaveTargetService::default());

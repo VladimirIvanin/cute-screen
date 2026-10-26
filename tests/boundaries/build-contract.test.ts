@@ -184,7 +184,7 @@ describe('Tauri build boundary', () => {
       /fn quick_capture_warmup[\s\S]*set_focusable\(false\)[\s\S]*set_opacity\(0\.01\)[\s\S]*window\.show\(\)/,
     )
     expect(hostSource).toMatch(
-      /fn quick_capture_reveal[\s\S]*linux_quick_presentation::reveal\(&window\)/,
+      /fn quick_capture_reveal[\s\S]*linux_quick_presentation::reveal\(&window, token\.as_deref\(\)\)/,
     )
   })
 

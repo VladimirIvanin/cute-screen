@@ -70,6 +70,17 @@ it('accepts the current version without changing files', async () => {
   expect(await snapshot(root)).toEqual(before)
 })
 
+it('keeps the Linux portal dependency and workspace lock entry in sync', async () => {
+  const root = await fixture()
+  const manifest = `${files['src-tauri/Cargo.toml']}\n[target.'cfg(target_os = "linux")'.dependencies]\ncute-screen-portal = { version = "=0.1.1", path = "../crates/cute-screen-portal" }\n`
+  const lock = `${files['Cargo.lock']}\n[[package]]\nname = "cute-screen-portal"\nversion = "0.1.1"\n`
+  await writeFile(path.join(root, 'src-tauri/Cargo.toml'), manifest)
+  await writeFile(path.join(root, 'Cargo.lock'), lock)
+  await bumpVersion(root, '0.1.2')
+  expect(await readFile(path.join(root, 'src-tauri/Cargo.toml'), 'utf8')).toContain('cute-screen-portal = { version = "=0.1.2"')
+  expect(await readFile(path.join(root, 'Cargo.lock'), 'utf8')).toContain('name = "cute-screen-portal"\nversion = "0.1.2"')
+})
+
 it.each([['0.1.2'], ['0.1.2', 'extra']])('reports CLI completion or argument errors: %j', async (...args: string[]) => {
   const root = await fixture()
   const originalArgv = process.argv
