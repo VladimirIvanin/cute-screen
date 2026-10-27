@@ -174,7 +174,7 @@ jobs:
 
       - name: Test macOS native capture contracts without screen access
         if: runner.os == 'macOS'
-        run: cargo test --locked --package cute-screen-desktop --lib macos
+        run: cargo test --locked --package cute-screen-desktop --lib macos_platform::tests::desktop_
 
       - name: Upload compile logs on failure
         if: failure()
