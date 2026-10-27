@@ -1,5 +1,28 @@
 # Сквозная приёмка
 
+## macOS Screen/Area через ScreenCaptureKit (2026-10-28, ADR-157)
+
+Статус: implementation и portable contracts; macOS compile/runtime pending.
+
+1. На macOS 12.7.6 выполнить `cargo test --locked --package cute-screen-desktop --lib macos`
+   и запустить свежую `.app` либо `pnpm tauri dev`. SDK 13.1 допустим для dev.
+   Screen/Area metadata должны показывать `screenCaptureKitStream`.
+2. На macOS 14+ со свежей SDK-14+ сборкой повторить: metadata —
+   `screenCaptureKitScreenshot`. Сборка с SDK 13.x должна выбрать stream.
+3. На каждом маршруте проверить первый grant, deny, повторный запуск и grant
+   для изменившейся ad-hoc сборки. Не считать включённый тумблер доказательством
+   разрешения текущему процессу. Отказ не открывает selector, не создаёт document.
+4. Проверить Screen и Area из видимого editor, tray и hotkey. В frozen image нет
+   редактора/selector; drag и Quick → Editor сохраняют тот же frame без переворота.
+   Export PNG повторно декодировать и сравнить размеры, угловые цветные метки,
+   непрозрачность, Retina 2×, два экрана 1×/2× слева/сверху и отрицательные origins.
+5. Escape/cancel во время ожидания кадра и выбора не создаёт original/draft;
+   следующий захват доступен. После серии Screen/Area не остаются SCStream
+   sessions/индикатор захвата. Изменение layout возвращает invalidTarget;
+   технический failure/timeout не превращается в permissionDenied или legacy success.
+
+Windows Rust pass и synthetic bitmap contracts не заменяют эти native steps.
+
 ## Portal lifecycle и регрессии waytator (2026-10-26, ADR-156)
 
 1. GNOME/KDE Wayland: из чужого приложения нажать зарегистрированный portal hotkey.

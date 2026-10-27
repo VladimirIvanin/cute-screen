@@ -230,9 +230,8 @@ pub enum MacosWindowPickerKind {
     SystemContentSharing,
 }
 
-/// ADR-038/104 routing: macOS 14 APIs require both the running OS and the
-/// build SDK. The actual pixel backend may still fall back to CoreGraphics
-/// when ScreenCaptureKit is unavailable at runtime.
+/// ADR-157 routing: macOS 14 APIs require both the running OS and the build
+/// SDK. Older SDKs use SCStream on 12.3+; capture errors never select legacy.
 pub const fn macos_capture_pixel_backend(
     major: u32,
     minor: u32,

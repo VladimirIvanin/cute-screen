@@ -1,5 +1,20 @@
 # Трассируемость требований
 
+## macOS desktop через ScreenCaptureKit (2026-10-28, ADR-157)
+
+`REQ-CAP-001/002/008/013/014/015`, ADR-157: Screen и frozen Area используют
+один native desktop backend: CoreGraphics только на 12.0–12.2, первый complete
+кадр SCStream на 12.3+, SCScreenshotManager на 14+ при SDK 14+. Старый SDK
+на новой ОС использует SCStream, без скрытого legacy fallback. Разрешение,
+отмена, timeout и изменение дисплеев различаются; callbacks не удерживают
+Rust pointers. Общий opaque BGRA desktop сохраняет top-down coordinates и
+Retina/mixed-scale layout. До кода — failing Rust ABI/length/status contracts;
+native routing/composition tests, CI SDK branches и реальные decoded Screen/Area
+на 12.7.6 и 14+ требуются отдельно. Windows checks не доказывают macOS runtime.
+Реализован общий native helper и metadata выбранного backend; portable Rust
+ABI/status tests прошли после red-first compile failure. Native tests добавлены
+в Intel/ARM CI; фактическая macOS compilation/runtime этим запуском не проверена.
+
 При устранении уязвимой зависимости Wayland активация по REQ-ACT-003/006/011
 и REQ-CAP-012 сохраняет контракт ADR-156; проверка зависимостей охватывает все
 платформы, а реальный Wayland focus по-прежнему требует отдельного runtime-теста.

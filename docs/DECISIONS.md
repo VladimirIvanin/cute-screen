@@ -1,5 +1,46 @@
 # Журнал архитектурных решений
 
+## ADR-157: macOS desktop capture
+
+**Статус:** accepted (2026-10-28); заменяет Area/desktop routing ADR-038,
+сохраняет baseline 12.0, permission recovery ADR-152 и Window gate ADR-110.
+
+**Контекст:** Screen и frozen Area фактически использовали CGWindowListCreateImage
+на всех ОС. Наличие SCScreenshotManager в отключённой Window-ветке не обновляло
+эти пути. SDK сборки и runtime OS — независимые ограничения. Apple документирует
+[ScreenCaptureKit с 12.3 и screenshot API с 14](https://developer.apple.com/videos/play/wwdc2023/10136/).
+Стабильность разрешений TCC зависит также от идентичности подписи; смена backend
+не заменяет пользовательское разрешение и не обещает сохранение grant между
+ad-hoc сборками ([Apple DTS](https://developer.apple.com/forums/thread/751658)).
+
+**Решение:** Screen и Area получают owned opaque desktop из одного native helper.
+На 12.0–12.2 используется CoreGraphics; на 12.3+ — первый complete кадр SCStream;
+на 14+ при SDK 14+ — SCScreenshotManager. SDK 13.x на новой ОС использует SCStream,
+а не legacy fallback. Технический сбой/отказ/timeout не переключает backend.
+Существующий main-thread permission preflight остаётся до захвата.
+
+Один список shareable content обслуживает активные дисплеи. Запросы кадров
+запускаются до ожидания результатов; поток каждого дисплея останавливается
+после первого complete кадра. Собственные окна исключаются по PID. Кадры
+копируются из SCK pools в собственные bitmap, сводятся в top-down desktop
+с равномерным максимальным physical/logical scale и чёрными промежутками.
+До публикации сверяется layout; изменение возвращает invalidTarget.
+Selector и Quick handoff получают тот же frozen desktop, нового picker нет.
+
+Native waiter имеет общий deadline 10 секунд и проверяет cancel; stream cleanup
+имеет общий deadline 2 секунды. Поздние callbacks удерживают только native state,
+никогда Rust context/output. Screen пересекает FFI как owned BGRA allocation
+с проверяемым ABI/длиной и RAII release; Area сохраняет существующий temporary PNG.
+Metadata называет фактический выбранный pixel backend.
+
+**Проверяемое основание:** failing-first Rust ABI/length/status contracts;
+native matrix 12.0/12.2/12.3/12.7/13/14/15 × SDK 13/14, synthetic bitmap
+orientation/origin/scale и cancel/timeout/late callback/error tests. CI собирает
+native code, syntax-checks SDK-13 branch и запускает macOS contracts на Intel/ARM.
+Windows checks не компилируют Objective-C. Реальные 12.7.6/14+ Screen/Area,
+grant/deny/relaunch, Retina/mixed-scale и decoded exports остаются pending до
+платформенного запуска; результаты фиксируются в TESTING/ACCEPTANCE.
+
 ## ADR-156 — Отмена portal-запросов и адресная активация Wayland
 
 **Статус:** accepted (2026-10-26); дополняет ADR-070 и ADR-122.
@@ -2427,7 +2468,8 @@ ADR-020 отложен, пока нет машины владельца.
 
 ## ADR-038 — Native macOS Area/Window selector и versioned capture routing
 
-**Статус:** accepted для Area/baseline; Window superseded by ADR-091
+**Статус:** superseded для Area/baseline by [ADR-157](#adr-157-macos-desktop-capture);
+Window superseded by ADR-091/110.
 
 **Контекст:** ADR-037 фиксирует первый Screen-only срез и не определяет
 Area/Window selector, минимальную версию macOS или маршрутизацию между

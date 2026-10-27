@@ -11,27 +11,32 @@ use std::{
 use core_graphics::{
     display::CGDisplay,
     geometry::{CGPoint, CGRect, CGSize},
-    window::{
-        kCGNullWindowID, kCGWindowImageBestResolution, kCGWindowImageShouldBeOpaque,
-        kCGWindowListOptionOnScreenOnly,
-    },
 };
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-use crate::macos_ffi::{CancellationProbe, NativeCaptureSelection, atomic_cancel_requested};
+use crate::macos_ffi::{
+    CancellationProbe, NativeCaptureSelection, NativeDesktopFrame, atomic_cancel_requested,
+    native_capture_error_code,
+};
 use crate::{
     image_transport::ImageTransportService,
     platform::{CaptureGeometry, CaptureResult, CaptureTarget, PlatformError, PlatformErrorCode},
 };
 
-/// macOS desktop capture. Screen uses a CoreGraphics snapshot. Area/Window
-/// use a native AppKit selector; pixel routing follows ADR-038 and falls back
-/// to CoreGraphics when ScreenCaptureKit is unavailable.
+/// Screen and frozen Area share the versioned native desktop backend (ADR-157).
+/// CoreGraphics is used only on macOS 12.0–12.2; newer systems use SCK.
 pub struct MacosScreenCaptureAdapter;
 
 unsafe extern "C" {
     fn cute_screen_capture_access(request: bool) -> bool;
+    fn cute_capture_desktop_frame(
+        bounds: CGRect,
+        cancel_context: *const std::ffi::c_void,
+        cancel_probe: Option<CancellationProbe>,
+        frame: *mut NativeDesktopFrame,
+    ) -> c_int;
+    fn cute_release_desktop_frame(frame: *mut NativeDesktopFrame);
     fn cute_capture_area(
         output_path: *const c_char,
         cancel_context: *const std::ffi::c_void,
@@ -50,6 +55,12 @@ unsafe extern "C" {
     fn cute_macos_system_window_picker_available() -> bool;
     #[cfg(test)]
     fn cute_macos_build_sdk_version() -> c_int;
+    #[cfg(test)]
+    fn cute_macos_desktop_backend_for_version(major: c_int, minor: c_int, sdk: c_int) -> c_int;
+    #[cfg(test)]
+    fn cute_macos_desktop_composition_contract() -> bool;
+    #[cfg(test)]
+    fn cute_macos_desktop_wait_contract() -> bool;
     fn cute_window_selector_set_locale(russian: bool);
     fn cute_quick_capture_set_presentation(window: *mut std::ffi::c_void, revealed: bool);
     fn cute_quick_capture_fit_pointer_screen(window: *mut std::ffi::c_void) -> bool;
@@ -171,7 +182,7 @@ fn macos_window_candidate_accepted(own_pid: i32, candidate: &MacosWindowCandidat
         && candidate.height >= 2.0
 }
 
-fn native_pixel_backend_name() -> &'static str {
+pub(crate) fn native_pixel_backend_name() -> &'static str {
     match unsafe { cute_macos_pixel_backend() } {
         2 => "screenCaptureKitScreenshot",
         1 => "screenCaptureKitStream",
@@ -221,8 +232,14 @@ impl MacosScreenCaptureAdapter {
         if matches!(target, CaptureTarget::Area | CaptureTarget::Window) {
             return capture_interactive_target(target, correlation_id, &transport, &cancel_signal);
         }
-        let (bgra, geometry) = capture_desktop_frame(correlation_id)?;
+        let (bgra, geometry) = capture_desktop_frame(correlation_id, &cancel_signal)?;
         let encoded = encode_bgra_png(&bgra, geometry.width, geometry.height, correlation_id)?;
+        if cancel_signal.load(Ordering::Acquire) {
+            return Err(PlatformError::new(
+                PlatformErrorCode::Cancelled,
+                correlation_id,
+            ));
+        }
         let image_token = Uuid::now_v7().simple().to_string();
         transport.import_owned_bytes(
             &image_token,
@@ -281,34 +298,16 @@ fn capture_interactive_target(
             _ => return Err(failure(correlation_id, "selectorTarget")),
         }
     };
-    match status {
-        0 => {}
-        1 => {
-            return Err(PlatformError::new(
-                PlatformErrorCode::Cancelled,
-                correlation_id,
-            ));
-        }
-        2 => {
-            return Err(PlatformError::new(
-                PlatformErrorCode::PermissionDenied,
-                correlation_id,
-            ));
-        }
-        4 => {
-            return Err(PlatformError::new(
-                PlatformErrorCode::InvalidTarget,
-                correlation_id,
-            ));
-        }
-        _ => {
-            let mut error = failure(correlation_id, "nativeSelector");
-            error.context.insert(
-                "pixelBackend".to_owned(),
-                native_pixel_backend_name().to_owned(),
-            );
-            return Err(error);
-        }
+    if let Some(code) = native_capture_error_code(status) {
+        let mut error = PlatformError::new(code, correlation_id);
+        error
+            .context
+            .insert("stage".to_owned(), "nativeSelector".to_owned());
+        error.context.insert(
+            "pixelBackend".to_owned(),
+            native_pixel_backend_name().to_owned(),
+        );
+        return Err(error);
     }
     let mut handoff_failure = SelectorHandoffFailureGuard(target == CaptureTarget::Area);
     if selection.width == 0
@@ -441,8 +440,19 @@ fn require_screen_recording(correlation_id: &str) -> Result<(), PlatformError> {
     ))
 }
 
+struct OwnedDesktopFrame(NativeDesktopFrame);
+
+impl Drop for OwnedDesktopFrame {
+    fn drop(&mut self) {
+        // SAFETY: the record is initialized only by the matching native bridge;
+        // release accepts a zero record and clears the allocation after freeing.
+        unsafe { cute_release_desktop_frame(&mut self.0) };
+    }
+}
+
 fn capture_desktop_frame(
     correlation_id: &str,
+    cancel_signal: &AtomicBool,
 ) -> Result<(Vec<u8>, CaptureGeometry), PlatformError> {
     let displays =
         CGDisplay::active_displays().map_err(|_| failure(correlation_id, "displayList"))?;
@@ -452,28 +462,45 @@ fn capture_desktop_frame(
         .collect();
     let bounds = desktop_capture_bounds(&display_bounds)
         .ok_or_else(|| failure(correlation_id, "noDisplays"))?;
-    let image = CGDisplay::screenshot(
-        bounds,
-        kCGWindowListOptionOnScreenOnly,
-        kCGNullWindowID,
-        kCGWindowImageBestResolution | kCGWindowImageShouldBeOpaque,
-    )
-    .ok_or_else(|| {
-        if screen_recording_allowed(false) {
-            failure(correlation_id, "desktopSnapshot")
-        } else {
-            PlatformError::new(PlatformErrorCode::PermissionDenied, correlation_id)
-        }
-    })?;
-    let width = u32::try_from(image.width()).map_err(|_| failure(correlation_id, "imageWidth"))?;
-    let height =
-        u32::try_from(image.height()).map_err(|_| failure(correlation_id, "imageHeight"))?;
-    let stride = image.bytes_per_row();
-    if image.bits_per_pixel() != 32 {
-        return Err(failure(correlation_id, "unexpectedPixelFormat"));
+    let fingerprint = layout_fingerprint(&displays);
+    let mut frame = OwnedDesktopFrame(NativeDesktopFrame::default());
+    // SAFETY: native capture is synchronous; only its waiter probes the borrowed
+    // AtomicBool. Completion handlers retain native objects, never Rust pointers.
+    let status = unsafe {
+        cute_capture_desktop_frame(
+            bounds,
+            std::ptr::from_ref(cancel_signal).cast(),
+            Some(atomic_cancel_requested),
+            &mut frame.0,
+        )
+    };
+    if let Some(code) = native_capture_error_code(status) {
+        let mut error = PlatformError::new(code, correlation_id);
+        error
+            .context
+            .insert("stage".to_owned(), "desktopSnapshot".to_owned());
+        error.context.insert(
+            "pixelBackend".to_owned(),
+            native_pixel_backend_name().to_owned(),
+        );
+        return Err(error);
     }
-    let data = image.data();
-    let bgra = packed_bgra_from_padded_rows(data.bytes(), width, height, stride, correlation_id)?;
+    let current =
+        CGDisplay::active_displays().map_err(|_| failure(correlation_id, "displayList"))?;
+    if current != displays || layout_fingerprint(&current) != fingerprint {
+        return Err(PlatformError::new(
+            PlatformErrorCode::InvalidTarget,
+            correlation_id,
+        ));
+    }
+    let len = frame
+        .0
+        .checked_len()
+        .ok_or_else(|| failure(correlation_id, "nativeDesktopBuffer"))?;
+    let (width, height) = (frame.0.width, frame.0.height);
+    // SAFETY: the successful bridge owns exactly `len` initialized BGRA bytes;
+    // metadata is validated and the guard keeps them alive until this copy ends.
+    let bgra = unsafe { std::slice::from_raw_parts(frame.0.data, len) }.to_vec();
     Ok((
         bgra,
         CaptureGeometry {
@@ -483,7 +510,7 @@ fn capture_desktop_frame(
             height,
             source_width: width,
             source_height: height,
-            layout_fingerprint: Some(layout_fingerprint(&displays)),
+            layout_fingerprint: Some(fingerprint),
             monitor_ids: Some(displays.iter().map(ToString::to_string).collect()),
         },
     ))
@@ -525,43 +552,6 @@ fn layout_fingerprint(display_ids: &[u32]) -> String {
         ));
     }
     format!("{:x}", Sha256::digest(payload.as_bytes()))
-}
-
-fn packed_bgra_from_padded_rows(
-    bytes: &[u8],
-    width: u32,
-    height: u32,
-    stride: usize,
-    correlation_id: &str,
-) -> Result<Vec<u8>, PlatformError> {
-    let width = usize::try_from(width).map_err(|_| failure(correlation_id, "packedWidth"))?;
-    let height = usize::try_from(height).map_err(|_| failure(correlation_id, "packedHeight"))?;
-    let row_bytes = width
-        .checked_mul(4)
-        .ok_or_else(|| failure(correlation_id, "packedRowBytes"))?;
-    if stride < row_bytes {
-        return Err(failure(correlation_id, "packedStride"));
-    }
-    let required = stride
-        .checked_mul(height)
-        .ok_or_else(|| failure(correlation_id, "packedBuffer"))?;
-    if bytes.len() < required {
-        return Err(failure(correlation_id, "packedLength"));
-    }
-    let mut packed = vec![
-        0;
-        checked_pixel_len(
-            u32::try_from(width).map_err(|_| failure(correlation_id, "packedWidthU32"))?,
-            u32::try_from(height).map_err(|_| failure(correlation_id, "packedHeightU32"))?,
-        )
-        .ok_or_else(|| failure(correlation_id, "packedSize"))?
-    ];
-    for row in 0..height {
-        let source = row * stride;
-        let target = row * row_bytes;
-        packed[target..target + row_bytes].copy_from_slice(&bytes[source..source + row_bytes]);
-    }
-    Ok(packed)
 }
 
 fn encode_bgra_png(
@@ -610,20 +600,12 @@ mod tests {
     use super::{
         CuteRect, MacosScreenCaptureAdapter, MacosWindowCandidate, NativeCaptureSelection,
         encode_bgra_png, geometry_from_native_selection, macos_window_candidate_accepted,
-        packed_bgra_from_padded_rows,
     };
     use crate::{
         image_transport::ImageTransportService,
         platform::{CaptureTarget, PlatformErrorCode},
     };
     use std::sync::{Arc, atomic::AtomicBool};
-
-    #[test]
-    fn packed_rows_drop_stride_padding() {
-        let padded = [1, 2, 3, 4, 9, 9, 5, 6, 7, 8, 9, 9];
-        let packed = packed_bgra_from_padded_rows(&padded, 1, 2, 6, "stride").expect("packed");
-        assert_eq!(packed, vec![1, 2, 3, 4, 5, 6, 7, 8]);
-    }
 
     #[test]
     fn screen_bounds_cover_exactly_the_displays() {
@@ -745,6 +727,65 @@ mod tests {
             (0..=2).contains(&backend),
             "unexpected pixel backend {backend}"
         );
+    }
+
+    #[test]
+    fn desktop_backend_obeys_runtime_and_build_sdk() {
+        let cases = [
+            (12, 0, 140000, 0),
+            (12, 2, 140000, 0),
+            (12, 3, 130100, 1),
+            (12, 7, 130100, 1),
+            (13, 6, 140000, 1),
+            (14, 0, 130100, 1),
+            (14, 0, 140000, 2),
+            (15, 0, 150000, 2),
+        ];
+        for (major, minor, sdk, expected) in cases {
+            // SAFETY: this is the pure routing function used by the native backend.
+            assert_eq!(
+                unsafe { super::cute_macos_desktop_backend_for_version(major, minor, sdk) },
+                expected
+            );
+            let policy = crate::platform::macos_capture_pixel_backend(
+                u32::try_from(major).expect("major"),
+                u32::try_from(minor).expect("minor"),
+                u32::try_from(sdk / 10000).expect("SDK major"),
+            );
+            use crate::platform::MacosCapturePixelBackend;
+            assert_eq!(
+                expected,
+                match policy {
+                    MacosCapturePixelBackend::CoreGraphicsLegacy => 0,
+                    MacosCapturePixelBackend::ScreenCaptureKitStream => 1,
+                    MacosCapturePixelBackend::ScreenCaptureKitScreenshot => 2,
+                }
+            );
+        }
+        let version = std::process::Command::new("sw_vers")
+            .arg("-productVersion")
+            .output()
+            .expect("OS version");
+        let version = String::from_utf8(version.stdout).expect("UTF-8 OS version");
+        let mut parts = version.trim().split('.');
+        let major = parts.next().expect("major").parse().expect("major integer");
+        let minor = parts.next().unwrap_or("0").parse().expect("minor integer");
+        let sdk = unsafe { super::cute_macos_build_sdk_version() };
+        assert_eq!(unsafe { super::cute_macos_pixel_backend() }, unsafe {
+            super::cute_macos_desktop_backend_for_version(major, minor, sdk)
+        });
+    }
+
+    #[test]
+    fn desktop_composition_keeps_negative_origins_scale_and_top_down_bgra() {
+        // SAFETY: the native contract uses synthetic bitmap contexts, no TCC calls.
+        assert!(unsafe { super::cute_macos_desktop_composition_contract() });
+    }
+
+    #[test]
+    fn desktop_wait_distinguishes_cancel_timeout_permission_and_late_callbacks() {
+        // SAFETY: uses native state/synthetic errors without starting capture.
+        assert!(unsafe { super::cute_macos_desktop_wait_contract() });
     }
 
     #[test]

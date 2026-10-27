@@ -4,6 +4,7 @@ fn main() {
         warn_about_legacy_macos_sdk();
         cc::Build::new()
             .file("src/macos_capture_bridge.m")
+            .file("src/macos_desktop_capture.m")
             .file("src/macos_window_capture.m")
             .file("src/macos_autostart_bridge.m")
             .flag("-fobjc-arc")
@@ -21,6 +22,8 @@ fn main() {
         println!("cargo:rustc-link-lib=framework=UniformTypeIdentifiers");
         println!("cargo:rustc-link-lib=framework=ServiceManagement");
         println!("cargo:rerun-if-changed=src/macos_capture_bridge.m");
+        println!("cargo:rerun-if-changed=src/macos_desktop_capture.m");
+        println!("cargo:rerun-if-changed=src/macos_desktop_capture.h");
         println!("cargo:rerun-if-changed=src/macos_window_capture.m");
         println!("cargo:rerun-if-changed=src/macos_window_capture.h");
         println!("cargo:rerun-if-changed=src/macos_autostart_bridge.m");
@@ -50,7 +53,7 @@ fn warn_about_legacy_macos_sdk() {
     if major.is_some_and(|major| major < 14) {
         println!(
             "cargo:warning=macOS SDK {version} < 14: system window picker and SCScreenshotManager are compiled out; \
-             Window uses the AppKit selector with SCStream/CoreGraphics. Release builds require SDK 14+."
+             Desktop uses SCStream on macOS 12.3+; Window uses the AppKit selector. Release builds require SDK 14+."
         );
     }
 }

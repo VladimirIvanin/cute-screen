@@ -472,8 +472,13 @@ Baseline macOS 12.0 из ADR-038 задан и в `bundle.macOS.minimumSystemVer
 нужна для прямых `cargo test`/`cargo check` в CI: они не читают Tauri bundle
 settings, а cc-rs без target может выбрать macOS 15.5 и отклонить
 `CGWindowListCreateImage` как obsoleted. Явное значение переменной окружения
-сохраняет приоритет над default Cargo. Это настройка сборки; она не подтверждает
-runtime capture на новых macOS и не реализует ScreenCaptureKit routing из ADR-038.
+сохраняет приоритет над default Cargo. Baseline не подтверждает runtime capture.
+ADR-157 подключает общий Screen/Area backend: CoreGraphics на 12.0–12.2,
+SCStream на 12.3+, SCScreenshotManager на 14+ с SDK 14+. С SDK 13.x новая ОС
+использует SCStream. `macos_desktop_capture.m` входит в сборку и CI legacy
+syntax check. `cargo test --locked --package cute-screen-desktop --lib macos`
+проверяет native contracts без системного захвата; реальные Screen/Area и
+разрешения на 12.7.6/14+ требуют отдельной проверки установленного приложения.
 
 Deployment target и SDK — разные ограничения (ADR-109). На macOS 12 доступен
 максимум Xcode 14.2 / Command Line Tools с SDK 13.1; такая сборка годится для

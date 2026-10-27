@@ -3,6 +3,7 @@
 #import <ImageIO/ImageIO.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #import "macos_window_capture.h"
+#import "macos_desktop_capture.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <unistd.h>
@@ -659,12 +660,6 @@ static CGRect CuteDisplayBounds(NSScreen *screen) {
   return CGDisplayBounds((CGDirectDisplayID)screenNumber.unsignedIntValue);
 }
 
-static CGImageRef CuteCreateVirtualDesktopImage(CGRect desktopBounds) {
-  return CGWindowListCreateImage(desktopBounds, kCGWindowListOptionOnScreenOnly,
-                                 kCGNullWindowID,
-                                 kCGWindowImageBestResolution | kCGWindowImageShouldBeOpaque);
-}
-
 static NSWindow *CuteMakeOverlayWindow(NSScreen *screen, CuteCaptureView **outView,
                                        CuteCaptureMode mode, CGImageRef frozen,
                                        CuteRect mainScreenFrame, CuteRect desktopPixelFrame,
@@ -727,10 +722,11 @@ static int32_t CuteRunSelectionInner(CuteCaptureMode mode, const char *outputPat
     result->status = 3;
     return 3;
   }
-  CGImageRef virtualFrozen = CuteCreateVirtualDesktopImage(quartzBounds);
+  int32_t snapshotStatus = 3;
+  CGImageRef virtualFrozen = CuteCreateDesktopImage(quartzBounds, cancelContext, cancelProbe, &snapshotStatus);
   if (virtualFrozen == NULL) {
-    result->status = 3;
-    return 3;
+    result->status = snapshotStatus;
+    return snapshotStatus;
   }
   size_t virtualImageWidth = CGImageGetWidth(virtualFrozen);
   size_t virtualImageHeight = CGImageGetHeight(virtualFrozen);
@@ -948,11 +944,4 @@ int32_t cute_capture_window(const char *outputPath, const void *cancelContext,
     return status;
   }
   return CuteRunSelection(CuteCaptureModeWindow, outputPath, cancelContext, cancelProbe, result);
-}
-
-int32_t cute_macos_pixel_backend(void) {
-  // The current bridge captures still images through CoreGraphics on every
-  // supported release. Do not label diagnostics as ScreenCaptureKit until the
-  // SCStream/SCScreenshotManager implementation is actually wired in.
-  return 0;
 }

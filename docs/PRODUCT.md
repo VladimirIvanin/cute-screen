@@ -188,6 +188,10 @@ Cute Screen — полноценный local-first редактор снимко
   `permissionDenied` без overlay и без зависших окон. UI объясняет переход в
   System Settings и что разрешение начинает действовать после полного перезапуска. Intel и Apple Silicon используют один
   adapter; capability не объявляется `supported` без runtime smoke.
+  Screen и frozen Area используют общий versioned desktop backend: CoreGraphics
+  на 12.0–12.2, первый complete кадр ScreenCaptureKit на 12.3+, screenshot API на
+  14+ при SDK 14+. Старый SDK на новой ОС использует SCStream. Отказ, timeout
+  и техническая ошибка не переключают захват на legacy backend (ADR-157).
 
 ## Запуск и горячие клавиши
 

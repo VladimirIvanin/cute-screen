@@ -1247,17 +1247,21 @@ fn fake_capture_frame(
     })
 }
 
+#[cfg(target_os = "macos")]
 fn capture_backend_metadata_name(action: CaptureAction) -> &'static str {
-    #[cfg(target_os = "macos")]
     if action == CaptureAction::Window {
-        return crate::macos_platform::window_pixel_backend_name();
+        crate::macos_platform::window_pixel_backend_name()
+    } else {
+        crate::macos_platform::native_pixel_backend_name()
     }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn capture_backend_metadata_name(action: CaptureAction) -> &'static str {
     if cfg!(target_os = "windows") && action == CaptureAction::Window {
         "windowsGraphicsCapture"
     } else if cfg!(target_os = "windows") {
         "windowsDxgi"
-    } else if cfg!(target_os = "macos") {
-        "macosScreenCapture"
     } else if cfg!(target_os = "linux")
         && std::env::var("XDG_SESSION_TYPE")
             .is_ok_and(|session| session.eq_ignore_ascii_case("x11"))
@@ -1709,7 +1713,11 @@ mod tests {
     fn macos_capture_metadata_names_the_native_backend() {
         assert_eq!(
             super::capture_backend_metadata_name(CaptureAction::Screen),
-            "macosScreenCapture"
+            crate::macos_platform::native_pixel_backend_name()
+        );
+        assert_eq!(
+            super::capture_backend_metadata_name(CaptureAction::Area),
+            crate::macos_platform::native_pixel_backend_name()
         );
     }
 

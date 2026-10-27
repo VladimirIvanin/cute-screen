@@ -1048,10 +1048,13 @@ names и успешные wire shapes, но возвращают единый `C
 - `HotkeyService` — Tauri/global-hotkey для X11/Windows/macOS, XDG portal для Wayland.
 - `platform/macos` — Screen Recording probe, native AppKit Area/Window selector
   и versioned capture routing при deployment baseline macOS 12.0:
-  CoreGraphics fallback на 12.0–12.2, intended one-shot `SCStream` на 12.3–13,
-  `SCScreenshotManager` и system window picker на 14+. Area передаёт frozen
-  multi-display draft в quick-mode; Window создаёт direct document. Runtime
-  availability проверяется динамически; реальные platform smokes ещё pending.
+  общий desktop helper для Screen/Area использует CoreGraphics на 12.0–12.2,
+  первый complete кадр `SCStream` на 12.3+, `SCScreenshotManager` на 14+ при
+  SDK 14+. Старый SDK на новой ОС выбирает SCStream; ошибка не запускает legacy
+  fallback (ADR-157). Owned per-display frames сводятся с максимальным scale;
+  layout проверяется повторно, native callbacks не удерживают Rust pointers.
+  Area передаёт frozen multi-display draft в quick-mode. Window capability
+  отключена ADR-110; её native код сохраняется. Реальные platform smokes pending.
 - `cute-screen-storage` — независимый от Tauri workspace crate: синхронный
   `LibraryRepository` принадлежит одному worker, клонируемый `StorageHandle`
   использует bounded Tokio channel и oneshot responses.

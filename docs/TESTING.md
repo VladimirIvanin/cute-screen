@@ -1,5 +1,27 @@
 # Стратегия тестирования
 
+## ScreenCaptureKit desktop (2026-10-28, ADR-157)
+
+Baseline `58196e0781c11b321fe9ab8563c364cada7a9d0f` + рабочая копия,
+Windows x64 / PowerShell / Rust 1.97.0. До реализации
+`cargo test --package cute-screen-desktop --lib macos_ffi::tests` завершился
+ожидаемым compile failure: отсутствовали NativeDesktopFrame и status mapping.
+После реализации та же команда: 4 passed; `cargo test --workspace`:
+208 passed, 1 existing ignored, doctests passed. Проверены ABI, exact BGRA length,
+null/empty/overflow rejection, status distinction и atomic cancellation probe.
+
+`cargo fmt --all`, `pnpm format` и полный `pnpm check`: passed, включая
+lint/typecheck/format/docs, boundary tests, IPC/schema и все configured Clippy
+passes. Первый check остановился на неверном ADR anchor; ссылка исправлена,
+повторная полная команда завершилась с exit 0. Evidence — `artifacts/macos-sck/`.
+
+Новые native contracts проверяют настоящие CoreGraphics bitmap helpers,
+version routing и native waiter без запроса TCC. В macOS Intel/ARM CI добавлены
+их запуск и legacy-SDK syntax check нового `.m`. Они ещё не запускались на Mac
+в рамках этой сессии; Windows не компилирует этот Objective-C код.
+Реальные grant/deny/relaunch, Screen/Area, Retina/mixed-scale, decoded exports
+и завершение SCStream на macOS 12.7.6/14+ остаются pending. Чеклист — ACCEPTANCE.md.
+
 ## Portal lifecycle и screenshot research (2026-10-26, ADR-156)
 
 Baseline `8fe6c91` (main после fast-forward), рабочая копия. Windows x64 /

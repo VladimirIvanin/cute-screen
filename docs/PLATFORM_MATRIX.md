@@ -1337,12 +1337,15 @@ UI получает `CaptureCapabilities` и не показывает непо�
 - ADR-110: на macOS доступны только Area и Screen; Window target не объявляется,
   tray menu не содержит «Снимок окна».
 - Deployment baseline — macOS 12.0. Native AppKit selector обслуживает Area и
-  Window. Intended pixel routing: legacy CoreGraphics fallback на 12.0–12.2,
-  one-shot `SCStream` на 12.3–13, `SCScreenshotManager` и system window picker
-  на 14+; API availability проверяется во время выполнения, а маршрут 14+
-  дополнительно требует SDK 14+ при сборке (ADR-109).
-- Area использует frozen multi-display frame и quick-mode. Window создаёт
-  direct document без quick-mode.
+  отключённую Window-ветку. Screen/Area делят native desktop helper (ADR-157):
+  CoreGraphics только на 12.0–12.2, первый complete SCStream frame на 12.3+,
+  SCScreenshotManager на 14+ с SDK 14+. При старом SDK новая ОС использует SCStream.
+  Отказ, timeout и capture failure не запускают legacy fallback. Точные ветки
+  проверяются native tests; Windows pass не подтверждает их компиляцию/runtime.
+- Area использует frozen multi-display frame и quick-mode. Desktop имеет uniform
+  maximum scale, top-down pixels и отрицательные logical origins; источники
+  копируются до возврата SCK callbacks, потоки завершаются, layout сверяется.
+  Реальные Retina/mixed-scale, grant/relaunch и capture на 12.7.6/14+ pending.
 - Локальный macOS 12.7.6 x64 startup smoke (2026-08-29) подтвердил только
   Screen-only поведение существующего среза и отсутствие prewarmed
   `quick-capture` окна; он не подтверждает новую Area/Window архитектуру.
