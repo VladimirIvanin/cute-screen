@@ -12,6 +12,7 @@ import {
 import { expect } from 'vitest'
 import type { Canvas2DLike } from './backends/canvas2d/contracts'
 import { Canvas2DRenderer } from './backends/canvas2d/renderer'
+import { resolveCanvas2DTestFontFamily } from './canvas2d-fonts.test-kit'
 
 export function asHtmlCanvas(canvas: Canvas): HTMLCanvasElement {
   return canvas as unknown as HTMLCanvasElement
@@ -73,6 +74,7 @@ export async function canvas2dPng(
   }> = {},
 ): Promise<Uint8Array> {
   const renderer = new Canvas2DRenderer({
+    resolveFontFamily: resolveCanvas2DTestFontFamily,
     exportCanvas: (width, height) => createCanvas(width, height) as unknown as Canvas2DLike,
   })
   const preview = createCanvas(scene.outputBounds.width, scene.outputBounds.height)

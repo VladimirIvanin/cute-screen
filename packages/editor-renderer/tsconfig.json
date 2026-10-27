@@ -13,6 +13,6 @@
     "lib": ["ES2023", "DOM", "DOM.Iterable"]
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.test.ts"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test-kit.ts"],
   "references": [{ "path": "../editor-core" }]
 }

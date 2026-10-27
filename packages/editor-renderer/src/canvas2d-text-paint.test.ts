@@ -11,6 +11,7 @@ import {
 
 import type { Canvas2DLike } from './backends/canvas2d/contracts'
 import { Canvas2DRenderer } from './backends/canvas2d/renderer'
+import { resolveCanvas2DTestFontFamily } from './canvas2d-fonts.test-kit'
 
 function asHtmlCanvas(canvas: unknown): HTMLCanvasElement {
   return canvas as unknown as HTMLCanvasElement
@@ -33,7 +34,7 @@ function verticalInkCenter(canvas: Canvas): number {
 
 describe('Canvas2D renderer text and paints', () => {
   it('renders committed multiline text through the same Canvas2D scene path', async () => {
-    const renderer = new Canvas2DRenderer()
+    const renderer = new Canvas2DRenderer({ resolveFontFamily: resolveCanvas2DTestFontFamily })
     const sceneCanvas = createCanvas(160, 80)
     await renderer.initialize({
       scene: asHtmlCanvas(sceneCanvas),
@@ -59,7 +60,7 @@ describe('Canvas2D renderer text and paints', () => {
               {
                 start: 0,
                 end: 3,
-                fontFamily: 'sans-serif',
+                fontFamily: 'Roboto',
                 fontSize: 24,
                 color: { red: 1, green: 0, blue: 0, alpha: 1 },
                 fontWeight: 400,
@@ -85,7 +86,7 @@ describe('Canvas2D renderer text and paints', () => {
   })
 
   it('visually centers numbered-marker digits from measured glyph ink', async () => {
-    const renderer = new Canvas2DRenderer()
+    const renderer = new Canvas2DRenderer({ resolveFontFamily: resolveCanvas2DTestFontFamily })
     const sceneCanvas = createCanvas(64, 64)
     await renderer.initialize({
       scene: asHtmlCanvas(sceneCanvas),
@@ -135,7 +136,7 @@ describe('Canvas2D renderer text and paints', () => {
   })
 
   it('renders mixed run colors, a metadata bullet and strikethrough', async () => {
-    const renderer = new Canvas2DRenderer()
+    const renderer = new Canvas2DRenderer({ resolveFontFamily: resolveCanvas2DTestFontFamily })
     const sceneCanvas = createCanvas(160, 80)
     await renderer.initialize({
       scene: asHtmlCanvas(sceneCanvas),
@@ -162,7 +163,7 @@ describe('Canvas2D renderer text and paints', () => {
               {
                 start: 0,
                 end: 1,
-                fontFamily: 'sans-serif',
+                fontFamily: 'Roboto',
                 fontSize: 32,
                 color: { red: 0, green: 0, blue: 1, alpha: 1 },
                 fontWeight: 400,
@@ -172,7 +173,7 @@ describe('Canvas2D renderer text and paints', () => {
               {
                 start: 1,
                 end: 3,
-                fontFamily: 'serif',
+                fontFamily: 'PT Serif',
                 fontSize: 24,
                 color: { red: 1, green: 0, blue: 0, alpha: 1 },
                 fontWeight: 700,

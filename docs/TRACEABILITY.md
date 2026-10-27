@@ -1,5 +1,13 @@
 # Трассируемость требований
 
+## Детерминированные шрифты Canvas2D unit tests (2026-10-28)
+
+`REQ-TOL-005/010`, `REQ-OUT-003`: text/ruler pixel tests должны регистрировать
+встроенные Roboto и PT Serif с используемыми weight/style под отдельными test
+aliases и явно выбирать их через Canvas2D font resolver. Системные generic
+families не задают метрики fixture. Проверки пикселей и допуски сохраняются;
+focused suite проверяется также с `DISABLE_SYSTEM_FONTS_LOAD=1`.
+
 ## macOS smoke lifecycle repair (2026-10-28)
 
 REQ-CAP-001/002/014/015: smoke обязан обслуживать AppKit main queue во время

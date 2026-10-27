@@ -1,5 +1,25 @@
 # Стратегия тестирования
 
+## Шрифты Canvas2D unit tests (2026-10-28)
+
+Baseline `6a49290` + рабочая копия, macOS 12.7.6 Intel x86_64.
+Text/ruler fixtures регистрируют встроенные Latin faces Roboto 400/600/700 normal
+и PT Serif 700 italic под private aliases и выбирают их через font resolver.
+Отсутствующий font asset завершает setup ошибкой. Generic families заменены
+конкретными; проверки пикселей и допуски не изменены. Test kits исключены
+из production TypeScript build, но проверяются через tests tsconfig.
+
+`DISABLE_SYSTEM_FONTS_LOAD=1 pnpm exec vitest run --project renderer packages/editor-renderer/src/canvas2d-text-paint.test.ts packages/editor-renderer/src/precision-canvas2d.test.ts`:
+2 files / 27 passed.
+`DISABLE_SYSTEM_FONTS_LOAD=1 pnpm exec vitest run --project renderer`:
+20 files / 200 passed. Это headless software evidence; повтор Linux CI
+остаётся необходимым для подтверждения устранения исходного сбоя.
+
+`pnpm exec tsc --noEmit -p packages/editor-renderer/tsconfig.json` и
+`pnpm exec vue-tsc --noEmit -p tests/tsconfig.json` — passed.
+Полный `pnpm check` и browser/native suites не запускались: production renderer
+не изменён. Краткий отчёт — `artifacts/canvas2d-test-fonts/summary.txt`.
+
 ## macOS smoke harness repair (2026-10-28)
 
 Baseline ab7e88b, macOS 12.7.6 Intel x86_64, SDK 13.1, Rust 1.97.0.
