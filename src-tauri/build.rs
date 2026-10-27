@@ -29,6 +29,13 @@ fn main() {
         println!("cargo:rerun-if-changed=src/macos_autostart_bridge.m");
         println!("cargo:rerun-if-env-changed=SDKROOT");
         println!("cargo:rerun-if-env-changed=DEVELOPER_DIR");
+        if std::env::var_os("CARGO_FEATURE_PLATFORM_SMOKE").is_some() {
+            cc::Build::new()
+                .file("src/macos_smoke_bridge.m")
+                .flag("-fobjc-arc")
+                .compile("cute_screen_macos_smoke");
+        }
+        println!("cargo:rerun-if-changed=src/macos_smoke_bridge.m");
     }
     tauri_build::build()
 }

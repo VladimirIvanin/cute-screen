@@ -1,5 +1,14 @@
 # Трассируемость требований
 
+## macOS smoke lifecycle repair (2026-10-28)
+
+REQ-CAP-001/002/014/015: smoke обязан обслуживать AppKit main queue во время
+capture-worker, возвращать ненулевой exit при unexpected outcome и проверять
+PNG полным decode с сопоставлением размеров. Native Area smoke не подменяет
+Quick WebView: проверяет selector/PNG отдельно, Escape — ожидаемый cancelled.
+Red-first contracts: отказ failed/denied/cancel вместо captured, truncated PNG
+и dimension mismatch. Runtime evidence фиксируется после прогона на macOS 12.7.6.
+
 ## macOS desktop через ScreenCaptureKit (2026-10-28, ADR-157)
 
 `REQ-CAP-001/002/008/013/014/015`, ADR-157: Screen и frozen Area используют

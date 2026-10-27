@@ -72,6 +72,7 @@ static CGImageRef CuteDesktopCopyImage(CGImageRef image) {
 @property(nonatomic, strong) id content;
 @property(nonatomic) int32_t status;
 @property(nonatomic) BOOL finished;
+@property(nonatomic, copy) NSString *stage;
 @end
 @implementation CuteDesktopResult
 - (void)dealloc { if (_image != NULL) CGImageRelease(_image); }
@@ -92,7 +93,7 @@ static int32_t CuteDesktopWait(CuteDesktopResult *state, const void *context,
     if (CuteDesktopCancelledNow(context, probe)) CuteDesktopFinish(state, NULL, CuteDesktopCancelled);
     @synchronized(state) { if (state.finished) return state.status; }
     if (NSProcessInfo.processInfo.systemUptime >= deadline) {
-      NSLog(@"Cute Screen desktop capture timed out");
+      NSLog(@"Cute Screen desktop capture timed out (%@)", state.stage ?: @"native contract");
       CuteDesktopFinish(state, NULL, CuteDesktopFailed);
       continue;
     }
@@ -237,6 +238,7 @@ static BOOL CuteDesktopStop(NSArray<CuteDesktopStream *> *requests) {
     CuteDesktopFinish(request.result, NULL, CuteDesktopCancelled);
     if (request.stream == nil) continue;
     CuteDesktopResult *stopped = [[CuteDesktopResult alloc] init];
+    stopped.stage = @"stopCapture";
     [stops addObject:stopped];
     [request.stream stopCaptureWithCompletionHandler:^(NSError *error) {
       if (error != nil) NSLog(@"Cute Screen desktop stream stop: %@", error);
@@ -267,6 +269,7 @@ static CGImageRef CuteDesktopSCK(CGRect bounds, const void *context,
   if (layout == nil) { *status = CuteDesktopInvalid; return NULL; }
   NSTimeInterval deadline = NSProcessInfo.processInfo.systemUptime + 10;
   CuteDesktopResult *loaded = [[CuteDesktopResult alloc] init];
+  loaded.stage = @"shareableContent";
   [SCShareableContent getShareableContentExcludingDesktopWindows:NO onScreenWindowsOnly:YES
       completionHandler:^(SCShareableContent *content, NSError *error) {
     if (error != nil) NSLog(@"Cute Screen shareable displays: %@", error);
@@ -312,6 +315,7 @@ static CGImageRef CuteDesktopSCK(CGRect bounds, const void *context,
       config.queueDepth = 3;
       CuteDesktopStream *request = [[CuteDesktopStream alloc] init];
       request.result = [[CuteDesktopResult alloc] init];
+      request.result.stage = @"firstFrame";
       [requests addObject:request];
       if (!CuteDesktopStart(filter, config, request)) { *status = request.result.status; break; }
     }

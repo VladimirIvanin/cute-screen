@@ -1,5 +1,32 @@
 # Стратегия тестирования
 
+## macOS smoke harness repair (2026-10-28)
+
+Baseline ab7e88b, macOS 12.7.6 Intel x86_64, SDK 13.1, Rust 1.97.0.
+`cargo test -p cute-screen-desktop --features platform-smoke --bin m04-platform-smoke macos_smoke_checks`:
+2 passed (unexpected terminal outcomes, full PNG decode/dimension validation).
+Первый повтор `pnpm smoke:m04:macos:screen` после AppKit-loop repair больше
+не зависает на permission dispatch: native capture вернул timeout, smoke
+сохранил JSON и завершился exit 1. Это подтверждает исправление false-success,
+но не успешный capture. Timeout теперь содержит этап: shareableContent,
+firstFrame или stopCapture. Повтор локализовал сбой: `firstFrame` (shareableContent
+уже получен). Runtime Screen/Area/Quick WebView остаётся pending.
+
+`cargo clippy -p cute-screen-desktop --features platform-smoke --bin m04-platform-smoke -- -D warnings`
+и `pnpm format:check` — passed. Полный `pnpm check` не запускался.
+
+`pnpm exec vitest run packages/editor-renderer/src/canvas2d-text-paint.test.ts packages/editor-renderer/src/precision-canvas2d.test.ts`:
+27 passed; повтор с `DISABLE_SYSTEM_FONTS_LOAD=1` — 27 passed. CI run
+40596405480 упал в Linux unit job; macOS Intel/ARM compile jobs прошли.
+Renderer failure из CI локально не воспроизведён, допуски не ослаблялись.
+
+`pnpm smoke:m04:macos:area` проверяет только native selector, сохраняет
+выделенный crop в `artifacts/m04/macos-area.png` и проверяет full-frame/crop PNG
+повторным decode. Это не Quick WebView/materialization evidence.
+`pnpm smoke:m04:macos:area-cancel` требует Escape и ожидает именно cancelled;
+permissionDenied/failed не считаются успешной отменой. После grant требуется
+новый запуск команды/приложения.
+
 ## ScreenCaptureKit desktop (2026-10-28, ADR-157)
 
 Baseline `58196e0781c11b321fe9ab8563c364cada7a9d0f` + рабочая копия,

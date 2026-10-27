@@ -1,3 +1,8 @@
+#[cfg(target_os = "macos")]
+mod macos_area_smoke;
+#[cfg(target_os = "macos")]
+mod macos_smoke_checks;
+
 #[cfg(target_os = "linux")]
 mod linux {
     use std::{
@@ -617,6 +622,38 @@ mod macos {
     };
     use serde::Serialize;
 
+    unsafe extern "C" {
+        fn cute_smoke_run_appkit(
+            context: *const std::ffi::c_void,
+            finished: extern "C" fn(*const std::ffi::c_void) -> bool,
+        );
+    }
+
+    extern "C" fn worker_finished(context: *const std::ffi::c_void) -> bool {
+        // SAFETY: run keeps the Arc alive until the native loop and worker end.
+        unsafe { &*context.cast::<std::sync::atomic::AtomicBool>() }
+            .load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    pub fn run() -> Result<(), Box<dyn std::error::Error>> {
+        let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let worker_done = Arc::clone(&done);
+        let worker = std::thread::spawn(move || {
+            let result = std::panic::catch_unwind(run_capture)
+                .map_err(|_| "macOS smoke worker panicked".to_owned())
+                .and_then(|result| result.map_err(|error| error.to_string()));
+            worker_done.store(true, std::sync::atomic::Ordering::Release);
+            result
+        });
+        // SAFETY: called on the process main thread; done and callback outlive
+        // the synchronous AppKit loop. No Rust unwind crosses this boundary.
+        unsafe { cute_smoke_run_appkit(Arc::as_ptr(&done).cast(), worker_finished) };
+        worker
+            .join()
+            .map_err(|_| "macOS smoke join failed")?
+            .map_err(Into::into)
+    }
+
     #[derive(Serialize)]
     #[serde(rename_all = "camelCase")]
     struct SmokeEvidence {
@@ -628,11 +665,12 @@ mod macos {
         outcome: cute_screen_desktop::capture::CaptureOutcomeV2,
     }
 
-    pub fn run() -> Result<(), Box<dyn std::error::Error>> {
+    fn run_capture() -> Result<(), Box<dyn std::error::Error>> {
         let args = env::args().skip(1).collect::<Vec<_>>();
         match args.first().map(String::as_str) {
             Some("macos-screen") => capture_smoke(&args, CaptureAction::Screen, "screen"),
-            Some("macos-area") => capture_smoke(&args, CaptureAction::Area, "area"),
+            Some("macos-area" | "macos-area-cancel") => super::macos_area_smoke::run(
+                &required_option(&args, "--output")?, args[0] == "macos-area-cancel"),
             Some("macos-window") => capture_smoke(&args, CaptureAction::Window, "window"),
             _ => Err(
                 "usage: m04-platform-smoke macos-screen|macos-area|macos-window --data-dir <path> --output <path>"
@@ -653,7 +691,7 @@ mod macos {
             data_dir.join("capture-staging"),
             data_dir.join("asset-staging"),
         )?);
-        let controller = CaptureController::new(repository, transport);
+        let controller = CaptureController::new(repository.clone(), transport);
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_time()
             .build()?;
@@ -678,6 +716,26 @@ mod macos {
         }
         fs::write(&output, serde_json::to_vec_pretty(&evidence)?)?;
         println!("{}", output.display());
+        let actual = serde_json::to_value(evidence.outcome.outcome)?;
+        super::macos_smoke_checks::require_outcome(
+            actual.as_str().unwrap_or("unknown"),
+            "captured",
+        )?;
+        let document = evidence
+            .outcome
+            .document
+            .ok_or("captured without a document")?;
+        let source: serde_json::Value = serde_json::from_str(&document.document_json)?;
+        let width = source["source"]["width"]
+            .as_u64()
+            .and_then(|value| u32::try_from(value).ok())
+            .ok_or("invalid source width")?;
+        let height = source["source"]["height"]
+            .as_u64()
+            .and_then(|value| u32::try_from(value).ok())
+            .ok_or("invalid source height")?;
+        let bytes = fs::read(repository.blob_path(document.source_hash)?)?;
+        super::macos_smoke_checks::decode_png(&bytes, width, height)?;
         Ok(())
     }
 
