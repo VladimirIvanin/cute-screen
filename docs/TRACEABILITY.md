@@ -62,6 +62,17 @@ Tauri config, Cargo workspace, точную storage dependency и Cargo.lock.
 Проверка: release version guard, тесты bump/release и форматирование.
 Поведение приложения и платформенные гарантии не меняются.
 
+## Бамп версии 0.1.16 (2026-10-28)
+
+`REQ-REL-005/006`: вспомогательные Rust-модули smoke находятся вне `src/bin`,
+чтобы Tauri не включал их как отдельные executable в Linux/macOS/Windows пакеты.
+Boundary-проверка сопоставляет файлы `src/bin/*.rs` с явными Cargo bin targets.
+
+`REQ-REL-005/006`: штатный `pnpm version:bump 0.1.16` синхронизирует package,
+Tauri config, Cargo workspace, точные path dependencies и Cargo.lock.
+Проверка: release version guard, тесты bump/release и форматирование.
+Поведение приложения и платформенные гарантии не меняются.
+
 ## Настройка панели быстрого режима (2026-10-25)
 
 `REQ-UI-017`, `REQ-EDT-003/008`, ADR-153: отдельный раздел Settings с двумя

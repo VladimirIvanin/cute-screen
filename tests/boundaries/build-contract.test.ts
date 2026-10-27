@@ -1,4 +1,7 @@
-import { readFile } from 'node:fs/promises'
+import {
+  readFile,
+  readdir,
+} from 'node:fs/promises'
 import path from 'node:path'
 
 import {
@@ -14,6 +17,14 @@ interface PackageManifest {
 }
 
 describe('Tauri build boundary', () => {
+  it('keeps helper modules outside the directory scanned by the Tauri bundler for binaries', async () => {
+    const manifest = await readFile('src-tauri/Cargo.toml', 'utf8')
+    const declared = [...manifest.matchAll(/^path = "src\/bin\/([^"/]+\.rs)"$/gm)]
+      .map((match) => match[1]).sort()
+    const files = (await readdir('src-tauri/src/bin')).filter((file) => file.endsWith('.rs')).sort()
+    expect(files).toEqual(declared)
+  })
+
   it('aligns direct Cargo builds with the macOS bundle deployment baseline', async () => {
     const root = process.cwd()
     const config = JSON.parse(await readFile(path.join(root, 'src-tauri', 'tauri.conf.json'), 'utf8')) as {

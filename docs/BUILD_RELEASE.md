@@ -1,5 +1,11 @@
 # CI-сборки и проверка версии через GitHub
 
+В `src-tauri/src/bin/*.rs` находятся только явные Cargo bin targets.
+Tauri также обнаруживает файлы в этом каталоге при подготовке bundle;
+`autobins = false` не защищает от попадания helper-модуля в список упаковки.
+Вспомогательные модули platform smoke размещаются в `src/platform_smoke/`.
+Этот контракт проверяется в `tests/boundaries/build-contract.test.ts`.
+
 ## Portal transport (ADR-156)
 
 cute-screen-portal — workspace crate, используемый Linux desktop; private-bus

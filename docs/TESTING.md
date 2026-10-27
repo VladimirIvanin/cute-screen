@@ -235,6 +235,30 @@ Node 22.23.1 / pnpm 10.33.2.
   2 файла, 33 tests passed.
 - `pnpm format` и `pnpm format:check`: passed.
 
+## Бамп версии 0.1.16 (2026-10-28)
+
+Исправление Linux ARM64 packaging (та же рабочая копия): helper-модули
+`macos_area_smoke` и `macos_smoke_checks` перенесены из `src/bin` в
+`src/platform_smoke`, чтобы Tauri не пытался копировать несуществующие executable.
+Новый boundary test до переноса: 1 failed / 13 passed, перечислены оба лишних файла.
+После переноса `pnpm exec vitest run --project boundaries tests/boundaries/build-contract.test.ts`:
+14 passed. Linux ARM64 `.deb` на этом macOS host не собирался; требуется CI package job.
+
+`cargo test -p cute-screen-desktop --features platform-smoke --bin m04-platform-smoke macos_smoke_checks`:
+2 passed после переноса модулей. `cargo metadata --no-deps --format-version 1 --locked --offline`:
+только четыре явных bin targets. `cargo fmt --all`, `pnpm format` и
+`pnpm format:check`: passed.
+
+macOS 12.7.6 x86_64, Node 22.23.1 / pnpm 10.33.2.
+
+- `pnpm version:bump 0.1.16`: `0.1.15 → 0.1.16` в пяти файлах метаданных.
+- `node scripts/release-assets.mjs version . v0.1.16`: passed.
+- `pnpm exec vitest run --project boundaries tests/boundaries/bump-version.test.ts tests/boundaries/release-assets.test.ts`:
+  2 файла, 34 tests passed.
+- `pnpm format` и `pnpm format:check`: passed.
+
+Изменены только версия приложения и release evidence; поведение приложения не менялось.
+
 ## Разделители непустых групп ToolRail (2026-10-25)
 
 `REQ-EDT-008`, `REQ-UI-017`; та же Ubuntu 24.04.5 и baseline

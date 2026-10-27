@@ -1,6 +1,8 @@
 #[cfg(target_os = "macos")]
+#[path = "../platform_smoke/macos_area_smoke.rs"]
 mod macos_area_smoke;
 #[cfg(target_os = "macos")]
+#[path = "../platform_smoke/macos_smoke_checks.rs"]
 mod macos_smoke_checks;
 
 #[cfg(target_os = "linux")]
