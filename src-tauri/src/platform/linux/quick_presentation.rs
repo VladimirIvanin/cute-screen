@@ -1,12 +1,18 @@
+use gtk::glib::translate::ToGlibPtr;
 use gtk::prelude::*;
 
 pub(crate) fn activate(native: &impl IsA<gtk::Window>, token: &str) {
     let native = native.as_ref();
-    if let Some(display) = native
-        .display()
-        .downcast_ref::<gdkwayland::WaylandDisplay>()
-    {
-        display.set_startup_notification_id(token);
+    let display = native.display();
+    if display.backend().is_wayland() {
+        // SAFETY: the backend check confirms a GdkWaylandDisplay, and both
+        // borrowed arguments remain alive for the duration of the call.
+        unsafe {
+            gdk_wayland_sys::gdk_wayland_display_set_startup_notification_id(
+                display.as_ptr().cast(),
+                token.to_glib_none().0,
+            );
+        }
     } else {
         native.set_startup_id(token);
     }

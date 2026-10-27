@@ -76,7 +76,7 @@ cute-screen-portal = { version = "=0.1.15", path = "../crates/cute-screen-portal
 ashpd = { version = "=0.13.13", default-features = false, features = ["tokio", "screenshot", "global_shortcuts"] }
 gtk = "=0.18.2"
 gdkx11 = "=0.18.2"
-gdkwayland = "=0.18.2"
+gdkwayland-sys = "=0.18.2"
 x11rb = { version = "=0.14.0", default-features = false, features = ["composite", "image", "randr", "xfixes", "xkb"], optional = true }
 
 [target.'cfg(target_os = "windows")'.dependencies]
