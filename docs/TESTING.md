@@ -1,5 +1,26 @@
 # Стратегия тестирования
 
+## Crash report при открытом меню macOS (2026-10-28)
+
+Приложенный пользователем отчёт за 14:38:58 MSK относится к тестовому
+`cute-screen` PID 75506: путь `/Users/USER/Public/*/cute-screen`, родитель
+`node` PID 75455, стек `tao::app_delegate::did_finish_launching`. Это тот же
+процесс, который запустил `CUTE_SCREEN_E2E_SCENARIOS=mcp-skill` до изоляции
+тестового activation socket. В `artifacts/tauri-e2e/wdio-2026-10-28T11-38-57-487Z.log`
+за ту же секунду записана причина `activation endpoint is unavailable`.
+Установленная `/Applications/Cute Screen.app` запустилась в 14:38:36 как PID
+75234 и оставалась запущенной после события. Отдельного crash report для её
+пути за этот период нет; отчёт не указывает на обработчик открытия меню.
+
+После изоляции test harness по `XDG_SESSION_ID` команда
+`CUTE_SCREEN_E2E_SCENARIOS=macos-app-menu pnpm test:e2e:tauri` — **1 passed** на
+macOS 12.7.6 Intel / WKWebView 605.1.15 при работающей установленной копии.
+Проверены реальные пункты native menu, обновление недавних снимков после двух
+захватов и переходы в историю. Артефакты:
+`artifacts/tauri-e2e/macos-app-menu-crash-audit.log`, `macos-app-menu.json`,
+`macos-app-menu-history.png`, `junit-macos-app-menu-0-0.xml`. Физический клик
+по системному меню этот WebDriver-сценарий не автоматизирует.
+
 ## Устанавливаемый навык аннотаций MCP (REQ-MCP-007, 2026-10-28)
 
 Платформа: macOS 12.7.6 Intel, WKWebView 605.1.15, Node 22.23.1;
