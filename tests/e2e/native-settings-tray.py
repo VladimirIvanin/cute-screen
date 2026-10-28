@@ -30,15 +30,23 @@ registered = call(
     ("org.kde.StatusNotifierWatcher", "RegisteredStatusNotifierItems"),
 )[0]
 for item in registered:
-    owner, _, path = item.partition("@")
-    pid = call(
-        "org.freedesktop.DBus",
-        "/org/freedesktop/DBus",
-        "org.freedesktop.DBus",
-        "GetConnectionUnixProcessID",
-        "(s)",
-        (owner,),
-    )[0]
+    owner, separator, path = item.partition("@")
+    if not separator:
+        owner, separator, suffix = item.partition("/")
+        path = f"/{suffix}" if separator else "/StatusNotifierItem"
+    try:
+        pid = call(
+            "org.freedesktop.DBus",
+            "/org/freedesktop/DBus",
+            "org.freedesktop.DBus",
+            "GetConnectionUnixProcessID",
+            "(s)",
+            (owner,),
+        )[0]
+    except GLib.Error as error:
+        if error.matches(Gio.dbus_error_quark(), Gio.DBusError.NAME_HAS_NO_OWNER):
+            continue
+        raise
     if str(pid) != sys.argv[1]:
         continue
     properties = call(
@@ -59,12 +67,19 @@ for item in registered:
             collect(child)
 
     collect(layout)
-    settings = [entry for entry in entries if entry["label"] in ("Settings…", "Настройки…")]
-    if len(settings) != 1:
-        raise RuntimeError(f"Expected one settings item: {entries}")
+    labels = (sys.argv[2],) if len(sys.argv) > 2 else ("Settings…", "Настройки…")
+    selected = [entry for entry in entries if entry["label"] in labels]
+    occurrence = int(sys.argv[3]) if len(sys.argv) > 3 else 0
+    if (
+        not selected
+        or occurrence < 0
+        or occurrence >= len(selected)
+        or (len(sys.argv) <= 3 and len(selected) != 1)
+    ):
+        raise RuntimeError(f"Expected menu item matching {labels} at {occurrence}: {entries}")
     call(
         owner, menu_path, "com.canonical.dbusmenu", "Event", "(isvu)",
-        (settings[0]["id"], "clicked", GLib.Variant("s", ""), 0),
+        (selected[occurrence]["id"], "clicked", GLib.Variant("s", ""), 0),
     )
     print(json.dumps(entries))
     break

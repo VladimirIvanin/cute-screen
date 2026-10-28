@@ -75,6 +75,7 @@ const scenarios = [
   { id: 'callout-editing-reopen', persistenceGroup: 'callout-editing', spec: 'tests/e2e/specs/tauri-callout-editing-reopen.e2e.ts', harnessQuery: '?m04=1&m08=1', driverProvider: 'external' },
   { id: 'tray-locale', persistenceGroup: 'tray-locale', spec: 'tests/e2e/specs/tauri-tray-locale.e2e.ts', harnessQuery: '?m04=1' },
   { id: 'macos-available-actions', spec: 'tests/e2e/specs/tauri-macos-available-actions.e2e.ts', harnessQuery: '?m04=1' },
+  ...(process.platform === 'linux' ? [{ id: 'linux-tray-menu', spec: 'tests/e2e/specs/tauri-linux-tray-menu.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' }] : []),
   { id: 'macos-app-menu', spec: 'tests/e2e/specs/tauri-macos-app-menu.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true },
   { id: 'tray-locale-reopen', persistenceGroup: 'tray-locale', spec: 'tests/e2e/specs/tauri-tray-locale-reopen.e2e.ts', harnessQuery: '?m04=1' },
   {

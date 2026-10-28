@@ -2239,26 +2239,49 @@ fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()
     let capture_repeat = item("capture-repeat", false)?;
     let quit = item("quit", true)?;
     let separator = PredefinedMenuItem::separator(app)?;
-    let listed: Vec<MenuItem<R>> = [
+    let mut listed: Vec<MenuItem<R>> = [
         &capture_area,
         &capture_screen,
         &capture_window,
         &capture_active,
         &capture_repeat,
         &show,
-        &settings,
-        &quit,
     ]
     .into_iter()
     .filter(|item| tray_lists_item(item.id().as_ref()))
     .cloned()
     .collect();
-    let mut entries: Vec<&dyn IsMenuItem<R>> = Vec::with_capacity(listed.len() + 1);
+    for id in settings_window::tray_navigation_ids(cfg!(target_os = "linux")) {
+        let navigation = item(id, *id != "app-version")?;
+        if *id == "app-version" {
+            listed.insert(0, navigation);
+        } else {
+            listed.push(navigation);
+        }
+    }
+    listed.extend([settings, quit]);
+    let recent = if cfg!(target_os = "linux") {
+        Some(settings_window::create_recent_menu(app)?)
+    } else {
+        None
+    };
+    let navigation_separator = PredefinedMenuItem::separator(app)?;
+    let version_separator = PredefinedMenuItem::separator(app)?;
+    let mut entries: Vec<&dyn IsMenuItem<R>> = Vec::with_capacity(listed.len() + 4);
     for item in &listed {
         if item.id().as_ref() == "show-editor" {
             entries.push(&separator);
         }
+        if item.id().as_ref() == "settings"
+            && let Some(recent) = recent.as_ref()
+        {
+            entries.push(recent);
+            entries.push(&navigation_separator);
+        }
         entries.push(item);
+        if item.id().as_ref() == "app-version" {
+            entries.push(&version_separator);
+        }
     }
     let menu = Menu::with_items(app, &entries)?;
 
@@ -2311,6 +2334,8 @@ fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()
             .map(MenuItem::text)
             .collect::<tauri::Result<_>>()?,
     ));
+    #[cfg(feature = "test-harness")]
+    app.manage(settings_window::TrayMenu(menu));
     app.manage(settings_window::TrayShortcutItems(listed));
     refresh_tray_capture_items(app, capture_area, capture_screen, capture_window);
     let controller = app.state::<CaptureController>().inner().clone();

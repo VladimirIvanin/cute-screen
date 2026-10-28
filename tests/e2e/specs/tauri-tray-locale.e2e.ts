@@ -6,19 +6,11 @@ import {
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
-import { russianTrayLabels } from '../tray-labels'
-
-export interface TrayLabels {
-  items: { id: string; text: string; enabled: boolean }[]
-  startup: string[]
-}
-
-export async function nativeTrayLabels(): Promise<TrayLabels> {
-  return browser.execute(async () => {
-    type Native = { __TAURI__: { core: { invoke<T>(command: string): Promise<T> } } }
-    return (window as unknown as Native).__TAURI__.core.invoke<TrayLabels>('test_tray_labels')
-  })
-}
+import {
+  nativeTrayLabels,
+  russianTrayLabels,
+  type TrayLabels,
+} from '../tray-labels'
 
 describe('native tray follows the Settings language', () => {
   it('switches all native menu labels RU/EN, synchronizes the editor and persists Russian', async () => {
@@ -39,8 +31,15 @@ describe('native tray follows the Settings language', () => {
       expect(labels.items).toHaveLength(russian.length)
       if (locale === 'ru') labels.items.forEach((item, index) => expect(item.text.split('    ')[0]).toBe(russian[index]))
       else {
-        expect(labels.items[0]?.text).toContain('Capture Area')
+        expect(labels.items.find((item) => item.id === 'capture-area')?.text).toContain('Capture Area')
         expect(labels.items.at(-2)?.text).toBe('Settings…')
+      }
+      if (process.platform === 'linux') {
+        expect(labels.recentLabel).toBe(locale === 'ru' ? 'Недавние снимки' : 'Recent Captures')
+        expect(labels.recent).toEqual([{
+          id: 'app-empty-history', text: locale === 'ru' ? 'Снимков пока нет' : 'No captures yet', enabled: false,
+        }])
+        expect(labels.appMenuInstalled).toBe(false)
       }
       evidence.push(labels)
     }

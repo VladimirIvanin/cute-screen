@@ -1,5 +1,110 @@
 # Стратегия тестирования
 
+## Бамп версии 0.1.24 (2026-10-28)
+
+Платформа: Ubuntu 22.04.5 x86_64. База `87a1861` с Linux tray и исправлениями
+ревью; `git fetch origin` подтвердил актуальность main перед бампом.
+`pnpm version:bump 0.1.24` обновил пять файлов: package.json, Tauri config,
+Cargo workspace, manifest desktop и Cargo.lock. Синхронизированы три точные
+локальные зависимости и четыре workspace package entries; внешние зависимости
+и pnpm-lock.yaml не менялись.
+
+- `node scripts/release-assets.mjs version . v0.1.24` — exit 0.
+- `cargo metadata --no-deps --format-version 1 --locked --offline` — exit 0.
+- `pnpm test:boundaries` — 16 файлов, 115/115 tests passed.
+- Форматирование перед коммитом: `pnpm format`, `pnpm format:check`,
+  `pnpm docs:check`, `cargo fmt --all --check`, `git diff --check`.
+  Логи: `artifacts/version-0.1.24/`.
+
+Полный `pnpm check`, 8 Rust navigation tests и три native menu/locale/reopen
+сценария прошли перед сменой номера на том же коде меню. После бампа native
+сборка не повторялась: проверены метаданные версии и относящиеся к ним gates.
+Коммит и push включают меню, исправления ревью, тесты, документацию и версию.
+
+## Ревью меню: блокировка и частичные ID (2026-10-28)
+
+База `87a1861` с рабочими изменениями Linux-меню. Ubuntu 22.04.5 x86_64,
+GNOME Shell 42.9 Wayland, WebKitGTK/WebKitWebDriver 2.50.4. Ревью обнаружило:
+
+- [P1] mutex таблицы recent ID удерживался во время синхронных native menu
+  calls, ожидающих UI-поток; menu event в UI мог ждать тот же mutex.
+- [P2] ошибка append после первой записи оставляла частичную таблицу активных ID.
+
+`cargo test -p cute-screen-desktop --lib recent_rebuild` — сначала 2 failed:
+`WouldBlock` при проверке блокировки и непустая таблица после simulated append
+failure. После исправления
+`cargo test -p cute-screen-desktop --lib navigation_tests` — 8/8 passed.
+Результаты: `artifacts/linux-tray-menu-review/red.log`, `green.log`.
+
+Перестройка теперь выполняется одной UI-задачей без mutex во время native calls.
+Снимок данных читается до отправки задачи; устаревшее поколение пропускается.
+ID публикуются целиком после успеха, а ошибка оставляет пустую таблицу.
+
+`CUTE_SCREEN_E2E_DRIVER_PROVIDER=external
+CUTE_SCREEN_E2E_SCENARIOS=linux-tray-menu,tray-locale,tray-locale-reopen
+pnpm test:e2e:tauri` с временным WebKitWebDriver и cached tauri-driver в PATH —
+3/3 сценария passed. Linux menu — 27.9 s: выбор старого снимка через настоящий
+DBusMenu во время серии из 40 Maintain requests, последующие Open/Cancel/Error,
+четыре 4K imports, пять recent items, удаление и stale-ID rejection.
+Locale — 5.6 s; reopen — 1 s. Лог: `artifacts/linux-tray-menu-review/e2e.log`.
+Ограничения fake capture/picker и непроверенные ОС прежние; native сбой append
+не внедрялся, его контракт проверен Rust-тестом.
+
+Финальные команды `pnpm format`, `pnpm check`, `git diff --check` и размеры
+workspace фиксируются в `artifacts/linux-tray-menu-review/`. Accepted ADR
+не менялись: исправлены ошибки выполнения существующего контракта меню.
+
+## Меню трея Linux (REQ-ACT-016, ADR-169, 2026-10-28)
+
+Платформа: Ubuntu 22.04.5 x86_64, GNOME Shell 42.9, Wayland,
+WebKitGTK/WebKitWebDriver 2.50.4; база `87a1861` (main, 0.1.23) с рабочими
+изменениями. `git pull --ff-only` обновил main до актуального origin/main.
+
+- `cargo test -p cute-screen-desktop --lib linux_tray_includes_file_history_and_version`
+  сначала упал: список новых пунктов был пуст. После реализации
+  `cargo test -p cute-screen-desktop --lib navigation_tests` — 6/6 passed.
+- `pnpm check` — exit 0: lint (0 errors, 37 прежних warnings), typecheck,
+  format:check, docs:check, 115/115 boundary tests, MCP/IPC schema и четыре
+  Rust Clippy-конфигурации. Лог: `artifacts/linux-tray-menu/check-final.log`.
+- Свежий `pnpm test:e2e:tauri` с
+  `CUTE_SCREEN_E2E_DRIVER_PROVIDER=external` и
+  `CUTE_SCREEN_E2E_SCENARIOS=linux-tray-menu,tray-locale,tray-locale-reopen`
+  проверил RU/EN/RU,
+  версию, новые пункты, empty label, отсутствие app menu и сохранение локали
+  после restart: оба сценария passed в прогоне с linux-tray-menu.
+  Лог: `artifacts/linux-tray-menu/e2e-external.log` (linux-tray-menu в этом
+  первоначальном прогоне упал в тестовом helper; два locale-сценария passed).
+- Финальный `CUTE_SCREEN_E2E_SCENARIOS=linux-tray-menu pnpm test:e2e:tauri`
+  с PATH внешних драйверов — exit 0, 1/1 passed, 27.4 s. Настоящие DBusMenu
+  события открыли историю, точный старый документ и штатный импорт. Подставленный
+  ответ picker проверил cancel, повреждённый PNG и четыре 3840×2160 изображения;
+  WebView дождался decode и монтирования каждого документа. Native snapshot
+  проверил лимит пяти записей, исчезновение удалённой записи и отказ для её
+  прежнего ID. Лог: `artifacts/linux-tray-menu/e2e-verified.log`; JSON, JUnit
+  и выбранные screenshots собраны в том же каталоге.
+
+Внешние драйверы переданы через PATH: cached tauri-driver из
+`artifacts/tauri-e2e/driver-cache/bin` и временный WebKitWebDriver из
+существующего образа `cute-screen-ubuntu22-build:local` (пакет
+2.50.4-0ubuntu0.22.04.1). Host packages не менялись; временный driver удаляется
+после проверки. Каждый native запуск заново собирал debug/no-bundle harness
+штатным runner, общий Cargo cache сохранён.
+
+Первые попытки: одновременная сборка пакетов удаляла declarations во время
+отдельного typecheck; архитектурные тесты под нагрузкой превысили 5 секунд.
+Последовательный полный check прошёл. Embedded driver не доставил смену
+select языка, а external без драйверов в PATH не создал сессию; после настройки
+external оба locale-теста прошли. DBusMenu helper исправлен для адресов
+`owner/path` наряду с `owner@path` и исчезнувших владельцев. В новом тесте
+уточнены разные capture/document ID и размеры fake capture 400×300;
+проверка импорта использует настоящую 4K fixture 3840×2160.
+
+Захват экрана здесь подменён fake-platform, ответ системного picker подставлен
+на OS-границе; decode, storage, main WebView и DBusMenu события настоящие.
+Физический клик по GNOME-панели, диалог выбора файла, X11/KDE и macOS/Windows
+этим изменением не подтверждаются. Ошибка чтения библиотеки покрыта общим
+кодом и контрактом подписей; отдельный native fault injection не выполнялся.
+
 ## Бамп версии 0.1.23 (2026-10-28)
 
 Платформа: macOS 12.7.6 Intel (Darwin x86_64), исходный commit `9c5bd05`.
