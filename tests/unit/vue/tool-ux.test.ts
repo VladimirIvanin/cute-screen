@@ -38,6 +38,7 @@ import {
 import { TOOL_SETTINGS_STORAGE_KEY } from '../../../packages/editor-vue/src/shell/workspace/tool-settings-memory'
 import { TextureResourceResolver } from '../../../packages/editor-vue/src/texture-fill'
 import { HighlighterBackgroundController } from '../../../packages/editor-vue/src/shell/workspace/highlighter-background'
+import { sameToolLayerIds } from '../../../packages/editor-vue/src/shell/workspace/selection-actions-controller'
 
 beforeEach(() => {
   localStorage.clear()
@@ -95,6 +96,20 @@ async function draw(
   })
 }
 describe('consistent tool UX through the mounted shell', () => {
+  it('limits same-tool selection to the current space and distinguishes line from arrow', () => {
+    const arrow = arrowDocument().layers[0]!
+    const secondArrow = { ...arrow, id: '019c1f62-058e-7000-8000-000000000011' }
+    const cardArrow = { ...arrow, id: '019c1f62-058e-7000-8000-000000000012', space: 'card' as const }
+    const line = createDrawingLayer({
+      id: '019c1f62-058e-7000-8000-000000000013',
+      tool: 'line', start: { x: 10, y: 10 }, end: { x: 30, y: 30 },
+    })!
+    const all = [arrow, line, secondArrow, cardArrow]
+    expect(sameToolLayerIds(all, arrow.id)).toEqual([arrow.id, secondArrow.id])
+    expect(sameToolLayerIds(all, line.id)).toEqual([line.id])
+    expect(sameToolLayerIds(all, cardArrow.id)).toEqual([cardArrow.id])
+    expect(sameToolLayerIds(all, 'missing')).toEqual([])
+  })
   it('targets callout context actions in Quick full-frame coordinates with a non-origin crop', async () => {
     const callout = createCalloutLayer({ id: '019c1f62-058e-7000-8000-000000000099',
       target: { x: 40, y: 50 }, label: { x: 80, y: 30 }, text: 'Label' }, {})!
@@ -478,6 +493,9 @@ describe('consistent tool UX through the mounted shell', () => {
     const forward = screen.getByRole('menuitem', { name: 'Bring forward' })
     expect(forward).toBeDisabled()
     expect(forward).toHaveAttribute('title', 'Already at the edge of the layer stack')
+    const selectSameTool = screen.getByRole('menuitem', { name: 'Select all of this tool' })
+    expect(selectSameTool).toBeDisabled()
+    expect(selectSameTool).toHaveAttribute('title', 'No other objects of this tool here')
     await fireEvent.keyDown(forward, { key: 'Escape' })
     await fireEvent.contextMenu(app.scene, { clientX: 180, clientY: 120 })
     const undo = screen.getByRole('menuitem', { name: 'Undo' })

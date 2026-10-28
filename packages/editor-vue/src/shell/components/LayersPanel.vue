@@ -7,6 +7,7 @@ import { NButton } from 'naive-ui'
 
 import { UiIcon } from '../icon'
 import type { LayerSummary } from '../types'
+import type { CanvasMenuRequest } from '../workspace/selection-actions-controller'
 import NumericControl from '../ui/NumericControl.vue'
 
 const props = defineProps<{
@@ -163,8 +164,39 @@ function selectLayer(
   emit('select', layerId, event.metaKey || event.ctrlKey, event.shiftKey)
 }
 
+function openLayerMenu(
+  event: MouseEvent | KeyboardEvent,
+  layer: LayerSummary,
+): void {
+  if (layer.transient) return
+  event.preventDefault()
+  const row = event.currentTarget
+  const rect = row instanceof HTMLElement ? row.getBoundingClientRect() : undefined
+  const pointer = event instanceof MouseEvent && (
+    event.clientX !== 0 ||
+    event.clientY !== 0
+  )
+  emit('contextMenu', {
+    layerId: layer.id,
+    clientX: pointer ? event.clientX : rect?.right ?? 0,
+    clientY: pointer ? event.clientY : rect?.top ?? 0,
+  })
+}
+
+function onLayerMenuKeydown(
+  event: KeyboardEvent,
+  layer: LayerSummary,
+): void {
+  if (
+    event.key === 'ContextMenu' ||
+    event.key === 'F10' &&
+    event.shiftKey
+  ) openLayerMenu(event, layer)
+}
+
 const emit = defineEmits<{
   select: [id: string, toggle: boolean, range: boolean]
+  contextMenu: [request: CanvasMenuRequest]
   toggle: []
   visibility: [id: string]
   lock: [id: string]
@@ -289,6 +321,8 @@ const emit = defineEmits<{
           @pointercancel="onLayerPointerCancel"
           @keydown.enter.prevent="selectLayer(layer.id, $event)"
           @keydown.space.prevent="selectLayer(layer.id, $event)"
+          @keydown="onLayerMenuKeydown($event, layer)"
+          @contextmenu="openLayerMenu($event, layer)"
         >
           <span class="cs-layer-name">{{ layer.name }}</span>
         </div>

@@ -1,5 +1,33 @@
 # Стратегия тестирования
 
+## Бамп версии 0.1.23 (2026-10-28)
+
+Платформа: macOS 12.7.6 Intel (Darwin x86_64), исходный commit `9c5bd05`.
+`pnpm version:bump 0.1.23` обновил package.json, Tauri config, Cargo workspace,
+три точные локальные зависимости и четыре записи Cargo.lock. Внешние
+зависимости и pnpm-lock.yaml не менялись.
+
+- `node scripts/release-assets.mjs version . v0.1.23` — passed.
+- `cargo metadata --no-deps --format-version 1 --locked --offline` — passed; все четыре cute-screen crates имеют версию 0.1.23. JSON: `artifacts/select-same-tool/version-cargo-metadata.json`.
+- `pnpm exec vitest run --project boundaries tests/boundaries/bump-version.test.ts tests/boundaries/release-assets.test.ts` — 2 файла, 34/34 passed.
+- `pnpm check` — exit 0: lint, typecheck, format:check, docs:check, 115/115 boundaries, MCP/IPC schema и Rust clippy feature sets. Лог: `artifacts/select-same-tool/version-check.log`.
+- `pnpm disk:usage`: общий `target/` вырос с 4.605 до 6.000 GiB после проверки новой версии; полезный Cargo cache сохранён. Лог: `artifacts/select-same-tool/version-disk.log`.
+
+Это бамп метаданных и исходников фичи в Git; release tag, GitHub Release и
+пакеты не создавались.
+
+## Массовое выделение одного инструмента (2026-10-28, ADR-168)
+
+Платформа: macOS 12.7.6 Intel (Darwin x86_64), Chrome 150 browser harness.
+Рабочее дерево поверх текущего commit; document/IPC/Rust не менялись.
+
+- `pnpm exec vitest run --project vue tests/unit/vue/numbered-marker.test.ts tests/unit/vue/tool-ux.test.ts` — 2 файла, 41/41 tests passed. Mounted shell проверяет меню canvas, Shift+F10 в Layers, выбор меток без команды, одну batch-команду цвета и точный Undo/Redo; чистая выборка различает Arrow/Line и content/card.
+- `pnpm exec vue-tsc --noEmit -p packages/editor-vue/tsconfig.json` — passed.
+- `pnpm test:e2e:browser --spec tests/e2e/specs/browser-numbered-marker.e2e.ts --mochaOpts.grep 'selects all numbered markers'` — 1/1 passed. Chrome 150 создал две метки через UI, применил красный цвет из групповой панели и проверил снимки документа до изменения, после Undo и Redo. Лог: `artifacts/select-same-tool/browser-direct.log`.
+- Первый browser запуск всего файла истёк по timeout 30 s при переходе helper через пустую корневую страницу. Профильный тест открывает document harness напрямую и проходит. В browser console остаются предупреждения о непромоканных native-командах (`mcp_editor_ready`, `app_menu_set_export_enabled`, `history_command`); они не прервали профильный прогон. Лог: `artifacts/select-same-tool/browser-direct.log`.
+- Первый `pnpm check` выявил тип нового browser assertion; после исправления следующий запуск выявил лимит файла `EditorWorkspace.vue` (501 > 500). Избыточный optional prop удалён, `pnpm test:boundaries` — 115/115 passed. Финальный `pnpm check` — exit 0: lint (0 errors, 37 warnings), typecheck, format:check, docs:check, boundaries, MCP/IPC schema и все Rust clippy feature sets. Лог: `artifacts/select-same-tool/check-verified.log`.
+- `pnpm disk:usage`: до полного Rust gate общего `target/` не было, после — 4.605 GiB в `target/debug`; это полезный cache холодной сборки, сохранён. `git diff --check` — passed. Сводка и размеры — `artifacts/select-same-tool/summary.md`.
+
 ## Бамп версии 0.1.22 (2026-10-28)
 
 Платформа: macOS 12.7.6 Intel, Node 22.23.1, pnpm 10.33.2; база `bd9cd74`

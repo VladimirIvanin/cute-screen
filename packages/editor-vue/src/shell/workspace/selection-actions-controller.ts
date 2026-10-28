@@ -12,6 +12,7 @@ import {
   canRemoveCalloutStep,
   type EditorCommand,
   type EditorDocumentV1,
+  type LayerNode,
   type LayerStyle,
 } from '@cute-screen/editor-renderer'
 import type { ResolvedEditorShellProps } from '../contracts'
@@ -29,6 +30,24 @@ export interface CanvasMenuItem {
   readonly label: string
   readonly disabled: boolean
   readonly reason?: string
+}
+export function sameToolLayerIds(
+  layers: readonly LayerNode[],
+  layerId: string,
+): string[] {
+  const source = layers.find((layer) => layer.id === layerId)
+  if (
+    !source ||
+    (source.kind === 'image' &&
+      source.payload.role === 'base')
+  ) return []
+  const tool = annotationTool(source)
+  const space = source.space ?? 'content'
+  return layers.filter((layer) =>
+    annotationTool(layer) === tool &&
+    (layer.space ?? 'content') === space &&
+    !(layer.kind === 'image' && layer.payload.role === 'base'),
+  ).map((layer) => layer.id)
 }
 interface SelectionContext {
   props: ResolvedEditorShellProps
@@ -84,6 +103,16 @@ export function createSelectionActions(context: SelectionContext) {
         },
       }
   }
+  function sameToolIds(layerId: string): string[] {
+    return sameToolLayerIds(context.document.value?.layers ?? [], layerId)
+  }
+  function selectSameTool(layerId: string | undefined): void {
+    if (!layerId) return
+    const ids = sameToolIds(layerId)
+    if (ids.length < 2) return
+    store.selectTool('select')
+    store.selectLayers(ids)
+  }
   const { duplicate, remove, reorder, lock, hide } = createSelectionMutations(context, { selected, blocked, execute })
   const actions: Record<string, () => void> = {
     copyStyle,
@@ -103,11 +132,13 @@ export function createSelectionActions(context: SelectionContext) {
     actual: () => store.setZoom(100),
   }
   function action(id: string): void {
+    const layerId = menu.value?.layerId
     menu.value = undefined
-    if (id.startsWith('callout')) context.changeCallout?.(id, '')
+    if (id === 'selectSameTool') selectSameTool(layerId)
+    else if (id.startsWith('callout')) context.changeCallout?.(id, '')
     else actions[id]?.()
   }
-  const items = computed(() => selectionMenuItems(context, menu.value))
+  const items = computed(() => selectionMenuItems(context, menu.value, sameToolIds))
 
   return {
     canvasMenu: menu,
@@ -205,6 +236,7 @@ function createSelectionMutations(
 function selectionMenuItems(
   context: SelectionContext,
   menu: CanvasMenuRequest | undefined,
+  sameToolIds: (layerId: string) => readonly string[],
 ): readonly CanvasMenuItem[] {
   const { store } = context
   const selected = () =>
@@ -246,6 +278,12 @@ function selectionMenuItems(
         : []),
     ]
   return [
+    {
+      id: 'selectSameTool',
+      label: text('Select all of this tool', 'Выделить все объекты этого инструмента'),
+      disabled: sameToolIds(menu.layerId).length < 2,
+      reason: text('No other objects of this tool here', 'Здесь нет других объектов этого инструмента'),
+    },
     ...(layers.length === 1 && layers[0]?.kind === 'callout' ? [
       { id: 'calloutInsert', label: text('Add step', 'Добавить ступень'), disabled: disabled || ['straight', 'quadratic'].includes(layers[0].payload.route.path), reason },
       { id: 'calloutRemoveStep', label: text('Remove last step', 'Удалить последнюю ступень'), disabled: disabled || !canRemoveCalloutStep(layers[0].payload, 1), reason },

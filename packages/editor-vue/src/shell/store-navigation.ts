@@ -26,11 +26,16 @@ export function createSelectionActions(state: ShellStoreState) {
     state.selectedLayerIds.value = selected
     state.selectedLayerId.value = range && anchor ? anchor : selected[0]
   }
+  function selectLayers(ids: readonly string[]): void {
+    const selected = [...new Set(ids)]
+    state.selectedLayerIds.value = selected
+    state.selectedLayerId.value = selected[0]
+  }
   function clearLayerSelection(): void {
     state.selectedLayerId.value = undefined
     state.selectedLayerIds.value = []
   }
-  return { clearLayerSelection, selectLayer, selectTool }
+  return { clearLayerSelection, selectLayer, selectLayers, selectTool }
 }
 
 export function createViewportActions(state: ShellStoreState) {
