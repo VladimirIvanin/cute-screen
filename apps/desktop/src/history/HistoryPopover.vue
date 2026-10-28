@@ -127,6 +127,7 @@ async function show(
     ) trigger.value?.focus()
   }
 }
+defineExpose({ open: () => show(true) })
 async function select(id: string): Promise<void> {
   if (loading.value || props.busy) return
   error.value = undefined

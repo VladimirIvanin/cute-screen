@@ -1,5 +1,42 @@
 # Платформенная матрица
 
+## Системное меню macOS (2026-10-28, ADR-166)
+
+Меню Cute Screen в строке macOS дополняется версией, открытием редактора,
+последними пятью снимками и Quit; Windows/Linux внутриоконное меню не получают.
+На macOS 12.7.6 Intel native snapshot и переход через общий menu handler
+прошли: два production capture видны в меню, старая запись открылась в
+редакторе. Реальный click системного меню, Cmd+Q, RU labels и macOS 26 требуют
+отдельного runtime подтверждения. Команда и артефакты — TESTING.md.
+
+## macOS Area handoff и временный blank (2026-10-28)
+
+При принятии области native selector раньше закрывался до первого кадра Quick
+WebView: условие ожидало `finishedView`, который Area не устанавливает. На
+macOS 12.7.6 Intel red-first нативный контракт воспроизвёл дефект; после
+исправления принятого Area selector он проходит, cancel/Window не удерживаются.
+Пользователь сообщил о разовом исчезновении окна после клика вне снимка на
+macOS 26.6.2, затем не смог повторить; причинная связь с handoff не доказана.
+Настоящий pointer click в WKWebView местный WebDriver не доставил, поэтому
+повторная проверка на macOS 26 остаётся открытой. Первоначальный TCC отказ на
+этой ОС исчез после повторной выдачи разрешения и перезапуска, по сообщению
+пользователя; локально эту ОС не проверяли.
+
+## Доступные capture actions и рамка Quick (2026-10-28, ADR-164/165)
+
+На macOS 12.7.6 Intel tray и Settings в реальном WKWebView показывают Area,
+Screen и Open Editor; tray также показывает Settings/Quit. Window, Active Window
+и Repeat отсутствуют. Native E2E — 1 passed, JSON и screenshot в
+`artifacts/tauri-e2e/macos-available-actions.*`. Пункты не удаляют сохранённые
+назначения. На Windows/Linux фильтр Settings не меняется; отдельный runtime
+этой правки там не выполнен. RU tray/Settings locale flow требует отдельной
+проверки: в этом прогоне выбор RU не сохранился.
+
+Ручки Quick Capture изменены с 8 на 12 CSS px, область захвата указателя —
+24×24 CSS px. Unit geometry/raster — 8 passed при разных scale. Общий native
+Quick E2E на macOS не прошёл 4 жестовых сценария; фактический drag новых ручек
+в WKWebView и другие платформы ещё требуют проверки. Подробности — TESTING.md.
+
 ## Default macOS helper (2026-10-28, ADR-163)
 
 На всех поддерживаемых macOS default — systemScreenshot через системный

@@ -11,12 +11,17 @@ use tauri::{Manager, State};
 #[tauri::command]
 pub async fn history_command(
     request: HistoryRequest,
+    app: tauri::AppHandle,
     repository: State<'_, StorageHandle>,
     transport: State<'_, Arc<ImageTransportService>>,
 ) -> CommandResult<HistoryResponse> {
     let activates = matches!(
         request,
         HistoryRequest::Activate { .. } | HistoryRequest::Deactivate
+    );
+    let changes_recent = matches!(
+        request,
+        HistoryRequest::Commit { .. } | HistoryRequest::Maintain
     );
     let mut response = repository
         .history(request, transport.authoritative_hashes()?)
@@ -45,6 +50,9 @@ pub async fn history_command(
         let token = uuid::Uuid::now_v7().simple().to_string();
         transport.register_authoritative(token.clone(), source)?;
         document.image_token = Some(token);
+    }
+    if changes_recent {
+        crate::settings_window::refresh_app_menu(&app);
     }
     Ok(response)
 }

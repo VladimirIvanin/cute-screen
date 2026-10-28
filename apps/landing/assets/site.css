@@ -129,9 +129,11 @@ h1 span {
 }
 .lede {
   margin-top: 21px;
+  max-width: 580px;
   color: #adaab6;
   font-size: 18px;
   letter-spacing: -0.02em;
+  line-height: 1.55;
 }
 .hero-action {
   flex-shrink: 0;
@@ -222,6 +224,68 @@ h1 span {
   text-align: center;
   color: #85838e;
   font-size: 11px;
+}
+.capture-overview {
+  padding-top: 83px;
+  scroll-margin-top: 30px;
+}
+.capture-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.capture-card {
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-raised);
+}
+.capture-card h3 {
+  color: #f4d6e4;
+  font-size: 16px;
+  font-weight: 600;
+}
+.capture-card p {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.capture-note {
+  margin-top: 18px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.capture-note a {
+  color: #f4d6e4;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.agents-overview {
+  margin-top: 64px;
+  padding: 30px 32px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface-raised);
+  scroll-margin-top: 30px;
+}
+.agents-overview .section-heading {
+  margin-bottom: 18px;
+}
+.agents-overview > p {
+  max-width: 780px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+.agents-overview > p + p {
+  margin-top: 12px;
+}
+.agents-overview a {
+  color: #f4d6e4;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .features {
   padding: 85px 0 40px;
@@ -518,6 +582,19 @@ h1 span {
     font-size: 10px;
     margin-top: 6px;
   }
+  .capture-overview {
+    padding-top: 55px;
+  }
+  .capture-grid {
+    grid-template-columns: 1fr;
+  }
+  .capture-card {
+    padding: 20px;
+  }
+  .agents-overview {
+    margin-top: 48px;
+    padding: 24px 20px;
+  }
   .features {
     padding-top: 55px;
   }
@@ -563,6 +640,9 @@ h1 span {
     gap: 15px;
   }
   .site-header nav > a:first-child {
+    display: none;
+  }
+  .site-header nav > a[href='#capture'] {
     display: none;
   }
   h1 {

@@ -1,5 +1,68 @@
 # Трассируемость требований
 
+## macOS application menu (2026-10-28)
+
+`REQ-ACT-008`, `REQ-ACT-014`, `REQ-LIB-002`: в системной строке macOS меню
+Cute Screen содержит Quit, версию, Settings (Cmd+,), Open Editor и подменю
+последних пяти снимков с переходом к полному списку. Пустая история и ошибка
+чтения имеют disabled состояние; stale item не должен открывать чужой снимок.
+Список обновляется после создания/удаления снимка и смены locale, подписи
+RU/EN синхронны. Quit проходит существующий запрос завершения. Доказательства:
+red-first Rust contract, real Tauri menu labels/actions и History UI;
+результаты — TESTING.md.
+
+## Quick Capture: клик вне рамки после Area (2026-10-28)
+
+`REQ-CAP-012`, `REQ-UI-010`: на macOS 26.6.2 пользователь сообщил, что после
+Area и клика по затемнённой части Quick Capture приложение осталось в Dock,
+но окно перестало показываться; после принудительного завершения и перезапуска
+захват снова работал, повторить сбой пользователь не смог. Кодовый аудит нашёл
+проверяемый дефект в native Area handoff: `finishedView` не устанавливается
+для Area, из-за чего accepted selector закрывался до готовности Quick WebView.
+Доказательство: failing-first нативный тест, затем passing; попытка реального
+WKWebView клика по затемнённому canvas не доставила pointerdown в WebDriver.
+Полный runtime сценарий на macOS 26 остаётся отдельным gate — TESTING.md.
+
+## Ручки рамки Quick Capture (2026-10-28, ADR-165)
+
+`REQ-CAP-012`, `REQ-UI-010`: после выбора области восемь ручек Quick
+отображаются квадратами 12×12 CSS px с квадратной hit-area 24×24 CSS px,
+независимо от zoom/DPR. При перекрытии hit-area выбирается ближайшая ручка;
+полный Editor Crop сохраняет прежний размер. Исследование: WCAG 2.2
+2.5.8 и WCAG2ICT рекомендуют минимум 24 CSS px для pointer target;
+визуальные 12 px — продуктовый выбор для плотной рамки. Доказательства:
+Vue geometry/raster tests и browser Quick pointer drag; native WebView
+отдельно. Фактические команды — TESTING.md.
+
+## macOS: скрытие недоступного захвата (2026-10-28, ADR-164)
+
+`REQ-ACT-008/013`, `REQ-CAP-003/004/005`, `REQ-UI-003/007`: Settings →
+«Горячие клавиши» на macOS показывает только действия, которые текущий
+capability snapshot помечает supported; tray menu не создаёт Window,
+Active Window и Repeat. Area, Screen, Open Editor, Settings и Quit остаются
+доступными по существующим правилам. Сохранённые назначения скрытых действий
+не удаляются, но capability gate не даёт их выполнить. На Windows/Linux
+отображение без изменений. Доказательства: red-first Rust tray contract,
+browser Settings через production mount и native macOS tray labels/Settings;
+фактические команды и ограничения — TESTING.md.
+
+## Публичное описание захвата и быстрого режима (2026-10-28)
+
+`REQ-WEB-008`, `REQ-CAP-001/002/003/010/011/012/014`: README на RU/EN и
+лендинг сразу называют Cute Screen приложением для захвата экрана, различают
+Area → Quick Capture и Screen/Window → полный редактор. Для Quick явно описаны
+аннотации, Copy, Save PNG, History и переход в Editor; пошаговая инструкция
+захвата не нужна. Ограничения режимов зависят от ОС и ведут к platform matrix.
+Доказательство: просмотр текста обеих локалей, production landing build,
+responsive browser check и проверка ссылок/форматирования.
+
+`REQ-WEB-009`, `REQ-MCP-001/002/003/004/005/006`: README и обе локали
+лендинга отдельно представляют opt-in локальный MCP. Описание называет
+возможности агента (захват, история, правки, preview, PNG), отдельные
+отзываемые ключи и границу: модель и передача данных зависят от клиента.
+Ссылка ведёт к инструкции MCP.md. Доказательство — RU/EN content review,
+production build, browser layout/links и docs:check.
+
 ## macOS: системный capture и opt-in SCK (2026-10-28)
 
 `REQ-CAP-001/002/011/014/015`, `REQ-REL-005/006`: default на всех macOS —

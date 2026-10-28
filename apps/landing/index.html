@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Снимайте экран, добавляйте стрелки, пояснения и скрывайте данные. Cute Screen — локальный редактор скриншотов с открытым кодом."
+      content="Захват экрана и быстрый режим Quick Capture: выделите область, добавьте аннотации, скопируйте или сохраните PNG. Cute Screen работает локально."
     />
     <meta name="theme-color" content="#191a1e" />
     <link rel="icon" href="assets/logo.svg" type="image/svg+xml" />
@@ -42,6 +42,8 @@
       >
       <nav aria-label="Основная навигация">
         <a href="#features">Инструменты</a>
+        <a href="#capture">Захват</a>
+        <a href="#agents">MCP</a>
         <a href="https://github.com/VladimirIvanin/cute-screen">GitHub <span aria-hidden="true">↗</span></a>
         <a class="locale-switch" href="en/" lang="en" hreflang="en">EN</a>
       </nav>
@@ -51,7 +53,10 @@
         <div class="hero-copy">
           <div>
             <h1 id="page-title">Объясняйте<br /><span>наглядно.</span></h1>
-            <p class="lede">Снять, отметить, сохранить. Всё локально.</p>
+            <p class="lede">
+              Захватите область и сразу добавьте пометки в быстром режиме. Скопируйте результат или откройте полный
+              редактор.
+            </p>
           </div>
           <div class="hero-action">
             <a class="button" data-download-primary href="#downloads">Все загрузки<span aria-hidden="true">↓</span></a>
@@ -97,6 +102,50 @@
           </div>
           <p class="toolbar-caption">Всё нужное — в одной строке.</p>
         </div>
+      </section>
+      <section id="capture" class="capture-overview container" aria-labelledby="capture-title">
+        <div class="section-heading">
+          <p class="eyebrow">ЗАХВАТ И БЫСТРЫЙ РЕЖИМ</p>
+          <h2 id="capture-title">От снимка до готового результата.</h2>
+          <p>Захват доступен из приложения, трея и через назначенные сочетания клавиш.</p>
+        </div>
+        <div class="capture-grid">
+          <article class="capture-card">
+            <h3>Область → Quick Capture</h3>
+            <p>Выберите или поправьте область и добавьте аннотации прямо в быстром режиме.</p>
+          </article>
+          <article class="capture-card">
+            <h3>Готово за пару действий</h3>
+            <p>Скопируйте снимок, сохраните PNG, добавьте его в локальную историю или перейдите в полный редактор.</p>
+          </article>
+          <article class="capture-card">
+            <h3>Экран и окно → редактор</h3>
+            <p>
+              Снимок всего экрана или окна сразу открывается для подробной работы. Можно открыть и готовое изображение.
+            </p>
+          </article>
+        </div>
+        <p class="capture-note">
+          Доступность режимов зависит от ОС.
+          <a href="https://github.com/VladimirIvanin/cute-screen/blob/main/docs/PLATFORM_MATRIX.md"
+            >Подробности по платформам ↗</a
+          >
+        </p>
+      </section>
+      <section id="agents" class="agents-overview container" aria-labelledby="agents-title">
+        <div class="section-heading">
+          <p class="eyebrow">ЛОКАЛЬНЫЕ АГЕНТЫ · MCP</p>
+          <h2 id="agents-title">Снимок можно редактировать вместе с агентом.</h2>
+        </div>
+        <p>
+          Подключение MCP включается в настройках. Совместимый агент может запустить захват, прочитать локальную
+          историю, изменить открытый документ, посмотреть превью и экспортировать PNG. У каждого клиента отдельный
+          отзываемый ключ.
+        </p>
+        <p>
+          Приложение не содержит модель ИИ; передачей данных модели управляет MCP-клиент.
+          <a href="https://github.com/VladimirIvanin/cute-screen/blob/main/docs/MCP.md">Подключение агентов ↗</a>
+        </p>
       </section>
       <section id="features" class="features container" aria-labelledby="features-title">
         <div class="section-heading">

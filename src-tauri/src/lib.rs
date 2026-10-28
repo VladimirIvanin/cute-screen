@@ -369,7 +369,7 @@ pub mod lifecycle;
 #[path = "services/settings_window.rs"]
 mod settings_window;
 #[cfg(feature = "test-harness")]
-use settings_window::test_tray_labels;
+use settings_window::{test_app_menu_snapshot, test_tray_labels};
 #[path = "services/shortcuts/mod.rs"]
 pub mod shortcuts;
 use shortcuts::commands::*;
@@ -1834,6 +1834,48 @@ fn show_editor<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     show_editor_with_activation(app, None);
 }
 
+fn open_history_from_app_menu<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    capture_id: Option<String>,
+) {
+    show_editor(app);
+    if let Err(error) = app.emit_to("main", "cute-screen:open-history", capture_id) {
+        eprintln!("cute-screen app history menu: {error}");
+    }
+}
+
+fn handle_app_menu_event<R: tauri::Runtime>(app: &tauri::AppHandle<R>, id: &str) {
+    match id {
+        "app-settings" => {
+            if let Err(error) = settings_window::open(app, false) {
+                eprintln!("cute-screen app settings: {error}");
+            }
+        }
+        "app-show-editor" => show_editor(app),
+        "app-all-history" => open_history_from_app_menu(app, None),
+        "app-quit" => {
+            if app.emit("cute-screen:request-quit", ()).is_err() {
+                app.exit(0);
+            }
+        }
+        id => {
+            if let Some(capture_id) = settings_window::recent_capture_from_menu(app, id) {
+                open_history_from_app_menu(app, Some(capture_id));
+            }
+        }
+    }
+}
+
+#[cfg(feature = "test-harness")]
+#[tauri::command]
+fn test_app_menu_activate(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    if id != "app-all-history" && settings_window::recent_capture_from_menu(&app, &id).is_none() {
+        return Err("menu item is unavailable".into());
+    }
+    handle_app_menu_event(&app, &id);
+    Ok(())
+}
+
 fn show_editor_with_activation<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
     token: Option<String>,
@@ -2277,9 +2319,13 @@ fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()
     Ok(())
 }
 
-/// macOS offers only Area and Screen capture (ADR-110).
+/// macOS offers only Area and Screen capture (ADR-164).
 fn tray_lists_item(id: &str) -> bool {
-    !(cfg!(target_os = "macos") && id == "capture-window")
+    !(cfg!(target_os = "macos")
+        && matches!(
+            id,
+            "capture-window" | "capture-active-window" | "capture-repeat"
+        ))
 }
 
 /// Tray items begin disabled: the portal version/advertised targets are not
@@ -2389,6 +2435,9 @@ fn publish_capture_outcome<R: tauri::Runtime>(
         });
     }
     let _ = app.emit("cute-screen:capture-outcome", outcome);
+    if outcome.outcome == CaptureTerminalOutcome::Captured {
+        settings_window::refresh_app_menu(app);
+    }
 }
 
 fn publish_capture_progress<R: tauri::Runtime>(
@@ -2909,13 +2958,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
-        .on_menu_event(|app, event| {
-            if event.id.as_ref() == "app-settings"
-                && let Err(error) = settings_window::open(app, false)
-            {
-                eprintln!("cute-screen app settings: {error}");
-            }
-        })
+        .on_menu_event(|app, event| handle_app_menu_event(app, event.id.as_ref()))
         .setup(move |app| {
             #[cfg(target_os = "linux")]
             if let Some(window) = app.get_webview_window("main") {
@@ -3144,6 +3187,8 @@ pub fn run() {
         test_result_export,
         test_result_export_named,
         test_tray_labels,
+        test_app_menu_snapshot,
+        test_app_menu_activate,
     ]);
 
     #[cfg(not(feature = "test-harness"))]
@@ -3556,11 +3601,14 @@ mod tests {
     }
 
     #[test]
-    fn tray_lists_window_capture_everywhere_except_macos() {
-        assert_eq!(
-            super::tray_lists_item("capture-window"),
-            !cfg!(target_os = "macos")
-        );
+    fn tray_lists_only_supported_capture_actions_on_macos() {
+        for id in ["capture-window", "capture-active-window", "capture-repeat"] {
+            assert_eq!(
+                super::tray_lists_item(id),
+                !cfg!(target_os = "macos"),
+                "{id}"
+            );
+        }
         for id in ["capture-area", "capture-screen", "show-editor", "quit"] {
             assert!(super::tray_lists_item(id), "{id}");
         }

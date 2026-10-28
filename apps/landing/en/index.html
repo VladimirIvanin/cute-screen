@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Capture, annotate and conceal details with Cute Screen. A local screenshot editor with arrows, text, numbered steps and more."
+      content="Capture your screen and annotate an area in Quick Capture. Copy or save a PNG, or continue in the full editor. Cute Screen keeps your work local."
     />
     <meta name="theme-color" content="#191a1e" />
     <link rel="icon" href="../assets/logo.svg" type="image/svg+xml" />
@@ -42,6 +42,8 @@
       >
       <nav aria-label="Primary navigation">
         <a href="#features">Tools</a>
+        <a href="#capture">Capture</a>
+        <a href="#agents">MCP</a>
         <a href="https://github.com/VladimirIvanin/cute-screen">GitHub <span aria-hidden="true">↗</span></a>
         <a class="locale-switch" href="../" lang="ru" hreflang="ru">RU</a>
       </nav>
@@ -51,7 +53,10 @@
         <div class="hero-copy">
           <div>
             <h1 id="page-title">Explain it<br /><span>visually.</span></h1>
-            <p class="lede">Capture, annotate, save. Everything stays local.</p>
+            <p class="lede">
+              Capture an area and annotate it in Quick Capture. Copy the result or continue in the full editor.
+              Everything stays local.
+            </p>
           </div>
           <div class="hero-action">
             <a class="button" data-download-primary href="#downloads">All downloads<span aria-hidden="true">↓</span></a>
@@ -92,6 +97,47 @@
           </div>
           <p class="toolbar-caption">Everything you need, in a single row.</p>
         </div>
+      </section>
+      <section id="capture" class="capture-overview container" aria-labelledby="capture-title">
+        <div class="section-heading">
+          <p class="eyebrow">CAPTURE AND QUICK MODE</p>
+          <h2 id="capture-title">From screenshot to finished result.</h2>
+          <p>Start a capture from the app, tray, or a configured keyboard shortcut.</p>
+        </div>
+        <div class="capture-grid">
+          <article class="capture-card">
+            <h3>Area → Quick Capture</h3>
+            <p>Select or adjust an area and annotate it right in the fast capture window.</p>
+          </article>
+          <article class="capture-card">
+            <h3>Finish in a few actions</h3>
+            <p>Copy the image, save a PNG, add it to local history, or continue in the full editor.</p>
+          </article>
+          <article class="capture-card">
+            <h3>Screen and window → editor</h3>
+            <p>A full-screen or window capture opens for detailed editing. You can open an existing image too.</p>
+          </article>
+        </div>
+        <p class="capture-note">
+          Capture modes vary by OS.
+          <a href="https://github.com/VladimirIvanin/cute-screen/blob/main/docs/PLATFORM_MATRIX.md"
+            >See platform details ↗</a
+          >
+        </p>
+      </section>
+      <section id="agents" class="agents-overview container" aria-labelledby="agents-title">
+        <div class="section-heading">
+          <p class="eyebrow">LOCAL AGENTS · MCP</p>
+          <h2 id="agents-title">Work on a screenshot with an agent.</h2>
+        </div>
+        <p>
+          Enable MCP in settings. A compatible agent can start a capture, read local history, edit the open document,
+          inspect a preview, and export a PNG. Each client has its own revocable key.
+        </p>
+        <p>
+          The app does not provide an AI model; the MCP client controls what it sends to its model.
+          <a href="https://github.com/VladimirIvanin/cute-screen/blob/main/docs/MCP.md">Connect an agent ↗</a>
+        </p>
       </section>
       <section id="features" class="features container" aria-labelledby="features-title">
         <div class="section-heading">

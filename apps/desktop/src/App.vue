@@ -79,6 +79,7 @@ const testActions: ShellActionAdapter | undefined =
     : undefined
 
 const shell = shallowRef<InstanceType<typeof EditorShell>>()
+const historyPopover = shallowRef<InstanceType<typeof HistoryPopover>>()
 const historyActiveCaptureId = shallowRef<string>()
 const historyBusy = shallowRef(false)
 const historyError = shallowRef<string>()
@@ -442,6 +443,9 @@ onMounted(() => {
       installLifecycleGuards,
     })
     if ('__TAURI_INTERNALS__' in window) {
+      await (await import('./platform/tauri/history-menu-adapter')).installHistoryMenuListener(
+        selectHistoryCapture, historyPopover, historyError, () => disposedHistory, lifecycleCleanup,
+      )
       const { installAgentRuntime } = await import('./platform/tauri/agent-runtime')
       lifecycleCleanup.push(await installAgentRuntime({
         session: () => documentSession.value,
@@ -507,6 +511,7 @@ onBeforeUnmount(() => {
   >
     <template v-if="openImageAvailable" #history="{ locale }">
       <HistoryPopover
+        ref="historyPopover"
         :bridge="nativeHistory"
         :active-id="historyActiveCaptureId"
         :locale="locale"

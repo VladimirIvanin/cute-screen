@@ -76,8 +76,25 @@ export class CropController {
     session: CropSession,
     point: CanvasPoint,
   ): CropResizeHandle | undefined {
-    const tolerance = 9 / this.#overlayScale()
-    return this.#handlePositions(session).find(
+    const positions = this.#handlePositions(session)
+    const scale = this.#overlayScale()
+    if (this.#context.props.quickFrameMode) {
+      const half = 12 / scale
+      let closest: CropResizeHandle | undefined
+      let distance = Number.POSITIVE_INFINITY
+      for (const [handle, position] of positions) {
+        const dx = point.x - position.x
+        const dy = point.y - position.y
+        if (Math.abs(dx) > half || Math.abs(dy) > half) continue
+        const candidate = dx * dx + dy * dy
+        if (candidate >= distance) continue
+        closest = handle
+        distance = candidate
+      }
+      return closest
+    }
+    const tolerance = 9 / scale
+    return positions.find(
       ([, position]) => Math.hypot(position.x - point.x, position.y - point.y) <= tolerance,
     )?.[0]
   }
@@ -292,7 +309,12 @@ export class CropController {
     context.fillStyle = '#ffffff'
     context.strokeStyle = '#d9773b'
     for (const [, position] of this.#handlePositions(session)) {
-      drawClampedHandleSquare(context, position, 4 / scale, outputBounds)
+      drawClampedHandleSquare(
+        context,
+        position,
+        (this.#context.props.quickFrameMode ? 6 : 4) / scale,
+        outputBounds,
+      )
     }
   }
 }

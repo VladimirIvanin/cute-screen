@@ -140,6 +140,7 @@ struct CuteRect {
 
 #[cfg(test)]
 unsafe extern "C" {
+    fn cute_selector_area_handoff_contract() -> bool;
     fn cute_selector_window_frame(screen_frame: CuteRect) -> CuteRect;
     fn cute_selector_constrained_frame(proposed: CuteRect, screen_frame: CuteRect) -> CuteRect;
     fn cute_selector_draws_with_flipped_ctm() -> bool;
@@ -610,6 +611,12 @@ fn failure(correlation_id: &str, stage: &'static str) -> PlatformError {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn accepted_area_retains_selector_until_quick_webview_reveals() {
+        // SAFETY: constructs a synthetic selector session without screen access.
+        assert!(unsafe { super::cute_selector_area_handoff_contract() });
+    }
+
     #[test]
     fn native_backend_authorizes_instead_of_coregraphics_preflight() {
         for backend in [1, 2, 3] {

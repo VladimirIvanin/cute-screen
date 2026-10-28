@@ -1,4 +1,11 @@
-use crate::shortcuts::{ShortcutAction, host::ShortcutService};
+use crate::{
+    shortcuts::{ShortcutAction, host::ShortcutService},
+    storage::{
+        LibraryRepository,
+        history::{HistoryRequest, HistoryResponse, RecentCapture},
+    },
+};
+use std::{collections::HashMap, sync::Mutex};
 use tauri::{Manager, Runtime, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
 pub fn open<R: Runtime>(app: &tauri::AppHandle<R>, first_run: bool) -> Result<(), String> {
@@ -82,6 +89,7 @@ fn open_query<R: Runtime>(app: &tauri::AppHandle<R>, query: &str) -> Result<(), 
 }
 
 pub fn refresh_tray<R: Runtime>(app: &tauri::AppHandle<R>) {
+    refresh_app_menu(app);
     if app.tray_by_id("main-tray").is_none() {
         return;
     }
@@ -139,11 +147,6 @@ pub fn refresh_tray<R: Runtime>(app: &tauri::AppHandle<R>) {
             }
         }
     }
-    if let Some(item) = app.try_state::<AppSettingsItem<R>>()
-        && let Err(error) = item.0.set_text(tray_text("settings", &locale, None))
-    {
-        eprintln!("cute-screen app settings label: {error}");
-    }
 }
 
 pub struct TrayShortcutItems<R: Runtime>(pub Vec<tauri::menu::MenuItem<R>>);
@@ -168,7 +171,42 @@ pub fn test_tray_labels(app: tauri::AppHandle) -> Result<serde_json::Value, Stri
     Ok(serde_json::json!({ "items": labels, "startup": app.state::<TrayStartupLabels>().0 }))
 }
 
-struct AppSettingsItem<R: Runtime>(tauri::menu::MenuItem<R>);
+#[cfg(feature = "test-harness")]
+#[tauri::command]
+pub fn test_app_menu_snapshot(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let items = app.state::<AppMenuItems<tauri::Wry>>();
+    let recent = items
+        .recent
+        .items()
+        .map_err(|error| error.to_string())?
+        .iter()
+        .filter_map(|item| item.as_menuitem())
+        .map(|item| {
+            Ok(serde_json::json!({
+                "id": item.id().as_ref(),
+                "text": item.text().map_err(|error| error.to_string())?,
+                "enabled": item.is_enabled().map_err(|error| error.to_string())?,
+            }))
+        })
+        .collect::<Result<Vec<serde_json::Value>, String>>()?;
+    Ok(serde_json::json!({
+        "version": items.version.text().map_err(|error| error.to_string())?,
+        "settings": items.settings.text().map_err(|error| error.to_string())?,
+        "editor": items.editor.text().map_err(|error| error.to_string())?,
+        "recentLabel": items.recent.text().map_err(|error| error.to_string())?,
+        "recent": recent,
+        "quit": items.quit.text().map_err(|error| error.to_string())?,
+    }))
+}
+
+struct AppMenuItems<R: Runtime> {
+    version: tauri::menu::MenuItem<R>,
+    settings: tauri::menu::MenuItem<R>,
+    editor: tauri::menu::MenuItem<R>,
+    recent: tauri::menu::Submenu<R>,
+    quit: tauri::menu::MenuItem<R>,
+    recent_ids: Mutex<HashMap<String, String>>,
+}
 
 pub const UI_PREFERENCES_KEY: &str = "cute-screen.ui-preferences.v1";
 
@@ -211,7 +249,26 @@ pub fn saved_locale<R: Runtime>(app: &tauri::AppHandle<R>) -> String {
 }
 
 pub fn tray_text(id: &str, locale: &str, trigger: Option<&str>) -> String {
+    if id == "app-version" {
+        return format!(
+            "{} {}",
+            if locale == "ru" {
+                "Версия"
+            } else {
+                "Version"
+            },
+            env!("CARGO_PKG_VERSION")
+        );
+    }
     let label = match (locale == "ru", id) {
+        (true, "app-recent") => "Недавние снимки",
+        (true, "app-all-history") => "Вся история…",
+        (true, "app-empty-history") => "Снимков пока нет",
+        (true, "app-history-error") => "История недоступна",
+        (_, "app-recent") => "Recent Captures",
+        (_, "app-all-history") => "All History…",
+        (_, "app-empty-history") => "No captures yet",
+        (_, "app-history-error") => "History unavailable",
         (true, "capture-area") => "Снимок области",
         (true, "capture-screen") => "Снимок экрана",
         (true, "capture-window") => "Снимок окна",
@@ -247,22 +304,240 @@ pub fn install_menu<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()> 
     if !installs_app_menu(cfg!(target_os = "macos")) {
         return Ok(());
     }
-    use tauri::menu::{Menu, MenuItem, Submenu};
+    use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
+    let locale = saved_locale(app);
+    let version = MenuItem::with_id(
+        app,
+        "app-version",
+        tray_text("app-version", &locale, None),
+        false,
+        None::<&str>,
+    )?;
     let settings = MenuItem::with_id(
         app,
         "app-settings",
-        tray_text("settings", &saved_locale(app), None),
+        tray_text("settings", &locale, None),
         true,
         Some("CmdOrCtrl+,"),
     )?;
-    let submenu = Submenu::with_items(app, "Cute Screen", true, &[&settings])?;
+    let editor = MenuItem::with_id(
+        app,
+        "app-show-editor",
+        tray_text("show-editor", &locale, None),
+        true,
+        None::<&str>,
+    )?;
+    let recent = Submenu::with_id(
+        app,
+        "app-recent",
+        tray_text("app-recent", &locale, None),
+        true,
+    )?;
+    let quit = MenuItem::with_id(
+        app,
+        "app-quit",
+        tray_text("quit", &locale, None),
+        true,
+        Some("CmdOrCtrl+Q"),
+    )?;
+    let first_separator = PredefinedMenuItem::separator(app)?;
+    let second_separator = PredefinedMenuItem::separator(app)?;
+    let submenu = Submenu::with_items(
+        app,
+        "Cute Screen",
+        true,
+        &[
+            &version,
+            &first_separator,
+            &settings,
+            &editor,
+            &recent,
+            &second_separator,
+            &quit,
+        ],
+    )?;
     app.set_menu(Menu::with_items(app, &[&submenu])?)?;
-    app.manage(AppSettingsItem(settings));
+    app.manage(AppMenuItems {
+        version,
+        settings,
+        editor,
+        recent,
+        quit,
+        recent_ids: Mutex::new(HashMap::new()),
+    });
+    refresh_app_menu(app);
     Ok(())
+}
+
+pub fn recent_capture_from_menu<R: Runtime>(app: &tauri::AppHandle<R>, id: &str) -> Option<String> {
+    app.try_state::<AppMenuItems<R>>()?
+        .recent_ids
+        .lock()
+        .ok()?
+        .get(id)
+        .cloned()
+}
+
+pub fn refresh_app_menu<R: Runtime>(app: &tauri::AppHandle<R>) {
+    if let Err(error) = try_refresh_app_menu(app) {
+        eprintln!("cute-screen app menu refresh: {error}");
+    }
+}
+
+fn try_refresh_app_menu<R: Runtime>(app: &tauri::AppHandle<R>) -> Result<(), String> {
+    use tauri::menu::{MenuItem, PredefinedMenuItem};
+    let Some(items) = app.try_state::<AppMenuItems<R>>() else {
+        return Ok(());
+    };
+    let locale = saved_locale(app);
+    items
+        .version
+        .set_text(tray_text("app-version", &locale, None))
+        .map_err(|error| error.to_string())?;
+    items
+        .settings
+        .set_text(tray_text("settings", &locale, None))
+        .map_err(|error| error.to_string())?;
+    items
+        .editor
+        .set_text(tray_text("show-editor", &locale, None))
+        .map_err(|error| error.to_string())?;
+    items
+        .recent
+        .set_text(tray_text("app-recent", &locale, None))
+        .map_err(|error| error.to_string())?;
+    items
+        .quit
+        .set_text(tray_text("quit", &locale, None))
+        .map_err(|error| error.to_string())?;
+
+    let recent = app
+        .try_state::<LibraryRepository>()
+        .ok_or_else(|| "library is unavailable".to_owned())?
+        .history(HistoryRequest::List { cursor: None });
+    let mut recent_ids = items.recent_ids.lock().map_err(|error| error.to_string())?;
+    recent_ids.clear();
+    while !items
+        .recent
+        .items()
+        .map_err(|error| error.to_string())?
+        .is_empty()
+    {
+        items
+            .recent
+            .remove_at(0)
+            .map_err(|error| error.to_string())?;
+    }
+    match recent {
+        Ok(HistoryResponse::Page { page }) if !page.items.is_empty() => {
+            for capture in page.items.iter().take(5) {
+                let id = format!("app-capture:{}", capture.capture_id);
+                let menu_item = MenuItem::with_id(
+                    app,
+                    id.clone(),
+                    recent_capture_text(capture, &locale),
+                    true,
+                    None::<&str>,
+                )
+                .map_err(|error| error.to_string())?;
+                items
+                    .recent
+                    .append(&menu_item)
+                    .map_err(|error| error.to_string())?;
+                recent_ids.insert(id, capture.capture_id.clone());
+            }
+        }
+        Ok(HistoryResponse::Page { .. }) => {
+            let empty = MenuItem::with_id(
+                app,
+                "app-empty-history",
+                tray_text("app-empty-history", &locale, None),
+                false,
+                None::<&str>,
+            )
+            .map_err(|error| error.to_string())?;
+            items
+                .recent
+                .append(&empty)
+                .map_err(|error| error.to_string())?;
+        }
+        Ok(_) | Err(_) => {
+            let error = MenuItem::with_id(
+                app,
+                "app-history-error",
+                tray_text("app-history-error", &locale, None),
+                false,
+                None::<&str>,
+            )
+            .map_err(|error| error.to_string())?;
+            items
+                .recent
+                .append(&error)
+                .map_err(|error| error.to_string())?;
+        }
+    }
+    let separator = PredefinedMenuItem::separator(app).map_err(|error| error.to_string())?;
+    let all = MenuItem::with_id(
+        app,
+        "app-all-history",
+        tray_text("app-all-history", &locale, None),
+        true,
+        None::<&str>,
+    )
+    .map_err(|error| error.to_string())?;
+    items
+        .recent
+        .append(&separator)
+        .map_err(|error| error.to_string())?;
+    items
+        .recent
+        .append(&all)
+        .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+fn recent_capture_text(capture: &RecentCapture, locale: &str) -> String {
+    let date = chrono::DateTime::from_timestamp_millis(capture.captured_at)
+        .map(|value| value.with_timezone(&chrono::Local));
+    let date = match (locale == "ru", date) {
+        (true, Some(value)) => value.format("%d.%m %H:%M").to_string(),
+        (false, Some(value)) => value.format("%b %-d, %H:%M").to_string(),
+        (true, None) => "Дата неизвестна".to_owned(),
+        (false, None) => "Unknown date".to_owned(),
+    };
+    format!("{date} · {}×{}", capture.width, capture.height)
 }
 
 #[cfg(test)]
 mod navigation_tests {
+    #[test]
+    fn macos_app_menu_has_localized_history_empty_error_and_version_labels() {
+        assert_eq!(
+            super::tray_text("app-recent", "ru", None),
+            "Недавние снимки"
+        );
+        assert_eq!(
+            super::tray_text("app-recent", "en", None),
+            "Recent Captures"
+        );
+        assert_eq!(
+            super::tray_text("app-all-history", "ru", None),
+            "Вся история…"
+        );
+        assert_eq!(
+            super::tray_text("app-empty-history", "ru", None),
+            "Снимков пока нет"
+        );
+        assert_eq!(
+            super::tray_text("app-history-error", "en", None),
+            "History unavailable"
+        );
+        assert_eq!(
+            super::tray_text("app-version", "en", None),
+            format!("Version {}", env!("CARGO_PKG_VERSION"))
+        );
+    }
+
     #[test]
     fn native_locale_uses_the_validated_shared_preference() {
         assert_eq!(

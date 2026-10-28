@@ -26,6 +26,11 @@ const emit = defineEmits<{ cancel: [] }>()
 const snapshot = computed(() => props.state.snapshot.value)
 const busy = computed(() => props.state.busy.value)
 const macos = computed(() => snapshot.value?.platform === 'macos')
+const visibleEntries = computed(() => {
+  const value = snapshot.value
+  if (!value) return []
+  return value.platform === 'macos' ? value.entries.filter((entry) => entry.supported) : value.entries
+})
 const copied = ref(false)
 const suggestions = shallowRef<Record<string, string>>({})
 let disposed = false
@@ -108,7 +113,7 @@ onBeforeUnmount(() => {
     </div>
     <section class="cs-shortcut-list" :aria-label="labels.shortcuts">
       <ShortcutRow
-        v-for="entry in snapshot.entries"
+        v-for="entry in visibleEntries"
         :key="entry.action"
         :entry="entry"
         :locale="locale"

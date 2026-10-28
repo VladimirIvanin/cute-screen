@@ -327,6 +327,7 @@ CuteRect cute_selector_view_rect_for_window_bounds(CuteRect window_bounds,
 @property(nonatomic) BOOL cancelled;
 @property(nonatomic, weak) CuteCaptureSession *session;
 - (void)updateAreaSelectionFromSession;
+- (void)finish:(BOOL)accepted;
 @end
 
 @implementation CuteCaptureSession
@@ -702,6 +703,25 @@ static NSWindow *CuteMakeOverlayWindow(NSScreen *screen, CuteCaptureView **outVi
   return window;
 }
 
+static BOOL CuteShouldRetainAreaHandoff(CuteCaptureMode mode,
+                                        CuteCaptureSession *session,
+                                        BOOL cancelled) {
+  return mode == CuteCaptureModeArea && session.accepted && !session.cancelled && !cancelled;
+}
+
+bool cute_selector_area_handoff_contract(void) {
+  CuteCaptureSession *session = [[CuteCaptureSession alloc] init];
+  CuteCaptureView *view = [[CuteCaptureView alloc] initWithFrame:NSMakeRect(0, 0, 10, 10)];
+  view.mode = CuteCaptureModeArea;
+  view.session = session;
+  [view finish:YES];
+  BOOL accepted = CuteShouldRetainAreaHandoff(CuteCaptureModeArea, session, NO);
+  BOOL wrongMode = CuteShouldRetainAreaHandoff(CuteCaptureModeWindow, session, NO);
+  [view finish:NO];
+  BOOL cancelled = CuteShouldRetainAreaHandoff(CuteCaptureModeArea, session, YES);
+  return accepted && !wrongMode && !cancelled;
+}
+
 static int32_t CuteRunSelectionInner(CuteCaptureMode mode, const char *outputPath,
                                      const void *cancelContext,
                                      CuteCancellationProbe cancelProbe,
@@ -836,7 +856,7 @@ static int32_t CuteRunSelectionInner(CuteCaptureMode mode, const char *outputPat
         selected = NSRectFromCGRect(selectedPixels);
       }
     }
-    if (!cancelled && finishedView != nil && mode == CuteCaptureModeArea) {
+    if (CuteShouldRetainAreaHandoff(mode, session, cancelled)) {
       // Keep the exact accepted frozen frame and selection above the desktop.
       // The ready quick WebView is ordered over it and explicitly completes
       // this handoff after its canvas and chrome have composited.

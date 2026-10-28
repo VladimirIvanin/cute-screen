@@ -53,7 +53,7 @@ describe('Quick Capture display resolution overlay', () => {
     expect(alpha.filter((value) => value !== 0 && value !== 255)).toHaveLength(0)
   })
 
-  it('uses the visible document scale for badge text and border hit tolerance', () => {
+  it('uses the visible document scale for badge text and enlarged handle target', () => {
     const scene = Object.assign(document.createElement('canvas'), {
       width: 400,
       height: 300,
@@ -93,7 +93,49 @@ describe('Quick Capture display resolution overlay', () => {
     expect(context.setLineDash).toHaveBeenCalledWith([7 / 3.6, 5 / 3.6])
     expect(
       crop.handleAtPoint({ crop: crop.quickDraft } as NonNullable<typeof crop.session>, { x: 13, y: 20 }),
+    ).toBe('northWest')
+    expect(
+      crop.handleAtPoint({ crop: crop.quickDraft } as NonNullable<typeof crop.session>, { x: 14, y: 20 }),
     ).toBeUndefined()
+  })
+
+  it.each([1, 2, 3.6])('draws Quick handles at 12 CSS px with a 24 CSS px square target at scale %s', (scale) => {
+    const scene = document.createElement('canvas')
+    scene.getBoundingClientRect = () => ({ width: 400 * scale, height: 300 * scale }) as DOMRect
+    const fillRect = vi.fn()
+    const context = {
+      save: vi.fn(),
+      restore: vi.fn(),
+      fillRect,
+      strokeRect: vi.fn(),
+      setLineDash: vi.fn(),
+      beginPath: vi.fn(),
+      roundRect: vi.fn(),
+      fill: vi.fn(),
+      fillText: vi.fn(),
+    } as unknown as CanvasRenderingContext2D
+    const crop = new CropController({
+      props: {
+        canvas: { width: 400, height: 300 },
+        document: { canvas: { width: 400, height: 300 }, crop: { x: 40, y: 50, width: 200, height: 150 } },
+        quickFrameMode: true,
+        zoom: scale * 100,
+      } as CanvasViewportProps,
+      emit: vi.fn(),
+      overlay: shallowRef(),
+      scene: shallowRef(scene),
+      rendererError: shallowRef(),
+    })
+
+    crop.draw(context, { x: 0, y: 0, width: 400, height: 300 })
+    expect(fillRect.mock.calls.slice(-8).map((call) => [call[2], call[3]])).toEqual(
+      Array.from({ length: 8 }, () => [12 / scale, 12 / scale]),
+    )
+    const session = crop.session!
+    expect(crop.handleAtPoint(session, { x: 40 + 11 / scale, y: 50 })).toBe('northWest')
+    expect(crop.handleAtPoint(session, { x: 40 + 13 / scale, y: 50 })).toBeUndefined()
+    expect(crop.handleAtPoint({ ...session, crop: { x: 40, y: 50, width: 12 / scale, height: 12 / scale } },
+      { x: 40 + 11 / scale, y: 50 })).toBe('northEast')
   })
 
   it('clears stale pixels and maps non-origin bounds without resetting document coordinates', () => {

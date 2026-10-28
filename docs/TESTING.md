@@ -1,5 +1,117 @@
 # Стратегия тестирования
 
+## Системное меню macOS (2026-10-28, ADR-166)
+
+Платформа: macOS 12.7.6 Intel, WKWebView 605.1.15, база `e5a136a` +
+рабочие изменения. `cargo test -p cute-screen-desktop --lib
+macos_app_menu_has_localized_history_empty_error_and_version_labels` был
+red-first: до добавления подписей FAILED, после — **1 passed**.
+
+`XDG_SESSION_ID=cute-screen-e2e-app-menu-final-20261028
+CUTE_SCREEN_E2E_SCENARIOS=macos-app-menu pnpm test:e2e:tauri` — **1 passed**
+на свежесобранном native harness. Из реальных Tauri menu items прочитаны
+версия, Settings, Open Editor, Recent Captures, Quit и disabled пустая история.
+Через production capture созданы два снимка; подменю обновилось и показало
+оба ID с датой и размером. Тот же обработчик, что принимает native menu event,
+открыл полный History popover, затем старый пункт загрузил именно его документ
+в редакторе. Артефакты: `artifacts/tauri-e2e/macos-app-menu.json`,
+`macos-app-menu-history.png`, `junit-macos-app-menu-0-0.xml`.
+
+Нативный click по строке системного меню, Cmd+Q, RU labels, удаление и ошибка
+чтения истории не автоматизированы этим сценарием; логика подписей
+покрыта Rust contract, runtime error state остаётся непроверенным. Версия macOS 26 требует
+отдельной runtime проверки. Первый одно-снимочный E2E прошёл; два следующих
+прогона остановились из-за отсутствующей M08 test facade, после добавления
+`m08=1` итоговый двух-снимочный сценарий прошёл и повторно прошёл после
+переноса Tauri listener в платформенный адаптер. Неуспешные временные appData
+удалены после диагностики. Финальный `pnpm check` — passed: lint без ошибок
+(38 существовавших warnings), typecheck, format, docs, 115 boundary tests,
+MCP/IPC и четыре конфигурации Rust Clippy. `pnpm clean:artifacts` — dry run
+0 временных каталогов; `pnpm disk:usage` — target 32.524 GiB, artifacts
+0.052 GiB. Общий Cargo cache сохранён.
+
+## macOS Area handoff и клик вне рамки (2026-10-28)
+
+Пользователь сообщил: на macOS 26.6.2 после повторной выдачи Screen Recording
+и перезапуска версия 0.1.20 начала захватывать экран. Один раз после Area и
+клика по затемнённому фону Quick окно перестало показываться при живом Dock
+процессе; после принудительного перезапуска работало, затем сбой не повторился.
+Это пользовательское наблюдение, не локально подтверждённый runtime результат.
+
+Аудит `macos_capture_bridge.m` выявил реальный дефект: Area завершает цикл
+через `session.accepted`, но последующее удержание selector проверяло
+`finishedView != nil`; у Area эта переменная всегда nil. Нативный тест
+`cargo test -p cute-screen-desktop --lib
+accepted_area_retains_selector_until_quick_webview_reveals` сначала FAILED,
+после замены условия на `session.accepted` — **1 passed**. Тест также проверяет,
+что cancel и Window не сохраняют handoff. Более широкий `cargo test -p
+cute-screen-desktop --lib macos_platform` — **22 passed**. Runtime Area
+selector на macOS 26 не запускался.
+
+Для клика вне crop подготовлен scoped fake capture с ненулевым crop через
+production mount-flow, но два native WKWebView прогона на macOS 12.7.6 не
+доставили `pointerdown` даже после явного `set_focus`; это совпадает с
+ограничением общего `quick-chrome` E2E. Сценарий удалён из репозитория, поскольку
+не доказывает пользовательский жест. Актуальный лог:
+`artifacts/tauri-e2e/quick-outside-click-retry.log`. Обработчик клика по
+затемнённому canvas не менялся без воспроизведения.
+
+## macOS actions и ручки Quick Capture (2026-10-28, ADR-164/165)
+
+Платформа: macOS 12.7.6 Intel, WKWebView 605.1.15; база `e5a136a` +
+рабочие изменения. Для tray сначала `cargo test -p cute-screen-desktop --lib
+tray_lists_only_supported_capture_actions_on_macos` упал на Active Window;
+после исправления прошёл. Для Quick `pnpm exec vitest run
+tests/unit/vue/quick-overlay-resolution.test.ts` сначала дал 3 failing проверки
+прежних 8 px; после исправления — 8 passed. Проверены видимые квадраты 12 px,
+квадратная hit-area 24 px, пересечение соседних ручек и scale 1/2/3.6.
+
+`XDG_SESSION_ID=cute-screen-e2e-adr164-165-20261028
+CUTE_SCREEN_E2E_SCENARIOS=macos-available-actions pnpm test:e2e:tauri` —
+**1 passed** на свежесобранном harness. Реальный native tray содержит только
+`capture-area`, `capture-screen`, `show-editor`, `settings`, `quit`; Settings
+в production WebView содержит только Area, Screen, Open Editor. Артефакты:
+`artifacts/tauri-e2e/macos-available-actions.json` и `.png`.
+
+Общий запуск `tray-locale,quick-chrome` на том же WKWebView не прошёл: смена
+языка native tray не обновилась до ожидаемой метки в timeout; в Quick 3 теста
+прошли, 4 теста жестов/поповеров упали (первый drag не записал trusted pointer
+samples). Это не подтверждает native pointer drag новых ручек или RU tray
+labels. Первый запуск без `XDG_SESSION_ID` встретил сокет уже запущенного
+установленного приложения; отдельный session ID изолировал harness.
+Дополнительная попытка переключить Settings на RU в узком сценарии не прошла:
+после выбора `ru` значение вернулось к `en`. Шаг удалён из проверки фильтра;
+отдельный locale flow остаётся непроверенным. `pnpm check` после добавления
+узкого E2E — passed: lint без ошибок (38 warnings), typecheck, format, docs,
+115 boundary tests, schema/IPC и четыре конфигурации Rust Clippy.
+`pnpm disk:usage`: target 24.958 GiB до native harness и 30.033 GiB после,
+artifacts 0.052 GiB после удаления диагностированных failed appData; общий
+Cargo cache сохранён. `pnpm clean:artifacts` — dry run 0 временных каталогов.
+
+## README и лендинг: захват, Quick Capture, MCP (2026-10-28)
+
+Платформа: macOS 12.7.6 Intel (x86_64), Chrome 150.0.7871.125; commit
+`e5a136a` + рабочие изменения. RU/EN README сокращены до 47 строк каждый;
+текст и контракты сверены с PRODUCT.md и MCP.md. На лендинге просмотрены
+capture/Quick/MCP блоки и ссылки на platform matrix и MCP.md.
+
+`pnpm format`, `pnpm format:check`, `pnpm docs:check` и `pnpm build:landing` —
+passed. Финальный `pnpm test:e2e:landing` — 6 passed, 1 skipped; RU/EN ×
+375/760/768/1024/1440 px, без горизонтального overflow, скриншот и инструменты,
+ссылки и клавиатура. `CUTE_SCREEN_LANDING_NO_JS=1 pnpm test:e2e:landing` —
+5 passed, 2 skipped; якоря, переход языков и загрузки работают без JS.
+Промежуточный E2E выявил повтор названия продукта в новом MCP-блоке;
+повтор удалён, после чего оба финальных прогона прошли.
+
+Артефакты: `artifacts/landing-copy/summary.md` и выбранные RU/EN screenshots;
+полный прогон — `artifacts/landing-e2e/js/` и `artifacts/landing-e2e/no-js/`.
+Временный профиль прерванного прогона удалён через
+`pnpm clean:artifacts --apply` после dry run (0.052 GiB). `pnpm disk:usage`
+после проверки: target 24.958 GiB, artifacts 0.098 GiB до очистки и
+0.049 GiB после очистки профиля и отбора screenshots;
+общий build cache сохранён. Новых native capture/runtime проверок эта правка
+не выполняет и платформенные гарантии не расширяет.
+
 ## macOS default helper и читаемость feedback (2026-10-28, ADR-163)
 
 Платформа: macOS 12.7.6 Intel, SDK 13.1, Retina 1440×900 pt; baseline c930793,

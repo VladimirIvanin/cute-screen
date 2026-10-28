@@ -44,6 +44,13 @@ describe('native tray follows the Settings language', () => {
       }
       evidence.push(labels)
     }
+    await $('.cs-settings-sidebar nav button:last-child').click()
+    await expect($('.cs-shortcut-list')).toBeDisplayed()
+    const actions = await browser.execute(() => [...document.querySelectorAll('.cs-shortcut-list [data-action]')]
+      .map((row) => row.getAttribute('data-action')))
+    expect(actions).toEqual(process.platform === 'darwin'
+      ? ['capture-area', 'capture-screen', 'show-editor']
+      : ['capture-area', 'capture-screen', 'capture-window', 'capture-active-window', 'capture-repeat', 'show-editor'])
     await browser.saveScreenshot(`${process.env.CUTE_SCREEN_WDIO_ARTIFACTS}/tray-locale-settings-ru.png`)
     await $('.cs-settings-footer button').click()
     await browser.tauri.switchWindow('main')
