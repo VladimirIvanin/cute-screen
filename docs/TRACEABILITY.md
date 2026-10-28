@@ -207,14 +207,15 @@ GPL issues не переносит сторонний код в продукт.
 
 ## MCP для локальных агентов (2026-10-25, ADR-154)
 
-| Требование  | Реализация                                                                                                            | Доказательство                                             |
-| ----------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| REQ-MCP-001 | Opt-in, профили клиентов, повторное открытие/копирование без ротации, восстановление после restart и legacy migration | Settings component, Rust credentials tests и native reopen |
-| REQ-MCP-002 | Stdio companion, authenticated loopback bridge, отзыв ключей                                                          | Rust transport/auth tests и packaged smoke                 |
-| REQ-MCP-003 | История, импорт и штатный capture с cancel/jobs                                                                       | Native production-flow E2E                                 |
-| REQ-MCP-004 | Atomic EditorCommand batch, Undo/Redo и state token                                                                   | Core failing-first и session tests                         |
-| REQ-MCP-005 | Snapshot preview, binary IPC, ImageContent только на MCP boundary                                                     | Decode/render/native E2E                                   |
-| REQ-MCP-006 | Атомарный PNG export без перезаписи                                                                                   | Rust destination tests и decoded export                    |
+| Требование  | Реализация                                                                                                            | Доказательство                                                              |
+| ----------- | --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| REQ-MCP-001 | Opt-in, профили клиентов, повторное открытие/копирование без ротации, восстановление после restart и legacy migration | Settings component, Rust credentials tests и native reopen                  |
+| REQ-MCP-002 | Stdio companion, authenticated loopback bridge, отзыв ключей                                                          | Rust transport/auth tests и packaged smoke                                  |
+| REQ-MCP-003 | История, импорт и штатный capture с cancel/jobs                                                                       | Native production-flow E2E                                                  |
+| REQ-MCP-004 | Atomic EditorCommand batch, Undo/Redo и state token                                                                   | Core failing-first и session tests                                          |
+| REQ-MCP-005 | Snapshot preview, binary IPC, ImageContent только на MCP boundary                                                     | Decode/render/native E2E                                                    |
+| REQ-MCP-006 | Атомарный PNG export без перезаписи                                                                                   | Rust destination tests и decoded export                                     |
+| REQ-MCP-007 | Устанавливаемый навык ведёт агента от захвата до читаемой аннотации и проверенного экспорта                           | Skill validator, реальные MCP-прогоны, независимый просмотр уменьшенных PNG |
 
 Результаты запусков фиксируются в TESTING.md; наличие строки не означает pass.
 

@@ -24,6 +24,7 @@ const embeddedWebDriverPort = Number.parseInt(process.env.TAURI_WEBDRIVER_PORT ?
 const scenarios = [
   { id: 'capture-lifecycle', spec: 'tests/e2e/specs/tauri-capture-lifecycle.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },
   { id: 'mcp', persistenceGroup: 'mcp', spec: 'tests/e2e/specs/tauri-mcp.e2e.ts', harnessQuery: '?m04=1', fakeCapture: true },
+  { id: 'mcp-skill', spec: 'tests/e2e/specs/tauri-mcp-skill.e2e.ts', harnessQuery: '?m04=1&m08=1' },
   { id: 'mcp-reopen', persistenceGroup: 'mcp', spec: 'tests/e2e/specs/tauri-mcp-reopen.e2e.ts', harnessQuery: '?m04=1', fakeCapture: true },
   { id: 'frame-snap', spec: 'tests/e2e/specs/tauri-frame-snap.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },
   { id: 'frame-seams', spec: 'tests/e2e/specs/tauri-frame-seams.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },
@@ -443,6 +444,12 @@ if (unknownScenarioIds.length > 0) {
 
 function isolatedAppDataEnvironment(directory) {
   const environment = { CUTE_SCREEN_E2E_APP_DATA: directory }
+
+  if (process.platform === 'darwin') {
+    // The installed app may be running in the same login session. Give the
+    // harness its own activation socket without changing the user's app.
+    return { ...environment, XDG_SESSION_ID: `cute-screen-e2e-${path.basename(directory)}` }
+  }
 
   if (process.platform === 'linux') {
     return {
