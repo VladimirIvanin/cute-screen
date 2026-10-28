@@ -56,6 +56,26 @@ describe('M02 editor shell', () => {
     })
   })
 
+  it('keeps permission recovery in the editor with separate settings and reopen actions', async () => {
+    window.localStorage.clear()
+    const openCaptureSettings = vi.fn().mockResolvedValue(undefined)
+    const relaunch = vi.fn().mockResolvedValue(undefined)
+    const run = vi.fn().mockRejectedValue(new Error('permissionDenied'))
+    render(EditorShell, {
+      props: { captureAvailable: true, actions: { run, openCaptureSettings, relaunch } },
+      global: { plugins: [createEditorShellPinia()] },
+    })
+    await fireEvent.click(screen.getByRole('button', { name: 'Capture' }))
+    const alert = await screen.findByRole('alert')
+    expect(openCaptureSettings).not.toHaveBeenCalled()
+    await fireEvent.click(within(alert).getByRole('button', { name: 'Screen Recording settings' }))
+    expect(openCaptureSettings).toHaveBeenCalledOnce()
+    expect(run).toHaveBeenCalledOnce()
+    await fireEvent.click(within(alert).getByRole('button', { name: 'Reopen' }))
+    expect(relaunch).toHaveBeenCalledOnce()
+    expect(run).toHaveBeenCalledOnce()
+  })
+
   it('uses the quick-mode tool contract and hides full editor chrome', () => {
     const view = render(EditorShell, {
       props: { quickMode: true, fixture: 'ready' },

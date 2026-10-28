@@ -57,6 +57,7 @@ export const useEditorShellStore = defineStore('cute-screen-editor-shell', () =>
     resolvedTheme: state.resolvedTheme,
     runAction: actions.runAction,
     retryAction: actions.retryAction,
+    openCaptureSettings: actions.openCaptureSettings,
     selectFrame: viewport.selectFrame,
     selectLayer: selection.selectLayer,
     selectTool: selection.selectTool,

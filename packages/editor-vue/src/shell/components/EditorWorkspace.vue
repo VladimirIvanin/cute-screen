@@ -438,6 +438,7 @@ defineExpose(createWorkspaceExposure(canvasViewport, store, props))
         :t="translate"
         @cancel="store.cancelAction"
         @retry="store.retryAction()"
+        @settings="store.openCaptureSettings()"
       />
       <CanvasContextMenu
         :request="canvasMenu"

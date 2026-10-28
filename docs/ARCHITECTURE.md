@@ -1,5 +1,24 @@
 # Архитектура Cute Screen
 
+## Режим Unix activation connection
+
+Listener остаётся nonblocking, чтобы worker обслуживал остановку сервера.
+Каждый принятый UnixStream перед чтением frame явно становится blocking с
+двухсекундным idle read timeout: Darwin наследует O_NONBLOCK listener-а.
+Ожидание terminal reply по-прежнему допускает время пользовательского capture;
+wire version, length limit и request ID остаются прежними. Это общий внутренний
+Unix transport; пользовательский CLI остаётся доступен только на Linux.
+
+## macOS ScreenCaptureKit: разрешение и Monterey filter (ADR-158/159)
+
+SCK сам проверяет доступ при загрузке shareable content; CG preflight ограничен
+legacy route 12.0–12.2. Monterey получает конкретное исключение собственных
+Window IDs, включая transient прозрачные 1×1 pt окна на каждом дисплее.
+Native scope создаёт/закрывает их на main queue и сохраняет finally для всех
+исходов. На macOS 13+ остаётся application exclusion. Stream lifecycle,
+owned BGRA, desktop composition и version routing ADR-157 не меняются.
+UI показывает явные Settings/Reopen действия вместо автоматического открытия ОС.
+
 ## Portal transport и активация (ADR-156)
 
 crates/cute-screen-portal отделяет D-Bus lifecycle от GTK и Tauri. Linux desktop

@@ -300,6 +300,7 @@ export interface ShellActionAdapter {
     reportOperationProgress?: (fraction: number) => void,
   ): Promise<string>
   relaunch?(): Promise<void>
+  openCaptureSettings?(): Promise<void>
 }
 
 export type IconName =
@@ -503,6 +504,7 @@ export const translationKeys = [
   'cancel',
   'retry',
   'reopen',
+  'capturePermissionSettings',
   'loadingEditor',
   'copyAction',
   'exportAction',

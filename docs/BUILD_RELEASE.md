@@ -1,5 +1,16 @@
 # CI-сборки и проверка версии через GitHub
 
+## ScreenCaptureKit Monterey (ADR-158/159)
+
+SDK/deployment baseline и зависимости не меняются. Debug-сборка с SDK 13.1
+продолжает использовать настоящий SCStream на macOS 12.3+; release SDK 14+
+сохраняет SCScreenshotManager на 14+. Compatibility windows и scoped cleanup
+находятся в общем native helper Screen/Area, smoke не подготавливает их сам.
+Для проверки использовать штатные macos Screen/Area smoke с полным PNG decode;
+unit tests и startup-check не заменяют native capture. Локальная `.app` собирается
+через `pnpm tauri build --debug --bundles app`; это unsigned dev artifact,
+не universal/notarized release и не гарантия сохранения TCC grant после upgrade.
+
 В `src-tauri/src/bin/*.rs` находятся только явные Cargo bin targets.
 Tauri также обнаруживает файлы в этом каталоге при подготовке bundle;
 `autobins = false` не защищает от попадания helper-модуля в список упаковки.

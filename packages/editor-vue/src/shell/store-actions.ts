@@ -146,6 +146,18 @@ export function createActionActions(
     }
     await runAction(current.action)
   }
+  async function openCaptureSettings(): Promise<void> {
+    const current = state.actionState.value
+    if (current.status !== 'error' || current.recovery !== 'relaunch') return
+    try {
+      await getOptions()?.actions?.openCaptureSettings?.()
+    } catch (error) {
+      publishFeedback({
+        ...current,
+        message: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
   onScopeDispose(clearFeedbackTimer)
-  return { cancelAction, clearFeedback, retryAction, runAction }
+  return { cancelAction, clearFeedback, retryAction, runAction, openCaptureSettings }
 }

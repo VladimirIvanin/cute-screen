@@ -263,14 +263,45 @@ static BOOL CuteDesktopStop(NSArray<CuteDesktopStream *> *requests) {
 }
 
 API_AVAILABLE(macos(12.3))
-static CGImageRef CuteDesktopSCK(CGRect bounds, const void *context,
+static NSArray<NSWindow *> *CuteDesktopMontereyExclusions(void) {
+  if (@available(macOS 13.0, *)) return @[];
+  __block NSArray<NSWindow *> *windows = nil;
+  void (^create)(void) = ^{
+    NSMutableArray<NSWindow *> *created = [NSMutableArray array];
+    for (NSScreen *screen in NSScreen.screens) {
+      NSRect frame = NSMakeRect(NSMinX(screen.frame), NSMinY(screen.frame), 1, 1);
+      NSWindow *window = [[NSWindow alloc] initWithContentRect:frame
+          styleMask:NSWindowStyleMaskBorderless backing:NSBackingStoreBuffered defer:NO];
+      window.releasedWhenClosed = NO;
+      window.opaque = NO;
+      window.backgroundColor = NSColor.clearColor;
+      window.hasShadow = NO;
+      window.ignoresMouseEvents = YES;
+      window.level = NSScreenSaverWindowLevel;
+      window.collectionBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces |
+          NSWindowCollectionBehaviorFullScreenAuxiliary;
+      [window orderFrontRegardless];
+      [created addObject:window];
+    }
+    windows = created;
+  };
+  if (NSThread.isMainThread) create();
+  else dispatch_sync(dispatch_get_main_queue(), create);
+  return windows;
+}
+
+API_AVAILABLE(macos(12.3))
+static CGImageRef CuteDesktopSCKCapture(CGRect bounds, const void *context,
                                   CuteWindowCancellationProbe probe, int32_t *status) {
   NSArray<NSDictionary *> *layout = CuteDesktopLayout(bounds);
   if (layout == nil) { *status = CuteDesktopInvalid; return NULL; }
   NSTimeInterval deadline = NSProcessInfo.processInfo.systemUptime + 10;
   CuteDesktopResult *loaded = [[CuteDesktopResult alloc] init];
   loaded.stage = @"shareableContent";
-  [SCShareableContent getShareableContentExcludingDesktopWindows:NO onScreenWindowsOnly:YES
+  // Hidden host windows still provide identities for the exclusion filter.
+  // On Monterey an empty exclusion list can start successfully without ever
+  // delivering frames; an unbundled host may also be absent from applications.
+  [SCShareableContent getShareableContentExcludingDesktopWindows:NO onScreenWindowsOnly:NO
       completionHandler:^(SCShareableContent *content, NSError *error) {
     if (error != nil) NSLog(@"Cute Screen shareable displays: %@", error);
     @synchronized(loaded) {
@@ -286,6 +317,19 @@ static CGImageRef CuteDesktopSCK(CGRect bounds, const void *context,
   NSMutableArray<SCRunningApplication *> *excluded = [NSMutableArray array];
   for (SCRunningApplication *app in content.applications) {
     if (app.processID == NSProcessInfo.processInfo.processIdentifier) [excluded addObject:app];
+  }
+  __block NSMutableSet<NSNumber *> *ownWindowIDs = nil;
+  void (^readOwnWindows)(void) = ^{
+    ownWindowIDs = [NSMutableSet set];
+    for (NSWindow *window in NSApp.windows) {
+      if (window.windowNumber > 0) [ownWindowIDs addObject:@(window.windowNumber)];
+    }
+  };
+  if (NSThread.isMainThread) readOwnWindows();
+  else dispatch_sync(dispatch_get_main_queue(), readOwnWindows);
+  NSMutableArray<SCWindow *> *excludedWindows = [NSMutableArray array];
+  for (SCWindow *window in content.windows) {
+    if ([ownWindowIDs containsObject:@(window.windowID)]) [excludedWindows addObject:window];
   }
   NSMutableArray<CuteDesktopStream *> *requests = [NSMutableArray array];
   CGFloat scale = 1;
@@ -304,8 +348,18 @@ static CGImageRef CuteDesktopSCK(CGRect bounds, const void *context,
         if (display.displayID == [entry[@"id"] unsignedIntValue]) { selected = display; break; }
       }
       if (selected == nil) { *status = CuteDesktopInvalid; break; }
-      SCContentFilter *filter = [[SCContentFilter alloc] initWithDisplay:selected
-          excludingApplications:excluded exceptingWindows:@[]];
+      SCContentFilter *filter = nil;
+      if (@available(macOS 13.0, *)) {
+        filter = [[SCContentFilter alloc] initWithDisplay:selected
+            excludingApplications:excluded exceptingWindows:@[]];
+      } else {
+        if (excludedWindows.count == 0) {
+          NSLog(@"Cute Screen desktop capture: missing Monterey exclusion window");
+          *status = CuteDesktopFailed;
+          break;
+        }
+        filter = [[SCContentFilter alloc] initWithDisplay:selected excludingWindows:excludedWindows];
+      }
       SCStreamConfiguration *config = [[SCStreamConfiguration alloc] init];
       config.width = [entry[@"width"] unsignedIntegerValue];
       config.height = [entry[@"height"] unsignedIntegerValue];
@@ -348,6 +402,28 @@ static CGImageRef CuteDesktopSCK(CGRect bounds, const void *context,
     // Also releases streams if a native exception unwinds the capture setup.
     if (requests.count > 0 && requests.firstObject.stream != nil) CuteDesktopStop(requests);
     CGContextRelease(bitmap);
+  }
+}
+
+API_AVAILABLE(macos(12.3))
+static CGImageRef CuteDesktopSCK(CGRect bounds, const void *context,
+                                  CuteWindowCancellationProbe probe, int32_t *status) {
+  // Monterey can start an effectively empty exclusion filter without producing
+  // frames. A transparent, noninteractive 1x1 own window on each display makes
+  // the exclusion concrete while preserving the entire foreign desktop, Dock
+  // and wallpaper. Hidden windows alone do not fix this OS behavior.
+  NSArray<NSWindow *> *exclusions = CuteDesktopMontereyExclusions();
+  @try {
+    return CuteDesktopSCKCapture(bounds, context, probe, status);
+  } @finally {
+    void (^close)(void) = ^{
+      for (NSWindow *window in exclusions) {
+        [window orderOut:nil];
+        [window close];
+      }
+    };
+    if (NSThread.isMainThread) close();
+    else dispatch_sync(dispatch_get_main_queue(), close);
   }
 }
 

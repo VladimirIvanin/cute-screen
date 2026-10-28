@@ -14,8 +14,13 @@ const bridge = vi.hoisted(() => ({
   chooseResultPng: vi.fn(),
   writeResultPng: vi.fn(),
   cancelResultPng: vi.fn(),
+  captureRequest: vi.fn(),
+  openScreenRecordingSettings: vi.fn(),
 }))
 vi.mock('../../../apps/desktop/src/desktop-bridge', () => ({ tauriDesktopBridge: bridge }))
+vi.mock('../../../apps/desktop/src/platform/tauri/window-adapter', () => ({
+  currentDesktopWindow: async () => ({ hide: vi.fn(), show: vi.fn() }),
+}))
 
 function setup() {
   const exportPng = vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3]))
@@ -42,6 +47,26 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('desktop PNG export', () => {
+  it('keeps permission denial in the app until settings are explicitly requested', async () => {
+    const actions = createDesktopShellActions({
+      canvasHosts: shallowRef(),
+      documentSession: shallowRef(),
+      platformCapabilities: shallowRef({
+        correlationId: 'permission-test', session: 'macos',
+        capture: { available: true, backend: 'macosScreenCapture', interactiveSelector: true,
+          monitorTarget: true, windowTarget: false, activeWindowTarget: false, cursor: false },
+        hotkeys: { available: true, backend: 'native', canListShortcuts: false }, cliFallback: false,
+      }),
+      correlationId: () => 'permission-test',
+      mountCapturedDocument: async () => true,
+    })!
+    bridge.captureRequest.mockResolvedValue({ outcome: 'permissionDenied' })
+    await expect(actions.run('capture', new AbortController().signal)).rejects.toThrow('permissionDenied')
+    expect(bridge.openScreenRecordingSettings).not.toHaveBeenCalled()
+    await actions.openCaptureSettings?.()
+    expect(bridge.openScreenRecordingSettings).toHaveBeenCalledOnce()
+  })
+
   it('commits edits and exports renderer bytes through the native save boundary', async () => {
     const { actions, exportPng, prepareDocumentChange } = setup()
     expect(await actions.run('export', new AbortController().signal)).toBe('PNG exported')

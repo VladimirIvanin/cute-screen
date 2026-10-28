@@ -37,13 +37,14 @@ pub fn run(output: &Path, expect_cancel: bool) -> Result<(), Box<dyn std::error:
     // SAFETY: native call is synchronous; path/output remain live, no context
     // or cancellation callback is retained. AppKit runs on the process main thread.
     let (status, backend) = unsafe {
-        let status = if cute_screen_capture_access(true) {
+        let backend = cute_macos_pixel_backend();
+        let status = if backend != 0 || cute_screen_capture_access(true) {
             cute_capture_area(path.as_ptr(), std::ptr::null(), None, &mut selection)
         } else {
             2
         };
         cute_selector_complete_handoff();
-        (status, cute_macos_pixel_backend())
+        (status, backend)
     };
     let outcome = match status {
         0 => "captured",

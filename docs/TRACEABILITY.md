@@ -1,5 +1,31 @@
 # Трассируемость требований
 
+## Unix activation: принятый socket и частичный frame (2026-10-28)
+
+`REQ-ACT-005/006`: nonblocking listener не навязывает этот режим worker-соединению.
+До чтения length-prefixed frame принятый stream явно переключается в blocking;
+двухсекундный read timeout сохраняется. Частичная доставка header/payload не
+обрывает запрос; terminal reply возвращает исходный request ID и outcome.
+Доказательства: существующий red activation round-trip на macOS, новый portable
+red-first nonblocking/fragmented socket test и полный Rust lib suite после исправления.
+Набор пользовательских CLI-платформ ADR-115 и wire protocol не меняются.
+
+## macOS: отказ доступа и получение первого кадра (2026-10-28)
+
+`REQ-CAP-001/002/015`, `REQ-MCP-003`: ScreenCaptureKit самостоятельно проверяет
+доступ при получении shareable content; отрицательный CoreGraphics preflight
+не блокирует этот backend. Legacy CoreGraphics сохраняет main-thread request.
+Version routing ADR-157 сохраняет SCK на macOS 12.3+; переключения backend
+после ошибки нет. Расследование firstFrame timeout не отменяет поддержку API.
+ADR-159: на Monterey конкретное исключение прозрачных собственных окон 1×1 pt
+устраняет пустой effective filter; scope закрывает окна при любом исходе.
+Включающие списки чужих окон/приложений не подменяют полный desktop.
+Отказ не открывает System Settings автоматически: переход доступен отдельной
+кнопкой, перезапуск остаётся явным. Timeout первого кадра отличается от отказа.
+Доказательства: failing-first Rust permission policy, native frame contract,
+Vue recovery actions и реальный decoded Screen smoke на macOS 12.7.6;
+новые macOS и обновление между подписанными сборками проверяются отдельно.
+
 ## Детерминированные шрифты Canvas2D unit tests (2026-10-28)
 
 `REQ-TOL-005/010`, `REQ-OUT-003`: text/ruler pixel tests должны регистрировать

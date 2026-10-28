@@ -1,8 +1,64 @@
 # Журнал архитектурных решений
 
+## ADR-159: конкретное исключение для ScreenCaptureKit на Monterey
+
+**Статус:** accepted (2026-10-28); заменяет построение desktop filter ADR-157
+на macOS 12.3–12.x. Version routing сохранён, включая SCStream с 12.3.
+
+**Основание:** macOS 12.7.6 Intel, SDK 13.1: пустые excludingWindows и
+excludingApplications запускают SCStream без ошибки, но не дают ни одного
+callback за 8–10 секунд. Непустые includingApplications, excludingApplications
+и исключение видимого собственного окна дают complete frame. Скрытое окно не
+исправляет сбой; прозрачное borderless окно 1×1 pt исправляет его без видимых
+пикселей. Парные пробы — artifacts/sck-investigation; production Screen smoke
+дважды получил и полностью декодировал 2880×1800 PNG с backend=screenCaptureKitStream.
+Одного факта доступности API недостаточно для выбора его параметров. WebRTC также
+фиксирует ограничения fullscreen SCK до macOS 13
+([первичный источник](https://webrtc.googlesource.com/src/+/be2f8f6ec8a7c47adfadcc9501d59de9109c6af8/modules/desktop_capture/mac/screen_capturer_sck.mm)).
+
+**Решение:** только на 12.3–12.x перед запросом content создаётся по одному
+прозрачному borderless NSWindow 1×1 pt на экран. Они не становятся key windows,
+игнорируют мышь, не имеют рамки/тени и присоединяются к fullscreen Spaces.
+Запрос content включает скрытые окна. Все собственные Window IDs сопоставляются
+с SCWindow и передаются в excludingWindows; окна приложений, Dock и wallpaper
+не ограничиваются включающим списком. На 13+ сохраняется исключение приложения.
+Никакого CoreGraphics fallback, второго кадра другого backend или новых прав нет.
+
+Весь native scope закрывает временные окна на main queue через finally при
+успехе, отказе, timeout и cancel. SCStream stop/release по-прежнему завершается
+перед возвратом. Неполный кадр и отсутствие exclusion identity остаются ошибками.
+Код не перезапускает системные службы; recovery системного replayd во время
+исследования описан отдельно в TESTING.md.
+
+**Проверка:** native failing capture до изменения, successful decoded Screen
+после; Area/cancel и пределы runtime evidence — TESTING.md. Несколько дисплеев,
+Apple Silicon и macOS 13+/14+ требуют отдельных runtime gates.
+
+## ADR-158: авторизация ScreenCaptureKit и явное восстановление доступа
+
+**Статус:** accepted (2026-10-28); заменяет обязательный CG preflight для SCK
+и recovery UX ADR-152/157. Version routing ADR-157 сохранён, включая SCStream
+на macOS 12.3+. Baseline, бинарный transport и Window gate не меняются.
+
+**Основание:** штатный capture 0.1.16 через настоящий stdio MCP возвращает
+permissionDenied. Rust failing-first показывает, что CG preflight блокирует SCK,
+хотя SCK имеет собственный запрос shareable content и типизированный user-declined.
+Vue failing-first воспроизводит открытие System Settings без явного действия.
+
+**Решение:** только legacy CoreGraphics запрашивает доступ на главной очереди.
+SCK получает разрешение через shareable content и различает user-declined,
+timeout и технический сбой. Отказ не открывает Settings автоматически.
+Две явные кнопки открывают Screen Recording и перезапускают приложение.
+Ошибка открытия Settings видима и допускает повтор. Код не сбрасывает TCC.
+Стабильное разрешение между unsigned/ad-hoc обновлениями не обещается.
+
+**Проверка:** red-first Rust authorization policy и Vue actions; фактические
+результаты native capture и пределы доказательств фиксируются в TESTING.md.
+
 ## ADR-157: macOS desktop capture
 
-**Статус:** accepted (2026-10-28); заменяет Area/desktop routing ADR-038,
+**Статус:** superseded для preflight by [ADR-158](#adr-158-авторизация-screencapturekit-и-явное-восстановление-доступа),
+для Monterey filter by [ADR-159](#adr-159-конкретное-исключение-для-screencapturekit-на-monterey); заменяет Area/desktop routing ADR-038,
 сохраняет baseline 12.0, permission recovery ADR-152 и Window gate ADR-110.
 
 **Контекст:** Screen и frozen Area фактически использовали CGWindowListCreateImage
@@ -144,7 +200,7 @@ trusted drag/reload/keyboard; фактические результаты — TE
 
 ## ADR-152 — Screen Recording проверяется на главной очереди и действует со следующего запуска
 
-**Статус:** accepted (2026-10-23); уточняет отказ `REQ-CAP-015`. Маршрут пикселей ADR-038 не меняется.
+**Статус:** superseded для SCK preflight/recovery UX by [ADR-158](#adr-158-авторизация-screencapturekit-и-явное-восстановление-доступа); уточняет отказ `REQ-CAP-015`. Маршрут пикселей ADR-038 не меняется.
 
 **Контекст:** на macOS 15+ панель называется «Запись экрана и системного звука». Тумблер Cute Screen.app может быть включён, а `CGPreflightScreenCaptureAccess` возвращает false. Проверка вызывалась из `spawn_blocking`, не с главной очереди AppKit: `CGRequestScreenCaptureAccess` вне этой очереди не показывает запрос. Разрешение, выданное живому процессу, применяет следующий запуск, поэтому кнопка «Повторить» снова вызывала захват в том же процессе. Это поведение TCC на новой macOS, а не отдельный дефект чипа M: машина разработки — macOS 12, где разрешение уже было выдано до запуска. Ad-hoc подпись по-прежнему привязывает grant к cdhash конкретной сборки; стабильный Apple Development сертификат этим решением не создаётся. Обход проверки не добавляется: без настоящего разрешения CoreGraphics возвращает пустой кадр.
 

@@ -37,6 +37,10 @@ export function createDesktopShellActions(ports: DesktopShellActionPorts): Shell
       const { tauriDesktopBridge } = await import('./desktop-bridge')
       await tauriDesktopBridge.reopenAfterScreenRecording()
     },
+    openCaptureSettings: async () => {
+      const { tauriDesktopBridge } = await import('./desktop-bridge')
+      await tauriDesktopBridge.openScreenRecordingSettings()
+    },
   }
 }
 
@@ -202,12 +206,6 @@ async function handleCaptureOutcome(
     throw new ActionCancelledError('Capture cancelled')
   }
   if (outcome.outcome === 'permissionDenied') {
-    const { tauriDesktopBridge } = await import('./desktop-bridge')
-    try {
-      await tauriDesktopBridge.openScreenRecordingSettings()
-    } catch (error) {
-      console.warn('cute-screen Screen Recording settings could not be opened', error)
-    }
     throw new Error('permissionDenied')
   }
   throw new Error(`Capture ${outcome.outcome}`)

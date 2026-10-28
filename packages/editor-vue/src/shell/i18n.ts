@@ -47,6 +47,7 @@ const dictionaries: Record<SupportedLocale, Record<TranslationKey, string>> = {
     captureUnavailable: 'Screen capture is currently unavailable.',
     captureScreenRecordingDenied: 'Allow Screen Recording in System Settings, quit Cute Screen, and open it again.',
     reopen: 'Reopen',
+    capturePermissionSettings: 'Screen Recording settings',
     captureFallback: 'Global shortcut is unavailable. Use this command:',
     copyCaptureFallback: 'Copy capture command',
     captureFallbackCopied: 'Capture command copied',
@@ -190,6 +191,7 @@ const dictionaries: Record<SupportedLocale, Record<TranslationKey, string>> = {
     captureScreenRecordingDenied:
       'Разрешите запись экрана в Системных настройках, полностью закройте Cute Screen и откройте его снова.',
     reopen: 'Открыть снова',
+    capturePermissionSettings: 'Настройки записи экрана',
     captureFallback: 'Глобальная горячая клавиша недоступна. Используйте эту команду:',
     copyCaptureFallback: 'Скопировать команду захвата',
     captureFallbackCopied: 'Команда захвата скопирована',

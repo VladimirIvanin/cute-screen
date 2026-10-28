@@ -180,6 +180,28 @@ describe('M04 capture action feedback', () => {
     expect(relaunch).toHaveBeenCalledOnce()
   })
 
+  it('opens permission settings only on request and reports a failed settings launch', async () => {
+    const store = useEditorShellStore(createEditorShellPinia())
+    const openCaptureSettings = vi.fn().mockRejectedValueOnce(new Error('Settings unavailable'))
+    store.initialize({
+      preferences: { load: () => undefined, save: () => undefined },
+      languages: ['en'],
+      systemDark: () => false,
+      actions: {
+        run: async () => {
+          throw new Error('permissionDenied')
+        },
+        openCaptureSettings,
+      },
+    })
+    await store.runAction('capture')
+    expect(openCaptureSettings).not.toHaveBeenCalled()
+    await store.openCaptureSettings()
+    expect(store.actionState).toMatchObject({ status: 'error', message: 'Settings unavailable', recovery: 'relaunch' })
+    await store.openCaptureSettings()
+    expect(openCaptureSettings).toHaveBeenCalledTimes(2)
+  })
+
   it('keeps Open image cancellation distinct from an error', async () => {
     const store = useEditorShellStore(createEditorShellPinia())
     store.initialize({

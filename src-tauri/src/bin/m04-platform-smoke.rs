@@ -625,6 +625,7 @@ mod macos {
     use serde::Serialize;
 
     unsafe extern "C" {
+        fn cute_smoke_onscreen_window_count() -> u32;
         fn cute_smoke_run_appkit(
             context: *const std::ffi::c_void,
             finished: extern "C" fn(*const std::ffi::c_void) -> bool,
@@ -665,6 +666,8 @@ mod macos {
         session: String,
         action: String,
         outcome: cute_screen_desktop::capture::CaptureOutcomeV2,
+        native_windows_before: u32,
+        native_windows_after: u32,
     }
 
     fn run_capture() -> Result<(), Box<dyn std::error::Error>> {
@@ -697,6 +700,8 @@ mod macos {
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_time()
             .build()?;
+        // SAFETY: read-only WindowServer query retains no pointers.
+        let native_windows_before = unsafe { cute_smoke_onscreen_window_count() };
         let outcome = runtime.block_on(controller.capture(CaptureRequestV1 {
             correlation_id: uuid::Uuid::now_v7().to_string(),
             action,
@@ -705,6 +710,8 @@ mod macos {
             series_id: None,
             invocation_source: CaptureInvocationSource::Cli,
         }));
+        // SAFETY: capture has returned and its native scopes have ended.
+        let native_windows_after = unsafe { cute_smoke_onscreen_window_count() };
         let evidence = SmokeEvidence {
             schema_version: 1,
             os: env::consts::OS.to_owned(),
@@ -712,6 +719,8 @@ mod macos {
             session: "macos".to_owned(),
             action: action_name.to_owned(),
             outcome,
+            native_windows_before,
+            native_windows_after,
         };
         if let Some(parent) = output.parent() {
             fs::create_dir_all(parent)?;
@@ -722,6 +731,10 @@ mod macos {
         super::macos_smoke_checks::require_outcome(
             actual.as_str().unwrap_or("unknown"),
             "captured",
+        )?;
+        super::macos_smoke_checks::require_window_cleanup(
+            native_windows_before,
+            native_windows_after,
         )?;
         let document = evidence
             .outcome

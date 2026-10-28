@@ -1,5 +1,15 @@
 use std::io::Cursor;
 
+pub fn require_window_cleanup(before: u32, after: u32) -> Result<(), String> {
+    if before != u32::MAX && before == after {
+        Ok(())
+    } else {
+        Err(format!(
+            "native capture leaked windows or window query failed: {before} -> {after}"
+        ))
+    }
+}
+
 pub fn require_outcome(actual: &str, expected: &str) -> Result<(), String> {
     if actual == expected {
         Ok(())
@@ -27,6 +37,13 @@ pub fn decode_png(bytes: &[u8], width: u32, height: u32) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn compatibility_windows_must_not_survive_capture_or_hide_a_query_failure() {
+        assert!(super::require_window_cleanup(0, 0).is_ok());
+        assert!(super::require_window_cleanup(0, 1).is_err());
+        assert!(super::require_window_cleanup(u32::MAX, u32::MAX).is_err());
+    }
+
     #[test]
     fn unexpected_terminal_outcomes_fail() {
         for outcome in ["failed", "permissionDenied", "cancelled", "unavailable"] {

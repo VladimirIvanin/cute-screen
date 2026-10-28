@@ -12,6 +12,7 @@ const props = defineProps<{
       | 'cancel'
       | 'retry'
       | 'reopen'
+      | 'capturePermissionSettings'
       | 'captureAction'
       | 'captureWindowAction'
       | 'openImageAction'
@@ -26,7 +27,7 @@ const props = defineProps<{
       | 'captureQuickEditing',
   ) => string
 }>()
-const emit = defineEmits<{ cancel: []; retry: [] }>()
+const emit = defineEmits<{ cancel: []; retry: []; settings: [] }>()
 function reopensApp(): boolean {
   return props.state.status === 'error' && props.state.recovery === 'relaunch'
 }
@@ -81,6 +82,13 @@ const progressKey: Record<
       max="1"
     />
     <span v-if="state.status === 'pending' && state.progress !== undefined">{{ Math.round(state.progress * 100) }}%</span>
+    <NButton
+      v-if="reopensApp()"
+      text
+      @click="emit('settings')"
+    >
+      {{ t('capturePermissionSettings') }}
+    </NButton>
     <NButton
       v-if="state.status === 'pending'"
       text

@@ -1,5 +1,28 @@
 # Сквозная приёмка
 
+## Unix activation frame
+
+`REQ-ACT-005/006`: входящий stream с наследованным O_NONBLOCK принимает header
+и payload частями без преждевременного закрытия; terminal reply сохраняет request
+ID/outcome. Проверить также Linux CLI cold/warm с реально запущенным приложением;
+macOS socket unit tests не объявляют пользовательский CLI поддержанным на macOS.
+
+## Monterey first frame и permission recovery (ADR-158/159)
+
+1. На 12.7.6 запустить штатный macos-screen smoke: metadata обязана содержать
+   screenCaptureKitStream, оригинал 2880×1800 полностью декодируется. Повтор
+   после успеха и отмены не требует перезапуска службы или приложения.
+2. Area получает тот же полный SCK frame; drag даёт корректный crop, Escape
+   возвращает cancelled. После timeout/cancel/deny нет временных exclusion окон,
+   захватов в библиотеке и активных SCStream.
+3. На видимом чужом приложении исключающие прозрачные окна не меняют key window,
+   мышь и снимок; проверить wallpaper/Dock, fullscreen Spaces и каждый монитор.
+4. Deny остаётся в редакторе с явными Settings/Reopen кнопками. Ошибка открытия
+   Settings видима, повтор доступен; выданные права код не сбрасывает.
+5. На macOS 13+/14+ подтвердить прежний route без Monterey compatibility windows.
+
+Фактический локальный evidence и оставшиеся gates — TESTING.md.
+
 ## macOS Screen/Area через ScreenCaptureKit (2026-10-28, ADR-157)
 
 Статус: implementation и portable contracts; macOS compile/runtime pending.

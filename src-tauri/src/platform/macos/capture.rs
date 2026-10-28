@@ -226,7 +226,12 @@ impl MacosScreenCaptureAdapter {
                 correlation_id,
             ));
         }
-        require_screen_recording(correlation_id)?;
+        require_screen_recording(
+            // SAFETY: this query reports the runtime backend and retains no data.
+            unsafe { cute_macos_pixel_backend() },
+            correlation_id,
+            screen_recording_allowed,
+        )?;
         // SAFETY: native locale is an atomic flag; no caller data is retained.
         unsafe { cute_window_selector_set_locale(crate::platform::window_selection::russian()) };
         if matches!(target, CaptureTarget::Area | CaptureTarget::Window) {
@@ -430,8 +435,14 @@ fn screen_recording_allowed(request: bool) -> bool {
     unsafe { cute_screen_capture_access(request) }
 }
 
-fn require_screen_recording(correlation_id: &str) -> Result<(), PlatformError> {
-    if screen_recording_allowed(true) {
+fn require_screen_recording(
+    backend: i32,
+    correlation_id: &str,
+    access: impl FnOnce(bool) -> bool,
+) -> Result<(), PlatformError> {
+    // SCK authorizes when loading shareable content and preserves its native
+    // user-declined error. A CoreGraphics preflight must not veto that request.
+    if backend != 0 || access(true) {
         return Ok(());
     }
     Err(PlatformError::new(
@@ -597,6 +608,29 @@ fn failure(correlation_id: &str, stage: &'static str) -> PlatformError {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn sck_authorizes_with_its_backend_instead_of_coregraphics_preflight() {
+        for backend in [1, 2] {
+            let result = super::require_screen_recording(backend, "sck", |_| {
+                panic!("ScreenCaptureKit must handle its own authorization")
+            });
+            assert!(result.is_ok());
+        }
+    }
+
+    #[test]
+    fn legacy_capture_requests_access_and_preserves_denial() {
+        let result = super::require_screen_recording(0, "legacy", |request| {
+            assert!(request);
+            false
+        });
+        assert_eq!(
+            result.expect_err("denied").code,
+            PlatformErrorCode::PermissionDenied
+        );
+        assert!(super::require_screen_recording(0, "legacy", |_| true).is_ok());
+    }
+
     use super::{
         CuteRect, MacosScreenCaptureAdapter, MacosWindowCandidate, NativeCaptureSelection,
         encode_bgra_png, geometry_from_native_selection, macos_window_candidate_accepted,

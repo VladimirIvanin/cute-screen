@@ -1,5 +1,24 @@
 # Платформенная матрица
 
+## Unix activation socket (2026-10-28)
+
+macOS 12.7.6: реальный accept наследует O_NONBLOCK; явная нормализация worker
+устраняет Broken pipe. Unix activation tests — 6 passed, включая частичную
+доставку header/payload при принудительно nonblocking входящем stream; desktop
+Rust lib — 183 passed. Linux runtime CLI cold/warm после этой правки не запускался;
+контракт Linux-only пользовательского CLI и Windows single-instance не меняется.
+
+## ScreenCaptureKit на Monterey (2026-10-28, ADR-158/159)
+
+macOS 12.7.6 Intel Iris Pro, SDK 13.1, один Retina-дисплей 1440×900 pt:
+парные native probes установили зависимость первого кадра от конкретного
+исключения. После scoped transparent-window fix production macos-screen smoke
+дважды вернул captured, backend=screenCaptureKitStream, с полным decode
+2880×1800 PNG. Это реальный SCK, без CoreGraphics fallback. UI recovery actions
+проверены компонентами; это не native WebView evidence. Runtime macOS 13+/14+,
+Apple Silicon, несколько дисплеев/Spaces и upgrade signed identity — pending.
+Команды, cancel/Area результаты и диагностический replayd restart — TESTING.md.
+
 Windows/macOS research от 2026-10-26:
 [SCREENSHOT_PROJECTS_RESEARCH.md](SCREENSHOT_PROJECTS_RESEARCH.md). В приоритете
 native clipboard alpha/formats, focus-return/paste, frozen menus, mixed-DPI/Retina,

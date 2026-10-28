@@ -180,7 +180,15 @@ mod unix {
         mut stream: UnixStream,
         handler: Arc<dyn Fn(CaptureRequestV1) -> CaptureOutcomeV2 + Send + Sync>,
     ) {
-        let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
+        // Darwin accept inherits O_NONBLOCK from the listener. Frame reads
+        // must wait for fragmented data, with the existing bounded idle wait.
+        if let Err(error) = stream
+            .set_nonblocking(false)
+            .and_then(|()| stream.set_read_timeout(Some(Duration::from_secs(2))))
+        {
+            eprintln!("cute-screen activation connection setup failed: {error}");
+            return;
+        }
         let request: ActivationRequestV1 = match read_frame::<ActivationRequestV1>(&mut stream) {
             Ok(request) if request.version == ACTIVATION_PROTOCOL_VERSION => request,
             _ => return,
@@ -268,6 +276,53 @@ mod unix {
             assert_eq!(reply.request_id, "request-1");
             assert_eq!(reply.outcome, CaptureTerminalOutcome::Cancelled);
             drop(server);
+        }
+
+        #[test]
+        fn connection_handles_inherited_nonblocking_mode_and_fragmented_frames() {
+            use std::sync::mpsc::{self, RecvTimeoutError};
+
+            let (mut client, accepted) = UnixStream::pair().expect("connected Unix streams");
+            // Darwin accept inherits the listener's O_NONBLOCK. Model that
+            // flag explicitly so Linux also exercises the worker contract.
+            accepted.set_nonblocking(true).expect("inherited flag");
+            client
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .expect("bounded test read");
+            let (finished_tx, finished_rx) = mpsc::channel();
+            let worker = thread::spawn(move || {
+                handle_connection(
+                    accepted,
+                    Arc::new(|capture| CaptureOutcomeV2 {
+                        version: 2,
+                        correlation_id: capture.correlation_id,
+                        outcome: CaptureTerminalOutcome::Cancelled,
+                        completion: None,
+                        document: None,
+                    }),
+                );
+                finished_tx.send(()).expect("worker result");
+            });
+            let request = request();
+            let payload = serde_json::to_vec(&request).expect("request payload");
+            let header = u32::try_from(payload.len()).expect("length").to_be_bytes();
+            client.write_all(&header[..2]).expect("partial header");
+            assert!(matches!(
+                finished_rx.recv_timeout(Duration::from_millis(50)),
+                Err(RecvTimeoutError::Timeout)
+            ));
+            client.write_all(&header[2..]).expect("remaining header");
+            client.write_all(&payload[..3]).expect("partial payload");
+            assert!(matches!(
+                finished_rx.recv_timeout(Duration::from_millis(50)),
+                Err(RecvTimeoutError::Timeout)
+            ));
+            client.write_all(&payload[3..]).expect("remaining payload");
+            let reply: ActivationReplyV1 = read_frame(&mut client).expect("terminal reply");
+            assert_eq!(reply.version, ACTIVATION_PROTOCOL_VERSION);
+            assert_eq!(reply.request_id, request.request_id);
+            assert_eq!(reply.outcome, CaptureTerminalOutcome::Cancelled);
+            worker.join().expect("connection worker");
         }
 
         #[test]

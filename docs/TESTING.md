@@ -1,5 +1,87 @@
 # Стратегия тестирования
 
+## Unix activation round-trip follow-up (2026-10-28)
+
+На том же macOS 12.7.6 host причина Broken pipe локализована до наследования
+O_NONBLOCK от listener через accept. Отдельный системный socket probe подтвердил
+флаг; новый `connection_handles_inherited_nonblocking_mode_and_fragmented_frames`
+сначала failed на partial header. После явного set_nonblocking(false) перед
+read timeout тест прошёл. Listener, wire protocol и двухсекундный idle timeout
+не менялись; setup failure теперь диагностируется.
+
+- `cargo test -p cute-screen-desktop --features platform-smoke --lib activation::unix::tests`
+  — 6 passed, включая прежний failing round-trip и новый fragmented-frame contract.
+- `cargo test -p cute-screen-desktop --features platform-smoke --lib`
+  — 183 passed, 0 failed; прежний Broken pipe ниже устранён этим follow-up.
+- `cargo test --workspace` — passed, включая 33 storage tests и doc tests.
+  History test с 55 снимками занял несколько минут в debug, проверка не прерывалась.
+- Повторный clippy с platform-smoke, cargo fmt check, pnpm format/check и docs check
+  — passed. Обновлённая debug `.app` пересобрана после activation fix;
+  packaged startup-check и companion self-check — passed.
+
+Workspace/clippy/build/format результаты — artifacts/sck-investigation/summary.txt.
+Новых dependencies и storage/schema изменений нет; Linux CLI runtime требует
+собственного cold/warm smoke.
+
+## ScreenCaptureKit Monterey и Escape smoke (2026-10-28, ADR-158/159)
+
+Baseline `15aaeafeffa2a5bf911af6cd083c5da84f57bb34` + рабочая копия.
+macOS 12.7.6 Intel x86_64, Intel Iris Pro, SDK 13.1; один Retina дисплей
+1440×900 pt / 2880×1800 px. VS Code получил Screen Recording grant.
+
+Настоящий установленный stdio companion 0.1.16 принял initialize/get_status
+и capture job, завершившийся permissionDenied. Секреты не копировались в evidence.
+Native SCK probe с пустыми исключениями воспроизводил firstFrame timeout:
+shareableContent и startCapture успешны, callbacks=0. Установка явного frame
+interval и перенос создания stream на main queue не исправили его. Парные
+включающие и непустые исключающие фильтры дали complete frames. Исключение
+скрытого окна не помогло; прозрачное 1×1 pt окно дало полный кадр SCK.
+
+При отдельном эксперименте updateContentFilter с пустым фильтром replayd
+перестал обслуживать новые clients, логировал `Could not consume extension token`.
+TERM не завершил пользовательский процесс, launchctl kickstart отказал;
+после KILL этого replayd launchd поднял его заново и рабочая проба снова получила
+кадр. TCC не сбрасывался. Это диагностическое действие не добавлено в приложение.
+После production fix повторные Screen захваты проходили без перезапуска службы.
+
+Фактические проверки:
+
+- Rust authorization regression сначала failed, затем passed: SCK не вызывает
+  CG preflight; legacy request сохраняет permissionDenied.
+- `pnpm smoke:m04:macos:screen` — три successful runs после исправления,
+  production CaptureController, backend=screenCaptureKitStream. Полный PNG decode
+  2880×1800, 5 184 000 pixels, alpha=255 для всех пикселей. Последний прогон
+  проверяет WindowServer: nativeWindowsBefore=0, nativeWindowsAfter=0.
+- Первые два `pnpm smoke:m04:macos:area-cancel` failed: Escape не закрывал
+  console selector, владелец выделял область для выхода; captured не засчитывался
+  как cancellation. Диагностика показала начальную activation policy=Prohibited.
+  После Regular policy в smoke тот же штатный сценарий завершился exit 0,
+  backend=1, outcome=cancelled, status=1, zero selection. Владелец подтвердил Escape.
+  Это native selector evidence; Quick WebView/materialization и decoded Area crop
+  этим прогоном не подтверждены.
+- `cargo test -p cute-screen-desktop --features platform-smoke --bin m04-platform-smoke macos_smoke_checks`
+  — 3 passed, включая red-first cleanup query failure/leaked windows contract.
+- `pnpm exec vitest run --project vue tests/unit/vue/app-shell-layout.test.ts tests/unit/vue/desktop-export.test.ts tests/unit/vue/shell-store.test.ts tests/unit/vue/capture-request.test.ts`
+  — 4 files / 35 passed. Recovery кнопки проходят mounted EditorShell;
+  Settings открываются только явно, ошибка открытия видима, Reopen не повторяет capture.
+- `pnpm exec vitest run --project boundaries tests/boundaries/build-contract.test.ts`
+  — 14 passed. `pnpm lint` — 0 errors, 38 existing warnings.
+- `pnpm tauri build --debug --bundles app` — passed; локальная Intel `.app`
+  содержит GUI и companion 0.1.16. Packaged `--startup-check` и companion
+  `--self-check` — passed. Это unsigned dev bundle, не universal release.
+- Общий `cargo test -p cute-screen-desktop --features platform-smoke --lib`:
+  181/182 passed; `activation_round_trip_preserves_the_terminal_request_id`
+  вернул Broken pipe. Изолированный повтор также failed. Это исходный прогон:
+  исправление и полностью зелёный повтор описаны в Unix activation follow-up выше.
+
+Первый typecheck нашёл неверный backend literal в новой Vue fixture; заменён
+на macosScreenCapture, все отдельные TypeScript projects прошли. Финальные
+typecheck/clippy/macOS-test результаты и disk usage — artifacts/sck-investigation/summary.txt.
+`pnpm dev` запускался на 127.0.0.1:5173; browser/native WebView E2E и полный
+`pnpm check` не запускались. macOS 13+/14+, ARM, multi-monitor/Spaces и signed
+upgrade остаются отдельными gates. Кадр/JSON/decode/probe source сохранены
+в artifacts/sck-investigation; app-data с MCP keys туда не копировались.
+
 ## Шрифты Canvas2D unit tests (2026-10-28)
 
 Baseline `6a49290` + рабочая копия, macOS 12.7.6 Intel x86_64.
