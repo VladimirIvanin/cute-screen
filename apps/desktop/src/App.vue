@@ -57,6 +57,14 @@ const testActions: ShellActionAdapter | undefined =
     ? {
         run: (action, signal) =>
           new Promise((resolve, reject) => {
+            if (
+              harness.captureDenied &&
+              (action === 'capture' ||
+                action === 'captureWindow')
+            ) {
+              reject(new Error('permissionDenied'))
+              return
+            }
             const timer = window.setTimeout(() => resolve(`${action} completed`), 150)
             signal.addEventListener(
               'abort',

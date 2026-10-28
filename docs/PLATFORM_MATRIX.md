@@ -1,5 +1,12 @@
 # Платформенная матрица
 
+## Action feedback (2026-10-28, ADR-162)
+
+Изменение CSS/Vue, без новых native API. macOS 12.7.6 / Chrome 150 проверяет
+перенос/геометрию, keyboard focus и доступ к ContextToolbar при ошибке.
+Native WKWebView/WebView2/WebKitGTK runtime не запускались; platform capture
+capabilities и TCC gate не расширяются. Команды и результаты — TESTING.md.
+
 ## Установленная macOS 0.1.17 (2026-10-28, ADR-160)
 
 На macOS 12.7.6 Intel установленный app без подписи воспроизводимо возвращает

@@ -1,5 +1,30 @@
 # Стратегия тестирования
 
+## Уведомление и доступ к инструментам (2026-10-28, ADR-162)
+
+Платформа: macOS 12.7.6 Intel, Chrome 150 headless; baseline 7b307bf,
+рабочая копия 0.1.19. Failing-first component test не находил кнопку закрытия;
+после реализации app-shell-layout/shell-store — 24 passed (timeout 15 s).
+`pnpm typecheck` и version/release boundaries — 34 passed. `pnpm dev --port 5180`
+запущен и проверен HTTP 200, затем остановлен.
+
+Browser: `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 pnpm test:e2e:browser --spec
+ tests/e2e/specs/browser-action-feedback.e2e.ts`. Настоящее нажатие Capture
+вызывает permissionDenied от тестового adapter и production feedback. Проверяются
+RU/EN × 1600/1024/900 px, отсутствие пересечений с chrome, hit-testing активного
+ToolRail и полей ContextToolbar, изменение следующего номера, close/focus.
+Первый запуск упёрся в cold-start timeout 30 s и остановлен; тест использует
+прямой mount drawing fixture и timeout 90 s. Следующий дал 4 passed / 2 failed:
+в 900 px hit-testing ошибочно включал скрытые прокруткой кнопки. Проверка уточнена
+до активного инструмента и contextual inputs; новый полный прогон — **6 passed** за 2m23s. Отсутствие перекрытия уже
+подтверждалось и в этих двух случаях. `pnpm lint` — passed (38 существующих
+warnings); `pnpm format`, `pnpm format:check`, `pnpm docs:check` — passed.
+Нативная сборка и полный pnpm check/Rust suite не запускались для этой UI-правки.
+
+Артефакты: `artifacts/feedback-layout/`, включая шесть PNG и итоговый JUnit.
+Это UI evidence; настоящий capture/TCC и native WKWebView этим прогоном не
+проверяются. Новых native API/dependencies и изменений scene graph нет.
+
 ## Именованная подпись 0.1.18 (2026-10-28, ADR-161)
 
 Платформа: macOS 12.7.6 Intel, SDK 13.1; baseline 7e88419 + рабочая копия.

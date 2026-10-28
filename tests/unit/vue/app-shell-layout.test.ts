@@ -76,6 +76,39 @@ describe('M02 editor shell', () => {
     expect(run).toHaveBeenCalledOnce()
   })
 
+  it('dismisses capture denial and returns focus to the selected tool', async () => {
+    window.localStorage.clear()
+    const run = vi.fn().mockRejectedValue(new Error('permissionDenied'))
+    render(EditorShell, {
+      props: { fixture: 'ready', captureAvailable: true, actions: { run } },
+      global: { plugins: [createEditorShellPinia()] },
+    })
+    await fireEvent.click(screen.getByRole('button', { name: 'Numbered marker' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Capture' }))
+    const alert = await screen.findByRole('alert')
+    await fireEvent.click(within(alert).getByRole('button', { name: 'Dismiss notification' }))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Numbered marker' })).toHaveFocus()
+    expect(run).toHaveBeenCalledOnce()
+  })
+
+  it('keeps cancellation available while an action is pending', async () => {
+    window.localStorage.clear()
+    let complete: ((message: string) => void) | undefined
+    const run = vi.fn(() => new Promise<string>((resolve) => {
+      complete = resolve
+    }))
+    render(EditorShell, {
+      props: { captureAvailable: true, actions: { run } },
+      global: { plugins: [createEditorShellPinia()] },
+    })
+    await fireEvent.click(screen.getByRole('button', { name: 'Capture' }))
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Dismiss notification' })).not.toBeInTheDocument()
+    complete?.('Capture completed')
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Dismiss notification' })).toBeInTheDocument())
+  })
+
   it('uses the quick-mode tool contract and hides full editor chrome', () => {
     const view = render(EditorShell, {
       props: { quickMode: true, fixture: 'ready' },

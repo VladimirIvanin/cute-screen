@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { NButton } from 'naive-ui'
+import { UiIcon } from '../icon'
 import type { CaptureProgressState } from '../../platform'
 import type {
   AsyncActionName,
@@ -13,6 +14,7 @@ const props = defineProps<{
       | 'retry'
       | 'reopen'
       | 'capturePermissionSettings'
+      | 'dismissActionFeedback'
       | 'captureAction'
       | 'captureWindowAction'
       | 'openImageAction'
@@ -27,7 +29,7 @@ const props = defineProps<{
       | 'captureQuickEditing',
   ) => string
 }>()
-const emit = defineEmits<{ cancel: []; retry: []; settings: [] }>()
+const emit = defineEmits<{ cancel: []; retry: []; settings: []; dismiss: [] }>()
 function reopensApp(): boolean {
   return props.state.status === 'error' && props.state.recovery === 'relaunch'
 }
@@ -68,40 +70,53 @@ const progressKey: Record<
     :class="`is-${state.status}`"
     :role="state.status === 'error' ? 'alert' : 'status'"
   >
-    <span v-if="state.status === 'pending'">
+    <span v-if="state.status === 'pending'" class="cs-action-feedback-message">
       {{
         (state.action === 'capture' || state.action === 'captureWindow') && state.captureProgress
           ? t(progressKey[state.captureProgress])
           : `${t(actionKey[state.action])}…`
       }}
     </span>
-    <span v-else>{{ state.message }}</span>
-    <progress
-      v-if="state.status === 'pending' && state.progress !== undefined"
-      :value="state.progress"
-      max="1"
-    />
-    <span v-if="state.status === 'pending' && state.progress !== undefined">{{ Math.round(state.progress * 100) }}%</span>
+    <span v-else class="cs-action-feedback-message">{{ state.message }}</span>
     <NButton
-      v-if="reopensApp()"
-      text
-      @click="emit('settings')"
+      v-if="state.status !== 'pending'"
+      class="cs-action-feedback-close"
+      quaternary
+      circle
+      :aria-label="t('dismissActionFeedback')"
+      :title="t('dismissActionFeedback')"
+      @click="emit('dismiss')"
     >
-      {{ t('capturePermissionSettings') }}
+      <UiIcon name="close" />
     </NButton>
-    <NButton
-      v-if="state.status === 'pending'"
-      text
-      @click="emit('cancel')"
-    >
-      {{ t('cancel') }}
-    </NButton>
-    <NButton
-      v-else-if="state.status === 'error'"
-      text
-      @click="emit('retry')"
-    >
-      {{ reopensApp() ? t('reopen') : t('retry') }}
-    </NButton>
+    <div v-if="state.status === 'pending' || state.status === 'error'" class="cs-action-feedback-actions">
+      <progress
+        v-if="state.status === 'pending' && state.progress !== undefined"
+        :value="state.progress"
+        max="1"
+      />
+      <span v-if="state.status === 'pending' && state.progress !== undefined">{{ Math.round(state.progress * 100) }}%</span>
+      <NButton
+        v-if="reopensApp()"
+        text
+        @click="emit('settings')"
+      >
+        {{ t('capturePermissionSettings') }}
+      </NButton>
+      <NButton
+        v-if="state.status === 'pending'"
+        text
+        @click="emit('cancel')"
+      >
+        {{ t('cancel') }}
+      </NButton>
+      <NButton
+        v-else-if="state.status === 'error'"
+        text
+        @click="emit('retry')"
+      >
+        {{ reopensApp() ? t('reopen') : t('retry') }}
+      </NButton>
+    </div>
   </div>
 </template>

@@ -122,6 +122,12 @@ const {
   fitCanvas,
 } = useEditorWorkspace(props)
 
+const shellRoot = ref<HTMLElement>()
+function dismissActionFeedback(): void {
+  store.clearFeedback()
+  shellRoot.value?.querySelector<HTMLButtonElement>('.cs-toolrail button[aria-pressed="true"]')?.focus()
+}
+
 const quickSettingsCollapsed = ref(true)
 watch(() => store.activeToolId, () => {
   quickSettingsCollapsed.value = true
@@ -152,7 +158,11 @@ defineExpose(createWorkspaceExposure(canvasViewport, store, props))
     :theme-overrides="cuteScreenThemeOverrides"
     :abstract="false"
   >
-    <div class="cs-editor-shell" :class="{ 'is-quick-mode': props.quickMode, 'is-image-drop-target': imageDropActive, 'has-composition-dock': compositionOpen || store.layersOpen && !props.quickMode }">
+    <div
+      ref="shellRoot"
+      class="cs-editor-shell"
+      :class="{ 'is-quick-mode': props.quickMode, 'is-image-drop-target': imageDropActive, 'has-composition-dock': compositionOpen || store.layersOpen && !props.quickMode }"
+    >
       <TopBar
         v-if="!props.quickMode"
         :appearance-open="compositionOpen"
@@ -439,6 +449,7 @@ defineExpose(createWorkspaceExposure(canvasViewport, store, props))
         @cancel="store.cancelAction"
         @retry="store.retryAction()"
         @settings="store.openCaptureSettings()"
+        @dismiss="dismissActionFeedback"
       />
       <CanvasContextMenu
         :request="canvasMenu"

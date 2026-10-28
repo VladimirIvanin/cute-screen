@@ -1,5 +1,13 @@
 # Архитектура Cute Screen
 
+## Feedback действий (ADR-162)
+
+ActionFeedback показывает ограниченную панель под шапкой, ниже слоя инструментов.
+Terminal close вызывает существующий clearFeedback (включая очистку таймера),
+workspace возвращает фокус активному ToolRail button. Pending остаётся отменяемым.
+Layout не читает scene graph и не добавляет pointermove updates в Vue. Browser
+harness моделирует denied в action adapter; production обработка ошибки общая.
+
 ## macOS package identity (ADR-160)
 
 Dev app и companion имеют стандартную ad-hoc подпись до упаковки.

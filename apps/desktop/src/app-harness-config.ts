@@ -1,5 +1,6 @@
 export interface AppHarnessConfig {
   readonly fixture: 'empty' | 'error' | 'loading' | 'ready'
+  readonly captureDenied: boolean
   readonly m03: boolean
   readonly m04Capture: boolean
   readonly m04Fallback: boolean
@@ -22,6 +23,7 @@ export function readAppHarnessConfig(): AppHarnessConfig {
   const alpha = query.get('m08alpha')
   return {
     fixture,
+    captureDenied: enabled && query.get('captureDenied') === '1',
     imageIngress: enabled && query.get('imageIngress') === '1',
     m03: enabled && query.get('m03') === '1',
     m04Capture: enabled && query.get('m04') === '1',

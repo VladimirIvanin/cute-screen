@@ -505,6 +505,7 @@ export const translationKeys = [
   'retry',
   'reopen',
   'capturePermissionSettings',
+  'dismissActionFeedback',
   'loadingEditor',
   'copyAction',
   'exportAction',

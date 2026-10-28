@@ -246,9 +246,6 @@
 }
 
 .cs-action-feedback {
-  z-index: 50;
-  right: 14px;
-  bottom: 72px;
   border-radius: 12px;
 }
 
