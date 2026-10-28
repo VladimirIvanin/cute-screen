@@ -184,20 +184,17 @@ Cute Screen — полноценный local-first редактор снимко
 - `REQ-CAP-014` — один Area draft блокирует параллельный capture. Copy, Save PNG, History
   и Editor дают terminal `captured` с различимым completion; Close даёт
   ожидаемый `cancelled` без скрытой очереди.
-- `REQ-CAP-015` — на macOS 12.0–12.2 CoreGraphics проверяет Screen Recording до захвата
-  на главной очереди AppKit; на 12.3+ доступ проверяет сам ScreenCaptureKit при
-  получении shareable content, без блокировки отрицательным CG preflight. Отказ даёт
-  `permissionDenied` без overlay и без зависших окон. UI объясняет переход в
-  System Settings и необходимость полного перезапуска после grant. Настройки
-  открываются только явной кнопкой; ошибка не переключает пользователя в них
-  автоматически. Intel и Apple Silicon используют один
-  adapter; capability не объявляется `supported` без runtime smoke.
-  Screen и frozen Area используют общий versioned desktop backend: CoreGraphics
-  на 12.0–12.2, первый complete кадр ScreenCaptureKit на 12.3+, screenshot API на
-  14+ при SDK 14+. Старый SDK на новой ОС использует SCStream. Отказ, timeout
-  и техническая ошибка не переключают захват на legacy backend (ADR-158).
-  На Monterey transient прозрачные exclusion windows ADR-159 не забирают фокус,
-  не принимают ввод и закрываются после каждого исхода capture.
+- `REQ-CAP-015` — на macOS Screen Recording запрашивается на главной очереди
+  AppKit. Default Screen/frozen Area используют системный screencapture через
+  приватный временный PNG и owned BGRA (ADR-163). Успешный exit без TCC доступа
+  не считается захватом: wallpaper-only результат не публикуется. Отказ даёт
+  `permissionDenied` без overlay и зависших окон. UI объясняет System Settings
+  и полный перезапуск после grant; настройки открываются только явной кнопкой.
+  Intel и Apple Silicon используют один adapter; capability не объявляется
+  `supported` без runtime smoke. ScreenCaptureKit доступен только с build feature
+  `macos-screencapturekit`: CoreGraphics на 12.0–12.2, SCStream на 12.3+,
+  screenshot API на 14+ при SDK 14+. Его routing и Monterey exclusions ADR-159
+  сохраняются; ошибка/denied не переключает backend автоматически.
 
 ## Запуск и горячие клавиши
 

@@ -1,5 +1,22 @@
 # Платформенная матрица
 
+## Default macOS helper (2026-10-28, ADR-163)
+
+На всех поддерживаемых macOS default — systemScreenshot через системный
+screencapture; macos-screencapturekit включает прежний backend при сборке.
+На macOS 12.7.6 Intel / SDK 13.1 Screen smoke получил полностью декодированный
+2880×1800 PNG реального desktop. Default binary не линкует ScreenCaptureKit.
+37 default / 41 opt-in native policy/lifecycle tests passed. Installed 0.1.20
+сначала получила denied из-за старого cdhash. После точечного reset и ручного
+regrant stdio MCP установленной /Applications app получил captured; независимый
+полный decode export 2880×1800 и визуальная проверка подтвердили чужие окна.
+Это отдельное installed evidence, не разрешение IDE. ARM, macOS 13+, mixed-DPI/multi-monitor и
+сохранение TCC между ad-hoc обновлениями требуют отдельной проверки.
+
+Release больше не использует именованную self-signed identity: app/companion
+ad-hoc, DMG без сертификатной подписи. Это не Developer ID/notarization;
+Gatekeeper warning и TCC grant остаются системными условиями.
+
 ## Action feedback (2026-10-28, ADR-162)
 
 Изменение CSS/Vue, без новых native API. macOS 12.7.6 / Chrome 150 проверяет

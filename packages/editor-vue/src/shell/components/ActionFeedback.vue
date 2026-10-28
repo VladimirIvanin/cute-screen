@@ -70,14 +70,22 @@ const progressKey: Record<
     :class="`is-${state.status}`"
     :role="state.status === 'error' ? 'alert' : 'status'"
   >
-    <span v-if="state.status === 'pending'" class="cs-action-feedback-message">
+    <span
+      v-if="state.status === 'pending'"
+      class="cs-action-feedback-message"
+      tabindex="0"
+    >
       {{
         (state.action === 'capture' || state.action === 'captureWindow') && state.captureProgress
           ? t(progressKey[state.captureProgress])
           : `${t(actionKey[state.action])}…`
       }}
     </span>
-    <span v-else class="cs-action-feedback-message">{{ state.message }}</span>
+    <span
+      v-else
+      class="cs-action-feedback-message"
+      tabindex="0"
+    >{{ state.message }}</span>
     <NButton
       v-if="state.status !== 'pending'"
       class="cs-action-feedback-close"

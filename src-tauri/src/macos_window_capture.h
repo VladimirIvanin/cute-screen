@@ -8,7 +8,10 @@
 #ifndef CUTE_SCREEN_MACOS_SDK
 #define CUTE_SCREEN_MACOS_SDK __MAC_OS_X_VERSION_MAX_ALLOWED
 #endif
-#define CUTE_SDK_HAS_SCK_14 (CUTE_SCREEN_MACOS_SDK >= 140000)
+#ifndef CUTE_SCREEN_SCK_ENABLED
+#define CUTE_SCREEN_SCK_ENABLED 0
+#endif
+#define CUTE_SDK_HAS_SCK_14 (CUTE_SCREEN_SCK_ENABLED && CUTE_SCREEN_MACOS_SDK >= 140000)
 
 typedef bool (*CuteWindowCancellationProbe)(const void *context);
 

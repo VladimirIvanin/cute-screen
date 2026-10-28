@@ -219,6 +219,7 @@ impl PlatformCapabilities {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MacosCapturePixelBackend {
+    SystemScreenshot,
     CoreGraphicsLegacy,
     ScreenCaptureKitStream,
     ScreenCaptureKitScreenshot,
@@ -230,14 +231,15 @@ pub enum MacosWindowPickerKind {
     SystemContentSharing,
 }
 
-/// ADR-157 routing: macOS 14 APIs require both the running OS and the build
-/// SDK. Older SDKs use SCStream on 12.3+; capture errors never select legacy.
+/// System helper by default; the opt-in SCK route also checks the build SDK.
 pub const fn macos_capture_pixel_backend(
     major: u32,
     minor: u32,
     sdk_major: u32,
 ) -> MacosCapturePixelBackend {
-    if major >= 14 && sdk_major >= 14 {
+    if !cfg!(feature = "macos-screencapturekit") {
+        MacosCapturePixelBackend::SystemScreenshot
+    } else if major >= 14 && sdk_major >= 14 {
         MacosCapturePixelBackend::ScreenCaptureKitScreenshot
     } else if major > 12 || (major == 12 && minor >= 3) {
         MacosCapturePixelBackend::ScreenCaptureKitStream
@@ -251,7 +253,7 @@ pub const fn macos_window_picker_kind(
     _minor: u32,
     sdk_major: u32,
 ) -> MacosWindowPickerKind {
-    if major >= 14 && sdk_major >= 14 {
+    if cfg!(feature = "macos-screencapturekit") && major >= 14 && sdk_major >= 14 {
         MacosWindowPickerKind::SystemContentSharing
     } else {
         MacosWindowPickerKind::NativeOverlay
@@ -592,6 +594,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "macos-screencapturekit")]
     #[test]
     fn macos_pixel_backend_follows_adr_038_version_routing() {
         assert_eq!(
@@ -620,6 +623,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "macos-screencapturekit")]
     #[test]
     fn macos_pixel_backend_never_exceeds_the_build_sdk() {
         assert_eq!(
@@ -640,6 +644,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "macos-screencapturekit")]
     #[test]
     fn macos_window_picker_uses_system_ui_only_from_sonoma() {
         assert_eq!(
@@ -656,6 +661,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "macos-screencapturekit")]
     #[test]
     fn macos_window_picker_falls_back_to_overlay_without_sonoma_sdk() {
         assert_eq!(
@@ -670,5 +676,20 @@ mod tests {
             macos_window_picker_kind(14, 0, 14),
             MacosWindowPickerKind::SystemContentSharing
         );
+    }
+
+    #[cfg(not(feature = "macos-screencapturekit"))]
+    #[test]
+    fn default_macos_policy_keeps_system_capture_and_native_overlay() {
+        for (major, minor, sdk) in [(12, 0, 13), (12, 7, 13), (14, 0, 15), (26, 0, 26)] {
+            assert_eq!(
+                macos_capture_pixel_backend(major, minor, sdk),
+                MacosCapturePixelBackend::SystemScreenshot
+            );
+            assert_eq!(
+                macos_window_picker_kind(major, minor, sdk),
+                MacosWindowPickerKind::NativeOverlay
+            );
+        }
     }
 }

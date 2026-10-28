@@ -1,5 +1,67 @@
 # Скриншотилки Windows и macOS: подходы и тесты
 
+## Документация Apple: обновление приложения и TCC (2026-10-28)
+
+[Apple TN3127](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements)
+объясняет сравнение новой программы с designated requirement, сохранённым при
+выдаче права. Ad-hoc DR относится к конкретной версии кода; bundle identifier
+сам по себе не даёт стабильной удостоверенной identity.
+[Apple DTS](https://developer.apple.com/forums/thread/678819) отдельно описывает
+responsible code: системный helper не отделяет TCC разрешение от родительского app.
+Публичного API управления базой TCC нет.
+
+[Документация сброса](https://developer.apple.com/documentation/xcode/resetting-access-to-protected-resources-in-macos)
+и локальный man tccutil на macOS 12.7.6 описывают
+`tccutil reset ScreenCapture io.github.vladimirivanin.cute-screen`: сброс только
+этого service/client, без выдачи нового разрешения. Документированного TCC hook
+для Finder replacement из DMG не найдено. Собственный first-launch/update flow
+может организовать восстановление, но это не автоматический перенос grant.
+Продукт не добавляет скрытый reset при каждом старте и не подделывает granted.
+
+Installed 0.1.20 имеет целую ad-hoc подпись и DR cdhash 3fec65…; TCC journal
+проверяет старый cdhash bad956… и возвращает -67050 / failed code requirement.
+Повтор через installed MCP подтвердил permissionDenied. После точечного tccutil
+reset владелец заново добавил app и перезапустил его. Installed stdio MCP получил
+captured и полностью декодированный export 2880×1800 с чужими окнами. Это проверка
+реальной app после regrant; сохранение права при следующем ad-hoc rebuild не доказано.
+
+## macOS: unsigned/ad-hoc, Gatekeeper и ScreenCaptureKit (2026-10-28)
+
+Проверены исходники и release instructions; чужие приложения локально не запускались.
+GPL-код не переносится. Скачанный владельцем Cute Screen 0.1.18 DMG проверен
+без изменения файла/quarantine: codesign valid, Authority=Vladimir Ivanin;
+`spctl --assess --type open --context context:primary-signature` — rejected.
+Самоподписанный издатель присутствует, но доверия Gatekeeper нет.
+
+| Проект и snapshot                                                                                               | Найденный путь                                                                                                                            | Ограничение вывода                                                                                                                     |
+| --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| [QuickShot](https://github.com/cclank/quickshot/tree/b9e6a91a748bed39d8fe51a4be224fa07100191b), Electron 39.2.7 | desktopCapturer.getSources; release notes допускают ad-hoc и требуют ручного разрешения Gatekeeper; локально описан self-signed publisher | GPL-3.0: только наблюдения, без переноса кода. Нет доказательства SCStream на Monterey                                                 |
+| [Snapkit](https://github.com/simiriva95/snapkit/tree/33e1ef5dce71c78bf090e21df04dabefb5de0cee)                  | desktopCapturer.getSources; builder identity='-', hardenedRuntime=false; CI без notarization                                              | README прямо описывает блокировку browser downloads. Альтернативный installer не означает обход TCC                                    |
+| [Skryn](https://github.com/rsedykh/skryn/tree/3fa0f016429373f292052b263f48af3134fc3847)                         | SCShareableContent + SCScreenshotManager; README сообщает о стабильном сертификате с 0.1.6                                                | macOS 14+, не эквивалент нашему 12.7.6. Публичный Signing.xcconfig по умолчанию ad-hoc; реальный release identity отдельно не проверен |
+
+[Electron 39 desktop capturer](https://github.com/electron/electron/blob/v39.2.7/shell/browser/api/electron_api_desktop_capturer.cc)
+вызывает TryPromptUserForScreenCapture. В
+[Chromium permission utilities](https://github.com/chromium/chromium/blob/main/ui/base/cocoa/permissions_utils.mm)
+это CGRequestScreenCaptureAccess; SCK thumbnail factory в
+[Chromium](https://github.com/chromium/chromium/blob/main/chrome/browser/media/webrtc/thumbnail_capturer_mac.mm)
+имеет runtime gate macOS 14.4. WebRTC ScreenCapturerSck также документирует
+проблемы fullscreen до 13 и теперь выбирается с 14. Наличие Electron getSources
+на macOS 12 не доказывает работу того же SCK backend, что выбран у Cute Screen.
+Это исследование кода, не runtime-сертификация чужих приложений.
+
+[Cap #1722](https://github.com/CapSoftware/Cap/issues/1722) закрыт после
+[патча a07fa12](https://github.com/CapSoftware/Cap/commit/a07fa128c12cab91d50d93de5a05fa54b2c2f340):
+debug возвращает Granted для Screen Recording/Accessibility, пропуская UI check.
+Системный TCC патч не изменяет. Сообщение относится к Sequoia; комментарий
+о бесплатном Apple Development — опыт автора, не доказательство для Monterey.
+У нас SCK уже не блокируется CG preflight, а установленный host вернул -3801.
+Гарантия исправления этим debug bypass из issue не следует.
+
+Для Gatekeeper ручное Open Anyway документирует
+[Apple](https://support.apple.com/en-us/102445). Runtime capture и доверенный
+публичный запуск проверяются отдельно. Новая identity/сброс TCC/изменение backend
+по итогам одного issue автоматически не выполняются.
+
 Исследование 2026-10-26. Изучены исходники и тесты на зафиксированных commits,
 а также выбранные issues. Чужие программы и их тесты локально не запускались.
 Идея теста не считается подтверждением поддержки Cute Screen.

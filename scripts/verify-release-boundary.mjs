@@ -39,21 +39,10 @@ function capture(
   return result.stdout
 }
 
-const minimumMacosSdk = 14
-let macosSdk = null
-if (process.platform === 'darwin') {
-  macosSdk = capture('xcrun', [
-    '--sdk',
-    process.env.SDKROOT || 'macosx',
-    '--show-sdk-version',
-  ]).trim()
-  if (Number.parseInt(macosSdk, 10) < minimumMacosSdk) {
-    console.error(
-      `macOS SDK ${macosSdk} is below ${minimumMacosSdk}: release builds would compile out the system window picker and SCScreenshotManager (ADR-109). Select Xcode 15+ via DEVELOPER_DIR or xcode-select.`,
-    )
-    process.exit(1)
-  }
-}
+// The default system screenshot helper has no ScreenCaptureKit SDK requirement.
+const macosSdk = process.platform === 'darwin'
+  ? capture('xcrun', ['--sdk', process.env.SDKROOT || 'macosx', '--show-sdk-version']).trim()
+  : null
 
 const tree = capture('cargo', [
   'tree',

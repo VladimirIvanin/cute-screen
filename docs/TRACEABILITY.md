@@ -1,5 +1,31 @@
 # Трассируемость требований
 
+## macOS: системный capture и opt-in SCK (2026-10-28)
+
+`REQ-CAP-001/002/011/014/015`, `REQ-REL-005/006`: default на всех macOS —
+/usr/sbin/screencapture с бинарным PNG во временном приватном каталоге;
+ScreenCaptureKit компилируется/линкуется только с macos-screencapturekit.
+Общая frozen Area/Screen pipeline, Retina decode и различение denied/cancel/error
+сохраняются. Helper завершается/reap-ится при cancel/timeout; временные файлы
+удаляются при любом исходе. TCC остаётся системным разрешением, не обходится. Exit 0 без доступа
+может дать wallpaper-only PNG: post-helper проверка обязана вернуть denied,
+не передавая его как успешный снимок.
+CI прекращает self-signed publisher: app/companion ad-hoc, без подписи DMG.
+Фактические proofs — native process lifecycle contracts, default/opt-in routing,
+link inspection и decoded Screen. Installed /Applications 0.1.20 после
+точечного reset старого code requirement и ручного regrant проверена через stdio
+MCP: captured, экспорт 2880×1800 полностью декодирован, чужие окна видны.
+
+## Читаемость feedback (2026-10-28)
+
+`REQ-UI-002/003/004/006/007/012/014`: контраст текста и действий проверяется
+по реальным computed colors в светлой/тёмной теме; фон остаётся непрозрачным,
+строки/действия не обрезаются. Длинное сообщение прокручивается отдельно от
+закрытия и recovery controls. RU/EN и узкое окно сохраняют доступ к инструментам.
+Короткие success/cancelled не резервируют пустую строку действий; текст и close
+центрированы в единственной строке, отступы сверху/снизу симметричны.
+Доказательства: browser contrast/geometry/keyboard и широкие Vue regression tests.
+
 ## Уведомление не перекрывает инструменты (2026-10-28)
 
 `REQ-UI-004/006/007/014`, `REQ-EDT-015`: feedback размещается слева под шапкой

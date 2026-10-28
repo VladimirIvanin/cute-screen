@@ -151,7 +151,7 @@ it('keeps the macOS app bundle and passes the Mach-O path before lipo -verify_ar
   )
 
   expect(workflow).toContain(
-    'pnpm build:macos:signed --target universal-apple-darwin --bundles app,dmg -- --locked',
+    'pnpm tauri build --target universal-apple-darwin --bundles app,dmg -- --locked',
   )
   expect(workflow).toContain(
     'lipo "target/universal-apple-darwin/release/bundle/macos/Cute Screen.app/Contents/MacOS/cute-screen" -verify_arch x86_64 arm64',

@@ -8,14 +8,17 @@ workspace возвращает фокус активному ToolRail button. Pe
 Layout не читает scene graph и не добавляет pointermove updates в Vue. Browser
 harness моделирует denied в action adapter; production обработка ошибки общая.
 
-## macOS package identity (ADR-160)
+## macOS capture и package identity (ADR-163)
 
-Dev app и companion имеют стандартную ad-hoc подпись до упаковки.
-Release использует постоянный сертификат Vladimir Ivanin (ADR-161), private key
-только в защищённом локальном каталоге и CI Secrets; в Git — публичный сертификат.
-Ad-hoc идентичность привязана к конкретной сборке. Совпадение сертификатного DR
-проверяется на разных executable; сохранение TCC после обновления проверяется отдельно. ScreenCaptureKit продолжает возвращать реальный denied; UI описывает
-regrant уже отмеченной записи. Разрешение IDE не служит доказательством для app.
+Default desktop pixels приходят из фиксированного `/usr/sbin/screencapture`:
+NSTask → private temporary PNG → ImageIO → owned BGRA → binary transport.
+Screen/frozen Area используют общий backend systemScreenshot; native selector
+и handoff сохраняются. Cancel/timeout завершают и reap-ят helper; finally удаляет
+временные файлы. TCC запрашивается на main queue, его отказ не подменяется grant.
+SCK компилируется и линкуется только с feature macos-screencapturekit.
+App и companion используют ad-hoc, DMG без сертификатной подписи. Release не
+использует прежний self-signed publisher или signing secrets. Gatekeeper/TCC
+остаются отдельными системными gates; IDE smoke не доказывает доступ app.
 
 ## Режим Unix activation connection
 
@@ -26,7 +29,7 @@ Listener остаётся nonblocking, чтобы worker обслуживал о
 wire version, length limit и request ID остаются прежними. Это общий внутренний
 Unix transport; пользовательский CLI остаётся доступен только на Linux.
 
-## macOS ScreenCaptureKit: разрешение и Monterey filter (ADR-158/159)
+## Opt-in macOS ScreenCaptureKit: разрешение и Monterey filter (ADR-158/159)
 
 SCK сам проверяет доступ при загрузке shareable content; CG preflight ограничен
 legacy route 12.0–12.2. Monterey получает конкретное исключение собственных
@@ -1082,15 +1085,13 @@ names и успешные wire shapes, но возвращают единый `C
 
 - `CaptureController` — выбирает backend и координирует capture lifecycle.
 - `HotkeyService` — Tauri/global-hotkey для X11/Windows/macOS, XDG portal для Wayland.
-- `platform/macos` — Screen Recording probe, native AppKit Area/Window selector
-  и versioned capture routing при deployment baseline macOS 12.0:
-  общий desktop helper для Screen/Area использует CoreGraphics на 12.0–12.2,
-  первый complete кадр `SCStream` на 12.3+, `SCScreenshotManager` на 14+ при
-  SDK 14+. Старый SDK на новой ОС выбирает SCStream; ошибка не запускает legacy
-  fallback (ADR-157). Owned per-display frames сводятся с максимальным scale;
-  layout проверяется повторно, native callbacks не удерживают Rust pointers.
-  Area передаёт frozen multi-display draft в quick-mode. Window capability
-  отключена ADR-110; её native код сохраняется. Реальные platform smokes pending.
+- `platform/macos` — Screen Recording request/post-check, native AppKit Area
+  selector и общий systemScreenshot backend Screen/frozen Area (ADR-163),
+  deployment baseline macOS 12.0. Fixed helper → private PNG → owned BGRA;
+  bounded child lifecycle, cleanup и повторная проверка display layout.
+  Только feature macos-screencapturekit включает прежний SDK/runtime routing
+  ADR-157 и Monterey workaround ADR-159. Window capability отключена ADR-110.
+  Реальный installed capture и mixed-DPI требуют отдельного runtime evidence.
 - `cute-screen-storage` — независимый от Tauri workspace crate: синхронный
   `LibraryRepository` принадлежит одному worker, клонируемый `StorageHandle`
   использует bounded Tokio channel и oneshot responses.

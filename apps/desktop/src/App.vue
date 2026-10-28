@@ -33,7 +33,10 @@ import { HistoryNavigation } from './history/navigation'
 import { runEditorStartup } from './editor-startup'
 import { useDesktopCapabilities } from './platform-capability-monitor'
 import { EditorFirstFrameGate } from './editor-first-frame'
-import { readAppHarnessConfig } from './app-harness-config'
+import {
+  readAppHarnessConfig,
+  captureHarnessError,
+} from './app-harness-config'
 import { mountM05HarnessDocument as mountM05Harness } from './m05-harness'
 import { createDesktopShellActions } from './desktop-shell-actions'
 import { installDesktopLifecycleGuards } from './platform/tauri/lifecycle-adapter'
@@ -57,12 +60,9 @@ const testActions: ShellActionAdapter | undefined =
     ? {
         run: (action, signal) =>
           new Promise((resolve, reject) => {
-            if (
-              harness.captureDenied &&
-              (action === 'capture' ||
-                action === 'captureWindow')
-            ) {
-              reject(new Error('permissionDenied'))
+            const captureError = captureHarnessError(harness, action)
+            if (captureError) {
+              reject(captureError)
               return
             }
             const timer = window.setTimeout(() => resolve(`${action} completed`), 150)

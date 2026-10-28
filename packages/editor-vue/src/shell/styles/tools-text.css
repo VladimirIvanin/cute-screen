@@ -474,18 +474,35 @@
   max-height: calc(100% - 210px);
   box-sizing: border-box;
   grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr);
   align-items: start;
   gap: 8px 12px;
-  overflow: auto;
+  overflow: hidden;
   padding: 10px 12px;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface-raised);
   box-shadow: var(--shadow-overlay);
 }
 .cs-action-feedback-message {
-  align-self: center;
+  min-height: 0;
+  align-self: stretch;
+  overflow: auto;
   overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.cs-action-feedback:is(.is-pending, .is-error) {
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+.cs-action-feedback:is(.is-success, .is-cancelled) .cs-action-feedback-message {
+  align-self: center;
+}
+.cs-action-feedback-message:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
 }
 .cs-action-feedback-close {
   grid-column: 2;
@@ -512,10 +529,17 @@
   border-color: var(--danger);
 }
 .cs-action-feedback button {
+  min-height: 32px;
   border: 0;
-  color: var(--accent);
+  color: var(--accent-hover);
   background: transparent;
+  font-size: inherit;
+  line-height: inherit;
   cursor: pointer;
+}
+.cs-action-feedback button.n-button:hover,
+.cs-action-feedback button.n-button:focus {
+  color: var(--accent-hover);
 }
 @media (max-width: 1100px) {
   .cs-brand strong,

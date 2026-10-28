@@ -1,6 +1,10 @@
+import { ActionCancelledError } from '@cute-screen/editor-vue'
+
 export interface AppHarnessConfig {
   readonly fixture: 'empty' | 'error' | 'loading' | 'ready'
   readonly captureDenied: boolean
+  readonly captureCancelled: boolean
+  readonly longCaptureError: boolean
   readonly m03: boolean
   readonly m04Capture: boolean
   readonly m04Fallback: boolean
@@ -14,6 +18,31 @@ export interface AppHarnessConfig {
   readonly imageIngress?: boolean
 }
 
+export function longCaptureDiagnostic(): Error {
+  return new Error([
+    'Capture failed: the display service did not respond.',
+    ...Array.from({ length: 24 }, (_, index) => `Frame ${index}: waiting for display service response.`),
+    `/Applications/${'CaptureDiagnostic'.repeat(20)}/capture.log`,
+    'End of diagnostic details.',
+  ].join('\n'))
+}
+
+export function captureHarnessError(
+  config: AppHarnessConfig,
+  action: string,
+): Error | undefined {
+  if (config.captureCancelled && action === 'capture') return new ActionCancelledError('Capture cancelled')
+  if (config.longCaptureError && action === 'capture') return longCaptureDiagnostic()
+  if (
+    config.captureDenied &&
+    (action === 'capture' ||
+      action === 'captureWindow')
+  ) {
+    return new Error('permissionDenied')
+  }
+  return undefined
+}
+
 export function readAppHarnessConfig(): AppHarnessConfig {
   const enabled = import.meta.env.VITE_TEST_HARNESS === 'true'
   const query = new URLSearchParams(window.location.search)
@@ -24,6 +53,8 @@ export function readAppHarnessConfig(): AppHarnessConfig {
   return {
     fixture,
     captureDenied: enabled && query.get('captureDenied') === '1',
+    captureCancelled: enabled && query.get('captureCancelled') === '1',
+    longCaptureError: enabled && query.get('captureError') === 'long',
     imageIngress: enabled && query.get('imageIngress') === '1',
     m03: enabled && query.get('m03') === '1',
     m04Capture: enabled && query.get('m04') === '1',

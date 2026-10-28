@@ -1,5 +1,47 @@
 # Журнал архитектурных решений
 
+## ADR-163: системный screenshot helper и отключаемый ScreenCaptureKit
+
+**Статус:** accepted (2026-10-28); supersedes default backend ADR-157/159
+и release signing ADR-161. Дополняет ADR-160 и REQ-CAP-001/002/014/015.
+
+**Основание:** владелец выбирает сборку без платного Developer ID и без
+самоподписанного издателя. Скачанный DMG 0.1.18 имеет целую подпись Vladimir
+Ivanin, но Gatekeeper отвергает его как unidentified developer. Именной сертификат
+не устранил реальный installed ScreenCaptureKit denied. Cap issue 1722 предлагает
+подмену UI permission status в debug, которая не доказывает получение кадра;
+исследование первичных исходников — SCREENSHOT_PROJECTS_RESEARCH.md.
+
+**Решение:** default на всех поддерживаемых macOS запускает фиксированный
+`/usr/sbin/screencapture -x -t png -R…` через NSTask, без shell. PNG существует
+только в уникальном приватном каталоге 0700; ImageIO декодирует его в owned BGRA,
+общий Rust transport остаётся бинарным. Screen и frozen Area используют один
+backend `systemScreenshot`. AppKit selector и handoff сохраняются. Изменение
+списка/геометрии дисплеев во время capture отменяет результат как invalid target.
+Cancel, timeout 10 секунд, launch failure и nonzero exit различаются внутри
+helper; child получает terminate/kill и reap до возврата. Временный каталог
+удаляется через finally. Не запускаются интерактивный системный picker и clipboard.
+
+Cargo feature `macos-screencapturekit` выключена по умолчанию. Только она
+компилирует прежние SCK implementations и линкует ScreenCaptureKit; routing
+SDK/runtime и Monterey workaround сохраняются в экспериментальной ветке.
+Это выбор при сборке, а не автоматический fallback после отказа пользователя.
+CGRequest вызывается на main queue; отрицательный preflight не блокирует
+настоящую попытку helper. После helper проверяется доступ: на Monterey exit 0
+может означать только wallpaper без чужих окон. Такой PNG не публикуется как
+успешный capture. TCC остаётся обязательным, разрешения не подделываются.
+
+Release использует обычную ad-hoc подпись app/companion (`signingIdentity="-"`)
+и DMG без сертификатной подписи. Нет публичного сертификата, signing wrapper
+и зависимости release job от private secrets. Уже созданные приватные ключи
+и secrets не удаляются автоматически. Ad-hoc необходима в том числе для ARM;
+сохранение TCC между обновлениями и отсутствие Gatekeeper warning не обещаются.
+
+**Проверка:** red-first default routing, native process lifecycle, обе Cargo
+конфигурации, inspected linkage и реальный полностью декодированный PNG.
+Installed app, новые macOS, ARM и mixed-DPI требуют отдельных runtime checks;
+команды, результаты и границы — TESTING.md и PLATFORM_MATRIX.md.
+
 ## ADR-162: уведомления действий вне нижних инструментов
 
 **Статус:** accepted (2026-10-28); дополняет REQ-UI-004/006/007/014.
@@ -21,7 +63,7 @@ Pending сохраняет Cancel; успех/отмена по-прежнему
 
 ## ADR-161: постоянный самоподписанный издатель Vladimir Ivanin
 
-**Статус:** accepted (2026-10-28); заменяет ad-hoc подпись релизов ADR-160.
+**Статус:** superseded by ADR-163 (2026-10-28); заменяет ad-hoc подпись релизов ADR-160.
 Dev default остаётся ad-hoc. Владелец явно выбрал самоподписанный сертификат.
 
 **Решение:** один RSA-3072/SHA-256 code-signing сертификат с CN Vladimir Ivanin,
@@ -84,7 +126,7 @@ app и вложенного companion средствами Tauri до созда
 
 ## ADR-159: конкретное исключение для ScreenCaptureKit на Monterey
 
-**Статус:** accepted (2026-10-28); заменяет построение desktop filter ADR-157
+**Статус:** superseded для default backend by ADR-163; retained для opt-in SCK (2026-10-28); заменяет построение desktop filter ADR-157
 на macOS 12.3–12.x. Version routing сохранён, включая SCStream с 12.3.
 
 **Основание:** macOS 12.7.6 Intel, SDK 13.1: пустые excludingWindows и

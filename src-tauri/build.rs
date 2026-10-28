@@ -1,28 +1,44 @@
 fn main() {
     #[cfg(target_os = "macos")]
     {
-        warn_about_legacy_macos_sdk();
-        cc::Build::new()
+        let sck = std::env::var_os("CARGO_FEATURE_MACOS_SCREENCAPTUREKIT").is_some();
+        if sck {
+            warn_about_legacy_macos_sdk();
+        }
+        let mut native = cc::Build::new();
+        if sck {
+            native
+                .define("CUTE_SCREEN_SCK_ENABLED", "1")
+                .file("src/macos_desktop_capture.m")
+                .file("src/macos_window_capture.m");
+        } else {
+            native
+                .file("src/macos_system_capture.m")
+                .file("src/macos_window_capture_disabled.m");
+        }
+        native
             .file("src/macos_capture_bridge.m")
-            .file("src/macos_desktop_capture.m")
-            .file("src/macos_window_capture.m")
             .file("src/macos_autostart_bridge.m")
             .flag("-fobjc-arc")
             .flag("-Wno-deprecated-declarations")
             .compile("cute_screen_macos_capture");
         println!("cargo:rustc-link-lib=framework=AppKit");
         println!("cargo:rustc-link-lib=framework=CoreGraphics");
-        println!("cargo:rustc-link-arg=-Wl,-weak_framework,ScreenCaptureKit");
+        if sck {
+            println!("cargo:rustc-link-arg=-Wl,-weak_framework,ScreenCaptureKit");
+            println!("cargo:rustc-link-lib=framework=CoreMedia");
+            println!("cargo:rustc-link-lib=framework=CoreVideo");
+            println!("cargo:rustc-link-lib=framework=CoreImage");
+        }
         // Rust uses -nodefaultlibs; @available still needs Clang's availability builtins.
         println!("cargo:rustc-link-arg=-fapple-link-rtlib");
-        println!("cargo:rustc-link-lib=framework=CoreMedia");
-        println!("cargo:rustc-link-lib=framework=CoreVideo");
-        println!("cargo:rustc-link-lib=framework=CoreImage");
         println!("cargo:rustc-link-lib=framework=ImageIO");
         println!("cargo:rustc-link-lib=framework=UniformTypeIdentifiers");
         println!("cargo:rustc-link-lib=framework=ServiceManagement");
         println!("cargo:rerun-if-changed=src/macos_capture_bridge.m");
         println!("cargo:rerun-if-changed=src/macos_desktop_capture.m");
+        println!("cargo:rerun-if-changed=src/macos_system_capture.m");
+        println!("cargo:rerun-if-changed=src/macos_window_capture_disabled.m");
         println!("cargo:rerun-if-changed=src/macos_desktop_capture.h");
         println!("cargo:rerun-if-changed=src/macos_window_capture.m");
         println!("cargo:rerun-if-changed=src/macos_window_capture.h");
@@ -60,7 +76,7 @@ fn warn_about_legacy_macos_sdk() {
     if major.is_some_and(|major| major < 14) {
         println!(
             "cargo:warning=macOS SDK {version} < 14: system window picker and SCScreenshotManager are compiled out; \
-             Desktop uses SCStream on macOS 12.3+; Window uses the AppKit selector. Release builds require SDK 14+."
+             Opt-in SCK uses SCStream on macOS 12.3+; Window uses the AppKit selector."
         );
     }
 }

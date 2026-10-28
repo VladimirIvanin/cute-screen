@@ -1,38 +1,25 @@
 # CI-сборки и проверка версии через GitHub
 
-## Feedback 0.1.19 (ADR-162)
+## macOS 0.1.20: default helper и ad-hoc (ADR-163)
 
-Тег v0.1.18 уже существует и не изменяется. Штатный `pnpm version:bump 0.1.19`
-синхронизирует npm/Cargo/Tauri и точные workspace dependencies. Исправление
-уведомления проверяется frontend/component/browser командами, без новой native
-сборки. Release продолжает использовать постоянный сертификат ADR-161; локальный
-ранее собранный DMG 0.1.18 не содержит эту UI-правку.
+Screen/Area используют системный `/usr/sbin/screencapture`. Для прежнего SCK
+нужен явный `--features macos-screencapturekit`, например
+`pnpm tauri build --debug --no-bundle --features macos-screencapturekit`.
+Обычная сборка не компилирует/линкует ScreenCaptureKit и не требует SDK 14.
+Минимальная ОС остаётся macOS 12.0; SDK/runtime ограничения относятся только к SCK.
 
-## Именованная подпись macOS release (ADR-161)
+Release: `pnpm tauri build --target universal-apple-darwin --bundles app,dmg -- --locked`.
+App/companion имеют техническую ad-hoc подпись; DMG не подписывается сертификатом.
+CI проверяет codesign целостность app/companion и hdiutil verify DMG. Именная
+identity Vladimir Ivanin, wrapper и requirement на signing secrets удалены.
+Существующие приватные ключи вне Git и GitHub Secrets оставлены архивными;
+релиз их не читает. Платный Developer ID и notarization не используются.
+Gatekeeper может требовать пользовательского Open Anyway. TCC grant по-прежнему
+обязателен и после обновления ad-hoc пакета может потребовать повторной выдачи.
 
-Релиз использует постоянный самоподписанный сертификат **Vladimir Ivanin**.
-Это не Apple Developer ID и не notarization; Gatekeeper может блокировать пакет.
-Публичный сертификат — `src-tauri/signing/vladimir-ivanin.pem`, SHA-1 fingerprint
-`341FAF8FC84676BC71B13456E85858F22B675F16`. Tauri подписывает app, companion
-и сам DMG; CI проверяет целостность и точное совпадение leaf certificate.
-
-GitHub Actions secrets:
-
-- `CUTE_SCREEN_MACOS_CERTIFICATE` — base64 зашифрованного PKCS#12.
-- `CUTE_SCREEN_MACOS_CERTIFICATE_PASSWORD` — пароль архива.
-
-Без этих secrets release job завершается ошибкой. Приватный ключ нельзя добавлять
-в Git, logs, artifacts и Downloads. Постоянные локальные файлы находятся в
-`~/Library/Application Support/Cute Screen Signing/` (каталог 0700, private файлы
-0600): `vladimir-ivanin.p12` и `pkcs12.pass`. Нужна отдельная защищённая резервная
-копия обоих файлов. Сертификат действителен до 2036-10-25; не генерировать новый
-для каждого релиза. Замена ключа меняет identity и может потребовать нового TCC grant.
-
-Для локального пакета: `pnpm build:macos:signed --debug --bundles app`.
-Другой приватный каталог задаётся через `CUTE_SCREEN_SIGNING_DIR`. Обычная
-`pnpm tauri build` сохраняет ad-hoc default; релиз задаёт identity через env.
-Ни пользовательский trust store, ни TCC автоматически не изменяются.
-Стабильность DR и сохранение разрешений — отдельные проверки, не следствие имени.
+Версия обновляется штатной `pnpm version:bump 0.1.20`. Существующий тег v0.1.18
+не перемещается; публикацию нового release выполняет владелец. Читаемость feedback
+проверяется browser/component suites, native capture — отдельным decoded smoke.
 
 ## macOS dev package signing (ADR-160)
 
@@ -44,7 +31,7 @@ bundle после подписи. Право записи экрана може�
 сборки: выключить/включить Cute Screen в системном списке и перезапустить.
 Не подменять этот контракт identifier-only DR или автоматическим сбросом TCC.
 
-## ScreenCaptureKit Monterey (ADR-158/159)
+## Opt-in ScreenCaptureKit Monterey (ADR-158/159, default заменён ADR-163)
 
 SDK/deployment baseline и зависимости не меняются. Debug-сборка с SDK 13.1
 продолжает использовать настоящий SCStream на macOS 12.3+; release SDK 14+
@@ -406,7 +393,7 @@ Runner записывает временный Tauri config с относите�
 не взаимодействует с selector другого executable и не останавливает пользовательский editor.
 
 Windows добавляет WinRT/WGC features существующего MIT windows crate;
-Screen/Area остаются DXGI. macOS weak-links ScreenCaptureKit, deployment baseline
+Screen/Area остаются DXGI. macOS weak-links ScreenCaptureKit только при opt-in feature ADR-163, deployment baseline
 12.0 сохраняется, CoreImage/CoreMedia/CoreVideo используются для одного frame.
 X11 использует существующий x11rb Composite. Новых GPL-зависимостей нет.
 
@@ -534,7 +521,7 @@ Baseline macOS 12.0 из ADR-038 задан и в `bundle.macOS.minimumSystemVer
 settings, а cc-rs без target может выбрать macOS 15.5 и отклонить
 `CGWindowListCreateImage` как obsoleted. Явное значение переменной окружения
 сохраняет приоритет над default Cargo. Baseline не подтверждает runtime capture.
-ADR-157 подключает общий Screen/Area backend: CoreGraphics на 12.0–12.2,
+Opt-in ADR-157 (default заменён ADR-163) подключает общий Screen/Area backend: CoreGraphics на 12.0–12.2,
 SCStream на 12.3+, SCScreenshotManager на 14+ с SDK 14+. С SDK 13.x новая ОС
 использует SCStream. `macos_desktop_capture.m` входит в сборку и CI legacy
 syntax check. `cargo test --locked --package cute-screen-desktop --lib macos`
@@ -545,8 +532,8 @@ Deployment target и SDK — разные ограничения (ADR-109). На
 максимум Xcode 14.2 / Command Line Tools с SDK 13.1; такая сборка годится для
 `pnpm tauri dev` и локальных тестов, но системный window picker и
 SCScreenshotManager в неё не компилируются, `build.rs` печатает предупреждение.
-Релиз собирается с SDK 14+ (Xcode 15+): `pnpm verify:release-boundary` на
-macOS завершается ошибкой при SDK ниже 14. SDK выбирается через `xcode-select`,
+Opt-in SCScreenshotManager требует SDK 14+ (Xcode 15+); default helper этого не требует. Прежняя блокировка
+`pnpm verify:release-boundary` при SDK ниже 14 удалена (ADR-163). SDK выбирается через `xcode-select`,
 `DEVELOPER_DIR` или `SDKROOT`; версию показывает `xcrun --show-sdk-version`.
 `tauri dev` запускает бинарник без `.app`: Info.plist не применяется,
 Screen Recording запрашивается для родительского terminal/IDE, а bundle id
@@ -583,8 +570,8 @@ Windows запускается через `CUTE_SCREEN_E2E_SCENARIOS=windows-cap
 ## Принцип
 
 Проект публикует неофициальные пакеты в GitHub Releases (ADR-111).
-macOS release получает постоянную самоподписанную подпись Vladimir Ivanin
-(ADR-161); dev default — ad-hoc, Windows остаётся unsigned.
+macOS release и dev используют ad-hoc app/companion (ADR-163), DMG без
+сертификатной подписи; Windows остаётся unsigned.
 Нет Developer ID, notarization, Tauri updater или автоматической установки обновлений.
 
 GitHub Actions выполняет две независимые функции:
@@ -596,13 +583,13 @@ Artifacts считаются тестовыми/неофициальными с�
 
 ## Матрица artifacts
 
-| ОС      | Target                                         | Runner               | CI artifact                  |
-| ------- | ---------------------------------------------- | -------------------- | ---------------------------- |
-| Linux   | `x86_64-unknown-linux-gnu`                     | Ubuntu 22.04 x64     | `.deb`, `.AppImage`          |
-| Linux   | `aarch64-unknown-linux-gnu`                    | Ubuntu 22.04 ARM64   | `.deb`, `.AppImage`          |
-| macOS   | `x86_64-apple-darwin` + `aarch64-apple-darwin` | native Apple Silicon | self-signed universal `.dmg` |
-| Windows | `x86_64-pc-windows-msvc`                       | Windows x64          | unsigned NSIS `.exe`         |
-| Windows | `aarch64-pc-windows-msvc`                      | Windows ARM64        | unsigned NSIS `.exe`         |
+| ОС      | Target                                         | Runner               | CI artifact                 |
+| ------- | ---------------------------------------------- | -------------------- | --------------------------- |
+| Linux   | `x86_64-unknown-linux-gnu`                     | Ubuntu 22.04 x64     | `.deb`, `.AppImage`         |
+| Linux   | `aarch64-unknown-linux-gnu`                    | Ubuntu 22.04 ARM64   | `.deb`, `.AppImage`         |
+| macOS   | `x86_64-apple-darwin` + `aarch64-apple-darwin` | native Apple Silicon | ad-hoc app, unsigned `.dmg` |
+| Windows | `x86_64-pc-windows-msvc`                       | Windows x64          | unsigned NSIS `.exe`        |
+| Windows | `aarch64-pc-windows-msvc`                      | Windows ARM64        | unsigned NSIS `.exe`        |
 
 Если hosted ARM runner недоступен, workflow использует узко помеченный self-hosted native runner. Cross-compilation может проверить compile, но не заменяет native install/launch smoke.
 

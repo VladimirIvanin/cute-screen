@@ -24,8 +24,7 @@ use crate::{
     platform::{CaptureGeometry, CaptureResult, CaptureTarget, PlatformError, PlatformErrorCode},
 };
 
-/// Screen and frozen Area share the versioned native desktop backend (ADR-157).
-/// CoreGraphics is used only on macOS 12.0–12.2; newer systems use SCK.
+/// Screen and frozen Area share the system helper; SCK is an opt-in build feature.
 pub struct MacosScreenCaptureAdapter;
 
 unsafe extern "C" {
@@ -57,10 +56,12 @@ unsafe extern "C" {
     fn cute_macos_build_sdk_version() -> c_int;
     #[cfg(test)]
     fn cute_macos_desktop_backend_for_version(major: c_int, minor: c_int, sdk: c_int) -> c_int;
-    #[cfg(test)]
+    #[cfg(all(test, feature = "macos-screencapturekit"))]
     fn cute_macos_desktop_composition_contract() -> bool;
-    #[cfg(test)]
+    #[cfg(all(test, feature = "macos-screencapturekit"))]
     fn cute_macos_desktop_wait_contract() -> bool;
+    #[cfg(all(test, not(feature = "macos-screencapturekit")))]
+    fn cute_macos_system_capture_contract() -> bool;
     fn cute_window_selector_set_locale(russian: bool);
     fn cute_quick_capture_set_presentation(window: *mut std::ffi::c_void, revealed: bool);
     fn cute_quick_capture_fit_pointer_screen(window: *mut std::ffi::c_void) -> bool;
@@ -184,6 +185,7 @@ fn macos_window_candidate_accepted(own_pid: i32, candidate: &MacosWindowCandidat
 
 pub(crate) fn native_pixel_backend_name() -> &'static str {
     match unsafe { cute_macos_pixel_backend() } {
+        3 => "systemScreenshot",
         2 => "screenCaptureKitScreenshot",
         1 => "screenCaptureKitStream",
         _ => "coreGraphicsLegacy",
@@ -440,8 +442,8 @@ fn require_screen_recording(
     correlation_id: &str,
     access: impl FnOnce(bool) -> bool,
 ) -> Result<(), PlatformError> {
-    // SCK authorizes when loading shareable content and preserves its native
-    // user-declined error. A CoreGraphics preflight must not veto that request.
+    // Native backends own their authorization, including the system helper.
+    // A CoreGraphics preflight must not veto the actual capture request.
     if backend != 0 || access(true) {
         return Ok(());
     }
@@ -609,10 +611,10 @@ fn failure(correlation_id: &str, stage: &'static str) -> PlatformError {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn sck_authorizes_with_its_backend_instead_of_coregraphics_preflight() {
-        for backend in [1, 2] {
-            let result = super::require_screen_recording(backend, "sck", |_| {
-                panic!("ScreenCaptureKit must handle its own authorization")
+    fn native_backend_authorizes_instead_of_coregraphics_preflight() {
+        for backend in [1, 2, 3] {
+            let result = super::require_screen_recording(backend, "native", |_| {
+                panic!("Native backend must handle its own authorization")
             });
             assert!(result.is_ok());
         }
@@ -754,15 +756,33 @@ mod tests {
         assert!(MacosScreenCaptureAdapter.available());
     }
 
+    #[cfg(not(feature = "macos-screencapturekit"))]
+    #[test]
+    fn default_desktop_uses_system_helper_on_every_supported_version() {
+        for (major, minor, sdk) in [
+            (12, 0, 130100),
+            (12, 7, 130100),
+            (14, 0, 150000),
+            (26, 0, 260000),
+        ] {
+            assert_eq!(
+                unsafe { super::cute_macos_desktop_backend_for_version(major, minor, sdk) },
+                3
+            );
+        }
+        assert_eq!(unsafe { super::cute_macos_pixel_backend() }, 3);
+    }
+
     #[test]
     fn native_pixel_backend_reports_an_adr_038_route() {
         let backend = unsafe { super::cute_macos_pixel_backend() };
         assert!(
-            (0..=2).contains(&backend),
+            (0..=3).contains(&backend),
             "unexpected pixel backend {backend}"
         );
     }
 
+    #[cfg(feature = "macos-screencapturekit")]
     #[test]
     fn desktop_backend_obeys_runtime_and_build_sdk() {
         let cases = [
@@ -790,6 +810,7 @@ mod tests {
             assert_eq!(
                 expected,
                 match policy {
+                    MacosCapturePixelBackend::SystemScreenshot => 3,
                     MacosCapturePixelBackend::CoreGraphicsLegacy => 0,
                     MacosCapturePixelBackend::ScreenCaptureKitStream => 1,
                     MacosCapturePixelBackend::ScreenCaptureKitScreenshot => 2,
@@ -810,16 +831,24 @@ mod tests {
         });
     }
 
+    #[cfg(feature = "macos-screencapturekit")]
     #[test]
     fn desktop_composition_keeps_negative_origins_scale_and_top_down_bgra() {
         // SAFETY: the native contract uses synthetic bitmap contexts, no TCC calls.
         assert!(unsafe { super::cute_macos_desktop_composition_contract() });
     }
 
+    #[cfg(feature = "macos-screencapturekit")]
     #[test]
     fn desktop_wait_distinguishes_cancel_timeout_permission_and_late_callbacks() {
         // SAFETY: uses native state/synthetic errors without starting capture.
         assert!(unsafe { super::cute_macos_desktop_wait_contract() });
+    }
+
+    #[cfg(not(feature = "macos-screencapturekit"))]
+    #[test]
+    fn system_helper_distinguishes_exit_cancel_timeout_launch_and_reaps_children() {
+        assert!(unsafe { super::cute_macos_system_capture_contract() });
     }
 
     #[test]

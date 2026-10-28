@@ -169,12 +169,15 @@ jobs:
         run: |
           for source in src/macos_window_capture.m src/macos_capture_bridge.m src/macos_desktop_capture.m; do
             cc -fsyntax-only -fobjc-arc -Wall -Wextra -Wno-deprecated-declarations \
-              -mmacosx-version-min=12.0 -DCUTE_SCREEN_MACOS_SDK=130000 "$source"
+              -mmacosx-version-min=12.0 -DCUTE_SCREEN_SCK_ENABLED=1 -DCUTE_SCREEN_MACOS_SDK=130000 "$source"
           done
 
       - name: Test macOS native capture contracts without screen access
         if: runner.os == 'macOS'
-        run: cargo test --locked --package cute-screen-desktop --lib macos_platform::tests::desktop_
+        run: |
+          cargo test --locked --package cute-screen-desktop --lib default_desktop_uses_system_helper
+          cargo test --locked --package cute-screen-desktop --lib system_helper_distinguishes
+          cargo test --locked --package cute-screen-desktop --lib --features macos-screencapturekit macos_platform::tests::desktop_
 
       - name: Upload compile logs on failure
         if: failure()

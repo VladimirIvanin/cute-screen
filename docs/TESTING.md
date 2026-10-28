@@ -1,5 +1,89 @@
 # Стратегия тестирования
 
+## macOS default helper и читаемость feedback (2026-10-28, ADR-163)
+
+Платформа: macOS 12.7.6 Intel, SDK 13.1, Retina 1440×900 pt; baseline c930793,
+рабочая копия 0.1.20. Red-first `cargo test -p cute-screen-desktop --lib
+ default_desktop_uses_system_helper_on_every_supported_version` сначала FAILED
+(backend 0 вместо 3). После реализации `cargo test -p cute-screen-desktop --lib
+ macos` — 37 passed. С `--features macos-screencapturekit macos` — 41 passed,
+включая сохранённые composition/wait contracts. Native helper contract проверяет
+успех, nonzero exit, launch failure, cancel, timeout и отсутствие живых children;
+frame release допускает повторный вызов.
+
+`pnpm smoke:m04:macos:screen` — captured, полностью декодированный PNG 2880×1800;
+визуально проверено содержимое реального рабочего стола с окном VS Code, не blank
+и не wallpaper-only. Native windows before/after=0. `otool -L
+ target/debug/m04-platform-smoke` не содержит ScreenCaptureKit. Это запуск из IDE,
+а не подтверждение разрешения установленного GUI. Первый GUI/MCP запуск
+из ad-hoc `.app` вернул captured, но визуальный decode export показал только
+wallpaper при наличии чужого окна на desktop. Результат признан невалидным,
+добавлен post-helper access check: успешный exit с denied не публикует PNG.
+Исходный пробный PNG оставлен для диагностики, не как passing evidence.
+Отдельные ARM/new macOS, несколько дисплеев и Spaces пока pending;
+результат installed regrant зафиксирован ниже.
+
+Feedback: `caffeinate -i env CUTE_SCREEN_BROWSER_E2E_HEADLESS=1
+ pnpm test:e2e:browser --spec tests/e2e/specs/browser-action-feedback.e2e.ts` —
+**8 passed** за 3m01s. RU/EN × 1600/1024/900 × light/dark дают 12 observations;
+ещё два проверяют длинную многострочную диагностику в 900×640. Реальное Capture
+вызывает denied/long error через test adapter. Computed text/button contrast,
+opaque background, геометрия, elementFromPoint, ввод в инструмент и close/focus
+проверяются после production mount. Light button contrast 5.395:1, dark 7.701:1;
+14px/21px. Long message прокручивается клавишей End, внешняя панель не скроллится,
+recovery/close доступны. Ручной просмотр выбранных PNG выполнен.
+
+Широкая регрессия `pnpm test --maxWorkers=1 --testTimeout=15000` завершилась
+1625 passed, 9 failed, 13 skipped; 174 files passed / 8 failed и один worker error.
+Runtime 10615s, timeout/hook/worker failures; это не green full-suite. Повтор
+всех 9 затронутых/незапущенных файлов с caffeinate, maxWorkers=1,
+`--testTimeout=15000 --hookTimeout=15000` — **9 files / 213 tests passed** за 82s,
+без ослабления проверок. Точные списки и вывод — regression-final/retry.log.
+
+Артефакты: `artifacts/macos-system-capture/`,
+`artifacts/notification-readability/`, `artifacts/browser-e2e/` и
+`artifacts/m04/macos-screen.json` с library PNG. Общий target не очищался;
+перед работой 17.617 GiB target / 0.014 GiB artifacts. После завершения: `pnpm check` — passed (38 lint warnings, без errors),
+включая 115 boundary tests и все четыре clippy configurations; `cargo test
+ --workspace` — 217 passed, включая 33 storage tests (637.75s). `pnpm typecheck`,
+`pnpm lint`, `pnpm format:check`, `pnpm docs:check`, `pnpm mcp:schema:check`,
+`pnpm ipc:check` и native syntax check — passed. Первый check обнаружил App.vue
+504 > 500 lines: test error factory вынесена в harness config без изменения budget.
+Параллельные boundary повторы имели 5s timeouts; финальный штатный check green.
+
+`pnpm tauri build --debug --bundles app,dmg` — passed, Intel package 0.1.20.
+App/companion codesign verify strict — passed; app Signature=adhoc,
+DMG code object is not signed, hdiutil verify — VALID. Повторный otool bundle
+не содержит ScreenCaptureKit. Это локальный debug x64, не universal release.
+GUI/MCP после post-helper check — terminal permissionDenied; wallpaper не
+публикуется новым успешным capture. Installed /Applications 0.1.20 повторяет denied;
+TCC --info --debug показывает сохранённый cdhash bad956… против current 3fec65…,
+SecStaticCodeCheckValidity -67050. После точечного reset владелец заново добавил
+/Applications/Cute Screen.app и перезапустил его. Повторный stdio MCP capture
+**11:04 Europe/Moscow** вернул terminal captured → editor, export_image создал
+installed-screen.png 2880×1800. Независимый @napi-rs/canvas полностью декодировал
+20 736 000 RGBA bytes; визуально видны чужие окна VS Code и System Preferences.
+SHA-256 export c9e31781c6b49f25578ae9f76b2bef097d1d23b24520db70c91aa6ca67d76adc.
+Это успех именно установленной ad-hoc 0.1.20, без IDE attribution. Изображение
+не wallpaper-only; своё окно скрыто. Артефакты installed-after-regrant.jsonl,
+installed-decode.json и installed-screen.png. Сохранение grant после следующего
+изменения ad-hoc bytes и новые macOS/ARM этим не доказываются.
+
+После замечания владельца о нижнем отступе короткий feedback использует одну
+строку вместо двух. Повтор `pnpm test:e2e:browser --spec
+ tests/e2e/specs/browser-action-feedback.e2e.ts --mochaOpts.grep
+ 'cancelled feedback|long diagnostics'` с headless/caffeinate — **3 passed**
+за 1m59s. Height ≤54px, разность верхнего/нижнего отступа ≤1px, центры текста
+и close совпадают ≤1px; длинные light/dark ошибки сохраняют scroll/recovery.
+PNG notification-cancelled-compact просмотрен. Focused app-shell-layout/shell-store
+— **24 passed**. Промежуточные browser повторы с timeout/HMR остановлены;
+они не засчитываются как passing evidence. Новая cancellation fixture использует
+тот же ActionCancelledError контракт, что production adapter.
+
+После остановки своих orphan browsers `pnpm clean:artifacts` preview/apply удалили
+2 профиля / 0.260 GiB. Полезный Cargo cache сохранён; рост target до 24.958 GiB
+обусловлен штатными проверками feature configurations, отдельный target не создавался.
+
 ## Уведомление и доступ к инструментам (2026-10-28, ADR-162)
 
 Платформа: macOS 12.7.6 Intel, Chrome 150 headless; baseline 7b307bf,

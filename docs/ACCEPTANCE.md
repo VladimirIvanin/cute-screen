@@ -1,5 +1,29 @@
 # Сквозная приёмка
 
+## Default macOS и feedback 0.1.20 (ADR-163)
+
+REQ-CAP-001/002/014/015: default system helper и отключённая SCK линковка
+проверены на macOS 12.7.6 Intel; Screen smoke — реальный decoded 2880×1800 PNG.
+37 default / 41 opt-in tests passed, включая cancel/timeout/child reap.
+Installed GUI сначала повторил permissionDenied из-за старого code requirement.
+После точечного reset и ручного regrant установленная /Applications 0.1.20 через
+stdio MCP вернула captured; экспорт 2880×1800 независимо декодирован, чужие окна
+видны. Этот installed gate пройден на Monterey Intel; следующий ad-hoc upgrade
+требует отдельного подтверждения сохранения прав.
+ARM и новые macOS остаются отдельными runtime gates.
+REQ-REL-005/006: release больше не зависит от self-signed certificate/secrets;
+app/companion ad-hoc, DMG без сертификатной подписи. Отсутствие Gatekeeper warning
+и сохранение grant при обновлении не заявляются.
+
+REQ-UI-002/003/004/006/007/012/014: browser **8 passed**, RU/EN, обе темы,
+900/1024/1600 px, computed contrast ≥4.5:1, длинная диагностика с отдельным
+keyboard scroll, доступные recovery/close и нижние инструменты. Широкий suite
+имел timeout/worker failures; все затронутые 9 файлов повторно прошли (213 tests).
+Это не объявляется чистым полным прогоном. Дополнительно short cancel/long
+diagnostics browser — 3 passed, compact height ≤54px и симметричные отступы;
+final pnpm check, cargo test --workspace и app/DMG package verification — passed.
+Подробности — TESTING.md.
+
 ## Feedback и нижние инструменты (ADR-162)
 
 `REQ-UI-004/006/007/014`, `REQ-EDT-015`: постоянное уведомление перенесено

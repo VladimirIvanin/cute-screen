@@ -143,22 +143,16 @@ jobs:
 
       - name: Build macOS universal DMG
         if: runner.os == 'macOS'
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.CUTE_SCREEN_MACOS_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.CUTE_SCREEN_MACOS_CERTIFICATE_PASSWORD }}
         run: |
-          test -n "$APPLE_CERTIFICATE" || { echo "Missing CUTE_SCREEN_MACOS_CERTIFICATE" >&2; exit 1; }
-          test -n "$APPLE_CERTIFICATE_PASSWORD" || { echo "Missing CUTE_SCREEN_MACOS_CERTIFICATE_PASSWORD" >&2; exit 1; }
           rustup target add x86_64-apple-darwin aarch64-apple-darwin
-          pnpm build:macos:signed --target universal-apple-darwin --bundles app,dmg -- --locked
+          pnpm tauri build --target universal-apple-darwin --bundles app,dmg -- --locked
           lipo "target/universal-apple-darwin/release/bundle/macos/Cute Screen.app/Contents/MacOS/cute-screen" -verify_arch x86_64 arm64
           lipo "target/universal-apple-darwin/release/bundle/macos/Cute Screen.app/Contents/MacOS/cute-screen-mcp" -verify_arch x86_64 arm64
           "target/universal-apple-darwin/release/bundle/macos/Cute Screen.app/Contents/MacOS/cute-screen-mcp" --self-check
-          codesign --verify --deep --strict --verbose=2 -R '=certificate leaf = H"341FAF8FC84676BC71B13456E85858F22B675F16"' "target/universal-apple-darwin/release/bundle/macos/Cute Screen.app"
-          codesign --verify --strict --verbose=2 -R '=certificate leaf = H"341FAF8FC84676BC71B13456E85858F22B675F16"' "target/universal-apple-darwin/release/bundle/macos/Cute Screen.app/Contents/MacOS/cute-screen-mcp"
+          codesign --verify --deep --strict --verbose=2 "target/universal-apple-darwin/release/bundle/macos/Cute Screen.app"
+          codesign --verify --strict --verbose=2 "target/universal-apple-darwin/release/bundle/macos/Cute Screen.app/Contents/MacOS/cute-screen-mcp"
           target/universal-apple-darwin/release/cute-screen --startup-check
           for dmg in target/universal-apple-darwin/release/bundle/dmg/*.dmg; do
-            codesign --verify --strict --verbose=2 -R '=certificate leaf = H"341FAF8FC84676BC71B13456E85858F22B675F16"' "$dmg"
             hdiutil verify "$dmg"
           done
 
