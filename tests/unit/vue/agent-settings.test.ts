@@ -52,6 +52,45 @@ function bridge(): AgentSettingsBridge {
   }
 }
 describe('agent connection settings', () => {
+  it('copies the skill command with MCP off and updates its guidance when the locale changes', async () => {
+    const adapter = bridge()
+    adapter.create = vi.fn(adapter.create)
+    const view = render(AgentSettingsPanel, { props: { locale: 'en', bridge: adapter } })
+    const copy = await screen.findByRole('button', { name: 'Copy install command' })
+    expect(screen.getByRole('checkbox')).not.toBeChecked()
+    expect(copy).toBeEnabled()
+    expect(screen.getByText(/Run this command in a terminal from your project folder/u)).toBeVisible()
+    await fireEvent.click(copy)
+    await waitFor(() => expect(adapter.copy).toHaveBeenCalledWith(
+      'npx --yes skills add VladimirIvanin/cute-screen --skill cute-screen-annotate --yes',
+    ))
+    expect(await screen.findByRole('status')).toHaveTextContent('Install command copied')
+    expect(adapter.create).not.toHaveBeenCalled()
+    await view.rerender({ locale: 'ru' })
+    expect(screen.getByRole('heading', { name: 'Навык для агента' })).toBeVisible()
+    expect(screen.getByText(/Выполните команду в терминале из папки проекта/u)).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Скопировать команду' })).toBeEnabled()
+  })
+
+  it('disables copying while pending and retries a failed skill-command copy', async () => {
+    const adapter = bridge()
+    let rejectCopy: (reason: Error) => void = () => undefined
+    adapter.copy = vi.fn().mockImplementationOnce(() => new Promise<void>((_resolve, reject) => {
+      rejectCopy = reject
+    })).mockResolvedValue(undefined)
+    render(AgentSettingsPanel, { props: { locale: 'en', bridge: adapter } })
+    const copy = await screen.findByRole('button', { name: 'Copy install command' })
+    await fireEvent.click(copy)
+    expect(copy).toBeDisabled()
+    rejectCopy(new Error('Clipboard unavailable'))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Clipboard unavailable')
+    expect(screen.queryByText('Install command copied')).toBeNull()
+    await fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    await screen.findByText('Install command copied')
+    expect(adapter.copy).toHaveBeenCalledTimes(2)
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
   it('switches all profiles with their own format and instructions, clearing the previous secret', async () => {
     const adapter = bridge()
     adapter.create = vi.fn(adapter.create)

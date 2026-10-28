@@ -66,6 +66,13 @@ Cancelled/Busy и завершение future очищают остаток. GTK
 token в GdkWaylandDisplay перед present; X11 сохраняет timestamp path.
 Ни persistence, ни generated IPC, ни переменные окружения не содержат token.
 
+## Установка навыка из Settings (ADR-171)
+
+AgentSettings показывает команду Skills CLI для `cute-screen-annotate` и
+копирует её через существующий AgentSettingsBridge.copy. Установка запускается
+пользователем в терминале проекта; MCP opt-in и создание ключей независимы.
+Секретов в команде нет. Clipboard pending/error/retry используют общий perform.
+
 ## Повторное получение MCP-конфигурации (ADR-155)
 
 Settings-only `mcp_connection_configuration(id)` читает отдельный приватный файл

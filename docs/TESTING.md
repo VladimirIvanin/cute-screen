@@ -1,5 +1,59 @@
 # Стратегия тестирования
 
+## Бамп 0.1.26 и публикация коммита (2026-10-28)
+
+Ubuntu 22.04.5 x86_64, Node 22.23.1, pnpm 10.33.2; исходный HEAD `2c3ccc2`.
+`git fetch origin` подтвердил совпадение main и origin/main.
+`pnpm version:bump 0.1.26` обновил пять файлов app/Tauri/Cargo metadata,
+три точные локальные зависимости и четыре workspace package entries в Cargo.lock.
+`node scripts/release-assets.mjs version . v0.1.26` и
+`cargo metadata --locked --offline --no-deps --format-version 1` — exit 0.
+`pnpm exec vitest run --project boundaries tests/boundaries/bump-version.test.ts tests/boundaries/release-assets.test.ts tests/boundaries/build-contract.test.ts`
+— **3 files / 48 tests passed**. Логи и metadata — `artifacts/mcp-skill-install/`.
+UI evidence 9 component / 4 browser tests и реальная установка навыка описаны
+ниже; после metadata-only bump UI suites повторно не запускались.
+`pnpm format`, `pnpm format:check`, `pnpm docs:check` и `git diff --check`
+проверяются перед коммитом. Коммит включает MCP-инструкцию и новую версию,
+push выполняется в origin/main.
+
+## Команда установки навыка в Settings (2026-10-28, ADR-171)
+
+Ubuntu 22.04.5 x86_64, Node 22.23.1, pnpm 10.33.2; исходный HEAD `2c3ccc2`.
+В отдельном временном проекте выполнена настоящая команда
+`npx --yes skills add VladimirIvanin/cute-screen --skill cute-screen-annotate --yes`
+(Skills CLI 1.7.4, `DISABLE_TELEMETRY=1 DO_NOT_TRACK=1`) — exit 0.
+CLI клонировал публичный GitHub-репозиторий, нашёл один навык и установил
+его в `.agents/skills/cute-screen-annotate`; SKILL.md и
+references/mcp-workflow.md побайтово совпали с файлами репозитория.
+Временный проект вместе с skills-lock.json удалён после проверки;
+глобальные навыки и настройки MCP не менялись. Лог и JSON с проверками —
+`artifacts/mcp-skill-install/install.log` и `install.json`.
+
+`pnpm test tests/unit/vue/agent-settings.test.ts` — **9 passed**: прежние
+подключения, копирование команды при MCP off, смена RU/EN, pending и error/retry.
+`pnpm dev --port 5247 --strictPort` запущен; HTTP-запросы страницы Settings и
+Vue-модуля завершились exit 0. Сервер остановлен после проверки.
+
+Браузерная проверка использует production Settings → Агенты / MCP с mock только
+на native IPC boundary: clipboard payload проверяется до системного буфера.
+Это проверка UI, а не повторный native clipboard или MCP capture smoke.
+Первый browser-прогон превысил общий Mocha timeout 30 секунд для четырёх
+вариантов; варианты разделены на четыре самостоятельных теста с прежним
+таймаутом. Первый format/lint выявил длинную строку нового spec; перенос
+исправлен. Итоговая команда
+`NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt CUTE_SCREEN_E2E_DISABLE_WATCH=1 CUTE_SCREEN_BROWSER_E2E_PORT=5249 CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 pnpm test:e2e:browser --spec tests/e2e/specs/browser-mcp-skill-install.e2e.ts`
+— **4 passed**, Chrome 147.0.7727.101 headless. RU/EN × light/dark, ширины
+820/620 px: полный clipboard payload, success feedback и отсутствие
+горизонтального переполнения. Выбранные screenshots просмотрены.
+`pnpm lint` — exit 0 (37 существующих warnings), `pnpm typecheck`,
+`pnpm format`, `pnpm format:check`, `pnpm docs:check` и `git diff --check` — exit 0.
+Первый typecheck выявил optional-field type в новом IPC mock;
+объявление исправлено под exactOptionalPropertyTypes, полный typecheck повторён.
+Нативные Rust/release проверки для этого UI-изменения не запускались.
+`pnpm disk:usage`: общий target 72,616 GiB сохранён; отдельный target не создавался,
+временный install-проект удалён, evidence задачи меньше 1 MiB.
+Артефакты — `artifacts/mcp-skill-install/`.
+
 ## Бамп 0.1.25 и публикация коммита (2026-10-28)
 
 Ubuntu 22.04.5 x86_64, Node 22.23.1, pnpm 10.33.2; исходный HEAD `f3e5c3f`.

@@ -1,5 +1,14 @@
 # Платформенная матрица
 
+## Установка навыка из Settings (REQ-MCP-001/007, ADR-171, 2026-10-28)
+
+Ubuntu 22.04.5 x86_64, Node 22.23.1: настоящая установка Skills CLI 1.7.4
+из `VladimirIvanin/cute-screen` в отдельный временный проект завершилась
+exit 0; установленный навык и references совпали с исходниками.
+Инструкция использует общий Vue UI и существующий clipboard bridge;
+новых native IPC и зависимостей нет. macOS/Windows установка Skills CLI
+этим прогоном не проверялась. Фактические UI-проверки — TESTING.md.
+
 ## Адаптив верхней панели (2026-10-28, ADR-170)
 
 Ubuntu 22.04.5 x86_64 / Chrome 147.0.7727.101 browser harness: 5/5 scenarios

@@ -22,6 +22,7 @@ const state = ref<AgentSettings>()
 const busy = ref(false)
 const error = ref('')
 const message = ref('')
+const skillInstallCommand = 'npx --yes skills add VladimirIvanin/cute-screen --skill cute-screen-annotate --yes'
 const config = ref('')
 const configId = ref<string>()
 const configField = ref<HTMLTextAreaElement>()
@@ -106,6 +107,15 @@ async function copy(id?: string): Promise<void> {
     const value = id ? await bridge.configuration(id) : config.value
     await bridge.copy(value)
     message.value = ru.value ? 'Конфигурация скопирована' : 'Configuration copied'
+    messageTimer = setTimeout(() => {
+      message.value = ''
+    }, 3000)
+  })
+}
+async function copySkillCommand(): Promise<void> {
+  await perform(async () => {
+    await bridge.copy(skillInstallCommand)
+    message.value = ru.value ? 'Команда установки скопирована' : 'Install command copied'
     messageTimer = setTimeout(() => {
       message.value = ''
     }, 3000)
@@ -217,6 +227,28 @@ onBeforeUnmount(() => {
           <button :disabled="busy" @click="hideConfiguration">{{ ru ? 'Скрыть конфигурацию' : 'Hide configuration' }}</button>
         </div>
       </template>
+      <section class="cs-agent-skill" aria-labelledby="mcp-skill-title">
+        <h3 id="mcp-skill-title">{{ ru ? 'Навык для агента' : 'Agent skill' }}</h3>
+        <p class="cs-settings-muted">
+          {{ ru
+            ? 'Установите cute-screen-annotate, чтобы агент умел делать снимки, добавлять читаемые аннотации и проверять экспорт через Cute Screen MCP.'
+            : 'Install cute-screen-annotate to help your agent capture screenshots, add readable annotations and verify exports through Cute Screen MCP.' }}
+        </p>
+        <p class="cs-settings-muted">
+          {{ ru
+            ? 'Выполните команду в терминале из папки проекта. Нужен Node.js 22.20 или новее. Skills CLI установит навык для поддерживаемых агентов в этом проекте.'
+            : 'Run this command in a terminal from your project folder. Requires Node.js 22.20 or later. Skills CLI installs the skill for supported agents in this project.' }}
+        </p>
+        <pre><code>{{ skillInstallCommand }}</code></pre>
+        <div class="cs-agent-buttons">
+          <button :disabled="busy" @click="copySkillCommand">{{ ru ? 'Скопировать команду' : 'Copy install command' }}</button>
+        </div>
+        <p class="cs-settings-muted">
+          {{ ru
+            ? 'Перезапустите сессию агента и попросите использовать cute-screen-annotate. Подключение MCP настройте отдельно выше.'
+            : 'Restart your agent session and ask it to use cute-screen-annotate. Configure the MCP connection separately above.' }}
+        </p>
+      </section>
       <p v-if="message" role="status">{{ message }}</p>
       <h3>{{ ru ? 'Подключения' : 'Connections' }}</h3>
       <p v-if="!state.connections.length" class="cs-settings-muted">{{ ru ? 'Подключений пока нет' : 'No connections yet' }}</p>
@@ -261,8 +293,10 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.cs-agent-settings { display: grid; gap: 12px; }
+.cs-agent-settings { display: grid; gap: 12px; min-width: 0; }
 .cs-agent-settings h3, .cs-agent-settings p { margin: 0; }
+.cs-agent-skill { display: grid; gap: 12px; min-width: 0; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.cs-agent-skill pre { min-width: 0; margin: 0; padding: 12px; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); }
 .cs-agent-enable { display: flex; gap: 8px; align-items: center; }
 .cs-agent-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .cs-agent-settings textarea { width: 100%; box-sizing: border-box; resize: vertical; padding: 12px; font-family: monospace; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); }
