@@ -1,0 +1,121 @@
+.cs-topbar {
+  height: auto;
+  min-height: 42px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.cs-topbar > .cs-brand,
+.cs-topbar > .cs-history,
+.cs-topbar > .cs-top-actions {
+  flex-shrink: 0;
+}
+
+.cs-topbar .cs-history {
+  margin-left: 0;
+}
+
+.cs-top-actions {
+  max-width: 100%;
+  height: auto;
+  min-height: 42px;
+  flex-wrap: wrap;
+}
+
+.cs-top-actions .n-button,
+.cs-brand-mark {
+  flex-shrink: 0;
+}
+
+.cs-topbar .cs-save-status,
+.cs-topbar-error {
+  flex: 0 1 auto;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 0 auto;
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.cs-topbar .cs-save-status {
+  flex-basis: 100%;
+}
+
+.cs-topbar-error {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--chrome-94);
+  color: var(--danger);
+  pointer-events: auto;
+}
+
+.cs-editor-shell .cs-layers-panel,
+.cs-editor-shell .cs-layers-peek,
+.cs-editor-shell .cs-composition-panel {
+  top: var(--cs-topbar-bottom, 64px);
+}
+
+.cs-editor-shell .cs-action-feedback {
+  top: calc(var(--cs-topbar-bottom, 64px) + 2px);
+}
+
+.cs-settings-popover .cs-agent-overflow {
+  display: none;
+}
+
+@media (max-width: 90em) {
+  .cs-top-actions .cs-agent-connect {
+    display: none;
+  }
+
+  .cs-settings-popover .cs-agent-overflow {
+    display: flex;
+  }
+}
+
+@media (max-width: 75em) {
+  .cs-top-actions .cs-button-quiet .n-button__content > span,
+  .cs-top-actions .cs-appearance-button .n-button__content > span {
+    display: none;
+  }
+
+  .cs-top-actions .cs-button-quiet,
+  .cs-top-actions .cs-appearance-button {
+    width: 34px;
+    padding-inline: 0;
+  }
+}
+
+@media (max-width: 56.25em) {
+  .cs-brand strong {
+    display: none;
+  }
+
+  .cs-topbar .cs-brand {
+    padding-inline: 5px;
+  }
+}
+
+@media (max-width: 40em) {
+  .cs-topbar > .cs-brand {
+    display: none;
+  }
+}
+
+@media (max-width: 30em) {
+  .cs-topbar,
+  .cs-top-actions {
+    gap: 4px;
+  }
+
+  .cs-top-actions .cs-button-primary {
+    width: 34px;
+    padding-inline: 0;
+  }
+
+  .cs-top-actions .cs-button-primary .n-button__content > span {
+    display: none;
+  }
+}

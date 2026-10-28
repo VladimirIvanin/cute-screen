@@ -61,12 +61,29 @@ const emit = defineEmits<{
   theme: [value: ThemePreference]
 }>()
 const disabled = computed(() => props.pending)
+const header = ref<HTMLElement>()
 const brand = ref<HTMLElement>()
 let disposeBrand: (() => void) | undefined
+let chromeObserver: ResizeObserver | undefined
+let shell: HTMLElement | null | undefined
 onMounted(() => {
   if (brand.value) disposeBrand = attachBrandEyes(brand.value)
+  shell = header.value?.closest<HTMLElement>('.cs-editor-shell')
+  const updateChromeBounds = () => {
+    if (!header.value || !shell) return
+    shell.style.setProperty('--cs-topbar-bottom', `${header.value.offsetTop + header.value.offsetHeight + 10}px`)
+  }
+  updateChromeBounds()
+  if (header.value && typeof ResizeObserver !== 'undefined') {
+    chromeObserver = new ResizeObserver(updateChromeBounds)
+    chromeObserver.observe(header.value)
+  }
 })
-onUnmounted(() => disposeBrand?.())
+onUnmounted(() => {
+  disposeBrand?.()
+  chromeObserver?.disconnect()
+  shell?.style.removeProperty('--cs-topbar-bottom')
+})
 const captureDisabled = computed(() => disabled.value || !props.captureAvailable)
 const captureTitle = computed(() =>
   props.captureAvailable ? props.t('capture') : (props.captureUnavailableReason ?? props.t('captureUnavailable')))
@@ -89,7 +106,7 @@ async function openAgent(): Promise<void> {
 </script>
 
 <template>
-  <header class="cs-topbar">
+  <header ref="header" class="cs-topbar">
     <div
       ref="brand"
       class="cs-brand"
@@ -138,37 +155,6 @@ async function openAgent(): Promise<void> {
         {{ t('redo') }}
       </NTooltip>
     </div>
-    <p
-      v-if="saveState && saveState !== 'saved'"
-      class="cs-save-status"
-      role="status"
-      aria-live="polite"
-      :data-state="saveState"
-    >
-      {{
-        saveState === 'dirty'
-          ? t('unsavedChanges')
-          : saveState === 'saving'
-            ? t('savingDocument')
-            : saveState === 'readOnly'
-              ? t('readOnlyDocument')
-              : (saveError ?? t('saveFailed'))
-      }}
-      <NButton
-        v-if="saveState === 'error'"
-        class="cs-save-retry"
-        @click="emit('retrySave')"
-      >
-        {{ t('retry') }}
-      </NButton>
-      <NButton
-        v-if="saveState === 'error'"
-        class="cs-save-retry"
-        @click="emit('exportRecovery')"
-      >
-        {{ t('exportRecovery') }}
-      </NButton>
-    </p>
     <div class="cs-top-actions">
       <NTooltip>
         <template #trigger>
@@ -203,6 +189,7 @@ async function openAgent(): Promise<void> {
       <NButton
         secondary
         class="cs-button cs-appearance-button"
+        :title="locale === 'ru' ? 'Оформление' : 'Appearance'"
         :disabled="disabled || !canEditCanvas"
         :aria-expanded="Boolean(appearanceOpen)"
         :aria-label="locale === 'ru' ? 'Оформление' : 'Appearance'"
@@ -235,7 +222,6 @@ async function openAgent(): Promise<void> {
       >
         <UiIcon name="agent" /><span>{{ locale === 'ru' ? 'Подключить агента' : 'Connect agent' }}</span>
       </NButton>
-      <span v-if="agentError" role="alert">{{ agentError }}</span>
       <EditorSettingsPopover
         :locale="locale"
         :theme="theme"
@@ -263,5 +249,43 @@ async function openAgent(): Promise<void> {
         {{ canCopyOrExport ? t('export') : t('exportUnavailable') }}
       </NTooltip>
     </div>
+    <p
+      v-if="saveState && saveState !== 'saved'"
+      class="cs-save-status"
+      role="status"
+      aria-live="polite"
+      :data-state="saveState"
+    >
+      {{
+        saveState === 'dirty'
+          ? t('unsavedChanges')
+          : saveState === 'saving'
+            ? t('savingDocument')
+            : saveState === 'readOnly'
+              ? t('readOnlyDocument')
+              : (saveError ?? t('saveFailed'))
+      }}
+      <NButton
+        v-if="saveState === 'error'"
+        class="cs-save-retry"
+        @click="emit('retrySave')"
+      >
+        {{ t('retry') }}
+      </NButton>
+      <NButton
+        v-if="saveState === 'error'"
+        class="cs-save-retry"
+        @click="emit('exportRecovery')"
+      >
+        {{ t('exportRecovery') }}
+      </NButton>
+    </p>
+    <p
+      v-if="agentError"
+      class="cs-topbar-error"
+      role="alert"
+    >
+      {{ agentError }}
+    </p>
   </header>
 </template>

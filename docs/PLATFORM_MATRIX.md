@@ -1,5 +1,15 @@
 # Платформенная матрица
 
+## Адаптив верхней панели (2026-10-28, ADR-170)
+
+Ubuntu 22.04.5 x86_64 / Chrome 147.0.7727.101 browser harness: 5/5 scenarios
+прошли. RU/EN × light/dark, resize 360–1600 px и текст 24 px: кнопки/группы
+не пересекаются, Undo/Redo доступны, агент находится в Settings, Escape
+возвращает фокус, layers/feedback учитывают реальную высоту header. Mounted
+Vue settings/placement — 21/21 passed. Это UI evidence; новые native проверки
+WebKitGTK/WKWebView/WebView2 и физических capture/import не выполнялись.
+Общий browser-shell имеет незакрытые сбои; детали и команды — TESTING.md.
+
 ## Ревью конкурентного обновления меню (2026-10-28)
 
 Linux Ubuntu 22.04.5 / GNOME 42.9 Wayland / WebKitGTK 2.50.4: свежий Tauri

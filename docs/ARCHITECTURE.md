@@ -1,5 +1,16 @@
 # Архитектура Cute Screen
 
+## Адаптивная верхняя панель (ADR-170)
+
+TopBar сохраняет DOM-порядок brand → history → actions → save status/error.
+`styles/topbar.css` владеет адаптивными правилами: группы не сжимаются,
+второстепенные подписи исчезают ступенями, остаточное переполнение переносится.
+Высота header определяется содержимым. Его ResizeObserver обновляет CSS
+переменную `--cs-topbar-bottom` у shell: layers/composition/feedback размещаются
+ниже header и после переноса, и после появления статуса. Observer отключается
+при unmount, переменная удаляется. Floating-toolbar/preview-placement читают
+настоящий bounding rect. Новых stores, IPC и изменений документа нет. Quick Capture не использует TopBar.
+
 ## Feedback действий (ADR-162)
 
 ActionFeedback показывает ограниченную панель под шапкой, ниже слоя инструментов.

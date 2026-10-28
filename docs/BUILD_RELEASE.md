@@ -1,5 +1,13 @@
 # CI-сборки и проверка версии через GitHub
 
+## Адаптив TopBar (ADR-170)
+
+UI-изменение без новых dependencies, IPC, Cargo profiles и release contracts.
+Для разработки использовать `pnpm dev`, профильный `pnpm test:e2e:browser`,
+Vue settings/placement tests, typecheck/lint и `pnpm format:check`.
+Release/package build для этой правки не требуется; runtime каждой native
+WebView остаётся отдельной проверкой. Команды и ограничения — TESTING.md.
+
 ## macOS 0.1.20: default helper и ad-hoc (ADR-163)
 
 Screen/Area используют системный `/usr/sbin/screencapture`. Для прежнего SCK

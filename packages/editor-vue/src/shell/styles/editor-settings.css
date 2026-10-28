@@ -118,15 +118,3 @@
 .cs-settings-app-link .cs-settings-open-error {
   color: var(--danger);
 }
-
-.cs-agent-overflow {
-  display: none;
-}
-@media (max-width: 1240px) {
-  .cs-agent-connect {
-    display: none;
-  }
-  .cs-agent-overflow {
-    display: inline-flex;
-  }
-}

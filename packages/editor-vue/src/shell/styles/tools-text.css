@@ -542,17 +542,6 @@
   color: var(--accent-hover);
 }
 @media (max-width: 1100px) {
-  .cs-brand strong,
-  .cs-history {
-    display: none;
-  }
-  .cs-button-quiet .n-button__content > span {
-    display: none;
-  }
-  .cs-button-quiet {
-    width: 36px;
-    padding: 0;
-  }
   .cs-context-toolbar small {
     display: none;
   }

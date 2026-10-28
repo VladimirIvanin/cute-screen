@@ -1,5 +1,63 @@
 # Стратегия тестирования
 
+## Бамп 0.1.25 и публикация коммита (2026-10-28)
+
+Ubuntu 22.04.5 x86_64, Node 22.23.1, pnpm 10.33.2; исходный HEAD `f3e5c3f`.
+`git fetch origin` подтвердил, что main совпадает с origin/main.
+`pnpm version:bump 0.1.25` обновил пять файлов metadata с 0.1.24;
+`node scripts/release-assets.mjs version . v0.1.25` и
+`cargo metadata --locked --offline --no-deps --format-version 1` проверяют
+согласованность app/Tauri/Cargo и точных зависимостей без обновления registry.
+`pnpm exec vitest run --project boundaries tests/boundaries/bump-version.test.ts tests/boundaries/release-assets.test.ts tests/boundaries/build-contract.test.ts`
+— 3 files / 48 tests passed; release guard и Cargo metadata завершились exit 0.
+`pnpm format`, `pnpm format:check`, `pnpm docs:check` и `git diff --check`
+фиксируются в `artifacts/topbar-responsive/`. UI evidence 5 browser + 21 Vue tests описано
+ниже; после metadata-only bump UI suites повторно не запускались.
+Коммит включает адаптив панели, документацию и версию; push выполняется
+в origin/main без нового tag/Release. Артефакты сборок не публикуются.
+
+## Адаптив верхней панели (2026-10-28, ADR-170)
+
+Ubuntu 22.04.5 x86_64, Chrome 147.0.7727.101 headless, Node 22.23.1,
+pnpm 10.33.2; база `f3e5c3f` с рабочими изменениями. `pnpm dev --port 5237`
+использован для просмотра shell, заполненная фикстура — штатный browser runner.
+
+- `NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt CUTE_SCREEN_E2E_DISABLE_WATCH=1 CUTE_SCREEN_BROWSER_E2E_PORT=5239 CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 pnpm test:e2e:browser --spec tests/e2e/specs/browser-topbar-responsive.e2e.ts`
+  — 5/5 passed. Последовательный resize 1600/1440/1280/1200/1100/1024/900/
+  760/640/480/360/1600, RU/EN × light/dark: группы, кнопки и содержимое
+  не пересекаются, normal layout остаётся одной строкой. Undo/Redo, Capture,
+  Copy, Export видимы; agent доступен через Settings на 1024; Escape возвращает
+  focus. Текст 24 px переносит группы без сдавливания; layers/feedback остаются
+  ниже фактического header. Лог: `artifacts/topbar-responsive/browser-final.log`.
+- `pnpm test tests/unit/vue/editor-settings.test.ts tests/unit/vue/selection-toolbar-position.test.ts tests/unit/vue/preview-placement.test.ts`
+  — 3 files / 21 tests passed, `artifacts/topbar-responsive/unit.log`.
+- `pnpm lint` — exit 0, 37 существующих warnings, `lint-final.log`;
+  `pnpm typecheck`, `pnpm format`, `pnpm format:check`, `pnpm docs:check`
+  и `git diff --check` — результаты в `artifacts/topbar-responsive/`.
+
+Визуально просмотрены `artifacts/browser-e2e/topbar-1600-ru-dark.png`,
+`topbar-360-ru-dark.png`, `topbar-large-text-1600.png` и компактный 1024 px.
+Увеличенный текст сначала перекрывал заголовок слоёв: после ResizeObserver
+и CSS-переменной header исправление подтверждено замерами и новым screenshot.
+Первый bootstrap драйвера отклонён TLS chain; повтор использует системные CA
+без отключения TLS. Промежуточный прогон при включённом HMR получил timeout
+смены locale; финальный прогон со стабильными исходниками и без watch прошёл.
+
+Общий `browser-shell.e2e.ts` запускался вместе с новым spec, но остановлен
+после ошибок старых ожиданий primary flow/1024: не появился highlighter toolbar,
+проверка доступности действий также упала. Полный suite не объявляется passed;
+причинная связь с этой правкой не установлена. Лог попытки —
+`artifacts/topbar-responsive/browser.log`. Browser harness сообщает unmocked
+native commands и недоступный image drop; tests здесь доказывают геометрию,
+не native capture/import. Tauri/WebKitGTK/WKWebView/WebView2, реальный picker,
+сохранение с отказом и recovery/export в этом прогоне отдельно не проверялись.
+Rust, renderer и release build не запускались: изменения в shell UI.
+
+`pnpm disk:usage` показал 72.616 GiB общего Cargo target и 0.728 GiB
+node_modules; новые targets не создавались, общий cache сохранён. Временные
+браузеры/dev servers остановлены; очистка известных временных profiles
+и повторный размер — `cleanup-preview.log`, `cleanup.log`, `disk-usage-final.log`.
+
 ## Бамп версии 0.1.24 (2026-10-28)
 
 Платформа: Ubuntu 22.04.5 x86_64. База `87a1861` с Linux tray и исправлениями
