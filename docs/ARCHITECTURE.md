@@ -1,5 +1,14 @@
 # Архитектура Cute Screen
 
+## macOS package identity (ADR-160)
+
+Dev app и companion имеют стандартную ad-hoc подпись до упаковки.
+Release использует постоянный сертификат Vladimir Ivanin (ADR-161), private key
+только в защищённом локальном каталоге и CI Secrets; в Git — публичный сертификат.
+Ad-hoc идентичность привязана к конкретной сборке. Совпадение сертификатного DR
+проверяется на разных executable; сохранение TCC после обновления проверяется отдельно. ScreenCaptureKit продолжает возвращать реальный denied; UI описывает
+regrant уже отмеченной записи. Разрешение IDE не служит доказательством для app.
+
 ## Режим Unix activation connection
 
 Listener остаётся nonblocking, чтобы worker обслуживал остановку сервера.

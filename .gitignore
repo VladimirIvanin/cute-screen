@@ -38,3 +38,7 @@ tests/fixtures/generated/
 
 # Generated companion binaries prepared by pnpm tauri build/dev
 src-tauri/binaries/
+
+# Private code-signing archives; only public certificates belong in Git
+*.p12
+*.pfx

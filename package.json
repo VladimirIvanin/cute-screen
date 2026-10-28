@@ -1,8 +1,9 @@
 {
   "name": "cute-screen",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "private": true,
   "license": "MIT",
+  "author": "Vladimir Ivanin",
   "type": "module",
   "packageManager": "pnpm@10.33.2",
   "engines": {
@@ -26,6 +27,7 @@
     "start:linux:dev": "bash scripts/run-linux-dev.sh",
     "check:linux:compat": "bash scripts/check-linux-compat.sh",
     "tauri": "node scripts/tauri.mjs",
+    "build:macos:signed": "node scripts/build-macos-signed.mjs",
     "icons:generate": "node scripts/generate-brand-assets.mjs",
     "icons:landing": "node scripts/generate-landing-icons.mjs",
     "artwork:github": "node scripts/generate-github-artwork.mjs",

@@ -1,5 +1,15 @@
 # Сквозная приёмка
 
+## Установленный macOS capture: повторное расследование (2026-10-28)
+
+`REQ-CAP-015`, `REQ-MCP-003`, `REQ-REL-005/006`: installed 0.1.17 MCP capture
+возвращает permissionDenied; полноценный app ранее не имел подписи. TCC InvalidCode
+устраняется стандартной ad-hoc подписью, но успешный capture после ручного regrant
+ещё не подтверждён. Для 0.1.18 подготовлена постоянная самоподписанная identity
+Vladimir Ivanin (ADR-161), app/companion и DMG локально проверены. Проверку capture
+владелец переносит на скачанный release DMG. Статус installed capture — pending; SCK smoke
+результаты относятся только к своему host и не закрывают этот acceptance gate.
+
 ## Unix activation frame
 
 `REQ-ACT-005/006`: входящий stream с наследованным O_NONBLOCK принимает header

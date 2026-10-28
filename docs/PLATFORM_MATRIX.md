@@ -1,5 +1,15 @@
 # Платформенная матрица
 
+## Установленная macOS 0.1.17 (2026-10-28, ADR-160)
+
+На macOS 12.7.6 Intel установленный app без подписи воспроизводимо возвращает
+permissionDenied через MCP; TCC пишет InvalidCode. Ручная стандартная ad-hoc
+подпись исправила распознавание identity. Capture после пользовательского regrant
+пока pending; успех smoke из IDE не закрывает этот gate. Постоянство прав при
+обновлении ad-hoc сборок не гарантируется. Для 0.1.18 release выбран постоянный
+самоподписанный сертификат Vladimir Ivanin (ADR-161). Подпись/DR проверяются
+локально, скачанный universal DMG и сохранение TCC после upgrade — pending.
+
 ## Unix activation socket (2026-10-28)
 
 macOS 12.7.6: реальный accept наследует O_NONBLOCK; явная нормализация worker

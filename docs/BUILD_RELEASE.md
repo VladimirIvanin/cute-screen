@@ -1,5 +1,41 @@
 # CI-сборки и проверка версии через GitHub
 
+## Именованная подпись macOS release (ADR-161)
+
+Релиз использует постоянный самоподписанный сертификат **Vladimir Ivanin**.
+Это не Apple Developer ID и не notarization; Gatekeeper может блокировать пакет.
+Публичный сертификат — `src-tauri/signing/vladimir-ivanin.pem`, SHA-1 fingerprint
+`341FAF8FC84676BC71B13456E85858F22B675F16`. Tauri подписывает app, companion
+и сам DMG; CI проверяет целостность и точное совпадение leaf certificate.
+
+GitHub Actions secrets:
+
+- `CUTE_SCREEN_MACOS_CERTIFICATE` — base64 зашифрованного PKCS#12.
+- `CUTE_SCREEN_MACOS_CERTIFICATE_PASSWORD` — пароль архива.
+
+Без этих secrets release job завершается ошибкой. Приватный ключ нельзя добавлять
+в Git, logs, artifacts и Downloads. Постоянные локальные файлы находятся в
+`~/Library/Application Support/Cute Screen Signing/` (каталог 0700, private файлы
+0600): `vladimir-ivanin.p12` и `pkcs12.pass`. Нужна отдельная защищённая резервная
+копия обоих файлов. Сертификат действителен до 2036-10-25; не генерировать новый
+для каждого релиза. Замена ключа меняет identity и может потребовать нового TCC grant.
+
+Для локального пакета: `pnpm build:macos:signed --debug --bundles app`.
+Другой приватный каталог задаётся через `CUTE_SCREEN_SIGNING_DIR`. Обычная
+`pnpm tauri build` сохраняет ad-hoc default; релиз задаёт identity через env.
+Ни пользовательский trust store, ни TCC автоматически не изменяются.
+Стабильность DR и сохранение разрешений — отдельные проверки, не следствие имени.
+
+## macOS dev package signing (ADR-160)
+
+В обычной dev-команде macOS app и companion подписываются ad-hoc средствами Tauri
+(`bundle.macOS.signingIdentity="-"`) перед DMG. Это не Developer ID/notarization;
+пакет остаётся неофициальным. CI проверяет app через `codesign --verify --deep
+--strict`, companion отдельно через `codesign --verify --strict`. Нельзя изменять
+bundle после подписи. Право записи экрана может потребовать regrant после замены
+сборки: выключить/включить Cute Screen в системном списке и перезапустить.
+Не подменять этот контракт identifier-only DR или автоматическим сбросом TCC.
+
 ## ScreenCaptureKit Monterey (ADR-158/159)
 
 SDK/deployment baseline и зависимости не меняются. Debug-сборка с SDK 13.1
@@ -538,8 +574,10 @@ Windows запускается через `CUTE_SCREEN_E2E_SCENARIOS=windows-cap
 
 ## Принцип
 
-Проект публикует неофициальные unsigned пакеты в GitHub Releases (ADR-111).
-Нет code signing, notarization, Tauri updater или автоматической установки обновлений.
+Проект публикует неофициальные пакеты в GitHub Releases (ADR-111).
+macOS release получает постоянную самоподписанную подпись Vladimir Ivanin
+(ADR-161); dev default — ad-hoc, Windows остаётся unsigned.
+Нет Developer ID, notarization, Tauri updater или автоматической установки обновлений.
 
 GitHub Actions выполняет две независимые функции:
 
@@ -550,13 +588,13 @@ Artifacts считаются тестовыми/неофициальными с�
 
 ## Матрица artifacts
 
-| ОС      | Target                                         | Runner               | CI artifact               |
-| ------- | ---------------------------------------------- | -------------------- | ------------------------- |
-| Linux   | `x86_64-unknown-linux-gnu`                     | Ubuntu 22.04 x64     | `.deb`, `.AppImage`       |
-| Linux   | `aarch64-unknown-linux-gnu`                    | Ubuntu 22.04 ARM64   | `.deb`, `.AppImage`       |
-| macOS   | `x86_64-apple-darwin` + `aarch64-apple-darwin` | native Apple Silicon | unsigned universal `.dmg` |
-| Windows | `x86_64-pc-windows-msvc`                       | Windows x64          | unsigned NSIS `.exe`      |
-| Windows | `aarch64-pc-windows-msvc`                      | Windows ARM64        | unsigned NSIS `.exe`      |
+| ОС      | Target                                         | Runner               | CI artifact                  |
+| ------- | ---------------------------------------------- | -------------------- | ---------------------------- |
+| Linux   | `x86_64-unknown-linux-gnu`                     | Ubuntu 22.04 x64     | `.deb`, `.AppImage`          |
+| Linux   | `aarch64-unknown-linux-gnu`                    | Ubuntu 22.04 ARM64   | `.deb`, `.AppImage`          |
+| macOS   | `x86_64-apple-darwin` + `aarch64-apple-darwin` | native Apple Silicon | self-signed universal `.dmg` |
+| Windows | `x86_64-pc-windows-msvc`                       | Windows x64          | unsigned NSIS `.exe`         |
+| Windows | `aarch64-pc-windows-msvc`                      | Windows ARM64        | unsigned NSIS `.exe`         |
 
 Если hosted ARM runner недоступен, workflow использует узко помеченный self-hosted native runner. Cross-compilation может проверить compile, но не заменяет native install/launch smoke.
 

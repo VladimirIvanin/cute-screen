@@ -1,5 +1,68 @@
 # Журнал архитектурных решений
 
+## ADR-161: постоянный самоподписанный издатель Vladimir Ivanin
+
+**Статус:** accepted (2026-10-28); заменяет ad-hoc подпись релизов ADR-160.
+Dev default остаётся ad-hoc. Владелец явно выбрал самоподписанный сертификат.
+
+**Решение:** один RSA-3072/SHA-256 code-signing сертификат с CN Vladimir Ivanin,
+сроком до 2036-10-25. Публичный сертификат хранится в
+`src-tauri/signing/vladimir-ivanin.pem`, private PKCS#12 и пароль — вне Git.
+Release workflow получает их из `CUTE_SCREEN_MACOS_CERTIFICATE` (base64 PKCS#12)
+и `CUTE_SCREEN_MACOS_CERTIFICATE_PASSWORD` в GitHub Actions Secrets. Identity
+закреплена по fingerprint, не по совпадению текстового имени. Ключ не создаётся
+заново на каждом runner. Его потеря/замена требует отдельной миграции разрешений.
+
+Обёртка создаёт временный keychain, импортирует identity и передаёт Tauri точный
+fingerprint без APPLE_CERTIFICATE (автоимпорт Tauri ожидает Apple team identity).
+Tauri подписывает companion, main, app и DMG; обёртка в finally удаляет keychain
+и временный PKCS#12. Системное доверие не изменяется. Release без секретов
+останавливается. CI проверяет app и companion через codesign с требованием
+точного leaf certificate; ad-hoc или другой сертификат эту проверку не проходят.
+Локальная команда `pnpm build:macos:signed --debug --bundles app` использует тот же
+публичный fingerprint и private файлы в пользовательском Application Support.
+
+**Ограничения:** имя подтверждено только владельцем ключа, а не Apple.
+Gatekeeper trust и notarization не появляются. Не добавляем доверие сертификату
+в Keychain пользователей и не изменяем TCC из runtime приложения. Сертификатная
+подпись позволяет DR различать постоянного издателя и identifier; фактическое
+сохранение Screen Recording между релизами проверяется отдельно.
+
+**Основание:** выбор владельца и
+[Apple Code Signing Tasks](https://developer.apple.com/library/archive/documentation/Security/Conceptual/CodeSigningGuide/Procedures/Procedures.html),
+[TN3161](https://developer.apple.com/documentation/technotes/tn3161-inside-code-signing-certificates).
+Проверки подписи реального app, DR и версии фиксируются в TESTING.md. Релиз и
+скачивание DMG выполняет владелец; installed capture пока остаётся pending.
+
+## ADR-160: ad-hoc подпись неофициального macOS пакета
+
+**Статус:** superseded для релизной подписи by [ADR-161](#adr-161-постоянный-самоподписанный-издатель-vladimir-ivanin);
+dev default accepted (2026-10-28); заменяет отсутствие code signing macOS
+в ADR-018. Не вводит Developer ID, notarization или официальный канал.
+
+**Основание:** установленная 0.1.17 на macOS 12.7.6 возвращает настоящий
+SCStreamErrorUserDeclined (-3801) через stdio MCP. `codesign` сообщает
+`code object is not signed at all`, TCC пишет InvalidCode и
+SecTaskCopySigningIdentifier Invalid argument. После стандартной ad-hoc подписи
+TCC узнаёт bundle identifier; старый отказ сохраняется до нового пользовательского
+разрешения. Успешный native smoke из IDE не доказывает доступ установленного app.
+Apple [TN3127](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements)
+объясняет отличие DR сертификатной, ad-hoc и отсутствующей подписи.
+
+**Решение:** `bundle.macOS.signingIdentity="-"` задаёт стандартную ad-hoc подпись
+app и вложенного companion средствами Tauri до создания DMG. CI вызывает
+`codesign --verify --deep --strict` для app и отдельно проверяет companion.
+Никакого identifier-only custom DR, сброса/редактирования TCC, перезапуска служб
+или обхода системной авторизации в приложении нет. DR привязан к конкретным bytes;
+новая сборка может требовать повторного разрешения. UI объясняет выключение и
+включение уже отмеченного приложения перед перезапуском. Стабильный grant между
+обновлениями требует отдельного решения о сертификатной подписи.
+
+**Проверка:** установленный MCP baseline и системные логи, проверка подписи
+полного Tauri app/companion; capture после ручного regrant и полный decode
+фиксируются отдельно в TESTING.md. До такого runtime результата восстановление
+захвата установленного пакета не считается доказанным.
+
 ## ADR-159: конкретное исключение для ScreenCaptureKit на Monterey
 
 **Статус:** accepted (2026-10-28); заменяет построение desktop filter ADR-157
@@ -1224,7 +1287,8 @@ reusable workflow graph, локальные smoke-команды и стабил
 
 ## ADR-111 — Автоматические пакеты в GitHub Releases
 
-**Статус:** accepted (2026-10-18); supersedes ADR-018 в способе распространения.
+**Статус:** superseded в отсутствии подписи macOS by [ADR-160](#adr-160-ad-hoc-подпись-неофициального-macos-пакета);
+остальные решения accepted (2026-10-18); supersedes ADR-018 в способе распространения.
 Проверка версий приложения по tags, отсутствие updater и code signing сохраняются.
 
 **Контекст:** GitHub Release `v0.1.0` содержит только автоматически созданные
@@ -2047,7 +2111,8 @@ rotation, transient preview/cancel и отсутствие non-image transform s
 
 ## ADR-018 — Неофициальные CI-сборки и GitHub version check
 
-**Статус:** superseded в способе распространения by [ADR-111](#adr-111-автоматические-пакеты-в-github-releases); остальные решения сохраняются.
+**Статус:** superseded в способе распространения by [ADR-111](#adr-111-автоматические-пакеты-в-github-releases),
+в отсутствии подписи macOS by [ADR-160](#adr-160-ad-hoc-подпись-неофициального-macos-пакета); остальные решения сохраняются.
 
 **Решение:** проект не создаёт официальный подписанный канал дистрибуции, не выполняет code signing/notarization и не использует Tauri updater. GitHub Actions собирает versioned unsigned artifacts для всей платформенной матрицы. Приложение сравнивает встроенную SemVer с публичными GitHub tags `vX.Y.Z` и только сообщает о более новой версии.
 

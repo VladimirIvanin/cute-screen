@@ -151,7 +151,7 @@ it('keeps the macOS app bundle and passes the Mach-O path before lipo -verify_ar
   )
 
   expect(workflow).toContain(
-    'pnpm tauri build --target universal-apple-darwin --bundles app,dmg -- --locked',
+    'pnpm build:macos:signed --target universal-apple-darwin --bundles app,dmg -- --locked',
   )
   expect(workflow).toContain(
     'lipo "target/universal-apple-darwin/release/bundle/macos/Cute Screen.app/Contents/MacOS/cute-screen" -verify_arch x86_64 arm64',
@@ -224,7 +224,7 @@ it('attaches verified assets, preserves notes and safely skips identical files o
   const body = JSON.parse(patch.body as string)
   expect(body.body).toContain('User release notes.')
   expect(body.body).toContain('macos-universal.dmg')
-  expect(body.body).toContain('UNSIGNED / UNOFFICIAL BUILD')
+  expect(body.body).toContain('UNOFFICIAL BUILD')
   expect(body).not.toHaveProperty('draft')
   const uploads = github.calls.filter((call) => call.url.startsWith('https://uploads.github.com/')).length
   expect(uploads).toBeGreaterThan(7)

@@ -45,7 +45,7 @@ const dictionaries: Record<SupportedLocale, Record<TranslationKey, string>> = {
     emptyDescription: 'Start a capture to open it here and add clarifying annotations.',
     readyLoadError: 'The document could not be loaded.',
     captureUnavailable: 'Screen capture is currently unavailable.',
-    captureScreenRecordingDenied: 'Allow Screen Recording in System Settings, quit Cute Screen, and open it again.',
+    captureScreenRecordingDenied: 'Allow Cute Screen in Screen Recording settings. If already enabled, turn it off and on again, then restart the app.',
     reopen: 'Reopen',
     capturePermissionSettings: 'Screen Recording settings',
     captureFallback: 'Global shortcut is unavailable. Use this command:',
@@ -189,7 +189,7 @@ const dictionaries: Record<SupportedLocale, Record<TranslationKey, string>> = {
     readyLoadError: 'Не удалось загрузить документ.',
     captureUnavailable: 'Захват экрана сейчас недоступен.',
     captureScreenRecordingDenied:
-      'Разрешите запись экрана в Системных настройках, полностью закройте Cute Screen и откройте его снова.',
+      'Разрешите Cute Screen в настройках записи экрана. Если галочка уже стоит, выключите и включите её, затем перезапустите приложение.',
     reopen: 'Открыть снова',
     capturePermissionSettings: 'Настройки записи экрана',
     captureFallback: 'Глобальная горячая клавиша недоступна. Используйте эту команду:',

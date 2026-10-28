@@ -155,7 +155,7 @@ describe('M04 capture action feedback', () => {
     expect(store.actionState).toEqual({
       status: 'error',
       action: 'capture',
-      message: 'Allow Screen Recording in System Settings, quit Cute Screen, and open it again.',
+      message: 'Allow Cute Screen in Screen Recording settings. If already enabled, turn it off and on again, then restart the app.',
       recovery: 'relaunch',
     })
   })

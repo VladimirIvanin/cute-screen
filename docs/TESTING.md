@@ -1,5 +1,65 @@
 # Стратегия тестирования
 
+## Именованная подпись 0.1.18 (2026-10-28, ADR-161)
+
+Платформа: macOS 12.7.6 Intel, SDK 13.1; baseline 7e88419 + рабочая копия.
+Владелец выбрал постоянный самоподписанный сертификат Vladimir Ivanin. Private
+PKCS#12/пароль сохранены вне Git (0700/0600), два GitHub Actions Secrets настроены;
+в репозитории только публичный сертификат. Trust settings не изменялись.
+
+- `pnpm build:macos:signed --debug --bundles app` и
+  `CI=true pnpm build:macos:signed --debug --bundles app,dmg` — passed.
+  `codesign --verify --strict` с точным leaf fingerprint — app/companion/DMG passed;
+  app также проверен с `--deep`. Authority=Vladimir Ivanin, версия 0.1.18,
+  copyright=Copyright © 2026 Vladimir Ivanin, startup/self-check — passed.
+- `hdiutil verify`, read-only attach, повторная проверка подписей app/companion
+  и embedded version из смонтированного DMG, detach — passed.
+- Разные реальные executable 0.1.17/0.1.18 с одинаковым bundle identifier после
+  подписи имеют одинаковый DR: identifier + certificate root fingerprint.
+  Разные SHA-256 и общий DR — `artifacts/installed-capture/stable-dr.json`.
+  Ad-hoc установленный app не проходит требование нового leaf certificate.
+- Успех и ошибка дочерней сборки оставляют исходный search list Keychain и не
+  оставляют временные keychain/PKCS#12. CI env import проверен при ошибке;
+  `signing-failure-cleanup.json`. Автоимпорт Tauri сначала отказал, поскольку
+  не смог разрешить Apple team identity; штатная обёртка устраняет этот путь.
+
+Это x86_64 debug DMG, не universal release. Установленная 0.1.17 не заменена
+новым пакетом. По решению владельца следующий шаг — создать release, скачать
+подписанный universal DMG и проверить настоящий installed Screen/Area/MCP/TCC.
+Capture и сохранение разрешения между обновлениями всё ещё pending;
+ни подпись, ни совпадение DR сами по себе их не доказывают.
+
+## Установленный app и TCC identity (2026-10-28, ADR-160)
+
+Платформа: macOS 12.7.6 Intel; baseline 7e88419, установленная 0.1.17.
+Реальный companion из `/Applications/Cute Screen.app` успешно выполнил initialize,
+get_status и capture(screen); terminal job outcome — permissionDenied (-3801 в
+системном логе). App был полностью unsigned, TCC писал InvalidCode и
+SecTaskCopySigningIdentifier Invalid argument. После резервной копии app добавлена
+стандартная ad-hoc подпись companion и bundle, `codesign --verify --deep --strict`
+passed. После relaunch TCC распознаёт bundle identifier, но без ручного regrant
+capture всё ещё denied. Это не доказательство успешного восстановления.
+Артефакты без ключей: `artifacts/installed-capture/`, baseline/adhoc-before-regrant
+JSONL, системный лог. После ручного выключения/включения и relaunch захват
+остался denied. Выполнен адресный диагностический `tccutil reset ScreenCapture
+io.github.vladimirivanin.cute-screen` (exit 0); ожидается новое ручное разрешение.
+Прочие приложения и системные службы не изменялись. Это действие расследования,
+его нет в runtime приложения. После reset запись исчезла из Settings;
+повторный cold launch и SCK capture всё ещё вернули denied. Ожидается ручное
+добавление `/Applications/Cute Screen.app` через «+»; installed capture pending.
+
+`pnpm tauri build --debug --bundles app` — passed, Tauri подписал app/companion
+ad-hoc. Проверки нового bundle через `codesign --verify --deep --strict`,
+companion через `codesign --verify --strict`, `--startup-check` и `--self-check`
+— passed. Этот dev app не установлен поверх release. `release-assets` и
+`build-contract` — 30 passed. `shell-store`/`app-shell-layout` — 22 passed
+(`--maxWorkers=1 --testTimeout=15000`); два предыдущих прогона с timeout 5 s
+получили 21 passed / 1 localization timeout при параллельной сборке.
+`pnpm format`, `pnpm format:check`, `pnpm docs:check` — passed.
+Не запускались полный `pnpm check`, Rust suites (Rust не изменён), native WebView
+E2E и release universal/DMG build. Shared target вырос с 14.099 до 15.258 GiB;
+полезный cache сохранён, отдельный target не создавался.
+
 ## Unix activation round-trip follow-up (2026-10-28)
 
 На том же macOS 12.7.6 host причина Broken pipe локализована до наследования

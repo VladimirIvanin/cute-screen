@@ -25,7 +25,7 @@ export function releaseDownloadNotes(
     '<!-- cute-screen-downloads:start -->',
     '## Downloads',
     '',
-    '**UNSIGNED / UNOFFICIAL BUILD.** Windows SmartScreen and macOS Gatekeeper may show warnings.',
+    '**UNOFFICIAL BUILD.** Windows packages are unsigned; macOS packages have no Apple Developer ID signature or notarization. SmartScreen and Gatekeeper may show warnings.',
     'macOS: one universal DMG for Intel and Apple Silicon. Linux: Ubuntu 22.04 or newer; Wayland capabilities depend on desktop portals.',
     'CLI/package checks do not certify the complete install/capture/export workflow on every platform.',
     '',
