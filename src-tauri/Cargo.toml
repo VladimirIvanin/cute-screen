@@ -40,8 +40,8 @@ required-features = ["ipc-codegen"]
 tauri-build = { version = "=2.6.3", features = [] }
 
 [dependencies]
-cute-screen-mcp = { version = "=0.1.21", path = "../crates/cute-screen-mcp" }
-cute-screen-storage = { version = "=0.1.21", path = "../crates/cute-screen-storage" }
+cute-screen-mcp = { version = "=0.1.22", path = "../crates/cute-screen-mcp" }
+cute-screen-storage = { version = "=0.1.22", path = "../crates/cute-screen-storage" }
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.151"
 sha2 = "=0.10.9"
@@ -72,7 +72,7 @@ tempfile = "=3.27.0"
 tokio = { version = "=1.53.3", features = ["rt", "sync", "time"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-cute-screen-portal = { version = "=0.1.21", path = "../crates/cute-screen-portal" }
+cute-screen-portal = { version = "=0.1.22", path = "../crates/cute-screen-portal" }
 ashpd = { version = "=0.13.13", default-features = false, features = ["tokio", "screenshot", "global_shortcuts"] }
 gtk = "=0.18.2"
 gdkx11 = "=0.18.2"

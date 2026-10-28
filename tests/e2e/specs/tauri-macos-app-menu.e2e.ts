@@ -3,9 +3,14 @@ import {
   browser,
   expect,
 } from '@wdio/globals'
-import { writeFile } from 'node:fs/promises'
+import {
+  readFile,
+  writeFile,
+} from 'node:fs/promises'
+import { loadImage } from '@napi-rs/canvas'
 import path from 'node:path'
 import { waitForStableCanvas } from '../canvas-ready'
+import { nativeImageIngress } from '../image-ingress'
 import { quickWindowVisibility } from '../quick-history'
 import { selectionDocument } from '../selection-interactions'
 
@@ -16,9 +21,15 @@ interface MenuItem {
 }
 
 interface AppMenuSnapshot {
+  topLevel: string[]
+  fileItems: string[]
   version: string
   settings: string
   editor: string
+  fileLabel: string
+  openImage: string
+  export: { text: string; enabled: boolean }
+  history: string
   recentLabel: string
   recent: MenuItem[]
   quit: string
@@ -65,12 +76,17 @@ describe('macOS application menu', () => {
     await expect($('.cs-editor-shell')).toExist()
     const empty = await appMenu()
     expect(empty.version).toMatch(/^Version \d+\.\d+\.\d+/)
+    expect(empty.topLevel).toEqual(['Cute Screen', 'File'])
+    expect(empty.fileItems).toEqual(['app-open-image', 'app-export', 'app-history', 'app-recent'])
     expect(empty.settings).toBe('Settings…')
     expect(empty.editor).toBe('Open Editor')
+    expect(empty.fileLabel).toBe('File')
+    expect(empty.openImage).toBe('Open Image…')
+    expect(empty.export).toEqual({ text: 'Export PNG…', enabled: false })
+    expect(empty.history).toBe('History…')
     expect(empty.recentLabel).toBe('Recent Captures')
     expect(empty.recent).toEqual([
       { id: 'app-empty-history', text: 'No captures yet', enabled: false },
-      { id: 'app-all-history', text: 'All History…', enabled: true },
     ])
     expect(empty.quit).toBe('Quit')
 
@@ -87,9 +103,9 @@ describe('macOS application menu', () => {
     expect(captures).toHaveLength(2)
     expect(captures[0]).toMatchObject({ enabled: true })
     expect(captures[0]!.text).toMatch(/\d+×\d+/)
-    expect(populated.recent.at(-1)).toMatchObject({ id: 'app-all-history', enabled: true })
+    expect(populated.export.enabled).toBe(true)
 
-    await activateMenuItem('app-all-history')
+    await activateMenuItem('app-history')
     await expect($('.cs-history-popover')).toBeDisplayed()
     await expect(browser.$$('.cs-history-capture')).toBeElementsArrayOfSize(2)
     await $('.cs-history-close').click()
@@ -103,6 +119,21 @@ describe('macOS application menu', () => {
     }, {
       timeoutMsg: 'Older menu item did not open its document',
     })
+
+    await nativeImageIngress('picker')
+    await activateMenuItem('app-open-image')
+    await browser.waitUntil(async () => (await selectionDocument()).id !== firstId, {
+      timeoutMsg: 'File menu Open Image did not mount the selected image',
+    })
+    await waitForStableCanvas()
+    const output = await browser.execute(async () => {
+      type Native = { __TAURI__: { core: { invoke<T>(command: string, args: unknown): Promise<T> } } }
+      return (window as unknown as Native).__TAURI__.core.invoke<string>('test_result_export', { cancel: false })
+    })
+    await activateMenuItem('app-export')
+    await expect($('.cs-action-feedback')).toHaveText(expect.stringContaining('PNG exported'))
+    const decoded = await loadImage(await readFile(output))
+    expect([decoded.width, decoded.height]).toEqual([3840, 2160])
 
     const artifactDirectory = process.env.CUTE_SCREEN_WDIO_ARTIFACTS!
     await browser.saveScreenshot(path.resolve(artifactDirectory, 'macos-app-menu-history.png'))

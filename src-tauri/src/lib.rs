@@ -1852,7 +1852,13 @@ fn handle_app_menu_event<R: tauri::Runtime>(app: &tauri::AppHandle<R>, id: &str)
             }
         }
         "app-show-editor" => show_editor(app),
-        "app-all-history" => open_history_from_app_menu(app, None),
+        "app-history" => open_history_from_app_menu(app, None),
+        "app-open-image" | "app-export" => {
+            show_editor(app);
+            if let Err(error) = app.emit_to("main", "cute-screen:file-action", id) {
+                eprintln!("cute-screen file menu: {error}");
+            }
+        }
         "app-quit" => {
             if app.emit("cute-screen:request-quit", ()).is_err() {
                 app.exit(0);
@@ -1869,8 +1875,13 @@ fn handle_app_menu_event<R: tauri::Runtime>(app: &tauri::AppHandle<R>, id: &str)
 #[cfg(feature = "test-harness")]
 #[tauri::command]
 fn test_app_menu_activate(app: tauri::AppHandle, id: String) -> Result<(), String> {
-    if id != "app-all-history" && settings_window::recent_capture_from_menu(&app, &id).is_none() {
+    if !matches!(id.as_str(), "app-history" | "app-open-image" | "app-export")
+        && settings_window::recent_capture_from_menu(&app, &id).is_none()
+    {
         return Err("menu item is unavailable".into());
+    }
+    if id == "app-export" && !settings_window::app_menu_export_enabled(&app)? {
+        return Err("menu item is disabled".into());
     }
     handle_app_menu_event(&app, &id);
     Ok(())
@@ -3174,6 +3185,7 @@ pub fn run() {
         font_catalog_list,
         clipboard_open_image,
         repository_open_image,
+        settings_window::app_menu_set_export_enabled,
         repository_resolve_texture,
         repository_export_recovery_bundle,
         lifecycle_complete_main_window_close,
@@ -3272,6 +3284,7 @@ pub fn run() {
         font_catalog_list,
         clipboard_open_image,
         repository_open_image,
+        settings_window::app_menu_set_export_enabled,
         repository_resolve_texture,
         repository_export_recovery_bundle,
         lifecycle_complete_main_window_close,

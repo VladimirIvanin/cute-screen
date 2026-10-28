@@ -175,6 +175,23 @@ pub fn test_tray_labels(app: tauri::AppHandle) -> Result<serde_json::Value, Stri
 #[tauri::command]
 pub fn test_app_menu_snapshot(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
     let items = app.state::<AppMenuItems<tauri::Wry>>();
+    let top_level = app
+        .menu()
+        .ok_or_else(|| "app menu is missing".to_owned())?
+        .items()
+        .map_err(|error| error.to_string())?
+        .iter()
+        .filter_map(|item| item.as_submenu())
+        .map(|item| item.text().map_err(|error| error.to_string()))
+        .collect::<Result<Vec<_>, String>>()?;
+    let file_items = items
+        .file
+        .items()
+        .map_err(|error| error.to_string())?
+        .iter()
+        .filter(|item| item.id().as_ref().starts_with("app-"))
+        .map(|item| item.id().as_ref().to_owned())
+        .collect::<Vec<_>>();
     let recent = items
         .recent
         .items()
@@ -190,9 +207,18 @@ pub fn test_app_menu_snapshot(app: tauri::AppHandle) -> Result<serde_json::Value
         })
         .collect::<Result<Vec<serde_json::Value>, String>>()?;
     Ok(serde_json::json!({
+        "topLevel": top_level,
+        "fileItems": file_items,
         "version": items.version.text().map_err(|error| error.to_string())?,
         "settings": items.settings.text().map_err(|error| error.to_string())?,
         "editor": items.editor.text().map_err(|error| error.to_string())?,
+        "fileLabel": items.file.text().map_err(|error| error.to_string())?,
+        "openImage": items.open_image.text().map_err(|error| error.to_string())?,
+        "export": {
+            "text": items.export.text().map_err(|error| error.to_string())?,
+            "enabled": items.export.is_enabled().map_err(|error| error.to_string())?,
+        },
+        "history": items.history.text().map_err(|error| error.to_string())?,
         "recentLabel": items.recent.text().map_err(|error| error.to_string())?,
         "recent": recent,
         "quit": items.quit.text().map_err(|error| error.to_string())?,
@@ -203,6 +229,10 @@ struct AppMenuItems<R: Runtime> {
     version: tauri::menu::MenuItem<R>,
     settings: tauri::menu::MenuItem<R>,
     editor: tauri::menu::MenuItem<R>,
+    file: tauri::menu::Submenu<R>,
+    open_image: tauri::menu::MenuItem<R>,
+    export: tauri::menu::MenuItem<R>,
+    history: tauri::menu::MenuItem<R>,
     recent: tauri::menu::Submenu<R>,
     quit: tauri::menu::MenuItem<R>,
     recent_ids: Mutex<HashMap<String, String>>,
@@ -261,12 +291,18 @@ pub fn tray_text(id: &str, locale: &str, trigger: Option<&str>) -> String {
         );
     }
     let label = match (locale == "ru", id) {
+        (true, "app-file") => "Файл",
+        (true, "app-open-image") => "Открыть изображение…",
+        (true, "app-export") => "Экспорт PNG…",
+        (true, "app-history") => "История…",
+        (_, "app-file") => "File",
+        (_, "app-open-image") => "Open Image…",
+        (_, "app-export") => "Export PNG…",
+        (_, "app-history") => "History…",
         (true, "app-recent") => "Недавние снимки",
-        (true, "app-all-history") => "Вся история…",
         (true, "app-empty-history") => "Снимков пока нет",
         (true, "app-history-error") => "История недоступна",
         (_, "app-recent") => "Recent Captures",
-        (_, "app-all-history") => "All History…",
         (_, "app-empty-history") => "No captures yet",
         (_, "app-history-error") => "History unavailable",
         (true, "capture-area") => "Снимок области",
@@ -333,6 +369,27 @@ pub fn install_menu<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()> 
         tray_text("app-recent", &locale, None),
         true,
     )?;
+    let open_image = MenuItem::with_id(
+        app,
+        "app-open-image",
+        tray_text("app-open-image", &locale, None),
+        true,
+        Some("CmdOrCtrl+O"),
+    )?;
+    let export = MenuItem::with_id(
+        app,
+        "app-export",
+        tray_text("app-export", &locale, None),
+        false,
+        None::<&str>,
+    )?;
+    let history = MenuItem::with_id(
+        app,
+        "app-history",
+        tray_text("app-history", &locale, None),
+        true,
+        None::<&str>,
+    )?;
     let quit = MenuItem::with_id(
         app,
         "app-quit",
@@ -351,16 +408,26 @@ pub fn install_menu<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()> 
             &first_separator,
             &settings,
             &editor,
-            &recent,
             &second_separator,
             &quit,
         ],
     )?;
-    app.set_menu(Menu::with_items(app, &[&submenu])?)?;
+    let file_separator = PredefinedMenuItem::separator(app)?;
+    let file = Submenu::with_items(
+        app,
+        tray_text("app-file", &locale, None),
+        true,
+        &[&open_image, &export, &file_separator, &history, &recent],
+    )?;
+    app.set_menu(Menu::with_items(app, &[&submenu, &file])?)?;
     app.manage(AppMenuItems {
         version,
         settings,
         editor,
+        file,
+        open_image,
+        export,
+        history,
         recent,
         quit,
         recent_ids: Mutex::new(HashMap::new()),
@@ -385,7 +452,7 @@ pub fn refresh_app_menu<R: Runtime>(app: &tauri::AppHandle<R>) {
 }
 
 fn try_refresh_app_menu<R: Runtime>(app: &tauri::AppHandle<R>) -> Result<(), String> {
-    use tauri::menu::{MenuItem, PredefinedMenuItem};
+    use tauri::menu::MenuItem;
     let Some(items) = app.try_state::<AppMenuItems<R>>() else {
         return Ok(());
     };
@@ -401,6 +468,22 @@ fn try_refresh_app_menu<R: Runtime>(app: &tauri::AppHandle<R>) -> Result<(), Str
     items
         .editor
         .set_text(tray_text("show-editor", &locale, None))
+        .map_err(|error| error.to_string())?;
+    items
+        .file
+        .set_text(tray_text("app-file", &locale, None))
+        .map_err(|error| error.to_string())?;
+    items
+        .open_image
+        .set_text(tray_text("app-open-image", &locale, None))
+        .map_err(|error| error.to_string())?;
+    items
+        .export
+        .set_text(tray_text("app-export", &locale, None))
+        .map_err(|error| error.to_string())?;
+    items
+        .history
+        .set_text(tray_text("app-history", &locale, None))
         .map_err(|error| error.to_string())?;
     items
         .recent
@@ -476,24 +559,29 @@ fn try_refresh_app_menu<R: Runtime>(app: &tauri::AppHandle<R>) -> Result<(), Str
                 .map_err(|error| error.to_string())?;
         }
     }
-    let separator = PredefinedMenuItem::separator(app).map_err(|error| error.to_string())?;
-    let all = MenuItem::with_id(
-        app,
-        "app-all-history",
-        tray_text("app-all-history", &locale, None),
-        true,
-        None::<&str>,
-    )
-    .map_err(|error| error.to_string())?;
-    items
-        .recent
-        .append(&separator)
-        .map_err(|error| error.to_string())?;
-    items
-        .recent
-        .append(&all)
-        .map_err(|error| error.to_string())?;
     Ok(())
+}
+
+#[tauri::command]
+pub fn app_menu_set_export_enabled<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    enabled: bool,
+) -> Result<(), String> {
+    if let Some(items) = app.try_state::<AppMenuItems<R>>() {
+        items
+            .export
+            .set_enabled(enabled)
+            .map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+#[cfg(feature = "test-harness")]
+pub fn app_menu_export_enabled<R: Runtime>(app: &tauri::AppHandle<R>) -> Result<bool, String> {
+    app.state::<AppMenuItems<R>>()
+        .export
+        .is_enabled()
+        .map_err(|error| error.to_string())
 }
 
 fn recent_capture_text(capture: &RecentCapture, locale: &str) -> String {
@@ -512,6 +600,15 @@ fn recent_capture_text(capture: &RecentCapture, locale: &str) -> String {
 mod navigation_tests {
     #[test]
     fn macos_app_menu_has_localized_history_empty_error_and_version_labels() {
+        for (id, ru, en) in [
+            ("app-file", "Файл", "File"),
+            ("app-open-image", "Открыть изображение…", "Open Image…"),
+            ("app-export", "Экспорт PNG…", "Export PNG…"),
+            ("app-history", "История…", "History…"),
+        ] {
+            assert_eq!(super::tray_text(id, "ru", None), ru);
+            assert_eq!(super::tray_text(id, "en", None), en);
+        }
         assert_eq!(
             super::tray_text("app-recent", "ru", None),
             "Недавние снимки"
@@ -519,10 +616,6 @@ mod navigation_tests {
         assert_eq!(
             super::tray_text("app-recent", "en", None),
             "Recent Captures"
-        );
-        assert_eq!(
-            super::tray_text("app-all-history", "ru", None),
-            "Вся история…"
         );
         assert_eq!(
             super::tray_text("app-empty-history", "ru", None),

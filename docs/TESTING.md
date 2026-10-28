@@ -1,5 +1,70 @@
 # Стратегия тестирования
 
+## Бамп версии 0.1.22 (2026-10-28)
+
+Платформа: macOS 12.7.6 Intel, Node 22.23.1, pnpm 10.33.2; база `bd9cd74`
+и изменения файлового меню macOS. `pnpm version:bump 0.1.22` синхронизировал
+package.json, Tauri config, Cargo workspace, три точные локальные зависимости
+и четыре записи Cargo.lock (`0.1.21 → 0.1.22`). `pnpm-lock.yaml` и версии
+внутренних JS-пакетов не менялись.
+
+- `node scripts/release-assets.mjs version . v0.1.22` — passed.
+- `cargo metadata --no-deps --format-version 1 --locked --offline` — passed.
+- `pnpm exec vitest run --project boundaries tests/boundaries/bump-version.test.ts tests/boundaries/release-assets.test.ts` — 2 файла, 34 tests passed.
+- `pnpm lint` — passed (0 errors, 38 существующих Vue warnings).
+- `pnpm typecheck` — passed, включая сборку editor-vue.
+- `pnpm format`, `pnpm format:check`, `pnpm docs:check` и `git diff --check` — passed.
+
+Native сценарий файлового меню и полный `pnpm check` прошли на том же коде до
+смены номера версии; повторный Cargo build после бампа не запускался, поскольку
+общий `target/` отсутствует. Метаданные и локальные версии проверены отдельно.
+
+Версионный тег, GitHub Release и пакеты этим бампом не создавались.
+
+## Отдельное File menu macOS (REQ-ACT-015, ADR-167, 2026-10-28)
+
+Платформа: macOS 12.7.6 Intel, WKWebView 605.1.15, Node 22.23.1.
+`cargo test -q -p cute-screen-desktop --lib
+macos_app_menu_has_localized_history_empty_error_and_version_labels` сначала
+завершился assertion failure (`app-file` вместо «Файл»), после реализации —
+**1 passed**. `pnpm exec vue-tsc --noEmit -p apps/desktop/tsconfig.json` и
+`pnpm exec tsc --noEmit -p tests/e2e/tsconfig.json` — passed.
+
+`CUTE_SCREEN_E2E_SCENARIOS=macos-app-menu pnpm test:e2e:tauri` — **1 passed**
+после исправления native export enabled state. Свежий Tauri harness проверил
+два верхнеуровневых меню и расположение пунктов внутри File, пустое меню,
+два production capture, пункт History и открытие старого снимка,
+Open Image через штатный file picker с 4K fixture, Export через меню и
+независимое повторное декодирование 3840×2160 PNG. Native snapshot проверил
+английские подписи и disabled Export без документа. Физический клик в строке
+macOS, Cmd+O, русский runtime и macOS 26 этим WebDriver не проверены. Артефакты:
+`artifacts/tauri-e2e/macos-file-menu-run.log`, `macos-app-menu.json`,
+`macos-app-menu-history.png`, `junit-macos-app-menu-0-0.xml`.
+
+Первая попытка Cargo test остановилась на `No space left on device` при
+записи query cache. После проверки отсутствия активных Cargo-процессов удалены
+четыре заброшенных incremental variant от утра 28 октября; общий deps/build
+cache и остальные incremental сохранены. Доступное место: 633 MiB → 1.9 GiB.
+Первый native прогон выявил неверную проверку `documentState.kind` в состоянии
+меню (Export оставался disabled после capture). После перехода на фактически
+монтированные `documentSession`, `sourceImage` и canvas host повторный прогон
+прошёл.
+
+После финального рефакторинга `pnpm check` — passed: lint, typecheck,
+`format:check`, docs, 115 boundary tests, MCP/IPC schema и четыре Rust Clippy
+конфигурации. Первый полный прогон перед рефакторингом нашёл прямой Tauri
+импорт в App.vue, превышение лимита строк в App.vue/EditorWorkspace.vue и
+вложенный `if` в Rust test handler; все три нарушения исправлены. Повторный
+Tauri E2E после усиления snapshot проверкой иерархии меню сначала прервался
+`ENOSPC` во время WebDriver capture. Удалены только неиспользуемые утренние
+incremental variants текущего дня; итоговый повтор — **1 passed**. Failed
+appData этих попыток удалены после диагностики.
+В конце задачи `pnpm disk:usage` показал `artifacts/` 0.055 GiB и не нашёл
+`target/`; повторная проверка `ls` подтвердила отсутствие всего `target/`.
+Причина его исчезновения не установлена; следующий Cargo запуск потребует
+холодной сборки. Эта полная очистка не была частью адресного удаления старых
+incremental variants, описанного выше.
+
 ## Crash report при открытом меню macOS (2026-10-28)
 
 Приложенный пользователем отчёт за 14:38:58 MSK относится к тестовому

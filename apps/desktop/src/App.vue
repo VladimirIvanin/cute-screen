@@ -141,7 +141,6 @@ const captureAvailable = computed(() =>
       (platformCapabilities.value?.capture.monitorTarget ?? false))
 const captureWindowAvailable = computed(() => platformCapabilities.value?.capture.windowTarget ?? false)
 const openImageAvailable = computed(() => '__TAURI_INTERNALS__' in window)
-const openSettings = openImageAvailable.value ? openActivationSettings : undefined
 const connectAgent = openImageAvailable.value ? async () => {
   const { openAgentSettings } = await import('./platform/tauri/agent-settings-adapter')
   await openAgentSettings()
@@ -446,6 +445,7 @@ onMounted(() => {
       await (await import('./platform/tauri/history-menu-adapter')).installHistoryMenuListener(
         selectHistoryCapture, historyPopover, historyError, () => disposedHistory, lifecycleCleanup,
       )
+      await (await import('./platform/tauri/file-menu-adapter')).installFileMenuListener(shell, lifecycleCleanup)
       const { installAgentRuntime } = await import('./platform/tauri/agent-runtime')
       lifecycleCleanup.push(await installAgentRuntime({
         session: () => documentSession.value,
@@ -494,7 +494,7 @@ onBeforeUnmount(() => {
     :capture-available="captureAvailable && !historyBusy"
     :capture-window-available="captureWindowAvailable && !historyBusy"
     :open-image-available="openImageAvailable && !historyBusy"
-    :open-settings="openSettings"
+    :open-settings="openImageAvailable ? openActivationSettings : undefined"
     :connect-agent="connectAgent"
     :capture-fallback-command="captureFallbackCommand"
     :capture-progress="captureProgress"

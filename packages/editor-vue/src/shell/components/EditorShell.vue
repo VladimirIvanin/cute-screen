@@ -13,6 +13,8 @@ defineExpose({
   isAgentBusy: () => workspace.value?.isAgentBusy() ?? false,
   prepareNavigation: () => workspace.value?.prepareNavigation(),
   restoreZoom: (viewport: { zoom: number; mode: string }) => workspace.value?.restoreZoom(viewport),
+  runFileAction: (action: 'openImage' | 'export') => workspace.value?.runFileAction(action),
+  canExport: () => workspace.value?.canExport() ?? false,
 })
 const props = defineProps(editorShellRuntimeProps)
 const emit = defineEmits(editorShellRuntimeEmits) as EditorShellEmit
