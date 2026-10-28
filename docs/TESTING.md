@@ -1,5 +1,20 @@
 # Стратегия тестирования
 
+## Бамп версии 0.1.21 (2026-10-28)
+
+Платформа: macOS 12.7.6 x86_64, Node 22.23.1, pnpm 10.33.2; базовый
+коммит `1c8bc58`. Штатный `pnpm version:bump 0.1.21` синхронизировал
+package.json, Tauri config, Cargo workspace, три точные локальные зависимости
+и четыре записи Cargo.lock (`0.1.20 → 0.1.21`). `pnpm-lock.yaml` и версии
+приватных JS-пакетов не менялись.
+
+- `node scripts/release-assets.mjs version . v0.1.21` — passed.
+- `cargo metadata --no-deps --format-version 1 --locked --offline` — passed.
+- `pnpm exec vitest run --project boundaries tests/boundaries/bump-version.test.ts tests/boundaries/release-assets.test.ts` — 2 файла, 34 tests passed.
+- `pnpm format`, `pnpm format:check` и `pnpm docs:check` — passed.
+
+Версионный тег, GitHub Release и пакеты этим бампом не создавались.
+
 ## Системное меню macOS (2026-10-28, ADR-166)
 
 Платформа: macOS 12.7.6 Intel, WKWebView 605.1.15, база `e5a136a` +

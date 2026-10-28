@@ -1,5 +1,14 @@
 # Трассируемость требований
 
+## Бамп версии 0.1.21 (2026-10-28)
+
+`REQ-REL-005/006`: штатная команда `pnpm version:bump 0.1.21` синхронизирует
+package.json, Tauri config, Cargo workspace, локальные path dependencies и
+Cargo.lock. Проверить release version guard, Cargo metadata с `--locked
+--offline`, профильные boundary tests и форматирование. Бамп не создаёт тег,
+GitHub Release или пакеты; платформенные гарантии не меняются. Результаты —
+TESTING.md.
+
 ## macOS application menu (2026-10-28)
 
 `REQ-ACT-008`, `REQ-ACT-014`, `REQ-LIB-002`: в системной строке macOS меню
