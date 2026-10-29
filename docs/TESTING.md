@@ -1,5 +1,50 @@
 # Стратегия тестирования
 
+## Первая ориентация телефона (2026-10-29, ADR-172)
+
+Windows x64, Node 22.23.1, pnpm 10.33.2; исходный main обновлён fast-forward
+с ab7e88b до efe60b8c. До реализации уточнён REQ-OUT-012 в TRACEABILITY.
+Новые core-проверки сначала упали 8/8: прежняя логика оставляла portrait,
+не запоминала выбор и не отклоняла ошибочное поле.
+
+`pnpm exec vitest run --project core` — **62 files / 583 tests passed**.
+`pnpm test tests/unit/vue/phone-orientation.test.ts tests/unit/vue/composition.test.ts`
+— **2 files / 13 tests passed**: оба UI-входа, landscape/portrait/square,
+одна команда и Undo/Redo, ручной выбор, повторный стиль, смена рамки,
+закрытие панели и codec/reopen после снятия оформления. Первый Vue-прогон
+выявил отсутствующий re-export helper через renderer; экспорт добавлен,
+повторный прогон прошёл. Предупреждения jsdom getContext сохранены в логе.
+
+`pnpm dev --host 127.0.0.1 --port 5255 --strictPort` — HTTP 200 для страницы
+и composition/controller.ts; сервер остановлен.
+`CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5254 CUTE_SCREEN_E2E_DISABLE_WATCH=1 pnpm test:e2e:browser --spec tests/e2e/specs/browser-phone-orientation.e2e.ts --spec tests/e2e/specs/browser-frame-types.e2e.ts`
+не создал session: ChromeDriver 156.0.8078.73 запущен, но listener отсутствует,
+ECONNREFUSED. Отдельный запуск того же driver на 127.0.0.1 также не открыл порт.
+`CUTE_SCREEN_E2E_SCENARIOS=phone-orientation CUTE_SCREEN_E2E_DISABLE_WATCH=1 pnpm test:e2e:tauri`
+собрал свежий debug/no-bundle harness в общем target/debug; startup остановлен
+до приложения: tauri-driver readiness timeout 10000 ms, EdgeDriver 156.0.4314.50
+подобран под такой же WebView2. Runtime assertions и screenshots не получены;
+browser/native tests остаются pending. Логи — `artifacts/phone-orientation/`,
+native launcher — `artifacts/tauri-e2e/wdio-2026-10-29T20-54-51-767Z.log`.
+
+`pnpm disk:usage` перед native build: target 80.210 GiB, artifacts 13.662 GiB.
+После build: target 82.444 GiB, artifacts 13.689 GiB; новый отдельный target
+не создавался, общий cache сохранён. `pnpm clean:artifacts` dry run показал
+только два профиля этого прогона; `pnpm clean:artifacts --apply` удалил их.
+Текущий неуспешный native appData оставлен для диагностики startup.
+
+Финальный прогон (2026-10-30):
+`pnpm test packages/editor-core/src tests/unit/vue/phone-orientation.test.ts tests/unit/vue/composition.test.ts`
+— **64 files / 596 tests passed**; `pnpm test:boundaries` — **114 passed,
+1 skipped**. Первый boundary-прогон обнаружил превышение лимита useComposition
+на четыре строки; commit выделен в отдельную фабрику, лимит не ослаблялся.
+`pnpm typecheck` прошёл; после выделения commit повторены vue-tsc tests/app
+и tsc e2e — exit 0. `pnpm lint` — 0 errors, 37 существующих warnings;
+`pnpm mcp:schema:check`, `pnpm docs:check`, `pnpm format` и `git diff --check`
+прошли. Полный `pnpm check` и Rust test matrix не запускались; native build
+использует актуальные исходники. Итоговые логи и summary.json —
+`artifacts/phone-orientation/`.
+
 ## Бамп 0.1.26 и публикация коммита (2026-10-28)
 
 Ubuntu 22.04.5 x86_64, Node 22.23.1, pnpm 10.33.2; исходный HEAD `2c3ccc2`.

@@ -36,6 +36,7 @@ export async function verifyFrameTypes(
   await browser.keys('ArrowRight')
   await expect(group.$('input[value="phone"]')).toBeChecked()
   expect((await readComposition())!.frame.kind).toBe('phone')
+  const phoneOrientation = (await readComposition())!.frame.orientation
   await expect(panel.$('label*=Orientation').$('select')).toBeDisplayed()
   await expect(panel.$('label*=Title')).not.toExist()
   await $('button[aria-label="Undo"]').click()
@@ -46,6 +47,7 @@ export async function verifyFrameTypes(
   expect((await readComposition())!.frame.kind).toBe('none')
   await expect(panel.$('label*=Frame theme')).not.toExist()
   await group.$('input[value="browser"] + .cs-card-frame-choice').click()
-  expect(await readComposition()).toEqual({ ...original, frame: { ...original.frame, kind: 'browser' } })
+  expect(await readComposition()).toEqual({ ...original,
+    frame: { ...original.frame, kind: 'browser', orientation: phoneOrientation } })
   await browser.saveScreenshot(`${directory}/frame-tiles.png`)
 }

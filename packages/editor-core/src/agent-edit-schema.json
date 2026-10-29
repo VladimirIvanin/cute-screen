@@ -1096,6 +1096,7 @@
       "type": "object",
       "properties": {
         "composition": { "$ref": "#/$defs/T151" },
+        "phoneOrientation": { "$ref": "#/$defs/T174" },
         "beautify": { "$ref": "#/$defs/T180" },
         "watermark": { "$ref": "#/$defs/T181" }
       },

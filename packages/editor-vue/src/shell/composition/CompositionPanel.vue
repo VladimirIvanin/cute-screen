@@ -23,7 +23,10 @@ provide(numericContextKey, () => `${props.active !== false}:${props.applied}:${p
 const title = ref(''), removeId = ref<string>()
 const text = (ru: string, en: string) => props.locale === 'ru' ? ru : en
 function start(kind: CompositionStart): void {
-  emit('change', createComposition(kind))
+  const next = createComposition(kind)
+  if (kind === 'phone' && props.value?.frame.kind === 'phone') {
+    emit('change', { ...next, frame: { ...next.frame, orientation: props.value.frame.orientation } })
+  } else emit('change', next)
 }
 function background(
   target: 'background' | 'header' | 'footer',

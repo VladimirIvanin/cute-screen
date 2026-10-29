@@ -425,6 +425,7 @@ export { prepareCompositionScene } from './composition/freeform'
 export {
   DEFAULT_PRESENTATION_SETTINGS,
   createComposition,
+  updateCompositionPresentation,
   createCardShadowOptions,
   type CardShadowOptions,
   compositionInteractionSpace,

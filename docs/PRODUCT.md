@@ -736,6 +736,10 @@ Cute Screen — полноценный local-first редактор снимко
   Gesture preview transient; один commit, keyboard, Escape/pointercancel.
 - `REQ-OUT-012` — neutral window/browser chrome с title/URL и phone portrait/landscape;
   contain default, explicit cover/position without distortion. Original immutable.
+  При первом UI-применении телефона ориентация определяется по видимому crop/canvas:
+  width > height — landscape, иначе portrait. Дальше выбор ручной и сохраняется
+  при смене параметров/рамки, повторном быстром стиле, снятии оформления и reopen;
+  сохранённые телефоны и явная ориентация пресета не переопределяются (ADR-172).
   Подложка экрана не образует светлый шов по границе непрозрачного снимка,
   включая дробный масштаб preview и PNG; свободные поля и alpha сохраняются (ADR-144).
   Новые рамки используют тёмную тему независимо от темы приложения; сохранённая

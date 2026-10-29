@@ -152,6 +152,8 @@ export interface SourceImageRef {
 
 export interface PresentationSettingsV1 {
   readonly composition?: import('../composition/types').CompositionSettings
+  /** Last phone orientation, retained when appearance is removed. */
+  readonly phoneOrientation?: 'portrait' | 'landscape'
   readonly beautify: Readonly<{ enabled: false }>
   readonly watermark: Readonly<{ enabled: false }>
 }

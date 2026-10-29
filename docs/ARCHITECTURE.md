@@ -1,5 +1,14 @@
 # Архитектура Cute Screen
 
+## Первое применение телефона (ADR-172)
+
+Core helper updateCompositionPresentation выбирает ориентацию из crop/canvas
+только при первом UI-входе в phone. Опциональный presentation.phoneOrientation
+сохраняет последний выбор вне composition, переживая снятие оформления и codec.
+Оформление и выбор проходят одну setPresentation command; Vue не меняет scene
+graph. Явное применение материала сохраняет ориентацию пресета. Renderer читает
+прежний frame.orientation; размеры output и исходные пиксели не вращаются.
+
 ## Адаптивная верхняя панель (ADR-170)
 
 TopBar сохраняет DOM-порядок brand → history → actions → save status/error.

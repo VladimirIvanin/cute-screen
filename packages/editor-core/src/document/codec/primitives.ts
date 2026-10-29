@@ -218,8 +218,17 @@ export function parsePresentation(value: unknown): PresentationSettingsV1 {
   if (beautify.enabled !== false || watermark.enabled !== false) {
     throw new Error('presentation contains unsupported settings')
   }
-  return input.composition === undefined ? DEFAULT_PRESENTATION_SETTINGS
-    : Object.freeze({ ...DEFAULT_PRESENTATION_SETTINGS, composition: parseComposition(input.composition) })
+  const phoneOrientation = input.phoneOrientation
+  if (
+    phoneOrientation !== undefined &&
+    phoneOrientation !== 'portrait' &&
+    phoneOrientation !== 'landscape'
+  ) {
+    throw new Error('presentation.phoneOrientation is invalid')
+  }
+  return Object.freeze({ ...DEFAULT_PRESENTATION_SETTINGS,
+    ...(phoneOrientation ? { phoneOrientation } : {}),
+    ...(input.composition === undefined ? {} : { composition: parseComposition(input.composition) }) })
 }
 
 export function parseBoundedNonNegative(

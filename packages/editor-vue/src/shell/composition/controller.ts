@@ -10,6 +10,7 @@ import {
 } from 'vue'
 import {
   createComposition,
+  updateCompositionPresentation,
   type CompositionSettings,
 } from '@cute-screen/editor-renderer'
 import type { ResolvedEditorShellProps } from '../contracts'
@@ -44,8 +45,7 @@ function removeComposition(
     const doc = workspace.activeDocument.value
     if (!doc?.presentation.composition || disabled()) return
     cancel()
-    const after = { ...doc.presentation }
-    delete after.composition
+    const after = updateCompositionPresentation(doc, undefined)
     props.documentSession!.execute({ type: 'setPresentation', before: doc.presentation, after })
   }
   if (workspace.canvasViewport.value) workspace.canvasViewport.value.finishTextEditing(finish)
@@ -60,6 +60,23 @@ function neutralComposition(): CompositionSettings {
     background: { ...neutral.background, kind: 'transparent' },
     radius: 0,
     shadow: 0,
+  }
+}
+
+function compositionCommit(
+  props: ResolvedEditorShellProps,
+  workspace: Workspace,
+  disabled: Ref<boolean>,
+  settings: Ref<CompositionSettings | undefined>,
+  cancel: () => void,
+) {
+  return (value: CompositionSettings, automaticPhoneOrientation = true): void => {
+    const doc = workspace.activeDocument.value
+    if (!doc || disabled.value) return
+    cancel()
+    if (JSON.stringify(settings.value) === JSON.stringify(value)) return
+    props.documentSession!.execute({ type: 'setPresentation', before: doc.presentation,
+      after: updateCompositionPresentation(doc, value, automaticPhoneOrientation) })
   }
 }
 
@@ -119,15 +136,9 @@ export function useComposition(
   const disabled = computed(() => props.readOnlyDocument || !props.documentSession || pending.value || store.actionState.status === 'pending')
   const { compositionPreview, preview, cancel } = useCompositionPreview(workspace, () => disabled.value)
   const t = (ru: string, en: string) => store.locale === 'ru' ? ru : en
-  function commit(value: CompositionSettings): void {
-    const doc = workspace.activeDocument.value
-    if (!doc || disabled.value) return
-    cancel()
-    if (JSON.stringify(settings.value) === JSON.stringify(value)) return
-    props.documentSession!.execute({ type: 'setPresentation', before: doc.presentation,
-      after: { ...doc.presentation, composition: value } })
-  }
-  const library = useCompositionMaterials({ props, workspace, settings, selectedBrand, disabled, commit, t, pending })
+  const commit = compositionCommit(props, workspace, disabled, settings, cancel)
+  const library = useCompositionMaterials({ props, workspace, settings, selectedBrand, disabled,
+    commit: (value) => commit(value, false), t, pending })
   const { materials, error, load, saveMaterial, removeMaterial, applyMaterial, importImage } = library
   function switchSpace(space: 'content' | 'card'): void {
     finishSpaceChange(props, workspace, store, compositionSpace, space)

@@ -1,5 +1,16 @@
 # Платформенная матрица
 
+## Первая ориентация телефона (2026-10-29, ADR-172)
+
+Windows x64: 583 core tests и 13 production-session Vue tests passed;
+phone orientation, codec, повторное применение, Undo/Redo и сохранение ручного
+выбора после снятия оформления/reopen. Fresh debug/no-bundle Tauri build прошёл.
+Browser UI заблокирован до session: ChromeDriver 156.0.8078.73 запускается без
+listener, ECONNREFUSED. Native UI заблокирован до запуска приложения:
+tauri-driver не становится ready за 10000 ms; EdgeDriver 156.0.4314.50 совпадает
+с WebView2. Runtime-поведение Windows WebView2, macOS и Linux этим прогоном
+не подтверждено. Команды и evidence — TESTING.md.
+
 ## Установка навыка из Settings (REQ-MCP-001/007, ADR-171, 2026-10-28)
 
 Ubuntu 22.04.5 x86_64, Node 22.23.1: настоящая установка Skills CLI 1.7.4

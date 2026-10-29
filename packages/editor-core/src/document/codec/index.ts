@@ -72,6 +72,7 @@ function documentToJson(document: EditorDocument): JsonObject {
     presentation: {
       beautify: { enabled: document.presentation.beautify.enabled },
       watermark: { enabled: document.presentation.watermark.enabled },
+      ...(document.presentation.phoneOrientation ? { phoneOrientation: document.presentation.phoneOrientation } : {}),
       ...(document.presentation.composition ? {
         composition: document.presentation.composition as unknown as JsonObject,
       } : {}),
