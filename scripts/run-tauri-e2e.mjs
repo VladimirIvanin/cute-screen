@@ -22,6 +22,8 @@ await mkdir(runtimeDirectory, { recursive: true })
 const embeddedWebDriverPort = Number.parseInt(process.env.TAURI_WEBDRIVER_PORT ?? '4445', 10)
 
 const scenarios = [
+  { id: 'mockups', persistenceGroup: 'mockups', spec: 'tests/e2e/specs/tauri-mockups.e2e.ts', harnessQuery: '?m04=1&m08=1', driverProvider: 'external' },
+  { id: 'mockups-reopen', persistenceGroup: 'mockups', spec: 'tests/e2e/specs/tauri-mockups-reopen.e2e.ts', harnessQuery: '?m04=1&m08=1', driverProvider: 'external' },
   { id: 'phone-orientation', spec: 'tests/e2e/specs/tauri-phone-orientation.e2e.ts', harnessQuery: '?m04=1&m08=1', driverProvider: 'external' },
   { id: 'capture-lifecycle', spec: 'tests/e2e/specs/tauri-capture-lifecycle.e2e.ts', harnessQuery: '?m04=1&m08=1', fakeCapture: true, driverProvider: 'external' },
   { id: 'mcp', persistenceGroup: 'mcp', spec: 'tests/e2e/specs/tauri-mcp.e2e.ts', harnessQuery: '?m04=1', fakeCapture: true },

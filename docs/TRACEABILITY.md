@@ -1,5 +1,57 @@
 # Трассируемость требований
 
+## Уведомления без сдвига редактора — до правки (2026-10-30)
+
+`REQ-UI-001/004/006/007`: dirty/saving/error и ошибки открытия Settings
+показываются компактно поверх canvas, вне потока TopBar. Появление/исчезновение
+не меняет header, canvas, zoom/pan и положение dock. Одновременные notices не
+пересекаются; recovery controls, long diagnostics и Quick остаются доступны.
+Проверка: production drawing → deferred persistence → saving/error/retry/saved,
+совместный ActionFeedback, geometry в каждом состоянии и RU/EN × темы/ширины.
+
+## Стабильная ширина подключения агента — до правки (2026-10-30)
+
+`REQ-MCP-001`, `REQ-UI-001/006`: pending кнопки «Подключить агента» заменяет
+иконку спиннером в одном слоте, без расширения кнопки, сдвига соседей или переноса
+TopBar. Сохранить disabled/aria-busy, защиту от повтора, success/error/retry.
+Проверка: deferred native boundary из production click-flow, DOM geometry по
+animation frames, RU/EN × light/dark, component regression.
+Результат: до правки browser воспроизвёл delta 31 CSS px; после правки 0 px
+во всех четырёх вариантах. Vue/settings 9 tests passed; evidence — TESTING.md.
+
+## Поворот мокапа кнопкой — до правки (2026-10-30)
+
+`REQ-OUT-012`, `REQ-EDT-002`, `REQ-UI-006`: заменить select ориентации телефона
+одной кнопкой с иконкой поворота, текущей ориентацией и RU/EN подсказкой следующего
+действия. Click/Enter/Space переключают portrait ↔ landscape одной undoable
+командой; фокус остаётся на кнопке, read-only/pending disabled. Исходник не вращается.
+Результат: 148 Vue/icon tests, 114 boundary tests и browser orientation/catalog
+passed; типы и RU/EN × темы проверены. Fresh WebView2 build прошёл, runtime
+заблокирован ожиданием инициализации тестового плагина; детали — TESTING.md.
+
+## Примыкание чёлки к корпусу — до правки (2026-10-30)
+
+`REQ-OUT-012`: у iphone-notch скругляются только свободные углы. У примыкания
+к верхнему краю экрана в portrait и левому в landscape углы прямые, без белых
+щелей. Общий контур scene/миниатюр/hit testing; island остаётся отдельной капсулой.
+Проверка: red-first core и decoded Canvas2D/CanvasKit 1×/2× в обеих ориентациях.
+Результат: 59 core/Vue, 114 boundary и renderer cases passed; Chrome catalog
+и fresh WebView2 mockups с decoded export прошли. Evidence — TESTING.md.
+
+## Каталог мокапов — до реализации (2026-10-30)
+
+`REQ-OUT-012/014`, `REQ-EDT-002/020`: четыре телефона (островок, чёлка,
+округлый/угловатый Android), modern/Windows 95/Macintosh browser, системные
+детали и safe/fullscreen размещение. Legacy phone визуально обновляется до
+островка без записи при открытии. Общая геометрия preview/export/миниатюр,
+undo/redo, codec, presets, hit testing и ручная ориентация обязательны.
+Проверки: red-first core; mounted Vue; decoded Canvas2D/CanvasKit 1×/2×;
+browser и свежий native harness, export/reopen. Статус: implemented.
+Итог: 1686 full-suite tests; после визуальных уточнений 57 focused tests,
+114 boundary tests, decoded Canvas2D/CanvasKit 1×/2×, Chrome и fresh WebView2
+mockups/export/reopen passed. Wi-Fi/battery-3 — контуры MIT Tabler без мелкого
+процента, общий размер/stroke/alignment. Команды и ограничения — TESTING.md.
+
 ## Первая ориентация телефона — до реализации (2026-10-29)
 
 `REQ-OUT-012/014`, `REQ-EDT-002`: первое применение телефона быстрым стилем

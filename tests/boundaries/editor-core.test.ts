@@ -84,6 +84,7 @@ describe('M05 icon-system boundary', () => {
       'packages/editor-vue/src/shell/components/CensorFormattingToolbar.vue',
       // Frame miniatures preview the resulting window/browser/phone geometry.
       'packages/editor-vue/src/shell/composition/CardFrame.vue',
+      'packages/editor-vue/src/shell/composition/CardFramePreview.vue',
     ])
     const violations: string[] = []
     for (const source of sources) {

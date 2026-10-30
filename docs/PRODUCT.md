@@ -14,6 +14,9 @@
 ## Локальные агенты (ADR-154)
 
 - `REQ-MCP-001` — «Подключить агента» открывает singleton Settings → Агенты / MCP;
+  При открытии спиннер заменяет иконку в том же слоте: размер кнопки и положение
+  соседних действий не меняются. Pending блокирует повтор и отражается aria-busy;
+  ошибка видима и допускает повторную попытку.
   opt-in, RU/EN, конфигурации Codex/Claude Code/Claude Desktop/Cursor/ZCode/GigaCode/OpenCode,
   VS Code/Copilot, Gemini CLI, Cline, Roo Code, Zed, Continue и Windsurf/Cascade;
   универсальный stdio-профиль. Форматы JSON/TOML/YAML, место вставки и инструкция
@@ -735,6 +738,21 @@ Cute Screen — полноценный local-first редактор снимко
   Номера ручек градиента 1–16 центрированы внутри кружков и не обрезаются при повороте.
   Gesture preview transient; один commit, keyboard, Escape/pointercancel.
 - `REQ-OUT-012` — neutral window/browser chrome с title/URL и phone portrait/landscape;
+  Каталог: modern, Windows 95/98 и Macintosh browser; iPhone island/notch,
+  округлый и угловатый Android с разными камерами, скруглениями и боковыми кнопками.
+  Переключатель системных деталей включает 9:41, полную сеть, Tabler wifi/battery-3
+  и индикатор жестов; выключен по умолчанию. Safe (default) исключает камеру
+  и включённые детали из области снимка; fullscreen рисует их поверх.
+  Legacy phone получает island/safe/details-off без записи или undo при открытии.
+  Модели и оба ретро-стиля имеют light/dark палитры; общий каталог геометрии
+  используется в миниатюрах, preview/export и hit testing (ADR-173).
+  Чёлка примыкает к краю экрана прямыми углами; скругляются только два свободных
+  угла. В landscape контур поворачивается вместе с аппаратными деталями.
+  Ориентация телефона переключается одной кнопкой с иконкой поворота, текущим
+  значением и RU/EN подсказкой следующего действия. Click/Enter/Space создают одну
+  undoable команду; фокус сохраняется, в read-only/pending кнопка disabled.
+  Wi-Fi и батарея используют исходные контуры Tabler с одинаковым квадратом,
+  толщиной и вертикальным выравниванием; мелкого процента внутри батареи нет.
   contain default, explicit cover/position without distortion. Original immutable.
   При первом UI-применении телефона ориентация определяется по видимому crop/canvas:
   width > height — landscape, иначе portrait. Дальше выбор ручной и сохраняется
@@ -755,6 +773,8 @@ Cute Screen — полноценный local-first редактор снимко
   вложенных expand: полноширинный текст, font/size, быстрая палитра и alignment;
   размещение, видимость и логотип — отдельные статические группы.
 - `REQ-OUT-014` — именованные ручные style presets; новый документ без оформления.
+  Модель телефона, стиль браузера, размещение снимка и системные детали
+  сохраняются в пресетах и документах, восстанавливаются Undo/Redo/reopen.
   Shared scene path covers preview/Copy/PNG/history; blur samples censored composite.
 - `REQ-EDT-020` — content/card spaces. Existing layers default to content and retain
   their ownership. New object ownership follows the gesture start:
@@ -814,6 +834,10 @@ Cute Screen — полноценный local-first редактор снимко
   агента в Settings, сохраняя доступ к Undo/Redo и акцент Export. Группы не
   сдавливают друг друга; при увеличенном тексте допустим перенос. Статус
   сохранения и recovery actions не обрезаются и не скрываются на узком окне.
+  Статусы и ошибки отображаются компактными плавающими сообщениями; их
+  появление не меняет высоту TopBar, положение canvas и панелей. Длинный текст
+  переносится в ограниченной ширине, при необходимости доступна прокрутка.
+  Одновременные уведомления не перекрывают друг друга (ADR-174).
   Нижний chrome (серия, `ToolRail`, zoom) остаётся внутри окна и не
   перекрывается.
 - `REQ-UI-005` — выбранный tool, object и frame различимы не только цветом.

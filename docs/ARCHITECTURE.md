@@ -1,5 +1,26 @@
 # Архитектура Cute Screen
 
+## Уведомления без сдвига chrome (ADR-174)
+
+TopBar содержит абсолютный стек статусов сохранения и ошибок подключения.
+Он не участвует в измеряемой высоте header: `--cs-topbar-bottom` по-прежнему
+учитывает только перенос групп действий. Отдельные `--cs-topbar-notices-height`
+и `--cs-topbar-notices-gap` сдвигают только ActionFeedback под этим стеком;
+canvas и dock от уведомлений не зависят. ResizeObserver отслеживает оба размера
+и освобождается вместе с CSS-переменными при unmount. Ширина сообщений зависит
+от содержимого с ограничением viewport; длинные сообщения переносятся.
+
+## Каталог мокапов (ADR-173)
+
+CardFrame содержит optional phoneModel/browserStyle/phoneSystemDetails/
+phoneContentMode. Defaults разрешаются без мутации сохранённого payload:
+iphone-island/modern/false/safe. CompositionLayout.screen — физический экран,
+viewport — clip и область вписывания снимка; content сохраняет единый scale
+и source-space координаты. Hardware вращается отдельно от содержимого.
+Core-каталог задаёт geometry, thumbnail scene и hit testing. Safe backdrop
+рисуется под viewport; fullscreen использует общий screen group ADR-144.
+Камеры и системные детали следуют после content, перед card annotations.
+
 ## Первое применение телефона (ADR-172)
 
 Core helper updateCompositionPresentation выбирает ориентацию из crop/canvas

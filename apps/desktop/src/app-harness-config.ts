@@ -10,6 +10,7 @@ export interface AppHarnessConfig {
   readonly m04Fallback: boolean
   readonly m05: boolean
   readonly m05Viewport: boolean
+  readonly m05DeferredSave?: boolean
   readonly m05ReferencePerf: boolean
   readonly m08: boolean
   readonly m08SourceNotReady: boolean
@@ -61,10 +62,11 @@ export function readAppHarnessConfig(): AppHarnessConfig {
     m04Fallback: enabled && query.get('m04fallback') === '1',
     m05,
     m05Viewport: m05 && query.get('m05viewport') === '1',
+    m05DeferredSave: m05 && query.get('m05DeferredSave') === '1',
     m05ReferencePerf: enabled && query.get('m05perf') === '1',
     m08,
     m08SourceNotReady: m08 && query.get('m08notready') === '1',
     m08ClipboardError: m08 && query.get('m08clipboarderror') === '1',
-    m08SourceAlpha: m08 && (alpha === '0' || alpha === '128' || alpha === '255') ? Number(alpha) : 255,
+    m08SourceAlpha: m08 && ['0', '128', '255'].includes(alpha ?? '') ? Number(alpha) : 255,
   }
 }

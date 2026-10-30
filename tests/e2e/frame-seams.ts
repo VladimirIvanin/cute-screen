@@ -12,6 +12,7 @@ import {
   expect,
 } from '@wdio/globals'
 import { waitForStableCanvas } from './canvas-ready'
+import { setPhoneOrientation } from './phone-orientation-control'
 
 type Observation = { width: number; height: number; maxDifference: number; changedChannels: number }
 
@@ -59,12 +60,13 @@ export async function verifyFrameSeams(
   await $('button[aria-label="Appearance"]').click()
   const panel = $('.cs-composition-panel')
   await panel.$('button=Phone').click()
-  if (!await panel.$('label*=Orientation').isDisplayed()) await panel.$('summary=Frame').click()
+  if (!await panel.$('.cs-card-orientation-toggle').isDisplayed()) await panel.$('summary=Frame').click()
+  await panel.$('label*=Screenshot placement').$('select').selectByAttribute('value', 'fullscreen')
   await panel.$('label*=Screen content').$('select').selectByAttribute('value', 'cover')
   const fill = panel.$('input[aria-label="Screen fill HEX"]')
   const reports = []
-  for (const orientation of ['portrait', 'landscape']) for (const theme of ['dark', 'light']) {
-    await panel.$('label*=Orientation').$('select').selectByAttribute('value', orientation)
+  for (const orientation of ['portrait', 'landscape'] as const) for (const theme of ['dark', 'light']) {
+    await setPhoneOrientation(orientation)
     await panel.$('label*=Frame theme').$('select').selectByAttribute('value', theme)
     await $('.cs-zoom-fit').click()
     await fill.setValue('#ffffff')

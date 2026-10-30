@@ -1,5 +1,172 @@
 # Стратегия тестирования
 
+## Компактные уведомления без сдвига редактора (2026-10-30, ADR-174)
+
+Windows x64 / Chrome 156.0.8078.76, рабочая копия поверх `420c04e`.
+Red browser test воспроизвёл рост header 44 → 87.1875 CSS px при сохранении
+(`artifacts/mockups/save-notices-red.log`). После исправления:
+
+`CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5254 CUTE_SCREEN_E2E_DISABLE_WATCH=1 pnpm test:e2e:browser --spec tests/e2e/specs/browser-save-notices.e2e.ts --spec tests/e2e/specs/browser-action-feedback.e2e.ts --spec tests/e2e/specs/browser-topbar-responsive.e2e.ts`
+— **3 specs, 22 tests passed**. Новый spec: RU/EN × light/dark × 1024/1600 px,
+реальный drawing и DocumentSession с deferred promise на persistence boundary.
+Dirty/saving/error/retry/saved не меняют geometry header/canvas/viewport/dock;
+короткий статус меньше 300 px, длинная ошибка не шире 480 px. Одновременный
+ActionFeedback не пересекается со статусом. Проверены Retry, длинная диагностика,
+контраст и доступность recovery controls, responsive toolbar 360–1600 px и
+увеличенный текст. JSON geometry и screenshots —
+`artifacts/browser-e2e/save-notices-*`; просмотрены dirty и RU/light/1024 error.
+Полный лог — `artifacts/mockups/save-notices-browser-final.log`.
+
+`pnpm test tests/unit/vue/document-session.test.ts tests/unit/vue/app-shell-layout.test.ts tests/unit/vue/agent-button-loading.test.ts tests/unit/vue/editor-settings.test.ts`
+— **4 files, 31 tests passed**. `pnpm test:boundaries` — **114 passed, 1 skipped**.
+Desktop vue-tsc и E2E tsc прошли. `pnpm lint` — 0 errors, 37 существующих warnings.
+Native API и renderer не менялись; WebView2/WKWebView/WebKitGTK runtime в этой
+правке не прогонялся. Browser result не заменяет native evidence.
+
+## Стабильная ширина «Подключить агента» (2026-10-30)
+
+`REQ-MCP-001`, `REQ-UI-001/006`: Naive NButton при loading добавлял отдельный
+icon slot, а агент оставался в content. Иконка перенесена в штатный slot #icon:
+spinner заменяет её, а не добавляется рядом. Добавлен aria-busy; label,
+disabled, duplicate guard и error/retry сохраняются. Native API не менялся.
+
+Windows x64 / Chrome 156.0.8078.76:
+`CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5254 CUTE_SCREEN_E2E_DISABLE_WATCH=1 pnpm test:e2e:browser --spec tests/e2e/specs/browser-agent-button-loading.e2e.ts`
+до правки воспроизвёл изменение geometry **31 CSS px**. После правки —
+**1/1 passed**, RU/EN × light/dark, max delta **0 px** во всех четырёх вариантах.
+Настоящий production click проходит через App/connectAgent и adapter; только
+promise native settings_open_agents удерживается на boundary. Измерены x/y/
+width/height кнопки, всей группы действий и Export по 24 animation frames;
+проверены disabled, aria-busy, один вызов и восстановление после resolve.
+Geometry JSON — `artifacts/agent-button-loading/geometry.json`; screenshots —
+`artifacts/browser-e2e/agent-button-loading-*.png`.
+
+`pnpm test tests/unit/vue/agent-button-loading.test.ts tests/unit/vue/editor-settings.test.ts`
+— **2 files / 9 tests passed**: pending, duplicate click, ошибка, повтор и success.
+`pnpm exec vue-tsc --noEmit -p tests/tsconfig.json` и
+`pnpm exec tsc --noEmit -p tests/e2e/tsconfig.json` прошли. Логи —
+`artifacts/mockups/agent-loading-*`. Browser native boundary mock не доказывает
+открытие системного окна Settings; этот native контракт здесь не менялся.
+
+## Кнопка поворота мокапа (2026-10-30)
+
+`REQ-OUT-012`, `REQ-EDT-002`, `REQ-UI-006`: select заменён кнопкой с Tabler
+rotate-rectangle через UiIcon. Текущее значение видно текстом, aria-label задаёт
+действие, aria-describedby — текущее состояние, title — следующее направление
+на RU/EN. Фокус, native keyboard activation и fieldset disabled сохранены.
+Core/document/IPC/renderer geometry не менялись.
+
+Windows x64, Node 22.23.1 / pnpm 10.33.2:
+`pnpm test tests/unit/vue/phone-orientation.test.ts tests/unit/vue/composition.test.ts tests/unit/vue/mockups.test.ts tests/unit/vue/ui-icon.test.ts`
+— **4 files / 148 tests passed**: один execute на поворот, Undo/Redo, title,
+первичная автоориентация, ручной выбор, смена рамки, removal/reopen и read-only.
+Проверка disabled сначала была вставлена посередине persistence flow и меняла
+его UI lifecycle; перенесена в конец, финальный прогон passed.
+`pnpm exec vue-tsc --noEmit -p tests/tsconfig.json` и
+`pnpm exec tsc --noEmit -p tests/e2e/tsconfig.json` прошли.
+`pnpm test:boundaries` — **114 passed / 1 existing skip**.
+
+Chrome 156.0.8078.76:
+`CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5254 CUTE_SCREEN_E2E_DISABLE_WATCH=1 pnpm test:e2e:browser --spec tests/e2e/specs/browser-phone-orientation.e2e.ts --spec tests/e2e/specs/browser-mockups.e2e.ts`
+— **3 tests passed**. После уточнения evidence отдельно повторены orientation
+2/2 и catalog 1/1: click, Space, Enter, сохранение фокуса и ручного выбора,
+RU/EN × light/dark, title следующего поворота и четыре cropped screenshots
+кнопки. Просмотрены полный editor и строка кнопки; overflow отсутствует.
+
+Fresh debug/no-bundle WebView2 156.0.4314.50, external driver:
+`CARGO_TARGET_DIR=D:/cutescreen/target/e2e-isolated CUTE_SCREEN_E2E_SCENARIOS=phone-orientation CUTE_SCREEN_E2E_DISABLE_WATCH=1 pnpm test:e2e:tauri`
+дважды успешно собрал актуальный UI, но оба запуска остановлены до сценария
+на wdioTauri.waitForInit. Read-only sync probe второго session также не ответил
+за 5 s. Это startup blocker, не результат runtime assertions новой кнопки.
+Остановлены только проверенные собственные runner/process trees uwkktA/BXAQbZ;
+рабочий target/debug процесс не затронут. Runtime WebView2/WKWebView/WebKitGTK
+для новой кнопки остаётся pending. Успешный native notch run до этой правки
+не используется как доказательство новой кнопки.
+
+Логи — `artifacts/mockups/rotate-*`; screenshots —
+`artifacts/browser-e2e/phone-rotate-control.png` и `phone-rotate-ru-dark.png`.
+Кэш существующего target/e2e-isolated сохранён; release/package и renderer
+goldens не пересобирались, поскольку изменён только control.
+
+## Углы примыкания чёлки (2026-10-30)
+
+`REQ-OUT-012`: rect со скруглением всех углов заменён общим векторным контуром
+iphone-notch. У корпуса углы прямые, два свободных угла скруглены; portrait
+и landscape используют один поворачиваемый контур. Hit testing учитывает
+прямые углы, island сохраняет капсульную форму. Документ/schema/IPC прежние.
+
+Windows x64 / Chrome 156.0.8078.76:
+red-first core — 2 failing cases; после реализации профильный core/Vue —
+9 files / 59 tests passed. `pnpm test:render tests/harness/render/mockups.test.ts`
+— 2/2 passed без update mode: оба backend, обе ориентации, 1×/2×. Новые
+decoded pixel assertions проверяют оба угла примыкания внутри экрана: RGB <20,
+alpha=255, без светлых щелей на production-like 4K fixture. Изменились только
+восемь iphone-notch goldens. `pnpm test:boundaries` — 114 passed / 1 existing skip.
+Browser mockups — 1/1 passed, screenshot чёлки добавлен в общий browser/native helper.
+Логи и crop нового стыка — `artifacts/mockups/notch-*`.
+
+Первый fresh WebView2 запуск остановлен после зависания ожидания
+wdioTauri.waitForInit, до действий сценария. Остановлен только собственный
+pin-бинарник 60Xwsf и его зависшее дерево driver/runner; рабочий target/debug
+процесс не затронут. Повтор штатной команды с `CUTE_SCREEN_E2E_SCENARIOS=mockups`
+и прежним `target/e2e-isolated` — **1/1 passed** на fresh WebView2 156.0.4314.50:
+production import, выбор чёлки и screenshot, trusted input, decoded phone/browser
+PNG export. Новый native contour просмотрен в `mockup-notch-landscape.png`.
+Лог — `artifacts/mockups/notch-native-retry.log`; WKWebView/WebKitGTK не проверялись.
+
+## Телефоны и ретро-браузеры (2026-10-30, ADR-173)
+
+Windows x64; Node 22.23.1, pnpm 10.33.2; base HEAD 420c04e + working tree.
+До реализации уточнена TRACEABILITY; red-first core mockups: 10/10 failed
+на отсутствии камеры, viewport, новых стилей и валидации. Последующие red-first
+проверки Wi-Fi и Tabler воспроизвели неподходящую геометрию и процент батареи.
+
+- `pnpm check` — passed: lint (37 existing warnings), typecheck, formatting,
+  docs/boundaries/MCP schema/IPC и Rust fmt/clippy. Выполнен до финального
+  визуального уточнения Tabler; Rust/IPC/schema после него не менялись.
+- `pnpm test` — 187 files / 1686 tests passed. После последнего уточнения:
+  `pnpm test packages/editor-core/src/composition tests/unit/vue/mockups.test.ts tests/unit/vue/phone-orientation.test.ts tests/unit/vue/composition.test.ts`
+  — 9 files / 57 tests passed; окончательный lint — 0 errors / 37 warnings,
+  `pnpm test:boundaries` — 114 passed / 1 existing skip.
+- `pnpm test:render` — 31 files / 89 tests passed. После Tabler повторён
+  `pnpm test:render tests/harness/render/mockups.test.ts` — 2/2 passed без
+  update mode: 12 вариантов × 2 backend × 1×/2×, PNG decode, камера поверх
+  4K fixture, preview parity, отсутствие искажения и сохранность original hash.
+  Эталоны обновлялись только для phone и новых мокапов.
+- `node scripts/generate-frame-status-icons.mjs --check` — passed: контуры
+  wifi/battery-3 соответствуют установленному MIT Tabler 3.49.0; Vue dependency
+  не импортируется в core. Новые paths включают исходную MIT notice.
+- `pnpm dev --host 127.0.0.1 --port 5255 --strictPort` — HTML и новый компонент
+  моделей HTTP 200; собственный сервер остановлен.
+
+Chrome 156.0.8078.76:
+`CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5254 CUTE_SCREEN_E2E_DISABLE_WATCH=1 pnpm test:e2e:browser --spec tests/e2e/specs/browser-mockups.e2e.ts`
+— 1/1 passed после Tabler: trusted pointer/keyboard, модели, Undo/Redo,
+сохранение опций при смене рамки, 1024 px RU/EN × light/dark без overflow.
+Frame-types — 1/1; phone-orientation и frame-seams — 3/3 passed. Orientation
+fixture включает imageIngress вместо missing-image error banner. Seam scenario
+явно выбирает fullscreen: safe по контракту оставляет видимые поля подложки.
+
+WebView2 156.0.4314.50, external tauri-driver 2.1.0 / compatible EdgeDriver:
+`CARGO_TARGET_DIR=D:/cutescreen/target/e2e-isolated CUTE_SCREEN_E2E_SCENARIOS=mockups,mockups-reopen CUTE_SCREEN_E2E_DISABLE_WATCH=1 pnpm test:e2e:tauri`
+— 2/2 passed после Tabler на свежем debug/no-bundle harness. Production import
+4K PNG, keyboard/pointer isTrusted, PNG export телефона/ретро-браузера с decode
+и проверкой dimensions, затем точное composition equality после native restart.
+Использован существующий isolated cache: общий target/debug executable занят
+другой запущенной dev-сессией. Старый binary не подставлялся.
+
+Первый build пересёкся с frontend build от `pnpm check` и потерял dist asset;
+повтор выполнен после завершения check. Первый runtime-тест кликал рамку сразу
+после записи PNG, пока export ещё pending; добавлено ожидание feedback и enabled
+input. Финальный свежий прогон прошёл без обхода production lifecycle.
+
+До native build: target 83.626 GiB, artifacts 13.690 GiB; после прогонов до
+cleanup: target 90.671 GiB, artifacts 13.775 GiB. Общий Cargo cache, существующий
+isolated cache и driver cache сохранены. Итоги/selected PNG/logs —
+`artifacts/mockups/`; native JUnit и decoded exports — `artifacts/tauri-e2e/`.
+Windows runtime подтверждён; WKWebView/WebKitGTK остаются pending. Full release,
+package build, cargo test и perf suite для этой frontend-правки не запускались.
+
 ## Первая ориентация телефона (2026-10-29, ADR-172)
 
 Windows x64, Node 22.23.1, pnpm 10.33.2; исходный main обновлён fast-forward

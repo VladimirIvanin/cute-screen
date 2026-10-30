@@ -2,6 +2,7 @@ import type { EditorDocumentV1 } from '@cute-screen/editor-vue'
 
 declare global {
   interface Window {
+    __cuteScreenE2eM05Save?: { complete(): void; fail(message: string): void }
     __cuteScreenE2eDocument?: {
       setCrop(): void
       snapshot():

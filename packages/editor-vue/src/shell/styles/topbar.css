@@ -27,19 +27,31 @@
   flex-shrink: 0;
 }
 
-.cs-topbar .cs-save-status,
-.cs-topbar-error {
-  flex: 0 1 auto;
+.cs-topbar-notices {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  width: max-content;
+  max-width: min(480px, 100%);
+  max-height: min(40vh, 280px);
+  overflow: auto;
+  pointer-events: auto;
+}
+
+.cs-topbar-notices .cs-save-status,
+.cs-topbar-notices .cs-topbar-error {
+  flex: 0 0 auto;
   width: fit-content;
   max-width: 100%;
-  margin: 0 0 0 auto;
+  box-sizing: border-box;
+  margin: 0;
   overflow: visible;
   white-space: normal;
   overflow-wrap: anywhere;
-}
-
-.cs-topbar .cs-save-status {
-  flex-basis: 100%;
 }
 
 .cs-topbar-error {
@@ -58,7 +70,10 @@
 }
 
 .cs-editor-shell .cs-action-feedback {
-  top: calc(var(--cs-topbar-bottom, 64px) + 2px);
+  top: calc(
+    var(--cs-topbar-bottom, 64px) + var(--cs-topbar-notices-height, 0px) + var(--cs-topbar-notices-gap, 0px) + 2px
+  );
+  max-height: max(80px, calc(100% - 210px - var(--cs-topbar-notices-height, 0px) - var(--cs-topbar-notices-gap, 0px)));
 }
 
 .cs-settings-popover .cs-agent-overflow {

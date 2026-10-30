@@ -314,6 +314,7 @@ export type IconName =
   | 'stretchX'
   | 'stretchY'
   | 'placement'
+  | 'rotatePhone'
 
   | 'gradient'
   | 'palette'

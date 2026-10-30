@@ -1097,8 +1097,8 @@
       "properties": {
         "composition": { "$ref": "#/$defs/T151" },
         "phoneOrientation": { "$ref": "#/$defs/T174" },
-        "beautify": { "$ref": "#/$defs/T180" },
-        "watermark": { "$ref": "#/$defs/T181" }
+        "beautify": { "$ref": "#/$defs/T183" },
+        "watermark": { "$ref": "#/$defs/T184" }
       },
       "additionalProperties": false,
       "required": ["beautify", "watermark"]
@@ -1114,8 +1114,8 @@
         "frame": { "$ref": "#/$defs/T171" },
         "radius": { "type": "number" },
         "shadow": { "type": "number" },
-        "shadowOptions": { "$ref": "#/$defs/T175" },
-        "branding": { "$ref": "#/$defs/T176" }
+        "shadowOptions": { "$ref": "#/$defs/T178" },
+        "branding": { "$ref": "#/$defs/T179" }
       },
       "additionalProperties": false,
       "required": ["version", "layout", "background", "header", "footer", "frame", "radius", "shadow", "branding"]
@@ -1270,7 +1270,11 @@
         "fit": { "$ref": "#/$defs/T169" },
         "screenColor": { "$ref": "#/$defs/T159" },
         "zoom": { "type": "number" },
-        "offset": { "$ref": "#/$defs/T156" }
+        "offset": { "$ref": "#/$defs/T156" },
+        "phoneModel": { "$ref": "#/$defs/T175" },
+        "browserStyle": { "$ref": "#/$defs/T176" },
+        "phoneSystemDetails": { "type": "boolean" },
+        "phoneContentMode": { "$ref": "#/$defs/T177" }
       },
       "additionalProperties": false,
       "required": ["kind", "theme", "title", "url", "orientation", "fit", "screenColor", "zoom", "offset"]
@@ -1279,6 +1283,16 @@
     "T173": { "anyOf": [{ "const": "light" }, { "const": "dark" }] },
     "T174": { "anyOf": [{ "const": "portrait" }, { "const": "landscape" }] },
     "T175": {
+      "anyOf": [
+        { "const": "iphone-island" },
+        { "const": "iphone-notch" },
+        { "const": "android-rounded" },
+        { "const": "android-angular" }
+      ]
+    },
+    "T176": { "anyOf": [{ "const": "modern" }, { "const": "retro-windows" }, { "const": "retro-mac" }] },
+    "T177": { "anyOf": [{ "const": "safe" }, { "const": "fullscreen" }] },
+    "T178": {
       "type": "object",
       "properties": {
         "size": { "type": "number" },
@@ -1290,7 +1304,7 @@
       "additionalProperties": false,
       "required": ["size", "softness", "spread", "offset", "color"]
     },
-    "T177": {
+    "T180": {
       "type": "object",
       "properties": {
         "id": { "type": "string" },
@@ -1299,7 +1313,7 @@
         "year": { "type": "number" },
         "image": { "$ref": "#/$defs/T167" },
         "imageSize": { "type": "number" },
-        "region": { "$ref": "#/$defs/T178" },
+        "region": { "$ref": "#/$defs/T181" },
         "alignment": { "$ref": "#/$defs/T156" },
         "offset": { "$ref": "#/$defs/T156" },
         "textAlignment": { "$ref": "#/$defs/T21" },
@@ -1308,7 +1322,7 @@
         "color": { "$ref": "#/$defs/T159" },
         "opacity": { "type": "number" },
         "padding": { "type": "number" },
-        "backplate": { "$ref": "#/$defs/T179" }
+        "backplate": { "$ref": "#/$defs/T182" }
       },
       "additionalProperties": false,
       "required": [
@@ -1330,16 +1344,16 @@
         "backplate"
       ]
     },
-    "T178": { "anyOf": [{ "const": "content" }, { "const": "card" }, { "const": "header" }, { "const": "footer" }] },
-    "T179": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/T159" }] },
-    "T176": { "type": "array", "items": { "$ref": "#/$defs/T177" } },
-    "T180": {
+    "T181": { "anyOf": [{ "const": "content" }, { "const": "card" }, { "const": "header" }, { "const": "footer" }] },
+    "T182": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/T159" }] },
+    "T179": { "type": "array", "items": { "$ref": "#/$defs/T180" } },
+    "T183": {
       "type": "object",
       "properties": { "enabled": { "const": false } },
       "additionalProperties": false,
       "required": ["enabled"]
     },
-    "T181": {
+    "T184": {
       "type": "object",
       "properties": { "enabled": { "const": false } },
       "additionalProperties": false,

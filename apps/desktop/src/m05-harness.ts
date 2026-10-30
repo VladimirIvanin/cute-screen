@@ -1,5 +1,6 @@
 import {
   DocumentSessionController,
+  type DocumentPersistenceBridge,
   type EditorDocumentV1,
 } from '@cute-screen/editor-vue'
 import type { ShallowRef } from 'vue'
@@ -14,6 +15,32 @@ export interface M05HarnessPorts {
   readonly waitForRender: () => Promise<void>
 }
 
+function harnessPersistence(deferred: boolean): DocumentPersistenceBridge {
+  let automatic = !deferred
+  let pending: { complete(): void; fail(message: string): void } | undefined
+  if (deferred) window.__cuteScreenE2eM05Save = {
+    complete: () => {
+      if (!pending) throw new Error('No pending harness save')
+      automatic = true
+      pending.complete()
+      pending = undefined
+    },
+    fail: (message) => {
+      if (!pending) throw new Error('No pending harness save')
+      pending.fail(message)
+      pending = undefined
+    },
+  }
+  else delete window.__cuteScreenE2eM05Save
+  return {
+    saveDocument: (record) => automatic ? Promise.resolve(record.revision + 1)
+      : new Promise<number>((resolve, reject) => {
+          pending = { complete: () => resolve(record.revision + 1), fail: (message) => reject(new Error(message)) }
+        }),
+    exportRecoveryBundle: async () => ({ kind: 'saved' }),
+  }
+}
+
 export async function mountM05HarnessDocument(
   config: AppHarnessConfig,
   ports: M05HarnessPorts,
@@ -26,11 +53,8 @@ export async function mountM05HarnessDocument(
   const session = new DocumentSessionController({
     document: createM05Document(dimensions, config.m08 || config.m05Viewport),
     revision: 0,
-    debounceMs: 0,
-    bridge: {
-      saveDocument: async (record) => record.revision + 1,
-      exportRecoveryBundle: async () => ({ kind: 'saved' }),
-    },
+    debounceMs: config.m05DeferredSave ? 1500 : 0,
+    bridge: harnessPersistence(config.m05DeferredSave ?? false),
     correlationId: ports.correlationId,
   })
   const image = config.m08SourceNotReady

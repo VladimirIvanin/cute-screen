@@ -1,5 +1,18 @@
 # CI-сборки и проверка версии через GitHub
 
+## Мокапы рамок (ADR-173)
+
+Frontend-only каталог и optional composition fields без новой document version,
+native IPC или dependencies. MIT Tabler wifi/battery-3 нормализуются из текущей
+установки `node scripts/generate-frame-status-icons.mjs`; после генерации выполнить
+`pnpm format`, затем тот же script с `--check`. Контуры и license notice хранятся
+в core, миниатюры/Canvas2D/CanvasKit используют общую геометрию.
+Gate: core/Vue, decoded render 1×/2×, browser catalog и fresh native
+`mockups,mockups-reopen`. Полный release/package build не требуется.
+Не запускать frontend rebuild параллельно с native embedding dist assets.
+Для этой задачи переиспользован target/e2e-isolated из-за занятого debug binary;
+cache сохранён. Фактические платформы, команды и evidence — TESTING.md.
+
 ## Адаптив TopBar (ADR-170)
 
 UI-изменение без новых dependencies, IPC, Cargo profiles и release contracts.

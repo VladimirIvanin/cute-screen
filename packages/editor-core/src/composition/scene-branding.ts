@@ -13,7 +13,7 @@ export function brandingNodes(
   layout: CompositionLayout,
 ): RenderNode[] {
   const region = block.region === 'card' ? { x: 0, y: 0, width: layout.width, height: layout.height }
-    : block.region === 'content' ? layout.screen : layout[block.region]
+    : block.region === 'content' ? layout.viewport : layout[block.region]
   if (region.width <= 0 || region.height <= 0) return []
   const p = block.padding
   const logoWidth = block.image ? block.imageSize * block.image.width / block.image.height : 0

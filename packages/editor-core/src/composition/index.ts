@@ -1,4 +1,6 @@
 export * from './types'
+export * from './frame-catalog'
+export * from './frame-preview'
 export * from './defaults'
 export * from './layout'
 export * from './interaction'

@@ -5,6 +5,7 @@ import {
 } from '@wdio/globals'
 import { openDrawingHarness } from './browser-m06-test-kit'
 import { waitForStableCanvas } from '../canvas-ready'
+import { setPhoneOrientation } from '../phone-orientation-control'
 import { setEditorPreferences } from '../editor-settings'
 import { verifyRemoveAppearance } from '../remove-appearance'
 import type { EditorDocumentV1 } from '../../../packages/editor-core/src/document/types'
@@ -54,7 +55,7 @@ describe('publication cards', () => {
     await browser.keys('Tab')
     await browser.waitUntil(async () => (await snapshot()).presentation.composition?.frame.title.includes('Cute Screen') === true)
     await panel.$('button=Phone').click()
-    await panel.$('label*=Orientation').$('select').selectByAttribute('value', 'landscape')
+    await setPhoneOrientation('landscape')
     await browser.waitUntil(async () => (await snapshot()).presentation.composition?.frame.orientation === 'landscape')
     await panel.$('button=Padding').click()
     await panel.$('[data-card-fill="freeform"]').click()

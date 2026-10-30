@@ -425,6 +425,11 @@ export { prepareCompositionScene } from './composition/freeform'
 export {
   DEFAULT_PRESENTATION_SETTINGS,
   createComposition,
+  PHONE_MODELS,
+  BROWSER_STYLES,
+  createFramePreview,
+  type PhoneModel,
+  type BrowserStyle,
   updateCompositionPresentation,
   createCardShadowOptions,
   type CardShadowOptions,

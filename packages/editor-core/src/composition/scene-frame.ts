@@ -2,6 +2,9 @@ import type { RenderNode } from '../scene/contracts'
 import type { CompositionLayout } from './layout'
 import type { CompositionSettings } from './types'
 import { cardColor } from './defaults'
+import { phoneScreenRadius } from './frame-catalog'
+import { phoneBody } from './scene-phone'
+import { retroBrowserNodes } from './scene-retro-browser'
 import {
   cardRect,
   cardText,
@@ -17,7 +20,13 @@ export function frameRadius(
   layout: CompositionLayout,
 ): number {
   const edge = Math.min(layout.frame.width, layout.frame.height)
-  return settings.frame.kind === 'phone' ? edge * 0.1 : Math.min(settings.radius, edge / 2)
+  if (settings.frame.kind === 'phone') return phoneScreenRadius(settings.frame, layout.screen) + (layout.screen.x - layout.frame.x)
+  if (
+    settings.frame.kind === 'browser' &&
+    settings.frame.browserStyle &&
+    settings.frame.browserStyle !== 'modern'
+  ) return 0
+  return Math.min(settings.radius, edge / 2)
 }
 
 export function frameNodes(
@@ -26,11 +35,16 @@ export function frameNodes(
 ): RenderNode[] {
   const f = settings.frame
   if (f.kind === 'none') return []
+  if (f.kind === 'phone') return phoneBody(settings, layout)
+  if (
+    f.kind === 'browser' &&
+    f.browserStyle &&
+    f.browserStyle !== 'modern'
+  ) return retroBrowserNodes(f, layout)
   const dark = f.theme === 'dark'
   const nodes: RenderNode[] = [cardRect('card:frame', layout.frame,
     dark ? cardColor(0.08, 0.08, 0.1) : cardColor(0.94, 0.94, 0.96),
     frameRadius(settings, layout))]
-  if (f.kind === 'phone') return nodes
   const titlebar = layout.screen.y - layout.frame.y
   const chromeScale = titlebar / 40
   for (const [index,

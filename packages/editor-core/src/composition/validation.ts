@@ -7,6 +7,10 @@ import type {
   CardBranding,
   CompositionSettings,
 } from './types'
+import {
+  PHONE_MODELS,
+  BROWSER_STYLES,
+} from './frame-catalog'
 
 type Obj = Record<string, unknown>
 export function number(
@@ -152,6 +156,12 @@ function validateLayout(layout: Obj): void {
 }
 function validateFrame(value: unknown): void {
   const f = readJsonObject(value, 'frame')
+  if (f.phoneModel !== undefined) choice(f.phoneModel, 'frame.phoneModel', PHONE_MODELS.map((model) => model.id))
+  if (f.browserStyle !== undefined) choice(f.browserStyle, 'frame.browserStyle', BROWSER_STYLES.map((style) => style.id))
+  if (f.phoneContentMode !== undefined) choice(f.phoneContentMode, 'frame.phoneContentMode', ['safe', 'fullscreen'])
+  if (f.phoneSystemDetails !== undefined && typeof f.phoneSystemDetails !== 'boolean') {
+    throw new Error('composition.frame.phoneSystemDetails is invalid')
+  }
   choice(f.kind, 'frame.kind', ['none', 'window', 'browser', 'phone'])
   choice(f.theme, 'frame.theme', ['light', 'dark'])
   choice(f.orientation, 'frame.orientation', ['portrait', 'landscape'])

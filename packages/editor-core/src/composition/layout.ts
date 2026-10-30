@@ -4,6 +4,10 @@ import type {
   Rect,
 } from '../document/types'
 import type { CompositionSettings } from './types'
+import {
+  browserChrome,
+  phoneViewport,
+} from './frame-catalog'
 
 export interface CompositionLayout {
   readonly width: number
@@ -11,6 +15,8 @@ export interface CompositionLayout {
   readonly source: Rect
   readonly frame: Rect
   readonly screen: Rect
+  /** Screenshot clip, excluding optional device chrome. */
+  readonly viewport: Rect
   readonly content: Rect
   readonly header: Rect
   readonly footer: Rect
@@ -22,7 +28,7 @@ function frameGeometry(
 ) {
   const frame = settings.frame
   if (frame.kind !== 'phone') return { width: source.width, height: source.height,
-    border: 0, top: frame.kind === 'none' ? 0 : 40 }
+    border: 0, top: browserChrome(frame) }
   const edge = Math.min(source.width, source.height)
   const portrait = frame.orientation === 'portrait'
   return { width: portrait ? edge : edge * 19.5 / 9, height: portrait ? edge * 19.5 / 9 : edge,
@@ -53,6 +59,7 @@ export function resolveCompositionLayout(document: Pick<EditorDocument, 'canvas'
       height: source.height },
 
     screen: { x: 0, y: 0, width: source.width, height: source.height },
+    viewport: { x: 0, y: 0, width: source.width, height: source.height },
     content: { x: 0, y: 0, width: source.width, height: source.height }, scale: 1,
     header: { x: 0, y: 0, width: source.width, height: 0 },
     footer: { x: 0, y: source.height, width: source.width, height: 0 } }
@@ -81,8 +88,9 @@ function resolveLayout(
     width: naturalW * scale, height: frameHeight }
   const screen = { x: frame.x + g.border * scale, y: frame.y + g.border * scale + chrome,
     width: g.width * scale, height: g.height * scale }
-  const content = fitContent(source, screen, s)
-  return { width, height, source, frame, screen, content, scale: content.width / source.width,
+  const viewport = s.frame.kind === 'phone' ? phoneViewport(s.frame, screen) : screen
+  const content = fitContent(source, viewport, s)
+  return { width, height, source, frame, screen, viewport, content, scale: content.width / source.width,
     header: { x: 0, y: 0, width, height: Math.min(height, s.header.height) },
     footer: { x: 0, y: Math.max(0, height - s.footer.height), width, height: Math.min(height, s.footer.height) } }
 }

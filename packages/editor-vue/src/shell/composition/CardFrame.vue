@@ -3,6 +3,8 @@ import { useId } from 'vue'
 import type { CardFrame } from '@cute-screen/editor-renderer'
 import CardNumber from './CardNumber.vue'
 import CardColor from './CardColor.vue'
+import CardFrameModels from './CardFrameModels.vue'
+import { UiIcon } from '../icon'
 const props = defineProps<{ value: CardFrame; locale: 'ru' | 'en'; disabled: boolean }>()
 const emit = defineEmits<{ change: [value: CardFrame]; preview: [value: CardFrame]; cancel: [] }>()
 const text = (ru: string, en: string) => props.locale === 'ru' ? ru : en
@@ -109,6 +111,11 @@ function patch(
         </span>
       </label>
     </div>
+    <CardFrameModels
+      :value="value"
+      :locale="locale"
+      @change="emit('change', $event)"
+    />
     <template v-if="value.kind !== 'none'">
       <label>{{ text('Тема рамки', 'Frame theme') }}<select :value="value.theme" @change="patch('theme', ($event.target as HTMLSelectElement).value)"><option value="light">{{ text('Светлая', 'Light') }}</option><option value="dark">{{ text('Тёмная', 'Dark') }}</option></select></label>
       <label v-if="value.kind !== 'phone'">{{ text('Заголовок', 'Title') }}<input
@@ -125,7 +132,26 @@ function patch(
       /></label>
     </template>
     <template v-if="value.kind === 'phone'">
-      <label>{{ text('Ориентация', 'Orientation') }}<select :value="value.orientation" @change="patch('orientation', ($event.target as HTMLSelectElement).value)"><option value="portrait">{{ text('Вертикальная', 'Portrait') }}</option><option value="landscape">{{ text('Горизонтальная', 'Landscape') }}</option></select></label>
+      <label class="cs-card-system-details"><input
+        type="checkbox"
+        :checked="value.phoneSystemDetails ?? false"
+        @change="patch('phoneSystemDetails', ($event.target as HTMLInputElement).checked)"
+      />{{ text('Системные детали', 'System details') }}</label>
+      <label>{{ text('Размещение снимка', 'Screenshot placement') }}<select :value="value.phoneContentMode ?? 'safe'" @change="patch('phoneContentMode', ($event.target as HTMLSelectElement).value)"><option value="safe">{{ text('Без перекрытия', 'Without overlap') }}</option><option value="fullscreen">{{ text('На весь экран', 'Full screen') }}</option></select></label>
+      <div class="cs-card-orientation">
+        <span>{{ text('Ориентация', 'Orientation') }}</span>
+        <button
+          type="button"
+          class="cs-card-orientation-toggle"
+          :aria-label="text('Повернуть мокап', 'Rotate mockup')"
+          :aria-describedby="`${groupName}-orientation`"
+          :title="value.orientation === 'portrait' ? text('Повернуть горизонтально', 'Rotate to landscape') : text('Повернуть вертикально', 'Rotate to portrait')"
+          @click="patch('orientation', value.orientation === 'portrait' ? 'landscape' : 'portrait')"
+        >
+          <UiIcon name="rotatePhone" />
+          <span :id="`${groupName}-orientation`">{{ value.orientation === 'portrait' ? text('Вертикальная', 'Portrait') : text('Горизонтальная', 'Landscape') }}</span>
+        </button>
+      </div>
       <label>{{ text('Снимок в экране', 'Screen content') }}<select :value="value.fit" @change="patch('fit', ($event.target as HTMLSelectElement).value)"><option value="contain">{{ text('Вписать', 'Contain') }}</option><option value="cover">{{ text('Заполнить', 'Cover') }}</option></select></label>
       <CardNumber
         :label="text('Масштаб экрана %', 'Screen scale %')"

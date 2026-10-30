@@ -55,6 +55,8 @@ export interface CardLayout {
   readonly scale: number
   readonly offset: CardPoint
 }
+export type PhoneModel = 'iphone-island' | 'iphone-notch' | 'android-rounded' | 'android-angular'
+export type BrowserStyle = 'modern' | 'retro-windows' | 'retro-mac'
 export interface CardFrame {
   readonly kind: 'none' | 'window' | 'browser' | 'phone'
   readonly theme: 'light' | 'dark'
@@ -65,6 +67,10 @@ export interface CardFrame {
   readonly screenColor: CardColor
   readonly zoom: number
   readonly offset: CardPoint
+  readonly phoneModel?: PhoneModel
+  readonly browserStyle?: BrowserStyle
+  readonly phoneSystemDetails?: boolean
+  readonly phoneContentMode?: 'safe' | 'fullscreen'
 }
 export interface CardBranding {
   readonly id: string

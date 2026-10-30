@@ -1,5 +1,53 @@
 # Платформенная матрица
 
+## Плавающие уведомления (2026-10-30, ADR-174)
+
+Windows x64 / Chrome 156.0.8078.76: 22 browser tests passed, включая восемь
+production save-flow вариантов RU/EN × light/dark × 1024/1600 px. Геометрия
+header/canvas/viewport/dock не меняется; статусы ограничены по ширине и не
+перекрывают ActionFeedback. Recovery и длинные diagnostics доступны.
+31 Vue tests и 114 boundaries passed, 1 boundary skipped. Native WebView2,
+WKWebView и WebKitGTK в этой правке не запускались; их runtime pending.
+Команды и evidence — TESTING.md, `artifacts/browser-e2e/save-notices-*`.
+
+## Loading кнопки подключения агента (2026-10-30)
+
+Windows x64 / Chrome 156.0.8078.76: production click → pending native boundary,
+RU/EN × light/dark; geometry delta кнопки/действий/Export по 24 frames — 0 px
+после исправления вместо 31 px до него. Vue/settings 9 tests passed.
+Проверен browser loading layout, не новое открытие native Settings.
+Команды и evidence — TESTING.md, `artifacts/agent-button-loading/geometry.json`.
+
+## Кнопка поворота мокапа (2026-10-30)
+
+Windows x64 / Chrome 156.0.8078.76: click/Space/Enter, keyboard focus, RU/EN
+× light/dark, Undo/Redo и сохранение ручной ориентации — passed.
+148 Vue/icon tests и 114 boundary tests passed; fresh debug/no-bundle build прошёл.
+WebView2 156.0.4314.50: два startup зависания wdioTauri.waitForInit до сценария,
+поэтому runtime кнопки pending. WKWebView/WebKitGTK также pending.
+Команды, screenshots и ограничения — TESTING.md, `artifacts/mockups/rotate-*`.
+
+## Прямые углы примыкания чёлки (2026-10-30)
+
+Windows x64 / Chrome 156.0.8078.76 — mockups 1/1 passed. Canvas2D/CanvasKit:
+decoded attachment pixels в portrait/landscape при 1×/2× без светлых щелей;
+core/Vue 59 tests и boundaries 114 tests passed. Fresh debug/no-bundle WebView2
+156.0.4314.50 — mockups 1/1 passed после одного startup retry; native screenshot
+нового контура просмотрен, PNG повторно декодированы. Первый запуск завис до
+действий сценария на wdioTauri.waitForInit. WKWebView/WebKitGTK — pending.
+Точные команды и evidence — TESTING.md, `artifacts/mockups/notch-*`.
+
+## Мокапы телефонов и ретро-браузеров (2026-10-30, ADR-173)
+
+Windows x64: Chrome 156.0.8078.76 — catalog 1024 px RU/EN × light/dark,
+trusted keyboard/pointer, Undo/Redo, orientation и fullscreen seams passed.
+Fresh debug/no-bundle WebView2 156.0.4314.50 / external tauri-driver 2.1.0:
+mockups + mockups-reopen 2/2 passed, включая финальные MIT Tabler wifi/battery-3,
+decoded PNG exports телефона/ретро-браузера и exact composition после restart.
+Capture backend не проверялся: production file import 4K fixture.
+Core/Vue/render evidence — TESTING.md и `artifacts/mockups/`.
+WKWebView/WebKitGTK требуют отдельных runtime прогонов и остаются pending.
+
 ## Первая ориентация телефона (2026-10-29, ADR-172)
 
 Windows x64: 583 core tests и 13 production-session Vue tests passed;

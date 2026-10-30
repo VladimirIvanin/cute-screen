@@ -470,7 +470,8 @@
   top: 66px;
   left: 14px;
   display: grid;
-  width: min(560px, calc(100% - 28px));
+  width: max-content;
+  max-width: min(560px, calc(100% - 28px));
   max-height: calc(100% - 210px);
   box-sizing: border-box;
   grid-template-columns: minmax(0, 1fr) auto;

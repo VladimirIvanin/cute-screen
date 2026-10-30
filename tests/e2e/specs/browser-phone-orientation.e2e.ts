@@ -13,7 +13,7 @@ describe('phone orientation on first application', () => {
   for (const entry of ['starter', 'tile'] as const) {
     it(`matches the screenshot once from ${entry} and keeps manual changes`, async () => {
       await browser.setWindowSize(1280, 900)
-      await openDrawingHarness(true)
+      await openDrawingHarness(true, true)
       await verifyPhoneOrientation(snapshot, entry, 'artifacts/browser-e2e')
     }).timeout(60000)
   }

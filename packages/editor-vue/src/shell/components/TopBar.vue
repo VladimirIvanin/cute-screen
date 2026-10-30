@@ -62,6 +62,7 @@ const emit = defineEmits<{
 }>()
 const disabled = computed(() => props.pending)
 const header = ref<HTMLElement>()
+const notices = ref<HTMLElement>()
 const brand = ref<HTMLElement>()
 let disposeBrand: (() => void) | undefined
 let chromeObserver: ResizeObserver | undefined
@@ -72,17 +73,23 @@ onMounted(() => {
   const updateChromeBounds = () => {
     if (!header.value || !shell) return
     shell.style.setProperty('--cs-topbar-bottom', `${header.value.offsetTop + header.value.offsetHeight + 10}px`)
+    const noticeHeight = notices.value?.offsetHeight ?? 0
+    shell.style.setProperty('--cs-topbar-notices-height', `${noticeHeight}px`)
+    shell.style.setProperty('--cs-topbar-notices-gap', noticeHeight ? '8px' : '0px')
   }
   updateChromeBounds()
   if (header.value && typeof ResizeObserver !== 'undefined') {
     chromeObserver = new ResizeObserver(updateChromeBounds)
     chromeObserver.observe(header.value)
+    if (notices.value) chromeObserver.observe(notices.value)
   }
 })
 onUnmounted(() => {
   disposeBrand?.()
   chromeObserver?.disconnect()
   shell?.style.removeProperty('--cs-topbar-bottom')
+  shell?.style.removeProperty('--cs-topbar-notices-height')
+  shell?.style.removeProperty('--cs-topbar-notices-gap')
 })
 const captureDisabled = computed(() => disabled.value || !props.captureAvailable)
 const captureTitle = computed(() =>
@@ -217,10 +224,12 @@ async function openAgent(): Promise<void> {
         secondary
         class="cs-button cs-agent-connect"
         :loading="openingAgent"
+        :aria-busy="openingAgent"
         :disabled="pending || openingAgent"
         @click="openAgent"
       >
-        <UiIcon name="agent" /><span>{{ locale === 'ru' ? 'Подключить агента' : 'Connect agent' }}</span>
+        <template #icon><UiIcon name="agent" /></template>
+        <span>{{ locale === 'ru' ? 'Подключить агента' : 'Connect agent' }}</span>
       </NButton>
       <EditorSettingsPopover
         :locale="locale"
@@ -249,43 +258,45 @@ async function openAgent(): Promise<void> {
         {{ canCopyOrExport ? t('export') : t('exportUnavailable') }}
       </NTooltip>
     </div>
-    <p
-      v-if="saveState && saveState !== 'saved'"
-      class="cs-save-status"
-      role="status"
-      aria-live="polite"
-      :data-state="saveState"
-    >
-      {{
-        saveState === 'dirty'
-          ? t('unsavedChanges')
-          : saveState === 'saving'
-            ? t('savingDocument')
-            : saveState === 'readOnly'
-              ? t('readOnlyDocument')
-              : (saveError ?? t('saveFailed'))
-      }}
-      <NButton
-        v-if="saveState === 'error'"
-        class="cs-save-retry"
-        @click="emit('retrySave')"
+    <div ref="notices" class="cs-topbar-notices">
+      <p
+        v-if="saveState && saveState !== 'saved'"
+        class="cs-save-status"
+        role="status"
+        aria-live="polite"
+        :data-state="saveState"
       >
-        {{ t('retry') }}
-      </NButton>
-      <NButton
-        v-if="saveState === 'error'"
-        class="cs-save-retry"
-        @click="emit('exportRecovery')"
+        {{
+          saveState === 'dirty'
+            ? t('unsavedChanges')
+            : saveState === 'saving'
+              ? t('savingDocument')
+              : saveState === 'readOnly'
+                ? t('readOnlyDocument')
+                : (saveError ?? t('saveFailed'))
+        }}
+        <NButton
+          v-if="saveState === 'error'"
+          class="cs-save-retry"
+          @click="emit('retrySave')"
+        >
+          {{ t('retry') }}
+        </NButton>
+        <NButton
+          v-if="saveState === 'error'"
+          class="cs-save-retry"
+          @click="emit('exportRecovery')"
+        >
+          {{ t('exportRecovery') }}
+        </NButton>
+      </p>
+      <p
+        v-if="agentError"
+        class="cs-topbar-error"
+        role="alert"
       >
-        {{ t('exportRecovery') }}
-      </NButton>
-    </p>
-    <p
-      v-if="agentError"
-      class="cs-topbar-error"
-      role="alert"
-    >
-      {{ agentError }}
-    </p>
+        {{ agentError }}
+      </p>
+    </div>
   </header>
 </template>

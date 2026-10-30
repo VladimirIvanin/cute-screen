@@ -153,7 +153,7 @@ describe('publication card interface', () => {
       await fireEvent.change(title, { target: { value: 'My window' } })
       await fireEvent.click(choices.getByRole('radio', { name: 'Phone' }))
       expect(within(panel).queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument()
-      expect(within(panel).getByRole('combobox', { name: 'Orientation' })).toBeVisible()
+      expect(within(panel).getByRole('button', { name: 'Rotate mockup' })).toBeVisible()
       await fireEvent.click(choices.getByRole('radio', { name: 'Browser' }))
       expect(within(panel).getByRole('textbox', { name: 'Title' })).toHaveValue('My window')
       expect(within(panel).getByRole('textbox', { name: 'URL' })).toBeVisible()

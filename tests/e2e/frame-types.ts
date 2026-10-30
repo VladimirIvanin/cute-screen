@@ -37,7 +37,7 @@ export async function verifyFrameTypes(
   await expect(group.$('input[value="phone"]')).toBeChecked()
   expect((await readComposition())!.frame.kind).toBe('phone')
   const phoneOrientation = (await readComposition())!.frame.orientation
-  await expect(panel.$('label*=Orientation').$('select')).toBeDisplayed()
+  await expect(panel.$('.cs-card-orientation-toggle')).toBeDisplayed()
   await expect(panel.$('label*=Title')).not.toExist()
   await $('button[aria-label="Undo"]').click()
   await expect(group.$('input[value="browser"]')).toBeChecked()

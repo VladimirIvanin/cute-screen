@@ -127,6 +127,33 @@
   margin: 7px 0;
   font-size: 12px;
 }
+.cs-card-orientation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 7px 0;
+  font-size: 12px;
+}
+.cs-composition-panel .cs-card-orientation-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 140px;
+  min-height: 32px;
+  flex-shrink: 0;
+}
+.cs-card-orientation-toggle svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.cs-card-orientation-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 .cs-composition-panel .cs-card-input,
 .cs-composition-panel select,
 .cs-composition-panel textarea {
@@ -403,6 +430,37 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 5px;
   margin: 4px 0 8px;
+}
+.cs-card-models {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  margin: 4px 0 10px;
+}
+.cs-card-models.is-phone {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.cs-card-models .cs-card-frame-choice {
+  height: 100%;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.cs-card-models .cs-card-frame-choice .cs-card-model-preview {
+  width: 90px;
+  height: 56px;
+  fill: none;
+  stroke: none;
+}
+.cs-card-models.is-phone .cs-card-frame-choice .cs-card-model-preview {
+  height: 88px;
+}
+.cs-composition-panel .cs-card-system-details {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cs-card-system-details input {
+  width: auto;
 }
 .cs-composition-panel .cs-card-frame-option {
   display: block;
