@@ -14,7 +14,7 @@ const union = types.match(/export type IconName\s*=\s*((?:\|\s*'[^']+'\s*)+)/u)?
 if (!union) throw new Error('IconName declaration is missing')
 const names = [...union.matchAll(/\| '([A-Za-z]+)'/gu)].map((match) => match[1] as IconName)
 
-const customNames = new Set<IconName>(['marker', 'pencil', 'eyedropper', 'spotlight', 'privacy', 'loupe', 'callout', 'strokeWidth', 'gradient'])
+const customNames = new Set<IconName>(['agent', 'marker', 'pencil', 'eyedropper', 'spotlight', 'privacy', 'loupe', 'callout', 'strokeWidth', 'gradient'])
 
 describe('semantic Tabler and project icons', () => {
   it.each(names)('preserves caller class and style for %s', (name) => {

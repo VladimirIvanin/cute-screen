@@ -1,5 +1,45 @@
 # Стратегия тестирования
 
+## Округление Canvas2D golden мокапов (2026-10-30)
+
+Base HEAD `044d8b9` + working tree; Windows x64 / PowerShell и Ubuntu 22.04
+x86_64 / WSL2, Node 22.23.1, pnpm 10.33.2, native canvas 1.0.2.
+Evidence — `artifacts/mockup-golden/`.
+
+До правки `pnpm test:render tests/harness/render/mockups.test.ts` на Linux
+точно воспроизвёл reported ratio 0.000022379557291666665: 220 RGB-каналов
+iphone-island landscape 2×, delta=1. Windows — 2/2 passed. Временный
+диагностический проход всех 48 PNG (12 вариантов × 2 backend × 1×/2×)
+обнаружил максимум 41 канал на 1× и 595 на 2× (iphone-notch landscape,
+0,006053%). Все отличия — RGB с delta=1, alpha точный; все 24 CanvasKit PNG
+точные. `differences.json` содержит counts, ratios, delta histogram и bounds.
+Linux island PNG и committed golden визуально просмотрены.
+
+Только `mockups.test.ts` использует отдельный `mockupCanvas2dTolerance`:
+доля каналов ≤0,00007 (0,007%), delta≤1, alpha по-прежнему точный.
+Composition сохраняет 0,00002, остальные goldens — exact по умолчанию.
+Production renderer и committed PNG не менялись. Десять assertion tests
+проверяют оба бюджета на границе и отклоняют следующий канал, delta=2,
+изменение alpha и разницу без явного допуска. Decoded размеры, source hash,
+document immutability, preview/export equality и backend parity сохранены.
+
+- Windows: `pnpm test:render tests/harness/render/golden-assertion.test.ts tests/harness/render/mockups.test.ts tests/harness/render/composition.test.ts`
+  — 3 files / 14 passed (`windows-focused.log`).
+- Полный `pnpm test:render` — Windows и Linux, по 31 files / 94 passed
+  (`windows-render.log`, `linux-render.log`). Update mode не использовался.
+- `pnpm lint` — exit 0, 37 прежних warnings; `pnpm exec vue-tsc --noEmit -p tests/tsconfig.json`
+  — exit 0 (`lint.log`, `typecheck.log`).
+- `pnpm format`, `pnpm format:check`, `pnpm docs:check`, `git diff --check`
+  — exit 0. Полный `pnpm check` не запускался для изменения test harness.
+
+Это изменение headless test harness; UI/native/Rust контракты не менялись.
+Linux использует те же исходники/lockfile/fonts и matching Linux native bindings
+через task-owned preload, без переустановки Windows node_modules. Диагностический
+test удалён перед финальными suites. Новых Cargo targets не создавалось.
+Task-owned Linux runtime удалён после suite: 274022035 → 0 bytes.
+`pnpm disk:usage`: target 91,414 GiB, artifacts 14,132 GiB до финального
+Windows suite; итоговый отчёт — `disk-usage-after.log`. Общий build cache сохранён.
+
 ## Компактные уведомления без сдвига редактора (2026-10-30, ADR-174)
 
 Windows x64 / Chrome 156.0.8078.76, рабочая копия поверх `420c04e`.
@@ -22,6 +62,31 @@ ActionFeedback не пересекается со статусом. Провер
 Desktop vue-tsc и E2E tsc прошли. `pnpm lint` — 0 errors, 37 существующих warnings.
 Native API и renderer не менялись; WebView2/WKWebView/WebKitGTK runtime в этой
 правке не прогонялся. Browser result не заменяет native evidence.
+
+## Подключён выбранный вариант 2 с точками на контуре (2026-10-30)
+
+Пользователь выбрал dots-2. Его точная геометрия перенесена в canonical
+agentGeometry и используется UiIcon в кнопке агента, Settings overflow
+и выбранном образце gallery. Уши — маленькие круглые выступы; полоса,
+сплошные глаза и два зуба сохранены. Подписи, hit area и действие не менялись.
+Windows x64 / Chrome 156.0.8078.76: browser-custom-icons и
+browser-topbar-responsive с evidence `agent-dots-selected`, port 5262,
+headless, disable-watch, grep `renders the actual|keeps groups`.
+Команды, фактические результаты, SVG/PNG и просмотренные screenshots —
+`artifacts/custom-icons/agent-dots-selected/summary.json`.
+Native MCP/WebView runtime этим browser evidence не подтверждается.
+
+## Два варианта ушей-точек (2026-10-30)
+
+Пользователь предпочёл уши и полосу. Production agentGeometry восстановлена
+до варианта с короткими ушами. Dev gallery сравнивает отдельно стоящие
+сплошные точки и круглые выступы на верхнем контуре; остальная голова общая
+с production geometry. Два новых кандидата пока не заменяют выбранный знак.
+Windows x64 / Chrome 156.0.8078.76: browser-custom-icons с evidence
+`agent-dot-ears`, port 5262, headless, disable-watch, grep `renders the actual`.
+Команды, результаты, SVG/PNG и просмотренные рендеры —
+`artifacts/custom-icons/agent-dot-ears/summary.json`.
+Native MCP/WebView runtime этим сравнением геометрии не подтверждается.
 
 ## Стабильная ширина «Подключить агента» (2026-10-30)
 
@@ -88,6 +153,19 @@ Fresh debug/no-bundle WebView2 156.0.4314.50, external driver:
 Кэш существующего target/e2e-isolated сохранён; release/package и renderer
 goldens не пересобирались, поскольку изменён только control.
 
+## Вернули полосу, убрали уши (2026-10-30)
+
+По обратной связи пользователя вернули центральную полосу и два зуба;
+уши убраны. Пропорции головы сохранены, она поднята на 2.5 единицы для
+центрирования в viewBox. Canonical agentGeometry используется production
+UiIcon и gallery; предыдущий вариант с короткими ушами сохранён для сравнения.
+Windows x64 / Chrome 156.0.8078.76: browser-custom-icons и
+browser-topbar-responsive, evidence `agent-no-ears`, port 5262, headless,
+disable-watch, grep `renders the actual|keeps groups`.
+Команды, результаты, SVG/PNG и просмотренные screenshots —
+`artifacts/custom-icons/agent-no-ears/summary.json`. Это замена геометрии;
+native MCP и WebView2/WebKitGTK/WKWebView этим browser evidence не подтверждены.
+
 ## Углы примыкания чёлки (2026-10-30)
 
 `REQ-OUT-012`: rect со скруглением всех углов заменён общим векторным контуром
@@ -113,6 +191,46 @@ pin-бинарник 60Xwsf и его зависшее дерево driver/runne
 production import, выбор чёлки и screenshot, trusted input, decoded phone/browser
 PNG export. Новый native contour просмотрен в `mockup-notch-landscape.png`.
 Лог — `artifacts/mockups/notch-native-retry.log`; WKWebView/WebKitGTK не проверялись.
+
+## Цельная голова без центральной полосы (2026-10-30)
+
+По эскизу пользователя убрана центральная перемычка: внешний контур объединяет
+лоб и челюсть, рот заменён короткой линией. Короткие уши и закрашенные глаза
+сохранены. Canonical agentGeometry используется и production UiIcon, и gallery;
+прежняя версия с полосой существует только как dev-сравнение.
+Windows x64 / Chrome 156.0.8078.76, HEAD `420c04e`: browser-custom-icons и
+browser-topbar-responsive с evidence `agent-no-band`, port 5262, headless,
+disable-watch и `--mochaOpts.grep "renders the actual|keeps groups"`.
+Команды, фактические результаты, форматирование и просмотренные рендеры —
+`artifacts/custom-icons/agent-no-band/summary.json`.
+Это замена геометрии без изменений IPC, action и hit area; native MCP,
+WebView2/WebKitGTK/WKWebView этим browser evidence не подтверждаются.
+
+## Подключён 2B3 с более короткими ушами (2026-10-30)
+
+Пользователь выбрал 2B3 и попросил улучшить читаемость робота при уменьшении.
+Каноническая agentGeometry получила короткие округлые уши, верх головы y7
+вместо y9 и центр глаз y11.5 вместо y12.5. Челюсть 18 единиц, сплошные глаза
+и зубы сохранены. Gallery использует production geometry; прежний 2B3
+сохранён только как dev-сравнение «До». Изменены рисунок и его preview,
+подписи, action, hit area и документ не меняются.
+
+Windows x64 / Chrome 156.0.8078.76, HEAD `420c04e`:
+`CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5262 CUTE_SCREEN_ICON_EVIDENCE=agent-short-ears CUTE_SCREEN_E2E_DISABLE_WATCH=1 pnpm test:e2e:browser --spec tests/e2e/specs/browser-custom-icons.e2e.ts --spec tests/e2e/specs/browser-topbar-responsive.e2e.ts --mochaOpts.grep "renders the actual|keeps groups"`
+— exit 0, 5 passed. Gallery DPR 1/2, light/dark, 16–64 px, currentColor,
+размеры и ink внутри viewBox; production TopBar/Settings overflow RU/EN ×
+light/dark, resize 360–1600 px, Escape/focus. Preview до/после, gallery DPR 2,
+TopBar RU/dark и Settings EN/light просмотрены.
+`pnpm test tests/unit/vue/ui-icon.test.ts tests/unit/vue/editor-settings.test.ts`
+— exit 0, 140 passed. Первый `pnpm test:boundaries` при параллельном typecheck
+остановился на timeout 5000 ms архитектурного ratchet: 113 passed, 1 skipped.
+Повтор и итог typecheck/lint/format/checks зафиксированы в summary.json.
+PNG сравнения построен из экспортированных browser SVG командой
+`node artifacts/custom-icons/agent-short-ears/render-preview.mjs` — exit 0.
+Evidence — `artifacts/custom-icons/agent-short-ears/`.
+Browser harness сообщает прежние unmocked native commands; native MCP,
+WebView2/WebKitGTK/WKWebView и полный `pnpm check` этой правкой не подтверждаются.
+Quick не содержит подключения агента. Новые targets/dependencies не создавались.
 
 ## Телефоны и ретро-браузеры (2026-10-30, ADR-173)
 
@@ -166,6 +284,82 @@ isolated cache и driver cache сохранены. Итоги/selected PNG/logs 
 `artifacts/mockups/`; native JUnit и decoded exports — `artifacts/tauri-e2e/`.
 Windows runtime подтверждён; WKWebView/WebKitGTK остаются pending. Full release,
 package build, cargo test и perf suite для этой frontend-правки не запускались.
+
+## Сплошные глаза в 2B (2026-10-30)
+
+Три dev-кандидата продолжают выбранный округлый 2B: круглые сплошные глаза
+2B1, округлые квадратики 2B2 и круглые глаза с более узкой челюстью 2B3.
+Геометрия ушей, два зуба и корневой контур 1.8 сохранены; заливка глаз
+наследует currentColor. Production mapping не менялся.
+Browser gallery: Windows x64 / Chrome 156.0.8078.76, прежний
+browser-custom-icons scenario с evidence `agent-2b-eyes`, port 5262,
+headless, disable-watch, `--mochaOpts.grep "renders the actual"`.
+Команды, результаты проверок и просмотренные SVG/PNG —
+`artifacts/custom-icons/agent-2b-eyes/summary.json`. Native connection
+не проверяется в этой итерации рисунка.
+
+## Вариации широкой челюсти 2A/2B/2C (2026-10-30)
+
+По запросу пользователя вариант 02 развит в три кандидата: классический с
+прямыми ушами, округлый с ушами врозь и механический с фасками и квадратными
+глазами. Все сохраняют широкую челюсть и два сплошных зуба. Production mapping
+не менялся; старые экспортированные варианты сохранены.
+Проверка на Windows x64 / Chrome 156.0.8078.76: прежний browser-custom-icons
+scenario с `CUTE_SCREEN_ICON_EVIDENCE=agent-jaw-variants`, port 5262,
+headless, disable-watch и `--mochaOpts.grep "renders the actual"`.
+Полные команды, результаты форматирования, SVG/PNG и просмотренные gallery
+DPR 1/2 — `artifacts/custom-icons/agent-jaw-variants/summary.json`.
+Это сравнение вариантов, native connect smoke не требуется для dev gallery.
+
+## Три варианта робозайца для выбора (2026-10-30)
+
+По обратной связи пользователя замкнутый рот с двумя отверстиями напоминал
+пятачок. Dev gallery получила три кандидата: прямые длинные уши с открытым
+ртом, широкую челюсть со сплошными зубами и угловатый корпус с прищуром.
+Production `agent` на этом этапе не заменяется. Кандидаты используют общий
+createCustomIcon и типизированную геометрию; экспорт получен из живого SVG.
+
+Windows x64, Chrome 156.0.8078.76, HEAD `420c04e`:
+`CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5262 CUTE_SCREEN_ICON_EVIDENCE=agent-variants CUTE_SCREEN_E2E_DISABLE_WATCH=1 pnpm test:e2e:browser --spec tests/e2e/specs/browser-custom-icons.e2e.ts --mochaOpts.grep "renders the actual"`
+— exit 0, 1 passed. Рендеры кандидатов 16/18/20/24/32/64 px в light/dark
+при DPR 1/2 сохранены; DPR 1 и итоговый PNG просмотрены.
+`node artifacts/custom-icons/agent-variants/render-preview.mjs` — exit 0,
+общий preview и три PNG с прозрачным фоном созданы из экспортированных SVG.
+Evidence — `artifacts/custom-icons/agent-variants/`. Это сравнение геометрии,
+новые native/production connect проверки к кандидатам не применялись.
+
+## Иконка подключения агента (2026-10-30)
+
+Windows x64, Chrome 156.0.8078.76, HEAD `420c04e` с существующими незавершёнными
+изменениями мокапов. `agent` использует общую контурную геометрию робозайца
+через UiIcon: два уха-антенны, два круглых глаза, два зуба. Подписи и action
+не меняются. В первом рисунке зубы касались нижнего контура; высота головы
+увеличена на единицу, итоговый browser screenshot просмотрен повторно.
+
+- `pnpm test tests/unit/vue/ui-icon.test.ts tests/unit/vue/editor-settings.test.ts`
+  — exit 0, 140 tests passed.
+- `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5262 CUTE_SCREEN_ICON_EVIDENCE=agent-after CUTE_SCREEN_E2E_DISABLE_WATCH=1 pnpm test:e2e:browser --spec tests/e2e/specs/browser-custom-icons.e2e.ts --mochaOpts.grep "renders the actual"`
+  — exit 0, 1 passed. 16/18/20/24/32 CSS px, light/dark, DPR 1/2;
+  проверены currentColor, размеры и отсутствие ink за viewBox. Gallery и
+  отдельные строки новой иконки сохранены; итоговый SVG взят из живого UiIcon.
+- `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5263 CUTE_SCREEN_E2E_DISABLE_WATCH=1 pnpm test:e2e:browser --spec tests/e2e/specs/browser-topbar-responsive.e2e.ts --mochaOpts.grep "ru/dark"`
+  — exit 0, 1 passed. Обычный production mount, resize 360–1600 px,
+  вход агента в TopBar и перенос в Settings при 1024 px, Escape/focus.
+  Screenshot 1600 px с новой иконкой просмотрен. Browser harness сообщает
+  прежние unmocked native commands; этот проход не подтверждает native MCP.
+- `pnpm lint` — exit 0, 37 warnings; `pnpm format` — exit 0.
+- `pnpm test:boundaries` — exit 1: 112 passed, 1 skipped, 2 failures в
+  существующей параллельной работе: inline SVG в CardFramePreview.vue и depth
+  scene-retro-browser.ts. `pnpm typecheck` — exit 2: три неподдерживаемых
+  `exact` в tests/unit/vue/mockups.test.ts. Файлы этих ошибок иконкой не менялись.
+
+Доказательства до/после: `artifacts/custom-icons/agent-before/` и `agent-after/`;
+PNG preview построен из того же SVG командой
+`node artifacts/custom-icons/agent-after/render-preview.mjs`.
+Полный `pnpm check`, native WebView2, WebKitGTK/WKWebView и MCP connect smoke
+для замены геометрии не запускались. Quick не содержит вход подключения агента.
+Финальные format:check/docs:check и ограничения записаны в summary.json рядом
+с рисунком.
 
 ## Первая ориентация телефона (2026-10-29, ADR-172)
 

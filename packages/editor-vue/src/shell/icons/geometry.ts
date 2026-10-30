@@ -17,6 +17,23 @@ export type IconPrimitive =
 
 export type IconGeometry = readonly IconPrimitive[]
 
+// User-selected dots-2: tiny rounded bumps on the head, a divider and two incisors.
+export const agentGeometry = [
+  ['path', {
+    d: 'M8.8 6a1.3 1.3 0 1 1-2.6 0 1.3 1.3 0 0 1 2.6 0ZM17.8 6a1.3 1.3 0 1 1-2.6 0 1.3 1.3 0 0 1 2.6 0Z',
+    fill: 'currentColor',
+    stroke: 'none',
+  }],
+  ['path', { d: 'M4 16V9a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7' }],
+  ['rect', { x: 3, y: 16, width: 18, height: 6, rx: 1.5 }],
+  ['path', {
+    d: 'M9.7 11.5a1.7 1.7 0 1 1-3.4 0 1.7 1.7 0 0 1 3.4 0ZM17.7 11.5a1.7 1.7 0 1 1-3.4 0 1.7 1.7 0 0 1 3.4 0Z',
+    fill: 'currentColor',
+    stroke: 'none',
+  }],
+  ['path', { d: 'M9 16h2v3H9ZM13 16h2v3h-2Z', fill: 'currentColor', stroke: 'none' }],
+] as const satisfies IconGeometry
+
 // User-selected 01: a square linear fill fading from left to right.
 export const gradientGeometry = [
   ['path', { d: 'M4 4h2v16h-2Z', fill: 'currentColor', 'fill-opacity': 1, stroke: 'none' }],

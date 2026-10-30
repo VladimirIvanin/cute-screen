@@ -38,7 +38,7 @@ import {
 } from './golden-assertion-test-kit'
 import {
   compareRgba,
-  compositionCanvas2dTolerance,
+  mockupCanvas2dTolerance,
 } from './golden'
 
 beforeAll(prepareGoldenRuntime)
@@ -99,7 +99,7 @@ it.each([1, 2])('decodes production-like mockups through both backends at %ix', 
         expect([decoded.width, decoded.height])
           .toEqual([composition.layout.width * scale, composition.layout.height * scale])
         await assertGolden(`mockup-${variant.name}-${backend}-${scale}`, bytes,
-          backend === 'canvas2d' ? compositionCanvas2dTolerance : undefined)
+          backend === 'canvas2d' ? mockupCanvas2dTolerance : undefined)
         if (scale === 1 && backend === 'canvas2d') await writeFile(`artifacts/mockups/${variant.name}.png`, bytes)
         if (composition.frame.kind === 'phone') {
           const screen = resolveCompositionLayout(doc).screen

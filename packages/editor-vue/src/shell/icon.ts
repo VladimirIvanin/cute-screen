@@ -29,7 +29,6 @@ import {
   IconArrowForwardUp,
   IconArrowUpRight,
   IconCamera,
-  IconRobot,
   IconCheck,
   IconChevronDown,
   IconCircleNumber1,
@@ -67,6 +66,7 @@ import {
 import type { IconName } from './types'
 import { createCustomIcon } from './icons/create-custom-icon'
 import {
+  agentGeometry,
   calloutGeometry,
   eyedropperGeometry,
   gradientGeometry,
@@ -110,7 +110,7 @@ const icons = {
 
   arrow: IconArrowUpRight,
   camera: IconCamera,
-  agent: IconRobot,
+  agent: createCustomIcon('agent', agentGeometry),
   callout: createCustomIcon('callout', calloutGeometry),
   check: IconCheck,
   close: IconX,

@@ -26,8 +26,15 @@ describe('custom icons beside Tabler', () => {
       await browser.execute(() => window.scrollTo(0, 0))
       expect(await browser.execute(() => devicePixelRatio)).toBe(dpr)
       await browser.saveScreenshot(path.join(evidence, `gallery-dpr-${dpr}.png`))
+      await $('.agent-proposals').saveScreenshot(path.join(evidence, `agent-variants-dpr-${dpr}.png`))
       await $('.loupe-preview').saveScreenshot(path.join(evidence, `loupe-dpr-${dpr}.png`))
       await $('.censor-proposals').saveScreenshot(path.join(evidence, `censor-options-dpr-${dpr}.png`))
+      await $('.icon-row[data-icon-name="agent"]').scrollIntoView({ block: 'center' })
+      await browser.saveScreenshot(path.join(evidence, `agent-family-dpr-${dpr}.png`))
+      for (const theme of ['light', 'dark']) {
+        await $(`.icon-theme[data-theme="${theme}"] [data-icon-name="agent"]`)
+          .saveScreenshot(path.join(evidence, `agent-${theme}-dpr-${dpr}.png`))
+      }
       await $('.icon-row[data-icon-name="callout"]').scrollIntoView({ block: 'start' })
       await browser.saveScreenshot(path.join(evidence, `callout-family-dpr-${dpr}.png`))
       await $('.icon-row[data-icon-name="gradient"]').scrollIntoView({ block: 'center' })
@@ -47,10 +54,26 @@ describe('custom icons beside Tabler', () => {
     expect(geometry.find((row) => row.theme === 'light')?.colours[0])
       .not.toBe(geometry.find((row) => row.theme === 'dark')?.colours[0])
     await writeFile(path.join(evidence, 'gallery.json'), JSON.stringify(geometry, null, 2))
+    const agentSvg = await browser.execute(() => {
+      const svg = document.querySelector('[data-icon-name="agent"] svg')!.cloneNode(true) as SVGSVGElement
+      svg.removeAttribute('style')
+      return new XMLSerializer().serializeToString(svg)
+    })
+    await writeFile(path.join(evidence, 'agent.svg'), agentSvg)
+    const agentCandidates = await browser.execute(() => [...document.querySelectorAll(
+      '.agent-proposals [data-theme="light"] [data-agent-candidate]',
+    )].map((row) => {
+      const svg = row.querySelector('svg')!.cloneNode(true) as SVGSVGElement
+      svg.removeAttribute('style')
+      return { id: row.getAttribute('data-agent-candidate'), svg: new XMLSerializer().serializeToString(svg) }
+    }))
+    for (const candidate of agentCandidates) {
+      await writeFile(path.join(evidence, `agent-${candidate.id}.svg`), candidate.svg)
+    }
     const rasters = await browser.execute(async () => {
       const results = []
       for (const name of [
-        'marker', 'pencil', 'eyedropper', 'spotlight', 'privacy', 'loupe', 'callout', 'gradient',
+        'agent', 'marker', 'pencil', 'eyedropper', 'spotlight', 'privacy', 'loupe', 'callout', 'gradient',
       ]) {
         for (const size of [16, 18, 20, 24, 32]) {
           for (const dpr of [1, 2]) {

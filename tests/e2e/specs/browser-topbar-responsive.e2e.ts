@@ -89,6 +89,7 @@ describe('responsive editor topbar', () => {
         await expect($('.cs-settings-popover')).toBeDisplayed()
         await expect($('.cs-agent-connect')).not.toBeDisplayed()
         await expect($('.cs-settings-popover .cs-agent-overflow')).toBeDisplayed()
+        await browser.saveScreenshot(path.resolve('artifacts/browser-e2e', `topbar-agent-settings-${locale}-${theme}.png`))
         await browser.keys(Key.Escape)
         await expect(settings).toBeFocused()
       }).timeout(120000)

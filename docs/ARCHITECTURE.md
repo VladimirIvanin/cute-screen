@@ -743,6 +743,13 @@ Ruler measurements используют canvas coordinates, clipboard bridge и 
 
 ## UI-иконки (ADR-055)
 
+`agent` — выбранный пользователем вариант `dots-2`: маленькие округлые выступы
+на верхнем контуре, сплошные круглые глаза, челюсть шириной 18 единиц,
+центральная полоса и два сплошных зуба. Production и выбранный образец dev
+gallery используют одну agentGeometry; альтернативный dots-1 остаётся для сравнения.
+`agentGeometry` подключена через тот же UiIcon в TopBar, Settings overflow
+и выбранном образце gallery; заливки наследуют currentColor.
+
 `shell/icon.ts` связывает стабильный `IconName` с явными Tabler imports и
 проектными иконками. `shell/icons/` хранит типизированную геометрию допустимых
 SVG-примитивов и один Vue renderer. Геометрия не попадает в editor-core,

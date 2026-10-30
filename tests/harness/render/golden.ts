@@ -16,6 +16,14 @@ export const compositionCanvas2dTolerance: GoldenTolerance = {
   maximumDelta: 1,
 }
 
+// The phone/browser catalog resamples the same 4K fixture into narrower viewports.
+// Linux/Windows: <=41 RGB channels at 1x, <=595 at 2x (0.0061%), delta 1.
+// Scope this budget to mockups; composition goldens retain their smaller budget.
+export const mockupCanvas2dTolerance: GoldenTolerance = {
+  maximumChangedChannelRatio: 0.00007,
+  maximumDelta: 1,
+}
+
 export const semanticParityTolerance = {
   // Skia and Cairo use different edge antialiasing kernels. Interior pixels
   // must agree; up to six percent of channels may differ at vector edges.

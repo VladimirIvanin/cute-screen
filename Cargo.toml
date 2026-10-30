@@ -6,7 +6,7 @@ resolver = "2"
 edition = "2024"
 license = "MIT"
 rust-version = "1.97"
-version = "0.1.26"
+version = "0.1.27"
 
 [workspace.lints.clippy]
 cast_possible_truncation = "deny"

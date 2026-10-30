@@ -1,5 +1,16 @@
 # Платформенная матрица
 
+## Canvas2D golden мокапов (2026-10-30)
+
+Windows x64 / Ubuntu 22.04 x86_64 WSL2, Node 22.23.1, native canvas 1.0.2:
+Linux воспроизводит CI-разницу island landscape 2× — 220 RGB-каналов.
+По всем 48 PNG максимумы 41/595 каналов при 1×/2×, delta=1, alpha exact;
+все 24 CanvasKit PNG exact. Только Canvas2D mockups имеют scoped бюджет
+0,007% каналов и delta≤1; прежний composition budget 0,002% сохранён.
+Полный `pnpm test:render` на обеих платформах — по 31 files / 94 passed.
+Это software renderer evidence; WebView2/WKWebView/WebKitGTK не проверялись.
+Команды и результаты — TESTING.md, `artifacts/mockup-golden/`.
+
 ## Плавающие уведомления (2026-10-30, ADR-174)
 
 Windows x64 / Chrome 156.0.8078.76: 22 browser tests passed, включая восемь

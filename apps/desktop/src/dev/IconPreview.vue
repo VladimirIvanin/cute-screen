@@ -10,9 +10,11 @@ import {
 import '../../../../packages/editor-vue/src/shell/shell.css'
 import { spotlightCandidates } from './spotlight-candidates'
 import { censorCandidates } from './censor-selected'
+import { agentCandidates } from './agent-candidates'
 
 const sizes = [16, 18, 20, 24, 32] as const
 const names = [
+  'agent',
   'callout',
   'loupe',
   'marker',
@@ -40,6 +42,37 @@ const eyedroppers = [
   <main class="icon-workbench">
     <h1>Cute Screen · Icon workbench</h1>
     <p>Live UiIcon · 24-unit grid · currentColor · stroke 1.8 · round caps and joins</p>
+    <section class="agent-proposals">
+      <h2>Робот · принят вариант 2, точки на контуре</h2>
+      <div class="icon-themes">
+        <section
+          v-for="theme in ['light', 'dark']"
+          :key="theme"
+          :data-theme="theme"
+          class="icon-theme"
+        >
+          <div class="icon-row agent-row icon-heading">
+            <span>{{ theme }}</span>
+            <span v-for="size in [...sizes, 64]" :key="size">{{ size }} px</span>
+          </div>
+          <div
+            v-for="candidate in agentCandidates"
+            :key="candidate.id"
+            :data-agent-candidate="candidate.id"
+            class="icon-row agent-row"
+          >
+            <span>{{ candidate.id }} · {{ candidate.name }}</span>
+            <span
+              v-for="size in [...sizes, 64]"
+              :key="size"
+              class="icon-cell"
+            >
+              <component :is="candidate.component" :style="{ width: `${size}px`, height: `${size}px` }" />
+            </span>
+          </div>
+        </section>
+      </div>
+    </section>
     <section class="loupe-preview">
       <h2>Лупа · принятый B1: область и увеличение</h2>
       <div class="icon-themes">
@@ -226,7 +259,7 @@ const eyedroppers = [
         </div>
         <h3>18 px · button states</h3>
         <div
-          v-for="name in ['callout', 'marker', 'pencil', 'eyedropper', 'gradient'] as const"
+          v-for="name in ['agent', 'callout', 'marker', 'pencil', 'eyedropper', 'gradient'] as const"
           :key="name"
           class="icon-states"
         >
@@ -263,6 +296,7 @@ body { margin: 0; background: #e9e9ec; color: #202124; font: 14px/1.5 system-ui,
 .icon-theme { padding: 20px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 12px; }
 .icon-theme h2 { margin: 0 0 12px; font-size: 18px; }
 .icon-row { display: grid; grid-template-columns: 110px repeat(5, 1fr); gap: 8px; align-items: center; min-height: 46px; border-bottom: 1px solid var(--border); }
+.agent-row { grid-template-columns: 112px repeat(5, 1fr) 70px; min-height: 88px; }
 .icon-heading { font-size: 11px; color: var(--text-muted); min-height: 28px; }
 .icon-candidates .icon-row { grid-template-columns: 110px repeat(4, 1fr); min-height: 60px; }
 .icon-cell { display: flex; align-items: center; justify-content: center; }
