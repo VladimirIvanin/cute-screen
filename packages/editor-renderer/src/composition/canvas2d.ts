@@ -17,6 +17,8 @@ import {
   type PaintSteps,
 } from '../effects/runtime'
 import { freeformPixels } from './freeform'
+import { drawAnnotationShadow2D } from '../backends/canvas2d/annotation-shadow'
+import { finishSteps } from '../effects/runtime'
 
 type Group = Extract<RenderNode, { kind: 'group' }>
 type NewCanvas = (width: number, height: number) => Canvas2DLike
@@ -35,6 +37,10 @@ export function* drawGroup2D(
   const requested = cache.mode === 'interactive' && node.blur > 0
     ? Math.min(scale, 2048 / Math.max(destination.width, destination.height)) : scale
   const density = groupRasterScale(node.scene, node.destination.width, requested)
+  if (node.tint) {
+    drawAnnotationShadow2D(context, node, density, newCanvas, (surface, scale) => finishSteps(render(surface, scale)))
+    return
+  }
   const sourceBounds = groupNeedsFullSource(node.scene) ? node.scene : node.scene.outputBounds
   const alignSource = Boolean(node.backdrop && (
     sourceBounds.width * density !== Math.round(sourceBounds.width * density) ||
@@ -56,7 +62,6 @@ export function* drawGroup2D(
       let complete = false
       try {
         yield* render(source, density)
-        if (node.tint) tintSilhouette(source, node.tint)
         frame.keep(sourceKey, source, true)
         complete = true
       } finally {
@@ -120,21 +125,6 @@ export function* drawGroup2D(
   }
 }
 
-function tintSilhouette(
-  source: Canvas2DLike,
-  color: NonNullable<Group['tint']>,
-): void {
-  const mask = source.getContext('2d')!
-  mask.save()
-  try {
-    mask.setTransform(1, 0, 0, 1, 0, 0)
-    mask.globalCompositeOperation = 'source-in'
-    mask.fillStyle = `rgba(${color.red * 255}, ${color.green * 255}, ${color.blue * 255}, ${color.alpha})`
-    mask.fillRect(0, 0, source.width, source.height)
-  } finally {
-    mask.restore()
-  }
-}
 export function drawFreeform2D(
   context: Context2D,
   node: Extract<RenderNode, { kind: 'freeform' }>,

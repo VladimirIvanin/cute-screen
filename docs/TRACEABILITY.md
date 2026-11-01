@@ -1,5 +1,23 @@
 # Трассируемость требований
 
+## Версия 0.1.30 — до бампа (2026-11-01)
+
+`REQ-REL-005/006`, `REQ-TOL-001`, `REQ-EDT-021`: по запросу владельца поднять
+patch 0.1.29 → 0.1.30 штатной `pnpm version:bump`, проверить metadata и
+форматирование, закоммитить исправление клиновидных стрелок/теней вместе с
+бампом и отправить текущую main в origin. Native runtime limitation ADR-176
+сохраняется; новый metadata bump не считается повторной runtime-проверкой.
+
+## Исправление клиновидной ломаной и drag/rotate (2026-11-01)
+
+`REQ-TOL-001`, `REQ-EDT-021`, `REQ-EDT-005`: до реализации добавить red tests
+для короткого конечного сегмента elbow, совпавших точек, непрерывного контура
+на прямых углах и shadow group в transient overlay. Проверить drag endpoints,
+middle anchor и rotate через production UI без исчезновения, одну команду на
+release и Undo/Redo/Cancel. Тени должны сохранять alpha-силуэт без CPU pixel
+readback/blur в каждом кадре; проверка PNG обоих backend при 1×/2× и измерение
+времени серии transient frames обязательны. Native/WebKit — отдельные gates.
+
 ## Версия 0.1.29 — до бампа (2026-11-01)
 
 `REQ-REL-005/006`, `REQ-MCP-004`: после исправления generated MCP-схемы

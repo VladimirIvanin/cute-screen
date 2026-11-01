@@ -1,5 +1,16 @@
 # Платформенная матрица
 
+## Drag/rotate клиновидной стрелки (2026-11-01, ADR-176)
+
+Windows x64 / Chrome 156.0.8078.76: UI creation, endpoint/middle/rotate live
+pixels, single-command Undo/Redo, Escape cancel, RU/EN × темы и 1024 px —
+2 browser tests passed. Core/renderer/Vue — 44 passed; полный decoded render
+suite — 96 passed, goldens сохранены. Software perf на 4K: p95 27,84 ms,
+не WebView/GPU frame guarantee. Native gate и evidence — TESTING.md и
+`artifacts/tapered-repair/README.md`. WebKitGTK/WKWebView pending.
+Fresh WebView2 156.0.4314.58: build прошёл, external session attach завис до
+assertions; Quick/handoff/reopen pending, тестовое дерево остановлено.
+
 ## Клиновидные стрелки и тень аннотаций (2026-11-01, ADR-175)
 
 Windows x64 / Chrome 156.0.8078.76: browser production drawing, defaults,

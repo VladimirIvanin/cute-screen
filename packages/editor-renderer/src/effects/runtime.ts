@@ -17,7 +17,7 @@ export type PaintSteps = Generator<PixelJob, void, void>
 export function hasPixelEffects(scene: RenderSceneSnapshot): boolean {
   return scene.nodes.some((node) => node.visible && node.opacity > 0 && (
     node.kind === 'censor' && node.effect.mode !== 'solid' ||
-    node.kind === 'group' && (node.blur > 0 || hasPixelEffects(node.scene))
+    node.kind === 'group' && (node.blur > 0 && !node.tint || hasPixelEffects(node.scene))
   ))
 }
 

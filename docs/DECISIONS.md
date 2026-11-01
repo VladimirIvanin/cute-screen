@@ -1,8 +1,39 @@
 # Журнал архитектурных решений
 
+## ADR-176 — Устойчивая клиновидная ломаная и native alpha shadow
+
+**Статус:** accepted (2026-11-01); supersedes ADR-175 в построении углов
+клиновидной ломаной и Canvas2D-отрисовке тени. Остальные контракты ADR-175 сохранены.
+
+**Основание:** red core test получил голову 72 px на конечном сегменте 5 px;
+red renderer test получил `group rendering requires an ordered Canvas2D surface`
+при transient rotate. Scene скрывал committed объект, overlay отвергал его тень,
+поэтому исчезал весь объект. CPU group blur делал readback и обход RGBA на кадр.
+
+**Решение:** клиновидный elbow удаляет совпавшие соседние route points,
+ограничивает каждую закрытую голову 80% её крайнего ненулевого сегмента и строит
+ограниченный miter из единичных нормалей. Ширина у вершины ограничена 40%
+прилегающих сегментов; стержень у закрытой головы — четвертью её длины.
+Геометрические ограничения не меняют handles и persisted payload.
+
+Canvas2D scene и lightweight overlay рисуют tinted annotation group одним
+native shadow от объединённой alpha mask. Pattern source вынесен за scratch,
+на surface остаётся только shadow; preset alpha применяется при композиции.
+Нет getImageData, CPU blur, worker job или CSS filter для общей тени.
+CanvasKit сохраняет прежние image/color filters. Одиночный vector fill без
+stroke рисуется напрямую; составные fill/stroke изолируются и освобождают scratch
+в finally. Censor и прочие pixel effects сохраняют прежний pipeline/cache.
+
+**Проверяемое основание:** red/green core и renderer tests, live pixels до
+pointerup при endpoint/middle/rotate с Undo/Redo/Cancel, повторное декодирование
+PNG 1×/2× и software timing на 4K screenshot. Фактические результаты и отдельные
+native/WebKit gates — TESTING.md.
+
 ## ADR-175 — Клиновидные стрелки и общая тень аннотаций
 
-**Статус:** accepted (2026-11-01); supersedes ADR-123 только в перечне
+**Статус:** superseded в геометрии elbow и Canvas2D shadow через
+[ADR-176](#adr-176-устойчивая-клиновидная-ломаная-и-native-alpha-shadow);
+остальное accepted (2026-11-01). Supersedes ADR-123 только в перечне
 оформлений стрелки и ADR-031 только в запрете общей тени text-bearing слоёв.
 
 **Основание:** пользовательский пример требует расширяющегося стержня и

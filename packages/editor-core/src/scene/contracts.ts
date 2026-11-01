@@ -60,6 +60,8 @@ interface RenderNodeBase {
 
 /** One composited figure: fill its outline, then stroke outline and internal details. */
 export interface RenderVectorNode extends RenderNodeBase {
+  /** One filled contour may compose directly, without a supersampled fill/stroke surface. */
+  readonly directFill?: boolean
   readonly kind: 'vector'
   readonly lineCap?: RenderLineCap
   readonly x: number

@@ -117,6 +117,15 @@ export function trimArrowBodyPoints(
       requestedEndInset === 0) ||
       points.length < 2
   ) return points
+  return trimArrowRoute(points, startInset, endInset)
+}
+
+/** Trim independent endpoint lengths, including route-constrained tapered heads. */
+export function trimArrowRoute(
+  points: readonly Point[],
+  startInset: number,
+  endInset: number,
+): readonly Point[] {
   const lengths = points
     .slice(1)
     .map((entry, index) => Math.hypot(entry.x - points[index]!.x, entry.y - points[index]!.y))

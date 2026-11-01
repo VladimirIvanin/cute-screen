@@ -4,7 +4,7 @@ import type {
 } from './document/types'
 import {
   arrowPathPoints,
-  trimArrowBodyPoints,
+  trimArrowRoute,
   arrowEndpointAngles,
   scaledClosedArrowCapSizes,
 } from './arrow-route'
@@ -35,11 +35,25 @@ export function taperedArrowGeometry(payload: ArrowLayerPayload): readonly Shape
     const t = total > 0 ? travelled / total : 0
     const progress = sizes.start > 0 ? (sizes.end > 0 ? Math.abs(2 * t - 1) : 1 - t) : t
     const maximumHalf = Math.max(width * 1.25, Math.max(sizes.start, sizes.end) * .2)
-    const half = width * .35 + (maximumHalf - width * .35) * progress
+    let half = width * .35 + (maximumHalf - width * .35) * progress
+    if (payload.path === 'elbow') {
+      // A short leg must not fold its two offset edges over the next corner.
+      half = Math.min(half, Math.min(lengths[Math.max(0, i - 1)]!, lengths[Math.min(i, lengths.length - 1)]!) * .4)
+    }
+    if (i === 0 && sizes.start > 0) half = Math.min(half, sizes.start * .25)
+    if (i === body.length - 1 && sizes.end > 0) half = Math.min(half, sizes.end * .25)
     const before = body[Math.max(0, i - 1)]!, after = body[Math.min(body.length - 1, i + 1)]!
-    const angle = Math.atan2(after.y - before.y, after.x - before.x)
-    left.push(offset(body[i]!, angle, half))
-    right.push(offset(body[i]!, angle, -half))
+    const incoming = i === 0 ? Math.atan2(after.y - body[i]!.y, after.x - body[i]!.x)
+      : Math.atan2(body[i]!.y - before.y, body[i]!.x - before.x)
+    const outgoing = i === body.length - 1 ? incoming : Math.atan2(after.y - body[i]!.y, after.x - body[i]!.x)
+    // Intersect unit offset normals; averaging neighbour positions cuts corners
+    // when the two adjoining segments have very different lengths.
+    const nx = -Math.sin(incoming) - Math.sin(outgoing), ny = Math.cos(incoming) + Math.cos(outgoing)
+    const norm = Math.hypot(nx, ny)
+    const angle = norm > .001 ? Math.atan2(-nx, ny) : outgoing
+    const miter = Math.min(2, 1 / Math.max(.5, Math.abs(Math.cos(angle - outgoing))))
+    left.push(offset(body[i]!, angle, half * miter))
+    right.push(offset(body[i]!, angle, -half * miter))
   }
   if (payload.stroke.style !== 'solid') return dashedOutline(payload, body, left, right, lengths, total, sizes, angles)
   // Closed solid heads share the same outline as the variable-width shaft.
@@ -85,14 +99,23 @@ function roundedOutline(
 }
 
 export function taperedArrowMetrics(payload: ArrowLayerPayload) {
-  const route = arrowPathPoints(payload)
+  const route = arrowPathPoints(payload).filter((p, i, points) =>
+    i === 0 || Math.hypot(p.x - points[i - 1]!.x, p.y - points[i - 1]!.y) > .000001)
   const width = payload.stroke.width
   const length = route.slice(1).reduce((sum, p, i) => sum + Math.hypot(p.x - route[i]!.x, p.y - route[i]!.y), 0)
   const heads = Number(payload.startCap === 'solidArrow' || payload.startCap === 'triangle') +
     Number(payload.endCap === 'solidArrow' || payload.endCap === 'triangle')
   const capWidth = Math.min(Math.max(width * 6, length * .24), width * 16, length * .6 / Math.max(1, heads)) / 3
-  const sizes = scaledClosedArrowCapSizes(route, payload.startCap, payload.endCap, capWidth)
-  const body = trimArrowBodyPoints(route, payload.startCap, payload.endCap, capWidth)
+  const requested = scaledClosedArrowCapSizes(route, payload.startCap, payload.endCap, capWidth)
+  const terminalLength = (start: boolean) => {
+    const a = start ? route[0] : route.at(-1), b = start ? route[1] : route.at(-2)
+    return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0
+  }
+  const sizes = payload.path === 'elbow' ? {
+    start: Math.min(requested.start, terminalLength(true) * .8),
+    end: Math.min(requested.end, terminalLength(false) * .8),
+  } : requested
+  const body = route.length >= 2 ? trimArrowRoute(route, sizes.start, sizes.end) : []
   const angles = arrowEndpointAngles(route)
   return { route, width, length, sizes, body, angles }
 }

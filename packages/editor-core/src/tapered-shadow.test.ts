@@ -28,6 +28,7 @@ import {
 import { rebaseArrowLayer } from './arrow-geometry'
 import { flattenShapePath } from './shapes'
 import { createTextCommitCommand } from './tools/content/commands'
+import { taperedArrowMetrics } from './tapered-arrow'
 
 function arrow(): ArrowLayer {
   return createDrawingLayer({ id: '019c1f62-058e-7000-8000-000000000004', tool: 'arrow',
@@ -37,6 +38,21 @@ function arrow(): ArrowLayer {
 }
 
 describe('tapered arrows and annotation shadows', () => {
+  it('keeps an elbow head on its terminal segment and a shaft inside the route corridor', () => {
+    const original = arrow()
+    const payload = { ...original.payload, path: 'elbow' as const,
+      start: { x: 0, y: 0 }, end: { x: 200, y: 100 }, elbow: { axis: 'x' as const, offset: 45 } }
+    const { sizes, body } = taperedArrowMetrics(payload)
+    expect(sizes.end).toBeLessThanOrEqual(4)
+    expect(body.at(-1)!.x).toBe(200)
+    const layer = rebaseArrowLayer({ ...original, transform: { ...original.transform, translateX: 0, translateY: 0 } }, { ...payload, elbow: { axis: 'x', offset: 0 } })
+    const scene = createDocumentRenderScene({ ...documentFixture, layers: [layer] })
+    const doc = { ...documentFixture, layers: [layer] }
+    // Both straight legs stay filled right up to the 90° corner.
+    expect(hitTestDocument(doc, { x: 0, y: 45 })?.nodeId).toBe(layer.id)
+    expect(hitTestDocument(doc, { x: 5, y: 50 })?.nodeId).toBe(layer.id)
+    expect(scene.nodes[0]?.kind).toBe('vector')
+  })
   it('creates a filled tapered silhouette with a wider head and precise fill hit testing', () => {
     const layer = arrow()
     expect(layer.payload.appearance).toBe('tapered')

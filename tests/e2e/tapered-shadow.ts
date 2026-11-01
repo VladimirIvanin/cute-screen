@@ -7,6 +7,7 @@ import { writeFile } from 'node:fs/promises'
 import { shapeDocument } from './shape-toolbar'
 import { drawingDefaultsHost } from './hand-drawn'
 import { waitForStableCanvas } from './canvas-ready'
+import { verifyTaperedInteractions } from './tapered-interactions'
 
 type Layer = Awaited<ReturnType<typeof shapeDocument>>['layers'][number] & { annotationShadow?: string }
 export async function shadowLayers(): Promise<Layer[]> {
@@ -72,6 +73,7 @@ export async function verifyTaperedShadow(directory: string): Promise<void> {
   expect(geometry.overlapsToolbar).toBe(false)
   await browser.saveScreenshot(`${directory}/tapered-shadow-popup.png`)
   await browser.keys('Escape')
+  await verifyTaperedInteractions(directory)
   await browser.saveScreenshot(`${directory}/tapered-shadow-arrow.png`)
   await writeFile(`${directory}/tapered-shadow-geometry.json`, JSON.stringify(geometry, null, 2))
   await writeFile(`${directory}/tapered-shadow-document.json`, JSON.stringify(await shapeDocument(), null, 2))

@@ -39,6 +39,21 @@ export function drawVectorNode2D(
   resources: ReadonlyMap<string, ImageResourceInput['source']>,
   newCanvas: (width: number, height: number) => Canvas2DLike = defaultCanvas,
 ): void {
+  // A single fill is already one composite operation. Tapered arrows do not
+  // need a document-sized intermediate surface on every pointer frame.
+  if (
+    node.directFill &&
+    node.strokeWidth === 0 &&
+    !node.open
+  ) {
+    withTransform(context, node, node.x + node.width / 2, node.y + node.height / 2, () => {
+      context.beginPath()
+      path(context, node.outline)
+      context.fillStyle = paintStyle(context, node.fill, resources)
+      context.fill()
+    })
+    return
+  }
   const matrix = context.getTransform()
   const scale = Math.max(Math.hypot(matrix.a, matrix.b), Math.hypot(matrix.c, matrix.d), 1)
   // Miter joins can extend beyond the intrinsic contour bounds.
@@ -50,25 +65,31 @@ export function drawVectorNode2D(
   const scratch = newCanvas(Math.ceil(width * scale), Math.ceil(height * scale))
   const target = scratch.getContext('2d')
   if (!target) throw new Error('Vector composition surface is unavailable')
-  target.setTransform(scale, 0, 0, scale, -left * scale, -top * scale)
-  if (!node.open) {
-    target.beginPath()
-    path(target, node.outline)
-    target.fillStyle = paintStyle(target, node.fill, resources)
-    target.fill()
+  try {
+    target.setTransform(scale, 0, 0, scale, -left * scale, -top * scale)
+    if (!node.open) {
+      target.beginPath()
+      path(target, node.outline)
+      target.fillStyle = paintStyle(target, node.fill, resources)
+      target.fill()
+    }
+    if (node.strokeWidth > 0) {
+      target.beginPath()
+      path(target, node.outline)
+      path(target, node.details)
+      target.strokeStyle = cssColor(node.stroke)
+      target.lineWidth = node.strokeWidth
+      target.lineJoin = node.lineJoin ?? 'miter'
+      target.lineCap = node.lineCap ?? 'butt'
+      target.setLineDash(node.dash ? [...node.dash] : [])
+      target.stroke()
+    }
+    withTransform(context, node, node.x + node.width / 2, node.y + node.height / 2, () => {
+      context.drawImage(scratch as unknown as CanvasImageSource,
+        left, top, scratch.width / scale, scratch.height / scale)
+    })
+  } finally {
+    scratch.width = 1
+    scratch.height = 1
   }
-  if (node.strokeWidth > 0) {
-    target.beginPath()
-    path(target, node.outline)
-    path(target, node.details)
-    target.strokeStyle = cssColor(node.stroke)
-    target.lineWidth = node.strokeWidth
-    target.lineJoin = node.lineJoin ?? 'miter'
-    target.lineCap = node.lineCap ?? 'butt'
-    target.setLineDash(node.dash ? [...node.dash] : [])
-    target.stroke()
-  }
-  withTransform(context, node, node.x + node.width / 2, node.y + node.height / 2, () => {
-    context.drawImage(scratch as unknown as CanvasImageSource, left, top, scratch.width / scale, scratch.height / scale)
-  })
 }

@@ -1,5 +1,14 @@
 # CI-сборки и проверка версии через GitHub
 
+## Геометрия и transient shadow repair (ADR-176)
+
+Frontend/core/renderer-only изменение: bounded elbow contour, native Canvas2D
+alpha shadow и lightweight overlay. Persisted document/schema/IPC, dependencies
+и Cargo profiles не меняются. Используется общий target/debug; runtime gate —
+`CUTE_SCREEN_E2E_SCENARIOS=tapered-shadow,tapered-shadow-reopen pnpm test:e2e:tauri`
+со свежим штатным debug/no-bundle harness. Release/package build не требуется.
+Фактические результаты и disk before/after — TESTING.md и task evidence.
+
 ## Аннотации с клиновидным контуром и тенью (ADR-175)
 
 Additive frontend/document fields в schema8 без новых зависимостей, IPC,

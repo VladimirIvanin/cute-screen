@@ -28,7 +28,7 @@ export function taperedArrowNodes(layer: ArrowLayer): readonly RenderNode[] {
     visible: layer.visible, blendMode: layerBlendMode(layer), kind: 'vector', id: `${layer.id}:body`,
     x: layer.transform.translateX + bounds.x, y: layer.transform.translateY + bounds.y,
     width: bounds.width, height: bounds.height, outline, details: [], open: false,
-    fill: style.color, stroke: TRANSPARENT, strokeWidth: 0,
+    fill: style.color, stroke: TRANSPARENT, strokeWidth: 0, directFill: true,
   }
   const { body, angles, sizes } = taperedArrowMetrics(arrow)
   return [node,

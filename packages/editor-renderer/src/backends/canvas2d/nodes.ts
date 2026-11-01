@@ -1,4 +1,6 @@
 import { drawVectorNode2D } from './vector-node'
+import { drawAnnotationShadow2D } from './annotation-shadow'
+import { defaultCanvas } from './paint'
 import type { RenderNode } from '@cute-screen/editor-core'
 import type { ImageResourceInput } from '../../types'
 import type {
@@ -54,6 +56,20 @@ export function drawNodes2D(
         // Resources are resolved by the renderer, keeping overlays independent.
         break
       case 'group':
+        if (!node.tint) throw new Error('group rendering requires an ordered Canvas2D surface')
+        {
+          const matrix = context.getTransform()
+          const density = Math.max(.01, Math.hypot(matrix.a, matrix.b), Math.hypot(matrix.c, matrix.d))
+          drawAnnotationShadow2D(context, node, density, newCanvas ?? defaultCanvas, (surface, scale) => {
+            const b = node.scene.outputBounds
+            surface.width = Math.max(1, Math.round(b.width * scale))
+            surface.height = Math.max(1, Math.round(b.height * scale))
+            const target = surface.getContext('2d')!
+            target.setTransform(scale, 0, 0, scale, -b.x * scale, -b.y * scale)
+            drawNodes2D(target, node.scene.nodes, resources, resolveFontFamily, newCanvas)
+          })
+        }
+        break
       case 'freeform':
       case 'censor':
       case 'spotlight':

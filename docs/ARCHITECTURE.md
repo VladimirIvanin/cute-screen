@@ -1,5 +1,16 @@
 # Архитектура Cute Screen
 
+## Transient стрелки и alpha shadow (ADR-176)
+
+Клиновидный elbow использует нормали сегментов с bounded miter; головы и ширина
+ограничены прилегающими ненулевыми сегментами. Один resolver обслуживает bounds,
+hit testing, preview и export; payload и commands не меняются.
+Canvas2D drawNodes2D поддерживает tinted annotation groups в transient overlay
+и drafts. Scene использует тот же native alpha-mask shadow helper без CPU
+readback/blur. Тень и ink остаются видимыми до pointerup; committed слой скрыт
+только на время transient gesture. Vector-only fill не создаёт промежуточный
+canvas; составные vectors и shadow surfaces освобождаются в finally.
+
 ## Клиновидный контур и тень аннотаций (ADR-175)
 
 arrow-route содержит прежние path/cap primitives без UI. tapered-arrow строит

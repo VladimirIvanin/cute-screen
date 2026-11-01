@@ -1,5 +1,66 @@
 # Стратегия тестирования
 
+## Бамп 0.1.30 после исправления стрелок (2026-11-01)
+
+Windows x64 / PowerShell, base `9b90176` + ADR-176 working tree:
+`pnpm version:bump 0.1.30` синхронизировал package/Tauri/Cargo metadata,
+точные workspace dependencies и четыре lock entries без обновления внешних
+зависимостей. `pnpm test:boundaries tests/boundaries/bump-version.test.ts tests/boundaries/release-assets.test.ts`
+— 2 files / 34 passed. `node scripts/release-assets.mjs version D:/cutescreen v0.1.30`
+и `pnpm mcp:schema:check` — exit 0. После бампа выполнены `pnpm format`,
+`pnpm format:check`, `pnpm docs:check` и `git diff --check`.
+Полные проверки исправления и ограничение native runtime указаны ниже;
+metadata bump не требует повторной package/release сборки.
+
+## Клиновидная ломаная и transient shadow repair (2026-11-01, ADR-176)
+
+Windows x64 / PowerShell, Node 22.23.1, pnpm 10.33.2, Chrome 156.0.8078.76.
+Evidence: `artifacts/tapered-repair/`; live screenshots/JSON —
+`artifacts/browser-e2e/tapered-shadow-*`.
+
+- До реализации focused core/renderer: 2 failed / 10 passed. Head на terminal
+  5 px имел длину 72 px; overlay выбрасывал ошибку на группе тени.
+- `pnpm test packages/editor-core/src/tapered-shadow.test.ts packages/editor-core/src/arrow-geometry.test.ts packages/editor-core/src/hand-drawn.test.ts packages/editor-renderer/src/annotation-shadow.test.ts packages/editor-renderer/src/effect-cache.test.ts tests/unit/vue/canvas-viewport-arrow.test.ts`
+  — 6 files / 44 passed (`unit.log`). Проверены live ink/shadow при rotation,
+  точное совпадение overlay/scene, отсутствие pixel readback/filter jobs и
+  освобождение scratch. Первый вариант pixel equality через deep assertion
+  превысил timeout; заменён бинарным сравнением тех же RGBA bytes.
+- `pnpm test:render` — финально 32 files / 96 passed (`render-final.log`),
+  включая PNG 1×/2× обоих backend. Первый проход обнаружил, что прямой fill
+  меняет antialiasing мокапов; optimization ограничена явным scene
+  флагом клиновидного контура. Существующие goldens и допуски не менялись.
+- `pnpm test:e2e:browser --spec tests/e2e/specs/browser-tapered-shadow.e2e.ts`
+  с `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1`, порт 5188 — 2 passed (`browser.log`).
+  Создание через UI, endpoint/middle/rotate с видимыми красными пикселями до
+  pointerup, unchanged committed document во время drag, one-command Undo/Redo,
+  Escape cancel с сохранением redo; RU/EN × light/dark, 1024 px. Первый проход
+  выявил лишний Escape в самом тесте, снимающий selection; исправлен тест.
+- `pnpm test:perf tests/harness/perf/annotation-shadow.test.ts` — 1 passed.
+  4K fixture, preview 0,5, 30 rotating frames: native p50 24,68 ms / p95 27,84 ms;
+  generic CPU blur reference p50 23,41 ms / p95 29,41 ms. Это software Canvas2D,
+  не доказательство 60 FPS в WebView. Главный проверенный выигрыш — отсутствие
+  readback/CPU blur/worker и лишнего vector scratch; median speedup не заявляется.
+- `pnpm typecheck` — exit 0 (`typecheck-final.log`). Остальные финальные
+  format/lint/docs checks и native результаты фиксируются в task README.
+
+Native: `CUTE_SCREEN_E2E_SCENARIOS=tapered-shadow,tapered-shadow-reopen pnpm test:e2e:tauri`
+собрал свежий debug/no-bundle harness за 44,80 s. WebView2 156.0.4314.58,
+EdgeDriver 156.0.4314.50, external tauri-driver. Создание WebDriver session
+осталось pending более трёх минут, worker log пуст, до первого assertion
+не дошло. Остановлено только дерево task-owned runner PID 62560; installed
+Cute Screen не останавливался. Reopen не запускался. Дополнительный осмотр
+Windows через computer-use трижды завершился `list_windows` timeout, включая
+reset helper. Это не native pass и не доказательство renderer failure.
+Native Quick/non-origin crop/handoff/reopen остаются pending.
+
+`pnpm clean:artifacts` отказал до удаления: WMI продолжает возвращать task pin
+`cute-screen-e2e-binary-5wzuvo` как активный после остановки. Проверка не обходилась;
+один текущий diagnostic profile и pin оставлены. Disk before/after — task README.
+
+Rust/IPC/schema/dependencies не менялись. Полный `pnpm check`, Rust tests и
+release/package build не запускались; native gate использует штатный свежий
+`--debug --no-bundle` harness. WebKitGTK/WKWebView здесь не запускались.
+
 ## Бамп 0.1.29 после исправления MCP-схемы (2026-11-01)
 
 Windows x64 / PowerShell, base `78a7fbc`: `pnpm version:bump 0.1.29`
