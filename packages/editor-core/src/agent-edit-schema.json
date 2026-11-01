@@ -564,8 +564,9 @@
       "type": "object",
       "properties": {
         "payload": { "$ref": "#/$defs/T90" },
+        "annotationShadow": { "$ref": "#/$defs/T98" },
         "space": { "$ref": "#/$defs/T2" },
-        "transform": { "$ref": "#/$defs/T98" },
+        "transform": { "$ref": "#/$defs/T99" },
         "localBounds": { "$ref": "#/$defs/T65" },
         "visible": { "type": "boolean" },
         "locked": { "type": "boolean" },
@@ -633,7 +634,8 @@
       "required": ["start", "end", "alignment", "listKind"]
     },
     "T96": { "type": "array", "items": { "$ref": "#/$defs/T97" } },
-    "T98": {
+    "T98": { "anyOf": [{ "const": "soft" }, { "const": "strong" }] },
+    "T99": {
       "type": "object",
       "properties": {
         "translateX": { "type": "number" },
@@ -645,12 +647,13 @@
       "additionalProperties": false,
       "required": ["translateX", "translateY", "rotation", "scaleX", "scaleY"]
     },
-    "T99": {
+    "T100": {
       "type": "object",
       "properties": {
-        "payload": { "$ref": "#/$defs/T100" },
+        "payload": { "$ref": "#/$defs/T101" },
+        "annotationShadow": { "$ref": "#/$defs/T98" },
         "space": { "$ref": "#/$defs/T2" },
-        "transform": { "$ref": "#/$defs/T98" },
+        "transform": { "$ref": "#/$defs/T99" },
         "localBounds": { "$ref": "#/$defs/T65" },
         "visible": { "type": "boolean" },
         "locked": { "type": "boolean" },
@@ -658,7 +661,7 @@
       },
       "additionalProperties": false
     },
-    "T100": {
+    "T101": {
       "type": "object",
       "properties": {
         "content": { "$ref": "#/$defs/T91" },
@@ -677,12 +680,13 @@
       "additionalProperties": false,
       "required": ["content", "background", "target", "label", "route", "stroke", "targetMarker", "labelMarker"]
     },
-    "T101": {
+    "T102": {
       "type": "object",
       "properties": {
-        "payload": { "$ref": "#/$defs/T102" },
+        "payload": { "$ref": "#/$defs/T103" },
+        "annotationShadow": { "$ref": "#/$defs/T98" },
         "space": { "$ref": "#/$defs/T2" },
-        "transform": { "$ref": "#/$defs/T98" },
+        "transform": { "$ref": "#/$defs/T99" },
         "localBounds": { "$ref": "#/$defs/T65" },
         "visible": { "type": "boolean" },
         "locked": { "type": "boolean" },
@@ -690,39 +694,40 @@
       },
       "additionalProperties": false
     },
-    "T102": {
+    "T103": {
       "type": "object",
       "properties": {
         "sequence": { "type": "number" },
         "label": { "$ref": "#/$defs/T91" },
-        "badge": { "$ref": "#/$defs/T103" }
+        "badge": { "$ref": "#/$defs/T104" }
       },
       "additionalProperties": false,
       "required": ["sequence", "label", "badge"]
     },
-    "T103": {
+    "T104": {
       "type": "object",
       "properties": { "shape": { "$ref": "#/$defs/T54" }, "color": { "$ref": "#/$defs/T23" } },
       "additionalProperties": false,
       "required": ["shape", "color"]
     },
-    "T104": {
+    "T105": {
       "type": "object",
       "properties": {
-        "payload": { "$ref": "#/$defs/T105" },
+        "payload": { "$ref": "#/$defs/T106" },
+        "annotationShadow": { "$ref": "#/$defs/T98" },
         "space": { "$ref": "#/$defs/T2" },
-        "transform": { "$ref": "#/$defs/T98" },
+        "transform": { "$ref": "#/$defs/T99" },
         "localBounds": { "$ref": "#/$defs/T65" },
         "visible": { "type": "boolean" },
         "locked": { "type": "boolean" },
         "extras": { "$ref": "#/$defs/T10" },
         "opacity": { "type": "number" },
-        "blendMode": { "$ref": "#/$defs/T108" },
-        "shadows": { "$ref": "#/$defs/T109" }
+        "blendMode": { "$ref": "#/$defs/T109" },
+        "shadows": { "$ref": "#/$defs/T110" }
       },
       "additionalProperties": false
     },
-    "T105": {
+    "T106": {
       "type": "object",
       "properties": {
         "blobHash": { "type": "string" },
@@ -731,7 +736,7 @@
         "format": { "$ref": "#/$defs/T57" },
         "orientationApplied": { "const": true },
         "color": {},
-        "role": { "$ref": "#/$defs/T107" },
+        "role": { "$ref": "#/$defs/T108" },
         "border": { "$ref": "#/$defs/T47" },
         "radius": { "type": "number" },
         "crop": { "type": "null" },
@@ -740,9 +745,9 @@
       "additionalProperties": { "$ref": "#/$defs/T11" },
       "required": ["blobHash", "intrinsicWidth", "intrinsicHeight", "format", "orientationApplied", "color", "role"]
     },
-    "T106": {},
-    "T107": { "anyOf": [{ "const": "content" }, { "const": "base" }] },
-    "T108": {
+    "T107": {},
+    "T108": { "anyOf": [{ "const": "content" }, { "const": "base" }] },
+    "T109": {
       "anyOf": [
         { "const": "normal" },
         { "const": "multiply" },
@@ -754,82 +759,85 @@
         { "const": "hardLight" }
       ]
     },
-    "T109": { "type": "array", "items": { "$ref": "#/$defs/T86" } },
-    "T110": {
+    "T110": { "type": "array", "items": { "$ref": "#/$defs/T86" } },
+    "T111": {
       "type": "object",
       "properties": {
-        "payload": { "$ref": "#/$defs/T111" },
+        "payload": { "$ref": "#/$defs/T112" },
+        "annotationShadow": { "$ref": "#/$defs/T98" },
         "space": { "$ref": "#/$defs/T2" },
-        "transform": { "$ref": "#/$defs/T98" },
+        "transform": { "$ref": "#/$defs/T99" },
         "localBounds": { "$ref": "#/$defs/T65" },
         "visible": { "type": "boolean" },
         "locked": { "type": "boolean" },
         "extras": { "$ref": "#/$defs/T10" },
         "opacity": { "type": "number" },
-        "blendMode": { "$ref": "#/$defs/T108" },
-        "shadows": { "$ref": "#/$defs/T109" }
+        "blendMode": { "$ref": "#/$defs/T109" },
+        "shadows": { "$ref": "#/$defs/T110" }
       },
       "additionalProperties": false
     },
-    "T111": {
+    "T112": {
       "type": "object",
       "properties": { "grapheme": { "type": "string" }, "asset": { "$ref": "#/$defs/T60" } },
       "additionalProperties": { "$ref": "#/$defs/T11" },
       "required": ["grapheme", "asset"]
     },
-    "T112": {
+    "T113": {
       "type": "object",
       "properties": {
-        "payload": { "$ref": "#/$defs/T113" },
+        "payload": { "$ref": "#/$defs/T114" },
+        "annotationShadow": { "$ref": "#/$defs/T98" },
         "space": { "$ref": "#/$defs/T2" },
-        "transform": { "$ref": "#/$defs/T98" },
+        "transform": { "$ref": "#/$defs/T99" },
         "localBounds": { "$ref": "#/$defs/T65" },
         "visible": { "type": "boolean" },
         "locked": { "type": "boolean" },
         "extras": { "$ref": "#/$defs/T10" },
         "opacity": { "type": "number" },
-        "blendMode": { "$ref": "#/$defs/T108" },
-        "shadows": { "$ref": "#/$defs/T109" }
+        "blendMode": { "$ref": "#/$defs/T109" },
+        "shadows": { "$ref": "#/$defs/T110" }
       },
       "additionalProperties": false
     },
-    "T113": {
+    "T114": {
       "type": "object",
       "properties": {
-        "region": { "$ref": "#/$defs/T114" },
-        "effect": { "$ref": "#/$defs/T117" },
+        "region": { "$ref": "#/$defs/T115" },
+        "effect": { "$ref": "#/$defs/T118" },
         "sampleSource": { "const": "compositeBelow" }
       },
       "additionalProperties": false,
       "required": ["region", "effect", "sampleSource"]
     },
-    "T115": {},
     "T116": {},
-    "T114": { "anyOf": [{}, {}] },
-    "T118": {},
+    "T117": {},
+    "T115": { "anyOf": [{}, {}] },
     "T119": {},
     "T120": {},
-    "T117": { "anyOf": [{}, {}, {}] },
-    "T121": {
+    "T121": {},
+    "T118": { "anyOf": [{}, {}, {}] },
+    "T122": {
       "type": "object",
       "properties": {
-        "payload": { "$ref": "#/$defs/T122" },
+        "payload": { "$ref": "#/$defs/T123" },
+        "annotationShadow": { "$ref": "#/$defs/T98" },
         "space": { "$ref": "#/$defs/T2" },
-        "transform": { "$ref": "#/$defs/T98" },
+        "transform": { "$ref": "#/$defs/T99" },
         "localBounds": { "$ref": "#/$defs/T65" },
         "visible": { "type": "boolean" },
         "locked": { "type": "boolean" },
         "extras": { "$ref": "#/$defs/T10" },
         "opacity": { "type": "number" },
-        "blendMode": { "$ref": "#/$defs/T108" },
-        "shadows": { "$ref": "#/$defs/T109" }
+        "blendMode": { "$ref": "#/$defs/T109" },
+        "shadows": { "$ref": "#/$defs/T110" }
       },
       "additionalProperties": false
     },
-    "T122": {
+    "T123": {
       "type": "object",
       "properties": {
-        "apertures": { "$ref": "#/$defs/T123" },
+        "apertures": { "$ref": "#/$defs/T124" },
         "dimColor": { "$ref": "#/$defs/T23" },
         "dimOpacity": { "type": "number" },
         "feather": { "$ref": "#/$defs/T75" }
@@ -837,17 +845,17 @@
       "additionalProperties": false,
       "required": ["apertures", "dimColor", "dimOpacity", "feather"]
     },
-    "T124": {
+    "T125": {
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "shape": { "$ref": "#/$defs/T74" },
-        "bounds": { "$ref": "#/$defs/T125" }
+        "bounds": { "$ref": "#/$defs/T126" }
       },
       "additionalProperties": false,
       "required": ["id", "shape", "bounds"]
     },
-    "T125": {
+    "T126": {
       "type": "object",
       "properties": {
         "x": { "type": "number" },
@@ -858,24 +866,25 @@
       "additionalProperties": false,
       "required": ["x", "y", "width", "height"]
     },
-    "T123": { "type": "array", "items": { "$ref": "#/$defs/T124" } },
-    "T126": {
+    "T124": { "type": "array", "items": { "$ref": "#/$defs/T125" } },
+    "T127": {
       "type": "object",
       "properties": {
-        "payload": { "$ref": "#/$defs/T127" },
+        "payload": { "$ref": "#/$defs/T128" },
+        "annotationShadow": { "$ref": "#/$defs/T98" },
         "space": { "$ref": "#/$defs/T2" },
-        "transform": { "$ref": "#/$defs/T98" },
+        "transform": { "$ref": "#/$defs/T99" },
         "localBounds": { "$ref": "#/$defs/T65" },
         "visible": { "type": "boolean" },
         "locked": { "type": "boolean" },
         "extras": { "$ref": "#/$defs/T10" },
         "opacity": { "type": "number" },
-        "blendMode": { "$ref": "#/$defs/T108" },
-        "shadows": { "$ref": "#/$defs/T109" }
+        "blendMode": { "$ref": "#/$defs/T109" },
+        "shadows": { "$ref": "#/$defs/T110" }
       },
       "additionalProperties": false
     },
-    "T127": {
+    "T128": {
       "type": "object",
       "properties": {
         "start": { "$ref": "#/$defs/T37" },
@@ -899,87 +908,89 @@
         "fontSize"
       ]
     },
-    "T128": {
+    "T129": {
       "type": "object",
       "properties": {
-        "payload": { "$ref": "#/$defs/T129" },
+        "payload": { "$ref": "#/$defs/T130" },
+        "annotationShadow": { "$ref": "#/$defs/T98" },
         "space": { "$ref": "#/$defs/T2" },
-        "transform": { "$ref": "#/$defs/T98" },
+        "transform": { "$ref": "#/$defs/T99" },
         "localBounds": { "$ref": "#/$defs/T65" },
         "visible": { "type": "boolean" },
         "locked": { "type": "boolean" },
         "extras": { "$ref": "#/$defs/T10" },
         "opacity": { "type": "number" },
-        "blendMode": { "$ref": "#/$defs/T108" },
-        "shadows": { "$ref": "#/$defs/T109" }
+        "blendMode": { "$ref": "#/$defs/T109" },
+        "shadows": { "$ref": "#/$defs/T110" }
       },
       "additionalProperties": false
     },
-    "T129": {
+    "T130": {
       "type": "object",
       "properties": {
         "sourceRegion": {},
-        "lens": { "$ref": "#/$defs/T131" },
+        "lens": { "$ref": "#/$defs/T132" },
         "zoom": { "type": "number" },
-        "border": { "$ref": "#/$defs/T132" },
+        "border": { "$ref": "#/$defs/T133" },
         "shadow": { "$ref": "#/$defs/T85" },
         "sampleSource": { "const": "compositeBelow" }
       },
       "additionalProperties": false,
       "required": ["sourceRegion", "lens", "zoom", "border", "shadow", "sampleSource"]
     },
-    "T130": {},
-    "T131": {
+    "T131": {},
+    "T132": {
       "type": "object",
       "properties": { "shape": { "$ref": "#/$defs/T83" }, "size": { "type": "number" } },
       "additionalProperties": { "$ref": "#/$defs/T11" },
       "required": ["shape", "size"]
     },
-    "T132": {
+    "T133": {
       "type": "object",
       "properties": { "color": { "$ref": "#/$defs/T23" }, "width": { "type": "number" } },
       "additionalProperties": { "$ref": "#/$defs/T11" },
       "required": ["color", "width"]
     },
-    "T133": {
+    "T134": {
       "type": "object",
       "properties": {
-        "payload": { "$ref": "#/$defs/T134" },
+        "payload": { "$ref": "#/$defs/T135" },
+        "annotationShadow": { "$ref": "#/$defs/T98" },
         "space": { "$ref": "#/$defs/T2" },
-        "transform": { "$ref": "#/$defs/T98" },
+        "transform": { "$ref": "#/$defs/T99" },
         "localBounds": { "$ref": "#/$defs/T65" },
         "visible": { "type": "boolean" },
         "locked": { "type": "boolean" },
         "extras": { "$ref": "#/$defs/T10" },
         "opacity": { "type": "number" },
-        "blendMode": { "$ref": "#/$defs/T108" },
-        "shadows": { "$ref": "#/$defs/T109" }
+        "blendMode": { "$ref": "#/$defs/T109" },
+        "shadows": { "$ref": "#/$defs/T110" }
       },
       "additionalProperties": false
     },
-    "T134": {
+    "T135": {
       "type": "object",
       "properties": {
-        "appearance": { "$ref": "#/$defs/T135" },
+        "appearance": { "$ref": "#/$defs/T136" },
         "sketchSeed": { "type": "number" },
         "sketchVersion": { "const": 1 },
         "annotationTool": { "const": "line" },
-        "path": { "$ref": "#/$defs/T136" },
+        "path": { "$ref": "#/$defs/T137" },
         "start": { "$ref": "#/$defs/T37" },
         "end": { "$ref": "#/$defs/T37" },
         "bend": { "$ref": "#/$defs/T37" },
         "elbow": {},
         "stroke": { "$ref": "#/$defs/T28" },
-        "startCap": { "$ref": "#/$defs/T138" },
-        "endCap": { "$ref": "#/$defs/T138" }
+        "startCap": { "$ref": "#/$defs/T139" },
+        "endCap": { "$ref": "#/$defs/T139" }
       },
       "additionalProperties": { "$ref": "#/$defs/T11" },
       "required": ["path", "start", "end", "stroke", "startCap", "endCap"]
     },
-    "T135": { "anyOf": [{ "const": "clean" }, { "const": "handDrawn" }] },
-    "T136": { "anyOf": [{ "const": "elbow" }, { "const": "straight" }, { "const": "quadratic" }] },
-    "T137": {},
-    "T138": {
+    "T136": { "anyOf": [{ "const": "clean" }, { "const": "handDrawn" }, { "const": "tapered" }] },
+    "T137": { "anyOf": [{ "const": "elbow" }, { "const": "straight" }, { "const": "quadratic" }] },
+    "T138": {},
+    "T139": {
       "anyOf": [
         { "const": "none" },
         { "const": "circle" },
@@ -989,35 +1000,20 @@
         { "const": "triangle" }
       ]
     },
-    "T139": {
-      "type": "object",
-      "properties": {
-        "payload": { "$ref": "#/$defs/T10" },
-        "space": { "$ref": "#/$defs/T2" },
-        "transform": { "$ref": "#/$defs/T98" },
-        "localBounds": { "$ref": "#/$defs/T65" },
-        "visible": { "type": "boolean" },
-        "locked": { "type": "boolean" },
-        "extras": { "$ref": "#/$defs/T10" },
-        "opacity": { "type": "number" },
-        "blendMode": { "$ref": "#/$defs/T108" },
-        "shadows": { "$ref": "#/$defs/T109" }
-      },
-      "additionalProperties": false
-    },
     "T140": {
       "type": "object",
       "properties": {
         "payload": { "$ref": "#/$defs/T10" },
+        "annotationShadow": { "$ref": "#/$defs/T98" },
         "space": { "$ref": "#/$defs/T2" },
-        "transform": { "$ref": "#/$defs/T98" },
+        "transform": { "$ref": "#/$defs/T99" },
         "localBounds": { "$ref": "#/$defs/T65" },
         "visible": { "type": "boolean" },
         "locked": { "type": "boolean" },
         "extras": { "$ref": "#/$defs/T10" },
         "opacity": { "type": "number" },
-        "blendMode": { "$ref": "#/$defs/T108" },
-        "shadows": { "$ref": "#/$defs/T109" }
+        "blendMode": { "$ref": "#/$defs/T109" },
+        "shadows": { "$ref": "#/$defs/T110" }
       },
       "additionalProperties": false
     },
@@ -1025,154 +1021,172 @@
       "type": "object",
       "properties": {
         "payload": { "$ref": "#/$defs/T10" },
+        "annotationShadow": { "$ref": "#/$defs/T98" },
         "space": { "$ref": "#/$defs/T2" },
-        "transform": { "$ref": "#/$defs/T98" },
+        "transform": { "$ref": "#/$defs/T99" },
         "localBounds": { "$ref": "#/$defs/T65" },
         "visible": { "type": "boolean" },
         "locked": { "type": "boolean" },
         "extras": { "$ref": "#/$defs/T10" },
         "opacity": { "type": "number" },
-        "blendMode": { "$ref": "#/$defs/T108" },
-        "shadows": { "$ref": "#/$defs/T109" }
+        "blendMode": { "$ref": "#/$defs/T109" },
+        "shadows": { "$ref": "#/$defs/T110" }
+      },
+      "additionalProperties": false
+    },
+    "T142": {
+      "type": "object",
+      "properties": {
+        "payload": { "$ref": "#/$defs/T10" },
+        "annotationShadow": { "$ref": "#/$defs/T98" },
+        "space": { "$ref": "#/$defs/T2" },
+        "transform": { "$ref": "#/$defs/T99" },
+        "localBounds": { "$ref": "#/$defs/T65" },
+        "visible": { "type": "boolean" },
+        "locked": { "type": "boolean" },
+        "extras": { "$ref": "#/$defs/T10" },
+        "opacity": { "type": "number" },
+        "blendMode": { "$ref": "#/$defs/T109" },
+        "shadows": { "$ref": "#/$defs/T110" }
       },
       "additionalProperties": false
     },
     "T88": {
       "anyOf": [
         { "$ref": "#/$defs/T89" },
-        { "$ref": "#/$defs/T99" },
-        { "$ref": "#/$defs/T101" },
-        { "$ref": "#/$defs/T104" },
-        { "$ref": "#/$defs/T110" },
-        { "$ref": "#/$defs/T112" },
-        { "$ref": "#/$defs/T121" },
-        { "$ref": "#/$defs/T126" },
-        { "$ref": "#/$defs/T128" },
-        { "$ref": "#/$defs/T133" },
-        { "$ref": "#/$defs/T139" },
+        { "$ref": "#/$defs/T100" },
+        { "$ref": "#/$defs/T102" },
+        { "$ref": "#/$defs/T105" },
+        { "$ref": "#/$defs/T111" },
+        { "$ref": "#/$defs/T113" },
+        { "$ref": "#/$defs/T122" },
+        { "$ref": "#/$defs/T127" },
+        { "$ref": "#/$defs/T129" },
+        { "$ref": "#/$defs/T134" },
         { "$ref": "#/$defs/T140" },
-        { "$ref": "#/$defs/T141" }
+        { "$ref": "#/$defs/T141" },
+        { "$ref": "#/$defs/T142" }
       ]
     },
-    "T142": {
+    "T143": {
       "type": "object",
       "properties": { "type": { "const": "remove" }, "layerId": { "type": "string" } },
       "additionalProperties": false,
       "required": ["type", "layerId"]
     },
-    "T143": {
+    "T144": {
       "type": "object",
       "properties": { "type": { "const": "duplicate" }, "layerId": { "type": "string" } },
       "additionalProperties": false,
       "required": ["type", "layerId"]
     },
-    "T144": {
+    "T145": {
       "type": "object",
       "properties": { "type": { "const": "reorder" }, "layerId": { "type": "string" }, "index": { "type": "number" } },
       "additionalProperties": false,
       "required": ["type", "layerId", "index"]
     },
-    "T145": {
+    "T146": {
       "type": "object",
-      "properties": { "type": { "const": "crop" }, "bounds": { "$ref": "#/$defs/T146" } },
+      "properties": { "type": { "const": "crop" }, "bounds": { "$ref": "#/$defs/T147" } },
       "additionalProperties": false,
       "required": ["type", "bounds"]
     },
-    "T146": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/T65" }] },
-    "T147": {
+    "T147": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/T65" }] },
+    "T148": {
       "type": "object",
-      "properties": { "type": { "const": "flip" }, "axis": { "$ref": "#/$defs/T148" } },
+      "properties": { "type": { "const": "flip" }, "axis": { "$ref": "#/$defs/T149" } },
       "additionalProperties": false,
       "required": ["type", "axis"]
     },
-    "T148": { "anyOf": [{ "const": "horizontal" }, { "const": "vertical" }] },
-    "T149": {
-      "type": "object",
-      "properties": { "type": { "const": "presentation" }, "value": { "$ref": "#/$defs/T150" } },
-      "additionalProperties": false,
-      "required": ["type", "value"]
-    },
+    "T149": { "anyOf": [{ "const": "horizontal" }, { "const": "vertical" }] },
     "T150": {
       "type": "object",
-      "properties": {
-        "composition": { "$ref": "#/$defs/T151" },
-        "phoneOrientation": { "$ref": "#/$defs/T174" },
-        "beautify": { "$ref": "#/$defs/T183" },
-        "watermark": { "$ref": "#/$defs/T184" }
-      },
+      "properties": { "type": { "const": "presentation" }, "value": { "$ref": "#/$defs/T151" } },
       "additionalProperties": false,
-      "required": ["beautify", "watermark"]
+      "required": ["type", "value"]
     },
     "T151": {
       "type": "object",
       "properties": {
-        "version": { "const": 1 },
-        "layout": { "$ref": "#/$defs/T152" },
-        "background": { "$ref": "#/$defs/T157" },
-        "header": { "$ref": "#/$defs/T170" },
-        "footer": { "$ref": "#/$defs/T170" },
-        "frame": { "$ref": "#/$defs/T171" },
-        "radius": { "type": "number" },
-        "shadow": { "type": "number" },
-        "shadowOptions": { "$ref": "#/$defs/T178" },
-        "branding": { "$ref": "#/$defs/T179" }
+        "composition": { "$ref": "#/$defs/T152" },
+        "phoneOrientation": { "$ref": "#/$defs/T175" },
+        "beautify": { "$ref": "#/$defs/T184" },
+        "watermark": { "$ref": "#/$defs/T185" }
       },
       "additionalProperties": false,
-      "required": ["version", "layout", "background", "header", "footer", "frame", "radius", "shadow", "branding"]
+      "required": ["beautify", "watermark"]
     },
     "T152": {
       "type": "object",
       "properties": {
-        "mode": { "$ref": "#/$defs/T153" },
+        "version": { "const": 1 },
+        "layout": { "$ref": "#/$defs/T153" },
+        "background": { "$ref": "#/$defs/T158" },
+        "header": { "$ref": "#/$defs/T171" },
+        "footer": { "$ref": "#/$defs/T171" },
+        "frame": { "$ref": "#/$defs/T172" },
+        "radius": { "type": "number" },
+        "shadow": { "type": "number" },
+        "shadowOptions": { "$ref": "#/$defs/T179" },
+        "branding": { "$ref": "#/$defs/T180" }
+      },
+      "additionalProperties": false,
+      "required": ["version", "layout", "background", "header", "footer", "frame", "radius", "shadow", "branding"]
+    },
+    "T153": {
+      "type": "object",
+      "properties": {
+        "mode": { "$ref": "#/$defs/T154" },
         "width": { "type": "number" },
         "height": { "type": "number" },
-        "insets": { "$ref": "#/$defs/T154" },
-        "alignment": { "$ref": "#/$defs/T156" },
+        "insets": { "$ref": "#/$defs/T155" },
+        "alignment": { "$ref": "#/$defs/T157" },
         "scale": { "type": "number" },
-        "offset": { "$ref": "#/$defs/T156" }
+        "offset": { "$ref": "#/$defs/T157" }
       },
       "additionalProperties": false,
       "required": ["mode", "width", "height", "insets", "alignment", "scale", "offset"]
     },
-    "T153": { "anyOf": [{ "const": "auto" }, { "const": "fixed" }] },
-    "T154": {
+    "T154": { "anyOf": [{ "const": "auto" }, { "const": "fixed" }] },
+    "T155": {
       "type": "object",
       "properties": {
         "top": { "type": "number" },
         "right": { "type": "number" },
         "bottom": { "type": "number" },
         "left": { "type": "number" },
-        "unit": { "$ref": "#/$defs/T155" },
+        "unit": { "$ref": "#/$defs/T156" },
         "linked": { "type": "boolean" }
       },
       "additionalProperties": false,
       "required": ["top", "right", "bottom", "left", "unit", "linked"]
     },
-    "T155": { "anyOf": [{ "const": "percent" }, { "const": "px" }] },
-    "T156": {
+    "T156": { "anyOf": [{ "const": "percent" }, { "const": "px" }] },
+    "T157": {
       "type": "object",
       "properties": { "x": { "type": "number" }, "y": { "type": "number" } },
       "additionalProperties": false,
       "required": ["x", "y"]
     },
-    "T157": {
+    "T158": {
       "type": "object",
       "properties": {
-        "kind": { "$ref": "#/$defs/T158" },
-        "color": { "$ref": "#/$defs/T159" },
-        "linear": { "$ref": "#/$defs/T160" },
-        "radial": { "$ref": "#/$defs/T163" },
-        "freeform": { "$ref": "#/$defs/T164" },
-        "image": { "$ref": "#/$defs/T167" },
-        "fit": { "$ref": "#/$defs/T169" },
+        "kind": { "$ref": "#/$defs/T159" },
+        "color": { "$ref": "#/$defs/T160" },
+        "linear": { "$ref": "#/$defs/T161" },
+        "radial": { "$ref": "#/$defs/T164" },
+        "freeform": { "$ref": "#/$defs/T165" },
+        "image": { "$ref": "#/$defs/T168" },
+        "fit": { "$ref": "#/$defs/T170" },
         "scale": { "type": "number" },
-        "offset": { "$ref": "#/$defs/T156" },
+        "offset": { "$ref": "#/$defs/T157" },
         "blur": { "type": "number" }
       },
       "additionalProperties": false,
       "required": ["kind", "color", "linear", "radial", "freeform", "image", "fit", "scale", "offset", "blur"]
     },
-    "T158": {
+    "T159": {
       "anyOf": [
         { "const": "image" },
         { "const": "solid" },
@@ -1183,7 +1197,7 @@
         { "const": "blurred" }
       ]
     },
-    "T159": {
+    "T160": {
       "type": "object",
       "properties": {
         "red": { "type": "number" },
@@ -1194,44 +1208,44 @@
       "additionalProperties": false,
       "required": ["red", "green", "blue", "alpha"]
     },
-    "T160": {
+    "T161": {
       "type": "object",
       "properties": {
-        "stops": { "$ref": "#/$defs/T161" },
-        "start": { "$ref": "#/$defs/T156" },
-        "end": { "$ref": "#/$defs/T156" }
+        "stops": { "$ref": "#/$defs/T162" },
+        "start": { "$ref": "#/$defs/T157" },
+        "end": { "$ref": "#/$defs/T157" }
       },
       "additionalProperties": false,
       "required": ["stops", "start", "end"]
     },
-    "T162": {
+    "T163": {
       "type": "object",
-      "properties": { "position": { "type": "number" }, "color": { "$ref": "#/$defs/T159" } },
+      "properties": { "position": { "type": "number" }, "color": { "$ref": "#/$defs/T160" } },
       "additionalProperties": false,
       "required": ["position", "color"]
     },
-    "T161": { "type": "array", "items": { "$ref": "#/$defs/T162" } },
-    "T163": {
+    "T162": { "type": "array", "items": { "$ref": "#/$defs/T163" } },
+    "T164": {
       "type": "object",
       "properties": {
-        "stops": { "$ref": "#/$defs/T161" },
-        "center": { "$ref": "#/$defs/T156" },
+        "stops": { "$ref": "#/$defs/T162" },
+        "center": { "$ref": "#/$defs/T157" },
         "radius": { "type": "number" }
       },
       "additionalProperties": false,
       "required": ["stops", "center", "radius"]
     },
-    "T164": {
+    "T165": {
       "type": "object",
-      "properties": { "version": { "const": 1 }, "points": { "$ref": "#/$defs/T165" } },
+      "properties": { "version": { "const": 1 }, "points": { "$ref": "#/$defs/T166" } },
       "additionalProperties": false,
       "required": ["version", "points"]
     },
-    "T166": {
+    "T167": {
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "color": { "$ref": "#/$defs/T159" },
+        "color": { "$ref": "#/$defs/T160" },
         "radius": { "type": "number" },
         "x": { "type": "number" },
         "y": { "type": "number" }
@@ -1239,8 +1253,8 @@
       "additionalProperties": false,
       "required": ["id", "color", "radius", "x", "y"]
     },
-    "T165": { "type": "array", "items": { "$ref": "#/$defs/T166" } },
-    "T168": {
+    "T166": { "type": "array", "items": { "$ref": "#/$defs/T167" } },
+    "T169": {
       "type": "object",
       "properties": {
         "blobHash": { "type": "string" },
@@ -1251,38 +1265,38 @@
       "additionalProperties": false,
       "required": ["blobHash", "width", "height", "format"]
     },
-    "T167": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/T168" }] },
-    "T169": { "anyOf": [{ "const": "cover" }, { "const": "contain" }] },
-    "T170": {
+    "T168": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/T169" }] },
+    "T170": { "anyOf": [{ "const": "cover" }, { "const": "contain" }] },
+    "T171": {
       "type": "object",
-      "properties": { "height": { "type": "number" }, "fill": { "$ref": "#/$defs/T157" } },
+      "properties": { "height": { "type": "number" }, "fill": { "$ref": "#/$defs/T158" } },
       "additionalProperties": false,
       "required": ["height", "fill"]
     },
-    "T171": {
+    "T172": {
       "type": "object",
       "properties": {
-        "kind": { "$ref": "#/$defs/T172" },
-        "theme": { "$ref": "#/$defs/T173" },
+        "kind": { "$ref": "#/$defs/T173" },
+        "theme": { "$ref": "#/$defs/T174" },
         "title": { "type": "string" },
         "url": { "type": "string" },
-        "orientation": { "$ref": "#/$defs/T174" },
-        "fit": { "$ref": "#/$defs/T169" },
-        "screenColor": { "$ref": "#/$defs/T159" },
+        "orientation": { "$ref": "#/$defs/T175" },
+        "fit": { "$ref": "#/$defs/T170" },
+        "screenColor": { "$ref": "#/$defs/T160" },
         "zoom": { "type": "number" },
-        "offset": { "$ref": "#/$defs/T156" },
-        "phoneModel": { "$ref": "#/$defs/T175" },
-        "browserStyle": { "$ref": "#/$defs/T176" },
+        "offset": { "$ref": "#/$defs/T157" },
+        "phoneModel": { "$ref": "#/$defs/T176" },
+        "browserStyle": { "$ref": "#/$defs/T177" },
         "phoneSystemDetails": { "type": "boolean" },
-        "phoneContentMode": { "$ref": "#/$defs/T177" }
+        "phoneContentMode": { "$ref": "#/$defs/T178" }
       },
       "additionalProperties": false,
       "required": ["kind", "theme", "title", "url", "orientation", "fit", "screenColor", "zoom", "offset"]
     },
-    "T172": { "anyOf": [{ "const": "none" }, { "const": "window" }, { "const": "browser" }, { "const": "phone" }] },
-    "T173": { "anyOf": [{ "const": "light" }, { "const": "dark" }] },
-    "T174": { "anyOf": [{ "const": "portrait" }, { "const": "landscape" }] },
-    "T175": {
+    "T173": { "anyOf": [{ "const": "none" }, { "const": "window" }, { "const": "browser" }, { "const": "phone" }] },
+    "T174": { "anyOf": [{ "const": "light" }, { "const": "dark" }] },
+    "T175": { "anyOf": [{ "const": "portrait" }, { "const": "landscape" }] },
+    "T176": {
       "anyOf": [
         { "const": "iphone-island" },
         { "const": "iphone-notch" },
@@ -1290,39 +1304,39 @@
         { "const": "android-angular" }
       ]
     },
-    "T176": { "anyOf": [{ "const": "modern" }, { "const": "retro-windows" }, { "const": "retro-mac" }] },
-    "T177": { "anyOf": [{ "const": "safe" }, { "const": "fullscreen" }] },
-    "T178": {
+    "T177": { "anyOf": [{ "const": "modern" }, { "const": "retro-windows" }, { "const": "retro-mac" }] },
+    "T178": { "anyOf": [{ "const": "safe" }, { "const": "fullscreen" }] },
+    "T179": {
       "type": "object",
       "properties": {
         "size": { "type": "number" },
         "softness": { "type": "number" },
         "spread": { "type": "number" },
-        "offset": { "$ref": "#/$defs/T156" },
-        "color": { "$ref": "#/$defs/T159" }
+        "offset": { "$ref": "#/$defs/T157" },
+        "color": { "$ref": "#/$defs/T160" }
       },
       "additionalProperties": false,
       "required": ["size", "softness", "spread", "offset", "color"]
     },
-    "T180": {
+    "T181": {
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "template": { "type": "string" },
         "text": { "type": "string" },
         "year": { "type": "number" },
-        "image": { "$ref": "#/$defs/T167" },
+        "image": { "$ref": "#/$defs/T168" },
         "imageSize": { "type": "number" },
-        "region": { "$ref": "#/$defs/T181" },
-        "alignment": { "$ref": "#/$defs/T156" },
-        "offset": { "$ref": "#/$defs/T156" },
+        "region": { "$ref": "#/$defs/T182" },
+        "alignment": { "$ref": "#/$defs/T157" },
+        "offset": { "$ref": "#/$defs/T157" },
         "textAlignment": { "$ref": "#/$defs/T21" },
         "fontFamily": { "type": "string" },
         "fontSize": { "type": "number" },
-        "color": { "$ref": "#/$defs/T159" },
+        "color": { "$ref": "#/$defs/T160" },
         "opacity": { "type": "number" },
         "padding": { "type": "number" },
-        "backplate": { "$ref": "#/$defs/T182" }
+        "backplate": { "$ref": "#/$defs/T183" }
       },
       "additionalProperties": false,
       "required": [
@@ -1344,16 +1358,16 @@
         "backplate"
       ]
     },
-    "T181": { "anyOf": [{ "const": "content" }, { "const": "card" }, { "const": "header" }, { "const": "footer" }] },
-    "T182": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/T159" }] },
-    "T179": { "type": "array", "items": { "$ref": "#/$defs/T180" } },
-    "T183": {
+    "T182": { "anyOf": [{ "const": "content" }, { "const": "card" }, { "const": "header" }, { "const": "footer" }] },
+    "T183": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/T160" }] },
+    "T180": { "type": "array", "items": { "$ref": "#/$defs/T181" } },
+    "T184": {
       "type": "object",
       "properties": { "enabled": { "const": false } },
       "additionalProperties": false,
       "required": ["enabled"]
     },
-    "T184": {
+    "T185": {
       "type": "object",
       "properties": { "enabled": { "const": false } },
       "additionalProperties": false,
@@ -1372,12 +1386,12 @@
         { "$ref": "#/$defs/T76" },
         { "$ref": "#/$defs/T81" },
         { "$ref": "#/$defs/T87" },
-        { "$ref": "#/$defs/T142" },
         { "$ref": "#/$defs/T143" },
         { "$ref": "#/$defs/T144" },
         { "$ref": "#/$defs/T145" },
-        { "$ref": "#/$defs/T147" },
-        { "$ref": "#/$defs/T149" }
+        { "$ref": "#/$defs/T146" },
+        { "$ref": "#/$defs/T148" },
+        { "$ref": "#/$defs/T150" }
       ]
     }
   }

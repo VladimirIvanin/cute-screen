@@ -1,5 +1,34 @@
 # Стратегия тестирования
 
+## Бамп 0.1.29 после исправления MCP-схемы (2026-11-01)
+
+Windows x64 / PowerShell, base `78a7fbc`: `pnpm version:bump 0.1.29`
+синхронизировал package/Tauri/Cargo metadata, точные workspace dependencies
+и четыре lock entries без обновления внешних зависимостей.
+`pnpm test:boundaries tests/boundaries/bump-version.test.ts tests/boundaries/release-assets.test.ts`
+— 2 files / 34 passed; `node scripts/release-assets.mjs version D:/cutescreen v0.1.29`
+и `pnpm mcp:schema:check` — exit 0. Финальные `pnpm format`,
+`pnpm format:check`, `pnpm docs:check` и `git diff --check` — exit 0.
+Сборка пакетов и native runtime для metadata bump не запускались.
+
+## MCP schema CI fix (2026-11-01)
+
+Windows x64 / PowerShell, Node 22.23.1, pnpm 10.33.2, base `78a7fbc`.
+`pnpm mcp:schema:check` воспроизвёл ошибку из Linux CI: tracked
+`agent-edit-schema.json` не обновлён после ADR-175. Штатная `pnpm mcp:schema`
+добавила annotationShadow и tapered из актуальных TypeScript-типов;
+перенумерация `$defs` — результат генератора.
+
+- `pnpm mcp:schema:check` после генерации — exit 0.
+- `pnpm test:boundaries` — 16 files, 114 passed / 1 skipped на Windows.
+- `pnpm test packages/editor-core/src/agent-edits.test.ts packages/editor-core/src/tapered-shadow.test.ts`
+  — 2 files / 30 passed.
+- `pnpm format` — exit 0. Финальные `pnpm format:check`, `pnpm docs:check`,
+  `pnpm mcp:schema:check` и `git diff --check` — exit 0.
+
+Linux CI повторно локально не запускался. Полный `pnpm check`, Rust и native
+runtime не запускались: изменены только generated JSON и документация.
+
 ## Бамп 0.1.28 (2026-11-01)
 
 Windows x64 / PowerShell: `pnpm version:bump 0.1.28` синхронизировал пять
