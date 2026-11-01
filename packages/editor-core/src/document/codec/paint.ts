@@ -229,7 +229,8 @@ function parseArrowAppearance(
   if (
     input.appearance !== undefined &&
     input.appearance !== 'clean' &&
-    input.appearance !== 'handDrawn'
+    input.appearance !== 'handDrawn' &&
+    input.appearance !== 'tapered'
   )
     throw new Error(`${field}.appearance is invalid`)
   if (

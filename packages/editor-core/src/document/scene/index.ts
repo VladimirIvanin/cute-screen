@@ -13,6 +13,7 @@ import type {
   LayerNode,
 } from '../types'
 import { arrowNodes } from './arrow'
+import { annotationShadowNodes } from './annotation-shadow'
 import {
   freehandNodes,
   shapeNodes,
@@ -107,7 +108,7 @@ export function createDocumentRenderScene(
   const layout = resolveCompositionLayout(document)
   for (const layer of document.layers) {
     if (layer.space === 'card') {
-      cardNodes.push(...(layer.kind === 'image' ? [imageNode(layer)] : projectAnnotationLayer(layer,
+      cardNodes.push(...annotationShadowNodes(layer, (layer.kind === 'image' ? [imageNode(layer)] : projectAnnotationLayer(layer,
         { ...document,
           canvas: { width: layout.width,
             height: layout.height },
@@ -117,21 +118,21 @@ export function createDocumentRenderScene(
         scaleX: layer.transform.scaleX,
         scaleY: layer.transform.scaleY,
         transformOriginX: layer.transform.translateX,
-        transformOriginY: layer.transform.translateY }))))
+        transformOriginY: layer.transform.translateY }))), layout))
       continue
     }
     if (layer.kind === 'image') {
-      nodes.push(imageNode(layer))
+      nodes.push(...annotationShadowNodes(layer, [imageNode(layer)], document.canvas))
       continue
     }
     nodes.push(
-      ...projectAnnotationLayer(layer, document, context).map((node) => ({
+      ...annotationShadowNodes(layer, projectAnnotationLayer(layer, document, context).map((node) => ({
         ...node,
         scaleX: layer.transform.scaleX,
         scaleY: layer.transform.scaleY,
         transformOriginX: layer.transform.translateX,
         transformOriginY: layer.transform.translateY,
-      })),
+      })), document.canvas),
     )
   }
   const content = createRenderSceneSnapshot({

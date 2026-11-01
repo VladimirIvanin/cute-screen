@@ -24,6 +24,7 @@ export interface CanvasKitPaint extends CanvasKitDeletable {
   setPathEffect(effect: CanvasKitPathEffect | null): void
   setMaskFilter?(filter: CanvasKitMaskFilter | null): void
   setImageFilter?(filter: CanvasKitImageFilter | null): void
+  setColorFilter?(filter: CanvasKitDeletable | null): void
 }
 
 export type CanvasKitShader = CanvasKitDeletable
@@ -134,6 +135,7 @@ export interface CanvasKitSurface {
 }
 
 export interface CanvasKitApi {
+  readonly ColorFilter?: { MakeBlend(color: Float32Array, mode: unknown): CanvasKitDeletable }
   readonly Paint: new () => CanvasKitPaint
   readonly PathBuilder: new () => CanvasKitPathBuilder
   readonly PaintStyle: Readonly<{ Fill: unknown; Stroke: unknown }>
@@ -141,6 +143,7 @@ export interface CanvasKitApi {
     SrcOver: unknown
     DstOut: unknown
     Src?: unknown
+    SrcIn?: unknown
     Multiply: unknown
     Screen: unknown
     Overlay: unknown

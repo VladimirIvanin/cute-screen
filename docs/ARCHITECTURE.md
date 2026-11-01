@@ -1,5 +1,15 @@
 # Архитектура Cute Screen
 
+## Клиновидный контур и тень аннотаций (ADR-175)
+
+arrow-route содержит прежние path/cap primitives без UI. tapered-arrow строит
+единый filled contour и общие cap metrics; bounds и hit testing используют тот
+же контур. В scene optional annotationShadow добавляет bounded tint/blur group
+перед исходными nodes всего объекта, включая text containers. Defaults используют
+existing remembered styles; изменение выделения проходит EditorCommand/batch.
+PNG и холст используют один renderer-neutral scene contract. Старые массивы
+shadows не переинтерпретируются, text opacity/blend/shadows остаются запрещены.
+
 ## Уведомления без сдвига chrome (ADR-174)
 
 TopBar содержит абсолютный стек статусов сохранения и ошибок подключения.

@@ -39,8 +39,16 @@ export function createTextCommitCommand(input: {
   return Object.freeze({
     type: 'updateLayer',
     before: input.existing,
-    after: input.next,
+    after: textCommitAppearance(input.existing, input.next),
   })
+}
+
+function textCommitAppearance(
+  existing: EditableTextLayer,
+  next: EditableTextLayer,
+): EditableTextLayer {
+  const annotationShadow = next.annotationShadow ?? existing.annotationShadow
+  return annotationShadow ? { ...next, annotationShadow } : next
 }
 
 export function createDuplicateLayerCommand(

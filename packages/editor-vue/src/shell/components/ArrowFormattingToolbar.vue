@@ -194,7 +194,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOnOutside
               :aria-label="pickerLocale === 'ru' ? 'Характер линии' : 'Line appearance'"
             >
               <button
-                v-for="appearance in (['clean', 'handDrawn'] as const)"
+                v-for="appearance in (control.taperedSupported ? ['clean', 'handDrawn', 'tapered'] as const : ['clean', 'handDrawn'] as const)"
                 :key="appearance"
                 type="button"
                 :aria-pressed="!control.appearanceMixed && control.appearance === appearance"
@@ -203,6 +203,12 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOnOutside
               >
                 <svg viewBox="0 0 42 16" aria-hidden="true">
                   <path
+                    v-if="appearance === 'tapered'"
+                    d="M3 9Q2 8 3 7L28 5V1L40 8 28 15V11Z"
+                    fill="currentColor"
+                  />
+                  <path
+                    v-else
                     :d="appearance === 'clean' ? 'M3 8H39' : 'M3 8C13 4 24 12 39 8'"
                     fill="none"
                     stroke="currentColor"
@@ -211,7 +217,8 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOnOutside
                   />
                 </svg>
                 <span v-if="appearance === 'clean'">{{ pickerLocale === 'ru' ? 'Ровная' : 'Clean' }}</span>
-                <span v-else>{{ pickerLocale === 'ru' ? 'Рукописная' : 'Hand-drawn' }}</span>
+                <span v-else-if="appearance === 'handDrawn'">{{ pickerLocale === 'ru' ? 'Рукописная' : 'Hand-drawn' }}</span>
+                <span v-else>{{ pickerLocale === 'ru' ? 'Клиновидная' : 'Tapered' }}</span>
               </button>
             </div>
             <div

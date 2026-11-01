@@ -1,5 +1,13 @@
 # CI-сборки и проверка версии через GitHub
 
+## Аннотации с клиновидным контуром и тенью (ADR-175)
+
+Additive frontend/document fields в schema8 без новых зависимостей, IPC,
+Cargo profiles и package/release изменений. Использовать общий target/debug;
+release/package build не требуется. Gate: core/Vue, decoded render 1×/2×,
+browser production drawing и fresh native `tapered-shadow,tapered-shadow-reopen`.
+Фактические результаты и недоступные runtime gates — TESTING.md.
+
 ## Мокапы рамок (ADR-173)
 
 Frontend-only каталог и optional composition fields без новой document version,

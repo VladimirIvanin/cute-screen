@@ -29,6 +29,7 @@ export function drawGroupCanvasKit(
   if (!surface) throw new Error('Card content surface creation failed')
   const paint = new kit.Paint()
   let filter: ReturnType<NonNullable<CanvasKitApi['ImageFilter']>['MakeBlur']> | undefined
+  let tint: import('../backends/canvaskit/contracts').CanvasKitDeletable | undefined
   canvas.save()
   try {
     render(surface, density)
@@ -50,6 +51,16 @@ export function drawGroupCanvasKit(
       true)
       paint.setAntiAlias(true)
       paint.setColorComponents(1, 1, 1, node.opacity)
+      if (node.tint) {
+        if (
+          !kit.ColorFilter ||
+          !paint.setColorFilter ||
+          kit.BlendMode.SrcIn === undefined
+        ) throw new Error('Annotation shadow tint support is unavailable')
+        const c = node.tint
+        tint = kit.ColorFilter.MakeBlend(new Float32Array([c.red, c.green, c.blue, c.alpha]), kit.BlendMode.SrcIn)
+        paint.setColorFilter(tint)
+      }
       if (node.blur > 0 && kit.ImageFilter) {
         filter = kit.ImageFilter.MakeBlur(node.blur / 2, node.blur / 2, kit.TileMode.Clamp, null)
         paint.setImageFilter?.(filter)
@@ -79,6 +90,7 @@ export function drawGroupCanvasKit(
   } finally {
     canvas.restore()
     filter?.delete()
+    tint?.delete()
     paint.delete()
     surface.dispose()
   }

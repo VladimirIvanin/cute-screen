@@ -32,6 +32,7 @@ import { precisionLayerHitPart } from './tools/precision/hit-test'
 
 import type { StrokeHitMetric } from './hit-test-metric'
 import type { HitPart } from './hit-test'
+import type { RenderNode } from './scene/contracts'
 
 function payloadStrokeWidth(
   payload: JsonObject,
@@ -144,20 +145,11 @@ export function drawingHitPart(
   const strokeWidth = layer.kind === 'shape' && payload.annotationTool === 'gradient' ? 0 : payloadStrokeWidth(payload)
   if (layer.kind === 'arrow') {
     const arrow = payload as unknown as ArrowLayerPayload
-    if (arrow.appearance === 'handDrawn') {
+    if (arrow.appearance === 'handDrawn' || arrow.appearance === 'tapered') {
       const nodes = arrowNodes({
         ...layer, transform: { ...layer.transform, translateX: 0, translateY: 0, rotation: 0 },
       })
-      for (const node of nodes) {
-        if (node.kind !== 'vector') continue
-        const contours = flattenShapePath(node.outline, 0.05)
-        const filled = !node.open && 'alpha' in node.fill && node.fill.alpha > 0
-        if (filled && contours.some((contour) => pointInPolygon(point, contour))) return 'fill'
-        const onStroke = contours.some((contour) => contour.slice(1).some((end, i) =>
-          strokeHit(contour[i]!, end, node.strokeWidth / 2)))
-        if (onStroke) return 'stroke'
-      }
-      return undefined
+      return renderedArrowHit(nodes, point, strokeHit)
     }
     const samples = arrowPathPoints(arrow)
     const bodyHit = samples
@@ -224,4 +216,35 @@ export function drawingHitPart(
     strokeHit(
       { x: contour[i]!.x + geometry.x, y: contour[i]!.y + geometry.y },
       { x: end.x + geometry.x, y: end.y + geometry.y }, strokeWidth / 2))) ? 'stroke' : undefined
+}
+
+function renderedArrowHit(
+  nodes: readonly RenderNode[],
+  point: Point,
+  strokeHit: (start: Point, end: Point, radius: number) => boolean,
+): HitPart | undefined {
+  for (const node of nodes) {
+    if (node.kind === 'ellipse') {
+      const center = { x: node.centerX, y: node.centerY }
+      if (strokeHit(center, center, node.radiusX + (node.strokeWidth ?? 0) / 2)) return 'fill'
+      continue
+    }
+    if (
+      node.kind !== 'vector' &&
+      node.kind !== 'polygon' &&
+      node.kind !== 'path'
+    ) continue
+    const contours = node.kind === 'vector' ? flattenShapePath(node.outline, .05)
+      : [node.kind === 'polygon' ? [...node.points, node.points[0]!] : node.points]
+    const fill = 'fill' in node ? node.fill : undefined
+    const filled = (node.kind !== 'vector' || !node.open) && fill && 'alpha' in fill && fill.alpha > 0
+    if (filled && contours.some((contour) => pointInPolygon(point, contour))) return 'fill'
+    if (
+      node.stroke &&
+      node.stroke.alpha > 0 &&
+      contours.some((contour) => contour.slice(1).some((end, i) =>
+        strokeHit(contour[i]!, end, (node.strokeWidth ?? 0) / 2)))
+    ) return 'stroke'
+  }
+  return undefined
 }

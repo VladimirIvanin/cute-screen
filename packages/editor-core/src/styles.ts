@@ -1,3 +1,4 @@
+import { supportsAnnotationShadow } from './annotation-shadow'
 import { sketchSeed } from './sketch-geometry'
 import { annotationTool } from './line'
 import {
@@ -112,7 +113,7 @@ function lineOnlyChannel(
 }
 
 export function extractLayerStyle(layer: LayerNode): LayerStyle {
-  const result: Record<string, JsonValue> = { ...arrowAppearanceStyle(layer) }
+  const result: Record<string, JsonValue> = { ...arrowAppearanceStyle(layer), ...annotationShadowStyle(layer) }
   if (layer.kind === 'callout') {
     result.calloutRoute = calloutRoutePreset(layer.payload.route)
     result.calloutFrame = clone(layer.payload.frame ?? {
@@ -162,6 +163,11 @@ function boundedStyle(
   layer: LayerNode,
   style: LayerStyle,
 ): LayerStyle {
+  if (annotationTool(layer) === 'line' && style.appearance === 'tapered') {
+    const { appearance: _appearance, ...compatible } = style
+    void _appearance
+    return boundedStyle(layer, compatible)
+  }
   if (layer.kind === 'ruler') {
     const bounded = { ...style }
     if (
@@ -312,7 +318,7 @@ export function applyLayerStyle<T extends LayerNode>(
     (payload.fill as JsonObject | undefined)?.kind !== 'linearGradient'
   ) payload.fill = layer.payload.fill!
   if (content) payload[layer.kind === 'numberedMarker' ? 'label' : 'content'] = styledContent(content, style)
-  let next = { ...layer, payload } as LayerNode
+  let next = applyAnnotationShadow({ ...layer, payload } as LayerNode, style)
   if ('opacity' in next)
     next = {
       ...next,
@@ -321,6 +327,22 @@ export function applyLayerStyle<T extends LayerNode>(
       ),
     }
   return rebaseStyledLayer(updateLoupeSource(next, layer), layer, canvas) as T
+}
+
+function annotationShadowStyle(layer: LayerNode): LayerStyle {
+  return { annotationShadow: layer.annotationShadow ?? 'none' }
+}
+
+function applyAnnotationShadow(
+  layer: LayerNode,
+  style: LayerStyle,
+): LayerNode {
+  if (!supportsAnnotationShadow(layer.kind)) return layer
+  if (style.annotationShadow === 'soft' || style.annotationShadow === 'strong') return { ...layer, annotationShadow: style.annotationShadow }
+  if (style.annotationShadow !== 'none') return layer
+  const { annotationShadow: _shadow, ...withoutShadow } = layer
+  void _shadow
+  return withoutShadow as LayerNode
 }
 /** Locked groups are all-or-nothing, and no-ops never enter history. */
 export function styleCommand(

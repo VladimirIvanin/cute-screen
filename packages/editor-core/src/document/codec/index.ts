@@ -46,6 +46,7 @@ function documentToJson(document: EditorDocument): JsonObject {
       visible: layer.visible,
       locked: layer.locked,
       payload: layer.payload,
+      ...(layer.annotationShadow ? { annotationShadow: layer.annotationShadow } : {}),
     }
     if (
       layer.kind === 'text' ||

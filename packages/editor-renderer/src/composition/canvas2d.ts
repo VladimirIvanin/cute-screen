@@ -40,7 +40,7 @@ export function* drawGroup2D(
     sourceBounds.width * density !== Math.round(sourceBounds.width * density) ||
     sourceBounds.height * density !== Math.round(sourceBounds.height * density)
   ))
-  const sourceKey = `group:${effectKey([node.scene, density, alignSource, cache.generation])}`
+  const sourceKey = `group:${effectKey([node.scene, node.tint, density, alignSource, cache.generation])}`
   const visibleSide = Math.max(1, Math.min(2048, Math.ceil(Math.max(destination.width, destination.height) * scale)))
   const sampleScale = cache.mode === 'interactive' && node.blur > 0
     ? Math.min(1, visibleSide / Math.max(Math.round(node.scene.outputBounds.width * density),
@@ -56,6 +56,7 @@ export function* drawGroup2D(
       let complete = false
       try {
         yield* render(source, density)
+        if (node.tint) tintSilhouette(source, node.tint)
         frame.keep(sourceKey, source, true)
         complete = true
       } finally {
@@ -116,6 +117,22 @@ export function* drawGroup2D(
       destination.height)
   } finally {
     context.restore()
+  }
+}
+
+function tintSilhouette(
+  source: Canvas2DLike,
+  color: NonNullable<Group['tint']>,
+): void {
+  const mask = source.getContext('2d')!
+  mask.save()
+  try {
+    mask.setTransform(1, 0, 0, 1, 0, 0)
+    mask.globalCompositeOperation = 'source-in'
+    mask.fillStyle = `rgba(${color.red * 255}, ${color.green * 255}, ${color.blue * 255}, ${color.alpha})`
+    mask.fillRect(0, 0, source.width, source.height)
+  } finally {
+    mask.restore()
   }
 }
 export function drawFreeform2D(

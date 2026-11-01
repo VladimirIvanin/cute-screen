@@ -91,7 +91,8 @@ export type ContextControl = (
     }>[]
   }
   | {
-    readonly appearance?: 'clean' | 'handDrawn'
+    readonly appearance?: 'clean' | 'handDrawn' | 'tapered'
+    readonly taperedSupported?: boolean
     readonly appearanceMixed?: boolean
     readonly appearanceSupported?: boolean
     readonly allStyles?: boolean
@@ -134,6 +135,7 @@ export type ContextControl = (
 export type ShapeFill = import('@cute-screen/editor-renderer').FillPaint
 
 export interface ContextToolbarSchema {
+  readonly annotationShadow?: 'none' | 'soft' | 'strong' | 'mixed'
   readonly gradient?: {
     readonly single: boolean
     readonly width: number

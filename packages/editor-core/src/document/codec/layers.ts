@@ -3,6 +3,7 @@ import {
   freezeJsonObject,
   readJsonObject,
 } from '../json'
+import { supportsAnnotationShadow } from '../../annotation-shadow'
 import {
   BLEND_MODES,
   type BlendMode,
@@ -130,7 +131,7 @@ function assertPrecisionLayerShape(
 ): void {
   assertOnlyFields(
     input,
-    ['id', 'space', 'kind', 'transform', 'localBounds', 'opacity', 'visible', 'locked', 'blendMode', 'shadows', 'payload'],
+    ['id', 'space', 'kind', 'transform', 'localBounds', 'opacity', 'visible', 'locked', 'blendMode', 'shadows', 'annotationShadow', 'payload'],
     field,
   )
   const transform = readJsonObject(input.transform, `${field}.transform`)
@@ -153,6 +154,9 @@ export function parseLayer(
   const field = `layers[${index}]`
   const input = readJsonObject(value, field)
   if (!isLayerKind(input.kind)) throw new Error(`${field}.kind is invalid`)
+  if (input.annotationShadow !== undefined && !supportsAnnotationShadow(input.kind)) {
+    throw new Error(`${field}.annotationShadow is unsupported for ${input.kind}`)
+  }
   const precisionLayer = isPrecisionLayer(input.kind)
   if (precisionLayer) assertPrecisionLayerShape(input, field)
   const textBearing = isTextBearingLayer(input.kind)
@@ -174,6 +178,7 @@ export function parseLayer(
     'locked',
     'blendMode',
     'shadows',
+    'annotationShadow',
     'payload',
     'space',
   ])
@@ -184,6 +189,9 @@ export function parseLayer(
   assertPrecisionPayloadBounds(input.kind, payload, localBounds, field)
   if (input.space !== undefined && !['content', 'card'].includes(String(input.space))) throw new Error(`${field}.space is invalid`)
   const common = {
+    ...(input.annotationShadow === undefined ? {} : {
+      annotationShadow: parseAnnotationShadow(input.annotationShadow, field),
+    }),
     ...(input.space === 'card' ? { space: 'card' as const } : {}),
     id: readStableId(input.id, `${field}.id`),
     kind: input.kind,
@@ -208,4 +216,12 @@ export function parseLayer(
     blendMode: input.blendMode,
     shadows: parseLayerShadows(input.shadows, field),
   }) as LayerNode
+}
+
+function parseAnnotationShadow(
+  value: unknown,
+  field: string,
+): 'soft' | 'strong' {
+  if (value !== 'soft' && value !== 'strong') throw new Error(`${field}.annotationShadow is invalid`)
+  return value
 }

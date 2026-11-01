@@ -1,5 +1,39 @@
 # Журнал архитектурных решений
 
+## ADR-175 — Клиновидные стрелки и общая тень аннотаций
+
+**Статус:** accepted (2026-11-01); supersedes ADR-123 только в перечне
+оформлений стрелки и ADR-031 только в запрете общей тени text-bearing слоёв.
+
+**Основание:** пользовательский пример требует расширяющегося стержня и
+крупного наконечника; увеличение постоянной толщины не даёт такой силуэт.
+Первые core tests зафиксировали отсутствие tapered и annotationShadow.
+
+**Решение:** optional arrow appearance=tapered использует общий filled vector
+path для scene/hit/export и общие route/cap metrics. Размер головы зависит от
+длины и толщины, ограничен 60% пути на закрытые caps; legacy clean/handDrawn
+не меняются. Body поддерживает solid/dashed/dotted. Line сохраняет собственные
+clean/handDrawn и не принимает tapered через style clipboard.
+
+Optional common annotationShadow=soft|strong задаёт два bounded пресета:
+чёрный alpha 0,24, offsetY=2, blur=6 либо alpha 0,4, offsetY=4, blur=10.
+Отсутствие поля означает none. Объект сначала целиком растеризуется в bounded
+alpha mask, затем tint/blur рисуется позади его исходных nodes. Это исключает
+швы между shaft/caps и shadow прямоугольника вокруг прозрачного объекта.
+Canvas2D использует общий cancellable effect cache, CanvasKit — color/image
+filters; временные ресурсы освобождаются штатным finally/dispose.
+
+Поле additive в schema8; прежние opacity/blend/shadows text-bearing слоёв
+по-прежнему запрещены. UI предоставляет три явных пресета для большинства
+аннотаций, общую batch-команду для выделения и existing remembered tool styles.
+Marker/Censor/Spotlight/Loupe не получают второй эффект. Binary IPC, originals,
+capture, release contract и dependencies не меняются.
+
+**Проверяемое основание:** codec/style/Undo/hit/short-route tests, декодирование
+PNG при 1×/2× обоих backend, production pointer creation и UI keyboard/focus,
+RU/EN × темы/1024 px; fresh native Capture → Quick → Editor и reopen — отдельные
+runtime gates. Фактические результаты и ограничения — TESTING.md.
+
 ## ADR-174 — Плавающие уведомления без сдвига редактора
 
 **Статус:** accepted (2026-10-30); supersedes ADR-170 только в части размещения
@@ -1244,7 +1278,8 @@ browser flow, decoded Canvas2D/CanvasKit export 1×/2× и real-WebView reopen;
 
 **Статус:** superseded в части геометрии/seed обводок — [ADR-147](#adr-147-выбранные-рукописные-обводки-и-документный-цикл) (2026-10-21);
 в части исключения Line — [ADR-125](#adr-125-рукописное-оформление-линии)
-(2026-10-20); остальные решения сохранены ADR-125.
+(2026-10-20); перечень оформлений расширен [ADR-175](#adr-175-клиновидные-стрелки-и-общая-тень-аннотаций)
+(2026-11-01); остальные решения сохранены ADR-125.
 
 **Основание:** нужен быстрый редактируемый акцент вокруг содержимого и
 индивидуальные стрелки с общим характером росчерка. Первые core-тесты до
@@ -2827,7 +2862,9 @@ pointermove path. Existing public shell props/emits and `ContextToolbarSchema`
 
 ## ADR-031 — Editable document v7 и переносимый минимальный text contract
 
-**Статус:** superseded in editable schema/clipboard boundary by [ADR-127](#adr-127-публикационная-карточка-и-постоянные-материалы); remaining text contract accepted; supersedes the older-schema migration portions of ADR-005
+**Статус:** superseded in editable schema/clipboard boundary by [ADR-127](#adr-127-публикационная-карточка-и-постоянные-материалы),
+in annotation shadow prohibition by [ADR-175](#adr-175-клиновидные-стрелки-и-общая-тень-аннотаций);
+remaining text contract accepted; supersedes the older-schema migration portions of ADR-005
 and ADR-022 and the text-contract portions of ADR-023, ADR-025 and ADR-026
 
 **Контекст:** paint/effect scope ADR-023 и ранний rich-text scope ADR-026

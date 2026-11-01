@@ -486,6 +486,7 @@ export {
 } from './gradient'
 
 export * from './composition'
+export { supportsAnnotationShadow } from './annotation-shadow'
 export type { EditorDocumentV8 } from './document/types'
 
 export {

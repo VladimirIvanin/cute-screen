@@ -1,7 +1,12 @@
+import { prepareCreationStyle } from './creation-style'
+import {
+  annotationShadowSchema,
+  changeAnnotationShadow,
+  retainShadowDefault,
+} from './annotation-shadow'
 import { annotationTool } from '@cute-screen/editor-renderer'
 import { createEmojiController } from './emoji-controller'
 import type { EmojiContext } from './emoji-state'
-import { measuredNumberedMarkerLayer } from '@cute-screen/editor-renderer'
 import {
   changeNumberedMarkerSetting,
   markerColorChange,
@@ -10,7 +15,6 @@ import {
 } from './numbered-marker-settings'
 import { computed } from 'vue'
 import {
-  applyLayerStyle,
   extractLayerStyle,
   styleCommand,
   type JsonObject,
@@ -218,7 +222,11 @@ function createEffects(
     applyCalloutChange: text.applyCalloutStrokeChange,
     applyPrecisionChange: precision.applyPrecisionChange,
     applyImageChange: image.applyImageChange,
-    applyDrawingChange: drawing.applyDrawingChange,
+    applyDrawingChange: (id, value) => {
+      if (id !== 'annotationShadow') return drawing.applyDrawingChange(id, value)
+      changeAnnotationShadow(context, selected(), effectProps, settingsTool.value, value)
+      return true
+    },
   })
   function numericCommands(
     id: string,
@@ -289,7 +297,7 @@ function createSelectionSettingsChange(
         tool &&
         tool !== 'select' &&
         workspace.rememberedStyles.value[tool as import('@cute-screen/editor-renderer').AnnotationTool]
-      ) workspace.rememberedStyles.value = { ...workspace.rememberedStyles.value, [tool]: {} }
+      ) retainShadowDefault(context, tool)
       contextEffects.onContextChange(id, value)
       return
     }
@@ -420,31 +428,7 @@ function createControllers(
     props,
     activeDocument: workspace.activeDocument,
     store,
-    prepareLayer: (layer) => {
-      // Modern ink freezes every setting, including pressure source, at pointerdown.
-      if (layer.kind === 'numberedMarker') return measuredNumberedMarkerLayer(layer)
-      if (
-        layer.kind === 'pencil' &&
-        (layer.payload.strokeVersion === 2 ||
-          layer.payload.strokeVersion === 3)
-      ) return layer
-      const style = workspace.rememberedStyles.value[annotationTool(layer)]
-      if (style && layer.kind === 'marker') {
-        // The gesture already resolved Auto for this source. A remembered resolved
-        // blend from another screenshot must never replace that frozen decision.
-        const { blendMode: _blend, highlighterMode: _mode, ...appearance } = style
-        void _blend
-        void _mode
-        return applyLayerStyle(
-          layer,
-          appearance,
-          workspace.activeDocument.value?.crop ?? workspace.activeDocument.value?.canvas,
-        )
-      }
-      return style && !['text', 'callout'].includes(layer.kind)
-        ? applyLayerStyle(layer, style, workspace.activeDocument.value?.crop ?? workspace.activeDocument.value?.canvas)
-        : layer
-    },
+    prepareLayer: (layer) => prepareCreationStyle(context, layer),
   })
   const content = createContentController({
     error: workspace.toolError,
@@ -473,13 +457,21 @@ export function createWorkspaceBindings(context: WorkspaceBindingsContext) {
   const effects = createEffects(context, schemas)
   const controllers = createControllers(context, schemas, effects)
   const emoji = createEmojiController(context, controllers.layers.addLayer)
+  const shadow = (schema: import('../types').ContextToolbarSchema | undefined, tool?: string) =>
+    annotationShadowSchema(context, schema, tool)
   return {
     tools: schemas.tools,
     floatingTextToolbarSchema: schemas.text.floatingTextToolbarSchema,
     contextSchema: schemas.contextSchema.contextSchema,
-    selectionSchema: computed(() => emoji.selectionSchema.value ?? schemas.contextSchema.selectionSchema.value),
-    creationSchema: computed(() => emoji.creationSchema.value ?? schemas.contextSchema.creationSchema.value),
-    toolConfigureSchema: computed(() => emoji.configureSchema.value ?? schemas.contextSchema.toolConfigureSchema.value),
+    selectionSchema: computed(() => shadow(emoji.selectionSchema.value ?? schemas.contextSchema.selectionSchema.value)),
+    creationSchema: computed(() => shadow(
+      emoji.creationSchema.value ?? schemas.contextSchema.creationSchema.value,
+      context.store.activeToolId,
+    )),
+    toolConfigureSchema: computed(() => shadow(
+      emoji.configureSchema.value ?? schemas.contextSchema.toolConfigureSchema.value,
+      context.workspace.toolConfigure.value?.toolId,
+    )),
     floatingArrowToolbarSchema: schemas.contextSchema.floatingArrowToolbarSchema,
     toolConfigureArrowSchema: schemas.contextSchema.toolConfigureArrowSchema,
     onContextChange: (id: string, value: string) => id === 'markerSample' ? controllers.toolUi.startEyedropper(value) : effects.contextEffects.onContextChange(id, value),

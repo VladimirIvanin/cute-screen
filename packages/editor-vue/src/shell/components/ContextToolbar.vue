@@ -9,6 +9,7 @@ import SimpleColorPicker from '../ui/SimpleColorPicker.vue'
 import NumericControl from '../ui/NumericControl.vue'
 import { numericDefaultsKey } from '../ui/numeric-preview'
 import UiSelect from '../ui/UiSelect.vue'
+import AnnotationShadowControl from './AnnotationShadowControl.vue'
 import TextFormattingToolbar from './TextFormattingToolbar.vue'
 import CalloutFormattingToolbar from './CalloutFormattingToolbar.vue'
 import ArrowFormattingToolbar from './ArrowFormattingToolbar.vue'
@@ -286,5 +287,12 @@ const emit = defineEmits<{
         }}
       </NButton>
     </div>
+    <AnnotationShadowControl
+      v-if="schema.annotationShadow !== undefined"
+      :value="schema.annotationShadow"
+      :locale="pickerLocale ?? 'en'"
+      :disabled="schema.disabled ?? false"
+      @change="emit('change', 'annotationShadow', $event)"
+    />
   </fieldset>
 </template>

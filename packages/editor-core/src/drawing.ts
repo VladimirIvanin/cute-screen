@@ -301,7 +301,8 @@ function createArrowDrawing(
   delete arrowStyle.start
   const payload: ArrowLayerPayload = {
     ...arrowStyle,
-    appearance: defaults.arrow.appearance === 'handDrawn' ? 'handDrawn' as const : 'clean' as const,
+    appearance: defaults.arrow.appearance === 'tapered' ? 'tapered' as const
+      : defaults.arrow.appearance === 'handDrawn' ? 'handDrawn' as const : 'clean' as const,
     sketchSeed: sketchSeed(input.id),
     sketchVersion: 1 as const,
     path,

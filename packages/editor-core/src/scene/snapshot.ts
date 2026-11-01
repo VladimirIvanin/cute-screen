@@ -35,6 +35,7 @@ function freezeNode(node: RenderNode): RenderNode {
   switch (node.kind) {
     case 'group':
       return Object.freeze({ ...node, scene: createRenderSceneSnapshot(node.scene),
+        ...(node.tint ? { tint: freezeColor(node.tint) } : {}),
         destination: Object.freeze({ ...node.destination }), clip: Object.freeze({ ...node.clip }),
         ...(node.backdrop ? { backdrop: freezeColor(node.backdrop) } : {}),
         ...(node.outerClip ? { outerClip: Object.freeze({ ...node.outerClip,

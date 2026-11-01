@@ -324,7 +324,7 @@ function arrowAppearancePayload(
   tool: DrawingTool,
   current: JsonObject,
 ): JsonObject | undefined {
-  return ['arrow', 'line'].includes(tool) && (value === 'clean' || value === 'handDrawn')
+  return ['arrow', 'line'].includes(tool) && (value === 'clean' || value === 'handDrawn' || (tool === 'arrow' && value === 'tapered'))
     ? { ...current, appearance: value } : undefined
 }
 

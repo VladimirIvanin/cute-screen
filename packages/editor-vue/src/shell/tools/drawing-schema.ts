@@ -115,7 +115,9 @@ function arrowSchema(
         solidLabel: translate('arrowSolid'),
         dashedLabel: translate('arrowDashed'),
         dottedLabel: translate('arrowDotted'),
-        appearance: values.appearance === 'handDrawn' ? 'handDrawn' as const : 'clean' as const,
+        appearance: values.appearance === 'tapered' ? 'tapered' as const
+          : values.appearance === 'handDrawn' ? 'handDrawn' as const : 'clean' as const,
+        taperedSupported: tool === 'arrow',
       },
       {
         kind: 'arrowCap',

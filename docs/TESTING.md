@@ -1,5 +1,67 @@
 # Стратегия тестирования
 
+## Бамп 0.1.28 (2026-11-01)
+
+Windows x64 / PowerShell: `pnpm version:bump 0.1.28` синхронизировал пять
+application metadata files и четыре workspace entries в Cargo.lock; внешние
+зависимости и pnpm-lock не менялись.
+`pnpm test:boundaries tests/boundaries/bump-version.test.ts tests/boundaries/release-assets.test.ts`
+— 2 files / 34 passed. `node scripts/release-assets.mjs version D:/cutescreen v0.1.28`
+— exit 0. `pnpm format` — exit 0; перед коммитом выполняются format:check,
+docs:check и git diff --check. Публикация release/tag не выполняется.
+`pnpm verify:release-boundary` был остановлен: команда запускает полный release
+build, который не требуется для metadata bump; этот gate не считается passed.
+Предыдущие результаты клиновидных стрелок/теней и native pending сохранены ниже.
+
+## Клиновидные стрелки и тени (2026-11-01, ADR-175)
+
+Windows x64 / PowerShell, Node 22.23.1, pnpm 10.33.2, Chrome 156.0.8078.76,
+base `68abda5` + working tree. Evidence: `artifacts/tapered-shadow/`, browser
+screenshots `artifacts/browser-e2e/tapered-shadow-*`.
+
+До реализации `pnpm test packages/editor-core/src/tapered-shadow.test.ts`:
+2 failed — create возвращал clean, style не сохранял annotationShadow.
+Отдельный red cap test затем обнаружил visible y=57,86 при bounds height=36,52;
+исправлены bounds и hit для независимых polygon/path/ellipse наконечников.
+
+- `pnpm test` — 188 files / 1698 passed, один новый test с неверной точкой
+  внутри dotted stroke failed. Координаты уточнены; повтор всего 9-минутного
+  suite не выполнялся. Финальный `pnpm test packages/editor-core/src/tapered-shadow.test.ts packages/editor-core/src/arrow-geometry.test.ts packages/editor-core/src/hand-drawn.test.ts packages/editor-core/src/styles.test.ts packages/editor-core/src/content-tools.test.ts tests/unit/vue/canvas-viewport-text.test.ts`
+  — 6 files / 54 passed, включая все 10 новых tests (`core.log`). Text commit
+  сохраняет тень, даже когда inline editor пересоздаёт text layer; red test
+  воспроизвёл потерю поля до исправления createTextCommitCommand.
+  Общий capability guard блокирует перенос тени на marker/pixel effects
+  в style clipboard, codec и scene.
+- `pnpm test:render` — 32 files / 96 passed (`render.log`). После cap repair
+  `pnpm test:render tests/harness/render/tapered-shadow.test.ts` — 2 passed
+  (`render-final.log`). Обе реализации PNG повторно декодированы при 1×/2×,
+  alpha silhouette видим, Canvas2D preview/export exact при 1×. Изображения
+  Canvas2D/CanvasKit на светлом фоне и production-like 4K fixture просмотрены.
+- `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 CUTE_SCREEN_BROWSER_E2E_PORT=5254 CUTE_SCREEN_E2E_DISABLE_WATCH=1 pnpm test:e2e:browser --spec tests/e2e/specs/browser-tapered-shadow.e2e.ts --spec tests/e2e/specs/browser-m06-arrow-tools.e2e.ts`
+  — 2 specs / 6 passed (`browser.log`): production drawing, defaults,
+  selection, geometry, Shadow soft/strong, Undo/Redo, Escape/focus,
+  RU/EN × light/dark, 1024 px; прежняя матрица Arrow сохранена.
+- `pnpm typecheck`, `pnpm lint` — exit 0; lint сохраняет 37 прежних warnings.
+  `pnpm test:boundaries` — 114 passed, 1 skipped.
+
+Native: `CUTE_SCREEN_E2E_SCENARIOS=tapered-shadow,tapered-shadow-reopen pnpm test:e2e:tauri`
+собрал свежий debug/no-bundle harness в общем target/debug (1m12s). External
+tauri-driver + EdgeDriver создали WebView2 session, но остановились на
+`wdioTauri.waitForInit` до Capture. После 150 секунд без продвижения остановлено
+только собственное дерево драйвера; последующие ECONNREFUSED — результат этой
+остановки, не product failure. Reopen также остановлен до проверки: первый
+сценарий ничего не сохранял. Native runner exit 4294967295; native runtime,
+Quick non-origin crop и native reopen остаются **pending**. WKWebView/WebKitGTK
+не запускались. Browser/headless evidence не выдаётся за native pass.
+
+Full `pnpm check`, Rust tests, perf и release/package build не запускались:
+Rust/IPC/dependencies не менялись. Финальные format/docs/diff checks и cleanup
+записаны в task README. Общий Cargo cache сохранён; target/debug вырос с
+53,772 до 55,788 GiB после fresh harness build. Отдельный target не создавался.
+Штатный cleanup отказал на pin path, который WMI продолжает считать активным;
+ручное удаление этой task-owned копии заблокировано автоматической проверкой
+безопасности («blocked by policy»). Сохранён один актуальный diagnostic profile.
+
 ## Округление Canvas2D golden мокапов (2026-10-30)
 
 Base HEAD `044d8b9` + working tree; Windows x64 / PowerShell и Ubuntu 22.04

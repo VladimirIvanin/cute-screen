@@ -1,5 +1,18 @@
 # Платформенная матрица
 
+## Клиновидные стрелки и тень аннотаций (2026-11-01, ADR-175)
+
+Windows x64 / Chrome 156.0.8078.76: browser production drawing, defaults,
+selection, geometry/Shadow, Undo/Redo, Escape/focus, RU/EN × light/dark и
+1024 px — 6 tests passed. Headless Canvas2D/CanvasKit: полный render suite
+96 passed, PNG 1×/2× повторно декодированы. Core/Vue focused — 54 passed;
+boundaries 114 passed, 1 skipped. Fresh debug/no-bundle harness собран.
+
+WebView2 external driver session зависла на `wdioTauri.waitForInit` до Capture;
+native drawing/Quick/handoff/reopen pending, запуск остановлен после диагностики.
+WKWebView/WebKitGTK и остальные runtime отдельно не проверялись.
+Команды, ограничения и evidence — TESTING.md, `artifacts/tapered-shadow/`.
+
 ## Canvas2D golden мокапов (2026-10-30)
 
 Windows x64 / Ubuntu 22.04 x86_64 WSL2, Node 22.23.1, native canvas 1.0.2:

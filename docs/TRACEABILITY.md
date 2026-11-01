@@ -1,5 +1,34 @@
 # Трассируемость требований
 
+## Версия 0.1.28 — до бампа (2026-11-01)
+
+По запросу владельца поднять patch 0.1.27 → 0.1.28 штатной `pnpm version:bump`:
+синхронизировать package/Tauri/Cargo metadata и lock entries без обновления
+зависимостей. Проверить version/release boundary, форматирование и diff;
+закоммитить клиновидные стрелки и тени вместе с бампом и отправить текущую main.
+
+Metadata синхронизированы штатным script; 34 version/release-assets tests и
+проверка текущей версии прошли. Внешние dependencies не обновлялись.
+
+## Клиновидные стрелки и тень аннотаций — до реализации (2026-11-01)
+
+`REQ-TOL-001`, `REQ-EDT-005/006/015/016/021`, `REQ-OUT-001/006`, `REQ-UI-003/006`:
+добавить оформление tapered с тонким округлым хвостом, расширяющимся телом
+и крупным наконечником. Общая геометрия scene/hit/export; straight, quadratic
+и elbow сохраняют редактируемые anchors, прежние стрелки не меняются.
+Добавить общий optional annotationShadow (none/soft/strong) для Arrow/Line,
+Shape/Gradient, Pencil, Text, Callout, Numbered Marker, Ruler, Emoji и Image.
+Тень от объединённого alpha-силуэта, одна правка — один Undo, сохранение/reopen,
+копирование стиля и defaults. Marker/Censor/Spotlight/Loupe не получают второй
+эффект: выделитель смешивает цвет, censorship/spotlight обрабатывают пиксели,
+у лупы собственная тень. Сначала failing core tests; затем decoded PNG 1×/2×
+обоих backend, production browser flow и профильные стабильные проверки.
+
+Реализовано ADR-175: final core/Vue 54 passed, decoded renderer suite 96 passed,
+browser Arrow/Shape/settings/Undo/keyboard/themes/locales — 6 passed.
+Native сборка прошла; driver init остановился до Capture, native runtime
+и reopen pending. Подробные команды и ограничения — TESTING.md.
+
 ## Переносимость golden мокапов — до правки (2026-10-30)
 
 `REQ-OUT-001/006/012/014`: воспроизвести Linux-разницу нового каталога

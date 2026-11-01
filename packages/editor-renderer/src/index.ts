@@ -1,3 +1,4 @@
+export { supportsAnnotationShadow } from '@cute-screen/editor-core'
 export {
   circlingSketch,
   isCirclingKind,

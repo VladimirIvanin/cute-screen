@@ -182,6 +182,8 @@ export const LAYER_KINDS = [
 export type LayerKind = (typeof LAYER_KINDS)[number]
 
 export interface LayerBase<K extends LayerKind, P extends JsonObject> {
+  /** Optional silhouette shadow; absence preserves existing documents. */
+  readonly annotationShadow?: 'soft' | 'strong'
   readonly id: string
   readonly space?: 'content' | 'card'
   readonly kind: K
@@ -195,7 +197,7 @@ export interface LayerBase<K extends LayerKind, P extends JsonObject> {
   readonly extras?: JsonObject
 }
 
-/** Text-bearing v7 layers intentionally cannot persist common visual effects. */
+/** Text-bearing layers exclude legacy opacity/blend/shadows; annotationShadow belongs to LayerBase. */
 export type TextBearingLayerBase<K extends 'text' | 'numberedMarker' | 'callout', P extends JsonObject> = LayerBase<
   K,
   P
@@ -338,7 +340,7 @@ export interface EmojiPayload extends JsonObject {
 }
 
 export interface ArrowLayerPayload extends JsonObject {
-  readonly appearance?: 'clean' | 'handDrawn'
+  readonly appearance?: 'clean' | 'handDrawn' | 'tapered'
   readonly sketchSeed?: number
   readonly sketchVersion?: 1
   readonly annotationTool?: 'line'

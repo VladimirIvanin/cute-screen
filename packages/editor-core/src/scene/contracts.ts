@@ -314,6 +314,8 @@ export interface RenderOutputBounds {
 }
 
 export interface RenderGroupNode extends RenderNodeBase {
+  /** Tint the combined alpha silhouette before blur (annotation shadows). */
+  readonly tint?: RgbaColor
   readonly kind: 'group'
   readonly scene: RenderSceneSnapshot
   readonly destination: RenderOutputBounds
