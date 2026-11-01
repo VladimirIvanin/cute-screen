@@ -1,5 +1,18 @@
 # Стратегия тестирования
 
+## Бамп 0.1.31 (2026-11-01)
+
+Windows x64 / PowerShell, base `34965ee`: `pnpm version:bump 0.1.31`
+синхронизировал package/Tauri/Cargo metadata, три точные workspace dependencies
+и четыре lock entries без обновления внешних зависимостей.
+`pnpm test:boundaries` — 16 files / 114 passed / 1 skipped на Windows,
+включая ранее падавший architecture gate. Команды
+`node scripts/release-assets.mjs version D:/cutescreen v0.1.31` и
+`pnpm mcp:schema:check` — exit 0. После бампа выполнены `pnpm format`,
+`pnpm format:check`, `pnpm docs:check` и `git diff --check`.
+Повторные renderer/native/package builds для metadata bump не запускались;
+доказательства исправления геометрии и native pending сохранены ниже.
+
 ## CI complexity repair после 0.1.30 (2026-11-01)
 
 Windows x64 / PowerShell, Node 22.23.1, pnpm 10.33.2, base `8b951a9`.
