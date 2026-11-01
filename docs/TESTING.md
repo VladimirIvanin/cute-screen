@@ -1,5 +1,25 @@
 # Стратегия тестирования
 
+## CI complexity repair после 0.1.30 (2026-11-01)
+
+Windows x64 / PowerShell, Node 22.23.1, pnpm 10.33.2, base `8b951a9`.
+`pnpm test:boundaries` до исправления воспроизвёл CI: complexity 24/20 в
+`taperedArrowGeometry`, 1 failed / 113 passed / 1 skipped. Расчёт границ
+стержня выделен в `taperedBodyEdges`; формулы и порядок вычислений сохранены.
+Architecture budgets и исключения не менялись.
+
+- `pnpm test:boundaries` — 16 files / 114 passed / 1 skipped на Windows.
+- `pnpm test packages/editor-core/src/tapered-shadow.test.ts packages/editor-core/src/arrow-geometry.test.ts packages/editor-renderer/src/annotation-shadow.test.ts`
+  — 3 files / 18 passed.
+- `pnpm test:render tests/harness/render/tapered-shadow.test.ts` — 2 passed,
+  PNG обоих backend при 1×/2× повторно декодированы; все четыре PNG совпали
+  по SHA-256 с результатами до рефакторинга.
+
+Evidence: `artifacts/tapered-complexity/`. Выполнены `pnpm typecheck`,
+`pnpm lint`, `pnpm format`, `pnpm format:check`, `pnpm docs:check` и
+`git diff --check`. Новый ADR, бамп версии и native/package build не нужны:
+контракт и видимые пиксели не меняются; прежний native runtime pending сохранён.
+
 ## Бамп 0.1.30 после исправления стрелок (2026-11-01)
 
 Windows x64 / PowerShell, base `9b90176` + ADR-176 working tree:

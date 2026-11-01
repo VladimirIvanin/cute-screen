@@ -15,7 +15,8 @@ import {
 
 /** A single filled silhouette prevents translucent seams between shaft and head. */
 export function taperedArrowGeometry(payload: ArrowLayerPayload): readonly ShapePathCommand[] {
-  const { width, length, sizes, body, angles } = taperedArrowMetrics(payload)
+  const metrics = taperedArrowMetrics(payload)
+  const { width, length, sizes, body, angles } = metrics
   if (length < .001) return []
   if (body.length < 2) {
     if (payload.startCap !== 'solidArrow' && payload.endCap !== 'solidArrow') return []
@@ -26,6 +27,28 @@ export function taperedArrowGeometry(payload: ArrowLayerPayload): readonly Shape
     const triangle = [offset(back, angle, size * .55), tip, offset(back, angle, -size * .55)]
     return roundedOutline(triangle, Math.min(width * .35, length * .04))
   }
+  const { lengths, total, left, right } = taperedBodyEdges(payload, metrics)
+  if (payload.stroke.style !== 'solid') return dashedOutline(payload, body, left, right, lengths, total, sizes, angles)
+  // Closed solid heads share the same outline as the variable-width shaft.
+  const outline = [...left]
+  if (payload.endCap === 'solidArrow') outline.push(
+    offset(body.at(-1)!, angles.end, sizes.end * .55), payload.end,
+    offset(body.at(-1)!, angles.end, -sizes.end * .55),
+  )
+  outline.push(...right.reverse())
+  if (payload.startCap === 'solidArrow') outline.push(
+    offset(body[0]!, angles.start, sizes.start * .55), payload.start,
+    offset(body[0]!, angles.start, -sizes.start * .55),
+  )
+  return roundedOutline(outline, Math.min(width * .35, length * .04))
+}
+
+/** Resolve the tapered shaft edges independently of solid/dashed cap assembly. */
+function taperedBodyEdges(
+  payload: ArrowLayerPayload,
+  metrics: ReturnType<typeof taperedArrowMetrics>,
+) {
+  const { width, sizes, body } = metrics
   const lengths = body.slice(1).map((p, i) => Math.hypot(p.x - body[i]!.x, p.y - body[i]!.y))
   const total = lengths.reduce((sum, value) => sum + value, 0)
   const left: Point[] = [], right: Point[] = []
@@ -55,19 +78,7 @@ export function taperedArrowGeometry(payload: ArrowLayerPayload): readonly Shape
     left.push(offset(body[i]!, angle, half * miter))
     right.push(offset(body[i]!, angle, -half * miter))
   }
-  if (payload.stroke.style !== 'solid') return dashedOutline(payload, body, left, right, lengths, total, sizes, angles)
-  // Closed solid heads share the same outline as the variable-width shaft.
-  const outline = [...left]
-  if (payload.endCap === 'solidArrow') outline.push(
-    offset(body.at(-1)!, angles.end, sizes.end * .55), payload.end,
-    offset(body.at(-1)!, angles.end, -sizes.end * .55),
-  )
-  outline.push(...right.reverse())
-  if (payload.startCap === 'solidArrow') outline.push(
-    offset(body[0]!, angles.start, sizes.start * .55), payload.start,
-    offset(body[0]!, angles.start, -sizes.start * .55),
-  )
-  return roundedOutline(outline, Math.min(width * .35, length * .04))
+  return { lengths, total, left, right }
 }
 
 function offset(

@@ -1,5 +1,13 @@
 # Трассируемость требований
 
+## CI: сложность клиновидного контура (2026-11-01)
+
+`REQ-TOL-001`, `REQ-REL-005`: воспроизвести architecture boundary failure
+на complexity 24/20; выделить расчёт границ стержня в отдельный helper,
+сохраняя формулы, порядок вычислений, geometry и существующие лимиты.
+Доказательства: полный `pnpm test:boundaries`, связанные core/renderer tests,
+decoded render 1×/2× и финальные format/typecheck/lint/docs checks.
+
 ## Версия 0.1.30 — до бампа (2026-11-01)
 
 `REQ-REL-005/006`, `REQ-TOL-001`, `REQ-EDT-021`: по запросу владельца поднять
