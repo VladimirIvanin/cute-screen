@@ -1,5 +1,41 @@
 # Стратегия тестирования
 
+## Бамп 0.1.33 (2026-11-02)
+
+Windows x64 / PowerShell, base `9121137` + image ingress mount repair.
+`pnpm version:bump 0.1.33` синхронизировал package/Tauri/Cargo metadata,
+три точные workspace dependencies и четыре lock entries без обновления
+внешних зависимостей. `pnpm test:boundaries tests/boundaries/bump-version.test.ts tests/boundaries/release-assets.test.ts`
+— 2 files / 34 passed. `node scripts/release-assets.mjs version D:/cutescreen v0.1.33`
+и `pnpm mcp:schema:check` — exit 0. Evidence: `artifacts/version-0.1.33/`.
+Native evidence перед metadata bump — ниже; повторный native/package build
+для изменения только версии не запускался. Linux runtime rerun остаётся за CI.
+
+## Native image ingress после mount (2026-11-02)
+
+Windows x64 / PowerShell, Node 22.23.1, pnpm 10.33.2, base `9121137`.
+Linux CI `result-export` упал до открытия fixture: `nativeImageIngress`
+читал bounds отсутствующего canvas. Helper теперь ждёт видимую
+`.cs-canvas-scroll`, которая монтируется вместе с обоими canvas и empty state.
+Ожидание использует штатный WDIO timeout, не создаёт документ и не меняет runtime.
+
+- `CUTE_SCREEN_E2E_SCENARIOS=result-export,m04-clean-profile-capture pnpm test:e2e:tauri`
+  — exit 0, 2 scenarios / 2 passed. Свежая debug/no-bundle сборка, общий
+  `target/debug`, WebView2 156.0.4314.58, external tauri-driver 2.1.0,
+  WDIO service / Rust plugins 1.3.0, WebDriver input.
+- Export: 3840×2160 PNG повторно декодирован и сравнен по RGBA SHA-256 с scene;
+  отмена Save As сохраняет прежние bytes, crop 2160×2160 совпадает с вырезкой
+  декодированного полного PNG, source неизменен. Скриншот
+  `artifacts/tauri-e2e/result-export/editor.png` просмотрен.
+- Clean-profile capture прошёл production request/mount/storage flow;
+  fake-platform не подтверждает physical capture.
+- `pnpm exec tsc --noEmit -p tests/e2e/tsconfig.json` и
+  `pnpm exec eslint tests/e2e/image-ingress.ts` — exit 0.
+
+Evidence: `artifacts/image-ingress-mount/` — native log, два JUnit,
+export worker log и formatting/typecheck/lint/docs logs. Linux/WebKitGTK
+повторно локально не запускался; подтверждение исходной платформы остаётся за CI.
+
 ## Допуск software perf для тени аннотаций (2026-11-02)
 
 Windows x64 / PowerShell, Node 22.23.1, pnpm 10.33.2, base `66a8ffc`.

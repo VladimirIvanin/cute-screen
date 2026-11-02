@@ -1,5 +1,22 @@
 # Трассируемость требований
 
+## Версия 0.1.33 — до бампа (2026-11-02)
+
+`REQ-REL-005/006`: по запросу владельца поднять patch 0.1.32 → 0.1.33
+штатной `pnpm version:bump`, проверить metadata/release boundaries,
+форматирование и docs. Закоммитить исправление ожидания mount в native image
+ingress вместе с бампом и отправить текущую main в origin.
+Native evidence исправления — два Windows WebView2 сценария; Linux rerun pending CI.
+
+## Native image ingress: ожидание mount — до правки (2026-11-02)
+
+`REQ-TOL-015`, `REQ-OUT-003/006`: устранить раннее обращение к отсутствующему
+canvas в Linux `result-export`. Общий E2E helper должен дождаться видимой
+рабочей области production editor перед вычислением native координат,
+включая пустой редактор. Проверить штатный `pnpm test:e2e:tauri` для
+`result-export,m04-clean-profile-capture` с повторным декодированием PNG;
+не создавать документ в обход mount-flow и не увеличивать timeout.
+
 ## Допуск software perf для тени аннотаций — до правки (2026-11-02)
 
 `REQ-TOL-001`, `REQ-EDT-021`: по запросу владельца увеличить smoke-порог

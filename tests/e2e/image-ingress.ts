@@ -1,4 +1,7 @@
-import { browser } from '@wdio/globals'
+import {
+  $,
+  browser,
+} from '@wdio/globals'
 
 export type ImageDocument = {
   id: string
@@ -30,6 +33,9 @@ export async function nativeImageIngress(
   action: string,
   fixture = 'ui-4k.png',
 ): Promise<void> {
+  // Selecting the native window can precede the Vue workspace mount.
+  // The empty editor mounts the same viewport and canvases as an open document.
+  await $('.cs-canvas-scroll').waitForDisplayed()
   await browser.execute(async (action, fixture) => {
     const rect = document.querySelector('.cs-empty-state')
       ? document.querySelector('.cs-canvas-scroll')!.getBoundingClientRect()
