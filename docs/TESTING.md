@@ -1,5 +1,9 @@
 # Стратегия тестирования
 
+## Проверка обновлений (ADR-177)
+
+Windows 10 Home / Chrome 156 / WebView2 156: `cargo test -p cute-screen-desktop --lib settings_window::` — 10 passed; `pnpm test:e2e:landing` — 7 passed, no-JS — 5 passed; `pnpm test:e2e:browser --spec tests/e2e/specs/browser-activation-settings.e2e.ts` — 2 passed; `CUTE_SCREEN_E2E_SCENARIOS=tray-locale,tray-locale-reopen pnpm test:e2e:tauri` — 2 passed. Скриншоты настроек: `artifacts/browser-e2e/settings-inline-ru-light-620.png` и варианты RU/EN, light/dark. Открытие ссылки в системном браузере и native smoke Linux/macOS остаются pending.
+
 ## Бамп 0.1.31 (2026-11-01)
 
 Windows x64 / PowerShell, base `34965ee`: `pnpm version:bump 0.1.31`

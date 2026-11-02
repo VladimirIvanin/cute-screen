@@ -78,6 +78,28 @@
   outline: 2px solid var(--focus-ring);
   outline-offset: 3px;
 }
+.cs-settings .cs-settings-version button {
+  min-height: 28px;
+  margin: -4px 0;
+  padding: 4px 0;
+  border: 0;
+  border-radius: 2px;
+  color: var(--text-muted);
+  background: transparent;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
+}
+.cs-settings .cs-settings-version button:hover:not(:disabled) {
+  color: var(--accent);
+  background: transparent;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.cs-settings-version p[role='alert'] {
+  margin-top: 6px;
+  color: var(--text);
+}
 .cs-settings-sidebar nav button {
   text-align: left;
   border-color: transparent;

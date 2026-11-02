@@ -30,6 +30,24 @@ async function openPage(
 }
 
 describe('static landing production preview', () => {
+  it('compares the application version and preserves the validated platform across languages', async function () {
+    if (process.env.CUTE_SCREEN_LANDING_NO_JS === '1') this.skip()
+    await browser.url('/cute-screen/?version=0.0.1&os=windows&arch=arm64')
+    await expect($('[data-update-result]')).toBeDisplayed()
+    await expect($('[data-update-message]')).toHaveText(expect.stringContaining('Доступна новая версия'))
+    await expect($('[data-update-result] a')).toHaveAttribute('href', '#download-windows')
+    await $('.locale-switch').click()
+    await expect($('[data-update-message]')).toHaveText(expect.stringContaining('An update is available'))
+    expect(await browser.execute(() => location.search)).toContain('arch=arm64')
+    const release = await browser.execute(() => document.querySelector<HTMLElement>('[data-update-result]')!.dataset.release!)
+    await browser.url(`/cute-screen/?version=${release}&os=linux`)
+    await expect($('[data-update-message]')).toHaveText(expect.stringContaining('Установлена последняя версия'))
+    await browser.url('/cute-screen/?version=999.0.0&os=linux')
+    await expect($('[data-update-message]')).toHaveText(expect.stringContaining('Установленная версия новее опубликованной'))
+    await browser.url('/cute-screen/?version=%3Cscript%3E&os=linux')
+    await expect($('[data-update-message]')).toHaveText('Не удалось проверить версию.')
+  })
+
   before(async () => {
     await mkdir(output, { recursive: true })
   })
@@ -131,8 +149,10 @@ describe('static landing production preview', () => {
     if (process.env.CUTE_SCREEN_LANDING_NO_JS === '1') this.skip()
     const assets = 'apps/landing/dist/assets'
     const scripts = (await readdir(assets)).filter((file) => file.endsWith('.js'))
-    expect(scripts).toHaveLength(1)
-    const source = await readFile(path.join(assets, scripts[0]!), 'utf8')
+    const mainScript = scripts.find((file) => file.startsWith('downloads-'))
+    expect(mainScript).toBeDefined()
+    expect(scripts.some((file) => file.startsWith('update-check-'))).toBe(true)
+    const source = await readFile(path.join(assets, mainScript!), 'utf8')
     expect(source.length).toBeLessThan(12_000)
     expect(source).not.toMatch(/__TAURI__|__VUE__|createApp|EditorCommand/u)
     for (const locale of ['ru', 'en'] as const) {

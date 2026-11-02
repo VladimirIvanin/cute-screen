@@ -14,7 +14,7 @@ export default defineConfig({
       order: 'pre',
       async handler(html) {
         const catalog = await readLandingCatalog(fileURLToPath(new URL('./assets/release.json', import.meta.url)))
-        return html.replace('<!-- downloads -->', downloadsHTML(catalog, /<html\s+lang="en"/u.test(html)))
+        return html.replace('<!-- downloads -->', downloadsHTML(catalog, /<html\s+lang="en"/u.test(html))).replace('<!-- update-version -->', catalog.tag.slice(1))
       },
     },
   }],

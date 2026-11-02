@@ -695,3 +695,16 @@ h1 span {
     transition: none;
   }
 }
+
+.update-result {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid currentColor;
+  border-radius: 12px;
+}
+.update-result[hidden] {
+  display: none;
+}
+.update-result p {
+  margin: 0 0 8px;
+}

@@ -1,19 +1,16 @@
 import { browser } from '@wdio/globals'
-import { createRequire } from 'node:module'
-
-const { version } = createRequire(import.meta.url)('../../package.json') as { version: string }
 
 // macOS offers only Area and Screen capture in the tray (ADR-164).
 export const russianTrayLabels = [
-  ...(process.platform === 'linux' ? [`Версия ${version}`] : []),
   'Снимок области',
   'Снимок экрана',
   'Снимок окна',
   'Снимок активного окна',
   'Повторить область',
   'Открыть редактор',
-  ...(process.platform === 'linux' ? ['Открыть изображение…', 'История…'] : []),
-  'Настройки…',
+  ...(process.platform === 'linux' ? ['Открыть изображение', 'История'] : []),
+  'Проверить обновления',
+  'Настройки',
   'Выход',
 ].filter((label) => process.platform !== 'darwin' || ![
   'Снимок окна', 'Снимок активного окна', 'Повторить область',

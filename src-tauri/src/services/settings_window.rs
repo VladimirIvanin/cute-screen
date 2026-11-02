@@ -14,6 +14,47 @@ use std::{
 };
 use tauri::{Manager, Runtime, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
+pub fn update_page_url(
+    locale: &str,
+    version: &str,
+    os: &str,
+    arch: &str,
+) -> Result<url::Url, String> {
+    let os = match os {
+        "windows" | "macos" | "linux" => os,
+        _ => return Err("Unsupported OS".into()),
+    };
+    let arch = match arch {
+        "x86_64" => "x64",
+        "aarch64" => "arm64",
+        _ => return Err("Unsupported architecture".into()),
+    };
+    let base = if locale == "ru" {
+        "https://vladimirivanin.github.io/cute-screen/"
+    } else {
+        "https://vladimirivanin.github.io/cute-screen/en/"
+    };
+    let mut url = url::Url::parse(base).map_err(|error| error.to_string())?;
+    url.query_pairs_mut()
+        .append_pair("version", version)
+        .append_pair("os", os)
+        .append_pair("arch", arch);
+    Ok(url)
+}
+
+pub fn open_update<R: Runtime>(app: &tauri::AppHandle<R>) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    let url = update_page_url(
+        &saved_locale(app),
+        &app.package_info().version.to_string(),
+        std::env::consts::OS,
+        std::env::consts::ARCH,
+    )?;
+    app.opener()
+        .open_url(url.as_str(), None::<&str>)
+        .map_err(|error| error.to_string())
+}
+
 pub fn open<R: Runtime>(app: &tauri::AppHandle<R>, first_run: bool) -> Result<(), String> {
     open_section(app, first_run, false)
 }
@@ -144,10 +185,14 @@ pub fn refresh_tray<R: Runtime>(app: &tauri::AppHandle<R>) {
             }
         }
         for item in items.0.iter().filter(|item| {
-            matches!(item.id().as_ref(), "settings" | "quit")
+            matches!(item.id().as_ref(), "settings" | "quit" | "check-updates")
                 || tray_navigation_ids(cfg!(target_os = "linux")).contains(&item.id().as_ref())
         }) {
-            if let Err(error) = item.set_text(tray_text(item.id().as_ref(), &locale, None)) {
+            if let Err(error) = item.set_text(
+                tray_text(item.id().as_ref(), &locale, None)
+                    .replace('…', "")
+                    .replace("...", ""),
+            ) {
                 eprintln!("cute-screen tray label: {error}");
             }
         }
@@ -156,7 +201,7 @@ pub fn refresh_tray<R: Runtime>(app: &tauri::AppHandle<R>) {
 
 pub fn tray_navigation_ids(is_linux: bool) -> &'static [&'static str] {
     if is_linux {
-        &["app-version", "app-open-image", "app-history"]
+        &["app-open-image", "app-history"]
     } else {
         &[]
     }
@@ -348,18 +393,9 @@ pub fn saved_locale<R: Runtime>(app: &tauri::AppHandle<R>) -> String {
 }
 
 pub fn tray_text(id: &str, locale: &str, trigger: Option<&str>) -> String {
-    if id == "app-version" {
-        return format!(
-            "{} {}",
-            if locale == "ru" {
-                "Версия"
-            } else {
-                "Version"
-            },
-            env!("CARGO_PKG_VERSION")
-        );
-    }
     let label = match (locale == "ru", id) {
+        (true, "app-version" | "check-updates") => "Проверить обновления",
+        (_, "app-version" | "check-updates") => "Check for updates",
         (true, "app-file") => "Файл",
         (true, "app-open-image") => "Открыть изображение…",
         (true, "app-export") => "Экспорт PNG…",
@@ -415,7 +451,7 @@ pub fn install_menu<R: Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()> 
         app,
         "app-version",
         tray_text("app-version", &locale, None),
-        false,
+        true,
         None::<&str>,
     )?;
     let settings = MenuItem::with_id(
@@ -745,7 +781,7 @@ mod navigation_tests {
     fn linux_tray_includes_file_history_and_version() {
         assert_eq!(
             super::tray_navigation_ids(true),
-            &["app-version", "app-open-image", "app-history"]
+            &["app-open-image", "app-history"]
         );
         assert!(super::tray_navigation_ids(false).is_empty());
     }
@@ -779,7 +815,7 @@ mod navigation_tests {
         );
         assert_eq!(
             super::tray_text("app-version", "en", None),
-            format!("Version {}", env!("CARGO_PKG_VERSION"))
+            "Check for updates"
         );
     }
 
@@ -847,5 +883,21 @@ mod navigation_tests {
     fn app_menu_is_not_an_in_window_title() {
         assert!(super::installs_app_menu(true));
         assert!(!super::installs_app_menu(false));
+    }
+}
+
+#[cfg(test)]
+mod update_page_contract_tests {
+    #[test]
+    fn encodes_version_and_platform_for_localized_landing() {
+        let url = super::update_page_url("en", "1.2.3+build", "windows", "x86_64").unwrap();
+        assert_eq!(
+            url.as_str(),
+            "https://vladimirivanin.github.io/cute-screen/en/?version=1.2.3%2Bbuild&os=windows&arch=x64"
+        );
+    }
+    #[test]
+    fn rejects_unknown_platform() {
+        assert!(super::update_page_url("ru", "1.2.3", "unknown", "x86_64").is_err());
     }
 }

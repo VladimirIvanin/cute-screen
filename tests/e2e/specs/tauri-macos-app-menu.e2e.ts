@@ -75,7 +75,7 @@ describe('macOS application menu', () => {
     this.timeout(180000)
     await expect($('.cs-editor-shell')).toExist()
     const empty = await appMenu()
-    expect(empty.version).toMatch(/^Version \d+\.\d+\.\d+/)
+    expect(empty.version).toBe('Check for updates')
     expect(empty.topLevel).toEqual(['Cute Screen', 'File'])
     expect(empty.fileItems).toEqual(['app-open-image', 'app-export', 'app-history', 'app-recent'])
     expect(empty.settings).toBe('Settings…')

@@ -1,6 +1,6 @@
 {
   "name": "cute-screen",
-  "version": "0.1.31",
+  "version": "0.1.32",
   "private": true,
   "license": "MIT",
   "author": "Vladimir Ivanin",
@@ -84,6 +84,7 @@
   "dependencies": {
     "@cute-screen/editor-vue": "workspace:*",
     "@tauri-apps/api": "2.11.1",
+    "semver": "7.8.5",
     "vue": "3.5.42"
   },
   "devDependencies": {
@@ -96,6 +97,7 @@
     "@testing-library/vue": "8.1.0",
     "@types/mocha": "10.0.10",
     "@types/node": "26.1.2",
+    "@types/semver": "7.8.0",
     "@vitejs/plugin-vue": "6.0.8",
     "@vitest/coverage-v8": "4.1.10",
     "@vue/compiler-sfc": "3.5.42",

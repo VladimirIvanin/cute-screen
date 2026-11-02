@@ -1,5 +1,9 @@
 # Платформенная матрица
 
+## Проверка обновлений (ADR-177)
+
+Native открытие браузера на Windows, macOS и Linux требует отдельного smoke evidence.
+
 ## Drag/rotate клиновидной стрелки (2026-11-01, ADR-176)
 
 Windows x64 / Chrome 156.0.8078.76: UI creation, endpoint/middle/rotate live

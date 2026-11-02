@@ -63,13 +63,13 @@ describe('Linux tray file and history menu', () => {
     await expect($('.cs-editor-shell')).toExist()
     const empty = await nativeTrayLabels()
     expect(empty.appMenuInstalled).toBe(false)
-    expect(empty.items.find((item) => item.id === 'app-version')).toMatchObject({
-      enabled: false, text: expect.stringMatching(/^Version \d+\.\d+\.\d+$/),
+    expect(empty.items.find((item) => item.id === 'check-updates')).toMatchObject({
+      enabled: true, text: 'Check for updates',
     })
     expect(empty.menuIds).toEqual([
-      'app-version', 'capture-area', 'capture-screen', 'capture-window',
+      'capture-area', 'capture-screen', 'capture-window',
       'capture-active-window', 'capture-repeat', 'show-editor',
-      'app-open-image', 'app-history', 'app-recent', 'settings', 'quit',
+      'app-open-image', 'app-history', 'app-recent', 'check-updates', 'settings', 'quit',
     ])
     expect(empty.recentLabel).toBe('Recent Captures')
     expect(empty.recent).toEqual([{ id: 'app-empty-history', text: 'No captures yet', enabled: false }])
@@ -79,7 +79,7 @@ describe('Linux tray file and history menu', () => {
     const firstMenuId = (await nativeTrayLabels()).recent[0]!.id
     const second = await captureInEditor(first)
     await browser.waitUntil(async () => (await nativeTrayLabels()).recent.length === 2)
-    await activateTrayLabel('History…')
+    await activateTrayLabel('History')
     await expect($('.cs-history-popover')).toBeDisplayed()
     await expect(browser.$$('.cs-history-capture')).toBeElementsArrayOfSize(2)
     await $('.cs-history-close').click()
@@ -130,7 +130,7 @@ describe('Linux tray file and history menu', () => {
     expect(populated.recent.slice(0, 4).every((item) => /3840×2160/.test(item.text))).toBe(true)
     expect(populated.recent.some((item) => item.id === firstMenuId)).toBe(false)
 
-    await activateTrayLabel('History…')
+    await activateTrayLabel('History')
     await expect(browser.$$('.cs-history-capture')).toBeElementsArrayOfSize(6)
     await $('[data-history-index="1"] + .cs-history-delete').click()
     await $('button=Delete').click()

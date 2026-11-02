@@ -4,9 +4,6 @@ import {
   expect,
 } from '@wdio/globals'
 import { Key } from 'webdriverio'
-import { readFileSync } from 'node:fs'
-
-const appVersion = (JSON.parse(readFileSync('src-tauri/tauri.conf.json', 'utf8')) as { version: string }).version
 
 async function resizeViewport(
   width: number,
@@ -76,7 +73,7 @@ describe('activation settings browser UI', () => {
     for (const locale of ['ru', 'en']) {
       for (const theme of ['light', 'dark']) {
         await chooseLanguage(locale)
-        await expect($('.cs-settings-version')).toHaveText(`${locale === 'ru' ? 'Версия' : 'Version'} ${appVersion}`)
+        await expect($('.cs-settings-version button:last-of-type')).toHaveText(locale === 'ru' ? 'Проверить обновления' : 'Check for updates')
         await browser.execute((value) => {
           document.documentElement.dataset.theme = value
         }, theme)
@@ -99,7 +96,7 @@ describe('activation settings browser UI', () => {
     }
     await $('.cs-settings-sidebar nav button:first-child').click()
     await expect($('h2=General')).toBeDisplayed()
-    await expect($('.cs-settings-version')).toHaveText(`Version ${appVersion}`)
+    await expect($('.cs-settings-version button:last-of-type')).toHaveText('Check for updates')
     await expect($('select[aria-label="Language / Язык"]')).toBeDisplayed()
     await browser.saveScreenshot('artifacts/browser-e2e/settings-general.png')
   })

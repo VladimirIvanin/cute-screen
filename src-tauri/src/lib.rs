@@ -1844,8 +1844,34 @@ fn open_history_from_app_menu<R: tauri::Runtime>(
     }
 }
 
+#[tauri::command]
+fn open_update_page(app: tauri::AppHandle) -> Result<(), String> {
+    settings_window::open_update(&app)
+}
+
+fn open_update_from_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+    if let Err(error) = settings_window::open_update(app) {
+        eprintln!("cute-screen update page: {error}");
+        let message = if settings_window::saved_locale(app) == "ru" {
+            "Не удалось открыть страницу обновлений"
+        } else {
+            "Could not open the update page"
+        };
+        if let Err(error) = app
+            .notification()
+            .builder()
+            .title("Cute Screen")
+            .body(message)
+            .show()
+        {
+            eprintln!("cute-screen update notification: {error}");
+        }
+    }
+}
+
 fn handle_app_menu_event<R: tauri::Runtime>(app: &tauri::AppHandle<R>, id: &str) {
     match id {
+        "app-version" => open_update_from_menu(app),
         "app-settings" => {
             if let Err(error) = settings_window::open(app, false) {
                 eprintln!("cute-screen app settings: {error}");
@@ -2225,7 +2251,9 @@ fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()
         MenuItem::with_id(
             app,
             id,
-            settings_window::tray_text(id, &locale, None),
+            settings_window::tray_text(id, &locale, None)
+                .replace('…', "")
+                .replace("...", ""),
             enabled,
             None::<&str>,
         )
@@ -2252,21 +2280,15 @@ fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()
     .cloned()
     .collect();
     for id in settings_window::tray_navigation_ids(cfg!(target_os = "linux")) {
-        let navigation = item(id, *id != "app-version")?;
-        if *id == "app-version" {
-            listed.insert(0, navigation);
-        } else {
-            listed.push(navigation);
-        }
+        listed.push(item(id, true)?);
     }
-    listed.extend([settings, quit]);
+    listed.extend([item("check-updates", true)?, settings, quit]);
     let recent = if cfg!(target_os = "linux") {
         Some(settings_window::create_recent_menu(app)?)
     } else {
         None
     };
     let navigation_separator = PredefinedMenuItem::separator(app)?;
-    let version_separator = PredefinedMenuItem::separator(app)?;
     let mut entries: Vec<&dyn IsMenuItem<R>> = Vec::with_capacity(listed.len() + 4);
     for item in &listed {
         if item.id().as_ref() == "show-editor" {
@@ -2279,9 +2301,6 @@ fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()
             entries.push(&navigation_separator);
         }
         entries.push(item);
-        if item.id().as_ref() == "app-version" {
-            entries.push(&version_separator);
-        }
     }
     let menu = Menu::with_items(app, &entries)?;
 
@@ -2317,6 +2336,7 @@ fn create_tray<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()
                 capture_request_for_tray(capture::CaptureAction::Repeat),
                 false,
             ),
+            "check-updates" => open_update_from_menu(app),
             "settings" => {
                 if let Err(error) = settings_window::open(app, false) {
                     eprintln!("cute-screen tray settings: {error}");
@@ -3130,6 +3150,7 @@ pub fn run() {
 
     #[cfg(feature = "test-harness")]
     let builder = builder.invoke_handler(tauri::generate_handler![
+        open_update_page,
         ping,
         capture_request,
         capture_cancel,
@@ -3230,6 +3251,7 @@ pub fn run() {
 
     #[cfg(not(feature = "test-harness"))]
     let builder = builder.invoke_handler(tauri::generate_handler![
+        open_update_page,
         ping,
         capture_request,
         capture_cancel,

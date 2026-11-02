@@ -32,7 +32,7 @@ describe('native tray follows the Settings language', () => {
       if (locale === 'ru') labels.items.forEach((item, index) => expect(item.text.split('    ')[0]).toBe(russian[index]))
       else {
         expect(labels.items.find((item) => item.id === 'capture-area')?.text).toContain('Capture Area')
-        expect(labels.items.at(-2)?.text).toBe('Settings…')
+        expect(labels.items.at(-2)?.text).toBe('Settings')
       }
       if (process.platform === 'linux') {
         expect(labels.recentLabel).toBe(locale === 'ru' ? 'Недавние снимки' : 'Recent Captures')

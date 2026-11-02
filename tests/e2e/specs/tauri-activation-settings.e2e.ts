@@ -6,10 +6,8 @@ import {
   expect,
 } from '@wdio/globals'
 import { Key } from 'webdriverio'
-import { readFileSync } from 'node:fs'
 
 const execute = promisify(execFile)
-const appVersion = (JSON.parse(readFileSync('src-tauri/tauri.conf.json', 'utf8')) as { version: string }).version
 
 async function openSettings(): Promise<void> {
   const executable = process.env.CUTE_SCREEN_WDIO_APP_BINARY
@@ -22,7 +20,7 @@ async function openSettings(): Promise<void> {
   await $('select[aria-label="Language / Язык"]').selectByAttribute('value', 'en')
   await $('.cs-settings-sidebar nav button:last-child').click()
   await expect($('.cs-shortcut-list')).toExist()
-  await expect($('.cs-settings-version')).toHaveText(`Version ${appVersion}`)
+  await expect($('.cs-settings-version button:last-of-type')).toHaveText('Check for updates')
 }
 
 describe('native shortcut settings and resident activation', () => {
@@ -59,7 +57,7 @@ describe('native shortcut settings and resident activation', () => {
     const { stdout } = await execute('pgrep', ['-f', `^${process.env.CUTE_SCREEN_WDIO_APP_BINARY}( |$)`])
     const { stdout: menu } = await execute('/usr/bin/python3', ['tests/e2e/native-settings-tray.py', stdout.trim()])
     const entries = JSON.parse(menu) as { label: string }[]
-    expect(entries.filter((entry) => ['Settings…', 'Настройки…'].includes(entry.label))).toHaveLength(1)
+    expect(entries.filter((entry) => ['Settings', 'Настройки'].includes(entry.label))).toHaveLength(1)
     expect(entries.some((entry) => entry.label.includes('Assign keyboard shortcuts'))).toBe(false)
     await browser.tauri.switchWindow('settings')
     await expect($('.cs-settings-sidebar nav button:first-child')).toHaveAttribute('aria-current', 'page')

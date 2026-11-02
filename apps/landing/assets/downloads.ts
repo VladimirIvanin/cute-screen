@@ -3,10 +3,16 @@ import './brand-eyes'
 import { resolveDownload } from './download-platform'
 
 export async function enhanceDownloads(): Promise<void> {
+  const { showUpdateResult } = await import('./update-check')
+  const updateContext = showUpdateResult()
   const button = document.querySelector<HTMLAnchorElement>('[data-download-primary]')
   const note = document.querySelector<HTMLElement>('[data-download-note]')
   if (!button || !note) return
-  const recommendation = await resolveDownload(navigator)
+  const recommendation = updateContext === undefined
+    ? await resolveDownload(navigator)
+    : updateContext && (updateContext.os === 'macos' || updateContext.architecture)
+      ? { os: updateContext.os, architecture: updateContext.os === 'macos' ? 'universal' as const : updateContext.architecture! }
+      : null
   if (!recommendation) return
   const { os, architecture } = recommendation
   const file = document.querySelector<HTMLAnchorElement>(`[data-download-file="${os}-${architecture}"]`)
