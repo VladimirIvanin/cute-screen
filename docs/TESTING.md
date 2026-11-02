@@ -1,5 +1,24 @@
 # Стратегия тестирования
 
+## Допуск software perf для тени аннотаций (2026-11-02)
+
+Windows x64 / PowerShell, Node 22.23.1, pnpm 10.33.2, base `66a8ffc`.
+После Linux CI p95 52,54 ms при прежнем пороге 50 ms по запросу владельца
+smoke-предел поднят до 100 ms. JSON с замерами и пределом записывается до
+assertions, включая случай превышения. Это допуск software smoke на общем
+runner, не изменение product SLA или reference GPU/WebView gate.
+
+- `pnpm test:perf` — 6 files / 20 passed; shadow p95 28,60 ms,
+  generic CPU reference p95 28,62 ms, 4K / preview 0,5 / 30 samples.
+- `pnpm test packages/editor-renderer/src/annotation-shadow.test.ts` — 1 passed:
+  видимые ink/shadow при rotation, scene/overlay parity, без pixel readback
+  и CPU filtering.
+
+Evidence: `artifacts/annotation-shadow-perf-budget/` — `perf.log`, `perf.json`,
+`renderer.log` и финальные formatting/lint/docs logs. Первый `pnpm format`
+обнаружил новую строку длиннее 120 символов; строка разбита перед повтором.
+Linux CI повторно локально не запускался; runtime/native/Rust не менялись.
+
 ## Проверка обновлений (ADR-177)
 
 Windows 10 Home / Chrome 156 / WebView2 156: `cargo test -p cute-screen-desktop --lib settings_window::` — 10 passed; `pnpm test:e2e:landing` — 7 passed, no-JS — 5 passed; `pnpm test:e2e:browser --spec tests/e2e/specs/browser-activation-settings.e2e.ts` — 2 passed; `CUTE_SCREEN_E2E_SCENARIOS=tray-locale,tray-locale-reopen pnpm test:e2e:tauri` — 2 passed. Скриншоты настроек: `artifacts/browser-e2e/settings-inline-ru-light-620.png` и варианты RU/EN, light/dark. Открытие ссылки в системном браузере и native smoke Linux/macOS остаются pending.
