@@ -1,5 +1,16 @@
 # Трассируемость требований
 
+## Dependabot — до настройки (2026-11-03)
+
+`REQ-REL-005/006`, ADR-014/016: добавить `.github/dependabot.yml` для корневых
+pnpm/Cargo workspaces и GitHub Actions. Проверка версий — каждый понедельник
+в 09:00 Europe/Moscow; minor/patch npm и Cargo группируются по экосистеме,
+major рассматриваются отдельно, Actions объединяются в свою группу.
+Лимит — пять открытых version PR на экосистему. Слияние ручное через существующие
+CI gates, включая security/license audit. Локальное доказательство — YAML validation,
+`pnpm format`, `pnpm format:check` и `pnpm docs:check`; создание PR проверяется
+на GitHub после попадания конфигурации в default branch.
+
 ## Ограничение экспорта и WebView — до реализации (2026-11-03)
 
 `REQ-SEC-001/002`: red-first Rust regression для назначения экспорта

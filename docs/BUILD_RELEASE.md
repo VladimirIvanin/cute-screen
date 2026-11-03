@@ -1,5 +1,23 @@
 # CI-сборки и проверка версии через GitHub
 
+## Обновления зависимостей через Dependabot
+
+Конфигурация [Dependabot](../.github/dependabot.yml) проверяет корневые pnpm
+(`npm`) и Cargo workspaces, а также GitHub Actions каждый понедельник в 09:00
+Europe/Moscow. Minor/patch npm и Cargo объединяются по экосистеме; major идут
+отдельными PR. Actions объединяются в одну группу. Лимит — пять открытых
+version PR на экосистему; автоматическое слияние не настраивается.
+
+PR проходят обычный CI, включая `pnpm audit:licenses`, `pnpm audit:security`
+и `cargo deny check`. Обновления patched npm packages требуют проверки
+совместимости локальных patches. Изменения закреплённых Node/pnpm/Rust версий
+согласуются с toolchain guards и версиями CI вручную.
+
+Version updates начнут работать после попадания конфигурации в default branch.
+Dependabot alerts и security updates включаются отдельно в настройках GitHub;
+этот файл сам по себе их не включает. Синтаксис и группировка описаны в
+[GitHub Docs](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference).
+
 ## Ограничение экспорта и WebView (ADR-178)
 
 Без новых зависимостей, Cargo profiles, features и package permissions.

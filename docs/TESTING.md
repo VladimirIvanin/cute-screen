@@ -1,5 +1,17 @@
 # Стратегия тестирования
 
+## Конфигурация Dependabot (2026-11-03)
+
+Linux 6.8.0-147-generic x86_64, Node 22.23.1 / pnpm 10.33.2;
+base commit `27e4c49`, рабочие изменения.
+
+- Python 3 / PyYAML 6.0.1: YAML разобран; проверены три экосистемы,
+  корневые manifests/lockfiles, weekly Monday 09:00 Europe/Moscow,
+  лимиты PR и minor/patch groups — pass.
+- `pnpm format`, `pnpm format:check`, `pnpm docs:check` — exit 0.
+- Создание Dependabot PR локально не проверяется; требуется конфигурация
+  в default branch GitHub и успешный update job. Security settings не менялись.
+
 ## Ограничение экспорта и WebView (ADR-178, 2026-11-03)
 
 Ubuntu 24.04.5 x86_64 / Linux 6.8.0-147 / X11 / WebKitGTK 2.52.6,
