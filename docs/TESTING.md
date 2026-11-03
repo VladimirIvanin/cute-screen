@@ -1,5 +1,17 @@
 # Стратегия тестирования
 
+## Бамп 0.1.34 (2026-11-03)
+
+Windows x64 / PowerShell, base `9608850`. `pnpm version:bump 0.1.34`
+синхронизировал package/Tauri/Cargo metadata, три точные локальные зависимости
+и четыре lock entries; внешние зависимости не обновлялись.
+`node scripts/release-assets.mjs version . v0.1.34` — exit 0.
+`pnpm test:boundaries tests/boundaries/bump-version.test.ts tests/boundaries/release-assets.test.ts`
+— 2 files / 34 passed. Форматирование и полный quality gate:
+`pnpm format`, `pnpm format:check`, `pnpm check`;
+логи — `artifacts/version-0.1.34/`. Native/runtime evidence для предыдущего
+кода — ниже; отдельный native/package build для смены версии не запускался.
+
 ## Cargo dependency compatibility (2026-11-03)
 
 Windows x64 / PowerShell, Node 22.23.1, pnpm 10.33.2, Rust 1.97.0;

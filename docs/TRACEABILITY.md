@@ -1,5 +1,14 @@
 # Трассируемость требований
 
+## Версия 0.1.34 — до бампа (2026-11-03)
+
+`REQ-REL-005/006`: по запросу владельца поднять patch 0.1.33 → 0.1.34
+штатной `pnpm version:bump`, синхронизировав package/Tauri/Cargo metadata
+и локальные lock entries без обновления внешних зависимостей. Проверки:
+release version guard, существующие boundary tests, `pnpm format`,
+`pnpm format:check` и полный `pnpm check`. Создать коммит и отправить main
+в origin; тег и публикация Release в запрос не входят.
+
 ## Cargo dependency compatibility — до обновления (2026-11-03)
 
 `REQ-REL-005/006`, `REQ-QLT-005`, `REQ-CAP-002/003`: применить обновления
