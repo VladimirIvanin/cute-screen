@@ -61,7 +61,7 @@ describe('local MCP through the real editor WebView', () => {
       await writeFile(source, original)
       const originalHash = createHash('sha256').update(original).digest('hex')
       await expect($('.cs-editor-shell')).toBeDisplayed()
-      await browser.setWindowSize(1280, 800)
+      await browser.setWindowSize(1600, 900)
       await setEditorPreferences('en', 'dark')
       await $('.cs-agent-connect').click()
       await browser.waitUntil(async () => (await browser.tauri.listWindows()).includes('settings'))
@@ -204,6 +204,8 @@ describe('local MCP through the real editor WebView', () => {
   })
 
   it('reopens configs, copies them and creates independent keys for the same client', async () => {
+    await browser.tauri.switchWindow('main')
+    const mainHandle = await browser.getWindowHandle()
     await browser.tauri.switchWindow('settings')
     await selectMcpClient('opencode')
     await $('.cs-agent-buttons button').click()
@@ -215,8 +217,9 @@ describe('local MCP through the real editor WebView', () => {
     try {
       await first.initialize()
       await $('.cs-settings-footer button').click()
+      await browser.switchToWindow(mainHandle)
       await browser.tauri.switchWindow('main')
-      await browser.setWindowSize(1280, 800)
+      await browser.setWindowSize(1600, 900)
       await expect($('.cs-agent-connect')).toBeDisplayed()
       await $('.cs-agent-connect').click()
       await browser.waitUntil(async () => (await browser.tauri.listWindows()).includes('settings'))

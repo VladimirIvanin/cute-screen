@@ -22,6 +22,13 @@ PR проходят обычный CI, включая `pnpm audit:licenses`, `pn
 совместимости локальных patches. Изменения закреплённых Node/pnpm/Rust версий
 согласуются с toolchain guards и версиями CI вручную.
 
+Обновление 2026-11-03 переносит версии из Dependabot #7/#10 поверх исправленного
+async-executor 1.14.1. windows 0.62.2 требует явного HRESULT для отсутствующего
+D3D11 device/context; GetLastError к успешному HRESULT-вызову не относится.
+Rust WDIO plugins 1.5.1 проверены с JS service 1.3.0 и существующими patches;
+их совместимость подтверждается native capture/export/MCP/reopen, а не только
+компиляцией test-harness. Фактические результаты и границы платформ — TESTING.md.
+
 Version updates начнут работать после попадания конфигурации в default branch.
 Dependabot alerts и security updates включаются отдельно в настройках GitHub;
 этот файл сам по себе их не включает. Синтаксис и группировка описаны в

@@ -1,5 +1,53 @@
 # Стратегия тестирования
 
+## Cargo dependency compatibility (2026-11-03)
+
+Windows x64 / PowerShell, Node 22.23.1, pnpm 10.33.2, Rust 1.97.0;
+base `c016d8dffd295aa9abd2a36658ab296d71575cfa`, branch
+`codex/dependency-compatibility`. Evidence: `artifacts/dependency-compatibility/`.
+
+Применены 18 обновлений из Dependabot #7 и windows 0.62.2 из #10.
+`cargo update --workspace` сохранил async-executor 1.14.1 и обновил только
+нужные dependencies. Node/pnpm/Rust, JS WDIO service 1.3.0 и его patches сохранены;
+Rust WDIO plugins обновлены до 1.5.1.
+
+- Red: regression `missing_device_output_does_not_use_thread_last_error`
+  воспроизвёл HRESULT(0) вместо E_POINTER при отсутствующем D3D11 output.
+  Green: общий private resolver возвращает E_POINTER независимо от
+  GetLastError=0/5; имеющийся output проходит без изменений.
+- `cargo test --workspace` — exit 0: 214 passed, 1 ignored; включая Windows
+  capture, storage recovery/bundle roundtrip и MCP binary framing.
+- `pnpm install --frozen-lockfile`, `pnpm tools:install`, `pnpm tools:check`,
+  `cargo fmt --all`, `pnpm format`, `pnpm check` — exit 0. Aggregate включает
+  dependency analyzers, frontend/types/docs/boundaries/schema/IPC и четыре
+  Clippy feature-набора. TEMP/TMP направлены в task-owned evidence directory,
+  чтобы системный Temp не наследовал внешний Yarn package.json.
+- `cargo deny check` — exit 0: advisories, bans, licenses, sources ok;
+  прежние duplicate warnings не подавлялись, policy не менялась.
+
+- `pnpm test` — exit 0: 190 files / 1702 passed.
+- Windows WebView2 156.0.4314.58 / external tauri-driver 2.1.0:
+  `result-export` — 3 passed (4K import/decoded PNG/crop/cancel, CSP form-action,
+  Settings export IPC denial); `m04-clean-profile-capture` — 1 passed.
+- Physical `window-capture` — 1 passed: Escape, mouse/keyboard и RU capture;
+  decoded 1386×893, все samples [37,71,105,255], occluder отсутствует.
+  Первый запуск обнаружил fixture focus race: BringToFront мог выполняться
+  уже после открытия picker. После handshake через consumed control file — pass.
+- `mcp,mcp-reopen` — exit 0: 5 + 2 passed через настоящий stdio companion:
+  4K import, atomic edits/Undo, preview, decoded export, capture jobs/cancel,
+  все client profiles и restart с тем же grant/config. Первоначальный запуск
+  выявил устаревший wide viewport 1280 px; тесты используют 1600 px и сохраняют
+  отдельную narrow проверку 1024 px. После закрытия Settings восстанавливается
+  живой main handle до service label switch. Product UI не менялся.
+- Финальный общий запуск
+  `CUTE_SCREEN_E2E_SCENARIOS=window-capture,result-export,m04-clean-profile-capture,mcp,mcp-reopen pnpm test:e2e:tauri`
+  (env задан через PowerShell) — exit 0, 5 scenarios / 12 passed.
+  Сборка fresh debug/no-bundle в общем target; JUnit и decoded JSON сохранены
+  в task evidence. Порты 4444/4445 после teardown свободны.
+
+Linux/macOS/ARM64 runtime и hosted CI этим Windows x64 прогоном не доказаны.
+Документ, IPC и product capture workflow не менялись; новый ADR не требуется.
+
 ## CI: Settings teardown и async-executor (2026-11-03)
 
 Windows x64 / PowerShell, Node 22.23.1, pnpm 10.33.2, Rust 1.97.0;

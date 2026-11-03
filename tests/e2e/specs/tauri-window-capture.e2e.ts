@@ -1,5 +1,8 @@
 import { spawn } from 'node:child_process'
-import { writeFile } from 'node:fs/promises'
+import {
+  readFile,
+  writeFile,
+} from 'node:fs/promises'
 import path from 'node:path'
 import {
   $,
@@ -58,6 +61,16 @@ describe('isolated Windows window capture', () => {
           await invoke('plugin:window|set_focus', { label: 'main' })
         })
         await writeFile(control, mode)
+        // The fixture must finish BringToFront before the picker takes focus.
+        await browser.waitUntil(async () => {
+          try {
+            await readFile(control)
+            return false
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true
+            throw error
+          }
+        }, { timeout: 10_000, timeoutMsg: 'Window fixture did not finish preparing the capture' })
         const outcome = await browser.execute(async () => {
           const invoke = (window as typeof window & {
             __TAURI__: { core: { invoke<T>(name: string, args: unknown): Promise<T> } }

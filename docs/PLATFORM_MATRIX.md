@@ -1,5 +1,17 @@
 # Платформенная матрица
 
+## Cargo dependency compatibility (2026-11-03)
+
+Windows x64: windows 0.62.2, Tauri 2.11.6 и остальные обновления Dependabot #7/#10
+проверены через pnpm check и cargo test --workspace. WebView2 156.0.4314.58 /
+external tauri-driver 2.1.0, JS service 1.3.0 + existing patches, Rust WDIO plugins
+1.5.1: physical window capture с decoded pixels и исключением occluder;
+4K PNG export/cancel/Settings IPC denial; clean-profile capture; MCP companion,
+профили клиентов и reconnect после restart — passed. Fake capture MCP/clean-profile
+не является доказательством physical screen capture. Подробности — TESTING.md.
+Linux/WebKitGTK, macOS/WKWebView и ARM64 требуют hosted compile/runtime evidence;
+результаты Windows x64 на них не переносятся. Платформенные гарантии не расширены.
+
 ## Dependency quality gates (ADR-179, 2026-11-03)
 
 Linux x86_64: общий installer, закреплённые CLI, реальные Git hooks и негативные

@@ -12,6 +12,17 @@
 Проверки: cargo check/test, pnpm tools:install/tools:check/check, cargo deny check,
 pnpm format/format:check и штатные native capture/result-export smoke.
 Linux/macOS/ARM64 не считать проверенными Windows x64 прогоном.
+`REQ-CAP-003`: native fixture должна завершить подготовку окон/указателя до
+capture_request; подтверждение готовности — удаление control file после
+BringToFront/SetCursorPos. Иначе fixture может забрать focus у уже открытого picker
+и отправить Escape чужому окну. Повтор проверяет отмену, mouse/keyboard capture
+и decoded pixels без изменения production focus policy.
+`REQ-MCP-001/003/004/005/006`, `REQ-UI-004`: повтор MCP через реальный companion
+должен использовать wide viewport для прямой Connect agent (при 1280 px действие
+уже находится в overflow по ADR-170), отдельную narrow проверку и живой main
+handle после уничтожения Settings. Нельзя обходить пользовательский UI через
+прямое создание grants/document. Проверить import/edit/Undo/preview/export,
+профили клиентов и reopen с сохранённым grant.
 
 ## CI: закрытие Settings и Rust audit — до правки (2026-11-03)
 

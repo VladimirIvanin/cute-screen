@@ -1,5 +1,15 @@
 # Сквозная приёмка
 
+## Cargo dependency compatibility (2026-11-03)
+
+`REQ-CAP-003`, `REQ-SEC-001/002`, `REQ-MCP-001/003/004/005/006`:
+Windows x64 / WebView2 — physical window capture (cancel, mouse/keyboard, RU,
+decoded unobscured pixels), 4K PNG export/crop/cancel и Settings IPC denial,
+MCP atomic edit/Undo/preview/decoded export и restart с сохранённым grant — passed.
+Rust missing-device-output regression и security/license audit — passed.
+Другие ОС/архитектуры и полный native suite — pending; команды и evidence
+перечислены в TESTING.md. Document/IPC и production UI contracts сохранены.
+
 ## Dependency quality gates (ADR-179)
 
 `REQ-REL-005/006`: `pnpm tools:install` и `pnpm tools:check` выбирают закреплённые

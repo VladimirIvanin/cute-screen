@@ -52,7 +52,7 @@ export async function selectMcpClient(client: string): Promise<void> {
 export async function connectAgent(): Promise<McpClient> {
   if (!(await browser.tauri.listWindows()).includes('settings')) {
     await browser.tauri.switchWindow('main')
-    await browser.setWindowSize(1280, 800)
+    await browser.setWindowSize(1600, 900)
     await $('.cs-agent-connect').click()
     await browser.waitUntil(async () => (await browser.tauri.listWindows()).includes('settings'))
   }

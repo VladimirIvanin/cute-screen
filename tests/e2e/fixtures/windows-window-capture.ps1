@@ -60,11 +60,12 @@ $script:selectorSeen = $null
 $timer.Add_Tick({
     if (Test-Path -LiteralPath $ControlPath) {
         $script:armed = [IO.File]::ReadAllText($ControlPath).Trim()
-        Remove-Item -LiteralPath $ControlPath
         $target.BringToFront()
         $occluder.BringToFront()
         [WindowCaptureInput]::SetCursorPos($target.Left + 100, $target.Top + 150) | Out-Null
         $script:selectorSeen = $null
+        # Acknowledge only after all focus-changing preparation is complete.
+        Remove-Item -LiteralPath $ControlPath
     }
     if (-not $script:armed) { return }
     $selector = [IntPtr]::Zero
