@@ -796,6 +796,12 @@ fn encode_window_png(
     Ok(encoded)
 }
 
+fn required_device_output<T>(output: Option<T>) -> windows::core::Result<T> {
+    // D3D11CreateDevice returns HRESULT, so GetLastError is unrelated to a
+    // missing output after a successful call.
+    output.ok_or_else(|| windows::core::Error::from_hresult(windows::Win32::Foundation::E_POINTER))
+}
+
 fn device() -> windows::core::Result<(ID3D11Device, ID3D11DeviceContext, IDirect3DDevice)> {
     let mut device = None;
     let mut context = None;
@@ -827,8 +833,8 @@ fn device() -> windows::core::Result<(ID3D11Device, ID3D11DeviceContext, IDirect
             )
         }?;
     }
-    let device = device.ok_or_else(windows::core::Error::from_win32)?;
-    let context = context.ok_or_else(windows::core::Error::from_win32)?;
+    let device = required_device_output(device)?;
+    let context = required_device_output(context)?;
     let dxgi: IDXGIDevice = device.cast()?;
     let direct = unsafe { CreateDirect3D11DeviceFromDXGIDevice(&dxgi) }?.cast()?;
     Ok((device, context, direct))
@@ -1046,6 +1052,19 @@ pub(super) fn capture(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn missing_device_output_does_not_use_thread_last_error() {
+        use windows::Win32::Foundation::E_POINTER;
+        use windows_sys::Win32::Foundation::SetLastError;
+
+        for last_error in [0, 5] {
+            unsafe { SetLastError(last_error) };
+            let error = super::required_device_output::<()>(None).expect_err("missing output");
+            assert_eq!(error.code(), E_POINTER);
+        }
+        assert_eq!(super::required_device_output(Some(42)).expect("output"), 42);
+    }
+
     #[test]
     fn window_png_preserves_alpha_and_unpremultiplies_colour() {
         let bytes = super::encode_window_png(&[10, 20, 40, 128, 0, 0, 0, 0], 2, 1, "window-alpha")
