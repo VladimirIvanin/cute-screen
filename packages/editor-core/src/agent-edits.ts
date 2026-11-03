@@ -31,7 +31,7 @@ const factories = {
   censor: createCensorLayer, spotlight: createSpotlightLayer, ruler: createRulerLayer, loupe: createLoupeLayer,
 }
 type Factories = typeof factories
-export type AgentCreateEdit = {
+type AgentCreateEdit = {
   [K in keyof Factories]: {
     readonly type: 'create'
     readonly tool: K

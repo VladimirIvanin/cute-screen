@@ -40,6 +40,11 @@ update installation. Test artifacts, when available, are unsigned and can trigge
 
 ## Commands and verification
 
+Install pinned dependency analyzers with `pnpm tools:install`, then verify them
+with `pnpm tools:check`. Optional local hooks are installed explicitly through
+`pnpm hooks:install`; installation preserves existing user hooks.
+See [Dependency quality gates](QUALITY_GATES.md) for versions and exceptions.
+
 ```text
 pnpm check
 pnpm test

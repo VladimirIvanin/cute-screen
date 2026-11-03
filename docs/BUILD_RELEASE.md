@@ -1,5 +1,14 @@
 # CI-сборки и проверка версии через GitHub
 
+## Dependency quality gates (ADR-179)
+
+Quality job устанавливает версии из корневого manifest через `pnpm tools:install`,
+проверяет их `pnpm tools:check` и вызывает общий `pnpm check` через hk.
+Installer переиспользует workspace target и versioned cache в
+`~/.cache/cute-screen-ci/quality-tools`; отдельный Cargo target/CARGO_HOME не нужен.
+Существующие audit, runtime и release gates сохраняются. Локальные hooks
+устанавливаются отдельно; правила и исключения — [QUALITY_GATES.md](QUALITY_GATES.md).
+
 ## Обновления зависимостей через Dependabot
 
 Конфигурация [Dependabot](../.github/dependabot.yml) проверяет корневые pnpm

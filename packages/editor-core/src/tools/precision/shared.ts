@@ -10,7 +10,7 @@ import {
   type SrgbColor,
 } from '../../document/types'
 
-export const IDENTITY = Object.freeze({
+const IDENTITY = Object.freeze({
   translateX: 0,
   translateY: 0,
   rotation: 0,

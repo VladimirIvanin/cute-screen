@@ -38,7 +38,7 @@ export function calloutRoutePreset(route: CalloutRoute): CalloutStyle['route'] {
   return route.path === 'quadratic' ? 'straight' : route.path === 'orthogonal' ? route.preset : route.path
 }
 /** Remove zero-length and collinear internal segments without moving endpoints. */
-export function normalizeCalloutPoints(points: readonly Point[]): readonly (Point & JsonObject)[] {
+function normalizeCalloutPoints(points: readonly Point[]): readonly (Point & JsonObject)[] {
   const result: (Point & JsonObject)[] = []
   for (const value of points) {
     const last = result.at(-1)

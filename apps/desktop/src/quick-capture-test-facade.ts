@@ -1,6 +1,6 @@
 import type { EditorDocumentV1 } from '@cute-screen/editor-vue'
 
-export interface QuickWarmupEvidence {
+interface QuickWarmupEvidence {
   document: string | null
   ready: boolean
   overlay: string

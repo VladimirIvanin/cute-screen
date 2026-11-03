@@ -1,5 +1,13 @@
 # Платформенная матрица
 
+## Dependency quality gates (ADR-179, 2026-11-03)
+
+Linux x86_64: общий installer, закреплённые CLI, реальные Git hooks и негативные
+сценарии dependency gates проверяются локально; результаты — TESTING.md.
+Windows/macOS исполнение installer/hooks отдельно не проверено. Production
+capture, упаковка и WebView runtime этим изменением не затрагиваются.
+CI quality остаётся Linux job; compile/runtime matrix сохранена.
+
 ## Ограничение экспорта и WebView (ADR-178, 2026-11-03)
 
 Общие Rust path/caller checks и CSP применяются на Linux, Windows и macOS;

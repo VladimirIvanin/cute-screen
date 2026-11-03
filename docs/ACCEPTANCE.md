@@ -1,5 +1,15 @@
 # Сквозная приёмка
 
+## Dependency quality gates (ADR-179)
+
+`REQ-REL-005/006`: `pnpm tools:install` и `pnpm tools:check` выбирают закреплённые
+версии, `pnpm check` включает прежние gates и три dependency-анализатора через hk.
+Неиспользуемые TS file/export, рассогласованные версии workspace и лишняя Rust
+dependency должны давать ненулевой exit через эту команду; pre-push передаёт отказ.
+Реальный commit проверяет staged content, восстанавливает unstaged и не исправляет
+файлы. Установка hooks сохраняет существующий пользовательский hook.
+Локальные результаты и ограничения — TESTING.md; hosted CI проверяется отдельным run.
+
 ## Ограничение экспорта и WebView (ADR-178)
 
 `REQ-SEC-001`: импорт 4K через production picker, создание аннотации и PNG export

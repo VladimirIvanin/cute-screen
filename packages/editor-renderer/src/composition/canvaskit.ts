@@ -6,6 +6,7 @@ import type { RenderNode } from '@cute-screen/editor-core'
 import type {
   CanvasKitApi,
   CanvasKitCanvas,
+  CanvasKitDeletable,
   CanvasKitSurface,
 } from '../backends/canvaskit/contracts'
 import { freeformPixels } from './freeform'
@@ -29,7 +30,7 @@ export function drawGroupCanvasKit(
   if (!surface) throw new Error('Card content surface creation failed')
   const paint = new kit.Paint()
   let filter: ReturnType<NonNullable<CanvasKitApi['ImageFilter']>['MakeBlur']> | undefined
-  let tint: import('../backends/canvaskit/contracts').CanvasKitDeletable | undefined
+  let tint: CanvasKitDeletable | undefined
   canvas.save()
   try {
     render(surface, density)

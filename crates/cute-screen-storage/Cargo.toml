@@ -9,7 +9,6 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
-chrono = "=0.4.45"
 image = { version = "=0.25.10", default-features = false, features = ["jpeg"] }
 png = "=0.18.1"
 rusqlite = { version = "=0.40.2", features = ["bundled"] }

@@ -60,7 +60,7 @@ function routeAxis(route: CalloutPayload['route']): 'x' | 'y' {
   if (route.path === 'straight' || route.path === 'quadratic') return 'y'
   return route.axis
 }
-export function calloutStyleFromPayload(payload: CalloutPayload): CalloutStyle {
+function calloutStyleFromPayload(payload: CalloutPayload): CalloutStyle {
   return { frame: payload.frame ?? { ...DEFAULT_CALLOUT_FRAME, kind: payload.background ? 'card' : 'text',
     ...(payload.background ? { fill: payload.background.color, padding: payload.background.padding,
       radius: payload.background.radius } : {}) },

@@ -84,7 +84,7 @@ function markerStyle(
     ...(input.color === undefined ? {} : { color: parseSrgbColor(input.color, `${field}.color`) as SrgbColor }),
   }
 }
-export function parseCalloutFrame(
+function parseCalloutFrame(
   value: unknown,
   field: string,
 ): CalloutFrame {

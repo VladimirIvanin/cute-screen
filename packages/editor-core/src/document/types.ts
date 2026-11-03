@@ -53,7 +53,7 @@ export interface GradientStop extends JsonObject {
   readonly color: SrgbColor
 }
 
-export interface PaintTransform extends JsonObject {
+interface PaintTransform extends JsonObject {
   readonly scale: number
   readonly rotation: number
   readonly offsetX: number
@@ -181,7 +181,7 @@ export const LAYER_KINDS = [
 
 export type LayerKind = (typeof LAYER_KINDS)[number]
 
-export interface LayerBase<K extends LayerKind, P extends JsonObject> {
+interface LayerBase<K extends LayerKind, P extends JsonObject> {
   /** Optional silhouette shadow; absence preserves existing documents. */
   readonly annotationShadow?: 'soft' | 'strong'
   readonly id: string
@@ -198,12 +198,12 @@ export interface LayerBase<K extends LayerKind, P extends JsonObject> {
 }
 
 /** Text-bearing layers exclude legacy opacity/blend/shadows; annotationShadow belongs to LayerBase. */
-export type TextBearingLayerBase<K extends 'text' | 'numberedMarker' | 'callout', P extends JsonObject> = LayerBase<
+type TextBearingLayerBase<K extends 'text' | 'numberedMarker' | 'callout', P extends JsonObject> = LayerBase<
   K,
   P
 >
 
-export interface CompositedLayerBase<
+interface CompositedLayerBase<
   K extends Exclude<LayerKind, 'text' | 'numberedMarker' | 'callout'>,
   P extends JsonObject,
 > extends LayerBase<K, P> {

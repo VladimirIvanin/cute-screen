@@ -1,4 +1,4 @@
-export type CaptureBackendKind = 'unavailable' | 'waylandPortal' | 'gnomeScreenshot' | 'gnomeShell' | 'grim' | 'windowsDxgi' | 'x11' | 'macosScreenCapture'
+type CaptureBackendKind = 'unavailable' | 'waylandPortal' | 'gnomeScreenshot' | 'gnomeShell' | 'grim' | 'windowsDxgi' | 'x11' | 'macosScreenCapture'
 
 export interface CaptureCapabilities {
   readonly available: boolean
@@ -66,7 +66,7 @@ export interface CaptureResult {
 }
 
 export type CaptureAction = 'area' | 'screen' | 'window' | 'activeWindow' | 'repeat'
-export type CaptureInvocationSource = 'cli' | 'tray' | 'ui' | 'hotkey'
+type CaptureInvocationSource = 'cli' | 'tray' | 'ui' | 'hotkey'
 export type CaptureTerminalOutcome =
   'captured' | 'cancelled' | 'busy' | 'permissionDenied' | 'unavailable' | 'invalidTarget' | 'failed'
 

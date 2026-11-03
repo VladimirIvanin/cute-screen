@@ -16,7 +16,7 @@ export const russianTrayLabels = [
   'Снимок окна', 'Снимок активного окна', 'Повторить область',
 ].includes(label))
 
-export interface TrayMenuItem {
+interface TrayMenuItem {
   id: string
   text: string
   enabled: boolean

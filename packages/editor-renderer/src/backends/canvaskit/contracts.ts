@@ -30,7 +30,7 @@ export interface CanvasKitPaint extends CanvasKitDeletable {
 export type CanvasKitShader = CanvasKitDeletable
 export type CanvasKitPathEffect = CanvasKitDeletable
 export type CanvasKitMaskFilter = CanvasKitDeletable
-export type CanvasKitImageFilter = CanvasKitDeletable
+type CanvasKitImageFilter = CanvasKitDeletable
 export type CanvasKitPath = CanvasKitDeletable
 export interface CanvasKitTypeface extends CanvasKitDeletable {
   getGlyphIDs?(text: string): Uint16Array | null
@@ -42,7 +42,7 @@ export interface CanvasKitFontData {
   readonly data: ArrayBuffer
 }
 
-export interface CanvasKitPathBuilder extends CanvasKitDeletable {
+interface CanvasKitPathBuilder extends CanvasKitDeletable {
   moveTo(x: number, y: number): void
   lineTo(x: number, y: number): void
   cubicTo(control1X: number, control1Y: number, control2X: number, control2Y: number, endX: number, endY: number): void
@@ -120,7 +120,7 @@ export interface CanvasKitFont
   setSkewX?(skew: number): void
 }
 
-export interface CanvasKitPictureRecorder extends CanvasKitDeletable {
+interface CanvasKitPictureRecorder extends CanvasKitDeletable {
   beginRecording(bounds: Float32Array): CanvasKitCanvas
   finishRecordingAsPicture(): CanvasKitPicture
 }

@@ -1,5 +1,47 @@
 # Стратегия тестирования
 
+## Dependency quality gates (ADR-179, 2026-11-03)
+
+Linux 6.8.0-147-generic x86_64, Node 22.23.1 / pnpm 10.33.2 / Rust 1.97.0;
+base commit `0364a16b4b282d12567ade2447628f9a706f31e3`, рабочие изменения.
+Evidence: `artifacts/quality-gates/` (команды, logs и negative-results.json).
+
+- `pnpm tools:install`, `pnpm tools:check`, `pnpm install --frozen-lockfile` — pass;
+  повтор installer переиспользовал hk 2.11.0 и cargo-machete 0.9.2 без сборки.
+- Knip 6.44.1: до cleanup после настройки entrypoints — 3 unused files,
+  39 exports, 38 types, 1 dependency, 2 devDependencies, 2 unlisted imports,
+  4 binaries, 3 группы duplicates. После исправлений и согласованных исключений —
+  0 findings. Public package exports и CanvasViewport facade сохранены.
+- cargo-machete: 3 unused dependencies (`serde`, `thiserror` в MCP, `chrono`
+  в storage) удалены; итог 0. syncpack до/после — 0 findings.
+- `pnpm check` — pass через hk, включая существующие lint/typecheck/format/docs,
+  architecture, schema/IPC generation и все четыре Clippy feature-набора.
+  Прежние ESLint warnings не превращались в новые исключения.
+- `pnpm test` — 190 files / 1702 passed; `pnpm test:render` — 32 files / 96 passed.
+  `cargo test -p cute-screen-mcp -p cute-screen-storage` — 36 passed.
+  Полный boundary suite прошёл; отдельный quality-gates suite — 5 passed.
+- Реальные временные Git repositories: partially staged commit использует index,
+  восстанавливает unstaged bytes; плохой staged JS/JSON блокируется без autofix
+  или staging. Чужой hook сохраняется, частичная установка не происходит;
+  неверная версия cached CLI и отсутствующий CLI отклоняются.
+- Полная копия production source/config: каждый из нового unused TS file/export,
+  Vue 3.5.41 вместо 3.5.42 и лишнего `sha2` в MCP дал exit 1 через `pnpm check`.
+  Тот же version mismatch дал exit 1 через pre-push. Clean dependency checks до
+  и после нарушений — pass; временный checkout удалён в finally.
+- `pnpm hooks:install` — установлены локальные pre-commit/pre-push.
+  Находка `katex` оказалась type dependency Naive UI: прежняя версия сохранена,
+  missing dependency объявлена в pnpm package extension; `CanvasKitDeletable`
+  использует явный type import вместо нераспознанного Knip inline import type.
+- Baseline отсутствует. Исключения согласованы владельцем и перечислены в
+  [QUALITY_GATES.md](QUALITY_GATES.md); дополнительных suppressions нет.
+- Диск до/после первичных сборок: target 157.821 → 159.321 GiB,
+  artifacts 61.328 → 61.332 GiB, node_modules 0.566 → 0.596 GiB.
+  Полезный общий Cargo cache сохранён; временные test repositories удалены.
+
+Hosted CI/branch protection, Windows/macOS installer/hooks и native E2E в этой
+задаче не проверялись. PR/push/release не создавались; существующая CI quality
+job вызывает тот же `pnpm check`, остальные jobs сохранены.
+
 ## Конфигурация Dependabot (2026-11-03)
 
 Linux 6.8.0-147-generic x86_64, Node 22.23.1 / pnpm 10.33.2;

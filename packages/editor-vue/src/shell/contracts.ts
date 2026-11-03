@@ -54,7 +54,7 @@ export type ResolvedEditorShellProps = EditorShellProps &
     >
   >
 
-export type EditorShellEmits = {
+type EditorShellEmits = {
   hostsReady: [hosts: CanvasViewportHosts]
   frameReady: [documentId: string]
   retryLoad: []

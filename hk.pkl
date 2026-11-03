@@ -1,0 +1,36 @@
+amends "package://github.com/jdx/hk/releases/download/v2.11.0/hk@2.11.0#/Config.pkl"
+
+min_hk_version = "2.11.0"
+
+hooks {
+  ["check"] {
+    steps {
+      ["project"] {
+        check = "pnpm check:project"
+      }
+    }
+  }
+  ["pre-commit"] {
+    fix = false
+    stage = false
+    stash = "git"
+    steps {
+      ["eslint"] {
+        glob = List("**/*.{js,mjs,ts,mts,vue}")
+        exclude = List("**/generated/**", "src-tauri/gen/**")
+        check = "pnpm exec eslint {{files}}"
+      }
+      ["prettier"] {
+        glob = List("**/*.{css,json,yaml,yml,md,html}", "apps/desktop/src/generated/desktop-ipc.ts")
+        check = "pnpm exec prettier --check {{files}}"
+      }
+    }
+  }
+  ["pre-push"] {
+    steps {
+      ["project"] {
+        check = "pnpm check"
+      }
+    }
+  }
+}

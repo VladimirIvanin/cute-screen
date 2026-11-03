@@ -165,7 +165,7 @@ export function layerBlendMode(layer: LayerNode) {
   return 'blendMode' in layer ? layer.blendMode : 'normal'
 }
 
-export function localPoint(
+function localPoint(
   value: unknown,
   fallback: { readonly x: number; readonly y: number },
 ) {

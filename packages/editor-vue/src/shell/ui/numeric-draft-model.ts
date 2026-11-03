@@ -27,7 +27,7 @@ export interface NumericDraftEvents {
   invalid?(value: boolean): void
 }
 
-export function formatNumeric(value: number): string {
+function formatNumeric(value: number): string {
   const text = String(value)
   if (!text.includes('e')) return text
   const [coefficient, exponent] = text.split('e')

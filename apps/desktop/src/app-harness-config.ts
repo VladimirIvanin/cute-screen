@@ -19,7 +19,7 @@ export interface AppHarnessConfig {
   readonly imageIngress?: boolean
 }
 
-export function longCaptureDiagnostic(): Error {
+function longCaptureDiagnostic(): Error {
   return new Error([
     'Capture failed: the display service did not respond.',
     ...Array.from({ length: 24 }, (_, index) => `Frame ${index}: waiting for display service response.`),

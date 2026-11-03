@@ -62,7 +62,7 @@ export interface TextFormattingPatch {
   readonly background?: TextBackground | null
 }
 
-export type CanvasTranslationKey =
+type CanvasTranslationKey =
   | 'canvasViewport'
   | 'sceneCanvas'
   | 'interactionOverlay'

@@ -4,7 +4,7 @@ import {
   expect,
 } from '@wdio/globals'
 
-export const startupBackendPattern = /^(canvaskit ready|Canvas2D fallback · startupFailure)$/
+const startupBackendPattern = /^(canvaskit ready|Canvas2D fallback · startupFailure)$/
 
 export async function waitForHarnessMount(): Promise<void> {
   await browser.waitUntil(

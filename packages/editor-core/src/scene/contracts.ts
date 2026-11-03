@@ -42,8 +42,8 @@ export type RenderPaint =
 export type RenderBlendMode =
   'normal' | 'multiply' | 'screen' | 'overlay' | 'darken' | 'lighten' | 'softLight' | 'hardLight'
 
-export type RenderLineCap = 'butt' | 'round' | 'square'
-export type RenderLineJoin = 'miter' | 'round' | 'bevel'
+type RenderLineCap = 'butt' | 'round' | 'square'
+type RenderLineJoin = 'miter' | 'round' | 'bevel'
 
 interface RenderNodeBase {
   readonly id: string
@@ -95,7 +95,7 @@ export interface RenderRectNode extends RenderNodeBase {
   readonly lineJoin?: RenderLineJoin
 }
 
-export interface RenderOuterShadow {
+interface RenderOuterShadow {
   readonly color: RgbaColor
   readonly offsetX: number
   readonly offsetY: number
@@ -328,7 +328,7 @@ export interface RenderGroupNode extends RenderNodeBase {
   readonly backdrop?: RgbaColor
   readonly blur: number
 }
-export interface RenderFreeformNode extends RenderNodeBase {
+interface RenderFreeformNode extends RenderNodeBase {
   readonly kind: 'freeform'
   readonly bounds: RenderOutputBounds
   readonly points: readonly import('../composition/types').FreeformPoint[]

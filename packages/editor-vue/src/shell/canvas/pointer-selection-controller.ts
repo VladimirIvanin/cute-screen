@@ -246,7 +246,7 @@ function beginCalloutBodyMove(
   beginDirectHandle(context, event, point, clicked, { kind: 'callout', handle: 'labelBody', nodeId: id, point, radius: 0 })
   return true
 }
-export function beginSelectionMove(
+function beginSelectionMove(
   context: PointerDownContext,
   event: PointerEvent,
   point: CanvasPoint,

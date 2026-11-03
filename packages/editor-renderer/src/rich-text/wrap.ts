@@ -73,13 +73,13 @@ export function glyphWidth(
   return width
 }
 
-export function trimTrailingWhitespace(glyphs: readonly StyledCodePoint[]): readonly StyledCodePoint[] {
+function trimTrailingWhitespace(glyphs: readonly StyledCodePoint[]): readonly StyledCodePoint[] {
   let end = glyphs.length
   while (end > 0 && glyphs[end - 1]!.whitespace) end -= 1
   return glyphs.slice(0, end)
 }
 
-export function trimLeadingWhitespace(glyphs: readonly StyledCodePoint[]): readonly StyledCodePoint[] {
+function trimLeadingWhitespace(glyphs: readonly StyledCodePoint[]): readonly StyledCodePoint[] {
   let start = 0
   while (start < glyphs.length && glyphs[start]!.whitespace) start += 1
   return glyphs.slice(start)

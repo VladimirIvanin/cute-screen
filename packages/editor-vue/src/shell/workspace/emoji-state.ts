@@ -25,7 +25,7 @@ export function emojiContainsPoint(
     point.x <= bounds.x + bounds.width && point.y <= bounds.y + bounds.height
 }
 
-export const EMOJI_PREFERENCES_KEY = 'cute-screen.emoji.v1'
+const EMOJI_PREFERENCES_KEY = 'cute-screen.emoji.v1'
 export function parseEmojiPreferences(value: unknown) {
   const data = value && typeof value === 'object' ? value as Record<string, unknown> : {}
   return {

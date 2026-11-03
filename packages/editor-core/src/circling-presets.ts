@@ -2,7 +2,7 @@ import type { LayerNode } from './document/types'
 
 export type CirclingKind = 'circling' | 'rectangularCircling'
 
-export const CIRCLING_SEEDS = Object.freeze({
+const CIRCLING_SEEDS = Object.freeze({
   circling: Object.freeze([1021, 241, 16411, 97531]),
   rectangularCircling: Object.freeze([683, 337, 127]),
 })

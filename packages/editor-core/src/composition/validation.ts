@@ -13,7 +13,7 @@ import {
 } from './frame-catalog'
 
 type Obj = Record<string, unknown>
-export function number(
+function number(
   value: unknown,
   field: string,
   min = -1_000_000,
@@ -27,7 +27,7 @@ export function number(
   ) throw new Error(`composition.${field} is invalid`)
   return value
 }
-export function choice(
+function choice(
   value: unknown,
   field: string,
   choices: readonly string[],
@@ -40,7 +40,7 @@ function string(
 ): void {
   if (typeof value !== 'string' || value.length > 16_384) throw new Error(`composition.${field} is invalid`)
 }
-export function point(
+function point(
   value: unknown,
   field: string,
   min = -1_000_000,
@@ -50,7 +50,7 @@ export function point(
   number(p.x, `${field}.x`, min, max)
   number(p.y, `${field}.y`, min, max)
 }
-export function color(
+function color(
   value: unknown,
   field: string,
 ): void {
@@ -73,7 +73,7 @@ function stops(
     color(stop.color, field)
   }
 }
-export function image(value: unknown): void {
+function image(value: unknown): void {
   if (value === null) return
   const ref = readJsonObject(value, 'image')
   if (Object.keys(ref).some((key) => !['blobHash', 'width', 'height', 'format'].includes(key))) throw new Error('composition images require blob references only')
@@ -82,7 +82,7 @@ export function image(value: unknown): void {
   number(ref.height, 'image.height', 1, 32768)
   choice(ref.format, 'image.format', ['png', 'jpeg', 'webp', 'svg'])
 }
-export function validateBackground(value: unknown): CardBackground {
+function validateBackground(value: unknown): CardBackground {
   const bg = readJsonObject(value, 'background')
   choice(bg.kind, 'background.kind', ['transparent', 'solid', 'linear', 'radial', 'freeform', 'image', 'blurred'])
   color(bg.color, 'background.color')

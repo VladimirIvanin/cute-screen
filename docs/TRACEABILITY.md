@@ -1,5 +1,24 @@
 # Трассируемость требований
 
+## Dependency quality gates — до реализации (2026-11-03)
+
+`REQ-REL-005/006`, ADR-014/016/112: сохранить действующие проверки и добавить
+Knip 6.44.1, syncpack 15.3.3, cargo-machete 0.9.2 и hk 2.11.0.
+`pnpm check` остаётся общей командой CI/pre-push; pre-commit проверяет staged
+content без autofix/staging. Версии инструментов закреплены в корневом manifest;
+Rust tools устанавливаются через общий installer в cache с workspace target.
+Сначала собрать полный inventory, затем исправить подтверждённые находки без
+удаления публичного API. Baselines и исключения требуют решения владельца.
+Доказательства: успешный aggregate, реальные нарушения каждого анализатора
+с ненулевым exit через hk/aggregate во временном checkout, partially staged
+commit и сохранение пользовательских hooks/unstaged content. Remote CI —
+только при наличии PR; native UI/runtime данным изменением не затрагиваются.
+
+Итог: три анализатора подключены к общему hk aggregate; локальные Git hooks
+установлены. Реальные negative probes блокируются с exit 1, staged/unstaged
+контракт проверен через Git. Baseline отсутствует; точные исключения согласованы
+владельцем. Команды, платформа и evidence — TESTING.md и `artifacts/quality-gates/`.
+
 ## Dependabot — до настройки (2026-11-03)
 
 `REQ-REL-005/006`, ADR-014/016: добавить `.github/dependabot.yml` для корневых

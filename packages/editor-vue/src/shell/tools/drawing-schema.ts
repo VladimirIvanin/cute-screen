@@ -44,7 +44,7 @@ interface DrawingValues {
   readonly width: unknown
 }
 
-export function isDrawingTool(value: string | undefined): value is DrawingTool {
+function isDrawingTool(value: string | undefined): value is DrawingTool {
   return value === 'arrow' || value === 'line' || value === 'shape' || value === 'gradient' || value === 'pencil' || value === 'marker'
 }
 

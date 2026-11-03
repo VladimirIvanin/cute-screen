@@ -52,47 +52,6 @@ export async function openDrawingHarness(
   await waitForStableCanvas()
 }
 
-export async function chooseOption(
-  controlName: string,
-  optionName: string,
-): Promise<void> {
-  await browser.execute((name) => {
-    if (document.querySelector(`[role="combobox"][aria-label="${name}"]`)) return
-    for (const toolbar of document.querySelectorAll('.cs-context-toolbar')) {
-      const more = [...toolbar.querySelectorAll('button')].find((button) => ['More', 'Ещё'].includes(button.textContent?.trim() ?? ''))
-      more?.click()
-    }
-  }, controlName)
-  const control = $(`[role="combobox"][aria-label="${controlName}"]`)
-  await browser.execute((name) => {
-    const target = [...document.querySelectorAll<HTMLElement>('[role="combobox"]')].find(
-      (element) => element.getAttribute('aria-label') === name,
-    )
-    if (!target) throw new Error(`Missing combobox: ${name}`)
-    target.click()
-  }, controlName)
-  await browser.waitUntil(() =>
-    browser.execute(
-      (name) =>
-        [...document.querySelectorAll<HTMLElement>('.cs-overlay-root [role="option"]')].some((element) => {
-          const text = element.textContent?.trim() ?? ''
-          const numericName = name.replace(/[^0-9.]/g, '')
-          return text === name || (numericName !== '' && text.startsWith(numericName))
-        }),
-      optionName,
-    ))
-  await browser.execute((name) => {
-    const target = [...document.querySelectorAll<HTMLElement>('.cs-overlay-root [role="option"]')].find((element) => {
-      const text = element.textContent?.trim() ?? ''
-      const numericName = name.replace(/[^0-9.]/g, '')
-      return text === name || (numericName !== '' && text.startsWith(numericName))
-    })
-    if (!target) throw new Error(`Missing select option: ${name}`)
-    target.click()
-  }, optionName)
-  await control.waitForExist()
-}
-
 export async function setShellPreferences(
   locale: 'en' | 'ru',
   theme: 'light' | 'dark',

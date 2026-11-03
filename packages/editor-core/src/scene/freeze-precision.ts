@@ -15,7 +15,7 @@ import {
   freezeColor,
 } from './validation'
 
-export function freezePoint(
+function freezePoint(
   point: Point2D,
   field: string,
 ): Point2D {

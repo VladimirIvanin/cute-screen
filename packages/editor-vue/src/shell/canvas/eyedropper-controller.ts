@@ -9,7 +9,7 @@ import type {
   ViewportOutputBounds,
 } from './contracts'
 
-export const EYEDROPPER_GRID_SIZE = 9
+const EYEDROPPER_GRID_SIZE = 9
 const GRID_RADIUS = Math.floor(EYEDROPPER_GRID_SIZE / 2)
 const CARD_FALLBACK_WIDTH = 286
 const CARD_FALLBACK_HEIGHT = 88

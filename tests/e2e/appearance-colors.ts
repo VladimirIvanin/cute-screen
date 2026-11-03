@@ -7,7 +7,7 @@ import {
 import { writeFile } from 'node:fs/promises'
 import type { EditorDocumentV1 } from '../../packages/editor-core/src/document/types'
 
-export async function waitForColorPopover(): Promise<void> {
+async function waitForColorPopover(): Promise<void> {
   await browser.waitUntil(() => browser.execute(() => !document.querySelector(
     '.cs-overlay-root .popover-transition-enter-active, .cs-overlay-root .popover-transition-leave-active',
   )))

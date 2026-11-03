@@ -27,7 +27,7 @@ import type {
   QuickCaptureDraftV1,
 } from './generated/desktop-ipc'
 
-export interface PingResponse {
+interface PingResponse {
   readonly message: 'pong'
   readonly protocolVersion: 1
 }
@@ -100,7 +100,7 @@ export interface DesktopBridge
   settingsPut(key: string, schemaVersion: number, valueJson: string, correlationId: string): Promise<void>
 }
 
-export interface RepositoryOpenDocument {
+interface RepositoryOpenDocument {
   readonly documentId: string
   readonly captureId: string
   readonly revision: number
@@ -109,17 +109,17 @@ export interface RepositoryOpenDocument {
   readonly imageToken?: string
 }
 
-export interface RepositorySeriesFrame {
+interface RepositorySeriesFrame {
   readonly captureId: string
 }
 
-export type OpenImageOutcome =
+type OpenImageOutcome =
   { readonly kind: 'cancelled' } | { readonly kind: 'opened'; readonly document: RepositoryOpenDocument }
 
-export type ClipboardOpenImageOutcome =
+type ClipboardOpenImageOutcome =
   { readonly kind: 'noBitmap' } | { readonly kind: 'opened'; readonly document: RepositoryOpenDocument }
 
-export type RecoveryExportOutcome = { readonly kind: 'saved' } | { readonly kind: 'cancelled' }
+type RecoveryExportOutcome = { readonly kind: 'saved' } | { readonly kind: 'cancelled' }
 
 export const tauriDesktopBridge: DesktopBridge = {
   releaseImage: (token) => invoke<void>('image_release', { token }),

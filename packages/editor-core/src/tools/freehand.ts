@@ -29,7 +29,7 @@ export function rebaseFreehandLayer<T extends PencilLayer | MarkerLayer>(layer: 
   }
   return { ...layer, localBounds: { x, y, width: right - x, height: bottom - y } }
 }
-export type FreehandSample = SampledPoint
+type FreehandSample = SampledPoint
 
 function freehandSamples(payload: JsonObject): readonly FreehandSample[] {
   const source = Array.isArray(payload.points) ? payload.points : []

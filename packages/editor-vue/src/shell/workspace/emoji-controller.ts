@@ -16,7 +16,6 @@ import {
   type EmojiState,
 } from './emoji-state'
 export {
-  EMOJI_PREFERENCES_KEY,
   parseEmojiPreferences,
 } from './emoji-state'
 

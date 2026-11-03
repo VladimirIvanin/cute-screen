@@ -12,7 +12,7 @@ import type {
   QuickCaptureSelectionV1,
 } from './generated/desktop-ipc'
 
-export type QuickCapturePhase = 'idle' | 'selecting' | 'editing' | 'preparing' | 'committing' | 'committed'
+type QuickCapturePhase = 'idle' | 'selecting' | 'editing' | 'preparing' | 'committing' | 'committed'
 
 export interface QuickCaptureCoordinator {
   readonly phase: Readonly<Ref<QuickCapturePhase>>

@@ -1,0 +1,53 @@
+{
+  "$schema": "https://unpkg.com/knip@6.44.1/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": [
+        "scripts/*.d.mts",
+        "scripts/format-desktop-ipc.mjs",
+        "scripts/generate-frame-status-icons.mjs",
+        "scripts/vendor-noto-emoji.mjs",
+        "tests/e2e/specs/*.e2e.ts",
+        "tests/e2e/wdio.*.conf.ts",
+        "apps/landing/index.html",
+        "apps/landing/en/index.html"
+      ],
+      "project": ["scripts/**/*.{mjs,mts}", "tests/**/*.{ts,vue}", "apps/landing/**/*.ts", "*.{js,mjs,ts}"],
+      "vite": {
+        "config": ["apps/landing/vite.config.ts"]
+      },
+      "webdriver-io": {
+        "config": ["tests/e2e/wdio.browser.conf.ts", "tests/e2e/wdio.landing.conf.ts"]
+      },
+      "ignoreDependencies": ["@wdio/local-runner"],
+      "ignoreBinaries": ["rustc", "xmessage", "dpkg", "dpkg-deb"]
+    },
+    "apps/desktop": {
+      "entry": [
+        "index.html",
+        "icons-preview.html",
+        "src/**/*.d.ts",
+        "src/dev/icons-preview.ts",
+        "src/generated/desktop-ipc.ts"
+      ],
+      "project": ["src/**/*.{ts,vue}", "*.ts"],
+      "vite": true
+    },
+    "packages/editor-core": {
+      "project": ["src/**/*.ts"]
+    },
+    "packages/editor-renderer": {
+      "entry": ["src/**/*.d.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "packages/editor-vue": {
+      "entry": ["src/shell/components/CanvasViewport.vue"],
+      "project": ["src/**/*.{ts,vue}", "*.ts"],
+      "vite": true,
+      "ignoreDependencies": ["katex"]
+    }
+  },
+  "ignoreIssues": {
+    "packages/editor-core/src/tools/content/clipboard-codec.ts": ["duplicates"]
+  }
+}

@@ -1,6 +1,6 @@
 import type { PlatformCapabilities } from '@cute-screen/editor-vue'
 
-export interface MainWindowCaptureAdapter {
+interface MainWindowCaptureAdapter {
   hide(): Promise<void>
   show(): Promise<void>
 }

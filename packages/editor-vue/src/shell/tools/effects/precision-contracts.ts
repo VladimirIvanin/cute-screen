@@ -14,12 +14,6 @@ export interface PrecisionEffectState<T extends PrecisionTool> {
   readonly document: EditorDocumentV1
 }
 
-export type PrecisionEffectResolver<T extends PrecisionTool> = (
-  id: string,
-  value: string,
-  state: PrecisionEffectState<T>,
-) => PrecisionSettingsEffect
-
 export function defaultsEffect(value: PrecisionToolDefaults): PrecisionSettingsEffect {
   return { kind: 'defaults', value }
 }

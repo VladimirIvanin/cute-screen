@@ -30,7 +30,7 @@ export interface PrecisionSchemaContext {
   readonly precisionDefaults: Ref<PrecisionToolDefaults>
   readonly translate: (key: Parameters<typeof import('../i18n').t>[1]) => string
 }
-export function hexColor(value: unknown): string {
+function hexColor(value: unknown): string {
   if (!value || typeof value !== 'object')
     return '#e5484d'
   const color = value as Record<string, unknown>

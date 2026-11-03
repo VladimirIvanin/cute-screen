@@ -21,7 +21,7 @@ export interface PrecisionEffectsContext {
   readonly selectedPrecisionLayer: () => PrecisionLayer | undefined
 }
 
-export function precisionToolForControl(id: string): PrecisionTool | undefined {
+function precisionToolForControl(id: string): PrecisionTool | undefined {
   return (['censor', 'spotlight', 'ruler', 'loupe'] as const).find((tool) => id.startsWith(tool))
 }
 

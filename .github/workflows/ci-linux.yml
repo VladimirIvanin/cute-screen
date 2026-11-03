@@ -84,6 +84,12 @@ jobs:
       - name: Install JavaScript dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install pinned dependency quality tools
+        if: inputs.task == 'quality'
+        run: |
+          pnpm tools:install
+          pnpm tools:check
+
       - name: Check frontend, Rust and documentation
         if: inputs.task == 'quality'
         run: pnpm check

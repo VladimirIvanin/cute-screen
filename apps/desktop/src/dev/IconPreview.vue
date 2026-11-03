@@ -4,7 +4,7 @@ import type { IconName } from '../../../../packages/editor-vue/src/shell/types'
 import { createCustomIcon } from '../../../../packages/editor-vue/src/shell/icons/create-custom-icon'
 import {
   dropEyedropperGeometry,
-  filledEyedropperGeometry,
+  eyedropperGeometry,
   outlineEyedropperGeometry,
 } from '../../../../packages/editor-vue/src/shell/icons/geometry'
 import '../../../../packages/editor-vue/src/shell/shell.css'
@@ -32,7 +32,7 @@ const names = [
 ] satisfies IconName[]
 const states = ['rest', 'hover', 'active', 'disabled', 'focus'] as const
 const eyedroppers = [
-  { name: 'Наполненная', component: createCustomIcon('eyedropper-filled', filledEyedropperGeometry) },
+  { name: 'Наполненная', component: createCustomIcon('eyedropper-filled', eyedropperGeometry) },
   { name: 'С каплей', component: createCustomIcon('eyedropper-drop', dropEyedropperGeometry) },
   { name: 'Предыдущая', component: createCustomIcon('eyedropper-outline', outlineEyedropperGeometry) },
 ]

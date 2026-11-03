@@ -13,7 +13,7 @@ export const IDENTITY = Object.freeze({
   scaleY: 1,
 })
 
-export const BLACK_COLOR = Object.freeze({
+const BLACK_COLOR = Object.freeze({
   red: 0,
   green: 0,
   blue: 0,

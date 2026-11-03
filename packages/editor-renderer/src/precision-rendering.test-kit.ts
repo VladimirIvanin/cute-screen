@@ -14,7 +14,7 @@ import type { Canvas2DLike } from './backends/canvas2d/contracts'
 import { Canvas2DRenderer } from './backends/canvas2d/renderer'
 import { resolveCanvas2DTestFontFamily } from './canvas2d-fonts.test-kit'
 
-export function asHtmlCanvas(canvas: Canvas): HTMLCanvasElement {
+function asHtmlCanvas(canvas: Canvas): HTMLCanvasElement {
   return canvas as unknown as HTMLCanvasElement
 }
 

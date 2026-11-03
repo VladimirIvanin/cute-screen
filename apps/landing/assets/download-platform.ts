@@ -1,5 +1,5 @@
 export type DownloadOS = 'windows' | 'macos' | 'linux'
-export type DownloadArchitecture = 'x64' | 'arm64' | 'unsupported'
+type DownloadArchitecture = 'x64' | 'arm64' | 'unsupported'
 
 export interface DownloadNavigator {
   userAgent: string
@@ -33,7 +33,7 @@ export function detectDownloadOS(source: DownloadNavigator): DownloadOS | null {
   return null
 }
 
-export function detectDownloadArchitecture(hints: { architecture?: string; bitness?: string }): DownloadArchitecture {
+function detectDownloadArchitecture(hints: { architecture?: string; bitness?: string }): DownloadArchitecture {
   if (hints.bitness === '32') return 'unsupported'
   if (hints.architecture === 'arm' && hints.bitness === '64') return 'arm64'
   return 'x64'

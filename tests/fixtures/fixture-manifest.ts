@@ -17,7 +17,7 @@ interface FixtureBase {
   readonly harnessOnly?: boolean
 }
 
-export interface ImageFixtureEntry extends FixtureBase {
+interface ImageFixtureEntry extends FixtureBase {
   readonly kind: 'image'
   readonly dimensions: Readonly<{ width: number; height: number }>
   readonly format: string
@@ -36,7 +36,7 @@ export interface ImageFixtureEntry extends FixtureBase {
   }>
 }
 
-export interface MonitorFixtureEntry extends FixtureBase {
+interface MonitorFixtureEntry extends FixtureBase {
   readonly kind: 'monitor-layout'
   readonly expectedValidation: 'success'
 }
@@ -78,7 +78,7 @@ export async function loadFixtureManifest(
   return manifest as FixtureManifest
 }
 
-export async function sha256File(file: string): Promise<string> {
+async function sha256File(file: string): Promise<string> {
   const hash = createHash('sha256')
   for await (const chunk of createReadStream(file)) hash.update(chunk)
   return hash.digest('hex')

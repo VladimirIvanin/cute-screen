@@ -67,10 +67,21 @@
 
 ## Команды проекта
 
+Перед первым `pnpm check` выполнить `pnpm tools:install` и `pnpm tools:check`.
+`pnpm check` обязан пройти до завершения изменения: hk запускает прежние gates,
+Knip, syncpack и cargo-machete; CI и pre-push вызывают эту же команду.
+Правила не отключать ради прохождения проверки. Новое исключение ограничивается
+путём/правилом, содержит причину и требует решения человека.
+`apps/desktop/src/generated/desktop-ipc.ts` и
+`packages/editor-core/src/agent-edit-schema.json` не редактировать вручную:
+`pnpm ipc:check` и `pnpm mcp:schema:check` проверяют актуальность генерации.
+Hooks устанавливаются явно: `pnpm hooks:install`.
+Подробности — [QUALITY_GATES.md](docs/QUALITY_GATES.md).
+
 Следующие команды считаются стабильным интерфейсом репозитория:
 
 ```text
-pnpm check              # lint + typecheck + formatting check
+pnpm check              # existing gates + Knip + syncpack + cargo-machete through hk
 pnpm test               # TypeScript/Vue unit and component tests
 pnpm test:render        # renderer golden tests
 pnpm test:e2e:browser   # WebdriverIO browser mode

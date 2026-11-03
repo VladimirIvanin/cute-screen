@@ -1,5 +1,23 @@
 # Журнал архитектурных решений
 
+## ADR-179 — Dependency quality gates через hk
+
+**Статус:** accepted (2026-11-03); дополняет ADR-014/016/112.
+
+**Решение:** сохранить ESLint/Prettier, strict TypeScript, архитектурные тесты,
+Clippy/rustfmt и отдельные audit/runtime jobs. Добавить Knip, syncpack и
+cargo-machete в `pnpm check`, исполняемый через закреплённый hk. Fast staged
+pre-commit не исправляет и не staging-ит файлы; pre-push и CI используют общий
+aggregate. Локальная установка hooks явная и не перезаписывает чужие hooks.
+Версии Rust CLI закрепляются в корневом manifest и устанавливаются общим
+installer в versioned cache с workspace target; новый toolchain manager не нужен.
+
+**Проверяемое основание:** полный inventory обнаружил лишние прямые зависимости,
+неиспользуемые внутренние exports и устаревшие design candidates. Анализаторы,
+реальные нарушения и частичный Git staging проверяются отдельно; публичный API
+сохраняется. Только перечисленные владельцем исключения —
+[QUALITY_GATES.md](QUALITY_GATES.md). Фактические результаты — TESTING.md.
+
 ## ADR-178 — Ограничение PNG-экспорта и веб-контента
 
 **Статус:** accepted (2026-11-03); дополняет существующие security boundaries.

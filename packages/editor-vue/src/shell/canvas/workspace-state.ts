@@ -14,7 +14,6 @@ import {
   type IntrinsicResizeHandle,
   type LayerNode,
   type NumberedMarkerLayer,
-  type RulerAngleGuide,
   type SnapCandidate,
   type StrokeStyle,
   type StrokeState,
@@ -251,37 +250,5 @@ export function createCanvasWorkspaceState() {
       }
       | undefined
     >(),
-  }
-}
-
-export interface CanvasRuntimeState {
-  lastFitZoom: number | undefined
-  pendingZoomAnchor:
-    | {
-      readonly canvas: CanvasPoint
-      readonly clientX: number
-      readonly clientY: number
-    }
-    | undefined
-  spacePressed: boolean
-  cycle: { readonly key: string; readonly at: number; readonly index: number } | undefined
-  cropSession: CropSession | undefined
-  quickSelectionDraft: { x: number; y: number; width: number; height: number } | undefined
-  rulerGuide: RulerAngleGuide | undefined
-  gesture: CanvasGesture
-  textToolbarPointerDown: boolean
-}
-
-export function createCanvasRuntimeState(): CanvasRuntimeState {
-  return {
-    lastFitZoom: undefined,
-    pendingZoomAnchor: undefined,
-    spacePressed: false,
-    cycle: undefined,
-    cropSession: undefined,
-    quickSelectionDraft: undefined,
-    rulerGuide: undefined,
-    gesture: undefined,
-    textToolbarPointerDown: false,
   }
 }

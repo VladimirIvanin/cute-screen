@@ -7,7 +7,7 @@ interface IconPathAttributes {
 }
 
 /** Monochrome geometry with optional halftones; theme and sizing belong to UiIcon. */
-export type IconPrimitive =
+type IconPrimitive =
   | readonly ['path', IconPathAttributes]
   | readonly ['circle', { readonly cx: number; readonly cy: number; readonly r: number }]
   | readonly ['rect', { readonly x: number; readonly y: number; readonly width: number; readonly height: number; readonly rx?: number }]
@@ -87,7 +87,7 @@ export const outlineEyedropperGeometry = [
   ['path', { d: 'm12 6 6 6M13.5 7.5 5 16l-1 4 4-1 8.5-8.5' }],
 ] as const satisfies IconGeometry
 
-export const filledEyedropperGeometry = [
+const filledEyedropperGeometry = [
   ['path', { d: 'M14 6l2-2a2.8 2.8 0 0 1 4 4l-2 2-1 1-4-4Z', fill: 'currentColor' }],
   ['path', { d: 'M13.5 7.5 5 16a2.1 2.1 0 0 0 3 3l8.5-8.5' }],
   ['path', { d: 'M7 14h6l-5 5a2.1 2.1 0 0 1-3-3Z', fill: 'currentColor', stroke: 'none' }],

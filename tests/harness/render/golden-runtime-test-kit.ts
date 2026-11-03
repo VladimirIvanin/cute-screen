@@ -65,9 +65,9 @@ export let canvasKit: CanvasKitApi
 
 export let canvasKitFonts: readonly CanvasKitFontData[] = []
 
-export const require = createRequire(import.meta.url)
+const require = createRequire(import.meta.url)
 
-export const CanvasKitInit =
+const CanvasKitInit =
   require('../../../packages/editor-renderer/node_modules/canvaskit-wasm/bin/canvaskit.js') as (options: {
     locateFile: () => string
   }) => Promise<CanvasKitApi>
@@ -318,7 +318,7 @@ export function precisionScene(): RenderSceneSnapshot {
   })
 }
 
-export const arrowCaps = [
+const arrowCaps = [
   'none',
   'lineArrow',
   'solidArrow',

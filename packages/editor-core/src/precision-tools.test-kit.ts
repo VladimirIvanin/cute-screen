@@ -14,7 +14,7 @@ export const IDS = {
   loupe: '019c1f62-058e-7000-8000-000000000005',
 } as const
 
-export const source = {
+const source = {
   blobHash: 'a'.repeat(64),
   format: 'png' as const,
   mimeType: 'image/png',

@@ -40,7 +40,7 @@ import {
   spotlightAperturePath,
 } from './paths'
 
-export function copyCanvas(
+function copyCanvas(
   factory: (width: number, height: number) => Canvas2DLike,
   source: Canvas2DLike,
 ): Canvas2DLike {
@@ -52,11 +52,6 @@ export function copyCanvas(
   context.drawImage(source as unknown as CanvasImageSource, 0, 0)
   return copy
 }
-
-export {
-  blurPixels as blurImageData,
-  pixelatePixels as pixelateImageData,
-} from '../../effects/pixels'
 
 export function drawCensor2D(
   context: Context2D,
