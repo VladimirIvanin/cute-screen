@@ -1,5 +1,32 @@
 # Журнал архитектурных решений
 
+## ADR-178 — Ограничение PNG-экспорта и веб-контента
+
+**Статус:** accepted (2026-11-03); дополняет существующие security boundaries.
+
+**Основание:** Rust regression воспроизвёл разрешённую замену ссылки внутри
+библиотеки, если её target находится снаружи. Canonicalization только конечного
+пути не защищает directory entry. Capabilities плагинов не ограничивают
+собственные Rust-команды автоматически; export IPC должен проверять caller.
+
+**Решение:** result_choose_png/result_cancel_png/result_write_png проверяют
+native WebviewWindow label main до диалога, доступа к tickets или payload.
+Save As и одноразовый ticket сохраняются. Назначение — абсолютный путь вне
+библиотеки: canonical parent проверяется независимо, existing symlinks,
+dangling symlinks, каталоги и специальные файлы отклоняются. Проверка повторяется
+перед записью; обычные файлы вне библиотеки можно заменять. Quick Save использует
+ту же проверку пути. Защита от конкурентной подмены каталогов другим процессом
+не гарантируется; это не OS sandbox.
+
+Production CSP добавляет base-uri/form-action/object-src 'none'. Источники
+IPC, изображений, workers, WASM и стили сохраняются; системный браузер и MCP
+loopback не блокируются. Упаковка, платформенные permissions и capture backends
+не меняются.
+
+**Проверяемое основание:** red-first destination tests; native result-export
+проверяет PNG decode, cancel, отказ Settings IPC и form-action violation.
+Фактические результаты по платформам — TESTING.md и PLATFORM_MATRIX.md.
+
 ## ADR-177 — Ручная проверка обновлений на лендинге
 
 **Статус:** accepted (2026-11-02); дополняет отображение версии в ADR-108 и заменяет пункты версии в ADR-166 и ADR-169. Остальные решения о меню и навигации сохраняются.

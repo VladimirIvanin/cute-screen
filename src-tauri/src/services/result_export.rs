@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
     sync::Mutex,
 };
-use tauri::{Manager, State};
+use tauri::{Manager, State, WebviewWindow};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 use uuid::Uuid;
 
@@ -30,10 +30,12 @@ static TEST_SAVE_PICKER: Mutex<Option<Option<PathBuf>>> = Mutex::new(None);
 
 #[tauri::command]
 pub async fn result_choose_png(
+    caller: WebviewWindow,
     app: tauri::AppHandle,
     repository: State<'_, crate::storage::StorageHandle>,
     service: State<'_, ResultExportService>,
 ) -> CommandResult<Option<String>> {
+    require_editor(caller.label())?;
     let window = app
         .get_webview_window("main")
         .ok_or_else(|| RepositoryError::Io("editor window is unavailable".into()))?;
@@ -78,9 +80,11 @@ pub async fn result_choose_png(
 
 #[tauri::command]
 pub fn result_cancel_png(
+    caller: WebviewWindow,
     ticket: String,
     service: State<'_, ResultExportService>,
 ) -> CommandResult<()> {
+    require_editor(caller.label())?;
     service
         .targets
         .lock()
@@ -91,9 +95,11 @@ pub fn result_cancel_png(
 
 #[tauri::command]
 pub async fn result_write_png(
+    caller: WebviewWindow,
     request: tauri::ipc::Request<'_>,
     service: State<'_, ResultExportService>,
 ) -> CommandResult<()> {
+    require_editor(caller.label())?;
     let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
         return Err(RepositoryError::InvalidImage.into());
     };
@@ -118,25 +124,38 @@ pub async fn result_write_png(
     Ok(())
 }
 
+fn require_editor(window: &str) -> Result<(), RepositoryError> {
+    if window != "main" {
+        return Err(RepositoryError::PermissionDenied);
+    }
+    Ok(())
+}
+
 pub(crate) fn validate_destination(
     destination: &Path,
     library_root: &Path,
 ) -> Result<(), RepositoryError> {
-    let canonical = if destination.exists() {
-        destination.canonicalize()?
-    } else {
-        let parent = destination
-            .parent()
-            .ok_or(RepositoryError::PermissionDenied)?
-            .canonicalize()?;
-        parent.join(
-            destination
-                .file_name()
-                .ok_or(RepositoryError::PermissionDenied)?,
-        )
-    };
-    if canonical.starts_with(library_root.canonicalize()?) {
+    if !destination.is_absolute() || destination.file_name().is_none() {
         return Err(RepositoryError::PermissionDenied);
+    }
+    // Validate the containing directory independently of the existing target:
+    // a symlink inside the library can resolve to an otherwise allowed location.
+    let parent = destination
+        .parent()
+        .ok_or(RepositoryError::PermissionDenied)?
+        .canonicalize()?;
+    let library = library_root.canonicalize()?;
+    if parent.starts_with(&library) {
+        return Err(RepositoryError::PermissionDenied);
+    }
+    match destination.symlink_metadata() {
+        Ok(metadata) => {
+            if !metadata.is_file() || destination.canonicalize()?.starts_with(&library) {
+                return Err(RepositoryError::PermissionDenied);
+            }
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error.into()),
     }
     Ok(())
 }
@@ -215,6 +234,74 @@ mod tests {
                 .expect("pixels");
         }
         bytes
+    }
+
+    #[test]
+    fn only_main_editor_can_choose_cancel_or_write_exports() {
+        assert!(require_editor("main").is_ok());
+        for caller in ["settings", "quick-capture", "", "main-other"] {
+            assert!(matches!(
+                require_editor(caller),
+                Err(RepositoryError::PermissionDenied)
+            ));
+        }
+    }
+
+    #[test]
+    fn export_rejects_relative_destinations_and_directories() {
+        let root = tempfile::tempdir().expect("root");
+        let library = root.path().join("library");
+        std::fs::create_dir(&library).expect("library");
+        assert!(matches!(
+            validate_destination(Path::new("export.png"), &library),
+            Err(RepositoryError::PermissionDenied)
+        ));
+        assert!(matches!(
+            validate_destination(root.path(), &library),
+            Err(RepositoryError::PermissionDenied)
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn export_rejects_symlinks_without_replacing_link_or_target() {
+        use std::os::unix::fs::symlink;
+
+        let root = tempfile::tempdir().expect("root");
+        let library = root.path().join("library");
+        std::fs::create_dir(&library).expect("library");
+        let target = root.path().join("target.png");
+        std::fs::write(&target, b"untouched").expect("target");
+        // An existing link inside the library previously canonicalized outside it.
+        for link in [library.join("link.png"), root.path().join("link.png")] {
+            symlink(&target, &link).expect("link");
+            assert!(matches!(
+                write_result_png(&link, &library, &png()),
+                Err(RepositoryError::PermissionDenied)
+            ));
+            assert!(link.symlink_metadata().expect("link metadata").is_symlink());
+            assert_eq!(std::fs::read(&target).expect("target"), b"untouched");
+        }
+        let dangling = root.path().join("dangling.png");
+        symlink(root.path().join("absent.png"), &dangling).expect("dangling link");
+        assert!(matches!(
+            validate_destination(&dangling, &library),
+            Err(RepositoryError::PermissionDenied)
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn export_rejects_a_directory_alias_into_the_library() {
+        let root = tempfile::tempdir().expect("root");
+        let library = root.path().join("library");
+        std::fs::create_dir(&library).expect("library");
+        let alias = root.path().join("alias");
+        std::os::unix::fs::symlink(&library, &alias).expect("alias");
+        assert!(matches!(
+            validate_destination(&alias.join("export.png"), &library),
+            Err(RepositoryError::PermissionDenied)
+        ));
     }
 
     #[test]

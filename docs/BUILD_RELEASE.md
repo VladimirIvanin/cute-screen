@@ -1,5 +1,14 @@
 # CI-сборки и проверка версии через GitHub
 
+## Ограничение экспорта и WebView (ADR-178)
+
+Без новых зависимостей, Cargo profiles, features и package permissions.
+Использовать общий target/debug. Проверки: cargo test для result_export,
+pnpm test:boundaries, pnpm check и штатный
+`CUTE_SCREEN_E2E_SCENARIOS=result-export pnpm test:e2e:tauri` со свежим harness.
+Release/package build не требуется. Артефакты — artifacts/security-hardening/;
+native screenshots/PNG — artifacts/tauri-e2e/result-export/.
+
 ## Проверка обновлений через Pages (ADR-177)
 
 Pages публикуется после полного релиза. Сборка сайта встраивает выбранную версию; проверка выполняется локально в браузере, установка остаётся ручной.

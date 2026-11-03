@@ -91,4 +91,65 @@ describe('PNG export through the production editor', () => {
     expect((await rulerDocument()).source).toEqual(initial.source)
     await browser.saveScreenshot(path.join(evidence, 'editor.png'))
   })
+
+  it('blocks form submissions in the production WebView', async () => {
+    const directive = await browser.execute(async () => new Promise<string>((resolve) => {
+      const frame = document.createElement('iframe')
+      frame.name = 'security-form-target'
+      frame.hidden = true
+      const form = document.createElement('form')
+      form.action = 'https://example.invalid/cute-screen-security-test'
+      form.target = frame.name
+      const observer = {
+        finish(result: string) {
+          clearTimeout(timeout)
+          document.removeEventListener('securitypolicyviolation', observer)
+          form.remove()
+          frame.remove()
+          resolve(result)
+        },
+        handleEvent(event: SecurityPolicyViolationEvent) {
+          if (event.effectiveDirective === 'form-action') observer.finish(event.effectiveDirective)
+        },
+      }
+      const timeout = setTimeout(() => observer.finish('no form-action violation'), 3000)
+      document.addEventListener('securitypolicyviolation', observer)
+      document.body.append(frame, form)
+      form.submit()
+    }))
+    expect(directive).toBe('form-action')
+  })
+
+  it('rejects editor export commands from the Settings WebView', async () => {
+    await browser.execute(async () => {
+      type Native = { __TAURI__: { core: { invoke(name: string): Promise<void> } } }
+      await (window as unknown as Native).__TAURI__.core.invoke('settings_open_history')
+    })
+    await browser.waitUntil(async () => (await browser.tauri.listWindows()).includes('settings'))
+    await browser.tauri.switchWindow('settings')
+    try {
+      await expect($('.cs-history-settings')).toBeDisplayed()
+      const outcomes = await browser.execute(async () => {
+        type Native = {
+          __TAURI__: { core: { invoke(name: string, args?: unknown): Promise<unknown> } }
+        }
+        const { invoke } = (window as unknown as Native).__TAURI__.core
+        const results: string[] = []
+        for (const command of ['result_choose_png', 'result_cancel_png', 'result_write_png']) {
+          try {
+            await invoke(command, { ticket: 'untrusted-settings-ticket', caller: 'main' })
+            results.push('unexpected success')
+          } catch (error) {
+            results.push((error as { code?: string }).code ?? String(error))
+          }
+        }
+        return results
+      })
+      expect(outcomes).toEqual(['permissionDenied', 'permissionDenied', 'permissionDenied'])
+    } finally {
+      await $('.cs-settings-footer button').click()
+      await browser.tauri.switchWindow('main')
+    }
+  })
+
 })

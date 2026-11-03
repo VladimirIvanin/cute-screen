@@ -13,6 +13,20 @@ interface TauriCapability {
 }
 
 describe('production Tauri capability boundary', () => {
+  it('blocks forms, base URL replacement and plugin objects without granting remote sources', async () => {
+    const config = JSON.parse(await readFile('src-tauri/tauri.conf.json', 'utf8'))
+    const directives = new Map<string, string[]>(config.app.security.csp.split(';').map((entry: string) => {
+      const [name, ...sources] = entry.trim().split(/\s+/)
+      return [name, sources]
+    }))
+    expect(directives.get('form-action')).toEqual(["'none'"])
+    expect(directives.get('base-uri')).toEqual(["'none'"])
+    expect(directives.get('object-src')).toEqual(["'none'"])
+    expect(directives.get('connect-src')).toEqual([
+      "'self'", 'ipc:', 'http://ipc.localhost', 'asset:', 'http://asset.localhost', 'blob:',
+    ])
+  })
+
   it('allows the emoji attribution URL only in editor windows and the native harness', async () => {
     const root = process.cwd()
     const capability = JSON.parse(await readFile(path.join(root, 'src-tauri/capabilities/emoji-attribution.json'), 'utf8'))

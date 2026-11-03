@@ -1,5 +1,15 @@
 # Платформенная матрица
 
+## Ограничение экспорта и WebView (ADR-178, 2026-11-03)
+
+Общие Rust path/caller checks и CSP применяются на Linux, Windows и macOS;
+форматы пакетов, hotkeys/capture adapters, MCP bridge и OS permissions сохранены.
+Linux X11 / WebKitGTK 2.52.6: native result-export — 3 passed,
+включая Settings IPC denial и form-action violation. Общие проверки — TESTING.md. Windows/WebView2 и
+macOS/WKWebView runtime повторно локально не проверены: native acceptance pending.
+Unix symlink regressions выполняются на Linux/macOS; Windows path/caller tests
+переносимы, но не являются evidence для Windows symlinks/reparse points.
+
 ## Проверка обновлений (ADR-177)
 
 Native открытие браузера на Windows, macOS и Linux требует отдельного smoke evidence.

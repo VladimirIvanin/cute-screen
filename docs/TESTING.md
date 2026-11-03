@@ -1,5 +1,44 @@
 # Стратегия тестирования
 
+## Ограничение экспорта и WebView (ADR-178, 2026-11-03)
+
+Ubuntu 24.04.5 x86_64 / Linux 6.8.0-147 / X11 / WebKitGTK 2.52.6,
+Node 22.23.1, pnpm 10.33.2; base commit afadba4, рабочие изменения.
+
+- Red-first: result_export tests — 2 failed / 4 passed (relative path error
+  contract и symlink внутри библиотеки); CSP boundary — 1 failed / 3 passed.
+- `cargo test -p cute-screen-desktop --lib result_export::tests` — 7 passed.
+- `cargo test --workspace` — 245 passed, без failures.
+- `pnpm test:boundaries` — 17 files / 123 passed. Первый запуск обнаружил
+  отсутствующий установленный semver; `pnpm install --frozen-lockfile` восстановил
+  зависимости без правки manifest/lockfile, повтор прошёл.
+- `pnpm check` — exit 0, включая форматирование, типы, docs, boundaries,
+  IPC/schema и четыре Rust Clippy конфигурации; существующие Vue lint warnings.
+- `pnpm format`, `cargo fmt --all` выполнены; финальный format:check фиксируется
+  в evidence вместе с native result-export.
+
+Первый native запуск остановился до создания сессии из-за отсутствия драйверов
+в PATH. Для повтора используется существующий artifacts/noto-driver/bin/tauri-driver
+и временно извлечённый webkit2gtk-driver 2.52.6-0ubuntu0.24.04.1; host packages
+не устанавливались. Штатный runner собирает свежий debug/no-bundle harness.
+Повтор после исправления двух E2E helpers прошёл:
+`PATH="/tmp/cutescreen-security-drivers/usr/bin:$PWD/artifacts/noto-driver/bin:$PATH" CUTE_SCREEN_E2E_SCENARIOS=result-export pnpm test:e2e:tauri`
+— 3 passed: 4K/full/crop decoded pixels и cancel; form-action violation;
+Settings не вызывает ни одну из трёх result_* команд, включая попытку подставить
+caller main через JSON. Helpers используют object methods для сериализации WDIO
+и production settings_open_history для штатного mount отдельного окна.
+`pnpm exec tsc --noEmit -p tests/e2e/tsconfig.json` — exit 0 после правки helpers.
+Windows/macOS native здесь не запускались и остаются pending.
+Диск по `pnpm disk:usage`: target 149,786 → 157,821 GiB
+(debug 146,726 → 154,761 GiB), artifacts 61,327 → 61,328 GiB.
+Рост — общий build cache после workspace tests и штатных Clippy feature sets;
+он сохранён. Отдельный target не создавался. Два appData неуспешных запусков,
+их failure screenshots и временный извлечённый WebDriver удалены после успеха;
+существующие caches и чужие runtime profiles сохранены.
+
+Evidence: artifacts/security-hardening/; native decoded PNG/screenshots —
+artifacts/tauri-e2e/result-export/.
+
 ## Бамп 0.1.33 (2026-11-02)
 
 Windows x64 / PowerShell, base `9121137` + image ingress mount repair.

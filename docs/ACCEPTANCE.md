@@ -1,5 +1,19 @@
 # Сквозная приёмка
 
+## Ограничение экспорта и WebView (ADR-178)
+
+`REQ-SEC-001`: импорт 4K через production picker, создание аннотации и PNG export
+с повторным декодированием, crop export и cancel Save As сохраняются. Вызовы
+result_choose_png/result_cancel_png/result_write_png из Settings возвращают
+permissionDenied. Symlink внутри/снаружи библиотеки, dangling link, directory
+alias в библиотеку, относительный путь и каталог отклоняются; originals и
+прежний target остаются неизменными. Обычный внешний файл заменяется.
+
+`REQ-SEC-002`: реальный WebView сообщает form-action violation при попытке
+отправить форму. Bundled renderer/WASM и binary IPC сохраняют работу.
+Native pass каждой ОС фиксируется отдельно в TESTING.md; конфигурация и unit
+проверки не заменяют Windows/macOS runtime evidence.
+
 ## Проверка обновлений (ADR-177)
 
 На каждой ОС активировать действие в трее и настройках; macOS также проверить системное меню. На лендинге проверить RU/EN, ошибочные параметры и все состояния сравнения.
