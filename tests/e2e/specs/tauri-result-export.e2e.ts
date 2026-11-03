@@ -121,6 +121,7 @@ describe('PNG export through the production editor', () => {
   })
 
   it('rejects editor export commands from the Settings WebView', async () => {
+    const mainHandle = await browser.getWindowHandle()
     await browser.execute(async () => {
       type Native = { __TAURI__: { core: { invoke(name: string): Promise<void> } } }
       await (window as unknown as Native).__TAURI__.core.invoke('settings_open_history')
@@ -148,6 +149,9 @@ describe('PNG export through the production editor', () => {
       expect(outcomes).toEqual(['permissionDenied', 'permissionDenied', 'permissionDenied'])
     } finally {
       await $('.cs-settings-footer button').click()
+      // Settings is destroyed on close. Restore a live context before the
+      // service's label switch reads getWindowHandle (WebKitGTK rejects it).
+      await browser.switchToWindow(mainHandle)
       await browser.tauri.switchWindow('main')
     }
   })

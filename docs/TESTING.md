@@ -1,5 +1,41 @@
 # Стратегия тестирования
 
+## CI: Settings teardown и async-executor (2026-11-03)
+
+Windows x64 / PowerShell, Node 22.23.1, pnpm 10.33.2, Rust 1.97.0;
+base `cf2fbb74786057e5e60365797d70bacf5ae03ee5` после fast-forward origin/main.
+Evidence: `artifacts/ci-export-audit/`.
+
+Linux CI падал в finally после проверки отказа export IPC из Settings:
+закрытие уничтожает WebView, а service 1.3.0 перед переключением по label читает
+текущий handle. Тест теперь сохраняет handle main до открытия Settings,
+восстанавливает живой WebDriver context после закрытия и затем выбирает main
+по Tauri label. Проверка всех трёх `permissionDenied` сохранена.
+
+- `cargo update -p async-executor` обновил только одну package entry:
+  1.14.0 → 1.14.1. `cargo deny check` — exit 0, все четыре раздела ok;
+  duplicate x11rb warnings сохранены, policy не менялась.
+- `pnpm install --frozen-lockfile`, `pnpm tools:install`, `pnpm tools:check`,
+  E2E TypeScript check, `pnpm format`, `pnpm format:check` — exit 0.
+- `pnpm check` — exit 0: Knip/syncpack/machete, lint/typecheck/format/docs,
+  boundaries (18 files / 127 passed / 1 skipped), schema/IPC и четыре Clippy
+  feature-набора. Для запуска TEMP/TMP направлены в task-owned
+  `artifacts/ci-export-audit/tmp`: системный Temp наследовал внешний Yarn
+  package.json. Отдельный boundary запуск до установки tools и запуск без
+  tools PATH выявили ошибки окружения; общий gate прошёл без правок тестов.
+- `CUTE_SCREEN_E2E_SCENARIOS=result-export,m04-clean-profile-capture pnpm test:e2e:tauri`
+  — exit 1. Свежий debug/no-bundle harness собран в общем target/debug;
+  external tauri-driver 2.1.0, WDIO service/Rust plugins 1.3.0.
+  До assertions завис `wdioTauri.waitForInit()` в service startup; затем
+  before-all hook сообщил timeout 60000 ms. Зависший teardown остановлен
+  по проверенному PID дерева текущего runner. Clean-profile сценарий не начат;
+  новые decoded PNG и screenshots не получены. Сохранены worker/launcher logs.
+  Windows native pass и повтор исходного Linux/WebKitGTK CI остаются pending.
+
+Production export/CSP/caller contract не менялся; новый ADR не требуется.
+Disk before: target 108.820 GiB, artifacts 14.221 GiB, node_modules 0.859 GiB.
+Финальные размеры и результат безопасного cleanup — task evidence; общий cache сохранён.
+
 ## Dependency quality gates (ADR-179, 2026-11-03)
 
 Linux 6.8.0-147-generic x86_64, Node 22.23.1 / pnpm 10.33.2 / Rust 1.97.0;

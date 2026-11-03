@@ -1,5 +1,17 @@
 # Трассируемость требований
 
+## CI: закрытие Settings и Rust audit — до правки (2026-11-03)
+
+`REQ-SEC-001/002`, `REQ-REL-005`: сохранить проверку отказа трёх export IPC
+из настоящего Settings WebView. Перед открытием Settings запомнить handle main;
+после закрытия Settings восстановить живой WebDriver context до переключения
+по Tauri label: service 1.3.0 читает текущий handle, которого уже нет в WebKitGTK.
+Проверки: штатный native `result-export,m04-clean-profile-capture`, decoded PNG,
+typecheck и общий `pnpm check`. Linux rerun фиксировать отдельно от Windows.
+`REQ-QLT-005`, ADR-016: точечно обновить отозванный `async-executor 1.14.0`
+в Cargo.lock до совместимой неотозванной версии; полный `cargo deny check`
+без ослабления policy и исключений.
+
 ## Dependency quality gates — до реализации (2026-11-03)
 
 `REQ-REL-005/006`, ADR-014/016/112: сохранить действующие проверки и добавить
