@@ -1,5 +1,18 @@
 # Трассируемость требований
 
+## Cargo dependency compatibility — до обновления (2026-11-03)
+
+`REQ-REL-005/006`, `REQ-QLT-005`, `REQ-CAP-002/003`: применить обновления
+из Dependabot #7 и #10 поверх исправлений текущей main, сохранив async-executor
+1.14.1 и существующие security/license gates. Адаптировать Windows capture
+к windows 0.62.2 без чтения stale GetLastError после успешного D3D11CreateDevice.
+Совместимость отсутствующего device/context проверяется red-first Rust regression;
+реальный capture и export требуют отдельного WebView evidence. Rust WDIO plugins
+и JS service должны сохранить рабочий startup/window lifecycle.
+Проверки: cargo check/test, pnpm tools:install/tools:check/check, cargo deny check,
+pnpm format/format:check и штатные native capture/result-export smoke.
+Linux/macOS/ARM64 не считать проверенными Windows x64 прогоном.
+
 ## CI: закрытие Settings и Rust audit — до правки (2026-11-03)
 
 `REQ-SEC-001/002`, `REQ-REL-005`: сохранить проверку отказа трёх export IPC
