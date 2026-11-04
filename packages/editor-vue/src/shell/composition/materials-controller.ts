@@ -31,15 +31,20 @@ export function useCompositionMaterials(context: MaterialContext) {
   const { props, workspace, settings, selectedBrand, disabled, pending, commit, t } = context
   const materials = shallowRef<readonly MaterialRecord[]>([])
   const error = ref('')
+  const loading = ref(false)
   let generation = 0, disposed = false
   async function load(): Promise<void> {
     if (!props.materialBridge) return
     const current = ++generation
+    loading.value = true
+    error.value = ''
     try {
       const list = await props.materialBridge.list()
       if (!disposed && current === generation) materials.value = list
     } catch (e) {
-      if (!disposed) error.value = describeError(e, t('Не удалось загрузить материалы', 'Could not load materials'))
+      if (!disposed && current === generation) error.value = describeError(e, t('Не удалось загрузить сохранённое оформление', 'Could not load saved appearance'))
+    } finally {
+      if (!disposed && current === generation) loading.value = false
     }
   }
   async function perform(action: () => Promise<void>): Promise<void> {
@@ -49,7 +54,7 @@ export function useCompositionMaterials(context: MaterialContext) {
     try {
       await action()
     } catch (e) {
-      error.value = describeError(e, t('Не удалось сохранить материал', 'Could not save material'))
+      error.value = describeError(e, t('Не удалось выполнить действие', 'Could not complete the action'))
     } finally {
       pending.value = false
     }
@@ -82,7 +87,7 @@ export function useCompositionMaterials(context: MaterialContext) {
       const next = materialValue(record, current, selectedBrand.value)
       commit(parseComposition(next))
     } catch (e) {
-      error.value = describeError(e, t('Материал повреждён', 'Material is invalid'))
+      error.value = describeError(e, t('Сохранённый элемент повреждён', 'Saved item is invalid'))
     }
   }
   async function importImage(
@@ -126,7 +131,7 @@ export function useCompositionMaterials(context: MaterialContext) {
     disposed = true
     generation++
   })
-  return { materials, error, load, saveMaterial, removeMaterial, applyMaterial, importImage }
+  return { materials, error, loading, load, saveMaterial, removeMaterial, applyMaterial, importImage }
 }
 
 function withLogo(

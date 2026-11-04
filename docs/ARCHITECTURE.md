@@ -1550,3 +1550,52 @@ Open/History отправляют существующие события гла
 mutex таблицы ID свободен, поэтому обработчик меню не блокирует UI в ожидании
 фонового потока. Новые ID публикуются целиком после успешной перестройки;
 ошибка оставляет таблицу пустой и не активирует частично созданные пункты.
+
+## Подробный инспектор оформления
+
+Подробный инспектор оформления (ADR-180/181): выбранный раздел и открытые формы
+сохранения — локальное UI-состояние. Готовые шаблоны над шестью разделами;
+«Мои шаблоны» используют тот же inspector body. Списки фоновых ресурсов и
+логотипов фильтруются по прежним storage kinds рядом с их настройками.
+Миниатюры стартов используют общий CardFramePreview и production frame contours.
+Изменения документа проходят controller commit/preview/cancel; сохранение
+библиотеки не создаёт history. Dock резервирует место canvas общей CSS-переменной
+ширины; Layers сохраняет собственную ширину. UI, JSON-контракт и бинарный
+transport ресурсов независимы: переименование не мигрирует данные.
+
+ADR-182: CardInsets владеет только выбранной стороной и transient копией четырёх
+чисел; document/scene graph не переносится в Vue. Общий NumericControl получает
+активную сторону и сохраняет прежние preview/commit/cancel. Кнопки схемы имеют
+data-inset-side и входят в numeric context-boundary: уход к другой стороне
+отменяет draft до blur. Связь и единицы используют прежний layout commit,
+проценты по-прежнему относятся к короткой стороне снимка.
+
+ADR-183: CardScreenshotStyle показывает прежние layout.scale и radius с
+образцами и видимыми единицами. В локальном state только numeric preview;
+data-geometry-preset отменяет незавершённый draft до blur. Условие доступности
+radius соответствует frameRadius: phone и non-modern browser используют
+геометрию модели. Их настройки не удаляются и schema не меняется.
+
+ADR-184: CardCanvasSize представляет прежние layout.mode/width/height двумя
+native radio-карточками и геометрическими aspect ratio кнопками. Имена radio
+уникальны для mount, keyboard/disabled используют native semantics. Смена
+режима и ratio входят в numeric context-boundary до blur. Нового persisted
+состояния и нового scene layout resolver нет.
+
+ADR-185: compositionCommit сравнивает прежние и новые mode/fixed dimensions
+после проверки disabled/no-op и выполняет прежнюю EditorCommand. При resize
+вызывает store.enableFit и существующий viewport.refitCanvas после Vue/RAF
+layout. Opening по-прежнему фиксирует текущий zoom; другие изменения
+оформления его не трогают. Режим зума и коэффициент отображения не записываются
+в document settings.
+
+ADR-186: CardInsets использует обычный button с aria-pressed и Tabler
+Link/Unlink через UiIcon. data-inset-link входит в numeric context-boundary,
+поэтому draft отменяется до blur. Меняется прежний insets.linked, нового state
+или storage поля нет. Подпись остаётся на кнопке, SVG декоративный 18 px.
+IconName объявлен в shell/icon-names.ts; types.ts сохраняет совместимый type
+re-export, чтобы общий каталог типов не превышал production line budget.
+
+ADR-187: общий header/hint CompositionPanel удалён; section сохраняет
+локализованное доступное имя через aria-label и прежний id для aria-controls.
+Навигация и подписи групп остаются источниками видимого контекста.

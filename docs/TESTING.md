@@ -1,5 +1,135 @@
 # Стратегия тестирования
 
+## Оформление без повторных заголовков — 2026-11-04 (ADR-187)
+
+Windows x64 / PowerShell, working-tree base `10a0c798880cadd4614a0ceccb767bbd258efc19`.
+Инспектор начинается с параметров, aria-label сохраняет локализованное имя
+раздела. Убраны общий heading/hint и первый лишний разделитель макета;
+подписи групп и пояснения конкретных настроек сохранены.
+
+- `pnpm tools:install`, `pnpm tools:check`, `pnpm format` — exit 0.
+- `pnpm exec vitest run --project vue tests/unit/vue/composition.test.ts tests/unit/vue/composition-style.test.ts`
+  — 2 files / 12 passed: production mount, навигация без history, draft/cancel,
+  linked/independent, disabled и Undo/Redo.
+- `pnpm test:e2e:browser --spec tests/e2e/specs/browser-composition-sticky.e2e.ts --spec tests/e2e/specs/browser-inset-slider.e2e.ts`
+  — 2 specs / 3 passed, Chrome 156.0.8078.76. Навигация остаётся на месте при
+  прокрутке; шаблоны, RU/EN × light/dark, padding и keyboard проходят прежние
+  сценарии. Env: headless=1, port=5193, совместимый CHROMEDRIVER_PATH 156.
+  Production RU dark осмотрен; screenshots и логи — `artifacts/appearance-headings/`.
+- Итоговые exit codes `pnpm check` и включённого `pnpm format:check` —
+  `artifacts/appearance-headings/verification.json`, общий лог рядом.
+
+Native повторно не запускался: прежний startup-блокер wdioTauri.waitForInit;
+WebView2/WebKitGTK/WKWebView pending. Core/Rust/IPC/dependencies не менялись.
+
+## Цепочка связи полей — 2026-11-04 (ADR-186)
+
+Windows x64 / PowerShell, working-tree base `10a0c798880cadd4614a0ceccb767bbd258efc19`.
+Checkbox заменён button с aria-pressed и установленными Tabler Link/Unlink
+через UiIcon. Подпись сохранена, title сообщает следующее действие.
+Выделение нейтральное; новое data-inset-link отменяет draft до blur.
+
+- `pnpm tools:install`, `pnpm tools:check`, `pnpm format` — exit 0.
+- `pnpm exec vitest run --project vue tests/unit/vue/composition.test.ts tests/unit/vue/composition-style.test.ts tests/unit/vue/ui-icon.test.ts`
+  — 3 files / 154 passed. Production mount, смена SVG вместе с pressed,
+  одна команда при переключении поверх draft, disabled, Undo/Redo и общий
+  SVG/currentColor/fallthrough контракт всех семантических иконок.
+- `pnpm test:e2e:browser --spec tests/e2e/specs/browser-inset-slider.e2e.ts --spec tests/e2e/specs/browser-composition-layout.e2e.ts`
+  — 2 specs / 3 tests passed, Chrome 156.0.8078.76. Native button Enter,
+  linked/independent, геометрия, slider/cancel/Undo, RU/EN × темы при 1024 px.
+  Галерея `/icons-preview.html` отрисовала реальные UiIcon в light/dark при
+  16/18/20/24/32 CSS px и DPR 1/2. Dark Link/Unlink осмотрены при 18 px.
+  После нейтрализации общего pressed CSS отдельный inset/gallery spec повторён;
+  итог — `artifacts/padding-link/verification.json` и `browser-final.log`.
+  Env process-local: headless=1, port=5193, CHROMEDRIVER_PATH — совместимый 156.
+- `pnpm format:check`, `pnpm check`: итоговые exit codes — verification.json,
+  логи рядом. Icon package/dependencies/schema/core не менялись.
+  Общий gate выявил types.ts 502 > 500: IconName вынесен в icon-names.ts,
+  прежний types.ts сохраняет type re-export и публичные imports. SVG test читает
+  канонический union; лимит и исключения не менялись.
+
+Production RU dark и glyph rows осмотрены; screenshots связанного и отдельного
+режимов сохранены. Native runtime повторно не запускался из-за предыдущего
+startup-блокера `wdioTauri.waitForInit`; WebView2/WebKitGTK/WKWebView pending.
+Общий target и полезные caches сохранены, новых targets/release builds нет.
+
+## Поля, компактный размер/холст и Fit — 2026-11-04 (ADR-182–185)
+
+Windows x64 / PowerShell, working-tree base `10a0c798880cadd4614a0ceccb767bbd258efc19`.
+CardInsets показывает четыре подписанные стороны, активную сторону/связь и
+transient значения. Ползунок и NumericControl, unit ranges и EditorCommand
+сохранены. Новых зависимостей, core/Rust/IPC контрактов нет.
+
+- `pnpm tools:install`, `pnpm tools:check` — exit 0.
+- `pnpm exec vitest run --project vue tests/unit/vue/composition.test.ts tests/unit/vue/composition-style.test.ts tests/unit/vue/numeric-control.test.ts tests/unit/vue/numeric-preview.test.ts`:
+  4 files / 35 passed. Production mount, linked/independent, изменение только
+  left, одинаковые значения при link, схема во время draft, отмена при смене
+  стороны до blur, invalid 201%/Escape и Undo/Redo.
+  Включены 23 проверки общего numeric lifecycle; новый size/radius тест
+  проверяет наглядные presets, отмену draft до click, Undo и phone/retro/modern.
+  Canvas radio проверяет размеры/ratio, сохранение размеров и отмену draft.
+  Fit regression до исправления: 1 failed / 1 passed, zoomMode оставался custom;
+  после исправления production mount включает Fit при fixed commit.
+- Chrome 156.0.8078.76, `pnpm test:e2e:browser --spec tests/e2e/specs/browser-inset-slider.e2e.ts --spec tests/e2e/specs/browser-composition-layout.e2e.ts --spec tests/e2e/specs/browser-composition-screenshot-style.e2e.ts`:
+  3/3 passed. Trusted pointer-held preview, commit/Undo/Redo, Escape, выбор
+  стороны с возвратом focus к числу, отмена draft при смене стороны, RU/EN ×
+  light/dark, внутренний viewport 1024×768, схема расположена пространственно
+  верно и без горизонтального overflow. RU dark и independent EN осмотрены.
+  Крайние значения 0/8192 px проверены на отдельной стороне в пределах image
+  pixel budget. Размер и углы проверены с %/px, визуальными образцами и
+  пояснениями, включая fixed phone corners. Screenshots size/radius RU dark
+  осмотрены. Env process-local: headless=1, port=5193,
+  CHROMEDRIVER_PATH — совместимый существующий 156, без изменения dependencies.
+  Финальный browser повтор с компактным нейтральным mode и единичными live
+  образцами — 3/3 passed. После ручного 1:1 fixed/ratio/Undo/Redo проверены
+  фактические canvas bounds внутри viewport, без нажатия Fit в тесте.
+  Увеличенные ранние карточки заменены по следующему замечанию владельца.
+  Helper ползунка прокручивает настоящий control и пересчитывает координаты
+  после layout, исправляя прежний out-of-bounds automation failure.
+- `pnpm format`, `pnpm format:check`, `pnpm check`: фактический итоговый exit
+  status — `artifacts/visual-insets/verification.json`, логи рядом.
+
+Native в этой правке повторно не запускался: два свежих запуска предыдущей
+проверки остаются заблокированы в service `wdioTauri.waitForInit()` до UI
+assertions. Они не являются runtime evidence новых полей. WebView2,
+WebKitGTK/WKWebView acceptance остаётся pending. Использован общий target;
+отдельные targets и Cargo profiles не создавались.
+
+## Шаблоны над настройками — 2026-11-04 (ADR-181)
+
+Windows x64 / PowerShell, working-tree base `10a0c798880cadd4614a0ceccb767bbd258efc19`.
+Шесть разделов, миниатюры готовых шаблонов, именование после нажатия,
+контекстные списки фонов/логотипов; storage/document contracts сохранены.
+
+- `pnpm tools:install`, `pnpm tools:check`: pinned tools verified.
+- `pnpm exec vitest run --project vue tests/unit/vue/composition.test.ts tests/unit/vue/mockups.test.ts tests/unit/vue/phone-orientation.test.ts`:
+  3 files / 17 passed. Production mount, нейтральная навигация, save pending/error,
+  Escape/focus, контекстный apply/Undo, раздельное сохранение фона, delete без
+  изменения документа и read-only.
+- Chrome 156.0.8078.76: `pnpm test:e2e:browser` с `--spec` для
+  browser-composition-sticky, browser-composition и browser-composition-branding:
+  3/3 passed. После уплотнения навигации sticky повторно 1/1 passed:
+  RU/EN × light/dark при 1024 px, видимые шесть пунктов, без горизонтального
+  overflow панели, canvas не перекрыт. Четыре screenshots осмотрены выборочно.
+  Headless и port 5192 заданы process-local; `CHROMEDRIVER_PATH` указывает на
+  существующий совместимый 156. Автоматический 157 не создавал browser session;
+  зависимости/конфигурация не менялись ради обхода.
+- `CARGO_TARGET_DIR=D:/cutescreen/target/e2e-isolated CUTE_SCREEN_E2E_SCENARIOS=composition,composition-reopen pnpm test:e2e:tauri`
+  (env через PowerShell): обе свежие debug/no-bundle сборки успешны, 2m04s и
+  18s. Общий debug executable занят пользовательским `pnpm tauri dev`, поэтому
+  переиспользован существующий isolated cache. External tauri-driver 2.1.0,
+  service 1.3.0, Rust plugins 1.5.1: оба запуска зависли в service startup
+  `window.wdioTauri.waitForInit()` до assertions. Первый остановлен после
+  нескольких минут без прогресса, повтор — после 60 s; завершены только
+  проверенные деревья собственных runner PID. Composition/reopen остаются
+  **pending**, новые native screenshots/decoded exports не получены.
+- `pnpm format`, `pnpm format:check`: exit 0. Общий `pnpm check` повторяется
+  после исправления TypeScript query options и Markdown anchor; итоговый exit
+  status хранится в task evidence. Правила не отключались.
+
+Evidence: `artifacts/appearance-templates/`. Нативный startup не является
+проверкой поведения UI. WebKitGTK/WKWebView в этой задаче не запускались.
+
 ## Бамп 0.1.34 (2026-11-03)
 
 Windows x64 / PowerShell, base `9608850`. `pnpm version:bump 0.1.34`
@@ -12341,3 +12471,20 @@ OpenCode в RU settings. Формат сверён с официальной с�
 <https://opencode.ai/docs/en/mcp-servers/>. Реальный OpenCode/runtime smoke и
 платформы Windows/macOS для этого профиля не запускались. Логи:
 `artifacts/opencode-2026-10-25/`.
+
+## Подробный инспектор оформления — 2026-11-04 (ADR-180)
+
+Windows, исходная база `10a0c79`. Перед реализацией обновлены REQ-OUT-009 и traceability.
+
+- `pnpm tools:install`, `pnpm tools:check`: pinned tools verified.
+- `pnpm test tests/unit/vue/composition.test.ts tests/unit/vue/mockups.test.ts tests/unit/vue/phone-orientation.test.ts`: 15/15 passed. Проверены production mount, семь разделов без изменения документа/history, отмена numeric draft по pointerdown навигации и undo/redo.
+- Browser Chrome 156.0.8078.76: navigation, layout/shadow, fill — 3/3 passed. Драйвер задан process-local `CHROMEDRIVER_PATH` существующим совместимым 156; автоматический 157 не создавал сессию. Конфигурация/зависимости ради этого не менялись.
+- Первый Windows WebView2 прогон `composition,composition-reopen`: navigation/cancel/undo прошли; дальнейший сценарий выявил перекрытие Fit canvas панелью инструментов. Reopen после незавершённого сценария не считается независимым результатом. Последующий результат фиксируется ниже.
+
+Артефакты: `artifacts/appearance-inspector/`, `artifacts/appearance-inspector-native.log`, `artifacts/tauri-e2e/appearance-inspector-navigation.png`. Изображение native navigation осмотрено: инспектор и canvas видимы, поля компоновки открыты. WebKit/WKWebView на этой машине не проверялся.
+
+Итог повторной проверки ADR-180: unit 15/15; все 13 затронутых browser specs прошли (первые успешные branding/compact/mockups и повтор phone/seams учтены отдельно в логах). Native `CUTE_SCREEN_E2E_SCENARIOS=composition,composition-reopen pnpm test:e2e:tauri` — оба сценария passed: trusted navigation/cancel, рамки, card/content ownership, библиотека, native Copy, декодирование PNG и восстановление после restart. Координаты жеста card-arrow вычисляются из реального layout и видимых DOM bounds; проверка space=card сохранена. После исправления нижней раскладки ToolRail и Zoom занимают разные строки. Навигационные подписи проверены на одну строку.
+
+Общий gate выявил ошибку изоляции quality-gates fixture: без packageManager Corepack наследовал yarn из внешнего ancestor. Fixture теперь сохраняет packageManager исходного manifest; focused red 2 failures → green 5/5, полный boundary 127 passed / 1 existing skipped. Правила и launcher не отключались.
+
+Финальные `pnpm format`, `pnpm format:check`, `pnpm check` записываются в `artifacts/appearance-inspector-format.log`, `artifacts/appearance-inspector-format-check.log`, `artifacts/appearance-inspector-check.log`; итоговый exit status — `artifacts/appearance-inspector/verification.json`. WebKit/WKWebView остаётся pending.

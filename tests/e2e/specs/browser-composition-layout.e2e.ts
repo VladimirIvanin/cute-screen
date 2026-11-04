@@ -25,7 +25,7 @@ async function fillField(
 }
 
 describe('compact background and layout', () => {
-  it('keeps common settings together and previews shadows with one undoable commit', async () => {
+  it('separates layout and shadow settings and previews shadows with one undoable commit', async () => {
     await browser.setWindowSize(1024, 768)
     await openDrawingHarness(true, true)
     const chrome = await browser.execute(() => ({
@@ -36,7 +36,9 @@ describe('compact background and layout', () => {
     await $('button[aria-label="Appearance"]').click()
     const panel = $('.cs-composition-panel')
     expect(await snapshot()).toBeUndefined()
+    await panel.$('[data-composition-section="background"]').click()
     await panel.$('[data-card-fill="solid"]').click()
+    await panel.$('[data-composition-section="layout"]').click()
     await fillField('All sides', '8')
     expect((await snapshot())!.layout.insets).toMatchObject({ top: 8, right: 8, bottom: 8, left: 8 })
     const units = panel.$('.cs-card-inset-units')
@@ -50,14 +52,16 @@ describe('compact background and layout', () => {
     expect((await snapshot())!.layout.insets.unit).toBe('px')
     await $('button[aria-label="Redo"]').click()
     expect((await snapshot())!.layout.insets.unit).toBe('percent')
-    await panel.$('button[aria-label="Link insets"]').click()
+    await panel.$('.cs-inset-link').click()
+    await panel.$('[data-inset-side="left"]').click()
     await fillField('Left', '16')
     expect((await snapshot())!.layout.insets).toMatchObject({ top: 8, right: 8, bottom: 8, left: 16 })
-    await panel.$('button[aria-label="Link insets"]').click()
+    await panel.$('.cs-inset-link').click()
     expect((await snapshot())!.layout.insets.left).toBe(8)
     await $('button[aria-label="Undo"]').click()
-    await expect(panel.$('label=Left').$('input')).toHaveValue('16')
+    await expect(panel.$('input[aria-label="Left"]')).toHaveValue('16')
     await $('button[aria-label="Redo"]').click()
+    await panel.$('[data-composition-section="shadow"]').click()
     await panel.$('button=Medium').click()
     expect((await snapshot())!.shadow).toBe(0.45)
     const slider = panel.$('[role="slider"][aria-label="Shadow strength"]')
@@ -82,9 +86,11 @@ describe('compact background and layout', () => {
     expect((await snapshot())!.shadow).toBe(committed)
     await $('button[aria-label="Redo"]').click()
     expect((await snapshot())!.shadow).toBe(0.63)
-    await fillField('Scale %', '99')
-    await fillField('Corners', '38')
-    await setNumericInput(shadow, '83')
+    await panel.$('[data-composition-section="layout"]').click()
+    await fillField('Screenshot size', '99')
+    await fillField('Screenshot corners', '38')
+    await panel.$('[data-composition-section="shadow"]').click()
+    await setNumericInput(panel.$('input[aria-label="Shadow strength"]'), '83')
     await browser.keys('Enter')
     const size = panel.$('input[aria-label="Shadow size"]')
     await setNumericInput(size, '400')
@@ -103,7 +109,7 @@ describe('compact background and layout', () => {
         x: 0, y: 0, deltaY: -2000, deltaX: 0, duration: 100 }).perform()
       const geometry = await browser.execute(() => {
         const body = document.querySelector('.cs-composition-body')!
-        const section = document.querySelector('.cs-card-layout')!
+        const section = document.querySelector('.cs-card-shadow')!
         const rect = section.getBoundingClientRect()
         const shadow = section.querySelector('.cs-card-shadow-controls')!.getBoundingClientRect()
         const presets = section.querySelector('.cs-card-shadow-presets')!.getBoundingClientRect()
@@ -123,7 +129,6 @@ describe('compact background and layout', () => {
       await verifyShadowPresetPreviews(`artifacts/browser-e2e/shadow-presets-${locale}-${theme}`)
     }
     await setEditorPreferences('en', 'dark')
-    await panel.$('summary=Advanced shadow').click()
     await fillField('Spread px', '24')
     await fillField('Shift X px', '-20')
     await fillField('Softness %', '150')
@@ -135,8 +140,7 @@ describe('compact background and layout', () => {
     await browser.saveScreenshot('artifacts/browser-e2e/appearance-shadow-advanced.png')
     await panel.$('button=Reset shadow settings').click()
     expect((await snapshot())!.shadowOptions).toMatchObject({ size: 1, spread: 0, offset: { x: 0, y: 0 } })
-    await panel.$('summary=Advanced shadow').click()
-    await panel.$('summary=Screenshot position').click()
+    await panel.$('[data-composition-section="layout"]').click()
     await expect(panel.$('button[aria-label="Bottom · Right"]')).toBeDisplayed()
     await panel.$('button[aria-label="Bottom · Right"]').click()
     expect((await snapshot())!.layout.alignment).toEqual({ x: 1, y: 1 })

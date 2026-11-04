@@ -143,7 +143,7 @@ describe('M05 icon-system boundary', () => {
   it('maps every declared semantic IconName in the central adapter', async () => {
     const root = process.cwd()
     const [types, icon] = await Promise.all([
-      readFile(path.join(root, 'packages/editor-vue/src/shell/types.ts'), 'utf8'),
+      readFile(path.join(root, 'packages/editor-vue/src/shell/icon-names.ts'), 'utf8'),
       readFile(path.join(root, 'packages/editor-vue/src/shell/icon.ts'), 'utf8'),
     ])
     const iconType = types.match(/export type IconName\s*=\s*((?:\|\s*'[^']+'\s*)+)/u)?.[1]

@@ -21,6 +21,7 @@ import { nativeImageIngress } from '../image-ingress'
 import { waitForStableCanvas } from '../canvas-ready'
 import { verifyAppearanceGradientDrag } from '../appearance-gradient'
 import { setNumericInput } from '../numeric-input'
+import { verifyAppearanceNavigation } from '../appearance-navigation'
 import { verifyFrameTypes } from '../frame-types'
 import { verifyInsetSlider } from '../inset-slider'
 import { verifyBackgroundThumbnail } from '../background-thumbnail'
@@ -63,7 +64,8 @@ describe('native publication card', () => {
     })
     await $('button[aria-label="Appearance"]').click()
     const panel = $('.cs-composition-panel')
-    await expect(panel.$('summary=Background & layout')).toBeDisplayed()
+    await verifyAppearanceNavigation(cardDocument, 'artifacts/tauri-e2e')
+    await expect(panel.$('[data-composition-section="layout"]')).toBeDisplayed()
     expect((await cardDocument()).presentation.composition).toBeUndefined()
     await panel.$('.cs-card-inset-units').$('button=px').click()
     expect((await cardDocument()).presentation.composition?.layout.insets.unit).toBe('px')
@@ -76,13 +78,16 @@ describe('native publication card', () => {
     expect((await cardDocument()).presentation.composition?.shadow).toBe(0)
     await $('button[aria-label="Undo"]').click()
     await browser.waitUntil(async () => (await cardDocument()).presentation.composition === undefined)
-    await expect(panel.$('summary=Background & layout')).toBeDisplayed()
+    await expect(panel.$('[data-composition-section="layout"]')).toBeDisplayed()
+    await panel.$('[data-composition-section="background"]').click()
     await panel.$('[data-card-fill="solid"]').click()
     await verifyAppearanceColors(cardDocument, 'artifacts/tauri-e2e')
     await verifyEyedropperButton('artifacts/tauri-e2e')
+    await panel.$('[data-composition-section="shadow"]').click()
     await panel.$('button=Medium').click()
     expect((await cardDocument()).presentation.composition?.shadow).toBe(0.45)
     await verifyInsetSlider(async () => (await cardDocument()).presentation.composition, 'artifacts/tauri-e2e')
+    await panel.$('[data-composition-section="shadow"]').click()
     const shadow = panel.$('input[aria-label="Shadow strength"]')
     await setNumericInput(shadow, '72')
     expect((await cardDocument()).presentation.composition?.shadow).toBe(0.45)
@@ -160,20 +165,27 @@ describe('native publication card', () => {
     await verifyBackgroundThumbnail(64, 64, 'artifacts/tauri-e2e')
     const resources = await cardNative<Array<{ id: string; kind: string }>>('materials_list')
     expect(resources.some((item) => item.kind === 'background')).toBe(true)
-    await panel.$('summary=Presets').click()
-    await setNumericInput(size, '250')
+    await panel.$('[data-composition-section="shadow"]').click()
+    await setNumericInput(panel.$('input[aria-label="Shadow size"]'), '250')
     await browser.keys('Enter')
     expect((await cardDocument()).presentation.composition?.shadowOptions?.size).toBe(2.5)
-    await panel.$('label*=Preset name').$('input').setValue('Cute publication')
-    await panel.$('button=Save style').click()
+    await panel.$('button=Save template…').click()
+    await panel.$('label*=Template name').$('input').setValue('Cute publication')
+    await panel.$('button=Save').click()
     await browser.waitUntil(async () => (await cardNative<Array<{ kind: string }>>('materials_list')).some((item) => item.kind === 'preset'))
+    await panel.$('[data-composition-section="background"]').click()
     await panel.$('[data-card-fill="freeform"]').click()
     await browser.waitUntil(async () => (await cardDocument()).presentation.composition?.background.kind === 'freeform')
     await waitForStableCanvas()
     await $('button[aria-label="Copy"]').click()
     await expect($('.cs-action-feedback.is-success')).toHaveText('Result copied', { wait: 90000 })
     const bitmap = await cardNative<{ bitmap: { width: number; height: number } }>('clipboard_read_snapshot', { correlationId: 'composition-copy' })
+    await panel.$('button=My templates').click()
+    await panel.$('button=Cute publication').click()
+    await browser.waitUntil(async () => (await cardDocument()).presentation.composition?.background.kind === 'image')
     await $('button[aria-label="Undo"]').click()
+    await browser.waitUntil(async () => (await cardDocument()).presentation.composition?.background.kind === 'freeform')
+    await $('button[aria-label="Redo"]').click()
     await browser.waitUntil(async () => (await cardDocument()).presentation.composition?.background.kind === 'image')
     const document = await cardDocument()
     expect(bitmap.bitmap.width).toBeGreaterThan(document.canvas.width)
@@ -196,10 +208,13 @@ describe('native publication card', () => {
 
 async function verifyConnectedShadow(): Promise<void> {
   const panel = $('.cs-composition-panel')
-  for (const [label, value] of [['All sides', '8'], ['Scale %', '99'], ['Corners', '38']] as const) {
-    await setNumericInput(panel.$(`input[aria-label="${label}"]`), value)
+  await panel.$('[data-composition-section="layout"]').click()
+  for (const [selector, value] of [['input[aria-label="All sides"]', '8'],
+    ['[data-composition-scale] input', '99'], ['[data-composition-radius] input', '38']] as const) {
+    await setNumericInput(panel.$(selector), value)
     await browser.keys('Tab')
   }
+  await panel.$('[data-composition-section="shadow"]').click()
   await setNumericInput(panel.$('input[aria-label="Shadow strength"]'), '83')
   await browser.keys('Enter')
   const document = await cardDocument()
@@ -227,13 +242,40 @@ async function verifyAutomaticCardArrow(): Promise<void> {
   await $('.cs-toolrail [data-tool-id="arrow"]').click()
   await $('.cs-zoom-fit').click()
   await waitForStableCanvas()
-  const canvas = await browser.execute(() =>
-    document.querySelector('.cs-canvas:not(.cs-canvas-overlay)')!.getBoundingClientRect().toJSON())
-  const count = (await cardDocument()).layers.length
-  const x = Math.round(canvas.left + canvas.width * 0.025)
-  const y = Math.round(canvas.top + canvas.height * 0.5)
-  await browser.action('pointer').move({ origin: 'viewport', x, y }).down({ button: 'left' })
-    .move({ origin: 'viewport', x: Math.round(canvas.left + canvas.width * 0.45), y, duration: 150 })
+  const document = await cardDocument()
+  const layout = resolveCompositionLayout(document)
+  const geometry = await browser.execute((layout) => {
+    const scene = globalThis.document.querySelector('.cs-canvas:not(.cs-canvas-overlay)')!
+    const canvas = scene.getBoundingClientRect()
+    const clip = globalThis.document.querySelector('.cs-canvas-scroll')!.getBoundingClientRect()
+    const scaleX = canvas.width / layout.width
+    const scaleY = canvas.height / layout.height
+    const contentLeft = canvas.left + Math.max(layout.content.x, layout.viewport.x) * scaleX
+    const contentRight = canvas.left + Math.min(layout.content.x + layout.content.width,
+      layout.viewport.x + layout.viewport.width) * scaleX
+    const contentTop = canvas.top + Math.max(layout.content.y, layout.viewport.y) * scaleY
+    const contentBottom = canvas.top + Math.min(layout.content.y + layout.content.height,
+      layout.viewport.y + layout.viewport.height) * scaleY
+    const marginLeft = Math.max(canvas.left, clip.left) + 4
+    const marginRight = Math.min(canvas.left + layout.frame.x * scaleX, clip.right) - 4
+    const top = Math.max(contentTop, clip.top) + 4
+    const bottom = Math.min(contentBottom, clip.bottom) - 4
+    if (marginRight <= marginLeft || bottom <= top) throw new Error('The card margin is not visible after Fit')
+    const start = { x: Math.round((marginLeft + marginRight) / 2), y: Math.round((top + bottom) / 2) }
+    const end = {
+      x: Math.round((Math.max(contentLeft, clip.left) + Math.min(contentRight, clip.right)) / 2),
+      y: start.y,
+    }
+    return { start, end, canvas: canvas.toJSON(), clip: clip.toJSON(),
+      startHitsCanvas: globalThis.document.elementFromPoint(start.x, start.y) === scene,
+      endHitsCanvas: globalThis.document.elementFromPoint(end.x, end.y) === scene }
+  }, layout)
+  await writeFile('artifacts/tauri-e2e/appearance-card-arrow-geometry.json', JSON.stringify({ layout, ...geometry }, null, 2))
+  expect(geometry.startHitsCanvas).toBe(true)
+  expect(geometry.endHitsCanvas).toBe(true)
+  const count = document.layers.length
+  await browser.action('pointer').move({ origin: 'viewport', ...geometry.start }).down({ button: 'left' })
+    .move({ origin: 'viewport', ...geometry.end, duration: 150 })
     .up({ button: 'left' }).perform()
   await browser.waitUntil(async () => (await cardDocument()).layers.length === count + 1)
   expect((await cardDocument()).layers.at(-1)?.space).toBe('card')

@@ -17,7 +17,7 @@ export async function verifyPhoneOrientation(
   const manual = automatic === 'landscape' ? 'portrait' : 'landscape'
   await $('button[aria-label="Appearance"]').click()
   const panel = $('.cs-composition-panel')
-  await panel.$('summary=Frame').click()
+  await panel.$('[data-composition-section="frame"]').click()
   if (entry === 'starter') await panel.$('button=Phone').click()
   else await panel.$('input[value="phone"] + .cs-card-frame-choice').click()
   const orientation = panel.$('.cs-card-orientation-toggle')

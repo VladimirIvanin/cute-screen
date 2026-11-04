@@ -47,7 +47,7 @@ function mount(document = initial(3840, 2160)) {
 async function openFrame() {
   await fireEvent.click(await screen.findByRole('button', { name: 'Appearance' }))
   const panel = within(screen.getByRole('complementary', { name: 'Appearance' }))
-  await fireEvent.click(panel.getByText('Frame', { selector: 'summary' }))
+  await fireEvent.click(panel.getByRole('button', { name: 'Frame' }))
   return panel
 }
 

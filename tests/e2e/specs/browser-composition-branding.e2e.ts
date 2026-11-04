@@ -32,9 +32,8 @@ describe('signature controls', () => {
     await openDrawingHarness(true, true)
     await $('button[aria-label="Appearance"]').click()
     const panel = $('.cs-composition-panel')
-    await panel.$('button=Padding').click()
-    for (const title of ['Presets', 'Layout', 'Background']) await panel.$(`summary=${title}`).click()
-    await panel.$('summary=Signatures').click()
+    await panel.$('button=With padding').click()
+    await panel.$('[data-composition-section="branding"]').click()
     await panel.$('button=Add signature').click()
     await browser.waitUntil(async () => (await blocks()).length === 1)
     const firstId = (await blocks())[0]!.id

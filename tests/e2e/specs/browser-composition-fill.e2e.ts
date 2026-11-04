@@ -20,7 +20,8 @@ describe('visual background fills', () => {
     await openDrawingHarness(true)
     await $('button[aria-label="Appearance"]').click()
     const panel = $('.cs-composition-panel')
-    await panel.$('button=Padding').click()
+    await panel.$('button=With padding').click()
+    await panel.$('[data-composition-section="background"]').click()
     const types = panel.$('.cs-card-fill-types')
     expect(await types.$$('button')).toHaveLength(7)
     for (const kind of ['transparent', 'solid', 'radial', 'freeform', 'image', 'blurred', 'linear']) {

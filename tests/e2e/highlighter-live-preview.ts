@@ -101,7 +101,7 @@ export async function verifyCompositionHighlighterPreview(
   prefix: string,
 ): Promise<void> {
   await $('button[aria-label="Appearance"]').click()
-  await $('.cs-composition-panel').$('button=Padding').click()
+  await $('.cs-composition-panel').$('button=With padding').click()
   await $('button[aria-label="Close appearance"]').click()
   await $('.cs-zoom-fit').click()
   await $('.cs-toolrail [data-tool-id="marker"]').click()

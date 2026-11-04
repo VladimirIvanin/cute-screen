@@ -18,7 +18,7 @@ describe('appearance gradient dragging', () => {
     await browser.setWindowSize(1280, 900)
     await openDrawingHarness(true)
     await $('button[aria-label="Appearance"]').click()
-    await $('.cs-composition-panel').$('button=Padding').click()
+    await $('.cs-composition-panel').$('button=With padding').click()
     await verifyAppearanceGradientDrag(stops)
     await browser.saveScreenshot('artifacts/browser-e2e/composition-gradient-drag.png')
   }).timeout(120000)

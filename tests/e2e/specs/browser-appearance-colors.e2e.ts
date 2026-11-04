@@ -21,6 +21,7 @@ describe('shared appearance palette', () => {
     await openDrawingHarness(true, true)
     await $('button[aria-label="Appearance"]').click()
     const panel = $('.cs-composition-panel')
+    await panel.$('[data-composition-section="background"]').click()
     await panel.$('[data-card-fill="solid"]').click()
     await verifyAppearanceColors(snapshot, 'artifacts/browser-e2e')
     await verifyEyedropperButton('artifacts/browser-e2e')

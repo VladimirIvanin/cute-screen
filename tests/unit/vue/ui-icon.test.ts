@@ -9,12 +9,12 @@ import { UiIcon } from '../../../packages/editor-vue/src/shell/icon'
 import type { IconName } from '../../../packages/editor-vue/src/shell/types'
 
 // Read the public semantic union so newly added names also require a working SVG.
-const types = readFileSync('packages/editor-vue/src/shell/types.ts', 'utf8')
+const types = readFileSync('packages/editor-vue/src/shell/icon-names.ts', 'utf8')
 const union = types.match(/export type IconName\s*=\s*((?:\|\s*'[^']+'\s*)+)/u)?.[1]
 if (!union) throw new Error('IconName declaration is missing')
 const names = [...union.matchAll(/\| '([A-Za-z]+)'/gu)].map((match) => match[1] as IconName)
 
-const customNames = new Set<IconName>(['agent', 'marker', 'pencil', 'eyedropper', 'spotlight', 'privacy', 'loupe', 'callout', 'strokeWidth', 'gradient'])
+const customNames = new Set<IconName>(['agent', 'marker', 'pencil', 'eyedropper', 'spotlight', 'privacy', 'loupe', 'callout', 'strokeWidth', 'gradient', 'shadow'])
 
 describe('semantic Tabler and project icons', () => {
   it.each(names)('preserves caller class and style for %s', (name) => {

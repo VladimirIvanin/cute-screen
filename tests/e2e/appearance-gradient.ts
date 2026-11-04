@@ -7,6 +7,7 @@ import {
 export async function verifyAppearanceGradientDrag(
   stops: () => Promise<readonly { position: number }[]>,
 ): Promise<void> {
+  await $('.cs-composition-panel [data-composition-section="background"]').click()
   const track = $('.cs-composition-panel .cs-gradient-track')
   await track.scrollIntoView({ block: 'center' })
   const rectangles = await browser.execute(() => {

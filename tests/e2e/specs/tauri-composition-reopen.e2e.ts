@@ -19,7 +19,9 @@ describe('publication card after native restart', () => {
     const saved = JSON.parse(await readFile('artifacts/tauri-e2e/composition-document.json', 'utf8')) as EditorDocumentV1
     expect((await cardDocument()).presentation.composition).toEqual(saved.presentation.composition)
     await $('button[aria-label="Appearance"]').click()
+    await $('.cs-composition-panel [data-composition-section="background"]').click()
     await verifyBackgroundThumbnail(64, 64, 'artifacts/tauri-e2e')
+    await $('.cs-composition-panel').$('button=My templates').click()
     await expect($('.cs-composition-panel').$('button*=Cute publication')).toExist()
     const materials = await cardNative<Array<{ kind: string }>>('materials_list')
     expect(materials.filter((item) => item.kind === 'preset')).toHaveLength(1)

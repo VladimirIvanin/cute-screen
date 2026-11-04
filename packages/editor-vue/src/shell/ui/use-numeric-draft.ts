@@ -162,7 +162,9 @@ function createNumericPointer(
     const contextTargets = [
       '[data-tool-id]', '[data-layer-id]', '[data-brand-id]', '[data-card-fill]',
       '[data-gradient-stop]', '.cs-card-gradient-handle', '.cs-canvas', '.cs-canvas-stage', '.cs-canvas-surface',
-      '[data-composition-reset]',
+      '[data-composition-reset]', '[data-composition-section]', '[data-inset-side]', '[data-geometry-preset]',
+      '[data-canvas-size]',
+      '[data-inset-link]',
     ].join(',')
     if (event.target.closest(contextTargets)) cancel()
     else finish()

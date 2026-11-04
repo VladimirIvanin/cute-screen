@@ -161,7 +161,7 @@ defineExpose(createWorkspaceExposure(canvasViewport, store, props))
     <div
       ref="shellRoot"
       class="cs-editor-shell"
-      :class="{ 'is-quick-mode': props.quickMode, 'is-image-drop-target': imageDropActive, 'has-composition-dock': compositionOpen || store.layersOpen && !props.quickMode }"
+      :class="{ 'is-quick-mode': props.quickMode, 'is-image-drop-target': imageDropActive, 'has-composition-dock': compositionOpen || store.layersOpen && !props.quickMode, 'has-appearance-inspector': compositionOpen }"
     >
       <TopBar
         v-if="!props.quickMode"

@@ -2189,3 +2189,23 @@ driver — 2 scenarios / 2 tests passed. Native Open image → восемь UI-c
 text layers → autosave → relaunch → повторный export 3840×2160 имеет тот же
 SHA-256 decoded RGBA. Desktop session — Wayland/XWayland; capture backend
 в этом сценарии не вызывался. Команды и selected screenshots — TESTING.md.
+
+## Подробный инспектор оформления
+
+Инспектор оформления ADR-180/181: общий Vue/CSS UI с шаблонами над настройками;
+Windows WebView2 требует отдельного runtime-прогона, browser не заменяет
+WebKitGTK/WKWebView. Результаты актуального прогона — TESTING.md.
+
+Визуальные поля и размер/углы ADR-182/183 используют общий Vue/NumericControl и CSS grid.
+Browser проверяется отдельно от native; известный startup-блокер WebView2
+`wdioTauri.waitForInit` не считается evidence этой правки. Платформенные гарантии
+не расширяются; фактические проверки — TESTING.md.
+
+Цепочка связи полей ADR-186 использует установленные MIT Tabler Link/Unlink
+через общий UiIcon, без новых dependencies и native API. Browser/DPR и SVG
+контракт проверяются отдельно от WebView2/WebKitGTK/WKWebView runtime;
+результаты текущего прогона — TESTING.md.
+
+ADR-187 убирает повторные заголовки общего Vue-инспектора; native API и
+платформенные гарантии не меняются. Browser screenshots не заменяют native
+WebView2/WebKitGTK/WKWebView runtime; фактические проверки — TESTING.md.

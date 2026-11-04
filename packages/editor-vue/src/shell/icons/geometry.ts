@@ -17,6 +17,12 @@ type IconPrimitive =
 
 export type IconGeometry = readonly IconPrimitive[]
 
+// User-selected 04: a card joined to its offset, diagonally hatched shadow.
+export const shadowGeometry = [
+  ['path', { d: 'M16 7h3.5a1.5 1.5 0 0 1 1.5 1.5v9.5a3 3 0 0 1-3 3H8.5A1.5 1.5 0 0 1 7 19.5V16M16 8l5 5M16 13l5 5M13 16l5 5M8 16l5 5' }],
+  ['rect', { x: 3, y: 3, width: 13, height: 13, rx: 3 }],
+] as const satisfies IconGeometry
+
 // User-selected dots-2: tiny rounded bumps on the head, a divider and two incisors.
 export const agentGeometry = [
   ['path', {

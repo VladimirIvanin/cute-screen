@@ -98,7 +98,9 @@ function change(
         @preview="change($event, true)"
         @cancel="emit('cancel')"
         @import="emit('select', active.id); emit('import')"
-      />
+      >
+        <template #logos><slot name="logos" :id="active.id" /></template>
+      </CardBrandingEditor>
     </section>
   </fieldset>
 </template>

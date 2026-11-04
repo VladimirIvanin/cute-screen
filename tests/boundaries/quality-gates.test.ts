@@ -40,6 +40,8 @@ async function fixture(projectCheck = 'node -e "process.exit(17)"') {
   await writeFile(path.join(root, 'package.json'), JSON.stringify({
     private: true,
     type: 'module',
+    // Keep Corepack from inheriting a different package manager from a temporary-directory ancestor.
+    packageManager: manifest.packageManager,
     qualityTools: manifest.qualityTools,
     scripts: { 'check:project': projectCheck },
   }, null, 2) + '\n')

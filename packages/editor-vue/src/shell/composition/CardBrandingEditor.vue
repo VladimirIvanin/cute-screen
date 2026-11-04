@@ -218,6 +218,7 @@ const anchors = computed(() => {
           @cancel="emit('cancel')"
         /><button type="button" @click="patch('image', null)">{{ text('Убрать логотип', 'Remove logo') }}</button>
       </template>
+      <slot name="logos" />
     </section>
   </div>
 </template>

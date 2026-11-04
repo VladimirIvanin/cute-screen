@@ -9,10 +9,13 @@ export async function verifyInsetSlider(
   snapshot: () => Promise<CompositionSettings | undefined>,
   directory: string,
 ): Promise<void> {
+  await $('.cs-composition-panel [data-composition-section="layout"]').click()
   const control = $('.cs-card-linked-inset')
+  await control.scrollIntoView({ block: 'center' })
   const input = control.$('input[aria-label="All sides"]')
   const slider = control.$('[role="slider"]')
   const original = (await snapshot())!
+  const unit = original.layout.insets.unit === 'px' ? 'px' : '%'
   const rail = await control.$('.n-slider-rail').getElement()
   const bounds = await browser.execute((element: HTMLElement) => element.getBoundingClientRect().toJSON(), rail)
   const y = Math.round(bounds.y + bounds.height / 2)
@@ -21,6 +24,8 @@ export async function verifyInsetSlider(
     .move({ origin: 'viewport', x: Math.round(bounds.x + bounds.width * 0.25), y, duration: 160 }).perform(true)
   await browser.waitUntil(async () => Number(await input.getValue()) !== original.layout.insets.top)
   expect(await snapshot()).toEqual(original)
+  await expect($('.cs-inset-side[data-inset-side="left"]'))
+    .toHaveAttribute('aria-label', `Left: ${await input.getValue()} ${unit}`)
   await browser.saveScreenshot(`${directory}/inset-slider-held.png`)
   const preview = Number(await input.getValue())
   await browser.action('pointer').up({ button: 'left' }).perform()
@@ -33,9 +38,10 @@ export async function verifyInsetSlider(
   expect((await snapshot())!.layout.insets.top).toBe(preview)
   const baseline = (await snapshot())!
   const railAgain = await browser.execute((element: HTMLElement) => element.getBoundingClientRect().toJSON(), rail)
-  await browser.action('pointer').move({ origin: 'viewport', x: Math.round(railAgain.x + railAgain.width * 0.35), y })
+  const currentY = Math.round(railAgain.y + railAgain.height / 2)
+  await browser.action('pointer').move({ origin: 'viewport', x: Math.round(railAgain.x + railAgain.width * 0.35), y: currentY })
     .down({ button: 'left' })
-    .move({ origin: 'viewport', x: Math.round(railAgain.x + railAgain.width * 0.4), y, duration: 100 }).perform(true)
+    .move({ origin: 'viewport', x: Math.round(railAgain.x + railAgain.width * 0.4), y: currentY, duration: 100 }).perform(true)
   await browser.keys('Escape')
   await browser.action('pointer').up({ button: 'left' }).perform()
   expect(await snapshot()).toEqual(baseline)

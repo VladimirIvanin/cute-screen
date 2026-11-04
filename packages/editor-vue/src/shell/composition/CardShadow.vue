@@ -106,8 +106,8 @@ function selected(
         @cancel="emit('cancel')"
       />
     </div>
-    <details class="cs-card-position-details cs-card-shadow-details">
-      <summary>{{ text('Параметры тени', 'Advanced shadow') }}</summary>
+    <section class="cs-card-shadow-parameters">
+      <h3 class="cs-composition-section-heading">{{ text('Параметры тени', 'Advanced shadow') }}</h3>
       <div class="cs-card-field-pair">
         <CardNumber
           :label="text('Мягкость %', 'Softness %')"
@@ -149,6 +149,6 @@ function selected(
       />
       <button type="button" @click="update(createCardShadowOptions())">{{ text('Сбросить параметры', 'Reset shadow settings') }}</button>
       <p class="cs-card-shadow-hint">{{ text('Для широкой тени увеличьте поля вокруг снимка.', 'Increase screenshot padding to leave room for a wider shadow.') }}</p>
-    </details>
+    </section>
   </div>
 </template>

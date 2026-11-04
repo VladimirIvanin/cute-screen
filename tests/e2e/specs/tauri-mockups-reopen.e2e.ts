@@ -15,7 +15,7 @@ describe('mockups after native restart', () => {
     const saved = JSON.parse(await readFile('artifacts/tauri-e2e/mockups-document.json', 'utf8')) as EditorDocumentV1
     expect((await cardDocument()).presentation.composition).toEqual(saved.presentation.composition)
     await $('button[aria-label="Appearance"]').click()
-    await $('.cs-composition-panel').$('summary=Frame').click()
+    await $('.cs-composition-panel').$('[data-composition-section="frame"]').click()
     await expect($('.cs-card-models input[value="android-angular"]')).toBeChecked()
     await expect($('.cs-composition-panel').$('label*=System details').$('input')).toBeChecked()
     await browser.saveScreenshot('artifacts/tauri-e2e/mockups-reopen.png')

@@ -99,7 +99,7 @@ const fills = computed(() => ({
       >
         {{ text('Загрузить картинку', 'Import image') }}
       </button>
-      <p v-if="value.kind === 'image' && !value.image">{{ text('Выберите фон из материалов или загрузите картинку', 'Choose a material or import an image') }}</p>
+      <p v-if="value.kind === 'image' && !value.image">{{ text('Загрузите картинку или выберите её в «Мои фоны».', 'Import an image or choose one from My backgrounds.') }}</p>
       <label>{{ text('Размещение фона', 'Background fit') }}<select :value="value.fit" @change="emit('change', { ...value, fit: ($event.target as HTMLSelectElement).value as 'cover' | 'contain' })"><option value="cover">{{ text('Заполнить', 'Cover') }}</option><option value="contain">{{ text('Вписать', 'Contain') }}</option></select></label>
       <CardNumber
         :label="text('Масштаб фона %', 'Background scale %')"

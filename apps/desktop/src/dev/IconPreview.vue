@@ -29,6 +29,9 @@ const names = [
   'camera',
   'shape',
   'gradient',
+  'shadow',
+  'link',
+  'unlink',
 ] satisfies IconName[]
 const states = ['rest', 'hover', 'active', 'disabled', 'focus'] as const
 const eyedroppers = [
@@ -259,7 +262,7 @@ const eyedroppers = [
         </div>
         <h3>18 px · button states</h3>
         <div
-          v-for="name in ['agent', 'callout', 'marker', 'pencil', 'eyedropper', 'gradient'] as const"
+          v-for="name in ['agent', 'callout', 'marker', 'pencil', 'eyedropper', 'gradient', 'shadow'] as const"
           :key="name"
           class="icon-states"
         >

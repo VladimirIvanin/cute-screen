@@ -22,6 +22,10 @@ import {
   createEditorShellPinia,
 } from '@cute-screen/editor-vue'
 import EditorShell from '../../../packages/editor-vue/src/shell/components/EditorShell.vue'
+import type {
+  MaterialBridge,
+  MaterialRecord,
+} from '../../../packages/editor-vue/src/materials'
 import {
   compositionViewport,
   mergeCompositionView,
@@ -40,6 +44,182 @@ function initial() {
       width: 3840, height: 2160, orientationApplied: true, color: { colorSpace: 'srgb', hasIccProfile: false } } })
 }
 describe('publication card interface', () => {
+  it('saves templates after naming, keeps failed drafts, cancels with focus and removes only the library entry', async () => {
+    localStorage.clear()
+    let items: MaterialRecord[] = []
+    let fail = true
+    let releaseSave: (() => void) | undefined
+    const bridge: MaterialBridge = {
+      list: async () => items,
+      put: async (record) => {
+        if (fail) throw new Error('Disk unavailable')
+        await new Promise<void>((resolve) => {
+          releaseSave = resolve
+        })
+        items = [...items, { ...record, byteSize: 0 }]
+      },
+      remove: async (id) => {
+        items = items.filter((item) => item.id !== id)
+      },
+    }
+    const session = new DocumentSessionController({ document: initial(), revision: 1, debounceMs: 60000,
+      bridge: { saveDocument: async () => 2, exportRecoveryBundle: async () => ({ kind: 'saved' }) }, correlationId: () => 'templates' })
+    const view = render(EditorShell, { props: { documentSession: markRaw(session), materialBridge: bridge },
+      global: { plugins: [createEditorShellPinia()] } })
+    try {
+      await fireEvent.click(await screen.findByRole('button', { name: 'Appearance' }))
+      const panel = screen.getByRole('complementary', { name: 'Appearance' })
+      const controls = within(panel)
+      expect(controls.getByRole('group', { name: 'Ready-made templates' }).querySelectorAll('svg')).toHaveLength(3)
+      expect(controls.queryByRole('button', { name: 'Materials' })).toBeNull()
+      const trigger = controls.getByRole('button', { name: 'Save template…' })
+      expect(trigger).toBeDisabled()
+      await fireEvent.click(controls.getByRole('button', { name: 'My templates' }))
+      expect(await controls.findByText('Save an appearance to reuse it on other screenshots.')).toBeVisible()
+      expect(session.snapshot.core.canUndo).toBe(false)
+      await fireEvent.click(controls.getByRole('button', { name: 'Browser' }))
+      const before = session.snapshot.core.document
+      await fireEvent.click(trigger)
+      const name = controls.getByRole('textbox', { name: 'Template name' })
+      expect(name).toHaveFocus()
+      expect(controls.getByRole('button', { name: 'Save' })).toBeDisabled()
+      await fireEvent.keyDown(name, { key: 'Escape' })
+      await vi.waitFor(() => expect(trigger).toHaveFocus())
+      expect(panel).toBeVisible()
+      await fireEvent.click(trigger)
+      await fireEvent.input(controls.getByRole('textbox', { name: 'Template name' }), { target: { value: 'Publication' } })
+      await fireEvent.submit(controls.getByRole('form', { name: 'Save template' }))
+      expect(await controls.findByRole('alert')).toHaveTextContent('Disk unavailable')
+      expect(controls.getByRole('textbox', { name: 'Template name' })).toHaveValue('Publication')
+      fail = false
+      await fireEvent.submit(controls.getByRole('form', { name: 'Save template' }))
+      expect(controls.getByRole('textbox', { name: 'Template name' })).toBeDisabled()
+      expect(controls.getByRole('button', { name: 'Saving…' })).toBeDisabled()
+      expect(controls.getByRole('button', { name: 'Cancel' })).toBeDisabled()
+      releaseSave!()
+      await vi.waitFor(() => expect(controls.queryByRole('textbox', { name: 'Template name' })).toBeNull())
+      expect(trigger).toHaveFocus()
+      expect(items.map((item) => item.kind)).toEqual(['preset'])
+      expect(session.snapshot.core.document).toEqual(before)
+      await fireEvent.click(controls.getByRole('button', { name: 'Publication' }))
+      const remove = controls.getByRole('button', { name: 'Remove saved item Publication' })
+      await fireEvent.click(remove)
+      const confirm = controls.getByRole('group', { name: 'Remove saved item' })
+      await fireEvent.keyDown(within(confirm).getByRole('button', { name: 'Cancel' }), { key: 'Escape' })
+      await vi.waitFor(() => expect(remove).toHaveFocus())
+      await fireEvent.click(remove)
+      await fireEvent.click(within(controls.getByRole('group', { name: 'Remove saved item' })).getByRole('button', { name: 'Remove' }))
+      await vi.waitFor(() => expect(controls.queryByRole('button', { name: 'Publication' })).toBeNull())
+      expect(items).toHaveLength(0)
+      expect(session.snapshot.core.document).toEqual(before)
+    } finally {
+      view.unmount()
+      session.dispose()
+    }
+  })
+  it('keeps saved backgrounds and logos beside their settings, applies only the chosen part and saves only a background', async () => {
+    localStorage.clear()
+    const bg = { ...createComposition().background, kind: 'solid' as const }
+    let items: MaterialRecord[] = [
+      { id: 'background', kind: 'gradient', title: 'Forest', valueJson: JSON.stringify(bg), byteSize: 0 },
+      { id: 'logo', kind: 'logo', title: 'Company', valueJson: JSON.stringify({ blobHash: 'b'.repeat(64), width: 64, height: 64, format: 'png' }), byteSize: 0 },
+    ]
+    const bridge: MaterialBridge = { list: async () => items,
+      put: async (record) => {
+        items = [...items, { ...record, byteSize: 0 }]
+      }, remove: async () => undefined }
+    const session = new DocumentSessionController({ document: initial(), revision: 1, debounceMs: 60000,
+      bridge: { saveDocument: async () => 2, exportRecoveryBundle: async () => ({ kind: 'saved' }) }, correlationId: () => 'contextual-library' })
+    const view = render(EditorShell, { props: { documentSession: markRaw(session), materialBridge: bridge },
+      global: { plugins: [createEditorShellPinia()] } })
+    try {
+      await fireEvent.click(await screen.findByRole('button', { name: 'Appearance' }))
+      const controls = within(screen.getByRole('complementary', { name: 'Appearance' }))
+      await fireEvent.click(controls.getByRole('button', { name: 'Browser' }))
+      const before = session.snapshot.core.document
+      await fireEvent.click(controls.getByRole('button', { name: 'Background' }))
+      await fireEvent.click(await controls.findByRole('button', { name: 'Forest' }))
+      expect(controls.queryByRole('button', { name: 'Company' })).toBeNull()
+      expect(session.snapshot.core.document.presentation.composition)
+        .toEqual({ ...before.presentation.composition, background: bg })
+      session.undo()
+      expect(session.snapshot.core.document).toEqual(before)
+      await fireEvent.click(controls.getByRole('button', { name: 'Save this background…' }))
+      await fireEvent.input(controls.getByRole('textbox', { name: 'Background name' }), { target: { value: 'My backdrop' } })
+      await fireEvent.submit(controls.getByRole('form', { name: 'Save background' }))
+      await vi.waitFor(() => expect(items.at(-1)?.kind).toBe('gradient'))
+      expect(JSON.parse(items.at(-1)!.valueJson)).toEqual(before.presentation.composition!.background)
+      await fireEvent.click(controls.getByRole('button', { name: 'Text and logo' }))
+      await fireEvent.click(controls.getByRole('button', { name: 'Add signature' }))
+      await fireEvent.click(await controls.findByRole('button', { name: 'Company' }))
+      expect(session.snapshot.core.document.presentation.composition?.branding[0]?.image?.blobHash).toBe('b'.repeat(64))
+      session.undo()
+      expect(session.snapshot.core.document.presentation.composition?.branding[0]?.image).toBeNull()
+      await fireEvent.click(controls.getByRole('button', { name: 'My templates' }))
+      expect(controls.queryByRole('button', { name: 'Forest' })).toBeNull()
+      expect(controls.queryByRole('button', { name: 'Company' })).toBeNull()
+      await view.rerender({ readOnlyDocument: true })
+      expect(controls.getByRole('button', { name: 'Save template…' })).toBeDisabled()
+    } finally {
+      view.unmount()
+      session.dispose()
+    }
+  })
+  it('navigates every inspector section without creating presentation or history and cancels drafts on departure', async () => {
+    localStorage.clear()
+    const document = initial()
+    const session = new DocumentSessionController({ document, revision: 1, debounceMs: 60000,
+      bridge: { saveDocument: async () => 2, exportRecoveryBundle: async () => ({ kind: 'saved' }) },
+      correlationId: () => 'appearance-navigation' })
+    const view = render(EditorShell, { props: { documentSession: markRaw(session) },
+      global: { plugins: [createEditorShellPinia()] } })
+    try {
+      const execute = vi.spyOn(session, 'execute')
+      await fireEvent.click(await screen.findByRole('button', { name: 'Appearance' }))
+      const panel = screen.getByRole('complementary', { name: 'Appearance' })
+      const controls = within(panel)
+      const sections = [
+        ['layout', 'Size and padding', '[aria-label="All sides"]'],
+        ['background', 'Background', '[data-card-fill="transparent"]'],
+        ['shadow', 'Shadow', '[aria-label="Shadow strength"]'],
+        ['frame', 'Frame', '[role="radiogroup"][aria-label="Frame type"]'],
+        ['bands', 'Strips', '[aria-label="Strip height"]'],
+        ['branding', 'Text and logo', '.cs-brand-add'],
+      ] as const
+      for (const [section, label, control] of sections) {
+        await fireEvent.click(controls.getByRole('button', { name: label }))
+        expect(panel.querySelector(`[data-composition-section="${section}"]`)).toHaveAttribute('aria-current', 'page')
+        expect(panel.querySelector('.cs-composition-body')!.querySelector(control)).toBeVisible()
+        expect(panel.querySelector('details')).toBeNull()
+        expect(session.snapshot.core.document).toEqual(document)
+        expect(session.snapshot.core.canUndo).toBe(false)
+        expect(execute).not.toHaveBeenCalled()
+      }
+      await fireEvent.click(controls.getByRole('button', { name: 'Size and padding' }))
+      expect(controls.queryByRole('spinbutton', { name: 'Shadow strength' })).toBeNull()
+      const inset = controls.getByRole('spinbutton', { name: 'All sides' })
+      await fireEvent.input(inset, { target: { value: '17' } })
+      await fireEvent.pointerDown(controls.getByRole('button', { name: 'Background' }))
+      await fireEvent.click(controls.getByRole('button', { name: 'Background' }))
+      expect(execute).not.toHaveBeenCalled()
+      await fireEvent.click(controls.getByRole('button', { name: 'Size and padding' }))
+      expect(controls.getByRole('spinbutton', { name: 'All sides' })).toHaveValue('0')
+      await fireEvent.input(controls.getByRole('spinbutton', { name: 'All sides' }), { target: { value: '17' } })
+      await fireEvent.keyDown(controls.getByRole('spinbutton', { name: 'All sides' }), { key: 'Enter' })
+      expect(execute).toHaveBeenCalledTimes(1)
+      await fireEvent.click(controls.getByRole('button', { name: 'Shadow' }))
+      await fireEvent.click(controls.getByRole('button', { name: 'Size and padding' }))
+      expect(execute).toHaveBeenCalledTimes(1)
+      session.undo()
+      await vi.waitFor(() => expect(controls.getByRole('spinbutton', { name: 'All sides' })).toHaveValue('0'))
+      expect(session.snapshot.core.document).toEqual(document)
+      session.redo()
+      await vi.waitFor(() => expect(controls.getByRole('spinbutton', { name: 'All sides' })).toHaveValue('17'))
+    } finally {
+      view.unmount()
+      session.dispose()
+    }
+  })
   it('removes appearance in one command, cancels the draft and restores all settings through undo', async () => {
     localStorage.clear()
     const session = new DocumentSessionController({ document: initial(), revision: 1, debounceMs: 60000,
@@ -53,6 +233,7 @@ describe('publication card interface', () => {
       const remove = controls.getByRole('button', { name: 'Remove appearance' })
       expect(remove).toBeDisabled()
       await fireEvent.click(controls.getByRole('button', { name: 'Browser' }))
+      await fireEvent.click(controls.getByRole('button', { name: 'Shadow' }))
       const before = session.snapshot.core.document
       const execute = vi.spyOn(session, 'execute')
       const shadow = controls.getByRole('spinbutton', { name: 'Shadow strength' })
@@ -89,6 +270,7 @@ describe('publication card interface', () => {
       await fireEvent.click(await screen.findByRole('button', { name: 'Appearance' }))
       const panel = screen.getByRole('complementary', { name: 'Appearance' })
       const controls = within(panel)
+      await fireEvent.click(controls.getByRole('button', { name: 'Background' }))
       await fireEvent.click(within(controls.getAllByRole('group', { name: 'Fill' })[0]!)
         .getByRole('button', { name: 'Color' }))
       const opacity = controls.getAllByRole('spinbutton', { name: 'Background opacity %' })[0]!
@@ -127,7 +309,7 @@ describe('publication card interface', () => {
       session.dispose()
     }
   })
-  it('puts frame tiles second and changes only the frame kind through undoable commands', async () => {
+  it('opens frame controls from persistent navigation and changes only the frame kind through undoable commands', async () => {
     localStorage.clear()
     const session = new DocumentSessionController({ document: initial(), revision: 1, debounceMs: 60000,
       bridge: { saveDocument: async () => 2, exportRecoveryBundle: async () => ({ kind: 'saved' }) },
@@ -137,10 +319,10 @@ describe('publication card interface', () => {
     try {
       await fireEvent.click(await screen.findByRole('button', { name: 'Appearance' }))
       const panel = screen.getByRole('complementary', { name: 'Appearance' })
-      const sections = [...panel.querySelectorAll('.cs-composition-body > details > summary')]
-      expect(sections.slice(0, 4).map((section) => section.textContent))
-        .toEqual(['Background & layout', 'Frame', 'Header strip', 'Footer strip'])
-      await fireEvent.click(within(panel).getByText('Frame', { selector: 'summary' }))
+      const sections = [...panel.querySelectorAll('[data-composition-section]')]
+      expect(sections.map((section) => section.getAttribute('data-composition-section')))
+        .toEqual(['layout', 'background', 'shadow', 'frame', 'bands', 'branding'])
+      await fireEvent.click(within(panel).getByRole('button', { name: 'Frame' }))
       const choices = within(within(panel).getByRole('radiogroup', { name: 'Frame type' }))
       expect(choices.getAllByRole('radio')).toHaveLength(4)
       expect(choices.getByRole('radio', { name: 'No frame' })).toBeChecked()
@@ -182,7 +364,8 @@ describe('publication card interface', () => {
       await fireEvent.click(button)
       const panel = screen.getByRole('complementary', { name: 'Appearance' })
       expect(session.snapshot.core.canUndo).toBe(false)
-      expect(within(panel).getByText('Background & layout', { selector: 'summary' })).toBeInTheDocument()
+      expect(within(panel).getByRole('button', { name: 'Size and padding' })).toBeVisible()
+      await fireEvent.click(within(panel).getByRole('button', { name: 'Background' }))
       const initialFills = within(panel).getAllByRole('group', { name: 'Fill' })[0]!
       expect(within(initialFills).getByRole('button', { name: 'Transparent' })).toHaveAttribute('aria-pressed', 'true')
       const execute = vi.spyOn(session, 'execute')
@@ -193,7 +376,7 @@ describe('publication card interface', () => {
       session.undo()
       expect(session.snapshot.core.document.presentation.composition).toBeUndefined()
       await vi.waitFor(() => {
-        expect(within(panel).getByText('Background & layout', { selector: 'summary' })).toBeInTheDocument()
+        expect(within(panel).getByRole('button', { name: 'Size and padding' })).toBeVisible()
       })
       session.redo()
       expect(session.snapshot.core.document.presentation.composition?.background.kind).toBe('solid')
@@ -201,7 +384,7 @@ describe('publication card interface', () => {
       expect(within(panel).queryByRole('button', { name: 'Footer strip' })).not.toBeInTheDocument()
       expect(within(panel).queryByRole('button', { name: 'Header strip' })).not.toBeInTheDocument()
       expect(within(panel).queryByRole('button', { name: 'Two strips' })).not.toBeInTheDocument()
-      await fireEvent.click(within(panel).getByRole('button', { name: 'Padding' }))
+      await fireEvent.click(within(panel).getByRole('button', { name: 'With padding' }))
       expect(session.snapshot.core.document.presentation.composition?.layout.insets.left).toBe(8)
       const fills = within(panel).getAllByRole('group', { name: 'Fill' })[0]!
       expect(within(fills).getAllByRole('button')).toHaveLength(7)
@@ -242,6 +425,9 @@ describe('publication card interface', () => {
       const execute = vi.spyOn(session, 'execute')
       const all = controls.getByRole('spinbutton', { name: 'All sides' })
       await fireEvent.input(all, { target: { value: '12' } })
+      expect(controls.getByRole('button', { name: 'Left: 12 %' })).toBeVisible()
+      expect(controls.getByRole('button', { name: 'Right: 12 %' })).toBeVisible()
+      expect(session.snapshot.core.document.presentation.composition).toBeUndefined()
       await fireEvent.keyDown(all, { key: 'Enter' })
       expect(session.snapshot.core.document.presentation.composition?.layout.insets).toMatchObject({
         top: 12, right: 12, bottom: 12, left: 12,
@@ -264,20 +450,46 @@ describe('publication card interface', () => {
       expect(session.snapshot.core.document.presentation.composition?.layout.insets).toMatchObject({ unit: 'px', top: 12 })
       session.undo()
       await vi.waitFor(() => expect(units.getByRole('button', { name: '%' })).toHaveAttribute('aria-pressed', 'true'))
-      await fireEvent.click(controls.getByRole('button', { name: 'Link insets' }))
+      const link = controls.getByRole('button', { name: 'Equal padding on all sides' })
+      expect(link).toHaveAttribute('aria-pressed', 'true')
+      expect(link.querySelector('.tabler-icon-link')).toBeTruthy()
+      const beforeLink = execute.mock.calls.length
+      await fireEvent.input(all, { target: { value: '17' } })
+      await fireEvent.pointerDown(link)
+      await fireEvent.click(link)
+      expect(execute).toHaveBeenCalledTimes(beforeLink + 1)
+      expect(session.snapshot.core.document.presentation.composition?.layout.insets.top).toBe(12)
+      expect(link).toHaveAttribute('aria-pressed', 'false')
+      expect(link.querySelector('.tabler-icon-unlink')).toBeTruthy()
+      await fireEvent.click(controls.getByRole('button', { name: 'Left: 12 %' }))
       const left = controls.getByRole('spinbutton', { name: 'Left' })
-      await fireEvent.input(left, { target: { value: '24' } })
-      await fireEvent.keyDown(left, { key: 'Enter' })
+      const beforeSelection = execute.mock.calls.length
+      await fireEvent.input(left, { target: { value: '27' } })
+      expect(controls.getByRole('button', { name: 'Left: 27 %' })).toHaveAttribute('aria-pressed', 'true')
+      await fireEvent.pointerDown(controls.getByRole('button', { name: 'Right: 12 %' }))
+      await fireEvent.click(controls.getByRole('button', { name: 'Right: 12 %' }))
+      expect(execute).toHaveBeenCalledTimes(beforeSelection)
+      expect(controls.getByRole('button', { name: 'Left: 12 %' })).toBeVisible()
+      await fireEvent.click(controls.getByRole('button', { name: 'Left: 12 %' }))
+      const selectedLeft = controls.getByRole('spinbutton', { name: 'Left' })
+      await fireEvent.input(selectedLeft, { target: { value: '201' } })
+      expect(selectedLeft).toHaveAttribute('aria-invalid', 'true')
+      await fireEvent.keyDown(selectedLeft, { key: 'Escape' })
+      expect(selectedLeft).toHaveValue('12')
+      expect(execute).toHaveBeenCalledTimes(beforeSelection)
+      await fireEvent.input(selectedLeft, { target: { value: '24' } })
+      await fireEvent.keyDown(selectedLeft, { key: 'Enter' })
       expect(session.snapshot.core.document.presentation.composition?.layout.insets).toMatchObject({
         top: 12, right: 12, bottom: 12, left: 24, linked: false,
       })
       const previous = execute.mock.calls.length
-      await fireEvent.click(controls.getByRole('button', { name: 'Link insets' }))
+      await fireEvent.click(controls.getByRole('button', { name: 'Equal padding on all sides' }))
       expect(execute).toHaveBeenCalledTimes(previous + 1)
       expect(controls.getByRole('spinbutton', { name: 'All sides' })).toHaveValue('12')
       session.undo()
       await vi.waitFor(() => expect(controls.getByRole('spinbutton', { name: 'Left' })).toHaveValue('24'))
       session.redo()
+      await fireEvent.click(controls.getByRole('button', { name: 'Shadow' }))
       await fireEvent.click(controls.getByRole('button', { name: 'Medium' }))
       expect(session.snapshot.core.document.presentation.composition?.shadow).toBe(0.45)
       const beforeDraft = execute.mock.calls.length
@@ -310,7 +522,7 @@ describe('publication card interface', () => {
       session.undo()
       expect(session.snapshot.core.document.presentation.composition?.shadowOptions?.size).toBe(1)
       session.redo()
-      const spread = controls.getByRole('spinbutton', { name: 'Spread px', hidden: true })
+      const spread = controls.getByRole('spinbutton', { name: 'Spread px' })
       await fireEvent.input(spread, { target: { value: '24' } })
       await fireEvent.keyDown(spread, { key: 'Enter' })
       expect(session.snapshot.core.document.presentation.composition?.shadowOptions)

@@ -22,7 +22,7 @@ export async function verifyMockups(
   })
   await $('button[aria-label="Appearance"]').click()
   const panel = $('.cs-composition-panel')
-  await panel.$('summary=Frame').click()
+  await panel.$('[data-composition-section="frame"]').click()
   const chooseType = async (kind: 'phone' | 'browser') => {
     const input = panel.$(`.cs-card-frame-types input[value="${kind}"]`)
     const tile = panel.$(`.cs-card-frame-types input[value="${kind}"] + span`)

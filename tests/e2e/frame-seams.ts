@@ -60,7 +60,7 @@ export async function verifyFrameSeams(
   await $('button[aria-label="Appearance"]').click()
   const panel = $('.cs-composition-panel')
   await panel.$('button=Phone').click()
-  if (!await panel.$('.cs-card-orientation-toggle').isDisplayed()) await panel.$('summary=Frame').click()
+  await panel.$('[data-composition-section="frame"]').click()
   await panel.$('label*=Screenshot placement').$('select').selectByAttribute('value', 'fullscreen')
   await panel.$('label*=Screen content').$('select').selectByAttribute('value', 'cover')
   const fill = panel.$('input[aria-label="Screen fill HEX"]')

@@ -10,10 +10,10 @@ export async function verifyFrameTypes(
   directory: string,
 ): Promise<void> {
   const panel = $('.cs-composition-panel')
-  const order = await browser.execute(() => [...document.querySelectorAll('.cs-composition-body > details > summary')]
-    .slice(0, 4).map((element) => element.textContent))
-  expect(order).toEqual(['Background & layout', 'Frame', 'Header strip', 'Footer strip'])
-  await panel.$('summary=Frame').click()
+  const order = await browser.execute(() => [...document.querySelectorAll('[data-composition-section]')]
+    .map((element) => element.getAttribute('data-composition-section')))
+  expect(order).toEqual(['layout', 'background', 'shadow', 'frame', 'bands', 'branding'])
+  await panel.$('[data-composition-section="frame"]').click()
   const group = panel.$('[role="radiogroup"][aria-label="Frame type"]')
   const original = (await readComposition())!
   expect(original.frame.theme).toBe('dark')

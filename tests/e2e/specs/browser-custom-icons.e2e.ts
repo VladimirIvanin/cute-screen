@@ -39,6 +39,12 @@ describe('custom icons beside Tabler', () => {
       await browser.saveScreenshot(path.join(evidence, `callout-family-dpr-${dpr}.png`))
       await $('.icon-row[data-icon-name="gradient"]').scrollIntoView({ block: 'center' })
       await browser.saveScreenshot(path.join(evidence, `gradient-family-dpr-${dpr}.png`))
+      await $('.icon-row[data-icon-name="shadow"]').scrollIntoView({ block: 'center' })
+      await browser.saveScreenshot(path.join(evidence, `shadow-family-dpr-${dpr}.png`))
+      for (const theme of ['light', 'dark']) {
+        await $(`.icon-theme[data-theme="${theme}"] [data-icon-name="shadow"]`)
+          .saveScreenshot(path.join(evidence, `shadow-${theme}-dpr-${dpr}.png`))
+      }
     }
     await browser.setViewport({ width: 1280, height: 800, devicePixelRatio: 1 })
     const geometry = await browser.execute(() => [...document.querySelectorAll('.icon-row[data-icon-name]')].map((row) => ({
@@ -73,7 +79,7 @@ describe('custom icons beside Tabler', () => {
     const rasters = await browser.execute(async () => {
       const results = []
       for (const name of [
-        'agent', 'marker', 'pencil', 'eyedropper', 'spotlight', 'privacy', 'loupe', 'callout', 'gradient',
+        'agent', 'marker', 'pencil', 'eyedropper', 'spotlight', 'privacy', 'loupe', 'callout', 'gradient', 'shadow',
       ]) {
         for (const size of [16, 18, 20, 24, 32]) {
           for (const dpr of [1, 2]) {

@@ -13,6 +13,7 @@ export async function verifyRemoveAppearance(
   verifyExport?: () => Promise<void>,
 ): Promise<void> {
   const panel = $('.cs-composition-panel')
+  await panel.$('[data-composition-section="shadow"]').click()
   const remove = panel.$('[data-composition-reset]')
   const before = await readDocument()
   expect(before.presentation.composition).toBeDefined()
@@ -69,12 +70,12 @@ export async function verifyRemoveAppearance(
   await $('button[aria-label="Undo"]').click()
   await expect(remove).toBeEnabled()
 
-  // A closed last section precedes the fixed action in the native Tab order.
-  const presets = panel.$('.cs-composition-body > details:last-child')
-  if (await presets.getAttribute('open') !== null) await presets.$('summary').click()
-  await presets.$('summary').click()
-  await presets.$('summary').click()
-  await browser.keys('Tab')
+  // Reach the fixed action through the real keyboard order, without opening disclosures.
+  await panel.$('[data-composition-section="shadow"]').click()
+  for (let step = 0; step < 60; step += 1) {
+    await browser.keys('Tab')
+    if (await browser.execute(() => document.activeElement?.hasAttribute('data-composition-reset'))) break
+  }
   expect(await browser.execute(() => document.activeElement?.hasAttribute('data-composition-reset'))).toBe(true)
   await browser.keys('Enter')
   await browser.waitUntil(async () => (await readDocument()).presentation.composition === undefined)

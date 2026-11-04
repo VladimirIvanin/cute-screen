@@ -38,7 +38,7 @@ describe('mockups in production editor session', () => {
     try {
       await fireEvent.click(await screen.findByRole('button', { name: 'Appearance' }))
       const panel = within(screen.getByRole('complementary', { name: 'Appearance' }))
-      await fireEvent.click(panel.getByText('Frame', { selector: 'summary' }))
+      await fireEvent.click(panel.getByRole('button', { name: 'Frame' }))
       expect(session.snapshot.core.document.presentation.composition).toBeUndefined()
       await fireEvent.click(panel.getByRole('radio', { name: 'Phone' }))
       expect(panel.getByRole('radio', { name: 'iPhone · Island' })).toBeChecked()

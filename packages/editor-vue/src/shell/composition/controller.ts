@@ -1,6 +1,7 @@
 import { useCompositionMaterials } from './materials-controller'
 import {
   computed,
+  nextTick,
   onBeforeUnmount,
   provide,
   ref,
@@ -69,14 +70,24 @@ function compositionCommit(
   disabled: Ref<boolean>,
   settings: Ref<CompositionSettings | undefined>,
   cancel: () => void,
+  refit: () => void,
 ) {
   return (value: CompositionSettings, automaticPhoneOrientation = true): void => {
     const doc = workspace.activeDocument.value
     if (!doc || disabled.value) return
     cancel()
     if (JSON.stringify(settings.value) === JSON.stringify(value)) return
+    const previous = settings.value?.layout
+    const resize = previous && (
+      previous.mode !== value.layout.mode ||
+      value.layout.mode === 'fixed' && (
+        previous.width !== value.layout.width ||
+        previous.height !== value.layout.height
+      )
+    )
     props.documentSession!.execute({ type: 'setPresentation', before: doc.presentation,
       after: updateCompositionPresentation(doc, value, automaticPhoneOrientation) })
+    if (resize) refit()
   }
 }
 
@@ -136,10 +147,13 @@ export function useComposition(
   const disabled = computed(() => props.readOnlyDocument || !props.documentSession || pending.value || store.actionState.status === 'pending')
   const { compositionPreview, preview, cancel } = useCompositionPreview(workspace, () => disabled.value)
   const t = (ru: string, en: string) => store.locale === 'ru' ? ru : en
-  const commit = compositionCommit(props, workspace, disabled, settings, cancel)
+  const commit = compositionCommit(props, workspace, disabled, settings, cancel, () => {
+    store.enableFit()
+    void nextTick(() => requestAnimationFrame(() => workspace.canvasViewport.value?.refitCanvas()))
+  })
   const library = useCompositionMaterials({ props, workspace, settings, selectedBrand, disabled,
     commit: (value) => commit(value, false), t, pending })
-  const { materials, error, load, saveMaterial, removeMaterial, applyMaterial, importImage } = library
+  const { materials, error, loading, load, saveMaterial, removeMaterial, applyMaterial, importImage } = library
   function switchSpace(space: 'content' | 'card'): void {
     finishSpaceChange(props, workspace, store, compositionSpace, space)
   }
@@ -212,6 +226,7 @@ export function useComposition(
     compositionSettings: settings,
     compositionApplied: applied,
     compositionMaterials: materials,
+    compositionLoading: loading,
 
     compositionPending: pending, compositionError: error, compositionDisabled: disabled,
     toggleComposition: toggle,

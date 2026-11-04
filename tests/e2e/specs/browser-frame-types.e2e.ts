@@ -14,7 +14,7 @@ async function snapshot() {
   }).__cuteScreenE2eM05.snapshot().presentation.composition)
 }
 describe('visual frame choices', () => {
-  it('puts frames second and supports keyboard selection, undo and compact bilingual previews', async () => {
+  it('opens frames from persistent navigation and supports keyboard selection, undo and compact bilingual previews', async () => {
     await browser.setWindowSize(1024, 768)
     await openDrawingHarness(true, true)
     await $('button[aria-label="Appearance"]').click()
@@ -23,8 +23,7 @@ describe('visual frame choices', () => {
     await verifyFrameTypes(snapshot, 'artifacts/browser-e2e')
     for (const locale of ['ru', 'en'] as const) for (const theme of ['dark', 'light'] as const) {
       await setEditorPreferences(locale, theme)
-      const summary = panel.$('summary=' + (locale === 'ru' ? 'Фон и макет' : 'Background & layout'))
-      await summary.click()
+      await panel.$('[data-composition-section="frame"]').click()
       const group = panel.$('.cs-card-frame-types')
       await expect(group).toBeDisplayed()
       const geometry = await browser.execute(() => {
@@ -43,7 +42,6 @@ describe('visual frame choices', () => {
         !option.overflow && option.width >= 60 && option.height >= 60)).toBe(true)
       expect(new Set(geometry.options.map((option) => option.y)).size).toBe(1)
       await browser.saveScreenshot(`artifacts/browser-e2e/frame-tiles-${locale}-${theme}.png`)
-      await summary.click()
     }
   }).timeout(120000)
 })
