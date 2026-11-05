@@ -495,7 +495,8 @@
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
-.cs-action-feedback:is(.is-pending, .is-error) {
+.cs-action-feedback.is-error,
+.cs-action-feedback.is-pending.has-progress {
   grid-template-rows: minmax(0, 1fr) auto;
 }
 .cs-action-feedback:is(.is-success, .is-cancelled) .cs-action-feedback-message {
@@ -521,6 +522,16 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 12px;
+}
+.cs-action-feedback.is-pending:not(.has-progress) {
+  align-items: center;
+}
+.cs-action-feedback.is-pending:not(.has-progress) .cs-action-feedback-message {
+  align-self: center;
+}
+.cs-action-feedback.is-pending:not(.has-progress) .cs-action-feedback-actions {
+  grid-column: 2;
+  grid-row: 1;
 }
 .cs-editor-shell.is-quick-mode .cs-action-feedback {
   top: 14px;

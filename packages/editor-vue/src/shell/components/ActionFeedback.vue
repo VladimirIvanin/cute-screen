@@ -67,7 +67,7 @@ const progressKey: Record<
   <div
     v-if="state.status !== 'idle'"
     class="cs-action-feedback"
-    :class="`is-${state.status}`"
+    :class="[`is-${state.status}`, { 'has-progress': state.status === 'pending' && state.progress !== undefined }]"
     :role="state.status === 'error' ? 'alert' : 'status'"
   >
     <span

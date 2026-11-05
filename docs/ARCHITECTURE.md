@@ -1616,3 +1616,9 @@ re-export, чтобы общий каталог типов не превышал
 ADR-187: общий header/hint CompositionPanel удалён; section сохраняет
 локализованное доступное имя через aria-label и прежний id для aria-controls.
 Навигация и подписи групп остаются источниками видимого контекста.
+
+Copy pending передаётся в TopBar отдельно от остальных pending действий.
+Header использует inert/aria-busy, сохраняя disabled props и DOM кнопок;
+готовность canvas во время Copy не меняется. ActionFeedback размещает короткое
+pending-сообщение и Cancel в одной строке; наличие progress включает второй ряд.
+Размещение под header и notices сохраняет контракт ADR-162/174.

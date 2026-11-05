@@ -12646,3 +12646,18 @@ Windows, исходная база `10a0c79`. Перед реализацией 
 Общий gate выявил ошибку изоляции quality-gates fixture: без packageManager Corepack наследовал yarn из внешнего ancestor. Fixture теперь сохраняет packageManager исходного manifest; focused red 2 failures → green 5/5, полный boundary 127 passed / 1 existing skipped. Правила и launcher не отключались.
 
 Финальные `pnpm format`, `pnpm format:check`, `pnpm check` записываются в `artifacts/appearance-inspector-format.log`, `artifacts/appearance-inspector-format-check.log`, `artifacts/appearance-inspector-check.log`; итоговый exit status — `artifacts/appearance-inspector/verification.json`. WebKit/WKWebView остаётся pending.
+
+## Copy: устойчивая верхняя панель и короткое уведомление — 2026-11-05
+
+Windows x64 / Chrome 157.0.8103.38, base `f5339aa`.
+`CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 pnpm test:e2e:browser --spec tests/e2e/specs/browser-action-feedback.e2e.ts --spec tests/e2e/specs/browser-composition-copy.e2e.ts`: 11 PASS.
+Production M05 mount/click, 2560×1440 document; RU/EN × light/dark.
+Pending action удерживается на существующем fake timer; DOM/buttons/disabled/цвета/геометрия
+header прежние, aria-busy/inert блокируют ввод. Сообщение и Cancel центрированы
+в одной строке (высота ≤54 px), отмена доступна; повторный Copy успешен.
+Длинные ошибки, recovery, keyboard и оформление/scroll regression PASS.
+Скриншоты `artifacts/browser-e2e/copy-pending-*.png` осмотрены; лог
+`artifacts/copy-feedback-browser.log`. Clipboard fake; native WebView и другие
+платформы этим прогоном не проверялись. `pnpm tools:install` и `pnpm tools:check` PASS.
+
+`pnpm exec vitest run --project vue tests/unit/vue/app-shell-layout.test.ts tests/unit/vue/composition.test.ts`: 18 PASS (2 files).

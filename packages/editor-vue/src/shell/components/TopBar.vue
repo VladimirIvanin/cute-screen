@@ -31,6 +31,7 @@ const props = withDefaults(
     canRedo?: boolean
     saveState?: DocumentSaveState | undefined
     saveError?: string | undefined
+    copying?: boolean
     pending?: boolean
     captureAvailable?: boolean
     captureUnavailableReason?: string | undefined
@@ -42,6 +43,7 @@ const props = withDefaults(
   {
     saveState: undefined,
     saveError: undefined,
+    copying: false,
     pending: false,
     captureAvailable: true,
     captureUnavailableReason: undefined,
@@ -60,7 +62,7 @@ const emit = defineEmits<{
   locale: [value: SupportedLocale]
   theme: [value: ThemePreference]
 }>()
-const disabled = computed(() => props.pending)
+const disabled = computed(() => props.pending && !props.copying)
 const header = ref<HTMLElement>()
 const notices = ref<HTMLElement>()
 const brand = ref<HTMLElement>()
@@ -113,7 +115,12 @@ async function openAgent(): Promise<void> {
 </script>
 
 <template>
-  <header ref="header" class="cs-topbar">
+  <header
+    ref="header"
+    class="cs-topbar"
+    :inert="copying"
+    :aria-busy="copying"
+  >
     <div
       ref="brand"
       class="cs-brand"
@@ -225,7 +232,7 @@ async function openAgent(): Promise<void> {
         class="cs-button cs-agent-connect"
         :loading="openingAgent"
         :aria-busy="openingAgent"
-        :disabled="pending || openingAgent"
+        :disabled="disabled || openingAgent"
         @click="openAgent"
       >
         <template #icon><UiIcon name="agent" /></template>

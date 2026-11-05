@@ -4,6 +4,7 @@ import {
   NConfigProvider,
 } from 'naive-ui'
 import {
+  computed,
   nextTick,
   ref,
   watch,
@@ -128,6 +129,11 @@ function dismissActionFeedback(): void {
   shellRoot.value?.querySelector<HTMLButtonElement>('.cs-toolrail button[aria-pressed="true"]')?.focus()
 }
 
+const canEditCanvas = computed(() =>
+  Boolean(activeDocument.value && props.documentSession) &&
+  !props.readOnlyDocument &&
+  store.documentHistory.saveState !== 'readOnly' &&
+  (store.actionState.status !== 'pending' || store.actionState.action === 'copy'))
 const quickSettingsCollapsed = ref(true)
 watch(() => store.activeToolId, () => {
   quickSettingsCollapsed.value = true
@@ -166,15 +172,7 @@ defineExpose(createWorkspaceExposure(canvasViewport, store, props))
       <TopBar
         v-if="!props.quickMode"
         :appearance-open="compositionOpen"
-        :can-edit-canvas="
-          Boolean(
-            activeDocument &&
-              props.documentSession &&
-              !props.readOnlyDocument &&
-              store.documentHistory.saveState !== 'readOnly' &&
-              store.actionState.status !== 'pending'
-          )
-        "
+        :can-edit-canvas="canEditCanvas"
         :locale="store.locale"
         :theme="store.preferences.theme"
         :can-copy-or-export="store.canCopyOrExport && !props.readOnlyDocument"
@@ -183,6 +181,7 @@ defineExpose(createWorkspaceExposure(canvasViewport, store, props))
         :save-state="store.documentHistory.saveState"
         :save-error="store.documentHistory.error"
         :pending="store.actionState.status === 'pending'"
+        :copying="store.actionState.status === 'pending' && store.actionState.action === 'copy'"
         :capture-available="props.captureAvailable"
         :capture-unavailable-reason="props.captureUnavailableReason ?? translate('captureUnavailable')"
         :open-image-available="props.openImageAvailable"

@@ -2251,3 +2251,10 @@ Browser проверяется отдельно от native; известный 
 ADR-187 убирает повторные заголовки общего Vue-инспектора; native API и
 платформенные гарантии не меняются. Browser screenshots не заменяют native
 WebView2/WebKitGTK/WKWebView runtime; фактические проверки — TESTING.md.
+
+## Copy chrome и pending feedback — 2026-11-05
+
+Windows x64 / Chrome 157: RU/EN × light/dark, неизменные DOM/цвета/геометрия
+header, компактная строка Copy/Cancel, cancel/retry и длинные ошибки — browser PASS.
+Native WebView2, WKWebView и WebKitGTK не проверялись; clipboard fake.
+Команды и evidence — TESTING.md.

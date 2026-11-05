@@ -2766,3 +2766,10 @@ aria-pressed=true и подсказка раздельной настройки;
 aria-pressed=false и подсказка объединения. Enter/Space переключают режим;
 один commit, Undo/Redo, disabled и отмена draft до click сохраняются.
 Проверить RU/EN × темы, 18 px в production и 16–32 px/DPR 1/2 в gallery.
+
+REQ-UI-001/003/006, REQ-OUT-004/007 (2026-11-05): Copy сохраняет оформление
+и геометрию верхней панели, блокируя ввод через inert/aria-busy. Короткое
+pending-уведомление показывает Cancel в одной строке с сообщением; progress
+и error сохраняют отдельный ряд действий. Windows Chrome: 11 browser tests PASS,
+включая RU/EN × темы и appearance regression. Native clipboard/WebView
+не проверялись; команды и evidence — TESTING.md.

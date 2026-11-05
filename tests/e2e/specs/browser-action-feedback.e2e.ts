@@ -7,9 +7,72 @@ import path from 'node:path'
 import { writeFile } from 'node:fs/promises'
 import { notificationReadability } from '../notification-readability'
 import { Key } from 'webdriverio'
-import { setShellPreferences } from './browser-m06-test-kit'
+import {
+  openDrawingHarness,
+  setShellPreferences,
+} from './browser-m06-test-kit'
 
 describe('Action feedback leaves editor tools accessible', () => {
+  it('keeps Copy chrome stable and pending feedback on one row', async function () {
+    this.timeout(90000)
+    await browser.setWindowSize(1280, 800)
+    await openDrawingHarness(true, true)
+    for (const locale of ['ru', 'en'] as const) for (const theme of ['dark', 'light'] as const) {
+      await setShellPreferences(locale, theme)
+      const result = await browser.execute(async () => {
+        const header = document.querySelector<HTMLElement>('.cs-topbar')!
+        const buttons = [...header.querySelectorAll<HTMLButtonElement>('button')]
+        const copy = buttons.find((button) => ['Copy', 'Копировать'].includes(button.getAttribute('aria-label') ?? ''))!
+        const measure = () => buttons.map((button) => {
+          const box = button.getBoundingClientRect()
+          const style = getComputedStyle(button)
+          return { box: [box.x, box.y, box.width, box.height], disabled: button.disabled,
+            color: style.color, background: style.backgroundColor, opacity: style.opacity }
+        })
+        const before = measure()
+        const mutations: string[] = []
+        const observer = new MutationObserver((records) => {
+          for (const record of records) mutations.push(record.type)
+        })
+        observer.observe(header, { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled'] })
+        // Hold only the existing fake action's completion, keeping the production click/mount flow.
+        const timeout = window.setTimeout
+        window.setTimeout = ((handler: TimerHandler, delay?: number, ...args: unknown[]) =>
+          timeout(handler, delay === 150 ? 30000 : delay, ...args)) as typeof window.setTimeout
+        try {
+          copy.click()
+        } finally {
+          window.setTimeout = timeout
+        }
+        await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+        const notice = document.querySelector<HTMLElement>('.cs-action-feedback.is-pending')!
+        const box = notice.getBoundingClientRect()
+        const message = notice.querySelector('.cs-action-feedback-message')!.getBoundingClientRect()
+        const cancel = notice.querySelector('button')!.getBoundingClientRect()
+        observer.disconnect()
+        return { before, after: measure(), mutations,
+          sameNodes: buttons.every((button, index) => header.querySelectorAll('button')[index] === button),
+          busy: header.getAttribute('aria-busy'), inert: header.inert, height: box.height,
+          centerDifference: Math.abs((message.top + message.bottom - cancel.top - cancel.bottom) / 2),
+          reachable: notice.querySelector('button')!.contains(document.elementFromPoint(cancel.x + cancel.width / 2, cancel.y + cancel.height / 2)) }
+      })
+      expect(result.after).toEqual(result.before)
+      expect(result.mutations).toEqual([])
+      expect(result.sameNodes).toBe(true)
+      expect(result.busy).toBe('true')
+      expect(result.inert).toBe(true)
+      expect(result.height).toBeLessThanOrEqual(54)
+      expect(result.centerDifference).toBeLessThanOrEqual(1)
+      expect(result.reachable).toBe(true)
+      await browser.saveScreenshot(`artifacts/browser-e2e/copy-pending-${locale}-${theme}.png`)
+      await $('.cs-action-feedback-actions button').click()
+      await expect($('.cs-action-feedback.is-cancelled')).toBeDisplayed()
+      await expect($('.cs-topbar')).toHaveAttribute('aria-busy', 'false')
+      await $(locale === 'ru' ? 'button=Копировать' : 'button=Copy').click()
+      await expect($('.cs-action-feedback.is-success')).toBeDisplayed()
+    }
+  })
+
   it('keeps cancelled feedback compact with balanced vertical spacing', async function () {
     this.timeout(90000)
     await browser.setWindowSize(1024, 700)

@@ -4079,3 +4079,5 @@ width проверяет фактическое применение face, а н
 REQ-OUT-009/010/011/012/013/014: семь постоянных разделов, все применимые параметры открыты, без details; расширенный dock резервирует viewport. Проверки: composition unit, browser inspector и real WebView. Реализация сохраняет EditorCommand/preview/cancel и ресурсы.
 
 REQ-OUT-009 / ADR-180: раздел «Рамка» использует существующую метафору Tabler Browser через UiIcon (2026-11-04); проверка общего контракта ui-icon и quality gates.
+
+REQ-UI-001/003/006, REQ-OUT-004/007 (2026-11-05, до реализации): Copy сохраняет DOM, геометрию и оформление верхней панели; pending блокирует ввод через inert без disabled-мигания. Короткое pending-уведомление располагает сообщение и отмену в одной строке; progress и длинные ошибки сохраняют доступные controls. Проверка: production browser click, RU/EN и обе темы.
