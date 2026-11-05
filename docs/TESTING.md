@@ -1,5 +1,17 @@
 # Стратегия тестирования
 
+## Логотип без служебной обводки — 2026-11-05
+
+Windows x64 / Chrome 157.0.8103.38, base `706b00f`. Production M05 mount,
+настоящий SVG decode и сохранённый логотип через штатный UI (mock library/OS
+boundary). `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 pnpm test:e2e:browser --spec tests/e2e/specs/browser-composition-logos.e2e.ts`
+— 1 PASS. Проверены drag, Undo/Redo, удаление из библиотеки, отсутствие border /
+box-shadow у hit target в RU/EN × light/dark при 1024×768 и keyboard focus-visible.
+Размер логотипа в screenshots — 320; `artifacts/browser-e2e/logos-ru-dark.png`
+осмотрен: постоянная пунктирная рамка и чёрная тень отсутствуют.
+Лог: `artifacts/logo-outline-browser.log`. Native WebView/macOS/Linux отдельно
+не проверялись; изменение только CSS, renderer/export/schema/IPC прежние.
+
 ## Live-точки стрелки с оформлением — 2026-11-05
 
 Windows x64 / Chrome 157.0.8103.38, base `b5a5a86`. Production M05 mount,

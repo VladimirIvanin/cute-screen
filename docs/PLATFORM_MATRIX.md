@@ -1,5 +1,9 @@
 # Платформенная матрица
 
+Логотип без служебной обводки (2026-11-05): Windows Chrome 157 — PASS,
+RU/EN × темы, drag/Undo/Redo и keyboard focus-visible. Native WebView,
+macOS/Linux отдельно не проверялись. CSS-only; backend/IPC/schema прежние.
+
 ADR-192 (2026-11-05): компактные поля проверены в Windows Chrome 157 при
 1024 px, RU/EN × темы. Native WebView/macOS/Linux отдельно не запускались.
 Меняются только Vue-разметка/CSS; geometry renderer, schema, IPC и backend прежние.

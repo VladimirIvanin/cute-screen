@@ -2773,3 +2773,10 @@ pending-уведомление показывает Cancel в одной стр�
 и error сохраняют отдельный ряд действий. Windows Chrome: 11 browser tests PASS,
 включая RU/EN × темы и appearance regression. Native clipboard/WebView
 не проверялись; команды и evidence — TESTING.md.
+
+## Логотип без служебной обводки (2026-11-05)
+
+`REQ-OUT-013`, `REQ-UI-007`: Windows Chrome 157 — PASS. У области переноса
+логотипа нет постоянной рамки/тени, drag/Undo/Redo и keyboard focus-visible
+сохранены. RU/EN × темы, 1024×768; evidence — TESTING.md. Native WebView,
+macOS/Linux отдельно не проверялись.

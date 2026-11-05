@@ -4,6 +4,7 @@ import {
   expect,
 } from '@wdio/globals'
 import { setEditorPreferences } from '../editor-settings'
+import { setNumericInput } from '../numeric-input'
 import type { EditorDocumentV1 } from '../../../packages/editor-core/src/document/types'
 
 async function snapshot() {
@@ -32,6 +33,19 @@ describe('logo previews and compact library', () => {
     await expect($('.cs-brand-logo-current [data-preview-state="ready"]')).toExist()
     const applied = await snapshot()
     expect(applied.presentation.composition!.branding[0]!.image).not.toBeNull()
+    const handle = $('.cs-card-brand-handle')
+    await expect(handle).toBeDisplayed()
+    await handle.dragAndDrop({ x: 24, y: 12 })
+    await browser.waitUntil(async () => {
+      const moved = (await snapshot()).presentation.composition!.branding[0]!.offset
+      return moved.x !== applied.presentation.composition!.branding[0]!.offset.x
+    })
+    const moved = await snapshot()
+    await $('button[aria-label="Undo"]').click()
+    expect((await snapshot()).presentation.composition).toEqual(applied.presentation.composition)
+    await $('button[aria-label="Redo"]').click()
+    expect((await snapshot()).presentation.composition).toEqual(moved.presentation.composition)
+    await $('button[aria-label="Undo"]').click()
     await $('button[aria-label="Undo"]').click()
     await expect($('.cs-brand-logo-current .cs-logo-preview')).not.toExist()
     await $('button[aria-label="Redo"]').click()
@@ -44,8 +58,16 @@ describe('logo previews and compact library', () => {
     await library.$('button=Remove').click()
     await expect(library.$('button[aria-label="Blue mark"]')).not.toExist()
     expect((await snapshot()).presentation.composition).toEqual(applied.presentation.composition)
+    await setNumericInput($('.cs-brand-logo-controls input'), '320')
+    await browser.keys('Tab')
     for (const locale of ['ru', 'en'] as const) for (const theme of ['light', 'dark'] as const) {
       await setEditorPreferences(locale, theme)
+      const decoration = await browser.execute(() => {
+        const handle = document.querySelector<HTMLElement>('.cs-card-brand-handle')!
+        const style = getComputedStyle(handle)
+        return { border: style.borderWidth, shadow: style.boxShadow, background: style.backgroundColor }
+      })
+      expect(decoration).toEqual({ border: '0px', shadow: 'none', background: 'rgba(0, 0, 0, 0)' })
       await browser.execute(() => {
         document.querySelector('.cs-composition-body')!.scrollTop = 0
       })
@@ -72,5 +94,13 @@ describe('logo previews and compact library', () => {
       })
       await browser.saveScreenshot(`artifacts/browser-e2e/logos-${locale}-${theme}.png`)
     }
+    await handle.execute((element) => (element as HTMLElement).focus())
+    await browser.keys('Tab')
+    await browser.keys(['Shift', 'Tab'])
+    await expect(handle).toBeFocused()
+    expect(await handle.execute((element) => {
+      const style = getComputedStyle(element)
+      return element.matches(':focus-visible') && style.outlineStyle !== 'none' && parseFloat(style.outlineWidth) > 0
+    })).toBe(true)
   }).timeout(120000)
 })

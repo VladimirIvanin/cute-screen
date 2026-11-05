@@ -499,7 +499,8 @@
   transform: none;
   background: transparent;
   color: transparent;
-  border: 1px dashed var(--accent);
+  border: 0;
+  box-shadow: none;
 }
 .cs-composition-handles .cs-card-title-hit {
   transform: none;
