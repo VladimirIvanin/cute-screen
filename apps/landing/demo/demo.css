@@ -38,12 +38,13 @@ body,
   flex: 0 0 auto;
   gap: 6px;
   min-height: 44px;
+  font: inherit;
   white-space: nowrap;
 }
 .demo-nav img {
   flex: 0 0 24px;
 }
-@media (max-width: 400px) {
+@media (max-width: 480px) {
   .demo-nav a span {
     display: none;
   }
@@ -106,7 +107,7 @@ body,
     font-size: 12px;
   }
   .demo-nav button {
-    padding-inline: 8px;
+    padding-inline: 6px;
   }
   .demo-app .cs-topbar {
     flex-wrap: wrap;
@@ -250,5 +251,25 @@ body,
   .demo-more svg {
     width: 20px;
     height: 20px;
+  }
+}
+
+.demo-open > svg {
+  display: none;
+}
+@media (max-width: 359px) {
+  .demo-nav .demo-open {
+    flex: 0 0 44px;
+    width: 44px;
+    min-width: 44px;
+    padding-inline: 0;
+  }
+  .demo-open > svg {
+    display: block;
+    width: 20px;
+    height: 20px;
+  }
+  .demo-open > span {
+    display: none;
   }
 }

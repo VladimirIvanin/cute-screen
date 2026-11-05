@@ -387,7 +387,16 @@ onBeforeUnmount(() => {
         />
         <span>Cute Screen</span>
       </a>
-      <button :disabled="busy" @click="guard(async () => { const file = await pickImage(); if (file) await replace(file) })">{{ text('Открыть', 'Open') }}</button>
+      <button
+        class="demo-open"
+        :disabled="busy"
+        :aria-label="text('Открыть изображение', 'Open image')"
+        :title="text('Открыть изображение', 'Open image')"
+        @click="guard(async () => { const file = await pickImage(); if (file) await replace(file) })"
+      >
+        <UiIcon name="image" />
+        <span>{{ text('Открыть', 'Open') }}</span>
+      </button>
       <button :disabled="busy" @click="guard(paste)">{{ text('Вставить', 'Paste') }}</button>
       <button
         :disabled="busy"

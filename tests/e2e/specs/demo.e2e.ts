@@ -121,26 +121,37 @@ describe('public web editor', () => {
     await expect($('[data-tool-id="hand"]')).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('keeps the PNG action on one line in narrow RU and EN headers', async () => {
+  it('keeps narrow RU and EN headers inside the viewport with different font metrics', async () => {
     for (const locale of ['ru', 'en']) {
       await browser.url(`demo/?lang=${locale}`)
       await expect($('.cs-editor-shell')).toBeDisplayed()
-      for (const width of [320, 360, 390]) {
-        await browser.setViewport({ width, height: 844, devicePixelRatio: 1 })
-        const header = await browser.execute(() => {
-          const buttons = [...document.querySelectorAll<HTMLElement>('.demo-nav button')]
-          const rectangles = buttons.map((button) => button.getBoundingClientRect())
-          return {
-            fits: rectangles.every((rect) => rect.left >= 0 && rect.right <= innerWidth),
-            sameHeight: rectangles.every((rect) => Math.abs(rect.height - rectangles[0]!.height) < 1),
-            singleRow: rectangles.every((rect) => Math.abs(rect.top - rectangles[0]!.top) < 1),
-            contentsFit: buttons.every((button) => button.scrollWidth <= button.clientWidth),
-          }
-        })
-        expect(header).toEqual({ fits: true, sameHeight: true, singleRow: true, contentsFit: true })
-        await browser.saveScreenshot(`artifacts/landing-e2e/demo-header-${locale}-${width}.png`)
+      for (const font of ['', '16px monospace']) {
+        await browser.execute((value) => {
+          for (const button of document.querySelectorAll<HTMLElement>('.demo-nav button')) button.style.font = value
+        }, font)
+        for (const width of [320, 360, 390]) {
+          await browser.setViewport({ width, height: 844, devicePixelRatio: 1 })
+          const header = await browser.execute(() => {
+            const buttons = [...document.querySelectorAll<HTMLElement>('.demo-nav button')]
+            const rectangles = buttons.map((button) => button.getBoundingClientRect())
+            return {
+              fits: rectangles.every((rect) => rect.left >= 0 && rect.right <= innerWidth),
+              sameHeight: rectangles.every((rect) => Math.abs(rect.height - rectangles[0]!.height) < 1),
+              singleRow: rectangles.every((rect) => Math.abs(rect.top - rectangles[0]!.top) < 1),
+              contentsFit: buttons.every((button) => button.scrollWidth <= button.clientWidth),
+              outside: buttons.flatMap((button, index) => {
+                const rect = rectangles[index]!
+                return rect.left >= 0 && rect.right <= innerWidth ? [] : [{
+                  label: button.textContent?.trim(), right: rect.right, viewport: innerWidth,
+                  font: getComputedStyle(button).font,
+                }]
+              }),
+            }
+          })
+          expect(header).toEqual({ fits: true, sameHeight: true, singleRow: true, contentsFit: true, outside: [] })
+          await browser.saveScreenshot(`artifacts/landing-e2e/demo-header-${locale}-${width}-${font ? 'wide' : 'default'}.png`)
+        }
       }
     }
   })
-
 })
