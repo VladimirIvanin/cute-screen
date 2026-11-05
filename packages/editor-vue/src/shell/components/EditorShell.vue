@@ -10,6 +10,9 @@ import EditorWorkspace from './EditorWorkspace.vue'
 defineSlots<{ history(props: { locale: 'ru' | 'en' }): unknown }>()
 const workspace = ref<InstanceType<typeof EditorWorkspace>>()
 defineExpose({
+  deleteSelection: () => workspace.value?.deleteSelection(),
+  duplicateSelection: () => workspace.value?.duplicateSelection(),
+  pasteImage: () => workspace.value?.pasteImage(),
   isAgentBusy: () => workspace.value?.isAgentBusy() ?? false,
   prepareNavigation: () => workspace.value?.prepareNavigation(),
   restoreZoom: (viewport: { zoom: number; mode: string }) => workspace.value?.restoreZoom(viewport),

@@ -10,9 +10,11 @@
         "tests/e2e/specs/*.e2e.ts",
         "tests/e2e/wdio.*.conf.ts",
         "apps/landing/index.html",
-        "apps/landing/en/index.html"
+        "apps/landing/en/index.html",
+        "apps/landing/demo/index.html",
+        "apps/landing/demo/main.ts"
       ],
-      "project": ["scripts/**/*.{mjs,mts}", "tests/**/*.{ts,vue}", "apps/landing/**/*.ts", "*.{js,mjs,ts}"],
+      "project": ["scripts/**/*.{mjs,mts}", "tests/**/*.{ts,vue}", "apps/landing/**/*.{ts,vue}", "*.{js,mjs,ts}"],
       "vite": {
         "config": ["apps/landing/vite.config.ts"]
       },

@@ -2780,3 +2780,7 @@ pending-уведомление показывает Cancel в одной стр�
 логотипа нет постоянной рамки/тени, drag/Undo/Redo и keyboard focus-visible
 сохранены. RU/EN × темы, 1024×768; evidence — TESTING.md. Native WebView,
 macOS/Linux отдельно не проверялись.
+
+## Web demo — REQ-WEB-DEMO-001
+
+Браузерная оболочка в apps/landing/demo использует общий EditorShell, Canvas2D, бинарные ресурсы и IndexedDB. Мобильные стили и gestures находятся только в demo. Windows Chrome production mount smoke PASS; Safari, iPhone, Android и native regression пока не проверены. Публикация требует production landing E2E; текущий smoke не доказывает полную acceptance.

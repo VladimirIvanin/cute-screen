@@ -2262,3 +2262,7 @@ Windows x64 / Chrome 157: RU/EN × light/dark, неизменные DOM/цвет
 header, компактная строка Copy/Cancel, cancel/retry и длинные ошибки — browser PASS.
 Native WebView2, WKWebView и WebKitGTK не проверялись; clipboard fake.
 Команды и evidence — TESTING.md.
+
+## Web demo — REQ-WEB-DEMO-001
+
+Браузерная оболочка в apps/landing/demo использует общий EditorShell, Canvas2D, бинарные ресурсы и IndexedDB. Мобильные стили и gestures находятся только в demo. Windows Chrome production mount smoke PASS; Safari, iPhone, Android и native regression пока не проверены. Публикация требует production landing E2E; текущий smoke не доказывает полную acceptance.

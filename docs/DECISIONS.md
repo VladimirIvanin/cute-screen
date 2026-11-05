@@ -4307,3 +4307,13 @@ Germanica, Rubik Dirt, Rubik Glitch, Unbounded, Russo One, Ruslan Display, Under
 20 семейств и B/I. Browser проверяет меню, measured geometry, переносы и
 undo/redo; native production-flow проверяет применение, сохранение, relaunch
 и повторное декодирование PNG. Фактические команды и платформы — TESTING.md.
+
+## ADR-193 — Браузерная оболочка демо
+
+**Статус:** accepted (2026-11-05).
+
+**Основание:** публичный production mount EditorShell в Chrome проходит без Tauri и тестового harness.
+
+**Решение:** статическая /demo/ точка входа Pages, адаптеры IndexedDB/Blob/clipboard, общий Canvas2D renderer. Мобильная компоновка и навигационные жесты принадлежат вебоболочке. Последняя работа и материалы хранятся локально; ревизия проверяется в readwrite-транзакции. Desktop IPC/schema не изменяются.
+
+**Проверка:** production browser E2E; реальные мобильные устройства и Safari остаются pending.

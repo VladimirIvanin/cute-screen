@@ -708,3 +708,71 @@ h1 span {
 .update-result p {
   margin: 0 0 8px;
 }
+
+.demo-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.demo-link > svg {
+  display: block;
+  flex: none;
+  width: 20px;
+  height: 20px;
+}
+.demo-link > span {
+  font-size: inherit;
+  line-height: inherit;
+}
+@media (max-width: 760px) {
+  .site-header > .demo-link {
+    flex: 0 0 44px;
+    min-height: 44px;
+  }
+  .site-header > .demo-link > span {
+    display: none;
+  }
+}
+
+.hero-action {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0;
+}
+.hero-action > p {
+  margin-top: 8px;
+}
+.hero-action > .demo-link {
+  min-height: 36px;
+  margin-top: 14px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-raised);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+}
+.hero-action > .demo-link:hover {
+  border-color: #ffffff40;
+  background: #ffffff08;
+}
+.hero-action > .demo-link > svg {
+  width: 18px;
+  height: 18px;
+}
+.hero-action > .all-downloads {
+  display: block;
+  flex-basis: auto;
+  margin-top: 10px;
+}
+@media (max-width: 760px) {
+  .hero-action {
+    align-items: flex-start;
+  }
+}

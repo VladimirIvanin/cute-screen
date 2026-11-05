@@ -98,7 +98,7 @@ describe('static landing production preview', () => {
           tools: expectedTools,
           iconsLoaded: true,
           descriptionsPresent: true,
-          scripts: 1,
+          scripts: 2,
         })
         await expect($('[data-tool="emoji"] h3')).toHaveText(locale === 'ru' ? 'Эмодзи' : 'Emoji')
         await expect($('[data-tool="emoji"] p')).toHaveText(expect.stringContaining('100'))

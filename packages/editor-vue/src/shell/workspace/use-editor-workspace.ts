@@ -226,6 +226,11 @@ function createWorkspaceViewModel(
     fallbackVisible: workspace.fallbackVisible,
     copyCaptureFallback: ui.copyCaptureFallback,
     dismissCaptureFallback: ui.dismissCaptureFallback,
+    exposureActions: {
+      pasteImage: bindings.pasteNativeClipboard,
+      deleteSelection: core.selectionActions.deleteSelection,
+      duplicateSelection: core.selectionActions.duplicateSelection,
+    },
     tools: bindings.tools,
     selectTool: bindings.selectTool,
     openToolConfigure: bindings.openToolConfigure,

@@ -12673,3 +12673,17 @@ header прежние, aria-busy/inert блокируют ввод. Сообще
 платформы этим прогоном не проверялись. `pnpm tools:install` и `pnpm tools:check` PASS.
 
 `pnpm exec vitest run --project vue tests/unit/vue/app-shell-layout.test.ts tests/unit/vue/composition.test.ts`: 18 PASS (2 files).
+
+## Web demo — 2026-11-05, Windows x64
+
+`pnpm build:landing`: PASS. `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 pnpm exec wdio run tests/e2e/wdio.landing.conf.ts --spec tests/e2e/specs/demo.e2e.ts`: Chrome 157, 1 passed — clean production mount, выбор Arrow и refresh. Это smoke, не доказательство полного import/export/recovery/mobile acceptance. Logs: artifacts/demo-e2e.log, artifacts/demo-build.log.
+
+### Web demo: расширенные проверки, Windows x64
+
+`pnpm test`: 195 files / 1731 tests PASS. `pnpm test:render`: 32 files / 96 tests PASS.
+`pnpm test:e2e:landing`: 2 specs PASS, 8 tests PASS / 1 existing skipped в Chrome 157.
+Demo production flow создаёт стрелку мышью, ожидает IndexedDB save, обновляет страницу,
+экспортирует PNG и повторно декодирует его в 1600×1000. Screenshot при 390 px:
+artifacts/landing-e2e/demo-mobile.png. Эмуляция ширины не доказывает реальный touch,
+Safari/iPhone/Android или native WebView. Полный импорт 4K/12 MP, clipboard permissions,
+quota/conflict и keyboard на физических телефонах требуют дополнительного evidence.

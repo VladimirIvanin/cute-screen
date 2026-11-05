@@ -1622,3 +1622,7 @@ Header использует inert/aria-busy, сохраняя disabled props и 
 готовность canvas во время Copy не меняется. ActionFeedback размещает короткое
 pending-сообщение и Cancel в одной строке; наличие progress включает второй ряд.
 Размещение под header и notices сохраняет контракт ADR-162/174.
+
+## Web demo — REQ-WEB-DEMO-001
+
+Браузерная оболочка в apps/landing/demo использует общий EditorShell, Canvas2D, бинарные ресурсы и IndexedDB. Мобильные стили и gestures находятся только в demo. Windows Chrome production mount smoke PASS; Safari, iPhone, Android и native regression пока не проверены. Публикация требует production landing E2E; текущий smoke не доказывает полную acceptance.

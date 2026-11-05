@@ -1,3 +1,4 @@
+import vue from '@vitejs/plugin-vue'
 import { fileURLToPath } from 'node:url'
 
 import { defineConfig } from 'vite'
@@ -8,7 +9,8 @@ import { downloadsHTML } from './downloads-html'
 export default defineConfig({
   base: '/cute-screen/',
   root: fileURLToPath(new URL('.', import.meta.url)),
-  plugins: [{
+  resolve: { alias: { '@cute-screen/editor-vue': fileURLToPath(new URL('../../packages/editor-vue/src/index.ts', import.meta.url)), '@cute-screen/editor-renderer': fileURLToPath(new URL('../../packages/editor-renderer/src/index.ts', import.meta.url)), '@cute-screen/editor-core': fileURLToPath(new URL('../../packages/editor-core/src/index.ts', import.meta.url)) } },
+  plugins: [vue(), {
     name: 'landing-downloads',
     transformIndexHtml: {
       order: 'pre',
@@ -24,6 +26,7 @@ export default defineConfig({
     outDir: 'dist',
     rollupOptions: {
       input: {
+        demo: fileURLToPath(new URL('./demo/index.html', import.meta.url)),
         en: fileURLToPath(new URL('./en/index.html', import.meta.url)),
         index: fileURLToPath(new URL('./index.html', import.meta.url)),
       },

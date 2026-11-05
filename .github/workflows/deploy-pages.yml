@@ -9,6 +9,9 @@ on:
     branches: [main]
     paths:
       - apps/landing/**
+      - packages/**
+      - package.json
+      - pnpm-lock.yaml
       - scripts/landing-release.mjs
       - scripts/release-assets.mjs
       - .github/workflows/deploy-pages.yml
@@ -52,6 +55,11 @@ jobs:
 
       - name: Build landing page
         run: pnpm build:landing
+
+      - name: Verify landing and demo
+        env:
+          CUTE_SCREEN_BROWSER_E2E_HEADLESS: '1'
+        run: pnpm test:e2e:landing
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0

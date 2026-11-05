@@ -46,7 +46,7 @@ async function startLandingServer(): Promise<{
 export const config: WebdriverIO.Config = {
   ...browserProfileHooks(outputDir),
   runner: 'local',
-  specs: ['./specs/landing.e2e.ts'],
+  specs: ['./specs/landing.e2e.ts', './specs/demo.e2e.ts'],
   maxInstances: 1,
   logLevel: 'warn',
   baseUrl,

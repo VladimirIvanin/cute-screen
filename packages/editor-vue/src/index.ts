@@ -174,3 +174,8 @@ export {
   searchEmoji,
   emojiReference,
 } from '@cute-screen/editor-renderer'
+
+export {
+  createTextLayer,
+  createDrawingLayer,
+} from '@cute-screen/editor-renderer'

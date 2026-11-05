@@ -36,6 +36,7 @@ defineSlots<{ history(props: { locale: 'ru' | 'en' }): unknown }>()
 const props = defineProps(editorShellRuntimeProps)
 const emit = defineEmits(editorShellRuntimeEmits)
 const {
+  exposureActions,
   compositionOpen,
   compositionSpace,
   compositionController,
@@ -153,7 +154,7 @@ function onTextCancelled(): void {
   cancelTextDefaults()
   selectTool('select')
 }
-defineExpose(createWorkspaceExposure(canvasViewport, store, props))
+defineExpose({ ...createWorkspaceExposure(canvasViewport, store, props), ...exposureActions })
 </script>
 
 <template>

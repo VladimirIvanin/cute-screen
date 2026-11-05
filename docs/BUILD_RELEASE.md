@@ -1076,3 +1076,7 @@ recording xdg-open только для этого сценария; frontend/IPC
 Артефакты: artifacts/tauri-e2e/emoji-link-dispatch.log и *-noto-link.png.
 На Windows/macOS автоматический сценарий пока skipped; нужен ручной click/Enter
 с реальным системным браузером. Не считать этот skip платформенным pass.
+
+## Web demo — REQ-WEB-DEMO-001
+
+Браузерная оболочка в apps/landing/demo использует общий EditorShell, Canvas2D, бинарные ресурсы и IndexedDB. Мобильные стили и gestures находятся только в demo. Windows Chrome production mount smoke PASS; Safari, iPhone, Android и native regression пока не проверены. Публикация требует production landing E2E; текущий smoke не доказывает полную acceptance.
