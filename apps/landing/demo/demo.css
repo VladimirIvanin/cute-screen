@@ -60,6 +60,36 @@ body,
   border-radius: 6px;
   padding: 8px 12px;
 }
+@media (min-width: 768px) and (pointer: fine) {
+  .demo-nav {
+    gap: 6px;
+    padding-block: max(8px, env(safe-area-inset-top)) 8px;
+  }
+  .demo-nav button {
+    min-height: 32px;
+    padding: 0 11px;
+    border-color: #44464d;
+    border-radius: 6px;
+    background: #27292f;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1;
+  }
+  .demo-nav button:hover:not(:disabled),
+  .demo-nav button[aria-expanded='true'] {
+    background: #393b43;
+    border-color: #62656f;
+  }
+  .demo-nav button:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .demo-light .demo-nav button:hover:not(:disabled),
+  .demo-light .demo-nav button[aria-expanded='true'] {
+    background: #e9e7e2;
+    border-color: #aaa9a4;
+  }
+}
 .demo-app > .n-config-provider {
   flex: 1;
   min-height: 0;
