@@ -1,5 +1,59 @@
 # Трассируемость требований
 
+## Компактная схема полей — до реализации (2026-11-05)
+
+`REQ-OUT-010`, `REQ-UI-006/007`: по референсам владельца убрать повторяющиеся
+названия сторон, подпись «Снимок» и отдельную текстовую кнопку связи. Четыре
+значения окружают центральную цепочку; units в шапке, объяснение процентов
+в tooltip. Accessible names/title сохраняют сторону, значение и режим связи.
+Выбор стороны не меняет документ; numeric/slider/draft/cancel/Undo сохраняются.
+Проверка: component и production browser, linked/unlinked, keyboard, RU/EN
+× темы при 1024 px; измерить высоту, положение цепочки и отсутствие overflow.
+
+## Встроенная палитра сплошного фона — до реализации (2026-11-05)
+
+`REQ-OUT-011`, `REQ-UI-006/007`: Solid background показывает палитру сразу
+в инспекторе, как gradient. Основные цвета и custom picker не телепортируются
+за границы dock. HEX/alpha, disabled, keyboard, Undo/Redo сохраняются.
+Проверка production browser: без клика по trigger видны swatches,
+изменение цвета/alpha и Undo, RU/EN × темы при 1024 px, custom palette внутри body.
+
+## Простые ретро-окна и домик в браузере — до реализации (2026-11-05)
+
+`REQ-OUT-012/014`: у Window собственные Modern / Windows 95/98 / Macintosh;
+ретро-окно содержит только title bar и системные кнопки, без nav/address.
+Стиль окна и браузера сохраняется независимо, через EditorCommand/Undo и
+codec/presets. В ретро-браузерах третья nav-кнопка — узнаваемый контур дома.
+Контуры, chrome height и фиксированные углы общие для preview/scene/export.
+Доказательства: core red→green, decoded Canvas2D/CanvasKit 4K goldens,
+production browser selection/keyboard/Undo/RU/EN/themes; WebView отдельно.
+
+## Логотипы выше и с миниатюрами — до реализации (2026-11-05)
+
+`REQ-OUT-013/014`, `REQ-UI-006/007`: блок логотипа первым в редакторе подписи;
+текущее изображение и сохранённые логотипы видны в миниатюрах с прозрачностью.
+Компактная прокручиваемая галерея сохраняет доступные имена apply/delete,
+подтверждение удаления и фокус. Preview загружает сохранённый blob отдельно
+от документа, через штатный binary transport, не применяет материал и не
+создаёт Undo. Loading/error/empty/read-only и RU/EN × темы — component/browser.
+
+## Удаление полос оформления — до реализации (2026-11-05)
+
+`REQ-OUT-009/010/013`: удалить верхнюю/нижнюю полосы из UI, композиции,
+геометрии, рендера, ресурсов, импорта и областей текста/логотипов. Не оставлять
+legacy controls, presets, migration или fallback. Текущий composition v1 содержит
+только фон, layout, frame, shadow и branding content/card. Поля полос явно
+отклоняются; версионирование не добавляется. Доказательства: core red→green, codec/schema, decoded render
+goldens, component и browser navigation/branding/Copy.
+
+## Копирование без мерцания оформления — до реализации (2026-11-05)
+
+`REQ-OUT-009`, `REQ-EXP-001`: Copy не переключает disabled-стили контролов
+оформления и сохраняет раздел, DOM и прокрутку панели. На время операции
+панель блокирует ввод через inert, команды и preview остаются заблокированы
+контроллером. Проверка: component regression с pending/success/error/cancel,
+browser production mount с наблюдением DOM. Native clipboard отдельно не меняется.
+
 ## Оформление без повторных заголовков — до реализации (2026-11-04)
 
 `REQ-OUT-009`, `REQ-UI-006/007`, ADR-187: убрать название выбранного раздела

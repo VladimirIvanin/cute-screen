@@ -4,7 +4,10 @@ import {
   shallowRef,
   watch,
 } from 'vue'
-import type { CompositionSettings } from '@cute-screen/editor-renderer'
+import {
+  isRetroFrame,
+  type CompositionSettings,
+} from '@cute-screen/editor-renderer'
 import NumericControl from '../ui/NumericControl.vue'
 import CardFramePreview from './CardFramePreview.vue'
 
@@ -14,9 +17,7 @@ const scaleDraft = shallowRef<number>()
 const radiusDraft = shallowRef<number>()
 const text = (ru: string, en: string) => props.locale === 'ru' ? ru : en
 const framed = computed(() => props.value.frame.kind !== 'none')
-const fixedCorners = computed(() => props.value.frame.kind === 'phone' || (
-  props.value.frame.kind === 'browser' && props.value.frame.browserStyle && props.value.frame.browserStyle !== 'modern'
-))
+const fixedCorners = computed(() => props.value.frame.kind === 'phone' || isRetroFrame(props.value.frame))
 const scaleLabel = computed(() => framed.value ? text('Размер с рамкой', 'Framed size') : text('Размер снимка', 'Screenshot size'))
 const radiusLabel = computed(() => framed.value ? text('Углы рамки', 'Frame corners') : text('Углы снимка', 'Screenshot corners'))
 const scales = [75, 100, 125]

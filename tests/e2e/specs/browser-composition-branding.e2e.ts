@@ -34,7 +34,7 @@ describe('signature controls', () => {
     const panel = $('.cs-composition-panel')
     await panel.$('button=With padding').click()
     await panel.$('[data-composition-section="branding"]').click()
-    await panel.$('button=Add signature').click()
+    await panel.$('.cs-brand-add').click()
     await browser.waitUntil(async () => (await blocks()).length === 1)
     const firstId = (await blocks())[0]!.id
     const text = panel.$('textarea')
@@ -68,7 +68,7 @@ describe('signature controls', () => {
     expect((await blocks())[0]!.backplate?.alpha).toBe(0.65)
     await showTextControls()
     await browser.saveScreenshot('artifacts/browser-e2e/composition-signature-single.png')
-    await panel.$('button=Add signature').click()
+    await panel.$('.cs-brand-add').click()
     await browser.waitUntil(async () => (await blocks()).length === 2)
     const secondId = (await blocks())[1]!.id
     await setNumericInput(panel.$('textarea'), 'Вторая подпись — длинное название канала '.repeat(5))

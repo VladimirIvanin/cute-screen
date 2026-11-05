@@ -10,6 +10,7 @@ import { UiIcon } from '../icon'
 import SimpleColorPicker from '../ui/SimpleColorPicker.vue'
 import { parseHexColor } from '../tools/effects/color'
 import CardNumber from './CardNumber.vue'
+import CardLogoPreview from './CardLogoPreview.vue'
 
 const props = defineProps<{ value: CardBranding; locale: 'ru' | 'en'; disabled: boolean; canImport: boolean }>()
 const emit = defineEmits<{ change: [value: CardBranding]; preview: [value: CardBranding]; cancel: []; import: [] }>()
@@ -43,6 +44,49 @@ const anchors = computed(() => {
 </script>
 <template>
   <div class="cs-brand-editor">
+    <section class="cs-brand-group cs-brand-logo" :aria-label="text('Логотип подписи', 'Signature logo')">
+      <h4>{{ text('Логотип', 'Logo') }}</h4>
+      <div class="cs-brand-logo-current">
+        <CardLogoPreview
+          v-if="value.image"
+          :blob-hash="value.image.blobHash"
+          :locale="locale"
+          :label="text('Текущий логотип', 'Current logo')"
+        />
+        <div class="cs-brand-logo-controls">
+          <div class="cs-brand-logo-actions">
+            <button
+              type="button"
+              :disabled="disabled || !canImport"
+              @click="emit('import')"
+            >
+              <UiIcon name="image" />{{ value.image ? text('Заменить логотип', 'Replace logo') : text('Загрузить логотип', 'Import logo') }}
+            </button>
+            <button
+              v-if="value.image"
+              type="button"
+              :disabled="disabled"
+              :aria-label="text('Убрать логотип', 'Remove logo')"
+              :title="text('Убрать логотип', 'Remove logo')"
+              @click="patch('image', null)"
+            >
+              <UiIcon name="trash" />
+            </button>
+          </div>
+          <CardNumber
+            v-if="value.image"
+            :label="text('Размер логотипа', 'Logo size')"
+            :value="value.imageSize"
+            :min="1"
+            :max="4096"
+            @change="patch('imageSize', $event)"
+            @preview="patch('imageSize', $event, true)"
+            @cancel="emit('cancel')"
+          />
+        </div>
+      </div>
+      <slot name="logos" />
+    </section>
     <label class="cs-brand-text"><span>{{ text('Текст подписи', 'Signature text') }}</span><textarea
       rows="2"
       maxlength="16384"
@@ -107,7 +151,7 @@ const anchors = computed(() => {
     <section class="cs-brand-group" :aria-label="text('Размещение подписи', 'Signature placement')">
       <h4>{{ text('Размещение', 'Placement') }}</h4>
       <label>{{ text('Область', 'Region') }}<select :value="value.region" @change="patch('region', ($event.target as HTMLSelectElement).value as CardBranding['region'])"><option
-        v-for="(label, region) in { content: text('На снимке', 'On screenshot'), card: text('На карточке', 'On card'), header: text('Верхняя полоса', 'Header'), footer: text('Нижняя полоса', 'Footer') }"
+        v-for="(label, region) in { content: text('На снимке', 'On screenshot'), card: text('На карточке', 'On card') }"
         :key="region"
         :value="region"
       >{{ label }}</option></select></label>
@@ -197,28 +241,6 @@ const anchors = computed(() => {
           @cancel="emit('cancel')"
         />
       </template>
-    </section>
-    <section class="cs-brand-group" :aria-label="text('Логотип подписи', 'Signature logo')">
-      <h4>{{ text('Логотип', 'Logo') }}</h4>
-      <button
-        type="button"
-        :disabled="disabled || !canImport"
-        @click="emit('import')"
-      >
-        <UiIcon name="image" />{{ value.image ? text('Заменить логотип', 'Replace logo') : text('Загрузить логотип', 'Import logo') }}
-      </button>
-      <template v-if="value.image">
-        <CardNumber
-          :label="text('Размер логотипа', 'Logo size')"
-          :value="value.imageSize"
-          :min="1"
-          :max="4096"
-          @change="patch('imageSize', $event)"
-          @preview="patch('imageSize', $event, true)"
-          @cancel="emit('cancel')"
-        /><button type="button" @click="patch('image', null)">{{ text('Убрать логотип', 'Remove logo') }}</button>
-      </template>
-      <slot name="logos" />
     </section>
   </div>
 </template>

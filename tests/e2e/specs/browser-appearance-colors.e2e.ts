@@ -27,17 +27,18 @@ describe('shared appearance palette', () => {
     await verifyEyedropperButton('artifacts/browser-e2e')
     for (const locale of ['ru', 'en'] as const) for (const theme of ['dark', 'light'] as const) {
       await setEditorPreferences(locale, theme)
-      await panel.$(`button[aria-label="${locale === 'ru' ? 'Цвет фона' : 'Background color'}"]`).click()
-      await $('.cs-simple-color-panel button[aria-label="' + (locale === 'ru' ? 'Свой цвет' : 'Custom colour') + '"]').click()
+      const custom = locale === 'ru' ? 'Свой цвет' : 'Custom colour'
+      await panel.$(`.cs-card-color-embedded .cs-simple-color-panel button[aria-label="${custom}"]`).click()
       const geometry = await browser.execute(() => {
-        const panel = document.querySelector('.cs-simple-color-panel:not(.is-embedded)')!
+        const panel = document.querySelector('.cs-card-color-embedded .cs-simple-color-panel')!
+        const body = panel.closest('.cs-composition-body')!.getBoundingClientRect()
         const rect = panel.getBoundingClientRect()
         return { overflow: panel.scrollWidth > panel.clientWidth,
-          fits: rect.left >= 0 && rect.top >= 0 && rect.right <= innerWidth && rect.bottom <= innerHeight }
+          fits: rect.left >= body.left && rect.right <= body.right,
+          portaled: Boolean(document.querySelector('.cs-overlay-root .cs-simple-color-panel')) }
       })
-      expect(geometry).toEqual({ overflow: false, fits: true })
+      expect(geometry).toEqual({ overflow: false, fits: true, portaled: false })
       await browser.saveScreenshot(`artifacts/browser-e2e/appearance-color-${locale}-${theme}.png`)
-      await browser.keys('Escape')
       await browser.keys('Escape')
     }
   }).timeout(120000)

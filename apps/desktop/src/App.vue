@@ -317,24 +317,6 @@ function onWindowClipboardKeydown(event: KeyboardEvent): void {
   void pasteClipboardIntoEmptyDocument()
 }
 
-async function mountM05HarnessDocument(): Promise<void> {
-  await mountM05Harness(harness, {
-    documentSession,
-    sourceImage,
-    correlationId,
-    installClipboardBridge: () => m08HarnessController.installBrowserClipboardBridge(),
-    installHarnessFacade: () => m08HarnessController.installFacade(),
-    waitForRender: waitForCanvasRender,
-  })
-  if (
-    import.meta.env.VITE_TEST_HARNESS === 'true' &&
-      harness.imageIngress
-  ) {
-    const { installImageIngressHarness } = await import('./image-ingress-harness')
-    lifecycleCleanup.push(installImageIngressHarness(contentImageBridge, clipboardBridge, documentSession))
-  }
-}
-
 /** Shares the native outcome event and the command response for one capture. */
 async function mountCapturedDocument(captureId?: string): Promise<boolean> {
   if (capturedDocumentMount) return capturedDocumentMount
@@ -413,7 +395,11 @@ onMounted(() => {
   window.addEventListener('keydown', onWindowClipboardKeydown)
   periodicMaintenance = setInterval(scheduleHistoryMaintenance, 3_600_000)
   void (async () => {
-    if ('__TAURI_INTERNALS__' in window && !harness.imageIngress) {
+    if (
+      '__TAURI_INTERNALS__' in window &&
+      !harness.imageIngress &&
+      !harness.logoLibrary
+    ) {
       const { tauriDesktopBridge } = await import('./desktop-bridge')
       materialBridge.value = (await import('./platform/tauri/materials-adapter')).nativeMaterialBridge
       textureBridge.value = tauriDesktopBridge
@@ -424,7 +410,19 @@ onMounted(() => {
     if (m05ReferencePerfHarness) return
     if (m05Harness) {
       try {
-        await mountM05HarnessDocument()
+        await mountM05Harness(harness, {
+          documentSession,
+          sourceImage,
+          correlationId,
+          installClipboardBridge: () => m08HarnessController.installBrowserClipboardBridge(),
+          installHarnessFacade: () => m08HarnessController.installFacade(),
+          waitForRender: waitForCanvasRender,
+          textureBridge,
+          materialBridge,
+          contentImageBridge,
+          clipboardBridge,
+          lifecycleCleanup,
+        })
       } catch (error) {
         documentState.value = {
           kind: 'error',

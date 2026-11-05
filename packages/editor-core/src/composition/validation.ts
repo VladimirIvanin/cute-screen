@@ -10,6 +10,7 @@ import type {
 import {
   PHONE_MODELS,
   BROWSER_STYLES,
+  WINDOW_STYLES,
 } from './frame-catalog'
 
 type Obj = Record<string, unknown>
@@ -132,7 +133,7 @@ function validateBranding(value: unknown): CardBranding {
   number(b.year, 'branding.year', 1, 9999)
   image(b.image)
   number(b.imageSize, 'branding.imageSize', 1, 4096)
-  choice(b.region, 'branding.region', ['content', 'card', 'header', 'footer'])
+  choice(b.region, 'branding.region', ['content', 'card'])
   point(b.alignment, 'branding.alignment', 0, 1)
   point(b.offset, 'branding.offset')
   number(b.fontSize, 'branding.fontSize', 6, 512)
@@ -158,6 +159,7 @@ function validateFrame(value: unknown): void {
   const f = readJsonObject(value, 'frame')
   if (f.phoneModel !== undefined) choice(f.phoneModel, 'frame.phoneModel', PHONE_MODELS.map((model) => model.id))
   if (f.browserStyle !== undefined) choice(f.browserStyle, 'frame.browserStyle', BROWSER_STYLES.map((style) => style.id))
+  if (f.windowStyle !== undefined) choice(f.windowStyle, 'frame.windowStyle', WINDOW_STYLES.map((style) => style.id))
   if (f.phoneContentMode !== undefined) choice(f.phoneContentMode, 'frame.phoneContentMode', ['safe', 'fullscreen'])
   if (f.phoneSystemDetails !== undefined && typeof f.phoneSystemDetails !== 'boolean') {
     throw new Error('composition.frame.phoneSystemDetails is invalid')
@@ -175,14 +177,10 @@ function validateFrame(value: unknown): void {
 export function parseComposition(value: unknown): CompositionSettings {
   const input = readJsonObject(value, 'composition')
   if (input.version !== 1) throw new Error('composition version is unsupported')
+  if ('header' in input || 'footer' in input) throw new Error('composition strips are unsupported')
   validateLayout(readJsonObject(input.layout, 'layout'))
   validateFrame(input.frame)
   validateBackground(input.background)
-  for (const name of ['header', 'footer']) {
-    const band = readJsonObject(input[name], name)
-    number(band.height, `${name}.height`, 0, 8192)
-    validateBackground(band.fill)
-  }
   number(input.radius, 'radius', 0, 4096)
   number(input.shadow, 'shadow', 0, 1)
   if (input.shadowOptions !== undefined) {

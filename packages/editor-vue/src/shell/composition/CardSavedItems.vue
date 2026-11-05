@@ -6,6 +6,7 @@ import {
 } from 'vue'
 import type { MaterialRecord } from '../../materials'
 import { UiIcon } from '../icon'
+import CardLogoPreview from './CardLogoPreview.vue'
 
 const props = defineProps<{
   materials: readonly MaterialRecord[]
@@ -50,6 +51,7 @@ watch(() => props.materials, async (items) => {
   <div
     ref="list"
     class="cs-card-materials"
+    :class="{ 'cs-logo-library': kind === 'logo' }"
     tabindex="-1"
     :aria-busy="loading"
   >
@@ -68,9 +70,17 @@ watch(() => props.materials, async (items) => {
       <button
         type="button"
         :disabled="disabled"
+        :aria-label="item.title"
+        :title="item.title"
         @click="emit('apply', item)"
       >
-        {{ item.title }}
+        <CardLogoPreview
+          v-if="kind === 'logo'"
+          :value-json="item.valueJson"
+          :locale="locale"
+          :label="`${text('Логотип', 'Logo')} ${item.title}`"
+        />
+        <span>{{ item.title }}</span>
       </button>
       <button
         type="button"

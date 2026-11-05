@@ -5,7 +5,7 @@ import type {
 } from '../document/types'
 import type { CompositionSettings } from './types'
 import {
-  browserChrome,
+  frameChrome,
   phoneViewport,
 } from './frame-catalog'
 
@@ -18,8 +18,6 @@ export interface CompositionLayout {
   /** Screenshot clip, excluding optional device chrome. */
   readonly viewport: Rect
   readonly content: Rect
-  readonly header: Rect
-  readonly footer: Rect
   readonly scale: number
 }
 function frameGeometry(
@@ -28,7 +26,7 @@ function frameGeometry(
 ) {
   const frame = settings.frame
   if (frame.kind !== 'phone') return { width: source.width, height: source.height,
-    border: 0, top: browserChrome(frame) }
+    border: 0, top: frameChrome(frame) }
   const edge = Math.min(source.width, source.height)
   const portrait = frame.orientation === 'portrait'
   return { width: portrait ? edge : edge * 19.5 / 9, height: portrait ? edge * 19.5 / 9 : edge,
@@ -60,9 +58,7 @@ export function resolveCompositionLayout(document: Pick<EditorDocument, 'canvas'
 
     screen: { x: 0, y: 0, width: source.width, height: source.height },
     viewport: { x: 0, y: 0, width: source.width, height: source.height },
-    content: { x: 0, y: 0, width: source.width, height: source.height }, scale: 1,
-    header: { x: 0, y: 0, width: source.width, height: 0 },
-    footer: { x: 0, y: source.height, width: source.width, height: 0 } }
+    content: { x: 0, y: 0, width: source.width, height: source.height }, scale: 1 }
   return resolveLayout(source, s)
 }
 function resolveLayout(
@@ -75,24 +71,22 @@ function resolveLayout(
   const naturalW = g.width + g.border * 2
   const naturalH = g.height + g.border * 2 + g.top
   const width = Math.ceil(s.layout.mode === 'auto' ? naturalW + (i.left + i.right) * unit : s.layout.width)
-  const height = Math.ceil(s.layout.mode === 'auto' ? naturalH + (i.top + i.bottom) * unit + s.header.height + s.footer.height : s.layout.height)
+  const height = Math.ceil(s.layout.mode === 'auto' ? naturalH + (i.top + i.bottom) * unit : s.layout.height)
   const availableW = Math.max(1, width - (i.left + i.right) * unit)
-  const availableH = Math.max(1, height - (i.top + i.bottom) * unit - s.header.height - s.footer.height)
+  const availableH = Math.max(1, height - (i.top + i.bottom) * unit)
   const fixedChrome = s.layout.mode === 'fixed' && g.top > 0
   const scale = Math.min(availableW / naturalW,
     fixedChrome ? Math.max(1, availableH - g.top) / (naturalH - g.top) : availableH / naturalH) * s.layout.scale
   const chrome = fixedChrome ? g.top * s.layout.scale : g.top * scale
   const frameHeight = (g.height + g.border * 2) * scale + chrome
   const frame = { x: i.left * unit + (availableW - naturalW * scale) * s.layout.alignment.x + s.layout.offset.x,
-    y: s.header.height + i.top * unit + (availableH - frameHeight) * s.layout.alignment.y + s.layout.offset.y,
+    y: i.top * unit + (availableH - frameHeight) * s.layout.alignment.y + s.layout.offset.y,
     width: naturalW * scale, height: frameHeight }
   const screen = { x: frame.x + g.border * scale, y: frame.y + g.border * scale + chrome,
     width: g.width * scale, height: g.height * scale }
   const viewport = s.frame.kind === 'phone' ? phoneViewport(s.frame, screen) : screen
   const content = fitContent(source, viewport, s)
-  return { width, height, source, frame, screen, viewport, content, scale: content.width / source.width,
-    header: { x: 0, y: 0, width, height: Math.min(height, s.header.height) },
-    footer: { x: 0, y: Math.max(0, height - s.footer.height), width, height: Math.min(height, s.footer.height) } }
+  return { width, height, source, frame, screen, viewport, content, scale: content.width / source.width }
 }
 export function contentToCard(
   point: Point,

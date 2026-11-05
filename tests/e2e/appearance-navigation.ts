@@ -19,7 +19,8 @@ export async function verifyAppearanceNavigation(
   await expect(panel.$('.cs-composition-inspector')).toHaveAttribute('data-active-section', 'templates')
   expect(await snapshot()).toEqual(original)
   await expect(panel.$('[data-composition-section="materials"]')).not.toExist()
-  const sections = ['layout', 'background', 'shadow', 'frame', 'bands', 'branding']
+  await expect(panel.$('[data-composition-section="bands"]')).not.toExist()
+  const sections = ['layout', 'background', 'shadow', 'frame', 'branding']
   const labels = await browser.execute(() => [...document.querySelectorAll('.cs-composition-tab > span')]
     .map((label) => {
       const range = document.createRange()

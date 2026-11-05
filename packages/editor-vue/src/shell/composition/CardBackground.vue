@@ -62,6 +62,7 @@ const fills = computed(() => ({
       :label="text('Цвет фона', 'Background color')"
       :opacity-label="text('Непрозрачность фона %', 'Background opacity %')"
       compact
+      embedded
       @change="emit('change', { ...value, color: $event })"
       @preview="emit('preview', { ...value, color: $event })"
       @cancel="emit('cancel')"

@@ -36,20 +36,17 @@ export function createCardBackground(kind: CardBackground['kind'] = 'linear'): C
   }
 }
 export function createComposition(start: CompositionStart = 'padding'): CompositionSettings {
-  const band = ['header', 'footer', 'bands'].includes(start)
   return {
     version: 1,
     layout: { mode: 'auto', width: 1080, height: 1080,
-      insets: { top: band ? 0 : 8, right: band ? 0 : 8, bottom: band ? 0 : 8, left: band ? 0 : 8,
+      insets: { top: 8, right: 8, bottom: 8, left: 8,
         unit: 'percent', linked: true },
       alignment: { x: 0.5, y: 0.5 }, scale: 1, offset: { x: 0, y: 0 } },
     background: createCardBackground(),
-    header: { height: start === 'header' || start === 'bands' ? 80 : 0, fill: createCardBackground('solid') },
-    footer: { height: start === 'footer' || start === 'bands' ? 80 : 0, fill: createCardBackground('solid') },
     frame: { kind: start === 'phone' ? 'phone' : start === 'browser' ? 'browser' : 'none',
       theme: 'dark', title: '', url: '', orientation: 'portrait', fit: 'contain',
       screenColor: cardColor(0.96, 0.96, 0.98), zoom: 1, offset: { x: 0, y: 0 } },
-    radius: band ? 0 : 12, shadow: band ? 0 : 0.3, branding: [],
+    radius: 12, shadow: 0.3, branding: [],
   }
 }
 export function createCardBranding(

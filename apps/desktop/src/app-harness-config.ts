@@ -17,6 +17,7 @@ export interface AppHarnessConfig {
   readonly m08ClipboardError: boolean
   readonly m08SourceAlpha: number
   readonly imageIngress?: boolean
+  readonly logoLibrary?: boolean
 }
 
 function longCaptureDiagnostic(): Error {
@@ -47,6 +48,7 @@ export function captureHarnessError(
 export function readAppHarnessConfig(): AppHarnessConfig {
   const enabled = import.meta.env.VITE_TEST_HARNESS === 'true'
   const query = new URLSearchParams(window.location.search)
+  const flag = (name: string) => enabled && query.get(name) === '1'
   const fixture = enabled ? ((query.get('m02') as AppHarnessConfig['fixture'] | null) ?? 'empty') : 'empty'
   const m05 = enabled && query.get('m05') === '1'
   const m08 = enabled && query.get('m08') === '1'
@@ -56,7 +58,8 @@ export function readAppHarnessConfig(): AppHarnessConfig {
     captureDenied: enabled && query.get('captureDenied') === '1',
     captureCancelled: enabled && query.get('captureCancelled') === '1',
     longCaptureError: enabled && query.get('captureError') === 'long',
-    imageIngress: enabled && query.get('imageIngress') === '1',
+    imageIngress: flag('imageIngress'),
+    logoLibrary: flag('logoLibrary'),
     m03: enabled && query.get('m03') === '1',
     m04Capture: enabled && query.get('m04') === '1',
     m04Fallback: enabled && query.get('m04fallback') === '1',

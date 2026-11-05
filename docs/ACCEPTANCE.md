@@ -1,5 +1,32 @@
 # Сквозная приёмка
 
+ADR-192 / REQ-OUT-010: четыре значения без повторённых слов, центральная связь,
+units в шапке, подсказки/accessible names сохранены. Windows Chrome 157,
+1024 px RU/EN × темы: component и browser linked/independent/slider/Undo/cancel,
+геометрия/скриншоты — TESTING.md. Native WebView/другие платформы не проверялись.
+
+ADR-190/191 / REQ-OUT-011/012/014: простые ретро-окна, Home в retro browser
+и embedded palette Solid background. Windows Chrome 157: 3 browser specs PASS,
+RU/EN × темы, keyboard/Undo/alpha/custom/focus/границы dock. Core/Vue 64 PASS;
+decoded Canvas2D/CanvasKit mockups 1×/2× PASS. Native WebView и другие платформы
+не проверялись. Команды и артефакты — TESTING.md.
+
+ADR-189 / REQ-OUT-013/014: logo первым, текущая миниатюра и компактная
+галерея сохранённых, preview без команды. Windows Chrome 157: decoded SVG
+previews, apply/Undo/Redo/delete/focus и 1024×768 RU/EN × темы; evidence и
+команды — TESTING.md. Native WebView/macOS/Linux отдельно не проверялись.
+
+ADR-188 / REQ-OUT-009/010/013: полосы удалены из UI, layout, scene, ресурсов,
+branding/import и MCP schema без смены версии и без fallback. Windows Chrome
+157: navigation/branding/gradient/Copy — 4 browser specs PASS. Decoded
+Canvas2D/CanvasKit render — PASS. Native WebView и другие платформы не проверены.
+
+REQ-OUT-009 / REQ-EXP-001, Copy без мерцания (2026-11-05): Windows Chrome 157
+browser PASS — оформление сохраняет controls/раздел/scrollTop; inert блокирует
+ввод без disabled-перекрашивания. Component PASS: success/error/cancel,
+команды в pending не применяются. Native clipboard и другие платформы
+не проверялись; команды и артефакты — TESTING.md.
+
 ADR-187 / REQ-OUT-009: выбранный раздел не повторяется заголовком и вводной
 строкой над параметрами. Подписи групп, доступное имя области, навигация,
 loading/empty/error и отмена draft сохраняются. Фактические проверки — TESTING.md.

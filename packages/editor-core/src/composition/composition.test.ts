@@ -20,13 +20,30 @@ import {
   createCardBranding,
   resolveBrandingYear,
   compositionPreset,
+  parseComposition,
 } from './index'
 
 const documentFixture = { ...sceneFixture, layers: sceneFixture.layers.map((layer) => layer.kind === 'image' ? { ...layer, payload: { ...layer.payload, crop: null, mask: null, border: null, radius: 0 } } : layer) }
 
 describe('publication card contract', () => {
+  it('has no strip settings or geometry and rejects removed formats without fallback', () => {
+    const composition = createComposition()
+    expect(composition.version).toBe(1)
+    expect(composition).not.toHaveProperty('header')
+    expect(composition).not.toHaveProperty('footer')
+    const document = { ...documentFixture, presentation: { ...documentFixture.presentation, composition } }
+    const layout = resolveCompositionLayout(document)
+    expect(layout).not.toHaveProperty('header')
+    expect(layout).not.toHaveProperty('footer')
+    expect(parseComposition(composition)).toEqual(composition)
+    expect(() => parseComposition({ ...composition, version: 2 })).toThrow()
+    for (const name of ['header', 'footer']) {
+      expect(() => parseComposition({ ...composition, [name]: { height: 80, fill: composition.background } })).toThrow()
+      expect(() => parseComposition({ ...composition, branding: [{ ...createCardBranding('brand', 2026), region: name }] })).toThrow()
+    }
+  })
   it('defaults new frames to dark while preserving saved light frames and presets', () => {
-    for (const start of ['padding', 'browser', 'phone', 'header', 'footer', 'bands'] as const) {
+    for (const start of ['padding', 'browser', 'phone'] as const) {
       expect(createComposition(start).frame.theme).toBe('dark')
     }
     const base = createComposition('browser')
@@ -108,14 +125,13 @@ describe('publication card contract', () => {
   it('keeps source geometry through asymmetric margins, crop and undo', () => {
     const manager = new CommandManager({ ...documentFixture, crop: { x: 20, y: 30, width: 400, height: 300 } })
     const before = manager.snapshot.document.presentation
-    const composition = createComposition('footer')
+    const composition = createComposition('padding')
     const after = { ...before, composition }
     manager.execute({ type: 'setPresentation', before, after })
     const layout = resolveCompositionLayout(manager.snapshot.document)
-    expect(layout.width).toBe(400)
+    expect(layout.width).toBe(448)
     expect(layout.height).toBeGreaterThan(300)
-    expect(layout.content.x).toBe(0)
-    expect(layout.footer.height).toBeGreaterThan(0)
+    expect(layout.content.x).toBe(24)
     const card = contentToCard({ x: 95, y: 72 }, layout)
     expect(cardToContent(card, layout)).toEqual({ x: 95, y: 72 })
     expect(manager.snapshot.document.layers).toEqual(documentFixture.layers)
@@ -164,7 +180,7 @@ describe('publication card contract', () => {
     expect(resolveCompositionLayout(manager.snapshot.document).width).toBe(100)
   })
   it('freezes the applied year, excludes window context from presets and explicitly refreshes with undo', () => {
-    const composition = createComposition('footer')
+    const composition = createComposition('padding')
     const block = resolveBrandingYear({ ...createCardBranding('brand', 2026), template: '© {year} My channel' }, 2026)
     const settings = { ...composition, frame: { ...composition.frame, title: 'Specific window', url: 'private.example' }, branding: [block] }
     const document = { ...documentFixture, presentation: { ...documentFixture.presentation, composition: settings } }
@@ -201,7 +217,7 @@ describe('publication card contract', () => {
     expect(shadow.x).toBe(body.x)
     expect(shadow.y).toBe(body.y)
   })
-  it('rejects invalid freeform colors, canvas dimensions and missing band targets', () => {
+  it('rejects invalid canvas dimensions', () => {
     const composition = createComposition('padding')
     const raw = { ...documentFixture, schemaVersion: 8, presentation: { ...documentFixture.presentation,
       composition: { ...composition, layout: { ...composition.layout, width: NaN } } } }

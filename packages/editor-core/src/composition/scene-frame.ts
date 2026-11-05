@@ -2,9 +2,12 @@ import type { RenderNode } from '../scene/contracts'
 import type { CompositionLayout } from './layout'
 import type { CompositionSettings } from './types'
 import { cardColor } from './defaults'
-import { phoneScreenRadius } from './frame-catalog'
+import {
+  phoneScreenRadius,
+  isRetroFrame,
+} from './frame-catalog'
 import { phoneBody } from './scene-phone'
-import { retroBrowserNodes } from './scene-retro-browser'
+import { retroFrameNodes } from './scene-retro-frame'
 import {
   cardRect,
   cardText,
@@ -21,11 +24,7 @@ export function frameRadius(
 ): number {
   const edge = Math.min(layout.frame.width, layout.frame.height)
   if (settings.frame.kind === 'phone') return phoneScreenRadius(settings.frame, layout.screen) + (layout.screen.x - layout.frame.x)
-  if (
-    settings.frame.kind === 'browser' &&
-    settings.frame.browserStyle &&
-    settings.frame.browserStyle !== 'modern'
-  ) return 0
+  if (isRetroFrame(settings.frame)) return 0
   return Math.min(settings.radius, edge / 2)
 }
 
@@ -36,11 +35,7 @@ export function frameNodes(
   const f = settings.frame
   if (f.kind === 'none') return []
   if (f.kind === 'phone') return phoneBody(settings, layout)
-  if (
-    f.kind === 'browser' &&
-    f.browserStyle &&
-    f.browserStyle !== 'modern'
-  ) return retroBrowserNodes(f, layout)
+  if (isRetroFrame(f)) return retroFrameNodes(f, layout)
   const dark = f.theme === 'dark'
   const nodes: RenderNode[] = [cardRect('card:frame', layout.frame,
     dark ? cardColor(0.08, 0.08, 0.1) : cardColor(0.94, 0.94, 0.96),

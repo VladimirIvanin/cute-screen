@@ -1,5 +1,28 @@
 # Платформенная матрица
 
+ADR-192 (2026-11-05): компактные поля проверены в Windows Chrome 157 при
+1024 px, RU/EN × темы. Native WebView/macOS/Linux отдельно не запускались.
+Меняются только Vue-разметка/CSS; geometry renderer, schema, IPC и backend прежние.
+
+ADR-190/191 (2026-11-05): Windows Chrome 157 — retro Window/browser и inline
+Solid palette PASS при 1024 px RU/EN × light/dark; decoded Canvas2D/CanvasKit
+1×/2× mockups PASS. Native WebView/macOS/Linux — не проверялись. Schema versions
+и native IPC/backends сохраняются; MCP schema перегенерирована для windowStyle.
+
+ADR-189, logo preview (2026-11-05): Windows Chrome 157, настоящий SVG decode
+и production UI поверх mock OS/library boundary; RU/EN × темы при 1024×768.
+Native WebView/macOS/Linux — не проверялись. Binary IPC, document schema и
+native backends сохраняются; миниатюры не входят в scene cache.
+
+Удаление полос, ADR-188 (2026-11-05): Windows Chrome 157 browser — PASS;
+Canvas2D/CanvasKit decoded PNG — PASS. Native WebView, macOS/Linux — не запускались.
+Composition остаётся v1; миграции/legacy fallback нет. Native IPC/backends не меняются.
+
+Copy без мерцания оформления (2026-11-05, REQ-OUT-009): Windows Chrome 157
+browser PASS; временный inert вместо disabled-стилей панели. Реальный WebView,
+macOS/Linux и native clipboard в этой UI-проверке не запускались. IPC,
+renderer и платформенные backends не изменены. Evidence — TESTING.md.
+
 ## Cargo dependency compatibility (2026-11-03)
 
 Windows x64: windows 0.62.2, Tauri 2.11.6 и остальные обновления Dependabot #7/#10

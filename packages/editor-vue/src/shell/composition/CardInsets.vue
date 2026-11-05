@@ -74,7 +74,7 @@ function changeUnit(unit: Insets['unit']): void {
     :aria-label="text('Поля вокруг снимка', 'Screenshot padding')"
   >
     <div class="cs-card-row-heading">
-      <span>{{ text('Поля вокруг снимка', 'Screenshot padding') }}</span>
+      <span>{{ text('Поля', 'Padding') }}</span>
       <div
         class="cs-card-inset-units"
         role="group"
@@ -86,26 +86,13 @@ function changeUnit(unit: Insets['unit']): void {
           type="button"
           :disabled="disabled"
           :aria-pressed="value.unit === option"
+          :title="option === 'percent' ? text('% от короткой стороны снимка', '% of the screenshot’s shorter side') : text('Пиксели', 'Pixels')"
           @click="changeUnit(option)"
         >
           {{ option === 'percent' ? '%' : 'px' }}
         </button>
       </div>
     </div>
-    <button
-      class="cs-inset-link"
-      data-inset-link
-      type="button"
-      :aria-pressed="value.linked"
-      :disabled="disabled"
-      :title="value.linked
-        ? text('Настроить каждую сторону отдельно', 'Adjust each side separately')
-        : text('Сделать поля одинаковыми со всех сторон', 'Use equal padding on all sides')"
-      @click="link"
-    >
-      <UiIcon :name="value.linked ? 'link' : 'unlink'" />
-      <span>{{ text('Одинаковые со всех сторон', 'Equal padding on all sides') }}</span>
-    </button>
     <div
       class="cs-inset-diagram"
       role="group"
@@ -120,19 +107,34 @@ function changeUnit(unit: Insets['unit']): void {
         :disabled="disabled"
         :aria-pressed="value.linked || selected === side.id"
         :aria-label="`${side.label}: ${shown[side.id]} ${unit}`"
+        :title="side.label"
         @click="choose(side.id)"
       >
-        <span>{{ side.label }}</span><strong>{{ shown[side.id] }} <small>{{ unit }}</small></strong>
+        <strong>{{ shown[side.id] }}</strong>
       </button>
-      <div class="cs-inset-center" aria-hidden="true">
+      <div class="cs-inset-center">
         <span
           v-for="side in sides"
           :key="side.id"
           class="cs-inset-band"
+          aria-hidden="true"
           :data-side="side.id"
           :class="{ 'is-active': value.linked || selected === side.id }"
         />
-        <div class="cs-inset-picture"><UiIcon name="image" /><span>{{ text('Снимок', 'Screenshot') }}</span></div>
+        <button
+          class="cs-inset-link"
+          data-inset-link
+          type="button"
+          :aria-pressed="value.linked"
+          :aria-label="text('Одинаковые со всех сторон', 'Equal padding on all sides')"
+          :disabled="disabled"
+          :title="value.linked
+            ? text('Настроить каждую сторону отдельно', 'Adjust each side separately')
+            : text('Сделать поля одинаковыми со всех сторон', 'Use equal padding on all sides')"
+          @click="link"
+        >
+          <UiIcon :name="value.linked ? 'link' : 'unlink'" />
+        </button>
       </div>
     </div>
     <div ref="number">
@@ -153,10 +155,5 @@ function changeUnit(unit: Insets['unit']): void {
         @cancel="cancel"
       />
     </div>
-    <p class="cs-inset-hint">
-      {{ value.unit === 'percent'
-        ? text('% от короткой стороны снимка', '% of the screenshot’s shorter side')
-        : text('Отступ от края снимка в пикселях', 'Padding from the screenshot edge in pixels') }}
-    </p>
   </section>
 </template>

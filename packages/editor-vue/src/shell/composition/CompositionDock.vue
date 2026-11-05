@@ -5,14 +5,12 @@ import type { useComposition } from './controller'
 const props = defineProps<{ controller: ReturnType<typeof useComposition>; canImport: boolean; canSave: boolean }>()
 const store = useEditorShellStore()
 const { compositionOpen, compositionSettings, compositionMaterials, compositionApplied, removeComposition,
-  compositionPending, compositionLoading, compositionError, compositionDisabled, toggleComposition,
+  compositionPending, compositionLoading, compositionError, compositionDisabled, compositionCopying, toggleComposition,
   commitComposition, previewComposition, cancelCompositionPreview, importCompositionImage,
   saveCompositionMaterial, removeCompositionMaterial, applyCompositionMaterial, reloadCompositionMaterials,
-  compositionGradientEditing, compositionSelectedBrand, compositionGradientTarget } = props.controller
-function editGradient(target: 'background' | 'header' | 'footer'): void {
-  compositionGradientEditing.value = compositionGradientTarget.value === target
-    ? !compositionGradientEditing.value : true
-  compositionGradientTarget.value = target
+  compositionGradientEditing, compositionSelectedBrand } = props.controller
+function editGradient(): void {
+  compositionGradientEditing.value = !compositionGradientEditing.value
 }
 </script>
 <template>
@@ -23,6 +21,8 @@ function editGradient(target: 'background' | 'header' | 'footer'): void {
     :applied="compositionApplied"
     :locale="store.locale"
     :disabled="compositionDisabled"
+    :inert="compositionCopying ? '' : undefined"
+    :aria-busy="compositionCopying"
     :materials="compositionMaterials"
     :pending="compositionPending"
     :loading="compositionLoading"
@@ -30,7 +30,6 @@ function editGradient(target: 'background' | 'header' | 'footer'): void {
     :can-import="canImport"
     :can-save="canSave"
     :editing="compositionGradientEditing"
-    :target="compositionGradientTarget"
     :selected-brand="compositionSelectedBrand"
     @change="commitComposition"
     @reset="removeComposition"

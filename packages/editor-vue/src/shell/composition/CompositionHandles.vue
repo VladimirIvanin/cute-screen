@@ -26,10 +26,9 @@ const layout = computed(() => resolveCompositionLayout({ ...props.document,
   presentation: { ...props.document.presentation, ...(settings.value ? { composition: settings.value } : {}) } }))
 const background = computed(() => {
   const s = settings.value
-  return !s || !state ? undefined : state.gradientTarget.value === 'background' ? s.background : s[state.gradientTarget.value].fill
+  return s?.background
 })
-const region = computed(() => !state || state.gradientTarget.value === 'background'
-  ? { x: 0, y: 0, width: layout.value.width, height: layout.value.height } : layout.value[state.gradientTarget.value])
+const region = computed(() => ({ x: 0, y: 0, width: layout.value.width, height: layout.value.height }))
 const handles = computed(() => {
   const bg = background.value
   if (bg?.kind === 'linear') return [bg.linear.start, bg.linear.end]
@@ -66,12 +65,11 @@ function updateBackground(
   s: CompositionSettings,
   bg: CardBackground,
 ): CompositionSettings {
-  const target = state!.gradientTarget.value
-  return target === 'background' ? { ...s, background: bg } : { ...s, [target]: { ...s[target], fill: bg } }
+  return { ...s, background: bg }
 }
 function movedGradient(point: CardPoint): CompositionSettings {
-  const s = baseline.value!, target = state!.gradientTarget.value
-  const bg = target === 'background' ? s.background : s[target].fill
+  const s = baseline.value!
+  const bg = s.background
   const r = region.value
   const p = { x: Math.max(0,
     Math.min(1,

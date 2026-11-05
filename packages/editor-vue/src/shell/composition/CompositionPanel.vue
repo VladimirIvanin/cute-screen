@@ -20,14 +20,13 @@ import CardBackground from './CardBackground.vue'
 import CardShadow from './CardShadow.vue'
 import CardFrame from './CardFrame.vue'
 import CardBranding from './CardBranding.vue'
-import CardNumber from './CardNumber.vue'
 import CardSavedItems from './CardSavedItems.vue'
 import CardSaveButton from './CardSaveButton.vue'
 import CardFramePreview from './CardFramePreview.vue'
 
-type Section = 'layout' | 'background' | 'shadow' | 'frame' | 'bands' | 'branding' | 'templates'
-const props = defineProps<{ active?: boolean; applied?: boolean; value?: CompositionSettings | undefined; locale: 'ru' | 'en'; disabled: boolean; materials: readonly MaterialRecord[]; pending: boolean; loading?: boolean; error: string; canImport: boolean; canSave: boolean; editing: boolean; target: 'background' | 'header' | 'footer'; selectedBrand?: string | undefined }>()
-const emit = defineEmits<{ change: [value: CompositionSettings]; preview: [value: CompositionSettings]; cancel: []; reset: []; close: []; layers: []; edit: [target: 'background' | 'header' | 'footer']; import: [kind: 'background' | 'logo', target?: 'background' | 'header' | 'footer']; save: [kind: 'preset' | 'gradient', title: string]; remove: [id: string]; apply: [record: MaterialRecord]; retry: []; selectBrand: [id: string] }>()
+type Section = 'layout' | 'background' | 'shadow' | 'frame' | 'branding' | 'templates'
+const props = defineProps<{ active?: boolean; applied?: boolean; value?: CompositionSettings | undefined; locale: 'ru' | 'en'; disabled: boolean; materials: readonly MaterialRecord[]; pending: boolean; loading?: boolean; error: string; canImport: boolean; canSave: boolean; editing: boolean; selectedBrand?: string | undefined }>()
+const emit = defineEmits<{ change: [value: CompositionSettings]; preview: [value: CompositionSettings]; cancel: []; reset: []; close: []; layers: []; edit: []; import: [kind: 'background' | 'logo']; save: [kind: 'preset' | 'gradient', title: string]; remove: [id: string]; apply: [record: MaterialRecord]; retry: []; selectBrand: [id: string] }>()
 const section = ref<Section>('layout')
 const body = ref<HTMLElement>()
 const panelId = useId()
@@ -37,7 +36,6 @@ const sections = computed(() => [
   { id: 'background', label: text('Фон', 'Background'), icon: 'palette' },
   { id: 'shadow', label: text('Тень', 'Shadow'), icon: 'shadow' },
   { id: 'frame', label: text('Рамка', 'Frame'), icon: 'browser' },
-  { id: 'bands', label: text('Полосы', 'Strips'), icon: 'textBackground' },
   { id: 'branding', label: text('Текст и логотип', 'Text and logo'), icon: 'text' },
 ] as const)
 const current = computed(() => section.value === 'templates'
@@ -51,10 +49,10 @@ const starters = computed(() => [
 const templates = computed(() => props.materials.filter((item) => item.kind === 'preset'))
 const backgrounds = computed(() => props.materials.filter((item) => item.kind === 'gradient' || item.kind === 'background'))
 const logos = computed(() => props.materials.filter((item) => item.kind === 'logo'))
-provide(numericContextKey, () => `${props.active !== false}:${props.applied}:${props.disabled}:${props.selectedBrand}:${props.target}:${props.editing}:${section.value}`)
+provide(numericContextKey, () => `${props.active !== false}:${props.applied}:${props.disabled}:${props.selectedBrand}:${props.editing}:${section.value}`)
 function finishPreview(): void {
   emit('cancel')
-  if (props.editing) emit('edit', props.target)
+  if (props.editing) emit('edit')
 }
 function selectSection(next: Section): void {
   if (section.value === next) return
@@ -73,12 +71,11 @@ function start(kind: CompositionStart): void {
   } else emit('change', next)
 }
 function background(
-  target: 'background' | 'header' | 'footer',
   fill: Background,
   preview = false,
 ): void {
   if (!props.value) return
-  const value = target === 'background' ? { ...props.value, background: fill } : { ...props.value, [target]: { ...props.value[target], fill } }
+  const value = { ...props.value, background: fill }
   if (preview) emit('preview', value)
   else emit('change', value)
 }
@@ -99,7 +96,7 @@ function applyLogo(
   <aside
     class="cs-composition-panel"
     :aria-label="text('Оформление', 'Appearance')"
-    @keydown.esc.stop="editing ? emit('edit', target) : emit('close')"
+    @keydown.esc.stop="editing ? emit('edit') : emit('close')"
   >
     <header>
       <strong>{{ text('Оформление', 'Appearance') }}</strong>
@@ -187,11 +184,11 @@ function applyLogo(
                 :locale="locale"
                 :disabled="disabled"
                 :can-import="canImport"
-                :editing="editing && target === 'background'"
-                @change="background('background', $event)"
-                @preview="background('background', $event, true)"
+                :editing="editing"
+                @change="background($event)"
+                @preview="background($event, true)"
                 @cancel="emit('cancel')"
-                @edit="emit('edit', 'background')"
+                @edit="emit('edit')"
                 @import="emit('import', 'background')"
               />
               <section class="cs-composition-library" :aria-label="text('Мои фоны', 'My backgrounds')">
@@ -236,37 +233,6 @@ function applyLogo(
               @preview="emit('preview', { ...value, frame: $event })"
               @cancel="emit('cancel')"
             />
-            <template v-else-if="section === 'bands'">
-              <section
-                v-for="band in ['header', 'footer'] as const"
-                :key="band"
-                class="cs-composition-band"
-              >
-                <h3 class="cs-composition-section-heading">{{ band === 'header' ? text('Верхняя полоса', 'Header strip') : text('Нижняя полоса', 'Footer strip') }}</h3>
-                <CardNumber
-                  :label="text('Высота полосы', 'Strip height')"
-                  :value="value[band].height"
-                  :min="0"
-                  :max="8192"
-                  :disabled="disabled"
-                  @change="emit('change', { ...value, [band]: { ...value[band], height: $event } })"
-                  @preview="emit('preview', { ...value, [band]: { ...value[band], height: $event } })"
-                  @cancel="emit('cancel')"
-                />
-                <CardBackground
-                  :value="value[band].fill"
-                  :locale="locale"
-                  :disabled="disabled"
-                  :can-import="canImport"
-                  :editing="editing && target === band"
-                  @change="background(band, $event)"
-                  @preview="background(band, $event, true)"
-                  @cancel="emit('cancel')"
-                  @edit="emit('edit', band)"
-                  @import="emit('import', 'background', band)"
-                />
-              </section>
-            </template>
             <CardBranding
               v-else-if="section === 'branding'"
               :value="value.branding"

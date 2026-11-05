@@ -10,7 +10,6 @@ export interface CompositionEditing {
   readonly preview: ShallowRef<CompositionSettings | undefined>
   readonly editing: Ref<boolean>
   readonly selectedBrand: Ref<string | undefined>
-  readonly gradientTarget: Ref<'background' | 'header' | 'footer'>
   readonly disabled: ComputedRef<boolean>
   commit(value: CompositionSettings): void
   showPreview(value: CompositionSettings): void

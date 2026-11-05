@@ -37,8 +37,6 @@ export interface CardBackground {
   readonly offset: CardPoint
   readonly blur: number
 }
-export interface CardBand { readonly height: number
-  readonly fill: CardBackground }
 export interface CardLayout {
   readonly mode: 'auto' | 'fixed'
   readonly width: number
@@ -57,6 +55,7 @@ export interface CardLayout {
 }
 export type PhoneModel = 'iphone-island' | 'iphone-notch' | 'android-rounded' | 'android-angular'
 export type BrowserStyle = 'modern' | 'retro-windows' | 'retro-mac'
+export type WindowStyle = 'modern' | 'retro-windows' | 'retro-mac'
 export interface CardFrame {
   readonly kind: 'none' | 'window' | 'browser' | 'phone'
   readonly theme: 'light' | 'dark'
@@ -69,6 +68,7 @@ export interface CardFrame {
   readonly offset: CardPoint
   readonly phoneModel?: PhoneModel
   readonly browserStyle?: BrowserStyle
+  readonly windowStyle?: WindowStyle
   readonly phoneSystemDetails?: boolean
   readonly phoneContentMode?: 'safe' | 'fullscreen'
 }
@@ -79,7 +79,7 @@ export interface CardBranding {
   readonly year: number
   readonly image: CardImage | null
   readonly imageSize: number
-  readonly region: 'content' | 'card' | 'header' | 'footer'
+  readonly region: 'content' | 'card'
   readonly alignment: CardPoint
   readonly offset: CardPoint
   readonly textAlignment: 'start' | 'center' | 'end'
@@ -101,12 +101,10 @@ export interface CompositionSettings {
   readonly version: 1
   readonly layout: CardLayout
   readonly background: CardBackground
-  readonly header: CardBand
-  readonly footer: CardBand
   readonly frame: CardFrame
   readonly radius: number
   readonly shadow: number
   readonly shadowOptions?: CardShadowOptions
   readonly branding: readonly CardBranding[]
 }
-export type CompositionStart = 'padding' | 'header' | 'footer' | 'bands' | 'browser' | 'phone'
+export type CompositionStart = 'padding' | 'browser' | 'phone'

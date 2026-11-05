@@ -36,8 +36,6 @@ export function composeDocumentScene(
   const windowChrome = hasWindowChrome(settings.frame)
   const nodes: RenderNode[] = [
     ...backgroundNodes('card:background', bounds, settings.background, content),
-    ...backgroundNodes('card:header', l.header, settings.header.fill, content),
-    ...backgroundNodes('card:footer', l.footer, settings.footer.fill, content),
     ...cardShadow(l.frame, frameRadius(settings, l), settings.shadow, settings.shadowOptions),
     ...frameNodes(settings, l),
     { ...visibleNode, id: 'card:content', kind: 'group', scene: content, destination: l.content,

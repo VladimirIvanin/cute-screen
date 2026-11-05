@@ -1,5 +1,22 @@
 # Архитектура Cute Screen
 
+## Ретро-окна и встроенный цвет фона (ADR-190/191)
+
+Optional windowStyle независим от browserStyle; общий frame catalogue задаёт
+chrome height, контуры и фиксированные углы для preview/scene/export. Ретро
+рисуется единым scene-retro-frame, Window завершает chrome после title bar,
+Browser добавляет Back/Forward/Home и URL. Версии документа/composition не меняются.
+Solid background встраивает общий SimpleColorPicker в CardColor; custom также
+остаётся в body инспектора. Инструментальные popovers сохраняются.
+
+## Оформление без полос (ADR-188)
+
+Composition сохраняет текущую версию 1, но больше не содержит header/footer.
+Layout и scene работают с общим фоном и областью снимка; branding привязан
+только к content/card. Gradient handles и импорт фона больше не выбирают
+целевую полосу. Удалённые поля и области отклоняются валидатором; миграции
+и legacy-render отсутствуют. MCP schema генерируется из обновлённых типов.
+
 ## Усиление границы экспорта (ADR-178)
 
 `REQ-SEC-001/002`: result_* PNG IPC проверяет native caller main. Файловое

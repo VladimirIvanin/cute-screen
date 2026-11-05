@@ -78,12 +78,18 @@ describe('linked padding slider', () => {
       const diagram = await browser.execute(() => {
         const root = document.querySelector('.cs-inset-diagram')!
         const center = root.querySelector('.cs-inset-center')!.getBoundingClientRect()
+        const link = root.querySelector('.cs-inset-link')!.getBoundingClientRect()
         const side = (id: string) => root.querySelector(`[data-inset-side="${id}"]`)!.getBoundingClientRect()
         return { top: side('top').bottom <= center.top, bottom: side('bottom').top >= center.bottom,
           left: side('left').right <= center.left, right: side('right').left >= center.right,
-          overflow: root.scrollWidth > root.clientWidth }
+          overflow: root.scrollWidth > root.clientWidth,
+          compact: root.getBoundingClientRect().height <= 112,
+          centered: Math.abs(link.x + link.width / 2 - center.x - center.width / 2) <= 1
+            && Math.abs(link.y + link.height / 2 - center.y - center.height / 2) <= 1 }
       })
-      expect(diagram).toEqual({ top: true, bottom: true, left: true, right: true, overflow: false })
+      expect(diagram).toEqual({
+        top: true, bottom: true, left: true, right: true, overflow: false, compact: true, centered: true,
+      })
       await browser.saveScreenshot(`artifacts/browser-e2e/inset-slider-${locale}-${theme}.png`)
       await browser.saveScreenshot(`artifacts/padding-link/linked-${locale}-${theme}.png`)
     }

@@ -5,6 +5,8 @@ import type {
 import type {
   CardFrame,
   PhoneModel,
+  BrowserStyle,
+  WindowStyle,
 } from './types'
 import type { ShapePathCommand } from '../shape-path-types'
 
@@ -19,12 +21,25 @@ export const BROWSER_STYLES = [
   { id: 'retro-windows', ru: 'Windows 95/98', en: 'Windows 95/98', chrome: 92 },
   { id: 'retro-mac', ru: 'Macintosh', en: 'Macintosh', chrome: 76 },
 ] as const
+export const WINDOW_STYLES = [
+  { id: 'modern', ru: 'Современное', en: 'Modern', chrome: 40 },
+  { id: 'retro-windows', ru: 'Windows 95/98', en: 'Windows 95/98', chrome: 32 },
+  { id: 'retro-mac', ru: 'Macintosh', en: 'Macintosh', chrome: 28 },
+] as const
+
+export function frameStyle(frame: CardFrame): BrowserStyle | WindowStyle {
+  return (frame.kind === 'window' ? frame.windowStyle : frame.browserStyle) ?? 'modern'
+}
+export function isRetroFrame(frame: CardFrame): boolean {
+  return (frame.kind === 'window' || frame.kind === 'browser') && frameStyle(frame) !== 'modern'
+}
 
 export function phoneModel(frame: Pick<CardFrame, 'phoneModel'>) {
   return PHONE_MODELS.find((model) => model.id === frame.phoneModel) ?? PHONE_MODELS[0]
 }
-export function browserChrome(frame: CardFrame): number {
+export function frameChrome(frame: CardFrame): number {
   if (frame.kind === 'none') return 0
+  if (frame.kind === 'window') return (WINDOW_STYLES.find((style) => style.id === frame.windowStyle) ?? WINDOW_STYLES[0]).chrome
   return frame.kind === 'browser'
     ? (BROWSER_STYLES.find((style) => style.id === frame.browserStyle) ?? BROWSER_STYLES[0]).chrome : 40
 }

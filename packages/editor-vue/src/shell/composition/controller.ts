@@ -126,12 +126,20 @@ function useCompositionPreview(
   return { compositionPreview, preview, cancel }
 }
 
+function provideCompositionImages(
+  props: ResolvedEditorShellProps,
+  workspace: Workspace,
+): void {
+  provide(compositionImagesKey, { images: workspace.textureImages, error: workspace.toolError,
+    bridge: () => props.textureBridge })
+}
+
 export function useComposition(
   props: ResolvedEditorShellProps,
   workspace: Workspace,
   store: ReturnType<typeof useEditorShellStore>,
 ) {
-  provide(compositionImagesKey, { images: workspace.textureImages, error: workspace.toolError })
+  provideCompositionImages(props, workspace)
   const compositionOpen = ref(false)
   const compositionSpace = ref<'content' | 'card'>('content')
   const neutralSettings = neutralComposition()
@@ -143,8 +151,11 @@ export function useComposition(
   const pending = ref(false)
   const editing = ref(false)
   const selectedBrand = ref<string>()
-  const gradientTarget = ref<'background' | 'header' | 'footer'>('background')
-  const disabled = computed(() => props.readOnlyDocument || !props.documentSession || pending.value || store.actionState.status === 'pending')
+  const copying = computed(() => store.actionState.status === 'pending' && store.actionState.action === 'copy')
+  // Copy blocks commands below and input via the dock's inert attribute without flashing disabled styles.
+  const controlsDisabled = computed(() => props.readOnlyDocument || !props.documentSession || pending.value ||
+    store.actionState.status === 'pending' && !copying.value)
+  const disabled = computed(() => controlsDisabled.value || copying.value)
   const { compositionPreview, preview, cancel } = useCompositionPreview(workspace, () => disabled.value)
   const t = (ru: string, en: string) => store.locale === 'ru' ? ru : en
   const commit = compositionCommit(props, workspace, disabled, settings, cancel, () => {
@@ -215,7 +226,6 @@ export function useComposition(
       preview: compositionPreview,
       editing,
       selectedBrand,
-      gradientTarget,
       commit,
       showPreview: preview,
       cancel,
@@ -228,7 +238,8 @@ export function useComposition(
     compositionMaterials: materials,
     compositionLoading: loading,
 
-    compositionPending: pending, compositionError: error, compositionDisabled: disabled,
+    compositionPending: pending, compositionError: error, compositionDisabled: controlsDisabled,
+    compositionCopying: copying,
     toggleComposition: toggle,
     activateCompositionSpace: activateSpace,
     commitComposition: commit,
@@ -241,6 +252,5 @@ export function useComposition(
     reloadCompositionMaterials: load,
 
     compositionGradientEditing: editing,
-    compositionSelectedBrand: selectedBrand,
-    compositionGradientTarget: gradientTarget }
+    compositionSelectedBrand: selectedBrand }
 }

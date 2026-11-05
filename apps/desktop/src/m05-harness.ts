@@ -2,6 +2,10 @@ import {
   DocumentSessionController,
   type DocumentPersistenceBridge,
   type EditorDocumentV1,
+  type ContentImageBridge,
+  type ClipboardBridge,
+  type MaterialBridge,
+  type TextureFillBridge,
 } from '@cute-screen/editor-vue'
 import type { ShallowRef } from 'vue'
 import type { AppHarnessConfig } from './app-harness-config'
@@ -13,6 +17,11 @@ export interface M05HarnessPorts {
   readonly installClipboardBridge: () => void
   readonly installHarnessFacade: () => void
   readonly waitForRender: () => Promise<void>
+  readonly textureBridge: ShallowRef<TextureFillBridge | undefined>
+  readonly materialBridge: ShallowRef<MaterialBridge | undefined>
+  readonly contentImageBridge: ShallowRef<ContentImageBridge | undefined>
+  readonly clipboardBridge: ShallowRef<ClipboardBridge | undefined>
+  readonly lifecycleCleanup: Array<() => void>
 }
 
 function harnessPersistence(deferred: boolean): DocumentPersistenceBridge {
@@ -69,6 +78,22 @@ export async function mountM05HarnessDocument(
   }
   ports.installClipboardBridge()
   ports.installHarnessFacade()
+  if (import.meta.env.VITE_TEST_HARNESS === 'true' && config.imageIngress) {
+    const { installImageIngressHarness } = await import('./image-ingress-harness')
+    ports.lifecycleCleanup.push(installImageIngressHarness(
+      ports.contentImageBridge,
+      ports.clipboardBridge,
+      ports.documentSession,
+    ))
+  }
+  if (import.meta.env.VITE_TEST_HARNESS === 'true' && config.logoLibrary) {
+    const { installLogoLibraryHarness } = await import('./logo-library-harness')
+    ports.lifecycleCleanup.push(await installLogoLibraryHarness(
+      ports.textureBridge,
+      ports.materialBridge,
+      ports.contentImageBridge,
+    ))
+  }
 }
 
 function loadM05HarnessImage(

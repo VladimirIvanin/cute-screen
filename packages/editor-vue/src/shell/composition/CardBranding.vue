@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import {
   computed,
+  nextTick,
+  ref,
   watch,
 } from 'vue'
 import {
@@ -19,15 +21,18 @@ const emit = defineEmits<{
   import: []
 }>()
 const text = (ru: string, en: string) => props.locale === 'ru' ? ru : en
+const root = ref<HTMLElement>()
 const active = computed(() => props.value.find((block) => block.id === props.selected) ?? props.value[0])
 const activeIndex = computed(() => props.value.findIndex((block) => block.id === active.value?.id))
 watch([() => active.value?.id, () => props.selected], ([id, selected]) => {
   if (id && id !== selected) emit('select', id)
 }, { immediate: true })
-function add(): void {
+async function add(): Promise<void> {
   const block = createCardBranding(crypto.randomUUID(), new Date().getFullYear())
   emit('change', [...props.value, block])
   emit('select', block.id)
+  await nextTick()
+  root.value?.querySelector<HTMLButtonElement>('.cs-brand-heading .cs-brand-add')?.focus()
 }
 function remove(): void {
   const remaining = props.value.filter((block) => block.id !== active.value?.id)
@@ -45,9 +50,14 @@ function change(
 }
 </script>
 <template>
-  <fieldset class="cs-branding" :disabled="disabled">
+  <fieldset
+    ref="root"
+    class="cs-branding"
+    :disabled="disabled"
+  >
     <p v-if="!value.length">{{ text('Добавьте копирайт, название канала, источник или логотип.', 'Add a copyright, channel name, source or logo.') }}</p>
     <button
+      v-if="!active"
       class="cs-brand-add"
       type="button"
       @click="add"
@@ -79,14 +89,25 @@ function change(
     >
       <div class="cs-brand-heading">
         <strong>{{ text('Подпись', 'Signature') }} {{ activeIndex + 1 }}</strong>
-        <button
-          type="button"
-          :aria-label="text('Удалить подпись', 'Remove signature')"
-          :title="text('Удалить подпись', 'Remove signature')"
-          @click="remove"
-        >
-          <UiIcon name="trash" />
-        </button>
+        <div class="cs-brand-heading-actions">
+          <button
+            type="button"
+            class="cs-brand-add"
+            :aria-label="text('Добавить подпись', 'Add signature')"
+            :title="text('Добавить подпись', 'Add signature')"
+            @click="add"
+          >
+            <UiIcon name="plus" />
+          </button>
+          <button
+            type="button"
+            :aria-label="text('Удалить подпись', 'Remove signature')"
+            :title="text('Удалить подпись', 'Remove signature')"
+            @click="remove"
+          >
+            <UiIcon name="trash" />
+          </button>
+        </div>
       </div>
       <CardBrandingEditor
         :key="active.id"

@@ -8,6 +8,7 @@ const props = withDefaults(defineProps<{
   label: string
   disabled?: boolean
   compact?: boolean
+  embedded?: boolean
   opacityLabel?: string
   locale?: 'ru' | 'en'
   showOpacity?: boolean
@@ -21,13 +22,25 @@ function change(value: string): void {
 }
 </script>
 <template>
-  <div :class="{ 'cs-card-color-compact': compact }">
+  <div :class="{ 'cs-card-color-compact': compact, 'cs-card-color-embedded': embedded }">
+    <SimpleColorPicker
+      v-if="embedded"
+      :model-value="hex"
+      v-bind="{ ariaLabel: label }"
+      :disabled="disabled"
+      :locale="locale"
+      :eyedropper="false"
+      embedded
+      compact
+      @commit="change"
+    />
     <div
       class="cs-card-color"
       role="group"
       :aria-label="label"
     >
       <span>{{ label }}</span><SimpleColorPicker
+        v-if="!embedded"
         :model-value="hex"
         v-bind="{ ariaLabel: label }"
         :disabled="disabled"
@@ -35,6 +48,11 @@ function change(value: string): void {
         :eyedropper="false"
         compact
         @commit="change"
+      /><div
+        v-else
+        class="cs-card-color-sample"
+        :style="{ backgroundColor: hex }"
+        aria-hidden="true"
       /><input
         class="cs-card-input"
         :aria-label="`${label} HEX`"

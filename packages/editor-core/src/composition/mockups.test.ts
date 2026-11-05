@@ -64,7 +64,7 @@ describe('device mockup contracts', () => {
     expect(serializeEditorDocument(parsed.document)).toBe(before)
     expect(createDocumentRenderScene(parsed.document).nodes.some((n) => n.id === 'card:phone:camera')).toBe(true)
   })
-  it.each(['phoneModel', 'browserStyle', 'phoneSystemDetails', 'phoneContentMode'])(
+  it.each(['phoneModel', 'browserStyle', 'windowStyle', 'phoneSystemDetails', 'phoneContentMode'])(
     'rejects invalid %s', (key) => {
       expect(() => parseEditorDocument(fixture({ [key]: 'invalid' }))).toThrow(key)
     })

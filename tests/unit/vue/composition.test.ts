@@ -1,3 +1,4 @@
+import { compositionFixture as initial } from './composition-test-kit'
 import {
   fireEvent,
   render,
@@ -11,7 +12,6 @@ import {
   vi,
 } from 'vitest'
 import {
-  createEditorDocumentFromImage,
   createComposition,
   createRulerLayer,
   contentToCard,
@@ -38,11 +38,6 @@ import {
   shallowReactive,
   markRaw,
 } from 'vue'
-function initial() {
-  return createEditorDocumentFromImage({ id: '019c1f62-058e-7000-8000-000000000000', baseLayerId: '019c1f62-058e-7000-8000-000000000001',
-    timestamp: '2026-10-20T00:00:00Z', source: { blobHash: 'a'.repeat(64), format: 'png', mimeType: 'image/png', provenance: 'fileOpen',
-      width: 3840, height: 2160, orientationApplied: true, color: { colorSpace: 'srgb', hasIccProfile: false } } })
-}
 describe('publication card interface', () => {
   it('saves templates after naming, keeps failed drafts, cancels with focus and removes only the library entry', async () => {
     localStorage.clear()
@@ -151,6 +146,8 @@ describe('publication card interface', () => {
       expect(JSON.parse(items.at(-1)!.valueJson)).toEqual(before.presentation.composition!.background)
       await fireEvent.click(controls.getByRole('button', { name: 'Text and logo' }))
       await fireEvent.click(controls.getByRole('button', { name: 'Add signature' }))
+      const region = controls.getByRole('combobox', { name: 'Region' })
+      expect([...region.querySelectorAll('option')].map((option) => option.value)).toEqual(['content', 'card'])
       await fireEvent.click(await controls.findByRole('button', { name: 'Company' }))
       expect(session.snapshot.core.document.presentation.composition?.branding[0]?.image?.blobHash).toBe('b'.repeat(64))
       session.undo()
@@ -183,7 +180,6 @@ describe('publication card interface', () => {
         ['background', 'Background', '[data-card-fill="transparent"]'],
         ['shadow', 'Shadow', '[aria-label="Shadow strength"]'],
         ['frame', 'Frame', '[role="radiogroup"][aria-label="Frame type"]'],
-        ['bands', 'Strips', '[aria-label="Strip height"]'],
         ['branding', 'Text and logo', '.cs-brand-add'],
       ] as const
       for (const [section, label, control] of sections) {
@@ -278,32 +274,29 @@ describe('publication card interface', () => {
       await fireEvent.keyDown(opacity, { key: 'Enter' })
       const before = session.snapshot.core.document.presentation.composition!.background.color
       const execute = vi.spyOn(session, 'execute')
-      const trigger = controls.getAllByRole('button', { name: 'Background color' })[0]!
-      await fireEvent.click(trigger)
-      const palette = await screen.findByRole('dialog', { name: 'Background color' })
+      const palette = panel.querySelector<HTMLElement>('.cs-card-color-embedded .cs-simple-color-panel')!
+      expect(palette).toBeVisible()
+      expect(controls.queryByRole('button', { name: 'Background color' })).toBeNull()
       await fireEvent.click(within(palette).getByRole('button', { name: 'Red' }))
       expect(execute).toHaveBeenCalledTimes(1)
       expect(session.snapshot.core.document.presentation.composition!.background.color)
         .toEqual({ red: 1, green: 117 / 255, blue: 86 / 255, alpha: 0.37 })
       session.undo()
       expect(session.snapshot.core.document.presentation.composition!.background.color).toEqual(before)
-      await fireEvent.click(trigger)
-      await fireEvent.click(within(await screen.findByRole('dialog', { name: 'Background color' }))
+      await fireEvent.click(within(palette)
         .getByRole('button', { name: 'Custom colour' }))
       const hex = await screen.findByRole('textbox', { name: 'HEX colour code' })
       await fireEvent.input(hex, { target: { value: 'badhex' } })
       await fireEvent.change(hex)
-      expect(await within(await screen.findByRole('dialog', { name: 'Background color' })).findByRole('alert'))
+      expect(await within(palette).findByRole('alert'))
         .toBeVisible()
       expect(execute).toHaveBeenCalledTimes(1)
       await fireEvent.keyDown(hex, { key: 'Escape' })
-      const back = await screen.findByRole('dialog', { name: 'Background color' })
-      await fireEvent.keyDown(back, { key: 'Escape' })
-      await vi.waitFor(() => expect(trigger).toHaveFocus())
+      await vi.waitFor(() => expect(within(palette).getByRole('button', { name: 'Custom colour' })).toHaveFocus())
       expect(panel).toBeVisible()
       expect(panel.querySelector('input[type="color"]')).toBeNull()
       await view.rerender({ readOnlyDocument: true })
-      expect(trigger).toBeDisabled()
+      expect(within(palette).getByRole('button', { name: 'Red' })).toBeDisabled()
     } finally {
       view.unmount()
       session.dispose()
@@ -321,7 +314,7 @@ describe('publication card interface', () => {
       const panel = screen.getByRole('complementary', { name: 'Appearance' })
       const sections = [...panel.querySelectorAll('[data-composition-section]')]
       expect(sections.map((section) => section.getAttribute('data-composition-section')))
-        .toEqual(['layout', 'background', 'shadow', 'frame', 'bands', 'branding'])
+        .toEqual(['layout', 'background', 'shadow', 'frame', 'branding'])
       await fireEvent.click(within(panel).getByRole('button', { name: 'Frame' }))
       const choices = within(within(panel).getByRole('radiogroup', { name: 'Frame type' }))
       expect(choices.getAllByRole('radio')).toHaveLength(4)
@@ -424,6 +417,10 @@ describe('publication card interface', () => {
       const controls = within(panel)
       const execute = vi.spyOn(session, 'execute')
       const all = controls.getByRole('spinbutton', { name: 'All sides' })
+      const centerLink = controls.getByRole('button', { name: 'Equal padding on all sides' })
+      expect(centerLink.closest('.cs-inset-center')).not.toBeNull()
+      expect(panel.querySelector('.cs-inset-picture')).toBeNull()
+      expect(panel.querySelector('.cs-inset-hint')).toBeNull()
       await fireEvent.input(all, { target: { value: '12' } })
       expect(controls.getByRole('button', { name: 'Left: 12 %' })).toBeVisible()
       expect(controls.getByRole('button', { name: 'Right: 12 %' })).toBeVisible()

@@ -92,7 +92,6 @@ export function useCompositionMaterials(context: MaterialContext) {
   }
   async function importImage(
     kind: 'background' | 'logo',
-    target: 'background' | 'header' | 'footer' = 'background',
   ): Promise<void> {
     if (!props.textureBridge || !props.materialBridge) return
     let image: CardImage | undefined
@@ -122,9 +121,7 @@ export function useCompositionMaterials(context: MaterialContext) {
     ) return
     const current = settings.value ?? createComposition()
     if (kind === 'background') {
-      const bg = target === 'background' ? current.background : current[target].fill
-      const fill = { ...bg, kind: 'image' as const, image }
-      commit(target === 'background' ? { ...current, background: fill } : { ...current, [target]: { ...current[target], fill } })
+      commit({ ...current, background: { ...current.background, kind: 'image', image } })
     } else if (selectedBrand.value) commit(withLogo(current, selectedBrand.value, image))
   }
   onBeforeUnmount(() => {

@@ -56,6 +56,10 @@ function variants(): Array<{ name: string; frame: Partial<CardFrame> }> {
         title: 'Cute Screen · Публикация — a deliberately long page title for truncation',
         url: 'https://example.test/публикация/a-long-path?preview=1&language=ru' },
     }))),
+    ...(['retro-windows', 'retro-mac'] as const).flatMap((windowStyle) => (['dark', 'light'] as const).map((theme) => ({
+      name: `window-${windowStyle}-${theme}`, frame: { kind: 'window' as const, windowStyle, theme,
+        title: 'Cute Screen · Простое ретро-окно' },
+    }))),
   ]
 }
 

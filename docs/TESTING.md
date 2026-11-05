@@ -1,5 +1,98 @@
 # Стратегия тестирования
 
+## Компактный контрол полей — 2026-11-05
+
+Windows, Chrome 157. `pnpm exec vitest run --project vue tests/unit/vue/composition.test.ts tests/unit/vue/composition-style.test.ts`
+— 12 PASS: прежние numeric/draft/cancel/Undo/read-only, link в центре,
+отсутствие удалённых подписей.
+С `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1`:
+`pnpm test:e2e:browser --spec tests/e2e/specs/browser-inset-slider.e2e.ts --spec tests/e2e/specs/browser-composition-layout.e2e.ts`
+проверяет production mount, slider preview/одну команду, link keyboard,
+independent sides, focus, отмену, Undo/Redo и пределы 0/8192 px. RU/EN ×
+light/dark при 1024 px: схема 112 px, chain в центре и значения без clipping;
+скриншоты `artifacts/browser-e2e/inset-slider-{ru,en}-{dark,light}.png`.
+RU dark осмотрен визуально: нижние настройки доступны выше за счёт сокращения
+блока. Native WebView/macOS/Linux отдельно не запускались. Renderer, document
+schema, команды и IPC не менялись.
+
+## Ретро-окна и inline background palette — 2026-11-05
+
+Windows / Chrome 157. Core red-first: `retro-window.test.ts` — 4 RED до
+реализации. `pnpm exec vitest run --project core --project vue packages/editor-core/src/composition tests/unit/vue/composition.test.ts tests/unit/vue/composition-copy.test.ts`
+— 64 PASS: chrome/отсутствие browser controls, Home outline, codec/Undo,
+invalid windowStyle, RGB/alpha/embedded custom/error/Escape/disabled.
+
+С `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1`:
+`pnpm test:e2e:browser --spec tests/e2e/specs/browser-retro-window.e2e.ts --spec tests/e2e/specs/browser-mockups.e2e.ts`
+— 2 specs PASS: production M05 mount, trusted keyboard, независимые window/browser
+styles, Undo/Redo, неизменные source layers, 1024 px RU/EN × темы. Скриншоты
+`artifacts/browser-e2e/window-retro-{windows,mac}-{ru,en}-{light,dark}.png`.
+`pnpm test:e2e:browser --spec tests/e2e/specs/browser-appearance-colors.e2e.ts`
+— PASS: палитра видна без trigger, RGB сохраняет alpha, custom HEX/invalid
+input/Escape/focus, tool eyedropper, RU/EN × темы без portaled palette/overflow.
+Скриншоты `artifacts/browser-e2e/appearance-color-*.png`.
+
+`CUTE_SCREEN_UPDATE_GOLDENS=1 pnpm test:render tests/harness/render/mockups.test.ts`
+обновил browser Home и добавил window cases; обычный повтор без update —
+2 PASS. Production-like 4K source, decoded PNG 1×/2× через Canvas2D/CanvasKit,
+сравнение backend output и неизменного source hash. Выбранные изображения в
+`artifacts/mockups/window-retro-*.png` и `retro-windows-light.png` осмотрены.
+Native WebView/macOS/Linux этим прогоном не проверялись.
+
+## Логотип выше текста и миниатюры — 2026-11-05
+
+Windows / Chrome 157, `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1`:
+`pnpm test:e2e:browser --spec tests/e2e/specs/browser-composition-logos.e2e.ts`
+проверяет production M05 mount и mock только OS/library boundary. Три разные
+SVG с alpha действительно декодируются в canvas: пиксели миниатюр различаются
+ещё до применения, документ не меняется. Apply/Undo/Redo, удаление только
+library entry, cancel/focus, RU/EN × light/dark и 1024×768. Галерея менее
+100 px высотой, без horizontal overflow, видна над нижней границей body.
+Скриншоты: `artifacts/browser-e2e/logos-{ru,en}-{light,dark}.png`.
+Дополнительно запускаются `browser-composition-branding.e2e.ts` и
+`browser-composition-copy.e2e.ts`.
+
+`pnpm exec vitest run --project vue tests/unit/vue/logo-preview.test.ts tests/unit/vue/composition.test.ts tests/unit/vue/composition-copy.test.ts`
+проверяет bounded 96×96 raster, pending/error/cancel, поздний grant после
+unmount и release token; существующие save/apply/delete/read-only/Copy
+контракты сохраняются. Loading и ошибки локальны миниатюре. Native WebView
+и native library/clipboard этим browser-прогоном не проверяются.
+
+## Удаление полос оформления — 2026-11-05
+
+Windows, текущая версия composition сохранена. Core regression сначала RED,
+после удаления полос `pnpm exec vitest run --project core packages/editor-core/src/composition`
+— 46 PASS. Проверяются отсутствие полей/геометрии полос и явный отказ
+от удалённых полей и branding regions без fallback.
+
+`CUTE_SCREEN_BROWSER_E2E_HEADLESS=1 pnpm test:e2e:browser` с четырьмя
+`--spec`: `browser-composition-copy.e2e.ts`, `browser-composition-sticky.e2e.ts`,
+`browser-composition-branding.e2e.ts`, `browser-composition-gradient.e2e.ts`
+— 4 specs PASS в Chrome 157. Production M05 mount: пять разделов без полос,
+RU/EN × light/dark, навигация без document edits, подписи/Undo/Redo, gradient
+handles и Copy без переключений disabled. Скриншоты в `artifacts/browser-e2e`.
+
+`CUTE_SCREEN_UPDATE_GOLDENS=1 pnpm test:render tests/harness/render/composition.test.ts`
+обновляет эталоны после удаления footer; обычный повтор той же команды без
+update — 2 PASS. PNG 960×720 / 1920×1440 повторно декодированы, Canvas2D и
+CanvasKit сравнены, source 4K не изменён. Footer cases заменены на padding,
+устаревшие footer goldens удалены. Визуально проверены padding и RU dark UI.
+Native WebView и системный clipboard не проверялись; platform backends не менялись.
+
+## Copy без мерцания оформления — 2026-11-05
+
+Windows, Chrome 157: `pnpm test:e2e:browser --spec tests/e2e/specs/browser-composition-copy.e2e.ts`
+с `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1` — PASS. Production mount через M05,
+2560×1440 source, Browser appearance → Background → Copy. MutationObserver
+не обнаружил замен контролов или переключений disabled; раздел, DOM-узлы
+и scrollTop сохранены; inert снят после завершения. Screenshot:
+`artifacts/browser-e2e/appearance-after-copy.png`.
+
+`pnpm exec vitest run --project vue tests/unit/vue/composition.test.ts tests/unit/vue/composition-copy.test.ts` — 13 PASS,
+включая Copy success/error/cancel и запрет команд в pending. Browser action
+adapter не записывает системный clipboard; native Copy, macOS и Linux этим
+прогоном не проверялись. Изменены только блокировка ввода и стили панели.
+
 ## Исправление селекторов фона текста — 2026-11-05
 
 Windows x64 / PowerShell, base `5d139e27dd231f93b5b646c4093afabbd6c3b7d5`.

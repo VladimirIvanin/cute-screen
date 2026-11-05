@@ -65,14 +65,14 @@ describe('publication cards on production-like content', () => {
       height: image.height,
       source: image as unknown as HTMLImageElement })
     try {
-      for (const kind of ['browser', 'window', 'phone', 'footer', 'freeform'] as const) {
+      for (const kind of ['browser', 'window', 'phone', 'padding', 'freeform'] as const) {
         const start = createComposition(kind === 'freeform' ? 'padding' : kind === 'window' ? 'browser' : kind)
         const branding = resolveBrandingYear({ ...createCardBranding('author', 2026),
-          template: '© {year} Cute Screen', region: 'footer', fontSize: 18 }, 2026)
+          template: '© {year} Cute Screen', region: 'card', fontSize: 18 }, 2026)
         const composition: CompositionSettings = { ...start,
           frame: { ...start.frame, kind: kind === 'window' ? 'window' : start.frame.kind, title: 'Cute Screen · Блог' },
           layout: { ...start.layout, mode: 'fixed', width: 960, height: 720 },
-          footer: { ...start.footer, height: 56 }, branding: [branding],
+          branding: [branding],
           background: { ...start.background, kind: kind === 'freeform' ? 'freeform' : 'linear' } }
         const sceneDoc = { ...doc, presentation: { ...doc.presentation, composition } }
         const scene = createDocumentRenderScene(sceneDoc)

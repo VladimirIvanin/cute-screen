@@ -199,17 +199,11 @@
   min-width: 0;
   min-height: 0;
 }
-.cs-composition-section-heading,
-.cs-composition-band > h3 {
+.cs-composition-section-heading {
   margin: 0 0 12px;
   font-size: 13px;
   font-weight: 600;
   line-height: 18px;
-}
-.cs-composition-band + .cs-composition-band {
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid var(--border);
 }
 .cs-composition-panel fieldset {
   border: 0;
@@ -689,17 +683,19 @@
   outline-offset: 2px;
 }
 .cs-composition-panel .cs-inset-link {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 8px;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
   min-height: 32px;
-  margin: 4px 0 8px;
-  padding: 4px;
+  margin: 0;
+  padding: 0;
   border-color: transparent;
   background: transparent;
   color: var(--text-muted);
-  font-size: 12px;
 }
 .cs-composition-panel .cs-inset-link[aria-pressed='true'] {
   border-color: var(--border);
@@ -723,9 +719,9 @@
 .cs-inset-diagram {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(92px, 1.2fr) minmax(0, 1fr);
-  grid-template-rows: 36px 64px 36px;
-  gap: 6px;
-  margin: 4px 0 10px;
+  grid-template-rows: 28px 48px 28px;
+  gap: 4px;
+  margin: 8px 0;
 }
 .cs-composition-panel .cs-inset-side {
   display: flex;
@@ -738,21 +734,12 @@
   background: var(--surface-sunken);
   color: var(--text-muted);
 }
-.cs-inset-side > span {
-  font-size: 11px;
-  line-height: 14px;
-}
 .cs-inset-side strong {
   color: var(--text);
   font-size: 13px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   line-height: 18px;
-}
-.cs-inset-side small {
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--text-muted);
 }
 .cs-inset-side[data-inset-side='top'] {
   grid-area: 1 / 2;
@@ -782,6 +769,8 @@
 }
 .cs-inset-center {
   position: relative;
+  display: grid;
+  place-items: center;
   grid-area: 2 / 2;
   overflow: hidden;
   border: 1px solid var(--border);
@@ -793,48 +782,32 @@
   background: var(--surface-hover);
 }
 .cs-inset-band.is-active {
-  background: var(--surface-hover);
+  background: var(--text-muted);
+  opacity: 0.25;
 }
 .cs-inset-band[data-side='top'] {
   inset: 0 0 auto;
-  height: 10px;
+  height: 6px;
 }
 .cs-inset-band[data-side='bottom'] {
   inset: auto 0 0;
-  height: 10px;
+  height: 6px;
 }
 .cs-inset-band[data-side='left'] {
-  inset: 10px auto 10px 0;
-  width: 10px;
+  inset: 6px auto 6px 0;
+  width: 6px;
 }
 .cs-inset-band[data-side='right'] {
-  inset: 10px 0 10px auto;
-  width: 10px;
+  inset: 6px 0 6px auto;
+  width: 6px;
 }
-.cs-inset-picture {
+.cs-inset-center::before {
+  content: '';
   position: absolute;
-  inset: 10px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
+  inset: 6px;
   border: 1px solid var(--border);
   border-radius: 2px;
   background: var(--surface-raised);
-  font-size: 10px;
-  line-height: 12px;
-  color: var(--text-muted);
-}
-.cs-inset-picture svg {
-  width: 16px;
-  height: 16px;
-}
-.cs-inset-hint {
-  margin: 4px 0 10px;
-  font-size: 11px;
-  line-height: 16px;
-  color: var(--text-muted);
 }
 .cs-card-insets.is-linked .cs-inset-side[aria-pressed='true'] {
   border-color: var(--border);
@@ -1176,6 +1149,17 @@
   grid-template-columns: minmax(0, 1fr) 74px;
   align-items: center;
   gap: 8px;
+}
+.cs-card-color-embedded > .cs-simple-color-picker {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.cs-card-color-sample {
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
 }
 .cs-card-color {
   display: grid;
