@@ -9,16 +9,16 @@ export interface GoldenTolerance {
 }
 
 // Native Canvas2D on Linux/Windows rounds a few resampled RGB channels differently.
-// Measured on the 4K composition fixture: <=28 channels at 1x, <=187 at 2x, delta 1.
-// Keep both a sparse-change budget (0.002%) and a one-level cap; alpha stays exact.
+// Current 4K cards (2026-11-05): <=66 channels at 1x, <=811 at 2x, delta 1.
+// Keep both a sparse-change budget (0.008%) and a one-level cap; alpha stays exact.
 export const compositionCanvas2dTolerance: GoldenTolerance = {
-  maximumChangedChannelRatio: 0.00002,
+  maximumChangedChannelRatio: 0.00008,
   maximumDelta: 1,
 }
 
 // The phone/browser catalog resamples the same 4K fixture into narrower viewports.
 // Linux/Windows: <=41 RGB channels at 1x, <=595 at 2x (0.0061%), delta 1.
-// Scope this budget to mockups; composition goldens retain their smaller budget.
+// Scope this budget to mockups; composition goldens use their separately measured budget.
 export const mockupCanvas2dTolerance: GoldenTolerance = {
   maximumChangedChannelRatio: 0.00007,
   maximumDelta: 1,

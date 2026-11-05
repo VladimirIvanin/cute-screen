@@ -986,6 +986,18 @@ Vue pointer cancel/readonly, decoded Canvas2D/CanvasKit 1×/2×, browser/native
 Chrome hand-drawn 2/2 и fresh WebKitGTK Quick → Editor/reopen 2/2 passed.
 Фактический результат и ограничения — TESTING.md и ADR-147.
 
+## Актуализация переносимости golden карточек — до правки (2026-11-05)
+
+`REQ-OUT-001/003/006/012/014`: на текущих карточках Ubuntu 22.04 / WSL2
+воспроизводит CI: browser 63/811 изменённых RGB-каналов при 1×/2×.
+Диагностика всех пяти карточек: максимум 66/811, только delta=1;
+alpha и CanvasKit exact. Обновить только явный Canvas2D composition budget
+до 0,008%; проверить принятие границы и отказ на следующем канале,
+delta=2 и alpha. Не менять эталоны, renderer и mockup budget. Сохранить
+decoded размеры, source hash, документ и preview/export parity.
+Evidence: `artifacts/composition-rounding/differences.json`; требуются обычные
+`pnpm test:render` на Windows/Linux и `pnpm check` на Windows.
+
 ## Переносимость golden карточек (2026-10-20)
 
 `REQ-OUT-001/003/006/012/014`: Linux воспроизводит CI-разницу Canvas2D

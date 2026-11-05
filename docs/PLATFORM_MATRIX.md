@@ -81,6 +81,16 @@ native drawing/Quick/handoff/reopen pending, запуск остановлен �
 WKWebView/WebKitGTK и остальные runtime отдельно не проверялись.
 Команды, ограничения и evidence — TESTING.md, `artifacts/tapered-shadow/`.
 
+## Canvas2D golden карточек (2026-11-05)
+
+Windows x64 и Ubuntu 22.04 x86_64 / WSL2, Node 22.23.1,
+`@napi-rs/canvas` 1.0.2. Linux воспроизводит текущий CI-сбой browser:
+63/811 RGB-каналов при 1×/2×. Диагностика всех пяти карточек — максимум
+66/811, delta=1; alpha и CanvasKit exact. Явный composition budget обновлён
+до 0,008%; mockups сохраняют 0,007%. Эталоны и production renderer прежние.
+Это software renderer evidence; WebView и native capture не проверяются.
+Команды и результаты — TESTING.md, `artifacts/composition-rounding/`.
+
 ## Canvas2D golden мокапов (2026-10-30)
 
 Windows x64 / Ubuntu 22.04 x86_64 WSL2, Node 22.23.1, native canvas 1.0.2:

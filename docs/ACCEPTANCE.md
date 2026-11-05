@@ -99,7 +99,8 @@ Escape/focus и меню RU/EN × light/dark на 1024 px — passed. Headless C
 ## Переносимость golden мокапов (REQ-OUT-001/006/012/014)
 
 Headless native Canvas2D на Linux/Windows допускает только sparse RGB
-rounding delta≤1: mockups ≤0,007% каналов, composition ≤0,002%.
+rounding delta≤1: mockups ≤0,007% каналов, composition ≤0,008%
+(актуальные карточки измерены 2026-11-05: максимум 66/811 каналов при 1×/2×).
 Alpha и CanvasKit exact. Assertion self-tests принимают точную границу
 каждого бюджета и отклоняют следующий изменённый канал, delta=2 и alpha.
 Production-like 4K fixture сохраняет decoded размеры, исходный SHA-256,

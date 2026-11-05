@@ -38,7 +38,7 @@ beforeEach(async () => {
 afterEach(() => vi.unstubAllEnvs())
 
 describe.each([
-  { name: 'composition', tolerance: compositionCanvas2dTolerance, maximumChannels: 2 },
+  { name: 'composition', tolerance: compositionCanvas2dTolerance, maximumChannels: 8 },
   { name: 'mockup', tolerance: mockupCanvas2dTolerance, maximumChannels: 7 },
 ])('$name golden assertion rounding budget', ({ tolerance, maximumChannels }) => {
   const changes = (count: number) => Array.from({ length: count }, (_, index) => [index * 4, 1] as const)

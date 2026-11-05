@@ -1,5 +1,27 @@
 # Стратегия тестирования
 
+## Округление актуальных golden карточек — 2026-11-05
+
+Windows x64 / PowerShell и Ubuntu 22.04 x86_64 / WSL2, base `23bca85`,
+Node 22.23.1, pnpm 10.33.2, `@napi-rs/canvas` 1.0.2. Исходный composition
+test на Linux воспроизвёл оба CI-падения с теми же ratio: 63/811 каналов
+browser при 1×/2×. Временная диагностика всех пяти карточек дала максимум
+66/811 RGB-каналов, только delta=1; alpha и все CanvasKit PNG exact.
+`differences.json` содержит histogram и bounds для каждого backend/scale.
+Linux browser 2× и эталон открыты и визуально сравнены.
+
+В `golden-assertion.test.ts` новая граница сначала дала RED; явный бюджет
+composition Canvas2D обновлён до 0,008%. Проверки требуют exact RGBA по
+умолчанию, допускают ровно 8 из 100 000 каналов и отклоняют девятый,
+delta=2 и изменение alpha. Mockup budget, production renderer и эталоны
+не менялись. Полный `pnpm test:render` сохраняет production-like 4K source,
+decoded размеры, SHA-256 оригинала, документ и preview/export parity.
+
+Команды, полные логи и итог: `artifacts/composition-rounding/`.
+Linux использует тот же JS workspace и соответствующие Linux native canvas /
+rolldown пакеты во временном каталоге; Windows node_modules не меняются.
+Это headless software renderer; native WebView/capture не проверялись.
+
 ## Компактный контрол полей — 2026-11-05
 
 Windows, Chrome 157. `pnpm exec vitest run --project vue tests/unit/vue/composition.test.ts tests/unit/vue/composition-style.test.ts`
