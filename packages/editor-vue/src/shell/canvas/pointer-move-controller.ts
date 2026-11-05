@@ -143,7 +143,7 @@ function moveDirectHandle(
     context.setGesture({ ...gesture, current: point, removal: { ...gesture.removal,
       cancelled: gesture.removal.cancelled || !event.altKey || distance >= SELECTION_DRAG_THRESHOLD_CSS } })
   } else context.setGesture({ ...gesture, current: point })
-  context.invalidateOverlay()
+  context.invalidateGesturePreview()
 }
 
 function movePan(

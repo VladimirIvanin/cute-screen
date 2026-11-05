@@ -96,6 +96,15 @@ Browser Windows/Chrome: создание Arrow/Shape, смена geometry/тен
 Escape/focus и меню RU/EN × light/dark на 1024 px — passed. Headless Canvas2D
 и CanvasKit при 1×/2× — passed. Native результаты и ограничения — TESTING.md.
 
+## Live-точки с оформлением (REQ-EDT-006, REQ-OUT-009/012)
+
+Windows / Chrome 157: Browser retro frame, production source 2560×1440,
+две позиции точки стрелки обновляют scene pixels до отпускания мыши.
+Snapshot неизменен во время drag; Escape возвращает точные pixels без команды,
+release / один Undo / Redo восстанавливают слои. Selection overlay и стрелка
+совпадают на осмотренном screenshot. Evidence — TESTING.md и
+`artifacts/composition-arrow-preview/`; native WebView отдельно не проверялся.
+
 ## Переносимость golden мокапов (REQ-OUT-001/006/012/014)
 
 Headless native Canvas2D на Linux/Windows допускает только sparse RGB

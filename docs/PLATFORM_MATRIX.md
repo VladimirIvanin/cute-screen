@@ -81,6 +81,15 @@ native drawing/Quick/handoff/reopen pending, запуск остановлен �
 WKWebView/WebKitGTK и остальные runtime отдельно не проверялись.
 Команды, ограничения и evidence — TESTING.md, `artifacts/tapered-shadow/`.
 
+## Live-точки в оформлении (2026-11-05)
+
+Windows x64 / Chrome 157.0.8103.38: production browser M05, retro Browser frame,
+scene pixels изменяются на каждом из двух pointermove точки стрелки до release;
+Escape без команды, один commit / Undo / Redo — PASS. Исправлен frontend
+invalidation path, общий для direct handles. Native WebView и macOS/Linux
+не запускались. Команды, screenshot и логи — TESTING.md,
+`artifacts/composition-arrow-preview/`.
+
 ## Canvas2D golden карточек (2026-11-05)
 
 Windows x64 и Ubuntu 22.04 x86_64 / WSL2, Node 22.23.1,

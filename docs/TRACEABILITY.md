@@ -986,6 +986,23 @@ Vue pointer cancel/readonly, decoded Canvas2D/CanvasKit 1×/2×, browser/native
 Chrome hand-drawn 2/2 и fresh WebKitGTK Quick → Editor/reopen 2/2 passed.
 Фактический результат и ограничения — TESTING.md и ADR-147.
 
+## Live handles внутри оформления — до реализации (2026-11-05)
+
+`REQ-EDT-006`, `REQ-OUT-009/012`: перемещение точки стрелки при включённом
+оформлении должно обновлять саму стрелку до pointerup, согласованно с handles.
+Проверить production browser mount, Browser frame, несколько pointermove,
+неизменный committed документ во время drag, Escape без команды, один commit
+на release и Undo/Redo. Общий direct-handle path должен обновлять scene preview
+также для callout; без оформления остаётся лёгкий overlay. Не делать scene graph
+глубоко реактивным и не создавать EditorCommand на pointermove.
+
+Результат: browser regression RED → GREEN; два pointermove меняют content
+pixels при неизменном snapshot. Escape exact restore, release / Undo / Redo
+прошли на Windows / Chrome 157. Component arrows/images — 10 PASS.
+Исправлены mouse и Shift/Alt invalidation через существующий renderer selector;
+EditorCommand, scene graph и форматы документа прежние. Evidence — TESTING.md,
+`artifacts/composition-arrow-preview/`.
+
 ## Актуализация переносимости golden карточек — до правки (2026-11-05)
 
 `REQ-OUT-001/003/006/012/014`: на текущих карточках Ubuntu 22.04 / WSL2

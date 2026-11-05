@@ -141,7 +141,7 @@ export class KeyboardController {
       event.altKey,
       this.#context.props,
     ))
-    this.#context.invalidateOverlay()
+    this.#context.invalidateGesturePreview()
   }
   #handleShift(
     event: KeyboardEvent,

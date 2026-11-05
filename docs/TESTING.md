@@ -1,5 +1,31 @@
 # Стратегия тестирования
 
+## Live-точки стрелки с оформлением — 2026-11-05
+
+Windows x64 / Chrome 157.0.8103.38, base `b5a5a86`. Production M05 mount,
+2560×1440 source, стрелка создана настоящим pointer input, затем через UI
+включён Browser / Windows 95/98. Новый
+`browser-composition-arrow-preview.e2e.ts` сначала RED: второй pointermove
+не менял пиксели scene при движущемся selection overlay. После маршрутизации
+direct handles через `invalidateGesturePreview` — GREEN. Чтение после RAF и
+штатного `waitForRender`, область вокруг стрелки исключает chrome/shadow.
+Два разных положения обновляют content pixels до pointerup; committed snapshot
+прежний. Escape возвращает точные pixels и документ; release создаёт одну
+правку, Undo/Redo восстанавливают слои. Скриншоты before/live осмотрены:
+стрелка и handles совпадают. Shift/Alt используют ту же invalidation для line
+endpoints; без оформления renderer выбирает прежний overlay.
+
+Команды и логи: `artifacts/composition-arrow-preview/`. Component regression:
+`pnpm exec vitest run --project vue tests/unit/vue/canvas-viewport-arrow.test.ts tests/unit/vue/image-scene-preview.test.ts`
+— 2 files / 10 PASS. Browser команда с `CUTE_SCREEN_BROWSER_E2E_HEADLESS=1`:
+`pnpm test:e2e:browser --spec tests/e2e/specs/browser-composition-arrow-preview.e2e.ts`.
+Совместный прогон с `browser-line.e2e.ts`, `browser-m06-arrow-tools.e2e.ts` и
+`browser-callout-editing.e2e.ts`: стрелка с оформлением 1/1, линии 2/2 и
+обычные стрелки 4/4 PASS. Callout spec FAIL до редактирования handles:
+`callout-editing.ts:85` ожидает закрытия width popover по первому Escape
+при активном numeric draft. Этот отдельный тест не изменялся.
+Native WebView, macOS/Linux этим frontend-прогоном не проверялись.
+
 ## Округление актуальных golden карточек — 2026-11-05
 
 Windows x64 / PowerShell и Ubuntu 22.04 x86_64 / WSL2, base `23bca85`,
