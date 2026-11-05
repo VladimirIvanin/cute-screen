@@ -1,5 +1,22 @@
 # Стратегия тестирования
 
+## Исправление селекторов фона текста — 2026-11-05
+
+Windows x64 / PowerShell, base `5d139e27dd231f93b5b646c4093afabbd6c3b7d5`.
+В `text-context-toolbar.test.ts` и `numeric-shell.test.ts` восстановлено доступное
+имя `Padding`: `With padding` относится к кнопке оформления карточки, а не
+числовому полю фона текста. Production UI и контракты документа не менялись.
+Сохранены проверки invalid/disabled Apply, focus, preview/cancel/Apply и Undo.
+
+- До исправления toolbar regression воспроизведена отдельно; совместный прогон
+  двух файлов также воспроизвёл падение mounted-shell на неверном имени.
+- `pnpm exec vitest run --project vue tests/unit/vue/numeric-shell.test.ts tests/unit/vue/text-context-toolbar.test.ts`
+  — 2 files / 13 passed после исправления.
+- `pnpm tools:install`, `pnpm tools:check` — exit 0.
+- Логи полного `pnpm test`, `pnpm check`, форматирования и итог проверки —
+  `artifacts/text-padding-tests/`. Native/browser повторно не запускались:
+  изменения ограничены component tests и документацией.
+
 ## Оформление без повторных заголовков — 2026-11-04 (ADR-187)
 
 Windows x64 / PowerShell, working-tree base `10a0c798880cadd4614a0ceccb767bbd258efc19`.

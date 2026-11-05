@@ -112,7 +112,7 @@ describe('v7 text contextual toolbar', () => {
     expect(background).toHaveFocus()
     await fireEvent.click(background)
     const backgroundDialog = await rendered.findByRole('dialog')
-    const padding = rendered.getByRole('spinbutton', { name: 'With padding' }) as HTMLInputElement
+    const padding = within(backgroundDialog).getByRole('spinbutton', { name: 'Padding' }) as HTMLInputElement
     await fireEvent.update(padding, '257')
     expect(within(backgroundDialog).getByRole('button', { name: 'Apply' })).toBeDisabled()
     size.focus()

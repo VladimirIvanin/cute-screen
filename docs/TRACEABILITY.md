@@ -1159,6 +1159,12 @@ parity, Escape и undo/redo. Component и decoded blend PNG — 26/26 passed,
 
 ## Клавиатурный контракт числовых полей (2026-10-20)
 
+Регрессия 2026-11-05, `REQ-UI-006/016`: toolbar component tests должны искать
+числовое поле фона по актуальному доступному имени `Padding` и сохранять
+проверки invalid draft, блокировки Apply и восстановления focus при отмене.
+Mounted-shell test использует то же имя для preview/cancel/Apply и Undo.
+Полный unit-прогон проверяет остальные регрессии после изменения inspector.
+
 `REQ-UI-016`, `REQ-EDT-006/016/017`: единый числовой draft для стилей,
 градиентов, слоёв, оформления и номера метки. ↑/↓ и Shift меняют preview,
 один key gesture подтверждается на keyup; каретка не подтверждает ввод.
