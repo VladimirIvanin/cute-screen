@@ -44,7 +44,7 @@ cute-screen-mcp = { version = "=0.1.36", path = "../crates/cute-screen-mcp" }
 cute-screen-storage = { version = "=0.1.36", path = "../crates/cute-screen-storage" }
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.154"
-sha2 = "=0.10.9"
+sha2 = "=0.11.1"
 png = "=0.18.1"
 # Used only for bounded JPEG header/EXIF inspection.  It is already a
 # transitive dependency of arboard; pinning it here makes the import contract
