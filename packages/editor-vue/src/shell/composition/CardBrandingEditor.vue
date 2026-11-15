@@ -122,7 +122,7 @@ const anchors = computed(() => {
     >
       <span>{{ text('Цвет текста', 'Text color') }}</span><SimpleColorPicker
         :model-value="hex(value.color)"
-        v-bind="{ ariaLabel: text('Цвет текста', 'Text color') }"
+        :ariaLabel="text('Цвет текста', 'Text color')"
         :locale="locale"
         :disabled="disabled"
         :eyedropper="false"
@@ -223,7 +223,7 @@ const anchors = computed(() => {
         <div class="cs-brand-backplate-colour">
           <span>{{ text('Цвет подложки', 'Backplate color') }}</span><SimpleColorPicker
             :model-value="hex(value.backplate)"
-            v-bind="{ ariaLabel: text('Цвет подложки', 'Backplate color') }"
+            :ariaLabel="text('Цвет подложки', 'Backplate color')"
             :locale="locale"
             :disabled="disabled"
             :eyedropper="false"

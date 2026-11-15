@@ -138,7 +138,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOnOutside
             :eyedropper="control.eyedropper ?? true"
             :mixed="control.mixed ?? false"
             :locale="pickerLocale ?? 'en'"
-            v-bind="{ ariaLabel: control.label }"
+            :ariaLabel="control.label"
             @opened="openPopover = {}"
             @commit="emit('change', control.id, $event)"
             @eyedropper="emit('eyedropper', control.id)"

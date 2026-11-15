@@ -8,15 +8,27 @@ export interface NumericPresentation {
   readonly presets?: readonly number[]
 }
 
+const LOUPE_ZOOM: NumericPresentation = { stepper: true, unit: '×', presets: [1, 2, 4, 8, 16] }
+const RULER_ANGLE: NumericPresentation = { stepper: true, unit: '°', presets: [15, 30, 45, 90] }
+const RULER_FONT_SIZE: NumericPresentation = { stepper: true, unit: 'px', presets: [12, 16, 24, 32, 48] }
+const IMAGE_OPACITY: NumericPresentation = { slider: true, unit: '%', displayScale: 100 }
+const PERCENT: NumericPresentation = { slider: true, unit: '%' }
+const SLIDER: NumericPresentation = { slider: true }
+const WIDTH: NumericPresentation = { slider: true, unit: 'px', presets: [1, 2, 4, 8, 16] }
+const PIXELS: NumericPresentation = { slider: true, unit: 'px' }
+
+const BY_ID: Record<string, NumericPresentation> = {
+  loupeZoom: LOUPE_ZOOM,
+  rulerAngle: RULER_ANGLE,
+  rulerFontSize: RULER_FONT_SIZE,
+  imageOpacity: IMAGE_OPACITY,
+  layerOpacity: PERCENT,
+  spotlightDimOpacity: PERCENT,
+  censorBlurStrength: SLIDER,
+  width: WIDTH,
+}
+
 export function numericPresentation(control: Extract<ContextControl, { kind: 'range' }>): NumericPresentation {
   if (control.numeric) return control.numeric
-  const { id } = control
-  if (id === 'loupeZoom') return { stepper: true, unit: '×', presets: [1, 2, 4, 8, 16] }
-  if (id === 'rulerAngle') return { stepper: true, unit: '°', presets: [15, 30, 45, 90] }
-  if (id === 'rulerFontSize') return { stepper: true, unit: 'px', presets: [12, 16, 24, 32, 48] }
-  if (id === 'imageOpacity') return { slider: true, unit: '%', displayScale: 100 }
-  if (id === 'layerOpacity' || id === 'spotlightDimOpacity') return { slider: true, unit: '%' }
-  if (id === 'censorBlurStrength') return { slider: true }
-  if (id === 'width') return { slider: true, unit: 'px', presets: [1, 2, 4, 8, 16] }
-  return { slider: true, unit: 'px' }
+  return BY_ID[control.id] ?? PIXELS
 }

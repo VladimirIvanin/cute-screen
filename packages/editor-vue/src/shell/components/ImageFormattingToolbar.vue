@@ -159,7 +159,7 @@ watch(() => open.value && blocked(open.value), (disabled) => {
         <SimpleColorPicker
           v-if="open === 'imageBorderWidth' && color"
           :model-value="color.value"
-          v-bind="{ ariaLabel: text('Border color', 'Цвет рамки') }"
+          :ariaLabel="text('Border color', 'Цвет рамки')"
           :mixed="color.mixed ?? false"
           :disabled="blocked(color.id)"
           :locale="locale"

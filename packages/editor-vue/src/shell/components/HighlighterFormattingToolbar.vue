@@ -114,7 +114,7 @@ watch(disabled, (blocked) => {
     <SimpleColorPicker
       ref="colorPicker"
       :model-value="value('color')"
-      v-bind="{ ariaLabel: text('Colour', 'Цвет') }"
+      :ariaLabel="text('Colour', 'Цвет')"
       :mixed="mixed('color')"
       :disabled="disabled"
       :locale="locale"

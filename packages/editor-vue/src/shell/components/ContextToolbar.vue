@@ -27,16 +27,7 @@ import {
   provide,
 } from 'vue'
 const expanded = ref(false)
-function controlsFor(schema: ContextToolbarSchema) {
-  const order = schema.icon === 'ruler' ? ['rulerColor', 'rulerThickness', 'rulerFontSize', 'rulerUnit'] : []
-  const controls = order.length
-    ? [...schema.controls].sort((a, b) => {
-        const rank = (id: string) => (order.includes(id) ? order.indexOf(id) : order.length)
-        return rank(a.id) - rank(b.id)
-      })
-    : schema.controls
-  return expanded.value ? controls : controls.slice(0, 4)
-}
+const RULER_ORDER = ['rulerColor', 'rulerThickness', 'rulerFontSize', 'rulerUnit']
 const props = defineProps<{
   defaultsTool?: string
   schema?: ContextToolbarSchema | undefined
@@ -44,6 +35,18 @@ const props = defineProps<{
   recentColors?: readonly SrgbColor[]
   pickerLocale?: 'en' | 'ru'
 }>()
+const arrowStrokeControls = computed(() => props.schema?.controls.filter((control) => control.kind === 'arrowStroke') ?? [])
+const visibleControls = computed(() => {
+  const schema = props.schema
+  if (!schema) return []
+  const controls = schema.icon === 'ruler'
+    ? [...schema.controls].sort((a, b) => {
+        const rank = (id: string) => (RULER_ORDER.includes(id) ? RULER_ORDER.indexOf(id) : RULER_ORDER.length)
+        return rank(a.id) - rank(b.id)
+      })
+    : schema.controls
+  return expanded.value ? controls : controls.slice(0, 4)
+})
 const cropPresetControl = computed(() => props.schema?.controls.find((control) => control.id === 'cropPreset' && control.kind === 'select'))
 const cropResetControl = computed(() => props.schema?.controls.find((control) => control.id === 'cropReset'))
 const cropActions = computed(() => props.schema?.controls
@@ -180,7 +183,7 @@ const emit = defineEmits<{
         <UiSelect
           class="cs-ui-select"
           :model-value="cropPresetControl.value"
-          v-bind="{ ariaLabel: cropPresetControl.label }"
+          :ariaLabel="cropPresetControl.label"
           :options="cropPresetControl.options"
           :disabled="Boolean(schema.disabled || cropPresetControl.disabled)"
           @update:model-value="emit('change', cropPresetControl.id, String($event))"
@@ -215,13 +218,13 @@ const emit = defineEmits<{
     </div>
     <div v-else class="cs-context-controls">
       <ArrowFormattingToolbar
-        v-if="schema.controls.some((control) => control.kind === 'arrowStroke')"
+        v-if="arrowStrokeControls.length"
         variant="floating"
-        :controls="schema.controls.filter((control) => control.kind === 'arrowStroke')"
+        :controls="arrowStrokeControls"
         :picker-locale="pickerLocale ?? 'en'"
         @change="(id, value) => emit('change', id, value)"
       />
-      <template v-for="control in controlsFor(schema)" :key="control.id">
+      <template v-for="control in visibleControls" :key="control.id">
         <NButton
           v-if="control.kind === 'action'"
           size="small"
@@ -244,7 +247,7 @@ const emit = defineEmits<{
             :eyedropper="control.eyedropper ?? true"
             :compact="control.compact ?? false"
             :locale="pickerLocale ?? 'en'"
-            v-bind="{ ariaLabel: control.label }"
+            :ariaLabel="control.label"
             @commit="emit('change', control.id, $event)"
             @eyedropper="emit('eyedropper', control.id)"
           />
@@ -269,7 +272,7 @@ const emit = defineEmits<{
           <UiSelect
             class="cs-ui-select"
             :model-value="control.value"
-            v-bind="{ ariaLabel: control.label }"
+            :ariaLabel="control.label"
             :options="control.options"
             :disabled="control.disabled ?? false"
             @update:model-value="emit('change', control.id, String($event))"

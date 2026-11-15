@@ -289,7 +289,7 @@ watch(() => props.schema.disabled, (disabled) => {
             />
             <SimpleColorPicker
               :model-value="hex(payload.stroke.color)"
-              v-bind="{ ariaLabel: text('Line color', 'Цвет линии') }"
+              :ariaLabel="text('Line color', 'Цвет линии')"
               :locale="locale"
               :eyedropper="false"
               :disabled="schema.disabled ?? false"
@@ -318,7 +318,7 @@ watch(() => props.schema.disabled, (disabled) => {
             <SimpleColorPicker
               v-if="frame.kind === 'card' || frame.kind === 'capsule'"
               :model-value="hex(frame.fill)"
-              v-bind="{ ariaLabel: text('Fill color', 'Цвет подложки') }"
+              :ariaLabel="text('Fill color', 'Цвет подложки')"
               :locale="locale"
               :eyedropper="false"
               @commit="fillColor"
@@ -363,7 +363,7 @@ watch(() => props.schema.disabled, (disabled) => {
             <SimpleColorPicker
               v-if="frame.border"
               :model-value="hex(frame.border.color)"
-              v-bind="{ ariaLabel: text('Border color', 'Цвет рамки') }"
+              :ariaLabel="text('Border color', 'Цвет рамки')"
               :locale="locale"
               :eyedropper="false"
               @commit="borderColor"

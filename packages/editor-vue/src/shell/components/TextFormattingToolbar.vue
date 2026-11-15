@@ -285,7 +285,7 @@ onBeforeUnmount(() => {
         ref="colorPicker"
         :model-value="text.color ?? '#000000'"
         :mixed="textMixed(text.color)"
-        v-bind="{ ariaLabel: `${textLabel('color')}${textMixed(text.color) ? `: ${textLabel('mixed')}` : ''}` }"
+        :ariaLabel="`${textLabel('color')}${textMixed(text.color) ? `: ${textLabel('mixed')}` : ''}`"
         :locale="pickerLocale ?? 'en'"
         :eyedropper="false"
         :disabled="blocked"
@@ -301,7 +301,7 @@ onBeforeUnmount(() => {
         :preview-text="text.fontPreviewText"
         :locale="pickerLocale"
 
-        v-bind="{ ariaLabel: `${textLabel('font')}${textMixed(text.fontFamily) ? `: ${textLabel('mixed')}` : ''}` }"
+        :ariaLabel="`${textLabel('font')}${textMixed(text.fontFamily) ? `: ${textLabel('mixed')}` : ''}`"
         :disabled="blocked"
         @opened="closeOtherPopovers('font')"
         @commit="emit('change', 'textFont', $event)"
@@ -439,7 +439,7 @@ onBeforeUnmount(() => {
           <span>{{ textLabel('color') }}</span>
           <SimpleColorPicker
             :model-value="textBackgroundDraft.color"
-            v-bind="{ ariaLabel: textLabel('background') + ' ' + textLabel('color') }"
+            :ariaLabel="textLabel('background') + ' ' + textLabel('color')"
             :locale="pickerLocale ?? 'en'"
             :eyedropper="false"
             :disabled="blocked"

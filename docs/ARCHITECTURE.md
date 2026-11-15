@@ -254,6 +254,9 @@ DOM, JSON/base64 изображений или EditorCommand.
 
 Контроллер coalesce-ит pointer/numeric preview: один активный кадр и последний
 ожидающий, запуск через rAF. Commit/cancel/document switch отменяет подготовку.
+Проекция кадра остаётся в `shallowRef` и не подменяет Vue-prop `document`:
+canvas рисует её напрямую, а размер viewport обновляется только когда числа
+layout изменились.
 Interactive background downsample до 2048 px выполняется после native цензуры.
 Экспорт получает activeDocument отдельно от display projection и сериализуется
 с worker; финальные алгоритмы, original blobs и undo/redo не изменены.

@@ -80,7 +80,9 @@ const {
   refitCanvas,
   imageInsertionTarget,
   focusCanvas,
+  repaintScene,
 } = useCanvasWorkspace(compositionView.props, compositionView.emit)
+compositionView.bindPaint(repaintScene)
 const emojiGhost = ref<HTMLImageElement>()
 function hideEmojiGhost(): void {
   if (emojiGhost.value) emojiGhost.value.style.display = 'none'
@@ -135,7 +137,7 @@ function onContextMenu(event: MouseEvent): void {
   compositionView.props.activateCompositionAt?.(event)
   const point = canvasPoint(event)
   if (!point || !props.document) return
-  const hit = hitTestDocument(props.document, point)
+  const hit = hitTestDocument(compositionView.props.document ?? props.document, point)
   emit('contextMenu', {
     clientX: event.clientX,
     clientY: event.clientY,

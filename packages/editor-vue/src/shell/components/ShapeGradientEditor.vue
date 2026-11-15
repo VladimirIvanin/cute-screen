@@ -54,6 +54,9 @@ const text = (en: string, ru: string) => props.locale === 'ru' ? ru : en
 const host = ref<HTMLElement>()
 const track = ref<HTMLElement>()
 const selected = ref(props.selectedIndex ?? 0)
+let nextStopId = 1
+const stopIds = ref<number[]>(props.fill.stops.map(() => nextStopId++))
+let idSnapshot: number[] | undefined
 const service = inject(numericPreviewKey, undefined)
 const defaultsTool = inject(numericDefaultsKey, () => undefined)
 let numericSelection: number | undefined
@@ -129,6 +132,9 @@ function trackClick(event: MouseEvent): void {
 }
 onBeforeUnmount(cancel)
 watch(() => props.fill, () => {
+  if (stopIds.value.length !== props.fill.stops.length) {
+    stopIds.value = props.fill.stops.map(() => nextStopId++)
+  }
   cancel()
   selected.value = Math.min(selected.value, props.fill.stops.length - 1)
 })
@@ -143,10 +149,20 @@ function updateStop(
   preview = false,
 ): void {
   if (props.disabled) return
+  const previous = current.value.stops
+  const previousIds = stopIds.value.length === previous.length
+    ? stopIds.value
+    : previous.map(() => nextStopId++)
   const replacement = { position: patch.position ?? stop.value.position, color: patch.color ?? stop.value.color }
-  const stops = current.value.stops
-    .map((entry, i) => i === selected.value ? replacement : entry)
-    .sort((a, b) => a.position - b.position)
+  const replacementId = previousIds[selected.value] ?? nextStopId++
+  const ordered = previous
+    .map((entry, index) => ({
+      entry: index === selected.value ? replacement : entry,
+      id: index === selected.value ? replacementId : previousIds[index]!,
+    }))
+    .sort((left, right) => left.entry.position - right.entry.position)
+  const stops = ordered.map((item) => item.entry)
+  stopIds.value = ordered.map((item) => item.id)
   selected.value = stops.indexOf(replacement)
   const fill = { ...current.value, stops }
   if (preview) {
@@ -172,7 +188,13 @@ function add(event: MouseEvent): void {
 function addStop(position: number): void {
   if (props.disabled || current.value.stops.length >= 8) return
   const entry = interpolateStop(current.value.stops, position)
-  const stops = [...current.value.stops, entry].sort((a, b) => a.position - b.position)
+  const entryId = nextStopId++
+  const ordered = [...current.value.stops.map((item, index) => ({
+    entry: item,
+    id: stopIds.value[index] ?? nextStopId++,
+  })), { entry, id: entryId }].sort((left, right) => left.entry.position - right.entry.position)
+  const stops = ordered.map((item) => item.entry)
+  stopIds.value = ordered.map((item) => item.id)
   selected.value = stops.indexOf(entry)
   commit({ ...current.value, stops })
   focusStop()
@@ -193,6 +215,7 @@ function addBetweenStops(): void {
 function remove(): void {
   if (props.disabled || current.value.stops.length <= 2) return
   const stops = current.value.stops.filter((_entry, i) => i !== selected.value)
+  stopIds.value = stopIds.value.filter((_id, index) => index !== selected.value)
   selected.value = Math.min(selected.value, stops.length - 1)
   commit({ ...current.value, stops })
   focusStop()
@@ -205,6 +228,7 @@ function begin(
   stopPointerClick = true
   selected.value = index
   dragging = true
+  idSnapshot = [...stopIds.value]
   draft.value = props.fill
   dragTarget = event.currentTarget as HTMLElement
   pointerId = event.pointerId
@@ -216,6 +240,8 @@ function move(event: PointerEvent): void {
 function cancel(): void {
   cancelNumeric()
   if (dragging) emit('cancel')
+  if (idSnapshot) stopIds.value = idSnapshot
+  idSnapshot = undefined
   dragging = false
   draft.value = undefined
   if (dragTarget?.hasPointerCapture?.(pointerId)) dragTarget.releasePointerCapture(pointerId)
@@ -224,6 +250,7 @@ function cancel(): void {
 function finish(event: PointerEvent): void {
   if (!dragging || event.pointerId !== pointerId) return
   const fill = current.value
+  idSnapshot = undefined
   cancel()
   commit(fill)
   focusStop()
@@ -266,6 +293,7 @@ function changeColor(value: string): void {
 }
 function reverse(): void {
   selected.value = current.value.stops.length - 1 - selected.value
+  stopIds.value = [...stopIds.value].reverse()
   commit(reverseGradient(current.value))
 }
 </script>
@@ -289,7 +317,7 @@ function reverse(): void {
       >
         <button
           v-for="(entry, index) in current.stops"
-          :key="index"
+          :key="stopIds[index]"
           :data-gradient-stop="index"
           class="cs-gradient-stop"
           :class="{ 'is-selected': selected === index }"
@@ -352,7 +380,7 @@ function reverse(): void {
     </div>
     <SimpleColorPicker
       :model-value="hex"
-      v-bind="{ ariaLabel: text('Stop colour', 'Цвет точки') }"
+      :ariaLabel="text('Stop colour', 'Цвет точки')"
       :recent-colors="recentColors"
       :locale="locale"
       :disabled="disabled"

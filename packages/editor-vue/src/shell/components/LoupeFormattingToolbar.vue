@@ -190,7 +190,7 @@ watch(disabled, (blocked) => {
         <template v-if="menu === 'loupeBorderWidth'">
           <SimpleColorPicker
             :model-value="value('loupeBorderColor')"
-            v-bind="{ ariaLabel: text('Border color', 'Цвет рамки') }"
+            :ariaLabel="text('Border color', 'Цвет рамки')"
             :mixed="mixed('loupeBorderColor')"
             :disabled="disabled"
             :locale="locale"

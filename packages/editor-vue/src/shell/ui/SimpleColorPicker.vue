@@ -35,6 +35,20 @@ const popoverPosition = usePreviewPopover(
   () => !props.embedded && shown.value ? panel.value : undefined,
 )
 const text = (en: string, ru: string) => props.locale === 'ru' ? ru : en
+const EMBEDDED_POPOVER = {}
+const popoverProps = computed(() => props.embedded ? EMBEDDED_POPOVER : {
+  show: shown.value,
+  disabled: props.disabled,
+  trigger: 'manual',
+  placement: 'top-start',
+  x: popoverPosition.value?.left ?? 0,
+  y: popoverPosition.value?.top ?? 0,
+  overlap: true,
+  flip: false,
+  showArrow: false,
+  raw: true,
+  to: '.cs-overlay-root',
+})
 const highlighter = ['#FFD54A', '#FFA629', '#FF6BA8', '#B58AFF', '#57ACFF', '#49CCBE', '#78D66D', '#D9D9D9']
 const drawing = [
   '#1E1E1E', '#757575', '#FF7556', '#FF9E42', '#FFC943', '#66D575', '#5AD8CC', '#3DADFF', '#9747FF', '#F849C1',
@@ -140,7 +154,7 @@ function outside(event: MouseEvent): void {
     </button>
     <component
       :is="embedded ? 'div' : NPopover"
-      v-bind="embedded ? {} : { show: shown, disabled, trigger: 'manual', placement: 'top-start', x: popoverPosition?.left ?? 0, y: popoverPosition?.top ?? 0, overlap: true, flip: false, showArrow: false, raw: true, to: '.cs-overlay-root' }"
+      v-bind="popoverProps"
       @update:show="show($event, false)"
       @clickoutside="outside"
     >
@@ -163,7 +177,7 @@ function outside(event: MouseEvent): void {
           </button>
           <DeferredColorPicker
             :model-value="modelValue"
-            v-bind="{ ariaLabel }"
+            :ariaLabel="ariaLabel"
             :recent-colors="recentColors"
             :disabled="disabled"
             :eyedropper="eyedropper"

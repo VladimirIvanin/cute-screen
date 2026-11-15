@@ -237,12 +237,10 @@ function createWorkspaceViewModel(
     closeToolConfigure: bindings.closeToolConfigure,
     activeDocument: workspace.activeDocument,
     spotlightEditing: workspace.spotlightEditing,
-    displayDocument: computed(() => {
-      const doc = workspace.numericPreviewDocument.value ?? workspace.activeDocument.value
-      return doc && core.composition.compositionPreview.value ? { ...doc,
-        presentation: { ...doc.presentation,
-          composition: core.composition.compositionPreview.value } } : doc
-    }),
+    scenePreview: {
+      numeric: workspace.numericPreviewDocument,
+      composition: core.composition.compositionPreview,
+    },
     ...core.composition,
     compositionController: core.composition,
     contextSchema: bindings.contextSchema,

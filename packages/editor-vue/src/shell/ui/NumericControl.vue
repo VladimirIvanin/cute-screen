@@ -57,6 +57,22 @@ const {
   invalid: (value) => emit('invalid', value),
 })
 const presets = computed(() => props.presets?.map((value) => value * (props.displayScale ?? 1)))
+const INPUT_THEME = { heightSmall: '32px', paddingSmall: '0 6px' }
+const ERROR_STATUS = { status: 'error' as const }
+const NO_STATUS = {}
+const inputStatus = computed(() => invalid.value ? ERROR_STATUS : NO_STATUS)
+const inputProps = computed(() => ({
+  role: 'spinbutton' as const,
+  title: blocked.value ? props.disabledReason : undefined,
+  inputmode: 'decimal' as const,
+  'aria-label': props.label,
+  'aria-valuemin': shownMin.value,
+  'aria-valuemax': shownMax.value,
+  'aria-valuenow': ariaValue.value,
+  'aria-describedby': invalid.value ? errorId : undefined,
+  'aria-valuetext': props.mixed && !editing.value ? '—' : `${draft.value}${props.unit ?? ''}`,
+  'aria-invalid': invalid.value ? 'true' as const : 'false' as const,
+}))
 function choose(value: number): void {
   preview(format(value))
   commit()
@@ -106,22 +122,11 @@ onMounted(() => {
         :class="{ 'cs-numeric-entry--stepper': stepper }"
         :value="draft"
         size="small"
-        :theme-overrides="{ heightSmall: '32px', paddingSmall: '0 6px' }"
+        :theme-overrides="INPUT_THEME"
         :disabled="blocked"
         :placeholder="mixed ? '—' : ''"
-        v-bind="invalid ? { status: 'error' as const } : {}"
-        :input-props="{
-          role: 'spinbutton',
-          title: blocked ? disabledReason : undefined,
-          inputmode: 'decimal',
-          'aria-label': label,
-          'aria-valuemin': shownMin,
-          'aria-valuemax': shownMax,
-          'aria-valuenow': ariaValue,
-          'aria-describedby': invalid ? errorId : undefined,
-          'aria-valuetext': mixed && !editing ? '—' : `${draft}${unit ?? ''}`,
-          'aria-invalid': invalid,
-        }"
+        v-bind="inputStatus"
+        :input-props="inputProps"
         @update:value="preview"
         @blur="blur"
       >

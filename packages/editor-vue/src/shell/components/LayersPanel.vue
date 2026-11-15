@@ -33,8 +33,10 @@ type DropPlace = 'before' | 'after'
 
 const DRAG_THRESHOLD_PX = 4
 
-const dragLayerId = ref<string>()
-const dropTarget = ref<{ readonly id: string; readonly place: DropPlace }>()
+const listRoot = ref<HTMLElement>()
+let dropTarget: { readonly id: string; readonly place: DropPlace } | undefined
+let markedRow: HTMLElement | undefined
+let draggedRow: HTMLElement | undefined
 const pointerReorder = ref<{
   readonly layerId: string
   readonly pointerId: number
@@ -55,6 +57,31 @@ function canReorderLayer(layer: LayerSummary): boolean {
   return !layer.transient && !layer.locked
 }
 
+function clearDropMarks(): void {
+  markedRow?.classList.remove('is-drop-before', 'is-drop-after')
+  markedRow = undefined
+  draggedRow?.classList.remove('is-dragging')
+  draggedRow = undefined
+}
+
+function paintDrop(): void {
+  markedRow?.classList.remove('is-drop-before', 'is-drop-after')
+  markedRow = undefined
+  if (!dropTarget) return
+  const row = listRoot.value?.querySelector<HTMLElement>(`[data-layer-id="${CSS.escape(dropTarget.id)}"]`)
+  if (!row) return
+  row.classList.add(dropTarget.place === 'before' ? 'is-drop-before' : 'is-drop-after')
+  markedRow = row
+}
+
+function markDragging(sourceId: string): void {
+  const row = listRoot.value?.querySelector<HTMLElement>(`[data-layer-id="${CSS.escape(sourceId)}"]`)
+  if (!row || row === draggedRow) return
+  draggedRow?.classList.remove('is-dragging')
+  row.classList.add('is-dragging')
+  draggedRow = row
+}
+
 function updateDropFromPointer(
   clientX: number,
   clientY: number,
@@ -63,28 +90,31 @@ function updateDropFromPointer(
   const hit = document.elementFromPoint(clientX, clientY)
   const row = hit?.closest('[data-layer-id]')
   if (!(row instanceof HTMLElement)) {
-    dropTarget.value = undefined
+    dropTarget = undefined
+    paintDrop()
     return
   }
   const targetId = row.dataset.layerId
   if (!targetId || targetId === sourceId) {
-    dropTarget.value = undefined
+    dropTarget = undefined
+    paintDrop()
     return
   }
   const rect = row.getBoundingClientRect()
   const place: DropPlace = clientY < rect.top + rect.height / 2 ? 'before' : 'after'
-  dropTarget.value = { id: targetId, place }
+  dropTarget = { id: targetId, place }
+  paintDrop()
 }
 
 function clearReorder(): void {
-  dragLayerId.value = undefined
-  dropTarget.value = undefined
+  dropTarget = undefined
+  clearDropMarks()
 }
 
 function finishPointerReorder(): void {
   const state = pointerReorder.value
   if (!state?.dragging) return
-  const target = dropTarget.value
+  const target = dropTarget
   if (target && state.layerId !== target.id) {
     emit('reorderTo', state.layerId, target.id, target.place)
   }
@@ -119,7 +149,7 @@ function onLayerPointerMove(event: PointerEvent): void {
     const distance = Math.hypot(event.clientX - state.startX, event.clientY - state.startY)
     if (distance < DRAG_THRESHOLD_PX) return
     state.dragging = true
-    dragLayerId.value = state.layerId
+    markDragging(state.layerId)
   }
   updateDropFromPointer(event.clientX, event.clientY, state.layerId)
 }
@@ -147,14 +177,6 @@ function onLayerPointerCancel(event: PointerEvent): void {
   if (!state || state.pointerId !== event.pointerId) return
   pointerReorder.value = undefined
   clearReorder()
-}
-
-function isDropBefore(layerId: string): boolean {
-  return dropTarget.value?.id === layerId && dropTarget.value.place === 'before'
-}
-
-function isDropAfter(layerId: string): boolean {
-  return dropTarget.value?.id === layerId && dropTarget.value.place === 'after'
 }
 
 function selectLayer(
@@ -279,6 +301,7 @@ const emit = defineEmits<{
     </p>
     <div
       v-else
+      ref="listRoot"
       class="cs-layers-list"
       role="listbox"
       :aria-label="t('layers')"
@@ -291,9 +314,6 @@ const emit = defineEmits<{
         :class="{
           'is-selected': selectedLayerIds?.includes(layer.id) ?? layer.id === selectedLayerId,
           'is-locked': layer.locked,
-          'is-dragging': dragLayerId === layer.id,
-          'is-drop-before': isDropBefore(layer.id),
-          'is-drop-after': isDropAfter(layer.id),
         }"
         role="option"
         :aria-selected="selectedLayerIds?.includes(layer.id) ?? layer.id === selectedLayerId"

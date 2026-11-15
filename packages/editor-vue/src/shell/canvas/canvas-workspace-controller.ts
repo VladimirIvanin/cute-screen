@@ -258,6 +258,10 @@ export class CanvasWorkspaceController {
       overlay: state.overlay,
       rendererError: state.rendererError,
       retryRender: () => void this.#renderer.drawDocument(),
+      repaintScene: () => {
+        void this.#renderer.drawDocument()
+        this.invalidateOverlay()
+      },
       ...this.#eyedropper.bindings(),
       applyCropDraft: this.applyCrop,
       cancelCropDraft: this.cancelCrop,

@@ -26,7 +26,7 @@ function change(value: string): void {
     <SimpleColorPicker
       v-if="embedded"
       :model-value="hex"
-      v-bind="{ ariaLabel: label }"
+      :ariaLabel="label"
       :disabled="disabled"
       :locale="locale"
       :eyedropper="false"
@@ -42,7 +42,7 @@ function change(value: string): void {
       <span>{{ label }}</span><SimpleColorPicker
         v-if="!embedded"
         :model-value="hex"
-        v-bind="{ ariaLabel: label }"
+        :ariaLabel="label"
         :disabled="disabled"
         :locale="locale"
         :eyedropper="false"

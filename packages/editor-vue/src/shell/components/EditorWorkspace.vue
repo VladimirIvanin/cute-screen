@@ -7,6 +7,7 @@ import {
   computed,
   nextTick,
   ref,
+  toRef,
   watch,
 } from 'vue'
 import { createWorkspaceExposure } from '../workspace/exposure'
@@ -56,7 +57,7 @@ const {
   openToolConfigure,
   closeToolConfigure,
   activeDocument,
-  displayDocument,
+  scenePreview,
   spotlightEditing,
   canvasMenu,
   canvasMenuItems,
@@ -123,6 +124,7 @@ const {
   exportDocumentRecovery,
   fitCanvas,
 } = useEditorWorkspace(props)
+const zoomPort = { zoom: toRef(store, 'zoom') }
 
 const shellRoot = ref<HTMLElement>()
 function dismissActionFeedback(): void {
@@ -330,9 +332,9 @@ defineExpose({ ...createWorkspaceExposure(canvasViewport, store, props), ...expo
           :texture-images="textureImages"
           :emoji-defaults="emojiDefaults"
           :image-layer="baseImageLayer"
-          :document="displayDocument"
+          :document="activeDocument"
           :export-document="activeDocument"
-          :interactive-preview="displayDocument !== activeDocument"
+          :scene-preview="scenePreview"
           :composition-space="compositionSpace"
           :selected-layer-id="store.selectedLayerId"
           :selected-layer-ids="store.selectedLayerIds"
@@ -398,7 +400,7 @@ defineExpose({ ...createWorkspaceExposure(canvasViewport, store, props), ...expo
           :schema="selectionSchema"
           :document="activeDocument"
           :selected-ids="store.selectedLayerIds"
-          :zoom="store.zoom"
+          :zoom-port="zoomPort"
           :locale="state.locale.value"
           :recent-colors="drawingPreferences.recentColors"
           @move-start="canvasViewport?.startSelectionMove($event)"

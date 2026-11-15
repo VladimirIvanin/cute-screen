@@ -75,7 +75,7 @@ function color(
       />
       <SimpleColorPicker
         :model-value="hex(payload[`${endpoint}MarkerStyle`]?.color ?? payload.stroke.color)"
-        v-bind="{ ariaLabel: text('Marker color', 'Цвет наконечника') }"
+        :ariaLabel="text('Marker color', 'Цвет наконечника')"
         :locale="locale"
         :eyedropper="false"
         :disabled="disabled"

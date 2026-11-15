@@ -36,6 +36,7 @@ import type {
 } from '../../../packages/editor-vue/src/shell/canvas/contracts'
 import {
   shallowReactive,
+  shallowRef,
   markRaw,
 } from 'vue'
 describe('publication card interface', () => {
@@ -555,5 +556,45 @@ describe('publication card interface', () => {
     expect(view.props.document!.layers).toEqual(document.layers)
     expect(mergeCompositionView(props.document, view.props.document, 'content')!.layers)
       .toEqual(props.document.layers)
+  })
+  it('paints numeric and composition preview without replacing the committed document', () => {
+    const document = initial()
+    const numeric = shallowRef<typeof document>()
+    const composition = shallowRef(document.presentation.composition)
+    const props = shallowReactive<CanvasViewportProps>({
+      documentState: { kind: 'ready', title: 'Card', dimensions: '4K' },
+      document,
+      scenePreview: { numeric, composition },
+      compositionSpace: 'content',
+      canvas: document.canvas,
+      zoom: 100,
+      t: (key) => key,
+    })
+    let paints = 0
+    const view = compositionViewport(props, vi.fn() as CanvasViewportEmit)
+    view.bindPaint(() => {
+      paints += 1
+    })
+    expect(view.props.document).toBe(document)
+    expect(view.props.interactivePreview).toBe(false)
+    const projected = {
+      ...document,
+      layers: document.layers.map((layer) => ({ ...layer, opacity: 0.4 })),
+    }
+    numeric.value = projected
+    expect(props.document).toBe(document)
+    expect(view.props.document).toBe(projected)
+    expect(view.props.interactivePreview).toBe(true)
+    expect(paints).toBe(1)
+    const preview = createComposition('browser')
+    composition.value = { ...preview, shadow: 0.2 }
+    expect(view.props.compositionDocument?.presentation.composition?.shadow).toBe(0.2)
+    expect(props.document?.presentation.composition).toBeUndefined()
+    expect(paints).toBe(2)
+    numeric.value = undefined
+    composition.value = undefined
+    expect(view.props.document).toBe(document)
+    expect(view.props.interactivePreview).toBe(false)
+    expect(paints).toBe(4)
   })
 })

@@ -52,6 +52,16 @@ const emit = defineEmits<{
 }>()
 
 const shown = ref(false)
+const EMBEDDED_POPOVER = {}
+const popoverProps = computed(() => props.embedded ? EMBEDDED_POPOVER : {
+  show: shown.value,
+  disabled: props.disabled,
+  trigger: 'click',
+  placement: 'top-start',
+  showArrow: false,
+  raw: true,
+  to: '.cs-overlay-root',
+})
 const trigger = ref<{ $el?: HTMLElement }>()
 const hexInput = ref<HTMLInputElement>()
 const popover = ref<HTMLElement>()
@@ -233,7 +243,7 @@ function requestEyedropper(): void {
       </template>
       <component
         :is="embedded ? 'div' : NPopover"
-        v-bind="embedded ? {} : { show: shown, disabled, trigger: 'click', placement: 'top-start', showArrow: false, raw: true, to: '.cs-overlay-root' }"
+        v-bind="popoverProps"
         @update:show="onShown"
       >
         <template v-if="!embedded" #trigger>

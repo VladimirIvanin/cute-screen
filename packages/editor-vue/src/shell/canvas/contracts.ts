@@ -1,4 +1,5 @@
 import type {
+  CompositionSettings,
   DrawingDefaults,
   EditorDocumentV1,
   ImageLayer,
@@ -77,8 +78,19 @@ type CanvasTranslationKey =
   | 'loadingEditor'
   | 'retry'
 
+/** Stable holders. Their `.value` updates every preview frame and must not be a Vue prop. */
+export interface ScenePreviewSource {
+  readonly numeric: { readonly value: EditorDocumentV1 | undefined }
+  readonly composition: { readonly value: CompositionSettings | undefined }
+}
+
 export interface CanvasViewportProps {
   interactivePreview?: boolean | undefined
+  scenePreview?: ScenePreviewSource | undefined
+  /** Set by the composition proxy when a preview frame changes viewport size. */
+  previewBounds?: ViewportOutputBounds | undefined
+  /** Set by the composition proxy when a preview frame changes content scale. */
+  previewZoomScale?: number | undefined
   compositionSpace?: 'content' | 'card' | undefined
   activateCompositionAt?: (event: MouseEvent, preserveSelection?: boolean) => void
   compositionDocument?: EditorDocumentV1 | undefined
@@ -197,6 +209,7 @@ export interface CanvasViewportExpose {
 
 export const canvasViewportRuntimeProps = {
   interactivePreview: Boolean,
+  scenePreview: Object as PropType<CanvasViewportProps['scenePreview']>,
   exportDocument: Object as PropType<CanvasViewportProps['exportDocument']>,
   compositionSpace: String as PropType<CanvasViewportProps['compositionSpace']>,
   emojiDefaults: Object as PropType<CanvasViewportProps['emojiDefaults']>,

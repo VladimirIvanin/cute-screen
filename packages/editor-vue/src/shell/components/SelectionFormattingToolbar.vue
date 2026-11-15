@@ -31,7 +31,8 @@ const props = defineProps<{
   document?: EditorDocumentV1 | undefined
   selectedIds: readonly string[]
   layersOpen: boolean
-  zoom: number
+  zoom?: number
+  zoomPort?: { readonly zoom: { readonly value: number } }
   quickMode?: boolean
   locale: 'en' | 'ru'
   recentColors: readonly SrgbColor[]
@@ -141,7 +142,7 @@ function observeLayout(element: HTMLElement): void {
 }
 watch(
   () => [
-    props.schema, props.document, props.selectedIds, props.zoom,
+    props.schema, props.document, props.selectedIds, props.zoomPort?.zoom.value ?? props.zoom,
     props.layersOpen, props.quickMode, props.moveEnabled,
   ],
   () => {

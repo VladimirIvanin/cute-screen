@@ -276,7 +276,7 @@ watch([disabled, mode], () => {
         <SimpleColorPicker
           v-else-if="mode === 'solid'"
           :model-value="value('censorSolidColor')"
-          v-bind="{ ariaLabel: parameterLabel }"
+          :ariaLabel="parameterLabel"
           :mixed="mixed('censorSolidColor')"
           :disabled="disabled"
           :locale="locale"
