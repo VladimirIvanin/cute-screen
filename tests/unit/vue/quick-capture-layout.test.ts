@@ -101,46 +101,162 @@ describe('quick capture overlay layout', () => {
       root.remove()
     }
   })
-  it.each([
-    { x: 200, y: 180, width: 700, height: 300 },
-    { x: 100, y: 650, width: 800, height: 240 },
-    { x: 0, y: 0, width: 500, height: 200 },
-    { x: 900, y: 0, width: 500, height: 200 },
-  ])('places the entire settings group outside crop %o', (crop) => {
-    const settingsSize = { width: 680, height: 46 }
-    const toolSize = { width: 700, height: 46 }
-    const layout = computeQuickCaptureLayout({ ...base, crop, toolSize, settingsSize })
+  it('keeps the tool bar still when the settings panel changes height', () => {
+    const root = document.createElement('div')
+    root.className = 'cs-quick-capture'
+    root.innerHTML = '<div class="cs-quick-actions"></div><div class="cs-quick-toolrail-group"></div><div class="cs-tool-defaults-toolbar"></div>'
+    document.body.append(root)
+    const width = window.innerWidth
+    const height = window.innerHeight
+    const scene = document.createElement('canvas')
+    scene.getBoundingClientRect = () => new DOMRect(0, 0, width, height)
+    const actions = root.querySelector<HTMLElement>('.cs-quick-actions')!
+    const row = root.querySelector<HTMLElement>('.cs-quick-toolrail-group')!
+    const settings = root.querySelector<HTMLElement>('.cs-tool-defaults-toolbar')!
+    Object.defineProperties(actions, { offsetWidth: { value: 46 }, offsetHeight: { value: 120 } })
+    Object.defineProperties(row, { offsetWidth: { value: 240 }, offsetHeight: { value: 40 } })
+    let settingsHeight = 36
+    Object.defineProperty(settings, 'offsetWidth', { value: 280 })
+    Object.defineProperty(settings, 'offsetHeight', { get: () => settingsHeight })
+    try {
+      const controller = new QuickCaptureLayoutController({
+        hosts: shallowRef({ scene } as NonNullable<ConstructorParameters<typeof QuickCaptureLayoutController>[0]['hosts']['value']>),
+        session: shallowRef({
+          snapshot: { core: { document: { canvas: { width, height } } } },
+        } as NonNullable<ConstructorParameters<typeof QuickCaptureLayoutController>[0]['session']['value']>),
+        currentCrop: ref({ x: 80, y: 80, width: 360, height: 160 }),
+      })
+      controller.update()
+      const barTop = row.style.top
+      const firstSettingsTop = Number.parseFloat(settings.style.top)
+      expect(Number.parseFloat(barTop)).toBeGreaterThan(firstSettingsTop)
+      settingsHeight = 120
+      controller.update()
+      expect(row.style.top).toBe(barTop)
+      expect(Number.parseFloat(settings.style.top)).toBeLessThan(firstSettingsTop)
+      expect(settings.dataset.placement).toBe('above')
+    } finally {
+      root.remove()
+    }
+  })
+  it('keeps the tool bar fixed when settings open or change height', () => {
+    const crop = { x: 200, y: 180, width: 700, height: 300 }
+    const plain = computeQuickCaptureLayout({ ...base, crop })
+    const shortSettings = { width: 680, height: 46 }
+    const short = computeQuickCaptureLayout({ ...base, crop, settingsSize: shortSettings })
+    const tall = computeQuickCaptureLayout({
+      ...base, crop, settingsSize: { width: 680, height: 120 },
+    })
+    expect(short.tools).toEqual(plain.tools)
+    expect(tall.tools).toEqual(plain.tools)
+    expect(plain.settings).toBeUndefined()
+    expect(short.settingsCollapsed).toBe(false)
+    expect(tall.settingsCollapsed).toBe(false)
+    expect(short.tools.side).toBe('below')
+    expect(short.settings).toEqual({
+      left: 210,
+      top: plain.tools.top - shortSettings.height - 6,
+      side: 'above',
+    })
+    expect(tall.settings?.top).toBe(plain.tools.top - 120 - 6)
+    expect(short.settings!.top).toBeGreaterThan(short.crop.top)
+    expect(short.settings!.top).toBeLessThan(short.crop.bottom)
+  })
+
+  it('opens settings below a bar that sits above the frame', () => {
+    const settingsSize = { width: 400, height: 46 }
+    const layout = computeQuickCaptureLayout({
+      ...base,
+      crop: { x: 900, y: 680, width: 500, height: 190 },
+      settingsSize,
+    })
+    expect(layout.tools.side).toBe('above')
     expect(layout.settingsCollapsed).toBe(false)
-    const height = settingsSize.height + 6 + toolSize.height
-    expect(layout.tools.top >= layout.crop.bottom + 12 ||
-      layout.tools.top + height <= layout.crop.top - 12).toBe(true)
-    expect(layout.tools.left).toBeGreaterThanOrEqual(8)
-    expect(layout.tools.left + toolSize.width).toBeLessThanOrEqual(base.viewport.width - 8)
-    const overlapsActions = layout.tools.left < layout.actions.left + base.actionSize.width &&
-      layout.tools.left + toolSize.width > layout.actions.left &&
-      layout.tools.top < layout.actions.top + base.actionSize.height &&
-      layout.tools.top + height > layout.actions.top
-    expect(overlapsActions).toBe(false)
+    expect(layout.settings).toMatchObject({
+      top: layout.tools.top + base.toolSize.height + 6,
+      side: 'below',
+    })
+    expect(layout.settings!.top + settingsSize.height).toBeGreaterThan(layout.crop.top)
+    expect(layout.settings!.top).toBeLessThan(layout.crop.bottom)
+    expect(layout.settings!.left).toBeGreaterThanOrEqual(8)
+    expect(layout.settings!.left + settingsSize.width).toBeLessThanOrEqual(base.viewport.width - 8)
+  })
+
+  it('shifts settings sideways instead of covering the action buttons', () => {
+    const settingsSize = { width: 400, height: 40 }
+    const toolSize = { width: 200, height: 46 }
+    const layout = computeQuickCaptureLayout({
+      ...base,
+      crop: { x: 1000, y: 200, width: 300, height: 200 },
+      toolSize,
+      settingsSize,
+    })
+    expect(layout.settingsCollapsed).toBe(false)
+    const settings = layout.settings!
+    const actions = {
+      left: layout.actions.left,
+      top: layout.actions.top,
+      right: layout.actions.left + base.actionSize.width,
+      bottom: layout.actions.top + base.actionSize.height,
+    }
+    const overlaps = settings.left < actions.right &&
+      settings.left + settingsSize.width > actions.left &&
+      settings.top < actions.bottom &&
+      settings.top + settingsSize.height > actions.top
+    expect(overlaps).toBe(false)
+    expect(settings.left).toBeGreaterThanOrEqual(8)
+    expect(settings.left + settingsSize.width).toBeLessThanOrEqual(base.viewport.width - 8)
+    expect(settings.top + settingsSize.height + 6).toBe(layout.tools.top)
+  })
+
+  it('collapses settings that cannot avoid the action buttons inside the viewport', () => {
+    const layout = computeQuickCaptureLayout({
+      ...base,
+      crop: { x: 200, y: 400, width: 400, height: 200 },
+      toolSize: { width: 200, height: 46 },
+      settingsSize: { width: 900, height: 80 },
+    })
+    expect(layout.settingsCollapsed).toBe(true)
+    expect(layout.settings).toBeUndefined()
+    expect(layout.tools.side).toBe('below')
   })
 
   it.each([
     { x: 0, y: 0, width: 1440, height: 900 },
     { x: 10, y: 15, width: 1400, height: 870 },
-    { x: 100, y: 70, width: 800, height: 760 },
-  ])('collapses settings when the entire group cannot fit outside %o', (crop) => {
+  ])('keeps the bar inside the viewport when settings overlay a large frame %o', (crop) => {
+    const plain = computeQuickCaptureLayout({ ...base, crop })
     const layout = computeQuickCaptureLayout({
       ...base, crop, settingsSize: { width: 680, height: 46 },
     })
-    expect(layout.settingsCollapsed).toBe(true)
+    expect(layout.tools).toEqual(plain.tools)
+    expect(layout.settingsCollapsed).toBe(false)
     expect(layout.tools.top).toBeGreaterThanOrEqual(8)
+    expect(layout.settings!.top).toBeGreaterThanOrEqual(8)
+    expect(layout.settings!.top + 46).toBeLessThanOrEqual(base.viewport.height - 8)
   })
 
-  it('collapses settings wider than the viewport instead of covering the crop', () => {
+  it('collapses settings that are taller than the space beside the bar', () => {
+    const plain = computeQuickCaptureLayout({
+      ...base, crop: { x: 0, y: 0, width: 1440, height: 900 },
+    })
+    const layout = computeQuickCaptureLayout({
+      ...base,
+      crop: { x: 0, y: 0, width: 1440, height: 900 },
+      settingsSize: { width: 680, height: 800 },
+    })
+    expect(layout.settingsCollapsed).toBe(true)
+    expect(layout.settings).toBeUndefined()
+    expect(layout.tools).toEqual(plain.tools)
+  })
+
+  it('collapses settings wider than the viewport', () => {
     const layout = computeQuickCaptureLayout({
       ...base, crop: { x: 100, y: 200, width: 800, height: 300 },
       settingsSize: { width: 1600, height: 46 },
     })
     expect(layout.settingsCollapsed).toBe(true)
+    expect(layout.settings).toBeUndefined()
   })
 
   it('maps the hidden native window before measuring WebKitGTK layout', async () => {

@@ -23,33 +23,38 @@ async function frame() {
     }
   })
 }
-async function resizeCorner(
-  corner: 'nw' | 'se',
-  x: number,
-  y: number,
-): Promise<void> {
-  const state = await frame()
-  const crop = state.crop
-  const cx = corner === 'nw' ? crop.x : crop.x + crop.width
-  const cy = corner === 'nw' ? crop.y : crop.y + crop.height
-  const point = (px: number, py: number) => ({
-    x: Math.min(
-      Math.round(state.scene.x + px * state.scene.width / state.canvas.width),
-      Math.round(state.scene.x + state.scene.width - 1),
-    ),
-    y: Math.min(
-      Math.round(state.scene.y + py * state.scene.height / state.canvas.height),
-      Math.round(state.scene.y + state.scene.height - 1),
-    ),
+async function chromeGeometry() {
+  return browser.execute(() => {
+    const tools = document.querySelector('.cs-quick-toolrail-group')!.getBoundingClientRect()
+    const rail = document.querySelector('.cs-toolrail')!.getBoundingClientRect()
+    const settings = document.querySelector<HTMLElement>('.cs-quick-defaults')
+    const visible = Boolean(settings?.checkVisibility({ visibilityProperty: true }))
+    const box = settings?.getBoundingClientRect()
+    return {
+      tools: {
+        x: Math.round(tools.x),
+        y: Math.round(tools.y),
+        width: Math.round(tools.width),
+        height: Math.round(tools.height),
+      },
+      rail: {
+        x: Math.round(rail.x),
+        y: Math.round(rail.y),
+        width: Math.round(rail.width),
+        height: Math.round(rail.height),
+      },
+      settings: visible && box ? {
+        x: Math.round(box.x),
+        y: Math.round(box.y),
+        width: Math.round(box.width),
+        height: Math.round(box.height),
+      } : undefined,
+    }
   })
-  const before = await $('.cs-quick-toolrail-group').getAttribute('style')
-  await browser.action('pointer').move({ origin: 'viewport', ...point(cx, cy) }).down({ button: 'left' })
-    .move({ origin: 'viewport', ...point(x * state.canvas.width, y * state.canvas.height), duration: 150 }).perform(true)
-  expect(await $('.cs-quick-toolrail-group').getAttribute('style')).toBe(before)
-  await browser.action('pointer').up({ button: 'left' }).perform()
 }
+
 describe('Quick settings keep the drawing area free', () => {
-  it('fits outside a small frame, collapses for a full frame and draws through outside dismissal', async function () {
+  it('keeps the tool bar still and opens settings toward the frame', async function () {
     this.timeout(120000)
     await $('button[aria-label="Capture"]').click()
     await browser.waitUntil(async () => (await browser.tauri.listWindows()).includes('quick-capture'))
@@ -57,34 +62,49 @@ describe('Quick settings keep the drawing area free', () => {
     await expect($('.cs-quick-actions button:first-child')).toBeEnabled()
     await $('button[aria-label="Select"]').click()
     await waitForStableCanvas()
-    await resizeCorner('se', .9, .9)
-    await resizeCorner('nw', .25, .25)
-    await resizeCorner('se', .65, .6)
     await $('button[aria-label="Pencil"]').click()
     await expect($('.cs-quick-defaults')).toBeDisplayed()
-    const geometry = await browser.execute(() => {
-      const row = document.querySelector('.cs-quick-defaults')!.getBoundingClientRect()
-      const tools = document.querySelector('.cs-quick-toolrail-group')!.getBoundingClientRect()
-      return { top: Math.min(row.top, tools.top), bottom: Math.max(row.bottom, tools.bottom) }
-    })
-    const small = await frame()
-    const cropTop = small.scene.y + small.crop.y * small.scene.height / small.canvas.height
-    const cropBottom = cropTop + small.crop.height * small.scene.height / small.canvas.height
-    expect(geometry.bottom <= cropTop - 11 || geometry.top >= cropBottom + 11).toBe(true)
+    const pencil = await chromeGeometry()
+    const captured = await frame()
+    const cropTop = captured.scene.y + captured.crop.y * captured.scene.height / captured.canvas.height
+    const cropBottom = cropTop + captured.crop.height * captured.scene.height / captured.canvas.height
+    expect(pencil.settings).toBeDefined()
+    const settings = pencil.settings!
+    const barBelow = pencil.rail.y >= cropBottom - 1
+    if (barBelow) expect(settings.y + settings.height).toBeLessThanOrEqual(pencil.rail.y + 1)
+    else expect(settings.y).toBeGreaterThanOrEqual(pencil.rail.y + pencil.rail.height - 1)
+    expect(settings.y < cropBottom && settings.y + settings.height > cropTop).toBe(true)
+    for (const label of ['Arrow', 'Shape', 'Text']) {
+      await $(`button[aria-label="${label}"]`).click()
+      expect((await chromeGeometry()).rail).toEqual(pencil.rail)
+    }
     await browser.saveScreenshot('artifacts/tauri-e2e/creation-settings-quick-outside.png')
-
-    await $('button[aria-label="Select"]').click()
-    await resizeCorner('nw', 0, 0)
-    await resizeCorner('se', 1, 1)
     await $('button[aria-label="Pencil"]').click()
-    await expect($('.cs-quick-defaults')).not.toBeDisplayed()
-    await expect($('.cs-quick-settings-button')).toBeDisplayed()
-    await $('.cs-quick-settings-button').click()
-    await expect($('.cs-tool-configure-popover-host')).toBeDisplayed()
+    expect((await chromeGeometry()).rail).toEqual(pencil.rail)
     await browser.saveScreenshot('artifacts/tauri-e2e/creation-settings-quick-manual.png')
     const before = await frame()
+    const stroke = await browser.execute(() => {
+      const obstacles = [...document.querySelectorAll<HTMLElement>(
+        '.cs-quick-defaults, .cs-quick-toolrail-group, .cs-quick-actions',
+      )].filter((element) => element.checkVisibility({ visibilityProperty: true }))
+        .map((element) => element.getBoundingClientRect())
+      const scene = document.querySelector('.cs-canvas:not(.cs-canvas-overlay)')!.getBoundingClientRect()
+      for (const ratio of [.62, .5, .75, .38]) {
+        const x = Math.round(scene.left + scene.width * .35)
+        const y = Math.round(scene.top + scene.height * ratio)
+        const blocked = obstacles.some((obstacle) =>
+          (x >= obstacle.left && x <= obstacle.right && y >= obstacle.top && y <= obstacle.bottom) ||
+          (x + 100 >= obstacle.left && x + 100 <= obstacle.right &&
+            y + 50 >= obstacle.top && y + 50 <= obstacle.bottom))
+        if (!blocked) return { x, y }
+      }
+      return {
+        x: Math.round(scene.left + scene.width * .35),
+        y: Math.round(scene.top + scene.height * .62),
+      }
+    })
     await browser.action('pointer')
-      .move({ origin: 'viewport', x: Math.round(before.scene.x + before.scene.width * .35), y: Math.round(before.scene.y + before.scene.height * .45) })
+      .move({ origin: 'viewport', ...stroke })
       .down({ button: 'left' })
       .move({ origin: 'pointer', x: 100, y: 50, duration: 200 })
       .up({ button: 'left' }).perform()
@@ -94,6 +114,18 @@ describe('Quick settings keep the drawing area free', () => {
     await browser.saveScreenshot('artifacts/tauri-e2e/creation-settings-quick-first-stroke.png')
     await $('.cs-quick-actions button:first-child').click()
     await browser.tauri.switchWindow('main')
+    await $('[aria-label="Scene canvas"]').waitForDisplayed()
+    await browser.waitUntil(() => browser.execute(() => {
+      const scene = document.querySelector<HTMLCanvasElement>('.cs-canvas:not(.cs-canvas-overlay)')
+      if (!scene || scene.width === 0) return false
+      const pixel = scene.getContext('2d')?.getImageData(
+        Math.floor(scene.width / 2),
+        Math.floor(scene.height / 2),
+        1,
+        1,
+      ).data
+      return pixel?.[3] === 255
+    }))
     await $('button[aria-label="Pencil"]').click()
     await expect($('.cs-tool-defaults-toolbar')).toBeDisplayed()
     await browser.saveScreenshot('artifacts/tauri-e2e/creation-settings-editor.png')

@@ -12,6 +12,7 @@ import {
   describe,
   expect,
   it,
+  vi,
 } from 'vitest'
 import {
   createEditorShellPinia,
@@ -52,6 +53,33 @@ describe('Quick Capture context toolbar', () => {
     expect(view.container.querySelector('.cs-context-toolbar')).toBeNull()
     view.unmount()
     session.dispose()
+  })
+
+  it('does not hide quick settings while switching between tools', async () => {
+    const { view, session, store } = renderDocument(true)
+    await fireEvent.click(screen.getByRole('button', { name: 'Pencil' }))
+    const panel = view.container.querySelector<HTMLElement>('.cs-quick-defaults')!
+    panel.dispatchEvent(new CustomEvent('cs-quick-settings-layout', { detail: false }))
+    await nextTick()
+    expect(panel).not.toHaveClass('is-collapsed')
+    const hidden = vi.fn()
+    const observer = new MutationObserver(() => {
+      if (panel.classList.contains('is-collapsed') || panel.getAttribute('aria-hidden') === 'true') hidden()
+    })
+    observer.observe(panel, { attributes: true, attributeFilter: ['class', 'aria-hidden'] })
+    try {
+      store.selectTool('arrow')
+      await nextTick()
+      panel.dispatchEvent(new CustomEvent('cs-quick-settings-layout', { detail: false }))
+      await nextTick()
+      expect(hidden).not.toHaveBeenCalled()
+      expect(panel).not.toHaveClass('is-collapsed')
+      expect(panel).toHaveAttribute('aria-hidden', 'false')
+    } finally {
+      observer.disconnect()
+      view.unmount()
+      session.dispose()
+    }
   })
 
   it('retains tool settings and selected-arrow formatting without fallback actions', async () => {

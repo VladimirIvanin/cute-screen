@@ -1079,7 +1079,8 @@ Apply/Cancel. Выбранные объекты и группы использу
 у выделения. При inline-редактировании Text/Callout/подписи Numbered Marker
 TextFormattingToolbar монтируется над .cs-text-editor без дублирования снизу.
 ПКМ и клавиатурный configure фокусируют видимую строку либо открывают явный
-popover. Quick Capture показывает автоматическую строку только вне crop.
+popover. В Quick Capture бар остаётся вне crop, а автоматическая строка
+открывается поверх области со стороны рамки (ADR-194).
 `LayersPanel` не становится вторым inspector: она управляет выбором, порядком,
 visibility, lock, rotation и opacity. Список слоёв — однострочные ряды;
 opacity и rotation редактируются в шапке панели для выбранного слоя, а не на
@@ -1386,11 +1387,14 @@ ADR-102: canvas gesture boundary отправляет bubbling `cs-quick-frame-g
 Внутренняя settings-policy определяет инструменты с автоматической строкой
 defaults. Строка использует существующие ContextToolbar schemas и defaults
 effects; inline text и selection сохраняют собственные владельцы.
-QuickCaptureLayoutController измеряет settings + tools как группу и показывает
-её вне crop либо сообщает свёрнутое состояние DOM-событием. Скрытая строка
-остаётся измеряемой, но inert и исключена из accessibility tree.
-useQuickChromeLayout наблюдает размеры chrome и фиксирует его положение на
-время canvas gesture; layout updates не передают pointermove в Vue state.
+QuickCaptureLayoutController ставит бар только по рамке и его собственному
+размеру, а настройки — отдельным прямоугольником к рамке. Если строка не
+помещается, событие сообщает свёрнутое состояние. Скрытая строка остаётся
+измеряемой, но inert и исключена из accessibility tree. Смена инструмента
+не сбрасывает это состояние. useQuickChromeLayout применяет `cs-preview-layout`
+сразу, а размеры chrome по-прежнему наблюдает через ResizeObserver и фиксирует
+положение на время canvas gesture; layout updates не передают pointermove
+в Vue state.
 Numeric drafts и пипетка сохраняют defaults target независимо от показа панели.
 Document v7, renderer geometry, native IPC и persistence не меняются.
 

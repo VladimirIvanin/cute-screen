@@ -76,7 +76,11 @@ describe('Quick Capture chrome in a real Tauri webview', () => {
       })
     })
     await pointer()
-      .move({ origin: 'viewport', x: before.x + 2, y: before.y + 2 })
+      .move({
+        origin: 'viewport',
+        x: before.x + 2,
+        y: Math.round(before.y + before.height / 2),
+      })
       .down({ button: 'left' })
       .move({ origin: 'viewport', ...end, duration: 150 }).pause(300).up({ button: 'left' }).perform()
     const samples = await browser.execute(() => {
@@ -91,7 +95,10 @@ describe('Quick Capture chrome in a real Tauri webview', () => {
     await expect($('.cs-quick-actions')).toBeDisplayed()
     await expect($('.cs-quick-toolrail-group')).toBeDisplayed()
     await writeFile(path.resolve('artifacts/portal-lifecycle/frame-samples.json'), JSON.stringify(samples, null, 2))
-    await browser.waitUntil(async () => JSON.stringify((await frame()).crop) !== JSON.stringify(before.crop))
+    await browser.waitUntil(
+      async () => JSON.stringify((await frame()).crop) !== JSON.stringify(before.crop),
+      { timeout: 8000, timeoutMsg: 'Quick frame did not resize from the free edge' },
+    )
     const resized = await frame()
     expect(resized.crop).not.toEqual(before.crop)
     await browser.saveScreenshot(path.resolve('artifacts/tauri-e2e/quick-frame-after-resize.png'))
@@ -111,7 +118,16 @@ describe('Quick Capture chrome in a real Tauri webview', () => {
     await expect($('.cs-quick-actions')).toBeDisplayed()
     await expect($('.cs-quick-toolrail-group')).toBeDisplayed()
     expect((await frame()).crop).toEqual(resized.crop)
-    await $('.cs-quick-actions button:last-child').click()
+    await $('button[aria-label="Undo"]').click()
+    expect((await frame()).crop).toEqual(before.crop)
+    await browser.releaseActions()
+    await browser.execute(() => {
+      document.querySelector<HTMLButtonElement>('[data-quick-action="close"]')?.click()
+    })
+    await browser.waitUntil(async () => !(await $('.cs-quick-actions').isExisting()), {
+      timeout: 8000,
+      timeoutMsg: 'Quick capture did not close after the frame resize',
+    })
   })
 
   it('cancels palette sampling when another tool action is chosen', async () => {
@@ -130,17 +146,21 @@ describe('Quick Capture chrome in a real Tauri webview', () => {
       }, { capture: true, once: true })
     })
     await $('button[aria-label="Arrow"]').click({ button: 'right' })
-    await expect($('.cs-tool-configure-popover-host')).toBeDisplayed()
+    const inlineSettings = await $('.cs-quick-defaults').isDisplayed()
+    const surface = inlineSettings ? '.cs-quick-defaults' : '.cs-tool-configure-popover-host'
+    await expect($(surface)).toBeDisplayed()
     expect(await $('html').getAttribute('data-e2e-context-trusted')).toBe('true')
-    await $('.cs-tool-configure-popover-host [data-control="stroke"] button').click()
+    await $(`${surface} [data-control="stroke"] button`).click()
     await expect($('.cs-arrow-toolbar-popover')).toBeDisplayed()
     await $('.cs-arrow-toolbar-popover').$('button[aria-label="2 px"]').click()
     await browser.saveScreenshot(path.resolve('artifacts/tauri-e2e/quick-native-tool-settings.png'))
     await browser.keys('Escape')
     expect(await $('html').getAttribute('data-e2e-key-trusted')).toBe('true')
     await expect($('.cs-arrow-toolbar-popover')).not.toExist()
-    await browser.keys('Escape')
-    await expect($('.cs-tool-configure-popover-host')).not.toExist()
+    if (!inlineSettings) {
+      await browser.keys('Escape')
+      await expect($('.cs-tool-configure-popover-host')).not.toExist()
+    }
     await expect($('.cs-quick-actions')).toBeDisplayed()
     await browser.keys('Escape')
     await browser.waitUntil(async () => !(await $('.cs-quick-actions').isExisting()))
@@ -166,19 +186,17 @@ describe('Quick Capture chrome in a real Tauri webview', () => {
     await $('button[aria-label="Select"]').click()
     const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
     const bounds = await scene.getSize()
-    const origin = await scene.getLocation()
     const sizeBefore = await browser.execute(() => document.querySelector('.cs-quick-size-a11y')?.textContent)
     await browser.action('pointer')
-      .move({ origin: 'viewport', x: Math.round(origin.x + 5), y: Math.round(origin.y + 5) })
+      .move({ origin: scene, x: -Math.round(bounds.width / 2) + 4, y: 0 })
       .down({ button: 'left' })
-      .move({ origin: 'pointer', x: Math.round(bounds.width * 0.2), y: Math.round(bounds.height * 0.2), duration: 100 })
+      .move({ origin: 'pointer', x: Math.round(bounds.width * 0.18), y: 0, duration: 100 })
       .up({ button: 'left' }).perform()
     await browser.waitUntil(async () =>
       (await browser.execute(() => document.querySelector('.cs-quick-size-a11y')?.textContent)) !== sizeBefore)
     await $('button[aria-label="Arrow"]').click()
     await browser.action('pointer')
-      .move({ origin: 'viewport', x: Math.round(origin.x + bounds.width * 0.35),
-        y: Math.round(origin.y + bounds.height * 0.6) })
+      .move({ origin: scene, x: 0, y: 40 })
       .down({ button: 'left' })
       .move({ origin: 'pointer', x: Math.round(bounds.width * 0.3), y: -Math.round(bounds.height * 0.2), duration: 100 })
       .up({ button: 'left' }).perform()

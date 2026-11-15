@@ -66,9 +66,6 @@ export class QuickCaptureLayoutController {
     if (!hasMeasurableChrome(actions, toolRow, bounds)) return undefined
     const tools = toolRow!
     const contextHeight = context?.offsetHeight ?? 0
-    const verticalGap = context ? 6 : 0
-    const groupHeight = contextHeight + verticalGap + tools.offsetHeight
-    const groupWidth = Math.max(tools.offsetWidth, context?.offsetWidth ?? 0)
     const layout = computeQuickCaptureLayout({
       viewport: { width: window.innerWidth, height: window.innerHeight },
       scene: {
@@ -84,25 +81,31 @@ export class QuickCaptureLayoutController {
       ...(context ? { settingsSize: { width: context.offsetWidth, height: contextHeight } } : {}),
     })
     context?.dispatchEvent(new CustomEvent('cs-quick-settings-layout', { detail: layout.settingsCollapsed }))
-    const visibleContextHeight = layout.settingsCollapsed ? 0 : contextHeight
-    const visibleWidth = layout.settingsCollapsed ? tools.offsetWidth : groupWidth
     positionActions(actions, layout.actions)
-    positionTools(tools, context, layout.tools, visibleContextHeight,
-      visibleContextHeight ? verticalGap : 0, visibleWidth)
+    positionTools(tools, context, layout.tools, layout.settings)
     const note = quickRoot?.querySelector<HTMLElement>('.cs-quick-portal-limit')
     if (note) {
       const position = placeQuickCaptureNote(
         { width: window.innerWidth, height: window.innerHeight },
         { width: note.offsetWidth, height: note.offsetHeight },
         { ...layout.actions, width: actions.offsetWidth, height: actions.offsetHeight },
-        { ...layout.tools, width: visibleWidth, height: tools.offsetHeight + visibleContextHeight + verticalGap },
+        { ...layout.tools, width: tools.offsetWidth, height: tools.offsetHeight },
         layout.crop,
       )
       note.style.left = `${Math.round(position.left)}px`
       note.style.top = `${Math.round(position.top)}px`
       note.style.right = 'auto'
     }
-    return layoutKey(bounds, source, crop, actions, groupWidth, groupHeight)
+    return layoutKey(
+      bounds,
+      source,
+      crop,
+      actions,
+      tools.offsetWidth,
+      tools.offsetHeight,
+      layout.settings ? context?.offsetWidth ?? 0 : 0,
+      layout.settings ? contextHeight : 0,
+    )
   }
 
   nextFrame(): Promise<void> {
@@ -152,22 +155,20 @@ function positionActions(
 function positionTools(
   row: HTMLElement,
   context: HTMLElement | null | undefined,
-  position: { left: number; top: number; side: string },
-  contextHeight: number,
-  gap: number,
-  groupWidth: number,
+  tools: { left: number; top: number; side: string },
+  settings: { left: number; top: number; side: string } | undefined,
 ): void {
-  if (context) {
-    context.style.left = `${Math.round(position.left + (groupWidth - context.offsetWidth) / 2)}px`
-    context.style.top = `${Math.round(position.top)}px`
-    context.style.bottom = 'auto'
-    context.style.transform = 'none'
-  }
-  row.style.left = `${Math.round(position.left + (groupWidth - row.offsetWidth) / 2)}px`
-  row.style.top = `${Math.round(position.top + contextHeight + gap)}px`
+  row.style.left = `${Math.round(tools.left)}px`
+  row.style.top = `${Math.round(tools.top)}px`
   row.style.bottom = 'auto'
   row.style.transform = 'none'
-  row.dataset.placement = position.side
+  row.dataset.placement = tools.side
+  if (!context || !settings) return
+  context.style.left = `${Math.round(settings.left)}px`
+  context.style.top = `${Math.round(settings.top)}px`
+  context.style.bottom = 'auto'
+  context.style.transform = 'none'
+  context.dataset.placement = settings.side
 }
 
 function layoutKey(
@@ -175,8 +176,10 @@ function layoutKey(
   source: { width: number; height: number },
   crop: QuickRect,
   actions: HTMLElement,
-  groupWidth: number,
-  groupHeight: number,
+  toolWidth: number,
+  toolHeight: number,
+  settingsWidth: number,
+  settingsHeight: number,
 ): string {
   return [
     window.innerWidth,
@@ -193,7 +196,9 @@ function layoutKey(
     crop.height,
     actions.offsetWidth,
     actions.offsetHeight,
-    groupWidth,
-    groupHeight,
+    toolWidth,
+    toolHeight,
+    settingsWidth,
+    settingsHeight,
   ].join(':')
 }

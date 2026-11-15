@@ -2466,7 +2466,8 @@ Windows/macOS/Wayland were not run for this follow-up. See TESTING.md for comman
 - Название и shortcut — единственное содержимое tool tooltip в RU/EN.
 - Девять creation tools показывают defaults при активации; Text/Callout — inline
   после размещения; Select показывает свойства выбранного объекта.
-- Quick: settings + tools целиком вне crop либо явная кнопка настроек.
+- Quick (ADR-194): бар вне crop и не двигается при смене инструмента.
+  Настройки поверх области со стороны бара, обращённой к рамке, либо кнопка.
   Chrome фиксирован во время gesture; outside-dismiss пропускает первый штрих.
 - Evidence: browser-creation-settings, tool-lifecycle, brushes; native scenario
   creation-settings через production Capture → Quick → Editor.

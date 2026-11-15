@@ -40,13 +40,19 @@ export async function verifyEyedropperToolSwitch(
     await expect(chosen).toHaveAttribute('aria-pressed', 'true')
     await waitForStableCanvas()
     const beforeCount = (await shapeDocument()).layers.length
-    const point = await browser.execute((index) => {
-      const rect = document.querySelector('.cs-canvas:not(.cs-canvas-overlay)')!.getBoundingClientRect()
-      return { x: Math.round(rect.left + rect.width / 2 - 60),
-        y: Math.round(rect.top + rect.height * (.25 + index * .25)) }
-    }, index)
-    await browser.action('pointer')
-      .move({ origin: 'viewport', ...point })
+    const stroke = label === 'quick-capture'
+      ? browser.action('pointer').move({ origin: scene, x: -60, y: 40 })
+      : browser.action('pointer').move({
+          origin: 'viewport',
+          ...(await browser.execute((ratio: number) => {
+            const rect = document.querySelector('.cs-canvas:not(.cs-canvas-overlay)')!.getBoundingClientRect()
+            return {
+              x: Math.round(rect.left + rect.width / 2 - 60),
+              y: Math.round(rect.top + rect.height * ratio),
+            }
+          }, .25 + index * .25)),
+        })
+    await stroke
       .down({ button: 'left' })
       .move({ origin: 'pointer', x: 120, y: 50, duration: 150 })
       .up({ button: 'left' }).perform()

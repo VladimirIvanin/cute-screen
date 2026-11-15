@@ -1,5 +1,16 @@
 # Стратегия тестирования
 
+## Quick Capture: бар не зависит от настроек — 2026-11-15
+
+Linux x86_64, WebKitGTK, локальный `main` совпадал с `origin/main` (`52eb77b`) до правки.
+До изменения, кадр 200,180 700×300 во viewport 1440×900 и бар 620×96: верх бара 492 без настроек, 544 при настройках 46 px и 618 при 120 px. Смена Pencil → Arrow давала два перехода видимости панели (`true` → `false` → `true`).
+
+После ADR-194 `computeQuickCaptureLayout` ставит бар только по рамке, viewport и размеру бара. Настройки — отдельный прямоугольник со стороны рамки. `pnpm exec vitest run --project vue tests/unit/vue/quick-capture-layout.test.ts tests/unit/vue/quick-context-toolbar.test.ts tests/unit/vue/canvas-viewport-quick.test.ts` и полный `pnpm test`: 195 files / 1734 tests PASS. `pnpm format:check` PASS.
+
+`CUTE_SCREEN_E2E_DRIVER_PROVIDER=external CUTE_SCREEN_E2E_SCENARIOS=creation-settings pnpm test:e2e:tauri` — 1 PASS, 3.6s. Скриншоты `artifacts/tauri-e2e/creation-settings-quick-outside.png`, `creation-settings-quick-manual.png`, `creation-settings-quick-first-stroke.png`: бар остаётся у верхнего края полнокадрового захвата, настройки карандаша открываются сразу под баром поверх снимка, штрих в свободной области.
+
+`CUTE_SCREEN_E2E_SCENARIOS=quick-chrome` на том же WebKitGTK: скрытие хрома при ресайзе с середины западного ребра проходит (верхние ручки закрыты баром). Повторный захват в той же сессии не получает OS pointer: eyedropper не создаёт слой, якорь рамки не меняет размер, закрытие Escape упирается в таймаут. Browser e2e не запускался: затронутых browser-спек нет. `pnpm check` PASS. Windows, macOS и Wayland не проверялись.
+
 ## Логотип без служебной обводки — 2026-11-05
 
 Windows x64 / Chrome 157.0.8103.38, base `706b00f`. Production M05 mount,

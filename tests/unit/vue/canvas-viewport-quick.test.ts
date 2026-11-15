@@ -83,6 +83,22 @@ describe('M05 CanvasViewport transforms', () => {
     }
   })
 
+  it('places quick chrome in the same turn as a preview layout event', () => {
+    const update = vi.fn()
+    const chrome = render(defineComponent({
+      setup() {
+        useQuickChromeLayout({ update } as unknown as QuickCaptureLayoutController)
+      },
+      template: '<main class="cs-quick-capture" />',
+    }))
+    try {
+      globalThis.document.dispatchEvent(new Event('cs-preview-layout'))
+      expect(update).toHaveBeenCalledTimes(1)
+    } finally {
+      chrome.unmount()
+    }
+  })
+
   it('does not signal frame changes for annotation drawing or full-editor Crop', async () => {
     for (const quick of [true, false]) {
       const view = mountViewport(quick ? 'pencil' : 'crop', document, '', undefined, false, undefined, undefined, quick)

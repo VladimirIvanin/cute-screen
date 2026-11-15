@@ -136,9 +136,6 @@ const canEditCanvas = computed(() =>
   store.documentHistory.saveState !== 'readOnly' &&
   (store.actionState.status !== 'pending' || store.actionState.action === 'copy'))
 const quickSettingsCollapsed = ref(true)
-watch(() => store.activeToolId, () => {
-  quickSettingsCollapsed.value = true
-}, { flush: 'sync' })
 function onQuickSettingsLayout(event: Event): void {
   quickSettingsCollapsed.value = (event as CustomEvent<boolean>).detail
 }

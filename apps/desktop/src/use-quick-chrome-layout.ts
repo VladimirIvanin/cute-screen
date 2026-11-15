@@ -21,6 +21,9 @@ export function useQuickChromeLayout(controller: QuickCaptureLayoutController) {
     }
     return canvasGesture ? undefined : controller.update(crop)
   }
+  function updateFromPreview(): void {
+    update()
+  }
   function schedule(): void {
     if (frame !== undefined) return
     frame = requestAnimationFrame(() => {
@@ -47,7 +50,7 @@ export function useQuickChromeLayout(controller: QuickCaptureLayoutController) {
   }
   onMounted(() => {
     if (typeof ResizeObserver !== 'undefined') observer = new ResizeObserver(schedule)
-    document.addEventListener('cs-preview-layout', schedule)
+    document.addEventListener('cs-preview-layout', updateFromPreview)
     document.addEventListener('pointerdown', start, true)
     document.addEventListener('cs-quick-frame-gesture', frameGesture)
     window.addEventListener('pointerup', finish)
@@ -59,7 +62,7 @@ export function useQuickChromeLayout(controller: QuickCaptureLayoutController) {
     observer?.disconnect()
     if (frame !== undefined) cancelAnimationFrame(frame)
     frameRoot?.classList.remove('is-changing-frame')
-    document.removeEventListener('cs-preview-layout', schedule)
+    document.removeEventListener('cs-preview-layout', updateFromPreview)
     document.removeEventListener('pointerdown', start, true)
     document.removeEventListener('cs-quick-frame-gesture', frameGesture)
     window.removeEventListener('pointerup', finish)
