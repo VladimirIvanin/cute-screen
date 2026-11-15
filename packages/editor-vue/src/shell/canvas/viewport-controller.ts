@@ -40,6 +40,11 @@ export class ViewportController {
 
   readonly #context: ViewportControllerContext
   #pendingZoomAnchor: ZoomAnchor | undefined
+  #fitted: {
+    readonly width: number
+    readonly height: number
+    readonly zoom: number
+  } | undefined
 
   imageInsertionTarget(point?: { readonly x: number; readonly y: number }) {
     return visibleImageTarget(this.#context.scrollContainer.value, this.#context.scene.value,
@@ -69,6 +74,8 @@ export class ViewportController {
       Number.parseFloat(style.paddingTop || '0') -
       Number.parseFloat(style.paddingBottom || '0')
     if (availableWidth <= 0 || availableHeight <= 0) return
+    const clientWidth = scrollContainer.value.clientWidth
+    const clientHeight = scrollContainer.value.clientHeight
     const scale = Math.min(availableWidth / bounds.width, availableHeight / bounds.height)
     // Round down: an integer percent that rounds up is wider than the
     // padded viewport and shows a scrollbar after capture opens in the editor.
@@ -79,7 +86,20 @@ export class ViewportController {
     ) {
       nextZoom -= 1
     }
-    if (nextZoom < 1 || nextZoom === props.zoom) return
+    if (nextZoom < 1) return
+    const fitted = this.#fitted
+    const growth = fitted
+      ? Math.max(Math.abs(clientWidth - fitted.width), Math.abs(clientHeight - fitted.height))
+      : Number.POSITIVE_INFINITY
+    // A scrollbar changes the client size by a few pixels and would otherwise
+    // raise the zoom, remove the scrollbar, and fit again forever.
+    if (
+      fitted &&
+      nextZoom > fitted.zoom &&
+      growth < 16
+    ) return
+    if (nextZoom === props.zoom) return
+    this.#fitted = { width: clientWidth, height: clientHeight, zoom: nextZoom }
     emit('fitZoom', nextZoom)
   }
 

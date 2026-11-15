@@ -22,7 +22,7 @@ fn remaining(age: Option<Duration>) -> Duration {
         .unwrap_or_default()
 }
 
-/// Order GTK unmap and the compositor roundtrip on the same UI thread.
+/// Order GTK unmap and a non-blocking display flush on the same UI thread.
 pub async fn hide<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
     correlation_id: &str,
@@ -45,7 +45,7 @@ pub async fn hide<R: tauri::Runtime>(
             }
             let display = gtk::gdk::Display::default()
                 .ok_or_else(|| "Wayland GDK display is unavailable".to_owned())?;
-            display.sync();
+            display.flush();
             Ok::<_, String>(has_editor)
         })();
         let _ = sender.send(result);
@@ -59,9 +59,9 @@ pub async fn hide<R: tauri::Runtime>(
     }
     match tokio::time::timeout(Duration::from_secs(2), receiver).await {
         Ok(Ok(Ok(hidden))) => {
-            // Mutter keeps the withdrawn actor for its 150ms fade. A Wayland
-            // roundtrip confirms unmap delivery, not completion of that effect.
-            // Repeated background captures must not pay an unconditional delay.
+            // Mutter keeps the withdrawn actor for its 150ms fade. Flush delivers
+            // the unmap without waiting on the compositor. Repeated background
+            // captures must not pay an unconditional delay.
             let age = LAST_HIDDEN
                 .lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner())

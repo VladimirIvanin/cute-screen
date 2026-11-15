@@ -187,16 +187,17 @@ Select закреплён. `createWorkspaceToolCatalog` фильтрует то�
 документ не меняются. Синхронизация между native WebViews использует имеющийся
 `cute-screen:ui-preferences` event и settings storage.
 
-## Восстановление GTK paint (ADR-149)
+## Восстановление GTK paint (ADR-195)
 
-`platform/linux/window_paint` обслуживает только native main window. Map,
-focus-in и новая allocation size объединяются в один двухкадровый цикл:
+`platform/linux/window_paint` обслуживает только native main window (ADR-195).
+Map, focus-in и новая allocation объединяются в один двухкадровый цикл:
 первый frame clock пропускается, второй вызывает полный GTK `queue_draw`
-и снимает callback. Unmap отменяет ожидание; одинаковая allocation не запускает
-новый цикл. Обработчики живут вместе с GTK widget; callback id хранит weak ref.
-Vue, scene renderer, IPC и EditorCommand в этом восстановлении не участвуют.
-Это ограниченная защита display lifecycle; причина intermittent blackout
-из расследования 2026-10-21 не считается установленной.
+и снимает callback. Unmap отменяет ожидание. Allocation сразу после этого
+draw и изменение меньше 2 px не запускают новый цикл. После завершённого
+цикла map и focus-in молчат до реального изменения размера или remap.
+Обработчики живут вместе с GTK widget. Vue scene renderer в этом
+восстановлении не участвует. Fit холста не повышает zoom без роста контейнера
+хотя бы на 16 px, а ResizeObserver области не запускает полный кадр.
 
 ## Software performance harness (ADR-148)
 
@@ -427,7 +428,7 @@ Arrow body учитывает trim наконечников; ломаная со
 стрелки сохраняют прежнюю геометрию. Circling входит в общий каталог как
 stroke-only фигура; заливка отключена и не создаёт hit area внутри петли.
 
-## Wayland single-shot routing (ADR-122)
+## Wayland single-shot routing (ADR-196)
 
 LinuxCaptureService выбирает отдельный Screenshot-запрос или внешний системный
 helper для Area/Screen/Repeat. GNOME Shell ≤42 в Auto использует встроенный
@@ -440,15 +441,17 @@ portal-окружений. В Auto техническая ошибка встр�
 запускают fallback. При отсутствии Screenshot доступен grim в известных
 wlroots-окружениях. Название окружения не доказывает runtime-поддержку протокола.
 Явный выбор не имеет скрытого fallback. Wayland hide main/settings/Quick
-выполняется на GTK thread с display.sync; ожидается лишь оставшаяся часть fade недавно
+выполняется на GTK thread через display.flush, без ожидания ответа композитора;
+ждётся лишь оставшаяся часть fade недавно
 скрытой поверхности вместо безусловных 200 мс. Capabilities отражают выбранный путь;
 Window/Active Window остаются отдельными advertised Screenshot targets.
 Helpers имеют child guard, 10-секундный timeout, cancel flag, приватный staging
 и полное PNG декодирование. ScreenCast session и GStreamer capture dependencies
 отсутствуют. Native Wayland startup сохраняется.
 
-Screenshot request/response не имеет deadline выбора пользователя: в ashpd
-0.13.13 уже send().await ожидает Response signal. Timeout относится к probe.
+Screenshot request немодальный. Handshake метода ограничен 2 секундами, ответ
+пользователя — 30 секундами; по истечении request закрывается и кадр не
+импортируется. Timeout probe остаётся отдельным.
 Перед mapped warmup переиспользованный Quick shell сбрасывает прежний документ
 и рамку, Vue применяет reset до показа native surface. EditorShell получает
 новый key только между drafts; переход selecting → editing остаётся в одном

@@ -312,10 +312,11 @@ export class CanvasRendererController {
         !this.isCurrent(revision) ||
         isCancelled(error)
       ) return
+      for (const { resource } of this.resources.values()) resource.dispose()
+      this.resources = new Map()
       this.renderer?.dispose()
       this.renderer = undefined
       this.sceneReady = false
-      this.resources = new Map()
       rendererError.value = error instanceof Error ? error.message : String(error)
     }
     if (this.isCurrent(revision)) {

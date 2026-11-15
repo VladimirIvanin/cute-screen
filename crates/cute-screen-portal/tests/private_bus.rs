@@ -247,9 +247,33 @@ fn user_interaction_outlives_the_technical_handshake_timeout() {
         };
         let (result, ()) = tokio::join!(capture, answer);
         assert_eq!(
-            result.expect("no deadline on user interaction"),
+            result.expect("response inside the permission deadline"),
             "file:///tmp/delayed.png"
         );
+        assert_eq!(*harness.state.modal.lock().expect("modal"), Some(false));
+    });
+}
+
+#[test]
+fn silent_permission_dialog_closes_without_importing_a_frame() {
+    support::run(async {
+        let harness = Harness::new().await;
+        harness.state.waiting.store(true, Ordering::Release);
+        let result = screenshot::capture_with_response_timeout(
+            &harness.client,
+            None,
+            Arc::new(AtomicBool::new(false)),
+            Duration::from_millis(80),
+        )
+        .await;
+        let message = result.expect_err("permission deadline").to_string();
+        assert!(
+            message.contains("permission response"),
+            "distinct from handshake timeout: {message}"
+        );
+        assert!(!message.contains("handshake"));
+        assert_eq!(harness.state.closed.load(Ordering::Acquire), 1);
+        assert_eq!(harness.state.responses.load(Ordering::Acquire), 0);
     });
 }
 

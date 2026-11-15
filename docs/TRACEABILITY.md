@@ -1,5 +1,18 @@
 # Трассируемость требований
 
+## Перерисовка редактора и диалог прав Screenshot (2026-11-15)
+
+`REQ-CAP-016/017`: portal Screenshot немодальный. Handshake метода остаётся
+2 секунды, ответ пользователя ограничен 30 секундами и закрывается через
+Request.Close; кадр при тишине не импортируется. Wayland hide вызывает
+`display.flush` и не ждёт композитор на GTK-потоке; пауза fade недавно скрытой
+поверхности сохраняется. Восстановление paint main window не запускает новый
+цикл из собственной allocation, дрожания меньше 2 px и повторного focus до
+unmap или реального resize. Fit холста не повышает zoom без роста контейнера
+на 16 px; ResizeObserver не рисует полный кадр. Ошибка кадра освобождает
+image resources. ADR-195 и ADR-196. Проверки: scheduler `linux_window_paint`,
+private-bus screenshot, unit fit.
+
 ## Исправление Rust dependency audit — до обновления (2026-11-15)
 
 `REQ-QLT-005`, `REQ-REL-005`, ADR-016. CI `cargo deny check` останавливается

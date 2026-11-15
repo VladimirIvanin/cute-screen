@@ -19,6 +19,7 @@ use std::{
 const DESTINATION: &str = "org.freedesktop.portal.Desktop";
 const DESKTOP: &str = "/org/freedesktop/portal/desktop";
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(2);
+const RESPONSE_TIMEOUT: Duration = Duration::from_secs(30);
 
 fn cancelled_error() -> ashpd::Error {
     ashpd::Error::Response(ResponseError::Cancelled)
@@ -56,10 +57,27 @@ fn timeout_error() -> ashpd::Error {
     .into()
 }
 
+fn response_timeout_error() -> ashpd::Error {
+    std::io::Error::new(
+        std::io::ErrorKind::TimedOut,
+        "Screenshot permission response timed out",
+    )
+    .into()
+}
+
 pub async fn capture(
     connection: &Connection,
     target: Option<u32>,
     cancelled: Arc<AtomicBool>,
+) -> Result<String, ashpd::Error> {
+    capture_with_response_timeout(connection, target, cancelled, RESPONSE_TIMEOUT).await
+}
+
+pub async fn capture_with_response_timeout(
+    connection: &Connection,
+    target: Option<u32>,
+    cancelled: Arc<AtomicBool>,
+    response_timeout: Duration,
 ) -> Result<String, ashpd::Error> {
     if cancelled.load(Ordering::Acquire) {
         return Err(cancelled_error());
@@ -100,7 +118,7 @@ pub async fn capture(
     let mut options = HashMap::from([
         ("handle_token", Value::from(token.as_str())),
         ("interactive", Value::from(false)),
-        ("modal", Value::from(true)),
+        ("modal", Value::from(false)),
     ]);
     if let Some(target) = target {
         options.insert("target", Value::from(target));
@@ -136,7 +154,13 @@ pub async fn capture(
         biased;
         _ = cancellation(&cancelled) => { close(&request).await; return Err(cancelled_error()); }
         _ = disconnected(&mut owner) => return Err(ashpd::Error::NoResponse),
-        message = responses.next() => message.ok_or(ashpd::Error::NoResponse)?,
+        message = tokio::time::timeout(response_timeout, responses.next()) => match message {
+            Ok(message) => message.ok_or(ashpd::Error::NoResponse)?,
+            Err(_) => {
+                close(&request).await;
+                return Err(response_timeout_error());
+            }
+        },
     };
     let (response, mut results) = message
         .body()

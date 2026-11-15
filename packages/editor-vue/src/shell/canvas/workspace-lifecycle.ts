@@ -71,8 +71,6 @@ export function registerRenderLifecycle(context: RenderLifecycleContext): void {
         resizeFrame = requestAnimationFrame(() => {
           resizeFrame = undefined
           context.fitCanvas()
-          void context.drawDocument()
-          context.invalidateOverlay()
         })
       })
       if (scrollContainer.value) resizeObserver.observe(scrollContainer.value)

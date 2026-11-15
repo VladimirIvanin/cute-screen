@@ -49,6 +49,7 @@ pub struct State {
     pub started: tokio::sync::Notify,
     pub session: Mutex<String>,
     pub request: Mutex<String>,
+    pub modal: Mutex<Option<bool>>,
 }
 
 pub struct Harness {
@@ -304,6 +305,9 @@ impl FakeScreenshot {
         #[zbus(connection)] connection: &Connection,
     ) -> Result<OwnedObjectPath, ashpd::PortalError> {
         self.0.calls.fetch_add(1, Ordering::AcqRel);
+        *self.0.modal.lock().expect("modal") = options
+            .get("modal")
+            .and_then(|value| bool::try_from(value).ok());
         if self.0.denied.load(Ordering::Acquire) {
             return Err(ashpd::PortalError::NotAllowed("denied".into()));
         }

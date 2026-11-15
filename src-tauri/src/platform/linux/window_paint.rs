@@ -1,13 +1,15 @@
-use std::{
-    cell::{Cell, RefCell},
-    rc::Rc,
-};
+use std::{cell::RefCell, rc::Rc};
 
 use gtk::{glib::ControlFlow, prelude::*};
+
+const SIZE_TOLERANCE: i32 = 2;
 
 #[derive(Debug, Default)]
 struct RepaintCycle {
     frames_remaining: u8,
+    settled: bool,
+    suppress_allocation: bool,
+    size: Option<(i32, i32)>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -19,9 +21,30 @@ enum FrameStep {
 
 impl RepaintCycle {
     fn request(&mut self, mapped: bool) -> bool {
-        if !mapped || self.frames_remaining != 0 {
+        if !mapped || self.frames_remaining != 0 || self.settled {
             return false;
         }
+        self.frames_remaining = 2;
+        true
+    }
+
+    fn request_size(&mut self, mapped: bool, width: i32, height: i32) -> bool {
+        if self.suppress_allocation {
+            self.suppress_allocation = false;
+            self.size = Some((width, height));
+            return false;
+        }
+        let changed =
+            self.size
+                .replace((width, height))
+                .is_none_or(|(previous_width, previous_height)| {
+                    (width - previous_width).abs() >= SIZE_TOLERANCE
+                        || (height - previous_height).abs() >= SIZE_TOLERANCE
+                });
+        if !changed || !mapped || self.frames_remaining != 0 {
+            return false;
+        }
+        self.settled = false;
         self.frames_remaining = 2;
         true
     }
@@ -31,6 +54,8 @@ impl RepaintCycle {
             0 => FrameStep::Stop,
             1 => {
                 self.frames_remaining = 0;
+                self.settled = true;
+                self.suppress_allocation = true;
                 FrameStep::Repaint
             }
             _ => {
@@ -42,6 +67,8 @@ impl RepaintCycle {
 
     fn cancel(&mut self) {
         self.frames_remaining = 0;
+        self.settled = false;
+        self.suppress_allocation = false;
     }
 }
 
@@ -49,12 +76,17 @@ impl RepaintCycle {
 struct WindowPaint {
     cycle: RefCell<RepaintCycle>,
     callback: RefCell<Option<gtk::TickCallbackId>>,
-    size: Cell<Option<(i32, i32)>>,
 }
 
 impl WindowPaint {
     fn request(self: &Rc<Self>, window: &gtk::Window) {
-        if !self.cycle.borrow_mut().request(window.is_mapped()) {
+        if self.cycle.borrow_mut().request(window.is_mapped()) {
+            self.arm(window);
+        }
+    }
+
+    fn arm(self: &Rc<Self>, window: &gtk::Window) {
+        if self.callback.borrow().is_some() {
             return;
         }
         let state = Rc::clone(self);
@@ -96,9 +128,12 @@ pub fn install(window: &gtk::ApplicationWindow) {
     });
     let on_size = Rc::clone(&state);
     window.connect_size_allocate(move |window, allocation| {
-        let size = (allocation.width(), allocation.height());
-        if on_size.size.replace(Some(size)) != Some(size) {
-            on_size.request(window);
+        if on_size.cycle.borrow_mut().request_size(
+            window.is_mapped(),
+            allocation.width(),
+            allocation.height(),
+        ) {
+            on_size.arm(window);
         }
     });
     window.connect_unmap(move |_window| state.cancel());
@@ -139,5 +174,44 @@ mod tests {
         assert_eq!(cycle.frame(), FrameStep::Wait);
         assert_eq!(cycle.frame(), FrameStep::Repaint);
         assert_eq!(cycle.frame(), FrameStep::Stop);
+    }
+
+    #[test]
+    fn own_draw_and_one_pixel_jitter_do_not_start_another_cycle() {
+        let mut cycle = RepaintCycle::default();
+        assert!(cycle.request_size(true, 800, 600));
+        assert_eq!(cycle.frame(), FrameStep::Wait);
+        assert_eq!(cycle.frame(), FrameStep::Repaint);
+        assert!(!cycle.request_size(true, 801, 600));
+        assert!(!cycle.request_size(true, 801, 601));
+        assert_eq!(cycle.frame(), FrameStep::Stop);
+    }
+
+    #[test]
+    fn a_real_resize_after_a_settled_paint_starts_one_cycle() {
+        let mut cycle = RepaintCycle::default();
+        assert!(cycle.request_size(true, 800, 600));
+        assert_eq!(cycle.frame(), FrameStep::Wait);
+        assert_eq!(cycle.frame(), FrameStep::Repaint);
+        assert!(!cycle.request_size(true, 801, 600));
+        assert!(cycle.request_size(true, 1200, 800));
+        assert!(!cycle.request_size(true, 1200, 800));
+        assert_eq!(cycle.frame(), FrameStep::Wait);
+        assert_eq!(cycle.frame(), FrameStep::Repaint);
+        assert_eq!(cycle.frame(), FrameStep::Stop);
+    }
+
+    #[test]
+    fn focus_after_a_completed_cycle_stays_quiet_until_remap() {
+        let mut cycle = RepaintCycle::default();
+        assert!(cycle.request(true));
+        assert_eq!(cycle.frame(), FrameStep::Wait);
+        assert_eq!(cycle.frame(), FrameStep::Repaint);
+        for _ in 0..10 {
+            assert!(!cycle.request(true));
+        }
+        cycle.cancel();
+        assert!(cycle.request(true));
+        assert_eq!(cycle.frame(), FrameStep::Wait);
     }
 }
