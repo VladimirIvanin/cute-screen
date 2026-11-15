@@ -71,6 +71,194 @@ function sameBounds(
     left.height === right.height
 }
 
+const missingPreviewProp = Symbol('missing-preview-prop')
+
+interface PaintedFrame {
+  full: EditorDocumentV1 | undefined
+  view: EditorDocumentV1 | undefined
+  active: boolean
+}
+
+interface PreviewRead {
+  readonly props: CanvasViewportProps
+  readonly painted: PaintedFrame
+  readonly committedView: () => EditorDocumentV1 | undefined
+  readonly bounds: () => ViewportOutputBounds | undefined
+  readonly previewBounds: () => ViewportOutputBounds | undefined
+  readonly previewScale: () => number | undefined
+  readonly contentScale: () => number
+  readonly space: () => 'content' | 'card'
+  readonly compositionEnabled: () => boolean
+  readonly activateAt: (
+    event: MouseEvent,
+    preserveSelection?: boolean,
+  ) => void
+}
+
+function scenePreviewValue(
+  key: string | symbol,
+  read: PreviewRead,
+): unknown {
+  const { props, painted } = read
+  if (key === 'document') return painted.view ?? read.committedView()
+  if (key === 'exportDocument') return props.exportDocument ?? props.document
+  if (key === 'compositionDocument') {
+    const full = painted.full ?? props.document
+    return compositionActive(full, props) ? full : undefined
+  }
+  if (key === 'canvas') {
+    return (painted.view ?? read.committedView())?.canvas ?? props.canvas
+  }
+  if (key === 'interactivePreview') {
+    return Boolean(props.interactivePreview || painted.active)
+  }
+  return missingPreviewProp
+}
+
+function framePreviewValue(
+  key: string | symbol,
+  read: PreviewRead,
+): unknown {
+  const { props } = read
+  if (key === 'compositionBounds') return read.bounds()
+  if (key === 'previewBounds') return read.previewBounds()
+  if (key === 'previewZoomScale') return read.previewScale()
+  if (key === 'zoom') {
+    return (props.zoom ?? 100) * (read.previewScale() ?? read.contentScale())
+  }
+  if (key === 'compositionSpace') return read.space()
+  if (key === 'activateCompositionAt') {
+    return read.compositionEnabled() ? read.activateAt : undefined
+  }
+  return missingPreviewProp
+}
+
+function previewProp(
+  target: CanvasViewportProps,
+  key: string | symbol,
+  read: PreviewRead,
+): unknown {
+  const scene = scenePreviewValue(key, read)
+  if (scene !== missingPreviewProp) return scene
+  const frame = framePreviewValue(key, read)
+  if (frame !== missingPreviewProp) return frame
+  return Reflect.get(target, key)
+}
+
+function paintPreview(
+  props: CanvasViewportProps,
+  space: 'content' | 'card',
+  painted: PaintedFrame,
+): EditorDocumentV1 | undefined {
+  const numeric = props.scenePreview?.numeric.value
+  const composition = props.scenePreview?.composition.value
+  const active = Boolean(numeric || composition)
+  const base = numeric ?? props.document
+  const full = base && composition
+    ? { ...base, presentation: { ...base.presentation, composition } }
+    : active
+      ? base
+      : undefined
+  painted.full = full
+  painted.view = full
+    ? projectView(full, space, compositionActive(full, props))
+    : undefined
+  painted.active = active
+  return full
+}
+
+function syncPaintedLayout(
+  full: EditorDocumentV1 | undefined,
+  props: CanvasViewportProps,
+  card: boolean,
+  committedBounds: ViewportOutputBounds | undefined,
+  committedScale: number,
+  paintedBounds: { value: ViewportOutputBounds | undefined },
+  paintedScale: { value: number | undefined },
+): void {
+  const active = full ? compositionActive(full, props) : false
+  const previewLayout = full?.presentation.composition
+    ? resolveCompositionLayout(full)
+    : undefined
+  const nextBounds = previewLayout && active
+    ? layoutBounds(previewLayout, card)
+    : undefined
+  if (!sameBounds(nextBounds, committedBounds)) {
+    if (!sameBounds(paintedBounds.value, nextBounds)) paintedBounds.value = nextBounds
+  } else if (paintedBounds.value) paintedBounds.value = undefined
+  const nextScale = previewLayout && active && !card
+    ? previewLayout.scale
+    : undefined
+  if (nextScale !== undefined && nextScale !== committedScale) {
+    if (paintedScale.value !== nextScale) paintedScale.value = nextScale
+  } else if (paintedScale.value !== undefined) paintedScale.value = undefined
+}
+
+function activateComposition(
+  props: CanvasViewportProps,
+  enabled: () => boolean,
+  space: { value: 'content' | 'card' },
+  layout: () => CompositionLayout | undefined,
+  emit: CanvasViewportEmit,
+): (
+  event: MouseEvent,
+  preserveSelection?: boolean,
+) => void {
+  return (
+    event,
+    preserveSelection = false,
+  ) => {
+    if (
+      !enabled() ||
+      !props.document ||
+      props.sampling ||
+      props.activeTool === 'hand'
+    ) return
+    const canvas = event.currentTarget as HTMLCanvasElement | null
+    const rect = canvas?.getBoundingClientRect()
+    if (!rect?.width || !rect.height) return
+    const current = layout()
+    if (!current) return
+    const point = {
+      x: (event.clientX - rect.left) * current.width / rect.width,
+      y: (event.clientY - rect.top) * current.height / rect.height,
+    }
+    const next = compositionInteractionSpace(
+      props.document,
+      point,
+      {
+        selecting: props.activeTool === 'select',
+        preserveSelection,
+        currentSpace: space.value,
+      },
+    )
+    if (space.value === next) return
+    space.value = next
+    emit('layerSpace', next)
+  }
+}
+
+function scaleOutgoingZoom(
+  emit: CanvasViewportEmit,
+  contentScale: () => number,
+): CanvasViewportEmit {
+  return (event, ...args) => {
+    if (event === 'zoom' || event === 'fitZoom') {
+      const emitZoom = emit as (
+        name: string,
+        ...values: unknown[]
+      ) => void
+      emitZoom(
+        event,
+        Math.max(1, Math.round((args[0] as number) / contentScale())),
+      )
+      return
+    }
+    const forward = emit as (...values: unknown[]) => void
+    forward(event, ...args)
+  }
+}
+
 /** Interaction geometry stays in its native space; only the display mapping changes. */
 export function compositionViewport(
   props: CanvasViewportProps,
@@ -82,7 +270,9 @@ export function compositionViewport(
     space.value = value ?? 'content'
   }, { flush: 'sync' })
   const card = () => space.value === 'card'
-  const layout = computed(() => props.document ? resolveCompositionLayout(props.document) : undefined)
+  const layout = computed(() => props.document
+    ? resolveCompositionLayout(props.document)
+    : undefined)
   const scale = () => enabled() && !card() ? layout.value!.scale : 1
   const viewDocument = computed(() => props.document
     ? projectView(props.document, space.value, enabled())
@@ -92,27 +282,15 @@ export function compositionViewport(
     return layoutBounds(layout.value!, card())
   }
   // Plain fields: preview frames must not become reactive props of the workspace.
-  const painted = {
-    full: undefined as EditorDocumentV1 | undefined,
-    view: undefined as EditorDocumentV1 | undefined,
+  const painted: PaintedFrame = {
+    full: undefined,
+    view: undefined,
     active: false,
   }
   const paintedBounds = shallowRef<ViewportOutputBounds>()
   const paintedScale = shallowRef<number>()
   let onPaint = () => {}
   let wasActive = false
-  function syncPaintedFrame(full: EditorDocumentV1 | undefined): void {
-    const active = full ? compositionActive(full, props) : false
-    const previewLayout = full?.presentation.composition ? resolveCompositionLayout(full) : undefined
-    const nextBounds = previewLayout && active ? layoutBounds(previewLayout, card()) : undefined
-    if (!sameBounds(nextBounds, bounds())) {
-      if (!sameBounds(paintedBounds.value, nextBounds)) paintedBounds.value = nextBounds
-    } else if (paintedBounds.value) paintedBounds.value = undefined
-    const nextScale = previewLayout && active && !card() ? previewLayout.scale : undefined
-    if (nextScale !== undefined && nextScale !== scale()) {
-      if (paintedScale.value !== nextScale) paintedScale.value = nextScale
-    } else if (paintedScale.value !== undefined) paintedScale.value = undefined
-  }
   watch(() => [
     props.scenePreview?.numeric.value,
     props.scenePreview?.composition.value,
@@ -121,81 +299,49 @@ export function compositionViewport(
     props.activeTool,
     props.quickFrameMode,
   ], () => {
-    const numeric = props.scenePreview?.numeric.value
-    const composition = props.scenePreview?.composition.value
-    const active = Boolean(numeric || composition)
-    const base = numeric ?? props.document
-    const full = base && composition
-      ? { ...base, presentation: { ...base.presentation, composition } }
-      : active ? base : undefined
-    painted.full = full
-    painted.view = full ? projectView(full, space.value, compositionActive(full, props)) : undefined
-    painted.active = active
-    syncPaintedFrame(full)
+    const full = paintPreview(props, space.value, painted)
+    syncPaintedLayout(
+      full,
+      props,
+      card(),
+      bounds(),
+      scale(),
+      paintedBounds,
+      paintedScale,
+    )
+    const active = painted.active
     if (active || wasActive) onPaint()
     wasActive = active
   }, { flush: 'sync' })
-  const viewProps = new Proxy(props, { get(
-    target,
-    key,
-  ) {
-    if (key === 'document') {
-      const committed = viewDocument.value
-      return painted.view ?? committed
-    }
-    if (key === 'exportDocument') return props.exportDocument ?? props.document
-    if (key === 'compositionDocument') {
-      const full = painted.full ?? props.document
-      return compositionActive(full, props) ? full : undefined
-    }
-    if (key === 'compositionBounds') return bounds()
-    if (key === 'previewBounds') return paintedBounds.value
-    if (key === 'previewZoomScale') return paintedScale.value
-    if (key === 'canvas') return (painted.view ?? viewDocument.value)?.canvas ?? props.canvas
-    if (key === 'zoom') return (props.zoom ?? 100) * (paintedScale.value ?? scale())
-    if (key === 'compositionSpace') return space.value
-    if (key === 'interactivePreview') return Boolean(target.interactivePreview || painted.active)
-    if (key === 'activateCompositionAt') return enabled() ? activateAt : undefined
-    return Reflect.get(target, key)
-  } })
-  function activateAt(
-    event: MouseEvent,
-    preserveSelection = false,
-  ): void {
-    if (
-      !enabled() ||
-      !props.document ||
-      props.sampling ||
-      props.activeTool === 'hand'
-    ) return
-    const canvas = event.currentTarget as HTMLCanvasElement | null
-    const bounds = canvas?.getBoundingClientRect()
-    if (!bounds?.width || !bounds.height) return
-    const l = layout.value!
-    const point = { x: (event.clientX - bounds.left) * l.width / bounds.width,
-      y: (event.clientY - bounds.top) * l.height / bounds.height }
-    const next = compositionInteractionSpace(props.document, point,
-      { selecting: props.activeTool === 'select', preserveSelection, currentSpace: space.value })
-    if (space.value !== next) {
-      space.value = next
-      emit('layerSpace', next)
-    }
-  }
-  const viewEmit: CanvasViewportEmit = (event, ...args) => {
-    if (event === 'zoom' || event === 'fitZoom') {
-      ;
-      (emit as (event: string,
-        ...args: unknown[]) => void)(event,
-        Math.max(1,
-          Math.round((args[0] as number) / scale())))
-      return
-    }
-    ;
-    (emit as (...values: unknown[]) => void)(event, ...args)
-  }
+  const activateAt = activateComposition(
+    props,
+    enabled,
+    space,
+    () => layout.value,
+    emit,
+  )
+  const viewProps = new Proxy(props, {
+    get(
+      target,
+      key,
+    ) {
+      return previewProp(target, key, {
+        props,
+        painted,
+        committedView: () => viewDocument.value,
+        bounds,
+        previewBounds: () => paintedBounds.value,
+        previewScale: () => paintedScale.value,
+        contentScale: scale,
+        space: () => space.value,
+        compositionEnabled: enabled,
+        activateAt,
+      })
+    },
+  })
   return {
     props: viewProps,
-    emit: viewEmit,
+    emit: scaleOutgoingZoom(emit, scale),
     bindPaint: (listener: () => void) => {
       onPaint = listener
     },
