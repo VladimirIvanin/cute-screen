@@ -156,7 +156,7 @@ MCP-конфигурации повторно доступны после restar
 `tauri.mcp.conf.json`. Без этого overlay прямые Cargo checks не требуют sidecar.
 Native E2E использует тот же wrapper и pin-ит оба freshly built executable.
 Companion наследует workspace version; version bump обновляет его lock entry и
-точную desktop dependency. rmcp 3.7.0 закреплён; license audit/SBOM включают crate.
+точную desktop dependency. rmcp 3.10.0 закреплён; license audit/SBOM включают crate.
 AppImage перенаправляет `--mcp-stdio` до GTK/Wayland initialization. Проверка release
 package обязана подтвердить запуск companion из установленного пакета на каждой ОС.
 Подробности: [MCP.md](MCP.md).

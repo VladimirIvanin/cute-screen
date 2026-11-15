@@ -1,5 +1,22 @@
 # Стратегия тестирования
 
+## Rust audit: libsqlite3-sys и rmcp — 2026-11-15
+
+Linux 6.8.0-147-generic x86_64, Rust/Cargo 1.97.0, cargo-deny 0.20.2.
+CI останавливался на RUSTSEC-2026-0459 (`libsqlite3-sys 0.38.2`) и
+RUSTSEC-2026-0462 (`rmcp 3.8.0`). Storage и desktop dev-dependency подняты до
+`rusqlite =0.41.1` и `rusqlite_migration =2.7.0`; lock получил `libsqlite3-sys 0.39.1`.
+`rusqlite 0.43.0` уже есть, но `rusqlite_migration 2.7.0` принимает только `^0.41.0`.
+Companion поднят до `rmcp =3.10.0` с прежними features `server` и `transport-io`;
+Streamable HTTP client в граф не входит. Policy и исключения не менялись.
+
+- `cargo test -p cute-screen-storage -p cute-screen-mcp --locked` — storage 33 passed,
+  companion 2 unit + 1 stdio passed.
+- `cargo deny check` — exit 0: advisories, bans, licenses и sources ok.
+  Duplicate warnings остаются на `multiple-versions = "warn"`.
+
+Hosted CI, Windows и macOS этим прогоном не подтверждаются.
+
 ## Quick Capture: бар не зависит от настроек — 2026-11-15
 
 Linux x86_64, WebKitGTK, локальный `main` совпадал с `origin/main` (`52eb77b`) до правки.

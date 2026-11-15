@@ -97,7 +97,7 @@ cc = "=1.10.0"
 # `cargo check --all-targets` compiles the cfg(test) X11 adapter on every CI
 # host. Keep its pure-Rust protocol dependency available outside Linux too.
 x11rb = { version = "=0.14.0", default-features = false, features = ["composite", "image", "randr", "xfixes", "xkb"] }
-rusqlite = { version = "=0.40.2", features = ["bundled"] }
+rusqlite = { version = "=0.41.1", features = ["bundled"] }
 
 [features]
 default = ["x11-capture"]

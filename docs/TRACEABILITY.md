@@ -1,5 +1,18 @@
 # Трассируемость требований
 
+## Исправление Rust dependency audit — до обновления (2026-11-15)
+
+`REQ-QLT-005`, `REQ-REL-005`, ADR-016. CI `cargo deny check` останавливается
+на RUSTSEC-2026-0459 (`libsqlite3-sys 0.38.2`, CVE-2026-119375) и
+RUSTSEC-2026-0462 (`rmcp 3.8.0`, неограниченная буферизация тела Streamable HTTP).
+План: поднять `rusqlite` до `=0.41.1` и `rusqlite_migration` до `=2.7.0`, чтобы
+bundled SQLite приходил из `libsqlite3-sys` не ниже 0.39.0; поднять `rmcp` до
+`=3.10.0`. Companion по-прежнему включает только `server` и `transport-io`:
+затронутые HTTP-клиенты не собираются, но advisory привязан к версии крейта,
+поэтому отключение feature audit не закрывает. Policy без исключений.
+Контракты документа, originals и stdio MCP не меняются. Проверки: тесты storage
+и companion, полный `cargo deny check`.
+
 ## Логотип без служебной обводки — до реализации (2026-11-05)
 
 `REQ-OUT-013`, `REQ-UI-007`: область перетаскивания подписи не рисует постоянную
