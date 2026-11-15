@@ -79,7 +79,7 @@ type CanvasTranslationKey =
   | 'retry'
 
 /** Stable holders. Their `.value` updates every preview frame and must not be a Vue prop. */
-export interface ScenePreviewSource {
+interface ScenePreviewSource {
   readonly numeric: { readonly value: EditorDocumentV1 | undefined }
   readonly composition: { readonly value: CompositionSettings | undefined }
 }
