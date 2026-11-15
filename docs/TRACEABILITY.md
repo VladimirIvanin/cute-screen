@@ -11,6 +11,13 @@ warmup ADR-197 не возвращается. Кэш probe не менялся: 
 показаться, это не `Unavailable`. ADR-198. Проверки: Vue layout и boundary
 порядка hide, `pnpm test` 198 files / 1746 tests. Команды — TESTING.md.
 
+## Версия 0.1.39 (2026-11-15)
+
+`REQ-REL-005/006`: по запросу владельца поднять patch 0.1.38 → 0.1.39
+штатной `pnpm version:bump`. Синхронизируются package.json, Tauri config,
+Cargo workspace, точные storage/mcp/portal dependencies и локальные package
+entries Cargo.lock. Внешние зависимости, тег и публикация Release не меняются.
+
 ## Курсор размера кисти (2026-11-15)
 
 `REQ-TOL-003/004`, `REQ-UI-005`: Pencil и Highlighter заменяют системный курсор

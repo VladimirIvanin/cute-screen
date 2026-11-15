@@ -880,7 +880,7 @@ checksum = "52560adf09603e58c9a7ee1fe1dcb95a16927b17c127f0ac02d6e768a0e25bc1"
 
 [[package]]
 name = "cute-screen-desktop"
-version = "0.1.38"
+version = "0.1.39"
 dependencies = [
  "arboard",
  "ashpd",
@@ -926,7 +926,7 @@ dependencies = [
 
 [[package]]
 name = "cute-screen-mcp"
-version = "0.1.38"
+version = "0.1.39"
 dependencies = [
  "base64 0.23.1",
  "rmcp",
@@ -937,7 +937,7 @@ dependencies = [
 
 [[package]]
 name = "cute-screen-portal"
-version = "0.1.38"
+version = "0.1.39"
 dependencies = [
  "ashpd",
  "futures-util",
@@ -950,7 +950,7 @@ dependencies = [
 
 [[package]]
 name = "cute-screen-storage"
-version = "0.1.38"
+version = "0.1.39"
 dependencies = [
  "image",
  "png 0.18.1",

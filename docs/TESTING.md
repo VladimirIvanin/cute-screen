@@ -19,6 +19,14 @@ GNOME пропадает, оверлей мелькает и поверхнос�
 Ручное подтверждение панели и повторного Area на GNOME 42 остаётся за
 владельцем. Windows и macOS этим изменением не запускались.
 
+## Версия 0.1.39 — 2026-11-15
+
+Linux 6.8.0-147-generic x86_64. `pnpm version:bump 0.1.39` синхронизировал
+package.json, `src-tauri/tauri.conf.json`, Cargo workspace, точные зависимости
+desktop crate и локальные package entries Cargo.lock: 0.1.38 → 0.1.39.
+`pnpm exec vitest run --project boundaries tests/boundaries/bump-version.test.ts tests/boundaries/release-assets.test.ts`
+— 2 files / 34 tests PASS. Тег и публикация Release не выполнялись.
+
 ## Курсор размера кисти — 2026-11-15
 
 Linux 6.8.0-147-generic x86_64, Node 22.23.1, pnpm 10.33.2.
