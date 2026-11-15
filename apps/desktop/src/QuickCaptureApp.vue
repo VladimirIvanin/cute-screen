@@ -176,6 +176,7 @@ function resetDraftSession(): void {
   materialized.value = false
   quickLayoutReady.value = false
   coordinator.reset()
+  shell.selectTool('select')
   error.value = undefined
   presentedDraftId = undefined
   presentingDraftId = undefined
@@ -190,6 +191,7 @@ async function dismissWindow(): Promise<void> {
 async function presentPreparedDraft(draftId: string): Promise<void> {
   if (presentedDraftId === draftId || presentingDraftId === draftId) return
   presentingDraftId = draftId
+  const revealStarted = performance.now()
   try {
     await nextTick()
     if (draft.value?.draftId !== draftId) return
@@ -204,7 +206,12 @@ async function presentPreparedDraft(draftId: string): Promise<void> {
         if (!(await tauriDesktopBridge.quickCaptureReveal(draftId))) {
           throw new Error('Quick capture draft is no longer active')
         }
-        if (draft.value?.draftId === draftId) testFacade?.recordReveal()
+        if (draft.value?.draftId === draftId) {
+          testFacade?.recordReveal()
+          console.info(
+            `cute-screen capture timing ${draft.value.correlationId} reveal ${Math.round(performance.now() - revealStarted)}ms`,
+          )
+        }
       },
       measure: () => selectionPending.value ? layoutController.selectionLayout() : updateQuickLayout(),
       nextFrame: nextLayoutFrame,
@@ -263,16 +270,31 @@ async function loadDraft(): Promise<void> {
   await nextTick()
   if (revision !== loadRevision || draft.value?.draftId !== active.draftId) return
   testFacade?.recordWarmup()
-  if (!(await tauriDesktopBridge.quickCaptureWarmup(active.draftId))) {
-    throw new Error('Quick capture draft is no longer active')
-  }
-  if (revision !== loadRevision || draft.value?.draftId !== active.draftId) return
-  const loaded = await loadImageWithBinaryFallback({
+  const warmupPromise = tauriDesktopBridge.quickCaptureWarmup(active.draftId)
+  const imageStarted = performance.now()
+  const imagePromise = loadImageWithBinaryFallback({
     token: active.imageToken,
     correlationId: active.correlationId,
     bridge: tauriDesktopBridge,
     createResource: async (image: HTMLImageElement) => image,
   })
+  const warmed = await warmupPromise
+  if (!warmed) {
+    void imagePromise.catch((cause: unknown) => {
+      console.warn('cute-screen quick capture image load after warmup failure', cause)
+    })
+    throw new Error('Quick capture draft is no longer active')
+  }
+  if (revision !== loadRevision || draft.value?.draftId !== active.draftId) {
+    void imagePromise.catch((cause: unknown) => {
+      console.warn('cute-screen quick capture image load after draft change', cause)
+    })
+    return
+  }
+  const loaded = await imagePromise
+  console.info(
+    `cute-screen capture timing ${active.correlationId} image-load ${Math.round(performance.now() - imageStarted)}ms`,
+  )
   if (revision !== loadRevision) return
   sourceImage.value = loaded.resource
   const now = new Date().toISOString()

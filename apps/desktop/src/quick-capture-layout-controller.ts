@@ -65,21 +65,7 @@ export class QuickCaptureLayoutController {
     const context = quickRoot?.querySelector<HTMLElement>('.cs-tool-defaults-toolbar')
     if (!hasMeasurableChrome(actions, toolRow, bounds)) return undefined
     const tools = toolRow!
-    const contextHeight = context?.offsetHeight ?? 0
-    const layout = computeQuickCaptureLayout({
-      viewport: { width: window.innerWidth, height: window.innerHeight },
-      scene: {
-        left: bounds.left,
-        top: bounds.top,
-        width: bounds.width,
-        height: bounds.height,
-      },
-      source,
-      crop,
-      actionSize: { width: actions.offsetWidth, height: actions.offsetHeight },
-      toolSize: { width: tools.offsetWidth, height: tools.offsetHeight },
-      ...(context ? { settingsSize: { width: context.offsetWidth, height: contextHeight } } : {}),
-    })
+    const layout = layoutQuickChrome(quickRoot, actions, tools, context, bounds, source, crop)
     context?.dispatchEvent(new CustomEvent('cs-quick-settings-layout', { detail: layout.settingsCollapsed }))
     positionActions(actions, layout.actions)
     positionTools(tools, context, layout.tools, layout.settings)
@@ -104,7 +90,7 @@ export class QuickCaptureLayoutController {
       tools.offsetWidth,
       tools.offsetHeight,
       layout.settings ? context?.offsetWidth ?? 0 : 0,
-      layout.settings ? contextHeight : 0,
+      layout.settings ? context?.offsetHeight ?? 0 : 0,
     )
   }
 
@@ -121,6 +107,38 @@ export class QuickCaptureLayoutController {
       requestAnimationFrame(finish)
     })
   }
+}
+
+function layoutQuickChrome(
+  root: HTMLElement | null,
+  actions: HTMLElement,
+  tools: HTMLElement,
+  context: HTMLElement | null | undefined,
+  bounds: DOMRect,
+  source: { width: number; height: number },
+  crop: QuickRect,
+) {
+  const measure = () => computeQuickCaptureLayout({
+    viewport: { width: window.innerWidth, height: window.innerHeight },
+    scene: {
+      left: bounds.left,
+      top: bounds.top,
+      width: bounds.width,
+      height: bounds.height,
+    },
+    source,
+    crop,
+    actionSize: { width: actions.offsetWidth, height: actions.offsetHeight },
+    toolSize: { width: tools.offsetWidth, height: tools.offsetHeight },
+    ...(context ? { settingsSize: { width: context.offsetWidth, height: context.offsetHeight } } : {}),
+  })
+  const layout = measure()
+  const button = root?.querySelector<HTMLElement>('.cs-quick-settings-button')
+  if (!button) return layout
+  const hidden = getComputedStyle(button).display === 'none'
+  if (hidden === !layout.settingsCollapsed) return layout
+  button.style.display = layout.settingsCollapsed ? '' : 'none'
+  return measure()
 }
 
 function hasMeasurableChrome(

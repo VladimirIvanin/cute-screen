@@ -1,5 +1,11 @@
 # Сквозная приёмка
 
+ADR-197 / REQ-CAP-001/009/012, REQ-UI-010, REQ-EDT-015: Quick warmup на Linux
+без fullscreen до present, текст подготовки виден после 900 мс, новый draft
+начинается с Select, бар не сдвигается из-за кнопки настроек. Ubuntu 24.04 /
+X11: `pnpm test` 197/1742 PASS, Rust cache и diagnostics PASS. GNOME 42 Wayland,
+Windows и macOS не проверялись. Команды — TESTING.md.
+
 ADR-192 / REQ-OUT-010: четыре значения без повторённых слов, центральная связь,
 units в шапке, подсказки/accessible names сохранены. Windows Chrome 157,
 1024 px RU/EN × темы: component и browser linked/independent/slider/Undo/cancel,
