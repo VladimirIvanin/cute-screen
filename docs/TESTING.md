@@ -1,5 +1,24 @@
 # Стратегия тестирования
 
+## Повторный старт Quick Capture — 2026-11-15
+
+Причина по коду и отчёту владельца на Ubuntu 22.04: после `present` панель
+GNOME пропадает, оверлей мелькает и поверхность закрывается. Это путь отмены
+из-за лимита в 6 кадров, а не негативный probe на 5 с: кадр успевал показаться.
+Живой прогон GNOME 42 Wayland на этом хосте не выполнялся (Ubuntu 24.04 / X11).
+
+Логи Quick: `present`, `layout-stable` или `layout-deadline`, `reveal`,
+`dismiss`.
+
+- `pnpm exec vitest run --project vue tests/unit/vue/quick-capture-layout.test.ts`
+  и `--project boundaries tests/boundaries/build-contract.test.ts` — PASS.
+- `cargo fmt --all` и `cargo check -p cute-screen-desktop --offline` — PASS.
+- `pnpm test` — 198 files / 1746 tests PASS.
+- `pnpm check` — PASS. Linux 6.8.0-147-generic x86_64.
+
+Ручное подтверждение панели и повторного Area на GNOME 42 остаётся за
+владельцем. Windows и macOS этим изменением не запускались.
+
 ## Курсор размера кисти — 2026-11-15
 
 Linux 6.8.0-147-generic x86_64, Node 22.23.1, pnpm 10.33.2.

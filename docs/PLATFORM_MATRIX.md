@@ -1656,7 +1656,10 @@ UI получает `CaptureCapabilities` и не показывает непо�
   only its unexpired remainder so Mutter's fade actor cannot enter the frame.
 - X11 Area decodes the captured root into owned binary transport before its
   first visible frame, then maps one prewarmed Quick WebView. Linux warmup stays
-  non-fullscreen at opacity `0.01`; fullscreen is applied at present (ADR-197). The
+  non-fullscreen at opacity `0.01`; fullscreen is applied at present (ADR-197).
+  Layout then waits for two matching measurements or 2s (ADR-198). The deadline
+  reveals the same surface instead of cancelling it. Linux dismiss and reuse
+  leave fullscreen before hide so Mutter can restore the shell panel. The
   same scene and overlay canvas own both the initial crosshair/dim/dashed crop
   gesture and subsequent annotation state. No native Area selector, retained
   overlay, second top-level XID or reveal-time window replacement is allowed.

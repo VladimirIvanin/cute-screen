@@ -56,10 +56,14 @@ export interface QuickCaptureLayout {
   }
 }
 
+/** Mutter can resize a just-fullscreen Quick window slower than six frames. */
+export const QUICK_CAPTURE_LAYOUT_DEADLINE_MS = 2_000
+
 export interface StableQuickCaptureLayoutOptions<T> {
   readonly measure: () => T | undefined
   readonly nextFrame: () => Promise<void>
-  readonly maximumFrames?: number
+  readonly deadlineMs?: number
+  readonly now?: () => number
   readonly equals?: (previous: T, current: T) => boolean
 }
 
@@ -74,17 +78,20 @@ export interface PresentedQuickCaptureLayout<T> {
 }
 
 /**
- * A hidden quick-capture webview can mount before Fit zoom and floating chrome
- * have reached their final dimensions. Native presentation is allowed only
- * after two consecutive animation frames report the same complete geometry.
+ * A mapped quick-capture webview can still be resizing after fullscreen.
+ * Two consecutive frames with the same complete geometry finish early.
+ * The wait is bounded by time, not by a frame count Mutter can miss.
  */
 export async function waitForStableQuickCaptureLayout<T>(
   options: StableQuickCaptureLayoutOptions<T>,
 ): Promise<T | undefined> {
-  const maximumFrames = Math.max(1, options.maximumFrames ?? 6)
+  const deadlineMs = Math.max(0, options.deadlineMs ?? QUICK_CAPTURE_LAYOUT_DEADLINE_MS)
+  const now = options.now ?? (() => performance.now())
   const equals = options.equals ?? Object.is
+  const started = now()
   let previous = options.measure()
-  for (let frame = 0; frame < maximumFrames; frame += 1) {
+  let elapsed = 0
+  while (elapsed < deadlineMs) {
     await options.nextFrame()
     const current = options.measure()
     if (
@@ -95,6 +102,8 @@ export async function waitForStableQuickCaptureLayout<T>(
       return current
     }
     previous = current
+    const observed = now() - started
+    elapsed = observed > elapsed ? observed : elapsed + 1
   }
   return undefined
 }
@@ -111,7 +120,9 @@ export async function presentThenWaitForStableQuickCaptureLayout<T>(
   const presented = await options.present()
   if (!presented) return { presented: false }
   const layout = await waitForStableQuickCaptureLayout(options)
-  if (layout !== undefined) await options.reveal?.()
+  // A late or still-moving layout must not cancel the capture. Unplaced
+  // chrome stays hidden until it receives data-placement.
+  await options.reveal?.()
   return { presented: true, layout }
 }
 

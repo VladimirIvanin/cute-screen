@@ -1183,7 +1183,42 @@ fn quick_capture_present(
         .map_err(|error| error.to_string())?;
     #[cfg(not(target_os = "windows"))]
     window.show().map_err(|error| error.to_string())?;
+    #[cfg(target_os = "linux")]
+    if let Some(correlation_id) = active.as_ref().map(|draft| draft.correlation_id.as_str())
+        && let Some(diagnostics) = app.try_state::<CaptureDiagnosticsService>()
+    {
+        diagnostics.mark(correlation_id, "present");
+    }
     Ok(true)
+}
+
+/// Leave fullscreen before hide on Linux. Mutter ignores a fullscreen change
+/// on an already withdrawn actor, so the shell panel stays hidden.
+fn release_quick_capture_window<R: tauri::Runtime>(
+    window: &tauri::WebviewWindow<R>,
+) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        window
+            .set_always_on_top(false)
+            .map_err(|error| error.to_string())?;
+        window.hide().map_err(|error| error.to_string())?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        window
+            .set_fullscreen(false)
+            .map_err(|error| error.to_string())?;
+        window.hide().map_err(|error| error.to_string())?;
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+    {
+        window.hide().map_err(|error| error.to_string())?;
+        window
+            .set_fullscreen(false)
+            .map_err(|error| error.to_string())?;
+    }
+    Ok(())
 }
 
 fn prepare_quick_capture_bounds_before_capture<R: tauri::Runtime>(
@@ -1306,20 +1341,7 @@ fn dismiss_quick_capture_window<R: tauri::Runtime>(
     let Some(window) = app.get_webview_window("quick-capture") else {
         return Ok(false);
     };
-    #[cfg(target_os = "windows")]
-    {
-        window
-            .set_always_on_top(false)
-            .map_err(|error| error.to_string())?;
-        window.hide().map_err(|error| error.to_string())?;
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        window.hide().map_err(|error| error.to_string())?;
-        window
-            .set_fullscreen(false)
-            .map_err(|error| error.to_string())?;
-    }
+    release_quick_capture_window(&window)?;
     #[cfg(all(target_os = "linux", feature = "x11-capture"))]
     x11_platform::note_app_surface_hidden();
     #[cfg(target_os = "linux")]
@@ -2096,20 +2118,7 @@ const fn should_prewarm_quick_capture_at_area_preflight(
 
 fn ensure_quick_capture_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("quick-capture") {
-        #[cfg(target_os = "windows")]
-        {
-            window
-                .set_always_on_top(false)
-                .map_err(|error| error.to_string())?;
-            window.hide().map_err(|error| error.to_string())?;
-        }
-        #[cfg(not(target_os = "windows"))]
-        {
-            window.hide().map_err(|error| error.to_string())?;
-            window
-                .set_fullscreen(false)
-                .map_err(|error| error.to_string())?;
-        }
+        release_quick_capture_window(&window)?;
         return Ok(());
     }
     let policy = quick_capture_window_policy();

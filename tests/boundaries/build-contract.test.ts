@@ -233,7 +233,6 @@ describe('Tauri build boundary', () => {
     const dismissStart = hostSource.indexOf('fn quick_capture_dismiss')
     const dismissEnd = hostSource.indexOf('#[tauri::command]', dismissStart + 1)
     const dismissSource = hostSource.slice(dismissStart, dismissEnd)
-    const windowsDismissSource = dismissSource.match(/#\[cfg\(target_os = "windows"\)\]\s*\{([\s\S]*?)\n\s*\}/)?.[1]
 
     expect(hostSource).toMatch(
       /fn quick_capture_commit[\s\S]*commit_quick_draft\([\s\S]*prepare_quick_capture_editor_handoff\([\s\S]*timeout\(/,
@@ -241,9 +240,16 @@ describe('Tauri build boundary', () => {
     expect(hostSource).toMatch(
       /fn prepare_quick_capture_editor_handoff[\s\S]*show_editor\([\s\S]*set_always_on_top\(false\)/,
     )
-    expect(dismissSource).toMatch(/target_os = "windows"[\s\S]*set_always_on_top\(false\)[\s\S]*window\.hide\(\)/)
-    expect(windowsDismissSource).toBeDefined()
-    expect(windowsDismissSource).not.toContain('set_fullscreen(false)')
+    expect(dismissSource).toContain('release_quick_capture_window')
+    const releaseStart = hostSource.indexOf('fn release_quick_capture_window')
+    const releaseEnd = hostSource.indexOf('fn prepare_quick_capture_bounds_before_capture', releaseStart)
+    const releaseSource = hostSource.slice(releaseStart, releaseEnd)
+    const windowsReleaseSource = releaseSource.match(/#\[cfg\(target_os = "windows"\)\]\s*\{([\s\S]*?)\n\s*\}/)?.[1]
+    expect(windowsReleaseSource).toMatch(/set_always_on_top\(false\)[\s\S]*window\.hide\(\)/)
+    expect(windowsReleaseSource).not.toContain('set_fullscreen(false)')
+    expect(releaseSource).toMatch(
+      /target_os = "linux"[\s\S]*set_fullscreen\(false\)[\s\S]*window\.hide\(\)/,
+    )
     expect(hostSource).toMatch(
       /fn present_windows_quick_capture[\s\S]*set_always_on_top\(true\)[\s\S]*commit_hidden_quick_capture_bounds\(window\)[\s\S]*set_fullscreen\(true\)/,
     )

@@ -1177,6 +1177,8 @@ WebView. Обычный (не quick-mode) `CanvasViewport` подтвержда�
 полностью occluded во время первого frame. После acknowledgement Quick выполняет
 `set_always_on_top(false) → hide`; `set_fullscreen(false)` после hide запрещён,
 поскольку Windows может remap-нуть скрытое окно как обычное top-level окно.
+На Linux порядок обратный: `set_fullscreen(false)` до `hide`, иначе Mutter
+оставляет панель оболочки скрытой (ADR-198).
 
 Draft store допускает одну активную сессию и удаляет staging по cancel, crash,
 shutdown и timeout. Подготовка cropped source и финальный repository commit —

@@ -1,5 +1,10 @@
 # Сквозная приёмка
 
+ADR-198 / REQ-CAP-001/012, REQ-UI-010: дедлайн раскладки Quick 2 с не отменяет
+захват; Linux снимает fullscreen до hide. Ubuntu 24.04 / X11: `pnpm test`
+198/1746 PASS, `cargo check -p cute-screen-desktop --offline` PASS. GNOME 42
+Wayland не воспроизводился. Команды — TESTING.md.
+
 ADR-197 / REQ-CAP-001/009/012, REQ-UI-010, REQ-EDT-015: Quick warmup на Linux
 без fullscreen до present, текст подготовки виден после 900 мс, новый draft
 начинается с Select, бар не сдвигается из-за кнопки настроек. Ubuntu 24.04 /

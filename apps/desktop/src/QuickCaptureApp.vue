@@ -183,6 +183,7 @@ function resetDraftSession(): void {
 }
 
 async function dismissWindow(): Promise<void> {
+  console.info(`cute-screen capture timing ${draft.value?.correlationId ?? 'none'} dismiss`)
   const dismissed = await tauriDesktopBridge.quickCaptureDismiss()
   if (!dismissed) throw new Error('Quick capture window is unavailable')
   resetDraftSession()
@@ -196,7 +197,13 @@ async function presentPreparedDraft(draftId: string): Promise<void> {
     await nextTick()
     if (draft.value?.draftId !== draftId) return
     const presentation = await presentThenWaitForStableQuickCaptureLayout({
-      present: () => tauriDesktopBridge.quickCapturePresent(draftId),
+      present: async () => {
+        const presented = await tauriDesktopBridge.quickCapturePresent(draftId)
+        if (presented && draft.value?.draftId === draftId) {
+          console.info(`cute-screen capture timing ${draft.value.correlationId} present`)
+        }
+        return presented
+      },
       reveal: async () => {
         if (draft.value?.draftId !== draftId) return
         quickLayoutReady.value = true
@@ -220,8 +227,13 @@ async function presentPreparedDraft(draftId: string): Promise<void> {
     if (!presentation.presented) {
       throw new Error('Quick capture draft is no longer active')
     }
-    if (!presentation.layout) {
-      throw new Error('Quick capture chrome did not reach a stable layout')
+    if (draft.value?.draftId === draftId) {
+      const timing = `cute-screen capture timing ${draft.value.correlationId}`
+      if (presentation.layout === undefined) {
+        console.warn(`${timing} layout-deadline`)
+      } else {
+        console.info(`${timing} layout-stable`)
+      }
     }
     presentedDraftId = draftId
   } finally {

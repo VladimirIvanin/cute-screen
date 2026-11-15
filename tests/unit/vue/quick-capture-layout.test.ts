@@ -9,6 +9,7 @@ import {
   computeQuickCaptureLayout,
   placeQuickCaptureNote,
   presentThenWaitForStableQuickCaptureLayout,
+  QUICK_CAPTURE_LAYOUT_DEADLINE_MS,
   waitForStableQuickCaptureLayout,
 } from '../../../apps/desktop/src/quick-capture-layout'
 import { QuickCaptureLayoutController } from '../../../apps/desktop/src/quick-capture-layout-controller'
@@ -331,39 +332,63 @@ describe('quick capture overlay layout', () => {
     expect(order.indexOf('reveal')).toBeGreaterThan(order.lastIndexOf('frame'))
   })
 
-  it('never reveals a mapped surface without stable complete geometry', async () => {
+  it('accepts geometry that settles after the old six-frame budget', async () => {
+    let frame = 0
+    let clock = 0
+
+    const stable = await waitForStableQuickCaptureLayout({
+      deadlineMs: QUICK_CAPTURE_LAYOUT_DEADLINE_MS,
+      now: () => clock,
+      nextFrame: async () => {
+        clock += 32
+        frame += 1
+      },
+      measure: () => (frame < 10 ? `moving-${frame}` : 'settled'),
+    })
+
+    expect(stable).toBe('settled')
+    expect(frame).toBeGreaterThan(6)
+    expect(clock).toBeLessThan(QUICK_CAPTURE_LAYOUT_DEADLINE_MS)
+  })
+
+  it('reveals a mapped surface when layout misses the deadline', async () => {
     const reveal = vi.fn()
+    let clock = 0
     const result = await presentThenWaitForStableQuickCaptureLayout({
       present: async () => true,
       measure: () => undefined,
-      nextFrame: async () => undefined,
+      deadlineMs: QUICK_CAPTURE_LAYOUT_DEADLINE_MS,
+      now: () => clock,
+      nextFrame: async () => {
+        clock += 400
+      },
       reveal,
-      maximumFrames: 2,
     })
 
-    expect(result).toEqual({ presented: true })
-    expect(reveal).not.toHaveBeenCalled()
+    expect(result).toEqual({ presented: true, layout: undefined })
+    expect(reveal).toHaveBeenCalledOnce()
+    expect(clock).toBeGreaterThanOrEqual(QUICK_CAPTURE_LAYOUT_DEADLINE_MS)
   })
 
-  it('waits for two matching layout frames before native presentation', async () => {
+  it('waits for two matching layout frames before reporting stable geometry', async () => {
     const measurements = ['initial', 'fitted', 'fitted']
     const nextFrame = vi.fn().mockResolvedValue(undefined)
 
     const stable = await waitForStableQuickCaptureLayout({
       measure: () => measurements.shift(),
       nextFrame,
-      maximumFrames: 4,
+      deadlineMs: QUICK_CAPTURE_LAYOUT_DEADLINE_MS,
     })
 
     expect(stable).toBe('fitted')
     expect(nextFrame).toHaveBeenCalledTimes(2)
   })
 
-  it('does not approve missing chrome measurements for presentation', async () => {
+  it('does not treat missing chrome as stable geometry', async () => {
     const stable = await waitForStableQuickCaptureLayout({
       measure: () => undefined,
       nextFrame: async () => undefined,
-      maximumFrames: 3,
+      deadlineMs: 0,
     })
 
     expect(stable).toBeUndefined()
