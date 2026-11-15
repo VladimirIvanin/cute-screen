@@ -2,14 +2,7 @@ import { compositionDraftDocument } from './composition-view'
 import { GradientEditingController } from './gradient-editing-controller'
 import { CalloutRouteEditing } from './callout-route-editing'
 import { textEditorBindings } from './text-editor-bindings'
-import {
-  useNumberedMarkerPreview,
-  type NumberedMarkerPreview,
-} from './numbered-marker-preview'
-import {
-  useBrushCursorPreview,
-  type BrushCursorPreview,
-} from './brush-cursor-preview'
+import { useCursorPreviews } from './cursor-preview-session'
 import {
   markerDocumentForScene,
   editSelectedMarkerLabel,
@@ -76,7 +69,6 @@ import {
   createKeyboardContext,
   createPointerDownContext,
   createPointerMoveContext,
-  createPointerLeaveHandler,
   type WorkspaceInteractionPorts,
 } from './workspace-interaction-contexts'
 import type { GestureFinishContext } from './gesture-finish-controller'
@@ -105,8 +97,7 @@ export class CanvasWorkspaceController {
   readonly #pointerDown: PointerDownContext
   readonly #pointerMove: PointerMoveContext
   readonly #finish: GestureFinishContext
-  readonly #markerPreview: NumberedMarkerPreview
-  readonly #brushPreview: BrushCursorPreview
+  readonly #cursors: ReturnType<typeof useCursorPreviews>
   #gesture: CanvasGesture
   #rulerGuide: RulerAngleGuide | undefined
   readonly #calloutRouting: CalloutRouteEditing
@@ -121,14 +112,10 @@ export class CanvasWorkspaceController {
     this.#calloutRouting = new CalloutRouteEditing(props)
     this.#props = props
     this.#emit = emit
-    this.#markerPreview = useNumberedMarkerPreview(
+    this.#cursors = useCursorPreviews(
       props,
       this.invalidateOverlay,
       () => this.#spacePressed || Boolean(this.#gesture),
-    )
-    this.#brushPreview = useBrushCursorPreview(
-      props,
-      this.invalidateOverlay,
       () => this.#spacePressed || this.#gesture?.kind === 'pan',
     )
     this.#viewport = new ViewportController({
@@ -225,14 +212,10 @@ export class CanvasWorkspaceController {
         handlePointerDown(this.#pointerDown, event)
       },
       editSelectedLabel: () => editSelectedMarkerLabel(this.#textEditor, this.selectedLayer()),
-      onPointerLeave: createPointerLeaveHandler(
-        [this.#markerPreview, this.#brushPreview],
-        this.#eyedropper,
-        () => {
-          this.#pointerGeometry.hoverTarget = { kind: 'empty' }
-          this.invalidateOverlay()
-        },
-      ),
+      onPointerLeave: this.#cursors.onLeave(this.#eyedropper, () => {
+        this.#pointerGeometry.hoverTarget = { kind: 'empty' }
+        this.invalidateOverlay()
+      }),
       finishTextEditing: (continuation: () => void) => this.#textEditor.finishEditing(continuation),
       onBackgroundPointerDown: (event: PointerEvent) =>
         handleCanvasBackgroundPointerDown(this.#pointerDown, Boolean(this.#gesture), event),
@@ -240,8 +223,7 @@ export class CanvasWorkspaceController {
         this.#calloutRouting.altPressed = event.altKey
         const previewPoint = event.target === state.scene.value
           ? this.canvasPoint(event) : undefined
-        this.#markerPreview.move(previewPoint)
-        this.#brushPreview.move(previewPoint)
+        this.#cursors.move(previewPoint)
         if (!this.#gesture && this.#gradient.pointerMove(event)) return
         if (!this.#spotlight.pointerMove(event)) handlePointerMove(this.#pointerMove, event)
         if (!this.#gesture) this.invalidateOverlay()
@@ -431,8 +413,7 @@ export class CanvasWorkspaceController {
       previewLayer: () => this.#spotlight?.selectionLayer() ?? this.gesturePreviewLayer(),
       selectedLayer: () => this.#spotlight?.selectionLayer() ?? this.selectedLayer(),
       drawDrafts: (context) => {
-        this.#markerPreview.draw(context)
-        this.#brushPreview.draw(context)
+        this.#cursors.draw(context)
         this.#draft.drawDrawing(context)
         this.#draft.drawCallout(context)
         this.#draft.drawPrecision(context)
@@ -479,17 +460,7 @@ export class CanvasWorkspaceController {
       spacePressed: () => this.#spacePressed,
       setSpacePressed: (pressed) => {
         this.#spacePressed = pressed
-        this.#markerPreview.refresh()
-        this.#brushPreview.refresh()
-        const tool = this.#props.activeTool
-        if (
-          tool === 'numberedMarker' ||
-          tool === 'pencil' ||
-          tool === 'marker'
-        ) {
-          const hidden = Boolean(this.#props.markerPreviewBlocked || this.#props.readOnly)
-          this.#pointerGeometry.setCursor(pressed ? 'grab' : hidden ? 'default' : 'none')
-        }
+        this.#cursors.syncSpaceCursor(pressed, (cursor) => this.#pointerGeometry.setCursor(cursor))
       },
       cycle: () => this.#cycle,
       setCycle: (cycle) => {
