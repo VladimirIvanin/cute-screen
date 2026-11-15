@@ -1,5 +1,12 @@
 # Трассируемость требований
 
+## Версия 0.1.38 (2026-11-15)
+
+`REQ-REL-005/006`: по запросу владельца поднять patch 0.1.37 → 0.1.38
+штатной `pnpm version:bump`. Синхронизируются package.json, Tauri config,
+Cargo workspace, точные storage/mcp/portal dependencies и локальные package
+entries Cargo.lock. Внешние зависимости, тег и публикация Release не меняются.
+
 ## Перерисовка редактора и диалог прав Screenshot (2026-11-15)
 
 `REQ-CAP-016/017`: portal Screenshot немодальный. Handshake метода остаётся

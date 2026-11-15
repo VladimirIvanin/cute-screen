@@ -1,5 +1,13 @@
 # Стратегия тестирования
 
+## Версия 0.1.38 — 2026-11-15
+
+Linux 6.8.0-147-generic x86_64. `pnpm version:bump 0.1.38` синхронизировал
+package.json, `src-tauri/tauri.conf.json`, Cargo workspace, точные зависимости
+desktop crate и локальные package entries Cargo.lock: 0.1.37 → 0.1.38.
+`pnpm exec vitest run --project boundaries tests/boundaries/bump-version.test.ts tests/boundaries/release-assets.test.ts`
+— 2 files / 34 tests PASS. Тег и публикация Release не выполнялись.
+
 ## Rust audit: libsqlite3-sys и rmcp — 2026-11-15
 
 Linux 6.8.0-147-generic x86_64, Rust/Cargo 1.97.0, cargo-deny 0.20.2.
