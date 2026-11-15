@@ -7,6 +7,10 @@ import {
   type NumberedMarkerPreview,
 } from './numbered-marker-preview'
 import {
+  useBrushCursorPreview,
+  type BrushCursorPreview,
+} from './brush-cursor-preview'
+import {
   markerDocumentForScene,
   editSelectedMarkerLabel,
 } from './numbered-marker-editing'
@@ -102,6 +106,7 @@ export class CanvasWorkspaceController {
   readonly #pointerMove: PointerMoveContext
   readonly #finish: GestureFinishContext
   readonly #markerPreview: NumberedMarkerPreview
+  readonly #brushPreview: BrushCursorPreview
   #gesture: CanvasGesture
   #rulerGuide: RulerAngleGuide | undefined
   readonly #calloutRouting: CalloutRouteEditing
@@ -120,6 +125,11 @@ export class CanvasWorkspaceController {
       props,
       this.invalidateOverlay,
       () => this.#spacePressed || Boolean(this.#gesture),
+    )
+    this.#brushPreview = useBrushCursorPreview(
+      props,
+      this.invalidateOverlay,
+      () => this.#spacePressed || this.#gesture?.kind === 'pan',
     )
     this.#viewport = new ViewportController({
       props,
@@ -215,10 +225,14 @@ export class CanvasWorkspaceController {
         handlePointerDown(this.#pointerDown, event)
       },
       editSelectedLabel: () => editSelectedMarkerLabel(this.#textEditor, this.selectedLayer()),
-      onPointerLeave: createPointerLeaveHandler(this.#markerPreview, this.#eyedropper, () => {
-        this.#pointerGeometry.hoverTarget = { kind: 'empty' }
-        this.invalidateOverlay()
-      }),
+      onPointerLeave: createPointerLeaveHandler(
+        [this.#markerPreview, this.#brushPreview],
+        this.#eyedropper,
+        () => {
+          this.#pointerGeometry.hoverTarget = { kind: 'empty' }
+          this.invalidateOverlay()
+        },
+      ),
       finishTextEditing: (continuation: () => void) => this.#textEditor.finishEditing(continuation),
       onBackgroundPointerDown: (event: PointerEvent) =>
         handleCanvasBackgroundPointerDown(this.#pointerDown, Boolean(this.#gesture), event),
@@ -227,6 +241,7 @@ export class CanvasWorkspaceController {
         const previewPoint = event.target === state.scene.value
           ? this.canvasPoint(event) : undefined
         this.#markerPreview.move(previewPoint)
+        this.#brushPreview.move(previewPoint)
         if (!this.#gesture && this.#gradient.pointerMove(event)) return
         if (!this.#spotlight.pointerMove(event)) handlePointerMove(this.#pointerMove, event)
         if (!this.#gesture) this.invalidateOverlay()
@@ -417,6 +432,7 @@ export class CanvasWorkspaceController {
       selectedLayer: () => this.#spotlight?.selectionLayer() ?? this.selectedLayer(),
       drawDrafts: (context) => {
         this.#markerPreview.draw(context)
+        this.#brushPreview.draw(context)
         this.#draft.drawDrawing(context)
         this.#draft.drawCallout(context)
         this.#draft.drawPrecision(context)
@@ -464,7 +480,16 @@ export class CanvasWorkspaceController {
       setSpacePressed: (pressed) => {
         this.#spacePressed = pressed
         this.#markerPreview.refresh()
-        if (this.#props.activeTool === 'numberedMarker') this.#pointerGeometry.setCursor(pressed ? 'grab' : 'none')
+        this.#brushPreview.refresh()
+        const tool = this.#props.activeTool
+        if (
+          tool === 'numberedMarker' ||
+          tool === 'pencil' ||
+          tool === 'marker'
+        ) {
+          const hidden = Boolean(this.#props.markerPreviewBlocked || this.#props.readOnly)
+          this.#pointerGeometry.setCursor(pressed ? 'grab' : hidden ? 'default' : 'none')
+        }
       },
       cycle: () => this.#cycle,
       setCycle: (cycle) => {

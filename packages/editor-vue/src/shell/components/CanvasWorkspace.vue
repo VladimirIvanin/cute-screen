@@ -193,13 +193,13 @@ defineExpose({
                   ? 'crosshair'
                   : activeTool === 'hand'
                     ? 'grab'
-                    : !sampling && activeTool === 'numberedMarker'
+                    : !sampling && (
+                      activeTool === 'numberedMarker' ||
+                      activeTool === 'pencil' ||
+                      activeTool === 'marker'
+                    )
                       ? markerPreviewBlocked || readOnly ? 'default' : 'none'
-                      : !sampling && (
-                        activeTool === 'line' ||
-                        activeTool === 'pencil' ||
-                        activeTool === 'marker'
-                      )
+                      : !sampling && activeTool === 'line'
                         ? 'crosshair'
                         : undefined,
             }"

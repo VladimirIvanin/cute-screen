@@ -138,9 +138,11 @@ export class PointerGeometryController {
       return
     }
     if (
-      props.activeTool === 'numberedMarker' &&
-      !props.sampling &&
-      !props.quickSelectionMode
+      (props.activeTool === 'numberedMarker' ||
+        props.activeTool === 'pencil' ||
+        props.activeTool === 'marker') &&
+        !props.sampling &&
+        !props.quickSelectionMode
     ) {
       this.setCursor(props.markerPreviewBlocked || props.readOnly ? 'default' : 'none')
       return

@@ -1,5 +1,23 @@
 # Стратегия тестирования
 
+## Курсор размера кисти — 2026-11-15
+
+Linux 6.8.0-147-generic x86_64, Node 22.23.1, pnpm 10.33.2.
+`REQ-TOL-003/004`: круг кисти рисуется на overlay, системный курсор — `none`.
+
+- `pnpm exec vitest run --project vue tests/unit/vue/brush-cursor-preview.test.ts`
+  — 3/3 PASS. Диаметр карандаша следует ширине 16 → 8; при выделении области и
+  pan пикселей нет; диск выделителя остаётся видимым source-over.
+- `pnpm exec vue-tsc --noEmit -p packages/editor-vue/tsconfig.json` и
+  `pnpm exec vue-tsc --noEmit -p tests/tsconfig.json` — exit 0.
+- `CUTE_SCREEN_BROWSER_E2E_PORT=5217 pnpm test:e2e:browser --spec tests/e2e/specs/browser-creation-cursors.e2e.ts`
+  — 1/1 PASS, Chrome 154.0.8037.57. Pencil, Highlighter и Numbered marker:
+  `none` сразу, после hover и после middle-pan; во время pan — `grabbing`.
+- `pnpm format:check` — PASS.
+
+Пиксели круга проверены unit-тестом на canvas, не скриншотом браузера.
+Native WebView, Windows и macOS не запускались.
+
 ## Версия 0.1.38 — 2026-11-15
 
 Linux 6.8.0-147-generic x86_64. `pnpm version:bump 0.1.38` синхронизировал

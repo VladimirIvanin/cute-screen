@@ -93,13 +93,13 @@ export async function verifyCreationCursors(
   const scene = $('.cs-canvas:not(.cs-canvas-overlay)')
   for (const label of ['Pencil', 'Highlighter', 'Numbered marker']) {
     await $(`button[aria-label="${label}"]`).click()
-    await expect(scene).toHaveStyle({ cursor: label === 'Numbered marker' ? 'none' : 'crosshair' })
+    await expect(scene).toHaveStyle({ cursor: 'none' })
     await browser.action('pointer').move({ origin: scene }).perform()
-    await expect(scene).toHaveStyle({ cursor: label === 'Numbered marker' ? 'none' : 'crosshair' })
+    await expect(scene).toHaveStyle({ cursor: 'none' })
     await browser.action('pointer').move({ origin: scene }).down({ button: 'middle' }).perform(true)
     await expect(scene).toHaveStyle({ cursor: 'grabbing' })
     await browser.action('pointer').up({ button: 'middle' }).perform()
-    await expect(scene).toHaveStyle({ cursor: label === 'Numbered marker' ? 'none' : 'crosshair' })
+    await expect(scene).toHaveStyle({ cursor: 'none' })
   }
   await browser.saveScreenshot(path.resolve(directory, `${prefix}-numbered-marker-cursor.png`))
   if (!(await $('.cs-quick-actions').isExisting())) {
@@ -156,7 +156,7 @@ export async function verifyHighlighter(
     }
   })
   await browser.action('pointer', { id: 'highlighter-stroke' }).move({ origin: 'viewport', x: points.x, y: points.y }).down({ button: 'left' }).move({ origin: 'viewport', x: points.endX, y: points.y, duration: 160 }).perform(true)
-  await expect(scene).toHaveStyle({ cursor: 'crosshair' })
+  await expect(scene).toHaveStyle({ cursor: 'none' })
   // Native input may finish before the queued preview RAF under build/test load.
   await browser.executeAsync((done) => requestAnimationFrame(() => requestAnimationFrame(() => done())))
   await scene.saveScreenshot(path.resolve(directory, `${prefix}-stroke-preview.png`))
@@ -165,7 +165,7 @@ export async function verifyHighlighter(
   await browser.action('pointer', { id: 'highlighter-stroke' }).up({ button: 'left' }).perform()
   await browser.waitUntil(async () => (await shapeDocument()).layers.length === initial + 1)
   await waitForStableCanvas()
-  await expect(scene).toHaveStyle({ cursor: 'crosshair' })
+  await expect(scene).toHaveStyle({ cursor: 'none' })
   await scene.saveScreenshot(path.resolve(directory, `${prefix}-stroke-committed.png`))
   expect(await sceneChecksum()).toBe(preview)
   await writeFile(path.resolve(directory, `${prefix}-document.json`), JSON.stringify(await shapeDocument(), null, 2))

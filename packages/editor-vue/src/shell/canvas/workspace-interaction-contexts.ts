@@ -14,7 +14,6 @@ import type { KeyboardContext } from './keyboard-controller'
 import type { PointerDownContext } from './pointer-down-contracts'
 import type { PointerGeometryController } from './pointer-geometry-controller'
 import type { PointerMoveContext } from './pointer-move-controller'
-import type { NumberedMarkerPreview } from './numbered-marker-preview'
 import type { CanvasRendererController } from './renderer-controller'
 import type { TextEditorController } from './text-editor-controller'
 import type {
@@ -64,12 +63,12 @@ export interface WorkspaceInteractionPorts {
 }
 
 export function createPointerLeaveHandler(
-  markerPreview: Pick<NumberedMarkerPreview, 'clear'>,
+  previews: readonly { clear(): void }[],
   eyedropper: EyedropperController,
   invalidateOverlay: () => void,
 ): () => void {
   return () => {
-    markerPreview.clear()
+    for (const preview of previews) preview.clear()
     eyedropper.cursor.value = undefined
     eyedropper.hide()
     invalidateOverlay()
