@@ -19,6 +19,7 @@ import {
   useEditorShellStore,
 } from '@cute-screen/editor-vue'
 import EditorShell from '../../../packages/editor-vue/src/shell/components/EditorShell.vue'
+import { rememberQuickSettingsCollapsed } from '../../../packages/editor-vue/src/shell/workspace/quick-settings-memory'
 import { arrowSession } from './app-test-kit'
 
 function renderDocument(quickMode: boolean) {
@@ -34,14 +35,15 @@ function renderDocument(quickMode: boolean) {
 
 describe('Quick Capture context toolbar', () => {
   it('omits canvas actions and empty panels across tools and selection changes', async () => {
+    rememberQuickSettingsCollapsed(false)
     const { view, session, store } = renderDocument(true)
     for (const tool of ['Select', 'Arrow', 'Select']) {
       await fireEvent.click(screen.getByRole('button', { name: tool }))
       expect(screen.queryByRole('button', { name: 'Flip horizontally' })).toBeNull()
       expect(screen.queryByRole('button', { name: 'Flip vertically' })).toBeNull()
       if (tool === 'Arrow') {
-        expect(view.container.querySelector('.cs-tool-defaults-toolbar')).toHaveAttribute('aria-hidden', 'true')
-        expect(screen.getByRole('button', { name: 'Tool settings' })).toBeInTheDocument()
+        expect(view.container.querySelector('.cs-tool-defaults-toolbar')).toHaveAttribute('aria-hidden', 'false')
+        expect(screen.queryByRole('button', { name: 'Tool settings' })).toBeNull()
       } else expect(view.container.querySelector('.cs-context-toolbar')).toBeNull()
     }
     store.selectLayer(session.snapshot.core.document.layers[0]!.id)
@@ -53,6 +55,25 @@ describe('Quick Capture context toolbar', () => {
     expect(view.container.querySelector('.cs-context-toolbar')).toBeNull()
     view.unmount()
     session.dispose()
+  })
+
+  it('reports quick defaults layout before the next paint task', async () => {
+    rememberQuickSettingsCollapsed(false)
+    const seen: boolean[] = []
+    const onPreview = () => {
+      seen.push(Boolean(document.querySelector('.cs-quick-defaults')))
+    }
+    document.addEventListener('cs-preview-layout', onPreview)
+    const { view, session } = renderDocument(true)
+    try {
+      await fireEvent.click(screen.getByRole('button', { name: 'Arrow' }))
+      expect(seen).toContain(true)
+      expect(view.container.querySelector('.cs-quick-toolrail-group')).toBeTruthy()
+    } finally {
+      document.removeEventListener('cs-preview-layout', onPreview)
+      view.unmount()
+      session.dispose()
+    }
   })
 
   it('does not hide quick settings while switching between tools', async () => {

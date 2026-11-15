@@ -19,6 +19,23 @@ creation cursors 1/1 на Chrome 154 / Linux x86_64. Команды — TESTING.
 Cargo workspace, точные storage/mcp/portal dependencies и локальные package
 entries Cargo.lock. Внешние зависимости, тег и публикация Release не меняются.
 
+## Старт Quick Capture (2026-11-15)
+
+`REQ-CAP-001/009/012`, `REQ-UI-010`, `REQ-EDT-015`: повторный probe способа
+захвата на одном Area не должен заново опрашивать portal, версию GNOME Shell
+и `PATH`. Снимок способа живёт несколько секунд и сбрасывается при явном выборе.
+Имя `org.gnome.Screenshot` по-прежнему не удерживается между кадрами.
+Прогрев Quick на Linux остаётся non-focusable с opacity `0.01`, но без
+fullscreen: fullscreen включается в `present`, когда кадр уже декодируется.
+Декодирование кадра идёт параллельно с warmup. Текст «Preparing editor…»
+остаётся в документе и становится видимым только после 900 мс. Новый Quick
+draft начинает с Select; превью номерной метки не рисуется в режиме выделения.
+Первый выбор инструмента не двигает бар: раскладка считается до paint, строка
+настроек скрыта до `data-placement`, видимость строки запоминается. ADR-197.
+Проверки: Rust cache и diagnostics, Vue warmup/marker/layout, `pnpm test`
+197 files / 1742 tests. Эталон Ubuntu 22.04 Wayland этим хостом не снимается:
+здесь Ubuntu 24.04 / X11. Команды — TESTING.md.
+
 ## Перерисовка редактора и диалог прав Screenshot (2026-11-15)
 
 `REQ-CAP-016/017`: portal Screenshot немодальный. Handshake метода остаётся

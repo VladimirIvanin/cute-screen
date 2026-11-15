@@ -32,6 +32,7 @@ use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, Ordering},
 };
+use std::time::Instant;
 use uuid::Uuid;
 
 #[cfg(feature = "test-harness")]
@@ -169,6 +170,7 @@ struct ClipboardReadSnapshot {
 struct CaptureDiagnosticsService {
     active_sources: Mutex<HashMap<String, String>>,
     entries: Mutex<VecDeque<CaptureDiagnosticV1>>,
+    started: Mutex<HashMap<String, Instant>>,
 }
 
 impl CaptureDiagnosticsService {
@@ -182,6 +184,26 @@ impl CaptureDiagnosticsService {
         if let Ok(mut active) = self.active_sources.lock() {
             active.insert(request.correlation_id.clone(), source.to_owned());
         }
+        if let Ok(mut started) = self.started.lock() {
+            if started.len() == CAPTURE_DIAGNOSTIC_CAPACITY {
+                started.clear();
+            }
+            started.insert(request.correlation_id.clone(), Instant::now());
+        }
+        self.mark(&request.correlation_id, "start");
+    }
+
+    fn mark(&self, correlation_id: &str, stage: &str) {
+        let Ok(started) = self.started.lock() else {
+            return;
+        };
+        let Some(origin) = started.get(correlation_id) else {
+            return;
+        };
+        eprintln!(
+            "cute-screen capture timing {correlation_id} {stage} {}ms",
+            origin.elapsed().as_millis()
+        );
     }
 
     fn finish(&self, outcome: &CaptureOutcomeV2) {
@@ -191,6 +213,7 @@ impl CaptureDiagnosticsService {
             .ok()
             .and_then(|mut active| active.remove(&outcome.correlation_id))
             .unwrap_or_else(|| "unknown".to_owned());
+        self.mark(&outcome.correlation_id, "done");
         if let Ok(mut entries) = self.entries.lock() {
             if entries.len() == CAPTURE_DIAGNOSTIC_CAPACITY {
                 let _ = entries.pop_front();
@@ -939,10 +962,7 @@ async fn compute_platform_capabilities(
     let session = current_session();
     #[cfg(target_os = "linux")]
     let portal = if session == SessionKind::Wayland {
-        linux_platform::AshpdPortalClient::default()
-            .probe(&correlation_id)
-            .await
-            .ok()
+        controller.portal_probe().await
     } else {
         None
     };
@@ -1085,8 +1105,8 @@ fn quick_capture_warmup(
         use gtk::prelude::WidgetExt;
 
         // WebKitGTK may not allocate or paint a fully hidden top-level window.
-        // Map the already decoded frozen frame without focus and reveal this
-        // same surface only after its renderer reports frame readiness.
+        // Map without focus or fullscreen. Fullscreen hides the shell panel for
+        // the whole decode, so it waits until present, when the frame is ready.
         let window = app
             .get_webview_window("quick-capture")
             .ok_or_else(|| "quick capture window is unavailable".to_owned())?;
@@ -1094,13 +1114,15 @@ fn quick_capture_warmup(
             .set_focusable(false)
             .map_err(|error| error.to_string())?;
         window
-            .set_fullscreen(true)
-            .map_err(|error| error.to_string())?;
-        window
             .gtk_window()
             .map_err(|error| error.to_string())?
             .set_opacity(0.01);
         window.show().map_err(|error| error.to_string())?;
+        if let Some(correlation_id) = active.as_ref().map(|draft| draft.correlation_id.as_str())
+            && let Some(diagnostics) = app.try_state::<CaptureDiagnosticsService>()
+        {
+            diagnostics.mark(correlation_id, "warmup");
+        }
     }
     #[cfg(not(target_os = "linux"))]
     let _ = app;
@@ -1260,6 +1282,11 @@ fn quick_capture_reveal(
                 .take(&draft.correlation_id)
         });
         linux_quick_presentation::reveal(&window, token.as_deref())?;
+        if let Some(correlation_id) = active.as_ref().map(|draft| draft.correlation_id.as_str())
+            && let Some(diagnostics) = app.try_state::<CaptureDiagnosticsService>()
+        {
+            diagnostics.mark(correlation_id, "reveal");
+        }
     }
     #[cfg(not(target_os = "linux"))]
     window.set_focus().map_err(|error| error.to_string())?;
@@ -2593,6 +2620,9 @@ async fn capture_with_preflight<R: tauri::Runtime>(
     publish_capture_progress(app, &request.correlation_id, CaptureProgressState::Probing);
     let capabilities =
         compute_platform_capabilities(request.correlation_id.clone(), controller).await;
+    if let Some(diagnostics) = app.try_state::<CaptureDiagnosticsService>() {
+        diagnostics.mark(&request.correlation_id, "probe");
+    }
     if !capture_action_supported(request.action, &capabilities) {
         let outcome = terminal_capture(request.correlation_id, CaptureTerminalOutcome::Unavailable);
         publish_capture_outcome(app, &outcome, action);
@@ -2642,6 +2672,9 @@ async fn capture_with_preflight<R: tauri::Runtime>(
         };
         let restore_editor = hid_editor && request.invocation_source == CaptureInvocationSource::Ui;
         publish_capture_progress(app, &request.correlation_id, CaptureProgressState::Ready);
+        if let Some(diagnostics) = app.try_state::<CaptureDiagnosticsService>() {
+            diagnostics.mark(&request.correlation_id, "hide");
+        }
         let progress_app = app.clone();
         let progress_correlation_id = request.correlation_id.clone();
         let outcome = controller
@@ -2649,6 +2682,9 @@ async fn capture_with_preflight<R: tauri::Runtime>(
                 publish_capture_progress(&progress_app, &progress_correlation_id, state);
             })
             .await;
+        if let Some(diagnostics) = app.try_state::<CaptureDiagnosticsService>() {
+            diagnostics.mark(&outcome.correlation_id, "capture");
+        }
         publish_capture_outcome(app, &outcome, action);
         if outcome.outcome != CaptureTerminalOutcome::Captured && restore_editor {
             show_editor(app);
@@ -2699,6 +2735,9 @@ async fn capture_with_preflight<R: tauri::Runtime>(
         }
     };
     let restore_editor = hid_editor && request.invocation_source == CaptureInvocationSource::Ui;
+    if let Some(diagnostics) = app.try_state::<CaptureDiagnosticsService>() {
+        diagnostics.mark(&request.correlation_id, "hide");
+    }
     let progress_app = app.clone();
     let progress_correlation_id = request.correlation_id.clone();
     let outcome = controller
@@ -2706,6 +2745,9 @@ async fn capture_with_preflight<R: tauri::Runtime>(
             publish_capture_progress(&progress_app, &progress_correlation_id, state);
         })
         .await;
+    if let Some(diagnostics) = app.try_state::<CaptureDiagnosticsService>() {
+        diagnostics.mark(&outcome.correlation_id, "capture");
+    }
     publish_capture_outcome(app, &outcome, action);
     if outcome.outcome != CaptureTerminalOutcome::Captured && restore_editor {
         show_editor(app);
@@ -3724,6 +3766,8 @@ mod tests {
             invocation_source: crate::capture::CaptureInvocationSource::Hotkey,
         };
         diagnostics.begin(&request);
+        diagnostics.mark(&request.correlation_id, "probe");
+        diagnostics.mark("missing-correlation", "probe");
         diagnostics.finish(&crate::capture::CaptureOutcomeV2 {
             version: 2,
             correlation_id: request.correlation_id,

@@ -447,6 +447,9 @@
   z-index: 20;
   max-width: calc(100vw - 32px);
 }
+.cs-quick-defaults:not([data-placement]) {
+  visibility: hidden;
+}
 .cs-quick-defaults > .cs-context-toolbar {
   position: static;
   max-width: 100%;

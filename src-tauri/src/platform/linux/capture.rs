@@ -3,14 +3,17 @@ mod gnome_shell;
 #[path = "helpers.rs"]
 mod helpers;
 
-use std::sync::{Arc, atomic::AtomicBool};
+use std::{
+    sync::{Arc, atomic::AtomicBool},
+    time::{Duration, Instant},
+};
 
 use crate::{
     image_transport::ImageTransportService,
     linux_platform::AshpdPortalClient,
     platform::{
         CaptureBackendKind, CaptureRequest, CaptureResult, CaptureTarget, PlatformCapabilities,
-        PlatformError, PlatformErrorCode,
+        PlatformError, PlatformErrorCode, PortalCapabilityProbe,
         capture_method::{CaptureMethodsProbe, LinuxCaptureMethod, LinuxCaptureMethods},
     },
     storage::StorageHandle,
@@ -19,10 +22,45 @@ use crate::{
 pub(crate) use helpers::validate_png;
 
 const SETTINGS_KEY: &str = "linux.capture-method";
+const PROBE_TTL: Duration = Duration::from_secs(5);
+
+#[derive(Clone)]
+struct ResolvedProbe {
+    methods: CaptureMethodsProbe,
+    portal: Option<PortalCapabilityProbe>,
+}
+
+struct ProbeCache<T> {
+    entry: Option<(Instant, T)>,
+}
+
+impl<T> Default for ProbeCache<T> {
+    fn default() -> Self {
+        Self { entry: None }
+    }
+}
+
+impl<T: Clone> ProbeCache<T> {
+    fn get(&self, now: Instant, ttl: Duration) -> Option<T> {
+        let (at, value) = self.entry.as_ref()?;
+        now.checked_duration_since(*at)
+            .is_some_and(|age| age < ttl)
+            .then(|| value.clone())
+    }
+
+    fn store(&mut self, now: Instant, value: T) {
+        self.entry = Some((now, value));
+    }
+
+    fn clear(&mut self) {
+        self.entry = None;
+    }
+}
 
 pub struct LinuxCaptureService {
     repository: StorageHandle,
     operation: tokio::sync::Mutex<()>,
+    probe_cache: std::sync::Mutex<ProbeCache<ResolvedProbe>>,
 }
 
 impl LinuxCaptureService {
@@ -30,7 +68,12 @@ impl LinuxCaptureService {
         Self {
             repository,
             operation: tokio::sync::Mutex::new(()),
+            probe_cache: std::sync::Mutex::new(ProbeCache::default()),
         }
+    }
+
+    pub async fn portal_capability(&self) -> Option<PortalCapabilityProbe> {
+        self.resolved_probe(false).await.portal
     }
 
     pub async fn methods(&self) -> Result<LinuxCaptureMethods, PlatformError> {
@@ -43,7 +86,7 @@ impl LinuxCaptureService {
             .transpose()
             .map_err(|_| PlatformError::new(PlatformErrorCode::CaptureFailed, "capture-method"))?
             .unwrap_or_default();
-        Ok(probe().await.snapshot(selected))
+        Ok(self.resolved_probe(false).await.methods.snapshot(selected))
     }
 
     pub async fn set_method(
@@ -54,7 +97,8 @@ impl LinuxCaptureService {
             .operation
             .try_lock()
             .map_err(|_| PlatformError::new(PlatformErrorCode::Busy, "capture-method"))?;
-        let snapshot = probe().await.snapshot(method);
+        self.clear_probe_cache();
+        let snapshot = self.resolved_probe(true).await.methods.snapshot(method);
         if !snapshot.available.contains(&method) {
             return Err(PlatformError::new(
                 PlatformErrorCode::PortalUnavailable,
@@ -85,6 +129,8 @@ impl LinuxCaptureService {
                 .capture_cancellable(request, &transport, cancelled)
                 .await;
         }
+        // `methods` reuses the preflight probe for a few seconds. It still reads
+        // the saved selection, so an explicit change is not ignored.
         let snapshot = self.methods().await?;
         match snapshot.resolved {
             Some(LinuxCaptureMethod::Portal) => {
@@ -191,7 +237,38 @@ async fn legacy_gnome() -> bool {
         .is_some_and(|major| major <= 42)
 }
 
-async fn probe() -> CaptureMethodsProbe {
+impl LinuxCaptureService {
+    fn clear_probe_cache(&self) {
+        if let Ok(mut cache) = self.probe_cache.lock() {
+            cache.clear();
+        }
+    }
+
+    fn fresh_probe(&self) -> Option<ResolvedProbe> {
+        self.probe_cache
+            .lock()
+            .ok()
+            .and_then(|cache| cache.get(Instant::now(), PROBE_TTL))
+    }
+
+    async fn resolved_probe(&self, refresh: bool) -> ResolvedProbe {
+        if !refresh && let Some(cached) = self.fresh_probe() {
+            return cached;
+        }
+        let started = Instant::now();
+        let resolved = probe().await;
+        eprintln!(
+            "cute-screen capture timing probe {}ms",
+            started.elapsed().as_millis()
+        );
+        if let Ok(mut cache) = self.probe_cache.lock() {
+            cache.store(Instant::now(), resolved.clone());
+        }
+        resolved
+    }
+}
+
+async fn probe() -> ResolvedProbe {
     let desktop = std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default();
     let gnome = desktop_matches(&desktop, &["GNOME"]);
     let wlroots = desktop_matches(&desktop, &["sway", "Hyprland", "river", "wayfire", "labwc"]);
@@ -199,14 +276,17 @@ async fn probe() -> CaptureMethodsProbe {
         .probe("capture-method")
         .await
         .ok();
-    CaptureMethodsProbe {
-        legacy_gnome: gnome && legacy_gnome().await,
-        gnome: gnome && helpers::find_program("gnome-screenshot").is_some(),
-        grim: wlroots && helpers::find_program("grim").is_some(),
-        portal: portal.is_some_and(|portal| {
-            portal.screenshot_version >= 2
-                && (portal.screenshot_version < 3 || portal.available_targets & 1 != 0)
-        }),
+    ResolvedProbe {
+        methods: CaptureMethodsProbe {
+            legacy_gnome: gnome && legacy_gnome().await,
+            gnome: gnome && helpers::find_program("gnome-screenshot").is_some(),
+            grim: wlroots && helpers::find_program("grim").is_some(),
+            portal: portal.is_some_and(|portal| {
+                portal.screenshot_version >= 2
+                    && (portal.screenshot_version < 3 || portal.available_targets & 1 != 0)
+            }),
+        },
+        portal,
     }
 }
 
@@ -250,6 +330,22 @@ mod tests {
             LinuxCaptureMethod::GnomeShell,
             PlatformErrorCode::CaptureFailed
         ));
+    }
+
+    #[test]
+    fn probe_cache_expires_and_clear_drops_a_fresh_value() {
+        let now = Instant::now();
+        let mut cache = ProbeCache::default();
+        assert!(cache.get(now, PROBE_TTL).is_none());
+        cache.store(now, 7);
+        assert_eq!(cache.get(now, PROBE_TTL), Some(7));
+        assert_eq!(
+            cache.get(now + PROBE_TTL - Duration::from_millis(1), PROBE_TTL),
+            Some(7)
+        );
+        assert_eq!(cache.get(now + PROBE_TTL, PROBE_TTL), None);
+        cache.clear();
+        assert_eq!(cache.get(now, PROBE_TTL), None);
     }
 
     #[test]

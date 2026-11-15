@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import {
   fireEvent,
   render,
@@ -48,6 +50,11 @@ vi.mock('@tauri-apps/api/event', () => ({
 }))
 
 import QuickCaptureApp from '../../../apps/desktop/src/QuickCaptureApp.vue'
+
+const loadingCss = readFileSync(
+  resolve('packages/editor-vue/src/shell/styles/tokens-primitives.css'),
+  'utf8',
+)
 
 const EditorShellStub = defineComponent({
   name: 'EditorShell',
@@ -130,6 +137,10 @@ describe('GTK quick capture mapped warmup', () => {
   })
 
   it('overlaps mapped warmup with frozen-frame decode', async () => {
+    let releaseWarmup: ((value: boolean) => void) | undefined
+    mocks.warmup.mockImplementation(() => new Promise((resolve) => {
+      releaseWarmup = resolve
+    }))
     render(QuickCaptureApp, {
       global: {
         plugins: [createEditorShellPinia()],
@@ -137,11 +148,59 @@ describe('GTK quick capture mapped warmup', () => {
       },
     })
 
-    await vi.waitFor(() => expect(mocks.warmup).toHaveBeenCalledWith('draft-gtk'))
-    expect(mocks.loadImage).toHaveBeenCalledOnce()
+    await vi.waitFor(() => expect(mocks.loadImage).toHaveBeenCalledOnce())
+    expect(releaseWarmup).toBeTypeOf('function')
     expect(mocks.warmup.mock.invocationCallOrder[0]).toBeLessThan(mocks.loadImage.mock.invocationCallOrder[0]!)
+    releaseWarmup!(true)
     expect(mocks.present).not.toHaveBeenCalled()
     expect(mocks.reveal).not.toHaveBeenCalled()
+  })
+
+  it('keeps the preparing text invisible until capture preparation stalls', async () => {
+    let releaseImage: ((value: unknown) => void) | undefined
+    mocks.loadImage.mockImplementation(() => new Promise((resolve) => {
+      releaseImage = resolve
+    }))
+    const view = render(QuickCaptureApp, {
+      global: { plugins: [createEditorShellPinia()] },
+    })
+    await vi.waitFor(() => expect(view.container.querySelector('.cs-loading')).toBeTruthy())
+    expect(loadingCss).toContain('animation: cs-loading-reveal 0s linear 900ms forwards')
+    expect(view.container.querySelector('.cs-loading')).toHaveAttribute('role', 'status')
+    releaseImage!({
+      resource: document.createElement('img'),
+      metadata: {
+        token: 'image-gtk',
+        assetUrl: 'asset://image-gtk',
+        mimeType: 'image/png',
+        width: 1280,
+        height: 720,
+        sha256: 'a'.repeat(64),
+        correlationId: 'capture-gtk',
+      },
+      transport: 'asset',
+    })
+    await vi.waitFor(() => expect(view.container.querySelector('.cs-loading')).toBeNull())
+  })
+
+  it('returns the reused quick shell to select after numbered markers', async () => {
+    const pinia = createEditorShellPinia()
+    const store = useEditorShellStore(pinia)
+    store.selectTool('numberedMarker')
+    render(QuickCaptureApp, {
+      global: {
+        plugins: [pinia],
+        stubs: { EditorShell: EditorShellStub },
+      },
+    })
+    await vi.waitFor(() => expect(mocks.loadImage).toHaveBeenCalledOnce())
+    expect(store.activeToolId).toBe('select')
+    store.selectTool('numberedMarker')
+    const first = await mocks.getActive()
+    mocks.getActive.mockResolvedValue({ ...first, draftId: 'second-draft' })
+    const available = mocks.listen.mock.calls.find(([event]) => event === 'cute-screen:quick-capture-available')?.[1] as (() => void)
+    available()
+    await vi.waitFor(() => expect(store.activeToolId).toBe('select'))
   })
 
   it('replaces the loading overlay after the pending full-frame session mounts', async () => {

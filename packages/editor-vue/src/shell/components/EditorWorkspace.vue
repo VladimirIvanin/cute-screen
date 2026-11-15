@@ -5,12 +5,12 @@ import {
 } from 'naive-ui'
 import {
   computed,
-  nextTick,
   ref,
   toRef,
   watch,
 } from 'vue'
 import { createWorkspaceExposure } from '../workspace/exposure'
+import { useRememberedQuickSettingsCollapsed } from '../workspace/quick-settings-memory'
 import { UiIcon } from '../icon'
 import ActionFeedback from './ActionFeedback.vue'
 import ImageImportFeedback from './ImageImportFeedback.vue'
@@ -137,16 +137,13 @@ const canEditCanvas = computed(() =>
   !props.readOnlyDocument &&
   store.documentHistory.saveState !== 'readOnly' &&
   (store.actionState.status !== 'pending' || store.actionState.action === 'copy'))
-const quickSettingsCollapsed = ref(true)
-function onQuickSettingsLayout(event: Event): void {
-  quickSettingsCollapsed.value = (event as CustomEvent<boolean>).detail
-}
+const { quickSettingsCollapsed, onQuickSettingsLayout } = useRememberedQuickSettingsCollapsed()
 function openQuickSettings(event: MouseEvent): void {
   if (event.currentTarget instanceof HTMLElement && store.activeToolId)
     openToolConfigure(store.activeToolId, event.currentTarget)
 }
 watch([creationSchema, toolConfigure, () => state.locale.value], () => {
-  void nextTick(() => document.dispatchEvent(new Event('cs-preview-layout')))
+  document.dispatchEvent(new Event('cs-preview-layout'))
 }, { flush: 'post' })
 
 function onTextCancelled(): void {

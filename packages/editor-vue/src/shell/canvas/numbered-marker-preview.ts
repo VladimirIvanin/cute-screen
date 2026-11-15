@@ -60,6 +60,7 @@ export class NumberedMarkerPreview {
       props.readOnly ||
       props.markerPreviewBlocked ||
       props.sampling ||
+      props.quickSelectionMode ||
       props.activeTool !== 'numberedMarker' ||
       this.suspended()
     ) return
@@ -89,7 +90,8 @@ export function useNumberedMarkerPreview(
 ) {
   const preview = new NumberedMarkerPreview(props, invalidate, suspended)
   watch(() => [props.nextMarkerSequence, props.markerShape, props.markerStyle,
-    props.markerPreviewBlocked, props.readOnly, props.sampling, props.activeTool], () => preview.refresh())
+    props.markerPreviewBlocked, props.readOnly, props.sampling, props.activeTool,
+    props.quickSelectionMode], () => preview.refresh())
   watch(() => props.document?.id, () => preview.clear())
   onMounted(() => document.fonts?.addEventListener('loadingdone', refreshFonts))
   function refreshFonts(): void {

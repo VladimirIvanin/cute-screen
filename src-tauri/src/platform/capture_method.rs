@@ -20,7 +20,7 @@ pub struct LinuxCaptureMethods {
     pub available: Vec<LinuxCaptureMethod>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct CaptureMethodsProbe {
     pub legacy_gnome: bool,
     pub gnome: bool,

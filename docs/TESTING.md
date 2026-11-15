@@ -26,6 +26,21 @@ desktop crate и локальные package entries Cargo.lock: 0.1.37 → 0.1.3
 `pnpm exec vitest run --project boundaries tests/boundaries/bump-version.test.ts tests/boundaries/release-assets.test.ts`
 — 2 files / 34 tests PASS. Тег и публикация Release не выполнялись.
 
+## Старт Quick Capture — 2026-11-15
+
+Linux 6.8.0-147-generic x86_64, Ubuntu 24.04.5, GNOME 46, сессия X11.
+Это не Ubuntu 22.04 Wayland: панель оболочки и первый hotkey → рамка здесь
+не измерялись. В лог добавлены строки `cute-screen capture timing`:
+`start`, `probe`, `hide`, `capture`, `done`, `warmup`, `reveal`, а в Quick
+ещё `image-load`. Повторный dbus probe способа захвата пропускается 5 секунд.
+
+- `cargo test --offline --lib linux_capture::` — 8 passed.
+- `cargo test --offline --lib capture_diagnostics_are_bounded` — 1 passed.
+- `pnpm test` — 197 files / 1742 tests PASS.
+- `pnpm check` — PASS после выноса памяти строки настроек из `EditorWorkspace`.
+- Ручной GNOME 42, исчезновение верхней панели и время первого Area остаются
+  проверкой владельца. Windows и macOS этим прогоном не подтверждались.
+
 ## Rust audit: libsqlite3-sys и rmcp — 2026-11-15
 
 Linux 6.8.0-147-generic x86_64, Rust/Cargo 1.97.0, cargo-deny 0.20.2.

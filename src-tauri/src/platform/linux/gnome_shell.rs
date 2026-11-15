@@ -96,6 +96,8 @@ pub async fn capture(
         .tempdir()
         .map_err(|_| failure(PlatformErrorCode::CaptureFailed))?;
     let output = directory.path().join("frame.png");
+    // One session connection per shot. Closing it releases org.gnome.Screenshot.
+    // The method probe is cached separately and must not keep this name.
     let connection = bounded(
         async { Connection::session().await.map_err(dbus_error) },
         &cancelled,

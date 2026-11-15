@@ -936,8 +936,12 @@ Cute Screen — полноценный local-first редактор снимко
   WebView; повторные show/hide/focus, native selector handoff и второй renderer
   mount запрещены. Surface не становится визуально доступной до decoded frozen
   frame и первого renderer flush; GTK может заранее map-нуть её non-focusable с
-  opacity `0.01`, чтобы WebKit allocation шёл параллельно decode. Пользователю
-  не показываются loading, blank или частично разложенный WebView.
+  opacity `0.01` и без fullscreen, чтобы WebKit allocation шёл параллельно decode.
+  Fullscreen включается в present, а не на время декодирования, чтобы панель
+  оболочки не скрывалась раньше кадра. Пользователю
+  не показываются loading, blank или частично разложенный WebView. Текст
+  подготовки остаётся доступным и становится видимым только если подготовка
+  длится дольше 900 мс. Новый Quick draft открывается инструментом Select.
   Создание WebView не входит в критический путь Area capture: резидентное
   приложение прогревает hidden quick surface заранее; для уже запущенного
   Windows-приложения reference target mouse-up → interactive chrome составляет

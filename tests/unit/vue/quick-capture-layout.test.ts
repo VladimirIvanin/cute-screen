@@ -101,6 +101,50 @@ describe('quick capture overlay layout', () => {
       root.remove()
     }
   })
+  it('positions the tool bar for the width after the settings button is hidden', () => {
+    const root = document.createElement('div')
+    root.className = 'cs-quick-capture'
+    root.innerHTML = '<div class="cs-quick-actions"></div><div class="cs-quick-toolrail-group"><button class="cs-quick-settings-button"></button></div><div class="cs-tool-defaults-toolbar"></div>'
+    document.body.append(root)
+    const width = window.innerWidth
+    const height = window.innerHeight
+    const scene = document.createElement('canvas')
+    scene.getBoundingClientRect = () => new DOMRect(0, 0, width, height)
+    const actions = root.querySelector<HTMLElement>('.cs-quick-actions')!
+    const row = root.querySelector<HTMLElement>('.cs-quick-toolrail-group')!
+    const button = root.querySelector<HTMLElement>('.cs-quick-settings-button')!
+    const settings = root.querySelector<HTMLElement>('.cs-tool-defaults-toolbar')!
+    Object.defineProperties(actions, { offsetWidth: { value: 46 }, offsetHeight: { value: 120 } })
+    Object.defineProperty(row, 'offsetWidth', { get: () => button.style.display === 'none' ? 220 : 280 })
+    Object.defineProperty(row, 'offsetHeight', { value: 40 })
+    Object.defineProperties(settings, { offsetWidth: { value: 280 }, offsetHeight: { value: 36 } })
+    try {
+      const controller = new QuickCaptureLayoutController({
+        hosts: shallowRef({ scene } as NonNullable<ConstructorParameters<typeof QuickCaptureLayoutController>[0]['hosts']['value']>),
+        session: shallowRef({
+          snapshot: { core: { document: { canvas: { width, height } } } },
+        } as NonNullable<ConstructorParameters<typeof QuickCaptureLayoutController>[0]['session']['value']>),
+        currentCrop: ref({ x: 80, y: 80, width: 360, height: 160 }),
+      })
+      controller.update()
+      const placed = row.style.left
+      controller.update()
+      expect(button.style.display).toBe('none')
+      expect(row.style.left).toBe(placed)
+      const wide = computeQuickCaptureLayout({
+        viewport: { width, height },
+        scene: { left: 0, top: 0, width, height },
+        source: { width, height },
+        crop: { x: 80, y: 80, width: 360, height: 160 },
+        actionSize: { width: 46, height: 120 },
+        toolSize: { width: 280, height: 40 },
+        settingsSize: { width: 280, height: 36 },
+      })
+      expect(placed).not.toBe(`${Math.round(wide.tools.left)}px`)
+    } finally {
+      root.remove()
+    }
+  })
   it('keeps the tool bar still when the settings panel changes height', () => {
     const root = document.createElement('div')
     root.className = 'cs-quick-capture'

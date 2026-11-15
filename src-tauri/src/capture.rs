@@ -305,6 +305,11 @@ impl CaptureController {
     }
 
     #[cfg(target_os = "linux")]
+    pub async fn portal_probe(&self) -> Option<crate::platform::PortalCapabilityProbe> {
+        self.linux_capture.portal_capability().await
+    }
+
+    #[cfg(target_os = "linux")]
     pub async fn capture_methods(
         &self,
     ) -> Result<crate::platform::capture_method::LinuxCaptureMethods, crate::platform::PlatformError>

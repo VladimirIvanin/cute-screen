@@ -414,6 +414,15 @@ button:focus-visible {
   color: var(--text-muted);
   text-align: center;
 }
+.cs-loading {
+  opacity: 0;
+  animation: cs-loading-reveal 0s linear 900ms forwards;
+}
+@keyframes cs-loading-reveal {
+  to {
+    opacity: 1;
+  }
+}
 .cs-empty-state > svg {
   width: 32px;
   height: 32px;
