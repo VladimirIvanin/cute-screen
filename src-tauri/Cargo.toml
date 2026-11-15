@@ -64,7 +64,7 @@ tracing-subscriber = { version = "=0.3.23", default-features = false, features =
 thiserror = "=2.0.21"
 ts-rs = "=12.0.1"
 url = "=2.5.8"
-uuid = { version = "=1.29.0", features = ["v7", "v4", "serde"] }
+uuid = { version = "=1.29.2", features = ["v7", "v4", "serde"] }
 chrono = "=0.4.45"
 tempfile = "=3.27.0"
 # CapturePreflightService is shared by every desktop host, not only the Linux
@@ -91,7 +91,7 @@ plist = "=1.10.3"
 core-graphics = "=0.25.0"
 
 [target.'cfg(target_os = "macos")'.build-dependencies]
-cc = "=1.10.0"
+cc = "=1.11.1"
 
 [dev-dependencies]
 # `cargo check --all-targets` compiles the cfg(test) X11 adapter on every CI

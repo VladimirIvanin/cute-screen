@@ -10,7 +10,7 @@ workspace = true
 
 [dependencies]
 serde_json = "=1.0.154"
-rmcp = { version = "=3.8.0", default-features = false, features = ["server", "transport-io"] }
+rmcp = { version = "=3.9.0", default-features = false, features = ["server", "transport-io"] }
 tokio = { version = "=1.54.1", features = ["rt-multi-thread", "macros"] }
 base64 = "=0.23.1"
 
