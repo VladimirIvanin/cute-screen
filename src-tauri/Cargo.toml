@@ -53,7 +53,7 @@ image = { version = "=0.25.10", default-features = false, features = ["jpeg"] }
 arboard = { version = "=3.7.0", features = ["wayland-data-control"] }
 futures-util = "=0.3.34"
 tauri = { version = "=2.11.6", features = ["protocol-asset", "tray-icon", "image-png"] }
-clap = { version = "=4.6.7", features = ["derive"] }
+clap = { version = "=4.6.9", features = ["derive"] }
 tauri-plugin-single-instance = "=2.4.5"
 tauri-plugin-dialog = "=2.7.3"
 tauri-plugin-notification = "=2.4.0"
@@ -64,7 +64,7 @@ tracing-subscriber = { version = "=0.3.23", default-features = false, features =
 thiserror = "=2.0.21"
 ts-rs = "=12.0.1"
 url = "=2.5.8"
-uuid = { version = "=1.29.0", features = ["v7", "v4", "serde"] }
+uuid = { version = "=1.29.3", features = ["v7", "v4", "serde"] }
 chrono = "=0.4.45"
 tempfile = "=3.27.0"
 # CapturePreflightService is shared by every desktop host, not only the Linux
@@ -87,11 +87,11 @@ windows = { version = "=0.62.2", features = ["Foundation", "Graphics_Capture", "
 
 [target.'cfg(target_os = "macos")'.dependencies]
 tauri-plugin-global-shortcut = "=2.3.2"
-plist = "=1.10.3"
+plist = "=1.10.4"
 core-graphics = "=0.25.0"
 
 [target.'cfg(target_os = "macos")'.build-dependencies]
-cc = "=1.10.0"
+cc = "=1.11.2"
 
 [dev-dependencies]
 # `cargo check --all-targets` compiles the cfg(test) X11 adapter on every CI
